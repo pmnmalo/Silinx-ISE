@@ -8,6 +8,7 @@
 //     onGenerate({ lang, filename, code }) {},
 //     onOpenModule(moduleName) {},
 //   });
+//   readOnly: true             // view only: pan/zoom/select/inspect, no edits (RTL schematic viewer)
 //   ed.getDoc(); ed.setDoc(doc); ed.setModules(modules); ed.fit(); ed.destroy();
 //
 // Styles: web/css/sch-editor.css (scoped under .sch-editor, themed by the ISE variables of theme.css).
@@ -273,8 +274,10 @@ export function mountSchEditor(container, opts = {}) {
   let destroyed = false;
   let lastDiags = null;
   let genLang = doc.lang;
+  const readOnly = !!opts.readOnly;
 
   container.classList.add('sch-editor');
+  container.classList.toggle('read-only', readOnly);
   if (!container.hasAttribute('tabindex')) container.tabIndex = 0;
   container.innerHTML = '';
 
@@ -540,13 +543,18 @@ export function mountSchEditor(container, opts = {}) {
   };
   function updateStatus() {
     const n = doc.symbols.length;
+    const tip = readOnly ? 'Read-only view. Drag on empty space to select, double-click a module to open it, wheel to zoom.' : (TOOL_HINT[tool] || '');
     const d = lastDiags ? ` · ${lastDiags.filter(x => x.severity === 'error').length} error(s), ${lastDiags.filter(x => x.severity === 'warning').length} warning(s)` : '';
-    status.innerHTML = `<span class="hint">${esc(TOOL_HINT[tool] || '')}</span><span class="sp"></span><span>${n} symbol${n === 1 ? '' : 's'}, ${nl ? nl.nets.length : 0} nets${d}</span><span class="xy">X ${snap(cursor.x)} Y ${snap(cursor.y)}</span><span class="zoom">${Math.round(view.s * 100)}%</span>`;
+    status.innerHTML = `<span class="hint">${esc(tip)}</span><span class="sp"></span><span>${n} symbol${n === 1 ? '' : 's'}, ${nl ? nl.nets.length : 0} nets${d}</span><span class="xy">X ${snap(cursor.x)} Y ${snap(cursor.y)}</span><span class="zoom">${Math.round(view.s * 100)}%</span>`;
   }
 
   // ---------------- properties panel
   function field(label, input, note) { return h('div', { class: 'se-field' }, h('label', { text: label }), input, note ? h('div', { class: 'se-note', text: note }) : null); }
   function renderProps() {
+    renderPropsInner();
+    if (readOnly) propBody.querySelectorAll('input, textarea, select, button').forEach(el => { if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text')) el.readOnly = true; else if (!el.classList.contains('ro-ok')) el.disabled = true; });
+  }
+  function renderPropsInner() {
     propBody.innerHTML = '';
     const items = [...sel];
     if (items.length === 0) return sheetProps();
@@ -625,7 +633,7 @@ export function mountSchEditor(container, opts = {}) {
         for (const g of gens) box.append(h('div', { class: 'se-row' }, h('span', { class: 'gn', text: g.name }), inp(s.params.generics?.[g.name] ?? '', x => { s.params.generics ||= {}; if (String(x).trim()) s.params.generics[g.name] = String(x).trim(); else delete s.params.generics[g.name]; }, { placeholder: g.default || '' })));
         propBody.append(field(m?.lang === 'verilog' || doc.lang === 'verilog' ? 'Parameters' : 'Generics', box, 'empty = module default'));
       }
-      if (opts.onOpenModule) propBody.append(h('div', { class: 'se-pbtns' }, h('button', { class: 'btn', type: 'button', text: 'Open module source', onclick: () => opts.onOpenModule(s.params.module) })));
+      if (opts.onOpenModule) propBody.append(h('div', { class: 'se-pbtns' }, h('button', { class: 'btn ro-ok', type: 'button', text: readOnly ? 'Open this instance' : 'Open module source', onclick: () => opts.onOpenModule(s.params.module, { instance: s.name, symbol: clone(s) }) })));
     }
     if (s.type === 'hdlblock') {
       propBody.append(field('Title', inp(s.params.title || '', x => { s.params.title = String(x); })));
@@ -683,6 +691,7 @@ export function mountSchEditor(container, opts = {}) {
   // ---------------- edits, undo, change notification
   const snapshot = () => JSON.stringify(doc);
   function edit(fn, { keepProps = false } = {}) {
+    if (readOnly) return;
     const before = snapshot();
     fn();
     doc = normalizeDoc(doc);
@@ -718,6 +727,7 @@ export function mountSchEditor(container, opts = {}) {
 
   // ---------------- tools
   function setTool(t) {
+    if (readOnly && t !== 'select') return;
     if (wireDraw) finishWire();
     tool = t;
     if (t !== 'place') placing = null;
@@ -1010,8 +1020,8 @@ export function mountSchEditor(container, opts = {}) {
       const k = `${it.kind}:${it.id}`;
       if (e.shiftKey || e.ctrlKey || e.metaKey) { if (sel.has(k)) sel.delete(k); else sel.add(k); render(); renderProps(); return; }
       if (!sel.has(k)) { sel = new Set([k]); render(); renderProps(); }
-      if (e.detail >= 2) { onDouble(it); return; }
-      drag = beginMove({ x: snap(pt.x), y: snap(pt.y) });
+      if (e.detail >= 2) return;            // handled by the dblclick listener
+      if (!readOnly) drag = beginMove({ x: snap(pt.x), y: snap(pt.y) });
       return;
     }
     drag = { kind: 'band', start: pt, cur: pt, add: e.shiftKey || e.ctrlKey || e.metaKey };
@@ -1046,7 +1056,7 @@ export function mountSchEditor(container, opts = {}) {
   function onDouble(it) {
     if (it.kind === 'sym') {
       const s = doc.symbols.find(x => x.id === it.id);
-      if (s?.type === 'module' && opts.onOpenModule) opts.onOpenModule(s.params.module);
+      if (s?.type === 'module' && opts.onOpenModule) opts.onOpenModule(s.params.module, { instance: s.name, symbol: clone(s) });
       else if (s?.type === 'hdlblock') setTimeout(() => propBody.querySelector('textarea.code')?.focus(), 0);
       else setTimeout(() => propBody.querySelector('input')?.focus(), 0);
     } else setTimeout(() => propBody.querySelector('input')?.focus(), 0);
@@ -1061,7 +1071,10 @@ export function mountSchEditor(container, opts = {}) {
   }
   svg.addEventListener('pointerdown', onDown);
   svg.addEventListener('contextmenu', e => e.preventDefault());
-  svg.addEventListener('dblclick', e => { if (tool === 'wire') { e.preventDefault(); finishWire(); } });
+  svg.addEventListener('dblclick', e => {
+    if (tool === 'wire') { e.preventDefault(); finishWire(); return; }
+    if (tool === 'select') { const it = itemAt(e.target); if (it) { e.preventDefault(); onDouble(it); } }
+  });
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
   svg.addEventListener('wheel', onWheel, { passive: false });
@@ -1070,7 +1083,7 @@ export function mountSchEditor(container, opts = {}) {
   canvas.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('text/x-xailinx-symbol')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
   canvas.addEventListener('drop', e => {
     const raw = e.dataTransfer.getData('text/x-xailinx-symbol');
-    if (!raw) return;
+    if (!raw || readOnly) return;
     e.preventDefault();
     const it = JSON.parse(raw);
     const src = { type: it.type, params: { ...defaultParams(it.type), ...(it.params || {}) }, rot: 0, mirror: false };
@@ -1090,11 +1103,12 @@ export function mountSchEditor(container, opts = {}) {
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (k === ' ' && !spaceDown) { spaceDown = true; canvas.classList.add('pan-ready'); e.preventDefault(); return; }
+    if (readOnly && !(['escape', 'f', '+', '=', '-', '_'].includes(k) || (mod && (k === 'a' || k === 'c')))) return;
     if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if ((mod && k === 'y') || (mod && k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); return; }
     if (mod && k === 'r') { e.preventDefault(); rotateSel(); return; }
     if (mod && k === 'm') { e.preventDefault(); mirrorSel(); return; }
-    if (mod && k === 'c') { e.preventDefault(); copySel(); return; }
+    if (mod && k === 'c') { e.preventDefault(); if (!readOnly) copySel(); return; }
     if (mod && k === 'x') { e.preventDefault(); copySel(true); return; }
     if (mod && k === 'v') { e.preventDefault(); paste(); return; }
     if (mod && k === 'a') { e.preventDefault(); selectAll(); return; }

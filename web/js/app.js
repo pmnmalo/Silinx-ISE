@@ -180,19 +180,25 @@ function renderHierarchy() {
     const file = info?.file || '?';
     const label = instName ? `${instName} - ${modName}` : modName;
     const sch = info && S.hdlToSch?.[file];
+    const schBase = sch && S.schBase?.[sch] !== 'hdl';
     const it = treeItem({
-      label, meta: info ? `(${(sch || file).split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : sch ? 'schematic' : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
+      label, meta: info ? `(${(schBase ? sch : file).split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : schBase ? 'schematic' : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
       cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2,
       onSelect: () => select({ type: 'module', module: modName, file, path, instName, sch }),
-      onOpen: () => info && (sch ? openSch(sch) : openFile(file, info.line)),
+      onOpen: () => info && (schBase ? openSch(sch) : openFile(file, info.line)),
       onContext: e => moduleContextMenu(e, modName, file),
     });
     parentUl.append(it.li);
-    if (sch) {
+    if (sch && schBase) {
       // the synchronized HDL file under its schematic
       const hl = treeItem({ label: file.split('/').pop(), meta: '(synchronized HDL)', ico: info.lang === 'vhdl' ? 'vhdl' : 'verilog', key: `hdl:${path}`,
         onSelect: () => select({ type: 'module', module: modName, file, path, sch }), onOpen: () => openFile(file, info.line), onContext: e => moduleContextMenu(e, modName, file) });
       hl.setLeaf(); it.ul.append(hl.li);
+    } else if (sch) {
+      // the synchronized schematic under its HDL file
+      const sl = treeItem({ label: sch.split('/').pop(), meta: '(synchronized schematic)', ico: 'schematic', key: `schv:${path}`,
+        onSelect: () => select({ type: 'module', module: modName, file, path, sch }), onOpen: () => openSch(sch), onContext: e => moduleContextMenu(e, modName, file) });
+      sl.setLeaf(); it.ul.append(sl.li);
     }
     if (info && depth < 30) {
       const kids = instancesOf(info.mod);
@@ -269,7 +275,15 @@ function moduleContextMenu(e, mod, file) {
     { label: isSimView ? 'Set as Simulation Top' : 'Set as Top Module', action: () => setTop(mod, isSimView) },
     { label: 'Open', action: () => { const i = moduleInfo(mod); if (i) openFile(i.file, i.line); } },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
-    { label: 'Convert to Schematic (editable)…', action: () => convertToSchematic(mod), disabled: !!Object.values(S.schOwners || {}).includes(file) },
+    ...(() => {
+      const sch = S.hdlToSch?.[file];
+      if (!sch) return [{ label: 'Convert to Schematic (editable)…', action: () => convertToSchematic(mod) }];
+      return [
+        S.schBase[sch] === 'hdl' ? { label: 'Convert to Schematic (schematic as base)', action: () => setSchBase(sch, 'schematic') }
+                                 : { label: 'Convert to HDL (HDL as base)', action: () => setSchBase(sch, 'hdl') },
+        { label: 'Remove Synchronized Schematic…', action: () => detachSchematic(sch) },
+      ];
+    })(),
     isSimView ? { label: 'Simulate Behavioral Model', action: () => runSimulation(mod) } : null,
     '-',
     { label: 'New Source…', action: () => wiz.newSourceWizard() },
@@ -325,7 +339,7 @@ function processDefs() {
   ];
   if (sel.type === 'sch') return [
     { id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.file) },
-    { id: 'sch-hdl', label: 'Convert to HDL (stop using the schematic)', ico: 'template', run: () => detachSchematic(sel.file) },
+    { id: 'sch-hdl', label: 'Convert to HDL', ico: 'template', run: () => convertSchToHdl(sel.file) },
   ];
   if (sel.type === 'ucf') return [
     { id: 'ucf-edit', label: 'Edit Constraints (Text)', ico: 'ucf', run: () => openFile(sel.file) },
@@ -341,7 +355,11 @@ function processDefs() {
     { id: 'rtl-sim', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
   ];
   return [
-    ...(sel.sch ? [{ id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.sch) }] : []),
+    ...(sel.sch ? [
+      { id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.sch) },
+      S.schBase?.[sel.sch] === 'hdl' ? { id: 'sch-base', label: 'Convert to Schematic (schematic as base)', ico: 'schematic', run: () => setSchBase(sel.sch, 'schematic') }
+                                     : { id: 'sch-base', label: 'Convert to HDL (HDL as base)', ico: 'template', run: () => setSchBase(sel.sch, 'hdl') },
+    ] : []),
     { id: 'summary', label: 'Design Summary/Reports', ico: 'summary', run: () => openSummary() },
     { id: 'utils', label: 'Design Utilities', ico: 'procGroup', children: [
       { id: 'template', label: 'View HDL Instantiation Template', ico: 'template', run: () => openInstTemplate(mod) },
@@ -773,7 +791,7 @@ export async function openFile(path, line, col) {
           h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findPersistent') }),
           (lang === 'vhdl' || lang === 'verilog') ? tplBtn : null,
           h('span', { class: 'path' }, path),
-          ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => h('span', { class: 'gen-banner' }, 'Synchronized with ', h('a', { onclick: () => openSch(sch) }, sch.split('/').pop()), ' — saving here updates the schematic')));
+          ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => h('span', { class: 'gen-banner' }, 'Synchronized with ', h('a', { onclick: () => openSch(sch) }, sch.split('/').pop()), S.schBase?.[sch] === 'hdl' ? ' (schematic view of this file) — saving here updates it' : ' — saving here updates the schematic')));
         tplBtn.addEventListener('click', e => {
           const r = tplBtn.getBoundingClientRect();
           popupMenu([
@@ -857,28 +875,51 @@ async function openSchematic(mod) {
   if (!design.top) { log(`ERROR: cannot elaborate '${mod}'`, 'err'); showConsolePage('errors'); return; }
   if (diags.some(d => d.severity === 'error')) log(`Schematic of '${mod}' generated with errors (see Errors tab).`, 'warn');
   setStatus(sim ? 'rtl-sim' : 'rtl', diags.some(d => d.severity === 'error') ? 'warn' : 'ok');
-  const { mountSchematic } = await import('./schematic-view.js');
-  const id = `sch:${mod}`;
+  const { mountSchEditor } = await import('./sch-editor.js');
+  const { schematicFromHdl, modulesFromLibrary } = await import('/core/schdoc.js');
+  const sources = Object.fromEntries(srcs.map(x => [x.path, x.text]));
+  const modules = modulesFromLibrary(lib, { sources });
+  const elk = window.ELK ? new window.ELK() : null;
+  const id = `rtl:${mod}`;
   const existing = findDoc(id);
   if (existing) await closeDoc(existing);
   openDoc({
     id, title: `${mod} (RTL)`, icon: 'schematic',
     create(el) {
-      const findInst = (inst, path) => {
-        if (inst.path === path) return inst;
-        for (const c of inst.children) { const r = findInst(c, path); if (r) return r; }
-        return null;
+      const bar = h('div', { class: 'doc-toolbar rtl-crumbs' });
+      const host = h('div', { class: 'doc-body' });
+      el.append(bar, host);
+      let ed = null, cur = null;
+      const crumbs = inst => { const out = []; for (let i = inst; i; i = i.parent) out.unshift(i); return out; };
+      const show = async inst => {
+        cur = inst;
+        bar.innerHTML = '';
+        bar.append(h('span', { class: 'rtl-ro' }, 'RTL Schematic (read-only)'));
+        crumbs(inst).forEach((i, k, all) => {
+          bar.append(h('span', { class: 'sep' }, k ? ' › ' : ' — '));
+          bar.append(k === all.length - 1 ? h('b', {}, `${i.name} : ${i.module}`) : h('a', { onclick: () => show(i) }, `${i.name} : ${i.module}`));
+        });
+        const info = moduleInfo(inst.module);
+        if (info) bar.append(h('span', { class: 'spacer' }), h('a', { onclick: () => openFile(info.file, info.line) }, `Open ${info.file.split('/').pop()}`));
+        status(`Drawing RTL schematic of ${inst.module}…`);
+        try {
+          const doc = await schematicFromHdl(inst, { sources, modules, layout: elk ? g => elk.layout(g) : undefined, lang: info?.lang || 'vhdl' });
+          if (cur !== inst) return;
+          if (!ed) {
+            ed = mountSchEditor(host, {
+              doc, modules, readOnly: true,
+              onOpenModule: (name, { instance } = {}) => {
+                const child = cur.children.find(c => c.name === instance) || cur.children.find(c => c.module === name);
+                if (child && !child.blackbox) show(child);
+              },
+            });
+          } else ed.setDoc(doc);
+          setTimeout(() => ed.fit?.(), 50);
+        } catch (e) { log(`ERROR: RTL schematic of ${inst.module}: ${e.message}`, 'err'); }
+        finally { status('Ready'); }
       };
-      const crumbs = inst => { const out = []; for (let i = inst; i; i = i.parent) out.unshift({ label: `${i.name} (${i.module})`, path: i.path }); return out; };
-      let view;
-      const show = inst => view.show(buildSchematic(inst), { title: `${inst.name} : ${inst.module}`, breadcrumb: crumbs(inst) });
-      view = mountSchematic(el, {
-        onOpenInstance: path => { const inst = findInst(design.top, path); if (inst && !inst.blackbox) show(inst); },
-        onOpenSource: ref => ref.file && openFile(ref.file, ref.line),
-        onSelect: () => {},
-      });
       show(design.top);
-      return { destroy: () => view.destroy?.(), onActivate: () => setTimeout(() => view.fit?.(), 0), view };
+      return { destroy: () => ed?.destroy?.(), onActivate: () => setTimeout(() => ed?.fit?.(), 30) };
     },
   });
 }
@@ -1116,22 +1157,61 @@ async function convertToSchematic(mod) {
   } finally { status('Ready'); }
 }
 
-// Schematic -> HDL: keep the generated HDL file as the source and drop the schematic.
+// Which of a synchronized pair is the base (shown as the module in the hierarchy, the other nested
+// under it). Both stay editable and synchronized either way.
+async function setSchBase(schPath, base) {
+  let doc;
+  try { doc = JSON.parse(await api.readFile(S.project.name, schPath)); } catch (e) { toast(e.message, 'error'); return; }
+  doc.base = base;
+  await api.writeFile(S.project.name, schPath, JSON.stringify(doc, null, 1));
+  const d = findDoc(`sch:${schPath}`);
+  if (d?.schEditor) { const cur = d.schEditor.getDoc(); cur.base = base; d.schEditor.setDoc(cur); }
+  const gen = doc.generatedFile;
+  log(base === 'hdl' ? `${gen} is now the base of '${doc.name}'; ${schPath} stays under it as its synchronized schematic.`
+                     : `${schPath} is now the base of '${doc.name}'; ${gen} stays under it as its synchronized HDL.`, 'info');
+  await reloadProject(false);
+  if (base === 'hdl' && gen) openFile(gen); else openSch(schPath);
+}
+
+// A schematic without HDL yet: generate its HDL file and make the HDL the base (schematic kept, in sync).
+async function convertSchToHdl(schPath) {
+  if (S.schOwners?.[schPath]) return setSchBase(schPath, 'hdl');
+  let doc;
+  try { doc = JSON.parse(await api.readFile(S.project.name, schPath)); } catch (e) { toast(e.message, 'error'); return; }
+  const { generateHdl } = await import('/core/schdoc.js');
+  const g = generateHdl(doc, { lang: doc.lang, modules: await schModules() });
+  const errs = (g.diagnostics || []).filter(x => x.severity === 'error');
+  if (errs.length) { alertDlg('Convert to HDL', `The schematic has ${errs.length} error(s):\n${errs.slice(0, 5).map(x => x.message).join('\n')}`, 'error'); return; }
+  const dir = schPath.includes('/') ? schPath.replace(/\/[^/]*$/, '') : 'src';
+  const target = `${dir}/${doc.name}.${doc.lang === 'verilog' ? 'v' : 'vhd'}`;
+  if (S.fileTree.includes(target) && !await confirmDlg('Convert to HDL', `${target} already exists. Overwrite it?`)) return;
+  await api.writeFile(S.project.name, target, g.code);
+  doc.generatedFile = target; doc.base = 'hdl';
+  await api.writeFile(S.project.name, schPath, JSON.stringify(doc, null, 1));
+  const d = findDoc(`sch:${schPath}`);
+  if (d?.schEditor) d.schEditor.setDoc(doc);
+  log(`${schPath} converted to ${target}; the schematic stays under it, synchronized.`, 'ok');
+  await reloadProject(false);
+  markStale();
+  openFile(target);
+}
+
+// Stop synchronizing: the HDL file stays, the schematic file is removed.
 async function detachSchematic(path) {
   const gen = S.schOwners?.[path];
-  if (!await confirmDlg('Convert to HDL', `Stop using the schematic ${path}?\n\n${gen ? `${gen} becomes a normal HDL source you edit directly. ` : ''}The schematic file is removed from the project.`)) return;
+  if (!await confirmDlg('Remove Synchronized Schematic', `Remove the schematic ${path}?${gen ? `\n\n${gen} stays as a normal HDL source.` : ''}`)) return;
   const d = findDoc(`sch:${path}`);
   if (d) { d.dirty = false; await closeDoc(d); }
   await api.deleteFile(S.project.name, path);
   await reloadProject();
-  log(`Schematic ${path} removed${gen ? `; ${gen} is now edited as HDL` : ''}.`, 'info');
+  log(`Schematic ${path} removed${gen ? `; ${gen} is kept` : ''}.`, 'info');
   if (gen) openFile(gen);
 }
 
 function schContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openSch(file) },
-    { label: 'Convert to HDL (stop using the schematic)', action: () => detachSchematic(file) },
+    { label: 'Convert to HDL', action: () => convertSchToHdl(file) },
     { label: 'Remove from Project', action: () => removeFile(file) },
   ], e.clientX, e.clientY);
 }
@@ -1181,10 +1261,11 @@ export async function reloadProject(render = true) {
   S.sources = await api.sources(pj.name);
   S.schOwners = {};
   S.hdlToSch = {};
+  S.schBase = {};
   for (const f of S.fileTree.filter(f => /\.sch\.json$/.test(f))) {
     try {
       const d = JSON.parse(await api.readFile(pj.name, f));
-      if (d.generatedFile && S.fileTree.includes(d.generatedFile)) { S.schOwners[f] = d.generatedFile; S.hdlToSch[d.generatedFile] = f; }
+      if (d.generatedFile && S.fileTree.includes(d.generatedFile)) { S.schOwners[f] = d.generatedFile; S.hdlToSch[d.generatedFile] = f; S.schBase[f] = d.base === 'hdl' ? 'hdl' : 'schematic'; }
     } catch { /* unreadable */ }
   }
   compileProject();

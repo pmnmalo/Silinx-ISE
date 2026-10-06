@@ -241,3 +241,9 @@
   .sch-editor .se-left { width: 150px; }
   .sch-editor .se-right { width: 190px; }
 }
+
+/* read-only view (RTL schematic): no palette, no editing tools */
+.sch-editor.read-only .se-left,
+.sch-editor.read-only .se-toolbar [data-act="wire"], .sch-editor.read-only .se-toolbar [data-act="net"], .sch-editor.read-only .se-toolbar [data-act="io"],
+.sch-editor.read-only .se-toolbar [data-act="rotate"], .sch-editor.read-only .se-toolbar [data-act="mirror"], .sch-editor.read-only .se-toolbar [data-act="delete"],
+.sch-editor.read-only .se-toolbar [data-act="undo"], .sch-editor.read-only .se-toolbar [data-act="redo"], .sch-editor.read-only .se-toolbar [data-act="generate"] { display: none; }

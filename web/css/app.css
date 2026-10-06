@@ -222,3 +222,7 @@ li.CodeMirror-hint-active .xl-hint-detail { color: #dde; }
 
 .editor-bar .gen-banner { margin-left: 12px; padding: 1px 8px; background: #fff4ce; border: 1px solid #e6d690; border-radius: 3px; color: #5a4a00; }
 .editor-bar .gen-banner a { color: #0645ad; cursor: pointer; text-decoration: underline; }
+.rtl-crumbs { gap: 4px; font-size: 12px; }
+.rtl-crumbs a { color: #1a4d9c; cursor: pointer; text-decoration: underline; }
+.rtl-crumbs .rtl-ro { color: #666; font-style: italic; }
+.rtl-crumbs .spacer { flex: 1; }
