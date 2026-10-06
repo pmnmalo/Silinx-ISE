@@ -472,22 +472,31 @@ async function checkSyntax(mod, sim = false) {
 
 // Check Syntax of one HDL file (editor toolbar / right-click): parses the project, elaborates every
 // module the file defines and reports the diagnostics.
-async function checkFileSyntax(path) {
-  await saveAll();
+// Diagnostics of one HDL file in the context of the project (text: the editor's current text).
+function hdlDiagnostics(path, text, info = []) {
   const fi = S.project.files.find(f => f.path === path);
   const sim = fi?.role === 'sim';
-  log(`\nStarted : "Check Syntax" of ${path}.\n`, 'hdr');
-  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design' || s.path === path));
+  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design' || s.path === path))
+    .map(s => (s.path === path && text != null ? { ...s, text } : s));
   const lib = compile(srcs);
   const units = (lib.parsed.find(p => p.file === path)?.units || []).filter(u => u.kind === 'module');
-  log(`${/\.vhdl?$/i.test(path) ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${path}" into library work`);
   let diags = [...lib.errors];
   for (const u of units) {
-    const design = elaborate(lib, u.name);
+    let design;
+    try { design = elaborate(lib, u.name); } catch (e) { diags.push({ file: path, line: u.loc?.line || 1, col: 1, severity: 'error', message: e.message }); continue; }
     diags.push(...design.diags);
-    if (design.top) log(`Elaborating module <${u.name}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
+    if (design.top) info.push(`Elaborating module <${u.name}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
   }
-  diags = diagsFor({ errors: diags }, null);
+  return diagsFor({ errors: diags }, null);
+}
+
+async function checkFileSyntax(path) {
+  await saveAll();
+  log(`\nStarted : "Check Syntax" of ${path}.\n`, 'hdr');
+  log(`${/\.vhdl?$/i.test(path) ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${path}" into library work`);
+  const info = [];
+  const diags = hdlDiagnostics(path, null, info);
+  for (const l of info) log(l);
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
   for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
@@ -882,7 +891,7 @@ export async function openFile(path, line, col) {
         d.editor = createEditor(host, {
           text, lang, path,
           project: () => ({ modules: S.modules }),
-          onChange: () => { setDirty(d, !d.editor.isClean()); if (lang === 'ucf') liveUcf(); },
+          onChange: () => { setDirty(d, !d.editor.isClean()); if (lang === 'ucf') liveUcf(); else if (lang === 'vhdl' || lang === 'verilog') liveHdl(); },
           onSave: () => d.save(),
           onGotoDefinition: ({ file, line: ln }) => openFile(file, ln),
           onCursor: (l, c) => { if (S.active === d) $('status-pos').textContent = `Ln ${l}  Col ${c}`; },
@@ -891,6 +900,17 @@ export async function openFile(path, line, col) {
         let ucfTimer = null;
         const liveUcf = () => { clearTimeout(ucfTimer); ucfTimer = setTimeout(async () => { if (d.editor) d.editor.setDiagnostics(await ucfDiagnostics(d.editor.getValue(), path)); }, 400); };
         if (lang === 'ucf') liveUcf();
+        // HDL: full check (parse + elaboration against the rest of the project) as you type
+        let hdlTimer = null;
+        const liveHdl = () => {
+          clearTimeout(hdlTimer);
+          hdlTimer = setTimeout(() => {
+            if (!d.editor || !S.project) return;
+            try { d.editor.setDiagnostics(hdlDiagnostics(path, d.editor.getValue()).filter(x => x.file === path)); } catch { /* keep the parser markers */ }
+          }, 600);
+        };
+        if (lang === 'vhdl' || lang === 'verilog') liveHdl();
+        d.liveCheck = lang === 'ucf' ? liveUcf : (lang === 'vhdl' || lang === 'verilog') ? liveHdl : null;
         const cm = d.editor.cm;
         cm.getWrapperElement().addEventListener('contextmenu', e => {
           e.preventDefault();
@@ -931,8 +951,8 @@ export async function openFile(path, line, col) {
             else await reloadProject(false);
             compileProject(); renderHierarchy(); markStale();
             status(`Saved ${path}`);
-            const ud = lang !== 'ucf' && S.project.constraints && findDoc(`file:${S.project.constraints}`);
-            if (ud?.editor) ucfDiagnostics(ud.editor.getValue(), ud.path).then(x => ud.editor.setDiagnostics(x)).catch(() => {});
+            // the other open editors depend on this file (ports, instances): check them again
+            for (const od of S.docs) if (od !== d) od.liveCheck?.();
             if (S.hdlToSch?.[path] && !S.syncing) syncSchematicFromHdl(path, { quiet: auto }).catch(e => log(`WARNING: schematic not synchronized: ${e.message}`, 'warn'));
           },
           destroy: () => d.editor.destroy(),

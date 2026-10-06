@@ -159,8 +159,12 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
       if (end === ch) end = Math.min(lineText.length, ch + 1);
       out.push({ from: CodeMirror.Pos(line, ch), to: CodeMirror.Pos(line, end), message: `${src}${d.message}`, severity: d.severity === 'warning' ? 'warning' : 'error' });
     };
-    for (const d of parsed.errors || []) mk(d, '');
-    for (const d of externalDiags) mk(d, '');
+    const seen = new Set();
+    for (const d of [...(parsed.errors || []), ...externalDiags]) {
+      const k = `${d.line}:${d.message}`;
+      if (seen.has(k)) continue;
+      seen.add(k); mk(d, '');
+    }
     return out;
   };
 
