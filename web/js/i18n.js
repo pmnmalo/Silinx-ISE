@@ -62,6 +62,10 @@ const PT = {
   'Import ISE Project': 'Importar Projeto ISE', 'Export ISE Project': 'Exportar Projeto ISE', 'File(s):': 'Ficheiro(s):', 'Project name:': 'Nome do projeto:',
   'Select a .zip of the ISE project folder (the .xise and its sources — e.g. one exported with File ▸ Export ISE Project).': 'Selecione um .zip da pasta do projeto ISE (o .xise e as suas fontes — p. ex. um exportado com Ficheiro ▸ Exportar Projeto ISE).',
   'Select a .zip (or a .xise with its sources).': 'Selecione um .zip (ou um .xise com as suas fontes).',
+  'Project folder:': 'Pasta do projeto:', 'or .zip / .xise file(s):': 'ou ficheiro(s) .zip / .xise:',
+  'Select the project folder, a .zip, or a .xise with its sources.': 'Selecione a pasta do projeto, um .zip, ou um .xise com as suas fontes.',
+  'ISE output files in the folder (xst, _ngo, netlists, bitstreams, logs) are not imported.': 'Os ficheiros gerados pelo ISE na pasta (xst, _ngo, netlists, bitstreams, logs) não são importados.',
+  'Import an ISE project from its folder (the folder with the .xise file), or from a .zip of that folder (e.g. one exported with File ▸ Export ISE Project).': 'Importe um projeto ISE a partir da sua pasta (a pasta com o ficheiro .xise), ou de um .zip dessa pasta (p. ex. um exportado com Ficheiro ▸ Exportar Projeto ISE).',
   'New Source Wizard': 'Assistente de Nova Fonte', 'Select Source Type': 'Selecionar Tipo de Fonte', 'File name:': 'Nome do ficheiro:',
   'Add to project': 'Adicionar ao projeto', 'Define Module': 'Definir Módulo', 'Entity / Module name:': 'Nome da entidade / módulo:',
   'Architecture name:': 'Nome da arquitetura:', 'Port Name': 'Nome do Porto', 'Direction': 'Direção', 'Associate Source': 'Associar Fonte',
@@ -185,6 +189,8 @@ const PT_PATTERNS = [
   [/^Bitstream: design (.*)$/, 'Bitstream: projeto $1'],
   [/^(\d+) Errors$/, '$1 Erros'], [/^(\d+) Warnings$/, '$1 Avisos'], [/^(\d+) HDL files$/, '$1 ficheiros HDL'],
   [/^position (\d+)$/, 'posição $1'],
+  [/^(\d+) file\(s\) selected$/, '$1 ficheiro(s) selecionado(s)'],
+  [/^Folder '(.*)': (\d+) file\(s\), project (.*)$/, "Pasta '$1': $2 ficheiro(s), projeto $3"],
 ];
 
 export const LOCALES = {
