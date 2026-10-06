@@ -299,3 +299,171 @@ export function locsNotOnBoard(assignments, board) {
   if (!pins.size) return [];
   return Object.entries(assignments).filter(([, a]) => a.loc && !pins.has(a.loc.toUpperCase())).map(([net, a]) => ({ net, loc: a.loc }));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Constraint check (the UCF part of ISE's NGDBuild "ConstraintSystem" checks, before any build).
+//
+// checkUcf(text, { top, ports, lang, iostandards, board, package })
+//   ports: [{ name, dir, width, msb, lsb }] of the top module (from elaboration)
+//   iostandards: the device family's I/O standards (optional)
+//   board: a board of server/devices.js (optional: pins not on it are reported)
+//   package: device package, e.g. 'cp132' (pin-name format check)
+// Returns [{ line, col, severity: 'error'|'warning', message }] (1-based line/col).
+
+const NET_ATTRS = new Set(['LOC', 'IOSTANDARD', 'PULLUP', 'PULLDOWN', 'KEEPER', 'DRIVE', 'SLEW', 'CLOCK_DEDICATED_ROUTE',
+  'TNM_NET', 'TNM', 'PERIOD', 'IOB', 'IN_TERM', 'OUT_TERM', 'DIFF_TERM', 'NODELAY', 'IOBDELAY', 'IBUF_DELAY_VALUE',
+  'IFD_DELAY_VALUE', 'OFFSET', 'TIG', 'MAXDELAY', 'MAXSKEW', 'KEEP', 'S', 'SAVE', 'FAST', 'SLOW', 'QUIETIO',
+  'USELOWSKEWLINES', 'PULLTYPE', 'FEEDBACK', 'VCCAUX_IO', 'IN_DELAY', 'CLOCK_BUFFER', 'BUFG', 'LOCK_PINS', 'NOREDUCE']);
+const IO_ATTRS = new Set(['LOC', 'IOSTANDARD', 'PULLUP', 'PULLDOWN', 'KEEPER', 'DRIVE', 'SLEW', 'IOB', 'IN_TERM', 'OUT_TERM', 'DIFF_TERM', 'FAST', 'SLOW']);
+const STATEMENTS = /^(NET|INST|PIN|TIMESPEC|TIMEGRP|CONFIG|AREA_GROUP|DEFAULT|SYSTEM_JITTER|MODE)\b/i;
+const DRIVES = new Set([2, 4, 6, 8, 12, 16, 24]);
+
+/** Statements with their position in the original text: [{ text, start }] (comments blanked). */
+function statementsAt(text) {
+  const src = String(text);
+  let clean = '';
+  let inStr = false, inCom = false;
+  for (const ch of src) {
+    if (ch === '\n') { inCom = false; inStr = false; clean += ch; continue; }
+    if (inCom) { clean += ' '; continue; }
+    if (ch === '"') inStr = !inStr;
+    if (ch === '#' && !inStr) { inCom = true; clean += ' '; continue; }
+    clean += ch;
+  }
+  const out = [];
+  let start = -1, cur = '';
+  inStr = false;
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean[i];
+    if (ch === '"') inStr = !inStr;
+    if (ch === ';' && !inStr) { if (cur.trim()) out.push({ text: cur, start, end: i, terminated: true }); cur = ''; start = -1; continue; }
+    if (start < 0 && !/\s/.test(ch)) start = i;
+    if (start >= 0) cur += ch;
+  }
+  if (cur.trim()) out.push({ text: cur, start, end: clean.length, terminated: false, unbalanced: inStr });
+  return { list: out, clean };
+}
+
+export function checkUcf(text, { top = '', ports = [], lang = 'vhdl', iostandards = null, board = null, package: pkg = '' } = {}) {
+  const diags = [];
+  const src = String(text);
+  const { list } = statementsAt(src);
+  const lineStarts = [0];
+  for (let i = 0; i < src.length; i++) if (src[i] === '\n') lineStarts.push(i + 1);
+  const posOf = off => { let lo = 0, hi = lineStarts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (lineStarts[m] <= off) lo = m; else hi = m - 1; } return { line: lo + 1, col: off - lineStarts[lo] + 1 }; };
+  // position of `needle` inside statement st (falls back to the statement start)
+  const at = (st, needle, from = 0) => {
+    if (needle) {
+      const i = src.slice(st.start, st.end).toLowerCase().indexOf(String(needle).toLowerCase(), from);
+      if (i >= 0) return posOf(st.start + i);
+    }
+    return posOf(st.start);
+  };
+  const add = (severity, p, message) => diags.push({ ...p, severity, message });
+
+  const portMap = new Map();
+  for (const p of ports) portMap.set(p.name.toLowerCase(), normalizePort(p));
+  const boardPins = board ? new Map() : null;
+  if (board) for (const r of board.resources || []) r.pins.forEach((pin, i) => boardPins.set(String(pin).toUpperCase(), r.pins.length > 1 ? `${r.name}<${i}>` : r.name));
+  const bga = /^(cp|cs|csg|ft|ftg|fg|fgg|bg|bf|ff|cpg|clg|tqg)?/i.exec(pkg || '')[1];
+  const qfpPins = /^(vq|tq|pq|vqg|tqg|pqg)(\d+)$/i.exec(pkg || '');
+  const locs = new Map();       // pin -> { net, pos }
+  const netLoc = new Map();     // net -> { loc, pos }
+  const tnms = new Set(), tsRefs = [];
+  const constrained = new Set();
+  let anyLoc = false;
+
+  for (const st of list) {
+    const s = st.text.replace(/\s+/g, ' ').trim();
+    if (st.unbalanced) { add('error', at(st, '"'), 'unterminated string (missing closing ")'); continue; }
+    if (!st.terminated) { add('error', posOf(st.start + st.text.trimEnd().length - 1), `missing ';' at the end of the constraint "${s.slice(0, 40)}${s.length > 40 ? '…' : ''}"`); }
+    if (!STATEMENTS.test(s)) { add('error', at(st), `syntax error: '${s.split(' ')[0]}' is not a UCF statement (NET, INST, TIMESPEC, TIMEGRP, CONFIG…)`); continue; }
+
+    const mTs = /^TIMESPEC\s+("[^"]*"|\S+)\s*=\s*PERIOD\s+("[^"]*"|\S+)\s+(.*)$/i.exec(s);
+    if (mTs) { tsRefs.push({ tnm: unq(mTs[2]), pos: at(st, unq(mTs[2])) }); if (!parsePeriodSpec(mTs[3])) add('error', at(st, 'PERIOD'), `invalid PERIOD value '${mTs[3]}'`); continue; }
+    const mGrp = /^TIMEGRP\s+("[^"]*"|\S+)\s*=/i.exec(s);
+    if (mGrp) { tnms.add(unq(mGrp[1])); continue; }
+
+    const mNet = /^NET\s+("[^"]*"|\S+)\s*(.*)$/i.exec(s);
+    if (!mNet) continue;
+    const net = unq(mNet[1]);
+    const netPos = at(st, net);
+    if (!mNet[2].trim()) { add('error', netPos, `NET "${net}" has no constraint`); continue; }
+    const attrs = [];
+    const rest = mNet[2];
+    if (/^PERIOD\s*=/i.test(rest)) {
+      attrs.push('PERIOD');
+      if (!parsePeriodSpec(rest.replace(/^PERIOD\s*=\s*/i, ''))) add('error', at(st, 'PERIOD'), `invalid PERIOD value '${rest.replace(/^PERIOD\s*=\s*/i, '')}'`);
+    } else {
+      for (const raw of rest.split('|')) {
+        const part = raw.trim();
+        if (!part) continue;
+        const kv = /^([A-Za-z_]+)\s*(?:=\s*(.*))?$/.exec(part);
+        if (!kv) { add('error', at(st, part), `syntax error in "${part}" (expected ATTRIBUTE = value)`); continue; }
+        const key = kv[1].toUpperCase();
+        const val = kv[2] !== undefined ? unq(kv[2]) : undefined;
+        attrs.push(key);
+        const p = at(st, kv[1]);
+        if (!NET_ATTRS.has(key)) { add('warning', p, `unknown NET attribute '${kv[1]}'`); continue; }
+        if ((key === 'LOC' || key === 'IOSTANDARD' || key === 'DRIVE' || key === 'SLEW' || key === 'TNM_NET' || key === 'TNM') && !val) { add('error', p, `${key} needs a value (${key} = …)`); continue; }
+        if (key === 'LOC') {
+          anyLoc = true;
+          const pin = val.toUpperCase();
+          const pp = at(st, val);
+          if (bga && !qfpPins && !/^[A-Z]{1,2}\d{1,2}$/.test(pin)) add('error', pp, `'${val}' is not a pin name of the ${pkg} package (BGA pins look like A1, B12, AA3)`);
+          else if (qfpPins && (!/^P\d{1,3}$/.test(pin) || +pin.slice(1) < 1 || +pin.slice(1) > +qfpPins[2])) add('error', pp, `'${val}' is not a pin of the ${pkg} package (P1…P${qfpPins[2]})`);
+          else if (boardPins && !boardPins.has(pin)) add('warning', pp, `pin ${pin} is not connected to any resource of the ${board.name}`);
+          const prev = locs.get(pin);
+          if (prev && prev.net.toLowerCase() !== net.toLowerCase()) {
+            add('error', pp, `pin ${pin} is already assigned to NET "${prev.net}" (line ${prev.pos.line})`);
+          } else locs.set(pin, { net, pos: pp });
+          const pl = netLoc.get(net.toLowerCase());
+          if (pl && pl.loc !== pin) add('warning', pp, `NET "${net}" already has LOC = ${pl.loc} (line ${pl.pos.line}); this one overrides it`);
+          netLoc.set(net.toLowerCase(), { loc: pin, pos: pp });
+        } else if (key === 'IOSTANDARD' && iostandards?.length && !iostandards.includes(val.toUpperCase())) {
+          add('error', at(st, val), `IOSTANDARD '${val}' is not supported by this device family`);
+        } else if (key === 'DRIVE' && !DRIVES.has(+val)) {
+          add('error', at(st, val), `invalid DRIVE '${val}' (2, 4, 6, 8, 12, 16 or 24 mA)`);
+        } else if (key === 'SLEW' && !/^(FAST|SLOW|QUIETIO)$/i.test(val)) {
+          add('error', at(st, val), `invalid SLEW '${val}' (FAST, SLOW or QUIETIO)`);
+        } else if (key === 'TNM_NET' || key === 'TNM') tnms.add(val);
+      }
+    }
+
+    // does the net exist in the top module?
+    if (!ports.length || /[/*?]/.test(net)) continue;   // hierarchical names / wildcards: resolved by the tools
+    const m = /^([A-Za-z_][\w$]*)\s*(?:([<([])\s*(-?\d+)\s*[>)\]])?$/.exec(net);
+    if (!m) { add('error', netPos, `invalid net name '${net}'`); continue; }
+    const port = portMap.get(m[1].toLowerCase());
+    const ioAttr = attrs.some(a => IO_ATTRS.has(a));
+    if (!port) {
+      const msg = `NET "${net}" does not exist in the top module '${top}'`;
+      if (ioAttr) add('error', netPos, `${msg} (no port named '${m[1]}')`);
+      else add('warning', netPos, `${msg} as a port (timing constraints on internal nets are resolved after synthesis)`);
+      continue;
+    }
+    if (lang === 'verilog' && port.name !== m[1]) add('error', netPos, `NET "${net}": the port is called '${port.name}' (UCF names are case-sensitive for Verilog designs)`);
+    if (m[2] && m[2] !== '<') add('warning', at(st, m[2]), `use ${m[1]}<${m[3]}> for a bus bit in UCF (the default bus delimiter is <>)`);
+    if (port.bus && m[3] === undefined) {
+      if (ioAttr) add('error', netPos, `'${m[1]}' is a ${port.width}-bit bus: constrain each bit (NET "${m[1]}<${port.lsb}>" …)`);
+      continue;
+    }
+    if (!port.bus && m[3] !== undefined) { add('error', netPos, `'${port.name}' is a single bit, not a bus: use NET "${port.name}"`); continue; }
+    if (port.bus) {
+      const b = +m[3], lo = Math.min(port.msb, port.lsb), hi = Math.max(port.msb, port.lsb);
+      if (b < lo || b > hi) { add('error', at(st, m[3]), `bit ${b} is out of range for '${port.name}' (${port.msb} downto ${port.lsb})`); continue; }
+      if (attrs.includes('LOC')) constrained.add(`${port.name.toLowerCase()}<${b}>`);
+    } else if (attrs.includes('LOC')) constrained.add(port.name.toLowerCase());
+  }
+
+  for (const t of tsRefs) if (!tnms.has(t.tnm)) add('error', t.pos, `TIMESPEC refers to the timing group "${t.tnm}", which no TNM_NET/TNM/TIMEGRP defines`);
+
+  // ports without a pin (only when the file places pins at all)
+  if (anyLoc && ports.length) {
+    const missing = [];
+    for (const p of portMap.values()) for (const n of expandPort(p)) if (!constrained.has(n.toLowerCase())) missing.push(n);
+    if (missing.length) add('warning', { line: Math.max(1, lineStarts.length - (src.endsWith('\n') ? 1 : 0)), col: 1 },
+      `${missing.length} port bit(s) of '${top}' have no LOC: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? ', …' : ''}`);
+  }
+  return diags.sort((a, b) => a.line - b.line || a.col - b.col);
+}

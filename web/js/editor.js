@@ -169,7 +169,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
     matchBrackets: true, autoCloseBrackets: true, styleActiveLine: true, highlightSelectionMatches: { showToken: /\w/, annotateScrollbar: false },
     foldGutter: true, foldOptions: { rangeFinder: CodeMirror.fold.indent, widget: '…' },
     gutters: ['CodeMirror-lint-markers', 'CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
-    lint: lang === 'vhdl' || lang === 'verilog' ? { getAnnotations: () => lintAnnotations(), delay: 400 } : false,
+    lint: lang === 'vhdl' || lang === 'verilog' || lang === 'ucf' ? { getAnnotations: () => lintAnnotations(), delay: 400 } : false,
     extraKeys: {
       'Ctrl-Space': c => showHint(c, true),
       'Cmd-S': () => onSave?.(), 'Ctrl-S': () => onSave?.(),

@@ -96,3 +96,37 @@ test('boardAutoAssign maps blinky ports to the Basys2 and locsNotOnBoard flags f
   assert.deepEqual(locsNotOnBoard(ucf.assignments, board), []);
   assert.deepEqual(locsNotOnBoard({ 'led<1>': { loc: 'E12' } }, board), [{ net: 'led<1>', loc: 'E12' }]);
 });
+
+// ---- checkUcf
+import { checkUcf } from '../core/ucf.js';
+const PORTS = [{ name: 'clk', dir: 'in', width: 1 }, { name: 'led', dir: 'out', width: 8, msb: 7, lsb: 0 }, { name: 'sw', dir: 'in', width: 4, msb: 3, lsb: 0 }];
+const chk = (t, o = {}) => checkUcf(t, { top: 'top', ports: PORTS, iostandards: ['LVCMOS33', 'LVTTL'], package: 'cp132', ...o });
+
+test('checkUcf: a correct file has no diagnostics', () => {
+  const t = 'NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33;\n' + [0, 1, 2, 3, 4, 5, 6, 7].map(i => `NET "led<${i}>" LOC = M${i + 1} | DRIVE = 8 | SLEW = SLOW;`).join('\n') +
+    '\n' + [0, 1, 2, 3].map(i => `NET "sw<${i}>" LOC = P${i + 1};`).join('\n') + '\nNET "clk" TNM_NET = "clk";\nTIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50%;\n';
+  assert.deepEqual(chk(t), []);
+});
+
+test('checkUcf: unknown nets, bus bits, duplicate pins, values and syntax are reported on their line', () => {
+  const t = 'NET "led<9>" LOC = M1;\nNET "foo" LOC = A1;\nNET "sw" LOC = C3;\nNET "clk" LOC = M1 | DRIVE = 7;\nNET "led<1>" IOSTANDARD = LVDS_99;\nTIMESPEC TS = PERIOD "nope" 20 ns;\nLOC x;\nNET "clk<0>" PULLUP;\nNET "led<2>" LOC = M3';
+  const d = chk(t);
+  const at = (line, re) => assert.ok(d.some(x => x.line === line && x.severity === 'error' && re.test(x.message)), `line ${line}: ${re}\n${JSON.stringify(d, null, 1)}`);
+  at(1, /out of range/);
+  at(2, /does not exist in the top module/);
+  at(3, /4-bit bus/);
+  at(4, /already assigned to NET "led<9>"/);
+  at(4, /invalid DRIVE/);
+  at(5, /IOSTANDARD 'LVDS_99'/);
+  at(6, /timing group "nope"/);
+  at(7, /not a UCF statement/);
+  at(8, /single bit/);
+  at(9, /missing ';'/);
+});
+
+test('checkUcf: timing constraints on internal nets are warnings; QFP pins and board pins are checked', () => {
+  assert.equal(chk('NET "cnt_en" TNM_NET = "x";\nTIMEGRP "x" = FFS;').filter(d => d.severity === 'error').length, 0);
+  assert.ok(chk('NET "clk" LOC = P200;', { package: 'vq100' }).some(d => d.severity === 'error' && /P1…P100/.test(d.message)));
+  const board = { name: 'B', resources: [{ name: 'clk', pins: ['B8'] }] };
+  assert.match(checkUcf('NET "clk" LOC = C9;', { top: 'top', ports: [PORTS[0]], board })[0].message, /not connected to any resource/);
+});

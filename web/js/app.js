@@ -299,6 +299,7 @@ function fileContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openFile(file) },
     /\.(vhdl?|v|sv)$/i.test(file) ? { label: 'Check Syntax', action: () => checkFileSyntax(file) } : null,
+    /\.ucf$/i.test(file) ? { label: 'Check Syntax', action: () => checkUcfFile(file) } : null,
     { label: 'Remove from Project', action: () => removeFile(file) },
     { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) },
   ].filter(Boolean), e.clientX, e.clientY);
@@ -346,6 +347,7 @@ function processDefs() {
   ];
   if (sel.type === 'ucf') return [
     { id: 'ucf-edit', label: 'Edit Constraints (Text)', ico: 'ucf', run: () => openFile(sel.file) },
+    { id: 'ucf-check', label: 'Check Constraints', ico: 'process', run: () => checkUcfFile(sel.file) },
     { id: 'pins', label: 'I/O Pin Planning', ico: 'pins', run: () => openPinPlanner() },
   ];
   if (sel.type !== 'module') return [{ id: 'none', label: 'No processes for the selected item', ico: 'process', disabled: true }];
@@ -370,6 +372,7 @@ function processDefs() {
     { id: 'constraints', label: 'User Constraints', ico: 'procGroup', children: [
       { id: 'pins', label: 'I/O Pin Planning', ico: 'pins', run: () => openPinPlanner(mod) },
       { id: 'ucf-edit', label: 'Edit Constraints (Text)', ico: 'ucf', run: () => openUcf() },
+      { id: 'ucf-check', label: 'Check Constraints', ico: 'process', run: () => checkUcfFile() },
     ] },
     { id: 'synth', label: 'Synthesize - XST', ico: 'process', run: () => runImpl(mod, ['synth']), children: [
       { id: 'rtl', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
@@ -622,9 +625,49 @@ function stepTracker() {
 }
 
 // Catch board/device/UCF mismatches before spending minutes in ISE.
+// ---- UCF check (nets that do not exist, bus bits, duplicate pins, I/O standards, syntax…)
+async function ucfDiagnostics(text, file) {
+  const { checkUcf } = await import('/core/ucf.js');
+  const pj = S.project;
+  let ports = [], lang = 'vhdl';
+  if (pj.top && S.lib) {
+    try {
+      const design = elaborate(S.lib, pj.top);
+      if (design.top) ports = design.top.ports.map(p => ({ name: p.name, dir: p.dir, width: p.sig.t.w, msb: p.sig.t.w > 1 ? p.sig.t.left : null, lsb: p.sig.t.w > 1 ? p.sig.t.right : null }));
+      lang = moduleInfo(pj.top)?.lang || 'vhdl';
+    } catch { /* no port data */ }
+  }
+  const db = S.devices;
+  const famId = db?.parts?.find(x => x.part === pj.device?.part)?.family || pj.device?.family;
+  const iostandards = db?.families?.find(f => f.id === famId)?.ioStandards || null;
+  return checkUcf(text, { top: pj.top, ports, lang, iostandards, board: projectBoard(pj), package: pj.device?.package })
+    .map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
+}
+
+async function checkUcfFile(path = S.project?.constraints, { quiet = false } = {}) {
+  if (!path) return true;
+  await saveAll();
+  let text;
+  try { text = await api.readFile(S.project.name, path); } catch { return true; }
+  const diags = await ucfDiagnostics(text, path);
+  const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
+  if (quiet && !diags.length) return true;
+  setDiagnostics(diags);
+  if (!quiet) log(`\nStarted : "Check Constraints" of ${path}.\n`, 'hdr');
+  for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:ConstraintSystem - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
+  if (ne) { log(`\nProcess "Check Constraints" failed (${ne} error(s), ${nw} warning(s))`, 'err'); showConsolePage('errors'); status(`${path.split('/').pop()}: ${ne} error(s)`); return false; }
+  if (!quiet) log(`\nProcess "Check Constraints" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
+  status(`Check Constraints: ${path.split('/').pop()} OK${nw ? ` (${nw} warning(s))` : ''}`);
+  return true;
+}
+
 async function checkConstraints() {
   const pj = S.project;
   const board = projectBoard(pj);
+  if (pj.constraints && S.fileTree.includes(pj.constraints) && !await checkUcfFile(pj.constraints, { quiet: true })) {
+    log(`ERROR: fix the errors in ${pj.constraints} before implementing (see the Errors tab).`, 'err');
+    return false;
+  }
   if (!board) return true;
   const devStr = d => `${d.part}${d.speed}-${d.package}`;
   if (board.device.part !== pj.device.part || board.device.package !== pj.device.package) {
@@ -823,7 +866,7 @@ export async function openFile(path, line, col) {
           h('div', { class: 'tb-sep' }),
           h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findPersistent') }),
           (lang === 'vhdl' || lang === 'verilog') ? tplBtn : null,
-          (lang === 'vhdl' || lang === 'verilog') ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file', onclick: () => checkFileSyntax(path) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
+          (lang === 'vhdl' || lang === 'verilog' || lang === 'ucf') ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file', onclick: () => (lang === 'ucf' ? checkUcfFile(path) : checkFileSyntax(path)) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
           h('span', { class: 'path' }, path),
           ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => h('span', { class: 'gen-banner' }, 'Synchronized with ', h('a', { onclick: () => openSch(sch) }, sch.split('/').pop()), S.schBase?.[sch] === 'hdl' ? ' (schematic view of this file) — saving here updates it' : ' — saving here updates the schematic')));
         tplBtn.addEventListener('click', e => {
@@ -839,12 +882,15 @@ export async function openFile(path, line, col) {
         d.editor = createEditor(host, {
           text, lang, path,
           project: () => ({ modules: S.modules }),
-          onChange: () => setDirty(d, !d.editor.isClean()),
+          onChange: () => { setDirty(d, !d.editor.isClean()); if (lang === 'ucf') liveUcf(); },
           onSave: () => d.save(),
           onGotoDefinition: ({ file, line: ln }) => openFile(file, ln),
           onCursor: (l, c) => { if (S.active === d) $('status-pos').textContent = `Ln ${l}  Col ${c}`; },
         });
         d.editor.setDiagnostics(S.diags.filter(x => x.file === path));
+        let ucfTimer = null;
+        const liveUcf = () => { clearTimeout(ucfTimer); ucfTimer = setTimeout(async () => { if (d.editor) d.editor.setDiagnostics(await ucfDiagnostics(d.editor.getValue(), path)); }, 400); };
+        if (lang === 'ucf') liveUcf();
         const cm = d.editor.cm;
         cm.getWrapperElement().addEventListener('contextmenu', e => {
           e.preventDefault();
@@ -867,6 +913,9 @@ export async function openFile(path, line, col) {
             hdl ? { label: 'Instantiate module', submenu: S.modules.filter(m => m.file !== path).map(m => ({ label: m.name, action: () => d.editor.insertText(instTemplate(m, lang) + '$0') })) } : null,
             hdl ? '-' : null,
             hdl ? { label: 'Check Syntax', action: () => checkFileSyntax(path) } : null,
+            lang === 'ucf' ? '-' : null,
+            lang === 'ucf' ? { label: 'Check Syntax', action: () => checkUcfFile(path) } : null,
+            lang === 'ucf' ? { label: 'I/O Pin Planning', action: () => openPinPlanner() } : null,
             sch ? { label: 'Open Synchronized Schematic', action: () => openSch(sch) } : null,
           ].filter(Boolean), e.clientX, e.clientY);
         });
@@ -882,6 +931,8 @@ export async function openFile(path, line, col) {
             else await reloadProject(false);
             compileProject(); renderHierarchy(); markStale();
             status(`Saved ${path}`);
+            const ud = lang !== 'ucf' && S.project.constraints && findDoc(`file:${S.project.constraints}`);
+            if (ud?.editor) ucfDiagnostics(ud.editor.getValue(), ud.path).then(x => ud.editor.setDiagnostics(x)).catch(() => {});
             if (S.hdlToSch?.[path] && !S.syncing) syncSchematicFromHdl(path, { quiet: auto }).catch(e => log(`WARNING: schematic not synchronized: ${e.message}`, 'warn'));
           },
           destroy: () => d.editor.destroy(),
