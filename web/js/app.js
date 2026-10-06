@@ -20,12 +20,44 @@ window.XAIlinx = S; // handy for debugging from the console
 const $ = id => document.getElementById(id);
 
 // ------------------------------------------------------------------ console
-export function log(text, cls = '') {
+export function log(text, cls = '', { diag = true } = {}) {
   const el = $('console-log');
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
-  for (const line of String(text).split('\n')) el.append(h('div', { class: `ln ${cls}` }, line));
+  for (const line of String(text).split('\n')) {
+    el.append(h('div', { class: `ln ${cls}` }, line));
+    if (diag) consoleMessage(line, cls);
+  }
   while (el.childElementCount > 5000) el.firstChild.remove();
   if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+// Every warning/error shown in the console also goes to the Warnings / Errors tabs.
+// Recognised forms: "ERROR:Tool:123 - msg", "WARNING:Tool - msg", "ERROR: msg", "WARNING: msg";
+// indented lines right after one are its continuation (ISE wraps long messages).
+let lastConsoleDiag = null;
+function consoleMessage(line, cls) {
+  if (lastConsoleDiag && /^\s{2,}\S/.test(line) && !cls) {
+    lastConsoleDiag.message += ' ' + line.trim();
+    renderDiagnosticsSoon();
+    return;
+  }
+  lastConsoleDiag = null;
+  if (cls !== 'err' && cls !== 'warn') return;
+  const m = /^\s*(ERROR|WARNING|FATAL|CRITICAL WARNING)\s*:\s*(?:([A-Za-z][\w-]*(?::\d+)?)\s+-\s+)?(.*)$/i.exec(line);
+  let severity = cls === 'err' ? 'error' : 'warning', tool = 'XAIlinx', message = line.trim();
+  if (m) { severity = /error|fatal/i.test(m[1]) ? 'error' : 'warning'; tool = m[2] || 'XAIlinx'; message = m[3]; }
+  else if (/=== XAILINX FAILED/.test(line)) { tool = 'XAIlinx'; message = line.replace(/=+/g, '').trim(); }
+  if (!message) return;
+  const d = { severity, tool, message, file: null, line: 0, source: 'console' };
+  S.diags.push(d);
+  lastConsoleDiag = d;
+  renderDiagnosticsSoon();
+}
+
+let diagTimer = null;
+function renderDiagnosticsSoon() {
+  if (diagTimer) return;
+  diagTimer = setTimeout(() => { diagTimer = null; renderDiagnostics(); }, 50);
 }
 function logLine(line) {
   let cls = '';
@@ -41,7 +73,15 @@ function showConsolePage(page) {
 
 // Diagnostics (Errors / Warnings tabs)
 export function setDiagnostics(diags, { source = 'check' } = {}) {
-  S.diags = diags;
+  S.diags = [...diags];
+  lastConsoleDiag = null;
+  renderDiagnostics();
+  // push file-local diagnostics to open editors
+  for (const doc of S.docs) if (doc.editor) doc.editor.setDiagnostics(diags.filter(d => d.file === doc.path && d.source !== 'parse'));
+}
+
+function renderDiagnostics() {
+  const diags = S.diags;
   const errs = diags.filter(d => d.severity === 'error'), warns = diags.filter(d => d.severity !== 'error');
   const fill = (el, list, ico) => {
     el.innerHTML = '';
@@ -50,7 +90,7 @@ export function setDiagnostics(diags, { source = 'check' } = {}) {
       const row = h('div', { class: 'diag' }, icon(ico),
         h('span', {}, `${d.severity === 'error' ? 'ERROR' : 'WARNING'}:${d.tool || 'HDLCompiler'} - `),
         d.file ? h('span', { class: 'loc' }, `"${d.file}" Line ${d.line}`) : null,
-        h('span', {}, `: ${d.message}`));
+        h('span', { 'data-no-i18n': true }, d.file ? `: ${d.message}` : d.message));
       row.addEventListener('click', () => d.file && openFile(d.file, d.line, d.col));
       el.append(row);
     }
@@ -59,8 +99,6 @@ export function setDiagnostics(diags, { source = 'check' } = {}) {
   fill($('console-warnings'), warns, 'warn');
   $('err-count').textContent = errs.length ? `(${errs.length})` : '';
   $('warn-count').textContent = warns.length ? `(${warns.length})` : '';
-  // push file-local diagnostics to open editors
-  for (const doc of S.docs) if (doc.editor) doc.editor.setDiagnostics(diags.filter(d => d.file === doc.path && d.source !== 'parse'));
 }
 
 export function status(text) { $('status-text').textContent = text; }
@@ -376,7 +414,7 @@ async function checkSyntax(mod, sim = false) {
   const diags = diagsFor(lib, design);
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
-  for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn');
+  for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
   if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err'); setStatus(id, 'err'); showConsolePage('errors'); return false; }
   log(`Elaborating top module <${mod}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
   log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
@@ -480,7 +518,7 @@ function stepTracker() {
       finish();
     } else if (cur && (m = /^(WARNING|ERROR):([\w-]+(?::\d+)?)\s*-\s*(.*)$/.exec(line))) {
       if (m[1] === 'WARNING') { warns++; t.warnings++; }
-      t.diags.push({ severity: m[1] === 'ERROR' ? 'error' : 'warning', tool: m[2] || STEP_TOOL[cur], message: m[3], file: null, line: 0 });
+      // (the line itself reaches the Warnings/Errors tabs through log())
     }
     refreshGroups();
     renderProcesses();
@@ -570,10 +608,7 @@ async function runImpl(mod, steps) {
       if (!track.failed) setStatus(procId, 'err');
       log(`\nProcess failed: ${res.error || 'see log'}`, 'err');
     }
-    if (track.diags.length) {
-      setDiagnostics([...S.diags.filter(d => d.tool === 'HDLCompiler'), ...track.diags]);
-      if (track.failed) showConsolePage('errors');
-    }
+    if (track.failed) showConsolePage('errors');
     refreshSummary();
   } catch (e) {
     setStatus(procId, 'err');
