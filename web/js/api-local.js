@@ -3,7 +3,7 @@
 // Synthesis/implementation and device programming need the XAIlinx server + Xilinx ISE,
 // so those operations report that they are unavailable here.
 import { getDeviceDb } from '../../server/devices.js';
-import { exportXise, importXise } from '../../server/xise.js';
+import { exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
 import EXAMPLES from 'xailinx-examples';
 import { createZip, readZip, browserCodec, textOf } from '../../core/zip.js';
 
@@ -142,11 +142,29 @@ export const api = {
     const p = mem[name];
     const safe = (f, dir) => (f.startsWith('/') || f.includes('..') ? `${dir}/${f.split('/').pop()}` : f);
     const out = [];
+    const sources = {};
     for (const f of parsed.files) {
       const target = safe(f.path, f.role === 'sim' ? 'sim' : 'src');
       const text = lookup(f.path);
-      if (typeof text === 'string') p.files[target] = text;
+      if (typeof text === 'string') { p.files[target] = text; sources[target] = text; }
       out.push({ path: target, lang: f.lang, role: f.role });
+    }
+    const warnings = [...parsed.warnings];
+    if (parsed.schematics.length) {
+      const schFiles = {}, roles = {};
+      for (const x of parsed.schematics) {
+        const target = safe(x.path, x.role === 'sim' ? 'sim' : 'src');
+        const text = lookup(x.path);
+        if (typeof text === 'string') { schFiles[target] = text; roles[target] = x.role; }
+      }
+      const symbols = {};
+      for (const [k, v] of Object.entries(files)) if (/\.sym$/i.test(k)) symbols[k.split('/').pop()] = v;
+      for (const r of importIseSchematics(schFiles, { sources, symbols, lang: parsed.lang, existing: k => files[k] })) {
+        warnings.push(...r.warnings);
+        if (!r.json) continue;
+        p.files[r.json] = r.jsonText; p.files[r.hdl] = r.code;
+        if (!out.some(f => f.path === r.hdl)) out.push({ path: r.hdl, lang: r.lang, role: roles[r.sch] || 'design' });
+      }
     }
     let constraints = 'constraints/top.ucf';
     if (parsed.constraints) {
@@ -156,15 +174,20 @@ export const api = {
     }
     Object.assign(p.json, { device: parsed.device.part ? parsed.device : p.json.device, top: parsed.top || '', simTop: parsed.simTop || '', files: out, constraints, impl: { ...p.json.impl, ...parsed.impl } });
     persist();
-    return { project: clone(p.json) };
+    return { project: clone(p.json), warnings };
   },
   syncXise: async () => fail('not available in the standalone edition (use File > Export ISE Project)'),
   exportZip: async name => {
     const p = proj(name);
-    const xml = exportXise(p.json, { sources: p.files });
+    const docs = {};
+    for (const [k, v] of Object.entries(p.files)) if (/\.sch\.json$/i.test(k)) { try { docs[k] = JSON.parse(v); } catch { /* skip */ } }
+    const sch = exportIseSchematics(p.json, docs, p.files);
+    const xml = exportXise(p.json, { sources: p.files, schematics: sch.schematics, extraFiles: sch.extraFiles });
+    const added = new Set(sch.files.map(f => f.path));
     const entries = [{ path: `${name}.xise`, data: xml }, { path: 'xailinx.json', data: JSON.stringify(p.json, null, 2) + '\n' },
-      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise`).map(([path, data]) => ({ path, data }))];
-    return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip` };
+      ...sch.files.map(f => ({ path: f.path, data: f.text })),
+      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k)).map(([path, data]) => ({ path, data }))];
+    return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip`, warnings: sch.warnings };
   },
   importZip: async (name, file) => {
     const entries = await readZip(new Uint8Array(await file.arrayBuffer()), browserCodec());
@@ -175,7 +198,8 @@ export const api = {
     const rel = p => (!root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
     const files = {};
     for (const e of entries) { const r = rel(e.path); if (r !== null && !/^build\//.test(r)) files[r] = textOf(e); }
-    if (xe) await api.importXise({ name, xise: textOf(xe), files });
+    let warnings = [];
+    if (xe) warnings = (await api.importXise({ name, xise: textOf(xe), files })).warnings || [];
     else createProjectSync({ name, template: 'empty' });
     const p = mem[name];
     const known = new Set(p.json.files.map(f => f.path).concat(p.json.constraints));
@@ -187,7 +211,7 @@ export const api = {
       } catch { /* ignore */ }
     }
     persist();
-    return { project: clone(p.json), missing: [] };
+    return { project: clone(p.json), missing: [], warnings };
   },
 
   // standalone-only: project bundles (one JSON file with every project file)

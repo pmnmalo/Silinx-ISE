@@ -7,6 +7,9 @@
 // Top-level values use ISE's "Module|name" (Verilog) / "Architecture|entity|arch" (VHDL) syntax.
 
 import { FAMILY_INFO, deviceFamily, familyFromXise, familyOfPart, familyName } from '../core/family.js';
+import { convertIseSchematics, exportIseSch } from '../core/isesch.js';
+import { compile, langOfPath } from '../core/compile.js';
+import { modulesFromLibrary } from '../core/schdoc.js';
 
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
 
@@ -42,10 +45,12 @@ function topValue(project, name, sources) {
  * @param {object} project  XAIlinx project json
  * @param {object} [opts]   { sources: { path: text } } (optional, used to detect VHDL architectures / top files)
  */
-export function exportXise(project, { sources } = {}) {
+export function exportXise(project, { sources, schematics = [], extraFiles = [] } = {}) {
   const dev = project.device || {};
   const impl = project.impl || {};
-  const files = project.files || [];
+  // ISE schematics (exported .sch) stand for the HDL generated from them; ISE generates that itself
+  const bySch = new Set(schematics.map(x => x.hdl));
+  const files = (project.files || []).filter(f => !bySch.has(f.path)).concat(extraFiles);
   const lines = [XML_HEADER, '<project xmlns="http://www.xilinx.com/XMLSchema" xmlns:xil_pn="http://www.xilinx.com/XMLSchema">', ''];
   lines.push('  <header>',
     '    <!-- ISE source project file exported by XAIlinx.                     -->',
@@ -67,6 +72,13 @@ export function exportXise(project, { sources } = {}) {
     lines.push('    </file>');
     seq++;
   }
+  for (const x of schematics) {
+    lines.push(`    <file xil_pn:name="${esc(x.path)}" xil_pn:type="FILE_SCHEMATIC">`);
+    lines.push(`      <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="${seq}"/>`);
+    if ((x.role || 'design') === 'design') lines.push(`      <association xil_pn:name="Implementation" xil_pn:seqID="${seq}"/>`);
+    lines.push('    </file>');
+    seq++;
+  }
   if (project.constraints) {
     lines.push(`    <file xil_pn:name="${esc(project.constraints)}" xil_pn:type="FILE_UCF">`,
       '      <association xil_pn:name="Implementation" xil_pn:seqID="0"/>', '    </file>');
@@ -74,6 +86,8 @@ export function exportXise(project, { sources } = {}) {
   lines.push('  </files>', '');
 
   const top = project.top ? topValue(project, project.top, sources) : null;
+  const schOf = p => schematics.find(x => x.hdl === p)?.path;
+  if (top?.file && schOf(top.file)) top.file = schOf(top.file);
   const sim = project.simTop ? topValue(project, project.simTop, sources) : null;
   const vhdlCount = files.filter(f => f.lang === 'vhdl').length;
   const prefLang = vhdlCount > files.length / 2 ? 'VHDL' : 'Verilog';
@@ -135,6 +149,7 @@ export function importXise(xml) {
   if (!/<project\b/.test(text)) throw Object.assign(new Error('not an ISE .xise project file (no <project> element)'), { status: 400 });
 
   const files = [];
+  const schematics = [];
   const unsupported = [];
   let constraints = null;
   const fileRe = /<file\b([^>]*?)(\/>|>([\s\S]*?)<\/file>)/g;
@@ -145,6 +160,7 @@ export function importXise(xml) {
     const type = (a.type || '').toUpperCase();
     const assoc = [...(m[3] || '').matchAll(/<association\b([^>]*)\/?>/g)].map(x => attrs(x[1]).name);
     if (type === 'FILE_UCF' || /\.ucf$/i.test(name)) { if (!constraints) constraints = name; continue; }
+    if (type === 'FILE_SCHEMATIC' || /\.sch$/i.test(name)) { schematics.push({ path: name, role: assoc.includes('Implementation') || !assoc.length ? 'design' : 'sim' }); continue; }
     const lang = type === 'FILE_VHDL' || /\.vhdl?$/i.test(name) ? 'vhdl' : type === 'FILE_VERILOG' || /\.(v|sv)$/i.test(name) ? 'verilog' : null;
     if (!lang) { if (name) unsupported.push({ name, type: type || '?' }); continue; }
     const role = assoc.includes('Implementation') || !assoc.length ? 'design' : 'sim';
@@ -180,7 +196,78 @@ export function importXise(xml) {
     optLevel: /high/i.test(props['Optimization Effort'] || '') ? 2 : 1,
     startupClk: /cclk/i.test(props['FPGA Start-Up Clock'] || '') ? 'Cclk' : /user/i.test(props['FPGA Start-Up Clock'] || '') ? 'UserClk' : 'JtagClk',
   };
-  const out = { device, top, simTop, files, constraints, impl, warnings };
+  const lang = /verilog/i.test(props['Preferred Language'] || '') ? 'verilog' : 'vhdl';
+  const out = { device, top, simTop, files, schematics, lang, constraints, impl, warnings };
   if (props['PROP_DesignName']) out.name = props['PROP_DesignName'];
   return out;
+}
+
+/**
+ * ISE schematics of an imported project -> XAIlinx schematics (.sch.json) + the HDL kept in sync with them.
+ * schFiles: { targetPath: schText }; existing(path): text of a file the import carries (an XAIlinx
+ * export already has the .sch.json and its HDL, which keep the exact drawing).
+ * Returns [{ sch, json, jsonText, hdl, code, lang, warnings }] (json/hdl missing when it failed).
+ */
+export function importIseSchematics(schFiles, { sources = {}, symbols = {}, lang = 'vhdl', existing = () => undefined } = {}) {
+  const out = [], todo = {};
+  for (const [p, text] of Object.entries(schFiles)) {
+    const json = p.replace(/\.sch$/i, '.sch.json');
+    const prev = existing(json);
+    if (typeof prev === 'string') {
+      try {
+        const doc = JSON.parse(prev);
+        const code = doc.generatedFile ? existing(doc.generatedFile) : undefined;
+        if (typeof code === 'string') { out.push({ sch: p, json, jsonText: prev, hdl: doc.generatedFile, code, lang: langOfPath(doc.generatedFile), warnings: [] }); continue; }
+      } catch { /* convert the .sch instead */ }
+    }
+    todo[p] = text;
+  }
+  const known = { ...sources };
+  for (const r of out) known[r.hdl] = r.code;
+  for (const r of convertIseSchematics(todo, { sources: known, symbols, lang })) {
+    const warnings = r.warnings.map(w => (w.startsWith(r.sch) ? w : `${r.sch}: ${w}`));
+    if (!r.doc) { out.push({ sch: r.sch, warnings }); continue; }
+    out.push({ sch: r.sch, json: r.json, jsonText: JSON.stringify(r.doc, null, 1), hdl: r.hdl, code: r.code, lang, warnings });
+  }
+  return out;
+}
+
+/**
+ * XAIlinx schematics -> ISE schematics for a project export.
+ * docs: { 'src/x.sch.json': doc }, sources: { path: text } (the project's HDL).
+ * Returns { schematics: [{ path, hdl, role }], extraFiles: [{ path, lang, role }], files: [{ path, text }], warnings }.
+ */
+export function exportIseSchematics(project, docs, sources) {
+  const res = { schematics: [], extraFiles: [], files: [], warnings: [] };
+  const entries = Object.entries(docs).filter(([, d]) => d?.generatedFile && (project.files || []).some(f => f.path === d.generatedFile));
+  if (!entries.length) return res;
+  let modules = {};
+  try {
+    const hdl = Object.fromEntries(Object.entries(sources).filter(([p]) => /\.(vhdl?|v|sv)$/i.test(p)));
+    modules = modulesFromLibrary(compile(Object.entries(hdl).map(([path, text]) => ({ path, text }))), { sources: hdl });
+  } catch { /* export without module pin data */ }
+  const family = deviceFamily(project.device || {}) || 'spartan3e';
+  const seen = new Map();
+  for (const [jsonPath, doc] of entries) {
+    const sch = jsonPath.replace(/\.sch\.json$/i, '.sch');
+    const dir = sch.includes('/') ? sch.replace(/\/[^/]*$/, '/') : '';
+    const role = (project.files.find(f => f.path === doc.generatedFile) || {}).role || 'design';
+    let r;
+    try { r = exportIseSch(doc, { modules, family, lang: langOfPath(doc.generatedFile) }); }
+    catch (e) { res.warnings.push(`${jsonPath}: not exported as an ISE schematic (${e.message}); ${doc.generatedFile} is exported instead`); continue; }
+    res.schematics.push({ path: sch, hdl: doc.generatedFile, role });
+    res.files.push({ path: sch, text: r.xml });
+    for (const f of r.files) {
+      const p = dir + f.path;
+      if (seen.has(p)) {
+        if (seen.get(p) !== f.text) res.warnings.push(`${sch}: custom symbol ${f.path} differs from the one of another schematic with the same name; only the first was exported (rename one of the HDL blocks)`);
+        continue;
+      }
+      seen.set(p, f.text);
+      res.files.push({ path: p, text: f.text });
+      if (f.kind === 'hdl') res.extraFiles.push({ path: p, lang: langOfPath(p), role: 'design' });
+    }
+    res.warnings.push(...r.warnings.map(w => `${sch}: ${w}`));
+  }
+  return res;
 }

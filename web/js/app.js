@@ -282,6 +282,7 @@ function moduleContextMenu(e, mod, file) {
       return [
         S.schBase[sch] === 'hdl' ? { label: 'Convert to Schematic (schematic as base)', action: () => setSchBase(sch, 'schematic') }
                                  : { label: 'Convert to HDL (HDL as base)', action: () => setSchBase(sch, 'hdl') },
+        { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(sch) },
         { label: 'Remove Synchronized Schematic…', action: () => detachSchematic(sch) },
       ];
     })(),
@@ -1255,6 +1256,30 @@ async function convertSchToHdl(schPath) {
   openFile(target);
 }
 
+// Download a schematic as an ISE 14.7 schematic (.sch); custom symbols come along in a zip.
+async function exportSchAsIse(schPath) {
+  let doc;
+  const od = findDoc(`sch:${schPath}`);
+  try { doc = od?.schEditor ? od.schEditor.getDoc() : JSON.parse(await api.readFile(S.project.name, schPath)); }
+  catch (e) { toast(e.message, 'error'); return; }
+  const { exportIseSch } = await import('/core/isesch.js');
+  const lang = doc.generatedFile && /\.v$/i.test(doc.generatedFile) ? 'verilog' : doc.lang;
+  let r;
+  try { r = exportIseSch(doc, { modules: await schModules(), family: S.project.device?.family || 'spartan3e', lang }); }
+  catch (e) { alertDlg('Export as ISE Schematic', e.message, 'error'); return; }
+  const base = schPath.split('/').pop().replace(/\.sch\.json$/i, '');
+  if (!r.files.length) downloadText(`${base}.sch`, r.xml, 'application/xml');
+  else {
+    const { createZip, browserCodec } = await import('/core/zip.js');
+    const zip = await createZip([{ path: `${base}.sch`, data: r.xml }, ...r.files.map(f => ({ path: f.path, data: f.text }))], browserCodec());
+    const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
+    downloadUrl(url, `${base}_ise_sch.zip`);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+  log(`Exported ${schPath} as the ISE schematic ${base}.sch${r.files.length ? ` (+ ${r.files.length} symbol/HDL file(s) for custom symbols, in a zip)` : ''}.`, 'ok');
+  for (const w of r.warnings) log(`WARNING: ${w}`, 'warn');
+}
+
 // Stop synchronizing: the HDL file stays, the schematic file is removed.
 async function detachSchematic(path) {
   const gen = S.schOwners?.[path];
@@ -1271,6 +1296,7 @@ function schContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openSch(file) },
     { label: 'Convert to HDL', action: () => convertSchToHdl(file) },
+    { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(file) },
     { label: 'Remove from Project', action: () => removeFile(file) },
   ], e.clientX, e.clientY);
 }
@@ -1529,11 +1555,12 @@ function downloadUrl(url, filename) {
 async function exportProjectZip() {
   await saveAll();
   try {
-    const { blob, filename } = await api.exportZip(S.project.name);
+    const { blob, filename, warnings = [] } = await api.exportZip(S.project.name);
     const url = URL.createObjectURL(blob);
     downloadUrl(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     log(`Exported ${filename}: ${S.project.name}.xise + xailinx.json + all project files (${Math.round(blob.size / 1024)} KB).`, 'ok');
+    for (const w of warnings) log(`WARNING: ${w}`, 'warn');
   } catch (e) { alertDlg('Export ISE Project', e.message, 'error'); }
 }
 

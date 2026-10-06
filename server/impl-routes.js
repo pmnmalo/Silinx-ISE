@@ -12,7 +12,7 @@ import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice } from './programmer.js';
-import { exportXise, importXise } from './xise.js';
+import { exportXise, importXise, importIseSchematics, exportIseSchematics } from './xise.js';
 
 export function registerImplRoutes(api, { wrap, projects: P }) {
   const bad = (msg, status = 400) => new P.HttpError(status, msg);
@@ -158,14 +158,24 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
   api.get('/projects/:p/export.zip', wrap(async (req, res) => {
     const name = req.params.p;
     const project = await P.readProject(name);
-    const xml = exportXise(project, { sources: await sourcesOf(name, project) });
-    await fs.writeFile(path.join(P.projectDir(name), xiseName(project)), xml);
+    const sources = await sourcesOf(name, project);
+    const tree = await P.fileTree(name);
+    // XAIlinx schematics go out as ISE schematics (.sch), listed in the .xise in place of their HDL
+    const docs = {};
+    for (const rel of tree.filter(f => /\.sch\.json$/i.test(f))) {
+      try { docs[rel] = JSON.parse(await fs.readFile(P.safeJoin(P.projectDir(name), rel), 'utf8')); } catch { /* skip */ }
+    }
+    const sch = exportIseSchematics(project, docs, sources);
+    const xml = exportXise(project, { sources, schematics: sch.schematics, extraFiles: sch.extraFiles });
     const entries = [];
-    for (const rel of await P.fileTree(name)) {
-      if (rel === xiseName(project)) continue;
+    const added = new Set(sch.files.map(f => f.path));
+    for (const rel of tree) {
+      if (rel === xiseName(project) || added.has(rel)) continue;
       entries.push({ path: rel, data: await fs.readFile(P.safeJoin(P.projectDir(name), rel)) });
     }
-    entries.unshift({ path: xiseName(project), data: xml }, { path: 'xailinx.json', data: await fs.readFile(path.join(P.projectDir(name), 'xailinx.json')) });
+    entries.unshift({ path: xiseName(project), data: xml }, { path: 'xailinx.json', data: await fs.readFile(path.join(P.projectDir(name), 'xailinx.json')) },
+      ...sch.files.map(f => ({ path: f.path, data: f.text })));
+    if (sch.warnings.length) res.set('X-XAIlinx-Warnings', encodeURIComponent(JSON.stringify(sch.warnings.slice(0, 50))));
     const zip = await createZip(entries, NODE_CODEC);
     res.type('application/zip').attachment(`${name}.zip`).send(Buffer.from(zip));
   }));
@@ -267,11 +277,33 @@ async function importXiseProject(P, name, xiseText, provided) {
   await P.createProject({ name, template: 'empty' });
   const files = [];
   const missing = [];
+  const sources = {};
   for (const f of parsed.files) {
     const target = safeRel(f.path, f.role === 'sim' ? 'sim' : 'src');
     const text = lookup(f.path);
-    if (typeof text === 'string') await P.writeFile(name, target, text); else missing.push(f.path);
+    if (typeof text === 'string') { await P.writeFile(name, target, text); sources[target] = text; } else missing.push(f.path);
     files.push({ path: target, lang: f.lang, role: f.role });
+  }
+  // ISE schematics -> XAIlinx schematics + their synchronized HDL
+  const warnings = [...parsed.warnings];
+  if (parsed.schematics.length) {
+    const schFiles = {}, roles = {};
+    for (const x of parsed.schematics) {
+      const target = safeRel(x.path, x.role === 'sim' ? 'sim' : 'src');
+      const text = lookup(x.path);
+      if (typeof text !== 'string') { missing.push(x.path); continue; }
+      schFiles[target] = text; roles[target] = x.role;
+    }
+    const symbols = {};
+    for (const [k, v] of Object.entries(provided)) if (/\.sym$/i.test(k)) symbols[path.posix.basename(k)] = v;
+    const existing = p => provided[p];
+    for (const r of importIseSchematics(schFiles, { sources, symbols, lang: parsed.lang, existing })) {
+      warnings.push(...r.warnings);
+      if (!r.json) continue;
+      await P.writeFile(name, r.json, r.jsonText);
+      await P.writeFile(name, r.hdl, r.code);
+      if (!files.some(f => f.path === r.hdl)) files.push({ path: r.hdl, lang: r.lang, role: roles[r.sch] || 'design' });
+    }
   }
   let constraints = 'constraints/top.ucf';
   if (parsed.constraints) {
@@ -286,11 +318,11 @@ async function importXiseProject(P, name, xiseText, provided) {
     impl: { ...pj.impl, ...parsed.impl },
   });
   const saved = await P.writeProject(name, pj);
-  return { project: saved, missing, warnings: parsed.warnings };
+  return { project: saved, missing, warnings };
 }
 
 // Files ISE/ISim generate in a project folder: never imported (they are rebuilt by the flow).
-const ISE_OUTPUT = /(^|\/)(build|_ngo|xst|iseconfig|_xmsgs|isim|xlnx_auto_0_xdb|planAhead_run_\d+|\.Xil)\/|\.(ngc|ngd|ncd|ngr|ngm|pcf|bld|map|mrp|par|pad|twr|twx|xpi|unroutes|bgn|drc|bit|bin|mcs|prm|syr|lso|xrpt|xwbt|ptwx|cmd_log|stx|gise|wdb|exe|log|xmsgs|prj|cmd|ini|xreport|html|xml)$|(^|\/)\./i;
+const ISE_OUTPUT = /(^|\/)(build|_ngo|xst|iseconfig|_xmsgs|isim|xlnx_auto_0_xdb|planAhead_run_\d+|\.Xil)\/|\.(ngc|ngd|ncd|ngr|ngm|pcf|bld|map|mrp|par|pad|twr|twx|xpi|unroutes|bgn|drc|bit|bin|mcs|prm|syr|lso|xrpt|xwbt|ptwx|cmd_log|stx|gise|wdb|exe|log|xmsgs|prj|cmd|ini|xreport|html|xml|vhf)$|(^|\/)\./i;
 
 const NODE_CODEC = { deflate: d => zlib.deflateRawSync(d), inflate: d => zlib.inflateRawSync(d) };
 

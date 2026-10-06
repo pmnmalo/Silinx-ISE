@@ -46,7 +46,9 @@ export const api = {
   exportZip: async name => {
     const r = await fetch(`/api/projects/${enc(name)}/export.zip`);
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
-    return { blob: await r.blob(), filename: `${name}.zip` };
+    let warnings = [];
+    try { warnings = JSON.parse(decodeURIComponent(r.headers.get('X-XAIlinx-Warnings') || '[]')); } catch { /* none */ }
+    return { blob: await r.blob(), filename: `${name}.zip`, warnings };
   },
   importZip: async (name, file) => {
     const r = await fetch(`/api/projects/import-zip?name=${enc(name)}`, { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file });

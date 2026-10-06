@@ -10,14 +10,18 @@ for Xilinx FPGAs supported by ISE 14.7.
   project modules, `numeric_std` functions, `$system` tasks), *Language Templates*, live errors,
   type tooltips, *go to definition* (Ctrl/Cmd+click, F12), folding, comment toggling (Ctrl+/),
   find/replace.
-- **Hierarchical RTL schematics** (ELK auto-layout): logic gates, multiplexers, adders/comparators,
-  registers, sub-instances you push into with a double-click, SVG export.
+- **RTL schematics**: the design drawn in the schematic editor, read-only, with sub-instances you
+  push into with a double-click.
 - **Schematic editor** (ISE Schematic Editor style): gates, muxes, adders/comparators, counters,
   flip-flops and registers, bus slices/joins, constants, I/O markers and any project module as a
-  symbol; wires, buses and net names; Check Schematic. It generates structural VHDL or Verilog,
-  and any HDL module can be converted to an editable schematic (*Convert to Schematic*):
-  processes and other behavioural code become HDL blocks that keep their source, and the
-  regenerated HDL simulates identically. *Convert to HDL* returns the module to plain HDL.
+  symbol; wires, buses and net names; Check Schematic. A schematic and its VHDL/Verilog file stay
+  **synchronized**: edit either one and the other follows (the drawing is kept when the structure
+  does not change). Any HDL module can be converted to a schematic (*Convert to Schematic*), with
+  processes and other behavioural code kept as HDL blocks; *Convert to HDL* makes the HDL the base
+  and keeps the schematic under it.
+- **ISE schematics (.sch)**: schematics in ISE projects (XML and older text formats) are converted
+  on import, with the Xilinx library symbols mapped to equivalent symbols or exact HDL blocks;
+  exporting a project writes them back as ISE `.sch` files (*Export as ISE Schematic* for one).
 - **Graphical ASM state-machine editor** (state, decision and conditional-output boxes) that
   generates synthesizable VHDL or Verilog (2/3-process style, binary/gray/one-hot/enum encoding)
   and adds it to the project.
