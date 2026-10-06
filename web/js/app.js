@@ -274,6 +274,7 @@ function moduleContextMenu(e, mod, file) {
   popupMenu([
     { label: isSimView ? 'Set as Simulation Top' : 'Set as Top Module', action: () => setTop(mod, isSimView) },
     { label: 'Open', action: () => { const i = moduleInfo(mod); if (i) openFile(i.file, i.line); } },
+    { label: 'Check Syntax', action: () => checkSyntax(mod, isSimView) },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
     ...(() => {
       const sch = S.hdlToSch?.[file];
@@ -296,9 +297,10 @@ function moduleContextMenu(e, mod, file) {
 function fileContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openFile(file) },
+    /\.(vhdl?|v|sv)$/i.test(file) ? { label: 'Check Syntax', action: () => checkFileSyntax(file) } : null,
     { label: 'Remove from Project', action: () => removeFile(file) },
     { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) },
-  ], e.clientX, e.clientY);
+  ].filter(Boolean), e.clientX, e.clientY);
 }
 function projectContextMenu(e) {
   popupMenu([
@@ -461,6 +463,33 @@ async function checkSyntax(mod, sim = false) {
   log(`Elaborating top module <${mod}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
   log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
   setStatus(id, nw ? 'warn' : 'ok');
+  return true;
+}
+
+// Check Syntax of one HDL file (editor toolbar / right-click): parses the project, elaborates every
+// module the file defines and reports the diagnostics.
+async function checkFileSyntax(path) {
+  await saveAll();
+  const fi = S.project.files.find(f => f.path === path);
+  const sim = fi?.role === 'sim';
+  log(`\nStarted : "Check Syntax" of ${path}.\n`, 'hdr');
+  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design' || s.path === path));
+  const lib = compile(srcs);
+  const units = (lib.parsed.find(p => p.file === path)?.units || []).filter(u => u.kind === 'module');
+  log(`${/\.vhdl?$/i.test(path) ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${path}" into library work`);
+  let diags = [...lib.errors];
+  for (const u of units) {
+    const design = elaborate(lib, u.name);
+    diags.push(...design.diags);
+    if (design.top) log(`Elaborating module <${u.name}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
+  }
+  diags = diagsFor({ errors: diags }, null);
+  setDiagnostics(diags);
+  const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
+  for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
+  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err'); showConsolePage('errors'); status(`Check Syntax: ${ne} error(s)`); return false; }
+  log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
+  status(`Check Syntax: ${path.split('/').pop()} OK${nw ? ` (${nw} warning(s))` : ''}`);
   return true;
 }
 
@@ -790,6 +819,7 @@ export async function openFile(path, line, col) {
           h('div', { class: 'tb-sep' }),
           h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findPersistent') }),
           (lang === 'vhdl' || lang === 'verilog') ? tplBtn : null,
+          (lang === 'vhdl' || lang === 'verilog') ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file', onclick: () => checkFileSyntax(path) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
           h('span', { class: 'path' }, path),
           ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => h('span', { class: 'gen-banner' }, 'Synchronized with ', h('a', { onclick: () => openSch(sch) }, sch.split('/').pop()), S.schBase?.[sch] === 'hdl' ? ' (schematic view of this file) — saving here updates it' : ' — saving here updates the schematic')));
         tplBtn.addEventListener('click', e => {
@@ -811,6 +841,32 @@ export async function openFile(path, line, col) {
           onCursor: (l, c) => { if (S.active === d) $('status-pos').textContent = `Ln ${l}  Col ${c}`; },
         });
         d.editor.setDiagnostics(S.diags.filter(x => x.file === path));
+        const cm = d.editor.cm;
+        cm.getWrapperElement().addEventListener('contextmenu', e => {
+          e.preventDefault();
+          const hdl = lang === 'vhdl' || lang === 'verilog';
+          const hasSel = cm.somethingSelected();
+          const sch = S.hdlToSch?.[path];
+          popupMenu([
+            { label: 'Undo', action: () => cm.undo(), disabled: !cm.historySize().undo },
+            { label: 'Redo', action: () => cm.redo(), disabled: !cm.historySize().redo },
+            '-',
+            { label: 'Cut', action: () => { navigator.clipboard?.writeText(cm.getSelection()); cm.replaceSelection(''); }, disabled: !hasSel },
+            { label: 'Copy', action: () => navigator.clipboard?.writeText(cm.getSelection()), disabled: !hasSel },
+            { label: 'Paste', action: async () => { try { cm.replaceSelection(await navigator.clipboard.readText()); cm.focus(); } catch { toast('Use Ctrl+V to paste', 'info'); } } },
+            { label: 'Select All', action: () => cm.execCommand('selectAll') },
+            '-',
+            hdl ? { label: 'Toggle Comment', action: () => cm.toggleComment?.() } : null,
+            { label: 'Find…', action: () => cm.execCommand('findPersistent') },
+            hdl ? '-' : null,
+            hdl ? { label: 'Language Templates', submenu: SNIPPETS[lang].map(sn => ({ label: sn.name, action: () => d.editor.insertText(sn.text) })) } : null,
+            hdl ? { label: 'Instantiate module', submenu: S.modules.filter(m => m.file !== path).map(m => ({ label: m.name, action: () => d.editor.insertText(instTemplate(m, lang) + '$0') })) } : null,
+            hdl ? '-' : null,
+            hdl ? { label: 'Check Syntax', action: () => checkFileSyntax(path) } : null,
+            sch ? { label: 'Open Synchronized Schematic', action: () => openSch(sch) } : null,
+            { label: 'Save', action: () => d.save() },
+          ].filter(Boolean), e.clientX, e.clientY);
+        });
         return {
           lang,
           onActivate: () => setTimeout(() => d.editor?.refresh(), 0),
