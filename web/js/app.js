@@ -179,17 +179,24 @@ function renderHierarchy() {
     const isTop = !instName && modName === topName;
     const file = info?.file || '?';
     const label = instName ? `${instName} - ${modName}` : modName;
+    const sch = info && S.hdlToSch?.[file];
     const it = treeItem({
-      label, meta: info ? `(${file.split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
+      label, meta: info ? `(${(sch || file).split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : sch ? 'schematic' : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
       cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2,
-      onSelect: () => select({ type: 'module', module: modName, file, path, instName }),
-      onOpen: () => info && openFile(file, info.line),
+      onSelect: () => select({ type: 'module', module: modName, file, path, instName, sch }),
+      onOpen: () => info && (sch ? openSch(sch) : openFile(file, info.line)),
       onContext: e => moduleContextMenu(e, modName, file),
     });
     parentUl.append(it.li);
+    if (sch) {
+      // the synchronized HDL file under its schematic
+      const hl = treeItem({ label: file.split('/').pop(), meta: '(synchronized HDL)', ico: info.lang === 'vhdl' ? 'vhdl' : 'verilog', key: `hdl:${path}`,
+        onSelect: () => select({ type: 'module', module: modName, file, path, sch }), onOpen: () => openFile(file, info.line), onContext: e => moduleContextMenu(e, modName, file) });
+      hl.setLeaf(); it.ul.append(hl.li);
+    }
     if (info && depth < 30) {
       const kids = instancesOf(info.mod);
-      if (!kids.length) it.setLeaf();
+      if (!kids.length && !sch) it.setLeaf();
       for (const k of kids) addModule(it.ul, k.module, k.name, depth + 1, `${path}/${k.name}`);
     } else it.setLeaf();
   };
@@ -206,8 +213,8 @@ function renderHierarchy() {
     const it = treeItem({ label: pj.constraints.split('/').pop(), ico: 'ucf', key: 'ucf', onSelect: () => select({ type: 'ucf', file: pj.constraints }), onOpen: () => openFile(pj.constraints), onContext: e => fileContextMenu(e, pj.constraints) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
-  for (const f of (S.fileTree || []).filter(f => /\.sch\.json$/.test(f))) {
-    const owned = S.schOwners?.[f];
+  for (const f of (S.fileTree || []).filter(f => /\.sch\.json$/.test(f) && !S.schOwners?.[f])) {
+    const owned = null;
     const it = treeItem({ label: f.split('/').pop(), meta: owned ? `(→ ${owned.split('/').pop()})` : '', ico: 'schematic', key: `sch:${f}`, onSelect: () => select({ type: 'sch', file: f }), onOpen: () => openSch(f), onContext: e => schContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
@@ -334,6 +341,7 @@ function processDefs() {
     { id: 'rtl-sim', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
   ];
   return [
+    ...(sel.sch ? [{ id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.sch) }] : []),
     { id: 'summary', label: 'Design Summary/Reports', ico: 'summary', run: () => openSummary() },
     { id: 'utils', label: 'Design Utilities', ico: 'procGroup', children: [
       { id: 'template', label: 'View HDL Instantiation Template', ico: 'template', run: () => openInstTemplate(mod) },
@@ -765,7 +773,7 @@ export async function openFile(path, line, col) {
           h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findPersistent') }),
           (lang === 'vhdl' || lang === 'verilog') ? tplBtn : null,
           h('span', { class: 'path' }, path),
-          ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => h('span', { class: 'gen-banner' }, 'Generated from ', h('a', { onclick: () => openSch(sch) }, sch.split('/').pop()), ' — edit the schematic (or Convert to HDL to edit this file)')));
+          ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => h('span', { class: 'gen-banner' }, 'Synchronized with ', h('a', { onclick: () => openSch(sch) }, sch.split('/').pop()), ' — saving here updates the schematic')));
         tplBtn.addEventListener('click', e => {
           const r = tplBtn.getBoundingClientRect();
           popupMenu([
@@ -797,6 +805,7 @@ export async function openFile(path, line, col) {
             else await reloadProject(false);
             compileProject(); renderHierarchy(); markStale();
             status(`Saved ${path}`);
+            if (S.hdlToSch?.[path] && !S.syncing) syncSchematicFromHdl(path).catch(e => log(`WARNING: schematic not synchronized: ${e.message}`, 'warn'));
           },
           destroy: () => d.editor.destroy(),
         };
@@ -975,7 +984,7 @@ export async function openSch(path) {
       const save = async m => { await api.writeFile(S.project.name, path, JSON.stringify(m, null, 1)); setDirty(d, false); };
       const ed = mountSchEditor(host, {
         doc, modules,
-        onChange: m => { setDirty(d, true); clearTimeout(timer); timer = setTimeout(() => save(m), 800); },
+        onChange: m => { setDirty(d, true); clearTimeout(timer); timer = setTimeout(async () => { await save(m); if (!S.syncing) syncHdlFromSchematic(path, m).catch(e => log(`WARNING: HDL not synchronized: ${e.message}`, 'warn')); }, 800); },
         onGenerate: async ({ lang, code, target }) => {
           const exists = S.fileTree.includes(target);
           const owned = S.schOwners?.[path] === target;
@@ -994,6 +1003,89 @@ export async function openSch(path) {
       return { save: () => save(ed.getDoc()), destroy: () => ed.destroy?.(), onActivate: () => setTimeout(() => ed.fit?.(), 30) };
     },
   });
+}
+
+// ---- schematic <-> HDL synchronization
+// Structure of a schematic: symbols (name, type, params), ports and net connectivity. When an HDL
+// edit keeps the structure, only the HDL kept in the schematic (HDL blocks, declarations) changes
+// and the drawing stays as it is; otherwise the schematic is regenerated and laid out again.
+async function schStructure(doc, modules) {
+  const { netlist } = await import('/core/schdoc.js');
+  const nl = netlist(doc, { modules });
+  const symName = id => doc.symbols.find(x => x.id === id)?.name;
+  const portName = id => doc.ports.find(x => x.id === id)?.name;
+  return JSON.stringify({
+    syms: doc.symbols.map(x => `${x.name}:${x.type}:${JSON.stringify(x.params || {})}`).sort(),
+    ports: doc.ports.map(x => `${x.name}:${x.dir}:${x.width}`).sort(),
+    nets: nl.nets.map(n => n.endpoints.map(e => (e.kind === 'pin' ? `${symName(e.sym)}.${e.pin}` : `port:${portName(e.port)}`)).sort().join(',')).sort(),
+  });
+}
+
+function refreshOpenEditor(path, text) {
+  const od = findDoc(`file:${path}`);
+  if (od && !od.dirty) { od.editor.setValue(text); od.editor.markClean(); setDirty(od, false); }
+}
+
+async function syncHdlFromSchematic(schPath, doc) {
+  const target = doc.generatedFile || S.schOwners?.[schPath];
+  if (!target) return;                    // a new schematic is linked by its first "Generate HDL"
+  const { generateHdl } = await import('/core/schdoc.js');
+  let g;
+  try { g = generateHdl(doc, { lang: doc.lang, modules: await schModules() }); }
+  catch (e) { log(`WARNING: ${target} not updated from ${schPath}: ${e.message}`, 'warn'); return; }
+  const errs = (g.diagnostics || []).filter(x => x.severity === 'error');
+  if (errs.length) { log(`WARNING: ${target} not updated: the schematic ${schPath} has ${errs.length} error(s) (Check Schematic)`, 'warn'); return; }
+  const cur = S.sources.find(x => x.path === target)?.text;
+  if (cur === g.code) return;
+  S.syncing = true;
+  try {
+    await api.writeFile(S.project.name, target, g.code);
+    const src = S.sources.find(x => x.path === target); if (src) src.text = g.code;
+    refreshOpenEditor(target, g.code);
+    compileProject(); renderHierarchy(); markStale();
+    status(`${target} updated from ${schPath.split('/').pop()}`);
+  } finally { S.syncing = false; }
+}
+
+async function syncSchematicFromHdl(hdlPath) {
+  const schPath = S.hdlToSch[hdlPath];
+  const errs = [...(S.lib?.errors || [])].filter(d => d.severity === 'error' && d.file === hdlPath);
+  if (errs.length) { log(`WARNING: ${schPath} not updated: ${hdlPath} has errors (it is updated once the HDL compiles)`, 'warn'); return; }
+  let old;
+  try { old = JSON.parse(await api.readFile(S.project.name, schPath)); } catch { return; }
+  const mods = S.modules.filter(m => m.file === hdlPath);
+  const mod = mods.find(m => m.name.toLowerCase() === String(old.name || '').toLowerCase()) || mods[0];
+  if (!mod) return;
+  const design = elaborate(S.lib, mod.name);
+  if (!design.top) return;
+  const { schematicFromHdl } = await import('/core/schdoc.js');
+  const sources = Object.fromEntries(S.sources.map(x => [x.path, x.text]));
+  const modules = await schModules();
+  const elk = window.ELK ? new window.ELK() : null;
+  let fresh;
+  try { fresh = await schematicFromHdl(design.top, { sources, modules, layout: elk ? g => elk.layout(g) : undefined, lang: mod.lang }); }
+  catch (e) { log(`WARNING: ${schPath} not updated from ${hdlPath}: ${e.message}`, 'warn'); return; }
+  let next, relaid = false;
+  if (await schStructure(fresh, modules) === await schStructure(old, modules)) {
+    // same structure: keep the drawing, take the HDL kept in the blocks and declarations
+    next = structuredClone(old);
+    for (const x of fresh.symbols) { const o = next.symbols.find(y => y.name === x.name && y.type === x.type); if (o) { o.hdl = x.hdl; o.params = x.params; } }
+    next.hdl = fresh.hdl;
+    for (const p of fresh.ports) { const o = next.ports.find(y => y.name === p.name); if (o) o.type = p.type; }
+  } else {
+    next = { ...fresh, generatedFile: hdlPath };
+    relaid = true;
+  }
+  next.generatedFile = hdlPath;
+  if (JSON.stringify(next) === JSON.stringify(old)) return;
+  S.syncing = true;
+  try {
+    await api.writeFile(S.project.name, schPath, JSON.stringify(next, null, 1));
+    const d = findDoc(`sch:${schPath}`);
+    if (d?.schEditor && !d.dirty) d.schEditor.setDoc(next);
+    log(relaid ? `${schPath} regenerated from ${hdlPath} (the design structure changed, so the schematic was laid out again).`
+               : `${schPath} updated from ${hdlPath} (same structure: layout kept).`, 'info');
+  } finally { S.syncing = false; }
 }
 
 // HDL -> editable schematic. The schematic then owns the module's HDL file (Generate HDL rewrites it).
@@ -1088,8 +1180,12 @@ export async function reloadProject(render = true) {
   S.project = pj;
   S.sources = await api.sources(pj.name);
   S.schOwners = {};
+  S.hdlToSch = {};
   for (const f of S.fileTree.filter(f => /\.sch\.json$/.test(f))) {
-    try { const d = JSON.parse(await api.readFile(pj.name, f)); if (d.generatedFile) S.schOwners[f] = d.generatedFile; } catch { /* unreadable */ }
+    try {
+      const d = JSON.parse(await api.readFile(pj.name, f));
+      if (d.generatedFile && S.fileTree.includes(d.generatedFile)) { S.schOwners[f] = d.generatedFile; S.hdlToSch[d.generatedFile] = f; }
+    } catch { /* unreadable */ }
   }
   compileProject();
   updateTitle();
