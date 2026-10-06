@@ -142,6 +142,9 @@ export function normalizeModel(m) {
     initial: src.initial == null ? '' : String(src.initial),
   };
   if (src.description) out.description = String(src.description);
+  // link to the HDL file kept in sync with the chart (see the app), and which of the two is the base
+  if (src.generatedFile) out.generatedFile = String(src.generatedFile);
+  if (src.base === 'hdl') out.base = 'hdl';
   if (!out.initial || types.get(out.initial) !== 'state') {
     const first = nodes.find((n) => n.type === 'state');
     if (!src.initial && first) out.initial = first.id;
@@ -945,7 +948,7 @@ function headerLines(a, lang) {
   L.push(`${c} ${lang === 'vhdl' ? 'Entity' : 'Module'}      : ${m.name}`);
   L.push(`${c} Description : finite state machine generated from the ASM chart ${m.name}.asm.json`);
   if (m.description) L.push(`${c}               ${m.description}`);
-  L.push(`${c} Generator   : XAIlinx ASM editor. Do not edit by hand: change the chart and regenerate.`);
+  L.push(`${c} Generator   : XAIlinx ASM editor, kept in sync with the chart (edit either one).`);
   L.push(`${c} Style       : state register + next-state logic + output logic (latch-free)`);
   L.push(`${c} Clock       : ${m.clock} (rising edge)`);
   L.push(`${c} Reset       : ${m.reset.name}, active-${m.reset.active}, ${m.reset.sync ? 'synchronous' : 'asynchronous'}`);
