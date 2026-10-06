@@ -15,6 +15,9 @@ import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
 import { deviceFamily } from '../core/family.js';
+import { compile, elaborate } from '../core/compile.js';
+import { parseUcf, bitName } from '../core/ucf.js';
+import { clocksOf } from '../core/schematic.js';
 import { spawn } from 'node:child_process';
 import { runCommand, JobCancelled } from './jobs.js';
 import { loadConfig, detectIse, iseStatus, which } from './toolchain.js';
@@ -216,6 +219,32 @@ if has synth; then
   mkdir -p xst/projnav.tmp
   run_step synth xst -intstyle xflow -ifn ${shQuote(top + '.xst')} -ofn ${shQuote(top + '.syr')}
 fi
+if has translate && [ -s autopins.txt ]; then
+  # Pins for ports without a LOC (no board selected): free general-purpose I/O pins of the package,
+  # skipping dual-purpose configuration pins and pins already used in the UCF.
+  echo "=== XAILINX STEP autopins ==="
+  # partgen deletes files in its working directory: run it in its own folder
+  rm -rf _partgen && mkdir -p _partgen && ( cd _partgen && partgen -v ${ps.bitPart.replace(/^/, 'xc')} > /dev/null 2>&1 ) || { echo "ERROR: partgen failed"; exit 1; }
+  awk -v ucf=${shQuote(top + '.ucf')} '
+    FILENAME == ucf { if (match($0, /LOC *= *"?[A-Za-z0-9]+/)) { l = substr($0, RSTART, RLENGTH); sub(/LOC *= *"?/, "", l); used[toupper(l)] = 1 } next }
+    FILENAME ~ /\\.pkg$/ {
+      if ($1 != "pin" || (toupper($3) in used)) next
+      if ($6 ~ /GCLK/ && $6 ~ /^I[OP]/) clk[++nclk] = $3                                    # global clock inputs
+      else if ($6 ~ /^IO(_L[0-9]+[NP]_[0-9]+|_[0-9]+)?$/) io[++nio] = $3                   # plain user I/O
+      next
+    }
+    FILENAME == "autopins.txt" && NF {
+      pin = ""
+      if ($3 == "clock") { while (++kc <= nclk) if (!(clk[kc] in taken)) { pin = clk[kc]; break } }
+      if (pin == "")     { while (++ki <= nio)  if (!(io[ki] in taken))  { pin = io[ki];  break } }
+      if (pin == "") { print "ERROR: not enough free I/O pins for " $1; exit 1 }
+      taken[pin] = 1
+      printf "NET \\"%s\\" LOC = \\"%s\\" ; # assigned by XAIlinx (no LOC given)\\n", $1, pin >> ucf
+      if ($3 == "clock" && clk[kc] != pin) printf "NET \\"%s\\" CLOCK_DEDICATED_ROUTE = FALSE ; # no free GCLK pin\\n", $1 >> ucf
+      printf "WARNING: %s -> pin %s (assigned automatically%s, no LOC constraint)\\n", $1, pin, ($3 == "clock" ? ", global clock pin" : "")
+    }
+  ' ${shQuote(top + '.ucf')} _partgen/*.pkg autopins.txt || exit 1
+fi
 if has translate; then
   run_step translate ngdbuild -intstyle xflow -dd _ngo -nt timestamp ${uc}-p ${ps.impl} ${shQuote(top + '.ngc')} ${shQuote(top + '.ngd')}
 fi
@@ -247,6 +276,28 @@ const DEFAULT_SETTINGS_SH = '/opt/Xilinx/14.7/ISE_DS/settings64.sh';
 /**
  * Create build/ for a project. Returns { buildDir, top, device, files, sources, hasUcf, warnings }.
  */
+/** Top-level port bits ({ net, dir }) that have no LOC in the given UCF text. */
+export async function unconstrainedPorts(sources, top, ucfText) {
+  let design;
+  try { design = elaborate(compile(sources), top); } catch { return []; }
+  if (!design?.top) return [];
+  let asg = {};
+  try { asg = parseUcf(ucfText || '').assignments || {}; } catch { /* unparsable: treat as empty */ }
+  const has = net => Object.entries(asg).some(([k, a]) => a.loc && k.toLowerCase() === net.toLowerCase());
+  // ports used as clocks anywhere in the hierarchy must go to global-clock (GCLK) pins
+  const clocks = new Set();
+  const visit = inst => { for (const pr of inst.procs || []) for (const c of clocksOf(pr).clocks) clocks.add(c); (inst.children || []).forEach(visit); };
+  visit(design.top);
+  const out = [];
+  for (const p of design.top.ports) {
+    const t = p.sig.t;
+    if (t.w === 1 && t.kind !== 'array') { if (!has(p.name)) out.push({ net: p.name, dir: p.dir, clock: p.dir === 'in' && clocks.has(p.sig) }); continue; }
+    const lo = Math.min(t.left, t.right), hi = Math.max(t.left, t.right);
+    for (let i = lo; i <= hi; i++) { const n = bitName(p.name, i); if (!has(n)) out.push({ net: n, dir: p.dir }); }
+  }
+  return out;
+}
+
 export async function generateBuild(project, projectDir, { steps } = {}) {
   const warnings = [];
   const top = project.top;
@@ -296,14 +347,27 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
 
   // Constraints.
   let hasUcf = false;
+  let ucfText = '';
   const ucfOut = path.join(buildDir, `${top}.ucf`);
   if (project.constraints && fss.existsSync(inside(project.constraints))) {
-    await fs.copyFile(inside(project.constraints), ucfOut);
+    ucfText = await fs.readFile(inside(project.constraints), 'utf8');
     hasUcf = true;
-  } else {
-    await fs.rm(ucfOut, { force: true });
-    warnings.push(`no constraints file (${project.constraints || 'project.constraints not set'}): pins will be assigned randomly by the tools - do NOT program real hardware with this bitstream`);
   }
+  // Top-level port bits without a LOC. ISE's placer crashes (segfault in "Design Feasibility Check")
+  // when it has to choose I/O sites itself under x86 emulation (Apple Silicon), so XAIlinx chooses
+  // them: run.sh assigns free general-purpose pins from partgen's package file. With a board this
+  // would put signals on arbitrary board pins, so it is refused instead.
+  const unplaced = await unconstrainedPorts(sources.map(f => ({ ...f, text: fss.readFileSync(path.join(buildDir, f.buildPath), 'utf8') })), top, ucfText);
+  await fs.rm(path.join(buildDir, 'autopins.txt'), { force: true });
+  if (unplaced.length) {
+    if (project.board) throw Object.assign(new Error(`${unplaced.length} top-level port bit(s) have no pin location (LOC) for the ${project.board} board: ${unplaced.slice(0, 12).map(u => u.net).join(', ')}${unplaced.length > 12 ? ', …' : ''}. Assign them in I/O Pin Planning (or remove the board in Design Properties).`), { status: 400 });
+    await fs.writeFile(path.join(buildDir, 'autopins.txt'), unplaced.map(u => `${u.net} ${u.dir} ${u.clock ? 'clock' : 'io'}`).join('\n') + '\n');
+    warnings.push(`${unplaced.length} port bit(s) have no LOC constraint (${unplaced.slice(0, 8).map(u => u.net).join(', ')}${unplaced.length > 8 ? ', …' : ''}): XAIlinx assigns free I/O pins automatically - do NOT program real hardware with this bitstream`);
+    hasUcf = true;
+  } else if (!hasUcf) {
+    warnings.push(`no constraints file (${project.constraints || 'project.constraints not set'}) - do NOT program real hardware with this bitstream`);
+  }
+  if (hasUcf) await fs.writeFile(ucfOut, ucfText); else await fs.rm(ucfOut, { force: true });
 
   const defaultSteps = normalizeSteps(steps);
   const files = {

@@ -12,6 +12,12 @@ for Xilinx FPGAs supported by ISE 14.7.
   find/replace.
 - **Hierarchical RTL schematics** (ELK auto-layout): logic gates, multiplexers, adders/comparators,
   registers, sub-instances you push into with a double-click, SVG export.
+- **Schematic editor** (ISE Schematic Editor style): gates, muxes, adders/comparators, counters,
+  flip-flops and registers, bus slices/joins, constants, I/O markers and any project module as a
+  symbol; wires, buses and net names; Check Schematic. It generates structural VHDL or Verilog,
+  and any HDL module can be converted to an editable schematic (*Convert to Schematic*):
+  processes and other behavioural code become HDL blocks that keep their source, and the
+  regenerated HDL simulates identically. *Convert to HDL* returns the module to plain HDL.
 - **Graphical ASM state-machine editor** (state, decision and conditional-output boxes) that
   generates synthesizable VHDL or Verilog (2/3-process style, binary/gray/one-hot/enum encoding)
   and adds it to the project.
@@ -20,8 +26,11 @@ for Xilinx FPGAs supported by ISE 14.7.
   `$display`, `$readmemh`…), an **ISim**-style waveform window, force/clock to simulate modules
   without a testbench, VCD export.
 - **Implementation** with **Xilinx ISE 14.7** (XST → NGDBuild → MAP → PAR → TRCE → BitGen), run
-  locally, in Docker or over SSH, with live per-step status (✓ / ⚠ / ✗) in the Processes panel and
-  utilization/timing reports in the *Design Summary*.
+  locally, in Docker or over SSH, with live per-step status (✓ / ⚠ / ✗) in the Processes panel
+  (restored when the project is reopened), *Stop*, every warning/error in the Warnings/Errors tabs,
+  and utilization/timing reports in the *Design Summary*. Simulation and editing stay available
+  while an implementation runs. Ports without a pin constraint get free I/O pins automatically when
+  no board is selected (with a warning; with a board they must be assigned).
 - **Devices**: every FPGA family ISE 14.7 WebPACK implements — Spartan-3, Spartan-3E,
   Spartan-3A/3AN, Spartan-3A DSP, Spartan-6, Virtex-4/5/6, Artix-7, Kintex-7 and Zynq-7000
   (WebPACK parts). Full flows verified to a bitstream on Spartan-3E and Spartan-6.

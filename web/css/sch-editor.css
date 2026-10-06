@@ -1,0 +1,243 @@
+/* XAIlinx schematic editor — ISE 14.x Schematic Editor look. Everything is scoped under .sch-editor
+   and themed by the ISE variables of theme.css (with fallbacks so the editor also works stand-alone). */
+
+.sch-editor {
+  --se-bg: var(--bg, #f0f0f0);
+  --se-panel: var(--panel, #ffffff);
+  --se-fg: var(--fg, #000000);
+  --se-muted: var(--muted, #6d6d6d);
+  --se-border: var(--border, #a0a0a0);
+  --se-border-light: var(--border-light, #d4d0c8);
+  --se-accent: var(--accent, #316ac5);
+  --se-hover: var(--hover, #e5f1fb);
+  --se-title-grad: var(--title-grad, linear-gradient(#e9eff8, #c9d7ed));
+  --se-title-fg: var(--title-fg, #15428b);
+  --se-toolbar: var(--toolbar-grad, linear-gradient(#fdfdfd, #e6e6e6));
+  --se-mono: var(--mono, Consolas, "Courier New", Menlo, monospace);
+  --se-symbol: var(--sch-symbol, #000080);
+  --se-symbol-fill: var(--sch-symbol-fill, #fffff0);
+  --se-inst-fill: var(--sch-inst-fill, #e8f0ff);
+  --se-wire: var(--sch-wire, #0000a0);
+  --se-bus: var(--sch-bus, #0000a0);
+  --se-text: var(--sch-text, #000000);
+  --se-pin: var(--sch-pin, #800000);
+  --se-select: var(--sch-select, #ff0000);
+  --se-highlight: var(--sch-highlight, #00a000);
+  --se-danger: var(--danger, #c00000);
+  --se-warning: var(--warning, #c08000);
+
+  display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 360px; min-width: 0;
+  background: var(--se-bg); color: var(--se-fg);
+  font: var(--fs, 12px) var(--font, "Segoe UI", Tahoma, Verdana, Arial, sans-serif);
+  outline: none; overflow: hidden; box-sizing: border-box; position: relative;
+}
+.sch-editor *, .sch-editor *::before, .sch-editor *::after { box-sizing: border-box; }
+.sch-editor button, .sch-editor input, .sch-editor select, .sch-editor textarea { font: inherit; color: inherit; }
+
+/* ------------------------------------------------------------------ toolbar */
+.sch-editor .se-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 1px; padding: 2px 4px; min-height: 28px;
+  background: var(--se-toolbar); border-bottom: 1px solid var(--se-border);
+}
+.sch-editor .se-btn {
+  height: 22px; min-width: 24px; padding: 0 3px; border: 1px solid transparent; border-radius: 2px; background: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px; cursor: default; white-space: nowrap;
+}
+.sch-editor .se-btn.wide { padding: 0 6px 0 4px; }
+.sch-editor .se-btn svg { width: 16px; height: 16px; flex: none; }
+.sch-editor .se-btn:hover:not(:disabled) { border-color: #a8c8eb; background: linear-gradient(#f3f8fd, #d5e6f8); }
+.sch-editor .se-btn:active:not(:disabled), .sch-editor .se-btn.on { border-color: #3c7fb1; background: linear-gradient(#c4e5f6, #98d1ef); }
+.sch-editor .se-btn:disabled { opacity: .4; }
+.sch-editor .se-sep { width: 1px; height: 18px; background: #c0c0c0; margin: 0 4px; box-shadow: 1px 0 #fff; }
+.sch-editor .se-lang { height: 21px; margin-right: 3px; }
+.sch-editor .se-opts { display: inline-flex; align-items: center; gap: 4px; }
+.sch-editor .se-opts label { color: var(--se-muted); }
+.sch-editor .se-optin { height: 21px; width: 110px; border: 1px solid #7f9db9; padding: 0 3px; background: #fff; }
+.sch-editor select.se-optin { width: auto; }
+.sch-editor .se-placing { color: var(--se-title-fg); font-weight: bold; }
+
+/* ------------------------------------------------------------------ layout */
+.sch-editor .se-main { flex: 1; display: flex; min-height: 0; }
+.sch-editor .se-left, .sch-editor .se-right {
+  background: var(--se-panel); display: flex; flex-direction: column; min-height: 0; flex: none;
+}
+.sch-editor .se-left { width: 190px; border-right: 1px solid var(--se-border); }
+.sch-editor .se-right { width: 250px; border-left: 1px solid var(--se-border); }
+.sch-editor .se-center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.sch-editor .se-cap {
+  background: var(--se-title-grad); color: var(--se-title-fg); font-weight: bold; padding: 2px 6px; height: 20px; flex: none;
+  border-bottom: 1px solid #99bbe8; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden;
+}
+.sch-editor .se-cap .sp { flex: 1; }
+.sch-editor .se-x { border: 0; background: none; font-size: 15px; line-height: 1; padding: 0 3px; color: var(--se-title-fg); }
+.sch-editor .se-x:hover { color: var(--se-danger); }
+
+/* ------------------------------------------------------------------ symbols panel */
+.sch-editor .se-lefttools { display: flex; flex-direction: column; gap: 3px; padding: 4px 5px; border-bottom: 1px solid var(--se-border-light); }
+.sch-editor .se-lefttools label { color: var(--se-muted); font-size: 11px; }
+.sch-editor .se-lefttools select, .sch-editor .se-lefttools input { height: 21px; border: 1px solid #7f9db9; background: #fff; padding: 0 3px; width: 100%; }
+.sch-editor .se-symlist { flex: 1; overflow: auto; min-height: 0; padding-bottom: 6px; }
+.sch-editor .se-cathead {
+  padding: 3px 6px 3px 16px; font-weight: bold; color: var(--se-title-fg); background: #f2f5fa; border-bottom: 1px solid #e3e8f0;
+  position: relative; cursor: default; user-select: none; position: sticky; top: 0; z-index: 1;
+}
+.sch-editor .se-cathead::before { content: '▸'; position: absolute; left: 5px; font-size: 9px; top: 5px; color: #555; }
+.sch-editor .se-cathead.open::before { content: '▾'; }
+.sch-editor .se-symrow { display: flex; align-items: center; gap: 6px; padding: 1px 6px; cursor: default; user-select: none; }
+.sch-editor .se-symrow:hover { background: var(--se-hover); }
+.sch-editor .se-symrow.active { background: var(--se-accent); color: #fff; }
+.sch-editor .se-symrow.active .se-pv { background: #fff; }
+.sch-editor .se-symrow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sch-editor .se-pv * { vector-effect: non-scaling-stroke; }
+.sch-editor .se-pv { flex: none; border: 1px solid #e4e4ec; background: #fff; border-radius: 2px; }
+.sch-editor .se-empty { padding: 4px 16px; color: var(--se-muted); font-style: italic; }
+.sch-editor .se-syminfo { flex: none; border-top: 1px solid var(--se-border-light); padding: 4px 6px; min-height: 34px; color: var(--se-muted); font-size: 11px; line-height: 1.3; }
+
+/* ------------------------------------------------------------------ properties panel */
+.sch-editor .se-props { flex: 1; overflow: auto; padding: 6px 8px 10px; min-height: 0; }
+.sch-editor .se-ptitle { font-weight: bold; color: var(--se-title-fg); margin: 2px 0 4px; }
+.sch-editor .se-field { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }
+.sch-editor .se-field > label { color: var(--se-muted); font-size: 11px; }
+.sch-editor .se-field input[type=text], .sch-editor .se-field input[type=number], .sch-editor .se-field select, .sch-editor .se-field textarea {
+  border: 1px solid #7f9db9; background: #fff; padding: 1px 4px; min-height: 21px; width: 100%;
+}
+.sch-editor .se-field input[type=checkbox] { align-self: flex-start; margin: 2px 0; }
+.sch-editor .se-field textarea { font-family: var(--se-mono); font-size: 11px; line-height: 1.35; resize: vertical; white-space: pre; tab-size: 2; }
+.sch-editor .se-field textarea.code { min-height: 180px; }
+.sch-editor .se-field input:focus, .sch-editor .se-field textarea:focus, .sch-editor .se-field select:focus { outline: 1px solid var(--se-accent); outline-offset: -1px; }
+.sch-editor .se-row { display: flex; align-items: center; gap: 4px; }
+.sch-editor .se-row input { flex: 1; min-width: 0; }
+.sch-editor .se-gens { display: flex; flex-direction: column; gap: 3px; }
+.sch-editor .se-gens .gn { width: 80px; flex: none; overflow: hidden; text-overflow: ellipsis; font-family: var(--se-mono); font-size: 11px; }
+.sch-editor .se-note { color: var(--se-muted); font-size: 11px; line-height: 1.3; }
+.sch-editor .se-pbtns { display: flex; gap: 4px; flex-wrap: wrap; margin: 8px 0; }
+.sch-editor .se-pbtns .btn { min-width: 0; }
+.sch-editor .se-sec { margin: 8px 0; border-top: 1px solid var(--se-border-light); padding-top: 4px; }
+.sch-editor .se-sec > summary { cursor: default; color: var(--se-title-fg); font-weight: bold; user-select: none; }
+.sch-editor .se-pins { margin: 4px 0; font: 11px/1.35 var(--se-mono); white-space: pre-wrap; color: #333; background: #fafafa; border: 1px solid #eee; padding: 3px 5px; max-height: 220px; overflow: auto; }
+
+/* classic button fallback when theme.css is not loaded */
+.sch-editor .btn { border: 1px solid #707070; border-radius: 3px; padding: 2px 10px; background: linear-gradient(#f2f2f2, #dddddd); cursor: default; }
+.sch-editor .btn:hover { background: linear-gradient(#eaf6fd, #bee6fd); border-color: #3c7fb1; }
+.sch-editor .btn.primary { border-color: #3c7fb1; }
+
+/* ------------------------------------------------------------------ canvas */
+.sch-editor .se-canvas { flex: 1; position: relative; overflow: hidden; min-height: 0; background: #c8ccd4; touch-action: none; user-select: none; }
+.sch-editor .se-canvas .se-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.sch-editor .se-canvas[data-tool="wire"], .sch-editor .se-canvas[data-tool="io"], .sch-editor .se-canvas[data-tool="place"] { cursor: crosshair; }
+.sch-editor .se-canvas[data-tool="net"] { cursor: text; }
+.sch-editor .se-canvas.pan-ready, .sch-editor .se-canvas.panning, .sch-editor .se-canvas.panning * { cursor: grabbing !important; }
+.sch-editor .se-hint {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 3; pointer-events: none;
+  background: #ffffe1; border: 1px solid #767676; padding: 3px 10px; box-shadow: 2px 2px 3px rgba(0,0,0,.18); white-space: nowrap;
+}
+.sch-editor .se-prompt {
+  position: absolute; z-index: 5; background: #ffffe1; border: 1px solid #767676; padding: 4px 6px; box-shadow: 2px 2px 4px rgba(0,0,0,.25);
+  display: flex; flex-direction: column; gap: 2px; width: 200px;
+}
+.sch-editor .se-prompt label { font-size: 11px; color: #333; }
+.sch-editor .se-prompt input { border: 1px solid #7f9db9; height: 21px; padding: 0 3px; }
+
+/* sheet */
+.sch-editor svg .sheet { fill: var(--sch-bg, #fff); stroke: #707070; stroke-width: 1; }
+.sch-editor svg .griddot { fill: #b8b8c8; }
+.sch-editor svg .gridfill2 { display: none; }
+.sch-editor .se-canvas.se-lod svg .gridfill { display: none; }
+.sch-editor .se-canvas.se-lod svg .gridfill2 { display: inline; }
+.sch-editor svg .frame { fill: none; stroke: #9a9aaa; stroke-width: 1; }
+.sch-editor svg .titleblock rect, .sch-editor svg .titleblock line { fill: none; stroke: #9a9aaa; stroke-width: 1; }
+.sch-editor svg .titleblock text { font: 10px Arial, Helvetica, sans-serif; fill: #666; }
+.sch-editor svg .titleblock .tb-v { font-weight: bold; fill: #000080; font-size: 12px; }
+
+/* drawing (matches the RTL viewer) */
+.sch-editor .se-svg text { font-family: Arial, Helvetica, sans-serif; font-size: 11px; fill: var(--se-text); }
+.sch-editor svg .hitbox { fill: transparent; stroke: none; }
+.sch-editor svg .wire .wline { fill: none; stroke: var(--se-wire); stroke-width: 1.3; stroke-linejoin: miter; }
+.sch-editor svg .wire.bus .wline { stroke: var(--se-bus); stroke-width: 3.2; }
+.sch-editor svg .wire .whit { fill: none; stroke: transparent; stroke-width: 9; }
+.sch-editor svg .wire:hover .wline { stroke: var(--se-highlight); }
+.sch-editor svg .wire.sel .wline { stroke: var(--se-select); }
+.sch-editor svg .junction { fill: var(--se-wire); }
+.sch-editor svg .pin { stroke: var(--se-symbol); stroke-width: 1.2; }
+.sch-editor svg .pin.bus { stroke-width: 3.2; }
+.sch-editor svg .gate { fill: var(--se-symbol-fill); stroke: var(--se-symbol); stroke-width: 1.5; }
+.sch-editor svg .gate.nofill { fill: none; }
+.sch-editor svg .box { fill: var(--se-inst-fill); stroke: var(--se-symbol); stroke-width: 1.5; }
+.sch-editor svg .box.hdl { fill: #fbfbf0; stroke-dasharray: 6 3; }
+.sch-editor svg .box.missing { fill: #fff4f4; stroke: var(--se-danger); stroke-dasharray: 6 3; }
+.sch-editor svg .clk { fill: none; stroke: var(--se-symbol); stroke-width: 1.1; }
+.sch-editor svg .ripper { fill: var(--se-symbol); stroke: var(--se-symbol); stroke-width: 1; }
+.sch-editor svg .cbox { fill: #f4fff4; stroke: #2d7d2d; stroke-width: 1; }
+.sch-editor svg .cval { font-family: Consolas, "Courier New", monospace; font-size: 10px; fill: #006000; }
+.sch-editor svg .iname { font-size: 9px; fill: #555; }
+.sch-editor svg .stitle { font-size: 11px; font-weight: bold; fill: var(--se-symbol); }
+.sch-editor svg .stitle.hdl { fill: #6a5a00; }
+.sch-editor svg .stype { font-size: 9px; font-weight: bold; fill: var(--se-symbol); }
+.sch-editor svg .sop { font-size: 15px; font-weight: bold; fill: var(--se-symbol); }
+.sch-editor svg .stext { font-size: 9px; fill: var(--se-pin); }
+.sch-editor svg .pname { font-size: 9px; fill: var(--se-pin); }
+.sch-editor svg .pwidth { font-size: 8px; fill: var(--se-pin); }
+.sch-editor svg .iomark { fill: var(--se-symbol-fill); stroke: var(--se-symbol); stroke-width: 1.3; }
+.sch-editor svg .iomark.bus { stroke-width: 2.2; }
+.sch-editor svg .ioname { font-size: 11px; font-weight: bold; }
+.sch-editor svg .label text { font-size: 10px; fill: var(--se-wire); }
+.sch-editor svg .label .lpt { fill: var(--se-wire); }
+.sch-editor svg .nc { fill: #fff; stroke: var(--se-danger); stroke-width: 1; }
+.sch-editor svg .sym:hover .gate, .sch-editor svg .sym:hover .box, .sch-editor svg .sym:hover .pin,
+.sch-editor svg .port:hover .iomark { stroke: var(--se-highlight); }
+
+/* selection */
+.sch-editor svg .sym.sel .gate, .sch-editor svg .sym.sel .box, .sch-editor svg .sym.sel .pin, .sch-editor svg .sym.sel .clk,
+.sch-editor svg .sym.sel .cbox, .sch-editor svg .port.sel .iomark, .sch-editor svg .port.sel .pin { stroke: var(--se-select); }
+.sch-editor svg .sym.sel .ripper { fill: var(--se-select); stroke: var(--se-select); }
+.sch-editor svg .sym.sel text, .sch-editor svg .port.sel text, .sch-editor svg .label.sel text { fill: var(--se-select); }
+
+/* overlay */
+.sch-editor svg .ghost { opacity: .55; pointer-events: none; }
+.sch-editor svg .wire-preview { fill: none; stroke: var(--se-highlight); stroke-width: 1.4; stroke-dasharray: 4 3; pointer-events: none; }
+.sch-editor svg .pinhover { fill: none; stroke: var(--se-highlight); stroke-width: 1.5; pointer-events: none; }
+.sch-editor svg .xhair { stroke: #888; stroke-width: .8; pointer-events: none; }
+.sch-editor svg .band { fill: rgba(49, 106, 197, .08); stroke: var(--se-accent); stroke-width: 1; stroke-dasharray: 4 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+
+/* low zoom */
+.sch-editor .se-canvas.se-lod svg .pname, .sch-editor .se-canvas.se-lod svg .iname, .sch-editor .se-canvas.se-lod svg .pwidth,
+.sch-editor .se-canvas.se-lod svg .nc { display: none; }
+
+/* ------------------------------------------------------------------ diagnostics */
+.sch-editor .se-diags { flex: none; height: 150px; display: flex; flex-direction: column; border-top: 1px solid var(--se-border); background: var(--se-panel); }
+.sch-editor .se-diags[hidden] { display: none; }
+.sch-editor .se-dlist { flex: 1; overflow: auto; }
+.sch-editor .se-drow { display: flex; gap: 8px; padding: 1px 8px; cursor: default; white-space: nowrap; }
+.sch-editor .se-drow:hover { background: var(--se-hover); }
+.sch-editor .se-drow .sev { width: 62px; flex: none; font-weight: bold; }
+.sch-editor .se-drow.error .sev { color: var(--se-danger); }
+.sch-editor .se-drow.warning .sev { color: var(--se-warning); }
+.sch-editor .se-drow.ok { color: var(--success, #008000); }
+
+/* ------------------------------------------------------------------ status bar */
+.sch-editor .se-status {
+  flex: none; display: flex; align-items: center; gap: 12px; height: 20px; padding: 0 6px; border-top: 1px solid var(--se-border);
+  background: var(--se-bg); color: #333; font-size: 11px; white-space: nowrap; overflow: hidden;
+}
+.sch-editor .se-status .hint { overflow: hidden; text-overflow: ellipsis; color: var(--se-muted); }
+.sch-editor .se-status .sp { flex: 1; }
+.sch-editor .se-status .xy { width: 110px; text-align: right; font-family: var(--se-mono); }
+.sch-editor .se-status .zoom { width: 44px; text-align: right; }
+
+/* ------------------------------------------------------------------ View HDL dialog */
+.sch-editor .se-modal { position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; }
+.sch-editor .se-dialog {
+  width: min(900px, 94%); height: min(640px, 92%); display: flex; flex-direction: column; background: var(--se-panel);
+  border: 1px solid #707070; box-shadow: 4px 4px 12px rgba(0,0,0,.35); outline: none;
+}
+.sch-editor .se-dhead { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--se-title-grad); color: var(--se-title-fg); border-bottom: 1px solid #99bbe8; }
+.sch-editor .se-dhead .sp { flex: 1; }
+.sch-editor .se-dinfo { color: var(--se-muted); font-size: 11px; }
+.sch-editor .se-code { flex: 1; margin: 0; overflow: auto; padding: 8px 10px; font: 12px/1.45 var(--se-mono); background: #fff; color: #000; white-space: pre; user-select: text; }
+.sch-editor .se-code .kw { color: #0000c0; font-weight: bold; }
+.sch-editor .se-code .cm { color: #008000; }
+
+@media (max-width: 760px) {
+  .sch-editor .se-left { width: 150px; }
+  .sch-editor .se-right { width: 190px; }
+}

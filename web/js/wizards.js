@@ -289,6 +289,7 @@ const SOURCE_TYPES = [
   { id: 'vhdl-tb', label: 'VHDL Test Bench', ico: 'vhdl', ext: '.vhd', dir: 'sim' },
   { id: 'verilog-tb', label: 'Verilog Test Fixture', ico: 'verilog', ext: '.v', dir: 'sim' },
   { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src' },
+  { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src' },
   { id: 'asm', label: 'ASM State Diagram (State Machine)', ico: 'asm', ext: '.asm.json', dir: 'src' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints' },
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
@@ -425,6 +426,11 @@ export async function newSourceWizard({ type } = {}) {
     }
     case 'ucf': text = T.ucfTemplate(pj); break;
     case 'mem': text = '// memory initialization file ($readmemh format)\n00\n01\n02\n03\n'; break;
+    case 'sch': {
+      const { newDoc } = await import('/core/schdoc.js');
+      text = JSON.stringify(newDoc(n.replace(/[^A-Za-z0-9_]/g, '_'), pj.preferredLanguage || 'vhdl'), null, 1);
+      break;
+    }
     case 'asm': {
       const { newModel } = await import('/core/asm.js');
       const m = newModel(n.replace(/[^A-Za-z0-9_]/g, '_'), pj.preferredLanguage || 'vhdl');
@@ -437,7 +443,7 @@ export async function newSourceWizard({ type } = {}) {
   if (st.id.endsWith('-tb')) { pj.simTop = n; await app.saveProjectJson(); }
   await app.reloadProject();
   app.log(`Created ${st.label} '${path}'.`, 'ok');
-  if (st.id === 'asm') app.openAsm(path); else app.openFile(path);
+  if (st.id === 'asm') app.openAsm(path); else if (st.id === 'sch') app.openSch(path); else app.openFile(path);
 }
 
 function uutInfo(m) {

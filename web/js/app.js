@@ -72,8 +72,10 @@ function showConsolePage(page) {
 }
 
 // Diagnostics (Errors / Warnings tabs)
-export function setDiagnostics(diags, { source = 'check' } = {}) {
-  S.diags = [...diags];
+export function setDiagnostics(diags, { keepConsole = true } = {}) {
+  // a check replaces its own entries; warnings/errors collected from the console (e.g. a running
+  // implementation) are kept unless keepConsole is false
+  S.diags = [...diags, ...(keepConsole ? S.diags.filter(d => d.source === 'console') : [])];
   lastConsoleDiag = null;
   renderDiagnostics();
   // push file-local diagnostics to open editors
@@ -204,6 +206,11 @@ function renderHierarchy() {
     const it = treeItem({ label: pj.constraints.split('/').pop(), ico: 'ucf', key: 'ucf', onSelect: () => select({ type: 'ucf', file: pj.constraints }), onOpen: () => openFile(pj.constraints), onContext: e => fileContextMenu(e, pj.constraints) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
+  for (const f of (S.fileTree || []).filter(f => /\.sch\.json$/.test(f))) {
+    const owned = S.schOwners?.[f];
+    const it = treeItem({ label: f.split('/').pop(), meta: owned ? `(→ ${owned.split('/').pop()})` : '', ico: 'schematic', key: `sch:${f}`, onSelect: () => select({ type: 'sch', file: f }), onOpen: () => openSch(f), onContext: e => schContextMenu(e, f) });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
   for (const f of (S.fileTree || []).filter(f => /\.asm\.json$/.test(f))) {
     const it = treeItem({ label: f.split('/').pop(), ico: 'asm', key: `asm:${f}`, onSelect: () => select({ type: 'asm', file: f }), onOpen: () => openAsm(f), onContext: e => fileContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
@@ -255,6 +262,7 @@ function moduleContextMenu(e, mod, file) {
     { label: isSimView ? 'Set as Simulation Top' : 'Set as Top Module', action: () => setTop(mod, isSimView) },
     { label: 'Open', action: () => { const i = moduleInfo(mod); if (i) openFile(i.file, i.line); } },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
+    { label: 'Convert to Schematic (editable)…', action: () => convertToSchematic(mod), disabled: !!Object.values(S.schOwners || {}).includes(file) },
     isSimView ? { label: 'Simulate Behavioral Model', action: () => runSimulation(mod) } : null,
     '-',
     { label: 'New Source…', action: () => wiz.newSourceWizard() },
@@ -266,7 +274,7 @@ function moduleContextMenu(e, mod, file) {
 }
 function fileContextMenu(e, file) {
   popupMenu([
-    { label: 'Open', action: () => (file.endsWith('.asm.json') ? openAsm(file) : openFile(file)) },
+    { label: 'Open', action: () => openFile(file) },
     { label: 'Remove from Project', action: () => removeFile(file) },
     { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) },
   ], e.clientX, e.clientY);
@@ -307,6 +315,10 @@ function processDefs() {
   if (!S.project) return [];
   if (sel.type === 'asm') return [
     { id: 'asm-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.file) },
+  ];
+  if (sel.type === 'sch') return [
+    { id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.file) },
+    { id: 'sch-hdl', label: 'Convert to HDL (stop using the schematic)', ico: 'template', run: () => detachSchematic(sel.file) },
   ];
   if (sel.type === 'ucf') return [
     { id: 'ucf-edit', label: 'Edit Constraints (Text)', ico: 'ucf', run: () => openFile(sel.file) },
@@ -365,8 +377,9 @@ export function renderProcesses() {
     row.addEventListener('contextmenu', e => {
       e.preventDefault(); row.click();
       popupMenu([
-        { label: 'Run', action: () => runProcess(p), disabled: !p.run || p.disabled },
-        { label: 'Rerun', action: () => runProcess(p), disabled: !p.run || p.disabled },
+        { label: 'Run', action: () => runProcess(p), disabled: !p.run || p.disabled || S.busy },
+        { label: 'Rerun', action: () => runProcess(p), disabled: !p.run || p.disabled || S.busy },
+        { label: 'Stop', icon: icon('stop'), action: () => stopProcesses(), disabled: !S.currentJob },
         '-',
         { label: 'Process Properties…', action: () => wiz.implProperties(), disabled: !['synth', 'impl', 'bitgen', 'map', 'par', 'translate'].includes(p.id) },
       ], e.clientX, e.clientY);
@@ -379,7 +392,10 @@ export function renderProcesses() {
 }
 
 async function runProcess(p) {
-  if (S.busy && !['summary', 'template', 'pins', 'ucf-edit', 'rtl', 'rtl-sim', 'asm-open', 'impact', 'config'].includes(p.id)) { toast('Another process is running', 'error'); return; }
+  // Only the ISE implementation runs are exclusive (one build directory); simulation, check syntax,
+  // schematics, editors and programming run in the browser or independently and stay available.
+  const ISE_PROCS = ['synth', 'impl', 'translate', 'map', 'par', 'bitgen'];
+  if (S.busy && ISE_PROCS.includes(p.id)) { toast('An implementation is already running (use Stop to cancel it)', 'error'); return; }
   try { await p.run(); }
   catch (e) { log(`ERROR: ${e.message}`, 'err'); console.error(e); }
 }
@@ -486,10 +502,24 @@ const STEP_TOOL = { synth: 'Xst', translate: 'NgdBuild', map: 'Map', par: 'Par',
 const RANK = { ok: 0, warn: 1, err: 2 };
 const worst = (...xs) => xs.filter(Boolean).reduce((a, b) => (RANK[b] > RANK[a] ? b : a), 'ok');
 
+// ISE writes many warnings only to its report files (XST's .syr, MAP's .mrp): use their counts too.
+async function applyReportWarnings(track) {
+  let rep = null;
+  try { rep = await api.reports(S.project.name); } catch { return; }
+  if (!rep || rep.available === false) return;
+  const mapWarn = (rep.map?.utilization || []).find(u => /warnings/i.test(u.name))?.used;
+  const bump = (id, n) => { if (n > 0 && (S.status[id] === 'ok')) { S.status[id] = 'warn'; track.result[id] = 'warn'; } };
+  bump('synth', rep.synthesis?.warnings);
+  bump('map', mapWarn);
+  if (S.status.impl && S.status.impl !== 'running') S.status.impl = worst(S.status.translate, S.status.map, S.status.par);
+  renderProcesses();
+}
+
 function stepTracker() {
   const result = {};              // process id -> ok | warn | err (this run)
   let cur = null, warns = 0;
-  const t = { warnings: 0, failed: false, diags: [] };
+  const early = {};               // warnings printed before the step they concern has started
+  const t = { warnings: 0, failed: false, diags: [], result, get current() { return cur; } };
   const setProc = (id, st) => { result[id] = st === 'running' ? result[id] : worst(result[id], st); S.status[id] = st === 'running' ? 'running' : result[id]; };
   const refreshGroups = () => {
     if (['translate', 'map', 'par'].some(k => result[k] || S.status[k] === 'running')) {
@@ -508,7 +538,8 @@ function stepTracker() {
     let m;
     if ((m = /^=== XAILINX STEP (\w+) ===/.exec(line))) {
       finish();
-      cur = m[1]; warns = 0;
+      cur = m[1]; warns = early[cur] || 0;
+      if (cur === 'synth' && early['*']) warns += early['*'];
       if (STEP_PROC[cur]) setProc(STEP_PROC[cur], 'running');
     } else if ((m = /^=== XAILINX FAILED (\w+)/.exec(line))) {
       cur = cur || m[1];
@@ -516,9 +547,12 @@ function stepTracker() {
       finish(false);
     } else if (/^=== XAILINX DONE ===/.test(line)) {
       finish();
-    } else if (cur && (m = /^(WARNING|ERROR):([\w-]+(?::\d+)?)\s*-\s*(.*)$/.exec(line))) {
-      if (m[1] === 'WARNING') { warns++; t.warnings++; }
-      // (the line itself reaches the Warnings/Errors tabs through log())
+    } else if (/^\s*(CRITICAL )?WARNING\b/i.test(line)) {
+      // any warning line counts (ISE "WARNING:Tool:N - ..." and XAIlinx "WARNING: ..."); the line
+      // itself reaches the Warnings tab through log()
+      t.warnings++;
+      if (cur) warns++;
+      else { const step = /constraints file|\.ucf\b|LOC/i.test(line) ? 'translate' : '*'; early[step] = (early[step] || 0) + 1; }
     }
     refreshGroups();
     renderProcesses();
@@ -578,6 +612,7 @@ async function runImpl(mod, steps) {
     if (!await confirmDlg('Set Top Module', `'${mod}' is not the top-level module of the implementation.\nSet it as top and continue?`)) return;
     await setTop(mod, false);
   }
+  S.diags = S.diags.filter(d => d.source !== 'console');   // new run: drop the previous run's messages
   if (!await checkSyntax(mod)) return;
   if (!await checkConstraints()) return;
   const procId = steps.includes('bitgen') ? 'bitgen' : steps.includes('translate') ? 'impl' : 'synth';
@@ -596,9 +631,22 @@ async function runImpl(mod, steps) {
       log('The build directory and run.sh are still generated so they can be run on a machine with ISE 14.7. Configure it in Tools > Toolchain Settings.', 'info');
     }
     const { job } = await api.implement(S.project.name, { steps, generateOnly: !tc.ise.available });
+    S.currentJob = job;
+    S.stopRequested = false;
+    renderProcesses();
     const res = await followJob(job, track.line);
+    const stopped = S.stopRequested;
     track.end(res.status === 'ok');
-    if (tc.ise.available) saveImplStatus();
+    if (stopped) {
+      // stopped by the user: the interrupted step and the ones not reached are left unmarked
+      for (const id of IMPL_IDS) if (S.status[id] === 'running' || (S.status[id] === 'err' && !track.result[id + '_ran'])) S.status[id] = null;
+      if (track.current) S.status[STEP_PROC[track.current]] = null;
+      for (const [id, st] of Object.entries(track.result)) if (st === 'err') S.status[id] = null;
+      renderProcesses();
+      log('\nProcess stopped by the user.', 'warn');
+      return;
+    }
+    if (tc.ise.available) { await applyReportWarnings(track); saveImplStatus(); }
     if (res.status === 'ok' && tc.ise.available) {
       log(`\nProcess "${{ synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId]}" completed successfully${track.warnings ? ` with ${track.warnings} warning(s)` : ''}`, 'ok');
     } else if (res.status === 'ok') {
@@ -614,9 +662,21 @@ async function runImpl(mod, steps) {
     setStatus(procId, 'err');
     log(`ERROR: ${e.message}`, 'err');
   } finally {
+    // processes that never got to run in this execution must not keep the "running" spinner
+    for (const id of IMPL_IDS) if (S.status[id] === 'running') S.status[id] = null;
     S.busy = false;
+    S.currentJob = null;
     status('Ready');
+    renderProcesses();
   }
+}
+
+// Stop the running implementation (kills the ISE tool / container run.sh via the job manager).
+export async function stopProcesses() {
+  if (!S.currentJob) { toast('No process is running'); return; }
+  S.stopRequested = true;
+  log('Stopping…', 'warn');
+  try { await api.cancelJob(S.currentJob); } catch (e) { log(`ERROR: cannot stop the process: ${e.message}`, 'err'); }
 }
 
 // ------------------------------------------------------------------ documents
@@ -685,6 +745,7 @@ function closeDocByPath(path) { for (const d of [...S.docs]) if (d.path === path
 export async function openFile(path, line, col) {
   if (!S.project) return;
   if (path.endsWith('.asm.json')) return openAsm(path);
+  if (path.endsWith('.sch.json')) return openSch(path);
   const id = `file:${path}`;
   let doc = findDoc(id);
   if (!doc) {
@@ -703,7 +764,8 @@ export async function openFile(path, line, col) {
           h('div', { class: 'tb-sep' }),
           h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findPersistent') }),
           (lang === 'vhdl' || lang === 'verilog') ? tplBtn : null,
-          h('span', { class: 'path' }, path));
+          h('span', { class: 'path' }, path),
+          ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => h('span', { class: 'gen-banner' }, 'Generated from ', h('a', { onclick: () => openSch(sch) }, sch.split('/').pop()), ' — edit the schematic (or Convert to HDL to edit this file)')));
         tplBtn.addEventListener('click', e => {
           const r = tplBtn.getBoundingClientRect();
           popupMenu([
@@ -889,6 +951,99 @@ export async function openAsm(path) {
   });
 }
 
+// ---- schematic editor (.sch.json): schematic <-> HDL
+async function schModules() {
+  const { modulesFromLibrary } = await import('/core/schdoc.js');
+  const sources = Object.fromEntries(S.sources.map(s => [s.path, s.text]));
+  return modulesFromLibrary(S.lib, { sources });
+}
+
+export async function openSch(path) {
+  const id = `sch:${path}`;
+  if (findDoc(id)) return activateDoc(findDoc(id));
+  let doc;
+  try { doc = JSON.parse(await api.readFile(S.project.name, path)); }
+  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  const { mountSchEditor } = await import('./sch-editor.js');
+  const modules = await schModules();
+  openDoc({
+    id, path, title: path.split('/').pop(), icon: 'schematic',
+    create(el, d) {
+      const host = h('div', { class: 'doc-body' });
+      el.append(host);
+      let timer = null;
+      const save = async m => { await api.writeFile(S.project.name, path, JSON.stringify(m, null, 1)); setDirty(d, false); };
+      const ed = mountSchEditor(host, {
+        doc, modules,
+        onChange: m => { setDirty(d, true); clearTimeout(timer); timer = setTimeout(() => save(m), 800); },
+        onGenerate: async ({ lang, code, target }) => {
+          const exists = S.fileTree.includes(target);
+          const owned = S.schOwners?.[path] === target;
+          if (exists && !owned && !await confirmDlg('Generate HDL', `${target} already exists and is not generated from this schematic. Overwrite it?`)) return;
+          await save(ed.getDoc());
+          await api.writeFile(S.project.name, target, code);
+          log(`Schematic '${path}' -> generated ${lang.toUpperCase()} file ${target}`, 'ok');
+          await reloadProject(false);
+          markStale();
+          const od = findDoc(`file:${target}`);
+          if (od) { od.editor.setValue(code); od.editor.markClean(); setDirty(od, false); }
+        },
+        onOpenModule: name => { const i = moduleInfo(name); if (i) openFile(i.file, i.line); },
+      });
+      d.schEditor = ed;
+      return { save: () => save(ed.getDoc()), destroy: () => ed.destroy?.(), onActivate: () => setTimeout(() => ed.fit?.(), 30) };
+    },
+  });
+}
+
+// HDL -> editable schematic. The schematic then owns the module's HDL file (Generate HDL rewrites it).
+async function convertToSchematic(mod) {
+  const info = moduleInfo(mod);
+  if (!info) return;
+  await saveAll();
+  const { schematicFromHdl } = await import('/core/schdoc.js');
+  const design = elaborate(S.lib, mod);
+  if (!design.top) { alertDlg('Convert to Schematic', `Cannot elaborate '${mod}'.`, 'error'); return; }
+  status(`Converting ${mod} to a schematic…`);
+  try {
+    const sources = Object.fromEntries(S.sources.map(s => [s.path, s.text]));
+    const modules = await schModules();
+    const elk = window.ELK ? new window.ELK() : null;
+    const doc = await schematicFromHdl(design.top, { sources, modules, layout: elk ? g => elk.layout(g) : undefined, lang: info.lang });
+    doc.generatedFile = info.file;
+    const dir = info.file.includes('/') ? info.file.replace(/\/[^/]*$/, '') : 'src';
+    let target = `${dir}/${mod}.sch.json`;
+    if (S.fileTree.includes(target) && !await confirmDlg('Convert to Schematic', `${target} already exists. Overwrite it?`)) return;
+    await api.writeFile(S.project.name, target, JSON.stringify(doc, null, 1));
+    log(`'${mod}' converted to the schematic ${target}: from now on ${info.file} is generated from it (Generate HDL in the schematic editor).`, 'ok');
+    for (const w of doc.importDiagnostics || []) log(`WARNING: ${w.message || w}`, 'warn');
+    await reloadProject(false);
+    openSch(target);
+  } catch (e) {
+    alertDlg('Convert to Schematic', e.message, 'error');
+  } finally { status('Ready'); }
+}
+
+// Schematic -> HDL: keep the generated HDL file as the source and drop the schematic.
+async function detachSchematic(path) {
+  const gen = S.schOwners?.[path];
+  if (!await confirmDlg('Convert to HDL', `Stop using the schematic ${path}?\n\n${gen ? `${gen} becomes a normal HDL source you edit directly. ` : ''}The schematic file is removed from the project.`)) return;
+  const d = findDoc(`sch:${path}`);
+  if (d) { d.dirty = false; await closeDoc(d); }
+  await api.deleteFile(S.project.name, path);
+  await reloadProject();
+  log(`Schematic ${path} removed${gen ? `; ${gen} is now edited as HDL` : ''}.`, 'info');
+  if (gen) openFile(gen);
+}
+
+function schContextMenu(e, file) {
+  popupMenu([
+    { label: 'Open', action: () => openSch(file) },
+    { label: 'Convert to HDL (stop using the schematic)', action: () => detachSchematic(file) },
+    { label: 'Remove from Project', action: () => removeFile(file) },
+  ], e.clientX, e.clientY);
+}
+
 // ---- summary, pin planner, impact
 export async function openSummary() {
   const { mountSummary } = await import('./summary.js');
@@ -932,6 +1087,10 @@ export async function reloadProject(render = true) {
   delete pj.fileTree;
   S.project = pj;
   S.sources = await api.sources(pj.name);
+  S.schOwners = {};
+  for (const f of S.fileTree.filter(f => /\.sch\.json$/.test(f))) {
+    try { const d = JSON.parse(await api.readFile(pj.name, f)); if (d.generatedFile) S.schOwners[f] = d.generatedFile; } catch { /* unreadable */ }
+  }
   compileProject();
   updateTitle();
   renderHierarchy();
@@ -1067,7 +1226,8 @@ function setupMenus() {
       { label: 'Sync with .xise', action: () => api.syncXise(S.project.name, 'export').then(() => toast('Exported .xise', 'ok')), disabled: hasPj },
     ] },
     { label: 'Process', items: () => [
-      { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top },
+      { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy },
+      { label: 'Stop', icon: icon('stop'), action: () => stopProcesses(), disabled: () => !S.currentJob },
       { label: 'Run', action: () => S.selProc && runProcess(S.selProc), disabled: () => !S.selProc?.run },
       { label: 'Check Syntax', action: () => S.sel?.module && checkSyntax(S.sel.module, S.view === 'sim'), disabled: () => !S.sel?.module },
       { label: 'Simulate Behavioral Model', icon: icon('wave'), action: () => (S.project?.simTop || S.sel?.module) && runSimulation(S.sel?.module || S.project.simTop), disabled: () => !S.sel?.module },
@@ -1119,7 +1279,8 @@ function setupToolbar() {
     btn('pins', 'I/O Pin Planning', () => S.project && openPinPlanner(S.sel?.module)),
     btn('asm', 'New ASM State Diagram', () => S.project && wiz.newSourceWizard({ type: 'asm' })),
     h('div', { class: 'tb-sep' }),
-    btn('run', 'Implement Top Module', () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen'])),
+    btn('run', 'Implement Top Module', () => S.project?.top && !S.busy && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen'])),
+    btn('stop', 'Stop the running process', () => stopProcesses()),
     btn('wave', 'Simulate Behavioral Model', () => S.sel?.module && runSimulation(S.sel.module)),
     btn('impact', 'Configure Target Device (iMPACT)', () => openImpact()),
     h('div', { class: 'tb-sep' }),
@@ -1200,6 +1361,6 @@ async function boot() {
   else showLeftPage('start');
 }
 
-export const app = { stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
+export const app = { openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
 window.XAIlinxApp = app;
 boot();

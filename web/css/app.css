@@ -219,3 +219,6 @@ li.CodeMirror-hint-active .xl-hint-detail { color: #dde; }
 /* asm/doc toolbars */
 .doc-toolbar { display: flex; align-items: center; gap: 2px; padding: 2px 4px; background: var(--toolbar-grad); border-bottom: 1px solid #ccc; flex: none; }
 .doc-body { flex: 1; min-height: 0; position: relative; }
+
+.editor-bar .gen-banner { margin-left: 12px; padding: 1px 8px; background: #fff4ce; border: 1px solid #e6d690; border-radius: 3px; color: #5a4a00; }
+.editor-bar .gen-banner a { color: #0645ad; cursor: pointer; text-decoration: underline; }

@@ -195,7 +195,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const extra = [];
     for (const e of entries) {
       const r = rel(e.path);
-      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'xailinx.json' || /^build\//.test(r) || /(^|\/)(_ngo|xst|iseconfig|_xmsgs)\//.test(r)) continue;
+      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'xailinx.json' || ISE_OUTPUT.test(r)) continue;
       const norm = path.posix.normalize(r);
       if (norm.startsWith('..') || path.posix.isAbsolute(norm)) continue;
       await fs.mkdir(path.dirname(P.safeJoin(P.projectDir(name), norm)), { recursive: true });
@@ -288,6 +288,9 @@ async function importXiseProject(P, name, xiseText, provided) {
   const saved = await P.writeProject(name, pj);
   return { project: saved, missing, warnings: parsed.warnings };
 }
+
+// Files ISE/ISim generate in a project folder: never imported (they are rebuilt by the flow).
+const ISE_OUTPUT = /(^|\/)(build|_ngo|xst|iseconfig|_xmsgs|isim|xlnx_auto_0_xdb|planAhead_run_\d+|\.Xil)\/|\.(ngc|ngd|ncd|ngr|ngm|pcf|bld|map|mrp|par|pad|twr|twx|xpi|unroutes|bgn|drc|bit|bin|mcs|prm|syr|lso|xrpt|xwbt|ptwx|cmd_log|stx|gise|wdb|exe|log|xmsgs|prj|cmd|ini|xreport|html|xml)$|(^|\/)\./i;
 
 const NODE_CODEC = { deflate: d => zlib.deflateRawSync(d), inflate: d => zlib.inflateRawSync(d) };
 

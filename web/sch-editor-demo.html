@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XAIlinx - Schematic Editor demo</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/sch-editor.css">
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; background: var(--bg); }
+    header { display: flex; align-items: center; gap: 8px; padding: 3px 8px; background: var(--toolbar-grad); border-bottom: 1px solid var(--border); }
+    header h1 { margin: 0; font-size: 13px; color: var(--title-fg); }
+    header .sub { color: var(--muted); }
+    header .sp { flex: 1; }
+    main { flex: 1; display: flex; min-height: 0; gap: 4px; padding: 4px; }
+    #editor { flex: 1; min-width: 0; border: 1px solid var(--border); }
+    aside { width: 380px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+    aside .ise-panel { flex: 1; }
+    aside .body { display: flex; flex-direction: column; gap: 4px; padding: 4px; }
+    #hdl-in { flex: 1; min-height: 120px; font: 11px/1.4 var(--mono); border: 1px solid #7f9db9; resize: none; white-space: pre; }
+    .row { display: flex; gap: 4px; align-items: center; }
+    .row select { height: 22px; }
+    #import-status { color: var(--muted); font-size: 11px; min-height: 14px; white-space: pre-wrap; }
+    #import-status.err { color: var(--danger); }
+    #gen-out { margin: 0; flex: 1; overflow: auto; font: 11px/1.4 var(--mono); background: #fff; border: 1px solid var(--border-light); padding: 4px 6px; white-space: pre; }
+    #gen-info { color: var(--muted); font-size: 11px; }
+    @media (max-width: 1150px) {
+      main { flex-direction: column; }
+      #editor { min-height: 480px; }
+      aside { width: auto; height: 300px; flex: none; flex-direction: row; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>XAIlinx · Schematic Editor</h1>
+    <span class="sub">standalone demo — the sheet is kept in localStorage</span>
+    <span class="sp"></span>
+    <button class="btn" id="sample" type="button">Load sample</button>
+    <button class="btn" id="clear" type="button">New sheet</button>
+    <button class="btn" id="download" type="button">Download .sch.json</button>
+  </header>
+  <main>
+    <div id="editor"></div>
+    <aside>
+      <div class="ise-panel">
+        <div class="caption">Import from HDL<span class="spacer"></span>
+          <select id="examples" title="Examples">
+            <option value="">Examples…</option>
+            <option value="gates">VHDL gates + mux</option>
+            <option value="counter">VHDL counter (process)</option>
+            <option value="fsm">VHDL FSM</option>
+            <option value="vtop">Verilog counter + generate</option>
+          </select>
+        </div>
+        <div class="body">
+          <textarea id="hdl-in" spellcheck="false"></textarea>
+          <div class="row"><label>Top:</label><select id="top"></select><span style="flex:1"></span><button class="btn" id="import" type="button">Import → schematic</button></div>
+          <div id="import-status"></div>
+        </div>
+      </div>
+      <div class="ise-panel">
+        <div class="caption">Generated HDL<span class="spacer"></span><span id="gen-info"></span></div>
+        <div class="body" style="padding:0"><pre id="gen-out">Click "Generate HDL" in the editor toolbar.</pre></div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/vendor/elk/elk.bundled.js"></script>
+  <script type="module">
+    import { mountSchEditor } from './js/sch-editor.js';
+    import { compile, elaborate, topCandidates } from '/core/compile.js';
+    import { schematicFromHdl, modulesFromLibrary, newDoc } from '/core/schdoc.js';
+
+    // ------------------------------------------------------------ project modules for the palette
+    const LIB_SRC = {
+      'half_adder.vhd': `library ieee; use ieee.std_logic_1164.all;
+entity half_adder is
+  port (x, y : in std_logic; s, c : out std_logic);
+end entity;
+architecture rtl of half_adder is
+begin
+  s <= x xor y;
+  c <= x and y;
+end architecture;`,
+      'debounce.v': `module debounce #(parameter N = 16) (input clk, input btn, output reg q);
+  reg [N-1:0] cnt = 0;
+  always @(posedge clk) if (btn == q) cnt <= 0; else begin cnt <= cnt + 1'b1; if (&cnt) q <= btn; end
+endmodule`,
+    };
+    const lib0 = compile(Object.entries(LIB_SRC).map(([path, text]) => ({ path, text })));
+    const MODULES = modulesFromLibrary(lib0, { sources: LIB_SRC });
+
+    // ------------------------------------------------------------ sample sheet (hand drawn)
+    const W = (...p) => ({ points: p.map(([x, y]) => ({ x, y })) });
+    const SAMPLE = {
+      version: 1, name: 'demo_top', lang: 'vhdl', sheet: { w: 1100, h: 760 },
+      symbols: [
+        { id: 'S1', type: 'counter', x: 300, y: 80, name: 'XLXI_1', params: { width: 8, en: true, reset: 'async', dir: 'up' } },
+        { id: 'S2', type: 'compare', x: 500, y: 160, name: 'XLXI_2', params: { width: 8, op: 'eq' } },
+        { id: 'S3', type: 'constant', x: 380, y: 180, name: 'XLXI_3', params: { value: '0xFF', width: 8 } },
+        { id: 'S4', type: 'and2', x: 300, y: 300, name: 'XLXI_4', params: { width: 1 } },
+        { id: 'S5', type: 'inv', x: 300, y: 400, name: 'XLXI_5', params: { width: 1 } },
+        { id: 'S6', type: 'or2', x: 440, y: 300, name: 'XLXI_6', params: { width: 1 } },
+        { id: 'S7', type: 'fd', x: 560, y: 380, name: 'XLXI_7', params: { init: '0' } },
+        { id: 'S8', type: 'module', x: 300, y: 480, name: 'u_ha', params: { module: 'half_adder', generics: {} } },
+        { id: 'S9', type: 'hdlblock', x: 300, y: 600, name: 'XLXI_9', params: { title: 'my_logic', inputs: [{ name: 'a', width: 1 }, { name: 'sel', width: 1 }], outputs: [{ name: 'xo', width: 1 }] },
+          hdl: "-- any VHDL statements\nxo <= a when sel = '0' else not a;" },
+      ],
+      wires: [
+        W([120, 90], [300, 90]), W([120, 110], [300, 110]), W([120, 130], [300, 130]),
+        W([390, 90], [700, 90]), W([450, 90], [450, 170], [500, 170]), W([440, 190], [500, 190]), W([580, 180], [700, 180]),
+        W([120, 310], [300, 310]), W([120, 330], [300, 330]), W([120, 410], [300, 410]),
+        W([380, 320], [410, 320], [410, 310], [440, 310]), W([360, 410], [420, 410], [420, 330], [440, 330]),
+        W([520, 320], [700, 320]), W([540, 320], [540, 390], [560, 390]), W([530, 410], [560, 410]), W([650, 390], [700, 390]),
+        W([260, 500], [300, 500]), W([260, 520], [300, 520]), W([430, 500], [700, 500]), W([430, 520], [700, 520]),
+        W([260, 620], [300, 620]), W([260, 640], [300, 640]), W([440, 620], [700, 620]),
+      ],
+      labels: [
+        { x: 530, y: 410, net: 'clk' }, { x: 260, y: 500, net: 'a' }, { x: 260, y: 520, net: 'b' },
+        { x: 260, y: 620, net: 'a' }, { x: 260, y: 640, net: 'sel' },
+      ],
+      ports: [
+        { name: 'en', dir: 'in', width: 1, x: 120, y: 90 }, { name: 'clk', dir: 'in', width: 1, x: 120, y: 110 }, { name: 'rst', dir: 'in', width: 1, x: 120, y: 130 },
+        { name: 'q', dir: 'out', width: 8, x: 700, y: 90 }, { name: 'match', dir: 'out', width: 1, x: 700, y: 180 },
+        { name: 'a', dir: 'in', width: 1, x: 120, y: 310 }, { name: 'b', dir: 'in', width: 1, x: 120, y: 330 }, { name: 'sel', dir: 'in', width: 1, x: 120, y: 410 },
+        { name: 'y', dir: 'out', width: 1, x: 700, y: 320 }, { name: 'led', dir: 'out', width: 1, x: 700, y: 390 },
+        { name: 'sum', dir: 'out', width: 1, x: 700, y: 500 }, { name: 'carry', dir: 'out', width: 1, x: 700, y: 520 },
+        { name: 'xo', dir: 'out', width: 1, x: 700, y: 620 },
+      ],
+    };
+
+    // ------------------------------------------------------------ editor
+    const KEY = 'xailinx.sch-demo';
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { saved = null; }
+    const genOut = document.getElementById('gen-out'), genInfo = document.getElementById('gen-info');
+    const ed = mountSchEditor(document.getElementById('editor'), {
+      doc: saved || SAMPLE,
+      modules: MODULES,
+      onChange: d => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* ignore */ } },
+      onGenerate: ({ lang, filename, code }) => { genOut.textContent = code; genInfo.textContent = `${filename} (${lang.toUpperCase()})`; },
+      onOpenModule: name => { const f = Object.entries(LIB_SRC).find(([, t]) => new RegExp(`\\b(entity|module)\\s+${name}\\b`, 'i').test(t)); alert(f ? `${f[0]}\n\n${f[1]}` : `Module ${name}`); },
+    });
+    window.schEditor = ed;
+    const download = (name, text) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+    document.getElementById('sample').onclick = () => ed.setDoc(SAMPLE);
+    document.getElementById('clear').onclick = () => ed.setDoc(newDoc('untitled', 'vhdl'));
+    document.getElementById('download').onclick = () => { const d = ed.getDoc(); download(`${d.name}.sch.json`, JSON.stringify(d, null, 2)); };
+
+    // ------------------------------------------------------------ import from HDL
+    const EXAMPLES = {
+      gates: { path: 'gates.vhd', text: `library ieee;
+use ieee.std_logic_1164.all;
+
+entity gates is
+  port (a, b, c : in std_logic;
+        s         : in std_logic;
+        d0, d1    : in std_logic_vector(3 downto 0);
+        y, k      : out std_logic;
+        q         : out std_logic_vector(3 downto 0);
+        hi        : out std_logic_vector(1 downto 0));
+end entity;
+
+architecture rtl of gates is
+  signal t : std_logic;
+begin
+  t  <= (a and b) or (not c);
+  y  <= t xor s;
+  k  <= a nand c;
+  q  <= d1 when s = '1' else d0;
+  hi <= d0(3 downto 2) and d1(1 downto 0);
+end architecture;` },
+      counter: { path: 'counter.vhd', text: `library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity counter is
+  generic (WIDTH : integer := 8);
+  port (clk, rst, en : in std_logic;
+        q   : out std_logic_vector(WIDTH-1 downto 0);
+        top : out std_logic);
+end entity;
+
+architecture rtl of counter is
+  signal cnt : unsigned(WIDTH-1 downto 0) := (others => '0');
+begin
+  process (clk, rst)
+  begin
+    if rst = '1' then
+      cnt <= (others => '0');
+    elsif rising_edge(clk) then
+      if en = '1' then cnt <= cnt + 1; end if;
+    end if;
+  end process;
+  q   <= std_logic_vector(cnt);
+  top <= '1' when cnt = 2**WIDTH - 1 else '0';
+end architecture;` },
+      fsm: { path: 'fsm.vhd', text: `library ieee;
+use ieee.std_logic_1164.all;
+
+entity seq_detect is
+  port (clk, reset, x : in std_logic; found : out std_logic);
+end entity;
+
+architecture two_proc of seq_detect is
+  type state_t is (IDLE, GOT1, GOT10, DETECTED);
+  signal state, next_state : state_t;
+begin
+  sync_proc : process (clk)
+  begin
+    if rising_edge(clk) then
+      if reset = '1' then state <= IDLE; else state <= next_state; end if;
+    end if;
+  end process;
+
+  comb_proc : process (state, x)
+  begin
+    next_state <= state; found <= '0';
+    case state is
+      when IDLE     => if x = '1' then next_state <= GOT1; end if;
+      when GOT1     => if x = '0' then next_state <= GOT10; end if;
+      when GOT10    => if x = '1' then next_state <= DETECTED; else next_state <= IDLE; end if;
+      when DETECTED => found <= '1'; if x = '1' then next_state <= GOT1; else next_state <= GOT10; end if;
+    end case;
+  end process;
+end architecture;` },
+      vtop: { path: 'top.v', text: `\`timescale 1ns/1ps
+module counter #(parameter N = 8) (input clk, input rst, input en, output reg [N-1:0] q, output tc);
+  assign tc = &q;
+  always @(posedge clk or posedge rst)
+    if (rst) q <= 0; else if (en) q <= q + 1'b1;
+endmodule
+
+module top(input clk, input btn, output [7:0] led, output [3:0] x);
+  wire t;
+  counter #(.N(8)) u0 (.clk(clk), .rst(btn), .en(1'b1), .q(led), .tc(t));
+  genvar i;
+  generate for (i = 0; i < 4; i = i + 1) begin : g
+    and a1(x[i], led[i], t);
+  end endgenerate
+endmodule` },
+    };
+    const hdlIn = document.getElementById('hdl-in'), topSel = document.getElementById('top'), status = document.getElementById('import-status');
+    let curPath = 'gates.vhd';
+    function setExample(k) {
+      const ex = EXAMPLES[k];
+      curPath = ex.path; hdlIn.value = ex.text; refreshTops();
+    }
+    function sources() {
+      const lang = /^\s*(library|entity|use)\b/im.test(hdlIn.value) ? 'vhdl' : 'verilog';
+      curPath = curPath.replace(/\.(vhd|v)$/, lang === 'vhdl' ? '.vhd' : '.v');
+      return [{ path: curPath, text: hdlIn.value }, ...Object.entries(LIB_SRC).map(([path, text]) => ({ path, text }))];
+    }
+    function refreshTops() {
+      const lib = compile([sources()[0]]);
+      const tops = [...lib.modules.keys()];
+      const cand = topCandidates(lib);
+      topSel.innerHTML = tops.map(t => `<option value="${t}">${t}</option>`).join('');
+      if (cand.length) topSel.value = cand[cand.length - 1];
+    }
+    let refreshTimer = null;
+    hdlIn.addEventListener('input', () => { clearTimeout(refreshTimer); refreshTimer = setTimeout(refreshTops, 400); });
+    document.getElementById('examples').onchange = e => { if (e.target.value) setExample(e.target.value); e.target.value = ''; };
+    document.getElementById('import').onclick = async () => {
+      status.className = ''; status.textContent = 'Compiling…';
+      try {
+        const srcs = sources();
+        const lib = compile(srcs);
+        const errs = lib.errors.filter(e => e.severity === 'error');
+        if (errs.length) throw new Error(errs.map(e => `${e.file}:${e.line}: ${e.message}`).join('\n'));
+        const d = elaborate(lib, topSel.value);
+        const derrs = d.diags.filter(e => e.severity === 'error');
+        if (derrs.length) throw new Error(derrs.map(e => `${e.file}:${e.line}: ${e.message}`).join('\n'));
+        status.textContent = 'Laying out with ELK…';
+        const elk = new globalThis.ELK();
+        const files = Object.fromEntries(srcs.map(s => [s.path, s.text]));
+        const modules = modulesFromLibrary(lib, { sources: files });
+        const doc = await schematicFromHdl(d.top, { sources: files, modules, layout: g => elk.layout(g) });
+        ed.setModules({ ...MODULES, ...modules });
+        ed.setDoc(doc);
+        const kinds = {};
+        for (const s of doc.symbols) kinds[s.type] = (kinds[s.type] || 0) + 1;
+        status.textContent = `Imported '${d.top.module}': ${Object.entries(kinds).map(([k, n]) => `${n} ${k}`).join(', ')}.`;
+      } catch (e) {
+        status.className = 'err'; status.textContent = e.message;
+      }
+    };
+    setExample('gates');
+  </script>
+</body>
+</html>
