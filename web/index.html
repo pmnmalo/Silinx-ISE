@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XAIlinx Project Navigator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='2' fill='%23c4161c'/%3E%3Ctext x='8' y='12' font-size='10' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3EX%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/vendor/codemirror/lib/codemirror.css">
+<link rel="stylesheet" href="/vendor/codemirror/addon/hint/show-hint.css">
+<link rel="stylesheet" href="/vendor/codemirror/addon/lint/lint.css">
+<link rel="stylesheet" href="/vendor/codemirror/addon/fold/foldgutter.css">
+<link rel="stylesheet" href="/vendor/codemirror/addon/dialog/dialog.css">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/asm-editor.css">
+<link rel="stylesheet" href="/css/schematic.css">
+<link rel="stylesheet" href="/css/isim.css">
+<script src="/vendor/codemirror/lib/codemirror.js"></script>
+<script src="/vendor/codemirror/mode/verilog/verilog.js"></script>
+<script src="/vendor/codemirror/mode/vhdl/vhdl.js"></script>
+<script src="/vendor/codemirror/addon/edit/matchbrackets.js"></script>
+<script src="/vendor/codemirror/addon/edit/closebrackets.js"></script>
+<script src="/vendor/codemirror/addon/selection/active-line.js"></script>
+<script src="/vendor/codemirror/addon/search/searchcursor.js"></script>
+<script src="/vendor/codemirror/addon/search/search.js"></script>
+<script src="/vendor/codemirror/addon/search/jump-to-line.js"></script>
+<script src="/vendor/codemirror/addon/search/match-highlighter.js"></script>
+<script src="/vendor/codemirror/addon/dialog/dialog.js"></script>
+<script src="/vendor/codemirror/addon/hint/show-hint.js"></script>
+<script src="/vendor/codemirror/addon/lint/lint.js"></script>
+<script src="/vendor/codemirror/addon/comment/comment.js"></script>
+<script src="/vendor/codemirror/addon/fold/foldcode.js"></script>
+<script src="/vendor/codemirror/addon/fold/foldgutter.js"></script>
+<script src="/vendor/codemirror/addon/fold/indent-fold.js"></script>
+<script src="/vendor/elk/elk.bundled.js"></script>
+</head>
+<body>
+<div id="app">
+  <div id="titlebar"><span class="app-logo">X</span><span id="title-text">XAIlinx - Project Navigator</span></div>
+  <div id="menubar"></div>
+  <div id="toolbar"></div>
+  <div id="main">
+    <div id="left">
+      <div id="left-pages">
+        <div class="left-page" data-page="design">
+          <div class="ise-panel" id="design-panel">
+            <div class="caption"><span>Design</span><span class="spacer"></span></div>
+            <div class="view-select">
+              <span>View:</span>
+              <label><input type="radio" name="view" value="impl" checked> <span class="ico-inline" data-icon="chip"></span>Implementation</label>
+              <label><input type="radio" name="view" value="sim"> <span class="ico-inline" data-icon="sim"></span>Simulation</label>
+            </div>
+            <div class="hier-caption">Hierarchy</div>
+            <div class="body" id="hier"></div>
+          </div>
+          <div id="left-split"></div>
+          <div class="ise-panel" id="proc-panel">
+            <div class="caption"><span id="proc-caption">Processes:</span><span class="spacer"></span></div>
+            <div class="body" id="procs"></div>
+          </div>
+        </div>
+        <div class="left-page" data-page="start" hidden><div class="ise-panel fill"><div class="caption">Start</div><div class="body" id="start-page"></div></div></div>
+        <div class="left-page" data-page="files" hidden><div class="ise-panel fill"><div class="caption">Files</div><div class="body" id="files-page"></div></div></div>
+        <div class="left-page" data-page="libraries" hidden><div class="ise-panel fill"><div class="caption">Libraries</div><div class="body" id="libs-page"></div></div></div>
+      </div>
+      <div id="left-tabs" class="bottom-tabs">
+        <div class="tab" data-page="start">Start</div>
+        <div class="tab active" data-page="design">Design</div>
+        <div class="tab" data-page="files">Files</div>
+        <div class="tab" data-page="libraries">Libraries</div>
+      </div>
+    </div>
+    <div id="v-split"></div>
+    <div id="center">
+      <div id="workspace"></div>
+      <div id="doc-tabs" class="bottom-tabs"></div>
+    </div>
+  </div>
+  <div id="h-split"></div>
+  <div id="console-wrap" class="ise-panel">
+    <div class="caption"><span id="console-caption">Console</span><span class="spacer"></span>
+      <button class="tb-btn" id="console-clear" title="Clear">⌫</button></div>
+    <div class="body" id="console-body">
+      <div class="console-page" data-page="console" id="console-log"></div>
+      <div class="console-page" data-page="errors" id="console-errors" hidden></div>
+      <div class="console-page" data-page="warnings" id="console-warnings" hidden></div>
+    </div>
+    <div id="console-tabs" class="bottom-tabs">
+      <div class="tab active" data-page="console"><span class="ico-inline" data-icon="console"></span>Console</div>
+      <div class="tab" data-page="errors"><span class="ico-inline" data-icon="err"></span>Errors <span class="count" id="err-count"></span></div>
+      <div class="tab" data-page="warnings"><span class="ico-inline" data-icon="warn"></span>Warnings <span class="count" id="warn-count"></span></div>
+    </div>
+  </div>
+  <div id="statusbar"><span id="status-text">Ready</span><span class="spacer"></span><span id="status-pos"></span><span id="status-device"></span></div>
+</div>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

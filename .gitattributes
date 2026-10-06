@@ -1,0 +1,4 @@
+*.sh text eol=lf
+docker/ise/* text eol=lf
+docker/ise/*.ps1 text eol=crlf
+run.sh text eol=lf

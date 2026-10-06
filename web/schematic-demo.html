@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XAIlinx - RTL schematic viewer demo</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/schematic.css">
+  <style>
+    body { display: flex; flex-direction: column; }
+    .bar { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--toolbar-grad); border-bottom: 1px solid var(--border); }
+    .bar b { color: var(--title-fg); }
+    .bar .sp { flex: 1; }
+    main { flex: 1; min-height: 0; display: grid; grid-template-columns: 240px 1fr; grid-template-rows: 1fr 150px; gap: 4px; padding: 4px; }
+    #hier { grid-row: 1 / span 2; }
+    #schPanel { min-height: 0; }
+    #sch { flex: 1; min-height: 0; border: 0; }
+    .tree .row.sel span { color: inherit !important; }
+    #src pre { margin: 0; font: 11px/1.45 var(--mono); }
+    #src .ln { display: inline-block; width: 36px; color: #888; text-align: right; padding-right: 8px; }
+    #src .hl { background: #ffff9a; display: block; }
+    .status { padding: 2px 8px; border-top: 1px solid var(--border); background: var(--bg); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .diag { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <b>RTL Schematic demo</b>
+    <label>Library <select id="libSel"></select></label>
+    <label>Top <select id="topSel"></select></label>
+    <span class="sp"></span>
+    <span id="diag" class="diag"></span>
+    <button class="btn" id="export" type="button">Export SVG</button>
+  </div>
+  <main>
+    <section class="ise-panel" id="hier"><div class="caption">Hierarchy</div><div class="body"><ul class="tree" id="tree"></ul></div></section>
+    <section class="ise-panel" id="schPanel"><div class="caption"><span id="schCaption">RTL Schematic</span></div><div class="body" id="sch" style="overflow:hidden"></div></section>
+    <section class="ise-panel" id="src"><div class="caption"><span id="srcCaption">Source</span></div><div class="body"><pre id="srcText"></pre></div></section>
+  </main>
+  <div class="status" id="status">Double-click an instance to push into it; double-click logic to open its source. Drag to pan, wheel to zoom.</div>
+
+  <script type="module">
+    import { compile, elaborate } from '/core/compile.js';
+    import { buildSchematic } from '/core/schematic.js';
+    import { mountSchematic } from './js/schematic-view.js';
+    import { LIBRARIES } from './js/schematic-demo-data.js';
+
+    const $ = id => document.getElementById(id);
+    const status = t => { $('status').textContent = t; };
+    let lib = null, sources = [], design = null, byPath = new Map(), parent = new Map(), current = null;
+
+    const view = mountSchematic($('sch'), {
+      onOpenInstance: path => open(path),
+      onOpenSource: ref => showSource(ref.file, ref.line),
+      onSelect: item => {
+        if (!item) return status('Nothing selected');
+        if (item.kind === 'node') status(`Selected ${item.node.kind} ${item.node.label || item.node.gate || ''}${item.node.sub ? ' : ' + item.node.sub : ''}`);
+        else status(`Selected net ${item.name || '(unnamed)'} [${item.w}] — ${item.edges.length} segment(s)`);
+      },
+    });
+    window.schView = view;
+
+    for (const [k, L] of Object.entries(LIBRARIES)) $('libSel').add(new Option(L.label, k));
+    $('libSel').onchange = () => loadLib($('libSel').value);
+    $('topSel').onchange = () => elab($('topSel').value);
+    $('export').onclick = () => {
+      const blob = new Blob([view.exportSvg()], { type: 'image/svg+xml' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = (current?.module || 'schematic') + '.svg'; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+
+    function loadLib(key) {
+      const L = LIBRARIES[key];
+      $('libSel').value = key;
+      sources = L.sources;
+      lib = compile(sources);
+      $('topSel').innerHTML = '';
+      for (const t of L.tops) $('topSel').add(new Option(t, t));
+      elab(L.tops[0]);
+    }
+
+    function elab(top) {
+      design = elaborate(lib, top);
+      const diags = [...lib.errors, ...design.diags].filter(d => d.severity === 'error');
+      $('diag').textContent = diags.length ? `${diags.length} error(s): ${diags[0].message}` : '';
+      byPath = new Map(); parent = new Map();
+      const walk = (i, p) => { byPath.set(i.path, i); if (p) parent.set(i.path, p); (i.children || []).forEach(c => walk(c, i)); };
+      if (design.top) walk(design.top, null);
+      renderTree();
+      if (design.top) open(design.top.path);
+      else view.show({ id: 'none', nodes: [], edges: [] }, { title: `top '${top}' not found` });
+    }
+
+    function renderTree() {
+      const li = i => `<li><div class="row" data-path="${i.path}"><span class="twisty">${i.children?.length ? '▾' : ''}</span>${i.name} <span style="color:var(--muted)">(${i.module})</span></div>${i.children?.length ? `<ul>${i.children.map(li).join('')}</ul>` : ''}</li>`;
+      $('tree').innerHTML = design.top ? li(design.top) : '';
+    }
+    $('tree').addEventListener('click', e => { const r = e.target.closest('.row'); if (r) open(r.dataset.path); });
+
+    function open(path) {
+      const inst = byPath.get(path);
+      if (!inst) return status(`No instance ${path}`);
+      current = inst;
+      const chain = []; for (let i = inst; i; i = parent.get(i.path)) chain.unshift(i);
+      const t0 = performance.now();
+      const graph = buildSchematic(inst);
+      view.show(graph, { title: `${inst.module}${inst.file ? ' — ' + inst.file : ''}`, breadcrumb: chain.map(i => ({ label: i.name, path: i.path })) });
+      $('schCaption').textContent = `RTL Schematic — ${graph.title} (${graph.nodes.length} symbols, ${graph.edges.length} wires)`;
+      for (const r of $('tree').querySelectorAll('.row')) r.classList.toggle('sel', r.dataset.path === path);
+      status(`Opened ${path} (schematic built in ${(performance.now() - t0).toFixed(1)} ms)`);
+      if (inst.file) showSource(inst.file, inst.loc?.line || 1, true);
+    }
+
+    function showSource(file, line, quiet) {
+      const s = sources.find(x => x.path === file);
+      $('srcCaption').textContent = `Source — ${file}:${line}`;
+      if (!s) { $('srcText').textContent = '(source not available)'; return; }
+      const esc = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+      $('srcText').innerHTML = s.text.split('\n').map((l, i) => i + 1 === line ? `<span class="hl"><span class="ln">${i + 1}</span>${esc(l)}</span>` : `<span class="ln">${i + 1}</span>${esc(l)}\n`).join('');
+      const hl = $('srcText').querySelector('.hl');
+      if (hl) hl.scrollIntoView({ block: 'center' });
+      if (!quiet) status(`Opened source ${file}:${line}`);
+    }
+
+    const q = new URLSearchParams(location.search);
+    loadLib(q.get('lib') || 'verilog');
+    if (q.get('top')) { $('topSel').value = q.get('top'); elab(q.get('top')); }
+    if (q.get('open')) open(q.get('open'));
+  </script>
+</body>
+</html>

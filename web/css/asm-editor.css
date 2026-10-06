@@ -1,0 +1,222 @@
+/* XAIlinx ASM chart editor. Everything is scoped under .asm-editor and themed with the
+   app variables --bg --panel --fg --muted --accent --border --danger (with fallbacks). */
+
+.asm-editor {
+  --asm-bg: var(--bg, #15171c);
+  --asm-panel: var(--panel, #1d2027);
+  --asm-fg: var(--fg, #d8dbe2);
+  --asm-muted: var(--muted, #8a90a0);
+  --asm-accent: var(--accent, #4f9cf9);
+  --asm-border: var(--border, #2e333d);
+  --asm-danger: var(--danger, #f0605d);
+  --asm-warn: var(--warning, #e5a83b);
+  --asm-ok: var(--success, #4cc38a);
+  --asm-mono: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
+  --asm-node: color-mix(in srgb, var(--asm-panel) 88%, var(--asm-fg) 12%);
+  --asm-state-fill: color-mix(in srgb, var(--asm-panel) 82%, var(--asm-accent) 18%);
+  --asm-dec-fill: color-mix(in srgb, var(--asm-panel) 85%, #c08cf0 15%);
+  --asm-out-fill: color-mix(in srgb, var(--asm-panel) 84%, var(--asm-ok) 16%);
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  background: var(--asm-bg);
+  color: var(--asm-fg);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  outline: none;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.asm-editor *, .asm-editor *::before, .asm-editor *::after { box-sizing: border-box; }
+
+/* ------------------------------------------------------------------ toolbar */
+.asm-editor .asm-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 6px 8px;
+  background: var(--asm-panel);
+  border-bottom: 1px solid var(--asm-border);
+}
+.asm-editor .asm-group { display: flex; align-items: center; gap: 4px; }
+.asm-editor .asm-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--asm-border); }
+.asm-editor .asm-spacer { flex: 1; }
+.asm-editor .asm-zoom { min-width: 42px; text-align: center; color: var(--asm-muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+.asm-editor .asm-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 28px; padding: 0 10px;
+  border: 1px solid var(--asm-border); border-radius: 6px;
+  background: color-mix(in srgb, var(--asm-panel) 85%, var(--asm-fg) 15%);
+  color: var(--asm-fg); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+  transition: background .12s, border-color .12s;
+}
+.asm-editor .asm-btn:hover:not(:disabled) { border-color: var(--asm-accent); background: color-mix(in srgb, var(--asm-panel) 75%, var(--asm-accent) 25%); }
+.asm-editor .asm-btn:disabled { opacity: .4; cursor: default; }
+.asm-editor .asm-btn.on { border-color: var(--asm-accent); color: var(--asm-accent); }
+.asm-editor .asm-btn.asm-primary { background: var(--asm-accent); border-color: var(--asm-accent); color: #fff; font-weight: 600; }
+.asm-editor .asm-btn.asm-primary:hover { filter: brightness(1.1); background: var(--asm-accent); }
+.asm-editor .asm-btn.asm-danger:hover:not(:disabled) { border-color: var(--asm-danger); background: color-mix(in srgb, var(--asm-panel) 75%, var(--asm-danger) 25%); }
+.asm-editor .asm-btn.asm-add { padding: 0 8px; }
+.asm-editor .asm-btn.asm-small { height: 22px; padding: 0 8px; font-size: 11.5px; }
+.asm-editor .asm-select {
+  height: 28px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--asm-border);
+  background: var(--asm-bg); color: var(--asm-fg); font: inherit; font-size: 12.5px;
+}
+
+/* shape icons */
+.asm-editor .asm-ico { display: inline-block; flex: none; width: 22px; height: 14px; border: 1.6px solid currentColor; }
+.asm-editor .asm-ico.ico-state { border-radius: 2px; background: var(--asm-state-fill); }
+.asm-editor .asm-ico.ico-decision { width: 13px; height: 13px; margin: 0 4px; transform: rotate(45deg); background: var(--asm-dec-fill); }
+.asm-editor .asm-ico.ico-output { border-radius: 8px; background: var(--asm-out-fill); }
+
+/* ------------------------------------------------------------------ layout */
+.asm-editor .asm-body { flex: 1; display: flex; min-height: 0; }
+.asm-editor .asm-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.asm-editor .asm-canvas-wrap { position: relative; flex: 1; min-height: 120px; }
+.asm-editor .asm-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: default; user-select: none; -webkit-user-select: none; touch-action: none; }
+.asm-editor .asm-canvas.panning, .asm-editor .asm-canvas.space { cursor: grab; }
+.asm-editor .asm-canvas.panning { cursor: grabbing; }
+.asm-editor .asm-canvas.connecting { cursor: crosshair; }
+.asm-editor .asm-hint {
+  position: absolute; left: 10px; bottom: 8px; right: 10px; pointer-events: none;
+  color: var(--asm-muted); font-size: 11.5px; opacity: .8;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.asm-editor .asm-side {
+  width: 320px; flex: none; overflow-y: auto;
+  background: var(--asm-panel); border-left: 1px solid var(--asm-border);
+}
+.asm-editor .asm-section { border-bottom: 1px solid var(--asm-border); padding: 10px 12px; }
+.asm-editor details.asm-section { padding: 0; }
+.asm-editor details.asm-section > summary {
+  padding: 9px 12px; cursor: pointer; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--asm-muted);
+  list-style: none; user-select: none;
+}
+.asm-editor details.asm-section > summary::-webkit-details-marker { display: none; }
+.asm-editor details.asm-section > summary::before { content: "▸"; display: inline-block; width: 14px; transition: transform .12s; }
+.asm-editor details.asm-section[open] > summary::before { transform: rotate(90deg); }
+.asm-editor .asm-section-body { padding: 0 12px 12px; }
+.asm-editor .asm-section h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--asm-muted); }
+.asm-editor .asm-muted { color: var(--asm-muted); margin: 0 0 8px; font-size: 12.5px; }
+.asm-editor .asm-legend { display: grid; gap: 6px; font-size: 12px; color: var(--asm-muted); }
+.asm-editor .asm-legend > div { display: flex; align-items: center; gap: 6px; }
+.asm-editor .asm-row { margin-top: 10px; display: flex; gap: 6px; }
+.asm-editor .asm-section .asm-btn { margin-top: 4px; }
+
+.asm-editor .asm-field { display: block; margin-bottom: 10px; }
+.asm-editor .asm-label { display: block; font-size: 11.5px; color: var(--asm-muted); margin-bottom: 3px; }
+.asm-editor .asm-fhint { display: block; color: var(--asm-muted); font-size: 11px; margin-top: 3px; line-height: 1.35; }
+.asm-editor .asm-input {
+  width: 100%; padding: 5px 7px; border-radius: 5px; border: 1px solid var(--asm-border);
+  background: var(--asm-bg); color: var(--asm-fg); font: inherit; font-size: 12.5px;
+}
+.asm-editor .asm-input.mono, .asm-editor textarea.asm-input { font-family: var(--asm-mono); font-size: 12px; }
+.asm-editor textarea.asm-input { resize: vertical; min-height: 56px; line-height: 1.45; }
+.asm-editor .asm-input:focus, .asm-editor .asm-select:focus { outline: none; border-color: var(--asm-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--asm-accent) 30%, transparent); }
+.asm-editor .asm-check { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 12.5px; cursor: pointer; }
+.asm-editor .asm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.asm-editor .asm-ports { margin: 4px 0 10px; }
+.asm-editor .asm-ports-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.asm-editor .asm-ports-head .asm-btn { margin: 0; }
+.asm-editor .asm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.asm-editor .asm-table th { text-align: left; font-weight: 500; color: var(--asm-muted); font-size: 11px; padding: 0 3px 2px; }
+.asm-editor .asm-table td { padding: 2px 3px; }
+.asm-editor .asm-table td.c { text-align: center; width: 1%; }
+.asm-editor .asm-table .asm-input { padding: 3px 5px; }
+.asm-editor .asm-table .asm-input.w { width: 52px; }
+.asm-editor .asm-table .asm-input.d { width: 70px; }
+.asm-editor .asm-x { border: 0; background: none; color: var(--asm-muted); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; }
+.asm-editor .asm-x:hover { color: var(--asm-danger); background: color-mix(in srgb, var(--asm-danger) 15%, transparent); }
+
+/* problems */
+.asm-editor .asm-prob-count { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.asm-editor .asm-problems { list-style: none; margin: 0; padding: 0 6px 8px; }
+.asm-editor .asm-prob { display: flex; gap: 7px; padding: 5px 6px; border-radius: 5px; font-size: 12px; line-height: 1.35; }
+.asm-editor .asm-prob.link { cursor: pointer; }
+.asm-editor .asm-prob.link:hover { background: color-mix(in srgb, var(--asm-panel) 80%, var(--asm-fg) 20%); }
+.asm-editor .asm-sev { flex: none; width: 14px; text-align: center; font-size: 11px; line-height: 16px; }
+.asm-editor .asm-prob.error .asm-sev { color: var(--asm-danger); }
+.asm-editor .asm-prob.warning .asm-sev { color: var(--asm-warn); }
+.asm-editor .asm-prob.info .asm-sev { color: var(--asm-accent); font-style: italic; font-weight: 700; }
+.asm-editor .asm-prob.ok { color: var(--asm-ok); }
+.asm-editor .c-err { color: var(--asm-danger); }
+.asm-editor .c-warn { color: var(--asm-warn); }
+.asm-editor .c-ok { color: var(--asm-ok); }
+
+/* code preview */
+.asm-editor .asm-codepanel { flex: 0 0 42%; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--asm-border); background: var(--asm-panel); }
+.asm-editor .asm-codepanel[hidden] { display: none; }
+.asm-editor .asm-codebar { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--asm-border); }
+.asm-editor .asm-codebar .asm-btn { height: 24px; padding: 0 8px; }
+.asm-editor .asm-code-title { font-family: var(--asm-mono); font-size: 12px; color: var(--asm-muted); }
+.asm-editor .asm-code {
+  flex: 1; margin: 0; padding: 10px 12px; overflow: auto; background: var(--asm-bg);
+  font: 12px/1.5 var(--asm-mono); color: var(--asm-fg); tab-size: 4; white-space: pre;
+}
+.asm-editor .asm-code.has-err { color: var(--asm-danger); white-space: pre-wrap; }
+.asm-editor .tk-com { color: var(--asm-muted); font-style: italic; }
+.asm-editor .tk-kw { color: color-mix(in srgb, var(--asm-accent) 80%, #fff 20%); font-weight: 600; }
+.asm-editor .tk-lit { color: #e3a86b; }
+.asm-editor .tk-st { color: #c99bf2; }
+.asm-editor .tk-attr { color: var(--asm-muted); }
+
+/* status bar */
+.asm-editor .asm-status {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  height: 24px; padding: 0 10px; font-size: 11.5px; color: var(--asm-muted);
+  background: var(--asm-panel); border-top: 1px solid var(--asm-border);
+}
+.asm-editor .asm-status-msg.err { color: var(--asm-danger); }
+.asm-editor .asm-status-msg.ok { color: var(--asm-ok); }
+
+/* ------------------------------------------------------------------ SVG chart */
+.asm-editor .asm-griddot { fill: color-mix(in srgb, var(--asm-fg) 22%, transparent); }
+.asm-editor .asm-bg { fill-opacity: 1; }
+.asm-editor .asm-block {
+  fill: color-mix(in srgb, var(--asm-accent) 4%, transparent);
+  stroke: color-mix(in srgb, var(--asm-muted) 55%, transparent);
+  stroke-width: 1; stroke-dasharray: 5 4; pointer-events: none;
+}
+.asm-editor .asm-node { cursor: move; }
+.asm-editor .asm-shape { stroke: var(--asm-fg); stroke-width: 1.5; }
+.asm-editor .asm-state .asm-shape { fill: var(--asm-state-fill); }
+.asm-editor .asm-decision .asm-shape { fill: var(--asm-dec-fill); }
+.asm-editor .asm-output .asm-shape { fill: var(--asm-out-fill); }
+.asm-editor .asm-node:hover .asm-shape { stroke: var(--asm-accent); }
+.asm-editor .asm-node.sel .asm-shape { stroke: var(--asm-accent); stroke-width: 2.5; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--asm-accent) 60%, transparent)); }
+.asm-editor .asm-node.warn .asm-shape { stroke: var(--asm-warn); stroke-dasharray: 6 3; }
+.asm-editor .asm-node.err .asm-shape { stroke: var(--asm-danger); stroke-dasharray: 6 3; stroke-width: 2; }
+.asm-editor .asm-node.drop .asm-shape { stroke: var(--asm-ok); stroke-width: 3; stroke-dasharray: none; }
+.asm-editor .asm-text { fill: var(--asm-fg); font: 12px var(--asm-mono); pointer-events: none; }
+.asm-editor .asm-empty { fill: var(--asm-muted); font-style: italic; font-size: 11px; font-family: system-ui, sans-serif; }
+.asm-editor .asm-tag rect { fill: var(--asm-panel); stroke: var(--asm-fg); stroke-width: 1.2; }
+.asm-editor .asm-tag text { fill: var(--asm-fg); font: 600 12px var(--asm-mono); pointer-events: none; }
+.asm-editor .asm-node.initial .asm-tag rect { fill: var(--asm-accent); stroke: var(--asm-accent); }
+.asm-editor .asm-node.initial .asm-tag text { fill: #fff; }
+.asm-editor .asm-init-mark { fill: #fff; }
+.asm-editor .asm-node.sel .asm-tag rect { stroke: var(--asm-accent); }
+.asm-editor .asm-statecode { fill: var(--asm-muted); font: 11px var(--asm-mono); pointer-events: none; }
+
+.asm-editor .asm-port { fill: var(--asm-bg); stroke: var(--asm-muted); stroke-width: 1.4; cursor: crosshair; opacity: .55; transition: opacity .1s; }
+.asm-editor .asm-port.free { stroke: var(--asm-accent); fill: color-mix(in srgb, var(--asm-accent) 35%, var(--asm-bg)); opacity: 1; }
+.asm-editor .asm-node:hover .asm-port, .asm-editor .asm-node.sel .asm-port { opacity: 1; }
+.asm-editor .asm-port:hover { fill: var(--asm-accent); stroke: var(--asm-accent); r: 7px; }
+
+.asm-editor .asm-edge { cursor: pointer; }
+.asm-editor .asm-edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
+.asm-editor .asm-edge-line { fill: none; stroke: color-mix(in srgb, var(--asm-fg) 80%, transparent); stroke-width: 1.5; stroke-linejoin: round; }
+.asm-editor .asm-edge:hover .asm-edge-line { stroke: var(--asm-accent); }
+.asm-editor .asm-edge.sel .asm-edge-line { stroke: var(--asm-accent); stroke-width: 2.5; }
+.asm-editor .asm-arrowhead { fill: color-mix(in srgb, var(--asm-fg) 80%, transparent); }
+.asm-editor .asm-arrowhead.sel { fill: var(--asm-accent); }
+.asm-editor .asm-edge-label { fill: var(--asm-fg); font: 700 11px var(--asm-mono); pointer-events: none; }
+.asm-editor .asm-edge-temp { fill: none; stroke: var(--asm-accent); stroke-width: 2; stroke-dasharray: 6 4; pointer-events: none; }
+.asm-editor .asm-rubber { fill: color-mix(in srgb, var(--asm-accent) 12%, transparent); stroke: var(--asm-accent); stroke-dasharray: 4 3; pointer-events: none; }
+
+@media (max-width: 760px) {
+  .asm-editor .asm-body { flex-direction: column; }
+  .asm-editor .asm-side { width: auto; max-height: 45%; border-left: 0; border-top: 1px solid var(--asm-border); }
+}

@@ -1,0 +1,134 @@
+/* XAIlinx RTL schematic viewer — ISE 14.x "View RTL Schematic" look. Scoped under .sch-view. */
+.sch-view {
+  position: relative; overflow: hidden; outline: none;
+  background-color: var(--sch-bg, #fff);
+  background-image: radial-gradient(circle, var(--sch-grid, #e8e8f0) 1px, transparent 1.2px);
+  background-size: 20px 20px;
+  user-select: none; -webkit-user-select: none;
+  cursor: default; touch-action: none;
+  font: var(--fs, 12px) var(--font, Tahoma, sans-serif);
+  min-height: 120px;
+}
+.sch-view.panning, .sch-view.panning * { cursor: grabbing !important; }
+.sch-view > .sch-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ---------- floating toolbar */
+.sch-view .sch-toolbar {
+  position: absolute; left: 6px; top: 6px; right: 6px; z-index: 2; pointer-events: none;
+  display: flex; align-items: center; gap: 1px; min-height: 26px;
+}
+.sch-view .sch-toolbar > * { pointer-events: auto; }
+.sch-view .sch-btn {
+  width: 24px; height: 22px; padding: 0; border: 1px solid #b9c9de; border-radius: 2px;
+  background: linear-gradient(#fdfdfd, #e6eaf0); display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08); cursor: default;
+}
+.sch-view .sch-btn:hover { border-color: #3c7fb1; background: linear-gradient(#f3f8fd, #d5e6f8); }
+.sch-view .sch-btn:active { background: linear-gradient(#c4e5f6, #98d1ef); }
+.sch-view .sch-btn:disabled { opacity: .45; border-color: #ccc; background: #f4f4f4; }
+.sch-view .sch-btn svg { width: 16px; height: 16px; }
+.sch-view .sch-sep { width: 1px; height: 18px; background: #c0c0c0; margin: 0 4px; box-shadow: 1px 0 #fff; }
+.sch-view .sch-crumbs {
+  margin-left: 6px; padding: 2px 8px; min-height: 22px; display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,.92); border: 1px solid #c9d7ed; border-radius: 2px; color: var(--title-fg, #15428b);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 120px);
+}
+.sch-view .sch-crumbs:empty { display: none; }
+.sch-view .sch-crumb { color: var(--title-fg, #15428b); text-decoration: none; }
+.sch-view a.sch-crumb { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.sch-view a.sch-crumb:hover { color: var(--accent, #316ac5); }
+.sch-view .sch-crumb.cur { font-weight: bold; }
+.sch-view .sch-crumb-sep { color: var(--muted, #6d6d6d); }
+.sch-view .sch-title { color: var(--muted, #6d6d6d); margin-left: 8px; }
+.sch-view .sch-crumb + .sch-title, .sch-view .sch-crumb.cur ~ .sch-title { border-left: 1px solid #c9d7ed; padding-left: 8px; }
+
+.sch-view .sch-zoomlabel {
+  position: absolute; right: 6px; bottom: 4px; z-index: 2; color: var(--muted, #6d6d6d); font-size: 10px;
+  background: rgba(255,255,255,.8); padding: 0 4px; pointer-events: none;
+}
+
+/* ---------- hint ("Laying out…", empty) */
+.sch-view .sch-hint {
+  position: absolute; left: 50%; top: 44px; transform: translateX(-50%); z-index: 3;
+  background: #ffffe1; border: 1px solid #767676; padding: 4px 10px; color: #000;
+  box-shadow: 2px 2px 3px rgba(0,0,0,.18); pointer-events: none; white-space: nowrap;
+}
+.sch-view .sch-hint.empty { top: 50%; transform: translate(-50%, -50%); background: #fff; color: var(--muted, #6d6d6d); border-color: var(--border-light, #d4d0c8); box-shadow: none; }
+
+/* ---------- tooltip (Windows classic) */
+.sch-view .sch-tip {
+  position: absolute; z-index: 4; pointer-events: none; max-width: 420px;
+  background: #ffffe1; color: #000; border: 1px solid #767676; padding: 3px 6px;
+  box-shadow: 2px 2px 3px rgba(0,0,0,.2); font-size: 11px; line-height: 1.4;
+}
+.sch-view .sch-tip .m { color: #555; }
+.sch-view .sch-tip code { font-family: var(--mono, monospace); font-size: 11px; }
+.sch-view .sch-tip hr { border: 0; border-top: 1px solid #c8c8a0; margin: 3px 0; }
+
+/* ---------- SVG drawing (rules containing ".sch-svg " are also embedded by exportSvg()) */
+.sch-view .sch-svg text { font-family: Arial, Helvetica, sans-serif; font-size: 11px; fill: var(--sch-text); }
+.sch-view .sch-svg .wire { fill: none; stroke: var(--sch-wire); stroke-width: 1; stroke-linejoin: miter; }
+.sch-view .sch-svg .edge.bus .wire { stroke: var(--sch-bus); stroke-width: 3; }
+.sch-view .sch-svg .hit { fill: none; stroke: transparent; stroke-width: 8; }
+.sch-view .sch-svg .pinhit .hit { fill: transparent; stroke: none; }
+.sch-view .sch-svg .nodehit { fill: transparent; stroke: none; }
+.sch-view .sch-svg .junction { fill: var(--sch-wire); stroke: none; }
+.sch-view .sch-svg .netlabel { font-size: 9px; fill: var(--sch-wire); }
+.sch-view .sch-svg .slash { stroke: var(--sch-bus); stroke-width: 1; }
+.sch-view .sch-svg .wtext { font-size: 8px; fill: var(--sch-bus); }
+
+.sch-view .sch-svg .pin { stroke: var(--sch-symbol); stroke-width: 1; }
+.sch-view .sch-svg .pin.bus { stroke-width: 3; }
+.sch-view .sch-svg .box { fill: var(--sch-inst-fill); stroke: var(--sch-symbol); stroke-width: 1.4; }
+.sch-view .sch-svg .box.reg { fill: var(--sch-symbol-fill); }
+.sch-view .sch-svg .box.comb { fill: var(--sch-symbol-fill); }
+.sch-view .sch-svg .box.tb { fill: #fafafa; stroke-dasharray: 5 3; }
+.sch-view .sch-svg .box.blackbox { fill: #fff4f4; stroke: var(--danger, #c00000); stroke-dasharray: 6 3; }
+.sch-view .sch-svg .regbar { stroke: var(--sch-symbol); stroke-width: 0.6; }
+.sch-view .sch-svg .gate { fill: var(--sch-symbol-fill); stroke: var(--sch-symbol); stroke-width: 1.4; }
+.sch-view .sch-svg .gate.nofill { fill: none; }
+.sch-view .sch-svg .ripper { fill: var(--sch-symbol); stroke: var(--sch-symbol); stroke-width: 1; }
+.sch-view .sch-svg .pad { fill: var(--sch-symbol-fill); stroke: var(--sch-symbol); stroke-width: 1.2; }
+.sch-view .sch-svg .flag { fill: #fff; stroke: var(--sch-wire); stroke-width: 1; }
+.sch-view .sch-svg .clk { fill: none; stroke: var(--sch-symbol); stroke-width: 1; }
+.sch-view .sch-svg .mod { font-weight: bold; font-size: 11px; fill: var(--sch-symbol); }
+.sch-view .sch-svg .mod.kindtag { font-size: 10px; fill: #8a8aa8; letter-spacing: .5px; }
+.sch-view .sch-svg .ilabel { font-size: 11px; fill: var(--sch-text); }
+.sch-view .sch-svg .pinlabel { font-size: 9px; fill: var(--sch-pin); }
+.sch-view .sch-svg .pinlabel.small { font-size: 8px; }
+.sch-view .sch-svg .rmark { font-size: 8px; font-weight: bold; fill: var(--sch-pin); }
+.sch-view .sch-svg .wlabel { font-size: 8px; fill: var(--sch-pin); }
+.sch-view .sch-svg .plabel { font-size: 11px; font-weight: bold; fill: var(--sch-text); }
+.sch-view .sch-svg .psub { font-size: 9px; font-weight: normal; fill: var(--sch-pin); }
+.sch-view .sch-svg .flabel { font-size: 9px; fill: var(--sch-wire); }
+.sch-view .sch-svg .clabel { font-size: 10px; fill: #006000; font-family: Consolas, "Courier New", monospace; }
+.sch-view .sch-svg .glabel { font-size: 9px; fill: var(--sch-symbol); }
+.sch-view .sch-svg .glabel.op { font-size: 12px; font-weight: bold; }
+.sch-view .sch-svg .glabel.small { font-size: 8px; font-weight: normal; }
+
+/* openable symbols */
+.sch-view .sch-svg .node.openable { cursor: pointer; }
+
+/* hover + selection (not exported) */
+.sch-view .sch-svg .edge.hover .wire, .sch-view .sch-svg .junction.hover { stroke: var(--sch-highlight); fill: var(--sch-highlight); }
+.sch-view .sch-svg .edge.hover .wire { fill: none; stroke-width: 2; }
+.sch-view .sch-svg .edge.bus.hover .wire { stroke-width: 4; }
+.sch-view .sch-svg .netlabel.hover, .sch-view .sch-svg .wann.hover text { fill: var(--sch-highlight); }
+.sch-view .sch-svg .node.hover .box, .sch-view .sch-svg .node.hover .gate, .sch-view .sch-svg .node.hover .pad,
+.sch-view .sch-svg .node.hover .pin, .sch-view .sch-svg .node.hover .flag, .sch-view .sch-svg .node.hover .clk { stroke: var(--sch-highlight); }
+.sch-view .sch-svg .node.hover .ripper { fill: var(--sch-highlight); stroke: var(--sch-highlight); }
+
+.sch-view .sch-svg .edge.sel .wire { stroke: var(--sch-select); stroke-width: 2; }
+.sch-view .sch-svg .edge.bus.sel .wire { stroke-width: 4; }
+.sch-view .sch-svg .junction.sel { fill: var(--sch-select); }
+.sch-view .sch-svg .netlabel.sel, .sch-view .sch-svg .wann.sel text { fill: var(--sch-select); }
+.sch-view .sch-svg .wann.sel line { stroke: var(--sch-select); }
+.sch-view .sch-svg .node.sel .box, .sch-view .sch-svg .node.sel .gate, .sch-view .sch-svg .node.sel .pad,
+.sch-view .sch-svg .node.sel .pin, .sch-view .sch-svg .node.sel .flag, .sch-view .sch-svg .node.sel .clk { stroke: var(--sch-select); }
+.sch-view .sch-svg .node.sel .box, .sch-view .sch-svg .node.sel .gate { stroke-width: 2; }
+.sch-view .sch-svg .node.sel .ripper { fill: var(--sch-select); stroke: var(--sch-select); }
+.sch-view .sch-svg .node.sel text { fill: var(--sch-select); }
+
+/* low zoom: drop small text for speed and legibility */
+.sch-view.sch-lod .sch-svg .pinlabel, .sch-view.sch-lod .sch-svg .wlabel, .sch-view.sch-lod .sch-svg .netlabel,
+.sch-view.sch-lod .sch-svg .wann, .sch-view.sch-lod .sch-svg .rmark { display: none; }

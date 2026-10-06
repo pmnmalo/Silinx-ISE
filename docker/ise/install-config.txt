@@ -1,0 +1,11 @@
+# Xilinx ISE 14.7 unattended install (batchxsetup --batch): WebPACK, no cable drivers
+# (programming is done by XAIlinx on the host), no license manager GUI.
+destination_dir=/opt/Xilinx
+copy_preferences=N
+use_multiple_cores=Y
+
+package=ISE WebPACK::1
+application=setupEnv.sh::0
+application=Install Linux System Generator Info XML::0
+application=Ensure Linux System Generator Symlinks::0
+application=Install Cable Drivers::0

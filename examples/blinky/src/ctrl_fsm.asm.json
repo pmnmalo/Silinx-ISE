@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "name": "ctrl_fsm",
+  "lang": "vhdl",
+  "clock": "clk",
+  "reset": {
+    "name": "rst",
+    "active": "high",
+    "sync": false
+  },
+  "encoding": "binary",
+  "inputs": [
+    {
+      "name": "start",
+      "width": 1
+    },
+    {
+      "name": "done",
+      "width": 1
+    }
+  ],
+  "outputs": [
+    {
+      "name": "busy",
+      "width": 1,
+      "default": "0",
+      "registered": false
+    },
+    {
+      "name": "load",
+      "width": 1,
+      "default": "0",
+      "registered": false
+    },
+    {
+      "name": "ready",
+      "width": 1,
+      "default": "0",
+      "registered": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "s1",
+      "type": "state",
+      "x": 200,
+      "y": 80,
+      "name": "IDLE",
+      "actions": [
+        "ready = 1"
+      ]
+    },
+    {
+      "id": "d1",
+      "type": "decision",
+      "x": 200,
+      "y": 190,
+      "cond": "start"
+    },
+    {
+      "id": "o1",
+      "type": "output",
+      "x": 200,
+      "y": 290,
+      "actions": [
+        "load = 1"
+      ]
+    },
+    {
+      "id": "s2",
+      "type": "state",
+      "x": 200,
+      "y": 390,
+      "name": "RUN",
+      "actions": [
+        "busy = 1"
+      ]
+    },
+    {
+      "id": "d2",
+      "type": "decision",
+      "x": 200,
+      "y": 500,
+      "cond": "done"
+    },
+    {
+      "id": "s3",
+      "type": "state",
+      "x": 200,
+      "y": 610,
+      "name": "FINISH",
+      "actions": [
+        "busy = 1",
+        "ready = 1"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "s1",
+      "to": "d1",
+      "port": "next"
+    },
+    {
+      "id": "e2",
+      "from": "d1",
+      "to": "o1",
+      "port": "true"
+    },
+    {
+      "id": "e3",
+      "from": "d1",
+      "to": "s1",
+      "port": "false"
+    },
+    {
+      "id": "e4",
+      "from": "o1",
+      "to": "s2",
+      "port": "next"
+    },
+    {
+      "id": "e5",
+      "from": "s2",
+      "to": "d2",
+      "port": "next"
+    },
+    {
+      "id": "e6",
+      "from": "d2",
+      "to": "s3",
+      "port": "true"
+    },
+    {
+      "id": "e7",
+      "from": "d2",
+      "to": "s2",
+      "port": "false"
+    },
+    {
+      "id": "e8",
+      "from": "s3",
+      "to": "s1",
+      "port": "next"
+    }
+  ],
+  "initial": "s1"
+}

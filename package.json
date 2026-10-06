@@ -1,0 +1,28 @@
+{
+  "name": "xailinx",
+  "version": "0.1.0",
+  "description": "XAIlinx - HDL design platform: projects, schematics, behavioral simulation and Spartan-3E programming",
+  "type": "module",
+  "bin": {
+    "xailinx": "bin/xailinx.js"
+  },
+  "scripts": {
+    "start": "node bin/xailinx.js serve",
+    "test": "node --test test/*.test.js",
+    "build:standalone": "node scripts/build-standalone.mjs"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "codemirror": "^5.65.21",
+    "elkjs": "^0.9.3",
+    "express": "^4.22.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pmnmalo/XAIlinx.git"
+  },
+  "author": "Pedro Malo"
+}

@@ -1,0 +1,1108 @@
+// XAIlinx Project Navigator — main application shell (ISE-like).
+import { api, followJob } from './api.js';
+import { icons, icon } from './icons.js';
+import { h, dialog, alertDlg, confirmDlg, popupMenu, menuBar, splitter, toast, downloadText } from './ui.js';
+import { createEditor, instTemplate, SNIPPETS, defineUcfMode, typeText } from './editor.js';
+import { compile, elaborate, topCandidates } from '/core/compile.js';
+import { Simulator } from '/core/simulator.js';
+import { buildSchematic } from '/core/schematic.js';
+import * as wiz from './wizards.js';
+
+// ------------------------------------------------------------------ state
+export const S = {
+  project: null, devices: null, toolchain: null,
+  view: 'impl', sources: [], lib: null, modules: [],
+  sel: null, docs: [], active: null, status: {}, diags: [], busy: false,
+};
+window.XAIlinx = S; // handy for debugging from the console
+
+const $ = id => document.getElementById(id);
+
+// ------------------------------------------------------------------ console
+export function log(text, cls = '') {
+  const el = $('console-log');
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+  for (const line of String(text).split('\n')) el.append(h('div', { class: `ln ${cls}` }, line));
+  while (el.childElementCount > 5000) el.firstChild.remove();
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+function logLine(line) {
+  let cls = '';
+  if (/^(ERROR|FATAL)|\bERROR:/i.test(line) || /=== XAILINX FAILED/.test(line)) cls = 'err';
+  else if (/^WARNING|\bWARNING:/i.test(line)) cls = 'warn';
+  else if (/=== XAILINX (STEP|DONE)/.test(line) || /completed successfully/i.test(line)) cls = 'ok';
+  log(line, cls);
+}
+function showConsolePage(page) {
+  document.querySelectorAll('#console-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.page === page));
+  document.querySelectorAll('.console-page').forEach(p => { p.hidden = p.dataset.page !== page; });
+}
+
+// Diagnostics (Errors / Warnings tabs)
+export function setDiagnostics(diags, { source = 'check' } = {}) {
+  S.diags = diags;
+  const errs = diags.filter(d => d.severity === 'error'), warns = diags.filter(d => d.severity !== 'error');
+  const fill = (el, list, ico) => {
+    el.innerHTML = '';
+    if (!list.length) { el.append(h('div', { class: 'ln info' }, 'No messages.')); return; }
+    for (const d of list) {
+      const row = h('div', { class: 'diag' }, icon(ico),
+        h('span', {}, `${d.severity === 'error' ? 'ERROR' : 'WARNING'}:${d.tool || 'HDLCompiler'} - `),
+        d.file ? h('span', { class: 'loc' }, `"${d.file}" Line ${d.line}`) : null,
+        h('span', {}, `: ${d.message}`));
+      row.addEventListener('click', () => d.file && openFile(d.file, d.line, d.col));
+      el.append(row);
+    }
+  };
+  fill($('console-errors'), errs, 'err');
+  fill($('console-warnings'), warns, 'warn');
+  $('err-count').textContent = errs.length ? `(${errs.length})` : '';
+  $('warn-count').textContent = warns.length ? `(${warns.length})` : '';
+  // push file-local diagnostics to open editors
+  for (const doc of S.docs) if (doc.editor) doc.editor.setDiagnostics(diags.filter(d => d.file === doc.path && d.source !== 'parse'));
+}
+
+export function status(text) { $('status-text').textContent = text; }
+
+// ------------------------------------------------------------------ compile
+export function compileProject() {
+  if (!S.project) return;
+  const srcs = S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
+  S.lib = compile(srcs);
+  // module info for editor completion / templates
+  const fileOf = new Map();
+  for (const p of S.lib.parsed) for (const u of p.units) if (u.kind === 'module' || u.kind === 'package') fileOf.set(u.name, p);
+  S.modules = [...S.lib.modules.values()].map(m => ({
+    name: m.name, lang: m.lang, file: m.archFile || m.file, line: m.loc?.line || 1, kind: m.lang === 'vhdl' ? 'entity' : 'module',
+    role: S.project.files.find(f => f.path === m.file)?.role || 'design',
+    portList: m.ports.map(p => ({ name: p.name, dir: p.dir, type: typeText(p.type, m.lang) })),
+    paramList: m.params.filter(p => !p.local).map(p => p.name),
+    ports: m.ports.map(p => `${p.dir.padEnd(5)} ${p.name} : ${typeText(p.type, m.lang)}`).join('\n'),
+    mod: m,
+  }));
+  return S.lib;
+}
+
+// The project's board with the variant (pin overrides) that matches the selected part.
+export function projectBoard(pj = S.project) {
+  const b = S.devices?.boards.find(x => x.id === pj?.board);
+  if (!b) return null;
+  const v = b.variants?.find(x => x.device.part === pj.device.part) || b.variants?.find(x => x.default) || null;
+  const ov = v?.resourceOverrides || {};
+  return { ...b, device: { ...(v?.device || b.device) }, resources: b.resources.map(r => (ov[r.name] ? { ...r, ...ov[r.name] } : r)) };
+}
+
+function moduleInfo(name) { return S.modules.find(m => m.name === name) || S.modules.find(m => m.name.toLowerCase() === String(name).toLowerCase()); }
+
+// Static hierarchy (from instances in the source, like ISE's Design view).
+function instancesOf(mod) {
+  const out = [];
+  const visit = (items, prefix) => {
+    for (const it of items || []) {
+      if (it.kind === 'instance') out.push({ name: prefix + it.name, module: it.module, loc: it.loc });
+      if (it.kind === 'generate_for') visit(it.items, `${prefix}${it.label}.`);
+      if (it.kind === 'generate_if') { visit(it.then, prefix + (it.label ? it.label + '.' : '')); visit(it.else, prefix); }
+    }
+  };
+  visit(mod.items, '');
+  return out;
+}
+
+// ------------------------------------------------------------------ hierarchy panel
+function renderHierarchy() {
+  const host = $('hier');
+  host.innerHTML = '';
+  if (!S.project) { host.append(h('div', { class: 'tree empty' }, 'No project open. Use File > New Project or File > Open Project.')); return; }
+  const pj = S.project;
+  const tree = h('ul', { class: 'tree' });
+  const dev = `${pj.device.part}${pj.device.speed}-${pj.device.package}`;
+  const root = treeItem({ label: pj.name, ico: 'project', open: true, onSelect: () => select({ type: 'project' }), key: 'project' });
+  tree.append(root.li);
+  const devItem = treeItem({ label: S.view === 'impl' ? dev : 'Behavioral', ico: S.view === 'impl' ? 'chip' : 'sim', open: true, key: 'device', onSelect: () => select({ type: 'device' }), onContext: e => projectContextMenu(e) });
+  root.ul.append(devItem.li);
+
+  const lib = S.lib;
+  const role = name => moduleInfo(name)?.role || 'design';
+  const visible = name => S.view === 'sim' || role(name) === 'design';
+  let roots = topCandidates(lib).filter(visible);
+  if (S.view === 'impl') {
+    // modules only instantiated from sim files are roots too
+    const used = new Set();
+    for (const m of lib.modules.values()) if (visible(m.name)) for (const i of instancesOf(m)) used.add(i.module.toLowerCase());
+    roots = [...lib.modules.values()].filter(m => visible(m.name) && !used.has(m.name.toLowerCase())).map(m => m.name);
+  }
+  const topName = S.view === 'impl' ? pj.top : pj.simTop;
+  roots.sort((a, b) => (a === topName ? -1 : b === topName ? 1 : a.localeCompare(b)));
+  const addModule = (parentUl, modName, instName, depth, path) => {
+    const info = moduleInfo(modName);
+    const isTop = !instName && modName === topName;
+    const file = info?.file || '?';
+    const label = instName ? `${instName} - ${modName}` : modName;
+    const it = treeItem({
+      label, meta: info ? `(${file.split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
+      cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2,
+      onSelect: () => select({ type: 'module', module: modName, file, path, instName }),
+      onOpen: () => info && openFile(file, info.line),
+      onContext: e => moduleContextMenu(e, modName, file),
+    });
+    parentUl.append(it.li);
+    if (info && depth < 30) {
+      const kids = instancesOf(info.mod);
+      if (!kids.length) it.setLeaf();
+      for (const k of kids) addModule(it.ul, k.module, k.name, depth + 1, `${path}/${k.name}`);
+    } else it.setLeaf();
+  };
+  for (const r of roots) addModule(devItem.ul, r, null, 0, r);
+
+  // packages, constraints, ASM charts and other files
+  for (const p of lib.packages.values()) {
+    const fi = S.project.files.find(f => f.path === p.file);
+    if (S.view === 'impl' && fi?.role === 'sim') continue;
+    const it = treeItem({ label: p.name, meta: `(${p.file.split('/').pop()})`, ico: 'vhdl', key: `pkg:${p.name}`, onSelect: () => select({ type: 'file', file: p.file }), onOpen: () => openFile(p.file, p.loc?.line), onContext: e => fileContextMenu(e, p.file) });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
+  if (S.view === 'impl' && pj.constraints && S.fileTree?.includes(pj.constraints)) {
+    const it = treeItem({ label: pj.constraints.split('/').pop(), ico: 'ucf', key: 'ucf', onSelect: () => select({ type: 'ucf', file: pj.constraints }), onOpen: () => openFile(pj.constraints), onContext: e => fileContextMenu(e, pj.constraints) });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
+  for (const f of (S.fileTree || []).filter(f => /\.asm\.json$/.test(f))) {
+    const it = treeItem({ label: f.split('/').pop(), ico: 'asm', key: `asm:${f}`, onSelect: () => select({ type: 'asm', file: f }), onOpen: () => openAsm(f), onContext: e => fileContextMenu(e, f) });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
+  // files that failed to parse into any unit
+  const withUnits = new Set(lib.parsed.filter(p => p.units.length).map(p => p.file));
+  for (const f of S.project.files.filter(f => !withUnits.has(f.path) && (S.view === 'sim' || f.role === 'design'))) {
+    const it = treeItem({ label: f.path.split('/').pop(), meta: '(no units)', ico: f.lang === 'vhdl' ? 'vhdl' : 'verilog', key: `f:${f.path}`, onSelect: () => select({ type: 'file', file: f.path }), onOpen: () => openFile(f.path), onContext: e => fileContextMenu(e, f.path) });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
+  host.append(tree);
+  // restore selection
+  const key = S.selKey;
+  const row = key && host.querySelector(`[data-key="${CSS.escape(key)}"]`);
+  if (row) row.classList.add('sel');
+  else {
+    const first = host.querySelector(`[data-key^="m:"]`);
+    if (first) first.dispatchEvent(new MouseEvent('click'));
+  }
+}
+
+function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onContext, cls = '', key }) {
+  const li = h('li');
+  const tw = h('span', { class: 'twisty' }, open ? '▾' : '▸');
+  const row = h('div', { class: `row ${cls}`, 'data-key': key }, tw, icon(ico), h('span', { class: 'lbl' }, label), meta ? h('span', { class: 'meta' }, meta) : null);
+  const ul = h('ul');
+  if (!open) ul.hidden = true;
+  li.append(row, ul);
+  tw.addEventListener('click', e => { e.stopPropagation(); ul.hidden = !ul.hidden; tw.textContent = ul.hidden ? '▸' : '▾'; });
+  row.addEventListener('click', () => {
+    row.closest('.tree').querySelectorAll('.row.sel').forEach(r => r.classList.remove('sel'));
+    row.classList.add('sel');
+    if (row.closest('#hier')) S.selKey = key;
+    onSelect?.();
+  });
+  row.addEventListener('dblclick', () => { if (onOpen) onOpen(); else if (ul.childElementCount) tw.click(); });
+  row.addEventListener('contextmenu', e => { e.preventDefault(); row.click(); onContext?.(e); });
+  return { li, ul, row, setLeaf() { tw.textContent = ''; } };
+}
+
+function select(sel) {
+  S.sel = sel;
+  renderProcesses();
+}
+
+function moduleContextMenu(e, mod, file) {
+  const isSimView = S.view === 'sim';
+  popupMenu([
+    { label: isSimView ? 'Set as Simulation Top' : 'Set as Top Module', action: () => setTop(mod, isSimView) },
+    { label: 'Open', action: () => { const i = moduleInfo(mod); if (i) openFile(i.file, i.line); } },
+    { label: 'View RTL Schematic', action: () => openSchematic(mod) },
+    isSimView ? { label: 'Simulate Behavioral Model', action: () => runSimulation(mod) } : null,
+    '-',
+    { label: 'New Source…', action: () => wiz.newSourceWizard() },
+    { label: 'Add Source…', action: () => wiz.addSourceDialog() },
+    { label: 'Remove from Project', action: () => removeFile(file) },
+    '-',
+    { label: 'Source Properties…', action: () => wiz.sourceProperties(file) },
+  ].filter(Boolean), e.clientX, e.clientY);
+}
+function fileContextMenu(e, file) {
+  popupMenu([
+    { label: 'Open', action: () => (file.endsWith('.asm.json') ? openAsm(file) : openFile(file)) },
+    { label: 'Remove from Project', action: () => removeFile(file) },
+    { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) },
+  ], e.clientX, e.clientY);
+}
+function projectContextMenu(e) {
+  popupMenu([
+    { label: 'New Source…', action: () => wiz.newSourceWizard() },
+    { label: 'Add Source…', action: () => wiz.addSourceDialog() },
+    '-',
+    { label: 'Design Properties…', action: () => wiz.projectProperties() },
+  ], e.clientX, e.clientY);
+}
+
+export async function setTop(mod, sim = S.view === 'sim') {
+  if (sim) S.project.simTop = mod; else S.project.top = mod;
+  await saveProjectJson();
+  markStale();
+  renderHierarchy();
+  log(`Top-level ${sim ? 'simulation ' : ''}module set to '${mod}'.`, 'info');
+}
+
+export async function saveProjectJson() {
+  S.project = await api.saveProject(S.project.name, S.project);
+}
+
+async function removeFile(file) {
+  if (!await confirmDlg('Remove Source', `Remove '${file}' from the project?\n(The file is deleted from the project folder.)`)) return;
+  closeDocByPath(file);
+  await api.deleteFile(S.project.name, file);
+  await reloadProject();
+}
+
+// ------------------------------------------------------------------ processes panel
+const STATUS_ICON = { ok: 'ok', warn: 'warn', err: 'err', running: 'running', stale: 'stale' };
+
+function processDefs() {
+  const sel = S.sel || {};
+  if (!S.project) return [];
+  if (sel.type === 'asm') return [
+    { id: 'asm-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.file) },
+  ];
+  if (sel.type === 'ucf') return [
+    { id: 'ucf-edit', label: 'Edit Constraints (Text)', ico: 'ucf', run: () => openFile(sel.file) },
+    { id: 'pins', label: 'I/O Pin Planning', ico: 'pins', run: () => openPinPlanner() },
+  ];
+  if (sel.type !== 'module') return [{ id: 'none', label: 'No processes for the selected item', ico: 'process', disabled: true }];
+  const mod = sel.module;
+  if (S.view === 'sim') return [
+    { id: 'isim', label: 'ISim Simulator', ico: 'sim', children: [
+      { id: 'sim-check', label: 'Behavioral Check Syntax', ico: 'process', run: () => checkSyntax(mod, true) },
+      { id: 'sim-run', label: 'Simulate Behavioral Model', ico: 'wave', run: () => runSimulation(mod) },
+    ] },
+    { id: 'rtl-sim', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
+  ];
+  return [
+    { id: 'summary', label: 'Design Summary/Reports', ico: 'summary', run: () => openSummary() },
+    { id: 'utils', label: 'Design Utilities', ico: 'procGroup', children: [
+      { id: 'template', label: 'View HDL Instantiation Template', ico: 'template', run: () => openInstTemplate(mod) },
+    ] },
+    { id: 'constraints', label: 'User Constraints', ico: 'procGroup', children: [
+      { id: 'pins', label: 'I/O Pin Planning', ico: 'pins', run: () => openPinPlanner(mod) },
+      { id: 'ucf-edit', label: 'Edit Constraints (Text)', ico: 'ucf', run: () => openUcf() },
+    ] },
+    { id: 'synth', label: 'Synthesize - XST', ico: 'process', run: () => runImpl(mod, ['synth']), children: [
+      { id: 'rtl', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
+      { id: 'check', label: 'Check Syntax', ico: 'process', run: () => checkSyntax(mod) },
+    ] },
+    { id: 'impl', label: 'Implement Design', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par']), children: [
+      { id: 'translate', label: 'Translate', ico: 'process', run: () => runImpl(mod, ['synth', 'translate']) },
+      { id: 'map', label: 'Map', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map']) },
+      { id: 'par', label: 'Place & Route', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par']) },
+    ] },
+    { id: 'bitgen', label: 'Generate Programming File', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par', 'bitgen']) },
+    { id: 'config', label: 'Configure Target Device', ico: 'impact', run: () => openImpact(), children: [
+      { id: 'impact', label: 'Manage Configuration Project (iMPACT)', ico: 'impact', run: () => openImpact() },
+    ] },
+  ];
+}
+
+export function renderProcesses() {
+  const host = $('procs');
+  host.innerHTML = '';
+  const sel = S.sel || {};
+  $('proc-caption').textContent = `Processes: ${sel.module || (sel.file ? sel.file.split('/').pop() : '')}`;
+  const tree = h('ul', { class: 'tree' });
+  const add = (ul, p) => {
+    const li = h('li');
+    const st = S.status[p.id];
+    const tw = h('span', { class: 'twisty' }, p.children ? '▾' : '');
+    const row = h('div', { class: `row${p.disabled ? ' disabled' : ''}` }, tw, h('span', { class: 'status', html: st ? icons[STATUS_ICON[st]] : '' }), icon(p.ico || 'process'), h('span', { class: 'lbl' }, p.label));
+    const sub = h('ul');
+    li.append(row, sub);
+    tw.addEventListener('click', e => { e.stopPropagation(); sub.hidden = !sub.hidden; tw.textContent = sub.hidden ? '▸' : '▾'; });
+    row.addEventListener('click', () => { host.querySelectorAll('.row.sel').forEach(r => r.classList.remove('sel')); row.classList.add('sel'); S.selProc = p; });
+    row.addEventListener('dblclick', () => p.run && !p.disabled && runProcess(p));
+    row.addEventListener('contextmenu', e => {
+      e.preventDefault(); row.click();
+      popupMenu([
+        { label: 'Run', action: () => runProcess(p), disabled: !p.run || p.disabled },
+        { label: 'Rerun', action: () => runProcess(p), disabled: !p.run || p.disabled },
+        '-',
+        { label: 'Process Properties…', action: () => wiz.implProperties(), disabled: !['synth', 'impl', 'bitgen', 'map', 'par', 'translate'].includes(p.id) },
+      ], e.clientX, e.clientY);
+    });
+    ul.append(li);
+    for (const c of p.children || []) add(sub, c);
+  };
+  for (const p of processDefs()) add(tree, p);
+  host.append(tree);
+}
+
+async function runProcess(p) {
+  if (S.busy && !['summary', 'template', 'pins', 'ucf-edit', 'rtl', 'rtl-sim', 'asm-open', 'impact', 'config'].includes(p.id)) { toast('Another process is running', 'error'); return; }
+  try { await p.run(); }
+  catch (e) { log(`ERROR: ${e.message}`, 'err'); console.error(e); }
+}
+
+function setStatus(id, st) { S.status[id] = st; renderProcesses(); }
+function markStale() {
+  for (const k of Object.keys(S.status)) if (S.status[k] && S.status[k] !== 'running') S.status[k] = 'stale';
+  renderProcesses();
+}
+
+// ------------------------------------------------------------------ check syntax / elaboration
+function diagsFor(lib, design) {
+  const all = [...lib.errors, ...(design ? design.diags : [])];
+  const seen = new Set();
+  return all.filter(d => { const k = `${d.file}:${d.line}:${d.message}`; if (seen.has(k)) return false; seen.add(k); return true; })
+    .map(d => ({ ...d, tool: d.tool || 'HDLCompiler' }));
+}
+
+export async function saveAll() {
+  for (const d of S.docs) if (d.dirty && d.save) await d.save();
+}
+
+async function checkSyntax(mod, sim = false) {
+  await saveAll();
+  const id = sim ? 'sim-check' : 'check';
+  setStatus(id, 'running');
+  log(`\nStarted : "${sim ? 'Behavioral Check Syntax' : 'Check Syntax'}".\n`, 'hdr');
+  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design'));
+  for (const s of srcs) log(`${s.lang === 'vhdl' ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${s.path}" into library work`);
+  const lib = compile(srcs);
+  const design = elaborate(lib, mod);
+  const diags = diagsFor(lib, design);
+  setDiagnostics(diags);
+  const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
+  for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn');
+  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err'); setStatus(id, 'err'); showConsolePage('errors'); return false; }
+  log(`Elaborating top module <${mod}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
+  log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
+  setStatus(id, nw ? 'warn' : 'ok');
+  return true;
+}
+
+// ------------------------------------------------------------------ implementation (ISE)
+// Live per-step status from run.sh's "=== XAILINX STEP <step> ===" markers and ISE WARNING/ERROR lines.
+const STEP_PROC = { synth: 'synth', translate: 'translate', map: 'map', par: 'par', trce: 'par', bitgen: 'bitgen', prombit: 'bitgen' };
+const STEP_TOOL = { synth: 'Xst', translate: 'NgdBuild', map: 'Map', par: 'Par', trce: 'Timing', bitgen: 'Bitgen', prombit: 'Bitgen' };
+const RANK = { ok: 0, warn: 1, err: 2 };
+const worst = (...xs) => xs.filter(Boolean).reduce((a, b) => (RANK[b] > RANK[a] ? b : a), 'ok');
+
+function stepTracker() {
+  const result = {};              // process id -> ok | warn | err (this run)
+  let cur = null, warns = 0;
+  const t = { warnings: 0, failed: false, diags: [] };
+  const setProc = (id, st) => { result[id] = st === 'running' ? result[id] : worst(result[id], st); S.status[id] = st === 'running' ? 'running' : result[id]; };
+  const refreshGroups = () => {
+    if (['translate', 'map', 'par'].some(k => result[k] || S.status[k] === 'running')) {
+      const done = result.par && S.status.par !== 'running';
+      S.status.impl = done || t.failed ? worst(result.translate, result.map, result.par) : 'running';
+    }
+  };
+  const finish = (ok = true) => {
+    if (!cur) return;
+    const id = STEP_PROC[cur];
+    setProc(id, ok ? (warns ? 'warn' : 'ok') : 'err');
+    cur = null;
+  };
+  t.line = line => {
+    logLine(line);
+    let m;
+    if ((m = /^=== XAILINX STEP (\w+) ===/.exec(line))) {
+      finish();
+      cur = m[1]; warns = 0;
+      if (STEP_PROC[cur]) setProc(STEP_PROC[cur], 'running');
+    } else if ((m = /^=== XAILINX FAILED (\w+)/.exec(line))) {
+      cur = cur || m[1];
+      t.failed = true;
+      finish(false);
+    } else if (/^=== XAILINX DONE ===/.test(line)) {
+      finish();
+    } else if (cur && (m = /^(WARNING|ERROR):([\w-]+(?::\d+)?)\s*-\s*(.*)$/.exec(line))) {
+      if (m[1] === 'WARNING') { warns++; t.warnings++; }
+      t.diags.push({ severity: m[1] === 'ERROR' ? 'error' : 'warning', tool: m[2] || STEP_TOOL[cur], message: m[3], file: null, line: 0 });
+    }
+    refreshGroups();
+    renderProcesses();
+  };
+  t.end = ok => {
+    if (cur) finish(ok);
+    refreshGroups();
+    renderProcesses();
+  };
+  return t;
+}
+
+// Catch board/device/UCF mismatches before spending minutes in ISE.
+async function checkConstraints() {
+  const pj = S.project;
+  const board = projectBoard(pj);
+  if (!board) return true;
+  const devStr = d => `${d.part}${d.speed}-${d.package}`;
+  if (board.device.part !== pj.device.part || board.device.package !== pj.device.package) {
+    log(`ERROR: the project device ${devStr(pj.device)} does not match the board ${board.name} (${devStr(board.device)}). Fix it in Project > Design Properties.`, 'err');
+    showConsolePage('console');
+    return false;
+  }
+  if (!pj.constraints || !S.fileTree.includes(pj.constraints)) return true;
+  const { parseUcf, locsNotOnBoard } = await import('/core/ucf.js');
+  let bad = [];
+  try { bad = locsNotOnBoard(parseUcf(await api.readFile(pj.name, pj.constraints)).assignments, board); } catch { return true; }
+  if (!bad.length) return true;
+  const list = bad.slice(0, 8).map(b => `${b.net}=${b.loc}`).join(', ') + (bad.length > 8 ? ', …' : '');
+  log(`ERROR: ${pj.constraints} uses ${bad.length} pin(s) that are not on the ${board.name}: ${list}`, 'err');
+  const fix = await confirmDlg('Constraints do not match the board',
+    `${pj.constraints} assigns ${bad.length} pin(s) that do not exist on the ${board.name} (${list}).\n\nRegenerate the constraints from the ${board.name} pin table now? (ports are matched by name: clk, led, sw, btn, seg, an…)`);
+  if (!fix) return false;
+  return regenerateUcf(board);
+}
+
+export async function regenerateUcf(board = projectBoard()) {
+  const pj = S.project;
+  if (!board || !pj.top) return false;
+  const { boardAutoAssign, generateUcf } = await import('/core/ucf.js');
+  const design = elaborate(S.lib, pj.top);
+  if (!design.top) return false;
+  const ports = design.top.ports.map(p => ({ name: p.name, dir: p.dir, width: p.sig.t.w, msb: p.sig.t.w > 1 ? p.sig.t.left : null, lsb: p.sig.t.w > 1 ? p.sig.t.right : null }));
+  const { assignments, clocks, matched, unmatched } = boardAutoAssign(ports, board);
+  const text = generateUcf({ ports, assignments, clocks, header: `UCF for top '${pj.top}' on ${board.name} (${board.device.part}${board.device.speed}-${board.device.package}), generated by XAIlinx` });
+  pj.constraints ||= 'constraints/top.ucf';
+  await api.writeFile(pj.name, pj.constraints, text);
+  await saveProjectJson();
+  await reloadProject(false);
+  const d = findDoc(`file:${pj.constraints}`);
+  if (d) { d.editor.setValue(text); d.editor.markClean(); setDirty(d, false); }
+  log(`${pj.constraints} regenerated for ${board.name}: ${matched.join(', ') || 'no ports matched'}${unmatched.length ? `; NOT assigned (use I/O Pin Planning): ${unmatched.join(', ')}` : ''}`, unmatched.length ? 'warn' : 'ok');
+  return unmatched.length === 0;
+}
+async function runImpl(mod, steps) {
+  if (S.project.top !== mod) {
+    if (!await confirmDlg('Set Top Module', `'${mod}' is not the top-level module of the implementation.\nSet it as top and continue?`)) return;
+    await setTop(mod, false);
+  }
+  if (!await checkSyntax(mod)) return;
+  if (!await checkConstraints()) return;
+  const procId = steps.includes('bitgen') ? 'bitgen' : steps.includes('translate') ? 'impl' : 'synth';
+  S.busy = true;
+  // Clear the icons of the processes this run will redo (they get running/ok/warn/err as it goes).
+  const runs = new Set(['synth', ...(steps.includes('translate') ? ['translate', 'impl'] : []), ...(steps.includes('map') ? ['map'] : []), ...(steps.includes('par') ? ['par'] : []), ...(steps.includes('bitgen') ? ['bitgen'] : [])]);
+  for (const id of runs) S.status[id] = null;
+  setStatus(procId, 'running');
+  status(`Running ${procId}…`);
+  log(`\nStarted : "${{ synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId]}".\n`, 'hdr');
+  const track = stepTracker();
+  try {
+    const tc = S.toolchain || await api.toolchain();
+    if (!tc.ise.available) {
+      log(`Xilinx ISE toolchain not available (${tc.ise.mode} mode): ${tc.ise.reason}`, 'warn');
+      log('The build directory and run.sh are still generated so they can be run on a machine with ISE 14.7. Configure it in Tools > Toolchain Settings.', 'info');
+    }
+    const { job } = await api.implement(S.project.name, { steps, generateOnly: !tc.ise.available });
+    const res = await followJob(job, track.line);
+    track.end(res.status === 'ok');
+    if (res.status === 'ok' && tc.ise.available) {
+      log(`\nProcess "${{ synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId]}" completed successfully${track.warnings ? ` with ${track.warnings} warning(s)` : ''}`, 'ok');
+    } else if (res.status === 'ok') {
+      setStatus(procId, 'warn');
+      log(`\nScripts generated in ${S.project.name}/build (ISE not run).`, 'warn');
+    } else {
+      if (!track.failed) setStatus(procId, 'err');
+      log(`\nProcess failed: ${res.error || 'see log'}`, 'err');
+    }
+    if (track.diags.length) {
+      setDiagnostics([...S.diags.filter(d => d.tool === 'HDLCompiler'), ...track.diags]);
+      if (track.failed) showConsolePage('errors');
+    }
+    refreshSummary();
+  } catch (e) {
+    setStatus(procId, 'err');
+    log(`ERROR: ${e.message}`, 'err');
+  } finally {
+    S.busy = false;
+    status('Ready');
+  }
+}
+
+// ------------------------------------------------------------------ documents
+function docTab(doc) {
+  const tab = h('div', { class: 'tab', title: doc.tooltip || doc.title }, icon(doc.icon || 'file'), h('span', { class: 'tlabel' }, doc.title),
+    h('span', { class: 'tclose', title: 'Close' }, '✕'));
+  tab.addEventListener('mousedown', e => { if (e.button === 0 && !e.target.closest('.tclose')) activateDoc(doc); });
+  tab.querySelector('.tclose').addEventListener('click', e => { e.stopPropagation(); closeDoc(doc); });
+  tab.addEventListener('auxclick', e => { if (e.button === 1) closeDoc(doc); });
+  tab.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    popupMenu([
+      { label: 'Close', action: () => closeDoc(doc) },
+      { label: 'Close Others', action: () => S.docs.filter(d => d !== doc).forEach(closeDoc) },
+      { label: 'Close All', action: () => [...S.docs].forEach(closeDoc) },
+    ], e.clientX, e.clientY);
+  });
+  return tab;
+}
+
+export function findDoc(id) { return S.docs.find(d => d.id === id); }
+
+// doc: { id, title, icon, create(el) -> controller }, controller: { onActivate, save, destroy, editor }
+export function openDoc(spec) {
+  let doc = findDoc(spec.id);
+  if (doc) { activateDoc(doc); return doc; }
+  doc = { ...spec, el: h('div', { class: 'doc' }) };
+  $('workspace').append(doc.el);
+  doc.tab = docTab(doc);
+  $('doc-tabs').append(doc.tab);
+  S.docs.push(doc);
+  activateDoc(doc);
+  Object.assign(doc, spec.create(doc.el, doc) || {});
+  doc.onActivate?.();
+  return doc;
+}
+
+export function activateDoc(doc) {
+  S.active = doc;
+  for (const d of S.docs) { d.el.hidden = d !== doc; d.tab.classList.toggle('active', d === doc); }
+  doc.onActivate?.();
+  $('status-pos').textContent = '';
+  updateTitle();
+}
+
+export function setDirty(doc, dirty) {
+  doc.dirty = dirty;
+  doc.tab.classList.toggle('dirty', dirty);
+}
+
+export async function closeDoc(doc) {
+  if (doc.dirty) {
+    const r = await dialog({ title: 'Save Changes', body: h('div', {}, `Save changes to "${doc.title}"?`), buttons: [{ label: 'Yes', value: 'yes', primary: true }, { label: 'No', value: 'no' }, { label: 'Cancel', value: null }] });
+    if (!r) return false;
+    if (r === 'yes') await doc.save?.();
+  }
+  doc.destroy?.();
+  doc.el.remove(); doc.tab.remove();
+  S.docs = S.docs.filter(d => d !== doc);
+  if (S.active === doc) { const last = S.docs[S.docs.length - 1]; if (last) activateDoc(last); else S.active = null; }
+  return true;
+}
+function closeDocByPath(path) { for (const d of [...S.docs]) if (d.path === path) { d.dirty = false; closeDoc(d); } }
+
+// ---- HDL / text editor
+export async function openFile(path, line, col) {
+  if (!S.project) return;
+  if (path.endsWith('.asm.json')) return openAsm(path);
+  const id = `file:${path}`;
+  let doc = findDoc(id);
+  if (!doc) {
+    let text;
+    try { text = await api.readFile(S.project.name, path); }
+    catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+    const lang = /\.(vhd|vhdl)$/i.test(path) ? 'vhdl' : /\.(v|vh|sv)$/i.test(path) ? 'verilog' : /\.ucf$/i.test(path) ? 'ucf' : 'text';
+    doc = openDoc({
+      id, path, title: path.split('/').pop(), tooltip: path, icon: lang === 'vhdl' ? 'vhdl' : lang === 'verilog' ? 'verilog' : lang === 'ucf' ? 'ucf' : 'file',
+      create(el, d) {
+        const tplBtn = h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Language Templates' }, 'Templates ▾');
+        const bar = h('div', { class: 'editor-bar' },
+          h('button', { class: 'tb-btn', title: 'Save (Ctrl+S)', html: icons.save, onclick: () => d.save() }),
+          h('button', { class: 'tb-btn', title: 'Undo', html: icons.undo, onclick: () => d.editor.exec('undo') }),
+          h('button', { class: 'tb-btn', title: 'Redo', html: icons.redo, onclick: () => d.editor.exec('redo') }),
+          h('div', { class: 'tb-sep' }),
+          h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findPersistent') }),
+          (lang === 'vhdl' || lang === 'verilog') ? tplBtn : null,
+          h('span', { class: 'path' }, path));
+        tplBtn.addEventListener('click', e => {
+          const r = tplBtn.getBoundingClientRect();
+          popupMenu([
+            ...SNIPPETS[lang].map(s => ({ label: s.name, action: () => d.editor.insertText(s.text) })),
+            '-',
+            { label: 'Instantiate module', submenu: S.modules.filter(m => m.file !== path).map(m => ({ label: m.name, action: () => d.editor.insertText(instTemplate(m, lang) + '$0') })) },
+          ], r.left, r.bottom);
+        });
+        const host = h('div', { class: 'editor-host' });
+        el.append(bar, host);
+        d.editor = createEditor(host, {
+          text, lang, path,
+          project: () => ({ modules: S.modules }),
+          onChange: () => setDirty(d, !d.editor.isClean()),
+          onSave: () => d.save(),
+          onGotoDefinition: ({ file, line: ln }) => openFile(file, ln),
+          onCursor: (l, c) => { if (S.active === d) $('status-pos').textContent = `Ln ${l}  Col ${c}`; },
+        });
+        d.editor.setDiagnostics(S.diags.filter(x => x.file === path));
+        return {
+          lang,
+          onActivate: () => setTimeout(() => d.editor?.refresh(), 0),
+          save: async () => {
+            await api.writeFile(S.project.name, path, d.editor.getValue());
+            d.editor.markClean();
+            setDirty(d, false);
+            const src = S.sources.find(s => s.path === path);
+            if (src) src.text = d.editor.getValue();
+            else await reloadProject(false);
+            compileProject(); renderHierarchy(); markStale();
+            status(`Saved ${path}`);
+          },
+          destroy: () => d.editor.destroy(),
+        };
+      },
+    });
+  } else activateDoc(doc);
+  if (line) setTimeout(() => doc.editor?.gotoLine(line, col), 30);
+  return doc;
+}
+
+async function openUcf() {
+  const pj = S.project;
+  if (!pj.constraints) { pj.constraints = 'constraints/top.ucf'; await saveProjectJson(); }
+  if (!S.fileTree.includes(pj.constraints)) {
+    const { ucfTemplate } = await import('./templates.js');
+    await api.writeFile(pj.name, pj.constraints, ucfTemplate(pj));
+    await reloadProject(false);
+  }
+  openFile(pj.constraints);
+}
+
+function openInstTemplate(mod) {
+  const m = moduleInfo(mod);
+  if (!m) return;
+  const lang = m.lang;
+  const txt = (lang === 'vhdl'
+    ? `-- Instantiation template for ${m.name} (copy into the architecture body)\n\n`
+    : `// Instantiation template for ${m.name}\n\n`) + instTemplate(m, lang) + '\n';
+  openDoc({
+    id: `tpl:${mod}`, title: `${mod}.${lang === 'vhdl' ? 'vhi' : 'tfi'}`, icon: 'template',
+    create(el, d) {
+      const host = h('div', { class: 'editor-host' });
+      el.append(host);
+      d.editor = createEditor(host, { text: txt, lang, readOnly: true, path: '' });
+      return { onActivate: () => setTimeout(() => d.editor.refresh(), 0) };
+    },
+  });
+}
+
+// ---- schematic
+async function openSchematic(mod) {
+  await saveAll();
+  const sim = S.view === 'sim';
+  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design'));
+  const lib = compile(srcs);
+  const design = elaborate(lib, mod);
+  const diags = diagsFor(lib, design);
+  setDiagnostics(diags);
+  if (!design.top) { log(`ERROR: cannot elaborate '${mod}'`, 'err'); showConsolePage('errors'); return; }
+  if (diags.some(d => d.severity === 'error')) log(`Schematic of '${mod}' generated with errors (see Errors tab).`, 'warn');
+  setStatus(sim ? 'rtl-sim' : 'rtl', diags.some(d => d.severity === 'error') ? 'warn' : 'ok');
+  const { mountSchematic } = await import('./schematic-view.js');
+  const id = `sch:${mod}`;
+  const existing = findDoc(id);
+  if (existing) await closeDoc(existing);
+  openDoc({
+    id, title: `${mod} (RTL)`, icon: 'schematic',
+    create(el) {
+      const findInst = (inst, path) => {
+        if (inst.path === path) return inst;
+        for (const c of inst.children) { const r = findInst(c, path); if (r) return r; }
+        return null;
+      };
+      const crumbs = inst => { const out = []; for (let i = inst; i; i = i.parent) out.unshift({ label: `${i.name} (${i.module})`, path: i.path }); return out; };
+      let view;
+      const show = inst => view.show(buildSchematic(inst), { title: `${inst.name} : ${inst.module}`, breadcrumb: crumbs(inst) });
+      view = mountSchematic(el, {
+        onOpenInstance: path => { const inst = findInst(design.top, path); if (inst && !inst.blackbox) show(inst); },
+        onOpenSource: ref => ref.file && openFile(ref.file, ref.line),
+        onSelect: () => {},
+      });
+      show(design.top);
+      return { destroy: () => view.destroy?.(), onActivate: () => setTimeout(() => view.fit?.(), 0), view };
+    },
+  });
+}
+
+// ---- simulation (ISim)
+async function readDataFiles() {
+  const map = new Map(S.sources.map(s => [s.path, s.text]));
+  for (const f of S.fileTree.filter(f => /\.(mem|hex|txt|dat|coe|bin)$/i.test(f))) {
+    try { map.set(f, await api.readFile(S.project.name, f)); } catch { /* ignore */ }
+  }
+  return map;
+}
+
+async function runSimulation(mod) {
+  await saveAll();
+  if (S.project.simTop !== mod) { S.project.simTop = mod; await saveProjectJson(); }
+  if (!await checkSyntax(mod, true)) return;
+  setStatus('sim-run', 'running');
+  log(`\nStarted : "Simulate Behavioral Model".\n\nBuilding simulation model for top '${mod}'...`, 'hdr');
+  const srcs = S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
+  const lib = compile(srcs);
+  const design = elaborate(lib, mod);
+  const files = await readDataFiles();
+  const sim = new Simulator(design, { files });
+  log(`Simulation model ready: ${design.signals.length} signals, ${design.procs.length} processes. Launching ISim view.`, 'ok');
+  setStatus('sim-run', 'ok');
+  const { mountISim } = await import('./isim.js');
+  const id = 'isim';
+  const old = findDoc(id);
+  if (old) await closeDoc(old);
+  openDoc({
+    id, title: `ISim (${mod})`, icon: 'wave',
+    create(el) {
+      // ISim runs 1000 ns at start-up
+      const view = mountISim(el, { design, sim, title: mod, initialRun: 1_000_000, onOpenSource: ref => ref?.file && openFile(ref.file, ref.line) });
+      return { destroy: () => view.destroy?.(), view, onActivate: () => setTimeout(() => view.refresh?.(), 0) };
+    },
+  });
+}
+
+// ---- ASM
+export async function openAsm(path) {
+  const id = `asm:${path}`;
+  if (findDoc(id)) return activateDoc(findDoc(id));
+  let model;
+  try { model = JSON.parse(await api.readFile(S.project.name, path)); }
+  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  const { mountAsmEditor } = await import('./asm-editor.js');
+  openDoc({
+    id, path, title: path.split('/').pop(), icon: 'asm',
+    create(el, d) {
+      const host = h('div', { class: 'doc-body' });
+      el.append(host);
+      let timer = null;
+      const ed = mountAsmEditor(host, {
+        model,
+        onChange: m => {
+          setDirty(d, true);
+          clearTimeout(timer);
+          timer = setTimeout(async () => { await api.writeFile(S.project.name, path, JSON.stringify(m, null, 2)); setDirty(d, false); }, 800);
+        },
+        onGenerate: async ({ lang, filename, code }) => {
+          const target = `src/${filename}`;
+          if (S.fileTree.includes(target) && !await confirmDlg('Generate HDL', `${target} already exists. Overwrite it?`)) return;
+          await api.writeFile(S.project.name, target, code);
+          log(`ASM chart '${path}' -> generated ${lang.toUpperCase()} file ${target}`, 'ok');
+          await reloadProject(false);
+          const od = findDoc(`file:${target}`);
+          if (od) { od.editor.setValue(code); od.editor.markClean(); setDirty(od, false); }
+          openFile(target);
+        },
+      });
+      return {
+        save: async () => { await api.writeFile(S.project.name, path, JSON.stringify(ed.getModel(), null, 2)); setDirty(d, false); },
+        destroy: () => ed.destroy?.(),
+        onActivate: () => setTimeout(() => ed.fit?.(), 30),
+      };
+    },
+  });
+}
+
+// ---- summary, pin planner, impact
+export async function openSummary() {
+  const { mountSummary } = await import('./summary.js');
+  const d = openDoc({ id: 'summary', title: 'Design Summary', icon: 'summary', create: el => mountSummary(el) });
+  d.refresh?.();
+}
+function refreshSummary() { const d = findDoc('summary'); d?.refresh?.(); }
+
+async function openPinPlanner(mod) {
+  const { mountPinPlanner } = await import('./pinplanner.js');
+  const top = mod || S.project.top;
+  if (!top) { alertDlg('I/O Pin Planning', 'Select a top-level module first.', 'warn'); return; }
+  const old = findDoc('pins');
+  if (old) await closeDoc(old);
+  openDoc({ id: 'pins', title: 'I/O Pin Planning', icon: 'pins', create: (el, d) => mountPinPlanner(el, d, top) });
+}
+
+async function openImpact() {
+  const { mountImpact } = await import('./impact.js');
+  openDoc({ id: 'impact', title: 'iMPACT', icon: 'impact', create: (el, d) => mountImpact(el, d) });
+}
+
+// ------------------------------------------------------------------ project lifecycle
+export async function openProject(name) {
+  for (const d of [...S.docs]) if (!await closeDoc(d)) return;
+  S.status = {};
+  try {
+    S.project = await api.project(name);
+  } catch (e) { alertDlg('Open Project', e.message, 'error'); return; }
+  try { localStorage.setItem('xailinx.lastProject', name); } catch { /* ignore */ }
+  rememberRecent(name);
+  await reloadProject();
+  log(`Project "${name}" opened (${S.project.device.part}${S.project.device.speed}-${S.project.device.package}).`, 'info');
+  openSummary();
+}
+
+export async function reloadProject(render = true) {
+  const pj = await api.project(S.project.name);
+  S.fileTree = pj.fileTree;
+  delete pj.fileTree;
+  S.project = pj;
+  S.sources = await api.sources(pj.name);
+  compileProject();
+  updateTitle();
+  renderHierarchy();
+  renderFilesPage();
+  renderLibsPage();
+  if (!render) return;
+}
+
+export async function closeProject() {
+  for (const d of [...S.docs]) if (!await closeDoc(d)) return;
+  S.project = null; S.lib = null; S.sources = []; S.modules = []; S.sel = null;
+  try { localStorage.removeItem('xailinx.lastProject'); } catch { /* ignore */ }
+  updateTitle(); renderHierarchy(); renderProcesses(); renderFilesPage(); renderLibsPage();
+  showLeftPage('start');
+}
+
+function updateTitle() {
+  const pj = S.project;
+  $('title-text').textContent = pj ? `XAIlinx - ${pj.name} - [${S.active?.title || 'Design Summary'}]` : 'XAIlinx - Project Navigator';
+  document.title = pj ? `${pj.name} — XAIlinx` : 'XAIlinx Project Navigator';
+  $('status-device').textContent = pj ? `${pj.device.part}${pj.device.speed}-${pj.device.package}${pj.board ? ` · ${pj.board}` : ''}` : '';
+}
+
+function rememberRecent(name) {
+  try {
+    const r = JSON.parse(localStorage.getItem('xailinx.recent') || '[]').filter(x => x !== name);
+    r.unshift(name);
+    localStorage.setItem('xailinx.recent', JSON.stringify(r.slice(0, 8)));
+  } catch { /* ignore */ }
+}
+function recent() { try { return JSON.parse(localStorage.getItem('xailinx.recent') || '[]'); } catch { return []; } }
+
+// ------------------------------------------------------------------ left pages
+function showLeftPage(page) {
+  document.querySelectorAll('#left-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.page === page));
+  document.querySelectorAll('.left-page').forEach(p => { p.hidden = p.dataset.page !== page; });
+  if (page === 'start') renderStartPage();
+}
+
+async function renderStartPage() {
+  const host = $('start-page');
+  host.innerHTML = '';
+  const projects = await api.projects().catch(() => []);
+  const page = h('div', { class: 'page' },
+    h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
+      ...[['New Project…', 'newProject', () => wiz.newProjectWizard()], ['Open Project…', 'open', () => wiz.openProjectDialog()], ['Import ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Open Example (blinky)', 'project', () => wiz.newProjectWizard({ template: 'blinky' })]]
+        .map(([l, ic, f]) => h('div', { class: 'entry' }, icon(ic), h('a', { onclick: f }, l)))),
+    h('div', { class: 'start-box' }, h('h3', {}, 'Recent Projects'),
+      ...(recent().filter(r => projects.some(p => p.name === r)).map(r => h('div', { class: 'entry' }, icon('project'), h('a', { onclick: () => openProject(r).then(() => showLeftPage('design')) }, r)))),
+      projects.length ? null : h('div', { class: 'entry', style: { color: '#888' } }, 'No projects yet.')),
+  );
+  host.append(page);
+}
+
+function renderFilesPage() {
+  const host = $('files-page');
+  host.innerHTML = '';
+  if (!S.project) return;
+  const tbl = h('table', { class: 'grid' }, h('tr', {}, h('th', {}, 'File Name'), h('th', {}, 'Association'), h('th', {}, 'Language')));
+  for (const f of S.project.files) {
+    const tr = h('tr', { ondblclick: () => openFile(f.path) }, h('td', {}, f.path), h('td', {}, f.role === 'sim' ? 'Simulation' : 'All'), h('td', {}, f.lang));
+    tbl.append(tr);
+  }
+  for (const f of S.fileTree.filter(f => !S.project.files.some(x => x.path === f))) {
+    tbl.append(h('tr', { ondblclick: () => openFile(f) }, h('td', {}, f), h('td', {}, f === S.project.constraints ? 'Implementation' : '—'), h('td', {}, f.split('.').pop())));
+  }
+  host.append(tbl);
+}
+
+function renderLibsPage() {
+  const host = $('libs-page');
+  host.innerHTML = '';
+  if (!S.lib) return;
+  const tree = h('ul', { class: 'tree' });
+  const work = treeItem({ label: 'work', ico: 'folder', open: true, key: 'lib:work' });
+  tree.append(work.li);
+  for (const m of S.modules) {
+    const it = treeItem({ label: m.name, meta: `(${m.file})`, ico: m.lang === 'vhdl' ? 'vhdl' : 'verilog', key: `lib:${m.name}`, onOpen: () => openFile(m.file, m.line) });
+    it.setLeaf(); work.ul.append(it.li);
+  }
+  for (const p of S.lib.packages.values()) {
+    const it = treeItem({ label: p.name, meta: '(package)', ico: 'vhdl', key: `lib:p:${p.name}`, onOpen: () => openFile(p.file, p.loc?.line) });
+    it.setLeaf(); work.ul.append(it.li);
+  }
+  host.append(tree);
+}
+
+// ------------------------------------------------------------------ menus & toolbar
+function setupMenus() {
+  const hasPj = () => !S.project;
+  menuBar($('menubar'), [
+    { label: 'File', items: () => [
+      { label: 'New Project…', icon: icon('newProject'), action: () => wiz.newProjectWizard() },
+      { label: 'Open Project…', icon: icon('open'), action: () => wiz.openProjectDialog() },
+      { label: 'Import ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
+      { label: 'Export ISE Project (.zip)…', action: () => exportProjectZip(), disabled: hasPj },
+      { label: 'Export .xise only', action: () => downloadUrl(api.exportXiseUrl(S.project.name), `${S.project.name}.xise`), disabled: hasPj },
+      api.standalone ? '-' : null,
+      api.standalone ? { label: 'Download Project Bundle…', action: () => downloadText(`${S.project.name}.xailinx.json`, api.exportBundle(S.project.name), 'application/json'), disabled: hasPj } : null,
+      api.standalone ? { label: 'Open Project Bundle…', action: () => openBundle() } : null,
+      { label: 'Close Project', action: () => closeProject(), disabled: hasPj },
+      '-',
+      { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj, shortcut: 'Alt+N' },
+      { label: 'Save', icon: icon('save'), action: () => S.active?.save?.(), disabled: () => !S.active?.save, shortcut: 'Ctrl+S' },
+      { label: 'Save All', icon: icon('saveAll'), action: () => saveAll(), disabled: hasPj },
+      '-',
+      { label: 'Recent Projects', submenu: recent().map(r => ({ label: r, action: () => openProject(r) })) },
+    ].filter(Boolean) },
+    { label: 'Edit', items: () => [
+      { label: 'Undo', icon: icon('undo'), action: () => S.active?.editor?.exec('undo'), shortcut: 'Ctrl+Z', disabled: () => !S.active?.editor },
+      { label: 'Redo', icon: icon('redo'), action: () => S.active?.editor?.exec('redo'), shortcut: 'Ctrl+Y', disabled: () => !S.active?.editor },
+      '-',
+      { label: 'Find…', icon: icon('find'), action: () => S.active?.editor?.exec('findPersistent'), shortcut: 'Ctrl+F', disabled: () => !S.active?.editor },
+      { label: 'Replace…', action: () => S.active?.editor?.exec('replace'), disabled: () => !S.active?.editor },
+      { label: 'Go to Line…', action: () => S.active?.editor?.exec('jumpToLine'), shortcut: 'Ctrl+G', disabled: () => !S.active?.editor },
+      '-',
+      { label: 'Language Templates', submenu: [...(SNIPPETS[S.active?.lang] || SNIPPETS.vhdl)].map(s => ({ label: s.name, action: () => S.active?.editor?.insertText(s.text), disabled: () => !S.active?.editor })) },
+    ] },
+    { label: 'View', items: () => [
+      { label: 'Implementation', checked: S.view === 'impl', action: () => setView('impl') },
+      { label: 'Simulation', checked: S.view === 'sim', action: () => setView('sim') },
+      '-',
+      { label: 'Design Summary', icon: icon('summary'), action: () => openSummary(), disabled: hasPj },
+    ] },
+    { label: 'Project', items: () => [
+      { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj },
+      { label: 'Add Source…', action: () => wiz.addSourceDialog(), disabled: hasPj },
+      { label: 'Add Copy of Source…', action: () => wiz.addSourceDialog(), disabled: hasPj },
+      '-',
+      { label: 'Set as Top Module', action: () => S.sel?.module && setTop(S.sel.module), disabled: () => !S.sel?.module },
+      { label: 'Design Properties…', action: () => wiz.projectProperties(), disabled: hasPj },
+      { label: 'Sync with .xise', action: () => api.syncXise(S.project.name, 'export').then(() => toast('Exported .xise', 'ok')), disabled: hasPj },
+    ] },
+    { label: 'Process', items: () => [
+      { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top },
+      { label: 'Run', action: () => S.selProc && runProcess(S.selProc), disabled: () => !S.selProc?.run },
+      { label: 'Check Syntax', action: () => S.sel?.module && checkSyntax(S.sel.module, S.view === 'sim'), disabled: () => !S.sel?.module },
+      { label: 'Simulate Behavioral Model', icon: icon('wave'), action: () => (S.project?.simTop || S.sel?.module) && runSimulation(S.sel?.module || S.project.simTop), disabled: () => !S.sel?.module },
+    ] },
+    { label: 'Tools', items: () => [
+      { label: 'ASM State Machine Editor…', icon: icon('asm'), action: () => wiz.newSourceWizard({ type: 'asm' }), disabled: hasPj },
+      { label: 'I/O Pin Planning', icon: icon('pins'), action: () => openPinPlanner(S.sel?.module), disabled: hasPj },
+      { label: 'iMPACT (Configure Target Device)', icon: icon('impact'), action: () => openImpact() },
+      { label: 'RTL Schematic', icon: icon('schematic'), action: () => S.sel?.module && openSchematic(S.sel.module), disabled: () => !S.sel?.module },
+      '-',
+      { label: 'Toolchain Settings (ISE / Programmers)…', icon: icon('gear'), action: () => wiz.toolchainDialog() },
+    ] },
+    { label: 'Window', items: () => [
+      ...S.docs.map(d => ({ label: d.title, checked: d === S.active, action: () => activateDoc(d) })),
+      S.docs.length ? '-' : null,
+      { label: 'Close All Documents', action: () => [...S.docs].forEach(closeDoc), disabled: () => !S.docs.length },
+    ].filter(Boolean) },
+    { label: 'Help', items: () => [
+      { label: 'About XAIlinx', icon: icon('help'), action: () => wiz.aboutDialog() },
+      { label: 'Keyboard Shortcuts', action: () => wiz.shortcutsDialog() },
+    ] },
+  ]);
+}
+
+function setupToolbar() {
+  const tb = $('toolbar');
+  const btn = (ico, title, fn, enabled = () => true) => {
+    const b = h('button', { class: 'tb-btn', title, html: icons[ico], onclick: () => enabled() && fn() });
+    b.dataset.enabled = '1';
+    b._enabled = enabled;
+    return b;
+  };
+  tb.append(
+    btn('newProject', 'New Project', () => wiz.newProjectWizard()),
+    btn('open', 'Open Project', () => wiz.openProjectDialog()),
+    btn('save', 'Save (Ctrl+S)', () => S.active?.save?.()),
+    btn('saveAll', 'Save All', () => saveAll()),
+    h('div', { class: 'tb-sep' }),
+    btn('undo', 'Undo', () => S.active?.editor?.exec('undo')),
+    btn('redo', 'Redo', () => S.active?.editor?.exec('redo')),
+    h('div', { class: 'tb-sep' }),
+    btn('cut', 'Cut', () => document.execCommand('cut')),
+    btn('copy', 'Copy', () => document.execCommand('copy')),
+    btn('paste', 'Paste', () => navigator.clipboard?.readText().then(t => S.active?.editor?.cm.replaceSelection(t))),
+    btn('find', 'Find', () => S.active?.editor?.exec('findPersistent')),
+    h('div', { class: 'tb-sep' }),
+    btn('summary', 'Design Summary', () => S.project && openSummary()),
+    btn('schematic', 'View RTL Schematic', () => S.sel?.module && openSchematic(S.sel.module)),
+    btn('pins', 'I/O Pin Planning', () => S.project && openPinPlanner(S.sel?.module)),
+    btn('asm', 'New ASM State Diagram', () => S.project && wiz.newSourceWizard({ type: 'asm' })),
+    h('div', { class: 'tb-sep' }),
+    btn('run', 'Implement Top Module', () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen'])),
+    btn('wave', 'Simulate Behavioral Model', () => S.sel?.module && runSimulation(S.sel.module)),
+    btn('impact', 'Configure Target Device (iMPACT)', () => openImpact()),
+    h('div', { class: 'tb-sep' }),
+    btn('gear', 'Toolchain Settings', () => wiz.toolchainDialog()),
+    btn('help', 'About', () => wiz.aboutDialog()),
+  );
+}
+
+function downloadUrl(url, filename) {
+  const a = h('a', { href: url, download: filename });
+  document.body.append(a); a.click(); a.remove();
+}
+
+async function exportProjectZip() {
+  await saveAll();
+  try {
+    const { blob, filename } = await api.exportZip(S.project.name);
+    const url = URL.createObjectURL(blob);
+    downloadUrl(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    log(`Exported ${filename}: ${S.project.name}.xise + xailinx.json + all project files (${Math.round(blob.size / 1024)} KB).`, 'ok');
+  } catch (e) { alertDlg('Export ISE Project', e.message, 'error'); }
+}
+
+function openBundle() {
+  const inp = h('input', { type: 'file', accept: '.json' });
+  inp.addEventListener('change', async () => {
+    const f = inp.files[0];
+    if (!f) return;
+    try { const name = await api.importBundle(await f.text()); await openProject(name); showLeftPage('design'); }
+    catch (e) { alertDlg('Open Project Bundle', e.message, 'error'); }
+  });
+  inp.click();
+}
+
+function setView(v) {
+  S.view = v;
+  document.querySelectorAll('input[name=view]').forEach(r => { r.checked = r.value === v; });
+  S.selKey = null;
+  renderHierarchy();
+  renderProcesses();
+}
+
+// ------------------------------------------------------------------ boot
+async function boot() {
+  defineUcfMode();
+  document.querySelectorAll('.ico-inline[data-icon]').forEach(e => { e.innerHTML = icons[e.dataset.icon] || ''; });
+  setupMenus();
+  setupToolbar();
+  splitter($('v-split'), $('left'), { dir: 'h', min: 180, max: 700, storageKey: 'xl.leftW' });
+  splitter($('left-split'), $('proc-panel'), { dir: 'v', min: 80, max: 900, invert: true, storageKey: 'xl.procH' });
+  splitter($('h-split'), $('console-wrap'), { dir: 'v', min: 60, max: 700, invert: true, storageKey: 'xl.consoleH' });
+  document.querySelectorAll('#left-tabs .tab').forEach(t => t.addEventListener('click', () => showLeftPage(t.dataset.page)));
+  document.querySelectorAll('#console-tabs .tab').forEach(t => t.addEventListener('click', () => showConsolePage(t.dataset.page)));
+  document.querySelectorAll('input[name=view]').forEach(r => r.addEventListener('change', () => setView(r.value)));
+  $('console-clear').addEventListener('click', () => { $('console-log').innerHTML = ''; });
+  addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); S.active?.save?.(); }
+  });
+  addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });
+
+  log('XAIlinx Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.', 'info');
+  if (api.standalone) log('Standalone edition: projects are stored in this browser (File > Download Project Bundle to keep a copy). Synthesis/programming need the full XAIlinx application.', 'warn');
+  try { S.devices = await api.devices(); } catch (e) { log(`ERROR: cannot reach the XAIlinx server: ${e.message}`, 'err'); }
+  api.toolchain().then(tc => {
+    S.toolchain = tc;
+    log(`Toolchain: ISE ${tc.ise.available ? 'available' : 'not available'} (${tc.ise.mode}: ${tc.ise.reason}).`, tc.ise.available ? 'ok' : 'warn');
+    const progs = Object.entries(tc.programmers).filter(([, v]) => v.found).map(([k]) => k);
+    log(`Programmers found: ${progs.length ? progs.join(', ') : 'none (install openFPGALoader, xc3sprog, Digilent Adept or ISE iMPACT)'}`, progs.length ? 'ok' : 'warn');
+  }).catch(() => {});
+  renderHierarchy();
+  renderProcesses();
+  let last = null;
+  try { last = localStorage.getItem('xailinx.lastProject'); } catch { /* ignore */ }
+  const projects = await api.projects().catch(() => []);
+  if (last && projects.some(p => p.name === last)) await openProject(last);
+  else showLeftPage('start');
+}
+
+export const app = { stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
+window.XAIlinxApp = app;
+boot();

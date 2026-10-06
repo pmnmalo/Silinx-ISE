@@ -1,0 +1,213 @@
+// Standalone (server-less) backend: same interface as api.js, with projects kept in the
+// browser's localStorage. Used by the single-file build (dist/XAIlinx.html).
+// Synthesis/implementation and device programming need the XAIlinx server + Xilinx ISE,
+// so those operations report that they are unavailable here.
+import { getDeviceDb } from '../../server/devices.js';
+import { exportXise, importXise } from '../../server/xise.js';
+import EXAMPLES from 'xailinx-examples';
+import { createZip, readZip, browserCodec, textOf } from '../../core/zip.js';
+
+const KEY = 'xailinx.standalone.fs';
+const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
+
+let mem = null;
+function load() {
+  if (mem) return mem;
+  try { mem = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { mem = {}; }
+  return mem;
+}
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify(mem)); }
+  catch (e) { throw new Error(`browser storage is full or unavailable (${e.message}); download your project bundle to keep it`); }
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+const fail = msg => { throw new Error(msg); };
+function proj(name) { return load()[name] || fail(`project '${name}' not found`); }
+function cleanPath(p) {
+  if (!p || typeof p !== 'string' || p.startsWith('/') || p.split('/').includes('..')) fail('invalid path');
+  return p.replace(/\\/g, '/');
+}
+const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.ucf$/i.test(p) ? 'ucf' : 'text');
+
+function writeFileSync(name, path, text) {
+  const pj = proj(name);
+  path = cleanPath(path);
+  pj.files[path] = text;
+  const lang = langOf(path);
+  if ((lang === 'vhdl' || lang === 'verilog') && !pj.json.files.some(f => f.path === path)) {
+    const role = /^(sim|tb|test)\//.test(path) || /(^|\/)tb_|_tb\.|_tb$/.test(path) ? 'sim' : 'design';
+    pj.json.files.push({ path, lang, role });
+  }
+  persist();
+}
+
+function createProjectSync({ name, template = 'empty', device, board }) {
+  if (!NAME_RE.test(name || '')) fail(`invalid project name '${name}'`);
+  if (load()[name]) fail(`project '${name}' already exists`);
+  if (template && template !== 'empty') {
+    const ex = EXAMPLES[template] || fail(`unknown template '${template}'`);
+    const json = { ...clone(ex.json), name };
+    if (device) json.device = device;
+    if (board !== undefined) json.board = board;
+    mem[name] = { json, files: clone(ex.files) };
+  } else {
+    mem[name] = {
+      json: { name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null, top: '', simTop: '', files: [], constraints: 'constraints/top.ucf', stimuli: {}, impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' } },
+      files: {},
+    };
+  }
+  persist();
+  return clone(mem[name].json);
+}
+
+// ---- fake jobs (for operations that need the server)
+const jobs = new Map();
+let jobSeq = 0;
+function fakeJob(kind, lines, status = 'error', error) {
+  const id = `local-${++jobSeq}`;
+  jobs.set(id, { id, kind, status, lines, next: lines.length, error });
+  return { job: id };
+}
+const NEED_SERVER = [
+  'This is the standalone (single HTML file) edition of XAIlinx.',
+  'Synthesis, implementation (Xilinx ISE 14.7) and device programming need the full XAIlinx',
+  'application: run `npm start` in the XAIlinx folder and open http://127.0.0.1:8642.',
+  'Tip: File > Download Project Bundle, then open it in the full application.',
+];
+
+export const api = {
+  standalone: true,
+  projects: async () => Object.values(load()).map(p => ({ name: p.json.name, device: p.json.device, top: p.json.top, board: p.json.board })).sort((a, b) => a.name.localeCompare(b.name)),
+  templates: async () => Object.keys(EXAMPLES),
+  createProject: async p => createProjectSync(p),
+  project: async name => {
+    const p = proj(name);
+    return { ...clone(p.json), fileTree: Object.keys(p.files).sort() };
+  },
+  saveProject: async (name, pj) => {
+    const p = proj(name);
+    const clean = { ...clone(pj), name };
+    delete clean.fileTree;
+    p.json = clean;
+    persist();
+    return clone(clean);
+  },
+  deleteProject: async name => { proj(name); delete mem[name]; persist(); return { ok: true }; },
+  readFile: async (name, path) => {
+    const t = proj(name).files[path];
+    if (t === undefined) fail(`file '${path}' not found`);
+    return t;
+  },
+  writeFile: async (name, path, text) => { writeFileSync(name, path, text); return { ok: true }; },
+  deleteFile: async (name, path) => {
+    const p = proj(name);
+    delete p.files[path];
+    p.json.files = p.json.files.filter(f => f.path !== path);
+    persist();
+    return { ok: true };
+  },
+  sources: async name => {
+    const p = proj(name);
+    return p.json.files.map(f => ({ ...f, text: p.files[f.path] ?? '', missing: p.files[f.path] === undefined }));
+  },
+  devices: async () => getDeviceDb(),
+  toolchain: async () => ({
+    platform: 'browser', configPath: '(browser — standalone edition)',
+    config: { mode: 'local', local: { settings: '' }, docker: { image: '', settings: '' }, ssh: { host: '', user: '', port: 22, remoteDir: '', settings: '' }, programmer: { tool: '', cable: '' } },
+    ise: { mode: 'browser', available: false, reason: 'standalone edition: synthesis and programming need the XAIlinx server and Xilinx ISE 14.7', help: NEED_SERVER.join(' ') },
+    programmers: {}, helpers: {},
+  }),
+  saveToolchain: async () => api.toolchain(),
+  implement: async () => fakeJob('implement', NEED_SERVER),
+  reports: async () => ({ available: false }),
+  bitinfo: async () => ({ available: false, reason: 'standalone edition' }),
+  program: async () => fakeJob('program', NEED_SERVER),
+  scan: async () => fakeJob('scan', NEED_SERVER),
+  prom: async () => fakeJob('prom', NEED_SERVER),
+  job: async (id, since = 0) => {
+    const j = jobs.get(id) || fail(`job '${id}' not found`);
+    return { ...j, lines: j.lines.slice(+since) };
+  },
+  cancelJob: async id => jobs.get(id),
+  exportXiseUrl: name => {
+    const p = proj(name);
+    const xml = exportXise(p.json, { sources: p.files });
+    return URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
+  },
+  importXise: async ({ name, xise, files = {} }) => {
+    const parsed = importXise(xise);
+    const lookup = path => files[path] ?? files[path.split('/').pop()];
+    createProjectSync({ name, template: 'empty' });
+    const p = mem[name];
+    const safe = (f, dir) => (f.startsWith('/') || f.includes('..') ? `${dir}/${f.split('/').pop()}` : f);
+    const out = [];
+    for (const f of parsed.files) {
+      const target = safe(f.path, f.role === 'sim' ? 'sim' : 'src');
+      const text = lookup(f.path);
+      if (typeof text === 'string') p.files[target] = text;
+      out.push({ path: target, lang: f.lang, role: f.role });
+    }
+    let constraints = 'constraints/top.ucf';
+    if (parsed.constraints) {
+      constraints = safe(parsed.constraints, 'constraints');
+      const text = lookup(parsed.constraints);
+      if (typeof text === 'string') p.files[constraints] = text;
+    }
+    Object.assign(p.json, { device: parsed.device.part ? parsed.device : p.json.device, top: parsed.top || '', simTop: parsed.simTop || '', files: out, constraints, impl: { ...p.json.impl, ...parsed.impl } });
+    persist();
+    return { project: clone(p.json) };
+  },
+  syncXise: async () => fail('not available in the standalone edition (use File > Export ISE Project)'),
+  exportZip: async name => {
+    const p = proj(name);
+    const xml = exportXise(p.json, { sources: p.files });
+    const entries = [{ path: `${name}.xise`, data: xml }, { path: 'xailinx.json', data: JSON.stringify(p.json, null, 2) + '\n' },
+      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise`).map(([path, data]) => ({ path, data }))];
+    return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip` };
+  },
+  importZip: async (name, file) => {
+    const entries = await readZip(new Uint8Array(await file.arrayBuffer()), browserCodec());
+    const xe = entries.filter(e => /\.xise$/i.test(e.path)).sort((a, b) => a.path.split('/').length - b.path.split('/').length)[0];
+    const pe = entries.find(e => /(^|\/)xailinx\.json$/.test(e.path));
+    if (!xe && !pe) fail('the zip contains no .xise (ISE project) and no xailinx.json');
+    const root = (xe || pe).path.includes('/') ? (xe || pe).path.replace(/\/[^/]*$/, '') : '';
+    const rel = p => (!root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
+    const files = {};
+    for (const e of entries) { const r = rel(e.path); if (r !== null && !/^build\//.test(r)) files[r] = textOf(e); }
+    if (xe) await api.importXise({ name, xise: textOf(xe), files });
+    else createProjectSync({ name, template: 'empty' });
+    const p = mem[name];
+    const known = new Set(p.json.files.map(f => f.path).concat(p.json.constraints));
+    for (const [k, v] of Object.entries(files)) if (!known.has(k) && !/\.xise$/i.test(k) && k !== 'xailinx.json') p.files[k] = v;
+    if (pe) {
+      try {
+        const saved = JSON.parse(textOf(pe));
+        p.json = xe ? { ...p.json, board: saved.board ?? p.json.board, stimuli: saved.stimuli || {}, preferredLanguage: saved.preferredLanguage, impl: { ...p.json.impl, ...saved.impl } } : { ...saved, name };
+      } catch { /* ignore */ }
+    }
+    persist();
+    return { project: clone(p.json), missing: [] };
+  },
+
+  // standalone-only: project bundles (one JSON file with every project file)
+  exportBundle: name => {
+    const p = proj(name);
+    return JSON.stringify({ format: 'xailinx-bundle', version: 1, project: p.json, files: p.files }, null, 1);
+  },
+  importBundle: async text => {
+    const b = JSON.parse(text);
+    if (b.format !== 'xailinx-bundle') fail('not an XAIlinx project bundle');
+    let name = b.project.name;
+    while (load()[name]) name = `${b.project.name}_${Math.floor(Math.random() * 1000)}`;
+    mem[name] = { json: { ...b.project, name }, files: b.files };
+    persist();
+    return name;
+  },
+};
+
+export async function followJob(id, onLine) {
+  const j = await api.job(id, 0);
+  for (const l of j.lines) onLine(l);
+  return j;
+}

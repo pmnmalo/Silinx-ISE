@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XAIlinx - ISim demo</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/isim.css">
+  <style>
+    body { display: flex; flex-direction: column; }
+    header { flex: none; display: flex; align-items: center; gap: 10px; padding: 4px 10px; background: var(--menu-bg); border-bottom: 1px solid var(--border); }
+    header b, header label { color: var(--title-fg); white-space: nowrap; }
+    header select { height: 22px; }
+    header .hint { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #host { flex: 1; min-height: 0; }
+    #errors { color: var(--danger); white-space: pre-wrap; font-family: var(--mono); padding: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <b>ISim demo</b>
+    <label>Design: <select id="demo"></select></label>
+    <span class="hint" id="hint"></span>
+  </header>
+  <div id="host"></div>
+  <div id="errors"></div>
+  <script type="module">
+    import { compile, elaborate } from '/core/compile.js';
+    import { Simulator } from '/core/simulator.js';
+    import { mountISim } from './js/isim.js';
+
+    const DEMOS = {
+      'Verilog counter + testbench': {
+        top: 'tb_counter', initialRun: 1e6,
+        hint: 'Testbench top: run all to reach $finish; try radix menus, markers, bus expansion.',
+        sources: {
+          'counter.v': `\`timescale 1ns/1ps
+module counter #(parameter N = 8) (
+  input  wire clk,
+  input  wire rst,
+  input  wire en,
+  output reg  [N-1:0] q,
+  output wire tc
+);
+  assign tc = &q;
+  always @(posedge clk or posedge rst)
+    if (rst) q <= 0;
+    else if (en) q <= q + 1'b1;
+endmodule
+`,
+          'tb_counter.v': `\`timescale 1ns/1ps
+module tb_counter;
+  reg clk = 0, rst = 1, en = 0;
+  wire [7:0] q;
+  wire tc;
+  reg [7:0] mem [0:15];
+  reg [15:0] msg;
+  integer cycles = 0;
+  counter #(.N(8)) dut (.clk(clk), .rst(rst), .en(en), .q(q), .tc(tc));
+  always #5 clk = ~clk;
+  always @(posedge clk) begin
+    cycles = cycles + 1;
+    mem[q[3:0]] <= q;
+  end
+  initial begin
+    msg = "OK";
+    #22 rst = 0; en = 1;
+    repeat (20) @(posedge clk);
+    en = 0;
+    #40 en = 1;
+    repeat (300) @(posedge clk);
+    $display("q = %0d after %0d cycles", q, cycles);
+    if (q !== 8'd63) $display("unexpected count");
+    $finish;
+  end
+endmodule
+`,
+        },
+      },
+      'VHDL FSM (enum) + testbench': {
+        top: 'tb_traffic', initialRun: 1e6,
+        hint: 'Enum states are shown by name; assertion reports appear in the console with timestamps.',
+        sources: {
+          'traffic.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity traffic is
+  port (
+    clk    : in  std_logic;
+    rst    : in  std_logic;
+    car    : in  std_logic;
+    red    : out std_logic;
+    yellow : out std_logic;
+    green  : out std_logic;
+    timer  : out unsigned(3 downto 0)
+  );
+end entity;
+
+architecture rtl of traffic is
+  type state_t is (S_RED, S_GREEN, S_YELLOW, S_ALLRED);
+  signal state : state_t := S_RED;
+  signal cnt   : unsigned(3 downto 0) := (others => '0');
+begin
+  process (clk, rst)
+  begin
+    if rst = '1' then
+      state <= S_RED; cnt <= (others => '0');
+    elsif rising_edge(clk) then
+      cnt <= cnt + 1;
+      case state is
+        when S_RED    => if car = '1' and cnt >= 3 then state <= S_GREEN;  cnt <= (others => '0'); end if;
+        when S_GREEN  => if cnt = 6 then state <= S_YELLOW; cnt <= (others => '0'); end if;
+        when S_YELLOW => if cnt = 2 then state <= S_ALLRED; cnt <= (others => '0'); end if;
+        when S_ALLRED => state <= S_RED; cnt <= (others => '0');
+      end case;
+    end if;
+  end process;
+  red    <= '1' when state = S_RED or state = S_ALLRED else '0';
+  yellow <= '1' when state = S_YELLOW else '0';
+  green  <= '1' when state = S_GREEN else '0';
+  timer  <= cnt;
+end architecture;
+`,
+          'tb_traffic.vhd': `library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity tb_traffic is
+end entity;
+
+architecture sim of tb_traffic is
+  signal clk    : std_logic := '0';
+  signal rst    : std_logic := '1';
+  signal car    : std_logic := '0';
+  signal red, yellow, green : std_logic;
+  signal timer  : unsigned(3 downto 0);
+  signal cycles : integer := 0;
+  signal busy   : boolean := false;
+  constant T : time := 10 ns;
+begin
+  clk <= not clk after T / 2;
+  uut : entity work.traffic port map (clk => clk, rst => rst, car => car,
+      red => red, yellow => yellow, green => green, timer => timer);
+
+  process (clk) begin
+    if rising_edge(clk) then cycles <= cycles + 1; end if;
+  end process;
+  busy <= green = '1' or yellow = '1';
+
+  stim : process
+  begin
+    wait for 25 ns;
+    rst <= '0';
+    wait for 40 ns;
+    car <= '1';
+    wait until green = '1';
+    report "green light at cycle " & integer'image(cycles);
+    wait for 30 ns;
+    car <= 'X';
+    wait for 20 ns;
+    car <= '0';
+    wait until red = '1';
+    assert yellow = '0' report "yellow should be off" severity error;
+    wait for 100 ns;
+    car <= '1';
+    wait for 200 ns;
+    assert cycles < 40 report "run took " & integer'image(cycles) & " cycles" severity warning;
+    report "simulation done" severity note;
+    std.env.finish;
+  end process;
+end architecture;
+`,
+        },
+      },
+      'Plain module (no testbench) - force workflow': {
+        top: 'accum', initialRun: 0,
+        hint: 'No testbench: right-click clk > Force Clock, rst/en/din > Force Constant (or type: isim force add clk 0 -value 1 -time 5 ns -repeat 10 ns), then Run.',
+        sources: {
+          'accum.v': `\`timescale 1ns/1ps
+// 8-bit accumulator with saturation flag: simulate it directly by forcing its inputs.
+module accum (
+  input  wire       clk,
+  input  wire       rst,
+  input  wire       en,
+  input  wire [7:0] din,
+  output reg  [7:0] acc,
+  output reg        ovf
+);
+  wire [8:0] sum = acc + din;
+  always @(posedge clk)
+    if (rst) begin acc <= 8'd0; ovf <= 1'b0; end
+    else if (en) begin acc <= sum[7:0]; ovf <= ovf | sum[8]; end
+endmodule
+`,
+        },
+      },
+    };
+
+    const sel = document.getElementById('demo');
+    for (const k of Object.keys(DEMOS)) sel.add(new Option(k, k));
+    const host = document.getElementById('host');
+    const errEl = document.getElementById('errors');
+    let isim = null;
+
+    function load(name) {
+      const d = DEMOS[name];
+      document.getElementById('hint').textContent = d.hint;
+      isim?.destroy(); isim = null;
+      errEl.textContent = '';
+      const srcs = Object.entries(d.sources).map(([path, text]) => ({ path, text }));
+      const lib = compile(srcs);
+      const design = elaborate(lib, d.top);
+      const errors = [...lib.errors, ...design.diags].filter(x => x.severity === 'error');
+      if (errors.length) { errEl.textContent = errors.map(e => `${e.file}:${e.line}: ${e.message}`).join('\n'); return; }
+      const sim = new Simulator(design, { files: new Map(srcs.map(s => [s.path, s.text])) });
+      isim = mountISim(host, {
+        design, sim, title: `ISim (XAIlinx) - [${d.top}] - Default.wcfg`,
+        initialRun: d.initialRun,
+        onOpenSource: ({ file, line }) => console.log(`open source ${file}:${line}`),
+      });
+      window.isim = isim; window.sim = sim; window.design = design;
+    }
+    sel.addEventListener('change', () => { load(sel.value); history.replaceState(null, '', '#' + Object.keys(DEMOS).indexOf(sel.value)); });
+    const idx = parseInt(location.hash.slice(1), 10);
+    if (idx >= 0 && idx < sel.options.length) sel.selectedIndex = idx;
+    load(sel.value);
+  </script>
+</body>
+</html>

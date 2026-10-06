@@ -1,0 +1,300 @@
+// REST routes for implementation (ISE), programming, JTAG, jobs, toolchain, devices and .xise.
+// Registered by server.js on the /api router.
+
+import fs from 'node:fs/promises';
+import zlib from 'node:zlib';
+import express from 'express';
+import { createZip, readZip } from '../core/zip.js';
+import fss from 'node:fs';
+import path from 'node:path';
+import { getDeviceDb, resolveBoard } from './devices.js';
+import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
+import { detectToolchain, saveConfig } from './toolchain.js';
+import { runImplementation, collectReports, normalizeSteps } from './ise.js';
+import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice } from './programmer.js';
+import { exportXise, importXise } from './xise.js';
+
+export function registerImplRoutes(api, { wrap, projects: P }) {
+  const bad = (msg, status = 400) => new P.HttpError(status, msg);
+
+  // ----- devices / toolchain ------------------------------------------------------------------
+  api.get('/devices', wrap(async () => getDeviceDb()));
+
+  api.get('/toolchain', wrap(() => detectToolchain()));
+
+  api.put('/toolchain', wrap(async req => {
+    try { await saveConfig(req.body || {}); }
+    catch (e) { throw bad(e.message, e.status || 400); }
+    return detectToolchain();
+  }));
+
+  // ----- implementation -----------------------------------------------------------------------
+  api.post('/projects/:p/implement', wrap(async req => {
+    const name = req.params.p;
+    const project = await P.readProject(name);
+    const projectDir = P.projectDir(name);
+    const body = req.body || {};
+    let steps;
+    try { steps = normalizeSteps(body.steps); } catch (e) { throw bad(e.message); }
+    if (!project.top) throw bad('set the top module of the project before implementing');
+    const job = createJob('implement', j => runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }), { meta: { project: name, steps } });
+    return { job: job.id };
+  }));
+
+  api.get('/projects/:p/reports', wrap(async req => {
+    const project = await P.readProject(req.params.p);
+    const buildDir = path.join(P.projectDir(req.params.p), 'build');
+    try { return JSON.parse(await fs.readFile(path.join(buildDir, 'reports.json'), 'utf8')); }
+    catch { /* not saved yet */ }
+    if (!fss.existsSync(buildDir) || !project.top) return { available: false };
+    return collectReports(buildDir, project.top, project.device);
+  }));
+
+  api.get('/projects/:p/bitinfo', wrap(async req => {
+    const project = await P.readProject(req.params.p);
+    if (!project.top) return { available: false, reason: 'no top module' };
+    const bit = path.join(P.projectDir(req.params.p), 'build', `${project.top}.bit`);
+    if (!fss.existsSync(bit)) return { available: false, path: bit };
+    try {
+      const info = await readBitInfo(bit);
+      return { available: true, ...info, warning: checkBitPart(info, project.device) };
+    } catch (e) { return { available: false, path: bit, error: e.message }; }
+  }));
+
+  // ----- programming / JTAG -------------------------------------------------------------------
+  api.post('/program', wrap(async req => {
+    const b = req.body || {};
+    let bitfile = null, project = null;
+    if (b.project) {
+      project = await P.readProject(b.project);
+      const dir = P.projectDir(b.project);
+      if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);
+      else {
+        if (!project.top) throw bad('project has no top module; cannot locate build/<top>.bit');
+        bitfile = path.join(dir, 'build', `${project.top}.bit`);
+      }
+    } else if (b.bitfile) {
+      if (!path.isAbsolute(b.bitfile)) throw bad('bitfile must be an absolute path when no project is given');
+      bitfile = b.bitfile;
+    } else throw bad('give a project or a bitfile');
+    if (!/\.bit$/i.test(bitfile)) throw bad('only .bit files can be programmed');
+    if (!fss.existsSync(bitfile)) throw bad(`bitstream not found: ${bitfile} (run the implementation first)`, 404);
+    const board = b.board || project?.board || null;
+    if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
+    const expect = b.expectDevice || expectedDevice(project, board);
+    const opts = { tool: b.tool, cable: b.cable, device: b.device, position: b.position, board, bitfile, expectDevice: expect };
+    const job = createJob('program', j => programJob(j, opts), { meta: { project: b.project || null, bitfile, board } });
+    return { job: job.id };
+  }));
+
+  // Platform Flash PROM (XCF0xS) of the board: program / verify / erase / read (backup) / reconfigure.
+  api.post('/prom', wrap(async req => {
+    const b = req.body || {};
+    if (!b.project) throw bad('give a project');
+    const project = await P.readProject(b.project);
+    const dir = P.projectDir(b.project);
+    const board = b.board || project.board || null;
+    if (board && !resolveBoard(board)) throw bad(`unknown board '${board}'`);
+    const opts = { op: b.op, device: b.device, verify: b.verify !== false, reconfigure: !!b.reconfigure, board, expectDevice: expectedDevice(project, board) };
+    if (b.op === 'program' || b.op === 'verify') {
+      if (!project.top && !b.bitfile) throw bad('project has no top module; cannot locate build/<top>_prom.bit');
+      opts.bitfile = b.bitfile ? P.safeJoin(dir, b.bitfile) : path.join(dir, 'build', `${project.top}_prom.bit`);
+      if (!/\.bit$/i.test(opts.bitfile)) throw bad('only .bit files can be written to the PROM');
+    }
+    if (b.op === 'read') opts.outfile = path.join(dir, 'build', 'prom-backup', `prom-${new Date().toISOString().replace(/[:.]/g, '-')}.bin`);
+    const job = createJob('prom', j => promJob(j, opts), { meta: { project: b.project, op: b.op } });
+    return { job: job.id };
+  }));
+
+  api.post('/jtag/scan', wrap(async req => {
+    const b = req.body || {};
+    if (b.board && !resolveBoard(b.board)) throw bad(`unknown board '${b.board}'`);
+    const job = createJob('scan', j => scanJob(j, { tool: b.tool, cable: b.cable, device: b.device, board: b.board }), { meta: { board: b.board || null } });
+    return { job: job.id };
+  }));
+
+  // ----- jobs ---------------------------------------------------------------------------------
+  api.get('/jobs', wrap(async () => listJobs()));
+
+  api.get('/jobs/:id', wrap(async req => {
+    const j = getJob(req.params.id, req.query.since);
+    if (!j) throw bad(`job '${req.params.id}' not found`, 404);
+    return j;
+  }));
+
+  api.post('/jobs/:id/cancel', wrap(async req => {
+    const j = cancelJob(req.params.id);
+    if (!j) throw bad(`job '${req.params.id}' not found`, 404);
+    return j;
+  }));
+
+  // ----- ISE .xise project files --------------------------------------------------------------
+  const xiseName = project => `${project.name}.xise`;
+
+  async function sourcesOf(name, project) {
+    const out = {};
+    for (const f of project.files || []) {
+      try { out[f.path] = await P.readFile(name, f.path); } catch { /* missing */ }
+    }
+    return out;
+  }
+
+  api.get('/projects/:p/export.xise', wrap(async (req, res) => {
+    const name = req.params.p;
+    const project = await P.readProject(name);
+    const xml = exportXise(project, { sources: await sourcesOf(name, project) });
+    await fs.writeFile(path.join(P.projectDir(name), xiseName(project)), xml);
+    res.type('application/xml').attachment(xiseName(project)).send(xml);
+  }));
+
+  api.post('/projects/import-xise', wrap(async req => {
+    const b = req.body || {};
+    if (!b.name) throw bad('missing project name');
+    if (typeof b.xise !== 'string' || !b.xise.trim()) throw bad('missing xise text');
+    return importXiseProject(P, b.name, b.xise, b.files && typeof b.files === 'object' ? b.files : {});
+  }));
+
+  // ----- whole project as a zip: <name>.xise + xailinx.json + all project files (not build/) -----
+  api.get('/projects/:p/export.zip', wrap(async (req, res) => {
+    const name = req.params.p;
+    const project = await P.readProject(name);
+    const xml = exportXise(project, { sources: await sourcesOf(name, project) });
+    await fs.writeFile(path.join(P.projectDir(name), xiseName(project)), xml);
+    const entries = [];
+    for (const rel of await P.fileTree(name)) {
+      if (rel === xiseName(project)) continue;
+      entries.push({ path: rel, data: await fs.readFile(P.safeJoin(P.projectDir(name), rel)) });
+    }
+    entries.unshift({ path: xiseName(project), data: xml }, { path: 'xailinx.json', data: await fs.readFile(path.join(P.projectDir(name), 'xailinx.json')) });
+    const zip = await createZip(entries, NODE_CODEC);
+    res.type('application/zip').attachment(`${name}.zip`).send(Buffer.from(zip));
+  }));
+
+  api.post('/projects/import-zip', express.raw({ type: () => true, limit: '200mb' }), wrap(async req => {
+    const name = String(req.query.name || '');
+    if (!name) throw bad('missing project name (?name=)');
+    if (!Buffer.isBuffer(req.body) || !req.body.length) throw bad('empty upload');
+    let entries;
+    try { entries = await readZip(new Uint8Array(req.body), NODE_CODEC); } catch (e) { throw bad(`cannot read zip: ${e.message}`); }
+    const xiseEntry = entries.filter(e => /\.xise$/i.test(e.path)).sort((x, y) => x.path.split('/').length - y.path.split('/').length)[0];
+    const pjEntry = entries.find(e => /(^|\/)xailinx\.json$/.test(e.path));
+    const root = (xiseEntry || pjEntry) ? path.posix.dirname((xiseEntry || pjEntry).path) : '';
+    const rel = p => (root === '.' || !root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
+    const text = e => Buffer.from(e.data).toString('utf8');
+    let result;
+    if (xiseEntry) {
+      const provided = {};
+      for (const e of entries) { const r = rel(e.path); if (r !== null) provided[r] = text(e); provided[path.posix.basename(e.path)] ??= text(e); }
+      result = await importXiseProject(P, name, text(xiseEntry), provided);
+    } else if (pjEntry) {
+      await P.createProject({ name, template: 'empty' });
+      result = { project: await P.readProject(name), missing: [], warnings: [] };
+    } else throw bad('the zip contains no .xise (ISE project) and no xailinx.json');
+    // copy every other file of the project folder (ASM charts, memory files, docs...) keeping its path
+    const written = new Set((result.project.files || []).map(f => f.path).concat(result.project.constraints || []));
+    const extra = [];
+    for (const e of entries) {
+      const r = rel(e.path);
+      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'xailinx.json' || /^build\//.test(r) || /(^|\/)(_ngo|xst|iseconfig|_xmsgs)\//.test(r)) continue;
+      const norm = path.posix.normalize(r);
+      if (norm.startsWith('..') || path.posix.isAbsolute(norm)) continue;
+      await fs.mkdir(path.dirname(P.safeJoin(P.projectDir(name), norm)), { recursive: true });
+      await fs.writeFile(P.safeJoin(P.projectDir(name), norm), Buffer.from(e.data));
+      extra.push(norm);
+    }
+    // XAIlinx export: restore the settings ISE does not know about (board, stimuli, language...)
+    let project = await P.readProject(name);
+    if (pjEntry) {
+      try {
+        const saved = JSON.parse(text(pjEntry));
+        project = { ...project, ...(xiseEntry ? { board: saved.board ?? project.board, stimuli: saved.stimuli || {}, preferredLanguage: saved.preferredLanguage, impl: { ...project.impl, ...saved.impl } } : { ...saved, name }) };
+        if (!xiseEntry) {
+          for (const f of saved.files || []) if (!fss.existsSync(path.join(P.projectDir(name), f.path))) result.missing.push(f.path);
+        }
+        project = await P.writeProject(name, project);
+      } catch { /* ignore a broken xailinx.json */ }
+    }
+    return { project, missing: result.missing, warnings: result.warnings, extra };
+  }));
+
+  api.post('/projects/:p/sync-xise', wrap(async req => {
+    const name = req.params.p;
+    const project = await P.readProject(name);
+    const dir = P.projectDir(name);
+    const xfile = path.join(dir, xiseName(project));
+    let direction = (req.body || {}).direction || 'auto';
+    if (!['auto', 'import', 'export'].includes(direction)) throw bad('direction must be auto, import or export');
+    if (direction === 'auto') {
+      if (!fss.existsSync(xfile)) direction = 'export';
+      else {
+        const xs = fss.statSync(xfile).mtimeMs, js = fss.statSync(path.join(dir, 'xailinx.json')).mtimeMs;
+        direction = xs > js ? 'import' : 'export';
+      }
+    }
+    if (direction === 'export') {
+      const xml = exportXise(project, { sources: await sourcesOf(name, project) });
+      await fs.writeFile(xfile, xml);
+      return { direction, file: xfile, project };
+    }
+    if (!fss.existsSync(xfile)) throw bad(`${xiseName(project)} not found`, 404);
+    let parsed;
+    try { parsed = importXise(await fs.readFile(xfile, 'utf8')); } catch (e) { throw bad(e.message); }
+    // Paths in the .xise are relative to the project dir; keep only those inside it.
+    const files = [];
+    const skipped = [];
+    for (const f of parsed.files) {
+      try { P.safeJoin(dir, f.path); files.push(f); } catch { skipped.push(f.path); }
+    }
+    const next = {
+      ...project,
+      device: parsed.device.part ? parsed.device : project.device,
+      top: parsed.top || project.top,
+      simTop: parsed.simTop || project.simTop,
+      files,
+      constraints: parsed.constraints && !parsed.constraints.includes('..') ? parsed.constraints : project.constraints,
+      impl: { ...project.impl, ...parsed.impl },
+    };
+    const saved = await P.writeProject(name, next);
+    return { direction, file: xfile, project: saved, skipped, warnings: parsed.warnings };
+  }));
+}
+
+/** Map an .xise file path into the project: keep safe relative paths, else <dir>/<basename>. */
+async function importXiseProject(P, name, xiseText, provided) {
+  let parsed;
+  try { parsed = importXise(xiseText); } catch (e) { throw Object.assign(new Error(e.message), { status: 400 }); }
+  const lookup = p => provided[p] ?? provided[path.posix.basename(p)];
+  await P.createProject({ name, template: 'empty' });
+  const files = [];
+  const missing = [];
+  for (const f of parsed.files) {
+    const target = safeRel(f.path, f.role === 'sim' ? 'sim' : 'src');
+    const text = lookup(f.path);
+    if (typeof text === 'string') await P.writeFile(name, target, text); else missing.push(f.path);
+    files.push({ path: target, lang: f.lang, role: f.role });
+  }
+  let constraints = 'constraints/top.ucf';
+  if (parsed.constraints) {
+    constraints = safeRel(parsed.constraints, 'constraints');
+    const text = lookup(parsed.constraints);
+    if (typeof text === 'string') await P.writeFile(name, constraints, text); else missing.push(parsed.constraints);
+  }
+  const pj = await P.readProject(name);
+  Object.assign(pj, {
+    device: parsed.device.part ? parsed.device : pj.device,
+    top: parsed.top || '', simTop: parsed.simTop || '', files, constraints,
+    impl: { ...pj.impl, ...parsed.impl },
+  });
+  const saved = await P.writeProject(name, pj);
+  return { project: saved, missing, warnings: parsed.warnings };
+}
+
+const NODE_CODEC = { deflate: d => zlib.deflateRawSync(d), inflate: d => zlib.inflateRawSync(d) };
+
+function safeRel(p, dir) {
+  const norm = String(p).replace(/\\/g, '/');
+  if (!norm || path.posix.isAbsolute(norm) || /^[A-Za-z]:/.test(norm) || norm.split('/').includes('..')) {
+    return `${dir}/${path.posix.basename(norm)}`;
+  }
+  return path.posix.normalize(norm);
+}

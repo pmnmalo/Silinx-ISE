@@ -1,0 +1,90 @@
+/* XAIlinx theme — modelled on the Xilinx ISE 14.x Project Navigator (Windows classic look). */
+:root {
+  --font: "Segoe UI", Tahoma, "Lucida Grande", Verdana, Arial, sans-serif;
+  --mono: Consolas, "Courier New", Menlo, monospace;
+  --fs: 12px;
+
+  --bg: #f0f0f0;            /* window background */
+  --panel: #ffffff;         /* panel content */
+  --panel-alt: #f7f7f7;
+  --fg: #000000;
+  --muted: #6d6d6d;
+  --border: #a0a0a0;
+  --border-light: #d4d0c8;
+  --accent: #316ac5;        /* selection blue */
+  --accent-fg: #ffffff;
+  --hover: #e5f1fb;
+  --danger: #c00000;
+  --warning: #c08000;
+  --success: #008000;
+
+  --title-grad: linear-gradient(#e9eff8, #c9d7ed);   /* panel caption bars */
+  --title-fg: #15428b;
+  --tab-active: #ffffff;
+  --tab-inactive: linear-gradient(#f6f6f6, #dedede);
+  --toolbar-grad: linear-gradient(#fdfdfd, #e6e6e6);
+  --menu-bg: #f5f6f7;
+
+  /* schematic (ISE RTL viewer style) */
+  --sch-bg: #ffffff;
+  --sch-grid: #e8e8f0;
+  --sch-symbol: #000080;
+  --sch-symbol-fill: #fffff0;
+  --sch-inst-fill: #e8f0ff;
+  --sch-wire: #0000a0;
+  --sch-bus: #0000a0;
+  --sch-text: #000000;
+  --sch-pin: #800000;
+  --sch-select: #ff0000;
+  --sch-highlight: #00a000;
+
+  /* waveform (ISim style) */
+  --wave-bg: #000000;
+  --wave-grid: #303030;
+  --wave-fg: #00ff00;
+  --wave-x: #ff0000;
+  --wave-z: #4080ff;
+  --wave-text: #ffffff;
+  --wave-cursor: #ffff00;
+  --wave-marker: #00c0ff;
+  --wave-names-bg: #ffffff;
+}
+
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: var(--fs) var(--font); }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; }
+
+/* Classic buttons */
+.btn {
+  border: 1px solid #707070; border-radius: 3px; padding: 3px 12px; min-width: 72px;
+  background: linear-gradient(#f2f2f2, #dddddd); color: #000; cursor: default;
+}
+.btn:hover { background: linear-gradient(#eaf6fd, #bee6fd); border-color: #3c7fb1; }
+.btn:active { background: linear-gradient(#c4e5f6, #98d1ef); }
+.btn:disabled { color: #8d8d8d; border-color: #adb2b5; background: #f4f4f4; }
+.btn.primary { border-color: #3c7fb1; }
+
+/* Panel with ISE caption bar */
+.ise-panel { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border); min-height: 0; min-width: 0; }
+.ise-panel > .caption {
+  background: var(--title-grad); color: var(--title-fg); font-weight: bold; padding: 2px 6px; height: 20px;
+  border-bottom: 1px solid #99bbe8; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden;
+}
+.ise-panel > .caption .spacer { flex: 1; }
+.ise-panel > .body { flex: 1; overflow: auto; min-height: 0; }
+
+/* Tool icons */
+.tb-btn { width: 24px; height: 22px; border: 1px solid transparent; border-radius: 2px; background: none; padding: 0; display: inline-flex; align-items: center; justify-content: center; cursor: default; }
+.tb-btn:hover { border-color: #a8c8eb; background: linear-gradient(#f3f8fd, #d5e6f8); }
+.tb-btn:disabled { opacity: .4; }
+.tb-btn svg { width: 16px; height: 16px; }
+.tb-sep { width: 1px; height: 18px; background: #c0c0c0; margin: 0 4px; box-shadow: 1px 0 #fff; }
+
+/* Trees */
+.tree { list-style: none; margin: 0; padding: 0 0 0 2px; user-select: none; }
+.tree ul { list-style: none; margin: 0; padding-left: 16px; }
+.tree .row { display: flex; align-items: center; gap: 4px; padding: 1px 4px 1px 0; white-space: nowrap; cursor: default; }
+.tree .row:hover { background: var(--hover); }
+.tree .row.sel { background: var(--accent); color: var(--accent-fg); }
+.tree .twisty { width: 12px; text-align: center; color: #555; font-size: 9px; flex: none; }
+.tree .ico { width: 16px; height: 16px; flex: none; display: inline-flex; }

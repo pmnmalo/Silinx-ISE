@@ -1,0 +1,43 @@
+{
+  "name": "blinky",
+  "version": 1,
+  "device": {
+    "family": "spartan3e",
+    "part": "xc3s250e",
+    "package": "cp132",
+    "speed": "-4"
+  },
+  "board": "basys2",
+  "top": "top",
+  "simTop": "tb_top",
+  "files": [
+    {
+      "path": "src/counter.v",
+      "lang": "verilog",
+      "role": "design"
+    },
+    {
+      "path": "src/knight.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/top.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "sim/tb_top.vhd",
+      "lang": "vhdl",
+      "role": "sim"
+    }
+  ],
+  "constraints": "constraints/top.ucf",
+  "stimuli": {},
+  "impl": {
+    "optMode": "Speed",
+    "optLevel": 1,
+    "startupClk": "JtagClk"
+  },
+  "preferredLanguage": "vhdl"
+}

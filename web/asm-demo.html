@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XAIlinx - ASM chart editor demo</title>
+  <link rel="stylesheet" href="css/asm-editor.css">
+  <style>
+    :root {
+      --bg: #14161b; --panel: #1c1f26; --fg: #d9dce3; --muted: #8b91a1;
+      --accent: #4f9cf9; --border: #2d323c; --danger: #f0605d;
+    }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
+    body { display: flex; flex-direction: column; }
+    header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--panel); }
+    header h1 { margin: 0; font-size: 15px; font-weight: 600; }
+    header .sub { color: var(--muted); font-size: 12px; }
+    header .sp { flex: 1; }
+    header button { height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: pointer; font: inherit; font-size: 12px; }
+    header button:hover { border-color: var(--accent); }
+    dialog button { height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: pointer; font: inherit; font-size: 12px; }
+    dialog button:hover { border-color: var(--accent); }
+    #editor { flex: 1; min-height: 0; }
+    dialog { width: min(900px, 92vw); max-height: 86vh; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--fg); }
+    dialog::backdrop { background: rgba(0, 0, 0, .55); }
+    dialog .bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    dialog .bar b { font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+    dialog pre { margin: 0; padding: 12px 14px; max-height: calc(86vh - 50px); overflow: auto; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>XAIlinx · ASM chart editor</h1>
+    <span class="sub">standalone demo, the chart is kept in localStorage</span>
+    <span class="sp"></span>
+    <button id="reset" type="button" title="Replace the chart with the built-in example">Load example</button>
+    <button id="export" type="button" title="Download the chart as .asm.json">Download .asm.json</button>
+  </header>
+  <div id="editor"></div>
+
+  <dialog id="dlg">
+    <div class="bar"><b id="dlg-title"></b><span style="flex:1"></span>
+      <button id="dlg-copy" type="button">Copy</button><button id="dlg-dl" type="button">Download</button><button id="dlg-close" type="button">Close</button></div>
+    <pre id="dlg-code"></pre>
+  </dialog>
+
+  <script type="module">
+    import { mountAsmEditor } from './js/asm-editor.js';
+    import { newModel } from '/core/asm.js';
+
+    const KEY = 'xailinx.asm-demo';
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { saved = null; }
+
+    const download = (name, text, type = 'text/plain') => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type }));
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+
+    const dlg = document.getElementById('dlg');
+    let last = null;
+    const editor = mountAsmEditor(document.getElementById('editor'), {
+      model: saved || newModel('controller', 'vhdl'),
+      onChange(model) { try { localStorage.setItem(KEY, JSON.stringify(model)); } catch {} },
+      onGenerate(result) {
+        last = result;
+        document.getElementById('dlg-title').textContent = result.filename;
+        document.getElementById('dlg-code').textContent = result.code;
+        dlg.showModal();
+      },
+    });
+    window.asmEditor = editor; // handy for debugging from the console
+
+    document.getElementById('dlg-close').onclick = () => dlg.close();
+    document.getElementById('dlg-copy').onclick = () => navigator.clipboard?.writeText(last?.code || '');
+    document.getElementById('dlg-dl').onclick = () => last && download(last.filename, last.code);
+    document.getElementById('reset').onclick = () => {
+      if (confirm('Replace the current chart with the example?')) editor.setModel(newModel('controller', 'vhdl'));
+    };
+    document.getElementById('export').onclick = () => {
+      const m = editor.getModel();
+      download(`${m.name}.asm.json`, JSON.stringify(m, null, 2), 'application/json');
+    };
+  </script>
+</body>
+</html>

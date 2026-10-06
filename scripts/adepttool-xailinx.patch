@@ -1,0 +1,31 @@
+diff --git a/adepttool/device.py b/adepttool/device.py
+index 21947ac..396848c 100644
+--- a/adepttool/device.py
++++ b/adepttool/device.py
+@@ -94,6 +94,11 @@ class Device:
+         self.dev.close()
+ 
+     def start(self):
++        # macOS libusb requires the interface to be claimed before bulk transfers (XAIlinx patch).
++        try:
++            self.dev.claimInterface(0)
++        except Exception:
++            pass
+         self.sys_reset(0)
+         self.dmgt = Dmgt(self)
+         self.djtg_ports = self.make_apps(APP_DJTG, Djtg, CAPS_DJTG)
+diff --git a/adepttool/jtag.py b/adepttool/jtag.py
+index ded394d..6effb7b 100644
+--- a/adepttool/jtag.py
++++ b/adepttool/jtag.py
+@@ -209,6 +209,10 @@ class PlatformFlashSerial(JtagDev):
+ 
+ DEVICES = [
+     (0x01c10093, 0x0fffffff, Spartan3, 'xc3s100e'),
++    (0x01c1a093, 0x0fffffff, Spartan3, 'xc3s250e'),
++    (0x01c22093, 0x0fffffff, Spartan3, 'xc3s500e'),
++    (0x01c2e093, 0x0fffffff, Spartan3, 'xc3s1200e'),
++    (0x01c3a093, 0x0fffffff, Spartan3, 'xc3s1600e'),
+     (0x05044093, 0x0fffffff, PlatformFlashSerial, 'xcf01s'),
+     (0x05045093, 0x0fffffff, PlatformFlashSerial, 'xcf02s'),
+     (0x05046093, 0x0fffffff, PlatformFlashSerial, 'xcf04s'),
