@@ -534,8 +534,13 @@ function vhExpr(ast, ctx) {
       return { t: 'uns', c: `(0 - ${vhUns(a, a.w, ctx)})`, w: a.w };
     }
     case 'bin': {
-      const a = vhExpr(ast.a, ctx), b = vhExpr(ast.b, ctx);
       const op = ast.op;
+      // Verilog sizing (which the VHDL must match): + and - are evaluated at the width of the
+      // assignment target; comparisons and logical operators size their operands by themselves
+      const saved = ctx.targetW;
+      if (!['+', '-', '&', '|', '^'].includes(op)) ctx.targetW = 0;
+      const a = vhExpr(ast.a, ctx), b = vhExpr(ast.b, ctx);
+      ctx.targetW = saved;
       if (op === '&&' || op === '||') {
         return { t: 'bool', c: `(${vhBool(a)} ${op === '&&' ? 'and' : 'or'} ${vhBool(b)})` };
       }
@@ -563,8 +568,9 @@ function vhExpr(ast, ctx) {
           if (v < 0n) ctx.error('negative constant result');
           return { t: 'lit', v: v < 0n ? 0n : v, w: null };
         }
-        const W = Math.max(...[a, b].filter((x) => x.t !== 'lit').map((x) => x.w));
-        return { t: 'uns', c: `(${vhUns(a, W, ctx)} ${op} ${vhUns(b, W, ctx)})`, w: W };
+        const W = Math.max(...[a, b].filter((x) => x.t !== 'lit').map((x) => x.w), ctx.targetW || 0);
+        const opnd = (x) => (x.t === 'lit' ? vhUns(x, W, ctx) : vhUnsW(x, W, ctx));
+        return { t: 'uns', c: `(${opnd(a)} ${op} ${opnd(b)})`, w: W };
       }
       // comparisons
       const vop = { '==': '=', '!=': '/=', '<': '<', '>': '>', '<=': '<=', '>=': '>=' }[op];
@@ -595,7 +601,9 @@ function vhLitW(v, w) { return w === 1 ? (v & 1n ? "'1'" : "'0'") : `"${bits(v, 
 
 /** VHDL statements assigning `ast` to signal `sig` of width `w`. */
 function vhAssign(sig, w, ast, ctx) {
+  ctx.targetW = w;
   const x = vhExpr(ast, ctx);
+  ctx.targetW = 0;
   switch (x.t) {
     case 'lit':
       if (bitlen(x.v) > w) ctx.warn(`value ${x.v} is truncated to ${w} bit(s)`);

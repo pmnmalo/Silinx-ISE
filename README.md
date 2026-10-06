@@ -25,6 +25,8 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Graphical ASM state-machine editor** (state, decision and conditional-output boxes) that
   generates synthesizable VHDL or Verilog (2/3-process style, binary/gray/one-hot/enum encoding)
   and adds it to the project.
+  The chart and its HDL file stay **synchronized** (edit either one), and an HDL state machine
+  (1/2/3-process, VHDL or Verilog) can be converted to a chart (*Convert to State Machine*).
 - **Behavioural simulation** with XAIlinx's own simulator, written from scratch in JavaScript:
   4-state logic, delta cycles, VHDL/Verilog testbenches (`wait`, `#delay`, `assert`/`report`,
   `$display`, `$readmemh`…), an **ISim**-style waveform window, force/clock to simulate modules
