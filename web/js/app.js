@@ -7,6 +7,7 @@ import { compile, elaborate, topCandidates } from '/core/compile.js';
 import { Simulator } from '/core/simulator.js';
 import { buildSchematic } from '/core/schematic.js';
 import * as wiz from './wizards.js';
+import { startI18n, setLanguage, getLanguage, LOCALES } from './i18n.js';
 
 // ------------------------------------------------------------------ state
 export const S = {
@@ -1018,6 +1019,8 @@ function setupMenus() {
       { label: 'Simulation', checked: S.view === 'sim', action: () => setView('sim') },
       '-',
       { label: 'Design Summary', icon: icon('summary'), action: () => openSummary(), disabled: hasPj },
+      '-',
+      { label: 'Language', submenu: Object.entries(LOCALES).map(([id, l]) => ({ label: l.name, checked: getLanguage() === id, action: () => setLanguage(id) })) },
     ] },
     { label: 'Project', items: () => [
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj },
@@ -1127,6 +1130,7 @@ function setView(v) {
 
 // ------------------------------------------------------------------ boot
 async function boot() {
+  startI18n();
   defineUcfMode();
   document.querySelectorAll('.ico-inline[data-icon]').forEach(e => { e.innerHTML = icons[e.dataset.icon] || ''; });
   setupMenus();

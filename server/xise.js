@@ -135,6 +135,7 @@ export function importXise(xml) {
   if (!/<project\b/.test(text)) throw Object.assign(new Error('not an ISE .xise project file (no <project> element)'), { status: 400 });
 
   const files = [];
+  const unsupported = [];
   let constraints = null;
   const fileRe = /<file\b([^>]*?)(\/>|>([\s\S]*?)<\/file>)/g;
   let m;
@@ -145,7 +146,7 @@ export function importXise(xml) {
     const assoc = [...(m[3] || '').matchAll(/<association\b([^>]*)\/?>/g)].map(x => attrs(x[1]).name);
     if (type === 'FILE_UCF' || /\.ucf$/i.test(name)) { if (!constraints) constraints = name; continue; }
     const lang = type === 'FILE_VHDL' || /\.vhdl?$/i.test(name) ? 'vhdl' : type === 'FILE_VERILOG' || /\.(v|sv)$/i.test(name) ? 'verilog' : null;
-    if (!lang) continue;
+    if (!lang) { if (name) unsupported.push({ name, type: type || '?' }); continue; }
     const role = assoc.includes('Implementation') || !assoc.length ? 'design' : 'sim';
     files.push({ path: name, lang, role });
   }
@@ -165,6 +166,11 @@ export function importXise(xml) {
   if (device.speed && !device.speed.startsWith('-')) device.speed = `-${device.speed}`;
   const fam = String(props['Device Family'] || '');
   const warnings = [];
+  const KIND = { FILE_SCHEMATIC: 'ISE schematic (.sch)', FILE_COREGEN: 'CORE Generator IP (.xco)', FILE_COREGENISE: 'CORE Generator IP (.xco)', FILE_STATEDIAGRAM: 'StateCAD state diagram (.dia)', FILE_XCO: 'CORE Generator IP (.xco)' };
+  for (const u of unsupported) {
+    const kind = KIND[u.type] || (/\.sch$/i.test(u.name) ? KIND.FILE_SCHEMATIC : /\.xco$/i.test(u.name) ? KIND.FILE_COREGEN : /\.dia$/i.test(u.name) ? KIND.FILE_STATEDIAGRAM : `${u.type} file`);
+    warnings.push(`${u.name}: ${kind} is not converted by XAIlinx and was left out of the project (the file itself is kept in the project folder when importing a .zip)`);
+  }
   if (fam && !familyFromXise(fam)) warnings.push(`device family '${fam}' is not an FPGA family supported by XAIlinx (${familyName(device.family)} assumed)`);
 
   const top = unitName(props['Implementation Top']) || (props['Implementation Top Instance Path'] || '').replace(/^\//, '') || '';

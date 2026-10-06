@@ -237,6 +237,7 @@ export async function importXiseDialog() {
     const n = res?.project?.files?.length ?? 0;
     app.log(`Imported ISE project '${pname}' (${n} source file(s)${res?.extra?.length ? `, ${res.extra.length} other file(s)` : ''}).`, 'ok');
     if (res?.missing?.length) app.log(`WARNING: files referenced by the .xise but not found: ${res.missing.join(', ')}`, 'warn');
+    for (const w of res?.warnings || []) app.log(`WARNING: ${w}`, 'warn');
   } catch (e) { alertDlg('Import ISE Project', e.message, 'error'); }
 }
 

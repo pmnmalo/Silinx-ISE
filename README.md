@@ -29,6 +29,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One.
   Ports are mapped to board resources by name, the UCF is generated, and pins are checked against
   the board before ISE runs.
+- **Internationalised interface**: English and Portuguese (*View ▸ Language*; the browser language
+  is used by default). Translations live in `web/js/i18n.js`: adding a language is adding a
+  dictionary. Code, tool output and design names are never translated.
 - **Programming** (iMPACT-like): the FPGA (volatile) or the board's Platform Flash PROM (boots at
   power-up), with openFPGALoader, xc3sprog, Digilent Adept (`djtgcfg`), ISE iMPACT or
   **adepttool** (Basys2 on macOS).
