@@ -443,7 +443,7 @@ function diagsFor(lib, design) {
 }
 
 export async function saveAll() {
-  for (const d of S.docs) if (d.dirty && d.save) await d.save();
+  for (const d of S.docs) await flushDoc(d);
 }
 
 async function checkSyntax(mod, sim = false) {
@@ -777,17 +777,21 @@ export function activateDoc(doc) {
   updateTitle();
 }
 
+// Editing always saves: a document with changes is written ~0.8 s after the last edit.
 export function setDirty(doc, dirty) {
   doc.dirty = dirty;
   doc.tab.classList.toggle('dirty', dirty);
+  clearTimeout(doc._autosave);
+  if (dirty && doc.save) doc._autosave = setTimeout(() => flushDoc(doc, { auto: true }), 800);
+}
+async function flushDoc(doc, opts) {
+  clearTimeout(doc._autosave);
+  if (!doc.dirty || !doc.save) return;
+  try { await doc.save(opts); } catch (e) { log(`ERROR: cannot save ${doc.path || doc.title}: ${e.message}`, 'err'); }
 }
 
 export async function closeDoc(doc) {
-  if (doc.dirty) {
-    const r = await dialog({ title: 'Save Changes', body: h('div', {}, `Save changes to "${doc.title}"?`), buttons: [{ label: 'Yes', value: 'yes', primary: true }, { label: 'No', value: 'no' }, { label: 'Cancel', value: null }] });
-    if (!r) return false;
-    if (r === 'yes') await doc.save?.();
-  }
+  await flushDoc(doc);
   doc.destroy?.();
   doc.el.remove(); doc.tab.remove();
   S.docs = S.docs.filter(d => d !== doc);
@@ -813,7 +817,6 @@ export async function openFile(path, line, col) {
       create(el, d) {
         const tplBtn = h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Language Templates' }, 'Templates ▾');
         const bar = h('div', { class: 'editor-bar' },
-          h('button', { class: 'tb-btn', title: 'Save (Ctrl+S)', html: icons.save, onclick: () => d.save() }),
           h('button', { class: 'tb-btn', title: 'Undo', html: icons.undo, onclick: () => d.editor.exec('undo') }),
           h('button', { class: 'tb-btn', title: 'Redo', html: icons.redo, onclick: () => d.editor.exec('redo') }),
           h('div', { class: 'tb-sep' }),
@@ -864,13 +867,12 @@ export async function openFile(path, line, col) {
             hdl ? '-' : null,
             hdl ? { label: 'Check Syntax', action: () => checkFileSyntax(path) } : null,
             sch ? { label: 'Open Synchronized Schematic', action: () => openSch(sch) } : null,
-            { label: 'Save', action: () => d.save() },
           ].filter(Boolean), e.clientX, e.clientY);
         });
         return {
           lang,
           onActivate: () => setTimeout(() => d.editor?.refresh(), 0),
-          save: async () => {
+          save: async ({ auto = false } = {}) => {
             await api.writeFile(S.project.name, path, d.editor.getValue());
             d.editor.markClean();
             setDirty(d, false);
@@ -879,7 +881,7 @@ export async function openFile(path, line, col) {
             else await reloadProject(false);
             compileProject(); renderHierarchy(); markStale();
             status(`Saved ${path}`);
-            if (S.hdlToSch?.[path] && !S.syncing) syncSchematicFromHdl(path).catch(e => log(`WARNING: schematic not synchronized: ${e.message}`, 'warn'));
+            if (S.hdlToSch?.[path] && !S.syncing) syncSchematicFromHdl(path, { quiet: auto }).catch(e => log(`WARNING: schematic not synchronized: ${e.message}`, 'warn'));
           },
           destroy: () => d.editor.destroy(),
         };
@@ -1029,14 +1031,9 @@ export async function openAsm(path) {
     create(el, d) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
-      let timer = null;
       const ed = mountAsmEditor(host, {
         model,
-        onChange: m => {
-          setDirty(d, true);
-          clearTimeout(timer);
-          timer = setTimeout(async () => { await api.writeFile(S.project.name, path, JSON.stringify(m, null, 2)); setDirty(d, false); }, 800);
-        },
+        onChange: () => setDirty(d, true),
         onGenerate: async ({ lang, filename, code }) => {
           const target = `src/${filename}`;
           if (S.fileTree.includes(target) && !await confirmDlg('Generate HDL', `${target} already exists. Overwrite it?`)) return;
@@ -1077,11 +1074,10 @@ export async function openSch(path) {
     create(el, d) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
-      let timer = null;
       const save = async m => { await api.writeFile(S.project.name, path, JSON.stringify(m, null, 1)); setDirty(d, false); };
       const ed = mountSchEditor(host, {
         doc, modules,
-        onChange: m => { setDirty(d, true); clearTimeout(timer); timer = setTimeout(async () => { await save(m); if (!S.syncing) syncHdlFromSchematic(path, m).catch(e => log(`WARNING: HDL not synchronized: ${e.message}`, 'warn')); }, 800); },
+        onChange: () => setDirty(d, true),
         onGenerate: async ({ lang, code, target }) => {
           const exists = S.fileTree.includes(target);
           const owned = S.schOwners?.[path] === target;
@@ -1097,7 +1093,13 @@ export async function openSch(path) {
         onOpenModule: name => { const i = moduleInfo(name); if (i) openFile(i.file, i.line); },
       });
       d.schEditor = ed;
-      return { save: () => save(ed.getDoc()), destroy: () => ed.destroy?.(), onActivate: () => setTimeout(() => ed.fit?.(), 30) };
+      return {
+        save: async () => {
+          const m = ed.getDoc();
+          await save(m);
+          if (!S.syncing) syncHdlFromSchematic(path, m).catch(e => log(`WARNING: HDL not synchronized: ${e.message}`, 'warn'));
+        },
+        destroy: () => ed.destroy?.(), onActivate: () => setTimeout(() => ed.fit?.(), 30) };
     },
   });
 }
@@ -1144,9 +1146,10 @@ async function syncHdlFromSchematic(schPath, doc) {
   } finally { S.syncing = false; }
 }
 
-async function syncSchematicFromHdl(hdlPath) {
+async function syncSchematicFromHdl(hdlPath, { quiet = false } = {}) {
   const schPath = S.hdlToSch[hdlPath];
   const errs = [...(S.lib?.errors || [])].filter(d => d.severity === 'error' && d.file === hdlPath);
+  if (errs.length && quiet) { status(`${schPath.split('/').pop()} not updated yet: ${hdlPath.split('/').pop()} has errors`); return; }
   if (errs.length) { log(`WARNING: ${schPath} not updated: ${hdlPath} has errors (it is updated once the HDL compiles)`, 'warn'); return; }
   let old;
   try { old = JSON.parse(await api.readFile(S.project.name, schPath)); } catch { return; }
@@ -1426,8 +1429,6 @@ function setupMenus() {
       { label: 'Close Project', action: () => closeProject(), disabled: hasPj },
       '-',
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj, shortcut: 'Alt+N' },
-      { label: 'Save', icon: icon('save'), action: () => S.active?.save?.(), disabled: () => !S.active?.save, shortcut: 'Ctrl+S' },
-      { label: 'Save All', icon: icon('saveAll'), action: () => saveAll(), disabled: hasPj },
       '-',
       { label: 'Recent Projects', submenu: recent().map(r => ({ label: r, action: () => openProject(r) })) },
     ].filter(Boolean) },
@@ -1496,8 +1497,6 @@ function setupToolbar() {
   tb.append(
     btn('newProject', 'New Project', () => wiz.newProjectWizard()),
     btn('open', 'Open Project', () => wiz.openProjectDialog()),
-    btn('save', 'Save (Ctrl+S)', () => S.active?.save?.()),
-    btn('saveAll', 'Save All', () => saveAll()),
     h('div', { class: 'tb-sep' }),
     btn('undo', 'Undo', () => S.active?.editor?.exec('undo')),
     btn('redo', 'Redo', () => S.active?.editor?.exec('redo')),
@@ -1572,7 +1571,7 @@ async function boot() {
   document.querySelectorAll('input[name=view]').forEach(r => r.addEventListener('change', () => setView(r.value)));
   $('console-clear').addEventListener('click', () => { $('console-log').innerHTML = ''; });
   addEventListener('keydown', e => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); S.active?.save?.(); }
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); if (S.active) flushDoc(S.active); }  // nothing to do: edits are saved automatically
   });
   addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });
 

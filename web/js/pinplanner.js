@@ -49,7 +49,6 @@ export function mountPinPlanner(el, doc, top) {
   const resHost = h('div', { class: 'pp-res' });
   const status = h('span', { style: { color: '#555', marginLeft: '10px' } });
   const bar = h('div', { class: 'pp-bar' },
-    h('button', { class: 'btn', onclick: () => save() }, 'Save Constraints'),
     h('button', { class: 'btn', onclick: () => autoAssign(), disabled: !board, title: board ? 'Match port names with board resources (clk, led, sw, btn, seg, an…)' : 'Select a board in Design Properties' }, 'Auto-assign from Board'),
     h('button', { class: 'btn', onclick: () => { asg = {}; clocks = []; render(); setDirty(doc, true); } }, 'Clear All'),
     h('span', {}, `Top: ${top} · Device ${pj.device.part}-${pj.device.package}${board ? ` · Board: ${board.name}` : ' · no board selected'}`),
@@ -145,7 +144,7 @@ export function mountPinPlanner(el, doc, top) {
   async function save() {
     const u = used();
     const dup = [...u.entries()].filter(([, v]) => v.length > 1);
-    if (dup.length && !await confirmDlg('Save Constraints', `Some pins are assigned more than once (${dup.map(([k]) => k).join(', ')}). Save anyway?`)) return;
+    status.textContent = dup.length ? `⚠ pins assigned more than once: ${dup.map(([k]) => k).join(', ')}` : '';
     const text = generateUcf({
       ports: ports.map(p => ({ name: p.name, dir: p.dir, msb: p.msb, lsb: p.lsb, width: p.width })),
       assignments: asg, clocks,
@@ -156,7 +155,7 @@ export function mountPinPlanner(el, doc, top) {
     await app.saveProjectJson();
     await app.reloadProject();
     setDirty(doc, false);
-    app.log(`Constraints written to ${pj.constraints}.`, 'ok');
+    if (!status.textContent) status.textContent = `Saved to ${pj.constraints}`;
     const d = app.findDoc(`file:${pj.constraints}`);
     if (d) { d.editor.setValue(text); d.editor.markClean(); setDirty(d, false); }
   }
