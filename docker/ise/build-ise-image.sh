@@ -4,6 +4,9 @@
 #
 #   docker/ise/build-ise-image.sh --installer ~/Downloads/Xilinx_ISE_DS_Lin_14.7_1015_1.tar \
 #                                 --license   ~/Downloads/Xilinx.lic  [--tag xailinx/ise:14.7] [--no-md5]
+#                                 [--full | --families "spartan3e spartan6"]
+# Default: ISE trimmed to the command-line flow (about 3 GB, every device family). --full keeps the
+# complete ~18 GB install; --families keeps only the listed families' device data.
 #
 # Requirements: Docker (Docker Desktop, OrbStack, Colima or Docker Engine) with BuildKit, ~30 GB
 # free disk during the build. The image contains AMD/Xilinx software and your license: never push
@@ -14,6 +17,7 @@ TAG="xailinx/ise:14.7"
 INSTALLER=""
 LICENSE=""
 CHECK_MD5=1
+BUILD_ARGS=()
 MD5_EXPECTED="e8065b2ffb411bb74ae32efa475f9817"   # Xilinx_ISE_DS_Lin_14.7_1015_1.tar (AMD download page)
 KIT_DIR="$(cd "$(dirname "$0")" && pwd)"
 XAILINX_DIR="$(cd "$KIT_DIR/../.." && pwd)"
@@ -27,6 +31,8 @@ while [ $# -gt 0 ]; do
     --license) LICENSE="$2"; shift 2 ;;
     --tag) TAG="$2"; shift 2 ;;
     --no-md5) CHECK_MD5=0; shift ;;
+    --full) BUILD_ARGS+=(--build-arg ISE_FULL=1); shift ;;
+    --families) BUILD_ARGS+=(--build-arg "KEEP_FAMILIES=$2"); shift 2 ;;
     -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) die "unknown option $1 (see --help)" ;;
   esac
@@ -83,7 +89,7 @@ LICENSE_DIR="$(mktemp -d)"
 trap 'rm -rf "$LICENSE_DIR" "$INSTALLER_DIR"' EXIT
 cp "$LICENSE" "$LICENSE_DIR/Xilinx.lic"
 info "building $TAG (extracting + installing ISE takes 20-60 min, longer under emulation)"
-docker buildx build --load --platform linux/amd64 \
+docker buildx build --load --platform linux/amd64 ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
   --build-context "installer=$INSTALLER_DIR" \
   --build-context "license=$LICENSE_DIR" \
   -t "$TAG" "$KIT_DIR"

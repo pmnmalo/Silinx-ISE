@@ -15,7 +15,9 @@ param(
   [string]$Installer = "",
   [string]$License = "",
   [string]$Tag = "xailinx/ise:14.7",
-  [switch]$NoMd5
+  [switch]$NoMd5,
+  [switch]$Full,          # keep the complete ~18 GB ISE install (default: trimmed to ~3 GB)
+  [string]$Families = ""  # e.g. "spartan3e spartan6": keep only these device families
 )
 $ErrorActionPreference = "Stop"
 $Md5Expected = "e8065b2ffb411bb74ae32efa475f9817"   # Xilinx_ISE_DS_Lin_14.7_1015_1.tar
@@ -72,7 +74,10 @@ Copy-Item $License (Join-Path $LicDir "Xilinx.lic")
 
 try {
   Info "building $Tag (extracting + installing ISE takes 20-60 min)"
-  docker buildx build --load --platform linux/amd64 --build-context "installer=$Stage" --build-context "license=$LicDir" -t $Tag $KitDir
+  $extra = @()
+  if ($Full) { $extra += @("--build-arg", "ISE_FULL=1") }
+  if ($Families) { $extra += @("--build-arg", "KEEP_FAMILIES=$Families") }
+  docker buildx build --load --platform linux/amd64 @extra --build-context "installer=$Stage" --build-context "license=$LicDir" -t $Tag $KitDir
   if ($LASTEXITCODE -ne 0) { Die "docker build failed" }
 
   Info "smoke test"

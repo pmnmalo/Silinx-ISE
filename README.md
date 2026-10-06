@@ -22,8 +22,13 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Implementation** with **Xilinx ISE 14.7** (XST → NGDBuild → MAP → PAR → TRCE → BitGen), run
   locally, in Docker or over SSH, with live per-step status (✓ / ⚠ / ✗) in the Processes panel and
   utilization/timing reports in the *Design Summary*.
-- **I/O Pin Planning** from a board database (Spartan-3E Starter Kit, Digilent Basys2, Nexys2),
-  generating the UCF; pins are checked against the board before ISE runs.
+- **Devices**: every FPGA family ISE 14.7 WebPACK implements — Spartan-3, Spartan-3E,
+  Spartan-3A/3AN, Spartan-3A DSP, Spartan-6, Virtex-4/5/6, Artix-7, Kintex-7 and Zynq-7000
+  (WebPACK parts). Full flows verified to a bitstream on Spartan-3E and Spartan-6.
+- **Boards and I/O Pin Planning**: Digilent Basys2, Nexys2, Nexys3, Atlys, Cmod S6; Xilinx
+  Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One.
+  Ports are mapped to board resources by name, the UCF is generated, and pins are checked against
+  the board before ISE runs.
 - **Programming** (iMPACT-like): the FPGA (volatile) or the board's Platform Flash PROM (boots at
   power-up), with openFPGALoader, xc3sprog, Digilent Adept (`djtgcfg`), ISE iMPACT or
   **adepttool** (Basys2 on macOS).
@@ -74,7 +79,9 @@ docker/ise/build-ise-image.sh --installer ~/Downloads/Xilinx_ISE_DS_Lin_14.7_101
 
 On Windows use `docker\ise\build-ise-image.ps1`. The script checks the installer and x86-64
 emulation, builds `xailinx/ise:14.7`, proves the license with a test synthesis and configures
-XAIlinx.
+XAIlinx. The image keeps only what a command-line flow needs (ISE drops from ~18 GB to ~3 GB, all
+device families kept); `--full` keeps the complete install and `--families "spartan3e spartan6"`
+keeps only some families.
 
 Other execution modes (*Tools ▸ Toolchain Settings*):
 

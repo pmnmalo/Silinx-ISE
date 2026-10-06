@@ -21,6 +21,47 @@ function select(options, value) {
   return s;
 }
 
+// Cascading Family -> Device -> Package -> Speed selectors over the device database.
+function devicePicker(db, device) {
+  const families = (db.families || []).filter(f => (f.parts || []).length);
+  const famOf = part => db.parts.find(p => p.part === part)?.family || 'spartan3e';
+  const famSel = h('select'), partSel = h('select'), pkgSel = h('select'), spdSel = h('select');
+  let cur = { ...device };
+  const fillFam = () => {
+    famSel.innerHTML = '';
+    for (const f of families) famSel.append(h('option', { value: f.id, selected: f.id === famOf(cur.part) }, f.displayName || f.name));
+  };
+  const fillParts = () => {
+    partSel.innerHTML = '';
+    const parts = db.parts.filter(p => p.family === famSel.value);
+    if (!parts.some(p => p.part === cur.part)) cur.part = parts[0]?.part;
+    for (const p of parts) partSel.append(h('option', { value: p.part, selected: p.part === cur.part }, p.part.toUpperCase()));
+    fillPkgs();
+  };
+  const fillPkgs = () => {
+    const part = db.parts.find(p => p.part === partSel.value);
+    pkgSel.innerHTML = ''; spdSel.innerHTML = '';
+    if (!part) return;
+    const pkgs = Object.keys(part.packages);
+    if (!pkgs.includes(cur.package)) cur.package = pkgs[0];
+    for (const k of pkgs) pkgSel.append(h('option', { value: k, selected: k === cur.package }, `${k.toUpperCase()}  (${part.packages[k].userIo ?? '?'} I/O)`));
+    if (!part.speeds.includes(cur.speed)) cur.speed = part.speeds.find(x => !/L|N$/i.test(x)) || part.speeds[0]; // a standard grade, not low-power
+    for (const sp of part.speeds) spdSel.append(h('option', { value: sp, selected: sp === cur.speed }, sp));
+  };
+  famSel.addEventListener('change', () => fillParts());
+  partSel.addEventListener('change', () => { cur.part = partSel.value; fillPkgs(); });
+  pkgSel.addEventListener('change', () => { cur.package = pkgSel.value; });
+  spdSel.addEventListener('change', () => { cur.speed = spdSel.value; });
+  const set = d => { cur = { ...d }; fillFam(); fillParts(); };
+  set(device);
+  return {
+    famSel, partSel, pkgSel, spdSel, set,
+    disable(on) { [famSel, partSel, pkgSel, spdSel].forEach(e => { e.disabled = on; }); },
+    value: () => ({ family: famSel.value, part: partSel.value, package: pkgSel.value, speed: spdSel.value }),
+    familyName: () => famSel.selectedOptions[0]?.textContent || famSel.value,
+  };
+}
+
 // Multi-page wizard driver. pages: [{ title, render() -> Node, validate?() -> string|null }]
 function wizard(title, pages, { width = 720, finishLabel = 'Finish' } = {}) {
   return new Promise(resolve => {
@@ -88,44 +129,31 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
     },
   };
   const boardSel = select([['', 'None Specified'], ...db.boards.map(b => [b.id, b.name])], '');
-  const partSel = h('select'), pkgSel = h('select'), spdSel = h('select');
-  const fillParts = () => {
-    partSel.innerHTML = '';
-    for (const p of db.parts) partSel.append(h('option', { value: p.part, selected: p.part === st.device.part }, p.part.toUpperCase()));
-    fillPkgs();
-  };
-  const fillPkgs = () => {
-    const part = db.parts.find(p => p.part === partSel.value);
-    pkgSel.innerHTML = '';
-    for (const k of Object.keys(part.packages)) pkgSel.append(h('option', { value: k, selected: k === st.device.package }, k.toUpperCase()));
-    spdSel.innerHTML = '';
-    for (const s of part.speeds) spdSel.append(h('option', { value: s, selected: s === st.device.speed }, s));
-  };
+  const dp = devicePicker(db, st.device);
   boardSel.addEventListener('change', () => {
     const b = db.boards.find(x => x.id === boardSel.value);
     st.device = b ? { ...b.device } : { ...DEFAULT_DEVICE };
-    fillParts();
-    [partSel, pkgSel, spdSel].forEach(e => { e.disabled = !!b; });
+    dp.set(st.device);
+    dp.disable(!!b);
   });
-  partSel.addEventListener('change', () => { st.device.part = partSel.value; fillPkgs(); });
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], 'vhdl');
   const p2 = {
     title: 'Project Settings',
-    render: () => { fillParts(); return h('div', {},
+    render: () => h('div', {},
       h('div', { class: 'hint' }, 'Select the device and design flow for the project.'),
       h('div', { class: 'form-grid' },
         ...field('Evaluation Development Board:', boardSel),
         ...field('Product Category:', select(['All'], 'All')),
-        ...field('Family:', select([['spartan3e', 'Spartan3E']], 'spartan3e')),
-        ...field('Device:', partSel),
-        ...field('Package:', pkgSel),
-        ...field('Speed:', spdSel),
+        ...field('Family:', dp.famSel),
+        ...field('Device:', dp.partSel),
+        ...field('Package:', dp.pkgSel),
+        ...field('Speed:', dp.spdSel),
         ...field('Top-Level Source Type:', select(['HDL'], 'HDL')),
         ...field('Synthesis Tool:', select(['XST (VHDL/Verilog)'], 'XST (VHDL/Verilog)')),
         ...field('Simulator:', select(['XAIlinx ISim-compatible (VHDL/Verilog)'], '')),
         ...field('Preferred Language:', langSel),
         ...field('VHDL Source Analysis Standard:', select(['VHDL-93', 'VHDL-2008'], 'VHDL-93')),
-      )); },
+      )),
   };
   const summary = h('div');
   const p3 = {
@@ -137,7 +165,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
       summary.append(h('pre', { style: { background: '#fff', border: '1px solid #ccc', padding: '10px', fontFamily: 'var(--mono)', whiteSpace: 'pre-wrap' } },
         `Project Navigator will create a new project with the following specifications.\n\n` +
         `Project:\n  Project Name: ${name.value.trim()}\n  Template:     ${tplSel.value}\n\n` +
-        `Device:\n  Board:        ${b ? b.name : 'None Specified'}\n  Family:       Spartan3E\n  Device:       ${partSel.value.toUpperCase()}\n  Package:      ${pkgSel.value.toUpperCase()}\n  Speed:        ${spdSel.value}\n\n` +
+        `Device:\n  Board:        ${b ? b.name : 'None Specified'}\n  Family:       ${dp.familyName()}\n  Device:       ${dp.value().part.toUpperCase()}\n  Package:      ${dp.value().package.toUpperCase()}\n  Speed:        ${dp.value().speed}\n\n` +
         `Flow:\n  Synthesis Tool:     XST (VHDL/Verilog)\n  Simulator:          XAIlinx behavioural simulator\n  Preferred Language: ${langSel.value.toUpperCase()}`));
     },
   };
@@ -146,7 +174,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
   try {
     const pj = await api.createProject({
       name: name.value.trim(), template: tplSel.value,
-      device: { family: 'spartan3e', part: partSel.value, package: pkgSel.value, speed: spdSel.value },
+      device: dp.value(),
       board: boardSel.value || (tplSel.value !== 'empty' ? undefined : null),
     });
     pj.preferredLanguage = langSel.value;
@@ -430,19 +458,12 @@ export async function projectProperties() {
   const db = S.devices;
   const pj = S.project;
   const boardSel = select([['', 'None Specified'], ...db.boards.map(b => [b.id, b.name])], pj.board || '');
-  const partSel = select(db.parts.map(p => [p.part, p.part.toUpperCase()]), pj.device.part);
-  const pkgSel = h('select'), spdSel = h('select');
-  const fill = () => {
-    const part = db.parts.find(p => p.part === partSel.value);
-    pkgSel.innerHTML = ''; spdSel.innerHTML = '';
-    for (const k of Object.keys(part.packages)) pkgSel.append(h('option', { value: k, selected: k === pj.device.package }, k.toUpperCase()));
-    for (const s of part.speeds) spdSel.append(h('option', { value: s, selected: s === pj.device.speed }, s));
-  };
-  fill();
-  partSel.addEventListener('change', fill);
+  const dp = devicePicker(db, pj.device);
+  dp.disable(!!pj.board);
   boardSel.addEventListener('change', () => {
     const b = db.boards.find(x => x.id === boardSel.value);
-    if (b) { partSel.value = b.device.part; fill(); pkgSel.value = b.device.package; spdSel.value = b.device.speed; }
+    if (b) dp.set(b.device);
+    dp.disable(!!b);
   });
   const lang = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], pj.preferredLanguage || 'vhdl');
   const r = await dialog({
@@ -450,8 +471,8 @@ export async function projectProperties() {
     body: h('div', { class: 'form-grid' },
       ...field('Name:', h('span', {}, pj.name)),
       ...field('Evaluation Development Board:', boardSel),
-      ...field('Family:', h('span', {}, 'Spartan3E')),
-      ...field('Device:', partSel), ...field('Package:', pkgSel), ...field('Speed:', spdSel),
+      ...field('Family:', dp.famSel),
+      ...field('Device:', dp.partSel), ...field('Package:', dp.pkgSel), ...field('Speed:', dp.spdSel),
       ...field('Top Module (implementation):', h('span', {}, pj.top || '(none)')),
       ...field('Top Module (simulation):', h('span', {}, pj.simTop || '(none)')),
       ...field('Preferred Language:', lang)),
@@ -459,7 +480,7 @@ export async function projectProperties() {
   if (!r) return;
   const oldBoard = pj.board, oldDev = `${pj.device.part}-${pj.device.package}`;
   pj.board = boardSel.value || null;
-  pj.device = { family: 'spartan3e', part: partSel.value, package: pkgSel.value, speed: spdSel.value };
+  pj.device = dp.value();
   pj.preferredLanguage = lang.value;
   await app.saveProjectJson();
   await app.reloadProject();

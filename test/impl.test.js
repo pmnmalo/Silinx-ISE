@@ -41,9 +41,11 @@ test('device database: resources + package validation', () => {
   assert.equal(dev.validateDevice({ part: 'xc3s100e', package: 'fg320', speed: '-4' }).length, 1);
   assert.equal(dev.validateDevice({ part: 'xc3s500e', package: 'vq100', speed: '-5' }).length, 1);
   assert.equal(dev.validateDevice({ part: 'xc3s1600e', package: 'fg484', speed: '-5' }).length, 0);
-  const db = dev.getDeviceDb();
-  assert.equal(db.parts.length, 5);
-  assert.equal(db.boards.length, 3);
+  const legacy = dev.getDeviceDb({ all: false });   // Spartan-3E-only view
+  assert.equal(legacy.parts.length, 5);
+  assert.equal(legacy.boards.length, 3);
+  const db = dev.getDeviceDb();                        // default: every ISE WebPACK family
+  assert.ok(db.parts.length > 5 && db.boards.length > 3 && db.families.length >= 10);
 });
 
 test('boards: valid devices, unique pins, expected key pins', () => {

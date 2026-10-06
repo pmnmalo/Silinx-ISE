@@ -31,7 +31,8 @@ export function mountPinPlanner(el, doc, top) {
   // board resources -> pins
   const resPins = [];
   for (const r of board?.resources || []) r.pins.forEach((pin, i) => resPins.push({ res: r, pin, label: r.pins.length > 1 ? `${r.name}<${i}>` : r.name, idx: i }));
-  const iostds = db?.iostandards || ['LVCMOS33', 'LVCMOS25', 'LVTTL'];
+  const famId = db?.parts?.find(p => p.part === pj.device.part)?.family || pj.device.family;
+  const iostds = db?.families?.find(f => f.id === famId)?.ioStandards || db?.iostandards || ['LVCMOS33', 'LVCMOS25', 'LVTTL'];
 
   let asg = {}, clocks = [];
   const load = async () => {

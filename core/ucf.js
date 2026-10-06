@@ -267,7 +267,9 @@ export function boardAutoAssign(ports, board) {
     const key = p.name.toLowerCase();
     const alias = ALIASES[key] || key;
     let r = byName.get(key) || byName.get(alias);
-    if (!r && alias === 'clk') r = res.find(x => x.group === 'Clock');
+    // fall back to the board's resource group (e.g. Numato boards call their switches "dip")
+    const GROUP = { clk: 'Clock', led: 'LEDs', sw: 'Switches', btn: 'Buttons' };
+    if (!r && GROUP[alias]) r = res.find(x => x.group === GROUP[alias] && x.pins.length >= Math.min(p.width || 1, 2)) || res.find(x => x.group === GROUP[alias]);
     if (!r) { unmatched.push(p.name); continue; }
     const attrs = pin => {
       const a = { loc: pin, iostandard: r.iostandard };

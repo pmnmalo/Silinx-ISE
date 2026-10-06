@@ -27,7 +27,12 @@ RUN apt-get update || { sed -i -E 's#http://(archive|security).ubuntu.com#http:/
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS install
-COPY install-config.txt /tmp/install-config.txt
+# ISE_FULL=1 keeps the complete WebPACK install (~18 GB). By default the image is trimmed to what a
+# command-line flow needs (~3 GB of ISE, all device families); KEEP_FAMILIES="spartan3e spartan6"
+# keeps only those families' device data.
+ARG ISE_FULL=0
+ARG KEEP_FAMILIES=""
+COPY install-config.txt trim-ise.sh /tmp/
 RUN --mount=type=bind,from=installer,source=Xilinx_ISE_DS_Lin_14.7_1015_1.tar,target=/tmp/ise.tar \
     set -eu; \
     mkdir -p /tmp/ise-src; \
@@ -35,7 +40,8 @@ RUN --mount=type=bind,from=installer,source=Xilinx_ISE_DS_Lin_14.7_1015_1.tar,ta
     cd /tmp/ise-src/Xilinx_ISE_DS_Lin_14.7_1015_1/bin/lin64; \
     yes | ./batchxsetup --batch /tmp/install-config.txt || true; \
     test -x /opt/Xilinx/14.7/ISE_DS/ISE/bin/lin64/xst; \
-    rm -rf /tmp/ise-src
+    rm -rf /tmp/ise-src; \
+    if [ "$ISE_FULL" != "1" ]; then KEEP_FAMILIES="$KEEP_FAMILIES" bash /tmp/trim-ise.sh; fi
 
 FROM base
 COPY --from=install /opt/Xilinx /opt/Xilinx

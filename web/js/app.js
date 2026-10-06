@@ -383,6 +383,63 @@ async function checkSyntax(mod, sim = false) {
   return true;
 }
 
+// ------------------------------------------------------------------ process status persistence
+// The implementation process marks (synth / translate / map / par / impl / bitgen) are saved in
+// build/xailinx-status.json with a fingerprint of the sources + constraints, and restored when the
+// project is opened (marked out of date if the sources changed since). Older builds without that
+// file get their marks from ISE's reports and output files.
+const IMPL_IDS = ['synth', 'translate', 'map', 'par', 'impl', 'bitgen'];
+const STATUS_FILE = 'build/xailinx-status.json';
+
+function sourcesFingerprint() {
+  const parts = S.sources.filter(f => f.role !== 'sim').map(f => `${f.path}\n${f.text}`).sort();
+  parts.push(`ucf\n${S.project.constraints}\n${S.ucfText ?? ''}`, `top\n${S.project.top}`, `dev\n${JSON.stringify(S.project.device)}`);
+  let h = 2166136261;                                    // FNV-1a, enough to detect changes
+  for (const c of parts.join('\0')) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  return h.toString(16);
+}
+
+async function loadUcfText() {
+  S.ucfText = null;
+  if (S.project?.constraints && S.fileTree?.includes(S.project.constraints)) {
+    try { S.ucfText = await api.readFile(S.project.name, S.project.constraints); } catch { /* none */ }
+  }
+}
+
+async function saveImplStatus() {
+  try {
+    await loadUcfText();
+    const status = Object.fromEntries(IMPL_IDS.filter(id => S.status[id] && S.status[id] !== 'running').map(id => [id, S.status[id]]));
+    await api.writeFile(S.project.name, STATUS_FILE, JSON.stringify({ top: S.project.top, fingerprint: sourcesFingerprint(), time: new Date().toISOString(), status }, null, 2));
+  } catch { /* best effort */ }
+}
+
+async function restoreImplStatus() {
+  if (!S.project?.top) return;
+  let saved = null;
+  try { saved = JSON.parse(await api.readFile(S.project.name, STATUS_FILE)); } catch { /* none */ }
+  await loadUcfText();
+  let status = {};
+  if (saved && saved.top === S.project.top) status = saved.status || {};
+  else {
+    // derive from ISE's reports (builds made before status saving, or by run.sh elsewhere)
+    let rep = null;
+    try { rep = await api.reports(S.project.name); } catch { /* none */ }
+    const sum = rep?.summary;
+    if (!sum || rep.top !== S.project.top) return;
+    const w = (n) => (n ? 'warn' : 'ok');
+    const mapWarn = (rep.map?.utilization || []).find(u => /warnings/i.test(u.name))?.used;
+    if (sum.synthesized) status.synth = w(rep.synthesis?.warnings);
+    if (sum.mapped) { status.translate = 'ok'; status.map = w(mapWarn); }
+    if (sum.routed) { status.par = sum.timingMet === false ? 'warn' : 'ok'; status.impl = worst(status.translate, status.map, status.par); }
+    if (sum.bitstream) status.bitgen = 'ok';
+  }
+  const fresh = !saved || saved.fingerprint === sourcesFingerprint();
+  for (const id of IMPL_IDS) if (status[id]) S.status[id] = fresh || status[id] === 'err' ? status[id] : 'stale';
+  if (!fresh) log('Sources changed since the last implementation run: processes marked out of date.', 'info');
+  renderProcesses();
+}
+
 // ------------------------------------------------------------------ implementation (ISE)
 // Live per-step status from run.sh's "=== XAILINX STEP <step> ===" markers and ISE WARNING/ERROR lines.
 const STEP_PROC = { synth: 'synth', translate: 'translate', map: 'map', par: 'par', trce: 'par', bitgen: 'bitgen', prombit: 'bitgen' };
@@ -502,6 +559,7 @@ async function runImpl(mod, steps) {
     const { job } = await api.implement(S.project.name, { steps, generateOnly: !tc.ise.available });
     const res = await followJob(job, track.line);
     track.end(res.status === 'ok');
+    if (tc.ise.available) saveImplStatus();
     if (res.status === 'ok' && tc.ise.available) {
       log(`\nProcess "${{ synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId]}" completed successfully${track.warnings ? ` with ${track.warnings} warning(s)` : ''}`, 'ok');
     } else if (res.status === 'ok') {
@@ -827,6 +885,7 @@ export async function openProject(name) {
   try { localStorage.setItem('xailinx.lastProject', name); } catch { /* ignore */ }
   rememberRecent(name);
   await reloadProject();
+  restoreImplStatus();
   log(`Project "${name}" opened (${S.project.device.part}${S.project.device.speed}-${S.project.device.package}).`, 'info');
   openSummary();
 }
@@ -933,7 +992,6 @@ function setupMenus() {
       { label: 'Open Project…', icon: icon('open'), action: () => wiz.openProjectDialog() },
       { label: 'Import ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
       { label: 'Export ISE Project (.zip)…', action: () => exportProjectZip(), disabled: hasPj },
-      { label: 'Export .xise only', action: () => downloadUrl(api.exportXiseUrl(S.project.name), `${S.project.name}.xise`), disabled: hasPj },
       api.standalone ? '-' : null,
       api.standalone ? { label: 'Download Project Bundle…', action: () => downloadText(`${S.project.name}.xailinx.json`, api.exportBundle(S.project.name), 'application/json'), disabled: hasPj } : null,
       api.standalone ? { label: 'Open Project Bundle…', action: () => openBundle() } : null,

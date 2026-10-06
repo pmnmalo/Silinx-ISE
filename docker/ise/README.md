@@ -47,6 +47,17 @@ The script checks the installer checksum and x86-64 emulation, builds `xailinx/i
 (20–60 minutes, once), synthesizes a test design to confirm the license works, and configures
 XAIlinx to use the image. Without arguments it looks for both files in `~/Downloads`.
 
+**Image size.** By default the install is trimmed to what the command-line flow uses
+(`trim-ise.sh`): EDK, PlanAhead, CORE Generator, SysGen, simulation libraries, documentation and
+the GUIs are removed, taking ISE from about 18 GB to about 3 GB while keeping every device family.
+Options (`.ps1`: `-Full`, `-Families`):
+
+| Option | Effect |
+|---|---|
+| *(default)* | trimmed, all device families |
+| `--families "spartan3e spartan6"` | trimmed, only these families' device data (the families they depend on are kept) |
+| `--full` | complete ISE WebPACK install, including the Project Navigator GUI and CORE Generator |
+
 Then in XAIlinx: *Process ▸ Implement Top Module* or double-click *Generate Programming File*.
 
 ## Using the image directly
@@ -67,4 +78,5 @@ XAIlinx on the host (USB), not inside the container.
 | `Dockerfile` | Ubuntu 14.04 + ISE 14.7 WebPACK installed with `batchxsetup`; the installer is bind-mounted (never stored in a layer) |
 | `install-config.txt` | unattended-install options (WebPACK, no cable drivers) |
 | `entrypoint.sh` | sets up `$HOME`, sources `settings64.sh`, runs the command |
+| `trim-ise.sh` | removes what the command-line flow does not use (run during the build unless `--full`) |
 | `build-ise-image.sh` / `.ps1` | build + test + configure XAIlinx (macOS/Linux / Windows) |

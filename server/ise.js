@@ -172,6 +172,12 @@ export function generateUt({ impl = {}, family = 'spartan3e' } = {}) {
 
 /** Contents of run.sh. Usage: ./run.sh [synth translate map par trce bitgen] */
 export function generateRunSh({ top, device, hasUcf, defaultSteps = STEPS }) {
+  // Spartan-3 / Virtex-4 generation: placement in PAR. Spartan-6, Virtex-5/6 and 7-series:
+  // timing-driven placement happens in MAP and PAR rejects "-t" (Par:526) - options as ISE's
+  // Project Navigator writes them for those families.
+  const legacy = /^(spartan3|virtex4)/.test(deviceFamily(device) || 'spartan3e');
+  const mapOpts = legacy ? '-cm area -ir off -pr off -c 100' : '-w -logic_opt off -ol high -t 1 -xt 0 -register_duplication off -r 4 -global_opt off -mt off -ir off -pr off -lc off -power off';
+  const parOpts = legacy ? '-ol high -t 1' : '-ol high -mt off';
   if (!IDENT.test(top)) throw new Error(`invalid top module name '${top}'`);
   const ps = partStrings(device);
   const uc = hasUcf ? `-uc ${shQuote(top + '.ucf')} ` : '';
@@ -214,10 +220,10 @@ if has translate; then
   run_step translate ngdbuild -intstyle xflow -dd _ngo -nt timestamp ${uc}-p ${ps.impl} ${shQuote(top + '.ngc')} ${shQuote(top + '.ngd')}
 fi
 if has map; then
-  run_step map map -intstyle xflow -p ${ps.impl} -cm area -ir off -pr off -c 100 -o ${shQuote(top + '_map.ncd')} ${shQuote(top + '.ngd')} ${shQuote(top + '.pcf')}
+  run_step map map -intstyle xflow -p ${ps.impl} ${mapOpts} -o ${shQuote(top + '_map.ncd')} ${shQuote(top + '.ngd')} ${shQuote(top + '.pcf')}
 fi
 if has par; then
-  run_step par par -w -intstyle xflow -ol high -t 1 ${shQuote(top + '_map.ncd')} ${shQuote(top + '.ncd')} ${shQuote(top + '.pcf')}
+  run_step par par -w -intstyle xflow ${parOpts} ${shQuote(top + '_map.ncd')} ${shQuote(top + '.ncd')} ${shQuote(top + '.pcf')}
 fi
 if has trce; then
   run_step trce trce -intstyle xflow -v 3 -s ${ps.speedNum} -n 3 -fastpaths -xml ${shQuote(top + '.twx')} ${shQuote(top + '.ncd')} -o ${shQuote(top + '.twr')} ${shQuote(top + '.pcf')}${hasUcf ? ` -ucf ${shQuote(top + '.ucf')}` : ''}
