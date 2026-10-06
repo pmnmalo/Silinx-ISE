@@ -847,7 +847,17 @@ export function setDirty(doc, dirty) {
 async function flushDoc(doc, opts) {
   clearTimeout(doc._autosave);
   if (!doc.dirty || !doc.save) return;
-  try { await doc.save(opts); } catch (e) { log(`ERROR: cannot save ${doc.path || doc.title}: ${e.message}`, 'err'); }
+  try {
+    await doc.save(opts);
+    if (doc._saveFailed) { doc._saveFailed = false; log(`${doc.path || doc.title} saved.`, 'ok'); }
+  } catch (e) {
+    // keep the changes and retry; report once until it works again
+    if (!doc._saveFailed) log(`ERROR: cannot save ${doc.path || doc.title}: ${e.message}. Your changes are kept and saved as soon as it is possible again.`, 'err');
+    doc._saveFailed = true;
+    doc.dirty = true; doc.tab.classList.add('dirty');
+    clearTimeout(doc._autosave);
+    doc._autosave = setTimeout(() => flushDoc(doc, opts), 3000);
+  }
 }
 
 export async function closeDoc(doc) {

@@ -5,7 +5,9 @@ async function req(method, url, body, { text = false } = {}) {
     if (typeof body === 'string') { opts.body = body; opts.headers['Content-Type'] = 'text/plain'; }
     else { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
   }
-  const r = await fetch(url, opts);
+  let r;
+  try { r = await fetch(url, opts); }
+  catch { throw Object.assign(new Error('the XAIlinx server is not running (start it with: node bin/xailinx.js serve)'), { offline: true }); }
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`;
     try { const j = await r.json(); if (j.error) msg = j.error; } catch { /* not json */ }
