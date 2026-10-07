@@ -93,6 +93,17 @@ export const api = {
     persist();
     return clone(clean);
   },
+  renameFile: async (name, from, to) => {
+    const p = proj(name);
+    if (p.files[from] === undefined) fail(`file '${from}' not found`);
+    if (from !== to && p.files[to] !== undefined) fail(`'${to}' already exists`);
+    const t = p.files[from]; delete p.files[from]; p.files[to] = t;
+    const lang = /\.vhdl?$/i.test(to) ? 'vhdl' : /\.(v|sv)$/i.test(to) ? 'verilog' : null;
+    p.json.files = p.json.files.map(f => (f.path === from ? { ...f, path: to, lang: lang || f.lang } : f));
+    if (p.json.constraints === from) p.json.constraints = to;
+    persist();
+    return clone(p.json);
+  },
   deleteProject: async name => { proj(name); delete mem[name]; persist(); return { ok: true }; },
   readFile: async (name, path) => {
     const t = proj(name).files[path];

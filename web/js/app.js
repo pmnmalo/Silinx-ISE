@@ -275,6 +275,7 @@ function moduleContextMenu(e, mod, file) {
   popupMenu([
     { label: isSimView ? 'Set as Simulation Top' : 'Set as Top Module', action: () => setTop(mod, isSimView) },
     { label: 'Open', action: () => { const i = moduleInfo(mod); if (i) openFile(i.file, i.line); } },
+    { label: 'Rename…', action: () => renameDialog(file, mod) },
     { label: 'Check Syntax', action: () => checkSyntax(mod, isSimView) },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
     ...(() => {
@@ -303,6 +304,7 @@ function moduleContextMenu(e, mod, file) {
 function fileContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openFile(file) },
+    { label: 'Rename…', action: () => renameDialog(file) },
     /\.(vhdl?|v|sv)$/i.test(file) ? { label: 'Check Syntax', action: () => checkFileSyntax(file) } : null,
     /\.ucf$/i.test(file) ? { label: 'Check Syntax', action: () => checkUcfFile(file) } : null,
     { label: 'Remove from Project', action: () => removeFile(file) },
@@ -1261,6 +1263,7 @@ async function convertAsmToHdl(asmPath) {
 function asmContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openAsm(file) },
+    { label: 'Rename…', action: () => renameDialog(file) },
     { label: 'Convert to HDL', action: () => convertAsmToHdl(file) },
     { label: 'Remove from Project', action: () => removeFile(file) },
   ], e.clientX, e.clientY);
@@ -1513,10 +1516,124 @@ async function detachSchematic(path) {
 function schContextMenu(e, file) {
   popupMenu([
     { label: 'Open', action: () => openSch(file) },
+    { label: 'Rename…', action: () => renameDialog(file) },
     { label: 'Convert to HDL', action: () => convertSchToHdl(file) },
     { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(file) },
     { label: 'Remove from Project', action: () => removeFile(file) },
   ], e.clientX, e.clientY);
+}
+
+// ---- rename a source (file and/or the module it defines), updating everything that refers to it
+const extOf = p => (/\.(sch|asm)\.json$/i.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
+const dirOf = p => (p.includes('/') ? p.replace(/\/[^/]*$/, '/') : '');
+
+async function renameDialog(file, mod = null) {
+  if (!S.project) return;
+  await saveAll();
+  const mods = S.modules.filter(m => m.file === file && m.kind !== 'package').map(m => m.name);
+  const modName = mod || (mods.length === 1 ? mods[0] : null);
+  const base = file.slice(dirOf(file).length, file.length - extOf(file).length);
+  const fIn = h('input', { type: 'text', value: file, style: { width: '100%' } });
+  const mIn = modName ? h('input', { type: 'text', value: modName, style: { width: '100%' } }) : null;
+  const follow = h('input', { type: 'checkbox', checked: !!modName && base.toLowerCase() === modName.toLowerCase() });
+  if (mIn) mIn.addEventListener('input', () => { if (follow.checked) fIn.value = dirOf(file) + mIn.value.trim() + extOf(file); });
+  const err = h('div', { class: 'hint', style: { color: '#b00', minHeight: '16px' } });
+  const r = await dialog({
+    title: 'Rename', width: 520,
+    body: h('div', {},
+      h('div', { class: 'form-grid' },
+        ...(mIn ? [h('label', {}, modName && S.modules.find(m => m.name === modName)?.lang === 'vhdl' ? 'Entity:' : 'Module:'), mIn] : []),
+        h('label', {}, 'File:'), fIn,
+        ...(mIn ? [h('span'), h('label', {}, follow, ' File name follows the module name')] : [])),
+      h('div', { class: 'hint', style: { marginTop: '8px' } }, mIn
+        ? 'Renaming the module also updates its instances in the other sources, schematics, linked charts and the project top.'
+        : 'References to this file in the project (synchronized schematics/charts, constraints) are updated.'),
+      err),
+    buttons: [{ label: 'Rename', primary: true, value: true, validate: () => { const m = check(); err.textContent = m || ''; return !m; } }, { label: 'Cancel', value: null }],
+  });
+  function check() {
+      const to = fIn.value.trim(), nm = mIn?.value.trim();
+      if (!to || to.startsWith('/') || to.split('/').includes('..')) return 'Enter a file path inside the project.';
+      if (to !== file && S.fileTree.some(f => f.toLowerCase() === to.toLowerCase()) && to.toLowerCase() !== file.toLowerCase()) return `${to} already exists.`;
+      if (mIn) {
+        if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(nm)) return 'The module name must start with a letter and contain only letters, digits and _.';
+        if (nm.toLowerCase() !== modName.toLowerCase() && S.modules.some(m => m.name.toLowerCase() === nm.toLowerCase())) return `A module named '${nm}' already exists.`;
+      }
+      return null;
+  }
+  if (!r) return;
+  await renameSource(file, fIn.value.trim(), modName, mIn ? mIn.value.trim() : null);
+}
+
+async function renameSource(from, to, oldMod, newMod) {
+  const pj = S.project;
+  const { renameModuleInSource, renameModuleInSchematic } = await import('/core/rename.js');
+  const changed = new Map();                      // path -> new text
+  const moved = new Map();                        // old path -> new path
+  const views = {};                               // .sch.json / .asm.json -> parsed
+  for (const f of S.fileTree.filter(f => /\.(sch|asm)\.json$/i.test(f))) {
+    try { views[f] = JSON.parse(await api.readFile(pj.name, f)); } catch { /* skip */ }
+  }
+  S.syncing = true;
+  try {
+    if (newMod && oldMod && newMod !== oldMod) {
+      for (const src of S.sources.filter(x => x.lang === 'vhdl' || x.lang === 'verilog')) {
+        const t = renameModuleInSource(src.text, src.lang, oldMod, newMod);
+        if (t !== src.text) changed.set(src.path, t);
+      }
+      for (const [f, d] of Object.entries(views)) {
+        const linked = d.generatedFile === from;
+        let ch = false;
+        if (/\.sch\.json$/i.test(f)) ch = renameModuleInSchematic(d, oldMod, newMod, { linked });
+        else if (linked && String(d.name).toLowerCase() === oldMod.toLowerCase()) { d.name = newMod; ch = true; }
+        if (ch) changed.set(f, JSON.stringify(d, null, /\.asm\.json$/i.test(f) ? 2 : 1));
+        // a synchronized view named after the module follows it
+        const vb = f.slice(dirOf(f).length, f.length - extOf(f).length);
+        if (linked && vb.toLowerCase() === oldMod.toLowerCase()) moved.set(f, dirOf(f) + newMod + extOf(f));
+      }
+      const eq = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+      if (eq(pj.top, oldMod)) pj.top = newMod;
+      if (eq(pj.simTop, oldMod)) pj.simTop = newMod;
+      if (pj.stimuli && pj.stimuli[oldMod]) { pj.stimuli[newMod] = pj.stimuli[oldMod]; delete pj.stimuli[oldMod]; }
+    }
+    if (to && to !== from) {
+      moved.set(from, to);
+      for (const [f, d] of Object.entries(views)) {
+        if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.asm\.json$/i.test(f) ? 2 : 1)); }
+      }
+    }
+    // close the editors of files that move or change (reopened below)
+    const reopen = [];
+    for (const d of [...S.docs]) {
+      if (d.path && (changed.has(d.path) || moved.has(d.path))) {
+        if (S.active === d) reopen.unshift(moved.get(d.path) || d.path); else reopen.push(moved.get(d.path) || d.path);
+        d.dirty = false; clearTimeout(d._autosave); await closeDoc(d);
+      }
+    }
+    for (const [p, text] of changed) await api.writeFile(pj.name, p, text);
+    await saveProjectJson();
+    for (const [a, b] of moved) await api.renameFile(pj.name, a, b);
+    await reloadProject(false);
+    // synchronized HDL of a renamed chart/schematic: regenerate it so its header names match
+    if (newMod && newMod !== oldMod) {
+      S.syncing = false;
+      for (const [f, d] of Object.entries(views)) {
+        if (!changed.has(f) || !d.generatedFile) continue;
+        const vp = moved.get(f) || f;
+        if (/\.asm\.json$/i.test(vp)) await syncHdlFromAsm(vp, d).catch(() => {});
+        else await syncHdlFromSchematic(vp, d).catch(() => {});
+      }
+    }
+    markStale();
+    const parts = [];
+    if (newMod && newMod !== oldMod) parts.push(`module '${oldMod}' renamed to '${newMod}' (${[...changed.keys()].length} file(s) updated)`);
+    for (const [a, b] of moved) parts.push(`${a} → ${b}`);
+    log(`Rename: ${parts.join('; ')}.`, 'ok');
+    for (const p of reopen.reverse()) await openFile(p);
+  } catch (e) {
+    alertDlg('Rename', e.message, 'error');
+    await reloadProject(false);
+  } finally { S.syncing = false; }
 }
 
 // ---- summary, pin planner, impact
@@ -1632,11 +1749,11 @@ function renderFilesPage() {
   if (!S.project) return;
   const tbl = h('table', { class: 'grid' }, h('tr', {}, h('th', {}, 'File Name'), h('th', {}, 'Association'), h('th', {}, 'Language')));
   for (const f of S.project.files) {
-    const tr = h('tr', { ondblclick: () => openFile(f.path) }, h('td', {}, f.path), h('td', {}, f.role === 'sim' ? 'Simulation' : 'All'), h('td', {}, f.lang));
+    const tr = h('tr', { ondblclick: () => openFile(f.path), oncontextmenu: e => { e.preventDefault(); fileContextMenu(e, f.path); } }, h('td', {}, f.path), h('td', {}, f.role === 'sim' ? 'Simulation' : 'All'), h('td', {}, f.lang));
     tbl.append(tr);
   }
   for (const f of S.fileTree.filter(f => !S.project.files.some(x => x.path === f))) {
-    tbl.append(h('tr', { ondblclick: () => openFile(f) }, h('td', {}, f), h('td', {}, f === S.project.constraints ? 'Implementation' : '—'), h('td', {}, f.split('.').pop())));
+    tbl.append(h('tr', { ondblclick: () => openFile(f), oncontextmenu: e => { e.preventDefault(); fileContextMenu(e, f); } }, h('td', {}, f), h('td', {}, f === S.project.constraints ? 'Implementation' : '—'), h('td', {}, f.split('.').pop())));
   }
   host.append(tbl);
 }

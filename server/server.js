@@ -34,6 +34,11 @@ export async function createApp() {
     await P.writeFile(req.params.p, req.query.path, body);
     return { ok: true };
   }));
+  api.post('/projects/:p/rename', wrap(async req => {
+    const { from, to } = req.body || {};
+    if (!from || !to) throw Object.assign(new Error('from and to are required'), { status: 400 });
+    return P.renameFile(req.params.p, String(from), String(to));
+  }));
   api.delete('/projects/:p/file', wrap(async req => { await P.deleteFile(req.params.p, req.query.path); return { ok: true }; }));
   api.get('/projects/:p/sources', wrap(req => P.readSources(req.params.p)));
   api.get('/templates', wrap(() => fs.readdirSync(P.EXAMPLES_DIR, { withFileTypes: true })

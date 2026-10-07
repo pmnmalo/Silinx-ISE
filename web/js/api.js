@@ -29,6 +29,7 @@ export const api = {
   deleteProject: name => req('DELETE', `/api/projects/${enc(name)}`),
   readFile: (name, path) => req('GET', `/api/projects/${enc(name)}/file?path=${enc(path)}`, undefined, { text: true }),
   writeFile: (name, path, text) => req('PUT', `/api/projects/${enc(name)}/file?path=${enc(path)}`, text),
+  renameFile: (name, from, to) => req('POST', `/api/projects/${enc(name)}/rename`, { from, to }),
   deleteFile: (name, path) => req('DELETE', `/api/projects/${enc(name)}/file?path=${enc(path)}`),
   sources: name => req('GET', `/api/projects/${enc(name)}/sources`),
   devices: () => req('GET', '/api/devices'),

@@ -151,6 +151,21 @@ export async function writeFile(name, rel, text) {
   }
 }
 
+/** Move/rename a project file (or folder), keeping the project's file list and constraints path. */
+export async function renameFile(name, from, to) {
+  const dir = projectDir(name);
+  const src = safeJoin(dir, from), dst = safeJoin(dir, to);
+  if (!await exists(src)) throw new HttpError(404, `file '${from}' not found`);
+  if (from !== to && await exists(dst) && from.toLowerCase() !== to.toLowerCase()) throw new HttpError(409, `'${to}' already exists`);
+  await fs.mkdir(path.dirname(dst), { recursive: true });
+  await fs.rename(src, dst);
+  const pj = await readProject(name);
+  const lang = langOf(to);
+  pj.files = pj.files.map(f => (f.path === from ? { ...f, path: to, lang: lang === 'vhdl' || lang === 'verilog' ? lang : f.lang } : f));
+  if (pj.constraints === from) pj.constraints = to;
+  return writeProject(name, pj);
+}
+
 export async function deleteFile(name, rel) {
   const dir = projectDir(name);
   await fs.rm(safeJoin(dir, rel), { force: true });
