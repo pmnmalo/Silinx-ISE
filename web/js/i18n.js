@@ -190,12 +190,30 @@ const PT = {
   '+ input': '+ entrada', '+ output': '+ saída', 'Add an input port': 'Adicionar um porto de entrada', 'Add an output port': 'Adicionar um porto de saída',
   'Registers are internal: assign them like registered outputs (next value at the clock edge, they hold otherwise) and read them anywhere. Generics are integer VHDL generics / Verilog parameters, usable in expressions (e.g. cnt == N - 1).': 'Os registos são internos: atribua-os como as saídas registadas (valor seguinte no flanco do relógio, mantêm-se nos outros casos) e leia-os em qualquer lado. Os genéricos são generics VHDL / parameters Verilog inteiros, utilizáveis em expressões (p.ex. cnt == N - 1).',
   'Combinational outputs take their default unless assigned. Registered outputs (Reg) hold their value, reset to the default and can be read in conditions, e.g. cnt = cnt + 1.': 'As saídas combinatórias tomam o valor por omissão quando não atribuídas. As saídas registadas (Reg) mantêm o valor, fazem reset para o valor por omissão e podem ser lidas em condições, p.ex. cnt = cnt + 1.',
+  // schematic symbol library: categories, decoders / encoders / demultiplexers
+  'Logic': 'Lógica', 'Arithmetic': 'Aritmética', 'Flip-Flops': 'Flip-Flops', 'Mux': 'Multiplexadores', 'Decoders/Encoders': 'Descodificadores/Codificadores',
+  'Bus': 'Barramento', 'Project modules': 'Módulos do projeto',
+  'n:2^n binary decoder (one-hot outputs, all 0 when E = 0; like Xilinx D2_4E / D3_8E / D4_16E)': 'Descodificador binário n:2^n (saídas one-hot, todas a 0 quando E = 0; como os Xilinx D2_4E / D3_8E / D4_16E)',
+  '2^n:n binary encoder: priority (highest active input wins) or one-hot (OR of the inputs); V = some input is 1': 'Codificador binário 2^n:n: com prioridade (ganha a entrada ativa de maior índice) ou one-hot (OU das entradas); V = alguma entrada a 1',
+  '1:2^n demultiplexer: output O<S> = D, the other outputs 0 (bitwise when Width > 1)': 'Desmultiplexador 1:2^n: saída O<S> = D, as outras saídas a 0 (bit a bit quando Largura > 1)',
+  'Address bits': 'Bits de endereço', 'Enable input E': 'Entrada de habilitação E', 'Bus pins (A, D)': 'Pinos em barramento (A, D)',
+  'Output bits': 'Bits de saída', 'Bus pins (I, A)': 'Pinos em barramento (I, A)', 'Select bits': 'Bits de seleção', 'Type': 'Tipo',
+  'priority': 'prioridade',
   // misc
   'Error': 'Erro', 'Warning': 'Aviso', 'Note': 'Nota', 'Failure': 'Falha', 'Running': 'Em curso', 'Running...': 'Em curso...', 'Other': 'Outro',
   'not available': 'indisponível', 'not found': 'não encontrado', 'see log': 'ver registo', 'Exported .xise': '.xise exportado',
 };
 
+const PT_GATE_INV = { 'input I0': 'a entrada I0', 'inputs I0 and I1': 'as entradas I0 e I1' };
 const PT_PATTERNS = [
+  // schematic symbols: inverted-input gates (AND2B1...), decoders, encoders, demultiplexers
+  [/^(\d)-input (AND|OR|NAND|NOR) gate with (input I0|inputs I0 and I1|inputs I0\.\.I\d) inverted \(bitwise when Width > 1\)$/,
+    (m, n, g, which) => `Porta ${g} de ${n} entradas com ${PT_GATE_INV[which] || `as entradas ${which.slice(7)}`} invertida${which === 'input I0' ? '' : 's'} (bit a bit quando Largura > 1)`],
+  [/^(\d+):(\d+) decoder with enable \(Xilinx (\w+)\): D<A> = E, the other outputs 0$/, 'Descodificador $1:$2 com habilitação (Xilinx $3): D<A> = E, as outras saídas a 0'],
+  [/^(\d+):(\d+) priority encoder: A = index of the highest input at 1 \(0 when none\), V = some input is 1$/, 'Codificador com prioridade $1:$2: A = índice da entrada a 1 de maior índice (0 se nenhuma), V = alguma entrada a 1'],
+  [/^1:(\d+) demultiplexer \((select S0|(\d)-bit select S)\): O<S> = D, the other outputs 0 \(bitwise when Width > 1\)$/,
+    (m, n, sel, k) => `Desmultiplexador 1:${n} (${k ? `seleção S de ${k} bits` : 'seleção S0'}): O<S> = D, as outras saídas a 0 (bit a bit quando Largura > 1)`],
+  [/^(Logic|Arithmetic|Flip-Flops|Mux|Decoders\/Encoders|Bus|I\/O|Project modules) \((\d+)\)$/, (m, c, n) => `${t(c)} (${n})`],
   [/^XAIlinx - (.*) - \[(.*)\]$/, (m, a, b) => `XAIlinx - ${a} - [${t(b)}]`],
   [/^(.*) \(RTL\)$/, '$1 (RTL)'],
   [/^Processes: (.*)$/, 'Processos: $1'],
@@ -210,6 +228,8 @@ const PT_PATTERNS = [
   [/^position (\d+)$/, 'posição $1'],
   [/^(\d+) file\(s\) selected$/, '$1 ficheiro(s) selecionado(s)'],
   [/^Folder '(.*)': (\d+) file\(s\), project (.*)$/, "Pasta '$1': $2 ficheiro(s), projeto $3"],
+  // schematic palette: "<SYMBOL>: <description>"
+  [/^([A-Z][A-Z0-9_]*(?: [A-Z]+)?): (.+)$/, (m, a, b) => `${a}: ${t(b)}`],
 ];
 
 export const LOCALES = {

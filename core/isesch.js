@@ -304,6 +304,23 @@ const LIB_GFX = {
   cb8re: 'L 384 -192 320 -192|L 0 -192 64 -192|L 192 -32 64 -32|L 192 -64 192 -32|L 0 -32 64 -32|L 80 -128 64 -144|L 64 -112 80 -128|L 0 -128 64 -128|L 384 -256 320 -256|R 320 -268 64 24|L 384 -128 320 -128|R 64 -320 256 256',
   comp8: 'R 64 -384 256 320|L 384 -224 320 -224|R 0 -332 64 24|L 0 -320 64 -320|R 0 -140 64 24|L 0 -128 64 -128',
 };
+// inverted-input gates (and2b1...): the plain gate with the first k input stubs shortened to 0..40 and a bubble at 52
+// (radius 12), as in the ISE library (checked against and2b2 / and3b1 / and3b2 of real ISE schematics)
+for (const base of Object.keys(LIB_GFX)) {
+  const m = /^(and|or|nand|nor)(\d)$/.exec(base);
+  if (!m) continue;
+  const n = +m[2];
+  for (let k = 1; k <= n; k++) {
+    LIB_GFX[`${base}b${k}`] = LIB_GFX[base].split('|').map(sh => {
+      const v = sh.split(' ');
+      for (let i = 0; i < k; i++) {
+        const y = -64 * (i + 1);
+        if (v[0] === 'L' && +v[1] === 0 && +v[2] === y && +v[4] === y) return `L 0 ${y} 40 ${y}|C 52 ${y} 12`;
+      }
+      return sh;
+    }).join('|');
+  }
+}
 const LIB_TS = { fdr: '2000-1-1T10:10:10', m2_1: '2001-5-4T10:10:51', cb8re: '2001-2-2T12:36:39' };
 function gfxShapes(code) {
   return code.split('|').map(t => {
@@ -1487,6 +1504,13 @@ function mapSymbol(blk, modules, warn, geo = {}) {
   if (m) {
     const op = m[1], n = +m[2], b = +(m[3] || 0);
     const t = `${op}${n}`;
+    // ANDnBk...: native XAIlinx symbol with the same pins (I0 at the bottom, I0..I(k-1) inverted)
+    if (b && b <= n && SYMBOLS[`${t}b${b}`]) {
+      const s = { type: `${t}b${b}`, params: { width: 1 }, pins: {} };
+      for (let k = 0; k < n; k++) s.pins[`I${k}`] = { xai: `I${k}`, dir: 'in', width: 1 };
+      s.pins.O = { xai: 'O', dir: 'out', width: 1 };
+      return s;
+    }
     if (SYMBOLS[t] && b <= n) {
       const s = { type: t, params: { width: 1 }, pins: {} };
       for (let k = 0; k < n; k++) s.pins[`I${k}`] = { xai: `I${n - 1 - k}`, dir: 'in', width: 1, invert: k < b };
@@ -1504,6 +1528,7 @@ function mapSymbol(blk, modules, warn, geo = {}) {
   }
   if ((m = /^fd(8|16|32)(ce|re)$/.exec(sym))) return direct('register', { width: +m[1], en: true, reset: m[2] === 'ce' ? 'async' : 'sync', init: '0' });
   if (sym === 'm2_1') return direct('mux2', { width: 1 });
+  if ((m = /^d(2|3|4)_(4|8|16)e$/.exec(sym)) && (1 << +m[1]) === +m[2]) return direct('decoder', { n: +m[1], en: true, bus: false });
   if (sym === 'vcc' || sym === 'gnd') return direct(sym, {});
   if ((m = /^cb(8|16)(ce|re)$/.exec(sym)) && !conn('CEO') && !conn('TC')) return direct('counter', { width: +m[1], en: true, reset: m[2] === 'ce' ? 'async' : 'sync', dir: 'up' });
   if ((m = /^comp(8|16)$/.exec(sym))) return direct('compare', { width: +m[1], op: 'eq', signed: false }, { EQ: 'O' });
@@ -1555,6 +1580,12 @@ function iseSymbolFor(s, def, netW, modules) {
     return { lib: false, module: true, name: p.module || m?.name || 'module' };
   }
   if (S?.gate) {
+    if (S.invIn && W === 1) {
+      // ANDnBk...: same pin names and positions as the Xilinx library symbol
+      const pins = { O: 'O' };
+      for (let k = 0; k < S.inputs; k++) pins[`I${k}`] = `I${k}`;
+      return { lib: true, name: t, pins };
+    }
     if (W === 1) {
       if (t === 'inv' || t === 'buf') return { lib: true, name: t, pins: { I: 'I', O: 'O' } };
       const n = S.inputs;
@@ -1568,6 +1599,22 @@ function iseSymbolFor(s, def, netW, modules) {
   switch (t) {
     case 'mux2': return W === 1 ? { lib: true, name: 'm2_1', pins: { D0: 'D0', D1: 'D1', S0: 'S0', O: 'O' } } : { lib: false, name: `xl_mux2_w${W}` };
     case 'mux4': return { lib: false, name: `xl_mux4_w${W}` };
+    case 'demux': return { lib: false, name: `xl_demux${Math.max(1, Math.min(4, parseInt(p.sel, 10) || 1))}_w${W}` };
+    case 'decoder': {
+      const n = Math.max(1, Math.min(5, parseInt(p.n, 10) || 2));
+      // D2_4E / D3_8E (pin positions known); D4_16E is written as an XAIlinx symbol with the same pins
+      if (p.en && !p.bus && (n === 2 || n === 3)) {
+        const pins = { E: 'E' };
+        for (let k = 0; k < n; k++) pins[`A${k}`] = `A${k}`;
+        for (let k = 0; k < 1 << n; k++) pins[`D${k}`] = `D${k}`;
+        return { lib: true, name: `d${n}_${1 << n}e`, pins };
+      }
+      return { lib: false, name: `xl_dec${n}${p.en ? '_e' : ''}${p.bus ? '_bus' : ''}` };
+    }
+    case 'encoder': {
+      const n = Math.max(2, Math.min(5, parseInt(p.n, 10) || 2));
+      return { lib: false, name: `xl_${p.mode === 'one-hot' ? 'enc' : 'penc'}${n}${p.bus ? '_bus' : ''}` };
+    }
     case 'fd': case 'fdc': case 'fdce': case 'fdre':
       if (String(p.init ?? '0') !== '1') return { lib: true, name: t, pins: { D: 'D', C: 'C', CE: 'CE', CLR: 'CLR', R: 'R', Q: 'Q' } };
       return { lib: false, name: `xl_reg1${S.ff.ce ? '_ce' : ''}${S.ff.rst === 'async' ? '_ar' : S.ff.rst === 'sync' ? '_sr' : ''}_h1` };
@@ -1626,7 +1673,10 @@ function iseSymbolFor(s, def, netW, modules) {
 export function decodeXlSymbol(name) {
   const s = lc(name);
   let m;
-  if ((m = /^xl_(and|or|nand|nor|xor|xnor)(\d)_w(\d+)$/.exec(s)) && SYMBOLS[m[1] + m[2]]) return { type: m[1] + m[2], params: { width: +m[3] } };
+  if ((m = /^xl_(and|or|nand|nor|xor|xnor)(\d(?:b\d)?)_w(\d+)$/.exec(s)) && SYMBOLS[m[1] + m[2]]) return { type: m[1] + m[2], params: { width: +m[3] } };
+  if ((m = /^xl_demux([1-4])_w(\d+)$/.exec(s))) return { type: 'demux', params: { sel: +m[1], width: +m[2] } };
+  if ((m = /^xl_dec([1-5])(_e)?(_bus)?$/.exec(s))) return { type: 'decoder', params: { n: +m[1], en: !!m[2], bus: !!m[3] } };
+  if ((m = /^xl_(p?enc)([2-5])(_bus)?$/.exec(s))) return { type: 'encoder', params: { n: +m[2], mode: m[1] === 'enc' ? 'one-hot' : 'priority', bus: !!m[3] } };
   if ((m = /^xl_(inv|buf|mux2|mux4)_w(\d+)$/.exec(s))) return { type: m[1], params: { width: +m[2] } };
   if ((m = /^xl_reg(\d+)(_ce)?(_ar|_sr)?_h([0-9a-f]+)$/.exec(s))) return { type: 'register', params: { width: +m[1], en: !!m[2], reset: m[3] === '_ar' ? 'async' : m[3] === '_sr' ? 'sync' : 'none', init: m[4] === '0' ? '0' : `0x${m[4]}` } };
   if ((m = /^xl_cnt(\d+)(_ce)?(_ar|_sr)?(_dn)?$/.exec(s))) return { type: 'counter', params: { width: +m[1], en: !!m[2], reset: m[3] === '_ar' ? 'async' : m[3] === '_sr' ? 'sync' : 'none', dir: m[4] ? 'down' : 'up' } };

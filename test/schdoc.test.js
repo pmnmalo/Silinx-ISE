@@ -503,7 +503,8 @@ test('round trip inline Verilog gate-level design (gates, mux, slices, concat, i
     files, module: 'gl', file: 'gl.v', tb: 'tb_gl', cutModule: true, until: 1e7,
     expect: d => {
       const t = d.symbols.map(s => s.type);
-      for (const k of ['nor2', 'mux2', 'and2', 'inv', 'xor2', 'busjoin', 'slice', 'module', 'constant']) assert.ok(t.includes(k), `has ${k}: ${t.join(',')}`);
+      // x[0] & ~y[0] -> AND2B1
+      for (const k of ['nor2', 'mux2', 'and2b1', 'xor2', 'busjoin', 'slice', 'module', 'constant']) assert.ok(t.includes(k), `has ${k}: ${t.join(',')}`);
     },
   });
   assert.ok(doc.symbols.filter(s => s.type === 'hdlblock').length <= 1);
@@ -544,7 +545,8 @@ test('round trip inline VHDL gate-level design', async () => {
     files, module: 'glv', file: 'glv.vhd', tb: 'tb_glv', until: 1e7,
     expect: d => {
       const t = d.symbols.map(s => s.type);
-      for (const k of ['and2', 'or2', 'inv', 'xor2', 'mux2', 'nand2', 'slice']) assert.ok(t.includes(k), `has ${k}: ${t.join(',')}`);
+      // (a and b) or (not c) -> OR2B1
+      for (const k of ['and2', 'or2b1', 'inv', 'xor2', 'mux2', 'nand2', 'slice']) assert.ok(t.includes(k), `has ${k}: ${t.join(',')}`);
     },
   });
   assert.equal(doc.symbols.filter(s => s.type === 'hdlblock').length, 0);

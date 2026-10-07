@@ -87,7 +87,10 @@ function bodySvg(sym, def) {
         } else {
           const t = p.y / h;
           const xe = isOr ? (base === 'xor' ? 14 : 20) + 24 * t * (1 - t) : 20;
-          s += lead(0, p.y, xe, p.y, bus(p));
+          if (p.inv) {
+            // inverted input (ANDnBk...): bubble between the pin lead and the body, as ISE draws it
+            s += lead(0, p.y, xe - 8, p.y, bus(p)) + `<circle class="gate bubble" cx="${r1(xe - 4)}" cy="${p.y}" r="4"/>`;
+          } else s += lead(0, p.y, xe, p.y, bus(p));
         }
       }
       if (def.bubble) s += `<circle class="gate" cx="63" cy="${h / 2}" r="3"/>`;
@@ -107,6 +110,22 @@ function bodySvg(sym, def) {
         else if (p.side === 'S') s += lead(p.x, bh - 5, p.x, p.y, bus(p));
         else s += lead(60, p.y, p.x, p.y, bus(p));
       }
+      break;
+    }
+    case 'demux': {
+      const bh = def.body.h;
+      s += `<path class="gate" d="M20,10 L60,0 L60,${bh} L20,${bh - 10} Z"/>`;
+      for (const p of pins) {
+        if (p.side === 'W') s += lead(0, p.y, 20, p.y, bus(p));
+        else if (p.side === 'S') s += lead(p.x, bh - 5, p.x, p.y, bus(p));
+        else s += lead(60, p.y, p.x, p.y, bus(p));
+      }
+      break;
+    }
+    case 'lib': {
+      const b = def.body;
+      s += `<rect class="gate" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/>`;
+      for (const p of pins) s += p.side === 'W' ? lead(0, p.y, b.x, p.y, bus(p)) : lead(b.x + b.w, p.y, p.x, p.y, bus(p));
       break;
     }
     case 'arith': {
@@ -156,7 +175,7 @@ function textsSvg(sym, def) {
   const cx = (lx, ly) => xform(sym, def, lx, ly);
   const center = cx(def.body.x + def.body.w / 2, def.body.y + def.body.h / 2);
   const showName = !['constant', 'vcc', 'gnd', 'slice', 'busjoin'].includes(sym.type);
-  const pinLabels = ['module', 'hdl', 'ff', 'arith', 'mux'].includes(def.shape);
+  const pinLabels = ['module', 'hdl', 'ff', 'arith', 'mux', 'demux', 'lib'].includes(def.shape);
   if (showName) s += `<text class="iname" x="${box.x + box.w / 2}" y="${box.y - 4}" text-anchor="middle">${esc(sym.name)}</text>`;
   if (def.shape === 'module' || def.shape === 'hdl') {
     const tt = def.shape === 'hdl' ? (sym.params.title || 'HDL') : def.title;
@@ -168,6 +187,11 @@ function textsSvg(sym, def) {
     const t = plain ? cx(def.body.x + def.body.w - 3, def.body.h - 4) : center;
     const nm = SYMBOLS[sym.type]?.title || '';
     s += `<text class="stype" x="${t.x}" y="${t.y + (plain ? 0 : 3)}" text-anchor="${plain ? 'end' : 'middle'}">${esc(sym.type === 'register' || sym.type === 'counter' ? `${nm}${sym.params.width}` : nm)}</text>`;
+  } else if (def.shape === 'lib') {
+    // library-style box (decoders, encoders): symbol name at the bottom, like ISE
+    const plain = !sym.rot;
+    const t = plain ? cx(def.body.x + def.body.w / 2, def.body.h - 5) : center;
+    s += `<text class="stype" x="${t.x}" y="${t.y + (plain ? 0 : 3)}" text-anchor="middle">${esc(def.title)}</text>`;
   } else if (def.shape === 'arith') {
     s += `<text class="sop" x="${center.x}" y="${center.y + 5}" text-anchor="middle">${esc(def.op)}</text>`;
   } else if (def.shape === 'slice') {
@@ -186,14 +210,15 @@ function textsSvg(sym, def) {
   if (pinLabels) {
     for (const p of symbolPins(sym, null, def)) {
       if (def.shape === 'mux' && p.side === 'E') continue;
+      if (def.shape === 'demux' && p.lx === 0) continue;
       if (def.shape === 'arith' && sym.type !== 'add' && p.side === 'E') continue;
       const v = { W: [1, 0], E: [-1, 0], N: [0, 1], S: [0, -1] }[p.side];
-      const inset = def.shape === 'mux' ? 23 : (def.shape === 'hdl' || def.shape === 'module') ? 23 + (p.clock && p.side === 'W' ? 8 : 0) : 22 + (p.clock ? 8 : 0);
+      const inset = def.shape === 'mux' || def.shape === 'demux' ? 23 : (def.shape === 'hdl' || def.shape === 'module' || def.shape === 'lib') ? 23 + (p.clock && p.side === 'W' ? 8 : 0) : 22 + (p.clock ? 8 : 0);
       const x = p.x + v[0] * inset, y = p.y + v[1] * (p.side === 'S' ? 16 : 14);
       const anchor = v[0] > 0 ? 'start' : v[0] < 0 ? 'end' : 'middle';
-      const label = def.shape === 'mux' ? (p.name.startsWith('D') ? p.name.slice(1) : p.name) : p.name;
+      const label = def.shape === 'mux' ? (p.name.startsWith('D') ? p.name.slice(1) : p.name) : def.shape === 'demux' ? (/^O\d/.test(p.name) ? p.name.slice(1) : p.name) : p.name;
       s += `<text class="pname" x="${x}" y="${y + (v[1] ? 0 : 3)}" text-anchor="${anchor}">${esc(label)}</text>`;
-      if ((p.width || 1) > 1 && (def.shape === 'module' || def.shape === 'hdl')) {
+      if ((p.width || 1) > 1 && (def.shape === 'module' || def.shape === 'hdl' || def.shape === 'lib')) {
         const o = { W: [-10, -3], E: [10, -3], N: [4, -8], S: [4, 8] }[p.side];
         s += `<text class="pwidth" x="${p.x + o[0]}" y="${p.y + o[1]}" text-anchor="middle">${p.width}</text>`;
       }
@@ -355,7 +380,12 @@ export function mountSchEditor(container, opts = {}) {
   const collapsed = new Set();
   function paletteItems() {
     const items = [];
-    for (const [type, S] of Object.entries(SYMBOLS)) if (type !== 'module') items.push({ type, cat: S.category, title: S.title, desc: S.description, params: {} });
+    for (const [type, S] of Object.entries(SYMBOLS)) {
+      if (type === 'module') continue;
+      // parameterised symbols listed under their Xilinx-style names (D2_4E, DEMUX1_4...), then the generic one
+      for (const pr of S.presets || []) items.push({ type, cat: S.category, title: pr.title, desc: pr.description || S.description, params: { ...pr.params }, preset: pr.title });
+      items.push({ type, cat: S.category, title: S.title, desc: S.description, params: {} });
+    }
     for (const m of Object.values(modules).sort((a, b) => a.name.localeCompare(b.name))) {
       if (m.name === doc.name) continue;
       items.push({ type: 'module', cat: 'Project modules', title: m.name, desc: `${m.ports?.length || 0} ports${m.lang ? ` · ${m.lang.toUpperCase()}` : ''}${m.file ? ` · ${m.file}` : ''}`, params: { module: m.name, generics: {} } });
@@ -386,7 +416,7 @@ export function mountSchEditor(container, opts = {}) {
       if (!its.length) symList.append(h('div', { class: 'se-empty', text: 'No other modules in the project' }));
       for (const it of its) {
         const row = h('div', {
-          class: `se-symrow${placing && placing.type === it.type && (it.type !== 'module' || placing.params.module === it.params.module) ? ' active' : ''}`,
+          class: `se-symrow${placing && placing.type === it.type && (placing.preset || null) === (it.preset || null) && (it.type !== 'module' || placing.params.module === it.params.module) ? ' active' : ''}`,
           draggable: 'true', title: it.desc,
           html: `${previewSvg(it)}<span class="nm">${esc(it.title)}</span>`,
         });
@@ -751,11 +781,11 @@ export function mountSchEditor(container, opts = {}) {
     optBox.innerHTML = '';
     if (tool === 'net') optBox.append(h('label', { text: 'Name:' }), netNameInput);
     else if (tool === 'io') optBox.append(h('label', { text: 'Name:' }), ioNameInput, ioDirSel);
-    else if (tool === 'place' && placing) optBox.append(h('span', { class: 'se-placing', text: `Placing ${placing.type === 'module' ? placing.params.module : (SYMBOLS[placing.type]?.title || placing.type)}` }));
+    else if (tool === 'place' && placing) optBox.append(h('span', { class: 'se-placing', text: `Placing ${placing.type === 'module' ? placing.params.module : (placing.preset || SYMBOLS[placing.type]?.title || placing.type)}` }));
   }
   function startPlace(it) {
     if (wireDraw) finishWire();
-    placing = { type: it.type, params: { ...defaultParams(it.type), ...clone(it.params || {}) }, rot: 0, mirror: false };
+    placing = { type: it.type, params: { ...defaultParams(it.type), ...clone(it.params || {}) }, rot: 0, mirror: false, preset: it.preset || null };
     if (it.type === 'module') {
       const m = modules[it.params.module];
       if (m) placing.params.ports = m.ports.map(p => ({ name: p.name, dir: p.dir, width: p.width }));
@@ -776,6 +806,8 @@ export function mountSchEditor(container, opts = {}) {
       doc.symbols.push(s);
       if (tool !== 'place') { sel.clear(); sel.add(`sym:${s.id}`); }
     });
+    // keep the keyboard on the editor (Esc, Ctrl+R / Ctrl+M while placing)
+    setTimeout(() => { if (!destroyed && container.isConnected) container.focus({ preventScroll: true }); }, 0);
   }
 
   // all connectable points (pins, I/O markers, wire vertices)
@@ -1137,6 +1169,15 @@ export function mountSchEditor(container, opts = {}) {
   // ---------------- keyboard
   function onKey(e) {
     if (destroyed) return;
+    // Esc stops placing a symbol / drawing a wire wherever the keyboard focus is (palette, search
+    // box, page), as long as this editor is on screen
+    if (e.key === 'Escape' && (tool !== 'select' || wireDraw) && container.isConnected && container.offsetParent) {
+      e.preventDefault();
+      if (wireDraw) { if (wireDraw.pts.length > 1) finishWire(); else { wireDraw = null; renderOverlay(); } }
+      else setTool('select');
+      container.focus({ preventScroll: true });
+      return;
+    }
     if (!container.contains(document.activeElement) && document.activeElement !== container) return;
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;

@@ -155,12 +155,15 @@ test('import: all fixtures keep the ISE connectivity', () => {
   for (const f of FIXTURES) assertSameConnectivity(read(f), imp(f));
 });
 
-test('import: inverted-input gates become gate + inverters, FD stays FD (list1, VERSION 6)', () => {
-  const { doc } = imp('list1.sch');
+test('import: inverted-input gates become the native ANDnBk symbols, FD stays FD (list1, VERSION 6)', () => {
+  const { doc, pinMap } = imp('list1.sch');
   const t = doc.symbols.map(s => s.type);
   assert.equal(t.filter(x => x === 'fd').length, 4);
-  assert.equal(t.filter(x => x === 'inv').length, 5);      // and2b2 (2) + and3b1 (1) + and3b2 (2)
-  assert.deepEqual(t.filter(x => /^(and|or)/.test(x)).sort(), ['and2', 'and3', 'and3', 'or3']);
+  assert.equal(t.filter(x => x === 'inv').length, 0);
+  assert.deepEqual(t.filter(x => /^(and|or)/.test(x)).sort(), ['and2b2', 'and3b1', 'and3b2', 'or3']);
+  // same pin names as ISE (I0 inverted, at the bottom)
+  assert.equal(pinMap['XLXI_2.I0'], 'XLXI_2.I0');
+  assert.equal(pinMap['XLXI_2.I2'], 'XLXI_2.I2');
   assert.deepEqual(doc.ports.map(p => `${p.name}:${p.dir}`).sort(), ['CLK:in', 'X1:in', 'X2:in', 'X3:in', 'Y:out']);
 });
 
@@ -393,12 +396,15 @@ test('export: well-formed ISE 14.7 XML with netlist, library blockdefs and sheet
   const tags = new Set(nlx.children.map(c => c.tag));
   for (const t of ['signal', 'port', 'blockdef', 'block']) assert.ok(tags.has(t), t);
   const defs = nlx.children.filter(c => c.tag === 'blockdef').map(c => c.attrs.name).sort();
-  assert.deepEqual(defs, ['and2', 'and3', 'fd', 'inv', 'or3']);
+  assert.deepEqual(defs, ['and2b2', 'and3b1', 'and3b2', 'fd', 'or3']);
+  // ISE library graphics of the inverted-input gates: bubbles on the inverted inputs
+  const b2 = nlx.children.find(c => c.tag === 'blockdef' && c.attrs.name === 'and3b2');
+  assert.equal(b2.children.filter(c => c.tag === 'circle').length, 2);
   for (const d of nlx.children.filter(c => c.tag === 'blockdef')) assert.equal(d.children[0].tag, 'timestamp');
   // library pin names
   const fd = nlx.children.find(c => c.tag === 'block' && c.attrs.symbolname === 'fd');
   assert.deepEqual(fd.children.map(c => c.attrs.name).sort(), ['C', 'D', 'Q']);
-  const and3 = nlx.children.find(c => c.tag === 'block' && c.attrs.symbolname === 'and3');
+  const and3 = nlx.children.find(c => c.tag === 'block' && c.attrs.symbolname === 'and3b1');
   assert.deepEqual(and3.children.map(c => c.attrs.name).sort(), ['I0', 'I1', 'I2', 'O']);
   assert.deepEqual(nlx.children.filter(c => c.tag === 'port').map(p => `${p.attrs.polarity} ${p.attrs.name}`).sort(), ['Input CLK', 'Input X1', 'Input X2', 'Input X3', 'Output Y']);
   const sheet = dr.children[2];
@@ -626,4 +632,118 @@ architecture s of tb is signal a, b, c : std_logic_vector(3 downto 0); begin
 end;`;
   const r = runSim({ [res[0].hdl]: res[0].code, [res[1].hdl]: res[1].code, 'tb.vhd': tb }, 'tb', 1e6);
   assert.ok(logOf(r).includes('errs=0'), logOf(r).join('\n') + res[1].code);
+});
+
+// ------------------------------------------------------------------ inverted-input gates, decoders, encoders, demultiplexers
+function libDoc() {
+  const doc = newDoc('newlib', 'vhdl');
+  const parts = [
+    ['and3b2', {}], ['nor2b1', {}], ['or2b1', { width: 4 }], ['decoder', { n: 2, en: true, bus: false }], ['decoder', { n: 3, en: true, bus: false }],
+    ['decoder', { n: 4, en: true, bus: false }], ['decoder', { n: 3, en: false, bus: true }], ['encoder', { n: 3, mode: 'priority', bus: true }],
+    ['encoder', { n: 2, mode: 'one-hot', bus: false }], ['demux', { sel: 2, width: 4 }],
+  ];
+  let x = 200, y = 100;
+  parts.forEach(([type, params], k) => {
+    const s = { id: `S${k + 1}`, type, x, y, rot: 0, mirror: false, name: `U${k + 1}`, params };
+    doc.symbols.push(s);
+    const def = symbolDef(normalizeDoc({ ...doc, symbols: [s] }).symbols[0]);
+    for (const p of symbolPins(normalizeDoc({ ...doc, symbols: [s] }).symbols[0])) {
+      const [dx, dy] = { W: [-40, 0], E: [40, 0], S: [0, 40], N: [0, -40] }[p.side];
+      const e = { x: p.x + dx, y: p.y + dy };
+      doc.wires.push({ id: `W${doc.wires.length + 1}`, points: [{ x: p.x, y: p.y }, e] });
+      doc.ports.push({ id: `P${doc.ports.length + 1}`, name: `${s.name}_${p.name}`, dir: p.dir === 'out' ? 'out' : 'in', width: p.width || 1, x: e.x, y: e.y });
+    }
+    y += def.h + 80;
+    if (y > 900) { y = 100; x += 400; }
+  });
+  return normalizeDoc(doc);
+}
+
+test('export: ANDnBk / D2_4E / D3_8E become Xilinx library symbols, the others xl_* symbols; ISE round trip keeps types and nets', () => {
+  const doc = libDoc();
+  assert.deepEqual(netlist(doc).diagnostics.filter(d => d.severity === 'error'), []);
+  const ex = exportIseSch(doc, { timestamp: '2024-1-2T3:4:5' });
+  assertIseGeometry(ex.xml, ex.files);
+  const m = parseIseSch(ex.xml);
+  const sym = n => m.blocks.find(b => b.name === n).symbol;
+  assert.deepEqual(['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9', 'U10'].map(sym),
+    ['and3b2', 'nor2b1', 'xl_or2b1_w4', 'd2_4e', 'd3_8e', 'xl_dec4_e', 'xl_dec3_bus', 'xl_penc3_bus', 'xl_enc2', 'xl_demux2_w4']);
+  // library pin names
+  assert.deepEqual(m.blocks.find(b => b.name === 'U1').pins.map(p => `${p.name}=${p.signal}`).sort(), ['I0=U1_I0', 'I1=U1_I1', 'I2=U1_I2', 'O=U1_O']);
+  assert.deepEqual(m.blocks.find(b => b.name === 'U5').pins.map(p => p.name).sort(), ['A0', 'A1', 'A2', 'D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'E']);
+  assert.deepEqual(m.blocks.find(b => b.name === 'U8').pins.map(p => p.name).sort(), ['A(2:0)', 'I(7:0)', 'V']);
+  // the library ANDnBk is drawn with its bubbles; the custom symbols come with HDL modules that compile
+  assert.equal(m.blockdefs.get('and3b2').shapes.filter(s => s.kind === 'circle').length, 2);
+  const hdl = ex.files.filter(f => f.kind === 'hdl');
+  assert.deepEqual(hdl.map(f => f.path).sort(), ['xl_dec3_bus.vhd', 'xl_dec4_e.vhd', 'xl_demux2_w4.vhd', 'xl_enc2.vhd', 'xl_or2b1_w4.vhd', 'xl_penc3_bus.vhd']);
+  compiles(Object.fromEntries(hdl.map(f => [f.path, f.text])), 'xl_penc3_bus');
+  for (const [n, t] of [['xl_dec4_e', { type: 'decoder', params: { n: 4, en: true, bus: false } }], ['xl_penc3_bus', { type: 'encoder', params: { n: 3, mode: 'priority', bus: true } }],
+    ['xl_enc2', { type: 'encoder', params: { n: 2, mode: 'one-hot', bus: false } }], ['xl_demux2_w4', { type: 'demux', params: { sel: 2, width: 4 } }], ['xl_or2b1_w4', { type: 'or2b1', params: { width: 4 } }]])
+    assert.deepEqual(decodeXlSymbol(n), t, n);
+  // back into XAIlinx: same symbols, same parameters, same nets
+  const symbols = Object.fromEntries(ex.files.filter(f => f.kind === 'sym').map(f => [f.path, f.text]));
+  const back = importIseSch(ex.xml, { name: 'newlib', symbols });
+  assert.deepEqual(back.warnings.filter(w => /^connectivity|schematic check/.test(w)), []);
+  const desc = d => d.symbols.map(s => `${s.name}:${s.type}:${['width', 'n', 'en', 'bus', 'mode', 'sel'].filter(k => k in s.params && (s.type !== 'decoder' || k !== 'width')).map(k => `${k}=${s.params[k]}`).join(',')}`).sort();
+  assert.deepEqual(desc(back.doc), desc(doc));
+  assert.deepEqual(partition(back.doc), partition(doc));
+});
+
+test('import: ISE D2_4E / D3_8E / D4_16E become the decoder symbol, inverted-input NAND/NOR the native symbols; simulates like the ISE function', () => {
+  const doc = libDoc();
+  // as ISE would write it: D4_16E is a library symbol there
+  const ex = exportIseSch(doc, {});
+  const xml = ex.xml.replace(/xl_dec4_e/g, 'd4_16e');
+  const symbols = Object.fromEntries(ex.files.filter(f => f.kind === 'sym').map(f => [f.path, f.text]));
+  const r = importIseSch(xml, { name: 'newlib', symbols });
+  assert.deepEqual(r.warnings.filter(w => /^connectivity|schematic check|no XAIlinx equivalent/.test(w)), []);
+  assertSameConnectivity(xml, r);
+  const by = n => r.doc.symbols.find(s => s.name === n);
+  for (const [n, k] of [['U4', 2], ['U5', 3], ['U6', 4]]) {
+    assert.equal(by(n).type, 'decoder');
+    assert.deepEqual([by(n).params.n, by(n).params.en, by(n).params.bus], [k, true, false]);
+  }
+  assert.equal(by('U2').type, 'nor2b1');
+  assert.equal(r.doc.symbols.filter(s => s.type === 'inv').length, 0);
+  // function of the imported D4_16E and NOR2B1 (VHDL and Verilog)
+  for (const lang of ['vhdl', 'verilog']) {
+    const g = generateHdl(r.doc, { lang });
+    assert.deepEqual(g.diagnostics.filter(d => d.severity === 'error').map(d => d.message), [], g.code);
+    const tb = lang === 'vhdl' ? `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
+entity tb is end;
+architecture s of tb is
+  signal a : unsigned(3 downto 0); signal e, i0, i1, o : std_logic; signal d : std_logic_vector(15 downto 0);
+begin
+  dut : entity work.newlib port map (U6_A0 => a(0), U6_A1 => a(1), U6_A2 => a(2), U6_A3 => a(3), U6_E => e,
+    U6_D0 => d(0), U6_D1 => d(1), U6_D2 => d(2), U6_D3 => d(3), U6_D4 => d(4), U6_D5 => d(5), U6_D6 => d(6), U6_D7 => d(7),
+    U6_D8 => d(8), U6_D9 => d(9), U6_D10 => d(10), U6_D11 => d(11), U6_D12 => d(12), U6_D13 => d(13), U6_D14 => d(14), U6_D15 => d(15),
+    U2_I0 => i0, U2_I1 => i1, U2_O => o);
+  process variable errs : integer := 0; variable x : unsigned(5 downto 0); begin
+    for i in 0 to 63 loop
+      x := to_unsigned(i, 6); a <= x(3 downto 0); e <= x(4); i0 <= x(0); i1 <= x(5); wait for 1 ns;
+      for k in 0 to 15 loop
+        if (d(k) = '1') /= (e = '1' and to_integer(a) = k) then errs := errs + 1; end if;
+      end loop;
+      if o /= not ((not i0) or i1) then errs := errs + 1; end if;
+    end loop;
+    report "errs=" & integer'image(errs); wait;
+  end process;
+end;` : `module tb;
+  reg [3:0] a; reg e, i0, i1; wire o; wire [15:0] d; integer i, k, errs = 0;
+  newlib dut (.U6_A0(a[0]), .U6_A1(a[1]), .U6_A2(a[2]), .U6_A3(a[3]), .U6_E(e),
+    .U6_D0(d[0]), .U6_D1(d[1]), .U6_D2(d[2]), .U6_D3(d[3]), .U6_D4(d[4]), .U6_D5(d[5]), .U6_D6(d[6]), .U6_D7(d[7]),
+    .U6_D8(d[8]), .U6_D9(d[9]), .U6_D10(d[10]), .U6_D11(d[11]), .U6_D12(d[12]), .U6_D13(d[13]), .U6_D14(d[14]), .U6_D15(d[15]),
+    .U2_I0(i0), .U2_I1(i1), .U2_O(o));
+  initial begin
+    for (i = 0; i < 64; i = i + 1) begin
+      {i1, e, a} = i; i0 = i[0]; #1;
+      if (d !== (e ? (16'b1 << a) : 16'b0)) errs = errs + 1;
+      if (o !== ~(~i0 | i1)) errs = errs + 1;
+    end
+    $display("errs=%0d", errs);
+  end
+endmodule`;
+    const rs = runSim({ [g.filename]: g.code, [lang === 'vhdl' ? 'tb.vhd' : 'tb.v']: tb }, 'tb', 1e6);
+    assert.ok(logOf(rs).includes('errs=0'), lang + '\n' + logOf(rs).join('\n'));
+  }
 });

@@ -43,12 +43,40 @@ function gateSym(op, n, title) {
 }
 
 export const SYMBOLS = {};
-for (const [op, ns] of [['and', [2, 3, 4, 5]], ['or', [2, 3, 4, 5]], ['nand', [2, 3, 4]], ['nor', [2, 3, 4]], ['xor', [2]], ['xnor', [2]]])
-  for (const n of ns) SYMBOLS[`${op}${n}`] = gateSym(op, n, `${op.toUpperCase()}${n}`);
+// gates, each followed by its inverted-input variants (Xilinx ANDnBk...: inputs I0..I(k-1) inverted)
+for (const [op, ns, inv] of [['and', [2, 3, 4, 5], true], ['or', [2, 3, 4, 5], true], ['nand', [2, 3, 4], true], ['nor', [2, 3, 4], true], ['xor', [2]], ['xnor', [2]]])
+  for (const n of ns) {
+    SYMBOLS[`${op}${n}`] = gateSym(op, n, `${op.toUpperCase()}${n}`);
+    if (inv) for (let k = 1; k <= n; k++) {
+      SYMBOLS[`${op}${n}b${k}`] = {
+        ...gateSym(op, n, `${op.toUpperCase()}${n}B${k}`), invIn: k,
+        description: `${n}-input ${op.toUpperCase()} gate with ${k === 1 ? 'input I0' : k === 2 ? 'inputs I0 and I1' : `inputs I0..I${k - 1}`} inverted (bitwise when Width > 1)`,
+      };
+    }
+  }
 SYMBOLS.inv = { category: 'Logic', title: 'INV', gate: 'not', inputs: 1, description: 'Inverter', params: [P_WIDTH] };
 SYMBOLS.buf = { category: 'Logic', title: 'BUF', gate: 'buf', inputs: 1, description: 'Buffer', params: [P_WIDTH] };
 SYMBOLS.mux2 = { category: 'Mux', title: 'M2_1', description: '2:1 multiplexer (O = S0 ? D1 : D0)', params: [P_WIDTH] };
 SYMBOLS.mux4 = { category: 'Mux', title: 'M4_1', description: '4:1 multiplexer (2-bit select S)', params: [P_WIDTH] };
+SYMBOLS.demux = {
+  category: 'Mux', title: 'DEMUX', description: '1:2^n demultiplexer: output O<S> = D, the other outputs 0 (bitwise when Width > 1)',
+  params: [P_WIDTH, { name: 'sel', label: 'Select bits', kind: 'int', default: 1, min: 1, max: 4 }],
+  presets: [1, 2, 3].map(k => ({ title: `DEMUX1_${1 << k}`, params: { sel: k }, description: `1:${1 << k} demultiplexer (${k === 1 ? 'select S0' : `${k}-bit select S`}): O<S> = D, the other outputs 0 (bitwise when Width > 1)` })),
+};
+SYMBOLS.decoder = {
+  category: 'Decoders/Encoders', title: 'DECODER', description: 'n:2^n binary decoder (one-hot outputs, all 0 when E = 0; like Xilinx D2_4E / D3_8E / D4_16E)',
+  params: [{ name: 'n', label: 'Address bits', kind: 'int', default: 2, min: 1, max: 5 },
+    { name: 'en', label: 'Enable input E', kind: 'bool', default: true },
+    { name: 'bus', label: 'Bus pins (A, D)', kind: 'bool', default: false }],
+  presets: [2, 3, 4].map(k => ({ title: `D${k}_${1 << k}E`, params: { n: k }, description: `${k}:${1 << k} decoder with enable (Xilinx D${k}_${1 << k}E): D<A> = E, the other outputs 0` })),
+};
+SYMBOLS.encoder = {
+  category: 'Decoders/Encoders', title: 'ENCODER', description: '2^n:n binary encoder: priority (highest active input wins) or one-hot (OR of the inputs); V = some input is 1',
+  params: [{ name: 'n', label: 'Output bits', kind: 'int', default: 2, min: 2, max: 5 },
+    { name: 'mode', label: 'Type', kind: 'select', options: ['priority', 'one-hot'], default: 'priority' },
+    { name: 'bus', label: 'Bus pins (I, A)', kind: 'bool', default: false }],
+  presets: [2, 3, 4].map(k => ({ title: `PENC${1 << k}_${k}`, params: { n: k }, description: `${1 << k}:${k} priority encoder: A = index of the highest input at 1 (0 when none), V = some input is 1` })),
+};
 SYMBOLS.add = {
   category: 'Arithmetic', title: 'ADD', description: 'Adder S = A + B (+ CI), optional carry out',
   params: [{ ...P_WIDTH, default: 8 }, { name: 'cin', label: 'Carry in', kind: 'bool', default: false }, { name: 'cout', label: 'Carry out', kind: 'bool', default: false }],
@@ -95,7 +123,7 @@ SYMBOLS.hdlblock = {
   params: [],
 };
 
-export const SYMBOL_CATEGORIES = ['Logic', 'Arithmetic', 'Flip-Flops', 'Mux', 'Bus', 'I/O', 'Project modules'];
+export const SYMBOL_CATEGORIES = ['Logic', 'Arithmetic', 'Flip-Flops', 'Mux', 'Decoders/Encoders', 'Bus', 'I/O', 'Project modules'];
 
 export function defaultParams(type) {
   const s = SYMBOLS[type];
@@ -146,7 +174,13 @@ export function symbolDef(sym, modules = {}) {
   if (S && S.gate && S.inputs > 1) {
     const n = S.inputs, h = Math.max(40, n * 20);
     const pins = [];
-    for (let i = 0; i < n; i++) pins.push({ name: `I${i}`, dir: 'in', x: 0, y: h / 2 - (n - 1) * 10 + 20 * i, side: 'W', width: W });
+    const k = S.invIn || 0;
+    // inverted-input gates follow the Xilinx library drawing: I0 at the bottom, bubbles on I0..I(k-1)
+    for (let i = 0; i < n; i++) {
+      const q = { name: `I${i}`, dir: 'in', x: 0, y: k ? h / 2 + (n - 1) * 10 - 20 * i : h / 2 - (n - 1) * 10 + 20 * i, side: 'W', width: W };
+      if (i < k) q.inv = true;
+      pins.push(q);
+    }
     pins.push({ name: 'O', dir: 'out', x: 80, y: h / 2, side: 'E', width: W });
     return { w: 80, h, shape: 'gate', gate: S.gate, bubble: /^n|xnor/.test(S.gate), body: { x: 20, y: 0, w: 40, h }, pins };
   }
@@ -161,6 +195,32 @@ export function symbolDef(sym, modules = {}) {
     pins.push(n === 2 ? { name: 'S0', dir: 'in', x: 40, y: h, side: 'S', width: 1 } : { name: 'S', dir: 'in', x: 40, y: h, side: 'S', width: 2 });
     pins.push({ name: 'O', dir: 'out', x: 80, y: bh / 2, side: 'E', width: W });
     return { w: 80, h, shape: 'mux', body: { x: 20, y: 0, w: 40, h: bh }, pins };
+  }
+  if (t === 'demux') {
+    const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k, bh = n * 20 + 20, h = bh + 10;
+    const pins = [{ name: 'D', dir: 'in', x: 0, y: bh / 2, side: 'W', width: W }];
+    pins.push(k === 1 ? { name: 'S0', dir: 'in', x: 40, y: h, side: 'S', width: 1 } : { name: 'S', dir: 'in', x: 40, y: h, side: 'S', width: k });
+    for (let i = 0; i < n; i++) pins.push({ name: `O${i}`, dir: 'out', x: 80, y: 20 + 20 * i, side: 'E', width: W });
+    return { w: 80, h, shape: 'demux', title: `DEMUX1_${n}`, body: { x: 20, y: 0, w: 40, h: bh }, pins };
+  }
+  if (t === 'decoder' || t === 'encoder') {
+    const west = [], east = [];
+    let title;
+    if (t === 'decoder') {
+      const n = Math.max(1, Math.min(5, int(p.n, 2))), o = 1 << n;
+      if (p.bus) west.push({ name: 'A', dir: 'in', width: n }); else for (let i = 0; i < n; i++) west.push({ name: `A${i}`, dir: 'in', width: 1 });
+      if (p.en) west.push({ name: 'E', dir: 'in', width: 1 });
+      if (p.bus) east.push({ name: 'D', dir: 'out', width: o }); else for (let i = 0; i < o; i++) east.push({ name: `D${i}`, dir: 'out', width: 1 });
+      title = `D${n}_${o}${p.en ? 'E' : ''}`;
+    } else {
+      const n = Math.max(2, Math.min(5, int(p.n, 2))), m = 1 << n;
+      if (p.bus) west.push({ name: 'I', dir: 'in', width: m }); else for (let i = 0; i < m; i++) west.push({ name: `I${i}`, dir: 'in', width: 1 });
+      if (p.bus) east.push({ name: 'A', dir: 'out', width: n }); else for (let i = 0; i < n; i++) east.push({ name: `A${i}`, dir: 'out', width: 1 });
+      east.push({ name: 'V', dir: 'out', width: 1 });
+      title = `${p.mode === 'one-hot' ? 'ENC' : 'PENC'}${m}_${n}`;
+    }
+    const d = boxDef(west, east, title, 60);
+    return { ...d, shape: 'lib', title };
   }
   if (t === 'add' || t === 'sub' || t === 'compare') {
     const h = t === 'compare' ? 40 : 60;
@@ -907,6 +967,7 @@ export function generateHdl(docIn, opts = {}) {
   const warnOpen = (s, pin) => diags.push({ severity: 'warning', message: `${s.name}: input ${pin} unconnected, tied to 0`, ref: { kind: 'symbol', id: s.id, pin } });
   const zero = w => (ci ? (w > 1 ? '(others => \'0\')' : "'0'") : `${w}'b0`);
   const IN = (s, pin) => { const n = P(s, pin); if (n) return n; warnOpen(s, pin); return zero(PW(s, pin)); };
+  const ones = w => (ci ? (w > 1 ? `"${'1'.repeat(w)}"` : "'1'") : `${w}'b${'1'.repeat(w)}`);
   const assign = (lhs, rhs) => body.push(ci ? `${lhs} <= ${rhs};` : `assign ${lhs} = ${rhs};`);
   // VHDL-93 cannot read 'out' ports: route internal readers through a local copy
   const outRead = new Map();
@@ -934,11 +995,17 @@ export function generateHdl(docIn, opts = {}) {
     const def = defs.get(s.id);
     const p = s.params;
     const S = SYMBOLS[s.type];
-    const cmt = ci ? `-- ${s.name}: ${S?.title || s.type}` : `// ${s.name}: ${S?.title || s.type}`;
+    const cmt = ci ? `-- ${s.name}: ${def.title || S?.title || s.type}` : `// ${s.name}: ${def.title || S?.title || s.type}`;
     if (S && S.gate) {
       const o = OUTN(s, 'O');
       if (!o) { diags.push({ severity: 'warning', message: `${s.name}: output not connected, gate skipped`, ref: { kind: 'symbol', id: s.id } }); continue; }
-      const ins = def.pins.filter(q => q.dir === 'in').map(q => INN(s, q.name));
+      const ins = def.pins.filter(q => q.dir === 'in').map(q => {
+        if (!q.inv) return INN(s, q.name);
+        // inverted input (ANDnBk...): an unconnected one is tied to 0, i.e. reads as all ones
+        const n = nl.pinNet.get(`${s.id}/${q.name}`);
+        if (!n) { warnOpen(s, q.name); return ones(PW(s, q.name)); }
+        return ci ? `(not ${outRead.get(n) || netName(n)})` : `~${outRead.get(n) || netName(n)}`;
+      });
       let rhs;
       const g = S.gate;
       if (ci) {
@@ -967,6 +1034,97 @@ export function generateHdl(docIn, opts = {}) {
           if (ci) body.push(`with ${sel} select ${o} <=\n  ${d[0]} when "00",\n  ${d[1]} when "01",\n  ${d[2]} when "10",\n  ${d[3]} when others;`);
           else assign(o, `${sel}[1] ? (${sel}[0] ? ${d[3]} : ${d[2]}) : (${sel}[0] ? ${d[1]} : ${d[0]})`);
         }
+        break;
+      }
+      case 'demux': {
+        const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k;
+        const dn = nl.pinNet.get(`${s.id}/D`);
+        const sp = k === 1 ? 'S0' : 'S', sn = nl.pinNet.get(`${s.id}/${sp}`);
+        if (!dn) warnOpen(s, 'D');
+        if (!sn) warnOpen(s, sp);
+        const d = dn ? (outRead.get(dn) || netName(dn)) : null, sel = sn ? (outRead.get(sn) || netName(sn)) : null;
+        const lines = [];
+        for (let i = 0; i < n; i++) {
+          const o = OUTN(s, `O${i}`); if (!o) continue;
+          const w = PW(s, `O${i}`);
+          const z = zero(w);
+          let rhs;
+          if (!d || (!sel && i)) rhs = z;
+          else if (!sel) rhs = d;
+          else if (ci) rhs = `${d} when ${sel} = ${k === 1 ? `'${i}'` : `"${i.toString(2).padStart(k, '0')}"`} else ${z}`;
+          else rhs = `(${sel} == ${k}'d${i}) ? ${d} : ${z}`;
+          lines.push(ci ? `${o} <= ${rhs};` : `assign ${o} = ${rhs};`);
+        }
+        if (lines.length) body.push([cmt, ...lines].join('\n'));
+        break;
+      }
+      case 'decoder': case 'encoder': {
+        // bit j of an input pin group: bus pin (bus mode) or one pin per bit; null when unconnected (tied to 0)
+        const bitIn = (bus, base, j) => {
+          const pin = bus ? base : `${base}${j}`;
+          const n = nl.pinNet.get(`${s.id}/${pin}`);
+          if (!n) { if (!bus || j === 0) warnOpen(s, pin); return null; }
+          const nm = outRead.get(n) || netName(n);
+          return bus ? (ci ? `${nm}(${j})` : `${nm}[${j}]`) : nm;
+        };
+        const AND = ci ? ' and ' : ' & ', OR = ci ? ' or ' : ' | ';
+        const NOT = x => (ci ? `(not ${x})` : `~${x}`);
+        const B0 = ci ? "'0'" : "1'b0";
+        const lines = [cmt];
+        if (s.type === 'decoder') {
+          const n = Math.max(1, Math.min(5, int(p.n, 2)));
+          const a = [...Array(n).keys()].map(j => bitIn(!!p.bus, 'A', j));
+          const e = p.en ? bitIn(false, 'E', '') : true;
+          const outBus = p.bus ? OUTN(s, 'D') : null;
+          if (p.bus && !outBus) continue;
+          for (let i = 0; i < 1 << n; i++) {
+            const o = p.bus ? (ci ? `${outBus}(${i})` : `${outBus}[${i}]`) : OUTN(s, `D${i}`);
+            if (!o) continue;
+            const terms = [];
+            let zeroT = e === null;
+            if (e !== true && e !== null) terms.push(e);
+            for (let j = n - 1; j >= 0; j--) {
+              const bit = (i >> j) & 1;
+              if (a[j] === null) { if (bit) zeroT = true; continue; }
+              terms.push(bit ? a[j] : NOT(a[j]));
+            }
+            const rhs = zeroT ? B0 : terms.length ? terms.join(AND) : (ci ? "'1'" : "1'b1");
+            lines.push(ci ? `${o} <= ${rhs};` : `assign ${o} = ${rhs};`);
+          }
+        } else {
+          const n = Math.max(2, Math.min(5, int(p.n, 2))), m = 1 << n;
+          const I = [...Array(m).keys()].map(i => bitIn(!!p.bus, 'I', i));
+          const oA = p.bus ? OUTN(s, 'A') : null;
+          const oBits = p.bus ? [] : [...Array(n).keys()].map(j => OUTN(s, `A${j}`));
+          const oV = OUTN(s, 'V');
+          const live = I.map((x, i) => [x, i]).filter(([x]) => x !== null);
+          if (oA || oBits.some(Boolean)) {
+            const t = fresh(`${s.name}_a`);
+            if (ci) extra.push({ name: t, type: `std_logic_vector(${n - 1} downto 0)` }); else extra.push({ name: t, width: n });
+            const lit = i => (ci ? `"${i.toString(2).padStart(n, '0')}"` : `${n}'d${i}`);
+            if (p.mode === 'one-hot') {
+              for (let j = 0; j < n; j++) {
+                const ors = live.filter(([, i]) => (i >> j) & 1).map(([x]) => x);
+                const rhs = ors.length ? ors.join(OR) : B0;
+                lines.push(ci ? `${t}(${j}) <= ${rhs};` : `assign ${t}[${j}] = ${rhs};`);
+              }
+            } else {
+              const chain = live.slice().reverse().filter(([, i]) => i > 0);
+              if (ci) lines.push(`${t} <= ${chain.map(([x, i]) => `${lit(i)} when ${x} = '1' else `).join('')}${lit(0)};`);
+              else lines.push(`assign ${t} = ${chain.map(([x, i]) => `${x} ? ${lit(i)} : `).join('')}${lit(0)};`);
+            }
+            if (oA) {
+              const cls = ci ? clsOf(oA) : 'v';
+              lines.push(ci ? `${oA} <= ${cls === 'u' ? `unsigned(${t})` : cls === 's' ? `signed(${t})` : t};` : `assign ${oA} = ${t};`);
+            }
+            oBits.forEach((o, j) => { if (o) lines.push(ci ? `${o} <= ${t}(${j});` : `assign ${o} = ${t}[${j}];`); });
+          }
+          if (oV) {
+            const rhs = live.length ? live.map(([x]) => x).join(OR) : B0;
+            lines.push(ci ? `${oV} <= ${rhs};` : `assign ${oV} = ${rhs};`);
+          }
+        }
+        if (lines.length > 1) body.push(lines.join('\n'));
         break;
       }
       case 'add': case 'sub': {
@@ -1570,6 +1728,23 @@ export async function schematicFromHdl(inst, opts = {}) {
       if (['&', '|', '^'].includes(e.o)) f(e); else flat.push(e.a, e.b);
       const maxN = inverted ? ({ '&': 4, '|': 4, '^': 2 }[e.o]) : ({ '&': 5, '|': 5, '^': 2 }[e.o] || 2);
       if (flat.length > maxN) return null;
+      // operands '~signal' of an AND/OR become the inverted inputs of an ANDnBk/ORnBk (NANDnBk/NORnBk) gate
+      const simpleNot = x => x.op === 'unary' && x.o === '~' && ['ref', 'index', 'slice', 'apply'].includes(x.a.op);
+      const nInv = ['&', '|'].includes(e.o) ? flat.filter(simpleNot).length : 0;
+      if (nInv && flat.length > 1) {
+        const op0 = inverted ? { '&': 'nand', '|': 'nor' }[e.o] : { '&': 'and', '|': 'or' }[e.o];
+        const type = `${op0}${flat.length}b${nInv}`;
+        if (SYMBOLS[type]) {
+          const ord = [...flat.filter(simpleNot).map(x => x.a), ...flat.filter(x => !simpleNot(x))];
+          const args = ord.map(x => exprToGates(x, plan));
+          if (args.every(Boolean) && !args.some((a, k) => k < nInv && a.lit)) {
+            const w = args[0].w, cls = args.find(a => !a.lit)?.cls || args[0].cls;
+            const okT = args.every(a => a.w === w && (a.cls === cls || (a.lit && ((cls === 'sl' && a.cls === 'sl') || (cls !== 'sl' && a.cls !== 'sl')))));
+            if (okT && !args.every(a => a.lit)) return gate(type, args.map((a, k) => [a, `I${k}`]), w, cls);
+          }
+          return null;
+        }
+      }
       const args = flat.map(x => exprToGates(x, plan));
       if (args.some(a => !a)) return null;
       const w = args[0].w, cls = args.find(a => !a.lit)?.cls || args[0].cls;
