@@ -1566,7 +1566,7 @@ async function renameDialog(file, mod = null) {
 }
 
 async function renameSource(from, to, oldMod, newMod) {
-  const pj = S.project;
+  const pj = structuredClone(S.project);           // project settings to save (only if everything worked)
   const { renameModuleInSource, renameModuleInSchematic } = await import('/core/rename.js');
   const changed = new Map();                      // path -> new text
   const moved = new Map();                        // old path -> new path
@@ -1610,9 +1610,21 @@ async function renameSource(from, to, oldMod, newMod) {
         d.dirty = false; clearTimeout(d._autosave); await closeDoc(d);
       }
     }
-    for (const [p, text] of changed) await api.writeFile(pj.name, p, text);
-    await saveProjectJson();
-    for (const [a, b] of moved) await api.renameFile(pj.name, a, b);
+    // 1. move the files (all or nothing: a failure undoes the moves already done)
+    const done = [];
+    try {
+      for (const [a, b] of moved) { await api.renameFile(pj.name, a, b); done.push([a, b]); }
+    } catch (e) {
+      for (const [a, b] of done.reverse()) await api.renameFile(pj.name, b, a).catch(() => {});
+      throw new Error(`could not rename ${[...moved].map(([a, b]) => `${a} → ${b}`).join(', ')}: ${e.message}. Nothing was changed.`);
+    }
+    // 2. the updated contents, at their new paths
+    for (const [p, text] of changed) await api.writeFile(pj.name, moved.get(p) || p, text);
+    // 3. project settings (top, sim top, stimuli) on top of the file list the moves produced
+    const fresh = await api.project(pj.name);
+    delete fresh.fileTree;
+    Object.assign(fresh, { top: pj.top, simTop: pj.simTop, stimuli: pj.stimuli });
+    S.project = await api.saveProject(pj.name, fresh);
     await reloadProject(false);
     // synchronized HDL of a renamed chart/schematic: regenerate it so its header names match
     if (newMod && newMod !== oldMod) {

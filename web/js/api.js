@@ -9,9 +9,10 @@ async function req(method, url, body, { text = false } = {}) {
   try { r = await fetch(url, opts); }
   catch { throw Object.assign(new Error('the XAIlinx server is not running (start it with: node bin/xailinx.js serve)'), { offline: true }); }
   if (!r.ok) {
-    let msg = `${r.status} ${r.statusText}`;
-    try { const j = await r.json(); if (j.error) msg = j.error; } catch { /* not json */ }
-    throw new Error(msg);
+    let msg = `${r.status} ${r.statusText}`, json = false;
+    try { const j = await r.json(); json = true; if (j.error) msg = j.error; } catch { /* not json */ }
+    // a 404 without a JSON error comes from a server that does not have this operation (older version)
+    throw Object.assign(new Error(msg), { status: r.status, unsupported: r.status === 404 && !json });
   }
   if (text) return r.text();
   const ct = r.headers.get('content-type') || '';
@@ -29,7 +30,23 @@ export const api = {
   deleteProject: name => req('DELETE', `/api/projects/${enc(name)}`),
   readFile: (name, path) => req('GET', `/api/projects/${enc(name)}/file?path=${enc(path)}`, undefined, { text: true }),
   writeFile: (name, path, text) => req('PUT', `/api/projects/${enc(name)}/file?path=${enc(path)}`, text),
-  renameFile: (name, from, to) => req('POST', `/api/projects/${enc(name)}/rename`, { from, to }),
+  renameFile: async (name, from, to) => {
+    try { return await req('POST', `/api/projects/${enc(name)}/rename`, { from, to }); }
+    catch (e) { if (!e.unsupported) throw e; }
+    // older server without the rename operation: copy, delete, then fix the project's file list
+    const text = await req('GET', `/api/projects/${enc(name)}/file?path=${enc(from)}`, undefined, { text: true });
+    const pj = await req('GET', `/api/projects/${enc(name)}`);
+    if ((pj.fileTree || []).some(f => f !== from && f.toLowerCase() === to.toLowerCase())) throw new Error(`'${to}' already exists`);
+    await req('PUT', `/api/projects/${enc(name)}/file?path=${enc(to)}`, text);
+    await req('DELETE', `/api/projects/${enc(name)}/file?path=${enc(from)}`);
+    delete pj.fileTree;
+    const lang = /\.vhdl?$/i.test(to) ? 'vhdl' : /\.(v|sv)$/i.test(to) ? 'verilog' : null;
+    const files = pj.files.filter(f => f.path !== to).map(f => (f.path === from ? { ...f, path: to, lang: lang || f.lang } : f));
+    if (!files.some(f => f.path === to) && lang && pj.files.some(f => f.path === from)) files.push({ ...pj.files.find(f => f.path === from), path: to, lang });
+    pj.files = files;
+    if (pj.constraints === from) pj.constraints = to;
+    return req('PUT', `/api/projects/${enc(name)}`, pj);
+  },
   deleteFile: (name, path) => req('DELETE', `/api/projects/${enc(name)}/file?path=${enc(path)}`),
   sources: name => req('GET', `/api/projects/${enc(name)}/sources`),
   devices: () => req('GET', '/api/devices'),
