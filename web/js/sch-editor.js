@@ -630,9 +630,16 @@ export function mountSchEditor(container, opts = {}) {
     else if (kind === 'wire') wireProps(obj);
   }
   // text input bound to a setter (commits on change)
+  // a property applied with Enter keeps the keyboard in the (redrawn) field
+  function keepFocus(el, apply) {
+    const fields = () => [...propBody.querySelectorAll('input, textarea, select')];
+    const kept = document.activeElement === el, idx = fields().indexOf(el);
+    apply();
+    if (kept && idx >= 0) setTimeout(() => { const f = fields()[idx]; if (f) { f.focus(); f.select?.(); } }, 0);
+  }
   function inp(value, set, attrs = {}) {
     const el = h('input', { type: 'text', value: value ?? '', ...attrs });
-    el.addEventListener('change', () => edit(() => set(el.type === 'number' ? Number(el.value) : el.value)));
+    el.addEventListener('change', () => keepFocus(el, () => edit(() => set(el.type === 'number' ? Number(el.value) : el.value))));
     return el;
   }
   function chk(value, set) { const el = h('input', { type: 'checkbox', checked: !!value }); el.addEventListener('change', () => edit(() => set(el.checked))); return el; }
@@ -663,7 +670,7 @@ export function mountSchEditor(container, opts = {}) {
   function ta(value, set, rows = 4) {
     const el = h('textarea', { rows, spellcheck: 'false' });
     el.value = value;
-    el.addEventListener('change', () => edit(() => set(el.value)));
+    el.addEventListener('change', () => keepFocus(el, () => edit(() => set(el.value))));
     return el;
   }
   function symProps(s) {
@@ -1241,7 +1248,8 @@ export function mountSchEditor(container, opts = {}) {
     if (mod && k === 'v') { e.preventDefault(); paste(); return; }
     if (mod && k === 'a') { e.preventDefault(); selectAll(); return; }
     if (mod) return;
-    if (k === 'delete' || k === 'backspace') { e.preventDefault(); deleteSel(); return; }
+    // only Delete removes the selection (Backspace is too easy to hit after typing in a property)
+    if (k === 'delete') { e.preventDefault(); deleteSel(); return; }
     if (k === 'escape') {
       if (wireDraw) { if (wireDraw.pts.length > 1) finishWire(); else { wireDraw = null; renderOverlay(); } return; }
       if (tool !== 'select') { setTool('select'); return; }
