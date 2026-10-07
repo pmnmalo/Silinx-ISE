@@ -376,6 +376,17 @@ export function mountSchEditor(container, opts = {}) {
     sep(), optBox,
   );
   langSel.value = genLang;
+  // read-only (RTL view): the editing tools are hidden, so drop the separators they leave doubled
+  if (readOnly) {
+    let prevSep = true;                                   // a separator at the start is not needed
+    let lastSep = null;
+    for (const el of tb.children) {
+      if (el.classList.contains('se-keep') || el.classList.contains('se-opts') || ['wire', 'net', 'io', 'rotate', 'mirror', 'delete', 'undo', 'redo', 'generate'].includes(el.dataset.act)) continue;   // hidden by .read-only CSS
+      if (el.classList.contains('se-sep')) { if (prevSep) el.style.display = 'none'; else { prevSep = true; lastSep = el; } }
+      else { prevSep = false; lastSep = null; }
+    }
+    if (lastSep) lastSep.style.display = 'none';          // nor at the end
+  }
   langSel.addEventListener('change', () => { genLang = langSel.value; });
   tb.addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
