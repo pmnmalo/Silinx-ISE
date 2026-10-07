@@ -1,6 +1,8 @@
 ----------------------------------------------------------------------------------
--- Test bench for top: uses a small DIV so the LEDs move every 4 clock cycles (speed level 0),
--- a 2-cycle button debounce, and checks that the buttons change the speed.
+-- Test bench for top: a small DIV (base tick every 2 clock cycles) and a 2-cycle button
+-- debounce. After reset the speed is level 3: the LEDs move every 2 * 2**3 = 16 cycles.
+-- Checks the knight rider, the binary counter, pause, invert and the speed buttons
+-- (the speed_fsm state machine: one level per press, limited to levels 0..7).
 ----------------------------------------------------------------------------------
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
@@ -17,7 +19,7 @@ ARCHITECTURE behavior OF tb_top IS
    constant clk_period : time := 20 ns;
 BEGIN
    uut: entity work.top
-      generic map ( DIV => 4, DEBOUNCE => 2, LEVEL0 => 0 )
+      generic map ( DIV => 2, DEBOUNCE => 2 )
       port map ( clk => clk, sw => sw, btn => btn, led => led );
 
    clk_process : process
@@ -28,43 +30,53 @@ BEGIN
 
    stim_proc: process
       variable snap : std_logic_vector(7 downto 0);
+      variable a, n : integer;
+      -- press and release a button (held long enough for the debounce)
       procedure press(signal b : out std_logic) is
       begin
          b <= '1'; wait for clk_period * 8;
          b <= '0'; wait for clk_period * 8;
       end procedure;
-      variable a, z : integer;
+      -- binary counter steps in `cycles` clock cycles must be `expect` (+-1: phase of the window)
+      procedure check_rate(cycles, expect : integer; what : string) is
+         variable s0, d : integer;
+      begin
+         s0 := to_integer(unsigned(led));
+         wait for clk_period * cycles;
+         d := (to_integer(unsigned(led)) - s0) mod 256;
+         assert abs (d - expect) <= 1
+            report what & ": expected " & integer'image(expect) & " steps, got " & integer'image(d) severity error;
+      end procedure;
    begin
       wait for 100 ns;
-      sw(0) <= '0';                       -- release reset
-      wait for clk_period * 4 * 8 + 1 ns; -- 7 steps to the left (1st step after 5 clocks)
+      sw(0) <= '0';                                   -- release reset
+      -- knight rider: the light runs to the MSB and comes back (a step every 16 cycles)
+      wait until led = "10000000" for clk_period * 16 * 9;
       assert led = "10000000" report "knight rider did not reach the MSB" severity error;
-      wait for clk_period * 4 * 7;
+      wait until led = "00000001" for clk_period * 16 * 9;
       assert led = "00000001" report "knight rider did not come back" severity error;
-      sw(1) <= '1';                       -- binary counter mode
+      sw(1) <= '1';                                   -- binary counter mode
       wait for clk_period * 40;
-      sw(2) <= '1';                       -- pause: the counter must hold
+      sw(2) <= '1';                                   -- pause: the counter must hold
       wait for clk_period * 2;
       snap := led;
-      wait for clk_period * 20;
+      wait for clk_period * 40;
       assert led = snap report "pause did not hold the LEDs" severity error;
-      sw(3) <= '1';                       -- invert
+      sw(3) <= '1';                                   -- invert
       wait for 1 ns;
       assert led = not snap report "invert did not invert the LEDs" severity error;
-      -- speed buttons (binary counter mode, not paused, not inverted)
       sw(3) <= '0'; sw(2) <= '0';
-      wait for clk_period * 4;
-      a := to_integer(unsigned(led)); wait for clk_period * 80; z := to_integer(unsigned(led));
-      assert (z - a) mod 256 = 20 report "level 0: expected 20 steps in 80 clocks, got " & integer'image((z - a) mod 256) severity error;
-      press(btn(0));                      -- slower: level 1, a step every 8 clocks
-      a := to_integer(unsigned(led)); wait for clk_period * 80; z := to_integer(unsigned(led));
-      assert (z - a) mod 256 = 10 report "slower: expected 10 steps in 80 clocks, got " & integer'image((z - a) mod 256) severity error;
-      press(btn(0));                      -- slower: level 2, a step every 16 clocks
-      a := to_integer(unsigned(led)); wait for clk_period * 160; z := to_integer(unsigned(led));
-      assert (z - a) mod 256 = 10 report "slower x2: expected 10 steps in 160 clocks, got " & integer'image((z - a) mod 256) severity error;
-      press(btn(1)); press(btn(1)); press(btn(1));   -- faster x3: back to level 0 (it stops there)
-      a := to_integer(unsigned(led)); wait for clk_period * 80; z := to_integer(unsigned(led));
-      assert (z - a) mod 256 = 20 report "faster: expected 20 steps in 80 clocks, got " & integer'image((z - a) mod 256) severity error;
+      wait for clk_period * 2;
+      -- speed buttons
+      check_rate(320, 20, "level 3 (reset)");         -- 16 cycles per step
+      press(btn(0));                                  -- slower: level 4, 32 cycles per step
+      check_rate(320, 10, "slower");
+      press(btn(1)); press(btn(1));                   -- faster x2: level 2, 8 cycles per step
+      check_rate(320, 40, "faster x2");
+      for i in 1 to 4 loop press(btn(1)); end loop;   -- faster x4: stops at level 0, 2 cycles
+      check_rate(320, 160, "fastest (level 0)");
+      for i in 1 to 9 loop press(btn(0)); end loop;   -- slower x9: stops at level 7, 256 cycles
+      check_rate(1024, 4, "slowest (level 7)");
       report "Simulation finished OK" severity note;
       wait;
    end process;

@@ -508,7 +508,7 @@ export function* exec(s, ctx) {
         const p = f.params[k];
         if (p && !p.alias && p.dir !== 'out' && a) {
           const v = evalE(a, ctx);
-          frame[p.i] = Array.isArray(v) ? v.slice() : fit(v, p.t.w, p.t.s);
+          frame[p.i] = Array.isArray(v) ? v.slice() : (isStr(v) || p.t.kind === 'str' ? v : fit(v, p.t.w, p.t.s));
         }
       });
       const sub = { ...ctx, frame };

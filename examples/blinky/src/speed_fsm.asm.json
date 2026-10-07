@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "name": "speed_fsm",
+  "lang": "vhdl",
+  "clock": "clk",
+  "reset": {
+    "name": "rst",
+    "active": "high",
+    "sync": true
+  },
+  "encoding": "binary",
+  "inputs": [
+    {
+      "name": "faster",
+      "width": 1
+    },
+    {
+      "name": "slower",
+      "width": 1
+    }
+  ],
+  "outputs": [
+    {
+      "name": "level",
+      "width": 3,
+      "default": "3",
+      "registered": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "s1",
+      "type": "state",
+      "x": 200,
+      "y": 80,
+      "name": "IDLE",
+      "actions": []
+    },
+    {
+      "id": "d1",
+      "type": "decision",
+      "x": 200,
+      "y": 190,
+      "cond": "faster"
+    },
+    {
+      "id": "d2",
+      "type": "decision",
+      "x": 200,
+      "y": 310,
+      "cond": "level != 0"
+    },
+    {
+      "id": "o1",
+      "type": "output",
+      "x": 200,
+      "y": 410,
+      "actions": [
+        "level = level - 1"
+      ]
+    },
+    {
+      "id": "d3",
+      "type": "decision",
+      "x": 430,
+      "y": 310,
+      "cond": "slower"
+    },
+    {
+      "id": "d4",
+      "type": "decision",
+      "x": 430,
+      "y": 430,
+      "cond": "level != 7"
+    },
+    {
+      "id": "o2",
+      "type": "output",
+      "x": 430,
+      "y": 530,
+      "actions": [
+        "level = level + 1"
+      ]
+    },
+    {
+      "id": "s2",
+      "type": "state",
+      "x": 200,
+      "y": 630,
+      "name": "WAIT_RELEASE",
+      "actions": []
+    },
+    {
+      "id": "d5",
+      "type": "decision",
+      "x": 200,
+      "y": 740,
+      "cond": "faster || slower"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "s1",
+      "to": "d1",
+      "port": "next"
+    },
+    {
+      "id": "e2",
+      "from": "d1",
+      "to": "d2",
+      "port": "true"
+    },
+    {
+      "id": "e3",
+      "from": "d1",
+      "to": "d3",
+      "port": "false"
+    },
+    {
+      "id": "e4",
+      "from": "d2",
+      "to": "o1",
+      "port": "true"
+    },
+    {
+      "id": "e5",
+      "from": "d2",
+      "to": "s2",
+      "port": "false"
+    },
+    {
+      "id": "e6",
+      "from": "o1",
+      "to": "s2",
+      "port": "next"
+    },
+    {
+      "id": "e7",
+      "from": "d3",
+      "to": "d4",
+      "port": "true"
+    },
+    {
+      "id": "e8",
+      "from": "d3",
+      "to": "s1",
+      "port": "false"
+    },
+    {
+      "id": "e9",
+      "from": "d4",
+      "to": "o2",
+      "port": "true"
+    },
+    {
+      "id": "e10",
+      "from": "d4",
+      "to": "s2",
+      "port": "false"
+    },
+    {
+      "id": "e11",
+      "from": "o2",
+      "to": "s2",
+      "port": "next"
+    },
+    {
+      "id": "e12",
+      "from": "s2",
+      "to": "d5",
+      "port": "next"
+    },
+    {
+      "id": "e13",
+      "from": "d5",
+      "to": "s2",
+      "port": "true"
+    },
+    {
+      "id": "e14",
+      "from": "d5",
+      "to": "s1",
+      "port": "false"
+    }
+  ],
+  "initial": "s1",
+  "description": "Blink speed: one level per button press (0 = fastest, 7 = slowest)",
+  "generatedFile": "src/speed_fsm.vhd"
+}

@@ -202,3 +202,21 @@ begin
   end process;
 end a;` }, 'tb');
 });
+
+test('VHDL procedure with a string parameter used in a report', () => {
+  const { out } = run({ 'tb.vhd': `
+entity tb is end tb;
+architecture a of tb is
+begin
+  process
+    procedure say(n : integer; what : string) is
+    begin
+      report what & " = " & integer'image(n);
+    end procedure;
+  begin
+    say(42, "answer");
+    wait;
+  end process;
+end a;` }, 'tb');
+  assert.ok(out.some(l => /answer = 42/.test(l)), out.join('\n'));
+});
