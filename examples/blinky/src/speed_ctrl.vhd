@@ -72,26 +72,26 @@ architecture rtl of speed_ctrl is
     constant S_IDLE         : state_t := "0";
     constant S_WAIT_RELEASE : state_t := "1";
 
-    signal state_reg  : state_t;
+    signal state_reg  : state_t := S_IDLE;
     signal state_next : state_t;
 
     attribute fsm_encoding : string;
     attribute fsm_encoding of state_reg : signal is "user";
 
     -- output registers
-    signal step_reg, step_next : std_logic;
+    signal step_reg, step_next : std_logic := '0';
 
     -- internal registers
-    signal cnt_f, cnt_f_next : std_logic_vector(19 downto 0);
-    signal deb_f, deb_f_next : std_logic;
-    signal cnt_s, cnt_s_next : std_logic_vector(19 downto 0);
-    signal deb_s, deb_s_next : std_logic;
-    signal level, level_next : std_logic_vector(2 downto 0);
-    signal ticks, ticks_next : std_logic_vector(7 downto 0);
+    signal cnt_f, cnt_f_next : std_logic_vector(19 downto 0) := "00000000000000000000";
+    signal deb_f, deb_f_next : std_logic := '0';
+    signal cnt_s, cnt_s_next : std_logic_vector(19 downto 0) := "00000000000000000000";
+    signal deb_s, deb_s_next : std_logic := '0';
+    signal level, level_next : std_logic_vector(2 downto 0) := "101";
+    signal ticks, ticks_next : std_logic_vector(7 downto 0) := "00000000";
 
     -- input synchronisers (2 flip-flops)
-    signal faster_meta, faster_sync : std_logic;
-    signal slower_meta, slower_sync : std_logic;
+    signal faster_meta, faster_sync : std_logic := '0';
+    signal slower_meta, slower_sync : std_logic := '0';
 
 begin
 

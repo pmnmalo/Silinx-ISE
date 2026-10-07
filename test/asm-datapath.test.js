@@ -256,8 +256,11 @@ test('VHDL: generics, registers, synchronisers, every-cycle blocks before the st
   assert.match(code, /entity speed_ctrl is\n {4}generic \(\n {8}DEBOUNCE : integer := 1000000\n {4}\);\n {4}port \(/);
   assert.match(code, /-- Generics {4}: DEBOUNCE = 1000000/);
   assert.match(code, /-- Every cycle \(in parallel with the states; the state's assignments take priority\):\n-- {3}debounce_faster : \(faster != deb_f\) && \(cnt_f == DEBOUNCE - 1\) {2}\[cnt_f = 0, deb_f = faster\]/);
-  assert.match(code, /signal cnt_f, cnt_f_next : std_logic_vector\(19 downto 0\);/);
-  assert.match(code, /signal faster_meta, faster_sync : std_logic;/);
+  assert.match(code, /signal cnt_f, cnt_f_next : std_logic_vector\(19 downto 0\) := "0{20}";/);
+  // registers power up with their reset values (no reset needed after configuration)
+  assert.match(code, /signal state_reg  : state_t := S_IDLE;/);
+  assert.match(code, /signal level, level_next : std_logic_vector\(2 downto 0\) := "011";/);
+  assert.match(code, /signal faster_meta, faster_sync : std_logic := '0';/);
   assert.match(code, /faster_meta <= '0';\n\s+faster_sync <= '0';/);
   assert.match(code, /faster_meta <= faster;\n\s+faster_sync <= faster_meta;/);
   assert.match(code, /level <= "011";/);
@@ -272,8 +275,10 @@ test('VHDL: generics, registers, synchronisers, every-cycle blocks before the st
 test('Verilog: parameters, registers, synchronisers, every-cycle blocks before the state logic', () => {
   const code = generate(speedCtrl(), 'verilog').code;
   assert.match(code, /module speed_ctrl #\(\n {4}parameter DEBOUNCE = 1000000\n\) \(/);
-  assert.match(code, /reg \[19:0\] cnt_f, cnt_f_next;/);
-  assert.match(code, /reg faster_meta, faster_sync;/);
+  assert.match(code, /reg \[19:0\] cnt_f = 20'd0, cnt_f_next;/);
+  assert.match(code, /reg \[2:0\] level = 3'd3, level_next;/);
+  assert.match(code, /reg state_reg = S_IDLE;/);
+  assert.match(code, /reg faster_meta = 1'b0, faster_sync = 1'b0;/);
   assert.match(code, /level <= 3'd3;/);
   assert.match(code, /if \(ticks >= \(\(1 << level\) - 1\)\) begin/);
   const out = code.slice(code.indexOf('output and register logic'));

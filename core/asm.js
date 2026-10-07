@@ -1464,26 +1464,27 @@ export function generateVerilog(model) {
   const cw = Math.max(...enc.map((s) => s.constName.length));
   for (const s of enc) L.push(`    localparam ${vec(W)}${pad(s.constName, cw)} = ${W}'b${s.bits};`);
   L.push('');
-  L.push(`    reg ${vec(W)}state_reg;`);
+  // initial values = reset values: the FPGA powers up as after a reset (XST uses them as INIT)
+  L.push(`    reg ${vec(W)}state_reg = ${enc[0].constName};`);
   if (m.encoding !== 'enum') L.push('    // synthesis attribute fsm_encoding of state_reg is user');
   L.push(`    reg ${vec(W)}state_next;`);
   const regs = m.outputs.filter((o) => o.registered);
   if (regs.length) {
     L.push('');
     L.push('    // ---------------------------------------------------------------- output registers');
-    for (const o of regs) L.push(`    reg ${vec(o.width)}${o.name}_reg, ${o.name}_next;`);
+    for (const o of regs) L.push(`    reg ${vec(o.width)}${o.name}_reg = ${vlLitW(a.defaults.get(o.name), o.width, 'd')}, ${o.name}_next;`);
     for (const o of regs) L.push(`    assign ${o.name} = ${o.name}_reg;`);
   }
   if (a.registers.length) {
     L.push('');
     L.push('    // ---------------------------------------------------------------- internal registers');
-    for (const r of a.registers) L.push(`    reg ${vec(r.width)}${r.name}, ${r.name}_next;`);
+    for (const r of a.registers) L.push(`    reg ${vec(r.width)}${r.name} = ${vlLitW(a.defaults.get(r.name), r.width, 'd')}, ${r.name}_next;`);
   }
   const synced = m.inputs.filter((i) => i.sync);
   if (synced.length) {
     L.push('');
     L.push('    // ---------------------------------------------------------------- input synchronisers (2 flip-flops)');
-    for (const i of synced) L.push(`    reg ${vec(i.width)}${i.name}_meta, ${i.name}_sync;`);
+    for (const i of synced) L.push(`    reg ${vec(i.width)}${i.name}_meta = ${vlLitW(0n, i.width, 'd')}, ${i.name}_sync = ${vlLitW(0n, i.width, 'd')};`);
   }
   // state register (and the other registers)
   const extra = a.registers.length || synced.length;
@@ -1588,7 +1589,8 @@ export function generateVhdl(model) {
     for (const s of enc) L.push(`    constant ${pad(s.constName, cw)} : state_t := "${s.bits}";`);
   }
   L.push('');
-  L.push('    signal state_reg  : state_t;');
+  // initial values = reset values: the FPGA powers up as after a reset (XST uses them as INIT)
+  L.push(`    signal state_reg  : state_t := ${enc[0].constName};`);
   L.push('    signal state_next : state_t;');
   if (m.encoding !== 'enum') {
     L.push('');
@@ -1599,18 +1601,18 @@ export function generateVhdl(model) {
   if (regs.length) {
     L.push('');
     L.push('    -- output registers');
-    for (const o of regs) L.push(`    signal ${o.name}_reg, ${o.name}_next : ${typ(o.width)};`);
+    for (const o of regs) L.push(`    signal ${o.name}_reg, ${o.name}_next : ${typ(o.width)} := ${vhLitW(a.defaults.get(o.name), o.width)};`);
   }
   if (a.registers.length) {
     L.push('');
     L.push('    -- internal registers');
-    for (const r of a.registers) L.push(`    signal ${r.name}, ${r.name}_next : ${typ(r.width)};`);
+    for (const r of a.registers) L.push(`    signal ${r.name}, ${r.name}_next : ${typ(r.width)} := ${vhLitW(a.defaults.get(r.name), r.width)};`);
   }
   const synced = m.inputs.filter((i) => i.sync);
   if (synced.length) {
     L.push('');
     L.push('    -- input synchronisers (2 flip-flops)');
-    for (const i of synced) L.push(`    signal ${i.name}_meta, ${i.name}_sync : ${typ(i.width)};`);
+    for (const i of synced) L.push(`    signal ${i.name}_meta, ${i.name}_sync : ${typ(i.width)} := ${vhLitW(0n, i.width)};`);
   }
   L.push('');
   L.push('begin');
