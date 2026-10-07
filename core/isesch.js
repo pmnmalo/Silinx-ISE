@@ -411,11 +411,25 @@ export function libPins(sym) {
     p.CO = ['out', 448, -64]; p.OFL = ['out', 448, -128];
     return p;
   }
-  m = /^ft(c|ce|p|pe)$/.exec(s);
+  m = /^ft(c|ce|cp|cpe|p|pe|rse|sre)$/.exec(s);
   if (m) {
+    const f = m[1];
     const p = { T: ['in', 0, -256], C: ['in', 0, -128], Q: ['out', 384, -256] };
-    if (m[1].includes('e')) p.CE = ['in', 0, -192];
-    if (m[1][0] === 'c') p.CLR = ['in', 0, -32]; else p.PRE = ['in', 0, -352];
+    if (f.endsWith('e')) p.CE = ['in', 0, -192];
+    if (f[0] === 'c') p.CLR = ['in', 0, -32];
+    if (/^c?p/.test(f)) p.PRE = ['in', 0, -352];
+    if (/^(rs|sr)/.test(f)) { p.R = ['in', 0, -32]; p.S = ['in', null, null]; }
+    return p;
+  }
+  // J-K flip-flops (pin positions inferred from the wires on import)
+  m = /^fjk(c|ce|cp|cpe|p|pe|rse|sre)$/.exec(s);
+  if (m) {
+    const f = m[1];
+    const p = { J: ['in', null, null], K: ['in', null, null], C: ['in', null, null], Q: ['out', null, null] };
+    if (f.endsWith('e')) p.CE = ['in', null, null];
+    if (f[0] === 'c') p.CLR = ['in', null, null];
+    if (/^c?p/.test(f)) p.PRE = ['in', null, null];
+    if (/^(rs|sr)/.test(f)) { p.R = ['in', null, null]; p.S = ['in', null, null]; }
     return p;
   }
   // carry logic / wide-function multiplexer primitives (positions inferred from the wires)
@@ -1520,12 +1534,8 @@ function mapSymbol(blk, modules, warn, geo = {}) {
   }
   if (BUF1.has(sym)) return direct(sym === 'inv' ? 'inv' : 'buf', { width: 1 });
   if ((m = /^(inv|buf|ibuf|obuf)(8|16|32)$/.exec(sym))) return direct(m[1] === 'inv' ? 'inv' : 'buf', { width: +m[2] });
-  if (['fd', 'fdc', 'fdce', 'fdre'].includes(sym)) return direct(sym, { init });
-  if ((m = /^fd(r|e|p|pe|s|se)$/.exec(sym))) {
-    const f = m[1];
-    const p = { width: 1, en: f.includes('e'), reset: f[0] === 'e' ? 'none' : (f[0] === 'p' ? 'async' : 'sync'), init: f[0] === 'p' || f[0] === 's' ? (blk.attrs.INIT != null ? init : '1') : init };
-    return direct('register', p, { PRE: 'CLR', S: 'R' });
-  }
+  // FD*, FT*, FJK*: native flip-flop symbols with the library pin names (INIT: the block attribute, else the Xilinx default)
+  if (SYMBOLS[sym]?.ff) return direct(sym, { init: blk.attrs.INIT != null ? init : SYMBOLS[sym].params[0].default });
   if ((m = /^fd(8|16|32)(ce|re)$/.exec(sym))) return direct('register', { width: +m[1], en: true, reset: m[2] === 'ce' ? 'async' : 'sync', init: '0' });
   if (sym === 'm2_1') return direct('mux2', { width: 1 });
   if ((m = /^d(2|3|4)_(4|8|16)e$/.exec(sym)) && (1 << +m[1]) === +m[2]) return direct('decoder', { n: +m[1], en: true, bus: false });
@@ -1596,6 +1606,14 @@ function iseSymbolFor(s, def, netW, modules) {
     if ((t === 'inv' || t === 'buf') && (W === 8 || W === 16) && t === 'inv') return { lib: true, name: `inv${W}`, pins: { I: `I(${W - 1}:0)`, O: `O(${W - 1}:0)` } };
     return { lib: false, name: `xl_${t}_w${W}` };
   }
+  if (S?.ff) {
+    // FD*/FT*/FJK*: the library flip-flop when the INIT value is the library default and all its pin positions are
+    // known, else an XAIlinx symbol carrying the INIT value in its name
+    const d0 = S.params[0].default, iv = String(p.init ?? d0) === '1' ? '1' : '0';
+    const lp = libPins(t);
+    if (iv === d0 && lp && def.pins.every(q => lp[q.name] && lp[q.name][1] != null)) return { lib: true, name: t, pins: Object.fromEntries(def.pins.map(q => [q.name, q.name])) };
+    return { lib: false, name: `xl_${t}_i${iv}` };
+  }
   switch (t) {
     case 'mux2': return W === 1 ? { lib: true, name: 'm2_1', pins: { D0: 'D0', D1: 'D1', S0: 'S0', O: 'O' } } : { lib: false, name: `xl_mux2_w${W}` };
     case 'mux4': return { lib: false, name: `xl_mux4_w${W}` };
@@ -1615,9 +1633,6 @@ function iseSymbolFor(s, def, netW, modules) {
       const n = Math.max(2, Math.min(5, parseInt(p.n, 10) || 2));
       return { lib: false, name: `xl_${p.mode === 'one-hot' ? 'enc' : 'penc'}${n}${p.bus ? '_bus' : ''}` };
     }
-    case 'fd': case 'fdc': case 'fdce': case 'fdre':
-      if (String(p.init ?? '0') !== '1') return { lib: true, name: t, pins: { D: 'D', C: 'C', CE: 'CE', CLR: 'CLR', R: 'R', Q: 'Q' } };
-      return { lib: false, name: `xl_reg1${S.ff.ce ? '_ce' : ''}${S.ff.rst === 'async' ? '_ar' : S.ff.rst === 'sync' ? '_sr' : ''}_h1` };
     case 'register': {
       const bits = constBits(p.init ?? '0', W) || '0'.repeat(W);
       const zero = /^0+$/.test(bits);
@@ -1674,6 +1689,7 @@ export function decodeXlSymbol(name) {
   const s = lc(name);
   let m;
   if ((m = /^xl_(and|or|nand|nor|xor|xnor)(\d(?:b\d)?)_w(\d+)$/.exec(s)) && SYMBOLS[m[1] + m[2]]) return { type: m[1] + m[2], params: { width: +m[3] } };
+  if ((m = /^xl_(f(?:d|t|jk)[a-z]*)_i([01])$/.exec(s)) && SYMBOLS[m[1]]?.ff) return { type: m[1], params: { init: m[2] } };
   if ((m = /^xl_demux([1-4])_w(\d+)$/.exec(s))) return { type: 'demux', params: { sel: +m[1], width: +m[2] } };
   if ((m = /^xl_dec([1-5])(_e)?(_bus)?$/.exec(s))) return { type: 'decoder', params: { n: +m[1], en: !!m[2], bus: !!m[3] } };
   if ((m = /^xl_(p?enc)([2-5])(_bus)?$/.exec(s))) return { type: 'encoder', params: { n: +m[2], mode: m[1] === 'enc' ? 'one-hot' : 'priority', bus: !!m[3] } };

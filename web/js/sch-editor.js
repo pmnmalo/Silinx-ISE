@@ -113,12 +113,12 @@ function bodySvg(sym, def) {
       break;
     }
     case 'demux': {
-      const bh = def.body.h;
-      s += `<path class="gate" d="M20,10 L60,0 L60,${bh} L20,${bh - 10} Z"/>`;
+      const b = def.body, bh = b.h, x1 = b.x + b.w;
+      s += `<path class="gate" d="M${b.x},20 L${x1},0 L${x1},${bh} L${b.x},${bh - 20} Z"/>`;
       for (const p of pins) {
-        if (p.side === 'W') s += lead(0, p.y, 20, p.y, bus(p));
-        else if (p.side === 'S') s += lead(p.x, bh - 5, p.x, p.y, bus(p));
-        else s += lead(60, p.y, p.x, p.y, bus(p));
+        if (p.side === 'W') s += lead(0, p.y, b.x, p.y, bus(p));
+        else if (p.side === 'S') s += lead(p.x, bh - 20 + 20 * (p.x - b.x) / b.w, p.x, p.y, bus(p));
+        else s += lead(x1, p.y, p.x, p.y, bus(p));
       }
       break;
     }
@@ -176,22 +176,29 @@ function textsSvg(sym, def) {
   const center = cx(def.body.x + def.body.w / 2, def.body.y + def.body.h / 2);
   const showName = !['constant', 'vcc', 'gnd', 'slice', 'busjoin'].includes(sym.type);
   const pinLabels = ['module', 'hdl', 'ff', 'arith', 'mux', 'demux', 'lib'].includes(def.shape);
-  if (showName) s += `<text class="iname" x="${box.x + box.w / 2}" y="${box.y - 4}" text-anchor="middle">${esc(sym.name)}</text>`;
+  if (showName) {
+    // above the symbol; when pins stick out of the top (turned symbols), beside the top right corner instead
+    const topPins = (def.shape === 'lib' || def.shape === 'demux' || def.shape === 'mux' || def.shape === 'ff') && symbolPins(sym, null, def).some(p => p.side === 'N');
+    s += topPins ? `<text class="iname" x="${box.x + box.w + 3}" y="${box.y - 2}" text-anchor="start">${esc(sym.name)}</text>`
+      : `<text class="iname" x="${box.x + box.w / 2}" y="${box.y - 4}" text-anchor="middle">${esc(sym.name)}</text>`;
+  }
   if (def.shape === 'module' || def.shape === 'hdl') {
     const tt = def.shape === 'hdl' ? (sym.params.title || 'HDL') : def.title;
     const top = cx(def.body.x + def.body.w / 2, def.body.y + 11);
     const rot = sym.rot === 90 || sym.rot === 270;
     s += `<text class="stitle${def.shape === 'hdl' ? ' hdl' : ''}" x="${rot ? center.x : top.x}" y="${rot ? center.y : top.y + 3}" text-anchor="middle">${esc(tt)}</text>`;
   } else if (def.shape === 'ff') {
-    const plain = !sym.rot && !sym.mirror;
-    const t = plain ? cx(def.body.x + def.body.w - 3, def.body.h - 4) : center;
+    // type name in the bottom corner away from the inputs (turned 90/270: the centre of the body)
+    const turned = sym.rot === 90 || sym.rot === 270;
+    const t = turned ? center : cx(def.body.x + def.body.w - 3, def.body.h - 4);
+    const dx = xform(sym, def, 1, 0).x - xform(sym, def, 0, 0).x;
     const nm = SYMBOLS[sym.type]?.title || '';
-    s += `<text class="stype" x="${t.x}" y="${t.y + (plain ? 0 : 3)}" text-anchor="${plain ? 'end' : 'middle'}">${esc(sym.type === 'register' || sym.type === 'counter' ? `${nm}${sym.params.width}` : nm)}</text>`;
+    s += `<text class="stype" x="${t.x}" y="${t.y + (turned ? 3 : sym.rot === 180 ? 7 : 0)}" text-anchor="${turned ? 'middle' : dx > 0 ? 'end' : 'start'}">${esc(sym.type === 'register' || sym.type === 'counter' ? `${nm}${sym.params.width}` : nm)}</text>`;
   } else if (def.shape === 'lib') {
-    // library-style box (decoders, encoders): symbol name at the bottom, like ISE
-    const plain = !sym.rot;
-    const t = plain ? cx(def.body.x + def.body.w / 2, def.body.h - 5) : center;
-    s += `<text class="stype" x="${t.x}" y="${t.y + (plain ? 0 : 3)}" text-anchor="middle">${esc(def.title)}</text>`;
+    // decoders / encoders: symbol name in the free top row, like the title of module symbols (centre when turned)
+    const top = cx(def.body.x + def.body.w / 2, def.body.y + 15);
+    const rot = sym.rot === 90 || sym.rot === 270;
+    s += `<text class="stitle" x="${rot ? center.x : top.x}" y="${rot ? center.y + 4 : top.y + 4}" text-anchor="middle">${esc(def.title)}</text>`;
   } else if (def.shape === 'arith') {
     s += `<text class="sop" x="${center.x}" y="${center.y + 5}" text-anchor="middle">${esc(def.op)}</text>`;
   } else if (def.shape === 'slice') {
@@ -207,18 +214,31 @@ function textsSvg(sym, def) {
     const w = sym.params?.width > 1 ? `${sym.params.width}` : '';
     if (w) { const t = cx(def.body.x + 8, def.h / 2); s += `<text class="pname" x="${t.x}" y="${t.y + 3}" text-anchor="middle">${w}</text>`; }
   }
-  if (pinLabels) {
+  if (def.shape === 'lib' || def.shape === 'demux' || def.shape === 'ff') {
+    // pin names inside the body, clear of the 20 px leads, upright in every orientation; bus widths beside the pin end
+    for (const p of symbolPins(sym, null, def)) {
+      const v = { W: [1, 0], E: [-1, 0], N: [0, 1], S: [0, -1] }[p.side];
+      // demux select: the lead ends on the sloped edge; clock pins: room for the clock triangle
+      const L = 20 + (def.shape === 'demux' && p.ly === def.h ? 6 : 0) + (p.clock ? 8 : 0);
+      let x = p.x, y = p.y, anchor = 'middle';
+      if (v[0]) { x += v[0] * (L + 3); y += 3; anchor = v[0] > 0 ? 'start' : 'end'; } else y += v[1] > 0 ? L + 10 : -(L + 4);
+      s += `<text class="pname" x="${x}" y="${y}" text-anchor="${anchor}">${esc(p.name)}</text>`;
+      if ((p.width || 1) > 1) {
+        const o = { W: [-10, -3], E: [10, -3], N: [6, -4], S: [6, 10] }[p.side];
+        s += `<text class="pwidth" x="${p.x + o[0]}" y="${p.y + o[1]}" text-anchor="${p.side === 'N' || p.side === 'S' ? 'start' : 'middle'}">${p.width}</text>`;
+      }
+    }
+  } else if (pinLabels) {
     for (const p of symbolPins(sym, null, def)) {
       if (def.shape === 'mux' && p.side === 'E') continue;
-      if (def.shape === 'demux' && p.lx === 0) continue;
       if (def.shape === 'arith' && sym.type !== 'add' && p.side === 'E') continue;
       const v = { W: [1, 0], E: [-1, 0], N: [0, 1], S: [0, -1] }[p.side];
-      const inset = def.shape === 'mux' || def.shape === 'demux' ? 23 : (def.shape === 'hdl' || def.shape === 'module' || def.shape === 'lib') ? 23 + (p.clock && p.side === 'W' ? 8 : 0) : 22 + (p.clock ? 8 : 0);
+      const inset = def.shape === 'mux' ? 23 : (def.shape === 'hdl' || def.shape === 'module') ? 23 + (p.clock && p.side === 'W' ? 8 : 0) : 22 + (p.clock ? 8 : 0);
       const x = p.x + v[0] * inset, y = p.y + v[1] * (p.side === 'S' ? 16 : 14);
       const anchor = v[0] > 0 ? 'start' : v[0] < 0 ? 'end' : 'middle';
-      const label = def.shape === 'mux' ? (p.name.startsWith('D') ? p.name.slice(1) : p.name) : def.shape === 'demux' ? (/^O\d/.test(p.name) ? p.name.slice(1) : p.name) : p.name;
+      const label = def.shape === 'mux' ? (p.name.startsWith('D') ? p.name.slice(1) : p.name) : p.name;
       s += `<text class="pname" x="${x}" y="${y + (v[1] ? 0 : 3)}" text-anchor="${anchor}">${esc(label)}</text>`;
-      if ((p.width || 1) > 1 && (def.shape === 'module' || def.shape === 'hdl' || def.shape === 'lib')) {
+      if ((p.width || 1) > 1 && (def.shape === 'module' || def.shape === 'hdl')) {
         const o = { W: [-10, -3], E: [10, -3], N: [4, -8], S: [4, 8] }[p.side];
         s += `<text class="pwidth" x="${p.x + o[0]}" y="${p.y + o[1]}" text-anchor="middle">${p.width}</text>`;
       }
@@ -648,7 +668,8 @@ export function mountSchEditor(container, opts = {}) {
   }
   function symProps(s) {
     const S = SYMBOLS[s.type];
-    const title = s.type === 'module' ? `Module ${s.params.module}` : `${S?.title || s.type}`;
+    const sd = symbolDef(s, modules);
+    const title = s.type === 'module' ? `Module ${s.params.module}` : (sd.shape === 'lib' || sd.shape === 'demux') ? `${sd.title} (${S.title})` : `${S?.title || s.type}`;
     propBody.append(h('div', { class: 'se-ptitle', text: title }), h('div', { class: 'se-note', text: S?.description || '' }));
     propBody.append(field('Instance name', inp(s.name, v => { s.name = String(v).trim() || s.name; })));
     for (const p of S?.params || []) {

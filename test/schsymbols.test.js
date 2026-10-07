@@ -224,3 +224,101 @@ test('generateHdl: unwired decoder / encoder / demux still give valid HDL', () =
     assert.deepEqual(r.errors.map(e => `${e.file}:${e.line} ${e.message}`), [], g.code);
   }
 });
+
+// ------------------------------------------------------------------ flip-flops FD* / FT* / FJK*
+test('flip-flop library: Xilinx names, pins, INIT defaults', () => {
+  const ffs = Object.keys(SYMBOLS).filter(t => SYMBOLS[t].ff);
+  for (const t of ['fd', 'fdc', 'fdce', 'fdcp', 'fdcpe', 'fde', 'fdp', 'fdpe', 'fdr', 'fdre', 'fdrs', 'fdrse', 'fds', 'fdse',
+    'ft', 'ftc', 'ftce', 'ftcp', 'ftcpe', 'ftp', 'ftpe', 'ftrse', 'ftsre', 'fjk', 'fjkc', 'fjkce', 'fjkcp', 'fjkcpe', 'fjkp', 'fjkpe', 'fjkrse', 'fjksre']) {
+    assert.ok(ffs.includes(t), t);
+    assert.equal(SYMBOLS[t].category, 'Flip-Flops');
+  }
+  const pins = t => symbolDef({ type: t, params: {} }).pins.map(p => p.name).sort().join(',');
+  assert.equal(pins('fdrse'), 'C,CE,D,Q,R,S');
+  assert.equal(pins('fdcpe'), 'C,CE,CLR,D,PRE,Q');
+  assert.equal(pins('ftce'), 'C,CE,CLR,Q,T');
+  assert.equal(pins('ftrse'), 'C,CE,Q,R,S,T');
+  assert.equal(pins('fjkc'), 'C,CLR,J,K,Q');
+  assert.equal(pins('fjkpe'), 'C,CE,J,K,PRE,Q');
+  assert.equal(pins('fjk'), 'C,J,K,Q');
+  const init = t => SYMBOLS[t].params.find(p => p.name === 'init').default;
+  for (const t of ['fdp', 'fdpe', 'fds', 'fdse', 'ftp', 'ftpe', 'ftsre', 'fjkp', 'fjkpe', 'fjksre']) assert.equal(init(t), '1', t);
+  for (const t of ['fd', 'fdc', 'fdcp', 'fdcpe', 'fdr', 'fdrs', 'fdrse', 'ftc', 'ftrse', 'fjkc', 'fjkcpe', 'fjkrse']) assert.equal(init(t), '0', t);
+  // clock pin drawn with the clock triangle; existing FD geometry unchanged (D and Q on the first row)
+  const fd = symbolDef({ type: 'fdce', params: {} });
+  assert.deepEqual(fd.pins.map(p => `${p.name}@${p.y}`), ['D@10', 'CE@30', 'C@50', 'CLR@70', 'Q@10']);
+  assert.ok(fd.pins.find(p => p.name === 'C').clock);
+});
+
+function ffModel(f, q, inp, edge) {
+  if (f.clr && inp.CLR) return 0;
+  if (f.pre && inp.PRE) return 1;
+  if (!edge) return q;
+  const sync = (f.sp ? [['S', 1], ['R', 0]] : [['R', 0], ['S', 1]]).filter(([p]) => (p === 'R' ? f.r : f.s));
+  for (const [p, v] of sync) if (inp[p]) return v;
+  if (f.ce && !inp.CE) return q;
+  if (f.k === 'd') return inp.D;
+  if (f.k === 't') return q ^ inp.T;
+  return inp.J && !q ? 1 : inp.K && q ? 0 : q;
+}
+
+test('simulation: every FD* / FT* / FJK* flip-flop (VHDL and Verilog) follows the Xilinx priorities and INIT', () => {
+  const types = Object.keys(SYMBOLS).filter(t => SYMBOLS[t].ff);
+  // every type with its default INIT, a few with the other INIT value
+  const cases = [...types.map(t => [t, SYMBOLS[t].params[0].default]), ['fd', '1'], ['ftce', '1'], ['fjkrse', '1'], ['fdpe', '0']];
+  for (const lang of ['vhdl', 'verilog']) {
+    const doc = newDoc('ffs', lang);
+    const items = [];
+    cases.forEach(([type, init], k) => {
+      const s = { id: `S${k + 1}`, type, x: 200 + (k % 6) * 200, y: 60 + Math.floor(k / 6) * 200, rot: 0, mirror: false, name: `U${k + 1}`, params: { init } };
+      doc.symbols.push(s);
+      const pins = symbolPins(normalizeDoc({ ...doc, symbols: [s] }).symbols[0]);
+      for (const q of pins) doc.ports.push({ id: `P${doc.ports.length + 1}`, name: `${s.name}_${q.name}`, dir: q.dir === 'out' ? 'out' : 'in', width: 1, x: q.x, y: q.y });
+      items.push({ s, f: SYMBOLS[type].ff, ins: pins.filter(q => q.dir === 'in' && q.name !== 'C').map(q => q.name), q: +init });
+    });
+    assert.deepEqual(netlist(doc).diagnostics.filter(d => d.severity === 'error'), []);
+    const g = generateHdl(doc, { lang });
+    assert.deepEqual(g.diagnostics.filter(d => d.severity === 'error').map(d => d.message), [], g.code);
+    // stimulus: 60 cycles; async inputs rarely active, never released while the other async input stays active
+    let seed = 7;
+    const rb = p => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff < p ? 1 : 0; };
+    const vh = lang === 'vhdl';
+    const set = (n, v) => (vh ? `    ${n} <= '${v}';` : `    ${n} = 1'b${v};`);
+    const chk = (n, v, tag) => (vh ? `    if ${n} /= '${v}' then errs := errs + 1; report "${tag} ${n}" severity warning; end if;` : `    if (${n} !== 1'b${v}) begin errs = errs + 1; $display("${tag} ${n}"); end`);
+    const L = [];
+    const cur = items.map(() => ({}));
+    for (let step = 0; step < 60; step++) {
+      items.forEach((it, k) => {
+        const prev = cur[k], inp = {};
+        for (const p of it.ins) {
+          const pr = p === 'CLR' || p === 'PRE' ? 0.12 : p === 'R' || p === 'S' ? 0.2 : p === 'CE' ? 0.7 : 0.5;
+          inp[p] = step < 2 && (p === 'CLR' || p === 'PRE') ? 0 : rb(pr);
+        }
+        if (it.f.clr && it.f.pre && prev.CLR && !inp.CLR) inp.PRE = 0;
+        if (it.f.clr && it.f.pre && prev.PRE && !inp.PRE) inp.CLR = 0;
+        cur[k] = inp;
+        for (const p of it.ins) L.push(set(`${it.s.name}_${p}`, inp[p]));
+      });
+      L.push(vh ? '    wait for 2 ns;' : '    #2;');
+      items.forEach((it, k) => { it.q = ffModel(it.f, it.q, cur[k], false); L.push(chk(`${it.s.name}_Q`, it.q, `s${step}a`)); });
+      for (const it of items) L.push(set(`${it.s.name}_C`, 1));
+      L.push(vh ? '    wait for 2 ns;' : '    #2;');
+      items.forEach((it, k) => { it.q = ffModel(it.f, it.q, cur[k], true); L.push(chk(`${it.s.name}_Q`, it.q, `s${step}b`)); });
+      for (const it of items) L.push(set(`${it.s.name}_C`, 0));
+      L.push(vh ? '    wait for 2 ns;' : '    #2;');
+    }
+    // initial values (before any input changes Q): first sample uses INIT, checked through the model above
+    const ports = doc.ports;
+    const tb = vh ? ['library ieee; use ieee.std_logic_1164.all;', 'entity tb is end;', 'architecture s of tb is',
+      ...ports.map(p => `  signal ${p.name} : std_logic${p.dir === 'in' ? " := '0'" : ''};`),
+      'begin', `  dut : entity work.ffs port map (${ports.map(p => `${p.name} => ${p.name}`).join(', ')});`,
+      '  process', '    variable errs : integer := 0;', '  begin', ...L, '    report "errs=" & integer\'image(errs);', '    wait;', '  end process;', 'end;'].join('\n')
+      : ['`timescale 1ns/1ps', 'module tb;', '  integer errs = 0;', ...ports.map(p => `  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.name}${p.dir === 'in' ? ' = 0' : ''};`),
+        `  ffs dut (${ports.map(p => `.${p.name}(${p.name})`).join(', ')});`, '  initial begin', ...L, '    $display("errs=%0d", errs);', '  end', 'endmodule'].join('\n');
+    const r = simulate([{ path: g.filename, text: g.code }, { path: vh ? 'tb.vhd' : 'tb.v', text: tb }], 'tb', { until: 1e7 });
+    assert.deepEqual(r.errors.map(e => `${e.file}:${e.line} ${e.message}`), [], `${lang}\n${g.code}`);
+    const log = r.sim.log.map(l => l.text);
+    assert.ok(log.includes('errs=0'), `${lang}\n${log.slice(0, 30).join('\n')}`);
+    for (const it of items) it.q = +it.s.params.init;   // reset the models for the other language
+  }
+});

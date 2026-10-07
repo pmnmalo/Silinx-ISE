@@ -75,7 +75,10 @@ SYMBOLS.encoder = {
   params: [{ name: 'n', label: 'Output bits', kind: 'int', default: 2, min: 2, max: 5 },
     { name: 'mode', label: 'Type', kind: 'select', options: ['priority', 'one-hot'], default: 'priority' },
     { name: 'bus', label: 'Bus pins (I, A)', kind: 'bool', default: false }],
-  presets: [2, 3, 4].map(k => ({ title: `PENC${1 << k}_${k}`, params: { n: k }, description: `${1 << k}:${k} priority encoder: A = index of the highest input at 1 (0 when none), V = some input is 1` })),
+  presets: [2, 3, 4].flatMap(k => [
+    { title: `PENC${1 << k}_${k}`, params: { n: k }, description: `${1 << k}:${k} priority encoder: A = index of the highest input at 1 (0 when none), V = some input is 1` },
+    { title: `ENC${1 << k}_${k}`, params: { n: k, mode: 'one-hot' }, description: `${1 << k}:${k} one-hot encoder: A = OR of the indices of the inputs at 1, V = some input is 1` },
+  ]),
 };
 SYMBOLS.add = {
   category: 'Arithmetic', title: 'ADD', description: 'Adder S = A + B (+ CI), optional carry out',
@@ -93,10 +96,32 @@ SYMBOLS.constant = {
 };
 SYMBOLS.vcc = { category: 'I/O', title: 'VCC', description: 'Logic 1 (all bits)', params: [] };
 SYMBOLS.gnd = { category: 'I/O', title: 'GND', description: 'Logic 0 (all bits)', params: [] };
-SYMBOLS.fd = { category: 'Flip-Flops', title: 'FD', ff: { ce: false, rst: 'none' }, description: 'D flip-flop', params: [P_INIT] };
-SYMBOLS.fdc = { category: 'Flip-Flops', title: 'FDC', ff: { ce: false, rst: 'async' }, description: 'D flip-flop with asynchronous clear', params: [P_INIT] };
-SYMBOLS.fdce = { category: 'Flip-Flops', title: 'FDCE', ff: { ce: true, rst: 'async' }, description: 'D flip-flop with clock enable and asynchronous clear', params: [P_INIT] };
-SYMBOLS.fdre = { category: 'Flip-Flops', title: 'FDRE', ff: { ce: true, rst: 'sync' }, description: 'D flip-flop with clock enable and synchronous reset', params: [P_INIT] };
+// Flip-flops of the Xilinx Unified Libraries (FT* / FJK* plus a plain FT / FJK, which Xilinx does not have).
+// ff: { k: 'd'|'t'|'jk', ce, clr, pre (asynchronous; CLR wins over PRE), r, s (synchronous; R wins over S unless sp) }.
+// Priorities as in the Xilinx Libraries Guide: CLR > PRE > clock; R > S > CE (FDSE/FTSRE/FJKSRE: S > R > CE).
+const FF_KIND = { d: ['D', 'D'], t: ['T', 'toggle (T)'], jk: ['JK', 'J-K'] };
+function ffSym(name, k, f, title) {
+  const parts = [];
+  if (f.ce) parts.push('clock enable');
+  if (f.clr) parts.push('asynchronous clear');
+  if (f.pre) parts.push('asynchronous preset');
+  if (f.r && f.s) parts.push(f.sp ? 'synchronous set and reset (S over R)' : 'synchronous reset and set (R over S)');
+  else if (f.r) parts.push('synchronous reset');
+  else if (f.s) parts.push('synchronous set');
+  const desc = `${FF_KIND[k][1]} flip-flop${parts.length ? ` with ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0]}` : ''}`;
+  // Xilinx INIT default: 1 for the preset / set types (FDP, FDS, FTP, FJKP, FDSE...), 0 otherwise
+  const init = (f.pre && !f.clr) || (f.s && (!f.r || f.sp)) ? '1' : '0';
+  return { category: 'Flip-Flops', title: title || name.toUpperCase(), ff: { k, ...f }, description: desc[0].toUpperCase() + desc.slice(1), params: [{ ...P_INIT, default: init }] };
+}
+for (const [k, pfx, list] of [
+  ['d', 'fd', ['', 'c', 'ce', 'cp', 'cpe', 'e', 'p', 'pe', 'r', 're', 'rs', 'rse', 's', 'se']],
+  ['t', 'ft', ['', 'c', 'ce', 'cp', 'cpe', 'p', 'pe', 'rse', 'sre']],
+  ['jk', 'fjk', ['', 'c', 'ce', 'cp', 'cpe', 'p', 'pe', 'rse', 'sre']],
+]) for (const x of list) {
+  const f = { ce: x.endsWith('e') && x !== '', clr: x[0] === 'c', pre: /^c?p/.test(x), r: /^r|^sr/.test(x), s: /^s|^rs/.test(x), sp: /^sr/.test(x) };
+  for (const q of Object.keys(f)) if (!f[q]) delete f[q];
+  SYMBOLS[pfx + x] = ffSym(pfx + x, k, f);
+}
 SYMBOLS.register = {
   category: 'Flip-Flops', title: 'REG', description: 'N-bit register',
   params: [{ ...P_WIDTH, default: 8 }, { name: 'en', label: 'Clock enable', kind: 'bool', default: true },
@@ -153,15 +178,15 @@ function findMod(modules, name) {
   return null;
 }
 
-function boxDef(west, east, title, minW = 80) {
+function boxDef(west, east, title, minW = 80, top = 20) {
   const rows = Math.max(west.length, east.length, 1);
   const lw = Math.max(0, ...west.map(p => String(p.name).length * chW + (p.clock ? 8 : 0)));
   const rw = Math.max(0, ...east.map(p => String(p.name).length * chW));
   const bw = r10(Math.max(minW, lw + rw + 24, String(title || '').length * 7 + 16));
-  const w = bw + 40, h = rows * 20 + 20;
+  const w = bw + 40, h = rows * 20 + top;
   const pins = [];
-  west.forEach((p, i) => pins.push({ ...p, x: 0, y: 20 + i * 20, side: 'W' }));
-  east.forEach((p, i) => pins.push({ ...p, x: w, y: 20 + i * 20, side: 'E' }));
+  west.forEach((p, i) => pins.push({ ...p, x: 0, y: top + i * 20, side: 'W' }));
+  east.forEach((p, i) => pins.push({ ...p, x: w, y: top + i * 20, side: 'E' }));
   return { w, h, body: { x: 20, y: 0, w: bw, h }, pins };
 }
 
@@ -197,11 +222,12 @@ export function symbolDef(sym, modules = {}) {
     return { w: 80, h, shape: 'mux', body: { x: 20, y: 0, w: 40, h: bh }, pins };
   }
   if (t === 'demux') {
-    const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k, bh = n * 20 + 20, h = bh + 10;
+    // trapezoid wide on the output side (mirror of M2_1/M4_1), 70 px wide so that the pin names fit inside
+    const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k, bh = n * 20 + 40, h = bh + 10;   // a free row at the bottom for S
     const pins = [{ name: 'D', dir: 'in', x: 0, y: bh / 2, side: 'W', width: W }];
-    pins.push(k === 1 ? { name: 'S0', dir: 'in', x: 40, y: h, side: 'S', width: 1 } : { name: 'S', dir: 'in', x: 40, y: h, side: 'S', width: k });
-    for (let i = 0; i < n; i++) pins.push({ name: `O${i}`, dir: 'out', x: 80, y: 20 + 20 * i, side: 'E', width: W });
-    return { w: 80, h, shape: 'demux', title: `DEMUX1_${n}`, body: { x: 20, y: 0, w: 40, h: bh }, pins };
+    pins.push(k === 1 ? { name: 'S0', dir: 'in', x: 60, y: h, side: 'S', width: 1 } : { name: 'S', dir: 'in', x: 60, y: h, side: 'S', width: k });
+    for (let i = 0; i < n; i++) pins.push({ name: `O${i}`, dir: 'out', x: 110, y: 20 + 20 * i, side: 'E', width: W });
+    return { w: 110, h, shape: 'demux', title: `DEMUX1_${n}`, body: { x: 20, y: 0, w: 70, h: bh }, pins };
   }
   if (t === 'decoder' || t === 'encoder') {
     const west = [], east = [];
@@ -219,7 +245,8 @@ export function symbolDef(sym, modules = {}) {
       east.push({ name: 'V', dir: 'out', width: 1 });
       title = `${p.mode === 'one-hot' ? 'ENC' : 'PENC'}${m}_${n}`;
     }
-    const d = boxDef(west, east, title, 60);
+    // a free row on top for the symbol name (drawn like the title of module symbols), pins below it
+    const d = boxDef(west, east, title, 80, 40);
     return { ...d, shape: 'lib', title };
   }
   if (t === 'add' || t === 'sub' || t === 'compare') {
@@ -233,17 +260,25 @@ export function symbolDef(sym, modules = {}) {
     return { w: 80, h, shape: 'arith', op, body: { x: 20, y: 0, w: 40, h }, pins };
   }
   if (S && (S.ff || t === 'register' || t === 'counter')) {
-    let ce, rst, west = [];
-    if (S.ff) { ce = S.ff.ce; rst = S.ff.rst; } else { ce = !!p.en; rst = p.reset || 'none'; }
-    const bw = S.ff ? 1 : W;
-    if (t !== 'counter') west.push({ name: 'D', dir: 'in', width: bw });
+    let ce, clr, pre, r, st, west = [];
+    const f = S.ff;
+    if (f) ({ ce, clr, pre, r, s: st } = f);
+    else { ce = !!p.en; clr = p.reset === 'async'; r = p.reset === 'sync'; }
+    const bw = f ? 1 : W;
+    // ISE order: PRE / S on top, data, CE, C, CLR / R at the bottom; Q level with the (first) data input
+    if (pre) west.push({ name: 'PRE', dir: 'in', width: 1 });
+    if (st) west.push({ name: 'S', dir: 'in', width: 1 });
+    const q0 = west.length;
+    if (f?.k === 't') west.push({ name: 'T', dir: 'in', width: 1 });
+    else if (f?.k === 'jk') west.push({ name: 'J', dir: 'in', width: 1 }, { name: 'K', dir: 'in', width: 1 });
+    else if (t !== 'counter') west.push({ name: 'D', dir: 'in', width: bw });
     if (ce) west.push({ name: 'CE', dir: 'in', width: 1 });
     west.push({ name: 'C', dir: 'in', width: 1, clock: true });
-    if (rst === 'async') west.push({ name: 'CLR', dir: 'in', width: 1 });
-    if (rst === 'sync') west.push({ name: 'R', dir: 'in', width: 1 });
-    const h = Math.max(40, west.length * 20);
+    if (clr) west.push({ name: 'CLR', dir: 'in', width: 1 });
+    if (r) west.push({ name: 'R', dir: 'in', width: 1 });
+    const h = Math.max(40, west.length * 20 + 10);   // bottom margin: the type name sits under the last pin name
     const pins = west.map((q, i) => ({ ...q, x: 0, y: 10 + 20 * i, side: 'W' }));
-    pins.push({ name: 'Q', dir: 'out', x: 90, y: 10, side: 'E', width: bw });
+    pins.push({ name: 'Q', dir: 'out', x: 90, y: 10 + 20 * (t === 'counter' ? 0 : q0), side: 'E', width: bw });
     return { w: 90, h, shape: 'ff', body: { x: 20, y: 0, w: 50, h }, pins };
   }
   if (t === 'slice') {
@@ -954,7 +989,7 @@ export function generateHdl(docIn, opts = {}) {
   const FF = new Set(['fd', 'fdc', 'fdce', 'fdre', 'register', 'counter']);
   for (const s of doc.symbols) {
     const def = defs.get(s.id);
-    if (FF.has(s.type)) {
+    if (FF.has(s.type) || SYMBOLS[s.type]?.ff) {
       const n = nl.pinNet.get(`${s.id}/Q`);
       if (n) { regNets.add(n); if (s.type !== 'counter') init.set(n, constBits(s.params.init ?? '0', n.width) || '0'.repeat(n.width)); }
     }
@@ -1021,6 +1056,52 @@ export function generateHdl(docIn, opts = {}) {
         else rhs = ins.join(` ${op} `);
       }
       assign(o, rhs);
+      continue;
+    }
+    if (S && S.ff) {
+      // single-bit library flip-flops (FD*, FT*, FJK*): async CLR > PRE, then at the clock edge
+      // R / S (in the order of the symbol), then CE, then the D / toggle / J-K update
+      const f = S.ff;
+      const qo = OUTN(s, 'Q');
+      if (!qo) { diags.push({ severity: 'warning', message: `${s.name}: output Q not connected, skipped`, ref: { kind: 'symbol', id: s.id } }); continue; }
+      const qn = nl.pinNet.get(`${s.id}/Q`);
+      const iv = String(p.init ?? S.params[0].default) === '1' ? '1' : '0';
+      const c = INN(s, 'C');
+      const has = nm => def.pins.some(x => x.name === nm);
+      const pin = nm => (has(nm) ? INN(s, nm) : null);
+      const clr = pin('CLR'), pre = pin('PRE'), r = pin('R'), st = pin('S'), ce = pin('CE');
+      // the toggle and J-K updates read the state: VHDL-93 cannot read an output port, so keep it in a local signal
+      let q = qo;
+      if (ci && f.k !== 'd') { q = fresh(`${s.name}_q`); extra.push({ name: q, type: 'std_logic', init: iv }); }
+      const B = v => (ci ? `'${v}'` : `1'b${v}`);
+      const next = f.k === 'd' ? INN(s, 'D')
+        : f.k === 't' ? (ci ? `${q} xor ${INN(s, 'T')}` : `${q} ^ ${INN(s, 'T')}`)
+          : (ci ? `(${INN(s, 'J')} and (not ${q})) or ((not ${INN(s, 'K')}) and ${q})` : `(${INN(s, 'J')} & ~${q}) | (~${INN(s, 'K')} & ${q})`);
+      const asyncL = [[clr, '0'], [pre, '1']].filter(([x]) => x);
+      const syncL = (f.sp ? [[st, '1'], [r, '0']] : [[r, '0'], [st, '1']]).filter(([x]) => x);
+      const lines = [cmt];
+      if (ci) {
+        lines.push(`process (${[c, ...asyncL.map(([x]) => x)].join(', ')})`, 'begin');
+        let kw = 'if';
+        for (const [x, v] of asyncL) { lines.push(`  ${kw} ${x} = '1' then`, `    ${q} <= ${B(v)};`); kw = 'elsif'; }
+        lines.push(`  ${kw} rising_edge(${c}) then`);
+        const inner = [];
+        let k2 = 'if';
+        for (const [x, v] of syncL) { inner.push(`${k2} ${x} = '1' then`, `  ${q} <= ${B(v)};`); k2 = 'elsif'; }
+        if (ce) inner.push(`${k2} ${ce} = '1' then`, `  ${q} <= ${next};`, 'end if;');
+        else if (syncL.length) inner.push('else', `  ${q} <= ${next};`, 'end if;');
+        else inner.push(`${q} <= ${next};`);
+        lines.push(...inner.map(l => '    ' + l), '  end if;', 'end process;');
+        if (q !== qo) lines.push(`${qo} <= ${q};`);
+      } else {
+        lines.push(`always @(${[`posedge ${c}`, ...asyncL.map(([x]) => `posedge ${x}`)].join(' or ')})`);
+        const ch = [...asyncL, ...syncL];
+        ch.forEach(([x, v], i) => lines.push(`  ${i ? 'else if' : 'if'} (${x}) ${q} <= ${B(v)};`));
+        const upd = `${ce ? `if (${ce}) ` : ''}${q} <= ${next};`;
+        lines.push(ch.length ? `  else ${upd}` : `  ${upd}`);
+      }
+      if (qn) init.set(qn, iv);
+      body.push(lines.join('\n'));
       continue;
     }
     switch (s.type) {
@@ -1199,7 +1280,7 @@ export function generateHdl(docIn, opts = {}) {
         if (ci) body.push(`${o} <= ${ins.join(' & ')};`); else assign(o, `{${ins.join(', ')}}`);
         break;
       }
-      case 'fd': case 'fdc': case 'fdce': case 'fdre': case 'register': case 'counter': {
+      case 'register': case 'counter': {
         const q = OUTN(s, 'Q');
         if (!q) { diags.push({ severity: 'warning', message: `${s.name}: output Q not connected, skipped`, ref: { kind: 'symbol', id: s.id } }); continue; }
         const has = nm => def.pins.some(x => x.name === nm);

@@ -167,12 +167,17 @@ test('import: inverted-input gates become the native ANDnBk symbols, FD stays FD
   assert.deepEqual(doc.ports.map(p => `${p.name}:${p.dir}`).sort(), ['CLK:in', 'X1:in', 'X2:in', 'X3:in', 'Y:out']);
 });
 
-test('import: library symbols without a XAIlinx twin get exact HDL (ftce), unknown ones a placeholder', () => {
+test('import: FTCE becomes the native flip-flop, library symbols without a XAIlinx twin get exact HDL, unknown ones a placeholder', () => {
   const { doc, warnings } = imp('Counter_2b.sch');
-  const blocks = doc.symbols.filter(s => s.type === 'hdlblock');
-  assert.equal(blocks.length, 2);
-  assert.ok(blocks.every(b => /rising_edge/.test(b.hdl)));
+  assert.equal(doc.symbols.filter(s => s.type === 'ftce').length, 2);
+  assert.equal(doc.symbols.filter(s => s.type === 'hdlblock').length, 0);
   assert.equal(warnings.filter(w => /no XAIlinx equivalent/.test(w)).length, 0);
+  // a library symbol without a twin (XOR4): an HDL block with its exact function
+  const x4 = importIseSch(read('Mux4to1b4.sch').replace(/"or4"/g, '"xor4"'), { name: 'm' });
+  assert.deepEqual(x4.warnings.filter(w => /connectivity|no XAIlinx equivalent/.test(w)), []);
+  const xb = x4.doc.symbols.filter(s => s.type === 'hdlblock');
+  assert.equal(xb.length, 4);
+  assert.ok(xb.every(b => / xor .* xor .* xor /.test(b.hdl)), xb[0].hdl);
   // an unknown symbol with a project module of that name becomes a module symbol
   const sch = read('MyAND2b4.sch').replace(/symbolname="and2"/g, 'symbolname="myand"');
   const mod = { myand: { name: 'myand', ports: [{ name: 'I0', dir: 'in', width: 1 }, { name: 'I1', dir: 'in', width: 1 }, { name: 'O', dir: 'out', width: 1 }] } };
@@ -746,4 +751,48 @@ endmodule`;
     const rs = runSim({ [g.filename]: g.code, [lang === 'vhdl' ? 'tb.vhd' : 'tb.v']: tb }, 'tb', 1e6);
     assert.ok(logOf(rs).includes('errs=0'), lang + '\n' + logOf(rs).join('\n'));
   }
+});
+
+// ------------------------------------------------------------------ flip-flops FD* / FT* / FJK*
+function ffDoc() {
+  const doc = newDoc('ffx', 'vhdl');
+  const parts = [['fd', '0'], ['fdcpe', '0'], ['fdse', '1'], ['fdp', '0'], ['ftcpe', '0'], ['ftrse', '0'], ['fjkc', '0'], ['fjksre', '1'], ['ft', '0']];
+  parts.forEach(([type, init], k) => {
+    const s = { id: `S${k + 1}`, type, x: 200 + (k % 3) * 300, y: 100 + Math.floor(k / 3) * 250, rot: 0, mirror: false, name: `U${k + 1}`, params: { init } };
+    doc.symbols.push(s);
+    for (const p of symbolPins(normalizeDoc({ ...doc, symbols: [s] }).symbols[0])) {
+      const e = { x: p.x + (p.side === 'W' ? -40 : 40), y: p.y };
+      doc.wires.push({ id: `W${doc.wires.length + 1}`, points: [{ x: p.x, y: p.y }, e] });
+      doc.ports.push({ id: `P${doc.ports.length + 1}`, name: `${s.name}_${p.name}`, dir: p.dir === 'out' ? 'out' : 'in', width: 1, x: e.x, y: e.y });
+    }
+  });
+  return normalizeDoc(doc);
+}
+
+test('export/import: flip-flops map to the Xilinx FD*/FT*/FJK* symbols (INIT default, known pin positions), else xl_<name>_i<INIT>', () => {
+  const doc = ffDoc();
+  const ex = exportIseSch(doc, {});
+  assertIseGeometry(ex.xml, ex.files);
+  const m = parseIseSch(ex.xml);
+  const sym = n => m.blocks.find(b => b.name === n).symbol;
+  assert.deepEqual(['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9'].map(sym), ['fd', 'fdcpe', 'xl_fdse_i1', 'xl_fdp_i0', 'ftcpe', 'xl_ftrse_i0', 'xl_fjkc_i0', 'xl_fjksre_i1', 'xl_ft_i0']);
+  assert.deepEqual(m.blocks.find(b => b.name === 'U2').pins.map(p => p.name).sort(), ['C', 'CE', 'CLR', 'D', 'PRE', 'Q']);
+  assert.deepEqual(decodeXlSymbol('xl_fjksre_i1'), { type: 'fjksre', params: { init: '1' } });
+  const symbols = Object.fromEntries(ex.files.filter(f => f.kind === 'sym').map(f => [f.path, f.text]));
+  const back = importIseSch(ex.xml, { name: 'ffx', symbols });
+  assert.deepEqual(back.warnings.filter(w => /^connectivity|schematic check/.test(w)), []);
+  const desc = d => d.symbols.map(s => `${s.name}:${s.type}:${s.params.init}`).sort();
+  assert.deepEqual(desc(back.doc), desc(doc));
+  assert.deepEqual(partition(back.doc), partition(doc));
+  // as ISE writes them: library FJKC / FJKSRE / FTRSE / FDSE / FDP (no INIT attribute: Xilinx default INIT)
+  const xml = ex.xml.replace(/xl_(fdse|fdp|ftrse|fjkc|fjksre)_i[01]/g, '$1');
+  const r = importIseSch(xml, { name: 'ffx', symbols });
+  assert.deepEqual(r.warnings.filter(w => /^connectivity|schematic check|no XAIlinx equivalent/.test(w)), []);
+  assertSameConnectivity(xml, r);
+  const by = n => r.doc.symbols.find(s => s.name === n);
+  assert.deepEqual(['U3', 'U4', 'U6', 'U7', 'U8'].map(n => `${by(n).type}:${by(n).params.init}`), ['fdse:1', 'fdp:1', 'ftrse:0', 'fjkc:0', 'fjksre:1']);
+  // Counter_2b's FTCE flip-flops are native now and keep the library pin names
+  const c = imp('Counter_2b.sch');
+  assert.ok(c.doc.symbols.filter(s => s.type === 'ftce').every(s => s.params.init === '0'));
+  assertSameConnectivity(read('Counter_2b.sch'), c);
 });
