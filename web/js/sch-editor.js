@@ -1080,9 +1080,9 @@ export function mountSchEditor(container, opts = {}) {
     if (b) pts.reverse();
     return pts.length >= 2 ? pts : pts0;
   }
-  function bandRect() { const a = drag.start, b = drag.cur || a; return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) }; }
-  function bandSelect(add) {
-    const r = bandRect();
+  function bandRect(d = drag) { const a = d.start, b = d.cur || a; return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) }; }
+  function bandSelect(add, d = drag) {
+    const r = bandRect(d);
     if (!add) sel.clear();
     for (const s of doc.symbols) { const b = symbolBox(s, modules); if (b.x >= r.x && b.y >= r.y && b.x + b.w <= r.x + r.w && b.y + b.h <= r.y + r.h) sel.add(`sym:${s.id}`); }
     for (const p of doc.ports) { const b = portBox(p); if (rectsTouch(b, r) && inside(p, r)) sel.add(`port:${p.id}`); }
@@ -1166,9 +1166,9 @@ export function mountSchEditor(container, opts = {}) {
       return;
     }
     if (d.kind === 'band') {
-      const r = bandRect.call(null);
+      const r = bandRect(d);
       if (r.w < 3 && r.h < 3) { if (!d.add) sel.clear(); }
-      else { drag = d; bandSelect(d.add); drag = null; }
+      else bandSelect(d.add, d);
       render(); renderProps();
     }
   }
