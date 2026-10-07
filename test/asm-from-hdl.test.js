@@ -596,7 +596,8 @@ test('module selection and language detection', () => {
 test('modules that are not pure state machines are rejected with a clear reason', () => {
   const v = (src) => () => asmFromHdl(src, { lang: 'verilog' });
   const extraReg = VERILOG_2P.replace('endmodule', '    reg [7:0] free;\n    always @(posedge clk or negedge reset_n) if (!reset_n) free <= 0; else free <= free + 1;\nendmodule');
-  assert.throws(v(extraReg), /register 'free' at line 39 is not part of the state machine/);
+  // extra registers are internal registers of the chart (data path), see asm-datapath.test.js
+  assert.deepEqual(asmFromHdl(extraReg, { lang: 'verilog' }).model.registers, [{ name: 'free', width: 8, init: '0' }]);
   assert.throws(v(VERILOG_2P.replace('endmodule', '    other u1 (.a(clk));\nendmodule')), /instance 'u1' of 'other' at line 38 is not part of the state machine/);
   assert.throws(v('module c(input a, output y); assign y = a; endmodule'), /no clocked process found/);
   assert.throws(v(VERILOG_2P.replace(/always @\(posedge clk or negedge reset_n\)\n\s*if \(!reset_n\) cs <= IDLE;\n\s*else cs <= ns;/, 'always @(posedge clk) cs <= ns;')),

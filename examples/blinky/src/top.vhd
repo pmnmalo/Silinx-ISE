@@ -5,7 +5,8 @@
 --   sw   : sw(0) = reset, sw(1) = mode (0 = knight rider, 1 = binary counter),
 --          sw(2) = pause, sw(3) = invert the LEDs
 --   btn  : btn(1) = faster, btn(0) = slower (8 speeds, from 80 to 0.6 steps per second;
---          the speed state machine is the ASM chart speed_fsm.asm.json)
+--          the speed control is the ASM chart speed_ctrl.asm.json: button synchronisers,
+--          debouncers, speed state machine and step divider in one chart)
 --   led  : LD0..LD7
 ----------------------------------------------------------------------------------
 library IEEE;
@@ -14,7 +15,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 entity top is
     Generic ( DIV      : integer := 625_000;     -- base tick: 80 per second at 50 MHz
               DEBOUNCE : integer := 1_000_000 ); -- button debounce: 20 ms at 50 MHz
-    -- speed after reset: level 3 of speed_fsm = 80 / 2**3 = 10 steps per second
+    -- speed after reset: level 3 of speed_ctrl = 80 / 2**3 = 10 steps per second
     Port ( clk : in  STD_LOGIC;
            sw  : in  STD_LOGIC_VECTOR (3 downto 0);
            btn : in  STD_LOGIC_VECTOR (1 downto 0);

@@ -27,6 +27,10 @@ for Xilinx FPGAs supported by ISE 14.7.
   and adds it to the project.
   The chart and its HDL file stay **synchronized** (edit either one), and an HDL state machine
   (1/2/3-process, VHDL or Verilog) can be converted to a chart (*Convert to State Machine*).
+  A chart can also hold the data path of a small controller: integer generics, internal
+  registers, 2-flip-flop input synchronisers, `<<`/`>>`, and *every cycle* blocks (decision and
+  output boxes evaluated on every clock cycle, in parallel with the states), e.g. the blinky
+  example's `speed_ctrl.asm.json` (button synchronisers + debouncers + speed FSM + step divider).
 - **Behavioural simulation** with XAIlinx's own simulator, written from scratch in JavaScript:
   4-state logic, delta cycles, VHDL/Verilog testbenches (`wait`, `#delay`, `assert`/`report`,
   `$display`, `$readmemh`…), an **ISim**-style waveform window, force/clock to simulate modules

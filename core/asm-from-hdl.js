@@ -44,6 +44,7 @@ import { parse as parseVhdl } from './vhdl/parser.js';
 import { parse as parseVerilog } from './verilog/parser.js';
 import {
   normalizeModel, validate, generate, parseCondition, parseAction, exprToString, extractTransitions,
+  extractAlwaysBlocks, asmJoinPoints,
 } from './asm.js';
 
 // ---------------------------------------------------------------------------------------
@@ -234,7 +235,20 @@ function parseHeader(src, lang) {
     lines.push(raw.slice(c.length));
   }
   if (!lines.some((l) => /^\s*Generator\s*:\s*XAIlinx ASM editor/.test(l))) return null;
-  const h = { name: null, description: null, encoding: null, states: new Map() };
+  const h = { name: null, description: null, encoding: null, states: new Map(), always: new Map(), regInit: new Map() };
+  const blk = (name) => {
+    if (!h.always.has(name)) h.always.set(name, { actions: [], conds: [], mealy: [] });
+    return h.always.get(name);
+  };
+  const addConds = (s, cond) => {
+    if (cond.trim() === 'always') return;
+    for (let piece of splitTopLevel(cond, ' && ')) {
+      piece = piece.trim();
+      if (piece.startsWith('!') && (/^![A-Za-z_]/.test(piece) || piece.startsWith('!('))) piece = piece.slice(1);
+      piece = unwrapParens(piece).trim();
+      if (piece && !s.conds.includes(piece)) s.conds.push(piece);
+    }
+  };
   const st = (name) => {
     if (!h.states.has(name)) h.states.set(name, { moore: null, conds: [], mealy: [] });
     return h.states.get(name);
@@ -251,6 +265,8 @@ function parseHeader(src, lang) {
     if ((m = /^ Encoding\s*: (\w+)/.exec(l))) { h.encoding = m[1]; continue; }
     if (/^ States:/.test(l)) { section = 'states'; continue; }
     if (/^ Transitions/.test(l)) { section = 'trans'; continue; }
+    if (/^ Every cycle/.test(l)) { section = 'every'; continue; }
+    if (/^ Registers \(internal/.test(l)) { section = 'regs'; continue; }
     if (!/^ {3}\S/.test(l)) { if (!/^ {3}/.test(l)) section = null; continue; }
     if (section === 'states') {
       m = /^ {3}(\S+)(.*)$/.exec(l);
@@ -264,17 +280,29 @@ function parseHeader(src, lang) {
       const mealy = /  \[(.*)\]$/.exec(rest);
       if (mealy) { s.mealy.push(...mealy[1].split(', ').map((x) => x.trim()).filter(Boolean)); rest = rest.slice(0, mealy.index); }
       const arrow = rest.lastIndexOf(' -> ');
-      const cond = arrow >= 0 ? rest.slice(0, arrow) : rest;
-      if (cond.trim() === 'always') continue;
-      for (let piece of splitTopLevel(cond, ' && ')) {
-        piece = piece.trim();
-        if (piece.startsWith('!') && (/^![A-Za-z_]/.test(piece) || piece.startsWith('!('))) piece = piece.slice(1);
-        piece = unwrapParens(piece).trim();
-        if (piece && !s.conds.includes(piece)) s.conds.push(piece);
-      }
+      addConds(s, arrow >= 0 ? rest.slice(0, arrow) : rest);
+    } else if (section === 'regs') {
+      if ((m = /^ {3}(\S+)\s*: \d+ bits?, reset (.+)$/.exec(l))) h.regInit.set(m[1], m[2].trim());
+    } else if (section === 'every') {
+      if ((m = /^ {3}(\S+)\s+Actions: (.*)$/.exec(l))) { blk(m[1]).actions = m[2].split(', ').map((x) => x.trim()).filter(Boolean); continue; }
+      m = /^ {3}(\S+)\s+: (.*)$/.exec(l);
+      if (!m) continue;
+      let rest = m[2];
+      const b = blk(m[1]);
+      const acts = /  \[(.*)\]$/.exec(rest);
+      if (acts) { b.mealy.push(...acts[1].split(', ').map((x) => x.trim()).filter(Boolean)); rest = rest.slice(0, acts.index); }
+      addConds(b, rest);
     }
   }
   return h;
+}
+
+/** Comment lines `-- every cycle: <name>` written by the generator before each every-cycle block. */
+function everyCycleMarks(src, lang) {
+  const re = lang === 'vhdl' ? /^\s*--\s*every cycle:\s*(\S+)\s*$/ : /^\s*\/\/\s*every cycle:\s*(\S+)\s*$/;
+  const out = [];
+  src.split(/\r?\n/).forEach((l, i) => { const m = re.exec(l); if (m) out.push({ line: i + 1, name: m[1] }); });
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -585,12 +613,54 @@ function analyzeModule(mod, src, lang) {
   const initial = stateOfExpr(sReset.value);
   if (!initial) fail(`the reset value of '${orig(S)}'${atLine(sReset.loc)} is not one of its states`);
 
+  // ---- generics: integer VHDL generics / Verilog parameters that are not state codes -----
+  const generics = [];
+  const genericSet = new Set();
+  for (const p of mod.params || []) {
+    if (p.local || stateByKey.has(p.name)) continue;
+    const integer = lang === 'vhdl' ? p.type?.kind === 'integer' : (p.type == null || p.type.kind === 'integer');
+    const v = consts.get(p.name)?.value;
+    if (!integer || v == null || v < 0n || v > 2147483647n) continue;
+    generics.push({ name: p.name, default: Number(v) });
+    genericSet.add(p.name);
+  }
+
+  // ---- input synchronisers: `m <= in; s <= m;` (2 flip-flops, reset to 0) ----------------
+  const refCount = new Map();
+  const countRefs = (e) => walkExpr(e, (x) => { if (x.op === 'ref') refCount.set(x.name, (refCount.get(x.name) || 0) + 1); });
+  const countStmts = (list) => walkStmts(list, (st) => {
+    for (const e of [st.cond, st.value, st.expr]) countRefs(e);
+    if (st.kind === 'case') for (const it of st.items) for (const ch of it.choices) if (ch && ch.op) countRefs(ch);
+  });
+  for (const c of clocked) countStmts(c.load);
+  for (const p of comb) countStmts(p.body);
+  for (const a of concs) countRefs(a.value);
+  const loadOf = new Map(); // register -> value of its unconditional load
+  for (const c of clocked) for (const st of c.load) if (st.kind === 'assign' && st.target.op === 'ref') loadOf.set(st.target.name, stripConv(st.value));
+  const zeroReset = (r) => { const rv = resetVals.get(r); return !!rv && constValue(rv.value, 1) === 0n; };
+  const syncOf = new Map(); // input -> { meta, sync }
+  const syncRegs = new Map(); // register -> { kind: 'syncmeta'|'syncout', input }
+  for (const [M, v] of loadOf) {
+    if (v.op !== 'ref' || ports.get(v.name)?.dir !== 'in' || v.name === clock || v.name === reset.name) continue;
+    const P = v.name;
+    if (ports.has(M) || syncOf.has(P) || refCount.get(P) !== 1 || refCount.get(M) !== 1 || drivers.get(M)?.kind !== 'clocked') continue;
+    const Y = [...loadOf].find(([, x]) => x.op === 'ref' && x.name === M)?.[0];
+    if (!Y || ports.has(Y) || !zeroReset(M) || !zeroReset(Y)) continue;
+    const w = ports.get(P).width;
+    if ([M, Y].some((r) => !signals.has(r) || widthOfType(signals.get(r).type, `signal '${orig(r)}'`, signals.get(r).loc) !== w)) continue;
+    syncOf.set(P, { meta: M, sync: Y });
+    syncRegs.set(M, { kind: 'syncmeta', input: P });
+    syncRegs.set(Y, { kind: 'syncout', input: P });
+  }
+
   // ---- registers and outputs -----------------------------------------------------------
   const roles = new Map();    // name -> { kind, out? }
   roles.set(S, { kind: 'state' });
   if (N) roles.set(N, { kind: 'next' });
+  for (const [r, info] of syncRegs) roles.set(r, info);
   const outputs = [];         // ordered like the ports
-  const outInfo = new Map();  // output name -> { registered, default(BigInt|null), width, reg, next }
+  const outInfo = new Map();  // output/register name -> { registered, internal?, default(BigInt|null), width, reg, next }
+  const registers = [];       // internal registers (in declaration order)
   const consumed = new Set(); // concurrent assignments used as register -> output links
   const nextOfReg = new Map();
   for (const c of clocked) {
@@ -603,7 +673,7 @@ function analyzeModule(mod, src, lang) {
     }
   }
   for (const R of regs) {
-    if (R === S) continue;
+    if (R === S || syncRegs.has(R)) continue;
     let O = null;
     if (ports.get(R)?.dir === 'out') O = R;
     else {
@@ -612,9 +682,19 @@ function analyzeModule(mod, src, lang) {
         if (a.target.op === 'ref' && ports.get(a.target.name)?.dir === 'out' && v.op === 'ref' && v.name === R) { O = a.target.name; consumed.add(a); }
       }
     }
-    if (!O) fail(`register '${orig(R)}'${atLine(drivers.get(R).loc)} is not part of the state machine (it does not drive an output): modules with extra registers are not pure state machines`);
-    if (outInfo.has(O)) fail(`output '${orig(O)}' is driven by more than one register`);
-    const width = ports.get(O).width;
+    let width, internal = false;
+    if (O) {
+      if (outInfo.has(O)) fail(`output '${orig(O)}' is driven by more than one register`);
+      width = ports.get(O).width;
+    } else {
+      // internal register (data path): readable in conditions, assigned like a registered output
+      const decl = signals.get(R);
+      if (!decl) fail(`register '${orig(R)}'${atLine(drivers.get(R).loc)} is not declared`);
+      width = widthOfType(decl.type, `register '${orig(R)}'`, decl.loc);
+      if (width == null) fail(`register '${orig(R)}'${atLine(decl.loc)} must be ${lang === 'vhdl' ? 'a std_logic, std_logic_vector or unsigned' : 'a reg (vector)'} to be a register of the chart`);
+      O = R;
+      internal = true;
+    }
     const rv = resetVals.get(R);
     let def = 0n;
     if (!rv) warnings.push(`register '${orig(R)}' has no reset value; the chart resets it to 0`);
@@ -623,11 +703,13 @@ function analyzeModule(mod, src, lang) {
       if (def == null) fail(`the reset value of '${orig(R)}'${atLine(rv.loc)} must be a constant`);
     }
     const nx = nextOfReg.get(R) || null;
-    outInfo.set(O, { registered: true, default: def, width, reg: R, next: nx });
+    outInfo.set(O, { registered: true, internal, default: def, width, reg: R, next: nx });
+    if (internal) registers.push(R);
     roles.set(R, { kind: 'regcur', out: O });
     if (O !== R) roles.set(O, { kind: 'regport', out: O });
     if (nx) roles.set(nx, { kind: 'reg', out: O });
   }
+  registers.sort((a, b) => [...signals.keys()].indexOf(a) - [...signals.keys()].indexOf(b));
   for (const [name, p] of ports) {
     if (p.dir !== 'out' || outInfo.has(name)) continue;
     const d = drivers.get(name);
@@ -638,13 +720,13 @@ function analyzeModule(mod, src, lang) {
   for (const p of mod.ports) if (outInfo.has(p.name)) outputs.push(p.name);
   for (const [name] of ports) if (ports.get(name).dir === 'in' && name !== clock && name !== reset.name) roles.set(name, { kind: 'in' });
   for (const [name, d] of drivers) {
-    if (!roles.has(name)) fail(`signal '${orig(name)}'${atLine(d.loc)} is not part of the state machine (it is neither the state, the next state nor an output)`);
+    if (!roles.has(name)) fail(`signal '${orig(name)}'${atLine(d.loc)} is not part of the state machine (it is neither the state, the next state, a register nor an output)`);
   }
   for (const [name, d] of signals) if (!roles.has(name)) warnings.push(`signal '${orig(name)}'${atLine(d.loc)} is not used by the state machine`);
   for (const c of clocked) {
     for (const [name] of resetVals) {
       const r = roles.get(name);
-      if (!r || (r.kind !== 'state' && r.kind !== 'regcur')) fail(`'${orig(name)}' is reset in the clocked process but is not a register of the state machine`);
+      if (!r || !['state', 'regcur', 'syncmeta', 'syncout'].includes(r.kind)) fail(`'${orig(name)}' is reset in the clocked process but is not a register of the state machine`);
     }
   }
 
@@ -664,6 +746,37 @@ function analyzeModule(mod, src, lang) {
 
   // ---- logic bodies --------------------------------------------------------------------
   const bodies = []; // { stmts, ctx: 'comb'|'clocked', loc }
+  const alwaysGroups = []; // every-cycle blocks: { name, stmts, ctx }
+  const marks = everyCycleMarks(src, lang);
+  const stateFree = (st) => {
+    let ok = true;
+    const noS = (e) => walkExpr(e, (x) => { if (x.op === 'ref' && x.name === S) ok = false; });
+    walkStmts([st], (x) => {
+      if (!['assign', 'if', 'case', 'null'].includes(x.kind)) ok = false;
+      if (x.kind === 'assign' && (x.target.op !== 'ref' || x.target.name === S || x.target.name === N)) ok = false;
+      for (const e of [x.cond, x.value, x.expr]) noS(e);
+      if (x.kind === 'case') for (const it of x.items) for (const ch of it.choices) if (ch && ch.op) noS(ch);
+    });
+    return ok;
+  };
+  const addGroups = (stmts, ctx, procLine, nextLine) => {
+    const mine = marks.filter((mk) => mk.line > procLine && mk.line < nextLine);
+    let cur = null;
+    for (const st of stmts) {
+      const line = lineOf(st.loc) || 0;
+      const mk = [...mine].reverse().find((x) => x.line < line);
+      const name = mk ? mk.name : null;
+      if (!cur || (mk && cur.mark !== mk)) {
+        cur = { name, mark: mk || null, stmts: [], ctx, line: mk ? mk.line : line };
+        alwaysGroups.push(cur);
+      }
+      cur.stmts.push(st);
+    }
+    // marks without statements: empty blocks
+    for (const mk of mine) if (!alwaysGroups.some((g) => g.mark === mk)) alwaysGroups.push({ name: mk.name, mark: mk, stmts: [], ctx, line: mk.line });
+  };
+  const units = [...comb, ...clocked.map((c) => c.proc), ...concs].sort((a, b) => (lineOf(a.loc) || 0) - (lineOf(b.loc) || 0));
+  const nextUnitLine = (it) => { const k = units.indexOf(it); return k >= 0 && k + 1 < units.length ? (lineOf(units[k + 1].loc) || Infinity) : Infinity; };
   for (const it of [...comb, ...clocked.map((c) => c.proc), ...concs].sort((a, b) => (lineOf(a.loc) || 0) - (lineOf(b.loc) || 0))) {
     if (it.kind === 'assign') {
       if (consumed.has(it)) continue;
@@ -674,16 +787,27 @@ function analyzeModule(mod, src, lang) {
     if (ck) {
       const rest = ck.load.filter((st) => !(st.kind === 'assign' && st.target.op === 'ref' &&
         ((st.target.name === S && N && st.value.op === 'ref' && st.value.name === N) ||
+         (syncRegs.has(st.target.name) && stripConv(st.value).op === 'ref') ||
          (nextOfReg.has(st.target.name) && stripConv(st.value).op === 'ref' && stripConv(st.value).name === nextOfReg.get(st.target.name)))));
+      // a clocked process that does not involve the state at all: an every-cycle block
+      if (rest.length && rest.every(stateFree) && !ck.resetStmts.some((st) => st.target?.name === S)) {
+        addGroups(rest, 'clocked', lineOf(it.loc) || 0, nextUnitLine(it));
+        continue;
+      }
       bodies.push({ stmts: rest, ctx: 'clocked', loc: it.loc });
       continue;
     }
-    // combinational process: leading default assignments
+    // combinational process: leading default assignments (up to the first every-cycle block)
     const list = stmtList(it.body);
+    const procLine = lineOf(it.loc) || 0;
+    const firstMark = marks.find((mk) => mk.line > procLine && mk.line < nextUnitLine(it))?.line ?? Infinity;
+    const defaulted = new Set();
     let i = 0;
     for (; i < list.length; i++) {
       const st = list[i];
       if (st.kind !== 'assign' || st.target.op !== 'ref') break;
+      if ((lineOf(st.loc) || 0) > firstMark || defaulted.has(st.target.name)) break;
+      defaulted.add(st.target.name);
       const r = roles.get(st.target.name);
       if (r?.kind === 'next' && st.value.op === 'ref' && st.value.name === S) continue;
       if (r?.kind === 'reg' && stripConv(st.value).op === 'ref' && stripConv(st.value).name === outInfo.get(r.out).reg) continue;
@@ -693,16 +817,32 @@ function analyzeModule(mod, src, lang) {
       }
       break;
     }
-    bodies.push({ stmts: list.slice(i), ctx: 'comb', loc: it.loc });
+    // statements that do not depend on the state, before the state logic: every-cycle blocks
+    // (the state logic after them takes priority, as in the chart)
+    let j = i;
+    while (j < list.length && stateFree(list[j])) j++;
+    if (j > i || firstMark < Infinity) addGroups(list.slice(i, j), 'comb', procLine, nextUnitLine(it));
+    bodies.push({ stmts: list.slice(j), ctx: 'comb', loc: it.loc });
+  }
+  alwaysGroups.sort((a, b) => a.line - b.line);
+  // names of the blocks (the generator's comments, else every_cycle, every_cycle2, ...)
+  const usedNames = new Set(alwaysGroups.filter((g) => g.name).map((g) => g.name.toLowerCase()));
+  let anon = 0;
+  for (const g of alwaysGroups) {
+    if (g.name) continue;
+    let nm;
+    do { anon++; nm = anon === 1 ? 'every_cycle' : `every_cycle${anon}`; } while (usedNames.has(nm));
+    usedNames.add(nm);
+    g.name = nm;
   }
 
   const widthOf = (name) => {
     const p = ports.get(name);
-    return p ? p.width : 1;
+    return p ? p.width : outInfo.get(name)?.width ?? 1;
   };
   return {
     warnings, orig, litBase, consts, ports, S, N, states, stateByKey, stateOfExpr, initial, enumType, sWidth,
-    clock, reset, roles, outputs, outInfo, bodies, widthOf,
+    clock, reset, roles, outputs, outInfo, bodies, widthOf, alwaysGroups, registers, generics, genericSet, syncOf,
     inputs: mod.ports.filter((p) => roles.get(p.name)?.kind === 'in').map((p) => p.name),
   };
 }
@@ -803,7 +943,7 @@ function specStmts(list, A, s) {
 // IR expression -> ASM expression
 // ---------------------------------------------------------------------------------------
 
-const ASM_BIN = new Set(['&&', '||', '|', '^', '&', '==', '!=', '<', '>', '<=', '>=', '+', '-']);
+const ASM_BIN = new Set(['&&', '||', '|', '^', '&', '==', '!=', '<', '>', '<=', '>=', '+', '-', '<<', '>>']);
 
 /** Convert an IR expression. Returns { ast, ty: 'bool'|'bit'|'vec'|'num', w }. */
 function conv(e, A, X) {
@@ -825,6 +965,8 @@ function conv(e, A, X) {
       const n = e.name;
       if (A.lang === 'vhdl' && (n === 'true' || n === 'false')) return { ast: lit(n === 'true' ? 1n : 0n), ty: 'bool' };
       const r = A.roles.get(n);
+      if (r?.kind === 'syncout') { const w = A.widthOf(r.input); return { ast: { k: 'id', name: A.orig(r.input) }, ty: w === 1 ? 'bit' : 'vec', w }; }
+      if (A.genericSet.has(n)) return { ast: { k: 'id', name: A.orig(n) }, ty: 'num' };
       if (r?.kind === 'in') { const w = A.widthOf(n); return { ast: { k: 'id', name: A.orig(n) }, ty: w === 1 ? 'bit' : 'vec', w }; }
       if (r?.kind === 'regcur' || r?.kind === 'regport') { const w = A.outInfo.get(r.out).width; return { ast: { k: 'id', name: A.orig(r.out) }, ty: w === 1 ? 'bit' : 'vec', w }; }
       if (A.consts.has(n) && !A.stateByKey.has(n)) {
@@ -840,9 +982,27 @@ function conv(e, A, X) {
       const name = e.name;
       const args = e.args.map((x) => (x && x.op ? x : x?.value));
       if (['unsigned', 'std_logic_vector', 'to_integer', 'std_logic', 'to_stdlogicvector', 'conv_integer'].includes(name) && args.length === 1) return conv(args[0], A, X);
-      if (name === 'resize' && args.length === 2) return conv(args[0], A, X);
+      if (name === 'resize' && args.length === 2) {
+        const r = conv(args[0], A, X);
+        const n = evalInt(args[1], A.consts);
+        if (n == null || n < 1n) return r;
+        // the width at which VHDL evaluates the operand (see vhdlSized)
+        if (r.ast.k === 'id' || (r.ast.k !== 'lit' && !A.vw.has(r.ast))) A.vw.set(r.ast, Number(n));
+        return { ...r, ty: r.ty === 'bool' ? r.ty : 'vec', w: Number(n) };
+      }
+      if ((name === 'shift_left' || name === 'shift_right') && args.length === 2) {
+        const a = conv(args[0], A, X), b = conv(args[1], A, X);
+        const ast = { k: 'bin', op: name === 'shift_left' ? '<<' : '>>', a: a.ast, b: b.ast };
+        A.vw.set(ast, a.w || 32);
+        return { ast, ty: 'vec', w: a.w };
+      }
       if ((name === 'to_unsigned' || name === 'conv_std_logic_vector') && args.length === 2) {
+        let usesGeneric = false;
+        walkExpr(args[0], (x) => { if (x.op === 'ref' && A.genericSet.has(x.name)) usesGeneric = true; });
+        if (usesGeneric) return conv(args[0], A, X);
         const v = evalInt(args[0], A.consts);
+        const n = evalInt(args[1], A.consts);
+        if (v != null && n != null && n >= 1n && n <= 256n) return { ast: lit(v, Number(n), 'd'), ty: 'vec', w: Number(n) };
         if (v != null) return { ast: lit(v), ty: 'num' };
         return conv(args[0], A, X);
       }
@@ -866,10 +1026,12 @@ function conv(e, A, X) {
       const a = conv(e.a, A, X);
       if (e.o === '~') {
         if (a.ty === 'bool') return { ast: { k: 'un', op: '!', a: a.ast }, ty: 'bool' };
-        return { ast: { k: 'un', op: '~', a: a.ast }, ty: a.ty, w: a.w };
+        const ast = { k: 'un', op: '~', a: a.ast };
+        if (a.w) A.vw.set(ast, a.w);
+        return { ast, ty: a.ty, w: a.w };
       }
       if (e.o === '!') return { ast: { k: 'un', op: '!', a: a.ast }, ty: 'bool' };
-      if (e.o === '-') return { ast: { k: 'un', op: '-', a: a.ast }, ty: 'vec', w: a.w };
+      if (e.o === '-') { const ast = { k: 'un', op: '-', a: a.ast }; if (a.w) A.vw.set(ast, a.w); return { ast, ty: 'vec', w: a.w }; }
       if (e.o === '+') return a;
       fail(`${where} uses the reduction operator '${e.o}', which a chart cannot express`);
     }
@@ -877,15 +1039,19 @@ function conv(e, A, X) {
       const a = conv(e.a, A, X), b = conv(e.b, A, X);
       let op = e.o;
       if (A.lang === 'vhdl' && (op === '&' || op === '|') && (a.ty === 'bool' || b.ty === 'bool')) op = op === '&' ? '&&' : '||';
-      if (!ASM_BIN.has(op)) fail(`${where} uses the operator '${e.o}', which a chart cannot express (supported: == != < > <= >= && || ! & | ^ ~ + -)`);
+      if (!ASM_BIN.has(op)) fail(`${where} uses the operator '${e.o}', which a chart cannot express (supported: == != < > <= >= && || ! & | ^ ~ + - << >>)`);
       const ast = { k: 'bin', op, a: a.ast, b: b.ast };
       if (BOOL_OPS.has(op)) return { ast, ty: 'bool' };
+      if (op === '<<' || op === '>>') { A.vw.set(ast, a.w || 32); return { ast, ty: 'vec', w: a.w }; }
       if (op === '&' || op === '|' || op === '^') {
         if (a.ty === 'bool' || b.ty === 'bool') return { ast, ty: 'bool' };
         const w = Math.max(a.w || 1, b.w || 1);
+        A.vw.set(ast, w);
         return { ast, ty: w === 1 && a.ty !== 'num' ? 'bit' : 'vec', w };
       }
-      return { ast, ty: 'vec', w: Math.max(a.w || 1, b.w || 1) };
+      const w = Math.max(a.w || 1, b.w || 1);
+      A.vw.set(ast, w);
+      return { ast, ty: 'vec', w };
     }
     case 'cond': fail(`${where} uses a conditional value (when/else, ?:) inside a state, which a chart cannot express; use if/else`);
     case 'concat': fail(`${where} uses concatenation, which a chart cannot express`);
@@ -901,14 +1067,92 @@ function conv(e, A, X) {
 // Tree: { k: 'act', acts, next } | { k: 'if', cond, t, f } | { k: 'leaf' }
 // act item: { goto: stateKey | '@self' } or { target, ast, prefix? }
 
+// VHDL evaluates `unsigned + natural`, shifts and `not` at the width of their vector operands,
+// while the chart (like Verilog) evaluates them at the width of their context, and unsized
+// literals count as 32 bits. Where the context matters (operands of a comparison that hold
+// arithmetic, shifts or ~; the right-hand side of an assignment with >>) the unsized literals
+// of a VHDL expression are given the width VHDL used, so that the chart means the same.
+const SIZE_SENSITIVE = new Set(['+', '-', '<<', '>>', '~', 'neg']);
+const ARITH = new Set(['+', '-', '&', '|', '^']);
+const CMPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
+function ctxSens(ast, ops = SIZE_SENSITIVE) {
+  if (ast.k === 'un') return ast.op !== '!' && (ops.has(ast.op === '-' ? 'neg' : ast.op) || ctxSens(ast.a, ops));
+  if (ast.k !== 'bin') return false;
+  if (ops.has(ast.op)) return true;
+  if (ARITH.has(ast.op)) return ctxSens(ast.a, ops) || ctxSens(ast.b, ops);
+  if (ast.op === '<<' || ast.op === '>>') return ctxSens(ast.a, ops);
+  return false;
+}
+function hasSignal(ast, A) {
+  if (ast.k === 'id') return !A.generics.some((g) => A.orig(g.name) === ast.name);
+  if (ast.k === 'un') return hasSignal(ast.a, A);
+  if (ast.k === 'bin') return hasSignal(ast.a, A) || hasSignal(ast.b, A);
+  return false;
+}
+function vhdlSized(ast, A, inSens = false, W = 0) {
+  const vw = (x) => A.vw.get(x) ?? (x.k === 'lit' ? x.w ?? 0 : x.k === 'id' && hasSignal(x, A) ? A.asmWidth(x.name) : 0);
+  switch (ast.k) {
+    case 'lit': return inSens && ast.w == null ? lit(ast.v, Math.max(W || 32, ast.v.toString(2).length), 'd') : ast;
+    case 'un':
+      if (ast.op === '!') return { ...ast, a: vhdlSized(ast.a, A) };
+      return { ...ast, a: vhdlSized(ast.a, A, inSens, A.vw.get(ast) ?? W) };
+    case 'bin': {
+      if (CMPS.has(ast.op)) {
+        const s = ctxSens(ast.a) || ctxSens(ast.b);
+        const Wc = Math.max(vw(ast.a), vw(ast.b));
+        return { ...ast, a: vhdlSized(ast.a, A, s, Wc), b: vhdlSized(ast.b, A, s, Wc) };
+      }
+      if (ast.op === '&&' || ast.op === '||') return { ...ast, a: vhdlSized(ast.a, A), b: vhdlSized(ast.b, A) };
+      if (!inSens || !hasSignal(ast, A)) return ast;
+      const Wn = A.vw.get(ast) ?? W;
+      if (ast.op === '<<' || ast.op === '>>') return { ...ast, a: vhdlSized(ast.a, A, true, Wn), b: vhdlSized(ast.b, A, ctxSens(ast.b), vw(ast.b)) };
+      return { ...ast, a: vhdlSized(ast.a, A, true, Wn), b: vhdlSized(ast.b, A, true, Wn) };
+    }
+  }
+  return ast;
+}
+
+/** Verilog self-determined width (unsized literals and generics: 32 bits). */
+function selfWidth(ast, wOf) {
+  switch (ast.k) {
+    case 'lit': return ast.w ?? 32;
+    case 'id': return wOf(ast.name);
+    case 'un': return ast.op === '!' ? 1 : selfWidth(ast.a, wOf);
+    case 'bin':
+      if (ARITH.has(ast.op)) return Math.max(selfWidth(ast.a, wOf), selfWidth(ast.b, wOf));
+      if (ast.op === '<<' || ast.op === '>>') return selfWidth(ast.a, wOf);
+      return 1;
+  }
+  return 1;
+}
+
+/**
+ * Key of the meaning of an expression where literal widths are concerned: they only matter
+ * through the width a comparison (or an assignment with >>) is evaluated at, which is part of
+ * the key; the widths of the literals themselves are dropped.
+ */
+function widthKey(ast, wOf) {
+  switch (ast.k) {
+    case 'lit': return lit(ast.v);
+    case 'un': return { ...ast, a: widthKey(ast.a, wOf) };
+    case 'bin': {
+      const k = { ...ast, a: widthKey(ast.a, wOf), b: widthKey(ast.b, wOf) };
+      if (CMPS.has(ast.op) && (ctxSens(ast.a) || ctxSens(ast.b))) k.op = `${ast.op}@${Math.max(selfWidth(ast.a, wOf), selfWidth(ast.b, wOf))}`;
+      if ((ast.op === '<<' || ast.op === '>>') && ctxSens(ast.b)) k.b = { k: 'un', op: `@${selfWidth(ast.b, wOf)}`, a: k.b };
+      return k;
+    }
+  }
+  return ast;
+}
+
 function makeTreeBuilder(A) {
   const condOf = (e, loc) => {
     const r = conv(e, A, { loc });
-    return A.lang === 'vhdl' ? simpLogical(r.ast, true, A.asmWidth) : r.ast;
+    return A.lang === 'vhdl' ? simpLogical(vhdlSized(r.ast, A), true, A.asmWidth) : r.ast;
   };
   const rhsOf = (e, width, loc) => {
     const r = conv(e, A, { loc, width });
-    let ast = A.lang === 'vhdl' ? simpLogical(r.ast, false, A.asmWidth) : r.ast;
+    let ast = A.lang === 'vhdl' ? simpLogical(vhdlSized(r.ast, A, ctxSens(r.ast, new Set(['>>'])), A.vw.get(r.ast) ?? r.w ?? 0), false, A.asmWidth) : r.ast;
     if (ast.k === 'lit') {
       if (width === 1 || A.lang === 'vhdl') ast = lit(ast.v);
       else if (ast.w == null) ast = lit(ast.v);
@@ -944,6 +1188,7 @@ function makeTreeBuilder(A) {
     const one = rhsOf(t[0].value, w, t[0].loc), zero = rhsOf(f[0].value, w, f[0].loc);
     if (one.k !== 'lit' || zero.k !== 'lit' || one.v !== 1n || zero.v !== 0n) return null;
     let c = conv(st.cond, A, { loc: st.loc }).ast;
+    if (A.lang === 'vhdl') c = vhdlSized(c, A);
     if (st.fromCond) {
       c = A.lang === 'vhdl' ? simpLogical(c, true, A.asmWidth) : c;
       if (w !== 1 && !asmIsBool(c)) return null;
@@ -987,7 +1232,41 @@ function makeTreeBuilder(A) {
     }
     return acts.length ? { k: 'act', acts, next: { k: 'leaf' } } : { k: 'leaf' };
   };
-  return { toTree };
+  // Every-cycle blocks: sequential items { k: 'acts', acts } | { k: 'if', cond, t, f }; the
+  // statement after an `if` is where both branches join again.
+  const toSeq = (list, ctx) => {
+    list = stmtList(list);
+    const out = [];
+    const push = (a) => {
+      if (a.goto) fail(`assignment${atLine(a.loc)} changes the state in logic that does not depend on the state`);
+      if (out.length && out[out.length - 1].k === 'acts') out[out.length - 1].acts.push(a);
+      else out.push({ k: 'acts', acts: [a] });
+    };
+    for (let i = 0; i < list.length; i++) {
+      const st = list[i];
+      if (st.kind === 'null') continue;
+      if (st.kind === 'assign') {
+        if (st.delay) fail(`assignment${atLine(st.loc)} has a delay, which a state machine chart cannot express`);
+        if (st.value.op === 'cond') {
+          list = [...list.slice(0, i), { kind: 'if', cond: st.value.cond, fromCond: true, loc: st.loc,
+            then: [{ ...st, value: st.value.then }], else: [{ ...st, value: st.value.else }] }, ...list.slice(i + 1)];
+          i--; continue;
+        }
+        push({ ...action(st, ctx), loc: st.loc });
+        continue;
+      }
+      if (st.kind === 'case') { list = [...list.slice(0, i), ...caseChain(st), ...list.slice(i + 1)]; i--; continue; }
+      if (st.kind === 'if') {
+        const ba = boolAssign(st, ctx);
+        if (ba) { push(ba); continue; }
+        out.push({ k: 'if', cond: condOf(st.cond, st.loc), t: toSeq(st.then, ctx), f: toSeq(st.else, ctx) });
+        continue;
+      }
+      fail(`${st.kind} statement${atLine(st.loc)} is not supported in a state machine chart`);
+    }
+    return out;
+  };
+  return { toTree, toSeq };
 }
 
 function restrict(t, key, neg, value, W) {
@@ -1061,7 +1340,8 @@ function assignsOnEveryPath(t, target) {
 
 function makeTexts(A, lang) {
   const W = A.asmWidth;
-  const strictCond = (ast) => (lang === 'vhdl' ? exprToString(valueLits(simpLogical(ast, true, W))) : exprToString(ast));
+  const wOf = (n) => (A.genericSet.has(n) || A.generics.some((g) => A.orig(g.name) === n) ? 32 : W(n));
+  const strictCond = (ast) => (lang === 'vhdl' ? exprToString(widthKey(simpLogical(ast, true, W), wOf)) : exprToString(ast));
   const negCond = (ast) => {
     if (lang === 'vhdl') {
       if (ast.k === 'id' && W(ast.name) === 1) return { k: 'bin', op: '==', a: ast, b: lit(0n) };
@@ -1078,7 +1358,8 @@ function makeTexts(A, lang) {
       if (lang === 'vhdl' || w === 1) return `${target}:#${ast.v}`;
       return `${target}:#${ast.base === 'b' ? 'b' : ast.base === 'h' ? 'h' : 'd'}${ast.v}`;
     }
-    return `${target}:${lang === 'vhdl' ? exprToString(valueLits(simpLogical(ast, false, W))) : exprToString(ast)}`;
+    const wide = ctxSens(ast, new Set(['>>'])) ? `@${Math.max(w, selfWidth(ast, wOf))}` : '';
+    return `${target}${wide}:${lang === 'vhdl' ? exprToString(widthKey(simpLogical(ast, false, W), wOf)) : exprToString(ast)}`;
   };
   const condText = (ast, cands) => {
     const key = strictCond(ast);
@@ -1149,6 +1430,7 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
 
   const A = analyzeModule(mod, source, lang);
   A.lang = lang;
+  A.vw = new WeakMap(); // VHDL width of expression nodes (see vhdlSized)
   const warnings = A.warnings;
   const header = parseHeader(source, lang);
   const prev = previous ? normalizeModel(previous) : null;
@@ -1158,6 +1440,8 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
   const asmWidths = new Map();
   for (const i of A.inputs) asmWidths.set(A.orig(i), A.widthOf(i));
   for (const o of A.outputs) asmWidths.set(outName(o), A.outInfo.get(o).width);
+  for (const r of A.registers) asmWidths.set(A.orig(r), A.outInfo.get(r).width);
+  for (const g of A.generics) asmWidths.set(A.orig(g.name), 32);
   A.asmWidth = (name) => asmWidths.get(name) ?? 1;
   A.outWidth = (name) => asmWidths.get(name) ?? 1;
 
@@ -1175,6 +1459,12 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
       c.conds.push(...h.conds);
       c.mealy.push(...h.mealy);
     }
+    for (const [name, h] of header.always) {
+      const c = candOf(`@${name}`);
+      c.moore.push(h.actions);
+      c.conds.push(...h.conds);
+      c.mealy.push(...h.mealy);
+    }
   }
   if (prev) {
     try {
@@ -1187,6 +1477,16 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
         }
       }
     } catch { /* an invalid previous chart only loses its texts */ }
+    try {
+      for (const b of extractAlwaysBlocks(prev)) {
+        const c = candOf(`@${b.name}`);
+        c.moore.push(b.actions);
+        for (const p of b.paths) {
+          for (const x of p.conditions) c.conds.push(x.cond.trim());
+          for (const x of p.actions) c.mealy.push(x.action);
+        }
+      }
+    } catch { /* idem */ }
   }
   // decision order per state (header / previous chart): used to stack merged decisions
   const rankOf = (stateName) => {
@@ -1210,6 +1510,12 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
     t = renameTargets(t, (o) => outName(o));
     trees.set(s.key, t);
   }
+
+  // ---- every-cycle blocks ----------------------------------------------------------------
+  const renameSeq = (items) => items.map((it) => (it.k === 'acts'
+    ? { ...it, acts: it.acts.map((a) => ({ ...a, target: outName(a.target) })) }
+    : { ...it, t: renameSeq(it.t), f: renameSeq(it.f) }));
+  const alwaysBlocks = A.alwaysGroups.map((g) => ({ name: g.name, items: renameSeq(TB.toSeq(g.stmts, g.ctx)) }));
 
   // ---- outputs: defaults ---------------------------------------------------------------
   const outputs = [];
@@ -1295,6 +1601,67 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
     const e0 = addEdge(stateNode.id, 'next');
     e0.to = build(t);
   }
+  let nA = 0;
+  for (const b of alwaysBlocks) {
+    const c = candOf(`@${b.name}`);
+    const header = { id: `a${++nA}`, type: 'always', name: b.name, x: 0, y: 0, actions: [] };
+    nodes.push(header);
+    let items = b.items;
+    if (items[0]?.k === 'acts') {
+      // leading unconditional actions: in the header box (as many as the header/previous chart lists)
+      const acts = items[0].acts;
+      let k = acts.length;
+      if (c.moore.length) {
+        k = 0;
+        const ref = c.moore[0];
+        while (k < acts.length && k < ref.length && TX.actionMatches(acts[k], ref[k])) k++;
+      }
+      header.actions = acts.slice(0, k).map((a) => TX.actionText(a, c.moore[0] || []));
+      items = k < acts.length ? [{ k: 'acts', acts: acts.slice(k) }, ...items.slice(1)] : items.slice(1);
+    }
+    // boxes, built from the end so that each `if` knows the box where its branches join;
+    // then numbered and listed top-down (header, 1 branch, 0 branch)
+    const bn = new Map(), be = [];
+    let tmp = 0;
+    const emit = (list, cont) => {
+      let next = cont;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const it = list[i];
+        const id = `#${++tmp}`;
+        if (it.k === 'acts') {
+          bn.set(id, { id, type: 'output', x: 0, y: 0, actions: it.acts.map((a) => TX.actionText(a, c.mealy)) });
+          if (next) be.push({ from: id, to: next, port: 'next' });
+        } else {
+          const { text, swap } = TX.condText(it.cond, c.conds);
+          bn.set(id, { id, type: 'decision', x: 0, y: 0, cond: text });
+          const T = emit(it.t, next), F = emit(it.f, next);
+          const [tt, ff] = swap ? [F, T] : [T, F];
+          if (tt) be.push({ from: id, to: tt, port: 'true' });
+          if (ff) be.push({ from: id, to: ff, port: 'false' });
+        }
+        next = id;
+      }
+      return next;
+    };
+    const first = emit(items, null);
+    if (first) be.push({ from: header.id, to: first, port: 'next' });
+    const order = [header.id];
+    const visit = (id) => {
+      if (!id || order.includes(id)) return;
+      order.push(id);
+      for (const port of ['true', 'false', 'next']) visit(be.find((e) => e.from === id && e.port === port)?.to);
+    };
+    visit(first);
+    const fin = new Map([[header.id, header.id]]);
+    for (const id of order.slice(1)) {
+      const n = bn.get(id);
+      n.id = n.type === 'decision' ? `d${++nD}` : `o${++nO}`;
+      fin.set(id, n.id);
+      nodes.push(n);
+    }
+    const rank = (e) => order.indexOf(e.from) * 3 + ['true', 'false', 'next'].indexOf(e.port);
+    for (const e of be.sort((x, y) => rank(x) - rank(y))) addEdge(fin.get(e.from), e.port).to = fin.get(e.to);
+  }
 
   // ---- encoding ------------------------------------------------------------------------
   let encoding;
@@ -1322,8 +1689,20 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
     clock: A.orig(A.clock),
     reset: { name: A.orig(A.reset.name), active: A.reset.active, sync: A.reset.sync },
     encoding,
-    inputs: A.inputs.map((i) => ({ name: A.orig(i), width: A.widthOf(i) })),
+    ...(A.generics.length ? { generics: A.generics.map((g) => ({ name: A.orig(g.name), default: g.default })) } : {}),
+    inputs: A.inputs.map((i) => (A.syncOf.has(i) ? { name: A.orig(i), width: A.widthOf(i), sync: true } : { name: A.orig(i), width: A.widthOf(i) })),
     outputs,
+    ...(A.registers.length ? { registers: A.registers.map((r) => {
+      const info = A.outInfo.get(r);
+      const nm = A.orig(r);
+      let init = String(info.default ?? 0n);
+      for (const text of [header?.regInit.get(nm), prev?.registers?.find((x) => x.name === nm)?.init]) {
+        if (text == null) continue;
+        const q = parseCondition(text);
+        if (!q.error && q.ast.k === 'lit' && q.ast.v === (info.default ?? 0n)) init = text;
+      }
+      return { name: nm, width: info.width, init };
+    }) } : {}),
     nodes, edges,
     initial: stateId.get(A.initial.key),
   };
@@ -1372,7 +1751,7 @@ const CHW = 7.25;
 const ceilTo = (v, g) => Math.ceil(v / g) * g;
 
 export function nodeSize(n) {
-  if (n.type === 'state') {
+  if (n.type === 'state' || n.type === 'always') {
     const lines = n.actions && n.actions.length ? n.actions : [''];
     const tw = Math.max(...lines.map((l) => l.length)) * CHW;
     return { w: Math.max(140, ceilTo(tw + 32, 2 * GRID)), h: Math.max(60, ceilTo(lines.length * 17 + 26, GRID)) };
@@ -1474,6 +1853,72 @@ export function asmLayout(model) {
     const r = place(sid, X0, y);
     y = ceilTo(r.bottom + BLOCK_GAP, 10);
   }
+  // every-cycle blocks: one column each, to the right of the state blocks; a decision's 1
+  // branch goes below it, its 0 branch to the right, and the box where both branches join
+  // again below both
+  const join = asmJoinPoints(norm);
+  const inBlock = (id) => id != null && byId.has(id) && !['state', 'always'].includes(byId.get(id).type) && !placed.has(id);
+  const placeSeq = (id, x, top, stop) => { // returns { bottom, right, left, ids }
+    const ids = [];
+    let bottom = top - VGAP, right = x, left = x;
+    const at = (nid, cx, t) => {
+      const { w, h } = nodeSize(byId.get(nid));
+      const cy = snap(t + h / 2);
+      pos.set(nid, { x: cx, y: cy }); placed.add(nid); ids.push(nid);
+      right = Math.max(right, cx + w / 2); left = Math.min(left, cx - w / 2);
+      return cy + h / 2;
+    };
+    for (let guard = 0; inBlock(id) && id !== stop && guard < 10000; guard++) {
+      const n = byId.get(id);
+      bottom = at(id, x, top);
+      const e = ex.get(id) || {};
+      if (n.type === 'decision') {
+        const j = join(id);
+        const below = bottom + VGAP;
+        let tRight = right, tBottom = bottom;
+        if (e.true !== j && inBlock(e.true)) {
+          const r = placeSeq(e.true, x, below, j);
+          ids.push(...r.ids); tRight = Math.max(tRight, r.right); tBottom = Math.max(tBottom, r.bottom); left = Math.min(left, r.left);
+        }
+        let fBottom = bottom, fRight = tRight;
+        if (e.false !== j && inBlock(e.false)) {
+          const r = placeSeq(e.false, 0, below, j);
+          const dx = snap(tRight + HGAP - r.left);
+          for (const fid of r.ids) pos.get(fid).x += dx;
+          ids.push(...r.ids); fRight = r.right + dx; fBottom = r.bottom;
+        }
+        right = Math.max(right, tRight, fRight);
+        bottom = Math.max(tBottom, fBottom);
+        id = j;
+      } else id = e.next;
+      top = bottom + VGAP;
+    }
+    return { bottom, right, left, ids };
+  };
+  let colLeft = X0;
+  for (const [id, p] of pos) colLeft = Math.max(colLeft, p.x + nodeSize(byId.get(id)).w / 2);
+  colLeft += 2 * HGAP;
+  let aTop = Y0 - 30;
+  const aBlocks = [];
+  for (const a of norm.nodes.filter((n) => n.type === 'always')) {
+    const { w, h } = nodeSize(a);
+    const ids = [a.id];
+    const cy = snap(aTop + h / 2);
+    pos.set(a.id, { x: 0, y: cy }); placed.add(a.id);
+    let left = -w / 2, right = w / 2;
+    const first = (ex.get(a.id) || {}).next;
+    if (inBlock(first)) {
+      const r = placeSeq(first, 0, cy + h / 2 + VGAP, null);
+      ids.push(...r.ids); left = Math.min(left, r.left); right = Math.max(right, r.right);
+      aTop = r.bottom;
+    } else aTop = cy + h / 2;
+    aTop = ceilTo(aTop + BLOCK_GAP, 10);
+    aBlocks.push({ ids, left });
+  }
+  // all headers on one vertical line, no box left of the column
+  const cx = snap(colLeft - Math.min(0, ...aBlocks.map((b) => b.left)));
+  for (const b of aBlocks) for (const id of b.ids) pos.get(id).x += cx;
+
   // boxes not reachable from any state: in a column on the right
   let maxRight = X0;
   for (const [id, p] of pos) maxRight = Math.max(maxRight, p.x + nodeSize(byId.get(id)).w / 2);
@@ -1499,20 +1944,21 @@ export function asmLayout(model) {
 function nodeSignatures(m) {
   const byId = new Map(m.nodes.map((n) => [n.id, n]));
   const ex = exitsOf(m);
-  const W = new Map([...m.inputs, ...m.outputs].map((p) => [p.name, p.width]));
+  const W = new Map([...m.inputs, ...m.outputs, ...(m.registers || [])].map((p) => [p.name, p.width]));
   const wOf = (n) => W.get(n) ?? 1;
   const keyOf = (n) => {
     if (n.type === 'decision') { const p = parseCondition(n.cond); return 'D:' + (p.error ? n.cond : condKey(p.ast, wOf)); }
     return 'O:' + n.actions.map((a) => { const p = parseAction(a); return p.error ? a : `${p.target}=${exprToString(valueLits(p.ast))}`; }).join(';');
   };
   const sigs = new Map(); // id -> { full, loose }
-  for (const s of m.nodes.filter((n) => n.type === 'state')) {
+  for (const s of m.nodes.filter((n) => n.type === 'state' || n.type === 'always')) {
+    const root = s.type === 'always' ? `@${s.name}` : s.name;
     const visit = (id, path, seen) => {
       const n = byId.get(id);
-      if (!n || n.type === 'state' || seen.has(id)) return;
+      if (!n || n.type === 'state' || n.type === 'always' || seen.has(id)) return;
       seen.add(id);
       const k = keyOf(n);
-      if (!sigs.has(id)) sigs.set(id, { full: `${s.name}|${path}|${k}`, loose: `${s.name}|${k}`, state: s.id });
+      if (!sigs.has(id)) sigs.set(id, { full: `${root}|${path}|${k}`, loose: `${root}|${k}`, state: s.id });
       const e = ex.get(id) || {};
       if (n.type === 'decision') { visit(e.true, `${path}/${k}=1`, seen); visit(e.false, `${path}/${k}=0`, seen); }
       else visit(e.next, `${path}/${k}`, seen);
@@ -1533,8 +1979,9 @@ function reusePrevious(model, prev) {
   const autoPos = new Map(auto.nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
   const idMap = new Map(); // new id -> previous node
   // states by name
-  const prevStates = new Map(prev.nodes.filter((n) => n.type === 'state').map((n) => [n.name.toLowerCase(), n]));
-  for (const n of model.nodes) if (n.type === 'state' && prevStates.has(n.name.toLowerCase())) idMap.set(n.id, prevStates.get(n.name.toLowerCase()));
+  const headKey = (n) => `${n.type}:${n.name.toLowerCase()}`;
+  const prevStates = new Map(prev.nodes.filter((n) => n.type === 'state' || n.type === 'always').map((n) => [headKey(n), n]));
+  for (const n of model.nodes) if ((n.type === 'state' || n.type === 'always') && prevStates.has(headKey(n))) idMap.set(n.id, prevStates.get(headKey(n)));
   // decisions / output boxes by path signature, then loosely by state + content
   const sNew = nodeSignatures(normalizeModel(model)), sOld = nodeSignatures(prev);
   const prevById = new Map(prev.nodes.map((n) => [n.id, n]));
@@ -1554,7 +2001,7 @@ function reusePrevious(model, prev) {
   const finalId = new Map();
   for (const n of model.nodes) {
     const p = idMap.get(n.id);
-    finalId.set(n.id, p ? p.id : fresh(n.type === 'state' ? 's' : n.type === 'decision' ? 'd' : 'o'));
+    finalId.set(n.id, p ? p.id : fresh({ state: 's', decision: 'd', always: 'a' }[n.type] || 'o'));
   }
   // positions
   const out = clone(model);
@@ -1623,7 +2070,13 @@ export function sameAsmStructure(a, b) {
     m.outputs.map((p) => { const r = parseCondition(p.default); return [p.name, p.width, p.registered, r.error ? p.default : String(r.ast.v)]; }),
   ]);
   if (ports(A) !== ports(B)) return false;
-  const W = new Map([...A.inputs, ...A.outputs].map((p) => [p.name, p.width]));
+  const extras = (m) => JSON.stringify([
+    (m.generics || []).map((g) => [g.name, g.default]),
+    m.inputs.map((p) => !!p.sync),
+    (m.registers || []).map((r) => { const q = parseCondition(r.init); return [r.name, r.width, q.error ? r.init : String(q.ast.v)]; }),
+  ]);
+  if (extras(A) !== extras(B)) return false;
+  const W = new Map([...A.inputs, ...A.outputs, ...(A.registers || [])].map((p) => [p.name, p.width]));
   const wOf = (n) => W.get(n) ?? 1;
   const sum = (m) => {
     const byId = new Map(m.nodes.map((n) => [n.id, n]));
@@ -1677,6 +2130,47 @@ export function sameAsmStructure(a, b) {
     for (let v = 0; v < 1 << atoms.size; v++) {
       if (run(SA, sa.root, v) !== run(SB, sb.root, v)) return false;
     }
+  }
+  // every-cycle blocks: same names in the same order, same final assignments on every path
+  const blocksOf = (m) => m.nodes.filter((n) => n.type === 'always');
+  const BA = blocksOf(A), BB = blocksOf(B);
+  if (BA.length !== BB.length) return false;
+  for (let i = 0; i < BA.length; i++) {
+    if (BA[i].name !== BB[i].name) return false;
+    const atoms = new Map();
+    const collect = (S, id, seen) => {
+      const n = S.byId.get(id);
+      if (!n || n.type === 'state' || n.type === 'always' || seen.has(id)) return;
+      seen.add(id);
+      const e = S.ex.get(id) || {};
+      if (n.type === 'decision') {
+        const k = atomOf(n.cond, wOf).key;
+        if (!atoms.has(k)) atoms.set(k, atoms.size);
+        collect(S, e.true, seen); collect(S, e.false, seen);
+      } else collect(S, e.next, seen);
+    };
+    collect(SA, (SA.ex.get(BA[i].id) || {}).next, new Set());
+    collect(SB, (SB.ex.get(BB[i].id) || {}).next, new Set());
+    if (atoms.size > 16) return false;
+    const run = (S, head, bitsv) => {
+      const acts = new Map();
+      const apply = (list) => { for (const x of list) { const [t, val] = actKey(x, wOf).split('\u0000'); acts.set(t, val); } };
+      apply(head.actions);
+      let id = (S.ex.get(head.id) || {}).next;
+      for (let guard = 0; guard < 1000; guard++) {
+        const n = S.byId.get(id);
+        if (!n) return JSON.stringify([...acts].sort());
+        if (n.type === 'state' || n.type === 'always') return null;
+        const e = S.ex.get(id) || {};
+        if (n.type === 'decision') {
+          const at = atomOf(n.cond, wOf);
+          const v = ((bitsv >> atoms.get(at.key)) & 1) === 1;
+          id = (v !== at.neg) ? e.true : e.false;
+        } else { apply(n.actions); id = e.next; }
+      }
+      return null;
+    };
+    for (let v = 0; v < 1 << atoms.size; v++) if (run(SA, BA[i], v) !== run(SB, BB[i], v)) return false;
   }
   return true;
 }

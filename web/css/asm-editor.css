@@ -220,3 +220,17 @@
   .asm-editor .asm-body { flex-direction: column; }
   .asm-editor .asm-side { width: auto; max-height: 45%; border-left: 0; border-top: 1px solid var(--asm-border); }
 }
+
+/* ------------------------------------------------------------------ every-cycle blocks */
+.asm-editor { --asm-always-fill: color-mix(in srgb, var(--asm-panel) 84%, var(--asm-warn) 16%); }
+.asm-editor .asm-ico.ico-always { border-radius: 2px; border-top-width: 4px; background: var(--asm-always-fill); }
+.asm-editor .asm-always .asm-shape { fill: var(--asm-always-fill); }
+.asm-editor .asm-always-band { fill: var(--asm-warn); pointer-events: none; }
+.asm-editor .asm-tag-always rect { fill: color-mix(in srgb, var(--asm-panel) 70%, var(--asm-warn) 30%); stroke: var(--asm-warn); }
+.asm-editor .asm-block.asm-block-always {
+  fill: color-mix(in srgb, var(--asm-warn) 5%, transparent);
+  stroke: color-mix(in srgb, var(--asm-warn) 60%, transparent);
+  stroke-dasharray: 2 3;
+}
+.asm-editor .asm-end { fill: none; stroke: var(--asm-muted); stroke-width: 1.5; pointer-events: none; }
+.asm-editor .asm-port.end { stroke: var(--asm-muted); fill: var(--asm-bg); opacity: .8; }

@@ -5,6 +5,11 @@
 //   ed.getModel(); ed.setModel(m); ed.destroy();
 //
 // Styles: web/css/asm-editor.css (scoped under .asm-editor, themed by --bg/--panel/--fg/...).
+//
+// Besides states, decisions and conditional outputs the chart may hold "every cycle" blocks
+// (type 'always': a header box whose tree of decisions/outputs runs on every clock cycle, in
+// parallel with the states; unconnected exits end the block), and the machine panel edits the
+// data path: generics, internal registers and the 2-flip-flop synchroniser of each input.
 
 import {
   normalizeModel, newModel, validate, generate, stateEncoding, ENCODINGS,
@@ -39,7 +44,7 @@ function h(tag, attrs = {}, ...children) {
 
 /** Size of a node box in chart units. */
 function nodeSize(n) {
-  if (n.type === 'state') {
+  if (n.type === 'state' || n.type === 'always') {
     const lines = n.actions.length ? n.actions : [''];
     const tw = Math.max(...lines.map((l) => l.length)) * CHW;
     return { w: Math.max(140, ceilTo(tw + 32, 2 * GRID)), h: Math.max(60, ceilTo(lines.length * 17 + 26, GRID)) };
@@ -119,7 +124,8 @@ function pathD(pts, r = 7) {
 const KW = new Set(('library use entity is port in out inout end architecture of signal constant type subtype ' +
   'attribute begin process if then elsif else case when others null downto to and or not xor ' +
   'module input output wire reg localparam always posedge negedge assign endcase endmodule default ' +
-  'std_logic std_logic_vector unsigned rising_edge resize all').split(' '));
+  'std_logic std_logic_vector unsigned rising_edge resize all generic integer parameter ' +
+  'shift_left shift_right to_integer to_unsigned').split(' '));
 function highlight(code) {
   const re = /(--[^\n]*|\/\/[^\n]*)|("[^"\n]*")|('[01]')|(\b\d+'[bdhoBDHO][0-9a-fA-F_]+\b)|(\(\*[^\n]*?\*\))|\b([A-Za-z_]\w*)\b/g;
   let out = '', last = 0, m;
@@ -177,12 +183,13 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       btn([h('span', { class: 'asm-ico ico-state' }), 'State'], 'Add state box (rectangle)', () => addNode('state'), 'asm-add'),
       btn([h('span', { class: 'asm-ico ico-decision' }), 'Decision'], 'Add decision box (diamond)', () => addNode('decision'), 'asm-add'),
       btn([h('span', { class: 'asm-ico ico-output' }), 'Cond. output'], 'Add conditional output box (oval)', () => addNode('output'), 'asm-add'),
+      btn([h('span', { class: 'asm-ico ico-always' }), 'Every cycle'], 'Add an every-cycle block (logic evaluated on every clock cycle, in parallel with the states)', () => addNode('always'), 'asm-add'),
       delBtn),
     sep(),
     h('div', { class: 'asm-group' }, undoBtn, redoBtn),
     sep(),
     h('div', { class: 'asm-group' },
-      btn('Arrange', 'Automatic top-down layout', () => autoArrange()),
+      btn('Arrange', 'Automatic layout (states top-down, every-cycle blocks on the right)', () => autoArrange()),
       snapBtn,
       btn('−', 'Zoom out', () => zoomBy(1 / 1.2)), zoomLbl, btn('+', 'Zoom in', () => zoomBy(1.2)),
       btn('Fit', 'Fit the chart in the window', () => fit())),
@@ -281,14 +288,22 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     return e;
   }
 
+  function uniqueBlockName() {
+    const used = new Set(M.nodes.filter((n) => n.type === 'always').map((n) => (n.name || '').toLowerCase()));
+    let i = 1;
+    while (used.has(i === 1 ? 'every_cycle' : `every_cycle${i}`)) i++;
+    return i === 1 ? 'every_cycle' : `every_cycle${i}`;
+  }
+
   function addNode(type, at) {
-    const n = { id: newId(type === 'state' ? 's' : type === 'decision' ? 'd' : 'o'), type, x: 0, y: 0 };
+    const n = { id: newId({ state: 's', decision: 'd', always: 'a' }[type] || 'o'), type, x: 0, y: 0 };
     if (type === 'state') { n.name = uniqueStateName(); n.actions = []; }
+    if (type === 'always') { n.name = uniqueBlockName(); n.actions = []; }
     if (type === 'decision') n.cond = M.inputs[0]?.name || 'cond';
     if (type === 'output') n.actions = M.outputs[0] ? [`${M.outputs[0].name} = 1`] : [];
     const s = nodeSize(n);
     let parent = null, port = null;
-    if (!at && sel.nodes.size === 1) {
+    if (!at && sel.nodes.size === 1 && type !== 'always') {
       parent = nodeById([...sel.nodes][0]);
       const ex = exitsOf(parent.id);
       port = portsOf(parent).find((p) => !ex[p]) || null;
@@ -314,6 +329,10 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
         const a = box(n);
         return M.nodes.some((o) => { const b = box(o); return a.l < b.r + 30 && a.r > b.l - 30 && a.t < b.b + 40 && a.b > b.t - 40; });
       };
+      if (type === 'always') { // to the right of the chart
+        const bb = chartBounds();
+        if (bb) { n.x = snapV(bb.r + s.w / 2 + 40); n.y = snapV(bb.t + 50 + s.h / 2); }
+      }
       for (let i = 0; i < 200 && overlaps(); i++) n.x += GRID;
     }
     M.nodes.push(n);
@@ -406,7 +425,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
     for (const n of M.nodes) {
       const bx = box(n);
-      l = Math.min(l, bx.l - 50); r = Math.max(r, bx.r + 50); t = Math.min(t, bx.t - (n.type === 'state' ? 50 : 20)); b = Math.max(b, bx.b + 40);
+      l = Math.min(l, bx.l - 50); r = Math.max(r, bx.r + 50); t = Math.min(t, bx.t - (n.type === 'state' || n.type === 'always' ? 50 : 20)); b = Math.max(b, bx.b + 40);
     }
     return { l, t, r, b };
   }
@@ -432,7 +451,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
   function blockMembers(stateId) {
     const out = new Set([stateId]);
     const stack = [];
-    const push = (id) => { const n = nodeById(id); if (n && n.type !== 'state' && !out.has(id)) { out.add(id); stack.push(id); } };
+    const push = (id) => { const n = nodeById(id); if (n && n.type !== 'state' && n.type !== 'always' && !out.has(id)) { out.add(id); stack.push(id); } };
     for (const e of M.edges) if (e.from === stateId && e.port === 'next') push(e.to);
     while (stack.length) {
       const id = stack.pop();
@@ -454,7 +473,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     // ASM block outlines
     let bh = '';
     for (const s of M.nodes) {
-      if (s.type !== 'state') continue;
+      if (s.type !== 'state' && s.type !== 'always') continue;
       const mem = blockMembers(s.id);
       if (mem.size < 2) continue;
       let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
@@ -462,7 +481,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
         const bx = box(nodeById(id));
         l = Math.min(l, bx.l); r = Math.max(r, bx.r); t = Math.min(t, bx.t); b = Math.max(b, bx.b);
       }
-      bh += `<rect class="asm-block" x="${l - 14}" y="${t - 32}" width="${r - l + 28}" height="${b - t + 46}" rx="10"/>`;
+      bh += `<rect class="asm-block${s.type === 'always' ? ' asm-block-always' : ''}" x="${l - 14}" y="${t - 32}" width="${r - l + 28}" height="${b - t + 46}" rx="10"/>`;
     }
     gBlocks.innerHTML = bh;
 
@@ -501,6 +520,8 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     gEdges.innerHTML = eh;
 
     // nodes
+    const inAlways = new Set();
+    for (const a of M.nodes) if (a.type === 'always') for (const id of blockMembers(a.id)) inAlways.add(id);
     let nh = '';
     for (const n of M.nodes) {
       const { w, h: hh } = nodeSize(n);
@@ -525,6 +546,14 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
           `<text x="${n.id === M.initial ? 17 : 8}" y="10.5" dominant-baseline="central">${esc(name)}</text></g>`;
         const code = enc.get(n.id);
         if (code && M.encoding !== 'enum') inner += `<text class="asm-statecode" x="${w / 2}" y="${-hh / 2 - 7}" text-anchor="end">${code.bits}</text>`;
+      } else if (n.type === 'always') {
+        inner += `<rect class="asm-shape" x="${-w / 2}" y="${-hh / 2}" width="${w}" height="${hh}" rx="3"/>`;
+        inner += `<rect class="asm-always-band" x="${-w / 2}" y="${-hh / 2}" width="${w}" height="6" rx="2"/>`;
+        inner += n.actions.length ? lines(n.actions) : `<text class="asm-text asm-empty" x="0" y="0" dominant-baseline="central" text-anchor="middle">every clock cycle</text>`;
+        const label = `↻ ${n.name || '?'}`;
+        const tw = Math.max(36, label.length * 7.6 + 16);
+        inner += `<g class="asm-tag asm-tag-always" transform="translate(${-w / 2},${-hh / 2 - 22})">` +
+          `<rect width="${tw}" height="20" rx="4"/><text x="8" y="10.5" dominant-baseline="central">${esc(label)}</text></g>`;
       } else if (n.type === 'decision') {
         inner += `<polygon class="asm-shape" points="0,${-hh / 2} ${w / 2},0 0,${hh / 2} ${-w / 2},0"/>`;
         inner += `<text class="asm-text" x="0" y="0" dominant-baseline="central" text-anchor="middle">${esc(n.cond || '?')}</text>`;
@@ -537,16 +566,25 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       for (const p of portsOf(n)) {
         const g = portGeom(n, p);
         const lx = g.x - n.x, ly = g.y - n.y;
-        const free = ex[p] ? '' : ' free';
-        inner += `<circle class="asm-port${free}" data-port="${p}" cx="${lx}" cy="${ly}" r="5.5"><title>${n.type === 'decision' ? (p === 'true' ? 'true (1) exit' : 'false (0) exit') : 'exit'} - drag to a box to connect</title></circle>`;
+        // an unconnected exit of an every-cycle block is the end of the block: drawn as a terminator
+        const end = !ex[p] && inAlways.has(n.id);
+        if (end) {
+          const ex2 = lx + g.dx * 16, ey2 = ly + g.dy * 16;
+          inner += `<path class="asm-end" d="M${lx},${ly} L${ex2},${ey2} M${ex2 - (g.dy ? 7 : 0)},${ey2 - (g.dx ? 7 : 0)} L${ex2 + (g.dy ? 7 : 0)},${ey2 + (g.dx ? 7 : 0)}"/>`;
+        }
+        const free = ex[p] ? '' : end ? ' end' : ' free';
+        const what = n.type === 'decision' ? (p === 'true' ? 'true (1) exit' : 'false (0) exit') : 'exit';
+        inner += `<circle class="asm-port${free}" data-port="${p}" cx="${lx}" cy="${ly}" r="5.5"><title>${what}${end ? ' (unconnected: end of the every-cycle block)' : ''} - drag to a box to connect</title></circle>`;
       }
       nh += `<g class="${cls.join(' ')}" data-node="${esc(n.id)}" transform="translate(${n.x},${n.y})">${inner}</g>`;
     }
     gNodes.innerHTML = nh;
 
     const ns = M.nodes.filter((n) => n.type === 'state').length;
+    const na = M.nodes.filter((n) => n.type === 'always').length;
     const ne = diags.filter((d) => d.severity === 'error').length, nw = diags.filter((d) => d.severity === 'warning').length;
     statusInfo.innerHTML = `${esc(M.name)} · ${ns} state${ns === 1 ? '' : 's'} · ` +
+      (na ? `${na} every-cycle block${na === 1 ? '' : 's'} · ` : '') +
       `<span class="${ne ? 'c-err' : 'c-ok'}">${ne} error${ne === 1 ? '' : 's'}</span> · ` +
       `<span class="${nw ? 'c-warn' : ''}">${nw} warning${nw === 1 ? '' : 's'}</span>`;
   }
@@ -639,7 +677,8 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       const e = M.edges.find((x) => x.id === sel.edge);
       if (!e) return;
       const a = nodeById(e.from), b = nodeById(e.to);
-      const nm = (n) => (n.type === 'state' ? `state ${n.name}` : n.type === 'decision' ? `decision "${n.cond}"` : 'conditional output');
+      const nm = (n) => (n.type === 'state' ? `state ${n.name}` : n.type === 'always' ? `every-cycle block ${n.name}`
+        : n.type === 'decision' ? `decision "${n.cond}"` : 'conditional output');
       put(h('h3', {}, 'Connection'),
         h('p', { class: 'asm-muted' }, `From ${nm(a)}${a.type === 'decision' ? ` (${e.port === 'true' ? '1' : '0'} branch)` : ''} to ${nm(b)}.`),
         e.points ? btn('Reset route', 'Use automatic routing', () => { delete e.points; commit('route'); }) : null,
@@ -658,7 +697,8 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
         h('div', { class: 'asm-legend' },
           h('div', {}, h('span', { class: 'asm-ico ico-state' }), ' State: name + Moore outputs'),
           h('div', {}, h('span', { class: 'asm-ico ico-decision' }), ' Decision: condition, exits 1 / 0'),
-          h('div', {}, h('span', { class: 'asm-ico ico-output' }), ' Conditional (Mealy) outputs')));
+          h('div', {}, h('span', { class: 'asm-ico ico-output' }), ' Conditional (Mealy) outputs'),
+          h('div', {}, h('span', { class: 'asm-ico ico-always' }), ' Every cycle: logic in parallel with the states')));
       return;
     }
     const n = nodeById([...sel.nodes][0]);
@@ -673,11 +713,20 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
         h('input', { type: 'checkbox', checked: isInit, disabled: isInit, onchange: () => { M.initial = n.id; commit('initial'); renderInspector(); renderMachine(); } }),
         isInit ? ' Initial (reset) state' : ' Make this the initial (reset) state'));
       put(field('Moore outputs (one per line)', actionsArea(n), syntax));
+    } else if (n.type === 'always') {
+      put(h('h3', {}, 'Every-cycle block'));
+      put(field('Name', h('input', { class: 'asm-input', value: n.name, spellcheck: 'false', 'data-focus': '1',
+        oninput: (ev) => { n.name = ev.target.value.trim(); commit(`name:${n.id}`); } }), 'Used in the generated code comments.'));
+      put(field('Actions on every cycle (one per line)', actionsArea(n),
+        'e.g. tc = 0, cnt = cnt + 1. Assign registers, registered outputs (next value) or combinational outputs.'));
+      put(h('p', { class: 'asm-muted' }, 'Connect the exit to decision and conditional output boxes: they are evaluated on every clock cycle, ' +
+        'in parallel with the states. Leave the last exits unconnected (end of the block); paths may join again but must not loop or reach a state. ' +
+        'An assignment of the current state to the same target takes priority.'));
     } else if (n.type === 'decision') {
       put(h('h3', {}, 'Decision'));
       put(field('Condition', h('input', { class: 'asm-input mono', value: n.cond, spellcheck: 'false', 'data-focus': '1',
         oninput: (ev) => { n.cond = ev.target.value; commit(`cond:${n.id}`); } }),
-      'e.g. go, !done, cnt == 9, x && (mode == 2\'b01). Exit 1 = true, 0 = false.'));
+      'e.g. go, !done, cnt == 9, x && (mode == 2\'b01), (1 << n) > cnt. Exit 1 = true, 0 = false.'));
       put(h('label', { class: 'asm-check' },
         h('input', { type: 'checkbox', checked: !!n.flip, onchange: (ev) => { if (ev.target.checked) n.flip = true; else delete n.flip; commit('flip'); } }),
         ' 0-exit on the left side'));
@@ -719,47 +768,90 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       !states.some((s) => s.id === M.initial) ? h('option', { value: '', selected: true }, '(none)') : null,
       ...states.map((s) => h('option', { value: s.id, selected: s.id === M.initial }, s.name || s.id)))));
 
-    // ports tables
-    const portTable = (title, list, isOut) => {
+    // ports, generics and registers tables
+    const usedNames = () => new Set([...M.inputs, ...M.outputs, ...(M.generics || []), ...(M.registers || [])].map((x) => x.name));
+    const freshName = (base, start) => { let k = start; const used = usedNames(); while (used.has(`${base}${k}`)) k++; return `${base}${k}`; };
+    const nameCell = (p, key) => h('td', {}, h('input', { class: 'asm-input mono', value: p.name, spellcheck: 'false', placeholder: 'name',
+      oninput: (ev) => { p.name = ev.target.value.trim(); commit(key); } }));
+    const widthCell = (p, key) => h('td', {}, h('input', { class: 'asm-input mono w', type: 'number', min: '1', max: '256', value: String(p.width),
+      oninput: (ev) => { p.width = parseInt(ev.target.value, 10) || 0; commit(key); } }));
+    const removeCell = (list, i, key) => h('td', { class: 'c' }, h('button', { type: 'button', class: 'asm-x', title: 'Remove',
+      onclick: () => {
+        list.splice(i, 1);
+        // optional lists disappear when empty (old charts stay unchanged)
+        for (const k of ['registers', 'generics']) if (M[k] && !M[k].length) delete M[k];
+        commit(key); renderMachine();
+      } }, '✕'));
+    const table = (title, cls, heads, list, row, addLabel, addTitle, make, attach = () => {}) => {
       const tb = h('tbody');
-      list.forEach((p, i) => {
-        const nameIn = h('input', { class: 'asm-input mono', value: p.name, spellcheck: 'false', placeholder: 'name',
-          oninput: (ev) => { p.name = ev.target.value.trim(); commit(`p-n:${isOut}:${i}`); } });
-        const wIn = h('input', { class: 'asm-input mono w', type: 'number', min: '1', max: '256', value: String(p.width),
-          oninput: (ev) => { p.width = parseInt(ev.target.value, 10) || 0; commit(`p-w:${isOut}:${i}`); } });
-        const cells = [h('td', {}, nameIn), h('td', {}, wIn)];
-        if (isOut) {
-          cells.push(h('td', {}, h('input', { class: 'asm-input mono d', value: p.default, spellcheck: 'false', title: 'Default (combinational) or reset value (registered)',
-            oninput: (ev) => { p.default = ev.target.value.trim() || '0'; commit(`p-d:${i}`); } })));
-          cells.push(h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: p.registered, title: 'Registered output (holds its value, readable in conditions)',
-            onchange: (ev) => { p.registered = ev.target.checked; commit('p-r'); } })));
-        }
-        cells.push(h('td', { class: 'c' }, h('button', { type: 'button', class: 'asm-x', title: 'Remove',
-          onclick: () => { list.splice(i, 1); commit('p-del'); renderMachine(); } }, '✕')));
-        tb.append(h('tr', {}, ...cells));
-      });
-      const head = h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Width'), isOut ? h('th', {}, 'Default') : null, isOut ? h('th', { title: 'Registered' }, 'Reg') : null, h('th', {}));
-      const add = btn(`+ ${isOut ? 'output' : 'input'}`, `Add an ${isOut ? 'output' : 'input'} port`, () => {
-        const base = isOut ? 'out' : 'in';
-        let k = list.length;
-        const used = new Set([...M.inputs, ...M.outputs].map((x) => x.name));
-        while (used.has(`${base}${k}`)) k++;
-        list.push(isOut ? { name: `${base}${k}`, width: 1, default: '0', registered: false } : { name: `${base}${k}`, width: 1 });
-        commit('p-add'); renderMachine();
-        const inputs = machineBody.querySelectorAll(`table.${isOut ? 'outs' : 'ins'} tbody tr:last-child input`);
+      list.forEach((p, i) => tb.append(h('tr', {}, ...row(p, i))));
+      const add = btn(addLabel, addTitle, () => {
+        attach(list);
+        list.push(make(list));
+        commit(`${cls}-add`); renderMachine();
+        const inputs = machineBody.querySelectorAll(`table.${cls} tbody tr:last-child input`);
         inputs[0]?.focus(); inputs[0]?.select();
       }, 'asm-small');
       return h('div', { class: 'asm-ports' },
         h('div', { class: 'asm-ports-head' }, h('span', { class: 'asm-label' }, title), add),
-        h('table', { class: `asm-table ${isOut ? 'outs' : 'ins'}` }, h('thead', {}, head), tb));
+        h('table', { class: `asm-table ${cls}` }, h('thead', {}, h('tr', {}, ...heads.map(([t, tt]) => h('th', tt ? { title: tt } : {}, t)), h('th', {}))), tb));
     };
-    machineBody.append(portTable('Inputs', M.inputs, false), portTable('Outputs', M.outputs, true));
+    machineBody.append(table('Inputs', 'ins', [['Name'], ['Width'], ['Sync', 'Synchronise with 2 flip-flops (conditions see the synchronised value)']], M.inputs,
+      (p, i) => [nameCell(p, `p-n:in:${i}`), widthCell(p, `p-w:in:${i}`),
+        h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!p.sync, title: 'Synchronise with 2 flip-flops (asynchronous input, e.g. a button)',
+          onchange: (ev) => { if (ev.target.checked) p.sync = true; else delete p.sync; commit('p-s'); } })),
+        removeCell(M.inputs, i, 'p-del')],
+      '+ input', 'Add an input port', () => ({ name: freshName('in', M.inputs.length), width: 1 })));
+    machineBody.append(table('Outputs', 'outs', [['Name'], ['Width'], ['Default'], ['Reg', 'Registered']], M.outputs,
+      (p, i) => [nameCell(p, `p-n:out:${i}`), widthCell(p, `p-w:out:${i}`),
+        h('td', {}, h('input', { class: 'asm-input mono d', value: p.default, spellcheck: 'false', title: 'Default (combinational) or reset value (registered)',
+          oninput: (ev) => { p.default = ev.target.value.trim() || '0'; commit(`p-d:${i}`); } })),
+        h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: p.registered, title: 'Registered output (holds its value, readable in conditions)',
+          onchange: (ev) => { p.registered = ev.target.checked; commit('p-r'); } })),
+        removeCell(M.outputs, i, 'p-del')],
+      '+ output', 'Add an output port', () => ({ name: freshName('out', M.outputs.length), width: 1, default: '0', registered: false })));
     machineBody.append(h('small', { class: 'asm-fhint' }, 'Combinational outputs take their default unless assigned. Registered outputs (Reg) hold their value, reset to the default and can be read in conditions, e.g. cnt = cnt + 1.'));
+    const regs = M.registers || [];
+    machineBody.append(table('Registers', 'regs', [['Name'], ['Width'], ['Reset', 'Reset (initial) value']], regs,
+      (r, i) => [nameCell(r, `r-n:${i}`), widthCell(r, `r-w:${i}`),
+        h('td', {}, h('input', { class: 'asm-input mono d', value: r.init, spellcheck: 'false', title: 'Reset value',
+          oninput: (ev) => { r.init = ev.target.value.trim() || '0'; commit(`r-i:${i}`); } })),
+        removeCell(regs, i, 'r-del')],
+      '+ register', 'Add an internal register (data path)', () => ({ name: freshName('r', regs.length), width: 8, init: '0' }),
+      (l) => { M.registers = l; }));
+    const gens = M.generics || [];
+    machineBody.append(table('Generics', 'gens', [['Name'], ['Default', 'Default value (integer)']], gens,
+      (g, i) => [nameCell(g, `g-n:${i}`),
+        h('td', {}, h('input', { class: 'asm-input mono d', value: String(g.default), spellcheck: 'false', title: 'Default value (non-negative integer)',
+          oninput: (ev) => { const t = ev.target.value.trim().replace(/_/g, ''); g.default = /^\d+$/.test(t) ? Number(t) : ev.target.value.trim(); commit(`g-d:${i}`); } })),
+        removeCell(gens, i, 'g-del')],
+      '+ generic', 'Add an integer generic / parameter', () => ({ name: freshName('N', gens.length + 1), default: 1 }),
+      (l) => { M.generics = l; }));
+    machineBody.append(h('small', { class: 'asm-fhint' }, 'Registers are internal: assign them like registered outputs (next value at the clock edge, they hold otherwise) ' +
+      'and read them anywhere. Generics are integer VHDL generics / Verilog parameters, usable in expressions (e.g. cnt == N - 1).'));
   }
 
   // ---------------------------------------------------------------------------- layout
-  function autoArrange() {
+  // Arrange: the layout used for charts extracted from HDL (state blocks top-down in BFS order,
+  // every-cycle blocks in a column on the right); the layered layout below is the fallback
+  async function autoArrange() {
     if (!M.nodes.length) return;
+    let asmLayout = null;
+    try { ({ asmLayout } = await import('/core/asm-from-hdl.js')); } catch { /* not available: fallback */ }
+    if (destroyed) return;
+    if (asmLayout) {
+      try {
+        const pos = new Map(asmLayout(M).nodes.map((n) => [n.id, n]));
+        for (const n of M.nodes) { const p = pos.get(n.id); if (p) { n.x = p.x; n.y = p.y; } }
+        for (const e of M.edges) delete e.points;
+        commit('arrange');
+        fit();
+        return;
+      } catch { /* fallback */ }
+    }
+    layeredArrange();
+  }
+  function layeredArrange() {
     const layer = new Map(), parentOf = new Map();
     const order = [];
     const bfs = (start) => {
@@ -897,6 +989,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
   function validTarget(from, to) {
     const a = nodeById(from), b = nodeById(to);
     if (!a || !b) return false;
+    if (b.type === 'always') return false; // an every-cycle block has no entry
     if (from === to) return a.type === 'state';
     return true;
   }

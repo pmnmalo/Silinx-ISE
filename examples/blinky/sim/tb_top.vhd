@@ -2,7 +2,7 @@
 -- Test bench for top: a small DIV (base tick every 2 clock cycles) and a 2-cycle button
 -- debounce. After reset the speed is level 3: the LEDs move every 2 * 2**3 = 16 cycles.
 -- Checks the knight rider, the binary counter, pause, invert and the speed buttons
--- (the speed_fsm state machine: one level per press, limited to levels 0..7).
+-- (the speed_ctrl ASM chart: one level per press, limited to levels 0..7).
 ----------------------------------------------------------------------------------
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;

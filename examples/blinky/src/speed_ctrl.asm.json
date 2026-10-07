@@ -1,0 +1,461 @@
+{
+  "version": 1,
+  "name": "speed_ctrl",
+  "lang": "vhdl",
+  "clock": "clk",
+  "reset": {
+    "name": "rst",
+    "active": "high",
+    "sync": true
+  },
+  "encoding": "binary",
+  "generics": [
+    {
+      "name": "DEBOUNCE",
+      "default": 1000000
+    }
+  ],
+  "inputs": [
+    {
+      "name": "faster",
+      "width": 1,
+      "sync": true
+    },
+    {
+      "name": "slower",
+      "width": 1,
+      "sync": true
+    },
+    {
+      "name": "tick",
+      "width": 1
+    }
+  ],
+  "outputs": [
+    {
+      "name": "step",
+      "width": 1,
+      "default": "0",
+      "registered": true
+    }
+  ],
+  "registers": [
+    {
+      "name": "cnt_f",
+      "width": 20,
+      "init": "0"
+    },
+    {
+      "name": "deb_f",
+      "width": 1,
+      "init": "0"
+    },
+    {
+      "name": "cnt_s",
+      "width": 20,
+      "init": "0"
+    },
+    {
+      "name": "deb_s",
+      "width": 1,
+      "init": "0"
+    },
+    {
+      "name": "level",
+      "width": 3,
+      "init": "3"
+    },
+    {
+      "name": "ticks",
+      "width": 8,
+      "init": "0"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "s1",
+      "type": "state",
+      "x": 200,
+      "y": 80,
+      "name": "IDLE",
+      "actions": []
+    },
+    {
+      "id": "d1",
+      "type": "decision",
+      "x": 200,
+      "y": 190,
+      "cond": "deb_f"
+    },
+    {
+      "id": "d2",
+      "type": "decision",
+      "x": 200,
+      "y": 310,
+      "cond": "level != 0"
+    },
+    {
+      "id": "o1",
+      "type": "output",
+      "x": 200,
+      "y": 410,
+      "actions": [
+        "level = level - 1"
+      ]
+    },
+    {
+      "id": "d3",
+      "type": "decision",
+      "x": 430,
+      "y": 310,
+      "cond": "deb_s"
+    },
+    {
+      "id": "d4",
+      "type": "decision",
+      "x": 430,
+      "y": 430,
+      "cond": "level != 7"
+    },
+    {
+      "id": "o2",
+      "type": "output",
+      "x": 430,
+      "y": 530,
+      "actions": [
+        "level = level + 1"
+      ]
+    },
+    {
+      "id": "s2",
+      "type": "state",
+      "x": 200,
+      "y": 630,
+      "name": "WAIT_RELEASE",
+      "actions": []
+    },
+    {
+      "id": "d5",
+      "type": "decision",
+      "x": 200,
+      "y": 740,
+      "cond": "deb_f || deb_s"
+    },
+    {
+      "id": "a1",
+      "type": "always",
+      "x": 810,
+      "y": 80,
+      "name": "debounce_faster",
+      "actions": []
+    },
+    {
+      "id": "d6",
+      "type": "decision",
+      "x": 810,
+      "y": 190,
+      "cond": "faster != deb_f"
+    },
+    {
+      "id": "d7",
+      "type": "decision",
+      "x": 810,
+      "y": 320,
+      "cond": "cnt_f == DEBOUNCE - 1"
+    },
+    {
+      "id": "o3",
+      "type": "output",
+      "x": 810,
+      "y": 440,
+      "actions": [
+        "cnt_f = 0",
+        "deb_f = faster"
+      ]
+    },
+    {
+      "id": "o4",
+      "type": "output",
+      "x": 1110,
+      "y": 430,
+      "actions": [
+        "cnt_f = cnt_f + 1"
+      ]
+    },
+    {
+      "id": "o5",
+      "type": "output",
+      "x": 1330,
+      "y": 290,
+      "actions": [
+        "cnt_f = 0"
+      ]
+    },
+    {
+      "id": "a2",
+      "type": "always",
+      "x": 810,
+      "y": 550,
+      "name": "debounce_slower",
+      "actions": []
+    },
+    {
+      "id": "d8",
+      "type": "decision",
+      "x": 810,
+      "y": 660,
+      "cond": "slower != deb_s"
+    },
+    {
+      "id": "d9",
+      "type": "decision",
+      "x": 810,
+      "y": 790,
+      "cond": "cnt_s == DEBOUNCE - 1"
+    },
+    {
+      "id": "o6",
+      "type": "output",
+      "x": 810,
+      "y": 910,
+      "actions": [
+        "cnt_s = 0",
+        "deb_s = slower"
+      ]
+    },
+    {
+      "id": "o7",
+      "type": "output",
+      "x": 1110,
+      "y": 900,
+      "actions": [
+        "cnt_s = cnt_s + 1"
+      ]
+    },
+    {
+      "id": "o8",
+      "type": "output",
+      "x": 1330,
+      "y": 760,
+      "actions": [
+        "cnt_s = 0"
+      ]
+    },
+    {
+      "id": "a3",
+      "type": "always",
+      "x": 810,
+      "y": 1020,
+      "name": "divider",
+      "actions": [
+        "step = 0"
+      ]
+    },
+    {
+      "id": "d10",
+      "type": "decision",
+      "x": 810,
+      "y": 1130,
+      "cond": "tick"
+    },
+    {
+      "id": "d11",
+      "type": "decision",
+      "x": 810,
+      "y": 1260,
+      "cond": "ticks >= (1 << level) - 1"
+    },
+    {
+      "id": "o9",
+      "type": "output",
+      "x": 810,
+      "y": 1380,
+      "actions": [
+        "ticks = 0",
+        "step = 1"
+      ]
+    },
+    {
+      "id": "o10",
+      "type": "output",
+      "x": 1130,
+      "y": 1370,
+      "actions": [
+        "ticks = ticks + 1"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "s1",
+      "to": "d1",
+      "port": "next"
+    },
+    {
+      "id": "e2",
+      "from": "d1",
+      "to": "d2",
+      "port": "true"
+    },
+    {
+      "id": "e3",
+      "from": "d1",
+      "to": "d3",
+      "port": "false"
+    },
+    {
+      "id": "e4",
+      "from": "d2",
+      "to": "o1",
+      "port": "true"
+    },
+    {
+      "id": "e5",
+      "from": "d2",
+      "to": "s2",
+      "port": "false"
+    },
+    {
+      "id": "e6",
+      "from": "o1",
+      "to": "s2",
+      "port": "next"
+    },
+    {
+      "id": "e7",
+      "from": "d3",
+      "to": "d4",
+      "port": "true"
+    },
+    {
+      "id": "e8",
+      "from": "d3",
+      "to": "s1",
+      "port": "false"
+    },
+    {
+      "id": "e9",
+      "from": "d4",
+      "to": "o2",
+      "port": "true"
+    },
+    {
+      "id": "e10",
+      "from": "d4",
+      "to": "s2",
+      "port": "false"
+    },
+    {
+      "id": "e11",
+      "from": "o2",
+      "to": "s2",
+      "port": "next"
+    },
+    {
+      "id": "e12",
+      "from": "s2",
+      "to": "d5",
+      "port": "next"
+    },
+    {
+      "id": "e13",
+      "from": "d5",
+      "to": "s2",
+      "port": "true"
+    },
+    {
+      "id": "e14",
+      "from": "d5",
+      "to": "s1",
+      "port": "false"
+    },
+    {
+      "id": "e15",
+      "from": "a1",
+      "to": "d6",
+      "port": "next"
+    },
+    {
+      "id": "e16",
+      "from": "d6",
+      "to": "d7",
+      "port": "true"
+    },
+    {
+      "id": "e17",
+      "from": "d6",
+      "to": "o5",
+      "port": "false"
+    },
+    {
+      "id": "e18",
+      "from": "d7",
+      "to": "o3",
+      "port": "true"
+    },
+    {
+      "id": "e19",
+      "from": "d7",
+      "to": "o4",
+      "port": "false"
+    },
+    {
+      "id": "e20",
+      "from": "a2",
+      "to": "d8",
+      "port": "next"
+    },
+    {
+      "id": "e21",
+      "from": "d8",
+      "to": "d9",
+      "port": "true"
+    },
+    {
+      "id": "e22",
+      "from": "d8",
+      "to": "o8",
+      "port": "false"
+    },
+    {
+      "id": "e23",
+      "from": "d9",
+      "to": "o6",
+      "port": "true"
+    },
+    {
+      "id": "e24",
+      "from": "d9",
+      "to": "o7",
+      "port": "false"
+    },
+    {
+      "id": "e25",
+      "from": "a3",
+      "to": "d10",
+      "port": "next"
+    },
+    {
+      "id": "e26",
+      "from": "d10",
+      "to": "d11",
+      "port": "true"
+    },
+    {
+      "id": "e27",
+      "from": "d11",
+      "to": "o9",
+      "port": "true"
+    },
+    {
+      "id": "e28",
+      "from": "d11",
+      "to": "o10",
+      "port": "false"
+    }
+  ],
+  "initial": "s1",
+  "description": "Blink speed: two debounced buttons, one level per press (0 = fastest, 7 = slowest), one step every 2**level ticks",
+  "generatedFile": "src/speed_ctrl.vhd"
+}
