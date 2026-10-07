@@ -1,6 +1,6 @@
 {
   "name": "xailinx",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "XAIlinx - HDL design platform: projects, schematics, behavioral simulation and Spartan-3E programming",
   "type": "module",
   "bin": {
