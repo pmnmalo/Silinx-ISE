@@ -1,0 +1,44 @@
+# Publishes a GitHub Release when a version tag (v1.2.3) is pushed:
+#   XAIlinx.html                         single-file edition (no install, runs in the browser)
+#   xailinx-<version>.zip                full app (server + UI + examples), production node_modules included
+#   xailinx-ise-docker-kit-<version>.zip builder kit for the private Xilinx ISE 14.7 Docker image
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Build the single-file edition
+        run: node scripts/build-standalone.mjs
+      - name: Package
+        run: |
+          set -e
+          V="${GITHUB_REF_NAME#v}"
+          mkdir -p out
+          cp dist/XAIlinx.html out/XAIlinx.html
+          # full app: tracked sources + production dependencies
+          rm -rf pkg && mkdir -p pkg/xailinx
+          git archive HEAD | tar -x -C pkg/xailinx
+          (cd pkg/xailinx && npm ci --omit=dev --ignore-scripts && rm -rf .github)
+          (cd pkg && zip -qr "../out/xailinx-$V.zip" xailinx)
+          # Docker builder kit for ISE 14.7 (no Xilinx software or licence inside)
+          (cd docker && zip -qr "../out/xailinx-ise-docker-kit-$V.zip" ise)
+          ls -la out
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          NOTES=".github/release-notes.md"
+          gh release create "$GITHUB_REF_NAME" out/* --title "XAIlinx $V" --notes-file "$NOTES"
