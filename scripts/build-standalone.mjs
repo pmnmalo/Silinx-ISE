@@ -1,4 +1,4 @@
-// Builds dist/Silinx.html: the whole Project Navigator in one self-contained HTML file
+// Builds dist/Silinx-ISE.html: the whole Project Navigator in one self-contained HTML file
 // (no server). Projects live in the browser's localStorage; the examples are embedded.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'dist', 'Silinx.html');
+const OUT = path.join(ROOT, 'dist', 'Silinx-ISE.html');
 const rd = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
 // ---- embedded examples

@@ -93,8 +93,8 @@ try {
   Write-Host "XST synthesis with your license: OK"
   Remove-Item -Recurse -Force $Tmp
 
-  if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $SilinxDir "bin\silinx.js"))) {
-    node (Join-Path $SilinxDir "bin\silinx.js") toolchain --docker $Tag
+  if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $SilinxDir "bin\silinx-ise.js"))) {
+    node (Join-Path $SilinxDir "bin\silinx-ise.js") toolchain --docker $Tag
   } else {
     Write-Host "Configure Silinx: Tools > Toolchain Settings > Docker image = $Tag"
   }

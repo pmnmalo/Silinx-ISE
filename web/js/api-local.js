@@ -1,5 +1,5 @@
 // Standalone (server-less) backend: same interface as api.js, with projects kept in the
-// browser's localStorage. Used by the single-file build (dist/Silinx.html).
+// browser's localStorage. Used by the single-file build (dist/Silinx-ISE.html).
 // Synthesis/implementation and device programming need the Silinx server + Xilinx ISE,
 // so those operations report that they are unavailable here.
 import { getDeviceDb } from '../../server/devices.js';

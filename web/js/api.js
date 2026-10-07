@@ -7,7 +7,7 @@ async function req(method, url, body, { text = false } = {}) {
   }
   let r;
   try { r = await fetch(url, opts); }
-  catch { throw Object.assign(new Error('the Silinx server is not running (start it with: node bin/silinx.js serve)'), { offline: true }); }
+  catch { throw Object.assign(new Error('the Silinx server is not running (start it with: node bin/silinx-ise.js serve)'), { offline: true }); }
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`, json = false;
     try { const j = await r.json(); json = true; if (j.error) msg = j.error; } catch { /* not json */ }

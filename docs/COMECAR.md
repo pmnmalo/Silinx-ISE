@@ -14,7 +14,7 @@ Não precisa de ferramentas de programação nem de git. Escolha **uma** das dua
 ## Forma 1: um só ficheiro (a mais simples)
 
 1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
-2. Em **Assets**, clique em **`Silinx.html`** para o descarregar.
+2. Em **Assets**, clique em **`Silinx-ISE.html`** para o descarregar.
 3. Faça duplo clique no ficheiro descarregado. Abre no browser (Chrome, Edge, Firefox ou Safari).
 4. Na página inicial clique em **Open Example (blinky)** ou **New Project…**.
 
@@ -45,24 +45,24 @@ O Silinx corre no **Node.js**, um programa gratuito.
 ### Passo 2: descarregar o Silinx
 
 1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
-2. Em **Assets**, descarregue **`silinx-<versão>.zip`** (por exemplo `silinx-0.2.0.zip`).
+2. Em **Assets**, descarregue **`silinx-ise-<versão>.zip`** (por exemplo `silinx-ise-0.2.0.zip`).
    - Não use o botão verde **Code ▸ Download ZIP** nem o "Source code": essa versão não traz tudo
      o que o Silinx precisa (funciona na mesma, mas o primeiro arranque precisa de Internet para
      descarregar o que falta).
 3. **Descompacte-o** (extraia-o) para uma pasta que volte a encontrar, por exemplo *Documentos*:
    - **Windows:** botão direito no zip ▸ **Extrair Tudo…** ▸ Extrair. Não o execute de dentro do zip.
    - **macOS:** duplo clique no zip.
-   - Fica com uma pasta chamada **`silinx`**.
+   - Fica com uma pasta chamada **`silinx-ise`**.
 
 ### Passo 3: arrancar o Silinx
 
-Abra a pasta `silinx` e faça duplo clique no ficheiro do seu sistema:
+Abra a pasta `silinx-ise` e faça duplo clique no ficheiro do seu sistema:
 
 | Sistema | Duplo clique em |
 |---|---|
-| Windows | **`Start Silinx.bat`** |
-| macOS | **`Start Silinx.command`** |
-| Linux | **`start-silinx.sh`** (ou `./start-silinx.sh` num terminal) |
+| Windows | **`Start Silinx-ISE.bat`** |
+| macOS | **`Start Silinx-ISE.command`** |
+| Linux | **`start-silinx-ise.sh`** (ou `./start-silinx-ise.sh` num terminal) |
 
 Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Silinx em
 **http://127.0.0.1:8642**.
@@ -77,7 +77,7 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 - **Firewall do Windows** pergunta pelo Node.js: clique em **Permitir** (o Silinx só aceita
   ligações do próprio computador).
 - **macOS: "não pode ser aberto porque é de um programador não identificado"**: botão direito
-  (ou Ctrl-clique) em `Start Silinx.command` ▸ **Abrir** ▸ **Abrir**. Das vezes seguintes basta
+  (ou Ctrl-clique) em `Start Silinx-ISE.command` ▸ **Abrir** ▸ **Abrir**. Das vezes seguintes basta
   o duplo clique.
 
 ### Passo 4: usar
@@ -91,7 +91,7 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 
 ### Atualizar o Silinx
 
-Descarregue o novo `silinx-<versão>.zip`, descompacte-o e use a nova pasta (pode apagar a
+Descarregue o novo `silinx-ise-<versão>.zip`, descompacte-o e use a nova pasta (pode apagar a
 antiga). **Os seus projetos não estão dentro dessa pasta**, por isso mantêm-se.
 
 ---
@@ -110,7 +110,7 @@ Precisam de mais duas coisas. O seu professor pode já as ter preparadas.
      pessoa cria a sua cópia.
 2. **O controlador USB da placa** para a programar:
    - **Windows:** instale o Digilent **Adept 2** (Runtime + Utilities) a partir de digilent.com.
-   - **macOS (Basys2):** num Terminal, dentro da pasta `silinx`, execute
+   - **macOS (Basys2):** num Terminal, dentro da pasta `silinx-ise`, execute
      `brew install libusb python` e `./scripts/install-adepttool.sh` (precisa do [Homebrew](https://brew.sh)).
    - **Linux:** Digilent Adept, ou o openFPGALoader do gestor de pacotes.
 
@@ -124,10 +124,10 @@ No Silinx, **Tools ▸ Toolchain Settings** mostra o que foi encontrado.
 |---|---|
 | O arranque diz **Node.js is not installed** | Instale-o (Passo 1). Feche a janela e faça duplo clique outra vez. |
 | Browser: **"Não é possível aceder a este site"** | A janela do Silinx foi fechada: faça duplo clique outra vez no ficheiro de arranque. |
-| **"Port 8642 is used by another program"** | Outro programa usa essa porta. Abra um terminal na pasta `silinx` e execute `node bin/silinx.js serve --port 8643 --open`. |
+| **"Port 8642 is used by another program"** | Outro programa usa essa porta. Abra um terminal na pasta `silinx-ise` e execute `node bin/silinx-ise.js serve --port 8643 --open`. |
 | Consola: **"the Silinx server is not running"** | O mesmo: volte a arrancar o Silinx. As alterações por guardar são guardadas assim que ele voltar. |
 | macOS: o ficheiro `.command` **abre num editor de texto** | Botão direito ▸ Abrir com ▸ Terminal. |
-| A janela abre e fecha logo | Abra um terminal na pasta `silinx` e execute `node bin/silinx.js serve --open` para ler a mensagem. |
+| A janela abre e fecha logo | Abra um terminal na pasta `silinx-ise` e execute `node bin/silinx-ise.js serve --open` para ler a mensagem. |
 
 **Abrir um terminal numa pasta:** Windows: abra a pasta, clique na barra de endereço, escreva
 `cmd` e carregue em Enter. macOS: botão direito na pasta ▸ *Novo Terminal na Pasta* (ou abra o

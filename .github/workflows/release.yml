@@ -1,6 +1,6 @@
 # Publishes a GitHub Release when a version tag (v1.2.3) is pushed:
-#   Silinx.html                         single-file edition (no install, runs in the browser)
-#   silinx-<version>.zip                full app (server + UI + examples), production node_modules included
+#   Silinx-ISE.html                         single-file edition (no install, runs in the browser)
+#   silinx-ise-<version>.zip                full app (server + UI + examples), production node_modules included
 #   silinx-ise-docker-kit-<version>.zip builder kit for the private Xilinx ISE 14.7 Docker image
 name: Release
 on:
@@ -26,12 +26,12 @@ jobs:
           set -e
           V="${GITHUB_REF_NAME#v}"
           mkdir -p out
-          cp dist/Silinx.html out/Silinx.html
+          cp dist/Silinx-ISE.html out/Silinx-ISE.html
           # full app: tracked sources + production dependencies
-          rm -rf pkg && mkdir -p pkg/silinx
-          git archive HEAD | tar -x -C pkg/silinx
-          (cd pkg/silinx && npm ci --omit=dev --ignore-scripts && rm -rf .github)
-          (cd pkg && zip -qr "../out/silinx-$V.zip" silinx)
+          rm -rf pkg && mkdir -p pkg/silinx-ise
+          git archive HEAD | tar -x -C pkg/silinx-ise
+          (cd pkg/silinx-ise && npm ci --omit=dev --ignore-scripts && rm -rf .github)
+          (cd pkg && zip -qr "../out/silinx-ise-$V.zip" silinx-ise)
           # Docker builder kit for ISE 14.7 (no Xilinx software or licence inside)
           (cd docker && zip -qr "../out/silinx-ise-docker-kit-$V.zip" ise)
           ls -la out

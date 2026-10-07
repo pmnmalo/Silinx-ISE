@@ -110,8 +110,8 @@ else
 fi
 
 # --- configure Silinx
-if command -v node >/dev/null && [ -f "$SILINX_DIR/bin/silinx.js" ]; then
-  node "$SILINX_DIR/bin/silinx.js" toolchain --docker "$TAG"
+if command -v node >/dev/null && [ -f "$SILINX_DIR/bin/silinx-ise.js" ]; then
+  node "$SILINX_DIR/bin/silinx-ise.js" toolchain --docker "$TAG"
 else
   echo "Configure Silinx: Tools > Toolchain Settings > Docker image = $TAG"
 fi

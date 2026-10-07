@@ -22,4 +22,4 @@ if [ ! -d node_modules/express ]; then
   npm install --omit=dev || { read -r -p "Installation failed. Press Enter to close."; exit 1; }
 fi
 echo "Starting Silinx... your browser opens at http://127.0.0.1:8642"
-node bin/silinx.js serve --open
+node bin/silinx-ise.js serve --open

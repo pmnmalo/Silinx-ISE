@@ -24,7 +24,7 @@ async function main() {
         if (e.code !== 'EADDRINUSE') throw e;
         // already running (e.g. the launcher was double-clicked twice): just open it
         const up = await fetch(`${url}/api/templates`).then(r => r.ok).catch(() => false);
-        if (!up) { console.error(`Port ${port} is used by another program. Start Silinx on another port: node bin/silinx.js serve --port ${port + 1}`); process.exit(1); }
+        if (!up) { console.error(`Port ${port} is used by another program. Start Silinx on another port: node bin/silinx-ise.js serve --port ${port + 1}`); process.exit(1); }
         console.log(`Silinx is already running at ${url}`);
         if (args.includes('--open')) await openBrowser(url);
         process.exit(0);
@@ -95,11 +95,11 @@ async function main() {
     }
     default:
       console.log(`usage:
-  silinx serve [--port 8642] [--host 127.0.0.1]     start the Project Navigator web UI
-  silinx check <projectDir> [--top name]            parse + elaborate the design
-  silinx sim   <projectDir> [--top tb] [--time ns] [--vcd out.vcd]   run a behavioural simulation
-  silinx ucf   <projectDir> --board basys2|nexys2|s3e-starter [--part xc3s100e]   pins from the board
-  silinx toolchain [--docker <image>]                show / set the ISE toolchain (docker image)`);
+  silinx-ise serve [--port 8642] [--host 127.0.0.1]     start the Project Navigator web UI
+  silinx-ise check <projectDir> [--top name]            parse + elaborate the design
+  silinx-ise sim   <projectDir> [--top tb] [--time ns] [--vcd out.vcd]   run a behavioural simulation
+  silinx-ise ucf   <projectDir> --board basys2|nexys2|s3e-starter [--part xc3s100e]   pins from the board
+  silinx-ise toolchain [--docker <image>]                show / set the ISE toolchain (docker image)`);
   }
 }
 main().catch(e => { console.error(e); process.exit(1); });

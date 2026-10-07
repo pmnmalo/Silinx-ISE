@@ -70,11 +70,11 @@ interconnect that wires its logic blocks together, which is what the designs mad
 
 In short, from the [latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest):
 
-- **Just design and simulate:** download **`Silinx.html`** and double-click it. Nothing to install;
+- **Just design and simulate:** download **`Silinx-ISE.html`** and double-click it. Nothing to install;
   projects are kept in the browser.
 - **Also synthesize and program boards:** install [Node.js](https://nodejs.org) (LTS), download
-  **`silinx-<version>.zip`**, unzip it and double-click **`Start Silinx.bat`** (Windows),
-  **`Start Silinx.command`** (macOS) or **`start-silinx.sh`** (Linux). Your browser opens
+  **`silinx-ise-<version>.zip`**, unzip it and double-click **`Start Silinx-ISE.bat`** (Windows),
+  **`Start Silinx-ISE.command`** (macOS) or **`start-silinx-ise.sh`** (Linux). Your browser opens
   Silinx; projects are folders in `Silinx-projects` in your user folder.
 - **Synthesis needs Xilinx ISE 14.7** (free WebPACK): build your own Docker image with
   **`silinx-ise-docker-kit-<version>.zip`** (see [below](#synthesis-and-bitstreams-xilinx-ise-147)).
@@ -84,7 +84,7 @@ In short, from the [latest release](https://github.com/pmnmalo/Silinx-ISE/releas
 ```bash
 git clone https://github.com/pmnmalo/Silinx-ISE.git && cd Silinx-ISE
 npm install
-npm start          # http://127.0.0.1:8642  (node bin/silinx.js serve --open also opens the browser)
+npm start          # http://127.0.0.1:8642  (node bin/silinx-ise.js serve --open also opens the browser)
 ```
 
 Projects live in `~/Silinx-projects` (override with `SILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
@@ -93,17 +93,17 @@ runs the tests and publishes a release with the files above (`.github/workflows/
 ### Command line
 
 ```bash
-node bin/silinx.js check <projectDir>                           # parse + elaborate the top
-node bin/silinx.js sim   <projectDir> --time 2000 --vcd out.vcd   # simulate the simulation top
-node bin/silinx.js ucf   <projectDir> --board basys2              # constraints from a board's pin table
-node bin/silinx.js toolchain [--docker silinx/ise:14.7]          # show / set the ISE toolchain
+node bin/silinx-ise.js check <projectDir>                           # parse + elaborate the top
+node bin/silinx-ise.js sim   <projectDir> --time 2000 --vcd out.vcd   # simulate the simulation top
+node bin/silinx-ise.js ucf   <projectDir> --board basys2              # constraints from a board's pin table
+node bin/silinx-ise.js toolchain [--docker silinx/ise:14.7]          # show / set the ISE toolchain
 npm test                                                         # test suite
 ```
 
 ### Standalone edition (a single HTML file)
 
 ```bash
-npm run build:standalone    # writes dist/Silinx.html (~2.5 MB)
+npm run build:standalone    # writes dist/Silinx-ISE.html (~2.5 MB)
 ```
 
 One file, no server: open it in a browser or share it. It includes the editor, schematics, ASM

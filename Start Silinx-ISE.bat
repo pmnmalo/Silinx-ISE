@@ -25,5 +25,5 @@ if not exist "node_modules\express" (
   if errorlevel 1 ( echo Installation failed. & pause & exit /b 1 )
 )
 echo Starting Silinx... your browser opens at http://127.0.0.1:8642
-node bin\silinx.js serve --open
+node bin\silinx-ise.js serve --open
 pause
