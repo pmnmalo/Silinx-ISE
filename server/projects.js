@@ -1,5 +1,7 @@
-// Project storage: one directory per project with an xailinx.json descriptor.
+// Project storage: one directory per project with a silinx.json descriptor.
+// (Projects from before the rename to Silinx have xailinx.json: it is read and renamed on first use.)
 import fs from 'node:fs/promises';
+import fss from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -7,8 +9,23 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
 
+export const PROJECT_FILE = 'silinx.json';
+export const LEGACY_PROJECT_FILE = 'xailinx.json';
+
 export function workspaceDir() {
-  return process.env.XAILINX_WORKSPACE || path.join(os.homedir(), 'XAIlinx-projects');
+  if (process.env.SILINX_WORKSPACE || process.env.XAILINX_WORKSPACE) return process.env.SILINX_WORKSPACE || process.env.XAILINX_WORKSPACE;
+  const ws = path.join(os.homedir(), 'Silinx-projects');
+  // before the rename the workspace was ~/XAIlinx-projects: keep using it until it is moved
+  const legacy = path.join(os.homedir(), 'XAIlinx-projects');
+  if (!fss.existsSync(ws) && fss.existsSync(legacy)) return legacy;
+  return ws;
+}
+
+/** Path of a project's descriptor, renaming a legacy xailinx.json to silinx.json. */
+async function projectFile(dir) {
+  const f = path.join(dir, PROJECT_FILE), old = path.join(dir, LEGACY_PROJECT_FILE);
+  if (!await exists(f) && await exists(old)) { try { await fs.rename(old, f); } catch { return old; } }
+  return f;
 }
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
@@ -47,7 +64,7 @@ export async function listProjects() {
   for (const ent of await fs.readdir(ws, { withFileTypes: true })) {
     if (!ent.isDirectory() || ent.name.startsWith('.')) continue;
     try {
-      const pj = JSON.parse(await fs.readFile(path.join(ws, ent.name, 'xailinx.json'), 'utf8'));
+      const pj = JSON.parse(await fs.readFile(await projectFile(path.join(ws, ent.name)), 'utf8'));
       out.push({ name: ent.name, device: pj.device, top: pj.top, board: pj.board });
     } catch { /* not a project */ }
   }
@@ -57,7 +74,7 @@ export async function listProjects() {
 export async function readProject(name) {
   const dir = projectDir(name);
   let pj;
-  try { pj = JSON.parse(await fs.readFile(path.join(dir, 'xailinx.json'), 'utf8')); }
+  try { pj = JSON.parse(await fs.readFile(await projectFile(dir), 'utf8')); }
   catch { throw new HttpError(404, `project '${name}' not found`); }
   pj.name = name;
   pj.files ||= [];
@@ -68,7 +85,8 @@ export async function writeProject(name, pj) {
   const dir = projectDir(name);
   const clean = { ...pj, name };
   delete clean.fileTree;
-  await fs.writeFile(path.join(dir, 'xailinx.json'), JSON.stringify(clean, null, 2) + '\n');
+  await fs.writeFile(path.join(dir, PROJECT_FILE), JSON.stringify(clean, null, 2) + '\n');
+  await fs.rm(path.join(dir, LEGACY_PROJECT_FILE), { force: true });
   return clean;
 }
 
@@ -84,7 +102,7 @@ async function walk(dir, base = '') {
 }
 
 export async function fileTree(name) {
-  return (await walk(projectDir(name))).filter(f => f !== 'xailinx.json').sort();
+  return (await walk(projectDir(name))).filter(f => f !== PROJECT_FILE && f !== LEGACY_PROJECT_FILE).sort();
 }
 
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
@@ -102,7 +120,7 @@ export async function createProject({ name, template = 'empty', device, board })
   if (await exists(dir)) throw new HttpError(409, `project '${name}' already exists`);
   if (template && template !== 'empty') {
     const src = path.join(EXAMPLES_DIR, template);
-    if (!/^[a-z0-9_-]+$/i.test(template) || !await exists(path.join(src, 'xailinx.json')))
+    if (!/^[a-z0-9_-]+$/i.test(template) || !await exists(path.join(src, PROJECT_FILE)))
       throw new HttpError(400, `unknown template '${template}'`);
     await copyDir(src, dir);
     const pj = await readProject(name);

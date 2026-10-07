@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-  Build the private XAIlinx Xilinx ISE 14.7 image from your own installer + WebPACK license,
-  then configure XAIlinx to use it. Windows 10/11 with Docker Desktop (WSL 2 backend).
+  Build the private Silinx Xilinx ISE 14.7 image from your own installer + WebPACK license,
+  then configure Silinx to use it. Windows 10/11 with Docker Desktop (WSL 2 backend).
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File docker\ise\build-ise-image.ps1 `
@@ -14,7 +14,7 @@
 param(
   [string]$Installer = "",
   [string]$License = "",
-  [string]$Tag = "xailinx/ise:14.7",
+  [string]$Tag = "silinx/ise:14.7",
   [switch]$NoMd5,
   [switch]$Full,          # keep the complete ~18 GB ISE install (default: trimmed to ~3 GB)
   [string]$Families = ""  # e.g. "spartan3e spartan6": keep only these device families
@@ -22,7 +22,7 @@ param(
 $ErrorActionPreference = "Stop"
 $Md5Expected = "e8065b2ffb411bb74ae32efa475f9817"   # Xilinx_ISE_DS_Lin_14.7_1015_1.tar
 $KitDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$XailinxDir = Resolve-Path (Join-Path $KitDir "..\..")
+$SilinxDir = Resolve-Path (Join-Path $KitDir "..\..")
 
 function Die($msg) { Write-Host "ERROR: $msg" -ForegroundColor Red; exit 1 }
 function Info($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
@@ -61,14 +61,14 @@ if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
 
 # Stage the installer in its own folder (hard link on the same NTFS volume, else copy) so that
 # BuildKit transfers only the tarball, then pass installer + license folders as build contexts.
-$Stage = Join-Path (Split-Path -Parent $Installer) ".xailinx-ise-stage"
+$Stage = Join-Path (Split-Path -Parent $Installer) ".silinx-ise-stage"
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 $StagedTar = Join-Path $Stage "Xilinx_ISE_DS_Lin_14.7_1015_1.tar"
 if (-not (Test-Path $StagedTar)) {
   try { New-Item -ItemType HardLink -Path $StagedTar -Target $Installer | Out-Null }
   catch { Info "copying the installer to a staging folder"; Copy-Item $Installer $StagedTar }
 }
-$LicDir = Join-Path ([System.IO.Path]::GetTempPath()) ("xailinx-lic-" + [guid]::NewGuid())
+$LicDir = Join-Path ([System.IO.Path]::GetTempPath()) ("silinx-lic-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Force -Path $LicDir | Out-Null
 Copy-Item $License (Join-Path $LicDir "Xilinx.lic")
 
@@ -83,7 +83,7 @@ try {
   Info "smoke test"
   docker run --rm --platform linux/amd64 $Tag bash -c 'which xst ngdbuild map par trce bitgen >/dev/null && echo "ISE tools: OK"'
   if ($LASTEXITCODE -ne 0) { Die "ISE tools not found in the image" }
-  $Tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("xailinx-xst-" + [guid]::NewGuid())
+  $Tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("silinx-xst-" + [guid]::NewGuid())
   New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
   Set-Content -NoNewline -Path (Join-Path $Tmp "t.v") -Value "module t(input a, input b, output y); assign y = a & b; endmodule`n"
   Set-Content -NoNewline -Path (Join-Path $Tmp "t.prj") -Value "verilog work `"t.v`"`n"
@@ -93,10 +93,10 @@ try {
   Write-Host "XST synthesis with your license: OK"
   Remove-Item -Recurse -Force $Tmp
 
-  if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $XailinxDir "bin\xailinx.js"))) {
-    node (Join-Path $XailinxDir "bin\xailinx.js") toolchain --docker $Tag
+  if ((Get-Command node -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $SilinxDir "bin\silinx.js"))) {
+    node (Join-Path $SilinxDir "bin\silinx.js") toolchain --docker $Tag
   } else {
-    Write-Host "Configure XAIlinx: Tools > Toolchain Settings > Docker image = $Tag"
+    Write-Host "Configure Silinx: Tools > Toolchain Settings > Docker image = $Tag"
   }
   Info "done. Keep the image private: it contains AMD/Xilinx software and your license."
 } finally {

@@ -1,4 +1,4 @@
-// XAIlinx - graphical ASM chart editor (SVG, no framework).
+// Silinx - graphical ASM chart editor (SVG, no framework).
 //
 //   import { mountAsmEditor } from './asm-editor.js';
 //   const ed = mountAsmEditor(container, { model, onChange(model) {}, onGenerate({ lang, filename, code }) {} });

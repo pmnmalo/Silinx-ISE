@@ -1,7 +1,7 @@
 // External toolchain detection + configuration (Xilinx ISE 14.7 and JTAG programmers).
 //
 // ISE 14.7 does not run natively on macOS (and only poorly on modern Linux), so the ISE flow
-// can be executed in three modes, chosen by the user and saved in ~/.xailinx/config.json:
+// can be executed in three modes, chosen by the user and saved in ~/.silinx/config.json:
 //   local  - ISE binaries on this machine (sourced from settings64.sh if not on PATH)
 //   docker - inside a user-supplied docker image that contains ISE, with build/ mounted at /work
 //   ssh    - build/ is streamed (tar over ssh) to a Linux host with ISE, run there,
@@ -19,7 +19,12 @@ export const PROGRAMMERS = ['openFPGALoader', 'xc3sprog', 'djtgcfg', 'impact'];
 export const DEFAULT_SETTINGS = '/opt/Xilinx/14.7/ISE_DS/settings64.sh';
 
 export function configDir() {
-  return process.env.XAILINX_CONFIG_DIR || path.join(os.homedir(), '.xailinx');
+  if (process.env.SILINX_CONFIG_DIR || process.env.XAILINX_CONFIG_DIR) return process.env.SILINX_CONFIG_DIR || process.env.XAILINX_CONFIG_DIR;
+  const dir = path.join(os.homedir(), '.silinx');
+  // before the rename the settings were in ~/.xailinx: keep using them until they are moved
+  const legacy = path.join(os.homedir(), '.xailinx');
+  if (!fss.existsSync(dir) && fss.existsSync(legacy)) return legacy;
+  return dir;
 }
 export const configPath = () => path.join(configDir(), 'config.json');
 
@@ -27,7 +32,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   mode: 'local',
   local: { settings: '' },                      // '' = auto-detect
   docker: { command: 'docker', image: '', platform: 'linux/amd64', settings: DEFAULT_SETTINGS, extraArgs: [] },
-  ssh: { host: '', user: '', port: 22, identity: '', remoteDir: 'xailinx-build', settings: DEFAULT_SETTINGS, sshArgs: [] },
+  ssh: { host: '', user: '', port: 22, identity: '', remoteDir: 'silinx-build', settings: DEFAULT_SETTINGS, sshArgs: [] },
   programmer: { tool: '', cable: '' },          // global defaults (board defaults take precedence when empty)
   paths: {},                                    // explicit binary paths, e.g. { djtgcfg: '/usr/local/bin/djtgcfg' }
 });
@@ -197,7 +202,7 @@ export function iseStatus(cfg, det) {
   if (mode === 'docker') {
     if (!det.helpers.docker) return { mode, available: false, reason: `'${cfg.docker.command || 'docker'}' command not found`, help };
     if (!cfg.docker.image) return { mode, available: false, reason: 'no docker image configured (docker.image)', help };
-    if (det.dockerImage && !det.dockerImage.present) return { mode, available: false, reason: `docker image '${cfg.docker.image}' not present locally (docker image inspect failed). Build or pull it yourself; XAIlinx never pulls images.`, help };
+    if (det.dockerImage && !det.dockerImage.present) return { mode, available: false, reason: `docker image '${cfg.docker.image}' not present locally (docker image inspect failed). Build or pull it yourself; Silinx never pulls images.`, help };
     return { mode, available: true, reason: `docker image ${cfg.docker.image}`, help };
   }
   if (mode === 'ssh') {
@@ -211,6 +216,6 @@ export function iseStatus(cfg, det) {
 
 export const HELP = {
   local: 'Install Xilinx ISE 14.7 (WebPACK) on a Linux/Windows machine and either put its bin directory on PATH or set "local.settings" to .../14.7/ISE_DS/settings64.sh via PUT /api/toolchain. On macOS use mode "docker" (an x86-64 image containing ISE 14.7 at /opt/Xilinx/14.7/ISE_DS) or mode "ssh" (a Linux host with ISE). You can also choose "generate scripts only" and run build/run.sh on any machine with ISE.',
-  docker: 'Set {"mode":"docker","docker":{"image":"<your-ise-image>","settings":"/opt/Xilinx/14.7/ISE_DS/settings64.sh"}} via PUT /api/toolchain. The image must already exist locally (XAIlinx never pulls/builds images). The build directory is mounted at /work and run.sh is executed there.',
-  ssh: 'Set {"mode":"ssh","ssh":{"host":"build-box","user":"me","remoteDir":"xailinx-build","settings":"/opt/Xilinx/14.7/ISE_DS/settings64.sh"}} via PUT /api/toolchain. Password-less (key) authentication is required; the build directory is streamed with tar over ssh into <remoteDir>/<project> and the results are copied back the same way.',
+  docker: 'Set {"mode":"docker","docker":{"image":"<your-ise-image>","settings":"/opt/Xilinx/14.7/ISE_DS/settings64.sh"}} via PUT /api/toolchain. The image must already exist locally (Silinx never pulls/builds images). The build directory is mounted at /work and run.sh is executed there.',
+  ssh: 'Set {"mode":"ssh","ssh":{"host":"build-box","user":"me","remoteDir":"silinx-build","settings":"/opt/Xilinx/14.7/ISE_DS/settings64.sh"}} via PUT /api/toolchain. Password-less (key) authentication is required; the build directory is streamed with tar over ssh into <remoteDir>/<project> and the results are copied back the same way.',
 };

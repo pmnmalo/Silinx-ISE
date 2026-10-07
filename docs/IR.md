@@ -1,4 +1,4 @@
-# XAIlinx HDL Intermediate Representation (parser output)
+# Silinx HDL Intermediate Representation (parser output)
 
 Both front-ends (`core/verilog/parser.js`, `core/vhdl/parser.js`) export
 

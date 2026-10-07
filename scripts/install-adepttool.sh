@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Installs adepttool (open-source driver for the Digilent Adept USB programmer of the Basys2,
-# https://github.com/mwkmwkmwk/adepttool, MIT licence) into ~/.xailinx/adepttool with its own
+# https://github.com/mwkmwkmwk/adepttool, MIT licence) into ~/.silinx/adepttool with its own
 # Python virtualenv. On macOS it uses Homebrew's Python + libusb (the system Python cannot load
 # Homebrew libraries because of SIP).
 set -euo pipefail
-ROOT="${XAILINX_CONFIG_DIR:-$HOME/.xailinx}/adepttool"
+ROOT="${SILINX_CONFIG_DIR:-$HOME/.silinx}/adepttool"
 REPO="https://github.com/mwkmwkmwk/adepttool.git"
 
 PY=""
@@ -18,9 +18,9 @@ fi
 
 mkdir -p "$ROOT"
 if [ -d "$ROOT/src/.git" ]; then git -C "$ROOT/src" pull --ff-only; else git clone --depth 1 "$REPO" "$ROOT/src"; fi
-# XAIlinx patch: claim the USB interface (required by libusb on macOS) and add the
+# Silinx patch: claim the USB interface (required by libusb on macOS) and add the
 # XC3S250E/500E/1200E/1600E IDCODEs (upstream only knows the Basys2-100E's XC3S100E).
-PATCH="$(cd "$(dirname "$0")" && pwd)/adepttool-xailinx.patch"
+PATCH="$(cd "$(dirname "$0")" && pwd)/adepttool-silinx.patch"
 if git -C "$ROOT/src" apply --check "$PATCH" 2>/dev/null; then git -C "$ROOT/src" apply "$PATCH"; echo "applied $PATCH"; fi
 "$PY" -m venv "$ROOT/venv"
 "$ROOT/venv/bin/python" -m pip install --quiet --upgrade pip

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# XAIlinx - Xilinx XCF0xS Platform Flash (serial PROM) programmer over the Digilent Adept USB
+# Silinx - Xilinx XCF0xS Platform Flash (serial PROM) programmer over the Digilent Adept USB
 # of the Basys2, built on adepttool's JTAG layer (github.com/mwkmwkmwk/adepttool).
 #
 # Implements the IEEE 1532 in-system-programming flow described in Xilinx's XCF0xS BSDL/ISC
@@ -17,7 +17,7 @@
 #   xcf_prog.py [--device N] reconfigure            FPGA reloads from the PROM (needs mode jumper = ROM)
 #
 # The .bit file for the PROM must be generated with StartUpClk:CCLK.
-# Apache-2.0 licence (same as XAIlinx).
+# Apache-2.0 licence (same as Silinx).
 
 import argparse
 import sys

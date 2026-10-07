@@ -1,4 +1,4 @@
-// Verilog-2001 (+ a few SystemVerilog conveniences) recursive-descent parser producing the XAIlinx IR.
+// Verilog-2001 (+ a few SystemVerilog conveniences) recursive-descent parser producing the Silinx IR.
 // See docs/IR.md.
 import { tokenize, basedToBits } from './lexer.js';
 

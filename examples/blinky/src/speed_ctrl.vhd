@@ -2,7 +2,7 @@
 -- Entity      : speed_ctrl
 -- Description : controller (state machine + data path) generated from the ASM chart speed_ctrl.asm.json
 --               Blink speed: two debounced buttons, one level per press (0 = fastest, 7 = slowest), one step every 2**level ticks
--- Generator   : XAIlinx ASM editor, kept in sync with the chart (edit either one).
+-- Generator   : Silinx ASM editor, kept in sync with the chart (edit either one).
 -- Style       : state register + next-state logic + output logic (latch-free)
 -- Clock       : clk (rising edge)
 -- Reset       : rst, active-high, synchronous

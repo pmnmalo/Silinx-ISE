@@ -1,7 +1,7 @@
-# XAIlinx project model
+# Silinx project model
 
-A project is a directory under the workspace (default `~/XAIlinx-projects`, override with
-`XAILINX_WORKSPACE`) containing `xailinx.json`:
+A project is a directory under the workspace (default `~/Silinx-projects`, override with
+`SILINX_WORKSPACE`) containing `silinx.json`:
 
 ```json
 {
@@ -42,7 +42,7 @@ All under `/api`. JSON in/out. Errors: `{ error: "message" }` with 4xx/5xx.
 | GET | /projects/:p/sources | `[{ path, lang, role, text }]` all HDL sources (for the in-browser compiler) |
 | GET | /devices | Spartan-3E parts + boards database (server/devices.js) |
 | GET | /toolchain | detected ISE + programmer tools |
-| PUT | /toolchain | save toolchain settings (`~/.xailinx/config.json`) |
+| PUT | /toolchain | save toolchain settings (`~/.silinx/config.json`) |
 | POST | /projects/:p/implement | `{ steps?: ['synth','translate','map','par','bitgen'] }` -> `{ job }` |
 | GET | /projects/:p/reports | parsed utilization / timing summaries of last run |
 | POST | /program | `{ project?, bitfile?, tool?, cable?, board?, position? }` -> `{ job }` |

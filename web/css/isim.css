@@ -1,4 +1,4 @@
-/* XAIlinx ISim window — scoped under .isim. Uses theme.css variables (--wave-*, --bg, --panel, ...). */
+/* Silinx ISim window — scoped under .isim. Uses theme.css variables (--wave-*, --bg, --panel, ...). */
 .isim {
   --isim-font: var(--font, "Segoe UI", Tahoma, Arial, sans-serif);
   display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0;

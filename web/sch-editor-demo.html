@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>XAIlinx - Schematic Editor demo</title>
+  <title>Silinx - Schematic Editor demo</title>
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/sch-editor.css">
   <style>
@@ -34,7 +34,7 @@
 </head>
 <body>
   <header>
-    <h1>XAIlinx · Schematic Editor</h1>
+    <h1>Silinx · Schematic Editor</h1>
     <span class="sub">standalone demo — the sheet is kept in localStorage</span>
     <span class="sp"></span>
     <button class="btn" id="sample" type="button">Load sample</button>
@@ -132,7 +132,7 @@ endmodule`,
     };
 
     // ------------------------------------------------------------ editor
-    const KEY = 'xailinx.sch-demo';
+    const KEY = 'silinx.sch-demo';
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { saved = null; }
     const genOut = document.getElementById('gen-out'), genInfo = document.getElementById('gen-info');

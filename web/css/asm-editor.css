@@ -1,4 +1,4 @@
-/* XAIlinx ASM chart editor. Everything is scoped under .asm-editor and themed with the
+/* Silinx ASM chart editor. Everything is scoped under .asm-editor and themed with the
    app variables --bg --panel --fg --muted --accent --border --danger (with fallbacks). */
 
 .asm-editor {

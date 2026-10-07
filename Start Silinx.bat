@@ -1,6 +1,6 @@
 @echo off
-rem XAIlinx launcher for Windows: double-click this file.
-title XAIlinx
+rem Silinx launcher for Windows: double-click this file.
+title Silinx
 cd /d "%~dp0"
 where node >nul 2>nul
 if errorlevel 1 (
@@ -20,10 +20,10 @@ if errorlevel 1 (
   exit /b 1
 )
 if not exist "node_modules\express" (
-  echo Installing what XAIlinx needs ^(first time only, needs Internet^)...
+  echo Installing what Silinx needs ^(first time only, needs Internet^)...
   call npm install --omit=dev
   if errorlevel 1 ( echo Installation failed. & pause & exit /b 1 )
 )
-echo Starting XAIlinx... your browser opens at http://127.0.0.1:8642
-node bin\xailinx.js serve --open
+echo Starting Silinx... your browser opens at http://127.0.0.1:8642
+node bin\silinx.js serve --open
 pause

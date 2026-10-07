@@ -1,13 +1,13 @@
 {
-  "name": "xailinx",
+  "name": "silinx",
   "version": "15.1.0",
-  "description": "XAIlinx ISE (Integrated Synthesis Environment): HDL design platform in the style of Xilinx ISE 14.x: VHDL/Verilog projects, schematic and ASM editors, behavioural simulation, ISE 14.7 implementation and board programming",
+  "description": "Silinx ISE (Integrated Synthesis Environment): HDL design platform in the style of Xilinx ISE 14.x: VHDL/Verilog projects, schematic and ASM editors, behavioural simulation, ISE 14.7 implementation and board programming",
   "type": "module",
   "bin": {
-    "xailinx": "bin/xailinx.js"
+    "silinx": "bin/silinx.js"
   },
   "scripts": {
-    "start": "node bin/xailinx.js serve",
+    "start": "node bin/silinx.js serve",
     "test": "node --test test/*.test.js",
     "build:standalone": "node scripts/build-standalone.mjs",
     "version": "node scripts/sync-version.mjs && git add core/version.js"
@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pmnmalo/XAIlinx-ISE.git"
+    "url": "https://github.com/pmnmalo/Silinx-ISE.git"
   },
   "author": "Pedro Malo"
 }

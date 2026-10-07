@@ -1,4 +1,4 @@
-// XAIlinx Project Navigator — main application shell (ISE-like).
+// Silinx Project Navigator — main application shell (ISE-like).
 import { api, followJob } from './api.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, alertDlg, confirmDlg, popupMenu, menuBar, splitter, toast, downloadText } from './ui.js';
@@ -16,7 +16,7 @@ export const S = {
   view: 'impl', sources: [], lib: null, modules: [],
   sel: null, docs: [], active: null, status: {}, diags: [], busy: false,
 };
-window.XAIlinx = S; // handy for debugging from the console
+window.Silinx = S; // handy for debugging from the console
 
 const $ = id => document.getElementById(id);
 
@@ -45,9 +45,9 @@ function consoleMessage(line, cls) {
   lastConsoleDiag = null;
   if (cls !== 'err' && cls !== 'warn') return;
   const m = /^\s*(ERROR|WARNING|FATAL|CRITICAL WARNING)\s*:\s*(?:([A-Za-z][\w-]*(?::\d+)?)\s+-\s+)?(.*)$/i.exec(line);
-  let severity = cls === 'err' ? 'error' : 'warning', tool = 'XAIlinx', message = line.trim();
-  if (m) { severity = /error|fatal/i.test(m[1]) ? 'error' : 'warning'; tool = m[2] || 'XAIlinx'; message = m[3]; }
-  else if (/=== XAILINX FAILED/.test(line)) { tool = 'XAIlinx'; message = line.replace(/=+/g, '').trim(); }
+  let severity = cls === 'err' ? 'error' : 'warning', tool = 'Silinx', message = line.trim();
+  if (m) { severity = /error|fatal/i.test(m[1]) ? 'error' : 'warning'; tool = m[2] || 'Silinx'; message = m[3]; }
+  else if (/=== SILINX FAILED/.test(line)) { tool = 'Silinx'; message = line.replace(/=+/g, '').trim(); }
   if (!message) return;
   const d = { severity, tool, message, file: null, line: 0, source: 'console' };
   S.diags.push(d);
@@ -62,9 +62,9 @@ function renderDiagnosticsSoon() {
 }
 function logLine(line) {
   let cls = '';
-  if (/^(ERROR|FATAL)|\bERROR:/i.test(line) || /=== XAILINX FAILED/.test(line)) cls = 'err';
+  if (/^(ERROR|FATAL)|\bERROR:/i.test(line) || /=== SILINX FAILED/.test(line)) cls = 'err';
   else if (/^WARNING|\bWARNING:/i.test(line)) cls = 'warn';
-  else if (/=== XAILINX (STEP|DONE)/.test(line) || /completed successfully/i.test(line)) cls = 'ok';
+  else if (/=== SILINX (STEP|DONE)/.test(line) || /completed successfully/i.test(line)) cls = 'ok';
   log(line, cls);
 }
 function showConsolePage(page) {
@@ -520,11 +520,11 @@ async function checkFileSyntax(path) {
 
 // ------------------------------------------------------------------ process status persistence
 // The implementation process marks (synth / translate / map / par / impl / bitgen) are saved in
-// build/xailinx-status.json with a fingerprint of the sources + constraints, and restored when the
+// build/silinx-status.json with a fingerprint of the sources + constraints, and restored when the
 // project is opened (marked out of date if the sources changed since). Older builds without that
 // file get their marks from ISE's reports and output files.
 const IMPL_IDS = ['synth', 'translate', 'map', 'par', 'impl', 'bitgen'];
-const STATUS_FILE = 'build/xailinx-status.json';
+const STATUS_FILE = 'build/silinx-status.json';
 
 function sourcesFingerprint() {
   const parts = S.sources.filter(f => f.role !== 'sim').map(f => `${f.path}\n${f.text}`).sort();
@@ -576,7 +576,7 @@ async function restoreImplStatus() {
 }
 
 // ------------------------------------------------------------------ implementation (ISE)
-// Live per-step status from run.sh's "=== XAILINX STEP <step> ===" markers and ISE WARNING/ERROR lines.
+// Live per-step status from run.sh's "=== SILINX STEP <step> ===" markers and ISE WARNING/ERROR lines.
 const STEP_PROC = { synth: 'synth', translate: 'translate', map: 'map', par: 'par', trce: 'par', bitgen: 'bitgen', prombit: 'bitgen' };
 const STEP_TOOL = { synth: 'Xst', translate: 'NgdBuild', map: 'Map', par: 'Par', trce: 'Timing', bitgen: 'Bitgen', prombit: 'Bitgen' };
 const RANK = { ok: 0, warn: 1, err: 2 };
@@ -616,19 +616,19 @@ function stepTracker() {
   t.line = line => {
     logLine(line);
     let m;
-    if ((m = /^=== XAILINX STEP (\w+) ===/.exec(line))) {
+    if ((m = /^=== SILINX STEP (\w+) ===/.exec(line))) {
       finish();
       cur = m[1]; warns = early[cur] || 0;
       if (cur === 'synth' && early['*']) warns += early['*'];
       if (STEP_PROC[cur]) setProc(STEP_PROC[cur], 'running');
-    } else if ((m = /^=== XAILINX FAILED (\w+)/.exec(line))) {
+    } else if ((m = /^=== SILINX FAILED (\w+)/.exec(line))) {
       cur = cur || m[1];
       t.failed = true;
       finish(false);
-    } else if (/^=== XAILINX DONE ===/.test(line)) {
+    } else if (/^=== SILINX DONE ===/.test(line)) {
       finish();
     } else if (/^\s*(CRITICAL )?WARNING\b/i.test(line)) {
-      // any warning line counts (ISE "WARNING:Tool:N - ..." and XAIlinx "WARNING: ..."); the line
+      // any warning line counts (ISE "WARNING:Tool:N - ..." and Silinx "WARNING: ..."); the line
       // itself reaches the Warnings tab through log()
       t.warnings++;
       if (cur) warns++;
@@ -717,7 +717,7 @@ export async function regenerateUcf(board = projectBoard()) {
   if (!design.top) return false;
   const ports = design.top.ports.map(p => ({ name: p.name, dir: p.dir, width: p.sig.t.w, msb: p.sig.t.w > 1 ? p.sig.t.left : null, lsb: p.sig.t.w > 1 ? p.sig.t.right : null }));
   const { assignments, clocks, matched, unmatched } = boardAutoAssign(ports, board);
-  const text = generateUcf({ ports, assignments, clocks, header: `UCF for top '${pj.top}' on ${board.name} (${board.device.part}${board.device.speed}-${board.device.package}), generated by XAIlinx` });
+  const text = generateUcf({ ports, assignments, clocks, header: `UCF for top '${pj.top}' on ${board.name} (${board.device.part}${board.device.speed}-${board.device.package}), generated by Silinx` });
   pj.constraints ||= 'constraints/top.ucf';
   await api.writeFile(pj.name, pj.constraints, text);
   await saveProjectJson();
@@ -1704,7 +1704,7 @@ export async function openProject(name) {
   try {
     S.project = await api.project(name);
   } catch (e) { alertDlg('Open Project', e.message, 'error'); return; }
-  try { localStorage.setItem('xailinx.lastProject', name); } catch { /* ignore */ }
+  try { localStorage.setItem('silinx.lastProject', name); } catch { /* ignore */ }
   rememberRecent(name);
   await reloadProject();
   restoreImplStatus();
@@ -1739,7 +1739,7 @@ export async function reloadProject(render = true) {
 export async function closeProject() {
   for (const d of [...S.docs]) if (!await closeDoc(d)) return;
   S.project = null; S.lib = null; S.sources = []; S.modules = []; S.sel = null;
-  try { localStorage.removeItem('xailinx.lastProject'); } catch { /* ignore */ }
+  try { localStorage.removeItem('silinx.lastProject'); } catch { /* ignore */ }
   updateTitle(); renderHierarchy(); renderProcesses(); renderFilesPage(); renderLibsPage();
   showLeftPage('start');
 }
@@ -1753,12 +1753,12 @@ function updateTitle() {
 
 function rememberRecent(name) {
   try {
-    const r = JSON.parse(localStorage.getItem('xailinx.recent') || '[]').filter(x => x !== name);
+    const r = JSON.parse(localStorage.getItem('silinx.recent') || '[]').filter(x => x !== name);
     r.unshift(name);
-    localStorage.setItem('xailinx.recent', JSON.stringify(r.slice(0, 8)));
+    localStorage.setItem('silinx.recent', JSON.stringify(r.slice(0, 8)));
   } catch { /* ignore */ }
 }
-function recent() { try { return JSON.parse(localStorage.getItem('xailinx.recent') || '[]'); } catch { return []; } }
+function recent() { try { return JSON.parse(localStorage.getItem('silinx.recent') || '[]'); } catch { return []; } }
 
 // ------------------------------------------------------------------ left pages
 function showLeftPage(page) {
@@ -1825,7 +1825,7 @@ function setupMenus() {
       { label: 'Import ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
       { label: 'Export ISE Project (.zip)…', action: () => exportProjectZip(), disabled: hasPj },
       api.standalone ? '-' : null,
-      api.standalone ? { label: 'Download Project Bundle…', action: () => downloadText(`${S.project.name}.xailinx.json`, api.exportBundle(S.project.name), 'application/json'), disabled: hasPj } : null,
+      api.standalone ? { label: 'Download Project Bundle…', action: () => downloadText(`${S.project.name}.silinx.json`, api.exportBundle(S.project.name), 'application/json'), disabled: hasPj } : null,
       api.standalone ? { label: 'Open Project Bundle…', action: () => openBundle() } : null,
       { label: 'Close Project', action: () => closeProject(), disabled: hasPj },
       '-',
@@ -1881,7 +1881,7 @@ function setupMenus() {
       { label: 'Close All Documents', action: () => [...S.docs].forEach(closeDoc), disabled: () => !S.docs.length },
     ].filter(Boolean) },
     { label: 'Help', items: () => [
-      { label: 'About XAIlinx ISE', icon: icon('help'), action: () => wiz.aboutDialog() },
+      { label: 'About Silinx ISE', icon: icon('help'), action: () => wiz.aboutDialog() },
       { label: 'Keyboard Shortcuts', action: () => wiz.shortcutsDialog() },
     ] },
   ]);
@@ -1934,7 +1934,7 @@ async function exportProjectZip() {
     const url = URL.createObjectURL(blob);
     downloadUrl(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
-    log(`Exported ${filename}: ${S.project.name}.xise + xailinx.json + all project files (${Math.round(blob.size / 1024)} KB).`, 'ok');
+    log(`Exported ${filename}: ${S.project.name}.xise + silinx.json + all project files (${Math.round(blob.size / 1024)} KB).`, 'ok');
     for (const w of warnings) log(`WARNING: ${w}`, 'warn');
   } catch (e) { alertDlg('Export ISE Project', e.message, 'error'); }
 }
@@ -1979,8 +1979,8 @@ async function boot() {
 
   updateTitle();
   log(`${PRODUCT} ${VERSION} Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.`, 'info');
-  if (api.standalone) log('Standalone edition: projects are stored in this browser (File > Download Project Bundle to keep a copy). Synthesis/programming need the full XAIlinx application.', 'warn');
-  try { S.devices = await api.devices(); } catch (e) { log(`ERROR: cannot reach the XAIlinx server: ${e.message}`, 'err'); }
+  if (api.standalone) log('Standalone edition: projects are stored in this browser (File > Download Project Bundle to keep a copy). Synthesis/programming need the full Silinx application.', 'warn');
+  try { S.devices = await api.devices(); } catch (e) { log(`ERROR: cannot reach the Silinx server: ${e.message}`, 'err'); }
   api.toolchain().then(tc => {
     S.toolchain = tc;
     log(`Toolchain: ISE ${tc.ise.available ? 'available' : 'not available'} (${tc.ise.mode}: ${tc.ise.reason}).`, tc.ise.available ? 'ok' : 'warn');
@@ -1990,12 +1990,12 @@ async function boot() {
   renderHierarchy();
   renderProcesses();
   let last = null;
-  try { last = localStorage.getItem('xailinx.lastProject'); } catch { /* ignore */ }
+  try { last = localStorage.getItem('silinx.lastProject'); } catch { /* ignore */ }
   const projects = await api.projects().catch(() => []);
   if (last && projects.some(p => p.name === last)) await openProject(last);
   else showLeftPage('start');
 }
 
 export const app = { openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
-window.XAIlinxApp = app;
+window.SilinxApp = app;
 boot();

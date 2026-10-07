@@ -1,4 +1,4 @@
-// XAIlinx - recover an ASM chart from a VHDL/Verilog finite state machine.
+// Silinx - recover an ASM chart from a VHDL/Verilog finite state machine.
 //
 // Isomorphic ES module: no DOM and no Node APIs.
 //
@@ -234,7 +234,7 @@ function parseHeader(src, lang) {
     if (!raw.startsWith(c)) break;
     lines.push(raw.slice(c.length));
   }
-  if (!lines.some((l) => /^\s*Generator\s*:\s*XAIlinx ASM editor/.test(l))) return null;
+  if (!lines.some((l) => /^\s*Generator\s*:\s*(?:Silinx|XAIlinx) ASM editor/.test(l))) return null;
   const h = { name: null, description: null, encoding: null, states: new Map(), always: new Map(), regInit: new Map() };
   const blk = (name) => {
     if (!h.always.has(name)) h.always.set(name, { actions: [], conds: [], mealy: [] });

@@ -1,4 +1,4 @@
-// XAIlinx - ISim-style simulation / waveform window (plain DOM + canvas, no framework).
+// Silinx - ISim-style simulation / waveform window (plain DOM + canvas, no framework).
 //
 //   import { mountISim } from './isim.js';
 //   const isim = mountISim(container, { design, sim, title, onOpenSource({ file, line }) {} });
@@ -1839,7 +1839,7 @@ export function mountISim(container, opts = {}) {
   }
   rebuildFlat();
   renderObjects();
-  logLine('ISim (XAIlinx behavioural simulator)');
+  logLine('ISim (Silinx behavioural simulator)');
   logLine('Time resolution is 1 ps');
   logLine('Simulator is doing circuit initialization process.');
   logLine('Finished circuit initialization process.');

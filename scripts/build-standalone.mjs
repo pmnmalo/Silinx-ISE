@@ -1,4 +1,4 @@
-// Builds dist/XAIlinx.html: the whole Project Navigator in one self-contained HTML file
+// Builds dist/Silinx.html: the whole Project Navigator in one self-contained HTML file
 // (no server). Projects live in the browser's localStorage; the examples are embedded.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'dist', 'XAIlinx.html');
+const OUT = path.join(ROOT, 'dist', 'Silinx.html');
 const rd = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
 // ---- embedded examples
@@ -15,24 +15,24 @@ function readTree(dir, base = '') {
   for (const e of fs.readdirSync(path.join(dir, base), { withFileTypes: true })) {
     const rel = base ? `${base}/${e.name}` : e.name;
     if (e.isDirectory()) Object.assign(out, readTree(dir, rel));
-    else if (rel !== 'xailinx.json') out[rel] = fs.readFileSync(path.join(dir, rel), 'utf8');
+    else if (rel !== 'silinx.json') out[rel] = fs.readFileSync(path.join(dir, rel), 'utf8');
   }
   return out;
 }
 const examples = {};
 for (const e of fs.readdirSync(path.join(ROOT, 'examples'), { withFileTypes: true })) {
   const dir = path.join(ROOT, 'examples', e.name);
-  if (!e.isDirectory() || !fs.existsSync(path.join(dir, 'xailinx.json'))) continue;
-  examples[e.name] = { json: JSON.parse(fs.readFileSync(path.join(dir, 'xailinx.json'), 'utf8')), files: readTree(dir) };
+  if (!e.isDirectory() || !fs.existsSync(path.join(dir, 'silinx.json'))) continue;
+  examples[e.name] = { json: JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8')), files: readTree(dir) };
 }
 
 // ---- bundle the app with the local (server-less) API
 const plugin = {
-  name: 'xailinx-standalone',
+  name: 'silinx-standalone',
   setup(b) {
     b.onResolve({ filter: /^\/core\// }, a => ({ path: path.join(ROOT, a.path) }));
     b.onResolve({ filter: /^\.\/api\.js$/ }, a => (a.importer.includes(`${path.sep}web${path.sep}js${path.sep}`) ? { path: path.join(ROOT, 'web/js/api-local.js') } : undefined));
-    b.onResolve({ filter: /^xailinx-examples$/ }, () => ({ path: 'xailinx-examples', namespace: 'virtual' }));
+    b.onResolve({ filter: /^silinx-examples$/ }, () => ({ path: 'silinx-examples', namespace: 'virtual' }));
     b.onLoad({ filter: /.*/, namespace: 'virtual' }, () => ({ contents: `export default ${JSON.stringify(examples)};`, loader: 'js' }));
   },
 };
@@ -57,8 +57,8 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => {
 });
 // replacer functions: the inserted code may contain `$'`, `$&`… which a replacement string would expand
 html = html.replace('<script type="module" src="/js/app.js"></script>',
-  () => `<script>window.XAILINX_STANDALONE = true;</script>\n<script type="module">${safeJs(appJs)}</script>`);
-html = html.replace('<title>XAIlinx ISE Project Navigator</title>', () => '<title>XAIlinx ISE Project Navigator (standalone)</title>');
+  () => `<script>window.SILINX_STANDALONE = true;</script>\n<script type="module">${safeJs(appJs)}</script>`);
+html = html.replace('<title>Silinx ISE Project Navigator</title>', () => '<title>Silinx ISE Project Navigator (standalone)</title>');
 if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inserted verbatim into the page');
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);

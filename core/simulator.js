@@ -384,7 +384,7 @@ export function toVCD(design, sim, { signals = design.signals, timescale = '1ps'
   const ids = new Map();
   let n = 0;
   const idOf = () => { let k = n++, s = ''; do { s += String.fromCharCode(33 + (k % 94)); k = Math.floor(k / 94); } while (k); return s; };
-  const lines = [`$date ${new Date().toISOString()} $end`, '$version XAIlinx $end', `$timescale ${timescale} $end`];
+  const lines = [`$date ${new Date().toISOString()} $end`, '$version Silinx $end', `$timescale ${timescale} $end`];
   const emitScope = inst => {
     lines.push(`$scope module ${inst.name} $end`);
     const seen = new Set();

@@ -6,7 +6,7 @@ index 21947ac..396848c 100644
          self.dev.close()
  
      def start(self):
-+        # macOS libusb requires the interface to be claimed before bulk transfers (XAIlinx patch).
++        # macOS libusb requires the interface to be claimed before bulk transfers (Silinx patch).
 +        try:
 +            self.dev.claimInterface(0)
 +        except Exception:

@@ -1,4 +1,4 @@
-// Thin REST client for the XAIlinx server.
+// Thin REST client for the Silinx server.
 async function req(method, url, body, { text = false } = {}) {
   const opts = { method, headers: {} };
   if (body !== undefined) {
@@ -7,7 +7,7 @@ async function req(method, url, body, { text = false } = {}) {
   }
   let r;
   try { r = await fetch(url, opts); }
-  catch { throw Object.assign(new Error('the XAIlinx server is not running (start it with: node bin/xailinx.js serve)'), { offline: true }); }
+  catch { throw Object.assign(new Error('the Silinx server is not running (start it with: node bin/silinx.js serve)'), { offline: true }); }
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`, json = false;
     try { const j = await r.json(); json = true; if (j.error) msg = j.error; } catch { /* not json */ }
@@ -62,12 +62,12 @@ export const api = {
   cancelJob: id => req('POST', `/api/jobs/${enc(id)}/cancel`),
   exportXiseUrl: name => `/api/projects/${enc(name)}/export.xise`,
   importXise: body => req('POST', '/api/projects/import-xise', body),
-  // whole project as a zip (.xise + xailinx.json + all files)
+  // whole project as a zip (.xise + silinx.json + all files)
   exportZip: async name => {
     const r = await fetch(`/api/projects/${enc(name)}/export.zip`);
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
     let warnings = [];
-    try { warnings = JSON.parse(decodeURIComponent(r.headers.get('X-XAIlinx-Warnings') || '[]')); } catch { /* none */ }
+    try { warnings = JSON.parse(decodeURIComponent(r.headers.get('X-Silinx-Warnings') || '[]')); } catch { /* none */ }
     return { blob: await r.blob(), filename: `${name}.zip`, warnings };
   },
   importZip: async (name, file) => {

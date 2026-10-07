@@ -33,7 +33,7 @@ test('xise schematics are imported as synchronized schematics and exported back 
   assert.doesNotMatch(xml, /Mux4to1b4\.vhd"/, 'the generated HDL is replaced by its schematic');
   assert.match(xml, /Implementation Top File" xil_pn:value="Mux4to1b4\.sch"/);
 
-  // re-import of an XAIlinx export keeps the exact .sch.json
+  // re-import of a Silinx export keeps the exact .sch.json
   const again = importIseSchematics({ 'Mux4to1b4.sch': sch.files.find(f => f.path === 'Mux4to1b4.sch').text },
     { existing: p => ({ 'Mux4to1b4.sch.json': JSON.stringify(docs['Mux4to1b4.sch.json']), 'Mux4to1b4.vhd': sources['Mux4to1b4.vhd'] })[p] });
   assert.deepEqual(JSON.parse(again[0].jsonText), docs['Mux4to1b4.sch.json']);

@@ -1,4 +1,4 @@
-// XAIlinx - ASM (Algorithmic State Machine) chart model, validation and HDL generators.
+// Silinx - ASM (Algorithmic State Machine) chart model, validation and HDL generators.
 //
 // Isomorphic ES module: no DOM and no Node APIs, usable from the browser editor and from
 // server/CLI code alike.
@@ -1305,7 +1305,7 @@ function headerLines(a, lang) {
   L.push(`${c} ${lang === 'vhdl' ? 'Entity' : 'Module'}      : ${m.name}`);
   L.push(`${c} Description : ${a.alwaysNodes.length || a.registers.length ? 'controller (state machine + data path)' : 'finite state machine'} generated from the ASM chart ${m.name}.asm.json`);
   if (m.description) L.push(`${c}               ${m.description}`);
-  L.push(`${c} Generator   : XAIlinx ASM editor, kept in sync with the chart (edit either one).`);
+  L.push(`${c} Generator   : Silinx ASM editor, kept in sync with the chart (edit either one).`);
   L.push(`${c} Style       : state register + next-state logic + output logic (latch-free)`);
   L.push(`${c} Clock       : ${m.clock} (rising edge)`);
   L.push(`${c} Reset       : ${m.reset.name}, active-${m.reset.active}, ${m.reset.sync ? 'synchronous' : 'asynchronous'}`);

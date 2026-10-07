@@ -1,4 +1,4 @@
-// XAIlinx RTL schematic viewer (ISE "View RTL Schematic" look).
+// Silinx RTL schematic viewer (ISE "View RTL Schematic" look).
 //
 //   const v = mountSchematic(container, { onOpenInstance(path), onOpenSource({file,line}), onSelect(item) });
 //   v.show(graph, { title, breadcrumb: [{ label, path }] });   // graph = core/schematic.js buildSchematic()
@@ -56,7 +56,7 @@ function getElk(base) {
   if (elkPromise) return elkPromise;
   elkPromise = (async () => {
     // Single-file build: ELK is inlined as a global, use it on the main thread.
-    if (globalThis.XAILINX_STANDALONE && globalThis.ELK) return { elk: new globalThis.ELK(), worker: false };
+    if (globalThis.SILINX_STANDALONE && globalThis.ELK) return { elk: new globalThis.ELK(), worker: false };
     // Prefer a real worker so big layouts don't freeze the UI.
     if (typeof Worker !== 'undefined') {
       try {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>XAIlinx - ISim demo</title>
+  <title>Silinx - ISim demo</title>
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/isim.css">
   <style>
@@ -215,7 +215,7 @@ endmodule
       if (errors.length) { errEl.textContent = errors.map(e => `${e.file}:${e.line}: ${e.message}`).join('\n'); return; }
       const sim = new Simulator(design, { files: new Map(srcs.map(s => [s.path, s.text])) });
       isim = mountISim(host, {
-        design, sim, title: `ISim (XAIlinx) - [${d.top}] - Default.wcfg`,
+        design, sim, title: `ISim (Silinx) - [${d.top}] - Default.wcfg`,
         initialRun: d.initialRun,
         onOpenSource: ({ file, line }) => console.log(`open source ${file}:${line}`),
       });

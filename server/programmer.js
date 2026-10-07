@@ -10,7 +10,7 @@
 //   impact          impact -batch <cmdfile>   with setMode -bs / setCable -port auto / Identify / assignFile / Program / quit
 //   adepttool       python basys2_prog.py [--device N] file.bit ; python list.py
 //                   (open-source driver for the Digilent Adept USB of the Basys2: github.com/mwkmwkmwk/adepttool,
-//                    installed by scripts/install-adepttool.sh into ~/.xailinx/adepttool)
+//                    installed by scripts/install-adepttool.sh into ~/.silinx/adepttool)
 //
 // Positions: iMPACT numbers chain devices from 1; xc3sprog, djtgcfg and openFPGALoader from 0.
 
@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runCommand } from './jobs.js';
-import { loadConfig, detectIse, resolveTool, which } from './toolchain.js';
+import { loadConfig, detectIse, resolveTool, which, configDir } from './toolchain.js';
 import { findBoard, resolveBoard } from './devices.js';
 import { splitBitPart, familyOfPart, familyName } from '../core/family.js';
 
@@ -241,7 +241,7 @@ export function adepttoolPaths(cfg) {
   const ok = fss.existsSync(path.join(src, 'basys2_prog.py')) && fss.existsSync(py);
   return { root, src, py, ok };
 }
-function configDirFor() { return process.env.XAILINX_CONFIG_DIR || path.join(os.homedir(), '.xailinx'); }
+function configDirFor() { return configDir(); }
 
 export function toolAvailable(name, cfg) {
   if (name === 'adepttool') return adepttoolPaths(cfg).ok;
@@ -261,7 +261,7 @@ async function execTool(job, c, cfg) {
   const bin = resolveTool(c.cmd, cfg, ise);
   let cmd = bin, args = c.args, cleanup = null;
   if (c.impactScript) {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'xailinx-impact-'));
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'silinx-impact-'));
     const file = path.join(dir, 'impact.cmd');
     await fs.writeFile(file, c.impactScript);
     job.log('iMPACT batch script:');

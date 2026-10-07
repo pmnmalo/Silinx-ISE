@@ -1,4 +1,4 @@
-// XAIlinx schematic editor (ISE 14.x "Schematic Editor" look). SVG, no framework.
+// Silinx schematic editor (ISE 14.x "Schematic Editor" look). SVG, no framework.
 //
 //   import { mountSchEditor } from './sch-editor.js';
 //   const ed = mountSchEditor(container, {
@@ -441,7 +441,7 @@ export function mountSchEditor(container, opts = {}) {
           html: `${previewSvg(it)}<span class="nm">${esc(it.title)}</span>`,
         });
         row.addEventListener('click', () => { startPlace(it); symInfo.textContent = `${it.title}: ${it.desc}`; });
-        row.addEventListener('dragstart', e => { e.dataTransfer.setData('text/x-xailinx-symbol', JSON.stringify(it)); e.dataTransfer.effectAllowed = 'copy'; });
+        row.addEventListener('dragstart', e => { e.dataTransfer.setData('text/x-silinx-symbol', JSON.stringify(it)); e.dataTransfer.effectAllowed = 'copy'; });
         symList.append(row);
       }
     }
@@ -518,7 +518,7 @@ export function mountSchEditor(container, opts = {}) {
       + `<line x1="${W - 10 - tbw}" y1="${H - 10 - tbh / 2}" x2="${W - 10}" y2="${H - 10 - tbh / 2}"/>`
       + `<text x="${W - tbw}" y="${H - 10 - tbh / 2 - 9}" class="tb-l">SHEET</text><text x="${W - tbw + 50}" y="${H - 10 - tbh / 2 - 9}" class="tb-v">${esc(doc.name)}</text>`
       + `<text x="${W - tbw}" y="${H - 19}" class="tb-l">LANGUAGE</text><text x="${W - tbw + 70}" y="${H - 19}" class="tb-v">${doc.lang.toUpperCase()}</text>`
-      + `<text x="${W - 20}" y="${H - 19}" class="tb-l" text-anchor="end">XAIlinx</text></g>`;
+      + `<text x="${W - 20}" y="${H - 19}" class="tb-l" text-anchor="end">Silinx</text></g>`;
   }
   function render() {
     if (destroyed) return;
@@ -1199,9 +1199,9 @@ export function mountSchEditor(container, opts = {}) {
   svg.addEventListener('wheel', onWheel, { passive: false });
   svg.addEventListener('pointerleave', () => { hoverPin = null; if (tool !== 'select') renderOverlay(); });
   // drag & drop from the palette
-  canvas.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('text/x-xailinx-symbol')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  canvas.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('text/x-silinx-symbol')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
   canvas.addEventListener('drop', e => {
-    const raw = e.dataTransfer.getData('text/x-xailinx-symbol');
+    const raw = e.dataTransfer.getData('text/x-silinx-symbol');
     if (!raw || readOnly) return;
     e.preventDefault();
     const it = JSON.parse(raw);

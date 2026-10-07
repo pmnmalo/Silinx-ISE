@@ -23,7 +23,7 @@ export function mountSummary(el) {
     const implState = sum.bitstream ? 'Programming File Generated' : sum.routed ? 'Placed and Routed' : sum.mapped ? 'Mapped' : sum.synthesized ? 'Synthesized' : 'New';
     const board = S.devices?.boards.find(b => b.id === pj.board);
     page.append(h('table', { class: 'summary-table' },
-      row('Project File:', `${pj.name}/xailinx.json`, 'Parser Errors:', h('span', { class: errs ? 'status-bad' : 'status-good' }, errs ? `${errs} Errors` : 'No Errors')),
+      row('Project File:', `${pj.name}/silinx.json`, 'Parser Errors:', h('span', { class: errs ? 'status-bad' : 'status-good' }, errs ? `${errs} Errors` : 'No Errors')),
       row('Module Name:', pj.top || '(not set)', 'Implementation State:', implState),
       row('Target Device:', `${pj.device.part}${pj.device.speed}-${pj.device.package}`, 'Warnings:', warns ? `${warns} Warnings` : 'No Warnings'),
       row('Board:', board ? board.name : 'None Specified', 'Simulation Top:', pj.simTop || '(not set)'),
@@ -66,7 +66,7 @@ export function mountSummary(el) {
         .map(([n, f, r]) => h('tr', {}, h('td', {}, n), h('td', {}, r ? h('a', { onclick: () => app.openFile(`build/${f}`) }, 'Current') : '')))));
     // quick links (ISE sidebar style)
     page.append(h('div', { style: { color: '#555', marginTop: '8px' } },
-      'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside XAIlinx; synthesis/implementation require Xilinx ISE 14.7 (Tools ▸ Toolchain Settings).'));
+      'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis/implementation require Xilinx ISE 14.7 (Tools ▸ Toolchain Settings).'));
   };
   return { refresh, onActivate: refresh };
 }

@@ -27,7 +27,7 @@ const PT = {
   'Simulate Behavioral Model': 'Simular Modelo Comportamental', 'ASM State Machine Editor…': 'Editor de Máquinas de Estados ASM…',
   'I/O Pin Planning': 'Planeamento de Pinos de E/S', 'iMPACT (Configure Target Device)': 'iMPACT (Configurar Dispositivo)',
   'RTL Schematic': 'Esquemático RTL', 'Toolchain Settings (ISE / Programmers)…': 'Definições da Toolchain (ISE / Programadores)…',
-  'Close All Documents': 'Fechar Todos os Documentos', 'About XAIlinx ISE': 'Acerca do XAIlinx ISE', 'Keyboard Shortcuts': 'Atalhos de Teclado',
+  'Close All Documents': 'Fechar Todos os Documentos', 'About Silinx ISE': 'Acerca do Silinx ISE', 'Keyboard Shortcuts': 'Atalhos de Teclado',
   'Close': 'Fechar', 'Close Others': 'Fechar Outros', 'Close All': 'Fechar Todos', 'Open': 'Abrir', 'Remove from Project': 'Remover do Projeto',
   'Source Properties…': 'Propriedades da Fonte…', 'Rerun': 'Executar Novamente', 'Stop': 'Parar', 'Schematic': 'Esquemático', 'View/Edit Schematic': 'Ver/Editar Esquemático', 'Convert to HDL': 'Converter para HDL', 'Rename…': 'Mudar o Nome…', 'File name follows the module name': 'O nome do ficheiro acompanha o nome do módulo', 'Rename': 'Mudar o Nome', 'Entity:': 'Entidade:', 'Convert to State Machine (ASM)…': 'Converter para Máquina de Estados (ASM)…', 'Convert to State Machine (state machine as base)': 'Converter para Máquina de Estados (máquina de estados como base)', 'Remove Synchronized State Machine…': 'Remover Máquina de Estados Sincronizada…', '(synchronized state machine)': '(máquina de estados sincronizada)', 'Open Synchronized State Machine': 'Abrir Máquina de Estados Sincronizada', 'Check Constraints': 'Verificar Restrições', 'Export as ISE Schematic (.sch)…': 'Exportar como Esquemático ISE (.sch)…', 'Check Syntax of this file': 'Verificar a sintaxe deste ficheiro', ' Check Syntax': ' Verificar Sintaxe', 'Toggle Comment': 'Comentar/Descomentar', 'Find…': 'Procurar…', 'Language Templates': 'Modelos de Linguagem', 'Instantiate module': 'Instanciar módulo', 'Open Synchronized Schematic': 'Abrir Esquemático Sincronizado', 'Select All': 'Selecionar Tudo', 'Convert to HDL (HDL as base)': 'Converter para HDL (HDL como base)', 'Convert to Schematic (schematic as base)': 'Converter para Esquemático (esquemático como base)', 'Remove Synchronized Schematic…': 'Remover Esquemático Sincronizado…', '(synchronized schematic)': '(esquemático sincronizado)', ' (schematic view of this file) — saving here updates it': ' (vista em esquemático deste ficheiro) — guardar aqui atualiza-o', 'RTL Schematic (read-only)': 'Esquemático RTL (só de leitura)', 'Open this instance': 'Abrir esta instância', 'Read-only view. Drag on empty space to select, double-click a module to open it, wheel to zoom.': 'Vista só de leitura. Arraste numa área vazia para selecionar, duplo-clique num módulo para o abrir, roda para zoom.', 'Convert to Schematic (editable)…': 'Converter para Esquemático (editável)…', 'Synchronized with ': 'Sincronizado com ', ' — saving here updates the schematic': ' — guardar aqui atualiza o esquemático', '(synchronized HDL)': '(HDL sincronizado)', 'An implementation is already running (use Stop to cancel it)': 'Já está uma implementação em curso (use Parar para a cancelar)', 'Stop the running process': 'Parar o processo em curso', 'No process is running': 'Nenhum processo em curso', 'Process Properties…': 'Propriedades do Processo…',
   // toolbar / panels
@@ -51,7 +51,7 @@ const PT = {
   'New Project Wizard': 'Assistente de Novo Projeto', 'Create New Project': 'Criar Novo Projeto', 'Project Settings': 'Definições do Projeto',
   'Project Summary': 'Resumo do Projeto', 'Enter a name and location for the project.': 'Indique um nome e uma localização para o projeto.',
   'Name:': 'Nome:', 'Location:': 'Localização:', 'Top-level source type:': 'Tipo de fonte de topo:', 'Start from:': 'Começar a partir de:',
-  'Empty project': 'Projeto vazio', 'Projects are stored in the XAIlinx workspace folder (default ~/XAIlinx-projects).': 'Os projetos são guardados na pasta de trabalho do XAIlinx (por omissão ~/XAIlinx-projects).',
+  'Empty project': 'Projeto vazio', 'Projects are stored in the Silinx workspace folder (default ~/Silinx-projects).': 'Os projetos são guardados na pasta de trabalho do Silinx (por omissão ~/Silinx-projects).',
   'Select the device and design flow for the project.': 'Selecione o dispositivo e o fluxo de projeto.',
   'Evaluation Development Board:': 'Placa de Desenvolvimento:', 'Product Category:': 'Categoria de Produto:', 'Family:': 'Família:',
   'Device:': 'Dispositivo:', 'Package:': 'Encapsulamento:', 'Speed:': 'Velocidade:', 'Top-Level Source Type:': 'Tipo de Fonte de Topo:',
@@ -224,7 +224,7 @@ const PT_PATTERNS = [
   [/^1:(\d+) demultiplexer \((select S0|(\d)-bit select S)\): O<S> = D, the other outputs 0 \(bitwise when Width > 1\)$/,
     (m, n, sel, k) => `Desmultiplexador 1:${n} (${k ? `seleção S de ${k} bits` : 'seleção S0'}): O<S> = D, as outras saídas a 0 (bit a bit quando Largura > 1)`],
   [/^(Logic|Arithmetic|Flip-Flops|Mux|Decoders\/Encoders|Bus|I\/O|Project modules) \((\d+)\)$/, (m, c, n) => `${t(c)} (${n})`],
-  [/^XAIlinx - (.*) - \[(.*)\]$/, (m, a, b) => `XAIlinx - ${a} - [${t(b)}]`],
+  [/^Silinx - (.*) - \[(.*)\]$/, (m, a, b) => `Silinx - ${a} - [${t(b)}]`],
   [/^(.*) \(RTL\)$/, '$1 (RTL)'],
   [/^Processes: (.*)$/, 'Processos: $1'],
   [/^Language: (.*)$/, 'Idioma: $1'],
@@ -247,7 +247,15 @@ export const LOCALES = {
   pt: { name: 'Português', strings: PT, patterns: PT_PATTERNS },
 };
 
-const KEY = 'xailinx.lang';
+const KEY = 'silinx.lang';
+// settings stored before the rename to Silinx (xailinx.* keys) move to the new keys
+try {
+  for (const [o, n] of [['xailinx.lang', KEY], ['xailinx.recent', 'silinx.recent'], ['xailinx.lastProject', 'silinx.lastProject']]) {
+    const v = localStorage.getItem(o);
+    if (v !== null && localStorage.getItem(n) === null) localStorage.setItem(n, v);
+    if (v !== null) localStorage.removeItem(o);
+  }
+} catch { /* no storage */ }
 let lang = 'en';
 try { lang = localStorage.getItem(KEY) || ''; } catch { /* storage unavailable */ }
 if (!LOCALES[lang]) lang = /^pt\b/i.test(navigator.language || '') ? 'pt' : 'en';

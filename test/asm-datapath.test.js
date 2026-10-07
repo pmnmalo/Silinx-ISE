@@ -539,7 +539,7 @@ test('blinky example: the chart generates speed_ctrl.vhd, which round-trips and 
   const { model, warnings } = asmFromHdl(file, { path: 'src/speed_ctrl.vhd', previous: m });
   assert.deepEqual(warnings, []);
   assert.deepEqual(model, normalizeModel(m));
-  const pj = JSON.parse(fs.readFileSync(path.join(BLINKY, 'xailinx.json'), 'utf8'));
+  const pj = JSON.parse(fs.readFileSync(path.join(BLINKY, 'silinx.json'), 'utf8'));
   assert.ok(!pj.files.some((f) => /speed_fsm/.test(f.path)));
   const sources = pj.files.map((f) => ({ path: f.path, text: fs.readFileSync(path.join(BLINKY, f.path), 'utf8') }));
   const r = simulate(sources, pj.simTop, { until: 2e8 });

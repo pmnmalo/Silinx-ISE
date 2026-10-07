@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Build the private XAIlinx Xilinx ISE 14.7 image from your own installer + WebPACK license,
-# then configure XAIlinx to use it.  macOS (Intel / Apple Silicon) and Linux (x86-64 / ARM64).
+# Build the private Silinx Xilinx ISE 14.7 image from your own installer + WebPACK license,
+# then configure Silinx to use it.  macOS (Intel / Apple Silicon) and Linux (x86-64 / ARM64).
 #
 #   docker/ise/build-ise-image.sh --installer ~/Downloads/Xilinx_ISE_DS_Lin_14.7_1015_1.tar \
-#                                 --license   ~/Downloads/Xilinx.lic  [--tag xailinx/ise:14.7] [--no-md5]
+#                                 --license   ~/Downloads/Xilinx.lic  [--tag silinx/ise:14.7] [--no-md5]
 #                                 [--full | --families "spartan3e spartan6"]
 # Default: ISE trimmed to the command-line flow (about 3 GB, every device family). --full keeps the
 # complete ~18 GB install; --families keeps only the listed families' device data.
@@ -13,14 +13,14 @@
 # it to a public registry.
 set -euo pipefail
 
-TAG="xailinx/ise:14.7"
+TAG="silinx/ise:14.7"
 INSTALLER=""
 LICENSE=""
 CHECK_MD5=1
 BUILD_ARGS=()
 MD5_EXPECTED="e8065b2ffb411bb74ae32efa475f9817"   # Xilinx_ISE_DS_Lin_14.7_1015_1.tar (AMD download page)
 KIT_DIR="$(cd "$(dirname "$0")" && pwd)"
-XAILINX_DIR="$(cd "$KIT_DIR/../.." && pwd)"
+SILINX_DIR="$(cd "$KIT_DIR/../.." && pwd)"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
@@ -79,7 +79,7 @@ fi
 # --- build (installer and license folders are passed as named build contexts)
 # The installer gets its own folder (hard link: instant, no extra space), so BuildKit only
 # transfers the tarball and not everything else that sits next to it (e.g. ~/Downloads).
-INSTALLER_DIR="$(cd "$(dirname "$INSTALLER")" && pwd)/.xailinx-ise-stage"
+INSTALLER_DIR="$(cd "$(dirname "$INSTALLER")" && pwd)/.silinx-ise-stage"
 mkdir -p "$INSTALLER_DIR" 2>/dev/null || INSTALLER_DIR="$(mktemp -d)"
 if [ ! -f "$INSTALLER_DIR/Xilinx_ISE_DS_Lin_14.7_1015_1.tar" ]; then
   ln "$INSTALLER" "$INSTALLER_DIR/Xilinx_ISE_DS_Lin_14.7_1015_1.tar" 2>/dev/null \
@@ -109,10 +109,10 @@ else
   die "XST could not synthesize a test design (license problem?). See $tmp/t.syr"
 fi
 
-# --- configure XAIlinx
-if command -v node >/dev/null && [ -f "$XAILINX_DIR/bin/xailinx.js" ]; then
-  node "$XAILINX_DIR/bin/xailinx.js" toolchain --docker "$TAG"
+# --- configure Silinx
+if command -v node >/dev/null && [ -f "$SILINX_DIR/bin/silinx.js" ]; then
+  node "$SILINX_DIR/bin/silinx.js" toolchain --docker "$TAG"
 else
-  echo "Configure XAIlinx: Tools > Toolchain Settings > Docker image = $TAG"
+  echo "Configure Silinx: Tools > Toolchain Settings > Docker image = $TAG"
 fi
 info "done. Keep the image private: it contains AMD/Xilinx software and your license."

@@ -1,5 +1,5 @@
 # Xilinx ISE 14.7 unattended install (batchxsetup --batch): WebPACK, no cable drivers
-# (programming is done by XAIlinx on the host), no license manager GUI.
+# (programming is done by Silinx on the host), no license manager GUI.
 destination_dir=/opt/Xilinx
 copy_preferences=N
 use_multiple_cores=Y

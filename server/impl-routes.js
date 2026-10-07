@@ -154,13 +154,13 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     return importXiseProject(P, b.name, b.xise, b.files && typeof b.files === 'object' ? b.files : {});
   }));
 
-  // ----- whole project as a zip: <name>.xise + xailinx.json + all project files (not build/) -----
+  // ----- whole project as a zip: <name>.xise + silinx.json + all project files (not build/) -----
   api.get('/projects/:p/export.zip', wrap(async (req, res) => {
     const name = req.params.p;
     const project = await P.readProject(name);
     const sources = await sourcesOf(name, project);
     const tree = await P.fileTree(name);
-    // XAIlinx schematics go out as ISE schematics (.sch), listed in the .xise in place of their HDL
+    // Silinx schematics go out as ISE schematics (.sch), listed in the .xise in place of their HDL
     const docs = {};
     for (const rel of tree.filter(f => /\.sch\.json$/i.test(f))) {
       try { docs[rel] = JSON.parse(await fs.readFile(P.safeJoin(P.projectDir(name), rel), 'utf8')); } catch { /* skip */ }
@@ -173,9 +173,9 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
       if (rel === xiseName(project) || added.has(rel)) continue;
       entries.push({ path: rel, data: await fs.readFile(P.safeJoin(P.projectDir(name), rel)) });
     }
-    entries.unshift({ path: xiseName(project), data: xml }, { path: 'xailinx.json', data: await fs.readFile(path.join(P.projectDir(name), 'xailinx.json')) },
+    entries.unshift({ path: xiseName(project), data: xml }, { path: 'silinx.json', data: await fs.readFile(path.join(P.projectDir(name), 'silinx.json')) },
       ...sch.files.map(f => ({ path: f.path, data: f.text })));
-    if (sch.warnings.length) res.set('X-XAIlinx-Warnings', encodeURIComponent(JSON.stringify(sch.warnings.slice(0, 50))));
+    if (sch.warnings.length) res.set('X-Silinx-Warnings', encodeURIComponent(JSON.stringify(sch.warnings.slice(0, 50))));
     const zip = await createZip(entries, NODE_CODEC);
     res.type('application/zip').attachment(`${name}.zip`).send(Buffer.from(zip));
   }));
@@ -187,7 +187,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     let entries;
     try { entries = await readZip(new Uint8Array(req.body), NODE_CODEC); } catch (e) { throw bad(`cannot read zip: ${e.message}`); }
     const xiseEntry = entries.filter(e => /\.xise$/i.test(e.path)).sort((x, y) => x.path.split('/').length - y.path.split('/').length)[0];
-    const pjEntry = entries.find(e => /(^|\/)xailinx\.json$/.test(e.path));
+    const pjEntry = entries.find(e => /(^|\/)(silinx|xailinx)\.json$/.test(e.path));   // xailinx.json: before the rename
     const root = (xiseEntry || pjEntry) ? path.posix.dirname((xiseEntry || pjEntry).path) : '';
     const rel = p => (root === '.' || !root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
     const text = e => Buffer.from(e.data).toString('utf8');
@@ -199,20 +199,20 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     } else if (pjEntry) {
       await P.createProject({ name, template: 'empty' });
       result = { project: await P.readProject(name), missing: [], warnings: [] };
-    } else throw bad('the zip contains no .xise (ISE project) and no xailinx.json');
+    } else throw bad('the zip contains no .xise (ISE project) and no silinx.json');
     // copy every other file of the project folder (ASM charts, memory files, docs...) keeping its path
     const written = new Set((result.project.files || []).map(f => f.path).concat(result.project.constraints || []));
     const extra = [];
     for (const e of entries) {
       const r = rel(e.path);
-      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'xailinx.json' || ISE_OUTPUT.test(r)) continue;
+      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'silinx.json' || r === 'xailinx.json' || ISE_OUTPUT.test(r)) continue;
       const norm = path.posix.normalize(r);
       if (norm.startsWith('..') || path.posix.isAbsolute(norm)) continue;
       await fs.mkdir(path.dirname(P.safeJoin(P.projectDir(name), norm)), { recursive: true });
       await fs.writeFile(P.safeJoin(P.projectDir(name), norm), Buffer.from(e.data));
       extra.push(norm);
     }
-    // XAIlinx export: restore the settings ISE does not know about (board, stimuli, language...)
+    // Silinx export: restore the settings ISE does not know about (board, stimuli, language...)
     let project = await P.readProject(name);
     if (pjEntry) {
       try {
@@ -222,7 +222,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
           for (const f of saved.files || []) if (!fss.existsSync(path.join(P.projectDir(name), f.path))) result.missing.push(f.path);
         }
         project = await P.writeProject(name, project);
-      } catch { /* ignore a broken xailinx.json */ }
+      } catch { /* ignore a broken silinx.json */ }
     }
     return { project, missing: result.missing, warnings: result.warnings, extra };
   }));
@@ -237,7 +237,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     if (direction === 'auto') {
       if (!fss.existsSync(xfile)) direction = 'export';
       else {
-        const xs = fss.statSync(xfile).mtimeMs, js = fss.statSync(path.join(dir, 'xailinx.json')).mtimeMs;
+        const xs = fss.statSync(xfile).mtimeMs, js = fss.statSync(path.join(dir, 'silinx.json')).mtimeMs;
         direction = xs > js ? 'import' : 'export';
       }
     }
@@ -284,7 +284,7 @@ async function importXiseProject(P, name, xiseText, provided) {
     if (typeof text === 'string') { await P.writeFile(name, target, text); sources[target] = text; } else missing.push(f.path);
     files.push({ path: target, lang: f.lang, role: f.role });
   }
-  // ISE schematics -> XAIlinx schematics + their synchronized HDL
+  // ISE schematics -> Silinx schematics + their synchronized HDL
   const warnings = [...parsed.warnings];
   if (parsed.schematics.length) {
     const schFiles = {}, roles = {};

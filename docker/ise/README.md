@@ -1,8 +1,8 @@
-# Xilinx ISE 14.7 toolchain for XAIlinx (Docker builder kit)
+# Xilinx ISE 14.7 toolchain for Silinx (Docker builder kit)
 
-XAIlinx simulates, draws schematics and programs boards on its own, but **synthesis, place & route
+Silinx simulates, draws schematics and programs boards on its own, but **synthesis, place & route
 and bitstream generation for Spartan-3E need Xilinx ISE 14.7** — there is no open-source
-alternative for this family. ISE runs only on x86-64 Linux/Windows, so XAIlinx runs it inside a
+alternative for this family. ISE runs only on x86-64 Linux/Windows, so Silinx runs it inside a
 Docker container on every platform.
 
 > **Why there is no ready-made image:** ISE WebPACK is free, but the AMD/Xilinx license agreement
@@ -43,9 +43,9 @@ Windows (PowerShell):
 powershell -ExecutionPolicy Bypass -File docker\ise\build-ise-image.ps1 -Installer $HOME\Downloads\Xilinx_ISE_DS_Lin_14.7_1015_1.tar -License $HOME\Downloads\Xilinx.lic
 ```
 
-The script checks the installer checksum and x86-64 emulation, builds `xailinx/ise:14.7`
+The script checks the installer checksum and x86-64 emulation, builds `silinx/ise:14.7`
 (20–60 minutes, once), synthesizes a test design to confirm the license works, and configures
-XAIlinx to use the image. Without arguments it looks for both files in `~/Downloads`.
+Silinx to use the image. Without arguments it looks for both files in `~/Downloads`.
 
 **Image size.** By default the install is trimmed to what the command-line flow uses
 (`trim-ise.sh`): EDK, PlanAhead, CORE Generator, SysGen, simulation libraries, documentation and
@@ -58,18 +58,18 @@ Options (`.ps1`: `-Full`, `-Families`):
 | `--families "spartan3e spartan6"` | trimmed, only these families' device data (the families they depend on are kept) |
 | `--full` | complete ISE WebPACK install, including the Project Navigator GUI and CORE Generator |
 
-Then in XAIlinx: *Process ▸ Implement Top Module* or double-click *Generate Programming File*.
+Then in Silinx: *Process ▸ Implement Top Module* or double-click *Generate Programming File*.
 
 ## Using the image directly
 
 ```bash
-docker run --rm -v "$PWD:/work" xailinx/ise:14.7 xst -help          # any ISE command-line tool
-docker run --rm -v "$PWD:/work" xailinx/ise:14.7 bash run.sh        # an XAIlinx build directory
+docker run --rm -v "$PWD:/work" silinx/ise:14.7 xst -help          # any ISE command-line tool
+docker run --rm -v "$PWD:/work" silinx/ise:14.7 bash run.sh        # a Silinx build directory
 ```
 
 The image runs under any user ID (`--user`), loads `settings64.sh` automatically and has the
 license at `/opt/Xilinx/Xilinx.lic` (`XILINXD_LICENSE_FILE`). Device programming is done by
-XAIlinx on the host (USB), not inside the container.
+Silinx on the host (USB), not inside the container.
 
 ## Files
 
@@ -79,4 +79,4 @@ XAIlinx on the host (USB), not inside the container.
 | `install-config.txt` | unattended-install options (WebPACK, no cable drivers) |
 | `entrypoint.sh` | sets up `$HOME`, sources `settings64.sh`, runs the command |
 | `trim-ise.sh` | removes what the command-line flow does not use (run during the build unless `--full`) |
-| `build-ise-image.sh` / `.ps1` | build + test + configure XAIlinx (macOS/Linux / Windows) |
+| `build-ise-image.sh` / `.ps1` | build + test + configure Silinx (macOS/Linux / Windows) |

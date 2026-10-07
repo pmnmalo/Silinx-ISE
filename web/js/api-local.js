@@ -1,13 +1,21 @@
 // Standalone (server-less) backend: same interface as api.js, with projects kept in the
-// browser's localStorage. Used by the single-file build (dist/XAIlinx.html).
-// Synthesis/implementation and device programming need the XAIlinx server + Xilinx ISE,
+// browser's localStorage. Used by the single-file build (dist/Silinx.html).
+// Synthesis/implementation and device programming need the Silinx server + Xilinx ISE,
 // so those operations report that they are unavailable here.
 import { getDeviceDb } from '../../server/devices.js';
 import { exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
-import EXAMPLES from 'xailinx-examples';
+import EXAMPLES from 'silinx-examples';
 import { createZip, readZip, browserCodec, textOf } from '../../core/zip.js';
 
-const KEY = 'xailinx.standalone.fs';
+const KEY = 'silinx.standalone.fs';
+// projects stored before the rename to Silinx (xailinx.* keys) are moved to the new keys
+try {
+  for (const [o, n] of [['xailinx.standalone.fs', KEY], ['xailinx.recent', 'silinx.recent'], ['xailinx.lastProject', 'silinx.lastProject'], ['xailinx.lang', 'silinx.lang']]) {
+    const v = localStorage.getItem(o);
+    if (v !== null && localStorage.getItem(n) === null) localStorage.setItem(n, v);
+    if (v !== null) localStorage.removeItem(o);
+  }
+} catch { /* no storage */ }
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
 
@@ -70,9 +78,9 @@ function fakeJob(kind, lines, status = 'error', error) {
   return { job: id };
 }
 const NEED_SERVER = [
-  'This is the standalone (single HTML file) edition of XAIlinx.',
-  'Synthesis, implementation (Xilinx ISE 14.7) and device programming need the full XAIlinx',
-  'application: run `npm start` in the XAIlinx folder and open http://127.0.0.1:8642.',
+  'This is the standalone (single HTML file) edition of Silinx.',
+  'Synthesis, implementation (Xilinx ISE 14.7) and device programming need the full Silinx',
+  'application: run `npm start` in the Silinx folder and open http://127.0.0.1:8642.',
   'Tip: File > Download Project Bundle, then open it in the full application.',
 ];
 
@@ -126,7 +134,7 @@ export const api = {
   toolchain: async () => ({
     platform: 'browser', configPath: '(browser — standalone edition)',
     config: { mode: 'local', local: { settings: '' }, docker: { image: '', settings: '' }, ssh: { host: '', user: '', port: 22, remoteDir: '', settings: '' }, programmer: { tool: '', cable: '' } },
-    ise: { mode: 'browser', available: false, reason: 'standalone edition: synthesis and programming need the XAIlinx server and Xilinx ISE 14.7', help: NEED_SERVER.join(' ') },
+    ise: { mode: 'browser', available: false, reason: 'standalone edition: synthesis and programming need the Silinx server and Xilinx ISE 14.7', help: NEED_SERVER.join(' ') },
     programmers: {}, helpers: {},
   }),
   saveToolchain: async () => api.toolchain(),
@@ -195,7 +203,7 @@ export const api = {
     const sch = exportIseSchematics(p.json, docs, p.files);
     const xml = exportXise(p.json, { sources: p.files, schematics: sch.schematics, extraFiles: sch.extraFiles });
     const added = new Set(sch.files.map(f => f.path));
-    const entries = [{ path: `${name}.xise`, data: xml }, { path: 'xailinx.json', data: JSON.stringify(p.json, null, 2) + '\n' },
+    const entries = [{ path: `${name}.xise`, data: xml }, { path: 'silinx.json', data: JSON.stringify(p.json, null, 2) + '\n' },
       ...sch.files.map(f => ({ path: f.path, data: f.text })),
       ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k)).map(([path, data]) => ({ path, data }))];
     return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip`, warnings: sch.warnings };
@@ -203,8 +211,8 @@ export const api = {
   importZip: async (name, file) => {
     const entries = await readZip(new Uint8Array(await file.arrayBuffer()), browserCodec());
     const xe = entries.filter(e => /\.xise$/i.test(e.path)).sort((a, b) => a.path.split('/').length - b.path.split('/').length)[0];
-    const pe = entries.find(e => /(^|\/)xailinx\.json$/.test(e.path));
-    if (!xe && !pe) fail('the zip contains no .xise (ISE project) and no xailinx.json');
+    const pe = entries.find(e => /(^|\/)(silinx|xailinx)\.json$/.test(e.path));
+    if (!xe && !pe) fail('the zip contains no .xise (ISE project) and no silinx.json');
     const root = (xe || pe).path.includes('/') ? (xe || pe).path.replace(/\/[^/]*$/, '') : '';
     const rel = p => (!root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
     const files = {};
@@ -214,7 +222,7 @@ export const api = {
     else createProjectSync({ name, template: 'empty' });
     const p = mem[name];
     const known = new Set(p.json.files.map(f => f.path).concat(p.json.constraints));
-    for (const [k, v] of Object.entries(files)) if (!known.has(k) && !/\.xise$/i.test(k) && k !== 'xailinx.json') p.files[k] = v;
+    for (const [k, v] of Object.entries(files)) if (!known.has(k) && !/\.xise$/i.test(k) && k !== 'silinx.json' && k !== 'xailinx.json') p.files[k] = v;
     if (pe) {
       try {
         const saved = JSON.parse(textOf(pe));
@@ -228,11 +236,11 @@ export const api = {
   // standalone-only: project bundles (one JSON file with every project file)
   exportBundle: name => {
     const p = proj(name);
-    return JSON.stringify({ format: 'xailinx-bundle', version: 1, project: p.json, files: p.files }, null, 1);
+    return JSON.stringify({ format: 'silinx-bundle', version: 1, project: p.json, files: p.files }, null, 1);
   },
   importBundle: async text => {
     const b = JSON.parse(text);
-    if (b.format !== 'xailinx-bundle') fail('not an XAIlinx project bundle');
+    if (b.format !== 'silinx-bundle' && b.format !== 'xailinx-bundle') fail('not a Silinx project bundle');
     let name = b.project.name;
     while (load()[name]) name = `${b.project.name}_${Math.floor(Math.random() * 1000)}`;
     mem[name] = { json: { ...b.project, name }, files: b.files };

@@ -273,7 +273,7 @@ test('vector expressions translate to numeric_std in VHDL', () => {
   assert.match(vl, /p = 4'd15;/);
 });
 
-// End-to-end: simulate the generated Verilog and VHDL with the XAIlinx simulator (core/compile.js)
+// End-to-end: simulate the generated Verilog and VHDL with the Silinx simulator (core/compile.js)
 // and check that both behave identically and correctly. Skipped if the simulator is not available.
 test('generated HDL simulates correctly in both languages (seq101 + registered counter)', async (t) => {
   let simulate;

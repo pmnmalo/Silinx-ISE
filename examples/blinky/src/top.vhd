@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------
--- XAIlinx example: blinky for the Digilent Basys2 (Spartan-3E XC3S250E-CP132).
+-- Silinx example: blinky for the Digilent Basys2 (Spartan-3E XC3S250E-CP132).
 -- Mixed-language design: VHDL top + VHDL pattern generator + Verilog prescaler.
 --   clk  : 50 MHz MCLK oscillator (B8, default JP4 setting)
 --   sw   : sw(0) = reset, sw(1) = mode (0 = knight rider, 1 = binary counter),

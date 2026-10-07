@@ -1,4 +1,4 @@
-/* XAIlinx RTL schematic viewer — ISE 14.x "View RTL Schematic" look. Scoped under .sch-view. */
+/* Silinx RTL schematic viewer — ISE 14.x "View RTL Schematic" look. Scoped under .sch-view. */
 .sch-view {
   position: relative; overflow: hidden; outline: none;
   background-color: var(--sch-bg, #fff);

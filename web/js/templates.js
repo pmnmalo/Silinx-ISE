@@ -11,7 +11,7 @@ function vhdlHeader(name, project, desc = '') {
 -- Module Name:    ${name}
 -- Project Name:   ${project.name}
 -- Target Devices: ${project.device.part}${project.device.speed}-${project.device.package}
--- Tool versions:  XAIlinx
+-- Tool versions:  Silinx
 -- Description:    ${desc}
 --
 -- Dependencies:
@@ -35,7 +35,7 @@ function vlogHeader(name, project, desc = '') {
 // Module Name:    ${name}
 // Project Name:   ${project.name}
 // Target Devices: ${project.device.part}${project.device.speed}-${project.device.package}
-// Tool versions:  XAIlinx
+// Tool versions:  Silinx
 // Description:    ${desc}
 //
 // Dependencies:

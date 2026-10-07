@@ -1,4 +1,4 @@
-// XAIlinx - VHDL lexer.
+// Silinx - VHDL lexer.
 //
 // Produces a flat token array. Each token: { type, value, line, col, ... }
 //   type 'id'     identifier (value lower-cased, `raw` keeps the original spelling)

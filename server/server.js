@@ -1,4 +1,4 @@
-// XAIlinx HTTP server: static web UI, shared core modules and the REST API.
+// Silinx HTTP server: static web UI, shared core modules and the REST API.
 import express from 'express';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -42,7 +42,7 @@ export async function createApp() {
   api.delete('/projects/:p/file', wrap(async req => { await P.deleteFile(req.params.p, req.query.path); return { ok: true }; }));
   api.get('/projects/:p/sources', wrap(req => P.readSources(req.params.p)));
   api.get('/templates', wrap(() => fs.readdirSync(P.EXAMPLES_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory() && fs.existsSync(path.join(P.EXAMPLES_DIR, d.name, 'xailinx.json')))
+    .filter(d => d.isDirectory() && fs.existsSync(path.join(P.EXAMPLES_DIR, d.name, 'silinx.json')))
     .map(d => d.name)));
 
   // Implementation (ISE) + programming routes live in impl-routes.js.
@@ -57,7 +57,7 @@ export async function startServer({ port = 8642, host = '127.0.0.1' } = {}) {
   const app = await createApp();
   return new Promise((resolve, reject) => {
     const srv = app.listen(port, host, () => {
-      console.log(`XAIlinx running at http://${host}:${port}  (workspace: ${P.workspaceDir()})`);
+      console.log(`Silinx running at http://${host}:${port}  (workspace: ${P.workspaceDir()})`);
       resolve(srv);
     });
     srv.on('error', reject);

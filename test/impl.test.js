@@ -12,9 +12,9 @@ const FIX = path.join(HERE, 'fixtures', 'ise');
 
 let tmp;
 before(async () => {
-  tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'xailinx-impl-test-'));
-  // Isolate the toolchain config from the user's ~/.xailinx.
-  process.env.XAILINX_CONFIG_DIR = path.join(tmp, 'cfg');
+  tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'silinx-impl-test-'));
+  // Isolate the toolchain config from the user's ~/.silinx.
+  process.env.SILINX_CONFIG_DIR = path.join(tmp, 'cfg');
 });
 after(async () => { await fs.rm(tmp, { recursive: true, force: true }); });
 
@@ -138,15 +138,15 @@ test('run.sh fails cleanly without ISE and runs selected steps with stub tools',
   const r = spawnSync('bash', ['run.sh', 'synth', 'map'], { cwd: dir, env });
   const out = r.stdout.toString();
   assert.equal(r.status, 0, r.stderr.toString());
-  assert.match(out, /=== XAILINX STEP synth ===\nstub xst/);
-  assert.match(out, /=== XAILINX STEP map ===\nstub map/);
+  assert.match(out, /=== SILINX STEP synth ===\nstub xst/);
+  assert.match(out, /=== SILINX STEP map ===\nstub map/);
   assert.doesNotMatch(out, /stub par/);
-  assert.match(out, /=== XAILINX DONE ===/);
+  assert.match(out, /=== SILINX DONE ===/);
   // failing tool
   await fs.writeFile(path.join(bin, 'map'), '#!/bin/sh\nexit 3\n', { mode: 0o755 });
   const r2 = spawnSync('bash', ['run.sh'], { cwd: dir, env });
   assert.equal(r2.status, 3);
-  assert.match(r2.stdout.toString(), /=== XAILINX FAILED map \(exit 3\) ===/);
+  assert.match(r2.stdout.toString(), /=== SILINX FAILED map \(exit 3\) ===/);
   // no ISE at all
   const r3 = spawnSync('bash', ['run.sh'], { cwd: dir, env: { PATH: '/usr/bin:/bin', ISE_SETTINGS: '/nonexistent' } });
   assert.equal(r3.status, 127);
@@ -173,7 +173,7 @@ async function makeProject(name) {
     constraints: 'constraints/top.ucf',
     impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' },
   };
-  await fs.writeFile(path.join(dir, 'xailinx.json'), JSON.stringify(project));
+  await fs.writeFile(path.join(dir, 'silinx.json'), JSON.stringify(project));
   return { dir, project };
 }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# XAIlinx launcher for macOS: double-click this file in Finder.
+# Silinx launcher for macOS: double-click this file in Finder.
 # (The first time macOS may refuse to open it: right-click it > Open > Open.)
 cd "$(dirname "$0")" || exit 1
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.volta/bin:$PATH"
@@ -18,8 +18,8 @@ if ! node -e "process.exit(+process.versions.node.split('.')[0] >= 18 ? 0 : 1)";
   open "https://nodejs.org"; read -r -p "Press Enter to close this window."; exit 1
 fi
 if [ ! -d node_modules/express ]; then
-  echo "Installing what XAIlinx needs (first time only, needs Internet)..."
+  echo "Installing what Silinx needs (first time only, needs Internet)..."
   npm install --omit=dev || { read -r -p "Installation failed. Press Enter to close."; exit 1; }
 fi
-echo "Starting XAIlinx... your browser opens at http://127.0.0.1:8642"
-node bin/xailinx.js serve --open
+echo "Starting Silinx... your browser opens at http://127.0.0.1:8642"
+node bin/silinx.js serve --open

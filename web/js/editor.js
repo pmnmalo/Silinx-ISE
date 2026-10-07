@@ -1,6 +1,6 @@
 // HDL source editor built on CodeMirror 5 (loaded globally as window.CodeMirror):
 // syntax highlighting, context-aware auto-complete, language templates (snippets), live lint
-// from the XAIlinx parsers, hover info, go-to-definition, folding, comment toggling, search.
+// from the Silinx parsers, hover info, go-to-definition, folding, comment toggling, search.
 import { parse as parseVerilog } from '/core/verilog/parser.js';
 import { parse as parseVhdl } from '/core/vhdl/parser.js';
 

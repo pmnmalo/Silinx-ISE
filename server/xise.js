@@ -42,7 +42,7 @@ function topValue(project, name, sources) {
 
 /**
  * Build .xise XML for a project.
- * @param {object} project  XAIlinx project json
+ * @param {object} project  Silinx project json
  * @param {object} [opts]   { sources: { path: text } } (optional, used to detect VHDL architectures / top files)
  */
 export function exportXise(project, { sources, schematics = [], extraFiles = [] } = {}) {
@@ -53,7 +53,7 @@ export function exportXise(project, { sources, schematics = [], extraFiles = [] 
   const files = (project.files || []).filter(f => !bySch.has(f.path)).concat(extraFiles);
   const lines = [XML_HEADER, '<project xmlns="http://www.xilinx.com/XMLSchema" xmlns:xil_pn="http://www.xilinx.com/XMLSchema">', ''];
   lines.push('  <header>',
-    '    <!-- ISE source project file exported by XAIlinx.                     -->',
+    '    <!-- ISE source project file exported by Silinx.                     -->',
     '    <!-- Open it in ISE 14.7 Project Navigator; ISE completes the defaults. -->',
     '  </header>', '');
   lines.push('  <version xil_pn:ise_version="14.7" xil_pn:schema_version="2"/>', '');
@@ -141,7 +141,7 @@ function unitName(v) {
 }
 
 /**
- * Parse .xise XML into a partial XAIlinx project:
+ * Parse .xise XML into a partial Silinx project:
  * { device, top, simTop, files:[{path,lang,role}], constraints, impl, name? }
  */
 export function importXise(xml) {
@@ -185,9 +185,9 @@ export function importXise(xml) {
   const KIND = { FILE_SCHEMATIC: 'ISE schematic (.sch)', FILE_COREGEN: 'CORE Generator IP (.xco)', FILE_COREGENISE: 'CORE Generator IP (.xco)', FILE_STATEDIAGRAM: 'StateCAD state diagram (.dia)', FILE_XCO: 'CORE Generator IP (.xco)' };
   for (const u of unsupported) {
     const kind = KIND[u.type] || (/\.sch$/i.test(u.name) ? KIND.FILE_SCHEMATIC : /\.xco$/i.test(u.name) ? KIND.FILE_COREGEN : /\.dia$/i.test(u.name) ? KIND.FILE_STATEDIAGRAM : `${u.type} file`);
-    warnings.push(`${u.name}: ${kind} is not converted by XAIlinx and was left out of the project (the file itself is kept in the project folder when importing a .zip)`);
+    warnings.push(`${u.name}: ${kind} is not converted by Silinx and was left out of the project (the file itself is kept in the project folder when importing a .zip)`);
   }
-  if (fam && !familyFromXise(fam)) warnings.push(`device family '${fam}' is not an FPGA family supported by XAIlinx (${familyName(device.family)} assumed)`);
+  if (fam && !familyFromXise(fam)) warnings.push(`device family '${fam}' is not an FPGA family supported by Silinx (${familyName(device.family)} assumed)`);
 
   const top = unitName(props['Implementation Top']) || (props['Implementation Top Instance Path'] || '').replace(/^\//, '') || '';
   const simTop = unitName(props['PROP_BehavioralSimTop']) || unitName(props['Selected Simulation Root Source Node Behavioral']) || '';
@@ -203,8 +203,8 @@ export function importXise(xml) {
 }
 
 /**
- * ISE schematics of an imported project -> XAIlinx schematics (.sch.json) + the HDL kept in sync with them.
- * schFiles: { targetPath: schText }; existing(path): text of a file the import carries (an XAIlinx
+ * ISE schematics of an imported project -> Silinx schematics (.sch.json) + the HDL kept in sync with them.
+ * schFiles: { targetPath: schText }; existing(path): text of a file the import carries (a Silinx
  * export already has the .sch.json and its HDL, which keep the exact drawing).
  * Returns [{ sch, json, jsonText, hdl, code, lang, warnings }] (json/hdl missing when it failed).
  */
@@ -233,7 +233,7 @@ export function importIseSchematics(schFiles, { sources = {}, symbols = {}, lang
 }
 
 /**
- * XAIlinx schematics -> ISE schematics for a project export.
+ * Silinx schematics -> ISE schematics for a project export.
  * docs: { 'src/x.sch.json': doc }, sources: { path: text } (the project's HDL).
  * Returns { schematics: [{ path, hdl, role }], extraFiles: [{ path, lang, role }], files: [{ path, text }], warnings }.
  */

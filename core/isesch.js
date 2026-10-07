@@ -1,4 +1,4 @@
-// Xilinx ISE schematic (.sch) <-> XAIlinx schematic document (.sch.json). Isomorphic (no DOM, no Node APIs).
+// Xilinx ISE schematic (.sch) <-> Silinx schematic document (.sch.json). Isomorphic (no DOM, no Node APIs).
 //
 //   import { importIseSch, exportIseSch, parseIseSch } from '/core/isesch.js';
 //
@@ -14,9 +14,9 @@
 //   <sheet>    : <instance x y name orien="R0..R270|M0..M270"/>, <branch name=..><wire x1 y1 x2 y2/>..</branch>,
 //                <iomarker x y name orien/>, <bustap x1 y1 (on the bus) x2 y2 (bit wire end)/>
 // Connectivity in ISE is by net name (a branch named d(3) is bit 3 of bus d(7:0)); the drawing is graphics.
-// XAIlinx connectivity is geometric, so the import rebuilds it: ISE coordinates are mapped with an order
+// Silinx connectivity is geometric, so the import rebuilds it: ISE coordinates are mapped with an order
 // preserving map (ISE unit 64 -> 20 px, minimum spacing one grid step) that keeps the wire topology exact,
-// XAIlinx symbols are placed on the ISE pin positions (stub wires where the symbol shapes differ), bus taps
+// Silinx symbols are placed on the ISE pin positions (stub wires where the symbol shapes differ), bus taps
 // become slice / bus join symbols, and net names are added wherever a net is joined by name only.
 // The result is checked with netlist() against the ISE netlist (warnings list any difference).
 import {
@@ -245,7 +245,7 @@ export function iseXform(orien, x, y) {
     default: return [x, y];
   }
 }
-// ISE orien <-> XAIlinx { rot, mirror } (XAIlinx mirrors first, then rotates: Mk == mirror + rot (360-k))
+// ISE orien <-> Silinx { rot, mirror } (Silinx mirrors first, then rotates: Mk == mirror + rot (360-k))
 export function iseOrienToXai(orien) {
   const m = /^([RM])(\d+)$/i.exec(String(orien || 'R0'));
   const k = m ? ((+m[2] % 360) + 360) % 360 : 0;
@@ -457,7 +457,7 @@ function blockdefPinPoints(def) {
   return [...pts.values()];
 }
 
-// ===================================================================== exact HDL for library symbols without a XAIlinx twin
+// ===================================================================== exact HDL for library symbols without a Silinx twin
 // Each template gets (lang, P, T, W): P(isePin) -> pin identifier, T(suffix) -> fresh temp identifier,
 // W(isePin) -> pin width. Returns { code, decls } (decls go to doc.hdl.decls).
 function vecV(P, names) { return `{${names.map(P).join(', ')}}`; }
@@ -695,7 +695,7 @@ function libTemplate(s, conn) {
 }
 
 // ===================================================================== import: .sch -> .sch.json
-const S_IN = 5 / 16;                       // ISE units -> XAIlinx px (ISE pin pitch 64 -> grid 20)
+const S_IN = 5 / 16;                       // ISE units -> Silinx px (ISE pin pitch 64 -> grid 20)
 const AUTO_RE = /^XLXN_\d+$/i;
 const SIDE_VEC = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] };
 const INWARD_ROT = { W: 0, N: 90, E: 180, S: 270 };   // inverter rotation so that it points into a pin on that side
@@ -754,7 +754,7 @@ function onSegment(px, py, [x1, y1, x2, y2]) {
 }
 
 /**
- * Convert an ISE schematic (.sch, version 7 XML or legacy VERSION 6 text) into a XAIlinx document.
+ * Convert an ISE schematic (.sch, version 7 XML or legacy VERSION 6 text) into a Silinx document.
  * @param {string} xmlText
  * @param {{ modules?: object|object[], symbols?: object, name?: string, lang?: 'vhdl'|'verilog' }} opts
  *   modules: project modules ({ name, ports: [{ name, dir, width }] }, e.g. from modulesFromLibrary) — ISE
@@ -793,7 +793,7 @@ export function importIseSch(xmlText, opts = {}) {
   for (const sh of model.sheets) { for (const b of sh.branches) sig(b.name); for (const io of sh.iomarkers) sig(io.name); }
   const keyWidth = k => sigs.get(k)?.p.width || 1;
 
-  // ------------------------------------------------------------- blocks -> XAIlinx specs
+  // ------------------------------------------------------------- blocks -> Silinx specs
   const instOf = new Map();
   model.sheets.forEach((sh, si) => sh.instances.forEach(i => instOf.set(lc(i.name), { ...i, sheet: si })));
   // ISE pin positions (sheet units) of a block, from the library tables and the wires that end on the symbol
@@ -903,7 +903,7 @@ export function importIseSch(xmlText, opts = {}) {
     }
   }
 
-  // ------------------------------------------------------------- names (XAIlinx identifiers)
+  // ------------------------------------------------------------- names (Silinx identifiers)
   const owner = new Map();     // lower-case identifier -> owner tag
   const claim = (want, tag) => {
     let b = String(want || 'n').replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '') || 'n';
@@ -967,7 +967,7 @@ export function importIseSch(xmlText, opts = {}) {
       sp.hdl = r.code;
       if (r.decls) declLines.push(...r.decls);
     } else {
-      sp.hdl = lang === 'vhdl' ? `-- TODO: ISE symbol '${B.blk.symbol}' has no XAIlinx equivalent: describe its function here` : `// TODO: ISE symbol '${B.blk.symbol}' has no XAIlinx equivalent: describe its function here`;
+      sp.hdl = lang === 'vhdl' ? `-- TODO: ISE symbol '${B.blk.symbol}' has no Silinx equivalent: describe its function here` : `// TODO: ISE symbol '${B.blk.symbol}' has no Silinx equivalent: describe its function here`;
     }
   }
 
@@ -992,9 +992,9 @@ export function importIseSch(xmlText, opts = {}) {
     for (const p of B.blk.pins) {
       const pm = sp.pins[p.name];
       const key = p.signal ? lc(p.signal.trim()) : null;
-      if (!pm) { if (key) warn(`${B.name} (${B.blk.symbol}): pin ${p.name} has no XAIlinx equivalent and is left unconnected`); continue; }
+      if (!pm) { if (key) warn(`${B.name} (${B.blk.symbol}): pin ${p.name} has no Silinx equivalent and is left unconnected`); continue; }
       const xp = pins.get(pm.xai);
-      if (!xp) { if (key) warn(`${B.name} (${B.blk.symbol}): pin ${p.name} not found on the XAIlinx symbol`); continue; }
+      if (!xp) { if (key) warn(`${B.name} (${B.blk.symbol}): pin ${p.name} not found on the Silinx symbol`); continue; }
       let E = [xp.x, xp.y], inv = null;
       if (pm.invert) {
         const [vx, vy] = SIDE_VEC[xp.side];
@@ -1066,7 +1066,7 @@ export function importIseSch(xmlText, opts = {}) {
     const pts = M.ext.filter(e => e.pt);
     for (const e of pts) { X.add(e.pt[0]); Y.add(e.pt[1]); }
     if (M.inst) X.add(M.inst.x), Y.add(M.inst.y);
-    // spacing constraints so the XAIlinx symbol fits between its ISE pin positions
+    // spacing constraints so the Silinx symbol fits between its ISE pin positions
     for (const [ax, A] of [[0, X], [1, Y]]) {
       const byC = new Map();
       for (const e of pts) { const c = e.pt[ax]; let g = byC.get(c); if (!g) byC.set(c, g = []); g.push(e.E[ax]); }
@@ -1139,7 +1139,7 @@ export function importIseSch(xmlText, opts = {}) {
     }
   });
   // ISE does not connect different branches that merely touch (a wire end on another net's wire);
-  // XAIlinx does: open a one-grid gap in the other wire (its two halves are re-joined by name below)
+  // Silinx does: open a one-grid gap in the other wire (its two halves are re-joined by name below)
   for (let pass = 0; pass < 40; pass++) {
     const H = new Map(), V = new Map();
     for (const w of wires) {
@@ -1189,7 +1189,7 @@ export function importIseSch(xmlText, opts = {}) {
   // ports of the netlist without an I/O marker
   const placedPorts = new Set(ports.map(p => portKey.get(p.id)));
   const unplacedPorts = model.ports.filter(p => !placedPorts.has(lc(p.name.trim())));
-  // stubs from the XAIlinx pins to the ISE pin positions
+  // stubs from the Silinx pins to the ISE pin positions
   // occupancy of grid points (wire vertices, pins, I/O markers) with the ISE net they belong to
   const occ = new Map();          // 'x,y' -> Set(keys)
   const occX = new Map(), occY = new Map();
@@ -1473,7 +1473,7 @@ export function importIseSch(xmlText, opts = {}) {
   for (const [k, s] of where) if (s.size > 1) { warn(`connectivity: ISE net '${sigs.get(k)?.name || k}' is split in ${s.size} parts`); unconnected.push(sigs.get(k)?.name || k); }
   for (const d of nl.diagnostics) if (d.severity === 'error') warn(`schematic check: ${d.message}`);
   if (model.sheets.some(s => s.texts.length)) warn(`${model.sheets.reduce((a, s) => a + s.texts.length, 0)} text annotation(s) of the ISE sheet were not imported`);
-  if (model.sheets.length > 1) warn(`the ${model.sheets.length} ISE sheets are placed side by side on one XAIlinx sheet`);
+  if (model.sheets.length > 1) warn(`the ${model.sheets.length} ISE sheets are placed side by side on one Silinx sheet`);
   doc.importedFrom = { format: 'ise-sch', version: model.version, family: model.attrs.DeviceFamilyName || null };
   // where each ISE block pin ended up ('XLXI_1.I0' -> 'XLXI_1_invI0.I')
   const pinMap = {};
@@ -1481,7 +1481,7 @@ export function importIseSch(xmlText, opts = {}) {
   return { doc, warnings, unconnected, pinMap };
 }
 
-// ISE block -> XAIlinx symbol spec: { type, params, pins: { isePin: { xai, dir, width, invert?, clock? } }, tpl?, title? }
+// ISE block -> Silinx symbol spec: { type, params, pins: { isePin: { xai, dir, width, invert?, clock? } }, tpl?, title? }
 function mapSymbol(blk, modules, warn, geo = {}) {
   const sym = lc(blk.symbol);
   const conn = n => blk.pins.some(p => lc(p.name) === lc(n) && p.signal);
@@ -1518,7 +1518,7 @@ function mapSymbol(blk, modules, warn, geo = {}) {
   if (m) {
     const op = m[1], n = +m[2], b = +(m[3] || 0);
     const t = `${op}${n}`;
-    // ANDnBk...: native XAIlinx symbol with the same pins (I0 at the bottom, I0..I(k-1) inverted)
+    // ANDnBk...: native Silinx symbol with the same pins (I0 at the bottom, I0..I(k-1) inverted)
     if (b && b <= n && SYMBOLS[`${t}b${b}`]) {
       const s = { type: `${t}b${b}`, params: { width: 1 }, pins: {} };
       for (let k = 0; k < n; k++) s.pins[`I${k}`] = { xai: `I${k}`, dir: 'in', width: 1 };
@@ -1548,7 +1548,7 @@ function mapSymbol(blk, modules, warn, geo = {}) {
   const lib = libPins(sym);
   const tpl = lib ? libTemplate(sym, conn) : null;
   const s = { type: 'hdlblock', title: blk.symbol, pins: {}, tpl };
-  if (!tpl) warn(`${blk.name}: ISE symbol '${blk.symbol}' ${/^xl_hdl_/i.test(blk.symbol) ? 'is an HDL block exported by XAIlinx: imported as an empty HDL block (paste the code of its HDL file, or import that file as a project module)' : 'has no XAIlinx equivalent: imported as an empty HDL block (write its HDL or add the module to the project)'}`);
+  if (!tpl) warn(`${blk.name}: ISE symbol '${blk.symbol}' ${/^xl_hdl_/i.test(blk.symbol) ? 'is an HDL block exported by Silinx: imported as an empty HDL block (paste the code of its HDL file, or import that file as a project module)' : 'has no Silinx equivalent: imported as an empty HDL block (write its HDL or add the module to the project)'}`);
   // pin sides from the symbol drawing: left/top = inputs, right/bottom = outputs (generated ISE symbols)
   let bx0 = Infinity, bx1 = -Infinity;
   for (const sh of geo.def?.shapes || []) if (sh.kind === 'line') { bx0 = Math.min(bx0, sh.x1, sh.x2); bx1 = Math.max(bx1, sh.x1, sh.x2); } else if (sh.kind === 'rect') { bx0 = Math.min(bx0, sh.x); bx1 = Math.max(bx1, sh.x + sh.w); }
@@ -1573,13 +1573,13 @@ function mapSymbol(blk, modules, warn, geo = {}) {
 }
 
 // ===================================================================== export: .sch.json -> .sch (ISE 14.7, version 7)
-const S_OUT = 16 / 5;                     // XAIlinx px -> ISE units (grid 10 -> 32, pin pitch 20 -> 64)
+const S_OUT = 16 / 5;                     // Silinx px -> ISE units (grid 10 -> 32, pin pitch 20 -> 64)
 const SHEET_SIZES = [[1760, 1360], [2720, 1760], [3520, 2720], [5440, 3520], [7040, 5440]];
 const xesc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const hexOf = bits => (bits ? BigInt('0b' + bits.replace(/[^01]/g, '0')).toString(16) : '0');
 
-// Name of the ISE symbol a XAIlinx symbol is exported as. Library symbols: { lib: true, name, pins: {xaiPin: isePin} };
-// XAIlinx-only symbols: { lib: false, name: 'xl_…' (parameters encoded in the name, decoded again on import) }.
+// Name of the ISE symbol a Silinx symbol is exported as. Library symbols: { lib: true, name, pins: {xaiPin: isePin} };
+// Silinx-only symbols: { lib: false, name: 'xl_…' (parameters encoded in the name, decoded again on import) }.
 function iseSymbolFor(s, def, netW, modules) {
   const t = s.type, p = s.params || {};
   const S = SYMBOLS[t];
@@ -1608,7 +1608,7 @@ function iseSymbolFor(s, def, netW, modules) {
   }
   if (S?.ff) {
     // FD*/FT*/FJK*: the library flip-flop when the INIT value is the library default and all its pin positions are
-    // known, else an XAIlinx symbol carrying the INIT value in its name
+    // known, else a Silinx symbol carrying the INIT value in its name
     const d0 = S.params[0].default, iv = String(p.init ?? d0) === '1' ? '1' : '0';
     const lp = libPins(t);
     if (iv === d0 && lp && def.pins.every(q => lp[q.name] && lp[q.name][1] != null)) return { lib: true, name: t, pins: Object.fromEntries(def.pins.map(q => [q.name, q.name])) };
@@ -1620,7 +1620,7 @@ function iseSymbolFor(s, def, netW, modules) {
     case 'demux': return { lib: false, name: `xl_demux${Math.max(1, Math.min(4, parseInt(p.sel, 10) || 1))}_w${W}` };
     case 'decoder': {
       const n = Math.max(1, Math.min(5, parseInt(p.n, 10) || 2));
-      // D2_4E / D3_8E (pin positions known); D4_16E is written as an XAIlinx symbol with the same pins
+      // D2_4E / D3_8E (pin positions known); D4_16E is written as a Silinx symbol with the same pins
       if (p.en && !p.bus && (n === 2 || n === 3)) {
         const pins = { E: 'E' };
         for (let k = 0; k < n; k++) pins[`A${k}`] = `A${k}`;
@@ -1684,7 +1684,7 @@ function iseSymbolFor(s, def, netW, modules) {
   }
 }
 
-// xl_* symbol name -> XAIlinx { type, params } (import of schematics exported by XAIlinx)
+// xl_* symbol name -> Silinx { type, params } (import of schematics exported by Silinx)
 export function decodeXlSymbol(name) {
   const s = lc(name);
   let m;
@@ -1718,11 +1718,11 @@ function shapeXml(sh, ind) {
 }
 
 /**
- * Write a XAIlinx schematic as an ISE 14.7 schematic (.sch, <drawing version="7">).
- * @param {object} docIn  XAIlinx document (.sch.json)
+ * Write a Silinx schematic as an ISE 14.7 schematic (.sch, <drawing version="7">).
+ * @param {object} docIn  Silinx document (.sch.json)
  * @param {{ modules?: object|object[], family?: string, timestamp?: string, lang?: 'vhdl'|'verilog' }} opts
  * @returns {{ xml: string, warnings: string[], files: { path: string, text: string, kind: 'hdl'|'sym' }[] }}
- *   files: HDL modules + ISE symbols (.sym) for the XAIlinx-only symbols (xl_*) and .sym files for project modules;
+ *   files: HDL modules + ISE symbols (.sym) for the Silinx-only symbols (xl_*) and .sym files for project modules;
  *   add them to the ISE project next to the .sch.
  */
 export function exportIseSch(docIn, opts = {}) {
@@ -1842,7 +1842,7 @@ export function exportIseSch(docIn, opts = {}) {
       localOf = xp => { const ip = pinMap[xp]; return ip && lp[ip] ? [lp[ip][1], lp[ip][2]] : null; };
       if (!blockdefs.has(lc(iseName))) blockdefs.set(lc(iseName), { name: iseName, timestamp: LIB_TS[iseName] || '2000-1-1T10:10:10', shapes: LIB_GFX[iseName] ? gfxShapes(LIB_GFX[iseName]) : boxShapes(lp) });
     } else {
-      // custom symbol: the XAIlinx geometry, scaled (origin = bottom left corner of the unrotated symbol)
+      // custom symbol: the Silinx geometry, scaled (origin = bottom left corner of the unrotated symbol)
       pinMap = Object.fromEntries(def.pins.map(q => [q.name, info.pins?.[q.name] ?? ((q.width ?? netW(q.name) ?? 1) > 1 ? `${q.name}(${(q.width ?? netW(q.name)) - 1}:0)` : q.name)]));
       localOf = xp => { const q = def.pins.find(r => r.name === xp); return q ? [X(q.x), X(q.y - def.h)] : null; };
       const key = lc(iseName);
@@ -1853,7 +1853,7 @@ export function exportIseSch(docIn, opts = {}) {
         blockdefs.set(key, cdef);
       } else if (info.hdl && (prev.sym.hdl || '') !== (s.hdl || '')) warn(`${s.name}: HDL block '${iseName}' differs from another block with the same name`);
     }
-    // instance origin: lines the ISE pins up with the XAIlinx pins (library symbols: most pins; stubs for the others)
+    // instance origin: lines the ISE pins up with the Silinx pins (library symbols: most pins; stubs for the others)
     const cands = new Map();
     for (const q of pinsSheet) {
       const l = localOf(q.name);
@@ -1883,7 +1883,7 @@ export function exportIseSch(docIn, opts = {}) {
         }
       }
     }
-    // library pins the XAIlinx symbol does not have (CEO/TC of counters...) stay unconnected
+    // library pins the Silinx symbol does not have (CEO/TC of counters...) stay unconnected
     if (info.lib) for (const ip of Object.keys(libPins(iseName))) if (!Object.values(pinMap).includes(ip) || !pinsSheet.some(q => pinMap[q.name] === ip)) { if (!bp.some(l => l.includes(`name="${ip}"`))) bp.push(`            <blockpin name="${xesc(ip)}" />`); }
     blocks.push([`        <block symbolname="${xesc(iseName)}" name="${xesc(s.name)}">`, ...bp, '        </block>'].join('\n'));
   }
@@ -1893,7 +1893,7 @@ export function exportIseSch(docIn, opts = {}) {
     const { name, sym, def, info, pinMap } = c;
     files.push({ path: `${name}.sym`, text: symFile(name, def, pinMap, stamp), kind: 'sym' });
     if (info.module) { warn(`'${name}': project module — ISE uses its HDL source and the ${name}.sym symbol (or regenerate it with Create Schematic Symbol)`); continue; }
-    if (info.project) { warn(`'${name}': symbol of the ISE project (imported as an HDL block) — keep the project's own ${name}.sym and HDL source; ${name}.sym returned here only matches the XAIlinx drawing`); continue; }
+    if (info.project) { warn(`'${name}': symbol of the ISE project (imported as an HDL block) — keep the project's own ${name}.sym and HDL source; ${name}.sym returned here only matches the Silinx drawing`); continue; }
     const mini = newDoc(name, lang);
     const s2 = { ...JSON.parse(JSON.stringify(sym)), id: 'S1', x: 200, y: 200, rot: 0, mirror: false, name: 'U1' };
     mini.symbols.push(s2);
@@ -1911,7 +1911,7 @@ export function exportIseSch(docIn, opts = {}) {
     const g = generateHdl(mini, { lang, modules });
     const errs = g.diagnostics.filter(d => d.severity === 'error');
     if (errs.length) warn(`${name}: HDL module has errors: ${errs.map(d => d.message).join('; ')}`);
-    files.push({ path: `${name}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: g.code.replace(/Generated by XAIlinx from .*$/m, `Generated by XAIlinx for the ISE schematic symbol ${name}`), kind: 'hdl' });
+    files.push({ path: `${name}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: g.code.replace(/Generated by (?:Silinx|XAIlinx) from .*$/m, `Generated by Silinx for the ISE schematic symbol ${name}`), kind: 'hdl' });
   }
   if (customs.size) {
     const xs = [...customs.values()].filter(c => !c.info.module).map(c => c.name);
@@ -1988,7 +1988,7 @@ function boxShapes(lp) {
   for (const [, x, y] of pts) shapes.push(x <= x0 ? { kind: 'line', x1: x, y1: y, x2: x + 64, y2: y } : { kind: 'line', x1: x, y1: y, x2: x - 64, y2: y });
   return shapes;
 }
-// blockdef of a XAIlinx-only symbol: its body rectangle and pin stubs, scaled
+// blockdef of a Silinx-only symbol: its body rectangle and pin stubs, scaled
 function customDef(name, def, pinMap, stamp) {
   const X = v => Math.round(v * S_OUT);
   const oy = def.h;
@@ -2025,7 +2025,7 @@ function symFile(name, def, pinMap, stamp) {
 
 // ===================================================================== project-level helpers
 /**
- * Convert the ISE schematics of a project (e.g. the FILE_SCHEMATIC entries of an imported .xise) into XAIlinx
+ * Convert the ISE schematics of a project (e.g. the FILE_SCHEMATIC entries of an imported .xise) into Silinx
  * schematics + their generated HDL. Hierarchical schematics (a schematic used as a symbol in another one) are
  * converted bottom-up so the parent sees the child's ports as a project module.
  * @param {{ [path: string]: string }} schFiles  'src/top.sch' -> .sch text

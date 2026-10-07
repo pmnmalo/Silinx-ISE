@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# XAIlinx - Xilinx ISE 14.7 (WebPACK) command-line toolchain image, built from YOUR OWN copy of the
+# Silinx - Xilinx ISE 14.7 (WebPACK) command-line toolchain image, built from YOUR OWN copy of the
 # official installer and license. The resulting image contains AMD/Xilinx software and your
 # personal license: keep it private, never push it to a public registry.
 #
@@ -10,7 +10,7 @@
 #   docker build --platform linux/amd64 \
 #     --build-context installer=<folder with Xilinx_ISE_DS_Lin_14.7_1015_1.tar> \
 #     --build-context license=<folder with Xilinx.lic> \
-#     -t xailinx/ise:14.7 docker/ise
+#     -t silinx/ise:14.7 docker/ise
 #
 # The installer tarball is bind-mounted during the install step, so its 6.5 GB never end up in
 # an image layer. ISE 14.7 is x86-64 only: on Apple Silicon / ARM Linux the image runs under
@@ -52,12 +52,12 @@ RUN set -eu; d=/opt/Xilinx/14.7/ISE_DS/ISE/lib/lin64; \
     [ -e /lib/x86_64-linux-gnu/libXp.so.6 ] || ln -s /usr/lib/x86_64-linux-gnu/libXpm.so.4 /lib/x86_64-linux-gnu/libXp.so.6; \
     rm /bin/sh && ln -s /bin/bash /bin/sh
 COPY --from=license Xilinx.lic /opt/Xilinx/Xilinx.lic
-COPY entrypoint.sh /usr/local/bin/xailinx-ise
-RUN sed -i "s/\r$//" /usr/local/bin/xailinx-ise && chmod 0755 /usr/local/bin/xailinx-ise && chmod 0644 /opt/Xilinx/Xilinx.lic && mkdir -p /work && chmod 0777 /work
+COPY entrypoint.sh /usr/local/bin/silinx-ise
+RUN sed -i "s/\r$//" /usr/local/bin/silinx-ise && chmod 0755 /usr/local/bin/silinx-ise && chmod 0644 /opt/Xilinx/Xilinx.lic && mkdir -p /work && chmod 0777 /work
 ENV XILINXD_LICENSE_FILE=/opt/Xilinx/Xilinx.lic LM_LICENSE_FILE=/opt/Xilinx/Xilinx.lic \
     ISE_SETTINGS=/opt/Xilinx/14.7/ISE_DS/settings64.sh
-LABEL org.xailinx.ise="14.7" org.xailinx.settings="/opt/Xilinx/14.7/ISE_DS/settings64.sh" \
-      org.opencontainers.image.description="Xilinx ISE 14.7 WebPACK for XAIlinx (private image: contains AMD/Xilinx software)"
+LABEL org.silinx.ise="14.7" org.silinx.settings="/opt/Xilinx/14.7/ISE_DS/settings64.sh" \
+      org.opencontainers.image.description="Xilinx ISE 14.7 WebPACK for Silinx (private image: contains AMD/Xilinx software)"
 WORKDIR /work
-ENTRYPOINT ["/usr/local/bin/xailinx-ise"]
+ENTRYPOINT ["/usr/local/bin/silinx-ise"]
 CMD ["bash"]

@@ -11,7 +11,7 @@
 //
 // Board resources list pins LSB first (pins[0] is bit 0). A resource with `verified:false`
 // was not cross-checked against an official file and must be checked by the user;
-// `iostandardVerified:false` flags an IOSTANDARD chosen by XAIlinx where the bank voltage is
+// `iostandardVerified:false` flags an IOSTANDARD chosen by Silinx where the bank voltage is
 // jumper-selectable or not stated by the source.
 //
 // `DEVICES` (the original Spartan-3E-only view) is kept unchanged for compatibility; the
@@ -457,7 +457,7 @@ export function validateDevice(dev) {
   if (!p) {
     const fam = familyOfPart(dev?.part);
     return [fam
-      ? `part '${dev?.part}' (${findFamily(fam)?.displayName || fam}) is not supported by ISE 14.7 WebPACK / not in the XAIlinx device database`
+      ? `part '${dev?.part}' (${findFamily(fam)?.displayName || fam}) is not supported by ISE 14.7 WebPACK / not in the Silinx device database`
       : `unknown part '${dev?.part}'`];
   }
   const pk = p.packages[String(dev.package || '').toLowerCase()];

@@ -32,7 +32,7 @@ function imp(file, opts = {}) {
   assert.deepEqual(r.warnings.filter(w => /^connectivity|schematic check/.test(w)), [], `${file}: ${r.warnings.join('\n')}`);
   return r;
 }
-// connectivity of the ISE netlist (block.pin grouped by signal) vs the XAIlinx netlist, through pinMap
+// connectivity of the ISE netlist (block.pin grouped by signal) vs the Silinx netlist, through pinMap
 function assertSameConnectivity(text, { doc, pinMap }) {
   const m = parseIseSch(text);
   const nl = netlist(doc);
@@ -48,7 +48,7 @@ function assertSameConnectivity(text, { doc, pinMap }) {
   const owner = new Map();
   for (const [sig, pins] of bySig) {
     const nets = new Set(pins.map(p => { const x = pinMap[p]; assert.ok(x, `pin ${p} mapped`); const n = netOf.get(x); assert.ok(n, `${p} -> ${x} is connected`); return n; }));
-    assert.equal(nets.size, 1, `ISE net ${sig} is one XAIlinx net (${pins.join(', ')})`);
+    assert.equal(nets.size, 1, `ISE net ${sig} is one Silinx net (${pins.join(', ')})`);
     const n = [...nets][0];
     assert.ok(!owner.has(n) || owner.get(n) === sig, `ISE nets ${owner.get(n)} and ${sig} stay apart`);
     owner.set(n, sig);
@@ -113,7 +113,7 @@ test('parseIseSch reads the legacy text format (VERSION 6)', () => {
   assert.ok(or2.r > 0);
 });
 
-test('orientation helpers: ISE Rk/Mk <-> XAIlinx rot/mirror', () => {
+test('orientation helpers: ISE Rk/Mk <-> Silinx rot/mirror', () => {
   assert.deepEqual(iseXform('R90', 0, -64), [64, 0]);
   assert.deepEqual(iseXform('M180', 256, -96), [256, 96]);
   for (const o of ['R0', 'R90', 'R180', 'R270', 'M0', 'M90', 'M180', 'M270']) {
@@ -167,14 +167,14 @@ test('import: inverted-input gates become the native ANDnBk symbols, FD stays FD
   assert.deepEqual(doc.ports.map(p => `${p.name}:${p.dir}`).sort(), ['CLK:in', 'X1:in', 'X2:in', 'X3:in', 'Y:out']);
 });
 
-test('import: FTCE becomes the native flip-flop, library symbols without a XAIlinx twin get exact HDL, unknown ones a placeholder', () => {
+test('import: FTCE becomes the native flip-flop, library symbols without a Silinx twin get exact HDL, unknown ones a placeholder', () => {
   const { doc, warnings } = imp('Counter_2b.sch');
   assert.equal(doc.symbols.filter(s => s.type === 'ftce').length, 2);
   assert.equal(doc.symbols.filter(s => s.type === 'hdlblock').length, 0);
-  assert.equal(warnings.filter(w => /no XAIlinx equivalent/.test(w)).length, 0);
+  assert.equal(warnings.filter(w => /no Silinx equivalent/.test(w)).length, 0);
   // a library symbol without a twin (XOR4): an HDL block with its exact function
   const x4 = importIseSch(read('Mux4to1b4.sch').replace(/"or4"/g, '"xor4"'), { name: 'm' });
-  assert.deepEqual(x4.warnings.filter(w => /connectivity|no XAIlinx equivalent/.test(w)), []);
+  assert.deepEqual(x4.warnings.filter(w => /connectivity|no Silinx equivalent/.test(w)), []);
   const xb = x4.doc.symbols.filter(s => s.type === 'hdlblock');
   assert.equal(xb.length, 4);
   assert.ok(xb.every(b => / xor .* xor .* xor /.test(b.hdl)), xb[0].hdl);
@@ -189,7 +189,7 @@ test('import: FTCE becomes the native flip-flop, library symbols without a XAIli
   const hb = u.doc.symbols.filter(s => s.type === 'hdlblock');
   assert.equal(hb.length, 4);
   assert.deepEqual(hb[0].params.inputs.length + hb[0].params.outputs.length, 3);
-  assert.ok(u.warnings.some(w => /'myand' has no XAIlinx equivalent/.test(w)));
+  assert.ok(u.warnings.some(w => /'myand' has no Silinx equivalent/.test(w)));
 });
 
 for (const lang of ['vhdl', 'verilog']) {
@@ -436,7 +436,7 @@ test('export -> import round trip preserves the connectivity of every fixture', 
   }
 });
 
-// a drawn XAIlinx schematic with symbols ISE does not have: bus gates, adder, register, constant, slice, bus join, HDL block
+// a drawn Silinx schematic with symbols ISE does not have: bus gates, adder, register, constant, slice, bus join, HDL block
 function nativeDoc(lang) {
   const doc = newDoc('accu', lang);
   let wid = 0;
@@ -484,7 +484,7 @@ function nativeDoc(lang) {
 }
 
 for (const lang of ['vhdl', 'verilog']) {
-  test(`export (${lang}): XAIlinx-only symbols get custom blockdefs + HDL modules + symbols; ISE round trip simulates like the original`, () => {
+  test(`export (${lang}): Silinx-only symbols get custom blockdefs + HDL modules + symbols; ISE round trip simulates like the original`, () => {
     const doc = normalizeDoc(nativeDoc(lang));
     const g0 = generateHdl(doc, { lang });
     assert.deepEqual(g0.diagnostics.filter(d => d.severity !== 'info').map(d => d.message), [], g0.code);
@@ -514,7 +514,7 @@ for (const lang of ['vhdl', 'verilog']) {
     // the HDL modules compile
     const hdlFiles = Object.fromEntries(ex.files.filter(f => f.kind === 'hdl').map(f => [f.path, f.text]));
     compile(Object.entries(hdlFiles).map(([path, text]) => ({ path, text })));
-    // re-import (as ISE would hand it back): xl_* symbols decode to XAIlinx symbols, the HDL block becomes a module
+    // re-import (as ISE would hand it back): xl_* symbols decode to Silinx symbols, the HDL block becomes a module
     const lib = compile(Object.entries(hdlFiles).map(([path, text]) => ({ path, text })));
     assert.deepEqual(lib.errors.filter(e => e.severity === 'error').map(e => e.message), []);
     const modules = modulesFromLibrary(lib, { sources: hdlFiles });
@@ -589,7 +589,7 @@ test('export: library gate geometry lines up exactly (no stub wires) and symbol 
   assert.equal(m.sheets[0].instances.find(i => i.name === 'U2').orien, 'R90');
   assert.equal(m.sheets[0].instances.find(i => i.name === 'U3').orien, 'M0');
   assertIseGeometry(xml, files);
-  // and2: the ISE pins are exactly the XAIlinx pins (scaled); INV is 224 units long in ISE (70 px, XAIlinx 60):
+  // and2: the ISE pins are exactly the Silinx pins (scaled); INV is 224 units long in ISE (70 px, Silinx 60):
   // its output gets one stub wire, nothing else is added to the 5 drawn wire segments
   const wires = m.sheets[0].branches.flatMap(b => b.wires);
   assert.equal(wires.length, 6);
@@ -602,7 +602,7 @@ test('export: library gate geometry lines up exactly (no stub wires) and symbol 
 });
 
 test('convertIseSchematics: hierarchical ISE project (a schematic used as a symbol) converts bottom-up and simulates', () => {
-  // parent drawn in XAIlinx around the MyAND2b4 module, written as an ISE schematic
+  // parent drawn in Silinx around the MyAND2b4 module, written as an ISE schematic
   const child = imp('MyAND2b4.sch');
   const gc = generateHdl(child.doc, { lang: 'vhdl' });
   const modules = modulesFromLibrary(compile([{ path: 'MyAND2b4.vhd', text: gc.code }]), { sources: { 'MyAND2b4.vhd': gc.code } });
@@ -685,7 +685,7 @@ test('export: ANDnBk / D2_4E / D3_8E become Xilinx library symbols, the others x
   for (const [n, t] of [['xl_dec4_e', { type: 'decoder', params: { n: 4, en: true, bus: false } }], ['xl_penc3_bus', { type: 'encoder', params: { n: 3, mode: 'priority', bus: true } }],
     ['xl_enc2', { type: 'encoder', params: { n: 2, mode: 'one-hot', bus: false } }], ['xl_demux2_w4', { type: 'demux', params: { sel: 2, width: 4 } }], ['xl_or2b1_w4', { type: 'or2b1', params: { width: 4 } }]])
     assert.deepEqual(decodeXlSymbol(n), t, n);
-  // back into XAIlinx: same symbols, same parameters, same nets
+  // back into Silinx: same symbols, same parameters, same nets
   const symbols = Object.fromEntries(ex.files.filter(f => f.kind === 'sym').map(f => [f.path, f.text]));
   const back = importIseSch(ex.xml, { name: 'newlib', symbols });
   assert.deepEqual(back.warnings.filter(w => /^connectivity|schematic check/.test(w)), []);
@@ -701,7 +701,7 @@ test('import: ISE D2_4E / D3_8E / D4_16E become the decoder symbol, inverted-inp
   const xml = ex.xml.replace(/xl_dec4_e/g, 'd4_16e');
   const symbols = Object.fromEntries(ex.files.filter(f => f.kind === 'sym').map(f => [f.path, f.text]));
   const r = importIseSch(xml, { name: 'newlib', symbols });
-  assert.deepEqual(r.warnings.filter(w => /^connectivity|schematic check|no XAIlinx equivalent/.test(w)), []);
+  assert.deepEqual(r.warnings.filter(w => /^connectivity|schematic check|no Silinx equivalent/.test(w)), []);
   assertSameConnectivity(xml, r);
   const by = n => r.doc.symbols.find(s => s.name === n);
   for (const [n, k] of [['U4', 2], ['U5', 3], ['U6', 4]]) {
@@ -787,7 +787,7 @@ test('export/import: flip-flops map to the Xilinx FD*/FT*/FJK* symbols (INIT def
   // as ISE writes them: library FJKC / FJKSRE / FTRSE / FDSE / FDP (no INIT attribute: Xilinx default INIT)
   const xml = ex.xml.replace(/xl_(fdse|fdp|ftrse|fjkc|fjksre)_i[01]/g, '$1');
   const r = importIseSch(xml, { name: 'ffx', symbols });
-  assert.deepEqual(r.warnings.filter(w => /^connectivity|schematic check|no XAIlinx equivalent/.test(w)), []);
+  assert.deepEqual(r.warnings.filter(w => /^connectivity|schematic check|no Silinx equivalent/.test(w)), []);
   assertSameConnectivity(xml, r);
   const by = n => r.doc.symbols.find(s => s.name === n);
   assert.deepEqual(['U3', 'U4', 'U6', 'U7', 'U8'].map(n => `${by(n).type}:${by(n).params.init}`), ['fdse:1', 'fdp:1', 'ftrse:0', 'fjkc:0', 'fjksre:1']);

@@ -1,4 +1,4 @@
-// XAIlinx - VHDL parser (recursive descent) producing the IR described in docs/IR.md.
+// Silinx - VHDL parser (recursive descent) producing the IR described in docs/IR.md.
 //
 //   import { parse } from './parser.js';
 //   const { file, lang, units, errors } = parse(source, 'top.vhd');

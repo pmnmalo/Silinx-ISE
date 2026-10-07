@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>XAIlinx - ASM chart editor demo</title>
+  <title>Silinx - ASM chart editor demo</title>
   <link rel="stylesheet" href="css/asm-editor.css">
   <style>
     :root {
@@ -30,7 +30,7 @@
 </head>
 <body>
   <header>
-    <h1>XAIlinx · ASM chart editor</h1>
+    <h1>Silinx · ASM chart editor</h1>
     <span class="sub">standalone demo, the chart is kept in localStorage</span>
     <span class="sp"></span>
     <button id="reset" type="button" title="Replace the chart with the built-in example">Load example</button>
@@ -48,7 +48,7 @@
     import { mountAsmEditor } from './js/asm-editor.js';
     import { newModel } from '/core/asm.js';
 
-    const KEY = 'xailinx.asm-demo';
+    const KEY = 'silinx.asm-demo';
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { saved = null; }
 

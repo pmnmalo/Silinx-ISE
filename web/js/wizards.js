@@ -67,7 +67,7 @@ function devicePicker(db, device) {
 function wizard(title, pages, { width = 720, finishLabel = 'Finish' } = {}) {
   return new Promise(resolve => {
     let idx = 0;
-    const side = h('div', { class: 'wiz-side' }, h('div', { class: 'logo' }, 'XAIlinx'), ...pages.map(p => h('div', { class: 'step' }, p.title)));
+    const side = h('div', { class: 'wiz-side' }, h('div', { class: 'logo' }, 'Silinx'), ...pages.map(p => h('div', { class: 'step' }, p.title)));
     const main = h('div', { class: 'wiz-main' });
     const err = h('div', { style: { color: 'var(--danger)', minHeight: '16px', marginTop: '6px' } });
     const body = h('div', {}, h('div', { class: 'wiz' }, side, h('div', { style: { flex: 1, display: 'flex', flexDirection: 'column' } }, main, err)));
@@ -137,7 +137,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
         ...field('Location:', h('input', { type: 'text', value: '<workspace>/' + (st.name || '…'), disabled: true })),
         ...field('Top-level source type:', select([['hdl', 'HDL']], 'hdl')),
         ...field('Start from:', tplSel)),
-      h('div', { class: 'hint', style: { marginTop: '14px' } }, 'Projects are stored in the XAIlinx workspace folder (default ~/XAIlinx-projects).')),
+      h('div', { class: 'hint', style: { marginTop: '14px' } }, 'Projects are stored in the Silinx workspace folder (default ~/Silinx-projects).')),
     validate: async () => {
       if (!NAME_RE.test(name.value.trim())) return 'Project name must start with a letter and contain only letters, digits and _.';
       st.replace = false;
@@ -171,7 +171,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
         ...field('Speed:', dp.spdSel),
         ...field('Top-Level Source Type:', select(['HDL'], 'HDL')),
         ...field('Synthesis Tool:', select(['XST (VHDL/Verilog)'], 'XST (VHDL/Verilog)')),
-        ...field('Simulator:', select(['XAIlinx ISim-compatible (VHDL/Verilog)'], '')),
+        ...field('Simulator:', select(['Silinx ISim-compatible (VHDL/Verilog)'], '')),
         ...field('Preferred Language:', langSel),
         ...field('VHDL Source Analysis Standard:', select(['VHDL-93', 'VHDL-2008'], 'VHDL-93')),
       )),
@@ -187,7 +187,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
         `Project Navigator will create a new project with the following specifications.\n\n` +
         `Project:\n  Project Name: ${name.value.trim()}\n  Template:     ${tplSel.value}\n\n` +
         `Device:\n  Board:        ${b ? b.name : 'None Specified'}\n  Family:       ${dp.familyName()}\n  Device:       ${dp.value().part.toUpperCase()}\n  Package:      ${dp.value().package.toUpperCase()}\n  Speed:        ${dp.value().speed}\n\n` +
-        `Flow:\n  Synthesis Tool:     XST (VHDL/Verilog)\n  Simulator:          XAIlinx behavioural simulator\n  Preferred Language: ${langSel.value.toUpperCase()}`));
+        `Flow:\n  Synthesis Tool:     XST (VHDL/Verilog)\n  Simulator:          Silinx behavioural simulator\n  Preferred Language: ${langSel.value.toUpperCase()}`));
     },
   };
   const ok = await wizard('New Project Wizard', [p1, p2, p3]);
@@ -625,8 +625,8 @@ export async function toolchainDialog() {
     body: h('div', {},
       h('div', { class: `msg ${st.available ? '' : 'msg-warn'}`, style: { marginBottom: '10px' } }, h('div', { class: 'msg-icon' }, st.available ? '✓' : '!'),
         h('div', { class: 'msg-text' }, h('b', {}, `Xilinx ISE 14.7: ${st.available ? 'available' : 'not available'}`), `\n${st.reason}\n\n`, h('span', { style: { color: '#555' } }, st.help),
-          st.available ? null : h('div', { style: { marginTop: '8px' } }, h('b', {}, 'Easiest setup on any OS: '), 'build the private Docker image with the XAIlinx kit (docker/ise/README.md): ',
-            h('code', {}, 'docker/ise/build-ise-image.sh --installer <Xilinx_ISE_DS_Lin_14.7_1015_1.tar> --license <Xilinx.lic>'), ' (Windows: build-ise-image.ps1). It configures XAIlinx automatically.'))),
+          st.available ? null : h('div', { style: { marginTop: '8px' } }, h('b', {}, 'Easiest setup on any OS: '), 'build the private Docker image with the Silinx kit (docker/ise/README.md): ',
+            h('code', {}, 'docker/ise/build-ise-image.sh --installer <Xilinx_ISE_DS_Lin_14.7_1015_1.tar> --license <Xilinx.lic>'), ' (Windows: build-ise-image.ps1). It configures Silinx automatically.'))),
       h('div', { class: 'form-grid' }, h('label', {}, 'Execution mode:'), mode),
       h('div', { style: { margin: '6px 0 10px' } }, modeBox),
       h('div', { style: { fontWeight: 'bold', margin: '8px 0 4px' } }, 'Device programmers'),
@@ -651,10 +651,10 @@ export function aboutDialog() {
   return dialog({
     title: `About ${PRODUCT}`, width: 480,
     body: h('div', { style: { display: 'flex', gap: '16px' } },
-      h('div', { style: { width: '64px', height: '64px', background: '#c4161c', color: '#fff', font: 'bold 40px Arial', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' } }, 'X'),
+      h('div', { style: { width: '64px', height: '64px', background: '#c4161c', color: '#fff', font: 'bold 40px Arial', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' } }, 'S'),
       h('div', {}, h('div', { style: { fontSize: '16px', fontWeight: 'bold' } }, PRODUCT_FULL), h('div', {}, `Version ${VERSION}`),
         h('p', {}, 'HDL design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7): mixed VHDL/Verilog projects, RTL schematics, ASM state machine editor, behavioural simulation and device programming.'),
-        h('p', { style: { color: '#666' } }, 'Synthesis, place & route and bitstream generation use the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; XAIlinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
+        h('p', { style: { color: '#666' } }, 'Synthesis, place & route and bitstream generation use the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });
 }
