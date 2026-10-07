@@ -662,11 +662,19 @@ function lookupOrErr(E, name, loc) {
   return null;
 }
 
+// x'event / rising_edge(x) operand: a signal, or one bit of a vector signal (constant index)
+function edgeOperand(node) {
+  if (node && node.k === 'sig') return { sig: node.sig };
+  if (node && node.k === 'bit' && node.base.k === 'sig' && node.index.k === 'c') return { sig: node.base.sig, bit: bitpos(node.base.t, V.toNum(node.index.val)) };
+  return null;
+}
+
 function refNode(E, entry, name) {
   switch (entry.kind) {
     case 'sig': return { k: 'sig', sig: entry.sig, t: entry.t || entry.sig.t, name };
     case 'const': return { k: 'c', val: entry.val, t: entry.t, name };
     case 'loc': return { k: 'loc', i: entry.i, t: entry.t, name };
+    case 'alias': return entry.rv;   // VHDL signal parameter: the actual signal itself
   }
   return null;
 }
@@ -887,8 +895,8 @@ function bindAttr(E, e, loc) {
   const cint = n => ({ k: 'c', val: V.fromInt(n, 32, true), t: INT });
   switch (at) {
     case 'event':
-      if (!node || node.k !== 'sig') throw new ElabError("'event requires a signal", loc);
-      return { k: 'event', sig: node.sig, t: BOOL };
+      if (!edgeOperand(node)) throw new ElabError("'event requires a signal", loc);
+      return { k: 'event', ...edgeOperand(node), t: BOOL };
     case 'length': return cint(t.kind === 'array' ? t.len : t.w);
     case 'left': return cint(t.left);
     case 'right': return cint(t.right);
@@ -901,8 +909,8 @@ function bindAttr(E, e, loc) {
       return fold({ k: 'bin', o: at === 'succ' ? '+' : '-', a, b: { k: 'c', val: V.fromInt(1, a.t.w, false), t: vecT(a.t.w) }, t });
     }
     case 'stable':
-      if (!node || node.k !== 'sig') throw new ElabError("'stable requires a signal", loc);
-      return { k: 'un', o: '!', a: { k: 'event', sig: node.sig, t: BOOL }, t: BOOL };
+      if (!edgeOperand(node)) throw new ElabError("'stable requires a signal", loc);
+      return { k: 'un', o: '!', a: { k: 'event', ...edgeOperand(node), t: BOOL }, t: BOOL };
   }
   throw new ElabError(`attribute '${e.attr} is not supported`, loc);
 }
@@ -983,7 +991,7 @@ function bindApply(E, e, expect, loc) {
   const name = e.name;
   const args = e.args.map(a => (a && a.named !== undefined ? a : a));
   const entry = E.sc.lookup(name);
-  if (entry && (entry.kind === 'sig' || entry.kind === 'const' || entry.kind === 'loc')) {
+  if (entry && (entry.kind === 'sig' || entry.kind === 'const' || entry.kind === 'loc' || entry.kind === 'alias')) {
     const base = refNode(E, entry, name);
     if (args.length !== 1) throw new ElabError(`'${name}' indexed with ${args.length} indices`, loc);
     const a = args[0].named !== undefined ? args[0].value : args[0];
@@ -1009,8 +1017,8 @@ function bindBuiltin(E, name, rawArgs, expect, loc) {
   switch (name) {
     case 'rising_edge': case 'falling_edge': {
       const a = A(0);
-      if (a.k !== 'sig') throw new ElabError(`${name} requires a signal`, loc);
-      return { k: 'edge', sig: a.sig, pos: name === 'rising_edge', t: BOOL };
+      if (!edgeOperand(a)) throw new ElabError(`${name} requires a signal`, loc);
+      return { k: 'edge', ...edgeOperand(a), pos: name === 'rising_edge', t: BOOL };
     }
     case 'to_unsigned': case 'conv_unsigned': return conv(A(0), C(1), false, true);
     case 'to_signed': case 'conv_signed': return conv(A(0), C(1), true, true);
@@ -1101,17 +1109,23 @@ function bindCall(E, entry, rawArgs, name, loc) {
   return fold({ k: 'call', fn, args, t: fn.retT });
 }
 
-function boundFunction(entry, args, loc) {
+function boundFunction(entry, args, loc, sigActuals = null) {
   const decl = entry.decl;
   const key = args.map(a => `${a.t.kind}${a.t.w}${a.t.s ? 's' : ''}`).join(',');
-  if (entry.cache.has(key)) return entry.cache.get(key);
+  if (!sigActuals && entry.cache.has(key)) return entry.cache.get(key);
   const DE = entry.E;
   const fb = new FrameBuilder();
   const sc = new Scope(DE.sc);
   const FE = { ...DE, sc, fb, inProcess: true, inFunction: true };
   const fn = { name: decl.name, params: [], body: null, retSlot: null, retT: null, impure: false };
-  entry.cache.set(key, fn);
+  if (!sigActuals) entry.cache.set(key, fn);
   decl.params.forEach((p, k) => {
+    if (sigActuals?.[k]) {
+      const a = sigActuals[k];
+      sc.def(p.name, { kind: 'alias', rv: a.rv, lv: a.lv, t: a.rv.t });
+      fn.params.push({ alias: true, dir: p.dir, name: p.name });
+      return;
+    }
     let t = elabType(FE, p.type, true);
     if ((t.unconstrained || (t.kind === 'logic' && t.w === 1 && p.type.kind === 'logic' && !p.type.range && args[k] && args[k].t.w > 1 && DE.lang === 'vhdl')) && args[k]) {
       t = { ...args[k].t };
@@ -1163,6 +1177,7 @@ function bindLvalue(E, e, loc) {
       }
       if (entry.kind === 'sig') return { k: 'sig', sig: entry.sig, t: entry.t || entry.sig.t, name: e.name };
       if (entry.kind === 'loc') return { k: 'loc', i: entry.i, t: entry.t, name: e.name };
+      if (entry.kind === 'alias' && entry.lv) return entry.lv;
       throw new ElabError(`cannot assign to '${e.name}'`, loc);
     }
     case 'index': {
@@ -1358,8 +1373,24 @@ function bindCallStmt(E, s, loc) {
     if (p.dir === 'out') return null;
     return bindExpr(E, a.named !== undefined ? a.value : a, null, loc);
   });
-  const fn = boundFunction(entry, s.args.map((a, k) => args[k] || bindLvalue(E, a.named !== undefined ? a.value : a, loc)), loc);
-  const outTargets = s.args.map((a, k) => (decl.params[k] && decl.params[k].dir !== 'in' ? bindLvalue(E, a.named !== undefined ? a.value : a, loc) : null));
+  // VHDL `signal` parameters refer to the actual signal (assignments inside the procedure drive
+  // it at once, across waits), instead of being copied in and out
+  const hasLoc = n => { let found = false; walk(n, x => { if (x.k === 'loc') found = true; }); return found; };
+  let sigActuals = null;
+  if (E.lang === 'vhdl') {
+    s.args.forEach((a, k) => {
+      const p = decl.params[k];
+      if (!p || String(p.class || '').toLowerCase() !== 'signal') return;
+      const actual = a.named !== undefined ? a.value : a;
+      const rv = bindExpr(E, actual, null, loc);
+      const lv = p.dir !== 'in' ? bindLvalue(E, actual, loc) : null;
+      if (hasLoc(rv) || (lv && hasLoc(lv))) return;     // actual uses process variables: copy semantics
+      (sigActuals ||= [])[k] = { rv, lv };
+    });
+  }
+  const fn = boundFunction(entry, s.args.map((a, k) => args[k] || bindLvalue(E, a.named !== undefined ? a.value : a, loc)), loc, sigActuals);
+  const outTargets = s.args.map((a, k) => (decl.params[k] && decl.params[k].dir !== 'in' && !sigActuals?.[k] ? bindLvalue(E, a.named !== undefined ? a.value : a, loc) : null));
+  if (sigActuals) args.forEach((_, k) => { if (sigActuals[k]) args[k] = null; });
   return { k: 'task', fn, args, outTargets, loc };
 }
 

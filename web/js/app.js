@@ -728,16 +728,26 @@ async function runImpl(mod, steps) {
     await setTop(mod, false);
   }
   S.diags = S.diags.filter(d => d.source !== 'console');   // new run: drop the previous run's messages
-  if (!await checkSyntax(mod)) return;
-  if (!await checkConstraints()) return;
   const procId = steps.includes('bitgen') ? 'bitgen' : steps.includes('translate') ? 'impl' : 'synth';
+  const procName = { synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId];
+  // Synthesize - XST always starts with Check Syntax (same messages as the Check Syntax process)
+  if (!await checkSyntax(mod)) {
+    setStatus('synth', 'err');
+    log(`Process "${procName}" stopped: Check Syntax found errors (see the Errors tab).`, 'err');
+    return;
+  }
+  if (!await checkConstraints()) {
+    setStatus(steps.includes('translate') ? 'translate' : 'synth', 'err');
+    log(`Process "${procName}" stopped: the constraints have errors.`, 'err');
+    return;
+  }
   S.busy = true;
   // Clear the icons of the processes this run will redo (they get running/ok/warn/err as it goes).
   const runs = new Set(['synth', ...(steps.includes('translate') ? ['translate', 'impl'] : []), ...(steps.includes('map') ? ['map'] : []), ...(steps.includes('par') ? ['par'] : []), ...(steps.includes('bitgen') ? ['bitgen'] : [])]);
   for (const id of runs) S.status[id] = null;
   setStatus(procId, 'running');
   status(`Running ${procId}…`);
-  log(`\nStarted : "${{ synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId]}".\n`, 'hdr');
+  log(`\nStarted : "${procName}".\n`, 'hdr');
   const track = stepTracker();
   try {
     const tc = S.toolchain || await api.toolchain();

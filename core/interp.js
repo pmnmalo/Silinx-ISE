@@ -73,12 +73,17 @@ export function evalE(n, ctx) {
     case 'edge': {
       const s = n.sig;
       if (!ctx.sim || s.evStamp !== ctx.sim.stamp) return V.ZERO;
-      const now = Number(s.val.v & 1n) && !(s.val.x & 1n), was = s.prev && Number(s.prev.v & 1n) && !(s.prev.x & 1n);
-      const wasZero = s.prev && !(s.prev.v & 1n) && !(s.prev.x & 1n);
-      const nowZero = !(s.val.v & 1n) && !(s.val.x & 1n);
-      return V.fromBool(n.pos ? (now && !was) : (nowZero && !wasZero));
+      const b = BigInt(n.bit || 0);
+      const one = x => !!x && !!((x.v >> b) & 1n) && !((x.x >> b) & 1n);
+      const zero = x => !!x && !((x.v >> b) & 1n) && !((x.x >> b) & 1n);
+      return V.fromBool(n.pos ? (one(s.val) && !one(s.prev)) : (zero(s.val) && !zero(s.prev)));
     }
-    case 'event': return V.fromBool(!!ctx.sim && n.sig.evStamp === ctx.sim.stamp);
+    case 'event': {
+      if (!ctx.sim || n.sig.evStamp !== ctx.sim.stamp) return V.ZERO;
+      if (n.bit == null) return V.ONE ?? V.fromBool(true);
+      const b = BigInt(n.bit), p = n.sig.prev, c = n.sig.val;
+      return V.fromBool(!p || ((p.v >> b) & 1n) !== ((c.v >> b) & 1n) || ((p.x >> b) & 1n) !== ((c.x >> b) & 1n));
+    }
     case 'str': return { str: n.value };
     case 'image': return { str: imageOf(evalE(n.a, ctx), n.a.t) };
     case 'strcat': return { str: n.parts.map(p => toStr(evalE(p, ctx), p.t)).join('') };
@@ -501,7 +506,7 @@ export function* exec(s, ctx) {
       const frame = f.frameInit();
       s.args.forEach((a, k) => {
         const p = f.params[k];
-        if (p && p.dir !== 'out' && a) {
+        if (p && !p.alias && p.dir !== 'out' && a) {
           const v = evalE(a, ctx);
           frame[p.i] = Array.isArray(v) ? v.slice() : fit(v, p.t.w, p.t.s);
         }
@@ -511,7 +516,7 @@ export function* exec(s, ctx) {
       // copy back outputs
       s.args.forEach((a, k) => {
         const p = f.params[k];
-        if (p && p.dir !== 'in' && s.outTargets[k]) {
+        if (p && !p.alias && p.dir !== 'in' && s.outTargets[k]) {
           doAssign({ target: s.outTargets[k], value: { k: 'c', val: frame[p.i], t: p.t }, nb: p.sigNb || false }, ctx);
         }
       });

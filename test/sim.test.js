@@ -173,3 +173,32 @@ test('vhdl fixtures: counter testbench passes', () => {
   const { out } = run(files, 'tb_counter');
   assert.ok(out.some(l => /finished/.test(l)));
 });
+
+test('VHDL procedure with a signal parameter drives the actual across waits', () => {
+  run({ 'tb.vhd': `
+library ieee; use ieee.std_logic_1164.all;
+entity tb is end tb;
+architecture a of tb is
+  signal b : std_logic_vector(1 downto 0) := "00";
+  signal seen : integer := 0;
+begin
+  process (b) begin
+    if rising_edge(b(0)) then seen <= seen + 1; end if;
+  end process;
+  process
+    procedure press(signal x : out std_logic) is
+    begin
+      x <= '1'; wait for 10 ns;
+      x <= '0'; wait for 10 ns;
+    end procedure;
+  begin
+    press(b(0));
+    press(b(0));
+    wait for 1 ns;
+    assert seen = 2 report "pulses seen: " & integer'image(seen) severity error;
+    assert b = "00" report "b not released" severity error;
+    report "ok";
+    wait;
+  end process;
+end a;` }, 'tb');
+});
