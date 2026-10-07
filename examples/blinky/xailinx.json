@@ -22,6 +22,11 @@
       "role": "design"
     },
     {
+      "path": "src/speed_ctrl.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
       "path": "src/top.vhd",
       "lang": "vhdl",
       "role": "design"
