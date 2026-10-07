@@ -187,7 +187,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     let entries;
     try { entries = await readZip(new Uint8Array(req.body), NODE_CODEC); } catch (e) { throw bad(`cannot read zip: ${e.message}`); }
     const xiseEntry = entries.filter(e => /\.xise$/i.test(e.path)).sort((x, y) => x.path.split('/').length - y.path.split('/').length)[0];
-    const pjEntry = entries.find(e => /(^|\/)(silinx|xailinx)\.json$/.test(e.path));   // xailinx.json: before the rename
+    const pjEntry = entries.find(e => /(^|\/)silinx\.json$/.test(e.path));
     const root = (xiseEntry || pjEntry) ? path.posix.dirname((xiseEntry || pjEntry).path) : '';
     const rel = p => (root === '.' || !root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
     const text = e => Buffer.from(e.data).toString('utf8');
@@ -205,7 +205,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const extra = [];
     for (const e of entries) {
       const r = rel(e.path);
-      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'silinx.json' || r === 'xailinx.json' || ISE_OUTPUT.test(r)) continue;
+      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'silinx.json' || ISE_OUTPUT.test(r)) continue;
       const norm = path.posix.normalize(r);
       if (norm.startsWith('..') || path.posix.isAbsolute(norm)) continue;
       await fs.mkdir(path.dirname(P.safeJoin(P.projectDir(name), norm)), { recursive: true });

@@ -7,9 +7,7 @@ const [cmd = 'serve', ...args] = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
 
 async function loadProject(dir) {
-  // silinx.json (xailinx.json in projects from before the rename)
-  const pf = ['silinx.json', 'xailinx.json'].map(f => path.join(dir, f)).find(f => fs.existsSync(f)) || path.join(dir, 'silinx.json');
-  const pj = JSON.parse(fs.readFileSync(pf, 'utf8'));
+  const pj = JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8'));
   const sources = pj.files.map(f => ({ ...f, text: fs.readFileSync(path.join(dir, f.path), 'utf8') }));
   return { pj, sources };
 }

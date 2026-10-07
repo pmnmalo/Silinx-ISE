@@ -8,14 +8,6 @@ import EXAMPLES from 'silinx-examples';
 import { createZip, readZip, browserCodec, textOf } from '../../core/zip.js';
 
 const KEY = 'silinx.standalone.fs';
-// projects stored before the rename to Silinx (xailinx.* keys) are moved to the new keys
-try {
-  for (const [o, n] of [['xailinx.standalone.fs', KEY], ['xailinx.recent', 'silinx.recent'], ['xailinx.lastProject', 'silinx.lastProject'], ['xailinx.lang', 'silinx.lang']]) {
-    const v = localStorage.getItem(o);
-    if (v !== null && localStorage.getItem(n) === null) localStorage.setItem(n, v);
-    if (v !== null) localStorage.removeItem(o);
-  }
-} catch { /* no storage */ }
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
 
@@ -211,7 +203,7 @@ export const api = {
   importZip: async (name, file) => {
     const entries = await readZip(new Uint8Array(await file.arrayBuffer()), browserCodec());
     const xe = entries.filter(e => /\.xise$/i.test(e.path)).sort((a, b) => a.path.split('/').length - b.path.split('/').length)[0];
-    const pe = entries.find(e => /(^|\/)(silinx|xailinx)\.json$/.test(e.path));
+    const pe = entries.find(e => /(^|\/)silinx\.json$/.test(e.path));
     if (!xe && !pe) fail('the zip contains no .xise (ISE project) and no silinx.json');
     const root = (xe || pe).path.includes('/') ? (xe || pe).path.replace(/\/[^/]*$/, '') : '';
     const rel = p => (!root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
@@ -222,7 +214,7 @@ export const api = {
     else createProjectSync({ name, template: 'empty' });
     const p = mem[name];
     const known = new Set(p.json.files.map(f => f.path).concat(p.json.constraints));
-    for (const [k, v] of Object.entries(files)) if (!known.has(k) && !/\.xise$/i.test(k) && k !== 'silinx.json' && k !== 'xailinx.json') p.files[k] = v;
+    for (const [k, v] of Object.entries(files)) if (!known.has(k) && !/\.xise$/i.test(k) && k !== 'silinx.json') p.files[k] = v;
     if (pe) {
       try {
         const saved = JSON.parse(textOf(pe));
@@ -240,7 +232,7 @@ export const api = {
   },
   importBundle: async text => {
     const b = JSON.parse(text);
-    if (b.format !== 'silinx-bundle' && b.format !== 'xailinx-bundle') fail('not a Silinx project bundle');
+    if (b.format !== 'silinx-bundle') fail('not a Silinx project bundle');
     let name = b.project.name;
     while (load()[name]) name = `${b.project.name}_${Math.floor(Math.random() * 1000)}`;
     mem[name] = { json: { ...b.project, name }, files: b.files };

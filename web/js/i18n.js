@@ -248,14 +248,6 @@ export const LOCALES = {
 };
 
 const KEY = 'silinx.lang';
-// settings stored before the rename to Silinx (xailinx.* keys) move to the new keys
-try {
-  for (const [o, n] of [['xailinx.lang', KEY], ['xailinx.recent', 'silinx.recent'], ['xailinx.lastProject', 'silinx.lastProject']]) {
-    const v = localStorage.getItem(o);
-    if (v !== null && localStorage.getItem(n) === null) localStorage.setItem(n, v);
-    if (v !== null) localStorage.removeItem(o);
-  }
-} catch { /* no storage */ }
 let lang = 'en';
 try { lang = localStorage.getItem(KEY) || ''; } catch { /* storage unavailable */ }
 if (!LOCALES[lang]) lang = /^pt\b/i.test(navigator.language || '') ? 'pt' : 'en';

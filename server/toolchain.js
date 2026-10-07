@@ -19,12 +19,7 @@ export const PROGRAMMERS = ['openFPGALoader', 'xc3sprog', 'djtgcfg', 'impact'];
 export const DEFAULT_SETTINGS = '/opt/Xilinx/14.7/ISE_DS/settings64.sh';
 
 export function configDir() {
-  if (process.env.SILINX_CONFIG_DIR || process.env.XAILINX_CONFIG_DIR) return process.env.SILINX_CONFIG_DIR || process.env.XAILINX_CONFIG_DIR;
-  const dir = path.join(os.homedir(), '.silinx');
-  // before the rename the settings were in ~/.xailinx: keep using them until they are moved
-  const legacy = path.join(os.homedir(), '.xailinx');
-  if (!fss.existsSync(dir) && fss.existsSync(legacy)) return legacy;
-  return dir;
+  return process.env.SILINX_CONFIG_DIR || path.join(os.homedir(), '.silinx');
 }
 export const configPath = () => path.join(configDir(), 'config.json');
 

@@ -1,7 +1,5 @@
 // Project storage: one directory per project with a silinx.json descriptor.
-// (Projects from before the rename to Silinx have xailinx.json: it is read and renamed on first use.)
 import fs from 'node:fs/promises';
-import fss from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -10,23 +8,12 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
 
 export const PROJECT_FILE = 'silinx.json';
-export const LEGACY_PROJECT_FILE = 'xailinx.json';
 
 export function workspaceDir() {
-  if (process.env.SILINX_WORKSPACE || process.env.XAILINX_WORKSPACE) return process.env.SILINX_WORKSPACE || process.env.XAILINX_WORKSPACE;
-  const ws = path.join(os.homedir(), 'Silinx-projects');
-  // before the rename the workspace was ~/XAIlinx-projects: keep using it until it is moved
-  const legacy = path.join(os.homedir(), 'XAIlinx-projects');
-  if (!fss.existsSync(ws) && fss.existsSync(legacy)) return legacy;
-  return ws;
+  return process.env.SILINX_WORKSPACE || path.join(os.homedir(), 'Silinx-projects');
 }
 
-/** Path of a project's descriptor, renaming a legacy xailinx.json to silinx.json. */
-async function projectFile(dir) {
-  const f = path.join(dir, PROJECT_FILE), old = path.join(dir, LEGACY_PROJECT_FILE);
-  if (!await exists(f) && await exists(old)) { try { await fs.rename(old, f); } catch { return old; } }
-  return f;
-}
+const projectFile = async dir => path.join(dir, PROJECT_FILE);
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 
@@ -86,7 +73,6 @@ export async function writeProject(name, pj) {
   const clean = { ...pj, name };
   delete clean.fileTree;
   await fs.writeFile(path.join(dir, PROJECT_FILE), JSON.stringify(clean, null, 2) + '\n');
-  await fs.rm(path.join(dir, LEGACY_PROJECT_FILE), { force: true });
   return clean;
 }
 
@@ -102,7 +88,7 @@ async function walk(dir, base = '') {
 }
 
 export async function fileTree(name) {
-  return (await walk(projectDir(name))).filter(f => f !== PROJECT_FILE && f !== LEGACY_PROJECT_FILE).sort();
+  return (await walk(projectDir(name))).filter(f => f !== PROJECT_FILE).sort();
 }
 
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
