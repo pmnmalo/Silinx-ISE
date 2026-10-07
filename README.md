@@ -55,29 +55,32 @@ for Xilinx FPGAs supported by ISE 14.7.
   power-up), with openFPGALoader, xc3sprog, Digilent Adept (`djtgcfg`), ISE iMPACT or
   **adepttool** (Basys2 on macOS).
 
-## Download
-
-Ready-made files are on the [Releases page](https://github.com/pmnmalo/XAIlinx/releases/latest):
-
-- **XAIlinx.html**: the single-file edition. Open it in a browser (no install) for the editor,
-  schematics, ASM charts and simulation; projects are kept in the browser.
-- **xailinx-&lt;version&gt;.zip**: the full app with its dependencies. With Node.js 20+:
-  unzip, `cd xailinx`, `node bin/xailinx.js serve`, open http://localhost:8642.
-- **xailinx-ise-docker-kit-&lt;version&gt;.zip**: the kit to build your own private ISE 14.7 Docker
-  image (ISE and its licence are not included).
-
-Maintainers: pushing a tag `vX.Y.Z` runs the tests and publishes a release with these files
-(`.github/workflows/release.yml`).
-
 ## Getting started
 
+**Step-by-step guide for beginners (no git or programming tools needed):
+[English](docs/GETTING-STARTED.md) · [Português](docs/COMECAR.md)**
+
+In short, from the [latest release](https://github.com/pmnmalo/XAIlinx/releases/latest):
+
+- **Just design and simulate:** download **`XAIlinx.html`** and double-click it. Nothing to install;
+  projects are kept in the browser.
+- **Also synthesize and program boards:** install [Node.js](https://nodejs.org) (LTS), download
+  **`xailinx-<version>.zip`**, unzip it and double-click **`Start XAIlinx.bat`** (Windows),
+  **`Start XAIlinx.command`** (macOS) or **`start-xailinx.sh`** (Linux). Your browser opens
+  XAIlinx; projects are folders in `XAIlinx-projects` in your user folder.
+- **Synthesis needs Xilinx ISE 14.7** (free WebPACK): build your own Docker image with
+  **`xailinx-ise-docker-kit-<version>.zip`** (see [below](#synthesis-and-bitstreams-xilinx-ise-147)).
+
+## For developers
+
 ```bash
+git clone https://github.com/pmnmalo/XAIlinx.git && cd XAIlinx
 npm install
-npm start          # http://127.0.0.1:8642
+npm start          # http://127.0.0.1:8642  (node bin/xailinx.js serve --open also opens the browser)
 ```
 
-Projects live in `~/XAIlinx-projects` (override with `XAILINX_WORKSPACE`). Use *File ▸ New Project*
-or *Open Example (blinky)* on the Start page.
+Projects live in `~/XAIlinx-projects` (override with `XAILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
+runs the tests and publishes a release with the files above (`.github/workflows/release.yml`).
 
 ### Command line
 

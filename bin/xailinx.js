@@ -15,8 +15,22 @@ async function loadProject(dir) {
 async function main() {
   switch (cmd) {
     case 'serve': {
-      const { startServer } = await import('../server/server.js');
-      await startServer({ port: +opt('port', process.env.PORT || 8642), host: opt('host', '127.0.0.1') });
+      const { startServer, openBrowser } = await import('../server/server.js');
+      const port = +opt('port', process.env.PORT || 8642), host = opt('host', '127.0.0.1');
+      const url = `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}`;
+      try {
+        await startServer({ port, host });
+      } catch (e) {
+        if (e.code !== 'EADDRINUSE') throw e;
+        // already running (e.g. the launcher was double-clicked twice): just open it
+        const up = await fetch(`${url}/api/templates`).then(r => r.ok).catch(() => false);
+        if (!up) { console.error(`Port ${port} is used by another program. Start XAIlinx on another port: node bin/xailinx.js serve --port ${port + 1}`); process.exit(1); }
+        console.log(`XAIlinx is already running at ${url}`);
+        if (args.includes('--open')) await openBrowser(url);
+        process.exit(0);
+      }
+      if (args.includes('--open')) await openBrowser(url);
+      console.log('Keep this window open while you use XAIlinx. To stop it, close the window or press Ctrl+C.');
       break;
     }
     case 'check': case 'sim': {

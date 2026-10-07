@@ -55,10 +55,19 @@ export async function createApp() {
 
 export async function startServer({ port = 8642, host = '127.0.0.1' } = {}) {
   const app = await createApp();
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const srv = app.listen(port, host, () => {
       console.log(`XAIlinx running at http://${host}:${port}  (workspace: ${P.workspaceDir()})`);
       resolve(srv);
     });
+    srv.on('error', reject);
   });
+}
+
+/** Open a URL in the default browser (best effort). */
+export async function openBrowser(url) {
+  const { spawn } = await import('node:child_process');
+  const [cmd, args] = process.platform === 'win32' ? ['cmd', ['/c', 'start', '""', url]]
+    : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
+  try { spawn(cmd, args, { stdio: 'ignore', detached: true }).unref(); } catch { /* no browser: the URL is printed */ }
 }
