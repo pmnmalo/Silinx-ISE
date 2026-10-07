@@ -791,9 +791,14 @@ function bindExpr0(E, e, expect, loc) {
     case 'aggregate': return bindAggregate(E, e, expect, loc);
     case 'qualified': {
       const te = E.sc.lookup(e.type);
-      const t = te && te.kind === 'type' ? te.t : (stdTypeName(e.type) ? null : null);
-      const inner = bindExpr(E, e.expr, t || expect, loc);
       const sn = stdTypeName(e.type);
+      let t = te && te.kind === 'type' ? te.t : null;
+      // unsigned'(0 => x) / std_logic_vector'(a, b): the aggregate's own length gives the width
+      if (!t && sn && e.expr.op === 'aggregate' && e.expr.items.length && e.expr.items.every(i => !i.choices || i.choices.every(c => c && c.op === 'int'))) {
+        const n = Math.max(e.expr.items.length, ...e.expr.items.flatMap(i => (i.choices || []).map(c => Number(c.value) + 1)));
+        t = vecT(n, !!sn.signed);
+      }
+      const inner = bindExpr(E, e.expr, t || expect, loc);
       if (sn && inner.t.kind === 'logic') return fold({ k: 'conv', a: inner, ext: inner.t.s, t: { ...inner.t, s: !!sn.signed } });
       return inner;
     }

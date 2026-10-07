@@ -210,10 +210,12 @@ export function rerouteAfterMove(doc, { orig, attached, dx, dy, modules = {} }) 
  * wire's vertex or segment, another pin or marker)? Used to nudge a dropped component.
  * moved: { symIds:Set, portIds:Set }, attachedIds: Set of wire ids stretched with the move.
  */
-export function placementClashes(doc, { moved, attachedIds = new Set(), modules = {} }) {
+export function placementClashes(doc, { moved, attachedIds = new Set(), modules = {}, guard = null }) {
+  // guard: only these pins/markers ('S1/O', 'port:P1') are checked for contacts — the ones that were
+  // connected before the move (dropping a free pin or marker on something is a wanted connection)
   const pts = [];
-  for (const s of doc.symbols) if (moved.symIds.has(s.id)) pts.push(...symbolPins(s, modules));
-  for (const p of doc.ports) if (moved.portIds.has(p.id)) pts.push(p);
+  for (const s of doc.symbols) if (moved.symIds.has(s.id)) for (const p of symbolPins(s, modules)) if (!guard || guard.has(`${s.id}/${p.name}`)) pts.push(p);
+  for (const p of doc.ports) if (moved.portIds.has(p.id) && (!guard || guard.has(`port:${p.id}`))) pts.push(p);
   const own = new Set(pts.map(p => K(p.x, p.y)));
   let n = 0;
   for (const p of pts) {
@@ -244,4 +246,22 @@ export function placementClashes(doc, { moved, attachedIds = new Set(), modules 
     for (const o of boxes) if (!moved.symIds.has(o.s.id) && b.x < o.b.x + o.b.w && o.b.x < b.x + b.w && b.y < o.b.y + o.b.h && o.b.y < b.y + b.h) n++;
   }
   return n;
+}
+
+/**
+ * Did a move break or merge existing nets? New connections of pins/markers that were not
+ * connected before are allowed. before/after: connectivity() results.
+ */
+export function connectionsKept(before, after) {
+  const netOf = new Map();
+  after.forEach((n, i) => n.split(' ').forEach(e => netOf.set(e, i)));
+  const used = new Set();
+  for (const n of before) {
+    const ids = new Set(n.split(' ').map(e => netOf.get(e)));
+    if (ids.size !== 1 || ids.has(undefined)) return false;      // split
+    const id = [...ids][0];
+    if (used.has(id)) return false;                               // merged with another net
+    used.add(id);
+  }
+  return true;
 }

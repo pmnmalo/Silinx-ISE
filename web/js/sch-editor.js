@@ -17,7 +17,7 @@ import {
   SYMBOLS, SYMBOL_CATEGORIES, GRID, defaultParams, normalizeDoc, newDoc, symbolDef, symbolPins, symbolBox,
   xform, rotSize, portBox, netlist, generateHdl, parseNetName,
 } from '/core/schdoc.js';
-import { rerouteAfterMove, connectivity, placementClashes } from '/core/schroute.js';
+import { rerouteAfterMove, connectivity, placementClashes, connectionsKept } from '/core/schroute.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1003,9 +1003,34 @@ export function mountSchEditor(container, opts = {}) {
     for (const w of doc.wires) anchors.push(w.points[0], w.points[w.points.length - 1]);
     for (const l of doc.labels) if (!labelIds.has(l.id)) anchors.push({ x: l.x, y: l.y });
     if (!keepConn) attach.length = 0;      // detach: the wires stay where they are
+    // moved pins / markers and what they touch now
+    const movedPts = [];
+    for (const s of doc.symbols) if (symIds.has(s.id)) for (const p of symbolPins(s, modules)) movedPts.push({ key: `${s.id}/${p.name}`, x: p.x, y: p.y });
+    for (const p of doc.ports) if (portIds.has(p.id)) movedPts.push({ key: `port:${p.id}`, x: p.x, y: p.y });
+    const fixedPts = [];
+    for (const s of doc.symbols) if (!symIds.has(s.id)) for (const p of symbolPins(s, modules)) fixedPts.push(p);
+    for (const p of doc.ports) if (!portIds.has(p.id)) fixedPts.push(p);
+    const wirePt = new Set();
+    for (const w of doc.wires) for (const p of w.points) wirePt.add(`${p.x},${p.y}`);
+    // pins/markers connected before the move: guarded against landing on other nets
+    const guard = new Set(movedPts.filter(q => wirePt.has(`${q.x},${q.y}`) || fixedPts.some(f => f.x === q.x && f.y === q.y)).map(q => q.key));
+    // touching a pin/marker directly (no wire): add a wire so the connection is kept
+    const synth = [];
+    if (keepConn) {
+      const done = new Set();
+      for (const q of movedPts) {
+        const k = `${q.x},${q.y}`;
+        if (done.has(k) || wirePt.has(k) || !fixedPts.some(f => f.x === q.x && f.y === q.y)) continue;
+        done.add(k);
+        const w = { id: nextId('W', doc.wires), points: [{ x: q.x, y: q.y }, { x: q.x, y: q.y }] };
+        doc.wires.push(w); orig.wires.push(clone(w));
+        attach.push({ id: w.id, a: false, b: true });
+        synth.push(w.id);
+      }
+    }
     let conn0 = null;
     try { conn0 = connectivity(doc, modules); } catch { /* checked only when available */ }
-    return { kind: 'move', start, before, orig, symIds, portIds, wireIds, labelIds, attach, anchors, conn0, dx: 0, dy: 0 };
+    return { kind: 'move', start, before, orig, symIds, portIds, wireIds, labelIds, attach, anchors, conn0, guard, synth, dx: 0, dy: 0 };
   }
   function applyMove(m, dx, dy) {
     if (dx === m.dx && dy === m.dy) return;
@@ -1107,7 +1132,7 @@ export function mountSchEditor(container, opts = {}) {
     // dropped with a pin on another net: nudge to the nearest clear position (up to 5 grid steps)
     if (keepConn && (m.symIds.size || m.portIds.size)) {
       const attachedIds = new Set(m.attach.map(a => a.id));
-      const clash = () => placementClashes(doc, { moved: { symIds: m.symIds, portIds: m.portIds }, attachedIds, modules });
+      const clash = () => placementClashes(doc, { moved: { symIds: m.symIds, portIds: m.portIds }, attachedIds, modules, guard: m.guard });
       if (clash()) {
         const bx = m.dx, by = m.dy;
         let found = false;
@@ -1127,7 +1152,7 @@ export function mountSchEditor(container, opts = {}) {
     if (keepConn && m.conn0) {
       let now = null;
       try { now = connectivity(doc, modules); } catch { /* ignore */ }
-      if (now && JSON.stringify(now) !== JSON.stringify(m.conn0)) flash('Connections changed by this move (a pin now touches another net, or a wire could not be routed). Undo with Ctrl+Z if not intended.');
+      if (now && !connectionsKept(m.conn0, now)) flash('Connections changed by this move (a pin now touches another net, or a wire could not be routed). Undo with Ctrl+Z if not intended.');
     }
     pushUndo(m.before); changed(); render(); renderProps();
   }
@@ -1137,6 +1162,7 @@ export function mountSchEditor(container, opts = {}) {
     if (d.kind === 'pan') { canvas.classList.remove('panning'); return; }
     if (d.kind === 'move') {
       if (d.dx || d.dy) finishMove(d);
+      else if (d.synth?.length) { doc.wires = doc.wires.filter(w => !d.synth.includes(w.id)); render(); }   // just a click
       return;
     }
     if (d.kind === 'band') {

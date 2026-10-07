@@ -1217,13 +1217,16 @@ export function generateHdl(docIn, opts = {}) {
         const cin = s.type === 'add' && p.cin ? INN(s, 'CI') : null;
         const op = s.type === 'add' ? '+' : '-';
         if (ci) {
-          if (!co && !cin) { if (o) body.push(`${o} <= ${wrapV(`unsigned(${a}) ${op} unsigned(${b})`, clsOf(o))};`); }
-          else {
+          // a 1-bit operand is a std_logic: unsigned'(0 => x) makes it a 1-bit vector
+          const U = x => (w === 1 ? `unsigned'(0 => ${x})` : `unsigned(${x})`);
+          if (!co && !cin) {
+            if (o) body.push(w === 1 ? `${o} <= ${a} xor ${b};` : `${o} <= ${wrapV(`unsigned(${a}) ${op} unsigned(${b})`, clsOf(o))};`);
+          } else {
             const t = fresh(`${s.name}_sum`);
             extra.push({ name: t, type: `unsigned(${w} downto 0)` });
-            const base = `resize(unsigned(${a}), ${w + 1}) ${op} resize(unsigned(${b}), ${w + 1})`;
+            const base = `resize(${U(a)}, ${w + 1}) ${op} resize(${U(b)}, ${w + 1})`;
             body.push(cin ? `${t} <= ${base} + 1 when ${cin} = '1' else ${base};` : `${t} <= ${base};`);
-            if (o) body.push(`${o} <= ${wrapV(`${t}(${w - 1} downto 0)`, clsOf(o))};`);
+            if (o) body.push(w === 1 ? `${o} <= ${t}(0);` : `${o} <= ${wrapV(`${t}(${w - 1} downto 0)`, clsOf(o))};`);
             if (co) body.push(`${co} <= ${t}(${w});`);
           }
         } else {
@@ -1240,7 +1243,8 @@ export function generateHdl(docIn, opts = {}) {
         const op = p.op || 'eq';
         if (ci) {
           const vo = { eq: '=', ne: '/=', lt: '<', le: '<=', gt: '>', ge: '>=' }[op];
-          const cast = x => (p.signed ? `signed(${x})` : `unsigned(${x})`);
+          const cw = Math.max(1, int(p.width, 1));
+          const cast = x => (cw === 1 ? `${p.signed ? 'signed' : 'unsigned'}'(0 => ${x})` : p.signed ? `signed(${x})` : `unsigned(${x})`);
           body.push(`${o} <= '1' when ${cast(a)} ${vo} ${cast(b)} else '0';`);
         } else {
           const vo = { eq: '==', ne: '!=', lt: '<', le: '<=', gt: '>', ge: '>=' }[op];

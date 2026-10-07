@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { simulate } from '../core/compile.js';
-import { newDoc, normalizeDoc, netlist, generateHdl, symbolDef, symbolPins, SYMBOLS, SYMBOL_CATEGORIES } from '../core/schdoc.js';
+import { newDoc, normalizeDoc, defaultParams, netlist, generateHdl, symbolDef, symbolPins, SYMBOLS, SYMBOL_CATEGORIES } from '../core/schdoc.js';
 
 // ------------------------------------------------------------------ JS models: (params, inputs { pin: BigInt }) -> { pin: BigInt }
 const bit = (v, i) => (v >> BigInt(i)) & 1n;
@@ -320,5 +320,38 @@ test('simulation: every FD* / FT* / FJK* flip-flop (VHDL and Verilog) follows th
     const log = r.sim.log.map(l => l.text);
     assert.ok(log.includes('errs=0'), `${lang}\n${log.slice(0, 30).join('\n')}`);
     for (const it of items) it.q = +it.s.params.init;   // reset the models for the other language
+  }
+});
+
+// ---- 1-bit arithmetic: a 1-bit operand is a std_logic in VHDL (regression: unsigned(std_logic))
+test('1-bit add / sub / compare generate valid VHDL and Verilog with the right function', () => {
+  const sym = (type, params) => ({ id: 'U', type, x: 200, y: 100, rot: 0, mirror: false, name: 'U1', params: { ...defaultParams(type), width: 1, ...params } });
+  const cases = [
+    ['add', {}, ['A', 'B'], ['S'], (a, b) => [(a + b) & 1]],
+    ['add', { cin: true, cout: true }, ['A', 'B', 'CI'], ['S', 'CO'], (a, b, c) => [(a + b + c) & 1, (a + b + c) >> 1]],
+    ['sub', {}, ['A', 'B'], ['D'], (a, b) => [(a - b) & 1]],
+    ['compare', { op: 'lt' }, ['A', 'B'], ['O'], (a, b) => [a < b ? 1 : 0]],
+  ];
+  for (const [type, params, ins, outs, f] of cases) {
+    const s = sym(type, params);
+    const doc = normalizeDoc({ name: 'dut', lang: 'vhdl', symbols: [s], wires: [], labels: [], ports: [] });
+    // one I/O marker on every pin
+    for (const p of symbolPins(doc.symbols[0], {})) doc.ports.push({ id: `P_${p.name}`, name: p.name.toLowerCase(), dir: p.dir === 'out' ? 'out' : 'in', width: 1, x: p.x, y: p.y });
+    for (const lang of ['vhdl', 'verilog']) {
+      const g = generateHdl(normalizeDoc(doc), { lang });
+      const n = ins.length;
+      const tb = `module tb; reg [${n - 1}:0] v; ${outs.map(o => `wire ${o.toLowerCase()};`).join(' ')}
+        dut u(${[...ins.map((x, i) => `.${x.toLowerCase()}(v[${i}])`), ...outs.map(o => `.${o.toLowerCase()}(${o.toLowerCase()})`)].join(', ')});
+        integer i; initial begin for (i = 0; i < ${1 << n}; i = i + 1) begin v = i; #1 $display("%0d ${outs.map(() => '%b').join(' ')}", i, ${outs.map(o => o.toLowerCase()).join(', ')}); end end endmodule`;
+      const r = simulate([{ path: lang === 'vhdl' ? 'dut.vhd' : 'dut.v', text: g.code }, { path: 'tb.v', text: tb }], 'tb', { until: 1e6 });
+      assert.deepEqual(r.errors, [], `${type}/${lang}: ${JSON.stringify(r.errors)}\n${g.code}`);
+      const lines = r.sim.log.map(l => String(l.text).trim()).filter(t => /^\d+ /.test(t));
+      for (const line of lines) {
+        const [i, ...got] = line.split(' ').map(Number);
+        const bits = ins.map((_, k) => (i >> k) & 1);
+        assert.deepEqual(got, f(...bits), `${type}${JSON.stringify(params)}/${lang} inputs ${bits}`);
+      }
+      assert.equal(lines.length, 1 << n);
+    }
   }
 });
