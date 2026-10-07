@@ -7,7 +7,7 @@ import { compile, elaborate, topCandidates } from '/core/compile.js';
 import { Simulator } from '/core/simulator.js';
 import { buildSchematic } from '/core/schematic.js';
 import * as wiz from './wizards.js';
-import { PRODUCT } from '/core/version.js';
+import { PRODUCT, VERSION } from '/core/version.js';
 import { startI18n, setLanguage, getLanguage, LOCALES } from './i18n.js';
 
 // ------------------------------------------------------------------ state
@@ -1720,8 +1720,8 @@ export async function closeProject() {
 
 function updateTitle() {
   const pj = S.project;
-  $('title-text').textContent = pj ? `${PRODUCT} - ${pj.name} - [${S.active?.title || 'Design Summary'}]` : `${PRODUCT} - Project Navigator`;
-  document.title = pj ? `${pj.name} — ${PRODUCT}` : `${PRODUCT} Project Navigator`;
+  $('title-text').textContent = pj ? `${PRODUCT} ${VERSION} - ${pj.name} - [${S.active?.title || 'Design Summary'}]` : `${PRODUCT} ${VERSION} - Project Navigator`;
+  document.title = pj ? `${pj.name} — ${PRODUCT} ${VERSION}` : `${PRODUCT} ${VERSION} Project Navigator`;
   $('status-device').textContent = pj ? `${pj.device.part}${pj.device.speed}-${pj.device.package}${pj.board ? ` · ${pj.board}` : ''}` : '';
 }
 
@@ -1952,7 +1952,7 @@ async function boot() {
   addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });
 
   updateTitle();
-  log(`${PRODUCT} Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.`, 'info');
+  log(`${PRODUCT} ${VERSION} Project Navigator — HDL design, schematics, behavioural simulation and Xilinx FPGA implementation/programming.`, 'info');
   if (api.standalone) log('Standalone edition: projects are stored in this browser (File > Download Project Bundle to keep a copy). Synthesis/programming need the full XAIlinx application.', 'warn');
   try { S.devices = await api.devices(); } catch (e) { log(`ERROR: cannot reach the XAIlinx server: ${e.message}`, 'err'); }
   api.toolchain().then(tc => {
