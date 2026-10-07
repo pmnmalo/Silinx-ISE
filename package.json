@@ -1,6 +1,6 @@
 {
   "name": "silinx",
-  "version": "15.1.0",
+  "version": "15.2.0",
   "description": "Silinx ISE (Integrated Synthesis Environment): HDL design platform in the style of Xilinx ISE 14.x: VHDL/Verilog projects, schematic and ASM editors, behavioural simulation, ISE 14.7 implementation and board programming",
   "type": "module",
   "bin": {
