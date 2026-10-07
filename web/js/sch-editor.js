@@ -608,8 +608,21 @@ export function mountSchEditor(container, opts = {}) {
 
   // ---------------- properties panel
   function field(label, input, note) { return h('div', { class: 'se-field' }, h('label', { text: label }), input, note ? h('div', { class: 'se-note', text: note }) : null); }
+  // the single selected module instance (RTL view: "push into"), or null
+  function selectedModuleSym() {
+    const ids = [...sel].filter(k => k.startsWith('sym:'));
+    if (ids.length !== 1 || sel.size !== 1) return null;
+    const s = doc.symbols.find(x => x.id === ids[0].slice(4));
+    return s && s.type === 'module' ? s : null;
+  }
+  function openSelected() {
+    const s = selectedModuleSym();
+    if (s && opts.onOpenModule) opts.onOpenModule(s.params.module, { instance: s.name, symbol: clone(s) });
+    return !!s;
+  }
   function renderProps() {
     renderPropsInner();
+    opts.onSelect?.(selectedModuleSym());
     if (readOnly) propBody.querySelectorAll('input, textarea, select, button').forEach(el => { if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text')) el.readOnly = true; else if (!el.classList.contains('ro-ok')) el.disabled = true; });
   }
   function renderPropsInner() {
@@ -1238,6 +1251,9 @@ export function mountSchEditor(container, opts = {}) {
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (k === ' ' && !spaceDown) { spaceDown = true; canvas.classList.add('pan-ready'); e.preventDefault(); return; }
+    // read-only (RTL view): Backspace = up to the parent module, Enter = push into the selected instance
+    if (readOnly && k === 'backspace' && !mod) { e.preventDefault(); opts.onUp?.(); return; }
+    if (readOnly && k === 'enter' && !mod) { if (openSelected()) e.preventDefault(); return; }
     if (readOnly && !(['escape', 'f', '+', '=', '-', '_'].includes(k) || (mod && (k === 'a' || k === 'c')))) return;
     if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if ((mod && k === 'y') || (mod && k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); return; }
@@ -1418,6 +1434,7 @@ export function mountSchEditor(container, opts = {}) {
     setDoc(d) { doc = normalizeDoc(d || newDoc()); undoStack.length = 0; redoStack.length = 0; sel.clear(); lastDiags = null; genLang = doc.lang; langSel.value = genLang; diagPanel.hidden = true; renderSheet(); renderPalette(); render(); renderProps(); fit(); },
     setModules(m) { modules = normMods(m); renderPalette(); render(); renderProps(); },
     check: () => runCheck(true),
+    openSelected,
     fit,
     destroy() {
       destroyed = true;

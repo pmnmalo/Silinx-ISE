@@ -1053,10 +1053,15 @@ async function openSchematic(mod) {
       el.append(bar, host);
       let ed = null, cur = null;
       const crumbs = inst => { const out = []; for (let i = inst; i; i = i.parent) out.unshift(i); return out; };
+      // ISE-style hierarchy navigation: up to the parent, push into the selected instance
+      const upBtn = h('button', { class: 'btn rtl-nav', title: 'Up to the parent module (Backspace)', onclick: () => cur?.parent && show(cur.parent) }, '⬆ Up');
+      const intoBtn = h('button', { class: 'btn rtl-nav', title: 'Push into the selected instance (Enter, or double-click it)', onclick: () => ed?.openSelected() }, '⬇ Push into');
+      const canEnter = s => !!(s && cur?.children.some(c => (c.name === s.name || c.module === s.params.module) && !c.blackbox));
       const show = async inst => {
         cur = inst;
         bar.innerHTML = '';
-        bar.append(h('span', { class: 'rtl-ro' }, 'RTL Schematic (read-only)'));
+        upBtn.disabled = !inst.parent; intoBtn.disabled = true;
+        bar.append(upBtn, intoBtn, h('span', { class: 'rtl-ro' }, 'RTL Schematic (read-only)'));
         crumbs(inst).forEach((i, k, all) => {
           bar.append(h('span', { class: 'sep' }, k ? ' › ' : ' — '));
           bar.append(k === all.length - 1 ? h('b', {}, `${i.name} : ${i.module}`) : h('a', { onclick: () => show(i) }, `${i.name} : ${i.module}`));
@@ -1070,6 +1075,8 @@ async function openSchematic(mod) {
           if (!ed) {
             ed = mountSchEditor(host, {
               doc, modules, readOnly: true,
+              onSelect: s => { intoBtn.disabled = !canEnter(s); },
+              onUp: () => cur?.parent && show(cur.parent),
               onOpenModule: (name, { instance } = {}) => {
                 const child = cur.children.find(c => c.name === instance) || cur.children.find(c => c.module === name);
                 if (child && !child.blackbox) show(child);
