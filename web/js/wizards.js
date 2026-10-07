@@ -102,6 +102,22 @@ function wizard(title, pages, { width = 720, finishLabel = 'Finish' } = {}) {
 }
 
 // ------------------------------------------------------------------ New Project
+// A project with this name already exists: ask whether to replace it. With the server the old
+// project is moved to <workspace>/.trash (recoverable); in the standalone edition it is deleted.
+async function askReplaceProject(pname) {
+  const list = await api.projects();
+  if (!list.some(p => p.name === pname)) return true;
+  return confirmDlg('Replace Project',
+    `A project named '${pname}' already exists.\n\nReplace it? ${api.standalone ? 'The existing project will be deleted from this browser.' : 'The existing project is moved to the workspace .trash folder.'}`);
+}
+async function removeExistingProject(pname) {
+  const list = await api.projects();
+  if (!list.some(p => p.name === pname)) return;
+  if (S.project?.name === pname) await app.closeProject();
+  await api.deleteProject(pname);
+  app.log(`Project '${pname}' replaced${api.standalone ? '' : ' (the old one is in the workspace .trash folder)'}.`, 'info');
+}
+
 export async function newProjectWizard({ template = 'empty' } = {}) {
   const db = S.devices || await api.devices();
   const templates = await api.templates().catch(() => []);
@@ -123,8 +139,12 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
       h('div', { class: 'hint', style: { marginTop: '14px' } }, 'Projects are stored in the XAIlinx workspace folder (default ~/XAIlinx-projects).')),
     validate: async () => {
       if (!NAME_RE.test(name.value.trim())) return 'Project name must start with a letter and contain only letters, digits and _.';
+      st.replace = false;
       const list = await api.projects();
-      if (list.some(p => p.name === name.value.trim())) return `A project named '${name.value.trim()}' already exists.`;
+      if (list.some(p => p.name === name.value.trim())) {
+        if (!await askReplaceProject(name.value.trim())) return `A project named '${name.value.trim()}' already exists: choose another name.`;
+        st.replace = true;
+      }
       return null;
     },
   };
@@ -172,6 +192,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
   const ok = await wizard('New Project Wizard', [p1, p2, p3]);
   if (!ok) return;
   try {
+    if (st.replace) await removeExistingProject(name.value.trim());
     const pj = await api.createProject({
       name: name.value.trim(), template: tplSel.value,
       device: dp.value(),
@@ -261,7 +282,9 @@ export async function importXiseDialog() {
   const xf = files.find(f => /\.xise$/i.test(f.name));
   if (!dirInp.files.length && !zf && !xf) return alertDlg('Import ISE Project', 'Select the project folder, a .zip, or a .xise with its sources.', 'error');
   const pname = name.value.trim() || (zf || xf)?.name.replace(/\.(zip|xise)$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
+  if (!await askReplaceProject(pname)) return;
   try {
+    await removeExistingProject(pname);
     let res;
     if (dirInp.files.length) {
       const z = await zipFolderSelection(dirInp.files);
