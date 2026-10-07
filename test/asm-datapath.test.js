@@ -19,7 +19,12 @@ const errorsOf = (m) => validate(m).filter((d) => d.severity === 'error');
 // ---------------------------------------------------------------------------------------
 
 /** The blinky example: button synchronisers + debouncers + speed FSM + step divider. */
-const speedCtrl = () => JSON.parse(fs.readFileSync(path.join(BLINKY, 'src', 'speed_ctrl.asm.json'), 'utf8'));
+// the blinky chart, with the reset speed level pinned to 3 (the example's own value may be tuned)
+const speedCtrl = () => {
+  const m = JSON.parse(fs.readFileSync(path.join(BLINKY, 'src', 'speed_ctrl.asm.json'), 'utf8'));
+  for (const r of m.registers || []) if (r.name === 'level') r.init = '3';
+  return m;
+};
 
 /** Shifts and Verilog sizing in every context, a generic in arithmetic, a joined branch. */
 function shifter() {
@@ -521,7 +526,7 @@ function isAlwaysPart(m, id) {
 // ---------------------------------------------------------------------------------------
 
 test('blinky example: the chart generates speed_ctrl.vhd, which round-trips and passes the test bench', () => {
-  const m = speedCtrl();
+  const m = JSON.parse(fs.readFileSync(path.join(BLINKY, 'src', 'speed_ctrl.asm.json'), 'utf8'));
   assert.equal(m.generatedFile, 'src/speed_ctrl.vhd');
   assert.deepEqual(validate(m), []);
   const file = fs.readFileSync(path.join(BLINKY, 'src', 'speed_ctrl.vhd'), 'utf8');

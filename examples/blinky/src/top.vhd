@@ -15,7 +15,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 entity top is
     Generic ( DIV      : integer := 625_000;     -- base tick: 80 per second at 50 MHz
               DEBOUNCE : integer := 1_000_000 ); -- button debounce: 20 ms at 50 MHz
-    -- speed after reset: level 3 of speed_ctrl = 80 / 2**3 = 10 steps per second
+    -- speed after reset: level 5 of speed_ctrl = 80 / 2**5 = 2.5 steps per second
     Port ( clk : in  STD_LOGIC;
            sw  : in  STD_LOGIC_VECTOR (3 downto 0);
            btn : in  STD_LOGIC_VECTOR (1 downto 0);

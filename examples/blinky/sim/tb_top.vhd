@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------------------
 -- Test bench for top: a small DIV (base tick every 2 clock cycles) and a 2-cycle button
--- debounce. After reset the speed is level 3: the LEDs move every 2 * 2**3 = 16 cycles.
+-- debounce. After reset the speed is level 5: the LEDs move every 2 * 2**5 = 64 cycles.
 -- Checks the knight rider, the binary counter, pause, invert and the speed buttons
 -- (the speed_ctrl ASM chart: one level per press, limited to levels 0..7).
 ----------------------------------------------------------------------------------
@@ -50,17 +50,17 @@ BEGIN
    begin
       wait for 100 ns;
       sw(0) <= '0';                                   -- release reset
-      -- knight rider: the light runs to the MSB and comes back (a step every 16 cycles)
-      wait until led = "10000000" for clk_period * 16 * 9;
+      -- knight rider: the light runs to the MSB and comes back (a step every 64 cycles)
+      wait until led = "10000000" for clk_period * 64 * 9;
       assert led = "10000000" report "knight rider did not reach the MSB" severity error;
-      wait until led = "00000001" for clk_period * 16 * 9;
+      wait until led = "00000001" for clk_period * 64 * 9;
       assert led = "00000001" report "knight rider did not come back" severity error;
       sw(1) <= '1';                                   -- binary counter mode
       wait for clk_period * 40;
       sw(2) <= '1';                                   -- pause: the counter must hold
       wait for clk_period * 2;
       snap := led;
-      wait for clk_period * 40;
+      wait for clk_period * 160;
       assert led = snap report "pause did not hold the LEDs" severity error;
       sw(3) <= '1';                                   -- invert
       wait for 1 ns;
@@ -68,11 +68,11 @@ BEGIN
       sw(3) <= '0'; sw(2) <= '0';
       wait for clk_period * 2;
       -- speed buttons
-      check_rate(320, 20, "level 3 (reset)");         -- 16 cycles per step
-      press(btn(0));                                  -- slower: level 4, 32 cycles per step
-      check_rate(320, 10, "slower");
-      press(btn(1)); press(btn(1));                   -- faster x2: level 2, 8 cycles per step
-      check_rate(320, 40, "faster x2");
+      check_rate(640, 10, "level 5 (reset)");         -- 64 cycles per step
+      press(btn(0));                                  -- slower: level 6, 128 cycles per step
+      check_rate(640, 5, "slower");
+      press(btn(1)); press(btn(1));                   -- faster x2: level 4, 32 cycles per step
+      check_rate(640, 20, "faster x2");
       for i in 1 to 4 loop press(btn(1)); end loop;   -- faster x4: stops at level 0, 2 cycles
       check_rate(320, 160, "fastest (level 0)");
       for i in 1 to 9 loop press(btn(0)); end loop;   -- slower x9: stops at level 7, 256 cycles

@@ -43,7 +43,7 @@
 --   deb_f : 1 bit, reset 0
 --   cnt_s : 20 bits, reset 0
 --   deb_s : 1 bit, reset 0
---   level : 3 bits, reset 3
+--   level : 3 bits, reset 5
 --   ticks : 8 bits, reset 0
 --==============================================================================
 
@@ -106,7 +106,7 @@ begin
                 deb_f <= '0';
                 cnt_s <= "00000000000000000000";
                 deb_s <= '0';
-                level <= "011";
+                level <= "101";
                 ticks <= "00000000";
                 faster_meta <= '0';
                 faster_sync <= '0';

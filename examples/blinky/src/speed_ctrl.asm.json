@@ -63,7 +63,7 @@
     {
       "name": "level",
       "width": 3,
-      "init": "3"
+      "init": "5"
     },
     {
       "name": "ticks",
