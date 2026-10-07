@@ -55,6 +55,20 @@ for Xilinx FPGAs supported by ISE 14.7.
   power-up), with openFPGALoader, xc3sprog, Digilent Adept (`djtgcfg`), ISE iMPACT or
   **adepttool** (Basys2 on macOS).
 
+## Download
+
+Ready-made files are on the [Releases page](https://github.com/pmnmalo/XAIlinx/releases/latest):
+
+- **XAIlinx.html**: the single-file edition. Open it in a browser (no install) for the editor,
+  schematics, ASM charts and simulation; projects are kept in the browser.
+- **xailinx-&lt;version&gt;.zip**: the full app with its dependencies. With Node.js 20+:
+  unzip, `cd xailinx`, `node bin/xailinx.js serve`, open http://localhost:8642.
+- **xailinx-ise-docker-kit-&lt;version&gt;.zip**: the kit to build your own private ISE 14.7 Docker
+  image (ISE and its licence are not included).
+
+Maintainers: pushing a tag `vX.Y.Z` runs the tests and publishes a release with these files
+(`.github/workflows/release.yml`).
+
 ## Getting started
 
 ```bash
