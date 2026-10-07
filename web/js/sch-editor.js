@@ -1248,8 +1248,7 @@ export function mountSchEditor(container, opts = {}) {
     if (mod && k === 'v') { e.preventDefault(); paste(); return; }
     if (mod && k === 'a') { e.preventDefault(); selectAll(); return; }
     if (mod) return;
-    // only Delete removes the selection (Backspace is too easy to hit after typing in a property)
-    if (k === 'delete') { e.preventDefault(); deleteSel(); return; }
+    if (k === 'delete' || k === 'backspace') { e.preventDefault(); deleteSel(); return; }
     if (k === 'escape') {
       if (wireDraw) { if (wireDraw.pts.length > 1) finishWire(); else { wireDraw = null; renderOverlay(); } return; }
       if (tool !== 'select') { setTool('select'); return; }

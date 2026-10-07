@@ -1052,8 +1052,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     const mod = ev.ctrlKey || ev.metaKey;
     const k = ev.key;
     if (k === ' ') { spaceDown = true; svg.classList.add('space'); ev.preventDefault(); return; }
-    // only Delete removes the selection (Backspace is too easy to hit after typing in a property)
-    if (k === 'Delete') { deleteSelection(); ev.preventDefault(); return; }
+    if (k === 'Delete' || k === 'Backspace') { deleteSelection(); ev.preventDefault(); return; }
     if (mod && (k === 'z' || k === 'Z')) { if (ev.shiftKey) redo(); else undo(); ev.preventDefault(); return; }
     if (mod && (k === 'y' || k === 'Y')) { redo(); ev.preventDefault(); return; }
     if (mod && (k === 'a' || k === 'A')) { sel = { nodes: new Set(M.nodes.map((n) => n.id)), edge: null }; render(); renderInspector(); updateToolbar(); ev.preventDefault(); return; }
