@@ -1,7 +1,7 @@
 {
   "name": "xailinx",
-  "version": "0.3.0",
-  "description": "XAIlinx - HDL design platform: projects, schematics, behavioral simulation and Spartan-3E programming",
+  "version": "15.0.0",
+  "description": "XAIlinx ISE (Integrated Synthesis Environment): HDL design platform in the style of Xilinx ISE 14.x: VHDL/Verilog projects, schematic and ASM editors, behavioural simulation, ISE 14.7 implementation and board programming",
   "type": "module",
   "bin": {
     "xailinx": "bin/xailinx.js"
@@ -9,7 +9,8 @@
   "scripts": {
     "start": "node bin/xailinx.js serve",
     "test": "node --test test/*.test.js",
-    "build:standalone": "node scripts/build-standalone.mjs"
+    "build:standalone": "node scripts/build-standalone.mjs",
+    "version": "node scripts/sync-version.mjs && git add core/version.js"
   },
   "license": "Apache-2.0",
   "dependencies": {
@@ -22,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pmnmalo/XAIlinx.git"
+    "url": "https://github.com/pmnmalo/XAIlinx-ISE.git"
   },
   "author": "Pedro Malo"
 }

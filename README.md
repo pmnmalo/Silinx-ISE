@@ -1,4 +1,8 @@
-# XAIlinx
+# XAIlinx ISE (Integrated Synthesis Environment) 15
+
+> XAIlinx ISE is an independent open-source project. It is not affiliated with, endorsed by or
+> supported by AMD/Xilinx. Xilinx, ISE, ISim, iMPACT, Spartan and Virtex are trademarks of AMD;
+> synthesis and bitstreams use the free Xilinx ISE 14.7 WebPACK tools, which you install yourself.
 
 A reprogrammable-hardware design platform in the style of the **Xilinx ISE 14.x Project Navigator**,
 for Xilinx FPGAs supported by ISE 14.7.
@@ -60,7 +64,7 @@ for Xilinx FPGAs supported by ISE 14.7.
 **Step-by-step guide for beginners (no git or programming tools needed):
 [English](docs/GETTING-STARTED.md) · [Português](docs/COMECAR.md)**
 
-In short, from the [latest release](https://github.com/pmnmalo/XAIlinx/releases/latest):
+In short, from the [latest release](https://github.com/pmnmalo/XAIlinx-ISE/releases/latest):
 
 - **Just design and simulate:** download **`XAIlinx.html`** and double-click it. Nothing to install;
   projects are kept in the browser.
@@ -74,7 +78,7 @@ In short, from the [latest release](https://github.com/pmnmalo/XAIlinx/releases/
 ## For developers
 
 ```bash
-git clone https://github.com/pmnmalo/XAIlinx.git && cd XAIlinx
+git clone https://github.com/pmnmalo/XAIlinx-ISE.git && cd XAIlinx-ISE
 npm install
 npm start          # http://127.0.0.1:8642  (node bin/xailinx.js serve --open also opens the browser)
 ```

@@ -1,5 +1,6 @@
 // Design Summary page (ISE "Design Summary/Reports").
 import { api } from './api.js';
+import { PRODUCT, VERSION } from '/core/version.js';
 import { h } from './ui.js';
 import { S, app } from './app.js';
 
@@ -26,7 +27,7 @@ export function mountSummary(el) {
       row('Module Name:', pj.top || '(not set)', 'Implementation State:', implState),
       row('Target Device:', `${pj.device.part}${pj.device.speed}-${pj.device.package}`, 'Warnings:', warns ? `${warns} Warnings` : 'No Warnings'),
       row('Board:', board ? board.name : 'None Specified', 'Simulation Top:', pj.simTop || '(not set)'),
-      row('Product Version:', 'XAIlinx 0.1 / ISE 14.7 flow', 'Constraints:', pj.constraints || '(none)'),
+      row('Product Version:', `${PRODUCT} ${VERSION} (Xilinx ISE 14.7 flow)`, 'Constraints:', pj.constraints || '(none)'),
       row('Design Goal:', `Balanced (${pj.impl?.optMode || 'Speed'})`, 'Sources:', `${pj.files.length} HDL files`),
     ));
     // utilization (from the MAP report when available)

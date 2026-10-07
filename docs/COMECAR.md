@@ -1,4 +1,4 @@
-# Começar a usar o XAIlinx (passo a passo)
+# Começar a usar o XAIlinx ISE 15 (passo a passo)
 
 Não precisa de ferramentas de programação nem de git. Escolha **uma** das duas formas abaixo.
 
@@ -13,7 +13,7 @@ Não precisa de ferramentas de programação nem de git. Escolha **uma** das dua
 
 ## Forma 1: um só ficheiro (a mais simples)
 
-1. Abra a **[última versão](https://github.com/pmnmalo/XAIlinx/releases/latest)**.
+1. Abra a **[última versão](https://github.com/pmnmalo/XAIlinx-ISE/releases/latest)**.
 2. Em **Assets**, clique em **`XAIlinx.html`** para o descarregar.
 3. Faça duplo clique no ficheiro descarregado. Abre no browser (Chrome, Edge, Firefox ou Safari).
 4. Na página inicial clique em **Open Example (blinky)** ou **New Project…**.
@@ -44,7 +44,7 @@ O XAIlinx corre no **Node.js**, um programa gratuito.
 
 ### Passo 2: descarregar o XAIlinx
 
-1. Abra a **[última versão](https://github.com/pmnmalo/XAIlinx/releases/latest)**.
+1. Abra a **[última versão](https://github.com/pmnmalo/XAIlinx-ISE/releases/latest)**.
 2. Em **Assets**, descarregue **`xailinx-<versão>.zip`** (por exemplo `xailinx-0.2.0.zip`).
    - Não use o botão verde **Code ▸ Download ZIP** nem o "Source code": essa versão não traz tudo
      o que o XAIlinx precisa (funciona na mesma, mas o primeiro arranque precisa de Internet para
@@ -138,8 +138,8 @@ Terminal, escreva `cd `, arraste a pasta para a janela e carregue em Enter).
 ## Para quem usa git
 
 ```bash
-git clone https://github.com/pmnmalo/XAIlinx.git
-cd XAIlinx
+git clone https://github.com/pmnmalo/XAIlinx-ISE.git
+cd XAIlinx-ISE
 npm install
 npm start            # http://127.0.0.1:8642
 ```

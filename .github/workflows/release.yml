@@ -41,4 +41,4 @@ jobs:
         run: |
           V="${GITHUB_REF_NAME#v}"
           NOTES=".github/release-notes.md"
-          gh release create "$GITHUB_REF_NAME" out/* --title "XAIlinx $V" --notes-file "$NOTES"
+          gh release create "$GITHUB_REF_NAME" out/* --title "XAIlinx ISE $V" --notes-file "$NOTES"

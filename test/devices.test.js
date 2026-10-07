@@ -161,3 +161,10 @@ test('getDeviceDb: every family by default, Spartan-3E-only view with { all: fal
   assert.equal(all.boards.length, dev.BOARDS.length);
   assert.ok(all.parts.some(p => p.family === 'zynq'));
 });
+
+test('core/version.js matches package.json', async () => {
+  const fs = await import('node:fs');
+  const { VERSION } = await import('../core/version.js');
+  const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(VERSION, pkg.version);
+});

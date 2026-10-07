@@ -58,7 +58,7 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, src) => {
 // replacer functions: the inserted code may contain `$'`, `$&`… which a replacement string would expand
 html = html.replace('<script type="module" src="/js/app.js"></script>',
   () => `<script>window.XAILINX_STANDALONE = true;</script>\n<script type="module">${safeJs(appJs)}</script>`);
-html = html.replace('<title>XAIlinx Project Navigator</title>', () => '<title>XAIlinx Project Navigator (standalone)</title>');
+html = html.replace('<title>XAIlinx ISE Project Navigator</title>', () => '<title>XAIlinx ISE Project Navigator (standalone)</title>');
 if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inserted verbatim into the page');
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);

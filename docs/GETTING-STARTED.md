@@ -1,4 +1,4 @@
-# Getting started with XAIlinx (step by step)
+# Getting started with XAIlinx ISE 15 (step by step)
 
 No programming tools or git needed. Pick **one** of the two ways below.
 
@@ -13,7 +13,7 @@ No programming tools or git needed. Pick **one** of the two ways below.
 
 ## Way 1: the single file (simplest)
 
-1. Open the **[latest release](https://github.com/pmnmalo/XAIlinx/releases/latest)**.
+1. Open the **[latest release](https://github.com/pmnmalo/XAIlinx-ISE/releases/latest)**.
 2. Under **Assets**, click **`XAIlinx.html`** to download it.
 3. Double-click the downloaded file. It opens in your browser (Chrome, Edge, Firefox or Safari).
 4. On the Start page click **Open Example (blinky)** or **New Project…**.
@@ -43,7 +43,7 @@ XAIlinx runs on **Node.js**, a free program.
 
 ### Step 2: download XAIlinx
 
-1. Open the **[latest release](https://github.com/pmnmalo/XAIlinx/releases/latest)**.
+1. Open the **[latest release](https://github.com/pmnmalo/XAIlinx-ISE/releases/latest)**.
 2. Under **Assets**, download **`xailinx-<version>.zip`** (for example `xailinx-0.2.0.zip`).
    - Don't use the green **Code ▸ Download ZIP** button or "Source code": that version does not
      include everything XAIlinx needs (it still works, but the first start needs Internet to
@@ -133,8 +133,8 @@ and press Enter. macOS: right-click the folder ▸ *New Terminal at Folder* (or 
 ## For those who use git
 
 ```bash
-git clone https://github.com/pmnmalo/XAIlinx.git
-cd XAIlinx
+git clone https://github.com/pmnmalo/XAIlinx-ISE.git
+cd XAIlinx-ISE
 npm install
 npm start            # http://127.0.0.1:8642
 ```

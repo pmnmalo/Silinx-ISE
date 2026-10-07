@@ -1,5 +1,6 @@
 // Wizards and dialogs modelled on ISE (New Project Wizard, New Source Wizard, properties...).
 import { api } from './api.js';
+import { PRODUCT, PRODUCT_FULL, VERSION } from '/core/version.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, alertDlg, confirmDlg, toast } from './ui.js';
 import * as T from './templates.js';
@@ -648,12 +649,12 @@ export async function toolchainDialog() {
 
 export function aboutDialog() {
   return dialog({
-    title: 'About XAIlinx', width: 480,
+    title: `About ${PRODUCT}`, width: 480,
     body: h('div', { style: { display: 'flex', gap: '16px' } },
       h('div', { style: { width: '64px', height: '64px', background: '#c4161c', color: '#fff', font: 'bold 40px Arial', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' } }, 'X'),
-      h('div', {}, h('div', { style: { fontSize: '16px', fontWeight: 'bold' } }, 'XAIlinx Project Navigator'), h('div', {}, 'Version 0.1'),
+      h('div', {}, h('div', { style: { fontSize: '16px', fontWeight: 'bold' } }, PRODUCT_FULL), h('div', {}, `Version ${VERSION}`),
         h('p', {}, 'HDL design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7): mixed VHDL/Verilog projects, RTL schematics, ASM state machine editor, behavioural simulation and device programming.'),
-        h('p', { style: { color: '#666' } }, 'Synthesis, place & route and bitstream generation use the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; XAIlinx is not affiliated with them.'))),
+        h('p', { style: { color: '#666' } }, 'Synthesis, place & route and bitstream generation use the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; XAIlinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });
 }
