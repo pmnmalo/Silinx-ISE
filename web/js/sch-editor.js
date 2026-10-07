@@ -17,6 +17,7 @@ import {
   SYMBOLS, SYMBOL_CATEGORIES, GRID, defaultParams, normalizeDoc, newDoc, symbolDef, symbolPins, symbolBox,
   xform, rotSize, portBox, netlist, generateHdl, parseNetName,
 } from '/core/schdoc.js';
+import { rerouteAfterMove, connectivity, placementClashes } from '/core/schroute.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -306,6 +307,11 @@ export function mountSchEditor(container, opts = {}) {
   const hint = canvas.querySelector('.se-hint');
 
   // ---------------- toolbar
+  // moving components keeps their wires connected (re-routed), or detaches them
+  let keepConn = true;
+  try { keepConn = localStorage.getItem('xl.sch.keepConn') !== '0'; } catch { /* default */ }
+  const keepBox = h('input', { type: 'checkbox', checked: keepConn });
+  keepBox.addEventListener('change', () => { keepConn = keepBox.checked; try { localStorage.setItem('xl.sch.keepConn', keepConn ? '1' : '0'); } catch { /* ignore */ } });
   const btn = (act, icon, title) => h('button', { type: 'button', class: 'se-btn', 'data-act': act, title, html: ICON[icon] });
   const sep = () => h('span', { class: 'se-sep' });
   const langSel = h('select', { class: 'se-lang', title: 'HDL language for Generate / View HDL' },
@@ -314,6 +320,8 @@ export function mountSchEditor(container, opts = {}) {
   tb.append(
     btn('select', 'select', 'Select (Esc)'), btn('wire', 'wire', 'Add Wire (W)'), btn('net', 'net', 'Add Net Name (N)'), btn('io', 'io', 'Add I/O Marker (O)'),
     sep(), btn('rotate', 'rotate', 'Rotate (Ctrl+R)'), btn('mirror', 'mirror', 'Mirror (Ctrl+M)'), btn('delete', 'del', 'Delete (Del)'),
+    sep(), h('label', { class: 'se-keep', title: 'Moving components: keep the wires connected (re-routed around other parts) or detach them' },
+      keepBox, h('span', { text: 'Keep connections' })),
     sep(), btn('undo', 'undo', 'Undo (Ctrl+Z)'), btn('redo', 'redo', 'Redo (Ctrl+Y)'),
     sep(), btn('zin', 'zin', 'Zoom In (+)'), btn('zout', 'zout', 'Zoom Out (−)'), btn('fit', 'fit', 'Zoom to Full View (F)'),
     sep(), h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'check', title: 'Check Schematic', html: `${ICON.check}<span>Check</span>` }),
@@ -941,7 +949,10 @@ export function mountSchEditor(container, opts = {}) {
     const anchors = [];
     for (const w of doc.wires) anchors.push(w.points[0], w.points[w.points.length - 1]);
     for (const l of doc.labels) if (!labelIds.has(l.id)) anchors.push({ x: l.x, y: l.y });
-    return { kind: 'move', start, before, orig, symIds, portIds, wireIds, labelIds, attach, anchors, dx: 0, dy: 0 };
+    if (!keepConn) attach.length = 0;      // detach: the wires stay where they are
+    let conn0 = null;
+    try { conn0 = connectivity(doc, modules); } catch { /* checked only when available */ }
+    return { kind: 'move', start, before, orig, symIds, portIds, wireIds, labelIds, attach, anchors, conn0, dx: 0, dy: 0 };
   }
   function applyMove(m, dx, dy) {
     if (dx === m.dx && dy === m.dy) return;
@@ -1038,12 +1049,41 @@ export function mountSchEditor(container, opts = {}) {
     if (tool !== 'select') renderOverlay();
     updateStatus();
   }
+  // after a move: re-route the stretched wires so every connection is kept and none is added
+  function finishMove(m) {
+    // dropped with a pin on another net: nudge to the nearest clear position (up to 5 grid steps)
+    if (keepConn && (m.symIds.size || m.portIds.size)) {
+      const attachedIds = new Set(m.attach.map(a => a.id));
+      const clash = () => placementClashes(doc, { moved: { symIds: m.symIds, portIds: m.portIds }, attachedIds, modules });
+      if (clash()) {
+        const bx = m.dx, by = m.dy;
+        let found = false;
+        for (let r = 1; r <= 5 && !found; r++) {
+          for (let i = -r; i <= r && !found; i++) for (const [ox, oy] of [[i, -r], [i, r], [-r, i], [r, i]]) {
+            applyMove(m, bx + ox * GRID, by + oy * GRID);
+            if (!clash()) { found = true; break; }
+          }
+        }
+        if (!found) applyMove(m, bx, by);
+      }
+    }
+    if (keepConn && m.attach.length) {
+      try { rerouteAfterMove(doc, { orig: m.orig, attached: m.attach, dx: m.dx, dy: m.dy, modules }); } catch (e) { console.error(e); }
+    }
+    doc = normalizeDoc(doc);
+    if (keepConn && m.conn0) {
+      let now = null;
+      try { now = connectivity(doc, modules); } catch { /* ignore */ }
+      if (now && JSON.stringify(now) !== JSON.stringify(m.conn0)) flash('Connections changed by this move (a pin now touches another net, or a wire could not be routed). Undo with Ctrl+Z if not intended.');
+    }
+    pushUndo(m.before); changed(); render(); renderProps();
+  }
   function onUp(e) {
     if (!drag) return;
     const d = drag; drag = null;
     if (d.kind === 'pan') { canvas.classList.remove('panning'); return; }
     if (d.kind === 'move') {
-      if (d.dx || d.dy) { doc = normalizeDoc(doc); pushUndo(d.before); changed(); render(); renderProps(); }
+      if (d.dx || d.dy) finishMove(d);
       return;
     }
     if (d.kind === 'band') {
@@ -1132,7 +1172,7 @@ export function mountSchEditor(container, opts = {}) {
       const dx = k === 'arrowleft' ? -d : k === 'arrowright' ? d : 0, dy = k === 'arrowup' ? -d : k === 'arrowdown' ? d : 0;
       const m = beginMove({ x: 0, y: 0 });
       applyMove(m, dx, dy);
-      doc = normalizeDoc(doc); pushUndo(m.before); changed(); render(); renderProps();
+      finishMove(m);
     }
   }
   function onKeyUp(e) { if (e.key === ' ') { spaceDown = false; canvas.classList.remove('pan-ready'); } }

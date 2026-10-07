@@ -247,3 +247,6 @@
 .sch-editor.read-only .se-toolbar [data-act="wire"], .sch-editor.read-only .se-toolbar [data-act="net"], .sch-editor.read-only .se-toolbar [data-act="io"],
 .sch-editor.read-only .se-toolbar [data-act="rotate"], .sch-editor.read-only .se-toolbar [data-act="mirror"], .sch-editor.read-only .se-toolbar [data-act="delete"],
 .sch-editor.read-only .se-toolbar [data-act="undo"], .sch-editor.read-only .se-toolbar [data-act="redo"], .sch-editor.read-only .se-toolbar [data-act="generate"] { display: none; }
+
+.sch-editor .se-keep { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; padding: 0 4px; cursor: pointer; }
+.sch-editor.read-only .se-keep { display: none; }
