@@ -2,5 +2,5 @@
 // VERSION is kept equal to package.json by scripts/sync-version.mjs (run by `npm version`).
 export const PRODUCT = 'Silinx ISE';
 export const PRODUCT_FULL = 'Silinx ISE (Integrated Synthesis Environment)';
-export const VERSION = '15.2.0';
+export const VERSION = '15.2.1';
 export const MAJOR = VERSION.split('.')[0];
