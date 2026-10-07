@@ -909,7 +909,7 @@ export async function openFile(path, line, col) {
           (lang === 'vhdl' || lang === 'verilog') ? tplBtn : null,
           (lang === 'vhdl' || lang === 'verilog' || lang === 'ucf') ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file', onclick: () => (lang === 'ucf' ? checkUcfFile(path) : checkFileSyntax(path)) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
           h('span', { class: 'path' }, path),
-          ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => h('span', { class: 'gen-banner' }, 'Synchronized with ', h('a', { onclick: () => openView(sch) }, sch.split('/').pop()), S.schBase?.[sch] === 'hdl' ? ` (${viewNoun(sch)} view of this file) — editing here updates it` : ` — editing here updates the ${viewNoun(sch)}`)));
+          ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => syncBanner(path, sch)));
         tplBtn.addEventListener('click', e => {
           const r = tplBtn.getBoundingClientRect();
           popupMenu([
@@ -1344,6 +1344,19 @@ async function schStructure(doc, modules) {
   });
 }
 
+// banner of an HDL editor linked to a schematic / chart (shows when it is out of sync and why)
+function syncBanner(path, sch) {
+  const why = S.outOfSync?.[path];
+  const el = h('span', { class: `gen-banner${why ? ' out-of-sync' : ''}`, 'data-sync-banner': path },
+    why ? 'Not in sync with ' : 'Synchronized with ', h('a', { onclick: () => openView(sch) }, sch.split('/').pop()),
+    why ? ` — the ${viewNoun(sch)} has errors: ${why}` : S.schBase?.[sch] === 'hdl' ? ` (${viewNoun(sch)} view of this file) — editing here updates it` : ` — editing here updates the ${viewNoun(sch)}`);
+  return el;
+}
+function refreshSyncBanner(path) {
+  const sch = S.hdlToSch?.[path];
+  for (const el of document.querySelectorAll('[data-sync-banner]')) if (el.dataset.syncBanner === path && sch) el.replaceWith(syncBanner(path, sch));
+}
+
 function refreshOpenEditor(path, text) {
   const od = findDoc(`file:${path}`);
   if (od && !od.dirty) { od.editor.setValue(text); od.editor.markClean(); setDirty(od, false); }
@@ -1357,7 +1370,18 @@ async function syncHdlFromSchematic(schPath, doc) {
   try { g = generateHdl(doc, { lang: doc.lang, modules: await schModules() }); }
   catch (e) { log(`WARNING: ${target} not updated from ${schPath}: ${e.message}`, 'warn'); return; }
   const errs = (g.diagnostics || []).filter(x => x.severity === 'error');
-  if (errs.length) { log(`WARNING: ${target} not updated: the schematic ${schPath} has ${errs.length} error(s) (Check Schematic)`, 'warn'); return; }
+  S.outOfSync ||= {};
+  if (errs.length) {
+    // show it where the user works: the schematic's Check panel, the HDL editor's banner, the console
+    const why = errs.map(x => x.message).join('; ');
+    if (S.outOfSync[target] !== why) log(`WARNING: ${target} not updated: the schematic ${schPath} has ${errs.length} error(s): ${why}`, 'warn');
+    S.outOfSync[target] = why;
+    findDoc(`sch:${schPath}`)?.schEditor?.check();
+    refreshSyncBanner(target);
+    status(`${target.split('/').pop()} not updated: ${why}`);
+    return;
+  }
+  if (S.outOfSync[target]) { delete S.outOfSync[target]; refreshSyncBanner(target); }
   const cur = S.sources.find(x => x.path === target)?.text;
   if (cur === g.code) return;
   S.syncing = true;

@@ -226,3 +226,5 @@ li.CodeMirror-hint-active .xl-hint-detail { color: #dde; }
 .rtl-crumbs a { color: #1a4d9c; cursor: pointer; text-decoration: underline; }
 .rtl-crumbs .rtl-ro { color: #666; font-style: italic; }
 .rtl-crumbs .spacer { flex: 1; }
+
+.gen-banner.out-of-sync { background: #fdecea; border-color: #e0a0a0; color: #900; }
