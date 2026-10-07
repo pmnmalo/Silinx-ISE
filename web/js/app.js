@@ -111,6 +111,8 @@ export function compileProject() {
   if (!S.project) return;
   const srcs = S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
   S.lib = compile(srcs);
+  // open schematics: their palette (Project modules) and module symbols follow the sources
+  if (S.docs.some(d => d.schEditor)) schModules().then(mods => { for (const d of S.docs) d.schEditor?.setModules(mods); }).catch(() => {});
   // module info for editor completion / templates
   const fileOf = new Map();
   for (const p of S.lib.parsed) for (const u of p.units) if (u.kind === 'module' || u.kind === 'package') fileOf.set(u.name, p);
