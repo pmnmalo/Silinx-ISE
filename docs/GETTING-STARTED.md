@@ -1,4 +1,4 @@
-# Getting started with XAIlinx ISE 15 (step by step)
+# Getting started with XAIlinx ISE (step by step)
 
 No programming tools or git needed. Pick **one** of the two ways below.
 

@@ -1,4 +1,4 @@
-# XAIlinx ISE (Integrated Synthesis Environment) 15
+# XAIlinx ISE (Integrated Synthesis Environment)
 
 > XAIlinx ISE is an independent open-source project. It is not affiliated with, endorsed by or
 > supported by AMD/Xilinx. Xilinx, ISE, ISim, iMPACT, Spartan and Virtex are trademarks of AMD;

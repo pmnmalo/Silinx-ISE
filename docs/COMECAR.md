@@ -1,4 +1,4 @@
-# Começar a usar o XAIlinx ISE 15 (passo a passo)
+# Começar a usar o XAIlinx ISE (passo a passo)
 
 Não precisa de ferramentas de programação nem de git. Escolha **uma** das duas formas abaixo.
 
