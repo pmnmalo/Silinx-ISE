@@ -521,7 +521,7 @@ export async function addSourceDialog() {
   const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.mem,.hex,.asm.json,.json' });
   const role = select([['design', 'All (Implementation + Simulation)'], ['sim', 'Simulation only']], 'design');
   const r = await dialog({
-    title: 'Add Source', width: 480,
+    title: 'Add Copy of Source', width: 480,
     body: h('div', { class: 'form-grid' }, ...field('Files:', inp), ...field('Association:', role)),
     buttons: [{ label: 'OK', primary: true, value: true }, { label: 'Cancel', value: null }],
   });
