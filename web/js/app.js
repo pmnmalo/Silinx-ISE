@@ -1875,8 +1875,6 @@ function setupMenus() {
       '-',
       { label: 'Print…', action: () => printActive(), shortcut: 'Ctrl+P', disabled: () => !(S.active?.asmEditor || S.active?.schEditor) },
       '-',
-      { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj, shortcut: 'Alt+N' },
-      '-',
       { label: 'Recent Projects', submenu: recent().map(r => ({ label: r, action: () => openProject(r) })) },
     ].filter(Boolean) },
     { label: 'Edit', items: () => [
