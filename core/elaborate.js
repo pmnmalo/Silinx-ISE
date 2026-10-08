@@ -550,6 +550,7 @@ function evalRange(E, r) {
   if (r.of) {
     const n = bindExpr(E, r.of, null);
     const t = n.t;
+    if (t.kind === 'str') throw new ElabError("'range of a string is not supported (use std_logic_vector)", r.of.loc);
     if (r.reverse) return { left: t.right, right: t.left, desc: !t.desc };
     return { left: t.left, right: t.right, desc: t.desc };
   }
@@ -898,6 +899,7 @@ function bindAttr(E, e, loc) {
   }
   if (!t) { node = bindExpr(E, e.prefix, null, loc); t = node.t; }
   const cint = n => ({ k: 'c', val: V.fromInt(n, 32, true), t: INT });
+  if (t.kind === 'str' && at !== 'event') throw new ElabError(`'${at} of a string is not supported (use std_logic_vector)`, loc);
   switch (at) {
     case 'event':
       if (!edgeOperand(node)) throw new ElabError("'event requires a signal", loc);
