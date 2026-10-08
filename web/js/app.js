@@ -15,6 +15,7 @@ export const S = {
   project: null, devices: null, toolchain: null,
   view: 'impl', sources: [], lib: null, modules: [],
   sel: null, docs: [], active: null, status: {}, diags: [], busy: false,
+  procCollapsed: new Set(),   // ids of the collapsed groups of the Processes panel
 };
 window.Silinx = S; // handy for debugging from the console
 
@@ -415,11 +416,24 @@ export function renderProcesses() {
   const add = (ul, p) => {
     const li = h('li');
     const st = S.status[p.id];
-    const tw = h('span', { class: 'twisty' }, p.children ? '▾' : '');
-    const row = h('div', { class: `row${p.disabled ? ' disabled' : ''}` }, tw, h('span', { class: 'status', html: st ? icons[STATUS_ICON[st]] : '' }), icon(p.ico || 'process'), h('span', { class: 'lbl' }, p.label));
+    // collapsed groups are remembered: the panel is redrawn on every status change
+    const key = p.id || p.label;
+    const collapsed = S.procCollapsed.has(key);
+    const tw = h('span', { class: 'twisty' }, p.children?.length ? (collapsed ? '▸' : '▾') : '');
+    const isSel = S.selProc?.id === p.id && S.selProc?.label === p.label;
+    const row = h('div', { class: `row${p.disabled ? ' disabled' : ''}${isSel ? ' sel' : ''}` }, tw, h('span', { class: 'status', html: st ? icons[STATUS_ICON[st]] : '' }), icon(p.ico || 'process'), h('span', { class: 'lbl' }, p.label));
     const sub = h('ul');
+    if (collapsed) sub.style.display = 'none';
     li.append(row, sub);
-    tw.addEventListener('click', e => { e.stopPropagation(); sub.hidden = !sub.hidden; tw.textContent = sub.hidden ? '▸' : '▾'; });
+    const toggle = () => {
+      if (!p.children?.length) return;
+      if (S.procCollapsed.has(key)) S.procCollapsed.delete(key); else S.procCollapsed.add(key);
+      const c = S.procCollapsed.has(key);
+      sub.style.display = c ? 'none' : '';
+      tw.textContent = c ? '▸' : '▾';
+    };
+    tw.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+    tw.addEventListener('dblclick', e => e.stopPropagation());
     row.addEventListener('click', () => { host.querySelectorAll('.row.sel').forEach(r => r.classList.remove('sel')); row.classList.add('sel'); S.selProc = p; });
     row.addEventListener('dblclick', () => p.run && !p.disabled && runProcess(p));
     row.addEventListener('contextmenu', e => {
