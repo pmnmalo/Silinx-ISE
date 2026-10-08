@@ -177,6 +177,8 @@ function statements(text) {
 }
 
 const unq = s => s.trim().replace(/^"(.*)"$/, '$1');
+// ISE accepts bus bits as a<0>, a(0) or a[0]: keep the canonical a<0>
+const busBit = s => s.replace(/^([A-Za-z_][\w$]*)\s*[([]\s*(-?\d+)\s*[)\]]$/, '$1<$2>');
 
 /** Parse 'PERIOD = 20 ns HIGH 50%' / 'PERIOD "tnm" 20 ns HIGH 50%' spec remainders. */
 function parsePeriodSpec(s) {
@@ -202,7 +204,7 @@ export function parseUcf(text) {
   for (const st of statements(text)) {
     const mNet = /^NET\s+("[^"]*"|\S+)\s+(.*)$/i.exec(st);
     if (mNet) {
-      const net = unq(mNet[1]);
+      const net = busBit(unq(mNet[1]));
       const rest = mNet[2];
       // Inline PERIOD on a net: NET "clk" PERIOD = 20 ns HIGH 50%;
       const mPer = /^PERIOD\s*=\s*(.*)$/i.exec(rest);

@@ -130,3 +130,10 @@ test('checkUcf: timing constraints on internal nets are warnings; QFP pins and b
   const board = { name: 'B', resources: [{ name: 'clk', pins: ['B8'] }] };
   assert.match(checkUcf('NET "clk" LOC = C9;', { top: 'top', ports: [PORTS[0]], board })[0].message, /not connected to any resource/);
 });
+
+test('parseUcf: bus bits written as a(0) or a[0] map to a<0>', () => {
+  const a = parseUcf('NET "sw(0)" LOC = "P11";\nNET sw[1] LOC = L3;\nNET "led<2>" LOC = "P7";').assignments;
+  assert.equal(a['sw<0>'].loc, 'P11');
+  assert.equal(a['sw<1>'].loc, 'L3');
+  assert.equal(a['led<2>'].loc, 'P7');
+});
