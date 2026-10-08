@@ -87,6 +87,4 @@ button, input, select, textarea { font: inherit; }
 .tree .row:hover { background: var(--hover); }
 .tree .row.sel { background: var(--accent); color: var(--accent-fg); }
 .tree .twisty { width: 12px; text-align: center; color: #555; font-size: 9px; flex: none; }
-.tree .twisty.expander { width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-.tree .twisty.expander svg { width: 14px; height: 14px; display: block; }
 .tree .ico { width: 16px; height: 16px; flex: none; display: inline-flex; }

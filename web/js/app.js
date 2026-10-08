@@ -16,6 +16,7 @@ export const S = {
   view: 'impl', sources: [], lib: null, modules: [],
   sel: null, docs: [], active: null, status: {}, diags: [], busy: false,
   procCollapsed: new Set(),   // ids of the collapsed groups of the Processes panel
+  treeOpen: new Map(),        // Design hierarchy / Files trees: key -> expanded? (as the user left it)
 };
 window.Silinx = S; // handy for debugging from the console
 
@@ -256,12 +257,20 @@ function renderHierarchy() {
 
 function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onContext, cls = '', key }) {
   const li = h('li');
+  // what the user collapsed / expanded is remembered across redraws
+  if (key && S.treeOpen.has(key)) open = S.treeOpen.get(key);
   const tw = h('span', { class: 'twisty' }, open ? '▾' : '▸');
   const row = h('div', { class: `row ${cls}`, 'data-key': key }, tw, icon(ico), h('span', { class: 'lbl' }, label), meta ? h('span', { class: 'meta' }, meta) : null);
   const ul = h('ul');
   if (!open) ul.hidden = true;
   li.append(row, ul);
-  tw.addEventListener('click', e => { e.stopPropagation(); ul.hidden = !ul.hidden; tw.textContent = ul.hidden ? '▸' : '▾'; });
+  tw.addEventListener('click', e => {
+    e.stopPropagation();
+    ul.hidden = !ul.hidden;
+    tw.textContent = ul.hidden ? '▸' : '▾';
+    if (key) S.treeOpen.set(key, !ul.hidden);
+  });
+  tw.addEventListener('dblclick', e => e.stopPropagation());
   row.addEventListener('click', () => {
     row.closest('.tree').querySelectorAll('.row.sel').forEach(r => r.classList.remove('sel'));
     row.classList.add('sel');
@@ -420,7 +429,7 @@ export function renderProcesses() {
     const key = p.id || p.label;
     const collapsed = S.procCollapsed.has(key);
     const group = !!p.children?.length;
-    const tw = h('span', { class: 'twisty expander', title: group ? 'Expand / collapse' : null, html: group ? icons[collapsed ? 'expand' : 'collapse'] : '' });
+    const tw = h('span', { class: 'twisty' }, group ? (collapsed ? '▸' : '▾') : '');
     const isSel = S.selProc?.id === p.id && S.selProc?.label === p.label;
     const row = h('div', { class: `row${p.disabled ? ' disabled' : ''}${isSel ? ' sel' : ''}` }, tw, h('span', { class: 'status', html: st ? icons[STATUS_ICON[st]] : '' }), icon(p.ico || 'process'), h('span', { class: 'lbl' }, p.label));
     const sub = h('ul');
@@ -431,7 +440,7 @@ export function renderProcesses() {
       if (S.procCollapsed.has(key)) S.procCollapsed.delete(key); else S.procCollapsed.add(key);
       const c = S.procCollapsed.has(key);
       sub.style.display = c ? 'none' : '';
-      tw.innerHTML = icons[c ? 'expand' : 'collapse'];
+      tw.textContent = c ? '▸' : '▾';
     };
     tw.addEventListener('click', e => { e.stopPropagation(); toggle(); });
     tw.addEventListener('dblclick', e => e.stopPropagation());
