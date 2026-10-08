@@ -3,7 +3,7 @@
 # then configure Silinx to use it.  macOS (Intel / Apple Silicon) and Linux (x86-64 / ARM64).
 #
 #   docker/ise/build-ise-image.sh --installer ~/Downloads/Xilinx_ISE_DS_Lin_14.7_1015_1.tar \
-#                                 --license   ~/Downloads/Xilinx.lic  [--tag silinx/ise:14.7] [--no-md5]
+#                                 --license   ~/Downloads/Xilinx.lic  [--tag xilinx/ise:14.7] [--no-md5]
 #                                 [--full | --families "spartan3e spartan6"]
 # Default: ISE trimmed to the command-line flow (about 3 GB, every device family). --full keeps the
 # complete ~18 GB install; --families keeps only the listed families' device data.
@@ -13,7 +13,7 @@
 # it to a public registry.
 set -euo pipefail
 
-TAG="silinx/ise:14.7"
+TAG="xilinx/ise:14.7"
 INSTALLER=""
 LICENSE=""
 CHECK_MD5=1

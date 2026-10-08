@@ -99,7 +99,7 @@ runs the tests and publishes a release with the files above (`.github/workflows/
 node bin/silinx-ise.js check <projectDir>                           # parse + elaborate the top
 node bin/silinx-ise.js sim   <projectDir> --time 2000 --vcd out.vcd   # simulate the simulation top
 node bin/silinx-ise.js ucf   <projectDir> --board basys2              # constraints from a board's pin table
-node bin/silinx-ise.js toolchain [--docker silinx/ise:14.7]          # show / set the ISE toolchain
+node bin/silinx-ise.js toolchain [--docker xilinx/ise:14.7]          # show / set the ISE toolchain
 npm test                                                         # test suite
 ```
 
@@ -128,7 +128,7 @@ docker/ise/build-ise-image.sh --installer ~/Downloads/Xilinx_ISE_DS_Lin_14.7_101
 ```
 
 On Windows use `docker\ise\build-ise-image.ps1`. The script checks the installer and x86-64
-emulation, builds `silinx/ise:14.7`, proves the license with a test synthesis and configures
+emulation, builds `xilinx/ise:14.7`, proves the license with a test synthesis and configures
 Silinx. The image keeps only what a command-line flow needs (ISE drops from ~18 GB to ~3 GB, all
 device families kept); `--full` keeps the complete install and `--families "spartan3e spartan6"`
 keeps only some families.

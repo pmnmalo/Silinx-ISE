@@ -14,7 +14,7 @@
 param(
   [string]$Installer = "",
   [string]$License = "",
-  [string]$Tag = "silinx/ise:14.7",
+  [string]$Tag = "xilinx/ise:14.7",
   [switch]$NoMd5,
   [switch]$Full,          # keep the complete ~18 GB ISE install (default: trimmed to ~3 GB)
   [string]$Families = ""  # e.g. "spartan3e spartan6": keep only these device families

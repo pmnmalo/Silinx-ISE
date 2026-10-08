@@ -10,7 +10,7 @@
 #   docker build --platform linux/amd64 \
 #     --build-context installer=<folder with Xilinx_ISE_DS_Lin_14.7_1015_1.tar> \
 #     --build-context license=<folder with Xilinx.lic> \
-#     -t silinx/ise:14.7 docker/ise
+#     -t xilinx/ise:14.7 docker/ise
 #
 # The installer tarball is bind-mounted during the install step, so its 6.5 GB never end up in
 # an image layer. ISE 14.7 is x86-64 only: on Apple Silicon / ARM Linux the image runs under

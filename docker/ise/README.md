@@ -43,7 +43,7 @@ Windows (PowerShell):
 powershell -ExecutionPolicy Bypass -File docker\ise\build-ise-image.ps1 -Installer $HOME\Downloads\Xilinx_ISE_DS_Lin_14.7_1015_1.tar -License $HOME\Downloads\Xilinx.lic
 ```
 
-The script checks the installer checksum and x86-64 emulation, builds `silinx/ise:14.7`
+The script checks the installer checksum and x86-64 emulation, builds `xilinx/ise:14.7`
 (20–60 minutes, once), synthesizes a test design to confirm the license works, and configures
 Silinx to use the image. Without arguments it looks for both files in `~/Downloads`.
 
@@ -63,8 +63,8 @@ Then in Silinx: *Process ▸ Implement Top Module* or double-click *Generate Pro
 ## Using the image directly
 
 ```bash
-docker run --rm -v "$PWD:/work" silinx/ise:14.7 xst -help          # any ISE command-line tool
-docker run --rm -v "$PWD:/work" silinx/ise:14.7 bash run.sh        # a Silinx build directory
+docker run --rm -v "$PWD:/work" xilinx/ise:14.7 xst -help          # any ISE command-line tool
+docker run --rm -v "$PWD:/work" xilinx/ise:14.7 bash run.sh        # a Silinx build directory
 ```
 
 The image runs under any user ID (`--user`), loads `settings64.sh` automatically and has the
