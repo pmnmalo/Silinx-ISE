@@ -266,9 +266,9 @@ export async function importXiseDialog() {
     info.textContent = files.length ? `Folder '${(files[0].webkitRelativePath || '').split('/')[0]}': ${files.length} file(s)${xise ? `, project ${xise.name}` : ' — no .xise found!'}` : '';
   });
   const r = await dialog({
-    title: 'Import ISE Project', width: 600,
+    title: 'Import Xilinx ISE Project', width: 600,
     body: h('div', {},
-      h('div', { class: 'hint' }, 'Import an ISE project from its folder (the folder with the .xise file), or from a .zip of that folder (e.g. one exported with File ▸ Export ISE Project). ',
+      h('div', { class: 'hint' }, 'Import an ISE project from its folder (the folder with the .xise file), or from a .zip of that folder (e.g. one exported with File ▸ Export Xilinx ISE Project). ',
         'ISE output files in the folder (xst, _ngo, netlists, bitstreams, logs) are not imported.'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         ...field('Project folder:', dirInp),
@@ -281,7 +281,7 @@ export async function importXiseDialog() {
   const files = [...fileInp.files];
   const zf = files.find(f => /\.zip$/i.test(f.name));
   const xf = files.find(f => /\.xise$/i.test(f.name));
-  if (!dirInp.files.length && !zf && !xf) return alertDlg('Import ISE Project', 'Select the project folder, a .zip, or a .xise with its sources.', 'error');
+  if (!dirInp.files.length && !zf && !xf) return alertDlg('Import Xilinx ISE Project', 'Select the project folder, a .zip, or a .xise with its sources.', 'error');
   const pname = name.value.trim() || (zf || xf)?.name.replace(/\.(zip|xise)$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
   if (!await askReplaceProject(pname)) return;
   try {
@@ -300,10 +300,43 @@ export async function importXiseDialog() {
     await app.openProject(pname);
     app.showLeftPage('design');
     const n = res?.project?.files?.length ?? 0;
-    app.log(`Imported ISE project '${pname}' (${n} source file(s)${res?.extra?.length ? `, ${res.extra.length} other file(s)` : ''}).`, 'ok');
+    app.log(`Imported Xilinx ISE project '${pname}' (${n} source file(s)${res?.extra?.length ? `, ${res.extra.length} other file(s)` : ''}).`, 'ok');
     if (res?.missing?.length) app.log(`WARNING: files referenced by the .xise but not found: ${res.missing.join(', ')}`, 'warn');
     for (const w of res?.warnings || []) app.log(`WARNING: ${w}`, 'warn');
-  } catch (e) { alertDlg('Import ISE Project', e.message, 'error'); }
+  } catch (e) { alertDlg('Import Xilinx ISE Project', e.message, 'error'); }
+}
+
+// ------------------------------------------------------------------ Import Silinx ISE Project
+// A .zip made with File ▸ Export Silinx ISE Project (silinx.json + every project file).
+export async function importSilinxDialog() {
+  const fileInp = h('input', { type: 'file', accept: '.zip' });
+  const name = h('input', { type: 'text', placeholder: 'project name' });
+  fileInp.addEventListener('change', () => {
+    const f = fileInp.files[0];
+    if (f && !name.value) name.value = f.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
+  });
+  const r = await dialog({
+    title: 'Import Silinx ISE Project', width: 520,
+    body: h('div', {},
+      h('div', { class: 'hint' }, 'Import a whole Silinx project from a .zip made with File ▸ Export Silinx ISE Project (silinx.json and every project file: sources, ASM charts, schematics, constraints, simulation files).'),
+      h('div', { class: 'form-grid', style: { marginTop: '10px' } },
+        ...field('.zip file:', fileInp),
+        ...field('Project name:', name))),
+    buttons: [{ label: 'Import', primary: true, value: true }, { label: 'Cancel', value: null }],
+  });
+  if (!r) return;
+  const zf = fileInp.files[0];
+  if (!zf) return alertDlg('Import Silinx ISE Project', 'Select the .zip of the Silinx project.', 'error');
+  const pname = name.value.trim() || zf.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
+  if (!await askReplaceProject(pname)) return;
+  try {
+    await removeExistingProject(pname);
+    const res = await api.importZip(pname, zf);
+    await app.openProject(pname);
+    app.showLeftPage('design');
+    app.log(`Imported Silinx project '${pname}' (${res?.project?.files?.length ?? 0} source file(s)${res?.extra?.length ? `, ${res.extra.length} other file(s)` : ''}).`, 'ok');
+    if (res?.missing?.length) app.log(`WARNING: files listed in silinx.json but not in the zip: ${res.missing.join(', ')}`, 'warn');
+  } catch (e) { alertDlg('Import Silinx ISE Project', e.message, 'error'); }
 }
 
 // ------------------------------------------------------------------ New Source

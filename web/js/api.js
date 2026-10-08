@@ -63,12 +63,12 @@ export const api = {
   exportXiseUrl: name => `/api/projects/${enc(name)}/export.xise`,
   importXise: body => req('POST', '/api/projects/import-xise', body),
   // whole project as a zip (.xise + silinx.json + all files)
-  exportZip: async name => {
-    const r = await fetch(`/api/projects/${enc(name)}/export.zip`);
+  exportZip: async (name, kind = 'xilinx') => {
+    const r = await fetch(`/api/projects/${enc(name)}/export.zip?kind=${enc(kind)}`);
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
     let warnings = [];
     try { warnings = JSON.parse(decodeURIComponent(r.headers.get('X-Silinx-Warnings') || '[]')); } catch { /* none */ }
-    return { blob: await r.blob(), filename: `${name}.zip`, warnings };
+    return { blob: await r.blob(), filename: kind === 'silinx' ? `${name}-silinx.zip` : `${name}.zip`, warnings };
   },
   importZip: async (name, file) => {
     const r = await fetch(`/api/projects/import-zip?name=${enc(name)}`, { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file });

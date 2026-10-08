@@ -14,6 +14,9 @@ import { runImplementation, collectReports, normalizeSteps } from './ise.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice } from './programmer.js';
 import { exportXise, importXise, importIseSchematics, exportIseSchematics } from './xise.js';
 
+// files that only Silinx understands: not part of an exported Xilinx ISE project
+const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch)\.json)$/i;
+
 export function registerImplRoutes(api, { wrap, projects: P }) {
   const bad = (msg, status = 400) => new P.HttpError(status, msg);
 
@@ -155,11 +158,20 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
   }));
 
   // ----- whole project as a zip: <name>.xise + silinx.json + all project files (not build/) -----
+  // ?kind=xilinx (default): Xilinx ISE project — <name>.xise, its sources, ISE schematics (.sch);
+  //   no Silinx-only files (silinx.json, ASM charts, Silinx schematics).
+  // ?kind=silinx: the whole Silinx project as it is — silinx.json and every project file.
   api.get('/projects/:p/export.zip', wrap(async (req, res) => {
     const name = req.params.p;
     const project = await P.readProject(name);
-    const sources = await sourcesOf(name, project);
     const tree = await P.fileTree(name);
+    if (req.query.kind === 'silinx') {
+      const entries = [{ path: 'silinx.json', data: await fs.readFile(path.join(P.projectDir(name), 'silinx.json')) }];
+      for (const rel of tree) if (!/\.xise$/i.test(rel)) entries.push({ path: rel, data: await fs.readFile(P.safeJoin(P.projectDir(name), rel)) });
+      const zip = await createZip(entries, NODE_CODEC);
+      return res.type('application/zip').attachment(`${name}-silinx.zip`).send(Buffer.from(zip));
+    }
+    const sources = await sourcesOf(name, project);
     // Silinx schematics go out as ISE schematics (.sch), listed in the .xise in place of their HDL
     const docs = {};
     for (const rel of tree.filter(f => /\.sch\.json$/i.test(f))) {
@@ -170,11 +182,10 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const entries = [];
     const added = new Set(sch.files.map(f => f.path));
     for (const rel of tree) {
-      if (rel === xiseName(project) || added.has(rel)) continue;
+      if (rel === xiseName(project) || added.has(rel) || SILINX_ONLY.test(rel)) continue;
       entries.push({ path: rel, data: await fs.readFile(P.safeJoin(P.projectDir(name), rel)) });
     }
-    entries.unshift({ path: xiseName(project), data: xml }, { path: 'silinx.json', data: await fs.readFile(path.join(P.projectDir(name), 'silinx.json')) },
-      ...sch.files.map(f => ({ path: f.path, data: f.text })));
+    entries.unshift({ path: xiseName(project), data: xml }, ...sch.files.map(f => ({ path: f.path, data: f.text })));
     if (sch.warnings.length) res.set('X-Silinx-Warnings', encodeURIComponent(JSON.stringify(sch.warnings.slice(0, 50))));
     const zip = await createZip(entries, NODE_CODEC);
     res.type('application/zip').attachment(`${name}.zip`).send(Buffer.from(zip));

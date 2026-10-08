@@ -83,7 +83,7 @@ A black window (the Silinx server) opens and then your browser shows Silinx at
 - Your projects are saved as normal folders in **`Silinx-projects`** in your user folder
   (Windows: `C:\Users\<you>\Silinx-projects`, macOS: `/Users/<you>/Silinx-projects`).
   You can copy them, back them up, or zip them to hand in.
-- **File ▸ Export ISE Project (.zip)** produces a zip that also opens in Xilinx ISE 14.7.
+- **File ▸ Export Xilinx ISE Project (.zip)** produces a zip that opens in Xilinx ISE 14.7; **File ▸ Export Silinx ISE Project (.zip)** saves the whole Silinx project (ASM charts and schematics included), reopened with **Import Silinx ISE Project**.
 
 ### Updating Silinx
 

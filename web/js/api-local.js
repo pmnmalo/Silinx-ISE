@@ -187,17 +187,23 @@ export const api = {
     persist();
     return { project: clone(p.json), warnings };
   },
-  syncXise: async () => fail('not available in the standalone edition (use File > Export ISE Project)'),
-  exportZip: async name => {
+  syncXise: async () => fail('not available in the standalone edition (use File > Export Xilinx ISE Project)'),
+  exportZip: async (name, kind = 'xilinx') => {
     const p = proj(name);
+    if (kind === 'silinx') {   // the whole Silinx project as it is
+      const entries = [{ path: 'silinx.json', data: JSON.stringify(p.json, null, 2) + '\n' },
+        ...Object.entries(p.files).filter(([k]) => !/\.xise$/i.test(k)).map(([path, data]) => ({ path, data }))];
+      return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}-silinx.zip`, warnings: [] };
+    }
     const docs = {};
     for (const [k, v] of Object.entries(p.files)) if (/\.sch\.json$/i.test(k)) { try { docs[k] = JSON.parse(v); } catch { /* skip */ } }
     const sch = exportIseSchematics(p.json, docs, p.files);
     const xml = exportXise(p.json, { sources: p.files, schematics: sch.schematics, extraFiles: sch.extraFiles });
     const added = new Set(sch.files.map(f => f.path));
-    const entries = [{ path: `${name}.xise`, data: xml }, { path: 'silinx.json', data: JSON.stringify(p.json, null, 2) + '\n' },
+    // Xilinx ISE project: no Silinx-only files (silinx.json, ASM charts, Silinx schematics)
+    const entries = [{ path: `${name}.xise`, data: xml },
       ...sch.files.map(f => ({ path: f.path, data: f.text })),
-      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k)).map(([path, data]) => ({ path, data }))];
+      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k) && !/(^|\/)[^/]+\.(asm|sch)\.json$/i.test(k)).map(([path, data]) => ({ path, data }))];
     return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip`, warnings: sch.warnings };
   },
   importZip: async (name, file) => {

@@ -86,7 +86,7 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 - Os projetos ficam em pastas normais em **`Silinx-projects`**, na sua pasta de utilizador
   (Windows: `C:\Users\<você>\Silinx-projects`, macOS: `/Users/<você>/Silinx-projects`).
   Pode copiá-los, fazer cópias de segurança, ou comprimi-los para entregar.
-- **File ▸ Export ISE Project (.zip)** cria um zip que também abre no Xilinx ISE 14.7.
+- **File ▸ Export Xilinx ISE Project (.zip)** cria um zip que abre no Xilinx ISE 14.7; **File ▸ Export Silinx ISE Project (.zip)** guarda o projeto Silinx completo (com os diagramas ASM e esquemáticos), que se reabre com **Import Silinx ISE Project**.
 - A interface pode ser posta em português em **View ▸ Language**.
 
 ### Atualizar o Silinx

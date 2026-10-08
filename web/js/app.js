@@ -187,7 +187,8 @@ function renderHierarchy() {
     const info = moduleInfo(modName);
     const isTop = !instName && modName === topName;
     const file = info?.file || '?';
-    const label = instName ? `${instName} - ${modName}` : modName;
+    // "label - module" like ISE; just the name when the instance is labelled with the module name
+    const label = instName && instName.toLowerCase() !== String(modName).toLowerCase() ? `${instName} - ${modName}` : modName;
     const sch = info && S.hdlToSch?.[file];
     const schBase = sch && S.schBase?.[sch] !== 'hdl';
     const viewIco = isAsm(sch) ? 'asm' : 'schematic';
@@ -1811,7 +1812,7 @@ async function renderStartPage() {
   const projects = await api.projects().catch(() => []);
   const page = h('div', { class: 'page' },
     h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
-      ...[['New Project…', 'newProject', () => wiz.newProjectWizard()], ['Open Project…', 'open', () => wiz.openProjectDialog()], ['Import ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Open Example (blinky)', 'project', () => wiz.newProjectWizard({ template: 'blinky' })]]
+      ...[['New Project…', 'newProject', () => wiz.newProjectWizard()], ['Open Project…', 'open', () => wiz.openProjectDialog()], ['Import Silinx ISE Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Open Example (blinky)', 'project', () => wiz.newProjectWizard({ template: 'blinky' })]]
         .map(([l, ic, f]) => h('div', { class: 'entry' }, icon(ic), h('a', { onclick: f }, l)))),
     h('div', { class: 'start-box' }, h('h3', {}, 'Recent Projects'),
       ...(recent().filter(r => projects.some(p => p.name === r)).map(r => h('div', { class: 'entry' }, icon('project'), h('a', { onclick: () => openProject(r).then(() => showLeftPage('design')) }, r)))),
@@ -1860,11 +1861,16 @@ function setupMenus() {
     { label: 'File', items: () => [
       { label: 'New Project…', icon: icon('newProject'), action: () => wiz.newProjectWizard() },
       { label: 'Open Project…', icon: icon('open'), action: () => wiz.openProjectDialog() },
-      { label: 'Import ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
-      { label: 'Export ISE Project (.zip)…', action: () => exportProjectZip(), disabled: hasPj },
-      api.standalone ? '-' : null,
+      '-',
+      { label: 'Import Silinx ISE Project (.zip)…', action: () => wiz.importSilinxDialog() },
+      { label: 'Export Silinx ISE Project (.zip)…', action: () => exportProjectZip('silinx'), disabled: hasPj },
+      '-',
+      { label: 'Import Xilinx ISE Project (.zip)…', action: () => wiz.importXiseDialog() },
+      { label: 'Export Xilinx ISE Project (.zip)…', action: () => exportProjectZip('xilinx'), disabled: hasPj },
+      '-',
       api.standalone ? { label: 'Download Project Bundle…', action: () => downloadText(`${S.project.name}.silinx.json`, api.exportBundle(S.project.name), 'application/json'), disabled: hasPj } : null,
       api.standalone ? { label: 'Open Project Bundle…', action: () => openBundle() } : null,
+      api.standalone ? '-' : null,
       { label: 'Close Project', action: () => closeProject(), disabled: hasPj },
       '-',
       { label: 'Print…', action: () => printActive(), shortcut: 'Ctrl+P', disabled: () => !(S.active?.asmEditor || S.active?.schEditor) },
@@ -1974,16 +1980,21 @@ function downloadUrl(url, filename) {
   document.body.append(a); a.click(); a.remove();
 }
 
-async function exportProjectZip() {
+// kind 'xilinx': a Xilinx ISE 14.7 project (.xise + sources, opens in ISE);
+// kind 'silinx': the whole Silinx project (silinx.json + every file, ASM charts and schematics included)
+async function exportProjectZip(kind = 'xilinx') {
   await saveAll();
+  const title = kind === 'silinx' ? 'Export Silinx ISE Project' : 'Export Xilinx ISE Project';
   try {
-    const { blob, filename, warnings = [] } = await api.exportZip(S.project.name);
+    const { blob, filename, warnings = [] } = await api.exportZip(S.project.name, kind);
     const url = URL.createObjectURL(blob);
     downloadUrl(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
-    log(`Exported ${filename}: ${S.project.name}.xise + silinx.json + all project files (${Math.round(blob.size / 1024)} KB).`, 'ok');
+    log(kind === 'silinx'
+      ? `Exported ${filename}: the whole Silinx project (silinx.json + all project files, ${Math.round(blob.size / 1024)} KB).`
+      : `Exported ${filename}: Xilinx ISE project ${S.project.name}.xise + its sources (${Math.round(blob.size / 1024)} KB).`, 'ok');
     for (const w of warnings) log(`WARNING: ${w}`, 'warn');
-  } catch (e) { alertDlg('Export ISE Project', e.message, 'error'); }
+  } catch (e) { alertDlg(title, e.message, 'error'); }
 }
 
 function openBundle() {
