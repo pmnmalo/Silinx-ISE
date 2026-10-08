@@ -216,6 +216,9 @@ run_step() {
 }
 
 if has synth; then
+  # fresh XST library: units compiled by earlier runs (e.g. an architecture that was renamed or
+  # removed since) would otherwise stay in xst/work and could be picked instead of the new ones
+  rm -rf xst/work xst/projnav.tmp
   mkdir -p xst/projnav.tmp
   run_step synth xst -intstyle xflow -ifn ${shQuote(top + '.xst')} -ofn ${shQuote(top + '.syr')}
 fi

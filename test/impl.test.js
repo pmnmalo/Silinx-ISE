@@ -112,6 +112,8 @@ test('prj / xst / ut contents', () => {
 test('run.sh contents and syntax', async () => {
   const sh = ise.generateRunSh({ top: 'top', device: DEVICE, hasUcf: true });
   assert.match(sh, /xst -intstyle xflow -ifn top\.xst -ofn top\.syr/);
+  // stale units of earlier runs must not stay in the XST library
+  assert.ok(sh.indexOf('rm -rf xst/work') >= 0 && sh.indexOf('rm -rf xst/work') < sh.indexOf('xst -intstyle'));
   assert.match(sh, /ngdbuild -intstyle xflow -dd _ngo -nt timestamp -uc top\.ucf -p xc3s500e-fg320-4 top\.ngc top\.ngd/);
   assert.match(sh, /map -intstyle xflow -p xc3s500e-fg320-4 -cm area -ir off -pr off -c 100 -o top_map\.ncd top\.ngd top\.pcf/);
   assert.match(sh, /par -w -intstyle xflow -ol high -t 1 top_map\.ncd top\.ncd top\.pcf/);
