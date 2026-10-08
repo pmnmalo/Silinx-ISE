@@ -419,7 +419,8 @@ export function renderProcesses() {
     // collapsed groups are remembered: the panel is redrawn on every status change
     const key = p.id || p.label;
     const collapsed = S.procCollapsed.has(key);
-    const tw = h('span', { class: 'twisty' }, p.children?.length ? (collapsed ? '▸' : '▾') : '');
+    const group = !!p.children?.length;
+    const tw = h('span', { class: 'twisty expander', title: group ? 'Expand / collapse' : null, html: group ? icons[collapsed ? 'expand' : 'collapse'] : '' });
     const isSel = S.selProc?.id === p.id && S.selProc?.label === p.label;
     const row = h('div', { class: `row${p.disabled ? ' disabled' : ''}${isSel ? ' sel' : ''}` }, tw, h('span', { class: 'status', html: st ? icons[STATUS_ICON[st]] : '' }), icon(p.ico || 'process'), h('span', { class: 'lbl' }, p.label));
     const sub = h('ul');
@@ -430,10 +431,13 @@ export function renderProcesses() {
       if (S.procCollapsed.has(key)) S.procCollapsed.delete(key); else S.procCollapsed.add(key);
       const c = S.procCollapsed.has(key);
       sub.style.display = c ? 'none' : '';
-      tw.textContent = c ? '▸' : '▾';
+      tw.innerHTML = icons[c ? 'expand' : 'collapse'];
     };
     tw.addEventListener('click', e => { e.stopPropagation(); toggle(); });
     tw.addEventListener('dblclick', e => e.stopPropagation());
+    // the icon of a group also expands / collapses it (single click; double-click on the name runs it)
+    const ico = row.children[2];
+    if (group && ico) { ico.style.cursor = 'pointer'; ico.addEventListener('click', e => { e.stopPropagation(); toggle(); }); ico.addEventListener('dblclick', e => e.stopPropagation()); }
     row.addEventListener('click', () => { host.querySelectorAll('.row.sel').forEach(r => r.classList.remove('sel')); row.classList.add('sel'); S.selProc = p; });
     row.addEventListener('dblclick', () => p.run && !p.disabled && runProcess(p));
     row.addEventListener('contextmenu', e => {
