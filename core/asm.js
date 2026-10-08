@@ -238,7 +238,7 @@ export function newModel(name = 'fsm', lang = 'vhdl') {
 // Expression language: tokenizer + parser
 // ---------------------------------------------------------------------------------------
 
-const OPS = ['&&', '||', '==', '!=', '/=', '<<', '>>', '<=', '>=', ':=', '<', '>', '!', '~', '&', '|', '^', '+', '-', '(', ')', '='];
+const OPS = ['&&', '||', '==', '!=', '/=', '<<', '>>', '<=', '>=', ':=', '<', '>', '!', '~', '&', '|', '^', '+', '-', '(', ')', '[', ']', ':', '='];
 const WORD_OPS = { and: '&&', or: '||', not: '!', xor: '^' };
 
 class ExprError extends Error {}
@@ -317,7 +317,27 @@ function makeParser(toks, condMode) {
   function primary() {
     const tk = toks[p];
     if (tk.t === 'lit') { p++; return tk.v; }
-    if (tk.t === 'id') { p++; return { k: 'id', name: tk.v }; }
+    if (tk.t === 'id') {
+      p++;
+      // bit / slice selection: name[i], name[h:l], name(i), name(h downto l)
+      const open = opv(peek());
+      if (open !== '[' && open !== '(') return { k: 'id', name: tk.v };
+      p++;
+      const close = open === '[' ? ']' : ')';
+      const idx = () => {
+        const n = toks[p];
+        if (n.t !== 'lit' || n.v.w != null) throw new ExprError(`bit index of '${tk.v}' must be a decimal number`);
+        p++;
+        return Number(n.v.v);
+      };
+      const hi = idx();
+      let lo = hi;
+      if (open === '[' && opv(peek()) === ':') { p++; lo = idx(); }
+      else if (open === '(' && peek().t === 'id' && peek().v.toLowerCase() === 'downto') { p++; lo = idx(); }
+      expect(close);
+      if (lo > hi) throw new ExprError(`slice ${tk.v}[${hi}:${lo}]: the left index must be the higher one`);
+      return { k: 'sel', name: tk.v, hi, lo };
+    }
     const o = opv(tk);
     if (o === '(') { p++; const e = binary(0); expect(')'); return e; }
     if (o === '!' || o === '~' || o === '-') { p++; return { k: 'un', op: o, a: primary() }; }
@@ -373,6 +393,7 @@ export function parseAction(src) {
 export function exprToString(ast) {
   switch (ast.k) {
     case 'id': return ast.name;
+    case 'sel': return ast.hi === ast.lo ? `${ast.name}[${ast.hi}]` : `${ast.name}[${ast.hi}:${ast.lo}]`;
     case 'lit': return litNeutral(ast);
     case 'un': return `${ast.op}${ast.a.k === 'bin' ? `(${exprToString(ast.a)})` : exprToString(ast.a)}`;
     case 'bin': {
@@ -594,6 +615,7 @@ function vlSelfWidth(ast, peek) {
   switch (ast.k) {
     case 'lit': return ast.w ?? 32;
     case 'id': { const s = peek(ast.name); return !s ? 1 : s.kind === 'generic' ? 32 : s.width; }
+    case 'sel': return ast.hi - ast.lo + 1;
     case 'un': return ast.op === '!' ? 1 : vlSelfWidth(ast.a, peek);
     case 'bin':
       if (ARITH_OPS.has(ast.op)) return Math.max(vlSelfWidth(ast.a, peek), vlSelfWidth(ast.b, peek));
@@ -678,6 +700,17 @@ function vhExpr(ast, ctx) {
       const c = s.sig;
       ctx.reads.add(c);
       return s.width === 1 ? { t: 'sl', c, w: 1 } : { t: 'slv', c, w: s.width };
+    }
+    case 'sel': {
+      const s = ctx.lookup(ast.name);
+      const w = ast.hi - ast.lo + 1;
+      if (!s) return w === 1 ? { t: 'sl', c: ast.name, w: 1 } : { t: 'slv', c: ast.name, w };
+      if (s.kind === 'generic') { ctx.error(`generic '${ast.name}' cannot be indexed`); return { t: 'int', c: s.name, w: 32 }; }
+      if (ast.hi >= s.width) ctx.error(`'${ast.name}' has ${s.width} bit${s.width === 1 ? '' : 's'} (${s.width - 1}..0): index ${ast.hi} is out of range`);
+      const c = s.sig;
+      ctx.reads.add(c);
+      if (s.width === 1) return { t: 'sl', c, w: 1 };
+      return w === 1 ? { t: 'sl', c: `${c}(${ast.hi})`, w: 1 } : { t: 'slv', c: `${c}(${ast.hi} downto ${ast.lo})`, w };
     }
     case 'un': {
       const saved = ctx.targetW;
@@ -859,6 +892,14 @@ function vlExpr(ast, ctx) {
       const c = s ? s.sig : ast.name;
       ctx.reads.add(c);
       return c;
+    }
+    case 'sel': {
+      const s = ctx.lookup(ast.name);
+      if (s?.kind === 'generic') return s.name;
+      const c = s ? s.sig : ast.name;
+      ctx.reads.add(c);
+      if (s && s.width === 1) return c;
+      return ast.hi === ast.lo ? `${c}[${ast.hi}]` : `${c}[${ast.hi}:${ast.lo}]`;
     }
     case 'un': {
       const a = vlExpr(ast.a, ctx);
@@ -1304,7 +1345,7 @@ function headerLines(a, lang) {
   L.push(rule);
   L.push(`${c} ${lang === 'vhdl' ? 'Entity' : 'Module'}      : ${m.name}`);
   L.push(`${c} Description : ${a.alwaysNodes.length || a.registers.length ? 'controller (state machine + data path)' : 'finite state machine'} generated from the ASM chart ${m.name}.asm.json`);
-  if (m.description) L.push(`${c}               ${m.description}`);
+  if (m.description) for (const line of m.description.split(/\r?\n/)) L.push(`${c}               ${line}`.trimEnd());
   L.push(`${c} Generator   : Silinx ASM editor, kept in sync with the chart (edit either one).`);
   L.push(`${c} Style       : state register + next-state logic + output logic (latch-free)`);
   L.push(`${c} Clock       : ${m.clock} (rising edge)`);

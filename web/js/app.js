@@ -1836,6 +1836,8 @@ function setupMenus() {
       api.standalone ? { label: 'Open Project Bundle…', action: () => openBundle() } : null,
       { label: 'Close Project', action: () => closeProject(), disabled: hasPj },
       '-',
+      { label: 'Print…', action: () => printActive(), shortcut: 'Ctrl+P', disabled: () => !(S.active?.asmEditor || S.active?.schEditor) },
+      '-',
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj, shortcut: 'Alt+N' },
       '-',
       { label: 'Recent Projects', submenu: recent().map(r => ({ label: r, action: () => openProject(r) })) },
@@ -1929,6 +1931,13 @@ function setupToolbar() {
   );
 }
 
+// Print the diagram of the active document (ASM chart or schematic)
+function printActive() {
+  const d = S.active;
+  if (d?.asmEditor) d.asmEditor.print();
+  else if (d?.schEditor) d.schEditor.print(`Schematic ${d.path || ''}`.trim());
+}
+
 function downloadUrl(url, filename) {
   const a = h('a', { href: url, download: filename });
   document.body.append(a); a.click(); a.remove();
@@ -1980,6 +1989,7 @@ async function boot() {
   document.querySelectorAll('input[name=view]').forEach(r => r.addEventListener('change', () => setView(r.value)));
   $('console-clear').addEventListener('click', () => { $('console-log').innerHTML = ''; });
   addEventListener('keydown', e => {
+    if (!e.defaultPrevented && (e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P') && (S.active?.asmEditor || S.active?.schEditor)) { e.preventDefault(); printActive(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); if (S.active) flushDoc(S.active); }  // nothing to do: edits are saved automatically
   });
   addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });

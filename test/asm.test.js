@@ -307,3 +307,26 @@ endmodule`;
   assert.equal(results[0][15], '006');
   assert.deepEqual(results[1], results[0]);
 });
+
+test('bit and slice selection in conditions: op[4], op[2:1], op(0), op(3 downto 2)', () => {
+  const m = newModel('t', 'vhdl');
+  m.inputs.push({ name: 'op', width: 5 });
+  m.nodes.find((n) => n.id === 'd1').cond = "op[4] && op[2:1] == 2'b10 || op(0) || op(3 downto 2) == 3";
+  assert.deepEqual(validate(m), []);
+  const vh = generateVhdl(m);
+  assert.match(vh, /op\(4\) = '1'/);
+  assert.match(vh, /unsigned\(op\(2 downto 1\)\) = 2/);
+  assert.match(vh, /unsigned\(op\(3 downto 2\)\) = 3/);
+  const vl = generateVerilog({ ...m, lang: 'verilog' });
+  assert.match(vl, /op\[4\] && \(op\[2:1\] == 2'b10\)/);
+  assert.match(vl, /op\[0\]/);
+  m.nodes.find((n) => n.id === 'd1').cond = 'op[5]';
+  assert.match(validate(m)[0].message, /index 5 is out of range/);
+  assert.ok(parseCondition('op[1:3]').error);
+});
+
+test('multi-line description: every header line stays a comment', () => {
+  const m = { ...newModel('t', 'vhdl'), description: 'line one\nline two' };
+  assert.match(generateVhdl(m), /^-- {15}line two$/m);
+  assert.match(generateVerilog({ ...m, lang: 'verilog' }), /^\/\/ {15}line two$/m);
+});

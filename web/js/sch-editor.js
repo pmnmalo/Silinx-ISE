@@ -17,6 +17,7 @@ import {
   SYMBOLS, SYMBOL_CATEGORIES, GRID, defaultParams, normalizeDoc, newDoc, symbolDef, symbolPins, symbolBox,
   xform, rotSize, portBox, netlist, generateHdl, parseNetName,
 } from '/core/schdoc.js';
+import { svgSnapshot, printDiagram } from './print.js';
 import { rerouteAfterMove, connectivity, placementClashes, connectionsKept } from '/core/schroute.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -497,6 +498,17 @@ export function mountSchEditor(container, opts = {}) {
     for (const l of doc.labels) add({ x: l.x, y: l.y - 12, w: 8 * l.net.length, h: 12 });
     if (!Number.isFinite(x0)) return null;
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  /** Print dialog for the whole schematic (selection and editing overlays left out). */
+  function print(title = 'Schematic') {
+    const b = contentBounds();
+    if (!b) return;
+    const saved = sel;
+    sel = new Set();
+    render();
+    let snap;
+    try { snap = svgSnapshot(svg, vp, { l: b.x - 30, t: b.y - 30, r: b.x + b.w + 30, b: b.y + b.h + 30 }, ['.se-sheet', '.se-overlay > *', 'defs pattern']); } finally { sel = saved; render(); }
+    printDiagram({ title, snapshot: snap, filename: title.replace(/[^\w.-]+/g, '_') });
   }
   function fit() {
     const r = svg.getBoundingClientRect();
@@ -1447,6 +1459,7 @@ export function mountSchEditor(container, opts = {}) {
     check: () => runCheck(true),
     openSelected,
     fit,
+    print,
     destroy() {
       destroyed = true;
       clearTimeout(changeTimer);

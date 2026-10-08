@@ -11,6 +11,7 @@
 // parallel with the states; unconnected exits end the block), and the machine panel edits the
 // data path: generics, internal registers and the 2-flip-flop synchroniser of each input.
 
+import { svgSnapshot, printDiagram } from './print.js';
 import {
   normalizeModel, newModel, validate, generate, stateEncoding, ENCODINGS,
 } from '/core/asm.js';
@@ -192,7 +193,8 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       btn('Arrange', 'Automatic layout (states top-down, every-cycle blocks on the right)', () => autoArrange()),
       snapBtn,
       btn('−', 'Zoom out', () => zoomBy(1 / 1.2)), zoomLbl, btn('+', 'Zoom in', () => zoomBy(1.2)),
-      btn('Fit', 'Fit the chart in the window', () => fit())),
+      btn('Fit', 'Fit the chart in the window', () => fit()),
+      btn('🖨', 'Print the chart / save it as PDF or SVG (Ctrl+P)', () => print())),
     sep(),
     h('div', { class: 'asm-group' }, langSel, encSel),
     h('div', { class: 'asm-spacer' }),
@@ -428,6 +430,17 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       l = Math.min(l, bx.l - 50); r = Math.max(r, bx.r + 50); t = Math.min(t, bx.t - (n.type === 'state' || n.type === 'always' ? 50 : 20)); b = Math.max(b, bx.b + 40);
     }
     return { l, t, r, b };
+  }
+  /** Print dialog for the whole chart (selection and editing handles left out). */
+  function print() {
+    const bb = chartBounds();
+    if (!bb) return;
+    const saved = sel;
+    sel = { nodes: new Set(), edge: null };
+    render();
+    let snap;
+    try { snap = svgSnapshot(svg, vp, bb, ['.asm-bg', '.asm-rubber', '.asm-port', '.asm-overlay > *', 'defs pattern']); } finally { sel = saved; render(); }
+    printDiagram({ title: `ASM chart ${M.name}`, snapshot: snap, filename: `${M.name}_asm` });
   }
   function fit() {
     const bb = chartBounds();
@@ -1055,6 +1068,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     if (k === 'Delete' || k === 'Backspace') { deleteSelection(); ev.preventDefault(); return; }
     if (mod && (k === 'z' || k === 'Z')) { if (ev.shiftKey) redo(); else undo(); ev.preventDefault(); return; }
     if (mod && (k === 'y' || k === 'Y')) { redo(); ev.preventDefault(); return; }
+    if (mod && (k === 'p' || k === 'P')) { print(); ev.preventDefault(); return; }
     if (mod && (k === 'a' || k === 'A')) { sel = { nodes: new Set(M.nodes.map((n) => n.id)), edge: null }; render(); renderInspector(); updateToolbar(); ev.preventDefault(); return; }
     if (k === 'Escape') {
       if (drag?.mode === 'connect') { drag = null; gOverlay.innerHTML = ''; svg.classList.remove('connecting'); }
@@ -1112,6 +1126,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     },
     validate: () => { runValidate(); return diags.slice(); },
     fit,
+    print,
     destroy() {
       destroyed = true;
       Object.values(timers).forEach(clearTimeout);
