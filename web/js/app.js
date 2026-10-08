@@ -34,10 +34,14 @@ export function log(text, cls = '', { diag = true } = {}) {
 
 // Every warning/error shown in the console also goes to the Warnings / Errors tabs.
 // Recognised forms: "ERROR:Tool:123 - msg", "WARNING:Tool - msg", "ERROR: msg", "WARNING: msg";
-// indented lines right after one are its continuation (ISE wraps long messages).
+// indented lines right after one are its continuation (ISE wraps long messages) — unless the
+// message is already complete (ends a sentence) or the line is report output (XST's indented
+// "Found finite state machine…", tables, rules), which would otherwise be glued to the warning.
 let lastConsoleDiag = null;
+const continuesDiag = (d, line) => /^\s{2,}\S/.test(line) && !/[.!?:]\s*$/.test(d.message)
+  && !/^\s*([|=+-]{2,}|\||Found\b|Summary:|Unit\b|Synthesizing\b|inferred\b)/.test(line);
 function consoleMessage(line, cls) {
-  if (lastConsoleDiag && /^\s{2,}\S/.test(line) && !cls) {
+  if (lastConsoleDiag && !cls && continuesDiag(lastConsoleDiag, line)) {
     lastConsoleDiag.message += ' ' + line.trim();
     renderDiagnosticsSoon();
     return;
