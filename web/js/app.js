@@ -1926,6 +1926,8 @@ function setupMenus() {
     { label: 'Help', items: () => [
       { label: 'About Silinx ISE', icon: icon('help'), action: () => wiz.aboutDialog() },
       { label: 'Keyboard Shortcuts', action: () => wiz.shortcutsDialog() },
+      '-',
+      { label: 'Check for Updates…', action: () => wiz.checkUpdatesDialog() },
     ] },
   ]);
 }

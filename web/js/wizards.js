@@ -1,6 +1,6 @@
 // Wizards and dialogs modelled on ISE (New Project Wizard, New Source Wizard, properties...).
 import { api } from './api.js';
-import { PRODUCT, PRODUCT_FULL, VERSION } from '/core/version.js';
+import { PRODUCT, PRODUCT_FULL, VERSION, REPOSITORY, compareVersions } from '/core/version.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, alertDlg, confirmDlg, toast } from './ui.js';
 import * as T from './templates.js';
@@ -691,13 +691,51 @@ export function aboutDialog() {
         h('p', {}, 'HDL design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7): mixed VHDL/Verilog projects, RTL schematics, ASM state machine editor, behavioural simulation and device programming.'),
         h('table', { class: 'about-info', style: { borderSpacing: '0 3px', margin: '6px 0 10px' } },
           h('tr', {}, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Project:'),
-            h('td', {}, link('https://github.com/pmnmalo/Silinx-ISE', 'github.com/pmnmalo/Silinx-ISE'))),
+            h('td', {}, link(`https://github.com/${REPOSITORY}`, `github.com/${REPOSITORY}`))),
           h('tr', {}, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Developers:'),
-            h('td', {}, h('div', {}, 'Pedro Malo — ', link('https://github.com/pmnmalo', 'github.com/pmnmalo')),
+            h('td', {}, h('div', {}, 'Pedro Maló — ', link('https://github.com/pmnmalo', 'github.com/pmnmalo')),
               h('div', { style: { color: '#666' } }, 'developed with Claude (Anthropic)')))),
         h('p', { style: { color: '#666' } }, 'Synthesis, place & route and bitstream generation use the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });
+}
+
+// ------------------------------------------------------------------ Check for updates
+const REPO = REPOSITORY;
+
+/** Help ▸ Check for Updates…: the running version vs the latest release on GitHub. */
+export async function checkUpdatesDialog() {
+  const body = h('div', {}, h('p', {}, `Running ${PRODUCT} ${VERSION}. Checking the latest release on GitHub…`));
+  const done = dialog({ title: 'Check for Updates', width: 520, body, buttons: [{ label: 'OK', primary: true, value: true }] });
+  let rel;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status === 403 ? 'GitHub rate limit reached, try again later' : `GitHub answered ${r.status}`);
+    rel = await r.json();
+  } catch (e) {
+    body.replaceChildren(h('p', {}, `Running ${PRODUCT} ${VERSION}.`),
+      h('p', { style: { color: '#c00000' } }, `Could not check for updates: ${e.message || e}.`),
+      h('p', {}, 'Releases: ', link(`https://github.com/${REPO}/releases`, `github.com/${REPO}/releases`)));
+    return done;
+  }
+  const latest = String(rel.tag_name || rel.name || '').replace(/^v/i, '');
+  const cmp = compareVersions(latest, VERSION);
+  const when = rel.published_at ? new Date(rel.published_at).toLocaleDateString() : '';
+  const assets = (rel.assets || []).map((a) => h('li', {}, link(a.browser_download_url, a.name), ` (${Math.max(1, Math.round(a.size / 1024))} KB)`));
+  if (cmp > 0) {
+    body.replaceChildren(...[
+      h('p', {}, h('b', {}, `A new version is available: ${PRODUCT} ${latest}`), when ? ` (released ${when})` : ''),
+      h('p', {}, `You are running ${VERSION}.`),
+      h('p', {}, 'Release notes and downloads: ', link(rel.html_url, rel.name || `v${latest}`)),
+      assets.length ? h('ul', { style: { margin: '4px 0 8px 18px', padding: 0 } }, ...assets) : null,
+      h('p', { class: 'hint' }, 'To update: download silinx-ise-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx-ISE.html for the standalone edition.')].filter(Boolean));
+  } else {
+    body.replaceChildren(...[
+      h('p', {}, h('b', {}, `${PRODUCT} ${VERSION} is up to date.`)),
+      h('p', {}, `Latest release on GitHub: ${latest}${when ? ` (${when})` : ''} — `, link(rel.html_url, 'release notes')),
+      cmp < 0 ? h('p', { class: 'hint' }, 'You are running a development version newer than the latest release.') : null].filter(Boolean));
+  }
+  return done;
 }
 
 export function shortcutsDialog() {
