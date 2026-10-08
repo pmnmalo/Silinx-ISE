@@ -30,9 +30,12 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **ISE schematics (.sch)**: schematics in ISE projects (XML and older text formats) are converted
   on import, with the Xilinx library symbols mapped to equivalent symbols or exact HDL blocks;
   exporting a project writes them back as ISE `.sch` files (*Export as ISE Schematic* for one).
-- **Graphical ASM state-machine editor** (state, decision and conditional-output boxes) that
-  generates synthesizable VHDL or Verilog (2/3-process style, binary/gray/one-hot/enum encoding)
-  and adds it to the project.
+- **Graphical ASM state-machine editor** (state, decision, case and conditional-output boxes)
+  that generates synthesizable VHDL or Verilog (2/3-process style, binary/gray/one-hot/enum
+  encoding) and adds it to the project. A *case* box is a multi-way decision on the value of a
+  signal (e.g. an `opcode`), one exit per value (`00100`, `0|1`, `others`), generated as a
+  `case` statement; conditions can test bits and slices (`opcode[4]`, `opcode[4:3]`).
+  Charts and schematics print on one page or tiled over several, or save as PNG / SVG.
   The chart and its HDL file stay **synchronized** (edit either one), and an HDL state machine
   (1/2/3-process, VHDL or Verilog) can be converted to a chart (*Convert to State Machine*).
   A chart can also hold the data path of a small controller: integer generics, internal

@@ -67,6 +67,7 @@
 /* shape icons */
 .asm-editor .asm-ico { display: inline-block; flex: none; width: 22px; height: 14px; border: 1.6px solid currentColor; }
 .asm-editor .asm-ico.ico-state { border-radius: 2px; background: var(--asm-state-fill); }
+.asm-editor .asm-ico.ico-case { width: 16px; height: 10px; margin: 0 3px; background: var(--asm-dec-fill); clip-path: polygon(0 50%, 25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%); outline: none; }
 .asm-editor .asm-ico.ico-decision { width: 13px; height: 13px; margin: 0 4px; transform: rotate(45deg); background: var(--asm-dec-fill); }
 .asm-editor .asm-ico.ico-output { border-radius: 8px; background: var(--asm-out-fill); }
 
@@ -184,6 +185,10 @@
 .asm-editor .asm-shape { stroke: var(--asm-fg); stroke-width: 1.5; }
 .asm-editor .asm-state .asm-shape { fill: var(--asm-state-fill); }
 .asm-editor .asm-decision .asm-shape { fill: var(--asm-dec-fill); }
+.asm-editor .asm-case .asm-shape { fill: var(--asm-dec-fill); }
+.asm-editor .asm-case-bar { fill: none; stroke: color-mix(in srgb, var(--asm-fg) 80%, transparent); stroke-width: 1.5; }
+.asm-editor .asm-case-list { display: grid; gap: 4px; }
+.asm-editor .asm-case-list .asm-row { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
 .asm-editor .asm-output .asm-shape { fill: var(--asm-out-fill); }
 .asm-editor .asm-node:hover .asm-shape { stroke: var(--asm-accent); }
 .asm-editor .asm-node.sel .asm-shape { stroke: var(--asm-accent); stroke-width: 2.5; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--asm-accent) 60%, transparent)); }

@@ -330,3 +330,67 @@ test('multi-line description: every header line stays a comment', () => {
   assert.match(generateVhdl(m), /^-- {15}line two$/m);
   assert.match(generateVerilog({ ...m, lang: 'verilog' }), /^\/\/ {15}line two$/m);
 });
+
+// ---- case (multi-way decision) boxes
+const caseModel = (over = {}) => ({
+  name: 'cs', lang: 'vhdl', clock: 'clk', reset: { name: 'rst' },
+  inputs: [{ name: 'op', width: 2 }, { name: 'go', width: 1 }],
+  outputs: [{ name: 'a', width: 1 }, { name: 'b', width: 1 }],
+  nodes: [
+    { id: 's0', type: 'state', name: 'IDLE', actions: [] },
+    { id: 'd', type: 'decision', cond: 'go' },
+    { id: 'c', type: 'case', expr: 'op' },
+    { id: 'o', type: 'output', actions: ['b'] },
+    { id: 's1', type: 'state', name: 'A1', actions: ['a'] },
+    { id: 's2', type: 'state', name: 'A2', actions: [] },
+  ],
+  edges: [
+    { from: 's0', to: 'd' }, { from: 'd', to: 'c', port: 'true' }, { from: 'd', to: 's0', port: 'false' },
+    { from: 'c', to: 's1', port: '00' }, { from: 'c', to: 'o', port: '01|10' }, { from: 'c', to: 's0', port: 'others' },
+    { from: 'o', to: 's2' }, { from: 's1', to: 's0' }, { from: 's2', to: 's0' },
+  ],
+  initial: 's0',
+  ...over,
+});
+
+test('case box: VHDL case / Verilog case with grouped values and others', () => {
+  assert.deepEqual(validate(caseModel()), []);
+  const vh = generateVhdl(caseModel());
+  assert.match(vh, /case op is\n\s+when "00" =>\n\s+state_next <= S_A1;\n\s+when "01" \| "10" =>\n\s+state_next <= S_A2;\n\s+when others =>\n\s+state_next <= S_IDLE;\n\s+end case;/);
+  assert.match(vh, /case op is\n\s+when "01" \| "10" =>\n\s+b <= '1';\n\s+when others =>\n\s+null;/);
+  const vl = generateVerilog(caseModel({ lang: 'verilog' }));
+  assert.match(vl, /case \(op\)\n\s+2'b00: state_next = S_A1;\n\s+2'b01, 2'b10: state_next = S_A2;\n\s+default: state_next = S_IDLE;\n\s+endcase/);
+  const tr = extractTransitions(caseModel()).find((s) => s.name === 'IDLE').transitions;
+  assert.deepEqual(tr.map((t) => t.nextName), ['A1', 'A2', 'IDLE', 'IDLE']);
+});
+
+test('case box: labels as literals, coverage, duplicates and errors', () => {
+  const m = caseModel();
+  m.edges.find((e) => e.port === 'others').port = '3';
+  assert.deepEqual(validate(m), []);                               // 00, 01|10, 3: complete
+  m.edges.find((e) => e.port === '3').port = "2'b10";
+  const msgs = validate(m).map((d) => d.message).join('\n');
+  assert.match(msgs, /value 10 is used by the exits '01\|10' and '2'b10'/);
+  assert.match(msgs, /1 value\(s\) have no exit \(e\.g\. 11\)/);
+  m.edges.find((e) => e.port === "2'b10").port = '7';
+  assert.match(validate(m).map((d) => d.message).join('\n'), /'7' does not fit in 2 bits/);
+  const m2 = caseModel();
+  m2.nodes.find((n) => n.id === 'c').expr = 'op + 1';
+  assert.match(validate(m2)[0].message, /must be a signal name or a bit slice/);
+});
+
+test('case box on a slice: VHDL if/elsif chain, Verilog case', () => {
+  const m = caseModel({ inputs: [{ name: 'op', width: 4 }, { name: 'go', width: 1 }] });
+  m.nodes.find((n) => n.id === 'c').expr = 'op[3:2]';
+  assert.deepEqual(validate(m), []);
+  const vh = generateVhdl(m);
+  assert.match(vh, /if op\(3 downto 2\) = "00" then\n\s+state_next <= S_A1;\n\s+elsif op\(3 downto 2\) = "01" or op\(3 downto 2\) = "10" then/);
+  assert.match(generateVerilog({ ...m, lang: 'verilog' }), /case \(op\[3:2\]\)/);
+});
+
+test('case box: not allowed in every-cycle blocks', () => {
+  const m = caseModel();
+  m.nodes.push({ id: 'al', type: 'always', name: 'blk', actions: [] }, { id: 'c2', type: 'case', expr: 'op' });
+  m.edges.push({ from: 'al', to: 'c2' });
+  assert.match(validate(m).map((d) => d.message).join('\n'), /case boxes are not supported in every-cycle blocks/);
+});

@@ -55,6 +55,10 @@ function nodeSize(n) {
     const w = Math.max(140, ceilTo(tw * 1.25 + 56, 2 * GRID));
     return { w, h: w > 260 ? 100 : 80 };
   }
+  if (n.type === 'case') {
+    const tw = Math.max(3, (n.expr || '').length) * CHW;
+    return { w: Math.max(160, ceilTo(tw + 80, 2 * GRID)), h: 60 };
+  }
   const lines = n.actions.length ? n.actions : [''];
   const tw = Math.max(...lines.map((l) => l.length)) * CHW;
   return { w: Math.max(120, ceilTo(tw + 44, 2 * GRID)), h: Math.max(40, ceilTo(lines.length * 17 + 16, GRID)) };
@@ -65,9 +69,16 @@ function box(n) {
   return { x: n.x, y: n.y, w, h, l: n.x - w / 2, r: n.x + w / 2, t: n.y - h / 2, b: n.y + h / 2 };
 }
 
-/** Exit point and direction of a port. */
-function portGeom(n, port) {
+// exits of a case box leave from a horizontal bar CASE_BAR below the box, above each target
+const CASE_BAR = 26;
+
+/** Exit point and direction of a port (`dst`: the target, which places the exits of a case box). */
+function portGeom(n, port, dst) {
   const b = box(n);
+  if (n.type === 'case') {
+    if (port === '+') return { x: b.r, y: n.y, dx: 1, dy: 0 };
+    return { x: dst ? dst.x : n.x, y: b.b + CASE_BAR, dx: 0, dy: 1 };
+  }
   if (n.type === 'decision' && port === 'false') {
     const s = n.flip ? -1 : 1;
     return { x: n.x + s * b.w / 2, y: n.y, dx: s, dy: 0 };
@@ -78,7 +89,7 @@ const portsOf = (n) => (n.type === 'decision' ? ['true', 'false'] : ['next']);
 
 /** Orthogonal route from a port to the top of the target box. */
 function routeEdge(src, port, dst, lane) {
-  const p = portGeom(src, port);
+  const p = portGeom(src, port, dst);
   const sb = box(src), db = box(dst);
   const t = { x: dst.x, y: db.t };
   const S = 20;
@@ -183,6 +194,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     h('div', { class: 'asm-group' },
       btn([h('span', { class: 'asm-ico ico-state' }), 'State'], 'Add state box (rectangle)', () => addNode('state'), 'asm-add'),
       btn([h('span', { class: 'asm-ico ico-decision' }), 'Decision'], 'Add decision box (diamond)', () => addNode('decision'), 'asm-add'),
+      btn([h('span', { class: 'asm-ico ico-case' }), 'Case'], 'Add case box (multi-way decision on the value of a signal, e.g. opcode)', () => addNode('case'), 'asm-add'),
       btn([h('span', { class: 'asm-ico ico-output' }), 'Cond. output'], 'Add conditional output box (oval)', () => addNode('output'), 'asm-add'),
       btn([h('span', { class: 'asm-ico ico-always' }), 'Every cycle'], 'Add an every-cycle block (logic evaluated on every clock cycle, in parallel with the states)', () => addNode('always'), 'asm-add'),
       delBtn),
@@ -290,6 +302,40 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     return e;
   }
 
+  /** Width (bits) of the expression of a case box, or 1 if unknown. */
+  function caseWidth(n) {
+    const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:[[(]\s*(\d+)\s*(?:(?::|downto)\s*(\d+))?\s*[\])])?\s*$/i.exec(n.expr || '');
+    if (!m) return 1;
+    if (m[2] != null) return m[3] != null ? Math.abs(+m[2] - +m[3]) + 1 : 1;
+    const p = [...M.inputs, ...M.outputs, ...(M.registers || [])].find((x) => x.name === m[1]);
+    return p ? p.width : 1;
+  }
+  const caseExits = (id) => M.edges.filter((e) => e.from === id);
+  /** Target of an exit as drawn: exits of a case box that share a target are spread apart. */
+  function drawTarget(e) {
+    const a = nodeById(e.from), b = nodeById(e.to);
+    if (!a || !b || a.type !== 'case') return b;
+    const sib = M.edges.filter((x) => x.from === e.from && x.to === e.to);
+    if (sib.length < 2) return b;
+    return { ...b, x: b.x + (sib.indexOf(e) - (sib.length - 1) / 2) * 22 };
+  }
+  /** Label for a new exit of a case box: the lowest value not used yet (binary), else 'others'. */
+  function nextCaseLabel(n) {
+    const w = caseWidth(n);
+    const used = new Set();
+    let others = false;
+    for (const e of caseExits(n.id)) {
+      for (const part of String(e.port).split(/\s*[|,]\s*/)) {
+        const t = part.replace(/_/g, '');
+        if (/^(others|default)$/i.test(t)) others = true;
+        else if (/^[01]+$/.test(t) && t.length === w) used.add(parseInt(t, 2));
+        else if (/^\d+$/.test(t)) used.add(parseInt(t, 10));
+      }
+    }
+    for (let v = 0; v < Math.min(2 ** w, 4096); v++) if (!used.has(v)) return v.toString(2).padStart(w, '0');
+    return others ? `${2 ** w}` : 'others';
+  }
+
   function uniqueBlockName() {
     const used = new Set(M.nodes.filter((n) => n.type === 'always').map((n) => (n.name || '').toLowerCase()));
     let i = 1;
@@ -298,17 +344,18 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
   }
 
   function addNode(type, at) {
-    const n = { id: newId({ state: 's', decision: 'd', always: 'a' }[type] || 'o'), type, x: 0, y: 0 };
+    const n = { id: newId({ state: 's', decision: 'd', case: 'c', always: 'a' }[type] || 'o'), type, x: 0, y: 0 };
     if (type === 'state') { n.name = uniqueStateName(); n.actions = []; }
     if (type === 'always') { n.name = uniqueBlockName(); n.actions = []; }
     if (type === 'decision') n.cond = M.inputs[0]?.name || 'cond';
+    if (type === 'case') n.expr = (M.inputs.find((i) => i.width > 1) || M.inputs[0])?.name || 'sel';
     if (type === 'output') n.actions = M.outputs[0] ? [`${M.outputs[0].name} = 1`] : [];
     const s = nodeSize(n);
     let parent = null, port = null;
     if (!at && sel.nodes.size === 1 && type !== 'always') {
       parent = nodeById([...sel.nodes][0]);
       const ex = exitsOf(parent.id);
-      port = portsOf(parent).find((p) => !ex[p]) || null;
+      port = parent.type === 'case' ? nextCaseLabel(parent) : (portsOf(parent).find((p) => !ex[p]) || null);
       if (!port) parent = null;
     }
     if (at) { n.x = snapV(at.x); n.y = snapV(at.y); }
@@ -502,14 +549,14 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     const lanes = { l: 0, r: 0 };
     let eh = '';
     for (const e of M.edges) {
-      const a = nodeById(e.from), b = nodeById(e.to);
+      const a = nodeById(e.from), b = drawTarget(e);
       if (!a || !b) continue;
       let pts;
       if (e.points?.length) {
-        const p = portGeom(a, e.port);
+        const p = portGeom(a, e.port, b);
         pts = [p, ...e.points, { x: b.x, y: box(b).t }];
       } else {
-        const p = portGeom(a, e.port);
+        const p = portGeom(a, e.port, b);
         const goingUp = box(b).t < p.y + 20;
         let lane = 0;
         if (goingUp) {
@@ -526,11 +573,23 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
         const lx = e.port === 'false' ? p.x + (a.flip ? -10 : 10) : p.x + 9;
         const ly = e.port === 'false' ? p.y - 7 : p.y + 14;
         label = `<text class="asm-edge-label" x="${lx}" y="${ly}" text-anchor="${e.port === 'false' && a.flip ? 'end' : 'start'}">${e.port === 'true' ? '1' : '0'}</text>`;
+      } else if (a.type === 'case') {
+        const p = pts[0];
+        label = `<text class="asm-edge-label asm-case-label" x="${p.x + 5}" y="${p.y + 13}">${esc(e.port)}</text>`;
       }
       eh += `<g class="asm-edge${selc}" data-edge="${esc(e.id)}"><path class="asm-edge-hit" d="${d}"/>` +
         `<path class="asm-edge-line" d="${d}" marker-end="url(#${uid}-arr${selc ? '-sel' : ''})"/>${label}</g>`;
     }
-    gEdges.innerHTML = eh;
+    // case boxes: stem and bar from which the exits leave
+    let ch = '';
+    for (const n of M.nodes) {
+      if (n.type !== 'case') continue;
+      const bx = box(n), by = bx.b + CASE_BAR;
+      const xs = [n.x];
+      for (const e of M.edges) { const t = e.from === n.id && drawTarget(e); if (t) xs.push(t.x); }
+      ch += `<path class="asm-case-bar" d="M${n.x},${bx.b} L${n.x},${by} M${Math.min(...xs)},${by} L${Math.max(...xs)},${by}"/>`;
+    }
+    gEdges.innerHTML = ch + eh;
 
     // nodes
     const inAlways = new Set();
@@ -570,13 +629,25 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       } else if (n.type === 'decision') {
         inner += `<polygon class="asm-shape" points="0,${-hh / 2} ${w / 2},0 0,${hh / 2} ${-w / 2},0"/>`;
         inner += `<text class="asm-text" x="0" y="0" dominant-baseline="central" text-anchor="middle">${esc(n.cond || '?')}</text>`;
+      } else if (n.type === 'case') {
+        const k = hh / 2;
+        inner += `<polygon class="asm-shape" points="${-w / 2},0 ${-w / 2 + k},${-hh / 2} ${w / 2 - k},${-hh / 2} ${w / 2},0 ${w / 2 - k},${hh / 2} ${-w / 2 + k},${hh / 2}"/>`;
+        inner += `<text class="asm-text" x="0" y="0" dominant-baseline="central" text-anchor="middle">${esc(n.expr || '?')}</text>`;
       } else {
         inner += `<rect class="asm-shape" x="${-w / 2}" y="${-hh / 2}" width="${w}" height="${hh}" rx="${Math.min(hh / 2, 22)}"/>`;
         inner += n.actions.length ? lines(n.actions) : `<text class="asm-text asm-empty" x="0" y="0" dominant-baseline="central" text-anchor="middle">no outputs</text>`;
       }
       // ports
       const ex = exitsOf(n.id);
-      for (const p of portsOf(n)) {
+      if (n.type === 'case') {
+        for (const e of caseExits(n.id)) {
+          const g = portGeom(n, e.port, drawTarget(e));
+          inner += `<circle class="asm-port" data-port="${esc(e.port)}" cx="${g.x - n.x}" cy="${g.y - n.y}" r="5.5"><title>exit ${esc(e.port)} - drag to another box to reconnect</title></circle>`;
+        }
+        const g = portGeom(n, '+');
+        inner += `<circle class="asm-port free" data-port="+" cx="${g.x - n.x}" cy="${g.y - n.y}" r="5.5"><title>new exit (next free value) - drag to a box to connect</title></circle>`;
+      }
+      for (const p of n.type === 'case' ? [] : portsOf(n)) {
         const g = portGeom(n, p);
         const lx = g.x - n.x, ly = g.y - n.y;
         // an unconnected exit of an every-cycle block is the end of the block: drawn as a terminator
@@ -691,9 +762,12 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       if (!e) return;
       const a = nodeById(e.from), b = nodeById(e.to);
       const nm = (n) => (n.type === 'state' ? `state ${n.name}` : n.type === 'always' ? `every-cycle block ${n.name}`
-        : n.type === 'decision' ? `decision "${n.cond}"` : 'conditional output');
+        : n.type === 'decision' ? `decision "${n.cond}"` : n.type === 'case' ? `case "${n.expr}"` : 'conditional output');
       put(h('h3', {}, 'Connection'),
         h('p', { class: 'asm-muted' }, `From ${nm(a)}${a.type === 'decision' ? ` (${e.port === 'true' ? '1' : '0'} branch)` : ''} to ${nm(b)}.`),
+        a.type === 'case' ? field('Value(s) of this exit', h('input', { class: 'asm-input mono', value: e.port, spellcheck: 'false', 'data-focus': '1',
+          oninput: (ev) => { e.port = ev.target.value.trim() || 'others'; commit(`lbl:${e.id}`); } }),
+        `e.g. ${'0'.repeat(Math.max(0, caseWidth(a) - 1))}1, 4, 0|1 (several values) or others`) : null,
         e.points ? btn('Reset route', 'Use automatic routing', () => { delete e.points; commit('route'); }) : null,
         btn('Delete connection', 'Delete (Del)', () => deleteSelection(), 'asm-danger'));
       return;
@@ -710,6 +784,7 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
         h('div', { class: 'asm-legend' },
           h('div', {}, h('span', { class: 'asm-ico ico-state' }), ' State: name + Moore outputs'),
           h('div', {}, h('span', { class: 'asm-ico ico-decision' }), ' Decision: condition, exits 1 / 0'),
+          h('div', {}, h('span', { class: 'asm-ico ico-case' }), ' Case: one exit per value of a signal'),
           h('div', {}, h('span', { class: 'asm-ico ico-output' }), ' Conditional (Mealy) outputs'),
           h('div', {}, h('span', { class: 'asm-ico ico-always' }), ' Every cycle: logic in parallel with the states')));
       return;
@@ -747,6 +822,22 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
         for (const e of M.edges) if (e.from === n.id) e.port = e.port === 'true' ? 'false' : 'true';
         commit('swap');
       }));
+    } else if (n.type === 'case') {
+      put(h('h3', {}, 'Case'));
+      put(field('Value tested', h('input', { class: 'asm-input mono', value: n.expr, spellcheck: 'false', 'data-focus': '1',
+        oninput: (ev) => { n.expr = ev.target.value; commit(`expr:${n.id}`); } }),
+      'An input, register or registered output, or a bit slice (e.g. opcode, opcode[4:3]). Generated as a case statement.'));
+      const list = h('div', { class: 'asm-case-list' });
+      for (const e of caseExits(n.id)) {
+        const t = nodeById(e.to);
+        list.append(h('div', { class: 'asm-row' },
+          h('input', { class: 'asm-input mono', value: e.port, spellcheck: 'false', title: 'Value(s) of this exit: binary digits, a literal, a|b, or others',
+            oninput: (ev) => { e.port = ev.target.value.trim() || 'others'; commit(`lbl:${e.id}`); } }),
+          h('span', { class: 'asm-muted' }, `→ ${t ? (t.type === 'state' ? t.name : t.type === 'decision' ? t.cond : t.type === 'case' ? t.expr : 'output') : '?'}`),
+          btn('✕', 'Delete this exit', () => { M.edges = M.edges.filter((x) => x.id !== e.id); commit('del-exit'); renderInspector(); }, 'asm-small asm-danger')));
+      }
+      put(field('Exits (value → box)', list, 'Drag from the ○ port on the right of the box to a box to add an exit (it gets the next free value). ' +
+        "Without an 'others' exit the values must cover every case."));
     } else {
       put(h('h3', {}, 'Conditional output'));
       put(field('Mealy outputs (one per line)', actionsArea(n), syntax));
@@ -876,7 +967,8 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       while (q.length) {
         const id = q.shift();
         const ex = exitsOf(id);
-        for (const p of ['next', 'true', 'false']) {
+        const ports = nodeById(id)?.type === 'case' ? caseExits(id).map((e) => e.port) : ['next', 'true', 'false'];
+        for (const p of ports) {
           const e = ex[p];
           if (!e || layer.has(e.to) || !nodeById(e.to)) continue;
           layer.set(e.to, layer.get(id) + 1); parentOf.set(e.to, { id, port: p }); order.push(e.to); q.push(e.to);
@@ -982,7 +1074,8 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       render();
     } else if (drag.mode === 'connect') {
       const a = nodeById(drag.from);
-      const p = portGeom(a, drag.port);
+      const cur = a.type === 'case' ? M.edges.find((e) => e.from === a.id && e.port === drag.port) : null;
+      const p = portGeom(a, drag.port, cur ? drawTarget(cur) : null);
       const w = toWorld(ev.clientX, ev.clientY);
       const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('[data-node]');
       svg.querySelectorAll('.drop').forEach((el) => el.classList.remove('drop'));
@@ -1019,7 +1112,11 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       svg.querySelectorAll('.drop').forEach((el) => el.classList.remove('drop'));
       const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('[data-node]');
       if (over && validTarget(d.from, over.dataset.node)) {
-        const e = connect(d.from, d.port, over.dataset.node);
+        const a = nodeById(d.from);
+        const same = a.type === 'case' && d.port === '+' ? M.edges.find((x) => x.from === a.id && x.to === over.dataset.node && x.port !== 'others') : null;
+        let e;
+        if (same) { same.port = `${same.port}|${nextCaseLabel(a)}`; e = same; }   // one more value for the same exit
+        else e = connect(d.from, a.type === 'case' && d.port === '+' ? nextCaseLabel(a) : d.port, over.dataset.node);
         sel = { nodes: new Set(), edge: e.id };
         commit('connect'); renderInspector();
       } else if (!over && Math.hypot(ev.clientX - d.start.cx, ev.clientY - d.start.cy) > 30) {

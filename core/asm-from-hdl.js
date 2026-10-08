@@ -1761,6 +1761,10 @@ export function nodeSize(n) {
     const w = Math.max(140, ceilTo(tw * 1.25 + 56, 2 * GRID));
     return { w, h: w > 260 ? 100 : 80 };
   }
+  if (n.type === 'case') {
+    const tw = Math.max(3, (n.expr || '').length) * CHW;
+    return { w: Math.max(160, ceilTo(tw + 80, 2 * GRID)), h: 60 };
+  }
   const lines = n.actions && n.actions.length ? n.actions : [''];
   const tw = Math.max(...lines.map((l) => l.length)) * CHW;
   return { w: Math.max(120, ceilTo(tw + 44, 2 * GRID)), h: Math.max(40, ceilTo(lines.length * 17 + 16, GRID)) };
@@ -1771,6 +1775,9 @@ const HGAP = 60;       // horizontal gap between the true and false branches
 const BLOCK_GAP = 50;  // vertical gap between state blocks
 const X0 = 200, Y0 = 80;
 const snap = (v) => Math.round(v / 10) * 10;
+
+/** Targets of the exits of a case box, in chart order. */
+const caseTargets = (m, id) => m.edges.filter((e) => e.from === id).map((e) => e.to);
 
 /** Exits of every node: id -> { next|true|false: targetId }. */
 function exitsOf(m) {
@@ -1800,7 +1807,9 @@ function stateOrder(m, byId, ex) {
       if (n.type === 'state') { push(id); return; }
       path.add(id);
       const e = ex.get(id) || {};
-      if (n.type === 'decision') { visit(e.true, path); visit(e.false, path); } else visit(e.next, path);
+      if (n.type === 'decision') { visit(e.true, path); visit(e.false, path); }
+      else if (n.type === 'case') for (const t of caseTargets(m, id)) visit(t, path);
+      else visit(e.next, path);
       path.delete(id);
     };
     visit((ex.get(s) || {}).next, new Set());
@@ -1830,7 +1839,17 @@ export function asmLayout(model) {
     const e = ex.get(id) || {};
     const child = (cid) => cid != null && byId.has(cid) && byId.get(cid).type !== 'state' && !placed.has(cid);
     const below = cy + h / 2 + VGAP;
-    if (n.type === 'decision') {
+    if (n.type === 'case') { // exits side by side below the box, from left to right
+      let cx = x, first = true;
+      for (const t of caseTargets(norm, id)) {
+        if (!child(t)) continue;
+        const tw = nodeSize(byId.get(t)).w;
+        if (!first) cx = right + HGAP + tw / 2;
+        const r = place(t, cx, below + 26);
+        bottom = Math.max(bottom, r.bottom); right = Math.max(right, r.right);
+        first = false;
+      }
+    } else if (n.type === 'decision') {
       let tRight = x + w / 2;
       if (child(e.true)) {
         const r = place(e.true, x, below);
@@ -1948,6 +1967,7 @@ function nodeSignatures(m) {
   const wOf = (n) => W.get(n) ?? 1;
   const keyOf = (n) => {
     if (n.type === 'decision') { const p = parseCondition(n.cond); return 'D:' + (p.error ? n.cond : condKey(p.ast, wOf)); }
+    if (n.type === 'case') return `C:${n.expr}`;
     return 'O:' + n.actions.map((a) => { const p = parseAction(a); return p.error ? a : `${p.target}=${exprToString(valueLits(p.ast))}`; }).join(';');
   };
   const sigs = new Map(); // id -> { full, loose }
@@ -1961,6 +1981,7 @@ function nodeSignatures(m) {
       if (!sigs.has(id)) sigs.set(id, { full: `${root}|${path}|${k}`, loose: `${root}|${k}`, state: s.id });
       const e = ex.get(id) || {};
       if (n.type === 'decision') { visit(e.true, `${path}/${k}=1`, seen); visit(e.false, `${path}/${k}=0`, seen); }
+      else if (n.type === 'case') for (const ed of m.edges.filter((x) => x.from === id)) visit(ed.to, `${path}/${k}=${ed.port}`, seen);
       else visit(e.next, `${path}/${k}`, seen);
       seen.delete(id);
     };
@@ -2063,6 +2084,8 @@ function reusePrevious(model, prev) {
 /** True if both charts describe the same machine (ids, positions and spelling ignored). */
 export function sameAsmStructure(a, b) {
   const A = normalizeModel(a), B = normalizeModel(b);
+  // charts with case boxes are compared as JSON (HDL is converted to decision boxes only)
+  if ([...A.nodes, ...B.nodes].some((n) => n.type === 'case')) return JSON.stringify(A) === JSON.stringify(B);
   if (A.name !== B.name || A.clock !== B.clock || A.encoding !== B.encoding) return false;
   if (A.reset.name !== B.reset.name || A.reset.active !== B.reset.active || A.reset.sync !== B.reset.sync) return false;
   const ports = (m) => JSON.stringify([

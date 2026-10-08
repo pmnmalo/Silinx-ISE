@@ -16,10 +16,11 @@
 //     nodes: [
 //       { id, type: 'state',    name: 'IDLE', x, y, actions: ['busy = 1'] },
 //       { id, type: 'decision', x, y, cond: 'go', flip?: bool },
+//       { id, type: 'case',     x, y, expr: 'opcode' },        (multi-way decision box)
 //       { id, type: 'output',   x, y, actions: ['ld = 1'] },
 //       { id, type: 'always',   name: 'divider', x, y, actions: ['tc = 0'] },
 //     ],
-//     edges: [{ id, from, to, port: 'next' | 'true' | 'false', points?: [{x,y}] }],
+//     edges: [{ id, from, to, port: 'next' | 'true' | 'false' | <case choice>, points?: [{x,y}] }],
 //     initial: '<state node id>'
 //   }
 //
@@ -34,6 +35,13 @@
 //   or the wider side of a comparison); unsized literals and generics are 32 bits wide; the
 //   shift amount is self-determined.
 // Actions:  `target = expr` (also `<=` / `:=`), or just `target` meaning `target = 1`.
+//
+// Case (multi-way decision) boxes: `expr` is an input, register or registered output (or a bit
+// slice of one); every exit is labelled with the value(s) it is taken for: a binary number with
+// as many digits as the expression has bits ("00100"), any literal (4, 5'b00100, 0x4, "00100"),
+// several values separated by | or , ("0|1"), or `others` for every remaining value. Without an
+// `others` exit the labels must cover every value. Generated as a VHDL case / Verilog case
+// statement. Case boxes are allowed in state blocks (not in every-cycle blocks).
 //
 // Output semantics:
 //   registered: false -> combinational output, takes `default` unless assigned in the
@@ -120,6 +128,10 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
 function normPort(port, type) {
+  if (type === 'case') {
+    const t = String(port ?? '').trim();
+    return !t || /^(others|default)$/i.test(t) ? 'others' : t;
+  }
   const p = String(port ?? '').toLowerCase();
   if (type === 'decision') {
     if (p === 'true' || p === '1' || p === 't' || p === 'yes') return 'true';
@@ -129,7 +141,7 @@ function normPort(port, type) {
   return p === '' ? 'next' : p;
 }
 
-const NODE_TYPES = ['state', 'decision', 'output', 'always'];
+const NODE_TYPES = ['state', 'decision', 'case', 'output', 'always'];
 
 /** Generic values are integers; keep anything else as text so that validation can report it. */
 function genericValue(v) {
@@ -152,6 +164,7 @@ export function normalizeModel(m) {
     const o = { id: String(n?.id ?? `n${i + 1}`), type, x: num(n?.x), y: num(n?.y) };
     if (type === 'state' || type === 'always') { o.name = String(n?.name ?? ''); o.actions = normActions(n?.actions); }
     if (type === 'decision') { o.cond = String(n?.cond ?? ''); if (n?.flip) o.flip = true; }
+    if (type === 'case') o.expr = String(n?.expr ?? '');
     if (type === 'output') o.actions = normActions(n?.actions);
     if (n?.comment) o.comment = String(n.comment);
     return o;
@@ -443,7 +456,8 @@ const pad = (s, n) => s + ' '.repeat(Math.max(0, n - s.length));
 function buildIndex(m) {
   const nodes = new Map();
   for (const n of m.nodes) if (!nodes.has(n.id)) nodes.set(n.id, n);
-  const exits = new Map(); // nodeId -> { next|true|false: edge }
+  const exits = new Map(); // nodeId -> { next|true|false|<case choice>: edge }
+  const cases = new Map(); // case nodeId -> [edge] in chart order
   const dupExits = [];
   const badEdges = [];
   for (const e of m.edges) {
@@ -451,13 +465,16 @@ function buildIndex(m) {
     if (!from || !nodes.has(e.to)) { badEdges.push(e); continue; }
     const port = normPort(e.port, from.type);
     const allowed = from.type === 'decision' ? ['true', 'false'] : ['next'];
-    if (!allowed.includes(port)) { badEdges.push(e); continue; }
+    if (from.type !== 'case' && !allowed.includes(port)) { badEdges.push(e); continue; }
     const ex = exits.get(e.from) || {};
-    if (ex[port]) dupExits.push(e);
-    else ex[port] = e;
+    if (Object.prototype.hasOwnProperty.call(ex, port)) dupExits.push(e);
+    else {
+      ex[port] = e;
+      if (from.type === 'case') { if (!cases.has(e.from)) cases.set(e.from, []); cases.get(e.from).push({ ...e, port }); }
+    }
     exits.set(e.from, ex);
   }
-  return { nodes, exits, dupExits, badEdges };
+  return { nodes, exits, cases, dupExits, badEdges };
 }
 
 /** Walk one ASM block. Returns a tree of { k:'goto'|'if'|'act'|'missing'|'loop' }. */
@@ -472,6 +489,9 @@ function walkBlock(idx, startId, fromNode, port) {
     const ex = idx.exits.get(n.id) || {};
     if (n.type === 'decision') {
       return { k: 'if', node: n, t: visit(ex.true?.to, p2, n, 'true'), f: visit(ex.false?.to, p2, n, 'false') };
+    }
+    if (n.type === 'case') {
+      return { k: 'case', node: n, branches: (idx.cases.get(n.id) || []).map((e) => ({ label: e.port, sub: visit(e.to, p2, n, e.port) })) };
     }
     return { k: 'act', node: n, next: visit(ex.next?.to, p2, n, 'next') };
   };
@@ -504,6 +524,7 @@ function walkAlways(idx, header) {
     if (n.type === 'decision') {
       return { k: 'if', node: n, t: visit(ex.true?.to, p2, n, 'true'), f: visit(ex.false?.to, p2, n, 'false') };
     }
+    if (n.type === 'case') return { k: 'badcase', id: n.id };
     return { k: 'act', node: n, next: visit(ex.next?.to, p2, n, 'next') };
   };
   const ex = idx.exits.get(header.id) || {};
@@ -520,6 +541,7 @@ function joinPoints(idx) {
     const n = idx.nodes.get(id);
     const ex = idx.exits.get(id) || {};
     const ok = (e) => (e && idx.nodes.has(e.to) && !['state', 'always'].includes(idx.nodes.get(e.to).type) ? e.to : null);
+    if (n.type === 'case') return (idx.cases.get(id) || []).map(ok);
     return n.type === 'decision' ? [ok(ex.true), ok(ex.false)] : [ok(ex.next)];
   };
   const memo = new Map();
@@ -547,6 +569,7 @@ function joinPoints(idx) {
 
 function treeNodes(tree, acc = new Set()) {
   if (tree.k === 'if') { acc.add(tree.node.id); treeNodes(tree.t, acc); treeNodes(tree.f, acc); }
+  else if (tree.k === 'case') { acc.add(tree.node.id); for (const b of tree.branches) treeNodes(b.sub, acc); }
   else if (tree.k === 'act') { acc.add(tree.node.id); treeNodes(tree.next, acc); }
   return acc;
 }
@@ -558,6 +581,9 @@ function flatten(tree, conds = [], acts = [], out = []) {
       flatten(tree.t, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: true }], acts, out);
       flatten(tree.f, [...conds, { nodeId: tree.node.id, cond: tree.node.cond, value: false }], acts, out);
       break;
+    case 'case':
+      for (const b of tree.branches) flatten(b.sub, [...conds, { nodeId: tree.node.id, cond: caseCondText(tree.node.expr, b.label), value: true }], acts, out);
+      break;
     case 'act':
       flatten(tree.next, conds, [...acts, ...tree.node.actions.map((a) => ({ nodeId: tree.node.id, action: a }))], out);
       break;
@@ -566,6 +592,32 @@ function flatten(tree, conds = [], acts = [], out = []) {
         error: tree.k === 'loop' ? 'loop without a state' : 'missing exit' });
   }
   return out;
+}
+
+const caseCondText = (expr, label) => (label === 'others' ? `${expr.trim()} = others` : `${expr.trim()} = ${label.split(/\s*[|,]\s*/).join(' | ')}`);
+
+/**
+ * Values selected by the label of a case exit, for an expression of `width` bits:
+ * { others: true } | { values: [BigInt] } | { error }.
+ */
+export function parseCaseChoices(label, width) {
+  const t = String(label ?? '').trim();
+  if (!t || /^(others|default)$/i.test(t)) return { others: true };
+  const values = [];
+  for (const part of t.split(/\s*[|,]\s*/)) {
+    if (!part) return { error: `empty value in '${t}'` };
+    let v;
+    const bin = part.replace(/_/g, '');
+    if (/^[01]+$/.test(bin) && bin.length === width) v = BigInt('0b' + bin);
+    else {
+      const r = parseCondition(part);
+      if (r.error || r.ast.k !== 'lit') return { error: `'${part}' is not a number (write ${width} binary digits, e.g. ${'0'.repeat(Math.max(0, width - 1))}1, or a literal such as 4 or ${width}'b${'0'.repeat(Math.max(0, width - 1))}1)` };
+      v = r.ast.v;
+    }
+    if (v >= 1n << BigInt(width)) return { error: `'${part}' does not fit in ${width} bit${width === 1 ? '' : 's'}` };
+    values.push(v);
+  }
+  return { values };
 }
 
 /** Per state: { state, name, mooreActions, transitions: [{ conditions, mealyActions, next, nextName }] } */
@@ -1049,6 +1101,7 @@ function analyze(model) {
         err(`${describe(a)}: a path reaches state '${t.name}' (the paths of an every-cycle block end without a next state: leave the exit unconnected)`, t.from);
       }
       if (t.k === 'loop' && !reported.has(key)) { reported.add(key); err(`${describe(a)}: loop through decision/output boxes (an every-cycle block must not loop)`, t.id); }
+      if (t.k === 'badcase' && !reported.has(key)) { reported.add(key); err(`${describe(a)}: case boxes are not supported in every-cycle blocks (use decision boxes)`, t.id); }
       if (t.k === 'if') { check(t.t); check(t.f); }
       if (t.k === 'act') check(t.next);
     })(tree);
@@ -1070,6 +1123,8 @@ function analyze(model) {
       else if (!ex.true) err(`${describe(n)} has no 1 (true) branch`, n.id);
       else if (!ex.false) err(`${describe(n)} has no 0 (false) branch`, n.id);
       if (ex.true && ex.false && ex.true.to === ex.false.to) warn(`${describe(n)}: both branches go to the same box (the decision has no effect)`, n.id);
+    } else if (n.type === 'case') {
+      if (!(idx.cases.get(n.id) || []).length) err(`${describe(n)} has no exits (connect one exit per value, or 'others')`, n.id);
     } else if (!ex.next && !inAlways) {
       err(`${describe(n)} has no exit${n.type === 'state' ? ' (next state path)' : ''}`, n.id);
     }
@@ -1083,6 +1138,7 @@ function analyze(model) {
     (function findLoops(t) {
       if (t.k === 'loop' && !loops.has(t.id)) { loops.add(t.id); err(`Loop through decision/output boxes without a state (in the block of state '${idx.nodes.get(sid).name}')`, t.id); }
       if (t.k === 'if') { findLoops(t.t); findLoops(t.f); }
+      if (t.k === 'case') for (const b of t.branches) findLoops(b.sub);
       if (t.k === 'act') findLoops(t.next);
     })(tree);
   }
@@ -1133,9 +1189,43 @@ function analyze(model) {
   });
 
   const parsedConds = new Map();
+  const parsedCases = new Map();   // nodeId -> { ast, width, branches: [{ label, others?, values? }] }
   const parsedActions = new Map(); // nodeId -> [{target, ast, text}]
   for (const n of m.nodes) {
-    if (n.type === 'decision') {
+    if (n.type === 'case') {
+      const where = `Case '${n.expr || '?'}'`;
+      if (!n.expr.trim()) { err('Case box has no expression (the value to test, e.g. opcode)', n.id); continue; }
+      const r = parseCondition(n.expr);
+      if (r.error) { err(`${where}: ${r.error}`, n.id); continue; }
+      if (r.ast.k !== 'id' && r.ast.k !== 'sel') { err(`${where}: the expression must be a signal name or a bit slice (e.g. opcode or opcode[4:3])`, n.id); continue; }
+      const ctx = makeCtx(n.id, where);
+      const x = vhExpr(r.ast, ctx);
+      if (x.t === 'int') { err(`${where}: a generic is a constant and cannot be tested`, n.id); continue; }
+      const width = x.w || 1;
+      const branches = [];
+      const seen = new Map();
+      let others = false;
+      for (const e of idx.cases.get(n.id) || []) {
+        const c = parseCaseChoices(e.port, width);
+        if (c.error) { err(`${where}: exit '${e.port}': ${c.error}`, n.id); continue; }
+        if (c.others) { others = true; branches.push({ label: 'others', others: true }); continue; }
+        for (const v of c.values) {
+          const k = v.toString();
+          if (seen.has(k)) err(`${where}: value ${bits(v, width)} is used by the exits '${seen.get(k)}' and '${e.port}'`, n.id);
+          else seen.set(k, e.port);
+        }
+        branches.push({ label: e.port, values: c.values });
+      }
+      if (!others && branches.length) {
+        if (width > 16) err(`${where}: add an 'others' exit (the values of a ${width}-bit expression cannot all be listed)`, n.id);
+        else if (seen.size < 2 ** width) {
+          let miss = 0n;
+          while (seen.has(miss.toString())) miss++;
+          err(`${where}: ${2 ** width - seen.size} value(s) have no exit (e.g. ${bits(miss, width)}): add them or an 'others' exit`, n.id);
+        }
+      } else if (others && seen.size >= 2 ** width && width <= 16) warn(`${where}: every value has its own exit, the 'others' exit is never taken`, n.id);
+      parsedCases.set(n.id, { ast: r.ast, width, branches });
+    } else if (n.type === 'decision') {
       const where = `Decision '${n.cond || '?'}'`;
       if (!n.cond.trim()) { err('Decision box has no condition', n.id); continue; }
       const r = parseCondition(n.cond);
@@ -1179,13 +1269,14 @@ function analyze(model) {
     }
   }
 
-  return { m, diags, idx, trees, syms, defaults, parsedConds, parsedActions, alwaysNodes, alwaysTrees, registers, generics };
+  return { m, diags, idx, trees, syms, defaults, parsedConds, parsedCases, parsedActions, alwaysNodes, alwaysTrees, registers, generics };
 }
 
 function describe(n) {
   if (!n) return 'Box';
   if (n.type === 'state') return `State '${n.name || n.id}'`;
   if (n.type === 'decision') return `Decision '${n.cond || n.id}'`;
+  if (n.type === 'case') return `Case '${n.expr || n.id}'`;
   if (n.type === 'always') return `Every-cycle block '${n.name || n.id}'`;
   return `Conditional output box${n.actions?.length ? ` '${n.actions[0]}${n.actions.length > 1 ? ', ...' : ''}'` : ''}`;
 }
@@ -1224,6 +1315,7 @@ function nextStmts(tree, B) {
       if (JSON.stringify(t) === JSON.stringify(f)) return t;
       return [{ s: 'if', cond: B.cond(tree.node.id), then: t, else: f }];
     }
+    case 'case': return B.caseStmt(tree.node.id, tree.branches.map((b) => nextStmts(b.sub, B)), true);
   }
   return [];
 }
@@ -1237,6 +1329,7 @@ function outStmts(tree, B) {
       if (!t.length) return [{ s: 'if', cond: B.not(B.cond(tree.node.id)), then: f, else: [] }];
       return [{ s: 'if', cond: B.cond(tree.node.id), then: t, else: f }];
     }
+    case 'case': return B.caseStmt(tree.node.id, tree.branches.map((b) => outStmts(b.sub, B)), false);
   }
   return [];
 }
@@ -1245,6 +1338,29 @@ function printStmts(stmts, ind, lang, out) {
   const I = '    '.repeat(ind);
   for (const st of stmts) {
     if (st.s === 'raw') { out.push(I + st.text); continue; }
+    if (st.s === 'case') {
+      const arms = [...st.items.map((it) => [lang === 'vhdl' ? it.choices.join(' | ') : it.choices.join(', '), it.body]),
+        ...(st.others ? [[lang === 'vhdl' ? 'others' : 'default', st.others]] : [])];
+      if (lang === 'vhdl') {
+        out.push(`${I}case ${st.expr} is`);
+        for (const [ch, body] of arms) {
+          out.push(`${I}    when ${ch} =>`);
+          if (body.length) printStmts(body, ind + 2, lang, out); else out.push(`${I}        null;`);
+        }
+        out.push(`${I}end case;`);
+      } else {
+        out.push(`${I}case (${st.expr})`);
+        for (const [ch, body] of arms) {
+          if (!body.length) { out.push(`${I}    ${ch}: ;`); continue; }
+          if (body.length === 1 && body[0].s === 'raw') { out.push(`${I}    ${ch}: ${body[0].text}`); continue; }
+          out.push(`${I}    ${ch}: begin`);
+          printStmts(body, ind + 2, lang, out);
+          out.push(`${I}    end`);
+        }
+        out.push(`${I}endcase`);
+      }
+      continue;
+    }
     if (lang === 'vhdl') {
       out.push(`${I}if ${st.cond} then`);
       printStmts(st.then, ind + 1, lang, out);
@@ -1422,6 +1538,44 @@ function makeBackend(a, lang) {
       return condCache.get(id);
     },
     not: (c) => (lang === 'vhdl' ? vhNot(c) : vlNot(c)),
+    /**
+     * Case statement of a case box; bodies[i] belongs to its i-th exit. `full`: the bodies are
+     * complete (next-state logic), so arms equal to the others arm can be merged into it.
+     */
+    caseStmt(id, bodies, full) {
+      const pc = a.parsedCases.get(id);
+      const key = (b) => JSON.stringify(b);
+      let others = null;
+      const items = [];
+      pc.branches.forEach((br, i) => {
+        if (br.others) others = bodies[i];
+        else items.push({ values: br.values, body: bodies[i] });
+      });
+      if (!items.length) return others || [];
+      if (!full && !items.some((it) => it.body.length) && !(others && others.length)) return [];
+      const all = [...items.map((it) => key(it.body)), ...(others ? [key(others)] : [])];
+      if (all.every((k) => k === all[0])) return items[0].body;
+      const w = pc.width;
+      const ctx = ctxFor();
+      const lit = (v) => (lang === 'vhdl' ? (w === 1 ? `'${v}'` : `"${bits(v, w)}"`) : `${w}'b${bits(v, w)}`);
+      let expr;
+      if (lang === 'vhdl') {
+        const x = vhExpr(pc.ast, ctx);
+        // a VHDL case needs a locally static subtype: slices are tested with if/elsif
+        if (pc.ast.k === 'sel' && w > 1) {
+          let chain = others || [];
+          for (let i = items.length - 1; i >= 0; i--) {
+            const cond = items[i].values.map((v) => `${x.c} = ${lit(v)}`).join(' or ');
+            chain = [{ s: 'if', cond, then: items[i].body, else: chain }];
+          }
+          return chain;
+        }
+        expr = x.c;
+      } else expr = stripParens(vlExpr(pc.ast, ctx));
+      // arms that do the same as the others arm are left to it
+      const ok = others ? items.filter((it) => key(it.body) !== key(others)) : items;
+      return [{ s: 'case', expr, items: ok.map((it) => ({ choices: it.values.map(lit), body: it.body })), others: others || [] }];
+    },
     actions(id) {
       const out = [];
       for (const act of a.parsedActions.get(id) || []) {
