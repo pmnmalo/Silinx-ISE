@@ -77,7 +77,7 @@ const PT = {
   'Implementation Constraints File': 'Ficheiro de Restrições de Implementação', 'Memory Initialization File (.mem)': 'Ficheiro de Inicialização de Memória (.mem)',
   'Enter a valid file name (letters, digits, _ and -).': 'Indique um nome de ficheiro válido (letras, dígitos, _ e -).', 'Invalid location.': 'Localização inválida.',
   'Invalid module name.': 'Nome de módulo inválido.', 'Duplicate port names.': 'Nomes de portos repetidos.', 'Select a module.': 'Selecione um módulo.',
-  'No design modules in the project.': 'Não há módulos de projeto.', 'Add Source': 'Adicionar Fonte', 'Add Copy of Source': 'Adicionar Cópia de Fonte', 'Files:': 'Ficheiros:', 'Association:': 'Associação:',
+  'No design modules in the project.': 'Não há módulos de projeto.', 'Add Source': 'Adicionar Fonte', 'Add Copy of Source': 'Adicionar Cópia de Fonte', 'Project:': 'Projeto:', 'Developers:': 'Programadores:', 'developed with Claude (Anthropic)': 'desenvolvido com Claude (Anthropic)', 'Files:': 'Ficheiros:', 'Association:': 'Associação:',
   'All (Implementation + Simulation)': 'Todas (Implementação + Simulação)', 'Simulation only': 'Só simulação', 'File:': 'Ficheiro:', 'Language:': 'Linguagem:',
   'View Association:': 'Associação de Vista:', 'Design Properties': 'Propriedades do Projeto', 'Top Module (implementation):': 'Módulo de Topo (implementação):',
   'Top Module (simulation):': 'Módulo de Topo (simulação):', 'Optimization Goal:': 'Objetivo de Otimização:', 'Optimization Effort:': 'Esforço de Otimização:',
