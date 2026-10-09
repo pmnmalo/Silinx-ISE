@@ -564,6 +564,7 @@ function doAssign(s, ctx) {
     if (x !== null && (x < s.rng[0] || x > s.rng[1])) throw new SimError(`value ${x} out of range ${s.rng[0]} to ${s.rng[1]}`);
   }
   let mech = null;
+  if (s.inertial) mech = { mech: 'inertial', cont: false, reject: null };
   if (s.vh) {
     mech = { mech: s.mech, cont: s.cont, reject: null };
     if (s.reject) { const r = evalE(s.reject, ctx); mech.reject = (r.real ?? V.toNum(r)) * (s.delayUnit || 1); }

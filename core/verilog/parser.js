@@ -623,7 +623,8 @@ class Parser {
       }
       if (this.is('for')) {
         this.next(); this.expect('(');
-        this.accept('integer'); this.accept('int');
+        // for (int k = 0; ...) / for (integer k = 0; ...): a loop variable of the loop's own
+        const local = !!(this.accept('integer') || (this.tok.t === 'id' && this.tok.v === 'int' && this.peek().t === 'id' && this.next()));
         const iv = this.ident(); this.expect('=');
         const init = { kind: 'assign', target: { op: 'ref', name: iv }, value: this.expr(), nonblocking: false, delay: null };
         this.expect(';');
@@ -631,7 +632,9 @@ class Parser {
         const sv = this.ident();
         const step = { kind: 'assign', target: { op: 'ref', name: sv }, value: this.stepValue(sv), nonblocking: false, delay: null };
         this.expect(')');
-        return { kind: 'for', init, cond, step, body: this.stmt() };
+        const loop = { kind: 'for', init, cond, step, body: this.stmt() };
+        if (!local) return loop;
+        return { kind: 'block', label: null, decls: [{ kind: 'signal', name: iv, type: { kind: 'integer', range: null }, init: null, net: 'variable' }], stmts: [loop] };
       }
       if (this.is('while')) { this.next(); this.expect('('); const cond = this.expr(); this.expect(')'); return { kind: 'while', cond, body: this.stmt() }; }
       if (this.is('repeat')) { this.next(); this.expect('('); const count = this.expr(); this.expect(')'); return { kind: 'repeat', count, body: this.stmt() }; }

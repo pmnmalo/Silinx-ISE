@@ -1,0 +1,138 @@
+// Verilog conformance: further details — #0, x results of division by zero, signedness of
+// part-selects and concatenations, real variables, SystemVerilog conveniences the parser accepts,
+// parameters with ranges, instance arrays, multi-dimensional memories, race-free clocking.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { out, sim, vinit, vlog } from './lang-util.js';
+
+test('division and modulus by zero give x; x operands make arithmetic results all x', () => {
+  const r = out(vinit(`
+    a = 8'd7; b = 0;
+    q = a / b; m = a % b; $display("%b %b", q, m);
+    b = 8'bx; s = a + b; $display("%b", s);
+    i = 5 / 0; $display("%0d", i);`,
+  `reg [7:0] a, b, q, m, s; integer i;`));
+  assert.deepEqual(r, ['xxxxxxxx xxxxxxxx', 'xxxxxxxx', 'x']);
+});
+
+test('part-selects and concatenations are unsigned even of signed operands; $signed restores the sign', () => {
+  const r = out(vinit(`
+    s = -4;
+    w = s[3:0]; $display("%0d", w);
+    w = {s}; $display("%0d", w);
+    w = $signed(s[3:0]); $display("%0d", w);
+    w = s; $display("%0d", w);
+    $display("%0d", s[3:0] < 0);`,
+  `reg signed [3:0] s; reg signed [7:0] w;`));
+  // s[3:0] is the unsigned 4'b1100 (12), zero-extended
+  assert.deepEqual(r, ['12', '12', '-4', '-4', '0']);
+});
+
+test('#0 delays: the process resumes in the same time step after the other active processes', () => {
+  const r = out(vlog(`
+  reg a = 0;
+  initial begin #0 $display("a=%0d", a); end
+  initial a = 1;`));
+  assert.deepEqual(r, ['a=1']);
+});
+
+test('real variables: arithmetic, comparisons, conversion when assigned to integers and regs; %f / %g', () => {
+  const r = out(vinit(`
+    x = 1.5; y = x * 2 + 0.25; $display("%f %0.2f", y, y / 2);
+    i = y; v = x * 3; $display("%0d %0d", i, v);
+    $display("%0d %0d", x < y, x == 1.5);`,
+  `real x, y; integer i; reg [7:0] v;`));
+  // 3.25 -> 3; 4.5 -> 5 (round half away from zero)
+  assert.deepEqual(r, ['3.250000 1.63', '3 5', '1 1']);
+});
+
+test('parameters with a range or a type, localparam expressions, parameters in widths and loops', () => {
+  const r = out(vlog(`
+  parameter [3:0] P = 5'h1F;
+  parameter integer N = 3;
+  parameter signed [7:0] S = -2;
+  localparam M = N * 2 + P;
+  reg [M-1:0] r;
+  initial $display("%0d %0d %0d %0d %0d", P, N, S, M, $bits(r));`));
+  // P is truncated to its 4-bit range
+  assert.deepEqual(r, ['15 3 -2 21 21']);
+});
+
+test('SystemVerilog conveniences accepted: logic, always_ff / always_comb, ++ / += in loops, \'0 / \'1 fills', () => {
+  const r = out(vlog(`
+  logic clk = 0; logic [3:0] q = '0; logic [3:0] c;
+  always_ff @(posedge clk) q <= q + 1;
+  always_comb c = ~q;
+  integer i, s;
+  initial begin
+    s = 0; for (int k = 0; k < 4; k++) s += k;
+    for (i = 0; i < 3; i++) begin clk = 1; #1 clk = 0; #1; end
+    $display("%0d %0d %b %b", s, q, c, '1 & 4'b1010);
+  end`));
+  assert.deepEqual(r, ['6 3 1100 1010']);
+});
+
+test('instance arrays (u[3:0]) connect one bit of each vector actual per instance', { todo: 'arrays of instances are not supported by the Verilog parser' }, () => {
+  const r = out(`
+module inv(input a, output y); assign y = ~a; endmodule
+module tb; reg [3:0] a = 4'b1010; wire [3:0] y; inv u[3:0] (.a(a), .y(y)); initial #1 $display("%b", y); endmodule`);
+  assert.deepEqual(r, ['0101']);
+});
+
+test('multi-dimensional memories (reg [7:0] m [0:1][0:3])', { todo: 'only the first unpacked dimension of a memory is supported' }, () => {
+  const r = out(vinit(`m[1][2] = 8'hAB; $display("%h", m[1][2]);`, `reg [7:0] m [0:1][0:3];`));
+  assert.deepEqual(r, ['ab']);
+});
+
+test('clocking is race-free with non-blocking assignments across modules (pipeline of registers)', () => {
+  const r = out(`
+module ff(input clk, input [3:0] d, output reg [3:0] q); always @(posedge clk) q <= d; endmodule
+module tb; reg clk = 0; reg [3:0] d = 0; wire [3:0] q1, q2, q3;
+  ff a(clk, d, q1); ff b(clk, q1, q2); ff c(clk, q2, q3);
+  always #5 clk = ~clk;
+  always @(posedge clk) d <= d + 1;
+  initial begin #42 $display("%0d %0d %0d %0d", d, q1, q2, q3); $finish; end
+endmodule`);
+  // edges at 5, 15, 25, 35: d counts 4 times; each stage lags by one edge
+  assert.deepEqual(r, ['4 3 2 1']);
+});
+
+test('strings: comparison, concatenation into a vector, %s of a reg; $sformatf-free formatting with $display', () => {
+  const r = out(vinit(`
+    s = "ab"; t = {s, "c"};
+    $display("%s %0d %0d", t, s == "ab", s == "ba");`,
+  `reg [15:0] s; reg [23:0] t;`));
+  assert.deepEqual(r, ['abc 1 0']);
+});
+
+test('functions with a range return and signed / integer arguments; task enabling with no arguments', () => {
+  const r = out(vlog(`
+  function signed [7:0] neg(input signed [7:0] v); neg = -v; endfunction
+  function [3:0] low(input [7:0] v); low = v[3:0]; endfunction
+  integer calls = 0;
+  task bump; calls = calls + 1; endtask
+  initial begin bump; bump; $display("%0d %0d %h", neg(-8'sd5), calls, low(8'hA7)); end`));
+  assert.deepEqual(r, ['5 2 7']);
+});
+
+test('always blocks with event lists on vector bits and expressions; @(a or b) wakes once per time step change', () => {
+  const r = out(vlog(`
+  reg [3:0] v; integer n = 0, m = 0, n0, m0;
+  always @(v[1]) n = n + 1;
+  always @(v[0] or v[3]) m = m + 1;
+  initial begin
+    #1 n0 = n; m0 = m;   // (counts from here: whether a block also runs at time 0 is left aside)
+    v = 0; #1 v = 4'b0001; #1 v = 4'b0011; #1 v = 4'b1011; #1 v = 4'b1011; #1 $display("%0d %0d", n - n0, m - m0);
+  end`));
+  // x -> 0 at 1 wakes both; then v[1] changes at 3, v[0] at 2, v[3] at 4 (rewriting the same value is no change)
+  assert.deepEqual(r, ['2 3']);
+});
+
+test('continuous assignment delays: inertial (a pulse shorter than the delay is filtered)', () => {
+  const r = sim(vlog(`
+  reg a = 0; wire y; assign #3 y = a;
+  initial begin #10 a = 1; #1 a = 0; #10 a = 1; #5 a = 0; #10 $finish; end`));
+  const y = r.design.signals.find(s => s.name === 'y');
+  // y becomes 0 at 3 ns; the 1 ns pulse at 10 ns is filtered; the 5 ns pulse at 21 ns appears at 24 ns .. 29 ns
+  assert.deepEqual(y.wave.t, [0, 3000, 24000, 29000]);
+});

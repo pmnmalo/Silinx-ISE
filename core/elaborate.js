@@ -343,6 +343,7 @@ function elabAssignItem(E, it) {
   checkAssignable(E, target, value, it.loc);
   const body = { k: 'asg', target, value, nb: E.lang === 'vhdl', delay: it.delay ? bindExpr(E, it.delay) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, prec: E.timePrec, loc: it.loc };
   if (E.lang === 'vhdl') { Object.assign(body, vhdlMech(E, it)); rangeCheck(body); }
+  else if (body.delay) body.inertial = true;   // Verilog: a change before the delay elapses replaces the pending one
   addProc(E, {
     name: `assign_${it.loc?.line ?? ''}`, kind: 'assign', mode: 'comb', body, triggers: triggersOfReads(body),
     lang: E.lang, loc: it.loc, file: E.file, item: it,
@@ -804,6 +805,8 @@ export function ctxSize(n, w) {
         // folded constant: size the original expression and evaluate it again
         ctxSize(n.src, w);
         try { n.val = evalE(n.src, constCtx()); } catch { /* keep the self-determined value */ }
+      } else if (n.fillBit && w > n.val.w) {
+        n.val = V.fromBits(n.fillBit.repeat(w));
       } else if (n.xext && w > n.val.w) {
         // unsized 'bx / 'bz: the x / z fills the context width
         const ext = V.mask(w) ^ V.mask(n.val.w);
@@ -893,7 +896,8 @@ function bindExpr0(E, e, expect, loc) {
     case 'fill': {
       const w = expect ? expect.w : 1;
       const bit = e.bit;
-      return { k: 'c', val: V.fromBits(bit.repeat(w)), t: expect || BIT };
+      // ('0 '1 'x 'z: in a context-determined expression the fill extends to the context width)
+      return { k: 'c', val: V.fromBits(bit.repeat(w)), t: expect || BIT, fillBit: bit };
     }
     case 'ref': {
       const entry = lookupOrErr(E, e.name, loc);
@@ -944,6 +948,7 @@ function bindExpr0(E, e, expect, loc) {
           ? { k: 'str', value: p.strText ?? e.parts[k].ch, t: STR } : p));
         return { k: 'strcat', parts, t: STR };
       }
+      if (E.lang === 'verilog') parts = parts.map(p => (p.k === 'str' ? { k: 'c', val: strToVal(p.value), t: vecT(Math.max(8, p.value.length * 8)) } : p));
       if (parts.some(p => p.t.kind === 'str')) return { k: 'strcat', parts, t: STR };
       if (parts.length === 1 && E.lang === 'verilog') return { k: 'conv', a: parts[0], ext: false, t: vecT(parts[0].t.w) };
       const w = parts.reduce((a, p) => a + p.t.w, 0);
@@ -1040,7 +1045,8 @@ function sliceNode(E, base, leftE, rightE, loc) {
     const p1 = bitpos(base.t, V.toNum(left.val)), p2 = bitpos(base.t, V.toNum(right.val));
     const lo = Math.min(p1, p2), w = Math.abs(p1 - p2) + 1;
     if (lo < 0 || lo + w > base.t.w) diag(E, `slice out of range for '${base.name || 'expression'}'`, loc, 'warning');
-    return { k: 'slice', base, lo, t: { ...vecT(w, base.t.kind === 'logic' ? base.t.s : false), ...(base.t.mark ? { mark: base.t.mark } : {}) } };
+    // (Verilog: a part-select is unsigned, even of a signed vector; VHDL: a slice keeps the type)
+    return { k: 'slice', base, lo, t: { ...vecT(w, base.t.kind === 'logic' && E.lang === 'vhdl' ? base.t.s : false), ...(base.t.mark ? { mark: base.t.mark } : {}) } };
   }
   // dynamic slice: width from a probe evaluation (loop variables at their initial values)
   let w;
