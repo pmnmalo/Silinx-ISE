@@ -309,7 +309,7 @@ export function boardAutoAssign(ports, board) {
     if (!r && GROUP[alias]) r = res.find(x => x.group === GROUP[alias] && x.pins.length >= Math.min(p.width || 1, 2)) || res.find(x => x.group === GROUP[alias]);
     if (!r) { unmatched.push(p.name); continue; }
     const attrs = pin => {
-      const a = { loc: pin, iostandard: r.iostandard };
+      const a = { loc: pin };   // I/O standard: the default (none written) unless the user picks one
       if (r.pull) a.pull = r.pull;
       if (r.drive) a.drive = r.drive;
       if (r.slew) a.slew = r.slew;

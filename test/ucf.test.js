@@ -92,6 +92,9 @@ test('boardAutoAssign maps blinky ports to the Basys2 and locsNotOnBoard flags f
   assert.equal(r.assignments['sw<3>'].loc, 'B4');
   assert.equal(r.assignments['led<7>'].loc, 'G1');
   assert.deepEqual(r.unmatched, ['foo']);
+  // the I/O standard is left at the default: no IOSTANDARD written
+  assert.ok(Object.values(r.assignments).every(a => a.iostandard === undefined));
+  assert.doesNotMatch(generateUcf({ ports, assignments: r.assignments, clocks: r.clocks }), /IOSTANDARD/);
   const ucf = parseUcf(generateUcf({ ports, assignments: r.assignments, clocks: r.clocks }));
   assert.deepEqual(locsNotOnBoard(ucf.assignments, board), []);
   assert.deepEqual(locsNotOnBoard({ 'led<1>': { loc: 'E12' } }, board), [{ net: 'led<1>', loc: 'E12' }]);

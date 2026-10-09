@@ -74,7 +74,6 @@ export function mountPinPlanner(el, doc, top) {
       resSel.addEventListener('change', () => {
         const r = resPins.find(x => x.pin === resSel.value);
         set('loc', resSel.value);
-        if (r?.res.iostandard) asg[n.net].iostandard = r.res.iostandard;
         if (r?.res.pull) asg[n.net].pull = r.res.pull;
         render();
       });
@@ -124,14 +123,14 @@ export function mountPinPlanner(el, doc, top) {
       let r = byName.get(key) || byName.get(aliases[key]) || (aliases[key] === 'clk' ? board.resources.find(x => x.group === 'Clock') : null);
       if (!r) continue;
       if (!p.bus) {
-        asg[p.name] = { ...(asg[p.name] || {}), loc: r.pins[0], iostandard: r.iostandard, pull: r.pull };
+        asg[p.name] = { ...(asg[p.name] || {}), loc: r.pins[0], pull: r.pull };   // I/O Std. stays default
         if (r.group === 'Clock' && r.extra?.period && !clocks.some(c => c.net === p.name)) clocks.push({ net: p.name, period: parseFloat(r.extra.period), duty: 50 });
         n++;
       } else {
         const lo = Math.min(p.msb, p.lsb);
         for (let i = 0; i < Math.min(p.width, r.pins.length); i++) {
           const net = bitName(p.name, lo + i);
-          asg[net] = { ...(asg[net] || {}), loc: r.pins[i], iostandard: r.iostandard, pull: r.pull, drive: r.drive, slew: r.slew };
+          asg[net] = { ...(asg[net] || {}), loc: r.pins[i], pull: r.pull, drive: r.drive, slew: r.slew };
           n++;
         }
       }
