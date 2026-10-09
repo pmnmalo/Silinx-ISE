@@ -2186,10 +2186,14 @@ async function renameSource(from, to, oldMod, newMod) {
 }
 
 // ---- summary, pin planner, impact
-export async function openSummary() {
+export async function openSummary({ background = false } = {}) {
+  const was = S.active;
   const { mountSummary } = await import('./summary.js');
+  // opened with the project (background): if the user opened another document meanwhile, keep it in front
+  const keep = background && S.active && S.active !== was && S.active.id !== 'summary' ? S.active : null;
   const d = openDoc({ id: 'summary', title: 'Design Summary', icon: 'summary', create: el => mountSummary(el) });
   d.refresh?.();
+  if (keep && S.docs.includes(keep)) activateDoc(keep);
 }
 function refreshSummary() { const d = findDoc('summary'); d?.refresh?.(); }
 
@@ -2231,7 +2235,7 @@ export async function openProject(name) {
   await reloadProject();
   restoreImplStatus();
   log(`Project "${name}" opened (${S.project.device.part}${S.project.device.speed}-${S.project.device.package}).`, 'info');
-  openSummary();
+  openSummary({ background: true });
 }
 
 export async function reloadProject(render = true) {
