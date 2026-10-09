@@ -724,6 +724,7 @@ export function aboutDialog() {
       h('div', { style: { width: '64px', height: '64px', background: '#c4161c', color: '#fff', font: 'bold 40px Arial', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' } }, 'S'),
       h('div', {}, h('div', { style: { fontSize: '16px', fontWeight: 'bold' } }, PRODUCT_FULL), h('div', {}, `Version ${VERSION}`),
         h('p', {}, 'HDL design platform for Xilinx FPGAs (Spartan-3/3A/3E/6, Virtex-4/5/6, 7-series with ISE 14.7): mixed VHDL/Verilog projects, RTL schematics, ASM state machine editor, behavioural simulation and device programming.'),
+        h('p', { style: { fontStyle: 'italic' } }, 'Silinx ISE was developed for educational purposes, specifically to support the teaching of Digital Systems at the Faculdade de Ciências e Tecnologia (FCT) of the Universidade Nova de Lisboa (NOVA), because AMD/Xilinx discontinued support for Xilinx ISE a long time ago.'),
         h('table', { class: 'about-info', style: { borderSpacing: '0 3px', margin: '6px 0 10px' } },
           h('tr', {}, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Project:'),
             h('td', {}, link(`https://github.com/${REPOSITORY}`, `github.com/${REPOSITORY}`))),
