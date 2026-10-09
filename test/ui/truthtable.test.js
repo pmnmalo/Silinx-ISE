@@ -27,7 +27,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, my expression, linked VHDL
   await page.openProject('TtPj');
   await page.menu('Tools', 'Truth Table / Karnaugh Map…');
   await page.waitDialog('New Source Wizard');
-  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .src-types .st.sel').textContent), /Truth Table \(\.tt\.json\)/);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .src-types .st.sel').textContent), /^\s*Truth Table\s*$/);
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj3');
   await page.dialogButton('Next >');
   await page.dialogButton('Finish');

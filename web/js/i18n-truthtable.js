@@ -3,7 +3,7 @@ export const TT_PT = {
   // menus, processes, New Source
   'Truth Table / Karnaugh Map…': 'Tabela de Verdade / Mapa de Karnaugh…', 'Truth Table / Karnaugh Map': 'Tabela de Verdade / Mapa de Karnaugh',
   'Truth Table / Karnaugh Map of this Module…': 'Tabela de Verdade / Mapa de Karnaugh deste Módulo…',
-  'Truth Table (.tt.json)': 'Tabela de Verdade (.tt.json)', 'View/Edit Truth Table': 'Ver/Editar Tabela de Verdade',
+  'Truth Table': 'Tabela de Verdade', 'View/Edit Truth Table': 'Ver/Editar Tabela de Verdade',
   'Open Synchronized Truth Table': 'Abrir Tabela de Verdade Sincronizada', 'Remove Synchronized Truth Table…': 'Remover Tabela de Verdade Sincronizada…',
   '(synchronized truth table)': '(tabela de verdade sincronizada)', 'Convert to Truth Table (truth table as base)': 'Converter para Tabela de Verdade (tabela de verdade como base)',
   'Truth Table from Module': 'Tabela de Verdade de um Módulo', 'Generate HDL': 'Gerar HDL', 'Generate Schematic': 'Gerar Esquemático',

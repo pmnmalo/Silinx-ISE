@@ -378,7 +378,7 @@ const SOURCE_TYPES = [
   { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src' },
   { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src' },
   { id: 'asm', label: 'ASM State Diagram (State Machine)', ico: 'asm', ext: '.asm.json', dir: 'src' },
-  { id: 'tt', label: 'Truth Table (.tt.json)', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
+  { id: 'tt', label: 'Truth Table', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints' },
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
 ];
