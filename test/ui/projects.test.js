@@ -165,6 +165,8 @@ uiTest('Add Copy of Source: new files, association, overwrite confirmation (No k
   await add(['syn_only.v'], 'impl');
   await page.waitFor(() => window.Silinx.project.files.find((f) => f.path === 'src/syn_only.v')?.role === 'impl', [], { what: 'syn_only.v implementation only' });
   await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'syn_only'), [], { what: 'syn_only in the Implementation view' });
+  await page.click('#left-tabs .tab[data-page=design]');
+  await page.waitFor(() => document.querySelector('input[name=view][value=sim]')?.getClientRects().length > 0, [], { what: 'Design page shown' });
   await page.click('input[name=view][value=sim]');
   await page.waitFor(() => ![...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'syn_only') && [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'tb_buf2'), [], { what: 'syn_only hidden in the Simulation view' });
   await page.click('input[name=view][value=impl]');
