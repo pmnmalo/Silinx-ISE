@@ -404,8 +404,9 @@ async function removeFile(file) {
   for (const d of [...S.docs]) if (d.path === file || String(d.id || '').endsWith(`:${file}`)) await closeDoc(d);
   return serialOp(() => removeNow(file));
 }
-async function removeNow(file) {
+async function removeNow(file, { redo = false } = {}) {
   const pj = S.project;
+  if (!redo) S.lastUndone = null;   // a new removal: nothing to redo
   const undo = { project: pj.name, path: file, entry: pj.files.find(f => f.path === file) || null, constraints: pj.constraints === file, at: Date.now() };
   if (undo.entry) pj.files = pj.files.filter(f => f.path !== file);
   if (undo.constraints) pj.constraints = '';
@@ -419,6 +420,21 @@ async function removeNow(file) {
 
 // undo the last Remove from Project
 function undoRemove() { return serialOp(undoRemoveNow); }
+// Redo of an undone removal: the file leaves the project again (no question)
+function redoRemove() {
+  const u = S.lastUndone;
+  if (!u || u.project !== S.project?.name) return null;
+  S.lastUndone = null;
+  return serialOp(async () => {
+    for (const d of [...S.docs]) if (d.path === u.path || String(d.id || '').endsWith(`:${u.path}`)) { d.dirty = false; clearTimeout(d._autosave); await closeDoc(d); }
+    await removeNow(u.path, { redo: true });
+  });
+}
+function redoesRemoval() {
+  const u = S.lastUndone;
+  if (!u || u.project !== S.project?.name) return false;
+  return !S.active?.editor || !(S.active._editedAt > u.at);
+}
 // does Undo (menu / Ctrl+Z) undo a removal? yes when the last removal is newer than the last edit
 // of the active editor (or no editor is active)
 function undoesRemoval() {
@@ -431,6 +447,7 @@ async function undoRemoveNow() {
   if (!u || u.project !== S.project?.name) return;
   S.lastRemoval = null;
   await addNow(u.path, u);
+  S.lastUndone = { ...u, at: Date.now() };   // Redo removes it again
   log(`Undo: ${u.path} is back in the project.`, 'ok');
 }
 
@@ -2773,7 +2790,9 @@ function setupMenus() {
       undoesRemoval()
         ? { label: 'Undo Remove from Project', icon: icon('undo'), action: () => undoRemove(), shortcut: 'Ctrl+Z' }
         : { label: 'Undo', icon: icon('undo'), action: () => S.active?.editor?.exec('undo'), shortcut: 'Ctrl+Z', disabled: () => !S.active?.editor },
-      { label: 'Redo', icon: icon('redo'), action: () => S.active?.editor?.exec('redo'), shortcut: 'Ctrl+Y', disabled: () => !S.active?.editor },
+      redoesRemoval()
+        ? { label: 'Redo Remove from Project', icon: icon('redo'), action: () => redoRemove(), shortcut: 'Ctrl+Y' }
+        : { label: 'Redo', icon: icon('redo'), action: () => S.active?.editor?.exec('redo'), shortcut: 'Ctrl+Y', disabled: () => !S.active?.editor },
       '-',
       { label: 'Find…', icon: icon('find'), action: () => S.active?.editor?.exec('findPersistent'), shortcut: 'Ctrl+F', disabled: () => !S.active?.editor },
       { label: 'Replace…', action: () => S.active?.editor?.exec('replace'), disabled: () => !S.active?.editor },
@@ -2845,7 +2864,7 @@ function setupToolbar() {
     btn('open', 'Open Project', () => wiz.openProjectDialog()),
     h('div', { class: 'tb-sep' }),
     btn('undo', 'Undo', () => (undoesRemoval() ? undoRemove() : S.active?.editor?.exec('undo'))),   // as Edit ▸ Undo
-    btn('redo', 'Redo', () => S.active?.editor?.exec('redo')),
+    btn('redo', 'Redo', () => (redoesRemoval() ? redoRemove() : S.active?.editor?.exec('redo'))),   // as Edit ▸ Redo
     h('div', { class: 'tb-sep' }),
     btn('cut', 'Cut', () => document.execCommand('cut')),
     btn('copy', 'Copy', () => document.execCommand('copy')),
@@ -2941,7 +2960,10 @@ async function boot() {
     if (!e.defaultPrevented && (e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P') && (S.active?.asmEditor || S.active?.schEditor || S.active?.fsmEditor)) { e.preventDefault(); printActive(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); if (S.active) flushDoc(S.active); }  // nothing to do: edits are saved automatically
     // Ctrl/Cmd+Z outside an editor or text field: undo the last Remove from Project
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && !e.target.closest?.('.CodeMirror, input, textarea, [contenteditable]') && undoesRemoval()) { e.preventDefault(); undoRemove(); }
+    const outside = !e.target.closest?.('.CodeMirror, input, textarea, [contenteditable]');
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && outside && undoesRemoval()) { e.preventDefault(); undoRemove(); }
+    // Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z outside an editor: redo it
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || e.key === 'Y' || (e.shiftKey && (e.key === 'z' || e.key === 'Z'))) && outside && redoesRemoval()) { e.preventDefault(); redoRemove(); }
   });
   addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });
 

@@ -243,6 +243,26 @@ uiTest('Files view: rename a file into another folder, remove a file (right-clic
   await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'));
   await page.click('#toolbar .tb-btn[title=Undo]');
   await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'toolbar undo: b.v back' });
+  // Redo: the toolbar button removes it again (no question), Ctrl+Z / Ctrl+Shift+Z and Ctrl+Y alternate
+  const inPj = () => page.eval(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'));
+  await page.click('#toolbar .tb-btn[title=Redo]');
+  await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'toolbar redo: b.v out' });
+  assert.equal(await page.dialogCount(), 0);
+  await page.eval(() => document.activeElement?.blur?.());
+  await page.key('z', { modifiers: 2 });
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'Ctrl+Z: back' });
+  await page.key('z', { modifiers: 2 | 8 });
+  await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'Ctrl+Shift+Z: out' });
+  await page.key('z', { modifiers: 2 });
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'Ctrl+Z: back again' });
+  const edit = await page.openMenu('Edit');
+  assert.ok(edit.some((i) => i.label === 'Redo Remove from Project' && !i.disabled), edit.map((i) => i.label).join(' | '));
+  await page.closeMenus();
+  await page.key('y', { modifiers: 2 });
+  await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'Ctrl+Y: out' });
+  await page.menu('Edit', 'Undo Remove from Project');
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'Edit undo: back' });
+  assert.ok(await inPj());
   await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].some((r) => r.cells[0]?.textContent === 'src/b.v' && r.cells[1]?.textContent === 'All'), [], { what: 'b.v row in the project again' });
   // remove once more, then right-click the "Not in project" row ▸ Add to Project
   await page.rightClick('#files-page tr', { index: await row('src/b.v') });
