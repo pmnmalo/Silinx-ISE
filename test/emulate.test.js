@@ -160,6 +160,44 @@ test('7-segment persistence: a multiplexed digit keeps its pattern, a blanked on
   assert.equal(window(1000).digits[0], null);
 });
 
+test('7-segment persistence: slow multiplexing keeps every digit; a digit the scan skips goes dark', () => {
+  // 4 digits, each lit for 8 clocks in turn; digit 2 is skipped while `show` = 0
+  const src = `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
+entity top is port(clk, show : in std_logic; seg : out std_logic_vector(6 downto 0); an : out std_logic_vector(3 downto 0)); end top;
+architecture rtl of top is
+  signal c : unsigned(4 downto 0) := (others => '0');
+begin
+  process(clk) begin if rising_edge(clk) then c <= c + 1; end if; end process;
+  an <= "1111" when show = '0' and c(4 downto 3) = "10" else
+        "1110" when c(4 downto 3) = "00" else "1101" when c(4 downto 3) = "01" else "1011" when c(4 downto 3) = "10" else "0111";
+  seg <= "1111001";
+end rtl;`;
+  const ucf = ['clk:B8', 'show:P11', 'seg<0>:L14', 'seg<1>:H12', 'seg<2>:N14', 'seg<3>:N11', 'seg<4>:P12', 'seg<5>:L13', 'seg<6>:M12', 'an<0>:F12', 'an<1>:J12', 'an<2>:M13', 'an<3>:K14']
+    .map((x) => { const [n, l] = x.split(':'); return `NET "${n}" LOC = "${l}";`; }).join('\n');
+  const d = elaborate(compile([{ path: 'top.vhd', lang: 'vhdl', text: src }]), 'top');
+  const board4 = { resources: BOARD.resources.map((r) => (r.name === 'an' ? { ...r, pins: ['F12', 'J12', 'M13', 'K14'] } : r)) };
+  const w = boardWiring({ ports: d.top.ports, assignments: parseUcf(ucf).assignments, board: board4 });
+  const sim = new Simulator(d);
+  const show = d.top.ports.find((p) => p.name === 'show').sig;
+  sim.force(show, V.ONE);
+  sim.addClock(w.clocks[0].sig, { period: 20000 });
+  sim.run(0);
+  let prev = null;
+  const window = (cycles) => {
+    const t0 = sim.now;
+    for (const s of d.signals) s.wave = { t: [sim.now], v: [s.val] };
+    sim.run(sim.now + cycles * 20000);
+    prev = boardOutputs(w, t0, sim.now, prev);
+    return prev;
+  };
+  for (let k = 0; k < 40; k++) window(1);   // first scan(s): the display learns
+  for (let k = 0; k < 64; k++) { const o = window(1); assert.ok(o.digits.every(Boolean), `cycle ${k}: all 4 digits shown`); }
+  sim.force(show, V.ZERO);
+  for (let k = 0; k < 80; k++) window(1);
+  assert.equal(prev.digits[2], null, 'skipped digit is dark');
+  assert.ok(prev.digits[0] && prev.digits[1] && prev.digits[3], 'the others stay on');
+});
+
 test('HD44780 bus: E falling edges on window boundaries are not lost', async () => {
   const { lcdState, lcdFeed } = await import('../core/emulate.js');
   // E high for one cycle every 4 cycles, changed on the falling clock edge (= the window boundaries)

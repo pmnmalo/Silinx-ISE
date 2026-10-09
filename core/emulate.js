@@ -110,9 +110,10 @@ export function timeWhere(tracks, t0, t1, pred) {
  *   leds: [brightness 0..1 per LED index]  (fraction of time on)
  *   digits: [{ seg: [a..g brightness], dp }] per anode index, or null (blank)
  * A digit that is not lit in the window keeps its previous pattern (persistence of vision: a
- * multiplexed display lights one digit at a time) until it has been dark for longer than 4x the
- * longest dark gap seen between its refreshes (at least two windows): a digit that is blanked
- * (leading-zero suppression, display turned off) then goes dark.
+ * multiplexed display lights one digit at a time) until another digit has been refreshed twice
+ * since it was last lit (the scan went past it: it is blanked, e.g. leading-zero suppression).
+ * When no digit is lit at all (display turned off) a digit goes dark after 4x the longest dark
+ * gap seen between its refreshes (at least two windows).
  * Active levels come from the board resources (extra.activeLow).
  */
 export function boardOutputs(wiring, t0, t1, prev = null) {
@@ -127,24 +128,30 @@ export function boardOutputs(wiring, t0, t1, prev = null) {
     else if (b.kind === 'dp') dpBits[b.idx] = b;
     else if (b.kind === 'an') anBits[b.idx] = b;
   }
+  // refresh episodes: a digit starts one when it is lit in this window and was not in the previous one
+  const episodes = [...(prev?.episodes || [])];
+  const times = anBits.map((an) => (an ? timeWhere([bitTrack(an.sig, an.pos, t0, t1)], t0, t1, ([v]) => v === on(an)) : 0));
+  times.forEach((time, k) => { if (time > 0 && !prev?.lit?.[k]?.on) episodes[k] = (episodes[k] || 0) + 1; });
+  const anyLit = times.some((x) => x > 0);
   anBits.forEach((an, k) => {
     if (!an) return;
-    const at = bitTrack(an.sig, an.pos, t0, t1);
-    const time = timeWhere([at], t0, t1, ([v]) => v === on(an));
-    const p = prev?.lit?.[k];   // { last: end of the last window the digit was lit in, gap }
+    const time = times[k];
+    const p = prev?.lit?.[k];   // { last: end of the last window the digit was lit in, gap, snap: episodes then, on }
     if (time <= 0) {
-      const keep = p && prev?.digits?.[k] && t1 - p.last <= Math.max(4 * p.gap, 2 * span);
+      const passed = p && episodes.some((e, j) => j !== k && (e || 0) - (p.snap[j] || 0) >= 2);
+      const keep = p && prev?.digits?.[k] && !passed && (anyLit || t1 - p.last <= Math.max(4 * p.gap, 2 * span));
       digits[k] = keep ? prev.digits[k] : null;
-      lit[k] = keep ? p : null;
+      lit[k] = p ? { ...p, on: false } : null;   // the history stays: the next refresh measures the real gap
       return;
     }
+    const at = bitTrack(an.sig, an.pos, t0, t1);
     const frac = (b) => (b ? timeWhere([at, bitTrack(b.sig, b.pos, t0, t1)], t0, t1, ([a, s]) => a === on(an) && s === on(b)) / time : 0);
     digits[k] = { seg: Array.from({ length: 7 }, (_, j) => frac(segBits[j])), dp: frac(dpBits[0]) };
     // dark time in this window (the anode is multiplexed within it) or since the last window
-    const gap = Math.max(span - time, p ? t0 - p.last : 0);
-    lit[k] = { last: t1, gap: Math.max(gap, p ? p.gap : 0) };
+    const gap = Math.max(span - time, p && prev?.digits?.[k] ? t0 - p.last : 0);   // a faded spell is not a refresh gap
+    lit[k] = { last: t1, gap: Math.max(gap, p ? p.gap : 0), snap: [...episodes], on: true };
   });
-  return { leds, digits, lit };
+  return { leds, digits, lit, episodes };
 }
 
 // ---------------------------------------------------------------------------------------------
