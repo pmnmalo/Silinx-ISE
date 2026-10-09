@@ -1429,7 +1429,12 @@ export function generateHdl(docIn, opts = {}) {
   if (ci) {
     const ctx = verbatimOK && hdl.context ? String(hdl.context).trim() : 'library ieee;\nuse ieee.std_logic_1164.all;\nuse ieee.numeric_std.all;';
     const arch = (verbatimOK && hdl.arch) || 'schematic';
-    const plist = ports.map(p => `${p.name} : ${p.dir} ${p.type && verbatimOK ? p.type : vtype(p.width)}`);
+    // an output driven directly by a flip-flop / register starts at its INIT value (port default)
+    const plist = ports.map(p => {
+      const ty = p.type && verbatimOK ? p.type : vtype(p.width);
+      const iv = p.dir === 'out' && p.net && regNets.has(p.net) && !outRead.has(p.net) ? init.get(p.net) : null;
+      return `${p.name} : ${p.dir} ${ty}${iv ? ` := ${vhdlClass(ty) === 'sl' ? vhdlBits(iv, true) : vhdlBits(iv, false)}` : ''}`;
+    });
     const L = [`-- ${header}`, ctx, '', `entity ${name} is`];
     if (generics.length) L.push(`  generic (\n${generics.map(g => `    ${g.name} : ${g.type || 'integer'}${g.default ? ` := ${g.default}` : ''}`).join(';\n')}\n  );`);
     if (plist.length) L.push(`  port (\n${plist.map(x => `    ${x}`).join(';\n')}\n  );`);

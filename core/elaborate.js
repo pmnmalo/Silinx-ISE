@@ -241,6 +241,11 @@ function elabPort(E, p, conn) {
   if (p.default) init = fitAny(constOf(E, bindExpr(E, p.default, t), p.loc), t);
   if (conn && conn.node && conn.node.k === 'sig' && conn.node.t.w === t.w && (t.kind === 'array') === (conn.node.t.kind === 'array') && p.dir !== undefined) {
     const sig = conn.node.sig;
+    // VHDL: the driver of an out port starts at the port's default; with the port aliased to its
+    // actual that is the actual's initial value (unless the actual was given one itself)
+    if (p.default && p.dir !== 'in' && E.lang === 'vhdl' && !sig.portInitSet && !sig.hasInit) {
+      sig.init = init; sig.val = init; sig.portInitSet = true;
+    }
     E.sc.def(p.name, { kind: 'sig', sig, t });
     E.inst.ports.push({ name: p.name, dir: p.dir, sig, t, alias: true, conn: conn.text });
     return;
@@ -516,6 +521,7 @@ function bindDecl(E, d) {
       }
       if (E.sc.local(d.name) && E.sc.local(d.name).kind === 'sig') { diag(E, `'${d.name}' redeclared`, d.loc, 'warning'); return; }
       const sig = newSignal(E, E.prefix + d.name, t, init, d.net === 'variable' ? 'var' : 'signal', d.loc);
+      if (d.init) sig.hasInit = true;
       E.sc.def(d.name, { kind: 'sig', sig, t });
       return;
     }

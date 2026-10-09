@@ -284,9 +284,7 @@ test('simulation: every FD* / FT* / FJK* flip-flop (VHDL and Verilog) follows th
     const rb = p => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff < p ? 1 : 0; };
     const vh = lang === 'vhdl';
     const set = (n, v) => (vh ? `    ${n} <= '${v}';` : `    ${n} = 1'b${v};`);
-    // VHDL: the generated flip-flops do not yet give Q its INIT value before the first clock edge
-    // (Q is 'U' there), so an unknown Q is not counted; Verilog checks it exactly
-    const chk = (n, v, tag) => (vh ? `    if ${n} /= '${v}' and ${n} /= 'U' then errs := errs + 1; report "${tag} ${n}" severity warning; end if;` : `    if (${n} !== 1'b${v}) begin errs = errs + 1; $display("${tag} ${n}"); end`);
+    const chk = (n, v, tag) => (vh ? `    if ${n} /= '${v}' then errs := errs + 1; report "${tag} ${n}" severity warning; end if;` : `    if (${n} !== 1'b${v}) begin errs = errs + 1; $display("${tag} ${n}"); end`);
     const L = [];
     const cur = items.map(() => ({}));
     for (let step = 0; step < 60; step++) {
