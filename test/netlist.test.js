@@ -475,3 +475,176 @@ test('SIMPRIM models: X_LATCHE, X_OBUFT on an inout pad, X_SRLC16E, X_RAMD16; a 
   const d = elaborate(compile([...primitiveSources(srcs), ...srcs]), 'main');
   assert.ok(d.top && d.diags.some((e) => e.severity === 'error' && /x_no_such_cell/i.test(e.message)));
 });
+
+// `formal(i) => net` for i = lo + n - 1 down to lo, '#' in `net` replaced by i - lo
+const pinBits = (formal, n, net, lo = 0) => Array.from({ length: n }, (_, k) => `      ${formal}(${lo + n - 1 - k}) => ${net.replace('#', String(n - 1 - k))}`).join(',\n');
+
+test('SIMPRIM models: X_RAMB16 written and read through both ports, connected bit by bit (as netgen writes them)', () => {
+  const t = netlist(['clk : in STD_LOGIC', 'we : in STD_LOGIC', 'web : in STD_LOGIC', 'addra : in STD_LOGIC_VECTOR ( 10 downto 0 )',
+    'addrb : in STD_LOGIC_VECTOR ( 8 downto 0 )', 'di : in STD_LOGIC_VECTOR ( 7 downto 0 )', 'dib : in STD_LOGIC_VECTOR ( 31 downto 0 )',
+    'do : out STD_LOGIC_VECTOR ( 7 downto 0 )', 'dop : out STD_LOGIC', 'dob : out STD_LOGIC_VECTOR ( 31 downto 0 )', 'dopb : out STD_LOGIC_VECTOR ( 3 downto 0 )'], `
+  r : X_RAMB16
+    generic map(
+      LOC => "RAMB16_X0Y1",
+      DOA_REG => 0,
+      DOB_REG => 0,
+      INIT_A => X"000000155",
+      INIT_B => X"000000000",
+      INVERT_CLK_DOA_REG => FALSE,
+      INVERT_CLK_DOB_REG => FALSE,
+      RAM_EXTENSION_A => "NONE",
+      RAM_EXTENSION_B => "NONE",
+      READ_WIDTH_A => 9,
+      READ_WIDTH_B => 36,
+      SIM_COLLISION_CHECK => "ALL",
+      SRVAL_A => X"000000000",
+      SRVAL_B => X"000000000",
+      WRITE_MODE_A => "READ_FIRST",
+      WRITE_MODE_B => "WRITE_FIRST",
+      WRITE_WIDTH_A => 9,
+      WRITE_WIDTH_B => 36,
+      SETUP_ALL => 266 ps,
+      SETUP_READ_FIRST => 266 ps,
+      INIT_00 => X"00000000000000000000000000000000000000000000000000000000BEEF1234",
+      INITP_00 => X"0000000000000000000000000000000000000000000000000000000000000002"
+    )
+    port map (
+      CLKA => clk,
+      CLKB => clk,
+      ENA => vcc,
+      ENB => vcc,
+      REGCEA => gnd,
+      REGCEB => gnd,
+      SSRA => gnd,
+      SSRB => gnd,
+      CASCADEINA => gnd,
+      CASCADEINB => gnd,
+      CASCADEOUTA => NLW_r_CASCADEOUTA_UNCONNECTED,
+      CASCADEOUTB => NLW_r_CASCADEOUTB_UNCONNECTED,
+      ADDRA(14) => gnd,
+${pinBits('ADDRA', 11, 'addra(#)', 3)},
+${pinBits('ADDRA', 3, 'gnd')},
+      ADDRB(14) => gnd,
+${pinBits('ADDRB', 9, 'addrb(#)', 5)},
+${pinBits('ADDRB', 5, 'gnd')},
+${pinBits('DIA', 24, 'gnd', 8)},
+${pinBits('DIA', 8, 'di(#)')},
+${pinBits('DIPA', 4, 'gnd')},
+${pinBits('DIB', 32, 'dib(#)')},
+${pinBits('DIPB', 4, 'gnd')},
+${pinBits('WEA', 4, 'we')},
+${pinBits('WEB', 4, 'web')},
+${pinBits('DOA', 24, 'NLW_r_DOA_UNCONNECTED(#)', 8)},
+${pinBits('DOA', 8, 'do(#)')},
+      DOPA(3) => NLW_r_DOPA_UNCONNECTED(3),
+      DOPA(2) => NLW_r_DOPA_UNCONNECTED(2),
+      DOPA(1) => NLW_r_DOPA_UNCONNECTED(1),
+      DOPA(0) => dop,
+${pinBits('DOB', 32, 'dob(#)')},
+${pinBits('DOPB', 4, 'dopb(#)')}
+    );
+  g0 : X_ZERO
+    port map (O => gnd);
+  v0 : X_ONE
+    port map (O => vcc);`, ['gnd : STD_LOGIC', 'vcc : STD_LOGIC', 'NLW_r_CASCADEOUTA_UNCONNECTED : STD_LOGIC', 'NLW_r_CASCADEOUTB_UNCONNECTED : STD_LOGIC',
+    'NLW_r_DOA_UNCONNECTED : STD_LOGIC_VECTOR ( 23 downto 0 )', 'NLW_r_DOPA_UNCONNECTED : STD_LOGIC_VECTOR ( 3 downto 1 )'], 'SIMPRIM');
+  const b = build(t);
+  // inputs settle (bit-by-bit glue) before the edge
+  const clock = () => { b.step(); b.set('clk', 1); b.step(); b.set('clk', 0); b.step(); };
+  b.set('clk', 0); b.set('we', 0); b.set('web', 0); b.set('addra', 1); b.set('addrb', 0); b.set('di', 0x42); b.set('dib', 0xCAFE0077);
+  b.sim.run(0); b.step();
+  assert.deepEqual(['do', 'dop', 'dob'].map(b.val), [0x55, 1, 0]);      // INIT_A / INIT_B
+  clock();
+  assert.deepEqual(['do', 'dop', 'dob', 'dopb'].map(b.val), [0x12, 1, 0xBEEF1234, 2]);   // A: byte 1 + parity bit 1; B: word 0
+  b.set('we', 1); clock();
+  assert.equal(b.val('do'), 0x12);           // READ_FIRST
+  b.set('we', 0); clock();
+  assert.deepEqual(['do', 'dop', 'dob', 'dopb'].map(b.val), [0x42, 0, 0xBEEF4234, 0]);   // written through A, read through B
+  b.set('web', 1); clock();
+  assert.equal(b.val('dob'), 0xCAFE0077);    // WRITE_FIRST
+  b.set('web', 0); clock();
+  assert.equal(b.val('do'), 0x00);           // written through B, read through A
+  b.set('addra', 3); clock();
+  assert.equal(b.val('do'), 0xCA);
+});
+
+test('SIMPRIM models: X_DCM_SP passes the clock to a counter, LOCKED after a few cycles', () => {
+  const t = netlist(['clk : in STD_LOGIC', 'rst : in STD_LOGIC', 'q : out STD_LOGIC_VECTOR ( 1 downto 0 )', 'locked : out STD_LOGIC'], `
+  clk_ibuf : X_CKBUF
+    port map (I => clk, O => clkin);
+  dcm : X_DCM_SP
+    generic map(
+      LOC => "DCM_X0Y0",
+      CLKDV_DIVIDE => 2.0,
+      CLKFX_DIVIDE => 1,
+      CLKFX_MULTIPLY => 4,
+      CLKIN_DIVIDE_BY_2 => FALSE,
+      CLKIN_PERIOD => 20.0,
+      CLKOUT_PHASE_SHIFT => "NONE",
+      CLK_FEEDBACK => "1X",
+      DESKEW_ADJUST => "SYSTEM_SYNCHRONOUS",
+      DFS_FREQUENCY_MODE => "LOW",
+      DLL_FREQUENCY_MODE => "LOW",
+      DSS_MODE => "NONE",
+      DUTY_CYCLE_CORRECTION => TRUE,
+      FACTORY_JF => X"C080",
+      PHASE_SHIFT => 0,
+      STARTUP_WAIT => FALSE
+    )
+    port map (
+      CLKIN => clkin,
+      CLKFB => clk0_g,
+      RST => rst,
+      DSSEN => gnd,
+      PSCLK => gnd,
+      PSEN => gnd,
+      PSINCDEC => gnd,
+      CLK0 => clk0,
+      CLK90 => NLW_dcm_CLK90_UNCONNECTED,
+      CLK180 => NLW_dcm_CLK180_UNCONNECTED,
+      CLKFX => NLW_dcm_CLKFX_UNCONNECTED,
+      LOCKED => lk,
+      PSDONE => NLW_dcm_PSDONE_UNCONNECTED,
+${pinBits('STATUS', 8, 'NLW_dcm_STATUS_UNCONNECTED(#)')}
+    );
+  clk0_bufg : X_CKBUF
+    port map (I => clk0, O => clk0_g);
+  lut0 : X_LUT2
+    generic map(
+      INIT => X"6"
+    )
+    port map (ADR0 => q0, ADR1 => lk, O => d0);
+  lut1 : X_LUT3
+    generic map(
+      INIT => X"78"
+    )
+    port map (ADR0 => q0, ADR1 => lk, ADR2 => q1, O => d1);
+  ff0 : X_FF
+    port map (I => d0, CE => vcc, CLK => clk0_g, SET => gnd, RST => gnd, O => q0);
+  ff1 : X_FF
+    port map (I => d1, CE => vcc, CLK => clk0_g, SET => gnd, RST => gnd, O => q1);
+  q(0) <= q0;
+  q(1) <= q1;
+  locked <= lk;
+  g0 : X_ZERO
+    port map (O => gnd);
+  v0 : X_ONE
+    port map (O => vcc);`, ['gnd : STD_LOGIC', 'vcc : STD_LOGIC', 'clkin : STD_LOGIC', 'clk0 : STD_LOGIC', 'clk0_g : STD_LOGIC', 'lk : STD_LOGIC',
+    'q0 : STD_LOGIC', 'q1 : STD_LOGIC', 'd0 : STD_LOGIC', 'd1 : STD_LOGIC', 'NLW_dcm_CLK90_UNCONNECTED : STD_LOGIC', 'NLW_dcm_CLK180_UNCONNECTED : STD_LOGIC',
+    'NLW_dcm_CLKFX_UNCONNECTED : STD_LOGIC', 'NLW_dcm_PSDONE_UNCONNECTED : STD_LOGIC', 'NLW_dcm_STATUS_UNCONNECTED : STD_LOGIC_VECTOR ( 7 downto 0 )'], 'SIMPRIM');
+  const b = build(t);
+  b.set('rst', 0);
+  b.sim.addClock(b.port('clk'), { period: 10000 });
+  b.sim.run(1000);
+  assert.deepEqual(['locked', 'q'].map(b.val), [0, 0]);
+  b.sim.run(50000);
+  assert.equal(b.val('locked'), 1);
+  const out = [];
+  for (let i = 0; i < 5; i++) { b.step(); out.push(b.val('q')); }
+  assert.deepEqual(out.slice(1).map((v, i) => (v - out[i] + 4) % 4), [1, 1, 1, 1]);   // counts on every CLKIN cycle
+  assert.ok(b.sim.log.some((l) => l.kind === 'warning' && /X_DCM_SP.*pass-through/.test(l.text)));
+  b.set('rst', 1); b.step();
+  assert.equal(b.val('locked'), 0);
+  const q = b.val('q'); b.step(); b.step();
+  assert.equal(b.val('q'), q);              // not locked: the counter holds
+});

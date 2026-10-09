@@ -296,11 +296,19 @@ end silinx;`,
 // bits shared by the ports whatever their widths, INIT_xx / INITP_xx contents, synchronous read
 // with WRITE_MODE (WRITE_FIRST / READ_FIRST / NO_CHANGE), SSR loads SRVAL, INIT = output at start.
 // Collisions between the ports are not checked.
+const hex2 = (k) => k.toString(16).toUpperCase().padStart(2, '0');
+// INIT_00 .. INIT_3F (data) and INITP_00 .. INITP_07 (parity) generics, and their loading into mem / par
+const bramInitGens = (parity) => [...Array.from({ length: 64 }, (_, k) => `INIT_${hex2(k)} : bit_vector(255 downto 0) := ${hexZeros(256)}`),
+  ...(parity ? Array.from({ length: 8 }, (_, k) => `INITP_${hex2(k)} : bit_vector(255 downto 0) := ${hexZeros(256)}`) : [])];
+const bramInitLoad = (parity) => [...Array.from({ length: 64 }, (_, k) => `      mem(${k * 256 + 255} downto ${k * 256}) := INIT_${hex2(k)};`),
+  ...(parity ? Array.from({ length: 8 }, (_, k) => `      par(${k * 256 + 255} downto ${k * 256}) := INITP_${hex2(k)};`) : [])].join('\n');
+// extra generics of the SIMPRIM block RAMs (timing checks, placement: accepted, not used)
+const XBRAM_GENS = ['LOC : string := "UNPLACED"', 'SETUP_ALL : time := 1000 ps', 'SETUP_READ_FIRST : time := 3000 ps', 'INIT_FILE : string := "NONE"'];
 const BRAM_W = { 1: [1, 0, 14], 2: [2, 0, 13], 4: [4, 0, 12], 9: [8, 1, 11], 18: [16, 2, 10], 36: [32, 4, 9] };   // data, parity, address bits
 const hexZeros = (bits) => `X"${'0'.repeat(Math.ceil(bits / 4))}"`;
-const bram = (ws) => {
+const bram = (ws, simprim = false) => {
   const dual = ws.length === 2;
-  const name = `RAMB16_${ws.map((w) => `S${w}`).join('_')}`;
+  const name = `${simprim ? 'X_' : ''}RAMB16_${ws.map((w) => `S${w}`).join('_')}`;
   const parity = ws.some((w) => BRAM_W[w][1]);
   const ports = [], gens = [], init = [], body = [];
   ws.forEach((w, k) => {
@@ -334,9 +342,7 @@ const bram = (ws) => {
       end if;
     end if;`);
   });
-  const hex = (k) => k.toString(16).toUpperCase().padStart(2, '0');
-  gens.push('SIM_COLLISION_CHECK : string := "ALL"', ...Array.from({ length: 64 }, (_, k) => `INIT_${hex(k)} : bit_vector(255 downto 0) := ${hexZeros(256)}`),
-    ...(parity ? Array.from({ length: 8 }, (_, k) => `INITP_${hex(k)} : bit_vector(255 downto 0) := ${hexZeros(256)}`) : []));
+  gens.push('SIM_COLLISION_CHECK : string := "ALL"', ...(simprim ? XBRAM_GENS : []), ...bramInitGens(parity));
   return `
 library IEEE; use IEEE.STD_LOGIC_1164.ALL;
 entity ${name} is
@@ -353,8 +359,7 @@ begin
   begin
     if not started then
       started := true;
-${Array.from({ length: 64 }, (_, k) => `      mem(${k * 256 + 255} downto ${k * 256}) := INIT_${hex(k)};`).join('\n')}
-${parity ? Array.from({ length: 8 }, (_, k) => `      par(${k * 256 + 255} downto ${k * 256}) := INITP_${hex(k)};`).join('\n') : ''}
+${bramInitLoad(parity)}
       ${init.join('\n      ')}
     end if;
 ${body.join('\n')}
@@ -362,7 +367,133 @@ ${body.join('\n')}
 end silinx;`;
 };
 const BW = [1, 2, 4, 9, 18, 36];
-const BRAMS = [...BW.map((w) => bram([w])), ...BW.flatMap((m, i) => BW.slice(i).map((n) => bram([m, n])))].join('\n');
+const brams = (simprim) => [...BW.map((w) => bram([w], simprim)), ...BW.flatMap((m, i) => BW.slice(i).map((n) => bram([m, n], simprim)))].join('\n');
+const BRAMS = brams(false);
+
+// SIMPRIM 16 Kbit block RAM with the port widths as generics: X_RAMB16 (Virtex-4 style ports,
+// ADDR 15 bits, READ_WIDTH / WRITE_WIDTH, cascade, optional output register DOx_REG) and
+// X_RAMB16BWE (Spartan-3A: ADDR 14 bits, DATA_WIDTH, byte write enables). Same memory layout and
+// read / write behaviour as RAMB16_S*: width w uses ADDR(13 downto log2(w)); 36-bit vectors
+// INIT_x / SRVAL_x hold the data bits then the parity bits; with a 36- or 18-bit port each bit
+// of WEx enables one byte (and its parity bit), narrower ports write with WEx(0). The read width
+// is used for both reading and writing (no mixed widths on one port); cascading is not modelled.
+const xbram = (name, { addr, v4 }) => {
+  const port = (x) => `
+    if rising_edge(CLK${x}) then
+      if ${v4 ? `DO${x}_REG = 1 and REGCE${x} = '1'` : `DO${x}_REG = 1 and EN${x} = '1'`} then
+        if SSR${x} = '1' then DO${x} <= sr${x}d; DOP${x} <= sr${x}p;
+        else DO${x} <= q${x}d; DOP${x} <= q${x}p;
+        end if;
+      end if;
+      if EN${x} = '1' then
+        a := 0; bad := false;
+        for i in 13 downto l${x} loop
+          a := a * 2;
+          if ADDR${x}(i) = '1' then a := a + 1; elsif ADDR${x}(i) /= '0' then bad := true; end if;
+        end loop;
+        wr := false;
+        for i in 0 to 3 loop
+          if w${x} >= 18 then we(i) := WE${x}(i) = '1'; else we(i) := WE${x}(0) = '1'; end if;
+          wr := wr or we(i);
+        end loop;
+        if SSR${x} = '1' then
+          vd := sr${x}d; vp := sr${x}p;
+        elsif bad then
+          vd := (others => 'X'); vp := (others => 'X');
+        elsif not wr or WRITE_MODE_${x} = "READ_FIRST" then
+          vd := (others => '0'); vp := (others => '0');
+          for i in 0 to d${x} - 1 loop if mem(a * d${x} + i) = '1' then vd(i) := '1'; end if; end loop;
+          for i in 0 to p${x} - 1 loop if par(a * p${x} + i) = '1' then vp(i) := '1'; end if; end loop;
+        elsif WRITE_MODE_${x} = "WRITE_FIRST" then
+          vd := (others => '0'); vp := (others => '0');
+          for i in 0 to d${x} - 1 loop vd(i) := DI${x}(i); end loop;
+          for i in 0 to p${x} - 1 loop vp(i) := DIP${x}(i); end loop;
+        else
+          vd := q${x}d; vp := q${x}p;   -- NO_CHANGE
+        end if;
+        q${x}d := vd; q${x}p := vp;
+        if DO${x}_REG /= 1 then DO${x} <= vd; DOP${x} <= vp; end if;
+        if wr and not bad then
+          for i in 0 to d${x} - 1 loop
+            if we(i / 8) then
+              if DI${x}(i) = '1' then mem(a * d${x} + i) := '1'; else mem(a * d${x} + i) := '0'; end if;
+            end if;
+          end loop;
+          for i in 0 to p${x} - 1 loop
+            if we(i) then
+              if DIP${x}(i) = '1' then par(a * p${x} + i) := '1'; else par(a * p${x} + i) := '0'; end if;
+            end if;
+          end loop;
+        end if;
+      end if;
+    end if;`;
+  // width of a port -> data bits, parity bits, lowest address bit; INIT / SRVAL split in data / parity
+  const setup = (x) => `
+      w${x} := ${v4 ? `READ_WIDTH_${x}; if w${x} = 0 then w${x} := WRITE_WIDTH_${x}; end if; if DATA_WIDTH_${x} /= 0 then w${x} := DATA_WIDTH_${x}; end if;` : `DATA_WIDTH_${x};`}
+      if w${x} >= 36 or w${x} = 0 then d${x} := 32; p${x} := 4; l${x} := 5;
+      elsif w${x} >= 18 then d${x} := 16; p${x} := 2; l${x} := 4;
+      elsif w${x} >= 9 then d${x} := 8; p${x} := 1; l${x} := 3;
+      elsif w${x} >= 4 then d${x} := 4; p${x} := 0; l${x} := 2;
+      elsif w${x} >= 2 then d${x} := 2; p${x} := 0; l${x} := 1;
+      else d${x} := 1; p${x} := 0; l${x} := 0;
+      end if;
+      if w${x} = 0 then w${x} := 36; end if;
+      q${x}d := (others => '0'); q${x}p := (others => '0'); sr${x}d := (others => '0'); sr${x}p := (others => '0');
+      for i in 0 to d${x} - 1 loop
+        if INIT_${x}(i) = '1' then q${x}d(i) := '1'; end if;
+        if SRVAL_${x}(i) = '1' then sr${x}d(i) := '1'; end if;
+      end loop;
+      for i in 0 to p${x} - 1 loop
+        if INIT_${x}(d${x} + i) = '1' then q${x}p(i) := '1'; end if;
+        if SRVAL_${x}(d${x} + i) = '1' then sr${x}p(i) := '1'; end if;
+      end loop;
+      DO${x} <= q${x}d; DOP${x} <= q${x}p;`;
+  const gens = ['LOC : string := "UNPLACED"', 'DATA_WIDTH_A : integer := 0', 'DATA_WIDTH_B : integer := 0',
+    ...(v4 ? ['READ_WIDTH_A : integer := 0', 'READ_WIDTH_B : integer := 0', 'WRITE_WIDTH_A : integer := 0', 'WRITE_WIDTH_B : integer := 0',
+      'INVERT_CLK_DOA_REG : boolean := FALSE', 'INVERT_CLK_DOB_REG : boolean := FALSE', 'RAM_EXTENSION_A : string := "NONE"', 'RAM_EXTENSION_B : string := "NONE"'] : []),
+    'DOA_REG : integer := 0', 'DOB_REG : integer := 0',
+    ...['INIT_A', 'INIT_B', 'SRVAL_A', 'SRVAL_B'].map((g) => `${g} : bit_vector(35 downto 0) := X"000000000"`),
+    'WRITE_MODE_A : string := "WRITE_FIRST"', 'WRITE_MODE_B : string := "WRITE_FIRST"', 'SIM_COLLISION_CHECK : string := "ALL"',
+    ...XBRAM_GENS.slice(1), ...bramInitGens(true)];
+  const ports = ['A', 'B'].flatMap((x) => [`ADDR${x} : in std_logic_vector(${addr - 1} downto 0)`, `CLK${x} : in std_ulogic`,
+    `DI${x} : in std_logic_vector(31 downto 0) := (others => '0')`, `DIP${x} : in std_logic_vector(3 downto 0) := (others => '0')`,
+    `EN${x} : in std_ulogic`, `SSR${x} : in std_ulogic := '0'`, `WE${x} : in std_logic_vector(3 downto 0)`,
+    ...(v4 ? [`CASCADEIN${x} : in std_ulogic := '0'`, `REGCE${x} : in std_ulogic := '1'`, `CASCADEOUT${x} : out std_ulogic`] : []),
+    `DO${x} : out std_logic_vector(31 downto 0)`, `DOP${x} : out std_logic_vector(3 downto 0)`]);
+  const vars = ['A', 'B'].map((x) => `    variable w${x}, d${x}, p${x}, l${x} : integer;
+    variable q${x}d, sr${x}d : std_logic_vector(31 downto 0);
+    variable q${x}p, sr${x}p : std_logic_vector(3 downto 0);`).join('\n');
+  return `
+library IEEE; use IEEE.STD_LOGIC_1164.ALL;
+entity ${name} is
+  generic (${gens.join(';\n    ')});
+  port (${ports.join(';\n    ')});
+end ${name};
+architecture silinx of ${name} is
+begin
+${v4 ? "  CASCADEOUTA <= '0'; CASCADEOUTB <= '0';\n" : ''}  process (CLKA, CLKB)
+    variable mem : bit_vector(16383 downto 0);
+    variable par : bit_vector(2047 downto 0);
+    variable started : boolean := false;
+    variable a : integer;
+    variable bad, wr : boolean;
+    type we_t is array (0 to 3) of boolean;
+    variable we : we_t;
+    variable vd : std_logic_vector(31 downto 0);
+    variable vp : std_logic_vector(3 downto 0);
+${vars}
+  begin
+    if not started then
+      started := true;
+${bramInitLoad(true)}
+${setup('A')}
+${setup('B')}
+    end if;
+${port('A')}
+${port('B')}
+  end process;
+end silinx;`;
+};
 
 // Digital clock managers: simulated as a pass-through (every clock output = CLKIN, inverted for
 // the 180-degree ones), with a warning
@@ -370,10 +501,13 @@ const DCM_GENS = 'CLKDV_DIVIDE : real := 2.0; CLKFX_DIVIDE : integer := 1; CLKFX
   + 'CLKIN_PERIOD : real := 10.0; CLKOUT_PHASE_SHIFT : string := "NONE"; CLK_FEEDBACK : string := "1X"; DESKEW_ADJUST : string := "SYSTEM_SYNCHRONOUS"; '
   + 'DFS_FREQUENCY_MODE : string := "LOW"; DLL_FREQUENCY_MODE : string := "LOW"; DSS_MODE : string := "NONE"; DUTY_CYCLE_CORRECTION : boolean := TRUE; '
   + 'FACTORY_JF : bit_vector(15 downto 0) := X"C080"; PHASE_SHIFT : integer := 0; STARTUP_WAIT : boolean := FALSE; SIM_MODE : string := "SAFE"';
-const dcm = (name) => `
+// The SIMPRIM ones (X_DCM_SP, X_DCM) also take LOC and assert LOCKED after LOCK_CYCLES rising
+// edges of CLKIN (RST restarts the count).
+const LOCK_CYCLES = 3;
+const dcm = (name, simprim = false) => `
 library IEEE; use IEEE.STD_LOGIC_1164.ALL;
 entity ${name} is
-  generic (${DCM_GENS});
+  generic (${simprim ? 'LOC : string := "UNPLACED"; ' : ''}${DCM_GENS});
   port (CLKIN : in std_ulogic; CLKFB, RST, DSSEN, PSCLK, PSEN, PSINCDEC : in std_ulogic := '0';
         CLK0, CLK90, CLK180, CLK270, CLK2X, CLK2X180, CLKDV, CLKFX, CLKFX180, LOCKED, PSDONE : out std_ulogic;
         STATUS : out std_logic_vector(7 downto 0));
@@ -382,7 +516,14 @@ architecture silinx of ${name} is
 begin
   CLK0 <= CLKIN; CLK90 <= CLKIN; CLK270 <= not CLKIN; CLK180 <= not CLKIN;
   CLK2X <= CLKIN; CLK2X180 <= not CLKIN; CLKDV <= CLKIN; CLKFX <= CLKIN; CLKFX180 <= not CLKIN;
-  LOCKED <= '0' when RST = '1' else '1';
+${simprim ? `  process (CLKIN, RST)
+    variable n : integer := 0;
+  begin
+    if RST = '1' then n := 0;
+    elsif rising_edge(CLKIN) and n < ${LOCK_CYCLES} then n := n + 1;
+    end if;
+    if n >= ${LOCK_CYCLES} then LOCKED <= '1'; else LOCKED <= '0'; end if;
+  end process;` : "  LOCKED <= '0' when RST = '1' else '1';"}
   PSDONE <= '0';
   STATUS <= (others => '0');
   process
@@ -495,6 +636,8 @@ begin
   u : entity work.LUT${n} generic map (INIT => INIT) port map (${Array.from({ length: n }, (_, i) => `I${i} => ADR${i}`).join(', ')}, O => O);
 end silinx;`),
   xff('X_FF', false), xff('X_SFF', true),
+  brams(true), xbram('X_RAMB16', { addr: 15, v4: true }), xbram('X_RAMB16BWE', { addr: 14, v4: false }),
+  dcm('X_DCM_SP', true), dcm('X_DCM', true),
   xlatch('X_LATCH', false), xlatch('X_LATCHE', true),
   srl('X_SRL16E', { ce: true, simprim: true }), srl('X_SRLC16E', { ce: true, q15: true, simprim: true }),
   ...[4, 5, 6].flatMap((n) => [dram(`X_RAMS${2 ** n}`, n, { simprim: true }), dram(`X_RAMD${2 ** n}`, n, { simprim: true, dual: true })]),
