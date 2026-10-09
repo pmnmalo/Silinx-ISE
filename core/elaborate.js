@@ -1793,7 +1793,8 @@ function bindStmt0(E, s, loc) {
       return { k: 'forever', body, hasWait: E.lang === 'vhdl' || containsKind(body, ['delay', 'event', 'wait', 'task', 'fork', 'waitfork']), loc, label: s.label };
     }
     case 'exit': case 'next': return { k: s.kind, c: s.cond ? bindExpr(E, s.cond, null, loc) : null, loc, label: s.label };
-    case 'return': return { k: 'ret', value: s.value ? bindExpr(E, s.value, E.retT && !E.retT.unconstrained && s.value.op === 'aggregate' ? E.retT : null, loc) : null, loc };
+    // the return type is the expected type of aggregates and of character / enumeration literals
+    case 'return': return { k: 'ret', value: s.value ? bindExpr(E, s.value, E.retT && !E.retT.unconstrained && (s.value.op === 'aggregate' || E.retT.char || E.retT.kind === 'enum') ? E.retT : null, loc) : null, loc };
     case 'null': return { k: 'null', loc };
     case 'delay': return { k: 'delay', amount: bindExpr(E, s.amount, null, loc), unit: E.timeUnit, prec: E.timePrec, stmt: s.stmt ? bindStmt(E, s.stmt, loc) : null, loc };
     case 'disable': return { k: 'disable', label: s.label, loc };

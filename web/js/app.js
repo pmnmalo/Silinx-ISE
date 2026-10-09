@@ -288,6 +288,12 @@ function select(sel) {
   renderProcesses();
 }
 
+// Test Bench Wizard (loaded on first use)
+async function testBench(mod) {
+  const { testBenchWizard } = await import('./tbwizard.js');
+  return testBenchWizard({ module: mod });
+}
+
 function moduleContextMenu(e, mod, file) {
   const isSimView = S.view === 'sim';
   popupMenu([
@@ -296,6 +302,7 @@ function moduleContextMenu(e, mod, file) {
     { label: 'Rename…', action: () => renameDialog(file, mod) },
     { label: 'Check Syntax', action: () => checkSyntax(mod, isSimView) },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
+    { label: 'Create Test Bench (Wizard)…', action: () => testBench(mod) },
     ...(() => {
       const sch = S.hdlToSch?.[file];
       if (!sch) return [
@@ -385,6 +392,7 @@ function processDefs() {
       ...Object.entries(SIM_MODEL_NAMES).map(([step, name]) => ({ id: `sim-${step}`, label: `Simulate ${name} Model`, ico: 'wave', run: () => runSimulation(mod, step) })),
     ] },
     { id: 'rtl-sim', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
+    { id: 'tb-wiz', label: 'Create Test Bench (Wizard)…', ico: 'template', run: () => testBench(mod) },
   ];
   return [
     ...(sel.sch ? [
@@ -2198,6 +2206,7 @@ function setupMenus() {
     { label: 'Project', items: () => [
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj },
       { label: 'Add Copy of Source…', action: () => wiz.addSourceDialog(), disabled: hasPj },
+      { label: 'New Test Bench (Wizard)…', action: () => testBench(S.sel?.module), disabled: hasPj },
       '-',
       { label: 'Set as Top Module', action: () => S.sel?.module && setTop(S.sel.module), disabled: () => !S.sel?.module },
       { label: 'Design Properties…', action: () => wiz.projectProperties(), disabled: hasPj },
@@ -2355,6 +2364,6 @@ async function boot() {
   else showLeftPage('start');
 }
 
-export const app = { openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
+export const app = { saveAll, openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
 window.SilinxApp = app;
 boot();

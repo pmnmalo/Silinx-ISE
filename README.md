@@ -62,6 +62,13 @@ for Xilinx FPGAs supported by ISE 14.7.
   4-state logic, delta cycles, VHDL/Verilog testbenches (`wait`, `#delay`, `assert`/`report`,
   `$display`, `$readmemh`…), an **ISim**-style waveform window, force/clock to simulate modules
   without a testbench, VCD export.
+- **Test Bench Wizard** (*Project ▸ New Test Bench (Wizard)…*, or right-click a module): writes a
+  self-checking VHDL or Verilog test bench for a module. Input vectors: every combination of the
+  inputs (exhaustive), random, counting, walking ones/zeros, or typed in; clock and reset detected
+  (sequential designs get one vector per clock cycle). The expected outputs of each vector are
+  typed in (what the design should do) or filled in from a simulation of the current design (a
+  regression test); `-` bits are not checked. The bench reports every mismatch with its inputs and
+  ends with *TEST PASSED* / *TEST FAILED*; it is VHDL-93 / Verilog-2001, so it also runs in ISim.
 - **Implementation** with **Xilinx ISE 14.7** (XST → NGDBuild → MAP → PAR → TRCE → BitGen), run
   locally, in Docker or over SSH, with live per-step status (✓ / ⚠ / ✗) in the Processes panel
   (restored when the project is reopened), *Stop*, every warning/error in the Warnings/Errors tabs,

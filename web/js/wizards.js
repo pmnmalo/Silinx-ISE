@@ -12,8 +12,8 @@ const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 const DEFAULT_DEVICE = { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' };
 const FILE_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
 
-function field(label, input) { return [h('label', {}, label), input]; }
-function select(options, value) {
+export function field(label, input) { return [h('label', {}, label), input]; }
+export function select(options, value) {
   const s = h('select');
   for (const o of options) {
     const [v, l] = Array.isArray(o) ? o : [o, o];
@@ -64,7 +64,7 @@ function devicePicker(db, device) {
 }
 
 // Multi-page wizard driver. pages: [{ title, render() -> Node, validate?() -> string|null }]
-function wizard(title, pages, { width = 720, finishLabel = 'Finish' } = {}) {
+export function wizard(title, pages, { width = 720, finishLabel = 'Finish' } = {}) {
   return new Promise(resolve => {
     let idx = 0;
     const side = h('div', { class: 'wiz-side' }, h('div', { class: 'logo' }, 'Silinx'), ...pages.map(p => h('div', { class: 'step' }, p.title)));
@@ -525,10 +525,12 @@ export async function newSourceWizard({ type } = {}) {
       break;
     }
   }
-  await api.writeFile(pj.name, path, text);
-  if (st.id === 'ucf' && !S.fileTree.includes(pj.constraints)) { pj.constraints = path; await app.saveProjectJson(); }
-  if (st.id.endsWith('-tb')) { pj.simTop = n; await app.saveProjectJson(); }
+  const noUcf = !S.fileTree.includes(pj.constraints);
+  await api.writeFile(pj.name, path, text);   // registers the new file in silinx.json
+  // reload first: saving the project settings from the old copy would drop that registration
   await app.reloadProject();
+  if (st.id === 'ucf' && noUcf) { S.project.constraints = path; await app.saveProjectJson(); await app.reloadProject(); }
+  if (st.id.endsWith('-tb')) await app.setTop(n, true);
   app.log(`Created ${st.label} '${path}'.`, 'ok');
   if (st.id === 'asm') app.openAsm(path); else if (st.id === 'sch') app.openSch(path); else app.openFile(path);
 }
