@@ -106,7 +106,15 @@ printf 'run -ifn t.prj -ifmt mixed -ofn t -ofmt NGC -p xc3s250e-4-cp132 -top t\n
 if docker run --rm --platform linux/amd64 -v "$tmp:/work" "$TAG" bash -c 'xst -ifn t.xst -ofn t.syr >/dev/null 2>&1; test -f t.ngc'; then
   echo "XST synthesis with your license: OK"
 else
-  die "XST could not synthesize a test design (license problem?). See $tmp/t.syr"
+  # show the log now: the EXIT trap deletes $tmp
+  if [ -s "$tmp/t.syr" ]; then
+    echo "---- last lines of the XST log (t.syr) ----" >&2
+    tail -n 40 "$tmp/t.syr" >&2
+    echo "-------------------------------------------" >&2
+  else
+    echo "(XST wrote no log: it probably did not start)" >&2
+  fi
+  die "XST could not synthesize a test design (license problem?); see the log above"
 fi
 
 # --- configure Silinx

@@ -506,9 +506,13 @@ test('hand-written VHDL 2-process FSM (when/else and with/select outputs, elsif 
   assert.deepEqual(byName('GOT10').actions, ['z = x', 'busy = 1']);
   assert.deepEqual(byName('PICK').actions, ['y = 1']);
   assert.ok(model.outputs.every((o) => o.default === '0' && !o.registered));
-  // elsif chain = chain of decisions on the false branch; case on sel = chain of comparisons
+  // elsif chain = chain of decisions on the false branch; case on sel = case box
   const conds = model.nodes.filter((n) => n.type === 'decision').map((n) => n.cond);
-  assert.deepEqual(conds, ['x', 'x == 0', "sel == 2'b11", 'x', "sel == 2'b00", "(sel == 2'b01) || (sel == 2'b10)"]);
+  assert.deepEqual(conds, ['x', 'x == 0', "sel == 2'b11", 'x']);
+  const cb = model.nodes.find((n) => n.type === 'case');
+  assert.equal(cb.expr, 'sel');
+  assert.deepEqual(model.edges.filter((e) => e.from === cb.id).map((e) => [e.port, model.nodes.find((n) => n.id === e.to).name]),
+    [['00', 'IDLE'], ['01|10', 'GOT1'], ['others', 'PICK']]);
   const d = model.nodes.find((n) => n.cond === 'x == 0');
   const falseEdge = model.edges.find((e) => e.from === d.id && e.port === 'false');
   assert.equal(model.nodes.find((n) => n.id === falseEdge.to).cond, "sel == 2'b11");
@@ -531,8 +535,9 @@ test('hand-written Verilog 1-process FSM (parameters, output reg, default before
   // the default `pulse_o <= 1'b0` before the case is overridden in FIRE, kept in the other states
   assert.deepEqual(byName('FIRE').actions, ['pulse_o = 1', 'n = n - 1']);
   assert.deepEqual(byName('WAITING').actions, ['pulse_o = 0']);
-  assert.ok(model.nodes.some((n) => n.cond === "len == 3'd0"));
-  assert.ok(model.nodes.some((n) => n.cond === "(len == 3'd1) || (len == 3'd2)"));
+  const cb = model.nodes.find((n) => n.type === 'case');
+  assert.equal(cb.expr, 'len');
+  assert.deepEqual(model.edges.filter((e) => e.from === cb.id).map((e) => e.port), ["3'd0", "3'd1|3'd2", 'others']);
 });
 
 test('if-chains on the state, ?: outputs and an async 1-process machine with non-standard codes', () => {
@@ -603,7 +608,9 @@ test('modules that are not pure state machines are rejected with a clear reason'
   assert.throws(v(VERILOG_2P.replace(/always @\(posedge clk or negedge reset_n\)\n\s*if \(!reset_n\) cs <= IDLE;\n\s*else cs <= ns;/, 'always @(posedge clk) cs <= ns;')),
     /clocked process at line 12 has no reset/);
   assert.throws(v(VERILOG_2P.replace('if (done) ns = IDLE;', 'if (req * 2 == 2) ns = IDLE;')), /line 28 uses the operator '\*'/);
-  assert.throws(v(VERILOG_2P.replace('if (done) ns = IDLE;', 'if (req[1]) ns = IDLE;')), /line 28 selects bits of a signal/);
+  assert.throws(v(VERILOG_2P.replace('if (done) ns = IDLE;', 'if (req[done]) ns = IDLE;')), /line 28 selects bits of 'req' with a variable index/);
+  assert.throws(v(VERILOG_2P.replace('if (done) ns = IDLE;', 'if (req[2]) ns = IDLE;')), /line 28 selects bit 2 of 'req', which has 2 bits/);
+  assert.throws(v(VERILOG_2P_BITSEL.replace('input  wire [1:0] req', 'input  wire [2:1] req')), /selects bits of 'req', whose bits are not numbered 1 downto 0/);
   assert.throws(v(VERILOG_2P.replace("idle = 1'b0;\n", '\n')), /output 'idle' has no default value and is not assigned on every path of state 'G0'/);
   assert.throws(v(VERILOG_2P.replace("idle = 1'b1;", 'idle = cs[0];')), /state register 'cs' is used at line 22/);
   assert.throws(v(VERILOG_2P.replace('reg [1:0] cs, ns;', 'reg [1:0] cs, ns;\n    wire t = ns[0];')), /signal 't' at line 11 is not part of the state machine/);
@@ -613,12 +620,85 @@ test('modules that are not pure state machines are rejected with a clear reason'
   assert.throws(() => asmFromHdl(vhdlExtra, { lang: 'vhdl' }), /process at line 56 is not part of the state machine \(it drives 'busy2'\)/);
   const vhdlVar = VHDL_2P.replace("  comb : process (state, x, sel)\n  begin", "  comb : process (state, x, sel)\n    variable t : std_logic;\n  begin");
   assert.throws(() => asmFromHdl(vhdlVar, { lang: 'vhdl' }), /process at line \d+ declares variables/);
-  assert.throws(() => asmFromHdl(VHDL_2P.replace("z <= '1' when state = S_GOT10 and x = '1' else '0';", "z <= sel(0);"), { lang: 'vhdl' }), /selects bits/);
+  assert.throws(() => asmFromHdl(VHDL_2P.replace("z <= '1' when state = S_GOT10 and x = '1' else '0';", "z <= sel(x);"), { lang: 'vhdl' }), /selects bits of 'sel' with a variable index/);
 });
 
 test('names that are not valid in a chart are reported', () => {
-  const src = VERILOG_1P.replace(/WAITING/g, 'WAIT');
-  assert.throws(() => asmFromHdl(src, { lang: 'verilog' }), /cannot be represented as an ASM chart:[\s\S]*State 'WAIT' is a reserved word in VHDL/);
+  const src = VERILOG_1P.replace(/trig/g, 'entity');
+  assert.throws(() => asmFromHdl(src, { lang: 'verilog' }), /cannot be represented as an ASM chart:[\s\S]*Input 'entity' is a reserved word in VHDL/);
+});
+
+test('state names that are reserved words are accepted (they only appear as S_<name>)', () => {
+  const { model } = checkHandWritten(VERILOG_1P.replace(/WAITING/g, 'WAIT'), 'verilog');
+  assert.ok(model.nodes.some((n) => n.type === 'state' && n.name === 'WAIT'));
+  // the common VHDL enum (S_IDLE, S_WAIT, S_NEXT)
+  const vhd = VHDL_2P.replace(/S_GOT10/g, 'S_WAIT').replace(/S_PICK/g, 'S_NEXT');
+  const b = checkHandWritten(vhd, 'vhdl');
+  assert.deepEqual(b.model.nodes.filter((n) => n.type === 'state').map((n) => n.name), ['IDLE', 'GOT1', 'WAIT', 'NEXT']);
+});
+
+// ---------------------------------------------------------------------------------------
+// Bit/slice selections and case boxes
+// ---------------------------------------------------------------------------------------
+
+const selCaseModel = (expr, ports, over = {}) => ({
+  name: 'cs', lang: 'vhdl', clock: 'clk', reset: { name: 'rst' }, encoding: 'binary',
+  inputs: [{ name: 'op', width: 4 }, { name: 'go', width: 1 }],
+  outputs: [{ name: 'a', width: 1 }, { name: 'b', width: 1 }, { name: 'st', width: 2, registered: true }],
+  registers: [{ name: 'cnt', width: 3, init: '0' }],
+  nodes: [
+    { id: 's0', type: 'state', name: 'IDLE', actions: ['st = 0'] },
+    { id: 'd', type: 'decision', cond: 'go || op[0]' },
+    { id: 'c', type: 'case', expr },
+    { id: 'o', type: 'output', actions: ['b', 'cnt = cnt + 1'] },
+    { id: 's1', type: 'state', name: 'A1', actions: ['a', 'st = 1'] },
+    { id: 's2', type: 'state', name: 'A2', actions: ['st = 2'] },
+  ],
+  edges: [
+    { from: 's0', to: 'd' }, { from: 'd', to: 'c', port: 'true' }, { from: 'd', to: 's0', port: 'false' },
+    ...ports.map(([port, to]) => ({ from: 'c', to, port })),
+    { from: 'o', to: 's2' }, { from: 's1', to: 's0' }, { from: 's2', to: 's0' },
+  ],
+  initial: 's0', ...over,
+});
+
+const SEL_CASES = {
+  'full value': selCaseModel('op', [['0|4', 's1'], ["4'd8, 0xC", 'o'], ['others', 's0']]),
+  slice: selCaseModel('op[3:2]', [['00', 's1'], ['01|10', 'o'], ['others', 's0']]),
+  bit: selCaseModel('op[1]', [['1', 's1'], ['0', 'o']]),
+  'registered output': selCaseModel('st', [['0', 's1'], ['1|2', 'o'], ['others', 's0']]),
+  'register slice': selCaseModel('cnt[2:1]', [['00', 's1'], ['others', 'o']]),
+  'exit like others': selCaseModel('op[3:2]', [['00', 's1'], ['01|10', 'o'], ['11', 's0'], ['others', 's0']]),
+  'all values, no others': selCaseModel('op[3:2]', [['00', 's1'], ['01|10', 'o'], ['11', 's0']]),
+};
+
+test('charts with bit/slice selections and case boxes convert back from their HDL unchanged', () => {
+  for (const [name, m0] of Object.entries(SEL_CASES)) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const m = { ...clone(m0), lang };
+      assert.deepEqual(validate(m).filter((d) => d.severity === 'error'), [], `${name} ${lang}`);
+      const g = generate(m, lang);
+      const { model, warnings } = asmFromHdl(g.code, { path: g.filename });
+      assert.deepEqual(warnings, [], `${name} ${lang}`);
+      assert.equal(generate(model, lang).code, g.code, `${name} ${lang}: regenerated file`);
+      const cb = model.nodes.find((n) => n.type === 'case');
+      assert.equal(cb?.expr, m.nodes.find((n) => n.type === 'case').expr, `${name} ${lang}: case box`);
+      assert.equal(model.nodes.filter((n) => n.type === 'decision').length, 1, `${name} ${lang}: no extra decisions`);
+      // without the generator header: same behaviour
+      const { model: m2 } = asmFromHdl(headerless(g.code), { path: g.filename });
+      const ref = runSim(g.code, lang, m, { cycles: 120 });
+      for (const l of ['vhdl', 'verilog']) assert.deepEqual(runSim(generate(m2, l).code, l, m, { cycles: 120 }), ref, `${name} ${lang} -> ${l}`);
+    }
+  }
+});
+
+test('hand-written bit selections (req[0], !req[1], VHDL sel(1), sel(1 downto 0)) become chart selections', () => {
+  const { model } = checkHandWritten(VERILOG_2P_BITSEL, 'verilog');
+  const conds = model.nodes.filter((n) => n.type === 'decision').map((n) => n.cond);
+  assert.deepEqual(conds, ["req[0] == 1'b1", "req == 2'b10", 'done', 'done && !req[1]', 'done']);
+  const vhd = VHDL_2P.replace('elsif sel = "11" then', 'elsif sel(1) = \'1\' and sel(1 downto 0) /= "10" then');
+  const b = checkHandWritten(vhd, 'vhdl');
+  assert.ok(b.model.nodes.some((n) => n.cond === "sel[1] && (sel[1:0] != 2'b10)"), b.model.nodes.map((n) => n.cond).join(' / '));
 });
 
 // ---------------------------------------------------------------------------------------

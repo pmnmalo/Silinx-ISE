@@ -155,3 +155,323 @@ test('SIMPRIM netlist (post-place & route style) with X_LUT / X_FF / ROC', () =>
   assert.ok(usesSimprim(t));
   assert.deepEqual(counts(t).out, [1, 2, 3, 0, 1, 2, 2]);
 });
+
+// ---------------------------------------------------------------------------------------------
+// a netgen-style netlist `main` around `body`; `ports` / `signals`: declarations
+const LIBS = { UNISIM: 'library UNISIM;\nuse UNISIM.VCOMPONENTS.ALL;', SIMPRIM: 'library SIMPRIM;\nuse SIMPRIM.VCOMPONENTS.ALL;\nuse SIMPRIM.VPACKAGE.ALL;' };
+const netlist = (ports, body, signals = [], lib = 'UNISIM') => `library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+${LIBS[lib]}
+
+entity main is
+  port (
+${ports.map((p) => `    ${p}`).join(';\n')}
+  );
+end main;
+
+architecture STRUCTURE of main is
+${signals.map((s) => `  signal ${s};`).join('\n')}
+begin
+${body}
+end STRUCTURE;
+`;
+/** Compile + elaborate (native primitives, or their VHDL models with native = false); the design must be clean. */
+function build(text, { native = true, scalarize = true } = {}) {
+  const net = { path: 'n.vhd', lang: 'vhdl', text: scalarize ? scalarizeNetlist(text) : text };
+  const prims = primitiveSources([net]).map((p) => (native ? p : { ...p, path: p.path.replace('<silinx>/', 'models/') }));
+  const lib = compile([...prims, net]);
+  assert.deepEqual(lib.errors.filter((e) => e.severity !== 'warning').map((e) => e.message), []);
+  const d = elaborate(lib, 'main');
+  assert.deepEqual(d.diags.map((e) => e.message), []);
+  const sim = new Simulator(d);
+  const port = (n) => d.top.ports.find((p) => p.name === n).sig;
+  const val = (n) => { const v = port(n).val; return v.x ? V.toBin(v).toLowerCase() : Number(v.v); };
+  const set = (n, v) => sim.force(port(n), typeof v === 'object' ? v : V.fromInt(v, port(n).t.w));
+  return { d, sim, port, val, set, step: (ps = 10000) => sim.run(sim.now + ps) };
+}
+
+test('latches: INIT honoured, LDP / LDPE start at 1', () => {
+  const t = netlist(['g : in STD_LOGIC', 'd : in STD_LOGIC', 'q1 : out STD_LOGIC', 'q2 : out STD_LOGIC', 'q3 : out STD_LOGIC', 'q4 : out STD_LOGIC'], `
+  l1 : LDP
+    port map (D => d, G => g, PRE => z, Q => q1);
+  l2 : LD
+    generic map(
+      INIT => '1'
+    )
+    port map (D => d, G => g, Q => q2);
+  l3 : LDCE
+    port map (D => d, G => g, GE => g, CLR => z, Q => q3);
+  l4 : LD_1
+    port map (D => d, G => g, Q => q4);
+  zz : GND
+    port map (G => z);`, ['z : STD_LOGIC']);
+  for (const native of [true, false]) {
+    const b = build(t, { native });
+    b.set('g', 0); b.set('d', 0);
+    b.sim.run(0); b.step();
+    assert.deepEqual(['q1', 'q2', 'q3'].map(b.val), [1, 1, 0]);
+    assert.equal(b.val('q4'), 0);            // gate active low: transparent at G = 0
+    b.set('g', 1); b.set('d', 0); b.step();
+    assert.deepEqual(['q1', 'q2', 'q3', 'q4'].map(b.val), [0, 0, 0, 0]);
+  }
+});
+
+test('mux primitives agree between the native and the VHDL models when the select is X', () => {
+  const t = netlist(['s : in STD_LOGIC', 'a : in STD_LOGIC', 'b : in STD_LOGIC', 'o1 : out STD_LOGIC', 'o2 : out STD_LOGIC'], `
+  m1 : MUXCY
+    port map (CI => a, DI => b, S => s, O => o1);
+  m2 : MUXF5
+    port map (I0 => a, I1 => b, S => s, O => o2);`);
+  const tx = netlist(['s : in STD_LOGIC', 'a : in STD_LOGIC', 'b : in STD_LOGIC', 'o1 : out STD_LOGIC', 'o2 : out STD_LOGIC'], `
+  m1 : X_MUX2
+    port map (IA => a, IB => b, SEL => s, O => o1);
+  m2 : X_BUFGMUX
+    port map (I0 => a, I1 => b, S => s, O => o2);`, [], 'SIMPRIM');
+  for (const text of [t, tx]) {
+    const res = [true, false].map((native) => {
+      const b = build(text, { native });
+      const out = [];
+      for (const [s, a, c] of [[V.X1, 0, 1], [V.X1, 1, 1], [V.X1, 0, 0], [V.ZERO, 0, 1], [V.ONE, 0, 1]]) {
+        b.set('s', s); b.set('a', a); b.set('b', c); b.step();
+        out.push(`${b.val('o1')}${b.val('o2')}`);
+      }
+      return out;
+    });
+    assert.deepEqual(res[0], res[1]);
+    assert.deepEqual(res[0].slice(0, 3), ['xx', '11', '00']);
+  }
+});
+
+test('parseNetgenVhdl / regroupNetlist: top entity of a multi-entity netlist, generic clause, other entities kept', () => {
+  const sub = `library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+library UNISIM;
+use UNISIM.VCOMPONENTS.ALL;
+
+entity sub is
+  port (
+    a : in STD_LOGIC := 'X';
+    y : out STD_LOGIC
+  );
+end sub;
+
+architecture STRUCTURE of sub is
+begin
+  u_inv : INV
+    port map (
+      I => a,
+      O => y
+    );
+end STRUCTURE;
+`;
+  const top = netlist(['a : in STD_LOGIC := \'X\'', 'y : out STD_LOGIC'], `
+  u : sub
+    port map (
+      a => a,
+      y => n1
+    );
+  g_inv : INV
+    port map (
+      I => n1,
+      O => y
+    );`, ['n1 : STD_LOGIC']).replace('entity main is\n', 'entity main is\n  generic (\n    W : integer := 4\n  );\n');
+  const text = `${sub}\n${top}`;
+  const p = parseNetgenVhdl(text);
+  assert.equal(p.entity, 'main');
+  assert.equal(p.generics, 'W : integer := 4');
+  assert.deepEqual(p.instances.map((i) => i.name), ['u', 'g_inv']);
+  assert.match(p.others, /entity sub is/);
+  assert.equal(parseNetgenVhdl(text, 'sub').entity, 'sub');
+  const r = regroupNetlist(text, ['g']);
+  assert.match(r.text, /entity sub is/);
+  assert.match(r.text, /entity main is\n {2}generic \(/);
+  assert.deepEqual(r.groups, { g: 1 });
+  assert.match(r.text, /entity g is\n {2}port \(\n {4}n1 : in STD_LOGIC;\n {4}y : out STD_LOGIC/);   // `u : sub` drives n1
+  const b = build(r.text, { scalarize: false });
+  b.set('a', 1); b.step(); assert.equal(b.val('y'), 1);
+  b.set('a', 0); b.step(); assert.equal(b.val('y'), 0);
+});
+
+test('regroupNetlist: pin directions per primitive (latch gate is an input, inout pads stay inout)', () => {
+  const t = netlist(['clk : in STD_LOGIC := \'X\'', 'd : in STD_LOGIC := \'X\'', 't : in STD_LOGIC := \'X\'', 'q : out STD_LOGIC', 'pad : inout STD_LOGIC'], `
+  ga_ff : FD
+    port map (C => clk, D => d, Q => ga_g);
+  gb_lat : LD
+    port map (D => d, G => ga_g, Q => q_i);
+  q_OBUF : OBUF
+    port map (I => q_i, O => q);
+  io_pad_IOBUF : IOBUF
+    port map (I => d, T => t, O => open_o, IO => pad);`, ['ga_g : STD_LOGIC', 'q_i : STD_LOGIC', 'open_o : STD_LOGIC']);
+  const r = regroupNetlist(t, ['ga', 'gb', 'io']);
+  const ports = (e) => r.text.match(new RegExp(`entity ${e} is\\n {2}port \\(([\\s\\S]*?)\\);`))[1].trim().split(/;\s*/);
+  assert.deepEqual(ports('gb'), ['d : in STD_LOGIC', 'ga_g : in STD_LOGIC', 'q_i : out STD_LOGIC']);
+  assert.deepEqual(ports('ga'), ['clk : in STD_LOGIC', 'd : in STD_LOGIC', 'ga_g : out STD_LOGIC']);
+  assert.ok(ports('io').includes('pad : inout STD_LOGIC'));
+  const b = build(r.text, { scalarize: false });
+  b.set('t', 0); b.set('d', 1); b.step();
+  assert.equal(b.val('pad'), 1);
+  b.set('t', 1); b.step();
+  assert.equal(b.val('pad'), 'z');
+});
+
+test('UNISIM models: SRLC16E, RAM16X1D, BUFGMUX / BUFGCE / BUFGCE_1, DCM_SP pass-through', () => {
+  const t = netlist(['clk : in STD_LOGIC', 'd : in STD_LOGIC', 'we : in STD_LOGIC', 'ce : in STD_LOGIC', 's : in STD_LOGIC',
+    'a : in STD_LOGIC_VECTOR ( 3 downto 0 )', 'b : in STD_LOGIC_VECTOR ( 3 downto 0 )',
+    'q : out STD_LOGIC', 'q15 : out STD_LOGIC', 'spo : out STD_LOGIC', 'dpo : out STD_LOGIC', 'o1 : out STD_LOGIC', 'o2 : out STD_LOGIC', 'o3 : out STD_LOGIC',
+    'c0 : out STD_LOGIC', 'c180 : out STD_LOGIC', 'locked : out STD_LOGIC'], `
+  sr : SRLC16E
+    generic map(
+      INIT => X"8001"
+    )
+    port map (A0 => a(0), A1 => a(1), A2 => a(2), A3 => a(3), CE => ce, CLK => clk, D => d, Q => q, Q15 => q15);
+  rm : RAM16X1D
+    generic map(
+      INIT => X"0004"
+    )
+    port map (A0 => a(0), A1 => a(1), A2 => a(2), A3 => a(3), DPRA0 => b(0), DPRA1 => b(1), DPRA2 => b(2), DPRA3 => b(3), D => d, WE => we, WCLK => clk, SPO => spo, DPO => dpo);
+  mx : BUFGMUX
+    port map (I0 => gnd, I1 => vcc, S => s, O => o1);
+  ce1 : BUFGCE
+    port map (I => vcc, CE => ce, O => o2);
+  ce2 : BUFGCE_1
+    port map (I => gnd, CE => ce, O => o3);
+  dcm : DCM_SP
+    generic map(
+      CLKDV_DIVIDE => 2.0,
+      CLKFX_MULTIPLY => 4,
+      CLKIN_PERIOD => 20.0,
+      CLK_FEEDBACK => "1X",
+      FACTORY_JF => X"C080",
+      STARTUP_WAIT => FALSE
+    )
+    port map (CLKIN => clk, CLKFB => c0_i, RST => gnd, CLK0 => c0_i, CLK180 => c180, LOCKED => locked);
+  c0 <= c0_i;
+  g0 : GND
+    port map (G => gnd);
+  v0 : VCC
+    port map (P => vcc);`, ['gnd : STD_LOGIC', 'vcc : STD_LOGIC', 'c0_i : STD_LOGIC']);
+  const b = build(t);
+  b.set('clk', 0); b.set('ce', 0); b.set('s', 0); b.set('a', 0); b.set('b', 2); b.set('we', 0); b.set('d', 1);
+  b.sim.run(0); b.step();
+  assert.deepEqual(['q', 'q15', 'spo', 'dpo', 'o1', 'o2', 'o3', 'c0', 'c180', 'locked'].map(b.val), [1, 1, 0, 1, 0, 0, 1, 0, 1, 1]);
+  assert.ok(b.sim.log.some((l) => l.kind === 'warning' && /DCM_SP.*pass-through/.test(l.text)));
+  // clock: shift in d = 1 (CE), write 1 at address 0
+  b.set('ce', 1); b.set('we', 1); b.set('s', 1);
+  b.set('clk', 1); b.step(); b.set('clk', 0); b.step();
+  b.set('a', 1); b.set('b', 0); b.step();
+  assert.deepEqual(['q', 'q15', 'spo', 'dpo', 'o1', 'o2', 'o3', 'c0'].map(b.val), [1, 0, 0, 1, 1, 1, 0, 0]);   // r = 0x0003; RAM(1) = 0; RAM(0) = 1
+});
+
+test('UNISIM models: MULT18X18SIO and RAMB16 connected bit by bit (as netgen writes them)', () => {
+  const bits = (formal, n, net) => Array.from({ length: n }, (_, i) => `      ${formal}(${n - 1 - i}) => ${net}(${n - 1 - i})`).join(',\n');
+  const t = netlist(['clk : in STD_LOGIC', 'we : in STD_LOGIC', 'a : in STD_LOGIC_VECTOR ( 17 downto 0 )', 'b : in STD_LOGIC_VECTOR ( 17 downto 0 )',
+    'p : out STD_LOGIC_VECTOR ( 35 downto 0 )', 'addr : in STD_LOGIC_VECTOR ( 10 downto 0 )', 'di : in STD_LOGIC_VECTOR ( 7 downto 0 )',
+    'do : out STD_LOGIC_VECTOR ( 7 downto 0 )', 'dop : out STD_LOGIC', 'dob : out STD_LOGIC_VECTOR ( 31 downto 0 )'], `
+  m : MULT18X18SIO
+    generic map(
+      AREG => 0,
+      BREG => 0,
+      B_INPUT => "DIRECT",
+      PREG => 1
+    )
+    port map (
+      CEA => gnd,
+      CEB => gnd,
+      CEP => vcc,
+      CLK => clk,
+      RSTA => gnd,
+      RSTB => gnd,
+      RSTP => gnd,
+${bits('A', 18, 'a')},
+${bits('B', 18, 'b')},
+${bits('BCIN', 18, 'zero18')},
+${bits('P', 36, 'p')},
+${bits('BCOUT', 18, 'NLW_m_BCOUT')}
+    );
+  r : RAMB16_S9_S36
+    generic map(
+      INIT_A => X"155",
+      WRITE_MODE_A => "READ_FIRST",
+      INIT_00 => X"00000000000000000000000000000000000000000000000000000000BEEF1234",
+      INITP_00 => X"0000000000000000000000000000000000000000000000000000000000000002"
+    )
+    port map (
+      CLKA => clk,
+      ENA => vcc,
+      SSRA => gnd,
+      WEA => we,
+      CLKB => clk,
+      ENB => vcc,
+      SSRB => gnd,
+      WEB => gnd,
+${bits('ADDRA', 11, 'addr')},
+${bits('DIA', 8, 'di')},
+      DIPA(0) => gnd,
+${bits('DOA', 8, 'do')},
+      DOPA(0) => dop,
+${bits('ADDRB', 9, 'zero18')},
+${bits('DIB', 32, 'zero32')},
+${bits('DIPB', 4, 'zero18')},
+${bits('DOB', 32, 'dob')}
+    );
+  g0 : GND
+    port map (G => gnd);
+  v0 : VCC
+    port map (P => vcc);
+  zero18 <= (others => '0');
+  zero32 <= (others => '0');`, ['gnd : STD_LOGIC', 'vcc : STD_LOGIC', 'zero18 : STD_LOGIC_VECTOR ( 17 downto 0 )', 'zero32 : STD_LOGIC_VECTOR ( 31 downto 0 )',
+    'NLW_m_BCOUT : STD_LOGIC_VECTOR ( 17 downto 0 )']);
+  const b = build(t);
+  b.set('clk', 0); b.set('we', 0); b.set('a', 7); b.set('b', (1 << 18) - 3); b.set('addr', 1); b.set('di', 0x42);
+  b.sim.run(0); b.step();
+  assert.equal(b.val('do'), 0x55);           // INIT_A
+  assert.equal(b.val('dop'), 1);
+  b.set('clk', 1); b.step(); b.set('clk', 0); b.step();
+  assert.equal(BigInt(b.val('p')), (1n << 36n) - 21n);   // 7 * -3
+  assert.equal(b.val('do'), 0x12);           // byte 1 of INIT_00
+  assert.equal(b.val('dop'), 1);             // parity bit 1 of INITP_00
+  assert.equal(b.val('dob'), 0xBEEF1234);    // port B: 32-bit word 0
+  b.set('we', 1); b.set('clk', 1); b.step(); b.set('clk', 0); b.step();
+  assert.equal(b.val('do'), 0x12);           // READ_FIRST
+  b.set('we', 0); b.set('clk', 1); b.step(); b.set('clk', 0); b.step();
+  assert.equal(b.val('do'), 0x42);
+  assert.equal(b.val('dop'), 0);
+  assert.equal(b.val('dob'), 0xBEEF4234);
+});
+
+test('SIMPRIM models: X_LATCHE, X_OBUFT on an inout pad, X_SRLC16E, X_RAMD16; a cell without a model is an error', () => {
+  const t = netlist(['clk : in STD_LOGIC', 't : in STD_LOGIC', 'pad : inout STD_LOGIC', 'padin : out STD_LOGIC', 'q : out STD_LOGIC', 'r : out STD_LOGIC', 'm : out STD_LOGIC'], `
+  ob : X_OBUFT
+    port map (I => vcc, CTL => t, O => pad);
+  ib : X_BUF
+    port map (I => pad, O => padin);
+  la : X_LATCHE
+    generic map(
+      INIT => '1'
+    )
+    port map (I => gnd, GE => t, CLK => clk, SET => gnd, RST => gnd, O => q);
+  sr : X_SRLC16E
+    generic map(
+      INIT => X"0002"
+    )
+    port map (A0 => vcc, A1 => gnd, A2 => gnd, A3 => gnd, CE => gnd, CLK => clk, D => gnd, Q => r, Q15 => open);
+  rm : X_RAMD16
+    generic map(
+      INIT => X"0002"
+    )
+    port map (RADR0 => vcc, RADR1 => gnd, RADR2 => gnd, RADR3 => gnd, WADR0 => gnd, WADR1 => gnd, WADR2 => gnd, WADR3 => gnd, I => gnd, WE => gnd, CLK => clk, O => m);
+  g0 : X_ZERO
+    port map (O => gnd);
+  v0 : X_ONE
+    port map (O => vcc);`, ['gnd : STD_LOGIC', 'vcc : STD_LOGIC'], 'SIMPRIM');
+  const b = build(t);
+  b.set('clk', 0); b.set('t', 0);
+  b.sim.run(0); b.step();
+  assert.deepEqual(['pad', 'padin', 'q', 'r', 'm'].map(b.val), [1, 1, 1, 1, 1]);
+  b.set('t', 1); b.set('clk', 1); b.step();
+  assert.deepEqual(['pad', 'q'].map(b.val), ['z', 0]);
+  const bad = netlist(['a : in STD_LOGIC', 'y : out STD_LOGIC'], '  u : X_NO_SUCH_CELL\n    port map (I => a, O => y);', [], 'SIMPRIM');
+  const srcs = [{ path: 'n.vhd', lang: 'vhdl', text: bad }];
+  const d = elaborate(compile([...primitiveSources(srcs), ...srcs]), 'main');
+  assert.ok(d.top && d.diags.some((e) => e.severity === 'error' && /x_no_such_cell/i.test(e.message)));
+});

@@ -426,7 +426,10 @@ const partIndex = new Map(PARTS.map(p => [p.part, p]));
 /** Part record (any family) by name, case-insensitive; also accepts a full ISE part string (xc6slx9-2csg324). */
 export function findPart(part) {
   const s = String(part || '').trim().toLowerCase();
-  return partIndex.get(s) || partIndex.get(s.split('-')[0]) || null;
+  if (partIndex.has(s)) return partIndex.get(s);
+  // a full ISE part string: <part>-<package><speed> or <part>-<speed>-<package>
+  const m = /^([a-z0-9]+)-[a-z0-9-]+$/.exec(s);
+  return m ? partIndex.get(m[1]) || null : null;
 }
 
 /** Family record by id ('spartan6') or by ISE name ('Spartan6', 'Spartan3A and Spartan3AN'). */

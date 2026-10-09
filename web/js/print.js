@@ -47,6 +47,7 @@ export function svgSnapshot(svg, world, bounds, drop = []) {
 const PAPERS = { A4: [210, 297], A3: [297, 420], Letter: [216, 279] };
 const MARGIN = 10;   // mm, page margin
 const CAPTION = 7;   // mm, page caption (title, page number)
+const SLACK = 0.5;   // mm, the page box stays this much shorter than the printable area (no blank extra page)
 
 /**
  * Page layout of a drawing of `bounds` ({w, h} in drawing units, 1 unit = 1 screen px):
@@ -57,7 +58,8 @@ export function pageLayout(bounds, { paper = 'A4', orient = 'auto', across = 1 }
   const land = orient === 'landscape' || (orient === 'auto' && bounds.w >= bounds.h);
   if (land) [pw, ph] = [ph, pw];
   const n = Math.max(1, Math.min(20, Math.round(across) || 1));
-  const aw = pw - 2 * MARGIN, ah = ph - 2 * MARGIN - CAPTION;
+  // ah: height of drawing shown per page, which is also the step between rows of tiles
+  const aw = pw - 2 * MARGIN, ah = ph - 2 * MARGIN - CAPTION - SLACK;
   let scale = aw * n / bounds.w;
   let rows = Math.max(1, Math.ceil(bounds.h * scale / ah - 1e-6));
   if (n === 1 && rows > 1) { scale = ah / bounds.h; rows = 1; }   // one page: fit both ways
@@ -90,10 +92,10 @@ export function printHtml(title, bounds, imgUrl, L, { autoPrint = true } = {}) {
 @page { size: ${size}; margin: ${MARGIN}mm; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.page { position: relative; width: ${mm(L.aw)}; height: ${mm(L.ah + CAPTION - 0.5)}; overflow: hidden; break-after: page; page-break-after: always; }
+.page { position: relative; width: ${mm(L.aw)}; height: ${mm(L.ah + CAPTION)}; overflow: hidden; break-after: page; page-break-after: always; }
 .page:last-child { break-after: auto; page-break-after: auto; }
 header { height: ${CAPTION}mm; font: 9pt system-ui, -apple-system, "Segoe UI", sans-serif; color: #444; white-space: nowrap; overflow: hidden; }
-.art { position: absolute; left: 0; top: ${CAPTION}mm; width: ${mm(L.aw)}; height: ${mm(L.ah - 0.5)}; overflow: hidden; }
+.art { position: absolute; left: 0; top: ${CAPTION}mm; width: ${mm(L.aw)}; height: ${mm(L.ah)}; overflow: hidden; }
 .art img { position: absolute; max-width: none; }
 @media screen {
   body { background: #777; padding: 12px 0; }

@@ -3,7 +3,7 @@
 // A netlist has hundreds of LUTs and flip-flops; interpreting their VHDL models (core/unisim.js)
 // costs ~25x the RTL. An instance of one of these primitives becomes a single native process
 // with the same behaviour (VHDL signal semantics: outputs are updated one delta later).
-// Primitives not listed here (latches, SRLs, RAMs) keep their VHDL models.
+// Primitives not listed here (latches, SRLs, RAMs, multipliers, DCMs) keep their VHDL models.
 import * as V from './values.js';
 
 const bit = (v) => (v == null || Array.isArray(v) ? 2 : (v.x & 1n) ? 2 : Number(v.v & 1n));
@@ -28,6 +28,9 @@ export function nativePrimitive(name, params, ports) {
   const set = (sim, sigs, b) => { for (const s of sigs) if (bit(s.val) !== b || s.val.w !== 1) sim.nba({ sig: s, whole: true }, VAL[b]); };
   const comb = (inputs, outputs, f) => ({ inputs, outputs, init: [], fn: (sim) => set(sim, outputs, f()) });
   const b = (k) => bit(P.get(k)?.val);
+  // 2:1 mux: with an unknown select the output is known only when both inputs agree (X-pessimism,
+  // as the VHDL models in core/unisim.js)
+  const mux = (a, c, s) => comb(ins(a, c, s), outs('O', 'LO'), () => { const x = b(s); if (x === 1) return b(c); if (x === 0) return b(a); const u = b(a); return u !== 2 && u === b(c) ? u : 2; });
 
   let m;
   if ((m = LUT.exec(N))) {
@@ -75,7 +78,7 @@ export function nativePrimitive(name, params, ports) {
     case 'IBUF': case 'IBUFG': case 'OBUF': case 'BUF': case 'BUFG': case 'BUFGP': case 'X_BUF': case 'X_CKBUF': case 'X_OBUF': case 'X_IPAD': case 'X_OPAD': case 'X_BUFGP':
       return comb(ins('I'), outs('O'), () => b('I'));
     case 'MUXCY': case 'MUXCY_L': case 'MUXCY_D':
-      return comb(ins('CI', 'DI', 'S'), outs('O', 'LO'), () => { const s = b('S'); return s === 1 ? b('CI') : s === 0 ? b('DI') : (b('CI') === b('DI') ? b('CI') : 2); });
+      return mux('DI', 'CI', 'S');
     case 'XORCY': case 'XORCY_L': case 'XORCY_D': case 'X_XOR2':
       return comb(ins('CI', 'LI', 'I0', 'I1'), outs('O', 'LO'), () => { const [x, y] = N === 'X_XOR2' ? [b('I0'), b('I1')] : [b('CI'), b('LI')]; return x === 2 || y === 2 ? 2 : x ^ y; });
     case 'MULT_AND': case 'X_AND2':
@@ -83,11 +86,11 @@ export function nativePrimitive(name, params, ports) {
     case 'X_OR2':
       return comb(ins('I0', 'I1'), outs('O'), () => { const x = b('I0'), y = b('I1'); return x === 1 || y === 1 ? 1 : x === 0 && y === 0 ? 0 : 2; });
     case 'X_MUX2':
-      return comb(ins('IA', 'IB', 'SEL'), outs('O'), () => { const s = b('SEL'); return s === 1 ? b('IB') : s === 0 ? b('IA') : (b('IA') === b('IB') ? b('IA') : 2); });
+      return mux('IA', 'IB', 'SEL');
     case 'X_BUFGMUX':
-      return comb(ins('I0', 'I1', 'S'), outs('O'), () => (b('S') === 1 ? b('I1') : b('I0')));
+      return mux('I0', 'I1', 'S');
     default:
-      if (/^MUXF[5-8](_L|_D)?$/.test(N)) return comb(ins('I0', 'I1', 'S'), outs('O', 'LO'), () => { const s = b('S'); return s === 1 ? b('I1') : s === 0 ? b('I0') : (b('I0') === b('I1') ? b('I0') : 2); });
+      if (/^MUXF[5-8](_L|_D)?$/.test(N)) return mux('I0', 'I1', 'S');
       return null;
   }
 }

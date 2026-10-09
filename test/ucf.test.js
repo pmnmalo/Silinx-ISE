@@ -137,3 +137,49 @@ test('parseUcf: bus bits written as a(0) or a[0] map to a<0>', () => {
   assert.equal(a['sw<1>'].loc, 'L3');
   assert.equal(a['led<2>'].loc, 'P7');
 });
+
+test('parseUcf -> generateUcf keeps INST/OFFSET/TIMEGRP, derived TIMESPECs and their TNM_NETs', () => {
+  const src = `NET "clk" LOC = "C9" | IOSTANDARD = LVCMOS33;
+NET "clk" TNM_NET = "clk";
+TIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50%;
+NET "clk2" TNM_NET = "clk2";
+TIMESPEC "TS_clk2" = PERIOD "clk2" TS_clk / 2;
+TIMESPEC "TS_clk4" = PERIOD "clk4" "TS_clk" * 4 PHASE 1 ns;
+INST "u_ram" LOC = RAMB16_X0Y0;
+NET "din<*>" OFFSET = IN 5 ns BEFORE "clk";
+TIMEGRP "fast" = FFS(u_core/*);
+NET "a" LOC = "P11" | IOB = TRUE;
+`;
+  const u = parseUcf(src);
+  assert.deepEqual(u.clocks, [{ net: 'clk', name: 'TS_clk', tnm: 'clk', period: 20, duty: 50 }]);   // not 2 ns, not 4 ns
+  assert.deepEqual(u.other, [
+    'NET "clk2" TNM_NET = "clk2"',
+    'TIMESPEC "TS_clk2" = PERIOD "clk2" TS_clk / 2',
+    'TIMESPEC "TS_clk4" = PERIOD "clk4" "TS_clk" * 4 PHASE 1 ns',
+    'INST "u_ram" LOC = RAMB16_X0Y0',
+    'NET "din<*>" OFFSET = IN 5 ns BEFORE "clk"',
+    'TIMEGRP "fast" = FFS(u_core/*)',
+    'NET "a" IOB = TRUE',
+  ]);
+  const out = generateUcf({ assignments: u.assignments, clocks: u.clocks, other: u.other });
+  for (const o of u.other) assert.ok(out.includes(`${o} ;`), o);
+  const again = parseUcf(out);
+  assert.deepEqual(again.assignments, u.assignments);
+  assert.deepEqual(again.clocks, u.clocks);
+  assert.deepEqual(again.other, u.other);
+  assert.deepEqual(checkUcf(out).filter(d => d.severity === 'error' && !/clk4/.test(d.message)), []);
+});
+
+test('parseUcf does not throw on attributes without a value (kept verbatim)', () => {
+  const u = parseUcf('NET "a" LOC;\nNET "b" SLEW;\nNET "c" IOSTANDARD | LOC = P3;\nNET "d" DRIVE = x;\nNET "e" LOC = "";');
+  assert.deepEqual(u.assignments, { c: { loc: 'P3' } });
+  assert.deepEqual(u.other, ['NET "a" LOC', 'NET "b" SLEW', 'NET "c" IOSTANDARD', 'NET "d" DRIVE = x', 'NET "e" LOC = ""']);
+  assert.ok(checkUcf('NET "a" LOC;').some(d => /LOC needs a value/.test(d.message)));
+});
+
+test('checkUcf positions are right after comments with emoji (astral characters)', () => {
+  const d = checkUcf('# pins \u{1F389}\u{1F389} for the board\nNET "a" LOC = A1 | DRIVE = 7;\n');
+  assert.equal(d.length, 1);
+  assert.deepEqual([d[0].line, d[0].col], [2, 28]);
+  assert.match(d[0].message, /invalid DRIVE/);
+});

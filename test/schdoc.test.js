@@ -250,6 +250,40 @@ endmodule`;
     else assert.ok(log.includes('note:done'), log.join('\n'));
   });
 
+  test(`generateHdl ${lang}: unconnected inputs are tied to 0 (inverted inputs read as all ones)`, () => {
+    const doc = newDoc('opens', lang);
+    const at = (s, pin, net) => { const p = pinAt(doc, s, pin); doc.labels.push({ id: `L${doc.labels.length + 1}`, x: p.x, y: p.y, net }); };
+    const g1 = sym(doc, 'and2b1', 200, 100);              // I0 (inverted) open: y = a
+    const ad = sym(doc, 'add', 200, 300, { width: 4 });    // B open: s = b
+    const mx = sym(doc, 'mux4', 200, 500, { width: 4 });   // S, D1..D3 open: m = D0 = b
+    const g2 = sym(doc, 'nor2b1', 200, 700, { width: 4 }); // I0 (inverted) open: n = ~(1111 | b) = 0
+    at(g1, 'I1', 'a'); at(g1, 'O', 'y');
+    at(ad, 'A', 'b'); at(ad, 'S', 's');
+    at(mx, 'D0', 'b'); at(mx, 'O', 'm');
+    at(g2, 'I1', 'b'); at(g2, 'O', 'n');
+    port(doc, 'a', 'in', 900, 100); port(doc, 'b', 'in', 900, 140, 4);
+    for (const [i, [nm, w]] of [['y', 1], ['s', 4], ['m', 4], ['n', 4]].entries()) port(doc, nm, 'out', 900, 200 + 40 * i, w);
+    const g = generateHdl(doc, { lang });
+    assert.deepEqual(g.diagnostics.filter(d => d.severity === 'error'), [], g.code);
+    const warns = g.diagnostics.map(d => d.message).join('\n');
+    for (const w of ['U1: input I0', 'U2: input B', 'U3: input S', 'U4: input I0']) assert.match(warns, new RegExp(`${w} unconnected, tied to 0`));
+    assert.doesNotMatch(g.code, /net_\d/, 'no undriven net is declared or read');
+    if (lang === 'vhdl') assert.doesNotMatch(g.code, /unsigned\(\(others|select\s+\(others|and \(others|or \(others/, g.code);
+    const tb = `module tb;
+  reg a; reg [3:0] b; wire y; wire [3:0] s, m, n; integer i, errs = 0;
+  opens u (.a(a), .b(b), .y(y), .s(s), .m(m), .n(n));
+  initial begin
+    for (i = 0; i < 32; i = i + 1) begin
+      {a, b} = i; #10;
+      if (y !== a || s !== b || m !== b || n !== 4'b0000) errs = errs + 1;
+    end
+    $display("errs=%0d", errs);
+  end
+endmodule`;
+    const r = runSim({ [g.filename]: g.code, 'tb.v': tb }, 'tb');
+    assert.ok(logOf(r).includes('print:errs=0'), `${logOf(r).join('\n')}\n${g.code}`);
+  });
+
   test(`generateHdl ${lang}: register + adder counter with clock and reset`, () => {
     // q <= q + 1 every clock when en, async reset
     const doc = newDoc('cnt8', lang);
@@ -471,6 +505,29 @@ test('round trip Verilog top (instance with constant ports, generate of gate pri
       assert.equal(doc.symbols.filter(s => s.type === 'constant').length, 2);
     },
   });
+});
+
+test('round trip Verilog `initial r = ...` next to the always block driving r (power-up value, not a second driver)', async () => {
+  const files = {
+    'init.v': `module initreg(input clk, input [3:0] d, output reg [3:0] q, output [3:0] p);
+  reg [3:0] r;
+  initial q = 4'd3;
+  initial r = 4'd9;
+  always @(posedge clk) q <= d;
+  always @(posedge clk) r <= q;
+  assign p = r;
+endmodule`,
+    'tb_init.v': `module tb_init; reg clk = 0; reg [3:0] d = 4'd5; wire [3:0] q, p;
+  initreg dut(.clk(clk), .d(d), .q(q), .p(p));
+  always #5 clk = ~clk;
+  initial begin #1 $display("q=%0d p=%0d", q, p); #12 d = 4'd7; #20 $display("q=%0d p=%0d", q, p); $finish; end
+endmodule`,
+  };
+  const { b } = await roundTrip({
+    files, module: 'initreg', file: 'init.v', tb: 'tb_init', until: 1e5,
+    expect: (doc, nl) => assert.equal(nl.diagnostics.filter(x => /drivers/.test(x.message)).length, 0),
+  });
+  assert.deepEqual(logOf(b).filter(l => l.startsWith('print:')), ['print:q=3 p=9', 'print:q=7 p=7']);
 });
 
 const GATES_V = `

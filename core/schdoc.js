@@ -959,7 +959,12 @@ export function generateHdl(docIn, opts = {}) {
   }
   // net names & types
   const netName = net => (net ? (portOf.get(net)?.name ?? net.name) : null);
-  const P = (sym, pin) => { const n = nl.pinNet.get(`${sym.id}/${pin}`); return n ? netName(n) : null; };
+  // netlist() gives every pin a net: a net made of that pin alone (maybe with a dangling wire,
+  // but no other pin, I/O marker or label) is an unconnected pin
+  const isolated = n => n.endpoints.length === 1 && !n.labels.length && !n.ports.length && !portOf.has(n);
+  /** Net read by an input pin, or null when the pin is unconnected. */
+  const inNet = (sym, pin) => { const n = nl.pinNet.get(`${sym.id}/${pin}`); return n && !isolated(n) ? n : null; };
+  const P = (sym, pin) => { const n = inNet(sym, pin); return n ? netName(n) : null; };
   const PW = (sym, pin) => nl.pinNet.get(`${sym.id}/${pin}`)?.width ?? defs.get(sym.id).pins.find(p => p.name === pin)?.width ?? 1;
   for (const net of nl.nets) {
     if (!portOf.has(net) && !net.auto && !validIdent(net.name, lang)) diags.push({ severity: 'error', message: `net name '${net.name}' is not a valid ${lang.toUpperCase()} identifier`, ref: { kind: 'label', id: net.labels[0] }, net: net.name });
@@ -1001,8 +1006,20 @@ export function generateHdl(docIn, opts = {}) {
   const fresh = base => { let b = base.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'n'; if (!/^[A-Za-z]/.test(b)) b = 'u' + b; let k = 0, nm = b; while (used.has(nk(nm)) || !validIdent(nm, lang)) nm = `${b}_${++k}`; used.add(nk(nm)); return nm; };
   const warnOpen = (s, pin) => diags.push({ severity: 'warning', message: `${s.name}: input ${pin} unconnected, tied to 0`, ref: { kind: 'symbol', id: s.id, pin } });
   const zero = w => (ci ? (w > 1 ? '(others => \'0\')' : "'0'") : `${w}'b0`);
-  const IN = (s, pin) => { const n = P(s, pin); if (n) return n; warnOpen(s, pin); return zero(PW(s, pin)); };
   const ones = w => (ci ? (w > 1 ? `"${'1'.repeat(w)}"` : "'1'") : `${w}'b${'1'.repeat(w)}`);
+  // constant value of an unconnected input. It goes through a signal when it is indexed
+  // (`named`) and, in VHDL, when it is a vector: neither an aggregate nor a string literal is
+  // legal as the operand of unsigned(...) or as a `with ... select` selector
+  const tie = (s, pin, bit, named = false) => {
+    const w = PW(s, pin);
+    if (!named && (!ci || w === 1)) return bit === '1' ? ones(w) : zero(w);
+    const t = fresh(`${s.name}_${pin}_${bit === '1' ? 'ones' : 'zero'}`);
+    extra.push(ci ? { name: t, type: vtype(w) } : { name: t, width: w });
+    if (ci) body.push(`${t} <= ${w > 1 ? `(others => '${bit}')` : `'${bit}'`};`);
+    else assign(t, bit === '1' ? ones(w) : zero(w));
+    return t;
+  };
+  const IN = (s, pin, named) => { const n = P(s, pin); if (n) return n; warnOpen(s, pin); return tie(s, pin, '0', named); };
   const assign = (lhs, rhs) => body.push(ci ? `${lhs} <= ${rhs};` : `assign ${lhs} = ${rhs};`);
   // VHDL-93 cannot read 'out' ports: route internal readers through a local copy
   const outRead = new Map();
@@ -1021,7 +1038,7 @@ export function generateHdl(docIn, opts = {}) {
     }
   }
   const OUTN = (s, pin) => { const n = nl.pinNet.get(`${s.id}/${pin}`); if (!n) return null; return outRead.get(n) || netName(n); };
-  const INN = (s, pin) => { const n = nl.pinNet.get(`${s.id}/${pin}`); if (n && outRead.has(n)) return outRead.get(n); return IN(s, pin); };
+  const INN = (s, pin, named) => { const n = inNet(s, pin); if (n && outRead.has(n)) return outRead.get(n); return IN(s, pin, named); };
   const castU = (x, cls, sgn) => (sgn ? `signed(${x})` : `unsigned(${x})`);
   const wrapV = (expr, cls) => (cls === 'u' || cls === 's' ? (cls === 's' ? `signed(${expr})` : expr) : `std_logic_vector(${expr})`);
 
@@ -1037,8 +1054,8 @@ export function generateHdl(docIn, opts = {}) {
       const ins = def.pins.filter(q => q.dir === 'in').map(q => {
         if (!q.inv) return INN(s, q.name);
         // inverted input (ANDnBk...): an unconnected one is tied to 0, i.e. reads as all ones
-        const n = nl.pinNet.get(`${s.id}/${q.name}`);
-        if (!n) { warnOpen(s, q.name); return ones(PW(s, q.name)); }
+        const n = inNet(s, q.name);
+        if (!n) { warnOpen(s, q.name); return tie(s, q.name, '1'); }
         return ci ? `(not ${outRead.get(n) || netName(n)})` : `~${outRead.get(n) || netName(n)}`;
       });
       let rhs;
@@ -1111,7 +1128,7 @@ export function generateHdl(docIn, opts = {}) {
           const d0 = INN(s, 'D0'), d1 = INN(s, 'D1'), sel = INN(s, 'S0');
           if (ci) body.push(`${o} <= ${d1} when ${sel} = '1' else ${d0};`); else assign(o, `${sel} ? ${d1} : ${d0}`);
         } else {
-          const d = [0, 1, 2, 3].map(i => INN(s, `D${i}`)), sel = INN(s, 'S');
+          const d = [0, 1, 2, 3].map(i => INN(s, `D${i}`)), sel = INN(s, 'S', true);
           if (ci) body.push(`with ${sel} select ${o} <=\n  ${d[0]} when "00",\n  ${d[1]} when "01",\n  ${d[2]} when "10",\n  ${d[3]} when others;`);
           else assign(o, `${sel}[1] ? (${sel}[0] ? ${d[3]} : ${d[2]}) : (${sel}[0] ? ${d[1]} : ${d[0]})`);
         }
@@ -1119,8 +1136,8 @@ export function generateHdl(docIn, opts = {}) {
       }
       case 'demux': {
         const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k;
-        const dn = nl.pinNet.get(`${s.id}/D`);
-        const sp = k === 1 ? 'S0' : 'S', sn = nl.pinNet.get(`${s.id}/${sp}`);
+        const dn = inNet(s, 'D');
+        const sp = k === 1 ? 'S0' : 'S', sn = inNet(s, sp);
         if (!dn) warnOpen(s, 'D');
         if (!sn) warnOpen(s, sp);
         const d = dn ? (outRead.get(dn) || netName(dn)) : null, sel = sn ? (outRead.get(sn) || netName(sn)) : null;
@@ -1143,7 +1160,7 @@ export function generateHdl(docIn, opts = {}) {
         // bit j of an input pin group: bus pin (bus mode) or one pin per bit; null when unconnected (tied to 0)
         const bitIn = (bus, base, j) => {
           const pin = bus ? base : `${base}${j}`;
-          const n = nl.pinNet.get(`${s.id}/${pin}`);
+          const n = inNet(s, pin);
           if (!n) { if (!bus || j === 0) warnOpen(s, pin); return null; }
           const nm = outRead.get(n) || netName(n);
           return bus ? (ci ? `${nm}(${j})` : `${nm}[${j}]`) : nm;
@@ -1270,7 +1287,7 @@ export function generateHdl(docIn, opts = {}) {
       }
       case 'slice': {
         const o = OUTN(s, 'O'); if (!o) continue;
-        const i = INN(s, 'I');
+        const i = INN(s, 'I', true);
         const msb = int(p.msb, 0), lsb = int(p.lsb, 0);
         const ow = Math.abs(msb - lsb) + 1;
         const outIsVec = ci ? clsOf(o) !== 'sl' : true;
@@ -1392,6 +1409,8 @@ export function generateHdl(docIn, opts = {}) {
     const nm = net.name;
     if (declared.has(nk(nm))) continue;
     if (!net.endpoints.length) continue;
+    if (isolated(net) && net.auto && net.endpoints[0].kind === 'pin' && net.endpoints[0].dir !== 'out'
+      && !['module', 'hdlblock'].includes(doc.symbols.find(x => x.id === net.endpoints[0].sym)?.type)) continue;
     const iv = init.get(net);
     if (ci) sigDecls.push(`  signal ${nm} : ${netType(net)}${iv ? ` := ${vhdlClass(netType(net)) === 'sl' ? vhdlBits(iv, true) : vhdlBits(iv, false)}` : ''};`);
     else {
@@ -1876,6 +1895,10 @@ export async function schematicFromHdl(inst, opts = {}) {
   }
 
   // ---- items
+  // signals written by items other than Verilog `initial` blocks: an `initial r = ...;` next to
+  // the always block that drives r only gives r its power-up value, it is not a second driver
+  const drivenElsewhere = new Set();
+  for (const it of mod.items || []) if (!(it.kind === 'process' && it.initial)) for (const x of itemRW.get(it)?.writes || []) drivenElsewhere.add(x);
   let blockK = 0;
   for (const it of mod.items || []) {
     const span = itemSpan.get(it);
@@ -1960,7 +1983,7 @@ export async function schematicFromHdl(inst, opts = {}) {
     // 3. everything else -> HDL block carrying the original text
     const kindTag = it.kind === 'process' ? (it.initial || it.sens === null ? 'tb' : rw.clocks.size ? 'reg' : 'comb') : it.kind === 'instance' ? 'inst' : it.kind.startsWith('generate') ? 'gen' : 'logic';
     const procedural = rw.procs.some(p => p.kind === 'process');
-    const outs = [...rw.writes];
+    const outs = [...rw.writes].filter(x => !(it.kind === 'process' && it.initial && drivenElsewhere.has(x)));
     const ins = [...rw.reads].filter(s => !rw.writes.has(s));
     const clocks = ins.filter(s => rw.clocks.has(s));
     const others = ins.filter(s => !rw.clocks.has(s));
