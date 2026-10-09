@@ -236,6 +236,10 @@ export class Simulator {
     const sim = this;
     switch (p.mode) {
       case 'initial': return (function* () { yield* exec(body, ctx); })();
+      case 'native': return (function* () {   // netlist primitive evaluated in JavaScript (core/native.js)
+        const fn = p.native;
+        for (;;) { fn(sim); yield triggers.length ? { triggers } : { forever: true }; }
+      })();
       case 'loop': return (function* () {
         for (;;) {
           const t0 = sim.now, s0 = sim.stamp;

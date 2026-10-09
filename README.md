@@ -47,6 +47,13 @@ for Xilinx FPGAs supported by ISE 14.7.
   wired by the UCF: click the slide switches, press the buttons, watch the LEDs and the
   multiplexed 7-segment display (persistence of vision), at a chosen clock rate, with a watch list
   of internal signals. It simulates the HDL, so it works without ISE and in the standalone edition.
+  With ISE it can also run what the tools built: the post-synthesis, post-translate, post-map or
+  post-place & route netlist (netgen), on the board or in ISim, with Silinx's own models of the
+  UNISIM / SIMPRIM primitives (functional, no SDF timing).
+- **ISE processes** beyond the main flow: View Technology Schematic (the post-synthesis netlist,
+  regrouped by the design's modules), Generate Post-Synthesis / Translate / Map / Place & Route
+  Simulation Model, Post-Place & Route Static Timing, Text Power Report (xpwr), Back-annotate Pin
+  Locations (pin2ucf, merged into the UCF).
 - **Behavioural simulation** with Silinx's own simulator, written from scratch in JavaScript:
   4-state logic, delta cycles, VHDL/Verilog testbenches (`wait`, `#delay`, `assert`/`report`,
   `$display`, `$readmemh`…), an **ISim**-style waveform window, force/clock to simulate modules

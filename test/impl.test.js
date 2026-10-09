@@ -473,3 +473,14 @@ test('xise import of an ISE-written file', () => {
   assert.equal(r.impl.startupClk, 'Cclk');
   assert.throws(() => xise.importXise('<foo/>'), /not an ISE/);
 });
+
+test('optional flow steps: simulation models, pin2ucf, xpwr', () => {
+  assert.deepEqual(ise.normalizeSteps(['par', 'postsynth', 'xpwr']), ['synth', 'postsynth', 'translate', 'map', 'par', 'trce', 'xpwr'].filter((s) => ['par', 'postsynth', 'xpwr', 'trce'].includes(s)));
+  const sh = ise.generateRunSh({ top: 'top', device: DEVICE, hasUcf: true });
+  assert.match(sh, /netgen -intstyle xflow -sim -ofmt vhdl -w top\.ngc netgen\/synthesis\/top_synthesis\.vhd/);
+  assert.match(sh, /netgen -intstyle xflow -sim -ofmt vhdl -w -pcf top\.pcf top\.ncd netgen\/par\/top_timesim\.vhd/);
+  assert.match(sh, /pin2ucf top\.ncd -o top_pins\.ucf/);
+  assert.match(sh, /xpwr -intstyle xflow -v -o top\.pwr top\.ncd top\.pcf/);
+  const p = ise.parsePwr('| Supply Power (mW)    | 52.46 | 1.50    | 50.96        |\n| Junction Temp (C)   | 27.5 |');
+  assert.deepEqual(p, { totalMw: 52.46, dynamicMw: 1.5, staticMw: 50.96, junctionC: 27.5 });
+});

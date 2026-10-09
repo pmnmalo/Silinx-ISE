@@ -2136,6 +2136,11 @@ async function placeAndRoute(doc, conns, { layout, modules, nk }) {
           'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', 'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
           'elk.layered.unnecessaryBendpoints': 'false', 'elk.padding': '[top=60,left=60,bottom=60,right=60]',
           'elk.separateConnectedComponents': 'false',
+          // large graphs (technology schematics: hundreds of LUTs / flip-flops): cheaper placement
+          ...(children.length > 100 || edges.length > 500 ? {
+            'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF', 'elk.layered.thoroughness': '1',
+            'elk.layered.crossingMinimization.greedySwitch.type': 'OFF', 'elk.layered.considerModelOrder.strategy': 'NONE',
+          } : {}),
         },
         children, edges: edges.map(({ _net, ...e }) => e),
       };

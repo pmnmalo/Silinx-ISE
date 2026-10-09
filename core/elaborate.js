@@ -9,6 +9,7 @@
 // Bound statements: blk asg if case for forrange while repeat forever exit next ret null delay event wait task sys report assert
 import * as V from './values.js';
 import { evalE, runSync, exec, SimError, strToVal, bitpos } from './interp.js';
+import { nativePrimitive } from './native.js';
 
 export const INT = { kind: 'int', w: 32, s: true, left: 31, right: 0, desc: true };
 export const BOOL = { kind: 'bool', w: 1, s: false, left: 0, right: 0, desc: true, scalar: true };
@@ -136,7 +137,9 @@ function packageScope(ctx, name, file, loc, diagE) {
   }
   const sc = new Scope(usesScope(ctx, pkg, 'vhdl'));
   ctx.pkgScopes.set(name, sc);
-  const E = { ctx, lang: 'vhdl', sc, inst: null, file: pkg.file, timeUnit: 1, fb: null, prefix: '' };
+  // package-level signals (e.g. SIMPRIM's GSR / GTS) belong to the package: one per design
+  const pinst = { name: pkg.name, path: pkg.name, signals: [], procs: [], children: [], params: [], ports: [] };
+  const E = { ctx, lang: 'vhdl', sc, inst: pinst, file: pkg.file, timeUnit: 1, fb: null, prefix: '' };
   for (const d of pkg.decls) {
     try { bindDecl(E, d); } catch (e) { if (!(e instanceof ElabError)) throw e; diag(E, e.message, e.loc || d.loc); }
   }
@@ -195,6 +198,17 @@ function elabInstance(ctx, mod, name, path, paramOverrides, portConns, parentIns
   for (const d of funcs) safe(E, d.loc, () => bindDecl(E, d));
   for (const d of early) safe(E, d.loc, () => bindDecl(E, d));
   for (const p of mod.ports) safe(E, p.loc, () => elabPort(E, p, portConns.get(p.name)));
+  // Silinx's own netlist primitives (core/unisim.js) run as native processes (core/native.js)
+  if (String(mod.file || '').startsWith('<silinx>/')) {
+    const nat = nativePrimitive(mod.name, inst.params, inst.ports);
+    if (nat) {
+      for (const [sig, v] of nat.init) { sig.init = v; sig.val = v; }
+      const proc = addProc(E, { name: mod.name.toUpperCase(), kind: 'native', mode: 'native', native: nat.fn, body: { k: 'null' },
+        triggers: nat.inputs.map((sig) => ({ sig, edge: 'any' })), lang: 'vhdl', loc: mod.loc, file: inst.file, inst });
+      proc.writes = new Set(nat.outputs);
+      return inst;
+    }
+  }
   for (const d of late) safe(E, d.loc, () => bindDecl(E, d));
   elabItems(E, mod.items);
   return inst;

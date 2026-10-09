@@ -382,6 +382,7 @@ function processDefs() {
     { id: 'isim', label: 'ISim Simulator', ico: 'sim', children: [
       { id: 'sim-check', label: 'Behavioral Check Syntax', ico: 'process', run: () => checkSyntax(mod, true) },
       { id: 'sim-run', label: 'Simulate Behavioral Model', ico: 'wave', run: () => runSimulation(mod) },
+      ...Object.entries(SIM_MODEL_NAMES).map(([step, name]) => ({ id: `sim-${step}`, label: `Simulate ${name} Model`, ico: 'wave', run: () => runSimulation(mod, step) })),
     ] },
     { id: 'rtl-sim', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
   ];
@@ -403,15 +404,29 @@ function processDefs() {
     ] },
     { id: 'synth', label: 'Synthesize - XST', ico: 'process', run: () => runImpl(mod, ['synth']), children: [
       { id: 'rtl', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
+      { id: 'tech', label: 'View Technology Schematic', ico: 'schematic', run: () => openTechSchematic(mod) },
       { id: 'check', label: 'Check Syntax', ico: 'process', run: () => checkSyntax(mod) },
+      { id: 'postsynth', label: EXTRA_STEPS.postsynth, ico: 'process', run: () => generateSimModel(mod, 'postsynth') },
     ] },
     { id: 'impl', label: 'Implement Design', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par']), children: [
-      { id: 'translate', label: 'Translate', ico: 'process', run: () => runImpl(mod, ['synth', 'translate']) },
-      { id: 'map', label: 'Map', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map']) },
-      { id: 'par', label: 'Place & Route', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par']) },
+      { id: 'translate', label: 'Translate', ico: 'process', run: () => runImpl(mod, ['synth', 'translate']), children: [
+        { id: 'posttrans', label: EXTRA_STEPS.posttrans, ico: 'process', run: () => generateSimModel(mod, 'posttrans') },
+      ] },
+      { id: 'map', label: 'Map', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map']), children: [
+        { id: 'postmap', label: EXTRA_STEPS.postmap, ico: 'process', run: () => generateSimModel(mod, 'postmap') },
+      ] },
+      { id: 'par', label: 'Place & Route', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par']), children: [
+        { id: 'trce', label: EXTRA_STEPS.trce, ico: 'process', run: () => postParTiming(mod) },
+        { id: 'xpwr', label: EXTRA_STEPS.xpwr, ico: 'process', run: () => textPowerReport(mod) },
+        { id: 'postpar', label: EXTRA_STEPS.postpar, ico: 'process', run: () => generateSimModel(mod, 'postpar') },
+        { id: 'pin2ucf', label: EXTRA_STEPS.pin2ucf, ico: 'process', run: () => backAnnotatePins(mod) },
+      ] },
     ] },
     { id: 'bitgen', label: 'Generate Programming File', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par', 'bitgen']) },
-    { id: 'emulate', label: 'Emulate on Board (RTL)', ico: 'board', run: () => openEmulator(mod) },
+    { id: 'emulate', label: 'Emulate on Board', ico: 'board', run: () => openEmulator(mod), children: [
+      { id: 'emulate-rtl', label: 'Emulate Behavioral Model (RTL)', ico: 'board', run: () => openEmulator(mod) },
+      ...Object.entries(SIM_MODEL_NAMES).map(([step, name]) => ({ id: `emulate-${step}`, label: `Emulate ${name} Model`, ico: 'board', run: () => openEmulator(mod, { model: step }) })),
+    ] },
     { id: 'config', label: 'Configure Target Device', ico: 'impact', run: () => openImpact(), children: [
       { id: 'impact', label: 'Manage Configuration Project (iMPACT)', ico: 'impact', run: () => openImpact() },
     ] },
@@ -556,7 +571,14 @@ async function checkFileSyntax(path) {
 // build/silinx-status.json with a fingerprint of the sources + constraints, and restored when the
 // project is opened (marked out of date if the sources changed since). Older builds without that
 // file get their marks from ISE's reports and output files.
-const IMPL_IDS = ['synth', 'translate', 'map', 'par', 'impl', 'bitgen'];
+const IMPL_IDS = ['synth', 'translate', 'map', 'par', 'impl', 'bitgen', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'xpwr', 'trce'];
+// optional steps of the ISE flow: process label (ISE names) and what they produce
+const EXTRA_STEPS = {
+  postsynth: 'Generate Post-Synthesis Simulation Model', posttrans: 'Generate Post-Translate Simulation Model',
+  postmap: 'Generate Post-Map Simulation Model', postpar: 'Generate Post-Place & Route Simulation Model',
+  pin2ucf: 'Back-annotate Pin Locations', xpwr: 'Generate Text Power Report', trce: 'Generate Post-Place & Route Static Timing',
+};
+const SIM_MODEL_NAMES = { postsynth: 'Post-Synthesis', posttrans: 'Post-Translate', postmap: 'Post-Map', postpar: 'Post-Place & Route' };
 const STATUS_FILE = 'build/silinx-status.json';
 
 function sourcesFingerprint() {
@@ -610,8 +632,10 @@ async function restoreImplStatus() {
 
 // ------------------------------------------------------------------ implementation (ISE)
 // Live per-step status from run.sh's "=== SILINX STEP <step> ===" markers and ISE WARNING/ERROR lines.
-const STEP_PROC = { synth: 'synth', translate: 'translate', map: 'map', par: 'par', trce: 'par', bitgen: 'bitgen', prombit: 'bitgen' };
-const STEP_TOOL = { synth: 'Xst', translate: 'NgdBuild', map: 'Map', par: 'Par', trce: 'Timing', bitgen: 'Bitgen', prombit: 'Bitgen' };
+const STEP_PROC = { synth: 'synth', translate: 'translate', map: 'map', par: 'par', trce: 'par', bitgen: 'bitgen', prombit: 'bitgen',
+  postsynth: 'postsynth', posttrans: 'posttrans', postmap: 'postmap', postpar: 'postpar', pin2ucf: 'pin2ucf', xpwr: 'xpwr' };
+const STEP_TOOL = { synth: 'Xst', translate: 'NgdBuild', map: 'Map', par: 'Par', trce: 'Timing', bitgen: 'Bitgen', prombit: 'Bitgen',
+  postsynth: 'NetListWriters', posttrans: 'NetListWriters', postmap: 'NetListWriters', postpar: 'NetListWriters', pin2ucf: 'Pin2UCF', xpwr: 'Power' };
 const RANK = { ok: 0, warn: 1, err: 2 };
 const worst = (...xs) => xs.filter(Boolean).reduce((a, b) => (RANK[b] > RANK[a] ? b : a), 'ok');
 
@@ -760,14 +784,16 @@ export async function regenerateUcf(board = projectBoard()) {
   log(`${pj.constraints} regenerated for ${board.name}: ${matched.join(', ') || 'no ports matched'}${unmatched.length ? `; NOT assigned (use I/O Pin Planning): ${unmatched.join(', ')}` : ''}`, unmatched.length ? 'warn' : 'ok');
   return unmatched.length === 0;
 }
-async function runImpl(mod, steps) {
+async function runImpl(mod, steps, opts = {}) {
+  let ok = false;
   if (S.project.top !== mod) {
     if (!await confirmDlg('Set Top Module', `'${mod}' is not the top-level module of the implementation.\nSet it as top and continue?`)) return;
     await setTop(mod, false);
   }
   S.diags = S.diags.filter(d => d.source !== 'console');   // new run: drop the previous run's messages
-  const procId = steps.includes('bitgen') ? 'bitgen' : steps.includes('translate') ? 'impl' : 'synth';
-  const procName = { synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId];
+  const extra = [...steps].reverse().find(st => EXTRA_STEPS[st] && st !== 'trce') || (opts.timing ? 'trce' : null);
+  const procId = extra || (steps.includes('bitgen') ? 'bitgen' : steps.includes('translate') ? 'impl' : 'synth');
+  const procName = EXTRA_STEPS[procId] || { synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId];
   // Synthesize - XST always starts with Check Syntax (same messages as the Check Syntax process)
   if (!await checkSyntax(mod)) {
     setStatus('synth', 'err');
@@ -811,7 +837,9 @@ async function runImpl(mod, steps) {
     }
     if (tc.ise.available) { await applyReportWarnings(track); saveImplStatus(); }
     if (res.status === 'ok' && tc.ise.available) {
-      log(`\nProcess "${{ synth: 'Synthesize - XST', impl: 'Implement Design', bitgen: 'Generate Programming File' }[procId]}" completed successfully${track.warnings ? ` with ${track.warnings} warning(s)` : ''}`, 'ok');
+      log(`\nProcess "${procName}" completed successfully${track.warnings ? ` with ${track.warnings} warning(s)` : ''}`, 'ok');
+      if (extra) setStatus(procId, track.warnings ? 'warn' : 'ok');
+      ok = true;
     } else if (res.status === 'ok') {
       setStatus(procId, 'warn');
       log(`\nScripts generated in ${S.project.name}/build (ISE not run).`, 'warn');
@@ -832,6 +860,51 @@ async function runImpl(mod, steps) {
     status('Ready');
     renderProcesses();
   }
+  return ok;
+}
+
+// ---- optional ISE processes: simulation models, timing, power, pins
+const FLOW_UP_TO = { synth: ['synth'], translate: ['synth', 'translate'], map: ['synth', 'translate', 'map'], par: ['synth', 'translate', 'map', 'par'] };
+async function generateSimModel(mod, step) {
+  const stage = { postsynth: 'synth', posttrans: 'translate', postmap: 'map', postpar: 'par' }[step];
+  if (await runImpl(mod, [...FLOW_UP_TO[stage], step])) {
+    const rel = (await api.reports(S.project.name).catch(() => null))?.simModels?.[step]?.path;
+    if (rel) log(`${SIM_MODEL_NAMES[step]} simulation model: ${rel} (simulate it in the Simulation view, or emulate it on the board).`, 'ok');
+  }
+}
+async function postParTiming(mod) {
+  if (await runImpl(mod, FLOW_UP_TO.par, { timing: true })) openSummary();
+}
+async function textPowerReport(mod) {
+  if (!await runImpl(mod, [...FLOW_UP_TO.par, 'xpwr'])) return;
+  const rel = `build/${S.project.top}.pwr`;
+  try { showTextDoc(`${S.project.top}.pwr`, await api.readFile(S.project.name, rel)); } catch (e) { log(`WARNING: cannot read ${rel}: ${e.message}`, 'warn'); }
+}
+// Back-annotate Pin Locations: the pins chosen by the tools (pin2ucf) are added to the project's
+// UCF for the ports that have no LOC yet (existing LOCs are never changed).
+async function backAnnotatePins(mod) {
+  if (!await runImpl(mod, [...FLOW_UP_TO.par, 'pin2ucf'])) return;
+  const { parseUcf } = await import('/core/ucf.js');
+  let pins;
+  try { pins = parseUcf(await api.readFile(S.project.name, `build/${S.project.top}_pins.ucf`)).assignments; } catch (e) { log(`WARNING: no pin file: ${e.message}`, 'warn'); return; }
+  const cur = S.ucfText ? parseUcf(S.ucfText).assignments : {};
+  const have = new Set(Object.keys(cur).filter(k => cur[k].loc).map(k => k.toLowerCase()));
+  const add = Object.entries(pins).filter(([net, a]) => a.loc && !have.has(net.toLowerCase()));
+  if (!add.length) { log('Back-annotate Pin Locations: every port already has a LOC in the UCF (nothing to add).', 'ok'); return; }
+  const lines = add.map(([net, a]) => `NET "${net}" LOC = "${a.loc}";`);
+  if (!await confirmDlg('Back-annotate Pin Locations', `Add the ${add.length} pin location(s) chosen by the tools to ${S.project.constraints || 'the UCF'}?\n\n${lines.slice(0, 12).join('\n')}${add.length > 12 ? '\n…' : ''}`)) return;
+  const file = S.project.constraints || `${S.project.top}.ucf`;
+  const text = `${(S.ucfText || '').replace(/\s*$/, '\n')}\n# Back-annotated pin locations (pin2ucf, ${new Date().toISOString().slice(0, 10)})\n${lines.join('\n')}\n`;
+  await api.writeFile(S.project.name, file, text);
+  if (!S.project.constraints) { S.project.constraints = file; await saveProjectJson(); }
+  await reloadProject(false);
+  log(`Back-annotated ${add.length} pin location(s) into ${file}.`, 'ok');
+}
+function showTextDoc(title, text) {
+  const id = `text:${title}`;
+  const old = findDoc(id);
+  if (old) closeDoc(old);
+  openDoc({ id, title, icon: 'report', create(el) { el.append(h('pre', { class: 'report-text', style: { margin: 0, padding: '8px', overflow: 'auto', height: '100%', boxSizing: 'border-box', font: '12px var(--mono)' } }, text)); } });
 }
 
 // Stop the running implementation (kills the ISE tool / container run.sh via the job manager).
@@ -1059,27 +1132,64 @@ function openInstTemplate(mod) {
 }
 
 // ---- schematic
-async function openSchematic(mod) {
+// Netlist written by netgen for `step` (postsynth / posttrans / postmap / postpar) with the
+// Silinx primitive models, ready to compile; null (after telling the user) when not generated.
+async function netlistSources(step, { hier = false } = {}) {
+  const name = SIM_MODEL_NAMES[step];
+  let rep = null;
+  try { rep = await api.reports(S.project.name); } catch { /* none */ }
+  const m = rep?.simModels?.[step];
+  if (!m || rep.top !== S.project.top) {
+    alertDlg(`${name} Model`, `There is no ${name.toLowerCase()} simulation model of '${S.project.top}' yet.\n\nRun "${EXTRA_STEPS[step]}" in the Implementation view first (it needs the Xilinx ISE toolchain).`);
+    return null;
+  }
+  const stage = { postsynth: 'synth', posttrans: 'translate', postmap: 'map', postpar: 'par' }[step];
+  if (S.status[stage] === 'stale' || S.status[step] === 'stale') log(`WARNING: the ${name.toLowerCase()} model is older than the sources (run "${EXTRA_STEPS[step]}" again to update it).`, 'warn');
+  const raw = await api.readFile(S.project.name, m.path);
+  const { primitiveSources } = await import('/core/unisim.js');
+  const { scalarizeNetlist, regroupNetlist } = await import('/core/netlist-hier.js');
+  // single-bit nets simulate several times faster than netgen's vector signals (same behaviour);
+  // the technology schematic regroups the flat netlist by the design's own instances
+  let text = scalarizeNetlist(raw);
+  if (hier) {
+    try {
+      const design = elaborate(compile(S.sources.filter(x => x.role === 'design' && (x.lang === 'vhdl' || x.lang === 'verilog'))), S.project.top);
+      text = regroupNetlist(raw, (design.top?.children || []).map(c => c.name)).text;
+    } catch (e) { log(`WARNING: technology schematic shown flat (${e.message})`, 'warn'); }
+  }
+  const net = { path: m.path, lang: 'vhdl', text, role: 'design', netlist: step };
+  return [...primitiveSources([net]), net];
+}
+const isPrimitive = inst => /^<silinx>\//.test(inst?.mod?.file || inst?.file || '');
+
+// View Technology Schematic: the post-synthesis netlist (LUTs, flip-flops, carry chain…)
+async function openTechSchematic(mod) {
+  const srcs = await netlistSources('postsynth', { hier: true });
+  if (srcs) return openSchematic(mod, { netlist: srcs });
+}
+
+async function openSchematic(mod, { netlist = null } = {}) {
   await saveAll();
   const sim = S.view === 'sim';
-  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design'));
+  const srcs = netlist || S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design'));
   const lib = compile(srcs);
   const design = elaborate(lib, mod);
   const diags = diagsFor(lib, design);
   setDiagnostics(diags);
   if (!design.top) { log(`ERROR: cannot elaborate '${mod}'`, 'err'); showConsolePage('errors'); return; }
   if (diags.some(d => d.severity === 'error')) log(`Schematic of '${mod}' generated with errors (see Errors tab).`, 'warn');
-  setStatus(sim ? 'rtl-sim' : 'rtl', diags.some(d => d.severity === 'error') ? 'warn' : 'ok');
+  setStatus(netlist ? 'tech' : sim ? 'rtl-sim' : 'rtl', diags.some(d => d.severity === 'error') ? 'warn' : 'ok');
+  const kindName = netlist ? 'Technology' : 'RTL';
   const { mountSchEditor } = await import('./sch-editor.js');
   const { schematicFromHdl, modulesFromLibrary } = await import('/core/schdoc.js');
   const sources = Object.fromEntries(srcs.map(x => [x.path, x.text]));
   const modules = modulesFromLibrary(lib, { sources });
   const elk = window.ELK ? new window.ELK() : null;
-  const id = `rtl:${mod}`;
+  const id = `${netlist ? 'tech' : 'rtl'}:${mod}`;
   const existing = findDoc(id);
   if (existing) await closeDoc(existing);
   openDoc({
-    id, title: `${mod} (RTL)`, icon: 'schematic',
+    id, title: `${mod} (${kindName})`, icon: 'schematic',
     create(el) {
       const bar = h('div', { class: 'doc-toolbar rtl-crumbs' });
       const host = h('div', { class: 'doc-body' });
@@ -1089,19 +1199,19 @@ async function openSchematic(mod) {
       // ISE-style hierarchy navigation: up to the parent, push into the selected instance
       const upBtn = h('button', { class: 'btn rtl-nav', title: 'Up to the parent module (Backspace)', onclick: () => cur?.parent && show(cur.parent) }, '⬆ Up');
       const intoBtn = h('button', { class: 'btn rtl-nav', title: 'Push into the selected instance (Enter, or double-click it)', onclick: () => ed?.openSelected() }, '⬇ Push into');
-      const canEnter = s => !!(s && cur?.children.some(c => (c.name === s.name || c.module === s.params.module) && !c.blackbox));
+      const canEnter = s => !!(s && cur?.children.some(c => (c.name === s.name || c.module === s.params.module) && !c.blackbox && !isPrimitive(c)));
       const show = async inst => {
         cur = inst;
         bar.innerHTML = '';
         upBtn.disabled = !inst.parent; intoBtn.disabled = true;
-        bar.append(upBtn, intoBtn, h('span', { class: 'rtl-ro' }, 'RTL Schematic (read-only)'));
+        bar.append(upBtn, intoBtn, h('span', { class: 'rtl-ro' }, netlist ? 'Technology Schematic (read-only): the post-synthesis netlist' : 'RTL Schematic (read-only)'));
         crumbs(inst).forEach((i, k, all) => {
           bar.append(h('span', { class: 'sep' }, k ? ' › ' : ' — '));
           bar.append(k === all.length - 1 ? h('b', {}, `${i.name} : ${i.module}`) : h('a', { onclick: () => show(i) }, `${i.name} : ${i.module}`));
         });
         const info = moduleInfo(inst.module);
         if (info) bar.append(h('span', { class: 'spacer' }), h('a', { onclick: () => openFile(info.file, info.line) }, `Open ${info.file.split('/').pop()}`));
-        status(`Drawing RTL schematic of ${inst.module}…`);
+        status(`Drawing ${kindName} schematic of ${inst.module}…`);
         try {
           const doc = await schematicFromHdl(inst, { sources, modules, layout: elk ? g => elk.layout(g) : undefined, lang: info?.lang || 'vhdl' });
           if (cur !== inst) return;
@@ -1112,12 +1222,12 @@ async function openSchematic(mod) {
               onUp: () => cur?.parent && show(cur.parent),
               onOpenModule: (name, { instance } = {}) => {
                 const child = cur.children.find(c => c.name === instance) || cur.children.find(c => c.module === name);
-                if (child && !child.blackbox) show(child);
+                if (child && !child.blackbox && !isPrimitive(child)) show(child);
               },
             });
           } else ed.setDoc(doc);
           setTimeout(() => ed.fit?.(), 50);
-        } catch (e) { log(`ERROR: RTL schematic of ${inst.module}: ${e.message}`, 'err'); }
+        } catch (e) { log(`ERROR: ${kindName} schematic of ${inst.module}: ${e.message}`, 'err'); }
         finally { status('Ready'); }
       };
       show(design.top);
@@ -1135,25 +1245,33 @@ async function readDataFiles() {
   return map;
 }
 
-async function runSimulation(mod) {
+// model: undefined = behavioural (the HDL sources); postsynth / posttrans / postmap / postpar =
+// the testbench against that netgen netlist (compiled after the sources: its entity replaces the RTL one)
+async function runSimulation(mod, model) {
   await saveAll();
   if (S.project.simTop !== mod) { S.project.simTop = mod; await saveProjectJson(); }
   if (!await checkSyntax(mod, true)) return;
-  setStatus('sim-run', 'running');
-  log(`\nStarted : "Simulate Behavioral Model".\n\nBuilding simulation model for top '${mod}'...`, 'hdr');
-  const srcs = S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
+  const net = model ? await netlistSources(model) : null;
+  if (model && !net) return;
+  const procId = model ? `sim-${model}` : 'sim-run';
+  const title = model ? `Simulate ${SIM_MODEL_NAMES[model]} Model` : 'Simulate Behavioral Model';
+  setStatus(procId, 'running');
+  log(`\nStarted : "${title}".\n\nBuilding simulation model for top '${mod}'${model ? ` with the ${SIM_MODEL_NAMES[model].toLowerCase()} netlist of '${S.project.top}'` : ''}...`, 'hdr');
+  const srcs = [...S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog'), ...(net || [])];
   const lib = compile(srcs);
+  if (model) lib.errors = lib.errors.filter(e => !/redefined/.test(e.message));
   const design = elaborate(lib, mod);
   const files = await readDataFiles();
   const sim = new Simulator(design, { files });
+  if (!design.top) { setStatus(procId, 'err'); log(`ERROR: cannot elaborate '${mod}': ${design.diags.map(d => d.message).join('; ')}`, 'err'); return; }
   log(`Simulation model ready: ${design.signals.length} signals, ${design.procs.length} processes. Launching ISim view.`, 'ok');
-  setStatus('sim-run', 'ok');
+  setStatus(procId, 'ok');
   const { mountISim } = await import('./isim.js');
   const id = 'isim';
   const old = findDoc(id);
   if (old) await closeDoc(old);
   openDoc({
-    id, title: `ISim (${mod})`, icon: 'wave',
+    id, title: `ISim (${mod}${model ? `, ${SIM_MODEL_NAMES[model]}` : ''})`, icon: 'wave',
     create(el) {
       // ISim runs 1000 ns at start-up
       const view = mountISim(el, { design, sim, title: mod, initialRun: 1_000_000, onOpenSource: ref => ref?.file && openFile(ref.file, ref.line) });
@@ -1163,20 +1281,27 @@ async function runSimulation(mod) {
 }
 
 // ---- Board emulator: the design (behavioural RTL) on a virtual board, wired by the UCF
-async function openEmulator(mod, { scale } = {}) {
+async function openEmulator(mod, { scale, model = null } = {}) {
   if (!mod) { toast('Select the top module first'); return; }
   await saveAll();
   const board = projectBoard();
   if (!board) { alertDlg('Board Emulator', 'The project has no board. Choose one in Project ▸ Design Properties (e.g. Digilent Basys2).'); return; }
   if (!await checkSyntax(mod)) return;
-  const srcs = S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
+  // the design to run: the HDL (RTL) or a netlist generated by netgen (post-synthesis …)
+  let rep = null;
+  try { rep = await api.reports(S.project.name); } catch { /* standalone / no build */ }
+  const models = Object.keys(SIM_MODEL_NAMES).filter(k => rep?.simModels?.[k] && rep.top === mod);
+  const net = model ? await netlistSources(model) : null;
+  if (model && !net) return;
+  const srcs = net || S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
   const { timingGenerics, autoTimeScale, scaledGenerics } = await import('/core/emulate.js');
   let design, gens = [];
   try {
     const lib = compile(srcs);
     design = elaborate(lib, mod);
+    if (!design.top) throw new Error(design.diags.map(d => d.message).join('; ') || `cannot elaborate '${mod}'`);
     // large timing generics (dividers, debouncers) divided so that the design visibly runs
-    gens = timingGenerics(design.top?.params);
+    gens = model ? [] : timingGenerics(design.top?.params);   // a netlist has its constants built in
     scale ??= autoTimeScale(gens);
     if (scale > 1 && gens.length) design = elaborate(lib, mod, { generics: scaledGenerics(gens, scale) });
   } catch (e) { alertDlg('Board Emulator', `Cannot build the design: ${e.message}`, 'error'); return; }
@@ -1189,11 +1314,13 @@ async function openEmulator(mod, { scale } = {}) {
   const old = findDoc(id);
   if (old) await closeDoc(old);
   openDoc({
-    id, title: `Board Emulator (${mod})`, icon: 'board',
+    id, title: `Board Emulator (${mod}${model ? `, ${SIM_MODEL_NAMES[model]}` : ''})`, icon: 'board',
     create(el) {
-      const view = mountEmulator(el, { design, board, assignments, title: mod, files,
-        timing: { gens, scale, onChange: (k) => setTimeout(() => openEmulator(mod, { scale: k }), 0) } });
-      log(`Board Emulator: '${mod}' on ${board.name} — ${view.wiring.bits.length} port bit(s) on board resources${view.wiring.unmapped.length ? `, ${view.wiring.unmapped.length} not connected` : ''}.`, 'ok');
+      const view = mountEmulator(el, { design, board, assignments, title: `${mod}${model ? ` — ${SIM_MODEL_NAMES[model]} netlist` : ''}`, files,
+        timing: { gens, scale, onChange: (k) => setTimeout(() => openEmulator(mod, { scale: k, model }), 0) },
+        model: { current: model, available: models, names: SIM_MODEL_NAMES,
+          onChange: (m) => setTimeout(() => openEmulator(mod, { model: m || null }), 0) } });
+      log(`Board Emulator: '${mod}' (${model ? `${SIM_MODEL_NAMES[model]} netlist` : 'RTL'}) on ${board.name} — ${view.wiring.bits.length} port bit(s) on board resources${view.wiring.unmapped.length ? `, ${view.wiring.unmapped.length} not connected` : ''}.`, 'ok');
       return { destroy: () => view.destroy(), view };
     },
   });
