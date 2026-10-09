@@ -226,3 +226,41 @@ test('signals declared in a package are shared; rising_edge of one bit of a vect
   end process;`, 'signal v : std_logic_vector(1 downto 0) := "00";', { ctx: 'use work.g.all;' }) });
   assert.deepEqual(r, ['b5', '4', 'v0 rose']);
 });
+
+test('record and array ports; nested records with element and bit writes', () => {
+  const P = `library ieee; use ieee.std_logic_1164.all;
+package p is
+  type pair is record a, b : integer; end record;
+  type arr is array (0 to 2) of integer;
+  type in_t is record v : std_logic_vector(3 downto 0); end record;
+  type out_t is record r : in_t; n : integer; end record;
+end package;
+library ieee; use ieee.std_logic_1164.all; use work.p.all;
+entity sw is port (i : in pair; a : in arr; o : out pair; s : out integer); end;
+architecture r of sw is begin o <= (a => i.b, b => i.a); s <= a(0) + a(1) + a(2); end;
+`;
+  const r = out({ 'p.vhd': P, 'tb.vhd': vhd(`
+  u : entity work.sw port map (x, z, y, sum);
+  process begin
+    x <= (1, 2); z <= (4, 5, 6); n.r.v <= "1010"; n.n <= 3; wait for 1 ns;
+    report integer'image(y.a) & integer'image(y.b) & " " & integer'image(sum) & " " & to_string(n.r.v) & integer'image(n.n);
+    n.r.v(0) <= '1'; wait for 1 ns; report to_string(n.r.v);
+    wait;
+  end process;`, 'signal x, y : pair := (0, 0); signal z : arr := (0, 0, 0); signal sum : integer; signal n : out_t;', { ctx: 'use work.p.all;' }) });
+  assert.deepEqual(r, ['21 15 10103', '1011']);
+});
+
+test('shared variables; procedures declared in a process assign the signals of the architecture; dynamic slices', () => {
+  const r = out(vhd(`
+  process begin cnt := cnt + 1; wait for 1 ns; report integer'image(cnt); wait; end process;
+  process begin cnt := cnt + 10; wait; end process;
+  process
+    procedure bump is begin s <= s + 1; end procedure;
+    variable v : std_logic_vector(7 downto 0) := (others => '0'); variable i : integer := 2;
+  begin
+    bump; wait for 1 ns; bump; wait for 1 ns; report integer'image(s);
+    v(i + 1 downto i) := "11"; v(i * 2 + 3 downto i * 2) := x"A"; report to_string(v);
+    wait;
+  end process;`, 'shared variable cnt : integer := 0; signal s : integer := 0;'));
+  assert.deepEqual(r, ['11', '2', '10101100']);
+});
