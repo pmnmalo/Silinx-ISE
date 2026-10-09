@@ -1,0 +1,267 @@
+// UI: projects — New Project wizard (every board, every device family), open / switch / close,
+// Add Copy of Source (overwrite confirmation), files view rename / remove, Silinx and Xilinx zip
+// export + import, a failing import keeps the project it would replace.
+import { before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { setupUi, uiTest, makeProject, readWs, waitDownload } from './harness.js';
+
+let env;
+before(async () => { env = await setupUi(); });
+after(async () => { await env?.teardown?.(); });
+const E = () => env;
+
+// New Project wizard: page 1 name (+ template), page 2 board / device / language, page 3 summary
+async function newProject(page, { name, template = 'empty', board = '', family, part, lang }) {
+  await page.menu('File', 'New Project…');
+  await page.waitDialog('New Project Wizard');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', name);
+  if (template !== 'empty') await page.fill('.dlg-overlay .wiz-main select', template, { index: 1 });
+  await page.dialogButton('Next >');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Project Settings');
+  if (board) await page.fill('.dlg-overlay .wiz-main select', board, { index: 0 });
+  if (family) await page.fill('.dlg-overlay .wiz-main select', family, { index: 2 });
+  if (part) await page.fill('.dlg-overlay .wiz-main select', part, { index: 3 });
+  if (lang) await page.fill('.dlg-overlay .wiz-main select', lang, { index: 9 });
+  const settings = await page.eval(() => {
+    const s = [...document.querySelectorAll('.dlg-overlay .wiz-main select')];
+    return { board: s[0].value, family: s[2].value, part: s[3].value, pkg: s[4].value, speed: s[5].value, disabled: s[2].disabled, parts: [...s[3].options].map((o) => o.value) };
+  });
+  await page.dialogButton('Next >');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Project Summary');
+  const summary = await page.eval(() => document.querySelector('.dlg-overlay .wiz-main pre').textContent);
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor((n) => window.Silinx.project?.name === n, [name], { what: `project ${name} open` });
+  return { settings, summary, project: await page.eval(() => window.Silinx.project) };
+}
+
+uiTest('New Project wizard: one project per evaluation board (board fixes the device)', E, async (page) => {
+  const db = await env.server.api('GET', '/api/devices');
+  assert.ok(db.boards.length >= 3);
+  for (const b of db.boards) {
+    const name = `B_${b.id.replace(/\W/g, '_')}`;
+    const r = await newProject(page, { name, board: b.id, lang: b.id === 'nexys2' ? 'verilog' : undefined });
+    assert.equal(r.settings.disabled, true, `${b.id}: device fields follow the board`);
+    assert.equal(r.settings.part, b.device.part);
+    assert.match(r.summary, new RegExp(`Board:\\s+${b.name.replace(/[()+.]/g, '\\$&')}`));
+    assert.equal(r.project.board, b.id);
+    assert.deepEqual({ part: r.project.device.part, package: r.project.device.package }, { part: b.device.part, package: b.device.package });
+    assert.equal(r.project.preferredLanguage, b.id === 'nexys2' ? 'verilog' : 'vhdl');
+    const status = await page.eval(() => document.getElementById('status-device').textContent);
+    assert.ok(status.includes(b.device.part) && status.includes(b.id), status);
+    assert.equal(await page.eval(() => document.querySelector('#hier .row .lbl').textContent), name);
+  }
+  const list = await env.server.api('GET', '/api/projects');
+  assert.equal(list.filter((p) => p.name.startsWith('B_')).length, db.boards.length);
+});
+
+uiTest('New Project wizard: every device family (no board), the device list follows the family; an example template', E, async (page) => {
+  const db = await env.server.api('GET', '/api/devices');
+  const families = db.families.filter((f) => (f.parts || []).length);
+  assert.ok(families.length >= 5);
+  for (const f of families) {
+    const parts = db.parts.filter((p) => p.family === f.id);
+    const last = parts[parts.length - 1];
+    const r = await newProject(page, { name: `F_${f.id}`, family: f.id, part: last.part });
+    assert.deepEqual(r.settings.parts, parts.map((p) => p.part), `${f.id}: device list`);
+    assert.equal(r.settings.disabled, false);
+    assert.equal(r.project.board, null);
+    assert.equal(r.project.device.part, last.part);
+    assert.ok(Object.keys(last.packages).includes(r.project.device.package));
+    assert.ok(last.speeds.includes(r.project.device.speed));
+  }
+  // from the blinky example: its sources, hierarchy and constraints
+  const r = await newProject(page, { name: 'FromExample', template: 'blinky', board: 'basys2' });
+  assert.equal(r.project.top, 'top');
+  await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'u_knight - knight'));
+  const files = r.project.files.map((x) => x.path).sort();
+  assert.ok(files.includes('src/top.vhd') && files.includes('sim/tb_top.vhd'), files.join(','));
+  assert.equal(await readWs(env, 'FromExample', 'src/counter.v').then((t) => /module prescaler/.test(t)), true);
+});
+
+uiTest('open, switch and close projects (Open Project dialog, Recent Projects, Start page)', E, async (page) => {
+  for (const n of ['Alpha', 'Beta']) {
+    await makeProject(env, { name: n, files: { [`src/${n.toLowerCase()}.vhd`]: `library ieee; use ieee.std_logic_1164.all;\nentity ${n.toLowerCase()} is port (a : in std_logic; y : out std_logic); end;\narchitecture r of ${n.toLowerCase()} is begin y <= not a; end r;\n` }, top: n.toLowerCase() });
+  }
+  // Open Project dialog: select a row, Open
+  await page.menu('File', 'Open Project…');
+  await page.waitDialog('Open Project');
+  await page.click('.dlg-overlay table.grid tr', { text: 'Alpha' });
+  await page.dialogButton('Open');
+  await page.waitFor(() => window.Silinx.project?.name === 'Alpha' && document.querySelector('#hier .row .lbl')?.textContent === 'Alpha');
+  assert.match(await page.eval(() => document.title), /^Alpha — Silinx ISE/);
+  await page.waitFor(() => window.SilinxApp.findDoc('summary'));
+  await page.eval(() => window.SilinxApp.openFile('src/alpha.vhd'));
+  await page.waitFor(() => window.SilinxApp.findDoc('file:src/alpha.vhd')?.editor);
+  // switch: double-click the other project; the documents of the first one are closed
+  await page.menu('File', 'Open Project…');
+  await page.waitDialog('Open Project');
+  await page.dblclick('.dlg-overlay table.grid tr', { text: 'Beta' });
+  await page.waitFor(() => window.Silinx.project?.name === 'Beta' && document.querySelector('#hier .row .lbl')?.textContent === 'Beta');
+  await page.waitNoDialog();
+  assert.equal(await page.eval(() => window.Silinx.docs.some((d) => d.project === 'Alpha')), false);
+  assert.ok(await page.eval(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'beta')));
+  // Recent Projects lists both, newest first; choosing one switches back
+  const items = await page.openMenu('File');
+  await page.hover(await page.point('body > .menu-popup > .mi', { index: items.findIndex((i) => i.label === 'Recent Projects') }));
+  await page.waitForSelector('.menu-popup.sub .mi');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.menu-popup.sub .mi .lbl')].map((e) => e.textContent)), ['Beta', 'Alpha']);
+  await page.click('.menu-popup.sub .mi', { text: 'Alpha' });
+  await page.waitFor(() => window.Silinx.project?.name === 'Alpha');
+  // Close Project: back to the Start page, project items disabled
+  await page.menu('File', 'Close Project');
+  await page.waitFor(() => window.Silinx.project === null && !document.querySelector('[data-page=start]').hidden);
+  assert.match(await page.eval(() => document.getElementById('hier').innerText), /No project open/);
+  assert.equal(await page.eval(() => window.Silinx.docs.length), 0);
+  const file = await page.openMenu('File');
+  assert.equal(file.find((i) => i.label === 'Close Project').disabled, true);
+  assert.equal(file.find((i) => i.label === 'Export Silinx ISE Project (.zip)…').disabled, true);
+  await page.closeMenus();
+  // the Start page opens a recent project
+  await page.waitFor(() => [...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Beta'));
+  await page.click('#start-page a', { text: 'Beta' });
+  await page.waitFor(() => window.Silinx.project?.name === 'Beta' && !document.querySelector('[data-page=design]').hidden);
+  // the last project is reopened when the page is loaded again
+  await page.goto(env.server.url);
+  await page.waitFor(() => window.Silinx?.project?.name === 'Beta');
+});
+
+uiTest('Add Copy of Source: new files, association, overwrite confirmation (No keeps, Yes replaces)', E, async (page) => {
+  const orig = 'library ieee; use ieee.std_logic_1164.all;\nentity inv is port (a : in std_logic; y : out std_logic); end inv;\narchitecture r of inv is begin y <= not a; end r;\n';
+  await makeProject(env, { name: 'Copies', files: { 'src/inv.vhd': orig }, top: 'inv' });
+  await page.openProject('Copies');
+  const dir = path.join(env.tmp, 'to-add');
+  await fs.mkdir(dir, { recursive: true });
+  const changed = orig.replace('not a', 'a');
+  await fs.writeFile(path.join(dir, 'inv.vhd'), changed);
+  await fs.writeFile(path.join(dir, 'buf2.v'), 'module buf2(input a, output y); assign y = a; endmodule\n');
+  await fs.writeFile(path.join(dir, 'tb_buf2.v'), 'module tb_buf2; reg a = 0; wire y; buf2 u(.a(a), .y(y)); initial begin #10 a = 1; #10 $finish; end endmodule\n');
+  const add = async (files, role, answer) => {
+    await page.menu('Project', 'Add Copy of Source…');
+    await page.waitDialog('Add Copy of Source');
+    await page.setFiles('.dlg-overlay input[type=file]', files.map((f) => path.join(dir, f)));
+    await page.fill('.dlg-overlay select', role);
+    await page.dialogButton('OK');
+    if (answer) {
+      await page.waitDialog('Add Copy of Source');
+      assert.match(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().innerText), /src\/inv\.vhd already exists in the project\. Replace it with the copy of inv\.vhd\?/);
+      await page.dialogButton(answer);
+    }
+    await page.waitNoDialog();
+  };
+  await add(['inv.vhd', 'buf2.v'], 'design', 'No');
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/buf2.v'));
+  assert.equal(await readWs(env, 'Copies', 'src/inv.vhd'), orig, 'No: the project file is kept');
+  await page.waitConsole(/Added 1 source file\(s\)\./);
+  await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'buf2'));
+  // a simulation-only copy goes to sim/ with the Simulation association
+  await add(['tb_buf2.v'], 'sim');
+  await page.waitFor(() => window.Silinx.project.files.find((f) => f.path === 'sim/tb_buf2.v')?.role === 'sim');
+  assert.equal(await page.eval(() => window.Silinx.project.files.find((f) => f.path === 'src/buf2.v').role), 'design');
+  // Yes: replaced, and the open editor of that file shows the new text after reopening
+  await add(['inv.vhd'], 'design', 'Yes');
+  await page.waitFor(async () => true);
+  await page.waitConsole(/Added 1 source file\(s\)\.[\s\S]*Added 1 source file\(s\)\.[\s\S]*Added 1 source file\(s\)\./);
+  assert.equal(await readWs(env, 'Copies', 'src/inv.vhd'), changed);
+  // Files view: every file with its association
+  await page.click('#left-tabs .tab[data-page=files]');
+  const rows = await page.eval(() => [...document.querySelectorAll('#files-page tr')].slice(1).map((r) => [...r.cells].map((c) => c.textContent).join('|')));
+  assert.ok(rows.includes('src/inv.vhd|All|vhdl') && rows.includes('src/buf2.v|All|verilog') && rows.includes('sim/tb_buf2.v|Simulation|verilog'), rows.join('\n'));
+});
+
+uiTest('Files view: rename a file into another folder, remove a file (right-click)', E, async (page) => {
+  await makeProject(env, {
+    name: 'FilesPj', top: 'a',
+    files: {
+      'src/a.vhd': 'library ieee; use ieee.std_logic_1164.all;\nentity a is port (x : in std_logic; y : out std_logic); end a;\narchitecture r of a is begin y <= x; end r;\n',
+      'src/b.v': 'module b(input x, output y); assign y = ~x; endmodule\n',
+    },
+  });
+  await page.openProject('FilesPj');
+  await page.click('#left-tabs .tab[data-page=files]');
+  const row = (text) => page.waitFor((t) => { const r = [...document.querySelectorAll('#files-page tr')].findIndex((tr) => tr.cells[0]?.textContent === t); return r >= 0 ? r + 1 : 0; }, [text]).then((i) => i - 1);
+  // rename src/a.vhd -> rtl/core/a.vhd
+  await page.rightClick('#files-page tr', { index: await row('src/a.vhd') });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Rename…' });
+  await page.waitDialog('Rename');
+  await page.fill('.dlg-overlay input[type=text]', 'rtl/core/a.vhd', { index: 1 });
+  await page.dialogButton('Rename');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'rtl/core/a.vhd'));
+  assert.equal(await page.eval(() => window.Silinx.project.files.some((f) => f.path === 'src/a.vhd')), false);
+  assert.match(await readWs(env, 'FilesPj', 'rtl/core/a.vhd'), /entity a is/);
+  await assert.rejects(fs.access(path.join(env.server.workspace, 'FilesPj', 'src/a.vhd')));
+  await page.waitConsole(/Rename: src\/a\.vhd → rtl\/core\/a\.vhd\./);
+  // remove src/b.v (confirmation)
+  await page.rightClick('#files-page tr', { index: await row('src/b.v') });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Remove from Project' });
+  await page.waitDialog('Remove Source');
+  await page.dialogButton('Yes');
+  await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'));
+  await assert.rejects(fs.access(path.join(env.server.workspace, 'FilesPj', 'src/b.v')));
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#files-page tr')].slice(1).map((r) => r.cells[0].textContent)).then((x) => x.filter((p) => /\.(vhd|v)$/.test(p))), ['rtl/core/a.vhd']);
+});
+
+uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing import keeps the existing project', E, async (page) => {
+  await makeProject(env, { name: 'ZipSrc', template: 'blinky', board: 'basys2' });
+  await page.openProject('ZipSrc');
+  await page.menu('File', 'Export Silinx ISE Project (.zip)…');
+  const silinxZip = await waitDownload(page, 'ZipSrc-silinx.zip');
+  await page.menu('File', 'Export Xilinx ISE Project (.zip)…');
+  const xilinxZip = await waitDownload(page, 'ZipSrc.zip');
+  const srcTree = (await env.server.api('GET', '/api/projects/ZipSrc')).fileTree;
+
+  // import the Silinx zip under a new name: every file and the settings come back
+  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
+  await page.waitDialog('Import Silinx ISE Project');
+  await page.setFiles('.dlg-overlay input[type=file]', [silinxZip]);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay input[type=text]').value), 'ZipSrc', 'name suggested from the zip');
+  await page.fill('.dlg-overlay input[type=text]', 'ZipCopy');
+  await page.dialogButton('Import');
+  await page.waitFor(() => window.Silinx.project?.name === 'ZipCopy');
+  await page.waitConsole(/Imported Silinx project 'ZipCopy'/);
+  const copy = await env.server.api('GET', '/api/projects/ZipCopy');
+  assert.deepEqual(copy.fileTree, srcTree);
+  assert.equal(copy.board, 'basys2');
+  assert.equal(copy.top, 'top');
+  assert.equal(await readWs(env, 'ZipCopy', 'src/speed_ctrl.asm.json'), await readWs(env, 'ZipSrc', 'src/speed_ctrl.asm.json'));
+
+  // the Xilinx zip (a .xise and its sources) imports as an ISE project
+  await page.menu('File', 'Import Xilinx ISE Project (.zip)…');
+  await page.waitDialog('Import Xilinx ISE Project');
+  await page.setFiles('.dlg-overlay input[type=file]', [xilinxZip], { index: 1 });
+  await page.fill('.dlg-overlay input[type=text]', 'FromIse');
+  await page.dialogButton('Import');
+  await page.waitFor(() => window.Silinx.project?.name === 'FromIse');
+  await page.waitConsole(/Imported Xilinx ISE project 'FromIse'/);
+  const ise = await env.server.api('GET', '/api/projects/FromIse');
+  assert.equal(ise.top, 'top');
+  for (const f of ['src/top.vhd', 'src/knight.vhd', 'src/counter.v', 'constraints/top.ucf']) assert.ok(ise.fileTree.includes(f), `${f} imported: ${ise.fileTree}`);
+  assert.ok(await page.eval(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'u_knight - knight')));
+
+  // a broken zip imported over an existing (open) project: error, and the existing project is still there
+  await page.openProject('ZipCopy');
+  const bad = path.join(env.tmp, 'broken.zip');
+  await fs.writeFile(bad, 'this is not a zip file');
+  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
+  await page.waitDialog('Import Silinx ISE Project');
+  await page.setFiles('.dlg-overlay input[type=file]', [bad]);
+  await page.fill('.dlg-overlay input[type=text]', 'ZipCopy');
+  await page.dialogButton('Import');
+  await page.waitDialog('Replace Project');
+  await page.dialogButton('Yes');
+  await page.waitFor(() => [...document.querySelectorAll('.dlg-overlay .msg-error')].length);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay').innerText), /cannot read zip/);
+  await page.dialogButton('OK');
+  await page.waitNoDialog();
+  const kept = await env.server.api('GET', '/api/projects/ZipCopy');
+  assert.deepEqual(kept.fileTree, srcTree, 'the project that the import would have replaced is kept');
+  assert.equal(kept.board, 'basys2');
+  assert.equal(await readWs(env, 'ZipCopy', 'src/top.vhd'), await readWs(env, 'ZipSrc', 'src/top.vhd'));
+  // …and it is open again, as it was before the import
+  await page.waitFor(() => window.Silinx.project?.name === 'ZipCopy');
+});
