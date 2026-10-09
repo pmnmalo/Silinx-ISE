@@ -394,3 +394,74 @@ test('case box: not allowed in every-cycle blocks', () => {
   m.edges.push({ from: 'al', to: 'c2' });
   assert.match(validate(m).map((d) => d.message).join('\n'), /case boxes are not supported in every-cycle blocks/);
 });
+
+// ---- names (audit fixes)
+test('validation: state names only appear as S_<name> (reserved words allowed); VHDL process labels are taken', () => {
+  const m = trafficLight();
+  m.nodes.find((n) => n.id === 'sY').name = 'WAIT';
+  m.nodes.find((n) => n.id === 'sG').name = 'next';
+  assert.deepEqual(errorsOf(m), []);
+  assert.match(generateVhdl(m), /constant S_WAIT/);
+  for (const label of ['output_logic', 'state_register', 'Next_State_Logic']) {
+    const m2 = trafficLight();
+    m2.inputs.push({ name: label, width: 1 });
+    assert.match(errorsOf(m2).map((d) => d.message).join('\n'), new RegExp(`Input '${label}' clashes with VHDL process label`, 'i'));
+  }
+  const m3 = trafficLight();
+  m3.inputs.push({ name: 'wait', width: 1 });
+  assert.match(errorsOf(m3)[0].message, /'wait' is a reserved word/); // ports are still checked
+});
+
+// ---- expression sizing: the VHDL must compute what Verilog computes (audit fixes)
+const sizingModel = (actions, cond = 'c') => ({
+  name: 'sz', clock: 'clk', reset: { name: 'rst' },
+  generics: [{ name: 'MASK', default: 12 }],
+  inputs: [{ name: 'a', width: 4 }, { name: 'b', width: 3 }, { name: 'c', width: 1 }],
+  outputs: [{ name: 'y', width: 5 }, { name: 'z1', width: 1 }, { name: 'z2', width: 1 }, { name: 'z3', width: 1 }, { name: 'z4', width: 1 }, { name: 'z5', width: 1 }],
+  nodes: [
+    { id: 's0', type: 'state', name: 'S0', actions },
+    { id: 'd', type: 'decision', cond },
+    { id: 'o', type: 'output', actions: ['z5 = 1'] },
+  ],
+  edges: [{ from: 's0', to: 'd' }, { from: 'd', to: 'o', port: 'true' }, { from: 'd', to: 's0', port: 'false' }, { from: 'o', to: 's0' }],
+  initial: 's0',
+});
+
+test('expression sizing: generics in & | ^, unsized literals in truth values, constant folding, comparisons with booleans', async (t) => {
+  let simulate;
+  try { ({ simulate } = await import('../core/compile.js')); } catch { t.skip('core/compile.js not available'); return; }
+  const m = sizingModel([
+    'y = b | MASK',                          // MASK is 32 bits wide: b | 01100
+    "z1 = !((a & 4'd5) + (a[3] + 1))",       // the 32-bit sum is never 0
+    "z2 = ((b ^ 4'd5) | (4'd5 ^ 40)) < a",   // 4'd5 ^ 40 = 45 (not 13)
+    'z3 = a == (b < c)',                     // a compared with the truth bit (0 or 1)
+    'z4 = 3 == (1 || c)',                    // always false
+  ], '(b - 40) << a[2:1]');                  // the 32-bit difference is never 0
+  assert.deepEqual(errorsOf(m), []);
+  assert.match(generateVhdl(m), /to_unsigned\(MASK, 5\)/);
+  const vecs = [];
+  for (let a = 0; a < 16; a += 3) for (let b = 0; b < 8; b += 3) for (const c of [0, 1]) vecs.push({ a, b, c });
+  const tb = ['module tb;', '  reg clk = 0, rst = 1; reg [3:0] a = 0; reg [2:0] b = 0; reg c = 0;',
+    '  wire [4:0] y; wire z1, z2, z3, z4, z5;',
+    '  sz dut(.clk(clk), .rst(rst), .a(a), .b(b), .c(c), .y(y), .z1(z1), .z2(z2), .z3(z3), .z4(z4), .z5(z5));',
+    '  always #5 clk = ~clk;', '  initial begin', '    #12 rst = 0;',
+    ...vecs.map((v) => `    a = ${v.a}; b = ${v.b}; c = ${v.c}; #3 $display("%b_%b%b%b%b%b", y, z1, z2, z3, z4, z5); @(posedge clk); #1;`),
+    '    $finish;', '  end', 'endmodule'].join('\n');
+  const expect = vecs.map(({ a, b, c }) => `${(b | 12).toString(2).padStart(5, '0')}_00${a === (b < c ? 1 : 0) ? 1 : 0}01`);
+  for (const lang of ['vhdl', 'verilog']) {
+    const g = generate(m, lang);
+    const r = simulate([{ path: g.filename, text: g.code }, { path: 'tb.v', text: tb }], 'tb', { until: 1e7 });
+    assert.deepEqual(r.errors, [], `${lang}: ${JSON.stringify(r.errors)}`);
+    const out = r.sim.log.map((e) => String(e.text).trim()).filter((s) => /^[01]{5}_[01]{5}$/.test(s));
+    assert.deepEqual(out, expect, lang);
+  }
+});
+
+test('expression sizing: comparison results mixed with multi-bit values are rejected', () => {
+  const msg = (acts, cond) => errorsOf(sizingModel(acts, cond)).map((d) => d.message).join('\n');
+  assert.match(msg([], "!(3'b101 < a) & (MASK | b)"), /'&' cannot combine a comparison \(1 bit\) with a 32-bit value/);
+  assert.match(msg(['y = (a < b) ^ a']), /'\^' cannot combine a comparison \(1 bit\) with a 4-bit value/);
+  assert.match(msg(['y = ~(a < b)']), /'~' cannot invert a comparison inside a 5-bit expression/);
+  // 1-bit mixes keep working
+  assert.deepEqual(errorsOf(sizingModel(['z1 = (a < b) & c', 'z2 = ~(a < b)', 'z3 = (a < b) == 0'], '(a < b) | (b < c)')), []);
+});

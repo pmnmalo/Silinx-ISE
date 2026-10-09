@@ -26,8 +26,12 @@
 //     / `assign o = (state == S)` outputs and `with state select` assignments; VHDL enum
 //     state types, VHDL constants and Verilog parameter/localparam state codes;
 //   * if/elsif/else chains and nested ifs on inputs become decision boxes (one per condition,
-//     an elsif chain is a chain of decisions on the false branch); `case` on an input becomes
-//     a chain of decisions (`sel == 2'b01`); default assignments before the case become output
+//     an elsif chain is a chain of decisions on the false branch); `case` on an input, a
+//     register or a bit selection of one with constant choices becomes a case box (other
+//     `case` statements become a chain of decisions, `sel == 2'b01`); bit and slice
+//     selections (`op[3]`, `op(3 downto 2)`) of inputs and registers are kept as such; a VHDL
+//     if/elsif chain on a slice is a case box when the generator header (or the previous
+//     chart) has a case box on it; default assignments before the case become output
 //     defaults; outputs assigned in the clocked process (or through `<name>_reg/_next`
 //     signals) become registered outputs (ASMD semantics: they hold when not assigned).
 //
@@ -44,7 +48,7 @@ import { parse as parseVhdl } from './vhdl/parser.js';
 import { parse as parseVerilog } from './verilog/parser.js';
 import {
   normalizeModel, validate, generate, parseCondition, parseAction, exprToString, extractTransitions,
-  extractAlwaysBlocks, asmJoinPoints,
+  extractAlwaysBlocks, asmJoinPoints, parseCaseChoices,
 } from './asm.js';
 
 // ---------------------------------------------------------------------------------------
@@ -164,10 +168,13 @@ function asmIsBool(ast) {
   return false;
 }
 
+/** True for a single bit: a 1-bit signal or a 1-bit selection (`x[3]`). */
+const isBit = (ast, widthOf) => (ast.k === 'id' && widthOf(ast.name) === 1) || (ast.k === 'sel' && ast.hi === ast.lo);
+
 /** VHDL: `x == 1` with a 1-bit x means the same as `x` where a boolean is expected. */
 function simpLogical(ast, logical, widthOf) {
   if (ast.k === 'bin') {
-    if (logical && ast.op === '==' && ast.a.k === 'id' && widthOf(ast.a.name) === 1 && ast.b.k === 'lit' && ast.b.v === 1n && (ast.b.w == null || ast.b.w === 1)) return ast.a;
+    if (logical && ast.op === '==' && isBit(ast.a, widthOf) && ast.b.k === 'lit' && ast.b.v === 1n && (ast.b.w == null || ast.b.w === 1)) return ast.a;
     const sub = ast.op === '&&' || ast.op === '||';
     return { ...ast, a: simpLogical(ast.a, sub, widthOf), b: simpLogical(ast.b, sub, widthOf) };
   }
@@ -181,7 +188,7 @@ const valueLits = (ast) => (ast.k === 'lit' ? lit(ast.v) : ast.k === 'un' ? { ..
 /** Canonical form used to decide that two conditions are the same (or opposite) decision. */
 function canon(ast, widthOf) {
   if (ast.k === 'lit') return lit(ast.v);
-  if (ast.k === 'id') return ast;
+  if (ast.k === 'id' || ast.k === 'sel') return ast;
   if (ast.k === 'un') {
     const a = canon(ast.a, widthOf);
     if (ast.op !== '!') return { ...ast, a };
@@ -191,7 +198,7 @@ function canon(ast, widthOf) {
   }
   let a = canon(ast.a, widthOf), b = canon(ast.b, widthOf);
   if ((ast.op === '==' || ast.op === '!=') && a.k === 'lit' && b.k !== 'lit') [a, b] = [b, a];
-  if ((ast.op === '==' || ast.op === '!=') && a.k === 'id' && widthOf(a.name) === 1 && b.k === 'lit' && b.v <= 1n) {
+  if ((ast.op === '==' || ast.op === '!=') && isBit(a, widthOf) && b.k === 'lit' && b.v <= 1n) {
     const positive = (ast.op === '==') === (b.v === 1n);
     return positive ? a : { k: 'un', op: '!', a };
   }
@@ -840,8 +847,16 @@ function analyzeModule(mod, src, lang) {
     const p = ports.get(name);
     return p ? p.width : outInfo.get(name)?.width ?? 1;
   };
+  /** Bit numbering of a port/signal: true if it is `(N downto 0)` / `[N:0]` (or a single bit). */
+  const zeroBased = (name) => {
+    let t = mod.ports.find((p) => p.name === name)?.type ?? signals.get(name)?.type;
+    if (t?.kind === 'named' && types.get(t.name)?.kind === 'logic') t = types.get(t.name);
+    if (t?.kind !== 'logic' || !t.range) return true;
+    const l = evalInt(t.range.left, consts), r = evalInt(t.range.right, consts);
+    return l != null && r === 0n && l >= r;
+  };
   return {
-    warnings, orig, litBase, consts, ports, S, N, states, stateByKey, stateOfExpr, initial, enumType, sWidth,
+    warnings, orig, litBase, consts, ports, S, N, states, stateByKey, stateOfExpr, initial, enumType, sWidth, zeroBased,
     clock, reset, roles, outputs, outInfo, bodies, widthOf, alwaysGroups, registers, generics, genericSet, syncOf,
     inputs: mod.ports.filter((p) => roles.get(p.name)?.kind === 'in').map((p) => p.name),
   };
@@ -945,6 +960,30 @@ function specStmts(list, A, s) {
 
 const ASM_BIN = new Set(['&&', '||', '|', '^', '&', '==', '!=', '<', '>', '<=', '>=', '+', '-', '<<', '>>']);
 
+/** A signal a chart can read (input, synchronised input, register, registered output): { name, w }. */
+function readable(n, A) {
+  const r = A.roles.get(n);
+  if (r?.kind === 'syncout') return { name: A.orig(r.input), w: A.widthOf(r.input) };
+  if (r?.kind === 'in') return { name: A.orig(n), w: A.widthOf(n) };
+  if (r?.kind === 'regcur' || r?.kind === 'regport') return { name: A.orig(r.out), w: A.outInfo.get(r.out).width };
+  return null;
+}
+
+/** Bit (`left` only) or slice selection of a signal -> { k: 'sel' }. */
+function convSel(n, left, right, A, X) {
+  const where = `expression${atLine(X.loc)}`;
+  const sig = readable(n, A);
+  if (!sig) return conv({ op: 'ref', name: n }, A, X); // reports why the signal cannot be read
+  const ev = (x) => (x?.k === 'lit' ? x.v : evalInt(x, A.consts));
+  const l = ev(left), r = right == null ? l : ev(right);
+  if (l == null || r == null) fail(`${where} selects bits of '${A.orig(n)}' with a variable index, which a chart cannot express`);
+  if (!A.zeroBased(n)) fail(`${where} selects bits of '${A.orig(n)}', whose bits are not numbered ${sig.w - 1} downto 0`);
+  const hi = Number(l > r ? l : r), lo = Number(l > r ? r : l);
+  if (hi >= sig.w) fail(`${where} selects bit ${hi} of '${sig.name}', which has ${sig.w} bit${sig.w === 1 ? '' : 's'}`);
+  const w = hi - lo + 1;
+  return { ast: { k: 'sel', name: sig.name, hi, lo }, ty: w === 1 ? 'bit' : 'vec', w };
+}
+
 /** Convert an IR expression. Returns { ast, ty: 'bool'|'bit'|'vec'|'num', w }. */
 function conv(e, A, X) {
   const where = `expression${atLine(X.loc)}`;
@@ -965,10 +1004,9 @@ function conv(e, A, X) {
       const n = e.name;
       if (A.lang === 'vhdl' && (n === 'true' || n === 'false')) return { ast: lit(n === 'true' ? 1n : 0n), ty: 'bool' };
       const r = A.roles.get(n);
-      if (r?.kind === 'syncout') { const w = A.widthOf(r.input); return { ast: { k: 'id', name: A.orig(r.input) }, ty: w === 1 ? 'bit' : 'vec', w }; }
-      if (A.genericSet.has(n)) return { ast: { k: 'id', name: A.orig(n) }, ty: 'num' };
-      if (r?.kind === 'in') { const w = A.widthOf(n); return { ast: { k: 'id', name: A.orig(n) }, ty: w === 1 ? 'bit' : 'vec', w }; }
-      if (r?.kind === 'regcur' || r?.kind === 'regport') { const w = A.outInfo.get(r.out).width; return { ast: { k: 'id', name: A.orig(r.out) }, ty: w === 1 ? 'bit' : 'vec', w }; }
+      if (A.genericSet.has(n) && r?.kind !== 'syncout') return { ast: { k: 'id', name: A.orig(n) }, ty: 'num' };
+      const sig = readable(n, A);
+      if (sig) return { ast: { k: 'id', name: sig.name }, ty: sig.w === 1 ? 'bit' : 'vec', w: sig.w };
       if (A.consts.has(n) && !A.stateByKey.has(n)) {
         const c = A.consts.get(n);
         if (c.value == null) fail(`constant '${A.orig(n)}' used${atLine(X.loc)} has no constant value`);
@@ -1007,7 +1045,8 @@ function conv(e, A, X) {
         return conv(args[0], A, X);
       }
       if (name === 'signed' || name === 'to_signed') fail(`${where} uses signed arithmetic, which is not supported`);
-      if (A.roles.has(name) || A.ports.has(name)) fail(`${where} selects bits of '${A.orig(name)}': bit/slice selections are not supported in a chart`);
+      if ((A.roles.has(name) || A.ports.has(name)) && args.length === 1 && args[0]) return convSel(name, args[0], null, A, X);
+      if (A.roles.has(name) || A.ports.has(name)) fail(`${where} selects bits of '${A.orig(name)}' in a way a chart cannot express`);
       fail(`${where} calls '${A.orig(name)}', which a chart cannot express`);
     }
     case 'qualified': return conv(e.expr, A, X);
@@ -1055,7 +1094,15 @@ function conv(e, A, X) {
     }
     case 'cond': fail(`${where} uses a conditional value (when/else, ?:) inside a state, which a chart cannot express; use if/else`);
     case 'concat': fail(`${where} uses concatenation, which a chart cannot express`);
-    case 'index': case 'slice': case 'pslice': fail(`${where} selects bits of a signal, which a chart cannot express`);
+    case 'index': case 'slice': case 'pslice': {
+      if (e.base?.op !== 'ref') fail(`${where} selects bits of an expression, which a chart cannot express`);
+      if (e.op === 'index') return convSel(e.base.name, e.index, null, A, X);
+      if (e.op === 'slice') return convSel(e.base.name, e.left, e.right, A, X);
+      const start = evalInt(e.start, A.consts), width = evalInt(e.width, A.consts);
+      if (start == null || width == null || width < 1n) fail(`${where} selects bits of '${A.orig(e.base.name)}' with a variable part-select, which a chart cannot express`);
+      const lo = e.dir === '-' ? start - width + 1n : start;
+      return convSel(e.base.name, lit(lo + width - 1n), lit(lo), A, X);
+    }
     case 'call': fail(`${where} calls '${e.name}', which a chart cannot express`);
   }
   fail(`${where} cannot be expressed in a chart (${e.op})`);
@@ -1085,12 +1132,13 @@ function ctxSens(ast, ops = SIZE_SENSITIVE) {
 }
 function hasSignal(ast, A) {
   if (ast.k === 'id') return !A.generics.some((g) => A.orig(g.name) === ast.name);
+  if (ast.k === 'sel') return true;
   if (ast.k === 'un') return hasSignal(ast.a, A);
   if (ast.k === 'bin') return hasSignal(ast.a, A) || hasSignal(ast.b, A);
   return false;
 }
 function vhdlSized(ast, A, inSens = false, W = 0) {
-  const vw = (x) => A.vw.get(x) ?? (x.k === 'lit' ? x.w ?? 0 : x.k === 'id' && hasSignal(x, A) ? A.asmWidth(x.name) : 0);
+  const vw = (x) => A.vw.get(x) ?? (x.k === 'lit' ? x.w ?? 0 : x.k === 'id' && hasSignal(x, A) ? A.asmWidth(x.name) : x.k === 'sel' ? x.hi - x.lo + 1 : 0);
   switch (ast.k) {
     case 'lit': return inSens && ast.w == null ? lit(ast.v, Math.max(W || 32, ast.v.toString(2).length), 'd') : ast;
     case 'un':
@@ -1117,6 +1165,7 @@ function selfWidth(ast, wOf) {
   switch (ast.k) {
     case 'lit': return ast.w ?? 32;
     case 'id': return wOf(ast.name);
+    case 'sel': return ast.hi - ast.lo + 1;
     case 'un': return ast.op === '!' ? 1 : selfWidth(ast.a, wOf);
     case 'bin':
       if (ARITH.has(ast.op)) return Math.max(selfWidth(ast.a, wOf), selfWidth(ast.b, wOf));
@@ -1213,16 +1262,97 @@ function makeTreeBuilder(A) {
     }
     return chain;
   };
+  // The value tested by a case box: a readable signal or a bit selection of one (else null).
+  const caseSubject = (e, loc) => {
+    let r;
+    try { r = conv(e, A, { loc }); } catch { return null; }
+    if (r.ast.k === 'sel') return { ast: r.ast, w: r.w };
+    if (r.ast.k === 'id' && r.ty !== 'num' && r.w) return { ast: r.ast, w: r.w };
+    return null;
+  };
+  // A constant choice of a case on a `w`-bit value (else null).
+  const caseValue = (ch, w, loc) => {
+    if (!ch || ch.range) return null;
+    let r;
+    try { r = conv(ch, A, { loc }); } catch { return null; }
+    if (r.ast.k !== 'lit' || r.ast.v >= 1n << BigInt(w)) return null;
+    if (A.lang === 'vhdl' && r.ast.w != null && r.ast.w !== w) return null;
+    return r.ast.v;
+  };
+  // items: [{ values: [BigInt], body: [stmt] }]; others: [stmt] | null
+  const caseItems = (subj, items, others, rest, ctx) => {
+    const seen = new Set();
+    for (const it of items) for (const v of it.values) { if (seen.has(v)) return null; seen.add(v); }
+    const full = subj.w <= 16 && seen.size === 2 ** subj.w;
+    const branches = items.map((it) => ({ values: it.values, sub: toTree([...it.body, ...rest], ctx) }));
+    // (an others arm with statements is kept even when the values are all listed)
+    if (!full || (others && others.length)) branches.push({ values: null, sub: toTree([...(others || []), ...rest], ctx) });
+    return { k: 'case', expr: subj.ast, w: subj.w, branches };
+  };
+  // HDL `case` on an input/register (or a selection of one) with constant choices -> case box
+  const caseStmtTree = (st, rest, ctx) => {
+    const subj = caseSubject(st.expr, st.loc);
+    if (!subj) return null;
+    const items = [];
+    for (const it of st.items) {
+      const values = it.choices.map((ch) => caseValue(ch, subj.w, st.loc));
+      if (!values.length || values.some((v) => v == null)) return null;
+      items.push({ values, body: stmtList(it.body) });
+    }
+    return caseItems(subj, items, st.default ? stmtList(st.default) : null, rest, ctx);
+  };
+  // `x = v1 or x = v2 ...` on the same multi-bit selection (VHDL case boxes on a slice are
+  // generated as if/elsif chains): { subj, values } or null
+  const sliceTest = (cond, loc) => {
+    let r;
+    try { r = conv(cond, A, { loc }); } catch { return null; }
+    const values = [];
+    let subj = null;
+    const walk = (x) => {
+      if (x.k === 'bin' && x.op === '||') return walk(x.a) && walk(x.b);
+      if (x.k !== 'bin' || x.op !== '==' || x.a.k !== 'sel' || x.b.k !== 'lit') return false;
+      if (subj && exprToString(subj) !== exprToString(x.a)) return false;
+      subj = x.a;
+      values.push(x.b.v);
+      return true;
+    };
+    if (!walk(r.ast) || subj.hi === subj.lo) return null;
+    const w = subj.hi - subj.lo + 1;
+    if (values.some((v) => v >= 1n << BigInt(w)) || !A.caseExprs?.has(exprToString(subj))) return null;
+    return { subj: { ast: subj, w }, values };
+  };
+  const sliceChainTree = (st, rest, ctx) => {
+    if (A.lang !== 'vhdl') return null;
+    const first = sliceTest(st.cond, st.loc);
+    if (!first) return null;
+    const key = exprToString(first.subj.ast);
+    const items = [{ values: first.values, body: stmtList(st.then) }];
+    let others = stmtList(st.else);
+    while (others.length === 1 && others[0].kind === 'if') {
+      const t = sliceTest(others[0].cond, others[0].loc);
+      if (!t || exprToString(t.subj.ast) !== key) break;
+      items.push({ values: t.values, body: stmtList(others[0].then) });
+      others = stmtList(others[0].else);
+    }
+    return caseItems(first.subj, items, others, rest, ctx);
+  };
   const toTree = (list, ctx) => {
     list = stmtList(list);
     const acts = [];
+    const withActs = (node) => (acts.length ? { k: 'act', acts, next: node } : node);
     for (let i = 0; i < list.length; i++) {
       const st = list[i];
       if (st.kind === 'assign') { acts.push(action(st, ctx)); continue; }
-      if (st.kind === 'case') { list = [...list.slice(0, i), ...caseChain(st), ...list.slice(i + 1)]; i--; continue; }
+      if (st.kind === 'case') {
+        const node = caseStmtTree(st, list.slice(i + 1), ctx);
+        if (node) return withActs(node);
+        list = [...list.slice(0, i), ...caseChain(st), ...list.slice(i + 1)]; i--; continue;
+      }
       if (st.kind === 'if') {
         const ba = boolAssign(st, ctx);
         if (ba) { acts.push(ba); continue; }
+        const sc = sliceChainTree(st, list.slice(i + 1), ctx);
+        if (sc) return withActs(sc);
         const rest = list.slice(i + 1);
         const node = { k: 'if', cond: condOf(st.cond, st.loc),
           t: toTree([...stmtList(st.then), ...rest], ctx), f: toTree([...stmtList(st.else), ...rest], ctx) };
@@ -1271,6 +1401,7 @@ function makeTreeBuilder(A) {
 
 function restrict(t, key, neg, value, W) {
   if (t.k === 'act') return { ...t, next: restrict(t.next, key, neg, value, W) };
+  if (t.k === 'case') return { ...t, branches: t.branches.map((br) => ({ ...br, sub: restrict(br.sub, key, neg, value, W) })) };
   if (t.k === 'if') {
     const k = condKey(t.cond, W);
     if (k === key) return restrict(value ? t.t : t.f, key, neg, value, W);
@@ -1290,6 +1421,14 @@ function mergeTrees(a, b, W, rank = () => Infinity) {
   if (b.k === 'act') return { k: 'act', acts: b.acts, next: mergeTrees(a, b.next, W, rank) };
   if (a.k === 'leaf') return b;
   if (b.k === 'leaf') return a;
+  if (a.k === 'case' && b.k === 'case' && caseKey(a) === caseKey(b)) return mergeCases(a, b, W, rank);
+  if (a.k === 'case') {
+    return { ...a, branches: a.branches.map((br) => ({ ...br, sub: mergeTrees(br.sub, restrictCase(b, a, br.values), W, rank) })) };
+  }
+  if (b.k === 'case') {
+    const key = condKey(a.cond, W), neg = condNegKey(a.cond, W);
+    return { k: 'if', cond: a.cond, t: mergeTrees(a.t, restrict(b, key, neg, true, W), W, rank), f: mergeTrees(a.f, restrict(b, key, neg, false, W), W, rank) };
+  }
   if (rank(b.cond) < rank(a.cond)) {
     const key = condKey(b.cond, W), neg = condNegKey(b.cond, W);
     if (condKey(a.cond, W) !== key && condKey(a.cond, W) !== neg) {
@@ -1300,6 +1439,106 @@ function mergeTrees(a, b, W, rank = () => Infinity) {
   const key = condKey(a.cond, W), neg = condNegKey(a.cond, W);
   const bt = restrict(b, key, neg, true, W), bf = restrict(b, key, neg, false, W);
   return { k: 'if', cond: a.cond, t: mergeTrees(a.t, bt, W, rank), f: mergeTrees(a.f, bf, W, rank) };
+}
+
+const caseKey = (t) => exprToString(t.expr);
+/** Index of the branch of case tree `t` taken for value `v` (the others branch, or -1). */
+function caseBranch(t, v) {
+  const i = t.branches.findIndex((br) => br.values && br.values.includes(v));
+  return i >= 0 ? i : t.branches.findIndex((br) => !br.values);
+}
+const caseSub = (t, i) => (i >= 0 ? t.branches[i].sub : { k: 'leaf' });
+
+/** Values of case tree `c` that go to its others branch, or null when there are too many. */
+function othersValues(c) {
+  if (c.w > 16) return null;
+  const listed = new Set(c.branches.flatMap((br) => br.values || []));
+  const out = [];
+  for (let v = 0n; v < 1n << BigInt(c.w); v++) if (!listed.has(v)) out.push(v);
+  return out;
+}
+
+/** Tree `t` where the subject of case tree `c` is known to be one of `values` (null: others of c). */
+function restrictCase(t, c, values) {
+  if (t.k === 'act') return { ...t, next: restrictCase(t.next, c, values) };
+  if (t.k === 'if') return { ...t, t: restrictCase(t.t, c, values), f: restrictCase(t.f, c, values) };
+  if (t.k !== 'case') return t;
+  if (caseKey(t) === caseKey(c)) {
+    const vals = values || othersValues(c);
+    if (vals && vals.length) {
+      const idx = new Set(vals.map((v) => caseBranch(t, v)));
+      if (idx.size === 1) return restrictCase(caseSub(t, [...idx][0]), c, values);
+    }
+  }
+  return { ...t, branches: t.branches.map((br) => ({ ...br, sub: restrictCase(br.sub, c, values) })) };
+}
+
+/** Merge two case trees on the same value: one branch per distinct pair of branches taken. */
+function mergeCases(a, b, W, rank) {
+  const groups = new Map();
+  const seen = new Set();
+  for (const t of [a, b]) {
+    for (const br of t.branches) {
+      for (const v of br.values || []) {
+        if (seen.has(v)) continue;
+        seen.add(v);
+        const ia = caseBranch(a, v), ib = caseBranch(b, v);
+        const k = `${ia},${ib}`;
+        if (!groups.has(k)) groups.set(k, { ia, ib, values: [] });
+        groups.get(k).values.push(v);
+      }
+    }
+  }
+  const branches = [...groups.values()].map((g) => ({ values: g.values, sub: mergeTrees(caseSub(a, g.ia), caseSub(b, g.ib), W, rank) }));
+  const oa = a.branches.findIndex((br) => !br.values), ob = b.branches.findIndex((br) => !br.values);
+  if (!(a.w <= 16 && seen.size === 2 ** a.w) || oa >= 0 || ob >= 0) {
+    branches.push({ values: null, sub: mergeTrees(caseSub(a, oa), caseSub(b, ob), W, rank) });
+  }
+  return { ...a, branches };
+}
+
+/**
+ * Exits of a case box built from case tree `t`: [{ label, sub }]. The labels, their order and
+ * the exits whose arm the generator left to `others` are taken from the `<expr> = <label>`
+ * conditions of the header / previous chart when they match.
+ */
+function caseLabels(t, conds, lang) {
+  const xt = exprToString(t.expr);
+  const known = [];
+  for (const c of conds) {
+    if (!c.startsWith(`${xt} = `)) continue;
+    const label = c.slice(xt.length + 3).trim();
+    const r = parseCaseChoices(label, t.w);
+    if (r.error) continue;
+    known.push(r.others ? { label: 'others', others: true } : { label, values: r.values });
+  }
+  const setKey = (vals) => vals.map(String).sort().join(',');
+  const branches = t.branches.map((br) => ({ ...br }));
+  const oi = branches.findIndex((br) => !br.values);
+  if (oi >= 0) {
+    // values the generated code left to the others arm (same effect)
+    const listed = new Set(branches.flatMap((br) => br.values || []));
+    let added = false;
+    for (const k of known) {
+      if (k.others || !k.values.length || k.values.some((v) => listed.has(v))) continue;
+      k.values.forEach((v) => listed.add(v));
+      branches.splice(oi, 0, { values: k.values, sub: branches[oi].sub });
+      added = true;
+    }
+    if (added && !known.some((k) => k.others) && t.w <= 16 && listed.size === 2 ** t.w) branches.pop();
+  }
+  const pos = (br) => {
+    const i = known.findIndex((k) => (br.values ? k.values && setKey(k.values) === setKey(br.values) : k.others));
+    return i < 0 ? Infinity : i;
+  };
+  const order = branches.map((br, i) => ({ br, i, p: pos(br) }))
+    .sort((x, y) => (x.p === y.p ? (!x.br.values) - (!y.br.values) || x.i - y.i : x.p - y.p));
+  return order.map(({ br, p }) => {
+    if (!br.values) return { label: 'others', sub: br.sub };
+    if (p !== Infinity) return { label: known[p].label, sub: br.sub };
+    const text = (v) => (lang === 'vhdl' || t.w === 1 ? v.toString(2).padStart(t.w, '0') : `${t.w}'d${v}`);
+    return { label: br.values.map(text).join('|'), sub: br.sub };
+  });
 }
 
 /** Resolve next-state assignments: leaves become { k: 'goto', state }. */
@@ -1318,6 +1557,11 @@ function resolveTree(t, cur, self) {
     if (treeSig(T) === treeSig(F)) return T;
     return { k: 'if', cond: t.cond, t: T, f: F };
   }
+  if (t.k === 'case') {
+    const branches = t.branches.map((br) => ({ ...br, sub: resolveTree(br.sub, cur, self) }));
+    if (branches.every((br) => treeSig(br.sub) === treeSig(branches[0].sub))) return branches[0].sub;
+    return { ...t, branches };
+  }
   return { k: 'goto', state: cur || self };
 }
 
@@ -1331,6 +1575,7 @@ const treeSig = (t) => JSON.stringify(t, (k, v) => (typeof v === 'bigint' ? `${v
 function assignsOnEveryPath(t, target) {
   if (t.k === 'act') return t.acts.some((x) => x.target === target) || assignsOnEveryPath(t.next, target);
   if (t.k === 'if') return assignsOnEveryPath(t.t, target) && assignsOnEveryPath(t.f, target);
+  if (t.k === 'case') return t.branches.every((br) => assignsOnEveryPath(br.sub, target));
   return false;
 }
 
@@ -1344,8 +1589,8 @@ function makeTexts(A, lang) {
   const strictCond = (ast) => (lang === 'vhdl' ? exprToString(widthKey(simpLogical(ast, true, W), wOf)) : exprToString(ast));
   const negCond = (ast) => {
     if (lang === 'vhdl') {
-      if (ast.k === 'id' && W(ast.name) === 1) return { k: 'bin', op: '==', a: ast, b: lit(0n) };
-      if (ast.k === 'bin' && ast.op === '==' && ast.a.k === 'id' && W(ast.a.name) === 1 && ast.b.k === 'lit' && ast.b.v <= 1n) {
+      if (isBit(ast, W)) return { k: 'bin', op: '==', a: ast, b: lit(0n) };
+      if (ast.k === 'bin' && ast.op === '==' && isBit(ast.a, W) && ast.b.k === 'lit' && ast.b.v <= 1n) {
         return ast.b.v === 1n ? { ...ast, b: lit(0n) } : ast.a;
       }
     }
@@ -1499,6 +1744,10 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
     return (ast) => r.get(condKey(ast, A.asmWidth)) ?? Infinity;
   };
 
+  // case boxes listed by the header / previous chart (`<expr> = <label>` conditions)
+  A.caseExprs = new Set();
+  for (const c of cands.values()) for (const t of c.conds) { const m = /^(.+?) = (?!=)/.exec(t); if (m) A.caseExprs.add(m[1].trim()); }
+
   // ---- per-state trees -----------------------------------------------------------------
   const TB = makeTreeBuilder(A);
   const trees = new Map();
@@ -1561,7 +1810,7 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
   // ---- nodes and edges -----------------------------------------------------------------
   const nodes = [], edges = [];
   const stateId = new Map();
-  let nS = 0, nD = 0, nO = 0, nE = 0;
+  let nS = 0, nD = 0, nO = 0, nE = 0, nC = 0;
   for (const s of A.states) stateId.set(s.key, `s${++nS}`);
   const addEdge = (from, port) => { const e = { id: `e${++nE}`, from, to: '', port }; edges.push(e); return e; };
   for (const s of A.states) {
@@ -1584,6 +1833,12 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
     }
     const build = (tr) => {
       if (tr.k === 'goto') return stateId.get(tr.state);
+      if (tr.k === 'case') {
+        const id = `c${++nC}`;
+        nodes.push({ id, type: 'case', x: 0, y: 0, expr: exprToString(tr.expr) });
+        for (const br of caseLabels(tr, c.conds, lang)) addEdge(id, br.label).to = build(br.sub);
+        return id;
+      }
       if (tr.k === 'act') {
         const id = `o${++nO}`;
         nodes.push({ id, type: 'output', x: 0, y: 0, actions: tr.acts.map((a) => TX.actionText(a, c.mealy)) });
@@ -1732,12 +1987,14 @@ export function asmFromHdl(source, { path = '', module = null, lang = null, prev
 function renameTargets(t, f) {
   if (t.k === 'act') return { ...t, acts: t.acts.map((a) => (a.target ? { ...a, target: f(a.target) } : a)), next: renameTargets(t.next, f) };
   if (t.k === 'if') return { ...t, t: renameTargets(t.t, f), f: renameTargets(t.f, f) };
+  if (t.k === 'case') return { ...t, branches: t.branches.map((br) => ({ ...br, sub: renameTargets(br.sub, f) })) };
   return t;
 }
 
 function assignsDeeper(t, target) {
   if (t.k === 'act') return t.acts.some((x) => x.target === target) || assignsDeeper(t.next, target);
   if (t.k === 'if') return assignsDeeper(t.t, target) || assignsDeeper(t.f, target);
+  if (t.k === 'case') return t.branches.some((br) => assignsDeeper(br.sub, target));
   return false;
 }
 
@@ -2084,7 +2341,7 @@ function reusePrevious(model, prev) {
 /** True if both charts describe the same machine (ids, positions and spelling ignored). */
 export function sameAsmStructure(a, b) {
   const A = normalizeModel(a), B = normalizeModel(b);
-  // charts with case boxes are compared as JSON (HDL is converted to decision boxes only)
+  // charts with case boxes are compared as JSON (the comparison below knows decisions only)
   if ([...A.nodes, ...B.nodes].some((n) => n.type === 'case')) return JSON.stringify(A) === JSON.stringify(B);
   if (A.name !== B.name || A.clock !== B.clock || A.encoding !== B.encoding) return false;
   if (A.reset.name !== B.reset.name || A.reset.active !== B.reset.active || A.reset.sync !== B.reset.sync) return false;

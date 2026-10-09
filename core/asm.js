@@ -742,6 +742,25 @@ function vhCount(x, ctx) {
   return '0';
 }
 
+/**
+ * Width at which Verilog evaluates `ast` when it is used as a truth value (a decision, an
+ * operand of ! && ||): its self-determined width, which counts unsized literals and generics
+ * as 32 bits. Only matters when arithmetic, shifts or ~ are reached.
+ */
+function truthWidth(ast, ctx) {
+  return ctxSensitive(ast, CMP_SENSITIVE) ? vlSelfWidth(ast, ctx.peek) : 0;
+}
+/** `ast` used as a truth value (VHDL typed fragment). */
+function vhTruth(ast, ctx) {
+  const saved = ctx.targetW;
+  ctx.targetW = truthWidth(ast, ctx);
+  const x = vhExpr(ast, ctx);
+  ctx.targetW = saved;
+  return x;
+}
+/** True for a 1-bit operand (std_logic or the literal 0 or 1). */
+const oneBit = (x) => x.t === 'sl' || (x.t === 'lit' && x.v <= 1n && (x.w == null || x.w === 1));
+
 function vhExpr(ast, ctx) {
   switch (ast.k) {
     case 'lit': return { t: 'lit', v: ast.v, w: ast.w };
@@ -766,16 +785,18 @@ function vhExpr(ast, ctx) {
     }
     case 'un': {
       const saved = ctx.targetW;
-      if (ast.op === '!') ctx.targetW = 0;
+      if (ast.op === '!') return { t: 'bool', c: `(not ${vhBool(vhTruth(ast.a, ctx))})` };
       const a = vhExpr(ast.a, ctx);
       ctx.targetW = saved;
-      if (ast.op === '!') return { t: 'bool', c: `(not ${vhBool(a)})` };
       if (a.t === 'int') { ctx.error(`'${ast.op}' cannot be applied to a generic`); return a; }
       if (ast.op === '~') {
         if (a.t === 'lit') {
           if (a.w == null) { ctx.error('~ needs a sized literal (e.g. ~4\'b0011)'); return a; }
           return { t: 'lit', v: (~a.v) & ((1n << BigInt(a.w)) - 1n), w: a.w };
         }
+        // Verilog extends the 1-bit truth value to the context width before inverting it,
+        // which a VHDL boolean cannot express
+        if (a.t === 'bool' && saved > 1) { ctx.error(`'~' cannot invert a comparison inside a ${saved}-bit expression (the result would be ${saved} bits wide); use '!' for a true/false value`); return a; }
         // Verilog extends the operand to the context width before inverting it
         if (a.t !== 'bool' && saved > a.w) return { t: 'uns', c: `(not ${vhUnsW(a, saved, ctx)})`, w: saved };
         return { ...a, c: `(not ${a.c})` };
@@ -812,31 +833,42 @@ function vhExpr(ast, ctx) {
       if (CMP_OPS.has(op) && (ctxSensitive(ast.a, CMP_SENSITIVE) || ctxSensitive(ast.b, CMP_SENSITIVE))) {
         cmpW = Math.max(vlSelfWidth(ast.a, ctx.peek), vlSelfWidth(ast.b, ctx.peek));
       }
+      if (op === '&&' || op === '||') {
+        // logical operators are self-determined: each operand is a truth value of its own
+        const a = vhTruth(ast.a, ctx), b = vhTruth(ast.b, ctx);
+        return { t: 'bool', c: `(${vhBool(a)} ${op === '&&' ? 'and' : 'or'} ${vhBool(b)})` };
+      }
       if (!ARITH_OPS.has(op)) ctx.targetW = cmpW;
       const a = vhExpr(ast.a, ctx), b = vhExpr(ast.b, ctx);
       ctx.targetW = saved;
-      if (op === '&&' || op === '||') {
-        return { t: 'bool', c: `(${vhBool(a)} ${op === '&&' ? 'and' : 'or'} ${vhBool(b)})` };
-      }
       if (op === '&' || op === '|' || op === '^') {
         const vop = { '&': 'and', '|': 'or', '^': 'xor' }[op];
-        if (a.t === 'bool' || b.t === 'bool') return { t: 'bool', c: `(${vhBool(a)} ${vop} ${vhBool(b)})` };
+        if (a.t === 'bool' || b.t === 'bool') {
+          // a comparison is a 1-bit value in Verilog: with another 1-bit operand the VHDL
+          // boolean operator gives the same bit; a wider operand would keep its upper bits
+          const o = a.t === 'bool' ? b : a;
+          if (o.t !== 'bool' && !oneBit(o)) ctx.error(`'${op}' cannot combine a comparison (1 bit) with a ${o.t === 'int' ? 'generic' : o.w ? `${o.w}-bit value` : 'multi-bit value'}; use && / || or compare the value first (e.g. x != 0)`);
+          return { t: 'bool', c: `(${vhBool(a)} ${vop} ${vhBool(b)})` };
+        }
         if ((a.t === 'int' || b.t === 'int') && isConst(a) && isConst(b)) {
           ctx.error(`'${op}' cannot combine generics and literals only (use a register or a sized literal)`);
           return { t: 'lit', v: 0n, w: null };
         }
         if (a.t === 'lit' && b.t === 'lit') {
           const v = op === '&' ? a.v & b.v : op === '|' ? a.v | b.v : a.v ^ b.v;
-          return { t: 'lit', v, w: a.w != null && b.w != null ? Math.max(a.w, b.w) : (a.w ?? b.w) };
+          // an unsized literal is 32 bits wide in Verilog: the result is unsized as well
+          return { t: 'lit', v, w: a.w != null && b.w != null ? Math.max(a.w, b.w) : null };
         }
         const ws = [a, b].filter((x) => !isConst(x)).map((x) => x.w);
         const lw = [a, b].filter((x) => x.t === 'lit').map((x) => x.w ?? bitlen(x.v));
-        const W = Math.max(...ws, ...lw);
+        // generics are 32 bits wide: keep all of their bits unless the context is narrower
+        const ints = saved ? [] : [a, b].filter((x) => x.t === 'int').map(() => 32);
+        const W = Math.max(...ws, ...lw, saved || 0, ...ints);
         if (W === 1) {
           const s = (x) => (isConst(x) ? vhSlLit(x, ctx) : x.c);
           return { t: 'sl', c: `(${s(a)} ${vop} ${s(b)})`, w: 1 };
         }
-        if (a.t === 'slv' && b.t === 'slv' && a.w === b.w) return { t: 'slv', c: `(${a.c} ${vop} ${b.c})`, w: W };
+        if (a.t === 'slv' && b.t === 'slv' && a.w === W && b.w === W) return { t: 'slv', c: `(${a.c} ${vop} ${b.c})`, w: W };
         return { t: 'uns', c: `(${vhUnsW(a, W, ctx)} ${vop} ${vhUnsW(b, W, ctx)})`, w: W };
       }
       if (op === '+' || op === '-') {
@@ -855,15 +887,24 @@ function vhExpr(ast, ctx) {
       // comparisons
       const vop = { '==': '=', '!=': '/=', '<': '<', '>': '>', '<=': '<=', '>=': '>=' }[op];
       if (a.t === 'bool' || b.t === 'bool') {
-        if (op !== '==' && op !== '!=') ctx.error(`'${op}' cannot compare booleans`);
-        return { t: 'bool', c: `(${vhBool(a)} ${vop} ${vhBool(b)})` };
+        if (op !== '==' && op !== '!=') { ctx.error(`'${op}' cannot compare booleans`); return { t: 'bool', c: 'false' }; }
+        const [bo, o] = a.t === 'bool' ? [a, b] : [b, a];
+        if (o.t === 'bool' || oneBit(o)) return { t: 'bool', c: `(${vhBool(a)} ${vop} ${vhBool(b)})` };
+        // Verilog compares the value with the zero-extended truth bit (0 or 1)
+        let eq;
+        if (o.t === 'lit') eq = o.v === 0n ? `(not ${bo.c})` : o.v === 1n ? bo.c : 'false';
+        else {
+          const u = o.t === 'int' ? o.c : vhUns(o, o.w, ctx);
+          eq = `((${u} = 1 and ${bo.c}) or (${u} = 0 and not ${bo.c}))`;
+        }
+        if (op === '==') return { t: 'bool', c: eq };
+        return { t: 'bool', c: eq === 'false' ? 'true' : `(not ${eq})` };
       }
       if (a.t === 'lit' && b.t === 'lit') {
         const r = { '==': a.v === b.v, '!=': a.v !== b.v, '<': a.v < b.v, '>': a.v > b.v, '<=': a.v <= b.v, '>=': a.v >= b.v }[op];
         return { t: 'bool', c: r ? 'true' : 'false' };
       }
       if (isConst(a) && isConst(b)) return { t: 'bool', c: `(${vhInt(a)} ${vop} ${vhInt(b)})` };
-      const oneBit = (x) => x.t === 'sl' || (x.t === 'lit' && x.v <= 1n && (x.w == null || x.w === 1));
       if (oneBit(a) && oneBit(b)) {
         const s = (x) => (x.t === 'lit' ? vhSlLit(x, ctx) : x.c);
         return { t: 'bool', c: `(${s(a)} ${vop} ${s(b)})` };
@@ -986,9 +1027,12 @@ function analyze(model) {
   const registers = m.registers || [];
 
   // ---- names --------------------------------------------------------------------------
-  const checkName = (name, what, nodeId) => {
+  // `bare`: the name never appears in the code on its own (state names only appear as
+  // S_<name>, every-cycle block names only in comments), so reserved words are fine
+  const checkName = (name, what, nodeId, bare = true) => {
     if (!name) { err(`${what} has no name`, nodeId); return false; }
     if (!isIdentifier(name)) { err(`${what} '${name}' is not a valid identifier (letters, digits, single '_', must start with a letter)`, nodeId); return false; }
+    if (!bare) return true;
     const r = reservedIn(name);
     if (r.length) { err(`${what} '${name}' is a reserved word in ${r.join(' and ')}`, nodeId); return false; }
     return true;
@@ -1005,6 +1049,8 @@ function analyze(model) {
   if (checkName(m.clock, 'Clock')) claim(m.clock, 'Clock');
   if (checkName(m.reset.name, 'Reset')) claim(m.reset.name, 'Reset');
   for (const internal of ['state_reg', 'state_next', 'state_t']) names.set(internal, `internal signal '${internal}'`);
+  // VHDL process labels share the architecture's declarative region with ports and signals
+  for (const label of ['state_register', 'next_state_logic', 'output_logic']) names.set(label, `VHDL process label '${label}'`);
 
   const syms = new Map();
   for (const g of generics) {
@@ -1060,7 +1106,7 @@ function analyze(model) {
   if (!states.length) err('The chart has no states');
   const stateNames = new Map();
   for (const s of states) {
-    if (!checkName(s.name, 'State', s.id)) continue;
+    if (!checkName(s.name, 'State', s.id, false)) continue;
     const k = s.name.toLowerCase();
     if (stateNames.has(k)) { err(`Duplicate state name '${s.name}'`, s.id); continue; }
     stateNames.set(k, s.id);
@@ -1085,7 +1131,7 @@ function analyze(model) {
   const alwaysOf = new Map(); // node id -> [always ids]
   const alwaysNames = new Map();
   for (const a of alwaysNodes) {
-    if (checkName(a.name, 'Every-cycle block', a.id)) {
+    if (checkName(a.name, 'Every-cycle block', a.id, false)) {
       const k = a.name.toLowerCase();
       if (alwaysNames.has(k)) err(`Duplicate every-cycle block name '${a.name}'`, a.id);
       else alwaysNames.set(k, a.id);
@@ -1231,7 +1277,7 @@ function analyze(model) {
       const r = parseCondition(n.cond);
       if (r.error) { err(`${where}: ${r.error}`, n.id); continue; }
       parsedConds.set(n.id, r.ast);
-      vhExpr(r.ast, makeCtx(n.id, where));
+      vhTruth(r.ast, makeCtx(n.id, where));
     } else {
       const list = [];
       const assigned = new Map();
@@ -1531,7 +1577,7 @@ function makeBackend(a, lang) {
     cond(id) {
       if (!condCache.has(id)) {
         const ast = a.parsedConds.get(id);
-        const code = lang === 'vhdl' ? stripParens(vhBool(vhExpr(ast, ctxFor()))) : stripParens(vlExpr(ast, ctxFor()));
+        const code = lang === 'vhdl' ? stripParens(vhBool(vhTruth(ast, ctxFor()))) : stripParens(vlExpr(ast, ctxFor()));
         condCache.set(id, code);
       }
       // re-register reads for this use (cache shares the same reads set anyway)
