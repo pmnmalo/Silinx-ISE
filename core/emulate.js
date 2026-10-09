@@ -157,3 +157,93 @@ export function scaledGenerics(gens, scale) {
   if (!scale || scale <= 1) return {};
   return Object.fromEntries(gens.map((g) => [g.name, Math.max(1, Math.round(g.value / scale))]));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Character LCD (HD44780 controller), as on the Spartan-3E / 3A Starter Kits.
+// The controller latches RS, R/W and the data bus on each falling edge of E. After power-up it is
+// in 8-bit mode (one transfer per command, DB7..DB4); a function set with DL = 0 switches it to
+// 4-bit mode, where every byte is two transfers (high nibble first).
+// ---------------------------------------------------------------------------------------------
+
+/** New controller state (after power-up). */
+export function lcdState() {
+  return { mode8: true, half: null, ddram: new Array(128).fill(0x20), cgram: new Array(64).fill(0), addr: 0, cg: false,
+    inc: true, shift: false, on: false, cursor: false, blink: false, dshift: 0, lines2: true, writes: 0 };
+}
+
+/** Execute one byte (RS = 0: instruction, RS = 1: data). */
+export function lcdExec(st, byte, rs) {
+  const step = () => {
+    if (st.cg) st.addr = (st.addr + (st.inc ? 1 : 63)) & 63;
+    else {
+      // 2-line mode: DDRAM 0x00..0x27 and 0x40..0x67
+      let a = st.addr + (st.inc ? 1 : -1);
+      if (st.lines2) { if (a === 0x28) a = 0x40; else if (a === 0x68 || a === 0x80) a = 0x00; else if (a === 0x3f) a = 0x27; else if (a < 0) a = 0x67; }
+      st.addr = a & 0x7f;
+    }
+  };
+  if (rs) {
+    st.writes++;
+    if (st.cg) st.cgram[st.addr & 63] = byte; else st.ddram[st.addr & 127] = byte;
+    step();
+    if (st.shift && !st.cg) st.dshift += st.inc ? 1 : -1;
+    return;
+  }
+  if (byte & 0x80) { st.addr = byte & 0x7f; st.cg = false; }
+  else if (byte & 0x40) { st.addr = byte & 0x3f; st.cg = true; }
+  else if (byte & 0x20) { st.mode8 = !!(byte & 0x10); st.half = null; st.lines2 = !!(byte & 0x08); }
+  else if (byte & 0x10) {
+    const right = !!(byte & 0x04);
+    if (byte & 0x08) st.dshift += right ? -1 : 1;          // display shift
+    else st.addr = (st.addr + (right ? 1 : 127)) & 0x7f;    // cursor move
+  } else if (byte & 0x08) { st.on = !!(byte & 0x04); st.cursor = !!(byte & 0x02); st.blink = !!(byte & 0x01); }
+  else if (byte & 0x04) { st.inc = !!(byte & 0x02); st.shift = !!(byte & 0x01); }
+  else if (byte & 0x02) { st.addr = 0; st.dshift = 0; st.cg = false; }
+  else if (byte & 0x01) { st.ddram.fill(0x20); st.addr = 0; st.dshift = 0; st.inc = true; st.cg = false; }
+}
+
+/** One transfer on the bus: `bus` = DB7..DB4 (4-bit wiring) or DB7..DB0 (`width` 8). */
+export function lcdTransfer(st, rs, rw, bus, width = 4) {
+  const nib = width === 8 ? (bus >> 4) & 15 : bus & 15;
+  if (rw) { if (!st.mode8) st.half = st.half === null ? 0 : null; return; }   // reads: keep the nibble pairing
+  if (st.mode8) { lcdExec(st, width === 8 ? bus & 255 : nib << 4, rs); return; }
+  if (st.half === null) { st.half = nib; return; }
+  const byte = (st.half << 4) | nib;
+  st.half = null;
+  lcdExec(st, byte, rs);
+}
+
+/** The two lines shown (character codes, 16 each), or null when the display is off. */
+export function lcdText(st) {
+  if (!st.on) return null;
+  const line = (base) => Array.from({ length: 16 }, (_, i) => st.ddram[base + (((i + st.dshift) % 40) + 40) % 40]);
+  return [line(0x00), line(0x40)];
+}
+
+/**
+ * Feed the LCD with the bus activity recorded in [t0, t1] (the falling edges of E). The LCD's
+ * port bits are found on the board resources lcd_e, lcd_rs, lcd_rw and lcd_d (DB4..DB7) or lcd_db
+ * (DB0..DB7).
+ */
+export function lcdFeed(st, wiring, t0, t1) {
+  const pin = (res, idx = 0) => wiring.bits.find((b) => b.res.name === res && b.idx === idx);
+  const e = pin('lcd_e');
+  if (!e) return false;
+  const wide = wiring.bits.some((b) => b.res.name === 'lcd_db');
+  const dbits = wide ? Array.from({ length: 8 }, (_, i) => pin('lcd_db', i)) : Array.from({ length: 4 }, (_, i) => pin('lcd_d', i));
+  const et = bitTrack(e.sig, e.pos, t0, t1);
+  const tracks = new Map();
+  const tr = (b) => { if (!b) return null; if (!tracks.has(b)) tracks.set(b, bitTrack(b.sig, b.pos, t0, t1)); return tracks.get(b); };
+  const before = (track, t) => { if (!track) return 0; let v = track[0][1]; for (const [tt, x] of track) { if (tt >= t) break; v = x; } return v === 1 ? 1 : 0; };
+  const rs = pin('lcd_rs'), rw = pin('lcd_rw');
+  let fed = false;
+  for (let i = 1; i < et.length; i++) {
+    if (!(et[i - 1][1] === 1 && et[i][1] === 0)) continue;
+    const t = et[i][0];
+    let bus = 0;
+    dbits.forEach((b, k) => { bus |= before(tr(b), t + 1) << k; });
+    lcdTransfer(st, before(tr(rs), t + 1), before(tr(rw), t + 1), bus, wide ? 8 : 4);
+    fed = true;
+  }
+  return fed;
+}

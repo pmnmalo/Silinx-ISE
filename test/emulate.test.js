@@ -74,3 +74,21 @@ architecture a of t is begin o <= N; end a;`;
   const d = elaborate(compile([{ path: 't.vhd', lang: 'vhdl', text: src }]), 't', { generics: { N: 500 } });
   assert.equal(Number(d.top.params[0].value.v), 500);
 });
+
+test('HD44780: 4-bit initialisation (UG230 sequence), text on two lines, clear', async () => {
+  const { lcdState, lcdTransfer, lcdText } = await import('../core/emulate.js');
+  const st = lcdState();
+  for (const n of [0x3, 0x3, 0x3, 0x2]) lcdTransfer(st, 0, 0, n);          // 8-bit mode nibbles, then 4-bit
+  const cmd = (b) => { lcdTransfer(st, 0, 0, b >> 4); lcdTransfer(st, 0, 0, b & 15); };
+  const dat = (b) => { lcdTransfer(st, 1, 0, b >> 4); lcdTransfer(st, 1, 0, b & 15); };
+  cmd(0x28); cmd(0x06); cmd(0x0C); cmd(0x01);
+  for (const c of 'Hello') dat(c.charCodeAt(0));
+  cmd(0xC0); for (const c of 'FPGA') dat(c.charCodeAt(0));
+  const [l1, l2] = lcdText(st).map((l) => String.fromCharCode(...l));
+  assert.equal(l1, 'Hello           ');
+  assert.equal(l2, 'FPGA            ');
+  cmd(0x01);
+  assert.equal(String.fromCharCode(...lcdText(st)[0]).trim(), '');
+  cmd(0x08);
+  assert.equal(lcdText(st), null);
+});

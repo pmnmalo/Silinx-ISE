@@ -4,7 +4,7 @@
 import { Simulator } from '/core/simulator.js';
 import * as V from '/core/values.js';
 import { formatTime } from '/core/interp.js';
-import { boardWiring, boardOutputs } from '/core/emulate.js';
+import { boardWiring, boardOutputs, lcdState, lcdFeed, lcdText } from '/core/emulate.js';
 
 const SPEEDS = [['max', 'Max speed'], [1e5, '100 kHz'], [1e4, '10 kHz'], [1e3, '1 kHz'], [100, '100 Hz'], [10, '10 Hz'], [1, '1 Hz']];
 const FRAME_BUDGET_MS = 14;
@@ -80,6 +80,11 @@ function injectStyle() {
 .nx2-btn.on { background: radial-gradient(#d33, #700); border-color: #fcc; }
 .s3e-knob { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(#666, #1c1c1c); border: 2px solid #777; cursor: pointer; user-select: none; }
 .s3e-knob.on { background: radial-gradient(#d33, #700); }
+.emu-lcd { position: relative; width: 248px; height: 44px; }
+.emu-lcd-cell { position: absolute; color: #1c2a08; font: bold 15px/19px var(--mono, monospace); text-align: center; overflow: hidden; }
+.emu-rot { display: flex; gap: 46px; }
+.emu-rot-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid #000; background: #2a2a2a; color: #eee; cursor: pointer; font-size: 14px; line-height: 20px; padding: 0; }
+.emu-rot-btn:active { background: #c22; }
 `));
 }
 
@@ -240,7 +245,7 @@ function nexys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, por
 /** Xilinx / Digilent Spartan-3E Starter Kit: dark green PCB, serial / VGA on the top edge,
  *  Ethernet and USB on the left, 16x2 LCD at the bottom, rotary knob with the four direction
  *  buttons around it, 8 LEDs and 4 slide switches bottom right. */
-function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote }) {
+function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkLcd, mkRotary, turnKnob }) {
   const W = 840, H = 560, silk = '#eef3ec';
   const lcdChars = Array.from({ length: 32 }, (_, i) => `<rect x="${314 + (i % 16) * 15.5}" y="${448 + Math.floor(i / 16) * 24}" width="12" height="19" fill="#9fbf3a" opacity=".55"/>`).join('');
   const art = `
@@ -260,14 +265,18 @@ function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabel, bitF
     <text x="560" y="270" fill="#cfe0d2" font-size="10" font-family="Arial" letter-spacing="2">STARTER KIT</text>
     <rect x="296" y="426" width="282" height="86" rx="4" fill="#3d4a1c" stroke="#222" stroke-width="2"/>
     <rect x="306" y="438" width="262" height="62" rx="2" fill="#b7d24c"/>${lcdChars}
-    <text x="437" y="530" fill="${silk}" font-size="10" text-anchor="middle" font-family="Arial">LCD 16x2 (not emulated yet)</text>
+    <text x="437" y="530" fill="${silk}" font-size="10" text-anchor="middle" font-family="Arial">LCD 16x2 (HD44780)</text>
     <circle cx="150" cy="420" r="34" fill="#111" stroke="#444" stroke-width="3"/><circle cx="150" cy="420" r="22" fill="#2a2a2a"/>
     <text x="236" y="380" fill="${silk}" font-size="9" font-family="Arial">ROTARY</text><text x="236" y="392" fill="${silk}" font-size="9" font-family="Arial">(push = ROT_CENTER)</text>`;
   const { put, wrap } = boardFrame({ h, W, H, art, board, title, clockNote });
   const silkText = (t, x, y) => put(h('span', { class: 'emu-silk' }, t), x, y);
   const port = (res, k, x, y) => put(h('span', { class: `emu-port${bitFor(res, k) ? '' : ' nc'}` }, portLabel(res, k)), x, y);
-  // rotary push in the middle of the knob, direction buttons around it
-  put(mkButton(0, 'emu-btn s3e-knob', 'rot_center'), 150, 403);
+  // LCD glass: 2 x 16 characters over the drawn cells
+  put(mkLcd(), 437, 448);
+  // rotary push in the middle of the knob, ⟲ / ⟳ beside it (and the mouse wheel), direction buttons around it
+  const knob = put(mkButton(0, 'emu-btn s3e-knob', 'rot_center'), 150, 403);
+  knob.addEventListener('wheel', (e) => { e.preventDefault(); turnKnob(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+  put(mkRotary(), 150, 446);
   const dirs = [['btn_north', 'NORTH', 150, 316], ['btn_south', 'SOUTH', 150, 470], ['btn_west', 'WEST', 70, 404], ['btn_east', 'EAST', 230, 404]];
   for (const [res, lbl, x, y] of dirs) {
     if (!board.resources.some((r) => r.name === res)) continue;
@@ -292,6 +301,7 @@ function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabel, bitF
 }
 
 const BOARD_LAYOUTS = { basys2: basys2Layout, nexys2: nexys2Layout, 's3e-starter': s3eLayout };
+s3eLayout.lcd = true;   // the layout shows the character LCD
 
 /**
  * Mount the emulator.
@@ -312,10 +322,15 @@ export function mountEmulator(container, { design, board, assignments, title = '
   }
   const period = wiring.clocks[0]?.period || 20000;
   const inVal = new Map(inputPorts.map((p) => [p.sig, 0n]));   // value of each input port (unmapped bits 0)
+  // inputs with a pull-up on the board (e.g. the rotary encoder's A / B) rest at '1'
+  for (const b of wiring.bits) if (b.dir === 'in' && b.res.pull === 'up' && b.kind !== 'sw' && b.kind !== 'btn') inVal.set(b.sig, (inVal.get(b.sig) ?? 0n) | (1n << BigInt(b.pos)));
+  const hasLcd = wiring.bits.some((b) => b.res.name === 'lcd_e');
+  let lcd = lcdState(), lcdView = null;
 
   let running = false, speed = 'max', prev = null, raf = 0, destroyed = false;
   let slice = 2000, cyclesAcc = 0, lastT = 0, rateWin = { t: performance.now(), cyc: 0, rate: 0 };
   let logN = 0;
+  let lcdDirty = true;
 
   // ------------------------------------------------------------------------------- DOM
   const root = h('div', { class: 'emu' });
@@ -383,14 +398,55 @@ export function mountEmulator(container, { design, board, assignments, title = '
     return el;
   };
   const portLabel = (res, k = 0) => { const b = bitFor(res, k); return b ? b.bit : '—'; };
+  // character LCD: 2 x 16 cells drawn from the HD44780 model (custom characters from CGRAM)
+  const mkLcd = ({ cellW = 15.5, cellH = 24, w = 12, h: ch = 19 } = {}) => {
+    const el = h('div', { class: 'emu-lcd', title: hasLcd ? 'Character LCD (HD44780): lcd_e, lcd_rs, lcd_rw, lcd_d' : 'LCD: not connected in the UCF' });
+    const cells = [];
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 16; c++) {
+      const cell = h('div', { class: 'emu-lcd-cell', style: { left: `${c * cellW}px`, top: `${r * cellH}px`, width: `${w}px`, height: `${ch}px` } });
+      cells.push(cell); el.append(cell);
+    }
+    lcdView = {
+      set(lines, st) {
+        cells.forEach((cell, i) => {
+          const code = lines ? lines[i >> 4][i & 15] : 0x20;
+          if (cell._code === code && !(code < 16 && lines)) return;
+          cell._code = code;
+          if (lines && code < 16) {   // custom character: 5x8 dots from CGRAM
+            const base = (code & 7) * 8;
+            let svg = '<svg viewBox="0 0 5 8" width="100%" height="100%">';
+            for (let y = 0; y < 8; y++) for (let x = 0; x < 5; x++) if ((st.cgram[base + y] >> (4 - x)) & 1) svg += `<rect x="${x}" y="${y}" width=".9" height=".9" fill="#1c2a08"/>`;
+            cell.innerHTML = `${svg}</svg>`;
+          } else cell.textContent = code === 0x20 ? '' : (code === 0x5c ? '¥' : code === 0x7e ? '→' : code === 0x7f ? '←' : String.fromCharCode(code));
+        });
+      },
+    };
+    return el;
+  };
+  // rotary encoder (ROT_A / ROT_B in quadrature, at rest both '1'): one detent per click / wheel step
+  const QUAD_CYCLES = 1000;
+  const turnKnob = (dir) => {
+    const a = bitFor('rot_a'), b = bitFor('rot_b');
+    if (!a || !b) return;
+    const seq = dir > 0 ? [[0, 1], [0, 0], [1, 0], [1, 1]] : [[1, 0], [0, 0], [0, 1], [1, 1]];   // clockwise: A leads
+    seq.forEach(([va, vb], k) => sim.at(sim.now + (k + 1) * QUAD_CYCLES * period, () => { setInputBit(a, va); setInputBit(b, vb); }));
+    if (!running) { runCycles(5 * QUAD_CYCLES); refresh(); }
+  };
+  const mkRotary = () => {
+    const el = h('div', { class: 'emu-rot', title: bitFor('rot_a') ? 'Turn the knob: ⟲ / ⟳ or the mouse wheel (ROT_A / ROT_B)' : 'Rotary encoder: ROT_A / ROT_B not connected in the UCF' },
+      h('button', { class: 'emu-rot-btn', title: 'Turn left (counter-clockwise)', onclick: () => turnKnob(-1) }, '⟲'),
+      h('button', { class: 'emu-rot-btn', title: 'Turn right (clockwise)', onclick: () => turnKnob(1) }, '⟳'));
+    return el;
+  };
 
-  const notEmulated = board.resources.filter((r) => !['led', 'sw', 'btn', 'seg', 'dp', 'an'].includes(wiring.bits.find((b) => b.res === r)?.kind) && r.group !== 'Clock'
+  const notEmulated = board.resources.filter((r) => !['led', 'sw', 'btn', 'seg', 'dp', 'an', 'rot'].includes(wiring.bits.find((b) => b.res === r)?.kind) && r.group !== 'Clock'
+    && !(r.group === 'LCD' && BOARD_LAYOUTS[board.id]?.lcd)
     && wiring.bits.some((b) => b.res === r)).map((r) => r.name);
   const clockNote = (wiring.clocks.length ? `Clock ${wiring.clocks.map((c) => c.port).join(', ')}: ${1e6 / period} MHz on the board${wiring.clocks[0].guessed ? ' (not in the UCF: assumed)' : ''}` : 'No clock input found')
     + (notEmulated.length ? ` · not emulated: ${notEmulated.join(', ')}` : '');
 
   const layout = BOARD_LAYOUTS[board.id];
-  if (layout) main.append(layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote }));
+  if (layout) main.append(layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkLcd, mkRotary, turnKnob }));
   else {
     // generic board: rows of displays, LEDs, switches and buttons
     const boardEl = h('div', { class: 'emu-board' }, h('h3', {}, `${board.name}${title ? ` — ${title}` : ''}`));
@@ -479,6 +535,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
     for (const p of inputPorts) applyInput(p.sig);
     for (const c of wiring.clocks) sim.addClock(c.sig, { period: c.period });
     prev = null;
+    lcd = lcdState(); lcdDirty = true;
     logN = 0;
     logEl.textContent = '';
   }
@@ -493,6 +550,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
     sim.waveEvents = 0; sim.waveTruncated = false;
     sim.run(sim.now + n * period);
     prev = boardOutputs(wiring, t0, Math.max(sim.now, t0 + 1), prev);
+    if (hasLcd && lcdFeed(lcd, wiring, t0, sim.now)) lcdDirty = true;
     rateWin.cyc += n;
   }
   function step() { setRunning(false); runCycles(1); refresh(); }
@@ -544,6 +602,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
       leds.forEach((l, k) => { const v = prev.leds[k] ?? 0; l.style.background = `rgb(${Math.round(27 + 20 * v)}, ${Math.round(58 + 197 * v)}, ${Math.round(35 + 40 * v)})`; l.style.boxShadow = v > 0.05 ? `0 0 ${Math.round(8 * v)}px #4f4` : 'none'; });
       digits.forEach((d, k) => d && d.set(prev.digits[k]));
     }
+    if (lcdView && lcdDirty) { lcdView.set(lcdText(lcd), lcd); lcdDirty = false; }
     for (const w of watched) {
       const v = w.s.val;
       w.val.textContent = v == null || Array.isArray(v) ? '?' : (w.s.t?.w > 1 ? `${V.toBin(v)}${v.x ? '' : ` (${v.v.toString(16).toUpperCase()}h)`}` : (v.x ? 'X' : v.v.toString()));
