@@ -260,6 +260,38 @@ test('Verilog recursive automatic function', () => {
   assert.deepEqual(out, ['120']);
 });
 
+test('VHDL port map with sub-element formals connects each bit / slice', () => {
+  const sub = `library ieee; use ieee.std_logic_1164.all;
+entity sub is port (a : in std_logic_vector(7 downto 0); y : out std_logic_vector(7 downto 0)); end;
+architecture rtl of sub is begin y <= not a; end;`;
+  const tb = vhd(`
+  u : entity work.sub port map (a(7) => b7, a(6) => b6, a(5 downto 2) => mid, a(1 downto 0) => "01",
+                                y(7) => o7, y(6 downto 0) => lo);
+  process begin
+    wait for 1 ns; report std_logic'image(o7) & " " & to_string(lo);
+    b7 <= '0'; mid <= "0000"; wait for 1 ns; report std_logic'image(o7) & " " & to_string(lo);
+    wait;
+  end process;`, `signal b7 : std_logic := '1'; signal b6 : std_logic := '0'; signal mid : std_logic_vector(3 downto 0) := "1010";
+  signal o7 : std_logic; signal lo : std_logic_vector(6 downto 0);`);
+  const r = simulate([{ path: 'sub.vhd', text: sub }, { path: 'tb.vhd', text: tb }], 'tb', { until: 1e9 });
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.sim.log.map(l => l.text), ["'0' 1010110", "'1' 1111110"]);
+});
+
+test('Verilog: unary ~ and - operands are widened to the context, also in conditions', () => {
+  const out = run(`module t;
+  reg [2:0] b, a; reg c; reg [3:0] y; wire w1 = b < ~c; wire w2 = (~(a[2:1]) + (3'b101 >> 3)) <= ~(c);
+  initial begin
+    b = 3'd5; c = 0; a = 3'b111;
+    #1 $display("%b %b %b", w1, w2, b < -c);
+    if (b < ~c) $display("if"); y = (b < ~c) ? 1 : 2; $display("%0d", y);
+    c = 1; #1 $display("%b %b %b", w1, w2, b < -c);
+    if (c && b < ~c) $display("if2"); while (b < ~c) b = b + 1; $display("%0d", b);
+  end
+  endmodule`, 't');
+  assert.deepEqual(out, ['1 1 0', 'if', '1', '1 1 1', 'if2', '6']);
+});
+
 // ------------------------------------------------------------------ memories
 test('memory element writes are cheap (64K-entry memory initialised in a loop)', () => {
   const t0 = Date.now();

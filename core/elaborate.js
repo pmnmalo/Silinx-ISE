@@ -251,6 +251,25 @@ function elabPort(E, p, conn) {
   E.inst.ports.push({ name: p.name, dir: p.dir, sig, t, alias: false, conn: conn?.text ?? null });
   if (!conn) return;
   const pE = conn.E;
+  if (conn.parts) {
+    // sub-element associations: one connection per formal part (formal bound in this instance)
+    for (const part of conn.parts) {
+      const loc = conn.loc;
+      if (p.dir === 'in' || (p.dir === 'inout' && !part.lnode)) {
+        if (!part.node) continue;
+        const target = bindLvalue(E, part.formal, loc);
+        const value = part.node;
+        if (pE.lang === 'verilog') ctxSize(value, target.t.w);
+        const body = { k: 'asg', target, value, nb: false, delay: null, loc };
+        addProc(E, { name: `${exprText(part.formal)}<=`, kind: 'glue', mode: 'comb', body, triggers: triggersOfReads(body), lang: 'verilog', loc, file: pE.file, inst: E.inst, glueOf: p.name });
+      } else if (part.lnode) {
+        const value = bindExpr(E, part.formal, null, loc);
+        const body = { k: 'asg', target: part.lnode, value, nb: false, delay: null, loc };
+        addProc(pE, { name: `${exprText(part.formal)}=>`, kind: 'glue', mode: 'comb', body, triggers: [{ sig, edge: 'any', pos: null }], lang: 'verilog', loc, file: pE.file, inst: pE.inst, glueOf: `${E.inst.name}.${p.name}` });
+      }
+    }
+    return;
+  }
   if (p.dir === 'in' || (p.dir === 'inout' && !conn.lnode)) {
     if (!conn.node) return;
     if (p.dir === 'inout') diag(E, `inout port '${p.name}' connected to an expression is treated as input`, p.loc, 'warning');
@@ -351,7 +370,7 @@ function elabChild(E, it) {
       if (!p) { diag(E, `module '${mod.name}' has no port '${pname}'`, it.loc); return; }
       pname = p.name;
     }
-    conns.push({ port: pname, expr: c.expr });
+    conns.push({ port: pname, expr: c.expr, formal: c.formal || null });
   });
   const portConns = new Map();
   for (const c of conns) {
@@ -364,6 +383,14 @@ function elabChild(E, it) {
     } catch (e) {
       if (!(e instanceof ElabError)) throw e;
       diag(E, e.message, e.loc || it.loc);
+      continue;
+    }
+    if (c.formal) {
+      // VHDL `P(3) => a, P(2) => b` / `P(7 downto 4) => x`: each sub-element formal connects its own bits
+      let pc = portConns.get(c.port);
+      if (!pc || !pc.parts) { pc = { parts: [], node: null, lnode: null, E, loc: it.loc, text: '' }; portConns.set(c.port, pc); }
+      pc.parts.push({ formal: c.formal, node, lnode, text: exprText(c.expr) });
+      pc.text = pc.parts.map(x => `${exprText(x.formal)} => ${x.text}`).join(', ');
       continue;
     }
     portConns.set(c.port, { node, lnode, E, loc: it.loc, text: exprText(c.expr) });
@@ -397,10 +424,11 @@ function elabChild(E, it) {
   child.connInfo = mod.ports.map(p => {
     const c = portConns.get(p.name);
     const port = child.ports.find(x => x.name === p.name);
+    const parts = c?.parts || [];
     return {
       port: p.name, dir: p.dir, t: port?.t, text: c?.text ?? null, node: c?.node ?? null,
-      reads: c?.node ? readsOf(c.node) : new Set(),
-      writes: c?.lnode ? writesOfL(c.lnode) : new Set(),
+      reads: c?.node ? readsOf(c.node) : new Set(parts.flatMap(x => (x.node ? [...readsOf(x.node)] : []))),
+      writes: c?.lnode ? writesOfL(c.lnode) : new Set(parts.flatMap(x => (x.lnode ? [...writesOfL(x.lnode)] : []))),
     };
   });
   for (const p of mod.ports) {
