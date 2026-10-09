@@ -1,4 +1,4 @@
-// UI: FSM state diagram editor. A new diagram from New Source (listed after State Machine (ASM)),
+// UI: FSM state diagram editor. A new diagram from New Source (listed just before State Machine (ASM)),
 // a state added by double-click and named in place, a transition drawn from the rim of a state,
 // conditions edited in place and in the properties panel; the tables (transition, state, encoded)
 // and the truth tables of the next-state logic; Generate HDL (linked: an edit of a transition
@@ -60,7 +60,7 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   await page.menu('Project', 'New Source…');
   await page.waitDialog('New Source Wizard');
   const types = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.textContent.trim()));
-  assert.equal(types.indexOf('State Machine (FSM)'), types.indexOf('State Machine (ASM)') + 1, types.join(' | '));
+  assert.equal(types.indexOf('State Machine (FSM)') + 1, types.indexOf('State Machine (ASM)'), types.join(' | '));   // FSM listed just before ASM
   await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim() === 'State Machine (FSM)'); r.scrollIntoView(); r.click(); });
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'det');
   await page.dialogButton('Next >');
