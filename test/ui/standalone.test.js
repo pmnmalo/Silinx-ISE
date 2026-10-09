@@ -53,7 +53,7 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   await page.menu('File', 'New Project…');
   await page.waitDialog('New Project Wizard');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'Solo');
-  await page.fill('.dlg-overlay .wiz-main select', 'blinky', { index: 1 });
+  await page.fill('.dlg-overlay .wiz-main select', 'blinky', { index: 0 });
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main select', 'basys2', { index: 0 });
   await page.dialogButton('Next >');

@@ -284,6 +284,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
       device: parsed.device.part ? parsed.device : cur.device,
       top: parsed.top || cur.top,
       simTop: parsed.simTop || cur.simTop,
+      topSourceType: parsed.topSourceType || cur.topSourceType || 'hdl',
       files,
       constraints: parsed.constraints && !parsed.constraints.includes('..') ? parsed.constraints : cur.constraints,
       impl: { ...cur.impl, ...parsed.impl },
@@ -336,7 +337,7 @@ async function importXiseProject(P, name, xiseText, provided) {
   }
   const saved = await P.updateProject(name, pj => Object.assign(pj, {
     device: parsed.device.part ? parsed.device : pj.device,
-    top: parsed.top || '', simTop: parsed.simTop || '', files, constraints,
+    top: parsed.top || '', simTop: parsed.simTop || '', topSourceType: parsed.topSourceType || 'hdl', files, constraints,
     impl: { ...pj.impl, ...parsed.impl },
   }));
   return { project: saved, missing, warnings };

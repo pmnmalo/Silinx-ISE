@@ -516,3 +516,16 @@ test('xise: implementation-only association round trip (Implementation only <-> 
   const back = importXise(x);
   assert.deepEqual(back.files.map(f => `${f.path}:${f.role}`), ['src/top.vhd:design', 'src/syn_only.vhd:impl', 'sim/tb.vhd:sim']);
 });
+
+test('xise: Top-Level Source Type round trip (Schematic <-> topSourceType sch, otherwise HDL)', async () => {
+  const { exportXise, importXise } = await import('../server/xise.js');
+  const base = { name: 'p', top: 'top', device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }] };
+  const sch = exportXise({ ...base, topSourceType: 'sch' }, {});
+  assert.match(sch, /<property xil_pn:name="Top-Level Source Type" xil_pn:value="Schematic"/);
+  assert.equal(importXise(sch).topSourceType, 'sch');
+  for (const t of ['hdl', 'fsm', 'tt', undefined]) {
+    const x = exportXise({ ...base, topSourceType: t }, {});
+    assert.match(x, /"Top-Level Source Type" xil_pn:value="HDL"/);
+    assert.equal(importXise(x).topSourceType, 'hdl');
+  }
+});

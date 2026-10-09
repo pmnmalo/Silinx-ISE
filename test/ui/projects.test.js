@@ -13,17 +13,18 @@ after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
 // New Project wizard: page 1 name (+ template), page 2 board / device / language, page 3 summary
-async function newProject(page, { name, template = 'empty', board = '', family, part, lang }) {
+async function newProject(page, { name, template = 'empty', board = '', family, part, lang, top }) {
   await page.menu('File', 'New Project…');
   await page.waitDialog('New Project Wizard');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', name);
-  if (template !== 'empty') await page.fill('.dlg-overlay .wiz-main select', template, { index: 1 });
+  if (template !== 'empty') await page.fill('.dlg-overlay .wiz-main select', template, { index: 0 });
   await page.dialogButton('Next >');
   await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Project Settings');
   if (board) await page.fill('.dlg-overlay .wiz-main select', board, { index: 0 });
   if (family) await page.fill('.dlg-overlay .wiz-main select', family, { index: 2 });
   if (part) await page.fill('.dlg-overlay .wiz-main select', part, { index: 3 });
   if (lang) await page.fill('.dlg-overlay .wiz-main select', lang, { index: 9 });
+  if (top) await page.fill('.dlg-overlay .wiz-main select', top, { index: 6 });   // Top-Level Source Type
   const settings = await page.eval(() => {
     const s = [...document.querySelectorAll('.dlg-overlay .wiz-main select')];
     return { board: s[0].value, family: s[2].value, part: s[3].value, pkg: s[4].value, speed: s[5].value, disabled: s[2].disabled, parts: [...s[3].options].map((o) => o.value) };
@@ -310,4 +311,34 @@ uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing im
   assert.equal(await readWs(env, 'ZipCopy', 'src/top.vhd'), await readWs(env, 'ZipSrc', 'src/top.vhd'));
   // …and it is open again, as it was before the import
   await page.waitFor(() => window.Silinx.project?.name === 'ZipCopy');
+});
+
+uiTest('New Project wizard: Top-Level Source Type Schematic / FSM / ASM / Truth Table starts the project with that top and its synchronized HDL', E, async (page) => {
+  const cases = [['sch', 'top.sch.json', 'vhdl'], ['fsm', 'top.fsm.json', 'verilog'], ['asm', 'top.asm.json', 'vhdl'], ['tt', 'top.tt.json', 'verilog']];
+  for (const [type, file, lang] of cases) {
+    const name = `Top_${type}`;
+    const r = await newProject(page, { name, lang, top: type });
+    assert.match(r.summary, /Top-Level Source Type: (Schematic|State Machine \((FSM|ASM)\)|Truth Table)/);
+    await page.waitFor((n) => window.Silinx.project?.name === n && window.Silinx.project.top === 'top', [name], { what: `${name}: top = top` });
+    const hdl = `src/top.${lang === 'vhdl' ? 'vhd' : 'v'}`;
+    const pj = JSON.parse(await readWs(env, name, 'silinx.json'));
+    assert.equal(pj.topSourceType, type);
+    assert.ok(pj.files.some((f) => f.path === hdl && f.role === 'design'), JSON.stringify(pj.files));
+    const doc = JSON.parse(await readWs(env, name, `src/${file}`));
+    assert.equal(doc.generatedFile, hdl);
+    assert.match(await readWs(env, name, hdl), lang === 'vhdl' ? /entity top is/ : /module top/);
+    // the hierarchy shows the top as that document, and its editor is open
+    await page.waitFor((f) => [...document.querySelectorAll('#hier .row')].some((r) => r.textContent.includes(`(${f})`)), [file], { what: `hierarchy shows ${file}` });
+    await page.waitFor((f) => String(window.Silinx.active?.id || '').endsWith(`src/${f}`), [file], { what: `${file} editor open` });
+  }
+  // an example: the type stays HDL (the example has its own sources)
+  await page.menu('File', 'New Project…');
+  await page.waitDialog('New Project Wizard');
+  await page.fill('.dlg-overlay .wiz-main select', 'blinky', { index: 0 });
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'Top_ex');
+  await page.dialogButton('Next >');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Project Settings');
+  assert.deepEqual(await page.eval(() => { const s = document.querySelectorAll('.dlg-overlay .wiz-main select')[6]; return [s.value, s.disabled]; }), ['hdl', true]);
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
 });

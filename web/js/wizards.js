@@ -166,7 +166,6 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
       h('div', { class: 'form-grid' },
         ...field('Name:', name),
         ...field('Location:', h('input', { type: 'text', value: '<workspace>/' + (st.name || '…'), disabled: true })),
-        ...field('Top-level source type:', select([['hdl', 'HDL']], 'hdl')),
         ...field('Start from:', tplSel)),
       h('div', { class: 'hint', style: { marginTop: '14px' } }, 'Projects are stored in the Silinx workspace folder (default ~/Silinx-projects).')),
     validate: async () => {
@@ -189,6 +188,18 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
     dp.disable(!!b);
   });
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], 'vhdl');
+  // the type of the top-level source: HDL, or a diagram / table whose HDL module is kept in sync
+  const topType = select(TOP_TYPES.map(t => [t.id, t.label]), 'hdl');
+  const topNote = h('div', { class: 'hint', style: { gridColumn: '1 / -1', marginTop: '-4px' } });
+  const syncTop = () => {
+    const ex = tplSel.value !== 'empty';
+    topType.disabled = ex;
+    if (ex) topType.value = 'hdl';
+    const t = TOP_TYPES.find(x => x.id === topType.value);
+    topNote.textContent = ex ? 'The example has its own sources.' : t.id === 'hdl' ? '' : `The project starts with ${t.file} (the top module 'top'), synchronized with its HDL module.`;
+    topNote.style.display = topNote.textContent ? '' : 'none';
+  };
+  topType.addEventListener('change', syncTop);
   const p2 = {
     title: 'Project Settings',
     render: () => h('div', {},
@@ -200,12 +211,13 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
         ...field('Device:', dp.partSel),
         ...field('Package:', dp.pkgSel),
         ...field('Speed:', dp.spdSel),
-        ...field('Top-Level Source Type:', select(['HDL'], 'HDL')),
+        ...field('Top-Level Source Type:', topType), topNote,
         ...field('Synthesis Tool:', select(['XST (VHDL/Verilog)'], 'XST (VHDL/Verilog)')),
         ...field('Simulator:', select(['Silinx ISim-compatible (VHDL/Verilog)'], '')),
         ...field('Preferred Language:', langSel),
         ...field('VHDL Source Analysis Standard:', select(['VHDL-93', 'VHDL-2008'], 'VHDL-93')),
       )),
+    onShow: () => syncTop(),
   };
   const summary = h('div');
   const p3 = {
@@ -218,7 +230,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
         `Project Navigator will create a new project with the following specifications.\n\n` +
         `Project:\n  Project Name: ${name.value.trim()}\n  Template:     ${tplSel.value}\n\n` +
         `Device:\n  Board:        ${b ? b.name : 'None Specified'}\n  Family:       ${dp.familyName()}\n  Device:       ${dp.value().part.toUpperCase()}\n  Package:      ${dp.value().package.toUpperCase()}\n  Speed:        ${dp.value().speed}\n\n` +
-        `Flow:\n  Synthesis Tool:     XST (VHDL/Verilog)\n  Simulator:          Silinx behavioural simulator\n  Preferred Language: ${langSel.value.toUpperCase()}`));
+        `Flow:\n  Top-Level Source Type: ${TOP_TYPES.find(t => t.id === topType.value).label}\n  Synthesis Tool:     XST (VHDL/Verilog)\n  Simulator:          Silinx behavioural simulator\n  Preferred Language: ${langSel.value.toUpperCase()}`));
     },
   };
   const ok = await wizard('New Project Wizard', [p1, p2, p3]);
@@ -231,11 +243,55 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
       board: boardSel.value || (tplSel.value !== 'empty' ? undefined : null),
     });
     pj.preferredLanguage = langSel.value;
+    pj.topSourceType = topType.value;
     await api.saveProject(pj.name, pj);
+    // a diagram / table top: its document and its synchronized HDL module 'top'
+    const top = topType.value !== 'hdl' && tplSel.value === 'empty' ? await createTopSource(pj.name, topType.value, langSel.value) : null;
     await app.openProject(pj.name);
     app.showLeftPage('design');
+    if (top) {
+      const fresh = await api.project(pj.name);
+      fresh.top = 'top';
+      delete fresh.fileTree;
+      await api.saveProject(pj.name, fresh);
+      await app.openProject(pj.name);
+      ({ sch: app.openSch, fsm: app.openFsm, asm: app.openAsm, tt: app.openTt })[topType.value](top);
+    }
     toast(`Project ${pj.name} created`, 'ok');
   } catch (e) { alertDlg('New Project', e.message, 'error'); }
+}
+
+// Top-Level Source Type: what the top of a new (empty) project is
+const TOP_TYPES = [
+  { id: 'hdl', label: 'HDL' },
+  { id: 'sch', label: 'Schematic', file: 'src/top.sch.json' },
+  { id: 'fsm', label: 'State Machine (FSM)', file: 'src/top.fsm.json' },
+  { id: 'asm', label: 'State Machine (ASM)', file: 'src/top.asm.json' },
+  { id: 'tt', label: 'Truth Table', file: 'src/top.tt.json' },
+];
+
+/** The top document of a new project (type sch / fsm / asm / tt) and its synchronized HDL module 'top'. */
+export async function createTopSource(pname, type, lang) {
+  const t = TOP_TYPES.find(x => x.id === type);
+  const hdlPath = `src/top.${lang === 'verilog' ? 'v' : 'vhd'}`;
+  let doc, code;
+  if (type === 'sch') {
+    const { newDoc, generateHdl } = await import('/core/schdoc.js');
+    doc = newDoc('top', lang); code = generateHdl(doc, { lang }).code;
+  } else if (type === 'fsm') {
+    const { newFsm, generateFsm } = await import('/core/fsm.js');
+    doc = newFsm('top', lang); code = generateFsm(doc, lang).code;
+  } else if (type === 'asm') {
+    const { newModel, generate } = await import('/core/asm.js');
+    doc = newModel('top', lang); code = generate(doc, lang).code;
+  } else if (type === 'tt') {
+    const { newTable, generateTableHdl } = await import('/core/logic.js');
+    doc = { ...newTable('top', ['a', 'b', 'c'], ['f']), lang }; code = generateTableHdl(doc, lang).code;
+  } else return null;
+  doc.generatedFile = hdlPath;
+  await api.writeFile(pname, t.file, JSON.stringify(doc, null, type === 'sch' ? 1 : 2));
+  await api.writeFile(pname, hdlPath, code);   // registers the module in the project
+  return t.file;
 }
 
 export async function openProjectDialog() {
@@ -689,6 +745,7 @@ export async function projectProperties() {
       ...field('Family:', dp.famSel),
       ...field('Device:', dp.partSel), ...field('Package:', dp.pkgSel), ...field('Speed:', dp.spdSel),
       ...field('Top Module (implementation):', h('span', {}, pj.top || '(none)')),
+      ...field('Top-Level Source Type:', h('span', {}, TOP_TYPES.find(t => t.id === (pj.topSourceType || 'hdl'))?.label || 'HDL')),
       ...field('Preferred Language:', lang)),
   });
   if (!r) return;

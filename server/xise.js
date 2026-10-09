@@ -107,7 +107,7 @@ export function exportXise(project, { sources, schematics = [], extraFiles = [] 
     ['Device', String(dev.part || 'xc3s500e').toLowerCase()],
     ['Package', String(dev.package || 'fg320').toLowerCase()],
     ['Speed Grade', String(dev.speed || '-4').startsWith('-') ? String(dev.speed || '-4') : `-${dev.speed}`],
-    ['Top-Level Source Type', 'HDL'],
+    ['Top-Level Source Type', project.topSourceType === 'sch' ? 'Schematic' : 'HDL'],
     ['Synthesis Tool', 'XST (VHDL/Verilog)'],
     ['Simulator', 'ISim (VHDL/Verilog)'],
     ['Preferred Language', prefLang],
@@ -207,7 +207,8 @@ export function importXise(xml) {
     startupClk: /cclk/i.test(props['FPGA Start-Up Clock'] || '') ? 'Cclk' : /user/i.test(props['FPGA Start-Up Clock'] || '') ? 'UserClk' : 'JtagClk',
   };
   const lang = /verilog/i.test(props['Preferred Language'] || '') ? 'verilog' : 'vhdl';
-  const out = { device, top, simTop, files, schematics, lang, constraints, impl, warnings };
+  const topSourceType = /schematic/i.test(props['Top-Level Source Type'] || '') ? 'sch' : 'hdl';
+  const out = { device, top, simTop, topSourceType, files, schematics, lang, constraints, impl, warnings };
   if (props['PROP_DesignName']) out.name = props['PROP_DesignName'];
   return out;
 }

@@ -198,7 +198,7 @@ export const api = {
       const text = lookup(parsed.constraints);
       if (typeof text === 'string') p.files[constraints] = text;
     }
-    Object.assign(p.json, { device: parsed.device.part ? parsed.device : p.json.device, top: parsed.top || '', simTop: parsed.simTop || '', files: out, constraints, impl: { ...p.json.impl, ...parsed.impl } });
+    Object.assign(p.json, { device: parsed.device.part ? parsed.device : p.json.device, top: parsed.top || '', simTop: parsed.simTop || '', topSourceType: parsed.topSourceType || 'hdl', files: out, constraints, impl: { ...p.json.impl, ...parsed.impl } });
     persist();
     return { project: clone(p.json), warnings };
   },
