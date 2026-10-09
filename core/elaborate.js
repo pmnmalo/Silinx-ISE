@@ -107,7 +107,7 @@ export function elaborate(lib, topName, opts = {}) {
   const ctx = { design, lib, pkgScopes: new Map() };
   try {
     // opts.generics: { NAME: integer } overrides the top module's generics / parameters
-    const ov = new Map(Object.entries(opts.generics || {}).map(([k, v]) => [k, { val: V.fromInt(v, 32, true), t: INT }]));
+    const ov = new Map(Object.entries(opts.generics || {}).flatMap(([k, v]) => { const e = { val: V.fromInt(v, 32, true), t: INT }; return [[k, e], [k.toLowerCase(), e]]; }));
     design.top = elabInstance(ctx, top, top.name, top.name, ov, new Map(), null, 0);
   } catch (e) {
     if (!(e instanceof ElabError)) throw e;
