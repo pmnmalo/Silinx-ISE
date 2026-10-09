@@ -97,7 +97,13 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   await page.fill(`${ED} .fsm-to`, sid);
   await page.waitFor((ed) => /No problems/.test(document.querySelector(`${ed} .fsm-problems`).textContent), [ED], { what: 'no problems' });
   await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
-  let m = await fsmFile('FsmPj', 'src/det.fsm.json');
+  // the save reaches the disk a moment after the tab is marked clean: wait for the new state in the file
+  let m;
+  for (let i = 0; i < 100; i++) {
+    m = await fsmFile('FsmPj', 'src/det.fsm.json');
+    if (m.states.some((s) => s.id === sid) && m.transitions.find((t) => t.id === 't6')?.to === sid) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
   assert.deepEqual(m.states.find((s) => s.id === sid), { id: sid, name: 'S3', x: m.states.find((s) => s.id === sid).x, y: m.states.find((s) => s.id === sid).y, outputs: { z: '1' } });
   assert.deepEqual(m.transitions.filter((t) => t.from === sid).map((t) => [t.to, t.cond]), [['s1', '']]);
   assert.equal(m.transitions.find((t) => t.id === 't6').to, sid);
