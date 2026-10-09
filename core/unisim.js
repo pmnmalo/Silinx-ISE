@@ -495,15 +495,36 @@ ${port('B')}
 end silinx;`;
 };
 
-// Digital clock managers: simulated as a pass-through (every clock output = CLKIN, inverted for
-// the 180-degree ones), with a warning
+// Digital clock managers (functional model): the CLKIN period is measured at its rising edges;
+// CLK0 = CLKIN, CLK90 / CLK180 / CLK270 are shifted by 1/4, 1/2, 3/4 of the period, CLK2X runs at
+// twice, CLKDV at 1 / CLKDV_DIVIDE and CLKFX at CLKFX_MULTIPLY / CLKFX_DIVIDE of the input
+// frequency (CLKIN_DIVIDE_BY_2 halves it first), all 50 % duty and re-aligned to CLKIN rising
+// edges. LOCKED rises after LOCK_CYCLES rising edges of CLKIN (RST restarts the count; the outputs
+// stay low until then). Fine phase shift, DSS and jitter are not modelled.
 const DCM_GENS = 'CLKDV_DIVIDE : real := 2.0; CLKFX_DIVIDE : integer := 1; CLKFX_MULTIPLY : integer := 4; CLKIN_DIVIDE_BY_2 : boolean := FALSE; '
   + 'CLKIN_PERIOD : real := 10.0; CLKOUT_PHASE_SHIFT : string := "NONE"; CLK_FEEDBACK : string := "1X"; DESKEW_ADJUST : string := "SYSTEM_SYNCHRONOUS"; '
   + 'DFS_FREQUENCY_MODE : string := "LOW"; DLL_FREQUENCY_MODE : string := "LOW"; DSS_MODE : string := "NONE"; DUTY_CYCLE_CORRECTION : boolean := TRUE; '
   + 'FACTORY_JF : bit_vector(15 downto 0) := X"C080"; PHASE_SHIFT : integer := 0; STARTUP_WAIT : boolean := FALSE; SIM_MODE : string := "SAFE"';
-// The SIMPRIM ones (X_DCM_SP, X_DCM) also take LOC and assert LOCKED after LOCK_CYCLES rising
-// edges of CLKIN (RST restarts the count).
 const LOCK_CYCLES = 3;
+// one synthesized output: on every D-th CLKIN rising edge (after lock), M periods of p*D/M
+const dcmOut = (sig, m, d) => `
+  process (CLKIN, RST)
+    variable k : integer := 0;
+    variable t : time;
+  begin
+    if RST = '1' then k := 0; ${sig} <= transport '0';
+    elsif rising_edge(CLKIN) and lk then
+      if k = 0 then
+        t := (pin * ${d}) / ${m};
+        for i in 0 to ${m} - 1 loop
+          ${sig} <= transport '1' after t * i;
+          ${sig} <= transport '0' after t * i + t / 2;
+        end loop;
+      end if;
+      k := k + 1;
+      if k >= ${d} * DIV then k := 0; end if;
+    end if;
+  end process;`;
 const dcm = (name, simprim = false) => `
 library IEEE; use IEEE.STD_LOGIC_1164.ALL;
 entity ${name} is
@@ -513,24 +534,44 @@ entity ${name} is
         STATUS : out std_logic_vector(7 downto 0));
 end ${name};
 architecture silinx of ${name} is
+  signal p, pin : time := 0 ns;          -- CLKIN period, and the period the DCM works from
+  signal lk : boolean := false;
+  signal c0, c180, c2x, cdv, cfx : std_ulogic := '0';
+  constant DIV : integer := 1 + boolean'pos(CLKIN_DIVIDE_BY_2);   -- CLKIN edges per DCM input period
+  signal c0d : std_ulogic := '0';
+  constant DV2 : integer := integer(CLKDV_DIVIDE * 2.0);   -- 2 x divide: odd = half-integer divide
+  constant DVM : integer := 1 + DV2 mod 2;                 -- CLKDV = CLKIN * DVM / DVD
+  constant DVD : integer := DV2 / (2 - DV2 mod 2);
 begin
-  CLK0 <= CLKIN; CLK90 <= CLKIN; CLK270 <= not CLKIN; CLK180 <= not CLKIN;
-  CLK2X <= CLKIN; CLK2X180 <= not CLKIN; CLKDV <= CLKIN; CLKFX <= CLKIN; CLKFX180 <= not CLKIN;
-${simprim ? `  process (CLKIN, RST)
+  process (CLKIN, RST)
+    variable last : time := 0 ns;
     variable n : integer := 0;
   begin
-    if RST = '1' then n := 0;
-    elsif rising_edge(CLKIN) and n < ${LOCK_CYCLES} then n := n + 1;
+    if RST = '1' then n := 0; lk <= false;
+    elsif rising_edge(CLKIN) then
+      if n > 0 then p <= now - last; end if;
+      last := now;
+      if n < ${LOCK_CYCLES} then n := n + 1; end if;
+      lk <= n >= ${LOCK_CYCLES};
     end if;
-    if n >= ${LOCK_CYCLES} then LOCKED <= '1'; else LOCKED <= '0'; end if;
-  end process;` : "  LOCKED <= '0' when RST = '1' else '1';"}
+  end process;
+  pin <= p * 2 when CLKIN_DIVIDE_BY_2 else p;
+  c0 <= c0d when CLKIN_DIVIDE_BY_2 else CLKIN when lk else '0';
+  CLK0 <= c0;
+  c180 <= not c0 when lk else '0';
+  CLK180 <= c180;
+  CLK90 <= transport c0 after pin / 4;
+  CLK270 <= transport c180 after pin / 4;
+${dcmOut('c0d', 1, 1)}
+${dcmOut('c2x', 2, 1)}
+${dcmOut('cdv', 'DVM', 'DVD')}
+${dcmOut('cfx', 'CLKFX_MULTIPLY', 'CLKFX_DIVIDE')}
+  CLK2X <= c2x; CLK2X180 <= not c2x when lk else '0';
+  CLKDV <= cdv;
+  CLKFX <= cfx; CLKFX180 <= not cfx when lk else '0';
+  LOCKED <= '1' when lk else '0';
   PSDONE <= '0';
   STATUS <= (others => '0');
-  process
-  begin
-    report "${name} simulated as a clock pass-through: CLK0, CLK2X, CLKDV and CLKFX all run at the CLKIN frequency (no multiplication, division or phase shift)" severity warning;
-    wait;
-  end process;
 end silinx;`;
 
 // ---------------------------------------------------------------------------------------------

@@ -314,7 +314,7 @@ test('regroupNetlist: pin directions per primitive (latch gate is an input, inou
   assert.equal(b.val('pad'), 'z');
 });
 
-test('UNISIM models: SRLC16E, RAM16X1D, BUFGMUX / BUFGCE / BUFGCE_1, DCM_SP pass-through', () => {
+test('UNISIM models: SRLC16E, RAM16X1D, BUFGMUX / BUFGCE / BUFGCE_1, DCM_SP', () => {
   const t = netlist(['clk : in STD_LOGIC', 'd : in STD_LOGIC', 'we : in STD_LOGIC', 'ce : in STD_LOGIC', 's : in STD_LOGIC',
     'a : in STD_LOGIC_VECTOR ( 3 downto 0 )', 'b : in STD_LOGIC_VECTOR ( 3 downto 0 )',
     'q : out STD_LOGIC', 'q15 : out STD_LOGIC', 'spo : out STD_LOGIC', 'dpo : out STD_LOGIC', 'o1 : out STD_LOGIC', 'o2 : out STD_LOGIC', 'o3 : out STD_LOGIC',
@@ -353,8 +353,7 @@ test('UNISIM models: SRLC16E, RAM16X1D, BUFGMUX / BUFGCE / BUFGCE_1, DCM_SP pass
   const b = build(t);
   b.set('clk', 0); b.set('ce', 0); b.set('s', 0); b.set('a', 0); b.set('b', 2); b.set('we', 0); b.set('d', 1);
   b.sim.run(0); b.step();
-  assert.deepEqual(['q', 'q15', 'spo', 'dpo', 'o1', 'o2', 'o3', 'c0', 'c180', 'locked'].map(b.val), [1, 1, 0, 1, 0, 0, 1, 0, 1, 1]);
-  assert.ok(b.sim.log.some((l) => l.kind === 'warning' && /DCM_SP.*pass-through/.test(l.text)));
+  assert.deepEqual(['q', 'q15', 'spo', 'dpo', 'o1', 'o2', 'o3', 'c0', 'c180', 'locked'].map(b.val), [1, 1, 0, 1, 0, 0, 1, 0, 0, 0]);   // the DCM is not locked yet
   // clock: shift in d = 1 (CE), write 1 at address 0
   b.set('ce', 1); b.set('we', 1); b.set('s', 1);
   b.set('clk', 1); b.step(); b.set('clk', 0); b.step();
@@ -568,7 +567,7 @@ ${pinBits('DOPB', 4, 'dopb(#)')}
   assert.equal(b.val('do'), 0xCA);
 });
 
-test('SIMPRIM models: X_DCM_SP passes the clock to a counter, LOCKED after a few cycles', () => {
+test('SIMPRIM models: X_DCM_SP clocks a counter, LOCKED after a few cycles', () => {
   const t = netlist(['clk : in STD_LOGIC', 'rst : in STD_LOGIC', 'q : out STD_LOGIC_VECTOR ( 1 downto 0 )', 'locked : out STD_LOGIC'], `
   clk_ibuf : X_CKBUF
     port map (I => clk, O => clkin);
@@ -642,9 +641,49 @@ ${pinBits('STATUS', 8, 'NLW_dcm_STATUS_UNCONNECTED(#)')}
   const out = [];
   for (let i = 0; i < 5; i++) { b.step(); out.push(b.val('q')); }
   assert.deepEqual(out.slice(1).map((v, i) => (v - out[i] + 4) % 4), [1, 1, 1, 1]);   // counts on every CLKIN cycle
-  assert.ok(b.sim.log.some((l) => l.kind === 'warning' && /X_DCM_SP.*pass-through/.test(l.text)));
   b.set('rst', 1); b.step();
   assert.equal(b.val('locked'), 0);
   const q = b.val('q'); b.step(); b.step();
   assert.equal(b.val('q'), q);              // not locked: the counter holds
+});
+
+test('DCM: CLK0/90/180/270, CLK2X, CLKDV and CLKFX frequencies and phases (UNISIM and SIMPRIM, CLKIN_DIVIDE_BY_2)', () => {
+  const run = (prim, gens) => {
+    const lib = prim.startsWith('X_') ? 'library simprim; use simprim.vcomponents.all;' : 'library unisim; use unisim.vcomponents.all;';
+    const src = [{ path: 't.vhd', lang: 'vhdl', text: `library ieee; use ieee.std_logic_1164.all; ${lib}
+entity t is end t;
+architecture s of t is
+  signal clk : std_logic := '0';
+  signal c0, c90, c180, c270, c2x, cdv, cfx, lk : std_logic;
+begin
+  clk <= not clk after 10 ns;
+  u : ${prim} generic map (${gens})
+    port map (CLKIN => clk, CLKFB => c0, RST => '0', CLK0 => c0, CLK90 => c90, CLK180 => c180, CLK270 => c270, CLK2X => c2x, CLKDV => cdv, CLKFX => cfx, LOCKED => lk);
+end s;` }];
+    const lb = compile([...primitiveSources(src), ...src]);
+    assert.deepEqual(lb.errors.filter((e) => e.severity !== 'warning').map((e) => e.message), []);
+    const d = elaborate(lb, 't');
+    assert.deepEqual(d.diags.filter((x) => x.severity === 'error').map((x) => x.message), []);
+    const sim = new Simulator(d);
+    const names = ['c0', 'c90', 'c180', 'c270', 'c2x', 'cdv', 'cfx', 'lk'];
+    const sig = Object.fromEntries(names.map((n) => [n, d.signals.find((x) => x.name.endsWith(`.${n}`) || x.name === n)]));
+    const rise = Object.fromEntries(names.map((n) => [n, []])), prev = {};
+    for (let t = 0; t <= 1000000; t += 250) {      // ps
+      sim.run(t);
+      for (const n of names) { const v = sig[n].val.x ? 2 : Number(sig[n].val.v & 1n); if (prev[n] === 0 && v === 1) rise[n].push(t / 1000); prev[n] = v; }
+    }
+    const period = (n) => { const r = rise[n].slice(-4); return Math.round(((r[3] - r[0]) / 3) * 10) / 10; };
+    const phase = (n) => { const r = rise[n].at(-1); const c = rise.c0.filter((x) => x <= r).at(-1); return Math.round((r - c) * 10) / 10; };
+    return { period, phase, rise };
+  };
+  let r = run('DCM_SP', 'CLKFX_MULTIPLY => 5, CLKFX_DIVIDE => 2, CLKDV_DIVIDE => 2.5');
+  assert.equal(r.rise.lk.length, 1);
+  assert.ok(r.rise.lk[0] > 20 && r.rise.lk[0] < 100, 'LOCKED after a few CLKIN cycles');
+  assert.deepEqual(['c0', 'c90', 'c180', 'c270', 'c2x', 'cdv', 'cfx'].map(r.period), [20, 20, 20, 20, 10, 50, 8]);
+  assert.deepEqual(['c90', 'c180', 'c270'].map(r.phase), [5, 10, 15]);
+  r = run('X_DCM_SP', 'CLKFX_MULTIPLY => 2, CLKFX_DIVIDE => 1, CLKDV_DIVIDE => 4.0');
+  assert.deepEqual(['c0', 'c2x', 'cdv', 'cfx'].map(r.period), [20, 10, 80, 10]);
+  r = run('DCM_SP', 'CLKIN_DIVIDE_BY_2 => TRUE, CLKFX_MULTIPLY => 3, CLKFX_DIVIDE => 1');
+  assert.deepEqual(['c0', 'c90', 'cdv'].map(r.period), [40, 40, 80]);
+  assert.ok(Math.abs(r.period('cfx') - 13.3) < 0.2);
 });

@@ -49,7 +49,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   of internal signals. It simulates the HDL, so it works without ISE and in the standalone edition.
   With ISE it can also run what the tools built: the post-synthesis, post-translate, post-map or
   post-place & route netlist (netgen), on the board or in ISim, with Silinx's own models of the
-  UNISIM / SIMPRIM primitives (functional, no SDF timing).
+  UNISIM / SIMPRIM primitives (functional, no SDF timing): LUTs, flip-flops, latches, carry
+  logic, SRLs, distributed and block RAM, multipliers, clock buffers and DCMs (CLK0/90/180/270,
+  CLK2X, CLKDV and CLKFX at their real frequencies).
 - **ISE processes** beyond the main flow: View Technology Schematic (the post-synthesis netlist,
   regrouped by the design's modules), Generate Post-Synthesis / Translate / Map / Place & Route
   Simulation Model, Post-Place & Route Static Timing, Text Power Report (xpwr), Back-annotate Pin
