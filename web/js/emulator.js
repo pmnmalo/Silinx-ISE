@@ -175,7 +175,7 @@ function basys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, por
     port('btn', k, x, 464);
   }
   const wrap = h('div', { class: 'emu-board-wrap' }, pcb,
-    h('div', { class: 'emu-board-note' }, `${board.name}${title ? ` — ${title}` : ''} · ${clockNote}`));
+    boardNote(h, board, title, clockNote));
   return wrap;
 }
 
@@ -189,11 +189,15 @@ const chip = (x, y, w, hgt, lines) => `<rect x="${x}" y="${y}" width="${w}" heig
   + lines.map((t, i) => `<text x="${x + w / 2}" y="${y + hgt / 2 - (lines.length - 1) * 9 + i * 18 + 4}" fill="${i ? '#bbb' : '#ddd'}" font-size="${i ? 11 : 14}" text-anchor="middle" font-family="Arial" font-weight="${i ? 'normal' : 'bold'}">${t}</text>`).join('');
 const holes4 = (W, H) => [[22, 22], [W - 22, 22], [22, H - 22], [W - 22, H - 22]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" fill="#d8c67e"/><circle cx="${x}" cy="${y}" r="5" fill="#1b1b1b"/>`).join('');
 
+// "<board> — <design> · <clock note>": the names are data (not translated), the note is UI text
+const boardNote = (h, board, title, clockNote) => h('div', { class: 'emu-board-note' },
+  h('span', { 'data-no-i18n': true }, `${board.name}${title ? ` — ${title}` : ''}`), ' · ', h('span', {}, clockNote));
+
 function boardFrame({ h, W, H, art, board, title, clockNote }) {
   const pcb = h('div', { class: 'emu-pcb', style: { width: `${W}px`, height: `${H}px` } });
   pcb.append(svgEl(W, H, art));
   const put = (el, x, y, cls = '') => { const w = h('div', { class: `emu-at ${cls}`, style: { left: `${x}px`, top: `${y}px` } }, el); pcb.append(w); return w; };
-  const wrap = h('div', { class: 'emu-board-wrap' }, pcb, h('div', { class: 'emu-board-note' }, `${board.name}${title ? ` — ${title}` : ''} · ${clockNote}`));
+  const wrap = h('div', { class: 'emu-board-wrap' }, pcb, boardNote(h, board, title, clockNote));
   return { pcb, put, wrap };
 }
 

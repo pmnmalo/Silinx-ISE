@@ -112,16 +112,32 @@ async function askReplaceProject(pname) {
     `A project named '${pname}' already exists.\n\nReplace it? ${api.standalone ? 'The existing project will be deleted from this browser.' : 'The existing project is moved to the workspace .trash folder.'}`);
 }
 // Replace an existing project by running `fn` (an import): the old project is removed first; if
-// the import then fails, it comes back (standalone: from a snapshot; server: it is in .trash)
+// the import then fails, it comes back from a snapshot taken before (standalone: a bundle; server:
+// a Silinx zip of the whole project) and is opened again if it was open. Should the restore fail
+// too, the server still has the old project in the workspace .trash folder.
 async function replaceProjectWith(pname, fn) {
   const exists = (await api.projects()).some(p => p.name === pname);
-  const backup = exists && api.standalone && api.exportBundle ? api.exportBundle(pname) : null;
+  const wasOpen = S.project?.name === pname;
+  let backup = null;
+  if (exists) {
+    try {
+      if (api.standalone && api.exportBundle) backup = { bundle: api.exportBundle(pname) };
+      else backup = { zip: (await api.exportZip(pname, 'silinx')).blob };
+    } catch { /* no snapshot: the server keeps the old project in .trash */ }
+  }
   await removeExistingProject(pname);
   try { return await fn(); }
   catch (e) {
     try { await api.deleteProject(pname); } catch { /* nothing was created */ }
-    if (backup) { try { await api.importBundle(backup); app.log(`The previous project '${pname}' was restored.`, 'info'); } catch { /* keep the error */ } }
-    else if (exists) app.log(`The previous project '${pname}' is in the workspace .trash folder.`, 'info');
+    let restored = false;
+    try {
+      if (backup?.bundle) { await api.importBundle(backup.bundle); restored = true; }
+      else if (backup?.zip) { await api.importZip(pname, backup.zip); restored = true; }
+    } catch { /* keep the import error */ }
+    if (restored) {
+      app.log(`The previous project '${pname}' was restored.`, 'info');
+      if (wasOpen) { try { await app.openProject(pname); app.showLeftPage('design'); } catch { /* it is in the project list */ } }
+    } else if (exists && !api.standalone) app.log(`The previous project '${pname}' is in the workspace .trash folder.`, 'info');
     throw e;
   }
 }

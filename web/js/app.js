@@ -527,7 +527,7 @@ async function checkSyntaxInner(mod, sim, id) {
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
   for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
-  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err'); setStatus(id, 'err'); showConsolePage('errors'); return false; }
+  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); setStatus(id, 'err'); showConsolePage('errors'); return false; }
   log(`Elaborating top module <${mod}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
   log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
   setStatus(id, nw ? 'warn' : 'ok');
@@ -564,7 +564,7 @@ async function checkFileSyntax(path) {
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
   for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
-  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err'); showConsolePage('errors'); status(`Check Syntax: ${ne} error(s)`); return false; }
+  if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); showConsolePage('errors'); status(`Check Syntax: ${ne} error(s)`); return false; }
   log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
   status(`Check Syntax: ${path.split('/').pop()} OK${nw ? ` (${nw} warning(s))` : ''}`);
   return true;
@@ -740,7 +740,7 @@ async function checkUcfFile(path = S.project?.constraints, { quiet = false } = {
   setDiagnostics(diags);
   if (!quiet) log(`\nStarted : "Check Constraints" of ${path}.\n`, 'hdr');
   for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:ConstraintSystem - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
-  if (ne) { log(`\nProcess "Check Constraints" failed (${ne} error(s), ${nw} warning(s))`, 'err'); showConsolePage('errors'); status(`${path.split('/').pop()}: ${ne} error(s)`); return false; }
+  if (ne) { log(`\nProcess "Check Constraints" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); showConsolePage('errors'); status(`${path.split('/').pop()}: ${ne} error(s)`); return false; }
   if (!quiet) log(`\nProcess "Check Constraints" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
   status(`Check Constraints: ${path.split('/').pop()} OK${nw ? ` (${nw} warning(s))` : ''}`);
   return true;
