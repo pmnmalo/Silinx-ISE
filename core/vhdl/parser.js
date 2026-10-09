@@ -146,6 +146,14 @@ class Parser {
   }
   expectOp(v) {
     if (this.isOp(v)) return this.next();
+    // a ';' missing at the end of a line: reported after the last token of that line, and parsing
+    // goes on as if it were there (no cascade of errors)
+    const prev = this.i > 0 ? this.t[this.i - 1] : null;
+    if (v === ';' && prev && this.peek().line > prev.line) {
+      const len = String(prev.raw ?? prev.value ?? '').length + (prev.type === 'str' || prev.type === 'char' ? 2 : 0);
+      this.diag(`expected ';' after ${this.describe(prev)}`, { line: prev.line, col: prev.col + len });
+      return prev;
+    }
     this.fail(`expected '${v}' but found ${this.describe(this.peek())}`);
   }
   expectId(what = 'identifier') {

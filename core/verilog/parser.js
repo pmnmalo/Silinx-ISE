@@ -38,6 +38,13 @@ class Parser {
   }
   expect(v) {
     if (this.is(v)) return this.next();
+    // a ';' missing at the end of a line: reported after the last token of that line, and parsing
+    // goes on as if it were there (no cascade of errors)
+    const prev = this.i > 0 ? this.toks[this.i - 1] : null;
+    if (v === ';' && prev && this.tok.line > prev.line) {
+      this.error(`expected ';' after '${prev.v ?? prev.t}'`, { line: prev.line, col: prev.col + String(prev.v ?? '').length });
+      return prev;
+    }
     this.error(`expected '${v}' but found '${this.tok.v || this.tok.t}'`);
     throw new Sync();
   }

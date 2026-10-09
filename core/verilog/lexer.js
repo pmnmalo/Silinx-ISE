@@ -198,7 +198,7 @@ export function tokenize(src, file, errors, opts = {}) {
           adv(); const e = src[i];
           s += e === 'n' ? '\n' : e === 't' ? '\t' : e; adv(); continue;
         }
-        if (src[i] === '\n') { err('unterminated string'); break; }
+        if (src[i] === '\n') { err('unterminated string', l0, c0); break; }
         s += src[i]; adv();
       }
       adv();

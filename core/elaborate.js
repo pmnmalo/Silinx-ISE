@@ -336,12 +336,13 @@ function elabItems(E, items) {
 }
 
 function elabAssignItem(E, it) {
-  const target = bindLvalue(E, it.target, it.loc);
+  // Verilog: an undeclared target of a continuous assignment is an implicit scalar net
+  const target = bindLvalue(E.lang === 'verilog' ? { ...E, implicitNets: true } : E, it.target, it.loc);
   const value = bindExpr(E, it.value, target.t, it.loc);
   if (E.lang === 'verilog') ctxSize(value, target.t.w);
   checkAssignable(E, target, value, it.loc);
   const body = { k: 'asg', target, value, nb: E.lang === 'vhdl', delay: it.delay ? bindExpr(E, it.delay) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, prec: E.timePrec, loc: it.loc };
-  if (E.lang === 'vhdl') Object.assign(body, vhdlMech(E, it));
+  if (E.lang === 'vhdl') { Object.assign(body, vhdlMech(E, it)); rangeCheck(body); }
   addProc(E, {
     name: `assign_${it.loc?.line ?? ''}`, kind: 'assign', mode: 'comb', body, triggers: triggersOfReads(body),
     lang: E.lang, loc: it.loc, file: E.file, item: it,
@@ -1007,13 +1008,14 @@ function hierLookup(E, name) {
 
 function indexNode(E, base, idxExpr, loc) {
   const index = bindExpr(E, idxExpr, null, loc);
-  if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem };
+  // (chk: VHDL, an index outside the range of the array is a run-time error)
+  if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem, ...(E.lang === 'vhdl' ? { chk: true } : {}) };
   if (base.t.kind === 'str') return { k: 'chr', base, index, t: CHAR };   // s(i): a CHARACTER
   if (index.k === 'c' && !index.val.x) {
     const p = bitpos(base.t, V.toNum(index.val));
     if (p < 0 || p >= base.t.w) diag(E, `index ${V.toDec(index.val, true)} out of range for '${base.name || 'expression'}'`, loc, 'warning');
   }
-  return { k: 'bit', base, index, t: BIT };
+  return { k: 'bit', base, index, t: BIT, ...(E.lang === 'vhdl' ? { chk: true } : {}) };
 }
 
 function sliceNode(E, base, leftE, rightE, loc) {
@@ -1098,13 +1100,14 @@ function bindBinary(E, e, expect, loc) {
   if (E.lang === 'vhdl' && (ARITH.has(o) && o !== '**')) [a, b] = harmonizeVhdl(a, b);
   if (E.lang === 'vhdl' && ARITH.has(o) && o !== '**') [a, b] = mixedSign(a, b);
   const s = a.t.s && b.t.s;
-  if (a.t.kind === 'int' && b.t.kind === 'int') return { k: 'bin', o, a, b, t: INT };
+  if (a.t.kind === 'int' && b.t.kind === 'int') return { k: 'bin', o, a, b, t: INT, ...(E.lang === 'vhdl' && (o === '/' || o === 'mod' || o === 'rem') ? { dz: true } : {}) };
   if (a.t.kind === 'time' && b.t.kind === 'time' && o === '/') return { k: 'bin', o, a, b: { ...b, t: { ...b.t, s: true } }, t: { ...INT, w: 64 } };   // time / time: universal integer
   if (a.t.kind === 'time' || b.t.kind === 'time') return { k: 'bin', o, a, b, t: TIME };
   if (o === '**') return { k: 'bin', o, a, b, t: a.t.kind === 'int' ? INT : vecT(a.t.w, a.t.s) };
   let w = Math.max(a.t.w, b.t.w);
   if (o === '*' && E.lang === 'vhdl') w = a.t.w + b.t.w;
-  if (BITWISE.has(o) && a.t.kind === 'bool' && b.t.kind === 'bool') return { k: 'bin', o, a, b, t: BOOL };
+  // (VHDL boolean and / or / nand / nor are short-circuit operators: sc)
+  if (BITWISE.has(o) && a.t.kind === 'bool' && b.t.kind === 'bool') return { k: 'bin', o, a, b, t: BOOL, ...(o !== '^' && o !== '~^' ? { sc: true } : {}) };
   const t = BITWISE.has(o) && w === 1 && (a.t.scalar || b.t.scalar) ? BIT : vecT(w, s);
   return { k: 'bin', o, a, b, t };
 }
@@ -1447,6 +1450,8 @@ function pickOverload(E, entry, rawArgs, loc) {
 function bindCall(E, entry, rawArgs, name, loc) {
   entry = pickOverload(E, entry, rawArgs, loc);
   const decl = entry.decl;
+  if (decl.kind === 'task') throw new ElabError(`'${name}' is a procedure/task, not a function`, loc);
+  if (rawArgs.filter(a => !(a && a.named !== undefined)).length > decl.params.length) throw new ElabError(`too many arguments in call to '${name}'`, loc);
   // named association
   let argExprs = new Array(decl.params.length).fill(null);
   rawArgs.forEach((a, k) => {
@@ -1592,9 +1597,10 @@ function bindLvalue(E, e, loc) {
     case 'index': {
       const base = bindLvalue(E, e.base, loc);
       const index = bindExpr(E, e.index, null, loc);
-      if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem };
+      const chk = E.lang === 'vhdl' ? { chk: true } : {};
+      if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem, ...chk };
       if (base.t.kind === 'str') return { k: 'chr', base, index, t: CHAR };
-      return { k: 'bit', base, index, t: BIT };
+      return { k: 'bit', base, index, t: BIT, ...chk };
     }
     case 'slice': {
       const base = bindLvalue(E, e.base, loc);
@@ -1618,9 +1624,10 @@ function bindLvalue(E, e, loc) {
       const a = args[args.length - 1];
       if (a.op === 'slice' && a.base == null) return sliceNode(E, base, a.left, a.right, loc);
       const index = bindExpr(E, a, null, loc);
-      if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem };
+      const chk = E.lang === 'vhdl' ? { chk: true } : {};
+      if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem, ...chk };
       if (base.t.kind === 'str') return { k: 'chr', base, index, t: CHAR };
-      return { k: 'bit', base, index, t: BIT };
+      return { k: 'bit', base, index, t: BIT, ...chk };
     }
     case 'concat': {
       const parts = e.parts.map(p => bindLvalue(E, p, loc));
@@ -1628,6 +1635,12 @@ function bindLvalue(E, e, loc) {
     }
   }
   throw new ElabError('invalid assignment target', loc);
+}
+
+// VHDL: an assignment to an object of an integer subtype checks the value against its range
+function rangeCheck(asg) {
+  const t = asg.target.t;
+  if (t && t.kind === 'int' && t.rlo !== undefined && (t.rlo > -2147483648 || t.rhi < 2147483647)) asg.rng = [t.rlo, t.rhi];
 }
 
 function lroot(L) {
@@ -1691,6 +1704,7 @@ function bindStmt0(E, s, loc) {
         delay: s.delay ? bindExpr(E, s.delay, null, loc) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, prec: E.timePrec, loc,
       };
       if (E.lang === 'vhdl' && asg.nb) Object.assign(asg, vhdlMech(E, s));
+      if (E.lang === 'vhdl') rangeCheck(asg);
       // Verilog `a = #d b;`: the process waits d, then assigns the value sampled before the wait
       if (E.lang === 'verilog' && !asg.nb && asg.delay) asg.intra = true;
       return asg;

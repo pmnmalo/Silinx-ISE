@@ -24,14 +24,16 @@ export function evalE(n, ctx) {
     case 'bit': {
       const b = evalE(n.base, ctx), i = evalE(n.index, ctx);
       if (i.x) return V.X1;
-      return V.getBits(b, bitpos(n.base.t, V.toNum(i)), 1);
+      const p = bitpos(n.base.t, V.toNum(i));
+      if (n.chk && (p < 0 || p >= b.w)) throw indexError(V.toNum(i), n.base.t);
+      return V.getBits(b, p, 1);
     }
     case 'elem': {
       const arr = evalE(n.base, ctx), i = evalE(n.index, ctx);
       const et = n.t;
       if (i.x) return V.allX(et.w, et.s);
       const k = V.toNum(i) - n.base.t.lo;
-      if (k < 0 || k >= arr.length) return V.allX(et.w, et.s);
+      if (k < 0 || k >= arr.length) { if (n.chk) throw indexError(V.toNum(i), n.base.t); return V.allX(et.w, et.s); }
       return arr[k];
     }
     case 'slice': return { ...V.getBits(evalE(n.base, ctx), n.lo, n.t.w), s: n.t.s };
@@ -132,6 +134,12 @@ export function evalE(n, ctx) {
 
 function fit(v, w, s) { return V.withSign(V.resize(v, w), s); }
 
+// VHDL: index outside the range of an array / vector
+function indexError(i, t) {
+  const [l, r] = t.kind === 'array' ? [t.left, t.right] : [t.left, t.right];
+  return new SimError(`index ${i} out of range ${l} ${(t.desc ? 'downto' : 'to')} ${r}`);
+}
+
 // equality of values, arrays (and records, arrays of arrays) element by element
 export function sameDeep(a, b) {
   if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((e, i) => sameDeep(e, b[i]));
@@ -170,6 +178,11 @@ function evalBin(n, ctx) {
     const b = V.truth(evalE(n.b, ctx));
     if (o === '&&') return a === 1 && b === 1 ? V.ONE : (b === 0 ? V.ZERO : V.X1);
     return b === 1 ? V.ONE : (a === 0 && b === 0 ? V.ZERO : V.X1);
+  }
+  if (n.sc) {   // VHDL boolean and / or / nand / nor: the right operand only when needed
+    const x = V.truth(evalE(n.a, ctx));
+    if (x === 0 && (o === '&' || o === 'nand')) return V.fromBool(o === 'nand');
+    if (x === 1 && (o === '|' || o === 'nor')) return V.fromBool(o === '|');
   }
   let a = evalE(n.a, ctx), b = evalE(n.b, ctx);
   if (Array.isArray(a) || Array.isArray(b)) {   // arrays / records (VHDL): element-wise equality
@@ -211,6 +224,7 @@ function evalBin(n, ctx) {
     case 'ror': return V.rotr(fit(a, w, s), b);
   }
   a = V.withSign(a, s); b = V.withSign(b, s);
+  if (n.dz && !b.x && b.v === 0n) throw new SimError(`division by zero (operator ${o === '/' ? '/' : o})`);
   switch (o) {
     case '+': return V.add(a, b, w, s);
     case '-': return V.sub(a, b, w, s);
@@ -443,6 +457,7 @@ function resolveTarget(L, ctx, out) {
       const i = evalE(L.index, ctx);
       if (i.x) { out.push({ ...b, invalid: true, w: L.t.w }); return; }
       const wr = { ...b, elem: V.toNum(i) - L.base.t.lo, lo: 0, w: L.t.w, whole: false };
+      if (L.chk && (wr.elem < 0 || wr.elem >= L.base.t.len)) throw indexError(V.toNum(i), L.base.t);
       // element of an element (arrays of arrays, records): the outer indices form a path
       if (b.elem != null) wr.path = [...(b.path || []), b.elem];
       if (L.t.kind === 'array') wr.sub = true;   // the element is itself an array / record
@@ -466,6 +481,7 @@ function resolveTarget(L, ctx, out) {
         const i = evalE(L.index, ctx);
         if (i.x) { out.push({ ...b, invalid: true, w }); return; }
         lo = bitpos(L.base.t, V.toNum(i));
+        if (L.chk && (lo < 0 || lo >= L.base.t.w)) throw indexError(V.toNum(i), L.base.t);
       } else if (L.k === 'pslice') {
         const st = evalE(L.start, ctx);
         if (st.x) { out.push({ ...b, invalid: true, w }); return; }
@@ -539,6 +555,10 @@ function prepAssign(s, ctx) {
 
 function doAssign(s, ctx) {
   const { writes, parts, delay } = prepAssign(s, ctx);
+  if (s.rng) {   // VHDL integer subtype: the value must be in its range
+    const v = parts[0], x = v.x ? null : Number(V.toBig(v));
+    if (x !== null && (x < s.rng[0] || x > s.rng[1])) throw new SimError(`value ${x} out of range ${s.rng[0]} to ${s.rng[1]}`);
+  }
   let mech = null;
   if (s.vh) {
     mech = { mech: s.mech, cont: s.cont, reject: null };
