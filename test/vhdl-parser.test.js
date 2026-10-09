@@ -288,14 +288,15 @@ describe('types and declarations', () => {
     assert.deepEqual(d.by_enum.type.range, { of: R('state_t'), reverse: false });
   });
 
-  test('object alias declarations; subprogram aliases are dropped with a warning', () => {
+  test('object alias declarations; subprogram aliases (with a signature)', () => {
     const r = parse(`entity e is end; architecture a of e is signal z : bit_vector(7 downto 0);
       alias hi : bit_vector(3 downto 0) is z(7 downto 4); alias zz is z;
-      alias f is foo [integer return integer]; begin end;`);
-    assert.equal(r.errors.filter((e) => e.severity === 'error').length, 0);
-    assert.equal(r.errors.filter((e) => e.severity === 'warning').length, 1);
+      alias f is foo [integer return integer]; alias g is ieee.numeric_std.to_integer [unsigned return natural];
+      alias p is work.pk.proc [integer, bit]; begin end;`);
+    assert.deepEqual(r.errors, []);
     const d = r.units[0].decls;
-    assert.deepEqual(d.map((x) => [x.kind, x.name]), [['signal', 'z'], ['alias', 'hi'], ['alias', 'zz']]);
+    assert.deepEqual(d.map((x) => [x.kind, x.name]), [['signal', 'z'], ['alias', 'hi'], ['alias', 'zz'], ['subalias', 'f'], ['subalias', 'g'], ['subalias', 'p']]);
+    assert.deepEqual(d.slice(3).map((x) => x.target), ['foo', 'to_integer', 'proc']);
     assert.equal(d[1].target.op, 'slice');
   });
 

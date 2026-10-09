@@ -518,6 +518,23 @@ class Parser {
         if (this.accept(':')) this.ident();
         return { kind: 'block', label, decls, stmts };
       }
+      if (this.is('fork')) {
+        // fork ... join | join_any | join_none (the last two SystemVerilog): each statement is a thread
+        this.next();
+        let label = null;
+        if (this.accept(':')) label = this.ident();
+        const decls = [], stmts = [];
+        while (this.isAny('reg', 'integer', 'logic', 'real', 'time')) this.netDecl([], decls);
+        for (const d of decls) d.net = 'variable';
+        const isEnd = () => this.is('join') || (this.tok.t === 'id' && (this.tok.v === 'join_any' || this.tok.v === 'join_none'));
+        while (!isEnd() && !this.isAny('end', 'endmodule') && this.tok.t !== 'eof') stmts.push(this.stmt());
+        let join = 'all';
+        if (this.tok.t === 'id' && this.tok.v === 'join_any') { this.next(); join = 'any'; }
+        else if (this.tok.t === 'id' && this.tok.v === 'join_none') { this.next(); join = 'none'; }
+        else this.expect('join');
+        if (this.accept(':')) this.ident();
+        return { kind: 'fork', label, decls, stmts, join };
+      }
       if (this.is('if')) {
         this.next(); this.expect('(');
         const cond = this.expr(); this.expect(')');
@@ -565,6 +582,7 @@ class Parser {
         const events = this.eventList();
         return { kind: 'event', events, stmt: this.is(';') ? (this.next(), null) : this.stmt() };
       }
+      if (this.is('wait') && this.is('fork', this.peek())) { this.next(); this.next(); this.expect(';'); return { kind: 'waitfork' }; }
       if (this.is('wait')) {
         this.next(); this.expect('(');
         const until = this.expr(); this.expect(')');
@@ -572,6 +590,7 @@ class Parser {
         if (this.accept(';')) return w;
         return { kind: 'block', label: null, decls: [], stmts: [w, this.stmt()] };
       }
+      if (this.is('disable') && this.is('fork', this.peek())) { this.next(); this.next(); this.expect(';'); return { kind: 'disablefork' }; }
       if (this.is('disable')) { this.error('disable is not supported (ignored)', t, 'warning'); this.sync(); return { kind: 'null' }; }
       if (t.t === 'sys') {
         this.next();
@@ -609,7 +628,7 @@ class Parser {
       return { kind: 'assign', target, value, nonblocking, delay };
     } catch (e) {
       if (!(e instanceof Sync)) throw e;
-      this.sync(['end', 'endcase', 'endmodule', 'endfunction', 'endtask']);
+      this.sync(['end', 'endcase', 'endmodule', 'endfunction', 'endtask', 'join']);
       return { kind: 'null' };
     }
   }

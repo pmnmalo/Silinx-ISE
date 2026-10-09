@@ -354,3 +354,94 @@ test('VHDL rising_edge / falling_edge need a 0 -> 1 / 1 -> 0 transition', () => 
   end process;`, `signal u : std_logic; signal r, f : integer := 0;`), 'tb');
   assert.deepEqual(out, ['1 2']);
 });
+
+// ------------------------------------------------------------------ fork / join
+test('Verilog fork/join: branches run as concurrent threads, the parent waits for all of them', () => {
+  const out = run(`module t; reg clk = 0, a = 0, b = 0; always #5 clk = ~clk;
+  initial begin
+    fork
+      begin #10 a = 1; $display("a=%0d at %0t", a, $time); end
+      begin @(posedge clk) b = 1; $display("b=%0d at %0t", b, $time); end
+      #3 $display("c at %0t", $time);
+    join
+    $display("join at %0t a=%0d b=%0d", $time, a, b);
+    fork join
+    $display("empty at %0t", $time);
+    $finish;
+  end
+  endmodule`, 't');
+  assert.deepEqual(out.slice(0, 5), ['c at 3', 'b=1 at 5', 'a=1 at 10', 'join at 10 a=1 b=1', 'empty at 10']);
+});
+
+test('Verilog fork: join_any, join_none, nested forks, disable fork, wait fork, fork-local variables', () => {
+  const out = run(`module t;
+  initial begin
+    fork #7 $display("slow %0t", $time); #2 $display("fast %0t", $time); join_any
+    $display("any %0t", $time);
+    fork #4 $display("bg %0t", $time); join_none
+    $display("none %0t", $time);
+    fork
+      begin fork #1 $display("i1 %0t", $time); #2 $display("i2 %0t", $time); join $display("inner %0t", $time); end
+      #1 $display("o %0t", $time);
+    join
+    $display("nested %0t", $time);
+    wait fork;
+    $display("waited %0t", $time);
+    fork #100 $display("BAD killed thread ran"); join_none
+    #1 disable fork;
+    fork : f integer k; begin k = 3; #k $display("k=%0d %0t", k, $time); end join
+    #200 $display("end %0t", $time);
+  end
+  endmodule`, 't');
+  assert.deepEqual(out, ['fast 2', 'any 2', 'none 2', 'o 3', 'i1 3', 'i2 4', 'inner 4', 'nested 4', 'bg 6', 'slow 7', 'waited 7', 'k=3 11', 'end 211']);
+});
+
+test('Verilog fork in an always block and in a task; threads share the process variables', () => {
+  const out = run(`module t; reg clk = 0; integer n = 0, m = 0; reg [7:0] r = 0;
+  always #5 clk = ~clk;
+  task pulse2; begin fork #1 m = m + 1; #2 m = m + 10; join end endtask
+  always @(posedge clk) begin
+    fork begin #1 n = n + 1; end begin #2 n = n + 2; end join
+  end
+  initial begin : blk
+    integer v; v = 0;
+    fork v = 5; #1 r = v; join
+    pulse2;
+    #1 $display("r=%0d m=%0d", r, m);
+  end
+  initial #32 begin $display("n=%0d", n); $finish; end
+  endmodule`, 't');
+  assert.deepEqual(out.filter(l => !/finished/.test(l)), ['r=5 m=11', 'n=9']);
+});
+
+// ------------------------------------------------------------------ VHDL subprogram aliases
+test('VHDL subprogram aliases (with or without signature, user and built-in subprograms)', () => {
+  const pkg = `library ieee; use ieee.std_logic_1164.all;
+package p is
+  function twice(x : integer) return integer;
+  alias dbl is twice [integer return integer];
+end;
+package body p is
+  function twice(x : integer) return integer is begin return 2 * x; end;
+end;`;
+  const tb = vhd(`
+  clk <= not clk after 5 ns;
+  process(clk) begin if re(clk) then cnt <= cnt + 1; end if; end process;
+  process
+    variable u : unsigned(7 downto 0) := x"2A";
+  begin
+    report "dbl=" & integer'image(dbl(21)) & " tw=" & integer'image(TW(4)) & " int=" & integer'image(to_int(u));
+    speak(7);
+    wait for 22 ns;
+    report "cnt=" & integer'image(cnt);
+    wait;
+  end process;`, `procedure say(n : integer) is begin report "say " & integer'image(n); end;
+  alias speak is say [integer];
+  alias to_int is ieee.numeric_std.to_integer [unsigned return natural];
+  alias tw is work.p.twice;
+  alias re is rising_edge [std_logic return boolean];
+  signal clk : std_logic := '0'; signal cnt : integer := 0;`, 'use work.p.all;');
+  const r = simulate([{ path: 'p.vhd', text: pkg }, { path: 'tb.vhd', text: tb }], 'tb', { until: 1e9 });
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.sim.log.map(l => l.text), ['dbl=42 tw=8 int=42', 'say 7', 'cnt=2']);
+});
