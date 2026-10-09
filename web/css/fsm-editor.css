@@ -1,0 +1,85 @@
+/* Silinx FSM state diagram editor (web/js/fsm-editor.js). The editor root has both classes
+   .asm-editor and .fsm-editor: toolbar, side panel, problems and code panel come from
+   asm-editor.css; this file adds the bubble diagram, the tables and the simulation panel. */
+
+.fsm-editor { --fsm-state-fill: color-mix(in srgb, var(--asm-panel) 82%, var(--asm-accent) 18%); --fsm-hot: #e0752d; }
+
+/* toolbar */
+.fsm-editor .fsm-ico-state { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1.6px solid currentColor; background: var(--fsm-state-fill); }
+.fsm-editor .fsm-link { display: inline-flex; align-items: center; font-size: 12px; }
+.fsm-editor .fsm-link .gen-banner { margin-left: 4px; padding: 2px 8px; background: #fff4ce; border: 1px solid #e6d690; border-radius: 4px; color: #5a4a00; }
+.fsm-editor .fsm-link .gen-banner.out-of-sync { background: #fdecea; border-color: #e0a0a0; color: #900; }
+.fsm-editor .fsm-link .gen-banner a { color: #0645ad; cursor: pointer; text-decoration: underline; }
+
+/* canvas */
+.fsm-editor .fsm-canvas.rim { cursor: crosshair; }
+.fsm-editor .fsm-state { cursor: move; }
+.fsm-editor .fsm-rim { fill: transparent; stroke: transparent; stroke-width: 8; cursor: crosshair; }
+.fsm-editor .fsm-state:hover .fsm-rim { stroke: color-mix(in srgb, var(--asm-accent) 28%, transparent); }
+.fsm-editor .fsm-circle { fill: var(--fsm-state-fill); stroke: var(--asm-fg); stroke-width: 1.6; }
+.fsm-editor .fsm-circle-in { fill: none; stroke: var(--asm-fg); stroke-width: 1.3; pointer-events: none; }
+.fsm-editor .fsm-entry { fill: none; stroke: var(--asm-fg); stroke-width: 1.6; pointer-events: none; }
+.fsm-editor .fsm-name { fill: var(--asm-fg); font: 700 13px system-ui, -apple-system, "Segoe UI", sans-serif; pointer-events: none; }
+.fsm-editor .fsm-outs { fill: var(--asm-fg); font: 12px var(--asm-mono); pointer-events: none; }
+.fsm-editor .fsm-divider { stroke: color-mix(in srgb, var(--asm-fg) 55%, transparent); stroke-width: 1; pointer-events: none; }
+.fsm-editor .fsm-code { fill: var(--asm-muted); font: 11px var(--asm-mono); pointer-events: none; }
+.fsm-editor .fsm-state:hover .fsm-circle { stroke: var(--asm-accent); }
+.fsm-editor .fsm-state.sel .fsm-circle { stroke: var(--asm-accent); stroke-width: 2.6; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--asm-accent) 60%, transparent)); }
+.fsm-editor .fsm-state.warn .fsm-circle { stroke: var(--asm-warn); stroke-dasharray: 6 3; }
+.fsm-editor .fsm-state.err .fsm-circle { stroke: var(--asm-danger); stroke-dasharray: 6 3; stroke-width: 2; }
+.fsm-editor .fsm-state.drop .fsm-circle { stroke: var(--asm-ok); stroke-width: 3; stroke-dasharray: none; }
+.fsm-editor .fsm-state.current .fsm-circle { fill: color-mix(in srgb, var(--asm-panel) 45%, var(--fsm-hot) 55%); stroke: var(--fsm-hot); stroke-width: 3; }
+
+.fsm-editor .fsm-edge { cursor: pointer; }
+.fsm-editor .fsm-hit { fill: none; stroke: transparent; stroke-width: 12; }
+.fsm-editor .fsm-edge-line { fill: none; stroke: color-mix(in srgb, var(--asm-fg) 85%, transparent); stroke-width: 1.6; }
+.fsm-editor .fsm-edge:hover .fsm-edge-line { stroke: var(--asm-accent); }
+.fsm-editor .fsm-edge.sel .fsm-edge-line { stroke: var(--asm-accent); stroke-width: 2.6; }
+.fsm-editor .fsm-edge.warn .fsm-edge-line { stroke: var(--asm-warn); stroke-dasharray: 6 3; }
+.fsm-editor .fsm-edge.err .fsm-edge-line { stroke: var(--asm-danger); stroke-dasharray: 6 3; }
+.fsm-editor .fsm-edge.hot .fsm-edge-line { stroke: var(--fsm-hot); stroke-width: 3; stroke-dasharray: 8 4; }
+.fsm-editor .fsm-arrowhead { fill: color-mix(in srgb, var(--asm-fg) 85%, transparent); }
+.fsm-editor .fsm-arrowhead.sel { fill: var(--asm-accent); }
+.fsm-editor .fsm-arrowhead.hot { fill: var(--fsm-hot); }
+.fsm-editor .fsm-label-bg { fill: var(--asm-bg); fill-opacity: .88; stroke: none; }
+.fsm-editor .fsm-edge.sel .fsm-label-bg { stroke: var(--asm-accent); stroke-width: 1; }
+.fsm-editor .fsm-label { fill: var(--asm-fg); font: 12px var(--asm-mono); }
+.fsm-editor .fsm-label.empty { fill: var(--asm-muted); }
+.fsm-editor .fsm-inline { position: absolute; z-index: 5; box-shadow: 0 2px 10px rgba(0, 0, 0, .35); }
+
+/* side panel */
+.fsm-editor .fsm-tlist { margin: 0 0 8px; padding-left: 22px; font: 12px var(--asm-mono); }
+.fsm-editor .fsm-tlist li.link { cursor: pointer; padding: 1px 0; }
+.fsm-editor .fsm-tlist li.link:hover { color: var(--asm-accent); }
+.fsm-editor .fsm-leg-circle { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; background: var(--fsm-state-fill); }
+.fsm-editor .fsm-leg-circle.init { box-shadow: inset 0 0 0 2px var(--asm-panel), inset 0 0 0 3.5px currentColor; }
+.fsm-editor .fsm-leg-arrow { display: inline-block; width: 22px; height: 0; border-top: 1.5px solid currentColor; position: relative; }
+.fsm-editor .fsm-leg-arrow::after { content: ""; position: absolute; right: -1px; top: -5px; border-left: 7px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+
+/* bottom panel */
+.fsm-editor .fsm-panel { flex: 0 0 44%; }
+.fsm-editor .fsm-panel-tools { display: inline-flex; gap: 6px; margin-left: 10px; }
+.fsm-editor .fsm-panel-body { flex: 1; overflow: auto; min-height: 0; background: var(--asm-bg); }
+.fsm-editor .fsm-panel-body .asm-code { height: 100%; }
+.fsm-editor .fsm-tables { padding: 8px 12px 16px; }
+.fsm-editor .fsm-tcap { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
+.fsm-editor .fsm-tcap:first-child { margin-top: 0; }
+.fsm-editor .fsm-table { border-collapse: collapse; font-size: 12px; }
+.fsm-editor .fsm-table th, .fsm-editor .fsm-table td { border: 1px solid var(--asm-border); padding: 2px 8px; text-align: center; }
+.fsm-editor .fsm-table th { background: var(--asm-panel); color: var(--asm-muted); font-weight: 600; }
+.fsm-editor .fsm-table td.mono, .fsm-editor .fsm-table th.mono { font-family: var(--asm-mono); }
+.fsm-editor .fsm-table tr.stays td { color: var(--asm-muted); }
+.fsm-editor .fsm-table tr.unused td { color: var(--asm-muted); font-style: italic; }
+.fsm-editor .fsm-table td.sepl { border-left: 2px solid var(--asm-muted); }
+.fsm-editor .fsm-table td.fsm-note { color: var(--asm-muted); text-align: left; font-size: 11.5px; }
+.fsm-editor .fsm-sim { padding: 8px 12px; display: grid; gap: 8px; }
+.fsm-editor .fsm-sim-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fsm-editor .fsm-sim-row > .asm-label { width: 60px; margin: 0; }
+.fsm-editor .fsm-sim-state { font-size: 15px; color: var(--fsm-hot); }
+.fsm-editor .fsm-sim-inputs, .fsm-editor .fsm-sim-outputs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fsm-editor .fsm-bit { font-family: var(--asm-mono); min-width: 64px; }
+.fsm-editor .asm-btn.fsm-bit.on, .fsm-editor .asm-btn.fsm-bit.on:hover { background: #2e9d5b; border-color: #2e9d5b; color: #fff; }
+.fsm-editor .fsm-bus { width: 80px; display: inline-block; }
+.fsm-editor .fsm-busl { font-family: var(--asm-mono); font-size: 12px; }
+.fsm-editor .fsm-led { font: 12px var(--asm-mono); padding: 3px 8px; border-radius: 10px; border: 1px solid var(--asm-border); }
+.fsm-editor .fsm-led.on { background: color-mix(in srgb, var(--asm-ok) 75%, transparent); color: #fff; border-color: var(--asm-ok); }

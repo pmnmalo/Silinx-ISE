@@ -11,6 +11,7 @@
 // Code can also call t('English text') directly.
 
 import { TT_PT, TT_PT_PATTERNS } from './i18n-truthtable.js';
+import { FSM_PT, FSM_PT_PATTERNS } from './i18n-fsm.js';
 
 const PT = {
   // menus
@@ -432,6 +433,8 @@ PT_PATTERNS.push(
   [/^(\S+) already exists\.$/, '$1 já existe.'],
 );
 Object.assign(PT, TT_PT); PT_PATTERNS.unshift(...TT_PT_PATTERNS);   // Truth Table / Karnaugh Map tool
+for (const [k, v] of Object.entries(FSM_PT)) if (!(k in PT)) PT[k] = v;   // FSM state diagram editor (existing translations kept)
+PT_PATTERNS.unshift(...FSM_PT_PATTERNS);
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },

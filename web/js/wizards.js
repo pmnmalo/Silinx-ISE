@@ -378,6 +378,7 @@ const SOURCE_TYPES = [
   { id: 'sch', label: 'Schematic (Diagram)', ico: 'schematic', ext: '.sch.json', dir: 'src' },
   { id: 'schwiz', label: 'Schematic (Wizard)', ico: 'schematic', ext: '.sch.json', dir: 'src' },
   { id: 'asm', label: 'State Machine (ASM)', ico: 'asm', ext: '.asm.json', dir: 'src' },
+  { id: 'fsm', label: 'State Machine (FSM)', ico: 'fsm', ext: '.fsm.json', dir: 'src' },
   { id: 'tb', label: 'Test Bench (HDL)', ico: 'vhdl', ext: null, dir: 'sim' },
   { id: 'tbwiz', label: 'Test Bench (Wizard)', ico: 'template', ext: null, dir: 'sim' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints' },
@@ -563,6 +564,11 @@ export async function newSourceWizard({ type } = {}) {
       text = JSON.stringify(m, null, 2);
       break;
     }
+    case 'fsm': {
+      const { newFsm } = await import('/core/fsm.js');
+      text = JSON.stringify(newFsm(n.replace(/[^A-Za-z0-9_]/g, '_'), pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'), null, 2);
+      break;
+    }
     case 'tt': {
       const { newTable } = await import('/core/logic.js');
       text = JSON.stringify({ ...newTable(n.replace(/[^A-Za-z0-9_]/g, '_'), ['a', 'b', 'c'], ['f']), lang: pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl' }, null, 2);
@@ -576,6 +582,7 @@ export async function newSourceWizard({ type } = {}) {
   if (st.id === 'ucf' && noUcf) { S.project.constraints = path; await app.saveProjectJson(); await app.reloadProject(); }
   if (st.id === 'tb') await app.setTop(n, true);
   app.log(`Created ${st.label}${st.ext ? '' : ` (${langSel.value === 'verilog' ? 'Verilog' : 'VHDL'})`} '${path}'.`, 'ok');
+  if (st.id === 'fsm') { app.openFsm(path); return; }
   if (st.id === 'asm') app.openAsm(path); else if (st.id === 'tt') app.openTt(path); else if (st.id === 'sch') app.openSch(path); else app.openFile(path);
 }
 

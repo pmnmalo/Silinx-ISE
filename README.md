@@ -123,6 +123,23 @@ for Xilinx FPGAs supported by ISE 14.7.
   *Generate Schematic* draws the minimal two-level circuit (AND/OR or NAND only) as an editable
   schematic. *Truth Table from Module…* (or right-click a module) reads the table of any
   combinational module of up to 8 input bits.
+- **State diagrams (FSM)** (*Tools ▸ FSM State Diagram Editor…*, New Source ▸ *State Machine (FSM)*,
+  `.fsm.json`): the bubble diagram of the 1st-semester courses, Moore or Mealy. Double-click to add
+  a state, drag from the rim of a state to another (or to itself) to add a transition, double-click
+  to edit in place (`S2 / z=1` in a state, `x && !y / z=1` on an arrow), drag a label to bend its
+  arrow; properties panel (initial/reset state, Moore outputs, condition, Mealy outputs, priority),
+  inputs and outputs (bits and buses, default values), clock, reset (sync/async, active level),
+  encoding (binary, gray, one-hot, enumerated), auto-layout, zoom/pan/fit, undo/redo, print / SVG.
+  Plain-language checks: unreachable states, states with no exit, overlapping conditions (two
+  transitions true at once: the first listed wins), incomplete conditions (the machine stays),
+  transitions never taken, outputs never set, invalid names and expressions. *Tables*: transition
+  table, classic state table and, for binary/gray, the encoded transition table (state bits, next
+  state bits, outputs; unused codes as don't cares) — CSV export and *Create Truth Tables* of the
+  next-state bits and outputs for the K-map exercise. *Generate HDL*: readable VHDL or Verilog
+  (2- or 3-process style) kept in sync both ways like ASM charts (an HDL edit that is no longer a
+  plain state machine shows the reason); *Convert to State Diagram (FSM)* reads an HDL module or an
+  ASM chart, *Convert to ASM chart* goes the other way; *Simulate* steps through the diagram (set
+  the inputs, clock edges, current state and the transition about to be taken highlighted).
 - **Implementation** with **Xilinx ISE 14.7** (XST → NGDBuild → MAP → PAR → TRCE → BitGen), run
   locally, in Docker or over SSH, with live per-step status (✓ / ⚠ / ✗) in the Processes panel
   (restored when the project is reopened), *Stop*, every warning/error in the Warnings/Errors tabs,

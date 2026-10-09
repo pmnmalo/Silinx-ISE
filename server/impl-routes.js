@@ -15,7 +15,7 @@ import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice
 import { exportXise, importXise, importIseSchematics, exportIseSchematics } from './xise.js';
 
 // files that only Silinx understands: not part of an exported Xilinx ISE project
-const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt)\.json)$/i;
+const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|fsm)\.json)$/i;
 
 export function registerImplRoutes(api, { wrap, projects: P }) {
   const bad = (msg, status = 400) => new P.HttpError(status, msg);
