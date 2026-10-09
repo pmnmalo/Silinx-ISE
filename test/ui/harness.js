@@ -79,7 +79,15 @@ class CDP {
 }
 
 async function launchChrome(exe, tmp) {
-  const userDir = path.join(tmp, 'chrome-profile');
+  // a slow machine (2-core CI runner, several suites at once) may need a second try
+  try { return await launchChromeOnce(exe, tmp, 'chrome-profile'); } catch (e) {
+    debug(`Chrome launch failed, retrying: ${e.message.slice(0, 300)}`);
+    return launchChromeOnce(exe, tmp, 'chrome-profile-2');
+  }
+}
+
+async function launchChromeOnce(exe, tmp, profile) {
+  const userDir = path.join(tmp, profile);
   await fsp.mkdir(userDir, { recursive: true });
   const args = [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${userDir}`,
@@ -91,11 +99,15 @@ async function launchChrome(exe, tmp) {
     ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
     'about:blank',
   ];
-  const proc = spawn(exe, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  // its own writable HOME / cache (fontconfig, crash reports): CI images may have none
+  const home = path.join(tmp, `${profile}-home`);
+  await fsp.mkdir(path.join(home, '.cache'), { recursive: true });
+  const env = { ...process.env, HOME: home, XDG_CACHE_HOME: path.join(home, '.cache'), XDG_CONFIG_HOME: path.join(home, '.config') };
+  const proc = spawn(exe, args, { stdio: ['ignore', 'ignore', 'pipe'], env });
   let stderr = '';
   proc.stderr.on('data', (d) => { stderr = (stderr + d).slice(-4000); });
   const portFile = path.join(userDir, 'DevToolsActivePort');
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < 1200; i++) {   // up to 60 s
     if (proc.exitCode != null) throw new Error(`Chrome exited (${proc.exitCode}): ${stderr}`);
     try {
       const [port, wsPath] = (await fsp.readFile(portFile, 'utf8')).split('\n');
