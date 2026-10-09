@@ -206,6 +206,39 @@ uiTest('Files view: rename a file into another folder, remove a file (right-clic
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#files-page tr')].slice(1).map((r) => r.cells[0].textContent)).then((x) => x.filter((p) => /\.(vhd|v)$/.test(p))), ['rtl/core/a.vhd']);
 });
 
+uiTest('Files view: rename a folder (its files and subfolders follow, still registered), delete a folder', E, async (page) => {
+  await makeProject(env, {
+    name: 'FoldPj', top: 'a',
+    files: {
+      'src/a.vhd': 'library ieee; use ieee.std_logic_1164.all;\nentity a is port (x : in std_logic; y : out std_logic); end a;\narchitecture r of a is begin y <= x; end r;\n',
+      'src/sub/b.v': 'module b(input x, output y); assign y = ~x; endmodule\n',
+      'old/c.v': 'module c(input x, output y); assign y = x; endmodule\n',
+    },
+  });
+  await page.openProject('FoldPj');
+  await page.click('#left-tabs .tab[data-page=files]');
+  const folderRow = (dir) => page.waitFor((d) => { const i = [...document.querySelectorAll('#files-page tr')].findIndex((tr) => tr.dataset.folder === d); return i >= 0 ? i + 1 : 0; }, [dir]).then((i) => i - 1);
+  // rename src -> rtl: both files (also the one in src/sub) move and stay registered
+  await page.rightClick('#files-page tr', { index: await folderRow('src') });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Rename Folder…' });
+  await page.waitDialog('Rename Folder');
+  await page.fill('.dlg-overlay input[type=text]', 'rtl');
+  await page.dialogButton('OK');
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'rtl/sub/b.v') && window.Silinx.project.files.some((f) => f.path === 'rtl/a.vhd'));
+  assert.equal(await page.eval(() => window.Silinx.project.files.some((f) => f.path.startsWith('src/'))), false);
+  assert.match(await readWs(env, 'FoldPj', 'rtl/sub/b.v'), /module b/);
+  await assert.rejects(fs.access(path.join(env.server.workspace, 'FoldPj', 'src')));
+  // delete the folder old (confirmation): its file is gone and unregistered
+  await page.rightClick('#files-page tr', { index: await folderRow('old') });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Delete Folder…' });
+  await page.waitDialog('Delete Folder');
+  await page.dialogButton('Yes');
+  await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'old/c.v'));
+  await assert.rejects(fs.access(path.join(env.server.workspace, 'FoldPj', 'old')));
+});
+
 uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing import keeps the existing project', E, async (page) => {
   await makeProject(env, { name: 'ZipSrc', template: 'blinky', board: 'basys2' });
   await page.openProject('ZipSrc');

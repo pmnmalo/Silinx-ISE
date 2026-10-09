@@ -255,7 +255,7 @@ test('flip-flops start at their INIT default (1 for FDP, FDPE, FDS, FDSE; 0 othe
   }
 });
 
-test('a flip-flop with unconnected CE / CLR pins generates valid HDL', { todo: "core/schdoc.js generateHdl writes an unconnected CLR as a literal in the VHDL sensitivity list (process (C, '0')) and ties an unconnected CE to '0'" }, () => {
+test('a flip-flop with unconnected CE / CLR pins generates valid HDL (CLR inactive, CE always enabled)', () => {
   const ins = { C: 1, D: 1 };
   check({ sym: 'fdce', ins, outs: { Q: 1 }, pins: { C: 'C', D: 'D', Q: 'Q' }, clock: 'C', init: { q: 0 } }, [{ D: 1 }, { D: 0 }],
     (v) => ({ out: { Q: v.D }, state: { q: v.D } }));
@@ -314,4 +314,11 @@ test('export -> import keeps each library block, its pins and its nets', () => {
     const g1 = generateHdl(a.doc, { lang: 'vhdl' }).code, g2 = generateHdl(b.doc, { lang: 'vhdl' }).code;
     assert.ok(g1.length > 0 && g2.length > 0);
   }
+});
+
+test('registers and counters with unconnected CE / CLR / R: no constant in a sensitivity list, they always load / count', () => {
+  check({ sym: 'fd4ce', ins: { D: 4, C: 1 }, outs: { Q: 4 }, pins: { ...bitPins('D', 'D', 4), ...bitPins('Q', 'Q', 4), C: 'C' }, clock: 'C', init: { q: 0 } },
+    [{ D: 5 }, { D: 9 }, { D: 3 }], (v) => ({ out: { Q: v.D }, state: { q: v.D } }));
+  check({ sym: 'cb4ce', ins: { C: 1 }, outs: { Q: 4 }, pins: { ...bitPins('Q', 'Q', 4), C: 'C' }, clock: 'C', init: { q: 0 } },
+    [{}, {}, {}, {}], (v, st) => { const q = (st.q + 1) & 15; return { out: { Q: q }, state: { q } }; });
 });

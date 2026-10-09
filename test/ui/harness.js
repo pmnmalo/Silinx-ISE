@@ -97,6 +97,7 @@ async function launchChromeOnce(exe, tmp, profile) {
     '--disable-features=Translate,MediaRouter,OptimizationHints', '--password-store=basic', '--use-mock-keychain',
     '--window-size=1400,900', '--allow-file-access-from-files',
     ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
+    ...(process.env.SILINX_UI_CHROME_ARGS ? process.env.SILINX_UI_CHROME_ARGS.split(/\s+/).filter(Boolean) : []),   // e.g. --disable-gpu
     'about:blank',
   ];
   // its own writable HOME / cache (fontconfig, crash reports): CI images may have none

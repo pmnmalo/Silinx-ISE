@@ -259,3 +259,14 @@ test('HD44780: address counter wraps on cursor moves, in 1-line mode, and advanc
   lcdTransfer(st, 1, 1, 0); assert.equal(st.addr, 0x06);
   lcdTransfer(st, 1, 1, 0); assert.equal(st.addr, 0x07);
 });
+
+test('boardWiring: a 1-bit vector port is wired from x<0>, and also from an older plain x', () => {
+  const src = `library ieee; use ieee.std_logic_1164.all;
+entity top is port(clk : in std_logic; sw : in std_logic_vector(0 downto 0); led : out std_logic_vector(0 downto 0)); end top;
+architecture rtl of top is begin led <= sw; end rtl;`;
+  const d = elaborate(compile([{ path: 'top.vhd', lang: 'vhdl', text: src }]), 'top');
+  for (const ucf of ['NET "clk" LOC = "B8"; NET "sw<0>" LOC = "P11"; NET "led<0>" LOC = "M5";', 'NET "clk" LOC = "B8"; NET "sw" LOC = "P11"; NET "led" LOC = "M5";']) {
+    const w = boardWiring({ ports: d.top.ports, assignments: parseUcf(ucf).assignments, board: BOARD });
+    assert.deepEqual(w.bits.filter((b) => b.kind !== 'clk').map((b) => `${b.kind}${b.idx}`).sort(), ['led0', 'sw0'], ucf);
+  }
+});

@@ -13,7 +13,7 @@ export function bitPos(t, i) {
 /** Bits of a port: [{ name: 'opcode<3>', index: 3, pos }] (a scalar port has one bit, name = port name). */
 export function portBits(port) {
   const t = port.sig.t;
-  if (!t || t.w <= 1 || t.left === undefined) return [{ name: port.name, index: null, pos: 0 }];
+  if (!t || t.left === undefined || (t.w <= 1 && (t.scalar || t.kind !== 'logic'))) return [{ name: port.name, index: null, pos: 0 }];
   const out = [];
   const step = t.desc ? -1 : 1;
   for (let i = t.left; ; i += step) {
@@ -51,7 +51,8 @@ export function boardWiring({ ports, assignments = {}, board }) {
   const bits = [], unmapped = [], clocks = [];
   for (const port of ports || []) {
     for (const b of portBits(port)) {
-      const a = asg.get(b.name.toLowerCase()) || (b.index === 0 && port.sig.t.w === 1 ? asg.get(`${port.name}<0>`.toLowerCase()) : null);
+      // a 1-bit port also matches the other spelling (x / x<0>), as older UCFs may have it
+      const a = asg.get(b.name.toLowerCase()) || (port.sig.t.w === 1 ? asg.get((b.index == null ? `${port.name}<0>` : port.name).toLowerCase()) : null);
       const loc = a?.loc ? String(a.loc).toUpperCase() : null;
       const hit = loc ? byPin.get(loc) : null;
       if (!hit) { unmapped.push({ port: port.name, bit: b.name, dir: port.dir, loc }); continue; }

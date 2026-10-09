@@ -36,14 +36,14 @@ uiTest('ISim: Simulate Behavioral Model runs the test bench; waveforms and objec
   assert.match(objs.led || '', /^[01]{8}$/, `led value in the Objects panel: ${JSON.stringify(st.objects)}`);
   assert.ok(objs.clk === '0' || objs.clk === '1');
   // the wave canvas has been drawn (not blank)
-  const inked = await page.eval(() => {
+  // (drawn on the next animation frame: wait for it)
+  await page.waitFor(() => {
     const c = document.querySelector('.isim-waves');
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     const colors = new Set();
     for (let i = 0; i < d.length; i += 16) colors.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
-    return colors.size;
-  });
-  assert.ok(inked > 3, `the waveform canvas shows traces (${inked} colours)`);
+    return colors.size > 3;
+  }, [], { what: 'the waveform canvas shows traces' });
   // ISim> run 500 ns
   await page.click('.isim-cmdline input');
   await page.type('run 500 ns');

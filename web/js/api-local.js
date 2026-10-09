@@ -95,6 +95,18 @@ export const api = {
   },
   renameFile: async (name, from, to) => {
     const p = proj(name);
+    const under = Object.keys(p.files).filter(k => k.startsWith(`${from}/`));
+    if (p.files[from] === undefined && under.length) {
+      // a folder: every file under it moves, registrations and the constraints path follow
+      if (to.startsWith(`${from}/`)) fail(`cannot move '${from}' into itself`);
+      if (Object.keys(p.files).some(k => k === to || k.startsWith(`${to}/`))) fail(`'${to}' already exists`);
+      const remap = k => (k.startsWith(`${from}/`) ? to + k.slice(from.length) : k);
+      for (const k of under) { p.files[remap(k)] = p.files[k]; delete p.files[k]; }
+      p.json.files = p.json.files.map(f => ({ ...f, path: remap(f.path) }));
+      if (p.json.constraints) p.json.constraints = remap(p.json.constraints);
+      persist();
+      return clone(p.json);
+    }
     if (p.files[from] === undefined) fail(`file '${from}' not found`);
     if (from !== to && p.files[to] !== undefined) fail(`'${to}' already exists`);
     const t = p.files[from]; delete p.files[from]; p.files[to] = t;
@@ -113,8 +125,11 @@ export const api = {
   writeFile: async (name, path, text) => { writeFileSync(name, path, text); return { ok: true }; },
   deleteFile: async (name, path) => {
     const p = proj(name);
-    delete p.files[path];
-    p.json.files = p.json.files.filter(f => f.path !== path);
+    // a folder: everything under it
+    const gone = k => k === path || k.startsWith(`${path}/`);
+    for (const k of Object.keys(p.files)) if (gone(k)) delete p.files[k];
+    p.json.files = p.json.files.filter(f => !gone(f.path));
+    if (p.json.constraints && gone(p.json.constraints)) p.json.constraints = null;
     persist();
     return { ok: true };
   },

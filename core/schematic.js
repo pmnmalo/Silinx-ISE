@@ -72,6 +72,61 @@ export function processTitle(p) {
 }
 
 // Find clock signals of a process: edge triggers (Verilog) or rising_edge()/'event (VHDL).
+/**
+ * Signals used as the gate (enable) of inferred latches: in a process with no clock edge, an
+ * `if` that assigns a signal in one branch but not in the other keeps its value (a latch) and the
+ * signals of its condition are the gate; likewise `q <= d when g = '1' [else q]`. Instances of
+ * the LD* primitives give their G input. Synthesis puts such gates on clock resources.
+ */
+export function latchGates(design) {
+  const gates = new Set();
+  const sigsIn = (n, out = new Set()) => {
+    if (!n || typeof n !== 'object') return out;
+    if (Array.isArray(n)) { n.forEach(x => sigsIn(x, out)); return out; }
+    if (n.k === 'sig' && n.sig) out.add(n.sig);
+    for (const key in n) if (!['sig', 't', 'fn', 'val', 'loc', 'triggers'].includes(key)) { const v = n[key]; if (v && typeof v === 'object') sigsIn(v, out); }
+    return out;
+  };
+  const targetOf = (t) => { while (t && t.k !== 'sig') t = t.a || t.target || t.base; return t?.sig || null; };
+  // flow through a combinational body: `done` = targets definitely assigned so far; a target
+  // assigned on some paths of an if / case but not all (and not before it) is a latch
+  const inter = (sets) => new Set([...sets[0]].filter(x => sets.every(st => st.has(x))));
+  const latchIf = (cond, branches, done) => {
+    const after = branches.map(b => flow(b, new Set(done)));
+    const all = new Set(after.flatMap(a => [...a]));
+    const definite = inter(after);
+    if ([...all].some(x => !definite.has(x) && !done.has(x))) for (const sg of sigsIn(cond)) gates.add(sg);
+    return definite;
+  };
+  const flow = (n, done) => {
+    if (!n || typeof n !== 'object') return done;
+    if (Array.isArray(n)) { for (const x of n) done = flow(x, done); return done; }
+    switch (n.k) {
+      case 'blk': return flow(n.stmts, done);
+      case 'asg': {
+        const t = targetOf(n.target);
+        if (n.value?.k === 'cond') {   // q <= d when g = '1' [else ... q]: the target keeps its value
+          let v = n.value;
+          while (v?.k === 'cond') { if (!done.has(t) && (targetOf(v.b) === t || targetOf(v.a) === t)) for (const sg of sigsIn(v.c)) gates.add(sg); v = v.b; }
+        }
+        if (t) done.add(t);
+        return done;
+      }
+      case 'if': return latchIf(n.c, [n.then, n.else], done);
+      case 'case': return n.def ? latchIf(n.sel, [...n.items.map(it => it.body), n.def], done) : done;   // without others: coverage unknown, not flagged
+      default: return done;
+    }
+  };
+  const walk = (body) => flow(body, new Set());
+  const visit = (inst) => {
+    if (/^LD/i.test(inst.mod?.name || '')) { const g = inst.ports?.find(p => p.name.toUpperCase() === 'G'); if (g) gates.add(g.sig); }
+    for (const pr of inst.procs || []) if (!clocksOf(pr).clocks.size) walk(pr.body);
+    (inst.children || []).forEach(visit);
+  };
+  visit(design.top);
+  return gates;
+}
+
 export function clocksOf(p) {
   const clocks = new Set();
   for (const t of p.triggers || []) if (t.edge !== 'any') clocks.add(t.sig);

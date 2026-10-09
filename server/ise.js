@@ -17,7 +17,8 @@ import path from 'node:path';
 import { deviceFamily } from '../core/family.js';
 import { compile, elaborate } from '../core/compile.js';
 import { parseUcf, bitName } from '../core/ucf.js';
-import { clocksOf } from '../core/schematic.js';
+import { clocksOf, latchGates } from '../core/schematic.js';
+import { primitiveSources } from '../core/unisim.js';
 import { spawn } from 'node:child_process';
 import { runCommand, JobCancelled } from './jobs.js';
 import { loadConfig, detectIse, iseStatus, which } from './toolchain.js';
@@ -321,7 +322,8 @@ const DEFAULT_SETTINGS_SH = '/opt/Xilinx/14.7/ISE_DS/settings64.sh';
 /** Top-level port bits ({ net, dir }) that have no LOC in the given UCF text. */
 export async function unconstrainedPorts(sources, top, ucfText) {
   let design;
-  try { design = elaborate(compile(sources), top); } catch { return []; }
+  // with Silinx's UNISIM models when the design instantiates primitives (LD*, BUFG ...)
+  try { design = elaborate(compile([...primitiveSources(sources), ...sources]), top); } catch { return []; }
   if (!design?.top) return [];
   let asg = {};
   try { asg = parseUcf(ucfText || '').assignments || {}; } catch { /* unparsable: treat as empty */ }
@@ -330,10 +332,13 @@ export async function unconstrainedPorts(sources, top, ucfText) {
   const clocks = new Set();
   const visit = inst => { for (const pr of inst.procs || []) for (const c of clocksOf(pr).clocks) clocks.add(c); (inst.children || []).forEach(visit); };
   visit(design.top);
+  // latch gates too: XST puts them on a global buffer, so they need a GCLK pin as well
+  for (const g of latchGates(design)) clocks.add(g);
   const out = [];
   for (const p of design.top.ports) {
     const t = p.sig.t;
-    if (t.w === 1 && t.kind !== 'array') { if (!has(p.name)) out.push({ net: p.name, dir: p.dir, clock: p.dir === 'in' && clocks.has(p.sig) }); continue; }
+    // a 1-bit vector (std_logic_vector(0 downto 0), [0:0]) is a bus in the UCF: x<0>
+    if (t.w === 1 && (t.scalar || t.kind !== 'logic')) { if (!has(p.name)) out.push({ net: p.name, dir: p.dir, clock: p.dir === 'in' && clocks.has(p.sig) }); continue; }
     const lo = Math.min(t.left, t.right), hi = Math.max(t.left, t.right);
     for (let i = lo; i <= hi; i++) { const n = bitName(p.name, i); if (!has(n)) out.push({ net: n, dir: p.dir }); }
   }

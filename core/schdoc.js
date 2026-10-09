@@ -1085,7 +1085,16 @@ export function generateHdl(docIn, opts = {}) {
       const iv = String(p.init ?? S.params[0].default) === '1' ? '1' : '0';
       const c = INN(s, 'C');
       const has = nm => def.pins.some(x => x.name === nm);
-      const pin = nm => (has(nm) ? INN(s, nm) : null);
+      // an unconnected control input is inactive: CLR / PRE / R / S never act, CE always enables
+      // (it is left out of the logic, not tied to a constant in a sensitivity list)
+      const pin = nm => {
+        if (!has(nm)) return null;
+        if (!inNet(s, nm)) {
+          diags.push({ severity: 'warning', message: `${s.name}: input ${nm} unconnected, ${nm === 'CE' ? 'always enabled' : 'inactive'}`, ref: { kind: 'symbol', id: s.id, pin: nm } });
+          return null;
+        }
+        return INN(s, nm);
+      };
       const clr = pin('CLR'), pre = pin('PRE'), r = pin('R'), st = pin('S'), ce = pin('CE');
       // the toggle and J-K updates read the state: VHDL-93 cannot read an output port, so keep it in a local signal
       let q = qo;
@@ -1307,9 +1316,13 @@ export function generateHdl(docIn, opts = {}) {
         const has = nm => def.pins.some(x => x.name === nm);
         const c = INN(s, 'C');
         const d = has('D') ? INN(s, 'D') : null;
-        const ce = has('CE') ? INN(s, 'CE') : null;
-        const clr = has('CLR') ? INN(s, 'CLR') : null;
-        const r = has('R') ? INN(s, 'R') : null;
+        // unconnected controls: CLR / R inactive, CE always enabled (left out of the logic)
+        const ctl = nm => {
+          if (!has(nm)) return null;
+          if (!inNet(s, nm)) { diags.push({ severity: 'warning', message: `${s.name}: input ${nm} unconnected, ${nm === 'CE' ? 'always enabled' : 'inactive'}`, ref: { kind: 'symbol', id: s.id, pin: nm } }); return null; }
+          return INN(s, nm);
+        };
+        const ce = ctl('CE'), clr = ctl('CLR'), r = ctl('R');
         const qn = nl.pinNet.get(`${s.id}/Q`);
         const w = qn.width;
         const rv = s.type === 'counter' ? '0'.repeat(w) : (constBits(p.init ?? '0', w) || '0'.repeat(w));
@@ -1375,6 +1388,16 @@ export function generateHdl(docIn, opts = {}) {
         for (const q of def.pins) {
           const n = nl.pinNet.get(`${s.id}/${q.name}`);
           if (!n) continue;
+          // an unconnected input is tied: CE (clock enable) to 1 = always enabled, others to 0
+          const open = q.dir === 'in' && !inNet(s, q.name);
+          if (open) {
+            const one = /^CE$/i.test(q.name), w = q.width || 1;
+            diags.push({ severity: 'warning', message: `${s.name}: input ${q.name} unconnected, ${one ? 'tied to 1 (always enabled)' : 'tied to 0'}`, ref: { kind: 'symbol', id: s.id, pin: q.name } });
+            const k = ci ? (w > 1 ? `(others => '${one ? 1 : 0}')` : `'${one ? 1 : 0}'`) : `{${w}{1'b${one ? 1 : 0}}}`;
+            if (!declared.has(nk(q.name))) { used.add(nk(q.name)); extra.push({ name: q.name, width: w, type: ci ? vtype(w) : null }); }
+            pre.push(ci ? `${q.name} <= ${k};` : `assign ${q.name} = ${k};`);
+            continue;
+          }
           const nn = q.dir !== 'out' && outRead.has(n) ? outRead.get(n) : netName(n);
           if (nk(nn) === nk(q.name)) continue;
           if (!used.has(nk(q.name)) || declared.has(nk(q.name))) {

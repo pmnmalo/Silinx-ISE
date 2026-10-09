@@ -472,3 +472,33 @@ test('zip: corrupt central directory, encrypted entries, unknown method, size mi
   const stored = await createZip([{ path: 'big.txt', data: 'a'.repeat(1000) }]);
   assert.equal((await readZip(stored)).length, 1);
 });
+
+test('unconstrainedPorts: a 1-bit vector port is x<0> in the UCF (VHDL and Verilog), a std_logic stays x', async () => {
+  const vhd = { path: 't.vhd', lang: 'vhdl', text: 'library ieee; use ieee.std_logic_1164.all; entity t is port(a : in std_logic; b : in std_logic_vector(0 downto 0); c : out std_logic_vector(1 downto 0)); end t; architecture r of t is begin c <= a & b(0); end r;' };
+  assert.deepEqual((await ise.unconstrainedPorts([vhd], 't', '')).map(u => u.net), ['a', 'b<0>', 'c<0>', 'c<1>']);
+  assert.deepEqual((await ise.unconstrainedPorts([vhd], 't', 'NET "b<0>" LOC = "P1";')).map(u => u.net), ['a', 'c<0>', 'c<1>']);
+  const v = { path: 'm.v', lang: 'verilog', text: 'module m(input a, input [0:0] b, output [1:0] c); assign c = {a, b}; endmodule' };
+  assert.deepEqual((await ise.unconstrainedPorts([v], 'm', '')).map(u => u.net), ['a', 'b<0>', 'c<0>', 'c<1>']);
+});
+
+test('unconstrainedPorts: latch gates are clocks (GCLK pins); default-then-if logic and muxes are not', async () => {
+  const vhd = { path: 't.vhd', lang: 'vhdl', text: `library ieee; use ieee.std_logic_1164.all;
+entity t is port(g, d, e, s, a, b, x : in std_logic; q, r, y, z : out std_logic); end t;
+architecture a of t is begin
+  process (g, d) begin if g = '1' then q <= d; end if; end process;      -- latch, gate g
+  r <= d when e = '1';                                                    -- latch, gate e
+  y <= a when s = '1' else b;                                             -- mux
+  process (x, a) begin z <= '0'; if x = '1' then z <= a; end if; end process;   -- default first: no latch
+end a;` };
+  const u = await ise.unconstrainedPorts([vhd], 't', '');
+  assert.deepEqual(u.filter(p => p.clock).map(p => p.net).sort(), ['e', 'g']);
+  const v = { path: 'm.v', lang: 'verilog', text: `module m(input g, input d, input s, input a, input b, output reg q, output reg y);
+  always @(g or d) if (g) q = d;
+  always @* begin if (s) y = a; else y = b; end
+endmodule` };
+  assert.deepEqual((await ise.unconstrainedPorts([v], 'm', '')).filter(p => p.clock).map(p => p.net), ['g']);
+  const ld = { path: 'l.vhd', lang: 'vhdl', text: `library ieee; use ieee.std_logic_1164.all; library unisim; use unisim.vcomponents.all;
+entity l is port(gate, d : in std_logic; q : out std_logic); end l;
+architecture a of l is begin u : LD port map (G => gate, D => d, Q => q); end a;` };
+  assert.deepEqual((await ise.unconstrainedPorts([ld], 'l', '')).filter(p => p.clock).map(p => p.net), ['gate']);
+});

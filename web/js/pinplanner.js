@@ -17,7 +17,7 @@ export function mountPinPlanner(el, doc, top) {
   const design = elaborate(S.lib, top);
   const ports = (design.top?.ports || []).map(p => {
     const t = p.sig.t;
-    const bus = t.w > 1;
+    const bus = t.w > 1 || (t.kind === 'logic' && !t.scalar);   // a 1-bit vector is x<0> in the UCF
     return { name: p.name, dir: p.dir, width: t.w, msb: bus ? t.left : null, lsb: bus ? t.right : null, bus };
   });
   const nets = [];
