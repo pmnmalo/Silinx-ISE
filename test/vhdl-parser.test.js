@@ -288,12 +288,15 @@ describe('types and declarations', () => {
     assert.deepEqual(d.by_enum.type.range, { of: R('state_t'), reverse: false });
   });
 
-  test('alias is dropped with a warning', () => {
+  test('object alias declarations; subprogram aliases are dropped with a warning', () => {
     const r = parse(`entity e is end; architecture a of e is signal z : bit_vector(7 downto 0);
-      alias hi : bit_vector(3 downto 0) is z(7 downto 4); begin end;`);
+      alias hi : bit_vector(3 downto 0) is z(7 downto 4); alias zz is z;
+      alias f is foo [integer return integer]; begin end;`);
     assert.equal(r.errors.filter((e) => e.severity === 'error').length, 0);
     assert.equal(r.errors.filter((e) => e.severity === 'warning').length, 1);
-    assert.deepEqual(r.units[0].decls.map((d) => d.name), ['z']);
+    const d = r.units[0].decls;
+    assert.deepEqual(d.map((x) => [x.kind, x.name]), [['signal', 'z'], ['alias', 'hi'], ['alias', 'zz']]);
+    assert.equal(d[1].target.op, 'slice');
   });
 
   test('constants / shared variable / components / attributes', () => {
@@ -646,7 +649,8 @@ describe('expressions', () => {
     assert.deepEqual(expr("'Z'"), L1('z'));
     assert.deepEqual(expr("'L'"), L1('0'));
     assert.deepEqual(expr("'H'"), L1('1'));
-    assert.deepEqual(expr('"01ZX-LHUW"'), LV('01zxx01xx'));
+    assert.deepEqual(expr('"01ZX-LHUW"'), { ...LV('01zxx01xx'), text: '01ZX-LHUW' });   // text: also a valid string
+    assert.deepEqual(expr('"hw"'), { ...LV('1x'), text: 'hw' });
     assert.deepEqual(expr('x"A5"'), LV('10100101'));
     assert.deepEqual(expr('x"0Z"'), LV('0000zzzz'));
     assert.deepEqual(expr('b"1010_1010"'), LV('10101010'));

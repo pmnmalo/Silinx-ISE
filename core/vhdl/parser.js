@@ -543,9 +543,20 @@ class Parser {
         return [];
       }
       case 'alias': {
-        this.warn('alias declarations are not supported and are ignored');
-        this.sync();
-        return [];
+        // object alias: `alias name [: subtype] is object_name;` -> { kind:'alias', name, type, target }
+        const tok = this.next();
+        const name = this.expectId('alias name');
+        let type = null;
+        if (this.acceptOp(':')) type = this.parseSubtypeIndication();
+        this.expectKw('is');
+        const target = this.parseExpression();
+        if (!this.isOp(';')) {
+          this.warn('alias declarations of subprograms are not supported and are ignored', tok);
+          this.sync();
+          return [];
+        }
+        this.expectOp(';');
+        return [{ kind: 'alias', name, type, target, loc: this.loc(tok) }];
       }
       case 'file': {
         this.warn('file declarations are not supported and are ignored');
@@ -1477,7 +1488,10 @@ class Parser {
       case 'str': {
         this.next();
         if (!this.strMode && tok.value.length > 0 && LOGIC_CHARS.test(tok.value)) {
-          return { op: 'lit', bits: mapBits(tok.value), signed: false, sized: true };
+          // text: the literal as written when the bits lose it (e.g. "hw"), for when a string is expected
+          const lit = { op: 'lit', bits: mapBits(tok.value), signed: false, sized: true };
+          if (/[^01]/.test(tok.value)) lit.text = tok.value;
+          return lit;
         }
         return { op: 'str', value: tok.value };
       }

@@ -67,6 +67,10 @@ export function evalE(n, ctx) {
     }
     case 'conv': { // resize/sign conversion; ext = signedness used for extension
       const a = evalE(n.a, ctx);
+      if (n.sres && n.t.w < a.w) { // numeric_std resize(signed): sign bit + low bits
+        const w = n.t.w, low = w > 1 ? V.getBits(a, 0, w - 1) : V.mk(0);
+        return V.withSign(V.concat([V.getBits(a, a.w - 1, 1), low]), true);
+      }
       return V.withSign(V.resize(V.withSign(a, n.ext), n.t.w), n.t.s);
     }
     case 'call': return callFunction(n, ctx);

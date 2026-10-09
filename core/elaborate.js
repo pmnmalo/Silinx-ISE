@@ -178,6 +178,7 @@ function elabInstance(ctx, mod, name, path, paramOverrides, portConns, parentIns
       if (ov && !p.local) {
         entry = { kind: 'const', val: ov.val, t: ov.t };
         if (ptype && ptype.kind !== 'str') entry = { kind: 'const', val: fitVal(ov.val, ptype), t: ptype };
+        else if (ptype && ov.text !== undefined) entry = { kind: 'const', val: { str: ov.text }, t: STR };   // NAME => "u1"
       } else if (p.default) {
         const n = bindExpr(E, p.default, ptype);
         const val = constOf(E, n, p.loc);
@@ -389,7 +390,7 @@ function elabChild(E, it) {
       pname = decl.name;
     }
     const n = bindExpr(E, p.value, null, it.loc);
-    ov.set(pname, { val: constOf(E, n, it.loc), t: n.t });
+    ov.set(pname, { val: constOf(E, n, it.loc), t: n.t, text: n.strText });
   });
   const child = elabInstance(E.ctx, mod, name, `${E.inst.path}.${name}`, ov, portConns, E.inst, (E.depth || 0) + 1);
   child.loc = it.loc; child.instFile = E.file;
@@ -493,6 +494,13 @@ function bindDecl(E, d) {
     case 'function': case 'task':
       E.sc.def(d.name, { kind: 'func', decl: d, E: { ...E, fb: null, inProcess: false }, cache: new Map() });
       return;
+    case 'alias': {   // VHDL object alias: reads and writes go to the aliased object (or slice)
+      const rv = bindExpr(E, d.target, null, d.loc);
+      const lv = isLvalueExpr(d.target) && rv.k !== 'c' ? bindLvalue(E, d.target, d.loc) : null;
+      if (rv.k === 'c') { E.sc.def(d.name, { kind: 'const', val: rv.val, t: rv.t }); return; }
+      E.sc.def(d.name, { kind: 'alias', rv, lv, t: rv.t });
+      return;
+    }
     default:
       return;
   }
@@ -556,7 +564,11 @@ function stdTypeName(n) {
     case 'std_logic': case 'std_ulogic': case 'bit': return { kind: 'logic', range: null, signed: false };
     case 'std_logic_vector': case 'std_ulogic_vector': case 'bit_vector': case 'unsigned': return { kind: 'logic', range: null, signed: false, unconstrained: true };
     case 'signed': return { kind: 'logic', range: null, signed: true, unconstrained: true };
-    case 'integer': case 'natural': case 'positive': return { kind: 'integer', range: null };
+    case 'integer': return { kind: 'integer', range: null };
+    case 'natural': case 'positive': {
+      const lit = v => ({ op: 'int', value: String(v) });
+      return { kind: 'integer', range: { left: lit(n.toLowerCase() === 'natural' ? 0 : 1), right: lit(2147483647), dir: 'to' } };
+    }
     case 'boolean': return { kind: 'boolean' };
     case 'time': return { kind: 'time' };
     case 'string': return { kind: 'string' };
@@ -725,6 +737,8 @@ function bindExpr0(E, e, expect, loc) {
   loc = e.loc || loc;
   switch (e.op) {
     case 'lit': {
+      if (E.lang === 'vhdl' && expect && expect.kind === 'str' && e.text !== undefined) return { k: 'str', value: e.text, t: STR };
+      if (E.lang === 'vhdl' && expect && expect.kind === 'str' && !e.scalar && /^[01]+$/.test(e.bits)) return { k: 'str', value: e.bits, t: STR };
       const val = V.fromBits(e.bits, !!e.signed);
       const t = e.scalar ? BIT : vecT(val.w, !!e.signed);
       if (E.lang === 'verilog' && e.sized === false && /^[xz]/.test(e.bits)) return { k: 'c', val, t, xext: e.bits[0] };
@@ -732,6 +746,7 @@ function bindExpr0(E, e, expect, loc) {
         // e.g. assigning '0' where a vector is expected is an error in VHDL; be lenient and extend
         return { k: 'c', val: V.resize(val, expect.w), t: expect };
       }
+      if (E.lang === 'vhdl' && !e.scalar && e.sized) return { k: 'c', val, t, strText: e.text ?? e.bits };
       return { k: 'c', val, t };
     }
     case 'int': {
@@ -900,6 +915,14 @@ function strAsLogic(n, other) {
   return { k: 'c', val, t: vecT(val.w) };
 }
 
+// std_logic_arith mixes unsigned and signed operands as signed: the unsigned one is extended
+// with a 0 sign bit (numeric_std does not allow the mix, so this never changes its results)
+function mixedSign(a, b) {
+  if (a.t.kind !== 'logic' || b.t.kind !== 'logic' || !!a.t.s === !!b.t.s) return [a, b];
+  const widen = n => fold({ k: 'conv', a: n, ext: false, t: vecT(n.t.w + 1, true) });
+  return a.t.s ? [a, widen(b)] : [widen(a), b];
+}
+
 function harmonizeVhdl(a, b) {
   // numeric_std: vector op integer -> integer converted to the vector's width
   if (a.t.kind === 'logic' && (b.t.kind === 'int')) b = fold({ k: 'conv', a: b, ext: true, t: vecT(a.t.w, a.t.s) });
@@ -914,7 +937,7 @@ function bindBinary(E, e, expect, loc) {
   else { a = bindExpr(E, e.a, ARITH.has(o) || BITWISE.has(o) ? expect : null, loc); b = bindExpr(E, e.b, a.t.kind === 'logic' || a.t.kind === 'enum' ? a.t : null, loc); }
   if (CMP.has(o)) {
     if (E.lang === 'vhdl' && a.t.kind === 'enum' && b.k === 'c') b = { ...b, t: a.t };
-    if (E.lang === 'vhdl') { a = strAsLogic(a, b); b = strAsLogic(b, a); }
+    if (E.lang === 'vhdl') { a = strAsLogic(a, b); b = strAsLogic(b, a); [a, b] = mixedSign(a, b); }
     // VHDL '=' / '/=' compare the enumeration values exactly ('X' = 'X' is true, 'U' /= '1' too)
     if (E.lang === 'vhdl') return { k: 'bin', o, a, b, t: BOOL, vh: o === '==' || o === '!=' };
     return { k: 'bin', o, a, b, t: BIT };
@@ -922,6 +945,7 @@ function bindBinary(E, e, expect, loc) {
   if (o === '&&' || o === '||') return { k: 'bin', o, a, b, t: BIT };
   if (SHIFT.has(o)) return { k: 'bin', o, a, b, t: a.t.kind === 'int' ? a.t : vecT(a.t.w, a.t.s) };
   if (E.lang === 'vhdl' && (ARITH.has(o) && o !== '**')) [a, b] = harmonizeVhdl(a, b);
+  if (E.lang === 'vhdl' && ARITH.has(o) && o !== '**') [a, b] = mixedSign(a, b);
   const s = a.t.s && b.t.s;
   if (a.t.kind === 'int' && b.t.kind === 'int') return { k: 'bin', o, a, b, t: INT };
   if (a.t.kind === 'time' || b.t.kind === 'time') return { k: 'bin', o, a, b, t: TIME };
@@ -949,6 +973,13 @@ function bindAttr(E, e, loc) {
   if (!t) { node = bindExpr(E, e.prefix, null, loc); t = node.t; }
   const cint = n => ({ k: 'c', val: V.fromInt(n, 32, true), t: INT });
   if (t.kind === 'str' && at !== 'event') throw new ElabError(`'${at} of a string is not supported (use std_logic_vector)`, loc);
+  if ((t.kind === 'int' || t.kind === 'enum') && ['left', 'right', 'high', 'low'].includes(at)) {
+    // scalar types: bounds of the range (integer ranges are ascending here)
+    const lo = t.kind === 'int' ? (t.rlo ?? -2147483648) : 0;
+    const hi = t.kind === 'int' ? (t.rhi ?? 2147483647) : t.names.length - 1;
+    const v = at === 'left' || at === 'low' ? lo : hi;
+    return t.kind === 'int' ? cint(v) : { k: 'c', val: V.fromInt(v, t.w, false), t };
+  }
   switch (at) {
     case 'event':
       if (!edgeOperand(node)) throw new ElabError("'event requires a signal", loc);
@@ -1080,7 +1111,11 @@ function bindBuiltin(E, name, rawArgs, expect, loc) {
     case 'to_signed': case 'conv_signed': return conv(A(0), C(1), true, true);
     case 'conv_std_logic_vector': return conv(A(0), C(1), false);
     case 'to_integer': case 'conv_integer': case 'integer': case 'natural': case 'positive': return conv(A(0), 32, true, A(0).t.s, 'int');
-    case 'resize': { const a = A(0); return conv(a, C(1), a.t.s); }
+    case 'resize': {
+      const a = A(0), w = C(1);
+      if (a.t.s && a.t.kind === 'logic' && w < a.t.w) return fold({ k: 'conv', a, ext: true, sres: true, t: vecT(w, true) });
+      return conv(a, w, a.t.s);
+    }
     case 'ext': return conv(A(0), C(1), false, false);
     case 'sxt': return conv(A(0), C(1), true, true);
     case 'unsigned': case 'std_logic_vector': case 'std_ulogic_vector': case 'to_stdlogicvector': case 'to_bitvector': case 'to_stdulogicvector': case 'bit_vector': {
@@ -1140,7 +1175,9 @@ function bindVlogCall(E, e, expect, loc) {
     }
     throw new ElabError(`system function ${name} is not supported`, loc);
   }
-  const entry = E.sc.lookup(name);
+  let entry = E.sc.lookup(name);
+  // a recursive call: inside the function its name is the return variable; find the function
+  for (let sc = E.sc; entry && entry.kind !== 'func' && sc; sc = sc.parent) { const x = sc.local(name); if (x && x.kind === 'func') entry = x; }
   if (!entry || entry.kind !== 'func') throw new ElabError(`function '${name}' is not declared`, loc);
   return bindCall(E, entry, e.args, name, loc);
 }
@@ -1158,7 +1195,11 @@ function bindCall(E, entry, rawArgs, name, loc) {
   });
   const args = argExprs.map((a, k) => {
     if (!a) throw new ElabError(`missing argument '${decl.params[k].name}' in call to '${name}'`, loc);
-    return bindExpr(E, a, null, loc);
+    const n = bindExpr(E, a, null, loc);
+    // a std_logic string literal (kept as a string in report messages) for a vector parameter
+    const pt = decl.params[k].type;
+    if (E.lang === 'vhdl' && n.k === 'str' && pt && (pt.kind === 'logic' || (pt.kind === 'named' && stdTypeName(pt.name)?.kind === 'logic'))) return strAsLogic(n, { t: { kind: 'logic' } });
+    return n;
   });
   const fn = boundFunction(entry, args, loc);
   if (decl.kind === 'task' || !fn.retT) throw new ElabError(`'${name}' is a procedure/task, not a function`, loc);
@@ -1166,47 +1207,94 @@ function bindCall(E, entry, rawArgs, name, loc) {
   return fold({ k: 'call', fn, args, t: fn.retT });
 }
 
+// Bound function / procedure for these argument types (cached per argument types).
+// VHDL: when the generic binding fails (e.g. a width depends on an integer parameter:
+// `variable r : std_logic_vector(n-1 downto 0)`, `to_unsigned(i, w)`), the subprogram is bound
+// again with its constant integer arguments known as constants (cached per argument value).
 function boundFunction(entry, args, loc, sigActuals = null) {
   const decl = entry.decl;
   const key = args.map(a => `${a.t.kind}${a.t.w}${a.t.s ? 's' : ''}`).join(',');
-  if (!sigActuals && entry.cache.has(key)) return entry.cache.get(key);
+  const consts = new Map();
+  if (entry.E.lang === 'vhdl') {
+    decl.params.forEach((p, k) => {
+      const a = args[k];
+      if (!sigActuals?.[k] && a && a.k === 'c' && a.t.kind === 'int' && p.dir !== 'out' && p.dir !== 'inout' && String(p.class || '').toLowerCase() !== 'variable') consts.set(k, a.val);
+    });
+  }
+  if (!sigActuals && entry.cache.has(key)) {
+    const fn = entry.cache.get(key);
+    if (!fn.needsConsts) return fn;
+  } else if (consts.size) {
+    // try the generic binding; on errors, fall back to the per-constant one
+    const diags = entry.E.ctx.design.diags, n0 = diags.length;
+    let fn = null;
+    try { fn = bindSubprogram(entry, args, key, sigActuals, null); } catch (e) { if (!(e instanceof ElabError) && !(e instanceof SimError)) throw e; }
+    if (fn && !diags.slice(n0).some(d => d.severity === 'error')) return fn;
+    diags.length = n0;
+    if (!sigActuals) entry.cache.set(key, { needsConsts: true });
+  } else {
+    return bindSubprogram(entry, args, key, sigActuals, null);
+  }
+  if (!consts.size) return entry.cache.get(key);
+  const ckey = key + '|' + [...consts].map(([k, v]) => `${k}=${V.toDec(v, true)}`).join(',');
+  if (!sigActuals && entry.cache.has(ckey)) return entry.cache.get(ckey);
+  return bindSubprogram(entry, args, ckey, sigActuals, consts);
+}
+
+function bindSubprogram(entry, args, key, sigActuals, consts) {
+  const decl = entry.decl;
   const DE = entry.E;
   const fb = new FrameBuilder();
   const sc = new Scope(DE.sc);
   const FE = { ...DE, sc, fb, inProcess: true, inFunction: true };
   const fn = { name: decl.name, params: [], body: null, retSlot: null, retT: null, impure: false };
   if (!sigActuals) entry.cache.set(key, fn);
-  decl.params.forEach((p, k) => {
-    if (sigActuals?.[k]) {
-      const a = sigActuals[k];
-      sc.def(p.name, { kind: 'alias', rv: a.rv, lv: a.lv, t: a.rv.t });
-      fn.params.push({ alias: true, dir: p.dir, name: p.name });
-      return;
+  try {
+    decl.params.forEach((p, k) => {
+      if (sigActuals?.[k]) {
+        const a = sigActuals[k];
+        sc.def(p.name, { kind: 'alias', rv: a.rv, lv: a.lv, t: a.rv.t });
+        fn.params.push({ alias: true, dir: p.dir, name: p.name });
+        return;
+      }
+      let t = elabType(FE, p.type, true);
+      if ((t.unconstrained || (t.kind === 'logic' && t.w === 1 && p.type.kind === 'logic' && !p.type.range && args[k] && args[k].t.w > 1 && DE.lang === 'vhdl')) && args[k]) {
+        t = { ...args[k].t };
+        delete t.unconstrained;
+      }
+      const i = fb.alloc(t, defaultValue(t, DE.lang));
+      if (consts?.has(k)) sc.def(p.name, { kind: 'const', val: fitVal(consts.get(k), t), t });
+      else sc.def(p.name, { kind: 'loc', i, t });
+      fn.params.push({ i, t, dir: p.dir, name: p.name });
+    });
+    let retOpen = false;
+    if (decl.returnType) {
+      let rt = elabType(FE, decl.returnType, true);
+      if (rt.unconstrained) {
+        // provisional (recursive calls): refined from the return statements below
+        retOpen = rt.kind === 'logic';
+        rt = args[0] ? { ...args[0].t } : vecT(1);
+        delete rt.unconstrained;
+        if (decl.returnType.signed !== undefined && rt.kind === 'logic') rt.s = !!decl.returnType.signed;
+      }
+      fn.retT = rt;
+      if (decl.retVar) {
+        fn.retSlot = fb.alloc(rt, defaultValue(rt, DE.lang));
+        sc.def(decl.retVar, { kind: 'loc', i: fn.retSlot, t: rt });
+      }
     }
-    let t = elabType(FE, p.type, true);
-    if ((t.unconstrained || (t.kind === 'logic' && t.w === 1 && p.type.kind === 'logic' && !p.type.range && args[k] && args[k].t.w > 1 && DE.lang === 'vhdl')) && args[k]) {
-      t = { ...args[k].t };
-      delete t.unconstrained;
+    for (const d of decl.decls) bindDecl(FE, d);
+    fn.body = bindBlock(FE, decl.body, decl.loc);
+    if (retOpen) {
+      // unconstrained return type (VHDL): the width of the returned values, when they agree
+      const ws = new Set();
+      walk(fn.body, x => { if (x.k === 'ret' && x.value && x.value.t) ws.add(x.value.t.kind === 'logic' ? x.value.t.w : -1); });
+      if (ws.size === 1 && !ws.has(-1)) fn.retT = vecT([...ws][0], !!fn.retT.s);
     }
-    const i = fb.alloc(t, defaultValue(t, DE.lang));
-    sc.def(p.name, { kind: 'loc', i, t });
-    fn.params.push({ i, t, dir: p.dir, name: p.name });
-  });
-  if (decl.returnType) {
-    let rt = elabType(FE, decl.returnType, true);
-    if (rt.unconstrained) {
-      rt = args[0] ? { ...args[0].t } : vecT(1);
-      delete rt.unconstrained;
-      if (decl.returnType.signed !== undefined && rt.kind === 'logic') rt.s = !!decl.returnType.signed;
-    }
-    fn.retT = rt;
-    if (decl.retVar) {
-      fn.retSlot = fb.alloc(rt, defaultValue(rt, DE.lang));
-      sc.def(decl.retVar, { kind: 'loc', i: fn.retSlot, t: rt });
-    }
+  } catch (e) {
+    if (!sigActuals && entry.cache.get(key) === fn) entry.cache.delete(key);
+    throw e;
   }
-  for (const d of decl.decls) bindDecl(FE, d);
-  fn.body = bindBlock(FE, decl.body, decl.loc);
   fn.frameInit = fb.makeInit();
   const rw = collectRW(fn.body);
   fn.impure = rw.reads.size > 0 || rw.writes.size > 0 || containsKind(fn.body, ['delay', 'event', 'wait', 'sys']);
@@ -1490,7 +1578,10 @@ export function readsOf(n) {
   const reads = new Set();
   walk(n, x => {
     if ((x.k === 'sig' || x.k === 'edge' || x.k === 'event') && x.sig) reads.add(x.sig);
-    if (x.k === 'call' && x.fn) for (const s of x.fn.reads || collectRW(x.fn.body || { k: 'null' }).reads) reads.add(s);
+    if (x.k === 'call' && x.fn && !x.fn._visiting) {   // (guard: recursive functions)
+      x.fn._visiting = true;
+      try { for (const s of x.fn.reads || collectRW(x.fn.body || { k: 'null' }).reads) reads.add(s); } finally { x.fn._visiting = false; }
+    }
   });
   return reads;
 }

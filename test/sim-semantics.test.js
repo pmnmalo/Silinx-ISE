@@ -169,6 +169,80 @@ test('Verilog: @(v[0]) waits for bit 0 only, @(v) for any bit', () => {
   assert.deepEqual(out, ['1 2 3']);
 });
 
+// ------------------------------------------------------------------ subprograms, attributes, types
+test('VHDL functions: unconstrained return width, widths from integer parameters', () => {
+  const out = run(vhd(`
+  y <= dbl(x); z <= zext(x, 8); w <= to_slv(5, 6);
+  process begin
+    wait for 1 ns; report to_string(y) & " " & to_string(z) & " " & to_string(w) & " " & to_string(zext("1", 3)); wait;
+  end process;`, `
+  function dbl(v : std_logic_vector) return std_logic_vector is begin return v & v; end function;
+  function zext(v : std_logic_vector; n : natural) return std_logic_vector is
+    variable r : std_logic_vector(n-1 downto 0) := (others => '0');
+  begin r(v'length-1 downto 0) := v; return r; end function;
+  function to_slv(i : integer; n : natural) return std_logic_vector is
+  begin return std_logic_vector(to_unsigned(i, n)); end function;
+  signal x : std_logic_vector(1 downto 0) := "10";
+  signal y : std_logic_vector(3 downto 0); signal z : std_logic_vector(7 downto 0); signal w : std_logic_vector(5 downto 0);`), 'tb');
+  assert.deepEqual(out, ['1010 00000010 000101 001']);
+});
+
+test("VHDL 'high / 'low / 'left / 'right of integer and enumeration types", () => {
+  const out = run(vhd(`
+  process begin
+    report integer'image(integer'high) & " " & integer'image(integer'low) & " " & integer'image(natural'low) & " "
+      & integer'image(natural'high) & " " & integer'image(positive'low) & " " & integer'image(idx'high) & " "
+      & integer'image(idx'low) & " " & integer'image(c'high) & " " & st'image(st'high) & " " & st'image(st'low);
+    wait;
+  end process;`, `subtype idx is integer range 2 to 15; type st is (A, B, C); signal c : integer range 0 to 99;`), 'tb');
+  assert.deepEqual(out, ['2147483647 -2147483648 0 2147483647 1 15 2 99 c a']);
+});
+
+test('VHDL strings made of std_logic characters stay strings; generics; aliases', () => {
+  const sub = `entity sub is generic (NAME : string := "x"); end;
+architecture a of sub is begin
+  process begin report "name=" & NAME; wait; end process;
+end;`;
+  const tb = vhd(`
+  u : entity work.sub generic map (NAME => "u1");
+  hi <= "1010";
+  process begin
+    report S; wait for 1 ns; report to_string(v) & " " & to_string(lo); wait;
+  end process;`, `constant S : string := "hw"; signal v : std_logic_vector(7 downto 0) := x"0F";
+  alias hi : std_logic_vector(3 downto 0) is v(7 downto 4); alias lo is v(3 downto 0);`);
+  const r = simulate([{ path: 'sub.vhd', text: sub }, { path: 'tb.vhd', text: tb }], 'tb', { until: 1e9 });
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.sim.log.map(l => l.text).sort(), ['10101111 1111', 'hw', 'name=u1']);
+});
+
+test('numeric_std resize of signed keeps the sign; std_logic_arith unsigned + signed is signed', () => {
+  const out = run(vhd(`
+  process begin
+    report integer'image(to_integer(resize(s8, 4))) & " " & integer'image(to_integer(resize(n8, 4))) & " "
+      & integer'image(to_integer(resize(s8, 12)));
+    wait;
+  end process;`, `signal s8 : signed(7 downto 0) := "01111111"; signal n8 : signed(7 downto 0) := "10000011";`), 'tb');
+  assert.deepEqual(out, ['7 -5 127']);
+  const out2 = run(`library ieee; use ieee.std_logic_1164.all; use ieee.std_logic_arith.all;
+entity tb is end;
+architecture sim of tb is
+  signal u : unsigned(3 downto 0) := "0010"; signal s : signed(3 downto 0) := "1101";
+begin
+  process begin report integer'image(conv_integer(u + s)) & " " & boolean'image(s < u); wait; end process;
+end;`, 'tb');
+  assert.deepEqual(out2, ['-1 true']);
+});
+
+test('Verilog recursive automatic function', () => {
+  const out = run(`module t;
+  function automatic integer fact(input integer n);
+    if (n <= 1) fact = 1; else fact = n * fact(n - 1);
+  endfunction
+  initial $display("%0d", fact(5));
+  endmodule`, 't');
+  assert.deepEqual(out, ['120']);
+});
+
 // ------------------------------------------------------------------ VHDL values
 test('VHDL = and /= compare std_logic values exactly (X, U, Z included)', () => {
   const out = run(vhd(`
