@@ -101,6 +101,13 @@ export function evalE(n, ctx) {
       return V.fromBool(lt === undefined || now - lt >= T);
     }
     case 'str': return { str: n.value };
+    case 'chr': {   // VHDL string indexing (strings index from 1 here)
+      const str = toStr(evalE(n.base, ctx)), i = evalE(n.index, ctx);
+      const k = i.x ? -1 : V.toNum(i) - 1;
+      if (k < 0 || k >= str.length) throw new SimError(`index ${i.x ? 'X' : V.toNum(i)} out of range for a string of length ${str.length}`);
+      return V.fromInt(str.charCodeAt(k) & 255, 8, false);
+    }
+    case 'strlen': return V.fromInt(toStr(evalE(n.a, ctx)).length);
     case 'image': {
       const v = evalE(n.a, ctx);
       if (n.hex && !Array.isArray(v) && !isStr(v)) return { str: V.toHex(v).padStart(Math.ceil(v.w / 4), '0').toUpperCase() };
@@ -267,6 +274,7 @@ function evalReal(n, a, b) {
 // ---------------- strings / formatting ----------------
 export function toStr(v, t) {
   if (isStr(v)) return v.str;
+  if (t && t.char && !Array.isArray(v)) return v.x ? '?' : String.fromCharCode(Number(v.v));
   if (Array.isArray(v)) return '(' + v.map((e, k) => toStr(e, t?.fields ? t.fields[k].t : t?.elem)).join(', ') + ')';
   return imageOf(v, t);
 }
@@ -275,7 +283,9 @@ export function imageOf(v, t) {
   if (isStr(v)) return v.str;
   if (!t) return V.toDec(v);
   switch (t.kind) {
-    case 'enum': return v.x ? 'U' : (t.names[Number(v.v)] ?? V.toDec(v));
+    case 'enum':
+      if (t.char) return v.x ? "'?'" : `'${String.fromCharCode(Number(v.v))}'`;
+      return v.x ? 'U' : (t.names[Number(v.v)] ?? V.toDec(v));
     case 'bool': return v.x ? 'X' : (v.v ? 'true' : 'false');
     case 'int': return V.toDec(v, true);
     case 'time': return v.x ? 'X' : formatTime(Number(V.toBig(v)));
@@ -393,7 +403,7 @@ function callFunction(n, ctx) {
     const v = evalE(a, ctx);
     frame[p.i] = Array.isArray(v) ? v.slice() : (p.t.kind === 'str' ? v : fit(v, p.t.w, p.t.s));
   });
-  const sub = { ...ctx, frame };
+  const sub = { ...ctx, frame, inFn: true };
   if (++ctx.depth > 2000) throw new SimError(`recursion too deep in function ${f.name}`);
   try {
     const r = runSync(exec(f.body, sub));
@@ -424,6 +434,13 @@ function resolveTarget(L, ctx, out) {
       if (b.elem != null) wr.path = [...(b.path || []), b.elem];
       if (L.t.kind === 'array') wr.sub = true;   // the element is itself an array / record
       out.push(wr);
+      return;
+    }
+    case 'chr': {
+      const base = [];
+      resolveTarget(L.base, ctx, base);
+      const i = evalE(L.index, ctx);
+      out.push({ ...base[0], chr: i.x ? -1 : V.toNum(i) - 1, whole: false });
       return;
     }
     case 'bit': case 'slice': case 'dslice': case 'pslice': {
@@ -462,6 +479,11 @@ export function applyElem(old, wr, val) {
 // Arrays: every container owns its array (a whole assignment stores a copy), so an element
 // write may update it in place (inPlace) instead of copying the whole memory.
 export function applyWrite(cur, wr, val, inPlace = false) {
+  if (wr.chr != null) {   // s(i) := c
+    const str = toStr(cur);
+    if (wr.chr < 0 || wr.chr >= str.length) throw new SimError(`index ${wr.chr + 1} out of range for a string of length ${str.length}`);
+    return { str: str.slice(0, wr.chr) + String.fromCharCode(Number(val.v & 255n)) + str.slice(wr.chr + 1) };
+  }
   if (wr.path) {   // nested element: copy the containers along the path (they may be shared)
     const [k, ...rest] = wr.path;
     if (!Array.isArray(cur) || k < 0 || k >= cur.length) return cur;
@@ -531,6 +553,14 @@ function* doAssignIntra(s, ctx) {
 }
 
 // ---------------- statements ----------------
+// Loop control after a body that ended with r ({ brk, label }): 0 next iteration, 1 leave this
+// loop, 2 pass r on (return, or exit / next of an enclosing labelled loop).
+function loopCtl(r, s) {
+  if (r.brk !== 'exit' && r.brk !== 'next') return 2;
+  if (r.label && r.label !== s.label) return 2;
+  return r.brk === 'exit' ? 1 : 0;
+}
+
 const severities = { note: 0, warning: 1, error: 2, failure: 3 };
 
 export function* exec(s, ctx) {
@@ -578,7 +608,7 @@ export function* exec(s, ctx) {
       let guard = 0;
       while (V.truth(evalE(s.cond, ctx)) === 1) {
         const r = yield* exec(s.body, ctx);
-        if (r) { if (r.brk === 'exit') break; if (r.brk !== 'next') return r; }
+        if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
         yield* exec(s.step, ctx);
         if (++guard > 10_000_000) throw new SimError('loop iteration limit exceeded', s.loc);
       }
@@ -590,7 +620,7 @@ export function* exec(s, ctx) {
       for (let i = a; s.down ? i >= b : i <= b; i += step) {
         ctx.frame[s.var] = V.fromInt(i, s.varT.w, s.varT.s);
         const r = yield* exec(s.body, ctx);
-        if (r) { if (r.brk === 'exit') break; if (r.brk !== 'next') return r; }
+        if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
       }
       return;
     }
@@ -598,7 +628,7 @@ export function* exec(s, ctx) {
       let guard = 0;
       while (V.truth(evalE(s.cond, ctx)) === 1) {
         const r = yield* exec(s.body, ctx);
-        if (r) { if (r.brk === 'exit') break; if (r.brk !== 'next') return r; }
+        if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
         if (++guard > 10_000_000) throw new SimError('loop iteration limit exceeded', s.loc);
       }
       return;
@@ -608,22 +638,25 @@ export function* exec(s, ctx) {
       const cnt = n.x ? 0 : V.toNum(n);
       for (let i = 0; i < cnt; i++) {
         const r = yield* exec(s.body, ctx);
-        if (r) { if (r.brk === 'exit') break; if (r.brk !== 'next') return r; }
+        if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
       }
       return;
     }
     case 'forever': {
+      let guard = 0;
       for (;;) {
         const t0 = ctx.sim ? ctx.sim.now : 0, st0 = ctx.sim ? ctx.sim.stamp : 0;
         const r = yield* exec(s.body, ctx);
-        if (r) { if (r.brk === 'exit') break; if (r.brk !== 'next') return r; }
-        if (ctx.sim && ctx.sim.now === t0 && ctx.sim.stamp === st0 && !s.hasWait)
-          throw new SimError('infinite loop without wait/delay', s.loc);
+        if (r) { const c = loopCtl(r, s); if (c === 1) break; if (c === 2) return r; }
+        if (!ctx.sim || (ctx.sim.now === t0 && ctx.sim.stamp === st0)) {   // an iteration without waiting
+          if (ctx.sim && !s.hasWait) throw new SimError('infinite loop without wait/delay', s.loc);
+          if (++guard > 10_000_000) throw new SimError('loop iteration limit exceeded', s.loc);
+        } else guard = 0;
       }
       return;
     }
     case 'exit': case 'next':
-      if (!s.c || V.truth(evalE(s.c, ctx)) === 1) return { brk: s.k };
+      if (!s.c || V.truth(evalE(s.c, ctx)) === 1) return { brk: s.k, label: s.label };
       return;
     case 'ret': return { brk: 'ret', value: s.value ? evalE(s.value, ctx) : null };
     case 'null': return;
@@ -686,7 +719,7 @@ export function* exec(s, ctx) {
     case 'report': {
       const msg = toStr(evalE(s.msg, ctx), s.msg.t);
       ctx.sim?.report(s.sev, msg, s.loc);
-      if (severities[s.sev] >= 3) ctx.sim?.finish('failure');
+      if (severities[s.sev] >= 3) { ctx.sim?.finish('failure'); if (ctx.sim && !ctx.inFn) yield { forever: true }; }
       return;
     }
     case 'assert': {
@@ -694,7 +727,7 @@ export function* exec(s, ctx) {
       if (c !== 1) {
         const msg = s.msg ? toStr(evalE(s.msg, ctx), s.msg.t) : 'Assertion violation.';
         ctx.sim?.report(s.sev, msg, s.loc);
-        if (severities[s.sev] >= 3) ctx.sim?.finish('failure');
+        if (severities[s.sev] >= 3) { ctx.sim?.finish('failure'); if (ctx.sim && !ctx.inFn) yield { forever: true }; }
       }
       return;
     }

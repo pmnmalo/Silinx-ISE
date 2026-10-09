@@ -18,6 +18,9 @@ export const BIT = { kind: 'logic', w: 1, s: false, left: 0, right: 0, desc: tru
 export const TIME = { kind: 'time', w: 64, s: true, left: 63, right: 0, desc: true };
 export const REAL = { kind: 'real', w: 64, s: true, left: 63, right: 0, desc: true };
 export const STR = { kind: 'str', w: 0, s: false };
+// VHDL CHARACTER: an enumeration of the 256 ISO 8859-1 characters (values: the character codes)
+export const CHAR = { kind: 'enum', name: 'character', char: true, names: Array.from({ length: 256 }, (_, i) => String.fromCharCode(i)), w: 8, s: false, left: 7, right: 0, desc: true };
+const charConst = ch => ({ k: 'c', val: V.fromInt(ch.charCodeAt(0) & 255, 8, false), t: CHAR });
 export const vecT = (w, s = false) => ({ kind: 'logic', w, s, left: w - 1, right: 0, desc: true });
 
 const PHYS = { fs: 0.001, ps: 1, ns: 1e3, us: 1e6, ms: 1e9, sec: 1e12, s: 1e12 };
@@ -179,7 +182,9 @@ function elabInstance(ctx, mod, name, path, paramOverrides, portConns, parentIns
       const ptype = p.type ? elabType(E, p.type) : null;
       if (ov && !p.local) {
         entry = { kind: 'const', val: ov.val, t: ov.t };
-        if (ptype && ptype.kind !== 'str') entry = { kind: 'const', val: fitVal(ov.val, ptype), t: ptype };
+        // an unconstrained generic (INIT : std_logic_vector) takes the actual's width
+        if (ptype && ptype.unconstrained && ov.t && ov.t.kind === ptype.kind) entry = { kind: 'const', val: ov.val, t: { ...ov.t, s: ptype.s } };
+        else if (ptype && ptype.kind !== 'str') entry = { kind: 'const', val: fitVal(ov.val, ptype), t: ptype };
         else if (ptype && ov.text !== undefined) entry = { kind: 'const', val: { str: ov.text }, t: STR };   // NAME => "u1"
       } else if (p.default) {
         const n = bindExpr(E, p.default, ptype);
@@ -532,9 +537,14 @@ function bindDecl(E, d) {
       E.sc.def(d.name, { kind: 'sig', sig, t });
       return;
     }
-    case 'function': case 'task':
-      E.sc.def(d.name, { kind: 'func', decl: d, E: { ...E, fb: null, inProcess: false }, cache: new Map() });
+    case 'function': case 'task': {
+      const ent = { kind: 'func', decl: d, E: { ...E, fb: null, inProcess: false }, cache: new Map() };
+      // VHDL overloading: subprograms of one name in one region (chosen per call: pickOverload)
+      const prev = E.lang === 'vhdl' ? E.sc.local(d.name) : null;
+      if (prev && prev.kind === 'func') ent.alts = [...(prev.alts || [prev]), ent];
+      E.sc.def(d.name, ent);
       return;
+    }
     case 'subalias': defSubAlias(E, d.name, d.target); return;
     case 'alias': {   // VHDL object alias: reads and writes go to the aliased object (or slice)
       // `alias f is g;` without a signature: an alias of subprogram g when g is one
@@ -579,6 +589,7 @@ function elabType(E, ts, allowUnconstrained = false) {
     case 'time': return TIME;
     case 'real': return REAL;
     case 'string': return STR;
+    case 'character': return CHAR;
     case 'array': {
       const elem = elabType(E, ts.elem);
       if (!ts.range) return { kind: 'array', unconstrained: true, elem, w: 0 };
@@ -631,6 +642,7 @@ function stdTypeName(n) {
     case 'time': return { kind: 'time' };
     case 'real': return { kind: 'real' };
     case 'string': return { kind: 'string' };
+    case 'character': return { kind: 'character' };
   }
   return null;
 }
@@ -696,6 +708,8 @@ function isConstNode(n) {
   switch (n.k) {
     case 'c': case 'str': return true;
     case 'sig': case 'loc': case 'edge': case 'event': case 'sys': case 'now': case 'sigattr': return false;
+    case 'chr': return isConstNode(n.base) && isConstNode(n.index);
+    case 'strlen': return isConstNode(n.a);
     case 'call': return !n.fn.impure && n.args.every(isConstNode);
     default:
       for (const key of ['a', 'b', 'c', 'base', 'index', 'left', 'right', 'start', 'count']) if (n[key] && typeof n[key] === 'object' && n[key].k && !isConstNode(n[key])) return false;
@@ -805,6 +819,7 @@ function bindExpr0(E, e, expect, loc) {
   loc = e.loc || loc;
   switch (e.op) {
     case 'lit': {
+      if (E.lang === 'vhdl' && expect && expect.char && e.scalar && e.ch) return charConst(e.ch);
       if (E.lang === 'vhdl' && expect && expect.kind === 'str' && e.text !== undefined) return { k: 'str', value: e.text, t: STR };
       if (E.lang === 'vhdl' && expect && expect.kind === 'str' && !e.scalar && /^[01]+$/.test(e.bits)) return { k: 'str', value: e.bits, t: STR };
       const val = V.fromBits(e.bits, !!e.signed);
@@ -831,6 +846,7 @@ function bindExpr0(E, e, expect, loc) {
     }
     case 'str': {
       if (E.lang === 'verilog' && expect && expect.kind === 'logic') return { k: 'c', val: strToVal(e.value), t: vecT(Math.max(8, e.value.length * 8)) };
+      if (E.lang === 'vhdl' && e.char && expect && expect.char) return charConst(e.value);
       // a string of std_logic characters where a vector is expected (in a report message, say)
       if (E.lang === 'vhdl' && expect && expect.kind === 'logic' && !e.char) return strAsLogic({ k: 'str', value: e.value, t: STR }, { t: expect });
       return { k: 'str', value: e.value, t: STR };
@@ -879,7 +895,13 @@ function bindExpr0(E, e, expect, loc) {
     case 'apply': return bindApply(E, e, expect, loc);
     case 'call': return bindVlogCall(E, e, expect, loc);
     case 'concat': {
-      const parts = e.parts.map(p => bindExpr(E, p, null, loc));
+      let parts = e.parts.map(p => bindExpr(E, p, null, loc));
+      if (E.lang === 'vhdl' && parts.some(p => p.t.kind === 'str' || p.t.char)) {
+        // "ab" & "-" & 'c': the string literals made of std_logic characters are strings here
+        parts = parts.map((p, k) => (p.k === 'c' && p.t.kind === 'logic' && !p.src && (p.strText !== undefined || e.parts[k].ch)
+          ? { k: 'str', value: p.strText ?? e.parts[k].ch, t: STR } : p));
+        return { k: 'strcat', parts, t: STR };
+      }
       if (parts.some(p => p.t.kind === 'str')) return { k: 'strcat', parts, t: STR };
       if (parts.length === 1 && E.lang === 'verilog') return { k: 'conv', a: parts[0], ext: false, t: vecT(parts[0].t.w) };
       const w = parts.reduce((a, p) => a + p.t.w, 0);
@@ -960,7 +982,7 @@ function hierLookup(E, name) {
 function indexNode(E, base, idxExpr, loc) {
   const index = bindExpr(E, idxExpr, null, loc);
   if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem };
-  if (base.t.kind === 'str') throw new ElabError('string indexing not supported', loc);
+  if (base.t.kind === 'str') return { k: 'chr', base, index, t: CHAR };   // s(i): a CHARACTER
   if (index.k === 'c' && !index.val.x) {
     const p = bitpos(base.t, V.toNum(index.val));
     if (p < 0 || p >= base.t.w) diag(E, `index ${V.toDec(index.val, true)} out of range for '${base.name || 'expression'}'`, loc, 'warning');
@@ -1067,7 +1089,9 @@ function bindAttr(E, e, loc) {
     const a = bindExpr(E, e.args[0], null, loc);
     // T'image(x): formatted as a value of T (boolean / enumeration prefixes)
     const pe = e.prefix.op === 'ref' ? E.sc.lookup(e.prefix.name) : null;
-    const it = pe && pe.kind === 'type' && pe.t && (pe.t.kind === 'enum' || pe.t.kind === 'bool') ? pe.t : (e.prefix.op === 'ref' && /^boolean$/i.test(e.prefix.name) ? BOOL : null);
+    const it = pe && pe.kind === 'type' && pe.t && (pe.t.kind === 'enum' || pe.t.kind === 'bool') ? pe.t
+      : e.prefix.op === 'ref' && /^boolean$/i.test(e.prefix.name) ? BOOL : e.prefix.op === 'ref' && /^character$/i.test(e.prefix.name) ? CHAR : null;
+    if (it === CHAR && a.k === 'str' && a.value.length === 1) return { k: 'image', a: charConst(a.value), t: STR, it };
     return { k: 'image', a, t: STR, ...(it ? { it } : {}), ...(at === 'to_string' ? { ts: true } : {}) };
   }
   // prefix could be a type name
@@ -1084,6 +1108,7 @@ function bindAttr(E, e, loc) {
     const dim = V.toNum(constOf(E, bindExpr(E, e.args[0], null, loc), loc));
     for (let k = 1; k < dim; k++) { if (t.elem?.kind !== 'array' && t.elem?.kind !== 'logic') throw new ElabError(`'${at}(${dim}): no dimension ${dim}`, loc); t = t.elem; }
   }
+  if (t.kind === 'str' && at === 'length' && node) return { k: 'strlen', a: node, t: INT };
   if (t.kind === 'str' && at !== 'event') throw new ElabError(`'${at} of a string is not supported (use std_logic_vector)`, loc);
   if ((t.kind === 'int' || t.kind === 'enum' || t.kind === 'bool') && ['left', 'right', 'high', 'low'].includes(at)) {
     // scalar types: bounds of the range (integer ranges are ascending here)
@@ -1102,7 +1127,7 @@ function bindAttr(E, e, loc) {
     case 'right': return cint(t.right);
     case 'high': return cint(Math.max(t.left, t.right));
     case 'low': return cint(Math.min(t.left, t.right));
-    case 'pos': return fold({ k: 'conv', a: bindExpr(E, e.args[0], null, loc), ext: false, t: INT });
+    case 'pos': return fold({ k: 'conv', a: bindExpr(E, e.args[0], t, loc), ext: false, t: INT });
     case 'val': return fold({ k: 'conv', a: bindExpr(E, e.args[0], null, loc), ext: true, t });
     case 'succ': case 'pred': case 'leftof': case 'rightof': {
       // (scalar types are ascending here: 'leftof is 'pred, 'rightof is 'succ)
@@ -1349,7 +1374,50 @@ function bindVlogCall(E, e, expect, loc) {
   return bindCall(E, entry, e.args, name, loc);
 }
 
+// VHDL overloaded subprogram: the alternative whose parameter types fit the actuals (first
+// exactly - signedness, type marks -, then by kind of type); the last declared one otherwise.
+function pickOverload(E, entry, rawArgs, loc) {
+  if (!entry.alts) return entry;
+  let acts;
+  try {
+    acts = rawArgs.map(a => (a == null ? null : { named: a.named, n: bindExpr(E, a.named !== undefined ? a.value : a, null, loc) }));
+  } catch (e) {
+    if (e instanceof ElabError || e instanceof SimError) return entry;
+    throw e;
+  }
+  const fitsType = (n, pt, strict) => {
+    const at = n.t;
+    if (n.k === 'str' && pt.kind === 'logic') return !pt.scalar && /^[01uxzwlh-]+$/i.test(n.value);
+    if (pt.kind !== at.kind) return false;
+    switch (pt.kind) {
+      case 'logic':
+        if (pt.scalar ? !(at.w === 1 && at.scalar) : at.scalar) return false;
+        return !strict || pt.scalar || (!!at.s === !!pt.s && (at.mark || '') === (pt.mark || ''));
+      case 'enum': return at.name === pt.name;
+      case 'array': return !strict || !pt.name || at.name === pt.name;
+      default: return true;
+    }
+  };
+  const fits = (alt, strict) => {
+    const ps = alt.decl.params, used = new Set();
+    if (acts.length > ps.length) return false;
+    for (let k = 0; k < acts.length; k++) {
+      const a = acts[k];
+      if (!a) continue;
+      const i = a.named !== undefined ? ps.findIndex(p => p.name === a.named) : k;
+      if (i < 0) return false;
+      used.add(i);
+      let pt;
+      try { pt = elabType(alt.E, ps[i].type, true); } catch { return false; }
+      if (!fitsType(a.n, pt, strict)) return false;
+    }
+    return ps.every((p, i) => used.has(i) || p.default);
+  };
+  return entry.alts.find(a => fits(a, true)) || entry.alts.find(a => fits(a, false)) || entry;
+}
+
 function bindCall(E, entry, rawArgs, name, loc) {
+  entry = pickOverload(E, entry, rawArgs, loc);
   const decl = entry.decl;
   // named association
   let argExprs = new Array(decl.params.length).fill(null);
@@ -1360,6 +1428,7 @@ function bindCall(E, entry, rawArgs, name, loc) {
       argExprs[idx] = a.value;
     } else argExprs[k] = a;
   });
+  argExprs = argExprs.map((a, k) => a || decl.params[k].default || null);   // VHDL default parameter values
   const args = argExprs.map((a, k) => {
     if (!a) throw new ElabError(`missing argument '${decl.params[k].name}' in call to '${name}'`, loc);
     const n = bindExpr(E, a, null, loc);
@@ -1496,6 +1565,7 @@ function bindLvalue(E, e, loc) {
       const base = bindLvalue(E, e.base, loc);
       const index = bindExpr(E, e.index, null, loc);
       if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem };
+      if (base.t.kind === 'str') return { k: 'chr', base, index, t: CHAR };
       return { k: 'bit', base, index, t: BIT };
     }
     case 'slice': {
@@ -1521,6 +1591,7 @@ function bindLvalue(E, e, loc) {
       if (a.op === 'slice' && a.base == null) return sliceNode(E, base, a.left, a.right, loc);
       const index = bindExpr(E, a, null, loc);
       if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem };
+      if (base.t.kind === 'str') return { k: 'chr', base, index, t: CHAR };
       return { k: 'bit', base, index, t: BIT };
     }
     case 'concat': {
@@ -1630,15 +1701,16 @@ function bindStmt0(E, s, loc) {
       const i = E.fb.alloc(INT, init);
       sc.def(s.var, { kind: 'loc', i, t: INT });
       const LE = { ...E, sc };
-      return { k: 'forrange', var: i, varT: INT, from: r.from, to: r.to, down: r.down, body: bindStmt(LE, s.body, loc), loc };
+      return { k: 'forrange', var: i, varT: INT, from: r.from, to: r.to, down: r.down, body: bindStmt(LE, s.body, loc), loc, label: s.label };
     }
-    case 'while': return { k: 'while', cond: vsize(E, bindExpr(E, s.cond, null, loc)), body: bindStmt(E, s.body, loc), loc };
+    case 'while': return { k: 'while', cond: vsize(E, bindExpr(E, s.cond, null, loc)), body: bindStmt(E, s.body, loc), loc, label: s.label };
     case 'repeat': return { k: 'repeat', count: vsize(E, bindExpr(E, s.count, null, loc)), body: bindStmt(E, s.body, loc), loc };
     case 'forever': {
       const body = bindStmt(E, s.body, loc);
-      return { k: 'forever', body, hasWait: containsKind(body, ['delay', 'event', 'wait', 'task', 'fork', 'waitfork']), loc };
+      // (a VHDL `loop` may iterate without waiting: it ends with exit; only the iteration count is limited)
+      return { k: 'forever', body, hasWait: E.lang === 'vhdl' || containsKind(body, ['delay', 'event', 'wait', 'task', 'fork', 'waitfork']), loc, label: s.label };
     }
-    case 'exit': case 'next': return { k: s.kind, c: s.cond ? bindExpr(E, s.cond, null, loc) : null, loc };
+    case 'exit': case 'next': return { k: s.kind, c: s.cond ? bindExpr(E, s.cond, null, loc) : null, loc, label: s.label };
     case 'return': return { k: 'ret', value: s.value ? bindExpr(E, s.value, null, loc) : null, loc };
     case 'null': return { k: 'null', loc };
     case 'delay': return { k: 'delay', amount: bindExpr(E, s.amount, null, loc), unit: E.timeUnit, stmt: s.stmt ? bindStmt(E, s.stmt, loc) : null, loc };
@@ -1702,7 +1774,8 @@ function bindCallStmt(E, s, loc) {
     }
     return { k: 'sys', name: sysName, args, loc };
   }
-  const entry = E.sc.lookup(name);
+  let entry = E.sc.lookup(name);
+  if (entry && entry.kind === 'func') entry = pickOverload(E, entry, s.args, loc);
   if (!entry || entry.kind !== 'func') {
     if (E.lang === 'vhdl' && ['deallocate', 'write', 'writeline', 'read', 'readline'].includes(name)) {
       diag(E, `procedure '${name}' (textio) is not supported`, loc, 'warning');
@@ -1711,11 +1784,25 @@ function bindCallStmt(E, s, loc) {
     throw new ElabError(`task/procedure '${name}' is not declared`, loc);
   }
   const decl = entry.decl;
+  // one actual per formal, in order: named association (f => a) and default values (VHDL)
+  const acts = new Array(Math.max(decl.params.length, s.args.length)).fill(null);
+  s.args.forEach((a, k) => {
+    if (a && a.named !== undefined) {
+      const i = decl.params.findIndex(p => p.name === a.named);
+      if (i < 0) throw new ElabError(`'${name}' has no parameter '${a.named}'`, loc);
+      acts[i] = a.value;
+    } else acts[k] = a;
+  });
+  decl.params.forEach((p, k) => {
+    if (!acts[k] && p.default && p.dir !== 'out') acts[k] = p.default;
+    if (!acts[k]) throw new ElabError(`missing argument '${p.name}' in call to '${name}'`, loc);
+  });
+  s = { ...s, args: acts };
   const args = s.args.map((a, k) => {
     const p = decl.params[k];
     if (!p) throw new ElabError(`too many arguments for '${name}'`, loc);
     if (p.dir === 'out') return null;
-    return bindExpr(E, a.named !== undefined ? a.value : a, null, loc);
+    return bindExpr(E, a, null, loc);
   });
   // VHDL `signal` parameters refer to the actual signal (assignments inside the procedure drive
   // it at once, across waits), instead of being copied in and out
@@ -1725,17 +1812,20 @@ function bindCallStmt(E, s, loc) {
     s.args.forEach((a, k) => {
       const p = decl.params[k];
       if (!p || String(p.class || '').toLowerCase() !== 'signal') return;
-      const actual = a.named !== undefined ? a.value : a;
+      const actual = a;
       const rv = bindExpr(E, actual, null, loc);
       const lv = p.dir !== 'in' ? bindLvalue(E, actual, loc) : null;
       if (hasLoc(rv) || (lv && hasLoc(lv))) return;     // actual uses process variables: copy semantics
       (sigActuals ||= [])[k] = { rv, lv };
     });
   }
-  const fn = boundFunction(entry, s.args.map((a, k) => args[k] || bindLvalue(E, a.named !== undefined ? a.value : a, loc)), loc, sigActuals);
-  const outTargets = s.args.map((a, k) => (decl.params[k] && decl.params[k].dir !== 'in' && !sigActuals?.[k] ? bindLvalue(E, a.named !== undefined ? a.value : a, loc) : null));
+  const fn = boundFunction(entry, s.args.map((a, k) => args[k] || bindLvalue(E, a, loc)), loc, sigActuals);
+  const outTargets = s.args.map((a, k) => (decl.params[k] && decl.params[k].dir !== 'in' && !sigActuals?.[k] ? bindLvalue(E, a, loc) : null));
   if (sigActuals) args.forEach((_, k) => { if (sigActuals[k]) args[k] = null; });
-  return { k: 'task', fn, args, outTargets, loc };
+  const node = { k: 'task', fn, args, outTargets, loc };
+  // signals passed to `signal` parameters of mode in / inout are read by the call
+  if (sigActuals) node.sigReads = sigActuals.flatMap((a, k) => (a && decl.params[k].dir !== 'out' ? [a.rv] : []));
+  return node;
 }
 
 function bindTrigger(E, expr, edge, loc) {
@@ -1802,6 +1892,7 @@ export function collectRW(body) {
     }
     if (x.k === 'task') {
       x.args.forEach(a => { if (a) for (const s of readsOf(a)) reads.add(s); });
+      x.sigReads?.forEach(a => { for (const s of readsOf(a)) reads.add(s); });
       x.outTargets.forEach(L => { if (L) visitL(L); });
       // signals the procedure assigns itself (signal parameters, outer signals)
       if (x.fn && x.fn.body && !x.fn._visiting) {

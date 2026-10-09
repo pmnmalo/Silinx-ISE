@@ -221,11 +221,14 @@ test('enumeration types: relational operators, \'pos \'val \'succ \'pred \'lefto
   ]);
 });
 
-test('predefined type CHARACTER: \'pos \'val \'image, string indexing', { todo: 'type CHARACTER and string indexing are not implemented (strings are opaque values)' }, () => {
+test('predefined type CHARACTER: \'pos \'val \'image, string indexing and element assignment, \'length of strings', () => {
   const r = out(vproc(`
-    report integer'image(character'pos('A')) & " " & character'image(character'val(66)) & " " & character'image(s(2));`,
-  `variable s : string(1 to 3) := "xyz";`));
-  assert.deepEqual(r, ["65 'B' 'y'"]);
+    report integer'image(character'pos('A')) & " " & character'image(character'val(66)) & " " & character'image(s(2));
+    s(3) := c; c := 'q'; s(1) := c;
+    report s & " " & integer'image(s'length) & " " & boolean'image(s(2) = 'y') & " " & boolean'image('a' < 'b');
+    for i in 1 to 3 loop if s(i) = 'y' then report "y at " & integer'image(i); end if; end loop;`,
+  `variable s : string(1 to 3) := "xyz"; variable c : character := '1';`));
+  assert.deepEqual(r, ["65 'B' 'y'", 'qy1 3 true true', 'y at 2']);
 });
 
 test('concatenation: element & element, array & element, of strings and vectors', () => {

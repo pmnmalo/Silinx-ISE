@@ -532,7 +532,7 @@ describe('sequential statements', () => {
     assert.equal(b[1].label, 'lbl');
     assert.deepEqual(b[1].range.dir, 'downto');
     assert.deepEqual(noloc(b[1].body.stmts[0]), { kind: 'next', cond: B('==', R('i'), I(3)) });
-    assert.deepEqual(noloc(b[1].body.stmts[1]), { kind: 'exit', cond: B('==', R('i'), I(1)) });
+    assert.deepEqual(noloc(b[1].body.stmts[1]), { kind: 'exit', cond: B('==', R('i'), I(1)), label: 'lbl' });
     assert.deepEqual(b[2].range, { of: R('x'), reverse: true });
     assert.equal(b[3].kind, 'while');
     assert.deepEqual(b[3].cond, B('<', R('n'), I(10)));

@@ -837,11 +837,7 @@ class Parser {
           return this.parseConcurrentAssignOrCall(label, loc);
         case 'for': return [this.parseForGenerate(label, loc)];
         case 'if': return [this.parseIfGenerate(label, loc)];
-        case 'case': {
-          this.warn('case-generate is not supported; statement ignored');
-          this.skipGenerate();
-          return [];
-        }
+        case 'case': return [this.parseCaseGenerate(label, loc)];
         case 'block': return this.parseBlock(decls);
         case 'assert': return [this.parseConcurrentAssert(label, loc)];
         case 'with': return [this.parseSelectedAssign(label, loc)];
@@ -957,6 +953,44 @@ class Parser {
       this.expectOp(';');
     }
     return g;
+  }
+
+  /**
+   * VHDL-2008 case-generate: `case e generate when c1 | c2 => ... when others => ... end generate;`
+   * becomes a chain of if-generates on `e = c1 or e = c2` (ranges: `lo <= e and e <= hi`).
+   */
+  parseCaseGenerate(label, loc) {
+    this.expectKw('case');
+    const sel = this.parseExpression();
+    this.expectKw('generate');
+    const alts = [];
+    while (this.acceptKw('when')) {
+      if (this.isId() && this.isOp(':', 1)) { this.next(); this.next(); }   // alternative label
+      const choices = [];
+      do { choices.push(this.acceptKw('others') ? 'others' : this.parseChoice()); } while (this.acceptOp('|'));
+      this.expectOp('=>');
+      const body = this.parseGenerateBody();
+      this.acceptAltEnd();
+      alts.push({ choices, body });
+    }
+    this.expectKw('end');
+    this.expectKw('generate');
+    if (this.isId()) this.next();
+    this.expectOp(';');
+    const test = (c) => {
+      if (!c.range) return bin('==', sel, c);
+      if (c.range.of) return bin('&', bin('>=', sel, { op: 'attr', prefix: c.range.of, attr: 'low', args: [] }), bin('<=', sel, { op: 'attr', prefix: c.range.of, attr: 'high', args: [] }));
+      const [lo, hi] = c.range.dir === 'downto' ? [c.range.right, c.range.left] : [c.range.left, c.range.right];
+      return bin('&', bin('>=', sel, lo), bin('<=', sel, hi));
+    };
+    let rest = [];
+    for (let k = alts.length - 1; k >= 0; k--) {
+      const { choices, body } = alts[k];
+      if (choices.includes('others')) { rest = [...body.decls.map((d) => ({ kind: 'decl', decl: d })), ...body.items]; continue; }
+      const cond = choices.map(test).reduce((x, y) => bin('|', x, y));
+      rest = [{ kind: 'generate_if', label, cond, then: body.items, else: rest, decls: body.decls, loc }];
+    }
+    return rest.length === 1 && rest[0].kind === 'generate_if' ? rest[0] : { kind: 'generate_if', label, cond: { op: 'ref', name: 'true' }, then: rest, else: [], decls: [], loc };
   }
 
   skipGenerate() {
@@ -1223,10 +1257,10 @@ class Parser {
         case 'for': case 'while': case 'loop': return this.parseLoop(label, loc);
         case 'exit': case 'next': {
           this.next();
-          if (this.isId()) this.next(); // loop label (ignored)
+          const target = this.isId() ? this.next().value : null;   // loop label
           const cond = this.acceptKw('when') ? this.parseExpression() : null;
           this.expectOp(';');
-          return { kind: tok.value, cond, loc };
+          return target ? { kind: tok.value, cond, loc, label: target } : { kind: tok.value, cond, loc };
         }
         case 'wait': return this.parseWait(loc);
         case 'report': {
@@ -1508,7 +1542,10 @@ class Parser {
       }
       case 'char': {
         this.next();
-        if (LOGIC_CHARS.test(tok.value)) return { op: 'lit', bits: mapBits(tok.value), signed: false, sized: true, scalar: true };
+        if (LOGIC_CHARS.test(tok.value)) {
+          // ch (not enumerable): the character as written, for when a CHARACTER is expected
+          return Object.defineProperty({ op: 'lit', bits: mapBits(tok.value), signed: false, sized: true, scalar: true }, 'ch', { value: tok.value });
+        }
         return { op: 'str', value: tok.value, char: true };
       }
       case 'str': {
