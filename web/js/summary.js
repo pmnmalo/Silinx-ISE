@@ -26,7 +26,7 @@ export function mountSummary(el) {
       row('Project File:', `${pj.name}/silinx.json`, 'Parser Errors:', h('span', { class: errs ? 'status-bad' : 'status-good' }, errs ? `${errs} Errors` : 'No Errors')),
       row('Module Name:', pj.top || '(not set)', 'Implementation State:', implState),
       row('Target Device:', `${pj.device.part}${pj.device.speed}-${pj.device.package}`, 'Warnings:', warns ? `${warns} Warnings` : 'No Warnings'),
-      row('Board:', board ? board.name : 'None Specified', 'Simulation Top:', pj.simTop || '(not set)'),
+      row('Board:', board ? board.name : 'None Specified', 'Test Benches:', String((pj.files || []).filter(f => f.role === 'sim').length)),
       row('Product Version:', `${PRODUCT} ${VERSION} (Xilinx ISE 14.7 flow)`, 'Constraints:', pj.constraints || '(none)'),
       row('Design Goal:', `Balanced (${pj.impl?.optMode || 'Speed'})`, 'Sources:', `${pj.files.length} HDL files`),
     ));

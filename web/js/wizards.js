@@ -596,7 +596,7 @@ export async function newSourceWizard({ type } = {}) {
   // reload first: saving the project settings from the old copy would drop that registration
   await app.reloadProject();
   if (st.id === 'ucf' && noUcf) { S.project.constraints = path; await app.saveProjectJson(); await app.reloadProject(); }
-  if (st.id === 'tb') await app.setTop(n, true);
+  if (st.id === 'tb') app.showInSim(n);   // selected in the Simulation view, ready to simulate
   app.log(`Created ${st.label}${st.ext ? '' : ` (${langSel.value === 'verilog' ? 'Verilog' : 'VHDL'})`} '${path}'.`, 'ok');
   if (st.id === 'asm') app.openAsm(path); else if (st.id === 'tt') app.openTt(path); else if (st.id === 'sch') app.openSch(path); else app.openFile(path);
 }
@@ -682,7 +682,6 @@ export async function projectProperties() {
       ...field('Family:', dp.famSel),
       ...field('Device:', dp.partSel), ...field('Package:', dp.pkgSel), ...field('Speed:', dp.spdSel),
       ...field('Top Module (implementation):', h('span', {}, pj.top || '(none)')),
-      ...field('Top Module (simulation):', h('span', {}, pj.simTop || '(none)')),
       ...field('Preferred Language:', lang)),
   });
   if (!r) return;
@@ -808,14 +807,32 @@ export function aboutDialog() {
 const REPO = REPOSITORY;
 
 /** Help ▸ Check for Updates…: the running version vs the latest release on GitHub. */
-export async function checkUpdatesDialog() {
+async function latestRelease() {
+  const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status === 403 ? 'GitHub rate limit reached, try again later' : `GitHub answered ${r.status}`);
+  return r.json();
+}
+
+/**
+ * At start-up: check the latest release on GitHub; a newer version opens the update dialog,
+ * otherwise one line in the console (no network / GitHub error: nothing shown).
+ */
+export async function checkUpdatesOnStart() {
+  let rel;
+  try { rel = await latestRelease(); } catch { return null; }
+  const latest = String(rel.tag_name || rel.name || '').replace(/^v/i, '');
+  if (!latest) return null;
+  if (compareVersions(latest, VERSION) > 0) return checkUpdatesDialog({ rel });
+  app.log(`${PRODUCT} ${VERSION} is up to date (latest release on GitHub: ${latest}).`, 'info');
+  return null;
+}
+
+export async function checkUpdatesDialog({ rel: known = null } = {}) {
   const body = h('div', {}, h('p', {}, `Running ${PRODUCT} ${VERSION}. Checking the latest release on GitHub…`));
   const done = dialog({ title: 'Check for Updates', width: 520, body, buttons: [{ label: 'OK', primary: true, value: true }] });
-  let rel;
+  let rel = known;
   try {
-    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
-    if (!r.ok) throw new Error(r.status === 403 ? 'GitHub rate limit reached, try again later' : `GitHub answered ${r.status}`);
-    rel = await r.json();
+    rel ||= await latestRelease();
   } catch (e) {
     body.replaceChildren(h('p', {}, `Running ${PRODUCT} ${VERSION}.`),
       h('p', { style: { color: '#c00000' } }, `Could not check for updates: ${e.message || e}.`),

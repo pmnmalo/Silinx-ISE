@@ -413,6 +413,8 @@ export async function setupUi({ server = true } = {}) {
     const page = new Page(env, sessionId, targetId, browserContextId, downloadDir);
     await page.send('Runtime.enable');
     await page.send('Page.enable');
+    // no update check against GitHub at start-up (a test can turn it on again with its own fetch stub)
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.SILINX_NO_UPDATE_CHECK = true;' });
     await page.send('DOM.enable');
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
     await page.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});

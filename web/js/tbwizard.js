@@ -8,7 +8,7 @@ import { api } from './api.js';
 import { h, alertDlg, toast } from './ui.js';
 import { compile, elaborate, simulate } from '/core/compile.js';
 import { clocksOf } from '/core/schematic.js';
-import { tbPorts, guessClockReset, makeVectors, parseValue, parseDrive, showValue, generateTestbench, expectedFromTrace, MAX_VECTORS } from '/core/testbench.js';
+import { tbPorts, guessClockReset, makeVectors, parseValue, parseDrive, showValue, generateTestbench, generateSkeleton, expectedFromTrace, MAX_VECTORS } from '/core/testbench.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
 
@@ -28,6 +28,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
   // ---------------------------------------------------------------- state
   let ports = [], ins = [], outs = [], ios = [], clockSigs = new Set();
   let rows = [];          // [{ in: { port: text }, drv: { port: text }, exp: { port: text } }] as typed in the table
+  let p4skip = false;   // no vectors (skeleton): the vectors page is left out
   const st = { clock: '', period: 20, reset: '', active: '1', cycles: 2, settle: 10, mode: 'exhaustive', count: 32, seed: 1 };
 
   const analyse = () => {
@@ -140,6 +141,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
     ['count', 'Counting (all inputs as one number: 0, 1, 2, …)'],
     ['walking', 'Walking ones and zeros (all 0, all 1, then one bit at a time)'],
     ['manual', 'I will type the vectors in (starts with one empty vector)'],
+    ['none', 'No vectors: a test bench skeleton (clock, reset and the module); I will write the stimulus'],
   ];
   const renderModes = () => {
     modeBox.innerHTML = '';
@@ -155,6 +157,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
   };
   const syncStim = () => {
     count.disabled = !['random', 'count'].includes(st.mode);
+    p4skip = st.mode === 'none';
     seed.disabled = st.mode !== 'random';
     stimNote.textContent = `Inputs (${ins.length ? ins.map(p => `${p.name}${p.width > 1 ? `[${p.width}]` : ''}`).join(', ') : 'none'})${st.clock ? `; ${st.clock} is the clock` : ''}${st.reset ? `; ${st.reset} is the reset (applied first)` : ''}. Outputs checked: ${outs.map(p => p.name).join(', ') || 'none'}.`;
     ioNote.textContent = ios.length ? `Bidirectional ports (${ios.map(p => `${p.name}${p.width > 1 ? `[${p.width}]` : ''}`).join(', ')}): the generated vectors come in pairs: the bench first drives the port like an input, then releases it (Z) with the same inputs, so that the design can drive the bus; the value on the bus is checked in both. You can change any row on the next page.` : '';
@@ -172,6 +175,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
     },
     validate: () => {
       st.count = Math.max(1, Math.min(MAX_VECTORS, +count.value || 1)); st.seed = +seed.value || 1;
+      if (st.mode === 'none') { rows = []; return null; }   // no vectors page, no vector table
       if (!rows.length) {
         try {
           rows = st.mode === 'manual' ? [{ in: {}, drv: {}, exp: {} }] : makeVectors([...ins, ...ios], { mode: st.mode, count: st.count, seed: st.seed })
@@ -288,11 +292,22 @@ export async function testBenchWizard({ module, name = null, location = null, la
     title: 'Summary',
     render: () => summary,
     onShow: () => {
+      if (st.mode === 'none') {
+        summary.textContent = [
+          `The wizard will create the test bench ${path()} (${lang.value === 'vhdl' ? 'VHDL' : 'Verilog'}) and select it in the Simulation view.`,
+          '',
+          `Unit under test: ${uut.name}`,
+          st.clock ? `Clock: ${st.clock}, ${st.period} ns` : 'No clock',
+          st.reset ? `Reset: ${st.reset}, active '${st.active}' for ${st.cycles} ${st.clock ? 'clock cycle(s)' : 'x 10 ns'}` : 'Reset: none',
+          'Vectors: none — a skeleton: write the stimulus (set the inputs, wait, check the outputs) where the comments show.',
+        ].join('\n');
+        return;
+      }
       const v = vectorsBits();
       const nexp = v.filter(x => chk().some(p => x.exp[p.name] && /[01]/.test(x.exp[p.name]))).length;
       const nrel = v.filter(x => ios.some(p => /Z/.test(x.drv[p.name]))).length;
       summary.textContent = [
-        `The wizard will create the test bench ${path()} (${lang.value === 'vhdl' ? 'VHDL' : 'Verilog'}) and make it the simulation top.`,
+        `The wizard will create the test bench ${path()} (${lang.value === 'vhdl' ? 'VHDL' : 'Verilog'}) and select it in the Simulation view.`,
         '',
         `Unit under test: ${uut.name}`,
         st.clock ? `Clock: ${st.clock}, ${st.period} ns (sequential test, one vector per clock cycle)` : `Combinational test, settling time ${st.settle} ns`,
@@ -306,16 +321,21 @@ export async function testBenchWizard({ module, name = null, location = null, la
     },
   };
 
-  const ok = await wizard('Test Bench Wizard', [p1, p2, p3, p4, pSum], { width: 820 });
+  // the vectors page is left out when the user chose no vectors (a skeleton)
+  const all = [p1, p2, p3, p4, pSum];
+  const list = () => (p4skip ? [p1, p2, p3, pSum] : all);
+  const proxy = new Proxy(all, { get: (t, k) => (k === 'length' ? list().length : (typeof k === 'string' && /^\d+$/.test(k) ? list()[+k] : t[k])) });
+  const ok = await wizard('Test Bench Wizard', proxy, { width: 820 });
   if (!ok) return;
   let text;
-  try { text = generateTestbench(tbOpts(vectorsBits())); } catch (e) { return alertDlg('Test Bench Wizard', e.message, 'error'); }
+  try { text = st.mode === 'none' ? generateSkeleton(tbOpts([])) : generateTestbench(tbOpts(vectorsBits())); } catch (e) { return alertDlg('Test Bench Wizard', e.message, 'error'); }
   const pj = S.project;
   await closeBeforeReplace(path());
   await api.writeFile(pj.name, path(), text);   // registers the file (role: simulation)
   await app.reloadProject();
-  await app.setTop(tbName.value.trim(), true);
-  app.log(`Test Bench Wizard: created ${path()} (${rows.length} vector(s)) for '${uut.name}', now the simulation top. Run Simulate Behavioral Model to check the design.`, 'ok');
+  app.showInSim(tbName.value.trim());
+  app.log(st.mode === 'none' ? `Test Bench Wizard: created the test bench skeleton ${path()} for '${uut.name}' (selected in the Simulation view): write the stimulus, then Simulate Behavioral Model.`
+    : `Test Bench Wizard: created ${path()} (${rows.length} vector(s)) for '${uut.name}' (selected in the Simulation view). Run Simulate Behavioral Model to check the design.`, 'ok');
   toast(`Test bench ${path()} created`, 'ok');
   app.openFile(path());
 }

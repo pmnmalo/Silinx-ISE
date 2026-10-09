@@ -178,7 +178,7 @@ uiTest('Test Bench Wizard: bidirectional register (VHDL), exhaustive drive / rea
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay pre').textContent), /Vectors: 128[\s\S]*Bidirectional ports: data \(driven by the bench in 64 vector\(s\), released in 64\)/);
   await next(page, null);
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.project.simTop === 'tb_bireg');
+  await page.waitFor(() => (window.Silinx.view === 'sim' && window.Silinx.sel?.module === 'tb_bireg'));
   assert.match(await readWs(env, 'IoTbV', 'sim/tb_bireg.vhd'), /constant VDRV/);
   assert.match(await simulateAll(page, 'tb_bireg'), /TEST PASSED: 128 vector/);
 });
@@ -217,7 +217,7 @@ uiTest('Test Bench Wizard: bidirectional register (Verilog), typed drive / relea
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay pre').textContent), /Bidirectional ports: data \(driven by the bench in 2 vector\(s\), released in 2\)/);
   await next(page, null);
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.project.simTop === 'tb_bireg');
+  await page.waitFor(() => (window.Silinx.view === 'sim' && window.Silinx.sel?.module === 'tb_bireg'));
   assert.match(await readWs(env, 'IoTbVl', 'sim/tb_bireg.v'), /reg \[3:0\] data_drv = 4'bz;/);
   const out = await simulateAll(page, 'tb_bireg');
   assert.match(out, /TEST PASSED: 4 vector/, out);

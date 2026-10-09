@@ -137,3 +137,20 @@ test('generator errors: bad names, no vectors, unsupported ports', () => {
   assert.throws(() => generateTestbench({ name: 'tb', uut: { name: 'adder' }, ports, vectors: [] }), /no vectors/);
   assert.throws(() => generateTestbench({ name: 'tb', uut: { name: 'adder' }, ports: [...ports, { name: 'io', dir: 'inout', width: 32, kind: 'int' }], vectors: v }), /bidirectional port\(s\) of a type/);
 });
+
+for (const lang of ['vhdl', 'verilog']) {
+  test(`${lang}: test bench skeleton without vectors (clock, reset, a generic, an inout) compiles, simulates and ends`, async () => {
+    const { generateSkeleton } = await import('../core/testbench.js');
+    const dut = { path: `counter.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text: lang === 'vhdl' ? COUNTER_VHD : COUNTER_V };
+    const ports = portsOf(dut.text, lang, 'counter');
+    const text = generateSkeleton({ name: 'tb_counter', lang, uut: { name: 'counter', params: [{ name: 'W', value: 4 }] }, ports, clock: { port: 'clk', periodNs: 20 }, reset: { port: 'rst', active: '1', cycles: 2 } });
+    assert.doesNotMatch(text, /VIN|vin\[/);   // no vector table
+    assert.match(text, /stimulus: set the inputs/);
+    const log = run(dut, { path: `tb.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text }, 'tb_counter');
+    assert.ok(log.some(l => /Simulation finished/.test(l)), log.join('\n'));
+    // combinational, no clock: also fine
+    const adder = { path: `adder.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text: lang === 'vhdl' ? ADDER_VHD : ADDER_V };
+    const t2 = generateSkeleton({ name: 'tb_adder', lang, uut: { name: 'adder', params: [] }, ports: portsOf(adder.text, lang, 'adder') });
+    assert.ok(run(adder, { path: `tb2.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text: t2 }, 'tb_adder').some(l => /Simulation finished/.test(l)));
+  });
+}

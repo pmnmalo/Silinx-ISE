@@ -181,7 +181,7 @@ function renderHierarchy() {
     for (const m of lib.modules.values()) if (visible(m.name)) for (const i of instancesOf(m)) used.add(i.module.toLowerCase());
     roots = [...lib.modules.values()].filter(m => visible(m.name) && !used.has(m.name.toLowerCase())).map(m => m.name);
   }
-  const topName = S.view === 'impl' ? pj.top : pj.simTop;
+  const topName = S.view === 'impl' ? pj.top : null;   // the Simulation view has no top: Simulate runs the selected module
   roots.sort((a, b) => (a === topName ? -1 : b === topName ? 1 : a.localeCompare(b)));
   const addModule = (parentUl, modName, instName, depth, path) => {
     const info = moduleInfo(modName);
@@ -309,7 +309,7 @@ export function inView(role, sim) {
 function moduleContextMenu(e, mod, file) {
   const isSimView = S.view === 'sim';
   popupMenu([
-    { label: isSimView ? 'Set as Simulation Top' : 'Set as Top Module', action: () => setTop(mod, isSimView) },
+    isSimView ? null : { label: 'Set as Top Module', action: () => setTop(mod, false) },
     { label: 'Open', action: () => { const i = moduleInfo(mod); if (i) openFile(i.file, i.line); } },
     { label: 'Rename…', action: () => renameDialog(file, mod) },
     { label: 'Check Syntax', action: () => checkSyntax(mod, isSimView) },
@@ -1309,7 +1309,6 @@ async function runSimulation(mod, model) {
 }
 async function runSimulationInner(mod, model) {
   await saveAll();
-  if (S.project.simTop !== mod) { S.project.simTop = mod; await saveProjectJson(); }
   if (!await checkSyntax(mod, true)) return;
   const net = model ? await netlistSources(model) : null;
   if (model && !net) return;
@@ -2462,7 +2461,8 @@ function setupMenus() {
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj },
       { label: 'Add Copy of Source…', action: () => wiz.addSourceDialog(), disabled: hasPj },
       '-',
-      { label: 'Set as Top Module', action: () => S.sel?.module && setTop(S.sel.module), disabled: () => !S.sel?.module },
+      // the implementation top (the Simulation view has none: Simulate runs the selected module)
+      S.view === 'sim' ? null : { label: 'Set as Top Module', action: () => S.sel?.module && setTop(S.sel.module, false), disabled: () => !S.sel?.module || S.sel.module === S.project?.top },
       { label: 'Design Properties…', action: () => wiz.projectProperties(), disabled: hasPj },
       api.standalone ? null : { label: 'Sync with .xise', action: () => api.syncXise(S.project.name, 'export').then(() => toast('Exported .xise', 'ok')).catch(e => alertDlg('Sync with .xise', e.message, 'error')), disabled: hasPj },
     ] },
@@ -2471,7 +2471,7 @@ function setupMenus() {
       { label: 'Stop', icon: icon('stop'), action: () => stopProcesses(), disabled: () => !S.currentJob },
       { label: 'Run', action: () => S.selProc && runProcess(S.selProc), disabled: () => !S.selProc?.run },
       { label: 'Check Syntax', action: () => S.sel?.module && checkSyntax(S.sel.module, S.view === 'sim'), disabled: () => !S.sel?.module },
-      { label: 'Simulate Behavioral Model', icon: icon('wave'), action: () => (S.project?.simTop || S.sel?.module) && runSimulation(S.sel?.module || S.project.simTop), disabled: () => !S.sel?.module },
+      { label: 'Simulate Behavioral Model', icon: icon('wave'), action: () => S.sel?.module && runSimulation(S.sel.module), disabled: () => !S.sel?.module },
     ] },
     { label: 'Tools', items: () => [
       { label: 'ASM State Machine Editor…', icon: icon('asm'), action: () => wiz.newSourceWizard({ type: 'asm' }), disabled: hasPj },
@@ -2572,6 +2572,13 @@ function openBundle() {
   inp.click();
 }
 
+// the Simulation view with module `mod` selected (e.g. a test bench just created): Simulate runs it
+export function showInSim(mod) {
+  setView('sim');
+  const row = document.querySelector(`#hier [data-key="${CSS.escape(`m:${mod}`)}"]`);
+  if (row) row.dispatchEvent(new MouseEvent('click'));
+}
+
 function setView(v) {
   S.view = v;
   document.querySelectorAll('input[name=view]').forEach(r => { r.checked = r.value === v; });
@@ -2617,8 +2624,10 @@ async function boot() {
   const projects = await api.projects().catch(() => []);
   if (last && projects.some(p => p.name === last)) await openProject(last);
   else showLeftPage('start');
+  // always check for updates at start-up (a newer release opens the update dialog); not awaited
+  if (!window.SILINX_NO_UPDATE_CHECK) wiz.checkUpdatesOnStart().catch(() => {});
 }
 
-export const app = { saveAll, openTt, openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
+export const app = { showInSim, saveAll, openTt, openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
 window.SilinxApp = app;
 boot();
