@@ -5,7 +5,7 @@
 // step runs), and follow the driver rules: a new assignment deletes the driver's later
 // transactions, and inertial delay also rejects pulses shorter than the reject limit.
 import * as V from './values.js';
-import { exec, evalE, applyWrite, applyElem, formatDisplay, SimError, formatTime } from './interp.js';
+import { exec, evalE, applyWrite, applyElem, formatDisplay, SimError, formatTime, sameDeep } from './interp.js';
 
 class Heap {
   constructor() { this.a = []; this.seq = 0; }
@@ -40,9 +40,26 @@ class Heap {
 // Driver identity of a process: a Verilog module's procedural code shares one driver per signal.
 const driverKey = p => (p.lang === 'verilog' && p.kind === 'process' ? 'vproc' : p.id);
 
+// Verilog wand / wor (and triand / trior), tri0 / tri1 resolution: per bit, a known 0 (wand) / 1
+// (wor) wins, then x, then the other value; z only when every driver is z (tri0 / tri1: 0 / 1).
+function resolveWired(sig) {
+  const w = sig.t.w, M = V.mask(w), kind = sig.wired;
+  let k0 = 0n, k1 = 0n, kx = 0n;
+  for (const { val: { v, x }, m } of sig.res.values()) { k0 |= m & ~x & ~v; k1 |= m & ~x & v; kx |= m & x & ~v; }
+  let v, x;
+  if (kind === 'and') { v = k1 & ~k0 & ~kx; x = kx & ~k0; }
+  else if (kind === 'or') { v = k1; x = kx & ~k1; }
+  else { const bad = kx | (k0 & k1); v = k1 & ~bad; x = bad; }
+  const none = M & ~(k0 | k1 | kx);   // only z drivers
+  if (kind === 'tri0') return V.mk(w, v, x, sig.t.s);
+  if (kind === 'tri1') return V.mk(w, v | none, x, sig.t.s);
+  return V.mk(w, v | none, x | none, sig.t.s);
+}
+
 // std_logic / Verilog wire resolution of the drivers of sig (4-state: 0 1 X Z).
 // Bits no driver has assigned yet keep the signal's current value.
 function resolve(sig) {
+  if (sig.wired) return resolveWired(sig);
   const w = sig.t.w, M = V.mask(w);
   let any0 = 0n, any1 = 0n, anyX = 0n, nz = 0n, D = 0n;
   for (const { val: { v, x }, m } of sig.res.values()) {
@@ -101,6 +118,7 @@ export class Simulator {
       s.val = Array.isArray(s.init) ? s.init.map(x => x) : s.init;
       s.prev = null;
       s.evStamp = -1;
+      s.lastT = undefined;   // time of the last event (VHDL 'last_event / 'stable(T))
       s.waiters = new Set();
       s.forced = null;
       s.wave = Array.isArray(s.init) || s.t.kind === 'str' ? null : { t: [0], v: [s.val] };
@@ -117,7 +135,9 @@ export class Simulator {
       }
     }
     for (const s of this.design.signals) {
-      s.res = !Array.isArray(s.init) && s.t.kind === 'logic' && drivers.get(s)?.size > 1 ? new Map() : null;
+      // a Verilog net starts at z when nothing drives it, else at x (its drivers' initial value)
+      if (s.netZ && drivers.has(s)) { s.val = V.allX(s.t.w, s.t.s); if (s.wave) s.wave.v[0] = s.val; }
+      s.res = !Array.isArray(s.init) && s.t.kind === 'logic' && (drivers.get(s)?.size > 1 || (s.wired && drivers.get(s)?.size)) ? new Map() : null;
     }
   }
 
@@ -191,12 +211,12 @@ export class Simulator {
   write(wr, val, drv = this.curProc) {
     const sig = wr.sig;
     if (sig.res) { this.writeResolved(sig, wr, val, drv); return; }
-    if (wr.elem != null && Array.isArray(sig.val)) {
+    if (wr.elem != null && !wr.path && Array.isArray(sig.val)) {
       // memory element: compare and update that element only (the array is the signal's own)
       const arr = sig.val;
       if (sig.forced || wr.elem < 0 || wr.elem >= arr.length) return;
       const old = arr[wr.elem], nv = applyElem(old, wr, val);
-      if (V.same(old, nv) && old.w === nv.w) return;
+      if (Array.isArray(nv) ? sameDeep(old, nv) : V.same(old, nv) && old.w === nv.w) return;
       arr[wr.elem] = nv;
       this.changed(sig, arr, arr);
       return;
@@ -227,7 +247,7 @@ export class Simulator {
     if (!p) return;
     let m = this.drvTx.get(p);
     if (!m) { if (!item) return; m = new Map(); this.drvTx.set(p, m); }
-    const key = `${wr.sig.id}:${wr.elem}:${wr.lo}:${wr.w}`;
+    const key = `${wr.sig.id}:${wr.path ? wr.path.join('.') + '.' : ''}${wr.elem}:${wr.lo}:${wr.w}`;
     const old = m.get(key);
     if (!old && !item) return;
     const keep = [];
@@ -250,7 +270,7 @@ export class Simulator {
     if (sig.forced) return;
     const old = sig.val;
     if (Array.isArray(nv)) {
-      if (Array.isArray(old) && nv.length === old.length && nv.every((e, i) => V.same(e, old[i]))) return;
+      if (Array.isArray(old) && nv.length === old.length && nv.every((e, i) => (Array.isArray(e) ? sameDeep(e, old[i]) : V.same(e, old[i])))) return;
     } else if (!Array.isArray(old) && V.same(old, nv) && old.w === nv.w) return;
     this.changed(sig, old, nv);
   }
@@ -260,6 +280,7 @@ export class Simulator {
     sig.prev = old;
     sig.val = nv;
     sig.evStamp = this.stamp;
+    sig.lastT = this.now;
     this.stats.events++;
     if (sig.wave && !this.waveTruncated) {
       const w = sig.wave, n = w.t.length;
@@ -472,7 +493,8 @@ export class Simulator {
     // end of time step: strobes / monitors
     if (this.strobes.length) { const s = this.strobes; this.strobes = []; for (const f of s) this.print(f()); }
     for (const m of this.monitors) {
-      const vals = m.args.map(a => (a.k === 'str' ? '' : JSON.stringify(evalE(a, m.ctx), (k, v) => (typeof v === 'bigint' ? v.toString() : v))));
+      // ($time / $stime / $realtime arguments do not trigger a $monitor)
+      const vals = m.args.map(a => (a.k === 'str' || (a.k === 'sys' && /^\$(s|real)?time$/.test(a.name)) ? '' : JSON.stringify(evalE(a, m.ctx), (k, v) => (typeof v === 'bigint' ? v.toString() : v))));
       const key = vals.join('|');
       if (key !== m.last) { m.last = key; this.print(formatDisplay(m.args, m.ctx)); }
     }
@@ -549,7 +571,7 @@ export function toVCD(design, sim, { signals = design.signals, timescale = '1ps'
   };
   const decl = (name, s) => {
     if (!ids.has(s)) ids.set(s, idOf());
-    const ty = s.t.kind === 'int' ? 'integer' : s.kind === 'var' ? 'reg' : 'wire';
+    const ty = s.t.kind === 'int' ? 'integer' : s.kind === 'var' || s.net === 'reg' ? 'reg' : 'wire';
     lines.push(`$var ${ty} ${s.t.w} ${ids.get(s)} ${name.replace(/\s/g, '_')} $end`);
   };
   emitScope(design.top);

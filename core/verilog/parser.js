@@ -2,7 +2,9 @@
 // See docs/IR.md.
 import { tokenize, basedToBits } from './lexer.js';
 
-const GATES = new Set(['and', 'or', 'nand', 'nor', 'xor', 'xnor', 'not', 'buf']);
+const GATES = new Set(['and', 'or', 'nand', 'nor', 'xor', 'xnor', 'not', 'buf', 'bufif0', 'bufif1', 'notif0', 'notif1']);
+// net types with their own resolution (wired and / or, pull-down / pull-up when undriven)
+const WIRED = { wand: 'and', triand: 'and', wor: 'or', trior: 'or', tri0: 'tri0', tri1: 'tri1' };
 const BIN_PREC = [
   ['||'], ['&&'], ['|'], ['^', '~^'], ['&'], ['==', '!=', '===', '!=='],
   ['<', '<=', '>', '>='], ['<<', '>>', '<<<', '>>>'], ['+', '-'], ['*', '/', '%'], ['**'],
@@ -11,9 +13,10 @@ const UNARY = new Set(['!', '~', '-', '+', '&', '|', '^', '~&', '~|', '~^']);
 
 class Sync extends Error {}
 
-export function parse(source, file = 'input') {
+// opts.include(name): the text of a project file for `include (null when there is none)
+export function parse(source, file = 'input', opts = {}) {
   const errors = [];
-  const { tokens, timescale } = tokenize(source, file, errors);
+  const { tokens, timescale } = tokenize(source, file, errors, { include: opts.include });
   const p = new Parser(tokens, file, errors, timescale);
   const units = p.parseFile();
   return { file, lang: 'verilog', units, errors };
@@ -35,6 +38,13 @@ class Parser {
   }
   expect(v) {
     if (this.is(v)) return this.next();
+    // a ';' missing at the end of a line: reported after the last token of that line, and parsing
+    // goes on as if it were there (no cascade of errors)
+    const prev = this.i > 0 ? this.toks[this.i - 1] : null;
+    if (v === ';' && prev && this.tok.line > prev.line) {
+      this.error(`expected ';' after '${prev.v ?? prev.t}'`, { line: prev.line, col: prev.col + String(prev.v ?? '').length });
+      return prev;
+    }
     this.error(`expected '${v}' but found '${this.tok.v || this.tok.t}'`);
     throw new Sync();
   }
@@ -165,8 +175,19 @@ class Parser {
     try {
       if (this.accept(';')) return;
       if (this.isAny('input', 'output', 'inout')) return this.portDecl();
-      if (this.isAny('wire', 'reg', 'logic', 'integer', 'tri', 'supply0', 'supply1', 'genvar', 'time', 'real', 'realtime'))
+      if (this.isAny('wire', 'reg', 'logic', 'integer', 'tri', 'supply0', 'supply1', 'genvar', 'time', 'real', 'realtime', ...Object.keys(WIRED)))
         return this.netDecl(items, decls);
+      if (this.is('specify')) {   // specify blocks (path delays, timing checks): ignored by simulation
+        while (!this.is('endspecify') && this.tok.t !== 'eof') this.next();
+        this.expect('endspecify');
+        return;
+      }
+      if (this.is('event')) {   // named events: 1-bit variables toggled by `-> e`
+        this.next();
+        do { const loc = this.loc(); decls.push({ kind: 'signal', name: this.ident(), type: { kind: 'logic', range: null, signed: false }, init: { op: 'lit', bits: '0', signed: false, sized: true }, net: 'reg', loc }); } while (this.accept(','));
+        this.expect(';');
+        return;
+      }
       if (this.isAny('parameter', 'localparam')) {
         const local = this.next().v === 'localparam' || !topLevel;
         const { type } = this.paramType();
@@ -204,13 +225,23 @@ class Parser {
       }
       if (this.is('for')) return items.push(this.genFor());
       if (this.is('if')) return items.push(this.genIf());
+      if (this.is('case')) return items.push(this.genCase());
       if (this.is('begin')) { // bare generate block
         const blk = this.genBlock();
         items.push({ kind: 'generate_if', label: blk.label, cond: { op: 'int', value: '1' }, then: blk.items, else: [], decls: blk.decls, loc: this.loc(t) });
         return;
       }
       if (this.is('function') || this.is('task')) return decls.push(this.funcDecl());
-      if (this.is('defparam')) { this.error('defparam is not supported; use #(...) parameter overrides', t, 'warning'); this.sync(); return; }
+      if (this.is('defparam')) {   // defparam u1.P = v, u1.u2.Q = w;
+        this.next();
+        do {
+          const loc = this.loc();
+          const path = this.hierName(); this.expect('=');
+          items.push({ kind: 'defparam', path, value: this.expr(), loc });
+        } while (this.accept(','));
+        this.expect(';');
+        return;
+      }
       if (t.t === 'kw' && GATES.has(t.v)) return this.gateInst(items);
       if (t.t === 'id') return this.instance(items);
       this.error(`unexpected '${t.v || t.t}' in module body`);
@@ -256,14 +287,14 @@ class Parser {
       type = { kind: 'logic', range: this.optRange(), signed };
     }
     const net = kw === 'reg' || kw === 'logic' || kw === 'integer' || kw === 'time' || kw === 'real' ? 'reg' : 'wire';
+    const wired = WIRED[kw];
     do {
       const loc = this.loc();
       const name = this.ident();
       let t = type;
-      while (this.is('[')) { // memory dims (only first dimension supported)
-        const r = this.optRange();
-        t = { kind: 'array', range: r, elem: t };
-      }
+      const dims = [];
+      while (this.is('[')) dims.push(this.optRange());   // memory dimensions: m [0:1][0:3] is 2 arrays of 4
+      for (let k = dims.length - 1; k >= 0; k--) t = { kind: 'array', range: dims[k], elem: t };
       let init = null;
       if (this.accept('=')) init = this.expr();
       const port = this.portNames.get(name);
@@ -275,12 +306,14 @@ class Parser {
         continue;
       }
       if (net === 'wire' && init) {
-        decls.push({ kind: 'signal', name, type: t, init: null, net, loc });
+        decls.push({ kind: 'signal', name, type: t, init: null, net, loc, ...(wired ? { wired } : {}) });
         items.push({ kind: 'assign', target: { op: 'ref', name }, value: init, delay: null, loc });
       } else {
         if (kw === 'supply0') init = { op: 'int', value: '0' };
         if (kw === 'supply1') init = { op: 'lit', bits: '1', signed: false, sized: true };
-        decls.push({ kind: 'signal', name, type: t, init, net, loc });
+        const d = { kind: 'signal', name, type: t, init, net, loc };
+        if (wired) d.wired = wired;
+        decls.push(d);
       }
     } while (this.accept(','));
     this.expect(';');
@@ -355,6 +388,36 @@ class Parser {
     this.error('expected loop step assignment'); throw new Sync();
   }
 
+  // case generate: a chain of if-generates on `expr == choice`
+  genCase() {
+    const loc = this.loc();
+    this.expect('case'); this.expect('(');
+    const sel = this.expr(); this.expect(')');
+    const alts = [];
+    let def = null;
+    while (!this.is('endcase') && this.tok.t !== 'eof') {
+      if (this.accept('default')) { this.accept(':'); def = this.genBlock(); continue; }
+      const choices = [];
+      do { choices.push(this.expr()); } while (this.accept(','));
+      this.expect(':');
+      alts.push({ choices, blk: this.genBlock() });
+    }
+    this.expect('endcase');
+    const wrap = b => (b.label ? [{ kind: 'generate_if', label: b.label, cond: { op: 'int', value: '1' }, then: b.items, else: [], decls: b.decls, loc }] : b.items);
+    let rest = def ? wrap(def) : [];
+    let restDecls = def && !def.label ? def.decls : [];
+    for (let k = alts.length - 1; k >= 0; k--) {
+      const { choices, blk } = alts[k];
+      const cond = choices.map(c => ({ op: 'binary', o: '==', a: sel, b: c })).reduce((x, y) => ({ op: 'binary', o: '||', a: x, b: y }));
+      const node = { kind: 'generate_if', label: blk.label, cond, then: blk.items, else: rest, decls: blk.decls, loc };
+      if (restDecls.length) node.elseDecls = restDecls;
+      rest = [node]; restDecls = [];
+    }
+    if (rest.length === 1 && rest[0].kind === 'generate_if') return rest[0];
+    const node = { kind: 'generate_if', label: null, cond: { op: 'int', value: '1' }, then: rest, else: [], decls: restDecls, loc };
+    return node;
+  }
+
   genIf() {
     const loc = this.loc();
     this.expect('if'); this.expect('(');
@@ -424,7 +487,8 @@ class Parser {
   gateInst(items) {
     const loc = this.loc();
     const g = this.next().v;
-    if (this.is('#')) { this.next(); this.delayValue(); }
+    let delay = null;
+    if (this.is('#')) { this.next(); delay = this.delayValue(); }
     do {
       if (this.tok.t === 'id') this.next(); // instance name (optional)
       this.expect('(');
@@ -434,12 +498,16 @@ class Parser {
       const out = args[0], ins = args.slice(1);
       let value;
       if (g === 'not' || g === 'buf') value = g === 'not' ? { op: 'unary', o: '~', a: ins[0] } : ins[0];
-      else {
+      else if (g.includes('if')) {   // bufif1 (out, in, enable): in when enabled, z otherwise
+        const d = g.startsWith('not') ? { op: 'unary', o: '~', a: ins[0] } : ins[0];
+        const z = { op: 'lit', bits: 'z', signed: false, sized: true };
+        value = g.endsWith('1') ? { op: 'cond', cond: ins[1], then: d, else: z } : { op: 'cond', cond: ins[1], then: z, else: d };
+      } else {
         const o = { and: '&', or: '|', xor: '^', nand: '&', nor: '|', xnor: '^' }[g];
         value = ins.reduce((acc, e) => ({ op: 'binary', o, a: acc, b: e }));
         if (g[0] === 'n' || g === 'xnor') value = { op: 'unary', o: '~', a: value };
       }
-      items.push({ kind: 'assign', target: out, value, delay: null, loc });
+      items.push({ kind: 'assign', target: out, value, delay, loc });
     } while (this.accept(','));
     this.expect(';');
   }
@@ -559,7 +627,8 @@ class Parser {
       }
       if (this.is('for')) {
         this.next(); this.expect('(');
-        this.accept('integer'); this.accept('int');
+        // for (int k = 0; ...) / for (integer k = 0; ...): a loop variable of the loop's own
+        const local = !!(this.accept('integer') || (this.tok.t === 'id' && this.tok.v === 'int' && this.peek().t === 'id' && this.next()));
         const iv = this.ident(); this.expect('=');
         const init = { kind: 'assign', target: { op: 'ref', name: iv }, value: this.expr(), nonblocking: false, delay: null };
         this.expect(';');
@@ -567,7 +636,9 @@ class Parser {
         const sv = this.ident();
         const step = { kind: 'assign', target: { op: 'ref', name: sv }, value: this.stepValue(sv), nonblocking: false, delay: null };
         this.expect(')');
-        return { kind: 'for', init, cond, step, body: this.stmt() };
+        const loop = { kind: 'for', init, cond, step, body: this.stmt() };
+        if (!local) return loop;
+        return { kind: 'block', label: null, decls: [{ kind: 'signal', name: iv, type: { kind: 'integer', range: null }, init: null, net: 'variable' }], stmts: [loop] };
       }
       if (this.is('while')) { this.next(); this.expect('('); const cond = this.expr(); this.expect(')'); return { kind: 'while', cond, body: this.stmt() }; }
       if (this.is('repeat')) { this.next(); this.expect('('); const count = this.expr(); this.expect(')'); return { kind: 'repeat', count, body: this.stmt() }; }
@@ -591,7 +662,19 @@ class Parser {
         return { kind: 'block', label: null, decls: [], stmts: [w, this.stmt()] };
       }
       if (this.is('disable') && this.is('fork', this.peek())) { this.next(); this.next(); this.expect(';'); return { kind: 'disablefork' }; }
-      if (this.is('disable')) { this.error('disable is not supported (ignored)', t, 'warning'); this.sync(); return { kind: 'null' }; }
+      if (this.is('disable')) {   // disable <named block | task>
+        this.next();
+        const label = this.hierName();
+        this.expect(';');
+        return { kind: 'disable', label };
+      }
+      if (this.is('->')) {   // trigger a named event (toggles its variable)
+        this.next();
+        const name = this.hierName();
+        this.expect(';');
+        const ref = { op: 'ref', name };
+        return { kind: 'assign', target: ref, value: { op: 'unary', o: '~', a: ref }, nonblocking: false, delay: null };
+      }
       if (t.t === 'sys') {
         this.next();
         const args = [];
@@ -658,8 +741,14 @@ class Parser {
 
   hierName() {
     let n = this.ident();
-    while (this.is('.') && this.peek().t === 'id') { this.next(); n += '.' + this.ident(); }
-    return n;
+    for (;;) {
+      if (this.is('.') && this.peek().t === 'id') { this.next(); n += '.' + this.ident(); continue; }
+      // a generate-for block instance: name[3].x
+      if (this.is('[') && this.peek().t === 'int' && this.is(']', this.peek(2)) && this.is('.', this.peek(3)) && this.peek(4).t === 'id') {
+        this.next(); n += `[${this.next().v}]`; this.next(); continue;
+      }
+      return n;
+    }
   }
 
   // ---------------- expressions ----------------

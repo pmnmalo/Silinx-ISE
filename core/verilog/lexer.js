@@ -1,21 +1,24 @@
-// Verilog-2001 lexer with a minimal preprocessor (`define, `ifdef/`ifndef/`else/`elsif/`endif,
-// `timescale, `include ignored with a warning, `default_nettype ignored).
+// Verilog-2001 lexer with a minimal preprocessor (`define with or without arguments, `undef,
+// `ifdef/`ifndef/`else/`elsif/`endif, `timescale, `include of project files, `default_nettype ignored).
 
 const KEYWORDS = new Set(`module endmodule macromodule input output inout wire reg logic integer genvar parameter localparam
 assign always always_ff always_comb always_latch initial begin end if else case casez casex endcase default for while repeat forever
 posedge negedge or and not generate endgenerate function endfunction task endtask signed unsigned
-supply0 supply1 tri wait disable fork join automatic real realtime time defparam`.split(/\s+/));
+supply0 supply1 tri wait disable fork join automatic real realtime time defparam
+nand nor xor xnor buf bufif0 bufif1 notif0 notif1 event wand wor triand trior tri0 tri1 specify endspecify`.split(/\s+/));
 
 const OPS = ['<<<=', '>>>=', '++', '--', '+=', '-=', '|=', '&=', '^=', '===', '!==', '<<<', '>>>', '~&', '~|', '~^', '^~', '==', '!=', '<=', '>=', '&&', '||', '<<', '>>', '**', '+:', '-:', '->',
   '+', '-', '*', '/', '%', '<', '>', '!', '~', '&', '|', '^', '?', ':', ';', ',', '.', '(', ')', '[', ']', '{', '}', '=', '#', '@'];
 
 const UNIT = { s: 1e12, ms: 1e9, us: 1e6, ns: 1e3, ps: 1, fs: 1e-3 };
 
-export function tokenize(src, file, errors) {
+// opts.include(name): the text of an `include file (null: not found); opts.defines: the macro table
+// (shared with included files and macro bodies).
+export function tokenize(src, file, errors, opts = {}) {
   const toks = [];
-  const defines = new Map();
+  const defines = opts.defines || new Map();   // name -> { params: [names] | null, body }
   const cond = []; // stack of { active, taken }
-  let timescale;
+  let timescale = opts.timescale;
   const active = () => cond.every(c => c.active);
   let i = 0, line = 1, col = 1;
   const err = (msg, l = line, c = col, sev = 'error') => errors.push({ file, line: l, col: c, message: msg, severity: sev });
@@ -80,8 +83,8 @@ export function tokenize(src, file, errors) {
         const body = restOfLine().trim();
         const m = /^([A-Za-z_][A-Za-z0-9_]*)(\([^)]*\))?\s*(.*)$/.exec(body);
         if (!m) { err('bad `define'); continue; }
-        if (m[2]) err(`macro with arguments '${m[1]}' not supported`, l0, c0, 'warning');
-        defines.set(m[1], m[3] || '');
+        const params = m[2] ? m[2].slice(1, -1).split(',').map(x => x.trim()).filter(Boolean) : null;
+        defines.set(m[1], { params, body: m[3] || '' });
       } else if (name === 'undef') {
         defines.delete(restOfLine().trim());
       } else if (name === 'timescale') {
@@ -89,12 +92,44 @@ export function tokenize(src, file, errors) {
         if (m) timescale = { unit: +m[1] * UNIT[m[2]], precision: +m[3] * UNIT[m[4]] };
         else err('bad `timescale');
       } else if (name === 'include') {
-        err('`include is not supported (add the file to the project instead)', l0, c0, 'warning');
-        restOfLine();
+        const m = /^\s*["<]([^">]+)[">]/.exec(restOfLine());
+        const text = m && opts.include ? opts.include(m[1]) : null;
+        if (!m) err('bad `include', l0, c0);
+        else if (text == null) err(`\`include file '${m[1]}' not found in the project`, l0, c0);
+        else if ((opts.depth || 0) > 16) err('`include nested too deeply', l0, c0);
+        else {
+          const sub = tokenize(text, file, errors, { ...opts, defines, timescale, depth: (opts.depth || 0) + 1 });
+          if (sub.timescale) timescale = sub.timescale;
+          for (const t of sub.tokens) if (t.t !== 'eof') toks.push(t);
+        }
       } else if (['default_nettype', 'resetall', 'celldefine', 'endcelldefine', 'unconnected_drive', 'nounconnected_drive'].includes(name)) {
         restOfLine();
       } else if (defines.has(name)) {
-        const sub = tokenize(defines.get(name), file, errors);
+        const mac = defines.get(name);
+        let body = mac.body;
+        if (mac.params) {
+          // actual arguments: comma-separated at parenthesis depth 0; each replaces its parameter
+          while (src[i] === ' ' || src[i] === '\t') adv();
+          const args = [];
+          if (src[i] === '(') {
+            adv();
+            let depth = 0, cur = '';
+            while (i < src.length && !(depth === 0 && src[i] === ')')) {
+              const ch = src[i];
+              if (ch === '(' || ch === '[' || ch === '{') depth++;
+              if (ch === ')' || ch === ']' || ch === '}') depth--;
+              if (ch === ',' && depth === 0) { args.push(cur.trim()); cur = ''; } else cur += ch;
+              adv();
+            }
+            adv();
+            args.push(cur.trim());
+          }
+          if (args.length !== mac.params.length) err(`macro \`${name} expects ${mac.params.length} argument(s)`, l0, c0);
+          const P = new Map(mac.params.map((p, k) => [p, args[k] ?? '']));
+          body = body.replace(/[A-Za-z_][A-Za-z0-9_$]*/g, w => (P.has(w) ? P.get(w) : w));
+        }
+        if ((opts.depth || 0) > 32) { err(`macro \`${name} expands too deeply`, l0, c0); continue; }
+        const sub = tokenize(body, file, errors, { ...opts, defines, depth: (opts.depth || 0) + 1 });
         for (const t of sub.tokens) { if (t.t !== 'eof') toks.push({ ...t, line: l0, col: c0 }); }
       } else {
         err(`undefined macro \`${name}`, l0, c0);
@@ -163,7 +198,7 @@ export function tokenize(src, file, errors) {
           adv(); const e = src[i];
           s += e === 'n' ? '\n' : e === 't' ? '\t' : e; adv(); continue;
         }
-        if (src[i] === '\n') { err('unterminated string'); break; }
+        if (src[i] === '\n') { err('unterminated string', l0, c0); break; }
         s += src[i]; adv();
       }
       adv();

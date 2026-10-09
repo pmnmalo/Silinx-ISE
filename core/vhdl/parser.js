@@ -80,6 +80,7 @@ const DECL_KWS = new Set(['signal', 'constant', 'variable', 'shared', 'type', 's
   'function', 'procedure', 'pure', 'impure', 'attribute', 'alias', 'file', 'use', 'group', 'disconnect']);
 const LOGICAL = { and: '&', or: '|', xor: '^', xnor: '~^', nand: 'nand', nor: 'nor' };
 const UNARY_REDUCE = { and: '&', or: '|', xor: '^', nand: '~&', nor: '~|', xnor: '~^' };
+// (the VHDL-2008 matching operators ?= ?/= carry a non-enumerable `match` flag: '-' matches anything)
 const RELATIONAL = { '=': '==', '/=': '!=', '<': '<', '<=': '<=', '>': '>', '>=': '>=',
   '?=': '==', '?/=': '!=', '?<': '<', '?<=': '<=', '?>': '>', '?>=': '>=' };
 const SHIFT = { sll: '<<', srl: '>>', sla: '<<<', sra: '>>>', rol: 'rol', ror: 'ror' };
@@ -114,6 +115,7 @@ class Parser {
     this.errors = errors;
     this.libraries = new Set(['work', 'ieee', 'std']);
     this.packageNames = new Set();   // packages known in this file / via use clauses
+    this.stdUses = new Set();        // ieee / std packages of the next unit's context clause
     this.strMode = 0;                // >0 while parsing report/assert messages
   }
 
@@ -145,6 +147,14 @@ class Parser {
   }
   expectOp(v) {
     if (this.isOp(v)) return this.next();
+    // a ';' missing at the end of a line: reported after the last token of that line, and parsing
+    // goes on as if it were there (no cascade of errors)
+    const prev = this.i > 0 ? this.t[this.i - 1] : null;
+    if (v === ';' && prev && this.peek().line > prev.line) {
+      const len = String(prev.raw ?? prev.value ?? '').length + (prev.type === 'str' || prev.type === 'char' ? 2 : 0);
+      this.diag(`expected ';' after ${this.describe(prev)}`, { line: prev.line, col: prev.col + len });
+      return prev;
+    }
     this.fail(`expected '${v}' but found ${this.describe(this.peek())}`);
   }
   expectId(what = 'identifier') {
@@ -193,11 +203,11 @@ class Parser {
         } else if (this.isKw('context')) {
           this.parseContext();
         } else if (this.isKw('entity')) {
-          raw.push(this.parseEntity(uses)); uses = [];
+          raw.push(this.stdFlags(this.parseEntity(uses))); uses = [];
         } else if (this.isKw('architecture')) {
-          raw.push(this.parseArchitecture(uses)); uses = [];
+          raw.push(this.stdFlags(this.parseArchitecture(uses))); uses = [];
         } else if (this.isKw('package')) {
-          const u = this.parsePackage(uses); uses = [];
+          const u = this.stdFlags(this.parsePackage(uses)); uses = [];
           if (u) raw.push(u);
         } else if (this.isKw('configuration')) {
           this.skipConfiguration(); uses = [];
@@ -243,6 +253,7 @@ class Parser {
         if (pkg !== 'all') {
           this.packageNames.add(pkg);
           if (!STD_LIBS.has(lib)) out.push(pkg);
+          else this.stdUses.add(pkg.toLowerCase());
         }
       }
     } while (this.acceptOp(','));
@@ -413,6 +424,14 @@ class Parser {
     return { kind: isBody ? 'package_body' : 'package', name, loc: this.loc(tok), decls, uses: pkgUses };
   }
 
+  /** Unit u uses std_logic_signed / std_logic_unsigned (std_logic_vector arithmetic). */
+  stdFlags(u) {
+    if (u && this.stdUses.has('std_logic_signed')) u.slvArith = 'signed';
+    else if (u && this.stdUses.has('std_logic_unsigned')) u.slvArith = 'unsigned';
+    this.stdUses = new Set();
+    return u;
+  }
+
   /** Merge entity+architecture and package+body into IR units (source order kept). */
   assembleUnits(raw) {
     const out = [];
@@ -426,6 +445,7 @@ class Parser {
           params: u.params, ports: u.ports, decls: [...u.decls], items: [], uses: dedupe(u.uses),
           entityOnly: true,
         };
+        if (u.slvArith) m.slvArith = u.slvArith;
         modules.set(u.name, { m, entityDecls: u.decls });
         out.push(m);
       } else if (u.kind === 'package' || u.kind === 'package_body') {
@@ -436,11 +456,12 @@ class Parser {
           out.push(pk);
         }
         pk.uses = dedupe([...pk.uses, ...u.uses]);
+        if (u.slvArith) pk.slvArith = u.slvArith;
         if (u.kind === 'package') pk.loc = u.loc;
         mergePackageDecls(pk.decls, u.decls);
       } else if (u.kind === 'architecture' && !entityNames.has(u.entity)) {
         out.push({ kind: 'architecture', name: u.name, entity: u.entity, lang: 'vhdl', file: this.file,
-          loc: u.loc, decls: u.decls, items: u.items, uses: dedupe(u.uses) });
+          loc: u.loc, decls: u.decls, items: u.items, uses: dedupe(u.uses), ...(u.slvArith ? { slvArith: u.slvArith } : {}) });
       }
     }
     // merge architectures into their entity (last one wins)
@@ -451,6 +472,7 @@ class Parser {
       m.items = u.items;
       m.uses = dedupe([...m.uses, ...u.uses]);
       m.arch = u.name;
+      if (u.slvArith) m.slvArith = u.slvArith;
       delete m.entityOnly;
     }
     return out;
@@ -800,7 +822,10 @@ class Parser {
     const items = [];
     while (!this.atEof() && !this.isKw('end') && !this.isKw('elsif') && !this.isKw('else') && !this.isKw('when')) {
       const before = this.i;
-      const res = this.guard(() => this.parseConcurrent(decls), null);
+      this.sawGuarded = false;
+      let res = this.guard(() => this.parseConcurrent(decls), null);
+      // `t <= guarded v` in a block with a guard expression: assigned only while GUARD is true
+      if (res && this.sawGuarded && this.blockGuard) res = guardItems(res, this.blockGuard);
       if (res) items.push(...res);
       if (this.i === before) { this.diag(`unexpected ${this.describe(this.peek())} in concurrent statement part`); this.next(); }
     }
@@ -824,11 +849,7 @@ class Parser {
           return this.parseConcurrentAssignOrCall(label, loc);
         case 'for': return [this.parseForGenerate(label, loc)];
         case 'if': return [this.parseIfGenerate(label, loc)];
-        case 'case': {
-          this.warn('case-generate is not supported; statement ignored');
-          this.skipGenerate();
-          return [];
-        }
+        case 'case': return [this.parseCaseGenerate(label, loc)];
         case 'block': return this.parseBlock(decls);
         case 'assert': return [this.parseConcurrentAssert(label, loc)];
         case 'with': return [this.parseSelectedAssign(label, loc)];
@@ -946,6 +967,44 @@ class Parser {
     return g;
   }
 
+  /**
+   * VHDL-2008 case-generate: `case e generate when c1 | c2 => ... when others => ... end generate;`
+   * becomes a chain of if-generates on `e = c1 or e = c2` (ranges: `lo <= e and e <= hi`).
+   */
+  parseCaseGenerate(label, loc) {
+    this.expectKw('case');
+    const sel = this.parseExpression();
+    this.expectKw('generate');
+    const alts = [];
+    while (this.acceptKw('when')) {
+      if (this.isId() && this.isOp(':', 1)) { this.next(); this.next(); }   // alternative label
+      const choices = [];
+      do { choices.push(this.acceptKw('others') ? 'others' : this.parseChoice()); } while (this.acceptOp('|'));
+      this.expectOp('=>');
+      const body = this.parseGenerateBody();
+      this.acceptAltEnd();
+      alts.push({ choices, body });
+    }
+    this.expectKw('end');
+    this.expectKw('generate');
+    if (this.isId()) this.next();
+    this.expectOp(';');
+    const test = (c) => {
+      if (!c.range) return bin('==', sel, c);
+      if (c.range.of) return bin('&', bin('>=', sel, { op: 'attr', prefix: c.range.of, attr: 'low', args: [] }), bin('<=', sel, { op: 'attr', prefix: c.range.of, attr: 'high', args: [] }));
+      const [lo, hi] = c.range.dir === 'downto' ? [c.range.right, c.range.left] : [c.range.left, c.range.right];
+      return bin('&', bin('>=', sel, lo), bin('<=', sel, hi));
+    };
+    let rest = [];
+    for (let k = alts.length - 1; k >= 0; k--) {
+      const { choices, body } = alts[k];
+      if (choices.includes('others')) { rest = [...body.decls.map((d) => ({ kind: 'decl', decl: d })), ...body.items]; continue; }
+      const cond = choices.map(test).reduce((x, y) => bin('|', x, y));
+      rest = [{ kind: 'generate_if', label, cond, then: body.items, else: rest, decls: body.decls, loc }];
+    }
+    return rest.length === 1 && rest[0].kind === 'generate_if' ? rest[0] : { kind: 'generate_if', label, cond: { op: 'ref', name: 'true' }, then: rest, else: [], decls: [], loc };
+  }
+
   skipGenerate() {
     let depth = 0;
     while (!this.atEof()) {
@@ -961,7 +1020,14 @@ class Parser {
   /** Block statement: flattened into the enclosing region. */
   parseBlock(decls) {
     this.expectKw('block');
-    if (this.acceptOp('(')) { this.parseExpression(); this.expectOp(')'); }
+    let guardExpr = null;
+    if (this.acceptOp('(')) { guardExpr = this.parseExpression(); this.expectOp(')'); }
+    const outerGuard = this.blockGuard;
+    if (guardExpr) this.blockGuard = guardExpr;
+    try { return this.parseBlockRest(decls); } finally { this.blockGuard = outerGuard; }
+  }
+
+  parseBlockRest(decls) {
     this.acceptKw('is');
     if (this.isKw('generic') || this.isKw('port')) {
       this.warn('block generics/ports are not supported');
@@ -1048,7 +1114,7 @@ class Parser {
     }
     if (!this.isOp('<=')) this.fail(`expected '<=' but found ${this.describe(this.peek())}`);
     this.next();
-    this.acceptKw('guarded');
+    if (this.acceptKw('guarded')) this.sawGuarded = true;
     const mech = this.parseDelayMechanism();
     const branches = this.parseConditionalWaveforms();
     this.expectOp(';');
@@ -1131,7 +1197,7 @@ class Parser {
     let nonblocking = true;
     if (this.acceptOp(':=')) nonblocking = false;
     else this.expectOp('<=');
-    this.acceptKw('guarded');
+    if (this.acceptKw('guarded')) this.sawGuarded = true;
     const mech = nonblocking ? this.parseDelayMechanism() : null;
     const items = [];
     let def = null;
@@ -1210,10 +1276,10 @@ class Parser {
         case 'for': case 'while': case 'loop': return this.parseLoop(label, loc);
         case 'exit': case 'next': {
           this.next();
-          if (this.isId()) this.next(); // loop label (ignored)
+          const target = this.isId() ? this.next().value : null;   // loop label
           const cond = this.acceptKw('when') ? this.parseExpression() : null;
           this.expectOp(';');
-          return { kind: tok.value, cond, loc };
+          return target ? { kind: tok.value, cond, loc, label: target } : { kind: tok.value, cond, loc };
         }
         case 'wait': return this.parseWait(loc);
         case 'report': {
@@ -1284,12 +1350,13 @@ class Parser {
     this.fail(`expected '<=', ':=' or ';' but found ${this.describe(this.peek())}`);
   }
 
-  /** Assignment target: a name, or an aggregate (not supported). */
+  /** Assignment target: a name, or a positional aggregate of names (VHDL-2008: a concatenation target). */
   parseTarget() {
     if (this.isOp('(')) {
       const tok = this.peek();
       const agg = this.parsePrimary();
-      this.diag('aggregate assignment targets are not supported', tok);
+      if (agg.op === 'aggregate' && agg.items.every((it) => !it.choices)) return { op: 'concat', parts: agg.items.map((it) => it.value) };
+      this.diag('aggregate assignment targets with choices are not supported', tok);
       return agg;
     }
     if (!this.isId()) this.fail(`expected a name but found ${this.describe(this.peek())}`);
@@ -1424,7 +1491,9 @@ class Parser {
     const tok = this.peek();
     if (tok.type === 'op' && RELATIONAL[tok.value]) {
       this.next();
-      return bin(RELATIONAL[tok.value], left, this.parseShift());
+      const e = bin(RELATIONAL[tok.value], left, this.parseShift());
+      if (tok.value === '?=' || tok.value === '?/=') Object.defineProperty(e, 'match', { value: true });
+      return e;
     }
     return left;
   }
@@ -1495,7 +1564,10 @@ class Parser {
       }
       case 'char': {
         this.next();
-        if (LOGIC_CHARS.test(tok.value)) return { op: 'lit', bits: mapBits(tok.value), signed: false, sized: true, scalar: true };
+        if (LOGIC_CHARS.test(tok.value)) {
+          // ch (not enumerable): the character as written, for when a CHARACTER is expected
+          return Object.defineProperty({ op: 'lit', bits: mapBits(tok.value), signed: false, sized: true, scalar: true }, 'ch', { value: tok.value });
+        }
         return { op: 'str', value: tok.value, char: true };
       }
       case 'str': {
@@ -1682,6 +1754,9 @@ function makeType(name, range, hasRange) {
   if (VECTOR_LOGIC.has(name)) {
     const t = { kind: 'logic', range: hasRange ? range : null, signed: name.endsWith('signed') && !name.endsWith('unsigned') };
     if (!hasRange || !range) t.unconstrained = true;
+    // the non-numeric array types (std_logic_vector / bit_vector) keep their type mark: their
+    // arithmetic depends on the use clauses (std_logic_unsigned / std_logic_signed)
+    if (!name.endsWith('signed')) t.mark = name === 'bit_vector' ? 'bit_vector' : 'std_logic_vector';
     return t;
   }
   switch (name) {
@@ -1698,6 +1773,20 @@ function makeType(name, range, hasRange) {
       return t;
     }
   }
+}
+
+/** Guarded concurrent assignments: processes that assign only while the block's guard is true. */
+function guardItems(items, guard) {
+  return items.map((it) => {
+    if (it.kind === 'assign') {
+      const a = { kind: 'assign', target: it.target, value: it.value, nonblocking: true, delay: it.delay, loc: it.loc };
+      if (it.mech) a.mech = it.mech;
+      return { kind: 'process', label: it.label || null, sens: 'all', initial: false, decls: [],
+        body: [{ kind: 'if', cond: guard, then: block([a], it.loc), else: null, loc: it.loc }], loc: it.loc };
+    }
+    if (it.kind === 'process') return { ...it, body: [{ kind: 'if', cond: guard, then: block(it.body, it.loc), else: null, loc: it.loc }] };
+    return it;
+  });
 }
 
 /** generate_for init/cond/step from a range. */
