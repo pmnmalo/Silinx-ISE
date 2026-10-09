@@ -7,6 +7,8 @@
 //   const live = r.live;
 //   live.set(portId, 1n);            // input I/O marker = value (forced), the circuit settles
 //   live.cycle(portId);              // one full clock cycle on a clock input (0 -> 1 -> 0)
+//   live.drive(portId, 5n | null);   // bidirectional (inout) marker: drive the bus from outside, or
+//                                    // release it (null = Z, the default) so that the circuit drives it
 //   live.netValue(net) / live.pinValue(symId, pin) / live.portValue(portId) / live.stored(symId)
 //   live.reset();                    // power cycle: back to time 0, registers to their INIT values
 //
@@ -169,6 +171,15 @@ export class LiveSim {
       const clock = sig.t.w === 1 && (clockSigs.has(sig) || (!!net && clockPin(net)));
       this.inputs.push({ id: p.id, name: p.name, sig, width: sig.t.w, clock, value: 0n });
     }
+    // bidirectional (inout) markers: the outside world is one more driver of the (resolved) bus,
+    // released (Z) until the user drives a value; the marker shows the resolved value
+    this.bidirs = [];
+    for (const p of doc.ports) {
+      if (p.dir !== 'inout') continue;
+      const sig = this.portSig.get(p.id);
+      if (!sig || !isVal(sig.val) || sig.t.kind !== 'logic') continue;
+      this.bidirs.push({ id: p.id, name: p.name, sig, width: sig.t.w, value: null });
+    }
     this.error = null;
     this.start();
   }
@@ -178,7 +189,13 @@ export class LiveSim {
     const sim = this.sim;
     for (const s of this.design.signals) s.wave = null;      // no waveform: the sheet shows the present only
     for (const i of this.inputs) sim.force(i.sig, V.mk(i.width, i.value));
+    for (const b of this.bidirs) { b.sig.res ||= new Map(); this.driveExt(b); }   // resolved: the circuit's drivers + the outside
     this.settle();
+  }
+  // the outside driver of a bidirectional marker: its value, or all Z (released)
+  driveExt(b) {
+    const M = V.mask(b.width);
+    this.sim.write({ sig: b.sig, whole: true }, b.value == null ? V.mk(b.width, M, M) : V.mk(b.width, b.value), null);
   }
   /** Power cycle: time 0, every signal back to its initial value, the inputs keep their values (clocks 0). */
   reset() {
@@ -207,6 +224,16 @@ export class LiveSim {
     return true;
   }
   toggle(id) { const i = this.input(id); return i ? this.set(id, i.width === 1 ? (i.value ? 0n : 1n) : i.value + 1n) : false; }
+  bidir(id) { return this.bidirs.find(b => b.id === id) || null; }
+  /** Drive a bidirectional marker from outside with a value (BigInt), or release it (null: Z), and settle. */
+  drive(id, value) {
+    const b = this.bidir(id);
+    if (!b) return false;
+    b.value = value == null ? null : BigInt.asUintN(b.width, BigInt(value));
+    this.driveExt(b);
+    this.settle();
+    return true;
+  }
   /** One full clock cycle on a (1-bit) input: rising edge, settle, falling edge, settle. */
   cycle(id) { return this.cycles([id], 1); }
   /** n full cycles of one or more clock inputs ticking together (they end low). */

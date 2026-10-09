@@ -85,29 +85,43 @@ for Xilinx FPGAs supported by ISE 14.7.
   typed in (what the design should do) or filled in from a simulation of the current design (a
   regression test); `-` bits are not checked. The bench reports every mismatch with its inputs and
   ends with *TEST PASSED* / *TEST FAILED*; it is VHDL-93 / Verilog-2001, so it also runs in ISim.
+  **Bidirectional (inout) ports** get two columns: what the bench *drives* on the bus (a value, like
+  an input; `Z` or empty releases it so that the design can drive it — per bit, e.g. `ZZ01`) and the
+  value *expected* on the bus (checked like an output). The bench declares a resolved signal
+  (`std_logic(_vector)` initialised to `'Z'` / a Verilog `wire` driven by a `reg` holding the value
+  or `z`). The generated vectors (exhaustive, random, counting, walking) come in pairs: the bench
+  drives the port like an input, then releases it (`Z`) with the same inputs so that the value the
+  design drives is checked; any row can be changed by hand.
 - **New Source types**: *Module (HDL)* (the ISE Define Module page: language, entity/module and
   architecture names, a port table), *Module (Wizard)*, *Test Bench (HDL)*, *Test Bench (Wizard)*,
   *Schematic (Diagram)* (a blank sheet), *Schematic (Wizard)*, *State Machine (ASM)*, *Truth Table*,
   *Implementation Constraints File*, *Memory Initialization File (.mem)*. For the wizards, page 1
   asks only the file name and location; *Finish* opens the wizard.
 - **Module Wizard** (*New Source ▸ Module (Wizard)*), for beginners: name, language (VHDL/Verilog)
-  and a description (it goes into the header comment); the inputs and outputs in a friendly table
-  (name, input/output, width — 1 is a single bit, N a bus N-1 downto 0 — and a description per
-  port), with quick-add buttons for the usual ports (clk, reset, enable, a/b [7:0], sw, btn, y,
-  sum, q, led, seg, an…) and checks (valid identifiers, no reserved word of the chosen language, no
+  and a description (it goes into the header comment); the inputs, outputs and bidirectional ports
+  in a friendly table (name, input/output/bidirectional, width — 1 is a single bit, N a bus N-1
+  downto 0 — and a description per port), with quick-add buttons for the usual ports (clk, reset,
+  enable, a/b [7:0], sw, btn, y, sum, q, led, seg, an, data [7:0] / sda bidirectional…) and checks (valid identifiers, no reserved word of the chosen language, no
   duplicates); the kind of logic: **combinational** (one assignment per output, or one process /
   `always @(*)` that reads every input with every output given a default — no latches) or
   **sequential** (clock, reset none / synchronous / asynchronous, active high or low, optional
   enable; the registered outputs reset to 0, a TODO comment where the next-state logic goes), and
   optional integer generics; a summary with a preview of the code. The file is written to `src/`,
   added to the project and opened; it compiles as generated (VHDL: `ieee.numeric_std`, entity,
-  `architecture rtl`; Verilog: ANSI ports, `reg` for the registered outputs). Generator:
+  `architecture rtl`; Verilog: ANSI ports, `reg` for the registered outputs). A **bidirectional
+  (inout) port** gets the tri-state pattern, commented: an output enable `<port>_oe` and a value
+  `<port>_out` (internal signals, with a TODO for the condition; `'0'` = released until written),
+  the driver `data <= data_out when data_oe = '1' else (others => 'Z');` /
+  `assign data = data_oe ? data_out : 8'bz;`, and the bus read from the port itself. Generator:
   `core/modgen.js`.
 - **Schematic Wizard** (*New Source ▸ Schematic (Wizard)*): the same port table and quick-add
   buttons, an optional clock input and the language of the synchronized HDL; it creates the
   `.sch.json` with the I/O markers placed tidily (inputs on the left edge, outputs on the right,
-  bus markers with their width), the description written on the sheet, and opens it in the
-  schematic editor, ready for the symbols and wires.
+  bidirectional markers on the right below the outputs, bus markers with their width), the
+  description written on the sheet, and opens it in the schematic editor, ready for the symbols and
+  wires. In the live simulation a bidirectional marker shows the value on the bus and can drive it
+  from outside (click: Z → 0 → 1; a bus opens the value editor, *Z* releases it) — the circuit
+  drives it through a module symbol with an inout port (the symbol library has no tri-state buffer).
 - **Truth Table / Karnaugh Map** (*Tools ▸ Truth Table / Karnaugh Map…*, New Source ▸ *Truth Table
   (.tt.json)*): name 1–6 inputs and 1–4 outputs, click the cells (0 → 1 → X don't care) or type an
   expression per output (`ab' + c`, `a·b + c`, `~a & b`, `(a and not b) or c`…). For each output:

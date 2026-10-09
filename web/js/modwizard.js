@@ -1,8 +1,9 @@
 // Beginner wizards of the New Source dialog (types 'Module (Wizard)' and 'Schematic (Wizard)'):
 // the New Source page 1 asks the file name and location, Finish there opens one of these.
 //
-//   moduleWizard:    name, language and description -> inputs and outputs (friendly table with
-//                    quick-add buttons) -> kind of logic (combinational / sequential with clock,
+//   moduleWizard:    name, language and description -> inputs, outputs and bidirectional (inout,
+//                    tri-state) ports (friendly table with quick-add buttons) -> kind of logic
+//                    (combinational / sequential with clock,
 //                    reset and enable; generics) -> summary with a preview of the code.
 //   schematicWizard: name, language and description -> inputs and outputs (same table, optional
 //                    clock input) -> summary; it creates a .sch.json with the I/O markers placed.
@@ -68,9 +69,9 @@ function portEditor(ports, { lang, onChange = () => {} }) {
   const add = p => { ports.push({ name: p.name, dir: p.dir, width: p.width, desc: p.desc || '' }); render(); onChange(); };
   const renderQuick = () => {
     quick.innerHTML = '';
-    for (const dir of ['in', 'out']) {
+    for (const dir of ['in', 'out', 'inout']) {
       const row = h('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' } },
-        h('span', { style: { width: '120px' } }, dir === 'in' ? 'Quick add (inputs):' : 'Quick add (outputs):'));
+        h('span', { style: { width: '120px' } }, dir === 'in' ? 'Quick add (inputs):' : dir === 'out' ? 'Quick add (outputs):' : 'Quick add (bidirectional):'));
       const btns = h('span', { 'data-no-i18n': '', style: { display: 'flex', gap: '4px', flexWrap: 'wrap' } });
       for (const q of QUICK_PORTS.filter(x => x.dir === dir)) {
         btns.append(h('button', { class: 'btn mw-qa', 'data-port': q.name, disabled: has(q.name), onclick: () => { if (!has(q.name)) add(q); } }, portText(q)));
@@ -84,9 +85,10 @@ function portEditor(ports, { lang, onChange = () => {} }) {
     tbl.append(h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Direction'), h('th', { title: '1 = a single bit; N = a bus of N bits (N-1 downto 0)' }, 'Width (bits)'), h('th', {}, 'Description'), h('th', {}, '')));
     ports.forEach((p, k) => {
       const nm = h('input', { type: 'text', class: 'mw-pname', value: p.name, style: { width: '110px' } });
-      const dir = select([['in', 'input'], ['out', 'output']], p.dir);
+      const dir = select([['in', 'input'], ['out', 'output'], ['inout', 'bidirectional']], p.dir);
       dir.classList.add('mw-pdir');
-      dir.style.minWidth = '90px';   // room for 'output' / 'saída'
+      dir.style.minWidth = '115px';   // room for 'bidirectional' / 'bidirecional'
+      dir.title = 'bidirectional = inout: a tri-state port the module can drive or release (Z), and read';
       const w = h('input', { type: 'number', class: 'mw-pwidth', min: 1, max: MAX_WIDTH, value: p.width, style: { width: '60px' } });
       const ds = h('input', { type: 'text', class: 'mw-pdesc', value: p.desc || '', placeholder: 'optional', style: { width: '100%', boxSizing: 'border-box' } });
       const bits = h('span', { class: 'hint mw-pbits', 'data-no-i18n': '', style: { marginLeft: '4px' } });
@@ -110,7 +112,7 @@ function portEditor(ports, { lang, onChange = () => {} }) {
   } }, 'Add Port');
   render();
   const node = h('div', {},
-    h('div', { class: 'hint' }, 'One row per input or output. Width 1 is a single bit (std_logic / wire); a width N makes a bus of N bits, numbered N-1 downto 0.'),
+    h('div', { class: 'hint' }, 'One row per input, output or bidirectional (inout) port. Width 1 is a single bit (std_logic / wire); a width N makes a bus of N bits, numbered N-1 downto 0.'),
     quick,
     h('div', { style: { maxHeight: '230px', overflow: 'auto', border: '1px solid #ccc' } }, tbl),
     h('div', { style: { marginTop: '6px' } }, addBtn));
@@ -242,13 +244,14 @@ export async function moduleWizard({ name = '', location = 'src', lang = null } 
     render: () => h('div', {}, summary, h('div', { style: { fontWeight: 'bold', marginTop: '8px' } }, 'Preview of the code:'), preview),
     onShow: () => {
       const o = opts();
-      const ins = o.ports.filter(p => p.dir === 'in'), outs = o.ports.filter(p => p.dir === 'out');
+      const ins = o.ports.filter(p => p.dir === 'in'), outs = o.ports.filter(p => p.dir === 'out'), ios = o.ports.filter(p => p.dir === 'inout');
       summary.textContent = [
         `The wizard will create ${p1.path()} (${o.lang === 'vhdl' ? 'VHDL' : 'Verilog'}) and open it.`,
         '',
         `Module: ${o.name}${o.lang === 'vhdl' ? ` (architecture ${o.arch})` : ''}`,
         `Inputs: ${ins.map(portText).join(', ') || 'none'}`,
         `Outputs: ${outs.map(portText).join(', ') || 'none'}`,
+        ...(ios.length ? [`Bidirectional (inout, tri-state): ${ios.map(portText).join(', ')}; each one gets an output enable ${ios.map(p => `${p.name}_oe`).join(', ')}`] : []),
         o.kind === 'comb' ? `Logic: combinational (${o.combStyle === 'process' ? 'one process' : 'one assignment per output'})`
           : `Logic: sequential, clock ${o.clock}; ${o.reset.mode === 'none' ? 'no reset' : `${o.reset.mode === 'async' ? 'asynchronous' : 'synchronous'} reset ${o.reset.port} active ${o.reset.active === '1' ? 'high' : 'low'}`}${o.enable ? `; enable ${o.enable}` : ''}`,
         `Generics: ${o.generics.map(g => `${g.name} = ${g.default}`).join(', ') || 'none'}`,
@@ -307,13 +310,14 @@ export async function schematicWizard({ name = '', location = 'src', lang = null
     render: () => summary,
     onShow: () => {
       const d = doc();
-      const ins = d.ports.filter(p => p.dir === 'in'), outs = d.ports.filter(p => p.dir === 'out');
+      const ins = d.ports.filter(p => p.dir === 'in'), outs = d.ports.filter(p => p.dir === 'out'), ios = d.ports.filter(p => p.dir === 'inout');
       summary.textContent = [
         `The wizard will create the schematic ${p1.path()} and open it in the schematic editor.`,
         '',
         `Module: ${d.name} (synchronized HDL: ${d.lang === 'vhdl' ? 'VHDL' : 'Verilog'})`,
         `Input markers (left edge): ${ins.map(portText).join(', ') || 'none'}`,
         `Output markers (right edge): ${outs.map(portText).join(', ') || 'none'}`,
+        ...(ios.length ? [`Bidirectional markers (right edge, below the outputs): ${ios.map(portText).join(', ')}`] : []),
         `Clock input: ${clockOf() || 'none'}`,
         '',
         'Then place the symbols in the middle of the sheet and wire them to the markers.',

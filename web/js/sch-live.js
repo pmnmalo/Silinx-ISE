@@ -1,5 +1,6 @@
 // Live simulation view of the schematic editor (Logisim style): the sheet is read-only, input I/O
-// markers are switches / bus value editors / clock steppers, every wire is coloured by its value,
+// markers are switches / bus value editors / clock steppers, bidirectional (inout) markers show the
+// bus and can drive it from outside or release it (Z), every wire is coloured by its value,
 // buses carry their value, outputs light up, registers show what they store, hovering shows values.
 // The model is core/schlive.js; sch-editor.js owns the drawing and calls this module.
 import { buildLiveSim, level, fmtValue, parseValue } from '/core/schlive.js';
@@ -123,8 +124,21 @@ function liveController(ctx, live) {
     let s = '';
     for (const p of doc.ports) {
       const v = live.portValue(p.id), lv = lvClass(v), y = p.y;
-      const inp = live.input(p.id);
-      if (inp && inp.clock) {
+      const inp = live.input(p.id), bd = live.bidir?.(p.id);
+      if (bd) {
+        // bidirectional marker: the value on the bus; click to drive it from outside or release it (Z)
+        const tip = `${p.name}: ${t(bd.value == null ? 'released (Z): click to drive the bus' : 'driven from outside: click to change or release (Z)')}`;
+        if (bd.width === 1) {
+          s += `<g class="lv-ctl lv-out lv-bidir ${lv}" data-lv="bidir" data-port="${esc(p.id)}"><title>${esc(tip)}</title>`
+            + `<circle class="lv-led" cx="${p.x + 15}" cy="${y}" r="5"/>`
+            + `<text class="lv-val" x="${p.x + 15}" y="${y - 9}" text-anchor="middle">${bd.value == null ? 'Z' : String(bd.value)}</text></g>`;
+        } else {
+          const txt = `${bd.value == null ? '' : '▸'}${fmtValue(v, radix)}`, w = Math.max(30, textW(txt));
+          s += `<g class="lv-ctl lv-out lv-bidir lv-bus ${lv}" data-lv="bidir" data-port="${esc(p.id)}"><title>${esc(tip)}</title>`
+            + `<rect class="lv-box" x="${p.x + 3}" y="${y - 22}" width="${w}" height="13" rx="2"/>`
+            + `<text class="lv-val" x="${p.x + 3 + w / 2}" y="${y - 12}" text-anchor="middle">${esc(txt)}</text></g>`;
+        }
+      } else if (inp && inp.clock) {
         const x = p.x - 27;
         s += `<g class="lv-ctl lv-clk ${lv}" data-lv="clock" data-port="${esc(p.id)}"><title>${esc(p.name)}: ${esc(t('click for one clock cycle'))}</title>`
           + `<rect class="lv-box" x="${x}" y="${y - 6}" width="16" height="12" rx="2"/>`
@@ -230,8 +244,9 @@ function liveController(ctx, live) {
   // ------------------------------------------------------------------ bus value editor
   function openEditor(portId) {
     closeEditor();
-    const p = doc.ports.find(q => q.id === portId), inp = live.input(portId);
+    const p = doc.ports.find(q => q.id === portId), bd = live.bidir?.(portId), inp = live.input(portId) || bd;
     if (!p || !inp) return;
+    const setv = n => (bd ? live.drive(portId, n) : live.set(portId, n));
     const pos = ctx.toCanvas({ x: p.x - 30, y: p.y + 10 });
     const field = h('input', { type: 'text', class: 'lv-edit-in', spellcheck: 'false' });
     const rsel = h('select', { title: 'Number format' }, h('option', { value: 'bin', text: 'Bin' }), h('option', { value: 'hex', text: 'Hex' }), h('option', { value: 'dec', text: 'Dec' }));
@@ -241,11 +256,11 @@ function liveController(ctx, live) {
       const n = parseValue(field.value, inp.width, rsel.value);
       if (n == null) { field.classList.add('bad'); return false; }
       field.classList.remove('bad');
-      act(() => live.set(portId, n));
+      act(() => setv(n));
       show();
       return true;
     };
-    const step = d => { act(() => live.set(portId, inp.value + BigInt(d))); show(); };
+    const step = d => { act(() => setv((inp.value ?? 0n) + BigInt(d))); show(); };
     rsel.addEventListener('change', show);
     field.addEventListener('keydown', e => {
       e.stopPropagation();
@@ -261,12 +276,16 @@ function liveController(ctx, live) {
       h('div', { class: 'lv-edit-row' },
         h('button', { type: 'button', class: 'btn', title: 'Subtract 1', text: '−1', onclick: () => step(-1) }),
         h('button', { type: 'button', class: 'btn', title: 'Add 1', text: '+1', onclick: () => step(1) }),
-        h('button', { type: 'button', class: 'btn', text: '0', title: 'All bits 0', onclick: () => { act(() => live.set(portId, 0n)); show(); } }),
+        h('button', { type: 'button', class: 'btn', text: '0', title: 'All bits 0', onclick: () => { act(() => setv(0n)); show(); } }),
+        bd ? h('button', { type: 'button', class: 'btn lv-release', text: 'Z', title: 'Release the bus (Z): the circuit drives it', onclick: () => { act(() => live.drive(portId, null)); closeEditor(); } }) : null,
         h('button', { type: 'button', class: 'btn primary', text: 'Set', onclick: () => { if (apply()) closeEditor(); } })),
       h('div', { class: 'lv-note', text: 'Hex 0x1F, binary 0b101, or decimal; ↑ / ↓ add / subtract 1' }));
     box.addEventListener('pointerdown', e => e.stopPropagation());
     canvas.append(box);
     editor = { box, portId };
+    // a marker near the right edge (bidirectional markers are on the right): keep the editor inside the canvas
+    const over = box.offsetLeft + box.offsetWidth - (canvas.clientWidth - 4);
+    if (over > 0) box.style.left = `${Math.max(4, box.offsetLeft - over)}px`;
     show();
     setTimeout(() => { field.focus(); field.select(); }, 0);
   }
@@ -294,6 +313,7 @@ function liveController(ctx, live) {
     el.innerHTML = '';
     el.append(h('div', { class: 'se-ptitle', text: 'Live simulation' }),
       h('div', { class: 'se-note', text: 'Click an input to change it: 1-bit inputs toggle, buses open a value editor, clock inputs step one cycle. Wires: green = 1, dark green = 0, red = X/U, blue = Z. Hover a pin or a wire to see its value; click a component to list its pins.' }),
+      ...(live.bidirs?.length ? [h('div', { class: 'se-note lv-bidir-note', text: 'Bidirectional (inout) markers show the value on the bus. Click one to drive the bus from outside (1-bit: Z, 0, 1 in turn; a bus opens the value editor, Z releases it); released (Z), the circuit drives it.' })] : []),
       h('div', { class: 'lv-inst' }));
     renderInstance();
   }
@@ -304,6 +324,12 @@ function liveController(ctx, live) {
     const ctl = e.target.closest?.('[data-lv]');
     const portId = ctl?.dataset.port || (item?.kind === 'port' ? item.id : null);
     if (portId) {
+      const bd = live.bidir?.(portId);
+      if (bd) {   // released -> 0 -> 1 -> released (1 bit); a bus opens the value editor
+        if (bd.width === 1) act(() => live.drive(portId, bd.value == null ? 0n : bd.value === 0n ? 1n : null));
+        else openEditor(portId);
+        return true;
+      }
       const inp = live.input(portId);
       if (!inp) return false;
       if (inp.clock) { stopClock(portId); act(() => live.cycle(portId)); }
