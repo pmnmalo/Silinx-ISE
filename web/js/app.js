@@ -411,6 +411,7 @@ function processDefs() {
       { id: 'par', label: 'Place & Route', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par']) },
     ] },
     { id: 'bitgen', label: 'Generate Programming File', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par', 'bitgen']) },
+    { id: 'emulate', label: 'Emulate on Board (RTL)', ico: 'board', run: () => openEmulator(mod) },
     { id: 'config', label: 'Configure Target Device', ico: 'impact', run: () => openImpact(), children: [
       { id: 'impact', label: 'Manage Configuration Project (iMPACT)', ico: 'impact', run: () => openImpact() },
     ] },
@@ -1157,6 +1158,34 @@ async function runSimulation(mod) {
       // ISim runs 1000 ns at start-up
       const view = mountISim(el, { design, sim, title: mod, initialRun: 1_000_000, onOpenSource: ref => ref?.file && openFile(ref.file, ref.line) });
       return { destroy: () => view.destroy?.(), view, onActivate: () => setTimeout(() => view.refresh?.(), 0) };
+    },
+  });
+}
+
+// ---- Board emulator: the design (behavioural RTL) on a virtual board, wired by the UCF
+async function openEmulator(mod) {
+  if (!mod) { toast('Select the top module first'); return; }
+  await saveAll();
+  const board = projectBoard();
+  if (!board) { alertDlg('Board Emulator', 'The project has no board. Choose one in Project ▸ Design Properties (e.g. Digilent Basys2).'); return; }
+  if (!await checkSyntax(mod)) return;
+  const srcs = S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
+  let design;
+  try { design = elaborate(compile(srcs), mod); } catch (e) { alertDlg('Board Emulator', `Cannot build the design: ${e.message}`, 'error'); return; }
+  const { parseUcf } = await import('/core/ucf.js');
+  const assignments = S.ucfText ? parseUcf(S.ucfText).assignments : {};
+  if (!S.ucfText) log('WARNING: the project has no UCF: the ports are not connected to the board (use I/O Pin Planning).', 'warn');
+  const files = await readDataFiles();
+  const { mountEmulator } = await import('./emulator.js');
+  const id = 'emulator';
+  const old = findDoc(id);
+  if (old) await closeDoc(old);
+  openDoc({
+    id, title: `Board Emulator (${mod})`, icon: 'board',
+    create(el) {
+      const view = mountEmulator(el, { design, board, assignments, title: mod, files });
+      log(`Board Emulator: '${mod}' on ${board.name} — ${view.wiring.bits.length} port bit(s) on board resources${view.wiring.unmapped.length ? `, ${view.wiring.unmapped.length} not connected` : ''}.`, 'ok');
+      return { destroy: () => view.destroy(), view };
     },
   });
 }
@@ -1914,6 +1943,7 @@ function setupMenus() {
       { label: 'ASM State Machine Editor…', icon: icon('asm'), action: () => wiz.newSourceWizard({ type: 'asm' }), disabled: hasPj },
       { label: 'I/O Pin Planning', icon: icon('pins'), action: () => openPinPlanner(S.sel?.module), disabled: hasPj },
       { label: 'iMPACT (Configure Target Device)', icon: icon('impact'), action: () => openImpact() },
+      { label: 'Board Emulator', icon: icon('board'), action: () => openEmulator(S.project.top), disabled: hasPj },
       { label: 'RTL Schematic', icon: icon('schematic'), action: () => S.sel?.module && openSchematic(S.sel.module), disabled: () => !S.sel?.module },
       '-',
       { label: 'Toolchain Settings (ISE / Programmers)…', icon: icon('gear'), action: () => wiz.toolchainDialog() },

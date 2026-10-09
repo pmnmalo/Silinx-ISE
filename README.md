@@ -42,6 +42,11 @@ for Xilinx FPGAs supported by ISE 14.7.
   registers, 2-flip-flop input synchronisers, `<<`/`>>`, and *every cycle* blocks (decision and
   output boxes evaluated on every clock cycle, in parallel with the states), e.g. the blinky
   example's `speed_ctrl.asm.json` (button synchronisers + debouncers + speed FSM + step divider).
+- **Board emulator** (*Emulate on Board (RTL)*): the design runs on a drawing of the real kit
+  (Digilent Basys2 and Nexys2, Spartan-3E Starter Kit; a generic panel for the other boards),
+  wired by the UCF: click the slide switches, press the buttons, watch the LEDs and the
+  multiplexed 7-segment display (persistence of vision), at a chosen clock rate, with a watch list
+  of internal signals. It simulates the HDL, so it works without ISE and in the standalone edition.
 - **Behavioural simulation** with Silinx's own simulator, written from scratch in JavaScript:
   4-state logic, delta cycles, VHDL/Verilog testbenches (`wait`, `#delay`, `assert`/`report`,
   `$display`, `$readmemh`…), an **ISim**-style waveform window, force/clock to simulate modules

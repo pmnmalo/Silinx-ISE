@@ -40,6 +40,7 @@ export const icons = {
   procGroup: S('<path d="M2 4h12v9H2z" fill="#eef3fb" stroke="#6b85b6"/><path d="M2 4l2-2h8l2 2" fill="#dbe5f5" stroke="#6b85b6"/>'),
   report: S('<rect x="2.5" y="1.5" width="11" height="13" fill="#fff" stroke="#556"/><path d="M4.5 10l2-3 2 2 3-4" fill="none" stroke="#2a7" stroke-width="1.3"/>'),
   pins: S('<rect x="4" y="4" width="8" height="8" fill="#333"/><path d="M6 1v3M10 1v3M6 12v3M10 12v3M1 6h3M1 10h3M12 6h3M12 10h3" stroke="#b08000" stroke-width="1.5"/>'),
+  board: S('<rect x="1" y="3" width="14" height="10" rx="1.5" fill="#2a6b45" stroke="#174a2d"/><rect x="3" y="5" width="6" height="3" fill="#111"/><path d="M4 6.5h1M6 6.5h1" stroke="#f33"/><circle cx="11.5" cy="6.5" r="1" fill="#6f6"/><rect x="3" y="10" width="2" height="2" fill="#ddd"/><rect x="6" y="10" width="2" height="2" fill="#ddd"/><circle cx="12" cy="11" r="1.2" fill="#222" stroke="#aaa" stroke-width=".5"/>'),
   impact: S('<rect x="1" y="5" width="6" height="6" fill="#444"/><rect x="9" y="5" width="6" height="6" fill="#444"/><path d="M7 8h2" stroke="#e33" stroke-width="2"/><path d="M4 2v3M12 2v3" stroke="#e33"/>'),
   gear: S('<circle cx="8" cy="8" r="2.5" fill="none" stroke="#555" stroke-width="1.5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3M3 3l2 2M11 11l2 2M13 3l-2 2M5 11l-2 2" stroke="#555" stroke-width="1.8"/>'),
   help: S('<circle cx="8" cy="8" r="6.5" fill="#2b6fd1" stroke="#15458e"/><text x="8" y="12" font-size="10" text-anchor="middle" fill="#fff" font-family="Georgia" font-weight="bold">?</text>'),
