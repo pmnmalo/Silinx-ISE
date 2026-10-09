@@ -388,7 +388,13 @@ uiTest('Remove from Project of a diagram (ASM chart): it leaves the hierarchy, t
   await fs.access(path.join(env.server.workspace, 'ExclPj', 'src/ctl.asm.json'));
   await page.click('#left-tabs .tab[data-page=design]');
   await page.waitFor(() => ![...document.querySelectorAll('#hier .row')].some((r) => r.textContent.includes('ctl.asm.json')), [], { what: 'chart left the hierarchy' });
-  await page.click('.toast .toast-action', { text: 'Undo' });
+  // the Edit menu has one Undo, which now undoes the removal; Ctrl+Z (outside an editor) does it
+  const items = await page.openMenu('Edit');
+  assert.ok(items.some((i) => i.label === 'Undo Remove from Project' && !i.disabled), items.map((i) => i.label).join(' | '));
+  assert.ok(!items.some((i) => i.label === 'Undo'), 'a single Undo entry');
+  await page.closeMenus();
+  await page.eval(() => document.activeElement?.blur?.());
+  await page.key('z', { modifiers: 2 });
   await page.waitFor(() => !(window.Silinx.project.excluded || []).includes('src/ctl.asm.json'), [], { what: 'undo' });
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => r.textContent.includes('ctl.asm.json')), [], { what: 'chart back in the hierarchy' });
   assert.ok(await inHier());

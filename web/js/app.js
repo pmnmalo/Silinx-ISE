@@ -406,7 +406,7 @@ async function removeFile(file) {
 }
 async function removeNow(file) {
   const pj = S.project;
-  const undo = { project: pj.name, path: file, entry: pj.files.find(f => f.path === file) || null, constraints: pj.constraints === file };
+  const undo = { project: pj.name, path: file, entry: pj.files.find(f => f.path === file) || null, constraints: pj.constraints === file, at: Date.now() };
   if (undo.entry) pj.files = pj.files.filter(f => f.path !== file);
   if (undo.constraints) pj.constraints = '';
   if (!undo.entry) pj.excluded = [...new Set([...(pj.excluded || []), file])];
@@ -419,6 +419,13 @@ async function removeNow(file) {
 
 // undo the last Remove from Project
 function undoRemove() { return serialOp(undoRemoveNow); }
+// does Undo (menu / Ctrl+Z) undo a removal? yes when the last removal is newer than the last edit
+// of the active editor (or no editor is active)
+function undoesRemoval() {
+  const u = S.lastRemoval;
+  if (!u || u.project !== S.project?.name) return false;
+  return !S.active?.editor || !(S.active._editedAt > u.at);
+}
 async function undoRemoveNow() {
   const u = S.lastRemoval;
   if (!u || u.project !== S.project?.name) return;
@@ -1072,6 +1079,7 @@ export function activateDoc(doc) {
 // Editing always saves: a document with changes is written ~0.8 s after the last edit.
 export function setDirty(doc, dirty) {
   doc.dirty = dirty;
+  if (dirty) doc._editedAt = Date.now();   // (Edit ▸ Undo: the last action was an edit or a removal?)
   doc.tab.classList.toggle('dirty', dirty);
   clearTimeout(doc._autosave);
   if (dirty && doc.save) doc._autosave = setTimeout(() => flushDoc(doc, { auto: true }), 800);
@@ -2761,8 +2769,10 @@ function setupMenus() {
       { label: 'Recent Projects', submenu: recent().map(r => ({ label: r, action: () => openProject(r) })) },
     ].filter(Boolean) },
     { label: 'Edit', items: () => [
-      { label: 'Undo', icon: icon('undo'), action: () => S.active?.editor?.exec('undo'), shortcut: 'Ctrl+Z', disabled: () => !S.active?.editor },
-      { label: 'Undo Remove from Project', action: () => undoRemove(), disabled: () => !S.lastRemoval || S.lastRemoval.project !== S.project?.name },
+      // one Undo: the last removal from the project when that was the last action, else the editor's undo
+      undoesRemoval()
+        ? { label: 'Undo Remove from Project', icon: icon('undo'), action: () => undoRemove(), shortcut: 'Ctrl+Z' }
+        : { label: 'Undo', icon: icon('undo'), action: () => S.active?.editor?.exec('undo'), shortcut: 'Ctrl+Z', disabled: () => !S.active?.editor },
       { label: 'Redo', icon: icon('redo'), action: () => S.active?.editor?.exec('redo'), shortcut: 'Ctrl+Y', disabled: () => !S.active?.editor },
       '-',
       { label: 'Find…', icon: icon('find'), action: () => S.active?.editor?.exec('findPersistent'), shortcut: 'Ctrl+F', disabled: () => !S.active?.editor },
@@ -2930,6 +2940,8 @@ async function boot() {
   addEventListener('keydown', e => {
     if (!e.defaultPrevented && (e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P') && (S.active?.asmEditor || S.active?.schEditor || S.active?.fsmEditor)) { e.preventDefault(); printActive(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); if (S.active) flushDoc(S.active); }  // nothing to do: edits are saved automatically
+    // Ctrl/Cmd+Z outside an editor or text field: undo the last Remove from Project
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && !e.target.closest?.('.CodeMirror, input, textarea, [contenteditable]') && undoesRemoval()) { e.preventDefault(); undoRemove(); }
   });
   addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });
 
