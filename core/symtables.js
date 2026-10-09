@@ -18,7 +18,7 @@ export const MAX_EXHAUSTIVE = 8;    // input bits simulated exhaustively (larger
 export const MAX_COMPACT = 16;      // rows of a compact table of more than MAX_FULL input bits
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
 const isSeq = type => !!SYMBOLS[type]?.ff || type === 'register' || type === 'counter';
-const bitwise = type => !!SYMBOLS[type]?.gate || ['mux2', 'mux4', 'demux'].includes(type);
+const bitwise = type => !!SYMBOLS[type]?.gate || ['mux2', 'mux4', 'demux', 'tbuf'].includes(type);
 const big = n => BigInt(n);
 
 /**

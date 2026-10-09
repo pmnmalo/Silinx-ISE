@@ -39,9 +39,18 @@ for Xilinx FPGAs supported by ISE 14.7.
   does not change). Any HDL module can be converted to a schematic (*Convert to Schematic*), with
   processes and other behavioural code kept as HDL blocks; *Convert to HDL* makes the HDL the base
   and keeps the schematic under it.
+- **Tri-state buffers** (palette category *Tri-State*): BUFE (enable E active high, O = E ? I : Z)
+  and BUFT (T active low, as in Xilinx), 1 bit or a bus of any width, with the Xilinx presets BUFE,
+  BUFE4 (one pin per bit), BUFE8, BUFE16, BUFT, BUFT4, BUFT8, BUFT16. Several tri-state outputs
+  (and inout markers / inout pins of modules) may drive the same net, a bus; an ordinary output
+  together with a tri-state output is still an error. The HDL is
+  `O <= I when E = '1' else (others => 'Z');` / `assign O = E ? I : {N{1'bz}};` on resolved
+  std_logic nets, read back as tri-state buffers by *Convert to Schematic*; ISE `.sch` BUFE / BUFT
+  symbols import to it and export back; the live simulation shows a released bus as Z (blue) and
+  two buffers driving different values as X (red).
 - **Symbol Info** (like the ISE Symbol Info / Libraries Guide pages): a datasheet for every symbol
   of the schematic library and its presets (gates and inverted-input gates, muxes, demuxes,
-  decoders, encoders, ADD/SUB/COMP, constants, FD*/FT*/FJK* flip-flops, registers, counters, bus
+  decoders, encoders, tri-state buffers (function table with Z), ADD/SUB/COMP, constants, FD*/FT*/FJK* flip-flops, registers, counters, bus
   taps/joins, modules, HDL blocks), in English or Portuguese: description, symbol drawing, pin table,
   parameters, truth table computed by simulating the symbol's own HDL (compact form with X, or
   representative rows for wide symbols), Xilinx-style mode table for sequential symbols, equivalent
@@ -131,7 +140,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   description written on the sheet, and opens it in the schematic editor, ready for the symbols and
   wires. In the live simulation a bidirectional marker shows the value on the bus and can drive it
   from outside (click: Z → 0 → 1; a bus opens the value editor, *Z* releases it) — the circuit
-  drives it through a module symbol with an inout port (the symbol library has no tri-state buffer).
+  drives it through tri-state buffers (BUFE / BUFT) or a module symbol with an inout port.
 - **Truth Table / Karnaugh Map** (*Tools ▸ Truth Table / Karnaugh Map…*, New Source ▸ *Truth Table
   (.tt.json)*): name 1–6 inputs and 1–4 outputs, click the cells (0 → 1 → X don't care) or type an
   expression per output (`ab' + c`, `a·b + c`, `~a & b`, `(a and not b) or c`…). For each output:

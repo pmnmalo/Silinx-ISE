@@ -108,6 +108,18 @@ function bodySvg(sym, def) {
       s += lead(0, 10, 20, 10, bus(pins[0])) + lead(def.shape === 'inv' ? 50 : 44, 10, 60, 10, bus(pins[1]));
       break;
     }
+    case 'tbuf': {
+      // tri-state buffer: one triangle per row, the enable line from the pin (row 0) down to their top
+      // edges (x = 33), a bubble on it for the active-low T of BUFT
+      const n = def.rows, ex = 33, edge = k => 20 + 20 * k + (ex - 20) * 10 / 26;
+      s += lead(0, 10, ex, 10, false) + `<path class="gate nofill" d="M${ex},10 V${r1(edge(n - 1))}"/>`;
+      for (let k = 0; k < n; k++) {
+        const y = 30 + 20 * k, ip = pins[1 + k], op = pins[1 + n + k];
+        s += `<path class="gate" d="M20,${y - 10} L46,${y} L20,${y + 10} Z"/>` + lead(0, y, 20, y, bus(ip)) + lead(46, y, 60, y, bus(op));
+      }
+      if (def.activeLow) s += `<circle class="gate" cx="${ex}" cy="${r1(edge(0) - 3.5)}" r="3"/>`;
+      break;
+    }
     case 'mux': {
       const bh = def.body.h;
       s += `<path class="gate" d="M20,0 L60,10 L60,${bh - 10} L20,${bh} Z"/>`;
@@ -219,6 +231,10 @@ function textsSvg(sym, def) {
   } else if (def.shape === 'gate' || def.shape === 'inv' || def.shape === 'buf') {
     const w = sym.params?.width > 1 ? `${sym.params.width}` : '';
     if (w) { const t = cx(def.body.x + 8, def.h / 2); s += `<text class="pname" x="${t.x}" y="${t.y + 3}" text-anchor="middle">${w}</text>`; }
+  } else if (def.shape === 'tbuf') {
+    // bus width inside the triangle (bus pins), as for the gates
+    const w = def.rows === 1 && sym.params?.width > 1 ? `${sym.params.width}` : '';
+    if (w) { const t = cx(def.body.x + 7, 30); s += `<text class="pname" x="${t.x}" y="${t.y + 3}" text-anchor="middle">${w}</text>`; }
   }
   if (def.shape === 'lib' || def.shape === 'demux' || def.shape === 'ff') {
     // pin names inside the body, clear of the 20 px leads, upright in every orientation; bus widths beside the pin end
@@ -769,7 +785,7 @@ export function mountSchEditor(container, opts = {}) {
   function symProps(s) {
     const S = SYMBOLS[s.type];
     const sd = symbolDef(s, modules);
-    const title = s.type === 'module' ? `Module ${s.params.module}` : (sd.shape === 'lib' || sd.shape === 'demux') ? `${sd.title} (${S.title})` : `${S?.title || s.type}`;
+    const title = s.type === 'module' ? `Module ${s.params.module}` : (sd.shape === 'lib' || sd.shape === 'demux' || sd.shape === 'tbuf') ? `${sd.title} (${S.title})` : `${S?.title || s.type}`;
     const sum = s.type === 'module' ? (S?.description || '') : symbolSummary(s.type, s.params, getLanguage());
     propBody.append(h('div', { class: 'se-ptitle', text: title }), h('div', { class: 'se-note se-sum', 'data-no-i18n': '', text: sum }),
       h('div', { class: 'se-pbtns' }, h('button', { class: 'btn ro-ok se-infobtn', type: 'button', text: 'Symbol Info…', title: 'Symbol Info (F1)', onclick: () => openInfo(infoTarget()) })));

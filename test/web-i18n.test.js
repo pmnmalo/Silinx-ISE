@@ -85,3 +85,19 @@ test('design checks: the Edit menu item, its messages and the labels of the help
   const { HINT_LABELS } = await import('../core/hints.js');
   assert.deepEqual(HINT_LABELS.pt, { explain: 'Explicação', fix: 'Como corrigir', more: 'Explicação e correção' });
 });
+
+test('tri-state buffers: the palette category, parameter labels and the descriptions of TBUF and every preset are translated', async () => {
+  const { SYMBOLS } = await import('../core/schdoc.js');
+  const S = SYMBOLS.tbuf;
+  assert.equal(t('Tri-State'), 'Três estados');
+  assert.equal(t('Tri-State (9)'), 'Três estados (9)');
+  for (const p of S.params) assert.notEqual(t(p.label), p.label, p.label);
+  assert.equal(t('Enable input'), 'Entrada de habilitação');
+  for (const d of [S.description, ...S.presets.map(p => p.description)]) {
+    const v = t(d);
+    assert.notEqual(v, d, d);
+    assert.match(v, /três estados/);
+  }
+  assert.equal(t(S.presets.find(p => p.title === 'BUFT8').description), 'Buffer de três estados de 8 bits (pinos em barramento), habilitação T ativa a 0: O = I quando T = 0, Z quando T = 1');
+  assert.equal(t(S.presets.find(p => p.title === 'BUFE4').description), 'Buffer de três estados de 4 bits (pinos I0..I3, O0..O3), habilitação ativa a 1: O = I quando E = 1, Z quando E = 0');
+});

@@ -57,6 +57,24 @@ for (const [op, ns, inv] of [['and', [2, 3, 4, 5], true], ['or', [2, 3, 4, 5], t
   }
 SYMBOLS.inv = { category: 'Logic', title: 'INV', gate: 'not', inputs: 1, description: 'Inverter', params: [P_WIDTH] };
 SYMBOLS.buf = { category: 'Logic', title: 'BUF', gate: 'buf', inputs: 1, description: 'Buffer', params: [P_WIDTH] };
+// tri-state buffers (Xilinx BUFE / BUFT families): O = I while enabled, Z (released) otherwise, so that
+// several of them (and bidirectional pins / I/O markers) may drive one net, a bus
+SYMBOLS.tbuf = {
+  category: 'Tri-State', title: 'TBUF',
+  description: 'Tri-state buffer: O = I while enabled, Z (high impedance, released) otherwise; E active high (BUFE) or T active low (BUFT)',
+  params: [P_WIDTH, { name: 'enable', label: 'Enable input', kind: 'select', options: ['E', 'T'], default: 'E' },
+    { name: 'bits', label: 'One pin per bit (I0.., O0..)', kind: 'bool', default: false }],
+  presets: [
+    { title: 'BUFE', params: { width: 1, enable: 'E' }, description: 'Tri-state buffer, active-high enable: O = I when E = 1, Z when E = 0' },
+    { title: 'BUFE4', params: { width: 4, enable: 'E', bits: true }, description: '4-bit tri-state buffer (pins I0..I3, O0..O3), active-high enable: O = I when E = 1, Z when E = 0' },
+    { title: 'BUFE8', params: { width: 8, enable: 'E', bits: false }, description: '8-bit tri-state buffer (bus pins), active-high enable: O = I when E = 1, Z when E = 0' },
+    { title: 'BUFE16', params: { width: 16, enable: 'E', bits: false }, description: '16-bit tri-state buffer (bus pins), active-high enable: O = I when E = 1, Z when E = 0' },
+    { title: 'BUFT', params: { width: 1, enable: 'T' }, description: 'Tri-state buffer, active-low enable T: O = I when T = 0, Z when T = 1' },
+    { title: 'BUFT4', params: { width: 4, enable: 'T', bits: true }, description: '4-bit tri-state buffer (pins I0..I3, O0..O3), active-low enable T: O = I when T = 0, Z when T = 1' },
+    { title: 'BUFT8', params: { width: 8, enable: 'T', bits: false }, description: '8-bit tri-state buffer (bus pins), active-low enable T: O = I when T = 0, Z when T = 1' },
+    { title: 'BUFT16', params: { width: 16, enable: 'T', bits: false }, description: '16-bit tri-state buffer (bus pins), active-low enable T: O = I when T = 0, Z when T = 1' },
+  ],
+};
 SYMBOLS.mux2 = { category: 'Mux', title: 'M2_1', description: '2:1 multiplexer (O = S0 ? D1 : D0)', params: [P_WIDTH] };
 SYMBOLS.mux4 = { category: 'Mux', title: 'M4_1', description: '4:1 multiplexer (2-bit select S)', params: [P_WIDTH] };
 SYMBOLS.demux = {
@@ -149,7 +167,7 @@ SYMBOLS.hdlblock = {
   params: [],
 };
 
-export const SYMBOL_CATEGORIES = ['Logic', 'Arithmetic', 'Flip-Flops', 'Mux', 'Decoders/Encoders', 'Bus', 'I/O', 'Project modules'];
+export const SYMBOL_CATEGORIES = ['Logic', 'Tri-State', 'Arithmetic', 'Flip-Flops', 'Mux', 'Decoders/Encoders', 'Bus', 'I/O', 'Project modules'];
 
 export function defaultParams(type) {
   const s = SYMBOLS[type];
@@ -213,6 +231,16 @@ export function symbolDef(sym, modules = {}) {
   if (t === 'inv' || t === 'buf') {
     return { w: 60, h: 20, shape: t, body: { x: 20, y: 0, w: 24, h: 20 },
       pins: [{ name: 'I', dir: 'in', x: 0, y: 10, side: 'W', width: W }, { name: 'O', dir: 'out', x: 60, y: 10, side: 'E', width: W }] };
+  }
+  if (t === 'tbuf') {
+    // the enable on the left, one row above the data (as the Xilinx BUFE / BUFT symbols); one triangle per
+    // bit when the bits have their own pins (BUFE4 / BUFT4), the enable line joining their top edges
+    const en = p.enable === 'T' ? 'T' : 'E', bits = W > 1 && !!p.bits, n = bits ? W : 1;
+    const pins = [{ name: en, dir: 'in', x: 0, y: 10, side: 'W', width: 1 }];
+    for (let k = 0; k < n; k++) pins.push({ name: bits ? `I${k}` : 'I', dir: 'in', x: 0, y: 30 + 20 * k, side: 'W', width: bits ? 1 : W });
+    for (let k = 0; k < n; k++) pins.push({ name: bits ? `O${k}` : 'O', dir: 'out', x: 60, y: 30 + 20 * k, side: 'E', width: bits ? 1 : W, tri: true });
+    const title = `BUF${en}${W > 1 ? W : ''}`;
+    return { w: 60, h: 20 + 20 * n, shape: 'tbuf', activeLow: en === 'T', rows: n, title, body: { x: 20, y: 20, w: 26, h: 20 * n }, pins };
   }
   if (t === 'mux2' || t === 'mux4') {
     const n = t === 'mux2' ? 2 : 4, bh = n * 20 + 20, h = bh + 10;
@@ -453,7 +481,7 @@ export function netlist(docIn, { modules = {} } = {}) {
     defs.set(s.id, def);
     for (const p of symbolPins(s, modules, def)) {
       const id = `p:${s.id}/${p.name}`;
-      pinInfo.set(id, { kind: 'pin', sym: s.id, pin: p.name, dir: p.dir, width: p.width, x: p.x, y: p.y });
+      pinInfo.set(id, { kind: 'pin', sym: s.id, pin: p.name, dir: p.dir, width: p.width, x: p.x, y: p.y, ...(p.tri ? { tri: true } : {}) });
       dsu.find(id);
       addAt(p.x, p.y, id);
     }
@@ -556,11 +584,18 @@ export function netlist(docIn, { modules = {} } = {}) {
       diags.push({ severity: 'error', message: `width mismatch on net '${net.name}': ${[...mism].join(' vs ')} bits`, ref: refOf(where, symById), x: where?.x, y: where?.y, net: net.name });
     }
     const pt = eps[0] || (labels[0] && labels[0].label) || doc.wires.find(w => w.id === wires[0])?.points[0];
-    // drivers
-    const outs = eps.filter(e => e.dir === 'out' && e.kind === 'pin');
+    // drivers: tri-state outputs (and bidirectional pins / markers) may share a net, a bus; an ordinary
+    // output or an input marker must be its only driver
+    const outs = eps.filter(e => e.dir === 'out' && e.kind === 'pin' && !e.tri);
     const ins = eps.filter(e => e.kind === 'port' && e.dir === 'in');
+    const tris = eps.filter(e => e.dir === 'out' && e.kind === 'pin' && e.tri);
     if (outs.length + ins.length > 1)
       diags.push({ severity: 'error', message: `net '${net.name}' has ${outs.length + ins.length} drivers (${[...outs, ...ins].map(e => epName(e, symById, doc)).join(', ')})`, ref: refOf(outs[0] || ins[0], symById), x: (outs[0] || ins[0]).x, y: (outs[0] || ins[0]).y, net: net.name });
+    else if (outs.length + ins.length === 1 && tris.length) {
+      const d = outs[0] || ins[0];
+      diags.push({ severity: 'error', message: `net '${net.name}' is driven by ${epName(d, symById, doc)} and by the tri-state output${tris.length > 1 ? 's' : ''} ${tris.map(e => epName(e, symById, doc)).join(', ')}: only tri-state outputs and bidirectional pins may share a net`, ref: refOf(d, symById), x: d.x, y: d.y, net: net.name });
+    }
+    if (tris.length) net.tristate = true;
     const sinks = eps.filter(e => (e.kind === 'pin' && e.dir !== 'out') || (e.kind === 'port' && e.dir !== 'in'));
     const inouts = eps.filter(e => e.dir === 'inout');
     const isolated = eps.length === 1 && !wires.length && !labels.length;
@@ -981,8 +1016,10 @@ export function generateHdl(docIn, opts = {}) {
     const p = portOf.get(net);
     if (p) return p.type && verbatimOK ? p.type : vtype(p.width);
     const d = declared.get(nk(net.name));
-    if (d?.type) return d.type;
-    return pinType.get(net) || vtype(net.width);
+    // a net driven by tri-state buffers needs a resolved type (std_logic, not std_ulogic)
+    const res = ty => (net.tristate ? String(ty).replace(/\bstd_ulogic\b/gi, 'std_logic') : ty);
+    if (d?.type) return res(d.type);
+    return res(pinType.get(net) || vtype(net.width));
   };
   const clsOf = nm => {
     if (!nm) return 'slv';
@@ -1164,6 +1201,23 @@ export function generateHdl(docIn, opts = {}) {
           lines.push(ci ? `${o} <= ${rhs};` : `assign ${o} = ${rhs};`);
         }
         if (lines.length) body.push([cmt, ...lines].join('\n'));
+        break;
+      }
+      case 'tbuf': {
+        // tri-state buffer: O = I while enabled, else Z; several of them may drive the same (resolved) net
+        const en = p.enable === 'T' ? 'T' : 'E';
+        const pairs = def.pins.filter(q => q.dir === 'out').map(q => [q.name.replace(/^O/, 'I'), q.name]);
+        const live = pairs.map(([i, o]) => [i, o, OUTN(s, o)]).filter(x => x[2]);
+        if (!live.length) { diags.push({ severity: 'warning', message: `${s.name}: output not connected, tri-state buffer skipped`, ref: { kind: 'symbol', id: s.id } }); continue; }
+        // (an unconnected enable is tied to 0 through a signal: '0' = '1' would be ambiguous in VHDL)
+        const e = INN(s, en, true);
+        const lines = [cmt];
+        for (const [i, op, o] of live) {
+          const w = PW(s, op), x = INN(s, i);
+          if (ci) lines.push(`${o} <= ${x} when ${e} = '${en === 'T' ? 0 : 1}' else ${w > 1 ? "(others => 'Z')" : "'Z'"};`);
+          else { const z = w > 1 ? `{${w}{1'bz}}` : "1'bz"; lines.push(`assign ${o} = ${en === 'T' ? `${e} ? ${z} : ${x}` : `${e} ? ${x} : ${z}`};`); }
+        }
+        body.push(lines.join('\n'));
         break;
       }
       case 'decoder': case 'encoder': {
@@ -1913,6 +1967,19 @@ export async function schematicFromHdl(inst, opts = {}) {
     }
     return null;
   }
+  // a tri-state driver: { sel, data, low } (low = the buffer drives while sel is 0) or null
+  const isZ = x => !!x && ((x.op === 'lit' && /^z+$/i.test(x.bits)) || (x.op === 'repl' && isZ(x.value))
+    || (x.op === 'aggregate' && x.items?.length === 1 && x.items[0].choices?.length === 1 && x.items[0].choices[0] === 'others' && isZ(x.items[0].value)));
+  function triParts(e) {
+    if (!e || e.op !== 'cond') return null;
+    let sel, hi = true;
+    if (!ci) sel = e.cond;
+    else if (e.cond.op === 'binary' && e.cond.o === '==' && e.cond.b?.op === 'lit' && e.cond.b.scalar && /^[01]$/.test(e.cond.b.bits)) { sel = e.cond.a; hi = e.cond.b.bits === '1'; }
+    else return null;
+    if (isZ(e.else) && !isZ(e.then)) return { sel, data: e.then, low: !hi };
+    if (isZ(e.then) && !isZ(e.else)) return { sel, data: e.else, low: hi };
+    return null;
+  }
   // materialise a planned gate tree: returns { net } handled by caller
   function materialise(node, plan, built) {
     if (node.net) return { netName: node.net, w: node.w };
@@ -1939,6 +2006,24 @@ export async function schematicFromHdl(inst, opts = {}) {
       const tsig = sigOfRef(it.target);
       if (tsig && moduleLevel(tsig)) {
         const tcls = clsOfSig(tsig);
+        // tri-state driver (x when e = '1' else 'Z' / e ? x : 'bz) -> tri-state buffer BUFE / BUFT
+        const tri = (tcls === 'sl' || tcls === 'slv' || tcls === 'v') ? triParts(it.value) : null;
+        if (tri) {
+          const plan = [];
+          const sv = exprToGates(tri.sel, plan), dv = exprToGates(tri.data, plan);
+          if (sv && sv.w === 1 && !sv.lit && (!ci || sv.cls === 'sl') && dv && dv.w === W(tsig) && (dv.cls === tcls || dv.lit)) {
+            const en = tri.low ? 'T' : 'E';
+            const s = addSym('tbuf', { width: dv.w, enable: en });
+            const built = [];
+            for (const [node, pin] of [[sv, en], [dv, 'I']]) {
+              const src = materialise(node, plan, built);
+              if (src.netName) connect(src.netName, src.w, { sym: s.id, pin });
+              else { const n = anonNet(node.w); connect(n, node.w, { sym: src.sym.id, pin: src.pin }, true); connect(n, node.w, { sym: s.id, pin }); }
+            }
+            connect(tsig.name, W(tsig), { sym: s.id, pin: 'O' }, true);
+            continue;
+          }
+        }
         const plan = [];
         const g = (tcls === 'sl' || tcls === 'slv' || tcls === 'v') ? exprToGates(it.value, plan) : null;
         if (g && g.w === W(tsig) && (g.cls === tcls || g.lit)) {
