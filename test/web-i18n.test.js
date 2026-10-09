@@ -77,3 +77,11 @@ test('every UI label in the web/js sources has a Portuguese translation', () => 
   const missing = [...labels].filter(([s]) => !SAME.has(s) && !/^[^a-z]*$/.test(s) && t(s) === s).map(([s, f]) => `${f}: ${s}`);
   assert.deepEqual(missing, []);
 });
+
+test('design checks: the Edit menu item, its messages and the labels of the help (core/hints.js) are translated', async () => {
+  assert.equal(t('Design Checks (Lint Warnings)'), 'Verificações do Circuito (Avisos de Lint)');
+  for (const s of ['Design checks on: Check Syntax and the editor show the lint warnings', 'Design checks off: only errors are shown']) assert.notEqual(t(s), s, s);
+  // the help of the Errors / Warnings tabs is rendered per language (the console pages are not translated by the DOM pass)
+  const { HINT_LABELS } = await import('../core/hints.js');
+  assert.deepEqual(HINT_LABELS.pt, { explain: 'Explicação', fix: 'Como corrigir', more: 'Explicação e correção' });
+});

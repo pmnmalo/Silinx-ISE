@@ -22,6 +22,7 @@ export function compile(sources) {
     if (lang !== 'vhdl' && lang !== 'verilog') continue;
     const r = lang === 'vhdl' ? parseVhdl(s.text, s.path) : parseVerilog(s.text, s.path, { include });
     r.role = s.role || 'design';
+    r.text = s.text;   // (design checks: suppression comments, use clauses)
     parsed.push(r);
   }
   const lib = buildLibrary(parsed);

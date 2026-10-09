@@ -12,6 +12,7 @@
 
 import { TT_PT, TT_PT_PATTERNS } from './i18n-truthtable.js';
 import { IO_PT, IO_PT_PATTERNS } from './i18n-inout.js';
+import { LINT_PT } from './i18n-lint.js';
 
 const PT = {
   // menus
@@ -433,6 +434,7 @@ PT_PATTERNS.push(
 );
 Object.assign(PT, TT_PT); PT_PATTERNS.unshift(...TT_PT_PATTERNS);   // Truth Table / Karnaugh Map tool
 Object.assign(PT, IO_PT); PT_PATTERNS.unshift(...IO_PT_PATTERNS);   // bidirectional (inout) ports of the wizards
+Object.assign(PT, LINT_PT);   // design checks (the help texts of the messages are in core/hints.js)
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },
