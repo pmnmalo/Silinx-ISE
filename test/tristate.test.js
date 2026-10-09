@@ -7,7 +7,7 @@
 //   Symbol Info: presets, Xilinx names, datasheet texts, the truth table with Z computed by simulation;
 //   live schematic simulation (core/schlive.js): wire values Z / X, the inout marker driven from outside;
 //   HDL -> schematic: tri-state assignments become tri-state buffers;
-//   ISE .sch import / export: BUFE / BUFT / BUFE4 / BUFE8 / BUFT8 / BUFE16 map to the symbol and back;
+//   ISE .sch import: BUFE / BUFT / BUFE4 / BUFE8 / BUFT8 / BUFE16 map to the symbol; export writes Silinx symbols;
 //   design checks (core/lint.js): no multiple-driver warning for the generated tri-state bus.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -441,7 +441,7 @@ endmodule`;
   }
 });
 
-test('ISE .sch export / import round trip: BUFE8 and BUFT on a bus to an inout marker; other widths as Silinx symbols', () => {
+test('ISE .sch export / import round trip: tri-state buffers on a bus to an inout marker, exported as Silinx symbols (ISE FPGA libraries have no BUFE / BUFT)', () => {
   for (const lang of LANGS) {
     // two BUFE8 / BUFT8 on an 8-bit bus, plus a 1-bit BUFT and a 4-bit one-pin-per-bit buffer
     const doc = busSheet(lang, { W: 8 });
@@ -466,15 +466,15 @@ test('ISE .sch export / import round trip: BUFE8 and BUFT on a bus to an inout m
     assert.deepEqual(errorsOf(netlist(ndoc)), []);
     const x = exportIseSch(ndoc, { timestamp: '2020-1-1T10:10:10', lang });
     assert.deepEqual(x.warnings.filter(w => /schematic check/.test(w)), []);
-    assert.match(x.xml, /<block symbolname="bufe8" name="ua">/);
-    assert.match(x.xml, /<block symbolname="bufe8" name="ub">/);
+    assert.match(x.xml, /<block symbolname="xl_tbufe_w8" name="ua">/);
+    assert.match(x.xml, /<block symbolname="xl_tbufe_w8" name="ub">/);
     assert.match(x.xml, /<blockpin signalname="data\(7:0\)" name="O\(7:0\)" \/>/);
-    assert.match(x.xml, /<block symbolname="buft" name="uc">/);
+    assert.match(x.xml, /<block symbolname="xl_tbuft_w1" name="uc">/);
     assert.match(x.xml, /<block symbolname="xl_tbufe_w4_bits" name="ud">/);
     assert.match(x.xml, /<block symbolname="xl_tbuft_w3" name="ue">/);
     assert.match(x.xml, /<port polarity="BiDirectional" name="data\(7:0\)" \/>/);
-    assert.match(x.xml, /<blockdef name="bufe8">/);
-    assert.deepEqual(x.files.map(f => f.path).sort(), [`xl_tbufe_w4_bits.${ext(lang)}`, 'xl_tbufe_w4_bits.sym', `xl_tbuft_w3.${ext(lang)}`, 'xl_tbuft_w3.sym'].sort());
+    assert.doesNotMatch(x.xml, /symbolname="buf[et]/);
+    assert.deepEqual(x.files.map(f => f.path).sort(), ['xl_tbufe_w4_bits', 'xl_tbufe_w8', 'xl_tbuft_w1', 'xl_tbuft_w3'].flatMap(n => [`${n}.${ext(lang)}`, `${n}.sym`]).sort());
     assert.deepEqual(decodeXlSymbol('xl_tbuft_w3'), { type: 'tbuf', params: { width: 3, enable: 'T', bits: false } });
     const im = importIseSch(x.xml, { name: 'tribus', lang });
     assert.deepEqual(im.warnings.filter(w => /connectivity|no Silinx equivalent|schematic check/.test(w)), [], im.warnings.join('\n'));

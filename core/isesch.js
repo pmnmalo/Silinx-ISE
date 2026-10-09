@@ -359,7 +359,7 @@ export function libPins(sym) {
   if (s === 'inv4' || s === 'buf4') { const p = {}; for (let k = 0; k < 4; k++) { p[`I${k}`] = ['in', 0, s === 'inv4' ? -32 - 64 * k : -224 + 64 * k]; p[`O${k}`] = ['out', 224, s === 'inv4' ? -32 - 64 * k : -224 + 64 * k]; } return p; }
   if (s === 'obufe' || s === 'bufe') return { E: ['in', 0, -96], I: ['in', 0, -32], O: ['out', 224, -32] };
   if (s === 'obuft') return { T: ['in', null, null], I: ['in', 0, -32], O: ['out', 224, -32] };
-  // BUFT: T at the place of the E of BUFE (assumed: not checked against an ISE schematic)
+  // BUFT: T at the place of the E of BUFE (import only: positions come from the wires)
   if (s === 'buft') return { T: ['in', 0, -96], I: ['in', 0, -32], O: ['out', 224, -32] };
   if ((m = /^buf([et])(8|16)$/.exec(s))) { const w = +m[2]; return { [m[1].toUpperCase()]: ['in', 0, -96], [`I(${w - 1}:0)`]: ['in', 0, -32], [`O(${w - 1}:0)`]: ['out', 224, -32] }; }
   if ((m = /^buf([et])4$/.exec(s))) { const p = { [m[1].toUpperCase()]: ['in', null, null] }; for (let k = 0; k < 4; k++) { p[`I${k}`] = ['in', null, null]; p[`O${k}`] = ['out', null, null]; } return p; }
@@ -1632,10 +1632,10 @@ function iseSymbolFor(s, def, netW, modules) {
     case 'mux2': return W === 1 ? { lib: true, name: 'm2_1', pins: { D0: 'D0', D1: 'D1', S0: 'S0', O: 'O' } } : { lib: false, name: `xl_mux2_w${W}` };
     case 'mux4': return { lib: false, name: `xl_mux4_w${W}` };
     case 'tbuf': {
-      // BUFE / BUFT, BUFE8/16 / BUFT8/16 (library); other widths and one-pin-per-bit buffers: a Silinx symbol
+      // always a Silinx symbol (with its .sym and HDL file): ISE 14.7's FPGA symbol libraries
+      // (Spartan-3/3E/6 ...) have no BUFE / BUFT (only CPLD ones do), so a library block would not
+      // open there; imported BUFE / BUFT blocks (CPLD schematics) still map to this symbol
       const en = p.enable === 'T' ? 'T' : 'E', bits = W > 1 && !!p.bits;
-      if (W === 1) return { lib: true, name: `buf${lc(en)}`, pins: { [en]: en, I: 'I', O: 'O' } };
-      if (!bits && (W === 8 || W === 16)) return { lib: true, name: `buf${lc(en)}${W}`, pins: { [en]: en, I: `I(${W - 1}:0)`, O: `O(${W - 1}:0)` } };
       return { lib: false, name: `xl_tbuf${lc(en)}_w${W}${bits ? '_bits' : ''}` };
     }
     case 'demux': return { lib: false, name: `xl_demux${Math.max(1, Math.min(4, parseInt(p.sel, 10) || 1))}_w${W}` };
