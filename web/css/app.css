@@ -230,3 +230,10 @@ li.CodeMirror-hint-active .xl-hint-detail { color: #dde; }
 .gen-banner.out-of-sync { background: #fdecea; border-color: #e0a0a0; color: #900; }
 
 .rtl-crumbs .rtl-nav { min-width: 0; padding: 1px 8px; margin-right: 4px; }
+
+/* plain-language help of a diagnostic (web/js/diaghelp.js): Errors / Warnings tabs and editor tooltip */
+.console-page .diag .diag-more { flex: none; margin-left: 10px; color: #0645ad; cursor: pointer; white-space: nowrap; }
+.console-page .diag .diag-more:hover { text-decoration: underline; }
+.console-page .diag-hint { margin: 0 6px 4px 26px; padding: 3px 8px; background: #fffbe6; border-left: 3px solid #e0b000; font-family: var(--font); white-space: normal; }
+.console-page .diag-hint b { font-weight: 600; }
+.CodeMirror-lint-message { white-space: pre-wrap; max-width: 600px; }

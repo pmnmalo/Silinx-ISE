@@ -3,6 +3,7 @@
 // from the Silinx parsers, hover info, go-to-definition, folding, comment toggling, search.
 import { parse as parseVerilog } from '/core/verilog/parser.js';
 import { parse as parseVhdl } from '/core/vhdl/parser.js';
+import { hintTooltip } from './diaghelp.js';
 
 const CM = () => window.CodeMirror;
 
@@ -157,7 +158,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
       let end = ch;
       while (end < lineText.length && /[\w$]/.test(lineText[end])) end++;
       if (end === ch) end = Math.min(lineText.length, ch + 1);
-      out.push({ from: CodeMirror.Pos(line, ch), to: CodeMirror.Pos(line, end), message: `${src}${d.message}`, severity: d.severity === 'warning' ? 'warning' : 'error' });
+      out.push({ from: CodeMirror.Pos(line, ch), to: CodeMirror.Pos(line, end), message: `${src}${d.message}${hintTooltip(d)}`, severity: d.severity === 'warning' ? 'warning' : 'error' });
     };
     const seen = new Set();
     for (const d of [...(parsed.errors || []), ...externalDiags]) {

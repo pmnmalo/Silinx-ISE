@@ -148,7 +148,7 @@ class Parser {
       const pn = this.ident();
       let def = null;
       if (this.accept('=')) def = this.expr();
-      const port = { name: pn, dir, type, default: def, loc };
+      const port = { name: pn, dir, type, default: def, loc, net };
       mod.ports.push(port); this.portNames.set(pn, port);
     } while (this.accept(','));
   }
@@ -269,7 +269,7 @@ class Parser {
         this.error(`'${pn}' is not in the port list`, this.toks[this.i - 1]);
         port = { name: pn, dir, type, default: null, loc };
       }
-      port.dir = dir; port.type = type; port.declared = true;
+      port.dir = dir; port.type = type; port.declared = true; port.net = net;
       if (this.accept('=')) port.default = this.expr();
     } while (this.accept(','));
     this.expect(';');
@@ -302,6 +302,7 @@ class Parser {
         // `output q; reg [3:0] q;` -> refine the port declaration
         if (type.range && !port.type.range) port.type = type;
         if (type.signed) port.type = { ...port.type, signed: true };
+        port.net = kw === 'logic' ? 'logic' : net;
         if (init) items.push({ kind: 'process', label: null, sens: null, initial: true, decls: [], body: [{ kind: 'assign', target: { op: 'ref', name }, value: init, nonblocking: false, delay: null }], loc });
         continue;
       }
@@ -476,8 +477,8 @@ class Parser {
       } else this.netDecl([], decls);
     }
     const body = [];
-    while (!this.is('endfunction') && !this.is('endtask') && this.tok.t !== 'eof') body.push(this.stmt());
-    this.next();
+    while (!this.isAny('endfunction', 'endtask', 'endmodule') && this.tok.t !== 'eof') { const i0 = this.i; body.push(this.stmt()); if (this.i === i0) break; }
+    if (this.isAny('endfunction', 'endtask')) this.next(); else this.error(`expected '${kind === 'task' ? 'endtask' : 'endfunction'}' but found '${this.tok.v || this.tok.t}'`);
     for (const d of decls) if (d.kind === 'signal') d.net = 'variable';
     const fn = { kind, name, params, returnType, decls, body, loc };
     if (kind === 'function') fn.retVar = name;
@@ -581,7 +582,9 @@ class Parser {
         const decls = [], stmts = [];
         while (this.isAny('reg', 'integer', 'logic', 'real', 'time')) this.netDecl([], decls);
         for (const d of decls) d.net = 'variable';
-        while (!this.is('end') && this.tok.t !== 'eof') stmts.push(this.stmt());
+        // a missing 'end' must not loop forever: stop at 'endmodule' or a module item (assign, always…)
+        // and on a statement that consumes nothing
+        while (!this.isAny('end', 'endmodule', 'assign', 'always', 'initial', 'module') && this.tok.t !== 'eof') { const i0 = this.i; stmts.push(this.stmt()); if (this.i === i0) break; }
         this.expect('end');
         if (this.accept(':')) this.ident();
         return { kind: 'block', label, decls, stmts };

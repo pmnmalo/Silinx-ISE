@@ -234,7 +234,8 @@ export function generateTestbench(opts) {
     } else if (clock) L.push(`    wait until falling_edge(${clock.port});`);
     L.push('    for k in 0 to NV - 1 loop', ...apply,
       clock ? `      wait until falling_edge(${clock.port});` : `      wait for ${settle} ns;`,
-      `      got := ${outs.length ? outs.map(toBits).join(' & ') : '"-"'};`);
+      // (one std_logic output: an aggregate, a std_logic is not a vector)
+      `      got := ${outs.length === 1 && outs[0].kind === 'sl' ? `(0 => ${outs[0].name})` : outs.length ? outs.map(toBits).join(' & ') : '"-"'};`);
     if (trace) L.push(`      report "@TB " & integer'image(k) & " " & ${vecText('got', NOUT)};`);
     L.push('      if ((got xor VEXP(k)) and VMASK(k)) /= ZERO then',
       '        errors := errors + 1;',

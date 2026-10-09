@@ -11,6 +11,7 @@
 // Code can also call t('English text') directly.
 
 import { TT_PT, TT_PT_PATTERNS } from './i18n-truthtable.js';
+import { LINT_PT } from './i18n-lint.js';
 
 const PT = {
   // menus
@@ -432,6 +433,7 @@ PT_PATTERNS.push(
   [/^(\S+) already exists\.$/, '$1 já existe.'],
 );
 Object.assign(PT, TT_PT); PT_PATTERNS.unshift(...TT_PT_PATTERNS);   // Truth Table / Karnaugh Map tool
+Object.assign(PT, LINT_PT);   // design checks (the help texts of the messages are in core/hints.js)
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },

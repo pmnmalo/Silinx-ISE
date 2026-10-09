@@ -9,6 +9,8 @@ import { buildSchematic } from '/core/schematic.js';
 import * as wiz from './wizards.js';
 import { PRODUCT, VERSION } from '/core/version.js';
 import { startI18n, setLanguage, getLanguage, LOCALES } from './i18n.js';
+import { onLanguageChange } from './i18n.js';
+import { designDiags, hintRow, sevWord, lintEnabled, setLintEnabled } from './diaghelp.js';
 
 // ------------------------------------------------------------------ state
 export const S = {
@@ -96,12 +98,14 @@ function renderDiagnostics() {
     el.innerHTML = '';
     if (!list.length) { el.append(h('div', { class: 'ln info' }, 'No messages.')); return; }
     for (const d of list) {
+      const hint = hintRow(d);   // plain-language explanation + fix, expandable under the message
       const row = h('div', { class: 'diag' }, icon(ico),
-        h('span', {}, `${d.severity === 'error' ? 'ERROR' : 'WARNING'}:${d.tool || 'HDLCompiler'} - `),
+        h('span', {}, `${sevWord(d)}:${d.tool || 'HDLCompiler'} - `),
         d.file ? h('span', { class: 'loc' }, `"${d.file}" Line ${d.line}`) : null,
-        h('span', { 'data-no-i18n': true }, d.file ? `: ${d.message}` : d.message));
+        h('span', { 'data-no-i18n': true }, d.file ? `: ${d.message}` : d.message), hint?.toggle);
       row.addEventListener('click', () => d.file && openFile(d.file, d.line, d.col));
       el.append(row);
+      if (hint) el.append(hint.box);
     }
   };
   fill($('console-errors'), errs, 'err');
@@ -109,6 +113,7 @@ function renderDiagnostics() {
   $('err-count').textContent = errs.length ? `(${errs.length})` : '';
   $('warn-count').textContent = warns.length ? `(${warns.length})` : '';
 }
+onLanguageChange(() => renderDiagnostics());
 
 export function status(text) { $('status-text').textContent = text; }
 
@@ -517,8 +522,8 @@ function markStale() {
 }
 
 // ------------------------------------------------------------------ check syntax / elaboration
-function diagsFor(lib, design) {
-  const all = [...lib.errors, ...(design ? design.diags : [])];
+function diagsFor(lib, design, extra = []) {
+  const all = [...lib.errors, ...(design ? design.diags : []), ...extra];
   const seen = new Set();
   return all.filter(d => { const k = `${d.file}:${d.line}:${d.message}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .map(d => ({ ...d, tool: d.tool || 'HDLCompiler' }));
@@ -541,10 +546,10 @@ async function checkSyntaxInner(mod, sim, id) {
   for (const s of srcs) log(`${s.lang === 'vhdl' ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${s.path}" into library work`);
   const lib = compile(srcs);
   const design = elaborate(lib, mod);
-  const diags = diagsFor(lib, design);
+  const diags = diagsFor(lib, design, designDiags(lib, design));   // + design checks (core/lint.js)
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
-  for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
+  for (const d of diags) log(`${sevWord(d)}:${d.tool || 'HDLCompiler'} - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
   if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); setStatus(id, 'err'); showConsolePage('errors'); return false; }
   log(`Elaborating top module <${mod}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
   log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
@@ -566,7 +571,7 @@ function hdlDiagnostics(path, text, info = []) {
   for (const u of units) {
     let design;
     try { design = elaborate(lib, u.name); } catch (e) { diags.push({ file: path, line: u.loc?.line || 1, col: 1, severity: 'error', message: e.message }); continue; }
-    diags.push(...design.diags);
+    diags.push(...design.diags, ...designDiags(lib, design));
     if (design.top) info.push(`Elaborating module <${u.name}>: ${design.signals.length} signals, ${design.procs.length} processes.`);
   }
   return diagsFor({ errors: diags }, null);
@@ -581,7 +586,7 @@ async function checkFileSyntax(path) {
   for (const l of info) log(l);
   setDiagnostics(diags);
   const ne = diags.filter(d => d.severity === 'error').length, nw = diags.length - ne;
-  for (const d of diags) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:HDLCompiler - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
+  for (const d of diags) log(`${sevWord(d)}:${d.tool || 'HDLCompiler'} - "${d.file}" Line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn', { diag: false });
   if (ne) { log(`\nProcess "Check Syntax" failed (${ne} error(s), ${nw} warning(s))`, 'err', { diag: false }); showConsolePage('errors'); status(`Check Syntax: ${ne} error(s)`); return false; }
   log(`\nProcess "Check Syntax" completed successfully${nw ? ` with ${nw} warning(s)` : ''}`, 'ok');
   status(`Check Syntax: ${path.split('/').pop()} OK${nw ? ` (${nw} warning(s))` : ''}`);
@@ -2441,6 +2446,8 @@ function setupMenus() {
       { label: 'Go to Line…', action: () => S.active?.editor?.exec('jumpToLine'), shortcut: 'Ctrl+G', disabled: () => !S.active?.editor },
       '-',
       { label: 'Language Templates', submenu: [...(SNIPPETS[S.active?.lang] || SNIPPETS.vhdl)].map(s => ({ label: s.name, action: () => S.active?.editor?.insertText(s.text), disabled: () => !S.active?.editor })) },
+      '-',
+      { label: 'Design Checks (Lint Warnings)', checked: lintEnabled(), action: () => { setLintEnabled(!lintEnabled()); toast(lintEnabled() ? 'Design checks on: Check Syntax and the editor show the lint warnings' : 'Design checks off: only errors are shown'); for (const d of S.docs) d.liveCheck?.(); } },
     ] },
     { label: 'View', items: () => [
       { label: 'Implementation', checked: S.view === 'impl', action: () => setView('impl') },
