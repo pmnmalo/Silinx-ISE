@@ -105,7 +105,7 @@ export class Simulator {
       s.forced = null;
       s.wave = Array.isArray(s.init) || s.t.kind === 'str' ? null : { t: [0], v: [s.val] };
     }
-    this.rts = this.design.procs.map(p => ({ p, gen: null, done: false, rec: null, ctx: null }));
+    this.rts = this.design.procs.map(p => ({ p, gen: null, done: false, rec: null, ctx: null, fork: null, parent: null, kids: null, waitKids: false }));
     // Resolved signals: a logic signal with several drivers (VHDL processes / concurrent
     // statements, Verilog continuous assignments and port connections; all the procedural code of
     // a Verilog module counts as one driver) keeps one value per driver and resolves them.
@@ -361,32 +361,78 @@ export class Simulator {
     if (rt.done) return;
     this.curProc = rt.p;
     this.stats.procRuns++;
-    let r;
-    try {
-      r = rt.gen.next(val);
-    } catch (e) {
-      rt.done = true;
-      const msg = e instanceof SimError ? e.message : `internal error: ${e.message}`;
-      this.emit({ kind: 'error', text: `${msg} (in ${rt.p.inst.path}/${rt.p.name})`, file: rt.p.file, line: e.loc?.line || rt.ctx?.loc?.line || rt.p.loc?.line });
-      if (!(e instanceof SimError)) console.error(e);
-      this.finish('error');
+    for (;;) {
+      let r;
+      try {
+        r = rt.gen.next(val);
+      } catch (e) {
+        rt.done = true;
+        const msg = e instanceof SimError ? e.message : `internal error: ${e.message}`;
+        this.emit({ kind: 'error', text: `${msg} (in ${rt.p.inst.path}/${rt.p.name})`, file: rt.p.file, line: e.loc?.line || rt.ctx?.loc?.line || rt.p.loc?.line });
+        if (!(e instanceof SimError)) console.error(e);
+        this.finish('error');
+        return;
+      }
+      if (r.done) { rt.done = true; if (rt.fork) this.threadDone(rt); return; }
+      const req = r.value;
+      if (req.delay !== undefined) {
+        // VHDL `wait for 0 ns` resumes after the pending signal updates (next delta);
+        // Verilog `#0` stays in the current one
+        if (req.delay <= 0) (rt.p.lang === 'vhdl' ? this.nextDelta : this.active).push({ rt, val: 'delay' });
+        else this.heap.push(this.now + req.delay, { wake: rt });
+      } else if (req.triggers) {
+        const rec = { rt, triggers: req.triggers, fired: false };
+        for (const tr of req.triggers) tr.sig.waiters.add(rec);
+        if (req.deadline != null) this.heap.push(req.deadline, { timeout: rec });
+        rt.rec = rec;
+      } else if (req.forever) {
+        rt.done = true;   // (a thread blocked forever never completes its fork)
+      } else if (req.fork) {
+        if (this.spawn(rt, req.fork, req.ctx)) { val = undefined; continue; }
+      } else if (req.waitFork) {
+        if (!rt.kids?.size) { val = undefined; continue; }
+        rt.waitKids = true;
+      } else if (req.disableFork) {
+        this.killKids(rt);
+        val = undefined; continue;
+      }
       return;
     }
-    if (r.done) { rt.done = true; return; }
-    const req = r.value;
-    if (req.delay !== undefined) {
-      // VHDL `wait for 0 ns` resumes after the pending signal updates (next delta);
-      // Verilog `#0` stays in the current one
-      if (req.delay <= 0) (rt.p.lang === 'vhdl' ? this.nextDelta : this.active).push({ rt, val: 'delay' });
-      else this.heap.push(this.now + req.delay, { wake: rt });
-    } else if (req.triggers) {
-      const rec = { rt, triggers: req.triggers, fired: false };
-      for (const tr of req.triggers) tr.sig.waiters.add(rec);
-      if (req.deadline != null) this.heap.push(req.deadline, { timeout: rec });
-      rt.rec = rec;
-    } else if (req.forever) {
-      rt.done = true;
+  }
+
+  // ---------------------------------------------------------- fork / join threads
+  // Start one child thread per branch of fork statement s (run by thread rt, in context ctx). The
+  // children share the process (driver identity, frame) and start in the current delta, after the
+  // running thread. Returns true when rt goes on at once (join_none).
+  spawn(rt, s, ctx) {
+    const F = { parent: rt, mode: s.join, left: s.branches.length, woke: s.join === 'none' };
+    if (!rt.kids) rt.kids = new Set();
+    for (const b of s.branches) {
+      const cctx = { ...ctx };
+      const kid = { p: rt.p, gen: exec(b, cctx), done: false, rec: null, ctx: cctx, fork: F, parent: rt, kids: null, waitKids: false };
+      rt.kids.add(kid);
+      this.active.push({ rt: kid, val: undefined });
     }
+    return F.woke;
+  }
+  // child thread kid finished: wake the thread waiting on its fork / on `wait fork`
+  threadDone(kid) {
+    const F = kid.fork, par = kid.parent;
+    par.kids.delete(kid);
+    F.left--;
+    if (!F.woke && (F.mode === 'any' || F.left === 0)) { F.woke = true; this.active.push({ rt: par, val: 'fork' }); }
+    else if (par.waitKids && !par.kids.size) { par.waitKids = false; this.active.push({ rt: par, val: 'fork' }); }
+  }
+  // `disable fork`: terminate every child thread of rt (and their descendants)
+  killKids(rt) {
+    if (!rt.kids) return;
+    for (const kid of rt.kids) {
+      kid.done = true;
+      const rec = kid.rec;
+      if (rec && !rec.fired) { rec.fired = true; for (const tr of rec.triggers) tr.sig.waiters.delete(rec); }
+      this.killKids(kid);
+    }
+    rt.kids.clear();
   }
 
   start() {

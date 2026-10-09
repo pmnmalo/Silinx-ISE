@@ -608,6 +608,14 @@ export function* exec(s, ctx) {
       return;
     }
     case 'sys': return yield* execSys(s, ctx);
+    // Verilog fork / join: the simulator starts one child thread per branch (sharing this frame)
+    // and resumes this one when all (join) / any (join_any) / none (join_none) of them are done.
+    case 'fork':
+      ctx.loc = s.loc;
+      if (s.branches.length) yield { fork: s, ctx };
+      return;
+    case 'waitfork': yield { waitFork: true }; return;
+    case 'disablefork': yield { disableFork: true }; return;
     case 'report': {
       const msg = toStr(evalE(s.msg, ctx), s.msg.t);
       ctx.sim?.report(s.sev, msg, s.loc);

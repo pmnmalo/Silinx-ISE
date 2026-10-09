@@ -533,7 +533,13 @@ function bindDecl(E, d) {
     case 'function': case 'task':
       E.sc.def(d.name, { kind: 'func', decl: d, E: { ...E, fb: null, inProcess: false }, cache: new Map() });
       return;
+    case 'subalias': defSubAlias(E, d.name, d.target); return;
     case 'alias': {   // VHDL object alias: reads and writes go to the aliased object (or slice)
+      // `alias f is g;` without a signature: an alias of subprogram g when g is one
+      if (d.target.op === 'ref' && !d.type) {
+        const te = E.sc.lookup(d.target.name);
+        if (te ? te.kind === 'func' || te.kind === 'subalias' : BUILTIN_SUBPROGRAMS.has(d.target.name)) { defSubAlias(E, d.name, d.target.name); return; }
+      }
       const rv = bindExpr(E, d.target, null, d.loc);
       const lv = isLvalueExpr(d.target) && rv.k !== 'c' ? bindLvalue(E, d.target, d.loc) : null;
       if (rv.k === 'c') { E.sc.def(d.name, { kind: 'const', val: rv.val, t: rv.t }); return; }
@@ -758,6 +764,13 @@ function edgeOperand(node) {
   return null;
 }
 
+// VHDL subprogram alias: the alias name stands for the subprogram (a user subprogram: the same
+// entry; a built-in one: calls are redirected to its name)
+function defSubAlias(E, name, target) {
+  const te = E.sc.lookup(target);
+  E.sc.def(name, te && (te.kind === 'func' || te.kind === 'subalias') ? te : { kind: 'subalias', target });
+}
+
 function refNode(E, entry, name) {
   switch (entry.kind) {
     case 'sig': return { k: 'sig', sig: entry.sig, t: entry.t || entry.sig.t, name };
@@ -812,6 +825,7 @@ function bindExpr0(E, e, expect, loc) {
     }
     case 'ref': {
       const entry = lookupOrErr(E, e.name, loc);
+      if (entry?.kind === 'subalias') return bindExpr0(E, { ...e, name: entry.target }, expect, loc);
       if (entry) {
         const n = refNode(E, entry, e.name);
         if (n) return n;
@@ -1120,6 +1134,7 @@ function bindApply(E, e, expect, loc) {
   const name = e.name;
   const args = e.args.map(a => (a && a.named !== undefined ? a : a));
   const entry = E.sc.lookup(name);
+  if (entry?.kind === 'subalias') return bindApply(E, { ...e, name: entry.target }, expect, loc);
   if (entry && (entry.kind === 'sig' || entry.kind === 'const' || entry.kind === 'loc' || entry.kind === 'alias')) {
     const base = refNode(E, entry, name);
     if (args.length !== 1) throw new ElabError(`'${name}' indexed with ${args.length} indices`, loc);
@@ -1137,6 +1152,12 @@ function bindApply(E, e, expect, loc) {
 }
 
 function positional(args) { return args.map(a => (a && a.named !== undefined ? a.value : a)); }
+
+// names of the built-in VHDL subprograms (bindBuiltin; finish / stop: std.env procedures)
+const BUILTIN_SUBPROGRAMS = new Set(`rising_edge falling_edge to_unsigned conv_unsigned to_signed conv_signed conv_std_logic_vector
+to_integer conv_integer resize ext sxt to_stdlogicvector to_bitvector to_stdulogicvector to_01 to_x01 to_stdulogic to_bit
+shift_left shift_right rotate_left rotate_right and_reduce or_reduce xor_reduce nand_reduce nor_reduce xnor_reduce
+to_string to_bstring to_hstring minimum maximum now std_match finish stop`.split(/\s+/));
 
 function bindBuiltin(E, name, rawArgs, expect, loc) {
   const args = positional(rawArgs);
@@ -1341,7 +1362,7 @@ function bindSubprogram(entry, args, key, sigActuals, consts) {
   }
   fn.frameInit = fb.makeInit();
   const rw = collectRW(fn.body);
-  fn.impure = rw.reads.size > 0 || rw.writes.size > 0 || containsKind(fn.body, ['delay', 'event', 'wait', 'sys']);
+  fn.impure = rw.reads.size > 0 || rw.writes.size > 0 || containsKind(fn.body, ['delay', 'event', 'wait', 'sys', 'fork', 'waitfork']);
   return fn;
 }
 
@@ -1440,6 +1461,15 @@ function bindStmt0(E, s, loc) {
       }
       return { k: 'blk', stmts: s.stmts.map(x => bindStmt(BE, x, loc)).filter(Boolean), loc };
     }
+    case 'fork': {   // Verilog fork: each statement runs as a child thread of the process
+      if (!E.fb) throw new ElabError('fork is only allowed in initial / always blocks and tasks', loc);
+      const sc = new Scope(E.sc);
+      const BE = { ...E, sc };
+      for (const d of s.decls || []) bindDecl(BE, d);
+      return { k: 'fork', branches: s.stmts.map(x => bindStmt(BE, x, loc)).filter(Boolean), join: s.join || 'all', loc };
+    }
+    case 'waitfork': return { k: 'waitfork', loc };
+    case 'disablefork': return { k: 'disablefork', loc };
     case 'assign': {
       const target = bindLvalue(E, s.target, loc);
       const value = bindExpr(E, s.value, target.t, loc);
@@ -1497,7 +1527,7 @@ function bindStmt0(E, s, loc) {
     case 'repeat': return { k: 'repeat', count: vsize(E, bindExpr(E, s.count, null, loc)), body: bindStmt(E, s.body, loc), loc };
     case 'forever': {
       const body = bindStmt(E, s.body, loc);
-      return { k: 'forever', body, hasWait: containsKind(body, ['delay', 'event', 'wait', 'task']), loc };
+      return { k: 'forever', body, hasWait: containsKind(body, ['delay', 'event', 'wait', 'task', 'fork', 'waitfork']), loc };
     }
     case 'exit': case 'next': return { k: s.kind, c: s.cond ? bindExpr(E, s.cond, null, loc) : null, loc };
     case 'return': return { k: 'ret', value: s.value ? bindExpr(E, s.value, null, loc) : null, loc };
@@ -1550,6 +1580,8 @@ function evalRangeDyn(E, r, loc) {
 }
 
 function bindCallStmt(E, s, loc) {
+  const sub = E.sc.lookup(s.name);
+  if (sub?.kind === 'subalias') return bindCallStmt(E, { ...s, name: sub.target }, loc);
   const name = s.name;
   const sysName = name[0] === '$' ? name : (['finish', 'stop'].includes(name.toLowerCase()) ? name.toLowerCase() : null);
   if (sysName && !(name[0] !== '$' && E.sc.lookup(name))) {

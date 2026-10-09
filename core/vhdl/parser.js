@@ -550,12 +550,25 @@ class Parser {
         if (this.acceptOp(':')) type = this.parseSubtypeIndication();
         this.expectKw('is');
         const target = this.parseExpression();
-        if (!this.isOp(';')) {
-          this.warn('alias declarations of subprograms are not supported and are ignored', tok);
+        let signature = false;
+        if (this.isOp('[')) {
+          // subprogram alias: `alias name is subprogram_name [signature];` (the signature only
+          // selects among overloads, which are not distinguished here) -> { kind:'subalias', ... }
+          signature = true;
+          let depth = 0;
+          do {
+            if (this.isOp('[')) depth++;
+            else if (this.isOp(']')) depth--;
+            this.next();
+          } while (depth > 0 && this.peek().type !== 'eof');
+        }
+        if (!this.isOp(';') || (signature && target.op !== 'ref')) {
+          this.warn('unsupported alias declaration (ignored)', tok);
           this.sync();
           return [];
         }
         this.expectOp(';');
+        if (signature) return [{ kind: 'subalias', name, target: target.name, loc: this.loc(tok) }];
         return [{ kind: 'alias', name, type, target, loc: this.loc(tok) }];
       }
       case 'file': {
