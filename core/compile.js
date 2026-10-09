@@ -11,10 +11,16 @@ export function langOfPath(p) {
 // sources: [{ path, text, lang?, role? }]
 export function compile(sources) {
   const parsed = [];
+  // Verilog `include "name": a project file of that path (or base name)
+  const include = name => {
+    const base = name.split(/[\\/]/).pop();
+    const f = sources.find(x => x.path === name) || sources.find(x => String(x.path).split(/[\\/]/).pop() === base);
+    return f ? f.text : null;
+  };
   for (const s of sources) {
     const lang = s.lang || langOfPath(s.path);
     if (lang !== 'vhdl' && lang !== 'verilog') continue;
-    const r = lang === 'vhdl' ? parseVhdl(s.text, s.path) : parseVerilog(s.text, s.path);
+    const r = lang === 'vhdl' ? parseVhdl(s.text, s.path) : parseVerilog(s.text, s.path, { include });
     r.role = s.role || 'design';
     parsed.push(r);
   }

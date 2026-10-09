@@ -68,6 +68,7 @@ export function evalE(n, ctx) {
     case 'conv': { // resize/sign conversion; ext = signedness used for extension
       const a = evalE(n.a, ctx);
       if (n.t.kind === 'real') return a.real !== undefined ? a : V.real(V.toNum(V.withSign(a, n.ext)));
+      if (n.rtoi && a.real !== undefined) return V.fromInt(Math.trunc(a.real), n.t.w, true);
       if (n.sres && n.t.w < a.w) { // numeric_std resize(signed): sign bit + low bits
         const w = n.t.w, low = w > 1 ? V.getBits(a, 0, w - 1) : V.mk(0);
         return V.withSign(V.concat([V.getBits(a, a.w - 1, 1), low]), true);
@@ -317,14 +318,15 @@ export function formatDisplay(args, ctx, defaultRadix = 'd') {
       for (let k = 0; k < fmt.length; k++) {
         const ch = fmt[k];
         if (ch !== '%') { out += ch; continue; }
-        let j = k + 1, width = '';
+        let j = k + 1, width = '', prec = '';
         while (/[0-9]/.test(fmt[j] || '')) width += fmt[j++];
+        if (fmt[j] === '.') { j++; while (/[0-9]/.test(fmt[j] || '')) prec += fmt[j++]; }
         const spec = (fmt[j] || '').toLowerCase();
         k = j;
         if (spec === '%') { out += '%'; continue; }
         if (spec === 'm') { out += ctx.scopeName || ''; continue; }
         const { v, t } = nextVal();
-        out += fmtOne(v, t, spec, width, ctx);
+        out += fmtOne(v, t, spec, width, ctx, prec);
       }
     } else {
       const { v, t } = nextVal();
@@ -334,19 +336,20 @@ export function formatDisplay(args, ctx, defaultRadix = 'd') {
   return out;
 }
 
-function fmtOne(v, t, spec, width, ctx) {
+function fmtOne(v, t, spec, width, ctx, prec = '') {
   if (isStr(v)) return v.str;
   if (Array.isArray(v)) return toStr(v, t);
   let s;
   if ((spec === 'f' || spec === 'e' || spec === 'g') || (t && t.kind === 'real' && spec === 'd')) {
-    const x = V.toReal(v);
-    s = spec === 'e' ? x.toExponential(6) : spec === 'g' ? String(x) : x.toFixed(spec === 'd' ? 0 : 6);
+    const x = V.toReal(v), p = prec === '' ? 6 : +prec;
+    // %e: C-style exponent with at least two digits (1.500000e+00)
+    s = spec === 'e' ? x.toExponential(p).replace(/e([+-])(\d)$/, 'e$10$2') : spec === 'g' ? String(x) : x.toFixed(spec === 'd' ? 0 : p);
     return width !== '' && width !== '0' ? s.padStart(+width, ' ') : s;
   }
   switch (spec) {
     case 'b': s = V.toBin(v); break;
     case 'h': case 'x': s = V.toHex(v).toLowerCase(); if (width === '') s = s.padStart(Math.ceil(v.w / 4), '0'); break;
-    case 'o': s = v.x ? 'x' : v.v.toString(8); break;
+    case 'o': s = v.x ? 'x' : v.v.toString(8); if (width === '') s = s.padStart(Math.ceil(v.w / 3), '0'); break;
     case 'c': s = v.x ? '?' : String.fromCharCode(Number(v.v & 255n)); break;
     case 's': { let b = v.v, str = ''; while (b > 0n) { str = String.fromCharCode(Number(b & 255n)) + str; b >>= 8n; } s = str; break; }
     case 't': s = V.toDec(v); break;
@@ -372,6 +375,16 @@ function evalSys(n, ctx) {
     case '$time': case '$stime': case '$realtime':
       return V.fromInt(Math.round((sim ? sim.now : 0) / (ctx.timeUnit || 1000)), 64, false);
     case '$random': case '$urandom': {
+      if (n.args.length) {   // $random(seed): the seed variable is the state of a generator of its own
+        const L = n.args[0], wr = [];
+        resolveTarget(L, ctx, wr);
+        const cur = evalE(L, ctx);
+        let x = (cur.x ? 0 : Number(cur.v & 0xFFFFFFFFn)) || 0x2545F491;
+        x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+        const nv = V.fromInt(x | 0, L.t.w, L.t.s);
+        for (const w of wr) { if (w.loc != null) ctx.frame[w.loc] = applyWrite(ctx.frame[w.loc], w, nv, true); else sim?.write(w, nv); }
+        return V.fromInt(x | 0, 32, true);
+      }
       const r = sim ? sim.random() : 0;
       return V.fromInt(r, 32, n.name === '$random');
     }
@@ -516,7 +529,11 @@ function prepAssign(s, ctx) {
     parts = writes.map(w => { off -= w.w; return V.getBits(v, off, w.w); });
   }
   let delay = 0;
-  if (s.delay) { const d = evalE(s.delay, ctx); delay = (d.real ?? V.toNum(d)) * (s.delayUnit || 1); }
+  if (s.delay) {
+    const d = evalE(s.delay, ctx);
+    delay = (d.real ?? V.toNum(d)) * (s.delayUnit || 1);
+    if (s.prec) delay = Math.round(delay / s.prec) * s.prec;
+  }
   return { writes, parts, delay };
 }
 
@@ -568,9 +585,10 @@ export function* exec(s, ctx) {
     case 'blk':
       for (const x of s.stmts) {
         const r = yield* exec(x, ctx);
-        if (r) return r;
+        if (r) return r.brk === 'disable' && r.label === s.label ? undefined : r;   // disable <this block>
       }
       return;
+    case 'disable': return { brk: 'disable', label: s.label };
     case 'asg':
       ctx.loc = s.loc;
       if (s.intra) { yield* doAssignIntra(s, ctx); return; }
@@ -662,7 +680,7 @@ export function* exec(s, ctx) {
     case 'null': return;
     case 'delay': {
       const amt = evalE(s.amount, ctx);
-      const ps = Math.round((amt.real ?? V.toNum(amt)) * s.unit);
+      const ps = s.prec ? Math.round((amt.real ?? V.toNum(amt)) * s.unit / s.prec) * s.prec : Math.round((amt.real ?? V.toNum(amt)) * s.unit);
       yield { delay: ps };
       if (s.stmt) return yield* exec(s.stmt, ctx);
       return;
@@ -697,6 +715,7 @@ export function* exec(s, ctx) {
       });
       const sub = { ...ctx, frame };
       const r = yield* exec(f.body, sub);
+      if (r && r.brk === 'disable' && r.label !== f.name) return r;   // (disable of an enclosing block)
       // copy back outputs
       s.args.forEach((a, k) => {
         const p = f.params[k];

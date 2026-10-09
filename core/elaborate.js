@@ -172,6 +172,7 @@ function elabInstance(ctx, mod, name, path, paramOverrides, portConns, parentIns
   const E = {
     ctx, lang: mod.lang, sc: new Scope(usesScope(ctx, mod, mod.lang)), inst,
     file: inst.file, timeUnit: mod.timescale?.unit ?? (mod.lang === 'vhdl' ? 1 : 1000), fb: null, prefix: '', depth,
+    timePrec: mod.lang === 'verilog' ? mod.timescale?.precision : undefined,   // delays round to the precision
     slvArith: mod.slvArith,   // VHDL: std_logic_vector arithmetic of std_logic_unsigned / std_logic_signed
   };
   // parameters / generics
@@ -219,6 +220,15 @@ function elabInstance(ctx, mod, name, path, paramOverrides, portConns, parentIns
     }
   }
   for (const d of late) safe(E, d.loc, () => bindDecl(E, d));
+  // Verilog defparam: overrides for the parameters of instances below this one (path, value)
+  E.defparams = [...(paramOverrides.defparams || [])];
+  for (const it of mod.items || []) {
+    if (it.kind !== 'defparam') continue;
+    safe(E, it.loc, () => {
+      const n = bindExpr(E, it.value, null, it.loc);
+      E.defparams.push({ path: it.path.split('.'), val: constOf(E, n, it.loc), t: n.t });
+    });
+  }
   elabItems(E, mod.items);
   return inst;
 }
@@ -318,6 +328,7 @@ function elabItems(E, items) {
         case 'generate_for': return elabGenFor(E, it);
         case 'generate_if': return elabGenIf(E, it);
         case 'decl': return bindDecl(E, it.decl);
+        case 'defparam': return;   // (applied when the instance it names is elaborated)
         default: diag(E, `unsupported item '${it.kind}'`, it.loc, 'warning');
       }
     });
@@ -329,7 +340,7 @@ function elabAssignItem(E, it) {
   const value = bindExpr(E, it.value, target.t, it.loc);
   if (E.lang === 'verilog') ctxSize(value, target.t.w);
   checkAssignable(E, target, value, it.loc);
-  const body = { k: 'asg', target, value, nb: E.lang === 'vhdl', delay: it.delay ? bindExpr(E, it.delay) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, loc: it.loc };
+  const body = { k: 'asg', target, value, nb: E.lang === 'vhdl', delay: it.delay ? bindExpr(E, it.delay) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, prec: E.timePrec, loc: it.loc };
   if (E.lang === 'vhdl') Object.assign(body, vhdlMech(E, it));
   addProc(E, {
     name: `assign_${it.loc?.line ?? ''}`, kind: 'assign', mode: 'comb', body, triggers: triggersOfReads(body),
@@ -436,6 +447,14 @@ function elabChild(E, it) {
     const n = bindExpr(E, p.value, null, it.loc);
     ov.set(pname, { val: constOf(E, n, it.loc), t: n.t, text: n.strText });
   });
+  // defparams naming this instance: its own parameters, and the ones further down (passed on)
+  for (const dp of E.defparams || []) {
+    if (dp.path[0] !== it.name || dp.path.length < 2) continue;
+    if (dp.path.length > 2) { (ov.defparams ||= []).push({ ...dp, path: dp.path.slice(1) }); continue; }
+    const decl = mod.params.find(x => x.name === dp.path[1] || (ci && x.name.toLowerCase() === dp.path[1].toLowerCase()));
+    if (!decl) { diag(E, `defparam: module '${mod.name}' has no parameter '${dp.path[1]}'`, it.loc); continue; }
+    ov.set(decl.name, { val: dp.val, t: dp.t });
+  }
   const child = elabInstance(E.ctx, mod, name, `${E.inst.path}.${name}`, ov, portConns, E.inst, (E.depth || 0) + 1);
   child.loc = it.loc; child.instFile = E.file;
   child.connInfo = mod.ports.map(p => {
@@ -532,8 +551,12 @@ function bindDecl(E, d) {
         return;
       }
       if (E.sc.local(d.name) && E.sc.local(d.name).kind === 'sig') { diag(E, `'${d.name}' redeclared`, d.loc, 'warning'); return; }
+      // Verilog: a net without drivers is z (tri0 / tri1: pulled to 0 / 1)
+      if (E.lang === 'verilog' && d.net === 'wire' && !d.init && t.kind === 'logic') init = d.wired === 'tri0' ? V.zero(t.w) : d.wired === 'tri1' ? V.mk(t.w, V.mask(t.w)) : V.mk(t.w, V.mask(t.w), V.mask(t.w), t.s);
       const sig = newSignal(E, E.prefix + d.name, t, init, d.net === 'variable' ? 'var' : 'signal', d.loc);
       if (d.init) sig.hasInit = true;
+      if (d.wired) sig.wired = d.wired;
+      if (E.lang === 'verilog' && d.net === 'wire' && !d.init && t.kind === 'logic' && !d.wired) sig.netZ = true;   // (x once it has drivers)
       E.sc.def(d.name, { kind: 'sig', sig, t });
       return;
     }
@@ -873,6 +896,9 @@ function bindExpr0(E, e, expect, loc) {
         return { k: 'sig', sig, t: BIT, name: e.name };
       }
       if (e.name.includes('.')) {
+        // a signal of a generate block of this instance (blk[2].t)
+        const gs = E.inst.signals.find(x => x.name === E.prefix + e.name) || E.inst.signals.find(x => x.name === e.name);
+        if (gs) return { k: 'sig', sig: gs, t: gs.t, name: e.name };
         const hs = hierLookup(E, e.name);
         if (hs) return { k: 'sig', sig: hs, t: hs.t, name: e.name };
       }
@@ -1354,7 +1380,7 @@ function bindVlogCall(E, e, expect, loc) {
       }
       case '$bits': return { k: 'c', val: V.fromInt(A(0).t.w), t: INT };
       case '$time': case '$stime': case '$realtime': return { k: 'sys', name, args: [], t: vecT(64) };
-      case '$random': return { k: 'sys', name, args: [], t: INT };
+      case '$random': return { k: 'sys', name, args: e.args.length ? [bindLvalue(E, e.args[0], loc)] : [], t: INT };
       case '$urandom': return { k: 'sys', name, args: [], t: vecT(32) };
       case '$urandom_range': return { k: 'sys', name, args: e.args.map((_, i) => A(i)), t: vecT(32) };
       case '$countones': {
@@ -1363,7 +1389,9 @@ function bindVlogCall(E, e, expect, loc) {
         for (let i = 0; i < a.t.w; i++) sum = { k: 'bin', o: '+', a: sum, b: { k: 'conv', a: { k: 'bit', base: a, index: { k: 'c', val: V.fromInt(a.t.desc ? a.t.right + i : a.t.right - i), t: INT }, t: BIT }, ext: false, t: INT }, t: INT };
         return fold(sum);
       }
-      case '$rtoi': case '$itor': case '$realtobits': case '$bitstoreal': return A(0);
+      case '$rtoi': { const a = A(0); return fold({ k: 'conv', a, ext: true, rtoi: true, t: INT }); }   // truncates
+      case '$itor': { const a = A(0); return fold({ k: 'conv', a, ext: a.t.s, t: REAL }); }
+      case '$realtobits': case '$bitstoreal': return A(0);
     }
     throw new ElabError(`system function ${name} is not supported`, loc);
   }
@@ -1639,7 +1667,7 @@ function bindStmt0(E, s, loc) {
         if (d.kind === 'signal') d.net = 'variable';
         bindDecl(BE, d);
       }
-      return { k: 'blk', stmts: s.stmts.map(x => bindStmt(BE, x, loc)).filter(Boolean), loc };
+      return { k: 'blk', stmts: s.stmts.map(x => bindStmt(BE, x, loc)).filter(Boolean), loc, ...(s.label ? { label: s.label } : {}) };
     }
     case 'fork': {   // Verilog fork: each statement runs as a child thread of the process
       if (!E.fb) throw new ElabError('fork is only allowed in initial / always blocks and tasks', loc);
@@ -1660,7 +1688,7 @@ function bindStmt0(E, s, loc) {
       if (E.inFunction && root.k === 'sig' && !s.nonblocking) diag(E, `function assigns signal '${root.name}'`, loc, 'warning');
       const asg = {
         k: 'asg', target, value, nb: !!s.nonblocking && root.k !== 'loc',
-        delay: s.delay ? bindExpr(E, s.delay, null, loc) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, loc,
+        delay: s.delay ? bindExpr(E, s.delay, null, loc) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, prec: E.timePrec, loc,
       };
       if (E.lang === 'vhdl' && asg.nb) Object.assign(asg, vhdlMech(E, s));
       // Verilog `a = #d b;`: the process waits d, then assigns the value sampled before the wait
@@ -1713,7 +1741,8 @@ function bindStmt0(E, s, loc) {
     case 'exit': case 'next': return { k: s.kind, c: s.cond ? bindExpr(E, s.cond, null, loc) : null, loc, label: s.label };
     case 'return': return { k: 'ret', value: s.value ? bindExpr(E, s.value, null, loc) : null, loc };
     case 'null': return { k: 'null', loc };
-    case 'delay': return { k: 'delay', amount: bindExpr(E, s.amount, null, loc), unit: E.timeUnit, stmt: s.stmt ? bindStmt(E, s.stmt, loc) : null, loc };
+    case 'delay': return { k: 'delay', amount: bindExpr(E, s.amount, null, loc), unit: E.timeUnit, prec: E.timePrec, stmt: s.stmt ? bindStmt(E, s.stmt, loc) : null, loc };
+    case 'disable': return { k: 'disable', label: s.label, loc };
     case 'event': {
       const stmt = s.stmt ? bindStmt(E, s.stmt, loc) : null;
       const triggers = s.events === 'all' ? triggersOfReads(stmt) : s.events.flatMap(ev => bindTrigger(E, ev.expr, ev.edge, loc));

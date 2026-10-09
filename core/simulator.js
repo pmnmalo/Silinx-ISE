@@ -40,9 +40,26 @@ class Heap {
 // Driver identity of a process: a Verilog module's procedural code shares one driver per signal.
 const driverKey = p => (p.lang === 'verilog' && p.kind === 'process' ? 'vproc' : p.id);
 
+// Verilog wand / wor (and triand / trior), tri0 / tri1 resolution: per bit, a known 0 (wand) / 1
+// (wor) wins, then x, then the other value; z only when every driver is z (tri0 / tri1: 0 / 1).
+function resolveWired(sig) {
+  const w = sig.t.w, M = V.mask(w), kind = sig.wired;
+  let k0 = 0n, k1 = 0n, kx = 0n;
+  for (const { val: { v, x }, m } of sig.res.values()) { k0 |= m & ~x & ~v; k1 |= m & ~x & v; kx |= m & x & ~v; }
+  let v, x;
+  if (kind === 'and') { v = k1 & ~k0 & ~kx; x = kx & ~k0; }
+  else if (kind === 'or') { v = k1; x = kx & ~k1; }
+  else { const bad = kx | (k0 & k1); v = k1 & ~bad; x = bad; }
+  const none = M & ~(k0 | k1 | kx);   // only z drivers
+  if (kind === 'tri0') return V.mk(w, v, x, sig.t.s);
+  if (kind === 'tri1') return V.mk(w, v | none, x, sig.t.s);
+  return V.mk(w, v | none, x | none, sig.t.s);
+}
+
 // std_logic / Verilog wire resolution of the drivers of sig (4-state: 0 1 X Z).
 // Bits no driver has assigned yet keep the signal's current value.
 function resolve(sig) {
+  if (sig.wired) return resolveWired(sig);
   const w = sig.t.w, M = V.mask(w);
   let any0 = 0n, any1 = 0n, anyX = 0n, nz = 0n, D = 0n;
   for (const { val: { v, x }, m } of sig.res.values()) {
@@ -117,7 +134,9 @@ export class Simulator {
       }
     }
     for (const s of this.design.signals) {
-      s.res = !Array.isArray(s.init) && s.t.kind === 'logic' && drivers.get(s)?.size > 1 ? new Map() : null;
+      // a Verilog net starts at z when nothing drives it, else at x (its drivers' initial value)
+      if (s.netZ && drivers.has(s)) { s.val = V.allX(s.t.w, s.t.s); if (s.wave) s.wave.v[0] = s.val; }
+      s.res = !Array.isArray(s.init) && s.t.kind === 'logic' && (drivers.get(s)?.size > 1 || (s.wired && drivers.get(s)?.size)) ? new Map() : null;
     }
   }
 
@@ -473,7 +492,8 @@ export class Simulator {
     // end of time step: strobes / monitors
     if (this.strobes.length) { const s = this.strobes; this.strobes = []; for (const f of s) this.print(f()); }
     for (const m of this.monitors) {
-      const vals = m.args.map(a => (a.k === 'str' ? '' : JSON.stringify(evalE(a, m.ctx), (k, v) => (typeof v === 'bigint' ? v.toString() : v))));
+      // ($time / $stime / $realtime arguments do not trigger a $monitor)
+      const vals = m.args.map(a => (a.k === 'str' || (a.k === 'sys' && /^\$(s|real)?time$/.test(a.name)) ? '' : JSON.stringify(evalE(a, m.ctx), (k, v) => (typeof v === 'bigint' ? v.toString() : v))));
       const key = vals.join('|');
       if (key !== m.last) { m.last = key; this.print(formatDisplay(m.args, m.ctx)); }
     }
