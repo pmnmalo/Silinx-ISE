@@ -556,6 +556,7 @@ function bindDecl(E, d) {
       if (E.lang === 'verilog' && d.net === 'wire' && !d.init && t.kind === 'logic') init = d.wired === 'tri0' ? V.zero(t.w) : d.wired === 'tri1' ? V.mk(t.w, V.mask(t.w)) : V.mk(t.w, V.mask(t.w), V.mask(t.w), t.s);
       const sig = newSignal(E, E.prefix + d.name, t, init, d.net === 'variable' ? 'var' : 'signal', d.loc);
       if (d.init) sig.hasInit = true;
+      if (d.net === 'reg') sig.net = 'reg';   // (Verilog reg: a variable in VCD files)
       if (d.wired) sig.wired = d.wired;
       if (E.lang === 'verilog' && d.net === 'wire' && !d.init && t.kind === 'logic' && !d.wired) sig.netZ = true;   // (x once it has drivers)
       E.sc.def(d.name, { kind: 'sig', sig, t });

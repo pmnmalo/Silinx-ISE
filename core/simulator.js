@@ -570,7 +570,7 @@ export function toVCD(design, sim, { signals = design.signals, timescale = '1ps'
   };
   const decl = (name, s) => {
     if (!ids.has(s)) ids.set(s, idOf());
-    const ty = s.t.kind === 'int' ? 'integer' : s.kind === 'var' ? 'reg' : 'wire';
+    const ty = s.t.kind === 'int' ? 'integer' : s.kind === 'var' || s.net === 'reg' ? 'reg' : 'wire';
     lines.push(`$var ${ty} ${s.t.w} ${ids.get(s)} ${name.replace(/\s/g, '_')} $end`);
   };
   emitScope(design.top);
