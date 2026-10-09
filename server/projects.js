@@ -179,7 +179,12 @@ export async function writeFile(name, rel, text) {
   const dir = projectDir(name);
   const full = safeJoin(dir, rel);
   await fs.mkdir(path.dirname(full), { recursive: true });
-  await fs.writeFile(full, text);
+  // atomic: a reader (or a crash) never sees a half-written / empty file
+  const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed
+  try {
+    await fs.writeFile(tmp, text);
+    await fs.rename(tmp, full);
+  } catch (e) { await fs.rm(tmp, { force: true }).catch(() => {}); throw e; }
   // Register HDL files automatically.
   const lang = langOf(rel);
   if (lang === 'verilog' || lang === 'vhdl') {
