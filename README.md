@@ -69,6 +69,21 @@ for Xilinx FPGAs supported by ISE 14.7.
   typed in (what the design should do) or filled in from a simulation of the current design (a
   regression test); `-` bits are not checked. The bench reports every mismatch with its inputs and
   ends with *TEST PASSED* / *TEST FAILED*; it is VHDL-93 / Verilog-2001, so it also runs in ISim.
+- **Truth Table / Karnaugh Map** (*Tools ▸ Truth Table / Karnaugh Map…*, New Source ▸ *Truth Table
+  (.tt.json)*): name 1–6 inputs and 1–4 outputs, click the cells (0 → 1 → X don't care) or type an
+  expression per output (`ab' + c`, `a·b + c`, `~a & b`, `(a and not b) or c`…). For each output:
+  the Karnaugh map (Gray order; 5–6 inputs as two/four 4×4 maps) with the groups of the minimal SOP
+  (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
+  Σm / ΠM canonical forms; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
+  essential prime implicants marked, "several minimal solutions" noted) with literal and gate
+  counts; and *Check my answer*, which compares the student's own expression with the table and
+  lists the rows that differ. *Generate VHDL / Verilog module* adds a module that stays in sync
+  with the table both ways (like ASM charts: editing the table rewrites it; editing and saving the
+  HDL updates the table by exhaustive simulation, don't cares kept in its comments; a module that
+  no longer fits — sequential, too many inputs — shows the reason in the editor banners).
+  *Generate Schematic* draws the minimal two-level circuit (AND/OR or NAND only) as an editable
+  schematic. *Truth Table from Module…* (or right-click a module) reads the table of any
+  combinational module of up to 8 input bits.
 - **Implementation** with **Xilinx ISE 14.7** (XST → NGDBuild → MAP → PAR → TRCE → BitGen), run
   locally, in Docker or over SSH, with live per-step status (✓ / ⚠ / ✗) in the Processes panel
   (restored when the project is reopened), *Stop*, every warning/error in the Warnings/Errors tabs,

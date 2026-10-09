@@ -10,6 +10,8 @@
 // patterns: [[/regex/, "replacement with $1"]] }). Strings missing from a dictionary stay in English.
 // Code can also call t('English text') directly.
 
+import { TT_PT, TT_PT_PATTERNS } from './i18n-truthtable.js';
+
 const PT = {
   // menus
   'File': 'Ficheiro', 'Edit': 'Editar', 'View': 'Ver', 'Project': 'Projeto', 'Process': 'Processo', 'Tools': 'Ferramentas',
@@ -334,6 +336,8 @@ PT_PATTERNS.unshift(
   [/^Drawing: (\d+) × (\d+) px\. Large diagrams: several pages across \(tiles\) or A3; text below ~5 pt is hard to read on paper\. For a PDF choose "Save as PDF" in the print dialog \(keep the margins at "Default"\)\.$/,
     'Desenho: $1 × $2 px. Diagramas grandes: várias páginas na horizontal (mosaico) ou A3; texto abaixo de ~5 pt é difícil de ler em papel. Para um PDF escolha "Guardar como PDF" no diálogo de impressão (mantenha as margens em "Predefinição").'],
 );
+
+Object.assign(PT, TT_PT); PT_PATTERNS.unshift(...TT_PT_PATTERNS);   // Truth Table / Karnaugh Map tool
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },

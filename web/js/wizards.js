@@ -378,6 +378,7 @@ const SOURCE_TYPES = [
   { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src' },
   { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src' },
   { id: 'asm', label: 'ASM State Diagram (State Machine)', ico: 'asm', ext: '.asm.json', dir: 'src' },
+  { id: 'tt', label: 'Truth Table (.tt.json)', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints' },
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
 ];
@@ -405,7 +406,7 @@ export async function newSourceWizard({ type } = {}) {
       h('div', { style: { flex: 1 } }, h('label', {}, 'File name:'), fname, h('label', {}, 'Location:'), loc,
         h('label', { style: { marginTop: '12px' } }, h('input', { type: 'checkbox', checked: true, disabled: true }), ' Add to project'))),
     validate: () => {
-      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json)$/i, '');
+      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
       if (!FILE_RE.test(n)) return 'Enter a valid file name (letters, digits, _ and -).';
       if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
       const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${st.ext}`;
@@ -481,7 +482,7 @@ export async function newSourceWizard({ type } = {}) {
     title: 'Summary',
     render: () => summary,
     onShow: () => {
-      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json)$/i, '');
+      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
       summary.textContent = `Project Navigator will create a new skeleton source with the following specifications.\n\nAdd to Project: Yes\nSource Directory: ${loc.value}\nSource Type: ${st.label}\nSource Name: ${n}${st.ext}\n` +
         (st.id === 'vhdl' || st.id === 'verilog' ? `\nEntity name: ${entName.value}\n${st.id === 'vhdl' ? `Architecture name: ${archName.value}\n` : ''}\nPort Definitions:\n${ports.map(p => `    ${p.name.padEnd(12)} ${p.bus ? `Bus[${p.msb}:${p.lsb}]` : 'Pin'.padEnd(8)}  ${p.dir}`).join('\n')}` : '') +
         (st.id.endsWith('-tb') ? `\nAssociated Source: ${uutName}` : '');
@@ -497,7 +498,7 @@ export async function newSourceWizard({ type } = {}) {
   const proxy = new Proxy(dyn, { get: (t, k) => (k === 'length' ? pages().length : (typeof k === 'string' && /^\d+$/.test(k) ? pages()[+k] : t[k])) });
   const ok = await wizard('New Source Wizard', proxy, { width: 760 });
   if (!ok) return;
-  const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json)$/i, '');
+  const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
   const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${st.ext}`;
   let text;
   const pj = S.project;
@@ -524,6 +525,11 @@ export async function newSourceWizard({ type } = {}) {
       text = JSON.stringify(m, null, 2);
       break;
     }
+    case 'tt': {
+      const { newTable } = await import('/core/logic.js');
+      text = JSON.stringify({ ...newTable(n.replace(/[^A-Za-z0-9_]/g, '_'), ['a', 'b', 'c'], ['f']), lang: pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl' }, null, 2);
+      break;
+    }
   }
   const noUcf = !S.fileTree.includes(pj.constraints);
   await api.writeFile(pj.name, path, text);   // registers the new file in silinx.json
@@ -532,7 +538,7 @@ export async function newSourceWizard({ type } = {}) {
   if (st.id === 'ucf' && noUcf) { S.project.constraints = path; await app.saveProjectJson(); await app.reloadProject(); }
   if (st.id.endsWith('-tb')) await app.setTop(n, true);
   app.log(`Created ${st.label} '${path}'.`, 'ok');
-  if (st.id === 'asm') app.openAsm(path); else if (st.id === 'sch') app.openSch(path); else app.openFile(path);
+  if (st.id === 'asm') app.openAsm(path); else if (st.id === 'tt') app.openTt(path); else if (st.id === 'sch') app.openSch(path); else app.openFile(path);
 }
 
 function uutInfo(m) {
