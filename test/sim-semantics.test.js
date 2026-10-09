@@ -233,6 +233,23 @@ end;`, 'tb');
   assert.deepEqual(out2, ['-1 true']);
 });
 
+test('VHDL REAL arithmetic, time * real, conversions', () => {
+  const out = run(vhd(`
+  process
+    variable r : real := 1.5; variable i : integer;
+  begin
+    wait for T * 2.5; report time'image(now);
+    r := r * 2.0; report real'image(r);
+    r := 1.0 / 4.0; report real'image(r) & " " & boolean'image(r < 0.3) & " " & boolean'image(r > 0.3);
+    i := integer(-r * 10.0); report integer'image(i) & " " & real'image(real(i) + 0.5) & " " & real'image(abs (-r));
+    wait for T / 4; report time'image(now);
+    rs <= 0.25; wait for 1 ns; rs <= 0.5; wait for 1 ns; report integer'image(n);
+    wait;
+  end process;
+  process(rs) begin n <= n + 1; end process;`, `constant T : time := 10 ns; signal rs : real := 0.0; signal n : integer := 0;`), 'tb');
+  assert.deepEqual(out, ['25 ns', '3.0', '0.25 true false', '-3 -2.5 0.25', '27500 ps', '3']);
+});
+
 test('Verilog recursive automatic function', () => {
   const out = run(`module t;
   function automatic integer fact(input integer n);

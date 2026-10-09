@@ -244,7 +244,16 @@ export function setBits(a, lo, w, b) {
   return { w: a.w, v, x, s: a.s };
 }
 
-export const same = (a, b) => a.v === b.v && a.x === b.x;
+export const same = (a, b) => a.v === b.v && a.x === b.x && (a.real === b.real || toReal(a) === toReal(b));
+
+// REAL values: a 64-bit integer value (rounded, for code that reads bits) carrying the exact
+// JS number in `real`.
+export function real(x) {
+  const r = Number.isFinite(x) ? Math.sign(x) * Math.round(Math.abs(x)) : 0;
+  const v = Math.abs(r) < 9.2e18 ? BigInt(r) : 0n;
+  return { ...fromInt(v, 64, true), real: x };
+}
+export const toReal = a => a.real ?? Number(toBig(a));
 
 // ---- formatting ----
 export function toBin(a) {

@@ -571,6 +571,7 @@ function stdTypeName(n) {
     }
     case 'boolean': return { kind: 'boolean' };
     case 'time': return { kind: 'time' };
+    case 'real': return { kind: 'real' };
     case 'string': return { kind: 'string' };
   }
   return null;
@@ -756,10 +757,7 @@ function bindExpr0(E, e, expect, loc) {
       while ((b >= 0n ? b >= 1n << BigInt(w - 1) : -b > 1n << BigInt(w - 1))) w += 32;
       return { k: 'c', val: V.mk(w, BigInt.asUintN(w, b), 0n, true), t: w === 32 ? INT : vecT(w, true) };
     }
-    case 'real': {
-      const val = { ...V.fromInt(Math.round(e.value), 64, true), real: e.value };
-      return { k: 'c', val, t: REAL };
-    }
+    case 'real': return { k: 'c', val: V.real(e.value), t: REAL };
     case 'phys': {
       const ps = Math.round(e.value * (PHYS[e.unit] ?? 1));
       return { k: 'c', val: V.fromInt(ps, 64, true), t: TIME };
@@ -826,6 +824,7 @@ function bindExpr0(E, e, expect, loc) {
     case 'unary': {
       const a = bindExpr(E, e.a, expect, loc);
       let t;
+      if (a.t.kind === 'real' && (e.o === '-' || e.o === 'abs')) return fold({ k: 'un', o: e.o, a, t: REAL, fp: true });
       if (e.o === '~' || e.o === '-' || e.o === 'abs') t = a.t.kind === 'bool' ? BOOL : (a.t.kind === 'int' ? a.t : vecT(a.t.w, a.t.s));
       else t = E.lang === 'vhdl' && e.o === '!' ? BOOL : BIT;
       if (e.o === '~' && a.t.kind === 'logic' && a.t.scalar) t = BIT;
@@ -935,6 +934,10 @@ function bindBinary(E, e, expect, loc) {
   let a, b;
   if (e.a.op === 'aggregate' && e.b.op !== 'aggregate') { b = bindExpr(E, e.b, null, loc); a = bindExpr(E, e.a, b.t, loc); }
   else { a = bindExpr(E, e.a, ARITH.has(o) || BITWISE.has(o) ? expect : null, loc); b = bindExpr(E, e.b, a.t.kind === 'logic' || a.t.kind === 'enum' ? a.t : null, loc); }
+  // REAL operands: floating point (time * real, real / real, comparisons...)
+  const fp = a.t.kind === 'real' || b.t.kind === 'real';
+  if (fp && CMP.has(o)) return { k: 'bin', o, a, b, t: E.lang === 'vhdl' ? BOOL : BIT, fp };
+  if (fp && (ARITH.has(o))) return { k: 'bin', o, a, b, t: a.t.kind === 'time' || b.t.kind === 'time' ? TIME : REAL, fp };
   if (CMP.has(o)) {
     if (E.lang === 'vhdl' && a.t.kind === 'enum' && b.k === 'c') b = { ...b, t: a.t };
     if (E.lang === 'vhdl') { a = strAsLogic(a, b); b = strAsLogic(b, a); [a, b] = mixedSign(a, b); }
@@ -1111,6 +1114,7 @@ function bindBuiltin(E, name, rawArgs, expect, loc) {
     case 'to_signed': case 'conv_signed': return conv(A(0), C(1), true, true);
     case 'conv_std_logic_vector': return conv(A(0), C(1), false);
     case 'to_integer': case 'conv_integer': case 'integer': case 'natural': case 'positive': return conv(A(0), 32, true, A(0).t.s, 'int');
+    case 'real': { const a = A(0); return fold({ k: 'conv', a, ext: a.t.s, t: REAL }); }
     case 'resize': {
       const a = A(0), w = C(1);
       if (a.t.s && a.t.kind === 'logic' && w < a.t.w) return fold({ k: 'conv', a, ext: true, sres: true, t: vecT(w, true) });

@@ -67,6 +67,7 @@ export function evalE(n, ctx) {
     }
     case 'conv': { // resize/sign conversion; ext = signedness used for extension
       const a = evalE(n.a, ctx);
+      if (n.t.kind === 'real') return a.real !== undefined ? a : V.real(V.toNum(V.withSign(a, n.ext)));
       if (n.sres && n.t.w < a.w) { // numeric_std resize(signed): sign bit + low bits
         const w = n.t.w, low = w > 1 ? V.getBits(a, 0, w - 1) : V.mk(0);
         return V.withSign(V.concat([V.getBits(a, a.w - 1, 1), low]), true);
@@ -111,6 +112,7 @@ export function psliceLo(t, start, w, dir) {
 
 function evalUn(n, ctx) {
   const a = evalE(n.a, ctx);
+  if (n.fp) { const x = V.toReal(a); return V.real(n.o === '-' ? -x : Math.abs(x)); }
   const w = n.ew || n.t.w;
   switch (n.o) {
     case '~': return V.not(V.resize(V.withSign(a, n.t.s), w), w, n.t.s);
@@ -141,6 +143,7 @@ function evalBin(n, ctx) {
     if (o === '!=') return V.fromBool(toStr(a) !== toStr(b));
     throw new SimError(`operator ${o} on strings`);
   }
+  if (n.fp) return evalReal(n, a, b);
   const w = n.ew || n.t.w, s = n.t.s;
   switch (o) {
     case '==': case '!=': case '===': case '!==': case '<': case '<=': case '>': case '>=': {
@@ -180,6 +183,28 @@ function evalBin(n, ctx) {
   throw new SimError(`unknown operator ${o}`);
 }
 
+// Floating point: operands of type REAL (and TIME / integer values mixed with them).
+function evalReal(n, a, b) {
+  if (a.x || b.x) return n.t.kind === 'real' || n.t.kind === 'time' ? V.allX(64, true) : V.X1;
+  const x = V.toReal(V.withSign(a, n.a.t.s || n.a.t.kind === 'time')), y = V.toReal(V.withSign(b, n.b.t.s || n.b.t.kind === 'time'));
+  let r;
+  switch (n.o) {
+    case '==': case '===': return V.fromBool(x === y);
+    case '!=': case '!==': return V.fromBool(x !== y);
+    case '<': return V.fromBool(x < y);
+    case '<=': return V.fromBool(x <= y);
+    case '>': return V.fromBool(x > y);
+    case '>=': return V.fromBool(x >= y);
+    case '+': r = x + y; break;
+    case '-': r = x - y; break;
+    case '*': r = x * y; break;
+    case '/': r = x / y; break;
+    case '**': r = x ** y; break;
+    default: throw new SimError(`operator ${n.o} on real values`);
+  }
+  return n.t.kind === 'time' ? V.fromInt(Math.round(r), 64, true) : V.real(r);
+}
+
 // ---------------- strings / formatting ----------------
 export function toStr(v, t) {
   if (isStr(v)) return v.str;
@@ -195,6 +220,7 @@ export function imageOf(v, t) {
     case 'bool': return v.x ? 'X' : (v.v ? 'true' : 'false');
     case 'int': return V.toDec(v, true);
     case 'time': return v.x ? 'X' : formatTime(Number(V.toBig(v)));
+    case 'real': { const x = V.toReal(v); return Number.isInteger(x) ? x.toFixed(1) : String(x); }
     case 'logic': return t.w === 1 && t.scalar ? `'${V.toBin(v)}'` : V.toBin(v).toUpperCase();
     default: return V.toDec(v);
   }
@@ -243,6 +269,11 @@ function fmtOne(v, t, spec, width, ctx) {
   if (isStr(v)) return v.str;
   if (Array.isArray(v)) return toStr(v, t);
   let s;
+  if ((spec === 'f' || spec === 'e' || spec === 'g') || (t && t.kind === 'real' && spec === 'd')) {
+    const x = V.toReal(v);
+    s = spec === 'e' ? x.toExponential(6) : spec === 'g' ? String(x) : x.toFixed(spec === 'd' ? 0 : 6);
+    return width !== '' && width !== '0' ? s.padStart(+width, ' ') : s;
+  }
   switch (spec) {
     case 'b': s = V.toBin(v); break;
     case 'h': case 'x': s = V.toHex(v).toLowerCase(); if (width === '') s = s.padStart(Math.ceil(v.w / 4), '0'); break;
