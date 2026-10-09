@@ -55,6 +55,9 @@ test('values: binary, hex, decimal, negative, don\'t care; display', () => {
   assert.equal(parseValue('h1f', 5), '11111');
   assert.equal(parseValue('d12', 4), '1100');
   assert.equal(parseValue('-3', 4), '1101');
+  assert.equal(parseValue('-000', 4), '-000', 'every bit given, with a don\'t care: binary (not -0)');
+  assert.equal(parseValue('-1', 4), '1111');
+  assert.equal(parseValue('-1', 2), '-1');
   assert.equal(parseValue('1-x0', 4), '1--0');
   assert.equal(parseValue('', 4), null);
   assert.throws(() => parseValue('d16', 4), /does not fit/);
@@ -132,5 +135,5 @@ test('generator errors: bad names, no vectors, unsupported ports', () => {
   const v = [{ in: { a: '000', b: '000', cin: '0' } }];
   assert.throws(() => generateTestbench({ name: '1tb', uut: { name: 'adder' }, ports, vectors: v }), /invalid test bench name/);
   assert.throws(() => generateTestbench({ name: 'tb', uut: { name: 'adder' }, ports, vectors: [] }), /no vectors/);
-  assert.throws(() => generateTestbench({ name: 'tb', uut: { name: 'adder' }, ports: [...ports, { name: 'io', dir: 'inout', width: 1, kind: 'sl' }], vectors: v }), /inout/);
+  assert.throws(() => generateTestbench({ name: 'tb', uut: { name: 'adder' }, ports: [...ports, { name: 'io', dir: 'inout', width: 32, kind: 'int' }], vectors: v }), /bidirectional port\(s\) of a type/);
 });

@@ -1,13 +1,14 @@
 // Test Bench Wizard: a self-checking test bench for a module of the project. The user chooses the
 // unit under test, its clock / reset, how the input vectors are made (every combination, random,
 // counting, walking ones/zeros or typed in), and the expected outputs of each vector: typed in,
-// or filled in from a simulation of the current design (a regression test). Generator:
-// core/testbench.js.
+// or filled in from a simulation of the current design (a regression test). Bidirectional (inout)
+// ports have two columns: what the bench drives on the bus (a value, or Z / empty = released so
+// that the design drives it) and the value expected on the bus. Generator: core/testbench.js.
 import { api } from './api.js';
 import { h, alertDlg, toast } from './ui.js';
 import { compile, elaborate, simulate } from '/core/compile.js';
 import { clocksOf } from '/core/schematic.js';
-import { tbPorts, guessClockReset, makeVectors, parseValue, showValue, generateTestbench, expectedFromTrace, MAX_VECTORS } from '/core/testbench.js';
+import { tbPorts, guessClockReset, makeVectors, parseValue, parseDrive, showValue, generateTestbench, expectedFromTrace, MAX_VECTORS } from '/core/testbench.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
 
@@ -25,8 +26,8 @@ export async function testBenchWizard({ module, name = null, location = null, la
   let uut = mods.find(m => m.name === module) || mods.find(m => m.name === S.project.top) || mods[0];
 
   // ---------------------------------------------------------------- state
-  let ports = [], ins = [], outs = [], clockSigs = new Set();
-  let rows = [];          // [{ in: { port: text }, exp: { port: text } }] as typed in the table
+  let ports = [], ins = [], outs = [], ios = [], clockSigs = new Set();
+  let rows = [];          // [{ in: { port: text }, drv: { port: text }, exp: { port: text } }] as typed in the table
   const st = { clock: '', period: 20, reset: '', active: '1', cycles: 2, settle: 10, mode: 'exhaustive', count: 32, seed: 1 };
 
   const analyse = () => {
@@ -48,8 +49,13 @@ export async function testBenchWizard({ module, name = null, location = null, la
     const special = new Set([st.clock, st.reset].filter(Boolean));
     ins = ports.filter(p => p.dir === 'in' && !special.has(p.name));
     outs = ports.filter(p => p.dir === 'out');
+    ios = ports.filter(p => p.dir === 'inout');
   };
-  const totalBits = () => ins.reduce((n, p) => n + p.width, 0);
+  // bits of the generated stimulus: the inputs and the bidirectional ports (driven like inputs)
+  const totalBits = () => [...ins, ...ios].reduce((n, p) => n + p.width, 0);
+  // vectors of the exhaustive test: each combination, followed by a read vector when there are inout ports
+  const exhaustiveCount = () => 2 ** totalBits() * (ios.length ? 2 : 1);
+  const chk = () => [...outs, ...ios];   // what is checked: the outputs and the bidirectional buses
 
   // ---------------------------------------------------------------- page 1: unit under test
   const modSel = select(mods.map(m => [m.name, `${m.name} (${m.file})`]), uut.name);
@@ -77,8 +83,8 @@ export async function testBenchWizard({ module, name = null, location = null, la
       const g = await guard(path);
       if (g) return g;
       try { analyse(); } catch (e) { return e.message; }
-      const bad = ports.filter(p => p.kind === 'other' || p.dir === 'inout');
-      if (bad.length) return `The wizard cannot drive these ports: ${bad.map(p => `${p.name} (${p.dir === 'inout' ? 'inout' : 'type'})`).join(', ')}.`;
+      const bad = ports.filter(p => p.kind === 'other' || (p.dir === 'inout' && p.kind === 'int'));
+      if (bad.length) return `The wizard cannot drive these ports: ${bad.map(p => `${p.name} (type)`).join(', ')}.`;
       return null;
     },
   };
@@ -138,33 +144,38 @@ export async function testBenchWizard({ module, name = null, location = null, la
   const renderModes = () => {
     modeBox.innerHTML = '';
     const n = totalBits();
+    const nv = exhaustiveCount();
     for (const [id, label] of MODES) {
-      const dis = id === 'exhaustive' && 2 ** n > MAX_VECTORS;
+      const dis = id === 'exhaustive' && nv > MAX_VECTORS;
       const r = h('input', { type: 'radio', name: 'tbw-mode', value: id, checked: st.mode === id, disabled: dis });
       r.addEventListener('change', () => { st.mode = id; rows = []; syncStim(); });
       modeBox.append(h('label', { class: 'tbw-mode', style: { display: 'block', margin: '4px 0', color: dis ? '#999' : '' } }, r, ` ${label}`,
-        id === 'exhaustive' ? h('span', { class: 'hint' }, ` — ${n} input bit(s): ${2 ** n > MAX_VECTORS ? `${2 ** n} vectors, more than ${MAX_VECTORS}` : `${2 ** n} vector(s)`}`) : null));
+        id === 'exhaustive' ? h('span', { class: 'hint' }, ` — ${n} input bit(s): ${nv > MAX_VECTORS ? `${nv} vectors, more than ${MAX_VECTORS}` : `${nv} vector(s)`}`) : null));
     }
   };
   const syncStim = () => {
     count.disabled = !['random', 'count'].includes(st.mode);
     seed.disabled = st.mode !== 'random';
     stimNote.textContent = `Inputs (${ins.length ? ins.map(p => `${p.name}${p.width > 1 ? `[${p.width}]` : ''}`).join(', ') : 'none'})${st.clock ? `; ${st.clock} is the clock` : ''}${st.reset ? `; ${st.reset} is the reset (applied first)` : ''}. Outputs checked: ${outs.map(p => p.name).join(', ') || 'none'}.`;
+    ioNote.textContent = ios.length ? `Bidirectional ports (${ios.map(p => `${p.name}${p.width > 1 ? `[${p.width}]` : ''}`).join(', ')}): the generated vectors come in pairs: the bench first drives the port like an input, then releases it (Z) with the same inputs, so that the design can drive the bus; the value on the bus is checked in both. You can change any row on the next page.` : '';
+    ioNote.style.display = ios.length ? '' : 'none';
   };
+  const ioNote = h('div', { class: 'hint tbw-ionote', style: { marginTop: '6px' } });
   [count, seed].forEach(e => e.addEventListener('change', () => { rows = []; }));
   const p3 = {
     title: 'Input Vectors',
     render: () => h('div', {}, modeBox,
-      h('div', { class: 'form-grid', style: { marginTop: '8px' } }, ...field('Number of vectors:', count), ...field('Random seed:', seed)), stimNote),
+      h('div', { class: 'form-grid', style: { marginTop: '8px' } }, ...field('Number of vectors:', count), ...field('Random seed:', seed)), stimNote, ioNote),
     onShow: () => {
-      if (st.mode === 'exhaustive' && 2 ** totalBits() > MAX_VECTORS) st.mode = 'random';
+      if (st.mode === 'exhaustive' && exhaustiveCount() > MAX_VECTORS) st.mode = 'random';
       renderModes(); syncStim();
     },
     validate: () => {
       st.count = Math.max(1, Math.min(MAX_VECTORS, +count.value || 1)); st.seed = +seed.value || 1;
       if (!rows.length) {
         try {
-          rows = st.mode === 'manual' ? [{ in: {}, exp: {} }] : makeVectors(ins, { mode: st.mode, count: st.count, seed: st.seed }).map(v => ({ in: { ...v.in }, exp: {} }));
+          rows = st.mode === 'manual' ? [{ in: {}, drv: {}, exp: {} }] : makeVectors([...ins, ...ios], { mode: st.mode, count: st.count, seed: st.seed })
+            .map(v => ({ in: { ...v.in }, drv: Object.fromEntries(ios.map(p => [p.name, /Z/.test(v.drv?.[p.name] || 'Z') ? 'Z' : showValue(v.drv[p.name], p.width)])), exp: {} }));
         } catch (e) { return e.message; }
       }
       return null;
@@ -175,23 +186,35 @@ export async function testBenchWizard({ module, name = null, location = null, la
   const tblHost = h('div', { class: 'tbw-table', style: { maxHeight: '330px', overflow: 'auto', border: '1px solid #ccc', marginTop: '6px' } });
   const vecNote = h('div', { class: 'hint' });
   const busy = h('span', { class: 'hint', style: { marginLeft: '8px' } });
+  const isZ = t => !String(t ?? '').trim() || /^z+$/i.test(String(t).trim());
   const cell = (row, side, p) => {
-    const inp = h('input', { type: 'text', class: `tbw-cell tbw-${side}`, 'data-port': p.name, value: row[side][p.name] ?? '', placeholder: side === 'exp' ? '–' : '0'.repeat(Math.min(p.width, 8)), style: { width: `${Math.max(3, Math.min(p.width, 16)) + 2}ch`, fontFamily: 'var(--mono, monospace)' } });
-    inp.addEventListener('input', () => { row[side][p.name] = inp.value; inp.classList.remove('bad'); });
+    row[side] ||= {};
+    const inp = h('input', { type: 'text', class: `tbw-cell tbw-${side}`, 'data-port': p.name, value: row[side][p.name] ?? '', placeholder: side === 'exp' ? '–' : side === 'drv' ? 'Z' : '0'.repeat(Math.min(p.width, 8)), style: { width: `${Math.max(3, Math.min(p.width, 16)) + 2}ch`, fontFamily: 'var(--mono, monospace)' } });
+    // a released bidirectional port (Z / empty): the design drives the bus in this vector
+    const tint = () => { if (side === 'drv') inp.style.background = isZ(inp.value) ? '#e8f0ff' : '#fff6dd'; };
+    tint();
+    inp.addEventListener('input', () => { row[side][p.name] = inp.value; inp.classList.remove('bad'); tint(); });
     return inp;
   };
   const renderTable = () => {
     tblHost.innerHTML = '';
     const t = h('table', { class: 'grid' });
-    t.append(h('tr', {}, h('th', {}, '#'), ...ins.map(p => h('th', { title: 'input' }, p.name)), ...outs.map(p => h('th', { title: 'expected output', style: { background: '#eef4ff' } }, `${p.name} (expected)`)), h('th', {}, '')));
+    t.append(h('tr', {}, h('th', {}, '#'), ...ins.map(p => h('th', { title: 'input' }, p.name)),
+      ...ios.map(p => h('th', { title: 'bidirectional: the value the bench drives on the bus; Z or empty = released (the design drives it)', style: { background: '#fff6dd' } }, `${p.name} (drive)`)),
+      ...outs.map(p => h('th', { title: 'expected output', style: { background: '#eef4ff' } }, `${p.name} (expected)`)),
+      ...ios.map(p => h('th', { title: 'bidirectional: the value expected on the bus', style: { background: '#eef4ff' } }, `${p.name} (expected)`)), h('th', {}, '')));
     rows.slice(0, SHOWN_ROWS).forEach((row, k) => {
       const del = h('button', { class: 'tb-btn', title: 'Delete this vector', onclick: () => { rows.splice(k, 1); renderTable(); } }, '×');
-      t.append(h('tr', {}, h('td', {}, String(k)), ...ins.map(p => h('td', {}, cell(row, 'in', p))), ...outs.map(p => h('td', {}, cell(row, 'exp', p))), h('td', {}, del)));
+      t.append(h('tr', {}, h('td', {}, String(k)), ...ins.map(p => h('td', {}, cell(row, 'in', p))), ...ios.map(p => h('td', {}, cell(row, 'drv', p))),
+        ...chk().map(p => h('td', {}, cell(row, 'exp', p))), h('td', {}, del)));
     });
     tblHost.append(t);
-    const nexp = rows.filter(r => outs.some(p => String(r.exp[p.name] ?? '').trim())).length;
+    const nexp = rows.filter(r => chk().some(p => String(r.exp[p.name] ?? '').trim())).length;
     vecNote.textContent = `${rows.length} vector(s)${rows.length > SHOWN_ROWS ? ` (the first ${SHOWN_ROWS} shown)` : ''}, ${nexp} with expected values. Values: binary 0101, hex 0x1F, decimal d12 (or 12: only 0s and 1s read as binary); - or x = bit not checked; an empty expected value is not checked.`;
+    ioHint.textContent = ios.length ? 'Bidirectional ports: the drive column is the value the bench puts on the bus (it drives it like an input); Z or empty releases the bus, so that the design can drive it. The expected column is the value read on the bus, checked like an output.' : '';
+    ioHint.style.display = ios.length ? '' : 'none';
   };
+  const ioHint = h('div', { class: 'hint tbw-iohint' });
   // the vectors as bits; throws with the first bad cell
   const vectorsBits = ({ withExp = true } = {}) => rows.map((r, k) => {
     const v = { in: {}, exp: {} };
@@ -201,8 +224,12 @@ export async function testBenchWizard({ module, name = null, location = null, la
       if (b != null && /-/.test(b)) throw new Error(`vector ${k}, input ${p.name}: an input cannot be '-'`);
       v.in[p.name] = b ?? '0'.repeat(p.width);
     }
+    v.drv = {};
+    for (const p of ios) {
+      try { v.drv[p.name] = parseDrive(r.drv?.[p.name], p.width); } catch (e) { throw new Error(`vector ${k}, ${p.name} (drive): ${e.message}`); }
+    }
     if (withExp) {
-      for (const p of outs) {
+      for (const p of chk()) {
         try { v.exp[p.name] = parseValue(r.exp[p.name], p.width); } catch (e) { throw new Error(`vector ${k}, expected ${p.name}: ${e.message}`); }
       }
     }
@@ -226,9 +253,9 @@ export async function testBenchWizard({ module, name = null, location = null, la
       const tb = { path: `${name}.${lang.value === 'vhdl' ? 'vhd' : 'v'}`, lang: lang.value, text };
       const r = simulate([...designSources(), tb], name, { until: 1e15 });
       if (r.errors.length) throw new Error(r.errors.slice(0, 3).map(e => `${e.file}:${e.line} ${e.message}`).join('\n'));
-      const exp = expectedFromTrace(r.sim.log.map(l => l.text), outs, rows.length);
+      const exp = expectedFromTrace(r.sim.log.map(l => l.text), chk(), rows.length);
       if (exp.some(e => !e)) throw new Error('the simulation did not reach every vector');
-      rows.forEach((row, k) => { for (const p of outs) row.exp[p.name] = showValue(exp[k][p.name], p.width); });
+      rows.forEach((row, k) => { for (const p of chk()) row.exp[p.name] = showValue(exp[k][p.name], p.width); });
       busy.textContent = 'Expected values filled in from the current design: check them!';
       renderTable();
     } catch (e) {
@@ -243,9 +270,9 @@ export async function testBenchWizard({ module, name = null, location = null, la
       h('div', { style: { marginTop: '6px', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' } },
         h('button', { class: 'btn', onclick: () => fillFromDesign() }, 'Fill Expected from Current Design'),
         h('button', { class: 'btn', onclick: () => { rows.forEach(r => { r.exp = {}; }); busy.textContent = ''; renderTable(); } }, 'Clear Expected'),
-        h('button', { class: 'btn', onclick: () => { if (rows.length < MAX_VECTORS) { rows.push({ in: {}, exp: {} }); renderTable(); tblHost.scrollTop = tblHost.scrollHeight; } } }, 'Add Vector'),
+        h('button', { class: 'btn', onclick: () => { if (rows.length < MAX_VECTORS) { rows.push({ in: {}, drv: {}, exp: {} }); renderTable(); tblHost.scrollTop = tblHost.scrollHeight; } } }, 'Add Vector'),
         busy),
-      tblHost, vecNote),
+      tblHost, vecNote, ioHint),
     onShow: () => renderTable(),
     validate: () => {
       if (!rows.length) return 'Add at least one vector.';
@@ -262,7 +289,8 @@ export async function testBenchWizard({ module, name = null, location = null, la
     render: () => summary,
     onShow: () => {
       const v = vectorsBits();
-      const nexp = v.filter(x => outs.some(p => x.exp[p.name] && /[01]/.test(x.exp[p.name]))).length;
+      const nexp = v.filter(x => chk().some(p => x.exp[p.name] && /[01]/.test(x.exp[p.name]))).length;
+      const nrel = v.filter(x => ios.some(p => /Z/.test(x.drv[p.name]))).length;
       summary.textContent = [
         `The wizard will create the test bench ${path()} (${lang.value === 'vhdl' ? 'VHDL' : 'Verilog'}) and make it the simulation top.`,
         '',
@@ -271,6 +299,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
         st.reset ? `Reset: ${st.reset}, active '${st.active}' for ${st.cycles} ${st.clock ? 'clock cycle(s)' : 'x 10 ns'}` : 'Reset: none',
         `Vectors: ${v.length} (${MODES.find(m => m[0] === st.mode)?.[1] || st.mode})`,
         `Expected values: ${nexp ? `${nexp} vector(s) checked` : 'none (the outputs are only reported)'}`,
+        ...(ios.length ? [`Bidirectional ports: ${ios.map(p => p.name).join(', ')} (driven by the bench in ${v.length - nrel} vector(s), released in ${nrel})`] : []),
         '',
         'Run it with Simulate Behavioral Model: the console shows each mismatch and TEST PASSED / TEST FAILED.',
       ].join('\n');

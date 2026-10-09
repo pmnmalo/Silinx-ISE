@@ -6,7 +6,9 @@
 //                        placed tidily (inputs on the left, outputs on the right).
 //
 // Both take the ports as the wizard's friendly table gives them:
-//   ports: [{ name, dir: 'in'|'out', width: 1..256 (1 = single bit, N = bus N-1 downto 0), desc? }]
+//   ports: [{ name, dir: 'in'|'out'|'inout', width: 1..256 (1 = single bit, N = bus N-1 downto 0), desc? }]
+// An 'inout' port is a bidirectional (tri-state) port: the module drives it only when its output
+// enable <port>_oe is 1 and releases it ('Z') otherwise; it reads the bus from the port itself.
 // and checkPorts() validates that table (identifiers, reserved words, duplicates, widths).
 // Isomorphic (no DOM).
 import { newDoc, normalizeDoc, portBox, GRID } from './schdoc.js';
@@ -51,7 +53,7 @@ export function checkPorts(ports, { lang = 'vhdl', name = null, generics = [] } 
     if (name != null && key === String(name).toLowerCase()) return `Port '${p.name}' has the name of the module.`;
     if (seen.has(key)) return `Two ports are named '${p.name}'${seen.get(key) !== p.name ? ` (letter case does not count: '${seen.get(key)}')` : ''}.`;
     seen.set(key, p.name);
-    if (!['in', 'out'].includes(p.dir)) return `Port '${p.name}': the direction must be input or output.`;
+    if (!['in', 'out', 'inout'].includes(p.dir)) return `Port '${p.name}': the direction must be input, output or bidirectional (inout).`;
     const w = Number(p.width);
     if (!Number.isInteger(w) || w < 1 || w > MAX_WIDTH) return `Port '${p.name}': the width must be a whole number from 1 to ${MAX_WIDTH}.`;
   }
@@ -82,6 +84,8 @@ export const QUICK_PORTS = [
   { name: 'led', dir: 'out', width: 8, desc: 'LEDs' },
   { name: 'seg', dir: 'out', width: 7, desc: '7-segment display segments (a..g)' },
   { name: 'an', dir: 'out', width: 4, desc: '7-segment display anodes' },
+  { name: 'data', dir: 'inout', width: 8, desc: 'bidirectional data bus' },
+  { name: 'sda', dir: 'inout', width: 1, desc: 'bidirectional line' },
 ];
 
 /** Likely clock / reset among the 1-bit inputs (by name), and the reset's active level. */
@@ -135,6 +139,8 @@ const vhdlType = w => (w > 1 ? `std_logic_vector(${w - 1} downto 0)` : 'std_logi
 const vhdlZero = w => (w > 1 ? "(others => '0')" : "'0'");
 const vlogRange = w => (w > 1 ? `[${w - 1}:0] ` : '');
 const vlogZero = w => `${w}'b0`;
+const vhdlHighZ = w => (w > 1 ? "(others => 'Z')" : "'Z'");
+const vlogHighZ = w => `${w}'bz`;
 
 /** A name not used yet (ignoring case): base, base_1, base_2… */
 function freshName(base, used) {
@@ -182,8 +188,9 @@ export function generateModule(opts) {
   }
   const ins = ports.filter(p => p.dir === 'in');
   const outs = ports.filter(p => p.dir === 'out');
+  const ios = ports.filter(p => p.dir === 'inout');   // bidirectional (tri-state) ports
   const data = ins.filter(p => p !== clock && p !== reset && p !== enable);
-  const o = { name, ports, generics, kind, clock, reset, enable, rmode, active, ins, outs, data, combStyle: opts.combStyle === 'process' ? 'process' : 'assign' };
+  const o = { name, ports, generics, kind, clock, reset, enable, rmode, active, ins, outs, ios, data, combStyle: opts.combStyle === 'process' ? 'process' : 'assign' };
   return lang === 'vhdl'
     ? header('vhdl', name, opts.project, opts.description) + vhdlBody(o, String(opts.arch || '').trim() || 'rtl')
     : header('verilog', name, opts.project, opts.description) + vlogBody(o);
@@ -215,24 +222,59 @@ function vhdlBody(o, arch) {
   L.push(`end ${o.name};`, '');
   L.push(`architecture ${arch} of ${o.name} is`, '');
   const used = new Set([...o.ports.map(p => p.name.toLowerCase()), ...o.generics.map(g => g.name.toLowerCase()), o.name.toLowerCase(), arch.toLowerCase()]);
+  // bidirectional ports: an output enable and the value driven (internal signals)
+  const tri = o.ios.map(p => ({ p, oe: freshName(`${p.name}_oe`, used), out: freshName(`${p.name}_out`, used) }));
+  let valueEx = w => o.data.find(p => p.width === w)?.name || vhdlZero(w);   // example value of a TODO
+  const triDecls = () => {
+    for (const t of tri) {
+      L.push(`  -- bidirectional port ${t.p.name}: ${t.oe} = '1' drives ${t.p.name} with ${t.out}, '0' releases it ('Z')`,
+        `  signal ${t.oe} : std_logic;`, `  signal ${t.out} : ${vhdlType(t.p.width)};`);
+    }
+    if (tri.length) L.push('');
+  };
+  // the tri-state driver of each bidirectional port (with its enable and value, or the driver alone)
+  const triDrivers = (withValues) => {
+    for (const t of tri) {
+      const w = t.p.width;
+      L.push(`  -- Bidirectional (tri-state) port ${t.p.name}: the module drives the bus only while ${t.oe} is '1';`,
+        "  -- otherwise it releases it ('Z', high impedance) so that another circuit can drive it.",
+        `  -- Read the bus from ${t.p.name} itself: it carries the value of whoever drives it.`);
+      if (withValues) {
+        L.push(`  -- TODO: when does the module drive ${t.p.name}? e.g. ${t.oe} <= ${oeExample(o, "'1'")};   and the value, e.g. ${t.out} <= ${valueEx(w)};`,
+          `  ${t.oe} <= '0';   -- '0': ${t.p.name} released (only read) until you write the condition`,
+          `  ${t.out} <= ${vhdlZero(w)};`);
+      }
+      L.push(`  ${t.p.name} <= ${t.out} when ${t.oe} = '1' else ${vhdlHighZ(w)};   -- tri-state driver`, '');
+    }
+  };
   if (o.kind === 'comb') {
-    L.push('  -- internal signals, if you need them, are declared here, e.g.', '  --   signal t : std_logic_vector(7 downto 0);', '', 'begin', '');
-    if (!o.outs.length) L.push('  -- (the module has no outputs)', '');
-    else if (o.combStyle === 'process' && o.ins.length) {
+    L.push('  -- internal signals, if you need them, are declared here, e.g.', '  --   signal t : std_logic_vector(7 downto 0);', '');
+    triDecls();
+    L.push('begin', '');
+    const reads = [...o.ins, ...o.ios];   // what the logic reads (a bidirectional port: the bus)
+    const targets = [...o.outs.map(p => ({ name: p.name, width: p.width })), ...tri.map(t => ({ name: t.out, width: t.p.width }))];
+    if (!o.outs.length && !tri.length) L.push('  -- (the module has no outputs)', '');
+    else if (o.combStyle === 'process' && reads.length) {
       L.push('  -- Combinational logic: the process runs again whenever one of the inputs in its',
         '  -- sensitivity list changes. Every output first gets a default value, so it has a',
         '  -- value on every path through the process and no latch is inferred.');
       const lbl = freshName('comb', used);
-      L.push(`  ${lbl} : process (${o.ins.map(p => p.name).join(', ')})`, '  begin');
+      L.push(`  ${lbl} : process (${reads.map(p => p.name).join(', ')})`, '  begin');
       for (const p of o.outs) L.push(`    ${p.name} <= ${vhdlZero(p.width)};   -- default value`);
-      L.push('', '    -- TODO: describe the logic here, e.g.', `    --   if ${o.ins[0].name}${o.ins[0].width > 1 ? ` = "${'0'.repeat(o.ins[0].width)}"` : " = '1'"} then`, `    --     ${o.outs[0].name} <= ${o.outs[0].width > 1 ? "(others => '1')" : "'1'"};`, '    --   end if;');
+      for (const t of tri) L.push(`    ${t.oe} <= '0';   -- default: ${t.p.name} released ('Z')`, `    ${t.out} <= ${vhdlZero(t.p.width)};   -- default value`);
+      L.push('', '    -- TODO: describe the logic here, e.g.', `    --   if ${reads[0].name}${reads[0].width > 1 ? ` = "${'0'.repeat(reads[0].width)}"` : " = '1'"} then`, `    --     ${targets[0].name} <= ${targets[0].width > 1 ? "(others => '1')" : "'1'"};`, '    --   end if;');
+      if (tri.length) L.push(`    -- (${tri[0].oe} <= '1' where the module must drive ${tri[0].p.name})`);
       L.push(`  end process ${lbl};`, '');
+      triDrivers(false);
     } else {
-      L.push('  -- Combinational logic: one concurrent assignment per output; each one is evaluated',
-        '  -- again whenever a signal on its right-hand side changes.',
-        `  -- TODO: replace each 0 by the expression of the output, e.g. ${o.outs[0].name} <= ${o.ins.length ? vhdlExample(o.ins, o.outs[0]) : vhdlZero(o.outs[0].width)};`);
-      for (const p of o.outs) L.push(`  ${p.name} <= ${vhdlZero(p.width)};`);
-      L.push('');
+      if (o.outs.length) {
+        L.push('  -- Combinational logic: one concurrent assignment per output; each one is evaluated',
+          '  -- again whenever a signal on its right-hand side changes.',
+          `  -- TODO: replace each 0 by the expression of the output, e.g. ${o.outs[0].name} <= ${reads.length ? vhdlExample(reads, o.outs[0]) : vhdlZero(o.outs[0].width)};`);
+        for (const p of o.outs) L.push(`  ${p.name} <= ${vhdlZero(p.width)};`);
+        L.push('');
+      }
+      triDrivers(true);
     }
     L.push(`end ${arch};`, '');
     return L.join('\n');
@@ -245,6 +287,8 @@ function vhdlBody(o, arch) {
     if (!o.reset) L.push('  -- (no reset: the registers start at 0 when the FPGA is configured)');
     L.push('');
   } else L.push('  -- internal signals (registers) are declared here, e.g.', `  --   signal count : unsigned(7 downto 0);`, '');
+  triDecls();
+  valueEx = w => regs.find(r => r.p.width === w)?.reg || o.data.find(p => p.width === w)?.name || vhdlZero(w);
   L.push('begin', '');
   const lvl = `'${o.active}'`;
   const rstAssign = pad => regs.map(r => `${pad}${r.reg} <= ${vhdlZero(r.p.width)};`);
@@ -253,6 +297,8 @@ function vhdlBody(o, arch) {
     const r = regs[0];
     if (r) out.push(r.p.width > 1 ? `${pad}--   ${r.reg} <= std_logic_vector(unsigned(${r.reg}) + 1);   -- count up` : `${pad}--   ${r.reg} <= not ${r.reg};   -- toggle`);
     else out.push(`${pad}--   count <= count + 1;`);
+    const lr = tri.length && regs.find(x => x.p.width === tri[0].p.width);
+    if (lr) out.push(`${pad}--   ${lr.reg} <= ${tri[0].p.name};   -- load the value on the bus ${tri[0].p.name}`);
     out.push(`${pad}-- (a register that is not assigned here keeps its value)`);
     return out;
   };
@@ -274,8 +320,15 @@ function vhdlBody(o, arch) {
     for (const r of regs) L.push(`  ${r.p.name} <= ${r.reg};`);
     L.push('');
   }
+  triDrivers(true);
   L.push(`end ${arch};`, '');
   return L.join('\n');
+}
+
+// a 1-bit input that could enable the driver of a bidirectional port (TODO examples)
+function oeExample(o, dflt) {
+  const b = o.data.find(p => p.width === 1);
+  return b ? b.name : dflt;
 }
 
 function vhdlExample(ins, out) {
@@ -288,14 +341,40 @@ function vhdlExample(ins, out) {
 // ---------------------------------------------------------------- Verilog
 function vlogBody(o) {
   const L = [];
-  const regOut = o.kind === 'seq' || (o.combStyle === 'process' && o.ins.length);
+  const reads = [...o.ins, ...o.ios];   // what the logic reads (a bidirectional port: the bus)
+  const regOut = o.kind === 'seq' || (o.combStyle === 'process' && reads.length);
+  const procTri = o.kind === 'comb' && regOut;   // enable / value of the bidirectional ports set in always @(*)
+  const used = new Set([...o.ports.map(p => p.name), ...o.generics.map(g => g.name), o.name].map(s => s.toLowerCase()));
+  const tri = o.ios.map(p => ({ p, oe: freshName(`${p.name}_oe`, used), out: freshName(`${p.name}_out`, used) }));
+  const valueEx = w => (o.kind === 'seq' ? o.outs.find(p => p.width === w)?.name : null) || o.data.find(p => p.width === w)?.name || vlogZero(w);
+  const triDecls = () => {
+    for (const t of tri) {
+      L.push(`  // bidirectional port ${t.p.name}: ${t.oe} = 1 drives ${t.p.name} with ${t.out}, 0 releases it (z)`,
+        `  ${procTri ? 'reg ' : 'wire'} ${t.oe};`, `  ${procTri ? 'reg ' : 'wire'} ${vlogRange(t.p.width)}${t.out};`);
+    }
+    if (tri.length) L.push('');
+  };
+  const triDrivers = () => {
+    for (const t of tri) {
+      const w = t.p.width;
+      L.push(`  // Bidirectional (tri-state) port ${t.p.name}: the module drives the bus only while ${t.oe} is 1;`,
+        "  // otherwise it releases it (z, high impedance) so that another circuit can drive it.",
+        `  // Read the bus from ${t.p.name} itself: it carries the value of whoever drives it.`);
+      if (!procTri) {
+        L.push(`  // TODO: when does the module drive ${t.p.name}? e.g. assign ${t.oe} = ${oeExample(o, "1'b1")};   and the value, e.g. assign ${t.out} = ${valueEx(w)};`,
+          `  assign ${t.oe} = 1'b0;   // 0: ${t.p.name} released (only read) until you write the condition`,
+          `  assign ${t.out} = ${vlogZero(w)};`);
+      }
+      L.push(`  assign ${t.p.name} = ${t.oe} ? ${t.out} : ${vlogHighZ(w)};   // tri-state driver`, '');
+    }
+  };
   let head = `module ${o.name}`;
   if (o.generics.length) {
     const rows = o.generics.map((g, k) => [`    parameter integer ${g.name} = ${g.default}${k < o.generics.length - 1 ? ',' : ''}`, g.desc]);
     L.push(`${head} #(`, ...withComments(rows, '//'), ') (');
   } else L.push(`${head} (`);
   if (o.ports.length) {
-    const decl = p => `${p.dir === 'in' ? 'input ' : 'output'} ${p.dir === 'out' && regOut ? 'reg ' : 'wire'} ${vlogRange(p.width)}`;
+    const decl = p => `${p.dir === 'in' ? 'input ' : p.dir === 'inout' ? 'inout ' : 'output'} ${p.dir === 'out' && regOut ? 'reg ' : 'wire'} ${vlogRange(p.width)}`;
     const dw = Math.max(...o.ports.map(p => decl(p).length));
     const rows = o.ports.map((p, k) => [`    ${decl(p).padEnd(dw)}${p.name}${k < o.ports.length - 1 ? ',' : ''}`,
       p.desc || (p === o.clock ? 'clock' : p === o.reset ? `reset (active ${o.active === '1' ? 'high' : 'low'})` : p === o.enable ? 'enable' : '')]);
@@ -304,21 +383,29 @@ function vlogBody(o) {
   L.push(');', '');
   if (o.kind === 'comb') {
     L.push('  // internal signals, if you need them, are declared here, e.g.', '  //   wire [7:0] t;', '');
-    if (!o.outs.length) L.push('  // (the module has no outputs)', '');
+    triDecls();
+    const targets = [...o.outs.map(p => ({ name: p.name, width: p.width })), ...tri.map(t => ({ name: t.out, width: t.p.width }))];
+    if (!o.outs.length && !tri.length) L.push('  // (the module has no outputs)', '');
     else if (regOut) {
       L.push('  // Combinational logic: the always block runs again whenever one of its inputs changes',
         '  // (@(*)). Every output first gets a default value, so it has a value on every path',
         '  // through the block and no latch is inferred. Use blocking assignments (=) here.');
       L.push('  always @(*) begin');
       for (const p of o.outs) L.push(`    ${p.name} = ${vlogZero(p.width)};   // default value`);
-      L.push('', '    // TODO: describe the logic here, e.g.', `    //   if (${o.ins[0].name}${o.ins[0].width > 1 ? ` == ${o.ins[0].width}'d0` : ''})`, `    //     ${o.outs[0].name} = ${o.outs[0].width > 1 ? `{${o.outs[0].width}{1'b1}}` : "1'b1"};`);
+      for (const t of tri) L.push(`    ${t.oe} = 1'b0;   // default: ${t.p.name} released (z)`, `    ${t.out} = ${vlogZero(t.p.width)};   // default value`);
+      L.push('', '    // TODO: describe the logic here, e.g.', `    //   if (${reads[0].name}${reads[0].width > 1 ? ` == ${reads[0].width}'d0` : ''})`, `    //     ${targets[0].name} = ${targets[0].width > 1 ? `{${targets[0].width}{1'b1}}` : "1'b1"};`);
+      if (tri.length) L.push(`    // (${tri[0].oe} = 1'b1 where the module must drive ${tri[0].p.name})`);
       L.push('  end', '');
+      triDrivers();
     } else {
-      L.push('  // Combinational logic: one continuous assignment per output; each one is evaluated',
-        '  // again whenever a signal on its right-hand side changes.',
-        `  // TODO: replace each 0 by the expression of the output, e.g. assign ${o.outs[0].name} = ${o.ins.length ? vlogExample(o.ins, o.outs[0]) : vlogZero(o.outs[0].width)};`);
-      for (const p of o.outs) L.push(`  assign ${p.name} = ${vlogZero(p.width)};`);
-      L.push('');
+      if (o.outs.length) {
+        L.push('  // Combinational logic: one continuous assignment per output; each one is evaluated',
+          '  // again whenever a signal on its right-hand side changes.',
+          `  // TODO: replace each 0 by the expression of the output, e.g. assign ${o.outs[0].name} = ${reads.length ? vlogExample(reads, o.outs[0]) : vlogZero(o.outs[0].width)};`);
+        for (const p of o.outs) L.push(`  assign ${p.name} = ${vlogZero(p.width)};`);
+        L.push('');
+      }
+      triDrivers();
     }
     L.push('endmodule', '');
     return L.join('\n');
@@ -332,11 +419,14 @@ function vlogBody(o) {
     const p = o.outs[0];
     if (p) out.push(p.width > 1 ? `${pad}//   ${p.name} <= ${p.name} + 1;   // count up` : `${pad}//   ${p.name} <= ~${p.name};   // toggle`);
     else out.push(`${pad}//   count <= count + 1;`);
+    const lr = tri.length && o.outs.find(x => x.width === tri[0].p.width);
+    if (lr) out.push(`${pad}//   ${lr.name} <= ${tri[0].p.name};   // load the value on the bus ${tri[0].p.name}`);
     out.push(`${pad}// (a register that is not assigned here keeps its value; use non-blocking <=)`);
     return out;
   };
   const body = pad => (o.enable ? [`${pad}if (${o.enable.name}) begin   // the registers change only when ${o.enable.name} is 1`, ...nextState(pad + '  '), `${pad}end`] : nextState(pad));
   if (!o.outs.length) L.push('  // registers (internal), if you need them, are declared here, e.g.', '  //   reg [7:0] count;', '');
+  triDecls();
   if (!o.reset && o.outs.length) {
     L.push('  // no reset: the registers start at 0 when the FPGA is configured');
     L.push('  initial begin');
@@ -354,6 +444,7 @@ function vlogBody(o) {
   } else {
     L.push(`  always @(posedge ${c}) begin`, ...body('    '), '  end', '');
   }
+  triDrivers();
   L.push('endmodule', '');
   return L.join('\n');
 }
@@ -371,7 +462,8 @@ const r10 = v => Math.ceil(v / GRID) * GRID;
 /**
  * A new schematic document with an I/O marker per port: inputs on the left edge, outputs on the
  * right one, 60 px apart (bus markers carry their width), the clock input (optional) at the
- * bottom of the inputs after a gap, an empty middle area. The description goes into
+ * bottom of the inputs after a gap, the bidirectional (inout) markers on the right edge below
+ * the outputs after a gap, an empty middle area. The description goes into
  * doc.description (shown on the sheet, and as a comment in the synchronized HDL).
  * opts: { name, lang, description, ports: [{ name, dir, width }], clock: port name or null }
  */
@@ -385,18 +477,20 @@ export function schematicFromPorts(opts) {
   const doc = newDoc(String(opts.name).trim(), lang);
   const desc = String(opts.description ?? '').trim();
   if (desc) doc.description = desc;
-  const ins = ports.filter(p => p.dir === 'in'), outs = ports.filter(p => p.dir === 'out');
+  const ins = ports.filter(p => p.dir === 'in'), outs = ports.filter(p => p.dir === 'out'), ios = ports.filter(p => p.dir === 'inout');
   const STEP = 60, TOP = desc ? 160 : 120;
   const nIn = ins.length + (clockName ? 2 : 0);   // the clock after an empty slot
-  const rows = Math.max(nIn, outs.length, 1);
+  const ioAt = outs.length ? outs.length + 1 : 0;  // the bidirectional markers after an empty slot
+  const rows = Math.max(nIn, ios.length ? ioAt + ios.length : outs.length, 1);
   doc.sheet.h = Math.max(1100, r10(TOP + rows * STEP + 140));
   const bw = p => portBox({ ...p, x: 0, y: 0 }).w;
   const xIn = r10(40 + Math.max(60, ...ins.map(bw), clockName ? bw({ name: clockName, dir: 'in' }) : 0));
-  const xOut = doc.sheet.w - r10(40 + Math.max(60, ...outs.map(p => bw(p))));
+  const xOut = doc.sheet.w - r10(40 + Math.max(60, ...[...outs, ...ios].map(p => bw(p))));
   let k = 0;
   const add = (p, x, y) => doc.ports.push({ id: `P${++k}`, name: p.name, dir: p.dir, width: p.width, x, y });
   ins.forEach((p, i) => add(p, xIn, TOP + i * STEP));
   if (clockName) add({ name: clockName, dir: 'in', width: 1 }, xIn, TOP + (ins.length + 1) * STEP);
   outs.forEach((p, i) => add(p, xOut, TOP + i * STEP));
+  ios.forEach((p, i) => add(p, xOut, TOP + (ioAt + i) * STEP));
   return normalizeDoc(doc);
 }

@@ -144,7 +144,8 @@ test('port table checks: identifiers, reserved words, duplicates, widths, generi
   assert.match(checkPorts([P('m')], { lang: 'vhdl', name: 'm' }), /name of the module/);
   assert.match(checkPorts([P('a', 'in', 0)], { lang: 'vhdl' }), /width must be a whole number/);
   assert.match(checkPorts([P('a', 'in', 2.5)], { lang: 'vhdl' }), /width must be a whole number/);
-  assert.match(checkPorts([P('a', 'inout')], { lang: 'vhdl' }), /input or output/);
+  assert.equal(checkPorts([P('a', 'inout', 8)], { lang: 'vhdl' }), null);
+  assert.match(checkPorts([P('a', 'buffer')], { lang: 'vhdl' }), /input, output or bidirectional \(inout\)/);
   assert.match(checkPorts([], { lang: 'vhdl', name: 'entity' }), /Module name: 'entity' is a reserved word/);
   assert.match(checkPorts([P('a')], { lang: 'vhdl', generics: [{ name: 'a', default: '1' }] }), /generic 'a' has the name of a port/);
   assert.match(checkPorts([], { lang: 'vhdl', generics: [{ name: 'N', default: 'x' }] }), /whole number/);

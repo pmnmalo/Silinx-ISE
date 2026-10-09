@@ -11,6 +11,7 @@
 // Code can also call t('English text') directly.
 
 import { TT_PT, TT_PT_PATTERNS } from './i18n-truthtable.js';
+import { IO_PT, IO_PT_PATTERNS } from './i18n-inout.js';
 
 const PT = {
   // menus
@@ -387,8 +388,6 @@ Object.assign(PT, {
   '1 = a single bit; N = a bus of N bits (N-1 downto 0)': '1 = um só bit; N = um barramento de N bits (N-1 downto 0)',
   'Description': 'Descrição', 'output': 'saída', 'optional': 'opcional', 'Add Port': 'Adicionar Porto',
   'No ports yet: use the quick-add buttons or Add Port.': 'Ainda sem portos: use os botões de adição rápida ou Adicionar Porto.',
-  'One row per input or output. Width 1 is a single bit (std_logic / wire); a width N makes a bus of N bits, numbered N-1 downto 0.':
-    'Uma linha por entrada ou saída. Largura 1 é um só bit (std_logic / wire); uma largura N faz um barramento de N bits, numerados de N-1 a 0.',
   'One assignment per output (concurrent)': 'Uma atribuição por saída (concorrente)', 'One process / always block that reads every input': 'Um processo / bloco always que lê todas as entradas',
   'No reset': 'Sem reset', 'Synchronous (at the clock edge)': 'Síncrono (no flanco do relógio)', 'Asynchronous (at once)': 'Assíncrono (imediato)',
   "Active high ('1')": "Ativo a 1 ('1')", "Active low ('0')": "Ativo a 0 ('0')",
@@ -423,7 +422,6 @@ PT_PATTERNS.push(
   [/^Port '(.*)' has the name of the module\.$/, "O porto '$1' tem o nome do módulo."],
   [/^Two ports are named '([^']*)'\.$/, "Há dois portos com o nome '$1'."],
   [/^Two ports are named '([^']*)' \(letter case does not count: '([^']*)'\)\.$/, "Há dois portos com o nome '$1' (maiúsculas e minúsculas não contam: '$2')."],
-  [/^Port '(.*)': the direction must be input or output\.$/, "Porto '$1': a direção tem de ser entrada ou saída."],
   [/^Port '(.*)': the width must be a whole number from 1 to (\d+)\.$/, "Porto '$1': a largura tem de ser um número inteiro de 1 a $2."],
   [/^The generic '(.*)' has the name of a port or of another generic\.$/, "O genérico '$1' tem o nome de um porto ou de outro genérico."],
   [/^The generic '(.*)' has the name of a port or of the module\.$/, "O genérico '$1' tem o nome de um porto ou do módulo."],
@@ -434,6 +432,7 @@ PT_PATTERNS.push(
   [/^(\S+) already exists: choose another name\.$/, '$1 já existe: escolha outro nome.'],
 );
 Object.assign(PT, TT_PT); PT_PATTERNS.unshift(...TT_PT_PATTERNS);   // Truth Table / Karnaugh Map tool
+Object.assign(PT, IO_PT); PT_PATTERNS.unshift(...IO_PT_PATTERNS);   // bidirectional (inout) ports of the wizards
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },
