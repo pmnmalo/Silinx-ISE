@@ -354,7 +354,8 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   const devErr = validateDevice(device);
   if (devErr.length) throw Object.assign(new Error(devErr.join('; ')), { status: 400 });
 
-  const design = (project.files || []).filter(f => (f.role || 'design') === 'design' && (f.lang === 'verilog' || f.lang === 'vhdl'));
+  // synthesis: the files of every view and the implementation-only ones (not the simulation-only ones)
+  const design = (project.files || []).filter(f => ['design', 'impl'].includes(f.role || 'design') && (f.lang === 'verilog' || f.lang === 'vhdl'));
   if (!design.length) throw Object.assign(new Error('project has no design (role "design") HDL files'), { status: 400 });
 
   const buildDir = path.join(projectDir, 'build');

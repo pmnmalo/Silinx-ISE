@@ -390,7 +390,7 @@ test('xise: import with provided / missing files (unsafe paths mapped into the p
   const pj = r.body.project;
   assert.deepEqual(pj.files, [
     { path: 'rtl/top.vhd', lang: 'vhdl', role: 'design' },
-    { path: 'src/util.v', lang: 'verilog', role: 'design' },
+    { path: 'src/util.v', lang: 'verilog', role: 'impl' },   // only Implementation in the .xise: implementation only
     { path: 'sim/tb.vhd', lang: 'vhdl', role: 'sim' },
   ]);
   assert.deepEqual(r.body.missing, ['C:/work/tb.vhd']);

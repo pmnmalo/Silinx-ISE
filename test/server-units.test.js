@@ -502,3 +502,17 @@ entity l is port(gate, d : in std_logic; q : out std_logic); end l;
 architecture a of l is begin u : LD port map (G => gate, D => d, Q => q); end a;` };
   assert.deepEqual((await ise.unconstrainedPorts([ld], 'l', '')).filter(p => p.clock).map(p => p.net), ['gate']);
 });
+
+test('xise: implementation-only association round trip (Implementation only <-> role impl)', async () => {
+  const { exportXise, importXise } = await import('../server/xise.js');
+  const project = { name: 'p', top: 'top', device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' },
+    files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/syn_only.vhd', lang: 'vhdl', role: 'impl' }, { path: 'sim/tb.vhd', lang: 'vhdl', role: 'sim' }] };
+  const x = exportXise(project, {});
+  const block = (name) => new RegExp(`<file xil_pn:name="${name.replace(/[./]/g, '\\$&')}"[^>]*>([\\s\\S]*?)</file>`).exec(x)[1];
+  assert.match(block('src/top.vhd'), /BehavioralSimulation[\s\S]*Implementation/);
+  assert.match(block('src/syn_only.vhd'), /Implementation/);
+  assert.doesNotMatch(block('src/syn_only.vhd'), /Simulation/);
+  assert.doesNotMatch(block('sim/tb.vhd'), /Implementation/);
+  const back = importXise(x);
+  assert.deepEqual(back.files.map(f => `${f.path}:${f.role}`), ['src/top.vhd:design', 'src/syn_only.vhd:impl', 'sim/tb.vhd:sim']);
+});

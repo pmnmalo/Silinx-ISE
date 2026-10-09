@@ -45,6 +45,14 @@ function topValue(project, name, sources) {
  * @param {object} project  Silinx project json
  * @param {object} [opts]   { sources: { path: text } } (optional, used to detect VHDL architectures / top files)
  */
+// association(s) of an ISE file -> Silinx role: both (or none) = design ("All"), only
+// Implementation = impl, otherwise (simulation only) = sim
+function roleOfAssoc(assoc) {
+  const impl = assoc.includes('Implementation'), sim = assoc.some(a => /Simulation/i.test(a));
+  if (!assoc.length || (impl && sim)) return 'design';
+  return impl ? 'impl' : 'sim';
+}
+
 export function exportXise(project, { sources, schematics = [], extraFiles = [] } = {}) {
   const dev = project.device || {};
   const impl = project.impl || {};
@@ -66,6 +74,8 @@ export function exportXise(project, { sources, schematics = [], extraFiles = [] 
     if ((f.role || 'design') === 'design') {
       lines.push(`      <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="${seq}"/>`);
       lines.push(`      <association xil_pn:name="Implementation" xil_pn:seqID="${seq}"/>`);
+    } else if (f.role === 'impl') {
+      lines.push(`      <association xil_pn:name="Implementation" xil_pn:seqID="${seq}"/>`);
     } else {
       lines.push(`      <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="${seq}"/>`);
     }
@@ -74,8 +84,8 @@ export function exportXise(project, { sources, schematics = [], extraFiles = [] 
   }
   for (const x of schematics) {
     lines.push(`    <file xil_pn:name="${esc(x.path)}" xil_pn:type="FILE_SCHEMATIC">`);
-    lines.push(`      <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="${seq}"/>`);
-    if ((x.role || 'design') === 'design') lines.push(`      <association xil_pn:name="Implementation" xil_pn:seqID="${seq}"/>`);
+    if (x.role !== 'impl') lines.push(`      <association xil_pn:name="BehavioralSimulation" xil_pn:seqID="${seq}"/>`);
+    if ((x.role || 'design') !== 'sim') lines.push(`      <association xil_pn:name="Implementation" xil_pn:seqID="${seq}"/>`);
     lines.push('    </file>');
     seq++;
   }
@@ -161,11 +171,10 @@ export function importXise(xml) {
     if (!name) continue;   // an entry without a file name is no file of the project
     const assoc = [...(m[3] || '').matchAll(/<association\b([^>]*)\/?>/g)].map(x => attrs(x[1]).name);
     if (type === 'FILE_UCF' || /\.ucf$/i.test(name)) { if (!constraints) constraints = name; continue; }
-    if (type === 'FILE_SCHEMATIC' || /\.sch$/i.test(name)) { schematics.push({ path: name, role: assoc.includes('Implementation') || !assoc.length ? 'design' : 'sim' }); continue; }
+    if (type === 'FILE_SCHEMATIC' || /\.sch$/i.test(name)) { schematics.push({ path: name, role: roleOfAssoc(assoc) }); continue; }
     const lang = type === 'FILE_VHDL' || /\.vhdl?$/i.test(name) ? 'vhdl' : type === 'FILE_VERILOG' || /\.(v|sv)$/i.test(name) ? 'verilog' : null;
     if (!lang) { unsupported.push({ name, type: type || '?' }); continue; }
-    const role = assoc.includes('Implementation') || !assoc.length ? 'design' : 'sim';
-    files.push({ path: name, lang, role });
+    files.push({ path: name, lang, role: roleOfAssoc(assoc) });
   }
 
   const props = {};

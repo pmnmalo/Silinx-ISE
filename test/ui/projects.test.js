@@ -160,10 +160,21 @@ uiTest('Add Copy of Source: new files, association, overwrite confirmation (No k
   await add(['tb_buf2.v'], 'sim');
   await page.waitFor(() => window.Silinx.project.files.find((f) => f.path === 'sim/tb_buf2.v')?.role === 'sim');
   assert.equal(await page.eval(() => window.Silinx.project.files.find((f) => f.path === 'src/buf2.v').role), 'design');
+  // an implementation-only copy: in the Implementation view, not in the Simulation view; Files and Source Properties show it
+  await fs.writeFile(path.join(dir, 'syn_only.v'), 'module syn_only(input a, output y); assign y = ~a; endmodule\n');
+  await add(['syn_only.v'], 'impl');
+  await page.waitFor(() => window.Silinx.project.files.find((f) => f.path === 'src/syn_only.v')?.role === 'impl', [], { what: 'syn_only.v implementation only' });
+  await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'syn_only'), [], { what: 'syn_only in the Implementation view' });
+  await page.click('input[name=view][value=sim]');
+  await page.waitFor(() => ![...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'syn_only') && [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'tb_buf2'), [], { what: 'syn_only hidden in the Simulation view' });
+  await page.click('input[name=view][value=impl]');
+  await page.click('#left-tabs .tab[data-page=files]');
+  await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].some((r) => r.cells[0]?.textContent === 'src/syn_only.v' && r.cells[1]?.textContent === 'Implementation'), [], { what: 'Files view: Implementation' });
+  await page.click('#left-tabs .tab[data-page=design]');
   // Yes: replaced, and the open editor of that file shows the new text after reopening
   await add(['inv.vhd'], 'design', 'Yes');
   await page.waitFor(async () => true);
-  await page.waitConsole(/Added 1 source file\(s\)\.[\s\S]*Added 1 source file\(s\)\.[\s\S]*Added 1 source file\(s\)\./);
+  await page.waitConsole(/(Added 1 source file\(s\)\.[\s\S]*){4}/);   // buf2, tb_buf2, syn_only, then inv replaced
   assert.equal(await readWs(env, 'Copies', 'src/inv.vhd'), changed);
   // Files view: every file with its association
   await page.click('#left-tabs .tab[data-page=files]');

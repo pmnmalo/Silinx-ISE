@@ -173,7 +173,7 @@ function renderHierarchy() {
 
   const lib = S.lib;
   const role = name => moduleInfo(name)?.role || 'design';
-  const visible = name => S.view === 'sim' || role(name) === 'design';
+  const visible = name => inView(role(name), S.view === 'sim');
   let roots = topCandidates(lib).filter(visible);
   if (S.view === 'impl') {
     // modules only instantiated from sim files are roots too
@@ -222,7 +222,7 @@ function renderHierarchy() {
   // packages, constraints, ASM charts and other files
   for (const p of lib.packages.values()) {
     const fi = S.project.files.find(f => f.path === p.file);
-    if (S.view === 'impl' && fi?.role === 'sim') continue;
+    if (!inView(fi?.role, S.view === 'sim')) continue;
     const it = treeItem({ label: p.name, meta: `(${p.file.split('/').pop()})`, ico: 'vhdl', key: `pkg:${p.name}`, onSelect: () => select({ type: 'file', file: p.file }), onOpen: () => openFile(p.file, p.loc?.line), onContext: e => fileContextMenu(e, p.file) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
@@ -245,7 +245,7 @@ function renderHierarchy() {
   }
   // files that failed to parse into any unit
   const withUnits = new Set(lib.parsed.filter(p => p.units.length).map(p => p.file));
-  for (const f of S.project.files.filter(f => !withUnits.has(f.path) && (S.view === 'sim' || f.role === 'design'))) {
+  for (const f of S.project.files.filter(f => !withUnits.has(f.path) && inView(f.role, S.view === 'sim'))) {
     const it = treeItem({ label: f.path.split('/').pop(), meta: '(no units)', ico: f.lang === 'vhdl' ? 'vhdl' : 'verilog', key: `f:${f.path}`, onSelect: () => select({ type: 'file', file: f.path }), onOpen: () => openFile(f.path), onContext: e => fileContextMenu(e, f.path) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
@@ -296,6 +296,14 @@ function select(sel) {
 async function testBench(mod) {
   const { testBenchWizard } = await import('./tbwizard.js');
   return testBenchWizard({ module: mod });
+}
+
+// is a source of association `role` part of the view? design = both views ("All"),
+// sim = simulation only, impl = implementation only (synthesis, not simulated)
+export function inView(role, sim) {
+  if (role === 'sim') return sim;
+  if (role === 'impl') return !sim;
+  return true;
 }
 
 function moduleContextMenu(e, mod, file) {
@@ -537,7 +545,7 @@ async function checkSyntaxInner(mod, sim, id) {
   await saveAll();
   setStatus(id, 'running');
   log(`\nStarted : "${sim ? 'Behavioral Check Syntax' : 'Check Syntax'}".\n`, 'hdr');
-  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design'));
+  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, sim));
   for (const s of srcs) log(`${s.lang === 'vhdl' ? 'Parsing VHDL' : 'Analyzing Verilog'} file "${s.path}" into library work`);
   const lib = compile(srcs);
   const design = elaborate(lib, mod);
@@ -558,7 +566,7 @@ async function checkSyntaxInner(mod, sim, id) {
 function hdlDiagnostics(path, text, info = []) {
   const fi = S.project.files.find(f => f.path === path);
   const sim = fi?.role === 'sim';
-  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design' || s.path === path))
+  const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (inView(s.role, sim) || s.path === path))
     .map(s => (s.path === path && text != null ? { ...s, text } : s));
   const lib = compile(srcs);
   const units = (lib.parsed.find(p => p.file === path)?.units || []).filter(u => u.kind === 'module');
@@ -1201,7 +1209,7 @@ async function netlistSources(step, { hier = false } = {}) {
   let text = scalarizeNetlist(raw);
   if (hier) {
     try {
-      const design = elaborate(compile(S.sources.filter(x => x.role === 'design' && (x.lang === 'vhdl' || x.lang === 'verilog'))), S.project.top);
+      const design = elaborate(compile(S.sources.filter(x => inView(x.role, false) && (x.lang === 'vhdl' || x.lang === 'verilog'))), S.project.top);
       text = regroupNetlist(raw, (design.top?.children || []).map(c => c.name)).text;
     } catch (e) { log(`WARNING: technology schematic shown flat (${e.message})`, 'warn'); }
   }
@@ -1219,7 +1227,7 @@ async function openTechSchematic(mod) {
 async function openSchematic(mod, { netlist = null } = {}) {
   await saveAll();
   const sim = S.view === 'sim';
-  const srcs = netlist || S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design'));
+  const srcs = netlist || S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, sim));
   const lib = compile(srcs);
   const design = elaborate(lib, mod);
   const diags = diagsFor(lib, design);
@@ -1309,7 +1317,7 @@ async function runSimulationInner(mod, model) {
   const title = model ? `Simulate ${SIM_MODEL_NAMES[model]} Model` : 'Simulate Behavioral Model';
   setStatus(procId, 'running');
   log(`\nStarted : "${title}".\n\nBuilding simulation model for top '${mod}'${model ? ` with the ${SIM_MODEL_NAMES[model].toLowerCase()} netlist of '${S.project.top}'` : ''}...`, 'hdr');
-  const srcs = [...S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog'), ...(net || [])];
+  const srcs = [...S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, true)), ...(net || [])];   // no implementation-only files
   const lib = compile(srcs);
   if (model) lib.errors = lib.errors.filter(e => !/redefined/.test(e.message));
   const design = elaborate(lib, mod);
@@ -1360,7 +1368,7 @@ async function openEmulator(mod, { scale, model = null } = {}) {
   const models = Object.keys(SIM_MODEL_NAMES).filter(k => rep?.simModels?.[k] && rep.top === mod);
   const net = model ? await netlistSources(model) : null;
   if (model && !net) return;
-  const srcs = net || S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
+  const srcs = net || S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, false));   // the implemented design
   const { timingGenerics, autoTimeScale, scaledGenerics } = await import('/core/emulate.js');
   let design, lib, gens = [];
   try {
@@ -2332,7 +2340,7 @@ function renderFilesPage() {
     const pad = { paddingLeft: `${4 + (parts.length - 1) * 14}px` };
     tbl.append(h('tr', { 'data-file': path, ondblclick: () => openFile(path), oncontextmenu: e => { e.preventDefault(); fileContextMenu(e, path); } },
       h('td', { style: pad }, path),
-      h('td', {}, f ? (f.role === 'sim' ? 'Simulation' : 'All') : path === S.project.constraints ? 'Implementation' : '—'),
+      h('td', {}, f ? (f.role === 'sim' ? 'Simulation' : f.role === 'impl' ? 'Implementation' : 'All') : path === S.project.constraints ? 'Implementation' : '—'),
       h('td', {}, f ? f.lang : path.split('.').pop())));
   }
   host.append(tbl);

@@ -595,7 +595,7 @@ function uutInfo(m) {
 
 export async function addSourceDialog() {
   const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.mem,.hex,.asm.json,.json' });
-  const role = select([['design', 'All (Implementation + Simulation)'], ['sim', 'Simulation only']], 'design');
+  const role = select([['design', 'All (Implementation + Simulation)'], ['impl', 'Implementation only'], ['sim', 'Simulation only']], 'design');
   const r = await dialog({
     title: 'Add Copy of Source', width: 480,
     body: h('div', { class: 'form-grid' }, ...field('Files:', inp), ...field('Association:', role)),
@@ -628,7 +628,7 @@ export async function addSourceDialog() {
 export async function sourceProperties(path) {
   const f = S.project.files.find(x => x.path === path);
   if (!f) return;
-  const role = select([['design', 'All'], ['sim', 'Simulation']], f.role);
+  const role = select([['design', 'All'], ['impl', 'Implementation'], ['sim', 'Simulation']], f.role || 'design');
   const r = await dialog({
     title: `Source Properties - ${path}`, width: 440,
     body: h('div', { class: 'form-grid' }, ...field('File:', h('span', {}, path)), ...field('Language:', h('span', {}, f.lang)), ...field('View Association:', role)),

@@ -484,3 +484,12 @@ test('optional flow steps: simulation models, pin2ucf, xpwr', () => {
   const p = ise.parsePwr('| Supply Power (mW)    | 52.46 | 1.50    | 50.96        |\n| Junction Temp (C)   | 27.5 |');
   assert.deepEqual(p, { totalMw: 52.46, dynamicMw: 1.5, staticMw: 50.96, junctionC: 27.5 });
 });
+
+test('generateBuild: an implementation-only source is synthesized, a simulation-only one is not', async () => {
+  const { dir, project } = await makeProject('blinky');
+  const p = { ...project, files: project.files.map(f => (f.path === 'src/counter.v' ? { ...f, role: 'impl' } : f)) };
+  const g = await ise.generateBuild(p, dir);
+  const prj = await fs.readFile(path.join(g.buildDir, 'top.prj'), 'utf8');
+  assert.match(prj, /src\/src\/counter\.v/);
+  assert.doesNotMatch(prj, /tb_top/);
+});
