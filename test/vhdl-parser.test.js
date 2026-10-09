@@ -158,7 +158,7 @@ describe('design units', () => {
     assert.deepEqual(m.ports.map((p) => [p.name, p.dir]),
       [['a', 'in'], ['b', 'in'], ['c', 'out'], ['d', 'inout'], ['e', 'out'], ['f', 'in']]);
     assert.deepEqual(m.ports[0].type, LOGIC);
-    assert.deepEqual(m.ports[2].type, { kind: 'logic', range: { left: I(3), right: I(0), dir: 'downto' }, signed: false });
+    assert.deepEqual(m.ports[2].type, { kind: 'logic', range: { left: I(3), right: I(0), dir: 'downto' }, signed: false, mark: 'std_logic_vector' });
     assert.equal(m.ports[4].type.signed, false);
     assert.deepEqual(m.ports[5].default, L1('1'));
     assert.ok(m.ports[0].loc.line === 3);
@@ -207,7 +207,7 @@ describe('design units', () => {
     assert.deepEqual(p.decls[1].value, I(50000000));
     const parity = p.decls[4];
     assert.deepEqual(parity.params, [{ name: 'v', dir: 'in', default: null,
-      type: { kind: 'logic', range: null, signed: false, unconstrained: true } }]);
+      type: { kind: 'logic', range: null, signed: false, unconstrained: true, mark: 'std_logic_vector' } }]);
     assert.deepEqual(parity.returnType, LOGIC);
     assert.equal(parity.decls[0].net, 'variable');
     assert.equal(parity.body[0].kind, 'forrange');
@@ -246,8 +246,8 @@ describe('types and declarations', () => {
       signal p : my_type; signal q : ieee.std_logic_1164.std_logic; signal r : std_ulogic_vector(1 downto 0);`);
     const t = Object.fromEntries(m.decls.map((d) => [d.name, d.type]));
     assert.deepEqual(t.a, LOGIC); assert.deepEqual(t.b, LOGIC); assert.deepEqual(t.c, LOGIC);
-    assert.deepEqual(t.d, { kind: 'logic', range: { left: I(7), right: I(0), dir: 'downto' }, signed: false });
-    assert.deepEqual(t.e, { kind: 'logic', range: { left: I(0), right: I(3), dir: 'to' }, signed: false });
+    assert.deepEqual(t.d, { kind: 'logic', range: { left: I(7), right: I(0), dir: 'downto' }, signed: false, mark: 'std_logic_vector' });
+    assert.deepEqual(t.e, { kind: 'logic', range: { left: I(0), right: I(3), dir: 'to' }, signed: false, mark: 'bit_vector' });
     assert.equal(t.f.signed, false);
     assert.equal(t.g.signed, true);
     assert.deepEqual(t.h, { kind: 'integer', range: null });
@@ -277,7 +277,7 @@ describe('types and declarations', () => {
     const d = Object.fromEntries(m.decls.map((x) => [x.name, x]));
     assert.deepEqual(noloc(d.state_t), { kind: 'type', name: 'state_t', type: { kind: 'enum', values: ['idle', 'run', 'done'] } });
     assert.deepEqual(d.ram_t.type, { kind: 'array', range: { left: I(0), right: I(255), dir: 'to' },
-      elem: { kind: 'logic', range: { left: I(7), right: I(0), dir: 'downto' }, signed: false } });
+      elem: { kind: 'logic', range: { left: I(7), right: I(0), dir: 'downto' }, signed: false, mark: 'std_logic_vector' } });
     assert.deepEqual(d.vec_arr.type, { kind: 'array', range: null, elem: LOGIC });
     assert.deepEqual(d.small.type, { kind: 'integer', range: { left: I(0), right: I(15), dir: 'to' } });
     assert.equal(d.byte.type.kind, 'logic');

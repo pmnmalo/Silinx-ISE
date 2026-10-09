@@ -68,6 +68,7 @@ export function buildLibrary(parsedFiles) {
     ent.items = a.items;
     ent.uses = [...new Set([...(ent.uses || []), ...(a.uses || [])])];
     ent.archFile = a.file;
+    if (a.slvArith) ent.slvArith = a.slvArith;
     delete ent.entityOnly;
   }
   return lib;
@@ -140,7 +141,7 @@ function packageScope(ctx, name, file, loc, diagE) {
   ctx.pkgScopes.set(name, sc);
   // package-level signals (e.g. SIMPRIM's GSR / GTS) belong to the package: one per design
   const pinst = { name: pkg.name, path: pkg.name, signals: [], procs: [], children: [], params: [], ports: [] };
-  const E = { ctx, lang: 'vhdl', sc, inst: pinst, file: pkg.file, timeUnit: 1, fb: null, prefix: '' };
+  const E = { ctx, lang: 'vhdl', sc, inst: pinst, file: pkg.file, timeUnit: 1, fb: null, prefix: '', slvArith: pkg.slvArith };
   for (const d of pkg.decls) {
     try { bindDecl(E, d); } catch (e) { if (!(e instanceof ElabError)) throw e; diag(E, e.message, e.loc || d.loc); }
   }
@@ -168,6 +169,7 @@ function elabInstance(ctx, mod, name, path, paramOverrides, portConns, parentIns
   const E = {
     ctx, lang: mod.lang, sc: new Scope(usesScope(ctx, mod, mod.lang)), inst,
     file: inst.file, timeUnit: mod.timescale?.unit ?? (mod.lang === 'vhdl' ? 1 : 1000), fb: null, prefix: '', depth,
+    slvArith: mod.slvArith,   // VHDL: std_logic_vector arithmetic of std_logic_unsigned / std_logic_signed
   };
   // parameters / generics
   for (const p of mod.params) {
@@ -554,19 +556,22 @@ function bindDecl(E, d) {
 function elabType(E, ts, allowUnconstrained = false) {
   switch (ts.kind) {
     case 'logic': {
+      // mark: std_logic_vector / bit_vector (not the numeric_std unsigned / signed types)
+      const mk = ts.mark ? { mark: ts.mark } : null;
       if (!ts.range) {
-        if (ts.unconstrained) return { ...vecT(1, ts.signed), unconstrained: true };
+        if (ts.unconstrained) return { ...vecT(1, ts.signed), unconstrained: true, ...mk };
         return { ...BIT, s: !!ts.signed };
       }
       const { left, right, desc } = evalRange(E, ts.range);
       const w = Math.abs(left - right) + 1;
-      return { kind: 'logic', w, s: !!ts.signed, left, right, desc };
+      return { kind: 'logic', w, s: !!ts.signed, left, right, desc, ...mk };
     }
     case 'integer': {
       const t = { ...INT };
       if (ts.range) {
         const r = evalRange(E, ts.range);
         t.rlo = Math.min(r.left, r.right); t.rhi = Math.max(r.left, r.right);
+        if (r.left > r.right) t.rdown = true;   // `range 10 downto 0`: 'left is the high bound
       }
       return t;
     }
@@ -596,10 +601,16 @@ function elabType(E, ts, allowUnconstrained = false) {
         }
         return { ...elabType(E, { ...e.unconstrained, range: ts.range }), name: e.name };
       }
-      if (ts.range && e.t.kind === 'logic') return elabType(E, { kind: 'logic', range: ts.range, signed: e.t.s });
+      if (ts.range && e.t.kind === 'logic') return elabType(E, { kind: 'logic', range: ts.range, signed: e.t.s, mark: e.t.mark });
       return e.t;
     }
     case 'enum': throw new ElabError('anonymous enum types are not supported');
+    case 'record': {
+      // a record is an array of its fields (values: JS arrays), with one type per field
+      const fields = ts.fields.map(f => ({ name: f.name, t: elabType(E, f.type) }));
+      const n = fields.length;
+      return { kind: 'array', fields, left: 0, right: n - 1, desc: false, lo: 0, len: n, elem: fields[0]?.t || INT, w: fields.reduce((a, f) => a + (f.t.w || 0), 0) };
+    }
   }
   throw new ElabError(`unsupported type '${ts.kind}'`);
 }
@@ -607,7 +618,9 @@ function elabType(E, ts, allowUnconstrained = false) {
 function stdTypeName(n) {
   switch (n.toLowerCase()) {
     case 'std_logic': case 'std_ulogic': case 'bit': return { kind: 'logic', range: null, signed: false };
-    case 'std_logic_vector': case 'std_ulogic_vector': case 'bit_vector': case 'unsigned': return { kind: 'logic', range: null, signed: false, unconstrained: true };
+    case 'std_logic_vector': case 'std_ulogic_vector': return { kind: 'logic', range: null, signed: false, unconstrained: true, mark: 'std_logic_vector' };
+    case 'bit_vector': return { kind: 'logic', range: null, signed: false, unconstrained: true, mark: 'bit_vector' };
+    case 'unsigned': return { kind: 'logic', range: null, signed: false, unconstrained: true };
     case 'signed': return { kind: 'logic', range: null, signed: true, unconstrained: true };
     case 'integer': return { kind: 'integer', range: null };
     case 'natural': case 'positive': {
@@ -641,14 +654,16 @@ export function defaultValue(t, lang, net) {
     case 'logic': return V.allX(t.w, t.s);
     case 'int': {
       if (lang === 'verilog') return V.allX(32, true);
-      return V.fromInt(t.rlo !== undefined ? t.rlo : -2147483648, 32, true);
+      return V.fromInt(t.rlo !== undefined ? (t.rdown ? t.rhi : t.rlo) : -2147483648, 32, true);
     }
     case 'bool': return V.ZERO;
     case 'enum': return V.mk(t.w, 0n);
     case 'time': return V.fromInt(0, 64, true);
     case 'real': return V.fromInt(0, 64, true);
     case 'str': return { str: '' };
-    case 'array': return t.unconstrained ? [] : Array.from({ length: t.len }, () => defaultValue(t.elem, lang, net));
+    case 'array':
+      if (t.fields) return t.fields.map(f => defaultValue(f.t, lang, net));
+      return t.unconstrained ? [] : Array.from({ length: t.len }, () => defaultValue(t.elem, lang, net));
   }
   return V.allX(t.w || 1);
 }
@@ -661,7 +676,7 @@ function fitAny(v, t) {
   if (t.kind === 'str') return v.str !== undefined ? v : { str: String(V.toDec(v)) };
   if (t.kind === 'array') {
     if (!Array.isArray(v)) throw new ElabError('array value expected');
-    return v.map(e => fitAny(e, t.elem));
+    return v.map((e, k) => fitAny(e, t.fields ? t.fields[k].t : t.elem));
   }
   if (v.str !== undefined) return fitVal(strToVal(v.str), t);
   return fitVal(v, t);
@@ -680,7 +695,7 @@ function constOf(E, n, loc) {
 function isConstNode(n) {
   switch (n.k) {
     case 'c': case 'str': return true;
-    case 'sig': case 'loc': case 'edge': case 'event': case 'sys': case 'now': return false;
+    case 'sig': case 'loc': case 'edge': case 'event': case 'sys': case 'now': case 'sigattr': return false;
     case 'call': return !n.fn.impure && n.args.every(isConstNode);
     default:
       for (const key of ['a', 'b', 'c', 'base', 'index', 'left', 'right', 'start', 'count']) if (n[key] && typeof n[key] === 'object' && n[key].k && !isConstNode(n[key])) return false;
@@ -816,6 +831,8 @@ function bindExpr0(E, e, expect, loc) {
     }
     case 'str': {
       if (E.lang === 'verilog' && expect && expect.kind === 'logic') return { k: 'c', val: strToVal(e.value), t: vecT(Math.max(8, e.value.length * 8)) };
+      // a string of std_logic characters where a vector is expected (in a report message, say)
+      if (E.lang === 'vhdl' && expect && expect.kind === 'logic' && !e.char) return strAsLogic({ k: 'str', value: e.value, t: STR }, { t: expect });
       return { k: 'str', value: e.value, t: STR };
     }
     case 'fill': {
@@ -877,8 +894,9 @@ function bindExpr0(E, e, expect, loc) {
     case 'unary': {
       const a = bindExpr(E, e.a, expect, loc);
       let t;
+      if (e.o === '+' && E.lang === 'vhdl') return a;
       if (a.t.kind === 'real' && (e.o === '-' || e.o === 'abs')) return fold({ k: 'un', o: e.o, a, t: REAL, fp: true });
-      if (e.o === '~' || e.o === '-' || e.o === 'abs') t = a.t.kind === 'bool' ? BOOL : (a.t.kind === 'int' ? a.t : vecT(a.t.w, a.t.s));
+      if (e.o === '~' || e.o === '-' || e.o === 'abs') t = a.t.kind === 'bool' ? BOOL : (a.t.kind === 'int' || a.t.kind === 'time' ? a.t : vecT(a.t.w, a.t.s));
       else t = E.lang === 'vhdl' && e.o === '!' ? BOOL : BIT;
       if (e.o === '~' && a.t.kind === 'logic' && a.t.scalar) t = BIT;
       return fold({ k: 'un', o: e.o, a, t });
@@ -894,6 +912,7 @@ function bindExpr0(E, e, expect, loc) {
       return fold({ k: 'cond', c, a, b, t, vh: E.lang === 'vhdl' });
     }
     case 'attr': return bindAttr(E, e, loc);
+    case 'field': return fold(fieldNode(E, bindExpr(E, e.base, null, loc), e.name, loc));
     case 'aggregate': return bindAggregate(E, e, expect, loc);
     case 'qualified': {
       const te = E.sc.lookup(e.type);
@@ -904,12 +923,22 @@ function bindExpr0(E, e, expect, loc) {
         const n = Math.max(e.expr.items.length, ...e.expr.items.flatMap(i => (i.choices || []).map(c => Number(c.value) + 1)));
         t = vecT(n, !!sn.signed);
       }
-      const inner = bindExpr(E, e.expr, t || expect, loc);
+      let inner = bindExpr(E, e.expr, t || expect, loc);
+      if (sn && sn.kind === 'logic' && inner.k === 'str') inner = strAsLogic(inner, { t: vecT(1) });
       if (sn && inner.t.kind === 'logic') return fold({ k: 'conv', a: inner, ext: inner.t.s, t: { ...inner.t, s: !!sn.signed } });
       return inner;
     }
   }
   throw new ElabError(`unsupported expression '${e.op}'`, loc);
+}
+
+// VHDL record element selection r.f: the element of the record (an array of its fields)
+function fieldNode(E, base, name, loc) {
+  const F = base.t.fields;
+  if (!F) throw new ElabError(`'${name}' selected from an expression that is not a record`, loc);
+  const k = F.findIndex(f => f.name === name);
+  if (k < 0) throw new ElabError(`record has no field '${name}'`, loc);
+  return { k: 'elem', base, index: { k: 'c', val: V.fromInt(k), t: INT }, t: F[k].t };
 }
 
 function hierLookup(E, name) {
@@ -946,7 +975,7 @@ function sliceNode(E, base, leftE, rightE, loc) {
     const p1 = bitpos(base.t, V.toNum(left.val)), p2 = bitpos(base.t, V.toNum(right.val));
     const lo = Math.min(p1, p2), w = Math.abs(p1 - p2) + 1;
     if (lo < 0 || lo + w > base.t.w) diag(E, `slice out of range for '${base.name || 'expression'}'`, loc, 'warning');
-    return { k: 'slice', base, lo, t: vecT(w, base.t.kind === 'logic' ? base.t.s : false) };
+    return { k: 'slice', base, lo, t: { ...vecT(w, base.t.kind === 'logic' ? base.t.s : false), ...(base.t.mark ? { mark: base.t.mark } : {}) } };
   }
   // dynamic slice: width from a probe evaluation (loop variables at their initial values)
   let w;
@@ -965,6 +994,12 @@ function strAsLogic(n, other) {
   if (n.k !== 'str' || other.t.kind !== 'logic' || !/^[01uxzwlh-]+$/i.test(n.value)) return n;
   const val = V.fromBits(mapBits(n.value));
   return { k: 'c', val, t: vecT(val.w) };
+}
+
+// std_logic_signed: std_logic_vector operands of arithmetic and comparisons are signed
+function slvNum(E, n) {
+  if (E.slvArith !== 'signed' || n.t.kind !== 'logic' || n.t.mark !== 'std_logic_vector' || n.t.s) return n;
+  return fold({ k: 'conv', a: n, ext: true, t: { ...n.t, s: true } });
 }
 
 // std_logic_arith mixes unsigned and signed operands as signed: the unsigned one is extended
@@ -987,6 +1022,8 @@ function bindBinary(E, e, expect, loc) {
   let a, b;
   if (e.a.op === 'aggregate' && e.b.op !== 'aggregate') { b = bindExpr(E, e.b, null, loc); a = bindExpr(E, e.a, b.t, loc); }
   else { a = bindExpr(E, e.a, ARITH.has(o) || BITWISE.has(o) ? expect : null, loc); b = bindExpr(E, e.b, a.t.kind === 'logic' || a.t.kind === 'enum' ? a.t : null, loc); }
+  if (E.lang === 'vhdl' && (BITWISE.has(o) || ARITH.has(o))) { a = strAsLogic(a, b); b = strAsLogic(b, a); }
+  if (E.lang === 'vhdl' && (ARITH.has(o) || CMP.has(o))) { a = slvNum(E, a); b = slvNum(E, b); }
   // REAL operands: floating point (time * real, real / real, comparisons...)
   const fp = a.t.kind === 'real' || b.t.kind === 'real';
   if (fp && CMP.has(o)) return { k: 'bin', o, a, b, t: E.lang === 'vhdl' ? BOOL : BIT, fp };
@@ -994,16 +1031,27 @@ function bindBinary(E, e, expect, loc) {
   if (CMP.has(o)) {
     if (E.lang === 'vhdl' && a.t.kind === 'enum' && b.k === 'c') b = { ...b, t: a.t };
     if (E.lang === 'vhdl') { a = strAsLogic(a, b); b = strAsLogic(b, a); [a, b] = mixedSign(a, b); }
+    // std_logic_1164 '=' on std_logic_vector (no std_logic_unsigned / _signed): arrays of
+    // different lengths are never equal (IEEE 1076 §9.2.3)
+    if (E.lang === 'vhdl' && !E.slvArith && (o === '==' || o === '!=') && a.t.kind === 'logic' && b.t.kind === 'logic' &&
+        (a.t.mark || b.t.mark) && a.t.w !== b.t.w) return { k: 'c', val: V.fromBool(o === '!='), t: BOOL };
     // VHDL '=' / '/=' compare the enumeration values exactly ('X' = 'X' is true, 'U' /= '1' too)
     if (E.lang === 'vhdl') return { k: 'bin', o, a, b, t: BOOL, vh: o === '==' || o === '!=' };
     return { k: 'bin', o, a, b, t: BIT };
   }
   if (o === '&&' || o === '||') return { k: 'bin', o, a, b, t: BIT };
-  if (SHIFT.has(o)) return { k: 'bin', o, a, b, t: a.t.kind === 'int' ? a.t : vecT(a.t.w, a.t.s) };
+  if (SHIFT.has(o)) {
+    const n = { k: 'bin', o, a, b, t: a.t.kind === 'int' ? a.t : { ...vecT(a.t.w, a.t.s), ...(a.t.mark ? { mark: a.t.mark } : {}) } };
+    // VHDL sll/srl/sla/sra/rol/ror: a negative count shifts the other way; bit_vector sla / sra
+    // replicate the rightmost / leftmost bit (numeric_std's sla / sra are shift_left / shift_right)
+    if (E.lang === 'vhdl') { n.vs = true; if (a.t.mark === 'bit_vector') n.fill = true; }
+    return n;
+  }
   if (E.lang === 'vhdl' && (ARITH.has(o) && o !== '**')) [a, b] = harmonizeVhdl(a, b);
   if (E.lang === 'vhdl' && ARITH.has(o) && o !== '**') [a, b] = mixedSign(a, b);
   const s = a.t.s && b.t.s;
   if (a.t.kind === 'int' && b.t.kind === 'int') return { k: 'bin', o, a, b, t: INT };
+  if (a.t.kind === 'time' && b.t.kind === 'time' && o === '/') return { k: 'bin', o, a, b: { ...b, t: { ...b.t, s: true } }, t: { ...INT, w: 64 } };   // time / time: universal integer
   if (a.t.kind === 'time' || b.t.kind === 'time') return { k: 'bin', o, a, b, t: TIME };
   if (o === '**') return { k: 'bin', o, a, b, t: a.t.kind === 'int' ? INT : vecT(a.t.w, a.t.s) };
   let w = Math.max(a.t.w, b.t.w);
@@ -1017,7 +1065,10 @@ function bindAttr(E, e, loc) {
   const at = e.attr.toLowerCase();
   if (at === 'image' || at === 'to_string') {
     const a = bindExpr(E, e.args[0], null, loc);
-    return { k: 'image', a, t: STR };
+    // T'image(x): formatted as a value of T (boolean / enumeration prefixes)
+    const pe = e.prefix.op === 'ref' ? E.sc.lookup(e.prefix.name) : null;
+    const it = pe && pe.kind === 'type' && pe.t && (pe.t.kind === 'enum' || pe.t.kind === 'bool') ? pe.t : (e.prefix.op === 'ref' && /^boolean$/i.test(e.prefix.name) ? BOOL : null);
+    return { k: 'image', a, t: STR, ...(it ? { it } : {}), ...(at === 'to_string' ? { ts: true } : {}) };
   }
   // prefix could be a type name
   let t, node = null;
@@ -1028,12 +1079,17 @@ function bindAttr(E, e, loc) {
   }
   if (!t) { node = bindExpr(E, e.prefix, null, loc); t = node.t; }
   const cint = n => ({ k: 'c', val: V.fromInt(n, 32, true), t: INT });
+  // A'length(N) ... of a multi-dimensional array (an array of arrays): dimension N
+  if (e.args.length && t.kind === 'array' && ['length', 'left', 'right', 'high', 'low', 'ascending'].includes(at)) {
+    const dim = V.toNum(constOf(E, bindExpr(E, e.args[0], null, loc), loc));
+    for (let k = 1; k < dim; k++) { if (t.elem?.kind !== 'array' && t.elem?.kind !== 'logic') throw new ElabError(`'${at}(${dim}): no dimension ${dim}`, loc); t = t.elem; }
+  }
   if (t.kind === 'str' && at !== 'event') throw new ElabError(`'${at} of a string is not supported (use std_logic_vector)`, loc);
-  if ((t.kind === 'int' || t.kind === 'enum') && ['left', 'right', 'high', 'low'].includes(at)) {
+  if ((t.kind === 'int' || t.kind === 'enum' || t.kind === 'bool') && ['left', 'right', 'high', 'low'].includes(at)) {
     // scalar types: bounds of the range (integer ranges are ascending here)
     const lo = t.kind === 'int' ? (t.rlo ?? -2147483648) : 0;
-    const hi = t.kind === 'int' ? (t.rhi ?? 2147483647) : t.names.length - 1;
-    const v = at === 'left' || at === 'low' ? lo : hi;
+    const hi = t.kind === 'int' ? (t.rhi ?? 2147483647) : t.kind === 'bool' ? 1 : t.names.length - 1;
+    const v = at === 'low' || (at === 'left') !== !!t.rdown ? lo : hi;
     return t.kind === 'int' ? cint(v) : { k: 'c', val: V.fromInt(v, t.w, false), t };
   }
   switch (at) {
@@ -1041,19 +1097,44 @@ function bindAttr(E, e, loc) {
       if (!edgeOperand(node)) throw new ElabError("'event requires a signal", loc);
       return { k: 'event', ...edgeOperand(node), t: BOOL };
     case 'length': return cint(t.kind === 'array' ? t.len : t.w);
+    case 'ascending': return { k: 'c', val: V.fromBool(t.kind === 'int' || t.kind === 'enum' || t.kind === 'bool' ? true : !t.desc), t: BOOL };
     case 'left': return cint(t.left);
     case 'right': return cint(t.right);
     case 'high': return cint(Math.max(t.left, t.right));
     case 'low': return cint(Math.min(t.left, t.right));
     case 'pos': return fold({ k: 'conv', a: bindExpr(E, e.args[0], null, loc), ext: false, t: INT });
     case 'val': return fold({ k: 'conv', a: bindExpr(E, e.args[0], null, loc), ext: true, t });
-    case 'succ': case 'pred': {
+    case 'succ': case 'pred': case 'leftof': case 'rightof': {
+      // (scalar types are ascending here: 'leftof is 'pred, 'rightof is 'succ)
       const a = bindExpr(E, e.args[0], null, loc);
-      return fold({ k: 'bin', o: at === 'succ' ? '+' : '-', a, b: { k: 'c', val: V.fromInt(1, a.t.w, false), t: vecT(a.t.w) }, t });
+      const up = at === 'succ' || at === 'rightof';
+      if (t.kind === 'int') return fold({ k: 'bin', o: up ? '+' : '-', a, b: cint(1), t: INT });
+      return fold({ k: 'bin', o: up ? '+' : '-', a, b: { k: 'c', val: V.fromInt(1, a.t.w, false), t: vecT(a.t.w) }, t });
+    }
+    case 'value': {   // T'value("text") of a constant string
+      const a = bindExpr(E, e.args[0], STR, loc);
+      const str = a.k === 'str' ? a.value : a.k === 'c' && a.val.str !== undefined ? a.val.str : null;
+      if (str === null) throw new ElabError("'value needs a constant string", loc);
+      const txt = str.trim().toLowerCase();
+      if (t.kind === 'enum') {
+        const i = t.names.indexOf(txt);
+        if (i < 0) throw new ElabError(`'${str}' is not a value of type '${t.name}'`, loc);
+        return { k: 'c', val: V.fromInt(i, t.w, false), t };
+      }
+      if (t.kind === 'bool' && (txt === 'true' || txt === 'false')) return { k: 'c', val: V.fromBool(txt === 'true'), t: BOOL };
+      if (t.kind === 'int' && /^[-+]?\d+$/.test(txt)) return cint(Number(txt));
+      throw new ElabError(`'value of '${str}' is not supported`, loc);
     }
     case 'stable':
       if (!edgeOperand(node)) throw new ElabError("'stable requires a signal", loc);
+      if (e.args.length) {   // S'stable(T): no event during the last T
+        if (node.k !== 'sig') throw new ElabError("'stable(T) requires a whole signal", loc);
+        return { k: 'sigattr', a: 'stable', sig: node.sig, T: bindExpr(E, e.args[0], TIME, loc), t: BOOL };
+      }
       return { k: 'un', o: '!', a: { k: 'event', ...edgeOperand(node), t: BOOL }, t: BOOL };
+    case 'last_value': case 'last_event':
+      if (!node || node.k !== 'sig') throw new ElabError(`'${at} requires a whole signal`, loc);
+      return { k: 'sigattr', a: at, sig: node.sig, t: at === 'last_event' ? TIME : node.t };
   }
   throw new ElabError(`attribute '${e.attr} is not supported`, loc);
 }
@@ -1066,6 +1147,22 @@ function bindAggregate(E, e, expect, loc) {
       return fold({ k: 'cat', parts, t: vecT(parts.reduce((a, p) => a + p.t.w, 0)) });
     }
     throw new ElabError('cannot determine the type of the aggregate', loc);
+  }
+  if (expect.kind === 'array' && expect.fields) {
+    // record aggregate: positional and / or named (field => value, others => value)
+    const F = expect.fields, slots = new Array(F.length).fill(null);
+    let pos = 0;
+    for (const it of e.items) {
+      if (!it.choices) { if (pos < F.length) { slots[pos] = bindExpr(E, it.value, F[pos].t, loc); pos++; } continue; }
+      for (const ch of it.choices) {
+        if (ch === 'others') { F.forEach((f, k) => { if (!slots[k]) slots[k] = bindExpr(E, it.value, f.t, loc); }); continue; }
+        const k = ch.op === 'ref' ? F.findIndex(f => f.name === ch.name) : -1;
+        if (k < 0) throw new ElabError(`record has no field '${ch.name ?? '?'}'`, loc);
+        slots[k] = bindExpr(E, it.value, F[k].t, loc);
+      }
+    }
+    const elems = slots.map((x, k) => x || { k: 'c', val: defaultValue(F[k].t, E.lang), t: F[k].t });
+    return fold({ k: 'arr', elems, t: expect });
   }
   if (expect.kind === 'array') {
     if (expect.unconstrained) {
@@ -1132,11 +1229,16 @@ function bindAggregate(E, e, expect, loc) {
 // VHDL name(args): index, call, or conversion
 function bindApply(E, e, expect, loc) {
   const name = e.name;
-  const args = e.args.map(a => (a && a.named !== undefined ? a : a));
+  const args = e.args.slice();
   const entry = E.sc.lookup(name);
   if (entry?.kind === 'subalias') return bindApply(E, { ...e, name: entry.target }, expect, loc);
   if (entry && (entry.kind === 'sig' || entry.kind === 'const' || entry.kind === 'loc' || entry.kind === 'alias')) {
-    const base = refNode(E, entry, name);
+    let base = refNode(E, entry, name);
+    // m(i, j) of a multi-dimensional array (an array of arrays): one index per dimension
+    while (args.length > 1 && base.t.kind === 'array') {
+      const a = args.shift();
+      base = fold({ k: 'elem', base, index: bindExpr(E, a.named !== undefined ? a.value : a, null, loc), t: base.t.elem });
+    }
     if (args.length !== 1) throw new ElabError(`'${name}' indexed with ${args.length} indices`, loc);
     const a = args[0].named !== undefined ? args[0].value : args[0];
     if (a.op === 'slice' && a.base == null) return fold(sliceNode(E, base, a.left, a.right, loc));
@@ -1173,7 +1275,7 @@ function bindBuiltin(E, name, rawArgs, expect, loc) {
     case 'to_unsigned': case 'conv_unsigned': return conv(A(0), C(1), false, true);
     case 'to_signed': case 'conv_signed': return conv(A(0), C(1), true, true);
     case 'conv_std_logic_vector': return conv(A(0), C(1), false);
-    case 'to_integer': case 'conv_integer': case 'integer': case 'natural': case 'positive': return conv(A(0), 32, true, A(0).t.s, 'int');
+    case 'to_integer': case 'conv_integer': case 'integer': case 'natural': case 'positive': { const a = slvNum(E, A(0)); return conv(a, 32, true, a.t.s, 'int'); }
     case 'real': { const a = A(0); return fold({ k: 'conv', a, ext: a.t.s, t: REAL }); }
     case 'resize': {
       const a = A(0), w = C(1);
@@ -1198,7 +1300,7 @@ function bindBuiltin(E, name, rawArgs, expect, loc) {
       const o = { and_reduce: '&', or_reduce: '|', xor_reduce: '^', nand_reduce: '~&', nor_reduce: '~|', xnor_reduce: '~^' }[name];
       return fold({ k: 'un', o, a: A(0), t: BIT });
     }
-    case 'to_string': case 'to_bstring': return { k: 'image', a: A(0), t: STR };
+    case 'to_string': case 'to_bstring': return { k: 'image', a: A(0), t: STR, ts: true };
     case 'to_hstring': return { k: 'image', a: A(0), t: STR, hex: true };
     case 'minimum': case 'maximum': {
       const a = A(0), b = A(1);
@@ -1370,8 +1472,8 @@ function bindSubprogram(entry, args, key, sigActuals, consts) {
 function isLvalueExpr(e) {
   switch (e.op) {
     case 'ref': return true;
-    case 'index': case 'slice': case 'pslice': return isLvalueExpr(e.base);
-    case 'apply': return e.args.length === 1;
+    case 'index': case 'slice': case 'pslice': case 'field': return isLvalueExpr(e.base);
+    case 'apply': return e.args.length >= 1;
     case 'concat': return e.parts.every(isLvalueExpr);
   }
   return false;
@@ -1406,9 +1508,16 @@ function bindLvalue(E, e, loc) {
       const w = V.toNum(constOf(E, bindExpr(E, e.width), loc));
       return { k: 'pslice', base, start: bindExpr(E, e.start, null, loc), dir: e.dir, t: vecT(w) };
     }
+    case 'field': return fieldNode(E, bindLvalue(E, e.base, loc), e.name, loc);
     case 'apply': {
-      const base = bindLvalue(E, { op: 'ref', name: e.name }, loc);
-      const a = positional(e.args)[0];
+      let base = bindLvalue(E, { op: 'ref', name: e.name }, loc);
+      const args = positional(e.args);
+      // m(i, j) of a multi-dimensional array (an array of arrays): one index per dimension
+      for (const a of args.slice(0, -1)) {
+        if (base.t.kind !== 'array') throw new ElabError(`'${e.name}' indexed with ${args.length} indices`, loc);
+        base = { k: 'elem', base, index: bindExpr(E, a, null, loc), t: base.t.elem };
+      }
+      const a = args[args.length - 1];
       if (a.op === 'slice' && a.base == null) return sliceNode(E, base, a.left, a.right, loc);
       const index = bindExpr(E, a, null, loc);
       if (base.t.kind === 'array') return { k: 'elem', base, index, t: base.t.elem };

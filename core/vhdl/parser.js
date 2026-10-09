@@ -114,6 +114,7 @@ class Parser {
     this.errors = errors;
     this.libraries = new Set(['work', 'ieee', 'std']);
     this.packageNames = new Set();   // packages known in this file / via use clauses
+    this.stdUses = new Set();        // ieee / std packages of the next unit's context clause
     this.strMode = 0;                // >0 while parsing report/assert messages
   }
 
@@ -193,11 +194,11 @@ class Parser {
         } else if (this.isKw('context')) {
           this.parseContext();
         } else if (this.isKw('entity')) {
-          raw.push(this.parseEntity(uses)); uses = [];
+          raw.push(this.stdFlags(this.parseEntity(uses))); uses = [];
         } else if (this.isKw('architecture')) {
-          raw.push(this.parseArchitecture(uses)); uses = [];
+          raw.push(this.stdFlags(this.parseArchitecture(uses))); uses = [];
         } else if (this.isKw('package')) {
-          const u = this.parsePackage(uses); uses = [];
+          const u = this.stdFlags(this.parsePackage(uses)); uses = [];
           if (u) raw.push(u);
         } else if (this.isKw('configuration')) {
           this.skipConfiguration(); uses = [];
@@ -243,6 +244,7 @@ class Parser {
         if (pkg !== 'all') {
           this.packageNames.add(pkg);
           if (!STD_LIBS.has(lib)) out.push(pkg);
+          else this.stdUses.add(pkg.toLowerCase());
         }
       }
     } while (this.acceptOp(','));
@@ -413,6 +415,14 @@ class Parser {
     return { kind: isBody ? 'package_body' : 'package', name, loc: this.loc(tok), decls, uses: pkgUses };
   }
 
+  /** Unit u uses std_logic_signed / std_logic_unsigned (std_logic_vector arithmetic). */
+  stdFlags(u) {
+    if (u && this.stdUses.has('std_logic_signed')) u.slvArith = 'signed';
+    else if (u && this.stdUses.has('std_logic_unsigned')) u.slvArith = 'unsigned';
+    this.stdUses = new Set();
+    return u;
+  }
+
   /** Merge entity+architecture and package+body into IR units (source order kept). */
   assembleUnits(raw) {
     const out = [];
@@ -426,6 +436,7 @@ class Parser {
           params: u.params, ports: u.ports, decls: [...u.decls], items: [], uses: dedupe(u.uses),
           entityOnly: true,
         };
+        if (u.slvArith) m.slvArith = u.slvArith;
         modules.set(u.name, { m, entityDecls: u.decls });
         out.push(m);
       } else if (u.kind === 'package' || u.kind === 'package_body') {
@@ -436,11 +447,12 @@ class Parser {
           out.push(pk);
         }
         pk.uses = dedupe([...pk.uses, ...u.uses]);
+        if (u.slvArith) pk.slvArith = u.slvArith;
         if (u.kind === 'package') pk.loc = u.loc;
         mergePackageDecls(pk.decls, u.decls);
       } else if (u.kind === 'architecture' && !entityNames.has(u.entity)) {
         out.push({ kind: 'architecture', name: u.name, entity: u.entity, lang: 'vhdl', file: this.file,
-          loc: u.loc, decls: u.decls, items: u.items, uses: dedupe(u.uses) });
+          loc: u.loc, decls: u.decls, items: u.items, uses: dedupe(u.uses), ...(u.slvArith ? { slvArith: u.slvArith } : {}) });
       }
     }
     // merge architectures into their entity (last one wins)
@@ -451,6 +463,7 @@ class Parser {
       m.items = u.items;
       m.uses = dedupe([...m.uses, ...u.uses]);
       m.arch = u.name;
+      if (u.slvArith) m.slvArith = u.slvArith;
       delete m.entityOnly;
     }
     return out;
@@ -1682,6 +1695,9 @@ function makeType(name, range, hasRange) {
   if (VECTOR_LOGIC.has(name)) {
     const t = { kind: 'logic', range: hasRange ? range : null, signed: name.endsWith('signed') && !name.endsWith('unsigned') };
     if (!hasRange || !range) t.unconstrained = true;
+    // the non-numeric array types (std_logic_vector / bit_vector) keep their type mark: their
+    // arithmetic depends on the use clauses (std_logic_unsigned / std_logic_signed)
+    if (!name.endsWith('signed')) t.mark = name === 'bit_vector' ? 'bit_vector' : 'std_logic_vector';
     return t;
   }
   switch (name) {

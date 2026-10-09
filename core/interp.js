@@ -91,14 +91,29 @@ export function evalE(n, ctx) {
       const b = BigInt(n.bit), p = n.sig.prev, c = n.sig.val;
       return V.fromBool(!p || ((p.v >> b) & 1n) !== ((c.v >> b) & 1n) || ((p.x >> b) & 1n) !== ((c.x >> b) & 1n));
     }
+    case 'sigattr': {   // VHDL S'last_value, S'last_event, S'stable(T)
+      const s = n.sig, sim = ctx.sim;
+      if (n.a === 'last_value') return s.prev ?? s.val;
+      const now = sim ? sim.now : 0, lt = s.lastT;
+      if (n.a === 'last_event') return V.fromInt(lt === undefined ? 2 ** 53 - 1 : now - lt, 64, true);
+      const T = V.toNum(evalE(n.T, ctx));
+      if (T === 0 || lt === now) return V.fromBool(!(sim && s.evStamp === sim.stamp) && (T === 0 || lt !== now));
+      return V.fromBool(lt === undefined || now - lt >= T);
+    }
     case 'str': return { str: n.value };
     case 'image': {
       const v = evalE(n.a, ctx);
       if (n.hex && !Array.isArray(v) && !isStr(v)) return { str: V.toHex(v).padStart(Math.ceil(v.w / 4), '0').toUpperCase() };
-      return { str: imageOf(v, n.a.t) };
+      const t = n.it || n.a.t;
+      // to_string of a scalar std_logic / bit: the character alone (no quotes, unlike 'image)
+      if (n.ts && t && t.kind === 'logic' && t.scalar && !isStr(v) && !Array.isArray(v)) return { str: V.toBin(v).toUpperCase() };
+      return { str: imageOf(v, t) };
     }
     case 'strcat': return { str: n.parts.map(p => toStr(evalE(p, ctx), p.t)).join('') };
-    case 'arr': return n.elems.map(e => V.resize(evalE(e, ctx), n.t.elem.w));
+    case 'arr': {
+      const F = n.t.fields;   // record: one type per element; arrays of arrays: no resize
+      return n.elems.map((e, k) => { const v = evalE(e, ctx), et = F ? F[k].t : n.t.elem; return Array.isArray(v) || isStr(v) || et.kind === 'array' || et.kind === 'str' ? v : V.resize(v, et.w); });
+    }
     case 'now': {
       const ps = ctx.sim ? ctx.sim.now : 0;
       return V.fromInt(Math.round(ps / (n.unit || 1)), 64, true);
@@ -108,6 +123,13 @@ export function evalE(n, ctx) {
 }
 
 function fit(v, w, s) { return V.withSign(V.resize(v, w), s); }
+
+// equality of values, arrays (and records, arrays of arrays) element by element
+export function sameDeep(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((e, i) => sameDeep(e, b[i]));
+  if (isStr(a) || isStr(b)) return isStr(a) && isStr(b) && a.str === b.str;
+  return V.same(a, b) && a.w === b.w;
+}
 
 export function psliceLo(t, start, w, dir) {
   const a = start, b = dir === '+' ? start + w - 1 : start - w + 1;
@@ -142,9 +164,17 @@ function evalBin(n, ctx) {
     return b === 1 ? V.ONE : (a === 0 && b === 0 ? V.ZERO : V.X1);
   }
   let a = evalE(n.a, ctx), b = evalE(n.b, ctx);
+  if (Array.isArray(a) || Array.isArray(b)) {   // arrays / records (VHDL): element-wise equality
+    if (o === '==' || o === '!=') return V.fromBool(sameDeep(a, b) === (o === '=='));
+    throw new SimError(`operator ${o} on arrays`);
+  }
   if (isStr(a) || isStr(b)) { // string comparison (VHDL)
     if (o === '==') return V.fromBool(toStr(a) === toStr(b));
     if (o === '!=') return V.fromBool(toStr(a) !== toStr(b));
+    if (o === '<' || o === '<=' || o === '>' || o === '>=') {   // VHDL strings: lexicographic order
+      const x = toStr(a), y = toStr(b);
+      return V.fromBool(o === '<' ? x < y : o === '<=' ? x <= y : o === '>' ? x > y : x >= y);
+    }
     throw new SimError(`operator ${o} on strings`);
   }
   if (n.fp) return evalReal(n, a, b);
@@ -162,6 +192,10 @@ function evalBin(n, ctx) {
       }
       return V.cmp(o, fit(a, cw, os), fit(b, cw, os));
     }
+    case '<<': case '<<<': case '>>': case '>>>': case 'rol': case 'ror':
+      if (n.vs) return vhShift(o, fit(a, w, s), b, w, n.fill);
+  }
+  switch (o) {
     case '<<': case '<<<': return V.shl(fit(a, w, s), b, w);
     case '>>': return V.shr(fit(a, w, s), b, w, false);
     case '>>>': return V.shr(fit(a, w, s), b, w, true);
@@ -185,6 +219,27 @@ function evalBin(n, ctx) {
     case 'nor': return V.not(V.or(a, b, w, s));
   }
   throw new SimError(`unknown operator ${o}`);
+}
+
+// VHDL shift operators: the count is an integer (negative: the opposite shift); fill: bit_vector
+// sla / sra (the vacated bits copy the rightmost / leftmost bit).
+const OPPOSITE = { '<<': '>>', '>>': '<<', '<<<': '>>>', '>>>': '<<<', rol: 'ror', ror: 'rol' };
+function vhShift(o, a, b, w, fill) {
+  if (b.x) return V.allX(w, a.s);
+  let k = V.toBig(b);
+  if (k < 0n) { o = OPPOSITE[o]; k = -k; }
+  const cnt = V.fromInt(Number(o === 'rol' || o === 'ror' ? k % BigInt(w || 1) : k > BigInt(w) ? BigInt(w) : k), 32, false);
+  switch (o) {
+    case '<<': return V.shl(a, cnt, w);
+    case '>>': return V.shr(a, cnt, w, false);
+    case 'rol': return V.rotl(a, cnt);
+    case 'ror': return V.rotr(a, cnt);
+  }
+  if (!fill) return o === '<<<' ? V.shl(a, cnt, w) : V.shr(a, cnt, w, true);
+  const m = Number(cnt.v);
+  const edge = o === '<<<' ? V.getBits(a, 0, 1) : V.getBits(a, w - 1, 1);
+  const r = o === '<<<' ? V.shl(a, cnt, w) : V.shr(V.withSign(a, false), cnt, w, false);
+  return V.setBits(r, o === '<<<' ? 0 : w - m, m, V.repl(m, edge));
 }
 
 // Floating point: operands of type REAL (and TIME / integer values mixed with them).
@@ -212,7 +267,7 @@ function evalReal(n, a, b) {
 // ---------------- strings / formatting ----------------
 export function toStr(v, t) {
   if (isStr(v)) return v.str;
-  if (Array.isArray(v)) return '(' + v.map(e => toStr(e, t?.elem)).join(', ') + ')';
+  if (Array.isArray(v)) return '(' + v.map((e, k) => toStr(e, t?.fields ? t.fields[k].t : t?.elem)).join(', ') + ')';
   return imageOf(v, t);
 }
 
@@ -225,7 +280,7 @@ export function imageOf(v, t) {
     case 'int': return V.toDec(v, true);
     case 'time': return v.x ? 'X' : formatTime(Number(V.toBig(v)));
     case 'real': { const x = V.toReal(v); return Number.isInteger(x) ? x.toFixed(1) : String(x); }
-    case 'logic': return t.w === 1 && t.scalar ? `'${V.toBin(v)}'` : V.toBin(v).toUpperCase();
+    case 'logic': return t.w === 1 && t.scalar ? `'${V.toBin(v).toUpperCase()}'` : V.toBin(v).toUpperCase();
     default: return V.toDec(v);
   }
 }
@@ -364,7 +419,11 @@ function resolveTarget(L, ctx, out) {
       const b = base[0];
       const i = evalE(L.index, ctx);
       if (i.x) { out.push({ ...b, invalid: true, w: L.t.w }); return; }
-      out.push({ ...b, elem: V.toNum(i) - L.base.t.lo, lo: 0, w: L.t.w, whole: false });
+      const wr = { ...b, elem: V.toNum(i) - L.base.t.lo, lo: 0, w: L.t.w, whole: false };
+      // element of an element (arrays of arrays, records): the outer indices form a path
+      if (b.elem != null) wr.path = [...(b.path || []), b.elem];
+      if (L.t.kind === 'array') wr.sub = true;   // the element is itself an array / record
+      out.push(wr);
       return;
     }
     case 'bit': case 'slice': case 'dslice': case 'pslice': {
@@ -395,6 +454,7 @@ function resolveTarget(L, ctx, out) {
 
 // New value of one array element after applying write wr (wr.elem) with value val.
 export function applyElem(old, wr, val) {
+  if (wr.sub || Array.isArray(old)) return Array.isArray(val) ? val.slice() : val;
   return wr.lo === 0 && wr.w === old.w ? { ...V.resize(val, old.w), s: old.s } : V.setBits(old, wr.lo, wr.w, V.resize(val, wr.w));
 }
 
@@ -402,6 +462,13 @@ export function applyElem(old, wr, val) {
 // Arrays: every container owns its array (a whole assignment stores a copy), so an element
 // write may update it in place (inPlace) instead of copying the whole memory.
 export function applyWrite(cur, wr, val, inPlace = false) {
+  if (wr.path) {   // nested element: copy the containers along the path (they may be shared)
+    const [k, ...rest] = wr.path;
+    if (!Array.isArray(cur) || k < 0 || k >= cur.length) return cur;
+    const arr = inPlace ? cur : cur.slice();
+    arr[k] = applyWrite(arr[k], { ...wr, path: rest.length ? rest : null }, val, false);
+    return arr;
+  }
   if (wr.elem != null) {
     if (!Array.isArray(cur) || wr.elem < 0 || wr.elem >= cur.length) return cur;
     const arr = inPlace ? cur : cur.slice();

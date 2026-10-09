@@ -106,7 +106,7 @@ test('VHDL: several drivers of a std_logic signal are resolved', () => {
     en1 <= '0'; wait for 1 ns; report std_logic'image(b) & " " & to_string(v);
     wait;
   end process;`, `signal b : std_logic; signal en1, en2 : std_logic := '0'; signal v : std_logic_vector(1 downto 0);`), 'tb');
-  assert.deepEqual(out, ["'z'", "'1'", "'x'", "'0' 01"]);
+  assert.deepEqual(out, ["'Z'", "'1'", "'X'", "'0' 01"]);
 });
 
 test('VHDL: a testbench and the design drive an inout bus (tri-state)', () => {

@@ -5,7 +5,7 @@
 // step runs), and follow the driver rules: a new assignment deletes the driver's later
 // transactions, and inertial delay also rejects pulses shorter than the reject limit.
 import * as V from './values.js';
-import { exec, evalE, applyWrite, applyElem, formatDisplay, SimError, formatTime } from './interp.js';
+import { exec, evalE, applyWrite, applyElem, formatDisplay, SimError, formatTime, sameDeep } from './interp.js';
 
 class Heap {
   constructor() { this.a = []; this.seq = 0; }
@@ -191,12 +191,12 @@ export class Simulator {
   write(wr, val, drv = this.curProc) {
     const sig = wr.sig;
     if (sig.res) { this.writeResolved(sig, wr, val, drv); return; }
-    if (wr.elem != null && Array.isArray(sig.val)) {
+    if (wr.elem != null && !wr.path && Array.isArray(sig.val)) {
       // memory element: compare and update that element only (the array is the signal's own)
       const arr = sig.val;
       if (sig.forced || wr.elem < 0 || wr.elem >= arr.length) return;
       const old = arr[wr.elem], nv = applyElem(old, wr, val);
-      if (V.same(old, nv) && old.w === nv.w) return;
+      if (Array.isArray(nv) ? sameDeep(old, nv) : V.same(old, nv) && old.w === nv.w) return;
       arr[wr.elem] = nv;
       this.changed(sig, arr, arr);
       return;
@@ -227,7 +227,7 @@ export class Simulator {
     if (!p) return;
     let m = this.drvTx.get(p);
     if (!m) { if (!item) return; m = new Map(); this.drvTx.set(p, m); }
-    const key = `${wr.sig.id}:${wr.elem}:${wr.lo}:${wr.w}`;
+    const key = `${wr.sig.id}:${wr.path ? wr.path.join('.') + '.' : ''}${wr.elem}:${wr.lo}:${wr.w}`;
     const old = m.get(key);
     if (!old && !item) return;
     const keep = [];
@@ -250,7 +250,7 @@ export class Simulator {
     if (sig.forced) return;
     const old = sig.val;
     if (Array.isArray(nv)) {
-      if (Array.isArray(old) && nv.length === old.length && nv.every((e, i) => V.same(e, old[i]))) return;
+      if (Array.isArray(old) && nv.length === old.length && nv.every((e, i) => (Array.isArray(e) ? sameDeep(e, old[i]) : V.same(e, old[i])))) return;
     } else if (!Array.isArray(old) && V.same(old, nv) && old.w === nv.w) return;
     this.changed(sig, old, nv);
   }
@@ -260,6 +260,7 @@ export class Simulator {
     sig.prev = old;
     sig.val = nv;
     sig.evStamp = this.stamp;
+    sig.lastT = this.now;
     this.stats.events++;
     if (sig.wave && !this.waveTruncated) {
       const w = sig.wave, n = w.t.length;
