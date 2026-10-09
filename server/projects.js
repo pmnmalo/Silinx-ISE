@@ -68,12 +68,49 @@ export async function readProject(name) {
   return pj;
 }
 
-export async function writeProject(name, pj) {
+// Per-project mutex: every read-modify-write of silinx.json runs under it, so concurrent requests
+// (API, CLI, several browser tabs) cannot lose each other's updates.
+const locks = new Map();
+export function withProjectLock(name, fn) {
+  name = String(name).toLowerCase();   // case-insensitive file systems: Foo and foo are one folder
+  const prev = locks.get(name) || Promise.resolve();
+  const run = prev.then(() => fn());
+  const tail = run.catch(() => {});
+  locks.set(name, tail);
+  tail.then(() => { if (locks.get(name) === tail) locks.delete(name); });
+  return run;
+}
+
+// Atomic write (temp file + rename): a concurrent reader never sees a half-written silinx.json.
+async function writeProjectUnlocked(name, pj) {
   const dir = projectDir(name);
   const clean = { ...pj, name };
   delete clean.fileTree;
-  await fs.writeFile(path.join(dir, PROJECT_FILE), JSON.stringify(clean, null, 2) + '\n');
+  const file = path.join(dir, PROJECT_FILE);
+  const tmp = path.join(dir, `.${PROJECT_FILE}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);
+  try {
+    await fs.writeFile(tmp, JSON.stringify(clean, null, 2) + '\n');
+    await fs.rename(tmp, file);
+  } catch (e) {
+    await fs.rm(tmp, { force: true }).catch(() => {});
+    throw e;
+  }
   return clean;
+}
+
+export function writeProject(name, pj) {
+  projectDir(name);
+  return withProjectLock(name, () => writeProjectUnlocked(name, pj));
+}
+
+/** Read silinx.json, let `fn(pj)` change it (or return a new object), write it back, all under the project lock. */
+export function updateProject(name, fn) {
+  projectDir(name);
+  return withProjectLock(name, async () => {
+    const pj = await readProject(name);
+    const next = (await fn(pj)) ?? pj;
+    return writeProjectUnlocked(name, next);
+  });
 }
 
 async function walk(dir, base = '') {
@@ -146,37 +183,67 @@ export async function writeFile(name, rel, text) {
   // Register HDL files automatically.
   const lang = langOf(rel);
   if (lang === 'verilog' || lang === 'vhdl') {
-    const pj = await readProject(name);
-    if (!pj.files.some(f => f.path === rel)) {
-      const role = /^(sim|tb|test)\//.test(rel) || /(^|\/)tb_|_tb\.|_tb$/.test(rel) ? 'sim' : 'design';
-      pj.files.push({ path: rel, lang, role });
-      await writeProject(name, pj);
-    }
+    await withProjectLock(name, async () => {
+      const pj = await readProject(name);
+      if (!pj.files.some(f => f.path === rel)) {
+        const role = /^(sim|tb|test)\//.test(rel) || /(^|\/)tb_|_tb\.|_tb$/.test(rel) ? 'sim' : 'design';
+        pj.files.push({ path: rel, lang, role });
+        await writeProjectUnlocked(name, pj);
+      }
+    });
   }
 }
+
+// project-relative path normalised to forward slashes, without './' or a trailing '/'
+const relKey = (dir, full) => path.relative(dir, full).split(path.sep).join('/');
 
 /** Move/rename a project file (or folder), keeping the project's file list and constraints path. */
 export async function renameFile(name, from, to) {
   const dir = projectDir(name);
   const src = safeJoin(dir, from), dst = safeJoin(dir, to);
-  if (!await exists(src)) throw new HttpError(404, `file '${from}' not found`);
-  if (from !== to && await exists(dst) && from.toLowerCase() !== to.toLowerCase()) throw new HttpError(409, `'${to}' already exists`);
-  await fs.mkdir(path.dirname(dst), { recursive: true });
-  await fs.rename(src, dst);
-  const pj = await readProject(name);
-  const lang = langOf(to);
-  pj.files = pj.files.map(f => (f.path === from ? { ...f, path: to, lang: lang === 'vhdl' || lang === 'verilog' ? lang : f.lang } : f));
-  if (pj.constraints === from) pj.constraints = to;
-  return writeProject(name, pj);
+  if (src === dir || dst === dir) throw new HttpError(400, 'cannot rename the project folder itself');
+  const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
+  if (fromKey === PROJECT_FILE || toKey === PROJECT_FILE) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
+  return withProjectLock(name, async () => {
+    let st;
+    try { st = await fs.stat(src); } catch { throw new HttpError(404, `file '${from}' not found`); }
+    const isDir = st.isDirectory();
+    if (isDir && src !== dst && (dst + path.sep).startsWith(src + path.sep)) throw new HttpError(400, `cannot move '${from}' into itself`);
+    if (src !== dst && await exists(dst) && src.toLowerCase() !== dst.toLowerCase()) throw new HttpError(409, `'${to}' already exists`);
+    await fs.mkdir(path.dirname(dst), { recursive: true });
+    await fs.rename(src, dst);
+    const pj = await readProject(name);
+    // a file maps exactly; a folder maps every path below it
+    const remap = p => {
+      if (p === fromKey) return toKey;
+      if (isDir && p.startsWith(fromKey + '/')) return toKey + p.slice(fromKey.length);
+      return null;
+    };
+    pj.files = pj.files.map(f => {
+      const np = remap(f.path);
+      if (np === null) return f;
+      const lang = langOf(np);
+      return { ...f, path: np, lang: lang === 'vhdl' || lang === 'verilog' ? lang : f.lang };
+    });
+    if (pj.constraints) pj.constraints = remap(pj.constraints) ?? pj.constraints;
+    return writeProjectUnlocked(name, pj);
+  });
 }
 
+/** Delete a project file or folder (recursively) and unregister the files it contained. */
 export async function deleteFile(name, rel) {
   const dir = projectDir(name);
-  await fs.rm(safeJoin(dir, rel), { force: true });
-  const pj = await readProject(name);
-  const n = pj.files.length;
-  pj.files = pj.files.filter(f => f.path !== rel);
-  if (pj.files.length !== n) await writeProject(name, pj);
+  const full = safeJoin(dir, rel);
+  if (full === dir) throw new HttpError(400, 'cannot delete the project folder itself (delete the project instead)');
+  const key = relKey(dir, full);
+  if (key === PROJECT_FILE) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
+  await withProjectLock(name, async () => {
+    await fs.rm(full, { recursive: true, force: true });
+    const pj = await readProject(name);
+    const n = pj.files.length;
+    pj.files = pj.files.filter(f => f.path !== key && !f.path.startsWith(key + '/'));
+    if (pj.files.length !== n) await writeProjectUnlocked(name, pj);
+  });
 }
 
 export async function readSources(name) {

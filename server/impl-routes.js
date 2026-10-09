@@ -19,6 +19,7 @@ const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch)\.json)$/i;
 
 export function registerImplRoutes(api, { wrap, projects: P }) {
   const bad = (msg, status = 400) => new P.HttpError(status, msg);
+  const implJobs = new Map();   // project name -> id of its latest implementation job
 
   // ----- devices / toolchain ------------------------------------------------------------------
   api.get('/devices', wrap(async () => getDeviceDb()));
@@ -40,7 +41,12 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     let steps;
     try { steps = normalizeSteps(body.steps); } catch (e) { throw bad(e.message); }
     if (!project.top) throw bad('set the top module of the project before implementing');
+    // one ISE run per project: two runs would share (and wipe) the same build/ folder
+    const key = name.toLowerCase();   // case-insensitive file systems: one folder
+    const running = implJobs.get(key);
+    if (running && getJob(running)?.status === 'running') throw bad(`an implementation of '${name}' is already running (job ${running}); wait for it or cancel it`, 409);
     const job = createJob('implement', j => runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }), { meta: { project: name, steps } });
+    implJobs.set(key, job.id);
     return { job: job.id };
   }));
 
@@ -211,12 +217,15 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
       await P.createProject({ name, template: 'empty' });
       result = { project: await P.readProject(name), missing: [], warnings: [] };
     } else throw bad('the zip contains no .xise (ISE project) and no silinx.json');
-    // copy every other file of the project folder (ASM charts, memory files, docs...) keeping its path
-    const written = new Set((result.project.files || []).map(f => f.path).concat(result.project.constraints || []));
+    // copy every other file of the project folder (ASM charts, memory files, docs...) keeping its path.
+    // ISE import: the sources were written by importXiseProject and ISE's own outputs are skipped.
+    // Silinx export: nothing is written yet (the empty project's default constraints path is not a
+    // file) and the zip is the whole project, so every file is restored whatever its extension.
+    const written = new Set(xiseEntry ? (result.project.files || []).map(f => f.path).concat(result.project.constraints || []) : []);
     const extra = [];
     for (const e of entries) {
       const r = rel(e.path);
-      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'silinx.json' || ISE_OUTPUT.test(r)) continue;
+      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'silinx.json' || (xiseEntry && ISE_OUTPUT.test(r))) continue;
       const norm = path.posix.normalize(r);
       if (norm.startsWith('..') || path.posix.isAbsolute(norm)) continue;
       await fs.mkdir(path.dirname(P.safeJoin(P.projectDir(name), norm)), { recursive: true });
@@ -226,14 +235,16 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     // Silinx export: restore the settings ISE does not know about (board, stimuli, language...)
     let project = await P.readProject(name);
     if (pjEntry) {
-      try {
-        const saved = JSON.parse(text(pjEntry));
-        project = { ...project, ...(xiseEntry ? { board: saved.board ?? project.board, stimuli: saved.stimuli || {}, preferredLanguage: saved.preferredLanguage, impl: { ...project.impl, ...saved.impl } } : { ...saved, name }) };
+      let saved = null;
+      try { saved = JSON.parse(text(pjEntry)); } catch { /* ignore a broken silinx.json */ }
+      if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+        const exists = p => { try { return fss.existsSync(P.safeJoin(P.projectDir(name), p)); } catch { return false; } };
+        project = await P.updateProject(name, cur => ({ ...cur, ...(xiseEntry ? { board: saved.board ?? cur.board, stimuli: saved.stimuli || {}, preferredLanguage: saved.preferredLanguage, impl: { ...cur.impl, ...saved.impl } } : { ...saved, name }) }));
         if (!xiseEntry) {
-          for (const f of saved.files || []) if (!fss.existsSync(path.join(P.projectDir(name), f.path))) result.missing.push(f.path);
+          for (const f of Array.isArray(saved.files) ? saved.files : []) if (f?.path && !exists(f.path)) result.missing.push(f.path);
+          if (typeof saved.constraints === 'string' && saved.constraints && !exists(saved.constraints) && !result.missing.includes(saved.constraints)) result.missing.push(saved.constraints);
         }
-        project = await P.writeProject(name, project);
-      } catch { /* ignore a broken silinx.json */ }
+      }
     }
     return { project, missing: result.missing, warnings: result.warnings, extra };
   }));
@@ -266,16 +277,15 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     for (const f of parsed.files) {
       try { P.safeJoin(dir, f.path); files.push(f); } catch { skipped.push(f.path); }
     }
-    const next = {
-      ...project,
-      device: parsed.device.part ? parsed.device : project.device,
-      top: parsed.top || project.top,
-      simTop: parsed.simTop || project.simTop,
+    const saved = await P.updateProject(name, cur => ({
+      ...cur,
+      device: parsed.device.part ? parsed.device : cur.device,
+      top: parsed.top || cur.top,
+      simTop: parsed.simTop || cur.simTop,
       files,
-      constraints: parsed.constraints && !parsed.constraints.includes('..') ? parsed.constraints : project.constraints,
-      impl: { ...project.impl, ...parsed.impl },
-    };
-    const saved = await P.writeProject(name, next);
+      constraints: parsed.constraints && !parsed.constraints.includes('..') ? parsed.constraints : cur.constraints,
+      impl: { ...cur.impl, ...parsed.impl },
+    }));
     return { direction, file: xfile, project: saved, skipped, warnings: parsed.warnings };
   }));
 }
@@ -322,13 +332,11 @@ async function importXiseProject(P, name, xiseText, provided) {
     const text = lookup(parsed.constraints);
     if (typeof text === 'string') await P.writeFile(name, constraints, text); else missing.push(parsed.constraints);
   }
-  const pj = await P.readProject(name);
-  Object.assign(pj, {
+  const saved = await P.updateProject(name, pj => Object.assign(pj, {
     device: parsed.device.part ? parsed.device : pj.device,
     top: parsed.top || '', simTop: parsed.simTop || '', files, constraints,
     impl: { ...pj.impl, ...parsed.impl },
-  });
-  const saved = await P.writeProject(name, pj);
+  }));
   return { project: saved, missing, warnings };
 }
 

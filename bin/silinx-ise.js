@@ -75,7 +75,10 @@ async function main() {
       pj.constraints ||= 'constraints/top.ucf';
       fs.mkdirSync(path.dirname(path.join(dir, pj.constraints)), { recursive: true });
       fs.writeFileSync(path.join(dir, pj.constraints), text);
-      fs.writeFileSync(path.join(dir, 'silinx.json'), JSON.stringify(pj, null, 2) + '\n');
+      // atomic (temp + rename): a running server never reads a half-written silinx.json
+      const tmpPj = path.join(dir, `.silinx.json.${process.pid}.tmp`);
+      fs.writeFileSync(tmpPj, JSON.stringify(pj, null, 2) + '\n');
+      fs.renameSync(tmpPj, path.join(dir, 'silinx.json'));
       console.log(`${pj.constraints}: ${matched.join(', ')} assigned for ${board.name}${unmatched.length ? `; NOT assigned: ${unmatched.join(', ')}` : ''}`);
       break;
     }
