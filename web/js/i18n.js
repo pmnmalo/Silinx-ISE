@@ -335,6 +335,30 @@ PT_PATTERNS.unshift(
     'Desenho: $1 × $2 px. Diagramas grandes: várias páginas na horizontal (mosaico) ou A3; texto abaixo de ~5 pt é difícil de ler em papel. Para um PDF escolha "Guardar como PDF" no diálogo de impressão (mantenha as margens em "Predefinição").'],
 );
 
+// live schematic simulation (sch-live.js)
+Object.assign(PT, {
+  'Simulate': 'Simular', 'Simulate: click the inputs and watch the circuit work (Esc to stop)': 'Simular: clique nas entradas e veja o circuito a funcionar (Esc para parar)',
+  'Live simulation: click the inputs (switches, bus values, clocks), hover a wire or pin to see its value, drag to pan. Esc stops the simulation.':
+    'Simulação em tempo real: clique nas entradas (interruptores, valores de barramentos, relógios), passe o rato sobre um fio ou pino para ver o valor, arraste para deslocar. Esc para a simulação.',
+  'Building the simulation model…': 'A construir o modelo de simulação…', 'Live simulation': 'Simulação em tempo real',
+  'Power cycle: back to time 0, registers to their initial values': 'Religar: volta ao tempo 0, registos com os valores iniciais',
+  'Step': 'Passo', 'One clock cycle (rising and falling edge)': 'Um ciclo de relógio (flanco ascendente e descendente)', 'Pause': 'Pausa',
+  'Run / pause the clock': 'Executar / pausar o relógio', 'Clock rate': 'Frequência do relógio', 'Buses:': 'Barramentos:',
+  'Number format of the bus values': 'Formato dos valores dos barramentos', 'Stop Simulation': 'Parar Simulação',
+  'Leave the simulation and edit the schematic (Esc)': 'Sair da simulação e editar o esquemático (Esc)', 'Number format': 'Formato do número',
+  'Subtract 1': 'Subtrair 1', 'Add 1': 'Somar 1', 'All bits 0': 'Todos os bits a 0', 'Set': 'Aplicar',
+  'Hex 0x1F, binary 0b101, or decimal; ↑ / ↓ add / subtract 1': 'Hex 0x1F, binário 0b101 ou decimal; ↑ / ↓ somam / subtraem 1',
+  'Click an input to change it: 1-bit inputs toggle, buses open a value editor, clock inputs step one cycle. Wires: green = 1, dark green = 0, red = X/U, blue = Z. Hover a pin or a wire to see its value; click a component to list its pins.':
+    'Clique numa entrada para a mudar: as entradas de 1 bit comutam, os barramentos abrem um editor de valor, as entradas de relógio avançam um ciclo. Fios: verde = 1, verde escuro = 0, vermelho = X/U, azul = Z. Passe o rato sobre um pino ou fio para ver o valor; clique num componente para listar os seus pinos.',
+  'click for one clock cycle': 'clique para um ciclo de relógio', 'click to toggle': 'clique para comutar', 'click to change the value': 'clique para mudar o valor',
+  'no value': 'sem valor', '(unconnected)': '(não ligado)',
+});
+PT_PATTERNS.push(
+  [/^Cannot simulate: (.*)$/s, 'Não é possível simular: $1'],
+  [/^Simulation refused: (\d+) error\(s\), (\d+) warning\(s\)$/, 'Simulação recusada: $1 erro(s), $2 aviso(s)'],
+  [/^Simulation stopped: (.*)$/s, 'Simulação parada: $1'],
+);
+
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },
   pt: { name: 'Português', strings: PT, patterns: PT_PATTERNS },

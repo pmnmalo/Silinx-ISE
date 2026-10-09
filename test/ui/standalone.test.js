@@ -82,4 +82,17 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   await page.waitFor(() => window.Silinx?.project?.name === 'Solo', [], { what: 'reopened after reload' });
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   await page.waitFor(() => window.Silinx.active?.editor && window.Silinx.active.editor.getValue().startsWith('-- kept in the browser\n'));
+  // live schematic simulation without a server: knight converted to a schematic (linked to knight.vhd)
+  await page.treeRow('#hier', 'u_knight - knight', { right: true });
+  await page.click('body > .menu-popup .mi', { text: 'Convert to Schematic (editable)…' });
+  const ED = '.doc:not([hidden]) .sch-editor';
+  await page.waitFor((sel) => window.Silinx.active?.id === 'sch:src/knight.sch.json' && document.querySelector(`${sel} .se-btn[data-act=sim]`), [ED], { what: 'converted schematic open' });
+  await page.click(`${ED} .se-btn[data-act=sim]`);
+  await page.waitFor((sel) => document.querySelector(sel).classList.contains('sim-mode'), [ED], { what: 'standalone live simulation' });
+  const leds = () => page.eval(() => { const ed = window.Silinx.active.schEditor, p = ed.getDoc().ports.find((q) => q.name === 'leds'); return ed.liveSim.portValue(p.id).v.toString(2); });
+  assert.equal(await leds(), '1');
+  const stepId = await page.eval(() => window.Silinx.active.schEditor.getDoc().ports.find((q) => q.name === 'step').id);
+  await page.click(`${ED} .lv-ctl[data-port="${stepId}"]`);
+  await page.click(`${ED} .se-simbar .lv-step`);
+  assert.equal(await leds(), '10', 'one LED step after a clock cycle with step = 1');
 }, { url: () => 'about:blank' });

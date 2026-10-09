@@ -1556,6 +1556,7 @@ export async function openSch(path) {
       const save = async m => { await api.writeFile(S.project.name, path, JSON.stringify(m, null, 1)); setDirty(d, false); };
       const ed = mountSchEditor(host, {
         doc, modules,
+        simSources: () => S.sources,   // live simulation: bodies of the module symbols
         onChange: () => setDirty(d, true),
         onGenerate: async ({ lang, code, target }) => {
           const exists = S.fileTree.includes(target);

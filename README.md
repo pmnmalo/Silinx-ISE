@@ -29,6 +29,13 @@ for Xilinx FPGAs supported by ISE 14.7.
   does not change). Any HDL module can be converted to a schematic (*Convert to Schematic*), with
   processes and other behavioural code kept as HDL blocks; *Convert to HDL* makes the HDL the base
   and keeps the schematic under it.
+- **Live schematic simulation** (Logisim style): *Simulate* in the schematic editor runs the drawing
+  itself. Click the input markers: 1-bit inputs are switches, buses open a value editor (hex /
+  binary / decimal, +1 / −1), clock inputs step one cycle or run at 1 Hz … 1 kHz; *Reset* power-cycles.
+  Wires are coloured by value (green 1, dark green 0, red X/U, blue Z), buses show their value,
+  outputs light up, flip-flops / registers / counters show what they store, hovering a pin or wire
+  shows its value and clicking a module instance lists its pin values. Module symbols simulate their
+  project HDL; schematic errors refuse the simulation with the list of errors. Esc returns to editing.
 - **ISE schematics (.sch)**: schematics in ISE projects (XML and older text formats) are converted
   on import, with the Xilinx library symbols mapped to equivalent symbols or exact HDL blocks;
   exporting a project writes them back as ISE `.sch` files (*Export as ISE Schematic* for one).

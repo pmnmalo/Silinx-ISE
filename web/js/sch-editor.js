@@ -60,6 +60,7 @@ const ICON = {
   fit: I('<path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="#24476f" stroke-width="1.5"/><rect x="5" y="5" width="6" height="6" fill="#9cc3ea" stroke="#24476f"/>'),
   check: I('<rect x="1.5" y="1.5" width="13" height="13" rx="1" fill="#fff" stroke="#24476f"/><path d="M4 8.2l2.6 2.6L12 5" fill="none" stroke="#008000" stroke-width="2"/>'),
   gen: I('<path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#24476f"/><path d="M10 1.5v3h3" fill="none" stroke="#24476f"/><path d="M5 8h6M5 10.5h6M5 13h4" stroke="#316ac5"/><path d="M1 6.5l2.5 2-2.5 2" fill="none" stroke="#c08000" stroke-width="1.4"/>'),
+  sim: I('<rect x="1" y="4" width="7" height="8" rx="1.5" fill="#1f6b1f" stroke="#0d3d0d"/><rect x="4.5" y="5.5" width="2.5" height="5" rx=".6" fill="#fff"/><path d="M9 8h2.5" stroke="#00b000" stroke-width="1.6"/><circle cx="13" cy="8" r="2.4" fill="#33e033" stroke="#0d6d0d"/>'),
   view: I('<path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#24476f"/><path d="M10 1.5v3h3" fill="none" stroke="#24476f"/><text x="4.2" y="12" font-size="6.5" font-family="Consolas,monospace" font-weight="bold" fill="#000080">&lt;/&gt;</text>'),
 };
 
@@ -322,6 +323,8 @@ export function mountSchEditor(container, opts = {}) {
   let lastDiags = null;
   let genLang = doc.lang;
   const readOnly = !!opts.readOnly;
+  let live = null;                    // live simulation controller (web/js/sch-live.js) while simulating
+  let liveStarting = false;
 
   container.classList.add('sch-editor');
   container.classList.toggle('read-only', readOnly);
@@ -335,7 +338,8 @@ export function mountSchEditor(container, opts = {}) {
   const right = h('div', { class: 'se-right' });
   const status = h('div', { class: 'se-status' });
   const diagPanel = h('div', { class: 'se-diags', hidden: true });
-  const main = h('div', { class: 'se-main' }, left, h('div', { class: 'se-center' }, canvas, diagPanel), right);
+  const simBar = h('div', { class: 'se-simbar', hidden: true });
+  const main = h('div', { class: 'se-main' }, left, h('div', { class: 'se-center' }, simBar, canvas, diagPanel), right);
   container.append(tb, main, status);
 
   canvas.innerHTML = `<svg class="se-svg" xmlns="${SVGNS}">
@@ -343,13 +347,14 @@ export function mountSchEditor(container, opts = {}) {
       <pattern id="se-grid-${uidE}" width="${GRID}" height="${GRID}" patternUnits="userSpaceOnUse"><circle cx="0" cy="0" r="0.7" class="griddot"/></pattern>
       <pattern id="se-grid2-${uidE}" width="${GRID * 5}" height="${GRID * 5}" patternUnits="userSpaceOnUse"><circle cx="0" cy="0" r="1.1" class="griddot"/></pattern>
     </defs>
-    <g class="se-vp"><g class="se-sheet"></g><g class="se-content"></g><g class="se-overlay"></g></g></svg>
+    <g class="se-vp"><g class="se-sheet"></g><g class="se-content"></g><g class="se-simlayer"></g><g class="se-overlay"></g></g></svg>
     <div class="se-hint" hidden></div>`;
   const svg = canvas.querySelector('svg');
   const vp = svg.querySelector('.se-vp');
   const sheetG = svg.querySelector('.se-sheet');
   const contentG = svg.querySelector('.se-content');
   const overlayG = svg.querySelector('.se-overlay');
+  const simG = svg.querySelector('.se-simlayer');
   const hint = canvas.querySelector('.se-hint');
 
   // ---------------- toolbar
@@ -374,6 +379,7 @@ export function mountSchEditor(container, opts = {}) {
     sep(), langSel,
     h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'view', title: 'View generated HDL', html: `${ICON.view}<span>View HDL</span>` }),
     h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'generate', title: 'Generate HDL source from the schematic', html: `${ICON.gen}<span>Generate HDL</span>` }),
+    sep(), h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'sim', title: 'Simulate: click the inputs and watch the circuit work (Esc to stop)', html: `${ICON.sim}<span>Simulate</span>` }),
     sep(), optBox,
   );
   langSel.value = genLang;
@@ -382,7 +388,7 @@ export function mountSchEditor(container, opts = {}) {
     let prevSep = true;                                   // a separator at the start is not needed
     let lastSep = null;
     for (const el of tb.children) {
-      if (el.classList.contains('se-keep') || el.classList.contains('se-opts') || ['wire', 'net', 'io', 'rotate', 'mirror', 'delete', 'undo', 'redo', 'generate'].includes(el.dataset.act)) continue;   // hidden by .read-only CSS
+      if (el.classList.contains('se-keep') || el.classList.contains('se-opts') || ['wire', 'net', 'io', 'rotate', 'mirror', 'delete', 'undo', 'redo', 'generate', 'sim'].includes(el.dataset.act)) continue;   // hidden by .read-only CSS
       if (el.classList.contains('se-sep')) { if (prevSep) el.style.display = 'none'; else { prevSep = true; lastSep = el; } }
       else { prevSep = false; lastSep = null; }
     }
@@ -393,6 +399,8 @@ export function mountSchEditor(container, opts = {}) {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled) return;
     const a = b.dataset.act;
+    if (a === 'sim') { if (live) leaveSim(); else enterSim(); container.focus({ preventScroll: true }); return; }
+    if (live && !['zin', 'zout', 'fit', 'view', 'check'].includes(a)) return;
     if (a === 'select' || a === 'wire' || a === 'net' || a === 'io') setTool(a);
     else if (a === 'rotate') rotateSel(); else if (a === 'mirror') mirrorSel(); else if (a === 'delete') deleteSel();
     else if (a === 'undo') undo(); else if (a === 'redo') redo();
@@ -583,6 +591,7 @@ export function mountSchEditor(container, opts = {}) {
     renderOverlay();
     updateToolbar();
     updateStatus();
+    if (live) live.update(true);
   }
   function renderOverlay() {
     let s = '';
@@ -606,7 +615,7 @@ export function mountSchEditor(container, opts = {}) {
     overlayG.innerHTML = s;
   }
   function updateToolbar() {
-    tb.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('on', b.dataset.act === tool));
+    tb.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('on', live ? b.dataset.act === 'sim' : b.dataset.act === tool));
     tb.querySelector('[data-act="undo"]').disabled = !undoStack.length;
     tb.querySelector('[data-act="redo"]').disabled = !redoStack.length;
     const any = sel.size > 0;
@@ -624,7 +633,7 @@ export function mountSchEditor(container, opts = {}) {
   };
   function updateStatus() {
     const n = doc.symbols.length;
-    const tip = readOnly ? 'Read-only view. Drag on empty space to select, double-click a module to open it, wheel to zoom.' : (TOOL_HINT[tool] || '');
+    const tip = live ? 'Live simulation: click the inputs (switches, bus values, clocks), hover a wire or pin to see its value, drag to pan. Esc stops the simulation.' : readOnly ? 'Read-only view. Drag on empty space to select, double-click a module to open it, wheel to zoom.' : (TOOL_HINT[tool] || '');
     const d = lastDiags ? ` · ${lastDiags.filter(x => x.severity === 'error').length} error(s), ${lastDiags.filter(x => x.severity === 'warning').length} warning(s)` : '';
     status.innerHTML = `<span class="hint">${esc(tip)}</span><span class="sp"></span><span>${n} symbol${n === 1 ? '' : 's'}, ${nl ? nl.nets.length : 0} nets${d}</span><span class="xy">X ${snap(cursor.x)} Y ${snap(cursor.y)}</span><span class="zoom">${Math.round(view.s * 100)}%</span>`;
   }
@@ -644,6 +653,7 @@ export function mountSchEditor(container, opts = {}) {
     return !!s;
   }
   function renderProps() {
+    if (live) { live.renderProps(propBody); return; }
     renderPropsInner();
     opts.onSelect?.(selectedModuleSym());
     if (readOnly) propBody.querySelectorAll('input, textarea, select, button').forEach(el => { if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text')) el.readOnly = true; else if (!el.classList.contains('ro-ok')) el.disabled = true; });
@@ -793,7 +803,7 @@ export function mountSchEditor(container, opts = {}) {
   // ---------------- edits, undo, change notification
   const snapshot = () => JSON.stringify(doc);
   function edit(fn, { keepProps = false } = {}) {
-    if (readOnly) return;
+    if (readOnly || live) return;
     const before = snapshot();
     fn();
     doc = normalizeDoc(doc);
@@ -808,13 +818,13 @@ export function mountSchEditor(container, opts = {}) {
     changeTimer = setTimeout(() => { if (!destroyed) opts.onChange?.(clone(doc)); }, 300);
   }
   function undo() {
-    if (!undoStack.length) return;
+    if (!undoStack.length || live) return;
     redoStack.push(snapshot());
     doc = normalizeDoc(JSON.parse(undoStack.pop()));
     pruneSel(); changed(); render(); renderProps();
   }
   function redo() {
-    if (!redoStack.length) return;
+    if (!redoStack.length || live) return;
     undoStack.push(snapshot());
     doc = normalizeDoc(JSON.parse(redoStack.pop()));
     pruneSel(); changed(); render(); renderProps();
@@ -1143,6 +1153,8 @@ export function mountSchEditor(container, opts = {}) {
     cursor = pt;
     if (e.button === 1 || spaceDown) { e.preventDefault(); drag = { kind: 'pan', cx: e.clientX, cy: e.clientY, tx: view.tx, ty: view.ty }; canvas.classList.add('panning'); return; }
     if (e.button !== 0) return;
+    // live simulation: the inputs are controls, the rest of the sheet pans
+    if (live) { if (!live.pointerDown(e, itemAt(e.target))) drag = { kind: 'pan', cx: e.clientX, cy: e.clientY, tx: view.tx, ty: view.ty }; return; }
     if (tool === 'place') { placeAt(pt); return; }
     if (tool === 'wire') { wireClick(pt, e.detail >= 2); return; }
     if (tool === 'net') { netClick(pt); return; }
@@ -1165,7 +1177,8 @@ export function mountSchEditor(container, opts = {}) {
     if (drag?.kind === 'pan') { view.tx = drag.tx + e.clientX - drag.cx; view.ty = drag.ty + e.clientY - drag.cy; applyView(); return; }
     if (drag?.kind === 'move') { applyMove(drag, snap(pt.x) - drag.start.x, snap(pt.y) - drag.start.y); return; }
     if (drag?.kind === 'band') { drag.cur = pt; renderOverlay(); return; }
-    if (!svg.contains(e.target) && e.target !== svg) return;
+    if (!svg.contains(e.target) && e.target !== svg) { live?.hideTip(); return; }
+    if (live) { live.hover(e, pt, view.s); updateStatus(); return; }
     if (tool === 'wire' || tool === 'io' || tool === 'net') hoverPin = pinNear(pt); else hoverPin = null;
     if (tool !== 'select') renderOverlay();
     updateStatus();
@@ -1234,18 +1247,19 @@ export function mountSchEditor(container, opts = {}) {
   svg.addEventListener('pointerdown', onDown);
   svg.addEventListener('contextmenu', e => e.preventDefault());
   svg.addEventListener('dblclick', e => {
+    if (live) { e.preventDefault(); return; }
     if (tool === 'wire') { e.preventDefault(); finishWire(); return; }
     if (tool === 'select') { const it = itemAt(e.target); if (it) { e.preventDefault(); onDouble(it); } }
   });
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
   svg.addEventListener('wheel', onWheel, { passive: false });
-  svg.addEventListener('pointerleave', () => { hoverPin = null; if (tool !== 'select') renderOverlay(); });
+  svg.addEventListener('pointerleave', () => { live?.hideTip(); hoverPin = null; if (tool !== 'select') renderOverlay(); });
   // drag & drop from the palette
   canvas.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('text/x-silinx-symbol')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
   canvas.addEventListener('drop', e => {
     const raw = e.dataTransfer.getData('text/x-silinx-symbol');
-    if (!raw || readOnly) return;
+    if (!raw || readOnly || live) return;
     e.preventDefault();
     const it = JSON.parse(raw);
     const src = { type: it.type, params: { ...defaultParams(it.type), ...(it.params || {}) }, rot: 0, mirror: false };
@@ -1259,6 +1273,19 @@ export function mountSchEditor(container, opts = {}) {
   // ---------------- keyboard
   function onKey(e) {
     if (destroyed) return;
+    if (live) {
+      if (!container.contains(document.activeElement) && document.activeElement !== container && !(e.key === 'Escape' && document.activeElement === document.body && container.offsetParent)) return;
+      const t0 = e.target;
+      if (t0 && (t0.tagName === 'INPUT' || t0.tagName === 'TEXTAREA' || t0.tagName === 'SELECT')) return;
+      const k0 = e.key.toLowerCase();
+      if (k0 === 'escape') { e.preventDefault(); if (live.editing) live.closeEditor(); else leaveSim(); return; }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (k0 === ' ' && !spaceDown) { spaceDown = true; canvas.classList.add('pan-ready'); e.preventDefault(); }
+      else if (k0 === 'f') fit();
+      else if (k0 === '+' || k0 === '=') zoomAt(1.25);
+      else if (k0 === '-' || k0 === '_') zoomAt(0.8);
+      return;
+    }
     // Esc stops placing a symbol / drawing a wire wherever the keyboard focus is (palette, search
     // box, page), as long as this editor is on screen
     if (e.key === 'Escape' && (tool !== 'select' || wireDraw) && container.isConnected && container.offsetParent) {
@@ -1326,11 +1353,55 @@ export function mountSchEditor(container, opts = {}) {
     updateStatus();
     return lastDiags;
   }
-  function showDiags() {
+
+  // ---------------- live simulation (Logisim style): web/js/sch-live.js on core/schlive.js
+  const toCanvas = pt => ({ x: pt.x * view.s + view.tx, y: pt.y * view.s + view.ty });
+  async function enterSim() {
+    if (live || liveStarting || readOnly || destroyed) return;
+    if (wireDraw) finishWire();
+    if (tool !== 'select') setTool('select');
+    liveStarting = true;
+    flash('Building the simulation model…');
+    try {
+      const [{ startLiveSim }, sources] = await Promise.all([import('./sch-live.js'), Promise.resolve(opts.simSources ? opts.simSources() : [])]);
+      if (destroyed || live) return;
+      const res = startLiveSim({
+        doc: clone(doc), modules, sources: sources || [], lang: opts.simLang || genLang, h,
+        layer: simG, content: contentG, bar: simBar, canvas, toCanvas, onExit: leaveSim,
+      });
+      if (!res.ok) {
+        lastDiags = res.diagnostics?.length ? res.diagnostics : res.errors.map(message => ({ severity: 'error', message }));
+        showDiags('Simulation refused');
+        flash(`Cannot simulate: ${res.errors[0]}`);
+        updateStatus();
+        return;
+      }
+      live = res.ctl;
+      sel.clear();
+      diagPanel.hidden = true;
+      hint.hidden = true;
+      container.classList.add('sim-mode');
+      render(); renderProps();
+      opts.onSimulate?.(true);
+    } catch (err) {
+      console.error(err);
+      flash(`Cannot simulate: ${err.message}`);
+    } finally { liveStarting = false; }
+  }
+  function leaveSim() {
+    if (!live) return;
+    live.destroy();
+    live = null;
+    container.classList.remove('sim-mode');
+    render(); renderProps();
+    opts.onSimulate?.(false);
+    container.focus({ preventScroll: true });
+  }
+  function showDiags(what = 'Check Schematic') {
     diagPanel.hidden = false;
     diagPanel.innerHTML = '';
     const errs = lastDiags.filter(d => d.severity === 'error').length, warns = lastDiags.filter(d => d.severity === 'warning').length;
-    const head = h('div', { class: 'se-cap' }, h('span', { text: `Check Schematic: ${errs} error(s), ${warns} warning(s)` }), h('span', { class: 'sp' }), h('button', { type: 'button', class: 'se-x', title: 'Close', text: '×', onclick: () => { diagPanel.hidden = true; } }));
+    const head = h('div', { class: 'se-cap' }, h('span', { text: `${what}: ${errs} error(s), ${warns} warning(s)` }), h('span', { class: 'sp' }), h('button', { type: 'button', class: 'se-x', title: 'Close', text: '×', onclick: () => { diagPanel.hidden = true; } }));
     const list = h('div', { class: 'se-dlist' });
     if (!lastDiags.length) list.append(h('div', { class: 'se-drow ok', text: 'No errors or warnings found.' }));
     for (const d of lastDiags) {
@@ -1454,13 +1525,18 @@ export function mountSchEditor(container, opts = {}) {
 
   return {
     getDoc: () => clone(normalizeDoc(doc)),
-    setDoc(d) { doc = normalizeDoc(d || newDoc()); undoStack.length = 0; redoStack.length = 0; sel.clear(); lastDiags = null; genLang = doc.lang; langSel.value = genLang; diagPanel.hidden = true; renderSheet(); renderPalette(); render(); renderProps(); fit(); },
-    setModules(m) { modules = normMods(m); renderPalette(); render(); renderProps(); },
+    setDoc(d) { leaveSim(); doc = normalizeDoc(d || newDoc()); undoStack.length = 0; redoStack.length = 0; sel.clear(); lastDiags = null; genLang = doc.lang; langSel.value = genLang; diagPanel.hidden = true; renderSheet(); renderPalette(); render(); renderProps(); fit(); },
+    setModules(m) { leaveSim(); modules = normMods(m); renderPalette(); render(); renderProps(); },
     check: () => runCheck(true),
     openSelected,
     fit,
     print,
+    simulate: enterSim,
+    stopSimulation: leaveSim,
+    get simulating() { return !!live; },
+    get liveSim() { return live?.live || null; },
     destroy() {
+      live?.destroy(); live = null;
       destroyed = true;
       clearTimeout(changeTimer);
       window.removeEventListener('pointermove', onMove);
