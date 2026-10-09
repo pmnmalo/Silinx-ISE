@@ -297,6 +297,7 @@ function elabAssignItem(E, it) {
   if (E.lang === 'verilog') ctxSize(value, target.t.w);
   checkAssignable(E, target, value, it.loc);
   const body = { k: 'asg', target, value, nb: E.lang === 'vhdl', delay: it.delay ? bindExpr(E, it.delay) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, loc: it.loc };
+  if (E.lang === 'vhdl') Object.assign(body, vhdlMech(E, it));
   addProc(E, {
     name: `assign_${it.loc?.line ?? ''}`, kind: 'assign', mode: 'comb', body, triggers: triggersOfReads(body),
     lang: E.lang, loc: it.loc, file: E.file, item: it,
@@ -1282,10 +1283,14 @@ function bindStmt0(E, s, loc) {
       const root = lroot(target.k === 'cat' ? target.parts[0] : target);
       if (E.lang === 'vhdl' && s.nonblocking && root.k === 'loc' && !E.inFunction) diag(E, `'${root.name}' is a variable: use ':='`, loc, 'warning');
       if (E.inFunction && root.k === 'sig' && !s.nonblocking) diag(E, `function assigns signal '${root.name}'`, loc, 'warning');
-      return {
+      const asg = {
         k: 'asg', target, value, nb: !!s.nonblocking && root.k !== 'loc',
         delay: s.delay ? bindExpr(E, s.delay, null, loc) : null, delayUnit: E.lang === 'vhdl' ? 1 : E.timeUnit, loc,
       };
+      if (E.lang === 'vhdl' && asg.nb) Object.assign(asg, vhdlMech(E, s));
+      // Verilog `a = #d b;`: the process waits d, then assigns the value sampled before the wait
+      if (E.lang === 'verilog' && !asg.nb && asg.delay) asg.intra = true;
+      return asg;
     }
     case 'if': return { k: 'if', c: bindExpr(E, s.cond, null, loc), then: bindStmt(E, s.then, loc), else: s.else ? bindStmt(E, s.else, loc) : null, loc };
     case 'case': {
@@ -1357,6 +1362,14 @@ function bindStmt0(E, s, loc) {
 }
 
 const cI = n => ({ k: 'c', val: V.fromInt(n), t: INT });
+
+// VHDL signal assignment: driver semantics (inertial / transport / reject, waveform elements).
+function vhdlMech(E, s) {
+  const m = { vh: true, mech: s.mech === 'transport' ? 'transport' : 'inertial' };
+  if (s.mech && s.mech.reject) m.reject = bindExpr(E, s.mech.reject, null, s.loc);
+  if (s.waveCont) m.cont = true;
+  return m;
+}
 
 function evalRangeDyn(E, r, loc) {
   if (r.of) {

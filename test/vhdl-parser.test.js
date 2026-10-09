@@ -455,7 +455,13 @@ describe('concurrent statements', () => {
     assert.equal(blk.kind, 'block');
     assert.deepEqual(blk.stmts, [
       { kind: 'assign', target: R('rst'), value: L1('1'), nonblocking: true, delay: null },
-      { kind: 'assign', target: R('rst'), value: L1('0'), nonblocking: true, delay: { op: 'phys', value: 100, unit: 'ns' } }]);
+      { kind: 'assign', target: R('rst'), value: L1('0'), nonblocking: true, delay: { op: 'phys', value: 100, unit: 'ns' }, waveCont: true }]);
+  });
+
+  test('delay mechanism: transport / reject ... inertial are kept on the assignment', () => {
+    const m = arch(`a <= transport b after 2 ns; c <= reject 1 ns inertial d after 3 ns;`);
+    assert.equal(m.items[0].mech, 'transport');
+    assert.deepEqual(m.items[1].mech, { reject: { op: 'phys', value: 1, unit: 'ns' } });
   });
 
   test('block statements are flattened', () => {

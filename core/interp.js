@@ -358,7 +358,8 @@ export function applyWrite(cur, wr, val) {
   return V.setBits(cur, wr.lo, wr.w, V.resize(val, wr.w));
 }
 
-function doAssign(s, ctx) {
+// Evaluate an assignment: the value split over the resolved writes, and the delay (ps).
+function prepAssign(s, ctx) {
   const val = evalE(s.value, ctx);
   const writes = [];
   resolveTarget(s.target, ctx, writes);
@@ -372,14 +373,39 @@ function doAssign(s, ctx) {
     parts = writes.map(w => { off -= w.w; return V.getBits(v, off, w.w); });
   }
   let delay = 0;
-  if (s.delay) delay = V.toNum(evalE(s.delay, ctx)) * (s.delayUnit || 1);
+  if (s.delay) { const d = evalE(s.delay, ctx); delay = (d.real ?? V.toNum(d)) * (s.delayUnit || 1); }
+  return { writes, parts, delay };
+}
+
+function doAssign(s, ctx) {
+  const { writes, parts, delay } = prepAssign(s, ctx);
+  let mech = null;
+  if (s.vh) {
+    mech = { mech: s.mech, cont: s.cont, reject: null };
+    if (s.reject) { const r = evalE(s.reject, ctx); mech.reject = (r.real ?? V.toNum(r)) * (s.delayUnit || 1); }
+  }
   writes.forEach((wr, k) => {
     if (wr.invalid) return; // X index: no effect
-    if (wr.loc != null) { ctx.frame[wr.loc] = applyWrite(ctx.frame[wr.loc], wr, parts[k]); return; }
+    if (wr.loc != null) { ctx.frame[wr.loc] = applyWrite(ctx.frame[wr.loc], wr, parts[k], true); return; }
     if (!ctx.sim) throw new SimError(`cannot assign signal '${wr.sig.name}' in a constant expression`);
-    if (delay > 0) ctx.sim.after(wr, parts[k], delay, s.nb);
-    else if (s.nb) ctx.sim.nba(wr, parts[k]);
-    else ctx.sim.write(wr, parts[k]);
+    // a queued array value must not change if the source container is updated in place later
+    const v = Array.isArray(parts[k]) ? parts[k].slice() : parts[k];
+    if (delay > 0) ctx.sim.after(wr, v, delay, s.nb, mech);
+    else if (s.nb) { if (mech) ctx.sim.preempt(wr, v, ctx.sim.now, mech, null); ctx.sim.nba(wr, v); }
+    else ctx.sim.write(wr, v);
+  });
+}
+
+// Verilog blocking assignment with an intra-assignment delay (`a = #5 b;`): sample the value,
+// suspend the process for the delay, then assign.
+function* doAssignIntra(s, ctx) {
+  const { writes, parts, delay } = prepAssign(s, ctx);
+  yield { delay };
+  writes.forEach((wr, k) => {
+    if (wr.invalid) return;
+    if (wr.loc != null) { ctx.frame[wr.loc] = applyWrite(ctx.frame[wr.loc], wr, parts[k], true); return; }
+    if (!ctx.sim) throw new SimError(`cannot assign signal '${wr.sig.name}' in a constant expression`);
+    ctx.sim.write(wr, parts[k]);
   });
 }
 
@@ -394,7 +420,11 @@ export function* exec(s, ctx) {
         if (r) return r;
       }
       return;
-    case 'asg': ctx.loc = s.loc; doAssign(s, ctx); return;
+    case 'asg':
+      ctx.loc = s.loc;
+      if (s.intra) { yield* doAssignIntra(s, ctx); return; }
+      doAssign(s, ctx);
+      return;
     case 'if': {
       const c = V.truth(evalE(s.c, ctx));
       if (c === 1) return yield* exec(s.then, ctx);

@@ -41,6 +41,19 @@ const ref = (name) => ({ op: 'ref', name });
 const int = (v) => ({ op: 'int', value: String(v) });
 const bin = (o, a, b) => ({ op: 'binary', o, a, b });
 const block = (stmts, loc) => ({ kind: 'block', label: null, decls: [], stmts, loc });
+// One nonblocking assignment per waveform element. The first carries the delay mechanism
+// (`mech`: 'transport' | { reject } | absent = inertial); the others only append (`waveCont`).
+function waveAssigns(wave, target, mech, loc) {
+  const out = [];
+  wave.forEach((w, k) => {
+    if (w.unaffected) return;
+    const a = { kind: 'assign', target, value: w.value, nonblocking: true, delay: w.delay, loc };
+    if (mech) a.mech = mech;
+    if (k > 0) a.waveCont = true;
+    out.push(a);
+  });
+  return out;
+}
 
 const LOGIC_CHARS = /^[01uxzwlhUXZWLH-]*$/;
 /** Map a VHDL std_logic character string to IR bits (01xz). */
@@ -1012,17 +1025,17 @@ class Parser {
     if (!this.isOp('<=')) this.fail(`expected '<=' but found ${this.describe(this.peek())}`);
     this.next();
     this.acceptKw('guarded');
-    this.parseDelayMechanism();
+    const mech = this.parseDelayMechanism();
     const branches = this.parseConditionalWaveforms();
     this.expectOp(';');
     if (branches.length === 1 && branches[0].wave.length > 1) {
       // multi-element waveform -> process with one assignment per element
-      const stmts = branches[0].wave.filter((w) => !w.unaffected)
-        .map((w) => ({ kind: 'assign', target, value: w.value, nonblocking: true, delay: w.delay, loc }));
+      const stmts = waveAssigns(branches[0].wave, target, mech, loc);
       return [{ kind: 'process', label, sens: 'all', initial: false, decls: [], body: [block(stmts, loc)], loc }];
     }
     const { value, delay } = this.foldConditional(branches, target, tok);
     const a = { kind: 'assign', target, value, delay, loc };
+    if (mech) a.mech = mech;
     if (label) a.label = label;
     return [a];
   }
@@ -1046,11 +1059,12 @@ class Parser {
     return { value, delay };
   }
 
-  /** `transport` | `[reject t] inertial` - parsed and ignored. */
+  /** `transport` | `[reject t] inertial` -> 'transport' | { reject: expr } | null (inertial). */
   parseDelayMechanism() {
-    if (this.acceptKw('transport')) return;
-    if (this.acceptKw('reject')) { this.parseExpression(); this.expectKw('inertial'); return; }
+    if (this.acceptKw('transport')) return 'transport';
+    if (this.acceptKw('reject')) { const reject = this.parseExpression(); this.expectKw('inertial'); return { reject }; }
     this.acceptKw('inertial');
+    return null;
   }
 
   /** waveform { when cond else waveform } [when cond] */
@@ -1094,7 +1108,7 @@ class Parser {
     if (this.acceptOp(':=')) nonblocking = false;
     else this.expectOp('<=');
     this.acceptKw('guarded');
-    if (nonblocking) this.parseDelayMechanism();
+    const mech = nonblocking ? this.parseDelayMechanism() : null;
     const items = [];
     let def = null;
     const loc = this.loc(tok);
@@ -1108,7 +1122,9 @@ class Parser {
       }
       this.expectKw('when');
       const choices = this.parseChoices();
-      const body = unaffected ? block([], sloc) : block([{ kind: 'assign', target, value, nonblocking, delay, loc: sloc }], sloc);
+      const asg = { kind: 'assign', target, value, nonblocking, delay, loc: sloc };
+      if (mech) asg.mech = mech;
+      const body = unaffected ? block([], sloc) : block([asg], sloc);
       const real = choices.filter((c) => c !== 'others');
       if (choices.includes('others')) def = body;
       if (real.length) items.push({ choices: real, body });
@@ -1212,17 +1228,19 @@ class Parser {
         this.next();
         if (this.isKw('in') || this.isKw('out')) this.next();
       }
-      this.parseDelayMechanism();
+      const mech = this.parseDelayMechanism();
       const branches = this.parseConditionalWaveforms();
       this.expectOp(';');
       if (branches.length === 1 && !branches[0].cond) {
-        const wave = branches[0].wave.filter((w) => !w.unaffected);
-        if (wave.length === 0) return { kind: 'null', loc };
-        if (wave.length === 1) return { kind: 'assign', target, value: wave[0].value, nonblocking: true, delay: wave[0].delay, loc };
-        return block(wave.map((w) => ({ kind: 'assign', target, value: w.value, nonblocking: true, delay: w.delay, loc })), loc);
+        const stmts = waveAssigns(branches[0].wave, target, mech, loc);
+        if (stmts.length === 0) return { kind: 'null', loc };
+        if (stmts.length === 1) return stmts[0];
+        return block(stmts, loc);
       }
       const { value, delay } = this.foldConditional(branches, target, tok);
-      return { kind: 'assign', target, value, nonblocking: true, delay, loc };
+      const a = { kind: 'assign', target, value, nonblocking: true, delay, loc };
+      if (mech) a.mech = mech;
+      return a;
     }
     if (this.acceptOp(':=')) {
       let value = this.parseExpression();

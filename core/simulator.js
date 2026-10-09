@@ -1,6 +1,9 @@
 // Event-driven behavioural simulator with delta cycles.
 // Time is in picoseconds (JS numbers). Verilog blocking assignments update immediately;
 // Verilog non-blocking and VHDL signal assignments are applied at the end of the delta (NBA).
+// VHDL `after` transactions mature at the start of their time step (before any process of that
+// step runs), and follow the driver rules: a new assignment deletes the driver's later
+// transactions, and inertial delay also rejects pulses shorter than the reject limit.
 import * as V from './values.js';
 import { exec, evalE, applyWrite, formatDisplay, SimError, formatTime } from './interp.js';
 
@@ -34,6 +37,7 @@ class Heap {
     return top;
   }
 }
+const sameVal = (a, b) => (Array.isArray(a) || Array.isArray(b) ? a === b : V.same(a, b) && a.real === b.real);
 const less = (x, y) => x.t < y.t || (x.t === y.t && x.s < y.s);
 
 function bitOf(v, pos) {
@@ -59,6 +63,8 @@ export class Simulator {
     this.heap = new Heap();
     this.active = [];
     this.nbaQ = [];
+    this.nextDelta = [];        // VHDL `wait for 0 ns`: resume in the next delta
+    this.drvTx = new Map();     // VHDL drivers: proc -> Map(target key -> pending heap items)
     this.log = [];
     this.finished = null;
     this.waveEvents = 0;
@@ -152,8 +158,38 @@ export class Simulator {
     this.setSignal(sig, applyWrite(sig.val, wr, val));
   }
   nba(wr, val) { this.nbaQ.push({ wr, val }); }
-  after(wr, val, delay, nb) {
-    this.heap.push(this.now + delay, { upd: true, wr, val, nb });
+  // mech (VHDL only): { mech: 'inertial' | 'transport', reject: ps | null, cont: waveform element > 1 }
+  after(wr, val, delay, nb, mech = null) {
+    const t = this.now + delay;
+    const item = { upd: true, wr, val, nb, vh: !!mech, t };
+    if (mech) this.preempt(wr, val, t, mech, item);
+    this.heap.push(t, item);
+  }
+  // VHDL driver update for a new transaction (val at time t) on the current process' driver of
+  // `wr`: delete the pending transactions at or after t; for inertial delay, also those inside
+  // the reject window [t - reject, t) except the run of equal values right before t.
+  preempt(wr, val, t, mech, item) {
+    const p = this.curProc;
+    if (!p) return;
+    let m = this.drvTx.get(p);
+    if (!m) { if (!item) return; m = new Map(); this.drvTx.set(p, m); }
+    const key = `${wr.sig.id}:${wr.elem}:${wr.lo}:${wr.w}`;
+    const old = m.get(key);
+    if (!old && !item) return;
+    const keep = [];
+    for (const it of old || []) {
+      if (it.cancelled || it.t <= this.now) continue;
+      if (it.t >= t) it.cancelled = true; else keep.push(it);
+    }
+    if (mech.mech !== 'transport' && !mech.cont) {
+      const win = t - (mech.reject ?? (t - this.now));
+      let i = keep.length - 1;
+      while (i >= 0 && keep[i].t >= win && sameVal(keep[i].val, val)) i--;
+      for (; i >= 0 && keep[i].t >= win; i--) keep[i].cancelled = true;
+    }
+    const live = keep.filter(it => !it.cancelled);
+    if (item) live.push(item);
+    if (live.length) m.set(key, live); else m.delete(key);
   }
 
   setSignal(sig, nv) {
@@ -279,7 +315,9 @@ export class Simulator {
     if (r.done) { rt.done = true; return; }
     const req = r.value;
     if (req.delay !== undefined) {
-      if (req.delay <= 0) this.active.push({ rt, val: 'delay' });
+      // VHDL `wait for 0 ns` resumes after the pending signal updates (next delta);
+      // Verilog `#0` stays in the current one
+      if (req.delay <= 0) (rt.p.lang === 'vhdl' ? this.nextDelta : this.active).push({ rt, val: 'delay' });
       else this.heap.push(this.now + req.delay, { wake: rt });
     } else if (req.triggers) {
       const rec = { rt, triggers: req.triggers, fired: false };
@@ -309,15 +347,16 @@ export class Simulator {
         this.active = [];
         for (const { rt, val } of q) {
           this.resume(rt, val);
-          if (this.finished === 'error') return;
+          if (this.finished) return;     // $finish / error / failure: nothing else runs
         }
       }
-      if (!this.nbaQ.length) break;
+      if (!this.nbaQ.length && !this.nextDelta.length) break;
       const q = this.nbaQ;
       this.nbaQ = [];
       this.stamp++;
       this.stats.deltas++;
       for (const { wr, val } of q) this.write(wr, val);
+      if (this.nextDelta.length) { this.active.push(...this.nextDelta); this.nextDelta = []; }
       if (++deltas > this.maxDeltas) {
         this.emit({ kind: 'error', text: `delta cycle limit (${this.maxDeltas}) exceeded at ${formatTime(this.now)}: combinational loop?` });
         this.finish('error');
@@ -337,7 +376,7 @@ export class Simulator {
   run(until = Infinity, { maxSteps = Infinity } = {}) {
     this.start();
     let steps = 0, brokeEarly = false;
-    if (this.active.length || this.nbaQ.length) this.deltaLoop();
+    if (this.active.length || this.nbaQ.length || this.nextDelta.length) this.deltaLoop();
     while (!this.finished) {
       const top = this.heap.peek();
       if (!top || top.t > until) break;
@@ -346,9 +385,14 @@ export class Simulator {
       this.stamp++;
       while (this.heap.size && this.heap.peek().t === this.now) {
         const { item } = this.heap.pop();
+        if (item.cancelled) continue;
         if (item.wake) this.active.push({ rt: item.wake, val: 'delay' });
         else if (item.timeout) { if (!item.timeout.fired) this.fire(item.timeout, 'timeout'); }
-        else if (item.upd) { if (item.nb) this.nbaQ.push({ wr: item.wr, val: item.val }); else this.write(item.wr, item.val); }
+        else if (item.upd) {
+          // Verilog `<= #d`: NBA region of that step; VHDL `after`: updated before the step's processes run
+          if (item.nb && !item.vh) this.nbaQ.push({ wr: item.wr, val: item.val });
+          else this.write(item.wr, item.val);
+        }
         else if (item.stim) this.forceOrSet(item.sig, item.val);
         else if (item.fn) item.fn(this);
         else if (item.clock) {
