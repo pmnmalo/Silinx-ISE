@@ -372,6 +372,65 @@ PT_PATTERNS.push(
   [/^Simulation refused: (\d+) error\(s\), (\d+) warning\(s\)$/, 'Simulação recusada: $1 erro(s), $2 aviso(s)'],
   [/^Simulation stopped: (.*)$/s, 'Simulação parada: $1'],
 );
+// New Source types, Module Wizard and Schematic Wizard (web/js/modwizard.js, core/modgen.js)
+Object.assign(PT, {
+  'Module (HDL)': 'Módulo (HDL)', 'Module (Wizard)': 'Módulo (Assistente)', 'Schematic (Diagram)': 'Esquemático (Diagrama)', 'Schematic (Wizard)': 'Esquemático (Assistente)',
+  'Module Wizard': 'Assistente de Módulo', 'Schematic Wizard': 'Assistente de Esquemático',
+  'Name and Language': 'Nome e Linguagem', 'Inputs and Outputs': 'Entradas e Saídas', 'Kind of Logic': 'Tipo de Lógica',
+  'The wizard creates a schematic with an I/O marker for each input and output, ready for you to place the symbols and wire them.':
+    'O assistente cria um esquemático com um marcador de E/S para cada entrada e saída, pronto para colocar os símbolos e ligá-los.',
+  'The wizard writes a commented skeleton of the module: its inputs and outputs, and a template of the logic (combinational or sequential).':
+    'O assistente escreve um esqueleto comentado do módulo: as entradas e saídas, e um modelo da lógica (combinatória ou sequencial).',
+  'Schematic (module) name:': 'Nome do esquemático (módulo):', 'Module name:': 'Nome do módulo:', 'Description (optional):': 'Descrição (opcional):',
+  'What the module does (it goes into the header comment)': 'O que o módulo faz (vai para o comentário de cabeçalho)',
+  'Quick add (inputs):': 'Adicionar (entradas):', 'Quick add (outputs):': 'Adicionar (saídas):', 'Width (bits)': 'Largura (bits)',
+  '1 = a single bit; N = a bus of N bits (N-1 downto 0)': '1 = um só bit; N = um barramento de N bits (N-1 downto 0)',
+  'Description': 'Descrição', 'output': 'saída', 'optional': 'opcional', 'Add Port': 'Adicionar Porto',
+  'No ports yet: use the quick-add buttons or Add Port.': 'Ainda sem portos: use os botões de adição rápida ou Adicionar Porto.',
+  'One row per input or output. Width 1 is a single bit (std_logic / wire); a width N makes a bus of N bits, numbered N-1 downto 0.':
+    'Uma linha por entrada ou saída. Largura 1 é um só bit (std_logic / wire); uma largura N faz um barramento de N bits, numerados de N-1 a 0.',
+  'One assignment per output (concurrent)': 'Uma atribuição por saída (concorrente)', 'One process / always block that reads every input': 'Um processo / bloco always que lê todas as entradas',
+  'No reset': 'Sem reset', 'Synchronous (at the clock edge)': 'Síncrono (no flanco do relógio)', 'Asynchronous (at once)': 'Assíncrono (imediato)',
+  "Active high ('1')": "Ativo a 1 ('1')", "Active low ('0')": "Ativo a 0 ('0')",
+  'Style:': 'Estilo:', 'Reset:': 'Tipo de reset:', 'Reset input:': 'Entrada de reset:', 'Enable input:': 'Entrada de habilitação:',
+  'Combinational: the outputs depend only on the present inputs (gates, multiplexers, adders, decoders…). Every output gets a default value, so no latch is made.':
+    'Combinatória: as saídas dependem só das entradas atuais (portas, multiplexadores, somadores, descodificadores…). Cada saída recebe um valor por omissão, por isso não se cria nenhuma latch.',
+  'Sequential: the outputs are registers that change at the rising edge of the clock (counters, shift registers, state machines…). The reset sets them to 0.':
+    'Sequencial: as saídas são registos que mudam no flanco ascendente do relógio (contadores, registos de deslocamento, máquinas de estados…). O reset põe-nos a 0.',
+  'Combinational': 'Combinatória', 'Sequential (clocked)': 'Sequencial (com relógio)', 'Default value': 'Valor por omissão',
+  'Generics (optional)': 'Genéricos (opcional)', 'Add Generic': 'Adicionar Genérico',
+  'Constants given when the module is used, e.g. a width (VHDL generic, Verilog parameter).': 'Constantes dadas quando o módulo é usado, p. ex. uma largura (generic em VHDL, parameter em Verilog).',
+  'Preview of the code:': 'Pré-visualização do código:', 'Clock input:': 'Entrada de relógio:',
+  'shown on the sheet and as a comment in the HDL': 'mostrada na folha e como comentário no HDL',
+  'Add at least one input or output.': 'Adicione pelo menos uma entrada ou saída.',
+  'A sequential module needs a clock: add a 1-bit input (e.g. clk) on the previous page.': 'Um módulo sequencial precisa de um relógio: adicione uma entrada de 1 bit (p. ex. clk) na página anterior.',
+  'Choose the reset input, or No reset.': 'Escolha a entrada de reset, ou Sem reset.',
+  'The clock and the reset must be different inputs.': 'O relógio e o reset têm de ser entradas diferentes.',
+  'The enable must be an input other than the clock and the reset.': 'A habilitação tem de ser uma entrada diferente do relógio e do reset.',
+  'A sequential module needs a clock: a 1-bit input.': 'Um módulo sequencial precisa de um relógio: uma entrada de 1 bit.',
+  'The reset must be a 1-bit input other than the clock.': 'O reset tem de ser uma entrada de 1 bit diferente do relógio.',
+  'The enable must be a 1-bit input other than the clock and the reset.': 'A habilitação tem de ser uma entrada de 1 bit diferente do relógio e do reset.',
+});
+// identifier problems (core/modgen.js identError), inside the messages below
+const ptIdent = s => s
+  .replace(/^the name is empty$/, 'o nome está vazio')
+  .replace(/^('.*') must start with a letter$/, '$1 tem de começar por uma letra')
+  .replace(/^('.*') may only contain letters, digits and _$/, '$1 só pode ter letras, dígitos e _')
+  .replace(/^('.*'): no double __ and no _ at the end$/, '$1: sem __ seguidos e sem _ no fim')
+  .replace(/^('.*') is a reserved word of (VHDL|Verilog)$/, '$1 é uma palavra reservada de $2');
+PT_PATTERNS.push(
+  [/^(Name|Module name|Architecture name|Generic|Port (\d+)): (.*)\.$/, (m, w, k, e) => `${{ Name: 'Nome', 'Module name': 'Nome do módulo', 'Architecture name': 'Nome da arquitetura', Generic: 'Genérico' }[w] || `Porto ${k}`}: ${ptIdent(e)}.`],
+  [/^Port '(.*)' has the name of the module\.$/, "O porto '$1' tem o nome do módulo."],
+  [/^Two ports are named '([^']*)'\.$/, "Há dois portos com o nome '$1'."],
+  [/^Two ports are named '([^']*)' \(letter case does not count: '([^']*)'\)\.$/, "Há dois portos com o nome '$1' (maiúsculas e minúsculas não contam: '$2')."],
+  [/^Port '(.*)': the direction must be input or output\.$/, "Porto '$1': a direção tem de ser entrada ou saída."],
+  [/^Port '(.*)': the width must be a whole number from 1 to (\d+)\.$/, "Porto '$1': a largura tem de ser um número inteiro de 1 a $2."],
+  [/^The generic '(.*)' has the name of a port or of another generic\.$/, "O genérico '$1' tem o nome de um porto ou de outro genérico."],
+  [/^The generic '(.*)' has the name of a port or of the module\.$/, "O genérico '$1' tem o nome de um porto ou do módulo."],
+  [/^Generic '(.*)': the default value must be a whole number\.$/, "Genérico '$1': o valor por omissão tem de ser um número inteiro."],
+  [/^A module named '(.*)' already exists\.$/, "Já existe um módulo chamado '$1'."],
+  [/^(\S+) already exists\.$/, '$1 já existe.'],
+);
 Object.assign(PT, TT_PT); PT_PATTERNS.unshift(...TT_PT_PATTERNS);   // Truth Table / Karnaugh Map tool
 
 export const LOCALES = {

@@ -40,7 +40,7 @@ const SCH_PIN = `window.__schPin = async (symIndex, dir) => {
 uiTest('schematic editor: place two inverters, wire them, add I/O markers, save, Generate HDL', E, async (page) => {
   await makeProject(env, { name: 'SchPj' });
   await page.openProject('SchPj');
-  await newSource(page, 'Schematic', 'chain');
+  await newSource(page, 'Schematic (Diagram)', 'chain');
   await page.waitFor(() => window.Silinx.active?.id === 'sch:src/chain.sch.json' && document.querySelector('.doc:not([hidden]) .se-symrow'));
   await page.eval(SCH_PIN);
   // the palette: search, then click the symbol and click twice on the sheet

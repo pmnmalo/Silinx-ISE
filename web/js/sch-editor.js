@@ -592,7 +592,9 @@ export function mountSchEditor(container, opts = {}) {
       + `<line x1="${W - 10 - tbw}" y1="${H - 10 - tbh / 2}" x2="${W - 10}" y2="${H - 10 - tbh / 2}"/>`
       + `<text x="${W - tbw}" y="${H - 10 - tbh / 2 - 9}" class="tb-l">SHEET</text><text x="${W - tbw + 50}" y="${H - 10 - tbh / 2 - 9}" class="tb-v">${esc(doc.name)}</text>`
       + `<text x="${W - tbw}" y="${H - 19}" class="tb-l">LANGUAGE</text><text x="${W - tbw + 70}" y="${H - 19}" class="tb-v">${doc.lang.toUpperCase()}</text>`
-      + `<text x="${W - 20}" y="${H - 19}" class="tb-l" text-anchor="end">Silinx</text></g>`;
+      + `<text x="${W - 20}" y="${H - 19}" class="tb-l" text-anchor="end">Silinx</text></g>`
+      // the sheet description (Schematic Wizard / sheet properties), top left
+      + (String(doc.description || '').trim() ? `<text class="se-desc" x="30" y="40">${String(doc.description).trim().split(/\r?\n/).map((l, i) => `<tspan x="30" dy="${i ? 16 : 0}">${esc(l)}</tspan>`).join('')}</text>` : '');
   }
   function render() {
     if (destroyed) return;
@@ -741,6 +743,7 @@ export function mountSchEditor(container, opts = {}) {
     propBody.append(h('div', { class: 'se-ptitle', text: 'Schematic sheet' }));
     propBody.append(field('Module name', inp(doc.name, v => { doc.name = String(v).trim() || 'schematic'; })));
     propBody.append(field('Language', selBox(doc.lang, [['vhdl', 'VHDL'], ['verilog', 'Verilog']], v => { doc.lang = v; genLang = v; langSel.value = v; })));
+    propBody.append(field('Description', ta(doc.description || '', v => { if (String(v).trim()) doc.description = v; else delete doc.description; }, 2), 'shown on the sheet and as a comment in the HDL'));
     propBody.append(field('Sheet size', h('div', { class: 'se-row' },
       inp(doc.sheet.w, v => { doc.sheet.w = Math.max(400, +v || 1700); }, { type: 'number', step: 100 }),
       h('span', { text: '×' }), inp(doc.sheet.h, v => { doc.sheet.h = Math.max(300, +v || 1100); }, { type: 'number', step: 100 }))));

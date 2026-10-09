@@ -147,6 +147,7 @@
 .sch-editor svg .frame { fill: none; stroke: #9a9aaa; stroke-width: 1; }
 .sch-editor svg .titleblock rect, .sch-editor svg .titleblock line { fill: none; stroke: #9a9aaa; stroke-width: 1; }
 .sch-editor svg .titleblock text { font: 10px Arial, Helvetica, sans-serif; fill: #666; }
+.sch-editor svg .se-desc { font: italic 13px Arial, Helvetica, sans-serif; fill: #2a4a7a; }
 .sch-editor svg .titleblock .tb-v { font-weight: bold; fill: #000080; font-size: 12px; }
 
 /* drawing (matches the RTL viewer) */

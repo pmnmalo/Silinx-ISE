@@ -108,7 +108,7 @@ uiTest('Test Bench Wizard: sequential counter (Verilog) with clock and reset, ve
   assert.match(out, /TEST FAILED: 1 of 4/);
 });
 
-uiTest('New Source ▸ Test Bench (HDL) in VHDL and in Verilog, HDL Module in Verilog: files registered, extension follows the language, test bench is the simulation top', E, async (page) => {
+uiTest('New Source ▸ Test Bench (HDL) in VHDL and in Verilog, Module (HDL) in Verilog: files registered, extension follows the language, test bench is the simulation top', E, async (page) => {
   await makeProject(env, { name: 'TbwNs', top: 'adder', files: { 'src/adder.vhd': ADDER } });
   await page.openProject('TbwNs');
   const newSource = async (type, name, lang) => {
@@ -119,7 +119,7 @@ uiTest('New Source ▸ Test Bench (HDL) in VHDL and in Verilog, HDL Module in Ve
     await page.dialogButton('Next >');
     await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main select'));
     await page.eval((l) => { const sel = [...document.querySelectorAll('.dlg-overlay .wiz-main select')].find((x) => [...x.options].some((o) => o.value === 'verilog')); sel.value = l; sel.dispatchEvent(new Event('change', { bubbles: true })); }, lang);
-    if (type === 'HDL Module') assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].find((i) => i.value === 'Behavioral').style.display), lang === 'vhdl' ? '' : 'none');
+    if (type === 'Module (HDL)') assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].find((i) => i.value === 'Behavioral').style.display), lang === 'vhdl' ? '' : 'none');
     await page.dialogButton('Next >');
     assert.match(await page.eval(() => document.querySelector('.dlg-overlay pre').textContent), new RegExp(`Source Name: ${name}\\.${lang === 'vhdl' ? 'vhd' : 'v'}`));
     await page.dialogButton('Finish');
@@ -133,7 +133,7 @@ uiTest('New Source ▸ Test Bench (HDL) in VHDL and in Verilog, HDL Module in Ve
   await newSource('Test Bench (HDL)', 'tb_skel_v', 'verilog');
   await page.waitFor(() => window.Silinx.project.simTop === 'tb_skel_v' && window.Silinx.project.files.some((f) => f.path === 'sim/tb_skel_v.v' && f.role === 'sim'), [], { what: 'tb_skel_v registered' });
   assert.match(await readWs(env, 'TbwNs', 'sim/tb_skel_v.v'), /module tb_skel_v;/);
-  await newSource('HDL Module', 'blk', 'verilog');
+  await newSource('Module (HDL)', 'blk', 'verilog');
   await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/blk.v' && f.role === 'design'), [], { what: 'src/blk.v registered' });
   assert.match(await readWs(env, 'TbwNs', 'src/blk.v'), /module blk/);
   // the Project menu has no separate test bench wizard entry any more

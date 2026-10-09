@@ -371,23 +371,29 @@ export async function importSilinxDialog() {
 
 // ------------------------------------------------------------------ New Source
 const SOURCE_TYPES = [
-  // hdl / tb / tbwiz: VHDL or Verilog, chosen in the wizard (the extension follows the language)
-  { id: 'hdl', label: 'HDL Module', ico: 'vhdl', ext: null, dir: 'src' },
+  // hdl / tb / tbwiz / modwiz / schwiz: VHDL or Verilog, chosen in the wizard (the extension follows the language)
+  { id: 'hdl', label: 'Module (HDL)', ico: 'vhdl', ext: null, dir: 'src' },
+  { id: 'modwiz', label: 'Module (Wizard)', ico: 'template', ext: null, dir: 'src' },
   { id: 'tb', label: 'Test Bench (HDL)', ico: 'vhdl', ext: null, dir: 'sim' },
   { id: 'tbwiz', label: 'Test Bench (Wizard)', ico: 'template', ext: null, dir: 'sim' },
-  { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src' },
-  { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src' },
+  { id: 'sch', label: 'Schematic (Diagram)', ico: 'schematic', ext: '.sch.json', dir: 'src' },
+  { id: 'schwiz', label: 'Schematic (Wizard)', ico: 'schematic', ext: '.sch.json', dir: 'src' },
   { id: 'asm', label: 'State Machine (ASM)', ico: 'asm', ext: '.asm.json', dir: 'src' },
   { id: 'tt', label: 'Truth Table', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints' },
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
+  // not in the list any more; newSourceWizard({ type: 'vhdl-pkg' }) still creates one
+  { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src', hidden: true },
 ];
+// the wizards opened by Finish on page 1 (New Source asks only the file name and location)
+const WIZARD_TYPES = new Set(['tbwiz', 'modwiz', 'schwiz']);
 
 export async function newSourceWizard({ type } = {}) {
   if (!S.project) return;
   // old type ids (vhdl, verilog, vhdl-tb, verilog-tb) still accepted: they preset the language
   const LEGACY = { vhdl: ['hdl', 'vhdl'], verilog: ['hdl', 'verilog'], 'vhdl-tb': ['tb', 'vhdl'], 'verilog-tb': ['tb', 'verilog'] };
   let st = SOURCE_TYPES.find(t => t.id === (LEGACY[type]?.[0] || type)) || SOURCE_TYPES[0];
+  const shown = () => SOURCE_TYPES.filter(t => !t.hidden || t === st);
   // language of HDL modules and test benches (Define Module / Associate Source pages)
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
   const extOf = t => t.ext ?? (langSel.value === 'verilog' ? '.v' : '.vhd');
@@ -396,11 +402,11 @@ export async function newSourceWizard({ type } = {}) {
   const list = h('div', { class: 'src-types' });
   const renderList = () => {
     list.innerHTML = '';
-    for (const t of SOURCE_TYPES) {
+    for (const t of shown()) {
       const row = h('div', { class: `st${t === st ? ' sel' : ''}` }, icon(t.ico), t.label);
       row.addEventListener('click', () => {
         st = t; loc.value = t.dir; renderList();
-        // the number of pages depends on the type: Finish right here for the Test Bench Wizard
+        // the number of pages depends on the type: Finish right here for the wizards
         const btn = [...(list.closest('.dlg')?.querySelectorAll('.dlg-buttons .btn') || [])].find(b => b.classList.contains('primary'));
         if (btn) btn.textContent = pages().length === 1 ? 'Finish' : 'Next >';
       });
@@ -416,7 +422,7 @@ export async function newSourceWizard({ type } = {}) {
       h('div', { style: { flex: 1 } }, h('label', {}, 'File name:'), fname, h('label', {}, 'Location:'), loc,
         h('label', { style: { marginTop: '12px' } }, h('input', { type: 'checkbox', checked: true, disabled: true }), ' Add to project'))),
     validate: () => {
-      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
+      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|sch\.json)$/i, '');
       if (!FILE_RE.test(n)) return 'Enter a valid file name (letters, digits, _ and -).';
       if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
       const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
@@ -498,7 +504,7 @@ export async function newSourceWizard({ type } = {}) {
     title: 'Summary',
     render: () => summary,
     onShow: () => {
-      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
+      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|sch\.json)$/i, '');
       const lg = langSel.value === 'verilog' ? 'Verilog' : 'VHDL';
       summary.textContent = `Project Navigator will create a new skeleton source with the following specifications.\n\nAdd to Project: Yes\nSource Directory: ${loc.value}\nSource Type: ${st.label}${st.ext ? '' : ` (${lg})`}\nSource Name: ${n}${extOf(st)}\n` +
         (st.id === 'hdl' ? `\nEntity name: ${entName.value}\n${langSel.value === 'vhdl' ? `Architecture name: ${archName.value}\n` : ''}\nPort Definitions:\n${ports.map(p => `    ${p.name.padEnd(12)} ${p.bus ? `Bus[${p.msb}:${p.lsb}]` : 'Pin'.padEnd(8)}  ${p.dir}`).join('\n')}` : '') +
@@ -508,23 +514,29 @@ export async function newSourceWizard({ type } = {}) {
   const pages = () => {
     if (st.id === 'hdl') return [p1, p2, pSum];
     if (st.id === 'tb') return [p1, p2tb, pSum];
-    if (st.id === 'tbwiz') return [p1];   // Finish opens the Test Bench Wizard
+    if (WIZARD_TYPES.has(st.id)) return [p1];   // Finish opens the Test Bench / Module / Schematic Wizard
     return [p1, pSum];
   };
   // The wizard driver takes a fixed page list; rebuild when the type changes on page 1.
   const dyn = [p1, { title: 'Options', render: () => h('div') }, pSum];
   const proxy = new Proxy(dyn, { get: (t, k) => (k === 'length' ? pages().length : (typeof k === 'string' && /^\d+$/.test(k) ? pages()[+k] : t[k])) });
   pSum.validate = () => {
-    const nn = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
+    const nn = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|sch\.json)$/i, '');
     const pp = `${loc.value.trim().replace(/\/+$/, '')}/${nn}${extOf(st)}`;
     return S.fileTree.includes(pp) ? `${pp} already exists.` : null;
   };
   const ok = await wizard('New Source Wizard', proxy, { width: 760 });
   if (!ok) return;
-  const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
+  const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|sch\.json)$/i, '');
   if (st.id === 'tbwiz') {
     const { testBenchWizard } = await import('./tbwizard.js');
     return testBenchWizard({ module: S.sel?.module, name: n, location: loc.value.trim().replace(/\/+$/, ''), lang: langSel.value });
+  }
+  if (st.id === 'modwiz' || st.id === 'schwiz') {
+    const mw = await import('./modwizard.js');
+    // a file name that is not an identifier (e.g. with -) becomes the suggested module name
+    const ident = n.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/_$/, '');
+    return (st.id === 'modwiz' ? mw.moduleWizard : mw.schematicWizard)({ name: ident, location: loc.value.trim().replace(/\/+$/, ''), lang: langSel.value });
   }
   const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
   let text;
