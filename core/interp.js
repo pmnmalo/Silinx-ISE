@@ -225,9 +225,11 @@ function evalBin(n, ctx) {
   }
   a = V.withSign(a, s); b = V.withSign(b, s);
   if (n.dz && !b.x && b.v === 0n && !ctx.probe) throw new SimError(`division by zero (operator ${o === '/' ? '/' : o})`);
-  if (n.ov && !a.x && !b.x && !ctx.probe) {
+  if (n.ov && !a.x && !b.x && !ctx.probe && ctx.sim && !n.warned) {
+    // VHDL INTEGER overflow: reported once per operator (as simulators that do not check it, the
+    // result wraps around and the simulation goes on)
     const x = V.toBig(a), y = V.toBig(b), r = o === '+' ? x + y : o === '-' ? x - y : x * y;
-    if (r > 2147483647n || r < -2147483648n) throw new SimError(`integer overflow: ${r} is outside the range of INTEGER`);
+    if (r > 2147483647n || r < -2147483648n) { n.warned = true; ctx.sim.report('warning', `integer overflow: ${r} is outside the range of INTEGER`, ctx.loc); }
   }
   switch (o) {
     case '+': return V.add(a, b, w, s);

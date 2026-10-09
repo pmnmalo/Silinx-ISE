@@ -142,11 +142,11 @@ test('report messages: time and integer images in strings; now', () => {
   assert.equal(r.lines[0], '1500 note t=1500 ps n=-3 ok');
 });
 
-test('integer arithmetic overflow beyond 32 bits is an error', () => {
-  const r = sim(vproc(`n := n + 1; report integer'image(n);`, 'variable n : integer := integer\'high;'), 'tb', { allowErrors: true });
-  assert.match(r.log.find(l => l.kind === 'error').text, /^integer overflow: 2147483648 is outside the range of INTEGER/);
-  const r2 = sim(vproc(`n := n * 65536 * 65536; report integer'image(n);`, 'variable n : integer := 3;'), 'tb', { allowErrors: true });
-  assert.match(r2.log.find(l => l.kind === 'error').text, /^integer overflow/);
+test('integer arithmetic overflow beyond 32 bits is reported (once per operator, as a warning; the value wraps around)', () => {
+  const r = sim(vproc(`for k in 1 to 3 loop n := integer'high; n := n + 1; end loop; report integer'image(n);`, 'variable n : integer;'));
+  assert.deepEqual(r.lines.filter(l => !/simulation/.test(l)), ['0 warning integer overflow: 2147483648 is outside the range of INTEGER', '0 note -2147483648']);
+  const r2 = sim(vproc(`n := n * 65536 * 65536; report integer'image(n);`, 'variable n : integer := 3;'));
+  assert.match(r2.log.find(l => l.kind === 'warning').text, /^integer overflow/);
 });
 
 test('generics of type std_logic_vector sized from another generic; generate over a generic vector\'range', () => {

@@ -181,3 +181,11 @@ module tb;
 endmodule`).out;
   assert.deepEqual(r, ['-2 7 0 1010', '1.5', '25']);
 });
+
+test('integer overflow wraps around; ** with negative exponents (1, -1, 0 and other bases)', () => {
+  const r = out(vinit(`
+    i = 2147483647; i = i + 1; $display("%0d", i);
+    $display("%0d %0d %0d %0d %0d", 2 ** -1, 1 ** -2, (-1) ** -3, (-1) ** -2, 0 ** -1);`,
+  'integer i;'));
+  assert.deepEqual(r, ['-2147483648', '0 1 -1 1 x']);
+});

@@ -89,7 +89,13 @@ export function mod(a, b, w, s) { // VHDL mod: sign of divisor
 export function pow(a, b, w, s) {
   if (a.x || b.x) return xres(w, s);
   const e = toBig(b);
-  if (e < 0n) return mk(w, 0n, 0n, s);
+  if (e < 0n) {   // Verilog: 1 ** -n = 1, (-1) ** -n = +-1, 0 ** -n = x, other bases give 0
+    const base = toBig(resize(a, w, s));
+    if (base === 0n) return xres(w, s);
+    if (base === 1n) return mk(w, 1n, 0n, s);
+    if (base === -1n && s) return mk(w, BigInt.asUintN(w, e % 2n === 0n ? 1n : -1n), 0n, s);
+    return mk(w, 0n, 0n, s);
+  }
   return mk(w, BigInt.asUintN(w, toBig(resize(a, w, s)) ** e), 0n, s);
 }
 export function neg(a, w, s) { return sub(mk(w, 0n, 0n, s), a, w, s); }
