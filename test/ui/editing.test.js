@@ -58,7 +58,7 @@ uiTest('editor: open from the hierarchy, edit, autosave, Ctrl+S, undo and live e
   assert.equal(await page.eval(() => window.Silinx.active.tab.classList.contains('dirty')), true);
   await page.waitFor(() => !window.Silinx.active.tab.classList.contains('dirty'), [], { what: 'autosave' });
   assert.match(await readWs(env, 'EdPj', 'src/top.vhd'), /^library ieee; -- autosaved\n/);
-  assert.equal(await page.eval(() => document.getElementById('status-text').textContent), 'Saved src/top.vhd');
+  await page.waitFor(() => document.getElementById('status-text').textContent === 'Saved src/top.vhd', [], { what: 'status Saved' });
   // Ctrl+S saves at once (before the autosave delay)
   // the cursor stays where the user typed (the delayed jump to the entity line must not move it)
   assert.equal(await page.eval(() => { const c = window.Silinx.active.editor.cm.getCursor(); return `${c.line}:${c.ch}`; }), '0:26');

@@ -49,9 +49,9 @@ uiTest('New Project wizard: one project per evaluation board (board fixes the de
     assert.equal(r.project.board, b.id);
     assert.deepEqual({ part: r.project.device.part, package: r.project.device.package }, { part: b.device.part, package: b.device.package });
     assert.equal(r.project.preferredLanguage, b.id === 'nexys2' ? 'verilog' : 'vhdl');
-    const status = await page.eval(() => document.getElementById('status-device').textContent);
-    assert.ok(status.includes(b.device.part) && status.includes(b.id), status);
-    assert.equal(await page.eval(() => document.querySelector('#hier .row .lbl').textContent), name);
+    // the status bar and the hierarchy follow the new project a moment after it opens
+    await page.waitFor((part, id) => { const t = document.getElementById('status-device').textContent; return t.includes(part) && t.includes(id); }, [b.device.part, b.id], { what: `status bar shows ${b.id}` });
+    await page.waitFor((n) => document.querySelector('#hier .row .lbl')?.textContent === n, [name], { what: `hierarchy shows ${name}` });
   }
   const list = await env.server.api('GET', '/api/projects');
   assert.equal(list.filter((p) => p.name.startsWith('B_')).length, db.boards.length);
