@@ -113,7 +113,7 @@ export function isIdentifier(s) {
   return typeof s === 'string' && /^[A-Za-z][A-Za-z0-9_]*$/.test(s) && !s.includes('__') && !s.endsWith('_');
 }
 
-function reservedIn(s) {
+export function reservedIn(s) {
   const out = [];
   if (VERILOG_RESERVED.has(s)) out.push('Verilog');
   if (VHDL_RESERVED.has(s.toLowerCase())) out.push('VHDL');
@@ -1968,4 +1968,44 @@ export function generate(model, lang) {
   return l === 'verilog'
     ? { lang: 'verilog', filename: `${name}.v`, code: generateVerilog(model) }
     : { lang: 'vhdl', filename: `${name}.vhd`, code: generateVhdl(model) };
+}
+
+// ---------------------------------------------------------------------------------------
+// Expression code for other generators (FSM bubble diagrams, core/fsm.js)
+// ---------------------------------------------------------------------------------------
+
+/**
+ * Code of conditions and literals over plain ports, with the same typing rules as the charts:
+ *   const c = portExprCoder({ inputs, outputs }, 'vhdl' | 'verilog');
+ *   c.cond('a && x == 2') -> "a = '1' and unsigned(x) = 2" (throws an Error on a bad expression)
+ *   c.not(code)           -> negated condition code
+ *   c.lit(value, width)   -> literal code ('1', "0101", 4'd5…)
+ *   c.reads               -> Set of the signals the conditions read
+ */
+export function portExprCoder({ inputs = [], outputs = [] } = {}, lang = 'vhdl') {
+  const syms = new Map();
+  for (const p of inputs) syms.set(p.name, { name: p.name, width: p.width || 1, kind: 'input', sig: p.name, next: p.name });
+  for (const p of outputs) syms.set(p.name, { name: p.name, width: p.width || 1, kind: 'output', sig: p.name, next: p.name });
+  const reads = new Set();
+  const errs = [];
+  const ctx = () => ({ reads, lookup: (n) => syms.get(n) || null, peek: (n) => syms.get(n) || null, error: (m) => errs.push(m), warn() {} });
+  const done = (code) => {
+    if (errs.length) { const e = new Error(errs.join('; ')); errs.length = 0; throw e; }
+    return code;
+  };
+  return {
+    reads,
+    cond(text) {
+      const r = parseCondition(text);
+      if (r.error) throw new Error(r.error);
+      const c = ctx();
+      if (lang !== 'vhdl') return done(stripParens(vlExpr(r.ast, c)));
+      // not (x = '1') reads better as x = '0'
+      const code = stripParens(vhBool(vhTruth(r.ast, c)))
+        .replace(/not \(([A-Za-z][A-Za-z0-9_]*(?:\(\d+\))?) = '([01])'\)/g, (m, x, b) => `${x} = '${b === '1' ? '0' : '1'}'`);
+      return done(stripParens(code));
+    },
+    not: (c) => (lang === 'vhdl' ? vhNot(c) : vlNot(c)),
+    lit: (v, w, base = 'b') => (lang === 'vhdl' ? vhLitW(BigInt(v), w) : vlLitW(BigInt(v), w, w === 1 ? 'b' : base)),
+  };
 }

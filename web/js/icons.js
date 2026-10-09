@@ -25,6 +25,7 @@ export const icons = {
   verilog: S('<rect x="2" y="1.5" width="12" height="13" fill="#fff" stroke="#556"/><text x="8" y="11" font-size="7.5" text-anchor="middle" fill="#0050a0" font-family="Arial" font-weight="bold">V</text>'),
   ucf: S('<rect x="2" y="1.5" width="12" height="13" fill="#fff" stroke="#556"/><text x="8" y="11" font-size="6" text-anchor="middle" fill="#606" font-family="Arial" font-weight="bold">UCF</text>'),
   asm: S('<rect x="4" y="1" width="8" height="4" fill="#fff8d0" stroke="#806000"/><path d="M8 5v2" stroke="#806000"/><path d="M8 7l4 2.5-4 2.5-4-2.5z" fill="#e0f0ff" stroke="#004080"/><path d="M8 12v3" stroke="#806000"/>'),
+  fsm: S('<circle cx="4" cy="11" r="3" fill="#e8f0ff" stroke="#004080"/><circle cx="12" cy="5" r="3" fill="#e8f0ff" stroke="#004080"/><circle cx="12" cy="5" r="1.7" fill="none" stroke="#004080" stroke-width=".7"/><path d="M5.5 8.6Q6.5 5.5 9 5" fill="none" stroke="#806000"/><path d="M8.2 4.2l1 .8-1.1.7" fill="none" stroke="#806000"/>'),
   truthtable: S('<rect x="1.5" y="1.5" width="13" height="13" fill="#fff" stroke="#556"/><path d="M1.5 5h13M6 1.5v13M10.5 1.5v13M1.5 8.5h13M1.5 12h13" stroke="#8aa0c8" stroke-width=".8"/><rect x="6" y="5" width="8.5" height="3.5" rx="1.5" fill="none" stroke="#d62728" stroke-width="1.2"/>'),
   file: S('<path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#556"/><path d="M10 1.5v3h3" fill="none" stroke="#556"/>'),
   folder: S('<path d="M1.5 3.5h5l1 1.5h7v9h-13z" fill="#f4d27a" stroke="#b48a2c"/>'),

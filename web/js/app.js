@@ -248,6 +248,10 @@ function renderHierarchy() {
     const it = treeItem({ label: f.split('/').pop(), ico: 'truthtable', key: `tt:${f}`, onSelect: () => select({ type: 'tt', file: f }), onOpen: () => openTt(f), onContext: e => ttContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
+  for (const f of (S.fileTree || []).filter(f => /\.fsm\.json$/.test(f) && !S.schOwners?.[f])) {
+    const it = treeItem({ label: f.split('/').pop(), ico: 'fsm', key: `fsm:${f}`, onSelect: () => select({ type: 'fsm', file: f }), onOpen: () => openFsm(f), onContext: e => fsmContextMenu(e, f) });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
   // files that failed to parse into any unit
   const withUnits = new Set(lib.parsed.filter(p => p.units.length).map(p => p.file));
   for (const f of S.project.files.filter(f => !withUnits.has(f.path) && inView(f.role, S.view === 'sim'))) {
@@ -326,12 +330,13 @@ function moduleContextMenu(e, mod, file) {
       if (!sch) return [
         { label: 'Convert to Schematic (editable)…', action: () => convertToSchematic(mod) },
         { label: 'Convert to State Machine (ASM)…', action: () => convertToAsm(mod) },
+        { label: 'Convert to State Diagram (FSM)…', action: () => convertToFsm(mod) },
       ];
       const T = viewTitle(sch);
       return [
         S.schBase[sch] === 'hdl' ? { label: `Convert to ${T} (${T.toLowerCase()} as base)`, action: () => setSchBase(sch, 'view') }
                                  : { label: 'Convert to HDL (HDL as base)', action: () => setSchBase(sch, 'hdl') },
-        isAsm(sch) || isTt(sch) ? null : { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(sch) },
+        isAsm(sch) || isTt(sch) || isFsm(sch) ? null : { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(sch) },
         { label: `Remove Synchronized ${T}…`, action: () => detachSchematic(sch) },
       ].filter(Boolean);
     })(),
@@ -392,6 +397,10 @@ function processDefs() {
     { id: 'asm-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.file) },
     { id: 'asm-hdl', label: 'Convert to HDL', ico: 'template', run: () => convertAsmToHdl(sel.file) },
   ];
+  if (sel.type === 'fsm') return [
+    { id: 'fsm-open', label: 'View/Edit State Diagram (FSM)', ico: 'fsm', run: () => openFsm(sel.file) },
+    { id: 'fsm-hdl', label: 'Convert to HDL', ico: 'template', run: () => convertFsmToHdl(sel.file) },
+  ];
   if (sel.type === 'tt') return [
     { id: 'tt-open', label: 'View/Edit Truth Table', ico: 'truthtable', run: () => openTt(sel.file) },
     { id: 'tt-hdl', label: 'Convert to HDL', ico: 'template', run: () => convertTtToHdl(sel.file) },
@@ -420,6 +429,7 @@ function processDefs() {
     ...(sel.sch ? [
       isAsm(sel.sch) ? { id: 'sch-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.sch) }
         : isTt(sel.sch) ? { id: 'sch-open', label: 'View/Edit Truth Table', ico: 'truthtable', run: () => openTt(sel.sch) }
+        : isFsm(sel.sch) ? { id: 'sch-open', label: 'View/Edit State Diagram (FSM)', ico: 'fsm', run: () => openFsm(sel.sch) }
                      : { id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.sch) },
       S.schBase?.[sel.sch] === 'hdl' ? { id: 'sch-base', label: `Convert to ${viewTitle(sel.sch)} (${viewNoun(sel.sch)} as base)`, ico: viewIcon(sel.sch), run: () => setSchBase(sel.sch, 'view') }
                                      : { id: 'sch-base', label: 'Convert to HDL (HDL as base)', ico: 'template', run: () => setSchBase(sel.sch, 'hdl') },
@@ -1052,6 +1062,7 @@ export async function openFile(path, line, col) {
   if (path.endsWith('.asm.json')) return openAsm(path);
   if (path.endsWith('.sch.json')) return openSch(path);
   if (path.endsWith('.tt.json')) return openTt(path);
+  if (path.endsWith('.fsm.json')) return openFsm(path);
   const id = `file:${path}`;
   let doc = findDoc(id);
   if (!doc) {
@@ -1147,7 +1158,7 @@ export async function openFile(path, line, col) {
             status(`Saved ${path}`);
             // the other open editors depend on this file (ports, instances): check them again
             for (const od of S.docs) if (od !== d) od.liveCheck?.();
-            if (S.hdlToSch?.[path] && !S.syncing) (isAsm(S.hdlToSch[path]) ? syncAsmFromHdl : isTt(S.hdlToSch[path]) ? syncTtFromHdl : syncSchematicFromHdl)(path, { quiet: auto }).catch(e => log(`WARNING: ${viewNoun(S.hdlToSch[path])} not synchronized: ${e.message}`, 'warn'));
+            if (S.hdlToSch?.[path] && !S.syncing) (isAsm(S.hdlToSch[path]) ? syncAsmFromHdl : isTt(S.hdlToSch[path]) ? syncTtFromHdl : isFsm(S.hdlToSch[path]) ? syncFsmFromHdl : syncSchematicFromHdl)(path, { quiet: auto }).catch(e => log(`WARNING: ${viewNoun(S.hdlToSch[path])} not synchronized: ${e.message}`, 'warn'));
           },
           destroy: () => d.editor.destroy(),
         };
@@ -1552,6 +1563,7 @@ function asmContextMenu(e, file) {
     { label: 'Open', action: () => openAsm(file) },
     { label: 'Rename…', action: () => renameDialog(file) },
     { label: 'Convert to HDL', action: () => convertAsmToHdl(file) },
+    { label: 'Convert to State Diagram (FSM)…', action: () => asmToFsmDiagram(file) },
     { label: 'Remove from Project', action: () => removeFile(file) },
   ], e.clientX, e.clientY);
 }
@@ -1783,6 +1795,241 @@ function ttContextMenu(e, file) {
   ], e.clientX, e.clientY);
 }
 
+// ---- state diagrams (.fsm.json): bubble diagram <-> HDL module, synchronized like ASM charts
+// The generated module is linked by generatedFile: every change of the diagram rewrites it, and a
+// saved edit of the HDL updates the diagram whenever it can be read back as a state machine
+// (core/fsm.js fsmFromHdl, through the ASM reader); otherwise the HDL editor and the diagram show
+// the out-of-sync banner with the reason. Editor: fsm-editor.js; model, tables, HDL: core/fsm.js.
+export async function openFsm(path) {
+  const id = `fsm:${path}`;
+  if (findDoc(id)) return activateDoc(findDoc(id));
+  let model;
+  try { model = JSON.parse(await api.readFile(S.project.name, path)); }
+  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  const { mountFsmEditor } = await import('./fsm-editor.js');
+  openDoc({
+    id, path, title: path.split('/').pop(), icon: 'fsm',
+    create(el, d) {
+      const host = h('div', { class: 'doc-body' });
+      el.append(host);
+      const ed = mountFsmEditor(host, {
+        model,
+        onChange: () => setDirty(d, true),
+        linkInfo: () => { const f = S.schOwners?.[path]; return f ? { file: f, why: S.outOfSync?.[f] } : null; },
+        onOpenFile: f => openFile(f),
+        onGenerate: ({ lang }) => generateFsmHdl(path, lang),
+        onTruthTables: () => fsmTruthTables(path),
+        onToAsm: () => fsmToAsmChart(path),
+      });
+      d.fsmEditor = ed;
+      return {
+        save: async () => {
+          const m = ed.getModel();
+          await api.writeFile(S.project.name, path, JSON.stringify(m, null, 2)); setDirty(d, false);
+          if (!S.syncing) syncHdlFromFsm(path, m).catch(e => log(`WARNING: HDL not synchronized: ${e.message}`, 'warn'));
+        },
+        destroy: () => ed.destroy?.(),
+        onActivate: () => setTimeout(() => ed.fit?.(), 30),
+      };
+    },
+  });
+}
+const fsmModel = async path => { const d = findDoc(`fsm:${path}`); if (d?.fsmEditor) { await flushDoc(d); return d.fsmEditor.getModel(); } return JSON.parse(await api.readFile(S.project.name, path)); };
+const refreshFsmLink = fsmPath => findDoc(`fsm:${fsmPath}`)?.fsmEditor?.refreshLink();
+const fsmDir = p => (p.includes('/') ? p.replace(/\/[^/]*$/, '') : 'src');
+/** A file name `${dir}/${base}${ext}` (and module name) not used yet in the project. */
+function freeName(dir, base, ext) {
+  let name = base, k = 1;
+  while (S.fileTree.includes(`${dir}/${name}${ext}`) || S.modules.some(x => x.name.toLowerCase() === name.toLowerCase())) name = `${base}${++k}`;
+  return name;
+}
+
+// "Generate HDL": write the module and link it to the diagram
+async function generateFsmHdl(fsmPath, lang) {
+  const { generateFsm, fsmErrors, normalizeFsm } = await import('/core/fsm.js');
+  const m = normalizeFsm(await fsmModel(fsmPath));
+  const errs = fsmErrors(m);
+  if (errs.length) { alertDlg('Generate HDL', errs.map(x => x.message).join('\n'), 'error'); return; }
+  const g = generateFsm({ ...m, lang }, lang, { source: fsmPath.split('/').pop() });
+  const owned = m.generatedFile && S.fileTree.includes(m.generatedFile) ? m.generatedFile : null;
+  const target = owned && extOf(owned) === extOf(g.filename) && owned.split('/').pop().replace(/\.[^.]+$/, '') === m.name ? owned : `${fsmDir(fsmPath)}/${g.filename}`;
+  const other = S.modules.find(x => x.name.toLowerCase() === m.name.toLowerCase() && x.file !== target && x.file !== owned);
+  if (other) { alertDlg('Generate HDL', `A module named '${m.name}' already exists in ${other.file}. Rename the state machine's module first.`, 'error'); return; }
+  if (S.fileTree.includes(target) && target !== owned && !await confirmDlg('Generate HDL', `${target} already exists and is not generated from this state diagram. Overwrite it?`)) return;
+  if (owned && owned !== target && !await confirmDlg('Generate HDL', `${owned} is generated from this state diagram. Replace it with ${target}?`)) return;
+  S.syncing = true;
+  try {
+    if (owned && owned !== target) { closeDocByPath(owned); await api.deleteFile(S.project.name, owned); }
+    await api.writeFile(S.project.name, target, g.code);
+    const next = { ...m, lang, generatedFile: target };
+    await api.writeFile(S.project.name, fsmPath, JSON.stringify(next, null, 2));
+    const d = findDoc(`fsm:${fsmPath}`);
+    if (d?.fsmEditor) { d.fsmEditor.setModel(next); setDirty(d, false); }
+    if (S.outOfSync) delete S.outOfSync[target];
+    log(`State diagram '${fsmPath}' -> ${lang.toUpperCase()} module ${target} (kept in sync with the diagram)`, 'ok');
+  } finally { S.syncing = false; }
+  await reloadProject(false);
+  markStale();
+  refreshOpenEditor(target, g.code);
+  refreshFsmLink(fsmPath);
+  openFile(target);
+}
+
+async function syncHdlFromFsm(fsmPath, model) {
+  const target = model.generatedFile;
+  if (!target || !S.fileTree.includes(target)) return;
+  const { generateFsm, fsmErrors, normalizeFsm } = await import('/core/fsm.js');
+  const m = normalizeFsm(model);
+  S.outOfSync ||= {};
+  const errs = fsmErrors(m);
+  if (errs.length) {
+    const why = `the state diagram has errors: ${errs.map(x => x.message).join('; ')}`;
+    if (S.outOfSync[target] !== why) log(`WARNING: ${target} not updated: ${why}`, 'warn');
+    S.outOfSync[target] = why; refreshSyncBanner(target); refreshFsmLink(fsmPath);
+    return;
+  }
+  const g = generateFsm(m, /\.v$/i.test(target) ? 'verilog' : 'vhdl', { source: fsmPath.split('/').pop() });
+  if (S.outOfSync[target]) { delete S.outOfSync[target]; refreshSyncBanner(target); refreshFsmLink(fsmPath); }
+  const cur = S.sources.find(x => x.path === target)?.text;
+  if (cur === g.code) return;
+  S.syncing = true;
+  try {
+    await api.writeFile(S.project.name, target, g.code);
+    const src = S.sources.find(x => x.path === target); if (src) src.text = g.code;
+    refreshOpenEditor(target, g.code);
+    compileProject(); renderHierarchy(); markStale();
+    status(`${target} updated from ${fsmPath.split('/').pop()}`);
+  } finally { S.syncing = false; }
+}
+
+// a saved edit of the linked HDL: the diagram follows when the module is still a plain state machine
+async function syncFsmFromHdl(hdlPath, { quiet = false } = {}) {
+  const fsmPath = S.hdlToSch[hdlPath];
+  S.outOfSync ||= {};
+  const fail = why => {
+    if (S.outOfSync[hdlPath] !== why && !quiet) log(`WARNING: ${fsmPath} not updated: ${why}`, 'warn');
+    S.outOfSync[hdlPath] = why; refreshSyncBanner(hdlPath); refreshFsmLink(fsmPath);
+    status(`${fsmPath.split('/').pop()} not updated: ${why}`);
+  };
+  const errs = [...(S.lib?.errors || [])].filter(d => d.severity === 'error' && d.file === hdlPath);
+  if (errs.length) return fail(`${hdlPath.split('/').pop()} has errors`);
+  let old;
+  try { old = JSON.parse(await api.readFile(S.project.name, fsmPath)); } catch { return; }
+  const mods = S.modules.filter(m => m.file === hdlPath && m.kind !== 'package');
+  const mod = mods.find(m => m.name.toLowerCase() === String(old.name || '').toLowerCase()) || mods[0];
+  if (!mod) return fail(`${hdlPath.split('/').pop()} has no module`);
+  const { fsmFromHdl, normalizeFsm } = await import('/core/fsm.js');
+  const text = S.sources.find(x => x.path === hdlPath)?.text ?? await api.readFile(S.project.name, hdlPath);
+  let r;
+  try { r = fsmFromHdl(text, { path: hdlPath, module: mod.name, lang: /\.v$/i.test(hdlPath) ? 'verilog' : 'vhdl', previous: old }); }
+  catch (e) { return fail(`the diagram cannot show it: ${e.message}`); }
+  const next = normalizeFsm({ ...r.model, generatedFile: hdlPath, ...(old.base ? { base: old.base } : {}) });
+  if (S.outOfSync[hdlPath]) { delete S.outOfSync[hdlPath]; refreshSyncBanner(hdlPath); }
+  if (JSON.stringify(next) !== JSON.stringify(normalizeFsm(old))) {
+    S.syncing = true;
+    try {
+      await api.writeFile(S.project.name, fsmPath, JSON.stringify(next, null, 2));
+      const d = findDoc(`fsm:${fsmPath}`);
+      if (d?.fsmEditor && !d.dirty) d.fsmEditor.setModel(next);
+      status(`${fsmPath.split('/').pop()} updated from ${hdlPath.split('/').pop()}`);
+      for (const w of r.warnings || []) if (!quiet) log(`WARNING: ${fsmPath}: ${w}`, 'warn');
+    } finally { S.syncing = false; }
+  }
+  refreshFsmLink(fsmPath);
+}
+
+// HDL module -> state diagram, linked to the HDL file (the diagram becomes the base)
+async function convertToFsm(mod) {
+  const info = moduleInfo(mod);
+  if (!info) return;
+  await saveAll();
+  const { fsmFromHdl } = await import('/core/fsm.js');
+  const text = S.sources.find(x => x.path === info.file)?.text ?? await api.readFile(S.project.name, info.file);
+  let r;
+  try { r = fsmFromHdl(text, { path: info.file, module: mod, lang: info.lang }); }
+  catch (e) { alertDlg('Convert to State Diagram', `'${mod}' cannot be shown as a state diagram:\n\n${e.message}`, 'error'); return; }
+  const target = `${fsmDir(info.file)}/${mod}.fsm.json`;
+  if (S.fileTree.includes(target) && !await confirmDlg('Convert to State Diagram', `${target} already exists. Overwrite it?`)) return;
+  const model = { ...r.model, generatedFile: info.file };
+  await api.writeFile(S.project.name, target, JSON.stringify(model, null, 2));
+  log(`'${mod}' converted to the state diagram ${target}; it stays in sync with ${info.file}.`, 'ok');
+  for (const w of r.warnings || []) log(`WARNING: ${target}: ${w}`, 'warn');
+  await reloadProject(false);
+  openFsm(target);
+}
+
+// process "Convert to HDL" of a diagram without HDL yet
+async function convertFsmToHdl(fsmPath) {
+  if (S.schOwners?.[fsmPath]) return setSchBase(fsmPath, 'hdl');
+  const m = await fsmModel(fsmPath);
+  return generateFsmHdl(fsmPath, m.lang === 'verilog' ? 'verilog' : 'vhdl');
+}
+
+// "Convert to ASM chart": a new (unlinked) ASM chart of the machine
+async function fsmToAsmChart(fsmPath) {
+  const { fsmToAsm, fsmErrors, normalizeFsm } = await import('/core/fsm.js');
+  const m = normalizeFsm(await fsmModel(fsmPath));
+  const errs = fsmErrors(m);
+  if (errs.length) { alertDlg('Convert to ASM chart', errs.map(x => x.message).join('\n'), 'error'); return; }
+  const dir = fsmDir(fsmPath);
+  const name = freeName(dir, `${m.name}_asm`, '.asm.json');
+  const asm = { ...fsmToAsm(m), name };
+  delete asm.generatedFile; delete asm.base;
+  const target = `${dir}/${name}.asm.json`;
+  await api.writeFile(S.project.name, target, JSON.stringify(asm, null, 2));
+  log(`State diagram '${fsmPath}' -> ASM chart ${target} (module '${name}'; not linked to the diagram).`, 'ok');
+  await reloadProject(false);
+  openAsm(target);
+}
+
+// ASM chart context menu: a new (unlinked) state diagram of the chart
+async function asmToFsmDiagram(asmPath) {
+  const { asmToFsm } = await import('/core/fsm.js');
+  let asm;
+  try { asm = JSON.parse(await api.readFile(S.project.name, asmPath)); } catch (e) { toast(e.message, 'error'); return; }
+  let m;
+  try { m = asmToFsm(asm); }
+  catch (e) { alertDlg('Convert to State Diagram', `${asmPath.split('/').pop()} cannot be shown as a state diagram:\n\n${e.message}`, 'error'); return; }
+  const dir = fsmDir(asmPath);
+  const name = freeName(dir, `${asm.name || 'fsm'}_fsm`, '.fsm.json');
+  m.name = name;
+  delete m.generatedFile; delete m.base;
+  const target = `${dir}/${name}.fsm.json`;
+  await api.writeFile(S.project.name, target, JSON.stringify(m, null, 2));
+  log(`ASM chart '${asmPath}' -> state diagram ${target} (module '${name}'; not linked to the chart).`, 'ok');
+  await reloadProject(false);
+  openFsm(target);
+}
+
+// "Create Truth Tables": next-state bits and outputs as functions of the state bits and the inputs
+async function fsmTruthTables(fsmPath) {
+  const { truthTablesOf, normalizeFsm } = await import('/core/fsm.js');
+  const m = normalizeFsm(await fsmModel(fsmPath));
+  const r = truthTablesOf(m);
+  if (r.error) { alertDlg('Create Truth Tables', r.error, 'error'); return; }
+  const dir = fsmDir(fsmPath);
+  const made = [];
+  for (const t of r.tables) {
+    const name = freeName(dir, t.doc.name, '.tt.json');
+    const target = `${dir}/${name}.tt.json`;
+    await api.writeFile(S.project.name, target, JSON.stringify({ ...t.doc, name }, null, 2));
+    made.push(target);
+  }
+  log(`State diagram '${fsmPath}' -> truth tables ${made.join(', ')} (next-state and output logic of the ${m.encoding} encoding; unused codes are don't cares).`, 'ok');
+  await reloadProject(false);
+  for (const f of made.reverse()) await openTt(f);
+}
+
+function fsmContextMenu(e, file) {
+  popupMenu([
+    { label: 'Open', action: () => openFsm(file) },
+    { label: 'Rename…', action: () => renameDialog(file) },
+    { label: 'Convert to HDL', action: () => convertFsmToHdl(file) },
+    { label: 'Convert to ASM chart', action: () => fsmToAsmChart(file) },
+    { label: 'Remove from Project', action: () => removeFile(file) },
+  ], e.clientX, e.clientY);
+}
+
 // ---- schematic editor (.sch.json): schematic <-> HDL
 async function schModules() {
   const { modulesFromLibrary } = await import('/core/schdoc.js');
@@ -1837,10 +2084,11 @@ export async function openSch(path) {
 // ---- views of an HDL file: schematic or ASM chart
 const isAsm = p => /\.asm\.json$/i.test(p || '');
 const isTt = p => /\.tt\.json$/i.test(p || '');
-const viewNoun = p => (isAsm(p) ? 'state machine' : isTt(p) ? 'truth table' : 'schematic');
-const viewTitle = p => (isAsm(p) ? 'State Machine' : isTt(p) ? 'Truth Table' : 'Schematic');
-const viewIcon = p => (isAsm(p) ? 'asm' : isTt(p) ? 'truthtable' : 'schematic');
-function openView(p) { return isAsm(p) ? openAsm(p) : isTt(p) ? openTt(p) : openSch(p); }
+const isFsm = p => /\.fsm\.json$/i.test(p || '');
+const viewNoun = p => (isAsm(p) ? 'state machine' : isTt(p) ? 'truth table' : isFsm(p) ? 'state diagram' : 'schematic');
+const viewTitle = p => (isAsm(p) ? 'State Machine' : isTt(p) ? 'Truth Table' : isFsm(p) ? 'State Diagram' : 'Schematic');
+const viewIcon = p => (isAsm(p) ? 'asm' : isTt(p) ? 'truthtable' : isFsm(p) ? 'fsm' : 'schematic');
+function openView(p) { return isAsm(p) ? openAsm(p) : isTt(p) ? openTt(p) : isFsm(p) ? openFsm(p) : openSch(p); }
 
 // ---- schematic <-> HDL synchronization
 // Structure of a schematic: symbols (name, type, params), ports and net connectivity. When an HDL
@@ -1863,7 +2111,7 @@ function syncBanner(path, sch) {
   const why = S.outOfSync?.[path];
   const el = h('span', { class: `gen-banner${why ? ' out-of-sync' : ''}`, 'data-sync-banner': path },
     why ? 'Not in sync with ' : 'Synchronized with ', h('a', { onclick: () => openView(sch) }, sch.split('/').pop()),
-    why ? (isTt(sch) ? ` — ${why}` : ` — the ${viewNoun(sch)} has errors: ${why}`) : S.schBase?.[sch] === 'hdl' ? ` (${viewNoun(sch)} view of this file) — editing here updates it` : ` — editing here updates the ${viewNoun(sch)}`);
+    why ? (isTt(sch) || isFsm(sch) ? ` — ${why}` : ` — the ${viewNoun(sch)} has errors: ${why}`) : S.schBase?.[sch] === 'hdl' ? ` (${viewNoun(sch)} view of this file) — editing here updates it` : ` — editing here updates the ${viewNoun(sch)}`);
   return el;
 }
 function refreshSyncBanner(path) {
@@ -1990,9 +2238,10 @@ async function setSchBase(schPath, base) {
   let doc;
   try { doc = JSON.parse(await api.readFile(S.project.name, schPath)); } catch (e) { toast(e.message, 'error'); return; }
   if (base === 'view') delete doc.base; else doc.base = base;
-  await api.writeFile(S.project.name, schPath, JSON.stringify(doc, null, isAsm(schPath) || isTt(schPath) ? 2 : 1));
-  const d = findDoc(`sch:${schPath}`) || findDoc(`asm:${schPath}`) || findDoc(`tt:${schPath}`);
+  await api.writeFile(S.project.name, schPath, JSON.stringify(doc, null, isAsm(schPath) || isTt(schPath) || isFsm(schPath) ? 2 : 1));
+  const d = findDoc(`sch:${schPath}`) || findDoc(`asm:${schPath}`) || findDoc(`tt:${schPath}`) || findDoc(`fsm:${schPath}`);
   if (d?.ttEditor) { const cur = d.ttEditor.getModel(); cur.base = doc.base; d.ttEditor.setModel(cur); }
+  if (d?.fsmEditor) { const cur = d.fsmEditor.getModel(); cur.base = doc.base; d.fsmEditor.setModel(cur); }
   if (d?.schEditor) { const cur = d.schEditor.getDoc(); cur.base = doc.base; d.schEditor.setDoc(cur); }
   if (d?.asmEditor) { const cur = d.asmEditor.getModel(); cur.base = doc.base; d.asmEditor.setModel(cur); }
   const gen = doc.generatedFile;
@@ -2053,7 +2302,7 @@ async function exportSchAsIse(schPath) {
 async function detachSchematic(path) {
   const gen = S.schOwners?.[path];
   if (!await confirmDlg(`Remove Synchronized ${viewTitle(path)}`, `Remove the ${viewNoun(path)} ${path}?${gen ? `\n\n${gen} stays as a normal HDL source.` : ''}`)) return;
-  const d = findDoc(`sch:${path}`) || findDoc(`asm:${path}`) || findDoc(`tt:${path}`);
+  const d = findDoc(`sch:${path}`) || findDoc(`asm:${path}`) || findDoc(`tt:${path}`) || findDoc(`fsm:${path}`);
   if (d) { d.dirty = false; await closeDoc(d); }
   await api.deleteFile(S.project.name, path);
   await reloadProject();
@@ -2072,7 +2321,7 @@ function schContextMenu(e, file) {
 }
 
 // ---- rename a source (file and/or the module it defines), updating everything that refers to it
-const extOf = p => (/\.(sch|asm|tt)\.json$/i.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
+const extOf = p => (/\.(sch|asm|tt|fsm)\.json$/i.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
 const dirOf = p => (p.includes('/') ? p.replace(/\/[^/]*$/, '/') : '');
 
 async function renameDialog(file, mod = null) {
@@ -2119,7 +2368,7 @@ async function renameSource(from, to, oldMod, newMod) {
   const changed = new Map();                      // path -> new text
   const moved = new Map();                        // old path -> new path
   const views = {};                               // .sch.json / .asm.json -> parsed
-  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt)\.json$/i.test(f))) {
+  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt|fsm)\.json$/i.test(f))) {
     try { views[f] = JSON.parse(await api.readFile(pj.name, f)); } catch { /* skip */ }
   }
   S.syncing = true;
@@ -2134,7 +2383,7 @@ async function renameSource(from, to, oldMod, newMod) {
         let ch = false;
         if (/\.sch\.json$/i.test(f)) ch = renameModuleInSchematic(d, oldMod, newMod, { linked });
         else if (linked && String(d.name).toLowerCase() === oldMod.toLowerCase()) { d.name = newMod; ch = true; }
-        if (ch) changed.set(f, JSON.stringify(d, null, /\.(asm|tt)\.json$/i.test(f) ? 2 : 1));
+        if (ch) changed.set(f, JSON.stringify(d, null, /\.(asm|tt|fsm)\.json$/i.test(f) ? 2 : 1));
         // a synchronized view named after the module follows it
         const vb = f.slice(dirOf(f).length, f.length - extOf(f).length);
         if (linked && vb.toLowerCase() === oldMod.toLowerCase()) moved.set(f, dirOf(f) + newMod + extOf(f));
@@ -2147,7 +2396,7 @@ async function renameSource(from, to, oldMod, newMod) {
     if (to && to !== from) {
       moved.set(from, to);
       for (const [f, d] of Object.entries(views)) {
-        if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.(asm|tt)\.json$/i.test(f) ? 2 : 1)); }
+        if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.(asm|tt|fsm)\.json$/i.test(f) ? 2 : 1)); }
       }
     }
     // close the editors of files that move or change (reopened below)
@@ -2182,6 +2431,7 @@ async function renameSource(from, to, oldMod, newMod) {
         const vp = moved.get(f) || f;
         if (/\.asm\.json$/i.test(vp)) await syncHdlFromAsm(vp, d).catch(() => {});
         else if (isTt(vp)) await syncHdlFromTt(vp, d).catch(() => {});
+        else if (isFsm(vp)) await syncHdlFromFsm(vp, d).catch(() => {});
         else await syncHdlFromSchematic(vp, d).catch(() => {});
       }
     }
@@ -2260,7 +2510,7 @@ export async function reloadProject(render = true) {
   S.hdlToSch = {};
   S.schBase = {};
   // schematics (.sch.json) and ASM charts (.asm.json) linked to an HDL file ("views" kept in sync)
-  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt)\.json$/.test(f))) {
+  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt|fsm)\.json$/.test(f))) {
     try {
       const d = JSON.parse(await api.readFile(pj.name, f));
       if (d.generatedFile && S.fileTree.includes(d.generatedFile) && !S.hdlToSch[d.generatedFile]) { S.schOwners[f] = d.generatedFile; S.hdlToSch[d.generatedFile] = f; S.schBase[f] = d.base === 'hdl' ? 'hdl' : 'view'; }
@@ -2369,7 +2619,7 @@ async function renameFolder(dir) {
   if (S.fileTree.some(f => f === to || f.startsWith(`${to}/`))) return alertDlg('Rename Folder', `'${to}' already exists.`);
   await saveAll();
   const remap = p => (p && p.startsWith(`${dir}/`) ? to + p.slice(dir.length) : p);
-  const views = S.fileTree.filter(f => /\.(sch|asm|tt)\.json$/i.test(f));
+  const views = S.fileTree.filter(f => /\.(sch|asm|tt|fsm)\.json$/i.test(f));
   // the editors of moved files are closed and reopened at their new paths
   const reopen = [];
   for (const d of [...S.docs]) if (d.path && d.path.startsWith(`${dir}/`)) { reopen.push(remap(d.path)); d.dirty = false; clearTimeout(d._autosave); await closeDoc(d); }
@@ -2382,7 +2632,7 @@ async function renameFolder(dir) {
       try { d = JSON.parse(await api.readFile(S.project.name, at)); } catch { continue; }
       if (d.generatedFile && d.generatedFile.startsWith(`${dir}/`)) {
         d.generatedFile = remap(d.generatedFile);
-        await api.writeFile(S.project.name, at, JSON.stringify(d, null, /\.(asm|tt)\.json$/i.test(at) ? 2 : 1));
+        await api.writeFile(S.project.name, at, JSON.stringify(d, null, /\.(asm|tt|fsm)\.json$/i.test(at) ? 2 : 1));
       }
     }
     log(`Folder ${dir} renamed to ${to}.`, 'ok');
@@ -2440,7 +2690,7 @@ function setupMenus() {
       api.standalone ? '-' : null,
       { label: 'Close Project', action: () => closeProject(), disabled: hasPj },
       '-',
-      { label: 'Print…', action: () => printActive(), shortcut: 'Ctrl+P', disabled: () => !(S.active?.asmEditor || S.active?.schEditor) },
+      { label: 'Print…', action: () => printActive(), shortcut: 'Ctrl+P', disabled: () => !(S.active?.asmEditor || S.active?.schEditor || S.active?.fsmEditor) },
       '-',
       { label: 'Recent Projects', submenu: recent().map(r => ({ label: r, action: () => openProject(r) })) },
     ].filter(Boolean) },
@@ -2483,6 +2733,7 @@ function setupMenus() {
     { label: 'Tools', items: () => [
       { label: 'ASM State Machine Editor…', icon: icon('asm'), action: () => wiz.newSourceWizard({ type: 'asm' }), disabled: hasPj },
       { label: 'Truth Table / Karnaugh Map…', icon: icon('truthtable'), action: () => wiz.newSourceWizard({ type: 'tt' }), disabled: hasPj },
+      { label: 'FSM State Diagram Editor…', icon: icon('fsm'), action: () => wiz.newSourceWizard({ type: 'fsm' }), disabled: hasPj },
       { label: 'I/O Pin Planning', icon: icon('pins'), action: () => openPinPlanner(S.sel?.module), disabled: hasPj },
       { label: 'iMPACT (Configure Target Device)', icon: icon('impact'), action: () => openImpact() },
       { label: 'Board Emulator', icon: icon('board'), action: () => openEmulator(S.project.top), disabled: hasPj },
@@ -2543,6 +2794,7 @@ function setupToolbar() {
 function printActive() {
   const d = S.active;
   if (d?.asmEditor) d.asmEditor.print();
+  else if (d?.fsmEditor) d.fsmEditor.print();
   else if (d?.schEditor) d.schEditor.print(`Schematic ${d.path || ''}`.trim());
 }
 
@@ -2609,7 +2861,7 @@ async function boot() {
   document.querySelectorAll('input[name=view]').forEach(r => r.addEventListener('change', () => setView(r.value)));
   $('console-clear').addEventListener('click', () => { $('console-log').innerHTML = ''; });
   addEventListener('keydown', e => {
-    if (!e.defaultPrevented && (e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P') && (S.active?.asmEditor || S.active?.schEditor)) { e.preventDefault(); printActive(); return; }
+    if (!e.defaultPrevented && (e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P') && (S.active?.asmEditor || S.active?.schEditor || S.active?.fsmEditor)) { e.preventDefault(); printActive(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); if (S.active) flushDoc(S.active); }  // nothing to do: edits are saved automatically
   });
   addEventListener('beforeunload', e => { if (S.docs.some(d => d.dirty)) { e.preventDefault(); e.returnValue = ''; } });
@@ -2635,6 +2887,6 @@ async function boot() {
   if (!window.SILINX_NO_UPDATE_CHECK) wiz.checkUpdatesOnStart().catch(() => {});
 }
 
-export const app = { showInSim, saveAll, openTt, openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
+export const app = { showInSim, saveAll, openTt, openFsm, openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
 window.SilinxApp = app;
 boot();
