@@ -108,14 +108,17 @@ export function timeWhere(tracks, t0, t1, pred) {
 /**
  * What the board shows after the window [t0, t1]:
  *   leds: [brightness 0..1 per LED index]  (fraction of time on)
- *   digits: [{ seg: [a..g brightness], dp }] per anode index, or null when the digit was not
- *           lit in the window (the caller keeps the previous pattern: persistence of vision)
+ *   digits: [{ seg: [a..g brightness], dp }] per anode index, or null (blank)
+ * A digit that is not lit in the window keeps its previous pattern (persistence of vision: a
+ * multiplexed display lights one digit at a time) until it has been dark for longer than 4x the
+ * longest dark gap seen between its refreshes (at least two windows): a digit that is blanked
+ * (leading-zero suppression, display turned off) then goes dark.
  * Active levels come from the board resources (extra.activeLow).
  */
 export function boardOutputs(wiring, t0, t1, prev = null) {
   const span = Math.max(1, t1 - t0);
   const on = (b) => (b.res.extra?.activeLow ? 0 : 1);
-  const leds = [], digits = [];
+  const leds = [], digits = [], lit = [];
   const segBits = [], dpBits = [], anBits = [];
   for (const b of wiring.bits) {
     if (b.dir !== 'out' && b.dir !== 'inout') continue;
@@ -127,12 +130,21 @@ export function boardOutputs(wiring, t0, t1, prev = null) {
   anBits.forEach((an, k) => {
     if (!an) return;
     const at = bitTrack(an.sig, an.pos, t0, t1);
-    const lit = timeWhere([at], t0, t1, ([v]) => v === on(an));
-    if (lit <= 0) { digits[k] = prev?.digits?.[k] ?? null; return; }
-    const frac = (b) => (b ? timeWhere([at, bitTrack(b.sig, b.pos, t0, t1)], t0, t1, ([a, s]) => a === on(an) && s === on(b)) / lit : 0);
+    const time = timeWhere([at], t0, t1, ([v]) => v === on(an));
+    const p = prev?.lit?.[k];   // { last: end of the last window the digit was lit in, gap }
+    if (time <= 0) {
+      const keep = p && prev?.digits?.[k] && t1 - p.last <= Math.max(4 * p.gap, 2 * span);
+      digits[k] = keep ? prev.digits[k] : null;
+      lit[k] = keep ? p : null;
+      return;
+    }
+    const frac = (b) => (b ? timeWhere([at, bitTrack(b.sig, b.pos, t0, t1)], t0, t1, ([a, s]) => a === on(an) && s === on(b)) / time : 0);
     digits[k] = { seg: Array.from({ length: 7 }, (_, j) => frac(segBits[j])), dp: frac(dpBits[0]) };
+    // dark time in this window (the anode is multiplexed within it) or since the last window
+    const gap = Math.max(span - time, p ? t0 - p.last : 0);
+    lit[k] = { last: t1, gap: Math.max(gap, p ? p.gap : 0) };
   });
-  return { leds, digits };
+  return { leds, digits, lit };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -140,9 +152,13 @@ export function boardOutputs(wiring, t0, t1, prev = null) {
 // ~10^5 cycles/s, so the large integer generics of the top are divided to make them visible.
 // ---------------------------------------------------------------------------------------------
 
-/** Integer generics of a top module ({ name, value } from its declaration defaults). */
+// Integer generics that are sizes, not cycle counts: never divided
+const SIZE_NAME = /WIDTH|DEPTH|SIZE|BITS|ADDR|WORDS|ENTRIES|BAUD|^N_|^(W|NB|AW|DW)$|_W$/i;
+
+/** Timing generics of a top module ({ name, value }): its integer generics >= 1000 that are not sizes. */
 export function timingGenerics(params) {
-  return (params || []).map((p) => ({ name: p.name, value: Number(p.value?.v ?? p.value) }))
+  return (params || []).filter((p) => p.t?.kind === 'int' && !SIZE_NAME.test(p.name))
+    .map((p) => ({ name: p.name, value: Number(p.value?.v ?? p.value) }))
     .filter((p) => Number.isFinite(p.value) && Number.isInteger(p.value) && p.value >= 1000);
 }
 
@@ -168,24 +184,27 @@ export function scaledGenerics(gens, scale) {
 /** New controller state (after power-up). */
 export function lcdState() {
   return { mode8: true, half: null, ddram: new Array(128).fill(0x20), cgram: new Array(64).fill(0), addr: 0, cg: false,
-    inc: true, shift: false, on: false, cursor: false, blink: false, dshift: 0, lines2: true, writes: 0 };
+    inc: true, shift: false, on: false, cursor: false, blink: false, dshift: 0, lines2: true, writes: 0, lastE: null };
+}
+
+/** Move the address counter one position (`fwd`: increment), wrapping like the HD44780. */
+function lcdStep(st, fwd) {
+  if (st.cg) { st.addr = (st.addr + (fwd ? 1 : 63)) & 63; return; }
+  let a = (st.addr & 0x7f) + (fwd ? 1 : -1);
+  if (st.lines2) {
+    // 2-line mode: DDRAM 0x00..0x27 and 0x40..0x67
+    if (a === 0x28) a = 0x40; else if (a >= 0x68) a = 0x00; else if (a === 0x3f) a = 0x27; else if (a < 0) a = 0x67;
+  } else if (a >= 0x50) a = 0x00;   // 1-line mode: DDRAM 0x00..0x4F
+  else if (a < 0) a = 0x4f;
+  st.addr = a;
 }
 
 /** Execute one byte (RS = 0: instruction, RS = 1: data). */
 export function lcdExec(st, byte, rs) {
-  const step = () => {
-    if (st.cg) st.addr = (st.addr + (st.inc ? 1 : 63)) & 63;
-    else {
-      // 2-line mode: DDRAM 0x00..0x27 and 0x40..0x67
-      let a = st.addr + (st.inc ? 1 : -1);
-      if (st.lines2) { if (a === 0x28) a = 0x40; else if (a === 0x68 || a === 0x80) a = 0x00; else if (a === 0x3f) a = 0x27; else if (a < 0) a = 0x67; }
-      st.addr = a & 0x7f;
-    }
-  };
   if (rs) {
     st.writes++;
     if (st.cg) st.cgram[st.addr & 63] = byte; else st.ddram[st.addr & 127] = byte;
-    step();
+    lcdStep(st, st.inc);
     if (st.shift && !st.cg) st.dshift += st.inc ? 1 : -1;
     return;
   }
@@ -195,7 +214,7 @@ export function lcdExec(st, byte, rs) {
   else if (byte & 0x10) {
     const right = !!(byte & 0x04);
     if (byte & 0x08) st.dshift += right ? -1 : 1;          // display shift
-    else st.addr = (st.addr + (right ? 1 : 127)) & 0x7f;    // cursor move
+    else lcdStep(st, right);                                // cursor move
   } else if (byte & 0x08) { st.on = !!(byte & 0x04); st.cursor = !!(byte & 0x02); st.blink = !!(byte & 0x01); }
   else if (byte & 0x04) { st.inc = !!(byte & 0x02); st.shift = !!(byte & 0x01); }
   else if (byte & 0x02) { st.addr = 0; st.dshift = 0; st.cg = false; }
@@ -205,7 +224,13 @@ export function lcdExec(st, byte, rs) {
 /** One transfer on the bus: `bus` = DB7..DB4 (4-bit wiring) or DB7..DB0 (`width` 8). */
 export function lcdTransfer(st, rs, rw, bus, width = 4) {
   const nib = width === 8 ? (bus >> 4) & 15 : bus & 15;
-  if (rw) { if (!st.mode8) st.half = st.half === null ? 0 : null; return; }   // reads: keep the nibble pairing
+  if (rw) {
+    // reads: busy flag / address (RS = 0) or data (RS = 1, the address counter advances as after a write)
+    let done = st.mode8;
+    if (!st.mode8) { done = st.half !== null; st.half = done ? null : 0; }
+    if (done && rs) lcdStep(st, st.inc);
+    return;
+  }
   if (st.mode8) { lcdExec(st, width === 8 ? bus & 255 : nib << 4, rs); return; }
   if (st.half === null) { st.half = nib; return; }
   const byte = (st.half << 4) | nib;
@@ -223,7 +248,7 @@ export function lcdText(st) {
 /**
  * Feed the LCD with the bus activity recorded in [t0, t1] (the falling edges of E). The LCD's
  * port bits are found on the board resources lcd_e, lcd_rs, lcd_rw and lcd_d (DB4..DB7) or lcd_db
- * (DB0..DB7).
+ * (DB0..DB7). Windows must follow each other (t0 = previous t1): the state remembers E between them.
  */
 export function lcdFeed(st, wiring, t0, t1) {
   const pin = (res, idx = 0) => wiring.bits.find((b) => b.res.name === res && b.idx === idx);
@@ -237,8 +262,12 @@ export function lcdFeed(st, wiring, t0, t1) {
   const before = (track, t) => { if (!track) return 0; let v = track[0][1]; for (const [tt, x] of track) { if (tt >= t) break; v = x; } return v === 1 ? 1 : 0; };
   const rs = pin('lcd_rs'), rw = pin('lcd_rw');
   let fed = false;
-  for (let i = 1; i < et.length; i++) {
-    if (!(et[i - 1][1] === 1 && et[i][1] === 0)) continue;
+  // E as it was at the end of the previous window: a falling edge exactly on the boundary shows
+  // up only as the first value of this window
+  const lastE = st.lastE;
+  st.lastE = et[et.length - 1][1];
+  for (let i = 0; i < et.length; i++) {
+    if (!((i ? et[i - 1][1] : lastE) === 1 && et[i][1] === 0)) continue;
     const t = et[i][0];
     let bus = 0;
     dbits.forEach((b, k) => { bus |= before(tr(b), t + 1) << k; });

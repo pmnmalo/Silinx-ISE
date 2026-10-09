@@ -512,7 +512,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   const logEl = h('div', { class: 'emu-log' });
   side.append(h('div', { class: 'emu-box' }, h('h4', {}, 'Messages'), logEl));
   side.append(h('div', { class: 'emu-hint' }, 'The design is simulated from its HDL (behavioural RTL) at a reduced clock rate; registers without an initial value start at 0, as on the FPGA; '
-    + 'each display digit keeps the last pattern it showed, as your eye does on the real board. Buttons: press and hold; Shift+click keeps a button pressed.'));
+    + 'each display digit keeps the last pattern it showed between its refreshes, as your eye does on the real board. Buttons: press and hold; Shift+click keeps a button pressed.'));
 
   // ------------------------------------------------------------------------------- simulation
   function applyInput(sig) {
@@ -598,10 +598,9 @@ export function mountEmulator(container, { design, board, assignments, title = '
   }
 
   function refresh() {
-    if (prev) {
-      leds.forEach((l, k) => { const v = prev.leds[k] ?? 0; l.style.background = `rgb(${Math.round(27 + 20 * v)}, ${Math.round(58 + 197 * v)}, ${Math.round(35 + 40 * v)})`; l.style.boxShadow = v > 0.05 ? `0 0 ${Math.round(8 * v)}px #4f4` : 'none'; });
-      digits.forEach((d, k) => d && d.set(prev.digits[k]));
-    }
+    // no window run yet (start-up, power cycle): LEDs and digits dark
+    leds.forEach((l, k) => { const v = prev?.leds[k] ?? 0; l.style.background = `rgb(${Math.round(27 + 20 * v)}, ${Math.round(58 + 197 * v)}, ${Math.round(35 + 40 * v)})`; l.style.boxShadow = v > 0.05 ? `0 0 ${Math.round(8 * v)}px #4f4` : 'none'; });
+    digits.forEach((d, k) => d && d.set(prev?.digits[k] ?? null));
     if (lcdView && lcdDirty) { lcdView.set(lcdText(lcd), lcd); lcdDirty = false; }
     for (const w of watched) {
       const v = w.s.val;
