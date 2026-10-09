@@ -6,13 +6,26 @@ import path from 'node:path';
 const [cmd = 'serve', ...args] = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
 
+const USAGE = `usage:
+  silinx-ise serve [--port 8642] [--host 127.0.0.1] [--open]   start the Project Navigator web UI
+  silinx-ise check <projectDir> [--top name]            parse + elaborate the design
+  silinx-ise sim   <projectDir> [--top tb] [--time ns] [--vcd out.vcd]   run a behavioural simulation
+  silinx-ise ucf   <projectDir> --board basys2|nexys2|s3e-starter [--part xc3s100e]   pins from the board
+  silinx-ise toolchain [--docker <image>]                show / set the ISE toolchain (docker image)
+  silinx-ise help                                       this text`;
+
 async function loadProject(dir) {
-  const pj = JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8'));
+  let pj;
+  try { pj = JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8')); }
+  catch (e) { throw new Error(e.code === 'ENOENT' ? `no Silinx project in ${dir} (silinx.json not found)` : `cannot read ${path.join(dir, 'silinx.json')}: ${e.message}`); }
+  pj.files ||= [];
   const sources = pj.files.map(f => ({ ...f, text: fs.readFileSync(path.join(dir, f.path), 'utf8') }));
   return { pj, sources };
 }
 
 async function main() {
+  // help never runs a command (`serve --help` must not start a server)
+  if (['help', '--help', '-h'].includes(cmd) || args.includes('--help') || args.includes('-h')) { console.log(USAGE); return; }
   switch (cmd) {
     case 'serve': {
       const { startServer, openBrowser } = await import('../server/server.js');
@@ -63,6 +76,7 @@ async function main() {
       const { compile, elaborate } = await import('../core/compile.js');
       const { boardAutoAssign, generateUcf } = await import('../core/ucf.js');
       const boardId = opt('board', pj.board);
+      if (!boardId) { console.error('no board: give --board <id> (e.g. basys2, nexys2, s3e-starter) or set the board of the project'); process.exit(1); }
       const rb = resolveBoard(boardId, { part: opt('part') || pj.device?.part });
       const board = rb && { ...rb.board, device: rb.device, resources: rb.resources };
       if (!board) { console.error(`unknown board '${boardId}'`); process.exit(1); }
@@ -97,12 +111,8 @@ async function main() {
       break;
     }
     default:
-      console.log(`usage:
-  silinx-ise serve [--port 8642] [--host 127.0.0.1]     start the Project Navigator web UI
-  silinx-ise check <projectDir> [--top name]            parse + elaborate the design
-  silinx-ise sim   <projectDir> [--top tb] [--time ns] [--vcd out.vcd]   run a behavioural simulation
-  silinx-ise ucf   <projectDir> --board basys2|nexys2|s3e-starter [--part xc3s100e]   pins from the board
-  silinx-ise toolchain [--docker <image>]                show / set the ISE toolchain (docker image)`);
+      console.error(`silinx-ise: unknown command '${cmd}'\n${USAGE}`);
+      process.exit(1);
   }
 }
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch(e => { console.error(process.env.SILINX_DEBUG ? e : `silinx-ise: ${e?.message || e}`); process.exit(1); });

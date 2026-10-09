@@ -153,7 +153,8 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const project = await P.readProject(name);
     const xml = exportXise(project, { sources: await sourcesOf(name, project) });
     await fs.writeFile(path.join(P.projectDir(name), xiseName(project)), xml);
-    res.type('application/xml').attachment(xiseName(project)).send(xml);
+    // attachment() sets the type from the extension (.xise: octet-stream): set the XML type after it
+    res.attachment(xiseName(project)).type('application/xml').send(xml);
   }));
 
   api.post('/projects/import-xise', wrap(async req => {
@@ -275,7 +276,8 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const files = [];
     const skipped = [];
     for (const f of parsed.files) {
-      try { P.safeJoin(dir, f.path); files.push(f); } catch { skipped.push(f.path); }
+      // a Windows drive path (C:/work/x.vhd) is outside the project too, even though POSIX path.resolve keeps it inside
+      try { if (/^[A-Za-z]:/.test(f.path)) throw new Error('absolute'); P.safeJoin(dir, f.path); files.push(f); } catch { skipped.push(f.path); }
     }
     const saved = await P.updateProject(name, cur => ({
       ...cur,

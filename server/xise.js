@@ -158,11 +158,12 @@ export function importXise(xml) {
     const a = attrs(m[1]);
     const name = (a.name || '').replace(/\\/g, '/');
     const type = (a.type || '').toUpperCase();
+    if (!name) continue;   // an entry without a file name is no file of the project
     const assoc = [...(m[3] || '').matchAll(/<association\b([^>]*)\/?>/g)].map(x => attrs(x[1]).name);
     if (type === 'FILE_UCF' || /\.ucf$/i.test(name)) { if (!constraints) constraints = name; continue; }
     if (type === 'FILE_SCHEMATIC' || /\.sch$/i.test(name)) { schematics.push({ path: name, role: assoc.includes('Implementation') || !assoc.length ? 'design' : 'sim' }); continue; }
     const lang = type === 'FILE_VHDL' || /\.vhdl?$/i.test(name) ? 'vhdl' : type === 'FILE_VERILOG' || /\.(v|sv)$/i.test(name) ? 'verilog' : null;
-    if (!lang) { if (name) unsupported.push({ name, type: type || '?' }); continue; }
+    if (!lang) { unsupported.push({ name, type: type || '?' }); continue; }
     const role = assoc.includes('Implementation') || !assoc.length ? 'design' : 'sim';
     files.push({ path: name, lang, role });
   }

@@ -45,7 +45,10 @@ export async function createApp({ host = '127.0.0.1' } = {}) {
     return P.writeProject(req.params.p, req.body);
   }));
   api.delete('/projects/:p', wrap(async req => { await P.deleteProject(req.params.p); return { ok: true }; }));
-  api.get('/projects/:p/file', wrap(async (req, res) => { res.type('text/plain').send(await P.readFile(req.params.p, req.query.path)); }));
+  api.get('/projects/:p/file', wrap(async (req, res) => {
+    const text = await P.readFile(req.params.p, req.query.path);   // read first: an error must go out as JSON, not text/plain
+    res.type('text/plain').send(text);
+  }));
   api.put('/projects/:p/file', wrap(async req => {
     const body = typeof req.body === 'string' ? req.body : (req.body?.text ?? '');
     await P.writeFile(req.params.p, req.query.path, body);
@@ -86,5 +89,11 @@ export async function openBrowser(url) {
   const { spawn } = await import('node:child_process');
   const [cmd, args] = process.platform === 'win32' ? ['cmd', ['/c', 'start', '""', url]]
     : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
-  try { spawn(cmd, args, { stdio: 'ignore', detached: true }).unref(); } catch { /* no browser: the URL is printed */ }
+  try {
+    // no opener installed (headless Linux without xdg-open): spawn reports ENOENT as an 'error' event,
+    // which would crash the process without a listener
+    const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+    child.on('error', () => { /* no browser: the URL is printed */ });
+    child.unref();
+  } catch { /* no browser: the URL is printed */ }
 }
