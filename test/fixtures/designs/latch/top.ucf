@@ -1,0 +1,5 @@
+NET "clk" LOC = "B8" ;
+NET "clk" TNM_NET = "clk" ;
+TIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50% ;
+NET "g" CLOCK_DEDICATED_ROUTE = FALSE ;
+NET "g3" CLOCK_DEDICATED_ROUTE = FALSE ;

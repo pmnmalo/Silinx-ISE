@@ -204,12 +204,36 @@ end STRUCTURE;
 }
 
 /**
+ * netgen connects the pad pin of a bidirectional buffer to one bit of an inout port vector
+ * (`IO => io(7)`, post-synthesis IOBUF). An inout formal associated with part of a signal is
+ * elaborated as an output only (the buffer's O would never see what drives the pad from outside),
+ * so each such IOBUF becomes the equivalent OBUFT (driving the pad) + IBUF (reading the resolved pad).
+ * Applies to every architecture of the text.
+ */
+export function splitInoutBuffers(text) {
+  const taken = new Set([...text.matchAll(/\b(\w+)\b/g)].map((m) => m[1].toLowerCase()));
+  const re = /((?:^|\n)(\s*))(\w+)\s*:\s*(IOBUF(?:_\w+)?)\s*\n\s*(generic\s+map\s*\([\s\S]*?\)\s*\n\s*)?port\s+map\s*\(([\s\S]*?)\)\s*;/gi;
+  return text.replace(re, (all, head, ind, inst, type, gen, assoc) => {
+    const pins = Object.fromEntries([...assoc.matchAll(/(\w+)\s*=>\s*([^,\n]+?)\s*(?:,|$)/gm)].map((x) => [x[1].toUpperCase(), x[2].trim()]));
+    if (!pins.IO || !/\(\s*\d+\s*\)\s*$/.test(pins.IO) || !pins.I || !pins.T) return all;
+    let ib = `${inst}_IN`, k = 1;
+    while (taken.has(ib.toLowerCase())) ib = `${inst}_IN${k++}`;
+    taken.add(ib.toLowerCase());
+    const i2 = `${ind}  `;
+    return `${head}${inst} : OBUFT\n${i2}${gen || ''}port map (\n${i2}  I => ${pins.I},\n${i2}  T => ${pins.T},\n${i2}  O => ${pins.IO}\n${i2});`
+      + (pins.O ? `\n${ind}${ib} : IBUF\n${i2}port map (\n${i2}  I => ${pins.IO},\n${i2}  O => ${pins.O}\n${i2});` : '');
+  });
+}
+
+/**
  * Speed up the simulation of a netgen netlist: its internal vector signals (carry chains, LUT
  * outputs of adders …) are split into single-bit signals, so that each primitive pin connects
  * to a whole signal (no glue process per bit, no wake-up of every reader of the vector).
- * Ports keep their types. The behaviour is unchanged.
+ * Ports keep their types. The behaviour is unchanged. Bidirectional buffers on bits of inout ports
+ * are split (splitInoutBuffers).
  */
 export function scalarizeNetlist(text) {
+  text = splitInoutBuffers(text);
   const arch = /(\barchitecture\s+(\w+)\s+of\s+\w+\s+is)([\s\S]*?)(\bbegin\b)([\s\S]*?)(\bend\s+\2\s*;)/i.exec(text);
   if (!arch) return text;
   const taken = new Set([...text.matchAll(/\b(\w+)\b/g)].map((m) => m[1].toLowerCase()));

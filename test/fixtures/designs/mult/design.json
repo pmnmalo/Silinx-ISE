@@ -1,0 +1,8 @@
+{
+  "description": "Multipliers (MULT18X18SIO): signed 12x10 with input and output registers and clock enable, unsigned 8x8 combinational, signed 18x18 with a synchronously reset output register",
+  "device": { "family": "spartan3e", "part": "xc3s500e", "package": "fg320", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 200, "prob": { "ce": 0.8, "rst": 0.1 } }
+}

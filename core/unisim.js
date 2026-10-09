@@ -129,9 +129,11 @@ end silinx;`;
 // attributes of the I/O buffers that netgen may write in their generic maps (no effect here)
 const IO_GENS = 'IOSTANDARD : string := "DEFAULT"; CAPACITANCE : string := "DONT_CARE"; DRIVE : integer := 12; SLEW : string := "SLOW"; '
   + 'IBUF_DELAY_VALUE : string := "0"; IFD_DELAY_VALUE : string := "AUTO"; IBUF_LOW_PWR : boolean := TRUE';
+// buffers pass 0 / 1 (and the weak H / L as 1 / 0); anything else (Z, X) gives X, as the native models
+const BUF_X01 = "  O <= '1' when I = '1' or I = 'H' else '0' when I = '0' or I = 'L' else 'X';";
 const buffers = [
-  ...['IBUF', 'IBUFG', 'OBUF', 'IBUFG_LVCMOS33', 'IBUF_LVCMOS33', 'OBUF_LVCMOS33'].map((b) => simple(b, 'I : in std_ulogic; O : out std_ulogic', '  O <= I;', IO_GENS)),
-  ...['BUF', 'BUFG', 'BUFGP'].map((b) => simple(b, 'I : in std_ulogic; O : out std_ulogic', '  O <= I;')),
+  ...['IBUF', 'IBUFG', 'OBUF', 'IBUFG_LVCMOS33', 'IBUF_LVCMOS33', 'OBUF_LVCMOS33'].map((b) => simple(b, 'I : in std_ulogic; O : out std_ulogic', BUF_X01, IO_GENS)),
+  ...['BUF', 'BUFG', 'BUFGP'].map((b) => simple(b, 'I : in std_ulogic; O : out std_ulogic', BUF_X01)),
   simple('OBUFT', 'I : in std_ulogic; T : in std_ulogic; O : out std_ulogic', "  O <= I when T = '0' else 'Z' when T = '1' else 'X';", IO_GENS),
   simple('IOBUF', 'I : in std_ulogic; T : in std_ulogic; O : out std_ulogic; IO : inout std_logic', "  IO <= I when T = '0' else 'Z' when T = '1' else 'X';\n  O <= IO;", IO_GENS),
   simple('PULLUP', 'O : out std_logic', "  O <= 'H';"),
@@ -139,8 +141,10 @@ const buffers = [
   // global clock buffers: clock enable (the output stays low; high for BUFGCE_1) and clock mux
   simple('BUFGCE', 'I : in std_ulogic; CE : in std_ulogic; O : out std_ulogic', "  O <= I when CE = '1' else '0' when CE = '0' else 'X';"),
   simple('BUFGCE_1', 'I : in std_ulogic; CE : in std_ulogic; O : out std_ulogic', "  O <= I when CE = '1' else '1' when CE = '0' else 'X';"),
+  // CLK_SEL_TYPE (netgen writes "SYNC"): accepted; the switch is modelled as a plain multiplexer
+  // (no glitch-free hand-over between the clocks)
   ...['BUFGMUX', 'BUFGMUX_1'].map((b) => simple(b, 'I0 : in std_ulogic; I1 : in std_ulogic; S : in std_ulogic; O : out std_ulogic',
-    "  O <= I1 when S = '1' else I0 when S = '0' else I0 when (I0 = '0' and I1 = '0') or (I0 = '1' and I1 = '1') else 'X';")),
+    "  O <= I1 when S = '1' else I0 when S = '0' else I0 when (I0 = '0' and I1 = '0') or (I0 = '1' and I1 = '1') else 'X';", 'CLK_SEL_TYPE : string := "SYNC"')),
 ];
 
 // 2:1 multiplexer `out` <= b when s = '1' else a; with an unknown select the output is known only
@@ -649,8 +653,8 @@ package VPACKAGE is
   signal GSR : std_logic := '0';
   signal GTS : std_logic := '0';
 end VPACKAGE;`,
-  ...['X_BUF', 'X_CKBUF', 'X_IPAD', 'X_OPAD', 'X_BUFGP'].map((n) => xs(n, PP, 'I : in std_ulogic; O : out std_ulogic', '  O <= I;')),
-  xs('X_OBUF', `${PP}; ${IO_GENS}`, 'I : in std_ulogic; O : out std_ulogic', '  O <= I;'),
+  ...['X_BUF', 'X_CKBUF', 'X_IPAD', 'X_OPAD', 'X_BUFGP'].map((n) => xs(n, PP, 'I : in std_ulogic; O : out std_ulogic', BUF_X01)),
+  xs('X_OBUF', `${PP}; ${IO_GENS}`, 'I : in std_ulogic; O : out std_ulogic', BUF_X01),
   // output buffer with 3-state control: CTL = '1' releases the pad (like T of OBUFT)
   xs('X_OBUFT', `${PP}; ${IO_GENS}`, 'I : in std_ulogic; CTL : in std_ulogic; O : out std_ulogic', "  O <= I when CTL = '0' else 'Z' when CTL = '1' else 'X';"),
   xs('X_PU', '', 'O : out std_logic', "  O <= 'H';"),
@@ -662,7 +666,7 @@ end VPACKAGE;`,
   xs('X_OR2', PP, 'I0 : in std_ulogic; I1 : in std_ulogic; O : out std_ulogic', '  O <= I0 or I1;'),
   xs('X_XOR2', PP, 'I0 : in std_ulogic; I1 : in std_ulogic; O : out std_ulogic', '  O <= I0 xor I1;'),
   xs('X_MUX2', PP, 'IA : in std_ulogic; IB : in std_ulogic; SEL : in std_ulogic; O : out std_ulogic', mux2('O', 'IA', 'IB', 'SEL')),
-  xs('X_BUFGMUX', '', 'I0 : in std_ulogic; I1 : in std_ulogic; S : in std_ulogic; O : out std_ulogic', mux2('O', 'I0', 'I1', 'S')),
+  xs('X_BUFGMUX', 'CLK_SEL_TYPE : string := "SYNC"', 'I0 : in std_ulogic; I1 : in std_ulogic; S : in std_ulogic; O : out std_ulogic', mux2('O', 'I0', 'I1', 'S')),
   xs('X_TRI', PP, 'I : in std_ulogic; CTL : in std_ulogic; O : out std_ulogic', "  O <= I when CTL = '1' else 'Z';"),
   xs('X_ROC', 'ROC_WIDTH : time := 100 ns', 'O : out std_ulogic', "  O <= '0';"),
   xs('X_TOC', '', 'O : out std_ulogic', "  O <= '0';"),

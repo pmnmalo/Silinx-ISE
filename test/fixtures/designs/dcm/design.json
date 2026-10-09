@@ -1,0 +1,8 @@
+{
+  "description": "DCM_SP: CLKFX = 3/2 x CLKIN, CLKDV = CLKIN / 2.5, CLK2X and CLK0 (feedback through a BUFG) each clocking a counter; LOCKED",
+  "device": { "family": "spartan3e", "part": "xc3s250e", "package": "cp132", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 120, "prob": { "en": 0.7 } }
+}

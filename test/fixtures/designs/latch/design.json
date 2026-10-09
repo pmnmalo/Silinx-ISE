@@ -1,0 +1,8 @@
+{
+  "description": "Latches: 4-bit with gate enable and asynchronous clear (LDCE), 2-bit active-low gate with preset starting at 1 (LDP_1), plain LD, registered copy",
+  "device": { "family": "spartan3e", "part": "xc3s250e", "package": "cp132", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 300, "late": ["g", "g3"], "prob": { "clr": 0.1, "pre": 0.1 } }
+}

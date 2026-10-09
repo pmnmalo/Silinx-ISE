@@ -1,0 +1,9 @@
+{
+  "description": "Dual-port block RAMs (Verilog): true dual port 1024x16 (READ_FIRST / WRITE_FIRST ports, initial contents), simple dual port 512x32",
+  "device": { "family": "spartan3e", "part": "xc3s500e", "package": "fg320", "speed": "-4" },
+  "top": "top",
+  "files": ["top.v"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 300, "ranges": { "addr_a": [0, 31], "addr_b": [0, 31] }, "prob": { "en_a": 0.9, "en_b": 0.9 },
+           "distinct": [{ "a": "addr_a", "b": "addr_b", "mask": 511 }] }
+}
