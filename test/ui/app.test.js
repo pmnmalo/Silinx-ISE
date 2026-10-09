@@ -233,7 +233,8 @@ uiTest('Portuguese: View ▸ Language switches the UI; menus, dialogs and the ma
   // data shown in the UI that is not translated (names from the project, the device database, the server)
   const db = await env.server.api('GET', '/api/devices');
   const tc = await env.server.api('GET', '/api/toolchain');
-  const data = new Set([...db.boards.map((b) => b.name), tc.ise.help, tc.ise.reason, 'LangPj', 'top', 'tb_top', 'basys2', 'in', 'out', 'inout',
+  const projects = (await env.server.api('GET', '/api/projects')).flatMap((p) => [p.name, p.top, p.board]);
+  const data = new Set([...projects, ...db.boards.map((b) => b.name), tc.ise.help, tc.ise.reason, 'LangPj', 'top', 'tb_top', 'basys2', 'in', 'out', 'inout',
     'impact', 'djtgcfg', 'adepttool', 'xc3sprog', 'openFPGALoader']);
   const same = [/^\(.*\)$/, /^LangPj\//, /^constraints\//, { test: (s) => data.has(s) }];
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
