@@ -86,6 +86,7 @@ function portEditor(ports, { lang, onChange = () => {} }) {
       const nm = h('input', { type: 'text', class: 'mw-pname', value: p.name, style: { width: '110px' } });
       const dir = select([['in', 'input'], ['out', 'output']], p.dir);
       dir.classList.add('mw-pdir');
+      dir.style.minWidth = '90px';   // room for 'output' / 'saída'
       const w = h('input', { type: 'number', class: 'mw-pwidth', min: 1, max: MAX_WIDTH, value: p.width, style: { width: '60px' } });
       const ds = h('input', { type: 'text', class: 'mw-pdesc', value: p.desc || '', placeholder: 'optional', style: { width: '100%', boxSizing: 'border-box' } });
       const bits = h('span', { class: 'hint mw-pbits', 'data-no-i18n': '', style: { marginLeft: '4px' } });
