@@ -446,8 +446,8 @@ async function undoRemoveNow() {
   const u = S.lastRemoval;
   if (!u || u.project !== S.project?.name) return;
   S.lastRemoval = null;
+  S.lastUndone = { ...u, at: Date.now() };   // Redo removes it again (set first: a Redo clicked meanwhile waits for this undo)
   await addNow(u.path, u);
-  S.lastUndone = { ...u, at: Date.now() };   // Redo removes it again
   log(`Undo: ${u.path} is back in the project.`, 'ok');
 }
 
