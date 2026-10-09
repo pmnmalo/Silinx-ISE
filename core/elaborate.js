@@ -1506,6 +1506,12 @@ export function collectRW(body) {
     if (x.k === 'task') {
       x.args.forEach(a => { if (a) for (const s of readsOf(a)) reads.add(s); });
       x.outTargets.forEach(L => { if (L) visitL(L); });
+      // signals the procedure assigns itself (signal parameters, outer signals)
+      if (x.fn && x.fn.body && !x.fn._visiting) {
+        x.fn._visiting = true;
+        for (const s of collectRW(x.fn.body).writes) writes.add(s);
+        x.fn._visiting = false;
+      }
       return false;
     }
     if (x.k === 'sys' && (x.name === '$readmemh' || x.name === '$readmemb') && x.args[1]) { visitL(x.args[1]); return false; }

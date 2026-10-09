@@ -92,6 +92,55 @@ test('Verilog $finish: no other process runs after it in the same delta', () => 
   assert.ok(!out.includes('c=1'), out.join('\n'));
 });
 
+// ------------------------------------------------------------------ drivers
+test('VHDL: several drivers of a std_logic signal are resolved', () => {
+  const out = run(vhd(`
+  b <= '1' when en1 = '1' else 'Z';
+  b <= '0' when en2 = '1' else 'Z';
+  v(0) <= '1';
+  v(1) <= '0';
+  process begin
+    wait for 1 ns; report std_logic'image(b);
+    en1 <= '1'; wait for 1 ns; report std_logic'image(b);
+    en2 <= '1'; wait for 1 ns; report std_logic'image(b);
+    en1 <= '0'; wait for 1 ns; report std_logic'image(b) & " " & to_string(v);
+    wait;
+  end process;`, `signal b : std_logic; signal en1, en2 : std_logic := '0'; signal v : std_logic_vector(1 downto 0);`), 'tb');
+  assert.deepEqual(out, ["'z'", "'1'", "'x'", "'0' 01"]);
+});
+
+test('VHDL: a testbench and the design drive an inout bus (tri-state)', () => {
+  const dut = `library ieee; use ieee.std_logic_1164.all;
+entity dut is port (oe : in std_logic; d : inout std_logic_vector(3 downto 0); q : out std_logic_vector(3 downto 0)); end;
+architecture rtl of dut is begin
+  d <= "1010" when oe = '1' else (others => 'Z');
+  q <= d;
+end;`;
+  const tb = vhd(`
+  u : entity work.dut port map (oe => oe, d => d, q => q);
+  process begin
+    oe <= '1'; d <= "ZZZZ"; wait for 1 ns; report to_string(q);
+    oe <= '0'; d <= "0110"; wait for 1 ns; report to_string(q);
+    oe <= '1'; wait for 1 ns; report to_string(q);
+    wait;
+  end process;`, `signal oe : std_logic; signal d, q : std_logic_vector(3 downto 0);`);
+  const r = simulate([{ path: 'dut.vhd', text: dut }, { path: 'tb.vhd', text: tb }], 'tb', { until: 1e9 });
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.sim.log.map(l => l.text), ['1010', '0110', 'XX10']);
+});
+
+test('Verilog: wires with several continuous drivers resolve z, conflicts give x', () => {
+  const out = run(`module t; reg e1 = 0, e2 = 0; wire w;
+  assign w = e1 ? 1'b1 : 1'bz;
+  assign w = e2 ? 1'b0 : 1'bz;
+  reg r; initial r = 0; always @(e1) r = e1;   // procedural writes to one reg are one driver
+  initial begin
+    #1 $display("%b", w); e1 = 1; #1 $display("%b", w); e2 = 1; #1 $display("%b", w); e1 = 0; #1 $display("%b %b", w, r);
+  end
+  endmodule`, 't');
+  assert.deepEqual(out, ['z', '1', 'x', '0 0']);
+});
+
 // ------------------------------------------------------------------ VHDL values
 test('VHDL = and /= compare std_logic values exactly (X, U, Z included)', () => {
   const out = run(vhd(`

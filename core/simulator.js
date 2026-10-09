@@ -37,6 +37,28 @@ class Heap {
     return top;
   }
 }
+// Driver identity of a process: a Verilog module's procedural code shares one driver per signal.
+const driverKey = p => (p.lang === 'verilog' && p.kind === 'process' ? 'vproc' : p.id);
+
+// std_logic / Verilog wire resolution of the drivers of sig (4-state: 0 1 X Z).
+// Bits no driver has assigned yet keep the signal's current value.
+function resolve(sig) {
+  const w = sig.t.w, M = V.mask(w);
+  let any0 = 0n, any1 = 0n, anyX = 0n, nz = 0n, D = 0n;
+  for (const { val: { v, x }, m } of sig.res.values()) {
+    D |= m;
+    nz |= m & ~(x & v);
+    any0 |= m & ~x & ~v;
+    any1 |= m & ~x & v;
+    anyX |= m & x & ~v;
+  }
+  const bad = anyX | (any0 & any1), zb = D & ~nz;
+  const cur = sig.val, und = M & ~D;
+  const v = (((any1 & ~bad) | zb) & D) | (cur.v & und);
+  const x = ((bad | zb) & D) | (cur.x & und);
+  return V.mk(w, v, x, sig.t.s);
+}
+
 const sameVal = (a, b) => (Array.isArray(a) || Array.isArray(b) ? a === b : V.same(a, b) && a.real === b.real);
 const less = (x, y) => x.t < y.t || (x.t === y.t && x.s < y.s);
 
@@ -84,6 +106,19 @@ export class Simulator {
       s.wave = Array.isArray(s.init) || s.t.kind === 'str' ? null : { t: [0], v: [s.val] };
     }
     this.rts = this.design.procs.map(p => ({ p, gen: null, done: false, rec: null, ctx: null }));
+    // Resolved signals: a logic signal with several drivers (VHDL processes / concurrent
+    // statements, Verilog continuous assignments and port connections; all the procedural code of
+    // a Verilog module counts as one driver) keeps one value per driver and resolves them.
+    const drivers = new Map();
+    for (const p of this.design.procs) {
+      for (const sig of p.writes || []) {
+        if (!drivers.has(sig)) drivers.set(sig, new Set());
+        drivers.get(sig).add(driverKey(p));
+      }
+    }
+    for (const s of this.design.signals) {
+      s.res = !Array.isArray(s.init) && s.t.kind === 'logic' && drivers.get(s)?.size > 1 ? new Map() : null;
+    }
   }
 
   // ---------------------------------------------------------- logging
@@ -153,15 +188,24 @@ export class Simulator {
   }
 
   // ---------------------------------------------------------- signal updates
-  write(wr, val) {
+  write(wr, val, drv = this.curProc) {
     const sig = wr.sig;
+    if (sig.res) { this.writeResolved(sig, wr, val, drv); return; }
     this.setSignal(sig, applyWrite(sig.val, wr, val));
   }
-  nba(wr, val) { this.nbaQ.push({ wr, val }); }
+  writeResolved(sig, wr, val, drv) {
+    const key = drv ? driverKey(drv) : 'ext', w = sig.t.w;
+    let d = sig.res.get(key);
+    if (!d) { d = { val: V.allX(w, sig.t.s), m: 0n }; sig.res.set(key, d); }
+    d.val = applyWrite(d.val, wr, val);
+    d.m |= wr.whole ? V.mask(w) : (V.mask(Math.min(wr.lo + wr.w, w)) & ~V.mask(Math.max(wr.lo, 0)));
+    this.setSignal(sig, resolve(sig));
+  }
+  nba(wr, val) { this.nbaQ.push({ wr, val, drv: this.curProc }); }
   // mech (VHDL only): { mech: 'inertial' | 'transport', reject: ps | null, cont: waveform element > 1 }
   after(wr, val, delay, nb, mech = null) {
     const t = this.now + delay;
-    const item = { upd: true, wr, val, nb, vh: !!mech, t };
+    const item = { upd: true, wr, val, nb, vh: !!mech, t, drv: this.curProc };
     if (mech) this.preempt(wr, val, t, mech, item);
     this.heap.push(t, item);
   }
@@ -355,7 +399,7 @@ export class Simulator {
       this.nbaQ = [];
       this.stamp++;
       this.stats.deltas++;
-      for (const { wr, val } of q) this.write(wr, val);
+      for (const { wr, val, drv } of q) this.write(wr, val, drv);
       if (this.nextDelta.length) { this.active.push(...this.nextDelta); this.nextDelta = []; }
       if (++deltas > this.maxDeltas) {
         this.emit({ kind: 'error', text: `delta cycle limit (${this.maxDeltas}) exceeded at ${formatTime(this.now)}: combinational loop?` });
@@ -390,8 +434,8 @@ export class Simulator {
         else if (item.timeout) { if (!item.timeout.fired) this.fire(item.timeout, 'timeout'); }
         else if (item.upd) {
           // Verilog `<= #d`: NBA region of that step; VHDL `after`: updated before the step's processes run
-          if (item.nb && !item.vh) this.nbaQ.push({ wr: item.wr, val: item.val });
-          else this.write(item.wr, item.val);
+          if (item.nb && !item.vh) this.nbaQ.push({ wr: item.wr, val: item.val, drv: item.drv });
+          else this.write(item.wr, item.val, item.drv);
         }
         else if (item.stim) this.forceOrSet(item.sig, item.val);
         else if (item.fn) item.fn(this);
