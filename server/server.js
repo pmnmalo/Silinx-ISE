@@ -12,8 +12,22 @@ const wrap = fn => (req, res) => Promise.resolve().then(() => fn(req, res)).then
   err => res.status(err.status || 500).json({ error: err.message }),
 );
 
-export async function createApp() {
+export async function createApp({ host = '127.0.0.1' } = {}) {
   const app = express();
+  // The API changes files and runs the ISE flow: only the Silinx page itself may call it.
+  // A request from another web origin (a malicious page in the same browser) is refused, and when
+  // bound to localhost the Host header must be local too (DNS rebinding).
+  const LOCAL = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+  app.use('/api', (req, res, next) => {
+    const hostName = String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase();
+    if (!['0.0.0.0', '::'].includes(host) && hostName && !LOCAL.has(hostName) && hostName !== String(host).toLowerCase()) return res.status(403).json({ error: 'forbidden host' });
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.headers.origin) {
+      let oh = '';
+      try { oh = new URL(req.headers.origin).host.toLowerCase(); } catch { /* invalid origin */ }
+      if (oh !== String(req.headers.host || '').toLowerCase()) return res.status(403).json({ error: 'cross-origin request refused' });
+    }
+    next();
+  });
   app.use(express.json({ limit: '20mb' }));
   app.use(express.text({ type: 'text/*', limit: '20mb' }));
 
@@ -26,7 +40,10 @@ export async function createApp() {
   api.get('/projects', wrap(() => P.listProjects()));
   api.post('/projects', wrap(req => P.createProject(req.body || {})));
   api.get('/projects/:p', wrap(async req => ({ ...await P.readProject(req.params.p), fileTree: await P.fileTree(req.params.p) })));
-  api.put('/projects/:p', wrap(req => P.writeProject(req.params.p, req.body)));
+  api.put('/projects/:p', wrap(req => {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) throw Object.assign(new Error('expected a JSON project object'), { status: 400 });
+    return P.writeProject(req.params.p, req.body);
+  }));
   api.delete('/projects/:p', wrap(async req => { await P.deleteProject(req.params.p); return { ok: true }; }));
   api.get('/projects/:p/file', wrap(async (req, res) => { res.type('text/plain').send(await P.readFile(req.params.p, req.query.path)); }));
   api.put('/projects/:p/file', wrap(async req => {
@@ -54,7 +71,7 @@ export async function createApp() {
 }
 
 export async function startServer({ port = 8642, host = '127.0.0.1' } = {}) {
-  const app = await createApp();
+  const app = await createApp({ host });
   return new Promise((resolve, reject) => {
     const srv = app.listen(port, host, () => {
       console.log(`Silinx running at http://${host}:${port}  (workspace: ${P.workspaceDir()})`);

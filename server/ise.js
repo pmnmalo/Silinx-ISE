@@ -47,6 +47,7 @@ export function shQuote(s) {
 
 /** Normalise a requested step list (default: everything). trce runs whenever par runs. */
 export function normalizeSteps(steps) {
+  if (typeof steps === 'string') steps = [steps];
   if (!steps || !steps.length) return [...STEPS];
   const set = new Set();
   for (const s of steps) {
@@ -61,9 +62,13 @@ export function normalizeSteps(steps) {
 
 /** Part strings: XST wants xc3s500e-4-fg320, ngdbuild/map accept xc3s500e-fg320-4. */
 export function partStrings(device) {
-  const part = String(device.part).toLowerCase();
-  const pkg = String(device.package).toLowerCase();
-  const speed = String(device.speed).startsWith('-') ? String(device.speed) : `-${device.speed}`;
+  const part = String(device.part).trim().toLowerCase();
+  const pkg = String(device.package).trim().toLowerCase();
+  const speed = String(device.speed).trim().startsWith('-') ? String(device.speed).trim() : `-${String(device.speed).trim()}`;
+  // these strings go into run.sh and the tools' command lines: only well-formed values pass
+  if (!/^x[a-z0-9]+$/.test(part) || !/^[a-z]+[0-9]+$/.test(pkg) || !/^-[0-9][a-z0-9]?$/i.test(speed)) {
+    throw Object.assign(new Error(`invalid device '${device.part}' / '${device.package}' / '${device.speed}'`), { status: 400 });
+  }
   return { xst: `${part}${speed}-${pkg}`, impl: `${part}-${pkg}${speed}`, speedNum: speed.slice(1), bitPart: `${part.replace(/^xc/, '')}${pkg}` };
 }
 
@@ -617,8 +622,8 @@ export function parseSyr(text) {
   const u = out.utilization;
   out.summary = {
     slices: pick(u, /^Number of Slices$/i),
-    ffs: pick(u, /Slice Flip Flops/i),
-    luts: pick(u, /4 input LUTs/i),
+    ffs: pick(u, /Slice Flip Flops/i) || pick(u, /Slice Registers/i),
+    luts: pick(u, /4 input LUTs/i) || pick(u, /Slice LUTs/i),
     iobs: pick(u, /bonded IOBs/i),
     bram: pick(u, /BRAMs|RAMB16/i),
     mult: pick(u, /MULT18X18/i),
@@ -641,8 +646,8 @@ export function parseMrp(text) {
   const u = out.utilization;
   out.summary = {
     slices: pick(u, /occupied Slices/i),
-    ffs: pick(u, /Slice Flip Flops/i),
-    luts: pick(u, /^Total Number of 4 input LUTs/i) || pick(u, /4 input LUTs/i),
+    ffs: pick(u, /Slice Flip Flops/i) || pick(u, /Slice Registers/i),
+    luts: pick(u, /^Total Number of 4 input LUTs/i) || pick(u, /4 input LUTs/i) || pick(u, /Number of Slice LUTs/i),
     iobs: pick(u, /bonded IOBs/i),
     bram: pick(u, /RAMB16/i),
     mult: pick(u, /MULT18X18/i),
