@@ -13,7 +13,7 @@
 
 import { svgSnapshot, printDiagram } from './print.js';
 import {
-  normalizeModel, newModel, validate, generate, stateEncoding, ENCODINGS,
+  normalizeModel, newModel, validate, generate, stateEncoding, ENCODINGS, nextCaseLabel as nextLabel,
 } from '/core/asm.js';
 
 const GRID = 20;
@@ -319,22 +319,8 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
     if (sib.length < 2) return b;
     return { ...b, x: b.x + (sib.indexOf(e) - (sib.length - 1) / 2) * 22 };
   }
-  /** Label for a new exit of a case box: the lowest value not used yet (binary), else 'others'. */
-  function nextCaseLabel(n) {
-    const w = caseWidth(n);
-    const used = new Set();
-    let others = false;
-    for (const e of caseExits(n.id)) {
-      for (const part of String(e.port).split(/\s*[|,]\s*/)) {
-        const t = part.replace(/_/g, '');
-        if (/^(others|default)$/i.test(t)) others = true;
-        else if (/^[01]+$/.test(t) && t.length === w) used.add(parseInt(t, 2));
-        else if (/^\d+$/.test(t)) used.add(parseInt(t, 10));
-      }
-    }
-    for (let v = 0; v < Math.min(2 ** w, 4096); v++) if (!used.has(v)) return v.toString(2).padStart(w, '0');
-    return others ? `${2 ** w}` : 'others';
-  }
+  /** Label for a new exit of a case box (see nextCaseLabel in core/asm.js), null when all values have one. */
+  const nextCaseLabel = (n) => nextLabel(caseExits(n.id).map((e) => e.port), caseWidth(n));
 
   function uniqueBlockName() {
     const used = new Set(M.nodes.filter((n) => n.type === 'always').map((n) => (n.name || '').toLowerCase()));
@@ -1114,11 +1100,15 @@ export function mountAsmEditor(container, { model, onChange, onGenerate } = {}) 
       if (over && validTarget(d.from, over.dataset.node)) {
         const a = nodeById(d.from);
         const same = a.type === 'case' && d.port === '+' ? M.edges.find((x) => x.from === a.id && x.to === over.dataset.node && x.port !== 'others') : null;
-        let e;
-        if (same) { same.port = `${same.port}|${nextCaseLabel(a)}`; e = same; }   // one more value for the same exit
-        else e = connect(d.from, a.type === 'case' && d.port === '+' ? nextCaseLabel(a) : d.port, over.dataset.node);
-        sel = { nodes: new Set(), edge: e.id };
-        commit('connect'); renderInspector();
+        const label = a.type === 'case' && d.port === '+' ? nextCaseLabel(a) : d.port;
+        if (label == null) flash('Every value of the case box already has an exit (edit the labels to change them)');
+        else {
+          let e;
+          if (same && label !== 'others') { same.port = `${same.port}|${label}`; e = same; }   // one more value for the same exit
+          else e = connect(d.from, label, over.dataset.node);
+          sel = { nodes: new Set(), edge: e.id };
+          commit('connect'); renderInspector();
+        }
       } else if (!over && Math.hypot(ev.clientX - d.start.cx, ev.clientY - d.start.cy) > 30) {
         flash('Drop the connection on a box (a state, decision or conditional output)');
       }
