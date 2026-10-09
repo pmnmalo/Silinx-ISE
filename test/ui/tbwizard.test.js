@@ -27,6 +27,16 @@ const COUNTER = `module counter(input clk, input rst, input en, output reg [2:0]
 endmodule
 `;
 
+// New Source ▸ Test Bench (Wizard): file name, Finish -> the Test Bench Wizard opens with that name
+const openTbw = async (page, name) => {
+  await page.menu('Project', 'New Source…');
+  await page.waitDialog('New Source Wizard');
+  await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => /^\s*Test Bench \(Wizard\)\s*$/.test(e.textContent)); r.scrollIntoView(); r.click(); });
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', name);
+  await page.dialogButton('Finish');
+  await page.waitDialog('Test Bench Wizard');
+};
+
 // next page of the wizard (the primary button) and wait for page `title`
 const next = async (page, title) => {
   await page.dialogButton(title === null ? 'Finish' : 'Next >');
@@ -46,8 +56,7 @@ const simulateAll = async (page, tb) => {
 uiTest('Test Bench Wizard: exhaustive test of a combinational adder, expected values from the design; a changed value fails', E, async (page) => {
   await makeProject(env, { name: 'TbwAdd', top: 'adder', files: { 'src/adder.vhd': ADDER } });
   await page.openProject('TbwAdd');
-  await page.menu('Project', 'New Test Bench (Wizard)…');
-  await page.waitDialog('Test Bench Wizard');
+  await openTbw(page, 'tb_adder');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main input[type=text]').value), 'tb_adder');
   await next(page, 'Clock and Reset');
   // no clock: combinational
@@ -75,8 +84,7 @@ uiTest('Test Bench Wizard: exhaustive test of a combinational adder, expected va
 uiTest('Test Bench Wizard: sequential counter (Verilog) with clock and reset, vectors typed in; a wrong expected value is reported', E, async (page) => {
   await makeProject(env, { name: 'TbwCnt', top: 'counter', files: { 'src/counter.v': COUNTER } });
   await page.openProject('TbwCnt');
-  await page.menu('Project', 'New Test Bench (Wizard)…');
-  await page.waitDialog('Test Bench Wizard');
+  await openTbw(page, 'tb_counter');
   await next(page, 'Clock and Reset');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay select')].slice(0, 2).map((s) => s.value)), ['clk', 'rst']);
   await next(page, 'Input Vectors');
@@ -100,19 +108,36 @@ uiTest('Test Bench Wizard: sequential counter (Verilog) with clock and reset, ve
   assert.match(out, /TEST FAILED: 1 of 4/);
 });
 
-uiTest('New Source ▸ VHDL Test Bench: the new file stays registered as a simulation source and becomes the simulation top', E, async (page) => {
+uiTest('New Source ▸ Test Bench (HDL) in VHDL and in Verilog, HDL Module in Verilog: files registered, extension follows the language, test bench is the simulation top', E, async (page) => {
   await makeProject(env, { name: 'TbwNs', top: 'adder', files: { 'src/adder.vhd': ADDER } });
   await page.openProject('TbwNs');
-  await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
-  await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => /VHDL Test Bench/.test(e.textContent)); r.scrollIntoView(); r.click(); });
-  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'tb_skel');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Finish');
-  await page.waitNoDialog();
+  const newSource = async (type, name, lang) => {
+    await page.menu('Project', 'New Source…');
+    await page.waitDialog('New Source Wizard');
+    await page.eval((t) => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim().endsWith(t)); r.scrollIntoView(); r.click(); }, type);
+    await page.fill('.dlg-overlay .wiz-main input[type=text]', name);
+    await page.dialogButton('Next >');
+    await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main select'));
+    await page.eval((l) => { const sel = [...document.querySelectorAll('.dlg-overlay .wiz-main select')].find((x) => [...x.options].some((o) => o.value === 'verilog')); sel.value = l; sel.dispatchEvent(new Event('change', { bubbles: true })); }, lang);
+    if (type === 'HDL Module') assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].find((i) => i.value === 'Behavioral').style.display), lang === 'vhdl' ? '' : 'none');
+    await page.dialogButton('Next >');
+    assert.match(await page.eval(() => document.querySelector('.dlg-overlay pre').textContent), new RegExp(`Source Name: ${name}\\.${lang === 'vhdl' ? 'vhd' : 'v'}`));
+    await page.dialogButton('Finish');
+    await page.waitNoDialog();
+  };
+  await newSource('Test Bench (HDL)', 'tb_skel', 'vhdl');
   await page.waitFor(() => window.Silinx.project.simTop === 'tb_skel' && window.Silinx.project.files.some((f) => f.path === 'sim/tb_skel.vhd' && f.role === 'sim'), [], { what: 'tb_skel registered' });
   const pj = JSON.parse(await readWs(env, 'TbwNs', 'silinx.json'));
   assert.ok(pj.files.some((f) => f.path === 'sim/tb_skel.vhd' && f.role === 'sim'), JSON.stringify(pj.files));
   assert.equal(pj.simTop, 'tb_skel');
+  await newSource('Test Bench (HDL)', 'tb_skel_v', 'verilog');
+  await page.waitFor(() => window.Silinx.project.simTop === 'tb_skel_v' && window.Silinx.project.files.some((f) => f.path === 'sim/tb_skel_v.v' && f.role === 'sim'), [], { what: 'tb_skel_v registered' });
+  assert.match(await readWs(env, 'TbwNs', 'sim/tb_skel_v.v'), /module tb_skel_v;/);
+  await newSource('HDL Module', 'blk', 'verilog');
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/blk.v' && f.role === 'design'), [], { what: 'src/blk.v registered' });
+  assert.match(await readWs(env, 'TbwNs', 'src/blk.v'), /module blk/);
+  // the Project menu has no separate test bench wizard entry any more
+  const items = await page.openMenu('Project');
+  assert.ok(!items.some((i) => /Test Bench/.test(i.label)), items.map((i) => i.label).join(' | '));
+  await page.key('Escape');
 });

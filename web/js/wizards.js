@@ -371,13 +371,13 @@ export async function importSilinxDialog() {
 
 // ------------------------------------------------------------------ New Source
 const SOURCE_TYPES = [
-  { id: 'vhdl', label: 'VHDL Module', ico: 'vhdl', ext: '.vhd', dir: 'src' },
-  { id: 'verilog', label: 'Verilog Module', ico: 'verilog', ext: '.v', dir: 'src' },
-  { id: 'vhdl-tb', label: 'VHDL Test Bench', ico: 'vhdl', ext: '.vhd', dir: 'sim' },
-  { id: 'verilog-tb', label: 'Verilog Test Fixture', ico: 'verilog', ext: '.v', dir: 'sim' },
+  // hdl / tb / tbwiz: VHDL or Verilog, chosen in the wizard (the extension follows the language)
+  { id: 'hdl', label: 'HDL Module', ico: 'vhdl', ext: null, dir: 'src' },
+  { id: 'tb', label: 'Test Bench (HDL)', ico: 'vhdl', ext: null, dir: 'sim' },
+  { id: 'tbwiz', label: 'Test Bench (Wizard)', ico: 'template', ext: null, dir: 'sim' },
   { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src' },
   { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src' },
-  { id: 'asm', label: 'ASM State Diagram (State Machine)', ico: 'asm', ext: '.asm.json', dir: 'src' },
+  { id: 'asm', label: 'State Machine (ASM)', ico: 'asm', ext: '.asm.json', dir: 'src' },
   { id: 'tt', label: 'Truth Table', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints' },
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
@@ -385,7 +385,12 @@ const SOURCE_TYPES = [
 
 export async function newSourceWizard({ type } = {}) {
   if (!S.project) return;
-  let st = SOURCE_TYPES.find(t => t.id === type) || SOURCE_TYPES.find(t => t.id === (S.project.preferredLanguage || 'vhdl'));
+  // old type ids (vhdl, verilog, vhdl-tb, verilog-tb) still accepted: they preset the language
+  const LEGACY = { vhdl: ['hdl', 'vhdl'], verilog: ['hdl', 'verilog'], 'vhdl-tb': ['tb', 'vhdl'], 'verilog-tb': ['tb', 'verilog'] };
+  let st = SOURCE_TYPES.find(t => t.id === (LEGACY[type]?.[0] || type)) || SOURCE_TYPES[0];
+  // language of HDL modules and test benches (Define Module / Associate Source pages)
+  const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
+  const extOf = t => t.ext ?? (langSel.value === 'verilog' ? '.v' : '.vhd');
   const fname = h('input', { type: 'text', placeholder: 'file name' });
   const loc = h('input', { type: 'text', value: st.dir });
   const list = h('div', { class: 'src-types' });
@@ -393,7 +398,12 @@ export async function newSourceWizard({ type } = {}) {
     list.innerHTML = '';
     for (const t of SOURCE_TYPES) {
       const row = h('div', { class: `st${t === st ? ' sel' : ''}` }, icon(t.ico), t.label);
-      row.addEventListener('click', () => { st = t; loc.value = t.dir; renderList(); });
+      row.addEventListener('click', () => {
+        st = t; loc.value = t.dir; renderList();
+        // the number of pages depends on the type: Finish right here for the Test Bench Wizard
+        const btn = [...(list.closest('.dlg')?.querySelectorAll('.dlg-buttons .btn') || [])].find(b => b.classList.contains('primary'));
+        if (btn) btn.textContent = pages().length === 1 ? 'Finish' : 'Next >';
+      });
       row.addEventListener('dblclick', () => { st = t; document.querySelector('.dlg .btn.primary')?.click(); });
       list.append(row);
     }
@@ -409,7 +419,7 @@ export async function newSourceWizard({ type } = {}) {
       const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
       if (!FILE_RE.test(n)) return 'Enter a valid file name (letters, digits, _ and -).';
       if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
-      const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${st.ext}`;
+      const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
       if (S.fileTree.includes(path)) return `${path} already exists.`;
       return null;
     },
@@ -441,15 +451,19 @@ export async function newSourceWizard({ type } = {}) {
       portTbl.append(h('tr', {}, h('td', {}, nm), h('td', {}, dir), h('td', { style: { textAlign: 'center' } }, bus), h('td', {}, msb), h('td', {}, lsb), h('td', {}, p.blank ? '' : del)));
     });
   };
+  const archLbl = h('label', {}, 'Architecture name:');
+  const syncArch = () => { const v = langSel.value === 'vhdl'; archLbl.style.display = archName.style.display = v ? '' : 'none'; };
+  langSel.addEventListener('change', syncArch);
+  const p2LangSlot = h('span');   // langSel lives here or on the test bench page (moved on show)
   const p2 = {
     title: 'Define Module',
     render: () => {
       renderPorts();
       return h('div', {},
-        h('div', { class: 'form-grid' }, ...field('Entity / Module name:', entName), ...(st.id === 'vhdl' ? field('Architecture name:', archName) : [])),
+        h('div', { class: 'form-grid' }, ...field('Language:', p2LangSlot), ...field('Entity / Module name:', entName), archLbl, archName),
         h('div', { style: { marginTop: '10px', maxHeight: '250px', overflow: 'auto', border: '1px solid #ccc' } }, portTbl));
     },
-    onShow: () => { if (!entName.value) entName.value = fname.value.trim().replace(/\..*$/, ''); },
+    onShow: () => { p2LangSlot.replaceChildren(langSel); if (!entName.value) entName.value = fname.value.trim().replace(/\..*$/, ''); syncArch(); },
     validate: () => {
       if (!NAME_RE.test(entName.value.trim())) return 'Invalid module name.';
       for (const p of ports) {
@@ -472,9 +486,11 @@ export async function newSourceWizard({ type } = {}) {
     }
     if (!uutList.childElementCount) uutList.append(h('div', { class: 'st' }, 'No design modules in the project.'));
   };
+  const tbLangHost = h('div', { class: 'form-grid', style: { marginBottom: '8px' } });
   const p2tb = {
     title: 'Associate Source',
-    render: () => { renderUut(); return h('div', {}, h('div', { class: 'hint' }, 'Select the source (Unit Under Test) to associate with the new test bench.'), uutList); },
+    render: () => { renderUut(); return h('div', {}, tbLangHost, h('div', { class: 'hint' }, 'Select the source (Unit Under Test) to associate with the new test bench.'), uutList); },
+    onShow: () => { tbLangHost.replaceChildren(...field('Language:', langSel)); },
     validate: () => (S.modules.some(m => m.name === uutName) ? null : 'Select a module.'),
   };
   const summary = h('pre', { style: { background: '#fff', border: '1px solid #ccc', padding: '10px', fontFamily: 'var(--mono)', whiteSpace: 'pre-wrap' } });
@@ -483,33 +499,43 @@ export async function newSourceWizard({ type } = {}) {
     render: () => summary,
     onShow: () => {
       const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
-      summary.textContent = `Project Navigator will create a new skeleton source with the following specifications.\n\nAdd to Project: Yes\nSource Directory: ${loc.value}\nSource Type: ${st.label}\nSource Name: ${n}${st.ext}\n` +
-        (st.id === 'vhdl' || st.id === 'verilog' ? `\nEntity name: ${entName.value}\n${st.id === 'vhdl' ? `Architecture name: ${archName.value}\n` : ''}\nPort Definitions:\n${ports.map(p => `    ${p.name.padEnd(12)} ${p.bus ? `Bus[${p.msb}:${p.lsb}]` : 'Pin'.padEnd(8)}  ${p.dir}`).join('\n')}` : '') +
-        (st.id.endsWith('-tb') ? `\nAssociated Source: ${uutName}` : '');
+      const lg = langSel.value === 'verilog' ? 'Verilog' : 'VHDL';
+      summary.textContent = `Project Navigator will create a new skeleton source with the following specifications.\n\nAdd to Project: Yes\nSource Directory: ${loc.value}\nSource Type: ${st.label}${st.ext ? '' : ` (${lg})`}\nSource Name: ${n}${extOf(st)}\n` +
+        (st.id === 'hdl' ? `\nEntity name: ${entName.value}\n${langSel.value === 'vhdl' ? `Architecture name: ${archName.value}\n` : ''}\nPort Definitions:\n${ports.map(p => `    ${p.name.padEnd(12)} ${p.bus ? `Bus[${p.msb}:${p.lsb}]` : 'Pin'.padEnd(8)}  ${p.dir}`).join('\n')}` : '') +
+        (st.id === 'tb' ? `\nAssociated Source: ${uutName}` : '');
     },
   };
   const pages = () => {
-    if (st.id === 'vhdl' || st.id === 'verilog') return [p1, p2, pSum];
-    if (st.id.endsWith('-tb')) return [p1, p2tb, pSum];
+    if (st.id === 'hdl') return [p1, p2, pSum];
+    if (st.id === 'tb') return [p1, p2tb, pSum];
+    if (st.id === 'tbwiz') return [p1];   // Finish opens the Test Bench Wizard
     return [p1, pSum];
   };
   // The wizard driver takes a fixed page list; rebuild when the type changes on page 1.
   const dyn = [p1, { title: 'Options', render: () => h('div') }, pSum];
   const proxy = new Proxy(dyn, { get: (t, k) => (k === 'length' ? pages().length : (typeof k === 'string' && /^\d+$/.test(k) ? pages()[+k] : t[k])) });
+  pSum.validate = () => {
+    const nn = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
+    const pp = `${loc.value.trim().replace(/\/+$/, '')}/${nn}${extOf(st)}`;
+    return S.fileTree.includes(pp) ? `${pp} already exists.` : null;
+  };
   const ok = await wizard('New Source Wizard', proxy, { width: 760 });
   if (!ok) return;
   const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json)$/i, '');
-  const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${st.ext}`;
+  if (st.id === 'tbwiz') {
+    const { testBenchWizard } = await import('./tbwizard.js');
+    return testBenchWizard({ module: S.sel?.module, name: n, location: loc.value.trim().replace(/\/+$/, ''), lang: langSel.value });
+  }
+  const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
   let text;
   const pj = S.project;
   switch (st.id) {
-    case 'vhdl': text = T.vhdlModule(entName.value.trim(), archName.value.trim(), ports, pj); break;
-    case 'verilog': text = T.vlogModule(entName.value.trim(), ports, pj); break;
+    case 'hdl': text = langSel.value === 'vhdl' ? T.vhdlModule(entName.value.trim(), archName.value.trim(), ports, pj) : T.vlogModule(entName.value.trim(), ports, pj); break;
     case 'vhdl-pkg': text = T.vhdlPackage(n, pj); break;
-    case 'vhdl-tb': case 'verilog-tb': {
+    case 'tb': {
       const m = S.modules.find(x => x.name === uutName);
       const uut = uutInfo(m);
-      text = st.id === 'vhdl-tb' ? T.vhdlTestbench(n, uut, pj) : T.vlogTestbench(n, uut, pj);
+      text = langSel.value === 'vhdl' ? T.vhdlTestbench(n, uut, pj) : T.vlogTestbench(n, uut, pj);
       break;
     }
     case 'ucf': text = T.ucfTemplate(pj); break;
@@ -536,8 +562,8 @@ export async function newSourceWizard({ type } = {}) {
   // reload first: saving the project settings from the old copy would drop that registration
   await app.reloadProject();
   if (st.id === 'ucf' && noUcf) { S.project.constraints = path; await app.saveProjectJson(); await app.reloadProject(); }
-  if (st.id.endsWith('-tb')) await app.setTop(n, true);
-  app.log(`Created ${st.label} '${path}'.`, 'ok');
+  if (st.id === 'tb') await app.setTop(n, true);
+  app.log(`Created ${st.label}${st.ext ? '' : ` (${langSel.value === 'verilog' ? 'Verilog' : 'VHDL'})`} '${path}'.`, 'ok');
   if (st.id === 'asm') app.openAsm(path); else if (st.id === 'tt') app.openTt(path); else if (st.id === 'sch') app.openSch(path); else app.openFile(path);
 }
 

@@ -78,7 +78,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   4-state logic, delta cycles, VHDL/Verilog testbenches (`wait`, `#delay`, `assert`/`report`,
   `$display`, `$readmemh`…), an **ISim**-style waveform window, force/clock to simulate modules
   without a testbench, VCD export.
-- **Test Bench Wizard** (*Project ▸ New Test Bench (Wizard)…*, or right-click a module): writes a
+- **Test Bench Wizard** (*New Source ▸ Test Bench (Wizard)*, or right-click a module): writes a
   self-checking VHDL or Verilog test bench for a module. Input vectors: every combination of the
   inputs (exhaustive), random, counting, walking ones/zeros, or typed in; clock and reset detected
   (sequential designs get one vector per clock cycle). The expected outputs of each vector are

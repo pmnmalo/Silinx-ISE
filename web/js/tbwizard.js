@@ -16,7 +16,7 @@ const SHOWN_ROWS = 512;   // rows of the vector table shown at once (the rest is
 
 const designSources = () => S.sources.filter(s => s.role === 'design' && (s.lang === 'vhdl' || s.lang === 'verilog'));
 
-export async function testBenchWizard({ module } = {}) {
+export async function testBenchWizard({ module, name = null, location = null, lang: langPick = null } = {}) {
   if (!S.project) return;
   await app.saveAll?.();
   const mods = S.modules.filter(m => m.role === 'design' && m.kind !== 'package');
@@ -52,9 +52,9 @@ export async function testBenchWizard({ module } = {}) {
 
   // ---------------------------------------------------------------- page 1: unit under test
   const modSel = select(mods.map(m => [m.name, `${m.name} (${m.file})`]), uut.name);
-  const tbName = h('input', { type: 'text', value: `tb_${uut.name}` });
-  const lang = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], S.project.preferredLanguage || uut.lang || 'vhdl');
-  const loc = h('input', { type: 'text', value: 'sim' });
+  const tbName = h('input', { type: 'text', value: name || `tb_${uut.name}` });
+  const lang = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], langPick || S.project.preferredLanguage || uut.lang || 'vhdl');
+  const loc = h('input', { type: 'text', value: location || 'sim' });
   modSel.addEventListener('change', () => {
     const was = `tb_${uut.name}`;
     uut = mods.find(m => m.name === modSel.value);

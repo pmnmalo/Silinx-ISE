@@ -2453,7 +2453,6 @@ function setupMenus() {
     { label: 'Project', items: () => [
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj },
       { label: 'Add Copy of Source…', action: () => wiz.addSourceDialog(), disabled: hasPj },
-      { label: 'New Test Bench (Wizard)…', action: () => testBench(S.sel?.module), disabled: hasPj },
       '-',
       { label: 'Set as Top Module', action: () => S.sel?.module && setTop(S.sel.module), disabled: () => !S.sel?.module },
       { label: 'Design Properties…', action: () => wiz.projectProperties(), disabled: hasPj },
