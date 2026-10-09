@@ -1292,6 +1292,7 @@ async function runSimulationInner(mod, model) {
   const files = await readDataFiles();
   const sim = new Simulator(design, { files });
   if (!design.top) { setStatus(procId, 'err'); log(`ERROR: cannot elaborate '${mod}': ${design.diags.map(d => d.message).join('; ')}`, 'err'); return; }
+  if (!await confirmElabErrors(title, lib, design)) { setStatus(procId, 'err'); return; }
   log(`Simulation model ready: ${design.signals.length} signals, ${design.procs.length} processes. Launching ISim view.`, 'ok');
   setStatus(procId, 'ok');
   const { mountISim } = await import('./isim.js');
@@ -1306,6 +1307,19 @@ async function runSimulationInner(mod, model) {
       return { destroy: () => view.destroy?.(), view, onActivate: () => setTimeout(() => view.refresh?.(), 0) };
     },
   });
+}
+
+// Elaboration errors of a design about to be simulated (e.g. a netlist cell without a model, which
+// would run as an empty black box): listed in the console and the Errors tab; true = run anyway.
+async function confirmElabErrors(title, lib, design) {
+  const errs = diagsFor(lib, design).filter(d => (d.severity || 'error') === 'error');
+  if (!errs.length) return true;
+  setDiagnostics(diagsFor(lib, design));
+  for (const d of errs.slice(0, 20)) log(`ERROR: ${d.file ? `${d.file}${d.line ? `:${d.line}` : ''}: ` : ''}${d.message}`, 'err');
+  if (errs.length > 20) log(`… ${errs.length - 20} more error(s) in the Errors tab.`, 'err');
+  const missing = errs.filter(d => /not found/.test(d.message)).length;
+  return !!await confirmDlg(title, `The design has ${errs.length} elaboration error(s)${missing ? `, ${missing} of them instances of cells or entities that have no model (they would do nothing)` : ''}:\n\n`
+    + `${errs.slice(0, 5).map(d => `• ${d.message}`).join('\n')}${errs.length > 5 ? '\n• …' : ''}\n\nThe results will not match the hardware. Run anyway?`);
 }
 
 // ---- Board emulator: the design (behavioural RTL) on a virtual board, wired by the UCF
@@ -1324,9 +1338,9 @@ async function openEmulator(mod, { scale, model = null } = {}) {
   if (model && !net) return;
   const srcs = net || S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
   const { timingGenerics, autoTimeScale, scaledGenerics } = await import('/core/emulate.js');
-  let design, gens = [];
+  let design, lib, gens = [];
   try {
-    const lib = compile(srcs);
+    lib = compile(srcs);
     design = elaborate(lib, mod);
     if (!design.top) throw new Error(design.diags.map(d => d.message).join('; ') || `cannot elaborate '${mod}'`);
     // large timing generics (dividers, debouncers) divided so that the design visibly runs
@@ -1334,6 +1348,7 @@ async function openEmulator(mod, { scale, model = null } = {}) {
     scale ??= autoTimeScale(gens);
     if (scale > 1 && gens.length) design = elaborate(lib, mod, { generics: scaledGenerics(gens, scale) });
   } catch (e) { alertDlg('Board Emulator', `Cannot build the design: ${e.message}`, 'error'); return; }
+  if (!await confirmElabErrors('Board Emulator', lib, design)) return;
   const { parseUcf } = await import('/core/ucf.js');
   const assignments = S.ucfText ? parseUcf(S.ucfText).assignments : {};
   if (!S.ucfText) log('WARNING: the project has no UCF: the ports are not connected to the board (use I/O Pin Planning).', 'warn');
