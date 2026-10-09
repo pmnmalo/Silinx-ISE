@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   newModel, normalizeModel, validate, extractTransitions, stateEncoding,
-  generateVerilog, generateVhdl, generate, parseCondition, parseAction,
+  generateVerilog, generateVhdl, generate, parseCondition, parseAction, nextCaseLabel, parseCaseChoices,
 } from '../core/asm.js';
 
 // Traffic light controller: Moore outputs, a 4-bit registered timer (ASMD style).
@@ -386,6 +386,19 @@ test('case box on a slice: VHDL if/elsif chain, Verilog case', () => {
   const vh = generateVhdl(m);
   assert.match(vh, /if op\(3 downto 2\) = "00" then\n\s+state_next <= S_A1;\n\s+elsif op\(3 downto 2\) = "01" or op\(3 downto 2\) = "10" then/);
   assert.match(generateVerilog({ ...m, lang: 'verilog' }), /case \(op\[3:2\]\)/);
+});
+
+test('case box: label of a new exit (any literal form counts as used; null when all values are taken)', () => {
+  assert.equal(nextCaseLabel([], 2), '00');
+  assert.equal(nextCaseLabel(["2'b00", '0x1'], 2), '10');
+  assert.equal(nextCaseLabel(["4'd0|4'd1", '2, 3'], 2), 'others');
+  assert.equal(nextCaseLabel(['00', '01|10', "2'd3"], 2), 'others');
+  assert.equal(nextCaseLabel(['00', '01|10', "2'd3", 'others'], 2), null); // was '4', which does not fit
+  assert.equal(nextCaseLabel(['0', 'others'], 1), '1');
+  assert.equal(nextCaseLabel(['1', '0', 'default'], 1), null);
+  const l = nextCaseLabel(["8'hFF", '0x0'], 8);
+  assert.equal(l, '00000001');
+  assert.deepEqual(parseCaseChoices(l, 8), { values: [1n] });
 });
 
 test('case box: not allowed in every-cycle blocks', () => {

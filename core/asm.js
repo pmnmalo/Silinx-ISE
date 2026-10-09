@@ -620,6 +620,24 @@ export function parseCaseChoices(label, width) {
   return { values };
 }
 
+/**
+ * Label for a new exit of a case box whose exits have the labels `labels`, for an expression of
+ * `width` bits: the lowest value no exit selects (as `width` binary digits), else 'others' when
+ * there is no others exit yet, else null (every value already has an exit).
+ */
+export function nextCaseLabel(labels, width) {
+  const used = new Set();
+  let others = false;
+  for (const l of labels) {
+    const c = parseCaseChoices(l, width);
+    if (c.others) others = true;
+    else if (c.values) for (const v of c.values) used.add(v);
+  }
+  const lim = 1n << BigInt(Math.min(width, 12));
+  for (let v = 0n; v < lim; v++) if (!used.has(v)) return v.toString(2).padStart(width, '0');
+  return others ? null : 'others';
+}
+
 /** Per state: { state, name, mooreActions, transitions: [{ conditions, mealyActions, next, nextName }] } */
 export function extractTransitions(model) {
   const m = normalizeModel(model);
