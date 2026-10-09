@@ -91,3 +91,40 @@ test('Verilog $finish: no other process runs after it in the same delta', () => 
   endmodule`, 't');
   assert.ok(!out.includes('c=1'), out.join('\n'));
 });
+
+// ------------------------------------------------------------------ VHDL values
+test('VHDL = and /= compare std_logic values exactly (X, U, Z included)', () => {
+  const out = run(vhd(`
+  process begin
+    report boolean'image(q /= 'X') & boolean'image(u /= '1') & boolean'image(z = 'Z') & boolean'image(v = "X1")
+      & boolean'image(not (u = '1')) & boolean'image(u = '0') & boolean'image(v /= "X1");
+    wait;
+  end process;`, `signal q : std_logic := '1'; signal u : std_logic; signal z : std_logic := 'Z'; signal v : std_logic_vector(1 downto 0) := "X1";`), 'tb');
+  assert.deepEqual(out, ['truetruetruetruetruefalsefalse']);
+});
+
+test('VHDL conditional assignment with an unknown condition takes the else branch; std_match', () => {
+  const out = run(vhd(`
+  y <= '1' when s = '1' else '0';
+  process begin
+    wait for 1 ns;
+    report std_logic'image(y) & boolean'image(std_match(v, "1-0")) & boolean'image(std_match(v, "100"))
+      & boolean'image(std_match(w, "1-0")) & boolean'image(std_match(w, "110"));
+    wait;
+  end process;`, `signal s, y : std_logic := 'X'; signal v : std_logic_vector(2 downto 0) := "110"; signal w : std_logic_vector(2 downto 0) := "1X0";`), 'tb');
+  assert.deepEqual(out, ["'0'truefalsetruefalse"]);
+});
+
+test('VHDL rising_edge / falling_edge need a 0 -> 1 / 1 -> 0 transition', () => {
+  const out = run(vhd(`
+  process begin
+    wait for 1 ns; u <= '1'; wait for 1 ns; u <= '0'; wait for 1 ns; u <= 'X'; wait for 1 ns; u <= '1';
+    wait for 1 ns; u <= 'X'; wait for 1 ns; u <= '0'; wait for 1 ns; u <= '1'; wait for 1 ns; u <= '0';
+    wait for 1 ns; report integer'image(r) & " " & integer'image(f); wait;
+  end process;
+  process(u) begin
+    if rising_edge(u) then r <= r + 1; end if;
+    if falling_edge(u) then f <= f + 1; end if;
+  end process;`, `signal u : std_logic; signal r, f : integer := 0;`), 'tb');
+  assert.deepEqual(out, ['1 2']);
+});

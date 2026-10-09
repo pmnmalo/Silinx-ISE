@@ -10,6 +10,7 @@
 import * as V from './values.js';
 import { evalE, runSync, exec, SimError, strToVal, bitpos } from './interp.js';
 import { nativePrimitive } from './native.js';
+import { mapBits } from './vhdl/parser.js';
 
 export const INT = { kind: 'int', w: 32, s: true, left: 31, right: 0, desc: true };
 export const BOOL = { kind: 'bool', w: 1, s: false, left: 0, right: 0, desc: true, scalar: true };
@@ -803,7 +804,8 @@ function bindExpr0(E, e, expect, loc) {
       const w = Math.max(a.t.w, b.t.w);
       let t = a.t.kind === b.t.kind && a.t.w === b.t.w ? a.t : vecT(w, a.t.s && b.t.s);
       if (a.t.kind === 'array' || a.t.kind === 'str') t = a.t;
-      return fold({ k: 'cond', c, a, b, t });
+      // VHDL `x when c else y`: a condition that is not true selects the else value
+      return fold({ k: 'cond', c, a, b, t, vh: E.lang === 'vhdl' });
     }
     case 'attr': return bindAttr(E, e, loc);
     case 'aggregate': return bindAggregate(E, e, expect, loc);
@@ -871,6 +873,14 @@ function sliceNode(E, base, leftE, rightE, loc) {
   return { k: 'dslice', base, left, right, t: vecT(w) };
 }
 
+// A VHDL string literal of std_logic characters (kept as a string inside report / assert
+// messages) compared with a vector is a vector literal.
+function strAsLogic(n, other) {
+  if (n.k !== 'str' || other.t.kind !== 'logic' || !/^[01uxzwlh-]+$/i.test(n.value)) return n;
+  const val = V.fromBits(mapBits(n.value));
+  return { k: 'c', val, t: vecT(val.w) };
+}
+
 function harmonizeVhdl(a, b) {
   // numeric_std: vector op integer -> integer converted to the vector's width
   if (a.t.kind === 'logic' && (b.t.kind === 'int')) b = fold({ k: 'conv', a: b, ext: true, t: vecT(a.t.w, a.t.s) });
@@ -885,7 +895,10 @@ function bindBinary(E, e, expect, loc) {
   else { a = bindExpr(E, e.a, ARITH.has(o) || BITWISE.has(o) ? expect : null, loc); b = bindExpr(E, e.b, a.t.kind === 'logic' || a.t.kind === 'enum' ? a.t : null, loc); }
   if (CMP.has(o)) {
     if (E.lang === 'vhdl' && a.t.kind === 'enum' && b.k === 'c') b = { ...b, t: a.t };
-    return { k: 'bin', o, a, b, t: E.lang === 'vhdl' ? BOOL : BIT };
+    if (E.lang === 'vhdl') { a = strAsLogic(a, b); b = strAsLogic(b, a); }
+    // VHDL '=' / '/=' compare the enumeration values exactly ('X' = 'X' is true, 'U' /= '1' too)
+    if (E.lang === 'vhdl') return { k: 'bin', o, a, b, t: BOOL, vh: o === '==' || o === '!=' };
+    return { k: 'bin', o, a, b, t: BIT };
   }
   if (o === '&&' || o === '||') return { k: 'bin', o, a, b, t: BIT };
   if (SHIFT.has(o)) return { k: 'bin', o, a, b, t: a.t.kind === 'int' ? a.t : vecT(a.t.w, a.t.s) };
@@ -1074,7 +1087,8 @@ function bindBuiltin(E, name, rawArgs, expect, loc) {
       return fold({ k: 'cond', c, a, b, t: a.t });
     }
     case 'now': return { k: 'now', t: TIME, unit: 1 };
-    case 'std_match': return fold({ k: 'bin', o: '==', a: A(0), b: A(1), t: BOOL });
+    // '-' in a constant operand is a don't care ('-' and 'X' share one encoding)
+    case 'std_match': { const a = A(0), b = A(1); return fold({ k: 'bin', o: '==', a: strAsLogic(a, b), b: strAsLogic(b, a), t: BOOL, vh: true, match: true }); }
   }
   throw new ElabError(`'${name}' is not declared`, loc);
 }

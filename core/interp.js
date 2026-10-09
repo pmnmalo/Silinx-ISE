@@ -53,6 +53,7 @@ export function evalE(n, ctx) {
     case 'cond': {
       const w = n.ew || n.t.w;
       const c = V.truth(evalE(n.c, ctx));
+      if (n.vh) { const r = evalE(c === 1 ? n.a : n.b, ctx); return Array.isArray(r) || isStr(r) ? r : fit(r, w, n.t.s); }
       if (c === 1) return fit(evalE(n.a, ctx), w, n.t.s);
       if (c === 0) return fit(evalE(n.b, ctx), w, n.t.s);
       const a = fit(evalE(n.a, ctx), w, n.t.s), b = fit(evalE(n.b, ctx), w, n.t.s);
@@ -76,7 +77,8 @@ export function evalE(n, ctx) {
       const b = BigInt(n.bit || 0);
       const one = x => !!x && !!((x.v >> b) & 1n) && !((x.x >> b) & 1n);
       const zero = x => !!x && !((x.v >> b) & 1n) && !((x.x >> b) & 1n);
-      return V.fromBool(n.pos ? (one(s.val) && !one(s.prev)) : (zero(s.val) && !zero(s.prev)));
+      // VHDL rising_edge: '0' -> '1' only (not 'X'/'U' -> '1'); falling_edge: '1' -> '0'
+      return V.fromBool(n.pos ? (one(s.val) && zero(s.prev)) : (zero(s.val) && one(s.prev)));
     }
     case 'event': {
       if (!ctx.sim || n.sig.evStamp !== ctx.sim.stamp) return V.ZERO;
@@ -140,6 +142,13 @@ function evalBin(n, ctx) {
     case '==': case '!=': case '===': case '!==': case '<': case '<=': case '>': case '>=': {
       const os = n.a.t.s && n.b.t.s;
       const cw = Math.max(n.cw || 0, a.w, b.w);
+      if (n.vh) { // VHDL '=': exact comparison of the values (std_match: constant 'X'/'-' bits are don't cares)
+        const A = fit(a, cw, os), B = fit(b, cw, os);
+        let care = V.mask(cw);
+        if (n.match) care &= ~((n.a.k === 'c' ? A.x : 0n) | (n.b.k === 'c' ? B.x : 0n));
+        const eq = ((A.v ^ B.v) & care) === 0n && ((A.x ^ B.x) & care) === 0n && (!n.match || ((A.x | B.x) & care) === 0n);
+        return V.fromBool(o === '==' ? eq : !eq);
+      }
       return V.cmp(o, fit(a, cw, os), fit(b, cw, os));
     }
     case '<<': case '<<<': return V.shl(fit(a, w, s), b, w);
