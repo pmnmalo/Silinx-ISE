@@ -372,12 +372,12 @@ export async function importSilinxDialog() {
 // ------------------------------------------------------------------ New Source
 const SOURCE_TYPES = [
   // hdl / tb / tbwiz / modwiz / schwiz: VHDL or Verilog, chosen in the wizard (the extension follows the language)
+  { id: 'tt', label: 'Truth Table', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
   { id: 'hdl', label: 'Module (HDL)', ico: 'vhdl', ext: null, dir: 'src' },
   { id: 'modwiz', label: 'Module (Wizard)', ico: 'template', ext: null, dir: 'src' },
   { id: 'sch', label: 'Schematic (Diagram)', ico: 'schematic', ext: '.sch.json', dir: 'src' },
   { id: 'schwiz', label: 'Schematic (Wizard)', ico: 'schematic', ext: '.sch.json', dir: 'src' },
   { id: 'asm', label: 'State Machine (ASM)', ico: 'asm', ext: '.asm.json', dir: 'src' },
-  { id: 'tt', label: 'Truth Table', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
   { id: 'tb', label: 'Test Bench (HDL)', ico: 'vhdl', ext: null, dir: 'sim' },
   { id: 'tbwiz', label: 'Test Bench (Wizard)', ico: 'template', ext: null, dir: 'sim' },
   { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints' },
@@ -392,7 +392,7 @@ export async function newSourceWizard({ type } = {}) {
   if (!S.project) return;
   // old type ids (vhdl, verilog, vhdl-tb, verilog-tb) still accepted: they preset the language
   const LEGACY = { vhdl: ['hdl', 'vhdl'], verilog: ['hdl', 'verilog'], 'vhdl-tb': ['tb', 'vhdl'], 'verilog-tb': ['tb', 'verilog'] };
-  let st = SOURCE_TYPES.find(t => t.id === (LEGACY[type]?.[0] || type)) || SOURCE_TYPES[0];
+  let st = SOURCE_TYPES.find(t => t.id === (LEGACY[type]?.[0] || type)) || SOURCE_TYPES.find(t => t.id === 'hdl');   // default: Module (HDL)
   const shown = () => SOURCE_TYPES.filter(t => !t.hidden || t === st);
   // language of HDL modules and test benches (Define Module / Associate Source pages)
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
