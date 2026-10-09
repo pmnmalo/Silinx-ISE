@@ -635,15 +635,18 @@ function fold(n) {
   if (n.k !== 'c' && isConstNode(n) && n.k !== 'str') {
     try {
       const v = evalE(n, constCtx());
-      return { k: 'c', val: v, t: n.t };
+      // src: the expression, re-evaluated if Verilog context sizing widens it (ctxSize)
+      return { k: 'c', val: v, t: n.t, src: n };
     } catch { return n; }
   }
   return n;
 }
 
-// Verilog context-determined sizing: propagate an evaluation width into the expression.
+// Verilog context-determined sizing: propagate an evaluation width into the expression
+// (self-determined operands are sized with their own width).
 export function ctxSize(n, w) {
   if (!n || !n.t) return;
+  const self = x => { if (x && x.t) ctxSize(x, x.t.w); };
   switch (n.k) {
     case 'bin': {
       const o = n.o;
@@ -652,19 +655,34 @@ export function ctxSize(n, w) {
         n.cw = m; ctxSize(n.a, m); ctxSize(n.b, m);
         return;
       }
-      if (o === '&&' || o === '||') return;
+      if (o === '&&' || o === '||') { self(n.a); self(n.b); return; }
       n.ew = Math.max(n.t.w, w);
       ctxSize(n.a, n.ew);
       if (!['<<', '>>', '<<<', '>>>', '**', 'rol', 'ror'].includes(o)) ctxSize(n.b, n.ew);
+      else self(n.b);
       return;
     }
     case 'un':
       if (n.o === '~' || n.o === '-') { n.ew = Math.max(n.t.w, w); ctxSize(n.a, n.ew); }
+      else self(n.a);
       return;
     case 'cond':
-      n.ew = Math.max(n.t.w, w); ctxSize(n.a, n.ew); ctxSize(n.b, n.ew);
+      n.ew = Math.max(n.t.w, w); self(n.c); ctxSize(n.a, n.ew); ctxSize(n.b, n.ew);
       return;
+    case 'cat': for (const p of n.parts) self(p); return;
+    case 'repl': self(n.a); return;
+    case 'conv': self(n.a); return;
+    case 'bit': case 'elem': self(n.index); return;
     case 'c':
+      if (n.src) {
+        // folded constant: size the original expression and evaluate it again
+        ctxSize(n.src, w);
+        try { n.val = evalE(n.src, constCtx()); } catch { /* keep the self-determined value */ }
+      } else if (n.xext && w > n.val.w) {
+        // unsized 'bx / 'bz: the x / z fills the context width
+        const ext = V.mask(w) ^ V.mask(n.val.w);
+        n.val = V.mk(w, n.val.v | (n.xext === 'z' ? ext : 0n), n.val.x | ext, n.val.s);
+      }
       return;
   }
 }
@@ -709,6 +727,7 @@ function bindExpr0(E, e, expect, loc) {
     case 'lit': {
       const val = V.fromBits(e.bits, !!e.signed);
       const t = e.scalar ? BIT : vecT(val.w, !!e.signed);
+      if (E.lang === 'verilog' && e.sized === false && /^[xz]/.test(e.bits)) return { k: 'c', val, t, xext: e.bits[0] };
       if (E.lang === 'vhdl' && e.scalar && expect && expect.kind === 'logic' && expect.w > 1 && !expect.unconstrained) {
         // e.g. assigning '0' where a vector is expected is an error in VHDL; be lenient and extend
         return { k: 'c', val: V.resize(val, expect.w), t: expect };
@@ -1306,7 +1325,7 @@ function bindStmt0(E, s, loc) {
       if (E.lang === 'verilog' && !asg.nb && asg.delay) asg.intra = true;
       return asg;
     }
-    case 'if': return { k: 'if', c: bindExpr(E, s.cond, null, loc), then: bindStmt(E, s.then, loc), else: s.else ? bindStmt(E, s.else, loc) : null, loc };
+    case 'if': return { k: 'if', c: vsize(E, bindExpr(E, s.cond, null, loc)), then: bindStmt(E, s.then, loc), else: s.else ? bindStmt(E, s.else, loc) : null, loc };
     case 'case': {
       const sel = bindExpr(E, s.expr, null, loc);
       const items = s.items.map(it => ({
@@ -1329,7 +1348,7 @@ function bindStmt0(E, s, loc) {
       return { k: 'case', sel, items, def: s.default ? bindStmt(E, s.default, loc) : null, variant: s.variant || 'case', loc };
     }
     case 'for': return {
-      k: 'for', init: bindStmt(E, s.init, loc), cond: bindExpr(E, s.cond, null, loc), step: bindStmt(E, s.step, loc),
+      k: 'for', init: bindStmt(E, s.init, loc), cond: vsize(E, bindExpr(E, s.cond, null, loc)), step: bindStmt(E, s.step, loc),
       body: bindStmt(E, s.body, loc), loc,
     };
     case 'forrange': {
@@ -1342,8 +1361,8 @@ function bindStmt0(E, s, loc) {
       const LE = { ...E, sc };
       return { k: 'forrange', var: i, varT: INT, from: r.from, to: r.to, down: r.down, body: bindStmt(LE, s.body, loc), loc };
     }
-    case 'while': return { k: 'while', cond: bindExpr(E, s.cond, null, loc), body: bindStmt(E, s.body, loc), loc };
-    case 'repeat': return { k: 'repeat', count: bindExpr(E, s.count, null, loc), body: bindStmt(E, s.body, loc), loc };
+    case 'while': return { k: 'while', cond: vsize(E, bindExpr(E, s.cond, null, loc)), body: bindStmt(E, s.body, loc), loc };
+    case 'repeat': return { k: 'repeat', count: vsize(E, bindExpr(E, s.count, null, loc)), body: bindStmt(E, s.body, loc), loc };
     case 'forever': {
       const body = bindStmt(E, s.body, loc);
       return { k: 'forever', body, hasWait: containsKind(body, ['delay', 'event', 'wait', 'task']), loc };
@@ -1358,7 +1377,7 @@ function bindStmt0(E, s, loc) {
       return { k: 'event', triggers, stmt, loc };
     }
     case 'wait': {
-      const until = s.until ? bindExpr(E, s.until, null, loc) : null;
+      const until = s.until ? vsize(E, bindExpr(E, s.until, null, loc)) : null;
       let triggers = [];
       if (s.on) triggers = s.on.flatMap(x => bindTrigger(E, x, 'any', loc));
       else if (until) triggers = triggersOfReads(until);
@@ -1376,6 +1395,8 @@ function bindStmt0(E, s, loc) {
 }
 
 const cI = n => ({ k: 'c', val: V.fromInt(n), t: INT });
+// Verilog: a self-determined expression (condition, count) is sized with its own width
+const vsize = (E, n) => { if (E.lang === 'verilog') ctxSize(n, n.t.w); return n; };
 
 // VHDL signal assignment: driver semantics (inertial / transport / reject, waveform elements).
 function vhdlMech(E, s) {
@@ -1446,11 +1467,11 @@ function bindCallStmt(E, s, loc) {
 
 function bindTrigger(E, expr, edge, loc) {
   const n = bindExpr(E, expr, null, loc);
-  if (n.k === 'sig') return [{ sig: n.sig, edge, pos: 0 }];
+  if (n.k === 'sig') return [{ sig: n.sig, edge, pos: null }];   // pos null: the whole signal
   if (n.k === 'bit' && n.base.k === 'sig' && n.index.k === 'c') return [{ sig: n.base.sig, edge, pos: bitpos(n.base.t, V.toNum(n.index.val)) }];
   const reads = readsOf(n);
   if (edge !== 'any') diag(E, 'edge on a complex expression: treated as any change', loc, 'warning');
-  return [...reads].map(sig => ({ sig, edge: 'any', pos: 0 }));
+  return [...reads].map(sig => ({ sig, edge: 'any', pos: null }));
 }
 
 // ---------------------------------------------------------------- read/write analysis
@@ -1528,7 +1549,7 @@ export function collectRW(body) {
 
 function triggersOfReads(n) {
   if (!n) return [];
-  return [...collectRW(n).reads].map(sig => ({ sig, edge: 'any', pos: 0 }));
+  return [...collectRW(n).reads].map(sig => ({ sig, edge: 'any', pos: null }));
 }
 
 function containsKind(n, kinds) {

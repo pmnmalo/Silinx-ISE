@@ -141,6 +141,34 @@ test('Verilog: wires with several continuous drivers resolve z, conflicts give x
   assert.deepEqual(out, ['z', '1', 'x', '0 0']);
 });
 
+// ------------------------------------------------------------------ Verilog sizing
+test('Verilog: constant expressions are sized by their context before folding', () => {
+  const out = run(`module t;
+  localparam [7:0] P = 4'hF + 4'h1;
+  wire [7:0] w = 4'hF + 4'h1;
+  reg [7:0] y, b; reg [63:0] q; reg [3:0] x;
+  initial begin
+    y = 4'hF + 4'h1; b = 2'd3 * 2'd3; q = 'hFFFFFFFF + 1; x = 4'hF;
+    #1 $display("%0d %0d %0d %0d %h", P, w, y, b, q);
+    $display("%0d %0d %0d", 4'd15 + 4'd1 == 5'd16, {4'b1010} + 4'b1000, (x + 1'b1 == 5'd16) ? 1 : 0);
+    if (4'd15 + 4'd1 == 5'd16) $display("if ok");
+    q = 'bz; $display("%h", q); q = 'hx; $display("%h", q); q = 'hx1; $display("%h", q);
+  end
+  endmodule`, 't');
+  assert.deepEqual(out, ['16 16 16 9 0000000100000000', '1 2 1', 'if ok', 'zzzzzzzzzzzzzzzz', 'xxxxxxxxxxxxxxxx', 'xxxxxxxxxxxxxxXX'.replace('XX', 'x1')]);
+});
+
+test('Verilog: @(v[0]) waits for bit 0 only, @(v) for any bit', () => {
+  const out = run(`module t;
+  reg [1:0] v = 0; integer n = 0, m = 0, k = 0;
+  initial begin #1 v = 2'b10; #1 v = 2'b00; #1 v = 2'b01; #1 $display("%0d %0d %0d", n, m, k); end
+  initial forever begin @(v[0]) n = n + 1; end
+  initial forever begin @(v[1]) m = m + 1; end
+  initial forever begin @(v) k = k + 1; end
+  endmodule`, 't');
+  assert.deepEqual(out, ['1 2 3']);
+});
+
 // ------------------------------------------------------------------ VHDL values
 test('VHDL = and /= compare std_logic values exactly (X, U, Z included)', () => {
   const out = run(vhd(`

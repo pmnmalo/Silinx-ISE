@@ -262,10 +262,11 @@ export class Simulator {
         if (rec.fired) continue;
         for (const tr of rec.triggers) {
           if (tr.sig !== sig) continue;
-          if (tr.edge !== 'any' || tr.pos) {
+          if (tr.edge !== 'any' || tr.pos != null) {   // pos null: whole signal (an edge is on its LSB)
             if (Array.isArray(nv)) { if (tr.edge !== 'any') continue; }
             else {
-              const o = old && !Array.isArray(old) ? bitOf(old, tr.pos) : 2, n = bitOf(nv, tr.pos);
+              const pos = tr.pos ?? 0;
+              const o = old && !Array.isArray(old) ? bitOf(old, pos) : 2, n = bitOf(nv, pos);
               if (o === n) continue;
               if (tr.edge === 'pos' && !((o === 0) || (o === 2 && n === 1))) continue;
               if (tr.edge === 'neg' && !((o === 1) || (o === 2 && n === 0))) continue;
