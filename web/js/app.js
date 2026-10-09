@@ -191,7 +191,7 @@ function renderHierarchy() {
     const label = instName && instName.toLowerCase() !== String(modName).toLowerCase() ? `${instName} - ${modName}` : modName;
     const sch = info && S.hdlToSch?.[file];
     const schBase = sch && S.schBase?.[sch] !== 'hdl';
-    const viewIco = isAsm(sch) ? 'asm' : 'schematic';
+    const viewIco = viewIcon(sch);
     const it = treeItem({
       label, meta: info ? `(${(schBase ? sch : file).split('/').pop()})` : '(missing)', ico: isTop ? 'moduleTop' : schBase ? viewIco : info ? (info.lang === 'vhdl' ? 'vhdl' : 'verilog') : 'err',
       cls: isTop ? 'top-mod' : '', key: `m:${path}`, open: depth < 2,
@@ -237,6 +237,10 @@ function renderHierarchy() {
   }
   for (const f of (S.fileTree || []).filter(f => /\.asm\.json$/.test(f) && !S.schOwners?.[f])) {
     const it = treeItem({ label: f.split('/').pop(), ico: 'asm', key: `asm:${f}`, onSelect: () => select({ type: 'asm', file: f }), onOpen: () => openAsm(f), onContext: e => asmContextMenu(e, f) });
+    it.setLeaf(); devItem.ul.append(it.li);
+  }
+  for (const f of (S.fileTree || []).filter(f => /\.tt\.json$/.test(f) && !S.schOwners?.[f])) {
+    const it = treeItem({ label: f.split('/').pop(), ico: 'truthtable', key: `tt:${f}`, onSelect: () => select({ type: 'tt', file: f }), onOpen: () => openTt(f), onContext: e => ttContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
   // files that failed to parse into any unit
@@ -303,6 +307,7 @@ function moduleContextMenu(e, mod, file) {
     { label: 'Check Syntax', action: () => checkSyntax(mod, isSimView) },
     { label: 'View RTL Schematic', action: () => openSchematic(mod) },
     { label: 'Create Test Bench (Wizard)…', action: () => testBench(mod) },
+    { label: 'Truth Table / Karnaugh Map of this Module…', action: () => ttFromModule(mod) },
     ...(() => {
       const sch = S.hdlToSch?.[file];
       if (!sch) return [
@@ -313,7 +318,7 @@ function moduleContextMenu(e, mod, file) {
       return [
         S.schBase[sch] === 'hdl' ? { label: `Convert to ${T} (${T.toLowerCase()} as base)`, action: () => setSchBase(sch, 'view') }
                                  : { label: 'Convert to HDL (HDL as base)', action: () => setSchBase(sch, 'hdl') },
-        isAsm(sch) ? null : { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(sch) },
+        isAsm(sch) || isTt(sch) ? null : { label: 'Export as ISE Schematic (.sch)…', action: () => exportSchAsIse(sch) },
         { label: `Remove Synchronized ${T}…`, action: () => detachSchematic(sch) },
       ].filter(Boolean);
     })(),
@@ -374,6 +379,10 @@ function processDefs() {
     { id: 'asm-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.file) },
     { id: 'asm-hdl', label: 'Convert to HDL', ico: 'template', run: () => convertAsmToHdl(sel.file) },
   ];
+  if (sel.type === 'tt') return [
+    { id: 'tt-open', label: 'View/Edit Truth Table', ico: 'truthtable', run: () => openTt(sel.file) },
+    { id: 'tt-hdl', label: 'Convert to HDL', ico: 'template', run: () => convertTtToHdl(sel.file) },
+  ];
   if (sel.type === 'sch') return [
     { id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.file) },
     { id: 'sch-hdl', label: 'Convert to HDL', ico: 'template', run: () => convertSchToHdl(sel.file) },
@@ -397,8 +406,9 @@ function processDefs() {
   return [
     ...(sel.sch ? [
       isAsm(sel.sch) ? { id: 'sch-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.sch) }
+        : isTt(sel.sch) ? { id: 'sch-open', label: 'View/Edit Truth Table', ico: 'truthtable', run: () => openTt(sel.sch) }
                      : { id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.sch) },
-      S.schBase?.[sel.sch] === 'hdl' ? { id: 'sch-base', label: `Convert to ${viewTitle(sel.sch)} (${viewNoun(sel.sch)} as base)`, ico: isAsm(sel.sch) ? 'asm' : 'schematic', run: () => setSchBase(sel.sch, 'view') }
+      S.schBase?.[sel.sch] === 'hdl' ? { id: 'sch-base', label: `Convert to ${viewTitle(sel.sch)} (${viewNoun(sel.sch)} as base)`, ico: viewIcon(sel.sch), run: () => setSchBase(sel.sch, 'view') }
                                      : { id: 'sch-base', label: 'Convert to HDL (HDL as base)', ico: 'template', run: () => setSchBase(sel.sch, 'hdl') },
     ] : []),
     { id: 'summary', label: 'Design Summary/Reports', ico: 'summary', run: () => openSummary() },
@@ -1028,6 +1038,7 @@ export async function openFile(path, line, col) {
   if (!S.project) return;
   if (path.endsWith('.asm.json')) return openAsm(path);
   if (path.endsWith('.sch.json')) return openSch(path);
+  if (path.endsWith('.tt.json')) return openTt(path);
   const id = `file:${path}`;
   let doc = findDoc(id);
   if (!doc) {
@@ -1123,7 +1134,7 @@ export async function openFile(path, line, col) {
             status(`Saved ${path}`);
             // the other open editors depend on this file (ports, instances): check them again
             for (const od of S.docs) if (od !== d) od.liveCheck?.();
-            if (S.hdlToSch?.[path] && !S.syncing) (isAsm(S.hdlToSch[path]) ? syncAsmFromHdl : syncSchematicFromHdl)(path, { quiet: auto }).catch(e => log(`WARNING: ${viewNoun(S.hdlToSch[path])} not synchronized: ${e.message}`, 'warn'));
+            if (S.hdlToSch?.[path] && !S.syncing) (isAsm(S.hdlToSch[path]) ? syncAsmFromHdl : isTt(S.hdlToSch[path]) ? syncTtFromHdl : syncSchematicFromHdl)(path, { quiet: auto }).catch(e => log(`WARNING: ${viewNoun(S.hdlToSch[path])} not synchronized: ${e.message}`, 'warn'));
           },
           destroy: () => d.editor.destroy(),
         };
@@ -1533,6 +1544,233 @@ function asmContextMenu(e, file) {
   ], e.clientX, e.clientY);
 }
 
+// ---- truth tables (.tt.json): table <-> HDL module, synchronized like ASM charts
+// The generated HDL module is linked by generatedFile: every change of the table rewrites it, and a
+// saved edit of the HDL updates the table (exhaustive simulation of the module, don't cares kept
+// in its "don't care:" comments). Truth Table / Karnaugh Map editor: truthtable.js; logic: core/logic.js.
+const ttDesignSources = () => S.sources.filter(s => s.role === 'design' && (s.lang === 'vhdl' || s.lang === 'verilog'));
+
+export async function openTt(path) {
+  const id = `tt:${path}`;
+  if (findDoc(id)) return activateDoc(findDoc(id));
+  let model;
+  try { model = JSON.parse(await api.readFile(S.project.name, path)); }
+  catch (e) { toast(`Cannot open ${path}: ${e.message}`, 'error'); return; }
+  const { mountTtEditor } = await import('./truthtable.js');
+  openDoc({
+    id, path, title: path.split('/').pop(), icon: 'truthtable',
+    create(el, d) {
+      const host = h('div', { class: 'doc-body' });
+      el.append(host);
+      const ed = mountTtEditor(host, {
+        model,
+        onChange: () => setDirty(d, true),
+        linkInfo: () => { const f = S.schOwners?.[path]; return f ? { file: f, why: S.outOfSync?.[f] } : null; },
+        onOpenFile: f => openFile(f),
+        onGenerate: ({ lang }) => generateTtHdl(path, lang),
+        onSchematic: o => schematicFromTt(path, o),
+        onFromModule: () => loadTtFromModule(path),
+      });
+      d.ttEditor = ed;
+      return {
+        save: async () => {
+          const m = ed.getModel();
+          await api.writeFile(S.project.name, path, JSON.stringify(m, null, 2)); setDirty(d, false);
+          if (!S.syncing) syncHdlFromTt(path, m).catch(e => log(`WARNING: HDL not synchronized: ${e.message}`, 'warn'));
+        },
+        destroy: () => ed.destroy?.(),
+      };
+    },
+  });
+}
+const ttModel = async path => { const d = findDoc(`tt:${path}`); if (d?.ttEditor) { await flushDoc(d); return d.ttEditor.getModel(); } return JSON.parse(await api.readFile(S.project.name, path)); };
+const refreshTtLink = ttPath => findDoc(`tt:${ttPath}`)?.ttEditor?.refreshLink();
+
+// "Generate VHDL / Verilog module": write the module and link it to the table
+async function generateTtHdl(ttPath, lang) {
+  const { generateTableHdl, validateTable, normalizeTable } = await import('/core/logic.js');
+  const m = normalizeTable(await ttModel(ttPath));
+  const errs = validateTable(m);
+  if (errs.length) { alertDlg('Generate HDL', errs.map(x => x.message).join('\n'), 'error'); return; }
+  const g = generateTableHdl({ ...m, lang }, lang, { source: ttPath.split('/').pop() });
+  const dir = ttPath.includes('/') ? ttPath.replace(/\/[^/]*$/, '') : 'src';
+  const owned = m.generatedFile && S.fileTree.includes(m.generatedFile) ? m.generatedFile : null;
+  const target = owned && extOf(owned) === extOf(g.filename) && owned.split('/').pop().replace(/\.[^.]+$/, '') === m.name ? owned : `${dir}/${g.filename}`;
+  const other = S.modules.find(x => x.name.toLowerCase() === m.name.toLowerCase() && x.file !== target && x.file !== owned);
+  if (other) { alertDlg('Generate HDL', `A module named '${m.name}' already exists in ${other.file}. Rename the table's module (its file name) first.`, 'error'); return; }
+  if (S.fileTree.includes(target) && target !== owned && !await confirmDlg('Generate HDL', `${target} already exists and is not generated from this truth table. Overwrite it?`)) return;
+  if (owned && owned !== target && !await confirmDlg('Generate HDL', `${owned} is generated from this truth table. Replace it with ${target}?`)) return;
+  S.syncing = true;
+  try {
+    if (owned && owned !== target) { closeDocByPath(owned); await api.deleteFile(S.project.name, owned); }
+    await api.writeFile(S.project.name, target, g.code);
+    const next = { ...m, lang, generatedFile: target };
+    await api.writeFile(S.project.name, ttPath, JSON.stringify(next, null, 2));
+    const d = findDoc(`tt:${ttPath}`);
+    if (d?.ttEditor) { d.ttEditor.setModel(next); setDirty(d, false); }
+    if (S.outOfSync) delete S.outOfSync[target];
+    log(`Truth table '${ttPath}' -> ${lang.toUpperCase()} module ${target} (kept in sync with the table)`, 'ok');
+  } finally { S.syncing = false; }
+  await reloadProject(false);
+  markStale();
+  refreshOpenEditor(target, g.code);
+  refreshTtLink(ttPath);
+  openFile(target);
+}
+
+async function syncHdlFromTt(ttPath, model) {
+  const target = model.generatedFile;
+  if (!target || !S.fileTree.includes(target)) return;
+  const { generateTableHdl, validateTable, normalizeTable } = await import('/core/logic.js');
+  const m = normalizeTable(model);
+  S.outOfSync ||= {};
+  const errs = validateTable(m);
+  if (errs.length) {
+    const why = `the truth table has errors: ${errs.map(x => x.message).join('; ')}`;
+    if (S.outOfSync[target] !== why) log(`WARNING: ${target} not updated: ${why}`, 'warn');
+    S.outOfSync[target] = why; refreshSyncBanner(target); refreshTtLink(ttPath);
+    return;
+  }
+  const g = generateTableHdl(m, /\.v$/i.test(target) ? 'verilog' : 'vhdl', { source: ttPath.split('/').pop() });
+  if (S.outOfSync[target]) { delete S.outOfSync[target]; refreshSyncBanner(target); refreshTtLink(ttPath); }
+  const cur = S.sources.find(x => x.path === target)?.text;
+  if (cur === g.code) return;
+  S.syncing = true;
+  try {
+    await api.writeFile(S.project.name, target, g.code);
+    const src = S.sources.find(x => x.path === target); if (src) src.text = g.code;
+    refreshOpenEditor(target, g.code);
+    compileProject(); renderHierarchy(); markStale();
+    status(`${target} updated from ${ttPath.split('/').pop()}`);
+  } finally { S.syncing = false; }
+}
+
+// a saved edit of the linked HDL: the table follows (exhaustive simulation of the module)
+async function syncTtFromHdl(hdlPath, { quiet = false } = {}) {
+  const ttPath = S.hdlToSch[hdlPath];
+  S.outOfSync ||= {};
+  const fail = why => {
+    if (S.outOfSync[hdlPath] !== why && !quiet) log(`WARNING: ${ttPath} not updated: ${why}`, 'warn');
+    S.outOfSync[hdlPath] = why; refreshSyncBanner(hdlPath); refreshTtLink(ttPath);
+    status(`${ttPath.split('/').pop()} not updated: ${why}`);
+  };
+  const errs = [...(S.lib?.errors || [])].filter(d => d.severity === 'error' && d.file === hdlPath);
+  if (errs.length) return fail(`${hdlPath.split('/').pop()} has errors`);
+  let old;
+  try { old = JSON.parse(await api.readFile(S.project.name, ttPath)); } catch { return; }
+  const mods = S.modules.filter(m => m.file === hdlPath && m.kind !== 'package');
+  const mod = mods.find(m => m.name.toLowerCase() === String(old.name || '').toLowerCase()) || mods[0];
+  if (!mod) return fail(`${hdlPath.split('/').pop()} has no module`);
+  const { truthTableFromModule, dontCaresInHdl, normalizeTable, MAX_EDIT_INPUTS, MAX_OUTPUTS } = await import('/core/logic.js');
+  let t;
+  try { t = truthTableFromModule(ttDesignSources(), mod.name, { maxInputs: MAX_EDIT_INPUTS, maxOutputs: MAX_OUTPUTS }); }
+  catch (e) { return fail(e.message); }
+  // don't cares written in the HDL comments ("don't care: f = d(3, 5)")
+  const dcs = dontCaresInHdl(S.sources.find(x => x.path === hdlPath)?.text);
+  for (const o of t.outputs) for (const r of dcs[o.toLowerCase()] || []) if (r >= 0 && r < t.table[o].length) t.table[o] = t.table[o].slice(0, r) + 'X' + t.table[o].slice(r + 1);
+  const exprs = {};
+  for (const o of t.outputs) if (old.exprs?.[o] && old.table?.[o] === t.table[o] && JSON.stringify(old.inputs) === JSON.stringify(t.inputs)) exprs[o] = old.exprs[o];
+  const next = normalizeTable({ ...old, name: t.name, inputs: t.inputs, outputs: t.outputs, table: t.table, exprs, lang: /\.v$/i.test(hdlPath) ? 'verilog' : 'vhdl', generatedFile: hdlPath });
+  if (S.outOfSync[hdlPath]) { delete S.outOfSync[hdlPath]; refreshSyncBanner(hdlPath); }
+  if (JSON.stringify(next) !== JSON.stringify(normalizeTable(old))) {
+    S.syncing = true;
+    try {
+      await api.writeFile(S.project.name, ttPath, JSON.stringify(next, null, 2));
+      const d = findDoc(`tt:${ttPath}`);
+      if (d?.ttEditor && !d.dirty) d.ttEditor.setModel(next);
+      status(`${ttPath.split('/').pop()} updated from ${hdlPath.split('/').pop()}`);
+    } finally { S.syncing = false; }
+  }
+  refreshTtLink(ttPath);
+}
+
+// pick a combinational module of the project
+async function pickModule(title, exclude) {
+  const mods = S.modules.filter(m => m.role === 'design' && m.kind !== 'package' && m.file !== exclude);
+  if (!mods.length) { alertDlg(title, 'The project has no design modules.', 'error'); return null; }
+  const sel = h('select', { style: { width: '100%' } }, ...mods.map(m => h('option', { value: m.name, selected: m.name === S.sel?.module }, `${m.name} (${m.file})`)));
+  const ok = await dialog({ title, width: 480, body: h('div', {}, h('div', { class: 'hint' }, 'Combinational module (at most 8 input bits): its truth table is computed by simulating every input combination.'), h('div', { style: { marginTop: '8px' } }, sel)),
+    buttons: [{ label: 'OK', primary: true, value: true }, { label: 'Cancel', value: null }] });
+  return ok ? sel.value : null;
+}
+async function moduleTable(title, mod) {
+  await saveAll();
+  const { truthTableFromModule } = await import('/core/logic.js');
+  try { return truthTableFromModule(ttDesignSources(), mod); }
+  catch (e) { alertDlg(title, e.message, 'error'); return null; }
+}
+
+// "Truth Table from Module…" in the editor: replace the table's contents
+async function loadTtFromModule(ttPath) {
+  const T = 'Truth Table from Module';
+  const d = findDoc(`tt:${ttPath}`);
+  const m = d?.ttEditor?.getModel();
+  const mod = await pickModule(T, m?.generatedFile);
+  if (!mod) return;
+  const t = await moduleTable(T, mod);
+  if (!t || !d?.ttEditor) return;
+  if (!await confirmDlg(T, `Replace the contents of ${ttPath.split('/').pop()} by the truth table of '${mod}' (${t.inputs.length} input(s), ${t.outputs.length} output(s))?`)) return;
+  d.ttEditor.setModel({ ...d.ttEditor.getModel(), inputs: t.inputs, outputs: t.outputs, table: t.table, exprs: {} });
+  setDirty(d, true);
+  for (const w of t.warnings) log(`WARNING: ${w}`, 'warn');
+  log(`${ttPath}: truth table of '${mod}' (${1 << t.inputs.length} rows, exhaustive simulation).`, 'ok');
+}
+
+// module context menu: a new (unlinked) table from a module
+async function ttFromModule(mod) {
+  const T = 'Truth Table / Karnaugh Map';
+  const t = await moduleTable(T, mod);
+  if (!t) return;
+  const { newTable } = await import('/core/logic.js');
+  const info = moduleInfo(mod);
+  const dir = info?.file?.includes('/') ? info.file.replace(/\/[^/]*$/, '') : 'src';
+  let name = `${mod}_tt`, k = 1;
+  while (S.fileTree.includes(`${dir}/${name}.tt.json`) || S.modules.some(x => x.name.toLowerCase() === name.toLowerCase())) name = `${mod}_tt${++k}`;
+  const target = `${dir}/${name}.tt.json`;
+  const doc = { ...newTable(name, t.inputs, t.outputs), table: t.table, lang: t.lang, notes: `Truth table of the module '${mod}' (${info?.file || ''}), by exhaustive simulation.` };
+  await api.writeFile(S.project.name, target, JSON.stringify(doc, null, 2));
+  for (const w of t.warnings) log(`WARNING: ${w}`, 'warn');
+  log(`Truth table of '${mod}' -> ${target}.`, 'ok');
+  await reloadProject(false);
+  openTt(target);
+}
+
+// "Generate Schematic": a one-off gate schematic of the table (not linked)
+async function schematicFromTt(ttPath, { form = 'sop', nand = false } = {}) {
+  const { schematicFromTable, validateTable, normalizeTable } = await import('/core/logic.js');
+  const { netlist } = await import('/core/schdoc.js');
+  const m = normalizeTable(await ttModel(ttPath));
+  const errs = validateTable(m);
+  if (errs.length) { alertDlg('Generate Schematic', errs.map(x => x.message).join('\n'), 'error'); return; }
+  const dir = ttPath.includes('/') ? ttPath.replace(/\/[^/]*$/, '') : 'src';
+  let name = `${m.name}_sch`, k = 1;
+  while (S.fileTree.includes(`${dir}/${name}.sch.json`) || S.modules.some(x => x.name.toLowerCase() === name.toLowerCase())) name = `${m.name}_sch${++k}`;
+  const doc = schematicFromTable(m, { form, nand, lang: m.lang, name });
+  const bad = netlist(doc).diagnostics.filter(x => x.severity === 'error');
+  if (bad.length) { alertDlg('Generate Schematic', bad.map(x => x.message).join('\n'), 'error'); return; }
+  const target = `${dir}/${name}.sch.json`;
+  await api.writeFile(S.project.name, target, JSON.stringify(doc, null, 1));
+  log(`Truth table '${ttPath}' -> schematic ${target} (minimal ${form.toUpperCase()}${nand ? ', NAND gates only' : ''}; not linked to the table: use Generate HDL in the schematic editor for its module '${name}').`, 'ok');
+  await reloadProject(false);
+  openSch(target);
+}
+
+// process "Convert to HDL" of a table without HDL yet
+async function convertTtToHdl(ttPath) {
+  if (S.schOwners?.[ttPath]) return setSchBase(ttPath, 'hdl');
+  const m = await ttModel(ttPath);
+  return generateTtHdl(ttPath, m.lang === 'verilog' ? 'verilog' : (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
+}
+
+function ttContextMenu(e, file) {
+  popupMenu([
+    { label: 'Open', action: () => openTt(file) },
+    { label: 'Rename…', action: () => renameDialog(file) },
+    { label: 'Convert to HDL', action: () => convertTtToHdl(file) },
+    { label: 'Remove from Project', action: () => removeFile(file) },
+  ], e.clientX, e.clientY);
+}
+
 // ---- schematic editor (.sch.json): schematic <-> HDL
 async function schModules() {
   const { modulesFromLibrary } = await import('/core/schdoc.js');
@@ -1586,9 +1824,11 @@ export async function openSch(path) {
 
 // ---- views of an HDL file: schematic or ASM chart
 const isAsm = p => /\.asm\.json$/i.test(p || '');
-const viewNoun = p => (isAsm(p) ? 'state machine' : 'schematic');
-const viewTitle = p => (isAsm(p) ? 'State Machine' : 'Schematic');
-function openView(p) { return isAsm(p) ? openAsm(p) : openSch(p); }
+const isTt = p => /\.tt\.json$/i.test(p || '');
+const viewNoun = p => (isAsm(p) ? 'state machine' : isTt(p) ? 'truth table' : 'schematic');
+const viewTitle = p => (isAsm(p) ? 'State Machine' : isTt(p) ? 'Truth Table' : 'Schematic');
+const viewIcon = p => (isAsm(p) ? 'asm' : isTt(p) ? 'truthtable' : 'schematic');
+function openView(p) { return isAsm(p) ? openAsm(p) : isTt(p) ? openTt(p) : openSch(p); }
 
 // ---- schematic <-> HDL synchronization
 // Structure of a schematic: symbols (name, type, params), ports and net connectivity. When an HDL
@@ -1611,7 +1851,7 @@ function syncBanner(path, sch) {
   const why = S.outOfSync?.[path];
   const el = h('span', { class: `gen-banner${why ? ' out-of-sync' : ''}`, 'data-sync-banner': path },
     why ? 'Not in sync with ' : 'Synchronized with ', h('a', { onclick: () => openView(sch) }, sch.split('/').pop()),
-    why ? ` — the ${viewNoun(sch)} has errors: ${why}` : S.schBase?.[sch] === 'hdl' ? ` (${viewNoun(sch)} view of this file) — editing here updates it` : ` — editing here updates the ${viewNoun(sch)}`);
+    why ? (isTt(sch) ? ` — ${why}` : ` — the ${viewNoun(sch)} has errors: ${why}`) : S.schBase?.[sch] === 'hdl' ? ` (${viewNoun(sch)} view of this file) — editing here updates it` : ` — editing here updates the ${viewNoun(sch)}`);
   return el;
 }
 function refreshSyncBanner(path) {
@@ -1738,8 +1978,9 @@ async function setSchBase(schPath, base) {
   let doc;
   try { doc = JSON.parse(await api.readFile(S.project.name, schPath)); } catch (e) { toast(e.message, 'error'); return; }
   if (base === 'view') delete doc.base; else doc.base = base;
-  await api.writeFile(S.project.name, schPath, JSON.stringify(doc, null, isAsm(schPath) ? 2 : 1));
-  const d = findDoc(`sch:${schPath}`) || findDoc(`asm:${schPath}`);
+  await api.writeFile(S.project.name, schPath, JSON.stringify(doc, null, isAsm(schPath) || isTt(schPath) ? 2 : 1));
+  const d = findDoc(`sch:${schPath}`) || findDoc(`asm:${schPath}`) || findDoc(`tt:${schPath}`);
+  if (d?.ttEditor) { const cur = d.ttEditor.getModel(); cur.base = doc.base; d.ttEditor.setModel(cur); }
   if (d?.schEditor) { const cur = d.schEditor.getDoc(); cur.base = doc.base; d.schEditor.setDoc(cur); }
   if (d?.asmEditor) { const cur = d.asmEditor.getModel(); cur.base = doc.base; d.asmEditor.setModel(cur); }
   const gen = doc.generatedFile;
@@ -1800,7 +2041,7 @@ async function exportSchAsIse(schPath) {
 async function detachSchematic(path) {
   const gen = S.schOwners?.[path];
   if (!await confirmDlg(`Remove Synchronized ${viewTitle(path)}`, `Remove the ${viewNoun(path)} ${path}?${gen ? `\n\n${gen} stays as a normal HDL source.` : ''}`)) return;
-  const d = findDoc(`sch:${path}`) || findDoc(`asm:${path}`);
+  const d = findDoc(`sch:${path}`) || findDoc(`asm:${path}`) || findDoc(`tt:${path}`);
   if (d) { d.dirty = false; await closeDoc(d); }
   await api.deleteFile(S.project.name, path);
   await reloadProject();
@@ -1819,7 +2060,7 @@ function schContextMenu(e, file) {
 }
 
 // ---- rename a source (file and/or the module it defines), updating everything that refers to it
-const extOf = p => (/\.(sch|asm)\.json$/i.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
+const extOf = p => (/\.(sch|asm|tt)\.json$/i.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
 const dirOf = p => (p.includes('/') ? p.replace(/\/[^/]*$/, '/') : '');
 
 async function renameDialog(file, mod = null) {
@@ -1866,7 +2107,7 @@ async function renameSource(from, to, oldMod, newMod) {
   const changed = new Map();                      // path -> new text
   const moved = new Map();                        // old path -> new path
   const views = {};                               // .sch.json / .asm.json -> parsed
-  for (const f of S.fileTree.filter(f => /\.(sch|asm)\.json$/i.test(f))) {
+  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt)\.json$/i.test(f))) {
     try { views[f] = JSON.parse(await api.readFile(pj.name, f)); } catch { /* skip */ }
   }
   S.syncing = true;
@@ -1881,7 +2122,7 @@ async function renameSource(from, to, oldMod, newMod) {
         let ch = false;
         if (/\.sch\.json$/i.test(f)) ch = renameModuleInSchematic(d, oldMod, newMod, { linked });
         else if (linked && String(d.name).toLowerCase() === oldMod.toLowerCase()) { d.name = newMod; ch = true; }
-        if (ch) changed.set(f, JSON.stringify(d, null, /\.asm\.json$/i.test(f) ? 2 : 1));
+        if (ch) changed.set(f, JSON.stringify(d, null, /\.(asm|tt)\.json$/i.test(f) ? 2 : 1));
         // a synchronized view named after the module follows it
         const vb = f.slice(dirOf(f).length, f.length - extOf(f).length);
         if (linked && vb.toLowerCase() === oldMod.toLowerCase()) moved.set(f, dirOf(f) + newMod + extOf(f));
@@ -1894,7 +2135,7 @@ async function renameSource(from, to, oldMod, newMod) {
     if (to && to !== from) {
       moved.set(from, to);
       for (const [f, d] of Object.entries(views)) {
-        if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.asm\.json$/i.test(f) ? 2 : 1)); }
+        if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.(asm|tt)\.json$/i.test(f) ? 2 : 1)); }
       }
     }
     // close the editors of files that move or change (reopened below)
@@ -1928,6 +2169,7 @@ async function renameSource(from, to, oldMod, newMod) {
         if (!changed.has(f) || !d.generatedFile) continue;
         const vp = moved.get(f) || f;
         if (/\.asm\.json$/i.test(vp)) await syncHdlFromAsm(vp, d).catch(() => {});
+        else if (isTt(vp)) await syncHdlFromTt(vp, d).catch(() => {});
         else await syncHdlFromSchematic(vp, d).catch(() => {});
       }
     }
@@ -2002,7 +2244,7 @@ export async function reloadProject(render = true) {
   S.hdlToSch = {};
   S.schBase = {};
   // schematics (.sch.json) and ASM charts (.asm.json) linked to an HDL file ("views" kept in sync)
-  for (const f of S.fileTree.filter(f => /\.(sch|asm)\.json$/.test(f))) {
+  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt)\.json$/.test(f))) {
     try {
       const d = JSON.parse(await api.readFile(pj.name, f));
       if (d.generatedFile && S.fileTree.includes(d.generatedFile) && !S.hdlToSch[d.generatedFile]) { S.schOwners[f] = d.generatedFile; S.hdlToSch[d.generatedFile] = f; S.schBase[f] = d.base === 'hdl' ? 'hdl' : 'view'; }
@@ -2111,7 +2353,7 @@ async function renameFolder(dir) {
   if (S.fileTree.some(f => f === to || f.startsWith(`${to}/`))) return alertDlg('Rename Folder', `'${to}' already exists.`);
   await saveAll();
   const remap = p => (p && p.startsWith(`${dir}/`) ? to + p.slice(dir.length) : p);
-  const views = S.fileTree.filter(f => /\.(sch|asm)\.json$/i.test(f));
+  const views = S.fileTree.filter(f => /\.(sch|asm|tt)\.json$/i.test(f));
   // the editors of moved files are closed and reopened at their new paths
   const reopen = [];
   for (const d of [...S.docs]) if (d.path && d.path.startsWith(`${dir}/`)) { reopen.push(remap(d.path)); d.dirty = false; clearTimeout(d._autosave); await closeDoc(d); }
@@ -2124,7 +2366,7 @@ async function renameFolder(dir) {
       try { d = JSON.parse(await api.readFile(S.project.name, at)); } catch { continue; }
       if (d.generatedFile && d.generatedFile.startsWith(`${dir}/`)) {
         d.generatedFile = remap(d.generatedFile);
-        await api.writeFile(S.project.name, at, JSON.stringify(d, null, /\.asm\.json$/i.test(at) ? 2 : 1));
+        await api.writeFile(S.project.name, at, JSON.stringify(d, null, /\.(asm|tt)\.json$/i.test(at) ? 2 : 1));
       }
     }
     log(`Folder ${dir} renamed to ${to}.`, 'ok');
@@ -2222,6 +2464,7 @@ function setupMenus() {
     ] },
     { label: 'Tools', items: () => [
       { label: 'ASM State Machine Editor…', icon: icon('asm'), action: () => wiz.newSourceWizard({ type: 'asm' }), disabled: hasPj },
+      { label: 'Truth Table / Karnaugh Map…', icon: icon('truthtable'), action: () => wiz.newSourceWizard({ type: 'tt' }), disabled: hasPj },
       { label: 'I/O Pin Planning', icon: icon('pins'), action: () => openPinPlanner(S.sel?.module), disabled: hasPj },
       { label: 'iMPACT (Configure Target Device)', icon: icon('impact'), action: () => openImpact() },
       { label: 'Board Emulator', icon: icon('board'), action: () => openEmulator(S.project.top), disabled: hasPj },
@@ -2365,6 +2608,6 @@ async function boot() {
   else showLeftPage('start');
 }
 
-export const app = { saveAll, openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
+export const app = { saveAll, openTt, openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, S };
 window.SilinxApp = app;
 boot();

@@ -10,6 +10,8 @@
 // patterns: [[/regex/, "replacement with $1"]] }). Strings missing from a dictionary stay in English.
 // Code can also call t('English text') directly.
 
+import { TT_PT, TT_PT_PATTERNS } from './i18n-truthtable.js';
+
 const PT = {
   // menus
   'File': 'Ficheiro', 'Edit': 'Editar', 'View': 'Ver', 'Project': 'Projeto', 'Process': 'Processo', 'Tools': 'Ferramentas',
@@ -358,6 +360,7 @@ PT_PATTERNS.push(
   [/^Simulation refused: (\d+) error\(s\), (\d+) warning\(s\)$/, 'Simulação recusada: $1 erro(s), $2 aviso(s)'],
   [/^Simulation stopped: (.*)$/s, 'Simulação parada: $1'],
 );
+Object.assign(PT, TT_PT); PT_PATTERNS.unshift(...TT_PT_PATTERNS);   // Truth Table / Karnaugh Map tool
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },
