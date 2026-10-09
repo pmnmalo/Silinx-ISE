@@ -260,6 +260,32 @@ test('Verilog recursive automatic function', () => {
   assert.deepEqual(out, ['120']);
 });
 
+// ------------------------------------------------------------------ memories
+test('memory element writes are cheap (64K-entry memory initialised in a loop)', () => {
+  const t0 = Date.now();
+  const out = run(`module t; reg [7:0] mem [0:65535]; integer i;
+  initial begin for (i = 0; i < 65536; i = i + 1) mem[i] = i; #1 $display("%0d %0d", mem[300], mem[65535]); end
+  endmodule`, 't');
+  assert.deepEqual(out, ['44 255']);
+  assert.ok(Date.now() - t0 < 4000, `took ${Date.now() - t0} ms`);
+});
+
+test('VHDL arrays: copies are independent of later element updates', () => {
+  const out = run(vhd(`
+  process
+    variable v : mem_t := (others => x"00");
+  begin
+    m <= (others => x"11"); wait for 1 ns;
+    v := m; v(0) := x"AA";                 -- the variable is a copy of the signal
+    m2 <= v; v(1) := x"BB";                -- the queued value is v at the assignment
+    m(2) <= x"CC";
+    wait for 1 ns;
+    report to_hstring(m(0)) & to_hstring(m(2)) & " " & to_hstring(m2(0)) & to_hstring(m2(1)) & " " & to_hstring(v(1));
+    wait;
+  end process;`, `type mem_t is array (0 to 3) of std_logic_vector(7 downto 0); signal m, m2 : mem_t;`), 'tb');
+  assert.deepEqual(out, ['11CC AA11 BB']);
+});
+
 // ------------------------------------------------------------------ VHDL values
 test('VHDL = and /= compare std_logic values exactly (X, U, Z included)', () => {
   const out = run(vhd(`

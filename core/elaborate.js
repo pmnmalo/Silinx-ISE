@@ -1138,7 +1138,8 @@ function bindBuiltin(E, name, rawArgs, expect, loc) {
       const o = { and_reduce: '&', or_reduce: '|', xor_reduce: '^', nand_reduce: '~&', nor_reduce: '~|', xnor_reduce: '~^' }[name];
       return fold({ k: 'un', o, a: A(0), t: BIT });
     }
-    case 'to_string': case 'to_hstring': case 'to_bstring': return { k: 'image', a: A(0), t: STR };
+    case 'to_string': case 'to_bstring': return { k: 'image', a: A(0), t: STR };
+    case 'to_hstring': return { k: 'image', a: A(0), t: STR, hex: true };
     case 'minimum': case 'maximum': {
       const a = A(0), b = A(1);
       const c = { k: 'bin', o: name === 'minimum' ? '<' : '>', a, b, t: BOOL };

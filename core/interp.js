@@ -92,7 +92,11 @@ export function evalE(n, ctx) {
       return V.fromBool(!p || ((p.v >> b) & 1n) !== ((c.v >> b) & 1n) || ((p.x >> b) & 1n) !== ((c.x >> b) & 1n));
     }
     case 'str': return { str: n.value };
-    case 'image': return { str: imageOf(evalE(n.a, ctx), n.a.t) };
+    case 'image': {
+      const v = evalE(n.a, ctx);
+      if (n.hex && !Array.isArray(v) && !isStr(v)) return { str: V.toHex(v).padStart(Math.ceil(v.w / 4), '0').toUpperCase() };
+      return { str: imageOf(v, n.a.t) };
+    }
     case 'strcat': return { str: n.parts.map(p => toStr(evalE(p, ctx), p.t)).join('') };
     case 'arr': return n.elems.map(e => V.resize(evalE(e, ctx), n.t.elem.w));
     case 'now': {
@@ -389,16 +393,22 @@ function resolveTarget(L, ctx, out) {
   throw new SimError(`invalid assignment target ${L.k}`);
 }
 
+// New value of one array element after applying write wr (wr.elem) with value val.
+export function applyElem(old, wr, val) {
+  return wr.lo === 0 && wr.w === old.w ? { ...V.resize(val, old.w), s: old.s } : V.setBits(old, wr.lo, wr.w, V.resize(val, wr.w));
+}
+
 // Compute the new full value of a container after applying write wr with value val.
-export function applyWrite(cur, wr, val) {
+// Arrays: every container owns its array (a whole assignment stores a copy), so an element
+// write may update it in place (inPlace) instead of copying the whole memory.
+export function applyWrite(cur, wr, val, inPlace = false) {
   if (wr.elem != null) {
     if (!Array.isArray(cur) || wr.elem < 0 || wr.elem >= cur.length) return cur;
-    const arr = cur.slice();
-    const old = arr[wr.elem];
-    arr[wr.elem] = wr.lo === 0 && wr.w === old.w ? { ...V.resize(val, old.w), s: old.s } : V.setBits(old, wr.lo, wr.w, V.resize(val, wr.w));
+    const arr = inPlace ? cur : cur.slice();
+    arr[wr.elem] = applyElem(arr[wr.elem], wr, val);
     return arr;
   }
-  if (wr.whole) return Array.isArray(val) ? val : { ...V.resize(val, cur.w), s: cur.s };
+  if (wr.whole) return Array.isArray(val) ? val.slice() : { ...V.resize(val, cur.w), s: cur.s };
   return V.setBits(cur, wr.lo, wr.w, V.resize(val, wr.w));
 }
 

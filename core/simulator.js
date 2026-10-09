@@ -5,7 +5,7 @@
 // step runs), and follow the driver rules: a new assignment deletes the driver's later
 // transactions, and inertial delay also rejects pulses shorter than the reject limit.
 import * as V from './values.js';
-import { exec, evalE, applyWrite, formatDisplay, SimError, formatTime } from './interp.js';
+import { exec, evalE, applyWrite, applyElem, formatDisplay, SimError, formatTime } from './interp.js';
 
 class Heap {
   constructor() { this.a = []; this.seq = 0; }
@@ -191,6 +191,16 @@ export class Simulator {
   write(wr, val, drv = this.curProc) {
     const sig = wr.sig;
     if (sig.res) { this.writeResolved(sig, wr, val, drv); return; }
+    if (wr.elem != null && Array.isArray(sig.val)) {
+      // memory element: compare and update that element only (the array is the signal's own)
+      const arr = sig.val;
+      if (sig.forced || wr.elem < 0 || wr.elem >= arr.length) return;
+      const old = arr[wr.elem], nv = applyElem(old, wr, val);
+      if (V.same(old, nv) && old.w === nv.w) return;
+      arr[wr.elem] = nv;
+      this.changed(sig, arr, arr);
+      return;
+    }
     this.setSignal(sig, applyWrite(sig.val, wr, val));
   }
   writeResolved(sig, wr, val, drv) {
@@ -242,6 +252,11 @@ export class Simulator {
     if (Array.isArray(nv)) {
       if (Array.isArray(old) && nv.length === old.length && nv.every((e, i) => V.same(e, old[i]))) return;
     } else if (!Array.isArray(old) && V.same(old, nv) && old.w === nv.w) return;
+    this.changed(sig, old, nv);
+  }
+
+  // sig changed from old to nv (already compared): record it and wake the waiting processes
+  changed(sig, old, nv) {
     sig.prev = old;
     sig.val = nv;
     sig.evStamp = this.stamp;
