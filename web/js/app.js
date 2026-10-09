@@ -1122,7 +1122,12 @@ export async function openFile(path, line, col) {
       },
     });
   } else activateDoc(doc);
-  if (line) setTimeout(() => doc.editor?.gotoLine(line, col), 30);
+  if (line) {
+    // jump once the editor is laid out, unless the user has already moved the cursor (a delayed
+    // timer, e.g. in a background tab, must not pull the cursor away from where they type)
+    const cm = doc.editor?.cm, at = cm && JSON.stringify(cm.getCursor());
+    setTimeout(() => { if (!cm || JSON.stringify(cm.getCursor()) === at) doc.editor?.gotoLine(line, col); }, 30);
+  }
   return doc;
 }
 

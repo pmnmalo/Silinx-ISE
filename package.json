@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node bin/silinx-ise.js serve",
     "test": "node --test test/*.test.js",
+    "test:ui": "node --test test/ui/*.test.js",
     "build:standalone": "node scripts/build-standalone.mjs",
     "version": "node scripts/sync-version.mjs && git add core/version.js"
   },
