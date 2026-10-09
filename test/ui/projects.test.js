@@ -234,6 +234,16 @@ uiTest('Files view: rename a file into another folder, remove a file (right-clic
   await page.menu('Edit', 'Undo Remove from Project');
   await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'Edit undo: b.v back' });
   await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].some((r) => r.cells[0]?.textContent === 'src/b.v' && r.cells[1]?.textContent === 'All'), [], { what: 'b.v row in the project again' });
+  // remove again, then the toolbar's Undo button
+  await page.rightClick('#files-page tr', { index: await row('src/b.v') });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Remove from Project' });
+  await page.waitDialog('Remove Source');
+  await page.dialogButton('Yes');
+  await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'));
+  await page.click('#toolbar .tb-btn[title=Undo]');
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'toolbar undo: b.v back' });
+  await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].some((r) => r.cells[0]?.textContent === 'src/b.v' && r.cells[1]?.textContent === 'All'), [], { what: 'b.v row in the project again' });
   // remove once more, then right-click the "Not in project" row ▸ Add to Project
   await page.rightClick('#files-page tr', { index: await row('src/b.v') });
   await page.waitForSelector('body > .menu-popup');

@@ -2844,7 +2844,7 @@ function setupToolbar() {
     btn('newProject', 'New Project', () => wiz.newProjectWizard()),
     btn('open', 'Open Project', () => wiz.openProjectDialog()),
     h('div', { class: 'tb-sep' }),
-    btn('undo', 'Undo', () => S.active?.editor?.exec('undo')),
+    btn('undo', 'Undo', () => (undoesRemoval() ? undoRemove() : S.active?.editor?.exec('undo'))),   // as Edit ▸ Undo
     btn('redo', 'Redo', () => S.active?.editor?.exec('redo')),
     h('div', { class: 'tb-sep' }),
     btn('cut', 'Cut', () => document.execCommand('cut')),
