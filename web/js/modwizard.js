@@ -11,7 +11,7 @@ import { api } from './api.js';
 import { icons } from './icons.js';
 import { h, alertDlg, toast } from './ui.js';
 import { generateModule, schematicFromPorts, checkPorts, identError, guessClockReset, QUICK_PORTS, MAX_WIDTH } from '/core/modgen.js';
-import { wizard, field, select } from './wizards.js';
+import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
 
 const LANGS = [['vhdl', 'VHDL'], ['verilog', 'Verilog']];
@@ -21,7 +21,7 @@ const extOf = (lang, sch) => (sch ? '.sch.json' : lang === 'verilog' ? '.v' : '.
 const portText = p => `${p.name}${+p.width > 1 ? ` [${p.width - 1}:0]` : ''}`;
 
 // ---------------------------------------------------------------- page 1: name, language, description
-function namePage({ title, name, lang, loc, sch, withArch }) {
+function namePage({ title, name, lang, loc, sch, withArch, guard }) {
   const nameIn = h('input', { type: 'text', class: 'mw-name', value: name || '' });
   const langSel = select(LANGS, lang);
   const archIn = h('input', { type: 'text', class: 'mw-arch', value: 'rtl' });
@@ -52,9 +52,9 @@ function namePage({ title, name, lang, loc, sch, withArch }) {
       const e = identError(n, langSel.value);
       if (e) return `Name: ${e}.`;
       if (withArch && langSel.value === 'vhdl') { const a = identError(archIn.value.trim(), 'vhdl'); if (a) return `Architecture name: ${a}.`; }
-      if (S.modules.some(m => m.name.toLowerCase() === n.toLowerCase())) return `A module named '${n}' already exists.`;
-      if (S.fileTree.includes(path())) return `${path()} already exists.`;
-      return null;
+      const other = moduleElsewhere(n, path());
+      if (other) return `A module named '${n}' already exists.`;
+      return guard(path());
     },
   };
   return { page, nameIn, langSel, archIn, desc, path, lang: () => langSel.value, name: () => nameIn.value.trim() };
@@ -124,9 +124,10 @@ function portEditor(ports, { lang, onChange = () => {} }) {
 
 // ---------------------------------------------------------------- Module (Wizard)
 export async function moduleWizard({ name = '', location = 'src', lang = null } = {}) {
+  const guard = replaceGuard('Module Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
-  const p1 = namePage({ title: 'Name and Language', name, lang: L, loc: location, withArch: true });
+  const p1 = namePage({ title: 'Name and Language', name, lang: L, loc: location, withArch: true, guard });
   const ports = [];
   const pe = portEditor(ports, { lang: p1.lang });
   const p2 = {
@@ -255,8 +256,9 @@ export async function moduleWizard({ name = '', location = 'src', lang = null } 
       ].join('\n');
       try { preview.textContent = text(); } catch (e) { preview.textContent = e.message; }
     },
-    validate: () => {
-      if (S.fileTree.includes(p1.path())) return `${p1.path()} already exists.`;
+    validate: async () => {
+      const g = await guard(p1.path());
+      if (g) return g;
       try { text(); } catch (e) { return e.message; }
       return null;
     },
@@ -267,6 +269,7 @@ export async function moduleWizard({ name = '', location = 'src', lang = null } 
   let code;
   try { code = text(); } catch (e) { return alertDlg('Module Wizard', e.message, 'error'); }
   const path = p1.path();
+  await closeBeforeReplace(path);
   await api.writeFile(S.project.name, path, code);   // registers the new file in silinx.json
   await app.reloadProject();
   app.log(`Module Wizard: created ${path} (${p1.lang() === 'vhdl' ? 'VHDL' : 'Verilog'}, ${st.kind === 'seq' ? 'sequential' : 'combinational'}). Fill in the TODO comments with the logic.`, 'ok');
@@ -276,9 +279,10 @@ export async function moduleWizard({ name = '', location = 'src', lang = null } 
 
 // ---------------------------------------------------------------- Schematic (Wizard)
 export async function schematicWizard({ name = '', location = 'src', lang = null } = {}) {
+  const guard = replaceGuard('Schematic Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
-  const p1 = namePage({ title: 'Name and Language', name, lang: L, loc: location, sch: true });
+  const p1 = namePage({ title: 'Name and Language', name, lang: L, loc: location, sch: true, guard });
   const ports = [];
   const clkChk = h('input', { type: 'checkbox', class: 'mw-clkchk' });
   const clkName = h('input', { type: 'text', class: 'mw-clkname', value: 'clk', style: { width: '100px' } });
@@ -319,13 +323,14 @@ export async function schematicWizard({ name = '', location = 'src', lang = null
         'Then place the symbols in the middle of the sheet and wire them to the markers.',
       ].join('\n');
     },
-    validate: () => (S.fileTree.includes(p1.path()) ? `${p1.path()} already exists.` : null),
+    validate: () => guard(p1.path()),
   };
   const ok = await wizard('Schematic Wizard', [p1.page, p2, pSum], { width: 820 });
   if (!ok) return;
   let d;
   try { d = doc(); } catch (e) { return alertDlg('Schematic Wizard', e.message, 'error'); }
   const path = p1.path();
+  await closeBeforeReplace(path);
   await api.writeFile(S.project.name, path, JSON.stringify(d, null, 1));
   await app.reloadProject();
   app.log(`Schematic Wizard: created ${path} with ${d.ports.length} I/O marker(s).`, 'ok');

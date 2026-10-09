@@ -8,7 +8,7 @@ import { h, alertDlg, toast } from './ui.js';
 import { compile, elaborate, simulate } from '/core/compile.js';
 import { clocksOf } from '/core/schematic.js';
 import { tbPorts, guessClockReset, makeVectors, parseValue, showValue, generateTestbench, expectedFromTrace, MAX_VECTORS } from '/core/testbench.js';
-import { wizard, field, select } from './wizards.js';
+import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
@@ -19,6 +19,7 @@ const designSources = () => S.sources.filter(s => s.role === 'design' && (s.lang
 export async function testBenchWizard({ module, name = null, location = null, lang: langPick = null } = {}) {
   if (!S.project) return;
   await app.saveAll?.();
+  const guard = replaceGuard('Test Bench Wizard');
   const mods = S.modules.filter(m => m.role === 'design' && m.kind !== 'package');
   if (!mods.length) return alertDlg('Test Bench Wizard', 'The project has no design modules to test.', 'error');
   let uut = mods.find(m => m.name === module) || mods.find(m => m.name === S.project.top) || mods[0];
@@ -67,12 +68,14 @@ export async function testBenchWizard({ module, name = null, location = null, la
       h('div', { class: 'hint' }, 'The wizard writes a self-checking test bench: it applies input vectors to the module and compares its outputs with the expected values, reporting each mismatch and TEST PASSED / TEST FAILED at the end.'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         ...field('Module to test:', modSel), ...field('Test bench name:', tbName), ...field('Language:', lang), ...field('Location:', loc))),
-    validate: () => {
+    validate: async () => {
       if (!NAME_RE.test(tbName.value.trim())) return 'Enter a valid test bench name (a letter, then letters, digits and _).';
-      if (S.modules.some(m => m.name.toLowerCase() === tbName.value.trim().toLowerCase())) return `A module named '${tbName.value.trim()}' already exists.`;
       if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
       const path = `${loc.value.trim().replace(/\/+$/, '')}/${tbName.value.trim()}.${lang.value === 'vhdl' ? 'vhd' : 'v'}`;
-      if (S.fileTree.includes(path)) return `${path} already exists.`;
+      // a module of that name in another file: refused; the file itself may be replaced
+      if (moduleElsewhere(tbName.value.trim(), path)) return `A module named '${tbName.value.trim()}' already exists.`;
+      const g = await guard(path);
+      if (g) return g;
       try { analyse(); } catch (e) { return e.message; }
       const bad = ports.filter(p => p.kind === 'other' || p.dir === 'inout');
       if (bad.length) return `The wizard cannot drive these ports: ${bad.map(p => `${p.name} (${p.dir === 'inout' ? 'inout' : 'type'})`).join(', ')}.`;
@@ -279,6 +282,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
   let text;
   try { text = generateTestbench(tbOpts(vectorsBits())); } catch (e) { return alertDlg('Test Bench Wizard', e.message, 'error'); }
   const pj = S.project;
+  await closeBeforeReplace(path());
   await api.writeFile(pj.name, path(), text);   // registers the file (role: simulation)
   await app.reloadProject();
   await app.setTop(tbName.value.trim(), true);

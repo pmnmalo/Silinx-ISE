@@ -369,6 +369,27 @@ export async function importSilinxDialog() {
   } catch (e) { alertDlg('Import Silinx ISE Project', e.message, 'error'); }
 }
 
+// ------------------------------------------------------------------ replacing an existing file
+// A wizard that would create a file which already exists asks once whether to replace it
+// (returns null = go on, or the message that keeps the wizard on its page).
+export function replaceGuard(title) {
+  const ok = new Set();
+  return async (path) => {
+    if (!S.fileTree.includes(path) || ok.has(path)) return null;
+    if (await confirmDlg(title, `${path} already exists.\n\nReplace it? Its current contents will be lost.`)) { ok.add(path); return null; }
+    return `${path} already exists: choose another name.`;
+  };
+}
+// close the editors of a file about to be replaced (its new contents are opened afterwards)
+export async function closeBeforeReplace(path) {
+  for (const d of [...S.docs]) {
+    if (d.path === path || String(d.id || '').endsWith(`:${path}`)) { d.dirty = false; clearTimeout(d._autosave); await app.closeDoc(d); }
+  }
+}
+// a module of that name defined in another file than `path` (the file being replaced may define it)
+export const moduleElsewhere = (name, path) => S.modules.find(m => m.name.toLowerCase() === String(name).toLowerCase() && m.file !== path
+  && S.hdlToSch?.[m.file] !== path);   // (the synchronized HDL of a schematic / chart being replaced)
+
 // ------------------------------------------------------------------ New Source
 const SOURCE_TYPES = [
   // hdl / tb / tbwiz / modwiz / schwiz: VHDL or Verilog, chosen in the wizard (the extension follows the language)
@@ -397,6 +418,7 @@ export async function newSourceWizard({ type } = {}) {
   // language of HDL modules and test benches (Define Module / Associate Source pages)
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
   const extOf = t => t.ext ?? (langSel.value === 'verilog' ? '.v' : '.vhd');
+  const guard = replaceGuard('New Source Wizard');
   const fname = h('input', { type: 'text', placeholder: 'file name' });
   const loc = h('input', { type: 'text', value: st.dir });
   const list = h('div', { class: 'src-types' });
@@ -421,13 +443,13 @@ export async function newSourceWizard({ type } = {}) {
       h('div', { style: { width: '270px' } }, list),
       h('div', { style: { flex: 1 } }, h('label', {}, 'File name:'), fname, h('label', {}, 'Location:'), loc,
         h('label', { style: { marginTop: '12px' } }, h('input', { type: 'checkbox', checked: true, disabled: true }), ' Add to project'))),
-    validate: () => {
+    validate: async () => {
       const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|sch\.json)$/i, '');
       if (!FILE_RE.test(n)) return 'Enter a valid file name (letters, digits, _ and -).';
       if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
-      const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
-      if (S.fileTree.includes(path)) return `${path} already exists.`;
-      return null;
+      // the wizards that write the file themselves ask on their own pages
+      if (['tbwiz', 'modwiz', 'schwiz'].includes(st.id)) return null;
+      return guard(`${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`);
     },
   };
   // ports page (modules)
@@ -520,10 +542,9 @@ export async function newSourceWizard({ type } = {}) {
   // The wizard driver takes a fixed page list; rebuild when the type changes on page 1.
   const dyn = [p1, { title: 'Options', render: () => h('div') }, pSum];
   const proxy = new Proxy(dyn, { get: (t, k) => (k === 'length' ? pages().length : (typeof k === 'string' && /^\d+$/.test(k) ? pages()[+k] : t[k])) });
-  pSum.validate = () => {
+  pSum.validate = () => {   // the language (extension) may have changed after page 1
     const nn = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|sch\.json)$/i, '');
-    const pp = `${loc.value.trim().replace(/\/+$/, '')}/${nn}${extOf(st)}`;
-    return S.fileTree.includes(pp) ? `${pp} already exists.` : null;
+    return guard(`${loc.value.trim().replace(/\/+$/, '')}/${nn}${extOf(st)}`);
   };
   const ok = await wizard('New Source Wizard', proxy, { width: 760 });
   if (!ok) return;
@@ -570,6 +591,7 @@ export async function newSourceWizard({ type } = {}) {
     }
   }
   const noUcf = !S.fileTree.includes(pj.constraints);
+  await closeBeforeReplace(path);
   await api.writeFile(pj.name, path, text);   // registers the new file in silinx.json
   // reload first: saving the project settings from the old copy would drop that registration
   await app.reloadProject();

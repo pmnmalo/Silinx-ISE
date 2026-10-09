@@ -1,0 +1,93 @@
+// UI: creating a source file that already exists asks whether to replace it — New Source (Test
+// Bench (HDL), Module (HDL)), the Test Bench Wizard and the Module Wizard: No keeps the file and
+// stays on the page, Yes replaces it (and its open editor shows the new contents).
+import { before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { setupUi, uiTest, makeProject, readWs } from './harness.js';
+
+let env;
+before(async () => { env = await setupUi(); });
+after(async () => { await env?.teardown?.(); });
+const E = () => env;
+
+const INV = 'library ieee; use ieee.std_logic_1164.all;\nentity inv is port (a : in std_logic; y : out std_logic); end inv;\narchitecture r of inv is begin y <= not a; end r;\n';
+const OLD_TB = '-- my old test bench\nentity tb_inv is end tb_inv;\narchitecture t of tb_inv is begin end t;\n';
+
+const pickType = (page, label) => page.eval((t) => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim().endsWith(t)); r.scrollIntoView(); r.click(); }, label);
+const topText = (page) => page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().innerText);
+
+uiTest('New Source on an existing file: asks to replace; No keeps it, Yes replaces it', E, async (page) => {
+  await makeProject(env, { name: 'Repl', top: 'inv', files: { 'src/inv.vhd': INV, 'sim/tb_inv.vhd': OLD_TB }, roles: { 'sim/tb_inv.vhd': 'sim' } });
+  await page.openProject('Repl');
+  await page.eval(() => window.SilinxApp.openFile('sim/tb_inv.vhd'));
+  await page.waitFor(() => window.Silinx.active?.id === 'file:sim/tb_inv.vhd');
+  const start = async () => {
+    await page.menu('Project', 'New Source…');
+    await page.waitDialog('New Source Wizard');
+    await pickType(page, 'Test Bench (HDL)');
+    await page.fill('.dlg-overlay .wiz-main input[type=text]', 'tb_inv');
+    await page.dialogButton('Next >');
+    // the replace question, on top of the wizard
+    await page.waitFor(() => document.querySelectorAll('.dlg-overlay').length === 2);
+    assert.match(await topText(page), /sim\/tb_inv\.vhd already exists\.[\s\S]*Replace it\?/);
+  };
+  // No: the wizard stays on page 1 with the message, the file is unchanged
+  await start();
+  await page.dialogButton('No');
+  await page.waitFor(() => document.querySelectorAll('.dlg-overlay').length === 1 && /already exists: choose another name/.test(document.querySelector('.dlg-overlay').innerText));
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  assert.equal(await readWs(env, 'Repl', 'sim/tb_inv.vhd'), OLD_TB);
+  // Yes: asked once, then the test bench replaces the old file; the open editor shows the new text
+  await start();
+  await page.dialogButton('Yes');
+  await page.waitFor(() => document.querySelectorAll('.dlg-overlay').length === 1 && document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Associate Source');
+  await page.dialogButton('Next >');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Summary');
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(async () => true);
+  await page.waitFor(() => /Test Bench for module: inv/.test(window.SilinxApp.findDoc('file:sim/tb_inv.vhd')?.editor?.getValue() || ''), [], { what: 'editor shows the new test bench' });
+  assert.match(await readWs(env, 'Repl', 'sim/tb_inv.vhd'), /Test Bench for module: inv/);
+  assert.equal(await page.eval(() => window.Silinx.project.files.filter((f) => f.path === 'sim/tb_inv.vhd').length), 1);
+});
+
+uiTest('Test Bench Wizard and Module Wizard on an existing file: replace after confirming; a module of that name in another file is refused', E, async (page) => {
+  await makeProject(env, { name: 'Repl2', top: 'inv', files: { 'src/inv.vhd': INV, 'sim/tb_inv.vhd': OLD_TB }, roles: { 'sim/tb_inv.vhd': 'sim' } });
+  await page.openProject('Repl2');
+  // Test Bench Wizard: tb_inv exists (defined in that same file): Yes replaces it
+  await page.menu('Project', 'New Source…');
+  await page.waitDialog('New Source Wizard');
+  await pickType(page, 'Test Bench (Wizard)');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'tb_inv');
+  await page.dialogButton('Finish');
+  await page.waitDialog('Test Bench Wizard');
+  await page.dialogButton('Next >');
+  await page.waitFor(() => document.querySelectorAll('.dlg-overlay').length === 2);
+  assert.match(await topText(page), /sim\/tb_inv\.vhd already exists/);
+  await page.dialogButton('Yes');
+  for (const t of ['Input Vectors', 'Vectors and Expected Outputs', 'Summary']) {
+    await page.dialogButton('Next >');
+    await page.waitFor((x) => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === x, [t]);
+  }
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(async () => true);
+  assert.match(await readWs(env, 'Repl2', 'sim/tb_inv.vhd'), /generated by the Silinx Test Bench Wizard/);
+  // Module Wizard: a module named inv lives in src/inv.vhd: a new file named inv2 with module inv is refused
+  await page.menu('Project', 'New Source…');
+  await page.waitDialog('New Source Wizard');
+  await pickType(page, 'Module (Wizard)');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'inv');
+  await page.dialogButton('Finish');
+  await page.waitDialog('Module Wizard');
+  await page.dialogButton('Next >');
+  // the same file (src/inv.vhd defines inv): the replace question
+  await page.waitFor(() => document.querySelectorAll('.dlg-overlay').length === 2);
+  assert.match(await topText(page), /src\/inv\.vhd already exists/);
+  await page.dialogButton('No');
+  await page.waitFor(() => document.querySelectorAll('.dlg-overlay').length === 1 && /choose another name/.test(document.querySelector('.dlg-overlay').innerText));
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  assert.equal(await readWs(env, 'Repl2', 'src/inv.vhd'), INV);
+});

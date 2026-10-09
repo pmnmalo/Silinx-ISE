@@ -430,6 +430,8 @@ PT_PATTERNS.push(
   [/^Generic '(.*)': the default value must be a whole number\.$/, "Genérico '$1': o valor por omissão tem de ser um número inteiro."],
   [/^A module named '(.*)' already exists\.$/, "Já existe um módulo chamado '$1'."],
   [/^(\S+) already exists\.$/, '$1 já existe.'],
+  [/^(\S+) already exists\.\n\nReplace it\? Its current contents will be lost\.$/, '$1 já existe.\n\nSubstituir? O conteúdo atual perde-se.'],
+  [/^(\S+) already exists: choose another name\.$/, '$1 já existe: escolha outro nome.'],
 );
 Object.assign(PT, TT_PT); PT_PATTERNS.unshift(...TT_PT_PATTERNS);   // Truth Table / Karnaugh Map tool
 
