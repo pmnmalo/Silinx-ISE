@@ -415,6 +415,8 @@ export async function setupUi({ server = true } = {}) {
     await page.send('DOM.enable');
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
     await page.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
+    // SILINX_UI_THROTTLE=6: a slow CPU (e.g. to reproduce CI-only timing problems)
+    if (process.env.SILINX_UI_THROTTLE) await page.send('Emulation.setCPUThrottlingRate', { rate: +process.env.SILINX_UI_THROTTLE }).catch(() => {});
     if (url) await page.goto(url);
     return page;
   };

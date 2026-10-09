@@ -35,7 +35,8 @@ function injectStyle() {
 .emu { display: flex; flex-direction: column; height: 100%; background: var(--bg, #f0f0f0); font: 12px var(--font, system-ui); overflow: auto; }
 .emu-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border, #aaa); background: var(--panel-alt, #f7f7f7); flex-wrap: wrap; }
 .emu-bar .sep { width: 1px; height: 20px; background: #ccc; margin: 0 4px; }
-.emu-bar .stat { margin-left: auto; color: #555; font-family: var(--mono, monospace); }
+.emu-bar .stat { margin-left: auto; color: #555; font-family: var(--mono, monospace); font-variant-numeric: tabular-nums;
+  flex: 1 1 0; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .emu-main { display: flex; gap: 12px; padding: 12px; flex-wrap: wrap; align-items: flex-start; }
 .emu-board { background: linear-gradient(#25603d, #1d4f32); border-radius: 10px; padding: 14px 18px 12px; color: #e9f3ea; box-shadow: 0 2px 8px #0005; min-width: 520px; }
 .emu-board h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: .04em; color: #fff; font-weight: 600; }
@@ -55,7 +56,8 @@ function injectStyle() {
 .emu-side { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 10px; }
 .emu-box { background: var(--panel, #fff); border: 1px solid var(--border, #aaa); border-radius: 4px; padding: 8px; }
 .emu-box h4 { margin: 0 0 6px; font-size: 12px; }
-.emu-box table { border-collapse: collapse; width: 100%; font-family: var(--mono, monospace); }
+.emu-box table { border-collapse: collapse; width: 100%; font-family: var(--mono, monospace); table-layout: fixed; font-variant-numeric: tabular-nums; }
+.emu-box td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .emu-box td { padding: 2px 4px; border-bottom: 1px solid #eee; }
 .emu-log { font-family: var(--mono, monospace); max-height: 140px; overflow: auto; white-space: pre-wrap; color: #333; }
 .emu-log .error { color: #c00; } .emu-log .warning { color: #a60; }
@@ -331,7 +333,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   const hasLcd = wiring.bits.some((b) => b.res.name === 'lcd_e');
   let lcd = lcdState(), lcdView = null;
 
-  let running = false, speed = 'max', prev = null, raf = 0, destroyed = false;
+  let running = false, speed = 'max', prev = null, raf = 0, destroyed = false, knobEnd = 0;
   let slice = 2000, cyclesAcc = 0, lastT = 0, rateWin = { t: performance.now(), cyc: 0, rate: 0 };
   let logN = 0;
   let lcdDirty = true;
@@ -433,8 +435,12 @@ export function mountEmulator(container, { design, board, assignments, title = '
     const a = bitFor('rot_a'), b = bitFor('rot_b');
     if (!a || !b) return;
     const seq = dir > 0 ? [[0, 1], [0, 0], [1, 0], [1, 1]] : [[1, 0], [0, 0], [0, 1], [1, 1]];   // clockwise: A leads
-    seq.forEach(([va, vb], k) => sim.at(sim.now + (k + 1) * QUAD_CYCLES * period, () => { setInputBit(a, va); setInputBit(b, vb); }));
-    if (!running) { runCycles(5 * QUAD_CYCLES); refresh(); }
+    // turns queue up: a click while the previous detent is still being played (the emulator is
+    // slower than the clicks) must not interleave the two quadrature sequences
+    const t0 = Math.max(sim.now, knobEnd);
+    seq.forEach(([va, vb], k) => sim.at(t0 + (k + 1) * QUAD_CYCLES * period, () => { setInputBit(a, va); setInputBit(b, vb); }));
+    knobEnd = t0 + seq.length * QUAD_CYCLES * period;
+    if (!running) { runCycles(Math.ceil((knobEnd - sim.now) / period) + QUAD_CYCLES); refresh(); }
   };
   const mkRotary = () => {
     const el = h('div', { class: 'emu-rot', title: bitFor('rot_a') ? 'Turn the knob: ⟲ / ⟳ or the mouse wheel (ROT_A / ROT_B)' : 'Rotary encoder: ROT_A / ROT_B not connected in the UCF' },
@@ -538,7 +544,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
     for (const s of design.signals) s.wave = null;
     for (const p of inputPorts) applyInput(p.sig);
     for (const c of wiring.clocks) sim.addClock(c.sig, { period: c.period });
-    prev = null;
+    prev = null; knobEnd = 0;
     lcd = lcdState(); lcdDirty = true;
     logN = 0;
     logEl.textContent = '';

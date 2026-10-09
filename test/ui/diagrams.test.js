@@ -123,7 +123,26 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }, sel);
   const arrange = async () => { await tool('Arrange'); await tool('Fit'); };
-  const select = async (id) => { await arrange(); await page.click(await at(`[data-node="${id}"]`)); await page.waitFor((i) => document.querySelector(`.doc:not([hidden]) [data-node="${i}"]`)?.classList.contains('sel'), [id]); };
+  // wait until the node stops moving (Arrange / Fit lay out over several frames on a slow machine)
+  const settled = async (sel) => {
+    let last = '';
+    for (let i = 0; i < 40; i++) {
+      const p = JSON.stringify(await at(sel));
+      if (p === last) return JSON.parse(p);
+      last = p;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return JSON.parse(last);
+  };
+  const isSel = (id) => page.eval((i) => !!document.querySelector(`.doc:not([hidden]) [data-node="${i}"]`)?.classList.contains('sel'), id);
+  const select = async (id) => {
+    await arrange();
+    for (let k = 0; k < 3 && !await isSel(id); k++) {
+      await page.click(await settled(`[data-node="${id}"]`));
+      await page.waitFor((i) => document.querySelector(`.doc:not([hidden]) [data-node="${i}"]`)?.classList.contains('sel'), [id], { timeout: 3000 }).catch(() => {});
+    }
+    assert.ok(await isSel(id), `node ${id} selected`);
+  };
   const newest = async (type) => (await model()).nodes.filter((n) => n.type === type && !ids0.has(n.id)).map((n) => n.id);
   // nothing selected: a free state
   await page.click('.doc:not([hidden]) .asm-canvas', {});
@@ -151,7 +170,7 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
   const idle = m.nodes.find((n) => n.name === 'IDLE').id;
   for (const s of added.filter((x) => x !== s0)) {
     await arrange();
-    await page.drag(await at(`[data-node="${s}"] [data-port="next"]`), await at(`[data-node="${idle}"]`));
+    await page.drag(await settled(`[data-node="${s}"] [data-port="next"]`), await settled(`[data-node="${idle}"]`));
     await page.waitFor((a, b) => window.Silinx.active.asmEditor.getModel().edges.some((e) => e.from === a && e.to === b), [s, idle], { what: `${s} -> IDLE` });
   }
   // the free state S0 is unreachable: a warning, not an error
