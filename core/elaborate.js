@@ -673,6 +673,20 @@ function stdTypeName(n) {
 }
 
 function evalRange(E, r) {
+  if (r.of && r.of.op === 'ref' && (E.sc.lookup(r.of.name)?.kind === 'type' || (!E.sc.lookup(r.of.name) && stdTypeName(r.of.name)))) {
+    // the range of a (sub)type: integer subtypes, enumerations, constrained vectors
+    const te = E.sc.lookup(r.of.name);
+    const t = te ? te.t : elabType(E, stdTypeName(r.of.name));
+    if (!t) throw new ElabError(`'${r.of.name}' has no range`, r.of.loc);
+    let lr;
+    if (t.kind === 'int') lr = t.rdown ? [t.rhi ?? 2147483647, t.rlo ?? -2147483648] : [t.rlo ?? -2147483648, t.rhi ?? 2147483647];
+    else if (t.kind === 'enum') lr = [0, t.names.length - 1];
+    else if (t.kind === 'bool') lr = [0, 1];
+    else lr = [t.left, t.right];
+    const desc = t.kind === 'int' || t.kind === 'enum' || t.kind === 'bool' ? lr[0] > lr[1] : t.desc;
+    if (r.reverse) return { left: lr[1], right: lr[0], desc: !desc };
+    return { left: lr[0], right: lr[1], desc };
+  }
   if (r.of) {
     const n = bindExpr(E, r.of, null);
     const t = n.t;
@@ -1031,7 +1045,8 @@ function sliceNode(E, base, leftE, rightE, loc) {
   // dynamic slice: width from a probe evaluation (loop variables at their initial values)
   let w;
   try {
-    const ctx = { frame: E.fb ? E.fb.probe() : [], sim: null, depth: 0 };
+    // (probe: loop variables are not at real values yet, so no run-time checks)
+    const ctx = { frame: E.fb ? E.fb.probe() : [], sim: null, depth: 0, probe: true };
     w = Math.abs(V.toNum(evalE(left, ctx)) - V.toNum(evalE(right, ctx))) + 1;
   } catch {
     throw new ElabError('slice bounds must be constant (or depend only on loop variables)', loc);
@@ -1086,8 +1101,9 @@ function bindBinary(E, e, expect, loc) {
     // different lengths are never equal (IEEE 1076 §9.2.3)
     if (E.lang === 'vhdl' && !E.slvArith && (o === '==' || o === '!=') && a.t.kind === 'logic' && b.t.kind === 'logic' &&
         (a.t.mark || b.t.mark) && a.t.w !== b.t.w) return { k: 'c', val: V.fromBool(o === '!='), t: BOOL };
-    // VHDL '=' / '/=' compare the enumeration values exactly ('X' = 'X' is true, 'U' /= '1' too)
-    if (E.lang === 'vhdl') return { k: 'bin', o, a, b, t: BOOL, vh: o === '==' || o === '!=' };
+    // VHDL '=' / '/=' compare the enumeration values exactly ('X' = 'X' is true, 'U' /= '1' too);
+    // the matching ?= / ?/= treat '-' (constant) bits as don't cares
+    if (E.lang === 'vhdl') return { k: 'bin', o, a, b, t: BOOL, vh: o === '==' || o === '!=', ...(e.match && a.t.kind === 'logic' ? { match: true } : {}) };
     return { k: 'bin', o, a, b, t: BIT };
   }
   if (o === '&&' || o === '||') return { k: 'bin', o, a, b, t: BIT };
@@ -1101,7 +1117,11 @@ function bindBinary(E, e, expect, loc) {
   if (E.lang === 'vhdl' && (ARITH.has(o) && o !== '**')) [a, b] = harmonizeVhdl(a, b);
   if (E.lang === 'vhdl' && ARITH.has(o) && o !== '**') [a, b] = mixedSign(a, b);
   const s = a.t.s && b.t.s;
-  if (a.t.kind === 'int' && b.t.kind === 'int') return { k: 'bin', o, a, b, t: INT, ...(E.lang === 'vhdl' && (o === '/' || o === 'mod' || o === 'rem') ? { dz: true } : {}) };
+  if (a.t.kind === 'int' && b.t.kind === 'int') {
+    // VHDL INTEGER: division by zero and results outside the 32-bit range are run-time errors
+    const chk = E.lang !== 'vhdl' ? {} : o === '/' || o === 'mod' || o === 'rem' ? { dz: true } : o === '+' || o === '-' || o === '*' ? { ov: true } : {};
+    return { k: 'bin', o, a, b, t: INT, ...chk };
+  }
   if (a.t.kind === 'time' && b.t.kind === 'time' && o === '/') return { k: 'bin', o, a, b: { ...b, t: { ...b.t, s: true } }, t: { ...INT, w: 64 } };   // time / time: universal integer
   if (a.t.kind === 'time' || b.t.kind === 'time') return { k: 'bin', o, a, b, t: TIME };
   if (o === '**') return { k: 'bin', o, a, b, t: a.t.kind === 'int' ? INT : vecT(a.t.w, a.t.s) };
@@ -1465,7 +1485,9 @@ function bindCall(E, entry, rawArgs, name, loc) {
   argExprs = argExprs.map((a, k) => a || decl.params[k].default || null);   // VHDL default parameter values
   const args = argExprs.map((a, k) => {
     if (!a) throw new ElabError(`missing argument '${decl.params[k].name}' in call to '${name}'`, loc);
-    const n = bindExpr(E, a, null, loc);
+    let at = null;   // an aggregate actual takes the type of its parameter
+    if (a.op === 'aggregate') { try { at = elabType(entry.E, decl.params[k].type, true); } catch { at = null; } }
+    const n = bindExpr(E, a, at && !at.unconstrained ? at : null, loc);
     // a std_logic string literal (kept as a string in report messages) for a vector parameter
     const pt = decl.params[k].type;
     if (E.lang === 'vhdl' && n.k === 'str' && pt && (pt.kind === 'logic' || (pt.kind === 'named' && stdTypeName(pt.name)?.kind === 'logic'))) return strAsLogic(n, { t: { kind: 'logic' } });
@@ -1548,6 +1570,7 @@ function bindSubprogram(entry, args, key, sigActuals, consts) {
         if (decl.returnType.signed !== undefined && rt.kind === 'logic') rt.s = !!decl.returnType.signed;
       }
       fn.retT = rt;
+      if (!retOpen) FE.retT = rt;   // (aggregates in return statements)
       if (decl.retVar) {
         fn.retSlot = fb.alloc(rt, defaultValue(rt, DE.lang));
         sc.def(decl.retVar, { kind: 'loc', i: fn.retSlot, t: rt });
@@ -1754,7 +1777,7 @@ function bindStmt0(E, s, loc) {
       return { k: 'forever', body, hasWait: E.lang === 'vhdl' || containsKind(body, ['delay', 'event', 'wait', 'task', 'fork', 'waitfork']), loc, label: s.label };
     }
     case 'exit': case 'next': return { k: s.kind, c: s.cond ? bindExpr(E, s.cond, null, loc) : null, loc, label: s.label };
-    case 'return': return { k: 'ret', value: s.value ? bindExpr(E, s.value, null, loc) : null, loc };
+    case 'return': return { k: 'ret', value: s.value ? bindExpr(E, s.value, E.retT && !E.retT.unconstrained && s.value.op === 'aggregate' ? E.retT : null, loc) : null, loc };
     case 'null': return { k: 'null', loc };
     case 'delay': return { k: 'delay', amount: bindExpr(E, s.amount, null, loc), unit: E.timeUnit, prec: E.timePrec, stmt: s.stmt ? bindStmt(E, s.stmt, loc) : null, loc };
     case 'disable': return { k: 'disable', label: s.label, loc };

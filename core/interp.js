@@ -25,7 +25,7 @@ export function evalE(n, ctx) {
       const b = evalE(n.base, ctx), i = evalE(n.index, ctx);
       if (i.x) return V.X1;
       const p = bitpos(n.base.t, V.toNum(i));
-      if (n.chk && (p < 0 || p >= b.w)) throw indexError(V.toNum(i), n.base.t);
+      if (n.chk && (p < 0 || p >= b.w) && !ctx.probe) throw indexError(V.toNum(i), n.base.t);
       return V.getBits(b, p, 1);
     }
     case 'elem': {
@@ -33,7 +33,7 @@ export function evalE(n, ctx) {
       const et = n.t;
       if (i.x) return V.allX(et.w, et.s);
       const k = V.toNum(i) - n.base.t.lo;
-      if (k < 0 || k >= arr.length) { if (n.chk) throw indexError(V.toNum(i), n.base.t); return V.allX(et.w, et.s); }
+      if (k < 0 || k >= arr.length) { if (n.chk && !ctx.probe) throw indexError(V.toNum(i), n.base.t); return V.allX(et.w, et.s); }
       return arr[k];
     }
     case 'slice': return { ...V.getBits(evalE(n.base, ctx), n.lo, n.t.w), s: n.t.s };
@@ -224,7 +224,11 @@ function evalBin(n, ctx) {
     case 'ror': return V.rotr(fit(a, w, s), b);
   }
   a = V.withSign(a, s); b = V.withSign(b, s);
-  if (n.dz && !b.x && b.v === 0n) throw new SimError(`division by zero (operator ${o === '/' ? '/' : o})`);
+  if (n.dz && !b.x && b.v === 0n && !ctx.probe) throw new SimError(`division by zero (operator ${o === '/' ? '/' : o})`);
+  if (n.ov && !a.x && !b.x && !ctx.probe) {
+    const x = V.toBig(a), y = V.toBig(b), r = o === '+' ? x + y : o === '-' ? x - y : x * y;
+    if (r > 2147483647n || r < -2147483648n) throw new SimError(`integer overflow: ${r} is outside the range of INTEGER`);
+  }
   switch (o) {
     case '+': return V.add(a, b, w, s);
     case '-': return V.sub(a, b, w, s);

@@ -80,6 +80,7 @@ const DECL_KWS = new Set(['signal', 'constant', 'variable', 'shared', 'type', 's
   'function', 'procedure', 'pure', 'impure', 'attribute', 'alias', 'file', 'use', 'group', 'disconnect']);
 const LOGICAL = { and: '&', or: '|', xor: '^', xnor: '~^', nand: 'nand', nor: 'nor' };
 const UNARY_REDUCE = { and: '&', or: '|', xor: '^', nand: '~&', nor: '~|', xnor: '~^' };
+// (the VHDL-2008 matching operators ?= ?/= carry a non-enumerable `match` flag: '-' matches anything)
 const RELATIONAL = { '=': '==', '/=': '!=', '<': '<', '<=': '<=', '>': '>', '>=': '>=',
   '?=': '==', '?/=': '!=', '?<': '<', '?<=': '<=', '?>': '>', '?>=': '>=' };
 const SHIFT = { sll: '<<', srl: '>>', sla: '<<<', sra: '>>>', rol: 'rol', ror: 'ror' };
@@ -1339,12 +1340,13 @@ class Parser {
     this.fail(`expected '<=', ':=' or ';' but found ${this.describe(this.peek())}`);
   }
 
-  /** Assignment target: a name, or an aggregate (not supported). */
+  /** Assignment target: a name, or a positional aggregate of names (VHDL-2008: a concatenation target). */
   parseTarget() {
     if (this.isOp('(')) {
       const tok = this.peek();
       const agg = this.parsePrimary();
-      this.diag('aggregate assignment targets are not supported', tok);
+      if (agg.op === 'aggregate' && agg.items.every((it) => !it.choices)) return { op: 'concat', parts: agg.items.map((it) => it.value) };
+      this.diag('aggregate assignment targets with choices are not supported', tok);
       return agg;
     }
     if (!this.isId()) this.fail(`expected a name but found ${this.describe(this.peek())}`);
@@ -1479,7 +1481,9 @@ class Parser {
     const tok = this.peek();
     if (tok.type === 'op' && RELATIONAL[tok.value]) {
       this.next();
-      return bin(RELATIONAL[tok.value], left, this.parseShift());
+      const e = bin(RELATIONAL[tok.value], left, this.parseShift());
+      if (tok.value === '?=' || tok.value === '?/=') Object.defineProperty(e, 'match', { value: true });
+      return e;
     }
     return left;
   }
