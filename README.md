@@ -29,6 +29,15 @@ for Xilinx FPGAs supported by ISE 14.7.
   does not change). Any HDL module can be converted to a schematic (*Convert to Schematic*), with
   processes and other behavioural code kept as HDL blocks; *Convert to HDL* makes the HDL the base
   and keeps the schematic under it.
+- **Symbol Info** (like the ISE Symbol Info / Libraries Guide pages): a datasheet for every symbol
+  of the schematic library and its presets (gates and inverted-input gates, muxes, demuxes,
+  decoders, encoders, ADD/SUB/COMP, constants, FD*/FT*/FJK* flip-flops, registers, counters, bus
+  taps/joins, modules, HDL blocks), in English or Portuguese: description, symbol drawing, pin table,
+  parameters, truth table computed by simulating the symbol's own HDL (compact form with X, or
+  representative rows for wide symbols), Xilinx-style mode table for sequential symbols, equivalent
+  VHDL and Verilog, and the Xilinx library names it stands for. Open it with *Symbol Info* (toolbar
+  or F1) on a selected or palette symbol, the palette right-click menu, *More…* in the palette info
+  box, or the Properties panel; change parameters in the dialog to watch the tables update.
 - **Live schematic simulation** (Logisim style): *Simulate* in the schematic editor runs the drawing
   itself. Click the input markers: 1-bit inputs are switches, buses open a value editor (hex /
   binary / decimal, +1 / −1), clock inputs step one cycle or run at 1 Hz … 1 kHz; *Reset* power-cycles.

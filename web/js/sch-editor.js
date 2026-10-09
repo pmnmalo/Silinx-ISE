@@ -18,6 +18,9 @@ import {
   xform, rotSize, portBox, netlist, generateHdl, parseNetName,
 } from '/core/schdoc.js';
 import { svgSnapshot, printDiagram } from './print.js';
+import { symbolSummary, presetOf } from '/core/symdocs.js';
+import { getLanguage, onLanguageChange } from './i18n.js';
+import { popupMenu } from './ui.js';
 import { rerouteAfterMove, connectivity, placementClashes, connectionsKept } from '/core/schroute.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -61,6 +64,7 @@ const ICON = {
   check: I('<rect x="1.5" y="1.5" width="13" height="13" rx="1" fill="#fff" stroke="#24476f"/><path d="M4 8.2l2.6 2.6L12 5" fill="none" stroke="#008000" stroke-width="2"/>'),
   gen: I('<path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#24476f"/><path d="M10 1.5v3h3" fill="none" stroke="#24476f"/><path d="M5 8h6M5 10.5h6M5 13h4" stroke="#316ac5"/><path d="M1 6.5l2.5 2-2.5 2" fill="none" stroke="#c08000" stroke-width="1.4"/>'),
   sim: I('<rect x="1" y="4" width="7" height="8" rx="1.5" fill="#1f6b1f" stroke="#0d3d0d"/><rect x="4.5" y="5.5" width="2.5" height="5" rx=".6" fill="#fff"/><path d="M9 8h2.5" stroke="#00b000" stroke-width="1.6"/><circle cx="13" cy="8" r="2.4" fill="#33e033" stroke="#0d6d0d"/>'),
+  info: I('<circle cx="8" cy="8" r="6.5" fill="#e8f2fc" stroke="#24476f" stroke-width="1.2"/><circle cx="8" cy="4.6" r="1.1" fill="#24476f"/><path d="M8 7v5" stroke="#24476f" stroke-width="2"/>'),
   view: I('<path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#24476f"/><path d="M10 1.5v3h3" fill="none" stroke="#24476f"/><text x="4.2" y="12" font-size="6.5" font-family="Consolas,monospace" font-weight="bold" fill="#000080">&lt;/&gt;</text>'),
 };
 
@@ -261,6 +265,26 @@ function symbolSvg(sym, def, cls = '') {
     + `<g transform="${matrixOf(sym, def)}">${bodySvg(sym, def)}</g>${textsSvg(sym, def)}</g>`;
 }
 
+/**
+ * Standalone SVG drawing of a symbol at its parameters (Symbol Info datasheets): the editor drawing
+ * plus the pin names of the symbols that do not show them (gates, inverters, arithmetic outputs).
+ */
+export function symbolDrawingSvg(symIn, def, { scale = 1.6 } = {}) {
+  const sym = { ...symIn, x: 0, y: 0, rot: 0, mirror: false, name: '' };
+  const labelled = ['lib', 'demux', 'ff', 'module', 'hdl', 'mux'].includes(def.shape);
+  let extra = '';
+  for (const p of def.pins) {
+    if (labelled && !(def.shape === 'mux' && p.side === 'E')) continue;
+    if (def.shape === 'arith' && p.side === 'W') continue;
+    const v = { W: [-1, 0], E: [1, 0], N: [0, -1], S: [0, 1] }[p.side];
+    const x = p.x + v[0] * 3, y = p.y + (v[1] ? v[1] * 12 : -3);
+    extra += `<text class="pname" x="${x}" y="${y}" text-anchor="${v[0] < 0 ? 'end' : v[0] > 0 ? 'start' : 'middle'}">${esc(p.name)}</text>`;
+  }
+  const m = 34, w = def.w + 2 * m, hh = def.h + 2 * 22;
+  return `<svg class="se-svg sd-svg" xmlns="${SVGNS}" viewBox="${-m} -22 ${w} ${hh}" width="${Math.round(w * scale)}" height="${Math.round(hh * scale)}">`
+    + `<g class="sym">${bodySvg(sym, def)}${textsSvg(sym, def)}${extra}</g></svg>`;
+}
+
 function portSvg(p, cls = '') {
   const b = portBox(p);
   const name = p.width > 1 ? `${p.name}(${p.width - 1}:0)` : p.name;
@@ -375,6 +399,7 @@ export function mountSchEditor(container, opts = {}) {
       keepBox, h('span', { text: 'Keep connections' })),
     sep(), btn('undo', 'undo', 'Undo (Ctrl+Z)'), btn('redo', 'redo', 'Redo (Ctrl+Y)'),
     sep(), btn('zin', 'zin', 'Zoom In (+)'), btn('zout', 'zout', 'Zoom Out (−)'), btn('fit', 'fit', 'Zoom to Full View (F)'),
+    sep(), btn('info', 'info', 'Symbol Info (F1)'),
     sep(), h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'check', title: 'Check Schematic', html: `${ICON.check}<span>Check</span>` }),
     sep(), langSel,
     h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'view', title: 'View generated HDL', html: `${ICON.view}<span>View HDL</span>` }),
@@ -400,6 +425,7 @@ export function mountSchEditor(container, opts = {}) {
     if (!b || b.disabled) return;
     const a = b.dataset.act;
     if (a === 'sim') { if (live) leaveSim(); else enterSim(); container.focus({ preventScroll: true }); return; }
+    if (a === 'info') { const t0 = infoTarget(); if (t0) openInfo(t0); return; }
     if (live && !['zin', 'zout', 'fit', 'view', 'check'].includes(a)) return;
     if (a === 'select' || a === 'wire' || a === 'net' || a === 'io') setTool(a);
     else if (a === 'rotate') rotateSel(); else if (a === 'mirror') mirrorSel(); else if (a === 'delete') deleteSel();
@@ -460,11 +486,28 @@ export function mountSchEditor(container, opts = {}) {
           draggable: 'true', title: it.desc,
           html: `${previewSvg(it)}<span class="nm">${esc(it.title)}</span>`,
         });
-        row.addEventListener('click', () => { startPlace(it); symInfo.textContent = `${it.title}: ${it.desc}`; });
+        row.addEventListener('click', () => { infoItem = it; startPlace(it); showSymInfo(it); });
+        row.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          infoItem = it; showSymInfo(it);
+          popupMenu([{ label: 'Symbol Info…', shortcut: 'F1', action: () => openInfo(itemTarget(it)) }, ...(readOnly ? [] : [{ label: 'Place Symbol', action: () => startPlace(it) }])], e.clientX, e.clientY);
+        });
         row.addEventListener('dragstart', e => { e.dataTransfer.setData('text/x-silinx-symbol', JSON.stringify(it)); e.dataTransfer.effectAllowed = 'copy'; });
         symList.append(row);
       }
     }
+  }
+  // the small info box under the palette: first sentence of the datasheet + More… (Symbol Info)
+  let infoItem = null;
+  function itemTarget(it) { return { type: it.type, params: { ...defaultParams(it.type), ...clone(it.params || {}) }, preset: it.preset || null }; }
+  function showSymInfo(it) {
+    symInfo.innerHTML = '';
+    if (!it) return;
+    const lang = getLanguage();
+    const sum = it.type === 'module' ? it.desc : symbolSummary(it.type, { ...defaultParams(it.type), ...it.params }, lang, it.preset || undefined);
+    const more = h('a', { href: '#', class: 'se-more', text: 'More…', title: 'Datasheet of the symbol: pins, parameters, truth table, equivalent HDL' });
+    more.addEventListener('click', e => { e.preventDefault(); openInfo(itemTarget(it)); });
+    symInfo.append(h('b', { 'data-no-i18n': '', text: it.title }), ': ', h('span', { class: 'se-sum', 'data-no-i18n': '', text: sum }), ' ', more);
   }
   function renderCats() {
     const cur = catSel.value || '<all>';
@@ -623,6 +666,7 @@ export function mountSchEditor(container, opts = {}) {
     const symSel = [...sel].some(k => k.startsWith('sym:')) || (tool === 'place');
     tb.querySelector('[data-act="rotate"]').disabled = !symSel;
     tb.querySelector('[data-act="mirror"]').disabled = !symSel;
+    tb.querySelector('[data-act="info"]').disabled = !infoTarget();
   }
   const TOOL_HINT = {
     select: 'Click to select, drag to move (connected wires follow), drag on empty space to select a region. Double-click a module to open it.',
@@ -723,7 +767,9 @@ export function mountSchEditor(container, opts = {}) {
     const S = SYMBOLS[s.type];
     const sd = symbolDef(s, modules);
     const title = s.type === 'module' ? `Module ${s.params.module}` : (sd.shape === 'lib' || sd.shape === 'demux') ? `${sd.title} (${S.title})` : `${S?.title || s.type}`;
-    propBody.append(h('div', { class: 'se-ptitle', text: title }), h('div', { class: 'se-note', text: S?.description || '' }));
+    const sum = s.type === 'module' ? (S?.description || '') : symbolSummary(s.type, s.params, getLanguage());
+    propBody.append(h('div', { class: 'se-ptitle', text: title }), h('div', { class: 'se-note se-sum', 'data-no-i18n': '', text: sum }),
+      h('div', { class: 'se-pbtns' }, h('button', { class: 'btn ro-ok se-infobtn', type: 'button', text: 'Symbol Info…', title: 'Symbol Info (F1)', onclick: () => openInfo(infoTarget()) })));
     propBody.append(field('Instance name', inp(s.name, v => { s.name = String(v).trim() || s.name; })));
     for (const p of S?.params || []) {
       const v = s.params[p.name];
@@ -1296,6 +1342,7 @@ export function mountSchEditor(container, opts = {}) {
       return;
     }
     if (!container.contains(document.activeElement) && document.activeElement !== container) return;
+    if (e.key === 'F1') { e.preventDefault(); const t1 = infoTarget(); if (t1) openInfo(t1); return; }
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
     const mod = e.ctrlKey || e.metaKey;
@@ -1438,6 +1485,32 @@ export function mountSchEditor(container, opts = {}) {
     opts.onGenerate?.({ lang: genLang, filename: g.filename, code: g.code, target });
     flash(`Generated ${g.filename}`);
   }
+  // ---------------- Symbol Info (datasheet of the selected / palette symbol): web/js/symbol-info.js
+  let infoDlg = null;
+  // the symbol the Symbol Info action is about: the selected symbol, else the one being placed / last picked in the palette
+  function infoTarget() {
+    const ids = selected('sym');
+    if (ids.length === 1 && sel.size === 1) {
+      const s = doc.symbols.find(x => x.id === ids[0]);
+      if (s) return { type: s.type, params: clone(s.params), hdl: s.hdl, preset: presetOf(s.type, s.params) };
+    }
+    if (tool === 'place' && placing) return { type: placing.type, params: clone(placing.params), preset: placing.preset };
+    return infoItem ? itemTarget(infoItem) : null;
+  }
+  async function openInfo(target) {
+    if (!target || destroyed) return null;
+    const { openSymbolInfo } = await import('./symbol-info.js');
+    if (destroyed) return null;
+    infoDlg?.close();
+    infoDlg = openSymbolInfo({
+      container, ...target, modules, lang: genLang, highlight,
+      draw: (sym, def) => symbolDrawingSvg(sym, def),
+      onClose: () => { infoDlg = null; if (container.isConnected) container.focus({ preventScroll: true }); },
+    });
+    return infoDlg;
+  }
+  const offLang = onLanguageChange(() => { if (infoItem) showSymInfo(infoItem); if (!live) renderProps(); });
+
   function viewHdl() {
     const dlg = h('div', { class: 'se-modal' });
     const box = h('div', { class: 'se-dialog' });
@@ -1525,7 +1598,7 @@ export function mountSchEditor(container, opts = {}) {
 
   return {
     getDoc: () => clone(normalizeDoc(doc)),
-    setDoc(d) { leaveSim(); doc = normalizeDoc(d || newDoc()); undoStack.length = 0; redoStack.length = 0; sel.clear(); lastDiags = null; genLang = doc.lang; langSel.value = genLang; diagPanel.hidden = true; renderSheet(); renderPalette(); render(); renderProps(); fit(); },
+    setDoc(d) { leaveSim(); infoDlg?.close(); doc = normalizeDoc(d || newDoc()); undoStack.length = 0; redoStack.length = 0; sel.clear(); lastDiags = null; genLang = doc.lang; langSel.value = genLang; diagPanel.hidden = true; renderSheet(); renderPalette(); render(); renderProps(); fit(); },
     setModules(m) { leaveSim(); modules = normMods(m); renderPalette(); render(); renderProps(); },
     check: () => runCheck(true),
     openSelected,
@@ -1535,7 +1608,11 @@ export function mountSchEditor(container, opts = {}) {
     stopSimulation: leaveSim,
     get simulating() { return !!live; },
     get liveSim() { return live?.live || null; },
+    /** Open the Symbol Info datasheet ({ type, params, preset } or the current target); resolves to the dialog. */
+    symbolInfo: target => openInfo(target || infoTarget()),
+    get symbolInfoDialog() { return infoDlg; },
     destroy() {
+      infoDlg?.close(); offLang();
       live?.destroy(); live = null;
       destroyed = true;
       clearTimeout(changeTimer);

@@ -212,6 +212,17 @@ const PT = {
   'Address bits': 'Bits de endereço', 'Enable input E': 'Entrada de habilitação E', 'Bus pins (A, D)': 'Pinos em barramento (A, D)',
   'Output bits': 'Bits de saída', 'Bus pins (I, A)': 'Pinos em barramento (I, A)', 'Select bits': 'Bits de seleção', 'Type': 'Tipo',
   'priority': 'prioridade',
+  // Symbol Info (datasheets of the schematic symbols; their own texts are in core/symdocs.js)
+  'Symbol Info (F1)': 'Informação do Símbolo (F1)', 'Symbol Info…': 'Informação do Símbolo…', 'Symbol Info': 'Informação do Símbolo',
+  // schematic editor labels that were still in English
+  'Select (Esc)': 'Selecionar (Esc)', 'Add Wire (W)': 'Adicionar Fio (W)', 'Add Net Name (N)': 'Adicionar Nome de Rede (N)', 'Add I/O Marker (O)': 'Adicionar Marcador de E/S (O)',
+  'Rotate (Ctrl+R)': 'Rodar (Ctrl+R)', 'Mirror (Ctrl+M)': 'Espelhar (Ctrl+M)', 'Delete (Del)': 'Apagar (Del)', 'Keep connections': 'Manter ligações',
+  'Undo (Ctrl+Z)': 'Anular (Ctrl+Z)', 'Redo (Ctrl+Y)': 'Refazer (Ctrl+Y)', 'Check': 'Verificar', 'View HDL': 'Ver HDL', 'Schematic sheet': 'Folha do esquemático',
+  'Context clause': 'Cláusula de contexto', 'Compiler directives': 'Diretivas do compilador', 'one per line: NAME : type := default': 'uma por linha: NOME : tipo := valor por omissão',
+  'signals, types, constants, functions emitted verbatim': 'sinais, tipos, constantes, funções copiados tal e qual',
+  'Tip: drag symbols from the Symbols panel; double-click a module symbol to open its source.': 'Dica: arraste símbolos do painel Símbolos; faça duplo clique num símbolo de módulo para abrir a sua fonte.',
+  'HDL kept with the schematic': 'HDL guardado com o esquemático',
+  'More…': 'Mais…', 'Place Symbol': 'Colocar Símbolo', 'Datasheet of the symbol: pins, parameters, truth table, equivalent HDL': 'Folha de características do símbolo: pinos, parâmetros, tabela de verdade, HDL equivalente',
   // misc
   'Error': 'Erro', 'Warning': 'Aviso', 'Note': 'Nota', 'Failure': 'Falha', 'Running': 'Em curso', 'Running...': 'Em curso...', 'Other': 'Outro',
   'not available': 'indisponível', 'not found': 'não encontrado', 'see log': 'ver registo', 'Exported .xise': '.xise exportado',
@@ -240,6 +251,7 @@ const PT_PATTERNS = [
   [/^Silinx - (.*) - \[(.*)\]$/, (m, a, b) => `Silinx - ${a} - [${t(b)}]`],
   [/^(.*) \(RTL\)$/, '$1 (RTL)'],
   [/^Processes: (.*)$/, 'Processos: $1'],
+  [/^HDL kept with the schematic \((VHDL|VERILOG)\)$/, 'HDL guardado com o esquemático ($1)'],
   [/^Language: (.*)$/, 'Idioma: $1'],
   [/^(\d+)\/(\d+) I\/Os assigned$/, '$1/$2 E/S atribuídas'],
   [/^Top: (.*?) · Device (.*?) · Board: (.*)$/, 'Topo: $1 · Dispositivo $2 · Placa: $3'],
@@ -458,6 +470,11 @@ export function startI18n() {
   observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
 }
 
+// views that render their own texts per language (e.g. the Symbol Info datasheets) re-render on a change
+const langListeners = new Set();
+/** Call fn(lang) after every language change; returns the function that removes the listener. */
+export function onLanguageChange(fn) { langListeners.add(fn); return () => langListeners.delete(fn); }
+
 export function setLanguage(next) {
   if (!LOCALES[next] || next === lang) return;
   lang = next;
@@ -465,4 +482,5 @@ export function setLanguage(next) {
   document.documentElement.lang = lang;
   translateTree(document.body);     // re-translate from the stored English originals
   translateTitle();
+  for (const fn of [...langListeners]) { try { fn(lang); } catch (e) { console.error(e); } }
 }

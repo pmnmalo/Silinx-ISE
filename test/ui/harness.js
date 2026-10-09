@@ -173,7 +173,7 @@ const KEYS = {
   Enter: { code: 'Enter', keyCode: 13, text: '\r' }, Escape: { code: 'Escape', keyCode: 27 }, Tab: { code: 'Tab', keyCode: 9 },
   Backspace: { code: 'Backspace', keyCode: 8 }, Delete: { code: 'Delete', keyCode: 46 },
   ArrowDown: { code: 'ArrowDown', keyCode: 40 }, ArrowUp: { code: 'ArrowUp', keyCode: 38 }, ArrowLeft: { code: 'ArrowLeft', keyCode: 37 }, ArrowRight: { code: 'ArrowRight', keyCode: 39 },
-  Home: { code: 'Home', keyCode: 36 }, End: { code: 'End', keyCode: 35 },
+  Home: { code: 'Home', keyCode: 36 }, End: { code: 'End', keyCode: 35 }, F1: { code: 'F1', keyCode: 112 },
 };
 
 export class Page {

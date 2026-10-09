@@ -237,9 +237,54 @@
 .sch-editor .se-code .kw { color: #0000c0; font-weight: bold; }
 .sch-editor .se-code .cm { color: #008000; }
 
+/* ------------------------------------------------------------------ Symbol Info (datasheet) */
+.sch-editor .se-syminfo .se-more { color: var(--se-accent); text-decoration: none; white-space: nowrap; }
+.sch-editor .se-syminfo .se-more:hover { text-decoration: underline; }
+.sch-editor .se-syminfo b { color: var(--se-fg); }
+.sch-editor .se-symdoc { width: min(1040px, 96%); height: min(760px, 94%); }
+.sch-editor .se-symdoc .sd-body { flex: 1; min-height: 0; overflow: auto; display: flex; gap: 14px; padding: 10px 12px; background: #fff; color: #000; }
+.sch-editor .se-symdoc .sd-side { flex: none; width: 250px; display: flex; flex-direction: column; gap: 8px; }
+.sch-editor .se-symdoc .sd-draw { border: 1px solid #e0e0e8; background: #fff; display: flex; justify-content: center; align-items: center; padding: 8px; min-height: 90px; overflow: auto; }
+.sch-editor .se-symdoc .sd-draw svg { position: static; max-width: 230px; height: auto; }
+.sch-editor .se-symdoc .sd-params { display: flex; flex-direction: column; gap: 4px; }
+.sch-editor .se-symdoc .sd-param { display: grid; grid-template-columns: 1fr 96px; align-items: center; gap: 6px; font-size: 11px; color: var(--se-muted); }
+.sch-editor .se-symdoc .sd-param input[type=text], .sch-editor .se-symdoc .sd-param input[type=number], .sch-editor .se-symdoc .sd-param select { border: 1px solid #7f9db9; padding: 1px 4px; min-height: 21px; width: 100%; background: #fff; }
+.sch-editor .se-symdoc .sd-param input[type=checkbox] { justify-self: start; }
+.sch-editor .se-symdoc .sd-h4 { font-weight: bold; color: var(--se-title-fg); font-size: 11px; }
+.sch-editor .se-symdoc .sd-xnames { font-family: var(--se-mono); font-size: 11px; }
+.sch-editor .se-symdoc .sd-main { flex: 1; min-width: 0; user-select: text; }
+.sch-editor .se-symdoc .sd-main h3 { margin: 12px 0 4px; font-size: 13px; color: var(--se-title-fg); border-bottom: 1px solid #d8e0ec; padding-bottom: 2px; }
+.sch-editor .se-symdoc .sd-main h3:first-child { margin-top: 0; }
+.sch-editor .se-symdoc .sd-main p { margin: 4px 0; line-height: 1.45; }
+.sch-editor .se-symdoc .sd-formula { margin: 6px 0; }
+.sch-editor .se-symdoc .sd-formula code { font-family: var(--se-mono); background: #f4f6fa; padding: 1px 5px; border: 1px solid #e3e8f0; }
+.sch-editor .se-symdoc .sd-note { color: var(--se-muted); font-size: 11px; margin: 4px 0; line-height: 1.35; }
+.sch-editor .se-symdoc .sd-note.err { color: var(--se-danger); }
+.sch-editor .se-symdoc .sd-table { border-collapse: collapse; margin: 4px 0; font-size: 12px; }
+.sch-editor .se-symdoc .sd-table th, .sch-editor .se-symdoc .sd-table td { border: 1px solid #c8d0dc; padding: 2px 7px; text-align: left; vertical-align: top; }
+.sch-editor .se-symdoc .sd-table th { background: #eef2f8; color: var(--se-title-fg); font-weight: bold; }
+.sch-editor .se-symdoc .sd-table .mono { font-family: var(--se-mono); white-space: nowrap; }
+.sch-editor .se-symdoc .sd-table .num { text-align: center; }
+.sch-editor .se-symdoc .sd-pins td:first-child { color: var(--se-pin); font-weight: bold; }
+.sch-editor .se-symdoc .sd-truth td, .sch-editor .se-symdoc .sd-truth th { text-align: center; font-family: var(--se-mono); min-width: 22px; }
+.sch-editor .se-symdoc .sd-truth tr.grp th { font-family: inherit; font-weight: normal; color: var(--se-muted); background: #f7f9fc; }
+.sch-editor .se-symdoc .sd-truth .sep { border-right: 2px solid #8090a8; }
+.sch-editor .se-symdoc .sd-truth td.x { color: #8a8a8a; }
+.sch-editor .se-symdoc .sd-truth td.out { background: #fbfcf2; font-weight: bold; }
+.sch-editor .se-symdoc .sd-truth td.v1 { color: #007000; }
+.sch-editor .se-symdoc .sd-mode td.out { font-family: inherit; white-space: nowrap; }
+.sch-editor .se-symdoc .sd-switch { display: flex; gap: 4px; margin: 2px 0 4px; }
+.sch-editor .se-symdoc .btn.on { background: linear-gradient(#dcebfc, #c1dcfc); border-color: #3c7fb1; }
+.sch-editor .se-symdoc .sd-tabs { display: flex; gap: 4px; align-items: center; margin: 4px 0; }
+.sch-editor .se-symdoc .sd-tabs .sp { flex: 1; }
+.sch-editor .se-symdoc .sd-code { border: 1px solid #e0e0e8; max-height: 360px; flex: none; }
+.sch-editor .se-props .se-sum { margin-bottom: 2px; }
+
 @media (max-width: 760px) {
   .sch-editor .se-left { width: 150px; }
   .sch-editor .se-right { width: 190px; }
+  .sch-editor .se-symdoc .sd-body { flex-direction: column; }
+  .sch-editor .se-symdoc .sd-side { width: auto; }
 }
 
 /* read-only view (RTL schematic): no palette, no editing tools */
