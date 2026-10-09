@@ -79,9 +79,12 @@ module tb; reg [3:0] a = 4'b1010; wire [3:0] y; inv u[3:0] (.a(a), .y(y)); initi
   assert.deepEqual(r, ['0101']);
 });
 
-test('multi-dimensional memories (reg [7:0] m [0:1][0:3])', { todo: 'only the first unpacked dimension of a memory is supported' }, () => {
-  const r = out(vinit(`m[1][2] = 8'hAB; $display("%h", m[1][2]);`, `reg [7:0] m [0:1][0:3];`));
-  assert.deepEqual(r, ['ab']);
+test('multi-dimensional memories (reg [7:0] m [0:1][0:3])', () => {
+  const r = out(vinit(`
+    for (i = 0; i < 2; i = i + 1) for (j = 0; j < 4; j = j + 1) m[i][j] = i * 16 + j;
+    m[1][2] = 8'hAB; m[0][3][7] = 1'b1;
+    $display("%h %h %h %h", m[1][2], m[1][3], m[0][3], m[0][0]);`, `reg [7:0] m [0:1][0:3]; integer i, j;`));
+  assert.deepEqual(r, ['ab 13 83 00']);
 });
 
 test('clocking is race-free with non-blocking assignments across modules (pipeline of registers)', () => {
@@ -135,4 +138,46 @@ test('continuous assignment delays: inertial (a pulse shorter than the delay is 
   const y = r.design.signals.find(s => s.name === 'y');
   // y becomes 0 at 3 ns; the 1 ns pulse at 10 ns is filtered; the 5 ns pulse at 21 ns appears at 24 ns .. 29 ns
   assert.deepEqual(y.wave.t, [0, 3000, 24000, 29000]);
+});
+
+test('concatenation as a continuous-assignment target (carry out of an adder); active-low asynchronous reset', () => {
+  const r = out(vlog(`
+  reg [3:0] a = 9, b = 8; reg cin = 1; wire [3:0] s; wire co;
+  assign {co, s} = a + b + cin;
+  reg clk = 0, rst_n = 0; reg [1:0] q;
+  always @(posedge clk or negedge rst_n) if (!rst_n) q <= 0; else q <= q + 1;
+  always #5 clk = ~clk;
+  initial begin #1 $display("%b %b", co, s); #11 rst_n = 1; #30 $display("%0d", q); $finish; end`));
+  // 9 + 8 + 1 = 18 = 1_0010; rising edges at 15, 25, 35 ns after the reset is released
+  assert.deepEqual(r, ['1 0010', '3']);
+});
+
+test('file output tasks write to the log ($fopen / $fdisplay / $fwrite / $fclose); $sformat and $sformatf', () => {
+  const r = out(vlog(`
+  integer f; reg [8*10:1] s;
+  initial begin
+    f = $fopen("out.txt", "w");
+    $fdisplay(f, "v=%0d", 7); $fwrite(f, "a"); $fwrite(f, "b\\n"); $fclose(f);
+    $sformat(s, "%0d-%0d", 3, 4); $display("%0s", s);
+    $display("%s", $sformatf("<%h>", 8'hA5));
+  end`));
+  assert.deepEqual(r, ['v=7', 'ab', '3-4', '<a5>']);
+});
+
+test('integer arrays, forever @(posedge), specify blocks are ignored, .* connections, genvar declared in the loop, $realtime', () => {
+  const r = sim(`\`timescale 1ns/1ps
+module inv(input a, output y); assign y = ~a; specify (a => y) = 1; endspecify endmodule
+module tb;
+  integer arr [0:3]; integer i, n = 0; reg clk = 0; reg a = 1; wire y; wire [3:0] w;
+  inv u(.*);
+  generate for (genvar g = 0; g < 4; g = g + 1) begin : gb assign w[g] = g[0]; end endgenerate
+  always #5 clk = ~clk;
+  initial begin
+    for (i = 0; i < 4; i = i + 1) arr[i] = i * i - 2;
+    #1 $display("%0d %0d %b %b", arr[0], arr[3], y, w);
+    #0.5 $display("%0.1f", $realtime);
+    forever @(posedge clk) begin n = n + 1; if (n == 3) begin $display("%0t", $time); $finish; end end
+  end
+endmodule`).out;
+  assert.deepEqual(r, ['-2 7 0 1010', '1.5', '25']);
 });

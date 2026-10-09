@@ -21,6 +21,11 @@ export const STR = { kind: 'str', w: 0, s: false };
 // VHDL CHARACTER: an enumeration of the 256 ISO 8859-1 characters (values: the character codes)
 export const CHAR = { kind: 'enum', name: 'character', char: true, names: Array.from({ length: 256 }, (_, i) => String.fromCharCode(i)), w: 8, s: false, left: 7, right: 0, desc: true };
 const charConst = ch => ({ k: 'c', val: V.fromInt(ch.charCodeAt(0) & 255, 8, false), t: CHAR });
+// a character literal of a user enumeration type (type abc is ('A', 'B', 'C'))
+function enumChar(t, ch) {
+  const i = t.names.indexOf(`'${ch}'`);
+  return i < 0 ? null : { k: 'c', val: V.fromInt(i, t.w, false), t };
+}
 export const vecT = (w, s = false) => ({ kind: 'logic', w, s, left: w - 1, right: 0, desc: true });
 
 const PHYS = { fs: 0.001, ps: 1, ns: 1e3, us: 1e6, ms: 1e9, sec: 1e12, s: 1e12 };
@@ -862,6 +867,7 @@ function bindExpr0(E, e, expect, loc) {
   switch (e.op) {
     case 'lit': {
       if (E.lang === 'vhdl' && expect && expect.char && e.scalar && e.ch) return charConst(e.ch);
+      if (E.lang === 'vhdl' && expect && expect.kind === 'enum' && e.scalar && e.ch) { const c = enumChar(expect, e.ch); if (c) return c; }
       if (E.lang === 'vhdl' && expect && expect.kind === 'str' && e.text !== undefined) return { k: 'str', value: e.text, t: STR };
       if (E.lang === 'vhdl' && expect && expect.kind === 'str' && !e.scalar && /^[01]+$/.test(e.bits)) return { k: 'str', value: e.bits, t: STR };
       const val = V.fromBits(e.bits, !!e.signed);
@@ -889,6 +895,7 @@ function bindExpr0(E, e, expect, loc) {
     case 'str': {
       if (E.lang === 'verilog' && expect && expect.kind === 'logic') return { k: 'c', val: strToVal(e.value), t: vecT(Math.max(8, e.value.length * 8)) };
       if (E.lang === 'vhdl' && e.char && expect && expect.char) return charConst(e.value);
+      if (E.lang === 'vhdl' && e.char && expect && expect.kind === 'enum') { const c = enumChar(expect, e.value); if (c) return c; }
       // a string of std_logic characters where a vector is expected (in a report message, say)
       if (E.lang === 'vhdl' && expect && expect.kind === 'logic' && !e.char) return strAsLogic({ k: 'str', value: e.value, t: STR }, { t: expect });
       return { k: 'str', value: e.value, t: STR };
@@ -1409,7 +1416,10 @@ function bindVlogCall(E, e, expect, loc) {
         return { k: 'c', val: V.fromInt(r), t: INT };
       }
       case '$bits': return { k: 'c', val: V.fromInt(A(0).t.w), t: INT };
-      case '$time': case '$stime': case '$realtime': return { k: 'sys', name, args: [], t: vecT(64) };
+      case '$time': case '$stime': return { k: 'sys', name, args: [], t: vecT(64) };
+      case '$realtime': return { k: 'sys', name, args: [], t: REAL };
+      case '$fopen': return { k: 'sys', name, args: [], t: vecT(32) };   // (file output goes to the log)
+      case '$sformatf': return { k: 'sys', name, args: e.args.map((_, i) => { const a = A(i); ctxSize(a, a.t.w); return a; }), t: STR };
       case '$random': return { k: 'sys', name, args: e.args.length ? [bindLvalue(E, e.args[0], loc)] : [], t: INT };
       case '$urandom': return { k: 'sys', name, args: [], t: vecT(32) };
       case '$urandom_range': return { k: 'sys', name, args: e.args.map((_, i) => A(i)), t: vecT(32) };
@@ -1840,7 +1850,7 @@ function bindCallStmt(E, s, loc) {
   const sysName = name[0] === '$' ? name : (['finish', 'stop'].includes(name.toLowerCase()) ? name.toLowerCase() : null);
   if (sysName && !(name[0] !== '$' && E.sc.lookup(name))) {
     const args = s.args.map(a => (a.op === 'str' ? { k: 'str', value: a.value, t: STR } : bindExpr(E, a, null, loc)));
-    if (sysName === '$monitor' || sysName === '$display' || sysName === '$write' || sysName === '$strobe') args.forEach(a => { if (a.k !== 'str' && E.lang === 'verilog') ctxSize(a, a.t.w); });
+    if (/^\$(monitor|display[bho]?|write[bho]?|strobe|fdisplay|fwrite|fstrobe|sformat|swrite)$/.test(sysName)) args.forEach(a => { if (a.k !== 'str' && E.lang === 'verilog') ctxSize(a, a.t.w); });
     if ((sysName === '$readmemh' || sysName === '$readmemb') && args[1]) {
       const L = bindLvalue(E, s.args[1], loc);
       return { k: 'sys', name: sysName, args: [args[0], L], loc };

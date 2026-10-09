@@ -5,7 +5,7 @@ const KEYWORDS = new Set(`module endmodule macromodule input output inout wire r
 assign always always_ff always_comb always_latch initial begin end if else case casez casex endcase default for while repeat forever
 posedge negedge or and not generate endgenerate function endfunction task endtask signed unsigned
 supply0 supply1 tri wait disable fork join automatic real realtime time defparam
-nand nor xor xnor buf bufif0 bufif1 notif0 notif1 event wand wor triand trior tri0 tri1`.split(/\s+/));
+nand nor xor xnor buf bufif0 bufif1 notif0 notif1 event wand wor triand trior tri0 tri1 specify endspecify`.split(/\s+/));
 
 const OPS = ['<<<=', '>>>=', '++', '--', '+=', '-=', '|=', '&=', '^=', '===', '!==', '<<<', '>>>', '~&', '~|', '~^', '^~', '==', '!=', '<=', '>=', '&&', '||', '<<', '>>', '**', '+:', '-:', '->',
   '+', '-', '*', '/', '%', '<', '>', '!', '~', '&', '|', '^', '?', ':', ';', ',', '.', '(', ')', '[', ']', '{', '}', '=', '#', '@'];

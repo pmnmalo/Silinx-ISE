@@ -172,3 +172,57 @@ test('signal assignments with unaffected and conditional waveforms with after', 
   end process;`, "signal a, en : std_logic := '0'; signal y : std_logic := 'Z';"));
   assert.deepEqual(r.out, ["'1'", "'1'"]);
 });
+
+test('bit-string literals x"" o"" b"" with underscores, VHDL-2008 sized literals 8x"F" / 6ux"F"', () => {
+  const r = out(vproc(`
+    report to_string(std_logic_vector'(x"A")) & " " & to_string(std_logic_vector'(x"DE_AD")) & " " & to_string(std_logic_vector'(o"7")) & " " & to_string(std_logic_vector'(b"10_10"));
+    report to_string(std_logic_vector'(8x"F")) & " " & to_string(std_logic_vector'(6ux"F"));`));
+  assert.deepEqual(r, ['1010 1101111010101101 111 1010', '00001111 001111']);
+});
+
+test('process variables keep their values between activations; wait until with a compound condition', () => {
+  const r = sim(vhd(`
+  process (t) variable n : integer := 0; begin n := n + 1; report "n=" & integer'image(n); end process;
+  process begin t <= '1'; wait for 1 ns; t <= '0'; wait; end process;
+  clk <= not clk after 5 ns when now < 60 ns;
+  process begin wait until rising_edge(clk) and en = '1'; report "at " & integer'image(now / 1 ns); wait; end process;
+  process begin wait for 22 ns; en <= '1'; wait; end process;`,
+  "signal t, clk, en : std_logic := '0';")).out;
+  assert.deepEqual(r, ['n=1', 'n=2', 'n=3', 'at 25']);
+});
+
+test('guarded blocks: guarded assignments only take effect while the guard expression is true', () => {
+  const r = out(vhd(`
+  b : block (en = '1') begin q <= guarded d; end block;
+  process begin d <= '1'; wait for 1 ns; report std_logic'image(q); en <= '1'; wait for 1 ns; report std_logic'image(q);
+    en <= '0'; d <= '0'; wait for 1 ns; report std_logic'image(q); wait; end process;`,
+  "signal en, d, q : std_logic := '0';"));
+  assert.deepEqual(r, ["'0'", "'1'", "'1'"]);
+});
+
+test('enumeration types with character literals; integer type declarations; attribute declarations and specifications', () => {
+  const r = out(vhd(`
+  process begin
+    report abc'image(x) & " " & integer'image(abc'pos(x)) & " " & boolean'image(x = 'B') & " " & integer'image(s) & " " & integer'image(small'high);
+    wait;
+  end process;`,
+  `type abc is ('A', 'B', 'C'); signal x : abc := 'B';
+   type small is range 0 to 7; signal s : small := 5;
+   attribute keep : string; attribute keep of x : signal is "true";`));
+  assert.deepEqual(r, ["'B' 1 true 5 7"]);
+});
+
+test('signals declared in a package are shared; rising_edge of one bit of a vector; exit from a while loop; case on characters', () => {
+  const r = out({ 'g.vhd': 'package g is signal gs : integer := 3; end package;',
+    't.vhd': vhd(`
+  process begin gs <= 4; v(1) <= '1'; wait for 1 ns; v(0) <= '1'; report integer'image(gs); wait; end process;
+  process begin wait until rising_edge(v(0)); report "v0 rose"; wait; end process;
+  process
+    variable i : integer := 0; variable c : character := 'b';
+  begin
+    while true loop i := i + 1; exit when i = 5; end loop;
+    case c is when 'a' => report "a"; when 'b' => report "b" & integer'image(i); when others => report "o"; end case;
+    wait;
+  end process;`, 'signal v : std_logic_vector(1 downto 0) := "00";', { ctx: 'use work.g.all;' }) });
+  assert.deepEqual(r, ['b5', '4', 'v0 rose']);
+});

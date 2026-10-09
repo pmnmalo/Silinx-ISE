@@ -177,6 +177,11 @@ class Parser {
       if (this.isAny('input', 'output', 'inout')) return this.portDecl();
       if (this.isAny('wire', 'reg', 'logic', 'integer', 'tri', 'supply0', 'supply1', 'genvar', 'time', 'real', 'realtime', ...Object.keys(WIRED)))
         return this.netDecl(items, decls);
+      if (this.is('specify')) {   // specify blocks (path delays, timing checks): ignored by simulation
+        while (!this.is('endspecify') && this.tok.t !== 'eof') this.next();
+        this.expect('endspecify');
+        return;
+      }
       if (this.is('event')) {   // named events: 1-bit variables toggled by `-> e`
         this.next();
         do { const loc = this.loc(); decls.push({ kind: 'signal', name: this.ident(), type: { kind: 'logic', range: null, signed: false }, init: { op: 'lit', bits: '0', signed: false, sized: true }, net: 'reg', loc }); } while (this.accept(','));
@@ -287,10 +292,9 @@ class Parser {
       const loc = this.loc();
       const name = this.ident();
       let t = type;
-      while (this.is('[')) { // memory dims (only first dimension supported)
-        const r = this.optRange();
-        t = { kind: 'array', range: r, elem: t };
-      }
+      const dims = [];
+      while (this.is('[')) dims.push(this.optRange());   // memory dimensions: m [0:1][0:3] is 2 arrays of 4
+      for (let k = dims.length - 1; k >= 0; k--) t = { kind: 'array', range: dims[k], elem: t };
       let init = null;
       if (this.accept('=')) init = this.expr();
       const port = this.portNames.get(name);

@@ -822,7 +822,10 @@ class Parser {
     const items = [];
     while (!this.atEof() && !this.isKw('end') && !this.isKw('elsif') && !this.isKw('else') && !this.isKw('when')) {
       const before = this.i;
-      const res = this.guard(() => this.parseConcurrent(decls), null);
+      this.sawGuarded = false;
+      let res = this.guard(() => this.parseConcurrent(decls), null);
+      // `t <= guarded v` in a block with a guard expression: assigned only while GUARD is true
+      if (res && this.sawGuarded && this.blockGuard) res = guardItems(res, this.blockGuard);
       if (res) items.push(...res);
       if (this.i === before) { this.diag(`unexpected ${this.describe(this.peek())} in concurrent statement part`); this.next(); }
     }
@@ -1017,7 +1020,14 @@ class Parser {
   /** Block statement: flattened into the enclosing region. */
   parseBlock(decls) {
     this.expectKw('block');
-    if (this.acceptOp('(')) { this.parseExpression(); this.expectOp(')'); }
+    let guardExpr = null;
+    if (this.acceptOp('(')) { guardExpr = this.parseExpression(); this.expectOp(')'); }
+    const outerGuard = this.blockGuard;
+    if (guardExpr) this.blockGuard = guardExpr;
+    try { return this.parseBlockRest(decls); } finally { this.blockGuard = outerGuard; }
+  }
+
+  parseBlockRest(decls) {
     this.acceptKw('is');
     if (this.isKw('generic') || this.isKw('port')) {
       this.warn('block generics/ports are not supported');
@@ -1104,7 +1114,7 @@ class Parser {
     }
     if (!this.isOp('<=')) this.fail(`expected '<=' but found ${this.describe(this.peek())}`);
     this.next();
-    this.acceptKw('guarded');
+    if (this.acceptKw('guarded')) this.sawGuarded = true;
     const mech = this.parseDelayMechanism();
     const branches = this.parseConditionalWaveforms();
     this.expectOp(';');
@@ -1187,7 +1197,7 @@ class Parser {
     let nonblocking = true;
     if (this.acceptOp(':=')) nonblocking = false;
     else this.expectOp('<=');
-    this.acceptKw('guarded');
+    if (this.acceptKw('guarded')) this.sawGuarded = true;
     const mech = nonblocking ? this.parseDelayMechanism() : null;
     const items = [];
     let def = null;
@@ -1763,6 +1773,20 @@ function makeType(name, range, hasRange) {
       return t;
     }
   }
+}
+
+/** Guarded concurrent assignments: processes that assign only while the block's guard is true. */
+function guardItems(items, guard) {
+  return items.map((it) => {
+    if (it.kind === 'assign') {
+      const a = { kind: 'assign', target: it.target, value: it.value, nonblocking: true, delay: it.delay, loc: it.loc };
+      if (it.mech) a.mech = it.mech;
+      return { kind: 'process', label: it.label || null, sens: 'all', initial: false, decls: [],
+        body: [{ kind: 'if', cond: guard, then: block([a], it.loc), else: null, loc: it.loc }], loc: it.loc };
+    }
+    if (it.kind === 'process') return { ...it, body: [{ kind: 'if', cond: guard, then: block(it.body, it.loc), else: null, loc: it.loc }] };
+    return it;
+  });
 }
 
 /** generate_for init/cond/step from a range. */

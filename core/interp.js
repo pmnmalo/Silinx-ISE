@@ -390,8 +390,11 @@ export function strToVal(str) {
 function evalSys(n, ctx) {
   const sim = ctx.sim;
   switch (n.name) {
-    case '$time': case '$stime': case '$realtime':
+    case '$time': case '$stime':
       return V.fromInt(Math.round((sim ? sim.now : 0) / (ctx.timeUnit || 1000)), 64, false);
+    case '$realtime': return V.real((sim ? sim.now : 0) / (ctx.timeUnit || 1000));
+    case '$fopen': return V.fromInt(0x40000000, 32, false);
+    case '$sformatf': return { str: formatDisplay(n.args, ctx) };
     case '$random': case '$urandom': {
       if (n.args.length) {   // $random(seed): the seed variable is the state of a generator of its own
         const L = n.args[0], wr = [];
@@ -464,7 +467,7 @@ function resolveTarget(L, ctx, out) {
       if (L.chk && (wr.elem < 0 || wr.elem >= L.base.t.len)) throw indexError(V.toNum(i), L.base.t);
       // element of an element (arrays of arrays, records): the outer indices form a path
       if (b.elem != null) wr.path = [...(b.path || []), b.elem];
-      if (L.t.kind === 'array') wr.sub = true;   // the element is itself an array / record
+      wr.sub = L.t.kind === 'array';   // the element is itself an array / record
       out.push(wr);
       return;
     }
@@ -495,7 +498,7 @@ function resolveTarget(L, ctx, out) {
         const p1 = bitpos(L.base.t, V.toNum(l)), p2 = bitpos(L.base.t, V.toNum(r));
         lo = Math.min(p1, p2); w = Math.abs(p1 - p2) + 1;
       }
-      out.push({ ...b, lo: b.lo + lo, w, whole: false, bitsOf: b.whole ? null : b });
+      out.push({ ...b, lo: b.lo + lo, w, whole: false, sub: false, bitsOf: b.whole ? null : b });
       return;
     }
   }
@@ -790,6 +793,22 @@ function* execSys(s, ctx) {
       return;
     }
     case '$monitor': sim?.monitor(s.args, ctx); return;
+    // file output: there are no files in the simulation; the text goes to the log
+    case '$fdisplay': case '$fwrite': case '$fstrobe': {
+      const text = formatDisplay(s.args.slice(1), ctx);
+      if (s.name === '$fstrobe') sim?.strobe(() => formatDisplay(s.args.slice(1), ctx));
+      else sim?.print(text, s.name !== '$fwrite');
+      return;
+    }
+    case '$fclose': case '$fflush': return;
+    case '$sformat': case '$swrite': {   // $sformat(target, format, args...): the text into a variable
+      const L = s.args[0], wr = [];
+      const str = formatDisplay(s.args.slice(1), ctx);
+      const v = isStr(evalE(L, ctx)) ? { str } : V.resize(strToVal(str), L.t.w);
+      resolveTarget(L, ctx, wr);
+      for (const w of wr) { if (w.loc != null) ctx.frame[w.loc] = applyWrite(ctx.frame[w.loc], w, v, true); else sim?.write(w, v); }
+      return;
+    }
     case '$finish': case '$stop': case 'finish': case 'stop': sim?.finish(s.name.replace('$', '')); yield { forever: true }; return;
     case '$error': case '$warning': case '$info': case '$fatal': {
       const args = s.name === '$fatal' && s.args.length && s.args[0].k === 'c' && !isStr(s.args[0].val) ? s.args.slice(1) : s.args;
