@@ -60,3 +60,17 @@ test('board emulation: wiring, LED brightness and multiplexed digits', () => {
   assert.deepEqual(out.digits[0].seg.map(Math.round), [0, 1, 1, 0, 0, 0, 0]);   // "1"
   assert.deepEqual(out.digits[1].seg.map(Math.round), [0, 0, 0, 0, 0, 0, 1]);   // "-"
 });
+
+test('timing scale: large integer generics of the top are divided for the emulator', async () => {
+  const { timingGenerics, autoTimeScale, scaledGenerics } = await import('../core/emulate.js');
+  const gens = timingGenerics([{ name: 'div', value: { v: 625000n } }, { name: 'debounce', value: { v: 1000000n } }, { name: 'width', value: { v: 8n } }]);
+  assert.deepEqual(gens.map((g) => g.name), ['div', 'debounce']);
+  assert.equal(autoTimeScale(gens), 1000);
+  assert.deepEqual(scaledGenerics(gens, 1000), { div: 625, debounce: 1000 });
+  assert.equal(autoTimeScale([{ name: 'n', value: 5000 }]), 1);
+  const src = `library ieee; use ieee.std_logic_1164.all;
+entity t is generic (N : integer := 500000); port (o : out integer); end t;
+architecture a of t is begin o <= N; end a;`;
+  const d = elaborate(compile([{ path: 't.vhd', lang: 'vhdl', text: src }]), 't', { generics: { N: 500 } });
+  assert.equal(Number(d.top.params[0].value.v), 500);
+});

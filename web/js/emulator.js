@@ -298,7 +298,7 @@ const BOARD_LAYOUTS = { basys2: basys2Layout, nexys2: nexys2Layout, 's3e-starter
  * @param {HTMLElement} container
  * @param {{ design, board, assignments, title?, files?, onOpenSource? }} opts
  */
-export function mountEmulator(container, { design, board, assignments, title = '', files }) {
+export function mountEmulator(container, { design, board, assignments, title = '', files, timing = null }) {
   injectStyle();
   const wiring = boardWiring({ ports: design.top.ports, assignments, board });
   const sim = new Simulator(design, { files, maxWaveEvents: 1e9 });
@@ -326,7 +326,17 @@ export function mountEmulator(container, { design, board, assignments, title = '
   const speedSel = h('select', { title: 'Emulated clock rate', onchange: (e) => { speed = e.target.value === 'max' ? 'max' : Number(e.target.value); } },
     ...SPEEDS.map(([v, l]) => h('option', { value: v }, l)));
   const stat = h('span', { class: 'stat' });
-  root.append(h('div', { class: 'emu-bar' }, runBtn, stepBtn, resetBtn, h('span', { class: 'sep' }), 'Clock:', speedSel, stat));
+  // timing scale: the top's large integer generics divided (see core/emulate.js)
+  let timingSel = null;
+  if (timing?.gens?.length) {
+    const opts = [1, 10, 100, 1000, 10000, 100000];
+    if (!opts.includes(timing.scale)) opts.push(timing.scale);
+    timingSel = h('select', { title: `Divide the timing generics (${timing.gens.map((g) => `${g.name} = ${g.value.toLocaleString()}`).join(', ')}) so that the design runs visibly at the emulator's speed`,
+      onchange: (e) => timing.onChange?.(Number(e.target.value)) },
+      ...opts.sort((a, b) => a - b).map((k) => h('option', { value: k, selected: k === timing.scale }, k === 1 ? 'real (÷1)' : `÷${k.toLocaleString()}`)));
+  }
+  root.append(h('div', { class: 'emu-bar' }, runBtn, stepBtn, resetBtn, h('span', { class: 'sep' }), 'Clock:', speedSel,
+    timingSel ? h('span', { class: 'sep' }) : null, timingSel ? 'Timing:' : null, timingSel, stat));
 
   const main = h('div', { class: 'emu-main' });
   root.append(main);
@@ -422,6 +432,15 @@ export function mountEmulator(container, { design, board, assignments, title = '
     refresh();
   });
   side.append(h('div', { class: 'emu-box' }, h('h4', {}, 'Watch'), sigSel, h('table', {}, watchBody)));
+  if (timing?.gens?.length) {
+    const used = new Map((design.top.params || []).map((p) => [p.name, Number(p.value?.v ?? 0)]));
+    side.append(h('div', { class: 'emu-box' }, h('h4', {}, timing.scale > 1 ? `Timing ÷${timing.scale.toLocaleString()} (emulation only)` : 'Timing generics'),
+      h('table', {}, h('tbody', {}, ...timing.gens.map((g) => h('tr', {}, h('td', {}, g.name), h('td', { style: { textAlign: 'right' } }, g.value.toLocaleString()),
+        h('td', { style: { textAlign: 'right' } }, timing.scale > 1 ? `→ ${(used.get(g.name) ?? 0).toLocaleString()}` : ''))))),
+      h('div', { class: 'emu-hint', style: { marginTop: '4px' } }, timing.scale > 1
+        ? 'Divided so that counters, dividers and debouncers advance at the emulator\'s speed (about 10^5 clock cycles per second instead of 50 MHz). The design and the bitstream are not changed.'
+        : 'Real values: at the emulator\'s speed, a design that counts millions of cycles moves very slowly.')));
+  }
   const unm = wiring.unmapped.filter((u) => !clockSigs.has(design.top.ports.find((p) => p.name === u.port)?.sig));
   if (unm.length) {
     side.append(h('div', { class: 'emu-box' }, h('h4', {}, 'Not on the board'),

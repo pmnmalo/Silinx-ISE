@@ -134,3 +134,26 @@ export function boardOutputs(wiring, t0, t1, prev = null) {
   });
   return { leds, digits };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Timing scale: designs count millions of clock cycles (dividers, debouncers); the emulator runs
+// ~10^5 cycles/s, so the large integer generics of the top are divided to make them visible.
+// ---------------------------------------------------------------------------------------------
+
+/** Integer generics of a top module ({ name, value } from its declaration defaults). */
+export function timingGenerics(params) {
+  return (params || []).map((p) => ({ name: p.name, value: Number(p.value?.v ?? p.value) }))
+    .filter((p) => Number.isFinite(p.value) && Number.isInteger(p.value) && p.value >= 1000);
+}
+
+/** Automatic factor: the largest timing generic becomes ~1000 (1 when none is large). */
+export function autoTimeScale(gens) {
+  const max = Math.max(0, ...gens.map((g) => g.value));
+  return max >= 100000 ? 10 ** (Math.floor(Math.log10(max)) - 3) : 1;
+}
+
+/** Overrides for elaborate(): every timing generic divided by `scale` (at least 1). */
+export function scaledGenerics(gens, scale) {
+  if (!scale || scale <= 1) return {};
+  return Object.fromEntries(gens.map((g) => [g.name, Math.max(1, Math.round(g.value / scale))]));
+}

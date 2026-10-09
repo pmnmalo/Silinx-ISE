@@ -7,8 +7,11 @@ set -u
 R=/opt/Xilinx/14.7/ISE_DS
 rm -rf "$R/EDK" "$R/PlanAhead"
 cd "$R/ISE" || exit 1
+# verilog/src/iSE (unisim_comp.v, ~1 MB) stays: netgen / ngc2edif need it to write netlists
+# (Silinx's Netlist mode on the board emulator runs the post-synthesis netlist)
+find verilog/src -mindepth 1 -maxdepth 1 ! -name iSE -exec rm -rf {} + 2>/dev/null
 rm -rf coregen sysgen secureip smartmodel doc java java6 ISEexamples lib/lin \
-       vhdl/hdp vhdl/src verilog/hdp verilog/src \
+       vhdl/hdp vhdl/src verilog/hdp \
        data/cse data/zynqconfig data/pcw data/coregen data/linux_flexlm_v11.11.zip data/windows_flexlm_v11.11.zip
 # device data: all families are kept by default; KEEP_FAMILIES="spartan3e spartan6 ..." removes the
 # others (the families they depend on, e.g. virtex2 for Spartan-3/3E, are always kept).

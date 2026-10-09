@@ -1163,15 +1163,23 @@ async function runSimulation(mod) {
 }
 
 // ---- Board emulator: the design (behavioural RTL) on a virtual board, wired by the UCF
-async function openEmulator(mod) {
+async function openEmulator(mod, { scale } = {}) {
   if (!mod) { toast('Select the top module first'); return; }
   await saveAll();
   const board = projectBoard();
   if (!board) { alertDlg('Board Emulator', 'The project has no board. Choose one in Project ▸ Design Properties (e.g. Digilent Basys2).'); return; }
   if (!await checkSyntax(mod)) return;
   const srcs = S.sources.filter(s => s.lang === 'vhdl' || s.lang === 'verilog');
-  let design;
-  try { design = elaborate(compile(srcs), mod); } catch (e) { alertDlg('Board Emulator', `Cannot build the design: ${e.message}`, 'error'); return; }
+  const { timingGenerics, autoTimeScale, scaledGenerics } = await import('/core/emulate.js');
+  let design, gens = [];
+  try {
+    const lib = compile(srcs);
+    design = elaborate(lib, mod);
+    // large timing generics (dividers, debouncers) divided so that the design visibly runs
+    gens = timingGenerics(design.top?.params);
+    scale ??= autoTimeScale(gens);
+    if (scale > 1 && gens.length) design = elaborate(lib, mod, { generics: scaledGenerics(gens, scale) });
+  } catch (e) { alertDlg('Board Emulator', `Cannot build the design: ${e.message}`, 'error'); return; }
   const { parseUcf } = await import('/core/ucf.js');
   const assignments = S.ucfText ? parseUcf(S.ucfText).assignments : {};
   if (!S.ucfText) log('WARNING: the project has no UCF: the ports are not connected to the board (use I/O Pin Planning).', 'warn');
@@ -1183,7 +1191,8 @@ async function openEmulator(mod) {
   openDoc({
     id, title: `Board Emulator (${mod})`, icon: 'board',
     create(el) {
-      const view = mountEmulator(el, { design, board, assignments, title: mod, files });
+      const view = mountEmulator(el, { design, board, assignments, title: mod, files,
+        timing: { gens, scale, onChange: (k) => setTimeout(() => openEmulator(mod, { scale: k }), 0) } });
       log(`Board Emulator: '${mod}' on ${board.name} — ${view.wiring.bits.length} port bit(s) on board resources${view.wiring.unmapped.length ? `, ${view.wiring.unmapped.length} not connected` : ''}.`, 'ok');
       return { destroy: () => view.destroy(), view };
     },
