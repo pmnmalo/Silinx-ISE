@@ -418,7 +418,12 @@ function elabChild(E, it) {
       pname = nonLocal[k].name;
     } else {
       const decl = mod.params.find(x => x.name === pname || (ci && x.name.toLowerCase() === pname.toLowerCase()));
-      if (!decl) { diag(E, `module '${mod.name}' has no parameter '${pname}'`, it.loc); return; }
+      if (!decl) {
+        // Silinx's own primitive models (UNISIM / SIMPRIM) ignore attributes they do not model
+        const prim = String(mod.file || '').startsWith('<silinx>/');
+        diag(E, prim ? `primitive '${mod.name}': generic '${pname}' is not modelled, ignored` : `module '${mod.name}' has no parameter '${pname}'`, it.loc, prim ? 'warning' : undefined);
+        return;
+      }
       pname = decl.name;
     }
     const n = bindExpr(E, p.value, null, it.loc);
