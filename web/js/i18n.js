@@ -253,6 +253,15 @@ const PT_PATTERNS = [
   [/^([A-Z][A-Z0-9_]*(?: [A-Z]+)?): (.+)$/, (m, a, b) => `${a}: ${t(b)}`],
 ];
 
+// t() looks strings up trimmed: the keys are trimmed the same way
+for (const k of Object.keys(PT)) { const tk = k.trim(); if (tk !== k) { if (!(tk in PT)) PT[tk] = PT[k].trim(); delete PT[k]; } }
+Object.assign(PT, {
+  'Not in sync with': 'Não sincronizado com', '— editing here updates the schematic': '— editar aqui atualiza o esquemático',
+  '— editing here updates the state machine': '— editar aqui atualiza a máquina de estados',
+  '(schematic view of this file) — editing here updates it': '(vista em esquemático deste ficheiro) — editar aqui atualiza-a',
+  '(state machine view of this file) — editing here updates it': '(vista em máquina de estados deste ficheiro) — editar aqui atualiza-a',
+});
+
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },
   pt: { name: 'Português', strings: PT, patterns: PT_PATTERNS },

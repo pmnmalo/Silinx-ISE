@@ -19,11 +19,12 @@ export function h(tag, attrs = {}, ...children) {
 
 // ------------------------------------------------------------------ dialogs
 let dialogZ = 1000;
+const dialogStack = [];   // open dialogs, innermost last: only it reacts to Enter / Escape
 export function dialog({ title, body, buttons = [{ label: 'OK', value: true, primary: true }, { label: 'Cancel', value: null }], width = 460, onOpen, className = '' }) {
   return new Promise(resolve => {
     const overlay = h('div', { class: 'dlg-overlay', style: { zIndex: ++dialogZ } });
     const content = typeof body === 'function' ? body() : body;
-    const close = v => { overlay.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
+    const close = v => { overlay.remove(); document.removeEventListener('keydown', onKey, true); dialogStack.splice(dialogStack.indexOf(overlay), 1); resolve(v); };
     const btnRow = h('div', { class: 'dlg-buttons' });
     const dlg = h('div', { class: `dlg ${className}`, style: { width: typeof width === 'number' ? `${width}px` : width } },
       h('div', { class: 'dlg-title' }, h('span', {}, title), h('button', { class: 'dlg-x', onclick: () => close(null), title: 'Close' }, '✕')),
@@ -40,6 +41,7 @@ export function dialog({ title, body, buttons = [{ label: 'OK', value: true, pri
       btnRow.append(el);
     }
     const onKey = e => {
+      if (dialogStack[dialogStack.length - 1] !== overlay) return;
       if (e.key === 'Escape') { e.stopPropagation(); close(null); }
       if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
         const p = buttons.find(b => b.primary);
@@ -47,6 +49,7 @@ export function dialog({ title, body, buttons = [{ label: 'OK', value: true, pri
       }
     };
     document.addEventListener('keydown', onKey, true);
+    dialogStack.push(overlay);
     overlay.append(dlg);
     document.body.append(overlay);
     // drag by title
@@ -128,7 +131,10 @@ function buildMenu(items) {
     } else {
       row.addEventListener('mouseenter', () => m.querySelectorAll(':scope > .menu-popup').forEach(s => s.remove()));
     }
-    if (!disabled && it.action) row.addEventListener('click', e => { e.stopPropagation(); closeMenus(); it.action(); });
+    if (!disabled && it.action) row.addEventListener('click', e => {
+      e.stopPropagation(); closeMenus();
+      Promise.resolve().then(() => it.action()).catch(err => { console.error(err); toast(`${it.label}: ${err.message || err}`, 'error'); });
+    });
     m.append(row);
   }
   return m;

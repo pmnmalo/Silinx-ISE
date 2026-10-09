@@ -511,8 +511,12 @@ export async function saveAll() {
 }
 
 async function checkSyntax(mod, sim = false) {
-  await saveAll();
   const id = sim ? 'sim-check' : 'check';
+  try { return await checkSyntaxInner(mod, sim, id); }
+  catch (e) { setStatus(id, 'err'); log(`ERROR: ${e.message}`, 'err'); return false; }
+}
+async function checkSyntaxInner(mod, sim, id) {
+  await saveAll();
   setStatus(id, 'running');
   log(`\nStarted : "${sim ? 'Behavioral Check Syntax' : 'Check Syntax'}".\n`, 'hdr');
   const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && (sim || s.role === 'design'));
@@ -590,10 +594,12 @@ function sourcesFingerprint() {
 }
 
 async function loadUcfText() {
-  S.ucfText = null;
+  let text = null;
   if (S.project?.constraints && S.fileTree?.includes(S.project.constraints)) {
-    try { S.ucfText = await api.readFile(S.project.name, S.project.constraints); } catch { /* none */ }
+    try { text = await api.readFile(S.project.name, S.project.constraints); } catch { /* none */ }
   }
+  S.ucfText = text;
+  return text;
 }
 
 async function saveImplStatus() {
@@ -605,6 +611,7 @@ async function saveImplStatus() {
 }
 
 async function restoreImplStatus() {
+  await loadUcfText();
   if (!S.project?.top) return;
   let saved = null;
   try { saved = JSON.parse(await api.readFile(S.project.name, STATUS_FILE)); } catch { /* none */ }
@@ -785,6 +792,14 @@ export async function regenerateUcf(board = projectBoard()) {
   return unmatched.length === 0;
 }
 async function runImpl(mod, steps, opts = {}) {
+  // one ISE run at a time (one build directory): checked and taken before any await
+  if (S.busy) { toast('An implementation is already running (use Stop to cancel it)', 'error'); return false; }
+  S.busy = true;
+  const pjName = S.project.name;
+  try { return await runImplInner(mod, steps, opts, pjName); }
+  finally { S.busy = false; }
+}
+async function runImplInner(mod, steps, opts, pjName) {
   let ok = false;
   if (S.project.top !== mod) {
     if (!await confirmDlg('Set Top Module', `'${mod}' is not the top-level module of the implementation.\nSet it as top and continue?`)) return;
@@ -805,7 +820,6 @@ async function runImpl(mod, steps, opts = {}) {
     log(`Process "${procName}" stopped: the constraints have errors.`, 'err');
     return;
   }
-  S.busy = true;
   // Clear the icons of the processes this run will redo (they get running/ok/warn/err as it goes).
   const runs = new Set(['synth', ...(steps.includes('translate') ? ['translate', 'impl'] : []), ...(steps.includes('map') ? ['map'] : []), ...(steps.includes('par') ? ['par'] : []), ...(steps.includes('bitgen') ? ['bitgen'] : [])]);
   for (const id of runs) S.status[id] = null;
@@ -828,14 +842,15 @@ async function runImpl(mod, steps, opts = {}) {
     track.end(res.status === 'ok');
     if (stopped) {
       // stopped by the user: the interrupted step and the ones not reached are left unmarked
-      for (const id of IMPL_IDS) if (S.status[id] === 'running' || (S.status[id] === 'err' && !track.result[id + '_ran'])) S.status[id] = null;
+      for (const id of IMPL_IDS) if (S.status[id] === 'running') S.status[id] = null;
       if (track.current) S.status[STEP_PROC[track.current]] = null;
       for (const [id, st] of Object.entries(track.result)) if (st === 'err') S.status[id] = null;
       renderProcesses();
       log('\nProcess stopped by the user.', 'warn');
       return;
     }
-    if (tc.ise.available) { await applyReportWarnings(track); saveImplStatus(); }
+    if (S.project?.name !== pjName) { log(`Implementation of '${pjName}' finished (another project is open now).`, 'info'); return res.status === 'ok'; }
+    if (tc.ise.available) { await applyReportWarnings(track); await saveImplStatus(); }
     if (res.status === 'ok' && tc.ise.available) {
       log(`\nProcess "${procName}" completed successfully${track.warnings ? ` with ${track.warnings} warning(s)` : ''}`, 'ok');
       if (extra) setStatus(procId, track.warnings ? 'warn' : 'ok');
@@ -884,6 +899,7 @@ async function textPowerReport(mod) {
 // UCF for the ports that have no LOC yet (existing LOCs are never changed).
 async function backAnnotatePins(mod) {
   if (!await runImpl(mod, [...FLOW_UP_TO.par, 'pin2ucf'])) return;
+  await loadUcfText();
   const { parseUcf } = await import('/core/ucf.js');
   let pins;
   try { pins = parseUcf(await api.readFile(S.project.name, `build/${S.project.top}_pins.ucf`)).assignments; } catch (e) { log(`WARNING: no pin file: ${e.message}`, 'warn'); return; }
@@ -896,6 +912,8 @@ async function backAnnotatePins(mod) {
   const file = S.project.constraints || `${S.project.top}.ucf`;
   const text = `${(S.ucfText || '').replace(/\s*$/, '\n')}\n# Back-annotated pin locations (pin2ucf, ${new Date().toISOString().slice(0, 10)})\n${lines.join('\n')}\n`;
   await api.writeFile(S.project.name, file, text);
+  S.ucfText = text;
+  refreshOpenEditor(file, text);
   if (!S.project.constraints) { S.project.constraints = file; await saveProjectJson(); }
   await reloadProject(false);
   log(`Back-annotated ${add.length} pin location(s) into ${file}.`, 'ok');
@@ -939,7 +957,7 @@ export function findDoc(id) { return S.docs.find(d => d.id === id); }
 export function openDoc(spec) {
   let doc = findDoc(spec.id);
   if (doc) { activateDoc(doc); return doc; }
-  doc = { ...spec, el: h('div', { class: 'doc' }) };
+  doc = { ...spec, el: h('div', { class: 'doc' }), project: S.project?.name };
   $('workspace').append(doc.el);
   doc.tab = docTab(doc);
   $('doc-tabs').append(doc.tab);
@@ -967,7 +985,9 @@ export function setDirty(doc, dirty) {
 }
 async function flushDoc(doc, opts) {
   clearTimeout(doc._autosave);
-  if (!doc.dirty || !doc.save) return;
+  if (!doc.dirty || !doc.save) return true;
+  // never write a document into another project (e.g. a retry after the project was switched)
+  if (doc.project && S.project?.name !== doc.project) return false;
   try {
     await doc.save(opts);
     if (doc._saveFailed) { doc._saveFailed = false; log(`${doc.path || doc.title} saved.`, 'ok'); }
@@ -978,11 +998,15 @@ async function flushDoc(doc, opts) {
     doc.dirty = true; doc.tab.classList.add('dirty');
     clearTimeout(doc._autosave);
     doc._autosave = setTimeout(() => flushDoc(doc, opts), 3000);
+    return false;
   }
+  return true;
 }
 
 export async function closeDoc(doc) {
-  await flushDoc(doc);
+  if (!await flushDoc(doc) && doc.dirty && !await confirmDlg('Close', `${doc.path || doc.title} could not be saved. Close it and lose the unsaved changes?`)) return false;
+  clearTimeout(doc._autosave);
+  doc.closed = true;
   doc.destroy?.();
   doc.el.remove(); doc.tab.remove();
   S.docs = S.docs.filter(d => d !== doc);
@@ -1190,7 +1214,7 @@ async function openSchematic(mod, { netlist = null } = {}) {
   if (existing) await closeDoc(existing);
   openDoc({
     id, title: `${mod} (${kindName})`, icon: 'schematic',
-    create(el) {
+    create(el, docRef) {
       const bar = h('div', { class: 'doc-toolbar rtl-crumbs' });
       const host = h('div', { class: 'doc-body' });
       el.append(bar, host);
@@ -1214,7 +1238,7 @@ async function openSchematic(mod, { netlist = null } = {}) {
         status(`Drawing ${kindName} schematic of ${inst.module}…`);
         try {
           const doc = await schematicFromHdl(inst, { sources, modules, layout: elk ? g => elk.layout(g) : undefined, lang: info?.lang || 'vhdl' });
-          if (cur !== inst) return;
+          if (cur !== inst || docRef.closed) return;
           if (!ed) {
             ed = mountSchEditor(host, {
               doc, modules, readOnly: true,
@@ -1248,6 +1272,10 @@ async function readDataFiles() {
 // model: undefined = behavioural (the HDL sources); postsynth / posttrans / postmap / postpar =
 // the testbench against that netgen netlist (compiled after the sources: its entity replaces the RTL one)
 async function runSimulation(mod, model) {
+  try { return await runSimulationInner(mod, model); }
+  catch (e) { setStatus(model ? `sim-${model}` : 'sim-run', 'err'); log(`ERROR: simulation: ${e.message}`, 'err'); }
+}
+async function runSimulationInner(mod, model) {
   await saveAll();
   if (S.project.simTop !== mod) { S.project.simTop = mod; await saveProjectJson(); }
   if (!await checkSyntax(mod, true)) return;
@@ -1287,6 +1315,7 @@ async function openEmulator(mod, { scale, model = null } = {}) {
   const board = projectBoard();
   if (!board) { alertDlg('Board Emulator', 'The project has no board. Choose one in Project ▸ Design Properties (e.g. Digilent Basys2).'); return; }
   if (!await checkSyntax(mod)) return;
+  await loadUcfText();   // the pins as they are now (pin planner / editor changes)
   // the design to run: the HDL (RTL) or a netlist generated by netgen (post-synthesis …)
   let rep = null;
   try { rep = await api.reports(S.project.name); } catch { /* standalone / no build */ }
@@ -1902,9 +1931,21 @@ async function openImpact() {
 }
 
 // ------------------------------------------------------------------ project lifecycle
+// per-project UI state (cleared when another project is opened or the project is closed)
+function resetProjectState() {
+  S.status = {}; S.sel = null; S.selKey = null; S.selProc = null; S.diags = []; S.outOfSync = {}; S.ucfText = null;
+  renderDiagnostics();
+}
+function blockedByRun(what) {
+  if (!S.busy && !S.currentJob) return false;
+  alertDlg(what, 'An implementation is running: stop it (or wait for it to finish) first.');
+  return true;
+}
+
 export async function openProject(name) {
+  if (blockedByRun('Open Project')) return;
   for (const d of [...S.docs]) if (!await closeDoc(d)) return;
-  S.status = {};
+  resetProjectState();
   try {
     S.project = await api.project(name);
   } catch (e) { alertDlg('Open Project', e.message, 'error'); return; }
@@ -1941,8 +1982,10 @@ export async function reloadProject(render = true) {
 }
 
 export async function closeProject() {
+  if (blockedByRun('Close Project')) return;
   for (const d of [...S.docs]) if (!await closeDoc(d)) return;
-  S.project = null; S.lib = null; S.sources = []; S.modules = []; S.sel = null;
+  S.project = null; S.lib = null; S.sources = []; S.modules = [];
+  resetProjectState();
   try { localStorage.removeItem('silinx.lastProject'); } catch { /* ignore */ }
   updateTitle(); renderHierarchy(); renderProcesses(); renderFilesPage(); renderLibsPage();
   showLeftPage('start');
@@ -2066,7 +2109,7 @@ function setupMenus() {
       '-',
       { label: 'Set as Top Module', action: () => S.sel?.module && setTop(S.sel.module), disabled: () => !S.sel?.module },
       { label: 'Design Properties…', action: () => wiz.projectProperties(), disabled: hasPj },
-      { label: 'Sync with .xise', action: () => api.syncXise(S.project.name, 'export').then(() => toast('Exported .xise', 'ok')), disabled: hasPj },
+      api.standalone ? null : { label: 'Sync with .xise', action: () => api.syncXise(S.project.name, 'export').then(() => toast('Exported .xise', 'ok')).catch(e => alertDlg('Sync with .xise', e.message, 'error')), disabled: hasPj },
     ] },
     { label: 'Process', items: () => [
       { label: 'Implement Top Module', icon: icon('run'), action: () => S.project?.top && runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), disabled: () => !S.project?.top || S.busy },

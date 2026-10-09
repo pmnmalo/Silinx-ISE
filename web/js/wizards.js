@@ -111,6 +111,21 @@ async function askReplaceProject(pname) {
   return confirmDlg('Replace Project',
     `A project named '${pname}' already exists.\n\nReplace it? ${api.standalone ? 'The existing project will be deleted from this browser.' : 'The existing project is moved to the workspace .trash folder.'}`);
 }
+// Replace an existing project by running `fn` (an import): the old project is removed first; if
+// the import then fails, it comes back (standalone: from a snapshot; server: it is in .trash)
+async function replaceProjectWith(pname, fn) {
+  const exists = (await api.projects()).some(p => p.name === pname);
+  const backup = exists && api.standalone && api.exportBundle ? api.exportBundle(pname) : null;
+  await removeExistingProject(pname);
+  try { return await fn(); }
+  catch (e) {
+    try { await api.deleteProject(pname); } catch { /* nothing was created */ }
+    if (backup) { try { await api.importBundle(backup); app.log(`The previous project '${pname}' was restored.`, 'info'); } catch { /* keep the error */ } }
+    else if (exists) app.log(`The previous project '${pname}' is in the workspace .trash folder.`, 'info');
+    throw e;
+  }
+}
+
 async function removeExistingProject(pname) {
   const list = await api.projects();
   if (!list.some(p => p.name === pname)) return;
@@ -282,21 +297,21 @@ export async function importXiseDialog() {
   const zf = files.find(f => /\.zip$/i.test(f.name));
   const xf = files.find(f => /\.xise$/i.test(f.name));
   if (!dirInp.files.length && !zf && !xf) return alertDlg('Import Xilinx ISE Project', 'Select the project folder, a .zip, or a .xise with its sources.', 'error');
-  const pname = name.value.trim() || (zf || xf)?.name.replace(/\.(zip|xise)$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
+  const folder = (dirInp.files[0]?.webkitRelativePath || '').split('/')[0];
+  const pname = (name.value.trim() || (zf || xf)?.name.replace(/\.(zip|xise)$/i, '') || folder || 'imported').replace(/[^A-Za-z0-9_]/g, '_');
   if (!await askReplaceProject(pname)) return;
   try {
-    await removeExistingProject(pname);
-    let res;
-    if (dirInp.files.length) {
-      const z = await zipFolderSelection(dirInp.files);
-      app.log(`Importing folder '${z.rootName}': ${z.count} file(s)${z.skipped ? `, ${z.skipped} ISE output/hidden file(s) skipped` : ''}.`, 'info');
-      res = await api.importZip(pname, z.blob);
-    } else if (zf) res = await api.importZip(pname, zf);
-    else {
+    const res = await replaceProjectWith(pname, async () => {
+      if (dirInp.files.length) {
+        const z = await zipFolderSelection(dirInp.files);
+        app.log(`Importing folder '${z.rootName}': ${z.count} file(s)${z.skipped ? `, ${z.skipped} ISE output/hidden file(s) skipped` : ''}.`, 'info');
+        return api.importZip(pname, z.blob);
+      }
+      if (zf) return api.importZip(pname, zf);
       const others = {};
       for (const f of files.filter(f => f !== xf)) others[f.name] = await f.text();
-      res = await api.importXise({ name: pname, xise: await xf.text(), files: others });
-    }
+      return api.importXise({ name: pname, xise: await xf.text(), files: others });
+    });
     await app.openProject(pname);
     app.showLeftPage('design');
     const n = res?.project?.files?.length ?? 0;
@@ -330,8 +345,7 @@ export async function importSilinxDialog() {
   const pname = name.value.trim() || zf.name.replace(/\.zip$/i, '').replace(/-silinx$/i, '').replace(/[^A-Za-z0-9_]/g, '_');
   if (!await askReplaceProject(pname)) return;
   try {
-    await removeExistingProject(pname);
-    const res = await api.importZip(pname, zf);
+    const res = await replaceProjectWith(pname, () => api.importZip(pname, zf));
     await app.openProject(pname);
     app.showLeftPage('design');
     app.log(`Imported Silinx project '${pname}' (${res?.project?.files?.length ?? 0} source file(s)${res?.extra?.length ? `, ${res.extra.length} other file(s)` : ''}).`, 'ok');
@@ -526,23 +540,27 @@ export async function addSourceDialog() {
     buttons: [{ label: 'OK', primary: true, value: true }, { label: 'Cancel', value: null }],
   });
   if (!r) return;
+  const written = [];
   for (const f of inp.files) {
     const ext = f.name.split('.').pop().toLowerCase();
     const dir = ext === 'ucf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
+    if (S.fileTree.includes(path) && !await confirmDlg('Add Copy of Source', `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, path, await f.text());
+    written.push(path);
     if (ext === 'ucf' && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
   }
-  // fix roles
+  if (!written.length) return;
+  // the association (role) of exactly the files written
   const pj = await api.project(S.project.name);
-  for (const f of inp.files) {
-    const e = pj.files.find(x => x.path.endsWith('/' + f.name));
+  for (const path of written) {
+    const e = pj.files.find(x => x.path === path);
     if (e) e.role = role.value;
   }
   delete pj.fileTree;
   await api.saveProject(pj.name, pj);
   await app.reloadProject();
-  app.log(`Added ${inp.files.length} source file(s).`, 'ok');
+  app.log(`Added ${written.length} source file(s).`, 'ok');
 }
 
 export async function sourceProperties(path) {
@@ -560,7 +578,8 @@ export async function sourceProperties(path) {
 }
 
 export async function projectProperties() {
-  const db = S.devices;
+  const db = S.devices || (S.devices = await api.devices().catch(() => null));
+  if (!db) return alertDlg("Design Properties", "The device database could not be loaded (is the Silinx server running?).", "error");
   const pj = S.project;
   const boardSel = select([['', 'None Specified'], ...db.boards.map(b => [b.id, b.name])], pj.board || '');
   const dp = devicePicker(db, pj.device);
