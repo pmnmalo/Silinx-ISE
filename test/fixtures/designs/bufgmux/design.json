@@ -1,0 +1,8 @@
+{
+  "description": "BUFGMUX clock switch between two clock inputs feeding a counter, plus a counter on the first clock",
+  "device": { "family": "spartan3e", "part": "xc3s250e", "package": "cp132", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clka", "period": 20000, "cycles": 200, "clocks": { "clkb": { "period": 17320, "offset": 3170 } }, "prob": { "sel": 0.5 }, "hold": 6 }
+}

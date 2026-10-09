@@ -1,0 +1,8 @@
+{
+  "description": "State machines (Verilog): overlapping 1101 sequence detector (Mealy) and a timed Moore controller with decoded outputs, synchronous reset",
+  "device": { "family": "spartan3e", "part": "xc3s500e", "package": "fg320", "speed": "-4" },
+  "top": "top",
+  "files": ["top.v"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 300, "prob": { "rst": 0.03, "go": 0.3 } }
+}

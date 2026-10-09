@@ -1,0 +1,8 @@
+{
+  "description": "Single-port block RAMs: WRITE_FIRST 1024x8, READ_FIRST 512x16 with initial contents, NO_CHANGE 4096x4",
+  "device": { "family": "spartan3e", "part": "xc3s500e", "package": "fg320", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 300, "ranges": { "addr": [0, 31] }, "prob": { "en": 0.85 } }
+}

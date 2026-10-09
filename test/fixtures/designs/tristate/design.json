@@ -1,0 +1,8 @@
+{
+  "description": "Tri-state I/O: 8-bit inout bus (IOBUF) captured into a register, 4-bit tri-state output with a registered enable (OBUFT); simulated through a harness with an external bus driver",
+  "device": { "family": "spartan3e", "part": "xc3s500e", "package": "fg320", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 200, "harness": "harness.vhd" }
+}

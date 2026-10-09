@@ -1,0 +1,8 @@
+{
+  "description": "Distributed RAMs: 16x8 single port and 32x4 dual port (asynchronous reads), 64x2 single port with initial contents and a registered read",
+  "device": { "family": "spartan3e", "part": "xc3s250e", "package": "cp132", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 300 }
+}

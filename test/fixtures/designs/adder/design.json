@@ -1,0 +1,8 @@
+{
+  "description": "Carry chain (Verilog): registered 16-bit adder / subtractor with carry in / out, unsigned and signed comparators, equality, accumulator",
+  "device": { "family": "spartan3e", "part": "xc3s250e", "package": "cp132", "speed": "-4" },
+  "top": "top",
+  "files": ["top.v"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 300, "equalBias": { "a": "b" } }
+}

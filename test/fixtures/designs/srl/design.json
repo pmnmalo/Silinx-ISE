@@ -1,0 +1,8 @@
+{
+  "description": "Shift registers in SRL16 LUTs: dynamic-tap 16x4 with clock enable and initial contents, fixed 20-cycle delay, falling-edge 8x2",
+  "device": { "family": "spartan3e", "part": "xc3s250e", "package": "cp132", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 300, "prob": { "ce": 0.7 } }
+}

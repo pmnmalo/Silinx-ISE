@@ -1,0 +1,8 @@
+NET "clka" LOC = "B8" ;
+NET "clkb" LOC = "M6" ;
+NET "clka" TNM_NET = "clka" ;
+NET "clkb" TNM_NET = "clkb" ;
+TIMESPEC "TS_clka" = PERIOD "clka" 20 ns HIGH 50% ;
+TIMESPEC "TS_clkb" = PERIOD "clkb" 17.32 ns HIGH 50% ;
+NET "clka" CLOCK_DEDICATED_ROUTE = FALSE ;
+NET "clkb" CLOCK_DEDICATED_ROUTE = FALSE ;

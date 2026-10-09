@@ -1,0 +1,10 @@
+{
+  "description": "Block RAM primitives instantiated in the RTL: RAMB16_S9_S36 (asymmetric ports, WRITE_FIRST / READ_FIRST, INIT_xx / INITP_xx, INIT, SRVAL) and RAMB16_S18 (NO_CHANGE)",
+  "device": { "family": "spartan3e", "part": "xc3s500e", "package": "fg320", "speed": "-4" },
+  "top": "top",
+  "files": ["top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 300, "ranges": { "addr_a": [0, 63], "addr_b": [0, 15] },
+           "prob": { "en_a": 0.9, "en_b": 0.9, "ssr_a": 0.08, "ssr_b": 0.08, "we_a": 0.4, "we_b": 0.3 },
+           "distinct": [{ "a": "addr_a", "b": "addr_b", "shiftA": 2, "mask": 511 }] }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "The repository's blinky example (examples/blinky, Basys2): mixed VHDL / Verilog, prescaler, ASM-chart speed control, knight-rider pattern; generics reduced (DIV = 2, DEBOUNCE = 3) so that it moves within a few hundred cycles",
+  "device": { "family": "spartan3e", "part": "xc3s250e", "package": "cp132", "speed": "-4" },
+  "top": "top",
+  "files": ["counter.v", "knight.vhd", "speed_ctrl.vhd", "top.vhd"],
+  "ucf": "top.ucf",
+  "sim": { "clock": "clk", "period": 20000, "cycles": 400, "start": { "sw": 1 }, "bitprob": { "sw": [0.01, 0.5, 0.15, 0.3] },
+           "hold": 12 }
+}
