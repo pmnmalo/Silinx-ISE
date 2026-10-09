@@ -350,6 +350,13 @@ function moduleContextMenu(e, mod, file) {
   ].filter(Boolean), e.clientX, e.clientY);
 }
 function fileContextMenu(e, file) {
+  if (!S.fileTree.includes(file)) {   // a file of the folder that is not in the project
+    popupMenu([
+      { label: 'Add to Project', action: () => addToProject(file).then(() => log(`${file} added to the project.`, 'ok')) },
+      { label: 'Open', action: () => openFile(file) },
+    ], e.clientX, e.clientY);
+    return;
+  }
   popupMenu([
     { label: 'Open', action: () => openFile(file) },
     { label: 'Rename…', action: () => renameDialog(file) },
@@ -380,10 +387,55 @@ export async function saveProjectJson() {
   S.project = await api.saveProject(S.project.name, S.project);
 }
 
+// Remove from Project: the file stays in the project folder (as in ISE); Undo / Add to Project
+// bring it back. HDL files leave the file list; other files (diagrams, tables, UCF) are listed in
+// project.excluded so that the project ignores them.
+// project-list changes (remove / undo / add) run one at a time: an Undo clicked while the removal
+// is still being saved waits for it
+function serialOp(fn) {
+  const run = () => fn();
+  S.opChain = (S.opChain || Promise.resolve()).then(run, run);
+  return S.opChain;
+}
+
 async function removeFile(file) {
-  if (!await confirmDlg('Remove Source', `Remove '${file}' from the project?\n(The file is deleted from the project folder.)`)) return;
-  closeDocByPath(file);
-  await api.deleteFile(S.project.name, file);
+  if (!await confirmDlg('Remove Source', `Remove '${file}' from the project?\n(The file stays in the project folder: Undo or Add to Project in the Files view brings it back.)`)) return;
+  await saveAll();
+  for (const d of [...S.docs]) if (d.path === file || String(d.id || '').endsWith(`:${file}`)) await closeDoc(d);
+  return serialOp(() => removeNow(file));
+}
+async function removeNow(file) {
+  const pj = S.project;
+  const undo = { project: pj.name, path: file, entry: pj.files.find(f => f.path === file) || null, constraints: pj.constraints === file };
+  if (undo.entry) pj.files = pj.files.filter(f => f.path !== file);
+  if (undo.constraints) pj.constraints = '';
+  if (!undo.entry) pj.excluded = [...new Set([...(pj.excluded || []), file])];
+  S.lastRemoval = undo;   // before the reload: Undo is available as soon as the file is out
+  await saveProjectJson();
+  await reloadProject();
+  log(`Removed ${file} from the project (the file is kept in the project folder).`, 'info');
+  toast(`Removed ${file.split('/').pop()} from the project`, 'info', 10000, { label: 'Undo', run: () => undoRemove() });
+}
+
+// undo the last Remove from Project
+function undoRemove() { return serialOp(undoRemoveNow); }
+async function undoRemoveNow() {
+  const u = S.lastRemoval;
+  if (!u || u.project !== S.project?.name) return;
+  S.lastRemoval = null;
+  await addNow(u.path, u);
+  log(`Undo: ${u.path} is back in the project.`, 'ok');
+}
+
+// put a file of the project folder (back) into the project
+function addToProject(file, undo = null) { return serialOp(() => addNow(file, undo)); }
+async function addNow(file, undo = null) {
+  const pj = S.project;
+  pj.excluded = (pj.excluded || []).filter(f => f !== file);
+  const lang = /\.vhdl?$/i.test(file) ? 'vhdl' : /\.(v|sv)$/i.test(file) ? 'verilog' : null;
+  if (lang && !pj.files.some(f => f.path === file)) pj.files.push(undo?.entry || { path: file, lang, role: /^(sim|tb|test)\//.test(file) || /(^|\/)tb_|_tb\./.test(file) ? 'sim' : 'design' });
+  if (undo?.constraints || (/\.ucf$/i.test(file) && !pj.constraints)) pj.constraints = file;
+  await saveProjectJson();
   await reloadProject();
 }
 
@@ -2500,9 +2552,22 @@ export async function openProject(name) {
   openSummary({ background: true });
 }
 
-export async function reloadProject(render = true) {
+// Reloads run one after the other, in call order: two reloads close together (e.g. Remove from
+// Project then Undo) could otherwise finish out of order and leave the older state on screen.
+export function reloadProject(render = true) {
+  const run = () => reloadProjectNow(render);
+  S.reloadChain = (S.reloadChain || Promise.resolve()).then(run, run);
+  return S.reloadChain;
+}
+
+async function reloadProjectNow(render = true) {
+  if (!S.project) return null;
   const pj = await api.project(S.project.name);
-  S.fileTree = pj.fileTree;
+  // the files on disk; the project ignores the ones removed from it (project.excluded, unregistered HDL)
+  S.diskTree = pj.fileTree || [];
+  const out = new Set(pj.excluded || []);
+  const hdlIn = new Set((pj.files || []).map(f => f.path));
+  S.fileTree = S.diskTree.filter(f => !out.has(f) && (!/\.(vhdl?|v|sv)$/i.test(f) || hdlIn.has(f)));
   delete pj.fileTree;
   S.project = pj;
   S.sources = await api.sources(pj.name);
@@ -2579,7 +2644,8 @@ function renderFilesPage() {
   const tbl = h('table', { class: 'grid' }, h('tr', {}, h('th', {}, 'File Name'), h('th', {}, 'Association'), h('th', {}, 'Language')));
   // files sorted by path, each folder as a row of its own (right-click: rename / delete the folder)
   const reg = new Map(S.project.files.map(f => [f.path, f]));
-  const paths = [...new Set([...S.project.files.map(f => f.path), ...S.fileTree])].sort((a, b) => a.localeCompare(b));
+  const inProject = new Set(S.fileTree);
+  const paths = [...new Set([...S.project.files.map(f => f.path), ...(S.diskTree || S.fileTree)])].sort((a, b) => a.localeCompare(b));
   const shown = new Set();
   for (const path of paths) {
     const parts = path.split('/');
@@ -2594,7 +2660,7 @@ function renderFilesPage() {
     const pad = { paddingLeft: `${4 + (parts.length - 1) * 14}px` };
     tbl.append(h('tr', { 'data-file': path, ondblclick: () => openFile(path), oncontextmenu: e => { e.preventDefault(); fileContextMenu(e, path); } },
       h('td', { style: pad }, path),
-      h('td', {}, f ? (f.role === 'sim' ? 'Simulation' : f.role === 'impl' ? 'Implementation' : 'All') : path === S.project.constraints ? 'Implementation' : '—'),
+      h('td', {}, !inProject.has(path) ? 'Not in project' : f ? (f.role === 'sim' ? 'Simulation' : f.role === 'impl' ? 'Implementation' : 'All') : path === S.project.constraints ? 'Implementation' : '—'),
       h('td', {}, f ? f.lang : path.split('.').pop())));
   }
   host.append(tbl);
@@ -2696,6 +2762,7 @@ function setupMenus() {
     ].filter(Boolean) },
     { label: 'Edit', items: () => [
       { label: 'Undo', icon: icon('undo'), action: () => S.active?.editor?.exec('undo'), shortcut: 'Ctrl+Z', disabled: () => !S.active?.editor },
+      { label: 'Undo Remove from Project', action: () => undoRemove(), disabled: () => !S.lastRemoval || S.lastRemoval.project !== S.project?.name },
       { label: 'Redo', icon: icon('redo'), action: () => S.active?.editor?.exec('redo'), shortcut: 'Ctrl+Y', disabled: () => !S.active?.editor },
       '-',
       { label: 'Find…', icon: icon('find'), action: () => S.active?.editor?.exec('findPersistent'), shortcut: 'Ctrl+F', disabled: () => !S.active?.editor },

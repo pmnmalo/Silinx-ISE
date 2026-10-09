@@ -209,15 +209,43 @@ uiTest('Files view: rename a file into another folder, remove a file (right-clic
   assert.match(await readWs(env, 'FilesPj', 'rtl/core/a.vhd'), /entity a is/);
   await assert.rejects(fs.access(path.join(env.server.workspace, 'FilesPj', 'src/a.vhd')));
   await page.waitConsole(/Rename: src\/a\.vhd → rtl\/core\/a\.vhd\./);
-  // remove src/b.v (confirmation)
+  // remove src/b.v (confirmation): out of the project, but the file stays in the folder ("Not in project")
+  await page.rightClick('#files-page tr', { index: await row('src/b.v') });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Remove from Project' });
+  await page.waitDialog('Remove Source');
+  assert.match(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().innerText), /The file stays in the project folder/);
+  await page.dialogButton('Yes');
+  await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'));
+  await fs.access(path.join(env.server.workspace, 'FilesPj', 'src/b.v'));   // still on disk
+  await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].some((r) => r.cells[0]?.textContent === 'src/b.v' && r.cells[1]?.textContent === 'Not in project'), [], { what: 'Not in project row' });
+  assert.ok(!(await page.eval(() => [...document.querySelectorAll('#hier .lbl')].map((e) => e.textContent))).includes('b'));
+  // Undo (the toast button): back in the project
+  await page.click('.toast .toast-action', { text: 'Undo' });
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v' && f.role === 'design'), [], { what: 'undo: b.v back' });
+  await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].some((r) => r.cells[0]?.textContent === 'src/b.v' && r.cells[1]?.textContent === 'All'), [], { what: 'b.v row in the project again' });
+  // remove again, then Edit ▸ Undo Remove from Project
   await page.rightClick('#files-page tr', { index: await row('src/b.v') });
   await page.waitForSelector('body > .menu-popup');
   await page.click('body > .menu-popup .mi', { text: 'Remove from Project' });
   await page.waitDialog('Remove Source');
   await page.dialogButton('Yes');
   await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'));
-  await assert.rejects(fs.access(path.join(env.server.workspace, 'FilesPj', 'src/b.v')));
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#files-page tr')].slice(1).map((r) => r.cells[0].textContent)).then((x) => x.filter((p) => /\.(vhd|v)$/.test(p))), ['rtl/core/a.vhd']);
+  await page.menu('Edit', 'Undo Remove from Project');
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'Edit undo: b.v back' });
+  await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].some((r) => r.cells[0]?.textContent === 'src/b.v' && r.cells[1]?.textContent === 'All'), [], { what: 'b.v row in the project again' });
+  // remove once more, then right-click the "Not in project" row ▸ Add to Project
+  await page.rightClick('#files-page tr', { index: await row('src/b.v') });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Remove from Project' });
+  await page.waitDialog('Remove Source');
+  await page.dialogButton('Yes');
+  await page.waitFor(() => !window.Silinx.project.files.some((f) => f.path === 'src/b.v'));
+  await page.waitFor(() => [...document.querySelectorAll('#files-page tr')].some((r) => r.cells[1]?.textContent === 'Not in project'));
+  await page.rightClick('#files-page tr', { index: await row('src/b.v') });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Add to Project' });
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/b.v'), [], { what: 'Add to Project' });
 });
 
 uiTest('Files view: rename a folder (its files and subfolders follow, still registered), delete a folder', E, async (page) => {
@@ -341,4 +369,27 @@ uiTest('New Project wizard: Top-Level Source Type Schematic / FSM / ASM / Truth 
   assert.deepEqual(await page.eval(() => { const s = document.querySelectorAll('.dlg-overlay .wiz-main select')[6]; return [s.value, s.disabled]; }), ['hdl', true]);
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
+});
+
+uiTest('Remove from Project of a diagram (ASM chart): it leaves the hierarchy, the file stays; Undo brings it back', E, async (page) => {
+  const { newModel } = await import('../../core/asm.js');
+  await makeProject(env, { name: 'ExclPj', files: { 'src/ctl.asm.json': JSON.stringify(newModel('ctl', 'vhdl'), null, 2) } });
+  await page.openProject('ExclPj');
+  const inHier = () => page.eval(() => [...document.querySelectorAll('#hier .row')].some((r) => r.textContent.includes('ctl.asm.json')));
+  await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => r.textContent.includes('ctl.asm.json')), [], { what: 'chart in the hierarchy' });
+  await page.click('#left-tabs .tab[data-page=files]');
+  const idx = await page.waitFor(() => { const i = [...document.querySelectorAll('#files-page tr')].findIndex((tr) => tr.cells[0]?.textContent === 'src/ctl.asm.json'); return i >= 0 ? i + 1 : 0; }) - 1;
+  await page.rightClick('#files-page tr', { index: idx });
+  await page.waitForSelector('body > .menu-popup');
+  await page.click('body > .menu-popup .mi', { text: 'Remove from Project' });
+  await page.waitDialog('Remove Source');
+  await page.dialogButton('Yes');
+  await page.waitFor(() => (window.Silinx.project.excluded || []).includes('src/ctl.asm.json'), [], { what: 'chart excluded' });
+  await fs.access(path.join(env.server.workspace, 'ExclPj', 'src/ctl.asm.json'));
+  await page.click('#left-tabs .tab[data-page=design]');
+  await page.waitFor(() => ![...document.querySelectorAll('#hier .row')].some((r) => r.textContent.includes('ctl.asm.json')), [], { what: 'chart left the hierarchy' });
+  await page.click('.toast .toast-action', { text: 'Undo' });
+  await page.waitFor(() => !(window.Silinx.project.excluded || []).includes('src/ctl.asm.json'), [], { what: 'undo' });
+  await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => r.textContent.includes('ctl.asm.json')), [], { what: 'chart back in the hierarchy' });
+  assert.ok(await inHier());
 });

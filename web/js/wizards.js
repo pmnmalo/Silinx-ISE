@@ -431,7 +431,7 @@ export async function importSilinxDialog() {
 export function replaceGuard(title) {
   const ok = new Set();
   return async (path) => {
-    if (!S.fileTree.includes(path) || ok.has(path)) return null;
+    if (!(S.diskTree || S.fileTree).includes(path) || ok.has(path)) return null;   // on disk (also a file removed from the project)
     if (await confirmDlg(title, `${path} already exists.\n\nReplace it? Its current contents will be lost.`)) { ok.add(path); return null; }
     return `${path} already exists: choose another name.`;
   };
@@ -692,7 +692,7 @@ export async function addSourceDialog() {
     const ext = f.name.split('.').pop().toLowerCase();
     const dir = ext === 'ucf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
-    if (S.fileTree.includes(path) && !await confirmDlg('Add Copy of Source', `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
+    if ((S.diskTree || S.fileTree).includes(path) && !await confirmDlg('Add Copy of Source', `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, path, await f.text());
     written.push(path);
     if (ext === 'ucf' && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }

@@ -147,3 +147,15 @@ test('a second implementation of the same project is refused with 409 while the 
   for (let i = 0; i < 200 && jobs.getJob(a.body.job).status === 'running'; i++) await new Promise(r => setTimeout(r, 20));
   assert.equal((await call('POST', '/projects/Impl/implement', { generateOnly: true })).status, 200);
 });
+
+test('a file removed from the project (excluded) is back in it when it is written again; the file itself is kept', async () => {
+  await P.createProject({ name: 'Excl1', template: 'empty' });
+  await P.writeFile('Excl1', 'src/ctrl.asm.json', '{"name":"ctrl"}');
+  await P.updateProject('Excl1', pj => { pj.excluded = ['src/ctrl.asm.json']; });
+  let pj = await P.readProject('Excl1');
+  assert.deepEqual(pj.excluded, ['src/ctrl.asm.json']);
+  await P.writeFile('Excl1', 'src/ctrl.asm.json', '{"name":"ctrl2"}');
+  pj = await P.readProject('Excl1');
+  assert.deepEqual(pj.excluded, []);
+  assert.equal(await P.readFile('Excl1', 'src/ctrl.asm.json'), '{"name":"ctrl2"}');
+});

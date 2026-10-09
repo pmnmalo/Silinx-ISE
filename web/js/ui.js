@@ -186,10 +186,12 @@ export function splitter(handle, target, { dir = 'h', min = 80, max = 2000, inve
   });
 }
 
-export function toast(msg, kind = 'info', ms = 3000) {
+// action (optional): { label, run } — a button in the toast (e.g. Undo)
+export function toast(msg, kind = 'info', ms = 3000, action = null) {
   let host = document.querySelector('.toasts');
   if (!host) { host = h('div', { class: 'toasts' }); document.body.append(host); }
   const t = h('div', { class: `toast toast-${kind}` }, msg);
+  if (action) t.append(' ', h('button', { class: 'btn toast-action', onclick: () => { t.remove(); action.run(); } }, action.label));
   host.append(t);
   setTimeout(() => t.remove(), ms);
 }

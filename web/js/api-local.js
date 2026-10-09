@@ -31,6 +31,7 @@ function cleanPath(p) {
 const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.ucf$/i.test(p) ? 'ucf' : 'text');
 
 function writeFileSync(name, path, text) {
+  { const pp = proj(name); if ((pp.json.excluded || []).includes(path)) pp.json.excluded = pp.json.excluded.filter(f => f !== path); }   // written again: back in the project
   const pj = proj(name);
   path = cleanPath(path);
   pj.files[path] = text;
