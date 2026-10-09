@@ -273,6 +273,7 @@
 .sch-editor .se-symdoc .sd-truth td.x { color: #8a8a8a; }
 .sch-editor .se-symdoc .sd-truth td.out { background: #fbfcf2; font-weight: bold; }
 .sch-editor .se-symdoc .sd-truth td.v1 { color: #007000; }
+.sch-editor .se-symdoc .sd-truth td.vZ { color: #1f5fff; font-weight: bold; }
 .sch-editor .se-symdoc .sd-mode td.out { font-family: inherit; white-space: nowrap; }
 .sch-editor .se-symdoc .sd-switch { display: flex; gap: 4px; margin: 2px 0 4px; }
 .sch-editor .se-symdoc .btn.on { background: linear-gradient(#dcebfc, #c1dcfc); border-color: #3c7fb1; }

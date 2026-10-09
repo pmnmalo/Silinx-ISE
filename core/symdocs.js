@@ -65,6 +65,7 @@ const UI = {
   'Change the parameters to see the tables and the HDL update (the placed symbol is not changed).': 'Altere os parâmetros para ver as tabelas e o HDL atualizarem (o símbolo colocado não é alterado).',
   'Used as': 'Usado como',
   'Priority': 'Prioridade',
+  'Z = high impedance: the output is released (not driven), so another driver can set the net.': 'Z = alta impedância: a saída fica libertada (não é forçada), para que outro driver possa definir a rede.',
 };
 /** Datasheet UI text in a language (English key). */
 export function T(key, lang) { return lang === 'pt' ? (UI[key] ?? key) : key; }
@@ -77,6 +78,7 @@ const PARAM_PT = {
   'Type': 'Tipo', 'Bus pins (I, A)': 'Pinos em barramento (I, A)', 'Carry in': 'Transporte de entrada (carry in)',
   'Carry out': 'Transporte de saída (carry out)', 'Operation': 'Operação', 'Signed': 'Com sinal', 'Value': 'Valor',
   'Clock enable': 'Habilitação do relógio', 'Reset': 'Reset', 'Reset/INIT value': 'Valor de reset/INIT', 'Direction': 'Sentido',
+  'Enable input': 'Entrada de habilitação', 'One pin per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)',
   'MSB index': 'Índice do MSB', 'LSB index': 'Índice do LSB', 'Input widths (MSB first)': 'Larguras das entradas (MSB primeiro)',
 };
 export const PARAM_LABELS_PT = PARAM_PT;
@@ -99,7 +101,8 @@ export function presetOf(type, params = {}) {
   const p = { ...defaultParams(type), ...params };
   for (const pr of S.presets) {
     const full = { ...defaultParams(type), ...pr.params };
-    if (Object.keys(full).every(k => COSMETIC.has(k) || String(full[k]) === String(p[k]))) return pr.title;
+    // width / bus pins do not name a preset unless the preset sets them (BUFE8 vs BUFE16)
+    if (Object.keys(full).every(k => (COSMETIC.has(k) && !(k in pr.params)) || String(full[k]) === String(p[k]))) return pr.title;
   }
   return null;
 }
@@ -119,6 +122,11 @@ export const XILINX_SYMBOLS = (() => {
   for (const w of [8, 16, 32]) { X[`INV${w}`] = { type: 'inv', params: { width: w } }; X[`BUF${w}`] = { type: 'buf', params: { width: w } }; }
   for (const b of ['IBUF', 'OBUF', 'IBUFG', 'BUFG', 'BUFGP']) X[b] = { type: 'buf', params: { width: 1 } };
   X.M2_1 = { type: 'mux2', params: { width: 1 } };
+  for (const en of ['E', 'T']) {
+    X[`BUF${en}`] = { type: 'tbuf', params: { width: 1, enable: en } };
+    X[`BUF${en}4`] = { type: 'tbuf', params: { width: 4, enable: en, bits: true } };
+    for (const w of [8, 16]) X[`BUF${en}${w}`] = { type: 'tbuf', params: { width: w, enable: en, bits: false } };
+  }
   for (const k of [2, 3, 4]) X[`D${k}_${1 << k}E`] = { type: 'decoder', params: { n: k, en: true, bus: false } };
   X.VCC = { type: 'vcc', params: {} };
   X.GND = { type: 'gnd', params: {} };
@@ -238,6 +246,24 @@ function describe(type, p, tx, preset) {
   switch (type) {
     case 'inv': return { text: [tx("The inverter (NOT gate) outputs the complement of its input: O = 1 when I = 0 and O = 0 when I = 1. It negates a condition or an active-low signal (e.g. a button that reads 0 when pressed).", "O inversor (porta NOT) dá na saída o complemento da entrada: O = 1 quando I = 0 e O = 0 quando I = 1. Nega uma condição ou um sinal ativo a 0 (p. ex. um botão que lê 0 quando premido)."), widthNote], formula: "O = I'" };
     case 'buf': return { text: [tx('The buffer copies its input to its output (O = I). Logically it is a wire: it connects two nets with different names (e.g. an internal signal to an output marker) and stands for the Xilinx buffers BUF, IBUF, OBUF and BUFG (clock buffer), whose electrical role is handled by the implementation tools.', 'O buffer copia a entrada para a saída (O = I). Logicamente é um fio: liga duas redes com nomes diferentes (p. ex. um sinal interno a um marcador de saída) e representa os buffers Xilinx BUF, IBUF, OBUF e BUFG (buffer de relógio), cujo papel elétrico é tratado pelas ferramentas de implementação.'), widthNote], formula: 'O = I' };
+    case 'tbuf': {
+      const low = p.enable === 'T', en = low ? 'T' : 'E';
+      const bits = W > 1 && !!p.bits;
+      const name = preset ? ` (Xilinx ${preset})` : '';
+      const t = [low
+        ? tx(`The tri-state buffer with active-low enable${name} copies its input to its output while T = 0 (O = I) and releases the output while T = 1: O is then Z, high impedance, as if the buffer were disconnected from the net. Several tri-state buffers (and bidirectional pins) may drive the same net, a bus, as long as only one of them is enabled at a time.`,
+          `O buffer de três estados com habilitação ativa a 0${name} copia a entrada para a saída enquanto T = 0 (O = I) e liberta a saída enquanto T = 1: O fica então em Z, alta impedância, como se o buffer estivesse desligado da rede. Vários buffers de três estados (e pinos bidirecionais) podem ligar à mesma rede, um barramento, desde que só um deles esteja habilitado de cada vez.`)
+        : tx(`The tri-state buffer with active-high enable${name} copies its input to its output while E = 1 (O = I) and releases the output while E = 0: O is then Z, high impedance, as if the buffer were disconnected from the net. Several tri-state buffers (and bidirectional pins) may drive the same net, a bus, as long as only one of them is enabled at a time.`,
+          `O buffer de três estados com habilitação ativa a 1${name} copia a entrada para a saída enquanto E = 1 (O = I) e liberta a saída enquanto E = 0: O fica então em Z, alta impedância, como se o buffer estivesse desligado da rede. Vários buffers de três estados (e pinos bidirecionais) podem ligar à mesma rede, um barramento, desde que só um deles esteja habilitado de cada vez.`),
+      tx(`The value of a shared net is resolved: one enabled buffer sets it, with all of them released it is Z (floating), and two enabled buffers driving different values are a conflict (X, shown in red by the simulation) — in real hardware a short circuit. The enables are therefore usually produced by a decoder, so that exactly one source drives the bus. ${low ? 'T' : 'E'} works as the output enable of the source (BUFT: T = "three-state", 1 = released).`,
+        `O valor de uma rede partilhada é resolvido: um buffer habilitado define-o, com todos libertados fica em Z (flutuante), e dois buffers habilitados com valores diferentes são um conflito (X, mostrado a vermelho pela simulação) — no hardware real um curto-circuito. Por isso as habilitações vêm normalmente de um descodificador, para que exatamente uma fonte controle o barramento. ${low ? 'T' : 'E'} funciona como a habilitação de saída da fonte (BUFT: T = "three-state", 1 = libertado).`),
+      tx('Typical uses: a data bus shared by several registers or a memory, and bidirectional FPGA pins (an output buffer with enable towards an inout I/O marker, read back through the same net). Inside current FPGAs there are no internal tri-state lines: ISE turns internal tri-state buses into multiplexers; at the pins they are real (OBUFT / IOBUF).',
+        'Usos típicos: um barramento de dados partilhado por vários registos ou uma memória, e pinos bidirecionais da FPGA (um buffer de saída com habilitação para um marcador de E/S inout, lido de volta pela mesma rede). Dentro das FPGAs atuais não há linhas de três estados internas: o ISE transforma os barramentos internos de três estados em multiplexadores; nos pinos são reais (OBUFT / IOBUF).')];
+      if (W > 1) t.push(bits
+        ? tx(`Each of the ${W} bits has its own pins (I0..I${W - 1}, O0..O${W - 1}, as the Xilinx ${en === 'T' ? 'BUFT4' : 'BUFE4'}); one enable ${en} controls all of them.`, `Cada um dos ${W} bits tem os seus pinos (I0..I${W - 1}, O0..O${W - 1}, como o Xilinx ${en === 'T' ? 'BUFT4' : 'BUFE4'}); uma única habilitação ${en} controla todos.`)
+        : tx(`I and O are ${W}-bit buses; one enable ${en} controls all the bits.`, `I e O são barramentos de ${W} bits; uma única habilitação ${en} controla todos os bits.`));
+      return { text: t, formula: low ? 'O = T ? Z : I' : 'O = E ? I : Z' };
+    }
     case 'mux2': return { text: [tx('The 2:1 multiplexer (M2_1) selects one of its two data inputs and copies it to the output: O = D0 when S0 = 0 and O = D1 when S0 = 1. A multiplexer is a switch controlled by a digital signal: it chooses between two data sources (e.g. load a new value or keep the old one in a register), builds wider multiplexers as trees, and with constants on the data inputs implements any function of one variable.',
       'O multiplexador 2:1 (M2_1) seleciona uma das duas entradas de dados e copia-a para a saída: O = D0 quando S0 = 0 e O = D1 quando S0 = 1. Um multiplexador é um comutador controlado por um sinal digital: escolhe entre duas fontes de dados (p. ex. carregar um valor novo ou manter o antigo num registo), constrói multiplexadores maiores em árvore e, com constantes nas entradas de dados, implementa qualquer função de uma variável.'), widthNote], formula: "O = S0'·D0 + S0·D1" };
     case 'mux4': return { text: [tx('The 4:1 multiplexer (M4_1) copies to its output the data input whose index is the 2-bit select value S: O = D0, D1, D2 or D3 for S = 00, 01, 10, 11 (S(1) is the most significant bit). It selects one of four data sources (e.g. the operation result of a small ALU); with the select bits as variables and constants 0 / 1 on the data inputs it implements any function of two variables.',
@@ -327,6 +353,13 @@ function pinFunc(type, p, pin, tx) {
   switch (type) {
     case 'inv': return n === 'I' ? tx('Input', 'Entrada') : tx('Output, the complement of I', 'Saída, o complemento de I');
     case 'buf': return n === 'I' ? tx('Input', 'Entrada') : tx('Output, equal to I', 'Saída, igual a I');
+    case 'tbuf': {
+      const bit = i != null ? tx(` (bit ${i})`, ` (bit ${i})`) : '';
+      if (n === 'E') return tx('Enable, active high: 1 = O drives I, 0 = O released (Z)', 'Habilitação, ativa a 1: 1 = O copia I, 0 = O libertada (Z)');
+      if (n === 'T') return tx('Three-state control, active low: 0 = O drives I, 1 = O released (Z)', 'Controlo de três estados, ativo a 0: 0 = O copia I, 1 = O libertada (Z)');
+      if (/^I/.test(n)) return tx(`Data input${bit}`, `Entrada de dados${bit}`);
+      return tx(`Tri-state output${bit}: I while enabled, else Z (may share its net with other tri-state outputs)`, `Saída de três estados${bit}: I enquanto habilitada, senão Z (pode partilhar a rede com outras saídas de três estados)`);
+    }
     case 'mux2': case 'mux4':
       if (n === 'O') return tx('Output: the selected data input', 'Saída: a entrada de dados selecionada');
       if (n === 'S0') return tx('Select: 0 = D0, 1 = D1', 'Seleção: 0 = D0, 1 = D1');
@@ -408,6 +441,8 @@ function paramMeaning(type, d, p, tx) {
     case 'en': return type === 'decoder' ? tx('Adds the enable input E (without it the decoder is always enabled)', 'Acrescenta a entrada de habilitação E (sem ela o descodificador está sempre habilitado)')
       : tx('Adds the clock enable input CE (without it every rising edge acts)', 'Acrescenta a entrada de habilitação do relógio CE (sem ela todos os flancos ascendentes atuam)');
     case 'bus': return tx('Draws the multi-bit pins as one bus pin instead of one pin per bit (same function)', 'Desenha os pinos de vários bits como um único pino em barramento em vez de um pino por bit (mesma função)');
+    case 'enable': return tx('E: enable active high (BUFE, O = I when E = 1); T: three-state control active low (BUFT, O = I when T = 0)', 'E: habilitação ativa a 1 (BUFE, O = I quando E = 1); T: controlo de três estados ativo a 0 (BUFT, O = I quando T = 0)');
+    case 'bits': return tx('With Width > 1: one pin per bit (I0.., O0.., as BUFE4 / BUFT4) instead of the bus pins I and O (same function)', 'Com Largura > 1: um pino por bit (I0.., O0.., como BUFE4 / BUFT4) em vez dos pinos em barramento I e O (mesma função)');
     case 'mode': return tx('priority: the highest active input wins; one-hot: OR of the indexes (inputs assumed one-hot)', 'prioridade: ganha a entrada ativa de maior índice; one-hot: OR dos índices (assume entradas one-hot)');
     case 'cin': return tx('Adds the carry in input CI', 'Acrescenta a entrada de transporte CI');
     case 'cout': return tx('Adds the carry out output CO', 'Acrescenta a saída de transporte CO');

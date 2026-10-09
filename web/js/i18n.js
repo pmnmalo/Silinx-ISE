@@ -215,6 +215,11 @@ const PT = {
   'Address bits': 'Bits de endereço', 'Enable input E': 'Entrada de habilitação E', 'Bus pins (A, D)': 'Pinos em barramento (A, D)',
   'Output bits': 'Bits de saída', 'Bus pins (I, A)': 'Pinos em barramento (I, A)', 'Select bits': 'Bits de seleção', 'Type': 'Tipo',
   'priority': 'prioridade',
+  // tri-state buffers (BUFE / BUFT)
+  'Tri-State': 'Três estados', 'Enable input': 'Entrada de habilitação', 'One pin per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)',
+  'Tri-state buffer: O = I while enabled, Z (high impedance, released) otherwise; E active high (BUFE) or T active low (BUFT)': 'Buffer de três estados: O = I enquanto habilitado, Z (alta impedância, libertado) caso contrário; E ativo a 1 (BUFE) ou T ativo a 0 (BUFT)',
+  'Tri-state buffer, active-high enable: O = I when E = 1, Z when E = 0': 'Buffer de três estados, habilitação ativa a 1: O = I quando E = 1, Z quando E = 0',
+  'Tri-state buffer, active-low enable T: O = I when T = 0, Z when T = 1': 'Buffer de três estados, habilitação T ativa a 0: O = I quando T = 0, Z quando T = 1',
   // Symbol Info (datasheets of the schematic symbols; their own texts are in core/symdocs.js)
   'Symbol Info (F1)': 'Informação do Símbolo (F1)', 'Symbol Info…': 'Informação do Símbolo…', 'Symbol Info': 'Informação do Símbolo',
   // schematic editor labels that were still in English
@@ -250,7 +255,9 @@ const PT_PATTERNS = [
   [/^(\d+):(\d+) one-hot encoder: A = OR of the indices of the inputs at 1, V = some input is 1$/, 'Codificador one-hot $1:$2: A = OU dos índices das entradas a 1, V = alguma entrada a 1'],
   [/^1:(\d+) demultiplexer \((select S0|(\d)-bit select S)\): O<S> = D, the other outputs 0 \(bitwise when Width > 1\)$/,
     (m, n, sel, k) => `Desmultiplexador 1:${n} (${k ? `seleção S de ${k} bits` : 'seleção S0'}): O<S> = D, as outras saídas a 0 (bit a bit quando Largura > 1)`],
-  [/^(Logic|Arithmetic|Flip-Flops|Mux|Decoders\/Encoders|Bus|I\/O|Project modules) \((\d+)\)$/, (m, c, n) => `${t(c)} (${n})`],
+  [/^(\d+)-bit tri-state buffer \((pins I0\.\.I3, O0\.\.O3|bus pins)\), active-(high|low) enable( T)?: O = I when (E = 1|T = 0), Z when (E = 0|T = 1)$/,
+    (m, n, pins, hl, tt, on, off) => `Buffer de três estados de ${n} bits (${pins === 'bus pins' ? 'pinos em barramento' : 'pinos I0..I3, O0..O3'}), habilitação${tt || ''} ativa a ${hl === 'high' ? '1' : '0'}: O = I quando ${on}, Z quando ${off}`],
+  [/^(Logic|Tri-State|Arithmetic|Flip-Flops|Mux|Decoders\/Encoders|Bus|I\/O|Project modules) \((\d+)\)$/, (m, c, n) => `${t(c)} (${n})`],
   [/^Silinx - (.*) - \[(.*)\]$/, (m, a, b) => `Silinx - ${a} - [${t(b)}]`],
   [/^(.*) \(RTL\)$/, '$1 (RTL)'],
   [/^Processes: (.*)$/, 'Processos: $1'],

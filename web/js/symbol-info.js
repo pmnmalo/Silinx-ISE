@@ -113,6 +113,7 @@ export function openSymbolInfo(opts) {
       t.dataset.kind = full ? 'full' : 'compact';
       const notes = [T('Computed by simulating the HDL of the symbol for every input combination.', lang)];
       if (tt.perBit) notes.unshift(T('The function is bitwise: the table is the same for every bit i of the buses (shown with Width = 1).', lang));
+      if (tt.rows.some(r => /Z/.test(r.out))) notes.push(T('Z = high impedance: the output is released (not driven), so another driver can set the net.', lang));
       if (tt.full && compactBetter) {
         const sw = h('div', { class: 'sd-switch' });
         for (const [val, label] of [[false, T('Compact table (X = any value)', lang)], [true, `${T('Full table', lang)} (${tt.rows.length})`]]) {
@@ -219,7 +220,7 @@ export function openSymbolInfo(opts) {
     body.scrollTop = scroll;
     if (focusParam) { const f = box.querySelector(`[data-param="${focusParam}"]`); if (f) f.focus(); }
   }
-  const CAT_PT = { 'Logic': 'Lógica', 'Arithmetic': 'Aritmética', 'Flip-Flops': 'Flip-Flops', 'Mux': 'Multiplexadores', 'Decoders/Encoders': 'Descodificadores/Codificadores', 'Bus': 'Barramento', 'I/O': 'E/S', 'Project modules': 'Módulos do projeto' };
+  const CAT_PT = { 'Logic': 'Lógica', 'Tri-State': 'Três estados', 'Arithmetic': 'Aritmética', 'Flip-Flops': 'Flip-Flops', 'Mux': 'Multiplexadores', 'Decoders/Encoders': 'Descodificadores/Codificadores', 'Bus': 'Barramento', 'I/O': 'E/S', 'Project modules': 'Módulos do projeto' };
   function catPt(c) { return CAT_PT[c] || c; }
 
   container.append(modal);

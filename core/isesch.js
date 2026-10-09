@@ -287,6 +287,12 @@ const LIB_GFX = {
   xnor2: 'L 0 -64 64 -64|L 0 -128 60 -128|A 16 -96 56 48 -48 44 -144|A 32 -96 56 64 -48 64 -144|L 128 -144 64 -144|L 128 -48 64 -48|A 132 -56 88 208 -96 128 -144|A 132 -136 88 128 -48 208 -96|C 220 -96 8|L 228 -96 256 -96|L 60 -28 60 -28',
   inv: 'L 0 -32 64 -32|L 224 -32 160 -32|L 64 -64 128 -32|L 128 -32 64 0|L 64 0 64 -64|C 144 -32 16',
   buf: 'L 0 -32 64 -32|L 224 -32 128 -32|L 64 0 128 -32|L 128 -32 64 -64|L 64 -64 64 0',
+  // tri-state buffers: the buffer triangle, the enable from the left one row above the data, down to the
+  // top edge of the triangle (a bubble on it for the active-low T)
+  bufe: 'L 0 -32 64 -32|L 224 -32 128 -32|L 64 0 128 -32|L 128 -32 64 -64|L 64 -64 64 0|L 0 -96 96 -96|L 96 -96 96 -48',
+  buft: 'L 0 -32 64 -32|L 224 -32 128 -32|L 64 0 128 -32|L 128 -32 64 -64|L 64 -64 64 0|L 0 -96 96 -96|L 96 -96 96 -72|C 96 -60 12',
+  bufe8: 'LW 0 -32 64 -32|LW 224 -32 128 -32|L 64 0 128 -32|L 128 -32 64 -64|L 64 -64 64 0|L 0 -96 96 -96|L 96 -96 96 -48',
+  buft8: 'LW 0 -32 64 -32|LW 224 -32 128 -32|L 64 0 128 -32|L 128 -32 64 -64|L 64 -64 64 0|L 0 -96 96 -96|L 96 -96 96 -72|C 96 -60 12',
   fd: 'R 64 -320 256 256|L 0 -128 64 -128|L 0 -256 64 -256|L 384 -256 320 -256|L 80 -128 64 -144|L 64 -112 80 -128',
   fdc: 'L 0 -128 64 -128|L 0 -32 64 -32|L 0 -256 64 -256|L 384 -256 320 -256|R 64 -320 256 256|L 64 -112 80 -128|L 80 -128 64 -144|L 192 -64 192 -32|L 192 -32 64 -32',
   fdce: 'L 0 -128 64 -128|L 0 -192 64 -192|L 0 -32 64 -32|L 0 -256 64 -256|L 384 -256 320 -256|L 64 -112 80 -128|L 80 -128 64 -144|L 192 -64 192 -32|L 192 -32 64 -32|R 64 -320 256 256',
@@ -304,6 +310,8 @@ const LIB_GFX = {
   cb8re: 'L 384 -192 320 -192|L 0 -192 64 -192|L 192 -32 64 -32|L 192 -64 192 -32|L 0 -32 64 -32|L 80 -128 64 -144|L 64 -112 80 -128|L 0 -128 64 -128|L 384 -256 320 -256|R 320 -268 64 24|L 384 -128 320 -128|R 64 -320 256 256',
   comp8: 'R 64 -384 256 320|L 384 -224 320 -224|R 0 -332 64 24|L 0 -320 64 -320|R 0 -140 64 24|L 0 -128 64 -128',
 };
+LIB_GFX.bufe16 = LIB_GFX.bufe8;
+LIB_GFX.buft16 = LIB_GFX.buft8;
 // inverted-input gates (and2b1...): the plain gate with the first k input stubs shortened to 0..40 and a bubble at 52
 // (radius 12), as in the ISE library (checked against and2b2 / and3b1 / and3b2 of real ISE schematics)
 for (const base of Object.keys(LIB_GFX)) {
@@ -350,7 +358,11 @@ export function libPins(sym) {
   if ((m = /^(inv|buf|ibuf|obuf)(8|16|32)$/.exec(s))) { const w = +m[2]; return { [`I(${w - 1}:0)`]: ['in', 0, -32], [`O(${w - 1}:0)`]: ['out', 224, -32] }; }
   if (s === 'inv4' || s === 'buf4') { const p = {}; for (let k = 0; k < 4; k++) { p[`I${k}`] = ['in', 0, s === 'inv4' ? -32 - 64 * k : -224 + 64 * k]; p[`O${k}`] = ['out', 224, s === 'inv4' ? -32 - 64 * k : -224 + 64 * k]; } return p; }
   if (s === 'obufe' || s === 'bufe') return { E: ['in', 0, -96], I: ['in', 0, -32], O: ['out', 224, -32] };
-  if (s === 'obuft' || s === 'buft') return { T: ['in', null, null], I: ['in', 0, -32], O: ['out', 224, -32] };
+  if (s === 'obuft') return { T: ['in', null, null], I: ['in', 0, -32], O: ['out', 224, -32] };
+  // BUFT: T at the place of the E of BUFE (assumed: not checked against an ISE schematic)
+  if (s === 'buft') return { T: ['in', 0, -96], I: ['in', 0, -32], O: ['out', 224, -32] };
+  if ((m = /^buf([et])(8|16)$/.exec(s))) { const w = +m[2]; return { [m[1].toUpperCase()]: ['in', 0, -96], [`I(${w - 1}:0)`]: ['in', 0, -32], [`O(${w - 1}:0)`]: ['out', 224, -32] }; }
+  if ((m = /^buf([et])4$/.exec(s))) { const p = { [m[1].toUpperCase()]: ['in', null, null] }; for (let k = 0; k < 4; k++) { p[`I${k}`] = ['in', null, null]; p[`O${k}`] = ['out', null, null]; } return p; }
   if (s === 'vcc') return { P: ['out', 64, 0] };
   if (s === 'gnd') return { G: ['out', 64, -128] };
   m = /^(fd|ld)(c|ce|e|p|pe|r|re|s|se|cp|cpe|rs|rse)?(_1)?$/.exec(s);
@@ -677,8 +689,8 @@ function libTemplate(s, conn) {
     return ffTpl({ ce: f.includes('e'), clr: /^c/.test(f), pre: /p/.test(f), r: /^r/.test(f), s: /s/.test(f), neg: !!m[2], init: /p|^s|rs/.test(f) ? '1' : '0' });
   }
   if ((m = /^ft(c|ce|p|pe)$/.exec(s))) return ffTpl({ toggle: true, ce: m[1].includes('e'), clr: m[1][0] === 'c', pre: m[1][0] === 'p', init: m[1][0] === 'p' ? '1' : '0' });
-  if (s === 'obufe' || s === 'bufe') return triTpl('e');
-  if (s === 'obuft' || s === 'buft') return triTpl('t');
+  if (s === 'obufe') return triTpl('e');
+  if (s === 'obuft') return triTpl('t');
   if (s === 'inv4' || s === 'buf4') return multiTpl(4, s === 'inv4');
   if ((m = /^(muxcy|xorcy|mult_and|muxf[5-8])(_l|_d)?$/.exec(s))) {
     const outs = m[1] === 'mult_and' ? ['LO'] : [...(m[2] !== '_l' ? ['O'] : []), ...(m[2] ? ['LO'] : [])];
@@ -1533,6 +1545,8 @@ function mapSymbol(blk, modules, warn, geo = {}) {
     }
   }
   if (BUF1.has(sym)) return direct(sym === 'inv' ? 'inv' : 'buf', { width: 1 });
+  // tri-state buffers BUFE / BUFT (1 bit), BUFE4 / BUFT4 (one pin per bit), BUFE8/16 / BUFT8/16 (bus pins)
+  if ((m = /^buf([et])(4|8|16)?$/.exec(sym))) { const w = m[2] ? +m[2] : 1; return direct('tbuf', { width: w, enable: m[1].toUpperCase(), bits: w === 4 }); }
   if ((m = /^(inv|buf|ibuf|obuf)(8|16|32)$/.exec(sym))) return direct(m[1] === 'inv' ? 'inv' : 'buf', { width: +m[2] });
   // FD*, FT*, FJK*: native flip-flop symbols with the library pin names (INIT: the block attribute, else the Xilinx default)
   if (SYMBOLS[sym]?.ff) return direct(sym, { init: blk.attrs.INIT != null ? init : SYMBOLS[sym].params[0].default });
@@ -1617,6 +1631,13 @@ function iseSymbolFor(s, def, netW, modules) {
   switch (t) {
     case 'mux2': return W === 1 ? { lib: true, name: 'm2_1', pins: { D0: 'D0', D1: 'D1', S0: 'S0', O: 'O' } } : { lib: false, name: `xl_mux2_w${W}` };
     case 'mux4': return { lib: false, name: `xl_mux4_w${W}` };
+    case 'tbuf': {
+      // BUFE / BUFT, BUFE8/16 / BUFT8/16 (library); other widths and one-pin-per-bit buffers: a Silinx symbol
+      const en = p.enable === 'T' ? 'T' : 'E', bits = W > 1 && !!p.bits;
+      if (W === 1) return { lib: true, name: `buf${lc(en)}`, pins: { [en]: en, I: 'I', O: 'O' } };
+      if (!bits && (W === 8 || W === 16)) return { lib: true, name: `buf${lc(en)}${W}`, pins: { [en]: en, I: `I(${W - 1}:0)`, O: `O(${W - 1}:0)` } };
+      return { lib: false, name: `xl_tbuf${lc(en)}_w${W}${bits ? '_bits' : ''}` };
+    }
     case 'demux': return { lib: false, name: `xl_demux${Math.max(1, Math.min(4, parseInt(p.sel, 10) || 1))}_w${W}` };
     case 'decoder': {
       const n = Math.max(1, Math.min(5, parseInt(p.n, 10) || 2));
@@ -1690,6 +1711,7 @@ export function decodeXlSymbol(name) {
   let m;
   if ((m = /^xl_(and|or|nand|nor|xor|xnor)(\d(?:b\d)?)_w(\d+)$/.exec(s)) && SYMBOLS[m[1] + m[2]]) return { type: m[1] + m[2], params: { width: +m[3] } };
   if ((m = /^xl_(f(?:d|t|jk)[a-z]*)_i([01])$/.exec(s)) && SYMBOLS[m[1]]?.ff) return { type: m[1], params: { init: m[2] } };
+  if ((m = /^xl_tbuf([et])_w(\d+)(_bits)?$/.exec(s))) return { type: 'tbuf', params: { width: +m[2], enable: m[1].toUpperCase(), bits: !!m[3] } };
   if ((m = /^xl_demux([1-4])_w(\d+)$/.exec(s))) return { type: 'demux', params: { sel: +m[1], width: +m[2] } };
   if ((m = /^xl_dec([1-5])(_e)?(_bus)?$/.exec(s))) return { type: 'decoder', params: { n: +m[1], en: !!m[2], bus: !!m[3] } };
   if ((m = /^xl_(p?enc)([2-5])(_bus)?$/.exec(s))) return { type: 'encoder', params: { n: +m[2], mode: m[1] === 'enc' ? 'one-hot' : 'priority', bus: !!m[3] } };
