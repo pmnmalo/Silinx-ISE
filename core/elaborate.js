@@ -250,7 +250,7 @@ function newSignal(E, name, t, init, kind, loc) {
   const d = E.ctx.design;
   const sig = {
     id: d.signals.length, name, path: `${E.inst.path}.${name}`, t, inst: E.inst, kind,
-    init, val: init, prev: null, evStamp: -1, waiters: null, wave: null, loc, file: E.file,
+    init, val: init, prev: null, evStamp: -1, lastT: undefined, waiters: null, wave: null, loc, file: E.file,
   };
   d.signals.push(sig);
   E.inst.signals.push(sig);

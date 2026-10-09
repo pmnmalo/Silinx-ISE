@@ -118,6 +118,7 @@ export class Simulator {
       s.val = Array.isArray(s.init) ? s.init.map(x => x) : s.init;
       s.prev = null;
       s.evStamp = -1;
+      s.lastT = undefined;   // time of the last event (VHDL 'last_event / 'stable(T))
       s.waiters = new Set();
       s.forced = null;
       s.wave = Array.isArray(s.init) || s.t.kind === 'str' ? null : { t: [0], v: [s.val] };

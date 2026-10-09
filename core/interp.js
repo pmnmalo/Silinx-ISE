@@ -185,11 +185,12 @@ function evalBin(n, ctx) {
     if (x === 1 && (o === '|' || o === 'nor')) return V.fromBool(o === '|');
   }
   let a = evalE(n.a, ctx), b = evalE(n.b, ctx);
-  if (Array.isArray(a) || Array.isArray(b)) {   // arrays / records (VHDL): element-wise equality
+  // (arrays, records and strings have no bits: v is undefined)
+  if ((a.v === undefined || b.v === undefined) && (Array.isArray(a) || Array.isArray(b))) {   // arrays / records (VHDL): element-wise equality
     if (o === '==' || o === '!=') return V.fromBool(sameDeep(a, b) === (o === '=='));
     throw new SimError(`operator ${o} on arrays`);
   }
-  if (isStr(a) || isStr(b)) { // string comparison (VHDL)
+  if ((a.v === undefined || b.v === undefined) && (isStr(a) || isStr(b))) { // string comparison (VHDL)
     if (o === '==') return V.fromBool(toStr(a) === toStr(b));
     if (o === '!=') return V.fromBool(toStr(a) !== toStr(b));
     if (o === '<' || o === '<=' || o === '>' || o === '>=') {   // VHDL strings: lexicographic order
