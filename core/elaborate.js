@@ -1409,6 +1409,8 @@ function bindVlogCall(E, e, expect, loc) {
     switch (name) {
       case '$signed': { const a = A(0); return fold({ k: 'conv', a, ext: a.t.s, t: vecT(a.t.w, true) }); }
       case '$unsigned': { const a = A(0); return fold({ k: 'conv', a, ext: a.t.s, t: vecT(a.t.w, false) }); }
+      // SystemVerilog size cast W'(expr): the value at W bits, extended by its own sign, signedness kept
+      case '$__size_cast': { const w = Number(e.args[0].value), a = A(1); return fold({ k: 'conv', a, ext: a.t.s, t: vecT(w, a.t.s) }); }
       case '$clog2': {
         diag(E, '$clog2 is not supported by XST (ISE 14.7); use a constant function instead', loc, 'warning');
         const v = V.toBig(constOf(E, A(0), loc));

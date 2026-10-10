@@ -790,7 +790,12 @@ class Parser {
 
   primary() {
     const t = this.tok;
-    if (t.t === 'int') { this.next(); return { op: 'int', value: t.v }; }
+    if (t.t === 'int') {
+      this.next();
+      // SystemVerilog size cast: 8'(expr)
+      if (this.tok.t === 'cast') { this.next(); this.expect('('); const e = this.expr(); this.expect(')'); return { op: 'call', name: '$__size_cast', args: [{ op: 'int', value: t.v }, e] }; }
+      return { op: 'int', value: t.v };
+    }
     if (t.t === 'real') { this.next(); return { op: 'real', value: t.v }; }
     if (t.t === 'based') { this.next(); const { bits, sized } = basedToBits(t); return { op: 'lit', bits, signed: t.signed, sized }; }
     if (t.t === 'fill') { this.next(); return { op: 'fill', bit: t.v }; }

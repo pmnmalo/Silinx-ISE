@@ -10,6 +10,11 @@ the "What's new" text of its GitHub release.
   Digital Systems, without naming an institution (Silinx is the work of Pedro Maló, in his own time).
 - Fixed: exporting a Xilinx ISE project with several schematics could report identical custom
   symbols as different ("custom symbol … differs"), when the export took more than a second.
+- **Synthesis front end** (`core/synth-verilog.js`, first version): Silinx writes the elaborated
+  VHDL / Verilog design as one flat synthesizable SystemVerilog module for Yosys, so that synthesis
+  needs neither GHDL nor ISE (and can run in the browser). lab11 and the blinky example go through
+  Yosys to a Spartan-3E netlist that behaves as the original in simulation.
+- Verilog: SystemVerilog size casts `W'(expr)`.
 - How the open toolchain for the Spartan-3E is being developed: `docs/OPEN-TOOLCHAIN.md`, and the
   first experiments in `research/s3e-bitstream`.
 

@@ -165,6 +165,13 @@ export function tokenize(src, file, errors, opts = {}) {
           toks.push({ t: 'real', v: parseFloat(s.replace(/_/g, '')), line: l0, col: c0 });
           continue;
         }
+        // SystemVerilog size cast: 8'(expr) -> the width and a cast mark
+        if (src[i] === "'" && src[i + 1] === '(') {
+          toks.push({ t: 'int', v: size.replace(/_/g, ''), line: l0, col: c0 });
+          adv();
+          toks.push({ t: 'cast', v: "'", line, col });
+          continue;
+        }
         // allow whitespace between size and '
         let j = i; while (src[j] === ' ' || src[j] === '\t') j++;
         if (src[j] !== "'" || !/[sSbBoOdDhH]/.test(src[j + 1] || '')) {
