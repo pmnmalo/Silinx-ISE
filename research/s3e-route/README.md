@@ -123,6 +123,13 @@ router now writes too.
 Writer check: ISE's lab11 and blinky, parsed and written back by `writeXdl()` without any change,
 give ISE's bitstream (0 frame bits differ, `cmpbit.mjs`), so the writer loses nothing ISE needs.
 
+## On the board
+
+2026-10-10: blinky and lab11 synthesized by Silinx + Yosys, packed, placed and routed by Silinx
+(`core/fpga/`), with ISE only converting the XDL (`xdl -xdl2ncd`), checking it (`drc`: 0 errors,
+0 warnings) and writing the bitstream (`bitgen -g StartUpClk:JtagClk`), both work on a Basys2
+(XC3S250E-CP132): the first bitstreams in which no ISE tool chose a cell, a site or a wire.
+
 ## Open problems
 
 - Timing is not considered: the router minimises wire count and congestion, not delay. It met

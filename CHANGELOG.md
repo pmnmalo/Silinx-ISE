@@ -21,6 +21,10 @@ the "What's new" text of its GitHub release.
   into slices (LUTs, flip-flops, latches, carry chains, F5-F8 multiplexers), I/O pads and global
   clock buffers, and placed by simulated annealing; checked with ISE (routing of our placement and
   simulation of the result) on lab11 and blinky.
+- **Router** for the Spartan-3E (`core/fpga/route.js`, first version): PathFinder over the device's
+  routing graph (built once per computer from ISE's device report, never shipped). lab11 and blinky,
+  synthesized, packed, placed and routed by Silinx, with ISE only writing the bitstream, pass ISE's
+  design rule check and work on a Basys2.
 - Verilog: SystemVerilog size casts `W'(expr)`.
 - How the open toolchain for the Spartan-3E is being developed: `docs/OPEN-TOOLCHAIN.md`, and the
   first experiments in `research/s3e-bitstream`.
