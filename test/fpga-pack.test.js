@@ -130,3 +130,11 @@ test('names are plain words; unsupported cells are reported', () => {
   nl.cells.push({ name: 'ram', type: 'RAMB16_S9', params: {}, attrs: {}, pins: {}, dirs: {} });
   assert.throws(() => pack(nl), e => e instanceof PackError && /RAMB16_S9/.test(e.message));
 });
+
+test('latches: #LATCH, transparent while CLKINV gives 0 (an active-high gate takes CLK_B, as ISE writes it)', () => {
+  const p = pack(load('latches'));
+  const lat = p.insts.filter(i => i.kind === 'slice' && ['X', 'Y'].some(X => val(i, `FF${X}`) === '#LATCH'));
+  assert.ok(lat.length >= 2);
+  // LDCE (gate g & ge) and LDPE (its gate !g2 through an inverter): both active high on the cell
+  for (const s of lat) { assert.equal(val(s, 'CLKINV'), 'CLK_B'); assert.equal(val(s, 'SYNC_ATTR'), 'ASYNC'); }
+});

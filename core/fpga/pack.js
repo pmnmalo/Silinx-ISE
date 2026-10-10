@@ -158,9 +158,11 @@ export function pack(nl, { ucf = null, part = 'xc3s250ecp132-4' } = {}) {
     const srNet = sr === undefined || (nets[sr].const === 0 && !inv(`IS_${k.sr}_INVERTED`)) ? null : sr;
     const initBits = paramBits(p.INIT);
     const init = initBits ? initBits[0] : (k.high ? 1 : 0);
-    // a latch's gate is its clock pin; the slice latch is transparent while its clock pin is high
-    // after the inverter (as a flip-flop captures on the rising edge after the inverter)
-    const clkInv = (k.neg ? 1 : 0) ^ (inv(`IS_${clkPin}_INVERTED`) ? 1 : 0);
+    // a latch's gate is its clock pin. A flip-flop captures on the rising edge after CLKINV; the
+    // slice latch is transparent while CLKINV's output is LOW (netgen models CLKINV::CLK on a
+    // #LATCH with an inverter: measured with designs/latches.v), so a latch with an active-high
+    // gate takes CLKINV::CLK_B, as ISE writes it
+    const clkInv = (k.neg ? 1 : 0) ^ (inv(`IS_${clkPin}_INVERTED`) ? 1 : 0) ^ (k.latch ? 1 : 0);
     return {
       cell: ci(c), name: c.name, kind: k, d: c.pins.D, q: c.pins.Q, init, clkPin, cePin, srPin: k.sr,
       ctrl: { clk: c.pins[clkPin], clkInv, ce: ceNet, ceInv: ceNet !== null && inv(`IS_${cePin}_INVERTED`) ? 1 : 0, sr: srNet,

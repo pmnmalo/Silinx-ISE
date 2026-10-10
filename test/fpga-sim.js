@@ -159,7 +159,7 @@ export function packedSim(packed) {
         }
       }
       if (changed) continue;
-      // latches: transparent while the clock (gate) is high after the inverter, once the logic has settled
+      // latches: transparent while the clock (gate) is LOW after the inverter, once the logic has settled
       for (let i = 0; i < insts.length; i++) {
         const c = C[i];
         for (const X of ['X', 'Y']) if (c.get(`FF${X}`)?.value === '#LATCH') {
@@ -181,7 +181,7 @@ export function packedSim(packed) {
     const sync = val('SYNC_ATTR') === 'SYNC';
     const q = st[i].q[X];
     if (sr && !sync) return srv;
-    if (latch) return clk && ce ? (sr ? srv : outs[i]._d[X]) : q;
+    if (latch) return !clk && ce ? (sr ? srv : outs[i]._d[X]) : q;   // open while CLKINV's output is low
     const edge = clk && !st[i].prevClk;
     if (!edge) return q;
     if (sr) return srv;
