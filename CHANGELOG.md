@@ -17,6 +17,10 @@ the "What's new" text of its GitHub release.
   It also handles initial blocks (initial values of registers and memories) and Xilinx primitives
   instantiated by name (block RAMs, clock buffers, DCMs, shift registers): every test design
   synthesizes to a netlist that behaves as the original.
+- **Packer and placer** for the Spartan-3E (`core/fpga/`, first version): Yosys's netlist packed
+  into slices (LUTs, flip-flops, latches, carry chains, F5-F8 multiplexers), I/O pads and global
+  clock buffers, and placed by simulated annealing; checked with ISE (routing of our placement and
+  simulation of the result) on lab11 and blinky.
 - Verilog: SystemVerilog size casts `W'(expr)`.
 - How the open toolchain for the Spartan-3E is being developed: `docs/OPEN-TOOLCHAIN.md`, and the
   first experiments in `research/s3e-bitstream`.
