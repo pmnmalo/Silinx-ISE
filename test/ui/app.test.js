@@ -189,6 +189,16 @@ uiTest('About shows the version and the GitHub link', E, async (page) => {
   const { VERSION, REPOSITORY } = await import('../../core/version.js');
   assert.match(info.text, new RegExp(`Version ${VERSION.replace(/\./g, '\\.')}`));
   assert.ok(info.links.some((l) => l.href === `https://github.com/${REPOSITORY}` && l.target === '_blank'), JSON.stringify(info.links));
+  // copyright, licence and the open-source components (collapsed, then opened)
+  assert.match(info.text, /Copyright 2026 Pedro Maló\. Free software under the GNU Affero General Public License v3\.0/);
+  assert.match(info.text, /ABSOLUTELY NO WARRANTY\. Source code: github\.com\//);
+  assert.ok(info.links.some((l) => l.href.endsWith('/THIRD-PARTY-NOTICES.md')));
+  const { THIRD_PARTY } = await import('../../core/third-party.js');
+  await page.click('.dlg-overlay .about-oss summary');
+  const rows = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .about-components tr')].slice(1).map((r) => [...r.cells].map((c) => c.textContent).join('|')));
+  assert.equal(rows.length, THIRD_PARTY.length);
+  assert.ok(rows.includes(`elkjs|${THIRD_PARTY.find((c) => c.name === 'elkjs').version}|EPL-2.0`), rows.join('\n'));
+  assert.ok(rows.some((r) => /^codemirror\|[\d.]+\|MIT$/.test(r)));
   await page.key('Enter');
   await page.waitNoDialog();
 });

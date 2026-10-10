@@ -6,6 +6,7 @@ import { h, dialog, alertDlg, confirmDlg, toast } from './ui.js';
 import * as T from './templates.js';
 import { typeText } from './editor.js';
 import { S, app } from './app.js';
+import { THIRD_PARTY } from '/core/third-party.js';
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 // Device used when no evaluation board is selected.
@@ -848,6 +849,19 @@ export async function toolchainDialog() {
 
 const link = (href, text) => h('a', { href, target: '_blank', rel: 'noopener' }, text);
 
+// the open-source components shipped with Silinx (core/third-party.js, generated), collapsible;
+// the standalone edition embeds only some of them
+function componentsNode() {
+  const list = THIRD_PARTY.filter(c => !api.standalone || c.standalone);
+  const tbl = h('table', { class: 'grid about-components', style: { fontSize: '11px' } },
+    h('tr', {}, h('th', {}, 'Component'), h('th', {}, 'Version'), h('th', {}, 'Licence')),
+    ...list.map(c => h('tr', { 'data-no-i18n': '' }, h('td', {}, link(c.url, c.name)), h('td', {}, c.version), h('td', {}, c.license))));   // names: not translated
+  return h('details', { class: 'about-oss', style: { margin: '6px 0' } },
+    h('summary', {}, `Open-source components (${list.length})`),
+    h('div', { class: 'hint', style: { margin: '4px 0' } }, 'Each keeps its own licence; the full texts are in ', h('span', { 'data-no-i18n': '' }, link(`https://github.com/${REPOSITORY}/blob/main/THIRD-PARTY-NOTICES.md`, 'THIRD-PARTY-NOTICES.md')), '. elkjs (EPL-2.0) source code: ', link('https://github.com/kieler/elkjs', 'github.com/kieler/elkjs'), '.'),
+    h('div', { style: { maxHeight: '160px', overflow: 'auto' } }, tbl));
+}
+
 export function aboutDialog() {
   return dialog({
     title: `About ${PRODUCT}`, width: 520,
@@ -862,6 +876,9 @@ export function aboutDialog() {
           h('tr', {}, h('td', { style: { paddingRight: '10px', verticalAlign: 'top', fontWeight: 'bold' } }, 'Developers:'),
             h('td', {}, h('div', {}, 'Pedro Maló — ', link('https://github.com/pmnmalo', 'github.com/pmnmalo')),
               h('div', { style: { color: '#666' } }, 'developed with Claude (Anthropic)')))),
+        h('p', {}, `Copyright 2026 Pedro Maló. Free software under the GNU Affero General Public License v3.0 (`, link(`https://github.com/${REPOSITORY}/blob/main/LICENSE`, 'LICENSE'), ', with an additional permission for elkjs: ', link(`https://github.com/${REPOSITORY}/blob/main/NOTICE`, 'NOTICE'), ').'),
+        h('p', { class: 'hint' }, 'This program comes with ABSOLUTELY NO WARRANTY. Source code: ', link(`https://github.com/${REPOSITORY}`, `github.com/${REPOSITORY}`), '.'),
+        componentsNode(),
         h('p', { style: { color: '#666' } }, 'Synthesis, place & route and bitstream generation use the Xilinx ISE 14.7 command-line tools. Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.'))),
     buttons: [{ label: 'OK', primary: true, value: true }],
   });

@@ -1,0 +1,29 @@
+Silinx ISE
+Copyright 2026 Pedro Maló
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License, version 3, as published by the Free Software Foundation (see
+LICENSE). It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+Affero General Public License for more details.
+
+Source code: https://github.com/pmnmalo/Silinx-ISE
+
+Additional permission under GNU AGPL version 3 section 7:
+If you modify this program, or any covered work, by linking or combining it with elkjs (the
+Eclipse Layout Kernel for JavaScript, https://github.com/kieler/elkjs), or a modified version of
+it, licensed under the Eclipse Public License 2.0, the licensors of this program grant you
+additional permission to convey the resulting work. Corresponding Source for a non-source form
+of such a combination shall include the source code for the parts of elkjs used as well as that
+of the covered work.
+
+It includes open-source components from other projects, each under its own licence:
+CodeMirror (MIT), Express and its dependencies (MIT, ISC, BSD-3-Clause) and elkjs
+(Eclipse Public License 2.0; source code: https://github.com/kieler/elkjs).
+Their licence texts are in THIRD-PARTY-NOTICES.md.
+
+Your designs, and the HDL Silinx generates for them, are not covered by this licence.
+
+Silinx ISE is an independent project, not affiliated with or endorsed by AMD/Xilinx.
+Xilinx, ISE, ISim, iMPACT, Spartan and Virtex are trademarks of AMD. Xilinx ISE itself is
+not included and must not be redistributed.

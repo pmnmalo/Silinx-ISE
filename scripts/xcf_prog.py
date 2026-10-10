@@ -17,7 +17,7 @@
 #   xcf_prog.py [--device N] reconfigure            FPGA reloads from the PROM (needs mode jumper = ROM)
 #
 # The .bit file for the PROM must be generated with StartUpClk:CCLK.
-# Apache-2.0 licence (same as Silinx).
+# GNU AGPL-3.0 licence (same as Silinx).
 
 import argparse
 import sys

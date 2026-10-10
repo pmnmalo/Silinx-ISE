@@ -16,6 +16,11 @@ the "What's new" text of its GitHub release.
   synchronized HDL module `top`.
 - **Release notes**: this changelog; each GitHub release and the update dialog show what is new.
 - Fixed: two project reloads close together could leave the older file list on screen.
+- **Licence: GNU AGPL-3.0** (was Apache-2.0), with an additional permission to combine Silinx
+  with elkjs (EPL-2.0); *Help ▸ About* shows the licence, the no-warranty notice and the source code link.
+- **Licence notices**: NOTICE and THIRD-PARTY-NOTICES.md (the open-source components Silinx ships
+  and their licences), also embedded in Silinx-ISE.html; *Help ▸ About* shows the copyright and the
+  components.
 
 ## 15.9.2
 

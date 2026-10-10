@@ -10,4 +10,4 @@
 
 The source code is attached by GitHub below (Source code zip / tar.gz).
 
-Silinx ISE is an independent open-source project, not affiliated with or endorsed by AMD/Xilinx. Xilinx and ISE are trademarks of AMD.
+Silinx ISE is free software (GNU AGPL-3.0, Copyright 2026 Pedro Maló; see LICENSE, NOTICE and THIRD-PARTY-NOTICES.md). It is an independent project, not affiliated with or endorsed by AMD/Xilinx. Xilinx and ISE are trademarks of AMD.

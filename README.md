@@ -312,3 +312,16 @@ test/       node:test suites
 
 Xilinx, ISE, ISim, iMPACT and Spartan are trademarks of AMD/Xilinx; Silinx is not affiliated
 with them.
+
+## Licence
+
+Silinx ISE is Copyright 2026 Pedro Maló and is free software, licensed under the
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only), with an additional permission
+to combine it with elkjs (EPL-2.0) — see [NOTICE](NOTICE). Modified versions, including ones offered
+to users over a network, must make their source code available under the same licence. Your
+designs, and the HDL Silinx generates for them, are yours: the licence does not cover them.
+
+Silinx includes open-source components under their own licences: CodeMirror (MIT), Express and
+its dependencies (MIT, ISC, BSD-3-Clause) and elkjs (EPL-2.0). Their licence texts are in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), generated with `node scripts/third-party.mjs`
+(run it again after changing the dependencies; the tests check it is up to date).

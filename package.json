@@ -14,7 +14,7 @@
     "build:standalone": "node scripts/build-standalone.mjs",
     "version": "node scripts/sync-version.mjs && git add core/version.js"
   },
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "codemirror": "^5.65.21",
     "elkjs": "^0.9.3",

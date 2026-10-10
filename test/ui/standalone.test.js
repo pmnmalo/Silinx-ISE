@@ -27,6 +27,7 @@ before(async () => {
   await fs.mkdir(path.join(root, 'scripts'), { recursive: true });
   await fs.copyFile(path.join(ROOT, 'scripts/build-standalone.mjs'), path.join(root, 'scripts/build-standalone.mjs'));
   for (const d of ['web', 'core', 'server', 'examples']) await fs.symlink(path.join(ROOT, d), path.join(root, d), 'dir');
+  for (const f of ['LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md']) await fs.copyFile(path.join(ROOT, f), path.join(root, f));   // the embedded notices
   await fs.symlink(modules, path.join(root, 'node_modules'), 'dir');
   const r = spawnSync(process.execPath, [path.join(root, 'scripts/build-standalone.mjs')], { cwd: root, encoding: 'utf8', timeout: 120000 });
   if (r.status !== 0) throw new Error(`standalone build failed: ${r.stderr || r.stdout}`);

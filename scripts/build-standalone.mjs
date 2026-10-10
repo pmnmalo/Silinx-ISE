@@ -60,6 +60,15 @@ html = html.replace('<script type="module" src="/js/app.js"></script>',
   () => `<script>window.SILINX_STANDALONE = true;</script>\n<script type="module">${safeJs(appJs)}</script>`);
 html = html.replace('<title>Silinx ISE Project Navigator</title>', () => '<title>Silinx ISE Project Navigator (standalone)</title>');
 if (!html.includes(safeJs(appJs))) throw new Error('the app bundle was not inserted verbatim into the page');
+// copyright and the licences of the components embedded in this single file (NOTICE + their texts
+// from THIRD-PARTY-NOTICES.md), kept in the page as plain text
+{
+  const notices = fs.readFileSync(path.join(ROOT, 'THIRD-PARTY-NOTICES.md'), 'utf8');
+  const parts = [...notices.matchAll(/^## (codemirror|elkjs) [^\n]*\n[\s\S]*?\n```\n/gm)].map(m => m[0]);
+  if (parts.length !== 2) throw new Error('THIRD-PARTY-NOTICES.md: the CodeMirror / elkjs sections were not found (run node scripts/third-party.mjs)');
+  const text = `${fs.readFileSync(path.join(ROOT, 'NOTICE'), 'utf8')}\n${fs.readFileSync(path.join(ROOT, 'LICENSE'), 'utf8')}\n# Embedded components\n\n${parts.join('\n')}`;
+  html = html.replace('</head>', () => `<script type="text/plain" id="silinx-notices">\n${safeJs(text)}\n</script>\n</head>`);
+}
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);
 console.log(`wrote ${path.relative(ROOT, OUT)} (${(html.length / 1024 / 1024).toFixed(2)} MB)`);
