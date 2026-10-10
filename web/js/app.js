@@ -2705,6 +2705,9 @@ export async function closeProject() {
 function updateTitle() {
   const pj = S.project;
   $('title-text').textContent = pj ? `${PRODUCT} ${VERSION} - ${pj.name} - [${S.active?.title || 'Design Summary'}]` : `${PRODUCT} ${VERSION} - Project Navigator`;
+  // the modern header: product and version (as the classic title bar)
+  const brand = $('title-brand');
+  if (!brand.querySelector('.m-ver')) { brand.textContent = `${PRODUCT} `; brand.append(h('span', { class: 'm-ver' }, VERSION)); }
   $('title-project').textContent = pj ? pj.name : 'No project open';
   $('title-project').classList.toggle('none', !pj);
   document.title = pj ? `${pj.name} — ${PRODUCT} ${VERSION}` : `${PRODUCT} ${VERSION} Project Navigator`;

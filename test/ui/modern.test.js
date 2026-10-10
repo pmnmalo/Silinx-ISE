@@ -45,6 +45,7 @@ uiTest('modern interface by default: header with search, activity bar, tabs on t
       consoleTabsOnTop: r('console-tabs').top < r('console-body').top,
       empty: vis('#ws-empty'),
       project: document.getElementById('title-project').textContent,
+      brand: document.getElementById('title-brand').textContent,
       steps: [...document.querySelectorAll('#toolbar .m-step')].map((b) => [b.textContent, b.disabled]),
       hiddenIcons: [...document.querySelectorAll('#toolbar .tb-btn')].filter((b) => !b.getClientRects().length).map((b) => b.dataset.cmd),
       classicTitle: vis('#title-text'),
@@ -56,6 +57,7 @@ uiTest('modern interface by default: header with search, activity bar, tabs on t
   assert.ok(L.consoleTabsOnTop, 'Console / Errors / Warnings above the log');
   assert.ok(L.empty, 'empty state when no document is open');
   assert.equal(L.project, 'No project open');
+  assert.match(L.brand, /^Silinx ISE \d+\.\d+\.\d+$/, 'product and version, as in the classic title bar');
   // without a project only Program (iMPACT) can run
   assert.deepEqual(L.steps, [['Check', true], ['Simulate', true], ['Implement', true], ['Emulate', true], ['Program', false]]);
   assert.deepEqual(L.hiddenIcons.sort(), ['asm', 'copy', 'cut', 'impact', 'paste', 'run', 'wave'], 'icons covered by the labelled steps are hidden');

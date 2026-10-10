@@ -5,6 +5,7 @@ the "What's new" text of its GitHub release.
 
 ## 15.10.1
 
+- The modern interface shows the version after "Silinx ISE" in its header, as the classic title bar does.
 - *Help ▸ About* and the README: Silinx ISE is described as developed to support the teaching of
   Digital Systems, without naming an institution (Silinx is the work of Pedro Maló, in his own time).
 - Fixed: exporting a Xilinx ISE project with several schematics could report identical custom
