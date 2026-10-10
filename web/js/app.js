@@ -11,6 +11,8 @@ import { PRODUCT, VERSION } from '/core/version.js';
 import { startI18n, setLanguage, getLanguage, LOCALES } from './i18n.js';
 import { onLanguageChange } from './i18n.js';
 import { designDiags, hintRow, sevWord, lintEnabled, setLintEnabled } from './diaghelp.js';
+import { applyPrefs, getInterface, setInterface, getTheme, setTheme, toggleTheme, menuCommands } from './modern.js';
+import { openPalette } from './palette.js';
 
 // ------------------------------------------------------------------ state
 export const S = {
@@ -2627,6 +2629,8 @@ export async function closeProject() {
 function updateTitle() {
   const pj = S.project;
   $('title-text').textContent = pj ? `${PRODUCT} ${VERSION} - ${pj.name} - [${S.active?.title || 'Design Summary'}]` : `${PRODUCT} ${VERSION} - Project Navigator`;
+  $('title-project').textContent = pj ? pj.name : 'No project open';
+  $('title-project').classList.toggle('none', !pj);
   document.title = pj ? `${pj.name} — ${PRODUCT} ${VERSION}` : `${PRODUCT} ${VERSION} Project Navigator`;
   $('status-device').textContent = pj ? `${pj.device.part}${pj.device.speed}-${pj.device.package}${pj.board ? ` · ${pj.board}` : ''}` : '';
 }
@@ -2765,7 +2769,7 @@ function renderLibsPage() {
 // ------------------------------------------------------------------ menus & toolbar
 function setupMenus() {
   const hasPj = () => !S.project;
-  menuBar($('menubar'), [
+  menuBar($('menubar'), S.menus = [
     { label: 'File', items: () => [
       { label: 'New Project…', icon: icon('newProject'), action: () => wiz.newProjectWizard() },
       { label: 'Open Project…', icon: icon('open'), action: () => wiz.openProjectDialog() },
@@ -2809,7 +2813,19 @@ function setupMenus() {
       { label: 'Design Summary', icon: icon('summary'), action: () => openSummary(), disabled: hasPj },
       '-',
       { label: 'Language', submenu: Object.entries(LOCALES).map(([id, l]) => ({ label: l.name, checked: getLanguage() === id, action: () => setLanguage(id) })) },
-    ] },
+      { label: 'Interface', submenu: [
+        { label: 'Modern', checked: getInterface() === 'modern', action: () => setInterface('modern') },
+        { label: 'Xilinx ISE (Classic)', checked: getInterface() === 'classic', action: () => setInterface('classic') },
+      ] },
+      // the classic ISE look is light only
+      getInterface() === 'modern' ? { label: 'Theme', submenu: [
+        { label: 'System', checked: getTheme() === 'system', action: () => setTheme('system') },
+        { label: 'Light', checked: getTheme() === 'light', action: () => setTheme('light') },
+        { label: 'Dark', checked: getTheme() === 'dark', action: () => setTheme('dark') },
+      ] } : null,
+      '-',
+      { label: 'Command Palette…', action: () => showPalette(), shortcut: 'Ctrl+K' },
+    ].filter(Boolean) },
     { label: 'Project', items: () => [
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj },
       { label: 'Add Copy of Source…', action: () => wiz.addSourceDialog(), disabled: hasPj },
@@ -2854,7 +2870,7 @@ function setupMenus() {
 function setupToolbar() {
   const tb = $('toolbar');
   const btn = (ico, title, fn, enabled = () => true) => {
-    const b = h('button', { class: 'tb-btn', title, html: icons[ico], onclick: () => enabled() && fn() });
+    const b = h('button', { class: 'tb-btn', title, 'data-cmd': ico, html: icons[ico], onclick: () => enabled() && fn() });
     b.dataset.enabled = '1';
     b._enabled = enabled;
     return b;
@@ -2884,6 +2900,33 @@ function setupToolbar() {
     btn('gear', 'Toolchain Settings', () => wiz.toolchainDialog()),
     btn('help', 'About', () => wiz.aboutDialog()),
   );
+  // the modern interface: the main steps of the design flow as labelled buttons
+  const step = (ico, label, title, fn, enabled) => {
+    const b = h('button', { class: 'm-step', title, onclick: () => enabled() && fn() }, h('span', { class: 'ico-inline', html: icons[ico] }), h('span', {}, label));
+    b._enabled = enabled;
+    return b;
+  };
+  const mod = () => S.sel?.module || (S.view === 'sim' ? null : S.project?.top);
+  const free = () => !!S.project && !S.busy;
+  tb.append(h('div', { class: 'm-steps', role: 'group', 'aria-label': 'Design flow' },
+    step('mCheck', 'Check', 'Check Syntax of the selected module', () => checkSyntax(mod(), S.view === 'sim'), () => free() && !!mod()),
+    step('mWave', 'Simulate', 'Simulate Behavioral Model of the selected module', () => runSimulation(mod()), () => free() && !!mod()),
+    step('mBolt', 'Implement', 'Implement Top Module', () => runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), () => free() && !!S.project.top),
+    step('mBoard', 'Emulate', 'Board Emulator', () => openEmulator(S.project.top), () => free() && !!S.project.top),
+    step('mUpload', 'Program', 'Configure Target Device (iMPACT)', () => openImpact(), () => true),
+  ));
+  refreshSteps();
+}
+
+// enable / disable the labelled buttons of the modern toolbar (cheap: run on clicks and changes)
+function refreshSteps() {
+  for (const b of document.querySelectorAll('#toolbar .m-step')) b.disabled = !b._enabled();
+}
+
+// Command palette: every enabled menu command and every project file
+function showPalette() {
+  const files = S.project ? [...new Set(S.project.files.map(f => f.path))].sort().map(path => ({ path, open: () => openFile(path) })) : [];
+  return openPalette({ commands: menuCommands(S.menus), files });
 }
 
 // Print the diagram of the active document (ASM chart or schematic)
@@ -2944,6 +2987,7 @@ function setView(v) {
 
 // ------------------------------------------------------------------ boot
 async function boot() {
+  applyPrefs();
   startI18n();
   defineUcfMode();
   document.querySelectorAll('.ico-inline[data-icon]').forEach(e => { e.innerHTML = icons[e.dataset.icon] || ''; });
@@ -2956,7 +3000,19 @@ async function boot() {
   document.querySelectorAll('#console-tabs .tab').forEach(t => t.addEventListener('click', () => showConsolePage(t.dataset.page)));
   document.querySelectorAll('input[name=view]').forEach(r => r.addEventListener('change', () => setView(r.value)));
   $('console-clear').addEventListener('click', () => { $('console-log').innerHTML = ''; });
+  // modern interface: header search / theme / project, keyboard access to the activity bar
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  for (const k of [$('palette-kbd'), ...document.querySelectorAll('.pal-key')]) k.textContent = mac ? '⌘ K' : 'Ctrl K';
+  $('palette-btn').addEventListener('click', () => showPalette());
+  $('theme-btn').addEventListener('click', () => toggleTheme());
+  $('title-project').addEventListener('click', () => wiz.openProjectDialog());
+  document.querySelectorAll('#left-tabs .tab').forEach(t => t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showLeftPage(t.dataset.page); } }));
+  for (const ev of ['click', 'keyup']) addEventListener(ev, () => setTimeout(refreshSteps), true);
+  setInterval(refreshSteps, 1000);
   addEventListener('keydown', e => {
+    // Ctrl/Cmd+K, Ctrl/Cmd+Shift+P: the command palette (not while a dialog is open)
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && ((e.key === 'k' || e.key === 'K') && !e.shiftKey || (e.shiftKey && (e.key === 'p' || e.key === 'P')))
+      && !document.querySelector('.dlg-overlay')) { e.preventDefault(); showPalette(); return; }
     if (!e.defaultPrevented && (e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P') && (S.active?.asmEditor || S.active?.schEditor || S.active?.fsmEditor)) { e.preventDefault(); printActive(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); if (S.active) flushDoc(S.active); }  // nothing to do: edits are saved automatically
     // Ctrl/Cmd+Z outside an editor or text field: undo the last Remove from Project

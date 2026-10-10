@@ -97,6 +97,8 @@ uiTest('live schematic simulation: toggle inputs, wire colours, outputs, clock s
   await page.click(`${ED} .lv-ctl[data-port="${portId(doc, 'x1')}"]`);
   const ledSum = `${ED} .se-simlayer .lv-out[data-port="${portId(doc, 'sum')}"]`;
   await page.waitFor((s) => document.querySelector(s).classList.contains('lv-1'), [ledSum], { what: 'sum = 1' });
+  // the whole sheet in view (the simulation bar made the canvas shorter): Zoom to Full View
+  await page.click(`${ED} .se-btn[data-act="fit"]`);
   await page.click(`${ED} g.sym[data-id="S4"] .hitbox`);
   await page.waitFor((sel) => document.querySelectorAll(`${sel} .lv-ports tr`).length === 4, [ED], { what: 'instance pin table' });
   assert.deepEqual(await page.eval((sel) => [...document.querySelectorAll(`${sel} .lv-ports tr`)].map((r) => [...r.cells].map((c) => c.textContent).join(' ')), ED), ['x in 1', 'y in 0', 's out 1', 'c out 0']);

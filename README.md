@@ -186,6 +186,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One.
   Ports are mapped to board resources by name, the UCF is generated, and pins are checked against
   the board before ISE runs.
+- **Two interfaces**: a modern one (default: header with search, activity bar, tabs, labelled
+  design-flow buttons, light and dark themes that follow the system, command palette with
+  Ctrl+K / Cmd+K) and the classic Xilinx ISE Project Navigator look (*View ▸ Interface*).
 - **Internationalised interface**: English and Portuguese (*View ▸ Language*; the browser language
   is used by default). Translations live in `web/js/i18n.js`: adding a language is adding a
   dictionary. Code, tool output and design names are never translated.
@@ -302,7 +305,7 @@ On the **iMPACT** page, select the PROM in the JTAG chain (Basys2: XCF02S) for *
 ```
 core/       VHDL/Verilog parsers, elaborator, simulator, schematics, ASM, UCF, zip (browser + Node)
 server/     HTTP server, projects, ISE flow, programmers, boards/devices, .xise
-web/        Project Navigator UI (ISE-like): editor, ISim, schematics, ASM, pin planner, iMPACT
+web/        Project Navigator UI (modern and ISE-like, web/css/modern.css): editor, ISim, schematics, ASM, pin planner, iMPACT
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image
 scripts/    adepttool installer/patch, Platform Flash programmer, standalone build
 examples/   example projects (mixed VHDL+Verilog blinky for the Digilent Basys2, XC3S250E-CP132)

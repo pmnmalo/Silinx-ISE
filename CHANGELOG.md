@@ -3,8 +3,20 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
-## 15.9.4
+## 15.10.0
 
+- **A new, modern interface** (the default), alongside the classic Xilinx ISE one (*View ▸
+  Interface*, remembered by the browser; both have every feature). It has a header with the
+  project and a search box; an activity bar for Start / Design / Files / Libraries; document tabs
+  above the editor; and labelled buttons for the design flow (Check, Simulate, Implement, Emulate,
+  Program). Dialogs, menus and controls follow current design practice, the whole interface is
+  usable from the keyboard, and the window adapts to small screens.
+- **Light and dark themes** in the modern interface: they follow the system by default, or are
+  chosen with *View ▸ Theme* or the header button. Diagram sheets stay light paper; the HDL editor,
+  ISim and every panel follow the theme.
+- **Command palette** (Ctrl+K / Cmd+K, or Ctrl+Shift+P): search any menu command or project file by
+  name and run or open it from the keyboard. In Portuguese it finds commands by their Portuguese
+  or English names.
 - *Help ▸ About* describes what Silinx does today (schematics with live simulation, FSM and ASM
   editors, truth tables and Karnaugh maps, wizards, netlist simulation, board emulator).
 

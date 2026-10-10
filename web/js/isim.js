@@ -12,6 +12,7 @@
 
 import * as V from '/core/values.js';
 import { toVCD } from '/core/simulator.js';
+import { onPrefsChange } from './modern.js';
 
 // ------------------------------------------------------------------------------- constants
 const ROW_H = 20;
@@ -354,6 +355,8 @@ export function mountISim(container, opts = {}) {
       accent: g('--accent', '#316ac5'), accentFg: g('--accent-fg', '#fff'), border: g('--border', '#a0a0a0'),
       borderLight: g('--border-light', '#d4d0c8'), fgText: g('--fg', '#000'), muted: g('--muted', '#6d6d6d'),
       header: g('--bg', '#f0f0f0'),
+      // the header of the names and the time ruler (themes: web/css/modern.css)
+      head1: g('--wave-head-1', '#fbfbfb'), head2: g('--wave-head-2', '#e3e3e3'), rulerFg: g('--wave-ruler-fg', '#000'), rulerTick: g('--wave-ruler-tick', '#555'),
       font: g('--font', 'Tahoma, Arial, sans-serif'), mono: g('--mono', 'Consolas, monospace'),
     };
   }
@@ -539,7 +542,7 @@ export function mountISim(container, opts = {}) {
     ctx.fillStyle = colors.names; ctx.fillRect(0, 0, NW, NH);
     // header
     const hg = ctx.createLinearGradient(0, 0, 0, RULER_H);
-    hg.addColorStop(0, '#fbfbfb'); hg.addColorStop(1, '#e3e3e3');
+    hg.addColorStop(0, colors.head1); hg.addColorStop(1, colors.head2);
     ctx.fillStyle = hg; ctx.fillRect(0, 0, NW, RULER_H);
     ctx.strokeStyle = colors.border; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, RULER_H - 0.5); ctx.lineTo(NW, RULER_H - 0.5);
@@ -638,10 +641,10 @@ export function mountISim(container, opts = {}) {
     const uname = { 1: 'ps', 1e3: 'ns', 1e6: 'us', 1e9: 'ms' }[unit];
     const minor = step / (mant === 2 ? 4 : 5);
     const rg = ctx.createLinearGradient(0, 0, 0, RULER_H);
-    rg.addColorStop(0, '#fbfbfb'); rg.addColorStop(1, '#e3e3e3');
+    rg.addColorStop(0, colors.head1); rg.addColorStop(1, colors.head2);
     ctx.fillStyle = rg; ctx.fillRect(0, 0, WW, RULER_H);
     ctx.strokeStyle = colors.border; ctx.beginPath(); ctx.moveTo(0, RULER_H - 0.5); ctx.lineTo(WW, RULER_H - 0.5); ctx.stroke();
-    ctx.strokeStyle = '#555'; ctx.fillStyle = '#000'; setFont(ctx, 11); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+    ctx.strokeStyle = colors.rulerTick; ctx.fillStyle = colors.rulerFg; setFont(ctx, 11); ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
     ctx.beginPath();
     const decs = Math.max(0, Math.ceil(-Math.log10(step / unit) - 1e-9));
     if (minor * 1 / st.scale >= 4) {
@@ -1832,6 +1835,7 @@ export function mountISim(container, opts = {}) {
 
   // ---------------------------------------------------------------- init
   readColors();
+  cleanups.push(onPrefsChange(() => requestAnimationFrame(() => { readColors(); layout(); })));   // light / dark theme
   renderTree();
   if (design.top) {
     const sigs = instSignals(design.top).map(o => o.sig);

@@ -234,6 +234,19 @@ const PT = {
   // misc
   'Error': 'Erro', 'Warning': 'Aviso', 'Note': 'Nota', 'Failure': 'Falha', 'Running': 'Em curso', 'Running...': 'Em curso...', 'Other': 'Outro',
   'not available': 'indisponível', 'not found': 'não encontrado', 'see log': 'ver registo', 'Exported .xise': '.xise exportado',
+
+  // modern interface (web/js/modern.js, web/js/palette.js): View ▸ Interface / Theme, header, design flow, command palette
+  'Interface': 'Interface', 'Modern': 'Moderna', 'Xilinx ISE (Classic)': 'Xilinx ISE (Clássica)',
+  'Theme': 'Tema', 'System': 'Sistema', 'Light': 'Claro', 'Dark': 'Escuro', 'Command Palette…': 'Paleta de Comandos…',
+  'Implement': 'Implementar', 'Emulate': 'Emular', 'Design flow': 'Fluxo de projeto',
+  'Check Syntax of the selected module': 'Verificar a sintaxe do módulo selecionado',
+  'Simulate Behavioral Model of the selected module': 'Simular o modelo comportamental do módulo selecionado',
+  'No project open': 'Nenhum projeto aberto', 'Main menu': 'Menu principal', 'Panels': 'Painéis',
+  'Search commands and files (Ctrl+K)': 'Procurar comandos e ficheiros (Ctrl+K)', 'Search commands and files…': 'Procurar comandos e ficheiros…',
+  'Search commands and files': 'Procurar comandos e ficheiros', 'Switch between light and dark theme': 'Alternar entre tema claro e escuro',
+  'Open a source from the Design panel, or search for any command or file.': 'Abra uma fonte no painel Projeto, ou procure qualquer comando ou ficheiro.',
+  'No matching commands or files': 'Nenhum comando ou ficheiro corresponde', 'to navigate': 'para navegar', 'to run': 'para executar', 'to close': 'para fechar',
+  'Open file': 'Abrir ficheiro', 'Command palette': 'Paleta de comandos', 'Command palette: search commands and files': 'Paleta de comandos: procurar comandos e ficheiros',
 };
 
 const PT_GATE_INV = { 'input I0': 'a entrada I0', 'inputs I0 and I1': 'as entradas I0 e I1' };

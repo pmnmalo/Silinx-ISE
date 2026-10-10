@@ -415,6 +415,8 @@ export async function setupUi({ server = true } = {}) {
     await page.send('Page.enable');
     // no update check against GitHub at start-up (a test can turn it on again with its own fetch stub)
     await page.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.SILINX_NO_UPDATE_CHECK = true;' });
+    // SILINX_UI_INTERFACE=classic: run the tests in the Xilinx ISE interface (the default is the modern one)
+    if (process.env.SILINX_UI_INTERFACE) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { if (!localStorage.getItem('silinx.ui')) localStorage.setItem('silinx.ui', ${JSON.stringify(process.env.SILINX_UI_INTERFACE)}); } catch (e) {}` });
     await page.send('DOM.enable');
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
     await page.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
@@ -444,10 +446,11 @@ export async function setupUi({ server = true } = {}) {
  * console.error() fail the test (page.allowErrors: regexps of expected ones); on failure a
  * screenshot is written and its path printed.
  */
-export function uiTest(name, envRef, fn, { timeout = 90000, url } = {}) {
+// skip: a reason to skip the test (e.g. it needs the default interface)
+export function uiTest(name, envRef, fn, { timeout = 90000, url, skip } = {}) {
   test(name, { timeout }, async (t) => {
     const env = typeof envRef === 'function' ? envRef() : envRef;
-    if (env.skip) { t.skip(env.skip); return; }
+    if (env.skip || skip) { t.skip(env.skip || skip); return; }
     const page = await env.newPage(url ? url(env) : undefined);
     try {
       if (!url) await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });

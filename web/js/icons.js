@@ -1,5 +1,7 @@
 // Small 16x16 SVG icons in the spirit of the ISE toolbar / tree icons.
 const S = (body, vb = '0 0 16 16') => `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
+// line icon (24x24, stroked in the current text colour)
+const L = body => `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
 export const icons = {
   newProject: S('<path d="M2 4h5l1 1.5h6v8.5H2z" fill="#f4d27a" stroke="#b48a2c"/><path d="M11 1v6M8 4h6" stroke="#2a8a2a" stroke-width="2"/>'),
@@ -54,6 +56,23 @@ export const icons = {
   refresh: S('<path d="M13 8a5 5 0 11-1.6-3.7" fill="none" stroke="#2b7a2b" stroke-width="1.8"/><path d="M13.5 1.5v4h-4" fill="none" stroke="#2b7a2b" stroke-width="1.8"/>'),
   add: S('<path d="M8 2v12M2 8h12" stroke="#2a8a2a" stroke-width="2.4"/>'),
   remove: S('<path d="M2 8h12" stroke="#c22" stroke-width="2.4"/>'),
+
+  // the modern interface (web/css/modern.css): line icons in the text colour
+  mHome: L('<path d="M3 10.5L12 3l9 7.5"/><path d="M5 9v11h5v-6h4v6h5V9"/>'),
+  mDesign: L('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h4a2.5 2.5 0 012.5 2.5v5"/>'),
+  mFiles: L('<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
+  mLibrary: L('<path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16.5 4.5l3.8 1 -3.9 14.6-3.8-1z"/>'),
+  mSearch: L('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'),
+  mSun: L('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>'),
+  mMoon: L('<path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/>'),
+  mCheck: L('<path d="M4 12.5l5 5L20 6.5"/>'),
+  mPlay: L('<path d="M7 4.5v15l12-7.5z"/>'),
+  mWave: L('<path d="M2 16h3V8h4v8h4V8h4v8h5"/>'),
+  mBolt: L('<path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z"/>'),
+  mBoard: L('<rect x="2.5" y="5" width="19" height="14" rx="2"/><rect x="6" y="8.5" width="6" height="4" rx=".5"/><path d="M15.5 9h2.5M15.5 12h2.5M6 16h1.5M10 16h1.5"/>'),
+  mUpload: L('<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 005.5 20h13a1.5 1.5 0 001.5-1.5V15"/>'),
+  mStop: L('<rect x="6" y="6" width="12" height="12" rx="1.5"/>'),
+  mPanel: L('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>'),
 };
 
 export function icon(name) {

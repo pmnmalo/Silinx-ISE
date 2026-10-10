@@ -14,9 +14,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: UI tests (headless Chrome)
+      - name: UI tests (headless Chrome, modern interface)
         run: npm run test:ui -- --test-concurrency=1
         timeout-minutes: 15
         env:
           CHROME_PATH: /usr/bin/google-chrome
+      - name: UI tests (classic Xilinx ISE interface)
+        run: npm run test:ui -- --test-concurrency=1
+        timeout-minutes: 15
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          SILINX_UI_INTERFACE: classic
       - run: node scripts/build-standalone.mjs

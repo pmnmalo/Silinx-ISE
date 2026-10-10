@@ -71,7 +71,7 @@ function sourceLabels() {
 test('every UI label in the web/js sources has a Portuguese translation', () => {
   // the same in both languages: names, codes, abbreviations
   const SAME = new Set(['work', 'iMPACT', 'OK', 'MSB', 'LSB', 'Bitstream', 'labels', 'Slew', 'Pull', 'Case', 'Flip-Flops', 'VHDL', 'Verilog', 'ISim', 'Bidir',
-    'schematic' /* default architecture name */, 'iMPACT — Boundary Scan']);
+    'schematic' /* default architecture name */, 'iMPACT — Boundary Scan', 'Interface' /* the same word in Portuguese */]);
   const labels = sourceLabels();
   assert.ok(labels.size > 200, `${labels.size} labels found`);
   const missing = [...labels].filter(([s]) => !SAME.has(s) && !/^[^a-z]*$/.test(s) && t(s) === s).map(([s, f]) => `${f}: ${s}`);

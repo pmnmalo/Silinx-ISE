@@ -18,6 +18,13 @@
 <link rel="stylesheet" href="/css/sch-editor.css">
 <link rel="stylesheet" href="/css/truthtable.css">
 <link rel="stylesheet" href="/css/fsm-editor.css">
+<link rel="stylesheet" href="/css/modern.css">
+<script>/* the interface (modern | classic) and theme before the first paint: web/js/modern.js */
+(function () { var d = document.documentElement, ui = 'modern', th = 'system';
+  try { ui = localStorage.getItem('silinx.ui') === 'classic' ? 'classic' : 'modern'; th = localStorage.getItem('silinx.theme') || 'system'; } catch (e) {}
+  var dark = th === 'dark' || (th !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  d.setAttribute('data-ui', ui); d.setAttribute('data-theme', ui === 'modern' && dark ? 'dark' : 'light'); })();
+</script>
 <script src="/vendor/codemirror/lib/codemirror.js"></script>
 <script src="/vendor/codemirror/mode/verilog/verilog.js"></script>
 <script src="/vendor/codemirror/mode/vhdl/vhdl.js"></script>
@@ -39,8 +46,14 @@
 </head>
 <body>
 <div id="app">
-  <div id="titlebar"><span class="app-logo">S</span><span id="title-text">Silinx ISE - Project Navigator</span></div>
-  <div id="menubar"></div>
+  <header id="topbar">
+    <div id="titlebar"><span class="app-logo">S</span><span id="title-brand" data-no-i18n>Silinx ISE</span><span id="title-text">Silinx ISE - Project Navigator</span><button id="title-project" class="m-chip" title="Open Project"></button></div>
+    <nav id="menubar" aria-label="Main menu"></nav>
+    <div id="top-actions">
+      <button id="palette-btn" class="m-search" title="Search commands and files (Ctrl+K)"><span class="ico-inline" data-icon="mSearch"></span><span class="m-search-text">Search commands and files…</span><kbd id="palette-kbd" data-no-i18n>Ctrl K</kbd></button>
+      <button id="theme-btn" class="m-icon-btn" title="Switch between light and dark theme" aria-label="Switch between light and dark theme"><span class="ico-inline m-sun" data-icon="mSun"></span><span class="ico-inline m-moon" data-icon="mMoon"></span></button>
+    </div>
+  </header>
   <div id="toolbar"></div>
   <div id="main">
     <div id="left">
@@ -66,16 +79,18 @@
         <div class="left-page" data-page="files" hidden><div class="ise-panel fill"><div class="caption">Files</div><div class="body" id="files-page"></div></div></div>
         <div class="left-page" data-page="libraries" hidden><div class="ise-panel fill"><div class="caption">Libraries</div><div class="body" id="libs-page"></div></div></div>
       </div>
-      <div id="left-tabs" class="bottom-tabs">
-        <div class="tab" data-page="start">Start</div>
-        <div class="tab active" data-page="design">Design</div>
-        <div class="tab" data-page="files">Files</div>
-        <div class="tab" data-page="libraries">Libraries</div>
+      <div id="left-tabs" class="bottom-tabs" role="tablist" aria-label="Panels">
+        <div class="tab" data-page="start" role="tab" tabindex="0"><span class="ico-inline tab-ico" data-icon="mHome"></span><span class="tab-lbl">Start</span></div>
+        <div class="tab active" data-page="design" role="tab" tabindex="0"><span class="ico-inline tab-ico" data-icon="mDesign"></span><span class="tab-lbl">Design</span></div>
+        <div class="tab" data-page="files" role="tab" tabindex="0"><span class="ico-inline tab-ico" data-icon="mFiles"></span><span class="tab-lbl">Files</span></div>
+        <div class="tab" data-page="libraries" role="tab" tabindex="0"><span class="ico-inline tab-ico" data-icon="mLibrary"></span><span class="tab-lbl">Libraries</span></div>
       </div>
     </div>
     <div id="v-split"></div>
     <div id="center">
-      <div id="workspace"></div>
+      <div id="workspace"><div id="ws-empty"><div class="ws-logo">S</div><h2>Silinx ISE</h2>
+        <p>Open a source from the Design panel, or search for any command or file.</p>
+        <div class="ws-keys"><span><kbd data-no-i18n class="pal-key">Ctrl K</kbd> <span>Search commands and files</span></span><span><kbd data-no-i18n>Ctrl S</kbd> <span>Save</span></span><span><kbd data-no-i18n>Ctrl Z</kbd> <span>Undo</span></span></div></div></div>
       <div id="doc-tabs" class="bottom-tabs"></div>
     </div>
   </div>

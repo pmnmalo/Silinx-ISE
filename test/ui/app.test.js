@@ -39,6 +39,7 @@ const SIGNATURE = `window.__sig = () => JSON.stringify({
   view: window.Silinx.view,
   con: document.getElementById('console-log').innerText.length,
   toasts: document.querySelectorAll('.toast').length,
+  palette: document.querySelectorAll('.pal-overlay').length,
   text: window.Silinx.active?.editor?.getValue?.() ?? '',
   top: window.Silinx.project?.top,
   status: document.getElementById('status-text').textContent,
@@ -46,11 +47,11 @@ const SIGNATURE = `window.__sig = () => JSON.stringify({
 
 async function settle(page) {
   for (let i = 0; i < 8; i++) {
-    const open = await page.eval(() => document.querySelectorAll('.dlg-overlay, .CodeMirror-dialog').length);
+    const open = await page.eval(() => document.querySelectorAll('.dlg-overlay, .CodeMirror-dialog, .pal-overlay').length);
     if (!open) break;
     await page.eval(() => { const i = document.querySelector('.CodeMirror-dialog input'); if (i && !document.querySelector('.dlg-overlay')) i.focus(); });
     await page.key('Escape');
-    await page.waitFor((n) => document.querySelectorAll('.dlg-overlay, .CodeMirror-dialog').length < n, [open], { timeout: 3000 }).catch(() => {});
+    await page.waitFor((n) => document.querySelectorAll('.dlg-overlay, .CodeMirror-dialog, .pal-overlay').length < n, [open], { timeout: 3000 }).catch(() => {});
   }
   await page.closeMenus();
   await page.waitFor(() => !window.Silinx.busy, [], { timeout: 30000, what: 'no process running' });

@@ -32,6 +32,7 @@ const SAME = [
   /^@?(English|Português)$/,
   /^@?<workspace>/,
   /^@?(Default\.wcfg)$/,
+  /^@?Interface$/,                                 // the same word in Portuguese
 ];
 export const isSame = (s) => SAME.some((re) => re.test(s));
 
