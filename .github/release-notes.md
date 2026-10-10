@@ -1,4 +1,4 @@
-**Silinx ISE (Integrated Synthesis Environment)** is an ISE-style FPGA design environment that runs in the browser: VHDL/Verilog projects, schematic and ASM state-machine editors kept in sync with HDL, behavioural simulation with waveforms, and Xilinx ISE 14.7 implementation and board programming.
+**Silinx ISE (Integrated Synthesis Environment)** is an ISE-style FPGA design environment that runs in the browser, made for teaching digital systems: VHDL/Verilog projects; schematics with live simulation; FSM and ASM state-machine editors, truth tables and Karnaugh maps, all kept in sync with their HDL; module and test bench wizards; behavioural and netlist simulation with waveforms; a board emulator; and Xilinx ISE 14.7 synthesis, implementation and board programming.
 
 ## Downloads
 
