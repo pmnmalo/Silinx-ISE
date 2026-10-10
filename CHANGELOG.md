@@ -3,6 +3,13 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.10.1
+
+- *Help ▸ About* and the README: Silinx ISE is described as developed to support the teaching of
+  Digital Systems, without naming an institution (Silinx is the work of Pedro Maló, in his own time).
+- How the open toolchain for the Spartan-3E is being developed: `docs/OPEN-TOOLCHAIN.md`, and the
+  first experiments in `research/s3e-bitstream`.
+
 ## 15.10.0
 
 - **A new, modern interface** (the default), alongside the classic Xilinx ISE one (*View ▸
@@ -130,8 +137,8 @@ the "What's new" text of its GitHub release.
   overloading, case-generate; Verilog macros with arguments, `include`, defparam, named events …).
 - Netlists from the real ISE 14.7 are checked against their RTL for 13 designs.
 - The board emulator no longer jumps up and down (seen on Safari); knob turns are never lost.
-- About and README: Silinx ISE was developed to support the teaching of Digital Systems at
-  FCT NOVA, because AMD/Xilinx discontinued Xilinx ISE.
+- About and README: Silinx ISE was developed to support the teaching of Digital Systems,
+  because AMD/Xilinx discontinued Xilinx ISE.
 
 ## 15.5.0
 
