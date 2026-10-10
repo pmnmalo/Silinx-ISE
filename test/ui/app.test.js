@@ -89,7 +89,8 @@ uiTest('every menu opens and every enabled item acts or opens its dialog', E, as
       if (m === 'View' && it.label === 'Implementation') { await page.closeMenus(); await page.click('input[name=view][value=sim]'); }
       // Design Summary: from another document
       if (m === 'View' && it.label === 'Design Summary') await page.eval(() => { const d = window.SilinxApp.findDoc('summary'); if (d) window.SilinxApp.closeDoc(d); });
-      const now = await page.openMenu(m);
+      // (a failure names the item before, whose effect may be in the way)
+      const now = await page.openMenu(m).catch(async (e) => { throw new Error(`menu ${m} for ${name}, after ${log.at(-1) || acted.at(-1) || 'none'}: ${e.message}; overlays: ${await page.eval(() => [...document.querySelectorAll('.dlg-overlay, .pal-overlay, .menu-popup, .CodeMirror-dialog')].map((x) => x.className).join(', '))}`); });
       const cur = now.find((x) => x.label === it.label);
       if (!cur) continue;                         // e.g. the Window list changed
       if (cur.disabled) { disabled.push(name); continue; }
