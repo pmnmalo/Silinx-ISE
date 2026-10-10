@@ -24,6 +24,12 @@ the "What's new" text of its GitHub release.
   - Click a site to see its logic: LUT equations with the names of their input signals,
     flip-flops (clock, enable, set / reset, initial value), carry chain and multiplexers; for a
     pad, its port, package pin, direction, I/O standard, drive and slew rate.
+  - **Inside a slice** (Spartan-3 / Spartan-3E): a diagram of the slice with the parts the design
+    uses (LUTs F and G, F5 multiplexer, carry chain, output multiplexers, flip-flops FFX and FFY)
+    in the module's colour and the pins that carry signals; the other slices of the same CLB.
+  - **How each function is implemented**: a LUT is a 16-bit memory. The view shows the truth
+    table it holds, with the names of its input signals, its 16 memory bits and the INIT value,
+    and marks the LUTs that only pass a signal through (route-thru).
   - Nets: what a net connects and the tiles its routing goes through; a site's connections;
     the global clock network; search by name.
   - The Design hierarchy and the chip select each other's modules.

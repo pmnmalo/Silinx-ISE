@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl, parseXdlrc, parseCfg, prettyEquation, fpgaModel } from '../core/xdl.js';
+import { parseXdl, parseXdlrc, parseCfg, prettyEquation, fpgaModel, evalLut, lutTable } from '../core/xdl.js';
 import * as ise from '../server/ise.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
@@ -118,4 +118,48 @@ test('run.sh: the fpgaview step converts the routed design to XDL and reports th
   assert.match(sh, /run_step fpgaview xdl -ncd2xdl top\.ncd top\.xdl/);
   assert.match(sh, /grep -q ' xc3s250ecp132-4 '/, 'the report of another device is replaced');
   assert.match(sh, /run_step fpgadevice xdl -report xc3s250ecp132-4 device\.xdlrc/);
+});
+
+test('evalLut: XDL LUT equations (not, and, xor, or with their precedence, constants, parentheses)', () => {
+  const v = (a1, a2, a3 = 0, a4 = 0) => ({ A1: a1, A2: a2, A3: a3, A4: a4 });
+  assert.equal(evalLut('D=(A1*~A2)', v(1, 0)), 1);
+  assert.equal(evalLut('D=(A1*~A2)', v(1, 1)), 0);
+  assert.equal(evalLut('D=A1+A2*A3', v(0, 1, 0)), 0, '* before +');
+  assert.equal(evalLut('D=A1+A2*A3', v(1, 0, 0)), 1);
+  assert.equal(evalLut('D=A1@A2*A3', v(1, 1, 0)), 1, '* before @');
+  assert.equal(evalLut('D=A1@A2+A3', v(1, 1, 1)), 1, '@ before +');
+  assert.equal(evalLut('D=~(A1+A2)', v(0, 0)), 1);
+  assert.equal(evalLut('D=1', v(0, 0)), 1);
+  assert.equal(evalLut('O6=(A6*A1)', { A1: 1, A6: 1 }), 1, 'Spartan-6 output name and inputs');
+  assert.throws(() => evalLut('D=(A1*A2', v(1, 1)), /'\)' expected/);
+  assert.throws(() => evalLut('D=A1#A2', v(1, 1)), /unexpected/);
+});
+
+test('lutTable: the inputs used, the truth table rows, the memory bits and the INIT value of the LUT', () => {
+  const t = lutTable('D=(A1*~A2)');
+  assert.deepEqual(t.inputs, ['A1', 'A2']);
+  assert.deepEqual(t.rows, [{ in: [0, 0], out: 0 }, { in: [0, 1], out: 0 }, { in: [1, 0], out: 1 }, { in: [1, 1], out: 0 }]);
+  assert.equal(t.bits.length, 16);
+  assert.deepEqual(t.bits.slice(0, 4), [0, 1, 0, 0], 'address = A4 A3 A2 A1 in binary');
+  assert.equal(t.init, '2222');
+  // values ISE writes for well-known functions
+  assert.equal(lutTable('D=A3').init, 'F0F0');
+  assert.equal(lutTable('D=~A1').init, '5555');
+  assert.equal(lutTable('D=(A1*A2*A3*A4)').init, '8000');
+  assert.equal(lutTable('D=(A1@A2)').init, '6666');
+  assert.equal(lutTable('D=1').init, 'FFFF');
+  assert.deepEqual(lutTable('D=1').inputs, []);
+  // a 6-input LUT: 64 bits
+  const t6 = lutTable('O6=(A1*A6)', 6);
+  assert.equal(t6.bits.length, 64);
+  assert.equal(t6.init, 'AAAAAAAA00000000');
+});
+
+test('fpgaModel keeps the settings of a site (internal multiplexers, inverters) and marks route-thru LUTs', () => {
+  const m = fpgaModel(parseXdl(`inst "s" "SLICEL",placed CLB_X1Y2 SLICE_X1Y4 ,
+  cfg " F:s/f:#LUT:D=A2 G::#OFF DXMUX::1 FXMUX::F CYINIT::BX _BEL_PROP::F:PK_PACKTHRU: BXINV::BX "
+  ;`), parseXdlrc(XDLRC));
+  const s = m.insts[0];
+  assert.deepEqual(s.opt, { DXMUX: '1', FXMUX: 'F', CYINIT: 'BX', BXINV: 'BX' });
+  assert.equal(s.cells[0].thru, true);
 });

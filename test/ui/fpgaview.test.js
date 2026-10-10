@@ -80,6 +80,45 @@ uiTest('FPGA view: chip, modules, a site\'s logic and connections, nets, clock n
   assert.match(det, /XORF u1\/Madd_cnt_xor<0> carry chain/);
   assert.match(det, /Connections[\s\S]*CLK\s+clk_BUFGP/);
   await page.waitFor(() => document.querySelector('#hier .row.sel .lbl')?.textContent === 'u1 - sub', [], { what: 'u1 selected in the hierarchy' });
+  // inside the slice: LUT F and FFX used (in the module's colour), LUT G and FFY not; the carry chain; pins with signals
+  const inside = await page.eval((v) => ({
+    on: [...document.querySelectorAll(`${v} .fv-slice .fv-sb.on`)].map((g) => g.dataset.bel),
+    off: [...document.querySelectorAll(`${v} .fv-slice .fv-sb:not(.on)`)].map((g) => g.dataset.bel),
+    pins: [...document.querySelectorAll(`${v} .fv-slice .fv-sp.on`)].map((t) => t.firstChild.textContent),
+    fill: document.querySelector(`${v} .fv-slice .fv-sb.on rect`).style.fill === document.querySelector(`${v} .fv-site.sel`).style.fill,
+  }), V);
+  assert.deepEqual(inside.on.sort(), ['CYMUXF', 'F', 'FFX', 'XORF']);
+  assert.deepEqual(inside.off.sort(), ['CYMUXG', 'FFY', 'G', 'XORG']);
+  assert.deepEqual(inside.pins.sort(), ['CLK', 'F1', 'F2', 'XQ']);
+  assert.ok(inside.fill, 'the used parts in the colour of the module');
+  // how LUT F implements its function: truth table with the signal names, the 16 memory bits, INIT
+  const lut = await page.eval((v) => {
+    const c = document.querySelector(`${v} .fv-cell[data-cell="F"]`);
+    return {
+      head: [...c.querySelectorAll('.fv-tt tr:first-child th div')].map((d) => d.textContent),
+      rows: [...c.querySelectorAll('.fv-tt tr')].slice(1).map((r) => [...r.cells].map((x) => x.textContent).join('')),
+      mem: [...c.querySelectorAll('.fv-mem span')].map((x) => x.textContent).join(''),
+      init: c.querySelector('.fv-lut').textContent.match(/INIT = (\w+)/)?.[1],
+    };
+  }, V);
+  assert.deepEqual(lut.head, ['a_IBUF', 'q']);
+  assert.deepEqual(lut.rows, ['000', '010', '101', '110']);
+  assert.equal(lut.mem, '0010001000100010', 'address 15 … 0');
+  assert.equal(lut.init, '2222');
+  // a pin of the slice shows its net; Enlarge widens the panel
+  await page.eval((v) => [...document.querySelectorAll(`${v} .fv-slice .fv-sp.on`)].find((t) => t.firstChild.textContent === 'F1').dispatchEvent(new MouseEvent('click')), V);
+  await page.waitFor((v) => /^Net a_IBUF/.test(document.querySelector(`${v} .fv-info`).textContent), [V], { what: 'pin F1 -> net a_IBUF' });
+  await page.click(`${V} .fv-enlarge`);
+  assert.ok(await page.eval((v) => document.querySelector(`${v} .fv-side`).classList.contains('wide'), V));
+  await page.click(`${V} .fv-enlarge`);
+  // the other slices of the CLB: 4 buttons, the used ones enabled; u1/r is in SLICE_X0Y4
+  const clb = await page.eval((v) => [...document.querySelectorAll(`${v} .fv-clb-s`)].map((b) => [b.textContent, b.disabled, b.classList.contains('cur')]), V);
+  assert.deepEqual(clb, [['X0Y4', false, false], ['X0Y5', true, false], ['X1Y4', true, false], ['X1Y5', false, true]]);
+  await page.click(`${V} .fv-clb-s`, { text: 'X0Y4' });
+  await page.waitFor((v) => /SLICE_X0Y4/.test(document.querySelector(`${v} .fv-detail`).textContent), [V], { what: 'the other slice' });
+  assert.match(await page.eval((v) => document.querySelector(`${v} .fv-cell[data-cell="G"] .fv-eq`).textContent, V), /^= \(q ⊕ GLOBAL_LOGIC1\)$/);
+  await page.click(`${V} .fv-site[data-i="${q}"]`);
+  await page.waitFor((v) => /SLICE_X1Y5/.test(document.querySelector(`${v} .fv-detail`).textContent), [V]);
   // its connections are drawn
   assert.ok(await page.eval((v) => document.querySelectorAll(`${v} .fv-conn line`).length, V) >= 3);
   // a net from the details: its loads and the tiles of its routing

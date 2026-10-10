@@ -11,6 +11,7 @@
 //   v.highlightModule('Inst_data' | null); v.select(instIndex); v.showNet(netIndex); v.destroy();
 // Styles: web/css/fpgaview.css.
 import { h } from './ui.js';
+import { lutTable } from '/core/xdl.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const S = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) if (v != null) e.setAttribute(k, v); return e; };
@@ -52,6 +53,89 @@ export function layoutSites(device) {
     });
   }
   return out;
+}
+
+/** Inside a Spartan-3 / Spartan-3E slice: the LUTs G and F, the F5 multiplexer, the carry logic and
+ *  the output multiplexers, the flip-flops FFY and FFX; what the design uses is coloured, each pin
+ *  shows (title) and links to its signal. onPin(pin), onPart(bel). */
+export function sliceDiagram(inst, { color = '#4e79a7', netName = () => null, onPin = () => {}, onPart = () => {} } = {}) {
+  const W = 300, H = 278;
+  const svg = S('svg', { viewBox: `0 0 ${W} ${H}`, class: 'fv-slice', role: 'img', 'aria-label': `Inside ${inst.site}` });
+  const has = bel => inst.cells.some(c => c.bel === bel);
+  const pin = p => inst.pins[p] !== undefined;
+  const o = inst.opt || {};
+  const wire = (pts, on, title) => {
+    const e = S('polyline', { points: pts.map(p => p.join(',')).join(' '), class: `fv-sw${on ? ' on' : ''}` });
+    if (title) e.append(S('title', {}, title));
+    svg.append(e);
+    return e;
+  };
+  const text = (x, y, t, cls = '', anchor = 'start') => { const e = S('text', { x, y, class: cls, 'text-anchor': anchor }); e.textContent = t; svg.append(e); return e; };
+  const pinLabel = (x, y, p, anchor) => {
+    const n = netName(p);
+    const e = text(x, y + 3.5, p, `fv-sp${n ? ' on' : ''}`, anchor);
+    if (n) { e.append(S('title', {}, `${p}: ${n}`)); e.addEventListener('click', () => onPin(p)); }
+  };
+  const block = (x, y, w, hh, label, bel, used, sub) => {
+    const g = S('g', { class: `fv-sb${used ? ' on' : ''}`, 'data-bel': bel });
+    const r = S('rect', { x, y, width: w, height: hh, rx: 3 });
+    if (used) r.style.fill = color;
+    g.append(r);
+    const t = S('text', { x: x + w / 2, y: y + hh / 2 + (sub ? -2 : 4), 'text-anchor': 'middle' }); t.textContent = label; g.append(t);
+    if (sub) { const t2 = S('text', { x: x + w / 2, y: y + hh / 2 + 10, 'text-anchor': 'middle', class: 'fv-sbs' }); t2.textContent = sub; g.append(t2); }
+    const cell = inst.cells.find(c => c.bel === bel);
+    if (cell) { g.append(S('title', {}, `${bel}: ${cell.name}`)); g.addEventListener('click', () => onPart(bel)); }
+    svg.append(g);
+  };
+  const mux = (x, y, hh, label, used) => {
+    const e = S('path', { d: `M${x} ${y}L${x + 12} ${y + 6}V${y + hh - 6}L${x} ${y + hh}Z`, class: `fv-sm${used ? ' on' : ''}` });
+    svg.append(e);
+    if (label) text(x + 6, y - 3, label, 'fv-sbs', 'middle');
+  };
+  const lut = (bel, y0, pins) => {
+    pins.forEach((p, k) => { const y = y0 + 10 + k * 16; pinLabel(2, y, p); wire([[22, y], [42, y]], pin(p), netName(p)); });
+    const c = inst.cells.find(x => x.bel === bel);
+    block(42, y0, 54, 70, `LUT ${bel}`, bel, !!c, c ? (c.thru ? 'route-thru' : c.kind === 'lut' ? '16×1 memory' : c.kind.toUpperCase()) : '');
+  };
+  // LUT G (top) and F (bottom), BY / BX
+  lut('G', 18, ['G4', 'G3', 'G2', 'G1']);
+  pinLabel(2, 100, 'BY'); lut('F', 112, ['F4', 'F3', 'F2', 'F1']); pinLabel(2, 194, 'BX');
+  // F5MUX between the LUTs
+  const f5 = has('F5MUX');
+  wire([[96, 53], [104, 53], [104, 92]], f5); wire([[96, 147], [104, 147], [104, 128]], f5);
+  mux(100, 88, 44, 'F5', f5);
+  // carry chain: CIN (bottom) -> CY / XOR of F -> CY / XOR of G -> COUT (top)
+  const cyF = has('CYMUXF') || has('XORF'), cyG = has('CYMUXG') || has('XORG');
+  wire([[140, H - 8], [140, 168]], pin('CIN'), netName('CIN'));
+  if (o.CYINIT === 'BX') wire([[22, 194], [140, 194], [140, 170]], cyF, netName('BX'));   // the carry chain starts from BX text(140, H - 1, 'CIN', `fv-sp${pin('CIN') ? ' on' : ''}`, 'middle');
+  wire([[140, 140], [140, 74]], cyF && cyG); wire([[140, 46], [140, 10]], pin('COUT'), netName('COUT')); text(140, 8, 'COUT', `fv-sp${pin('COUT') ? ' on' : ''}`, 'middle');
+  block(128, 46, 24, 14, 'CY', 'CYMUXG', has('CYMUXG')); block(128, 62, 24, 14, '⊕', 'XORG', has('XORG'));
+  block(128, 140, 24, 14, 'CY', 'CYMUXF', has('CYMUXF')); block(128, 156, 24, 14, '⊕', 'XORF', has('XORF'));
+  // output multiplexers: Y from G / GXOR, X from F / F5 / FXOR
+  const gy = pin('Y') || has('FFY'), fx = pin('X') || has('FFX');
+  wire([[96, 40], [164, 40]], gy && (o.GYMUX || 'G') === 'G'); wire([[152, 69], [164, 52]], gy && o.GYMUX === 'GXOR');
+  mux(164, 30, 32, o.GYMUX ? `GYMUX=${o.GYMUX}` : '', gy);
+  wire([[96, 134], [164, 134]], fx && (o.FXMUX || 'F') === 'F'); wire([[116, 110], [124, 110], [124, 128], [164, 140]], fx && o.FXMUX === 'F5'); wire([[152, 163], [164, 150]], fx && o.FXMUX === 'FXOR');
+  mux(164, 124, 32, o.FXMUX ? `FXMUX=${o.FXMUX}` : '', fx);
+  // flip-flops: D from the output multiplexer (DYMUX / DXMUX = 1) or from BY / BX (= 0)
+  const ff = (bel, y, q, comb, byx, dmux, muxY, outY) => {
+    const used = has(bel);
+    wire([[176, muxY], [186, muxY], [186, y + 14], [204, y + 14]], used && dmux !== '0');
+    wire([[22, byx], [194, byx], [194, y + 26], [204, y + 26]], (used && dmux === '0') || false, netName(byx === 100 ? 'BY' : 'BX'));
+    block(204, y, 40, 46, bel, bel, used, used ? (inst.opt[`${bel}_INIT_ATTR`] === 'INIT1' ? 'init 1' : 'init 0') : '');
+    wire([[244, y + 14], [272, y + 14]], pin(q), netName(q)); pinLabel(298, y + 14, q, 'end');
+    wire([[186, muxY], [186, outY], [272, outY]], pin(comb), netName(comb)); pinLabel(298, outY, comb, 'end');
+  };
+  ff('FFY', 22, 'YQ', 'Y', 100, o.DYMUX, 46, 82);
+  ff('FFX', 116, 'XQ', 'X', 194, o.DXMUX, 140, 176);
+  // clock, clock enable, set / reset to both flip-flops
+  [['CE', 214], ['CLK', 230], ['SR', 246]].forEach(([p, y], k) => {
+    const x = 214 + k * 10;
+    pinLabel(2, y, p);
+    wire([[22, y], [x, y], [x, 162]], pin(p), netName(p));
+    wire([[x, 116], [x, 68]], pin(p) && has('FFY') && has('FFX'));
+  });
+  return svg;
 }
 
 /** The module key of a hierarchy path at a level (1 = the top's instances): 'Inst_data/u1' at 1 -> 'Inst_data'. */
@@ -193,6 +277,29 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
         ? h('a', { href: '#', 'data-no-i18n': '', onclick: e => { e.preventDefault(); highlightModule(inst.module); onSelectModule(inst.module); } }, moduleLabel(inst.module))
         : h('span', { 'data-no-i18n': '' }, moduleLabel(''))));
     selBox.append(tbl);
+    // the other slices of the same CLB
+    const tile = model.device.tiles.find(t => t[2] === inst.tile);
+    const clbSlices = tile ? tile[4].filter(x => isSlice(x[1])) : [];
+    if (isSlice(inst.type) && clbSlices.length > 1) {
+      const bySite = new Map(model.insts.map((x, k) => [x.site, k]));
+      selBox.append(h('div', { class: 'fv-clb' }, h('span', { class: 'fv-hint' }, 'Slices of this CLB:'),
+        ...clbSlices.map(([name, type]) => {
+          const k = bySite.get(name);
+          const b = h('button', { class: `fv-clb-s${name === inst.site ? ' cur' : ''}`, disabled: k === undefined, title: k === undefined ? `${name} (${type}): not used` : `${name} (${type})`, 'data-no-i18n': '',
+            onclick: () => select(k) }, name.replace(/^SLICE_/, ''));
+          if (k !== undefined) b.style.borderColor = colorOf.get(moduleAt(model.insts[k].module, level));
+          return b;
+        })));
+    }
+    if (isSlice(inst.type) && inst.cells.some(c => c.bel === 'F' || c.bel === 'G' || /^FF[XY]$/.test(c.bel))) {
+      const big = h('button', { class: 'btn fv-enlarge', title: 'Show the slice and the tables larger', onclick: () => { side.classList.toggle('wide'); big.textContent = side.classList.contains('wide') ? 'Smaller' : 'Enlarge'; } }, side.classList.contains('wide') ? 'Smaller' : 'Enlarge');
+      selBox.append(h('h5', { class: 'fv-h-row' }, h('span', {}, 'Inside the slice'), big), sliceDiagram(inst, {
+        color: colorOf.get(moduleAt(inst.module, level)),
+        netName: p => (inst.pins[p] !== undefined ? short(model.nets[inst.pins[p]].name) : null),
+        onPin: p => showNet(inst.pins[p]),
+        onPart: bel => selBox.querySelector(`[data-cell="${bel}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }),
+      }));
+    }
     if (inst.io) {
       selBox.append(h('table', { class: 'fv-kv' },
         kv('Port', mono(inst.name)), kv('Package pin', mono(inst.io.pad)), kv('Direction', inst.io.dir === 'in' ? 'input' : inst.io.dir === 'out' ? 'output' : 'bidirectional'),
@@ -202,10 +309,11 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
     const luts = inst.cells.filter(c => c.kind === 'lut' || c.kind === 'ram' || c.kind === 'rom');
     if (luts.length) {
       selBox.append(h('h5', {}, 'Look-up tables (LUTs)'));
-      for (const c of luts) selBox.append(h('div', { class: 'fv-cell' },
+      for (const c of luts) selBox.append(h('div', { class: 'fv-cell', 'data-cell': c.bel },
         h('div', { class: 'fv-cell-h' }, h('b', {}, `${c.bel} `), mono(c.name)),
         c.kind === 'lut' ? h('div', { class: 'fv-eq', 'data-no-i18n': '', title: 'Signal names without the module path' }, `= ${short(c.text || c.eq)}`) : h('div', { class: 'fv-hint' }, c.kind === 'ram' ? 'used as distributed RAM' : 'used as ROM'),
-        c.inputs && Object.keys(c.inputs).length ? h('div', { class: 'fv-ins' }, ...Object.entries(c.inputs).map(([a, n]) => h('span', {}, mono(`${a}: `), netLink(inst.pins[`${c.bel.length === 1 ? c.bel : c.bel[0]}${a.slice(1)}`] ?? model.nets.findIndex(x => x.name === n), n)))) : null));
+        c.inputs && Object.keys(c.inputs).length ? h('div', { class: 'fv-ins' }, ...Object.entries(c.inputs).map(([a, n]) => h('span', {}, mono(`${a}: `), netLink(inst.pins[`${c.bel.length === 1 ? c.bel : c.bel[0]}${a.slice(1)}`] ?? model.nets.findIndex(x => x.name === n), n)))) : null,
+        c.kind === 'lut' ? lutContents(c, inst) : null));
     }
     const ffs = inst.cells.filter(c => c.kind === 'ff' || c.kind === 'latch');
     if (ffs.length) {
@@ -234,6 +342,24 @@ export function mountFpgaView(el, { model, top = '', entities = new Map(), onSel
       selBox.append(h('h5', {}, 'Connections'));
       selBox.append(h('table', { class: 'fv-kv fv-pins' }, ...pins.map(([p, ni]) => kv(mono(p), netLink(ni)))));
     }
+  }
+  // how the function is implemented: the LUT is a small memory addressed by its inputs
+  function lutContents(c, inst) {
+    let t;
+    try { t = lutTable(c.eq, /^[A-D]6?LUT$/.test(c.bel) ? 6 : 4); } catch { return null; }
+    const name = a => short((c.inputs || {})[a] || a);
+    const box = h('div', { class: 'fv-lut' });
+    if (c.thru) box.append(h('div', { class: 'fv-hint' }, 'Route-thru: the LUT only passes a signal through (used as a wire).'));
+    if (t.rows.length <= 64 && t.inputs.length) {
+      box.append(h('table', { class: 'fv-tt' },
+        h('tr', {}, ...t.inputs.map(a => h('th', { title: `${a}: ${(c.inputs || {})[a] || '—'}`, 'data-no-i18n': '' }, h('div', {}, name(a)), h('span', { class: 'fv-hint' }, a))), h('th', { 'data-no-i18n': '' }, short(c.name).split('/').pop())),
+        ...t.rows.map(r => h('tr', { class: r.out ? 'one' : '' }, ...r.in.map(b => h('td', {}, String(b))), h('td', { class: 'out' }, String(r.out))))));
+    }
+    const size = t.bits.length;
+    box.append(h('div', { class: 'fv-mem', title: 'The LUT\'s memory: one bit per combination of its inputs (address = the inputs A4…A1 as a binary number)' },
+      ...t.bits.map((b, a) => h('span', { class: b ? 'one' : '', title: `address ${a.toString(2).padStart(Math.log2(size), '0')} → ${b}` }, String(b))).reverse()),
+      h('div', { class: 'fv-hint' }, h('span', {}, 'Memory contents'), ' ', h('span', { class: 'fv-mono', 'data-no-i18n': '' }, `INIT = ${t.init}`), ' ', h('span', {}, `(${size} bits, address ${size - 1} … 0)`)));
+    return box;
   }
   function netList() {
     const q = netSearch.value.trim().toLowerCase();

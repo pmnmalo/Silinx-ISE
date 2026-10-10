@@ -8,6 +8,9 @@
 // parseXdlrc(text) -> device, parseXdl(text) -> design, fpgaModel(design, device) -> the model
 // drawn by web/js/fpgaview.js (Processes ▸ Place & Route ▸ View Implemented Design (FPGA)).
 
+/** The format of fpgaModel(): bumped when it changes (the server's cache of it is rebuilt). */
+export const MODEL_VERSION = 2;
+
 // sites that are not drawn: tie-offs, reserved and global-signal pseudo sites
 const HIDDEN_SITES = /^(VCC|GND|TIEOFF|GLOBALSIG|RESERVED_\w+|PMV|PCILOGICSE?|BSCAN|CAPTURE|ICAP|STARTUP|JTAGPPC|PMVBRAM|PMVIOB|DNA_PORT|SUSPEND_SYNC|POST_CRC_INTERNAL|SPI_ACCESS|OCT_CALIBRATE|EFUSE_USR|USR_ACCESS\w*|FRAME_ECC|KEY_CLEAR|DCIRESET|CFG_IO_ACCESS|PCIE_\w+|GTP\w*|GTX\w*)$/;
 
@@ -120,6 +123,51 @@ export function prettyEquation(eq, inputs = {}) {
   return s.replace(/~/g, '¬').replace(/\*/g, ' · ').replace(/\+/g, ' + ').replace(/@/g, ' ⊕ ');
 }
 
+// ------------------------------------------------------------------ LUT contents
+/** Evaluate a LUT equation (XDL syntax: A1..A6, 0 / 1, ~ not, * and, @ xor, + or, parentheses) for
+ *  the inputs in `v` ({ A1: 0 | 1, … }). Throws on a malformed equation. */
+export function evalLut(eq, v) {
+  const s = String(eq).replace(/^\s*\w*=\s*/, '').replace(/\s+/g, '');
+  let i = 0;
+  const peek = () => s[i];
+  const atom = () => {
+    if (peek() === '~') { i++; return 1 - atom(); }
+    if (peek() === '(') { i++; const x = or(); if (s[i++] !== ')') throw new Error(`')' expected in ${eq}`); return x; }
+    const m = /^(A[1-6]|[01])/.exec(s.slice(i));
+    if (!m) throw new Error(`unexpected '${s.slice(i, i + 4)}' in ${eq}`);
+    i += m[0].length;
+    return m[0][0] === 'A' ? (v[m[0]] ? 1 : 0) : +m[0];
+  };
+  const and = () => { let x = atom(); while (peek() === '*') { i++; x &= atom(); } return x; };
+  const xor = () => { let x = and(); while (peek() === '@') { i++; x ^= and(); } return x; };
+  const or = () => { let x = xor(); while (peek() === '+') { i++; x |= xor(); } return x; };
+  const r = or();
+  if (i !== s.length) throw new Error(`unexpected '${s.slice(i)}' in ${eq}`);
+  return r;
+}
+
+/** The contents of a LUT: { inputs: ['A1', 'A3'] (the inputs its equation uses), rows: [{ in: [0, 1], out }],
+ *  bits: the 2^size memory bits by address (A1 the least significant), init: their hex value as in
+ *  ISE's INIT attribute }. size: 4 for Spartan-3 (16 bits), 6 for Spartan-6 / Virtex-5 and later. */
+export function lutTable(eq, size = 4) {
+  const used = [...new Set((String(eq).replace(/^\s*\w*=/, '').match(/A[1-6]/g) || []))].sort();
+  const bits = [];
+  for (let a = 0; a < 1 << size; a++) {
+    const v = {};
+    for (let k = 1; k <= size; k++) v[`A${k}`] = (a >> (k - 1)) & 1;
+    bits.push(evalLut(eq, v));
+  }
+  const rows = [];
+  for (let r = 0; r < 1 << used.length; r++) {
+    const v = {};
+    used.forEach((a, k) => { v[a] = (r >> (used.length - 1 - k)) & 1; });
+    rows.push({ in: used.map(a => v[a]), out: evalLut(eq, v) });
+  }
+  let init = '';
+  for (let a = (1 << size) - 4; a >= 0; a -= 4) init += (bits[a] | (bits[a + 1] << 1) | (bits[a + 2] << 2) | (bits[a + 3] << 3)).toString(16).toUpperCase();
+  return { inputs: used, rows, bits, init };
+}
+
 /** The site pin of a LUT input (A1..A4 of LUT F -> F1..F4; G -> G1..G4; Spartan-6 A6LUT A1..A6 -> A1..A6). */
 const lutPin = (attr, n) => (attr === 'F' || attr === 'G' ? `${attr}${n}` : `${attr[0]}${n}`);
 
@@ -145,8 +193,12 @@ export function fpgaModel(design, device) {
       }
     }
     // FF options of the slice (Spartan-3: FFX_INIT_ATTR:#OFF:INIT0, SYNC_ATTR, *INV)
+    // the settings of the site: its internal multiplexers and inverters (DXMUX, FXMUX, CYSELF,
+    // CLKINV…), the FF options, the I/O standard…
     const opt = {};
-    for (const c of d.cfg) if (/^(FF[XY]_INIT_ATTR|FF[XY]_SR_ATTR|SYNC_ATTR|CLKINV|CEINV|SRINV|IOATTRBOX|DRIVEATTRBOX|SLEW|PULL|IOSTANDARD|INBUFUSED|OUTBUFUSED|TUSED|O1INV|IINV|OMUX|IMUX)$/.test(c.attr) && c.value !== '#OFF') opt[c.attr] = c.value;
+    for (const c of d.cfg) if (!c.name && c.value !== '#OFF' && c.value !== '' && !c.attr.startsWith('_')) opt[c.attr] = c.value;
+    // LUTs used only to pass a signal through (route-thru)
+    for (const c of d.cfg) if (c.attr === '_BEL_PROP' && /PK_PACKTHRU/.test(c.value)) { const bel = c.name || c.value.split(':')[0]; const lut = cells.find(x => x.kind === 'lut' && x.bel === bel); if (lut) lut.thru = true; }
     // the module of the site: the most common hierarchy path of its logic (the instance name for an IOB)
     // (pads and global buffers belong to the top level; their names are not hierarchy paths)
     const count = new Map();

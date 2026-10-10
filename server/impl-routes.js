@@ -67,10 +67,11 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const dir = path.join(P.projectDir(req.params.p), 'build');
     const f = name => path.join(dir, name);
     const mtime = p => { try { return fss.statSync(p).mtimeMs; } catch { return 0; } };
+    const { MODEL_VERSION } = await import('../core/xdl.js');
     const ncd = mtime(f(`${project.top}.ncd`)), xdl = mtime(f(`${project.top}.xdl`)), dev = mtime(f('device.xdlrc'));
     if (!ncd) return { available: false, reason: 'no-ncd' };
     if (!xdl || !dev || xdl < ncd) return { available: false, reason: xdl ? 'stale' : 'no-xdl' };
-    const key = `${ncd}:${xdl}:${dev}`;
+    const key = `${MODEL_VERSION}:${ncd}:${xdl}:${dev}`;   // a new model format rebuilds the cache
     try { const c = JSON.parse(await fs.readFile(f('fpga-view.json'), 'utf8')); if (c.key === key) return c.model; } catch { /* not cached */ }
     const { parseXdl, parseXdlrc, fpgaModel } = await import('../core/xdl.js');
     const model = { available: true, ...fpgaModel(parseXdl(await fs.readFile(f(`${project.top}.xdl`), 'utf8')), parseXdlrc(await fs.readFile(f('device.xdlrc'), 'utf8'))) };

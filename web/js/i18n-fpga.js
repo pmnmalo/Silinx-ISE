@@ -28,12 +28,20 @@ export const FPGA_PT = {
   'output buffer': 'buffer de saída', 'global clock buffer': 'buffer de relógio global', 'block RAM': 'block RAM (memória)', 'multiplier': 'multiplicador',
   'DSP block': 'bloco DSP', 'input flip-flop': 'flip-flop de entrada', 'output flip-flop': 'flip-flop de saída', '3-state flip-flop': 'flip-flop de três estados',
   'clock manager (DCM)': 'gestor de relógio (DCM)', 'global clock multiplexer': 'multiplexer de relógio global',
-  'Connections': 'Ligações', 'No net matches.': 'Nenhuma rede corresponde.',
+  'Connections': 'Ligações', 'Inside the slice': 'Dentro da slice', 'Slices of this CLB:': 'Slices deste CLB:',
+  'Show the slice and the tables larger': 'Mostrar a slice e as tabelas maiores', 'Enlarge': 'Ampliar', 'Smaller': 'Reduzir',
+  'Route-thru: the LUT only passes a signal through (used as a wire).': 'Route-thru: a LUT só deixa passar um sinal (usada como fio).',
+  "The LUT's memory: one bit per combination of its inputs (address = the inputs A4…A1 as a binary number)": 'A memória da LUT: um bit por combinação das entradas (endereço = as entradas A4…A1 como número binário)',
+  'Memory contents': 'Conteúdo da memória', 'No net matches.': 'Nenhuma rede corresponde.',
 };
 export const FPGA_PT_PATTERNS = [
   [/^Hierarchy level (\d+)$/, 'Nível $1 da hierarquia'],
   [/^clock · (\d+)$/, 'relógio · $1'],
   [/^… (\d+) more: type part of the name$/, '… mais $1: escreva parte do nome'],
   [/^initial value ([01])$/, 'valor inicial $1'],
+  [/^\((\d+) bits, address (\d+) … 0\)$/, '($1 bits, endereço $2 … 0)'],
+  [/^(\S+) \((\S+)\): not used$/, '$1 ($2): não usada'],
+  [/^address ([01]+) → ([01])$/, 'endereço $1 → $2'],
+  [/^Inside (\S+)$/, 'Dentro de $1'],
   [/^The implemented design could not be read: (.*)$/s, 'Não foi possível ler o projeto implementado: $1'],
 ];

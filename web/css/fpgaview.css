@@ -65,3 +65,38 @@
 .fv-netrow.sel { background: var(--hover, #e5f1fb); }
 .fv-detail a { color: var(--accent, #0645ad); }
 html[data-theme="dark"] .fv-stale { background: rgba(227, 179, 65, .14); color: #f2d58a; border-color: rgba(227, 179, 65, .4); }
+
+/* inside a slice (sliceDiagram) and the LUT contents */
+.fv-slice { width: 100%; max-width: 310px; display: block; margin: 4px 0 8px; background: var(--panel-alt, #f7f7f7); border: 1px solid var(--border-light, #ddd); border-radius: 6px; font: 9px var(--mono, monospace); }
+.fv-slice text { fill: var(--muted, #777); }
+.fv-sw { fill: none; stroke: var(--border-light, #c8c8c8); stroke-width: 1; stroke-dasharray: 2 2; }
+.fv-sw.on { stroke: var(--accent, #316ac5); stroke-width: 1.6; stroke-dasharray: none; }
+.fv-sp.on { fill: var(--fg, #000); font-weight: bold; cursor: pointer; }
+.fv-sp.on:hover { fill: var(--accent, #316ac5); }
+.fv-sb rect { fill: none; stroke: var(--border, #aaa); stroke-dasharray: 3 2; }
+.fv-sb.on rect { stroke: rgba(0, 0, 0, .55); stroke-dasharray: none; fill-opacity: .85; }
+.fv-sb.on { cursor: pointer; }
+.fv-sb text { fill: var(--muted, #999); font-weight: bold; }
+.fv-sb.on text { fill: #fff; paint-order: stroke; stroke: rgba(0, 0, 0, .45); stroke-width: 2px; }
+.fv-sb .fv-sbs { font-weight: normal; font-size: 7.5px; }
+.fv-sm { fill: none; stroke: var(--border, #aaa); stroke-dasharray: 2 2; }
+.fv-sm.on { fill: var(--panel, #fff); stroke: var(--accent, #316ac5); stroke-width: 1.4; stroke-dasharray: none; }
+.fv-clb { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0; }
+.fv-clb-s { font: 10px var(--mono, monospace); padding: 2px 5px; border: 2px solid var(--border-light, #ccc); border-radius: 5px; background: var(--panel, #fff); color: var(--fg, #000); cursor: pointer; }
+.fv-clb-s.cur { font-weight: bold; box-shadow: 0 0 0 1px var(--fg, #000); }
+.fv-clb-s:disabled { opacity: .45; cursor: default; border-style: dashed; }
+.fv-lut { margin: 4px 0 2px; }
+.fv-tt { border-collapse: collapse; font: 11px var(--mono, monospace); margin: 4px 0; }
+.fv-tt th, .fv-tt td { border: 1px solid var(--border-light, #ccc); padding: 1px 6px; text-align: center; }
+.fv-tt th { font-weight: normal; vertical-align: bottom; max-width: 70px; }
+.fv-tt th div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70px; }
+.fv-tt th .fv-hint { font-size: 9px; }
+.fv-tt td.out { font-weight: bold; }
+.fv-tt tr.one td.out { background: rgba(76, 175, 80, .22); }
+.fv-mem { display: flex; flex-wrap: wrap; gap: 1px; margin: 4px 0 2px; font: 10px var(--mono, monospace); }
+.fv-mem span { width: 15px; text-align: center; border: 1px solid var(--border-light, #ccc); border-radius: 2px; background: var(--panel, #fff); }
+.fv-mem span.one { background: rgba(76, 175, 80, .3); font-weight: bold; }
+.fv-side.wide { width: min(720px, 60%); }
+.fv-side.wide .fv-slice { max-width: 680px; }
+.fv-h-row { display: flex; align-items: center; justify-content: space-between; }
+.fv .fv-enlarge { min-width: 0; height: 22px; padding: 0 8px; font-size: 11px; }
