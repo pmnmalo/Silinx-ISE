@@ -2,7 +2,7 @@
 // VERSION is kept equal to package.json by scripts/sync-version.mjs (run by `npm version`).
 export const PRODUCT = 'Silinx ISE';
 export const PRODUCT_FULL = 'Silinx ISE (Integrated Synthesis Environment)';
-export const VERSION = '15.9.3';
+export const VERSION = '15.10.0';
 export const MAJOR = VERSION.split('.')[0];
 export const REPOSITORY = 'pmnmalo/Silinx-ISE';   // GitHub owner/name (About, Check for Updates)
 
