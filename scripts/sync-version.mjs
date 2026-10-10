@@ -4,6 +4,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+// a release needs its notes: CHANGELOG.md must have a "## <version>" section
+const { changesOf } = await import('../core/changelog.js');
+if (!changesOf(fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8'), version)) {
+  console.error(`CHANGELOG.md has no "## ${version}" section: write what changed in ${version} before releasing it.`);
+  process.exit(1);
+}
 const f = path.join(ROOT, 'core', 'version.js');
 fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/VERSION = '[^']*'/, `VERSION = '${version}'`));
 console.log(`core/version.js: ${version}`);

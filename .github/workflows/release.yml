@@ -40,5 +40,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           V="${GITHUB_REF_NAME#v}"
-          NOTES=".github/release-notes.md"
-          gh release create "$GITHUB_REF_NAME" out/* --title "Silinx ISE $V" --notes-file "$NOTES"
+          # "What's new" (CHANGELOG.md section of this version) + downloads / licence note
+          node scripts/release-notes.mjs "$V" --require > out-notes.md
+          gh release create "$GITHUB_REF_NAME" out/* --title "Silinx ISE $V" --notes-file out-notes.md

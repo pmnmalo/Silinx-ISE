@@ -210,7 +210,8 @@ uiTest('Check for Updates: newer release, up to date and a GitHub error (fetch s
   await page.menu('Help', 'Check for Updates…');
   await page.waitFor(() => /A new version is available: Silinx ISE 99\.1\.0/.test(document.querySelector('.dlg-overlay')?.innerText || ''));
   assert.ok(await page.eval(() => [...document.querySelectorAll('.dlg-overlay a')].some((a) => a.textContent === 'silinx-ise-99.1.0.zip')));
-  assert.deepEqual(await page.eval(() => window.__ghCalls), [`https://api.github.com/repos/${REPOSITORY}/releases/latest`]);
+  // the release, then its changelog (What's new; refused here: the dialog shows without it)
+  assert.deepEqual(await page.eval(() => window.__ghCalls), [`https://api.github.com/repos/${REPOSITORY}/releases/latest`, `https://raw.githubusercontent.com/${REPOSITORY}/v99.1.0/CHANGELOG.md`]);
   await page.key('Escape');
   await page.waitNoDialog();
   await stub({ tag_name: `v${VERSION}`, html_url: `https://github.com/${REPOSITORY}/releases` });
@@ -298,7 +299,7 @@ uiTest('Portuguese: View ▸ Language switches the UI; menus, dialogs and the ma
 uiTest('at start-up the app checks for updates: a newer release opens the update dialog, the same version only logs a line', E, async (page) => {
   // turn the start-up check on again, with GitHub stubbed (no network): first a newer release
   const stub = (tag) => `window.SILINX_NO_UPDATE_CHECK = false;
-    (() => { const orig = window.fetch; window.fetch = (u, o) => (String(u).includes('api.github.com')
+    (() => { const orig = window.fetch; window.fetch = (u, o) => (String(u).includes('raw.githubusercontent.com') ? Promise.resolve(new Response('', { status: 404 })) : String(u).includes('api.github.com')
       ? Promise.resolve(new Response(JSON.stringify({ tag_name: '${tag}', name: '${tag}', html_url: 'https://github.com/x/y/releases/tag/${tag}', assets: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
       : orig(u, o)); })();`;
   const s1 = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: stub('v99.0.0') });
@@ -316,4 +317,34 @@ uiTest('at start-up the app checks for updates: a newer release opens the update
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
   await page.waitConsole(/is up to date \(latest release on GitHub/);
   assert.equal(await page.dialogCount(), 0);
+});
+
+uiTest("update dialog: What's new lists the changes of every version newer than the one running (text only)", E, async (page) => {
+  const version = await page.eval(async () => (await import('/core/version.js')).VERSION);
+  const cl = `# Changelog\n\n## 99.1.0\n\n- **Big** feature with \`code\` and *style*\n- <img src=x onerror="window.__pwned=1"> shown as text\n\n## 99.0.0\n\n- Another change\n  continued line\n\n## ${version}\n\n- already running\n`;
+  await page.eval((text) => {
+    const orig = window.fetch;
+    window.fetch = (u, o) => {
+      const s = String(u);
+      if (s.includes('api.github.com')) return Promise.resolve(new Response(JSON.stringify({ tag_name: 'v99.1.0', name: 'v99.1.0', html_url: 'https://github.com/x/y/releases/tag/v99.1.0', assets: [] }), { status: 200, headers: { 'content-type': 'application/json' } }));
+      if (s.includes('raw.githubusercontent.com') && s.endsWith('/v99.1.0/CHANGELOG.md')) return Promise.resolve(new Response(text, { status: 200 }));
+      return orig(u, o);
+    };
+  }, cl);
+  await page.menu('Help', 'Check for Updates…');
+  await page.waitDialog('Check for Updates');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .whats-new'), [], { what: "What's new" });
+  const box = await page.eval(() => {
+    const b = document.querySelector('.dlg-overlay .whats-new');
+    return { text: b.innerText, bold: [...b.querySelectorAll('b')].map(x => x.textContent), code: [...b.querySelectorAll('code')].map(x => x.textContent), imgs: b.querySelectorAll('img').length };
+  });
+  assert.match(box.text, /Silinx ISE 99\.1\.0[\s\S]*Big feature with code and style[\s\S]*Silinx ISE 99\.0\.0[\s\S]*Another change continued line/);
+  assert.doesNotMatch(box.text, /already running/);   // the running version is not listed
+  assert.deepEqual(box.bold, ['Big']);
+  assert.deepEqual(box.code, ['code']);
+  assert.equal(box.imgs, 0);
+  assert.match(box.text, /<img src=x onerror="window.__pwned=1"> shown as text/);
+  assert.equal(await page.eval(() => window.__pwned ?? null), null);
+  await page.dialogButton('OK');
+  await page.waitNoDialog();
 });

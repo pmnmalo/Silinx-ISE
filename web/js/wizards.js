@@ -871,6 +871,46 @@ export function aboutDialog() {
 const REPO = REPOSITORY;
 
 /** Help ▸ Check for Updates…: the running version vs the latest release on GitHub. */
+// What changed between the running version and `latest`: the CHANGELOG.md of that release (newest
+// first); without it, the "What's new" part of the release text. Never fails (null).
+async function whatsNew(latest, rel) {
+  const { changesSince, parseChangelog } = await import('/core/changelog.js');
+  try {
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 4000);   // never hold the dialog long
+    const r = await fetch(`https://raw.githubusercontent.com/${REPO}/v${latest}/CHANGELOG.md`, { cache: 'no-store', signal: ctl.signal }).finally(() => clearTimeout(timer));
+    if (r.ok) { const secs = changesSince(await r.text(), VERSION, latest); if (secs.length) return secs; }
+  } catch { /* offline / no changelog in that release */ }
+  const m = /## What's new in (\S+)\s*\n([\s\S]*?)(?=\n## |\n\*\*Silinx ISE|$)/.exec(rel?.body || '');
+  return m ? parseChangelog(`## ${m[1]}\n${m[2]}`) : null;
+}
+
+// a changelog section as DOM (bullets, **bold**, *italic*, `code`; text only, never HTML)
+function changesNode(sections) {
+  const inline = (text) => {
+    const out = [];
+    const re = /\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`/g;
+    let at = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > at) out.push(text.slice(at, m.index));
+      out.push(m[1] != null ? h('b', {}, m[1]) : m[2] != null ? h('i', {}, m[2]) : h('code', {}, m[3]));
+      at = re.lastIndex;
+    }
+    if (at < text.length) out.push(text.slice(at));
+    return out;
+  };
+  const box = h('div', { class: 'whats-new', style: { maxHeight: '260px', overflow: 'auto', border: '1px solid #ddd', padding: '4px 10px', margin: '6px 0' } });
+  for (const s of sections) {
+    box.append(h('div', { style: { fontWeight: 'bold', marginTop: '6px' } }, `${PRODUCT} ${s.version}`));
+    const items = [];
+    for (const line of s.body.split('\n')) {
+      if (/^\s*-\s+/.test(line)) items.push(line.replace(/^\s*-\s+/, ''));
+      else if (line.trim() && items.length) items[items.length - 1] += ` ${line.trim()}`;
+    }
+    box.append(h('ul', { style: { margin: '2px 0 4px 18px', padding: 0 } }, ...items.map(it => h('li', {}, ...inline(it)))));
+  }
+  return box;
+}
+
 async function latestRelease() {
   const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
   if (!r.ok) throw new Error(r.status === 403 ? 'GitHub rate limit reached, try again later' : `GitHub answered ${r.status}`);
@@ -908,9 +948,11 @@ export async function checkUpdatesDialog({ rel: known = null } = {}) {
   const when = rel.published_at ? new Date(rel.published_at).toLocaleDateString() : '';
   const assets = (rel.assets || []).map((a) => h('li', {}, link(a.browser_download_url, a.name), ` (${Math.max(1, Math.round(a.size / 1024))} KB)`));
   if (cmp > 0) {
+    const news = await whatsNew(latest, rel);
     body.replaceChildren(...[
       h('p', {}, h('b', {}, `A new version is available: ${PRODUCT} ${latest}`), when ? ` (released ${when})` : ''),
       h('p', {}, `You are running ${VERSION}.`),
+      news?.length ? h('div', {}, h('b', {}, "What's new:"), changesNode(news)) : null,
       h('p', {}, 'Release notes and downloads: ', link(rel.html_url, rel.name || `v${latest}`)),
       assets.length ? h('ul', { style: { margin: '4px 0 8px 18px', padding: 0 } }, ...assets) : null,
       h('p', { class: 'hint' }, 'To update: download silinx-ise-<version>.zip and replace your Silinx folder (your projects in the workspace are kept), or download the new Silinx-ISE.html for the standalone edition.')].filter(Boolean));
