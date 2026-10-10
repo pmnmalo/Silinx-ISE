@@ -1,0 +1,90 @@
+# =======================================================
+# XDL NCD CONVERSION MODE $Revision: 1.01$
+# (a small hand-made design in the format of xdl -ncd2xdl, for the tests of core/xdl.js)
+# =======================================================
+design "top" xc3s50etq144-4 v3.2 ,
+  cfg "
+       _DESIGN_PROP::PIN_INFO:a:/top/PACKED/top/a/a/PAD:INPUT:0:a";
+
+#  =======================================================
+#  The syntax for instances is:
+#      instance <name> <sitedef>, placed <tile> <site>, cfg <string> ;
+#  =======================================================
+inst "a" "IOB",placed TIOIS_X1Y3 P1  ,
+  cfg " INBUF:a_IBUF: PAD:a: IOATTRBOX::LVCMOS33 PULL::PULLUP OUTBUF::#OFF "
+  ;
+inst "y" "IOB",placed TIOIS_X1Y3 P2  ,
+  cfg " OUTBUF:y_OBUF: PAD:y: IOATTRBOX::LVCMOS33 DRIVEATTRBOX::12 SLEW::SLOW "
+  ;
+inst "clk" "IBUF",placed LIOIS_X0Y0 P4  ,
+  cfg " INBUF:clk_BUFGP/IBUFG: PAD:clk: IOATTRBOX::LVCMOS33 "
+  ;
+inst "clk_BUFGP/BUFG" "BUFGMUX",placed CLKT_X2Y3 BUFGMUX_X1Y10  ,
+  cfg " GCLKMUX:clk_BUFGP/BUFG.GCLKMUX: GCLK_BUFFER:clk_BUFGP/BUFG: "
+  ;
+inst "u1/q" "SLICEL",placed CLB_X1Y2 SLICE_X1Y5  ,
+  cfg " F:u1/q_next:#LUT:D=(A1*~A2) FFX:u1/q:#FF FFX_INIT_ATTR::INIT1 FFX_SR_ATTR::SRLOW SYNC_ATTR::ASYNC
+       CLKINV::CLK G::#OFF FFY::#OFF XORF:u1/Madd_cnt_xor<0>: CYMUXF:u1/Madd_cnt_cy<0>: "
+  ;
+inst "u1/r" "SLICEM",placed CLB_X1Y2 SLICE_X0Y4  ,
+  cfg " G:u1/r_d:#LUT:D=(A1@A2) FFY:u1/r:#FF SYNC_ATTR::SYNC FFY_SR_ATTR::SRHIGH "
+  ;
+inst "y_and" "SLICEL",placed CLB_X2Y2 SLICE_X3Y4  ,
+  cfg " F:y_and:#LUT:D=(A1+A3) F5MUX:y_mux: name\:with\:colons:x "
+  ;
+inst "u1/unplaced" "SLICEL",unplaced  ,
+  cfg " F:u1/lost:#LUT:D=A1 "
+  ;
+
+#  =======================================================
+#  The syntax for nets is:
+#     net <name> <type>, outpin <inst> <pin>, inpin <inst> <pin>, pip <tile> <wire0> <dir> <wire1>, ;
+#  =======================================================
+net "clk_BUFGP" ,
+  outpin "clk_BUFGP/BUFG" O ,
+  inpin "u1/q" CLK ,
+  inpin "u1/r" CLK ,
+  pip CLKT_X2Y3 CLKT_GCLK0 -> GCLK0 ,
+  pip CLB_X1Y2 GCLK0 -> CLK_B0 ,
+  ;
+net "clk_BUFGP/IBUFG" ,
+  outpin "clk" I ,
+  inpin "clk_BUFGP/BUFG" I0 ,
+  pip LIOIS_X0Y0 IOIS_I0 -> LIOIS_CLK ,
+  ;
+net "a_IBUF" ,
+  outpin "a" I ,
+  inpin "u1/q" F1 ,
+  inpin "y_and" F1 ,
+  pip TIOIS_X1Y3 IOIS_IQ1 => OMUX0 ,
+  pip CLB_X1Y2 OMUX0 -> F1_B1 ,
+  pip CLB_X2Y2 OMUX_W0 -> F1_B3 ,
+  ;
+net "u1/q" ,
+  outpin "u1/q" XQ ,
+  inpin "u1/q" F2 ,
+  inpin "u1/r" G1 ,
+  inpin "y_and" F3 ,
+  pip CLB_X1Y2 XQ -> OMUX2 ,
+  ;
+net "y_OBUF" ,
+  outpin "y_and" X ,
+  inpin "y" O1 ,
+  pip CLB_X2Y2 X -> OMUX1 ,
+  pip TIOIS_X1Y3 OMUX1 -> IOIS_O1 ,
+  ;
+net "GLOBAL_LOGIC1" vcc,
+  outpin "XDL_DUMMY_CLB_X2Y2_VCC_X2Y2" VCCOUT ,
+  inpin "u1/r" G2 ,
+  pip CLB_X2Y2 VCC_PINWIRE -> G2_B0 ,
+  ;
+net "unused_net" ,
+  ;
+
+# =======================================================
+# SUMMARY
+# Number of Module Defs: 0
+# Number of Module Insts: 0
+# Number of Primitive Insts: 8
+# Number of Nets: 7
+# =======================================================

@@ -1,0 +1,67 @@
+/* View Implemented Design (FPGA): web/js/fpgaview.js. The chip is drawn dark (a die) in every theme. */
+.fv { display: flex; flex-direction: column; height: 100%; background: var(--panel, #fff); color: var(--fg, #000); }
+.fv-bar { gap: 6px; flex-wrap: wrap; }
+.fv .fv-bar .btn { min-width: 0; padding: 0 10px; }
+.fv .fv-bar .btn.on { background: #f5c542; border-color: #b8860b; color: #000; }
+.fv-sep { width: 1px; height: 18px; background: var(--border-light, #ccc); margin: 0 4px; }
+.fv-info { margin-left: 8px; color: var(--muted, #666); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.fv-stale { padding: 4px 10px; background: #fff4ce; color: #5a4a00; border-bottom: 1px solid #e6d690; }
+.fv-main { flex: 1; display: flex; min-height: 0; }
+.fv-canvas { flex: 1; position: relative; min-width: 0; overflow: hidden; background: #0d1117; cursor: grab; }
+.fv-canvas.panning { cursor: grabbing; }
+.fv-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; user-select: none; touch-action: none; }
+.fv-die { fill: #161b22; }
+.fv-tile { stroke: #2b3440; stroke-width: .6; }
+.fv-tile-clb { fill: #1c232d; }
+.fv-tile-io { fill: #232b22; }
+.fv-tile-mem { fill: #2a2236; }
+.fv-tile-clk { fill: #2e2a1c; }
+.fv-site-free { fill: #2f3a48; }
+.fv-site { stroke: rgba(0, 0, 0, .55); stroke-width: .5; cursor: pointer; }
+.fv-site:hover { stroke: #fff; stroke-width: 1.2; }
+.fv-site.sel { stroke: #fff; stroke-width: 2; }
+.fv-dim .fv-site:not(.hl):not(.sel) { opacity: .18; }
+.fv-netg { pointer-events: none; }
+.fv-route { fill: rgba(255, 214, 10, .14); stroke: rgba(255, 214, 10, .5); stroke-width: .6; }
+.fv-wire { stroke: #ffd60a; stroke-width: 1.1; opacity: .85; }
+.fv-load { fill: #ffd60a; }
+.fv-drv { fill: #fff; stroke: #ffd60a; stroke-width: 1.2; }
+.fv-conn .fv-wire { stroke: #7cc4ff; } .fv-conn .fv-load { fill: #7cc4ff; } .fv-conn .fv-route { fill: rgba(124, 196, 255, .10); stroke: rgba(124, 196, 255, .35); } .fv-conn .fv-drv { stroke: #7cc4ff; }
+.fv-clock .fv-wire { stroke: #ff6b6b; stroke-width: .8; opacity: .7; } .fv-clock .fv-load { fill: #ff6b6b; } .fv-clock .fv-route { fill: rgba(255, 107, 107, .10); stroke: rgba(255, 107, 107, .35); } .fv-clock .fv-drv { stroke: #ff6b6b; }
+.fv-picked .fv-wire { stroke-width: 1.6; opacity: 1; }
+.fv-tip { position: absolute; z-index: 3; pointer-events: none; background: rgba(13, 17, 23, .92); color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 4px 8px; font: 11px var(--mono, monospace); white-space: pre; }
+.fv-side { width: 330px; flex: none; overflow: auto; border-left: 1px solid var(--border-light, #ccc); padding: 6px 10px 12px; font-size: 12px; }
+.fv-sec { margin-bottom: 10px; }
+.fv-sec h4 { margin: 6px 0; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted, #666); }
+.fv-sec h5 { margin: 10px 0 4px; font-size: 12px; }
+.fv-dev { font-family: var(--mono, monospace); margin-bottom: 4px; }
+.fv-util { width: 100%; border-collapse: collapse; }
+.fv-util td { padding: 2px 4px 2px 0; white-space: nowrap; }
+.fv-util td.num { text-align: right; font-family: var(--mono, monospace); }
+.fv-bar-u { width: 70px; height: 7px; border-radius: 4px; background: var(--panel-alt, #eee); overflow: hidden; border: 1px solid var(--border-light, #ccc); }
+.fv-bar-u > div { height: 100%; background: var(--accent, #316ac5); }
+.fv-mod { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 6px; cursor: pointer; }
+.fv-mod:hover { background: var(--hover, #e5f1fb); }
+.fv-mod.sel { background: var(--hover, #e5f1fb); outline: 1px solid var(--accent, #316ac5); }
+.fv-swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.fv-mod-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fv-mod-n { color: var(--muted, #666); font-family: var(--mono, monospace); }
+.fv-hint { color: var(--muted, #777); }
+.fv-kv { border-collapse: collapse; width: 100%; margin-bottom: 4px; }
+.fv-kv th { text-align: left; font-weight: normal; color: var(--muted, #666); padding: 1px 8px 1px 0; white-space: nowrap; vertical-align: top; width: 1%; }
+.fv-kv td { padding: 1px 0; word-break: break-all; }
+.fv-mono { font-family: var(--mono, monospace); }
+.fv-cell { margin: 4px 0 8px; }
+.fv-cell-h { word-break: break-all; }
+.fv-eq { font-family: var(--mono, monospace); background: var(--panel-alt, #f4f4f4); border-radius: 4px; padding: 4px 6px; margin: 3px 0; word-break: break-word; }
+.fv-ins { display: flex; flex-direction: column; gap: 1px; padding-left: 6px; }
+.fv-net { color: var(--accent, #0645ad); text-decoration: none; word-break: break-all; }
+.fv-net:hover { text-decoration: underline; }
+.fv-k-clock { color: #d23f3f; }
+.fv-k-power { color: var(--muted, #777); }
+.fv-search { width: 100%; margin-bottom: 4px; }
+.fv-nets { max-height: 260px; overflow: auto; }
+.fv-netrow { padding: 1px 4px; border-radius: 4px; }
+.fv-netrow.sel { background: var(--hover, #e5f1fb); }
+.fv-detail a { color: var(--accent, #0645ad); }
+html[data-theme="dark"] .fv-stale { background: rgba(227, 179, 65, .14); color: #f2d58a; border-color: rgba(227, 179, 65, .4); }

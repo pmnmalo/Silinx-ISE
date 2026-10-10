@@ -148,6 +148,7 @@ export const api = {
   saveToolchain: async () => api.toolchain(),
   implement: async () => fakeJob('implement', NEED_SERVER),
   reports: async () => ({ available: false }),
+  fpgaView: async () => ({ available: false, reason: 'standalone' }),
   bitinfo: async () => ({ available: false, reason: 'standalone edition' }),
   program: async () => fakeJob('program', NEED_SERVER),
   scan: async () => fakeJob('scan', NEED_SERVER),

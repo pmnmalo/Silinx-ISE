@@ -82,7 +82,7 @@ test('board resources -> UCF -> parse', () => {
 // ------------------------------------------------------------------------------------------
 
 test('part strings', () => {
-  assert.deepEqual(ise.partStrings(DEVICE), { xst: 'xc3s500e-4-fg320', impl: 'xc3s500e-fg320-4', speedNum: '4', bitPart: '3s500efg320' });
+  assert.deepEqual(ise.partStrings(DEVICE), { xst: 'xc3s500e-4-fg320', impl: 'xc3s500e-fg320-4', speedNum: '4', speed: '-4', bitPart: '3s500efg320' });
 });
 
 test('steps normalisation', () => {

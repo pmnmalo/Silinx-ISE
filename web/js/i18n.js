@@ -14,6 +14,7 @@ import { TT_PT, TT_PT_PATTERNS } from './i18n-truthtable.js';
 import { IO_PT, IO_PT_PATTERNS } from './i18n-inout.js';
 import { LINT_PT } from './i18n-lint.js';
 import { FSM_PT, FSM_PT_PATTERNS } from './i18n-fsm.js';
+import { FPGA_PT, FPGA_PT_PATTERNS } from './i18n-fpga.js';
 
 const PT = {
   // menus
@@ -465,6 +466,8 @@ Object.assign(PT, IO_PT); PT_PATTERNS.unshift(...IO_PT_PATTERNS);   // bidirecti
 Object.assign(PT, LINT_PT);   // design checks (the help texts of the messages are in core/hints.js)
 for (const [k, v] of Object.entries(FSM_PT)) if (!(k in PT)) PT[k] = v;   // FSM state diagram editor (existing translations kept)
 PT_PATTERNS.unshift(...FSM_PT_PATTERNS);
+for (const [k, v] of Object.entries(FPGA_PT)) if (!(k in PT)) PT[k] = v;   // View Implemented Design (FPGA)
+PT_PATTERNS.unshift(...FPGA_PT_PATTERNS);
 
 export const LOCALES = {
   en: { name: 'English', strings: {}, patterns: [] },

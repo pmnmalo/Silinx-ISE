@@ -54,6 +54,7 @@ export const api = {
   saveToolchain: cfg => req('PUT', '/api/toolchain', cfg),
   implement: (name, body) => req('POST', `/api/projects/${enc(name)}/implement`, body),
   reports: name => req('GET', `/api/projects/${enc(name)}/reports`),
+  fpgaView: name => req('GET', `/api/projects/${enc(name)}/fpga-view`),
   bitinfo: name => req('GET', `/api/projects/${enc(name)}/bitinfo`),
   program: body => req('POST', '/api/program', body),
   scan: body => req('POST', '/api/jtag/scan', body),

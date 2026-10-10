@@ -59,6 +59,25 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     return collectReports(buildDir, project.top, project.device);
   }));
 
+  // the implemented design inside the FPGA (web/js/fpgaview.js): build/<top>.xdl + build/device.xdlrc,
+  // written by the 'fpgaview' step; the model is cached in build/fpga-view.json
+  api.get('/projects/:p/fpga-view', wrap(async req => {
+    const project = await P.readProject(req.params.p);
+    if (!project.top) return { available: false, reason: 'no-top' };
+    const dir = path.join(P.projectDir(req.params.p), 'build');
+    const f = name => path.join(dir, name);
+    const mtime = p => { try { return fss.statSync(p).mtimeMs; } catch { return 0; } };
+    const ncd = mtime(f(`${project.top}.ncd`)), xdl = mtime(f(`${project.top}.xdl`)), dev = mtime(f('device.xdlrc'));
+    if (!ncd) return { available: false, reason: 'no-ncd' };
+    if (!xdl || !dev || xdl < ncd) return { available: false, reason: xdl ? 'stale' : 'no-xdl' };
+    const key = `${ncd}:${xdl}:${dev}`;
+    try { const c = JSON.parse(await fs.readFile(f('fpga-view.json'), 'utf8')); if (c.key === key) return c.model; } catch { /* not cached */ }
+    const { parseXdl, parseXdlrc, fpgaModel } = await import('../core/xdl.js');
+    const model = { available: true, ...fpgaModel(parseXdl(await fs.readFile(f(`${project.top}.xdl`), 'utf8')), parseXdlrc(await fs.readFile(f('device.xdlrc'), 'utf8'))) };
+    await fs.writeFile(f('fpga-view.json'), JSON.stringify({ key, model }));
+    return model;
+  }));
+
   api.get('/projects/:p/bitinfo', wrap(async req => {
     const project = await P.readProject(req.params.p);
     if (!project.top) return { available: false, reason: 'no top module' };

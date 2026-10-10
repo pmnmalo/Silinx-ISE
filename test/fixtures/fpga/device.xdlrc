@@ -1,0 +1,53 @@
+# =======================================================
+# XDL REPORT MODE $Revision: 1.8 $
+# (a small hand-made device in the format of xdl -report, for the tests of core/xdl.js)
+# =======================================================
+(xdl_resource_report v0.2 xc3s50etq144-4 spartan3e
+# **************************************************************************
+# * Tile Resources                                                         *
+# **************************************************************************
+(tiles 4 5
+	(tile 0 0 EMPTY_CNR_X0Y3 EMPTY_CNR 0
+	)
+	(tile 0 1 TIOIS_X1Y3 TIOIS 3
+		(primitive_site P1 IOB bonded 29)
+		(primitive_site P2 IOB bonded 29)
+		(primitive_site NOPAD1 IOB unbonded 29)
+	)
+	(tile 0 2 CLKT_X2Y3 CLKT 2
+		(primitive_site BUFGMUX_X1Y10 BUFGMUX internal 4)
+		(primitive_site GLOBALSIG_X2Y3 GLOBALSIG internal 0)
+	)
+	(tile 1 1 CLB_X1Y2 CENTER_SMALL 5
+		(primitive_site RLL_X1Y2 RESERVED_LL internal 8)
+		(primitive_site SLICE_X0Y4 SLICEM internal 32)
+		(primitive_site SLICE_X0Y5 SLICEM internal 32)
+		(primitive_site SLICE_X1Y4 SLICEL internal 25)
+		(primitive_site SLICE_X1Y5 SLICEL internal 25)
+	)
+	(tile 1 2 CLB_X2Y2 CENTER_SMALL 5
+		(primitive_site VCC_X2Y2 VCC internal 1)
+		(primitive_site SLICE_X2Y4 SLICEM internal 32)
+		(primitive_site SLICE_X2Y5 SLICEM internal 32)
+		(primitive_site SLICE_X3Y4 SLICEL internal 25)
+		(primitive_site SLICE_X3Y5 SLICEL internal 25)
+	)
+	(tile 2 2 BRAMSITE2_X2Y1 BRAMSITE2 2
+		(primitive_site RAMB16_X0Y0 RAMB16 internal 180)
+		(primitive_site MULT18X18_X0Y0 MULT18X18SIO internal 115)
+	)
+	(tile 3 0 LIOIS_X0Y0 LIOIS 2
+		(primitive_site P3 IOB bonded 29)
+		(primitive_site P4 IBUF bonded 9)
+	)
+)
+# **************************************************************************
+# * Primitive Site Definitions                                             *
+# **************************************************************************
+(primitive_defs 1
+	(primitive_def SLICEL 25 30
+		(pin F1 F1 input)
+	)
+)
+(summary tiles=20 sites=15 sitedefs=1)
+)

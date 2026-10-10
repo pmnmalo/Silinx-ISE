@@ -186,6 +186,10 @@ for Xilinx FPGAs supported by ISE 14.7.
   Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One.
   Ports are mapped to board resources by name, the UCF is generated, and pins are checked against
   the board before ISE runs.
+- **View Implemented Design (FPGA)**: the placed and routed design inside the chip (from ISE's
+  `xdl`): sites coloured by module, LUT equations and flip-flops of each site, I/O pads, nets
+  and their routing, the clock network; selecting a module in the Design hierarchy shows it on
+  the chip and the other way round.
 - **Two interfaces**: a modern one (default: header with search, activity bar, tabs, labelled
   design-flow buttons, light and dark themes that follow the system, command palette with
   Ctrl+K / Cmd+K) and the classic Xilinx ISE Project Navigator look (*View ▸ Interface*).

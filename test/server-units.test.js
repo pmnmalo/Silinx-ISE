@@ -146,7 +146,7 @@ test('capture: output, missing binary, timeout, spawn error', async () => {
 const S6 = { family: 'spartan6', part: 'xc6slx9', package: 'csg324', speed: '2' };
 
 test('ISE scripts for Spartan-6 / 7-series: no legacy XST options, MAP placement options, conservative bitgen', () => {
-  assert.deepEqual(ise.partStrings(S6), { xst: 'xc6slx9-2-csg324', impl: 'xc6slx9-csg324-2', speedNum: '2', bitPart: '6slx9csg324' });
+  assert.deepEqual(ise.partStrings(S6), { xst: 'xc6slx9-2-csg324', impl: 'xc6slx9-csg324-2', speedNum: '2', speed: '-2', bitPart: '6slx9csg324' });
   for (const bad of [{ part: 'xc3s250e; rm', package: 'cp132', speed: '-4' }, { part: 'xc3s250e', package: 'cp-132', speed: '-4' }, { part: 'xc3s250e', package: 'cp132', speed: '-4x9' }]) {
     assert.throws(() => ise.partStrings(bad), e => e.status === 400 && /invalid device/.test(e.message));
   }

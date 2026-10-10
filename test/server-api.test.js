@@ -683,3 +683,40 @@ test('startServer listens (and rejects a used port); openBrowser runs the platfo
   try { await openBrowser('http://127.0.0.1:1'); } finally { process.env.PATH = oldPath; }
   await sleep(50);
 });
+
+test('fpga-view: the implemented design inside the FPGA from build/<top>.xdl + device.xdlrc (states, model, cache)', async () => {
+  const FIX = path.join(HERE, 'fixtures', 'fpga');
+  let r = await call('POST', '/projects', { name: 'Fv' });
+  assert.equal(r.status, 200);
+  const pj = JSON.parse(await fs.readFile(path.join(P.projectDir('Fv'), 'silinx.json'), 'utf8'));
+  const get = async () => (await call('GET', '/projects/Fv/fpga-view')).body;
+  if (pj.top) { pj.top = null; await fs.writeFile(path.join(P.projectDir('Fv'), 'silinx.json'), JSON.stringify(pj)); }
+  assert.deepEqual(await get(), { available: false, reason: 'no-top' });
+  pj.top = 'top';
+  await fs.writeFile(path.join(P.projectDir('Fv'), 'silinx.json'), JSON.stringify(pj));
+  const build = path.join(P.projectDir('Fv'), 'build');
+  await fs.mkdir(build, { recursive: true });
+  assert.deepEqual(await get(), { available: false, reason: 'no-ncd' }, 'not placed and routed');
+  const at = async (f, t) => fs.utimes(path.join(build, f), t, t);
+  await fs.writeFile(path.join(build, 'top.ncd'), 'NCD');
+  assert.deepEqual(await get(), { available: false, reason: 'no-xdl' });
+  await fs.copyFile(path.join(FIX, 'top.xdl'), path.join(build, 'top.xdl'));
+  await fs.copyFile(path.join(FIX, 'device.xdlrc'), path.join(build, 'device.xdlrc'));
+  await at('top.ncd', new Date(2026, 0, 2)); await at('top.xdl', new Date(2026, 0, 1));
+  assert.deepEqual(await get(), { available: false, reason: 'stale' }, 'routed again after the XDL export');
+  await at('top.xdl', new Date(2026, 0, 3));
+  const m = await get();
+  assert.equal(m.available, true);
+  assert.equal(m.design.name, 'top');
+  assert.equal(m.device.part, 'xc3s50etq144-4');
+  assert.equal(m.insts.length, 8);
+  assert.equal(m.nets.find(n => n.name === 'clk_BUFGP').kind, 'clock');
+  // cached until one of the files changes
+  const cache = JSON.parse(await fs.readFile(path.join(build, 'fpga-view.json'), 'utf8'));
+  assert.equal(cache.model.design.name, 'top');
+  cache.model.design.name = 'cached';
+  await fs.writeFile(path.join(build, 'fpga-view.json'), JSON.stringify(cache));
+  assert.equal((await get()).design.name, 'cached');
+  await at('device.xdlrc', new Date(2026, 0, 4));
+  assert.equal((await get()).design.name, 'top', 'rebuilt after a change');
+});

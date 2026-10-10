@@ -17,6 +17,18 @@ the "What's new" text of its GitHub release.
 - **Command palette** (Ctrl+K / Cmd+K, or Ctrl+Shift+P): search any menu command or project file by
   name and run or open it from the keyboard. In Portuguese it finds commands by their Portuguese
   or English names.
+- **View Implemented Design (FPGA)**: how ISE placed and routed the design inside the chip
+  (*Processes ▸ Implement Design ▸ Place & Route*, or *Tools*).
+  - The device as its grid of logic blocks, I/O pads, block RAMs, multipliers, clock buffers and
+    DCMs, with the used sites coloured by module (at any hierarchy level) and the utilisation.
+  - Click a site to see its logic: LUT equations with the names of their input signals,
+    flip-flops (clock, enable, set / reset, initial value), carry chain and multiplexers; for a
+    pad, its port, package pin, direction, I/O standard, drive and slew rate.
+  - Nets: what a net connects and the tiles its routing goes through; a site's connections;
+    the global clock network; search by name.
+  - The Design hierarchy and the chip select each other's modules.
+  - Zoom and pan. The view reads the routed design with ISE's `xdl` (a new `fpgaview` step that
+    only runs Place & Route first when needed).
 - **Board emulator: the power switch works.** Off stops the board (LEDs, displays and LCD go
   dark); on starts the design again from time 0, as configuring the FPGA at power-up does.
   Switches moved while the board is off are read at power-up.

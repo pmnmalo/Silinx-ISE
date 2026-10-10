@@ -301,6 +301,7 @@ function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onContext,
 function select(sel) {
   S.sel = sel;
   renderProcesses();
+  syncFpgaView(sel);
 }
 
 // Test Bench Wizard (loaded on first use)
@@ -545,6 +546,7 @@ function selectionProcesses() {
         { id: 'xpwr', label: EXTRA_STEPS.xpwr, ico: 'process', run: () => textPowerReport(mod) },
         { id: 'postpar', label: EXTRA_STEPS.postpar, ico: 'process', run: () => generateSimModel(mod, 'postpar') },
         { id: 'pin2ucf', label: EXTRA_STEPS.pin2ucf, ico: 'process', run: () => backAnnotatePins(mod) },
+        { id: 'fpgaview', label: EXTRA_STEPS.fpgaview, ico: 'chip', run: () => openFpgaView(mod) },
       ] },
     ] },
     { id: 'bitgen', label: 'Generate Programming File', ico: 'process', run: () => runImpl(mod, ['synth', 'translate', 'map', 'par', 'bitgen']) },
@@ -700,12 +702,13 @@ async function checkFileSyntax(path) {
 // build/silinx-status.json with a fingerprint of the sources + constraints, and restored when the
 // project is opened (marked out of date if the sources changed since). Older builds without that
 // file get their marks from ISE's reports and output files.
-const IMPL_IDS = ['synth', 'translate', 'map', 'par', 'impl', 'bitgen', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'xpwr', 'trce'];
+const IMPL_IDS = ['synth', 'translate', 'map', 'par', 'impl', 'bitgen', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'xpwr', 'trce', 'fpgaview'];
 // optional steps of the ISE flow: process label (ISE names) and what they produce
 const EXTRA_STEPS = {
   postsynth: 'Generate Post-Synthesis Simulation Model', posttrans: 'Generate Post-Translate Simulation Model',
   postmap: 'Generate Post-Map Simulation Model', postpar: 'Generate Post-Place & Route Simulation Model',
   pin2ucf: 'Back-annotate Pin Locations', xpwr: 'Generate Text Power Report', trce: 'Generate Post-Place & Route Static Timing',
+  fpgaview: 'View Implemented Design (FPGA)',
 };
 const SIM_MODEL_NAMES = { postsynth: 'Post-Synthesis', posttrans: 'Post-Translate', postmap: 'Post-Map', postpar: 'Post-Place & Route' };
 const STATUS_FILE = 'build/silinx-status.json';
@@ -765,9 +768,9 @@ async function restoreImplStatus() {
 // ------------------------------------------------------------------ implementation (ISE)
 // Live per-step status from run.sh's "=== SILINX STEP <step> ===" markers and ISE WARNING/ERROR lines.
 const STEP_PROC = { synth: 'synth', translate: 'translate', map: 'map', par: 'par', trce: 'par', bitgen: 'bitgen', prombit: 'bitgen',
-  postsynth: 'postsynth', posttrans: 'posttrans', postmap: 'postmap', postpar: 'postpar', pin2ucf: 'pin2ucf', xpwr: 'xpwr' };
+  postsynth: 'postsynth', posttrans: 'posttrans', postmap: 'postmap', postpar: 'postpar', pin2ucf: 'pin2ucf', xpwr: 'xpwr', fpgaview: 'fpgaview', fpgadevice: 'fpgaview' };
 const STEP_TOOL = { synth: 'Xst', translate: 'NgdBuild', map: 'Map', par: 'Par', trce: 'Timing', bitgen: 'Bitgen', prombit: 'Bitgen',
-  postsynth: 'NetListWriters', posttrans: 'NetListWriters', postmap: 'NetListWriters', postpar: 'NetListWriters', pin2ucf: 'Pin2UCF', xpwr: 'Power' };
+  postsynth: 'NetListWriters', posttrans: 'NetListWriters', postmap: 'NetListWriters', postpar: 'NetListWriters', pin2ucf: 'Pin2UCF', xpwr: 'Power', fpgaview: 'Xdl', fpgadevice: 'Xdl' };
 const RANK = { ok: 0, warn: 1, err: 2 };
 const worst = (...xs) => xs.filter(Boolean).reduce((a, b) => (RANK[b] > RANK[a] ? b : a), 'ok');
 
@@ -946,7 +949,7 @@ async function runImplInner(mod, steps, opts, pjName) {
     return;
   }
   // Clear the icons of the processes this run will redo (they get running/ok/warn/err as it goes).
-  const runs = new Set(['synth', ...(steps.includes('translate') ? ['translate', 'impl'] : []), ...(steps.includes('map') ? ['map'] : []), ...(steps.includes('par') ? ['par'] : []), ...(steps.includes('bitgen') ? ['bitgen'] : [])]);
+  const runs = new Set([...(steps.includes('synth') ? ['synth'] : []), ...(steps.includes('translate') ? ['translate', 'impl'] : []), ...(steps.includes('map') ? ['map'] : []), ...(steps.includes('par') ? ['par'] : []), ...(steps.includes('bitgen') ? ['bitgen'] : [])]);
   for (const id of runs) S.status[id] = null;
   setStatus(procId, 'running');
   status(`Running ${procId}…`);
@@ -2533,6 +2536,73 @@ async function renameSource(from, to, oldMod, newMod) {
 }
 
 // ---- summary, pin planner, impact
+// ---- View Implemented Design (FPGA): web/js/fpgaview.js over the XDL of the routed design
+// The hierarchy paths of the design as XST names them ('Inst_data/u1', from the top's instance
+// labels) -> entity / module name, for the legend of the view.
+function hierarchyEntities(top) {
+  const out = new Map();
+  const walk = (modName, prefix, depth) => {
+    const info = moduleInfo(modName);
+    if (!info || depth > 30) return;
+    for (const k of instancesOf(info.mod)) {
+      const p = prefix ? `${prefix}/${k.name}` : k.name;
+      out.set(p.toLowerCase(), k.module);
+      walk(k.module, p, depth + 1);
+    }
+  };
+  if (top) walk(top, '', 0);
+  return out;
+}
+async function openFpgaView(mod = S.project?.top) {
+  if (!S.project || !mod) return;
+  const title = 'View Implemented Design (FPGA)';
+  if (api.standalone) { alertDlg(title, 'The FPGA view needs the full Silinx application with Xilinx ISE (it reads the placed and routed design).'); return; }
+  let m = await api.fpgaView(S.project.name).catch(e => ({ available: false, reason: 'error', error: e.message }));
+  if (!m.available) {
+    if (m.reason === 'error') { alertDlg(title, m.error, 'error'); return; }
+    if (m.reason === 'no-top') { alertDlg(title, 'Set the top module of the project first.'); return; }
+    // placed and routed and up to date: only the XDL export; otherwise the flow up to Place & Route first
+    const routed = m.reason !== 'no-ncd' && ['ok', 'warn'].includes(S.status.par);
+    if (!routed && !await confirmDlg(title, 'The FPGA view shows the design after Place & Route. Run Implement Design (Synthesize, Translate, Map, Place & Route) now?')) return;
+    if (!await runImpl(mod, routed ? ['fpgaview'] : [...FLOW_UP_TO.par, 'fpgaview'])) return;
+    m = await api.fpgaView(S.project.name).catch(e => ({ available: false, error: e.message }));
+    if (!m.available) { alertDlg(title, `The implemented design could not be read${m.error ? `: ${m.error}` : ''}.`, 'error'); return; }
+  }
+  const { mountFpgaView } = await import('./fpgaview.js');
+  const old = findDoc('fpgaview');
+  if (old) await closeDoc(old);
+  const top = S.project.top;
+  openDoc({ id: 'fpgaview', title: `FPGA (${top})`, icon: 'chip', tooltip: `${title}: ${m.device.part}`,
+    create: el => {
+      const view = mountFpgaView(el, { model: m, top, entities: hierarchyEntities(top), stale: S.status.par === 'stale',
+        onSelectModule: path => selectHierarchyPath(path) });
+      return { view, destroy: () => view.destroy() };
+    } });
+  syncFpgaView(S.sel);
+}
+// stage 4: the Design hierarchy and the FPGA view select each other's modules
+function syncFpgaView(sel) {
+  const v = findDoc('fpgaview')?.view;
+  if (!v || S.fpgaSyncing) return;
+  const top = S.project?.top;
+  if (sel?.type !== 'module' || !sel.path) return;
+  const [root, ...rest] = sel.path.split('/');
+  if (root !== top) return;
+  v.highlightModule(rest.length ? rest.join('/') : null);
+}
+function selectHierarchyPath(path) {
+  const top = S.project?.top;
+  if (!top) return;
+  const want = `m:${top}${path ? `/${path}` : ''}`.toLowerCase();
+  const row = [...document.querySelectorAll('#hier .row[data-key^="m:"]')].find(r => r.dataset.key.toLowerCase() === want);
+  if (!row) return;
+  // show it: expand its ancestors
+  for (let ul = row.parentElement.parentElement; ul && ul.id !== 'hier'; ul = ul.parentElement) if (ul.tagName === 'UL' && ul.hidden) { ul.hidden = false; const tw = ul.previousElementSibling?.querySelector('.twisty'); if (tw) tw.textContent = '▾'; }
+  S.fpgaSyncing = true;
+  try { row.click(); } finally { S.fpgaSyncing = false; }
+  row.scrollIntoView({ block: 'nearest' });
+}
+
 export async function openSummary({ background = false } = {}) {
   const was = S.active;
   const { mountSummary } = await import('./summary.js');
@@ -2868,6 +2938,7 @@ function setupMenus() {
       { label: 'iMPACT (Configure Target Device)', icon: icon('impact'), action: () => openImpact() },
       { label: 'Board Emulator', icon: icon('board'), action: () => openEmulator(S.project.top), disabled: hasPj },
       { label: 'RTL Schematic', icon: icon('schematic'), action: () => S.sel?.module && openSchematic(S.sel.module), disabled: () => !S.sel?.module },
+      { label: 'Implemented Design (FPGA View)', icon: icon('chip'), action: () => openFpgaView(), disabled: () => !S.project?.top || api.standalone },
       '-',
       { label: 'Toolchain Settings (ISE / Programmers)…', icon: icon('gear'), action: () => wiz.toolchainDialog() },
     ] },
