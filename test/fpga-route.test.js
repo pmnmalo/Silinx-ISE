@@ -105,6 +105,13 @@ test('routeDesign: VCC without a source is tied to the VCC site of each sink til
     ['pwr_0', 'XDL_DUMMY_CLB_X1Y0_VCC_X1Y0', 'VCCOUT'], ['pwr_1', 'XDL_DUMMY_CLB_X2Y0_VCC_X2Y0', 'VCCOUT'],
   ]);
   assert.deepEqual(out.map(n => n.pips.map(p => `${p.tile} ${p.from} -> ${p.to}`)), [['CLB_X1Y0 VCC_PINWIRE -> F2_B_PINWIRE0'], ['CLB_X2Y0 VCC_PINWIRE -> F2_B_PINWIRE1']]);
+  // the made-up sources are declared as instances, as ISE does (xdl -xdl2ncd needs them)
+  const dum = r.design.insts.filter(i => /^XDL_DUMMY/.test(i.name));
+  assert.deepEqual(dum.map(i => [i.name, i.type, i.tile, i.site, i.cfgRaw]), [
+    ['XDL_DUMMY_CLB_X1Y0_VCC_X1Y0', 'VCC', 'CLB_X1Y0', 'VCC_X1Y0', '_NO_USER_LOGIC:: _VCC_SOURCE::VCCOUT '],
+    ['XDL_DUMMY_CLB_X2Y0_VCC_X2Y0', 'VCC', 'CLB_X2Y0', 'VCC_X2Y0', '_NO_USER_LOGIC:: _VCC_SOURCE::VCCOUT '],
+  ]);
+  assert.match(writeXdl(r.design), /inst "XDL_DUMMY_CLB_X1Y0_VCC_X1Y0" "VCC",placed CLB_X1Y0 VCC_X1Y0 {2},\n {2}cfg "_NO_USER_LOGIC:: _VCC_SOURCE::VCCOUT "/);
   assert.ok(checkRouting(r.design, device).ok);
   const r2 = routeDesign(design(net('v', 'vcc', [['XDL_DUMMY_CLB_X2Y0_VCC_X2Y0', 'VCCOUT']], [['b0', 'F2']])), device);
   assert.deepEqual(pipsOf(r2, 'v'), ['CLB_X2Y0 VCC_PINWIRE -> F2_B_PINWIRE0']);
@@ -121,6 +128,8 @@ test('routeDesign: GND without a source comes from the Y output of the nearest u
   assert.deepEqual(r.errors, []);
   const g = r.design.nets.filter(n => n.type === 'gnd');
   assert.deepEqual(g.map(n => [n.name, n.outpins[0].inst, n.outpins[0].pin, n.inpins.map(p => p.inst)]), [['g1_0', 'XDL_DUMMY_CLB_X1Y0_SLICE_X0Y1', 'Y', ['b0', 'b1']]]);
+  assert.deepEqual(r.design.insts.filter(i => /^XDL_DUMMY/.test(i.name)).map(i => [i.type, i.site, i.cfgRaw]), [['SLICEL', 'SLICE_X0Y1', '_NO_USER_LOGIC:: _GND_SOURCE::Y ']]);
+  assert.equal(r.design.nets.filter(n => n.name === 'g2').length, 0, 'the merged net is not written twice');
   assert.ok(checkRouting(r.design, device).ok);
   // no free slice at all: reported
   const r2 = routeDesign(design(net('g', 'gnd', [], [['b0', 'F2']])), device);

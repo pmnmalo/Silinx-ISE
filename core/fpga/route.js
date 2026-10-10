@@ -234,7 +234,10 @@ export function routeDesign(design, device, opts = {}) {
   }
 
   // the routed design: each net's PIPs (ISE's own power nets keep their names; made-up ones are added)
-  const out = { ...design, insts: design.insts, nets: [] };
+  // the made-up sources are declared as instances, as ISE writes them (xdl -xdl2ncd rejects an
+  // outpin on an undeclared "XDL_DUMMY_…" instance)
+  const dummies = work.filter(w => w.synthetic && !design.insts.some(i => i.name === w.outpins[0].inst)).map(w => w.dummy);
+  const out = { ...design, insts: [...design.insts, ...dummies], nets: [] };
   const routedBy = new Map();
   work.forEach((n, i) => routedBy.set(n.net, [...(routedBy.get(n.net) || []), i]));
   let pipCount = 0;
@@ -270,6 +273,9 @@ export function routeDesign(design, device, opts = {}) {
 // - GND: the Y output of an unused slice nearby, "XDL_DUMMY_<tile>_<slice>" Y; xdl -xdl2ncd turns
 //   it into a slice whose G LUT gives 0 (ISE's own designs read back this way give the same
 //   bitstream as ISE's: research/s3e-route/README.md).
+// Each source is declared as an instance with ISE's configuration for it:
+//   inst "XDL_DUMMY_CLB_X9Y1_SLICE_X17Y1" "SLICEL", placed CLB_X9Y1 SLICE_X17Y1, cfg "_NO_USER_LOGIC:: _GND_SOURCE::Y ";
+//   inst "XDL_DUMMY_CLKB_X13Y0_VCC_X15Y0" "VCC", placed CLKB_X13Y0 VCC_X15Y0, cfg "_NO_USER_LOGIC:: _VCC_SOURCE::VCCOUT ";
 // All the sourceless nets of one kind are the same signal, so they are merged and split again
 // into one net per source.
 function tieConstants(nets, kind, device, usedSites, errors) {
@@ -297,6 +303,11 @@ function tieConstants(nets, kind, device, usedSites, errors) {
   return [...groups.values()].map(({ site, net, sinks }) => ({
     net: net.net, name: `${nets[0].name}_${k++}`, type: kind, sources: [site.node], sinks, clock: false, synthetic: true,
     outpins: [{ inst: `XDL_DUMMY_${site.tileName}_${site.name}`, pin }],
+    dummy: {
+      name: `XDL_DUMMY_${site.tileName}_${site.name}`, type: site.type, placed: true, tile: site.tileName, site: site.name,
+      cfg: [{ attr: '_NO_USER_LOGIC', name: '', value: '' }, { attr: kind === 'vcc' ? '_VCC_SOURCE' : '_GND_SOURCE', name: '', value: pin }],
+      cfgRaw: `_NO_USER_LOGIC:: ${kind === 'vcc' ? '_VCC_SOURCE' : '_GND_SOURCE'}::${pin} `,
+    },
   }));
 }
 
