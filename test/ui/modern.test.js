@@ -95,8 +95,7 @@ uiTest('View ▸ Interface: the Xilinx ISE look and back, live and remembered af
   assert.ok(!(await page.openMenu('View')).some((x) => x.label === 'Theme'));
   await page.closeMenus();
   // remembered: the page loads in the classic look
-  await page.eval(() => location.reload());
-  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'));
+  await page.reload();
   assert.deepEqual(await ui(page), { ui: 'classic', theme: 'light' });
   subs = await subMenu(page, 'View', 'Interface');
   assert.deepEqual(subs.map((s) => s.checked), [false, true]);
@@ -129,8 +128,7 @@ uiTest('theme: follows the system, View ▸ Theme ▸ Dark / Light / System, hea
   await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
   assert.equal((await ui(page)).theme, 'dark', 'a chosen theme ignores the system');
   // remembered, and set before the first paint (the early script of index.html)
-  await page.eval(() => location.reload());
-  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'));
+  await page.reload();
   assert.equal((await ui(page)).theme, 'dark');
   // an editor in the dark theme: dark CodeMirror
   await makeProject(env, { name: 'DarkPj', template: 'blinky' });

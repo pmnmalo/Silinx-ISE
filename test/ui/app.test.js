@@ -315,17 +315,17 @@ uiTest('at start-up the app checks for updates: a newer release opens the update
       ? Promise.resolve(new Response(JSON.stringify({ tag_name: '${tag}', name: '${tag}', html_url: 'https://github.com/x/y/releases/tag/${tag}', assets: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
       : orig(u, o)); })();`;
   const s1 = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: stub('v99.0.0') });
-  await page.eval(() => location.reload());
+  await page.reload();
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
   await page.waitDialog('Check for Updates');
-  assert.match(await page.eval(() => [...document.querySelectorAll('.dlg-overlay')].pop().innerText), /A new version is available: Silinx ISE 99\.0\.0/);
+  await page.waitFor(() => /A new version is available: Silinx ISE 99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'update dialog text' });
   await page.dialogButton('OK');
   await page.waitNoDialog();
   // the version running is the latest: no dialog, one line in the console
   await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: s1.identifier });
   const version = await page.eval(async () => (await import('/core/version.js')).VERSION);
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: stub(`v${version}`) });
-  await page.eval(() => location.reload());
+  await page.reload();
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
   await page.waitConsole(/is up to date \(latest release on GitHub/);
   assert.equal(await page.dialogCount(), 0);

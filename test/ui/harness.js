@@ -225,6 +225,13 @@ export class Page {
   waitForSelector(sel, opts = {}) {
     return this.waitFor((s) => { const e = document.querySelector(s); return !!e && !!(e.offsetParent || e.getClientRects().length); }, [sel], { what: `selector ${sel}`, ...opts });
   }
+  /** Reload the page and wait for the new one to load and the app to start (not the old page). */
+  async reload() {
+    const loaded = this.waitEvent('Page.loadEventFired', 30000);
+    await this.send('Page.reload', {});
+    await loaded;
+    await this.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot after reload' });
+  }
   async goto(url) {
     const loaded = this.waitEvent('Page.loadEventFired', 30000);
     await this.send('Page.navigate', { url });
