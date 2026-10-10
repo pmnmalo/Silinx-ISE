@@ -123,6 +123,13 @@ settings (initial value, set or reset, synchronous, latch), the D-input and outp
 and the carry-chain settings (CYSEL, CY0 with a 3-bit code) are in the frame before. Still to do:
 CYINIT, the X / Y outputs, and checking the same layout on SLICEM and on the lower slice of a CLB.
 
+### Open synthesis on the board (2026-10-10)
+
+lab11 and the blinky example, synthesized by Silinx's own front end (`core/synth-verilog.js`: the
+elaborated design as Verilog) and Yosys (`synth_xilinx -family xc3se -ise -flatten`, no GHDL, no
+XST), implemented by ISE's ngdbuild / map / par / bitgen (fully routed, timing constraints met:
+lab11 393 slices, blinky 119), were programmed on a Digilent Basys2 and **work as the originals**.
+
 ## To do later: synthesis quality
 
 Open synthesis (Silinx front end + Yosys `synth_xilinx -family xc3se`) is correct but its
