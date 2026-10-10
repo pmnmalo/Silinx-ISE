@@ -9,15 +9,15 @@ const BASE = {
   FFX: 's_x:#FF', FFY: 's_y:#FF',
   FFX_INIT_ATTR: ':INIT0', FFY_INIT_ATTR: ':INIT0', FFX_SR_ATTR: ':SRLOW', FFY_SR_ATTR: ':SRLOW',
   SYNC_ATTR: ':ASYNC', CLKINV: ':CLK', CEINV: ':CE', SRINV: ':SR', BXINV: ':BX', BYINV: ':BY',
-  DXMUX: ':1', DYMUX: ':1', FXMUX: ':F', GYMUX: ':G', XUSED: ':0', YUSED: ':0',
+  DXMUX: ':1', DYMUX: ':1', FXMUX: ':F', GYMUX: ':G',
 };
+// (XUSED / YUSED, the combinational outputs X / Y, need a net on the pin: measured with nets later)
 // [setting, value] per design ('#OFF' = setting removed)
 const VARIANTS = [
   ['FFX', 's_x:#LATCH'], ['FFY', 's_y:#LATCH'], ['FFX', ':#OFF'], ['FFY', ':#OFF'],
   ['FFX_INIT_ATTR', ':INIT1'], ['FFY_INIT_ATTR', ':INIT1'], ['FFX_SR_ATTR', ':SRHIGH'], ['FFY_SR_ATTR', ':SRHIGH'],
   ['SYNC_ATTR', ':SYNC'], ['CLKINV', ':CLK_B'], ['CEINV', ':CE_B'], ['SRINV', ':SR_B'], ['BXINV', ':BX_B'], ['BYINV', ':BY_B'],
   ['DXMUX', ':0'], ['DYMUX', ':0'], ['FXMUX', ':F5'], ['FXMUX', ':FXOR'], ['GYMUX', ':FX'], ['GYMUX', ':GXOR'],
-  ['XUSED', ':#OFF'], ['YUSED', ':#OFF'],
   ['F5USED', ':0'], ['FXUSED', ':0'], ['XBUSED', ':0'], ['YBUSED', ':0'], ['COUTUSED', ':0'], ['REVUSED', ':0'],
   ['CYINIT', ':BX'], ['CYINIT', ':CIN'], ['CYSELF', ':F'], ['CYSELF', ':1'], ['CYSELG', ':G'], ['CYSELG', ':1'],
   ['CY0F', ':0'], ['CY0F', ':1'], ['CY0F', ':BX'], ['CY0F', ':F1'], ['CY0F', ':F2'], ['CY0F', ':PROD'],

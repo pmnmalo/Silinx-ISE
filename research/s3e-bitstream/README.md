@@ -28,6 +28,8 @@ reference design implemented by ISE (`top.xdl`, `top.bit`, from `top.v` / `top.u
 | `lib.mjs` | Shared helpers (LUT equation from its 16 bits) |
 | `gen-map.mjs`, `decode-map.mjs` | Stage A: one design with every slice numbered in its LUT F; the frame of every slice column and the bit of every slice row |
 | `gen-slice.mjs`, `analyze-slice.mjs` | Stage B: the settings inside a slice (flip-flops, inverters, multiplexers, carry), one design per setting |
+| `gen-harness.mjs`, `gen-hvar.mjs` | Stage B2: the slice under test with all its pins connected, routed once by ISE; one variant per setting |
+| `db/xc3s250e-slice.json` | Result of stage B: the bits of each slice setting |
 | `compare-sim.mjs` | Does the netlist of open synthesis behave like the design? Simulates both with Silinx |
 | `db/xc3s250e-lut.json` | Result of stage A: where every LUT of the chip is in the bitstream |
 
@@ -104,6 +106,22 @@ One design numbers every one of the 2448 slices in its LUT F; one bitstream loca
   frames apart; CLB columns are 19 frames apart, except where the block-RAM and clock columns
   are, so the order follows the device's column addresses rather than X (table in
   `db/xc3s250e-lut.json`).
+
+### Stage B: the settings inside a slice
+
+Measured on one slice in isolation (`gen-slice.mjs`), most settings did not change the
+bitstream: bitgen only programs an inverter, a carry-chain setting or a multiplexer when its
+pin has a net. So the slice is measured in a **harness** (`gen-harness.mjs`): every input pin of
+SLICE_X31Y47 is driven by its own driver slice, every output goes to a load slice, and the carry
+chain comes from the slice below and goes to the one above. ISE's `par -p` routes it once
+(placement kept, 58 routing switches); every variant (`gen-hvar.mjs`) is that routed XDL with only
+the slice's settings changed, so the routing never changes between variants.
+
+All settings but CYINIT were measured (`db/xc3s250e-slice.json`): the five inverters (clock,
+enable, set/reset, BX, BY) are one bit each in the frame 2 after the LUT frame; the flip-flop
+settings (initial value, set or reset, synchronous, latch), the D-input and output multiplexers
+and the carry-chain settings (CYSEL, CY0 with a 3-bit code) are in the frame before. Still to do:
+CYINIT, the X / Y outputs, and checking the same layout on SLICEM and on the lower slice of a CLB.
 
 ## Conclusion
 

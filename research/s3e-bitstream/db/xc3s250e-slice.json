@@ -1,0 +1,403 @@
+{
+ "device": "xc3s250e-4-cp132",
+ "measured_on": "SLICE_X31Y47 (SLICEL, odd X, odd Y), LUT F at frame 236 bit 736",
+ "source": "research/s3e-bitstream: gen-harness.mjs (harness routed by ISE par -p) + gen-hvar.mjs + analyze-slice.mjs; ISE 14.7 xdl/bitgen; 2026-10-10",
+ "note": "Positions relative to the LUT F of the slice: frame offset (df) and bit offset (db). Values are the bit values in the bitstream. Not yet checked on SLICEM / even-X / even-Y slices.",
+ "settings": {
+  "CLKINV": {
+   "bits": [
+    [
+     2,
+     0
+    ]
+   ],
+   "values": {
+    "CLK": [
+     0
+    ],
+    "CLK_B": [
+     1
+    ]
+   }
+  },
+  "CEINV": {
+   "bits": [
+    [
+     2,
+     -16
+    ]
+   ],
+   "values": {
+    "CE": [
+     1
+    ],
+    "CE_B": [
+     0
+    ]
+   }
+  },
+  "SRINV": {
+   "bits": [
+    [
+     2,
+     34
+    ]
+   ],
+   "values": {
+    "SR": [
+     1
+    ],
+    "SR_B": [
+     0
+    ]
+   }
+  },
+  "BXINV": {
+   "bits": [
+    [
+     2,
+     11
+    ]
+   ],
+   "values": {
+    "BX": [
+     0
+    ],
+    "BX_B": [
+     1
+    ]
+   }
+  },
+  "BYINV": {
+   "bits": [
+    [
+     2,
+     -2
+    ]
+   ],
+   "values": {
+    "BY": [
+     0
+    ],
+    "BY_B": [
+     1
+    ]
+   }
+  },
+  "FFX_INIT_ATTR": {
+   "bits": [
+    [
+     -1,
+     -3
+    ]
+   ],
+   "values": {
+    "INIT0": [
+     1
+    ],
+    "INIT1": [
+     0
+    ]
+   }
+  },
+  "FFY_INIT_ATTR": {
+   "bits": [
+    [
+     -1,
+     -6
+    ]
+   ],
+   "values": {
+    "INIT0": [
+     1
+    ],
+    "INIT1": [
+     0
+    ]
+   }
+  },
+  "FFX_SR_ATTR": {
+   "bits": [
+    [
+     -1,
+     1
+    ]
+   ],
+   "values": {
+    "SRLOW": [
+     1
+    ],
+    "SRHIGH": [
+     0
+    ]
+   }
+  },
+  "FFY_SR_ATTR": {
+   "bits": [
+    [
+     -1,
+     -9
+    ]
+   ],
+   "values": {
+    "SRLOW": [
+     1
+    ],
+    "SRHIGH": [
+     0
+    ]
+   }
+  },
+  "SYNC_ATTR": {
+   "bits": [
+    [
+     -1,
+     -4
+    ]
+   ],
+   "values": {
+    "ASYNC": [
+     0
+    ],
+    "SYNC": [
+     1
+    ]
+   }
+  },
+  "FF_LATCH": {
+   "bits": [
+    [
+     -1,
+     -7
+    ]
+   ],
+   "values": {
+    "FF": [
+     0
+    ],
+    "LATCH": [
+     1
+    ]
+   },
+   "note": "FFX and FFY together"
+  },
+  "DXMUX": {
+   "bits": [
+    [
+     -1,
+     4
+    ]
+   ],
+   "values": {
+    "0": [
+     0
+    ],
+    "1": [
+     1
+    ]
+   }
+  },
+  "DYMUX": {
+   "bits": [
+    [
+     -1,
+     -12
+    ]
+   ],
+   "values": {
+    "0": [
+     0
+    ],
+    "1": [
+     1
+    ]
+   }
+  },
+  "FXMUX": {
+   "bits": [
+    [
+     -1,
+     13
+    ],
+    [
+     -1,
+     -1
+    ]
+   ],
+   "values": {
+    "F": [
+     0,
+     0
+    ],
+    "F5": [
+     1,
+     0
+    ],
+    "FXOR": [
+     1,
+     1
+    ]
+   }
+  },
+  "GYMUX": {
+   "bits": [
+    [
+     -1,
+     -10
+    ],
+    [
+     -1,
+     -13
+    ]
+   ],
+   "values": {
+    "G": [
+     0,
+     0
+    ],
+    "FX": [
+     1,
+     0
+    ],
+    "GXOR": [
+     1,
+     1
+    ]
+   }
+  },
+  "CYSELF": {
+   "bits": [
+    [
+     -1,
+     15
+    ]
+   ],
+   "values": {
+    "1": [
+     0
+    ],
+    "F": [
+     1
+    ]
+   }
+  },
+  "CYSELG": {
+   "bits": [
+    [
+     -1,
+     12
+    ]
+   ],
+   "values": {
+    "1": [
+     0
+    ],
+    "G": [
+     1
+    ]
+   }
+  },
+  "CY0F": {
+   "bits": [
+    [
+     -1,
+     5
+    ],
+    [
+     -1,
+     6
+    ],
+    [
+     -1,
+     8
+    ]
+   ],
+   "values": {
+    "0": [
+     1,
+     1,
+     1
+    ],
+    "1": [
+     1,
+     1,
+     0
+    ],
+    "BX": [
+     0,
+     0,
+     0
+    ],
+    "F1": [
+     0,
+     1,
+     1
+    ],
+    "F2": [
+     0,
+     1,
+     0
+    ],
+    "PROD": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  "CY0G": {
+   "bits": [
+    [
+     -1,
+     -16
+    ],
+    [
+     -1,
+     -15
+    ],
+    [
+     -1,
+     -14
+    ]
+   ],
+   "values": {
+    "0": [
+     1,
+     1,
+     1
+    ],
+    "1": [
+     0,
+     1,
+     1
+    ],
+    "BY": [
+     0,
+     0,
+     0
+    ],
+    "G1": [
+     1,
+     0,
+     1
+    ],
+    "G2": [
+     0,
+     0,
+     1
+    ],
+    "PROD": [
+     0,
+     1,
+     0
+    ]
+   }
+  }
+ },
+ "todo": [
+  "CYINIT (BX / CIN)",
+  "XUSED / YUSED",
+  "SLICEM, even X and even Y slices",
+  "SLICEM LUT RAM / shift-register modes"
+ ]
+}

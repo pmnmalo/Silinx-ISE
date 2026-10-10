@@ -7,14 +7,14 @@ const dir = process.argv[2];
 const LUTF = { frame: 236, bit: 736 };   // LUT F of SLICE_X31Y47 (stage 2)
 const base = readBit(`${dir}/BASE.bit`), FW = base.flr + 1;
 const rows = [];
-for (const f of fs.readdirSync(dir).filter(f => /^V\d+.*\.bit$/.test(f)).sort()) {
+for (const f of fs.readdirSync(dir).filter(f => /\.bit$/.test(f) && f !== 'BASE.bit').sort()) {
   const v = readBit(`${dir}/${f}`);
   const d = diffBits(base.fdri, v.fdri, FW).map(x => ({ df: x.frame - LUTF.frame, db: x.wordInFrame * 32 + (31 - x.bit) - LUTF.bit, to: x.to }));
   const log = fs.existsSync(`${dir}/${f.replace('.bit', '.xlog')}`) ? fs.readFileSync(`${dir}/${f.replace('.bit', '.xlog')}`, 'utf8') : '';
   const err = /ERROR[^\n]*/.exec(log)?.[0];
   rows.push({ variant: f.replace('.bit', ''), bits: d.length, where: d.map(x => `f${x.df >= 0 ? '+' : ''}${x.df}:b${x.db >= 0 ? '+' : ''}${x.db}=${x.to}`).join(' '), err });
 }
-const failed = fs.readdirSync(dir).filter(f => /^V\d+.*\.xdl$/.test(f) && !fs.existsSync(`${dir}/${f.replace('.xdl', '.bit')}`));
+const failed = fs.readdirSync(dir).filter(f => /\.xdl$/.test(f) && f !== 'BASE.xdl' && !fs.existsSync(`${dir}/${f.replace('.xdl', '.bit')}`));
 for (const r of rows) console.log(`${r.variant.padEnd(22)} ${String(r.bits).padStart(2)}  ${r.where}`);
 if (failed.length) {
   console.log(`\nnot accepted by ISE (${failed.length}):`);
