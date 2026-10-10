@@ -468,9 +468,15 @@ async function addNow(file, undo = null) {
 // ------------------------------------------------------------------ processes panel
 const STATUS_ICON = { ok: 'ok', warn: 'warn', err: 'err', running: 'running', stale: 'stale' };
 
+// The Design Summary can always be (re)opened from the Processes panel: whatever is selected, in both views
+const SUMMARY_PROC = { id: 'summary', label: 'Design Summary/Reports', ico: 'summary', run: () => openSummary() };
 function processDefs() {
-  const sel = S.sel || {};
   if (!S.project) return [];
+  const defs = selectionProcesses();
+  return defs.some(p => p.id === 'summary') ? defs : [SUMMARY_PROC, ...defs.filter(p => p.id !== 'none')];
+}
+function selectionProcesses() {
+  const sel = S.sel || {};
   if (sel.type === 'asm') return [
     { id: 'asm-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.file) },
     { id: 'asm-hdl', label: 'Convert to HDL', ico: 'template', run: () => convertAsmToHdl(sel.file) },
@@ -512,7 +518,7 @@ function processDefs() {
       S.schBase?.[sel.sch] === 'hdl' ? { id: 'sch-base', label: `Convert to ${viewTitle(sel.sch)} (${viewNoun(sel.sch)} as base)`, ico: viewIcon(sel.sch), run: () => setSchBase(sel.sch, 'view') }
                                      : { id: 'sch-base', label: 'Convert to HDL (HDL as base)', ico: 'template', run: () => setSchBase(sel.sch, 'hdl') },
     ] : []),
-    { id: 'summary', label: 'Design Summary/Reports', ico: 'summary', run: () => openSummary() },
+    SUMMARY_PROC,
     { id: 'utils', label: 'Design Utilities', ico: 'procGroup', children: [
       { id: 'template', label: 'View HDL Instantiation Template', ico: 'template', run: () => openInstTemplate(mod) },
     ] },
@@ -588,8 +594,8 @@ export function renderProcesses() {
     row.addEventListener('contextmenu', e => {
       e.preventDefault(); row.click();
       popupMenu([
-        { label: 'Run', action: () => runProcess(p), disabled: !p.run || p.disabled || S.busy },
-        { label: 'Rerun', action: () => runProcess(p), disabled: !p.run || p.disabled || S.busy },
+        { label: 'Run', action: () => runProcess(p), disabled: !p.run || p.disabled || (S.busy && ISE_PROCS.includes(p.id)) },
+        { label: 'Rerun', action: () => runProcess(p), disabled: !p.run || p.disabled || (S.busy && ISE_PROCS.includes(p.id)) },
         { label: 'Stop', icon: icon('stop'), action: () => stopProcesses(), disabled: !S.currentJob },
         '-',
         { label: 'Process Properties…', action: () => wiz.implProperties(), disabled: !['synth', 'impl', 'bitgen', 'map', 'par', 'translate'].includes(p.id) },
@@ -602,10 +608,10 @@ export function renderProcesses() {
   host.append(tree);
 }
 
+// Only the ISE implementation runs are exclusive (one build directory); simulation, check syntax,
+// schematics, editors and programming run in the browser or independently and stay available.
+const ISE_PROCS = ['synth', 'impl', 'translate', 'map', 'par', 'bitgen'];
 async function runProcess(p) {
-  // Only the ISE implementation runs are exclusive (one build directory); simulation, check syntax,
-  // schematics, editors and programming run in the browser or independently and stay available.
-  const ISE_PROCS = ['synth', 'impl', 'translate', 'map', 'par', 'bitgen'];
   if (S.busy && ISE_PROCS.includes(p.id)) { toast('An implementation is already running (use Stop to cancel it)', 'error'); return; }
   try { await p.run(); }
   catch (e) { log(`ERROR: ${e.message}`, 'err'); console.error(e); }
@@ -2643,6 +2649,12 @@ function rememberRecent(name) {
   } catch { /* ignore */ }
 }
 function recent() { try { return JSON.parse(localStorage.getItem('silinx.recent') || '[]'); } catch { return []; } }
+// File ▸ Recent Projects ▸ Clear Recent Projects, and the Start page link: forget the list (the projects stay)
+function clearRecent() {
+  try { localStorage.removeItem('silinx.recent'); } catch { /* ignore */ }
+  if (!document.querySelector('.left-page[data-page=start]').hidden) renderStartPage();
+  toast('Recent projects cleared (the projects themselves are kept)', 'ok');
+}
 
 // ------------------------------------------------------------------ left pages
 function showLeftPage(page) {
@@ -2655,13 +2667,15 @@ async function renderStartPage() {
   const host = $('start-page');
   host.innerHTML = '';
   const projects = await api.projects().catch(() => []);
+  const recentHere = recent().filter(r => projects.some(p => p.name === r));
   const page = h('div', { class: 'page' },
     h('div', { class: 'start-box' }, h('h3', {}, 'Project Commands'),
       ...[['New Project…', 'newProject', () => wiz.newProjectWizard()], ['Open Project…', 'open', () => wiz.openProjectDialog()], ['Import Silinx ISE Project (.zip)…', 'open', () => wiz.importSilinxDialog()], ['Import Xilinx ISE Project (.zip)…', 'open', () => wiz.importXiseDialog()], ['Open Example (blinky)', 'project', () => wiz.newProjectWizard({ template: 'blinky' })]]
         .map(([l, ic, f]) => h('div', { class: 'entry' }, icon(ic), h('a', { onclick: f }, l)))),
     h('div', { class: 'start-box' }, h('h3', {}, 'Recent Projects'),
-      ...(recent().filter(r => projects.some(p => p.name === r)).map(r => h('div', { class: 'entry' }, icon('project'), h('a', { onclick: () => openProject(r).then(() => showLeftPage('design')) }, r)))),
-      projects.length ? null : h('div', { class: 'entry', style: { color: '#888' } }, 'No projects yet.')),
+      ...(recentHere.map(r => h('div', { class: 'entry' }, icon('project'), h('a', { onclick: () => openProject(r).then(() => showLeftPage('design')) }, r)))),
+      projects.length ? null : h('div', { class: 'entry', style: { color: '#888' } }, 'No projects yet.'),
+      recentHere.length ? h('div', { class: 'entry start-clear' }, h('a', { onclick: () => clearRecent() }, 'Clear Recent Projects')) : null),
   );
   host.append(page);
 }
@@ -2787,7 +2801,11 @@ function setupMenus() {
       '-',
       { label: 'Print…', action: () => printActive(), shortcut: 'Ctrl+P', disabled: () => !(S.active?.asmEditor || S.active?.schEditor || S.active?.fsmEditor) },
       '-',
-      { label: 'Recent Projects', submenu: recent().map(r => ({ label: r, action: () => openProject(r) })) },
+      { label: 'Recent Projects', submenu: [
+        ...recent().map(r => ({ label: r, action: () => openProject(r) })),
+        recent().length ? '-' : null,
+        { label: 'Clear Recent Projects', action: () => clearRecent(), disabled: !recent().length },
+      ].filter(Boolean) },
     ].filter(Boolean) },
     { label: 'Edit', items: () => [
       // one Undo: the last removal from the project when that was the last action, else the editor's undo
@@ -2907,12 +2925,13 @@ function setupToolbar() {
     return b;
   };
   const mod = () => S.sel?.module || (S.view === 'sim' ? null : S.project?.top);
-  const free = () => !!S.project && !S.busy;
+  // only Implement waits for a running implementation (one ISE build at a time); checking,
+  // simulating, emulating and programming run in the browser or independently of it
   tb.append(h('div', { class: 'm-steps', role: 'group', 'aria-label': 'Design flow' },
-    step('mCheck', 'Check', 'Check Syntax of the selected module', () => checkSyntax(mod(), S.view === 'sim'), () => free() && !!mod()),
-    step('mWave', 'Simulate', 'Simulate Behavioral Model of the selected module', () => runSimulation(mod()), () => free() && !!mod()),
-    step('mBolt', 'Implement', 'Implement Top Module', () => runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), () => free() && !!S.project.top),
-    step('mBoard', 'Emulate', 'Board Emulator', () => openEmulator(S.project.top), () => free() && !!S.project.top),
+    step('mCheck', 'Check', 'Check Syntax of the selected module', () => checkSyntax(mod(), S.view === 'sim'), () => !!S.project && !!mod()),
+    step('mWave', 'Simulate', 'Simulate Behavioral Model of the selected module', () => runSimulation(mod()), () => !!S.project && !!mod()),
+    step('mBolt', 'Implement', 'Implement Top Module', () => runImpl(S.project.top, ['synth', 'translate', 'map', 'par', 'bitgen']), () => !!S.project?.top && !S.busy),
+    step('mBoard', 'Emulate', 'Board Emulator', () => openEmulator(S.project.top), () => !!S.project?.top),
     step('mUpload', 'Program', 'Configure Target Device (iMPACT)', () => openImpact(), () => true),
   ));
   refreshSteps();

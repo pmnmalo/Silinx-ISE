@@ -360,3 +360,33 @@ uiTest("update dialog: What's new lists the changes of every version newer than 
   await page.dialogButton('OK');
   await page.waitNoDialog();
 });
+
+uiTest('Design Summary: once closed it reopens from the Processes panel whatever is selected, in both views, and from the toolbar', E, async (page) => {
+  await makeProject(env, { name: 'SumPj', template: 'blinky' });
+  await page.openProject('SumPj');
+  await page.waitFor(() => window.SilinxApp.findDoc('summary'));
+  const close = async () => {
+    await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('summary')));
+    await page.waitFor(() => !window.SilinxApp.findDoc('summary'));
+  };
+  const reopenFromProcesses = async (what) => {
+    await close();
+    await page.treeRow('#procs', 'Design Summary/Reports', { dbl: true, exact: true });
+    await page.waitFor(() => window.Silinx.active?.id === 'summary' && /Project Status/.test(document.querySelector('.doc:not([hidden])').innerText), [], { what: `summary reopened (${what})` });
+  };
+  // a module (Implementation view), the constraints file, the Simulation view (test bench and nothing selected)
+  await page.treeRow('#hier', 'top', {});
+  await reopenFromProcesses('module');
+  await page.treeRow('#hier', 'top.ucf', {});
+  assert.ok(await page.eval(() => [...document.querySelectorAll('#procs .lbl')].some((e) => e.textContent === 'Check Constraints')), 'the UCF processes are kept');
+  await reopenFromProcesses('constraints file');
+  await page.click('input[name=view][value=sim]');
+  await reopenFromProcesses('Simulation view, nothing selected');
+  assert.ok(!await page.eval(() => [...document.querySelectorAll('#procs .lbl')].some((e) => e.textContent === 'No processes for the selected item')));
+  await page.treeRow('#hier', 'tb_top', {});
+  await reopenFromProcesses('test bench');
+  // the toolbar button
+  await close();
+  await page.click('#toolbar .tb-btn[data-cmd=summary]');
+  await page.waitFor(() => window.Silinx.active?.id === 'summary');
+});

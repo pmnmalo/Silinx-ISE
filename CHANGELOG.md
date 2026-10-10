@@ -17,6 +17,16 @@ the "What's new" text of its GitHub release.
 - **Command palette** (Ctrl+K / Cmd+K, or Ctrl+Shift+P): search any menu command or project file by
   name and run or open it from the keyboard. In Portuguese it finds commands by their Portuguese
   or English names.
+- **Board emulator: the power switch works.** Off stops the board (LEDs, displays and LCD go
+  dark); on starts the design again from time 0, as configuring the FPGA at power-up does.
+  Switches moved while the board is off are read at power-up.
+- **Clear Recent Projects** (*File ▸ Recent Projects*, and a link on the Start page). The projects
+  themselves are kept.
+- Fixed: Check, Simulate, Emulate and Program stayed disabled while an implementation was running;
+  only Implement has to wait for it (also for *Run* in the right-click menu of the processes).
+- Fixed: the Design Summary could not be reopened from the Processes panel once closed, unless a
+  module was selected in the Implementation view. *Design Summary/Reports* is now there whatever is
+  selected, in both views.
 - *Help ▸ About* describes what Silinx does today (schematics with live simulation, FSM and ASM
   editors, truth tables and Karnaugh maps, wizards, netlist simulation, board emulator).
 

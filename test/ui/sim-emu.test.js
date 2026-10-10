@@ -138,6 +138,33 @@ for (const [board, name] of [['basys2', 'Basys2'], ['nexys2', 'Nexys2']]) {
     // a signal in the Watch box
     await page.eval(() => { const s = document.querySelector('.doc:not([hidden]) .emu-box select'); s.value = [...s.options].find((o) => o.textContent.endsWith('led')).value; s.dispatchEvent(new Event('change')); });
     await page.waitFor(() => /^[01X]{8}/.test(document.querySelector('.doc:not([hidden]) .emu-box tbody td:nth-child(2)')?.textContent || ''));
+    // the board's power switch: off = nothing runs, LEDs and display dark, Run / Step / Power cycle disabled
+    await widget(page, 'SW3 = sw<3>');
+    await waitLed(page, 3, true);
+    await page.click('.doc:not([hidden]) .emu-power');
+    await page.waitFor(() => !window.Silinx.active.view.powered && window.Silinx.active.view.outputs === null, [], { what: 'power off' });
+    const off = await page.eval(() => ({
+      sw: document.querySelector('.doc:not([hidden]) .emu-power').getAttribute('aria-checked'),
+      stat: document.querySelector('.doc:not([hidden]) .emu-bar .stat').textContent,
+      disabled: [...document.querySelectorAll('.doc:not([hidden]) .emu-bar .btn')].map((b) => [b.textContent, b.disabled]),
+      t: window.Silinx.active.view.sim.now,
+    }));
+    assert.equal(off.sw, 'false');
+    assert.equal(off.stat, 'Power off');
+    assert.deepEqual(off.disabled, [['▶ Run', true], ['⏭ Step', true], ['⟲ Power cycle', true]]);
+    assert.ok(await led(page, 3) < 0.5, 'LD3 dark without power');
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(await page.eval(() => window.Silinx.active.view.sim.now), off.t, 'time stands still');
+    // a switch moved while off (SW0 back to 0) is read at power-up; on again (keyboard): the design restarts from time 0
+    await widget(page, 'SW0 = sw<0>');
+    await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-power').focus());
+    await page.key('Enter');
+    const t0 = await page.waitFor(() => window.Silinx.active.view.powered && window.Silinx.active.view.sim.now > 0 && window.Silinx.active.view.sim.now, [], { what: 'power on, running' });
+    assert.ok(t0 < off.t, `restarted from time 0 (${t0} < ${off.t})`);
+    await waitLed(page, 3, true);
+    await page.waitFor(() => window.Silinx.active.view.outputs?.digits[0]?.seg[0] > 0.5, [], { what: 'digit 0 (SW0 turned off while off)' });
+    assert.deepEqual((await digit(page, 0)).seg.map((x) => (x > 0.5 ? 1 : 0)), [1, 1, 1, 1, 1, 1, 0]);
+    assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-bar .btn').textContent), '⏸ Pause');
   });
 }
 
@@ -185,6 +212,11 @@ uiTest('board emulator (RTL) on the Spartan-3E Starter Kit: LCD text after a swi
   assert.equal(await lcd(), '', 'the LCD is off before the design writes to it');
   await widget(page, 'SW0 = sw<0>');
   await page.waitFor(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-lcd-cell')].map((c) => c.textContent).join('').trim() === 'HI', [], { what: 'LCD shows HI' });
+  // power off: the LCD goes blank; on: the design starts again and writes HI (SW0 still on)
+  await page.click('.doc:not([hidden]) .emu-power');
+  await page.waitFor(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-lcd-cell')].every((c) => c.textContent === ''), [], { what: 'LCD blank without power' });
+  await page.click('.doc:not([hidden]) .emu-power');
+  await page.waitFor(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-lcd-cell')].map((c) => c.textContent).join('').trim() === 'HI', [], { what: 'LCD shows HI after power-up' });
   // the knob: ⟳ counts up, ⟲ counts down (LEDs 0..5 show the count)
   await page.click('.doc:not([hidden]) .emu-rot-btn[title="Turn right (clockwise)"]');
   await waitLed(page, 0, true);

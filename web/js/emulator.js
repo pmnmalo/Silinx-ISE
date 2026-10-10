@@ -68,6 +68,15 @@ function injectStyle() {
 .emu-pcb-art { position: absolute; left: 0; top: 0; }
 .emu-at { position: absolute; transform: translateX(-50%); display: flex; justify-content: center; }
 .emu-silk { color: #e8edf7; font: bold 10px Arial, sans-serif; white-space: nowrap; }
+/* the power switch (a slide switch, ON to the right) and its LED */
+.emu-power { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+.emu-power-sw { width: 34px; height: 14px; border-radius: 2px; background: #111; border: 1px solid #000; position: relative; }
+.emu-power-sw::after { content: ''; position: absolute; top: 1px; bottom: 1px; left: 2px; width: 14px; background: #ddd; border-radius: 1px; transition: left .08s; }
+.emu-power.on .emu-power-sw::after { left: 16px; background: #fff; }
+.emu-power-led { width: 7px; height: 7px; border-radius: 50%; background: #4a1414; border: 1px solid #200; }
+.emu-power.on .emu-power-led { background: #ff3b30; box-shadow: 0 0 5px #ff3b30; }
+.emu-power:focus-visible { outline: 2px solid #9cf; outline-offset: 2px; }
+.emu.off .emu-pcb { filter: saturate(.85) brightness(.92); }
 .emu-port { color: #ffcf66; font: 9px var(--mono, monospace); white-space: nowrap; max-width: 50px; overflow: hidden; text-overflow: ellipsis; }
 .emu-port.nc { color: #8090bb; }
 .b2-led { width: 16px; height: 10px; border-radius: 2px; border: 1px solid #0a0a0a; background: #1b3a23; }
@@ -122,7 +131,7 @@ const pmod = (x, y, name, silk) => `<rect x="${x}" y="${y}" width="92" height="2
 
 /** Digilent Basys2: navy PCB, Pmods JA..JD on the top edge, USB left, PS/2 and VGA right,
  *  LEDs above the 8 slide switches at the bottom, 4-digit display with the 4 buttons below it. */
-function basys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote }) {
+function basys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkPower }) {
   const W = 780, H = 500, silk = '#e8edf7';
   const pcb = h('div', { class: 'emu-pcb', style: { width: `${W}px`, height: `${H}px` } });
   const holes = [[22, 22], [W - 22, 22], [22, H - 22], [W - 22, H - 22]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" fill="#d8c67e"/><circle cx="${x}" cy="${y}" r="5" fill="#1b1b1b"/>`).join('');
@@ -133,7 +142,6 @@ function basys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, por
     ${pmod(170, 12, 'JA', silk)}${pmod(300, 12, 'JB', silk)}${pmod(430, 12, 'JC', silk)}${pmod(560, 12, 'JD', silk)}
     <rect x="0" y="64" width="40" height="40" rx="3" fill="#b9bec6" stroke="#6b7079"/><rect x="6" y="76" width="22" height="16" rx="2" fill="#4a4e55"/>
     <text x="58" y="88" fill="${silk}" font-size="11" font-family="Arial" font-weight="bold">USB</text>
-    <rect x="52" y="122" width="34" height="14" rx="2" fill="#111"/><rect x="54" y="124" width="14" height="10" rx="1" fill="#ddd"/>
     <text x="52" y="152" fill="${silk}" font-size="9" font-family="Arial">POWER</text>
     <rect x="676" y="58" width="70" height="62" rx="6" fill="#7b3fa0" stroke="#4d2266"/><circle cx="711" cy="89" r="17" fill="#2b2b2b"/><circle cx="711" cy="89" r="5" fill="#777"/>
     <text x="711" y="136" fill="${silk}" font-size="11" text-anchor="middle" font-family="Arial" font-weight="bold">PS2</text>
@@ -153,6 +161,7 @@ function basys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, por
   `));
   const put = (el, x, y, cls = '') => { const w = h('div', { class: `emu-at ${cls}`, style: { left: `${x}px`, top: `${y}px` } }, el); pcb.append(w); return w; };
   const silkText = (t, x, y, size = 10) => put(h('span', { class: 'emu-silk', style: { fontSize: `${size}px` } }, t), x, y);
+  put(mkPower(), 75, 122);
   const port = (kind, k, x, y) => put(h('span', { class: `emu-port${bitFor(kind, k) ? '' : ' nc'}` }, portLabel(kind, k)), x, y);
   // LEDs LD7..LD0 above the switches SW7..SW0 (left half of the bottom edge)
   for (let i = 0; i < 8; i++) {
@@ -205,13 +214,13 @@ function boardFrame({ h, W, H, art, board, title, clockNote }) {
 
 /** Digilent Nexys2: teal PCB, Pmods JA..JD on the top edge, serial / VGA / USB on the left, the
  *  FX2 expansion connector on the right, switches + LEDs bottom left, display and buttons bottom right. */
-function nexys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote }) {
+function nexys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkPower }) {
   const W = 800, H = 560, silk = '#eef5f4';
   const art = `
     <defs><linearGradient id="nx2pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f7a7c"/><stop offset="1" stop-color="#215e61"/></linearGradient></defs>
     <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="14" fill="url(#nx2pcb)" stroke="#153f41" stroke-width="3"/>
     ${holes4(W, H)}
-    <rect x="44" y="8" width="38" height="34" rx="3" fill="#151515"/><text x="63" y="58" fill="${silk}" font-size="9" text-anchor="middle" font-family="Arial">POWER</text>
+    <text x="63" y="58" fill="${silk}" font-size="9" text-anchor="middle" font-family="Arial">POWER</text>
     ${pmod12(150, 10, 'JA', silk)}${pmod12(270, 10, 'JB', silk)}${pmod12(390, 10, 'JC', silk)}${pmod12(510, 10, 'JD', silk)}
     ${db(0, 100, 46, 76, '#b9bec6', 'RS-232', silk)}${db(0, 196, 46, 86, '#2f63c9', 'VGA', silk)}
     <rect x="0" y="312" width="34" height="30" rx="3" fill="#b9bec6" stroke="#6b7079"/><rect x="5" y="320" width="20" height="14" rx="2" fill="#4a4e55"/>
@@ -229,6 +238,7 @@ function nexys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, por
   const { put, wrap } = boardFrame({ h, W, H, art, board, title, clockNote });
   const silkText = (t, x, y) => put(h('span', { class: 'emu-silk' }, t), x, y);
   const port = (res, k, x, y) => put(h('span', { class: `emu-port${bitFor(res, k) ? '' : ' nc'}` }, portLabel(res, k)), x, y);
+  put(mkPower(), 69, 26);
   for (let i = 0; i < 8; i++) {
     const k = 7 - i, x = 66 + i * 50;
     put(mkLed(k, 'emu-led b2-led'), x, 432);
@@ -251,14 +261,14 @@ function nexys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, por
 /** Xilinx / Digilent Spartan-3E Starter Kit: dark green PCB, serial / VGA on the top edge,
  *  Ethernet and USB on the left, 16x2 LCD at the bottom, rotary knob with the four direction
  *  buttons around it, 8 LEDs and 4 slide switches bottom right. */
-function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkLcd, mkRotary, turnKnob }) {
+function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkLcd, mkRotary, turnKnob, mkPower }) {
   const W = 840, H = 560, silk = '#eef3ec';
   const lcdChars = Array.from({ length: 32 }, (_, i) => `<rect x="${314 + (i % 16) * 15.5}" y="${448 + Math.floor(i / 16) * 24}" width="12" height="19" fill="#9fbf3a" opacity=".55"/>`).join('');
   const art = `
     <defs><linearGradient id="s3epcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#24543a"/><stop offset="1" stop-color="#1a412b"/></linearGradient></defs>
     <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="12" fill="url(#s3epcb)" stroke="#102a1b" stroke-width="3"/>
     ${holes4(W, H)}
-    <rect x="70" y="6" width="40" height="36" rx="3" fill="#151515"/><text x="90" y="58" fill="${silk}" font-size="9" text-anchor="middle" font-family="Arial">POWER</text>
+    <text x="90" y="58" fill="${silk}" font-size="9" text-anchor="middle" font-family="Arial">POWER</text>
     <rect x="150" y="6" width="54" height="52" rx="6" fill="#7b3fa0" stroke="#4d2266"/><circle cx="177" cy="32" r="15" fill="#2b2b2b"/><text x="177" y="74" fill="${silk}" font-size="10" text-anchor="middle" font-family="Arial" font-weight="bold">PS/2</text>
     ${db(250, 0, 90, 46, '#b9bec6', 'DCE', silk, false)}${db(430, 0, 90, 46, '#b9bec6', 'DTE', silk, false)}${db(560, 0, 96, 46, '#2f63c9', 'VGA', silk, false)}
     <rect x="0" y="180" width="54" height="60" rx="3" fill="#c3c7cd" stroke="#6b7079"/><rect x="8" y="192" width="38" height="36" fill="#55595f"/>
@@ -277,6 +287,7 @@ function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabel, bitF
   const { put, wrap } = boardFrame({ h, W, H, art, board, title, clockNote });
   const silkText = (t, x, y) => put(h('span', { class: 'emu-silk' }, t), x, y);
   const port = (res, k, x, y) => put(h('span', { class: `emu-port${bitFor(res, k) ? '' : ' nc'}` }, portLabel(res, k)), x, y);
+  put(mkPower(), 96, 18);
   // LCD glass: 2 x 16 characters over the drawn cells
   put(mkLcd(), 437, 448);
   // rotary push in the middle of the knob, ⟲ / ⟳ beside it (and the mouse wheel), direction buttons around it
@@ -334,6 +345,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   let lcd = lcdState(), lcdView = null;
 
   let running = false, speed = 'max', prev = null, raf = 0, destroyed = false, knobEnd = 0;
+  let powered = true;   // the board's power switch: off = nothing runs, outputs dark
   let slice = 2000, cyclesAcc = 0, lastT = 0, rateWin = { t: performance.now(), cyc: 0, rate: 0 };
   let logN = 0;
   let lcdDirty = true;
@@ -449,6 +461,17 @@ export function mountEmulator(container, { design, board, assignments, title = '
     return el;
   };
 
+  // the power switch: off stops the board (LEDs, displays and LCD dark); on starts the design again
+  // from time 0, as configuring the FPGA at power-up does
+  const powerSwitches = [];
+  const mkPower = () => {
+    const el = h('div', { class: 'emu-power on', role: 'switch', tabindex: '0', 'aria-checked': 'true', 'aria-label': 'Power', title: 'Power switch: click to turn the board off / on' },
+      h('div', { class: 'emu-power-sw' }), h('div', { class: 'emu-power-led' }));
+    el.addEventListener('click', () => setPower(!powered));
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPower(!powered); } });
+    powerSwitches.push(el);
+    return el;
+  };
   const notEmulated = board.resources.filter((r) => !['led', 'sw', 'btn', 'seg', 'dp', 'an', 'rot'].includes(wiring.bits.find((b) => b.res === r)?.kind) && r.group !== 'Clock'
     && !(r.group === 'LCD' && BOARD_LAYOUTS[board.id]?.lcd)
     && wiring.bits.some((b) => b.res === r)).map((r) => r.name);
@@ -456,10 +479,11 @@ export function mountEmulator(container, { design, board, assignments, title = '
     + (notEmulated.length ? ` · not emulated: ${notEmulated.join(', ')}` : '');
 
   const layout = BOARD_LAYOUTS[board.id];
-  if (layout) main.append(layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkLcd, mkRotary, turnKnob }));
+  if (layout) main.append(layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkLcd, mkRotary, turnKnob, mkPower }));
   else {
     // generic board: rows of displays, LEDs, switches and buttons
-    const boardEl = h('div', { class: 'emu-board' }, h('h3', {}, `${board.name}${title ? ` — ${title}` : ''}`));
+    const boardEl = h('div', { class: 'emu-board' }, h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' } },
+      h('h3', { style: { margin: 0 } }, `${board.name}${title ? ` — ${title}` : ''}`), h('span', { class: 'emu-silk' }, 'POWER'), mkPower()));
     main.append(boardEl);
     const cell = (kind, idx, widget) => h('div', { class: `emu-cell${bitFor(kind, idx) ? '' : ' nc'}`, title: tip(kind, idx) },
       widget, h('span', { class: 'res' }, `${resLabel[kind] || kind}${idx}`), h('span', { class: 'port' }, portLabel(kind, idx)));
@@ -554,7 +578,16 @@ export function mountEmulator(container, { design, board, assignments, title = '
     setupSim();
     refresh();
   }
+  function setPower(on) {
+    if (on === powered) return;
+    powered = on;
+    for (const el of powerSwitches) { el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on)); }
+    root.classList.toggle('off', !on);
+    if (on) { powerCycle(); setRunning(true); }
+    else { setRunning(false); prev = null; lcd = lcdState(); lcdDirty = true; refresh(); }
+  }
   function runCycles(n) {
+    if (!powered) return;
     const t0 = sim.now;
     for (const s of outputSigs) s.wave = { t: [sim.now], v: [s.val] };
     sim.waveEvents = 0; sim.waveTruncated = false;
@@ -565,9 +598,11 @@ export function mountEmulator(container, { design, board, assignments, title = '
   }
   function step() { setRunning(false); runCycles(1); refresh(); }
   function setRunning(on) {
-    running = on && !sim.finished;
+    running = on && powered && !sim.finished;
     runBtn.textContent = running ? '⏸ Pause' : '▶ Run';
-    stepBtn.disabled = running;
+    stepBtn.disabled = running || !powered;
+    runBtn.disabled = !powered;
+    resetBtn.disabled = !powered;
     lastT = performance.now();
     cyclesAcc = 0;
   }
@@ -611,7 +646,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
     // no window run yet (start-up, power cycle): LEDs and digits dark
     leds.forEach((l, k) => { const v = prev?.leds[k] ?? 0; l.style.background = `rgb(${Math.round(27 + 20 * v)}, ${Math.round(58 + 197 * v)}, ${Math.round(35 + 40 * v)})`; l.style.boxShadow = v > 0.05 ? `0 0 ${Math.round(8 * v)}px #4f4` : 'none'; });
     digits.forEach((d, k) => d && d.set(prev?.digits[k] ?? null));
-    if (lcdView && lcdDirty) { lcdView.set(lcdText(lcd), lcd); lcdDirty = false; }
+    if (lcdView && lcdDirty) { lcdView.set(powered ? lcdText(lcd) : null, lcd); lcdDirty = false; }
     for (const w of watched) {
       const v = w.s.val;
       w.val.textContent = v == null || Array.isArray(v) ? '?' : (w.s.t?.w > 1 ? `${V.toBin(v)}${v.x ? '' : ` (${v.v.toString(16).toUpperCase()}h)`}` : (v.x ? 'X' : v.v.toString()));
@@ -619,6 +654,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
     const nowMs = performance.now();
     if (nowMs - rateWin.t > 1000) { rateWin.rate = rateWin.cyc * 1000 / (nowMs - rateWin.t); rateWin = { t: nowMs, cyc: 0, rate: rateWin.rate }; }
     const r = running ? rateWin.rate : 0;
+    if (!powered) { stat.textContent = 'Power off'; return; }
     stat.textContent = `t = ${formatTime(sim.now)} · ${Math.round(sim.now / period).toLocaleString()} cycles${running ? ` · ${r >= 1000 ? `${(r / 1000).toFixed(1)} kHz` : `${Math.round(r)} Hz`} (${(r * period / 1e10).toFixed(r * period / 1e10 < 1 ? 3 : 1)}% of real time)` : ''}${sim.finished === 'error' ? ' · stopped by an error' : ''}`;
     // simulator messages
     const log = sim.log;
@@ -639,6 +675,8 @@ export function mountEmulator(container, { design, board, assignments, title = '
   return {
     destroy() { destroyed = true; clearTimeout(raf); root.remove(); },
     pause: () => setRunning(false),
+    power: (on) => setPower(!!on),
+    get powered() { return powered; },
     wiring,
     sim,
     get outputs() { return prev; },

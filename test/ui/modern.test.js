@@ -202,7 +202,7 @@ uiTest('command palette: Ctrl+K, search, arrow keys, Enter runs a command or ope
   await page.key('Escape');
 }, O);
 
-uiTest('design-flow buttons: Check, Simulate and Emulate act on the selected / top module', E, async (page) => {
+uiTest('design-flow buttons: Check, Simulate and Emulate act on the selected / top module, also while implementing', E, async (page) => {
   await makeProject(env, { name: 'FlowPj', template: 'blinky' });
   await page.openProject('FlowPj');
   await page.waitFor(() => !document.querySelector('#toolbar .m-step').disabled, [], { what: 'Check enabled' });
@@ -215,11 +215,16 @@ uiTest('design-flow buttons: Check, Simulate and Emulate act on the selected / t
   await page.waitFor(() => !window.Silinx.busy);
   await step('Emulate');
   await page.waitFor(() => window.Silinx.docs.some((d) => /^Board Emulator/.test(d.title)), [], { what: 'emulator open', timeout: 20000 });
-  // while a process runs the steps wait
+  // while an implementation runs only Implement waits (one ISE build at a time); the others still work
+  const states = () => page.eval(() => [...document.querySelectorAll('#toolbar .m-step')].map((b) => [b.textContent, b.disabled]));
   await page.eval(() => { window.Silinx.busy = true; });
-  await page.waitFor(() => document.querySelector('#toolbar .m-step').disabled, [], { what: 'disabled while busy' });
+  await page.waitFor(() => [...document.querySelectorAll('#toolbar .m-step')].find((b) => b.textContent === 'Implement').disabled, [], { what: 'Implement disabled while implementing' });
+  assert.deepEqual(await states(), [['Check', false], ['Simulate', false], ['Implement', true], ['Emulate', false], ['Program', false]]);
+  await page.eval(() => { document.getElementById('console-log').innerHTML = ''; });
+  await step('Check');
+  await page.waitConsole(/Process "Check Syntax" completed successfully/);
   await page.eval(() => { window.Silinx.busy = false; });
-  await page.waitFor(() => !document.querySelector('#toolbar .m-step').disabled);
+  await page.waitFor(() => !document.querySelectorAll('#toolbar .m-step')[2].disabled, [], { what: 'Implement enabled again' });
 }, O);
 
 uiTest('Portuguese: the modern header, buttons, empty state and palette are translated', E, async (page) => {

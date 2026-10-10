@@ -108,7 +108,7 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   const items = await page.openMenu('File');
   await page.hover(await page.point('body > .menu-popup > .mi', { index: items.findIndex((i) => i.label === 'Recent Projects') }));
   await page.waitForSelector('.menu-popup.sub .mi');
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.menu-popup.sub .mi .lbl')].map((e) => e.textContent)), ['Beta', 'Alpha']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.menu-popup.sub .mi .lbl')].map((e) => e.textContent)), ['Beta', 'Alpha', 'Clear Recent Projects']);
   await page.click('.menu-popup.sub .mi', { text: 'Alpha' });
   await page.waitFor(() => window.Silinx.project?.name === 'Alpha');
   // Close Project: back to the Start page, project items disabled
@@ -127,6 +127,28 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   // the last project is reopened when the page is loaded again
   await page.goto(env.server.url);
   await page.waitFor(() => window.Silinx?.project?.name === 'Beta');
+  // File ▸ Recent Projects ▸ Clear Recent Projects: the list is empty (the projects stay)
+  const recentSub = async () => {
+    const it = await page.openMenu('File');
+    await page.hover(await page.point('body > .menu-popup > .mi', { index: it.findIndex((i) => i.label === 'Recent Projects') }));
+    await page.waitForSelector('.menu-popup.sub .mi');
+    return page.eval(() => [...document.querySelectorAll('.menu-popup.sub .mi')].map((r) => [r.querySelector('.lbl').textContent, r.classList.contains('disabled')]));
+  };
+  await recentSub();
+  await page.click('.menu-popup.sub .mi', { text: 'Clear Recent Projects' });
+  await page.waitFor(() => !localStorage.getItem('silinx.recent'), [], { what: 'recent list cleared' });
+  assert.deepEqual(await recentSub(), [['Clear Recent Projects', true]]);
+  await page.closeMenus();
+  assert.deepEqual((await env.server.api('GET', '/api/projects')).map((p) => p.name).filter((n) => ['Alpha', 'Beta'].includes(n)).sort(), ['Alpha', 'Beta'], 'the projects are kept');
+  // the Start page: no recent projects; opening one lists it again, and its Clear link empties the list
+  await page.menu('File', 'Close Project');
+  await page.waitFor(() => !document.querySelector('[data-page=start]').hidden && document.querySelector('#start-page .start-box'));
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#start-page .start-box')][1].querySelectorAll('a').length), 0);
+  await page.openProject('Alpha');
+  await page.menu('File', 'Close Project');
+  await page.waitFor(() => [...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Alpha'));
+  await page.click('#start-page a', { text: 'Clear Recent Projects' });
+  await page.waitFor(() => ![...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Alpha' || a.textContent === 'Clear Recent Projects'), [], { what: 'Start page list cleared' });
 });
 
 uiTest('Add Copy of Source: new files, association, overwrite confirmation (No keeps, Yes replaces)', E, async (page) => {

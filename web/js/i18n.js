@@ -246,6 +246,8 @@ const PT = {
   'Search commands and files': 'Procurar comandos e ficheiros', 'Switch between light and dark theme': 'Alternar entre tema claro e escuro',
   'Open a source from the Design panel, or search for any command or file.': 'Abra uma fonte no painel Projeto, ou procure qualquer comando ou ficheiro.',
   'No matching commands or files': 'Nenhum comando ou ficheiro corresponde', 'to navigate': 'para navegar', 'to run': 'para executar', 'to close': 'para fechar',
+  'Clear Recent Projects': 'Limpar Projetos Recentes', 'Recent projects cleared (the projects themselves are kept)': 'Projetos recentes limpos (os projetos mantêm-se)',
+  'Power switch: click to turn the board off / on': 'Interruptor de alimentação: clique para desligar / ligar a placa', 'Power off': 'Desligada', 'Power': 'Alimentação',
   'Open file': 'Abrir ficheiro', 'Command palette': 'Paleta de comandos', 'Command palette: search commands and files': 'Paleta de comandos: procurar comandos e ficheiros',
 };
 
