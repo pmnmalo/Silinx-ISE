@@ -313,7 +313,9 @@ web/        Project Navigator UI (modern and ISE-like, web/css/modern.css): edit
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image
 scripts/    adepttool installer/patch, Platform Flash programmer, standalone build
 examples/   example projects (mixed VHDL+Verilog blinky for the Digilent Basys2, XC3S250E-CP132)
-docs/       IR.md (parser intermediate representation), PROJECT.md (project model and API)
+docs/       IR.md (parser intermediate representation), PROJECT.md (project model and API),
+            OPEN-TOOLCHAIN.md (how the open Spartan-3E toolchain is developed)
+research/   s3e-bitstream: experiments towards an open toolchain for the Spartan-3E (Basys2)
 test/       node:test suites
 ```
 
