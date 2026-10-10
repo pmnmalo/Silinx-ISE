@@ -98,7 +98,7 @@ const PT = {
   'Top Module (simulation):': 'Módulo de Topo (simulação):', 'Optimization Goal:': 'Objetivo de Otimização:', 'Optimization Effort:': 'Esforço de Otimização:',
   'FPGA Start-Up Clock:': 'Relógio de Arranque da FPGA:', 'Speed': 'Velocidade', 'Area': 'Área', 'High': 'Alto', 'Normal': 'Normal',
   'JTAG Clock': 'Relógio JTAG', 'User Clock': 'Relógio do Utilizador', 'Process Properties - Synthesis / Implementation / Bitstream': 'Propriedades do Processo - Síntese / Implementação / Bitstream',
-  'Execution mode:': 'Modo de execução:', 'Local (Xilinx ISE installed on this machine)': 'Local (Xilinx ISE instalado nesta máquina)',
+  'Execution mode:': 'Modo de execução:', 'Local (Xilinx ISE installed locally)': 'Local (Xilinx ISE instalado localmente)',
   'Docker image with Xilinx ISE': 'Imagem Docker com Xilinx ISE', 'Remote host with Xilinx ISE via SSH': 'Máquina remota com Xilinx ISE por SSH',
   'ISE settings64.sh:': 'settings64.sh do ISE:', 'Docker image:': 'Imagem Docker:', 'Host:': 'Servidor:', 'User:': 'Utilizador:', 'Port:': 'Porto:',
   'Remote build dir:': 'Pasta remota de build:', 'Remote settings64.sh:': 'settings64.sh remoto:', 'Docker image on the remote host:': 'Imagem Docker na máquina remota:', 'none: ISE installed on the host': 'nenhuma: ISE instalado na máquina', 'Programmer tool:': 'Ferramenta de programação:',
