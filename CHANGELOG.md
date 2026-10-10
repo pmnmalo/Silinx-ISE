@@ -25,7 +25,7 @@ the "What's new" text of its GitHub release.
   routing graph (built once per computer from ISE's device report, never shipped). lab11 and blinky,
   synthesized, packed, placed and routed by Silinx, with ISE only writing the bitstream, pass ISE's
   design rule check and work on a Basys2.
-- *Toolchain Settings*: the SSH mode (now *Remote host via SSH*) can run the ISE flow in a Docker
+- *Toolchain Settings*: the SSH mode (now *Remote host with ISE 14.7 via SSH*) can run the ISE flow in a Docker
   image on the remote host (*Docker image on the remote host*), so another machine with the
   Silinx ISE image can build, e.g. an Intel Mac, where ISE runs natively instead of emulated as on
   Apple Silicon (lab11: about 70 s instead of 10 minutes).

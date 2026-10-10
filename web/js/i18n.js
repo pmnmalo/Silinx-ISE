@@ -99,7 +99,7 @@ const PT = {
   'FPGA Start-Up Clock:': 'Relógio de Arranque da FPGA:', 'Speed': 'Velocidade', 'Area': 'Área', 'High': 'Alto', 'Normal': 'Normal',
   'JTAG Clock': 'Relógio JTAG', 'User Clock': 'Relógio do Utilizador', 'Process Properties - Synthesis / Implementation / Bitstream': 'Propriedades do Processo - Síntese / Implementação / Bitstream',
   'Execution mode:': 'Modo de execução:', 'Local (ISE installed on this machine)': 'Local (ISE instalado nesta máquina)',
-  'Docker image with ISE 14.7': 'Imagem Docker com ISE 14.7', 'Remote host via SSH': 'Máquina remota por SSH',
+  'Docker image with ISE 14.7': 'Imagem Docker com ISE 14.7', 'Remote host with ISE 14.7 via SSH': 'Máquina remota com ISE 14.7 por SSH',
   'ISE settings64.sh:': 'settings64.sh do ISE:', 'Docker image:': 'Imagem Docker:', 'Host:': 'Servidor:', 'User:': 'Utilizador:', 'Port:': 'Porto:',
   'Remote build dir:': 'Pasta remota de build:', 'Remote settings64.sh:': 'settings64.sh remoto:', 'Docker image on the remote host:': 'Imagem Docker na máquina remota:', 'none: ISE installed on the host': 'nenhuma: ISE instalado na máquina', 'Programmer tool:': 'Ferramenta de programação:',
   'Cable:': 'Cabo:', 'Device programmers': 'Programadores de dispositivos', 'Tool': 'Ferramenta', 'Location': 'Localização',
