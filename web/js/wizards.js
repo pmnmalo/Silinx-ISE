@@ -790,7 +790,7 @@ export async function toolchainDialog() {
   let tc;
   try { tc = await api.toolchain(); } catch (e) { return alertDlg('Toolchain', e.message, 'error'); }
   const cfg = JSON.parse(JSON.stringify(tc.config));
-  const mode = select([['local', 'Local (ISE installed on this machine)'], ['docker', 'Docker image with ISE 14.7'], ['ssh', 'Remote host with ISE 14.7 via SSH']], cfg.mode);
+  const mode = select([['local', 'Local (Xilinx ISE installed on this machine)'], ['docker', 'Docker image with Xilinx ISE'], ['ssh', 'Remote host with Xilinx ISE via SSH']], cfg.mode);
   const inputs = {
     'local.settings': h('input', { type: 'text', value: cfg.local.settings || '', placeholder: 'auto-detect (…/14.7/ISE_DS/settings64.sh)' }),
     'docker.image': h('input', { type: 'text', value: cfg.docker.image || '', placeholder: 'e.g. my-ise:14.7' }),
