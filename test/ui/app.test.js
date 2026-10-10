@@ -112,6 +112,9 @@ uiTest('every menu opens and every enabled item acts or opens its dialog', E, as
       }
       const before = await page.eval(() => window.__sig());
       await page.click('body > .menu-popup > .mi', { index: idx });
+      // the FPGA view first asks the server for the routed design, then (none here) asks whether to
+      // run Implement Design: wait for that question, which can come after the other checks
+      if (it.label === 'Implemented Design (FPGA View)') await page.waitDialog('View Implemented Design (FPGA)');
       const changed = await page.waitFor((b) => window.__sig() !== b, [before], { timeout: 8000 }).catch(() => false);
       (changed ? acted : idle).push(name);
       // what it did: an error message box is a failure
