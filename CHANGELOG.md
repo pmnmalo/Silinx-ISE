@@ -14,6 +14,9 @@ the "What's new" text of its GitHub release.
   VHDL / Verilog design as one flat synthesizable SystemVerilog module for Yosys, so that synthesis
   needs neither GHDL nor ISE (and can run in the browser). lab11 and the blinky example go through
   Yosys to a Spartan-3E netlist that behaves as the original in simulation.
+  It also handles initial blocks (initial values of registers and memories) and Xilinx primitives
+  instantiated by name (block RAMs, clock buffers, DCMs, shift registers): every test design
+  synthesizes to a netlist that behaves as the original.
 - Verilog: SystemVerilog size casts `W'(expr)`.
 - How the open toolchain for the Spartan-3E is being developed: `docs/OPEN-TOOLCHAIN.md`, and the
   first experiments in `research/s3e-bitstream`.
