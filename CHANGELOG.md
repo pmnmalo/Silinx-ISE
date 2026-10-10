@@ -3,6 +3,11 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.9.4
+
+- *Help ▸ About* describes what Silinx does today (schematics with live simulation, FSM and ASM
+  editors, truth tables and Karnaugh maps, wizards, netlist simulation, board emulator).
+
 ## 15.9.3
 
 - **Remove from Project keeps the file** in the project folder, as in ISE. The file leaves the

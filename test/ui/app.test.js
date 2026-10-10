@@ -190,6 +190,7 @@ uiTest('About shows the version and the GitHub link', E, async (page) => {
   assert.match(info.text, new RegExp(`Version ${VERSION.replace(/\./g, '\\.')}`));
   assert.ok(info.links.some((l) => l.href === `https://github.com/${REPOSITORY}` && l.target === '_blank'), JSON.stringify(info.links));
   // copyright, licence and the open-source components (collapsed, then opened)
+  assert.match(info.text, /Digital design platform for Xilinx FPGAs[\s\S]*made for teaching[\s\S]*FSM and ASM state machine editors[\s\S]*truth tables and Karnaugh maps[\s\S]*board emulator/);
   assert.match(info.text, /Copyright 2026 Pedro Maló\. Free software under the GNU Affero General Public License v3\.0/);
   assert.match(info.text, /ABSOLUTELY NO WARRANTY\. Source code: github\.com\//);
   assert.ok(info.links.some((l) => l.href.endsWith('/THIRD-PARTY-NOTICES.md')));
