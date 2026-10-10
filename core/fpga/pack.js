@@ -11,7 +11,7 @@
 // flip-flops take their D from that multiplexer or from BX / BY (DXMUX / DYMUX).
 //
 // pack(netlist, { ucf, part }) -> {
-//   name, part,
+//   name, part, cfg (the design's cfg string: the ports' bus information, raw XDL text),
 //   insts:  [{ name, type: 'SLICEL' | 'IBUF' | 'IOB' | 'BUFGMUX', cfg: [{ attr, name, value }], loc: pad | null }],
 //   nets:   [{ name, type: 'wire' | 'gnd' | 'vcc', outpins: [{ inst, pin }], inpins: [{ inst, pin }] }]   (inst = index)
 //   macros: [{ kind: 'carry' | 'F6' | 'F7' | 'F8', members: [{ inst, dx, dy }] }]   slices that must keep these
@@ -661,8 +661,24 @@ export function pack(nl, { ucf = null, part = 'xc3s250ecp132-4' } = {}) {
     s.cfg = cfg;
   }
   const slices = insts.filter(s => s.kind === 'slice');
+  // the ports of the design, as ISE's map records them in the design's cfg (netgen names the ports
+  // of its simulation model from them): one BUS_INFO per bus, one PIN_INFO per bus bit (the
+  // index counted from the first bit declared; ':' inside a field escaped)
+  const designCfg = [];
+  for (const p of nl.ports) {
+    if (p.bits.length < 2 && !/<\d+>$/.test(p.bits[0]?.name || '')) continue;
+    const idx = p.bits.map(b => +/<(-?\d+)>$/.exec(b.name)[1]);
+    const msb = idx.at(-1), lsb = idx[0];
+    const dir = p.dir === 'in' ? 'INPUT' : p.dir === 'out' ? 'OUTPUT' : 'BIDIR';
+    const bus = `${clean(p.name)}<${msb}:${lsb}>`;
+    designCfg.push(`_DESIGN_PROP::BUS_INFO:${p.bits.length}:${dir}:${bus}`);
+    p.bits.forEach((b, i) => {
+      const n = clean(b.name);
+      designCfg.push(`_DESIGN_PROP::PIN_INFO:${n}:/${clean(nl.name)}/PACKED/${clean(nl.name)}/${n}/${n}/PAD:${dir}:${p.bits.length - 1 - i}:${bus.replace(':', '\\:')}`);
+    });
+  }
   const out = {
-    name: nl.name, part,
+    name: nl.name, part, cfg: designCfg.join('\n       '),
     insts: insts.map(s => ({ name: s.name, type: s.type, cfg: s.cfg, loc: s.loc || null, kind: s.kind, dir: s.dir })),
     nets: outNets.filter(n => n.inpins.length),
     macros,

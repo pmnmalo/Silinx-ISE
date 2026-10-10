@@ -1,0 +1,17 @@
+{
+  "description": "test/fixtures/designs/fsm: two state machines (its UCF is for another package: pads placed by Silinx)",
+  "dir": "../../../test/fixtures/designs/fsm",
+  "files": [
+    "top.v"
+  ],
+  "top": "top",
+  "sim": {
+    "clock": "clk",
+    "period": 20000,
+    "cycles": 5000,
+    "prob": {
+      "rst": 0.03,
+      "go": 0.3
+    }
+  }
+}

@@ -96,8 +96,11 @@ test('placed XDL: written, read back by core/xdl.js with the same instances, sit
   assert.deepEqual(back.insts.map(i => [i.name, i.type, i.placed, i.tile, i.site]), d.insts.map(i => [i.name, i.type, true, i.tile, i.site]));
   assert.deepEqual(back.insts.map(i => i.cfg), d.insts.map(i => i.cfg.map(c => ({ attr: c.attr, name: c.name, value: c.value }))));
   assert.deepEqual(back.nets.map(n => [n.name, n.type, n.outpins, n.inpins]), d.nets.map(n => [n.name, n.type, n.outpins, n.inpins]));
+  // the ports' bus information in the design's cfg (raw XDL text: the parser reads it unescaped)
+  assert.match(text, /_DESIGN_PROP::PIN_INFO:q<0>:\/counter\/PACKED\/counter\/q<0>\/q<0>\/PAD:OUTPUT:7:q<7\\:0>/);
+  assert.equal(back.cfg, d.cfg.replace(/\\:/g, ':'));
   // and written again: the same text
-  assert.equal(writeXdl({ ...back, insts: back.insts, nets: back.nets }), text);
+  assert.equal(writeXdl({ ...back, cfg: d.cfg }), text);
 });
 
 test('the random generator is deterministic and uniform enough', () => {

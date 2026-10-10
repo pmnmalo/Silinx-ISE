@@ -23,7 +23,8 @@ export function writeXdl(d) {
   const out = [];
   out.push(`# Written by Silinx (core/fpga/xdl-write.js)`);
   out.push(`design ${q(d.name || 'top')} ${d.part}${d.ncdVersion ? ` ${d.ncdVersion}` : ' v3.2'} ,`);
-  out.push(`  cfg ${q(d.cfg || '')};`);
+  // the design's cfg is raw XDL text (its fields keep their '\' escapes): only quotes are escaped
+  out.push(`  cfg "${String(d.cfg || '').replace(/"/g, '\\"')}";`);
   out.push('');
   for (const i of d.insts) {
     const place = i.placed ? `placed ${i.tile} ${i.site}` : 'unplaced';

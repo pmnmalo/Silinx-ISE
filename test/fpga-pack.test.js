@@ -15,7 +15,7 @@ const load = n => readYosysJson(fs.readFileSync(path.join(FIX, `${n}.json`), 'ut
 const cfgOf = inst => Object.fromEntries(inst.cfg.map(c => [c.attr, c]));
 const val = (inst, a) => cfgOf(inst)[a]?.value;
 
-for (const [name, cycles] of [['sw', 50], ['counter', 600], ['ffs', 400], ['widemux', 300], ['mux64', 150]]) {
+for (const [name, cycles] of [['sw', 50], ['counter', 600], ['ffs', 400], ['widemux', 300], ['mux64', 150], ['latches', 600]]) {
   test(`packed ${name} behaves like its netlist (random stimulus, ${cycles} cycles)`, () => {
     const nl = load(name);
     const p = pack(nl);

@@ -61,9 +61,100 @@ const crossing = n => (n < CROSS.length ? CROSS[n] : 2.7933 + 0.02616 * (n - 50)
 // takes a global buffer of that edge (as ISE does: B8 -> BUFGMUX_X2Y11); others the first free one.
 const BUFG_ORDER = ['BUFGMUX_X2Y11', 'BUFGMUX_X2Y10', 'BUFGMUX_X1Y11', 'BUFGMUX_X1Y10', 'BUFGMUX_X2Y1', 'BUFGMUX_X2Y0', 'BUFGMUX_X1Y1', 'BUFGMUX_X1Y0'];
 
+// ------------------------------------------------------------------ timing
+// Which input pins of a site reach each of its outputs without a flip-flop in between, from its
+// settings (the slice's output multiplexers and carry logic); flip-flop outputs (XQ, YQ) and pads
+// start paths.
+const LUT_PINS = s => [1, 2, 3, 4].map(k => `${s}${k}`);
+function throughPins(inst) {
+  const m = new Map(inst.cfg.map(c => [c.attr, c.value]));
+  const deps = {};
+  if (inst.kind !== 'slice') return deps;
+  const cin = m.get('CYINIT') === 'BX' ? ['BX'] : ['CIN'];
+  const cy0 = side => { const v = m.get(`CY0${side}`); return /^(BX|BY|F1|F2|G1|G2)$/.test(v || '') ? [v] : v === 'PROD' ? [`${side}1`, `${side}2`] : []; };
+  const cyF = [...LUT_PINS('F'), ...cin, ...cy0('F')];
+  const cyG = [...cyF, ...LUT_PINS('G'), ...cy0('G')];
+  const f5 = [...LUT_PINS('F'), ...LUT_PINS('G'), 'BX'], fx = ['FXINA', 'FXINB', 'BY'];
+  deps.X = { F: LUT_PINS('F'), F5: f5, FXOR: [...LUT_PINS('F'), ...cin] }[m.get('FXMUX')] || [];
+  deps.Y = { G: LUT_PINS('G'), FX: fx, GXOR: [...LUT_PINS('G'), ...cyF] }[m.get('GYMUX')] || [];
+  deps.F5 = f5; deps.FX = fx; deps.XB = cyF; deps.YB = cyG; deps.COUT = cyG;
+  return deps;
+}
+
+/** Connections and their timing: every driver pin -> load pin of the nets (clocks and constants
+ *  left out), with the input pins each output depends on. */
+export function timingGraph(packed) {
+  const conns = [];
+  packed.nets.forEach((n, k) => {
+    if (n.type !== 'wire' || !n.outpins.length) return;
+    const src = n.outpins[0];
+    if (packed.insts[src.inst].kind === 'bufg') return;
+    for (const p of n.inpins) if (p.pin !== 'CLK') conns.push({ net: k, src: src.inst, srcPin: src.pin, dst: p.inst, dstPin: p.pin });
+  });
+  return { conns, deps: packed.insts.map(throughPins) };
+}
+
+/** Static timing on a placement, in rough units (a LUT 1, a connection 0.6 + 0.12 per CLB):
+ *  the critical path delay and the criticality (0..1) of every connection. pos[inst] = [x, y]. */
+export function analyzeTiming(tg, pos, { lut = 1, wire0 = 0.6, perClb = 0.12 } = {}) {
+  const { conns, deps } = tg;
+  const delay = c => wire0 + perClb * (Math.abs(pos[c.src][0] - pos[c.dst][0]) + Math.abs(pos[c.src][1] - pos[c.dst][1]));
+  // pins as nodes: `${inst}:${pin}`
+  const into = new Map();    // input pin -> connections arriving
+  const outOf = new Map();   // output pin -> connections leaving
+  const key = (i, p) => `${i}:${p}`;
+  for (const c of conns) {
+    const a = key(c.dst, c.dstPin), b = key(c.src, c.srcPin);
+    if (!into.has(a)) into.set(a, []);
+    into.get(a).push(c);
+    if (!outOf.has(b)) outOf.set(b, []);
+    outOf.get(b).push(c);
+  }
+  // arrival at an output pin: its through inputs + a LUT level (memoised depth-first; a loop
+  // through the model counts as a start)
+  const arr = new Map();
+  const busy = new Set();
+  const arrOut = (i, p) => {
+    const k = key(i, p);
+    if (arr.has(k)) return arr.get(k);
+    const d = deps[i][p];
+    if (!d || !d.length || busy.has(k)) return 0;
+    busy.add(k);
+    let t = 0;
+    for (const q of d) for (const c of into.get(key(i, q)) || []) t = Math.max(t, arrOut(c.src, c.srcPin) + delay(c));
+    busy.delete(k);
+    arr.set(k, t + lut);
+    return t + lut;
+  };
+  let dmax = 0;
+  for (const c of conns) { c.delay = delay(c); c.arr = arrOut(c.src, c.srcPin) + c.delay; if (c.arr > dmax) dmax = c.arr; }
+  // required times: dmax at every load pin, earlier when the pin passes on to an output
+  const req = new Map();
+  const reqIn = (i, p) => {
+    let r = dmax;
+    for (const [o, d] of Object.entries(deps[i])) if (d.includes(p) && outOf.has(key(i, o))) r = Math.min(r, reqOut(i, o) - lut);
+    return r;
+  };
+  const reqOut = (i, p) => {
+    const k = key(i, p);
+    if (req.has(k)) return req.get(k);
+    req.set(k, dmax);   // (loops)
+    let r = dmax;
+    for (const c of outOf.get(k) || []) r = Math.min(r, reqIn(c.dst, c.dstPin) - c.delay);
+    req.set(k, r);
+    return r;
+  };
+  for (const c of conns) {
+    const slack = reqIn(c.dst, c.dstPin) - c.arr;
+    c.crit = dmax > 0 ? Math.max(0, Math.min(1, 1 - slack / dmax)) : 0;
+  }
+  return { dmax, conns };
+}
+
 /** Place a packed design. Options: seed (1), effort (1: moves per temperature scale with it),
+ *  timing (1: how much more the nets on the slowest paths weigh; 0: wirelength only),
  *  log (function for progress lines). */
-export function place(packed, dev, { seed = 1, effort = 1, log = null } = {}) {
+export function place(packed, dev, { seed = 1, effort = 1, timing = 1, log = null } = {}) {
   const t0 = Date.now();
   if (!dev.slices) throw new PlaceError('place: pass deviceSites(parseXdlrc(…))');
   const random = rng(seed);
@@ -183,7 +274,7 @@ export function place(packed, dev, { seed = 1, effort = 1, log = null } = {}) {
     const pins = [...new Set([...n.outpins, ...n.inpins].map(p => p.inst))];
     if (pins.length < 2) continue;
     const k = nets.length;
-    nets.push({ pins, w: crossing(pins.length), cost: 0 });
+    nets.push({ pins, base: crossing(pins.length), w: crossing(pins.length), cost: 0, src: n });
     for (const i of pins) netsOf[i].push(k);
   }
   const netCost = n => {
@@ -194,6 +285,22 @@ export function place(packed, dev, { seed = 1, effort = 1, log = null } = {}) {
   let cost = 0;
   for (const n of nets) { n.cost = netCost(n); cost += n.cost; }
   const initialCost = cost;
+  // timing: a net weighs more the more critical its most critical connection is; the weights
+  // follow the placement (recomputed at every temperature, as VPR's timing-driven placer does)
+  const tg = timing > 0 ? timingGraph(packed) : null;
+  const netIndex = new Map(nets.map((n, k) => [n.src, k]));
+  let dmax = 0;
+  const reweight = () => {
+    if (!tg) return;
+    const t = analyzeTiming(tg, pos);
+    dmax = t.dmax;
+    const crit = new Array(nets.length).fill(0);
+    for (const c of t.conns) { const k = netIndex.get(packed.nets[c.net]); if (k !== undefined && c.crit > crit[k]) crit[k] = c.crit; }
+    cost = 0;
+    nets.forEach((n, k) => { n.w = n.base * (1 + timing * crit[k] ** 4); n.cost = netCost(n); cost += n.cost; });
+  };
+  reweight();
+  const initialDelay = dmax;
 
   // ---------------------------------------------------------------- moves
   const movable = objs.filter(o => (o.kind === 'macro') || (o.kind === 'iob' && !o.fixed));
@@ -283,6 +390,7 @@ export function place(packed, dev, { seed = 1, effort = 1, log = null } = {}) {
       if (d <= 0 || random() < Math.exp(-d / T)) { commit(mv, newCosts); acc++; }
     }
     moves += perT; temps++;
+    reweight();
     const a = tried ? acc / tried : 0;
     // VPR's schedule: cool slowly while many moves are accepted
     T *= a > 0.96 ? 0.5 : a > 0.8 ? 0.9 : a > 0.15 ? 0.95 : 0.8;
@@ -292,15 +400,17 @@ export function place(packed, dev, { seed = 1, effort = 1, log = null } = {}) {
   }
   // a last greedy pass (temperature 0)
   for (let k = 0; k < perT; k++) { const mv = propose(); if (!mv) continue; const { d, newCosts } = delta(mv.ch); if (d < 0) commit(mv, newCosts); }
-  // recompute (no drift)
+  // the result: the wirelength alone (no drift), and the estimated critical path
+  reweight();
+  if (!tg) dmax = analyzeTiming(timingGraph(packed), pos).dmax;
   cost = 0;
-  for (const n of nets) { n.cost = netCost(n); cost += n.cost; }
+  for (const n of nets) { n.w = n.base; n.cost = netCost(n); cost += n.cost; }
   return finish();
 
   function finish() {
     return {
       sites: sites.map(s => ({ tile: s.tile, site: s.name })),
-      cost, stats: { initialCost, moves, temps, seconds: (Date.now() - t0) / 1000, objects: objs.length },
+      cost, delay: dmax, stats: { initialCost, initialDelay, moves, temps, seconds: (Date.now() - t0) / 1000, objects: objs.length },
     };
   }
 }
@@ -314,5 +424,5 @@ export function placedXdl(packed, placement) {
     inpins: n.inpins.map(p => ({ inst: insts[p.inst].name, pin: p.pin })),
     pips: [],
   }));
-  return { name: packed.name, part: packed.part, insts, nets };
+  return { name: packed.name, part: packed.part, cfg: packed.cfg || '', insts, nets };
 }

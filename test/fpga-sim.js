@@ -44,7 +44,10 @@ export function netlistSim(nl) {
         else continue;
         put(c.pins.O, o);
       }
-      // latches are transparent while their gate is active
+      // latches are transparent while their gate is active; they follow the logic once it has
+      // settled (both simulators do the same, so a gate and a data input changing together do
+      // not race differently in the two)
+      if (changed) continue;
       for (const f of ffs) if (f.latch) {
         const c = f.c, g = v[c.pins.G] ^ (f.neg ? 1 : 0) ^ paramInt(c.params.IS_G_INVERTED);
         const ge = c.pins.GE === undefined ? 1 : v[c.pins.GE];
@@ -154,7 +157,10 @@ export function packedSim(packed) {
           if (p === '_d') continue;
           for (const k of drv.get(`${i}:${p}`) || []) if (netVal[k] !== x) { netVal[k] = x; changed = true; }
         }
-        // latches: transparent while the clock (gate) is high after the inverter
+      }
+      if (changed) continue;
+      // latches: transparent while the clock (gate) is high after the inverter, once the logic has settled
+      for (let i = 0; i < insts.length; i++) {
         const c = C[i];
         for (const X of ['X', 'Y']) if (c.get(`FF${X}`)?.value === '#LATCH') {
           const q = ffNext(i, X, true);
