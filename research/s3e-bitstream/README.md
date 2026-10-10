@@ -123,6 +123,17 @@ settings (initial value, set or reset, synchronous, latch), the D-input and outp
 and the carry-chain settings (CYSEL, CY0 with a 3-bit code) are in the frame before. Still to do:
 CYINIT, the X / Y outputs, and checking the same layout on SLICEM and on the lower slice of a CLB.
 
+## To do later: synthesis quality
+
+Open synthesis (Silinx front end + Yosys `synth_xilinx -family xc3se`) is correct but its
+netlists are much larger than XST's: lab11 needs 886 LUTs / 522 slices against XST's 309 / 180
+(about 2.9x), mostly wide multiplexers built from many small LUTs (Yosys's Spartan-3E support is
+marked experimental; no shift-register inference for xc3se either). Synthesis time is fine
+(11 ms front end + 1.7 s Yosys for lab11, against XST's 5 s), but a larger circuit is slower
+to place and route and slower on the chip. To improve later: Yosys options and scripts (ABC
+settings, `-nowidelut`, `-widemux`, retiming), and / or Silinx's own mapping of multiplexers,
+decoders and ROMs before Yosys. Measure on lab11 and the example designs against XST.
+
 ## Conclusion
 
 The method works for this device: LUT contents, I/O pads and routing switches can be located by
