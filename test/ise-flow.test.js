@@ -9,7 +9,7 @@ import path from 'node:path';
 import { scratchEnv, makeFakes, isolatedPath, startApp, waitJob, waitLine, writeConfig, makeBit } from './server-helpers.js';
 
 let tmp, fakes, app, jobs, P, oldPath;
-const FAKE_ENV = ['FAKE_ISE_FAIL', 'FAKE_ISE_SLEEP', 'FAKE_ISE_LOG', 'FAKE_DOCKER_NO_IMAGE', 'FAKE_DOCKER_LOG', 'FAKE_SSH_LOG', 'FAKE_SSH_FAIL'];
+const FAKE_ENV = ['FAKE_ISE_FAIL', 'FAKE_ISE_SLEEP', 'FAKE_ISE_LOG', 'FAKE_DOCKER_NO_IMAGE', 'FAKE_DOCKER_LOG', 'FAKE_SSH_LOG', 'FAKE_SSH_FAIL', 'FAKE_DOCKER_LOG', 'SILINX_DEV_ISE_HOST', 'SILINX_DEV_ISE_IMAGE', 'SILINX_DEV_ISE_DIR'];
 
 before(async () => {
   tmp = await scratchEnv('silinx-flow-test-');
@@ -202,6 +202,37 @@ test('ssh mode: build dir is uploaded with tar over ssh, run remotely and the re
   assert.equal(j2.status, 'error');
   assert.match(j2.error, /ISE flow failed \(exit code 255\)/);
   assert.ok(j2.lines.some(l => /Connection refused/.test(l)));
+});
+
+test('development remote (SILINX_DEV_ISE_HOST): the flow runs in Docker on the ssh host, whatever the saved mode', async () => {
+  await writeConfig({ mode: 'local' });
+  process.env.SILINX_DEV_ISE_HOST = 'dev@mini';
+  const tc = await app.call('GET', '/toolchain');
+  assert.equal(tc.body.config.mode, 'local', 'the saved configuration is not changed');
+  assert.equal(tc.body.config.devRemote, undefined);
+  assert.equal(tc.body.ise.mode, 'dev-remote');
+  assert.equal(tc.body.ise.available, true, tc.body.ise.reason);
+  assert.equal(tc.body.ise.reason, 'development: docker image xilinx/ise:14.7 on dev@mini (SILINX_DEV_ISE_HOST)');
+  const dir = await makeProject('FlowDev');
+  process.env.FAKE_SSH_LOG = path.join(tmp, 'ssh-dev.log');
+  process.env.FAKE_DOCKER_LOG = path.join(tmp, 'docker-dev.log');
+  const j = await waitJob(jobs, await implement('FlowDev', { steps: ['synth'] }));
+  assert.equal(j.status, 'ok', j.lines.join('\n'));
+  assert.equal(j.result.mode, 'dev-remote');
+  assert.deepEqual(j.result.completedSteps, ['synth']);
+  assert.ok(fss.existsSync(path.join(process.env.FAKE_SSH_HOME, 'silinx-dev-build', 'FlowDev', 'top.syr')), 'ran on the remote host');
+  assert.ok(fss.existsSync(path.join(dir, 'build', 'top.syr')), 'results downloaded');
+  const log = await fs.readFile(process.env.FAKE_SSH_LOG, 'utf8');
+  assert.match(log, /^dev@mini rm -rf silinx-dev-build\/FlowDev && mkdir -p silinx-dev-build\/FlowDev && tar -C silinx-dev-build\/FlowDev -xf -$/m);
+  assert.match(log, /^dev@mini export PATH="\$PATH:\/usr\/local\/bin:\/opt\/homebrew\/bin"; cd silinx-dev-build\/FlowDev && docker run --rm -v "\$PWD":\/work -w \/work xilinx\/ise:14.7 bash run.sh synth$/m);
+  assert.match(await fs.readFile(process.env.FAKE_DOCKER_LOG, 'utf8'), /^run --rm -v .*silinx-dev-build\/FlowDev:\/work -w \/work xilinx\/ise:14.7 bash run.sh synth$/m);
+
+  // without the variable, the saved configuration is used again
+  delete process.env.SILINX_DEV_ISE_HOST;
+  assert.equal((await app.call('GET', '/toolchain')).body.ise.mode, 'local');
+  // the mode cannot be chosen through the API
+  const bad = await app.call('PUT', '/toolchain', { mode: 'dev-remote' });
+  assert.equal(bad.status, 400);
 });
 
 test('ssh mode: not configured / remote dir rejected', async () => {

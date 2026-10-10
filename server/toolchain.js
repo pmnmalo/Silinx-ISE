@@ -7,6 +7,10 @@
 //   ssh    - build/ is streamed (tar over ssh) to a Linux host with ISE, run there,
 //            and the results are streamed back
 // Programmers always run locally (they need the USB device).
+//
+// For Silinx's own development only (never offered to users, not in the settings or the API):
+// SILINX_DEV_ISE_HOST=user@host runs the ISE flow in Docker on that host (tar over ssh, as the ssh
+// mode), whatever the saved configuration says; see devRemote().
 
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
@@ -59,6 +63,31 @@ export async function saveConfig(partial) {
   await fs.mkdir(configDir(), { recursive: true });
   await fs.writeFile(configPath(), JSON.stringify(cfg, null, 2) + '\n');
   return cfg;
+}
+
+/**
+ * Development-only remote ISE: the ISE flow runs in a Docker image on another machine of the
+ * developer's (e.g. an Intel Mac, where ISE runs natively instead of emulated). Set only from the
+ * environment, so users never see or configure it:
+ *   SILINX_DEV_ISE_HOST    user@host (key authentication)
+ *   SILINX_DEV_ISE_IMAGE   Docker image with ISE 14.7 on that host (default xilinx/ise:14.7)
+ *   SILINX_DEV_ISE_DIR     build folder under the remote home (default silinx-dev-build)
+ * Returns null when SILINX_DEV_ISE_HOST is not set; throws on invalid values.
+ */
+export function devRemote(env = process.env) {
+  const target = (env.SILINX_DEV_ISE_HOST || '').trim();
+  if (!target) return null;
+  const m = /^(?:([A-Za-z0-9._-]+)@)?([A-Za-z0-9._\-[\]:]+)$/.exec(target);
+  if (!m) throw new Error(`SILINX_DEV_ISE_HOST: invalid ssh target '${target}' (user@host)`);
+  const image = (env.SILINX_DEV_ISE_IMAGE || 'xilinx/ise:14.7').trim();
+  if (!/^[\w./:@-]+$/.test(image)) throw new Error(`SILINX_DEV_ISE_IMAGE: invalid image '${image}'`);
+  return { user: m[1] || '', host: m[2], image, remoteDir: (env.SILINX_DEV_ISE_DIR || 'silinx-dev-build').trim() };
+}
+
+/** The configuration with the development remote applied (mode 'dev-remote'), or as it is. */
+export function withDevRemote(cfg, dev = devRemote()) {
+  if (!dev) return cfg;
+  return { ...cfg, mode: 'dev-remote', ssh: { ...cfg.ssh, host: dev.host, user: dev.user, port: 22, identity: '', sshArgs: [], remoteDir: dev.remoteDir, settings: '' }, devRemote: dev };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -169,7 +198,7 @@ export async function detectToolchain() {
     const r = await capture(helpers.docker, ['image', 'inspect', '--format', '{{.Id}}', cfg.docker.image], { timeoutMs: 5000 });
     dockerImage = { image: cfg.docker.image, present: r.code === 0, detail: r.code === 0 ? r.out.trim() : (r.error || r.out.trim().slice(0, 200)) };
   }
-  const status = iseStatus(cfg, { ise, helpers, dockerImage });
+  const status = iseStatus(withDevRemote(cfg), { ise, helpers, dockerImage });
   return {
     platform: process.platform,
     config: cfg,
@@ -205,6 +234,12 @@ export function iseStatus(cfg, det) {
     if (!det.helpers.tar) return { mode, available: false, reason: 'tar not found (used to copy the build directory over ssh)', help };
     if (!cfg.ssh.host) return { mode, available: false, reason: 'no ssh host configured (ssh.host)', help };
     return { mode, available: true, reason: `remote host ${cfg.ssh.user ? cfg.ssh.user + '@' : ''}${cfg.ssh.host}`, help };
+  }
+  if (mode === 'dev-remote' && cfg.devRemote) {
+    if (!det.helpers.ssh) return { mode, available: false, reason: 'ssh not found', help: HELP.ssh };
+    if (!det.helpers.tar) return { mode, available: false, reason: 'tar not found (used to copy the build directory over ssh)', help: HELP.ssh };
+    const d = cfg.devRemote;
+    return { mode, available: true, reason: `development: docker image ${d.image} on ${d.user ? d.user + '@' : ''}${d.host} (SILINX_DEV_ISE_HOST)`, help: HELP.ssh };
   }
   return { mode, available: false, reason: `unknown mode '${mode}'`, help: HELP.local };
 }

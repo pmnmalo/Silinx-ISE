@@ -212,6 +212,27 @@ test('implement job without ISE fails with a helpful message but generates scrip
   assert.equal(jobs.getJob(job2.id).status, 'ok');
 });
 
+test('development remote: only from the environment, validated, never saved', async () => {
+  const tc = await import('../server/toolchain.js');
+  assert.equal(tc.devRemote({}), null);
+  assert.equal(tc.devRemote({ SILINX_DEV_ISE_HOST: '  ' }), null);
+  assert.deepEqual(tc.devRemote({ SILINX_DEV_ISE_HOST: 'dev@10.0.0.2' }), { user: 'dev', host: '10.0.0.2', image: 'xilinx/ise:14.7', remoteDir: 'silinx-dev-build' });
+  assert.deepEqual(tc.devRemote({ SILINX_DEV_ISE_HOST: 'mini', SILINX_DEV_ISE_IMAGE: 'me/ise:1', SILINX_DEV_ISE_DIR: 'b' }), { user: '', host: 'mini', image: 'me/ise:1', remoteDir: 'b' });
+  assert.throws(() => tc.devRemote({ SILINX_DEV_ISE_HOST: 'a;rm -rf x' }), /SILINX_DEV_ISE_HOST/);
+  assert.throws(() => tc.devRemote({ SILINX_DEV_ISE_HOST: 'a', SILINX_DEV_ISE_IMAGE: 'x y' }), /SILINX_DEV_ISE_IMAGE/);
+  const base = await tc.loadConfig();
+  assert.equal(tc.withDevRemote(base, null), base);
+  const cfg = tc.withDevRemote(base, tc.devRemote({ SILINX_DEV_ISE_HOST: 'u@h' }));
+  assert.equal(cfg.mode, 'dev-remote');
+  assert.equal(cfg.ssh.host, 'h'); assert.equal(cfg.ssh.user, 'u');
+  assert.equal(ise.remoteFlowCommand(cfg, 'silinx-dev-build/p', ['synth', 'map']),
+    `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"; cd silinx-dev-build/p && docker run --rm -v "$PWD":/work -w /work xilinx/ise:14.7 bash run.sh synth map`);
+  assert.equal(ise.remoteFlowCommand({ mode: 'ssh', ssh: { settings: '' } }, 'b/p', ['synth']), 'cd b/p && bash run.sh synth');
+  // a saved 'dev-remote' mode (edited by hand) is not usable without the environment variable
+  assert.equal(tc.iseStatus({ ...base, mode: 'dev-remote' }, { ise: {}, helpers: { ssh: '/x', tar: '/x' } }).available, false);
+  assert.equal(tc.iseStatus(cfg, { ise: {}, helpers: { ssh: null, tar: '/x' } }).reason, 'ssh not found');
+});
+
 test('ssh remote dir sanitising', () => {
   assert.equal(ise.remoteDirFor({ ssh: { remoteDir: '~/builds/' } }, 'p'), 'builds/p');
   assert.equal(ise.remoteDirFor({ ssh: { remoteDir: '/scratch/x' } }, 'p'), '/scratch/x/p');

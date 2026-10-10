@@ -21,7 +21,7 @@ import { clocksOf, latchGates } from '../core/schematic.js';
 import { primitiveSources } from '../core/unisim.js';
 import { spawn } from 'node:child_process';
 import { runCommand, JobCancelled } from './jobs.js';
-import { loadConfig, detectIse, iseStatus, which } from './toolchain.js';
+import { loadConfig, detectIse, iseStatus, which, withDevRemote } from './toolchain.js';
 import { validateDevice } from './devices.js';
 import { parseBitHeader } from './programmer.js';
 
@@ -475,7 +475,7 @@ export async function runImplementation(job, { project, projectDir, steps, gener
     return result;
   }
 
-  const cfg = await loadConfig();
+  const cfg = withDevRemote(await loadConfig());
   const det = { ise: detectIse(cfg), helpers: { bash: which('bash'), docker: which(cfg.docker.command || 'docker'), ssh: which('ssh'), rsync: which('rsync'), scp: which('scp'), tar: which('tar') } };
   const status = iseStatus(cfg, det);
   result.mode = cfg.mode;
@@ -565,8 +565,7 @@ async function runSsh(job, cfg, det, project, gen, steps, onLine) {
     ['tar', ['-C', gen.buildDir, '-cf', '-', '.']],
     ['ssh', [...opts, '--', target, `rm -rf ${rq} && mkdir -p ${rq} && tar -C ${rq} -xf -`]]);
   if (code !== 0) return code;
-  const settings = cfg.ssh.settings ? `ISE_SETTINGS=${shQuote(cfg.ssh.settings)} ` : '';
-  const flow = await runCommand(job, 'ssh', [...opts, '--', target, `cd ${rq} && ${settings}bash run.sh ${steps.map(shQuote).join(' ')}`], { onLine });
+  const flow = await runCommand(job, 'ssh', [...opts, '--', target, remoteFlowCommand(cfg, rdir, steps)], { onLine });
   job.log(`Downloading results from ${target}:${rdir}`);
   // Download everything except the sources we uploaded.
   code = await runPipe(job,
@@ -574,6 +573,20 @@ async function runSsh(job, cfg, det, project, gen, steps, onLine) {
     ['tar', ['-C', gen.buildDir, '-xf', '-']]);
   if (code !== 0) job.log('WARNING: downloading results failed');
   return flow;
+}
+
+/**
+ * The shell command that runs the flow on the ssh host, in `rdir` (relative to the remote home):
+ * run.sh directly, or (development remote) inside the Docker image with the folder at /work.
+ */
+export function remoteFlowCommand(cfg, rdir, steps) {
+  const rq = shQuote(rdir), args = steps.map(shQuote).join(' ');
+  if (cfg.mode === 'dev-remote') {
+    // a non-interactive ssh shell may lack Docker Desktop's /usr/local/bin (macOS) on PATH
+    return `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"; cd ${rq} && docker run --rm -v "$PWD":/work -w /work ${shQuote(cfg.devRemote.image)} bash run.sh ${args}`;
+  }
+  const settings = cfg.ssh.settings ? `ISE_SETTINGS=${shQuote(cfg.ssh.settings)} ` : '';
+  return `cd ${rq} && ${settings}bash run.sh ${args}`;
 }
 
 /** Run `a | b`, logging stderr of both; resolves with the first non-zero exit code. */

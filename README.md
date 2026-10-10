@@ -227,6 +227,12 @@ npm start          # http://127.0.0.1:8642  (node bin/silinx-ise.js serve --open
 Projects live in `~/Silinx-projects` (override with `SILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
 runs the tests and publishes a release with the files above (`.github/workflows/release.yml`).
 
+For development only (not a user setting): `SILINX_DEV_ISE_HOST=user@host npm start` runs every ISE
+flow in Docker on another machine of yours, over ssh with key authentication, whatever the Toolchain
+Settings say. It is useful when ISE is emulated here (an Apple Silicon Mac) and native there (an Intel
+machine). The image there defaults to `xilinx/ise:14.7` (`SILINX_DEV_ISE_IMAGE`) and the builds go
+to `~/silinx-dev-build` on that host (`SILINX_DEV_ISE_DIR`).
+
 ### Command line
 
 ```bash
