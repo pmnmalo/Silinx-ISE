@@ -4,13 +4,10 @@
 // can be executed in three modes, chosen by the user and saved in ~/.silinx/config.json:
 //   local  - ISE binaries on this machine (sourced from settings64.sh if not on PATH)
 //   docker - inside a user-supplied docker image that contains ISE, with build/ mounted at /work
-//   ssh    - build/ is streamed (tar over ssh) to a Linux host with ISE, run there,
-//            and the results are streamed back
+//   ssh    - build/ is streamed (tar over ssh) to another machine, run there (with ISE installed
+//            on it, or in a docker image on it: ssh.image, e.g. an Intel Mac) and the results
+//            are streamed back
 // Programmers always run locally (they need the USB device).
-//
-// For Silinx's own development only (never offered to users, not in the settings or the API):
-// SILINX_DEV_ISE_HOST=user@host runs the ISE flow in Docker on that host (tar over ssh, as the ssh
-// mode), whatever the saved configuration says; see devRemote().
 
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
@@ -31,7 +28,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   mode: 'local',
   local: { settings: '' },                      // '' = auto-detect
   docker: { command: 'docker', image: '', platform: 'linux/amd64', settings: DEFAULT_SETTINGS, extraArgs: [] },
-  ssh: { host: '', user: '', port: 22, identity: '', remoteDir: 'silinx-build', settings: DEFAULT_SETTINGS, sshArgs: [] },
+  ssh: { host: '', user: '', port: 22, identity: '', remoteDir: 'silinx-build', settings: DEFAULT_SETTINGS, image: '', sshArgs: [] },   // image: docker image on the host ('' = ISE installed there)
   programmer: { tool: '', cable: '' },          // global defaults (board defaults take precedence when empty)
   paths: {},                                    // explicit binary paths, e.g. { djtgcfg: '/usr/local/bin/djtgcfg' }
 });
@@ -59,35 +56,11 @@ export async function saveConfig(partial) {
   for (const k of ['extraArgs']) if (!Array.isArray(cfg.docker[k])) throw Object.assign(new Error(`docker.${k} must be an array of strings`), { status: 400 });
   if (!Array.isArray(cfg.ssh.sshArgs)) throw Object.assign(new Error('ssh.sshArgs must be an array of strings'), { status: 400 });
   if (cfg.ssh.host && !/^[A-Za-z0-9._@:\-[\]]+$/.test(cfg.ssh.host)) throw Object.assign(new Error('ssh.host contains invalid characters'), { status: 400 });
+  if (cfg.ssh.image && !/^[\w./:@-]+$/.test(cfg.ssh.image)) throw Object.assign(new Error('ssh.image contains invalid characters'), { status: 400 });
   if (cfg.ssh.user && !/^[A-Za-z0-9._-]+$/.test(cfg.ssh.user)) throw Object.assign(new Error('ssh.user contains invalid characters'), { status: 400 });
   await fs.mkdir(configDir(), { recursive: true });
   await fs.writeFile(configPath(), JSON.stringify(cfg, null, 2) + '\n');
   return cfg;
-}
-
-/**
- * Development-only remote ISE: the ISE flow runs in a Docker image on another machine of the
- * developer's (e.g. an Intel Mac, where ISE runs natively instead of emulated). Set only from the
- * environment, so users never see or configure it:
- *   SILINX_DEV_ISE_HOST    user@host (key authentication)
- *   SILINX_DEV_ISE_IMAGE   Docker image with ISE 14.7 on that host (default xilinx/ise:14.7)
- *   SILINX_DEV_ISE_DIR     build folder under the remote home (default silinx-dev-build)
- * Returns null when SILINX_DEV_ISE_HOST is not set; throws on invalid values.
- */
-export function devRemote(env = process.env) {
-  const target = (env.SILINX_DEV_ISE_HOST || '').trim();
-  if (!target) return null;
-  const m = /^(?:([A-Za-z0-9._-]+)@)?([A-Za-z0-9._\-[\]:]+)$/.exec(target);
-  if (!m) throw new Error(`SILINX_DEV_ISE_HOST: invalid ssh target '${target}' (user@host)`);
-  const image = (env.SILINX_DEV_ISE_IMAGE || 'xilinx/ise:14.7').trim();
-  if (!/^[\w./:@-]+$/.test(image)) throw new Error(`SILINX_DEV_ISE_IMAGE: invalid image '${image}'`);
-  return { user: m[1] || '', host: m[2], image, remoteDir: (env.SILINX_DEV_ISE_DIR || 'silinx-dev-build').trim() };
-}
-
-/** The configuration with the development remote applied (mode 'dev-remote'), or as it is. */
-export function withDevRemote(cfg, dev = devRemote()) {
-  if (!dev) return cfg;
-  return { ...cfg, mode: 'dev-remote', ssh: { ...cfg.ssh, host: dev.host, user: dev.user, port: 22, identity: '', sshArgs: [], remoteDir: dev.remoteDir, settings: '' }, devRemote: dev };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -198,7 +171,7 @@ export async function detectToolchain() {
     const r = await capture(helpers.docker, ['image', 'inspect', '--format', '{{.Id}}', cfg.docker.image], { timeoutMs: 5000 });
     dockerImage = { image: cfg.docker.image, present: r.code === 0, detail: r.code === 0 ? r.out.trim() : (r.error || r.out.trim().slice(0, 200)) };
   }
-  const status = iseStatus(withDevRemote(cfg), { ise, helpers, dockerImage });
+  const status = iseStatus(cfg, { ise, helpers, dockerImage });
   return {
     platform: process.platform,
     config: cfg,
@@ -233,13 +206,7 @@ export function iseStatus(cfg, det) {
     if (!det.helpers.ssh) return { mode, available: false, reason: 'ssh not found', help };
     if (!det.helpers.tar) return { mode, available: false, reason: 'tar not found (used to copy the build directory over ssh)', help };
     if (!cfg.ssh.host) return { mode, available: false, reason: 'no ssh host configured (ssh.host)', help };
-    return { mode, available: true, reason: `remote host ${cfg.ssh.user ? cfg.ssh.user + '@' : ''}${cfg.ssh.host}`, help };
-  }
-  if (mode === 'dev-remote' && cfg.devRemote) {
-    if (!det.helpers.ssh) return { mode, available: false, reason: 'ssh not found', help: HELP.ssh };
-    if (!det.helpers.tar) return { mode, available: false, reason: 'tar not found (used to copy the build directory over ssh)', help: HELP.ssh };
-    const d = cfg.devRemote;
-    return { mode, available: true, reason: `development: docker image ${d.image} on ${d.user ? d.user + '@' : ''}${d.host} (SILINX_DEV_ISE_HOST)`, help: HELP.ssh };
+    return { mode, available: true, reason: `remote host ${cfg.ssh.user ? cfg.ssh.user + '@' : ''}${cfg.ssh.host}${cfg.ssh.image ? ` (docker image ${cfg.ssh.image})` : ''}`, help };
   }
   return { mode, available: false, reason: `unknown mode '${mode}'`, help: HELP.local };
 }
@@ -247,5 +214,5 @@ export function iseStatus(cfg, det) {
 export const HELP = {
   local: 'Install Xilinx ISE 14.7 (WebPACK) on a Linux/Windows machine and either put its bin directory on PATH or set "local.settings" to .../14.7/ISE_DS/settings64.sh via PUT /api/toolchain. On macOS use mode "docker" (an x86-64 image containing ISE 14.7 at /opt/Xilinx/14.7/ISE_DS) or mode "ssh" (a Linux host with ISE). You can also choose "generate scripts only" and run build/run.sh on any machine with ISE.',
   docker: 'Set {"mode":"docker","docker":{"image":"<your-ise-image>","settings":"/opt/Xilinx/14.7/ISE_DS/settings64.sh"}} via PUT /api/toolchain. The image must already exist locally (Silinx never pulls/builds images). The build directory is mounted at /work and run.sh is executed there.',
-  ssh: 'Set {"mode":"ssh","ssh":{"host":"build-box","user":"me","remoteDir":"silinx-build","settings":"/opt/Xilinx/14.7/ISE_DS/settings64.sh"}} via PUT /api/toolchain. Password-less (key) authentication is required; the build directory is streamed with tar over ssh into <remoteDir>/<project> and the results are copied back the same way.',
+  ssh: 'Set {"mode":"ssh","ssh":{"host":"build-box","user":"me","remoteDir":"silinx-build","settings":"/opt/Xilinx/14.7/ISE_DS/settings64.sh"}} via PUT /api/toolchain. Password-less (key) authentication is required; the build directory is streamed with tar over ssh into <remoteDir>/<project> and the results are copied back the same way. With "image" (a docker image with ISE 14.7 on the host, e.g. on an Intel Mac) the flow runs in that image instead of an ISE installed on the host.',
 };

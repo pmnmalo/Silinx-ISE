@@ -227,12 +227,6 @@ npm start          # http://127.0.0.1:8642  (node bin/silinx-ise.js serve --open
 Projects live in `~/Silinx-projects` (override with `SILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
 runs the tests and publishes a release with the files above (`.github/workflows/release.yml`).
 
-For development only (not a user setting): `SILINX_DEV_ISE_HOST=user@host npm start` runs every ISE
-flow in Docker on another machine of yours, over ssh with key authentication, whatever the Toolchain
-Settings say. It is useful when ISE is emulated here (an Apple Silicon Mac) and native there (an Intel
-machine). The image there defaults to `xilinx/ise:14.7` (`SILINX_DEV_ISE_IMAGE`) and the builds go
-to `~/silinx-dev-build` on that host (`SILINX_DEV_ISE_DIR`).
-
 ### Command line
 
 ```bash
@@ -279,7 +273,7 @@ Other execution modes (*Tools ▸ Toolchain Settings*):
 |---|---|
 | `local` | ISE installed on this machine (Linux/Windows); `settings64.sh` is detected |
 | `docker` | an x86-64 image with ISE 14.7 at `/opt/Xilinx/14.7/ISE_DS` (Silinx never pulls images) |
-| `ssh` | a remote Linux machine with ISE (key-based authentication) |
+| `ssh` | another machine, over SSH with key-based authentication: with ISE installed (Linux), or with the ISE Docker image (*Docker image on the remote host*), e.g. an Intel Mac, where ISE runs natively instead of emulated as on Apple Silicon |
 
 Only the project's `build/` folder is mounted in the container (at `/work`); no X11 or `$HOME`
 mount is needed for command-line builds. Without ISE, the implementation processes still write

@@ -21,7 +21,7 @@ import { clocksOf, latchGates } from '../core/schematic.js';
 import { primitiveSources } from '../core/unisim.js';
 import { spawn } from 'node:child_process';
 import { runCommand, JobCancelled } from './jobs.js';
-import { loadConfig, detectIse, iseStatus, which, withDevRemote } from './toolchain.js';
+import { loadConfig, detectIse, iseStatus, which } from './toolchain.js';
 import { validateDevice } from './devices.js';
 import { parseBitHeader } from './programmer.js';
 
@@ -475,7 +475,7 @@ export async function runImplementation(job, { project, projectDir, steps, gener
     return result;
   }
 
-  const cfg = withDevRemote(await loadConfig());
+  const cfg = await loadConfig();
   const det = { ise: detectIse(cfg), helpers: { bash: which('bash'), docker: which(cfg.docker.command || 'docker'), ssh: which('ssh'), rsync: which('rsync'), scp: which('scp'), tar: which('tar') } };
   const status = iseStatus(cfg, det);
   result.mode = cfg.mode;
@@ -577,15 +577,16 @@ async function runSsh(job, cfg, det, project, gen, steps, onLine) {
 
 /**
  * The shell command that runs the flow on the ssh host, in `rdir` (relative to the remote home):
- * run.sh directly, or (development remote) inside the Docker image with the folder at /work.
+ * run.sh with the ISE installed there, or (ssh.image) inside that docker image, folder at /work.
  */
 export function remoteFlowCommand(cfg, rdir, steps) {
-  const rq = shQuote(rdir), args = steps.map(shQuote).join(' ');
-  if (cfg.mode === 'dev-remote') {
+  const s = cfg.ssh, rq = shQuote(rdir), args = steps.map(shQuote).join(' ');
+  if (s.image) {
     // a non-interactive ssh shell may lack Docker Desktop's /usr/local/bin (macOS) on PATH
-    return `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"; cd ${rq} && docker run --rm -v "$PWD":/work -w /work ${shQuote(cfg.devRemote.image)} bash run.sh ${args}`;
+    const env = s.settings ? `-e ISE_SETTINGS=${shQuote(s.settings)} ` : '';
+    return `export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"; cd ${rq} && docker run --rm -v "$PWD":/work -w /work ${env}${shQuote(s.image)} bash run.sh ${args}`;
   }
-  const settings = cfg.ssh.settings ? `ISE_SETTINGS=${shQuote(cfg.ssh.settings)} ` : '';
+  const settings = s.settings ? `ISE_SETTINGS=${shQuote(s.settings)} ` : '';
   return `cd ${rq} && ${settings}bash run.sh ${args}`;
 }
 

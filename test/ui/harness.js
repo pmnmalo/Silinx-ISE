@@ -121,10 +121,9 @@ async function launchChromeOnce(exe, tmp, profile) {
 }
 
 // ------------------------------------------------------------------------------------- server
-export async function startSilinxServer(tmp, extraEnv = {}) {
+export async function startSilinxServer(tmp) {
   const env = {
     ...process.env,
-    ...extraEnv,
     SILINX_WORKSPACE: path.join(tmp, 'workspace'),
     SILINX_CONFIG_DIR: path.join(tmp, 'config'),
     HOME: path.join(tmp, 'home'),
@@ -398,16 +397,15 @@ export class Page {
 // ------------------------------------------------------------------------------------- setup
 /**
  * Start the server and Chrome. Returns { skip } (a reason string) when Chrome is not installed.
- * `server: false` for tests that do not need the Silinx server (standalone edition); `serverEnv`
- * adds environment variables to the server's.
+ * `server: false` for tests that do not need the Silinx server (standalone edition).
  */
-export async function setupUi({ server = true, serverEnv = {} } = {}) {
+export async function setupUi({ server = true } = {}) {
   const chrome = findChrome();
   if (!chrome) return { skip: 'Google Chrome / Chromium not found (set CHROME_PATH): UI tests skipped' };
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), 'silinx-ui-'));
   const env = { tmp, chrome, shotDir: path.join(tmp, 'screenshots') };
   await fsp.mkdir(env.shotDir, { recursive: true });
-  if (server) env.server = await startSilinxServer(tmp, serverEnv);
+  if (server) env.server = await startSilinxServer(tmp);
   const { proc, cdp } = await launchChrome(chrome, tmp);
   env.chromeProc = proc;
   env.cdp = cdp;
