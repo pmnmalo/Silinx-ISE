@@ -1,0 +1,7 @@
+{
+  "description": "switch -> LED (research/s3e-bitstream/top.v)",
+  "dir": "../../s3e-bitstream",
+  "files": ["top.v"],
+  "top": "top",
+  "sim": { "period": 20000, "cycles": 200 }
+}
