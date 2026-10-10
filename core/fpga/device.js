@@ -28,7 +28,7 @@
 export const DEVICE_FORMAT_VERSION = 1;
 
 /** PIP flags in the packed templates. */
-export const PIP_BIDI = 1;          // '=-' in the report: one direction of a bidirectional, unbuffered switch
+export const PIP_BIDI = 1;          // '=-' in the report: one direction of a bidirectional switch (buffered both ways)
 export const PIP_ROUTETHRU = 2;     // a path through a site (a LUT, the carry chain, a BUFGMUX): not a plain switch
 
 // ------------------------------------------------------------------ small helpers (no Node APIs)
