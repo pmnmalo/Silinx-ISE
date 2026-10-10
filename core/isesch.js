@@ -1727,7 +1727,7 @@ export function decodeXlSymbol(name) {
   return null;
 }
 
-function iseTimestamp(d = new Date()) {
+export function iseTimestamp(d = new Date()) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}T${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
 }
 function shapeXml(sh, ind) {

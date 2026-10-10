@@ -7,6 +7,8 @@ the "What's new" text of its GitHub release.
 
 - *Help ▸ About* and the README: Silinx ISE is described as developed to support the teaching of
   Digital Systems, without naming an institution (Silinx is the work of Pedro Maló, in his own time).
+- Fixed: exporting a Xilinx ISE project with several schematics could report identical custom
+  symbols as different ("custom symbol … differs"), when the export took more than a second.
 - How the open toolchain for the Spartan-3E is being developed: `docs/OPEN-TOOLCHAIN.md`, and the
   first experiments in `research/s3e-bitstream`.
 

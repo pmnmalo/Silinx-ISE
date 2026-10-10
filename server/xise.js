@@ -7,7 +7,7 @@
 // Top-level values use ISE's "Module|name" (Verilog) / "Architecture|entity|arch" (VHDL) syntax.
 
 import { FAMILY_INFO, deviceFamily, familyFromXise, familyOfPart, familyName } from '../core/family.js';
-import { convertIseSchematics, exportIseSch } from '../core/isesch.js';
+import { convertIseSchematics, exportIseSch, iseTimestamp } from '../core/isesch.js';
 import { compile, langOfPath } from '../core/compile.js';
 import { modulesFromLibrary } from '../core/schdoc.js';
 
@@ -259,12 +259,14 @@ export function exportIseSchematics(project, docs, sources) {
   } catch { /* export without module pin data */ }
   const family = deviceFamily(project.device || {}) || 'spartan3e';
   const seen = new Map();
+  // one time stamp for the whole export: the symbols of two schematics are compared as text
+  const timestamp = iseTimestamp();
   for (const [jsonPath, doc] of entries) {
     const sch = jsonPath.replace(/\.sch\.json$/i, '.sch');
     const dir = sch.includes('/') ? sch.replace(/\/[^/]*$/, '/') : '';
     const role = (project.files.find(f => f.path === doc.generatedFile) || {}).role || 'design';
     let r;
-    try { r = exportIseSch(doc, { modules, family, lang: langOfPath(doc.generatedFile) }); }
+    try { r = exportIseSch(doc, { modules, family, timestamp, lang: langOfPath(doc.generatedFile) }); }
     catch (e) { res.warnings.push(`${jsonPath}: not exported as an ISE schematic (${e.message}); ${doc.generatedFile} is exported instead`); continue; }
     res.schematics.push({ path: sch, hdl: doc.generatedFile, role });
     res.files.push({ path: sch, text: r.xml });

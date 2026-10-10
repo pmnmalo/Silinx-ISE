@@ -407,6 +407,22 @@ test('xise: custom symbols of several schematics are exported once; a clash with
   assert.ok(!res.warnings.some(w => /^four\.sch: custom symbol .* differs/.test(w)));
 });
 
+test('xise: an export that spans a change of second does not report identical custom symbols as different (one time stamp)', async () => {
+  const { importIseSch } = await import('../core/isesch.js');
+  const sch = (await fs.readFile(path.join(HERE, 'fixtures', 'ise-sch', 'MyAND2b4.sch'), 'utf8')).replace(/symbolname="and2"/g, 'symbolname="myand"');
+  const base = importIseSch(sch, { name: 'm' }).doc;
+  const docs = Object.fromEntries(['one', 'two'].map(n => [`${n}.sch.json`, { ...JSON.parse(JSON.stringify(base)), generatedFile: `${n}.vhd` }]));
+  const project = { files: ['one', 'two'].map(n => ({ path: `${n}.vhd`, lang: 'vhdl', role: 'design' })) };
+  // a clock that moves on one second every time it is read (a slow machine)
+  const RealDate = globalThis.Date;
+  let t = new RealDate(2026, 0, 1, 10, 0, 0).getTime();
+  globalThis.Date = class extends RealDate { constructor(...a) { if (a.length) super(...a); else { super(t); t += 1000; } } static now() { t += 1000; return t; } };
+  let res;
+  try { res = xise.exportIseSchematics(project, docs, {}); } finally { globalThis.Date = RealDate; }
+  assert.deepEqual(res.warnings.filter(w => /differs/.test(w)), []);
+  assert.equal(res.files.filter(f => f.path === 'myand.sym').length, 1);
+});
+
 // ------------------------------------------------------------------------------------------------
 // family detection
 // ------------------------------------------------------------------------------------------------
