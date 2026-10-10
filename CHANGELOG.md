@@ -34,7 +34,8 @@ the "What's new" text of its GitHub release.
 - Memory tests (`test/ui/memory.test.js`): opening and closing the FPGA view, the editors, ISim and
   the board emulator, selecting in the FPGA view and switching projects many times must leave
   nothing behind (JS heap, DOM nodes and event listeners after garbage collection), and the page
-  must stay within a memory budget.
+  must stay within a memory budget. The same scenarios also run in WebKit, Safari's engine
+  (`npm run test:webkit`, with Playwright), within a memory budget.
 - Verilog: SystemVerilog size casts `W'(expr)`.
 - How the open toolchain for the Spartan-3E is being developed: `docs/OPEN-TOOLCHAIN.md`, and the
   first experiments in `research/s3e-bitstream`.
