@@ -51,6 +51,11 @@ anyone changing it, people and AI agents alike. The README and docs/ describe th
 - **Merging**: when the pull request's CI is green, merge it into `main` (rebased, fast-forward, no
   merge commit) without running the suites again locally. If `main` moved meanwhile, rebase the
   branch and push it again (CI runs again). Then check the CI run of `main`.
+- **`main` is protected** (repository rulesets): no deletion and no force push, for anyone; a commit
+  reaches `main` only with CI's unit and UI checks green, the repository's admin excepted (for the
+  release commit and documentation-only changes, whose pull requests skip CI). The weekly quality
+  comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
+  maintainer merges.
 - **CI** (`.github/workflows/ci.yml`) runs everything on every pull request and every push to main: unit tests on Linux,
   macOS and Windows, UI in both interfaces, Firefox and WebKit, the standalone build, the release zip.
   A docs-only push runs `docs.yml` only. The ISE tests (nightly) and the quality comparison against

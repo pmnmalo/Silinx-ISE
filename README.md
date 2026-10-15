@@ -248,8 +248,8 @@ runs the tests and publishes a release with the files above (`.github/workflows/
 The tests against ISE (`test/ise/`) run nightly, and on demand (Actions ▸ ISE ▸ Run workflow), on
 a self-hosted runner with the ISE Docker image (label `ise`, `.github/workflows/ise.yml`); only code
 already on main runs there, never a pull request's. The same runner compares the Silinx toolchain
-with ISE on the design corpus every week (`.github/workflows/quality.yml`) and commits the results to
-[docs/QUALITY.md](docs/QUALITY.md). The scheduled runs (nightly, ISE, weekly comparison) are skipped when
+with ISE on the design corpus every week (`.github/workflows/quality.yml`) and pushes the results
+([docs/QUALITY.md](docs/QUALITY.md)) to the branch `quality-results`, merged into main by a maintainer. The scheduled runs (nightly, ISE, weekly comparison) are skipped when
 main has not changed since their last successful run, documentation aside
 (`scripts/changed-since-last-run.mjs`); run by hand, they always run.
 A push that changes only documentation does not run CI either: `.github/workflows/docs.yml` runs the

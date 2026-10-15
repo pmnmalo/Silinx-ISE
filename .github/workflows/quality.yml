@@ -4,7 +4,7 @@ name: Quality
 # size and speed of each design with both flows on the XC3S1200E (test/designs-corpus/compare-ise.mjs).
 # Weekly, and by hand (Actions ▸ Quality ▸ Run workflow), on the self-hosted runner with the ISE
 # Docker image (label "ise", as .github/workflows/ise.yml); the new results
-# (test/designs-corpus/ise-comparison.json and the page docs/QUALITY.md) are committed to main.
+# (test/designs-corpus/ise-comparison.json and the page docs/QUALITY.md) are pushed to the branch quality-results, merged into main by a maintainer (main requires CI).
 #
 # The repository is public: only code already on main runs there, never a pull request's.
 on:
@@ -69,8 +69,10 @@ jobs:
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             commit -m "Quality: the weekly Silinx toolchain vs ISE comparison (docs/QUALITY.md)"
-          for k in 1 2 3; do git pull --rebase -q origin main && git push -q origin HEAD:main && exit 0; sleep 10; done
-          exit 1
+          # main requires CI's checks (a ruleset), which a workflow's push cannot pass: the results go to the
+          # branch quality-results, to be merged into main by a maintainer (CLAUDE.md, Integration)
+          git push -q -f origin HEAD:refs/heads/quality-results
+          echo "::notice::Results pushed to the branch quality-results: merge it into main"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
