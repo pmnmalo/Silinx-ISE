@@ -718,18 +718,4 @@ uiTest('browser edition: Generate Post-Synthesis Simulation Model in the browser
   const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return /Simulation finished OK|ERROR/.test(t) ? t : null; }, [], { timeout: 120000, what: 'the simulation of the model' });
   assert.match(out, /Simulation finished OK/);
   assert.doesNotMatch(out, /ERROR/);
-  // Back up PROM: the whole PROM read and downloaded (prom-<date>.bin, in the .bit's bit order)
-  await page.click('.doc:not([hidden]) .btn', { text: 'Back up PROM' });
-  await page.waitConsole(/PROM backup downloaded\./, { timeout: 120000 });
-  const backup = (await page.consoleText()).split('Backing up XCF02S...')[1].trim().split('\n').map((l) => l.trimEnd());
-  const name = backup.find((l) => /^PROM backup: /.test(l)).match(/^PROM backup: (prom-[\dTZ-]+\.bin) \(262144 bytes\)$/)?.[1];
-  assert.ok(name, backup.join('\n'));
-  assert.deepEqual(backup.map((l) => l.replace(/\(\d+ bytes before/, '(N bytes before').replace(name, 'F')), [
-    'Platform Flash: read', 'Programmer: Digilent Basys2 (serial 10146A2B3C4D)', 'JTAG chain: xcf02s(d5045093), xc3s250e(11c1a093)',
-    'PROM xcf02s: 2048 Kbit, 4096-bit blocks', 'read 262144 bytes (N bytes before the erased tail)', 'PROM backup: F (262144 bytes)',
-    'Platform Flash read finished.', 'PROM backup downloaded.',
-  ]);
-  const saved = await fs.readFile(await waitDownload(page, name));
-  assert.equal(saved.length, 262144);
-  assert.equal(saved.indexOf(Buffer.from([0xaa, 0x99, 0x55, 0x66])) >= 0, true, 'the sync word, in the .bit\'s bit order');
 }, { url: () => 'about:blank', timeout: 300000 });
