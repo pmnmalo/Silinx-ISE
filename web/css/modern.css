@@ -489,6 +489,19 @@ html[data-ui="modern"][data-theme="dark"] .sch-editor .lv-clock { background: tr
   html[data-ui="modern"] .m-search { width: 32px; padding: 0; justify-content: center; }
   html[data-ui="modern"] .menubar .item { padding: 0 7px; }
 }
+/* 1024 px or less (#266, web/js/narrow.js): the activity bar stays, the pages beside it are a drawer
+   over the workspace; with the drawer closed no page's button looks pressed */
+@media (max-width: 1024px) {
+  html[data-ui="modern"] #drawer-btn { width: 32px; height: 32px; border-radius: var(--m-radius); color: var(--m-muted); }
+  html[data-ui="modern"] #drawer-btn:hover { border-color: transparent; background: var(--m-hover); color: var(--m-fg); }
+  html[data-ui="modern"] #drawer-btn .ico-inline, html[data-ui="modern"] #drawer-btn .ico-inline svg { width: 18px; height: 18px; }
+  html[data-ui="modern"] #left { width: 64px !important; min-width: 64px; position: relative; z-index: 40; }
+  html[data-ui="modern"] #left-pages { position: absolute; top: 0; bottom: 0; left: 64px; width: min(344px, calc(100vw - 120px));
+    background: var(--m-surface); border-right: 1px solid var(--m-border); box-shadow: 6px 0 24px rgba(0, 0, 0, .22); }
+  html[data-ui="modern"]:not([data-drawer="open"]) #left-pages { display: none; }
+  html[data-ui="modern"]:not([data-drawer="open"]) #left-tabs .tab.active { background: none; color: var(--m-muted); font-weight: 500; }
+  html[data-ui="modern"] #drawer-scrim { left: 64px; }
+}
 @media (max-width: 720px) {
   html[data-ui="modern"] #title-project { display: none; }
   html[data-ui="modern"] #left { min-width: 64px; }

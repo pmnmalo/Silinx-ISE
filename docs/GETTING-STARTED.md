@@ -51,7 +51,8 @@ That's all. Things to know:
   from a computer). The projects stay in the browser, which iPadOS may clear after some weeks
   without use: keep a copy with **File ▸ Export Silinx ISE Project (.zip)…**. A tablet has less
   memory, so a large design may fail in synthesis. The right-click menus open with a **long press**
-  (hold a finger still for half a second). Hold the tablet in landscape.
+  (hold a finger still for half a second). In portrait the Design pane is a drawer (the button at
+  the left of the header), and the editors' properties open over the drawing (**Properties**).
 
 ---
 

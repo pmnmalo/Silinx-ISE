@@ -247,8 +247,10 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
   on a Design-pane row or badge, a document tab, a Files view row, a symbol of the schematic
   editor's list or the ISim wave window; the keyboard's context-menu key (or Shift+F10) opens the
   Design pane's too.
-- **Landscape is recommended**: the layout is made for a wide screen (the portrait layout is
-  [#266](https://github.com/pmnmalo/Silinx-ISE/issues/266)).
+- **Landscape or portrait**: in landscape the layout is the desktop's. In portrait (1024 px wide or
+  less) the Design pane is a drawer, opened by the button at the left of the header. The drawing
+  editors' properties (and the schematic's symbols) open over the drawing with their toolbar's
+  *Properties* (*Symbols*) button, so the drawing keeps the whole width.
 
 ## For developers
 

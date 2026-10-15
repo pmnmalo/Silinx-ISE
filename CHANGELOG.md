@@ -14,9 +14,22 @@ In short:
   waveform viewer's cursor, markers and rows.
 - **The right-click menus on an iPad or a touch screen:** a long press (a finger or a pen held still
   for half a second) opens them. The README and the getting-started guides say what works on a tablet.
+- **Narrow screens (an iPad in portrait):** the drawing editors get the whole width. The Design pane
+  is a drawer opened by the header's button, and the editors' properties (and the schematic's
+  symbols) open over the drawing.
 
 In detail:
 
+- **Narrow screens (#266):** at 1024 px wide or less (every iPad in portrait, 768 to 1024 px; in
+  landscape, from 1080 px, nothing changes) the left side (Start, Design, Files, Libraries and the
+  Processes) is a drawer over the workspace, shown and hidden by a new button at the left of the
+  header and, in the modern interface, by the activity bar, which stays; a tap beside it, or a document
+  opened, closes it. The schematic, ASM, state diagram and Petri net editors' side panels go over the
+  canvas, shown by their toolbar's *Properties* button (the schematic's palette by *Symbols*), so the
+  drawing keeps nearly all the width (756 of 820 px) instead of a narrow strip. The link banner of a
+  state diagram or Petri net ("HDL: … — generated from the net") is one line, its whole text in its
+  tip, and the editors' toolbars wrap as one row of buttons. What was left open is remembered in the
+  browser. Both interfaces; in English and in Portuguese.
 - **Touch screens (#263):** iPadOS Safari fires no 'contextmenu' on a long press, so every right-click
   menu was out of reach on an iPad. A finger's or a pen's press held still (8 px) for 500 ms now opens
   the same menu at the press's point: the Design pane's rows and badges, the Processes rows, the

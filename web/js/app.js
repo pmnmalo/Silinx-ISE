@@ -17,6 +17,7 @@ import { onLanguageChange } from './i18n.js';
 import { designDiags, hintRow, sevWord, lintEnabled, setLintEnabled } from './diaghelp.js';
 import { applyPrefs, getInterface, setInterface, getTheme, setTheme, toggleTheme, menuCommands } from './modern.js';
 import { openPalette } from './palette.js';
+import { initDrawer, drawerGiveWay, leftTabClicked } from './narrow.js';
 import { createHistory } from './history.js';
 import { viewHdl, drawnModule, drawnHdlPath, drawnHdlClash } from '/core/view-hdl.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
@@ -1392,7 +1393,7 @@ export function findDoc(id) { return S.docs.find(d => d.id === id); }
 // view is the user's, and a late fit moved the drawing under the pointer, #233, #244)
 export function openDoc(spec) {
   let doc = findDoc(spec.id);
-  if (doc) { activateDoc(doc); return doc; }
+  if (doc) { activateDoc(doc, spec); return doc; }
   doc = { ...spec, el: h('div', { class: 'doc' }), project: S.project?.name };
   // the user's own actions in the document (Edit ▸ Undo: was the last change an edit of theirs?)
   for (const ev of ['keydown', 'pointerdown', 'input', 'paste', 'drop']) doc.el.addEventListener(ev, () => { doc._userAt = Date.now(); }, true);
@@ -1400,18 +1401,20 @@ export function openDoc(spec) {
   doc.tab = docTab(doc);
   $('doc-tabs').append(doc.tab);
   S.docs.push(doc);
-  activateDoc(doc);
+  activateDoc(doc, spec);
   Object.assign(doc, spec.create(doc.el, doc) || {});
   doc.onActivate?.();
   saveViewState();
   return doc;
 }
 
-export function activateDoc(doc) {
+// background: opened with the project, not by the user (a narrow screen's drawer stays open)
+export function activateDoc(doc, { background = false } = {}) {
   S.active = doc;
   for (const d of S.docs) { d.el.hidden = d !== doc; d.tab.classList.toggle('active', d === doc); }
   doc.onActivate?.();
   $('status-pos').textContent = '';
+  if (!keepView && !background) drawerGiveWay();   // a narrow screen: the drawer gives way to the document (#266)
   updateTitle();
   saveViewState();
 }
@@ -3206,7 +3209,7 @@ export async function openSummary({ background = false } = {}) {
   const { mountSummary } = await import('./summary.js');
   // opened with the project (background): if the user opened another document meanwhile, keep it in front
   const keep = background && S.active && S.active !== was && S.active.id !== 'summary' ? S.active : null;
-  const d = openDoc({ id: 'summary', title: 'Design Summary', icon: 'summary', create: el => mountSummary(el) });
+  const d = openDoc({ id: 'summary', title: 'Design Summary', icon: 'summary', background, create: el => mountSummary(el) });
   d.refresh?.();
   if (keep && S.docs.includes(keep)) activateDoc(keep);
 }
@@ -3771,7 +3774,8 @@ async function boot() {
   splitter($('v-split'), $('left'), { dir: 'h', min: 180, max: 700, storageKey: 'xl.leftW' });
   splitter($('left-split'), $('proc-panel'), { dir: 'v', min: 80, max: 900, invert: true, storageKey: 'xl.procH' });
   splitter($('h-split'), $('console-wrap'), { dir: 'v', min: 60, max: 700, invert: true, storageKey: 'xl.consoleH' });
-  document.querySelectorAll('#left-tabs .tab').forEach(t => t.addEventListener('click', () => showLeftPage(t.dataset.page)));
+  initDrawer();
+  document.querySelectorAll('#left-tabs .tab').forEach(t => t.addEventListener('click', () => { leftTabClicked(t.dataset.page, document.querySelector('#left-tabs .tab.active')?.dataset.page); showLeftPage(t.dataset.page); }));
   document.querySelectorAll('#console-tabs .tab').forEach(t => t.addEventListener('click', () => showConsolePage(t.dataset.page)));
   document.querySelectorAll('input[name=view]').forEach(r => r.addEventListener('change', () => setView(r.value)));
   $('console-clear').addEventListener('click', () => { $('console-log').innerHTML = ''; });
@@ -3781,7 +3785,7 @@ async function boot() {
   $('palette-btn').addEventListener('click', () => showPalette());
   $('theme-btn').addEventListener('click', () => toggleTheme());
   $('title-project').addEventListener('click', () => wiz.openProjectDialog());
-  document.querySelectorAll('#left-tabs .tab').forEach(t => t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showLeftPage(t.dataset.page); } }));
+  document.querySelectorAll('#left-tabs .tab').forEach(t => t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.click(); } }));
   for (const ev of ['click', 'keyup']) addEventListener(ev, () => setTimeout(refreshSteps), true);
   setInterval(refreshSteps, 1000);
   addEventListener('keydown', e => {

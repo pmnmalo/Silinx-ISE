@@ -221,9 +221,17 @@
 .asm-editor .asm-edge-temp { fill: none; stroke: var(--asm-accent); stroke-width: 2; stroke-dasharray: 6 4; pointer-events: none; }
 .asm-editor .asm-rubber { fill: color-mix(in srgb, var(--asm-accent) 12%, transparent); stroke: var(--asm-accent); stroke-dasharray: 4 3; pointer-events: none; }
 
-@media (max-width: 760px) {
-  .asm-editor .asm-body { flex-direction: column; }
-  .asm-editor .asm-side { width: auto; max-height: 45%; border-left: 0; border-top: 1px solid var(--asm-border); }
+/* 1024 px wide or less (#266, web/js/narrow.js): the side panel goes over the canvas, shown by the
+   toolbar's Properties button (.side-open); the link banner is one line (its whole text in its tip) */
+@media (max-width: 1024px) {
+  .asm-editor .asm-body { position: relative; }
+  .asm-editor .asm-side { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(320px, 85%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
+  .asm-editor:not(.side-open) .asm-side { display: none; }
+  .asm-editor .asm-toolbar { gap: 4px; }
+  .asm-editor .asm-toolbar .asm-sep { display: none; }
+  .asm-editor .asm-toolbar .asm-group { display: contents; }   /* one row of buttons, wrapped where it ends */
+  .asm-editor :is(.fsm-link, .pn-link) { min-width: 0; max-width: 100%; }
+  .asm-editor :is(.fsm-link, .pn-link) .gen-banner { display: block; max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* ------------------------------------------------------------------ every-cycle blocks */

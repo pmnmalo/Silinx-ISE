@@ -78,6 +78,22 @@
 #statusbar { height: 22px; display: flex; align-items: center; gap: 12px; padding: 0 8px; background: var(--bg); border-top: 1px solid #c8c8c8; color: #333; }
 #statusbar .spacer { flex: 1; }
 
+/* narrow screens (#266, web/js/narrow.js: 1024 px wide or less, an iPad in portrait): the left side is
+   a drawer over the workspace, shown and hidden by the header's button; the scrim beside it closes it */
+#drawer-btn, #drawer-scrim { display: none; }
+@media (min-width: 1025px) { .narrow-only { display: none !important; } }
+@media (max-width: 1024px) {
+  #drawer-btn { display: inline-flex; width: 22px; height: 20px; padding: 0; border: 1px solid transparent; border-radius: 3px; background: none; color: inherit; align-items: center; justify-content: center; }
+  #drawer-btn:hover { border-color: #7da2ce; background: #d5e7f8; }
+  #drawer-btn .ico-inline { margin: 0; }
+  #main { position: relative; }
+  #v-split { display: none; }
+  html:not([data-ui="modern"]) #left { position: absolute; z-index: 40; top: 3px; bottom: 0; left: 3px; width: min(320px, calc(100vw - 56px)) !important;
+    background: var(--bg); box-shadow: 4px 0 18px rgba(0, 0, 0, .3); }
+  html:not([data-ui="modern"]):not([data-drawer="open"]) #left { display: none; }
+  html[data-drawer="open"] #drawer-scrim { display: block; position: absolute; inset: 0; z-index: 39; background: rgba(0, 0, 0, .18); }
+}
+
 /* splitters */
 .splitter.split-h { width: 5px; cursor: col-resize; flex: none; }
 .splitter.split-v { height: 5px; cursor: row-resize; flex: none; }

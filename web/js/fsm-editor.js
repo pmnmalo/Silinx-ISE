@@ -15,6 +15,7 @@
 // Model, validation, tables and HDL: core/fsm.js. Styles: asm-editor.css (shared look) + fsm-editor.css.
 
 import { h, downloadText, undoButton, linkModel, linkSnapshot } from './ui.js';
+import { panelToggle, PROPS_KEY } from './narrow.js';
 import { svgSnapshot, printDiagram } from './print.js';
 import {
   normalizeFsm, newFsm, validateFsm, generateFsm, parseLabel, parseOutputs, formatOutputs, fsmEncoding,
@@ -116,7 +117,7 @@ export function mountFsmEditor(container, opts = {}) {
     sep(),
     h('div', { class: 'asm-group' }, typeSel, encSel, styleSel, langSel),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' }, tabBtns.tables, tabBtns.code, tabBtns.sim,
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.tables, tabBtns.code, tabBtns.sim,
       btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.())),
     linkHost);
 
@@ -910,7 +911,7 @@ export function mountFsmEditor(container, opts = {}) {
     const L = opts.linkInfo?.();
     if (!L) return;
     const a = h('a', { onclick: () => opts.onOpenFile?.(L.file) }, L.file.split('/').pop());
-    linkHost.append(h('span', { class: `gen-banner${L.why ? ' out-of-sync' : ''}`, title: L.why || '' },
+    linkHost.append(h('span', { class: `gen-banner${L.why ? ' out-of-sync' : ''}`, title: L.why || `HDL: ${L.file.split('/').pop()} — generated from the diagram` },
       L.why ? 'Not in sync with ' : 'HDL: ', a, L.why ? ` — ${L.why}` : ' — generated from the diagram'));
   }
 

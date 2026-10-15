@@ -25,7 +25,10 @@
 (function () { var d = document.documentElement, ui = 'modern', th = 'system';
   try { ui = localStorage.getItem('silinx.ui') === 'classic' ? 'classic' : 'modern'; th = localStorage.getItem('silinx.theme') || 'system'; } catch (e) {}
   var dark = th === 'dark' || (th !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-  d.setAttribute('data-ui', ui); d.setAttribute('data-theme', ui === 'modern' && dark ? 'dark' : 'light'); })();
+  d.setAttribute('data-ui', ui); d.setAttribute('data-theme', ui === 'modern' && dark ? 'dark' : 'light');
+  /* narrow screens: the left side's drawer as the viewer left it (web/js/narrow.js, #266) */
+  var dr = 'open'; try { dr = localStorage.getItem('silinx.drawer') === 'closed' ? 'closed' : 'open'; } catch (e) {}
+  d.setAttribute('data-drawer', dr); })();
 </script>
 <script src="/vendor/codemirror/lib/codemirror.js"></script>
 <script src="/vendor/codemirror/mode/verilog/verilog.js"></script>
@@ -49,7 +52,7 @@
 <body>
 <div id="app">
   <header id="topbar">
-    <div id="titlebar"><span class="app-logo">S</span><span id="title-brand" data-no-i18n>Silinx ISE</span><span id="title-text">Silinx ISE - Project Navigator</span><button id="title-project" class="m-chip" title="Open Project"></button></div>
+    <div id="titlebar"><button id="drawer-btn" class="m-icon-btn" title="Show / hide the side panel (Design, Files, Processes)" aria-label="Show / hide the side panel (Design, Files, Processes)" aria-controls="left" aria-expanded="true"><span class="ico-inline" data-icon="mPanel"></span></button><span class="app-logo">S</span><span id="title-brand" data-no-i18n>Silinx ISE</span><span id="title-text">Silinx ISE - Project Navigator</span><button id="title-project" class="m-chip" title="Open Project"></button></div>
     <nav id="menubar" aria-label="Main menu"></nav>
     <div id="top-actions">
       <button id="palette-btn" class="m-search" title="Search commands and files (Ctrl+K)"><span class="ico-inline" data-icon="mSearch"></span><span class="m-search-text">Search commands and files…</span><kbd id="palette-kbd" data-no-i18n>Ctrl K</kbd></button>
@@ -89,6 +92,7 @@
       </div>
     </div>
     <div id="v-split"></div>
+    <div id="drawer-scrim"></div>
     <div id="center">
       <div id="workspace"><div id="ws-empty"><div class="ws-logo">S</div><h2>Silinx ISE</h2>
         <p>Open a source from the Design panel, or search for any command or file.</p>

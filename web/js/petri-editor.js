@@ -14,6 +14,7 @@
 // the HDL generated from the net. Model, simulation, HDL and PNML: core/petri.js.
 
 import { h, downloadText, undoButton, linkModel, linkSnapshot } from './ui.js';
+import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
   normalizePetri, newPetri, validatePetri, generatePetri, initialMarking, enabledTransitions, fire, clockStep, isDeadlock,
   outputsOf, toPnml, fromPnml, PLACE_R, TRANS_W, TRANS_H,
@@ -90,9 +91,10 @@ export function mountPetriEditor(container, opts = {}) {
     h('div', { class: 'asm-group' }, undoBtn, redoBtn), sep(),
     h('div', { class: 'asm-group' }, btn('Fit', 'Fit the net in the window', () => fit()), langSel),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' }, tabBtns.sim, tabBtns.code, tabBtns.analysis,
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.sim, tabBtns.code, tabBtns.analysis,
       btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
-      btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()), pnmlIn, linkHost));
+      btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()), pnmlIn),
+    linkHost);
 
   // ---------------------------------------------------------------- canvas, panels
   const defs = sv('defs', {},
@@ -286,7 +288,7 @@ export function mountPetriEditor(container, opts = {}) {
   }
   function refreshLink() {
     const li = opts.linkInfo?.();
-    linkHost.replaceChildren(...(li?.file ? [h('span', { class: 'gen-banner' }, 'HDL: ', (() => { const a = h('a', {}, li.file.split('/').pop()); a.addEventListener('click', () => opts.onOpenFile?.(li.file)); return a; })(), ' — generated from the net')] : []));
+    linkHost.replaceChildren(...(li?.file ? [h('span', { class: 'gen-banner', title: `HDL: ${li.file.split('/').pop()} — generated from the net` }, 'HDL: ', (() => { const a = h('a', {}, li.file.split('/').pop()); a.addEventListener('click', () => opts.onOpenFile?.(li.file)); return a; })(), ' — generated from the net')] : []));
   }
 
   // ---------------------------------------------------------------- simulation and HDL panel

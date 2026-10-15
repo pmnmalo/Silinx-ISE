@@ -412,6 +412,8 @@ export class Page extends PageBase {
     });
   }
   send(method, params) { return this.cdp.send(method, params, this.sessionId); }
+  /** The page's size in CSS px (the window's is 1400 × 900), e.g. an iPad in portrait: 820 × 1180. */
+  setViewport(width, height) { return this.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false }); }
   /** Like eval; a result that cannot be serialized (DOM node, editor…) comes back as `fallback`. */
   async evalAs(fallback, fn, ...args) {
     const expression = typeof fn === 'function'
@@ -592,6 +594,7 @@ export class PwPage extends PageBase {
   async type(text) { await this.page.keyboard.insertText(text); }
   /** Give an <input type=file> local files (Playwright fires input + change). */
   async setFiles(sel, files, { index = 0 } = {}) { await this.page.locator(sel).nth(index).setInputFiles(files); }
+  setViewport(width, height) { return pwLimit('setViewportSize', this.page.setViewportSize({ width, height }), this); }
   async screenshot(file) { await this.page.screenshot({ path: file }); return file; }
   async close() { this.closing = true; await this.context.close().catch(() => {}); }
 }

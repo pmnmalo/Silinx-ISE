@@ -72,7 +72,11 @@ const PT = {
   'New Project': 'Novo Projeto', 'Open Project': 'Abrir Projeto', 'Save (Ctrl+S)': 'Guardar (Ctrl+S)', 'Cut': 'Cortar', 'Copy': 'Copiar',
   'Paste': 'Colar', 'Find': 'Procurar', 'View RTL Schematic': 'Ver Esquemático RTL', 'New ASM State Diagram': 'Novo Diagrama de Estados ASM',
   'Configure Target Device (iMPACT)': 'Configurar Dispositivo (iMPACT)', 'Toolchain Settings': 'Definições da Toolchain', 'About': 'Acerca de',
-  'Design': 'Projeto', 'View:': 'Vista:', 'Hierarchy': 'Hierarquia', 'Processes:': 'Processos:', 'Start': 'Início', 'Files': 'Ficheiros',
+  // narrow screens (#266): the drawer of the left side, the editors' panels over the canvas
+  'Show / hide the side panel (Design, Files, Processes)': 'Mostrar / esconder o painel lateral (Projeto, Ficheiros, Processos)',
+  '☰ Properties': '☰ Propriedades', 'Show / hide the properties panel': 'Mostrar / esconder o painel das propriedades',
+  '☰ Symbols': '☰ Símbolos', 'Show / hide the symbols panel': 'Mostrar / esconder o painel dos símbolos',
+  'Design': 'Projeto', 'View:': 'Vista:','Hierarchy': 'Hierarquia', 'Processes:': 'Processos:', 'Start': 'Início', 'Files': 'Ficheiros',
   'Libraries': 'Bibliotecas', 'Console': 'Consola', 'Errors': 'Erros', 'Warnings': 'Avisos', 'Ready': 'Pronto', 'Clear': 'Limpar',
   'Project Commands': 'Comandos do Projeto', 'Open Example (gates)': 'Abrir Exemplo (gates)', 'Open Example (traffic)': 'Abrir Exemplo (traffic)', 'Open Example (blinky)': 'Abrir Exemplo (blinky)', 'Open Example (pong)': 'Abrir Exemplo (pong)', 'Open Example (stopwatch)': 'Abrir Exemplo (stopwatch)', 'Open Example (clock)': 'Abrir Exemplo (clock)', 'No projects yet.': 'Ainda não há projetos.',
   'File Name': 'Nome do Ficheiro', 'Association': 'Associação', 'Behavioral': 'Comportamental',
@@ -289,6 +293,8 @@ const PT_FF = [['synchronous set and reset (S over R)', 'set e reset síncronos 
   ['clock enable', 'habilitação do relógio'], ['asynchronous clear', 'clear assíncrono'], ['asynchronous preset', 'preset assíncrono'],
   ['synchronous reset', 'reset síncrono'], ['synchronous set', 'set síncrono']];
 const PT_PATTERNS = [
+  // the tip of a drawing's link banner, shortened on a narrow screen (#266)
+  [/^HDL: (\S+) — generated from the (diagram|net|table)$/, (m, f, w) => `HDL: ${f} — gerado a partir ${{ diagram: 'do diagrama', net: 'da rede', table: 'da tabela' }[w]}`],
   // a process run on the top module while another module is selected (#223)
   [/^(.+) (implements|synthesizes|emulates) the top module '(.+)', not the selected module '(.+)'\.$/,
     (m, p, v, top, sel) => `${t(p)} ${{ implements: 'implementa', synthesizes: 'sintetiza', emulates: 'emula' }[v]} o módulo de topo '${top}', não o módulo selecionado '${sel}'.`],

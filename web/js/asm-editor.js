@@ -13,6 +13,7 @@
 
 import { svgSnapshot, printDiagram } from './print.js';
 import { undoButton, linkModel, linkSnapshot } from './ui.js';
+import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
   normalizeModel, newModel, validate, generate, stateEncoding, ENCODINGS, nextCaseLabel as nextLabel,
 } from '/core/asm.js';
@@ -212,6 +213,7 @@ export function mountAsmEditor(container, { model, onChange } = {}) {
     h('div', { class: 'asm-group' }, langSel, encSel),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' },
+      panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }),
       btn('✓ Validate', 'Check the chart for errors', () => { runValidate(); showProblems(true); }),
       codeBtn));
 

@@ -287,9 +287,17 @@
 .sch-editor .se-symdoc .sd-code { border: 1px solid #e0e0e8; max-height: 360px; flex: none; }
 .sch-editor .se-props .se-sum { margin-bottom: 2px; }
 
+/* 1024 px wide or less (#266, web/js/narrow.js): the symbols and the properties go over the canvas,
+   shown by the toolbar's Symbols (.pal-open) and Properties (.side-open) buttons */
+.sch-editor .se-panels { display: inline-flex; gap: 2px; margin-left: auto; }
+@media (max-width: 1024px) {
+  .sch-editor .se-main { position: relative; }
+  .sch-editor :is(.se-left, .se-right) { position: absolute; z-index: 6; top: 0; bottom: 0; }
+  .sch-editor .se-left { left: 0; width: min(220px, 45%); box-shadow: 6px 0 20px rgba(0, 0, 0, .22); }
+  .sch-editor .se-right { right: 0; width: min(280px, 60%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
+  .sch-editor:not(.pal-open) .se-left, .sch-editor:not(.side-open) .se-right, .sch-editor.read-only [data-panel="symbols"] { display: none; }
+}
 @media (max-width: 760px) {
-  .sch-editor .se-left { width: 150px; }
-  .sch-editor .se-right { width: 190px; }
   .sch-editor .se-symdoc .sd-body { flex-direction: column; }
   .sch-editor .se-symdoc .sd-side { width: auto; }
 }

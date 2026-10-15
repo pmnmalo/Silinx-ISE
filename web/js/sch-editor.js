@@ -21,6 +21,7 @@ import { symbolSummary, presetOf } from '/core/symdocs.js';
 import { lutFunction } from '/core/fpga/techview.js';
 import { getLanguage, onLanguageChange } from './i18n.js';
 import { popupMenu, undoButton, linkModel, linkSnapshot, longPressMenu } from './ui.js';
+import { panelToggle, PROPS_KEY, SYMBOLS_KEY } from './narrow.js';
 import { rerouteAfterMove, connectivity, placementClashes, connectionsKept } from '/core/schroute.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -426,6 +427,10 @@ export function mountSchEditor(container, opts = {}) {
     h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'view', title: 'View generated HDL', html: `${ICON.view}<span>View HDL</span>` }),
     sep(), h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'sim', title: 'Simulate: click the inputs and watch the circuit work (Esc to stop)', html: `${ICON.sim}<span>Simulate</span>` }),
     sep(), optBox,
+    // a narrow screen (#266): the symbols and the properties over the canvas, shown by these
+    h('span', { class: 'se-panels' },
+      panelToggle(container, h('button', { type: 'button', class: 'se-btn wide', 'data-panel': 'symbols', title: 'Show / hide the symbols panel' }, '☰ Symbols'), { cls: 'pal-open', key: SYMBOLS_KEY }),
+      panelToggle(container, h('button', { type: 'button', class: 'se-btn wide', 'data-panel': 'props', title: 'Show / hide the properties panel' }, '☰ Properties'), { key: PROPS_KEY })),
   );
   langSel.value = genLang;
   // read-only (RTL view): the editing tools are hidden, so drop the separators they leave doubled
