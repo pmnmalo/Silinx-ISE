@@ -23,6 +23,16 @@ export function h(tag, attrs = {}, ...children) {
 export const undoButton = (ico, onclick, attrs = {}) =>
   h('button', { type: 'button', class: 'tb-btn', title: ico === 'undo' ? 'Undo' : 'Redo', html: icons[ico], onclick, ...attrs });
 
+// A drawing editor's model with its HDL file linked (generatedFile; none: unlinked), in place: the
+// link alone changes (#245), the editor's history, selection and view are kept
+export function linkModel(m, file) {
+  if (file) m.generatedFile = String(file); else delete m.generatedFile;
+  return m;
+}
+// the same for a snapshot of the editor's history (its JSON): an Undo / Redo keeps the link (#245);
+// `norm`: the editor's normalization, when its history holds normalized models
+export const linkSnapshot = (s, file, norm = m => m) => JSON.stringify(norm(linkModel(JSON.parse(s), file)));
+
 // ------------------------------------------------------------------ dialogs
 let dialogZ = 1000;
 const dialogStack = [];   // open dialogs, innermost last: only it reacts to Enter / Escape

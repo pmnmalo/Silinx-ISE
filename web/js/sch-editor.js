@@ -8,7 +8,7 @@
 //     onOpenModule(moduleName) {},
 //   });
 //   readOnly: true             // view only: pan/zoom/select/inspect, no edits (RTL schematic viewer)
-//   ed.getDoc(); ed.setDoc(doc); ed.setModules(modules); ed.fit(); ed.destroy();
+//   ed.getDoc(); ed.setDoc(doc); ed.setLink(file); ed.setModules(modules); ed.fit(); ed.destroy();
 //
 // Styles: web/css/sch-editor.css (scoped under .sch-editor, themed by the ISE variables of theme.css).
 
@@ -20,7 +20,7 @@ import { svgSnapshot, printDiagram } from './print.js';
 import { symbolSummary, presetOf } from '/core/symdocs.js';
 import { lutFunction } from '/core/fpga/techview.js';
 import { getLanguage, onLanguageChange } from './i18n.js';
-import { popupMenu, undoButton } from './ui.js';
+import { popupMenu, undoButton, linkModel, linkSnapshot } from './ui.js';
 import { rerouteAfterMove, connectivity, placementClashes, connectionsKept } from '/core/schroute.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -1674,6 +1674,11 @@ export function mountSchEditor(container, opts = {}) {
     undo: () => undo(), redo: () => redo(),
     canUndo: () => undoStack.length > 0 && !live, canRedo: () => redoStack.length > 0 && !live,
     setDoc(d) { leaveSim(); infoDlg?.close(); doc = normalizeDoc(d || newDoc()); undoStack.length = 0; redoStack.length = 0; sel.clear(); lastDiags = null; genLang = doc.lang; langSel.value = genLang; diagPanel.hidden = true; renderSheet(); renderPalette(); render(); renderProps(); fit(); },
+    // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
+    setLink(file) {
+      linkModel(doc, file);
+      for (const st of [undoStack, redoStack]) st.forEach((s, i) => { st[i] = linkSnapshot(s, file); });
+    },
     setModules(m) { leaveSim(); modules = normMods(m); renderPalette(); render(); renderProps(); },
     check: () => runCheck(true),
     openSelected,

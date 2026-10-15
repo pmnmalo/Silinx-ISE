@@ -2,7 +2,7 @@
 //
 //   import { mountPetriEditor } from './petri-editor.js';
 //   const ed = mountPetriEditor(container, { model, onChange(model), linkInfo() -> { file } | null, onOpenFile(path) });
-//   ed.getModel(); ed.setModel(m); ed.undo(); ed.redo(); ed.canUndo(); ed.canRedo(); ed.fit(); ed.refreshLink(); ed.destroy();
+//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.undo(); ed.redo(); ed.canUndo(); ed.canRedo(); ed.fit(); ed.refreshLink(); ed.destroy();
 //
 // Places are circles holding their tokens (dots, or a number), transitions bars; an arc goes from a
 // place to a transition (it takes tokens: its weight) or from a transition to a place (it puts them);
@@ -13,7 +13,7 @@
 // enabled transition whose guard is true fires, as the generated hardware does), run, reset; and shows
 // the HDL generated from the net. Model, simulation, HDL and PNML: core/petri.js.
 
-import { h, downloadText, undoButton } from './ui.js';
+import { h, downloadText, undoButton, linkModel, linkSnapshot } from './ui.js';
 import {
   normalizePetri, newPetri, validatePetri, generatePetri, initialMarking, enabledTransitions, fire, clockStep, isDeadlock,
   outputsOf, toPnml, fromPnml, PLACE_R, TRANS_W, TRANS_H,
@@ -507,6 +507,8 @@ export function mountPetriEditor(container, opts = {}) {
     getModel: () => clone(M),
     setModel(m) { M = normalizePetri(m); hist.length = 0; hist.push(JSON.stringify(M)); hi = 0; sel = null; if (sim) resetSim(false); render(); },
     undo, redo, canUndo: () => hi > 0, canRedo: () => hi < hist.length - 1,
+    // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
+    setLink(file) { linkModel(M, file); hist.forEach((s, i) => { hist[i] = linkSnapshot(s, file, normalizePetri); }); refreshLink(); },
     fit, refreshLink,
     destroy() { destroyed = true; ro?.disconnect(); if (sim?.timer) clearInterval(sim.timer); container.innerHTML = ''; },
   };

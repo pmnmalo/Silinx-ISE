@@ -2,7 +2,7 @@
 //
 //   import { mountAsmEditor } from './asm-editor.js';
 //   const ed = mountAsmEditor(container, { model, onChange(model) {} });
-//   ed.getModel(); ed.setModel(m); ed.destroy();
+//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.destroy();
 //
 // Styles: web/css/asm-editor.css (scoped under .asm-editor, themed by --bg/--panel/--fg/...).
 //
@@ -12,7 +12,7 @@
 // data path: generics, internal registers and the 2-flip-flop synchroniser of each input.
 
 import { svgSnapshot, printDiagram } from './print.js';
-import { undoButton } from './ui.js';
+import { undoButton, linkModel, linkSnapshot } from './ui.js';
 import {
   normalizeModel, newModel, validate, generate, stateEncoding, ENCODINGS, nextCaseLabel as nextLabel,
 } from '/core/asm.js';
@@ -1205,6 +1205,8 @@ export function mountAsmEditor(container, { model, onChange } = {}) {
       render(); renderInspector(); renderMachine(); updateToolbar(); runValidate();
       fitted = tryInitialFit();
     },
+    // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
+    setLink(file) { linkModel(M, file); hist = hist.map((s) => linkSnapshot(s, file)); },
     validate: () => { runValidate(); return diags.slice(); },
     fit,
     print,

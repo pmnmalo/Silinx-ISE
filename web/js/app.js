@@ -2541,11 +2541,7 @@ async function drawnHdlLanguage(path, m) {
     await api.writeFile(S.project.name, target, r.text);
     const next = { ...m, generatedFile: target };
     await api.writeFile(S.project.name, path, JSON.stringify(next, null, viewKind(path) === 'sch' ? 1 : 2));
-    // an open editor of the drawing keeps the link (its next save writes it)
-    const d = findDoc(`${viewKind(path)}:${path}`);
-    const ed = d?.schEditor || d?.asmEditor || d?.ttEditor || d?.fsmEditor || d?.petriEditor;
-    if (ed?.setDoc) { const cur = ed.getDoc(); cur.generatedFile = target; ed.setDoc(cur); }
-    else if (ed?.setModel) { const cur = ed.getModel(); cur.generatedFile = target; ed.setModel(cur); }
+    linkOpenEditor(path, target);
     log(`${path}: its HDL is now in ${L}, ${target} (${owned} removed)`, 'info');
   } finally { S.syncing = false; }
   await reloadProject(false);
@@ -2584,13 +2580,15 @@ async function writeDrawnHdl(path, target, hdl) {
   await api.writeFile(S.project.name, target, hdl);   // (registers the module in the project)
   await api.writeFile(S.project.name, path, text);
   S.viewTexts[path] = text;
-  // an open editor of the drawing keeps the link (its next save writes it)
-  const d = findDoc(`${viewKind(path)}:${path}`);
-  const ed = d?.schEditor || d?.asmEditor || d?.ttEditor || d?.fsmEditor || d?.petriEditor;
-  if (ed?.setDoc) { const cur = ed.getDoc(); cur.generatedFile = target; ed.setDoc(cur); }
-  else if (ed?.setModel) { const cur = ed.getModel(); cur.generatedFile = target; ed.setModel(cur); }
-  d?.ttEditor?.refreshLink?.(); d?.petriEditor?.refreshLink?.();
+  linkOpenEditor(path, target);
   return true;
+}
+
+// an open editor of the drawing keeps the link (its next save writes it): the link alone, its undo
+// history, selection and view kept (#245: not the whole model again, which reset them)
+function linkOpenEditor(path, target) {
+  const d = findDoc(`${viewKind(path)}:${path}`);
+  (d?.schEditor || d?.asmEditor || d?.ttEditor || d?.fsmEditor || d?.petriEditor)?.setLink(target);
 }
 
 // ---- a drawing whose HDL file name is taken (#230)
@@ -3262,6 +3260,8 @@ async function reloadProjectNow(render = true, depth = 0) {
   // file gets it (#207): read the project again with them
   if (depth < 2 && (await drawingsAsBase() || await adoptDrawnHdl())) return reloadProjectNow(render, depth + 1);
   await drawnHdlClashes();
+  // the open drawings show their links as they are now (one linked meanwhile, #245)
+  for (const d of S.docs) (d.ttEditor || d.fsmEditor || d.petriEditor)?.refreshLink?.();
   updateTitle();
   renderHierarchy();
   renderFilesPage();

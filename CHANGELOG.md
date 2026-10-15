@@ -3,6 +3,22 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.10.17
+
+In short:
+
+- **Undo keeps working when a drawing gets its HDL file:** a schematic, ASM chart, state diagram,
+  truth table or Petri net that gets its HDL file while it is open keeps its Undo history, its
+  selection and its zoom.
+
+In detail:
+
+- **A drawing's HDL file linked while it is open (#245):** when a drawn source gets its HDL file (on
+  the save that clears its errors, from *Generate HDL File…*, or when its HDL language changes), its
+  open editor took the whole drawing again, about a second after the edit: Undo was emptied, the
+  selection cleared and the view fitted again. The editor now takes the link alone; Undo and Redo
+  keep it, and the editor's HDL link is shown at once.
+
 ## 15.10.16
 
 In short:

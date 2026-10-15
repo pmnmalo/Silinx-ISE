@@ -9,9 +9,9 @@
 //
 //   const ed = mountTtEditor(host, { model, onChange, onSchematic({ form, nand }),
 //                                    onFromModule(), linkInfo() -> { file, why } | null, onOpenFile(path) });
-//   ed.getModel(), ed.setModel(m), ed.destroy()
+//   ed.getModel(), ed.setModel(m), ed.setLink(file), ed.destroy()
 // Styles: web/css/truthtable.css.
-import { h, undoButton } from './ui.js';
+import { h, undoButton, linkModel, linkSnapshot } from './ui.js';
 import {
   normalizeTable, validateTable, reshapeTable, analyzeOutput, parseExpr, exprColumn, formatExpr, compareExpr,
   kmapLayout, kmapRects, MAX_EDIT_INPUTS,
@@ -325,6 +325,8 @@ export function mountTtEditor(container, opts = {}) {
     undo, redo,
     canUndo: () => hi > 0,
     canRedo: () => hi < hist.length - 1,
+    // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
+    setLink(file) { linkModel(M, file); hist.forEach((s, i) => { hist[i] = linkSnapshot(s, file); }); renderLink(); },
     refreshLink: () => renderLink(),
     select(o) { if (M.outputs.includes(o)) { out = o; render(); } },
     destroy() { destroyed = true; clearTimeout(mineT); container.innerHTML = ''; },

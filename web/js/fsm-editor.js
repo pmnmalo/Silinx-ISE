@@ -3,7 +3,7 @@
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
 //                                          onOpenFile(path), onTruthTables(), onToAsm() });
-//   ed.getModel(); ed.setModel(m); ed.refreshLink(); ed.fit(); ed.print(); ed.destroy();
+//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.fit(); ed.print(); ed.destroy();
 //
 // States are circles (the initial state has a double circle and an entry arrow); transitions are
 // curved arrows labelled "condition / outputs" (Mealy outputs) — Moore outputs are written inside
@@ -14,7 +14,7 @@
 // simulation of the diagram (current state highlighted, inputs set by hand, clock steps).
 // Model, validation, tables and HDL: core/fsm.js. Styles: asm-editor.css (shared look) + fsm-editor.css.
 
-import { h, downloadText, undoButton } from './ui.js';
+import { h, downloadText, undoButton, linkModel, linkSnapshot } from './ui.js';
 import { svgSnapshot, printDiagram } from './print.js';
 import {
   normalizeFsm, newFsm, validateFsm, generateFsm, parseLabel, parseOutputs, formatOutputs, fsmEncoding,
@@ -938,6 +938,8 @@ export function mountFsmEditor(container, opts = {}) {
       if (sim && !stateById(sim.state)) resetSim();
       render(); renderSide(); runValidate(); refreshLink(); if (panel) renderPanel();
     },
+    // its HDL file linked (generatedFile, #245): nothing else changes, Undo / Redo keep the link
+    setLink(file) { linkModel(M, file); hist = hist.map((s) => linkSnapshot(s, file, normalizeFsm)); refreshLink(); },
     refreshLink,
     validate: () => { runValidate(); return diags.slice(); },
     showPanel: (p) => { if (panel !== p) togglePanel(p); },
