@@ -3,6 +3,31 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.10.19
+
+In short:
+
+- **The board's Platform Flash from the browser:** the browser edition (Chrome / Edge) now programs
+  the PROM of the Basys2 / Nexys2 over USB, as the full application does, so the design starts at
+  power-up: select the PROM in Configure Target Device's chain and click *Program PROM* (also
+  *Verify*, *Erase*, *Back up PROM*, downloaded, and *Reload FPGA from PROM*).
+
+In detail:
+
+- **Platform Flash over WebUSB (#271):** a new module, `core/xcf.js`, programs the XCF01S / XCF02S /
+  XCF04S over the JTAG of the board's Digilent Adept USB (`core/adept.js`), with the steps of the full
+  application's `scripts/xcf_prog.py` (the IEEE 1532 flow of the XCF's BSDL: the PROM found by its
+  IDCODE, ISC_ENABLE, ISC_ERASE, the data in 4096-bit blocks, 2048 on the XCF01S, with
+  ISC_DATA_SHIFT, ISC_ADDRESS_SHIFT and ISC_PROGRAM, ISC_READ to verify, ISC_DISABLE, then CONFIG and
+  the FPGA's DONE checked). The image is `build/<top>_prom.bit` (StartUpClk:Cclk), which Generate
+  Programming File already writes in the browser, or a `.bit` chosen from the disk. The console shows
+  the full application's lines; a design too large for the PROM, a bitstream for another FPGA, a
+  write-protected PROM, a verify mismatch (its byte and block) or an FPGA that does not load from the
+  PROM (the mode jumper) stop it with a clear error. The old "programmed by the full Silinx
+  application" error is gone. Tested against a simulated board whose PROM implements the
+  instructions and checks the protocol (erase before program, block writes, verify), with the blocks
+  compared to those of `xcf_prog.py`; to be checked on a real Basys2 and Nexys2.
+
 ## 15.10.18
 
 In short:

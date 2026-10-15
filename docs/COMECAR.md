@@ -45,8 +45,9 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
   FPGA** e escolha a placa na lista que o browser mostra (só na primeira vez). No Windows, se o
   Digilent Adept estiver instalado, o controlador dele ocupa a placa: dê-lhe o controlador WinUSB com
   o [Zadig](https://zadig.akeo.ie) para a usar a partir do browser. No Linux, permita o acesso à placa
-  com uma regra udev (`SUBSYSTEM=="usb", ATTR{idVendor}=="1443", MODE="0666"`). Guardar o desenho na
-  flash da placa (PROM) precisa da Forma 2.
+  com uma regra udev (`SUBSYSTEM=="usb", ATTR{idVendor}=="1443", MODE="0666"`). Para guardar o desenho
+  na flash da placa (PROM), para que arranque ao ligar, selecione a PROM (XCF02S / XCF04S) na cadeia e
+  clique em **Program PROM**, com o jumper de modo em ROM (Basys2: JP3).
 - **Num iPad ou num tablet** (Safari, ou o browser do tablet): editar, desenhar, simular e
   **Generate Programming File** funcionam; programar a placa não (programe o `.bit` descarregado a
   partir de um computador). Os projetos ficam no browser, que o iPadOS pode apagar ao fim de algumas

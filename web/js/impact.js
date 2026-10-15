@@ -62,6 +62,7 @@ export function mountImpact(el) {
   const selectDevice = i => {
     selPos = i;
     const d = sel();
+    bitData = null;   // (a .bit chosen for the other device)
     bitfile.value = d.role === 'prom' ? promFile : fpgaFile;
     promBox.hidden = d.role !== 'prom';
     fpgaBox.hidden = d.role === 'prom';
@@ -83,7 +84,7 @@ export function mountImpact(el) {
         + '• Windows: if Digilent Adept is installed, its driver holds the board; to use it from the browser, give it the WinUSB driver with Zadig (zadig.akeo.ie; Adept then no longer sees it until its driver is put back).\n'
         + '• Linux: allow access to the board (a udev rule: SUBSYSTEM=="usb", ATTR{idVendor}=="1443", MODE="0666").\n'
         + '• Close Adept, iMPACT or the Silinx application first: one program at a time can use the board.\n'
-        + 'The Platform Flash (PROM) is programmed by the full Silinx application.';
+        + 'The Platform Flash (PROM) is programmed the same way: select it in the chain.';
       return;
     }
     help.textContent = board
@@ -124,9 +125,13 @@ export function mountImpact(el) {
     if (op === 'program' && !await confirmDlg('Program PROM', `Erase the ${name} and write ${bitfile.value.trim()}?\n\nThe design will then load automatically at power-up when the board's mode jumper is set to ROM (Basys2: JP3).\nTip: use "Back up PROM" first if it holds something you want to keep.`)) return;
     if (op === 'erase' && !await confirmDlg('Erase PROM', `Erase the whole ${name}? The board will no longer boot a design from flash.`)) return;
     const titles = { program: `Programming ${name}`, verify: `Verifying ${name}`, erase: `Erasing ${name}`, read: `Backing up ${name}`, reconfigure: 'Reloading the FPGA from the PROM' };
-    const oks = { program: `'${selPos + 1}': ${name} programmed${verify.checked ? ' and verified' : ''}${reload.checked ? '; FPGA loaded from the PROM (DONE)' : ''}.`, verify: `${name} verified: contents match.`, erase: `${name} erased.`, read: 'PROM backup saved in build/prom-backup/.', reconfigure: 'FPGA loaded from the PROM (DONE).' };
-    const r = await runJob(titles[op], () => api.prom({ project: pj?.name, board: board?.id, op, bitfile: bitfile.value.trim(), verify: verify.checked, reconfigure: reload.checked }), oks[op]);
-    if (r?.status === 'ok' && op === 'read') app.reloadProject(false);
+    const oks = { program: `'${selPos + 1}': ${name} programmed${verify.checked ? ' and verified' : ''}${reload.checked ? '; FPGA loaded from the PROM (DONE)' : ''}.`, verify: `${name} verified: contents match.`, erase: `${name} erased.`, read: api.standalone ? 'PROM backup downloaded.' : 'PROM backup saved in build/prom-backup/.', reconfigure: 'FPGA loaded from the PROM (DONE).' };
+    const r = await runJob(titles[op], () => api.prom({ project: pj?.name, board: board?.id, op, bitfile: bitfile.value.trim(), verify: verify.checked, reconfigure: reload.checked,
+      ...(bitData ? { bitData } : {}) }), oks[op]);
+    if (r?.status === 'ok' && op === 'read' && r.download) {   // the browser edition: the backup downloaded
+      const a = h('a', { href: r.download.url, download: r.download.filename });
+      document.body.append(a); a.click(); a.remove();
+    } else if (r?.status === 'ok' && op === 'read') app.reloadProject(false);
   };
 
   const loadBitInfo = async () => {
@@ -154,7 +159,8 @@ export function mountImpact(el) {
       h('button', { class: 'btn', onclick: () => prom('reconfigure') }, 'Reload FPGA from PROM')),
     h('div', { style: { color: 'var(--grey-4)', marginTop: '6px' } },
       'The PROM image is build/<top>_prom.bit (generated with StartUpClk:CCLK by "Generate Programming File"). ',
-      'To boot from flash at power-up, set the mode jumper to ROM (Basys2: JP3). Uses adepttool + scripts/xcf_prog.py over the on-board USB.'));
+      'To boot from flash at power-up, set the mode jumper to ROM (Basys2: JP3). ',
+      api.standalone ? 'Programmed over the board\'s USB from the browser (WebUSB).' : 'Uses adepttool + scripts/xcf_prog.py over the on-board USB.'));
 
   page.append(
     h('h2', {}, 'iMPACT — Boundary Scan'),

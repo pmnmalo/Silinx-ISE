@@ -320,7 +320,8 @@ descriptions, the bit database and Yosys in WebAssembly, ~115 MB), with which th
 Silinx toolchain in the browser: *Implement Design* and *Generate Programming File* for the
 Spartan-3E boards (the bitstream is downloaded), and *Configure Target Device* programs the FPGA of
 a Basys2 / Nexys2 over WebUSB (Chrome / Edge; core/adept.js, a port of adepttool's Adept USB
-protocol). XST (Xilinx ISE) and the Platform Flash need the full application (`npm start`).
+protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`). XST (Xilinx ISE)
+needs the full application (`npm start`).
 
 ## Synthesis and bitstreams (Xilinx ISE 14.7)
 
@@ -411,7 +412,8 @@ On the **iMPACT** page, select the PROM in the JTAG chain (Basys2: XCF02S) for *
 (erase → write → verify), *Verify*, *Erase*, *Back up PROM* (saved in `build/prom-backup/`) and
 *Reload FPGA from PROM*. The image is `build/<top>_prom.bit`, generated with `StartUpClk:CCLK` by
 *Generate Programming File*. To boot from flash at power-up, set the mode jumper to **ROM**
-(Basys2: JP3). Uses `scripts/xcf_prog.py` (adepttool) over the board's USB.
+(Basys2: JP3). Uses `scripts/xcf_prog.py` (adepttool) over the board's USB; the browser edition does
+the same over WebUSB (`core/xcf.js`, Chrome / Edge), its backup downloaded as `prom-<date>.bin`.
 
 ## Layout
 

@@ -183,15 +183,19 @@ export class Chain {
     const hi = (await this.port.putTdiBits(true, true, 1, new Uint8Array([Number((num >> BigInt(length - 1)) & 1n)])))[0] & 1;
     return res | (BigInt(hi) << BigInt(length - 1));
   }
-  // a long DR (a bitstream): the data without its last bit, then the last bit with TMS (Exit1-DR)
-  async shiftBytes(data, length) {
-    if (length % 8 === 1) {
-      if (length > 1) await this.port.putTdiBits(false, false, length - 1, data.subarray(0, data.length - 1));
-    } else {
-      await this.port.putTdiBits(false, false, length - 1, data);
+  // a long DR (a bitstream): the data without its last bit, then the last bit with TMS (Exit1-DR);
+  // read: returns what came out of TDO meanwhile (LSB first, as the data)
+  async shiftBytes(data, length, read = false) {
+    const got = new Uint8Array((length + 7) >> 3);
+    if (length > 1) {
+      const r = await this.port.putTdiBits(read, false, length - 1, data.subarray(0, (length + 6) >> 3));
+      if (read) got.set(r.subarray(0, got.length));
     }
-    const fin = (data[data.length - 1] >> ((length - 1) % 8)) & 1;
-    await this.port.putTdiBits(false, true, 1, new Uint8Array([fin]));
+    const at = length - 1, fin = (data[at >> 3] >> (at % 8)) & 1;
+    const last = await this.port.putTdiBits(read, true, 1, new Uint8Array([fin]));
+    if (!read) return null;
+    got[at >> 3] = (got[at >> 3] & ((1 << (at % 8)) - 1)) | ((last[0] & 1) << (at % 8));
+    return got;
   }
 
   // every device's current instruction; returns what each captured (the status of a Xilinx device)

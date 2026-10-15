@@ -223,7 +223,61 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
   await page.click('.doc:not([hidden]) .btn.primary', { text: 'Program FPGA' });
   await page.waitConsole(/Programming FPGA \(SRAM\) failed: the board's FPGA is a XC3S500E, the bitstream is for a XC3S250E/);
   assert.equal(await page.eval(() => window.__board.done), false);
-}, { url: () => 'about:blank', timeout: 240000 });
+
+  // the Platform Flash (#271): Program PROM over WebUSB (core/xcf.js) with build/top_prom.bit, verified,
+  // then the FPGA reloaded from it; the lines of the full application's
+  await page.eval(async (url) => {
+    const { SimAdeptBoard, simUsb } = await import(url);
+    window.__board = Object.assign(new SimAdeptBoard({ fpga: 'xc3s250e', prom: 'xcf02s' }), { granted: true });
+    Object.defineProperty(navigator, 'usb', { value: simUsb(window.__board), configurable: true });
+  }, `${siteUrl}__test/adept-sim.js`);
+  await page.click('.doc:not([hidden]) .impact-dev', { text: 'XCF02S' });
+  await page.waitFor(() => [...document.querySelectorAll('.doc:not([hidden]) input[type=text]')].some((i) => i.value === 'build/top_prom.bit'), [], { what: 'the PROM\'s file' });
+  await page.eval(() => document.querySelectorAll('.doc:not([hidden]) .prom-box input[type=checkbox]')[1].click());   // reload the FPGA from it
+  await page.click('.doc:not([hidden]) .btn.primary', { text: 'Program PROM' });
+  await page.waitDialog('Program PROM');
+  await page.dialogButton('Yes');
+  await page.waitConsole(/'2': XCF02S programmed and verified; FPGA loaded from the PROM \(DONE\)\./, { timeout: 120000 });
+  const promLog = (await page.consoleText()).split('Programming XCF02S...')[1].trim().split('\n').map((l) => l.trimEnd());
+  const blocks = promLog.filter((l) => /^ {2}programmed block/.test(l));
+  const n = +blocks.at(-1).match(/\/(\d+)$/)[1];
+  assert.deepEqual(promLog.map((l) => l.replace(/built \S+ \S+$/, 'built D T').replace(/(part 3s250ecp132) \S+ \S+, \d+ bytes$/, '$1 D T, N bytes')), [
+    'PROM image build/top_prom.bit: design top.ncd, part 3s250ecp132, built D T',
+    'Platform Flash: program + reload FPGA from PROM',
+    'Programmer: Digilent Basys2 (serial 10146A2B3C4D)',
+    'JTAG chain: xcf02s(d5045093), xc3s250e(11c1a093)',
+    'PROM xcf02s: 2048 Kbit, 4096-bit blocks',
+    'bitstream: design top.ncd part 3s250ecp132 D T, N bytes',
+    'erasing...', 'programming...',
+    ...Array.from({ length: n }, (_, i) => i).filter((i) => i % 16 === 0 || i === n - 1).map((i) => `  programmed block ${i + 1}/${n}`),
+    'verifying...', 'verify OK', 'reconfiguring the FPGA from the PROM...', 'STATUS: DONE',
+    'Platform Flash program finished.',
+    "'2': XCF02S programmed and verified; FPGA loaded from the PROM (DONE).",
+  ]);
+  assert.doesNotMatch(await page.consoleText(), /programmed by the full Silinx application/);
+  assert.doesNotMatch(promLog.join('\n'), /WARNING|ERROR|failed/);
+  // the PROM holds the PROM bitstream (StartUpClk:Cclk), and the FPGA took it from the PROM
+  assert.deepEqual(await page.eval(() => window.__board.promDev.errors), []);
+  assert.ok(await page.eval(() => window.__board.done));
+  // (the PROM's whole memory: the configuration from the sync word, as long as the .bit's at least, then the erased cells)
+  const cfg = await page.eval(() => [window.__board.config.length, ...window.__board.config.subarray(0, 4)]);
+  assert.deepEqual(cfg.slice(1), [0xaa, 0x99, 0x55, 0x66]);
+  assert.ok(cfg[0] >= bit.length - sync, `${cfg[0]} bytes from the PROM`);
+  // Back up PROM: the whole PROM read and downloaded (prom-<date>.bin, in the .bit's bit order)
+  await page.click('.doc:not([hidden]) .btn', { text: 'Back up PROM' });
+  await page.waitConsole(/PROM backup downloaded\./, { timeout: 120000 });
+  const backup = (await page.consoleText()).split('Backing up XCF02S...')[1].trim().split('\n').map((l) => l.trimEnd());
+  const name = backup.find((l) => /^PROM backup: /.test(l)).match(/^PROM backup: (prom-[\dTZ-]+\.bin) \(262144 bytes\)$/)?.[1];
+  assert.ok(name, backup.join('\n'));
+  assert.deepEqual(backup.map((l) => l.replace(/\(\d+ bytes before/, '(N bytes before').replace(name, 'F')), [
+    'Platform Flash: read', 'Programmer: Digilent Basys2 (serial 10146A2B3C4D)', 'JTAG chain: xcf02s(d5045093), xc3s250e(11c1a093)',
+    'PROM xcf02s: 2048 Kbit, 4096-bit blocks', 'read 262144 bytes (N bytes before the erased tail)', 'PROM backup: F (262144 bytes)',
+    'Platform Flash read finished.', 'PROM backup downloaded.',
+  ]);
+  const saved = await fs.readFile(await waitDownload(page, name));
+  assert.equal(saved.length, 262144);
+  assert.equal(saved.indexOf(Buffer.from([0xaa, 0x99, 0x55, 0x66])) >= 0, true, 'the sync word, in the .bit\'s bit order');
+}, { url: () => 'about:blank', timeout: 300000 });
 
 // ---- projects in a folder on the disk (File System Access API, Chrome / Edge). The real folder
 // picker cannot be driven headless: the page gets a fake one (test/fixtures/fs-access-fake.js),
@@ -664,4 +718,18 @@ uiTest('browser edition: Generate Post-Synthesis Simulation Model in the browser
   const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return /Simulation finished OK|ERROR/.test(t) ? t : null; }, [], { timeout: 120000, what: 'the simulation of the model' });
   assert.match(out, /Simulation finished OK/);
   assert.doesNotMatch(out, /ERROR/);
+  // Back up PROM: the whole PROM read and downloaded (prom-<date>.bin, in the .bit's bit order)
+  await page.click('.doc:not([hidden]) .btn', { text: 'Back up PROM' });
+  await page.waitConsole(/PROM backup downloaded\./, { timeout: 120000 });
+  const backup = (await page.consoleText()).split('Backing up XCF02S...')[1].trim().split('\n').map((l) => l.trimEnd());
+  const name = backup.find((l) => /^PROM backup: /.test(l)).match(/^PROM backup: (prom-[\dTZ-]+\.bin) \(262144 bytes\)$/)?.[1];
+  assert.ok(name, backup.join('\n'));
+  assert.deepEqual(backup.map((l) => l.replace(/\(\d+ bytes before/, '(N bytes before').replace(name, 'F')), [
+    'Platform Flash: read', 'Programmer: Digilent Basys2 (serial 10146A2B3C4D)', 'JTAG chain: xcf02s(d5045093), xc3s250e(11c1a093)',
+    'PROM xcf02s: 2048 Kbit, 4096-bit blocks', 'read 262144 bytes (N bytes before the erased tail)', 'PROM backup: F (262144 bytes)',
+    'Platform Flash read finished.', 'PROM backup downloaded.',
+  ]);
+  const saved = await fs.readFile(await waitDownload(page, name));
+  assert.equal(saved.length, 262144);
+  assert.equal(saved.indexOf(Buffer.from([0xaa, 0x99, 0x55, 0x66])) >= 0, true, 'the sync word, in the .bit\'s bit order');
 }, { url: () => 'about:blank', timeout: 300000 });

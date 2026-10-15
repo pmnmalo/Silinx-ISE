@@ -44,8 +44,9 @@ That's all. Things to know:
   FPGA** and choose the board in the list the browser shows (only the first time). On Windows, if
   Digilent Adept is installed, its driver holds the board: give it the WinUSB driver with
   [Zadig](https://zadig.akeo.ie) to use it from the browser. On Linux, allow access to the board with a
-  udev rule (`SUBSYSTEM=="usb", ATTR{idVendor}=="1443", MODE="0666"`). Storing the design in the
-  board's flash (PROM) needs Way 2.
+  udev rule (`SUBSYSTEM=="usb", ATTR{idVendor}=="1443", MODE="0666"`). To store the design in the
+  board's flash (PROM), so that it starts at power-up, select the PROM (XCF02S / XCF04S) in the chain
+  and click **Program PROM**, with the mode jumper on ROM (Basys2: JP3).
 - **On an iPad or a tablet** (Safari, or the tablet's browser): editing, drawing, simulation and
   **Generate Programming File** work; programming the board does not (program the downloaded `.bit`
   from a computer). The projects stay in the browser, which iPadOS may clear after some weeks

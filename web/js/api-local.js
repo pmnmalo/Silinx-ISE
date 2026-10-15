@@ -8,8 +8,8 @@
 // (they are too large for localStorage; in a workspace folder they are also written into the
 // project's build/ folder, as the full application does, with build/reports.json and the FPGA
 // view's model: read back from there after a reload) and the bitstream is downloaded. Configure
-// Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge).
-// XST (Xilinx ISE) and the Platform Flash need the full application.
+// Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge),
+// and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
 import { getDeviceDb } from '../../server/devices.js';
 import { exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
 import EXAMPLES from 'silinx-examples';
@@ -17,6 +17,7 @@ import { orderExamples } from '../../core/examples.js';
 import { createZip, readZip, browserCodec, textOf } from '../../core/zip.js';
 import { runBrowserFlow, browserOpenStatus } from './open-flow-browser.js';
 import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from '../../core/adept.js';
+import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { browserStore, folderStore, projectOps, copyProjects, emptyProjectJson, saveBuildResults, readBuildResults, BUILD_VIEW, DEV_SITE } from './project-store.js';
 import { MODEL_VERSION } from '../../core/xdl.js';
 
@@ -86,12 +87,6 @@ function fakeJob(kind, lines, status = 'error', error) {
   return { job: id };
 }
 const FULL_APP = 'the full Silinx application (run `npm start` in the Silinx folder and open http://127.0.0.1:8642; File > Download Project Bundle moves a project there)';
-const NEED_SERVER = [
-  'This is the browser (single HTML file) edition of Silinx: it programs the FPGA (Program FPGA), not the Platform Flash.',
-  `Programming the PROM needs ${FULL_APP}.`,
-];
-// the job's error (the end of "<operation> failed: …")
-const NO_PROM = 'the Platform Flash (PROM) is programmed by the full Silinx application (the browser edition programs the FPGA)';
 const NO_WEBUSB = 'programming from the browser needs Chrome or Edge (WebUSB), with the page opened from https:// or http://localhost (not from a file); or program the downloaded .bit with the full Silinx application, Digilent Adept or iMPACT';
 // the board's Digilent USB (the user chooses it once; the browser remembers the permission)
 async function adeptDevice() {
@@ -103,13 +98,13 @@ async function adeptDevice() {
     fail(e.name === 'NotFoundError' ? 'no board chosen: connect the board\'s USB cable, switch it on and choose it in the browser\'s list' : e.message);
   }
 }
-// a job that talks to the board: its log lines, then ok or the error
+// a job that talks to the board: its log lines, then ok or the error (run(log, job))
 function usbJob(kind, run) {
   const id = `local-${++jobSeq}`;
   const job = { id, kind, status: 'running', lines: [], next: 0, error: null, result: null };
   jobs.set(id, job);
   const push = l => { job.lines.push(l); job.next = job.lines.length; };
-  run(push).then(result => { job.result = result; job.status = 'ok'; })
+  run(push, job).then(result => { job.result = result; job.status = 'ok'; })
     .catch(e => { const m = e.message.replace(/^Adept USB: /, ''); push(`ERROR: ${m}`); job.status = 'error'; job.error = m; });
   return { job: id };
 }
@@ -337,7 +332,30 @@ export const api = {
     return programAdept(await adeptDevice(), bit, { part, log });
   }),
   scan: async () => usbJob('scan', async log => scanAdept(await adeptDevice(), { log })),
-  prom: async () => fakeJob('prom', NEED_SERVER, 'error', NO_PROM),
+  // the Platform Flash (core/xcf.js): { project, op, bitfile, bitData? (a .bit chosen from the disk),
+  // verify, reconfigure }; the lines of the full application's (server/programmer.js promJob); a
+  // backup (read) is downloaded
+  prom: async ({ project, op, bitfile, bitData, verify = true, reconfigure = false } = {}) => usbJob('prom', async (log, job) => {
+    if (!PROM_OPS.includes(op)) fail(`unknown PROM operation '${op}' (valid: ${PROM_OPS.join(', ')})`);
+    let bit = null;
+    if (op === 'program' || op === 'verify') {
+      bit = bitData || await bitOf(project, bitfile);
+      if (!bit) fail(`no bitstream ${bitfile || ''} in this browser: run Generate Programming File first (it writes build/<top>_prom.bit for the PROM), or choose a .bit file`);
+      const hd = bitHeader(bit);
+      if (!hd) fail(`${bitfile || 'the file'} is not a .bit file`);
+      log(`PROM image ${bitfile}: design ${hd.design}, part ${hd.part.replace(/^xc/, '')}${hd.package}, built ${hd.date} ${hd.time}`);
+      if (!/_prom\.bit$/i.test(bitfile || '')) log('WARNING: this does not look like a PROM bitstream (built with StartUpClk:Cclk); a JTAG-clock bitstream will not boot from flash.');
+    }
+    log(`Platform Flash: ${op}${reconfigure && op === 'program' ? ' + reload FPGA from PROM' : ''}`);
+    const r = await promAdept(await adeptDevice(), { op, bit, verify, reconfigure: op === 'program' && reconfigure, log });
+    if (r.data) {
+      const filename = `prom-${new Date().toISOString().replace(/[:.]/g, '-')}.bin`;
+      job.download = { filename, url: URL.createObjectURL(new Blob([r.data], { type: 'application/octet-stream' })) };
+      log(`PROM backup: ${filename} (${r.data.length} bytes)`);
+    }
+    log(`Platform Flash ${op} finished.`);
+    return { op, prom: r.prom };
+  }),
   job: async (id, since = 0) => {
     const j = jobs.get(id) || fail(`job '${id}' not found`);
     return { ...j, lines: j.lines.slice(+since), next: j.lines.length };

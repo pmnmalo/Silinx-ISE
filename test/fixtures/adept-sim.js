@@ -1,13 +1,21 @@
 // A simulated Digilent board for the tests of core/adept.js: the Adept USB firmware (the commands
 // of adepttool/device.py) behind WebUSB's USBDevice methods, and a JTAG chain of TAP controllers
 // (IEEE 1149.1) with a Spartan-3E (IDCODE, BYPASS, JPROGRAM, CFG_IN, JSTART, the status in the
-// captured IR) and a Platform Flash (IDCODE, BYPASS). Runs in Node and in the browser (the UI test
-// installs it as navigator.usb).
+// captured IR) and a Platform Flash (IDCODE, BYPASS, its in-system programming for core/xcf.js).
+// Runs in Node and in the browser (the UI test installs it as navigator.usb).
 //   const board = new SimAdeptBoard({ fpga: 'xc3s250e' });  board.config: the bytes the FPGA took
-//   (from its sync word), board.done: DONE.
+//   (from its sync word), board.done: DONE; board.promDev: the PROM (mem, ops, errors).
 
-const IDS = { xc3s100e: 0x11c10093, xc3s250e: 0x11c1a093, xc3s500e: 0x11c22093, xc3s1200e: 0x11c2e093, xcf02s: 0xd5045093, xcf04s: 0xd5046093 };
+const IDS = { xc3s100e: 0x11c10093, xc3s250e: 0x11c1a093, xc3s500e: 0x11c22093, xc3s1200e: 0x11c2e093, xcf01s: 0xd5044093, xcf02s: 0xd5045093, xcf04s: 0xd5046093 };
 const SYNC = 0xaa995566;
+
+// a data register: its bits (LSB, the next out on TDO, first); captureDr gives [value, length] or { bits }
+const reg = c => {
+  if (c.bits) return { bits: [...c.bits], off: 0, n: c.bits.length };
+  const [v, n] = c, bits = [];
+  for (let i = 0; i < n; i++) bits.push(Number((BigInt(v) >> BigInt(i)) & 1n));
+  return { bits, off: 0, n };
+};
 
 // TAP states and their successors on TMS = 0 / 1
 const NEXT = {
@@ -30,6 +38,8 @@ class Fpga {
     if (!this.init && --this.initDelay <= 0) this.init = true;
     if (state === 'RTI' && this.ir === 0x0c && ++this.startClocks >= 8 && !this.done) this.start();
   }
+  // the configuration of a Platform Flash (master serial: its bits in order, CCLK)
+  configureFrom(bits) { this.done = false; this.config = null; this.stream = bits; this.start(); this.stream = []; }
   start() {
     // the configuration from the sync word on (MSB first, as the FPGA reads it)
     const bits = this.stream;
@@ -47,25 +57,106 @@ class Fpga {
     }
   }
 }
+// the Platform Flash: IDCODE, BYPASS and its in-system programming (the instructions core/xcf.js
+// uses, DS123 / the XCF0xS BSDL): the memory, erase and program taking TCK clocks in Run-Test/Idle,
+// the ISC status, CONFIG (the FPGA configured from the memory, the mode jumper on ROM). What breaks
+// the protocol (a program before an erase, ISC outside ISC mode, a wrong length…) goes to errors.
+const ISC = { ENABLE: 0xe8, PROGRAM: 0xea, ADDRESS: 0xeb, ERASE: 0xec, DATA: 0xed, CONFIG: 0xee, READ: 0xef, DISABLE: 0xf0, STATUS: 0xe3 };
 class Prom {
-  constructor(name) { Object.assign(this, { name, irLen: 8, idcode: IDS[name], idInstr: 0xfe }); this.reset(); }
+  constructor(name, { writeProtected = false, eraseClocks = 5000, programClocks = 200, failBlock = null } = {}) {
+    const [size, block] = { xcf01s: [1 << 20, 2048], xcf02s: [2 << 20, 4096], xcf04s: [4 << 20, 4096] }[name];
+    Object.assign(this, { name, irLen: 8, idcode: IDS[name], idInstr: 0xfe, size, block, writeProtected, eraseClocks, programClocks, failBlock });
+    this.mem = new Uint8Array(size).fill(1);   // one bit per entry, in the order they are shifted in (and out to the FPGA)
+    this.written = new Uint8Array(size / block);   // blocks programmed since the last erase
+    this.isc = false; this.addr = 0; this.data = null; this.busy = 0; this.pendingOp = null;
+    this.errors = []; this.ops = []; this.fpga = null; this.mode = 'rom';
+    this.reset();
+  }
   reset() { this.ir = this.idInstr; }
-  captureIr() { return 0x01; }
-  update() {}
-  captureDr() { return this.ir === this.idInstr ? [this.idcode, 32] : [0, 1]; }
+  captureIr() { return 0x01 | (this.writeProtected ? 0x08 : 0) | (this.isc ? 0x10 : 0); }
+  error(m) { this.errors.push(m); }
+  update() {
+    const ir = this.ir;
+    if (ir === ISC.ERASE) {
+      if (!this.isc) return this.error('ISC_ERASE outside ISC mode');
+      if (this.addr !== 1) return this.error(`ISC_ERASE with the address ${this.addr} (not 1)`);
+      if (this.writeProtected) return this.error('ISC_ERASE of a write-protected PROM');
+      this.busy = this.eraseClocks; this.pendingOp = 'erase';
+    } else if (ir === ISC.PROGRAM) {
+      if (!this.isc) return this.error('ISC_PROGRAM outside ISC mode');
+      if (!this.data) return this.error('ISC_PROGRAM with no data shifted');
+      if (this.addr % 32) return this.error(`ISC_PROGRAM at frame ${this.addr} (not a block's first)`);
+      const b = this.addr / 32;
+      if (b >= this.written.length) return this.error(`ISC_PROGRAM past the end (block ${b})`);
+      if (this.written[b]) return this.error(`block ${b} programmed twice without an erase`);
+      for (let i = 0; i < this.block; i++) if (!this.mem[b * this.block + i]) return this.error(`block ${b} programmed before an erase`);
+      this.busy = this.programClocks; this.pendingOp = 'program';
+    } else if (ir === ISC.DISABLE) {
+      if (this.isc) this.ops.push('disable');
+      this.isc = false;
+    } else if (ir === ISC.CONFIG) {
+      if (this.isc) return this.error('CONFIG in ISC mode');
+      this.ops.push('config');
+      if (this.fpga && this.mode === 'rom') this.fpga.configureFrom(this.mem);
+    }
+  }
+  finish() {
+    if (this.pendingOp === 'erase') { this.mem.fill(1); this.written.fill(0); this.ops.push('erase'); }
+    if (this.pendingOp === 'program') {
+      const b = this.addr / 32;
+      // a flash cell only goes from 1 to 0
+      for (let i = 0; i < this.block; i++) this.mem[b * this.block + i] &= this.data[i] ^ (b === this.failBlock && i === 5 ? 1 : 0);
+      this.written[b] = 1;
+      this.ops.push(`program ${b}`);
+      this.data = null;
+    }
+    this.pendingOp = null;
+  }
+  captureDr() {
+    switch (this.ir) {
+      case this.idInstr: return [this.idcode, 32];
+      case ISC.ENABLE: return [0, 6];
+      case ISC.ADDRESS: return [0, 16];
+      case ISC.STATUS: return [this.busy ? 0x00 : 0x04, 8];
+      case ISC.DATA: return { bits: new Array(this.block).fill(0) };
+      case ISC.READ: {
+        if (!this.isc) { this.error('ISC_READ outside ISC mode'); return { bits: new Array(this.block).fill(0) }; }
+        const b = this.addr / 32;
+        this.ops.push(`read ${b}`);
+        return { bits: [...this.mem.subarray(b * this.block, (b + 1) * this.block)] };
+      }
+      default: return [0, 1];
+    }
+  }
+  updateDr(bits) {
+    const num = () => bits.reduce((v, b, i) => v | (b << i), 0);
+    if (this.ir === ISC.ENABLE) {
+      if (bits.length !== 6) return this.error(`ISC_ENABLE with ${bits.length} bits`);
+      this.isc = true; this.enableCode = num(); this.ops.push(`enable 0x${this.enableCode.toString(16)}`);
+    } else if (this.ir === ISC.ADDRESS) {
+      if (bits.length !== 16) return this.error(`ISC_ADDRESS_SHIFT with ${bits.length} bits`);
+      this.addr = num();
+    } else if (this.ir === ISC.DATA) {
+      if (bits.length !== this.block) return this.error(`ISC_DATA_SHIFT with ${bits.length} bits`);
+      if (!this.isc) return this.error('ISC_DATA_SHIFT outside ISC mode');
+      this.data = bits;
+    }
+  }
   shiftedIn() {}
-  clock() {}
+  clock(state) { if (state === 'RTI' && this.busy && --this.busy === 0) this.finish(); }
 }
 
 export class SimAdeptBoard {
   /** chain: the devices from TDI to TDO (the Basys2: the FPGA, then the PROM). */
-  constructor({ fpga = 'xc3s250e', prom = 'xcf02s', product = 'Basys2', serial = '10146A2B3C4D', inUse = false } = {}) {
+  /** promOptions: the Platform Flash's (writeProtected, eraseClocks, programClocks, failBlock); mode: the jumper ('rom' / 'jtag'). */
+  constructor({ fpga = 'xc3s250e', prom = 'xcf02s', product = 'Basys2', serial = '10146A2B3C4D', inUse = false, promOptions = {}, mode = 'rom' } = {}) {
     this.fpgaDev = new Fpga(fpga);
-    this.chain = [this.fpgaDev, ...(prom ? [new Prom(prom)] : [])];
+    this.promDev = prom ? Object.assign(new Prom(prom, promOptions), { fpga: this.fpgaDev, mode }) : null;
+    this.chain = [this.fpgaDev, ...(prom ? [this.promDev] : [])];
     Object.assign(this, { product, serial, inUse, vendorId: 0x1443, productId: 0x0007, productName: `Digilent ${product}` });
     this.state = 'TLR';
     this.irs = this.chain.map(() => 0);
-    this.drs = this.chain.map(() => [0, 1]);
+    this.drs = this.chain.map(() => reg([0, 1]));
     this.opened = false; this.configuration = null; this.claimed = false;
     this.replies = []; this.pending = null; this.log = [];
   }
@@ -76,7 +167,7 @@ export class SimAdeptBoard {
   tck(tms, tdi) {
     const last = this.chain.length - 1;
     let tdo = 0;
-    if (this.state === 'SDR') tdo = Number(BigInt(this.drs[last][0]) & 1n);
+    if (this.state === 'SDR') tdo = this.drs[last].bits[this.drs[last].off];
     if (this.state === 'SIR') tdo = this.irs[last] & 1;
     switch (this.state) {
       case 'CIR': this.irs = this.chain.map(d => d.captureIr()); break;
@@ -85,14 +176,14 @@ export class SimAdeptBoard {
         this.chain.forEach((d, i) => { const out = this.irs[i] & 1; this.irs[i] = (this.irs[i] >> 1) | (bit << (d.irLen - 1)); bit = out; });
         break;
       }
-      case 'CDR': this.drs = this.chain.map(d => { const [v, n] = d.captureDr(); return [BigInt(v), n]; }); break;
+      case 'CDR': this.drs = this.chain.map(d => reg(d.captureDr())); break;
       case 'SDR': {
         let bit = tdi;
         this.chain.forEach((d, i) => {
           d.shiftedIn(bit);
-          const [v, n] = this.drs[i];
-          const out = Number(v & 1n);
-          this.drs[i] = [(v >> 1n) | (BigInt(bit) << BigInt(n - 1)), n];
+          const r = this.drs[i];
+          const out = r.bits[r.off];
+          r.bits[r.off + r.n] = bit; r.off++;
           bit = out;
         });
         break;
@@ -101,6 +192,7 @@ export class SimAdeptBoard {
     }
     const next = NEXT[this.state][tms ? 1 : 0];
     if (next === 'UIR') this.chain.forEach((d, i) => { d.ir = this.irs[i]; d.update(); });
+    if (next === 'UDR') this.chain.forEach((d, i) => d.updateDr?.(this.drs[i].bits.slice(this.drs[i].off, this.drs[i].off + this.drs[i].n)));
     if (next === 'TLR') this.chain.forEach(d => d.reset());
     this.state = next;
     this.chain.forEach(d => d.clock(this.state));
