@@ -5,7 +5,7 @@
 // reconfigure (the FPGA configured from the PROM's bits), the image's bit order, the errors.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { promAdept, promImage, bitFields, xcfSize, Xcf, NOT_DONE } from '../core/xcf.js';
+import { promAdept, promImage, bitFields, xcfSize, Xcf, NOT_DONE, PROGRAM_S, tckRate } from '../core/xcf.js';
 import { Adept, Djtg, Chain } from '../core/adept.js';
 import { SimAdeptBoard } from './fixtures/adept-sim.js';
 
@@ -225,4 +225,59 @@ sys.stdout.write(b''.join(out).hex())`;
   if (run.error) return;   // no Python 3 on this machine
   assert.equal(run.status, 0, run.stderr);
   assert.equal(run.stdout, Buffer.from(promImage(bitFields(bit).data, 4096)).toString('hex'));
+});
+
+// #274: each Adept command is ~5 USB transfers (~1 ms each over WebUSB); a JTAG step a command made
+// an XC3S250E design (331 blocks) ~100,000 transfers. The blocks now go out as streams: the
+// transfers of programming + verifying it counted (and the program waits at the port's TCK rate)
+const counted = board => {
+  const n = { all: 0 }, out = board.transferOut.bind(board), inn = board.transferIn.bind(board);
+  board.transferOut = (...a) => { n.all++; return out(...a); };
+  board.transferIn = (...a) => { n.all++; return inn(...a); };
+  return n;
+};
+test('program + verify of an XC3S250E design (331 blocks) in fewer than 3000 USB transfers; the program time clocked at the port\'s TCK rate', async () => {
+  const board = new SimAdeptBoard();   // GET_SPEED: 4 MHz
+  const { bit, data } = fakeBit(169000);
+  const n = Math.ceil(data.length * 8 / 4096);
+  assert.equal(n, 331);
+  const c = counted(board), per = {};
+  let phase = 'setup', at = 0;
+  const lines = [];
+  await promAdept(board, { op: 'program', bit, sleep: async () => {}, log: l => { lines.push(l); if (/^(erasing|programming|verifying)\.\.\.$/.test(l)) { per[phase] = c.all - at; at = c.all; phase = l; } } });
+  per[phase] = c.all - at;
+  assert.deepEqual(lines.slice(4), ['erasing...', 'programming...', ...blockLines(n), 'verifying...', 'verify OK']);
+  assert.deepEqual(board.promDev.errors, []);
+  assert.ok(c.all < 3000, `${c.all} transfers: ${JSON.stringify(per)}`);
+  assert.ok(per['programming...'] < 600 && per['verifying...'] < 100, JSON.stringify(per));
+  // every block given its whole program time (PROGRAM_S at the port's 4 MHz) in Run-Test/Idle: a PROM
+  // that takes all of it still programs every block
+  const slow = new SimAdeptBoard({ promOptions: { programClocks: Math.floor(PROGRAM_S * 4e6) } });
+  await promAdept(slow, { op: 'program', bit: fakeBit(3000).bit, sleep: async () => {} });
+  assert.deepEqual(slow.promDev.errors, []);
+});
+
+test('the program wait: TCK_HZ at least, the PROM\'s 10 MHz when the port does not say its rate', async () => {
+  const a = await new Adept(new SimAdeptBoard({ tckHz: 6_000_000 })).open();
+  assert.equal(await tckRate(new Djtg(a, 0)), 6_000_000);
+  const b = await new Adept(new SimAdeptBoard({ tckHz: 1_000_000 })).open();
+  assert.equal(await tckRate(new Djtg(b, 0)), 2_000_000);
+  const board = new SimAdeptBoard({ tckHz: null });
+  const c = await new Adept(board).open();
+  assert.equal(await tckRate(new Djtg(c, 0)), 10_000_000);
+  // and the commands after the refused one still work
+  await promAdept(board, { op: 'program', bit: fakeBit(1000).bit, sleep: async () => {} });
+  assert.deepEqual(board.promDev.errors, []);
+});
+
+test('a program wait too short for the PROM: the next block\'s instruction cuts it short, verify / the status fail', async () => {
+  // the PROM needs 1000 clocks a block, the wait is PROGRAM_S x 20 kHz = 400
+  const board = new SimAdeptBoard({ promOptions: { programClocks: 1000 } });
+  const { bit } = fakeBit(1500);
+  await assert.rejects(promAdept(board, { op: 'program', bit, ...FAST }), /^Error: Adept USB: verify FAILED at byte 8 \(block 0\): read ff expected 55$/);
+  assert.deepEqual(board.promDev.errors, ['DATA while the program runs', 'DATA while the program runs']);
+  assert.deepEqual(board.promDev.ops.filter(o => /^program/.test(o)), ['program 2'], 'only the last block programmed');
+  // one block, still programming after the status polls: the existing error
+  const one = new SimAdeptBoard({ promOptions: { programClocks: 1e6 } });
+  await assert.rejects(promAdept(one, { op: 'program', bit: fakeBit(100).bit, ...FAST }), /^Error: Adept USB: programming block 0 did not complete \(timeout 0\.1 s\)$/);
 });

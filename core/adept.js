@@ -22,6 +22,7 @@ const APP_SYS = 0, APP_DMGT = 1, APP_DJTG = 2;
 const CAPS_DJTG = 0x1;
 const CMD_SYS_RESET = 3;
 const CMD_APP_ENABLE = 0, CMD_APP_DISABLE = 1, CMD_APP_GET_PORTS = 2;
+const CMD_DJTG_GET_SPEED = 4;
 const CMD_DJTG_CLOCK_TCK = 7, CMD_DJTG_PUT_TDI_BITS = 8, CMD_DJTG_GET_TDO_BITS = 9, CMD_DJTG_PUT_TMS_TDI_BITS = 10;
 const ERRORS = { 3: 'the JTAG port is in use (another program: Adept, iMPACT?)', 4: 'the port is disabled', 49: 'unknown application', 50: 'unknown command' };
 
@@ -112,6 +113,8 @@ export class Djtg {
   long(c, payload, send, recvLen) { return this.adept.cmdLong(APP_DJTG, c, this.port, payload, send, recvLen); }
   enable() { return this.cmd(CMD_APP_ENABLE, [], 0); }
   disable() { return this.cmd(CMD_APP_DISABLE, [], 0); }
+  // the TCK frequency the port runs at (Hz)
+  async getSpeed() { return rd32(await this.cmd(CMD_DJTG_GET_SPEED, [], 4)); }
 
   async clockTck(tms, tdi, bits) {
     const { sent, recvd } = await this.long(CMD_DJTG_CLOCK_TCK, [+tms, +tdi, ...le32(bits)], null, 0);
@@ -219,6 +222,80 @@ export class Chain {
 
   async instr(dev, cmd) { dev.cur = cmd; await this.shiftIr(); }
   async status(dev) { return (await this.shiftIr())[this.devices.indexOf(dev)]; }
+}
+
+// ---- whole JTAG operations in one stream
+// Every command of the Adept costs about five USB transfers (command and reply, the data, the
+// counts), each ~1 ms over WebUSB: a sequence of TAP moves, IR and DR shifts and Run-Test/Idle
+// clocks is composed here as TMS / TDI pairs and sent with one PUT_TMS_TDI_BITS (in pieces of
+// STREAM_CLOCKS, below the bitstreams the port already takes in one command), TDO captured only
+// where a shift is read. The TAP starts and ends in Run-Test/Idle or an Update state, as Chain's.
+export const STREAM_CLOCKS = 1 << 19;   // 128 KB of TMS / TDI pairs a command
+
+// a read shift's bits out of the captured TDO: .bytes (LSB first), .num
+class Capture {
+  constructor(at, n) { Object.assign(this, { at, n, bytes: null }); }
+  get num() { let v = 0n; for (let i = this.bytes.length - 1; i >= 0; i--) v = (v << 8n) | BigInt(this.bytes[i]); return Number(v); }
+}
+const bytesOfNum = (num, n) => bytesOfBig(BigInt(num), (n + 7) >> 3);
+
+export class JtagSeq {
+  constructor(chain) { this.chain = chain; this.buf = new Uint8Array(1 << 12); this.n = 0; this.reads = []; }
+  get clocks() { return this.n; }
+  clock(tms, tdi = 0) {
+    if (this.n === this.buf.length) { const b = new Uint8Array(this.buf.length * 2); b.set(this.buf); this.buf = b; }
+    this.buf[this.n++] = (tms ? 2 : 0) | (tdi ? 1 : 0);
+  }
+  // n bits of data (LSB first; null: zeros), TMS high on the last one when exit
+  shift(data, n, exit = false) {
+    for (let i = 0; i < n; i++) this.clock(exit && i === n - 1, data ? (data[i >> 3] >> (i & 7)) & 1 : 0);
+  }
+  // the TDO of the next n clocks, filled in by run()
+  capture(n) { const c = new Capture(this.n, n); this.reads.push(c); return c; }
+  // Run-Test/Idle, then n clocks there (Chain.clockRti)
+  rti(n) { for (let i = 0; i <= n; i++) this.clock(0); }
+  // every device's current instruction (dev's set to cmd) to Update-IR; returns what dev captured
+  ir(dev, cmd) {
+    const ds = this.chain.devices;
+    dev.cur = cmd;
+    this.clock(1); this.clock(1); this.clock(0); this.clock(0);   // Select-DR, Select-IR, Capture-IR, Shift-IR
+    let got = null;
+    ds.forEach((d, i) => {
+      if (d === dev) got = this.capture(d.irLen);
+      this.shift(bytesOfNum(d.cur, d.irLen), d.irLen, i === ds.length - 1);
+    });
+    this.clock(1);   // Update-IR
+    return got;
+  }
+  // dev's data register (data: bytes LSB first, a number, or null: zeros) to Update-DR, the other
+  // devices in BYPASS; read: returns what came out of dev's register
+  dr(dev, data, n, read = false) {
+    const ds = this.chain.devices, idx = ds.indexOf(dev), last = idx === ds.length - 1;
+    if (typeof data === 'number' || typeof data === 'bigint') data = bytesOfNum(data, n);
+    this.clock(1); this.clock(0); this.clock(0);   // Select-DR, Capture-DR, Shift-DR
+    this.shift(null, idx);   // the BYPASS bits of the devices nearer TDO
+    const got = read ? this.capture(n) : null;
+    this.shift(data, n, last);
+    if (!last) this.shift(null, ds.length - 1 - idx, true);
+    this.clock(1);   // Update-DR
+    return got;
+  }
+  // the stream out (TDO read only in the pieces that hold a capture); the captures filled in
+  async run() {
+    const n = this.n, reads = this.reads, tdo = reads.length ? new Uint8Array((n + 7) >> 3) : null;
+    for (let s = 0; s < n; s += STREAM_CLOCKS) {
+      const m = Math.min(STREAM_CLOCKS, n - s), data = new Uint8Array((m + 3) >> 2);
+      for (let i = 0; i < m; i++) data[i >> 2] |= this.buf[s + i] << ((i & 3) << 1);
+      const oe = reads.some(c => c.at < s + m && c.at + c.n > s);
+      const got = await this.chain.port.putTmsTdiBits(oe, m, data);
+      if (oe) tdo.set(got.subarray(0, (m + 7) >> 3), s >> 3);
+    }
+    for (const c of reads) {
+      c.bytes = new Uint8Array((c.n + 7) >> 3);
+      for (let i = 0; i < c.n; i++) c.bytes[i >> 3] |= ((tdo[(c.at + i) >> 3] >> ((c.at + i) & 7)) & 1) << (i & 7);
+    }
+    this.n = 0; this.reads = [];
+  }
 }
 
 // Spartan-3E configuration instructions and status bits (UG332)

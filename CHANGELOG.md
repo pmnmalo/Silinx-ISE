@@ -3,6 +3,28 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.10.20
+
+In short:
+
+- **Faster Platform Flash from the browser:** programming and verifying the PROM of the Basys2 /
+  Nexys2 from the browser edition now takes seconds instead of minutes.
+
+In detail:
+
+- **PROM programming over WebUSB in streams (#274):** `core/xcf.js` sent every JTAG step as its own
+  Adept command (about five USB transfers, ~1 ms each over WebUSB), and polled the PROM's status
+  after each block: about 100,000 transfers to program and verify an XC3S250E design (331 blocks).
+  The steps are now composed into whole JTAG streams (`JtagSeq` in `core/adept.js`: the TAP moves,
+  the IR of the whole chain, the DR with the other devices in BYPASS, the Run-Test/Idle clocks, TDO
+  read only where needed), sent with one PUT_TMS_TDI_BITS for several blocks: each block's
+  ISC_DATA_SHIFT, ISC_ADDRESS_SHIFT and ISC_PROGRAM followed by its maximum program time (14 ms, with
+  margin 20 ms) clocked in Run-Test/Idle, counted at the TCK rate the Adept reports (GET_SPEED), the
+  status checked once after the last block; the verify reads several blocks a stream. The same
+  design now takes about 540 transfers. The console lines, the errors and the ISC protocol are those
+  of before; the simulated PROM now also flags an instruction that cuts a program short (a wait too
+  short), and a test counts the transfers. The full application's `scripts/xcf_prog.py` is unchanged.
+
 ## 15.10.19
 
 In short:

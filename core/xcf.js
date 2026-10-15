@@ -13,7 +13,7 @@
 // sends a byte's bit 0 first, the FPGA reads a byte MSB first), padded with 0xFF to whole blocks.
 // The .bit for the PROM is generated with StartUpClk:CCLK (build/<top>_prom.bit).
 
-import { Adept, Djtg, Chain, byterev, bitHeader } from './adept.js';
+import { Adept, Djtg, Chain, JtagSeq, STREAM_CLOCKS, byterev, bitHeader } from './adept.js';
 
 // XCF instructions (8-bit IR)
 export const XCF = {
@@ -22,6 +22,10 @@ export const XCF = {
 };
 export const FRAMES_PER_BLOCK = 32;
 const TCK_HZ = 2_000_000;   // a conservative effective TCK rate of the Adept JTAG port (nominal 4 MHz)
+const MAX_TCK_HZ = 10_000_000;   // the XCF0xS's fastest TCK (DS123, TAP timing: TCKMIN 100 ns)
+// the longest a block takes to program: 14 ms (the fixed wait after ISC_PROGRAM of Xilinx's XCF00S
+// algorithm, as xc3sprog's progalgxcf.cpp has it, also its poll limit of 28 x 0.5 ms), with margin
+export const PROGRAM_S = 0.02;
 // the XCF0xS by IDCODE bits 19..12: [size in bits, bits per block]
 const SIZES = { 0x44: [1 << 20, 2048], 0x45: [2 << 20, 4096], 0x46: [4 << 20, 4096] };
 const ST_DONE = 0x20;   // the Spartan-3E's DONE in its captured IR
@@ -72,34 +76,36 @@ export function xcfSize(idcode) {
 }
 
 /** The PROM of a chain (core/adept.js Chain) and its ISC operations (xcf_prog.py's class Xcf). */
+// Each operation goes out as one JTAG stream (core/adept.js JtagSeq), the blocks of a program or a
+// read several to a stream: a few USB transfers where a command a step took hundreds a block.
 export class Xcf {
   constructor(chain, dev, { tckHz = TCK_HZ } = {}) {
     Object.assign(this, { chain, dev, tckHz }, xcfSize(dev.idcode));
     for (const d of chain.devices) d.cur = (1 << d.irLen) - 1;   // everything else in BYPASS
   }
 
-  async ir(cmd) { this.dev.cur = cmd; return (await this.chain.shiftIr())[this.chain.devices.indexOf(this.dev)]; }
-  async drNum(value, bits) {
-    let out;
-    await this.chain.shiftDr(this.dev, async last => { out = Number(await this.chain.shiftNum(value, bits, last)); });
-    return out;
-  }
-  async drBytes(data, bits, read = false) {
-    let out = null;
-    await this.chain.shiftDr(this.dev, async last => {
-      if (last) out = await this.chain.shiftBytes(data, bits, read);
-      else out = await this.port().putTdiBits(read, false, bits, data);   // (devices nearer TDI follow)
-    });
-    return out;
-  }
-  port() { return this.chain.port; }
+  seq() { return new JtagSeq(this.chain); }
+  // TCK cycles for at least `seconds` (and minTck)
+  clocks(seconds, minTck = 1) { return Math.max(minTck, Math.floor(seconds * this.tckHz)); }
+  // one instruction: what the PROM captured in its IR (its status bits)
+  async ir(cmd) { const s = this.seq(), got = s.ir(this.dev, cmd); await s.run(); return got.num; }
   // stay in Run-Test/Idle clocking TCK for at least `seconds` (and minTck cycles)
-  wait(seconds, minTck = 1) { return this.chain.clockRti(Math.max(minTck, Math.floor(seconds * this.tckHz))); }
+  wait(seconds, minTck = 1) { return this.chain.clockRti(this.clocks(seconds, minTck)); }
+  // ISC_ADDRESS_SHIFT of a frame, into a stream
+  address(s, frame) {
+    s.ir(this.dev, XCF.ISC_ADDRESS_SHIFT);
+    s.rti(1);
+    s.dr(this.dev, frame, 16);
+    s.rti(1);
+  }
 
   async status() {
-    await this.ir(XCF.ISCTESTSTATUS);
-    await this.wait(0, 1);
-    return this.drNum(0, 8);
+    const s = this.seq();
+    s.ir(this.dev, XCF.ISCTESTSTATUS);
+    s.rti(1);
+    const got = s.dr(this.dev, 0, 8, true);
+    await s.run();
+    return got.num;
   }
   // the ISC status's 'done' bit (0x04), TCK clocked between the polls
   async waitReady(step, timeout, what) {
@@ -110,20 +116,16 @@ export class Xcf {
     fail(`${what} did not complete (timeout ${timeout.toFixed(1)} s)`);
   }
   async enable(code = 0x37) {
-    await this.ir(XCF.ISC_ENABLE);
-    await this.drNum(code, 6);
-    await this.wait(0, 1);
+    const s = this.seq();
+    s.ir(this.dev, XCF.ISC_ENABLE);
+    s.dr(this.dev, code, 6);
+    s.rti(1);
+    await s.run();
   }
   async disable() {
     await this.ir(XCF.ISC_DISABLE);
     await this.wait(0.11);
     await this.ir(XCF.BYPASS);
-    await this.wait(0, 1);
-  }
-  async address(frame) {
-    await this.ir(XCF.ISC_ADDRESS_SHIFT);
-    await this.wait(0, 1);
-    await this.drNum(frame, 16);
     await this.wait(0, 1);
   }
   async writeProtected() {
@@ -136,8 +138,10 @@ export class Xcf {
   async erase() {
     if (await this.writeProtected()) fail('the PROM is write protected');
     await this.enable();
-    await this.address(1);
-    await this.ir(XCF.ISC_ERASE);
+    const s = this.seq();
+    this.address(s, 1);
+    s.ir(this.dev, XCF.ISC_ERASE);
+    await s.run();
     await this.waitReady(0.1, 20, 'erase');   // typically ~4 s on an XCF02S
     await this.disable();
   }
@@ -145,31 +149,47 @@ export class Xcf {
     const nbits = data.length * 8;
     if (nbits > this.size) fail(`bitstream (${nbits} bits) does not fit the PROM (${this.size} bits): the ${this.dev.name.toUpperCase()} holds ${this.size / 1024} Kbit`);
   }
+  // per block ISC_DATA_SHIFT, ISC_ADDRESS_SHIFT, ISC_PROGRAM and the block's program time clocked in
+  // Run-Test/Idle (PROGRAM_S: no poll a block), blocks streamed together; the status checked once,
+  // after the last block (a block that did not program shows in the verify)
   async program(data, log = () => {}) {
     this.checkFits(data);
     const bpb = this.block / 8, image = promImage(data, this.block), n = image.length / bpb;
     await this.ir(XCF.ISC_DISABLE);
     await this.wait(0.001);
     await this.enable();
-    for (let i = 0; i < n; i++) {
-      await this.ir(XCF.ISC_DATA_SHIFT);
-      await this.drBytes(image.subarray(i * bpb, (i + 1) * bpb), this.block);
-      await this.address(i * FRAMES_PER_BLOCK);
-      await this.ir(XCF.ISC_PROGRAM);
-      await this.waitReady(0.0005, 0.05, `programming block ${i}`);
-      if (i % 16 === 0 || i === n - 1) log(`  programmed block ${i + 1}/${n}`);
+    const s = this.seq(), wait = this.clocks(PROGRAM_S);
+    for (let i = 0, from = 0; i < n; i++) {
+      s.ir(this.dev, XCF.ISC_DATA_SHIFT);
+      s.dr(this.dev, image.subarray(i * bpb, (i + 1) * bpb), this.block);
+      this.address(s, i * FRAMES_PER_BLOCK);
+      s.ir(this.dev, XCF.ISC_PROGRAM);
+      s.rti(wait);
+      if (s.clocks + wait + 2 * this.block > STREAM_CLOCKS || i === n - 1) {
+        await s.run();
+        for (; from <= i; from++) if (from % 16 === 0 || from === n - 1) log(`  programmed block ${from + 1}/${n}`);
+      }
     }
+    await this.waitReady(0.0005, 0.05, `programming block ${n - 1}`);
     await this.disable();
   }
-  // the first nbits of the PROM, as stored (bits of each byte reversed)
+  // the first nbits of the PROM, as stored (bits of each byte reversed): per block its address,
+  // ISC_READ, the read's TCK cycles and the block shifted out, blocks streamed together
   async read(nbits) {
     const bpb = this.block / 8, n = this.blocks(nbits), out = new Uint8Array(n * bpb);
     await this.enable(0x34);
+    const s = this.seq(), wait = this.clocks(0.00005, 1);   // the read happens during these TCK cycles
+    let got = [];
     for (let i = 0; i < n; i++) {
-      await this.address(i * FRAMES_PER_BLOCK);
-      await this.ir(XCF.ISC_READ);
-      await this.wait(0.00005, 1);   // the read happens during these TCK cycles
-      out.set(await this.drBytes(new Uint8Array(bpb), this.block, true), i * bpb);
+      this.address(s, i * FRAMES_PER_BLOCK);
+      s.ir(this.dev, XCF.ISC_READ);
+      s.rti(wait);
+      got.push([i, s.dr(this.dev, null, this.block, true)]);
+      if (s.clocks + wait + 2 * this.block > STREAM_CLOCKS || i === n - 1) {
+        await s.run();
+        for (const [j, c] of got) out.set(c.bytes, j * bpb);
+        got = [];
+      }
     }
     await this.disable();
     return out.subarray(0, (nbits + 7) >> 3);
@@ -186,6 +206,18 @@ export class Xcf {
     await this.ir(XCF.BYPASS);
     await this.wait(0, 1);
   }
+}
+
+/**
+ * The TCK rate the waits are counted at: the port's (DJTG GET_SPEED), at least TCK_HZ (a wait then
+ * lasts at least its time); when the port does not say, the PROM's maximum TCK (DS123: 10 MHz).
+ */
+export async function tckRate(port) {
+  try {
+    const hz = await port.getSpeed();
+    if (hz > 0) return Math.max(TCK_HZ, hz);
+  } catch { /* an Adept without the command */ }
+  return MAX_TCK_HZ;
 }
 
 export const PROM_OPS = ['program', 'verify', 'erase', 'read', 'reconfigure'];
@@ -214,7 +246,7 @@ export async function promAdept(usb, { op, bit = null, verify = true, reconfigur
     const prom = chain.devices.find(d => d.kind === 'prom');
     if (!prom) fail(`no XCF Platform Flash in the JTAG chain (found ${chain.devices.map(d => d.name.toUpperCase()).join(', ')})`);
     const fpga = chain.devices.find(d => d.kind === 'fpga') || null;
-    const x = new Xcf(chain, prom, { tckHz });
+    const x = new Xcf(chain, prom, { tckHz: tckHz ?? await tckRate(chain.port) });
     const wp = await x.writeProtected();
     log(`PROM ${prom.name}: ${x.size / 1024} Kbit, ${x.block}-bit blocks${wp ? ', WRITE PROTECTED' : ''}`);
     let result = { op, prom: prom.name };

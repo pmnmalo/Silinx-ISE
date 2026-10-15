@@ -77,6 +77,12 @@ class Prom {
   error(m) { this.errors.push(m); }
   update() {
     const ir = this.ir;
+    // an erase / a program runs while TCK clocks in Run-Test/Idle: another instruction meanwhile
+    // (the next block's, a wait too short) cuts it short, and the block stays unprogrammed
+    if (this.busy && ir !== ISC.STATUS && ir !== 0xff) {
+      this.error(`${Object.keys(ISC).find(k => ISC[k] === ir) ?? `instruction 0x${ir.toString(16)}`} while the ${this.pendingOp} runs`);
+      this.busy = 0; this.pendingOp = null; this.data = null;
+    }
     if (ir === ISC.ERASE) {
       if (!this.isc) return this.error('ISC_ERASE outside ISC mode');
       if (this.addr !== 1) return this.error(`ISC_ERASE with the address ${this.addr} (not 1)`);
@@ -149,11 +155,12 @@ class Prom {
 export class SimAdeptBoard {
   /** chain: the devices from TDI to TDO (the Basys2: the FPGA, then the PROM). */
   /** promOptions: the Platform Flash's (writeProtected, eraseClocks, programClocks, failBlock); mode: the jumper ('rom' / 'jtag'). */
-  constructor({ fpga = 'xc3s250e', prom = 'xcf02s', product = 'Basys2', serial = '10146A2B3C4D', inUse = false, promOptions = {}, mode = 'rom' } = {}) {
+  /** tckHz: the JTAG port's TCK rate, as GET_SPEED says it (null: a firmware without the command). */
+  constructor({ fpga = 'xc3s250e', prom = 'xcf02s', product = 'Basys2', serial = '10146A2B3C4D', inUse = false, promOptions = {}, mode = 'rom', tckHz = 4_000_000 } = {}) {
     this.fpgaDev = new Fpga(fpga);
     this.promDev = prom ? Object.assign(new Prom(prom, promOptions), { fpga: this.fpgaDev, mode }) : null;
     this.chain = [this.fpgaDev, ...(prom ? [this.promDev] : [])];
-    Object.assign(this, { product, serial, inUse, vendorId: 0x1443, productId: 0x0007, productName: `Digilent ${product}` });
+    Object.assign(this, { product, serial, inUse, tckHz, vendorId: 0x1443, productId: 0x0007, productName: `Digilent ${product}` });
     this.state = 'TLR';
     this.irs = this.chain.map(() => 0);
     this.drs = this.chain.map(() => reg([0, 1]));
@@ -246,6 +253,7 @@ export class SimAdeptBoard {
     if (app === 0 && cmd === 3) return this.reply(0, [0, 0, 0, 0]);
     if (app === 2 && cmd === 2) return this.reply(0, p[0] === 1 ? [1] : [1, ...le(0x1)]);
     if (app === 2 && (cmd === 0 || cmd === 1)) return this.reply(0);
+    if (app === 2 && cmd === 4 && this.tckHz) return this.reply(0, le(this.tckHz));   // GET_SPEED
     if (app === 2 && cmd & 0x80) {
       const q = this.pending;
       this.pending = null;
