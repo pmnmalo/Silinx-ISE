@@ -88,6 +88,7 @@ for (const [w, h] of [[820, 1180], [768, 1024]]) {
     await page.click('#drawer-btn');
     await page.reload();
     await page.waitFor(() => document.querySelector('#hier .row'), [], { what: 'the project reopened' });
+    await page.waitFor((d) => document.querySelector(`${d} .sch-editor [data-panel=props]`), [DOC], { what: 'the schematic reopened' });
     assert.equal(await page.eval(() => document.documentElement.dataset.drawer), 'open');
     assert.ok(await shown(page, '#hier'));
     if (modern) {

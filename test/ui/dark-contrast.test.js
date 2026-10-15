@@ -67,7 +67,7 @@ async function themed(page, theme) {
   await page.eval((t) => { localStorage.setItem('silinx.ui', 'modern'); localStorage.setItem('silinx.theme', t); }, theme);
   await page.reload();
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
-  assert.deepEqual(await page.eval(() => ({ ...document.documentElement.dataset })), { ui: 'modern', theme });
+  assert.deepEqual(await page.eval(() => ({ ...document.documentElement.dataset })), { ui: 'modern', theme, drawer: 'open' });   // (the drawer of a narrow screen, #266)
   await page.eval(CONTRAST);
   const bad = [];
   const skip = EXCEPTIONS.filter((x) => !x.theme || x.theme === theme).map((x) => x.skip).join(', ');
