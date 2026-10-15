@@ -21,7 +21,7 @@ import { createHistory } from './history.js';
 import { viewHdl, drawnModule, drawnHdlPath, drawnHdlClash } from '/core/view-hdl.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
 import { countEvent } from './analytics.js';
-import { setActionRunner, runAction } from './ui.js';
+import { setActionRunner, runAction, longPressMenu } from './ui.js';
 
 // ------------------------------------------------------------------ state
 export const S = {
@@ -414,6 +414,7 @@ function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onContext,
   row.addEventListener('click', () => selectRow(row, key, onSelect));
   row.addEventListener('dblclick', () => { if (onOpen) onOpen(); else if (ul.childElementCount) tw.click(); });
   row.addEventListener('contextmenu', e => { e.preventDefault(); row.click(); onContext?.(e); });
+  longPressMenu(row);   // (its badges' menus too: a touch's long press, #263)
   return { li, ul, row, setLeaf() { tw.textContent = ''; } };
 }
 function selectRow(row, key, onSelect) {
@@ -797,6 +798,7 @@ export function renderProcesses() {
         { label: 'Process Properties…', action: () => wiz.implProperties(), disabled: !['synth', 'impl', 'bitgen', 'map', 'par', 'translate'].includes(p.id) },
       ], e.clientX, e.clientY);
     });
+    longPressMenu(row);
     ul.append(li);
     for (const c of p.children || []) add(sub, c);
   };
@@ -1379,6 +1381,7 @@ function docTab(doc) {
       { label: 'Close All', action: () => [...S.docs].forEach(closeDoc) },
     ], e.clientX, e.clientY);
   });
+  longPressMenu(tab);
   return tab;
 }
 
@@ -1620,6 +1623,7 @@ export async function openFile(path, line, col) {
             sch ? { label: `Open ${viewTitle(sch)}`, action: () => openView(sch) } : null,
           ].filter(Boolean), e.clientX, e.clientY);
         });
+        longPressMenu(cm.getWrapperElement(), { select: true });
         return {
           lang,
           onActivate: () => setTimeout(() => d.editor?.refresh(), 0),
@@ -3403,6 +3407,7 @@ function renderFilesPage() {
       h('td', {}, !inProject.has(path) ? 'Not in project' : f ? (f.role === 'sim' ? 'Simulation' : f.role === 'impl' ? 'Implementation' : 'All') : path === S.project.constraints ? 'Implementation' : '—'),
       h('td', {}, f ? f.lang : path.split('.').pop())));
   }
+  longPressMenu(tbl);   // (each row's menu, on touch)
   host.append(tbl);
 }
 

@@ -232,6 +232,24 @@ In short, from the [latest release](https://github.com/pmnmalo/Silinx-ISE/releas
   your own Docker image with **`silinx-ise-docker-kit-<version>.zip`** (see
   [below](#synthesis-and-bitstreams-xilinx-ise-147)) and choose an ISE mode in *Toolchain Settings*.
 
+### On an iPad or a tablet
+
+The site (and `Silinx-ISE.html`) runs in Safari on an iPad (WebKit) and in a tablet's browser: the HDL
+editors and the drawings, simulation, and the Silinx toolchain (synthesis, place and route, the
+`.bit`). What is different from a computer:
+
+- **No board programming**: WebUSB exists only in desktop Chrome / Edge. Generate the `.bit` on the
+  tablet, then program the board from a computer.
+- **No workspace folder on the disk**: the projects are kept in the browser's storage, which iPadOS
+  may clear after some weeks without use. Keep a copy with *File ▸ Export Silinx ISE Project (.zip)…*.
+- **Less memory per tab**: a large design may fail in synthesis or implementation.
+- **The right-click menus open with a long press** (a finger or a pen held still for half a second)
+  on a Design-pane row or badge, a document tab, a Files view row, a symbol of the schematic
+  editor's list or the ISim wave window; the keyboard's context-menu key (or Shift+F10) opens the
+  Design pane's too.
+- **Landscape is recommended**: the layout is made for a wide screen (the portrait layout is
+  [#266](https://github.com/pmnmalo/Silinx-ISE/issues/266)).
+
 ## For developers
 
 ```bash

@@ -13,6 +13,7 @@
 import * as V from '/core/values.js';
 import { toVCD } from '/core/simulator.js';
 import { onPrefsChange } from './modern.js';
+import { longPressMenu } from './ui.js';
 
 // ------------------------------------------------------------------------------- constants
 const ROW_H = 20;
@@ -1012,7 +1013,16 @@ export function mountISim(container, opts = {}) {
     if (!it.bit && it.row.sig.wave && isBitsType(it.row.sig.t) && it.row.sig.t.w > 1) { it.row.expanded = !it.row.expanded; rebuildFlat(); invalidate(); return; }
     openSource(it.row.sig);
   });
-  on(cn, 'contextmenu', (e) => { e.preventDefault(); showMenu(e.clientX, e.clientY, waveRowMenu()); });
+  on(cn, 'contextmenu', (e) => {
+    e.preventDefault();
+    // (the row under it selected, as the right button's mousedown does: a touch's long press has none)
+    const [, y] = localXY(e, cn);
+    const i = y >= RULER_H ? rowAtY(y) : -1;
+    if (i >= 0 && !st.sel.has(flat[i].key)) selectRow(i, null);
+    showMenu(e.clientX, e.clientY, waveRowMenu());
+  });
+  // the menus on touch too: a long press (#263)
+  longPressMenu(cn); longPressMenu(cw); longPressMenu(treeEl); longPressMenu(objBody);
   on(cn, 'wheel', (e) => { e.preventDefault(); vsc.scrollTop += e.deltaY; }, { passive: false });
 
   // names-column splitter (DOM)
@@ -1308,6 +1318,8 @@ export function mountISim(container, opts = {}) {
       });
       tr.addEventListener('contextmenu', (e) => {
         e.preventDefault();
+        // (selected, as by the right button's mousedown: a touch's long press has none)
+        if (!st.selObj.has(sig)) { st.selObj = new Set([sig]); for (const r of objRows) r.tr.classList.toggle('sel', st.selObj.has(r.sig)); }
         const sel = [...st.selObj];
         const one = sel.length === 1 ? sel[0] : null;
         showMenu(e.clientX, e.clientY, [

@@ -47,6 +47,12 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
   o [Zadig](https://zadig.akeo.ie) para a usar a partir do browser. No Linux, permita o acesso à placa
   com uma regra udev (`SUBSYSTEM=="usb", ATTR{idVendor}=="1443", MODE="0666"`). Guardar o desenho na
   flash da placa (PROM) precisa da Forma 2.
+- **Num iPad ou num tablet** (Safari, ou o browser do tablet): editar, desenhar, simular e
+  **Generate Programming File** funcionam; programar a placa não (programe o `.bit` descarregado a
+  partir de um computador). Os projetos ficam no browser, que o iPadOS pode apagar ao fim de algumas
+  semanas sem uso: guarde uma cópia com **File ▸ Export Silinx ISE Project (.zip)…**. Um tablet tem
+  menos memória, por isso um desenho grande pode falhar na síntese. Os menus do botão direito abrem
+  com um **toque longo** (o dedo parado meio segundo). Use o tablet na horizontal.
 - A interface pode ser posta em português em **View ▸ Language**.
 
 ---

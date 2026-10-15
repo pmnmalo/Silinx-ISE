@@ -12,9 +12,24 @@ In short:
 - **The start page shows only the command search (Ctrl+K):** its Save and Undo hints are gone.
 - **Touch screens:** a finger drags the splitters between panes, a dialog by its title and the
   waveform viewer's cursor, markers and rows.
+- **The right-click menus on an iPad or a touch screen:** a long press (a finger or a pen held still
+  for half a second) opens them. The README and the getting-started guides say what works on a tablet.
 
 In detail:
 
+- **Touch screens (#263):** iPadOS Safari fires no 'contextmenu' on a long press, so every right-click
+  menu was out of reach on an iPad. A finger's or a pen's press held still (8 px) for 500 ms now opens
+  the same menu at the press's point: the Design pane's rows and badges, the Processes rows, the
+  document tabs, the Files view, the HDL editor, the schematic editor's symbol list, and ISim's wave
+  window, instance tree and objects (whose row pressed is selected, as by the right button). A tap or a
+  press that moves (a drag, a scroll) is left alone; the release's click is swallowed; a browser with
+  its own long-press menu (Android) shows one menu. The mouse's right-click is unchanged. No '⋯'
+  button was added to the rows and tabs: in a narrow Design pane it would take the badges' room, and
+  the long press is documented.
+- **What works on an iPad / a tablet (#267):** the README (*On an iPad or a tablet*) and the
+  getting-started guides (English, Portuguese): the editors, simulation and the Silinx toolchain run;
+  no board programming (WebUSB: desktop Chrome / Edge), no workspace folder (browser storage, which
+  iPadOS may clear: export a zip), less memory per tab, the long press for the menus, landscape.
 - **Touch screens (#264):** the splitters between panes, moving a dialog by its title and the waveform
   viewer's drags (the cursor, a marker, the rows' order, its splitters and its names column) used
   mouse events only, so a finger did nothing (a touch gives a mouse event on a tap, never a drag).

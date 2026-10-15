@@ -46,6 +46,12 @@ That's all. Things to know:
   [Zadig](https://zadig.akeo.ie) to use it from the browser. On Linux, allow access to the board with a
   udev rule (`SUBSYSTEM=="usb", ATTR{idVendor}=="1443", MODE="0666"`). Storing the design in the
   board's flash (PROM) needs Way 2.
+- **On an iPad or a tablet** (Safari, or the tablet's browser): editing, drawing, simulation and
+  **Generate Programming File** work; programming the board does not (program the downloaded `.bit`
+  from a computer). The projects stay in the browser, which iPadOS may clear after some weeks
+  without use: keep a copy with **File ▸ Export Silinx ISE Project (.zip)…**. A tablet has less
+  memory, so a large design may fail in synthesis. The right-click menus open with a **long press**
+  (hold a finger still for half a second). Hold the tablet in landscape.
 
 ---
 

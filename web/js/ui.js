@@ -163,6 +163,63 @@ function buildMenu(items) {
   return m;
 }
 
+// ------------------------------------------------------------------ long press: the right-click menus on touch (#263)
+// iPadOS Safari fires no 'contextmenu' on a long press (only with a mouse or trackpad), so a press
+// of a finger or a pen held still for LP_DELAY ms over an element wired here dispatches the same
+// 'contextmenu' event at the press's point, on the element pressed (its listener, or an outer one,
+// shows the menu as a right-click does). A press that moves more than LP_SLOP px (a drag, a scroll)
+// or ends sooner (a tap) is left alone; the click (and the mouse events) of the release are
+// swallowed; a browser that fires its own 'contextmenu' (Android) shows one menu, not two. The mouse
+// is not concerned: the desktop's right-click stays as it is.
+//   longPressMenu(el)                       el, its own callout and text selection off
+//   longPressMenu(el, { select: true })     text kept selectable (a text editor)
+const LP_DELAY = 500, LP_SLOP = 8;
+let lpPress = null;      // the press being timed: { ev, id, x, y, timer, fired }
+let lpSwallow = 0;       // until when (ms) the release's click / mouse events are swallowed
+export function longPressMenu(el, { select = false } = {}) {
+  if (!el || el.longPressMenu) return el;
+  el.longPressMenu = true;
+  if (!select) { el.style.webkitTouchCallout = 'none'; el.style.webkitUserSelect = 'none'; el.style.userSelect = 'none'; }
+  el.addEventListener('pointerdown', lpDown);
+  return el;
+}
+function lpDown(e) {
+  if ((e.pointerType !== 'touch' && e.pointerType !== 'pen') || !e.isPrimary) return;
+  if (lpPress?.ev === e) return;          // timed already by an element inside this one
+  lpCancel();
+  const target = e.target, x = e.clientX, y = e.clientY;
+  const p = lpPress = { ev: e, id: e.pointerId, x, y, fired: false };
+  p.timer = setTimeout(() => {
+    if (lpPress !== p) return;
+    p.fired = true;
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true, view: window, button: 2, clientX: x, clientY: y, screenX: e.screenX, screenY: e.screenY }));
+  }, LP_DELAY);
+}
+function lpCancel() { if (lpPress) clearTimeout(lpPress.timer); lpPress = null; }
+function lpEnd(e) {
+  if (lpPress?.id !== e.pointerId) return;
+  if (lpPress.fired && e.type === 'pointerup') lpSwallow = Date.now() + 700;
+  lpCancel();
+}
+addEventListener('pointerdown', () => { lpSwallow = 0; }, true);
+addEventListener('pointermove', e => {
+  if (lpPress?.id === e.pointerId && !lpPress.fired && Math.hypot(e.clientX - lpPress.x, e.clientY - lpPress.y) > LP_SLOP) lpCancel();
+}, true);
+addEventListener('pointerup', lpEnd, true);
+addEventListener('pointercancel', lpEnd, true);
+for (const type of ['mousedown', 'mouseup', 'click']) {
+  addEventListener(type, e => {
+    if (Date.now() >= lpSwallow) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (type === 'click') lpSwallow = 0;
+  }, true);
+}
+// the browser's own 'contextmenu' of a long press: before ours, ours is not needed; after, it is one too many
+addEventListener('contextmenu', e => {
+  if (!e.isTrusted || !lpPress) return;
+  if (lpPress.fired) { e.preventDefault(); e.stopImmediatePropagation(); } else lpCancel();
+}, true);
+
 export function menuBar(el, menus) {
   el.classList.add('menubar');
   el.innerHTML = '';

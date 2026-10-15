@@ -20,7 +20,7 @@ import { svgSnapshot, printDiagram } from './print.js';
 import { symbolSummary, presetOf } from '/core/symdocs.js';
 import { lutFunction } from '/core/fpga/techview.js';
 import { getLanguage, onLanguageChange } from './i18n.js';
-import { popupMenu, undoButton, linkModel, linkSnapshot } from './ui.js';
+import { popupMenu, undoButton, linkModel, linkSnapshot, longPressMenu } from './ui.js';
 import { rerouteAfterMove, connectivity, placementClashes, connectionsKept } from '/core/schroute.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -512,6 +512,7 @@ export function mountSchEditor(container, opts = {}) {
           popupMenu([{ label: 'Symbol Info…', shortcut: 'F1', action: () => openInfo(itemTarget(it)) }, ...(readOnly ? [] : [{ label: 'Place Symbol', action: () => startPlace(it) }])], e.clientX, e.clientY);
         });
         row.addEventListener('dragstart', e => { e.dataTransfer.setData('text/x-silinx-symbol', JSON.stringify(it)); e.dataTransfer.effectAllowed = 'copy'; });
+        longPressMenu(row);
         symList.append(row);
       }
     }
