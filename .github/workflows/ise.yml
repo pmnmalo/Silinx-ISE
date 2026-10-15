@@ -10,7 +10,7 @@ name: ISE
 # the other way round.
 on:
   schedule:
-    - cron: '47 3 * * *'      # after the nightly (03:17 UTC)
+    - cron: '47 21 * * *'     # after the nightly (21:17 UTC)
   workflow_dispatch:
 permissions:
   contents: read

@@ -9,7 +9,7 @@ name: Quality
 # The repository is public: only code already on main runs there, never a pull request's.
 on:
   schedule:
-    - cron: '0 5 * * 0'       # Sundays 05:00 UTC (after the nightly ISE tests)
+    - cron: '0 23 * * 6'      # Saturdays 23:00 UTC (after the nightly ISE tests)
   workflow_dispatch:
 permissions:
   contents: write             # the results' commit

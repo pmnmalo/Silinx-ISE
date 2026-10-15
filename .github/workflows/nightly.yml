@@ -6,7 +6,7 @@ name: Nightly
 #     Silinx's simulator against Yosys's netlist; a failing module is reduced and printed
 on:
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '17 21 * * *'     # 21:17 UTC: GitHub starts scheduled runs hours late (03:17 started at 08:00-10:40)
   workflow_dispatch:
     inputs:
       count:
