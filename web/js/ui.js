@@ -68,16 +68,17 @@ export function dialog({ title, body, buttons = [{ label: 'OK', value: true, pri
     dialogStack.push(overlay);
     overlay.append(dlg);
     document.body.append(overlay);
-    // drag by title
+    // drag by title: pointer events, so a finger drags it too (#264)
     const t = dlg.querySelector('.dlg-title');
-    t.addEventListener('mousedown', e => {
-      if (e.target.closest('button')) return;
+    t.addEventListener('pointerdown', e => {
+      if (e.target.closest('button') || !e.isPrimary) return;
       const r = dlg.getBoundingClientRect();
       const ox = e.clientX - r.left, oy = e.clientY - r.top;
       dlg.style.position = 'fixed';
-      const mv = ev => { dlg.style.left = `${ev.clientX - ox}px`; dlg.style.top = `${ev.clientY - oy}px`; dlg.style.margin = '0'; };
-      const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); };
-      addEventListener('mousemove', mv); addEventListener('mouseup', up);
+      try { t.setPointerCapture(e.pointerId); } catch { /* not an active pointer */ }
+      const mv = ev => { if (ev.pointerId !== e.pointerId) return; dlg.style.left = `${ev.clientX - ox}px`; dlg.style.top = `${ev.clientY - oy}px`; dlg.style.margin = '0'; };
+      const up = ev => { if (ev.pointerId !== e.pointerId) return; removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
     });
     onOpen?.({ dlg, close, buttons });
     const first = dlg.querySelector('.dlg-body input, .dlg-body select, .dlg-body textarea');
@@ -188,23 +189,29 @@ export function splitter(handle, target, { dir = 'h', min = 80, max = 2000, inve
   if (storageKey) {
     try { const v = localStorage.getItem(storageKey); if (v) target.style[dir === 'h' ? 'width' : 'height'] = v; } catch { /* storage unavailable */ }
   }
-  handle.addEventListener('mousedown', e => {
-    e.preventDefault();
+  // pointer events, so a finger drags it too (#264); the mouse's own default (a text selection, the
+  // focus leaving the editor) stays prevented
+  handle.addEventListener('mousedown', e => e.preventDefault());
+  handle.addEventListener('pointerdown', e => {
+    if (!e.isPrimary) return;
+    try { handle.setPointerCapture(e.pointerId); } catch { /* not an active pointer */ }
     const start = dir === 'h' ? e.clientX : e.clientY;
     const size0 = dir === 'h' ? target.offsetWidth : target.offsetHeight;
     document.body.classList.add(dir === 'h' ? 'resizing-h' : 'resizing-v');
     const mv = ev => {
+      if (ev.pointerId !== e.pointerId) return;
       const d = (dir === 'h' ? ev.clientX : ev.clientY) - start;
       const sz = Math.max(min, Math.min(max, size0 + (invert ? -d : d)));
       target.style[dir === 'h' ? 'width' : 'height'] = `${sz}px`;
       dispatchEvent(new Event('resize'));
     };
-    const up = () => {
-      removeEventListener('mousemove', mv); removeEventListener('mouseup', up);
+    const up = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
       document.body.classList.remove('resizing-h', 'resizing-v');
       if (storageKey) { try { localStorage.setItem(storageKey, target.style[dir === 'h' ? 'width' : 'height']); } catch { /* ignore */ } }
     };
-    addEventListener('mousemove', mv); addEventListener('mouseup', up);
+    addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
   });
 }
 

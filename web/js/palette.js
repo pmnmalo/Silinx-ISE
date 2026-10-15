@@ -56,7 +56,7 @@ export function openPalette({ commands = [], files = [], placeholder = 'Search c
         : h('div', { class: 'pal-item pal-file', role: 'option', id: `pal-${i}` },
           h('span', { class: 'pal-kind' }, 'Open file'),
           h('span', { class: 'pal-label', 'data-no-i18n': '' }, e.f.path));
-      row.addEventListener('mousemove', () => { if (sel !== i) { sel = i; mark(); } });
+      row.addEventListener('pointermove', () => { if (sel !== i) { sel = i; mark(); } });   // a pen / finger too (#264)
       row.addEventListener('click', () => run(e));
       list.append(row);
     });

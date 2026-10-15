@@ -239,6 +239,18 @@ export function mountISim(container, opts = {}) {
 
   const cleanups = [];
   const on = (el, ev, fn, o) => { el.addEventListener(ev, fn, o); cleanups.push(() => el.removeEventListener(ev, fn, o)); };
+  // A drag from the pointerdown `e` on `el` (mouse, pen or finger, #264): mm(ev) on every move of that
+  // pointer, mu(ev) when it is released, or cancelled (then ev.type is 'pointercancel').
+  const track = (el, e, mm, mu) => {
+    try { el.setPointerCapture(e.pointerId); } catch { /* not an active pointer */ }
+    const move = (ev) => { if (ev.pointerId === e.pointerId) mm(ev); };
+    const up = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      mu(ev);
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  };
 
   // ---------------------------------------------------------------- state
   const st = {
@@ -927,7 +939,8 @@ export function mountISim(container, opts = {}) {
   }
   function localXY(e, el) { const r = el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 
-  on(cn, 'mousedown', (e) => {
+  on(cn, 'pointerdown', (e) => {
+    if (!e.isPrimary) return;
     cn.focus();
     const [x, y] = localXY(e, cn);
     if (y < RULER_H) {
@@ -964,8 +977,8 @@ export function mountISim(container, opts = {}) {
       invalidate(false);
     };
     const mu = (ev) => {
-      window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu);
       cn.style.cursor = '';
+      if (ev.type === 'pointercancel') { dragRow = null; invalidate(); return; }
       if (dragging && dragRow) {
         const target = flat[dragRow.flatIdx]?.row ?? null;
         const moving = st.rows.filter(r => st.sel.has(String(r.id)) || flat.some(f => f.row === r && st.sel.has(f.key)));
@@ -980,7 +993,7 @@ export function mountISim(container, opts = {}) {
       }
       dragRow = null; invalidate();
     };
-    window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu);
+    track(cn, e, mm, mu);
   });
   on(cn, 'mousemove', (e) => {
     const [x, y] = localXY(e, cn);
@@ -988,9 +1001,7 @@ export function mountISim(container, opts = {}) {
   });
   function startColResize(e) {
     const x0 = e.clientX, w0 = st.nameW;
-    const mm = (ev) => { st.nameW = clamp(w0 + ev.clientX - x0, 60, 600); layout(); };
-    const mu = () => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
-    window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu);
+    track(cn, e, (ev) => { st.nameW = clamp(w0 + ev.clientX - x0, 60, 600); layout(); }, () => {});
   }
   on(cn, 'dblclick', (e) => {
     const [, y] = localXY(e, cn);
@@ -1006,12 +1017,11 @@ export function mountISim(container, opts = {}) {
 
   // names-column splitter (DOM)
   const splitNames = $('.isim-split-names');
-  on(splitNames, 'mousedown', (e) => {
-    e.preventDefault();
+  on(splitNames, 'mousedown', (e) => e.preventDefault());   // no text selection, the focus stays
+  on(splitNames, 'pointerdown', (e) => {
+    if (!e.isPrimary) return;
     const x0 = e.clientX, w0 = st.valW;
-    const mm = (ev) => { st.valW = clamp(w0 + ev.clientX - x0, 40, 800); layout(); };
-    const mu = () => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
-    window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu);
+    track(splitNames, e, (ev) => { st.valW = clamp(w0 + ev.clientX - x0, 40, 800); layout(); }, () => {});
   });
 
   // ---------------------------------------------------------------- wave canvas interaction
@@ -1033,7 +1043,8 @@ export function mountISim(container, opts = {}) {
     for (const m of st.markers) { const d = Math.abs(xOf(m.t) - x); if (d < bd) { bd = d; best = m; } }
     return best;
   }
-  on(cw, 'mousedown', (e) => {
+  on(cw, 'pointerdown', (e) => {
+    if (!e.isPrimary) return;
     cw.focus();
     if (e.button !== 0) return;
     const [x, y] = localXY(e, cw);
@@ -1050,9 +1061,7 @@ export function mountISim(container, opts = {}) {
       }
     };
     move(e);
-    const mm = (ev) => move(ev);
-    const mu = (ev) => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); move(ev, true); };
-    window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu);
+    track(cw, e, (ev) => move(ev), (ev) => { if (ev.type === 'pointerup') move(ev, true); });
   });
   on(cw, 'mousemove', (e) => {
     if (e.buttons) return;
@@ -1672,13 +1681,12 @@ export function mountISim(container, opts = {}) {
 
   // ---------------------------------------------------------------- splitters
   function hookSplit(el, dirV, get, set) {
-    on(el, 'mousedown', (e) => {
-      e.preventDefault();
+    on(el, 'mousedown', (e) => e.preventDefault());   // no text selection, the focus stays
+    on(el, 'pointerdown', (e) => {
+      if (!e.isPrimary) return;
       const p0 = dirV ? e.clientX : e.clientY, v0 = get();
       root.classList.add(dirV ? 'isim-resizing-v' : 'isim-resizing-h');
-      const mm = (ev) => { set(v0 + ((dirV ? ev.clientX : ev.clientY) - p0)); };
-      const mu = () => { root.classList.remove('isim-resizing-v', 'isim-resizing-h'); window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); };
-      window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu);
+      track(el, e, (ev) => { set(v0 + ((dirV ? ev.clientX : ev.clientY) - p0)); }, () => root.classList.remove('isim-resizing-v', 'isim-resizing-h'));
     });
   }
   let leftW = 290, consoleH = 170, instH = null;

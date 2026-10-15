@@ -265,6 +265,14 @@ class PageBase {
     await this.mouse('mouseReleased', b.x, b.y);
   }
   async hover(target) { const { x, y } = await this.point(target); await this.mouse('mouseMoved', x, y); }
+  /** A finger dragged from `from` to `to` (CDP touch events: pointer events of pointerType 'touch'; Chrome only). */
+  async touchDrag(from, to, { steps = 8 } = {}) {
+    const a = await this.point(from), b = await this.point(to);
+    const at = (x, y) => [{ x, y, id: 1, radiusX: 1, radiusY: 1, force: 1 }];
+    await this.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(a.x, a.y) });
+    for (let i = 1; i <= steps; i++) await this.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(a.x + (b.x - a.x) * i / steps, a.y + (b.y - a.y) * i / steps) });
+    await this.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
   /** Set the value of an <input>/<select> and fire input + change. */
   async fill(sel, value, { index = 0 } = {}) {
     const ok = await this.eval((s, v, i) => {

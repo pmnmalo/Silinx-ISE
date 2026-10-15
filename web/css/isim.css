@@ -49,6 +49,8 @@
 .isim-split-v { flex: none; width: 4px; cursor: col-resize; background: var(--bg, #f0f0f0); }
 .isim-split-h { flex: none; height: 4px; cursor: row-resize; background: var(--bg, #f0f0f0); }
 .isim-split-v:hover, .isim-split-h:hover { background: #c9d7ed; }
+/* a finger drags the splitters, the cursor, markers and rows instead of scrolling the page (#264) */
+.isim-split-v, .isim-split-h, .isim-split-names, .isim-names, .isim-waves { touch-action: none; }
 
 /* instance tree */
 .isim .tree { list-style: none; margin: 0; padding: 2px 0 2px 2px; }

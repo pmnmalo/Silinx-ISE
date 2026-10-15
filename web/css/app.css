@@ -82,6 +82,8 @@
 .splitter.split-h { width: 5px; cursor: col-resize; flex: none; }
 .splitter.split-v { height: 5px; cursor: row-resize; flex: none; }
 .splitter:hover { background: #cfdcef; }
+/* a finger drags the splitters and the dialogs' titles instead of scrolling the page (#264) */
+.splitter, .dlg-title { touch-action: none; }
 body.resizing-h, body.resizing-h * { cursor: col-resize !important; user-select: none; }
 body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select: none; }
 

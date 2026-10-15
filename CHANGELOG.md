@@ -10,9 +10,19 @@ In short:
 - **Removing the top module from the project:** the module left becomes the top (Undo brings the old
   one back), and I/O Pin Planning no longer opens empty for a top the project no longer has.
 - **The start page shows only the command search (Ctrl+K):** its Save and Undo hints are gone.
+- **Touch screens:** a finger drags the splitters between panes, a dialog by its title and the
+  waveform viewer's cursor, markers and rows.
 
 In detail:
 
+- **Touch screens (#264):** the splitters between panes, moving a dialog by its title and the waveform
+  viewer's drags (the cursor, a marker, the rows' order, its splitters and its names column) used
+  mouse events only, so a finger did nothing (a touch gives a mouse event on a tap, never a drag).
+  They use pointer events now, and their handles take the touch instead of the page scrolling; the
+  mouse works as before. The command palette's selection follows a pen too.
+- **Touch screens, the state diagram and Petri net editors (#265):** their canvases already take a
+  finger's drag (touch-action: none, from the ASM chart's styles they share); a UI test now drags a
+  state and a place with a finger and checks it.
 - **Start page (#261):** its sentence's lines are balanced, so no word is left alone on the last one ("file."),
   in English and in Portuguese.
 - **The site's usage counts (#257):** from 13 October the published pages had no GoatCounter loader,
