@@ -11,14 +11,20 @@ on:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+# A pull request runs the unit tests on Linux, the UI tests in both interfaces and Firefox / WebKit
+# (main requires the unit and UI checks to merge it: a ruleset); a push to main runs everything: the
+# unit tests on macOS and Windows too, the operating systems' smoke tests, WebKit memory and the
+# standalone build, the release zip. A failure there only (an OS-specific bug) becomes an issue,
+# fixed in the next change.
 jobs:
-  # the unit tests, in three parts at once (node --test --test-shard), on Linux, macOS and Windows:
-  # one after another they take about 15 minutes on Linux and 20 on the macOS and Windows runners
+  # the unit tests, in three parts at once (node --test --test-shard), on Linux, macOS and Windows
+  # (Linux only for a pull request): one after another they take about 15 minutes on Linux and 20 on
+  # the macOS and Windows runners
   unit:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest", "windows-latest"]') }}
         shard: [1, 2, 3]
     runs-on: ${{ matrix.os }}
     name: unit (${{ matrix.os }}, ${{ matrix.shard }}/3)
@@ -55,6 +61,7 @@ jobs:
 
   # the memory test in WebKit (Safari's engine), and the single-file edition builds
   webkit-standalone:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -71,6 +78,7 @@ jobs:
   # the release zip as users get it: packaged as the Release workflow does, unzipped, started with its
   # launcher, and the open synthesis run in Chrome from it without the Internet
   release-zip:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -101,6 +109,7 @@ jobs:
   # macOS and Windows: a small UI smoke test in the installed Chrome (and on macOS the release zip,
   # with its .command launcher); their unit tests are in the unit job
   os:
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:

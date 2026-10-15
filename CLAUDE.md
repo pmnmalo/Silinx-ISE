@@ -52,12 +52,14 @@ anyone changing it, people and AI agents alike. The README and docs/ describe th
   merge commit) without running the suites again locally. If `main` moved meanwhile, rebase the
   branch and push it again (CI runs again). Then check the CI run of `main`.
 - **`main` is protected** (repository rulesets): no deletion and no force push, for anyone; a commit
-  reaches `main` only with CI's unit and UI checks green, the repository's admin excepted (for the
+  reaches `main` only with CI's unit (Linux) and UI checks green, the repository's admin excepted (for the
   release commit and documentation-only changes, whose pull requests skip CI). The weekly quality
   comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
   maintainer merges.
-- **CI** (`.github/workflows/ci.yml`) runs everything on every pull request and every push to main: unit tests on Linux,
-  macOS and Windows, UI in both interfaces, Firefox and WebKit, the standalone build, the release zip.
+- **CI** (`.github/workflows/ci.yml`): a pull request runs the unit tests on Linux, the UI tests in
+  both interfaces and Firefox / WebKit; a push to main runs everything (the unit tests on macOS and
+  Windows too, the operating systems' smoke tests, WebKit memory, the standalone build, the release
+  zip). A failure on main only (an OS-specific bug) becomes an issue, fixed in the next change.
   A docs-only push runs `docs.yml` only. The ISE tests (nightly) and the quality comparison against
   XST (weekly) run on a self-hosted runner, only when main changed since their last run.
 - **CHANGELOG.md**: every change gets an item under the next, unreleased version's heading ("In
