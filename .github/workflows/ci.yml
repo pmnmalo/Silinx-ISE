@@ -7,10 +7,12 @@ on:
     paths-ignore: ['**.md', 'docs/**']
   pull_request:
     paths-ignore: ['**.md', 'docs/**']
-# a newer push to the same branch / pull request cancels the run still going
+# a newer push to a pull request cancels its run still going; on main every push's run completes (the
+# development site is deployed from a green run of main: cancelled runs, merges in quick succession,
+# would leave it behind)
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || 'pr' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 # A pull request runs the unit tests on Linux, the UI tests in both interfaces and Firefox / WebKit
 # (main requires the unit and UI checks to merge it: a ruleset); a push to main runs everything: the
 # unit tests on macOS and Windows too, the operating systems' smoke tests, WebKit memory and the
