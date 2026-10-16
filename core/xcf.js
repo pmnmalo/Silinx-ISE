@@ -26,7 +26,7 @@ const MAX_TCK_HZ = 10_000_000;   // the XCF0xS's fastest TCK (DS123, TAP timing:
 // the longest a block takes to program: 14 ms (the fixed wait after ISC_PROGRAM of Xilinx's XCF00S
 // algorithm, as xc3sprog's progalgxcf.cpp has it, also its poll limit of 28 x 0.5 ms), with margin
 export const PROGRAM_S = 0.02;
-// the wait a block is given (#291): WAIT_FACTOR times the longest program time measured (ISCTESTSTATUS
+// mode 'extrapolate' (#291, unsafe: #294): the wait a block is given WAIT_FACTOR times the longest program time measured (ISCTESTSTATUS
 // polled after ISC_PROGRAM: 0.19 ms on a Basys2's XCF02S), at least PROGRAM_MIN_S, at most PROGRAM_S;
 // measured on the first MEASURE_FIRST blocks, every MEASURE_EVERY and the last, and whenever a status
 // check finds the PROM still busy
@@ -34,6 +34,9 @@ export const PROGRAM_MIN_S = 0.002, WAIT_FACTOR = 5;
 export const MEASURE_FIRST = 2, MEASURE_EVERY = 64;
 const POLL_FIRST_S = 0.001;   // the first span of the polls (16 of them)
 const POLL_S = 0.05;   // the longest a program is polled (xcf_prog.py's)
+// every block confirmed (#294): CONFIRM_POLLS status reads in its own stream, CONFIRM_GAP clocks in
+// Run-Test/Idle before each; then, while busy, more, the gap doubling up to CONFIRM_GAP_S
+export const CONFIRM_POLLS = 4, CONFIRM_GAP = 128, CONFIRM_GAP_S = 0.002;   // the gap at most 2 ms
 // the XCF0xS by IDCODE bits 19..12: [size in bits, bits per block]
 const SIZES = { 0x44: [1 << 20, 2048], 0x45: [2 << 20, 4096], 0x46: [4 << 20, 4096] };
 const ST_DONE = 0x20;   // the Spartan-3E's DONE in its captured IR
@@ -210,7 +213,9 @@ export class Xcf {
   // (#291); the status checked at the end of each stream, a PROM still busy measured again, and once
   // more after the last block (a block cut short shows in the verify). measure false: PROGRAM_S for
   // every block, only the last one's time polled for the console (#289)
-  async program(data, log = () => {}, { measure = true } = {}) {
+  // the program of #291 (mode 'extrapolate': on the board block 7 then needed more than the 10 ms it
+  // was given, #294) or of #289 (mode 'fixed': 20 ms a block)
+  async programWaits(data, log = () => {}, { measure = true } = {}) {
     this.checkFits(data);
     const bpb = this.block / 8, image = promImage(data, this.block), n = image.length / bpb;
     await this.ir(XCF.ISC_DISABLE);
@@ -261,6 +266,60 @@ export class Xcf {
     const ms = c => (c / this.tckHz * 1000).toFixed(2);
     if (measure) log(`  block program time (ISCTESTSTATUS): ${ms(shortest)} to ${ms(longest)} ms on ${measured} blocks; the others waited ${ms(wait())} ms`);
     else log(`  program time of the last block (ISCTESTSTATUS): ${last === null ? `over ${ms(most)} ms` : `${ms(last)} ms`}; each block waited ${ms(most)} ms`);
+    await this.disable();
+  }
+  // after an ISC_PROGRAM in stream s: ISCTESTSTATUS polled (#289's polls: `gap` clocks in
+  // Run-Test/Idle, ISCTESTSTATUS, one clock, the read) until it says done, CONFIRM_POLLS in the
+  // block's own stream, then while busy more, the gap doubling (over RTI_PAIRS a CLOCK_TCK and one
+  // poll after it); an error after POLL_S of clocks. Returns { clocks (in Run-Test/Idle until done), polls }
+  async confirm(s, what) {
+    const limit = this.clocks(POLL_S);
+    let t = 0, gap = CONFIRM_GAP, polls = 0;
+    for (;;) {
+      const reads = [];
+      for (let j = 0; j < (gap > RTI_PAIRS ? 1 : CONFIRM_POLLS); j++) {
+        s.rti(gap);
+        s.ir(this.dev, XCF.ISCTESTSTATUS);
+        s.rti(1);
+        t += gap + 3;
+        reads.push([t, s.dr(this.dev, 0, 8, true)]);
+      }
+      await s.run();
+      const k = reads.findIndex(([, c]) => c.num & 0x04);
+      if (k >= 0) return { clocks: reads[k][0], polls: polls + k + 1 };
+      polls += reads.length;
+      if (t >= limit) fail(`${what} did not complete (timeout ${POLL_S.toFixed(1)} s)`);
+      gap = Math.min(2 * gap, Math.max(CONFIRM_GAP, this.clocks(CONFIRM_GAP_S)));
+    }
+  }
+  // per block ISC_DATA_SHIFT, ISC_ADDRESS_SHIFT, ISC_PROGRAM and its status polled until it says
+  // done (confirm), the next block only then (#294: the program time of a block varies, 0.3 to over
+  // 10 ms on the board, as xcf_prog.py polls each); the status checked once more after the last
+  // block, then the verify. mode 'fixed' / 'extrapolate': programWaits
+  async program(data, log = () => {}, { mode = 'confirm' } = {}) {
+    if (mode !== 'confirm') return this.programWaits(data, log, { measure: mode === 'extrapolate' });
+    this.checkFits(data);
+    const bpb = this.block / 8, image = promImage(data, this.block), n = image.length / bpb;
+    await this.ir(XCF.ISC_DISABLE);
+    await this.wait(0.001);
+    await this.enable();
+    const s = this.seq(), times = [], host = [];
+    let polls = 0;
+    for (let i = 0; i < n; i++) {
+      const t0 = this.now?.();
+      s.ir(this.dev, XCF.ISC_DATA_SHIFT);
+      s.dr(this.dev, image.subarray(i * bpb, (i + 1) * bpb), this.block);
+      this.address(s, i * FRAMES_PER_BLOCK);
+      s.ir(this.dev, XCF.ISC_PROGRAM);
+      const r = await this.confirm(s, `programming block ${i}`);
+      times.push(r.clocks);
+      polls += r.polls;
+      if (this.now) host.push(this.now() - t0);
+      if (i % 16 === 0 || i === n - 1) log(`  programmed block ${i + 1}/${n}`);
+    }
+    await this.waitReady(0.0005, POLL_S, `programming block ${n - 1}`);
+    const ms = v => v.toFixed(2), range = v => `${ms(Math.min(...v))} to ${ms(Math.max(...v))} ms, mean ${ms(v.reduce((a, b) => a + b, 0) / v.length)} ms`;
+    log(`  block program time (ISCTESTSTATUS, every block): ${range(times.map(c => c / this.tckHz * 1000))} of TCK; ${polls} polls${host.length ? `; ${range(host)} a block in all` : ''}`);
     await this.disable();
   }
   // the first nbits of the PROM, as stored (bits of each byte reversed): per block its address,
@@ -319,7 +378,7 @@ export const PROM_OPS = ['program', 'verify', 'erase', 'read', 'reconfigure'];
  * then reloads from the PROM (DONE checked). bit: the .bit (program / verify), checked against the
  * chain's FPGA. The console lines are those of the full application.
  */
-export async function promAdept(usb, { op, bit = null, verify = true, reconfigure = false, log = () => {}, tckHz, sleep = sleepMs, donePolls = 25, now = () => performance.now(), measure = true } = {}) {
+export async function promAdept(usb, { op, bit = null, verify = true, reconfigure = false, log = () => {}, tckHz, sleep = sleepMs, donePolls = 25, now = () => performance.now(), mode = 'confirm' } = {}) {
   const start = now();
   // a phase, and the time it took
   const timed = async f => { const t = now(); await f(); return secs(now() - t); };
@@ -367,7 +426,7 @@ export async function promAdept(usb, { op, bit = null, verify = true, reconfigur
           log('erasing...'); log(`erased in ${await timed(() => x.erase())}`);
           log('programming...');
           x.stats = { now };
-          const t = await timed(() => x.program(parsed.data, log, { measure }));
+          const t = await timed(() => x.program(parsed.data, log, { mode }));
           log(usbLine(x.stats));
           log(`programmed ${x.blocks(parsed.data.length * 8)} blocks in ${t}`);
         }

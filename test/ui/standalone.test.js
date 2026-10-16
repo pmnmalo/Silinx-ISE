@@ -247,7 +247,7 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
     .replace(/^ {2}USB: data shifts (\d+) x \d+\.\d KB in \d+\.\d s(?: \(\d+ KB\/s\))?; TAP moves \d+ x \d+\.\d KB in \d+\.\d s(?: \(\d+ KB\/s\))?(; waits \d+ x in T s)?$/, (m, k, w) => `  USB: data shifts ${k} x…${w ? '; waits' : ''}`)
     // (#291: the TCK measured in the browser's time, and so the times in clocks converted)
     .replace(/^TCK: 4\.00 MHz said, \d+\.\d\d MHz measured: the waits counted at \d+\.\d\d MHz$/, 'TCK: 4.00 MHz said, …')
-    .replace(/^ {2}block program time \(ISCTESTSTATUS\): \d+\.\d\d to \d+\.\d\d ms on (\d+) blocks; the others waited \d+\.\d\d ms$/, '  block program time (ISCTESTSTATUS): … on $1 blocks; …')), [
+    .replace(/^ {2}block program time \(ISCTESTSTATUS, every block\): \d+\.\d\d to \d+\.\d\d ms, mean \d+\.\d\d ms of TCK; \d+ polls; \d+\.\d\d to \d+\.\d\d ms, mean \d+\.\d\d ms a block in all$/, '  block program time (ISCTESTSTATUS, every block): …')), [
     'PROM image build/top_prom.bit: design top.ncd, part 3s250ecp132, built D T',
     'Platform Flash: program + reload FPGA from PROM',
     'Programmer: Digilent Basys2 (serial 10146A2B3C4D)',
@@ -257,7 +257,7 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
     'bitstream: design top.ncd part 3s250ecp132 D T, N bytes',
     'erasing...', 'erased in T s', 'programming...',
     ...Array.from({ length: n }, (_, i) => i).filter((i) => i % 16 === 0 || i === n - 1).map((i) => `  programmed block ${i + 1}/${n}`),
-    `  block program time (ISCTESTSTATUS): … on ${3 + Math.floor((n - 2) / 64)} blocks; …`, `  USB: data shifts ${n} x…; waits`, `programmed ${n} blocks in T s`,
+    '  block program time (ISCTESTSTATUS, every block): …', `  USB: data shifts ${n} x…`, `programmed ${n} blocks in T s`,
     'verifying...', `  USB: data shifts ${n} x…`, 'verify OK in T s', 'reconfiguring the FPGA from the PROM...', 'STATUS: DONE', 'program done in T s',
     'Platform Flash program finished.',
     "'2': XCF02S programmed and verified; FPGA loaded from the PROM (DONE).",

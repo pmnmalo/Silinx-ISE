@@ -8,9 +8,9 @@ the "What's new" text of its GitHub release.
 In short:
 
 - **Platform Flash from the browser, faster still:** programming the PROM of the Basys2 / Nexys2 from
-  the browser edition sends the blocks as the FPGA's bitstream is sent, waits for each block about
-  as long as the PROM needs (measured) and no longer sends those waits as data over USB; the console
-  says how long the erase, the program and the verify took, and where the USB time went.
+  the browser edition sends the blocks as the FPGA's bitstream is sent and waits for each block until
+  the PROM says it is programmed, as the full application does; the console says how long the
+  erase, the program and the verify took, and where the USB time went.
 
 In detail:
 
@@ -57,6 +57,20 @@ In detail:
   `  block program time (ISCTESTSTATUS): 0.19 to 0.21 ms on 8 blocks; the others waited 2.00 ms`;
   the fixed 20 ms with the option `measure: false`. The waits of the 331 blocks: ~0.7 s of clocks
   (and their CLOCK_TCKs' round trips) instead of 14.1 s.
+- **PROM programming over WebUSB: every block confirmed before the next (#294):** on the board #291
+  failed (`verify FAILED at byte 4078 (block 7): read ff expected 00`): its 9 blocks measured took
+  0.32 to 2.07 ms, the others were given 10.33 ms, and block 7, not measured, needed more: a block's
+  program time varies (up to ~14 ms), so it is not extrapolated any more. Every block's status is
+  now polled until it says done before the next block's ISC_DATA_SHIFT, as `scripts/xcf_prog.py`
+  does: in the block's own stream after ISC_PROGRAM 4 polls (#289's: 128 clocks in Run-Test/Idle,
+  ISCTESTSTATUS, one clock, the read), then while busy more, the gap doubling up to 2 ms (a
+  CLOCK_TCK past 1024 clocks), 50 ms at most (the existing error); the status checked once more
+  after the last block, then the verify. No block's stream is sent before the previous one's status
+  came back. The console: `  block program time (ISCTESTSTATUS, every block): min to max ms, mean
+  … ms of TCK; N polls; min to max ms, mean … ms a block in all` (the host's time per block). #291's
+  and #289's programs stay as the options `mode: 'extrapolate'` / `'fixed'`. The simulated PROM
+  takes a seeded program time per block, 0.2 to 14 ms (mostly short): every block programs and
+  verifies, and #291's waits fail on it at a slow block not measured, as on the board.
 
 ## 15.10.20
 

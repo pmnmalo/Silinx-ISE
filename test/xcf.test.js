@@ -73,12 +73,13 @@ test('program: the Basys2\'s XCF02S erased, programmed by blocks, verified; the 
     'PROM xcf02s: 2048 Kbit, 4096-bit blocks',
     TCK20,
     bitLines(data),
-    // each phase's time (here the simulated TCK clocks at 20 kHz, #287), the program time measured
-    // (#291: 10 ms, the PROM's 200 clocks at 20 kHz; x 5, capped at 20 ms), the USB commands (#289)
+    // each phase's time (here the simulated TCK clocks at 20 kHz, #287), every block's program time
+    // (#294: the PROM's 200 clocks, 10 ms at 20 kHz, polled every 131 clocks), the USB commands (#289)
     'erasing...', 'erased in 0.5 s', 'programming...', ...blockLines(n),
-    '  block program time (ISCTESTSTATUS): 10.40 to 10.40 ms on 3 blocks; the others waited 20.00 ms', '  USB: data shifts 40 x 20.5 KB in 8.2 s (3 KB/s); TAP moves 52 x 6.1 KB in 1.1 s (5 KB/s)',
-    'programmed 40 blocks in 9.4 s', 'verifying...', '  USB: data shifts 40 x 20.5 KB in 8.2 s (3 KB/s); TAP moves 44 x 1.1 KB in 0.1 s (8 KB/s)', 'verify OK in 8.4 s',
-    'reconfiguring the FPGA from the PROM...', 'STATUS: DONE', 'program done in 18.5 s',
+    '  block program time (ISCTESTSTATUS, every block): 13.10 to 13.10 ms, mean 13.10 ms of TCK; 80 polls; 241.75 to 241.75 ms, mean 241.75 ms a block in all',
+    '  USB: data shifts 40 x 20.5 KB in 8.2 s (3 KB/s); TAP moves 85 x 11.1 KB in 1.5 s (7 KB/s)',
+    'programmed 40 blocks in 9.8 s', 'verifying...', '  USB: data shifts 40 x 20.5 KB in 8.2 s (3 KB/s); TAP moves 44 x 1.1 KB in 0.1 s (8 KB/s)', 'verify OK in 8.4 s',
+    'reconfiguring the FPGA from the PROM...', 'STATUS: DONE', 'program done in 18.9 s',
   ]);
   const prom = board.promDev;
   assert.deepEqual(prom.errors, [], 'the ISC protocol kept');
@@ -99,7 +100,8 @@ test('program without verify or reload; verify alone; read (backup) in the .bit\
   const lines = [];
   await promAdept(board, { op: 'program', bit, verify: false, log: l => lines.push(l), ...fast(board) });
   assert.deepEqual(lines.slice(3), [TCK20, bitLines(data), 'erasing...', 'erased in 0.5 s', 'programming...', '  programmed block 1/18', '  programmed block 17/18', '  programmed block 18/18',
-    '  block program time (ISCTESTSTATUS): 10.40 to 10.40 ms on 3 blocks; the others waited 20.00 ms', '  USB: data shifts 18 x 9.2 KB in 3.7 s (3 KB/s); TAP moves 30 x 3.4 KB in 0.6 s (6 KB/s)', 'programmed 18 blocks in 4.4 s', 'program done in 5.0 s']);
+    '  block program time (ISCTESTSTATUS, every block): 13.10 to 13.10 ms, mean 13.10 ms of TCK; 36 polls; 241.75 to 241.75 ms, mean 241.75 ms a block in all',
+    '  USB: data shifts 18 x 9.2 KB in 3.7 s (3 KB/s); TAP moves 41 x 5.0 KB in 0.7 s (7 KB/s)', 'programmed 18 blocks in 4.5 s', 'program done in 5.1 s']);
   assert.equal(board.done, false, 'the FPGA not reloaded');
   const v = [];
   await promAdept(board, { op: 'verify', bit, log: l => v.push(l), ...fast(board) });
@@ -144,8 +146,9 @@ test('the Nexys2-500\'s XCF04S, and an XCF01S (2048-bit blocks)', async () => {
   await promAdept(small, { op: 'program', bit: b.bit, log: l => l2.push(l), ...fast(small) });
   const n = Math.ceil(b.data.length * 8 / 2048);
   assert.deepEqual(l2.slice(2), ['PROM xcf01s: 1024 Kbit, 2048-bit blocks', TCK20, bitLines(b.data, '3s100ecp132'), 'erasing...', 'erased in 0.5 s', 'programming...', ...blockLines(n),
-    '  block program time (ISCTESTSTATUS): 10.40 to 10.40 ms on 3 blocks; the others waited 20.00 ms', '  USB: data shifts 20 x 5.1 KB in 2.0 s (3 KB/s); TAP moves 32 x 3.6 KB in 0.6 s (6 KB/s)',
-    'programmed 20 blocks in 2.8 s', 'verifying...', '  USB: data shifts 20 x 5.1 KB in 2.0 s (3 KB/s); TAP moves 24 x 0.6 KB in 0.1 s (7 KB/s)', 'verify OK in 2.2 s', 'program done in 5.7 s']);
+    '  block program time (ISCTESTSTATUS, every block): 13.10 to 13.10 ms, mean 13.10 ms of TCK; 40 polls; 139.35 to 139.35 ms, mean 139.35 ms a block in all',
+    '  USB: data shifts 20 x 5.1 KB in 2.0 s (3 KB/s); TAP moves 45 x 5.6 KB in 0.7 s (7 KB/s)',
+    'programmed 20 blocks in 2.9 s', 'verifying...', '  USB: data shifts 20 x 5.1 KB in 2.0 s (3 KB/s); TAP moves 24 x 0.6 KB in 0.1 s (7 KB/s)', 'verify OK in 2.2 s', 'program done in 5.8 s']);
   assert.ok(small.promDev.ops.includes(`program ${n - 1}`));
   assert.deepEqual(small.promDev.errors, []);
 });
@@ -262,66 +265,87 @@ async function countedProgram(board, bit, opts = {}) {
   return { lines, per, all: c.all };
 }
 const WAIT = 80000;   // PROGRAM_S at the board's 4 MHz
-const MIN_WAIT = 8000;   // PROGRAM_MIN_S at 4 MHz
 const programs = (board, n) => assert.deepEqual(board.promDev.ops.filter(o => /^program/.test(o)), Array.from({ length: n }, (_, i) => `program ${i}`));
+// a PROM whose block program time varies (#294): 0.2 to 14 ms a block at 4 MHz, most of them short
+// and a few long (as on the board: 0.3 to 2 ms measured, a block over 10 ms), seeded (mulberry32)
+const randomTimes = seed => {
+  const ms = [];
+  for (let i = 0; i < 1024; i++) {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    ms.push(0.2 + 13.8 * (((t ^ (t >>> 14)) >>> 0) / 4294967296) ** 4);
+  }
+  return b => Math.round(ms[b] * 4000);
+};
+// #291's waits for such a PROM: measured on blocks 0, 1, every 64th and the last; the others 5 x the
+// longest measured before them (2 ms to 20 ms): the first block cut short (the end-of-stream checks aside)
+const MEASURED = n => [...new Set([0, 1, ...Array.from({ length: Math.ceil(n / 64) }, (_, k) => 64 * k), n - 1])];
+const slowBlock = (times, n) => Array.from({ length: n }, (_, b) => b).find(b => !MEASURED(n).includes(b)
+  && times(b) > Math.min(WAIT, Math.max(8000, 5 * Math.max(...MEASURED(n).filter(m => m < b).map(times)))));
 
-test('program + verify of an XC3S250E design (331 blocks): the program time measured, each other block 2 ms (a CLOCK_TCK), its data a PUT_TDI_BITS, under 250 KB over USB', async () => {
+test('program + verify of an XC3S250E design (331 blocks): every block\'s status polled until done before the next, its data a PUT_TDI_BITS, under 300 KB over USB', async () => {
   const board = new SimAdeptBoard();   // GET_SPEED: 4 MHz; the PROM programs a block in 200 TCK clocks
   const { bit, data } = fakeBit(169000);
   const n = Math.ceil(data.length * 8 / 4096);
   assert.equal(n, 331);
   const { lines, per, all } = await countedProgram(board, bit);
-  // #291: measured on blocks 0, 1, 64, 128, 192, 256, 320 and the last: 0.06 ms; x 5 under 2 ms
+  // #294: each block polled every 131 clocks: done at the 2nd poll
   assert.deepEqual(lines.slice(3), ['TCK: 4.00 MHz said, 4.00 MHz measured: the waits counted at 4.00 MHz', bitLines(data), 'erasing...', 'erased in 0.3 s', 'programming...', ...blockLines(n),
-    '  block program time (ISCTESTSTATUS): 0.06 to 0.06 ms on 8 blocks; the others waited 2.00 ms',
-    '  USB: data shifts 331 x 169.5 KB in 0.3 s (500 KB/s); TAP moves 673 x 21.5 KB in 0.0 s (1297 KB/s); waits 323 x in 0.6 s',
-    'programmed 331 blocks in 1.1 s', 'verifying...',
-    '  USB: data shifts 331 x 169.5 KB in 0.3 s (500 KB/s); TAP moves 337 x 33.7 KB in 0.0 s (1507 KB/s)', 'verify OK in 0.5 s', 'program done in 2.0 s']);
+    '  block program time (ISCTESTSTATUS, every block): 0.07 to 0.07 ms, mean 0.07 ms of TCK; 662 polls; 1.21 to 1.21 ms, mean 1.21 ms a block in all',
+    '  USB: data shifts 331 x 169.5 KB in 0.3 s (500 KB/s); TAP moves 667 x 91.4 KB in 0.1 s (1492 KB/s)',
+    'programmed 331 blocks in 0.5 s', 'verifying...',
+    '  USB: data shifts 331 x 169.5 KB in 0.3 s (500 KB/s); TAP moves 337 x 33.7 KB in 0.0 s (1507 KB/s)', 'verify OK in 0.5 s', 'program done in 1.4 s']);
   assert.deepEqual(board.promDev.errors, []);
   programs(board, n);
   const p = per['programming...'], info = JSON.stringify(per);
-  // #289: per block its moves and its last bit as pairs, its data as PUT_TDI_BITS, its wait a CLOCK_TCK
-  // (4 commands, ~19 transfers; the pairs are slow on the board); to verify, per block the moves and
-  // the 200-clock read wait as pairs and the block a GET_TDO_BITS (~11 transfers)
-  assert.ok(p.all < 20 * n && per['verifying...'].all < 12 * n, `${all} transfers: ${info}`);
-  assert.ok(p.bytes < 250000 && per['verifying...'].bytes < 250000, `bytes: ${info}`);   // (programming was 10.4 MB, #287)
-  // the waits: the 323 blocks not measured 2 ms each, the ISC_DISABLEs around (1 ms before, 110 ms
-  // after) and the final status check's 0.5 ms
-  assert.equal(p.tck, 323 * MIN_WAIT + 4001 + 440001 + 2 + 2001, info);
-  // the bytes per kind of command (JtagSeq's stats)
-  const a = await new Adept(new SimAdeptBoard()).open(), chain = new Chain(new Djtg(a, 0));
-  await chain.init();
-  const x = new Xcf(chain, chain.devices[0], { tckHz: 4e6 });
-  await x.erase();
-  x.stats = { now: () => 0 };
-  await x.program(data);
-  const { data: d, pairs, waits } = x.stats;
-  assert.deepEqual([d.cmds, d.bytes, d.clocks], [n, n * 512, n * 4095], 'each block\'s data a PUT_TDI_BITS of 4095 bits (its last bit a pair)');
-  assert.ok(pairs.bytes < 70 * n, `${pairs.bytes} bytes of pairs`);
-  assert.deepEqual([waits.cmds, waits.clocks], [323, 323 * MIN_WAIT]);
-  await a.close();
+  // per block: its moves as pairs, its data a PUT_TDI_BITS, its ISC_PROGRAM and the status polls as
+  // pairs (3 commands, ~16 transfers); to verify, per block the moves and the 200-clock read wait as
+  // pairs and the block a GET_TDO_BITS (~11 transfers)
+  assert.ok(p.all < 17 * n && per['verifying...'].all < 12 * n, `${all} transfers: ${info}`);
+  assert.ok(p.bytes < 300000 && per['verifying...'].bytes < 250000, `bytes: ${info}`);   // (programming was 10.4 MB, #287)
+  // no CLOCK_TCK but the ISC_DISABLEs' around (1 ms before, 110 ms after) and the final check's 0.5 ms
+  assert.equal(p.tck, 4001 + 440001 + 2 + 2001, info);
 });
 
-test('#291: the TCK slower than the port says (half, as on a Basys2): measured on a CLOCK_TCK, the waits counted at it', async () => {
+test('#294: a PROM whose program time varies, 0.2 to 14 ms a block (seeded): every block polled until done, all programmed and verified; #291\'s waits fail at a block not measured', async () => {
+  const { bit, data } = fakeBit(169000);
+  const n = Math.ceil(data.length * 8 / 4096);
+  let seed = 294;
+  while (slowBlock(randomTimes(seed), n) === undefined) seed++;
+  const times = randomTimes(seed);
+  const board = new SimAdeptBoard({ promOptions: { programClocks: times } });
+  const { lines } = await countedProgram(board, bit);
+  assert.deepEqual(board.promDev.errors, []);
+  programs(board, n);
+  assert.ok(lines.includes('verify OK in 0.5 s'), lines.join('\n'));
+  const stat = lines.find(l => /every block/.test(l));
+  assert.match(stat, /^ {2}block program time \(ISCTESTSTATUS, every block\): 0\.\d\d to 1\d\.\d\d ms, mean \d\.\d\d ms of TCK; \d+ polls; [\d.]+ to [\d.]+ ms, mean [\d.]+ ms a block in all$/);
+  // the board's failure (#291): measured on 8 blocks, the others 5 x the longest of those; a slower one not measured is cut short
+  const old = new SimAdeptBoard({ promOptions: { programClocks: times } });
+  const first = slowBlock(times, n);
+  await assert.rejects(promAdept(old, { op: 'program', bit, mode: 'extrapolate', sleep: async () => {}, now: () => old.now() }), new RegExp(`^Error: Adept USB: verify FAILED at byte \\d+ \\(block ${first}\\)`));
+  assert.ok(old.promDev.errors.includes('DATA while the program runs'));
+});
+
+test('#291: the TCK slower than the port says (half, as on a Basys2): measured on a CLOCK_TCK, the limits counted at it', async () => {
   const board = new SimAdeptBoard();   // says 4 MHz
   const { bit, data } = fakeBit(51000);
   const n = Math.ceil(data.length * 8 / 4096);
-  const c = counted(board), lines = [];
+  const lines = [];
   // the clock: the board's TCK clocks at 2 MHz
   await promAdept(board, { op: 'program', bit, sleep: async () => {}, now: () => board.now(2e6), log: l => lines.push(l) });
   assert.equal(lines[3], 'TCK: 4.00 MHz said, 2.00 MHz measured: the waits counted at 2.00 MHz');
-  // 0.13 ms measured (200 clocks at 2 MHz, the polls' steps 125 clocks), x 5 under 2 ms: 2 ms at 2 MHz
-  assert.ok(lines.includes('  block program time (ISCTESTSTATUS): 0.13 to 0.13 ms on 4 blocks; the others waited 2.00 ms'), lines.join('\n'));
+  assert.ok(lines.includes('  block program time (ISCTESTSTATUS, every block): 0.13 to 0.13 ms, mean 0.13 ms of TCK; 200 polls; 2.42 to 2.42 ms, mean 2.42 ms a block in all'), lines.join('\n'));
   assert.deepEqual(board.promDev.errors, []);
   programs(board, n);
-  assert.ok(c.tck > 96 * 4000, 'the waits in clocks at 2 MHz');
 });
 
-test('#289: measure false: every block waits PROGRAM_S (20 ms), only the last block\'s time polled, for the console', async () => {
+test('#289: mode fixed: every block waits PROGRAM_S (20 ms), only the last block\'s time polled, for the console', async () => {
   const board = new SimAdeptBoard();
   const { bit, data } = fakeBit(51000);
   const n = Math.ceil(data.length * 8 / 4096);
-  const { lines, per } = await countedProgram(board, bit, { measure: false });
+  const { lines, per } = await countedProgram(board, bit, { mode: 'fixed' });
   assert.deepEqual(lines.filter(l => /program time/.test(l)), ['  program time of the last block (ISCTESTSTATUS): 0.06 ms; each block waited 20.00 ms']);
   assert.deepEqual(board.promDev.errors, []);
   programs(board, n);
@@ -364,19 +388,23 @@ test('#289: an ISC_PROGRAM followed by another instruction before Run-Test/Idle 
   await a.close();
 });
 
-test('#291: a slow PROM (12 ms a block): measured, x 5 capped at 20 ms (PROGRAM_S), every block programmed', async () => {
+test('#294: a slow PROM (12 ms a block), and one slower from block 70: every block polled until done (the gaps doubling, up to 2 ms), all programmed', async () => {
   const board = new SimAdeptBoard({ promOptions: { programClocks: Math.floor(0.012 * 4e6) } });
   const { bit, data } = fakeBit(9000);
   const n = Math.ceil(data.length * 8 / 4096);
-  const { lines } = await countedProgram(board, bit);
-  assert.deepEqual(lines.filter(l => /program time/.test(l)), ['  block program time (ISCTESTSTATUS): 12.28 to 12.28 ms on 3 blocks; the others waited 20.00 ms']);
+  const { lines, per } = await countedProgram(board, bit);
+  assert.deepEqual(lines.filter(l => /program time/.test(l)), ['  block program time (ISCTESTSTATUS, every block): 13.47 to 13.47 ms, mean 13.47 ms of TCK; 414 polls; 14.70 to 14.70 ms, mean 14.70 ms a block in all']);
   assert.deepEqual(board.promDev.errors, []);
   programs(board, n);
-  // one that takes nearly all of PROGRAM_S (19 ms): x 5 capped, still every block programmed
-  const slowest = new SimAdeptBoard({ promOptions: { programClocks: 76000 } });
-  const { lines: l2 } = await countedProgram(slowest, fakeBit(3000).bit);
-  assert.deepEqual(slowest.promDev.errors, []);
-  assert.deepEqual(l2.filter(l => /program time/.test(l)), ['  block program time (ISCTESTSTATUS): 19.44 to 19.44 ms on 3 blocks; the others waited 20.00 ms']);
+  assert.ok(per["programming..."].all < 150 * n, JSON.stringify(per));   // ~2 commands a 2 ms poll
+  const { bit: bit2, data: d2 } = fakeBit(75000);
+  const later = new SimAdeptBoard({ promOptions: { programClocks: b => (b < 70 ? 200 : 20000) } });
+  await countedProgram(later, bit2);
+  assert.deepEqual(later.promDev.errors, []);
+  programs(later, Math.ceil(d2.length * 8 / 4096));
+  // one block, still programming after POLL_S: the existing error
+  const one = new SimAdeptBoard({ promOptions: { programClocks: 1e6 } });
+  await assert.rejects(promAdept(one, { op: 'program', bit: fakeBit(100).bit, ...FAST }), /^Error: Adept USB: programming block 0 did not complete \(timeout 0\.1 s\)$/);
 });
 
 test('the program wait: TCK_HZ at least, the PROM\'s 10 MHz when the port does not say its rate', async () => {
@@ -390,29 +418,4 @@ test('the program wait: TCK_HZ at least, the PROM\'s 10 MHz when the port does n
   // and the commands after the refused one still work
   await promAdept(board, { op: 'program', bit: fakeBit(1000).bit, sleep: async () => {} });
   assert.deepEqual(board.promDev.errors, []);
-});
-
-test('#291: a PROM slower later: measured again every 64 blocks; slower in the middle of a stream, the status at its end measures it again, and the verify fails', async () => {
-  // 0.05 ms a block, then from block 64 (measured) 1 ms: the wait follows, 5 ms
-  const { bit, data } = fakeBit(51000);
-  const n = Math.ceil(data.length * 8 / 4096);
-  assert.equal(n, 100);
-  const board = new SimAdeptBoard({ promOptions: { programClocks: b => (b < 64 ? 200 : 4000) } });
-  const { lines } = await countedProgram(board, bit);
-  assert.deepEqual(lines.filter(l => /program time/.test(l)), ['  block program time (ISCTESTSTATUS): 0.06 to 1.01 ms on 4 blocks; the others waited 5.06 ms']);
-  assert.deepEqual(board.promDev.errors, []);
-  programs(board, n);
-  // 5 ms from block 70: blocks 70..126 waited 2 ms, each cut short by the next block's ISC_DATA_SHIFT;
-  // block 127's (the stream's last) status still busy: polled to its end, measured, the wait 5 times it
-  const { bit: bit2 } = fakeBit(75000);
-  const later = new SimAdeptBoard({ promOptions: { programClocks: b => (b < 70 ? 200 : 20000) } });
-  const l2 = [];
-  await assert.rejects(promAdept(later, { op: 'program', bit: bit2, sleep: async () => {}, now: () => later.now(), log: l => l2.push(l) }), /^Error: Adept USB: verify FAILED at byte 35840 \(block 70\): read [0-9a-f]{2} expected [0-9a-f]{2}$/);
-  assert.ok(l2.some(l => /^ {2}block program time \(ISCTESTSTATUS\): 0\.06 to 5\.\d\d ms on \d+ blocks; the others waited 20\.00 ms$/.test(l)), l2.join('\n'));
-  assert.deepEqual(later.promDev.errors, Array(57).fill('DATA while the program runs'));
-  assert.equal(later.promDev.ops.filter(o => /^program/.test(o)).length, 147 - 57);
-  assert.equal(later.promDev.isc, false, 'the PROM left out of ISC mode');
-  // one block, still programming after the status polls: the existing error
-  const one = new SimAdeptBoard({ promOptions: { programClocks: 1e6 } });
-  await assert.rejects(promAdept(one, { op: 'program', bit: fakeBit(100).bit, ...FAST }), /^Error: Adept USB: programming block 0 did not complete \(timeout 0\.1 s\)$/);
 });
