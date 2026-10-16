@@ -26,12 +26,13 @@ const MAX_TCK_HZ = 10_000_000;   // the XCF0xS's fastest TCK (DS123, TAP timing:
 // the longest a block takes to program: 14 ms (the fixed wait after ISC_PROGRAM of Xilinx's XCF00S
 // algorithm, as xc3sprog's progalgxcf.cpp has it, also its poll limit of 28 x 0.5 ms), with margin
 export const PROGRAM_S = 0.02;
-// with the option measure (off: on the board the measured waits left block 0 unprogrammed, #289):
-// the wait a block is given twice the longest program time measured (ISCTESTSTATUS polled after
-// ISC_PROGRAM), at least PROGRAM_MIN_S, at most PROGRAM_S; measured on the first MEASURE_FIRST
-// blocks and every MEASURE_EVERY, and whenever a status check finds the PROM still busy
-export const PROGRAM_MIN_S = 0.001;
+// the wait a block is given (#291): WAIT_FACTOR times the longest program time measured (ISCTESTSTATUS
+// polled after ISC_PROGRAM: 0.19 ms on a Basys2's XCF02S), at least PROGRAM_MIN_S, at most PROGRAM_S;
+// measured on the first MEASURE_FIRST blocks, every MEASURE_EVERY and the last, and whenever a status
+// check finds the PROM still busy
+export const PROGRAM_MIN_S = 0.002, WAIT_FACTOR = 5;
 export const MEASURE_FIRST = 2, MEASURE_EVERY = 64;
+const POLL_FIRST_S = 0.001;   // the first span of the polls (16 of them)
 const POLL_S = 0.05;   // the longest a program is polled (xcf_prog.py's)
 // the XCF0xS by IDCODE bits 19..12: [size in bits, bits per block]
 const SIZES = { 0x44: [1 << 20, 2048], 0x45: [2 << 20, 4096], 0x46: [4 << 20, 4096] };
@@ -99,7 +100,7 @@ export function xcfSize(idcode) {
 // (#289): a few commands a block where a command a step took hundreds.
 export class Xcf {
   constructor(chain, dev, { tckHz = TCK_HZ } = {}) {
-    Object.assign(this, { chain, dev, tckHz, stats: null }, xcfSize(dev.idcode));
+    Object.assign(this, { chain, dev, tckHz, stats: null, now: null, measuredHz: null }, xcfSize(dev.idcode));
     for (const d of chain.devices) d.cur = (1 << d.irLen) - 1;   // everything else in BYPASS
   }
 
@@ -150,10 +151,19 @@ export class Xcf {
   }
   async writeProtected() {
     await this.ir(XCF.ISC_DISABLE);
+    const t = this.now?.();
     await this.wait(0.11);
+    if (this.now) this.calibrate(this.clocks(0.11) + 1, this.now() - t);
     return !!((await this.ir(XCF.BYPASS)) & 0x08);
   }
   blocks(nbits) { return Math.ceil(nbits / this.block); }
+  // the TCK rate measured on a CLOCK_TCK of `clocks` that took `ms` (its round trips counted in: the
+  // rate a little under the real one): the waits counted at it when 1 % or more under the port's (on a Basys2
+  // half of the 4 MHz it says, #291)
+  calibrate(clocks, ms) {
+    this.measuredHz = ms > 0 ? clocks / ms * 1000 : Infinity;
+    if (this.measuredHz < 0.99 * this.tckHz) this.tckHz = Math.floor(this.measuredHz);
+  }
 
   async erase() {
     if (await this.writeProtected()) fail('the PROM is write protected');
@@ -176,7 +186,7 @@ export class Xcf {
   // Returns the clocks in Run-Test/Idle until the PROM said ready, or null when not within `limit`
   async readyClocks(s, limit) {
     if (s.clocks > 1 << 14) await s.run();   // the stream so far without its TDO
-    let t = 0, span = this.clocks(PROGRAM_MIN_S, 16);
+    let t = 0, span = this.clocks(POLL_FIRST_S, 16);
     for (;;) {
       const step = Math.ceil(span / 16), polls = [];
       for (let k = 0; k < 16 && t < limit; k++) {
@@ -193,21 +203,23 @@ export class Xcf {
       span = t;
     }
   }
-  // per block ISC_DATA_SHIFT, ISC_ADDRESS_SHIFT, ISC_PROGRAM and its wait in Run-Test/Idle, PROGRAM_S
-  // (as a CLOCK_TCK, no data), blocks streamed together; the last block's program time polled for the
-  // console (a diagnostic: the block still waits PROGRAM_S, the polls xcf_prog.py's), then the status
-  // checked once (a block that did not program shows in the verify). measure (off by default, #289):
-  // the wait twice the program time measured on the first blocks and every MEASURE_EVERY, the status
-  // checked at the end of each stream, a PROM still busy measured again
-  async program(data, log = () => {}, { measure = false } = {}) {
+  // per block ISC_DATA_SHIFT, ISC_ADDRESS_SHIFT, ISC_PROGRAM and its wait in Run-Test/Idle (a
+  // CLOCK_TCK, no data), blocks streamed together. The program time measured (readyClocks: polled to
+  // the end, xcf_prog.py's polls) on the first MEASURE_FIRST blocks, every MEASURE_EVERY and the last;
+  // the others wait WAIT_FACTOR times the longest measured, at least PROGRAM_MIN_S, at most PROGRAM_S
+  // (#291); the status checked at the end of each stream, a PROM still busy measured again, and once
+  // more after the last block (a block cut short shows in the verify). measure false: PROGRAM_S for
+  // every block, only the last one's time polled for the console (#289)
+  async program(data, log = () => {}, { measure = true } = {}) {
     this.checkFits(data);
     const bpb = this.block / 8, image = promImage(data, this.block), n = image.length / bpb;
     await this.ir(XCF.ISC_DISABLE);
     await this.wait(0.001);
     await this.enable();
     const s = this.seq(), most = this.clocks(PROGRAM_S), least = this.clocks(PROGRAM_MIN_S), poll = this.clocks(POLL_S);
-    let longest = 0, from = 0, last = null;   // the longest program time measured, the last block's (TCK clocks)
-    const wait = () => (measure ? Math.min(most, Math.max(least, 2 * longest)) : most);
+    let longest = 0, shortest = Infinity, measured = 0, from = 0, last = null;   // the program times measured (TCK clocks)
+    const note = t => { longest = Math.max(longest, t); shortest = Math.min(shortest, t); measured++; };
+    const wait = () => (measure ? Math.min(most, Math.max(least, WAIT_FACTOR * longest)) : most);
     const sent = i => { for (; from <= i; from++) if (from % 16 === 0 || from === n - 1) log(`  programmed block ${from + 1}/${n}`); };
     const late = i => fail(`programming block ${i} did not complete (timeout ${POLL_S.toFixed(1)} s)`);
     for (let i = 0; i < n; i++) {
@@ -215,21 +227,22 @@ export class Xcf {
       s.dr(this.dev, image.subarray(i * bpb, (i + 1) * bpb), this.block);
       this.address(s, i * FRAMES_PER_BLOCK);
       s.ir(this.dev, XCF.ISC_PROGRAM);
-      if (i === n - 1) {
+      if (measure && (i < MEASURE_FIRST || i % MEASURE_EVERY === 0 || i === n - 1)) {
+        const t = await this.readyClocks(s, poll);
+        if (t === null) late(i);
+        note(t);
+        if (i === n - 1) await this.waitReady(0.0005, POLL_S, `programming block ${i}`);
+        sent(i);
+      } else if (i === n - 1) {
         last = await this.readyClocks(s, most);
         if (last !== null && last < most) s.rti(most - last);   // PROGRAM_S in all, as every block
         await s.run();
         await this.waitReady(0.0005, POLL_S, `programming block ${i}`);
         sent(i);
-      } else if (measure && (i < MEASURE_FIRST || i % MEASURE_EVERY === 0)) {
-        const t = await this.readyClocks(s, poll);
-        if (t === null) late(i);
-        longest = Math.max(longest, t);
-        sent(i);
       } else {
         const w = wait();
         s.rti(w);
-        if (s.clocks + Math.min(w, RTI_PAIRS) + 2 * this.block > STREAM_CLOCKS || (measure && (i + 1) % MEASURE_EVERY === 0)) {
+        if (s.clocks + 2 * this.block > STREAM_CLOCKS || (measure && (i + 1) % MEASURE_EVERY === 0)) {
           if (measure) {
             s.ir(this.dev, XCF.ISCTESTSTATUS);
             s.rti(1);
@@ -238,7 +251,7 @@ export class Xcf {
             if (!(st.num & 0x04)) {
               const more = await this.readyClocks(s, poll);
               if (more === null) late(i);
-              longest = Math.max(longest, w + 3 + more);
+              note(w + 3 + more);
             }
           } else await s.run();
           sent(i);
@@ -246,8 +259,8 @@ export class Xcf {
       }
     }
     const ms = c => (c / this.tckHz * 1000).toFixed(2);
-    if (measure) log(`  block program time: ${ms(longest)} ms measured, ${ms(wait())} ms waited`);
-    log(`  program time of the last block (ISCTESTSTATUS): ${last === null ? `over ${ms(most)} ms` : `${ms(last)} ms`}; each block waited ${ms(wait())} ms`);
+    if (measure) log(`  block program time (ISCTESTSTATUS): ${ms(shortest)} to ${ms(longest)} ms on ${measured} blocks; the others waited ${ms(wait())} ms`);
+    else log(`  program time of the last block (ISCTESTSTATUS): ${last === null ? `over ${ms(most)} ms` : `${ms(last)} ms`}; each block waited ${ms(most)} ms`);
     await this.disable();
   }
   // the first nbits of the PROM, as stored (bits of each byte reversed): per block its address,
@@ -306,7 +319,7 @@ export const PROM_OPS = ['program', 'verify', 'erase', 'read', 'reconfigure'];
  * then reloads from the PROM (DONE checked). bit: the .bit (program / verify), checked against the
  * chain's FPGA. The console lines are those of the full application.
  */
-export async function promAdept(usb, { op, bit = null, verify = true, reconfigure = false, log = () => {}, tckHz, sleep = sleepMs, donePolls = 25, now = () => performance.now(), measure = false } = {}) {
+export async function promAdept(usb, { op, bit = null, verify = true, reconfigure = false, log = () => {}, tckHz, sleep = sleepMs, donePolls = 25, now = () => performance.now(), measure = true } = {}) {
   const start = now();
   // a phase, and the time it took
   const timed = async f => { const t = now(); await f(); return secs(now() - t); };
@@ -326,9 +339,12 @@ export async function promAdept(usb, { op, bit = null, verify = true, reconfigur
     const prom = chain.devices.find(d => d.kind === 'prom');
     if (!prom) fail(`no XCF Platform Flash in the JTAG chain (found ${chain.devices.map(d => d.name.toUpperCase()).join(', ')})`);
     const fpga = chain.devices.find(d => d.kind === 'fpga') || null;
-    const x = new Xcf(chain, prom, { tckHz: tckHz ?? await tckRate(chain.port) });
+    const x = new Xcf(chain, prom, { tckHz: tckHz ?? await tckRate(chain.port) }), given = x.tckHz;
+    x.now = now;
     const wp = await x.writeProtected();
     log(`PROM ${prom.name}: ${x.size / 1024} Kbit, ${x.block}-bit blocks${wp ? ', WRITE PROTECTED' : ''}`);
+    const mhz = hz => (hz / 1e6).toFixed(2);
+    log(`TCK: ${mhz(given)} MHz said, ${Number.isFinite(x.measuredHz) ? mhz(x.measuredHz) : '?'} MHz measured: the waits counted at ${mhz(x.tckHz)} MHz`);
     let result = { op, prom: prom.name };
     if (parsed) {
       const part = bitHeader(bit)?.part;

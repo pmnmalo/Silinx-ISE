@@ -8,9 +8,9 @@ the "What's new" text of its GitHub release.
 In short:
 
 - **Platform Flash from the browser, faster still:** programming the PROM of the Basys2 / Nexys2 from
-  the browser edition sends the blocks as the FPGA's bitstream is sent, and its waits no longer as
-  data over USB; the console says how long the erase, the program and the verify took, and where
-  the USB time went.
+  the browser edition sends the blocks as the FPGA's bitstream is sent, waits for each block about
+  as long as the PROM needs (measured) and no longer sends those waits as data over USB; the console
+  says how long the erase, the program and the verify took, and where the USB time went.
 
 In detail:
 
@@ -44,6 +44,19 @@ In detail:
   the program and the verify, the USB commands of each kind (count, bytes, time, KB/s). The simulated
   PROM starts an erase / a program only in Run-Test/Idle (the board's failure reproduced), and
   counts the bytes of each kind of command.
+- **PROM programming over WebUSB: the measured wait, in real time (#291):** after #289 a Basys2's
+  XCF02S programmed and verified in 22.9 s, 14.1 s of it the 331 waits of 20 ms, though
+  ISCTESTSTATUS put a block's program time at 0.19 ms; and those 20 ms of clocks took ~43 ms: the
+  port's TCK is about half the 4 MHz it says. The program time is now measured again by default
+  (#289's polls: Run-Test/Idle, ISCTESTSTATUS, one clock, the status read, until ready, 50 ms at
+  most) on blocks 0 and 1, every 64th and the last; the others wait 5 times the longest measured, at
+  least 2 ms, at most 20 ms; the status checked at the end of each stream (a PROM still busy measured
+  again), once more after the last block, and the verify. The TCK rate is measured on the 110 ms
+  CLOCK_TCK of the first ISC_DISABLE and the waits counted at it when it is under the port's. The
+  console: `TCK: 4.00 MHz said, 2.00 MHz measured: the waits counted at 2.00 MHz` and
+  `  block program time (ISCTESTSTATUS): 0.19 to 0.21 ms on 8 blocks; the others waited 2.00 ms`;
+  the fixed 20 ms with the option `measure: false`. The waits of the 331 blocks: ~0.7 s of clocks
+  (and their CLOCK_TCKs' round trips) instead of 14.1 s.
 
 ## 15.10.20
 
