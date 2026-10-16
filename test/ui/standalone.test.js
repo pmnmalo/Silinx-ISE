@@ -241,16 +241,18 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
   const promLog = (await page.consoleText()).split('Programming XCF02S...')[1].trim().split('\n').map((l) => l.trimEnd());
   const blocks = promLog.filter((l) => /^ {2}programmed block/.test(l));
   const n = +blocks.at(-1).match(/\/(\d+)$/)[1];
-  assert.deepEqual(promLog.map((l) => l.replace(/built \S+ \S+$/, 'built D T').replace(/(part 3s250ecp132) \S+ \S+, \d+ bytes$/, '$1 D T, N bytes')), [
+  // (each phase's time, #287, the browser's: T)
+  assert.deepEqual(promLog.map((l) => l.replace(/built \S+ \S+$/, 'built D T').replace(/(part 3s250ecp132) \S+ \S+, \d+ bytes$/, '$1 D T, N bytes').replace(/ in \d+\.\d s$/, ' in T s')), [
     'PROM image build/top_prom.bit: design top.ncd, part 3s250ecp132, built D T',
     'Platform Flash: program + reload FPGA from PROM',
     'Programmer: Digilent Basys2 (serial 10146A2B3C4D)',
     'JTAG chain: xcf02s(d5045093), xc3s250e(11c1a093)',
     'PROM xcf02s: 2048 Kbit, 4096-bit blocks',
     'bitstream: design top.ncd part 3s250ecp132 D T, N bytes',
-    'erasing...', 'programming...',
+    'erasing...', 'erased in T s', 'programming...',
     ...Array.from({ length: n }, (_, i) => i).filter((i) => i % 16 === 0 || i === n - 1).map((i) => `  programmed block ${i + 1}/${n}`),
-    'verifying...', 'verify OK', 'reconfiguring the FPGA from the PROM...', 'STATUS: DONE',
+    '  block program time: 0.06 ms measured, 1.00 ms waited', `programmed ${n} blocks in T s`,
+    'verifying...', 'verify OK in T s', 'reconfiguring the FPGA from the PROM...', 'STATUS: DONE', 'program done in T s',
     'Platform Flash program finished.',
     "'2': XCF02S programmed and verified; FPGA loaded from the PROM (DONE).",
   ]);
@@ -269,9 +271,9 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
   const backup = (await page.consoleText()).split('Backing up XCF02S...')[1].trim().split('\n').map((l) => l.trimEnd());
   const name = backup.find((l) => /^PROM backup: /.test(l)).match(/^PROM backup: (prom-[\dTZ-]+\.bin) \(262144 bytes\)$/)?.[1];
   assert.ok(name, backup.join('\n'));
-  assert.deepEqual(backup.map((l) => l.replace(/\(\d+ bytes before/, '(N bytes before').replace(name, 'F')), [
+  assert.deepEqual(backup.map((l) => l.replace(/\(\d+ bytes before/, '(N bytes before').replace(name, 'F').replace(/ in \d+\.\d s$/, ' in T s')), [
     'Platform Flash: read', 'Programmer: Digilent Basys2 (serial 10146A2B3C4D)', 'JTAG chain: xcf02s(d5045093), xc3s250e(11c1a093)',
-    'PROM xcf02s: 2048 Kbit, 4096-bit blocks', 'read 262144 bytes (N bytes before the erased tail)', 'PROM backup: F (262144 bytes)',
+    'PROM xcf02s: 2048 Kbit, 4096-bit blocks', 'read 262144 bytes (N bytes before the erased tail)', 'read done in T s', 'PROM backup: F (262144 bytes)',
     'Platform Flash read finished.', 'PROM backup downloaded.',
   ]);
   const saved = await fs.readFile(await waitDownload(page, name));

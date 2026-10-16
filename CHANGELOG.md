@@ -3,6 +3,34 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.10.21
+
+In short:
+
+- **Platform Flash from the browser, faster still:** programming the PROM of the Basys2 / Nexys2 from
+  the browser edition waits for each block only as long as the PROM needs (measured), and no longer
+  sends those waits as data over USB; the console says how long the erase, the program and the
+  verify took.
+
+In detail:
+
+- **PROM programming over WebUSB: the waits measured, without data (#287):** after #274 each block's
+  program wait (20 ms, the 14 ms maximum with margin) went out as TMS / TDI pairs, about 20 KB a block
+  at the Adept's 4 MHz, and every IR shift read its TDO back: 10.4 MB over full-speed USB (~1 MB/s)
+  to program an XC3S250E design (331 blocks). `core/xcf.js` now measures the PROM's block program
+  time on the first 2 blocks and every 64th (ISCTESTSTATUS polled within the stream, no USB round
+  trip between the polls) and waits twice the longest measured (at least 1 ms, at most 20 ms); the
+  status read at the end of each stream measures a PROM still busy again, and the verify catches a
+  block cut short. `JtagSeq` (`core/adept.js`) sends a Run-Test/Idle wait of more than 8192 clocks as
+  one DJTG CLOCK_TCK (no data) between the stream's pieces, and reads an IR's TDO only when asked.
+  With the simulated PROM, programming those 331 blocks takes 0.7 MB and 143 transfers instead of
+  10.4 MB and 382 (about 0.8 s at 1 MB/s instead of 10.5 s); a PROM that does need 12 ms a block
+  gets 20 ms as CLOCK_TCK, 0.55 MB. The console gives each phase's time (e.g. `erased in 4.1 s`,
+  `programmed 331 blocks in 2.0 s`, `verify OK in 1.3 s`, `program done in 7.6 s`) and the program
+  time measured (`  block program time: 0.06 ms measured, 1.00 ms waited`). The simulated PROM takes
+  a program time per block; the tests' clock is the simulated board's TCK count. The full
+  application's `scripts/xcf_prog.py` is unchanged.
+
 ## 15.10.20
 
 In short:

@@ -96,7 +96,7 @@ class Prom {
       if (b >= this.written.length) return this.error(`ISC_PROGRAM past the end (block ${b})`);
       if (this.written[b]) return this.error(`block ${b} programmed twice without an erase`);
       for (let i = 0; i < this.block; i++) if (!this.mem[b * this.block + i]) return this.error(`block ${b} programmed before an erase`);
-      this.busy = this.programClocks; this.pendingOp = 'program';
+      this.busy = typeof this.programClocks === 'function' ? this.programClocks(b) : this.programClocks; this.pendingOp = 'program';
     } else if (ir === ISC.DISABLE) {
       if (this.isc) this.ops.push('disable');
       this.isc = false;
@@ -154,7 +154,8 @@ class Prom {
 
 export class SimAdeptBoard {
   /** chain: the devices from TDI to TDO (the Basys2: the FPGA, then the PROM). */
-  /** promOptions: the Platform Flash's (writeProtected, eraseClocks, programClocks, failBlock); mode: the jumper ('rom' / 'jtag'). */
+  /** promOptions: the Platform Flash's (writeProtected, eraseClocks, programClocks: the TCK clocks in Run-Test/Idle a block takes,
+      or a function of the block, failBlock); mode: the jumper ('rom' / 'jtag'). */
   /** tckHz: the JTAG port's TCK rate, as GET_SPEED says it (null: a firmware without the command). */
   constructor({ fpga = 'xc3s250e', prom = 'xcf02s', product = 'Basys2', serial = '10146A2B3C4D', inUse = false, promOptions = {}, mode = 'rom', tckHz = 4_000_000 } = {}) {
     this.fpgaDev = new Fpga(fpga);
@@ -165,13 +166,17 @@ export class SimAdeptBoard {
     this.irs = this.chain.map(() => 0);
     this.drs = this.chain.map(() => reg([0, 1]));
     this.opened = false; this.configuration = null; this.claimed = false;
-    this.replies = []; this.pending = null; this.log = [];
+    this.replies = []; this.pending = null; this.log = []; this.ticks = 0;
   }
   get done() { return this.fpgaDev.done; }
   get config() { return this.fpgaDev.config; }
 
+  // the simulated time (ms): the TCK clocks so far at a rate (the tests' deterministic clock)
+  now(hz = this.tckHz) { return this.ticks / hz * 1000; }
+
   // ---- JTAG: one TCK; returns TDO (sampled before the edge)
   tck(tms, tdi) {
+    this.ticks++;
     const last = this.chain.length - 1;
     let tdo = 0;
     if (this.state === 'SDR') tdo = this.drs[last].bits[this.drs[last].off];

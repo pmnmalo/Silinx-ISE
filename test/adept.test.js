@@ -3,7 +3,7 @@
 // Spartan-3E and a Platform Flash): the chain scanned, a bitstream configured, the errors.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scanAdept, programAdept, byterev, bitHeader } from '../core/adept.js';
+import { scanAdept, programAdept, byterev, bitHeader, Adept, Djtg, Chain, JtagSeq, RTI_PAIRS } from '../core/adept.js';
 import { SimAdeptBoard } from './fixtures/adept-sim.js';
 
 // a .bit: a header, dummy words, the sync word, then the configuration
@@ -71,4 +71,36 @@ test('bitHeader: the design and part of a .bit; the part checked against the boa
   assert.equal(bitHeader(new Uint8Array([1, 2, 3])), null);
   // the header's part wins over the one given
   await assert.rejects(programAdept(new SimAdeptBoard({ fpga: 'xc3s500e' }), bit, { part: 'xc3s500e' }), /the board's FPGA is a XC3S500E, the bitstream is for a XC3S250E/);
+});
+
+// #287: a wait of more than RTI_PAIRS clocks is not sent as TMS / TDI pairs (a byte every 4 clocks)
+// but as one CLOCK_TCK between the stream's pieces; what is read comes back across them (the pieces
+// not on byte boundaries); an IR shift's TDO only read when asked
+test('JtagSeq: a long Run-Test/Idle wait sent as a CLOCK_TCK between the pieces of the stream, the reads across them', async () => {
+  const board = new SimAdeptBoard();
+  const a = await new Adept(board).open();
+  const chain = new Chain(new Djtg(a, 0));
+  await chain.init();
+  const [prom, fpga] = chain.devices;
+  const s = new JtagSeq(chain);
+  assert.equal(s.ir(prom, 0xfe), null, 'an IR not read: no capture');
+  const ir = s.ir(fpga, 0x09, true);
+  s.rti(RTI_PAIRS + 5);   // over RTI_PAIRS: a CLOCK_TCK
+  const id1 = s.dr(prom, 0, 32, true);
+  s.rti(3);
+  s.rti(RTI_PAIRS);   // up to RTI_PAIRS: pairs
+  s.rti(3 * RTI_PAIRS);
+  s.ir(prom, 0xff);   // the PROM in BYPASS, the FPGA's IDCODE through it
+  const id2 = s.dr(fpga, 0, 32, true);
+  const pairs = s.clocks, t0 = board.ticks;
+  board.log.length = 0;
+  await s.run();
+  assert.equal(ir.num, 0x11, 'the FPGA\'s status (INIT)');
+  assert.equal(id1.num, 0xd5045093);
+  assert.equal(id2.num, 0x11c1a093);
+  assert.equal(board.ticks - t0, pairs + RTI_PAIRS + 5 + 3 * RTI_PAIRS, 'every clock, in the pairs or the CLOCK_TCKs');
+  // PUT_TMS_TDI_BITS (10) and its counts, CLOCK_TCK (7) and its counts, …
+  assert.deepEqual(board.log.map(([, c]) => c), [10, 0x8a, 7, 0x87, 10, 0x8a, 7, 0x87, 10, 0x8a]);
+  assert.equal(s.clocks, 0, 'the stream emptied');
+  await a.close();
 });

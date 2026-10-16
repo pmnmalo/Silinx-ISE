@@ -229,8 +229,11 @@ export class Chain {
 // counts), each ~1 ms over WebUSB: a sequence of TAP moves, IR and DR shifts and Run-Test/Idle
 // clocks is composed here as TMS / TDI pairs and sent with one PUT_TMS_TDI_BITS (in pieces of
 // STREAM_CLOCKS, below the bitstreams the port already takes in one command), TDO captured only
-// where a shift is read. The TAP starts and ends in Run-Test/Idle or an Update state, as Chain's.
+// where a shift is read. A long wait in Run-Test/Idle (more than RTI_PAIRS clocks) is not sent as
+// pairs (a byte every 4 clocks: at 4 MHz as much as full-speed USB carries) but as one CLOCK_TCK
+// (no data) between the pieces. The TAP starts and ends in Run-Test/Idle or an Update state, as Chain's.
 export const STREAM_CLOCKS = 1 << 19;   // 128 KB of TMS / TDI pairs a command
+export const RTI_PAIRS = 1 << 13;   // 2 KB of pairs (~2 ms of USB): about what a command's round trips cost
 
 // a read shift's bits out of the captured TDO: .bytes (LSB first), .num
 class Capture {
@@ -240,7 +243,8 @@ class Capture {
 const bytesOfNum = (num, n) => bytesOfBig(BigInt(num), (n + 7) >> 3);
 
 export class JtagSeq {
-  constructor(chain) { this.chain = chain; this.buf = new Uint8Array(1 << 12); this.n = 0; this.reads = []; }
+  constructor(chain) { this.chain = chain; this.buf = new Uint8Array(1 << 12); this.n = 0; this.reads = []; this.waits = []; }
+  // the TMS / TDI pairs so far (the CLOCK_TCK waits not counted)
   get clocks() { return this.n; }
   clock(tms, tdi = 0) {
     if (this.n === this.buf.length) { const b = new Uint8Array(this.buf.length * 2); b.set(this.buf); this.buf = b; }
@@ -252,16 +256,19 @@ export class JtagSeq {
   }
   // the TDO of the next n clocks, filled in by run()
   capture(n) { const c = new Capture(this.n, n); this.reads.push(c); return c; }
-  // Run-Test/Idle, then n clocks there (Chain.clockRti)
-  rti(n) { for (let i = 0; i <= n; i++) this.clock(0); }
-  // every device's current instruction (dev's set to cmd) to Update-IR; returns what dev captured
-  ir(dev, cmd) {
+  // Run-Test/Idle, then n clocks there (Chain.clockRti); more than RTI_PAIRS: one CLOCK_TCK
+  rti(n) {
+    if (n > RTI_PAIRS) { this.clock(0); this.waits.push({ at: this.n, n }); return; }
+    for (let i = 0; i <= n; i++) this.clock(0);
+  }
+  // every device's current instruction (dev's set to cmd) to Update-IR; read: returns what dev captured
+  ir(dev, cmd, read = false) {
     const ds = this.chain.devices;
     dev.cur = cmd;
     this.clock(1); this.clock(1); this.clock(0); this.clock(0);   // Select-DR, Select-IR, Capture-IR, Shift-IR
     let got = null;
     ds.forEach((d, i) => {
-      if (d === dev) got = this.capture(d.irLen);
+      if (d === dev && read) got = this.capture(d.irLen);
       this.shift(bytesOfNum(d.cur, d.irLen), d.irLen, i === ds.length - 1);
     });
     this.clock(1);   // Update-IR
@@ -280,21 +287,27 @@ export class JtagSeq {
     this.clock(1);   // Update-DR
     return got;
   }
-  // the stream out (TDO read only in the pieces that hold a capture); the captures filled in
+  // the stream out (TDO read only in the pieces that hold a capture), the long waits as CLOCK_TCK
+  // between its pieces; the captures filled in
   async run() {
-    const n = this.n, reads = this.reads, tdo = reads.length ? new Uint8Array((n + 7) >> 3) : null;
-    for (let s = 0; s < n; s += STREAM_CLOCKS) {
-      const m = Math.min(STREAM_CLOCKS, n - s), data = new Uint8Array((m + 3) >> 2);
-      for (let i = 0; i < m; i++) data[i >> 2] |= this.buf[s + i] << ((i & 3) << 1);
-      const oe = reads.some(c => c.at < s + m && c.at + c.n > s);
-      const got = await this.chain.port.putTmsTdiBits(oe, m, data);
-      if (oe) tdo.set(got.subarray(0, (m + 7) >> 3), s >> 3);
+    const n = this.n, reads = this.reads, waits = this.waits, tdo = reads.length ? new Uint8Array((n + 7) >> 3) : null;
+    for (let s = 0, w = 0; s < n || w < waits.length;) {
+      const m = Math.min(STREAM_CLOCKS, n, w < waits.length ? waits[w].at : n) - s;
+      if (m > 0) {
+        const data = new Uint8Array((m + 3) >> 2);
+        for (let i = 0; i < m; i++) data[i >> 2] |= this.buf[s + i] << ((i & 3) << 1);
+        const oe = reads.some(c => c.at < s + m && c.at + c.n > s);
+        const got = await this.chain.port.putTmsTdiBits(oe, m, data);
+        if (oe) for (let i = 0; i < m; i++) tdo[(s + i) >> 3] |= ((got[i >> 3] >> (i & 7)) & 1) << ((s + i) & 7);
+        s += m;
+      }
+      for (; w < waits.length && waits[w].at === s; w++) await this.chain.port.clockTck(false, false, waits[w].n);
     }
     for (const c of reads) {
       c.bytes = new Uint8Array((c.n + 7) >> 3);
       for (let i = 0; i < c.n; i++) c.bytes[i >> 3] |= ((tdo[(c.at + i) >> 3] >> ((c.at + i) & 7)) & 1) << (i & 7);
     }
-    this.n = 0; this.reads = [];
+    this.n = 0; this.reads = []; this.waits = [];
   }
 }
 

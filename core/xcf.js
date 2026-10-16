@@ -13,7 +13,7 @@
 // sends a byte's bit 0 first, the FPGA reads a byte MSB first), padded with 0xFF to whole blocks.
 // The .bit for the PROM is generated with StartUpClk:CCLK (build/<top>_prom.bit).
 
-import { Adept, Djtg, Chain, JtagSeq, STREAM_CLOCKS, byterev, bitHeader } from './adept.js';
+import { Adept, Djtg, Chain, JtagSeq, STREAM_CLOCKS, RTI_PAIRS, byterev, bitHeader } from './adept.js';
 
 // XCF instructions (8-bit IR)
 export const XCF = {
@@ -26,6 +26,12 @@ const MAX_TCK_HZ = 10_000_000;   // the XCF0xS's fastest TCK (DS123, TAP timing:
 // the longest a block takes to program: 14 ms (the fixed wait after ISC_PROGRAM of Xilinx's XCF00S
 // algorithm, as xc3sprog's progalgxcf.cpp has it, also its poll limit of 28 x 0.5 ms), with margin
 export const PROGRAM_S = 0.02;
+// the wait a block is given: twice the longest program time measured (ISCTESTSTATUS polled after
+// ISC_PROGRAM), at least PROGRAM_MIN_S, at most PROGRAM_S; measured on the first MEASURE_FIRST
+// blocks and every MEASURE_EVERY, and whenever a status check finds the PROM still busy
+export const PROGRAM_MIN_S = 0.001;
+export const MEASURE_FIRST = 2, MEASURE_EVERY = 64;
+const POLL_S = 0.05;   // the longest a program is polled (xcf_prog.py's)
 // the XCF0xS by IDCODE bits 19..12: [size in bits, bits per block]
 const SIZES = { 0x44: [1 << 20, 2048], 0x45: [2 << 20, 4096], 0x46: [4 << 20, 4096] };
 const ST_DONE = 0x20;   // the Spartan-3E's DONE in its captured IR
@@ -34,6 +40,7 @@ export const NOT_DONE = 'the FPGA did not load from the PROM (mode jumper on ROM
 const fail = msg => { throw new Error(`Adept USB: ${msg}`); };
 const hex8 = n => n.toString(16).padStart(8, '0');
 const sleepMs = ms => new Promise(r => setTimeout(r, ms));
+const secs = ms => `${(ms / 1000).toFixed(1)} s`;
 
 /**
  * A .bit's header fields (a: design;UserID=…, b: part, c: date, d: time) and its configuration
@@ -88,7 +95,7 @@ export class Xcf {
   // TCK cycles for at least `seconds` (and minTck)
   clocks(seconds, minTck = 1) { return Math.max(minTck, Math.floor(seconds * this.tckHz)); }
   // one instruction: what the PROM captured in its IR (its status bits)
-  async ir(cmd) { const s = this.seq(), got = s.ir(this.dev, cmd); await s.run(); return got.num; }
+  async ir(cmd) { const s = this.seq(), got = s.ir(this.dev, cmd, true); await s.run(); return got.num; }
   // stay in Run-Test/Idle clocking TCK for at least `seconds` (and minTck cycles)
   wait(seconds, minTck = 1) { return this.chain.clockRti(this.clocks(seconds, minTck)); }
   // ISC_ADDRESS_SHIFT of a frame, into a stream
@@ -149,28 +156,59 @@ export class Xcf {
     const nbits = data.length * 8;
     if (nbits > this.size) fail(`bitstream (${nbits} bits) does not fit the PROM (${this.size} bits): the ${this.dev.name.toUpperCase()} holds ${this.size / 1024} Kbit`);
   }
-  // per block ISC_DATA_SHIFT, ISC_ADDRESS_SHIFT, ISC_PROGRAM and the block's program time clocked in
-  // Run-Test/Idle (PROGRAM_S: no poll a block), blocks streamed together; the status checked once,
-  // after the last block (a block that did not program shows in the verify)
+  // after an ISC_PROGRAM (and its wait) in stream s: ISCTESTSTATUS polled in Run-Test/Idle, the polls
+  // in the stream itself (no USB round trip between them: TCK runs on), 16 in each span, each span
+  // as long as the time so far; returns the TCK clocks in Run-Test/Idle until the PROM was done
+  // (from 2: the first poll at once), or an error after POLL_S
+  async busyClocks(s, what) {
+    if (s.clocks > 1 << 14) await s.run();   // the stream so far without its TDO
+    s.ir(this.dev, XCF.ISCTESTSTATUS);
+    s.rti(1);
+    let t = 2, span = this.clocks(PROGRAM_MIN_S, 16), polls = [[t, s.dr(this.dev, 0, 8, true)]];
+    for (;;) {
+      const step = Math.ceil(span / 16);
+      for (let k = 0; k < 16; k++) { s.rti(step); t += step + 1; polls.push([t, s.dr(this.dev, 0, 8, true)]); }
+      await s.run();
+      const ready = polls.find(([, c]) => c.num & 0x04);
+      if (ready) return ready[0];
+      if (t >= this.clocks(POLL_S)) fail(`${what} did not complete (timeout ${POLL_S.toFixed(1)} s)`);
+      polls = []; span = t;
+    }
+  }
+  // per block ISC_DATA_SHIFT, ISC_ADDRESS_SHIFT, ISC_PROGRAM and its wait in Run-Test/Idle, blocks
+  // streamed together (a long wait as a CLOCK_TCK, no data): the wait twice the program time measured
+  // (busyClocks) on the first blocks and every MEASURE_EVERY; the status checked at the end of each
+  // stream, a PROM still busy measured again (a block cut short by a wait too short shows in the verify)
   async program(data, log = () => {}) {
     this.checkFits(data);
     const bpb = this.block / 8, image = promImage(data, this.block), n = image.length / bpb;
     await this.ir(XCF.ISC_DISABLE);
     await this.wait(0.001);
     await this.enable();
-    const s = this.seq(), wait = this.clocks(PROGRAM_S);
-    for (let i = 0, from = 0; i < n; i++) {
+    const s = this.seq(), most = this.clocks(PROGRAM_S), least = this.clocks(PROGRAM_MIN_S);
+    let longest = 0, from = 0;   // the longest program time measured (TCK clocks)
+    const wait = () => Math.min(most, Math.max(least, 2 * longest));
+    const sent = i => { for (; from <= i; from++) if (from % 16 === 0 || from === n - 1) log(`  programmed block ${from + 1}/${n}`); };
+    for (let i = 0; i < n; i++) {
       s.ir(this.dev, XCF.ISC_DATA_SHIFT);
       s.dr(this.dev, image.subarray(i * bpb, (i + 1) * bpb), this.block);
       this.address(s, i * FRAMES_PER_BLOCK);
       s.ir(this.dev, XCF.ISC_PROGRAM);
-      s.rti(wait);
-      if (s.clocks + wait + 2 * this.block > STREAM_CLOCKS || i === n - 1) {
-        await s.run();
-        for (; from <= i; from++) if (from % 16 === 0 || from === n - 1) log(`  programmed block ${from + 1}/${n}`);
+      if (i < MEASURE_FIRST || i % MEASURE_EVERY === 0) {
+        longest = Math.max(longest, await this.busyClocks(s, `programming block ${i}`));
+        sent(i);
+        continue;
+      }
+      const w = wait();
+      s.rti(w);
+      if (s.clocks + Math.min(w, RTI_PAIRS) + 2 * this.block > STREAM_CLOCKS || i === n - 1 || (i + 1) % MEASURE_EVERY === 0) {
+        const more = await this.busyClocks(s, `programming block ${i}`);
+        if (more > 2) longest = Math.max(longest, w + 1 + more);
+        sent(i);
       }
     }
-    await this.waitReady(0.0005, 0.05, `programming block ${n - 1}`);
+    const ms = c => (c / this.tckHz * 1000).toFixed(2);
+    log(`  block program time: ${ms(longest)} ms measured, ${ms(wait())} ms waited`);
     await this.disable();
   }
   // the first nbits of the PROM, as stored (bits of each byte reversed): per block its address,
@@ -229,7 +267,10 @@ export const PROM_OPS = ['program', 'verify', 'erase', 'read', 'reconfigure'];
  * then reloads from the PROM (DONE checked). bit: the .bit (program / verify), checked against the
  * chain's FPGA. The console lines are those of the full application.
  */
-export async function promAdept(usb, { op, bit = null, verify = true, reconfigure = false, log = () => {}, tckHz, sleep = sleepMs, donePolls = 25 } = {}) {
+export async function promAdept(usb, { op, bit = null, verify = true, reconfigure = false, log = () => {}, tckHz, sleep = sleepMs, donePolls = 25, now = () => performance.now() } = {}) {
+  const start = now();
+  // a phase, and the time it took
+  const timed = async f => { const t = now(); await f(); return secs(now() - t); };
   if (!PROM_OPS.includes(op)) fail(`unknown PROM operation '${op}' (valid: ${PROM_OPS.join(', ')})`);
   let parsed = null;
   if (op === 'program' || op === 'verify') {
@@ -263,15 +304,17 @@ export async function promAdept(usb, { op, bit = null, verify = true, reconfigur
         log(`read ${data.length} bytes (${used} bytes before the erased tail)`);
         result.data = data;
       } else if (op === 'erase') {
-        log('erasing...'); await x.erase(); log('erased');
+        log('erasing...'); log(`erased in ${await timed(() => x.erase())}`);
       } else if (parsed) {
         const f = parsed.fields;
         log(`bitstream: design ${f.a ?? '?'} part ${f.b ?? '?'} ${f.c ?? ''} ${f.d ?? ''}, ${parsed.data.length} bytes`);
         if (op === 'program') {
-          log('erasing...'); await x.erase();
-          log('programming...'); await x.program(parsed.data, log);
+          log('erasing...'); log(`erased in ${await timed(() => x.erase())}`);
+          log('programming...');
+          const t = await timed(() => x.program(parsed.data, log));
+          log(`programmed ${x.blocks(parsed.data.length * 8)} blocks in ${t}`);
         }
-        if (op === 'verify' || verify) { log('verifying...'); await x.verify(parsed.data); log('verify OK'); }
+        if (op === 'verify' || verify) { log('verifying...'); log(`verify OK in ${await timed(() => x.verify(parsed.data))}`); }
       }
       if (op === 'reconfigure' || (op === 'program' && reconfigure)) {
         log('reconfiguring the FPGA from the PROM...');
@@ -287,6 +330,7 @@ export async function promAdept(usb, { op, bit = null, verify = true, reconfigur
         if (!ok) fail(NOT_DONE);
         result.done = true;
       }
+      log(`${op} done in ${secs(now() - start)}`);
     } catch (e) {
       // the PROM not left in ISC mode (it would neither configure the FPGA nor answer as usual)
       try { await x.disable(); } catch { /* the board is gone */ }
