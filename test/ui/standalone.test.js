@@ -242,7 +242,9 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
   const blocks = promLog.filter((l) => /^ {2}programmed block/.test(l));
   const n = +blocks.at(-1).match(/\/(\d+)$/)[1];
   // (each phase's time, #287, the browser's: T)
-  assert.deepEqual(promLog.map((l) => l.replace(/built \S+ \S+$/, 'built D T').replace(/(part 3s250ecp132) \S+ \S+, \d+ bytes$/, '$1 D T, N bytes').replace(/ in \d+\.\d s$/, ' in T s')), [
+  // (each phase's USB commands, #289: the browser's times, the counts of the data shifts kept)
+  assert.deepEqual(promLog.map((l) => l.replace(/built \S+ \S+$/, 'built D T').replace(/(part 3s250ecp132) \S+ \S+, \d+ bytes$/, '$1 D T, N bytes').replace(/ in \d+\.\d s$/, ' in T s')
+    .replace(/^ {2}USB: data shifts (\d+) x \d+\.\d KB in \d+\.\d s(?: \(\d+ KB\/s\))?; TAP moves \d+ x \d+\.\d KB in \d+\.\d s(?: \(\d+ KB\/s\))?(; waits \d+ x in T s)?$/, (m, k, w) => `  USB: data shifts ${k} x…${w ? '; waits' : ''}`)), [
     'PROM image build/top_prom.bit: design top.ncd, part 3s250ecp132, built D T',
     'Platform Flash: program + reload FPGA from PROM',
     'Programmer: Digilent Basys2 (serial 10146A2B3C4D)',
@@ -251,8 +253,8 @@ uiTest('browser edition (the site over HTTP): Generate Programming File runs the
     'bitstream: design top.ncd part 3s250ecp132 D T, N bytes',
     'erasing...', 'erased in T s', 'programming...',
     ...Array.from({ length: n }, (_, i) => i).filter((i) => i % 16 === 0 || i === n - 1).map((i) => `  programmed block ${i + 1}/${n}`),
-    '  block program time: 0.06 ms measured, 1.00 ms waited', `programmed ${n} blocks in T s`,
-    'verifying...', 'verify OK in T s', 'reconfiguring the FPGA from the PROM...', 'STATUS: DONE', 'program done in T s',
+    '  program time of the last block (ISCTESTSTATUS): 0.06 ms; each block waited 20.00 ms', `  USB: data shifts ${n} x…; waits`, `programmed ${n} blocks in T s`,
+    'verifying...', `  USB: data shifts ${n} x…`, 'verify OK in T s', 'reconfiguring the FPGA from the PROM...', 'STATUS: DONE', 'program done in T s',
     'Platform Flash program finished.',
     "'2': XCF02S programmed and verified; FPGA loaded from the PROM (DONE).",
   ]);

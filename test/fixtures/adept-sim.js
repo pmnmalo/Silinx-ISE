@@ -58,8 +58,9 @@ class Fpga {
   }
 }
 // the Platform Flash: IDCODE, BYPASS and its in-system programming (the instructions core/xcf.js
-// uses, DS123 / the XCF0xS BSDL): the memory, erase and program taking TCK clocks in Run-Test/Idle,
-// the ISC status, CONFIG (the FPGA configured from the memory, the mode jumper on ROM). What breaks
+// uses, DS123 / the XCF0xS BSDL): the memory, erase and program taking TCK clocks in Run-Test/Idle
+// (IEEE 1532: an ISC operation starts when the TAP enters Run-Test/Idle with its instruction in
+// the IR; another instruction before that and it never runs, #289), the ISC status, CONFIG (the FPGA configured from the memory, the mode jumper on ROM). What breaks
 // the protocol (a program before an erase, ISC outside ISC mode, a wrong length…) goes to errors.
 const ISC = { ENABLE: 0xe8, PROGRAM: 0xea, ADDRESS: 0xeb, ERASE: 0xec, DATA: 0xed, CONFIG: 0xee, READ: 0xef, DISABLE: 0xf0, STATUS: 0xe3 };
 class Prom {
@@ -68,7 +69,7 @@ class Prom {
     Object.assign(this, { name, irLen: 8, idcode: IDS[name], idInstr: 0xfe, size, block, writeProtected, eraseClocks, programClocks, failBlock });
     this.mem = new Uint8Array(size).fill(1);   // one bit per entry, in the order they are shifted in (and out to the FPGA)
     this.written = new Uint8Array(size / block);   // blocks programmed since the last erase
-    this.isc = false; this.addr = 0; this.data = null; this.busy = 0; this.pendingOp = null;
+    this.isc = false; this.addr = 0; this.data = null; this.busy = 0; this.pendingOp = null; this.armed = null;
     this.errors = []; this.ops = []; this.fpga = null; this.mode = 'rom';
     this.reset();
   }
@@ -77,6 +78,12 @@ class Prom {
   error(m) { this.errors.push(m); }
   update() {
     const ir = this.ir;
+    // an erase / a program whose instruction was not followed by Run-Test/Idle never started
+    if (this.armed) {
+      this.error(`ISC_${this.armed.op === 'erase' ? 'ERASE' : 'PROGRAM'} never started: no Run-Test/Idle before the next instruction`);
+      if (this.armed.op === 'program') this.data = null;
+      this.armed = null;
+    }
     // an erase / a program runs while TCK clocks in Run-Test/Idle: another instruction meanwhile
     // (the next block's, a wait too short) cuts it short, and the block stays unprogrammed
     if (this.busy && ir !== ISC.STATUS && ir !== 0xff) {
@@ -87,7 +94,7 @@ class Prom {
       if (!this.isc) return this.error('ISC_ERASE outside ISC mode');
       if (this.addr !== 1) return this.error(`ISC_ERASE with the address ${this.addr} (not 1)`);
       if (this.writeProtected) return this.error('ISC_ERASE of a write-protected PROM');
-      this.busy = this.eraseClocks; this.pendingOp = 'erase';
+      this.armed = { op: 'erase', clocks: this.eraseClocks };
     } else if (ir === ISC.PROGRAM) {
       if (!this.isc) return this.error('ISC_PROGRAM outside ISC mode');
       if (!this.data) return this.error('ISC_PROGRAM with no data shifted');
@@ -96,7 +103,7 @@ class Prom {
       if (b >= this.written.length) return this.error(`ISC_PROGRAM past the end (block ${b})`);
       if (this.written[b]) return this.error(`block ${b} programmed twice without an erase`);
       for (let i = 0; i < this.block; i++) if (!this.mem[b * this.block + i]) return this.error(`block ${b} programmed before an erase`);
-      this.busy = typeof this.programClocks === 'function' ? this.programClocks(b) : this.programClocks; this.pendingOp = 'program';
+      this.armed = { op: 'program', clocks: typeof this.programClocks === 'function' ? this.programClocks(b) : this.programClocks };
     } else if (ir === ISC.DISABLE) {
       if (this.isc) this.ops.push('disable');
       this.isc = false;
@@ -149,7 +156,11 @@ class Prom {
     }
   }
   shiftedIn() {}
-  clock(state) { if (state === 'RTI' && this.busy && --this.busy === 0) this.finish(); }
+  clock(state) {
+    if (state !== 'RTI') return;
+    if (this.armed) { this.busy = this.armed.clocks; this.pendingOp = this.armed.op; this.armed = null; return; }   // it starts
+    if (this.busy && --this.busy === 0) this.finish();
+  }
 }
 
 export class SimAdeptBoard {

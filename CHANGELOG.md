@@ -8,9 +8,9 @@ the "What's new" text of its GitHub release.
 In short:
 
 - **Platform Flash from the browser, faster still:** programming the PROM of the Basys2 / Nexys2 from
-  the browser edition waits for each block only as long as the PROM needs (measured), and no longer
-  sends those waits as data over USB; the console says how long the erase, the program and the
-  verify took.
+  the browser edition sends the blocks as the FPGA's bitstream is sent, and its waits no longer as
+  data over USB; the console says how long the erase, the program and the verify took, and where
+  the USB time went.
 
 In detail:
 
@@ -30,6 +30,20 @@ In detail:
   time measured (`  block program time: 0.06 ms measured, 1.00 ms waited`). The simulated PROM takes
   a program time per block; the tests' clock is the simulated board's TCK count. The full
   application's `scripts/xcf_prog.py` is unchanged.
+- **PROM programming over WebUSB: the fixed wait again, the blocks as PUT_TDI_BITS (#289):** on the
+  board #287's measured waits failed (`verify FAILED at byte 4 (block 0): read ff expected 55`, the
+  program time measured 0.00 ms): the measurement shifted ISCTESTSTATUS right after ISC_PROGRAM,
+  and an ISC operation starts only in Run-Test/Idle (IEEE 1532), so block 0 never programmed and the
+  PROM said ready. Every block now waits the fixed 20 ms again (a CLOCK_TCK, no data); the measured
+  waits are an option, off (`measure`), their polls those of `scripts/xcf_prog.py` (Run-Test/Idle
+  first). The board also showed the TMS / TDI pairs slow (331 blocks in 10.9 s with 1 ms waits):
+  `JtagSeq` now sends a long DR shift (a block's 4096 bits, written or read) as one PUT_TDI_BITS /
+  GET_TDO_BITS, as the FPGA's bitstream goes, the pairs only for the TAP moves (9 KB for 331 blocks
+  instead of 0.7 MB), and a wait over 1024 clocks as a CLOCK_TCK. The console gives, for the last
+  block only, what ISCTESTSTATUS says of its program time (its wait still the full 20 ms) and, after
+  the program and the verify, the USB commands of each kind (count, bytes, time, KB/s). The simulated
+  PROM starts an erase / a program only in Run-Test/Idle (the board's failure reproduced), and
+  counts the bytes of each kind of command.
 
 ## 15.10.20
 

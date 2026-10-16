@@ -3,7 +3,7 @@
 // Spartan-3E and a Platform Flash): the chain scanned, a bitstream configured, the errors.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scanAdept, programAdept, byterev, bitHeader, Adept, Djtg, Chain, JtagSeq, RTI_PAIRS } from '../core/adept.js';
+import { scanAdept, programAdept, byterev, bitHeader, Adept, Djtg, Chain, JtagSeq, RTI_PAIRS, DR_TDI_BITS } from '../core/adept.js';
 import { SimAdeptBoard } from './fixtures/adept-sim.js';
 
 // a .bit: a header, dummy words, the sync word, then the configuration
@@ -102,5 +102,36 @@ test('JtagSeq: a long Run-Test/Idle wait sent as a CLOCK_TCK between the pieces 
   // PUT_TMS_TDI_BITS (10) and its counts, CLOCK_TCK (7) and its counts, …
   assert.deepEqual(board.log.map(([, c]) => c), [10, 0x8a, 7, 0x87, 10, 0x8a, 7, 0x87, 10, 0x8a]);
   assert.equal(s.clocks, 0, 'the stream emptied');
+  await a.close();
+});
+
+// #289: on the board the pairs are slow; a long DR shift (DR_TDI_BITS or more) goes as PUT_TDI_BITS
+// (TMS low; a read of zeros as GET_TDO_BITS), its last bit a pair, as the FPGA's bitstream goes
+test('JtagSeq: a long DR shift as PUT_TDI_BITS / GET_TDO_BITS, its last bit a pair; what it reads; the bytes per kind of command', async () => {
+  const board = new SimAdeptBoard();
+  const a = await new Adept(board).open();
+  const chain = new Chain(new Djtg(a, 0));
+  await chain.init();
+  const [prom, fpga] = chain.devices;
+  const st = { now: () => board.now() };
+  const s = new JtagSeq(chain, st);
+  s.ir(prom, 0xff);   // both in BYPASS
+  s.ir(fpga, 0x3f);
+  const data = Uint8Array.from({ length: 25 }, (_, i) => (i * 73 + 5) & 0xff);   // 200 bits
+  const got = s.dr(prom, data, 200, true);
+  const zeros = s.dr(prom, null, 200, true);
+  const short = s.dr(prom, 0x5, DR_TDI_BITS, true);   // under DR_TDI_BITS + 1: pairs
+  board.log.length = 0;
+  await s.run();
+  // TDI through the two 1-bit BYPASS registers (the FPGA's, then the PROM's): the data two bits later
+  const bit = (b, i) => (b[i >> 3] >> (i & 7)) & 1;
+  for (let i = 0; i < 200; i++) assert.equal(bit(got.bytes, i), i > 1 ? bit(data, i - 2) : 0, `bit ${i}`);
+  assert.ok(zeros.bytes.every(b => b === 0));
+  assert.equal(short.num, 0x5 << 2);
+  // pairs, PUT_TDI_BITS (8), pairs, GET_TDO_BITS (9), pairs: each with its counts
+  assert.deepEqual(board.log.map(([, c]) => c), [10, 0x8a, 8, 0x88, 10, 0x8a, 9, 0x89, 10, 0x8a]);
+  assert.deepEqual([st.data.cmds, st.data.clocks, st.data.bytes], [2, 2 * 199, 25 * 2 + 25], 'the data both ways, the zeros\' only in');
+  assert.equal(st.pairs.cmds, 3);
+  assert.equal(st.waits, undefined);
   await a.close();
 });

@@ -224,16 +224,18 @@ export class Chain {
   async status(dev) { return (await this.shiftIr())[this.devices.indexOf(dev)]; }
 }
 
-// ---- whole JTAG operations in one stream
+// ---- whole JTAG operations in few commands
 // Every command of the Adept costs about five USB transfers (command and reply, the data, the
 // counts), each ~1 ms over WebUSB: a sequence of TAP moves, IR and DR shifts and Run-Test/Idle
-// clocks is composed here as TMS / TDI pairs and sent with one PUT_TMS_TDI_BITS (in pieces of
-// STREAM_CLOCKS, below the bitstreams the port already takes in one command), TDO captured only
-// where a shift is read. A long wait in Run-Test/Idle (more than RTI_PAIRS clocks) is not sent as
-// pairs (a byte every 4 clocks: at 4 MHz as much as full-speed USB carries) but as one CLOCK_TCK
-// (no data) between the pieces. The TAP starts and ends in Run-Test/Idle or an Update state, as Chain's.
+// clocks is composed here and sent in few commands, TDO read only where a shift is read. The TAP
+// moves and the short shifts go as TMS / TDI pairs with PUT_TMS_TDI_BITS (in pieces of STREAM_CLOCKS);
+// a long DR shift (DR_TDI_BITS bits or more: a PROM block) as PUT_TDI_BITS, TMS low, as the FPGA's
+// bitstream goes (on the board the pairs are far slower than the PUT_TDI_BITS a bit a clock, #289);
+// a long wait in Run-Test/Idle (more than RTI_PAIRS clocks) as one CLOCK_TCK, no data. The TAP
+// starts and ends in Run-Test/Idle or an Update state, as Chain's.
 export const STREAM_CLOCKS = 1 << 19;   // 128 KB of TMS / TDI pairs a command
-export const RTI_PAIRS = 1 << 13;   // 2 KB of pairs (~2 ms of USB): about what a command's round trips cost
+export const RTI_PAIRS = 1 << 10;   // 256 bytes of pairs: about what a command's round trips cost
+export const DR_TDI_BITS = 64;
 
 // a read shift's bits out of the captured TDO: .bytes (LSB first), .num
 class Capture {
@@ -242,23 +244,28 @@ class Capture {
 }
 const bytesOfNum = (num, n) => bytesOfBig(BigInt(num), (n + 7) >> 3);
 
+// stats (optional): { now() (ms) }, to which run() adds per kind of command ('pairs', 'data',
+// 'waits') { cmds, bytes (over USB, both ways), clocks, ms }
 export class JtagSeq {
-  constructor(chain) { this.chain = chain; this.buf = new Uint8Array(1 << 12); this.n = 0; this.reads = []; this.waits = []; }
-  // the TMS / TDI pairs so far (the CLOCK_TCK waits not counted)
-  get clocks() { return this.n; }
+  constructor(chain, stats = null) {
+    Object.assign(this, { chain, stats, buf: new Uint8Array(1 << 12), n: 0, v: 0, reads: [], marks: [] });
+  }
+  // the clocks so far that carry data (the pairs and the PUT_TDI_BITS shifts, not the CLOCK_TCKs)
+  get clocks() { return this.v; }
   clock(tms, tdi = 0) {
     if (this.n === this.buf.length) { const b = new Uint8Array(this.buf.length * 2); b.set(this.buf); this.buf = b; }
     this.buf[this.n++] = (tms ? 2 : 0) | (tdi ? 1 : 0);
+    this.v++;
   }
   // n bits of data (LSB first; null: zeros), TMS high on the last one when exit
   shift(data, n, exit = false) {
     for (let i = 0; i < n; i++) this.clock(exit && i === n - 1, data ? (data[i >> 3] >> (i & 7)) & 1 : 0);
   }
   // the TDO of the next n clocks, filled in by run()
-  capture(n) { const c = new Capture(this.n, n); this.reads.push(c); return c; }
+  capture(n) { const c = new Capture(this.v, n); this.reads.push(c); return c; }
   // Run-Test/Idle, then n clocks there (Chain.clockRti); more than RTI_PAIRS: one CLOCK_TCK
   rti(n) {
-    if (n > RTI_PAIRS) { this.clock(0); this.waits.push({ at: this.n, n }); return; }
+    if (n > RTI_PAIRS) { this.clock(0); this.marks.push({ at: this.n, wait: n }); return; }
     for (let i = 0; i <= n; i++) this.clock(0);
   }
   // every device's current instruction (dev's set to cmd) to Update-IR; read: returns what dev captured
@@ -275,39 +282,61 @@ export class JtagSeq {
     return got;
   }
   // dev's data register (data: bytes LSB first, a number, or null: zeros) to Update-DR, the other
-  // devices in BYPASS; read: returns what came out of dev's register
+  // devices in BYPASS; read: returns what came out of dev's register. A long one: its bits but the
+  // last with PUT_TDI_BITS (TMS low), the last one a pair (Chain.shiftBytes)
   dr(dev, data, n, read = false) {
     const ds = this.chain.devices, idx = ds.indexOf(dev), last = idx === ds.length - 1;
     if (typeof data === 'number' || typeof data === 'bigint') data = bytesOfNum(data, n);
     this.clock(1); this.clock(0); this.clock(0);   // Select-DR, Capture-DR, Shift-DR
     this.shift(null, idx);   // the BYPASS bits of the devices nearer TDO
     const got = read ? this.capture(n) : null;
-    this.shift(data, n, last);
+    if (n - 1 >= DR_TDI_BITS) {
+      this.marks.push({ at: this.n, data, bits: n - 1 });
+      this.v += n - 1;
+      this.clock(last, data ? (data[(n - 1) >> 3] >> ((n - 1) & 7)) & 1 : 0);
+    } else this.shift(data, n, last);
     if (!last) this.shift(null, ds.length - 1 - idx, true);
     this.clock(1);   // Update-DR
     return got;
   }
-  // the stream out (TDO read only in the pieces that hold a capture), the long waits as CLOCK_TCK
-  // between its pieces; the captures filled in
+  // the sequence out: the pairs, the PUT_TDI_BITS shifts and the CLOCK_TCK waits in their order
+  // (TDO read only by the commands that hold a capture); the captures filled in
   async run() {
-    const n = this.n, reads = this.reads, waits = this.waits, tdo = reads.length ? new Uint8Array((n + 7) >> 3) : null;
-    for (let s = 0, w = 0; s < n || w < waits.length;) {
-      const m = Math.min(STREAM_CLOCKS, n, w < waits.length ? waits[w].at : n) - s;
-      if (m > 0) {
-        const data = new Uint8Array((m + 3) >> 2);
+    const { reads, marks, stats: st } = this, port = this.chain.port, tdo = reads.length ? new Uint8Array((this.v + 7) >> 3) : null;
+    const timed = async (kind, bytes, clocks, f) => {
+      if (!st) return f();
+      const t = st.now(), r = await f(), k = st[kind] ??= { cmds: 0, bytes: 0, clocks: 0, ms: 0 };
+      k.cmds++; k.bytes += bytes; k.clocks += clocks; k.ms += st.now() - t;
+      return r;
+    };
+    const oeAt = (v, m) => reads.some(c => c.at < v + m && c.at + c.n > v);
+    const put = (got, v, m) => { for (let i = 0; i < m; i++) tdo[(v + i) >> 3] |= ((got[i >> 3] >> (i & 7)) & 1) << ((v + i) & 7); };
+    let s = 0, v = 0;   // the pairs sent, the clocks with data so far
+    const pairsTo = async end => {
+      while (s < end) {
+        const m = Math.min(STREAM_CLOCKS, end - s), data = new Uint8Array((m + 3) >> 2), oe = oeAt(v, m);
         for (let i = 0; i < m; i++) data[i >> 2] |= this.buf[s + i] << ((i & 3) << 1);
-        const oe = reads.some(c => c.at < s + m && c.at + c.n > s);
-        const got = await this.chain.port.putTmsTdiBits(oe, m, data);
-        if (oe) for (let i = 0; i < m; i++) tdo[(s + i) >> 3] |= ((got[i >> 3] >> (i & 7)) & 1) << ((s + i) & 7);
-        s += m;
+        const got = await timed('pairs', data.length + (oe ? (m + 7) >> 3 : 0), m, () => port.putTmsTdiBits(oe, m, data));
+        if (oe) put(got, v, m);
+        s += m; v += m;
       }
-      for (; w < waits.length && waits[w].at === s; w++) await this.chain.port.clockTck(false, false, waits[w].n);
+    };
+    for (const k of marks) {
+      await pairsTo(k.at);
+      if (k.wait) { await timed('waits', 0, k.wait, () => port.clockTck(false, false, k.wait)); continue; }
+      // a read of zeros shifted in: GET_TDO_BITS (TDO only)
+      const nb = (k.bits + 7) >> 3, oe = oeAt(v, k.bits), data = k.data ? k.data.subarray(0, nb) : new Uint8Array(nb);
+      const got = await timed('data', nb * (oe && k.data ? 2 : 1), k.bits,
+        () => (oe && !k.data ? port.getTdoBits(false, false, k.bits) : port.putTdiBits(oe, false, k.bits, data)));
+      if (oe) put(got, v, k.bits);
+      v += k.bits;
     }
+    await pairsTo(this.n);
     for (const c of reads) {
       c.bytes = new Uint8Array((c.n + 7) >> 3);
       for (let i = 0; i < c.n; i++) c.bytes[i >> 3] |= ((tdo[(c.at + i) >> 3] >> ((c.at + i) & 7)) & 1) << (i & 7);
     }
-    this.n = 0; this.reads = []; this.waits = [];
+    this.n = 0; this.v = 0; this.reads = []; this.marks = [];
   }
 }
 
