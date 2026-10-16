@@ -49,8 +49,9 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
   na flash da placa (PROM), para que arranque ao ligar, selecione a PROM (XCF02S / XCF04S) na cadeia e
   clique em **Program PROM**, com o jumper de modo em ROM (Basys2: JP3).
 - **Num iPad ou num tablet** (Safari, ou o browser do tablet): editar, desenhar, simular e
-  **Generate Programming File** funcionam; programar a placa não (programe o `.bit` descarregado a
-  partir de um computador). Os projetos ficam no browser, que o iPadOS pode apagar ao fim de algumas
+  **Generate Programming File** funcionam. Programar a placa funciona num **tablet Android com o
+  Chrome** (a placa na porta USB do tablet), não num iPad (programe o `.bit` descarregado a partir
+  de um computador). Os projetos ficam no browser, que o iPadOS pode apagar ao fim de algumas
   semanas sem uso: guarde uma cópia com **File ▸ Export Silinx ISE Project (.zip)…**. Um tablet tem
   menos memória, por isso um desenho grande pode falhar na síntese. Os menus do botão direito abrem
   com um **toque longo** (o dedo parado meio segundo). Na vertical o painel Projeto é uma gaveta (o botão à esquerda do

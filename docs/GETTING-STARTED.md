@@ -48,8 +48,9 @@ That's all. Things to know:
   board's flash (PROM), so that it starts at power-up, select the PROM (XCF02S / XCF04S) in the chain
   and click **Program PROM**, with the mode jumper on ROM (Basys2: JP3).
 - **On an iPad or a tablet** (Safari, or the tablet's browser): editing, drawing, simulation and
-  **Generate Programming File** work; programming the board does not (program the downloaded `.bit`
-  from a computer). The projects stay in the browser, which iPadOS may clear after some weeks
+  **Generate Programming File** work. Programming the board works on an **Android tablet in Chrome**
+  (the board on the tablet's USB port), not on an iPad (program the downloaded `.bit` from a
+  computer). The projects stay in the browser, which iPadOS may clear after some weeks
   without use: keep a copy with **File ▸ Export Silinx ISE Project (.zip)…**. A tablet has less
   memory, so a large design may fail in synthesis. The right-click menus open with a **long press**
   (hold a finger still for half a second). In portrait the Design pane is a drawer (the button at

@@ -238,8 +238,10 @@ The site (and `Silinx-ISE.html`) runs in Safari on an iPad (WebKit) and in a tab
 editors and the drawings, simulation, and the Silinx toolchain (synthesis, place and route, the
 `.bit`). What is different from a computer:
 
-- **No board programming**: WebUSB exists only in desktop Chrome / Edge. Generate the `.bit` on the
-  tablet, then program the board from a computer.
+- **Board programming**: on an **Android tablet in Chrome** the board is programmed over USB as from a
+  computer (WebUSB; checked on a Samsung tablet), the board on the tablet's USB-C port (a USB-C to
+  USB adapter if needed). **On an iPad** it is not: Safari has no WebUSB, so generate the `.bit` on
+  the iPad and program the board from a computer.
 - **No workspace folder on the disk**: the projects are kept in the browser's storage, which iPadOS
   may clear after some weeks without use. Keep a copy with *File ▸ Export Silinx ISE Project (.zip)…*.
 - **Less memory per tab**: a large design may fail in synthesis or implementation.
