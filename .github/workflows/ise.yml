@@ -19,7 +19,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   # whether main changed since this workflow's last successful run (a scheduled run with nothing new to
-  # test is skipped; by hand it always runs): scripts/changed-since-last-run.mjs, here on GitHub's runner
+  # test is skipped; by hand it always runs): scripts/changed-since-last-run.mjs, here on GitHub's runner;
+  # only the ISE tests' inputs count (the toolchain, the server, the examples, the bit database, the
+  # tests themselves), not the web interface, the UI tests or the other workflows
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -32,7 +34,7 @@ jobs:
         with:
           fetch-depth: 0
       - id: changed
-        run: node scripts/changed-since-last-run.mjs ise.yml
+        run: node scripts/changed-since-last-run.mjs ise.yml --only core/,server/,scripts/,bin/,docker/,examples/,research/s3e-,test/ise/,test/examples-lib.mjs,test/fixtures/,package.json,package-lock.json,.github/workflows/ise.yml
         env:
           GITHUB_TOKEN: ${{ github.token }}
   ise:

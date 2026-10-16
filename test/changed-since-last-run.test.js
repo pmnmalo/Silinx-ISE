@@ -17,6 +17,25 @@ test('changed since the last run: a run by hand always runs; a scheduled one onl
     { run: true, reason: '1 file(s) changed since aaaaaaa (the last successful run): core/ucf.js' });
 });
 
+test('changed since the last run: --only, the workflow\'s inputs (the ISE tests: not the web interface)', () => {
+  const only = ['core/', 'server/', 'examples/', 'test/ise/'];
+  assert.deepEqual(decide({ event: 'schedule', current: B, last: A, changed: ['web/js/app.js', 'test/ui/touch.test.js', 'README.md'], only }),
+    { run: false, reason: "since aaaaaaa (the last successful run) none of this workflow's inputs changed (2 other file(s): web/js/app.js, test/ui/touch.test.js)" });
+  assert.deepEqual(decide({ event: 'schedule', current: B, last: A, changed: ['web/js/app.js', 'core/xcf.js'], only }),
+    { run: true, reason: "1 file(s) of this workflow's inputs changed since aaaaaaa (the last successful run): core/xcf.js" });
+  assert.equal(decide({ event: 'workflow_dispatch', current: B, last: A, changed: ['web/js/app.js'], only }).run, true, 'by hand: always');
+  assert.equal(decide({ event: 'schedule', current: A, last: null, only }).run, true, 'no successful run before');
+  // ise.yml passes its inputs
+  const yml = fs.readFileSync(new URL('../.github/workflows/ise.yml', import.meta.url), 'utf8');
+  const m = yml.match(/changed-since-last-run\.mjs ise\.yml --only (\S+)/);
+  assert.ok(m, 'ise.yml --only');
+  const inputs = m[1].split(',');
+  for (const f of ['core/xcf.js', 'server/ise.js', 'examples/gates/src/gates.vhd', 'research/s3e-bitstream/db/s3e-tiles.json', 'test/ise/examples.test.js', 'package-lock.json'])
+    assert.ok(inputs.some(p => f.startsWith(p)), f);
+  for (const f of ['web/js/app.js', 'test/ui/touch.test.js', '.github/workflows/ci.yml', 'test/xcf.test.js'])
+    assert.ok(!inputs.some(p => f.startsWith(p)), f);
+});
+
 test('changed since the last run: the files that cannot change a result', () => {
   for (const f of ['README.md', 'CHANGELOG.md', 'docs/COMECAR.md', 'docs/QUALITY.md', 'test/designs-corpus/ise-comparison.json', 'test/corpus/README.md']) assert.ok(irrelevant(f), f);
   for (const f of ['core/ucf.js', 'test/designs-corpus/expected.json', 'examples/gates/src/gates.vhd', '.github/workflows/ise.yml', 'package.json']) assert.ok(!irrelevant(f), f);
