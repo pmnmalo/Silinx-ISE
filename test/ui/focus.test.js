@@ -110,3 +110,44 @@ uiTest('the diagram editors (schematic, ASM, FSM, Petri net) keep their view (zo
   }
   assert.deepEqual(moved, [], 'the views kept');
 });
+
+// #339 regression: the FSM and ASM editors fit the view once, when their canvas first has a size; that first fit
+// came after the user's press when the canvas got its size late (a slow machine): the drawing moved under the
+// pointer while it dragged (CI: a state dragged by 60 px ended 21 px to the left). Now the view is the user's
+// from the first press: each editor opened while the workspace is hidden (no size to fit to), the workspace
+// shown and a state / block pressed at once, the frames (its ResizeObserver, its first fit) passed with the
+// press held, moved, released: the view as it was, the item moved with the pointer.
+uiTest('#339 the FSM and ASM editors: a first fit coming after the press (the canvas sized late) does not move the drawing under a drag', E, async (page) => {
+  await makeProject(env, { name: 'LateFit', template: 'blinky', files: { 'src/m.fsm.json': JSON.stringify(newFsm('m')) } });
+  await page.openProject('LateFit');
+  const editors = [
+    { what: 'FSM', open: 'openFsm', file: 'src/m.fsm.json', ed: 'fsmEditor', item: '[data-state="s1"] .fsm-circle', vp: '.fsm-vp' },
+    { what: 'ASM', open: 'openAsm', file: 'src/speed_ctrl.asm.json', ed: 'asmEditor', item: '[data-node]', vp: '.asm-vp' },
+  ];
+  for (const e of editors) {
+    await page.eval(() => { document.getElementById('workspace').style.display = 'none'; });
+    await page.eval((o, f) => window.SilinxApp[o](f), e.open, e.file);
+    await page.waitFor((x) => window.Silinx.active?.[x] && document.querySelector('.doc:not([hidden]) svg'), [e.ed], { what: `${e.file} open (hidden)` });
+    const r = await page.eval(async (o) => {
+      const frames = (n) => new Promise((res) => { const f = () => (--n ? requestAnimationFrame(f) : res()); requestAnimationFrame(f); });
+      await frames(3);   // hidden: nothing to fit to yet
+      document.getElementById('workspace').style.display = '';
+      const D = '.doc:not([hidden])', vp = document.querySelector(`${D} ${o.vp}`), svg = vp.closest('svg');
+      svg.setPointerCapture = () => {};   // (synthetic pointer events)
+      const el = document.querySelector(`${D} ${o.item}`), id = el.closest('[data-state],[data-node]').outerHTML.match(/data-(?:state|node)="[^"]*"/)[0];
+      const at = () => { const b = document.querySelector(`${D} [${id}]`).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; };
+      const b0 = el.getBoundingClientRect(), p = { x: b0.left + b0.width / 2, y: b0.top + b0.height / 2 }, a0 = at(), view0 = vp.getAttribute('transform');
+      const ev = (type, x, y, target) => target.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'mouse', isPrimary: true, button: type === 'pointermove' ? -1 : 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y, bubbles: true, cancelable: true, composed: true }));
+      ev('pointerdown', p.x, p.y, el);
+      await frames(3);   // the canvas has a size now: its ResizeObserver and the first frame pass, the press held
+      for (let i = 1; i <= 6; i++) ev('pointermove', p.x + 10 * i, p.y + 5 * i, svg);
+      ev('pointerup', p.x + 60, p.y + 30, svg);
+      await frames(2);
+      const a1 = at();
+      return { dx: a1.x - a0.x, dy: a1.y - a0.y, view0, view1: vp.getAttribute('transform') };
+    }, e);
+    assert.equal(r.view1, r.view0, `${e.what}: the view kept from the press on`);
+    assert.ok(Math.abs(r.dx - 60) <= 12 && Math.abs(r.dy - 30) <= 12, `${e.what}: the item dragged by (60, 30): ${JSON.stringify(r)}`);
+  }
+  assert.deepEqual(page.console.filter((c) => /^warn/.test(c.type) || c.type === 'error').map((c) => c.text), []);
+});

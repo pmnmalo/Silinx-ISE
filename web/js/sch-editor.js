@@ -1730,7 +1730,13 @@ export function mountSchEditor(container, opts = {}) {
       linkModel(doc, file);
       for (const st of [undoStack, redoStack]) st.forEach((s, i) => { st[i] = linkSnapshot(s, file); });
     },
-    setModules(m) { leaveSim(); modules = normMods(m); renderPalette(); render(); renderProps(); },
+    // (called after every compile of the project: the same modules again change nothing, so that the palette and
+    // the properties are not made anew between the press and the release of a click on them, #339)
+    setModules(m) {
+      const next = normMods(m);
+      if (!live && JSON.stringify(next) === JSON.stringify(modules)) return;
+      leaveSim(); modules = next; renderPalette(); render(); renderProps();
+    },
     check: () => runCheck(true),
     openSelected,
     fit,

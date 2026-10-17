@@ -157,10 +157,15 @@ for (const [board, name] of [['basys2', 'Basys2'], ['nexys2', 'Nexys2']]) {
     assert.equal(await page.eval(() => window.Silinx.active.view.sim.now), off.t, 'time stands still');
     // a switch moved while off (SW0 back to 0) is read at power-up; on again (keyboard): the design restarts from time 0
     await widget(page, 'SW0 = sw<0>');
-    await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-power').focus());
+    // (the time read at once after the switch's own key handler, on the page's keydown after it: once the board
+    // runs, the time reached by the first look may pass the time it was switched off at, on a slow machine, #293)
+    await page.eval(() => {
+      document.querySelector('.doc:not([hidden]) .emu-power').focus();
+      document.addEventListener('keydown', () => { const v = window.Silinx.active.view; window.__powerOn = { powered: v.powered, now: v.sim.now }; }, { once: true });
+    });
     await page.key('Enter');
-    const t0 = await page.waitFor(() => window.Silinx.active.view.powered && window.Silinx.active.view.sim.now > 0 && window.Silinx.active.view.sim.now, [], { what: 'power on, running' });
-    assert.ok(t0 < off.t, `restarted from time 0 (${t0} < ${off.t})`);
+    assert.deepEqual(await page.eval(() => window.__powerOn), { powered: true, now: 0 }, 'restarted from time 0');
+    await page.waitFor(() => window.Silinx.active.view.powered && window.Silinx.active.view.sim.now > 0, [], { what: 'power on, running' });
     await waitLed(page, 3, true);
     await page.waitFor(() => window.Silinx.active.view.outputs?.digits[0]?.seg[0] > 0.5, [], { what: 'digit 0 (SW0 turned off while off)' });
     assert.deepEqual((await digit(page, 0)).seg.map((x) => (x > 0.5 ? 1 : 0)), [1, 1, 1, 1, 1, 1, 0]);

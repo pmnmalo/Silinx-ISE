@@ -28,7 +28,7 @@ const noSideScroll = (page) => page.eval(() => {
 // the warnings of the page's console (console.warn) and of the Warnings tab: none
 async function noWarnings(page) {
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
-  assert.equal(await page.eval(() => document.getElementById('warn-count').textContent), '');
+  assert.deepEqual(await page.eval(() => [document.getElementById('warn-count').textContent, ...[...document.querySelectorAll('#console-warnings .diag')].map((d) => d.textContent)]), ['']);
 }
 
 for (const [w, h] of [[820, 1180], [768, 1024]]) {

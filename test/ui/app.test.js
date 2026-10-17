@@ -436,6 +436,36 @@ uiTest('at start-up the app checks for updates: a newer release opens the update
   assert.equal(await page.dialogCount(), 0);
 }, { skip: chromeOnly });   // (Page.addScriptToEvaluateOnNewDocument and its removal)
 
+// #339 regression: at start-up the last project is reopened while the toolchain check runs; its two warnings
+// on a machine with neither ISE nor a programmer (CI's) were in the Warnings tab or not by which came first
+// (opening a project clears the tabs). Now, coming after the project opened, they are in the console only.
+// The check's answer held until the project is open, made to say ISE not available and no programmer.
+uiTest('#339 the start-up checks answering after the last project reopened: their warnings in the console, not in the Warnings tab', E, async (page) => {
+  await makeProject(env, { name: 'StartLate', files: {} });
+  await page.openProject('StartLate');   // (the last project: reopened at start-up)
+  const s = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const orig = window.fetch;
+    window.fetch = async (u, o) => {
+      if (!/\\/api\\/toolchain$/.test(String(u)) || window.__tcHeld) return orig(u, o);
+      window.__tcHeld = true;
+      const tc = await (await orig(u, o)).json();
+      while (!(window.Silinx?.project && document.querySelector('#hier .row'))) await new Promise((r) => setTimeout(r, 20));
+      tc.ise = { ...tc.ise, mode: 'docker', available: false, reason: 'held by the test' };
+      tc.programmers = {};
+      return new Response(JSON.stringify(tc), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  await page.reload();
+  await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: s.identifier });
+  assert.equal(await page.eval(() => window.__tcHeld), true);
+  assert.equal(await page.eval(() => window.Silinx.project?.name), 'StartLate');
+  const lines = await page.eval(() => [...document.querySelectorAll('#console-log .ln.warn')].map((l) => l.textContent));
+  assert.deepEqual(lines, ['Toolchain: ISE not available (docker: held by the test).', 'Programmers found: none (install openFPGALoader, xc3sprog, Digilent Adept or ISE iMPACT)']);
+  // (the messages of the tabs, then the tabs as drawn)
+  assert.deepEqual(await page.eval(() => window.Silinx.diags.map((d) => d.message)), []);
+  assert.deepEqual(await page.eval(() => [document.getElementById('warn-count').textContent, document.getElementById('err-count').textContent]), ['', '']);
+}, { skip: chromeOnly });   // (Page.addScriptToEvaluateOnNewDocument)
+
 uiTest("update dialog: What's new lists the changes of every version newer than the one running (text only)", E, async (page) => {
   const version = await page.eval(async () => (await import('/core/version.js')).VERSION);
   const cl = `# Changelog\n\n## 99.1.0\n\n- **Big** feature with \`code\` and *style*\n- <img src=x onerror="window.__pwned=1"> shown as text\n\n## 99.0.0\n\n- Another change\n  continued line\n\n## ${version}\n\n- already running\n`;

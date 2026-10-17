@@ -163,6 +163,9 @@ export function mountAsmEditor(container, { model, onChange } = {}) {
   let M = normalizeModel(model || newModel('fsm', 'vhdl'));
   let sel = { nodes: new Set(), edge: null };
   let view = { tx: 40, ty: 40, k: 1 };
+  // the view fitted once, when the canvas first has a size, or the user's from the first press or zoom: a first
+  // fit coming late (the canvas sized on a slow machine) moved the drawing under the pointer while it dragged (#339)
+  let fitted = false;
   let snap = true;
   let showCode = false;
   let diags = [];
@@ -448,6 +451,7 @@ export function mountAsmEditor(container, { model, onChange } = {}) {
     const r = svg.getBoundingClientRect();
     const px = cx - r.left, py = cy - r.top;
     const k = clamp(view.k * f, 0.2, 4);
+    fitted = true;
     view.tx = px - ((px - view.tx) * k) / view.k;
     view.ty = py - ((py - view.ty) * k) / view.k;
     view.k = k;
@@ -997,6 +1001,7 @@ export function mountAsmEditor(container, { model, onChange } = {}) {
   // ---------------------------------------------------------------------------- pointer interaction
   function onPointerDown(ev) {
     if (ev.button !== 0 && ev.button !== 1) return;
+    fitted = true;
     root.focus({ preventScroll: true });
     const t = ev.target;
     const nodeEl = t.closest?.('[data-node]');
@@ -1178,7 +1183,6 @@ export function mountAsmEditor(container, { model, onChange } = {}) {
   root.addEventListener('keydown', onKeyDown);
   root.addEventListener('keyup', onKeyUp);
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (!fitted) { fitted = tryInitialFit(); } }) : null;
-  let fitted = false;
   function tryInitialFit() {
     const r = svg.getBoundingClientRect();
     if (r.width < 10 || r.height < 10) return false;

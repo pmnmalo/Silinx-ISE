@@ -29,6 +29,7 @@ export const S = {
   project: null, devices: null, toolchain: null,
   view: 'impl', sources: [], lib: null, modules: [],
   sel: null, docs: [], active: null, status: {}, diags: [], busy: false,
+  diagsCleared: 0,            // how many times the Errors / Warnings tabs were cleared (a project opened or closed)
   procCollapsed: new Set(),   // ids of the collapsed groups of the Processes panel
   treeOpen: new Map(),        // Design hierarchy / Files trees: key -> expanded? (as the user left it)
 };
@@ -3340,6 +3341,7 @@ async function openImpact() {
 // ------------------------------------------------------------------ project lifecycle
 // per-project UI state (cleared when another project is opened or the project is closed)
 function resetProjectState() {
+  S.diagsCleared++;   // (the start-up checks' lines coming later: not in the tabs, #339)
   S.status = {}; S.sel = null; S.selKey = null; S.selProc = null; S.diags = []; S.outOfSync = {}; S.staleHdl = {}; S.staleSeen = new Map(); S.ucfText = null; S.hdlClash = {}; S.hdlClashWarned = new Set();
   renderDiagnostics();
 }
@@ -3925,15 +3927,20 @@ async function boot() {
     updateStorageStatus();
   }
   try { S.devices = await api.devices(); } catch (e) { log(`ERROR: cannot reach the Silinx server: ${e.message}`, 'err'); }
+  // the start-up checks' warnings are in the Warnings tab until a project opens, as the lines written before
+  // them: when their answer comes after a project was opened (the last one, reopened while the checks run),
+  // they are in the console only; they were in the tabs or not by which came first (#339)
+  const cleared = S.diagsCleared;
   api.toolchain().then(tc => {
     S.toolchain = tc;
-    if (tc.ise.mode === 'silinx') log(`Toolchain: ${tc.ise.reason}.`, 'ok');
-    else log(`Toolchain: ISE ${tc.ise.available ? 'available' : 'not available'} (${tc.ise.mode}: ${tc.ise.reason}).`, tc.ise.available ? 'ok' : 'warn');
+    const opts = { diag: S.diagsCleared === cleared };
+    if (tc.ise.mode === 'silinx') log(`Toolchain: ${tc.ise.reason}.`, 'ok', opts);
+    else log(`Toolchain: ISE ${tc.ise.available ? 'available' : 'not available'} (${tc.ise.mode}: ${tc.ise.reason}).`, tc.ise.available ? 'ok' : 'warn', opts);
     renderProcesses();
     // (the browser edition reaches no programmer: it says so in its own startup line)
     if (api.standalone) return;
     const progs = Object.entries(tc.programmers).filter(([, v]) => v.found).map(([k]) => k);
-    log(`Programmers found: ${progs.length ? progs.join(', ') : 'none (install openFPGALoader, xc3sprog, Digilent Adept or ISE iMPACT)'}`, progs.length ? 'ok' : 'warn');
+    log(`Programmers found: ${progs.length ? progs.join(', ') : 'none (install openFPGALoader, xc3sprog, Digilent Adept or ISE iMPACT)'}`, progs.length ? 'ok' : 'warn', opts);
   }).catch(() => {}).finally(() => { S.startupChecked = true; });   // (the start-up lines all written: the UI tests wait for it)
   renderHierarchy();
   renderProcesses();

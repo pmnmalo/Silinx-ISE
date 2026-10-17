@@ -49,9 +49,27 @@ In short:
   select bits S1 and S0 as pins of their own (the DEMUX too); every multiplexer and demultiplexer comes
   with an enable E (M2_1E, M4_1E, DEMUX1_4E…); new M8_1, M16_1 and DEMUX1_16 (with and without E); the
   palette no longer lists DECODER and ENCODER, the same symbols as D2_4E… and PENC / ENC.
+- **Clicks no longer lost in the schematic editor:** a click on the palette or the properties right after an
+  edit (when the project compiles again) sometimes did nothing.
+- **State diagrams and ASM charts opened on a slow machine:** a state or block dragged at once no longer
+  jumps away when the editor fits the drawing in the window.
 
 In detail:
 
+- **Schematic editor, clicks lost (#339):** every compile of the project (after each saved edit) gave the open
+  schematics their modules again, and the editor made its palette and properties anew even when nothing had
+  changed: a click whose press and release fell on each side of it was lost (a Rotate, a flip-flop's CLR, a palette
+  row). The same modules now change nothing.
+- **FSM and ASM editors, the first fit (#339):** the view is fitted to the drawing once, when the canvas first has
+  a size; on a slow machine that came after the user's first press, and the state being dragged jumped. As in the
+  Petri net editor, the view is the user's from the first press or zoom.
+- **Start-up warnings (#339):** the toolchain check's warnings (ISE not available, no programmer) stayed in the
+  Warnings tab of the project reopened at start-up when their answer came after it opened, and not otherwise; with
+  a project open they are now in the console only.
+- **UI tests (#339, #293):** the touch test drags a state once the drawing stands still; the narrow-screen test
+  lists the warnings it finds; the board emulator's power test reads the time just after the switch turns it on
+  (0) instead of comparing the first time it sees with the time it was turned off at, which a fast-running board
+  could pass.
 - **ISim: groups of signals (#341):** in the wave window, *New Group* (right-click) puts the selected signals in a named
   group, a row that opens and closes (its triangle, a double-click) and shows how many signals it has; *Rename Group…*,
   *Ungroup*; a signal dragged between the signals of an open group joins it, dragged elsewhere leaves it; *Delete* on a

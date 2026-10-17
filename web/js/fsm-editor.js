@@ -67,6 +67,9 @@ export function mountFsmEditor(container, opts = {}) {
   let M = normalizeFsm(opts.model || newFsm('fsm'));
   let sel = null;                      // { type: 'state' | 'trans', id }
   let view = { tx: 40, ty: 40, k: 1 };
+  // the view fitted once, when the canvas first has a size, or the user's from the first press or zoom: a first
+  // fit coming late (the canvas sized on a slow machine) moved the drawing under the pointer while it dragged (#339)
+  let fitted = false;
   let hist = [JSON.stringify(M)], hi = 0, lastKey = null, lastT = 0;
   let diags = [];
   let drag = null;
@@ -255,6 +258,7 @@ export function mountFsmEditor(container, opts = {}) {
     const r = svg.getBoundingClientRect();
     const px = cx - r.left, py = cy - r.top;
     const k = clamp(view.k * f, 0.2, 4);
+    fitted = true;
     view.tx = px - ((px - view.tx) * k) / view.k; view.ty = py - ((py - view.ty) * k) / view.k; view.k = k;
     applyView();
   }
@@ -472,6 +476,7 @@ export function mountFsmEditor(container, opts = {}) {
     return null;
   };
   function onPointerDown(ev) {
+    fitted = true;
     const onItem = ev.target.closest('[data-state],[data-trans]');
     if (ev.button === 1 || (ev.button === 0 && !onItem)) {
       closeInline(true);
@@ -917,7 +922,6 @@ export function mountFsmEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------------------- init
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (!fitted) fitted = tryFit(); }) : null;
-  let fitted = false;
   const tryFit = () => { const r = svg.getBoundingClientRect(); if (r.width < 10 || r.height < 10) return false; fit(); return true; };
   ro?.observe(svg);
   applyView();

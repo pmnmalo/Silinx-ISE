@@ -16,6 +16,18 @@ const touchAction = (page, sel) => page.eval((s) => { const e = document.querySe
 const rectOf = (page, sel) => page.eval((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; }, sel);
 const center = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 const warnings = (page) => page.console.filter((m) => /^warn/.test(m.type)).map((m) => m.text);
+// the centre of `sel` once it stands still over two frames (an editor fits its view to the drawing when its
+// canvas first has a size: a point taken before that is not where the drawing is, #339)
+async function steady(page, sel) {
+  let p = null;
+  for (let i = 0; i < 50; i++) {
+    const q = center(await rectOf(page, sel));
+    if (p && Math.abs(p.x - q.x) < 0.5 && Math.abs(p.y - q.y) < 0.5) return q;
+    p = q;
+    await page.eval(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  }
+  return p;
+}
 const near = (a, b, tol, what) => assert.ok(Math.abs(a - b) <= tol, `${what}: ${a} is not ${b} ± ${tol}`);
 
 uiTest('touch (#264): a finger drags a pane splitter and a dialog by its title; the mouse still does', E, async (page) => {
@@ -115,7 +127,7 @@ uiTest('touch (#265): a finger drags a state of the FSM editor and a place of th
   await page.waitFor((ed) => document.querySelector(`${ed} [data-state=s1] .fsm-circle`)?.getBoundingClientRect().width > 10, [FSM], { what: 'the state diagram editor' });
   assert.equal(await touchAction(page, `${FSM} .fsm-canvas`), 'none');
   const S = `${FSM} [data-state=s1] .fsm-circle`;
-  const a0 = center(await rectOf(page, S));
+  const a0 = await steady(page, S);
   await page.touchDrag(a0, { x: a0.x + 60, y: a0.y + 40 });
   const a1 = center(await rectOf(page, S));
   near(a1.x - a0.x, 60, 15, 'the state dragged by a finger (x)');
@@ -134,7 +146,7 @@ uiTest('touch (#265): a finger drags a state of the FSM editor and a place of th
   assert.equal(await touchAction(page, `${PN} .pn-canvas`), 'none');
   const id = await page.eval((ed) => document.querySelector(`${ed} .pn-place`).dataset.id, PN);
   const P = `${PN} .pn-place[data-id="${id}"] .pn-circle`;
-  const p0 = center(await rectOf(page, P));
+  const p0 = await steady(page, P);
   await page.touchDrag(p0, { x: p0.x + 60, y: p0.y + 40 });
   const p1 = center(await rectOf(page, P));
   near(p1.x - p0.x, 60, 15, 'the place dragged by a finger (x)');

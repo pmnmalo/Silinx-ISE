@@ -164,6 +164,48 @@ uiTest('schematic editor (#196): Rotate by Ctrl+R, the toolbar and the propertie
   assert.deepEqual(page.dialogs, []);
 });
 
+// #339 regression: every compile of the project gives the open schematics their modules again; the same modules
+// no longer make the palette and the properties anew, so a click held across a compile (the save of the edit
+// before it compiles the project) is not lost: the properties' Rotate and a palette row, pressed, a compile, released
+uiTest('#339 schematic editor: a click on the properties\' Rotate or a palette row held across a compile of the project is not lost (the same modules make nothing anew)', E, async (page) => {
+  const { newDoc } = await import('../../core/schdoc.js');
+  const doc = newDoc('held', 'vhdl');
+  doc.symbols.push({ id: 'S1', type: 'and2', x: 300, y: 100, rot: 0, mirror: false, name: 'U1', params: {} }, { id: 'S2', type: 'inv', x: 300, y: 300, rot: 0, mirror: false, name: 'U2', params: {} });
+  await makeProject(env, { name: 'SchHeld', files: { 'src/held.sch.json': JSON.stringify(doc) }, top: '' });
+  await page.openProject('SchHeld');
+  await page.eval(() => window.SilinxApp.openSch('src/held.sch.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'sch:src/held.sch.json' && document.querySelector('.doc:not([hidden]) .se-symrow'), [], { what: 'schematic editor' });
+  const D = '.doc:not([hidden])';
+  const waitRot = (rots) => page.waitFor(async (r) => JSON.stringify(JSON.parse(await (await fetch('/api/projects/SchHeld/file?path=src%2Fheld.sch.json')).text()).symbols.map((s) => s.rot)) === r, [JSON.stringify(rots)], { what: `saved rotations ${rots}` });
+  // a compile of the project, its modules given to the editor (awaited): the element pressed still the same one
+  const compileHeld = (sel) => page.eval(async (s) => {
+    const el = document.querySelector(s), ed = window.SilinxApp.findDoc('sch:src/held.sch.json').schEditor, set = ed.setModules;
+    const given = new Promise((res) => { ed.setModules = (m) => { ed.setModules = set; set(m); res(); }; });
+    window.SilinxApp.compileProject();
+    await given;
+    return el.isConnected;
+  }, sel);
+  await page.click(`${D} .se-svg`);   // focus the editor (an empty spot of the sheet); Ctrl+A: both selected
+  await page.key('a', { modifiers: 2 });
+  await page.waitFor((d) => document.querySelector(`${d} .se-ptitle`)?.textContent === '2 objects selected', [D], { what: 'two selected' });
+  const rot = await page.point(`${D} .se-pbtns .btn`, { text: 'Rotate' });
+  await page.mouse('mouseMoved', rot.x, rot.y);
+  await page.mouse('mousePressed', rot.x, rot.y);
+  assert.equal(await compileHeld(`${D} .se-pbtns .btn`), true, 'the properties kept');
+  await page.mouse('mouseReleased', rot.x, rot.y);
+  await waitRot([90, 90]);
+  // a palette row: pressed, a compile, released: the symbol being placed
+  await page.fill(`${D} .se-search`, 'inv');
+  const row = await page.point(`${D} .se-symrow`, { text: 'INV' });
+  await page.mouse('mouseMoved', row.x, row.y);
+  await page.mouse('mousePressed', row.x, row.y);
+  assert.equal(await compileHeld(`${D} .se-symrow`), true, 'the palette kept');
+  await page.mouse('mouseReleased', row.x, row.y);
+  await page.waitFor((d) => document.querySelector(`${d} .se-symrow.active`)?.textContent === 'INV', [D], { what: 'INV being placed' });
+  await page.key('Escape');
+  assert.deepEqual(page.dialogs, []);
+});
+
 // #296: the I/O markers turned (Ctrl+R, the toolbar, the properties: a quarter turn clockwise around their
 // connection point) and mirrored (to the opposite side); the side saved in the .sch.json (none when it is
 // the default one), the marker drawn there; with a symbol selected too, both turn; one Undo
