@@ -2,12 +2,14 @@
 // A scheduled workflow's failure as an issue (#251): the nightly corpora, the ISE tests and the weekly
 // comparison with ISE run unattended, so a job that fails opens an issue (one per workflow and job,
 // '<workflow> failed: <job>', labels bug and tests & CI), or comments on it when it is open already:
-// the run, the commit, and the lines of the job's log that say what failed. Issues are public: the
+// the run, the commit, and the lines of the job's log that say what failed. A job that hit its time limit
+// (timeout-minutes) is reported too (#343): GitHub ends it 'cancelled', not 'failure', and says so in an
+// annotation, which a job cancelled by hand or by a newer run does not have. Issues are public: the
 // lines are cleaned of home folders, logins, addresses and e-mails (the ISE jobs run on a machine of
 // our own).
 //
 //   node scripts/report-failure.mjs
-//   (in GitHub Actions: GITHUB_TOKEN with issues: write and actions: read, GITHUB_REPOSITORY,
+//   (in GitHub Actions: GITHUB_TOKEN with issues: write, actions: read and checks: read, GITHUB_REPOSITORY,
 //   GITHUB_RUN_ID, GITHUB_WORKFLOW, GITHUB_SHA, GITHUB_SERVER_URL); REPORT_DRY_RUN=1 prints what it would
 //   write instead (a try on a past run)
 import { fileURLToPath } from 'node:url';
@@ -37,12 +39,37 @@ export function failureLines(log, max = 40) {
   return out;
 }
 
-/** The issue of a failed job: { title, body } (body: also the comment when the issue is open already). */
-export function issueText({ workflow, job, runUrl, sha, lines }) {
+// the annotation of a job that hit its timeout-minutes ('The job has exceeded the maximum execution time of
+// 1h0m0s'); one cancelled by a newer run says 'Canceling since a higher priority waiting request … exists'
+export const TIMED_OUT = /\bexceeded the maximum execution time\b/;
+
+/**
+ * The jobs of a run to report: [{ job, timedOut }], those that failed (timedOut null) and those cancelled
+ * at their time limit (timedOut: the annotation's message); a job cancelled otherwise (by hand, by a newer
+ * run) is not. annotationsOf(job) resolves with the annotations of the job's check run.
+ */
+export async function jobsToReport(jobs, annotationsOf) {
+  const out = [];
+  for (const job of jobs) {
+    if (job.conclusion === 'failure') out.push({ job, timedOut: null });
+    else if (job.conclusion === 'cancelled') {
+      let notes = [];
+      try { notes = await annotationsOf(job); } catch (e) { console.error(`the annotations of ${job.name}: ${e.message}`); }
+      const t = notes.find(a => TIMED_OUT.test(a.message || ''));
+      if (t) out.push({ job, timedOut: t.message });
+    }
+  }
+  return out;
+}
+
+/** The issue of a failed job: { title, body } (body: also the comment when the issue is open already);
+ *  timedOut: the annotation of a job cancelled at its time limit. */
+export function issueText({ workflow, job, runUrl, sha, lines, timedOut = null }) {
   return {
     title: `${workflow} failed: ${job}`,
     body: [
-      `The scheduled run ${runUrl} failed in the job **${job}**, on ${sha.slice(0, 7)}.`,
+      timedOut ? `The scheduled run ${runUrl} timed out in the job **${job}** (${timedOut}), on ${sha.slice(0, 7)}.`
+        : `The scheduled run ${runUrl} failed in the job **${job}**, on ${sha.slice(0, 7)}.`,
       '',
       lines.length ? 'What its log says:' : 'Its log says nothing more (see the run).',
       ...(lines.length ? ['', '```', ...lines, '```'] : []),
@@ -62,18 +89,19 @@ async function main() {
     return r;
   };
   const jobs = (await (await api(`actions/runs/${runId}/jobs?per_page=100`)).json()).jobs || [];
-  const failed = jobs.filter(j => j.conclusion === 'failure');
-  if (!failed.length) { console.log('no failed job'); return; }
+  // (a job's check run: its check_run_url, the job's id otherwise)
+  const failed = await jobsToReport(jobs, async j => (await api(`check-runs/${String(j.check_run_url || j.id).split('/').pop()}/annotations?per_page=100`)).json());
+  if (!failed.length) { console.log('no failed or timed-out job'); return; }
   const open = [];
   for (let page = 1; page <= 5; page++) {
     const batch = await (await api(`issues?state=open&per_page=100&page=${page}`)).json();
     open.push(...batch.filter(i => !i.pull_request));
     if (batch.length < 100) break;
   }
-  for (const j of failed) {
+  for (const { job: j, timedOut } of failed) {
     let lines = [];
     try { lines = failureLines(await (await api(`actions/jobs/${j.id}/logs`)).text()); } catch (e) { console.error(`the log of ${j.name}: ${e.message}`); }
-    const { title, body } = issueText({ workflow, job: j.name, runUrl: `${server}/${repo}/actions/runs/${runId}`, sha, lines });
+    const { title, body } = issueText({ workflow, job: j.name, runUrl: `${server}/${repo}/actions/runs/${runId}`, sha, lines, timedOut });
     const issue = open.find(i => i.title === title);
     if (process.env.REPORT_DRY_RUN) { console.log(`${issue ? `comment on #${issue.number}` : 'new issue'}: ${title}\n${body}\n`); continue; }
     if (issue) {

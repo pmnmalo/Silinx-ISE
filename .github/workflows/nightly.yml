@@ -30,9 +30,17 @@ jobs:
         run: node scripts/changed-since-last-run.mjs nightly.yml
         env:
           GITHUB_TOKEN: ${{ github.token }}
+  # in two jobs at once (#343): every other file each (--shard), about half an hour each in October 2026, the
+  # open synthesis making several mappings of a module (up to 7 Yosys runs); a file that takes over 15 minutes
+  # fails its job (run-corpus.mjs's --timeout); the slowest files are printed at the end
   corpus:
     needs: changes
     if: needs.changes.outputs.run == 'true'
+    name: corpus (${{ matrix.shard }}/2)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -48,7 +56,7 @@ jobs:
           key: yosys-tests-${{ hashFiles('scripts/fetch-yosys-tests.mjs') }}
       - run: npm run fetch:yosys-tests
       - name: Yosys's test designs (Silinx vs Yosys)
-        run: npm run test:corpus -- --jobs 4
+        run: npm run test:corpus -- --jobs 4 --shard ${{ matrix.shard }}/2
   vloghammer:
     needs: changes
     if: needs.changes.outputs.run == 'true'
@@ -110,13 +118,16 @@ jobs:
           if-no-files-found: ignore
 
   # a failed job is an issue (#251): one per job ('<workflow> failed: <job>'), commented on when it is
-  # open already; the lines of its log that say what failed, without home folders, logins or addresses
+  # open already; the lines of its log that say what failed, without home folders, logins or addresses.
+  # A job that hit its timeout-minutes is 'cancelled', not 'failure': it is reported too (#343), told from
+  # one cancelled by hand or by a newer run by its annotation (checks: read)
   report:
     needs: [changes, corpus, vloghammer, designs]
-    if: failure() && github.event_name == 'schedule'
+    if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      checks: read
       contents: read
       issues: write
     steps:

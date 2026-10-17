@@ -1,12 +1,13 @@
 // A scheduled workflow's failure as an issue (scripts/report-failure.mjs, #251): the lines of a job's log
 // that say what failed (as the nightly of 15 October's designs job wrote them), cleaned of what must
-// not be public; the issue's title and body; the workflows' last job.
+// not be public; the issue's title and body; a job cancelled at its time limit reported, one cancelled by a
+// newer run not (#343); the workflows' last job.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { clean, failureLines, issueText } from '../scripts/report-failure.mjs';
+import { clean, failureLines, issueText, jobsToReport, TIMED_OUT } from '../scripts/report-failure.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -50,13 +51,51 @@ test('report-failure: the issue of a failed job, its title one per workflow and 
   assert.match(issueText({ workflow: 'ISE', job: 'ise', runUrl: 'u', sha: 'abcdef0', lines: [] }).body, /Its log says nothing more \(see the run\)\./);
 });
 
+// the annotations of the nightly of 16 October's corpus job (its timeout) and of a CI job a newer run cancelled
+const TIMEOUT_NOTES = [{ annotation_level: 'failure', message: 'The job has exceeded the maximum execution time of 1h0m0s' },
+  { annotation_level: 'failure', message: 'The operation was canceled.' }];
+const SUPERSEDED_NOTES = [{ annotation_level: 'failure', message: 'Canceling since a higher priority waiting request for ci-refs/pull/340/merge-pr exists' },
+  { annotation_level: 'failure', message: 'The operation was canceled.' }];
+
+test('report-failure: a job cancelled at its time limit is reported, one cancelled by a newer run or by hand is not (#343)', async () => {
+  const jobs = [
+    { id: 1, name: 'changes', conclusion: 'success' },
+    { id: 2, name: 'designs', conclusion: 'failure' },
+    { id: 3, name: 'corpus (1/2)', conclusion: 'cancelled', check_run_url: 'https://api.github.com/repos/o/r/check-runs/3' },
+    { id: 4, name: 'vloghammer', conclusion: 'cancelled' },
+    { id: 5, name: 'corpus (2/2)', conclusion: 'cancelled' },
+    { id: 6, name: 'report', conclusion: 'skipped' },
+  ];
+  const asked = [];
+  const notes = { 3: TIMEOUT_NOTES, 4: SUPERSEDED_NOTES, 5: [] };
+  const r = await jobsToReport(jobs, async j => { asked.push(j.id); return notes[j.id]; });
+  assert.deepEqual(r.map(x => [x.job.name, x.timedOut]), [['designs', null], ['corpus (1/2)', 'The job has exceeded the maximum execution time of 1h0m0s']]);
+  // only the cancelled jobs' annotations are read
+  assert.deepEqual(asked, [3, 4, 5]);
+  // annotations that cannot be read: the job is not reported (nothing says it timed out), the others are
+  const err = console.error;
+  console.error = () => {};
+  try {
+    const r2 = await jobsToReport([{ id: 7, name: 'ise', conclusion: 'cancelled' }, { id: 8, name: 'x', conclusion: 'failure' }], async () => { throw new Error('403'); });
+    assert.deepEqual(r2.map(x => x.job.name), ['x']);
+  } finally { console.error = err; }
+  assert.ok(TIMED_OUT.test('The job running on runner GitHub Actions 12 has exceeded the maximum execution time of 60 minutes.'));
+  assert.ok(!TIMED_OUT.test('The operation was canceled.'));
+  // its issue says it timed out, in the same issue as its failures (the title)
+  const t = issueText({ workflow: 'Nightly', job: 'corpus (1/2)', runUrl: 'https://github.com/o/r/actions/runs/2', sha: '9056ed4d1b32', lines: ['##[error]The operation was canceled.'], timedOut: 'The job has exceeded the maximum execution time of 1h0m0s' });
+  assert.equal(t.title, 'Nightly failed: corpus (1/2)');
+  assert.equal(t.body.split('\n')[0], 'The scheduled run https://github.com/o/r/actions/runs/2 timed out in the job **corpus (1/2)** (The job has exceeded the maximum execution time of 1h0m0s), on 9056ed4.');
+});
+
 test('report-failure: the scheduled workflows end with the job that reports a failure (#251)', () => {
   for (const [file, jobs] of [['nightly.yml', ['changes', 'corpus', 'vloghammer', 'designs']], ['ise.yml', ['changes', 'ise']], ['quality.yml', ['changes', 'compare']]]) {
     const yml = fs.readFileSync(path.join(ROOT, '.github/workflows', file), 'utf8');
     const job = yml.slice(yml.indexOf('\n  report:\n'));
     assert.ok(yml.includes('\n  report:\n'), file);
     assert.match(job, new RegExp(`needs: \\[${jobs.join(', ')}\\]`), file);
-    assert.match(job, /if: failure\(\) && github\.event_name == 'schedule'/, file);
+    // after a failure, or a job cancelled (at its time limit: the script tells which, #343), even in a run cancelled
+    assert.match(job, /if: always\(\) && github\.event_name == 'schedule' && \(contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\)\)\n/, file);
+    assert.match(job, /checks: read/, file);
     assert.match(job, /runs-on: ubuntu-latest/, file);
     assert.match(job, /issues: write/, file);
     assert.match(job, /node scripts\/report-failure\.mjs/, file);

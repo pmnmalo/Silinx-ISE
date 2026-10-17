@@ -3,8 +3,12 @@
 // licence; fetched by scripts/fetch-yosys-tests.mjs at a pinned commit, never committed) through
 // Silinx's front end and simulator, compared with Yosys's netlists (test/diff-synth.js).
 //
-//   node test/corpus/run-corpus.mjs [--update] [--filter text] [--jobs n] [--cycles n] [--json file]
+//   node test/corpus/run-corpus.mjs [--update] [--filter text] [--shard k/n] [--jobs n] [--cycles n] [--timeout s]
 //   (npm run test:corpus)
+//
+// --shard k/n runs the k-th of n parts of the files (every n-th file, the nightly's jobs in parallel, #343);
+// --timeout s is the time a file may take (900 s): a file that takes longer fails the run, whatever was
+// expected of it (its modules have no result, #343); the slowest files and their times are printed.
 //
 // Every Verilog file is parsed and elaborated by Silinx; each of its top modules (the modules no
 // other module of the file instantiates) is then simulated with seeded random stimulus and compared
@@ -33,7 +37,40 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXPECTED = path.join(HERE, 'expected.json');
 const WARNINGS = path.join(HERE, 'warnings.json');
-const TIMEOUT = 900000;   // per file (hana/test_intermout.v: 33 modules, two netlists each)
+const TIMEOUT = 900;   // s, per file (hana/test_intermout.v: 33 modules, two netlists each)
+
+/** The files of shard 'k/n' (1 <= k <= n): every n-th, from the k-th; all of them without a shard. */
+export function shardOf(files, spec) {
+  if (!spec) return files;
+  const m = /^(\d+)\/(\d+)$/.exec(spec);
+  const k = m ? +m[1] : 0, n = m ? +m[2] : 0;
+  if (!(n >= 1 && k >= 1 && k <= n)) throw new Error(`--shard ${spec}: k/n with 1 <= k <= n`);
+  return files.filter((_, i) => i % n === k - 1);
+}
+
+/**
+ * The results against the expectations: { regress, fixed, fresh, timedOut }. A key expected to pass that
+ * does not, or has no result while its file ran (the file failed as a whole: a crash; results gets its
+ * 'missing (…)'), is a regression; a file that timed out is one too, even when none of its keys was
+ * expected to pass (a design that hangs or got too slow is never skipped in silence, #343).
+ */
+export function compareResults(expected, results, ran) {
+  const regress = [], fixed = [], fresh = [];
+  const keys = Object.keys(results).sort();
+  for (const k of keys) {
+    const e = expected[k];
+    if (e === undefined) fresh.push(k);
+    else if (e === 'pass' && results[k] !== 'pass') regress.push(k);
+    else if (e !== 'pass' && results[k] === 'pass') fixed.push(k);
+  }
+  for (const [k, e] of Object.entries(expected)) {
+    const f = k.split(':')[0];
+    if (e === 'pass' && ran.has(f) && !(k in results)) { regress.push(k); results[k] = `missing (${results[f] || 'no result'})`; }
+  }
+  const timedOut = [...ran].filter(f => /^error: timeout\b/.test(results[f] || '')).sort();
+  for (const f of timedOut) if (!regress.includes(f)) regress.push(f);
+  return { regress, fixed, fresh, timedOut };
+}
 
 /** One line of a reason: no newlines, no absolute paths, bounded. */
 const clean = s => String(s).replace(/\s+/g, ' ').replace(/(src\d+_)/g, '').slice(0, 160);
@@ -80,13 +117,15 @@ if (!isMainThread) {
     catch (e) { res = { [rel]: `error: harness: ${clean(e.message)}` }; }
     parentPort.postMessage({ rel, res });
   });
-} else {
+} else if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
   const update = args.includes('--update');
   const filter = opt('--filter', '');
   const jobs = Math.max(1, +opt('--jobs', Math.max(1, Math.min(8, os.availableParallelism?.() ?? os.cpus().length) - 1)));
   const cycles = +opt('--cycles', 100);
+  const shard = opt('--shard', '');
+  const timeout = +opt('--timeout', TIMEOUT);
   const { fetchYosysTests, YOSYS_TEST_DIRS, YOSYS_TESTS_PIN } = await import(pathToFileURL(path.join(HERE, '..', '..', 'scripts', 'fetch-yosys-tests.mjs')).href);
   const dir = await fetchYosysTests();
   const files = [];
@@ -95,9 +134,10 @@ if (!isMainThread) {
     if (!fs.existsSync(abs)) continue;
     for (const f of fs.readdirSync(abs).sort()) if (/\.s?v$/.test(f)) files.push(`${d.replace(/^tests\//, '')}/${f}`);
   }
-  const todo = files.filter(f => f.includes(filter)).map(f => f);
+  const todo = shardOf(files.filter(f => f.includes(filter)), shard);
+  const partial = !!(filter || shard);
   const testsDir = path.join(dir, 'tests');
-  const results = {}, reports = {}, warnings = {};
+  const results = {}, reports = {}, warnings = {}, times = {};
   const t0 = Date.now();
   let next = 0, doneN = 0;
   await new Promise(resolve => {
@@ -106,15 +146,24 @@ if (!isMainThread) {
       if (next >= todo.length) { if (!live) resolve(); return; }
       live++;
       const w = new Worker(fileURLToPath(import.meta.url), { workerData: { dir: testsDir, cycles } });
-      let cur = null, timer = null;
+      let cur = null, timer = null, since = 0;
       const give = () => {
         if (next >= todo.length) { w.terminate(); return; }
         cur = todo[next++];
-        timer = setTimeout(() => { results[cur] = 'error: timeout'; doneN++; cur = null; w.terminate(); }, TIMEOUT);
+        since = Date.now();
+        timer = setTimeout(() => {
+          results[cur] = `error: timeout (over ${timeout} s)`;
+          times[cur] = Date.now() - since;
+          doneN++;
+          process.stderr.write(`\r${doneN}/${todo.length} ${cur}: timed out (over ${timeout} s)\n`);
+          cur = null;
+          w.terminate();
+        }, timeout * 1000);
         w.postMessage(cur);
       };
       w.on('message', ({ rel, res }) => {
         clearTimeout(timer);
+        times[rel] = Date.now() - since;
         for (const [k, v] of Object.entries(res)) (k.endsWith('#report') ? reports : k.endsWith('#warnings') ? warnings : results)[k.replace(/#(report|warnings)$/, '')] = v;
         doneN++;
         process.stderr.write(`\r${doneN}/${todo.length} ${rel.padEnd(60).slice(0, 60)}`);
@@ -143,29 +192,21 @@ if (!isMainThread) {
   console.log(`Yosys ${YOSYS_TESTS_PIN.tag} tests: ${fileSet.size} files, ${parsed.length} parsed by Silinx; ${src.filter(k => k.includes(':')).length} top modules, ${elaborated.length} elaborated`);
   console.log(`  vs Yosys reading the source:  ${tally(src.filter(k => k.includes(':')))}`);
   console.log(`  vs Silinx's open synthesis:   ${tally(syn)}`);
-  console.log(`  (${((Date.now() - t0) / 1000).toFixed(0)} s, ${jobs} jobs, ${cycles} cycles)`);
+  console.log(`  (${((Date.now() - t0) / 1000).toFixed(0)} s, ${jobs} jobs, ${cycles} cycles${shard ? `, shard ${shard}` : ''})`);
+  // the slowest files: what to look at when the run gets near its job's time limit
+  const slowest = Object.entries(times).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  if (slowest.length) console.log(`  slowest: ${slowest.map(([f, ms]) => `${f} ${(ms / 1000).toFixed(0)} s`).join(', ')}`);
   for (const k of keys) if (kind(results[k]) === 'mismatch' && reports[k]) console.log(`\n${reports[k]}`);
 
   // against the expectations
   const expected = fs.existsSync(EXPECTED) ? JSON.parse(fs.readFileSync(EXPECTED, 'utf8')) : {};
-  const regress = [], fixed = [], fresh = [];
-  for (const k of keys) {
-    const e = expected[k];
-    if (e === undefined) fresh.push(k);
-    else if (e === 'pass' && results[k] !== 'pass') regress.push(k);
-    else if (e !== 'pass' && results[k] === 'pass') fixed.push(k);
-  }
-  // a module that passed and has no result now (its file failed as a whole: a timeout, a crash)
   const ran = new Set(todo);
-  for (const [k, e] of Object.entries(expected)) {
-    const f = k.split(':')[0];
-    if (e === 'pass' && ran.has(f) && !(k in results)) { regress.push(k); results[k] = `missing (${results[f] || 'no result'})`; }
-  }
+  const { regress, fixed, fresh, timedOut } = compareResults(expected, results, ran);
   if (fixed.length) console.log(`\nnewly passing (${fixed.length}; npm run test:corpus -- --update records them):\n${fixed.map(k => `  ${k}  (was: ${expected[k]})`).join('\n')}`);
   const freshBad = fresh.filter(k => results[k] !== 'pass');
   if (fresh.length && !update) console.log(`\nnot in expected.json: ${fresh.length} (${fresh.length - freshBad.length} pass)${freshBad.slice(0, 60).map(k => `\n  ${k}: ${results[k]}`).join('')}`);
   if (update) {
-    const merged = filter ? { ...expected, ...Object.fromEntries(keys.map(k => [k, results[k]])) } : Object.fromEntries(keys.map(k => [k, results[k]]));
+    const merged = partial ? { ...expected, ...Object.fromEntries(keys.map(k => [k, results[k]])) } : Object.fromEntries(keys.map(k => [k, results[k]]));
     const sorted = Object.fromEntries(Object.keys(merged).sort().map(k => [k, merged[k]]));
     fs.writeFileSync(EXPECTED, JSON.stringify(sorted, null, 1) + '\n');
     console.log(`\nwrote ${path.relative(process.cwd(), EXPECTED)} (${Object.keys(sorted).length} entries)`);
@@ -182,11 +223,12 @@ if (!isMainThread) {
   if (goneW.length) console.log(`\nwarnings no longer given (${goneW.length}):\n${goneW.join('\n')}`);
   if (newW.length) console.log(`\nNEW WARNINGS (${newW.length}; review them, then --update records them):\n${newW.join('\n')}`);
   if (update) {
-    const mergedW = filter ? { ...Object.fromEntries(Object.entries(expW).filter(([k]) => !ran.has(k.split(':')[0]))), ...warnings } : warnings;
+    const mergedW = partial ? { ...Object.fromEntries(Object.entries(expW).filter(([k]) => !ran.has(k.split(':')[0]))), ...warnings } : warnings;
     const sortedW = Object.fromEntries(Object.keys(mergedW).sort().filter(k => mergedW[k].length).map(k => [k, mergedW[k]]));
     fs.writeFileSync(WARNINGS, JSON.stringify(sortedW, null, 1) + '\n');
     console.log(`wrote ${path.relative(process.cwd(), WARNINGS)} (${Object.keys(sortedW).length} entries)`);
   } else if (newW.length) process.exitCode = 1;
+  if (timedOut.length) console.log(`\nTIMED OUT (${timedOut.length}; over ${timeout} s each): ${timedOut.join(', ')}`);
   if (regress.length) {
     console.log(`\nREGRESSIONS (${regress.length}): expected to pass\n${regress.map(k => `  ${k}: ${results[k]}`).join('\n')}`);
     if (!update) process.exitCode = 1;
