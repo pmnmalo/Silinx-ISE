@@ -53,6 +53,13 @@ In detail:
   commits, the MCC models) are compared with their upstream monthly (`pins.yml`, `scripts/check-pins.mjs`):
   one issue, "Pinned sources: newer versions available", lists what is behind, and is closed when all are
   current.
+- **esbuild 0.28 and Playwright 1.64 (#355); a UI test's race (#359):** Dependabot's first npm update
+  (esbuild 0.24.2 → 0.28.2, Playwright 1.49.1 → 1.64.0). esbuild's breaking releases since 0.24 (0.25: its
+  development server's access, 0.27 / 0.28: the Go compiler, the binary download's integrity check) do not
+  touch the standalone build (`build({ bundle, format: 'esm', minify, write: false })`): the page is the
+  same size (4.74 MB, 20 bytes more), the same warnings. Its `ui (classic)` failure was not the update's: the
+  test of a drawing's HDL language read the Design pane's row as soon as the links and the file tree had
+  changed, which a project read again sets before it draws the tree; it waits for the row now.
 
 ## 15.10.22
 

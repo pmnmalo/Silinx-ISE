@@ -471,6 +471,9 @@ uiTest('a drawing\'s HDL language changed in its editor (ASM chart, state diagra
       const d = JSON.parse(await readWs(env, 'H_lang', k.file));
       assert.deepEqual([d.lang, d.generatedFile], [lang, `src/${k.name}.${ext}`], k.file);
       assert.equal(await readWs(env, 'H_lang', `src/${k.name}.${ext}`), viewHdl(k.file, JSON.stringify({ ...d, generatedFile: undefined })).text);
+      // the links and the file tree are set while the project is read again, the Design pane drawn after it
+      await page.waitFor((n, l) => [...document.querySelectorAll('#hier .row')].some((r) => r.querySelector('.lbl').textContent === n
+        && [...r.querySelectorAll('.badge')].some((b) => b.textContent === l)), [k.name, L], { what: `the row of ${k.name} with [${L}]` });
       const row = (await rows(page)).find((r) => r.trim().startsWith(`${k.ico} ${k.name} `));
       assert.equal(row?.trim(), `${k.ico} ${k.name} [${k.badge}*] [${L}] (${k.file.split('/').pop()})`);
     }
