@@ -1,0 +1,842 @@
+{
+ "examples/gates": {
+  "now": {
+   "seconds": 4.9,
+   "luts": 2,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 1,
+   "period": null
+  },
+  "lut4": {
+   "seconds": 1.7,
+   "luts": 2,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 1,
+   "period": null
+  },
+  "abc9": {
+   "seconds": 3.1,
+   "luts": 1,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 1,
+   "period": null
+  },
+  "abc9-4": {
+   "seconds": 2.9,
+   "luts": 1,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 1,
+   "period": null
+  }
+ },
+ "examples/traffic": {
+  "now": {
+   "seconds": 8.6,
+   "luts": 108,
+   "muxf": 13,
+   "ffs": 58,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 67,
+   "period": 8.055
+  },
+  "lut4": {
+   "seconds": 1.9,
+   "luts": 110,
+   "muxf": 0,
+   "ffs": 58,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 64,
+   "period": 9.958
+  },
+  "abc9": {
+   "seconds": 3.3,
+   "luts": 130,
+   "muxf": 134,
+   "ffs": 58,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 118,
+   "period": 9.95
+  },
+  "abc9-4": {
+   "seconds": 3.2,
+   "luts": 115,
+   "muxf": 0,
+   "ffs": 58,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 69,
+   "period": 10.348
+  }
+ },
+ "examples/blinky": {
+  "now": {
+   "seconds": 4.4,
+   "luts": 69,
+   "muxf": 16,
+   "ffs": 97,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 86,
+   "period": 7.526
+  },
+  "lut4": {
+   "seconds": 1.9,
+   "luts": 73,
+   "muxf": 0,
+   "ffs": 97,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 80,
+   "period": 7.35
+  },
+  "abc9": {
+   "seconds": 3.3,
+   "luts": 73,
+   "muxf": 18,
+   "ffs": 97,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 87,
+   "period": 7.272
+  },
+  "abc9-4": {
+   "seconds": 3.2,
+   "luts": 72,
+   "muxf": 0,
+   "ffs": 97,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 79,
+   "period": 7.229
+  }
+ },
+ "examples/pong": {
+  "now": {
+   "seconds": 5.3,
+   "luts": 282,
+   "muxf": 0,
+   "ffs": 226,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 247,
+   "period": 12.568
+  },
+  "lut4": {
+   "seconds": 2.2,
+   "luts": 282,
+   "muxf": 0,
+   "ffs": 226,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 247,
+   "period": 12.568
+  },
+  "abc9": {
+   "seconds": 4.3,
+   "luts": 355,
+   "muxf": 147,
+   "ffs": 226,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 292,
+   "period": 12.546
+  },
+  "abc9-4": {
+   "seconds": 3.6,
+   "luts": 299,
+   "muxf": 0,
+   "ffs": 226,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 253,
+   "period": 12.363
+  }
+ },
+ "examples/stopwatch": {
+  "now": {
+   "seconds": 8.2,
+   "luts": 202,
+   "muxf": 41,
+   "ffs": 200,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 194,
+   "period": 12.489
+  },
+  "lut4": {
+   "seconds": 2.3,
+   "luts": 224,
+   "muxf": 0,
+   "ffs": 200,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 195,
+   "period": 13.14
+  },
+  "abc9": {
+   "seconds": 3.7,
+   "luts": 200,
+   "muxf": 69,
+   "ffs": 200,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 204,
+   "period": 12.832
+  },
+  "abc9-4": {
+   "seconds": 3.9,
+   "luts": 222,
+   "muxf": 0,
+   "ffs": 200,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 194,
+   "period": 12.793
+  }
+ },
+ "examples/clock": {
+  "now": {
+   "seconds": 5.3,
+   "luts": 207,
+   "muxf": 0,
+   "ffs": 174,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 205,
+   "period": 8.818
+  },
+  "lut4": {
+   "seconds": 2.2,
+   "luts": 207,
+   "muxf": 0,
+   "ffs": 174,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 205,
+   "period": 8.818
+  },
+  "abc9": {
+   "seconds": 3.6,
+   "luts": 268,
+   "muxf": 151,
+   "ffs": 174,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 249,
+   "period": 7.276
+  },
+  "abc9-4": {
+   "seconds": 3.5,
+   "luts": 224,
+   "muxf": 0,
+   "ffs": 174,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 210,
+   "period": 8.579
+  }
+ },
+ "serv": {
+  "now": {
+   "seconds": 9.2,
+   "luts": 273,
+   "muxf": 43,
+   "ffs": 182,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 208,
+   "period": 13.155
+  },
+  "lut4": {
+   "seconds": 2.3,
+   "luts": 250,
+   "muxf": 0,
+   "ffs": 182,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 193,
+   "period": 13.189
+  },
+  "abc9": {
+   "seconds": 3.8,
+   "luts": 364,
+   "muxf": 176,
+   "ffs": 182,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 254,
+   "period": 14.925
+  },
+  "abc9-4": {
+   "seconds": 3.6,
+   "luts": 261,
+   "muxf": 0,
+   "ffs": 182,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 168,
+   "period": 13.514
+  }
+ },
+ "picorv32": {
+  "now": {
+   "seconds": 9.9,
+   "luts": 1184,
+   "muxf": 0,
+   "ffs": 463,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 791,
+   "period": 11.782
+  },
+  "lut4": {
+   "seconds": 3.7,
+   "luts": 1184,
+   "muxf": 0,
+   "ffs": 463,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 786,
+   "period": 11.803
+  },
+  "abc9": {
+   "seconds": 5.9,
+   "luts": 1476,
+   "muxf": 416,
+   "ffs": 463,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 958,
+   "period": 11.859
+  },
+  "abc9-4": {
+   "seconds": 5.3,
+   "luts": 1275,
+   "muxf": 0,
+   "ffs": 463,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 749,
+   "period": 12.077
+  }
+ },
+ "femtorv32-quark": {
+  "now": {
+   "seconds": 7.9,
+   "luts": 638,
+   "muxf": 217,
+   "ffs": 127,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 423,
+   "period": 17.271
+  },
+  "lut4": {
+   "seconds": 2.7,
+   "luts": 689,
+   "muxf": 0,
+   "ffs": 127,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 433,
+   "period": 19.215
+  },
+  "abc9": {
+   "seconds": 4.7,
+   "luts": 885,
+   "muxf": 581,
+   "ffs": 127,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 570,
+   "period": 17.239
+  },
+  "abc9-4": {
+   "seconds": 4.2,
+   "luts": 749,
+   "muxf": 0,
+   "ffs": 127,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 418,
+   "period": 18.72
+  }
+ },
+ "light8080": {
+  "now": {
+   "seconds": 7.6,
+   "luts": 313,
+   "muxf": 0,
+   "ffs": 206,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 192,
+   "period": 12.753
+  },
+  "lut4": {
+   "seconds": 2.9,
+   "luts": 313,
+   "muxf": 0,
+   "ffs": 206,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 192,
+   "period": 12.753
+  },
+  "abc9": {
+   "seconds": 4.9,
+   "luts": 540,
+   "muxf": 424,
+   "ffs": 206,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 381,
+   "period": 13.202
+  },
+  "abc9-4": {
+   "seconds": 4.3,
+   "luts": 343,
+   "muxf": 0,
+   "ffs": 206,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 207,
+   "period": 11.636
+  }
+ },
+ "verilog-uart": {
+  "now": {
+   "seconds": 7.4,
+   "luts": 132,
+   "muxf": 40,
+   "ffs": 79,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 131,
+   "period": 10.266
+  },
+  "lut4": {
+   "seconds": 2.1,
+   "luts": 129,
+   "muxf": 0,
+   "ffs": 79,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 120,
+   "period": 10.748
+  },
+  "abc9": {
+   "seconds": 3.6,
+   "luts": 157,
+   "muxf": 46,
+   "ffs": 79,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 130,
+   "period": 10.233
+  },
+  "abc9-4": {
+   "seconds": 3.2,
+   "luts": 148,
+   "muxf": 0,
+   "ffs": 79,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 125,
+   "period": 9.299
+  }
+ },
+ "verilog-i2c-master": {
+  "now": {
+   "seconds": 7.5,
+   "luts": 190,
+   "muxf": 57,
+   "ffs": 72,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 126,
+   "period": 10.963
+  },
+  "lut4": {
+   "seconds": 2,
+   "luts": 193,
+   "muxf": 0,
+   "ffs": 72,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 115,
+   "period": 10.707
+  },
+  "abc9": {
+   "seconds": 3.4,
+   "luts": 263,
+   "muxf": 230,
+   "ffs": 72,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 203,
+   "period": 11.183
+  },
+  "abc9-4": {
+   "seconds": 3.2,
+   "luts": 194,
+   "muxf": 0,
+   "ffs": 72,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 113,
+   "period": 9.741
+  }
+ },
+ "nandland-spi-vhdl": {
+  "now": {
+   "seconds": 4.1,
+   "luts": 46,
+   "muxf": 0,
+   "ffs": 37,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 52,
+   "period": 5.488
+  },
+  "lut4": {
+   "seconds": 1.7,
+   "luts": 46,
+   "muxf": 0,
+   "ffs": 37,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 52,
+   "period": 5.488
+  },
+  "abc9": {
+   "seconds": 3.1,
+   "luts": 44,
+   "muxf": 10,
+   "ffs": 37,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 36,
+   "period": 5.301
+  },
+  "abc9-4": {
+   "seconds": 3,
+   "luts": 44,
+   "muxf": 0,
+   "ffs": 37,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 33,
+   "period": 5.354
+  }
+ },
+ "fpu-adder": {
+  "now": {
+   "seconds": 5.6,
+   "luts": 480,
+   "muxf": 0,
+   "ffs": 285,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 341,
+   "period": 12.491
+  },
+  "lut4": {
+   "seconds": 2.3,
+   "luts": 480,
+   "muxf": 0,
+   "ffs": 285,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 341,
+   "period": 12.491
+  },
+  "abc9": {
+   "seconds": 4.4,
+   "luts": 508,
+   "muxf": 70,
+   "ffs": 285,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 374,
+   "period": 11.29
+  },
+  "abc9-4": {
+   "seconds": 4.2,
+   "luts": 514,
+   "muxf": 0,
+   "ffs": 285,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 344,
+   "period": 11.165
+  }
+ },
+ "secworks-siphash": {
+  "now": {
+   "seconds": 7.4,
+   "luts": 1059,
+   "muxf": 0,
+   "ffs": 462,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 913,
+   "period": 14.107
+  },
+  "lut4": {
+   "seconds": 2.7,
+   "luts": 1059,
+   "muxf": 0,
+   "ffs": 462,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 913,
+   "period": 14.107
+  },
+  "abc9": {
+   "seconds": 5,
+   "luts": 1417,
+   "muxf": 691,
+   "ffs": 462,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 1099,
+   "period": 17.776
+  },
+  "abc9-4": {
+   "seconds": 4.7,
+   "luts": 1060,
+   "muxf": 0,
+   "ffs": 462,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 707,
+   "period": 14.984
+  }
+ },
+ "epfl-dec": {
+  "now": {
+   "seconds": 5.4,
+   "luts": 288,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 187,
+   "period": 6.515
+  },
+  "lut4": {
+   "seconds": 1.9,
+   "luts": 288,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 187,
+   "period": 6.515
+  },
+  "abc9": {
+   "seconds": 6.3,
+   "luts": 256,
+   "muxf": 3840,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 340,
+   "period": 10.164
+  },
+  "abc9-4": {
+   "seconds": 3.1,
+   "luts": 288,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 187,
+   "period": 6.451
+  }
+ },
+ "epfl-priority": {
+  "now": {
+   "seconds": 9.8,
+   "luts": 209,
+   "muxf": 36,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 115,
+   "period": 11.244
+  },
+  "lut4": {
+   "seconds": 2.7,
+   "luts": 171,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 87,
+   "period": 45.337
+  },
+  "abc9": {
+   "seconds": 4,
+   "luts": 373,
+   "muxf": 444,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 305,
+   "period": 36.461
+  },
+  "abc9-4": {
+   "seconds": 3.6,
+   "luts": 254,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 130,
+   "period": 52.138
+  }
+ },
+ "epfl-ctrl": {
+  "now": {
+   "seconds": 7.4,
+   "luts": 43,
+   "muxf": 14,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 25,
+   "period": null
+  },
+  "lut4": {
+   "seconds": 1.9,
+   "luts": 50,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 25,
+   "period": null
+  },
+  "abc9": {
+   "seconds": 3.5,
+   "luts": 55,
+   "muxf": 42,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 34,
+   "period": null
+  },
+  "abc9-4": {
+   "seconds": 3,
+   "luts": 54,
+   "muxf": 0,
+   "ffs": 0,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 27,
+   "period": null
+  }
+ },
+ "vtr-ch-intrinsics": {
+  "now": {
+   "seconds": 4.6,
+   "luts": 103,
+   "muxf": 6,
+   "ffs": 219,
+   "diff": "mismatch: cycle 199: memory_controller_in",
+   "part": "xc3s250ecp132-4",
+   "slices": 275,
+   "period": 7.592
+  },
+  "lut4": {
+   "seconds": 1.9,
+   "luts": 107,
+   "muxf": 0,
+   "ffs": 219,
+   "diff": "mismatch: cycle 199: memory_controller_in",
+   "part": "xc3s250ecp132-4",
+   "slices": 275,
+   "period": 7.592
+  },
+  "abc9": {
+   "seconds": 3.4,
+   "luts": 197,
+   "muxf": 278,
+   "ffs": 219,
+   "diff": "mismatch: cycle 199: memory_controller_in",
+   "part": "xc3s250ecp132-4",
+   "slices": 311,
+   "period": 8.015
+  },
+  "abc9-4": {
+   "seconds": 3,
+   "luts": 104,
+   "muxf": 0,
+   "ffs": 219,
+   "diff": "mismatch: cycle 199: memory_controller_in",
+   "part": "xc3s250ecp132-4",
+   "slices": 275,
+   "period": 6.156
+  }
+ },
+ "vtr-stereovision3": {
+  "now": {
+   "seconds": 4.4,
+   "luts": 135,
+   "muxf": 38,
+   "ffs": 120,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 112,
+   "period": 7.993
+  },
+  "lut4": {
+   "seconds": 1.8,
+   "luts": 127,
+   "muxf": 0,
+   "ffs": 120,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 99,
+   "period": 8.033
+  },
+  "abc9": {
+   "seconds": 3.3,
+   "luts": 104,
+   "muxf": 105,
+   "ffs": 120,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 112,
+   "period": 8.308
+  },
+  "abc9-4": {
+   "seconds": 3,
+   "luts": 140,
+   "muxf": 0,
+   "ffs": 120,
+   "diff": "pass",
+   "part": "xc3s250ecp132-4",
+   "slices": 84,
+   "period": 8.277
+  }
+ }
+}

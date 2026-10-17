@@ -40,7 +40,7 @@ mapping fixed, lab11's LUT and flip-flop counts are at or below XST's.
   1,1,1,1,2,4,8 (LUT7 allowed: 326 slices) / 1,1,1,1,2,3 / 1,1,1,1,2,5 / 1,1,1,1,3,4 / 1,1,1,1,3,6;
   `-D 1`, `-dress`. 1,1,1,1,2,4 had the best slices and critical path on lab11 and a second course
   project; 1,1,1,1,2,5 is equivalent. `-abc9` and `-widemux` fail on xc3se in YoWASP 0.68 (`-abc9`
-  runs in 0.70: to be measured, #369; `-widemux` is for LUT6 architectures only).
+  runs in 0.70: measured below, "ABC9"; `-widemux` is for LUT6 architectures only).
 - **Tables** (`core/synth-verilog.js` `tabulate`): an expression with arithmetic (+ - * / mod,
   comparisons, shifts by a variable amount) that reads at most 6 bits of signals and variables is
   written as a function with a case over those bits; its values come from the simulator's own
@@ -329,6 +329,41 @@ Yosys in the application, #86), each kept by `keepSecond`, the one with the dela
 it is better by `DEPTH_RULE`. Corpus, the designs concerned (routed): EPFL max 29.4 ns and 1232 LUTs
 (30.2 and 1795), EPFL router 15 % smaller and 5 % slower, the others as before; the examples as before
 but pong (11.2 ns estimated instead of 12.4, 311 LUTs instead of 275).
+
+## ABC9 (#369)
+
+`synth_xilinx -abc9` runs on xc3se since Yosys 0.70 (YoWASP 0.68 failed). `abc9.mjs` measures its LUT mapping
+against the open synthesis's, on the examples and the design corpus's representative subset (DESIGN_SUBSET of
+`scripts/yosys-update-report.mjs`), each netlist simulated against the RTL and taken through the open back end
+(pack, place and route, seed 1; Silinx's timing analysis of the routed design):
+
+    node research/synth-quality/abc9.mjs [--filter blinky,serv] [--ways now,abc9]
+    node research/synth-quality/abc9.mjs --table research/synth-quality/abc9-results.json
+
+The four mappings share the front end and the steps up to the LUT mapping (tables, SRL16E): *now* is what the
+open synthesis does (`synthesizeOpen`), *lut4* its usual mapping alone (`abc -luts 1,1,1,1`), *abc9*
+synth_xilinx's own `map_luts` with `-abc9` (ABC9's `&if` with Yosys's LUT delays, LUTs of up to 8 inputs then
+split by `lut_map.v`), *abc9-4* the same with `-nowidelut` (LUT4s alone). Every netlist is equal to the RTL
+(vtr-ch-intrinsics differs at cycle 199 in all four, as in the corpus's expectations). Geometric means over the 18
+designs with a clock (2026-10-17, `abc9-results.json`):
+
+| mapping | LUTs | slices | period | synthesis time |
+|---|---:|---:|---:|---:|
+| lut4 / now | 0.996 | 0.959 | 1.103 | 0.34 |
+| abc9 / now | 1.232 | 1.280 | 1.118 | 0.62 |
+| abc9-4 / now | 1.058 | 0.934 | 1.074 | 0.55 |
+| **abc9-4 / lut4** | 1.062 | **0.974** | **0.973** | 1.61 |
+
+- **abc9 is no candidate**: it maps onto LUTs of up to 8 inputs, each split into LUT4s and MUXF5-8 (the problem of
+  15.10.1, "Where the size came from"): 23 % more LUTs, 28 % more slices and slower; EPFL dec 3840 MUXFs and
+  340 slices (187 now), light8080 381 slices (192).
+- **abc9-4 against lut4** (the same role, the usual mapping onto LUT4s): 6 % more LUTs but 2.6 % fewer slices and
+  a 2.7 % shorter period, by design between -37 % (nandland-spi-vhdl) and +49 % (EPFL priority) slices and -19 %
+  (vtr-ch-intrinsics) and +15 % (EPFL priority) period; the period of one seed (up to 12.5 % of placement noise,
+  test/designs-corpus/README.md). Against *now*, which also tries the wider and the depth-oriented mappings, it
+  is 7 % slower (EPFL priority 52 ns against 11).
+- So abc9-4 would be one more candidate of the mappings kept by `DEPTH_RULE`, not a replacement: left to the
+  synthesis-speed work (#377); not wired into `core/synth-open.js`.
 
 ## What is left
 
