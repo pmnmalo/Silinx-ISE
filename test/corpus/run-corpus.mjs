@@ -3,8 +3,11 @@
 // licence; fetched by scripts/fetch-yosys-tests.mjs at a pinned commit, never committed) through
 // Silinx's front end and simulator, compared with Yosys's netlists (test/diff-synth.js).
 //
-//   node test/corpus/run-corpus.mjs [--update] [--filter text] [--shard k/n] [--jobs n] [--cycles n] [--timeout s]
+//   node test/corpus/run-corpus.mjs [--update] [--filter text] [--shard k/n] [--jobs n] [--cycles n] [--timeout s] [--json file]
 //   (npm run test:corpus)
+//
+// --json file writes the run against the expectations ({ tag, results, regress, fixed, fresh, timedOut,
+// newWarnings, goneWarnings }), for the comparison of a Yosys update (#352, scripts/yosys-update-report.mjs).
 //
 // --shard k/n runs the k-th of n parts of the files (every n-th file, the nightly's jobs in parallel, #343);
 // --timeout s is the time a file may take (900 s): a file that takes longer fails the run (its modules have
@@ -75,6 +78,16 @@ export function compareResults(expected, results, ran) {
   return { regress, fixed, fresh, timedOut };
 }
 
+/**
+ * A run against the expectations as --json writes it: { tag, results (every key's), expected (the expected
+ * result of each regression and newly passing key), regress, fixed, fresh, timedOut, newWarnings, goneWarnings }
+ * (the warnings' lines without their indent).
+ */
+export function runSummary({ tag, results, expected, regress, fixed, fresh, timedOut, newWarnings, goneWarnings }) {
+  return { tag, results: Object.fromEntries(Object.keys(results).sort().map(k => [k, results[k]])), expected: Object.fromEntries([...regress, ...fixed].map(k => [k, expected[k] ?? null])),
+    regress, fixed, fresh, timedOut, newWarnings: newWarnings.map(w => w.trim()), goneWarnings: goneWarnings.map(w => w.trim()) };
+}
+
 /** One line of a reason: no newlines, no absolute paths, bounded. */
 const clean = s => String(s).replace(/\s+/g, ' ').replace(/(src\d+_)/g, '').slice(0, 160);
 
@@ -129,6 +142,7 @@ if (!isMainThread) {
   const cycles = +opt('--cycles', 100);
   const shard = opt('--shard', '');
   const timeout = +opt('--timeout', TIMEOUT);
+  const jsonOut = opt('--json', null);
   const { fetchYosysTests, YOSYS_TEST_DIRS, YOSYS_TESTS_PIN } = await import(pathToFileURL(path.join(HERE, '..', '..', 'scripts', 'fetch-yosys-tests.mjs')).href);
   const dir = await fetchYosysTests();
   const files = [];
@@ -235,5 +249,10 @@ if (!isMainThread) {
   if (regress.length) {
     console.log(`\nREGRESSIONS (${regress.length}): expected to pass\n${regress.map(k => `  ${k}: ${results[k]}`).join('\n')}`);
     if (!update) process.exitCode = 1;
+  }
+  if (jsonOut) {
+    const out = runSummary({ tag: YOSYS_TESTS_PIN.tag, results, expected, regress, fixed, fresh, timedOut, newWarnings: newW, goneWarnings: goneW });
+    fs.mkdirSync(path.dirname(path.resolve(jsonOut)), { recursive: true });
+    fs.writeFileSync(jsonOut, `${JSON.stringify(out, null, 1)}\n`);
   }
 }

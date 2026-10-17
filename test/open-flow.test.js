@@ -46,8 +46,8 @@ test('every shipped device description loads and has the datasheet\'s slices and
 });
 
 // the open flow of a project: its exit status, output and warnings (every line that says "warning")
-const openFlow = (dir, out) => {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), dir, out],
+const openFlow = (dir, out, args = []) => {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), dir, out, ...args],
     { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
   return { ...r, warnings: `${r.stdout}\n${r.stderr}`.split('\n').filter(l => /warning/i.test(l)).map(l => l.trim()) };
 };
@@ -56,9 +56,16 @@ const BLINKY_WARNINGS = [];
 
 test('the open flow on the shipped graph: blinky from VHDL to a complete bitstream, no Xilinx tool', { timeout: 300000 }, async () => {
   const out = path.join(tmp, 'blinky');
-  const r = openFlow(path.join(ROOT, 'examples/blinky'), out);
+  const r = openFlow(path.join(ROOT, 'examples/blinky'), out, ['--quality', path.join(out, 'quality.json')]);
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
   assert.match(r.stdout, /top\.bit: complete \(every feature in the bit database\)/);
+  // --quality (#352): the circuit's size and speed as the design corpus records them, the pack's and the STA's
+  const q = JSON.parse(fs.readFileSync(path.join(out, 'quality.json'), 'utf8'));
+  assert.deepEqual(Object.keys(q), ['part', 'slices', 'luts', 'ffs', 'period']);
+  assert.equal(q.part, 'xc3s250ecp132-4');
+  assert.equal(q.slices, +/pack \((\d+) slices\)/.exec(r.stdout)[1]);
+  assert.ok(q.luts > 0 && q.ffs > 0 && q.luts <= 2 * q.slices && q.ffs <= 2 * q.slices, JSON.stringify(q));
+  assert.equal(q.period.toFixed(3), /timing: clock \S+: minimum period ([\d.]+) ns/.exec(r.stdout)[1]);
   // no warnings (front end, synthesis, packer: each printed as "  Warning: …")
   assert.doesNotMatch(`${r.stdout}\n${r.stderr}`, /warning/i);
   assert.match(r.stdout, /timing: constraint PERIOD 20 ns on clk: met/);

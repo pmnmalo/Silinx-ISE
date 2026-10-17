@@ -1,0 +1,27 @@
+name: Pins
+# The sources pinned outside npm against their upstream (#352): Yosys's test designs, the design corpus's
+# repositories, the MCC models of the diagram corpus (scripts/check-pins.mjs). What is behind becomes one
+# issue, "Pinned sources: newer versions available", opened or updated; closed when all are current.
+# Monthly, and by hand (Actions ▸ Pins ▸ Run workflow), on GitHub's runner. (npm packages and GitHub
+# Actions: .github/dependabot.yml.)
+on:
+  schedule:
+    - cron: '23 6 1 * *'      # the 1st of every month, 06:23 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node scripts/check-pins.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

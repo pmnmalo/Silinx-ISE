@@ -40,6 +40,19 @@ In detail:
   went away; the crumbs now change with the drawing. Of the other failures named, Open Example (traffic) was
   #215 (fixed), #253's test read the project before it was saved (fixed in its test), and yosysWorkers on
   Windows imported the module by its path, not a file URL (fixed in its test).
+- **New versions of the open-source software Silinx uses (#352):** Dependabot (`.github/dependabot.yml`)
+  proposes weekly, in few pull requests: the minor and patch updates of CodeMirror, Express, elkjs, esbuild
+  and Playwright in one, the GitHub Actions in another, Yosys (`@yowasp/yosys`) in one of its own, labelled
+  `yosys update`; CodeMirror 6, Express 5 and elkjs above 0.9 are ignored (#349, #350, #351). A pull request
+  that changes Yosys runs `yosys-update.yml` on GitHub's runners: the open synthesis of the examples and of
+  14 designs of the design corpus with the new Yosys and with the base's (slices, LUTs, flip-flops, critical
+  path; `open-flow.mjs --quality`), and Yosys's test designs against their expectations
+  (`run-corpus.mjs --json`), in one table (`scripts/yosys-update-report.mjs`): the job summary, an artifact,
+  and a comment on the pull request when the token may write one. Such a pull request is never merged on
+  green alone (CLAUDE.md). The sources pinned outside npm (Yosys's test designs, the design corpus's
+  commits, the MCC models) are compared with their upstream monthly (`pins.yml`, `scripts/check-pins.mjs`):
+  one issue, "Pinned sources: newer versions available", lists what is behind, and is closed when all are
+  current.
 
 ## 15.10.22
 

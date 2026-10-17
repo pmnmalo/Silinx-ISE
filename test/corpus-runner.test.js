@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { shardOf, compareResults } from './corpus/run-corpus.mjs';
+import { shardOf, compareResults, runSummary } from './corpus/run-corpus.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -62,4 +62,16 @@ test('corpus runner: the nightly runs the corpus in shards that cover every file
   assert.match(job, /name: corpus \(\$\{\{ matrix\.shard \}\}\/\d+\)/);
   assert.match(job, /fail-fast: false/);
   assert.match(job, /timeout-minutes: 60/);
+});
+
+test('corpus runner: --json writes the run against the expectations, for the comparison of a Yosys update (#352)', () => {
+  const expected = { 'a.v:a': 'pass', 'b.v:b': 'mismatch: x', 'c.v:c': 'pass' };
+  const results = { 'c.v:c': 'pass', 'b.v:b': 'pass', 'a.v:a': 'mismatch: y' };
+  const cmp = compareResults(expected, results, new Set(['a.v', 'b.v', 'c.v']));
+  const out = runSummary({ tag: 'v0.68', results, expected, ...cmp, newWarnings: ['  a.v: 3: w'], goneWarnings: [] });
+  assert.deepEqual(out, {
+    tag: 'v0.68', results: { 'a.v:a': 'mismatch: y', 'b.v:b': 'pass', 'c.v:c': 'pass' }, expected: { 'a.v:a': 'pass', 'b.v:b': 'mismatch: x' },
+    regress: ['a.v:a'], fixed: ['b.v:b'], fresh: [], timedOut: [], newWarnings: ['a.v: 3: w'], goneWarnings: [],
+  });
+  assert.deepEqual(Object.keys(out.results), ['a.v:a', 'b.v:b', 'c.v:c']);
 });

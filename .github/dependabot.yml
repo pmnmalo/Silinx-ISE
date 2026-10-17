@@ -1,0 +1,42 @@
+# Dependabot (#352): newer versions of the open-source software Silinx uses, weekly, in few pull requests.
+#   - npm: the minor and patch updates of codemirror, express, elkjs, esbuild and playwright in one pull
+#     request; @yowasp/yosys (Yosys) never grouped: a pull request of its own, which
+#     .github/workflows/yosys-update.yml labels "yosys update" and measures (the new Yosys against the
+#     base's), and which is never merged on green alone (CLAUDE.md, Integration)
+#   - GitHub Actions: every action of the workflows in one pull request
+# Sources pinned outside npm (Yosys's test designs, the design corpus, the MCC models): the monthly
+# .github/workflows/pins.yml (scripts/check-pins.mjs).
+# A dependency update changes NOTICE / THIRD-PARTY-NOTICES when its licence or authors change (CLAUDE.md).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencies]
+    groups:
+      npm-minor-patch:
+        patterns: [codemirror, express, elkjs, esbuild, playwright]
+        update-types: [minor, patch]
+    ignore:
+      # CodeMirror 5 to 6: a rewrite of the editor's integration (#349)
+      - dependency-name: codemirror
+        update-types: [version-update:semver-major]
+      # Express 4 to 5 (#350)
+      - dependency-name: express
+        update-types: [version-update:semver-major]
+      # elkjs above 0.9: the schematic layout changes (#351)
+      - dependency-name: elkjs
+        versions: ['>=0.10.0']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    labels: [dependencies]
+    groups:
+      github-actions:
+        patterns: ['*']

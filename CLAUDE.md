@@ -51,6 +51,12 @@ anyone changing it, people and AI agents alike. The README and docs/ describe th
 - **Merging**: when the pull request's CI is green, merge it into `main` (rebased, fast-forward, no
   merge commit) without running the suites again locally. If `main` moved meanwhile, rebase the
   branch and push it again (CI runs again). Then check the CI run of `main`.
+- **Dependencies** (`.github/dependabot.yml`): Dependabot's weekly pull requests are merged as any other.
+  A **"yosys update" pull request is never merged on green alone**: the maintainer (or the session) reviews
+  the comparison `yosys-update.yml` writes (the open synthesis's size and speed with the new Yosys and
+  the base's, Yosys's test designs against their expectations), and the user decides. After merging, the
+  quality comparison against ISE is run by hand (Actions ▸ Quality ▸ Run workflow) and reviewed. The
+  sources pinned outside npm are checked monthly (`pins.yml`: one issue lists what is behind).
 - **`main` is protected** (repository rulesets): no deletion and no force push, for anyone; a commit
   reaches `main` only with CI's unit (Linux) and UI checks green, the repository's admin excepted (for the
   release commit and documentation-only changes, whose pull requests skip CI). The weekly quality

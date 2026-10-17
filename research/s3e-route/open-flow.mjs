@@ -2,14 +2,17 @@
 // to WebAssembly (core/synth-open.js) -> pack -> place -> route on the PIPs whose bits are known ->
 // Silinx's bitgen. Needs the device cache (~/.silinx/devices, built from the user's own
 // device report: research/s3e-route/build-device.mjs).
-//   node research/s3e-route/open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--effort E] [--timing T] [--timing-route 0|1] [--tries N] [--no-replicate] [--replicate-opts JSON] [--no-crc]
+//   node research/s3e-route/open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--effort E] [--timing T] [--timing-route 0|1] [--tries N] [--no-replicate] [--replicate-opts JSON] [--no-crc] [--quality file]
 // (seed, effort, timing: the placer's options, core/fpga/place.js; --timing-route 0: route for
 // wirelength only, without the timing-driven router (default 1); --tries N: N placements from
 // seed on, each routed, the fastest kept (default 1); --no-replicate: no register replication
 // (core/fpga/replicate.js: by default the flip-flops of many loads on the critical path are copied,
 // the design placed and routed again, the faster kept; --replicate-opts '{"perCopy":8}' overrides
 // its REPLICATION settings)). After routing, the static timing
-// analysis of core/fpga/timing.js prints the critical path of each clock (also in timing.txt). Writes into the out folder: <top>.json (Yosys), placed.xdl, routed.xdl, <top>.bit. Fails (exit 1)
+// analysis of core/fpga/timing.js prints the critical path of each clock (also in timing.txt). Writes into the out folder: <top>.json (Yosys), placed.xdl, routed.xdl, <top>.bit;
+// --quality file: the circuit's size and speed as JSON ({ part, slices, luts, ffs, period }: the design
+// corpus's qualityOf, test/designs-corpus/lib.mjs), for the comparison of a Yosys update (#352,
+// scripts/yosys-update-report.mjs). Fails (exit 1)
 // listing the nets that cannot be routed on known PIPs, or the features of the design the bit
 // database does not know: the .bit is written only when it is complete.
 import fs from 'node:fs';
@@ -28,13 +31,14 @@ import { bitgen, knownRouting } from '../../core/fpga/bitgen.js';
 import { analyzeTiming, timingReport, checkPeriods, delayTable } from '../../core/fpga/timing.js';
 import { parseUcf } from '../../core/ucf.js';
 import { loadDb } from '../s3e-bitstream/db.mjs';
+import { qualityOf } from '../../test/designs-corpus/lib.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); if (i < 0) return def; const v = args[i + 1]; args.splice(i, 2); return v; };
 const flag = name => { const i = args.indexOf(name); if (i >= 0) args.splice(i, 1); return i >= 0; };
-const json = opt('--json', null), seed = +opt('--seed', '1'), effort = +opt('--effort', '1'), timing = opt('--timing', null), timingRoute = opt('--timing-route', '1') !== '0', noCrc = flag('--no-crc'), tries = Math.max(1, +opt('--tries', '1')), replicate = !flag('--no-replicate'), replicateOpts = JSON.parse(opt('--replicate-opts', '{}'));
+const json = opt('--json', null), seed = +opt('--seed', '1'), effort = +opt('--effort', '1'), timing = opt('--timing', null), timingRoute = opt('--timing-route', '1') !== '0', noCrc = flag('--no-crc'), tries = Math.max(1, +opt('--tries', '1')), replicate = !flag('--no-replicate'), replicateOpts = JSON.parse(opt('--replicate-opts', '{}')), qualityFile = opt('--quality', null);
 const [projDir, outDir] = args;
-if (!projDir || !outDir) { console.error('usage: open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--effort E] [--timing T] [--timing-route 0|1] [--tries N] [--no-replicate] [--replicate-opts JSON] [--no-crc]'); process.exit(2); }
+if (!projDir || !outDir) { console.error('usage: open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--effort E] [--timing T] [--timing-route 0|1] [--tries N] [--no-replicate] [--replicate-opts JSON] [--no-crc] [--quality file]'); process.exit(2); }
 const proj = JSON.parse(fs.readFileSync(path.join(projDir, 'silinx.json'), 'utf8'));
 const top = proj.top;
 const part = `${proj.device.part}${proj.device.package}${proj.device.speed}`;
@@ -116,6 +120,7 @@ const checks = checkPeriods(sta0, routedDesign, ucf ? parseUcf(ucf).clocks : [])
 const sta = timingReport(sta0, checks);
 fs.writeFileSync(path.join(outDir, 'timing.txt'), `${sta.join('\n')}\n`);
 for (const l of sta) if (/^(clock|constraint)/.test(l)) console.log(`timing: ${l}`);
+if (qualityFile) fs.writeFileSync(qualityFile, `${JSON.stringify(qualityOf(part, packed.stats, sta0.clocks))}\n`);
 // the bitstream
 t = Date.now();
 const { bytes, unknown } = bitgen(routedText, db, { name: `${top}.ncd`, crc: !noCrc, startupClk: proj.impl?.startupClk || 'JtagClk' });
