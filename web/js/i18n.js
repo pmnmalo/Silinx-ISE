@@ -205,7 +205,6 @@ const PT = {
   'Stop Editing': 'Terminar a Edição', 'Stimulus Timing': 'Temporização dos Estímulos', 'None (combinational)': 'Nenhum (combinatório)',
   'Clock Period (ns):': 'Período do Relógio (ns):', 'Time Step (ns):': 'Passo de Tempo (ns):', 'Cycles:': 'Ciclos:', 'Input Value': 'Valor da Entrada',
   'Expected Value': 'Valor Esperado', 'From Cycle:': 'A partir do Ciclo:', 'Value:': 'Valor:', 'Save as Test Bench': 'Guardar como Bancada de Teste',
-  'Test bench name:': 'Nome da bancada de teste:',
   'Bits, most significant first (0 1 Z X), h… hexadecimal or d… decimal; it holds up to the next change.': 'Bits, o mais significativo primeiro (0 1 Z X), h… hexadecimal ou d… decimal; mantém-se até à mudança seguinte.',
   'Bits, most significant first (0 1, - not checked), h… hexadecimal or d… decimal; - alone: not checked.': 'Bits, o mais significativo primeiro (0 1, - não verificado), h… hexadecimal ou d… decimal; - sozinho: não verificado.',
   // schematic viewer

@@ -17,6 +17,9 @@ In short:
 
 In detail:
 
+- **i18n: a duplicate key (#362):** `'Test bench name:'` was written twice in web/js/i18n.js (the same translation),
+  which esbuild warned of when building the standalone edition; `test/web-i18n.test.js` now rejects a key written
+  twice in any of the web/js/i18n*.js dictionaries.
 - **The release zip's size budget (#380):** 30 → 32 MB, by Yosys 0.70 (#368): its WebAssembly (69 MB)
   and resources (11 MB), all needed, make the zip 30.4 MB.
 - **EPFL benchmarks against the best-known LUT-6 results (#367):** `research/epfl-records/measure.mjs` maps each EPFL

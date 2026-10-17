@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { transformSync } from 'esbuild';
 
 const WEB = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'web', 'js');
 // the module picks the language from localStorage when it loads
@@ -38,6 +39,18 @@ test('Portuguese dictionary: trimmed keys, non-empty translations, valid pattern
     assert.ok(typeof p[1] === 'string' || typeof p[1] === 'function');
     assert.ok(p[0].source.startsWith('^') && p[0].source.endsWith('$'), `pattern ${p[0]} is anchored`);
   }
+});
+
+// a key written twice in an object literal is lost to the second one (the standalone build warns of it)
+test('no dictionary in web/js/i18n*.js has a key written twice (#362)', () => {
+  const files = fs.readdirSync(WEB).filter((f) => /^i18n.*\.js$/.test(f));
+  assert.ok(files.length >= 9, files.join(', '));
+  const dups = files.flatMap((f) => transformSync(fs.readFileSync(path.join(WEB, f), 'utf8'), { loader: 'js', sourcefile: f }).warnings
+    .filter((w) => w.id === 'duplicate-object-key').map((w) => `${f}:${w.location.line}: ${w.text}`));
+  assert.deepEqual(dups, []);
+  // the check itself: esbuild reports a key written twice
+  const w = transformSync("const PT = { 'Test bench name:': 'a', 'Test bench name:': 'b' };", { loader: 'js' }).warnings;
+  assert.deepEqual(w.map((x) => [x.id, x.text]), [['duplicate-object-key', 'Duplicate key "Test bench name:" in object literal']]);
 });
 
 test('t(): exact strings, patterns, surrounding whitespace, unknown text unchanged', () => {
