@@ -7,8 +7,9 @@
 //   (npm run test:corpus)
 //
 // --shard k/n runs the k-th of n parts of the files (every n-th file, the nightly's jobs in parallel, #343);
-// --timeout s is the time a file may take (900 s): a file that takes longer fails the run, whatever was
-// expected of it (its modules have no result, #343); the slowest files and their times are printed.
+// --timeout s is the time a file may take (900 s): a file that takes longer fails the run (its modules have
+// no result, #343), unless expected.json has the file itself failing as a whole ('error: …', hana/hana_vlib.v);
+// the slowest files and their times are printed.
 //
 // Every Verilog file is parsed and elaborated by Silinx; each of its top modules (the modules no
 // other module of the file instantiates) is then simulated with seeded random stimulus and compared
@@ -52,7 +53,9 @@ export function shardOf(files, spec) {
  * The results against the expectations: { regress, fixed, fresh, timedOut }. A key expected to pass that
  * does not, or has no result while its file ran (the file failed as a whole: a crash; results gets its
  * 'missing (…)'), is a regression; a file that timed out is one too, even when none of its keys was
- * expected to pass (a design that hangs or got too slow is never skipped in silence, #343).
+ * expected to pass (a design that hangs or got too slow is never skipped in silence, #343), unless the file
+ * itself is expected to fail as a whole (an 'error: …' of its own: hana/hana_vlib.v, out of memory or out of
+ * time, the cell library Yosys fails on module after module).
  */
 export function compareResults(expected, results, ran) {
   const regress = [], fixed = [], fresh = [];
@@ -68,7 +71,7 @@ export function compareResults(expected, results, ran) {
     if (e === 'pass' && ran.has(f) && !(k in results)) { regress.push(k); results[k] = `missing (${results[f] || 'no result'})`; }
   }
   const timedOut = [...ran].filter(f => /^error: timeout\b/.test(results[f] || '')).sort();
-  for (const f of timedOut) if (!regress.includes(f)) regress.push(f);
+  for (const f of timedOut) if (!regress.includes(f) && !/^error: /.test(expected[f] || '')) regress.push(f);
   return { regress, fixed, fresh, timedOut };
 }
 

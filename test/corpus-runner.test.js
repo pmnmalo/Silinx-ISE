@@ -36,7 +36,7 @@ test('corpus runner: regressions, newly passing and new keys against expected.js
   assert.equal(results['c.v:c'], 'missing (error: harness: out of memory)');
 });
 
-test('corpus runner: a file that timed out fails the run, even when none of its modules was expected to pass (#343)', () => {
+test('corpus runner: a file that timed out fails the run, even when none of its modules was expected to pass, not when expected to fail as a whole (#343)', () => {
   const expected = { 'slow.v:m': 'unsupported: elaborate: x', 'slow.v:m (synth)': 'error: yosys: y', 'hang.v:h': 'pass', 'ok.v:o': 'pass' };
   const results = { 'slow.v': 'error: timeout (over 900 s)', 'hang.v': 'error: timeout (over 900 s)', 'ok.v:o': 'pass' };
   const r = compareResults(expected, results, new Set(['slow.v', 'hang.v', 'ok.v']));
@@ -45,6 +45,12 @@ test('corpus runner: a file that timed out fails the run, even when none of its 
   assert.equal(results['hang.v:h'], 'missing (error: timeout (over 900 s))');
   // a timeout is no 'error: timeout…' of a key of a module
   assert.deepEqual(compareResults({}, { 'x.v:t': 'error: yosys: timeout of ABC' }, new Set(['x.v'])).timedOut, []);
+  // unless the file itself is expected to fail as a whole (hana/hana_vlib.v: out of memory, or out of time)
+  const vlib = compareResults({ 'hana/hana_vlib.v': 'error: harness: Worker terminated due to reaching memory limit: JS heap out of memory' },
+    { 'hana/hana_vlib.v': 'error: timeout (over 900 s)' }, new Set(['hana/hana_vlib.v']));
+  assert.deepEqual([vlib.timedOut, vlib.regress], [['hana/hana_vlib.v'], []]);
+  // a file expected unsupported (it does not parse) that times out: a failure
+  assert.deepEqual(compareResults({ 'p.v': 'unsupported: parse: x' }, { 'p.v': 'error: timeout (over 900 s)' }, new Set(['p.v'])).regress, ['p.v']);
 });
 
 test('corpus runner: the nightly runs the corpus in shards that cover every file, each with its time limit (#343)', () => {

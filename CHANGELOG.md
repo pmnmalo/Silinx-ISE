@@ -61,7 +61,8 @@ In detail:
   every file took 20–25 % longer, Silinx's synthesis of a module being up to 7 Yosys runs since its
   mappings for depth, with the wider functions and the LUT delays and the carry chains (#52, #54, #77, #78).
   The corpus now runs in two jobs at once (`run-corpus.mjs --shard 1/2`, `2/2`: every other file); a file
-  that takes over 15 minutes (`--timeout`) fails the run even when none of its modules was expected to pass;
+  that takes over 15 minutes (`--timeout`) fails the run even when none of its modules was expected to pass
+  (not one expected to fail as a whole, `hana/hana_vlib.v`); 36 and 22 minutes on 17 October;
   the run prints its ten slowest files. The report job (#251) ran only after a `failure`, and a job at its
   time limit ends `cancelled`: the nightly's, ISE's and the quality comparison's report job now also runs
   after a cancelled job, and `scripts/report-failure.mjs` reports a cancelled job whose annotation says it
