@@ -311,7 +311,7 @@ ${outs.map(p => `net "n_${p}" ,
 });
 
 test('a DCM whose CLKIN comes from a global clock buffer, a DCM whose CLKFX / CLKFX180 drive nothing: bits of DCM:USED cleared, as ISE\'s bitgen does, on every DCM (#47)', async () => {
-  const { loadDb } = await import('../research/s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
   const db = loadDb('xc3s250ecp132-4');
   const dcm = (tile, site, from, drv = from.startsWith('GCLK') ? 'BUFGMUX' : 'IBUF') => `design "t" xc3s250ecp132-4 v3.2 , cfg "";
 inst "u" "DCM",placed ${tile} ${site} ,
@@ -502,7 +502,7 @@ test('padsFromDevice: the bonded I/O sites of the device, by their index among t
 // written as usual. The expected bits are ISE's (XC3S250E-CP132, routed XDL with dangling inputs at
 // B8, C11, G12 and A7; ISE's DRC: 0 errors, one PhysDesignRules:812 warning per pad, dangling pin).
 test('an input pad that drives nothing: the bits ISE\'s bitgen writes (I:NOLOAD), with its pull; a connected input keeps its standard (#18)', async () => {
-  const { loadDb } = await import('../research/s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
   const db = loadDb('xc3s250ecp132-4');
   const pad = (name, tile, site, cfg) => `inst "${name}" "IBUF",placed ${tile} ${site} ,\n  cfg " IDELMUX::1 IMUX::1 ${cfg} INBUF:${name}_IBUF: PAD:${name}: "\n  ;\n`;
   const xdl = `design "top" xc3s250ecp132-4 v3.2 , cfg "";\n${pad('clk', 'TIBUFS_X13Y35', 'B8', 'IOATTRBOX::LVCMOS33')}${pad('b1', 'TIOIS_X20Y35', 'C11', 'IOATTRBOX::LVCMOS33 PULL::PULLUP')}${pad('b0', 'RIBUFS_PCI_X27Y21', 'G12', 'IOATTRBOX::LVCMOS18')}${pad('b3', 'TIOIS_X12Y35', 'A7', 'IOATTRBOX::LVTTL PULL::PULLDOWN')}`;
@@ -528,7 +528,7 @@ test('an input pad that drives nothing: the bits ISE\'s bitgen writes (I:NOLOAD)
 });
 
 test('the bit database: every pad of every package has I:NOLOAD, its 1.8 V input bits less one (#18)', async () => {
-  const { loadDb } = await import('../research/s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
   for (const part of ['xc3s100ecp132-4', 'xc3s250ecp132-4', 'xc3s500efg320-4', 'xc3s1200efg320-4']) {
     const db = loadDb(part);
     const pads = Object.entries(db.padFeats);

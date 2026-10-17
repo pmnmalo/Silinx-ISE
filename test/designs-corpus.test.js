@@ -180,7 +180,7 @@ test('boardClockUcf: the clock on B8 with a 20 ns PERIOD', () => {
 
 test('design corpus: the devices of the flow, smallest first, each with a device description and a bit database (#7)', async () => {
   const { findDeviceGraph } = await import('../core/fpga/device-node.js');
-  const { loadDb } = await import('../research/s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
   assert.deepEqual(FLOW_PARTS.map(chipOf), ['XC3S250E', 'XC3S500E', 'XC3S1200E']);
   assert.deepEqual(deviceOf('xc3s500efg320-4'), { family: 'spartan3e', part: 'xc3s500e', package: 'fg320', speed: '-4' });
   assert.throws(() => deviceOf('xc6slx16csg324-3'), /not a device of the flow/);

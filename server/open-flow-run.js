@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { yosysWorkers } from '../core/synth-open-node.js';
 import { loadDeviceCache } from '../core/fpga/device-node.js';
-import { loadDb } from '../research/s3e-bitstream/db.mjs';
+import { loadDb } from '../core/fpga/bitdb-node.js';
 import { runOpenFlow } from '../core/open-flow-core.js';
 
 const spec = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));

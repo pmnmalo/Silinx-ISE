@@ -369,6 +369,9 @@ In detail:
   errors); a test checks that the two agree on all 2048 sets of steps. It fixes two orders both had: the
   post-synthesis model with a step that needs the placement (`postsynth` + `fpgaview`) ran no synthesis, and with
   the synthesis up to date `map` + `pin2ucf` ran Map twice.
+- **The bit database loader in core/ (#407):** `core/fpga/bitdb-node.js` reads the bit database for the open flow
+  (`server/open-flow.js`, `server/open-flow-run.js`) and the tests; `research/s3e-bitstream/db.mjs` re-exports it
+  with the experiments' default part. The application imports nothing from `research/` (`test/layering.test.js`).
 
 ## 15.10.22
 

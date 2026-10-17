@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
-import { DB_DIR } from '../../research/s3e-bitstream/db.mjs';
+import { DB_DIR } from '../../core/fpga/bitdb-node.js';
 
 let env;
 // the server's bit database: the shipped one, plus the (empty) pads of the XC3S250E in the TQ144

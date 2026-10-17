@@ -339,8 +339,8 @@ test('DCM: the top-left DCM site (no INST LOC: the placer\'s choice, #47), the s
 test('bufgReach: each output of the top-left DCM reaches its global buffer through switches of known bits (CLK0, CLK2X, CLKDV, CLKFX)', async () => {
   const { bufgReach } = await import('../core/fpga/route.js');
   const { knownRouting } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../research/s3e-bitstream/db.mjs');
-  const known = knownRouting(loadDb());
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
+  const known = knownRouting(loadDb('xc3s250ecp132-4'));
   const g = loadDeviceCache('xc3s250ecp132-4');
   const got = Object.fromEntries(['CLK0', 'CLK2X', 'CLKDV', 'CLKFX', 'CLK90', 'CLKFX180'].map(p => [p, bufgReach(g, 'DCM_X0Y1', p, known.allowPip)]));
   // (the DCM pins' switches measured in stage F of research/s3e-bitstream add CLK0 -> X2Y11 and CLKFX -> X1Y11;
@@ -415,7 +415,7 @@ function constMults() {
 test('multipliers with constant inputs (x * 6554) on every multiplier site: every input tied to 1 routed on switches of known bits, from the VCC site of its own block-RAM interconnect tile, as ISE does (#35)', { timeout: 120000 }, async () => {
   const { routeDesign, checkRouting } = await import('../core/fpga/route.js');
   const { knownRouting, bitgen } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../research/s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
   const { placedXdl } = await import('../core/fpga/place.js');
   const { parseXdl, writeXdl } = await import('../core/xdl.js');
   const g = loadDeviceCache('xc3s250ecp132-4');
@@ -453,7 +453,7 @@ test('multipliers with constant inputs (x * 6554) on every multiplier site: ever
 test('control pins tied to 1 / 0: block RAM EN / WE / SSR, multiplier CE / RST and DCM RST / PS… on VCC / GND, not inverted, routed on switches of known bits; a DCM\'s DSSEN open (#50, #190)', { timeout: 120000 }, async () => {
   const { routeDesign, checkRouting } = await import('../core/fpga/route.js');
   const { knownRouting, bitgen, designFeatures } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../research/s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
   const { placedXdl } = await import('../core/fpga/place.js');
   const { parseXdl, writeXdl } = await import('../core/xdl.js');
   const nl = yjson({ clk: ['input', 1], a: ['input', 10], q: ['output', 4] }, [
@@ -518,7 +518,7 @@ async function flowOf(part) {
   if (flows.has(part)) return flows.get(part);
   const { clockReach, bufgReach } = await import('../core/fpga/route.js');
   const { knownRouting } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../research/s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
   const g = loadDeviceCache(part);
   const known = knownRouting(loadDb(part, { graph: g }));
   const reach = new Map();

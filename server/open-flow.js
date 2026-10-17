@@ -29,7 +29,7 @@ import { OPEN_STEPS, orderOpenSteps } from '../core/open-steps.js';
 import { synthEffort } from '../core/synth-open.js';
 import { findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR } from '../core/fpga/device-node.js';
 import { S3E_DEVICES } from '../core/fpga/bitstream.js';
-import { DB_DIR, hasBitDb, dbPackages } from '../research/s3e-bitstream/db.mjs';
+import { DB_DIR, hasBitDb, dbPackages } from '../core/fpga/bitdb-node.js';
 import { runCommand } from './jobs.js';
 import { safeJoin } from './projects.js';
 import { loadConfig, detectIse, iseStatus, iseModeOf, which } from './toolchain.js';

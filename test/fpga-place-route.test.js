@@ -19,7 +19,7 @@ import { routeDesign, clockReach, bufgReach } from '../core/fpga/route.js';
 import { knownRouting } from '../core/fpga/bitgen.js';
 import { analyzeTiming, delayTable } from '../core/fpga/timing.js';
 import { parseXdl, writeXdl } from '../core/xdl.js';
-import { loadDb } from '../research/s3e-bitstream/db.mjs';
+import { loadDb } from '../core/fpga/bitdb-node.js';
 import { placeRoute, placeRouteBest, RETRY_SEEDS } from '../core/fpga/place-route.js';
 
 const PART = 'xc3s250ecp132-4';

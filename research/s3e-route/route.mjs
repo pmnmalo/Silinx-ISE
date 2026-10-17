@@ -20,7 +20,7 @@ for (const n of design.nets) n.pips = [];
 let t = Date.now();
 const device = loadDeviceCache(design.part);
 console.log(`device ${design.part}: ${device.nodeCount} nodes, loaded in ${Date.now() - t} ms`);
-const r = routeDesign(design, device, { log: s => console.log('  ' + s), ...(known ? knownRouting((await import('../s3e-bitstream/db.mjs')).loadDb(design.part, { graph: device })) : {}) });
+const r = routeDesign(design, device, { log: s => console.log('  ' + s), ...(known ? knownRouting((await import('../../core/fpga/bitdb-node.js')).loadDb(design.part, { graph: device })) : {}) });
 console.log(`routed ${r.routed} nets in ${r.timeMs} ms, ${r.iterations} iterations, ${r.pips} PIPs (ISE: ${ise}), overused ${r.overused}, failed ${r.failed.length}`);
 for (const e of r.errors.slice(0, 20)) console.log('  error: ' + e);
 for (const f of r.failed.slice(0, 20)) console.log('  failed: ' + f);

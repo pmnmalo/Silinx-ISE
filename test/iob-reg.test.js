@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { parseXdl } from '../core/xdl.js';
 import { designFeatures, frameData, iobRegFeatures, parseBit } from '../core/fpga/bitgen.js';
 import { getBit, diffFrames } from '../core/fpga/bitstream.js';
-import { loadDb } from '../research/s3e-bitstream/db.mjs';
+import { loadDb } from '../core/fpga/bitdb-node.js';
 
 const cfgOf = s => s.trim().split(/\s+/).map(t => { const m = /^([^:]+):([^:]*):(.*)$/.exec(t); return { attr: m[1], name: m[2], value: m[3] }; });
 

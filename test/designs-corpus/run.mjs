@@ -218,7 +218,7 @@ async function backEnd(d, design, syn, srcs, res, opts, m, forceWrap = false, pa
   const { analyzeTiming, checkPeriods } = await import('../../core/fpga/timing.js');
   const { parseUcf } = await import('../../core/ucf.js');
   const { parseXdl, writeXdl } = await import('../../core/xdl.js');
-  const { loadDb } = await import('../../research/s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../../core/fpga/bitdb-node.js');
   const w = [], steps = {};
   let again = false;
   res.details.flowSteps = steps;

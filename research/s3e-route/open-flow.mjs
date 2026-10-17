@@ -30,7 +30,7 @@ import { checkRouting } from '../../core/fpga/route.js';
 import { bitgen, knownRouting } from '../../core/fpga/bitgen.js';
 import { analyzeTiming, timingReport, checkPeriods, delayTable } from '../../core/fpga/timing.js';
 import { parseUcf } from '../../core/ucf.js';
-import { loadDb } from '../s3e-bitstream/db.mjs';
+import { loadDb } from '../../core/fpga/bitdb-node.js';
 import { qualityOf } from '../../test/designs-corpus/lib.mjs';
 
 const args = process.argv.slice(2);
