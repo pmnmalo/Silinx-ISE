@@ -497,6 +497,6 @@ designs, and the HDL Silinx generates for them, are yours: the licence does not 
 
 Silinx includes open-source components under their own licences: CodeMirror (MIT), Express and
 its dependencies (MIT, ISC, BSD-3-Clause), Yosys (YoWASP, ISC), a port of adepttool (MIT) and elkjs
-(EPL-2.0). Their licence texts are in
+(EPL-2.0 or GPL-3.0-or-later). Their licence texts are in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), generated with `node scripts/third-party.mjs`
 (run it again after changing the dependencies; the tests check it is up to date).

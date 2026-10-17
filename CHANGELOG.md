@@ -43,7 +43,7 @@ In detail:
 - **New versions of the open-source software Silinx uses (#352):** Dependabot (`.github/dependabot.yml`)
   proposes weekly, in few pull requests: the minor and patch updates of CodeMirror, Express, elkjs, esbuild
   and Playwright in one, the GitHub Actions in another, Yosys (`@yowasp/yosys`) in one of its own, labelled
-  `yosys update`; CodeMirror 6, Express 5 and elkjs above 0.9 are ignored (#349, #350, #351). A pull request
+  `yosys update`; CodeMirror 6 and Express 5 are ignored (#349, #350; elkjs above 0.9 was too, until #351). A pull request
   that changes Yosys runs `yosys-update.yml` on GitHub's runners: the open synthesis of the examples and of
   14 designs of the design corpus with the new Yosys and with the base's (slices, LUTs, flip-flops, critical
   path; `open-flow.mjs --quality`), and Yosys's test designs against their expectations
@@ -69,6 +69,17 @@ In detail:
   download's file name is no longer quoted when it needs no quotes (`attachment; filename=top.zip`).
   Dependabot proposes Express's major versions again; THIRD-PARTY-NOTICES lists Express 5's dependencies
   (the same licences: MIT, ISC, BSD-3-Clause).
+- **elkjs 0.12 (#351):** the layout engine of Convert to Schematic and of the RTL / Technology Schematic goes
+  from elkjs 0.9.3 to 0.12.0 (ELK 0.10–0.12: no layout option Silinx uses renamed or removed, the same API, the
+  worker loaded the same way; the standalone page embeds it as before). Of the 35 schematics the examples'
+  modules and the Convert to Schematic test cases become, 24 are drawn exactly as before; 11 are placed a
+  little differently (traffic's `top` and `timer`, `digital_clock`, `speed_ctrl`, four test benches, three
+  test cases), with no symbols overlapping, no wire through a symbol or along another net's wire, and the same
+  generated HDL and simulations. In traffic's `top` and `timer` more nets are now drawn as wires where they
+  were labelled stubs (27 labels to 15, 23 to 14). elkjs 0.12 is licensed EPL-2.0 or GPL-3.0-or-later
+  (THIRD-PARTY-NOTICES, NOTICE, README, the About box); Dependabot no longer ignores it. New tests check, for a
+  future update, that every ELK option Silinx sets is known to the installed elkjs and that those 35 schematics
+  stay readable (no overlapping symbols, no two nets' wires along each other).
 
 ## 15.10.22
 

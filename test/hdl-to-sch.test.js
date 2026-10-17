@@ -8,7 +8,8 @@ import { compile, elaborate, simulate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import * as V from '../core/values.js';
 import { convertModuleToSchematic, designUnits, moduleUnitRanges } from '../core/hdl-to-sch.js';
-import { schematicFromHdl, generateHdl, normalizeDoc, netlist, modulesFromLibrary } from '../core/schdoc.js';
+import { schematicFromHdl, generateHdl, normalizeDoc, netlist, modulesFromLibrary, symbolBox } from '../core/schdoc.js';
+import fs from 'node:fs';
 import { example, runTestbench, EXAMPLES } from './examples-lib.mjs';
 import { CASES } from './fixtures/hdl-to-sch-cases.js';
 
@@ -252,4 +253,45 @@ test('a module that does not elaborate is not converted (nothing written)', asyn
   const files = { 'src/bad.vhd': 'library ieee; use ieee.std_logic_1164.all;\nentity bad is port (a : in std_logic; y : out std_logic); end bad;\narchitecture rtl of bad is begin y <= a and nosuch; end rtl;\n' };
   await assert.rejects(convertModuleToSchematic({ sources: srcList(files), module: 'bad', layout }), /^Error: 'bad' does not elaborate \(.*nosuch.*\): correct it first\.$/);
   await assert.rejects(convertModuleToSchematic({ sources: srcList(files), module: 'nothere' }), /^Error: No module 'nothere' in the project\.$/);
+});
+
+// ------------------------------------------------------------------ the layout engine (elkjs, #351)
+test('every ELK layout option Silinx sets is one the installed elkjs knows (schdoc.js, schematic-view.js)', async () => {
+  const known = new Set((await elk.knownLayoutOptions()).map(o => o.id));
+  for (const f of ['core/schdoc.js', 'web/js/schematic-view.js']) {
+    const used = new Set([...fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8').matchAll(/'(elk\.[A-Za-z.]+)'/g)].map(m => m[1]).filter(o => !o.endsWith('.js')));
+    assert.ok(used.size >= 15, `${f}: ${used.size} options`);
+    for (const o of used) assert.ok(known.has(`org.eclipse.${o}`), `${f}: ${o} unknown to elkjs`);
+  }
+});
+
+test('the schematics of the examples and of the test cases are readable: no symbols overlap, no wire runs along another net\'s', async () => {
+  const all = [];
+  for (const name of EXAMPLES) {
+    const ex = example(name);
+    const lib = compile(ex.sources);
+    const files = new Set(ex.sources.map(s => s.path));
+    for (const m of lib.modules.values()) if (files.has(m.archFile || m.file)) all.push([`${name}/${m.name}`, ex.sources, m.name]);
+  }
+  for (const c of CASES) all.push([c.name, srcList(c.files), c.module]);
+  assert.ok(all.length >= 30, `${all.length} schematics`);
+  for (const [what, sources, module] of all) {
+    const { doc } = await convertModuleToSchematic({ sources, module, layout });
+    const modules = modulesFromLibrary(compile(sources), { sources: Object.fromEntries(sources.map(s => [s.path, s.text])) });
+    const boxes = doc.symbols.map(s => ({ id: s.id, ...symbolBox(s, modules) }));
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j];
+      assert.ok(!(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h), `${what}: ${a.id} overlaps ${b.id}`);
+    }
+    const nl = netlist(normalizeDoc(doc), { modules });
+    const segs = doc.wires.flatMap(w => w.points.slice(1).map((q, i) => ({ p: w.points[i], q, net: nl.wireNet.get(w.id) })));
+    const span = (a, b, c, d) => Math.min(Math.max(a, b), Math.max(c, d)) - Math.max(Math.min(a, b), Math.min(c, d));
+    for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {
+      const s = segs[i], t = segs[j];
+      if (s.net === t.net) continue;
+      const along = s.p.y === s.q.y && t.p.y === t.q.y && s.p.y === t.p.y ? span(s.p.x, s.q.x, t.p.x, t.q.x) > 0
+        : s.p.x === s.q.x && t.p.x === t.q.x && s.p.x === t.p.x && span(s.p.y, s.q.y, t.p.y, t.q.y) > 0;
+      assert.ok(!along, `${what}: two nets' wires along each other at (${s.p.x},${s.p.y})-(${s.q.x},${s.q.y})`);
+    }
+  }
 });

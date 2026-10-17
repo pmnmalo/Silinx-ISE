@@ -6,6 +6,8 @@
 #   - GitHub Actions: every action of the workflows in one pull request
 # Sources pinned outside npm (Yosys's test designs, the design corpus, the MCC models): the monthly
 # .github/workflows/pins.yml (scripts/check-pins.mjs).
+# elkjs is no longer ignored (0.9 to 0.12 in #351): a 0.x minor update may change the schematic layout;
+# its pull request runs test/hdl-to-sch.test.js, which checks every example's Convert to Schematic.
 # A dependency update changes NOTICE / THIRD-PARTY-NOTICES when its licence or authors change (CLAUDE.md).
 version: 2
 updates:
@@ -25,9 +27,7 @@ updates:
       - dependency-name: codemirror
         update-types: [version-update:semver-major]
       # Express: on 5 since #350, its major updates no longer ignored
-      # elkjs above 0.9: the schematic layout changes (#351)
-      - dependency-name: elkjs
-        versions: ['>=0.10.0']
+      # elkjs: on 0.12 since #351, no longer ignored
   - package-ecosystem: github-actions
     directory: /
     schedule:

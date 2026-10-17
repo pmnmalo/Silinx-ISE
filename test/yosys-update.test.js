@@ -17,7 +17,7 @@ const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const SCRIPT = path.join(ROOT, 'scripts/yosys-update-report.mjs');
 
 test('yosys update: the version of @yowasp/yosys asked for and resolved; whether a pull request changes it', () => {
-  const pkg = { dependencies: { '@yowasp/yosys': '0.68.1207', elkjs: '^0.9.3' } };
+  const pkg = { dependencies: { '@yowasp/yosys': '0.68.1207', elkjs: '^0.12.0' } };
   const lock = { packages: { 'node_modules/@yowasp/yosys': { version: '0.68.1207' } } };
   assert.deepEqual(yosysVersion(pkg, lock), { spec: '0.68.1207', resolved: '0.68.1207' });
   assert.deepEqual(yosysVersion({}, {}), { spec: null, resolved: null });
@@ -216,7 +216,9 @@ test('yosys update: Dependabot weekly, npm grouped but for Yosys, the majors wit
   // Express 5 since #350: its majors are no longer ignored
   assert.match(npm, /# Express: on 5 since #350/);
   assert.ok(!/dependency-name: express/.test(npm));
-  assert.match(npm, /# elkjs above 0\.9.*\(#351\)\n\s+- dependency-name: elkjs\n\s+versions: \['>=0\.10\.0'\]/);
+  // elkjs no longer ignored (0.12, #351)
+  assert.ok(!/dependency-name: elkjs/.test(npm));
+  assert.match(read('.github/dependabot.yml'), /# elkjs is no longer ignored \(0\.9 to 0\.12 in #351\)/);
 });
 
 test('yosys update: CLAUDE.md says a "yosys update" pull request is never merged on green alone', () => {

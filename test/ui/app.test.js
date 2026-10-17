@@ -282,7 +282,8 @@ uiTest('About shows the version and the GitHub link', E, async (page) => {
   await page.click('.dlg-overlay .about-oss summary');
   const rows = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .about-components tr')].slice(1).map((r) => [...r.cells].map((c) => c.textContent).join('|')));
   assert.equal(rows.length, THIRD_PARTY.length);
-  assert.ok(rows.includes(`elkjs|${THIRD_PARTY.find((c) => c.name === 'elkjs').version}|EPL-2.0`), rows.join('\n'));
+  // elkjs 0.12: EPL-2.0 or GPL-3.0-or-later (#351)
+  assert.ok(rows.includes(`elkjs|${THIRD_PARTY.find((c) => c.name === 'elkjs').version}|EPL-2.0 OR GPL-3.0-or-later`), rows.join('\n'));
   assert.ok(rows.some((r) => /^codemirror\|[\d.]+\|MIT$/.test(r)));
   await page.key('Enter');
   await page.waitNoDialog();

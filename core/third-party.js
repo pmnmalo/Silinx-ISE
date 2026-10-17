@@ -116,8 +116,8 @@ export const THIRD_PARTY = [
   },
   {
     "name": "elkjs",
-    "version": "0.9.3",
-    "license": "EPL-2.0",
+    "version": "0.12.0",
+    "license": "EPL-2.0 OR GPL-3.0-or-later",
     "url": "https://github.com/kieler/elkjs",
     "standalone": true
   },

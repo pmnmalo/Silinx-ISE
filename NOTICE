@@ -19,7 +19,7 @@ of the covered work.
 
 It includes open-source components from other projects, each under its own licence:
 CodeMirror (MIT), Express and its dependencies (MIT, ISC, BSD-3-Clause), Yosys (YoWASP, ISC),
-a port of adepttool (MIT) and elkjs (Eclipse Public License 2.0; source code:
+a port of adepttool (MIT) and elkjs (Eclipse Public License 2.0, or GNU GPL 3.0 or later; source code:
 https://github.com/kieler/elkjs).
 Their licence texts are in THIRD-PARTY-NOTICES.md.
 
