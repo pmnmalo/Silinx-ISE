@@ -7,8 +7,10 @@ import {
   parseExpr, formatExpr, exprVars, exprColumn, canonical, minimize, minimalAst, gateCount, primeImplicants,
   cubeMinterms, kmapLayout, kmapRects, gray, newTable, normalizeTable, validateTable, reshapeTable, analyzeOutput,
   generateTableHdl, dontCaresInHdl, truthTableFromModule, schematicFromTable, schematicErrors, compareExpr, LogicError,
+  minimizeXor, exprCost, MAX_XOR_INPUTS,
 } from '../core/logic.js';
 import { generateHdl } from '../core/schdoc.js';
+import { compile, elaborate } from '../core/compile.js';
 
 // deterministic random numbers
 function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
@@ -507,5 +509,233 @@ test('gate schematic of a 6- and a 9-output table: netlist() without errors, sim
     const g = generateHdl(sch, { lang: opts.lang });
     const t = truthTableFromModule([{ path: `${doc.name}.${opts.lang === 'vhdl' ? 'vhd' : 'v'}`, text: g.code }], doc.name);
     for (const o of doc.outputs) assert.ok(careEqual(doc.table[o], t.table[o]), `${doc.name} ${JSON.stringify(opts)} ${o}: ${doc.table[o]} vs ${t.table[o]}`);
+  }
+});
+
+// ------------------------------------------------------------------ the / notation (#434)
+const strip = e => JSON.parse(JSON.stringify(e, (k, v) => (k === 'pos' ? undefined : v)));
+
+test('formats: the / notation (/a·b + c, /(a + b)) and its compact form (/ab + c); XNOR in VHDL / Verilog (#434)', () => {
+  const vars = ['a', 'b', 'c'];
+  const e = parseExpr("ab' + c(a+b)' + a^c", { vars });
+  assert.equal(formatExpr(e, 'slash'), 'a·/b + c·/(a + b) + a ⊕ c');
+  assert.equal(formatExpr(e, 'slash-compact'), 'a/b + c/(a + b) + a ⊕ c');
+  const f = parseExpr("a'b + c'", { vars });
+  assert.equal(formatExpr(f, 'slash'), '/a·b + /c');
+  assert.equal(formatExpr(f, 'slash-compact'), '/ab + /c');      // /ab is /a·b, as the input reads it
+  assert.equal(formatExpr(parseExpr("(ab)'·c", { vars }), 'slash'), '/(a·b)·c');
+  assert.equal(formatExpr(parseExpr("(ab)'·c", { vars }), 'slash-compact'), '/(ab)c');
+  assert.equal(formatExpr(parseExpr("a''", { vars }), 'slash'), '//a');
+  assert.equal(formatExpr(parseExpr('0'), 'slash'), '0');
+  assert.equal(formatExpr(parseExpr("a'·b'·c'", { vars }), 'slash-compact'), '/a/b/c');
+  // names of more than one letter: no juxtaposition
+  const v2 = ['x1', 'x2', 'en'];
+  assert.equal(formatExpr(parseExpr("x1' x2 + en'", { vars: v2 }), 'slash-compact'), '/x1·x2 + /en');
+  assert.equal(formatExpr(parseExpr("x1' x2 + en'", { vars: v2 }), 'slash'), '/x1·x2 + /en');
+  // XNOR: /(a ⊕ b); xnor / ~^ in HDL (two operands), not (…) for more
+  const xn = parseExpr('(a xnor b)(c ^~ a)', { vars });
+  assert.deepEqual(strip(xn), strip(parseExpr("(a ^ b)'·(c ⊕ a)'", { vars })));
+  assert.equal(formatExpr(xn, 'slash'), '/(a ⊕ b)·/(c ⊕ a)');
+  assert.equal(formatExpr(xn, 'slash-compact'), '/(a ⊕ b)/(c ⊕ a)');
+  assert.equal(formatExpr(xn, 'textbook'), "(a ⊕ b)'·(c ⊕ a)'");
+  assert.equal(formatExpr(xn, 'vhdl'), '(a xnor b) and (c xnor a)');
+  assert.equal(formatExpr(xn, 'verilog'), '(a ~^ b) & (c ~^ a)');
+  assert.equal(formatExpr(parseExpr('a ~^ b', { vars }), 'vhdl'), 'a xnor b');
+  assert.equal(formatExpr(parseExpr('/(a ^ b ^ c)', { vars }), 'vhdl'), 'not (a xor b xor c)');
+  assert.equal(formatExpr(parseExpr('/(a ^ b ^ c)', { vars }), 'verilog'), '~(a ^ b ^ c)');
+  // Verilog's ~^ and ^~ read as XNOR
+  for (const s of ['a ~^ b', 'a ^~ b', 'a^~b', 'a xnor b']) assert.equal(exprColumn(parseExpr(s, { vars }), vars), '11000011', s);
+  assert.throws(() => formatExpr(e, 'slashes'), /unknown notation 'slashes'/);
+});
+
+test('round trip: every expression the editor shows reads back as the same expression in the / notations (#434)', () => {
+  const r = rng(434);
+  const P = (s, vars) => parseExpr(s, { vars });
+  const asts = [];
+  for (let k = 0; k < 120; k++) {
+    const n = 1 + (k % 6), vars = k % 4 === 3 ? ['x1', 'en', 'b_2', 'q', 'y0', 'zz'].slice(0, n) : V(n);
+    const col = randCol(r, n, k % 3 ? 0.15 : 0);
+    const a = analyzeOutput({ ...newTable('t', vars, ['f']), table: { f: col } }, 'f');
+    asts.push([vars, a.sop.ast], [vars, a.pos.ast]);
+    if (a.xor) asts.push([vars, a.xor.ast]);
+    // the essential prime implicants and the K-map groups: one term (or clause) each
+    for (const res of [a.sop, a.pos]) for (const t of res.terms) asts.push([vars, minimalAst({ ...res, terms: [t] }, vars)]);
+  }
+  for (const [vars, ast] of asts) {
+    for (const N of ['slash', 'slash-compact']) assert.deepEqual(strip(P(formatExpr(ast, N), vars)), strip(ast), `${N}: ${formatExpr(ast, N)}`);
+    for (const N of ['textbook', 'compact', 'ascii']) assert.equal(exprColumn(P(formatExpr(ast, N), vars), vars), exprColumn(ast, vars), N);
+  }
+  assert.ok(asts.length > 500, `${asts.length} expressions`);
+});
+
+// ------------------------------------------------------------------ XOR / XNOR forms (#435)
+const colOf = (n, f) => Array.from({ length: 1 << n }, (_, r) => (f(r) ? '1' : '0')).join('');
+const parity = r => r.toString(2).split('1').length % 2 === 0;
+/** The XOR form of a column in the / notation (null: none), checked on the whole table. */
+const xorOf = (col, inputs) => {
+  const x = minimizeXor(col, inputs);
+  if (!x) return null;
+  assert.ok(careEqual(col, exprColumn(x.ast, inputs)), `${col}: ${formatExpr(x.ast, 'slash')}`);
+  assert.equal(x.exact, true, col);
+  return formatExpr(x.ast, 'slash');
+};
+
+test('XOR forms (#435): parity of 2–6 inputs, full adder, 2-bit comparator, Gray <-> binary, exact expressions', () => {
+  // parity: one XOR of every input, n literals and n - 1 operators (SOP: 2^(n-1) terms of n literals)
+  for (let n = 2; n <= 6; n++) {
+    const x = minimizeXor(colOf(n, parity), V(n));
+    assert.equal(formatExpr(x.ast, 'slash'), V(n).join(' ⊕ '));
+    assert.deepEqual([x.literals, x.ops, x.xor, x.and, x.or, x.exact], [n, n - 1, n - 1, 0, 0, true]);
+    assert.equal(xorOf(colOf(n, r => !parity(r)), V(n)), `/(${V(n).join(' ⊕ ')})`);    // even parity: XNOR
+  }
+  // full adder: sum and carry
+  const fa = ['a', 'b', 'cin'];
+  assert.equal(xorOf(colOf(3, parity), fa), 'a ⊕ b ⊕ cin');
+  const carry = minimizeXor('00010111', fa);
+  assert.deepEqual([formatExpr(carry.ast, 'slash'), formatExpr(carry.ast, 'textbook'), formatExpr(carry.ast, 'vhdl'), formatExpr(carry.ast, 'verilog')],
+    ['a·b + cin·(a ⊕ b)', 'a·b + cin·(a ⊕ b)', '(a and b) or (cin and (a xor b))', '(a & b) | (cin & (a ^ b))']);
+  assert.deepEqual([carry.literals, carry.ops, carry.xor, carry.and, carry.or], [5, 4, 1, 2, 1]);   // the SOP: 6 literals, 5 operators
+  // 2-bit equality comparator a1a0 = b1b0: two XNORs
+  const eq = ['a1', 'a0', 'b1', 'b0'];
+  const e = minimizeXor(colOf(4, r => r >> 2 === (r & 3)), eq);
+  assert.deepEqual([formatExpr(e.ast, 'slash'), formatExpr(e.ast, 'slash-compact'), formatExpr(e.ast, 'textbook'), formatExpr(e.ast, 'vhdl'), formatExpr(e.ast, 'verilog')],
+    ['/(a1 ⊕ b1)·/(a0 ⊕ b0)', '/(a1 ⊕ b1)·/(a0 ⊕ b0)', "(a1 ⊕ b1)'·(a0 ⊕ b0)'", '(a1 xnor b1) and (a0 xnor b0)', '(a1 ~^ b1) & (a0 ~^ b0)']);
+  assert.deepEqual([e.literals, e.ops], [4, 3]);
+  // Gray -> binary (4 bits): b_k = g3 ⊕ … ⊕ g_k; the MSB is a plain wire: no XOR form
+  const g2b = r => { let b = r; for (let s = r >> 1; s; s >>= 1) b ^= s; return b; };
+  const G = ['g3', 'g2', 'g1', 'g0'];
+  assert.deepEqual([3, 2, 1, 0].map(k => xorOf(colOf(4, r => (g2b(r) >> k) & 1), G)), [null, 'g3 ⊕ g2', 'g3 ⊕ g2 ⊕ g1', 'g3 ⊕ g2 ⊕ g1 ⊕ g0']);
+  // binary -> Gray: g_k = b_(k+1) ⊕ b_k
+  const B = ['b3', 'b2', 'b1', 'b0'];
+  assert.deepEqual([3, 2, 1, 0].map(k => xorOf(colOf(4, r => ((r ^ (r >> 1)) >> k) & 1), B)), [null, 'b3 ⊕ b2', 'b2 ⊕ b1', 'b1 ⊕ b0']);
+  // a variable XOR a product: a ⊕ b·c (SOP a·/b + a·/c + /a·b·c, 7 literals)
+  assert.equal(xorOf('00011110', V(3)), 'a ⊕ b·c');
+  assert.equal(xorOf('01100000', V(3)), '/a·(b ⊕ c)');
+});
+
+test("XOR forms (#435): don't cares used; none when it is not simpler than the SOP and POS; none above 6 inputs", () => {
+  // f = Σm(1, 2) + d(5, 6): with the don't cares b ⊕ c (without: /a·(b ⊕ c))
+  assert.equal(xorOf('01100XX0', V(3)), 'b ⊕ c');
+  assert.equal(xorOf('X1100XX0', V(3)), 'b ⊕ c');
+  assert.equal(xorOf('1001X00X', V(3)), '/(b ⊕ c)');
+  // XOR does not help (a·b + c, a, a + b + c, a·b·c, /a·/b…): no XOR form
+  for (const col of ['01010111', '00001111', '01111111', '00000001', '11000000', '0X0X0111']) assert.equal(minimizeXor(col, V(3)), null, col);
+  assert.equal(minimizeXor('0101', V(2)), null);
+  // constant columns, one input, more than MAX_XOR_INPUTS inputs: none
+  for (const col of ['00000000', '11111111', 'XXXXXXXX', '1X1X1X1X']) assert.equal(minimizeXor(col, V(3)), null, col);
+  assert.equal(minimizeXor('01', ['a']), null);
+  assert.equal(MAX_XOR_INPUTS, 6);
+  const seven = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+  assert.equal(minimizeXor(colOf(7, parity), seven), null);
+  // analyzeOutput: the XOR form only when it is cheaper
+  const fa = { ...newTable('fa', ['a', 'b', 'cin'], ['s', 'cout', 'x']), table: { s: colOf(3, parity), cout: '00010111', x: '01010111' } };
+  assert.equal(formatExpr(analyzeOutput(fa, 's').xor.ast, 'slash'), 'a ⊕ b ⊕ cin');
+  assert.equal(formatExpr(analyzeOutput(fa, 'cout').xor.ast, 'slash'), 'a·b + cin·(a ⊕ b)');
+  assert.equal(analyzeOutput(fa, 'x').xor, null);
+  assert.equal(analyzeOutput({ ...newTable('p7', seven, ['p']), table: { p: colOf(7, parity) } }, 'p', { maxNodes: 50000 }).xor, null);
+  // the cost: literals, then two-input operators (NOT free)
+  assert.deepEqual(exprCost(parseExpr("/(a ^ b)·c' + a", { vars: V(3) })), { literals: 4, xor: 1, and: 1, or: 1, ops: 3 });
+});
+
+test('XOR forms (#435): random functions of 2–6 inputs with don\'t cares: equivalent to the table, cheaper than the SOP and POS, quick', () => {
+  const r = rng(435);
+  const cost = e => { const c = exprCost(e); return c.literals * 1024 + c.ops; };
+  let found = 0, worst = 0;
+  for (let k = 0; k < 80; k++) {
+    const n = 2 + (k % 5), vars = V(n);
+    const col = randCol(r, n, [0, 0.1, 0.3][k % 3]);
+    const sop = minimalAst(minimize(col, n), vars), pos = minimalAst(minimize(col, n, { form: 'pos' }), vars);
+    const t0 = performance.now();
+    const x = minimizeXor(col, vars);
+    worst = Math.max(worst, performance.now() - t0);
+    if (!x) continue;
+    found++;
+    assert.ok(careEqual(col, exprColumn(x.ast, vars)), `${col}: ${formatExpr(x.ast, 'slash')}`);
+    assert.ok(cost(x.ast) < cost(sop) && cost(x.ast) < cost(pos), `${col}: ${formatExpr(x.ast, 'slash')} vs ${formatExpr(sop, 'slash')}`);
+    assert.deepEqual(strip(parseExpr(formatExpr(x.ast, 'slash'), { vars })), strip(x.ast));
+    // the same table, the same form
+    assert.deepEqual(minimizeXor(col, vars, { timeMs: Infinity }).ast, x.ast);
+  }
+  assert.ok(found > 30, `${found} XOR forms`);
+  assert.ok(worst < 1000, `${worst} ms`);
+});
+
+test("HDL with the XOR form (#435): form 'xor' uses it where it is simpler, else the minimal SOP; exact VHDL and Verilog, no warnings, simulates to the table", () => {
+  const doc = { ...SIX(), form: 'xor' };
+  assert.equal(normalizeTable(doc).form, 'xor');
+  assert.equal(normalizeTable({ ...doc, form: 'esop' }).form, 'sop');
+  const vhd = generateTableHdl(doc, 'vhdl');
+  assert.equal(vhd.code.slice(vhd.code.indexOf('-- y0 =')), `-- y0 = Σm(7)
+-- y0 = a·b·c   (minimal SOP, 3 literal(s))
+-- y1 = Σm(1, 2, 3, 4, 5, 6, 7)
+-- y1 = c + b + a   (minimal SOP, 3 literal(s))
+-- y2 = Σm(1, 2, 4, 7)
+-- y2 = a ⊕ b ⊕ c   (XOR form, 3 literal(s))
+-- y3 = Σm(3, 5, 6, 7)
+-- y3 = a·b + c·(a ⊕ b)   (XOR form, 5 literal(s))
+-- y4 = Σm(0, 2)
+-- y4 = a'·c'   (minimal SOP, 2 literal(s))
+-- y5 = Σm(0, 6) + d(1, 3, 5, 7)
+-- y5 = (a ⊕ b)'   (XOR form, 2 literal(s))
+-- don't care: y5 = d(1, 3, 5, 7)
+
+library ieee;
+use ieee.std_logic_1164.all;
+
+entity six is
+    port (
+        a, b, c : in  std_logic;
+        y0, y1, y2, y3, y4, y5 : out std_logic
+    );
+end six;
+
+architecture truth_table of six is
+begin
+    y0 <= a and b and c;
+    y1 <= c or b or a;
+    y2 <= a xor b xor c;
+    y3 <= (a and b) or (c and (a xor b));
+    y4 <= not a and not c;
+    y5 <= a xnor b;
+end truth_table;
+`);
+  const v = generateTableHdl(doc, 'verilog');
+  assert.equal(v.code.slice(v.code.indexOf('module six')), `module six (
+    input  wire a, b, c,
+    output wire y0, y1, y2, y3, y4, y5
+);
+
+    assign y0 = a & b & c;
+    assign y1 = c | b | a;
+    assign y2 = a ^ b ^ c;
+    assign y3 = (a & b) | (c & (a ^ b));
+    assign y4 = ~a & ~c;
+    assign y5 = a ~^ b;
+
+endmodule
+`);
+  for (const g of [vhd, v]) {
+    // compiles and elaborates with no errors and no warnings
+    const lib = compile([{ path: g.filename, text: g.code }]);
+    assert.deepEqual([...lib.errors, ...elaborate(lib, 'six').diags].map(d => `${d.severity}: ${d.message}`), []);
+    const t = truthTableFromModule([{ path: g.filename, text: g.code }], 'six');
+    assert.deepEqual(t.warnings, []);
+    for (const o of doc.outputs) assert.ok(careEqual(doc.table[o], t.table[o]), `${g.lang} ${o}`);
+    assert.deepEqual(dontCaresInHdl(g.code), { y5: [1, 3, 5, 7] });
+  }
+  // the default (SOP) is unchanged: no XOR in the module
+  assert.doesNotMatch(generateTableHdl(SIX(), 'vhdl').code, /xor|xnor|⊕/);
+  // random tables of 2–6 inputs with form 'xor': simulate to the table in both languages
+  const r = rng(4350);
+  for (let k = 0; k < 10; k++) {
+    const n = 2 + (k % 5), outs = ['y', 'z'];
+    const d = { ...newTable(`x${k}`, V(n), outs), form: 'xor' };
+    d.table.y = randCol(r, n, 0.2); d.table.z = colOf(n, parity);
+    for (const lang of ['vhdl', 'verilog']) {
+      const g = generateTableHdl(d, lang);
+      assert.match(g.code, lang === 'vhdl' ? /z <= a xor b/ : /assign z = a \^ b/);
+      const t = truthTableFromModule([{ path: g.filename, text: g.code }], d.name);
+      for (const o of outs) assert.ok(careEqual(d.table[o], t.table[o]), `${lang} ${o}: ${d.table[o]} vs ${t.table[o]}`);
+    }
   }
 });

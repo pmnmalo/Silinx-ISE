@@ -485,6 +485,12 @@ test('regression: generated HDL (ASM charts, ISE schematics, truth tables, Modul
     t.table.f = '00010111';
     const tt = generateTableHdl(t, lang);
     out.push(...lintProject([{ path: tt.filename, text: tt.code }], ['maj']));
+    // a table's module with the XOR form (#435): xor, xnor / ^, ~^
+    const fa = { ...newTable('fa', ['a', 'b', 'c'], ['s', 'co', 'e']), form: 'xor' };
+    Object.assign(fa.table, { s: '01101001', co: '00010111', e: '11000011' });
+    const fx = generateTableHdl(fa, lang);
+    assert.match(fx.code, lang === 'vhdl' ? /e <= a xnor b;/ : /assign e = a ~\^ b;/);
+    out.push(...lintProject([{ path: fx.filename, text: fx.code }], ['fa']));
     const ports = [{ name: 'clk', dir: 'in' }, { name: 'rst', dir: 'in' }, { name: 'd', dir: 'in', width: 4 }, { name: 'q', dir: 'out', width: 4 }];
     for (const kind of ['comb', 'seq']) for (const mode of ['none', 'sync', 'async']) {
       const g = generateModule({ lang, name: 'm1', kind, ports, clock: 'clk', reset: { port: 'rst', mode, active: '1' } });

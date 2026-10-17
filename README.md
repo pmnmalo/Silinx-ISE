@@ -171,8 +171,15 @@ for Xilinx FPGAs supported by ISE 14.7.
   (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
   Σm / ΠM canonical forms; minimal SOP and POS (Quine–McCluskey + exact cover, don't cares used,
   essential prime implicants marked, "several minimal solutions" noted) with literal and gate
-  counts; and *Check my answer*, which compares the student's own expression with the table and
-  lists the rows that differ. The table always has its HDL module, made with it in the project's
+  counts; the *XOR form* when it is simpler than both (fewer literals, or as many and fewer
+  two-input operators): `a ⊕ b ⊕ c`, a full adder's carry `a·b + c·(a ⊕ b)`, a comparator's
+  `/(a1 ⊕ b1)·/(a0 ⊕ b0)`, `a ⊕ b·c` (sums of products of literals and XOR / XNOR factors, or a
+  variable XOR one; up to 6 inputs, don't cares used, checked on the whole table); and *Check my
+  answer*, which compares the student's own expression with the table and lists the rows that
+  differ. The expressions are written with `/` as NOT (`/a·b + c`, `/(a + b)`), or, chosen, as
+  `/ab + c`, `a·b' + c`, `ab' + c`, VHDL or Verilog; each reads back as typed. *HDL logic* picks the
+  module's logic: the minimal SOP, POS, or the XOR form where it is simpler (`xor` / `xnor`, `^` /
+  `~^`). The table always has its HDL module, made with it in the project's
   preferred language, kept in sync with the table both ways (like ASM charts: editing the table
   rewrites it; editing and saving the HDL updates the table by exhaustive simulation, don't cares
   kept in its comments; a module that no longer fits — sequential, too many inputs — shows the

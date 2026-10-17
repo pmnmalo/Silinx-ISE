@@ -2,7 +2,8 @@
 // number: the table scrolls, one output at a time in the tabs) are named in the toolbar; the truth table is edited by clicking its output cells (0 → 1 → X) or by
 // typing an expression per output. For the selected output: Karnaugh map with the groups of the
 // minimal SOP (1s) or POS (0s), canonical forms Σm / ΠM, minimal SOP and POS with their literal and
-// gate counts, and a check of the student's own expression. Tables read from a module may have up
+// gate counts, the XOR form when it is cheaper (#435), and a check of the student's own expression.
+// The expressions are written in the notation chosen, by default with / as NOT (/a·b + c, #434). Tables read from a module may have up
 // to 8 inputs (no Karnaugh map then). Logic: core/logic.js. The table always has its HDL module, in
 // its language (the project's preferred one), generated from it by the host (app.js), which keeps
 // both in sync.
@@ -19,7 +20,7 @@ import {
 
 const NEXT = { 0: '1', 1: 'X', X: '0' };
 const COLORS = ['#d62728', '#1f77b4', '#2ca02c', '#9467bd', '#ff7f0e', '#17becf', '#e377c2', '#8c564b', '#bcbd22', '#7f7f7f'];
-const NOTATIONS = [['textbook', 'a·b\' + c'], ['compact', 'ab\' + c'], ['vhdl', 'VHDL'], ['verilog', 'Verilog']];
+const NOTATIONS = [['slash', '/a·b + c'], ['slash-compact', '/ab + c'], ['textbook', 'a·b\' + c'], ['compact', 'ab\' + c'], ['vhdl', 'VHDL'], ['verilog', 'Verilog']];
 const SVGNS = 'http://www.w3.org/2000/svg';
 const sv = (tag, attrs = {}, ...kids) => {
   const el = document.createElementNS(SVGNS, tag);
@@ -33,7 +34,7 @@ export function mountTtEditor(container, opts = {}) {
   let M = normalizeTable(opts.model);
   let out = M.outputs[0];
   let groups = 'sop';            // groups drawn on the K-map: 'sop' (1s) or 'pos' (0s)
-  let notation = 'textbook';
+  let notation = 'slash';         // of the expressions shown (#434)
   let mine = '';                 // the student's expression for the selected output
   let nand = false;
   let destroyed = false;
@@ -82,7 +83,7 @@ export function mountTtEditor(container, opts = {}) {
     el.addEventListener('change', applyShape);
   }
   const formSel = h('select', { class: 'tt-form', title: 'Form of the logic in the generated HDL module', onchange: () => { M.form = formSel.value; changed(); } },
-    h('option', { value: 'sop' }, 'Minimal SOP'), h('option', { value: 'pos' }, 'Minimal POS'));
+    h('option', { value: 'sop' }, 'Minimal SOP'), h('option', { value: 'pos' }, 'Minimal POS'), h('option', { value: 'xor' }, 'XOR form (when simpler)'));
   const nandBox = h('input', { type: 'checkbox', class: 'tt-nand', onchange: () => { nand = nandBox.checked; } });
   const btn = (label, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, title, onclick }, label);
   const link = h('span', { class: 'tt-link' });
@@ -106,7 +107,7 @@ export function mountTtEditor(container, opts = {}) {
   notes.addEventListener('input', () => { M.notes = notes.value; opts.onChange?.(M); clearTimeout(notesT); notesT = setTimeout(snap, 600); });
   const left = h('div', { class: 'tt-left' }, h('div', { class: 'tt-caption' }, 'Truth table'), h('div', { class: 'hint' }, 'Click an output cell to change it: 0 → 1 → X (don\'t care).'), tableHost, h('div', { class: 'tt-caption' }, 'Notes'), notes);
   const tabs = h('div', { class: 'tt-tabs' });
-  const exprIn = h('input', { type: 'text', class: 'tt-expr-in', spellcheck: 'false', placeholder: "e.g. a'b + c" });
+  const exprIn = h('input', { type: 'text', class: 'tt-expr-in', spellcheck: 'false', placeholder: 'e.g. /a·b + c' });
   const exprErr = h('div', { class: 'tt-err tt-expr-err' });
   const applyExpr = () => {
     const text = exprIn.value.trim();
@@ -121,12 +122,12 @@ export function mountTtEditor(container, opts = {}) {
   exprIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyExpr(); } });
   const exprLbl = h('span', { class: 'tt-expr-lbl' });
   const exprRow = h('div', { class: 'tt-row' }, exprLbl, exprIn, btn('Fill Table', 'Fill the column of this output from the expression', applyExpr));
-  const OPS = "Operators: ' / ~ (NOT), · . * (AND), ^ or xor (XOR), + (OR)";
+  const OPS = "Operators: / ' ~ (NOT), · . * (AND), ⊕ ^ or xor (XOR), xnor, + (OR)";
   exprIn.title = OPS;
   const kmapHost = h('div', { class: 'tt-kmap-host' });
   const grpSel = h('div', { class: 'tt-groups' });
   const results = h('div', { class: 'tt-results' });
-  const mineIn = h('input', { type: 'text', class: 'tt-mine-in', spellcheck: 'false', placeholder: 'type your answer, e.g. a\'c + b' });
+  const mineIn = h('input', { type: 'text', class: 'tt-mine-in', spellcheck: 'false', placeholder: 'type your answer, e.g. /a·c + b' });
   const mineOut = h('div', { class: 'tt-mine-out' });
   let mineT = null;
   mineIn.addEventListener('input', () => { mine = mineIn.value; clearTimeout(mineT); mineT = setTimeout(() => { renderTable(); renderMine(); }, 250); });
@@ -247,7 +248,7 @@ export function mountTtEditor(container, opts = {}) {
     const leg = h('div', { class: 'tt-legend' });
     res.terms.forEach((t, ti) => {
       const one = { ...res, terms: [t] };
-      const text = formatExpr(groups === 'pos' ? clauseAst(one) : termAst(one), notation === 'vhdl' || notation === 'verilog' ? notation : 'textbook');
+      const text = formatExpr(groups === 'pos' ? clauseAst(one) : termAst(one), notation);
       leg.append(h('div', { class: 'tt-leg' }, h('span', { class: 'tt-swatch', style: { borderColor: COLORS[ti % COLORS.length], background: `${COLORS[ti % COLORS.length]}22` } }), h('code', { 'data-no-i18n': '' }, text),
         h('span', { class: 'tt-leg-cells' }, ` ${groups === 'pos' ? 'M' : 'm'}(${t.minterms.join(', ')})`), t.essential ? h('span', { class: 'tt-ess' }, ' essential') : null));
     });
@@ -272,13 +273,20 @@ export function mountTtEditor(container, opts = {}) {
         ...note);
     };
     const ess = A.sop.essential;
+    // the XOR form, when cheaper than both (#435)
+    const x = A.xor;
+    const xorForm = x && h('div', { class: 'tt-res tt-xor', title: 'Shown when it has fewer literals than the minimal SOP and POS, or as many and fewer operators' },
+      h('div', {}, h('b', {}, 'XOR form'), ': ', h('code', { class: 'tt-expr', 'data-no-i18n': '' }, `${out} = ${formatExpr(x.ast, notation)}`)),
+      h('div', { class: 'tt-cost' }, `${x.literals} literal(s), ${x.ops} two-input operator(s): ${x.xor} XOR / XNOR, ${x.and} AND, ${x.or} OR`),
+      x.exact ? null : h('span', { class: 'tt-note' }, 'The search was cut short: a simpler XOR form may exist.'));
     results.append(
       h('div', { class: 'tt-row' }, h('label', {}, 'Notation:'), nsel),
       h('div', { class: 'tt-res tt-canon' }, h('b', {}, 'Canonical forms'), ': ', h('code', { 'data-no-i18n': '' }, `${out} = ${A.sigma}`), h('br'), h('code', { 'data-no-i18n': '', style: { marginLeft: '0' } }, `${out} = ${A.pi}`)),
       form('Minimal SOP', A.sop, 'tt-sop'),
       form('Minimal POS', A.pos, 'tt-pos'),
+      ...(xorForm ? [xorForm] : []),
       h('div', { class: 'tt-res tt-ess-list' }, h('b', {}, 'Essential prime implicants (SOP)'), ': ',
-        h('code', { 'data-no-i18n': '' }, ess.length ? ess.map(t => formatExpr(termAst({ terms: [t] }), notation === 'vhdl' || notation === 'verilog' ? notation : 'textbook')).join(', ') : '—'),
+        h('code', { 'data-no-i18n': '' }, ess.length ? ess.map(t => formatExpr(termAst({ terms: [t] }), notation)).join(', ') : '—'),
         h('span', { class: 'tt-cost' }, ` (${A.sop.primes.length} prime implicant(s))`)));
   }
 

@@ -11,7 +11,9 @@
 //
 // Truth table documents (<name>.tt.json):
 //   { version: 1, name, inputs: ['a', 'b'], outputs: ['f'], table: { f: '0110' }, exprs: { f: 'a^b' },
-//     notes: '', form: 'sop'|'pos', lang: 'vhdl'|'verilog', generatedFile?: 'src/name.vhd' }
+//     notes: '', form: 'sop'|'pos'|'xor', lang: 'vhdl'|'verilog', generatedFile?: 'src/name.vhd' }
+//   form: the logic of the generated HDL module: the minimal SOP, POS, or the XOR form of each output
+//   where it is cheaper than both (#435), else its minimal SOP.
 
 import { newDoc, symbolDef, symbolPins, symbolBox, netlist } from './schdoc.js';
 import { compile, elaborate, simulate } from './compile.js';
@@ -52,6 +54,8 @@ function tokenize(src) {
     }
     if (/[0-9]/.test(c)) throw new LogicError(`'${/^[0-9]+/.exec(s.slice(i))[0]}' is not a constant (only 0 and 1)`, pos);
     if (c === "'" || c === '’' || c === '′') { toks.push({ k: 'post', pos, text: c }); i++; continue; }
+    // Verilog's XNOR ~^ and ^~ (a^~b, the same function, reads as XNOR too)
+    if ((c === '~' && s[i + 1] === '^') || (c === '^' && s[i + 1] === '~')) { toks.push({ k: 'xnor', pos, text: c + s[i + 1] }); i += 2; continue; }
     if (c === '~' || c === '!' || c === '¬' || c === '/') { toks.push({ k: 'not', pos, text: c }); i++; continue; }
     if (c === '·' || c === '*' || c === '&' || c === '∧' || c === '.' || c === '⋅') { toks.push({ k: 'and', pos, text: c }); i += (c === '&' && s[i + 1] === '&') ? 2 : 1; continue; }
     if (c === '+' || c === '|' || c === '∨') { toks.push({ k: 'or', pos, text: c }); i += (c === '|' && s[i + 1] === '|') ? 2 : 1; continue; }
@@ -68,7 +72,7 @@ function tokenize(src) {
  * the declared spelling is kept); when every variable is a single letter, a run of letters such
  * as ab'c is read as a product (a·b'·c). Without opts.vars any identifier is a variable.
  * Operators: NOT postfix ' or prefix ~ ! / not; AND · . * & and (or juxtaposition: a b, a(b+c));
- * XOR ^ xor; OR + | or; also nand nor xnor. Precedence: NOT > AND > XOR > OR.
+ * XOR ^ ⊕ xor; OR + | or; also nand nor xnor (~^ ^~). Precedence: NOT > AND > XOR > OR.
  * '/' is the bar over one letter ("A barrado", /A): it negates only the next variable, also in a run
  * of letters (/ab = a'·b, //ab = a·b); /(ab) negates the product. ~ab and !ab negate the product.
  * Constants are only 0 and 1 (no decimal point: '.' is always AND).
@@ -201,36 +205,52 @@ export function exprColumn(ast, inputs) {
 
 /**
  * Text of an expression. notation:
+ *   'slash'    /a·b + c (the editor's default: NOT is a prefix /, a negated group /(a + b))
+ *   'slash-compact' /ab + c (juxtaposition when every name is one letter; /ab is /a·b, as typed)
  *   'textbook' a·b' + c   'compact' ab' + c (juxtaposition when every name is one letter)
  *   'ascii'    a*b' + c   'vhdl' (a and not b) or c   'verilog' (a & ~b) | c
+ * XOR is ⊕ (ascii ^, vhdl xor, verilog ^); the XNOR of two operands is xnor / ~^ in VHDL / Verilog.
+ * parseExpr reads the / notations back as the same expression (the editor's expressions: tested),
+ * 'textbook', 'compact' and 'ascii' as the same function.
  */
 export function formatExpr(e, notation = 'textbook') {
   const N = notation;
   const allSingle = exprVars(e).every(v => v.length === 1);
-  const compact = N === 'compact' && allSingle;
+  const juxt = (N === 'compact' || N === 'slash-compact') && allSingle;
   const sym = {
+    slash: { and: '·', or: ' + ', xor: ' ⊕ ', c0: '0', c1: '1' },
+    'slash-compact': { and: juxt ? '' : '·', or: ' + ', xor: ' ⊕ ', c0: '0', c1: '1' },
     textbook: { and: '·', or: ' + ', xor: ' ⊕ ', c0: '0', c1: '1' },
-    compact: { and: compact ? '' : '·', or: ' + ', xor: ' ⊕ ', c0: '0', c1: '1' },
+    compact: { and: juxt ? '' : '·', or: ' + ', xor: ' ⊕ ', c0: '0', c1: '1' },
     ascii: { and: '*', or: ' + ', xor: ' ^ ', c0: '0', c1: '1' },
     vhdl: { and: ' and ', or: ' or ', xor: ' xor ', c0: "'0'", c1: "'1'" },
     verilog: { and: ' & ', or: ' | ', xor: ' ^ ', c0: "1'b0", c1: "1'b1" },
   }[N];
   if (!sym) throw new Error(`unknown notation '${N}'`);
+  const hdl = N === 'vhdl' || N === 'verilog';
   const prec = { or: 1, xor: 2, and: 3 };
+  const atom = x => x.t === 'var' || x.t === 'const';
   const f = (x, parentOp) => {
     switch (x.t) {
       case 'const': return x.v ? sym.c1 : sym.c0;
       case 'var': return x.name;
       case 'not': {
-        if (N === 'vhdl') return x.a.t === 'var' || x.a.t === 'const' ? `not ${f(x.a)}` : `not (${f(x.a)})`;
-        if (N === 'verilog') return x.a.t === 'var' || x.a.t === 'const' ? `~${f(x.a)}` : `~(${f(x.a)})`;
-        return x.a.t === 'var' || x.a.t === 'const' || x.a.t === 'not' ? `${f(x.a)}'` : `(${f(x.a)})'`;
+        // XNOR of two operands: a xnor b, a ~^ b
+        if (hdl && x.a.t === 'xor' && x.a.args.length === 2) {
+          const s = x.a.args.map(a => f(a, 'xor')).join(N === 'vhdl' ? ' xnor ' : ' ~^ ');
+          return parentOp ? `(${s})` : s;
+        }
+        if (N === 'vhdl') return atom(x.a) ? `not ${f(x.a)}` : `not (${f(x.a)})`;
+        if (N === 'verilog') return atom(x.a) ? `~${f(x.a)}` : `~(${f(x.a)})`;
+        // the bar over a letter, /a; over a group, /(a + b)
+        if (N === 'slash' || N === 'slash-compact') return atom(x.a) || x.a.t === 'not' ? `/${f(x.a)}` : `/(${f(x.a)})`;
+        return atom(x.a) || x.a.t === 'not' ? `${f(x.a)}'` : `(${f(x.a)})'`;
       }
       default: {
         const s = x.args.map(a => f(a, x.t)).join(sym[x.t]);
         // HDL: parentheses around every nested operation (VHDL requires them between different
         // operators); textbook: only when the operator binds less tightly than its parent
-        const need = parentOp && (N === 'vhdl' || N === 'verilog' ? true : prec[x.t] < prec[parentOp]);
+        const need = parentOp && (hdl ? true : prec[x.t] < prec[parentOp]);
         return need ? `(${s})` : s;
       }
     }
@@ -429,6 +449,193 @@ export function gateCount(res) {
   return g;
 }
 
+// ===================================================================== XOR / XNOR forms (#435)
+// Many functions are much simpler with XOR / XNOR (parity, adders, comparators, Gray code). The
+// XOR form of a column is the cheapest expression of these two shapes, when it is strictly cheaper
+// than both the minimal SOP and the minimal POS:
+//   * a sum of XOR products: an OR of terms, each a product (AND) of literals and XOR / XNOR
+//     factors of two or more variables, every variable at most once in a term:
+//     a ⊕ b ⊕ c,  a·b + c·(a ⊕ b),  /(a1 ⊕ b1)·/(a0 ⊕ b0); a plain SOP is one of them;
+//   * a variable XOR such a sum: a ⊕ b·c.
+// Cost: the literals (variable occurrences) first, then the two-input operators (an n-input gate is
+// n − 1 of them; NOT is free, as in the literal count of the SOP / POS, and XNOR is an XOR).
+// The terms of n ≤ MAX_XOR_INPUTS variables are all enumerated (7107 for 6 inputs); for a column the
+// terms within its 1s and don't cares are kept (the dominated ones dropped) and the cheapest cover of
+// its 1s is found by branch and bound, bounded by a node budget (and 250 ms, a safety net on slow
+// machines): when cut short, the result is the best found, `exact` false. The result is checked
+// against the whole table. 2–6 inputs: a few ms, at most about 40 ms (random 6-input functions);
+// more inputs: no XOR form. (No general XOR of products (ESOP) is searched: only x ⊕ (…).)
+export const MAX_XOR_INPUTS = 6;
+const XOR_LIT = 1024;     // cost of a term or an expression as one number: literals · 1024 + operators
+const xorTermsCache = new Map();
+const setHas = (s, r) => (s[r >> 5] >>> (r & 31)) & 1;
+const setOf = (n, pred) => { const s = new Uint32Array(Math.max(1, (1 << n) >> 5)); for (let r = 0; r < 1 << n; r++) if (pred(r)) s[r >> 5] |= 1 << (r & 31); return s; };
+const setAnd = (a, b) => a.map((x, i) => x & b[i]);
+const setEmpty = a => a.every(x => x === 0);
+const setSub = (a, b) => a.every((x, i) => (x & ~b[i]) === 0);
+const setCount = a => a.reduce((k, x) => k + popcount(x), 0);
+
+// every term of n variables: { lits: [{ v, neg }], groups: [{ vars, odd }], nlits, ops, cost, set }
+function xorTerms(n) {
+  if (xorTermsCache.has(n)) return xorTermsCache.get(n);
+  const out = [];
+  const role = new Array(n);     // -1 absent, -2 positive literal, -3 negated literal, k ≥ 0: in group k
+  const bit = (r, j) => (r >> (n - 1 - j)) & 1;
+  const emit = groups => {
+    if (groups.some(g => g.length < 2)) return;
+    for (let par = 0; par < 1 << groups.length; par++) {
+      const lits = [];
+      for (let j = 0; j < n; j++) if (role[j] === -2 || role[j] === -3) lits.push({ v: j, neg: role[j] === -3 });
+      const gs = groups.map((vars, k) => ({ vars: [...vars], odd: !!((par >> k) & 1) }));
+      const nl = lits.length + gs.reduce((s, g) => s + g.vars.length, 0);
+      if (!nl) continue;
+      const ops = gs.reduce((s, g) => s + g.vars.length - 1, 0) + lits.length + gs.length - 1;
+      const set = setOf(n, r => lits.every(l => bit(r, l.v) === (l.neg ? 0 : 1)) && gs.every(g => g.vars.reduce((x, v) => x ^ bit(r, v), 0) === (g.odd ? 1 : 0)));
+      // order of equally cheap terms: by variable, a literal before an XOR factor before nothing (ab before bc)
+      const key = Array.from({ length: n }, (_, j) => (role[j] === -2 ? 'a' : role[j] === -3 ? 'b' : role[j] === -1 ? 'z' : `c${role[j]}`)).join('');
+      out.push({ lits, groups: gs, nlits: nl, ops, cost: nl * XOR_LIT + ops + 1, set, key });
+    }
+  };
+  const walk = (j, groups) => {
+    if (j === n) { emit(groups); return; }
+    // (the first variables in XOR factors first: of equal covers, a·b + c·(a ⊕ b) is found)
+    for (let k = 0; k <= groups.length; k++) {
+      role[j] = k;
+      const g = groups.map(x => [...x]);
+      if (k === groups.length) g.push([]);
+      g[k].push(j);
+      walk(j + 1, g);
+    }
+    for (const r of [-2, -3, -1]) { role[j] = r; walk(j + 1, groups); }
+  };
+  walk(0, []);
+  xorTermsCache.set(n, out);
+  return out;
+}
+
+const termOrder = (a, b) => a.cost - b.cost || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+const solKey = cs => cs.map(c => c.t).sort(termOrder).map(t => t.key).join('|');
+
+// cheapest OR of XOR products covering `on`, within `allowed` (1s and don't cares), of cost < bound
+function xorCover(n, on, allowed, bound, budget) {
+  const cand = xorTerms(n).filter(t => setSub(t.set, allowed) && !setEmpty(setAnd(t.set, on)))
+    .map((t, i) => ({ t, i, cov: setAnd(t.set, on) }));
+  cand.forEach(c => { c.k = setCount(c.cov); });
+  // drop a term when another as cheap covers all its 1s (of equal ones, the larger, then the first, kept)
+  cand.sort((a, b) => b.k - a.k || a.t.cost - b.t.cost || a.i - b.i);
+  const keep = [];
+  for (const c of cand) if (!keep.some(d => d.t.cost <= c.t.cost && setSub(c.cov, d.cov))) keep.push(c);
+  keep.sort((a, b) => a.t.cost - b.t.cost || b.k - a.k || a.i - b.i);
+  // the 1s numbered 0..R-1; each term: the 1s it covers
+  const rows = []; for (let r = 0; r < 1 << n; r++) if (setHas(on, r)) rows.push(r);
+  keep.forEach((c, i) => { c.id = i; c.rows = []; rows.forEach((r, k) => { if (setHas(c.cov, r)) c.rows.push(k); }); });
+  const coverers = rows.map((_, k) => keep.filter(c => c.rows.includes(k)));
+  const covered = new Int32Array(rows.length);
+  const blocked = new Int32Array(keep.length);
+  let best = bound, bestSol = null, bestKey = '', nodes = 0, exact = true, stamp = 0;
+  const chosen = [];
+  const lowerBound = () => {
+    // uncovered 1s no term covers two of: each needs a term of its own
+    stamp++;
+    let lb = 0;
+    for (let k = 0; k < rows.length; k++) {
+      if (covered[k]) continue;
+      const cs = coverers[k];
+      if (cs.some(c => blocked[c.id] === stamp)) continue;
+      lb += cs[0].t.cost; for (const c of cs) blocked[c.id] = stamp;
+    }
+    return lb;
+  };
+  const search = cost => {
+    if (++nodes > budget.nodes || ((nodes & 255) === 0 && Date.now() > budget.until)) { exact = false; return; }
+    let pick = -1;
+    for (let k = 0; k < rows.length; k++) if (!covered[k] && (pick < 0 || coverers[k].length < coverers[pick].length)) pick = k;
+    if (pick < 0) {
+      // of the cheapest covers, the first in the order of their terms
+      const key = solKey(chosen);
+      if (cost - 1 < best || (bestSol && cost - 1 === best && key < bestKey)) { best = cost - 1; bestSol = [...chosen]; bestKey = key; }
+      return;
+    }
+    const over = x => (bestSol ? x > best : x >= best);
+    if (over(cost - 1 + lowerBound())) return;
+    for (const c of coverers[pick]) {
+      if (over(cost + c.t.cost - 1)) continue;
+      chosen.push(c);
+      for (const k of c.rows) covered[k]++;
+      search(cost + c.t.cost);
+      for (const k of c.rows) covered[k]--;
+      chosen.pop();
+      if (!exact) return;
+    }
+  };
+  search(0);
+  budget.nodes -= Math.min(nodes, budget.nodes);
+  if (!exact) budget.cut = true;
+  if (!bestSol) return null;
+  return { terms: bestSol.map(c => c.t), cost: best, exact };
+}
+
+// expression of an OR of XOR products: literals first, then the XOR / XNOR factors
+function xorTermsAst(terms, inputs) {
+  const v = j => ({ t: 'var', name: inputs[j] });
+  const prods = [...terms].sort(termOrder).map(t => {
+    const fs = [...t.lits.map(l => (l.neg ? { t: 'not', a: v(l.v) } : v(l.v))),
+      ...t.groups.map(g => { const x = { t: 'xor', args: g.vars.map(v) }; return g.odd ? x : { t: 'not', a: x }; })];
+    return fs.length === 1 ? fs[0] : { t: 'and', args: fs };
+  });
+  return prods.length === 1 ? prods[0] : { t: 'or', args: prods };
+}
+
+/** Literals and two-input operators of an expression: { literals, xor, and, or, ops } (NOT free). */
+export function exprCost(e) {
+  const c = { literals: 0, xor: 0, and: 0, or: 0 };
+  const walk = x => {
+    if (x.t === 'var') c.literals++;
+    else if (x.t === 'not') walk(x.a);
+    else if (x.args) { c[x.t] += x.args.length - 1; x.args.forEach(walk); }
+  };
+  walk(e);
+  c.ops = c.xor + c.and + c.or;
+  return c;
+}
+
+/**
+ * XOR form of a column (see above), or null when there is none strictly cheaper than `than` (the
+ * minimal SOP and POS asts, computed when not given), the column is constant, or it has more than
+ * MAX_XOR_INPUTS inputs. Returns { ast, literals, ops, xor, and, or, exact }.
+ */
+export function minimizeXor(colIn, inputs, { than, maxNodes = 30000, timeMs = 250 } = {}) {
+  const n = inputs.length;
+  if (n < 2 || n > MAX_XOR_INPUTS) return null;
+  const col = normColumn(colIn, n);
+  if (!col.includes('1') || !col.includes('0')) return null;
+  if (!than) than = ['sop', 'pos'].map(form => minimalAst(minimize(col, n, { form }), inputs));
+  const costOf = e => { const c = exprCost(e); return c.literals * XOR_LIT + c.ops; };
+  const bound0 = Math.min(...than.map(costOf));
+  const budget = { nodes: maxNodes, until: Date.now() + timeMs, cut: false };
+  const bit = (r, j) => (r >> (n - 1 - j)) & 1;
+  let best = null;
+  // a sum of XOR products
+  const s0 = xorCover(n, setOf(n, r => col[r] === '1'), setOf(n, r => col[r] !== '0'), bound0, budget);
+  if (s0) best = { ast: xorTermsAst(s0.terms, inputs), cost: s0.cost };
+  // x ⊕ (a sum of XOR products of f ⊕ x)
+  for (let j = 0; j < n && !budget.cut; j++) {
+    const g = r => (col[r] === 'X' ? 'X' : String(+col[r] ^ bit(r, j)));
+    const gc = Array.from({ length: 1 << n }, (_, r) => g(r)).join('');
+    if (!gc.includes('1') || !gc.includes('0')) continue;
+    const s = xorCover(n, setOf(n, r => gc[r] === '1'), setOf(n, r => gc[r] !== '0'), (best ? best.cost : bound0) - XOR_LIT - 1, budget);
+    if (s) {
+      const rest = xorTermsAst(s.terms, inputs);
+      best = { ast: { t: 'xor', args: [{ t: 'var', name: inputs[j] }, ...(rest.t === 'xor' ? rest.args : [rest])] }, cost: s.cost + XOR_LIT + 1 };
+    }
+  }
+  if (!best) return null;
+  // equivalent to the table on every row that is not a don't care
+  const got = exprColumn(best.ast, inputs);
+  for (let r = 0; r < col.length; r++) if (col[r] !== 'X' && col[r] !== got[r]) throw new Error(`XOR form of ${col} wrong at row ${r}`);
+  return { ast: best.ast, ...exprCost(best.ast), exact: !budget.cut };
+}
+
 /** A student's expression against a column: { equal, diffs: [{ row, expected, got }] } (X rows never differ). */
 export function compareExpr(text, inputs, colIn) {
   const ast = parseExpr(text, { vars: inputs });
@@ -518,7 +725,7 @@ export function normalizeTable(d) {
   const ex = doc.exprs && typeof doc.exprs === 'object' ? doc.exprs : {};
   doc.exprs = Object.fromEntries(doc.outputs.filter(o => typeof ex[o] === 'string' && ex[o].trim()).map(o => [o, ex[o]]));
   doc.notes = String(doc.notes ?? '');
-  doc.form = doc.form === 'pos' ? 'pos' : 'sop';
+  doc.form = doc.form === 'pos' || doc.form === 'xor' ? doc.form : 'sop';
   doc.lang = doc.lang === 'verilog' ? 'verilog' : 'vhdl';
   return doc;
 }
@@ -561,7 +768,10 @@ export function reshapeTable(doc, inputs, outputs) {
   return { ...doc, inputs: [...inputs], outputs: [...outputs], table, exprs };
 }
 
-/** All the results shown for one output: canonical forms, minimal SOP and POS, gate counts. */
+/**
+ * All the results shown for one output: canonical forms, minimal SOP and POS, gate counts, and the
+ * XOR form when it is cheaper than both (else null; none above MAX_XOR_INPUTS inputs).
+ */
 export function analyzeOutput(doc, out, opts = {}) {
   const n = doc.inputs.length;
   const col = normColumn(doc.table[out], n);
@@ -569,13 +779,17 @@ export function analyzeOutput(doc, out, opts = {}) {
   const sop = minimize(col, n, { form: 'sop', ...opts }), pos = minimize(col, n, { form: 'pos', ...opts });
   sop.ast = minimalAst(sop, doc.inputs); pos.ast = minimalAst(pos, doc.inputs);
   sop.gates = gateCount(sop); pos.gates = gateCount(pos);
-  return { col, ...can, sop, pos };
+  const xor = minimizeXor(col, doc.inputs, { than: [sop.ast, pos.ast] });
+  return { col, ...can, sop, pos, xor };
 }
 
 // ===================================================================== HDL module of a table
 const DC_RE = /don't cares?:\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*d\(([^)]*)\)/gi;
 
-/** HDL module (VHDL or Verilog) of a table: one assignment per output, its minimal SOP or POS. */
+/**
+ * HDL module (VHDL or Verilog) of a table: one assignment per output, its minimal SOP or POS; with
+ * form 'xor', its XOR form where there is one (xor / xnor, ^ / ~^), else its minimal SOP.
+ */
 export function generateTableHdl(docIn, lang = docIn.lang || 'vhdl', { form = docIn.form || 'sop', source } = {}) {
   const doc = normalizeTable(docIn);
   const errs = validateTable(doc);
@@ -583,8 +797,15 @@ export function generateTableHdl(docIn, lang = docIn.lang || 'vhdl', { form = do
   const c = lang === 'verilog' ? '//' : '--';
   const n = doc.inputs.length;
   const res = doc.outputs.map(o => {
-    const m = minimize(doc.table[o], n, { form, ...(n > MAX_EDIT_INPUTS ? { maxNodes: 50000 } : {}) });
+    const m = minimize(doc.table[o], n, { form: form === 'pos' ? 'pos' : 'sop', ...(n > MAX_EDIT_INPUTS ? { maxNodes: 50000 } : {}) });
     m.ast = minimalAst(m, doc.inputs);
+    m.what = `minimal ${m.form === 'pos' ? 'POS' : 'SOP'}, ${m.literals} literal(s)`;
+    if (form === 'xor') {
+      // the XOR form against both minimal forms; a fixed node budget only, no time limit: the
+      // same table always gives the same module
+      const x = minimizeXor(doc.table[o], doc.inputs, { timeMs: Infinity });
+      if (x) Object.assign(m, { ast: x.ast, what: `XOR form, ${x.literals} literal(s)` });
+    }
     return { o, a: canonical(doc.table[o]), m };
   });
   const head = [
@@ -595,7 +816,7 @@ export function generateTableHdl(docIn, lang = docIn.lang || 'vhdl', { form = do
   ];
   for (const { o, a, m } of res) {
     head.push(`${c} ${o} = ${a.sigma}`);
-    head.push(`${c} ${o} = ${formatExpr(m.ast, 'textbook')}   (minimal ${form === 'pos' ? 'POS' : 'SOP'}, ${m.literals} literal(s))`);
+    head.push(`${c} ${o} = ${formatExpr(m.ast, 'textbook')}   (${m.what})`);
     if (a.dcs.length) head.push(`${c} don't care: ${o} = d(${a.dcs.join(', ')})`);
   }
   const L = [...head, ''];

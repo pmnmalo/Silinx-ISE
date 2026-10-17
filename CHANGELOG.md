@@ -29,6 +29,9 @@ In short:
 - **The power of a design without ISE:** *Generate Text Power Report* works with the Silinx toolchain: an estimate
   of the design's power (static and dynamic, by clocks, logic, signals and I/Os), said to be one, within 10 % of
   Xilinx XPower's total on the examples.
+- **Truth tables: / as NOT, and XOR forms:** the expressions are written with `/` as NOT by default (`/a·b + c`,
+  `/(a + b)`), the other notations still selectable; beside the minimal SOP and POS, the *XOR form* when it is
+  simpler (`a ⊕ b ⊕ c`, `a·b + c·(a ⊕ b)`, `/(a1 ⊕ b1)·/(a0 ⊕ b0)`), which the table's HDL module can use.
 
 In detail:
 
@@ -46,6 +49,19 @@ In detail:
   power within 0.1 %, its dynamic power 0.35 to 2.2 times XPower's: the netlists of Yosys and XST differ),
   `scripts/measure-power.mjs --compare` and test/power.test.js. The process is no longer disabled in the Silinx
   toolchain.
+- **The / notation in the Truth Table editor (#434):** `formatExpr` (core/logic.js) writes NOT as a prefix `/`
+  (`slash`: `/a·b + c`, `/(a + b)`; `slash-compact`: `/ab + c`, where `/ab` is `/a·b` as the input reads it), the
+  editor's default for the minimal SOP / POS, the XOR form, the essential prime implicants and the K-map's groups
+  (which now follow the notation chosen, the compact ones too). Every expression shown reads back as the same
+  expression. The input reads Verilog's XNOR `~^` / `^~`; VHDL / Verilog write the XNOR of two operands as
+  `xnor` / `~^`. The generated SOP / POS modules are unchanged.
+- **XOR / XNOR forms (#435):** `minimizeXor` finds the cheapest sum of products of literals and XOR / XNOR factors
+  (`a·b + c·(a ⊕ b)`), or a variable XOR one (`a ⊕ b·c`), of a column of 2–6 inputs: every such term enumerated
+  (7107 for 6 inputs), the ones within the 1s and don't cares kept, the cheapest cover by branch and bound
+  (a node budget: a few ms, at most about 40 ms for random 6-input functions). Cost: literals, then two-input
+  operators (NOT free). It is shown as *XOR form* only when cheaper than both the minimal SOP and POS, and it is
+  checked on the whole table. *HDL logic ▸ XOR form (when simpler)* (`form: 'xor'`, default off) writes it into
+  the table's module (`xor` / `xnor`, `^` / `~^`), the minimal SOP for the other outputs.
 - **ABC9 on the Spartan-3E, measured (#369):** `research/synth-quality/abc9.mjs` maps the examples and the design
   corpus's representative subset with Yosys's `synth_xilinx -abc9` (and `-nowidelut`) after the open synthesis's own
   steps, simulates each netlist against the RTL and takes it through the open back end. With LUTs up to 8 inputs
