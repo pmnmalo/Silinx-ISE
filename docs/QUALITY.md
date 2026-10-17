@@ -7,7 +7,7 @@ crypto, benchmarks), each built by both flows for the same chip, the XC3S1200E-F
 with the same top (a design with more ports than the package has pins goes through the same I/O
 wrapper in both).
 
-Measured 2026-10-13 (Silinx 15.10.8, ISE 14.7), with
+Measured 2026-10-17 (Silinx 15.10.22, ISE 14.7), with
 `test/designs-corpus/compare-ise.mjs`. ISE is given its best chance: its map packs the slices as
 tightly as it can (`-c 1`, as Silinx's packer always does) and the clock constraint is tightened to
 5 ns, so that its place and route works for speed (ISE stops improving once a constraint
@@ -15,11 +15,11 @@ is met; the Silinx toolchain always places and routes for speed).
 
 ## Summary
 
-- **Size:** 26 designs built by both. Logic LUTs: Silinx −22% against ISE; flip-flops
-  −7%; slices −16% (geometric means of the ratios; below 0: Silinx is smaller). Silinx
-  needs as few LUTs or fewer on 18 of 26.
-- **Speed:** 23 designs timed by both. Critical path: Silinx +14% against ISE
-  (above 0: Silinx is slower); Silinx is as fast or faster on 8 of 23. Both critical
+- **Size:** 26 designs built by both. Logic LUTs: Silinx −25% against ISE; flip-flops
+  −7%; slices −26% (geometric means of the ratios; below 0: Silinx is smaller). Silinx
+  needs as few LUTs or fewer on 17 of 26.
+- **Speed:** 23 designs timed by both. Critical path: Silinx +22% against ISE
+  (above 0: Silinx is slower); Silinx is as fast or faster on 4 of 23. Both critical
   paths are measured by ISE's timing analyser (trce) on the routed design.
 - **Reading the design:** XST (ISE 14.7's synthesis, from 2013) cannot read 12 of the designs (`$clog2`, VHDL-2008
   and other constructs it predates, listed below); Silinx reads them.
@@ -34,44 +34,44 @@ ratio of logic LUTs (below 1: Silinx is smaller).
 
 | design | LUTs Silinx | LUTs ISE | S / I | FFs Silinx | FFs ISE | slices Silinx | slices ISE | SRL16 S / I | RAMB16 S / I | MULT S / I |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| epfl-adder | 497 | 696 | 0.71 | 386 | 386 | 268 | 446 | 0 / 0 | 0 / 0 | 0 / 0 |
-| epfl-bar | 1707 | 939 | 1.82 | 272 | 269 | 854 | 534 | 0 / 1 | 0 / 0 | 0 / 0 |
-| epfl-cavlc | 250 | 222 | 1.13 | 0 | – | 160 | 111 | 0 / 0 | 0 / 0 | 0 / 0 |
-| epfl-ctrl | 46 | 48 | 0.96 | 0 | – | 25 | 24 | 0 / 0 | 0 / 0 | 0 / 0 |
+| epfl-adder | 384 | 696 | 0.55 | 386 | 386 | 193 | 446 | 0 / 0 | 0 / 0 | 0 / 0 |
+| epfl-bar | 1201 | 939 | 1.28 | 264 | 269 | 601 | 534 | 0 / 1 | 0 / 0 | 0 / 0 |
+| epfl-cavlc | 286 | 222 | 1.29 | 0 | – | 143 | 111 | 0 / 0 | 0 / 0 | 0 / 0 |
+| epfl-ctrl | 50 | 48 | 1.04 | 0 | – | 25 | 24 | 0 / 0 | 0 / 0 | 0 / 0 |
 | epfl-dec | 373 | 373 | 1.00 | 265 | 265 | 187 | 190 | 0 / 0 | 0 / 0 | 0 / 0 |
-| epfl-i2c | 446 | 589 | 0.76 | 276 | 270 | 254 | 355 | 0 / 6 | 0 / 0 | 0 / 0 |
-| epfl-int2float | 81 | 64 | 1.27 | 0 | – | 55 | 32 | 0 / 0 | 0 / 0 | 0 / 0 |
-| epfl-max | 1168 | 1386 | 0.84 | 644 | 643 | 645 | 927 | 0 / 0 | 0 / 0 | 0 / 0 |
-| epfl-priority | 255 | 417 | 0.61 | 137 | 137 | 144 | 257 | 0 / 0 | 0 / 0 | 0 / 0 |
-| epfl-router | 58 | 125 | 0.46 | 64 | 64 | 38 | 87 | 0 / 0 | 0 / 0 | 0 / 0 |
-| femtorv32-quark | 722 | – | – | 224 | – | 476 | – | 0 / – | 2 / – | 0 / – |
-| fpu-adder | 512 | 699 | 0.73 | 389 | 389 | 361 | 446 | 0 / 0 | 0 / 0 | 0 / 0 |
-| fpu-multiplier | 385 | 539 | 0.71 | 404 | 406 | 261 | 397 | 0 / 0 | 0 / 0 | 4 / 4 |
-| light8080 | 343 | 855 | 0.40 | 206 | 237 | 246 | 482 | 0 / 0 | 2 / 1 | 0 / 0 |
+| epfl-i2c | 471 | 589 | 0.80 | 276 | 270 | 236 | 355 | 0 / 6 | 0 / 0 | 0 / 0 |
+| epfl-int2float | 82 | 64 | 1.28 | 0 | – | 41 | 32 | 0 / 0 | 0 / 0 | 0 / 0 |
+| epfl-max | 1088 | 1386 | 0.78 | 643 | 643 | 544 | 927 | 0 / 0 | 0 / 0 | 0 / 0 |
+| epfl-priority | 174 | 417 | 0.42 | 137 | 137 | 87 | 257 | 0 / 0 | 0 / 0 | 0 / 0 |
+| epfl-router | 63 | 125 | 0.50 | 64 | 64 | 32 | 87 | 0 / 0 | 0 / 0 | 0 / 0 |
+| femtorv32-quark | 710 | – | – | 224 | – | 433 | – | 0 / – | 2 / – | 0 / – |
+| fpu-adder | 486 | 699 | 0.70 | 389 | 389 | 341 | 446 | 0 / 0 | 0 / 0 | 0 / 0 |
+| fpu-multiplier | 404 | 539 | 0.75 | 404 | 406 | 241 | 397 | 0 / 0 | 0 / 0 | 4 / 4 |
+| light8080 | 313 | 855 | 0.37 | 206 | 237 | 192 | 482 | 0 / 0 | 2 / 1 | 0 / 0 |
 | nandland-spi-verilog | 46 | – | – | 37 | – | 52 | – | 0 / – | 0 / – | 0 / – |
 | nandland-spi-vhdl | 46 | – | – | 37 | – | 52 | – | 0 / – | 0 / – | 0 / – |
-| neorv32 | 2842 | – | – | 1319 | – | 2280 | – | 0 / – | 6 / – | 0 / – |
-| picorv32 | 1283 | – | – | 767 | – | 825 | – | 0 / – | 2 / – | 0 / – |
-| secworks-aes | 10353 | – | – | 2996 | – | 7662 | – | 0 / – | 0 / – | 0 / – |
-| secworks-sha1 | 2234 | – | – | 1560 | – | 1883 | – | 0 / – | 0 / – | 0 / – |
-| secworks-sha256 | 3072 | – | – | 1809 | – | 2400 | – | 0 / – | 0 / – | 0 / – |
-| secworks-siphash | 1220 | 1180 | 1.03 | 798 | 798 | 1055 | 727 | 0 / 0 | 0 / 0 | 0 / 0 |
-| serv | 315 | – | – | 354 | – | 220 | – | 1 / – | 1 / – | 0 / – |
-| spi-fpga-master | 27 | 29 | 0.93 | 21 | 21 | 18 | 17 | 0 / 0 | 0 / 0 | 0 / 0 |
-| spi-fpga-slave | 21 | 50 | 0.42 | 21 | 20 | 16 | 29 | 0 / 2 | 0 / 0 | 0 / 0 |
-| t80 | 2224 | 1874 | 1.19 | 361 | 247 | 1478 | 1000 | 0 / 0 | 0 / 0 | 0 / 0 |
-| uart-for-fpga | 56 | 52 | 1.08 | 53 | 52 | 42 | 38 | 0 / 0 | 0 / 0 | 0 / 0 |
+| neorv32 | 2900 | – | – | 1319 | – | 2158 | – | 0 / – | 6 / – | 0 / – |
+| picorv32 | 1264 | – | – | 770 | – | 786 | – | 0 / – | 2 / – | 0 / – |
+| secworks-aes | 8679 | – | – | 2996 | – | 5584 | – | 0 / – | 0 / – | 0 / – |
+| secworks-sha1 | 2064 | – | – | 1537 | – | 1466 | – | 0 / – | 0 / – | 0 / – |
+| secworks-sha256 | 2940 | – | – | 1809 | – | 1993 | – | 0 / – | 0 / – | 0 / – |
+| secworks-siphash | 1228 | 1180 | 1.04 | 798 | 798 | 913 | 727 | 0 / 0 | 0 / 0 | 0 / 0 |
+| serv | 309 | – | – | 354 | – | 193 | – | 1 / – | 1 / – | 0 / – |
+| spi-fpga-master | 26 | 29 | 0.90 | 21 | 21 | 18 | 17 | 0 / 0 | 0 / 0 | 0 / 0 |
+| spi-fpga-slave | 21 | 50 | 0.42 | 21 | 20 | 14 | 29 | 0 / 2 | 0 / 0 | 0 / 0 |
+| t80 | 2153 | 1874 | 1.15 | 361 | 247 | 1296 | 1000 | 0 / 0 | 0 / 0 | 0 / 0 |
+| uart-for-fpga | 60 | 52 | 1.15 | 53 | 52 | 42 | 38 | 0 / 0 | 0 / 0 | 0 / 0 |
 | verilog-axis-fifo | 16 | – | – | 32 | – | 19 | – | 0 / – | 1 / – | 0 / – |
-| verilog-i2c-master | 195 | 266 | 0.73 | 72 | 91 | 128 | 145 | 0 / 0 | 0 / 0 | 0 / 0 |
-| verilog-lfsr-crc | 97 | – | – | 64 | – | 52 | – | 0 / – | 0 / – | 0 / – |
+| verilog-i2c-master | 193 | 266 | 0.73 | 72 | 91 | 115 | 145 | 0 / 0 | 0 / 0 | 0 / 0 |
+| verilog-lfsr-crc | 100 | – | – | 64 | – | 53 | – | 0 / – | 0 / – | 0 / – |
 | verilog-lfsr-prbs | 16 | – | – | 31 | – | 16 | – | 0 / – | 0 / – | 0 / – |
-| verilog-uart | 132 | 160 | 0.82 | 79 | 79 | 131 | 84 | 0 / 0 | 0 / 0 | 0 / 0 |
-| vtr-ch-intrinsics | 145 | 154 | 0.94 | 509 | 425 | 281 | 273 | 0 / 1 | 0 / 0 | 0 / 0 |
-| vtr-diffeq1 | 409 | 346 | 1.18 | 451 | 451 | 263 | 321 | 0 / 0 | 0 / 0 | 13 / 13 |
-| vtr-diffeq2 | 311 | 312 | 1.00 | 258 | 258 | 161 | 208 | 0 / 0 | 0 / 0 | 13 / 13 |
-| vtr-mkPktMerge | 268 | 4018 | 0.07 | 962 | 8153 | 732 | 5812 | 0 / 153 | 0 / 0 | 0 / 0 |
-| vtr-sha | 1610 | 2255 | 0.71 | 893 | 900 | 837 | 1149 | 0 / 0 | 0 / 0 | 0 / 0 |
-| vtr-stereovision3 | 132 | 109 | 1.21 | 120 | 101 | 118 | 92 | 0 / 4 | 0 / 0 | 0 / 0 |
+| verilog-uart | 129 | 160 | 0.81 | 79 | 79 | 120 | 84 | 0 / 0 | 0 / 0 | 0 / 0 |
+| vtr-ch-intrinsics | 141 | 154 | 0.92 | 509 | 425 | 275 | 273 | 0 / 1 | 0 / 0 | 0 / 0 |
+| vtr-diffeq1 | 410 | 346 | 1.18 | 451 | 451 | 262 | 321 | 0 / 0 | 0 / 0 | 13 / 13 |
+| vtr-diffeq2 | 309 | 312 | 0.99 | 258 | 258 | 160 | 208 | 0 / 0 | 0 / 0 | 13 / 13 |
+| vtr-mkPktMerge | 256 | 4018 | 0.06 | 962 | 8153 | 730 | 5812 | 0 / 153 | 0 / 0 | 0 / 0 |
+| vtr-sha | 1583 | 2255 | 0.70 | 893 | 900 | 816 | 1149 | 0 / 0 | 0 / 0 | 0 / 0 |
+| vtr-stereovision3 | 127 | 109 | 1.17 | 121 | 101 | 99 | 92 | 0 / 4 | 0 / 0 | 0 / 0 |
 
 ## Speed
 
@@ -81,41 +81,41 @@ timing analysis (what its Design Summary shows).
 
 | design | Silinx (trce) | ISE (trce) | S / I | Silinx estimate |
 |---|---:|---:|---:|---:|
-| epfl-adder | 74.55 | 12.25 | 6.09 | 75.87 |
-| epfl-bar | 10.35 | 9.08 | 1.14 | 10.31 |
-| epfl-dec | 6.25 | 6.12 | 1.02 | 6.29 |
-| epfl-i2c | 7.90 | 6.81 | 1.16 | 8.10 |
-| epfl-max | 36.88 | 25.68 | 1.44 | 37.31 |
-| epfl-priority | 16.27 | 20.83 | 0.78 | 16.48 |
-| epfl-router | 9.14 | 9.36 | 0.98 | 9.43 |
-| femtorv32-quark | 18.72 | – | – | 18.48 |
-| fpu-adder | 11.21 | 12.07 | 0.93 | 11.43 |
-| fpu-multiplier | 14.84 | 14.61 | 1.02 | 15.13 |
-| light8080 | 11.85 | 15.13 | 0.78 | 12.25 |
-| nandland-spi-verilog | 5.69 | – | – | 5.51 |
-| nandland-spi-vhdl | 5.28 | – | – | 5.23 |
-| neorv32 | 16.74 | – | – | 16.17 |
-| picorv32 | 12.29 | – | – | 12.41 |
-| secworks-aes | 28.08 | – | – | 27.69 |
-| secworks-sha1 | 16.88 | – | – | 16.79 |
-| secworks-sha256 | 26.86 | – | – | 26.63 |
-| secworks-siphash | 15.63 | 13.98 | 1.12 | 15.88 |
-| serv | 13.44 | – | – | 13.56 |
-| spi-fpga-master | 4.72 | 4.99 | 0.95 | 4.85 |
-| spi-fpga-slave | 5.36 | 4.94 | 1.08 | 5.30 |
-| t80 | 23.81 | 18.13 | 1.31 | 23.93 |
-| uart-for-fpga | 4.80 | 4.69 | 1.02 | 4.54 |
-| verilog-axis-fifo | 5.78 | – | – | 5.54 |
-| verilog-i2c-master | 10.94 | 9.88 | 1.11 | 10.88 |
-| verilog-lfsr-crc | 3.89 | – | – | 3.96 |
-| verilog-lfsr-prbs | 2.27 | – | – | 2.29 |
-| verilog-uart | 10.18 | 9.24 | 1.10 | 10.33 |
-| vtr-ch-intrinsics | 7.57 | 5.06 | 1.50 | 7.77 |
-| vtr-diffeq1 | 35.73 | 35.80 | 1.00 | 39.35 |
-| vtr-diffeq2 | 31.76 | 26.74 | 1.19 | 32.99 |
-| vtr-mkPktMerge | 7.15 | 9.27 | 0.77 | 7.42 |
-| vtr-sha | 15.97 | 19.92 | 0.80 | 16.02 |
-| vtr-stereovision3 | 7.68 | 4.92 | 1.56 | 7.79 |
+| epfl-adder | 83.37 | 12.25 | 6.81 | 87.28 |
+| epfl-bar | 10.86 | 9.08 | 1.20 | 10.73 |
+| epfl-dec | 6.32 | 6.12 | 1.03 | 6.24 |
+| epfl-i2c | 7.64 | 6.81 | 1.12 | 7.67 |
+| epfl-max | 61.75 | 25.68 | 2.40 | 64.22 |
+| epfl-priority | 43.01 | 20.83 | 2.06 | 43.88 |
+| epfl-router | 10.09 | 9.36 | 1.08 | 10.32 |
+| femtorv32-quark | 18.72 | – | – | 19.61 |
+| fpu-adder | 11.69 | 12.07 | 0.97 | 11.79 |
+| fpu-multiplier | 15.10 | 14.61 | 1.03 | 15.19 |
+| light8080 | 12.06 | 15.13 | 0.80 | 12.57 |
+| nandland-spi-verilog | 5.38 | – | – | 5.35 |
+| nandland-spi-vhdl | 5.51 | – | – | 5.51 |
+| neorv32 | 15.50 | – | – | 15.61 |
+| picorv32 | 11.41 | – | – | 11.47 |
+| secworks-aes | 27.98 | – | – | 28.39 |
+| secworks-sha1 | 17.06 | – | – | 17.36 |
+| secworks-sha256 | 25.87 | – | – | 26.09 |
+| secworks-siphash | 15.03 | 13.98 | 1.08 | 14.90 |
+| serv | 13.39 | – | – | 13.58 |
+| spi-fpga-master | 5.07 | 4.99 | 1.02 | 5.03 |
+| spi-fpga-slave | 5.86 | 4.94 | 1.19 | 6.00 |
+| t80 | 22.43 | 18.13 | 1.24 | 23.00 |
+| uart-for-fpga | 5.90 | 4.69 | 1.26 | 5.94 |
+| verilog-axis-fifo | 6.46 | – | – | 6.07 |
+| verilog-i2c-master | 10.13 | 9.88 | 1.03 | 10.27 |
+| verilog-lfsr-crc | 3.96 | – | – | 3.94 |
+| verilog-lfsr-prbs | 2.36 | – | – | 2.33 |
+| verilog-uart | 11.70 | 9.24 | 1.27 | 11.44 |
+| vtr-ch-intrinsics | 6.31 | 5.06 | 1.25 | 6.57 |
+| vtr-diffeq1 | 36.07 | 35.80 | 1.01 | 40.07 |
+| vtr-diffeq2 | 27.64 | 26.74 | 1.03 | 29.27 |
+| vtr-mkPktMerge | 8.03 | 9.27 | 0.87 | 7.95 |
+| vtr-sha | 15.51 | 19.92 | 0.78 | 15.28 |
+| vtr-stereovision3 | 5.58 | 4.92 | 1.13 | 8.22 |
 
 ## Not built by one of the flows
 
