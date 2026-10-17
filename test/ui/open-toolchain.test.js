@@ -165,7 +165,7 @@ uiTest('open mode: a device without a bit database or without a shipped descript
 // built again, nothing more to add
 const BA_UCF = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '../../examples/blinky/constraints/top.ucf'), 'utf8')
   .split('\n').map((l) => (/"(led<[4-7]>|sw<3>)"/.test(l) ? l.replace(/LOC = "\w+" \| /, '') : l)).join('\n');
-const BA_PINS = ['NET "led<4>" LOC = "N5";', 'NET "led<5>" LOC = "M4";', 'NET "led<6>" LOC = "N4";', 'NET "led<7>" LOC = "P4";', 'NET "sw<3>" LOC = "N3";'];
+const BA_PINS = ['NET "led<4>" LOC = "H3";', 'NET "led<5>" LOC = "N4";', 'NET "led<6>" LOC = "N5";', 'NET "led<7>" LOC = "M4";', 'NET "sw<3>" LOC = "P4";'];
 uiTest('open mode: Back-annotate Pin Locations writes the pins the placer chose into the UCF; Portuguese', E, async (page) => {
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'OpenPins', template: 'blinky', board: null, files: { 'constraints/top.ucf': BA_UCF } });
@@ -321,7 +321,7 @@ uiTest('open mode: View Technology Schematic of blinky and pong without ISE: the
   await page.click('input[name=view][value=impl]');
   assert.deepEqual((await procLabels(page)).find((p) => p.label === 'View Technology Schematic'), { label: 'View Technology Schematic', disabled: false, title: '' });
   await checkTechSchematic(page, { top: 'top', blocks: ['u_pre', 'u_speed', 'u_knight'], inside: 'u_pre',
-    message: "Technology Schematic of 'top': the netlist of the Silinx toolchain's synthesis (build/open/top.json), 352 cells in 3 block(s): u_knight (50), u_speed (203), u_pre (67)." });
+    message: "Technology Schematic of 'top': the netlist of the Silinx toolchain's synthesis (build/open/top.json), 353 cells in 3 block(s): u_knight (50), u_speed (203), u_pre (68)." });
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
   // Portuguese: the view's bar, its tab and the LUT's function have no untranslated text (the netlist's names apart)
   await page.eval(TEXTS);

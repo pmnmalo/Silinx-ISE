@@ -100,6 +100,17 @@ In detail:
   Start page and reopened its documents with no project open (seen as a UI test's failure on CI: the Start page's
   recent project not visible to click). Opening and closing projects now run one after the other, in the order
   they are chosen (regression test: Close Project at once after Open, and as soon as the project is open).
+- **Yosys 0.70 (#363, Dependabot's #356):** `@yowasp/yosys` 0.68.1207 → 0.70.1258. Yosys 0.70 colours its
+  log (ANSI escapes) even when it is not a terminal, and YoWASP 0.70 flushes its output after each write, also
+  in the middle of a line (`Warning: ` then the message): the synthesis's warnings were all lost (and Yosys's
+  "Shift register inference not yet supported" no longer left out, the escapes in the console). The lines of
+  Yosys's output (`lineStream`, `core/synth-open.js`) are now plain text and split at the newlines only, the
+  end of a run said by `end()` (`--no-color` is unknown to Yosys 0.68, which the comparison runs with the same
+  code). The yosys-update workflow's base side failed on `npm ls` (the base's version "invalid" against the
+  pull request's `package.json`): the installed version is checked instead. Changed by the new Yosys: the
+  source lines in its latch warnings (`proc_dlatch.cc:555…559`), the pins the placer chooses for blinky's
+  back-annotation, the technology schematic's cells per block (blinky's `u_speed` 213, `u_pre` 68 at Normal
+  effort). YoWASP 0.70's ABC still crashes on `read_lut` from a script file: the inline script (#78) stays.
 
 ## 15.10.22
 

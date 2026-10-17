@@ -61,8 +61,17 @@ test('Yosys output split into lines, across chunks', () => {
   const lines = [];
   const feed = lineStream(l => lines.push(l));
   const enc = s => new TextEncoder().encode(s);
-  feed(enc('Warning: a\nWar')); feed(enc('ning: b\r\nend')); feed(null);
+  feed(enc('Warning: a\nWar')); feed(null); feed(enc('ning: b\r\nend')); feed.end();
   assert.deepEqual(lines, ['Warning: a', 'Warning: b', 'end']);
+});
+
+test('Yosys 0.70\'s coloured log: the lines without the ANSI escapes, also split across chunks', () => {
+  const lines = [];
+  const feed = lineStream(l => lines.push(l));
+  const enc = s => new TextEncoder().encode(s);
+  feed(enc('\x1b[0m\x1b[93mWarning: \x1b[0m\x1b[1m\x1b[34mLatch inferred\n\x1b[1m\x1b[36m1. \x1b[0m\x1b'));
+  feed(enc('[1m\x1b[37mExecuting\n\x1b[0m\nERROR: \x1b[91mno')); feed.end();
+  assert.deepEqual(lines, ['Warning: Latch inferred', '1. Executing', '', 'ERROR: no']);
 });
 
 test('a counter synthesized by Yosys (WebAssembly) counts like the design', { timeout: 120000 }, async () => {

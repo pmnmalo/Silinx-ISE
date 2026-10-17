@@ -593,7 +593,7 @@ uiTest('browser edition: Back-annotate Pin Locations runs the Silinx toolchain i
   }, ucf);
   await page.treeRow('#procs', 'Back-annotate Pin Locations', { dbl: true, exact: true });
   await page.waitDialog('Back-annotate Pin Locations', { timeout: 120000 });
-  const pins = ['NET "led<4>" LOC = "N5";', 'NET "led<5>" LOC = "M4";', 'NET "led<6>" LOC = "N4";', 'NET "led<7>" LOC = "P4";', 'NET "sw<3>" LOC = "N3";'];
+  const pins = ['NET "led<4>" LOC = "H3";', 'NET "led<5>" LOC = "N4";', 'NET "led<6>" LOC = "N5";', 'NET "led<7>" LOC = "M4";', 'NET "sw<3>" LOC = "P4";'];
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .msg-text').textContent),
     `Add the 5 pin location(s) chosen by the tools to constraints/top.ucf?\n\n${pins.join('\n')}`);
   const log = await page.consoleText();

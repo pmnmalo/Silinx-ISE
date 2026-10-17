@@ -9,10 +9,10 @@ parentPort.on('message', async ({ id, args, files }) => {
   const out = lineStream(line => parentPort.postMessage({ id, line }));
   try {
     const res = await runYosys(args, files, { stdout: out, stderr: out, fetchProgress: () => {} });
-    out(null);
+    out.end();
     parentPort.postMessage({ id, files: Object.fromEntries(Object.entries(res).map(([k, v]) => [k, asText(v)])) });
   } catch (e) {
-    out(null);
+    out.end();
     parentPort.postMessage({ id, error: `Yosys failed${e.code !== undefined ? ` (exit code ${e.code})` : `: ${e.message}`}`, code: e.code });
   }
 });

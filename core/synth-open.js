@@ -485,18 +485,26 @@ export function yosysError(e) {
 export const asText = v => (typeof v === 'string' ? v : v instanceof Uint8Array ? new TextDecoder().decode(v) : '');
 
 /**
- * Line splitter for Yosys's stdout / stderr byte streams: feed(bytes | null) calls onLine for each
- * complete line; null (end of stream) flushes the rest.
+ * Line splitter for Yosys's stdout / stderr byte streams: feed(bytes) calls onLine for each complete
+ * line, feed.end() (the end of the run) flushes the rest. YoWASP 0.70 calls the stream with null after
+ * each write (a flush, even in the middle of a line: "Warning: " then the message): not the end. The
+ * lines are plain text: Yosys 0.70 colours its log (ANSI escapes, "\x1b[93mWarning: \x1b[0m…") even
+ * when it is not a terminal, and its option --no-color is unknown to the earlier versions; the escapes
+ * are dropped here (one place for every run).
  */
 export function lineStream(onLine) {
   const dec = new TextDecoder();
+  const plain = l => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
   let buf = '';
-  return bytes => {
-    buf += bytes ? dec.decode(bytes, { stream: true }) : dec.decode();
+  const feed = bytes => {
+    if (!bytes) return;
+    buf += dec.decode(bytes, { stream: true });
     let i;
-    while ((i = buf.indexOf('\n')) >= 0) { onLine(buf.slice(0, i).replace(/\r$/, '')); buf = buf.slice(i + 1); }
-    if (!bytes && buf) { onLine(buf); buf = ''; }
+    while ((i = buf.indexOf('\n')) >= 0) { onLine(plain(buf.slice(0, i).replace(/\r$/, ''))); buf = buf.slice(i + 1); }
   };
+  // (the rest: a last line with no newline; not the escapes alone that end Yosys 0.70's output)
+  feed.end = () => { buf = plain(buf + dec.decode()); if (buf) onLine(buf); buf = ''; };
+  return feed;
 }
 
 /**
@@ -512,10 +520,10 @@ self.onmessage = async ({ data: { id, args, files } }) => {
   const out = lineStream(line => self.postMessage({ id, line }));
   try {
     const res = await runYosys(args, files, { stdout: out, stderr: out });
-    out(null);
+    out.end();
     self.postMessage({ id, files: Object.fromEntries(Object.entries(res).map(([k, v]) => [k, asText(v)])) });
   } catch (e) {
-    out(null);
+    out.end();
     const { message, code, crash } = yosysError(e);
     self.postMessage({ id, error: message, code, crash });
   }

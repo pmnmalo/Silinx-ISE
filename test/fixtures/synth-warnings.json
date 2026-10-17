@@ -12,9 +12,9 @@
   "designs/fsm": [],
   "designs/fsm (Yosys's front end)": [],
   "designs/latch": [
-    "Warning: Latch inferred for signal `\\top.\\l3' from process `\\top.$proc$top_syn.v:40$10': $auto$proc_dlatch.cc:547:proc_dlatch$1140",
-    "Warning: Latch inferred for signal `\\top.\\l2' from process `\\top.$proc$top_syn.v:30$6': $auto$proc_dlatch.cc:545:proc_dlatch$1153",
-    "Warning: Latch inferred for signal `\\top.\\l1' from process `\\top.$proc$top_syn.v:20$1': $auto$proc_dlatch.cc:543:proc_dlatch$1172"
+    "Warning: Latch inferred for signal `\\top.\\l3' from process `\\top.$proc$top_syn.v:40$10': $auto$proc_dlatch.cc:559:proc_dlatch$1140",
+    "Warning: Latch inferred for signal `\\top.\\l2' from process `\\top.$proc$top_syn.v:30$6': $auto$proc_dlatch.cc:557:proc_dlatch$1153",
+    "Warning: Latch inferred for signal `\\top.\\l1' from process `\\top.$proc$top_syn.v:20$1': $auto$proc_dlatch.cc:555:proc_dlatch$1172"
   ],
   "designs/mult": [],
   "designs/srl": [],

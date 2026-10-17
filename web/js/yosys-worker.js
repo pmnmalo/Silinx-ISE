@@ -12,10 +12,10 @@ self.onmessage = async ({ data: { id, args, files } }) => {
       stdout: out, stderr: out,
       fetchProgress: e => { if (e.totalLength) self.postMessage({ id, progress: e.doneLength / e.totalLength }); },
     });
-    out(null);
+    out.end();
     self.postMessage({ id, files: Object.fromEntries(Object.entries(res).map(([k, v]) => [k, asText(v)])) });
   } catch (e) {
-    out(null);
+    out.end();
     const { message, code, crash } = yosysError(e);
     self.postMessage({ id, error: message, code, crash });
   }

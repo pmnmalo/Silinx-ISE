@@ -76,7 +76,10 @@ jobs:
         if: matrix.side == 'base'
         run: |
           npm install --no-save --ignore-scripts @yowasp/yosys@${{ needs.check.outputs.base }}
-          npm ls @yowasp/yosys
+          # not npm ls: the installed version is "invalid" against the pull request's package.json (exit 1)
+          v=$(node -p "require('./node_modules/@yowasp/yosys/package.json').version")
+          echo "@yowasp/yosys $v"
+          test "$v" = "${{ needs.check.outputs.base }}"
       - name: The examples
         run: |
           mkdir -p "out/examples"

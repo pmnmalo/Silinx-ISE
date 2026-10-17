@@ -51,10 +51,10 @@ self.onmessage = async ({ data }) => {
       const out = lineStream(onLine);
       try {
         const res = await runYosys(args, yfiles, { stdout: out, stderr: out });
-        out(null);
+        out.end();
         return Object.fromEntries(Object.entries(res).map(([k, v]) => [k, asText(v)]));
       } catch (e) {
-        out(null);
+        out.end();
         const { message, code } = yosysError(e);
         throw Object.assign(new Error(message), { code });
       }

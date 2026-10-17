@@ -13,8 +13,8 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
-// Yosys 0.68: the version YoWASP (@yowasp/yosys 0.68.x) runs
-export const YOSYS_TESTS_PIN = { tag: 'v0.68', commit: '38e001a6ff74ca434bf4cc02c053f53619160ab0' };
+// Yosys 0.70: the version YoWASP (@yowasp/yosys 0.70.x) runs
+export const YOSYS_TESTS_PIN = { tag: 'v0.70', commit: '28ba3cb926fe376fa05ebfc1b921747d011d4557' };
 export const YOSYS_TEST_DIRS = ['tests/simple', 'tests/asicworld', 'tests/hana', 'tests/vloghtb', 'tests/various'];
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const CACHE = path.join(ROOT, '.cache', 'yosys-tests');

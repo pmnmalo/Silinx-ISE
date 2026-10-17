@@ -11,10 +11,10 @@ export async function yosysNode(args, files, onLine = () => {}) {
   const out = lineStream(onLine);
   try {
     const res = await runYosys(args, files, { stdout: out, stderr: out, fetchProgress: () => {} });
-    out(null);
+    out.end();
     return Object.fromEntries(Object.entries(res).map(([k, v]) => [k, asText(v)]));
   } catch (e) {
-    out(null);
+    out.end();
     throw Object.assign(new Error(`Yosys failed${e.code !== undefined ? ` (exit code ${e.code})` : `: ${e.message}`}`), { code: e.code });
   }
 }
