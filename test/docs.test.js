@@ -21,7 +21,7 @@ const walk = d => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).fl
   e.name.startsWith('.') || ['node_modules', 'dist'].includes(e.name) ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.md') ? [path.join(d, e.name)] : []);
 const ALL_MD = walk('.');
 // the user documentation (what the tests of facts read)
-const DOCS = ['README.md', ...fs.readdirSync(path.join(ROOT, 'docs')).filter(f => f.endsWith('.md')).map(f => `docs/${f}`)];
+const DOCS = ['README.md', 'ONBOARDING.md', 'CLAUDE.md', ...fs.readdirSync(path.join(ROOT, 'docs')).filter(f => f.endsWith('.md')).map(f => `docs/${f}`)];
 
 // GitHub's heading anchors
 const slug = s => s.trim().toLowerCase().replace(/[^\p{L}\p{N} _-]/gu, '').replace(/ /g, '-');

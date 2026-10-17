@@ -3,7 +3,9 @@
 Silinx ISE is an ISE-like FPGA IDE for teaching digital systems (Spartan-3E boards: Basys2,
 Nexys2). It runs in the browser or as a local server, with its own open toolchain (Yosys WASM,
 pack, place, route, bitgen) and optionally Xilinx ISE 14.7. These are the project's rules for
-anyone changing it, people and AI agents alike. The README and docs/ describe the product.
+anyone changing it, people and AI agents alike. The README and docs/ describe the product;
+[ONBOARDING.md](ONBOARDING.md) adds the setup, how several Claude sessions work together, a map of
+the code and the lessons learnt.
 
 ## Development
 

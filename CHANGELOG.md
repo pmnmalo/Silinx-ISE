@@ -17,6 +17,9 @@ In short:
 
 In detail:
 
+- **ONBOARDING.md:** a guide for a new developer or Claude Code session: the setup, how several
+  sessions work on the repository together, a map of the code, the product's rules and the lessons
+  learnt; CLAUDE.md points to it, and the documentation test checks its paths and links (and CLAUDE.md's).
 - **i18n: a duplicate key (#362):** `'Test bench name:'` was written twice in web/js/i18n.js (the same translation),
   which esbuild warned of when building the standalone edition; `test/web-i18n.test.js` now rejects a key written
   twice in any of the web/js/i18n*.js dictionaries.
