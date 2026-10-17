@@ -120,7 +120,9 @@ In detail:
   slower (the speed after 0.70: #377). Raised by Yosys 0.70 (#368): the pedestrian crossing's size budget to
   110 LUTs (94 LUTs, 32 MUXF, 68 slices with 0.68; 108 LUTs, 13 MUXF, 67 slices with 0.70) and #54's rotator
   to 319 LUTs (313 with 0.68), still LUT4s alone; the design corpus's expected sizes and speeds as 0.70 makes
-  them (`test/designs-corpus/expected.json`).
+  them (`test/designs-corpus/expected.json`). Yosys's test design `hana/test_intermout.v` takes 841 to over 900 s
+  with 0.70 on GitHub's runners (650 s with 0.68): the corpus's limit per file is 1500 s now (900 s, #343), the
+  nightly's jobs 26 to 37 minutes of their 60 (#378).
 
 ## 15.10.22
 

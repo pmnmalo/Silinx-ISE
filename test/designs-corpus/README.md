@@ -187,7 +187,7 @@ The 8 slowest designs (s: synthesis / flow / all the stages):
 | secworks-siphash | 49 / 97 / 152 | 15 / 45 / 62 |
 <!-- end of the run times -->
 
-## Results (Yosys 0.68 / YoWASP)
+## Results (Yosys 0.70 / YoWASP)
 
 Generated from `expected.json` (`node test/designs-corpus/run.mjs --table`; `--update` rewrites it
 too; `test/designs-corpus.test.js` checks that it is the one the committed expectations give, #89).
@@ -201,44 +201,44 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 <!-- the results table: generated from expected.json by `node test/designs-corpus/run.mjs --table`; do not edit by hand -->
 | design | lang | licence | frontend | tb | synth | diff | flow | device | slices | LUTs | FFs | critical path (ns) | warnings |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| serv | Verilog | ISC | pass | - | pass | pass | complete | XC3S250E | 191 | 330 | 354 | 13.228 | 20 (frontend 20) |
-| picorv32 | Verilog | ISC | pass | - | pass | pass | complete | XC3S250E | 774 | 1544 | 767 | 11.426 | 33 (frontend 28, synth 5) |
-| femtorv32-quark | Verilog | BSD-3-Clause | pass | - | pass | pass | complete | XC3S250E | 512 | 1020 | 224 | 16.351 | 0 |
-| neorv32 | VHDL | BSD-3-Clause | pass | - | pass | pass | complete | XC3S250E | 2137 | 4265 | 1320 | 16.850 | 72 (frontend 47, synth 25) |
-| light8080 | VHDL | LGPL-2.1 | pass | pass | pass | pass | complete | XC3S250E | 189 | 375 | 206 | 12.226 | 17 (frontend 17) |
-| t80 | VHDL | BSD-3-Clause-style | pass | - | pass | pass | complete | XC3S250E | 1478 | 2946 | 361 | 23.265 | 6 (frontend 5, flow 1) |
-| verilog-uart | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 120 | 237 | 79 | 10.937 | 0 |
-| verilog-i2c-master | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 138 | 273 | 72 | 9.928 | 4 (frontend 4) |
-| verilog-lfsr-crc | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 52 | 103 | 64 | 4.199 | 0 |
-| verilog-lfsr-prbs | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 16 | 16 | 31 | 2.221 | 1 (frontend 1) |
-| verilog-axis-fifo | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 19 | 33 | 32 | 5.949 | 11 (frontend 10, synth 1) |
-| uart-for-fpga | VHDL | MIT | pass | pass | pass | pass | complete | XC3S250E | 42 | 81 | 53 | 4.874 | 1 (frontend 1) |
-| spi-fpga-master | VHDL | MIT | pass | pass | pass | pass | complete | XC3S250E | 18 | 33 | 22 | 4.378 | 1 (frontend 1) |
-| spi-fpga-slave | VHDL | MIT | pass | pass | pass | pass | complete | XC3S250E | 16 | 26 | 21 | 5.164 | 0 |
-| nandland-spi-verilog | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 51 | 98 | 37 | 5.535 | 1 (frontend 1) |
-| nandland-spi-vhdl | VHDL | MIT | pass | - | pass | pass | complete | XC3S250E | 51 | 98 | 37 | 5.701 | 2 (frontend 2) |
-| secworks-sha1 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1883 | 3763 | 1560 | 17.515 | 2 (frontend 1, synth 1) |
-| secworks-sha256 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1997 | 3992 | 1809 | 27.987 | 3 (frontend 1, synth 1, flow 1) |
-| secworks-siphash | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 913 | 1823 | 798 | 15.511 | 0 |
-| secworks-aes | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S1200E | 5717 | 11433 | 2996 | 26.477 | 4 (synth 3, flow 1) |
-| fpu-adder | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 342 | 678 | 389 | 12.070 | 0 |
-| fpu-multiplier | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 261 | 510 | 404 | 15.866 | 0 |
-| vtr-sha | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 817 | 1630 | 893 | 15.851 | 0 |
-| vtr-diffeq1 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S500E | 262 | 412 | 451 | 41.036 | 1 (flow 1) |
-| vtr-diffeq2 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S500E | 144 | 282 | 96 | 28.622 | 1 (flow 1) |
-| vtr-ch-intrinsics | Verilog | VTR benchmarks | pass | - | pass | mismatch | complete | XC3S250E | 275 | 180 | 509 | 6.237 | 21 (frontend 13, synth 8) |
-| vtr-stereovision3 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 106 | 210 | 120 | 7.532 | 3 (frontend 2, synth 1) |
-| vtr-mkPktMerge | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 730 | 784 | 962 | 7.313 | 33 (frontend 33) |
-| epfl-ctrl | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 25 | 50 | 0 |  | 0 |
-| epfl-int2float | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 43 | 86 | 0 |  | 0 |
-| epfl-cavlc | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 160 | 320 | 0 |  | 0 |
-| epfl-router | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 35 | 61 | 64 | 8.138 | 0 |
-| epfl-priority | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 127 | 253 | 137 | 11.720 | 0 |
-| epfl-dec | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 187 | 373 | 265 | 6.046 | 0 |
-| epfl-i2c | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 236 | 471 | 276 | 7.644 | 0 |
-| epfl-adder | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 194 | 172 | 386 | 13.207 | 0 |
-| epfl-bar | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 601 | 1201 | 272 | 10.498 | 0 |
-| epfl-max | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 616 | 1232 | 643 | 29.448 | 1 (flow 1) |
+| serv | Verilog | ISC | pass | - | pass | pass | complete | XC3S250E | 208 | 347 | 354 | 13.155 | 20 (frontend 20) |
+| picorv32 | Verilog | ISC | pass | - | pass | pass | complete | XC3S250E | 791 | 1579 | 767 | 11.782 | 33 (frontend 28, synth 5) |
+| femtorv32-quark | Verilog | BSD-3-Clause | pass | - | pass | pass | complete | XC3S250E | 423 | 843 | 226 | 17.271 | 0 |
+| neorv32 | VHDL | BSD-3-Clause | pass | - | pass | pass | complete | XC3S250E | 2158 | 4306 | 1319 | 15.631 | 72 (frontend 47, synth 25) |
+| light8080 | VHDL | LGPL-2.1 | pass | pass | pass | pass | complete | XC3S250E | 192 | 380 | 206 | 12.753 | 17 (frontend 17) |
+| t80 | VHDL | BSD-3-Clause-style | pass | - | pass | pass | complete | XC3S250E | 1296 | 2584 | 361 | 23.123 | 6 (frontend 5, flow 1) |
+| verilog-uart | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 131 | 259 | 79 | 10.286 | 0 |
+| verilog-i2c-master | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 126 | 250 | 72 | 10.963 | 4 (frontend 4) |
+| verilog-lfsr-crc | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 53 | 105 | 64 | 3.868 | 0 |
+| verilog-lfsr-prbs | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 16 | 16 | 31 | 2.506 | 1 (frontend 1) |
+| verilog-axis-fifo | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 19 | 33 | 32 | 5.269 | 11 (frontend 10, synth 1) |
+| uart-for-fpga | VHDL | MIT | pass | pass | pass | pass | complete | XC3S250E | 42 | 80 | 53 | 4.811 | 1 (frontend 1) |
+| spi-fpga-master | VHDL | MIT | pass | pass | pass | pass | complete | XC3S250E | 18 | 33 | 21 | 5.092 | 1 (frontend 1) |
+| spi-fpga-slave | VHDL | MIT | pass | pass | pass | pass | complete | XC3S250E | 16 | 26 | 21 | 4.984 | 0 |
+| nandland-spi-verilog | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 52 | 100 | 37 | 5.211 | 1 (frontend 1) |
+| nandland-spi-vhdl | VHDL | MIT | pass | - | pass | pass | complete | XC3S250E | 52 | 100 | 37 | 5.524 | 2 (frontend 2) |
+| secworks-sha1 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 1879 | 3756 | 1560 | 17.545 | 2 (frontend 1, synth 1) |
+| secworks-sha256 | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 2423 | 4845 | 1809 | 26.632 | 3 (frontend 1, synth 1, flow 1) |
+| secworks-siphash | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S250E | 913 | 1824 | 798 | 14.085 | 0 |
+| secworks-aes | Verilog | BSD-2-Clause | pass | pass | pass | pass | complete | XC3S1200E | 5584 | 11167 | 2996 | 28.385 | 4 (synth 3, flow 1) |
+| fpu-adder | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 341 | 677 | 389 | 12.491 | 0 |
+| fpu-multiplier | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 246 | 482 | 404 | 15.296 | 0 |
+| vtr-sha | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 834 | 1665 | 893 | 15.700 | 0 |
+| vtr-diffeq1 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S500E | 263 | 414 | 451 | 42.614 | 1 (flow 1) |
+| vtr-diffeq2 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S500E | 144 | 282 | 96 | 29.308 | 1 (flow 1) |
+| vtr-ch-intrinsics | Verilog | VTR benchmarks | pass | - | pass | mismatch | complete | XC3S250E | 275 | 178 | 509 | 7.592 | 21 (frontend 13, synth 8) |
+| vtr-stereovision3 | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 112 | 223 | 120 | 7.993 | 3 (frontend 2, synth 1) |
+| vtr-mkPktMerge | Verilog | VTR benchmarks | pass | - | pass | pass | complete | XC3S250E | 730 | 785 | 962 | 7.494 | 33 (frontend 33) |
+| epfl-ctrl | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 25 | 49 | 0 |  | 0 |
+| epfl-int2float | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 41 | 82 | 0 |  | 0 |
+| epfl-cavlc | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 139 | 277 | 0 |  | 0 |
+| epfl-router | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 36 | 61 | 64 | 7.786 | 0 |
+| epfl-priority | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 115 | 229 | 137 | 11.244 | 0 |
+| epfl-dec | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 187 | 373 | 265 | 6.515 | 0 |
+| epfl-i2c | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 236 | 471 | 276 | 7.759 | 0 |
+| epfl-adder | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 194 | 172 | 386 | 13.316 | 0 |
+| epfl-bar | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 601 | 1201 | 272 | 10.697 | 0 |
+| epfl-max | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 722 | 1444 | 644 | 28.878 | 1 (flow 1) |
 
 Summary: 38 designs; front end 38 / 38; own testbenches 8 / 8 pass; synthesis 38; netlist = RTL 37; fully open bitstream complete for 38 designs (35 on the XC3S250E, 2 on the XC3S500E, 1 on the XC3S1200E).
 <!-- end of the results table -->

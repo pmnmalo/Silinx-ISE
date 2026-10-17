@@ -52,9 +52,9 @@ result of each `file:top` (Yosys's front end) and `file:top (synth)` (Silinx's s
 `pass`, `unsupported: <stage>: <reason>`, `mismatch: <reason>` or `error: <stage>: <reason>`.
 The run fails on a regression (a key expected to pass that does not); newly passing keys are
 listed, and `--update` records the results. Options: `--filter text`, `--jobs n`, `--cycles n`,
-`--shard k/n` (every n-th file from the k-th) and `--timeout s` (900 s): a file that takes longer fails
-the run, unless `expected.json` has the file itself failing as a whole (`hana/hana_vlib.v`, out of memory or
-out of time); the run prints its ten slowest files.
+`--shard k/n` (every n-th file from the k-th) and `--timeout s` (1500 s; 900 s before Yosys 0.70, #378):
+a file that takes longer fails the run, unless `expected.json` has the file itself failing as a whole
+(`hana/hana_vlib.v`, out of memory or out of time); the run prints its ten slowest files.
 
 The nightly (`.github/workflows/nightly.yml`) runs it in two jobs at once, `--shard 1/2` and `2/2`, 4 jobs
 each (#343): Silinx's synthesis of a module is up to 7 Yosys runs (its mappings onto LUT4s alone, with the

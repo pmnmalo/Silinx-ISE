@@ -10,7 +10,7 @@
 // newWarnings, goneWarnings }), for the comparison of a Yosys update (#352, scripts/yosys-update-report.mjs).
 //
 // --shard k/n runs the k-th of n parts of the files (every n-th file, the nightly's jobs in parallel, #343);
-// --timeout s is the time a file may take (900 s): a file that takes longer fails the run (its modules have
+// --timeout s is the time a file may take (1500 s): a file that takes longer fails the run (its modules have
 // no result, #343), unless expected.json has the file itself failing as a whole ('error: …', hana/hana_vlib.v);
 // the slowest files and their times are printed.
 //
@@ -41,7 +41,7 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXPECTED = path.join(HERE, 'expected.json');
 const WARNINGS = path.join(HERE, 'warnings.json');
-const TIMEOUT = 900;   // s, per file (hana/test_intermout.v: 33 modules, two netlists each)
+const TIMEOUT = 1500;   // s, per file (hana/test_intermout.v: 33 modules, two netlists each; 650 s with Yosys 0.68, 841-900+ with 0.70, #378)
 
 /** The files of shard 'k/n' (1 <= k <= n): every n-th, from the k-th; all of them without a shard. */
 export function shardOf(files, spec) {
