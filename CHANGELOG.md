@@ -3,6 +3,23 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.10.23
+
+In detail:
+
+- **Nightly: Yosys's test designs in two jobs, a timed-out job reported (#343):** the corpus job hit its
+  60-minute limit on 15 and 16 October (46 minutes on 12 and 13 October, 52 on 14 October): no design hung,
+  every file took 20–25 % longer, Silinx's synthesis of a module being up to 7 Yosys runs since its
+  mappings for depth, with the wider functions and the LUT delays and the carry chains (#52, #54, #77, #78).
+  The corpus now runs in two jobs at once (`run-corpus.mjs --shard 1/2`, `2/2`: every other file); a file
+  that takes over 15 minutes (`--timeout`) fails the run even when none of its modules was expected to pass
+  (not one expected to fail as a whole, `hana/hana_vlib.v`); 36 and 22 minutes on 17 October;
+  the run prints its ten slowest files. The report job (#251) ran only after a `failure`, and a job at its
+  time limit ends `cancelled`: the nightly's, ISE's and the quality comparison's report job now also runs
+  after a cancelled job, and `scripts/report-failure.mjs` reports a cancelled job whose annotation says it
+  exceeded its maximum execution time (not one cancelled by hand or by a newer run), its issue saying it
+  timed out.
+
 ## 15.10.22
 
 In short:
@@ -56,18 +73,6 @@ In short:
 
 In detail:
 
-- **Nightly: Yosys's test designs in two jobs, a timed-out job reported (#343):** the corpus job hit its
-  60-minute limit on 15 and 16 October (46 minutes on 12 and 13 October, 52 on 14 October): no design hung,
-  every file took 20–25 % longer, Silinx's synthesis of a module being up to 7 Yosys runs since its
-  mappings for depth, with the wider functions and the LUT delays and the carry chains (#52, #54, #77, #78).
-  The corpus now runs in two jobs at once (`run-corpus.mjs --shard 1/2`, `2/2`: every other file); a file
-  that takes over 15 minutes (`--timeout`) fails the run even when none of its modules was expected to pass
-  (not one expected to fail as a whole, `hana/hana_vlib.v`); 36 and 22 minutes on 17 October;
-  the run prints its ten slowest files. The report job (#251) ran only after a `failure`, and a job at its
-  time limit ends `cancelled`: the nightly's, ISE's and the quality comparison's report job now also runs
-  after a cancelled job, and `scripts/report-failure.mjs` reports a cancelled job whose annotation says it
-  exceeded its maximum execution time (not one cancelled by hand or by a newer run), its issue saying it
-  timed out.
 - **Schematic editor, clicks lost (#339):** every compile of the project (after each saved edit) gave the open
   schematics their modules again, and the editor made its palette and properties anew even when nothing had
   changed: a click whose press and release fell on each side of it was lost (a Rotate, a flip-flop's CLR, a palette
