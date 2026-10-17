@@ -1,7 +1,7 @@
 # Quality of the open synthesis (size and speed against XST)
 
 The open synthesis is Silinx's front end (`core/synth-verilog.js`: the elaborated design as one flat
-SystemVerilog module) + Yosys (`core/synth-open.js`, YoWASP 0.68) + Silinx's packer
+SystemVerilog module) + Yosys (`core/synth-open.js`, YoWASP 0.70 since 15.10.23, 0.68 before) + Silinx's packer
 (`core/fpga/pack.js`). Until 15.10.1 its netlists were about 2.5 times larger than XST's
 (research/s3e-bitstream/README.md, "To do later"). This page says where the size came from, what
 changed in 15.10.2 and what is left. `measure.mjs` reproduces the tables:
@@ -39,7 +39,8 @@ mapping fixed, lab11's LUT and flip-flop counts are at or below XST's.
   `-nowidelut` (LUT4 only: lab11 316 LUTs / 166 slices but 16.2 ns), costs 1,1,1,1,2 / 1,1,1,1,3 /
   1,1,1,1,2,4,8 (LUT7 allowed: 326 slices) / 1,1,1,1,2,3 / 1,1,1,1,2,5 / 1,1,1,1,3,4 / 1,1,1,1,3,6;
   `-D 1`, `-dress`. 1,1,1,1,2,4 had the best slices and critical path on lab11 and a second course
-  project; 1,1,1,1,2,5 is equivalent. `-abc9` and `-widemux` fail on xc3se in YoWASP 0.68.
+  project; 1,1,1,1,2,5 is equivalent. `-abc9` and `-widemux` fail on xc3se in YoWASP 0.68 (`-abc9`
+  runs in 0.70: to be measured, #369; `-widemux` is for LUT6 architectures only).
 - **Tables** (`core/synth-verilog.js` `tabulate`): an expression with arithmetic (+ - * / mod,
   comparisons, shifts by a variable amount) that reads at most 6 bits of signals and variables is
   written as a function with a case over those bits; its values come from the simulator's own

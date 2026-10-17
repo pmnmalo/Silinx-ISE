@@ -110,7 +110,14 @@ In detail:
   pull request's `package.json`): the installed version is checked instead. Changed by the new Yosys: the
   source lines in its latch warnings (`proc_dlatch.cc:555…559`), the pins the placer chooses for blinky's
   back-annotation, the technology schematic's cells per block (blinky's `u_speed` 213, `u_pre` 68 at Normal
-  effort). YoWASP 0.70's ABC still crashes on `read_lut` from a script file: the inline script (#78) stays.
+  effort; pong 1012 cells in 21 blocks instead of 1041 in 20, `pressL`'s flip-flop in its block). YoWASP 0.70's
+  ABC still crashes on `read_lut` from a script file: the inline script (#78) stays; `-abc9` now runs on xc3se
+  (to be measured, #369). Yosys's test designs pinned at v0.70 (`scripts/fetch-yosys-tests.mjs`): one file
+  more (`various/json_netnames_signed.v`, passing), no result changed (454 / 457 passing). The comparison
+  (`yosys-update.yml`, on #368): the examples as large or smaller (pong 264 → 247 slices, clock 233 → 205), pong
+  14.5 % slower by the estimate (11.0 → 12.6 ns); of the design corpus's subset, femtorv32 17 % and the EPFL
+  priority encoder 9 % smaller, serv 9 %, verilog-uart 9 % and stereovision3 6 % larger, ch_intrinsics 22 %
+  slower.
 
 ## 15.10.22
 

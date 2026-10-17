@@ -338,10 +338,11 @@ uiTest('open mode: View Technology Schematic of blinky and pong without ISE: the
   await page.openProject('OpenTechPong');
   await page.click('input[name=view][value=impl]');
   const pong = await checkTechSchematic(page, { top: 'pong', blocks: ['display', 'dbL', 'dbR', 'db1', 'db2', 'timer_logic'], inside: 'dbL',
-    message: "Technology Schematic of 'pong': the netlist of the Silinx toolchain's synthesis (build/open/pong.json), 1041 cells in 20 block(s): " });
+    message: "Technology Schematic of 'pong': the netlist of the Silinx toolchain's synthesis (build/open/pong.json), 1012 cells in 21 block(s): " });
   // the cells and nets as the netlist writes them (#131): pong's lockL and pressL (Verilog names), not lockl, pressl
   assert.ok(pong.top.syms.some((x) => x.name === 'lockL_logic' && x.module === 'lockL_logic'), pong.top.syms.map((x) => x.name).join(' '));
-  assert.ok(pong.top.syms.some((x) => /^pressL_FDRE$/.test(x.name)), pong.top.syms.map((x) => x.name).join(' '));
+  // (with Yosys 0.70 pressL's flip-flop is in its block pressL_logic, not a cell pressL_FDRE of the top module)
+  assert.ok(pong.top.syms.some((x) => x.name === 'pressL_logic' && x.module === 'pressL_logic'), pong.top.syms.map((x) => x.name).join(' '));
   assert.deepEqual(pong.top.syms.filter((x) => /^(ibuf|obuf|bufg|fdre|lut\d)$/.test(x.module || '')), [], 'the primitives in upper case');
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
 }, { timeout: 400000 });
