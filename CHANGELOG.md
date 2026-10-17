@@ -60,6 +60,15 @@ In detail:
   same size (4.74 MB, 20 bytes more), the same warnings. Its `ui (classic)` failure was not the update's: the
   test of a drawing's HDL language read the Design pane's row as soon as the links and the file tree had
   changed, which a project read again sets before it draws the tree; it waits for the row now.
+- **Express 5 (#350):** the local server runs on Express 5.3 (from 4.22). Its routes, parameters, body
+  parsers, static files and error handling needed no change (no wildcard or regular-expression routes, no
+  removed methods; every handler's error goes out as JSON through its own wrapper). Express 5 calls
+  `app.listen`'s callback with a listen error too: on a port already in use the server printed *Silinx
+  running at …* and carried on as if it listened (`serve` neither opened the running Silinx nor said the port
+  was taken); `startServer` now rejects with the error (regression tests: the server's and the CLI's). A
+  download's file name is no longer quoted when it needs no quotes (`attachment; filename=top.zip`).
+  Dependabot proposes Express's major versions again; THIRD-PARTY-NOTICES lists Express 5's dependencies
+  (the same licences: MIT, ISC, BSD-3-Clause).
 
 ## 15.10.22
 

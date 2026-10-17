@@ -213,7 +213,9 @@ test('yosys update: Dependabot weekly, npm grouped but for Yosys, the majors wit
   assert.match(actions, /patterns: \['\*'\]/);
   // the ignored updates, each with its issue
   assert.match(npm, /# CodeMirror 5 to 6.*\(#349\)\n\s+- dependency-name: codemirror\n\s+update-types: \[version-update:semver-major\]/);
-  assert.match(npm, /# Express 4 to 5 \(#350\)\n\s+- dependency-name: express\n\s+update-types: \[version-update:semver-major\]/);
+  // Express 5 since #350: its majors are no longer ignored
+  assert.match(npm, /# Express: on 5 since #350/);
+  assert.ok(!/dependency-name: express/.test(npm));
   assert.match(npm, /# elkjs above 0\.9.*\(#351\)\n\s+- dependency-name: elkjs\n\s+versions: \['>=0\.10\.0'\]/);
 });
 

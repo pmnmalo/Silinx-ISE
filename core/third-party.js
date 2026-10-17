@@ -10,7 +10,7 @@ export const THIRD_PARTY = [
   },
   {
     "name": "accepts",
-    "version": "1.3.8",
+    "version": "2.0.0",
     "license": "MIT",
     "url": "jshttp/accepts",
     "standalone": false
@@ -24,15 +24,8 @@ export const THIRD_PARTY = [
     "ported": true
   },
   {
-    "name": "array-flatten",
-    "version": "1.1.1",
-    "license": "MIT",
-    "url": "https://github.com/blakeembrey/array-flatten",
-    "standalone": false
-  },
-  {
     "name": "body-parser",
-    "version": "1.20.8",
+    "version": "2.3.0",
     "license": "MIT",
     "url": "expressjs/body-parser",
     "standalone": false
@@ -67,14 +60,14 @@ export const THIRD_PARTY = [
   },
   {
     "name": "content-disposition",
-    "version": "0.5.4",
+    "version": "2.0.1",
     "license": "MIT",
     "url": "jshttp/content-disposition",
     "standalone": false
   },
   {
     "name": "content-type",
-    "version": "1.0.5",
+    "version": "2.1.0",
     "license": "MIT",
     "url": "jshttp/content-type",
     "standalone": false
@@ -88,16 +81,16 @@ export const THIRD_PARTY = [
   },
   {
     "name": "cookie-signature",
-    "version": "1.0.7",
+    "version": "1.2.2",
     "license": "MIT",
     "url": "https://github.com/visionmedia/node-cookie-signature",
     "standalone": false
   },
   {
     "name": "debug",
-    "version": "2.6.9",
+    "version": "4.4.3",
     "license": "MIT",
-    "url": "https://github.com/visionmedia/debug",
+    "url": "https://github.com/debug-js/debug",
     "standalone": false
   },
   {
@@ -105,13 +98,6 @@ export const THIRD_PARTY = [
     "version": "2.0.0",
     "license": "MIT",
     "url": "dougwilson/nodejs-depd",
-    "standalone": false
-  },
-  {
-    "name": "destroy",
-    "version": "1.2.0",
-    "license": "MIT",
-    "url": "stream-utils/destroy",
     "standalone": false
   },
   {
@@ -179,14 +165,14 @@ export const THIRD_PARTY = [
   },
   {
     "name": "express",
-    "version": "4.22.3",
+    "version": "5.3.0",
     "license": "MIT",
-    "url": "http://expressjs.com/",
+    "url": "https://expressjs.com/",
     "standalone": false
   },
   {
     "name": "finalhandler",
-    "version": "1.3.2",
+    "version": "2.1.1",
     "license": "MIT",
     "url": "pillarjs/finalhandler",
     "standalone": false
@@ -200,7 +186,7 @@ export const THIRD_PARTY = [
   },
   {
     "name": "fresh",
-    "version": "0.5.2",
+    "version": "2.0.0",
     "license": "MIT",
     "url": "jshttp/fresh",
     "standalone": false
@@ -256,9 +242,9 @@ export const THIRD_PARTY = [
   },
   {
     "name": "iconv-lite",
-    "version": "0.4.24",
+    "version": "0.7.3",
     "license": "MIT",
-    "url": "https://github.com/ashtuchkin/iconv-lite",
+    "url": "https://github.com/pillarjs/iconv-lite",
     "standalone": false
   },
   {
@@ -276,6 +262,13 @@ export const THIRD_PARTY = [
     "standalone": false
   },
   {
+    "name": "is-promise",
+    "version": "4.0.0",
+    "license": "MIT",
+    "url": "https://github.com/then/is-promise",
+    "standalone": false
+  },
+  {
     "name": "math-intrinsics",
     "version": "1.1.0",
     "license": "MIT",
@@ -284,63 +277,42 @@ export const THIRD_PARTY = [
   },
   {
     "name": "media-typer",
-    "version": "0.3.0",
+    "version": "1.1.1",
     "license": "MIT",
     "url": "jshttp/media-typer",
     "standalone": false
   },
   {
     "name": "merge-descriptors",
-    "version": "1.0.3",
+    "version": "2.0.0",
     "license": "MIT",
     "url": "sindresorhus/merge-descriptors",
     "standalone": false
   },
   {
-    "name": "methods",
-    "version": "1.1.2",
-    "license": "MIT",
-    "url": "jshttp/methods",
-    "standalone": false
-  },
-  {
-    "name": "mime",
-    "version": "1.6.0",
-    "license": "MIT",
-    "url": "https://github.com/broofa/node-mime",
-    "standalone": false
-  },
-  {
     "name": "mime-db",
-    "version": "1.52.0",
+    "version": "1.54.0",
     "license": "MIT",
     "url": "jshttp/mime-db",
     "standalone": false
   },
   {
     "name": "mime-types",
-    "version": "2.1.35",
+    "version": "3.0.2",
     "license": "MIT",
     "url": "jshttp/mime-types",
     "standalone": false
   },
   {
     "name": "ms",
-    "version": "2.0.0",
-    "license": "MIT",
-    "url": "zeit/ms",
-    "standalone": false
-  },
-  {
-    "name": "ms",
     "version": "2.1.3",
     "license": "MIT",
-    "url": "zeit/ms",
+    "url": "vercel/ms",
     "standalone": false
   },
   {
     "name": "negotiator",
-    "version": "0.6.3",
+    "version": "1.1.0",
     "license": "MIT",
     "url": "jshttp/negotiator",
     "standalone": false
@@ -360,6 +332,13 @@ export const THIRD_PARTY = [
     "standalone": false
   },
   {
+    "name": "once",
+    "version": "1.4.0",
+    "license": "ISC",
+    "url": "https://github.com/isaacs/once",
+    "standalone": false
+  },
+  {
     "name": "parseurl",
     "version": "1.3.3",
     "license": "MIT",
@@ -368,7 +347,7 @@ export const THIRD_PARTY = [
   },
   {
     "name": "path-to-regexp",
-    "version": "0.1.13",
+    "version": "8.4.2",
     "license": "MIT",
     "url": "https://github.com/pillarjs/path-to-regexp",
     "standalone": false
@@ -382,30 +361,30 @@ export const THIRD_PARTY = [
   },
   {
     "name": "qs",
-    "version": "6.16.0",
+    "version": "6.16.1",
     "license": "BSD-3-Clause",
     "url": "https://github.com/ljharb/qs",
     "standalone": false
   },
   {
     "name": "range-parser",
-    "version": "1.2.1",
+    "version": "1.3.0",
     "license": "MIT",
     "url": "jshttp/range-parser",
     "standalone": false
   },
   {
     "name": "raw-body",
-    "version": "2.5.3",
+    "version": "3.0.2",
     "license": "MIT",
     "url": "stream-utils/raw-body",
     "standalone": false
   },
   {
-    "name": "safe-buffer",
-    "version": "5.2.1",
+    "name": "router",
+    "version": "2.2.0",
     "license": "MIT",
-    "url": "https://github.com/feross/safe-buffer",
+    "url": "pillarjs/router",
     "standalone": false
   },
   {
@@ -417,14 +396,14 @@ export const THIRD_PARTY = [
   },
   {
     "name": "send",
-    "version": "0.19.2",
+    "version": "1.2.1",
     "license": "MIT",
     "url": "pillarjs/send",
     "standalone": false
   },
   {
     "name": "serve-static",
-    "version": "1.16.3",
+    "version": "2.2.1",
     "license": "MIT",
     "url": "expressjs/serve-static",
     "standalone": false
@@ -480,7 +459,7 @@ export const THIRD_PARTY = [
   },
   {
     "name": "type-is",
-    "version": "1.6.18",
+    "version": "2.1.0",
     "license": "MIT",
     "url": "jshttp/type-is",
     "standalone": false
@@ -493,17 +472,17 @@ export const THIRD_PARTY = [
     "standalone": false
   },
   {
-    "name": "utils-merge",
-    "version": "1.0.1",
-    "license": "MIT",
-    "url": "https://github.com/jaredhanson/utils-merge",
-    "standalone": false
-  },
-  {
     "name": "vary",
     "version": "1.1.2",
     "license": "MIT",
     "url": "jshttp/vary",
+    "standalone": false
+  },
+  {
+    "name": "wrappy",
+    "version": "1.0.2",
+    "license": "ISC",
+    "url": "https://github.com/npm/wrappy",
     "standalone": false
   }
 ];

@@ -80,7 +80,9 @@ export async function createApp({ host = '127.0.0.1' } = {}) {
 export async function startServer({ port = 8642, host = '127.0.0.1' } = {}) {
   const app = await createApp({ host });
   return new Promise((resolve, reject) => {
-    const srv = app.listen(port, host, () => {
+    // Express 5 calls the listen callback with the error too (a port in use): not "running"
+    const srv = app.listen(port, host, err => {
+      if (err) return reject(err);
       console.log(`Silinx running at http://${host}:${port}  (workspace: ${P.workspaceDir()})`);
       resolve(srv);
     });

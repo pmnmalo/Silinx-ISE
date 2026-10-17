@@ -24,9 +24,7 @@ updates:
       # CodeMirror 5 to 6: a rewrite of the editor's integration (#349)
       - dependency-name: codemirror
         update-types: [version-update:semver-major]
-      # Express 4 to 5 (#350)
-      - dependency-name: express
-        update-types: [version-update:semver-major]
+      # Express: on 5 since #350, its major updates no longer ignored
       # elkjs above 0.9: the schematic layout changes (#351)
       - dependency-name: elkjs
         versions: ['>=0.10.0']

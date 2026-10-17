@@ -4,7 +4,8 @@
 import { createApp } from '../../server/server.js';
 
 const app = await createApp({ host: '127.0.0.1' });
-const srv = app.listen(0, '127.0.0.1', () => {
+const srv = app.listen(0, '127.0.0.1', err => {   // Express 5: a listen error comes here too
+  if (err) throw err;
   process.stdout.write(`SILINX_PORT ${srv.address().port}\n`);
 });
 const stop = () => { srv.closeAllConnections?.(); srv.close(() => process.exit(0)); setTimeout(() => process.exit(0), 500).unref(); };

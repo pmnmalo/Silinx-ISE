@@ -439,7 +439,8 @@ test('xise: import with provided / missing files (unsafe paths mapped into the p
   r = await call('GET', '/projects/X1/export.xise');
   assert.equal(r.status, 200);
   assert.match(r.headers.get('content-type'), /application\/xml/);
-  assert.match(r.headers.get('content-disposition'), /attachment; filename="X1.xise"/);
+  // Express 5 (content-disposition 2): a token filename is not quoted (#350)
+  assert.equal(r.headers.get('content-disposition'), 'attachment; filename=X1.xise');
   assert.match(r.body, /xil_pn:name="Implementation Top" xil_pn:value="Architecture\|top\|rtl"/);
   assert.match(r.body, /xil_pn:name="FPGA Start-Up Clock" xil_pn:value="User Clock"/);
   assert.equal(await fs.readFile(path.join(P.projectDir('X1'), 'X1.xise'), 'utf8'), r.body);
@@ -509,7 +510,7 @@ test('zip: Xilinx export (.xise + sources, no Silinx-only files) and re-import',
   const r = await call('GET', '/projects/Zx/export.zip');
   assert.equal(r.status, 200);
   assert.match(r.headers.get('content-type'), /application\/zip/);
-  assert.match(r.headers.get('content-disposition'), /filename="Zx.zip"/);
+  assert.equal(r.headers.get('content-disposition'), 'attachment; filename=Zx.zip');
   const files = await unzip(r.body);
   assert.deepEqual(Object.keys(files).sort(), ['Zx.xise', 'constraints/top.ucf', 'mem/rom.hex', 'sim/tb_top.v', 'src/top.vhd']);
   assert.match(files['Zx.xise'], /xil_pn:name="PROP_BehavioralSimTop" xil_pn:value="Module\|tb_top"/);
@@ -533,7 +534,7 @@ test('zip: Silinx export keeps silinx.json and every file; import restores board
   await fs.writeFile(path.join(P.projectDir('Zs'), 'build', 'top.bit'), 'x');
   await P.updateProject('Zs', pj => { pj.top = 'top'; pj.stimuli = { a: [1, 0] }; pj.preferredLanguage = 'verilog'; });
   const r = await call('GET', '/projects/Zs/export.zip?kind=silinx');
-  assert.match(r.headers.get('content-disposition'), /filename="Zs-silinx.zip"/);
+  assert.equal(r.headers.get('content-disposition'), 'attachment; filename=Zs-silinx.zip');
   const files = await unzip(r.body);
   assert.deepEqual(Object.keys(files).sort(), ['silinx.json', 'src/fsm.asm.json', 'src/top.v']);
   const imp = await call('POST', '/projects/import-zip?name=Zs2', new Uint8Array(r.body));
@@ -675,7 +676,11 @@ test('startServer listens (and rejects a used port); openBrowser runs the platfo
   assert.match(out.join('\n'), /Silinx running at http:\/\/127.0.0.1:0 {2}\(workspace: /);
   const port = srv.address().port;
   assert.equal((await fetch(`http://127.0.0.1:${port}/api/templates`)).status, 200);
-  await assert.rejects(startServer({ port, host: '127.0.0.1' }), /EADDRINUSE/);
+  // a used port: rejected, and "running" never printed (Express 5 passes the error to the listen callback, #350)
+  out.length = 0;
+  console.log = (...a) => out.push(a.join(' '));
+  try { await assert.rejects(startServer({ port, host: '127.0.0.1' }), /EADDRINUSE/); } finally { console.log = log; }
+  assert.deepEqual(out, []);
   srv.closeAllConnections?.();
   await new Promise(r => srv.close(r));
 
