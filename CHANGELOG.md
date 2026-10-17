@@ -34,6 +34,18 @@ In detail:
   marked the error just fixed). Find, Replace, Go to Line and folding have their Portuguese texts
   (web/js/i18n-editor.js) and follow a change of language. Dependabot no longer ignores CodeMirror's major
   versions; `@codemirror/*` and `@lezer/*` are in the group of minor / patch updates.
+- **A compiled cycle simulator (#384, part 1 of #102):** `core/compiled-sim.js` reads the design at word level with
+  Yosys (`prep -flatten; memory -nomap`, from the Verilog of the synthesis: a few tens of milliseconds for the
+  examples) and compiles its netlist into one JavaScript function that runs n clock cycles: the combinational cells
+  as integer operations (BigInt above 32 bits), the flip-flops as variables, the memories as typed arrays; two-state
+  values, registers at their initial value or 0. The main clock's edges are the loop's steps; the other clocks (a
+  counter bit, a button, a gated or inverted clock), the asynchronous resets / loads / sets and the latches are
+  settled after each evaluation. 36 to 83 million cycles per second on the examples, 300 to 900 times the
+  event-driven simulator. Checked against it cycle by cycle, ports and internal signals (`test/compiled-diff.js`):
+  the six examples, the open synthesis's test designs, test designs in Verilog and VHDL exercising every cell at
+  1 to 64 bits; the cells Silinx's Verilog does not make against a reference. What it cannot compile (a
+  combinational loop, an inout port, a tristate buffer, RAMB16 / DCM_SP / BUFGMUX…) is an error with the reason. The
+  Board Emulator does not use it yet (part 2).
 - **i18n: a duplicate key (#362):** `'Test bench name:'` was written twice in web/js/i18n.js (the same translation),
   which esbuild warned of when building the standalone edition; `test/web-i18n.test.js` now rejects a key written
   twice in any of the web/js/i18n*.js dictionaries.
