@@ -20,7 +20,9 @@ import { setupUi } from '../ui/harness.js';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 // the zip and the unzipped app (2026-10: about 20 MB and 100 MB, 3/4 of it Yosys's WebAssembly)
-const BUDGET = { zipMB: 30, appMB: 140 };
+// zipMB 30 → 32 by Yosys 0.70 (#368, #380): its WebAssembly is 69 MB, its resources 11 MB, all of it
+// needed; the zip 30.4 MB
+const BUDGET = { zipMB: 32, appMB: 140 };
 
 const has = (cmd) => { try { execFileSync(cmd, ['-v'], { stdio: 'ignore' }); return true; } catch { return false; } };
 const SKIP = process.platform === 'win32' ? 'the release is packaged on Linux (zip): not on Windows'

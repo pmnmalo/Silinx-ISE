@@ -17,6 +17,8 @@ In short:
 
 In detail:
 
+- **The release zip's size budget (#380):** 30 → 32 MB, by Yosys 0.70 (#368): its WebAssembly (69 MB)
+  and resources (11 MB), all needed, make the zip 30.4 MB.
 - **EPFL benchmarks against the best-known LUT-6 results (#367):** `research/epfl-records/measure.mjs` maps each EPFL
   combinational benchmark with Silinx's front end and Yosys / ABC to 6-input LUTs (ABC's default mapping for area,
   Silinx's depth-oriented one for depth) and compares the count and the levels with the competition's 2026 records
