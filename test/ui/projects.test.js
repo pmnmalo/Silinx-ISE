@@ -372,6 +372,33 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   await page.waitFor(() => ![...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Alpha' || a.textContent === 'Clear Recent Projects'), [], { what: 'Start page list cleared' });
 });
 
+uiTest('Close Project while the project is still opening: closed after the opening, the Start page stays shown (#375)', E, async (page) => {
+  await makeProject(env, { name: 'Gamma', files: { 'src/gamma.vhd': 'library ieee; use ieee.std_logic_1164.all;\nentity gamma is port (a : in std_logic; y : out std_logic); end;\narchitecture r of gamma is begin y <= not a; end r;\n' }, top: 'gamma' });
+  // opened once with a file: its view (the Design page, the file open) is restored when it is opened again
+  await page.openProject('Gamma');
+  await page.eval(() => window.SilinxApp.openFile('src/gamma.vhd'));
+  await page.waitFor(() => window.SilinxApp.findDoc('file:src/gamma.vhd')?.editor);
+  await page.menu('File', 'Close Project');
+  await page.waitFor(() => window.Silinx.project === null && !document.querySelector('[data-page=start]').hidden);
+  const closedState = () => page.eval(() => ({ project: window.Silinx.project?.name ?? null, docs: window.Silinx.docs.length, start: !document.querySelector('[data-page=start]').hidden, design: !document.querySelector('[data-page=design]').hidden }));
+  const closed = { project: null, docs: 0, start: true, design: false };
+  // Close Project chosen at once after Open: run in that order, the project ends closed
+  await page.eval(async () => { await Promise.all([window.SilinxApp.openProject('Gamma'), window.SilinxApp.closeProject()]); });
+  assert.deepEqual(await closedState(), closed);
+  // Close Project as soon as the project is open (the rest of its opening still running): the opening did not
+  // show the Design page over the Start page, nor reopen its documents, after the close
+  await page.eval(async () => {
+    const opening = window.SilinxApp.openProject('Gamma');
+    while (window.Silinx.project?.name !== 'Gamma') await new Promise((r) => setTimeout(r, 0));
+    await Promise.all([opening, window.SilinxApp.closeProject()]);
+  });
+  assert.deepEqual(await closedState(), closed);
+  // the Start page's recent project is there to click
+  await page.click('#start-page a', { text: 'Gamma' });
+  await page.waitFor(() => window.Silinx.project?.name === 'Gamma' && !document.querySelector('[data-page=design]').hidden);
+  assert.doesNotMatch(await page.consoleText(), /ERROR/);
+});
+
 uiTest('Add Copy of Source: new files, association, overwrite confirmation (No keeps, Yes replaces)', E, async (page) => {
   const orig = 'library ieee; use ieee.std_logic_1164.all;\nentity inv is port (a : in std_logic; y : out std_logic); end inv;\narchitecture r of inv is begin y <= not a; end r;\n';
   await makeProject(env, { name: 'Copies', files: { 'src/inv.vhd': orig }, top: 'inv' });

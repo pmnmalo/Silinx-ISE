@@ -90,6 +90,12 @@ In detail:
   (THIRD-PARTY-NOTICES, NOTICE, README, the About box); Dependabot no longer ignores it. New tests check, for a
   future update, that every ELK option Silinx sets is known to the installed elkjs and that those 35 schematics
   stay readable (no overlapping symbols, no two nets' wires along each other).
+- **Close Project while a project is opening (#375):** opening a project reads it, restores the status of its
+  last run and then the documents and the page it was left on; a Close Project chosen before that ended (as soon
+  as its name was in the title) closed it, and the rest of the opening then showed its Design page over the
+  Start page and reopened its documents with no project open (seen as a UI test's failure on CI: the Start page's
+  recent project not visible to click). Opening and closing projects now run one after the other, in the order
+  they are chosen (regression test: Close Project at once after Open, and as soon as the project is open).
 
 ## 15.10.22
 

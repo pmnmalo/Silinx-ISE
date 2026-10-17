@@ -3358,7 +3358,19 @@ function blockedByRun(what) {
   return true;
 }
 
-export async function openProject(name) {
+// Opening and closing projects run one after the other, in call order (#375): a project closed while it was
+// still opening (its status and documents being restored) was closed, then the rest of the opening showed its
+// Design page over the Start page and reopened its documents with no project open.
+let lifecycle = Promise.resolve();
+function inOrder(fn) {
+  const run = lifecycle.then(fn, fn);
+  lifecycle = run.catch(() => {});
+  return run;
+}
+export function openProject(name) { return inOrder(() => openProjectNow(name)); }
+export function closeProject() { return inOrder(closeProjectNow); }
+
+async function openProjectNow(name) {
   if (blockedByRun('Open Project')) return;
   keepView = true;   // (the documents of the project left are kept as they were)
   try { for (const d of [...S.docs]) if (!await closeDoc(d)) return; } finally { keepView = false; }
@@ -3425,7 +3437,7 @@ async function reloadProjectNow(render = true, depth = 0) {
   if (!render) return;
 }
 
-export async function closeProject() {
+async function closeProjectNow() {
   if (blockedByRun('Close Project')) return;
   keepView = true;
   try { for (const d of [...S.docs]) if (!await closeDoc(d)) return; } finally { keepView = false; }
