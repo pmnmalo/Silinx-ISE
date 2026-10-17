@@ -365,6 +365,36 @@ designs with a clock (2026-10-17, `abc9-results.json`):
 - So abc9-4 would be one more candidate of the mappings kept by `DEPTH_RULE`, not a replacement: left to the
   synthesis-speed work (#377); not wired into `core/synth-open.js`.
 
+Per design, abc9-4 against *now* (the 18 designs with a clock; better in bold). The last column is what
+`keepDepth` (DEPTH_RULE) would keep between the two, given the routed periods and the LUTs. The open synthesis
+gives it its own estimate (`criticalDelay`) instead, so it is only an indication. The rule weighs LUTs, not
+slices: serv, secworks-siphash and vtr-stereovision3 keep *now* even though abc9-4 has 19 to 25 % fewer slices.
+
+| design | slices: now → abc9-4 | | period (ns): now → abc9-4 | | LUTs: now → abc9-4 | kept by DEPTH_RULE |
+|---|---|---:|---|---:|---|---|
+| examples/traffic | 67 → 69 | +3.0 % | 8.05 → 10.35 | +28.5 % | 108 → 115 | now |
+| examples/blinky | 86 → 79 | **−8.1 %** | 7.53 → 7.23 | **−3.9 %** | 69 → 72 | **abc9-4** |
+| examples/pong | 247 → 253 | +2.4 % | 12.57 → 12.36 | **−1.6 %** | 282 → 299 | now |
+| examples/stopwatch | 194 → 194 | +0.0 % | 12.49 → 12.79 | +2.4 % | 202 → 222 | now |
+| examples/clock | 205 → 210 | +2.4 % | 8.82 → 8.58 | **−2.7 %** | 207 → 224 | now |
+| serv | 208 → 168 | **−19.2 %** | 13.15 → 13.51 | +2.7 % | 273 → 261 | now |
+| picorv32 | 791 → 749 | **−5.3 %** | 11.78 → 12.08 | +2.5 % | 1184 → 1275 | now |
+| femtorv32-quark | 423 → 418 | **−1.2 %** | 17.27 → 18.72 | +8.4 % | 638 → 749 | now |
+| light8080 | 192 → 207 | +7.8 % | 12.75 → 11.64 | **−8.8 %** | 313 → 343 | **abc9-4** |
+| verilog-uart | 131 → 125 | **−4.6 %** | 10.27 → 9.30 | **−9.4 %** | 132 → 148 | now |
+| verilog-i2c-master | 126 → 113 | **−10.3 %** | 10.96 → 9.74 | **−11.1 %** | 190 → 194 | **abc9-4** |
+| nandland-spi-vhdl | 52 → 33 | **−36.5 %** | 5.49 → 5.35 | **−2.4 %** | 46 → 44 | **abc9-4** |
+| fpu-adder | 341 → 344 | +0.9 % | 12.49 → 11.16 | **−10.6 %** | 480 → 514 | **abc9-4** |
+| secworks-siphash | 913 → 707 | **−22.6 %** | 14.11 → 14.98 | +6.2 % | 1059 → 1060 | now |
+| epfl-dec | 187 → 187 | +0.0 % | 6.51 → 6.45 | **−1.0 %** | 288 → 288 | **abc9-4** |
+| epfl-priority | 115 → 130 | +13.0 % | 11.24 → 52.14 | +363.7 % | 209 → 254 | now |
+| vtr-ch-intrinsics | 275 → 275 | +0.0 % | 7.59 → 6.16 | **−18.9 %** | 103 → 104 | **abc9-4** |
+| vtr-stereovision3 | 112 → 84 | **−25.0 %** | 7.99 → 8.28 | +3.6 % | 135 → 140 | now |
+
+abc9-4 would be kept on 7 of the 18 designs: blinky, light8080, verilog-i2c-master, nandland-spi-vhdl, fpu-adder,
+EPFL dec and vtr-ch-intrinsics, where its period is 1 to 19 % shorter. On EPFL priority it would be refused
+(52 ns against 11: without the depth-oriented mapping).
+
 ## What is left
 
 - **Speed**: lab11's critical path now has XST's logic depth (state register -> control decoding
