@@ -32,6 +32,14 @@ In detail:
   after a cancelled job, and `scripts/report-failure.mjs` reports a cancelled job whose annotation says it
   exceeded its maximum execution time (not one cancelled by hand or by a newer run), its issue saying it
   timed out.
+- **CI-only UI failures found (#346):** a project opened restored its processes' status (and whether its
+  synthesis is up to date, #280) after it said it was open: a process double-clicked at once could be lost
+  (the Processes panel drawn again between the press and the release) or synthesize again; it is restored
+  before now. The RTL / Technology Schematic changed its crumbs to the instance pushed into before that
+  instance's drawing was laid out: a click meanwhile selected a cell of the drawing left, whose properties then
+  went away; the crumbs now change with the drawing. Of the other failures named, Open Example (traffic) was
+  #215 (fixed), #253's test read the project before it was saved (fixed in its test), and yosysWorkers on
+  Windows imported the module by its path, not a file URL (fixed in its test).
 
 ## 15.10.22
 

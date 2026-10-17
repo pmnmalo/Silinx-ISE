@@ -261,6 +261,23 @@ async function waitTech(page, top) {
     throw new Error(`${e.message}\n--- the app: ${JSON.stringify(st)}\n--- console:\n${(await page.consoleText().catch(() => '')).split('\n').slice(-25).join('\n')}`);
   }
 }
+// push into the instance `inside` (its block, symbol `id`, double-clicked): the crumbs say it once its drawing
+// is shown, not before (#346: a click meanwhile went to the drawing left, its properties then replaced)
+async function pushInto(page, id, inside) {
+  await page.eval(() => {
+    const bar = document.querySelector('.doc:not([hidden]) .rtl-crumbs'), ed = window.Silinx.active.viewer;
+    window.__crumbs = [];
+    window.__crumbsObs?.disconnect();
+    window.__crumbsObs = new MutationObserver(() => window.__crumbs.push({ crumb: bar.querySelector('b')?.textContent ?? null, modules: ed.getDoc().symbols.map((x) => x.params?.module) }));
+    window.__crumbsObs.observe(bar, { childList: true, subtree: true, characterData: true });
+  });
+  await page.dblclick(`.doc:not([hidden]) .se-svg [data-kind=sym][data-id="${id}"]`);
+  await page.waitFor((b) => document.querySelector('.doc:not([hidden]) .rtl-crumbs b')?.textContent === `${b} : ${b}`, [inside], { what: `inside ${inside}`, timeout: 60000 });
+  const seen = await page.eval(() => { window.__crumbsObs.disconnect(); return window.__crumbs; });
+  // every change of the crumbs: the drawing then shown is the instance's (no block of that name in it, its primitives)
+  assert.ok(seen.length > 0);
+  for (const c of seen) assert.ok(c.crumb !== `${inside} : ${inside}` || (!c.modules.includes(inside) && c.modules.length > 5), `the crumbs say ${c.crumb} over the drawing of ${c.modules.join(' ')}`);
+}
 async function checkTechSchematic(page, { top, blocks, message, inside }) {
   await page.treeRow('#procs', 'View Technology Schematic', { dbl: true, exact: true });
   await waitTech(page, top);
@@ -278,9 +295,7 @@ async function checkTechSchematic(page, { top, blocks, message, inside }) {
   for (const b of blocks) assert.ok(v.syms.some((x) => x.name === b && x.module === b), `instance ${b}: ${v.syms.map((x) => x.name).join(' ')}`);
   // push into an instance: its LUTs, flip-flops, carry chain
   const blk = v.syms.find((x) => x.module === inside);
-  await page.dblclick(`${TECH} .se-svg [data-kind=sym][data-id="${blk.id}"]`);
-  await page.waitFor((b) => document.querySelector('.doc:not([hidden]) .rtl-crumbs b')?.textContent === `${b} : ${b}`, [inside], { what: `inside ${inside}`, timeout: 60000 });
-  await page.waitFor((n) => window.Silinx.active.viewer.getDoc().symbols.length > 5 && !window.Silinx.active.viewer.getDoc().symbols.some((x) => x.params?.module === n), [inside]);
+  await pushInto(page, blk.id, inside);
   v = await techView(page);
   const types = new Set(v.syms.map((x) => x.module));
   for (const t of ['FDRE', 'MUXCY', 'XORCY']) assert.ok(types.has(t), `${t} in ${inside}: ${[...types].join(' ')}`);
@@ -451,11 +466,14 @@ uiTest('#280 open mode: Generate Programming File after a change of the pins onl
   await makeProject(env, { name: 'OpenAgain', template: 'blinky' });
   await page.openProject('OpenAgain');
   await reloadToolchain(page);
-  // a process run: its part of the console (from where the console was before)
+  // a process run: its part of the console (from where the console was before); a timeout says what the app was doing
   const run = async (proc) => {
     const before = (await page.consoleText()).length;
     await page.treeRow('#procs', proc, { dbl: true, exact: true });
-    await page.waitFor((b, re) => new RegExp(re).test(document.getElementById('console-log').innerText.slice(b)), [before, DONE(proc).source], { what: proc, timeout: 120000 });
+    await page.waitFor((b, re) => new RegExp(re).test(document.getElementById('console-log').innerText.slice(b)), [before, DONE(proc).source], { what: proc, timeout: 120000 }).catch(async (e) => {
+      const st = await page.eval(() => { const S = window.SilinxApp.S; return { busy: !!S.busy, job: S.currentJob || null, status: S.status, sel: S.sel, dialogs: [...document.querySelectorAll('.dlg-overlay')].map((d) => d.innerText.slice(0, 300)) }; });
+      throw new Error(`${e.message}\n--- the app: ${JSON.stringify(st)}\n--- console:\n${(await page.consoleText()).split('\n').slice(-30).join('\n')}`);
+    });
     return (await page.consoleText()).slice(before);
   };
   const file = (p) => env.server.api('GET', `/api/projects/OpenAgain/file?path=${encodeURIComponent(p)}`);
@@ -477,8 +495,11 @@ uiTest('#280 open mode: Generate Programming File after a change of the pins onl
   const st = await page.eval(() => window.SilinxApp.S.status);
   for (const id of ['synth', 'translate', 'map', 'par', 'impl', 'bitgen']) assert.ok(['ok', 'warn'].includes(st[id]), `${id}: ${st[id]}`);
   assert.deepEqual((await env.server.api('GET', '/api/projects/OpenAgain/reports')).synthesis, synth1);
-  // reopened: still up to date
-  await page.openProject('OpenAgain');
+  // reopened: still up to date, the processes' status restored once the project is open (#346: restored
+  // after it, the Processes panel was drawn again under the double-click on Implement Design, which never started)
+  const reopened = await page.eval(async () => { await window.SilinxApp.openProject('OpenAgain'); const S = window.SilinxApp.S; return { synthDone: S.synthDone, status: { ...S.status } }; });
+  assert.ok(reopened.synthDone?.fingerprint, JSON.stringify(reopened));
+  for (const id of ['synth', 'translate', 'map', 'par', 'impl', 'bitgen']) assert.ok(['ok', 'warn'].includes(reopened.status[id]), `${id}: ${JSON.stringify(reopened.status)}`);
   log = await run('Implement Design');
   assert.ok(!synthRuns(log) && log.includes(UPTODATE), log.slice(0, 3000));
   // Synthesize itself runs it

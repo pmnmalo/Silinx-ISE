@@ -639,21 +639,16 @@ uiTest('browser edition: View Technology Schematic of blinky and pong: the netli
     for (const m of ['IBUF', 'OBUF', 'BUFG', ...blocks]) assert.ok(mods.has(m), `${name}: ${m} (${[...mods].join(' ')})`);
     // push into an instance: LUTs and flip-flops; a LUT's function on demand
     await page.dblclick(`.doc:not([hidden]) .se-svg [data-kind=sym][data-id="${v.syms.find((x) => x.module === inside).id}"]`);
-    await page.waitFor((b) => document.querySelector('.doc:not([hidden]) .rtl-crumbs b')?.textContent === `${b} : ${b}` && window.Silinx.active.viewer.getDoc().symbols.length > 5, [inside], { what: `inside ${inside}`, timeout: 60000 });
+    // (the crumbs say the instance once its drawing is shown, #346: a click before then went to the drawing left)
+    await page.waitFor((b) => document.querySelector('.doc:not([hidden]) .rtl-crumbs b')?.textContent === `${b} : ${b}`, [inside], { what: `inside ${inside}`, timeout: 60000 });
     v = await view();
+    assert.ok(!v.syms.some((x) => x.module === inside), `${name}/${inside}: the instance's drawing`);
     assert.ok(v.syms.some((x) => x.module === 'FDRE'), `${name}/${inside}: flip-flops`);
     const lut = v.syms.find((x) => /^LUT[1-4]$/.test(x.module));
-    // (the view may still be fitting itself to the window, and the properties drawn again once more: a
-    // click that missed the LUT, or a section replaced under the click, is repeated)
-    for (let k = 0; ; k++) {
-      try {
-        await page.click(`.doc:not([hidden]) .se-svg [data-kind=sym][data-id="${lut.id}"]`);
-        await page.waitFor(() => document.querySelector('.doc:not([hidden]) .se-lutfn > summary')?.getClientRects().length, [], { what: 'the LUT function', timeout: 3000 });
-        await page.click('.doc:not([hidden]) .se-lutfn > summary');
-        await page.waitFor(() => document.querySelector('.doc:not([hidden]) .se-lutfn[open] .se-lut-eq')?.getClientRects().length, [], { what: 'the LUT equation', timeout: 3000 });
-        break;
-      } catch (e) { if (k >= 4) throw e; }
-    }
+    await page.click(`.doc:not([hidden]) .se-svg [data-kind=sym][data-id="${lut.id}"]`);
+    await page.waitFor(() => document.querySelector('.doc:not([hidden]) .se-lutfn > summary')?.getClientRects().length, [], { what: 'the LUT function' });
+    await page.click('.doc:not([hidden]) .se-lutfn > summary');
+    await page.waitFor(() => document.querySelector('.doc:not([hidden]) .se-lutfn[open] .se-lut-eq')?.getClientRects().length, [], { what: 'the LUT equation' });
     assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .se-lut-eq').textContent), /^O = (0|1|!?I\d)/);
   }
 }, { url: () => 'about:blank', timeout: 400000 });

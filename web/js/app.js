@@ -1848,8 +1848,9 @@ async function openSchematic(mod, { netlist = null } = {}) {
       const upBtn = h('button', { class: 'btn rtl-nav', title: 'Up to the parent module (Backspace)', onclick: () => cur?.parent && show(cur.parent) }, '⬆ Up');
       const intoBtn = h('button', { class: 'btn rtl-nav', title: 'Push into the selected instance (Enter, or double-click it)', onclick: () => ed?.openSelected() }, '⬇ Push into');
       const canEnter = s => !!(s && cur?.children.some(c => (sameName(c.name, s.name, cur.mod?.lang === 'vhdl') || sameName(c.module, s.params.module, c.mod?.lang === 'vhdl')) && !c.blackbox && !isPrimitive(c)));
-      const show = async inst => {
-        cur = inst;
+      // the bar (Up, the crumbs) says the instance drawn: it changes with the drawing, once that is laid
+      // out, not before (a click meanwhile went to the drawing left, its properties then replaced, #346)
+      const drawBar = (inst, info) => {
         bar.innerHTML = '';
         upBtn.disabled = !inst.parent; intoBtn.disabled = true;
         bar.append(upBtn, intoBtn, h('span', { class: 'rtl-ro' }, netlist ? 'Technology Schematic (read-only): the post-synthesis netlist' : 'RTL Schematic (read-only)'));
@@ -1857,12 +1858,17 @@ async function openSchematic(mod, { netlist = null } = {}) {
           bar.append(h('span', { class: 'sep' }, k ? ' › ' : ' — '));
           bar.append(k === all.length - 1 ? h('b', {}, label(i)) : h('a', { onclick: () => show(i) }, label(i)));
         });
-        const info = moduleInfo(inst.module);
         if (info) bar.append(h('span', { class: 'spacer' }), h('a', { onclick: () => openFile(info.file, info.line) }, `Open ${info.file.split('/').pop()}`));
+      };
+      let want = null;   // the instance asked for last (its drawing being laid out)
+      const show = async inst => {
+        want = inst;
+        const info = moduleInfo(inst.module);
         status(`Drawing ${kindName} schematic of ${inst.module}…`);
         try {
           const doc = await schematicFromHdl(inst, { sources, modules, layout: elk ? g => elk.layout(g) : undefined, lang: info?.lang || 'vhdl' });
-          if (cur !== inst || docRef.closed) return;
+          if (want !== inst || docRef.closed) return;
+          cur = inst;
           if (!ed) {
             ed = mountSchEditor(host, {
               doc, modules, readOnly: true,
@@ -1875,6 +1881,7 @@ async function openSchematic(mod, { netlist = null } = {}) {
             });
             docRef.viewer = ed;   // (the read-only editor of the view: tests)
           } else ed.setDoc(doc);
+          drawBar(inst, info);
           setTimeout(() => ed.fit?.(), 50);
         } catch (e) { log(`ERROR: ${kindName} schematic of ${inst.module}: ${e.message}`, 'err'); }
         finally { status('Ready'); }
@@ -3363,8 +3370,11 @@ export async function openProject(name) {
   rememberRecent(name);
   await reloadProject();
   await fixMissingTops();   // (a project saved with a top it no longer has, #253)
-  restoreImplStatus();
   log(`Project "${name}" opened (${S.project.device.part}${S.project.device.speed}-${S.project.device.package}).`, 'info');
+  // the processes' status of the last run, its synthesis up to date or not (#280), restored before the project is
+  // used: not awaited, it drew the Processes panel again under a double-click on a process and Implement Design
+  // then did not start, or synthesized again (#346)
+  await restoreImplStatus();
   // where the user was in this project; the Design Summary the first time
   if (!await restoreViewState(name)) openSummary({ background: true });
 }
