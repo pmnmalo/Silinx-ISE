@@ -286,7 +286,8 @@ endmodule
   assert.equal(d.status, 'pass', d.report || JSON.stringify(d));
   const rot = elaborate(compile([{ path: 'rot.v', lang: 'verilog', text: SHL.replace('rd << rs', '(rd << rs) | (rd >> (32 - rs))').replace(/shl/g, 'rot') }]), 'rot');
   const r2 = await synthesizeOpen(rot, { family: 'spartan3e', run: yosysNode });
-  assert.deepEqual([r2.util.luts, r2.util.muxes, r2.depth.wide.kept], [313, 0, false], JSON.stringify(r2.depth));
+  // (raised by Yosys 0.70 (#368): 313 LUTs with 0.68, 319 with 0.70)
+  assert.deepEqual([r2.util.luts, r2.util.muxes, r2.depth.wide.kept], [319, 0, false], JSON.stringify(r2.depth));
   const d2 = compareNetlist(rot, r2, { name: 'lut4-rot', sim: { cycles: 300 } });
   assert.equal(d2.status, 'pass', d2.report || JSON.stringify(d2));
 });

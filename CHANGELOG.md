@@ -117,7 +117,10 @@ In detail:
   (`yosys-update.yml`, on #368): the examples as large or smaller (pong 264 → 247 slices, clock 233 → 205), pong
   14.5 % slower by the estimate (11.0 → 12.6 ns); of the design corpus's subset, femtorv32 17 % and the EPFL
   priority encoder 9 % smaller, serv 9 %, verilog-uart 9 % and stereovision3 6 % larger, ch_intrinsics 22 %
-  slower.
+  slower (the speed after 0.70: #377). Raised by Yosys 0.70 (#368): the pedestrian crossing's size budget to
+  110 LUTs (94 LUTs, 32 MUXF, 68 slices with 0.68; 108 LUTs, 13 MUXF, 67 slices with 0.70) and #54's rotator
+  to 319 LUTs (313 with 0.68), still LUT4s alone; the design corpus's expected sizes and speeds as 0.70 makes
+  them (`test/designs-corpus/expected.json`).
 
 ## 15.10.22
 

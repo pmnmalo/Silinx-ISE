@@ -69,8 +69,9 @@ const BUDGETS = {
   'examples/clock': { design: () => example('clock'), luts: 230, muxes: 87, slices: 256 },
   // the pedestrian crossing (state diagram, truth table, timer, display; 15.10.12: 114 LUTs, 22 MUXF, 73
   // slices; 15.10.16, balanced once more for depth (#52): 94 LUTs, 32 MUXF, 68 slices, 7.1 ns estimated
-  // instead of 7.9)
-  'examples/traffic': { design: () => example('traffic'), luts: 105, muxes: 35, slices: 75 },
+  // instead of 7.9; raised by Yosys 0.70 (#368): 94 LUTs, 32 MUXF, 68 slices with 0.68, 108 LUTs, 13 MUXF,
+  // 67 slices with 0.70)
+  'examples/traffic': { design: () => example('traffic'), luts: 110, muxes: 35, slices: 75 },
   fsm: { design: () => fixture('fsm'), luts: 14, muxes: 4, slices: 10 },
   adder: { design: () => fixture('adder'), luts: 72, muxes: 2, slices: 63 },
   // shift registers: the fixed chains in SRL16E (15.10.2: 63 slices; in flip-flops 79; XST about 9
