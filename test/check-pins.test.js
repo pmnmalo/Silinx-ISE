@@ -31,7 +31,7 @@ test('check-pins: every pin of the repository (Yosys\'s test designs, each corpu
   const serv = commits.find(p => p.repo === 'olofk/serv');
   for (const d of manifest.designs.filter(x => x.source === 'serv')) for (const f of d.files.filter(x => !x.startsWith('local:'))) assert.ok(serv.used.includes(f), f);
   const mcc = pins.find(p => p.kind === 'mcc');
-  assert.equal(mcc.year, 2024);
+  assert.equal(mcc.year, 2026);
   assert.ok(mcc.models.length >= 2);
   assert.equal(pins.length, 2 + commits.length);
 });

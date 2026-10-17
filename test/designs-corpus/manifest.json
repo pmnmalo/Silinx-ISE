@@ -4,7 +4,7 @@
   "serv": { "repo": "olofk/serv", "commit": "f200eb2ed7b69ac1c6b8eddd47654522aeee5ce8", "url": "https://github.com/olofk/serv", "licence": "ISC", "licenceFile": "LICENSE" },
   "picorv32": { "repo": "YosysHQ/picorv32", "commit": "ef203c2b0a3fb793280f5114941416c425c5b461", "url": "https://github.com/YosysHQ/picorv32", "licence": "ISC", "licenceFile": "COPYING" },
   "learn-fpga": { "repo": "BrunoLevy/learn-fpga", "commit": "5c08c870315c09ccd9ec64ccde20ab3375b3f273", "url": "https://github.com/BrunoLevy/learn-fpga", "licence": "BSD-3-Clause", "licenceFile": "LICENSE" },
-  "neorv32": { "repo": "stnolting/neorv32", "commit": "af905649fdbe650245af700690e435b58601ef7e", "url": "https://github.com/stnolting/neorv32", "licence": "BSD-3-Clause", "licenceFile": "LICENSE" },
+  "neorv32": { "repo": "stnolting/neorv32", "commit": "b2620454ebb2407e81a6a1965ef52e2a860b0432", "url": "https://github.com/stnolting/neorv32", "licence": "BSD-3-Clause", "licenceFile": "LICENSE" },
   "light8080": { "repo": "jaruiz/light8080", "commit": "57163bcb641298feae19df41d461d1365591ac3e", "url": "https://github.com/jaruiz/light8080", "licence": "LGPL-2.1", "licenceFile": "LICENSE" },
   "t80": { "repo": "freecores/t80", "commit": "0f4d94a07f61340fa2963cd6d7ed3c5691d2f305", "url": "https://github.com/freecores/t80", "licence": "BSD-3-Clause-style (OpenCores T80 header, Daniel Wallner)", "licenceFile": "rtl/vhdl/T80s.vhd" },
   "verilog-uart": { "repo": "alexforencich/verilog-uart", "commit": "1b867e53af738e4a8bc7c839ca2f1c07f40382dc", "url": "https://github.com/alexforencich/verilog-uart", "licence": "MIT", "licenceFile": "COPYING" },
@@ -19,7 +19,7 @@
   "secworks-sha256": { "repo": "secworks/sha256", "commit": "837c5cc396f001d18f2c765721c585716eb439ae", "url": "https://github.com/secworks/sha256", "licence": "BSD-2-Clause", "licenceFile": "LICENSE" },
   "secworks-siphash": { "repo": "secworks/siphash", "commit": "25f5482f4ecbf1ab60a7b5e5dd7e2d7f56b0aa6c", "url": "https://github.com/secworks/siphash", "licence": "BSD-2-Clause", "licenceFile": "LICENSE.txt" },
   "fpu": { "repo": "dawsonjon/fpu", "commit": "c45d5e0a9f1b7e945e2be6770dbc1203825a05c4", "url": "https://github.com/dawsonjon/fpu", "licence": "MIT", "licenceFile": "COPYING.txt" },
-  "vtr": { "repo": "verilog-to-routing/vtr-verilog-to-routing", "commit": "a33307dd319a5ef9d26747c4be64ce12c8ac975d", "url": "https://github.com/verilog-to-routing/vtr-verilog-to-routing", "licence": "VTR benchmarks: open source, each under the terms in its own source (LICENSE.md)", "licenceFile": "LICENSE.md" },
+  "vtr": { "repo": "verilog-to-routing/vtr-verilog-to-routing", "commit": "8d2f38937c873df532ae855a31481704acdca08d", "url": "https://github.com/verilog-to-routing/vtr-verilog-to-routing", "licence": "VTR benchmarks: open source, each under the terms in its own source (LICENSE.md)", "licenceFile": "LICENSE.md" },
   "epfl": { "repo": "lsils/benchmarks", "commit": "82d8cc6910419298e713a46644ed59fd3df53038", "url": "https://github.com/lsils/benchmarks", "licence": "MIT", "licenceFile": "LICENSE" }
  },
  "designs": [

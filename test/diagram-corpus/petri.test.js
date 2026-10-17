@@ -1,4 +1,4 @@
-// The Petri nets of the diagram corpus (#205): P/T nets of the Model Checking Contest 2024
+// The Petri nets of the diagram corpus (#205): P/T nets of the Model Checking Contest 2026
 // (test/diagram-corpus/mcc.json, fetched by scripts/fetch-diagram-corpus.mjs, never committed), read
 // from their PNML and analysed (core/petri-analysis.js): the size of the reachability graph, the most
 // tokens in a place and in a marking, deadlock, liveness, 1-safe, against the contest's results; the

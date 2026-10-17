@@ -35,7 +35,7 @@ netlist simulated against the HDL, its cells recorded (`sizes.json`).
 
 ## Petri nets: `mcc.json`
 
-Twelve P/T nets of the [Model Checking Contest](https://mcc.lip6.fr/2024/models.php) 2024, from 13 to
+Twelve P/T nets of the [Model Checking Contest](https://mcc.lip6.fr/2026/models.php) 2026, from 13 to
 10 636 reachable markings, 1-safe and k-bounded (k = 2, 3, 10), with and without deadlocks, live and
 not. **Fetched for testing only, never committed** (`scripts/fetch-diagram-corpus.mjs`: the
 archive checked against its SHA-256, only the net kept, in the main checkout's
@@ -45,5 +45,5 @@ archive checked against its SHA-256, only the net kept, in the main checkout's
 Each one (`test/diagram-corpus/petri.test.js`): read from its PNML, analysed (`core/petri-analysis.js`),
 the number of reachable markings and of firings between them, the most tokens in a place and in a
 marking, deadlock, liveness and 1-safe compared with the contest's consensus results
-(`raw-result-analysis.csv` of 2024); the small safe nets also as hardware, their VHDL and Verilog
+(`raw-result-analysis.csv` of 2026); the small safe nets also as hardware, their VHDL and Verilog
 simulated against the clock step.

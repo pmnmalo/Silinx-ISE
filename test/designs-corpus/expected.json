@@ -346,10 +346,10 @@
   },
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 2151,
-   "luts": 4293,
-   "ffs": 1319,
-   "period": 17.442
+   "slices": 2137,
+   "luts": 4265,
+   "ffs": 1320,
+   "period": 16.85
   }
  },
  "picorv32": {

@@ -12,6 +12,16 @@ In short:
 
 In detail:
 
+- **Pinned sources at their latest versions (#358):** what `scripts/check-pins.mjs` (#352) found behind, but
+  Yosys's test designs (they move with the Yosys update). The design corpus: neorv32 af90564 → b262045
+  (11 commits: v1.13.6.6, the I2C device's ACK/NACK as the I2C-bus specification has it, a store-conditional's bus
+  request kept stable until its response); it passes every stage as before, with the same warnings, and is
+  slightly smaller and faster (2151 → 2137 slices, 4293 → 4265 LUTs, 17.442 → 16.850 ns; one more flip-flop, a
+  register replicated on the critical path): `expected.json`; the old pin gives the old figures exactly.
+  vtr a33307d → 8d2f389 (74 commits, none in the benchmarks used): the same results. The Model Checking
+  Contest's models 2024 → 2026: the twelve nets are byte for byte the same (only their archives repacked, new
+  SHA-256), the 2026 consensus results (`raw-result-analysis.csv.tar.gz`) the same values, and the call for models
+  the same terms ("expected to become part of the public domain").
 - **Emulator: a manual clock on a button (#347):** with no port on a board clock pin, the emulator took a port named
   clk… for the 50 MHz clock and drove it, even when the UCF puts it on a button (a manual clock, e.g. BTN0 with
   CLOCK_DEDICATED_ROUTE = FALSE): a flip-flop's Q followed D at once and the button did nothing, in the behavioural
