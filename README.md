@@ -311,7 +311,8 @@ way they can use it; the token changes at every start. The toolchain settings th
 `~/.silinx/config.json` only, never from the page.
 
 Projects live in `~/Silinx-projects` (override with `SILINX_WORKSPACE`). Pushing a tag `vX.Y.Z`
-runs the tests and publishes a release with the files above (`.github/workflows/release.yml`).
+publishes a release with the files above (`.github/workflows/release.yml`), once main's CI has passed on
+the tagged commit (`scripts/wait-for-ci.mjs`).
 The tests against ISE (`test/ise/`) run nightly, and on demand (Actions ▸ ISE ▸ Run workflow), on
 a self-hosted runner with the ISE Docker image (label `ise`, `.github/workflows/ise.yml`); only code
 already on main runs there, never a pull request's. The same runner compares the Silinx toolchain

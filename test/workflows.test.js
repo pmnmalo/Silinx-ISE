@@ -109,7 +109,7 @@ test('workflows: explicit permissions, and no ${{ }} expression inside a run: sc
   for (const f of FILES) {
     const yml = read(f);
     // the token's permissions said by every workflow, not the repository's default
-    assert.match(yml.slice(0, yml.indexOf('\njobs:\n')), /^permissions:\n {2}[\w-]+: (read|write)$/m, `${f}: permissions`);
+    assert.match(yml.slice(0, yml.indexOf('\njobs:\n')), /^permissions:\n {2}[\w-]+: (read|write)\b/m, `${f}: permissions`);
     // a value goes into a script through env:, never pasted into it (an injection: a pull request's package.json,
     // an input typed by hand)
     for (const { line, script } of runScripts(yml)) assert.doesNotMatch(script, /\$\{\{/, `${f}:${line}`);

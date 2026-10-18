@@ -118,6 +118,10 @@ In detail:
   so only the system's libraries are installed each run; every job of every workflow has its `timeout-minutes`
   (a hang no longer lasts GitHub's 360 minutes; unit 45, ui 20, browsers and webkit-standalone 25, os 30, the
   change checks and failure reports 10). Tests: `test/workflows.test.js`.
+- **Releases without running the tests again (#416):** the Release workflow no longer runs `npm test` (12-29
+  minutes) on a commit main's CI tests anyway: it waits for the CI run of the tagged commit on main
+  (`scripts/wait-for-ci.mjs`) and fails when that run did not pass, or when the commit has no CI run on main; the
+  single-file edition, the packages and the release zip's test are kept. Tests: `test/wait-for-ci.test.js`.
 
 ## 15.11.0
 

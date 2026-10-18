@@ -77,6 +77,7 @@ the code and the lessons learnt.
 - **Releases**, only when asked:
   1. `npm version X --no-git-tag-version`, then `node scripts/sync-version.mjs`;
   2. commit `core/version.js`, `package.json`, `package-lock.json` and the CHANGELOG;
-  3. tag `vX` and push; the Release workflow publishes it.
+  3. tag `vX` and push; the Release workflow publishes it once main's CI has passed on that commit (it does
+     not run the tests again).
 
   The Pages site serves the latest release at the root and `main` under `dev/`.

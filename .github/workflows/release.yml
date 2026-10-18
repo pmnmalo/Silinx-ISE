@@ -2,16 +2,19 @@
 #   Silinx-ISE.html                         single-file edition (no install, runs in the browser)
 #   silinx-ise-<version>.zip                full app (server + UI + examples), production node_modules included
 #   silinx-ise-docker-kit-<version>.zip builder kit for the private Xilinx ISE 14.7 Docker image
+# The tests are not run again (#416): the tagged commit must have passed main's CI (a push to main runs
+# everything); the job waits for that run (scripts/wait-for-ci.mjs), then checks the packages it publishes.
 name: Release
 on:
   push:
     tags: ['v*']
 permissions:
+  actions: read               # the tagged commit's CI run
   contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -19,7 +22,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      # main's CI on this commit, waited for when it is still running (the release commit and its tag are
+      # pushed together); no run on main, or a failed one: no release
+      - name: CI passed on main
+        run: node scripts/wait-for-ci.mjs "$GITHUB_SHA" --timeout 60 --appear 10
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Build the single-file edition
         run: node scripts/build-standalone.mjs
       # the same script as the release test (npm run test:release, in CI): the app zip (tracked files +
