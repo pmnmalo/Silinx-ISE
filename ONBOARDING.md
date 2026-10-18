@@ -55,7 +55,7 @@ Several sessions work on the repository at the same time, each in its own clone 
 |---|---|
 | **Silinx core development** (Pedro) | the app and its UI, editors, board/PROM programming (`core/adept.js`, `core/xcf.js`), CI and workflows, releases |
 | **Codebase bug review** (Pedro) | synthesis, place & route, bitstream: `core/synth-open*.js`, `core/fpga/*`, `research/*`, the design corpus |
-| **Silinx-ISE Maria 1, 2, 3…** (Maria) | one issue each, announced to the others (e.g. CodeMirror 6 #349, the compiled simulator #384, the device descriptions #3) |
+| **Issue sessions** (one per issue, named after it) | one issue each, announced to the others (e.g. CodeMirror 6 #349, the compiled simulator #384, the device descriptions #3) |
 
 - **Before starting, announce** the issue and the files you will touch to the other sessions
   (SendMessage: `ListAgents` gives their names). Ask before touching another session's area.
