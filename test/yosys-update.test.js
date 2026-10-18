@@ -198,8 +198,10 @@ test('yosys update: Dependabot weekly, npm grouped but for Yosys, the majors wit
   const [npm, actions] = y.split('\n  - package-ecosystem: ').slice(1);
   assert.match(npm, /^npm\n/);
   assert.match(actions, /^github-actions\n/);
+  assert.match(npm, /directory: \/\n/);
+  // the workflows' actions and the setup action's (#417, #414)
+  assert.match(actions, /directories: \[\/, \/\.github\/actions\/setup\]\n/);
   for (const part of [npm, actions]) {
-    assert.match(part, /directory: \/\n/);
     assert.match(part, /interval: weekly/);
     assert.match(part, /open-pull-requests-limit: [1-3]\n/);
     assert.match(part, /labels: \[dependencies\]/);

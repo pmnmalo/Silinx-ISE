@@ -56,9 +56,9 @@ test('workflows: the self-hosted runner only for main, read-only, without the ch
       for (const [scope, level] of Object.entries(permissions(lines) || {})) assert.equal(level, 'read', `${f}:${name} ${scope}`);
       assert.doesNotMatch(yml.slice(0, yml.indexOf('\njobs:\n')), /^ {2}[\w-]+: write$/m, `${f}: no writing permission for the workflow`);
       const body = lines.join('\n');
-      const checkouts = body.match(/uses: actions\/checkout@\S+/g) || [];
+      const checkouts = body.match(/uses: actions\/checkout@.+/g) || [];
       assert.ok(checkouts.length, `${f}:${name}`);
-      assert.equal((body.match(/uses: actions\/checkout@\S+\n\s+with:\n(?:\s+\w[\w-]*: .*\n)*?\s+persist-credentials: false/g) || []).length, checkouts.length, `${f}:${name} persist-credentials: false`);
+      assert.equal((body.match(/uses: actions\/checkout@.+\n\s+with:\n(?:\s+\w[\w-]*: .*\n)*?\s+persist-credentials: false/g) || []).length, checkouts.length, `${f}:${name} persist-credentials: false`);
       assert.doesNotMatch(body, /git push|GITHUB_TOKEN|GH_TOKEN|github\.token/, `${f}:${name} no token used`);
     }
   }
@@ -72,11 +72,11 @@ test('workflows: the weekly comparison\'s results pushed from GitHub\'s runner, 
   assert.doesNotMatch(publish, /^ {4}if:/m, 'only when compare passed (its --guard)');
   assert.match(publish, /^ {4}runs-on: ubuntu-latest$/m);
   assert.deepEqual(permissions(j.publish), { contents: 'write' });
-  assert.match(publish, /uses: actions\/download-artifact@\S+\n\s+with:\n\s+name: quality-results/);
+  assert.match(publish, /uses: actions\/download-artifact@.+\n\s+with:\n\s+name: quality-results/);
   assert.match(publish, /git push -q -f origin HEAD:refs\/heads\/quality-results/);
   // the artifact the compare job uploads holds the files the publish job commits
   const compare = j.compare.join('\n');
-  assert.match(compare, /- if: always\(\)\n\s+uses: actions\/upload-artifact@\S+\n\s+with:\n\s+name: quality-results\n\s+path: \|\n\s+test\/designs-corpus\/ise-comparison\.json\n\s+docs\/QUALITY\.md/);
+  assert.match(compare, /- if: always\(\)\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: quality-results\n\s+path: \|\n\s+test\/designs-corpus\/ise-comparison\.json\n\s+docs\/QUALITY\.md/);
   for (const f of ['test/designs-corpus/ise-comparison.json', 'docs/QUALITY.md']) assert.match(publish, new RegExp(`git add .*${f.replace(/[./]/g, '\\$&')}`), f);
   assert.match(compare, /compare-ise\.mjs .* --guard/);
 });
@@ -129,7 +129,7 @@ test('workflows: every job has a time limit; the Playwright browsers cached by i
   for (const [name, lines] of installs) {
     const body = lines.join('\n');
     const browsers = /npx playwright install --with-deps ([\w ]+?)(?: &&|\n|$)/.exec(body)[1].split(' ');
-    const cache = /uses: actions\/cache@\S+\n\s+with:\n\s+path: ~\/\.cache\/ms-playwright\n\s+key: (.+)/.exec(body);
+    const cache = /uses: actions\/cache@.+\n\s+with:\n\s+path: ~\/\.cache\/ms-playwright\n\s+key: (.+)/.exec(body);
     assert.ok(cache, name);
     assert.equal(cache[1], `playwright-\${{ runner.os }}-${browsers.join('-')}-\${{ hashFiles('node_modules/playwright-core/package.json') }}`, name);
     assert.ok(body.indexOf('ms-playwright') > body.indexOf('npm ci') && body.indexOf('ms-playwright') < body.indexOf('npx playwright install'), `${name}: after npm ci (the key's file), before the install`);
@@ -138,13 +138,13 @@ test('workflows: every job has a time limit; the Playwright browsers cached by i
 
 test('workflows: one setup for the jobs that run the repository\'s code, the action of the repository (#417)', () => {
   const action = fs.readFileSync(path.join(ROOT, '.github/actions/setup/action.yml'), 'utf8');
-  assert.match(action, /\nruns:\n  using: composite\n  steps:\n    - uses: actions\/setup-node@\S+\n      with:\n        node-version: 22\n        cache: \$\{\{ inputs\.npm-cache == 'true' && 'npm' \|\| '' \}\}\n    - run: npm ci\n      shell: bash\n/);
+  assert.match(action, /\nruns:\n  using: composite\n  steps:\n    - uses: actions\/setup-node@.+\n      with:\n        node-version: 22\n        cache: \$\{\{ inputs\.npm-cache == 'true' && 'npm' \|\| '' \}\}\n    - run: npm ci\n      shell: bash\n/);
   let n = 0;
   for (const f of FILES) {
     for (const [name, lines] of Object.entries(jobs(read(f)))) {
       const body = lines.join('\n');
       // npm ci is the action's, after the job's checkout; setup-node alone only where no npm ci follows
-      assert.doesNotMatch(body, /setup-node@\S+\n(?:\s+with:\n(?:\s+[\w-]+: .*\n)*)?\s+- run: npm ci/, `${f}:${name}`);
+      assert.doesNotMatch(body, /setup-node@.+\n(?:\s+with:\n(?:\s+[\w-]+: .*\n)*)?\s+- run: npm ci/, `${f}:${name}`);
       if (!body.includes('uses: ./.github/actions/setup')) continue;
       n++;
       assert.ok(body.indexOf('actions/checkout@') >= 0 && body.indexOf('actions/checkout@') < body.indexOf('uses: ./.github/actions/setup'), `${f}:${name}: the checkout first`);
@@ -154,4 +154,25 @@ test('workflows: one setup for the jobs that run the repository\'s code, the act
     }
   }
   assert.ok(n >= 15, `${n} jobs`);
+});
+
+test('workflows: every action pinned by its commit, its version in a comment, all of one version (#414)', () => {
+  const action = '.github/actions/setup/action.yml';
+  const uses = [];
+  for (const [f, yml] of [...FILES.map(f => [f, read(f)]), [action, fs.readFileSync(path.join(ROOT, action), 'utf8')]])
+    for (const m of yml.matchAll(/^\s*(?:- )?uses: (.+)$/gm)) uses.push([f, m[1]]);
+  const version = {};
+  for (const [f, u] of uses) {
+    if (u.startsWith('./')) { assert.ok(fs.existsSync(path.join(ROOT, u.split('@')[0])), `${f}: ${u}`); continue; }
+    const m = u.match(/^([\w.-]+\/[\w.-]+)@([0-9a-f]{40}) # (v\d+\.\d+\.\d+)$/);
+    assert.ok(m, `${f}: ${u} (owner/repo@<40-hex sha> # vX.Y.Z)`);
+    const [, name, sha, v] = m;
+    // the same action at the same commit everywhere (one Dependabot pull request moves them all)
+    assert.deepEqual(version[name] ??= [sha, v], [sha, v], `${f}: ${name}`);
+  }
+  assert.ok(Object.keys(version).length >= 7, Object.keys(version).join(', '));
+  // first-party actions only
+  for (const name of Object.keys(version)) assert.match(name, /^actions\//, name);
+  // Dependabot looks at the setup action too
+  assert.match(fs.readFileSync(path.join(ROOT, '.github/dependabot.yml'), 'utf8'), /github-actions\n\s+directories: \[\/, \/\.github\/actions\/setup\]/);
 });

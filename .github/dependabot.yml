@@ -3,7 +3,8 @@
 #     playwright in one pull request; @yowasp/yosys (Yosys) never grouped: a pull request of its own, which
 #     .github/workflows/yosys-update.yml labels "yosys update" and measures (the new Yosys against the
 #     base's), and which is never merged on green alone (CLAUDE.md, Integration)
-#   - GitHub Actions: every action of the workflows in one pull request
+#   - GitHub Actions: every action of the workflows and of the setup action in one pull request; the actions are
+#     pinned by commit, their version in a comment (#414), which Dependabot updates with the commit
 # Sources pinned outside npm (Yosys's test designs, the design corpus, the MCC models): the monthly
 # .github/workflows/pins.yml (scripts/check-pins.mjs).
 # elkjs is no longer ignored (0.9 to 0.12 in #351): a 0.x minor update may change the schematic layout;
@@ -27,7 +28,7 @@ updates:
     # Express: on 5 since #350, its major updates no longer ignored
     # elkjs: on 0.12 since #351, no longer ignored
   - package-ecosystem: github-actions
-    directory: /
+    directories: [/, /.github/actions/setup]
     schedule:
       interval: weekly
       day: monday

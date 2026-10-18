@@ -28,7 +28,7 @@ jobs:
     outputs:
       code: ${{ steps.changes.outputs.code }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           filter: blob:none
@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 45
     name: unit (${{ matrix.os }}, ${{ matrix.shard }}/3)
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: node --test --test-shard="$SHARD/3" "test/*.test.js"
         env:
@@ -68,7 +68,7 @@ jobs:
     timeout-minutes: 20
     name: ui (${{ matrix.interface }})
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: UI tests (headless Chrome, ${{ matrix.interface }} interface)
         run: npm run test:ui -- --test-concurrency=1
@@ -84,11 +84,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       # the browsers kept between runs, for the version of Playwright (#415); the system's libraries
       # installed every run (--with-deps)
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: npm run test:release
         timeout-minutes: 10
@@ -119,9 +119,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-firefox-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
@@ -145,7 +145,7 @@ jobs:
       SILINX_UI_CHROME_ARGS: ${{ matrix.os == 'macos-latest' && '--disable-gpu' || '' }}
       SILINX_UI_CDP_TIMEOUT: 60000
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: UI smoke test (headless Chrome)
         run: node --test --test-concurrency=1 test/ui/modern.test.js test/ui/focus.test.js test/ui/synth-open.test.js

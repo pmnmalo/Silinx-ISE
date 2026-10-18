@@ -39,7 +39,7 @@ jobs:
       base: ${{ steps.v.outputs.base }}
       head: ${{ steps.v.outputs.head }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - id: v
@@ -70,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: The base's Yosys
         if: matrix.side == 'base'
@@ -90,7 +90,7 @@ jobs:
               || echo "::warning::$ex: the open flow failed (out/examples/$ex.log)"
             tail -3 "out/examples/$ex.log"
           done
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/designs-corpus
           key: designs-corpus-${{ hashFiles('test/designs-corpus/manifest.json') }}
@@ -98,7 +98,7 @@ jobs:
       - name: The design corpus (a representative subset)
         run: node test/designs-corpus/run.mjs --filter "$(node scripts/yosys-update-report.mjs subset)" --stages frontend,synth,flow --jobs 4 --json out/designs.json || true
       - if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: yosys-${{ matrix.side }}
           path: out
@@ -115,9 +115,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/yosys-tests
           key: yosys-tests-${{ hashFiles('scripts/fetch-yosys-tests.mjs') }}
@@ -127,7 +127,7 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
       - if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: yosys-corpus-${{ matrix.shard }}
           path: out
@@ -140,11 +140,11 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: results
       - name: The table of the differences
@@ -157,7 +157,7 @@ jobs:
           node scripts/yosys-update-report.mjs report --base results/yosys-base --head results/yosys-head --corpus results/corpus \
             --base-version "$BASE_VERSION" --head-version "$HEAD_VERSION" --out yosys-update.md
           cat yosys-update.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: yosys-update-report
           path: |

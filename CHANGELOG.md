@@ -128,6 +128,10 @@ In detail:
   since their last successful run) and `failure-report.yml` (a failed job as an issue) instead of a copy each.
   ONBOARDING.md: the building blocks, and scheduled runs starting hours late. Tests: `test/workflows.test.js`,
   `test/changed-since-last-run.test.js`, `test/report-failure.test.js`.
+- **Workflows: the actions pinned by commit (#414):** every action (`actions/checkout`, `setup-node`, `cache`,
+  `upload-artifact`, `download-artifact`, `upload-pages-artifact`, `deploy-pages`) is used at its release's full
+  commit SHA with the version in a comment, the same everywhere; Dependabot's weekly GitHub Actions pull request
+  moves them, the setup action's included (`directories`). Tests: `test/workflows.test.js`, `test/yosys-update.test.js`.
 
 ## 15.11.0
 

@@ -40,7 +40,7 @@ jobs:
       SILINX_ISE_TESTS: '1'
       SILINX_ISE_HOST: local    # the ISE Docker image on the runner itself
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup

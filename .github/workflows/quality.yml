@@ -38,7 +38,7 @@ jobs:
     env:
       SILINX_ISE_HOST: local    # ISE from the Docker image on the runner itself
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
@@ -61,7 +61,7 @@ jobs:
         # some GB on each side); --guard: nothing published when a design built before fails now
         run: node test/designs-corpus/compare-ise.mjs "$RUNNER_TEMP/quality" --jobs 1 --ise-jobs 1 --serial --guard
       - if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: quality-results
           path: |
@@ -77,8 +77,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: quality-results
           path: ${{ runner.temp }}/quality-results
