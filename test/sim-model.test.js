@@ -49,8 +49,23 @@ test('postSynthesisModels: VHDL of UNISIM primitives with the top\'s ports and t
   assert.match(m.vhdl, /: FDRE\n/);
   assert.deepEqual(m.verilog.split('\n').slice(0, 4), head.map(l => l.replace(/^--/, '//')));
   assert.match(m.verilog, /^module cnt\(.*\);\n {2}parameter N = 3;$/m);
-  assert.deepEqual(m.unknown.filter(t => !/^\$SPECIFY/.test(t)), []);
+  assert.deepEqual(m.unknown, []);
   assert.ok(['LUT4', 'FDRE', 'RAMB16_S18_S18', 'MULT18X18', 'SRL16E', 'DCM'].every(p => SIM_PRIMITIVES.has(p)));
+});
+
+// Regression (#493): the netlist's library cells (a primitive's model with its $specify2 timing arcs, first in
+// the JSON) are not the design's: only the top module's cells count, a cell with no model of its own still said
+test('postSynthesisModels: only the top module\'s cells are looked at, not the library cells before it (#493)', () => {
+  const cell = (type, conns) => ({ type, parameters: {}, port_directions: Object.fromEntries(Object.keys(conns).map(p => [p, p === 'O' || p === 'Y' ? 'output' : 'input'])), connections: conns });
+  const json = { modules: {
+    LUT1: { attributes: { blackbox: 1 }, ports: {}, cells: { s: cell('$specify2', { SRC: [2], DST: [3], EN: ['1'] }), b: cell('$buf', { A: [2], Y: [3] }) }, netnames: {} },
+    top: { attributes: { top: 1 }, ports: { a: { direction: 'input', bits: [2] }, y: { direction: 'output', bits: [3] } },
+      cells: { i: cell('INV', { I: [2], O: [3] }) }, netnames: { a: { bits: [2] }, y: { bits: [3] } } } } };
+  const synth = t => ({ top: 'top', files: { 'top.json': JSON.stringify(t), 'top_yosys.v': 'module top(a, y);\n  input a;\n  output y;\nendmodule\n' } });
+  assert.deepEqual(postSynthesisModels(synth(json), { top: 'top' }).unknown, []);
+  // a cell of the top with no model: still said
+  json.modules.top.cells.x = cell('XYZ', { I: [2] });
+  assert.deepEqual(postSynthesisModels(synth(json), { top: 'top' }).unknown, ['XYZ']);
 });
 
 test('the flow\'s postsynth step: the model synthesized with the test bench\'s generics, written, in the report; the server\'s steps', async () => {
@@ -62,7 +77,6 @@ test('the flow\'s postsynth step: the model synthesized with the test bench\'s g
   assert.deepEqual(r.report.simModels, { postsynth: { path: 'build/netgen/synthesis/cnt_synthesis.vhd', verilog: 'build/netgen/synthesis/cnt_synthesis.v', testbench: 'tb', generics: { n: 3 } } });
   assert.deepEqual(lines.filter(l => /^(WARNING|INFO|Synthesizing|Post-Synthesis)/.test(l)), [
     "Synthesizing 'cnt' with the generics the test bench 'tb' gives: n = 3",
-    'WARNING:Silinx - cells with no simulation model in Silinx (the model cannot be simulated as it is): $SPECIFY2',
     `Post-Synthesis Simulation Model: build/netgen/synthesis/cnt_synthesis.vhd (VHDL, UNISIM primitives) and build/netgen/synthesis/cnt_synthesis.v (Verilog), ${lines.join('\n').match(/\(Verilog\), (\d+) cells/)[1]} cells`,
   ]);
   // the test bench on the model: q counts every 3 clocks (95 ns: 9 edges, q = 3)

@@ -540,13 +540,13 @@ uiTest('#490 open mode: Simulate Post-Synthesis Model with no model offers "Gene
   const lines = log.split('\n').map((l) => l.trim()).filter(Boolean);
   // the process ran once, ended without errors, then the simulation of the model started
   const at = (re) => { const i = lines.findIndex((l) => re.test(l)); assert.ok(i >= 0, `${re}\n${log.slice(-3000)}`); return i; };
-  const order = [/^Started : "Generate Post-Synthesis Simulation Model"\.$/, /^Process "Generate Post-Synthesis Simulation Model" completed successfully with 1 warning\(s\)$/,
+  const order = [/^Started : "Generate Post-Synthesis Simulation Model"\.$/, /^Process "Generate Post-Synthesis Simulation Model" completed successfully$/,
     /^Post-Synthesis simulation model: build\/netgen\/synthesis\/top_synthesis\.vhd \(simulate it in the Simulation view, or emulate it on the board\)\.$/,
     /^Started : "Simulate Post-Synthesis Model"\.$/, /^Building simulation model for top 'tb_top' with the post-synthesis netlist of 'top'\.\.\.$/].map(at);
   assert.deepEqual([...order].sort((a, b) => a - b), order, log);
   assert.equal(lines.filter((l) => /^Started : "Generate Post-Synthesis Simulation Model"/.test(l)).length, 1);
-  // the flow's own warning (as Generate Post-Synthesis Simulation Model run from the Processes pane, #120), no other
-  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), ['WARNING:Silinx - cells with no simulation model in Silinx (the model cannot be simulated as it is): $SPECIFY2']);
+  // no warning (the netlist's library cells are not the model's: #493)
+  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), []);
   assert.equal(await page.eval(() => window.Silinx.active.title), 'ISim (tb_top, Post-Synthesis)');
   // the test bench passes on the generated netlist
   for (let k = 0; ; k++) {
@@ -582,9 +582,9 @@ uiTest('#490 open mode: Emulate Post-Synthesis Model with no model: "Generate an
   assert.equal(await page.eval(() => window.Silinx.active.title), 'Board Emulator (top, Post-Synthesis)');
   const lines = (await page.consoleText()).slice(start).split('\n').map((l) => l.trim()).filter(Boolean);
   assert.equal(lines.filter((l) => /^Started : "Generate Post-Synthesis Simulation Model"/.test(l)).length, 1, lines.join('\n'));
-  assert.ok(lines.includes('Process "Generate Post-Synthesis Simulation Model" completed successfully with 1 warning(s)'), lines.join('\n'));
+  assert.ok(lines.includes('Process "Generate Post-Synthesis Simulation Model" completed successfully'), lines.join('\n'));
   assert.ok(lines.some((l) => /^Board Emulator: 'top' \(Post-Synthesis netlist, /.test(l)), lines.join('\n'));
-  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), ['WARNING:Silinx - cells with no simulation model in Silinx (the model cannot be simulated as it is): $SPECIFY2']);
+  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), []);
   // the emulator's model menu knows the model just generated (not "(not generated)")
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select option')].filter((o) => o.value === 'postsynth').map((o) => o.textContent)), ['Post-Synthesis netlist']);
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });

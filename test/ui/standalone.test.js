@@ -855,10 +855,10 @@ uiTest('browser edition: Simulate Post-Synthesis Model with no model: "Generate 
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 180000, what: 'ISim ready' });
   const lines = (await page.consoleText()).slice(start).split('\n').map((l) => l.trim()).filter(Boolean);
-  const done = 'Process "Generate Post-Synthesis Simulation Model" completed successfully with 1 warning(s)';
+  const done = 'Process "Generate Post-Synthesis Simulation Model" completed successfully';
   assert.ok(lines.includes('=== SILINX STEP postsynth ==='), lines.join('\n'));
   assert.ok(lines.includes(done), lines.join('\n'));
   assert.ok(lines.indexOf(done) < lines.indexOf('Started : "Simulate Post-Synthesis Model".'), lines.join('\n'));
-  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), ['WARNING:Silinx - cells with no simulation model in Silinx (the model cannot be simulated as it is): $SPECIFY2']);
+  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), []);
   assert.equal(await page.eval(() => window.Silinx.active.title), 'ISim (tb_top, Post-Synthesis)');
 }, { url: () => 'about:blank', timeout: 300000 });

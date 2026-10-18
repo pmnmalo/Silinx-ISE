@@ -53,7 +53,10 @@ export function dutGenerics(simDesign, top) {
 export function postSynthesisModels(synth, { top, part = '', generics = {}, testbench = null } = {}) {
   const json = JSON.parse(synth.files[`${synth.top}.json`]);
   const tn = technologyNetlist(json, { top });
-  const types = new Set(Object.values(Object.values(json.modules)[0]?.cells || {}).map(c => String(c.type).toUpperCase()));
+  // (the top module's cells: the netlist also holds the library cells Yosys read, a primitive's model with its
+  // $specify2 timing arcs first, #493)
+  const mod = json.modules[synth.top] || Object.values(json.modules).find(m => m.attributes?.top) || Object.values(json.modules)[0];
+  const types = new Set(Object.values(mod?.cells || {}).map(c => String(c.type).toUpperCase()));
   const unknown = [...types].filter(t => !SIM_PRIMITIVES.has(t)).sort();
   const gens = Object.entries(generics);
   const head = (c) => [
