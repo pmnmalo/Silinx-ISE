@@ -29,6 +29,7 @@ jobs:
   # is not, which changes nothing else)
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       issues: write
@@ -142,6 +143,7 @@ jobs:
     needs: [check, measure, corpus]
     if: always() && needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write

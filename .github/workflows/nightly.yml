@@ -19,6 +19,7 @@ jobs:
   # test is skipped; by hand it always runs): scripts/changed-since-last-run.mjs, here on GitHub's runner
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -132,6 +133,7 @@ jobs:
     needs: [changes, corpus, vloghammer, designs]
     if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       checks: read

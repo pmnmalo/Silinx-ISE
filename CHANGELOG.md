@@ -113,6 +113,11 @@ In detail:
   from a pull request's `package.json` (`yosys-update.yml`), the nightly's module count typed by hand, the
   release tag and the shard numbers go in through `env:`. Tests: `test/workflows.test.js`, `test/yosys-update.test.js`,
   `test/corpus-runner.test.js`.
+- **CI: the Playwright browsers cached, a time limit for every job (#415):** the `browsers` and `webkit-standalone`
+  jobs restore `~/.cache/ms-playwright` for the version of Playwright installed (`playwright-core`'s package.json),
+  so only the system's libraries are installed each run; every job of every workflow has its `timeout-minutes`
+  (a hang no longer lasts GitHub's 360 minutes; unit 45, ui 20, browsers and webkit-standalone 25, os 30, the
+  change checks and failure reports 10). Tests: `test/workflows.test.js`.
 
 ## 15.11.0
 

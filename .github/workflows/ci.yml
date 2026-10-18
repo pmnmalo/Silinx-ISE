@@ -24,6 +24,7 @@ jobs:
   # against its base, a push against the commit main had before it
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       code: ${{ steps.changes.outputs.code }}
     steps:
@@ -46,6 +47,7 @@ jobs:
         os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest", "windows-latest"]') }}
         shard: [1, 2, 3]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     name: unit (${{ matrix.os }}, ${{ matrix.shard }}/3)
     steps:
       - uses: actions/checkout@v7
@@ -67,6 +69,7 @@ jobs:
       matrix:
         interface: [modern, classic]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     name: ui (${{ matrix.interface }})
     steps:
       - uses: actions/checkout@v7
@@ -87,6 +90,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -94,6 +98,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # the browsers kept between runs, for the version of Playwright (#415); the system's libraries
+      # installed every run (--with-deps)
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
       - name: Memory in WebKit (Safari's engine)
         run: npx playwright install --with-deps webkit && npm run test:webkit
         timeout-minutes: 15
@@ -105,6 +115,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -122,6 +133,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -129,6 +141,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-firefox-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
       - run: npx playwright install --with-deps firefox webkit
       - run: npm run test:browsers
         timeout-minutes: 20
@@ -143,6 +159,7 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     env:
       # the macOS runner's Chrome with its GPU slows down until it stops answering: software rendering
       SILINX_UI_CHROME_ARGS: ${{ matrix.os == 'macos-latest' && '--disable-gpu' || '' }}
@@ -168,6 +185,7 @@ jobs:
     if: always()
     needs: [changes, unit, ui, webkit-standalone, release-zip, browsers, os]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - run: echo "$RESULTS"
         env:

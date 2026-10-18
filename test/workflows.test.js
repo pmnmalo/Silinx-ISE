@@ -116,3 +116,21 @@ test('workflows: explicit permissions, and no ${{ }} expression inside a run: sc
   }
   for (const f of ['ci.yml', 'nightly.yml']) assert.match(read(f), /\npermissions:\n {2}contents: read\n/, f);
 });
+
+test('workflows: every job has a time limit; the Playwright browsers cached by its version (#415)', () => {
+  for (const f of FILES)
+    for (const [name, lines] of Object.entries(jobs(read(f))))
+      assert.ok(lines.some(l => /^ {4}timeout-minutes: \d+$/.test(l)), `${f}:${name}: timeout-minutes (else 360 minutes)`);
+  // every job that installs Playwright's browsers restores them first, keyed on the version that picks them
+  const j = jobs(read('ci.yml'));
+  const installs = Object.entries(j).filter(([, lines]) => lines.some(l => /npx playwright install/.test(l)));
+  assert.deepEqual(installs.map(([n]) => n).sort(), ['browsers', 'webkit-standalone']);
+  for (const [name, lines] of installs) {
+    const body = lines.join('\n');
+    const browsers = /npx playwright install --with-deps ([\w ]+?)(?: &&|\n|$)/.exec(body)[1].split(' ');
+    const cache = /uses: actions\/cache@\S+\n\s+with:\n\s+path: ~\/\.cache\/ms-playwright\n\s+key: (.+)/.exec(body);
+    assert.ok(cache, name);
+    assert.equal(cache[1], `playwright-\${{ runner.os }}-${browsers.join('-')}-\${{ hashFiles('node_modules/playwright-core/package.json') }}`, name);
+    assert.ok(body.indexOf('ms-playwright') > body.indexOf('npm ci') && body.indexOf('ms-playwright') < body.indexOf('npx playwright install'), `${name}: after npm ci (the key's file), before the install`);
+  }
+});

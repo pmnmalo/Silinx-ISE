@@ -24,6 +24,7 @@ jobs:
   # tests themselves), not the web interface, the UI tests or the other workflows
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -67,6 +68,7 @@ jobs:
     needs: [changes, ise]
     if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       checks: read
