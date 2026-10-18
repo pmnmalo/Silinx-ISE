@@ -1,0 +1,23 @@
+name: Failure report
+# A failed job of a scheduled workflow as an issue (#251), called by the nightly, the ISE tests and the weekly
+# comparison with ISE as their last job `report` (#417): one issue per job ('<workflow> failed: <job>'),
+# commented on when it is open already; the lines of its log that say what failed, without home folders,
+# logins or addresses (scripts/report-failure.mjs). A job that hit its timeout-minutes is 'cancelled', not
+# 'failure': it is reported too (#343), told from one cancelled by hand or by a newer run by its annotation
+# (checks: read). (A called workflow's github context is its caller's: the run, the workflow's name.)
+on:
+  workflow_call:
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  issues: write
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - run: node scripts/report-failure.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

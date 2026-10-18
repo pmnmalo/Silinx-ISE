@@ -51,11 +51,7 @@ jobs:
     name: unit (${{ matrix.os }}, ${{ matrix.shard }}/3)
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - run: node --test --test-shard="$SHARD/3" "test/*.test.js"
         env:
           SHARD: ${{ matrix.shard }}
@@ -73,11 +69,7 @@ jobs:
     name: ui (${{ matrix.interface }})
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: UI tests (headless Chrome, ${{ matrix.interface }} interface)
         run: npm run test:ui -- --test-concurrency=1
         timeout-minutes: 15
@@ -93,11 +85,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       # the browsers kept between runs, for the version of Playwright (#415); the system's libraries
       # installed every run (--with-deps)
       - uses: actions/cache@v6
@@ -118,11 +106,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - run: npm run test:release
         timeout-minutes: 10
         env:
@@ -136,11 +120,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
@@ -166,11 +146,7 @@ jobs:
       SILINX_UI_CDP_TIMEOUT: 60000
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: UI smoke test (headless Chrome)
         run: node --test --test-concurrency=1 test/ui/modern.test.js test/ui/focus.test.js test/ui/synth-open.test.js
         timeout-minutes: 10

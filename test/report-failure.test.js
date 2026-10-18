@@ -95,9 +95,11 @@ test('report-failure: the scheduled workflows end with the job that reports a fa
     assert.match(job, new RegExp(`needs: \\[${jobs.join(', ')}\\]`), file);
     // after a failure, or a job cancelled (at its time limit: the script tells which, #343), even in a run cancelled
     assert.match(job, /if: always\(\) && github\.event_name == 'schedule' && \(contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\)\)\n/, file);
-    assert.match(job, /checks: read/, file);
-    assert.match(job, /runs-on: ubuntu-latest/, file);
-    assert.match(job, /issues: write/, file);
-    assert.match(job, /node scripts\/report-failure\.mjs/, file);
+    // the reusable job (#417), given the permissions it needs
+    assert.match(job, /\n    uses: \.\/\.github\/workflows\/failure-report\.yml\n    permissions:\n      actions: read\n      checks: read\n      contents: read\n      issues: write\n/, file);
   }
+  const yml = fs.readFileSync(path.join(ROOT, '.github/workflows/failure-report.yml'), 'utf8');
+  assert.match(yml, /\non:\n  workflow_call:\n/);
+  assert.match(yml, /\npermissions:\n  actions: read\n  checks: read\n  contents: read\n  issues: write\n/);
+  assert.match(yml, /\n  report:\n    runs-on: ubuntu-latest\n(?:.*\n)*?      - run: node scripts\/report-failure\.mjs\n        env:\n          GITHUB_TOKEN: \$\{\{ github\.token \}\}\n/);
 });

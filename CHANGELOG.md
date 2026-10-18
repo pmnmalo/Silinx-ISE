@@ -122,6 +122,12 @@ In detail:
   minutes) on a commit main's CI tests anyway: it waits for the CI run of the tagged commit on main
   (`scripts/wait-for-ci.mjs`) and fails when that run did not pass, or when the commit has no CI run on main; the
   single-file edition, the packages and the release zip's test are kept. Tests: `test/wait-for-ci.test.js`.
+- **Workflows: one setup action, the scheduled workflows' common jobs reused (#417):** the 16 jobs that set up
+  Node.js 22 and run `npm ci` use the repository's composite action `.github/actions/setup` (without npm's cache on
+  the self-hosted runner); the nightly, ISE and Quality workflows call `scheduled-changes.yml` (whether main changed
+  since their last successful run) and `failure-report.yml` (a failed job as an issue) instead of a copy each.
+  ONBOARDING.md: the building blocks, and scheduled runs starting hours late. Tests: `test/workflows.test.js`,
+  `test/changed-since-last-run.test.js`, `test/report-failure.test.js`.
 
 ## 15.11.0
 

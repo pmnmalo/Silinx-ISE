@@ -1,0 +1,18 @@
+# The setup of a job that runs the repository's code (#417): Node.js 22 and the dependencies (npm ci), after
+# the job's own checkout (a local action is read from the checkout). npm's download cache kept by GitHub, but
+# on the self-hosted runner (npm-cache: false).
+name: Setup
+description: Node.js 22 and npm ci, with npm's cache
+inputs:
+  npm-cache:
+    description: keep npm's download cache between runs (GitHub's cache)
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 22
+        cache: ${{ inputs.npm-cache == 'true' && 'npm' || '' }}
+    - run: npm ci
+      shell: bash

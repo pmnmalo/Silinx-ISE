@@ -1,0 +1,39 @@
+name: Scheduled changes
+# Whether main changed since a scheduled workflow's last successful run (#148), called by the nightly, the ISE
+# tests and the weekly comparison with ISE as their job `changes` (#417): scripts/changed-since-last-run.mjs on
+# GitHub's runner (never the self-hosted one). A scheduled run with nothing new to test is skipped; by hand it
+# always runs. `only`: the workflow's inputs (--only), when not all of the repository.
+on:
+  workflow_call:
+    inputs:
+      workflow:
+        description: the calling workflow's file, e.g. ise.yml
+        type: string
+        required: true
+      only:
+        description: the prefixes of the workflow's inputs, comma-separated (empty for every file)
+        type: string
+        default: ''
+    outputs:
+      run:
+        description: "'true' when the calling workflow has something new to test"
+        value: ${{ jobs.changes.outputs.run }}
+permissions:
+  actions: read
+  contents: read
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      run: ${{ steps.changed.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: changed
+        run: node scripts/changed-since-last-run.mjs "$WORKFLOW" ${ONLY:+--only "$ONLY"}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WORKFLOW: ${{ inputs.workflow }}
+          ONLY: ${{ inputs.only }}

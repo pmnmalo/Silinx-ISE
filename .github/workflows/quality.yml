@@ -20,23 +20,14 @@ concurrency:
   cancel-in-progress: false
 jobs:
   # whether main changed since this workflow's last successful run (a scheduled run with nothing new to
-  # test is skipped; by hand it always runs): scripts/changed-since-last-run.mjs, here on GitHub's runner
+  # test is skipped; by hand it always runs): .github/workflows/scheduled-changes.yml, on GitHub's runner
   changes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: ./.github/workflows/scheduled-changes.yml
     permissions:
       actions: read
       contents: read
-    outputs:
-      run: ${{ steps.changed.outputs.run }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - id: changed
-        run: node scripts/changed-since-last-run.mjs quality.yml
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+    with:
+      workflow: quality.yml
   compare:
     needs: changes
     if: needs.changes.outputs.run == 'true' && github.repository == 'pmnmalo/Silinx-ISE' && github.ref == 'refs/heads/main'
@@ -50,10 +41,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 22
-      - run: npm ci
+          npm-cache: false
       # the corpus's sources kept on the runner between runs (the checkout cleans the work folder)
       - name: The corpus's sources
         run: |
@@ -105,22 +95,13 @@ jobs:
           git push -q -f origin HEAD:refs/heads/quality-results
           echo "::notice::Results pushed to the branch quality-results: merge it into main"
 
-  # a failed job is an issue (#251): one per job ('<workflow> failed: <job>'), commented on when it is
-  # open already; the lines of its log that say what failed, without home folders, logins or addresses.
-  # A job that hit its timeout-minutes is 'cancelled', not 'failure': it is reported too (#343), told from
-  # one cancelled by hand or by a newer run by its annotation (checks: read)
+  # a failed job is an issue (#251): .github/workflows/failure-report.yml
   report:
     needs: [changes, compare, publish]
     if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: ./.github/workflows/failure-report.yml
     permissions:
       actions: read
       checks: read
       contents: read
       issues: write
-    steps:
-      - uses: actions/checkout@v7
-      - run: node scripts/report-failure.mjs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}

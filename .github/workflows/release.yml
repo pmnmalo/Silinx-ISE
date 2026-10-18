@@ -17,11 +17,7 @@ jobs:
     timeout-minutes: 80
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       # main's CI on this commit, waited for when it is still running (the release commit and its tag are
       # pushed together); no run on main, or a failed one: no release
       - name: CI passed on main

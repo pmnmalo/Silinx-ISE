@@ -19,25 +19,17 @@ concurrency:
   cancel-in-progress: false
 jobs:
   # whether main changed since this workflow's last successful run (a scheduled run with nothing new to
-  # test is skipped; by hand it always runs): scripts/changed-since-last-run.mjs, here on GitHub's runner;
+  # test is skipped; by hand it always runs): .github/workflows/scheduled-changes.yml, on GitHub's runner;
   # only the ISE tests' inputs count (the toolchain, the server, the examples, the bit database, the
   # tests themselves), not the web interface, the UI tests or the other workflows
   changes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: ./.github/workflows/scheduled-changes.yml
     permissions:
       actions: read
       contents: read
-    outputs:
-      run: ${{ steps.changed.outputs.run }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - id: changed
-        run: node scripts/changed-since-last-run.mjs ise.yml --only core/,server/,scripts/,bin/,docker/,examples/,research/s3e-,test/ise/,test/examples-lib.mjs,test/fixtures/,package.json,package-lock.json,.github/workflows/ise.yml
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+    with:
+      workflow: ise.yml
+      only: core/,server/,scripts/,bin/,docker/,examples/,research/s3e-,test/ise/,test/examples-lib.mjs,test/fixtures/,package.json,package-lock.json,.github/workflows/ise.yml
   ise:
     # never from a fork, and only main
     needs: changes
@@ -51,31 +43,21 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 22
-      - run: npm ci
+          npm-cache: false
       - name: Docker and the ISE image
         run: docker image inspect --format '{{.Id}} {{.Size}}' "${SILINX_ISE_IMAGE:-xilinx/ise:14.7}"
       - name: ISE tests
         run: node --test --test-reporter=spec test/ise/*.test.js
 
-  # a failed job is an issue (#251): one per job ('<workflow> failed: <job>'), commented on when it is
-  # open already; the lines of its log that say what failed, without home folders, logins or addresses.
-  # A job that hit its timeout-minutes is 'cancelled', not 'failure': it is reported too (#343), told from
-  # one cancelled by hand or by a newer run by its annotation (checks: read)
+  # a failed job is an issue (#251): .github/workflows/failure-report.yml
   report:
     needs: [changes, ise]
     if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: ./.github/workflows/failure-report.yml
     permissions:
       actions: read
       checks: read
       contents: read
       issues: write
-    steps:
-      - uses: actions/checkout@v7
-      - run: node scripts/report-failure.mjs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}

@@ -120,7 +120,8 @@ test('workflows: explicit permissions, and no ${{ }} expression inside a run: sc
 test('workflows: every job has a time limit; the Playwright browsers cached by its version (#415)', () => {
   for (const f of FILES)
     for (const [name, lines] of Object.entries(jobs(read(f))))
-      assert.ok(lines.some(l => /^ {4}timeout-minutes: \d+$/.test(l)), `${f}:${name}: timeout-minutes (else 360 minutes)`);
+      // (a job that calls a reusable workflow has none: its jobs have theirs)
+      assert.ok(lines.some(l => /^ {4}timeout-minutes: \d+$/.test(l) || /^ {4}uses: \.\/\.github\/workflows\//.test(l)), `${f}:${name}: timeout-minutes (else 360 minutes)`);
   // every job that installs Playwright's browsers restores them first, keyed on the version that picks them
   const j = jobs(read('ci.yml'));
   const installs = Object.entries(j).filter(([, lines]) => lines.some(l => /npx playwright install/.test(l)));
@@ -133,4 +134,24 @@ test('workflows: every job has a time limit; the Playwright browsers cached by i
     assert.equal(cache[1], `playwright-\${{ runner.os }}-${browsers.join('-')}-\${{ hashFiles('node_modules/playwright-core/package.json') }}`, name);
     assert.ok(body.indexOf('ms-playwright') > body.indexOf('npm ci') && body.indexOf('ms-playwright') < body.indexOf('npx playwright install'), `${name}: after npm ci (the key's file), before the install`);
   }
+});
+
+test('workflows: one setup for the jobs that run the repository\'s code, the action of the repository (#417)', () => {
+  const action = fs.readFileSync(path.join(ROOT, '.github/actions/setup/action.yml'), 'utf8');
+  assert.match(action, /\nruns:\n  using: composite\n  steps:\n    - uses: actions\/setup-node@\S+\n      with:\n        node-version: 22\n        cache: \$\{\{ inputs\.npm-cache == 'true' && 'npm' \|\| '' \}\}\n    - run: npm ci\n      shell: bash\n/);
+  let n = 0;
+  for (const f of FILES) {
+    for (const [name, lines] of Object.entries(jobs(read(f)))) {
+      const body = lines.join('\n');
+      // npm ci is the action's, after the job's checkout; setup-node alone only where no npm ci follows
+      assert.doesNotMatch(body, /setup-node@\S+\n(?:\s+with:\n(?:\s+[\w-]+: .*\n)*)?\s+- run: npm ci/, `${f}:${name}`);
+      if (!body.includes('uses: ./.github/actions/setup')) continue;
+      n++;
+      assert.ok(body.indexOf('actions/checkout@') >= 0 && body.indexOf('actions/checkout@') < body.indexOf('uses: ./.github/actions/setup'), `${f}:${name}: the checkout first`);
+      // no npm cache on the self-hosted runner (a machine of our own)
+      const selfHosted = lines.some(l => /^ {4}runs-on: .*self-hosted/.test(l));
+      assert.equal(/uses: \.\/\.github\/actions\/setup\n\s+with:\n\s+npm-cache: false/.test(body), selfHosted, `${f}:${name}`);
+    }
+  }
+  assert.ok(n >= 15, `${n} jobs`);
 });

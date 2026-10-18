@@ -27,11 +27,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || 'main' }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: Build the single-file edition
         run: node scripts/build-standalone.mjs
       - name: Package (as a release, version dev)

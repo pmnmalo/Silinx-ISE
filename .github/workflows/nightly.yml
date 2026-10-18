@@ -16,23 +16,14 @@ permissions:
   contents: read
 jobs:
   # whether main changed since this workflow's last successful run (a scheduled run with nothing new to
-  # test is skipped; by hand it always runs): scripts/changed-since-last-run.mjs, here on GitHub's runner
+  # test is skipped; by hand it always runs): .github/workflows/scheduled-changes.yml, on GitHub's runner
   changes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: ./.github/workflows/scheduled-changes.yml
     permissions:
       actions: read
       contents: read
-    outputs:
-      run: ${{ steps.changed.outputs.run }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - id: changed
-        run: node scripts/changed-since-last-run.mjs nightly.yml
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+    with:
+      workflow: nightly.yml
   # in two jobs at once (#343): every other file each (--shard), about half an hour each in October 2026, the
   # open synthesis making several mappings of a module (up to 7 Yosys runs); a file that takes over 15 minutes
   # fails its job (run-corpus.mjs's --timeout); the slowest files are printed at the end
@@ -48,11 +39,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - uses: actions/cache@v6
         with:
           path: .cache/yosys-tests
@@ -69,11 +56,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - name: VlogHammer random modules (seed = run number)
         run: npm run test:vloghammer -- --seed $(( RUN_NUMBER * 1000 )) --count "$COUNT" --out vloghammer-failures
         env:
@@ -98,11 +81,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - uses: actions/cache@v6
         with:
           path: .cache/designs-corpus
@@ -125,22 +104,13 @@ jobs:
             .cache/designs-boards/bits
           if-no-files-found: ignore
 
-  # a failed job is an issue (#251): one per job ('<workflow> failed: <job>'), commented on when it is
-  # open already; the lines of its log that say what failed, without home folders, logins or addresses.
-  # A job that hit its timeout-minutes is 'cancelled', not 'failure': it is reported too (#343), told from
-  # one cancelled by hand or by a newer run by its annotation (checks: read)
+  # a failed job is an issue (#251): .github/workflows/failure-report.yml
   report:
     needs: [changes, corpus, vloghammer, designs]
     if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: ./.github/workflows/failure-report.yml
     permissions:
       actions: read
       checks: read
       contents: read
       issues: write
-    steps:
-      - uses: actions/checkout@v7
-      - run: node scripts/report-failure.mjs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
