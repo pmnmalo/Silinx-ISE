@@ -59,6 +59,9 @@ In detail:
   `DONE: the FPGA is configured in T s`. The tests assert the commands of a program in their order and the
   transfers; the standalone UI test the console lines. Not measured on a board yet: the bitstream's own clocks
   (~1.4 Mbit at the port's ~2 MHz, about 0.7 s on a Basys2) are unchanged, the new line shows that rate.
+- **CI: the Windows unit tests (#505):** since #413 their step passes the shard as `$SHARD`, which Windows'
+  default shell (PowerShell) does not expand (`--test-shard=/3`): the step runs in bash; a test checks every
+  `run:` script that reads an environment variable says `shell: bash` in a job that runs on Windows.
 - **Optimization Effort Normal maps a deep design for speed (#468):** `synthesizeOpen` at Normal makes the usual
   mapping first, then measures its logic levels (`logicLevels`: the LUTs and MUXF5s of the deepest path); a design
   of more than 16 levels and 5000 LUTs at most (`DEEP_RULE`, `deepDesign`) also gets High's mappings (the wider and

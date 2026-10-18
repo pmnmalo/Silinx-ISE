@@ -176,3 +176,17 @@ test('workflows: every action pinned by its commit, its version in a comment, al
   // Dependabot looks at the setup action too
   assert.match(fs.readFileSync(path.join(ROOT, '.github/dependabot.yml'), 'utf8'), /github-actions\n\s+directories: \[\/, \/\.github\/actions\/setup\]/);
 });
+
+test('workflows: a run: script that reads an env variable says shell: bash in a job that runs on Windows (#505)', () => {
+  // (Windows runners' default shell is PowerShell: "$SHARD" is not expanded there, the unit tests got '/3')
+  for (const f of FILES) {
+    for (const [name, lines] of Object.entries(jobs(read(f)))) {
+      if (!lines.some(l => /windows/.test(l))) continue;
+      const steps = lines.join('\n').split(/\n(?= {6}- )/).filter(s => /^ {6}- /.test(s) && /\brun:/.test(s));
+      for (const step of steps) {
+        const script = step.slice(step.indexOf('run:') + 4).split(/\n {8}(?:env|shell|with|if|name|timeout-minutes|id):/)[0];
+        if (/\$[A-Z_]{2,}\b/.test(script)) assert.match(step, /\n {8}shell: bash\b/, `${f} ${name}: ${script.trim().split('\n')[0]}`);
+      }
+    }
+  }
+});

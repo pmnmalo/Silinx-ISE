@@ -53,6 +53,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: node --test --test-shard="$SHARD/3" "test/*.test.js"
+        shell: bash   # (Windows: PowerShell would not expand $SHARD)
         env:
           SHARD: ${{ matrix.shard }}
 
