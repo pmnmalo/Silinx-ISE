@@ -6,13 +6,15 @@ name: Quality
 # Docker image (label "ise", as .github/workflows/ise.yml); the new results
 # (test/designs-corpus/ise-comparison.json and the page docs/QUALITY.md) are pushed to the branch quality-results, merged into main by a maintainer (main requires CI).
 #
-# The repository is public: only code already on main runs there, never a pull request's.
+# The repository is public: only code already on main runs there, never a pull request's. The job on the
+# self-hosted runner has a read-only token and keeps no credentials (it runs third-party code: the corpus's
+# fetch, npm ci); the results' commit is pushed from GitHub's runner by a job of its own (#412).
 on:
   schedule:
     - cron: '0 23 * * 6'      # Saturdays 23:00 UTC (after the nightly ISE tests)
   workflow_dispatch:
 permissions:
-  contents: write             # the results' commit
+  contents: read
 concurrency:
   group: ise                  # one ISE job at a time on the runner
   cancel-in-progress: false
@@ -39,10 +41,14 @@ jobs:
     if: needs.changes.outputs.run == 'true' && github.repository == 'pmnmalo/Silinx-ISE' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, ise]
     timeout-minutes: 900
+    permissions:
+      contents: read
     env:
       SILINX_ISE_HOST: local    # ISE from the Docker image on the runner itself
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -63,16 +69,6 @@ jobs:
         # one build at a time, the ISE ones after the Silinx ones (8 GB of memory: a large design needs
         # some GB on each side); --guard: nothing published when a design built before fails now
         run: node test/designs-corpus/compare-ise.mjs "$RUNNER_TEMP/quality" --jobs 1 --ise-jobs 1 --serial --guard
-      - name: Commit the results
-        run: |
-          git add test/designs-corpus/ise-comparison.json docs/QUALITY.md
-          if git diff --cached --quiet; then echo "no change"; exit 0; fi
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Quality: the weekly Silinx toolchain vs ISE comparison (docs/QUALITY.md)"
-          # main requires CI's checks (a ruleset), which a workflow's push cannot pass: the results go to the
-          # branch quality-results, to be merged into main by a maintainer (CLAUDE.md, Integration)
-          git push -q -f origin HEAD:refs/heads/quality-results
-          echo "::notice::Results pushed to the branch quality-results: merge it into main"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -81,12 +77,39 @@ jobs:
             test/designs-corpus/ise-comparison.json
             docs/QUALITY.md
 
+  # the results' commit, on GitHub's runner (the only job with a writing token), from the compare job's
+  # artifact, on the commit it compared; only when the comparison passed (--guard)
+  publish:
+    needs: compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: quality-results
+          path: ${{ runner.temp }}/quality-results
+      - name: Commit the results
+        run: |
+          cp "$RUNNER_TEMP/quality-results/test/designs-corpus/ise-comparison.json" test/designs-corpus/
+          cp "$RUNNER_TEMP/quality-results/docs/QUALITY.md" docs/
+          git add test/designs-corpus/ise-comparison.json docs/QUALITY.md
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Quality: the weekly Silinx toolchain vs ISE comparison (docs/QUALITY.md)"
+          # main requires CI's checks (a ruleset), which a workflow's push cannot pass: the results go to the
+          # branch quality-results, to be merged into main by a maintainer (CLAUDE.md, Integration)
+          git push -q -f origin HEAD:refs/heads/quality-results
+          echo "::notice::Results pushed to the branch quality-results: merge it into main"
+
   # a failed job is an issue (#251): one per job ('<workflow> failed: <job>'), commented on when it is
   # open already; the lines of its log that say what failed, without home folders, logins or addresses.
   # A job that hit its timeout-minutes is 'cancelled', not 'failure': it is reported too (#343), told from
   # one cancelled by hand or by a newer run by its annotation (checks: read)
   report:
-    needs: [changes, compare]
+    needs: [changes, compare, publish]
     if: always() && github.event_name == 'schedule' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
     runs-on: ubuntu-latest
     permissions:

@@ -48,6 +48,8 @@ jobs:
       SILINX_ISE_HOST: local    # the ISE Docker image on the runner itself
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22

@@ -102,6 +102,11 @@ In detail:
   model: the Silinx toolchain or an available ISE; the later ones: ISE), otherwise the dialog says why. The emulator's
   model menu lists a model generated this way, and a dialog's button pressed twice closes it once (`web/js/ui.js`).
   Tests: `test/ui/open-toolchain.test.js` and `test/ui/standalone.test.js` (both interfaces, Portuguese).
+- **The self-hosted runner without a writing token (#412):** the weekly comparison with ISE (`quality.yml`) runs on
+  the ISE machine with a read-only token and `persist-credentials: false` (it runs third-party code: the corpus's
+  fetch, `npm ci`), as the ISE tests (`ise.yml`) now do too; its results go out as the artifact `quality-results`,
+  and a `publish` job on GitHub's runner, the only one with `contents: write`, commits them to the branch
+  `quality-results` when the comparison passed. Tests: `test/workflows.test.js`.
 
 ## 15.11.0
 
