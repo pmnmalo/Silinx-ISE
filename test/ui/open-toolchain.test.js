@@ -487,6 +487,149 @@ uiTest('open mode: Generate Post-Synthesis Simulation Model of blinky, then Simu
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
 }, { timeout: 300000 });
 
+// #490: Simulate Post-Synthesis Model with no model yet: a dialog offers to generate it ("Generate and
+// Simulate"); Cancel (or Escape) runs nothing; in Portuguese; Enter generates it and the simulation starts
+const modelDialog = (page) => page.eval(() => {
+  const d = [...document.querySelectorAll('.dlg-overlay')].pop();
+  return { title: d.querySelector('.dlg-title span').textContent, text: [...d.querySelectorAll('.msg-text > div')].map((x) => x.textContent), buttons: [...d.querySelectorAll('.dlg-buttons .btn')].map((b) => b.textContent) };
+});
+uiTest('#490 open mode: Simulate Post-Synthesis Model with no model offers "Generate and Simulate": Cancel runs nothing, the button generates it and the simulation starts', E, async (page) => {
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await makeProject(env, { name: 'GenAndSim', template: 'blinky' });
+  await page.openProject('GenAndSim');
+  await reloadToolchain(page);
+  await page.click('input[name=view][value=sim]');
+  await page.treeRow('#hier', 'tb_top');
+  const ask = async () => {
+    await page.treeRow('#procs', 'Simulate Post-Synthesis Model', { dbl: true, exact: true });
+    await page.waitDialog('Simulate Post-Synthesis Model');
+    return modelDialog(page);
+  };
+  const before = await page.consoleText();
+  assert.deepEqual(await ask(), { title: 'Simulate Post-Synthesis Model', buttons: ['Generate and Simulate', 'Cancel'], text: [
+    "There is no post-synthesis simulation model of 'top' yet.",
+    'Generate it now with "Generate Post-Synthesis Simulation Model"? When it ends without errors, the simulation starts.'] });
+  // Cancel, then Escape: nothing runs (no process, no ISim)
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  await ask();
+  await page.key('Escape');
+  await page.waitNoDialog();
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(await page.eval(() => !!window.SilinxApp.findDoc('isim') || !!window.SilinxApp.S.busy), false);
+  const after = (await page.consoleText()).slice(before.length);
+  assert.doesNotMatch(after, /Started : "(?!(Behavioral )?Check Syntax")|Generate Post-Synthesis|WARNING|ERROR/, after);
+  // in Portuguese
+  const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
+  await setLang('pt');
+  await page.treeRow('#procs', 'Simular Modelo Pós-Síntese', { dbl: true, exact: true });
+  await page.waitDialog('Simular Modelo Pós-Síntese');
+  assert.deepEqual(await modelDialog(page), { title: 'Simular Modelo Pós-Síntese', buttons: ['Gerar e Simular', 'Cancelar'], text: [
+    "Ainda não há modelo de simulação pós-síntese de 'top'.",
+    'Gerá-lo agora com "Gerar Modelo de Simulação Pós-Síntese"? Quando terminar sem erros, a simulação começa.'] });
+  await page.dialogButton('Cancelar');
+  await page.waitNoDialog();
+  await setLang('en');
+  // Enter: the primary button, Generate and Simulate: the model is generated, then the simulation starts
+  const start = (await page.consoleText()).length;
+  await ask();
+  await page.key('Enter');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 180000, what: 'ISim ready' });
+  const log = (await page.consoleText()).slice(start);
+  const lines = log.split('\n').map((l) => l.trim()).filter(Boolean);
+  // the process ran once, ended without errors, then the simulation of the model started
+  const at = (re) => { const i = lines.findIndex((l) => re.test(l)); assert.ok(i >= 0, `${re}\n${log.slice(-3000)}`); return i; };
+  const order = [/^Started : "Generate Post-Synthesis Simulation Model"\.$/, /^Process "Generate Post-Synthesis Simulation Model" completed successfully with 1 warning\(s\)$/,
+    /^Post-Synthesis simulation model: build\/netgen\/synthesis\/top_synthesis\.vhd \(simulate it in the Simulation view, or emulate it on the board\)\.$/,
+    /^Started : "Simulate Post-Synthesis Model"\.$/, /^Building simulation model for top 'tb_top' with the post-synthesis netlist of 'top'\.\.\.$/].map(at);
+  assert.deepEqual([...order].sort((a, b) => a - b), order, log);
+  assert.equal(lines.filter((l) => /^Started : "Generate Post-Synthesis Simulation Model"/.test(l)).length, 1);
+  // the flow's own warning (as Generate Post-Synthesis Simulation Model run from the Processes pane, #120), no other
+  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), ['WARNING:Silinx - cells with no simulation model in Silinx (the model cannot be simulated as it is): $SPECIFY2']);
+  assert.equal(await page.eval(() => window.Silinx.active.title), 'ISim (tb_top, Post-Synthesis)');
+  // the test bench passes on the generated netlist
+  for (let k = 0; ; k++) {
+    await page.fill('.doc:not([hidden]) .isim-cmdline input', 'run all');
+    await page.key('Enter');
+    try { await page.waitFor(() => window.Silinx.active.view.state.running || /Simulation finished OK/.test(document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''), [], { what: 'run all started', timeout: 5000 }); break; } catch (e) { if (k >= 3) throw e; }
+  }
+  const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return /Simulation finished OK|ERROR/.test(t) ? t : null; }, [], { timeout: 120000, what: 'the simulation of the model' });
+  assert.match(out, /Simulation finished OK/);
+  assert.doesNotMatch(out, /ERROR/);
+  // the model now exists: no dialog the next time
+  await page.treeRow('#procs', 'Simulate Post-Synthesis Model', { dbl: true, exact: true });
+  await page.waitConsole(/Started : "Simulate Post-Synthesis Model"\.[\s\S]*Started : "Simulate Post-Synthesis Model"\./, { timeout: 30000 });
+  assert.equal(await page.dialogCount(), 0);
+  await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
+}, { timeout: 300000 });
+
+uiTest('#490 open mode: Emulate Post-Synthesis Model with no model: "Generate and Emulate" (pressed twice) generates it once and the emulator opens on it', E, async (page) => {
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await makeProject(env, { name: 'GenAndEmu', template: 'blinky' });
+  await page.openProject('GenAndEmu');
+  await reloadToolchain(page);
+  const start = (await page.consoleText()).length;
+  await page.treeRow('#procs', 'Emulate Post-Synthesis Model', { dbl: true, exact: true });
+  await page.waitDialog('Emulate Post-Synthesis Model');
+  assert.deepEqual(await modelDialog(page), { title: 'Emulate Post-Synthesis Model', buttons: ['Generate and Emulate', 'Cancel'], text: [
+    "There is no post-synthesis simulation model of 'top' yet.",
+    'Generate it now with "Generate Post-Synthesis Simulation Model"? When it ends without errors, the emulator opens.'] });
+  // a double press: one run
+  await page.eval(() => { const b = document.querySelector('.dlg-overlay .dlg-buttons .btn.primary'); b.click(); b.click(); });
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { timeout: 180000, what: 'the emulator' });
+  assert.equal(await page.eval(() => window.Silinx.active.title), 'Board Emulator (top, Post-Synthesis)');
+  const lines = (await page.consoleText()).slice(start).split('\n').map((l) => l.trim()).filter(Boolean);
+  assert.equal(lines.filter((l) => /^Started : "Generate Post-Synthesis Simulation Model"/.test(l)).length, 1, lines.join('\n'));
+  assert.ok(lines.includes('Process "Generate Post-Synthesis Simulation Model" completed successfully with 1 warning(s)'), lines.join('\n'));
+  assert.ok(lines.some((l) => /^Board Emulator: 'top' \(Post-Synthesis netlist, /.test(l)), lines.join('\n'));
+  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), ['WARNING:Silinx - cells with no simulation model in Silinx (the model cannot be simulated as it is): $SPECIFY2']);
+  // the emulator's model menu knows the model just generated (not "(not generated)")
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-bar select option')].filter((o) => o.value === 'postsynth').map((o) => o.textContent)), ['Post-Synthesis netlist']);
+  await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
+}, { timeout: 300000 });
+
+uiTest('#490 a model that needs ISE: the dialog says why, without the button (Silinx toolchain: Post-Map, Post-Place & Route; ISE not available: Post-Synthesis)', E, async (page) => {
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await makeProject(env, { name: 'NeedsIse', template: 'blinky' });
+  await page.openProject('NeedsIse');
+  await reloadToolchain(page);
+  const before = (await page.consoleText()).length;
+  const check = async (proc, title, text, button = 'OK') => {
+    await page.treeRow('#procs', proc, { dbl: true, exact: true });
+    await page.waitDialog(title);
+    assert.deepEqual(await modelDialog(page), { title, buttons: [button], text });
+    await page.key('Enter');
+    await page.waitNoDialog();
+  };
+  await check('Emulate Post-Map Model', 'Emulate Post-Map Model', ["There is no post-map simulation model of 'top' yet.",
+    '"Generate Post-Map Simulation Model" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings).']);
+  const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
+  await setLang('pt');
+  await check('Emular Modelo Pós-Place & Route', 'Emular Modelo Pós-Place & Route', ["Ainda não há modelo de simulação pós-place & route de 'top'.",
+    '"Gerar Modelo de Simulação Pós-Place & Route" requer a toolchain Xilinx ISE: não está disponível com a toolchain Silinx (escolha um modo ISE nas Definições da Toolchain).']);
+  await setLang('en');
+  await page.click('input[name=view][value=sim]');
+  await page.treeRow('#hier', 'tb_top');
+  await check('Simulate Post-Translate Model', 'Simulate Post-Translate Model', ["There is no post-translate simulation model of 'top' yet.",
+    '"Generate Post-Translate Simulation Model" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings).']);
+  // an ISE mode with no ISE: even the Post-Synthesis model cannot be generated
+  await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
+  await reloadToolchain(page);
+  assert.equal((await env.server.api('GET', '/api/toolchain')).ise.available, false);
+  await check('Simulate Post-Synthesis Model', 'Simulate Post-Synthesis Model', ["There is no post-synthesis simulation model of 'top' yet.",
+    '"Generate Post-Synthesis Simulation Model" needs the Xilinx ISE toolchain, which is not available (configure it in Tools ▸ Toolchain Settings).']);
+  await setLang('pt');
+  await check('Simular Modelo Pós-Síntese', 'Simular Modelo Pós-Síntese', ["Ainda não há modelo de simulação pós-síntese de 'top'.",
+    '"Gerar Modelo de Simulação Pós-Síntese" requer a toolchain Xilinx ISE, que não está disponível (configure-a em Ferramentas ▸ Definições da Toolchain).']);
+  await setLang('en');
+  // nothing ran
+  const log = (await page.consoleText()).slice(before);
+  assert.doesNotMatch(log, /Started : "(?!(Behavioral )?Check Syntax")|WARNING|ERROR/, log);
+  assert.equal(await page.eval(() => !!window.SilinxApp.findDoc('isim') || !!window.SilinxApp.findDoc('emulator')), false);
+}, { timeout: 120000 });
+
 // #280: Implement Design does not synthesize again while the synthesis is up to date (the design sources,
 // the top, the device the same): a change of the pins only starts at Translate, from the saved netlist, the
 // Design Summary still says what the synthesis made; reopened, the same; a change of an HDL file, the

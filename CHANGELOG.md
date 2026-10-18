@@ -21,6 +21,8 @@ In short:
 - **pong and clock in real time in the Board Emulator:** the compiled engine computes only the logic whose inputs
   changed in a clock cycle, so at Max speed pong runs at about 66 million cycles per second and clock at 88 million
   (were 28 and 23), above the boards' 50 MHz; blinky at 128 million (was 73).
+- **Generate and Simulate:** Simulate (or Emulate) a Post-Synthesis Model that is not generated yet offers to
+  generate it and goes on with the simulation (or the emulator) once it is; a model that needs Xilinx ISE says so.
 
 In detail:
 
@@ -91,6 +93,15 @@ In detail:
   `test/compiled-sim.test.js` (the seven examples and thirteen test designs with and without the activity, with its
   most and its fewest guards: every value, memory, count and edge equal after runs of up to 4000 cycles; the
   segments' choice).
+- **A simulation model not generated yet: "Generate and Simulate" (#490):** Simulate / Emulate Post-Synthesis,
+  Post-Translate, Post-Map or Post-Place & Route Model, and View Technology Schematic (ISE), with no such model of the
+  top yet showed only a message; their dialog now has "Generate and Simulate" ("Generate and Emulate", "Generate and
+  Show"), which runs "Generate … Simulation Model" as the Processes pane does (the steps before it included, the
+  browser edition's flow in the browser), then the simulation, the emulator or the schematic when it ends without
+  errors; Cancel / Escape run nothing. The button is offered only when the process can run here (the Post-Synthesis
+  model: the Silinx toolchain or an available ISE; the later ones: ISE), otherwise the dialog says why. The emulator's
+  model menu lists a model generated this way, and a dialog's button pressed twice closes it once (`web/js/ui.js`).
+  Tests: `test/ui/open-toolchain.test.js` and `test/ui/standalone.test.js` (both interfaces, Portuguese).
 
 ## 15.11.0
 

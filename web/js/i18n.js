@@ -456,7 +456,18 @@ Object.assign(PT, {
 });
 const PT_POST = { 'Post-Synthesis': 'Pós-Síntese', 'Post-Translate': 'Pós-Translate', 'Post-Map': 'Pós-Map', 'Post-Place & Route': 'Pós-Place & Route' };
 const PT_PRESS = { ' — click to toggle': ' — clique para comutar', ' — press and hold (Shift+click keeps it pressed)': ' — carregue e mantenha (Shift+clique mantém-no carregado)' };
+const PT_THEN = { 'the simulation starts': 'a simulação começa', 'the emulator opens': 'o emulador abre', 'the technology schematic opens': 'o esquemático tecnológico abre' };
+Object.assign(PT, { 'Generate and Simulate': 'Gerar e Simular', 'Generate and Emulate': 'Gerar e Emular', 'Generate and Show': 'Gerar e Mostrar' });
 PT_PATTERNS.unshift(
+  // a simulation model not generated yet (#490): generate it and go on, or why it cannot be
+  [/^There is no (post-synthesis|post-translate|post-map|post-place & route) simulation model of '(.+)' yet\.$/,
+    (m, n, top) => `Ainda não há modelo de simulação ${PT_POST[Object.keys(PT_POST).find((k) => k.toLowerCase() === n)].toLowerCase()} de '${top}'.`],
+  [/^Generate it now with "(.+)"\? When it ends without errors, (the simulation starts|the emulator opens|the technology schematic opens)\.$/,
+    (m, p, w) => `Gerá-lo agora com "${t(p)}"? Quando terminar sem erros, ${PT_THEN[w]}.`],
+  [/^"(.+)" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain \(choose an ISE mode in Toolchain Settings\)\.$/,
+    (m, p) => `"${t(p)}" requer a toolchain Xilinx ISE: não está disponível com a toolchain Silinx (escolha um modo ISE nas Definições da Toolchain).`],
+  [/^"(.+)" needs the Xilinx ISE toolchain, which is not available \(configure it in Tools ▸ Toolchain Settings\)\.$/,
+    (m, p) => `"${t(p)}" requer a toolchain Xilinx ISE, que não está disponível (configure-a em Ferramentas ▸ Definições da Toolchain).`],
   // board emulator
   [/^Divide the timing generics \((.*)\) so that the design runs visibly at the emulator's speed$/, 'Dividir os genéricos de temporização ($1) para que o projeto avance visivelmente à velocidade do emulador'],
   [/^(Post-Synthesis|Post-Translate|Post-Map|Post-Place & Route) netlist( \(not generated\))?$/, (m, n, ng) => `Netlist ${PT_POST[n]}${ng ? ' (não gerada)' : ''}`],

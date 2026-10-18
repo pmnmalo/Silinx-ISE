@@ -1366,10 +1366,10 @@ async function synthOpen(mod) {
 const FLOW_UP_TO = { synth: ['synth'], translate: ['synth', 'translate'], map: ['synth', 'translate', 'map'], par: ['synth', 'translate', 'map', 'par'] };
 async function generateSimModel(mod, step) {
   const stage = { postsynth: 'synth', posttrans: 'translate', postmap: 'map', postpar: 'par' }[step];
-  if (await runImpl(mod, [...FLOW_UP_TO[stage], step])) {
-    const rel = (await api.reports(S.project.name).catch(() => null))?.simModels?.[step]?.path;
-    if (rel) log(`${SIM_MODEL_NAMES[step]} simulation model: ${rel} (simulate it in the Simulation view, or emulate it on the board).`, 'ok');
-  }
+  if (!await runImpl(mod, [...FLOW_UP_TO[stage], step])) return false;
+  const rel = (await api.reports(S.project.name).catch(() => null))?.simModels?.[step]?.path;
+  if (rel) log(`${SIM_MODEL_NAMES[step]} simulation model: ${rel} (simulate it in the Simulation view, or emulate it on the board).`, 'ok');
+  return true;
 }
 async function postParTiming(mod) {
   if (await runImpl(mod, FLOW_UP_TO.par, { timing: true })) openSummary();
@@ -1745,15 +1745,21 @@ function openInstTemplate(mod) {
 
 // ---- schematic
 // Netlist written by netgen for `step` (postsynth / posttrans / postmap / postpar) with the
-// Silinx primitive models, ready to compile; null (after telling the user) when not generated.
-async function netlistSources(step, { hier = false } = {}) {
+// Silinx primitive models, ready to compile. When it is not generated yet, the user is offered to
+// generate it (the process of the Processes pane, with the steps before it) and the caller goes on
+// with it (#490); null when it is not generated (cancelled, failed, or it cannot run here).
+// `action`: what the caller does with it ('Simulate', 'Emulate', 'Show'), `title` its dialog's title.
+async function netlistSources(step, { hier = false, action = 'Simulate', title = `${action} ${SIM_MODEL_NAMES[step]} Model` } = {}) {
   const name = SIM_MODEL_NAMES[step];
-  let rep = null;
-  try { rep = await api.reports(S.project.name); } catch { /* none */ }
-  const m = rep?.simModels?.[step];
-  if (!m || rep.top !== S.project.top) {
-    alertDlg(`${name} Model`, `There is no ${name.toLowerCase()} simulation model of '${S.project.top}' yet.\n\nRun "${EXTRA_STEPS[step]}" in the Implementation view first${step === 'postsynth' ? '' : ' (it needs the Xilinx ISE toolchain)'}.`);
-    return null;
+  const modelOf = async () => {
+    const rep = await api.reports(S.project.name).catch(() => null);
+    return rep?.simModels?.[step] && rep.top === S.project.top ? rep.simModels[step] : null;
+  };
+  let m = await modelOf();
+  if (!m) {
+    if (!await offerSimModel(step, action, title)) return null;
+    m = await modelOf();
+    if (!m) return null;
   }
   const stage = { postsynth: 'synth', posttrans: 'translate', postmap: 'map', postpar: 'par' }[step];
   if (S.status[stage] === 'stale' || S.status[step] === 'stale') log(`WARNING: the ${name.toLowerCase()} model is older than the sources (run "${EXTRA_STEPS[step]}" again to update it).`, 'warn');
@@ -1771,12 +1777,36 @@ async function netlistSources(step, { hier = false } = {}) {
   const net = { path: m.path, lang: 'vhdl', text, role: 'design', netlist: step };
   return [...primitiveSources([net]), net];
 }
+// The dialog of a model not generated yet (#490): "Generate and <action>" runs its process when the
+// toolchain can (the Post-Synthesis model: the Silinx toolchain and ISE; the later ones: ISE), else it
+// says why. true when the process ran and ended without errors.
+const SIM_MODEL_THEN = { Simulate: 'the simulation starts', Emulate: 'the emulator opens', Show: 'the technology schematic opens' };
+async function offerSimModel(step, action, title) {
+  const proc = EXTRA_STEPS[step];
+  let why = null;
+  if (openMode()) {
+    if (ISE_ONLY.has(step)) why = `"${proc}" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings).`;
+  } else {
+    const tc = S.toolchain || await api.toolchain().catch(() => null);
+    if (!tc?.ise?.available) why = `"${proc}" needs the Xilinx ISE toolchain, which is not available (configure it in Tools ▸ Toolchain Settings).`;
+  }
+  const p = (text, first) => h('div', { style: first ? {} : { marginTop: '8px' } }, text);
+  const text = h('div', { class: 'msg-text' }, p(`There is no ${SIM_MODEL_NAMES[step].toLowerCase()} simulation model of '${S.project.top}' yet.`, true),
+    p(why || `Generate it now with "${proc}"? When it ends without errors, ${SIM_MODEL_THEN[action]}.`));
+  const go = await dialog({
+    title, width: 440, className: 'sim-model-dlg',
+    body: h('div', { class: `msg msg-${why ? 'info' : 'question'}` }, h('div', { class: 'msg-icon' }, why ? 'i' : '?'), text),
+    buttons: why ? [{ label: 'OK', value: null, primary: true }] : [{ label: `Generate and ${action}`, value: true, primary: true }, { label: 'Cancel', value: null }],
+  });
+  if (!go) return false;
+  return !!await generateSimModel(S.project.top, step);
+}
 const isPrimitive = inst => /^<silinx>\//.test(inst?.mod?.file || inst?.file || '');
 
 // View Technology Schematic: the post-synthesis netlist (LUTs, flip-flops, carry chain…)
 async function openTechSchematic(mod) {
   if (openMode()) return openSilinxTechSchematic(mod);
-  const srcs = await netlistSources('postsynth', { hier: true });
+  const srcs = await netlistSources('postsynth', { hier: true, action: 'Show', title: 'View Technology Schematic' });
   if (srcs) return openSchematic(mod, { netlist: srcs });
 }
 
@@ -2009,11 +2039,12 @@ async function openEmulator(mod, { scale, model = null, engine = null } = {}) {
   if (!await checkSyntax(mod)) return;
   await loadUcfText();   // the pins as they are now (pin planner / editor changes)
   // the design to run: the HDL (RTL) or a netlist generated by netgen (post-synthesis …)
+  // (the model first: it may be generated now, #490)
+  const net = model ? await netlistSources(model, { action: 'Emulate' }) : null;
+  if (model && !net) return;
   let rep = null;
   try { rep = await api.reports(S.project.name); } catch { /* standalone / no build */ }
   const models = Object.keys(SIM_MODEL_NAMES).filter(k => rep?.simModels?.[k] && rep.top === mod);
-  const net = model ? await netlistSources(model) : null;
-  if (model && !net) return;
   const srcs = net || S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, false));   // the implemented design
   const { timingGenerics, autoTimeScale, scaledGenerics } = await import('/core/emulate.js');
   let design, lib, gens = [];

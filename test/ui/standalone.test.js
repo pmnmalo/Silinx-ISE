@@ -842,3 +842,23 @@ uiTest('browser edition: Generate Post-Synthesis Simulation Model in the browser
   assert.match(out, /Simulation finished OK/);
   assert.doesNotMatch(out, /ERROR/);
 }, { url: () => 'about:blank', timeout: 300000 });
+
+uiTest('browser edition: Simulate Post-Synthesis Model with no model: "Generate and Simulate" generates it in the browser and the simulation starts (#490)', E, async (page) => {
+  await newSiteProject(page, 'WebGenSim', 'blinky');
+  await page.click('input[name=view][value=sim]');
+  await page.treeRow('#hier', 'tb_top');
+  const start = (await page.consoleText()).length;
+  await page.treeRow('#procs', 'Simulate Post-Synthesis Model', { dbl: true, exact: true });
+  await page.waitDialog('Simulate Post-Synthesis Model');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].map((b) => b.textContent)), ['Generate and Simulate', 'Cancel']);
+  await page.dialogButton('Generate and Simulate');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 180000, what: 'ISim ready' });
+  const lines = (await page.consoleText()).slice(start).split('\n').map((l) => l.trim()).filter(Boolean);
+  const done = 'Process "Generate Post-Synthesis Simulation Model" completed successfully with 1 warning(s)';
+  assert.ok(lines.includes('=== SILINX STEP postsynth ==='), lines.join('\n'));
+  assert.ok(lines.includes(done), lines.join('\n'));
+  assert.ok(lines.indexOf(done) < lines.indexOf('Started : "Simulate Post-Synthesis Model".'), lines.join('\n'));
+  assert.deepEqual(lines.filter((l) => /^(WARNING|ERROR)/i.test(l)), ['WARNING:Silinx - cells with no simulation model in Silinx (the model cannot be simulated as it is): $SPECIFY2']);
+  assert.equal(await page.eval(() => window.Silinx.active.title), 'ISim (tb_top, Post-Synthesis)');
+}, { url: () => 'about:blank', timeout: 300000 });

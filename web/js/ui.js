@@ -40,7 +40,9 @@ export function dialog({ title, body, buttons = [{ label: 'OK', value: true, pri
   return new Promise(resolve => {
     const overlay = h('div', { class: 'dlg-overlay', style: { zIndex: ++dialogZ } });
     const content = typeof body === 'function' ? body() : body;
-    const close = v => { overlay.remove(); document.removeEventListener('keydown', onKey, true); dialogStack.splice(dialogStack.indexOf(overlay), 1); resolve(v); };
+    // once only: a second click or key (a button pressed twice) must not close another dialog (#490)
+    let closed = false;
+    const close = v => { if (closed) return; closed = true; overlay.remove(); document.removeEventListener('keydown', onKey, true); dialogStack.splice(dialogStack.indexOf(overlay), 1); resolve(v); };
     const btnRow = h('div', { class: 'dlg-buttons' });
     const dlg = h('div', { class: `dlg ${className}`, style: { width: typeof width === 'number' ? `${width}px` : width } },
       h('div', { class: 'dlg-title' }, h('span', {}, title), h('button', { class: 'dlg-x', onclick: () => close(null), title: 'Close' }, '✕')),
