@@ -1089,6 +1089,12 @@ export async function checkUpdatesOnStart() {
 
 export async function checkUpdatesDialog({ rel: known = null, served = undefined } = {}) {
   const body = h('div', {}, h('p', {}, `Running ${PRODUCT} ${VERSION_LABEL}. Checking for a newer version…`));
+  // the dialog at once, filled in when the answer comes (opened after it, the site's version.json or
+  // GitHub's release, it came over whatever was done meanwhile: #441); on the site, Reload is added
+  // when it serves another page
+  let ui = null;
+  const done = dialog({ title: 'Check for Updates', width: 520, body, buttons: [{ label: 'OK', primary: true, value: true }], onOpen: x => { ui = x; } })
+    .then(v => { if (v === 'reload') location.reload(); return v; });
   // on the site: a newer page served (reload), or this one is the site's
   if (served === undefined && !known) served = await siteVersion();
   if (served) {
@@ -1098,10 +1104,9 @@ export async function checkUpdatesDialog({ rel: known = null, served = undefined
       fresh ? h('p', {}, 'It is the version this site serves.') : h('p', {}, `This page is ${VERSION_LABEL}: reload the page to get the new version (your projects are kept).`),
       BUILD ? h('p', { class: 'hint' }, 'This is the development edition, built from the latest code (main): it is updated after every change, before the releases.') : null,
       h('p', {}, 'Releases: ', link(`https://github.com/${REPO}/releases`, `github.com/${REPO}/releases`))].filter(Boolean));
-    return dialog({ title: 'Check for Updates', width: 520, body, buttons: [...(fresh ? [] : [{ label: 'Reload', value: 'reload' }]), { label: 'OK', primary: true, value: true }] })
-      .then(v => { if (v === 'reload') location.reload(); return v; });
+    if (!fresh) ui.dlg.querySelector('.dlg-buttons').prepend(h('button', { class: 'btn', onclick: () => ui.close('reload') }, 'Reload'));
+    return done;
   }
-  const done = dialog({ title: 'Check for Updates', width: 520, body, buttons: [{ label: 'OK', primary: true, value: true }] });
   let rel = known;
   try {
     rel ||= await latestRelease();

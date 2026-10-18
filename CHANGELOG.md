@@ -42,6 +42,11 @@ In detail:
   vtr-ch-intrinsics has the one gated clock that ISE's own implementation also reports (a latch's gate from logic),
   157 LUTs instead of 178 and 6.3 ns instead of 7.6. The examples and the open flow's fixtures are byte-identical
   with ISE's bitgen as before.
+- **Check for Updates opens its dialog at once (#441):** it opened only once the site's version.json had answered
+  (in the application, the Silinx server's answer, slow on a busy machine), so it came over whatever was done
+  meanwhile: the menus UI test failed at the next item (Help ▸ Tell Us Who You Are…). The dialog now opens with
+  "Checking for a newer version…" and is filled in when the answer comes (Reload added when the site serves another
+  page); a regression test holds version.json back.
 - **An estimated power report in the Silinx toolchain (#123):** the `xpwr` step of the flow (core/open-flow-core.js,
   after Place & Route and its timing) writes `build/<top>.pwr` from core/power.js: the device's static power (the
   supplies' quiescent currents XPower 14.7 gives each device, Vccint's with the junction temperature) and the routed

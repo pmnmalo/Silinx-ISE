@@ -414,6 +414,52 @@ uiTest('Portuguese: View ▸ Language switches the UI; menus, dialogs and the ma
   await page.waitFor(() => document.querySelector('#menubar .item').textContent === 'File');
 });
 
+// #441: the dialog opens at once, "Checking…", and is filled in when the answer comes; opened only after
+// the site's version.json (slow on a busy machine), it came over whatever was done meanwhile (the next menu)
+uiTest('Check for Updates opens its dialog at once, then fills it in when the site\'s version.json answers (#441)', E, async (page) => {
+  const { VERSION, REPOSITORY } = await import('../../core/version.js');
+  // version.json held until the test answers it; GitHub stubbed
+  await page.eval((ver, repo) => {
+    window.__origFetch ||= window.fetch;
+    window.__answer = null;
+    window.fetch = (u, o) => {
+      if (/version\.json$/.test(String(u))) return new Promise((resolve) => { window.__answer = resolve; });
+      if (String(u).includes('api.github.com')) return Promise.resolve(new Response(JSON.stringify({ tag_name: `v${ver}`, html_url: `https://github.com/${repo}/releases` }), { status: 200, headers: { 'content-type': 'application/json' } }));
+      return window.__origFetch(u, o);
+    };
+  }, VERSION, REPOSITORY);
+  const opened = async () => {
+    await page.menu('Help', 'Check for Updates…');
+    // at once, before the answer: the dialog, checking
+    assert.equal(await page.dialogCount(), 1);
+    assert.match(await page.eval(() => document.querySelector('.dlg-overlay').innerText), /Checking for a newer version…/);
+    await page.waitFor(() => !!window.__answer, [], { what: 'version.json asked' });
+  };
+  // not a site (no version.json): GitHub's latest release, the same version
+  await opened();
+  await page.eval(() => window.__answer(new Response('not found', { status: 404 })));
+  await page.waitFor(() => /is up to date/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'up to date' });
+  assert.equal(await page.dialogCount(), 1);
+  await page.key('Escape');
+  await page.waitNoDialog();
+  // a site serving another page: the same dialog, now with Reload
+  await opened();
+  await page.eval(() => window.__answer(new Response(JSON.stringify({ version: '99.0.0', build: null }), { status: 200, headers: { 'content-type': 'application/json' } })));
+  await page.waitFor(() => /This site now serves Silinx ISE 99\.0\.0\./.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'newer page served' });
+  assert.equal(await page.dialogCount(), 1);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons button')].map((b) => b.textContent)), ['Reload', 'OK']);
+  await page.key('Escape');
+  await page.waitNoDialog();
+  // closed before the answer: the late answer opens nothing
+  await opened();
+  await page.key('Escape');
+  await page.waitNoDialog();
+  await page.eval(() => window.__answer(new Response('not found', { status: 404 })));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(await page.dialogCount(), 0);
+  await page.eval(() => { window.fetch = window.__origFetch; });
+});
+
 uiTest('at start-up the app checks for updates: a newer release opens the update dialog, the same version only logs a line', E, async (page) => {
   // turn the start-up check on again, with GitHub stubbed (no network): first a newer release
   const stub = (tag) => `window.SILINX_NO_UPDATE_CHECK = false;
