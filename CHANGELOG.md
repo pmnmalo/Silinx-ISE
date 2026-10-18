@@ -162,6 +162,11 @@ In detail:
   warnings, the test bench, the UCF, the Silinx toolchain on the four devices), its synthesis' size budget, the
   quick fixes' list of where none puts a removed `end process;` back; `test/compiled-emulate.test.js` and
   `test/emulate-remote.test.js` compare its VGA pins (it lights no LED).
+- **The vga example with no ISE warning (#461):** ISE's map warned `Pack:266` (the function generator
+  `timing/active_and…` failed to merge with an F5 multiplexer) on every device: `vga_sync`'s `active` was a
+  comparison of both counters (`hc < 640 and vc < 480`). It is now the AND of two flags kept with the counters (set
+  when a counter starts again, cleared after its last visible value): the same timing, simulation and picture. The
+  open synthesis: 171 LUTs, 13 MUXF, 160 slices (163, 0, 157); its size budget follows.
 - **The Board Emulator's VGA monitor (#420, part 3 of #102):** when the UCF wires the board's VGA connector (its
   colour widths from the board: 3-3-2 bits on the Basys2 and the Nexys2, 1-1-1 on the Starter Kit), the compiled
   code keeps a monitor (`core/compiled-sim.js` VGA_CODE): a line from each leading edge of HSYNC (its active level

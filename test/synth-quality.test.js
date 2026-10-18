@@ -67,8 +67,9 @@ const BUDGETS = {
   'examples/pong': { design: () => example('pong'), luts: 340, muxes: 68, slices: 300 },
   'examples/stopwatch': { design: () => example('stopwatch'), luts: 255, muxes: 62, slices: 243 },
   'examples/clock': { design: () => example('clock'), luts: 230, muxes: 87, slices: 256 },
-  // the VGA picture: counters and comparisons (15.10.23: 163 LUTs, 0 MUXF, 219 carry, 53 FFs, 157 slices)
-  'examples/vga': { design: () => example('vga'), luts: 180, muxes: 4, slices: 173 },
+  // the VGA picture: counters and comparisons (15.10.23: 163 LUTs, 0 MUXF, 219 carry, 53 FFs, 157 slices; with the
+  // visible area in two flip-flops (#461): 171 LUTs, 13 MUXF, 213 carry, 55 FFs, 160 slices)
+  'examples/vga': { design: () => example('vga'), luts: 188, muxes: 15, slices: 176 },
   // the pedestrian crossing (state diagram, truth table, timer, display; 15.10.12: 114 LUTs, 22 MUXF, 73
   // slices; 15.10.16, balanced once more for depth (#52): 94 LUTs, 32 MUXF, 68 slices, 7.1 ns estimated
   // instead of 7.9; raised by Yosys 0.70 (#368): 94 LUTs, 32 MUXF, 68 slices with 0.68, 108 LUTs, 13 MUXF,
