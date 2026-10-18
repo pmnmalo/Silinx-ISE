@@ -56,8 +56,11 @@ let worker = null, runSeq = 0;
 const runs = new Map();   // id -> { onData, fail }
 function getWorker() {
   if (worker) return worker;
-  const src = globalThis.SILINX_FLOW_WORKER_SRC;   // the single-file edition: the worker's code, embedded
-  const w = src ? new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })), { type: 'module' }) : new Worker('/js/open-flow-worker.js', { type: 'module' });
+  // the single-file edition: the worker's code, embedded, started from a Blob as a classic worker (its
+  // bundle has no imports): a file:// page is an opaque origin, from which Chrome refuses a module Blob
+  // worker but starts a classic one (#512)
+  const src = globalThis.SILINX_FLOW_WORKER_SRC;
+  const w = src ? new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))) : new Worker('/js/open-flow-worker.js', { type: 'module' });
   w.onmessage = ({ data }) => runs.get(data.id)?.onData(data);
   w.onerror = e => stopWorker(new Error(`the Silinx toolchain could not start in this browser: ${e.message || 'the worker failed'}`));
   worker = w;

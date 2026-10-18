@@ -171,7 +171,9 @@ test('#279 the code of a Yosys worker from a Blob: Yosys from the URL given, its
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-yw-'));
   const fake = fakeBundle(dir);
   const src = yosysWorkerSource(pathToFileURL(fake).href);
-  assert.match(src, new RegExp(`^import \\{ runYosys \\} from ${JSON.stringify(pathToFileURL(fake).href).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')};`));
+  // (a dynamic import: the code of a classic worker, which a file:// page can start from a Blob, #512)
+  assert.match(src, new RegExp(`^const yosys = import\\(${JSON.stringify(pathToFileURL(fake).href).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\\);`));
+  assert.doesNotMatch(src, /^import /m, 'no static import');
   await checkWorkerCode(src, dir);
 });
 

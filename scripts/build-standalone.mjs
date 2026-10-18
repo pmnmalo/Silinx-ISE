@@ -56,7 +56,8 @@ const res = await esbuild.build({
 });
 const appJs = res.outputFiles[0].text;
 // the Silinx toolchain's Web Worker (web/js/open-flow-worker.js), embedded as text: the page starts
-// it from a Blob (a single file has no other file to load it from)
+// it from a Blob (a single file has no other file to load it from) as a classic worker, which a page
+// opened from file:// can start and a module worker is not (#512): the bundle has no imports
 const workerRes = await esbuild.build({
   entryPoints: [path.join(ROOT, 'web/js/open-flow-worker.js')],
   bundle: true, format: 'esm', minify: true, write: false, target: 'es2022', plugins: [plugin], logLevel: 'warning', platform: 'browser', define,

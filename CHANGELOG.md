@@ -29,6 +29,9 @@ In short:
 - **Adders written as gates on the carry chain at the default effort:** at Optimization Effort Normal, an adder
   written gate by gate that is not deep enough for the mappings for speed (a schematic of 8 to 32 full adders) is
   also mapped onto the FPGA's carry chain when that is faster. Other designs synthesize as before.
+- **The single-file edition works again from the disk:** Silinx-ISE.html opened from a folder (file://) in Chrome
+  ran neither Generate Programming File ("the Silinx toolchain could not start in this browser: the worker failed")
+  nor the Board Emulator's compiled engine: the workers it embeds now start the way such a page allows.
 - **Smaller circuits at Optimization Effort High:** the choice between the synthesis's mappings weighs the slices,
   the FPGA's own measure, and not only the LUTs (SHA-1 core 42 % fewer slices, SipHash 23 %, a USB PHY 18 %).
 - **Program FPGA from the browser in fewer USB round trips:** Configure Target Device ▸ Program FPGA over
@@ -181,6 +184,20 @@ In detail:
   `upload-artifact`, `download-artifact`, `upload-pages-artifact`, `deploy-pages`) is used at its release's full
   commit SHA with the version in a comment, the same everywhere; Dependabot's weekly GitHub Actions pull request
   moves them, the setup action's included (`directories`). Tests: `test/workflows.test.js`, `test/yosys-update.test.js`.
+- **The standalone edition's workers from file:// (#512):** the single file starts its embedded workers (the
+  Silinx toolchain's, `web/js/open-flow-browser.js` getWorker; the compiled engine's, `web/js/emulator.js`) from
+  a Blob as classic workers, no longer module ones: a page opened from file:// is an opaque origin, from which
+  Chrome refuses a module Blob worker (`onerror` with no message) but starts a classic one; the bundles have no
+  imports. The Yosys workers started from a Blob (`core/synth-open.js` yosysWorkerSource: the flow worker's
+  pool, the emulator's Yosys from the site) load Yosys's bundle by a dynamic import and are classic workers
+  too (the flow worker fell back to its own thread; the emulator's had no fallback). The served editions
+  (`/js/open-flow-worker.js`, `/js/emulator-worker.js`, `/js/yosys-worker.js`) stay module workers. The UI
+  tests had not seen it: the harness runs Chrome with `--allow-file-access-from-files`, under which both
+  kinds start; `setupUi({ fileAccess: false })` now launches a Chrome without it. Tests:
+  `test/ui/standalone.test.js` (a second Chrome without the flag: the single file from file:// runs Generate
+  Programming File to the bitstream and the Board Emulator's compiled engine in their workers; fails on the
+  old code with the error above), `test/yosys-client.test.js` (the Blob worker's code: a dynamic import, no
+  static one).
 - **Adders' carry chains at effort Normal (#477, #377):** a design written as gates (#77's GATE_MIN) that is not deep
   (#468 gives a deep one, the EPFL adder, High's mappings) gets its first Yosys run up to `synth_xilinx`'s fine step
   beside the usual run, at once; only adders' chains (half of their bits with a sum at least:

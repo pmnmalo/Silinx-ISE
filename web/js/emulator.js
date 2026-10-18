@@ -345,14 +345,14 @@ export async function emulatorYosys(standalone) {
     const [{ yosysPool }, { assetsBase }, { yosysWorkerSource }] = await Promise.all([import('./yosys-client.js'), import('./open-flow-browser.js'), import('/core/synth-open.js')]);
     const bundle = new URL('vendor/yowasp-yosys/gen/bundle.js', assetsBase()).href;
     const url = URL.createObjectURL(new Blob([yosysWorkerSource(bundle)], { type: 'text/javascript' }));
-    siteYosys = yosysPool({ spawn: () => new Worker(url, { type: 'module' }), workers: 1 });
+    siteYosys = yosysPool({ spawn: () => new Worker(url), workers: 1 });   // (a classic worker: from file:// too, #512)
   }
   return siteYosys;
 }
 
 // the compiled engine's worker (#427): started from its file (the local server) or, in the single-file
-// edition, from its embedded text (a Blob); on the page's thread (a MessageChannel) when no worker starts,
-// or with SILINX_EMU_IN_PAGE (to compare the two)
+// edition, from its embedded text (a Blob, a classic worker: a file:// page cannot start a module one, #512);
+// on the page's thread (a MessageChannel) when no worker starts, or with SILINX_EMU_IN_PAGE (to compare the two)
 let emuWorkerUrl = null;
 const liveWorkers = new Set();
 /** The emulator's workers running (a closed emulator terminates its own). */
@@ -362,7 +362,7 @@ function compiledHost() {
     try {
       const src = globalThis.SILINX_EMU_WORKER_SRC;
       if (src) emuWorkerUrl ??= URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-      const w = new Worker(src ? emuWorkerUrl : '/js/emulator-worker.js', { type: 'module' });
+      const w = src ? new Worker(emuWorkerUrl) : new Worker('/js/emulator-worker.js', { type: 'module' });
       liveWorkers.add(w);
       return { port: w, worker: true, close: () => { w.terminate(); liveWorkers.delete(w); } };
     } catch { /* (no worker: on the page's thread) */ }

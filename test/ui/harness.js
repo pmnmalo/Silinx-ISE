@@ -90,15 +90,15 @@ class CDP {
   close() { try { this.ws.close(); } catch { /* ignore */ } }
 }
 
-async function launchChrome(exe, tmp, extraArgs = []) {
+async function launchChrome(exe, tmp, extraArgs = [], opts = {}) {
   // a slow machine (2-core CI runner, several suites at once) may need a second try
-  try { return await launchChromeOnce(exe, tmp, 'chrome-profile', extraArgs); } catch (e) {
+  try { return await launchChromeOnce(exe, tmp, 'chrome-profile', extraArgs, opts); } catch (e) {
     debug(`Chrome launch failed, retrying: ${e.message.slice(0, 300)}`);
-    return launchChromeOnce(exe, tmp, 'chrome-profile-2', extraArgs);
+    return launchChromeOnce(exe, tmp, 'chrome-profile-2', extraArgs, opts);
   }
 }
 
-async function launchChromeOnce(exe, tmp, profile, extraArgs) {
+async function launchChromeOnce(exe, tmp, profile, extraArgs, { fileAccess = true } = {}) {
   const userDir = path.join(tmp, profile);
   await fsp.mkdir(userDir, { recursive: true });
   const args = [
@@ -107,7 +107,10 @@ async function launchChromeOnce(exe, tmp, profile, extraArgs) {
     '--disable-background-networking', '--disable-component-update', '--disable-default-apps', '--metrics-recording-only',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
     '--disable-features=Translate,MediaRouter,OptimizationHints', '--password-store=basic', '--use-mock-keychain',
-    '--window-size=1400,900', '--allow-file-access-from-files',
+    '--window-size=1400,900',
+    // a file:// page may read other files (the tests' fixtures); without it (fileAccess: false) Chrome
+    // treats the page as a user's Chrome does: an opaque origin, no module Blob workers (#512)
+    ...(fileAccess ? ['--allow-file-access-from-files'] : []),
     ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
     ...(process.env.SILINX_UI_CHROME_ARGS ? process.env.SILINX_UI_CHROME_ARGS.split(/\s+/).filter(Boolean) : []),   // e.g. --disable-gpu
     ...extraArgs,
@@ -673,9 +676,10 @@ function initScripts({ updateCheck }) {
  * `server: false` for tests that do not need the Silinx server (standalone edition, or one started
  * by the test). `offline: true`: the browser's requests to other hosts are refused and recorded in
  * env.external (see startRecordingProxy). env.newPage(url, { updateCheck }) opens a page (the
- * update check against GitHub only with updateCheck: true).
+ * update check against GitHub only with updateCheck: true). `fileAccess: false`: Chrome without
+ * --allow-file-access-from-files, as a user opens a file (the standalone edition from file://, #512).
  */
-export async function setupUi({ server = true, offline = false, root = ROOT } = {}) {
+export async function setupUi({ server = true, offline = false, root = ROOT, fileAccess = true } = {}) {
   const missing = missingDependencies(root);
   if (missing.length) throw new Error(dependenciesMessage(missing));
   if (BROWSER !== 'chrome') return setupPlaywright({ server, offline });
@@ -689,7 +693,7 @@ export async function setupUi({ server = true, offline = false, root = ROOT } = 
   const proxy = offline ? await startRecordingProxy() : null;
   // (the proxy also sees Chrome's own requests to Google: the pages' requests are recorded by CDP)
   env.external = proxy ? [] : undefined;
-  const { proc, cdp } = await launchChrome(chrome, tmp, proxy ? [`--proxy-server=${proxy.url}`] : []);
+  const { proc, cdp } = await launchChrome(chrome, tmp, proxy ? [`--proxy-server=${proxy.url}`] : [], { fileAccess });
   env.chromeProc = proc;
   env.cdp = cdp;
   env.pageSeq = 0;

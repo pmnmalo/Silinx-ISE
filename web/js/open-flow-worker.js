@@ -63,7 +63,7 @@ self.onmessage = async ({ data }) => {
     if (!pools.has(bundle) && typeof Worker !== 'undefined') {
       try {
         const url = URL.createObjectURL(new Blob([yosysWorkerSource(bundle)], { type: 'text/javascript' }));
-        pools.set(bundle, yosysPool({ spawn: () => new Worker(url, { type: 'module' }) }));
+        pools.set(bundle, yosysPool({ spawn: () => new Worker(url) }));   // (classic workers: from a file:// page too, #512)
       } catch { pools.set(bundle, null); }
     }
     pool = pools.get(bundle) || null;

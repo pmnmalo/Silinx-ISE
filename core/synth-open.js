@@ -660,16 +660,18 @@ export function lineStream(onLine) {
 
 /**
  * The code of a Yosys worker (as web/js/yosys-worker.js) that loads Yosys from bundleUrl (YoWASP's
- * gen/bundle.js): for a worker started from a Blob, with no file of its own.
+ * gen/bundle.js): for a worker started from a Blob, with no file of its own. A classic worker's code
+ * (Yosys by a dynamic import, which a classic worker may do, a static one not): a page opened from
+ * file:// (the single-file edition, an opaque origin) cannot start a module worker from a Blob (#512).
  */
 export function yosysWorkerSource(bundleUrl) {
-  return `import { runYosys } from ${JSON.stringify(String(bundleUrl))};
+  return `const yosys = import(${JSON.stringify(String(bundleUrl))});
 const lineStream = ${lineStream};
 const asText = ${asText};
 const yosysError = ${yosysError};
 const runYosysOnce = (${yosysRunner})(lineStream, asText, yosysError);
 self.onmessage = async ({ data: { id, args, files } }) => {
-  try { self.postMessage({ id, files: await runYosysOnce(runYosys, args, files, line => self.postMessage({ id, line })) }); }
+  try { const { runYosys } = await yosys; self.postMessage({ id, files: await runYosysOnce(runYosys, args, files, line => self.postMessage({ id, line })) }); }
   catch (e) { self.postMessage({ id, error: e.message, code: e.code, crash: e.crash }); }
 };
 `;

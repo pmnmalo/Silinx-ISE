@@ -12,15 +12,17 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { setupUi, uiTest, waitDownload, ROOT, chromeOnly } from './harness.js';
+import { setupUi, uiTest, waitDownload, ROOT, chromeOnly, BROWSER } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 import { buildInfo } from '../../scripts/build-info.mjs';
 import { VERSION, versionLabel } from '../../core/version.js';
 
-let env, html, site, server, siteUrl, build, skip = null;
+let env, plain, html, site, server, siteUrl, build, skip = null;
 before(async () => {
   env = await setupUi({ server: false });
   if (env.skip) return;
+  // a Chrome as a user's: without --allow-file-access-from-files, which the harness's has (#512)
+  if (BROWSER === 'chrome') plain = await setupUi({ server: false, fileAccess: false });
   // the build script writes <its root>/dist: give it a root of its own (links to web, core, server,
   // examples and the installed packages) so that the repository's dist/ is not touched
   const require = createRequire(path.join(ROOT, 'package.json'));
@@ -64,8 +66,9 @@ before(async () => {
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
   siteUrl = `http://127.0.0.1:${server.address().port}/`;
 });
-after(async () => { server?.close(); await env?.teardown?.(); });
+after(async () => { server?.close(); await env?.teardown?.(); await plain?.teardown?.(); });
 const E = () => (skip ? { skip } : env);
+const PLAIN = () => (skip ? { skip } : plain || { skip: chromeOnly });
 
 uiTest('standalone edition (dist build): loads from file://, creates a project from an example, simulates it', E, async (page) => {
   const stat = await fs.stat(html);
@@ -389,6 +392,43 @@ uiTest('standalone edition (file://): the Board Emulator runs blinky on the comp
   assert.equal(await page.eval(() => window.Silinx.active.view.worker), true, 'the compiled engine in a worker');
   await page.waitFor(() => window.Silinx.active.view.sim.now > 1e11, [], { what: '0.1 s of the board\'s time', timeout: 60000 });
 }, { url: () => 'about:blank', timeout: 240000 });
+
+// #512: the single file opened from the disk in a user's Chrome (no --allow-file-access-from-files: the
+// page an opaque origin, from which a module worker cannot start from a Blob): the Silinx toolchain's
+// worker and the compiled engine's, embedded in the page, start as classic workers, and Yosys's too
+uiTest('standalone edition (file://) in a Chrome without --allow-file-access-from-files: Generate Programming File and the Board Emulator run in their workers (#512)', PLAIN, async (page) => {
+  await page.goto(pathToFileURL(html).href);
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'standalone boot' });
+  assert.equal(await page.eval(() => location.protocol), 'file:');
+  await page.eval((u) => { window.SILINX_ASSETS = u; }, `${siteUrl}assets/`);
+  await page.menu('File', 'New Project…');
+  await page.waitDialog('New Project Wizard');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'SoloPlain');
+  await page.fill('.dlg-overlay .wiz-main select', 'blinky', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.fill('.dlg-overlay .wiz-main select', 'basys2', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.project?.name === 'SoloPlain' && window.Silinx.project.top);
+  // the flow in its worker, down to the bitstream (the old code: "the Silinx toolchain could not start in
+  // this browser: the worker failed")
+  await page.click('input[name=view][value=impl]');
+  await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
+  await page.waitConsole(/=== SILINX DONE ===|could not start in this browser/, { timeout: 120000 });
+  await page.waitFor(() => !window.Silinx.busy, [], { what: 'flow finished', timeout: 30000 });
+  const log = await page.consoleText();
+  assert.doesNotMatch(log, /could not start in this browser|the Yosys worker failed|SILINX FAILED|Process failed/);
+  for (const re of [/=== SILINX STEP synth ===/, /=== SILINX STEP bitgen ===/, /Bitstream: build\/top\.bit/, /=== SILINX DONE ===/]) assert.match(log, re);
+  assert.ok((await fs.readFile(await waitDownload(page, 'top.bit'))).length > 100_000, 'top.bit downloaded');
+  // the Board Emulator: the compiled engine in its worker, Yosys in its own
+  await page.menu('Tools', 'Board Emulator');
+  await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { what: 'emulator running', timeout: 120000 });
+  assert.equal(await page.eval(() => window.Silinx.active.view.engine), 'compiled');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .emu-side > .emu-hint')].map((e) => e.textContent).slice(1)), [], 'no reason, no warning');
+  assert.equal(await page.eval(() => window.Silinx.active.view.worker), true, 'the compiled engine in a worker');
+  await page.waitFor(() => window.Silinx.active.view.sim.now > 1e11, [], { what: '0.1 s of the board\'s time', timeout: 60000 });
+}, { url: () => 'about:blank', timeout: 300000 });
 
 // #418: the Board Emulator in the browser edition compiles the design with the site's Yosys (its assets)
 uiTest('browser edition: the Board Emulator runs blinky on the compiled engine, Yosys from the site\'s assets', E, async (page) => {
