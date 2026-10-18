@@ -93,7 +93,7 @@ test('CI: on every push to main and pull request; the long jobs gated on the cha
   assert.match(j.changes.join('\n'), /fetch-depth: 0[\s\S]*node scripts\/ci-changes\.mjs "\$BASE" HEAD[\s\S]*BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}/);
   // the unit tests always (the documentation's tests are among them), the others only for code
   assert.ok(!j.unit.some(l => /needs:|^    if:/.test(l)), 'unit: not gated');
-  assert.match(j.unit.join('\n'), /node --test --test-shard=\$\{\{ matrix\.shard \}\}\/3 "test\/\*\.test\.js"/);
+  assert.match(j.unit.join('\n'), /node --test --test-shard="\$SHARD\/3" "test\/\*\.test\.js"/);
   for (const t of ['docs', 'changelog', 'quality-page']) assert.ok(fs.existsSync(path.join(ROOT, `test/${t}.test.js`)), t);
   for (const job of ['ui', 'webkit-standalone', 'release-zip', 'browsers', 'os']) {
     assert.ok(j[job].includes('    needs: changes'), job);

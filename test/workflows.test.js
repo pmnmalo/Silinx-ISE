@@ -80,3 +80,39 @@ test('workflows: the weekly comparison\'s results pushed from GitHub\'s runner, 
   for (const f of ['test/designs-corpus/ise-comparison.json', 'docs/QUALITY.md']) assert.match(publish, new RegExp(`git add .*${f.replace(/[./]/g, '\\$&')}`), f);
   assert.match(compare, /compare-ise\.mjs .* --guard/);
 });
+
+/** The run: scripts of a workflow: [{ line, script }] (one line, or a block | / >). */
+export function runScripts(yml) {
+  const lines = yml.split('\n'), out = [];
+  lines.forEach((l, i) => {
+    const m = l.match(/^(\s*)(?:- )?run: (.*)$/);
+    if (!m) return;
+    const indent = m[1].length + (l.trimStart().startsWith('- ') ? 2 : 0);
+    // (not a job's output named run: its parent key is outputs:)
+    let p = i - 1;
+    while (p >= 0 && (!lines[p].trim() || lines[p].search(/\S/) >= m[1].length)) p--;
+    if (p >= 0 && /^\s*outputs:$/.test(lines[p])) return;
+    if (!/^[|>][-+]?$/.test(m[2])) return out.push({ line: i + 1, script: m[2] });
+    const body = [];
+    for (let k = i + 1; k < lines.length && (!lines[k].trim() || lines[k].search(/\S/) > indent); k++) body.push(lines[k]);
+    out.push({ line: i + 1, script: body.join('\n') });
+  });
+  return out;
+}
+
+test('workflows: the run: scripts parsed', () => {
+  const yml = 'jobs:\n  a:\n    outputs:\n      run: ${{ steps.c.outputs.run }}\n    steps:\n      - run: echo "$A"\n        env:\n          A: ${{ x }}\n      - name: b\n        run: |\n          one\n\n          two ${{ y }}\n      - run: three\n';
+  assert.deepEqual(runScripts(yml), [{ line: 6, script: 'echo "$A"' }, { line: 10, script: '          one\n\n          two ${{ y }}' }, { line: 14, script: 'three' }]);
+});
+
+test('workflows: explicit permissions, and no ${{ }} expression inside a run: script (#413)', () => {
+  for (const f of FILES) {
+    const yml = read(f);
+    // the token's permissions said by every workflow, not the repository's default
+    assert.match(yml.slice(0, yml.indexOf('\njobs:\n')), /^permissions:\n {2}[\w-]+: (read|write)$/m, `${f}: permissions`);
+    // a value goes into a script through env:, never pasted into it (an injection: a pull request's package.json,
+    // an input typed by hand)
+    for (const { line, script } of runScripts(yml)) assert.doesNotMatch(script, /\$\{\{/, `${f}:${line}`);
+  }
+  for (const f of ['ci.yml', 'nightly.yml']) assert.match(read(f), /\npermissions:\n {2}contents: read\n/, f);
+});

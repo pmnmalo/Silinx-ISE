@@ -12,6 +12,8 @@ on:
       count:
         description: VlogHammer modules
         default: '500'
+permissions:
+  contents: read
 jobs:
   # whether main changed since this workflow's last successful run (a scheduled run with nothing new to
   # test is skipped; by hand it always runs): scripts/changed-since-last-run.mjs, here on GitHub's runner
@@ -56,7 +58,9 @@ jobs:
           key: yosys-tests-${{ hashFiles('scripts/fetch-yosys-tests.mjs') }}
       - run: npm run fetch:yosys-tests
       - name: Yosys's test designs (Silinx vs Yosys)
-        run: npm run test:corpus -- --jobs 4 --shard ${{ matrix.shard }}/2
+        run: npm run test:corpus -- --jobs 4 --shard "$SHARD/2"
+        env:
+          SHARD: ${{ matrix.shard }}
   vloghammer:
     needs: changes
     if: needs.changes.outputs.run == 'true'
@@ -70,7 +74,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: VlogHammer random modules (seed = run number)
-        run: npm run test:vloghammer -- --seed $(( ${{ github.run_number }} * 1000 )) --count ${{ github.event.inputs.count || '500' }} --out vloghammer-failures
+        run: npm run test:vloghammer -- --seed $(( RUN_NUMBER * 1000 )) --count "$COUNT" --out vloghammer-failures
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          COUNT: ${{ github.event.inputs.count || '500' }}
       - if: failure()
         uses: actions/upload-artifact@v7
         with:

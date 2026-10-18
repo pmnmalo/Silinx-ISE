@@ -42,14 +42,17 @@ jobs:
         with:
           fetch-depth: 0
       - id: v
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git show ${{ github.event.pull_request.base.sha }}:package.json > "$RUNNER_TEMP/base-package.json"
-          git show ${{ github.event.pull_request.base.sha }}:package-lock.json > "$RUNNER_TEMP/base-lock.json"
+          git show "$BASE_SHA:package.json" > "$RUNNER_TEMP/base-package.json"
+          git show "$BASE_SHA:package-lock.json" > "$RUNNER_TEMP/base-lock.json"
           node scripts/yosys-update-report.mjs versions "$RUNNER_TEMP/base-package.json" "$RUNNER_TEMP/base-lock.json" package.json package-lock.json
       - if: steps.v.outputs.changed == 'true'
         continue-on-error: true
-        run: gh pr edit ${{ github.event.pull_request.number }} --add-label "yosys update"
+        run: gh pr edit "$PR_NUMBER" --add-label "yosys update"
         env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
   # the open synthesis with each Yosys: the examples through the open flow (research/s3e-route/open-flow.mjs
@@ -74,12 +77,14 @@ jobs:
       - run: npm ci
       - name: The base's Yosys
         if: matrix.side == 'base'
+        env:
+          BASE_VERSION: ${{ needs.check.outputs.base }}
         run: |
-          npm install --no-save --ignore-scripts @yowasp/yosys@${{ needs.check.outputs.base }}
+          npm install --no-save --ignore-scripts "@yowasp/yosys@$BASE_VERSION"
           # not npm ls: the installed version is "invalid" against the pull request's package.json (exit 1)
           v=$(node -p "require('./node_modules/@yowasp/yosys/package.json').version")
           echo "@yowasp/yosys $v"
-          test "$v" = "${{ needs.check.outputs.base }}"
+          test "$v" = "$BASE_VERSION"
       - name: The examples
         run: |
           mkdir -p "out/examples"
@@ -125,7 +130,9 @@ jobs:
           key: yosys-tests-${{ hashFiles('scripts/fetch-yosys-tests.mjs') }}
       - run: npm run fetch:yosys-tests
       - name: Yosys's test designs (Silinx vs Yosys)
-        run: npm run test:corpus -- --jobs 4 --shard ${{ matrix.shard }}/2 --json out/shard-${{ matrix.shard }}.json || true
+        run: npm run test:corpus -- --jobs 4 --shard "$SHARD/2" --json "out/shard-$SHARD.json" || true
+        env:
+          SHARD: ${{ matrix.shard }}
       - if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -147,11 +154,14 @@ jobs:
         with:
           path: results
       - name: The table of the differences
+        env:
+          BASE_VERSION: ${{ needs.check.outputs.base }}
+          HEAD_VERSION: ${{ needs.check.outputs.head }}
         run: |
           mkdir -p results/corpus
           cp results/yosys-corpus-*/shard-*.json results/corpus/ 2>/dev/null || true
           node scripts/yosys-update-report.mjs report --base results/yosys-base --head results/yosys-head --corpus results/corpus \
-            --base-version "${{ needs.check.outputs.base }}" --head-version "${{ needs.check.outputs.head }}" --out yosys-update.md
+            --base-version "$BASE_VERSION" --head-version "$HEAD_VERSION" --out yosys-update.md
           cat yosys-update.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:

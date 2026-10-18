@@ -107,6 +107,12 @@ In detail:
   fetch, `npm ci`), as the ISE tests (`ise.yml`) now do too; its results go out as the artifact `quality-results`,
   and a `publish` job on GitHub's runner, the only one with `contents: write`, commits them to the branch
   `quality-results` when the comparison passed. Tests: `test/workflows.test.js`.
+- **Workflows: explicit permissions, values through `env:` (#413):** `ci.yml` and `nightly.yml` say
+  `permissions: contents: read` (every workflow now states its token's permissions instead of relying on the
+  repository's default), and no `run:` script has a `${{ }}` expression in it any more: the Yosys versions read
+  from a pull request's `package.json` (`yosys-update.yml`), the nightly's module count typed by hand, the
+  release tag and the shard numbers go in through `env:`. Tests: `test/workflows.test.js`, `test/yosys-update.test.js`,
+  `test/corpus-runner.test.js`.
 
 ## 15.11.0
 

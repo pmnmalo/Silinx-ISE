@@ -168,14 +168,14 @@ test('yosys update: the workflow on pull requests that change @yowasp/yosys, Git
   for (const m of yml.matchAll(/runs-on: (.+)/g)) assert.equal(m[1], 'ubuntu-latest');
   assert.match(yml, /\npermissions:\n  contents: read\n/);
   // the check of the diff: the base's versions against the pull request's; the label
-  assert.match(yml, /git show \$\{\{ github\.event\.pull_request\.base\.sha \}\}:package\.json/);
+  assert.match(yml, /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}\n\s+run: \|\n\s+git show "\$BASE_SHA:package\.json"/);
   assert.match(yml, /node scripts\/yosys-update-report\.mjs versions /);
   assert.match(yml, /gh pr edit .* --add-label "yosys update"/);
   for (const job of ['measure', 'corpus']) assert.match(yml, new RegExp(`\\n  ${job}:\\n    needs: check\\n    if: needs\\.check\\.outputs\\.changed == 'true'\\n`), job);
   assert.match(yml, /\n  report:\n    needs: \[check, measure, corpus\]\n    if: always\(\) && needs\.check\.outputs\.changed == 'true'\n/);
   // both sides, the base's Yosys installed over the same code
   assert.match(yml, /side: \[base, head\]/);
-  assert.match(yml, /if: matrix\.side == 'base'\n\s+run: \|\n\s+npm install --no-save --ignore-scripts @yowasp\/yosys@\$\{\{ needs\.check\.outputs\.base \}\}/);
+  assert.match(yml, /if: matrix\.side == 'base'\n\s+env:\n\s+BASE_VERSION: \$\{\{ needs\.check\.outputs\.base \}\}\n\s+run: \|\n\s+npm install --no-save --ignore-scripts "@yowasp\/yosys@\$BASE_VERSION"/);
   // every example, in their order, through the open flow with --quality
   const ex = /for ex in ([\w ]+); do/.exec(yml)[1].split(' ');
   assert.deepEqual(ex, EXAMPLE_ORDER);
@@ -184,7 +184,7 @@ test('yosys update: the workflow on pull requests that change @yowasp/yosys, Git
   // the corpus sharded as the nightly's
   const nightly = read('.github/workflows/nightly.yml');
   assert.equal(/shard: (\[[\d, ]+\])/.exec(yml)[1], /shard: (\[[\d, ]+\])/.exec(nightly)[1]);
-  assert.match(yml, /npm run test:corpus -- --jobs 4 --shard \$\{\{ matrix\.shard \}\}\/2 --json out\/shard-\$\{\{ matrix\.shard \}\}\.json/);
+  assert.match(yml, /npm run test:corpus -- --jobs 4 --shard "\$SHARD\/2" --json "out\/shard-\$SHARD\.json"/);
   // the table: the job summary, the artifact, and the comment (which may fail with a read-only token)
   assert.match(yml, /cat yosys-update\.md >> "\$GITHUB_STEP_SUMMARY"/);
   assert.match(yml, /name: yosys-update-report/);

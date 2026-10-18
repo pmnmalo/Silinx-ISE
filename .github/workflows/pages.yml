@@ -52,8 +52,10 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Stable edition: $TAG ($(git rev-parse --short "$TAG^{commit}"))"
       - name: Build the stable edition (the site's root)
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
         run: |
-          git worktree add --detach ../stable "${{ steps.release.outputs.tag }}"
+          git worktree add --detach ../stable "$TAG"
           cd ../stable
           npm ci
           node scripts/build-standalone.mjs --site "$GITHUB_WORKSPACE/site"
@@ -69,7 +71,9 @@ jobs:
       # only the pages opened on the site, never the file people download
       - name: Usage counts (GoatCounter)
         if: vars.GOATCOUNTER_CODE != ''
-        run: node scripts/site-analytics.mjs site "${{ vars.GOATCOUNTER_CODE }}"
+        run: node scripts/site-analytics.mjs site "$GOATCOUNTER_CODE"
+        env:
+          GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

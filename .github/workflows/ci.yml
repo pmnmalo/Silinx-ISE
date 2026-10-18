@@ -9,6 +9,8 @@ on:
 # a newer push to a pull request cancels its run still going; on main every push's run completes (the
 # development site is deployed from a green run of main: cancelled runs, merges in quick succession,
 # would leave it behind)
+permissions:
+  contents: read
 concurrency:
   group: ci-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || 'pr' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -52,7 +54,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node --test --test-shard=${{ matrix.shard }}/3 "test/*.test.js"
+      - run: node --test --test-shard="$SHARD/3" "test/*.test.js"
+        env:
+          SHARD: ${{ matrix.shard }}
 
   # the UI tests in headless Chrome, with each interface (alongside the unit tests)
   ui:

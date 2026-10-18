@@ -57,7 +57,8 @@ test('corpus runner: the nightly runs the corpus in shards that cover every file
   const yml = fs.readFileSync(path.join(ROOT, '.github/workflows/nightly.yml'), 'utf8');
   const job = yml.slice(yml.indexOf('\n  corpus:\n'), yml.indexOf('\n  vloghammer:\n'));
   const shards = JSON.parse(/shard: (\[[\d, ]+\])/.exec(job)[1]);
-  const n = +/--shard \$\{\{ matrix\.shard \}\}\/(\d+)/.exec(job)[1];
+  const n = +/--shard "\$SHARD\/(\d+)"/.exec(job)[1];
+  assert.match(job, /env:\n\s+SHARD: \$\{\{ matrix\.shard \}\}/);
   assert.deepEqual(shards, Array.from({ length: n }, (_, i) => i + 1));
   assert.match(job, /name: corpus \(\$\{\{ matrix\.shard \}\}\/\d+\)/);
   assert.match(job, /fail-fast: false/);
