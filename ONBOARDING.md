@@ -68,7 +68,7 @@ Several sessions work on the repository at the same time, each in its own clone 
 - **Review by intent and evidence** (CLAUDE.md, Integration): what the change is for, its tests and its
   warnings, the product's rules; line by line only where the risk is.
 - **A CI watcher** (a scheduled session) checks the workflows every hour (the release's CI, the nightly, ISE
-  and Quality runs, the release's CodeQL, the dev build): it reruns a flaky job once, opens or
+  and Quality runs, CodeQL, the dev build): it reruns a flaky job once, opens or
   updates an issue (`bug`, `tests & CI`) and tells the core session of real breaks.
 - **Conflicts:** CHANGELOG.md no longer conflicts: when every pull request edited its unreleased section, each
   merge made the others' pull requests conflict there (a rebase and a new CI run each time); each change now
@@ -145,7 +145,7 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
   branches, #555), so a harmless match in an old
   commit goes to the script's `ALLOW` list with its reason.
 - **The security checks** (#498, [SECURITY.md](SECURITY.md)): CodeQL (`.github/workflows/codeql.yml`)
-  analyses the JavaScript at every release (a tag `v*`), its findings under Security ▸ Code scanning; Dependabot's
+  analyses the JavaScript nightly on main and at every release (a tag `v*`), its findings under Security ▸ Code scanning; Dependabot's
   alerts report a dependency with a known vulnerability (licences are tracked by `scripts/third-party.mjs`).
   Secret scanning, push protection and Dependabot's alerts are the repository's settings, on.
 

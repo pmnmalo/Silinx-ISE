@@ -1,6 +1,6 @@
 // CI at a release only (#607): .github/workflows/ci.yml on a version tag and by hand, never on a pull
 // request or a push to main; everything it runs, and ci-ok, the verdict the Release workflow waits for.
-// The development build and the site's dev/ on every push to main; CodeQL at a release too.
+// The development build and the site's dev/ on every push to main; CodeQL nightly and at a release.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -71,10 +71,10 @@ test('CI at a release only: the development build and the site\'s dev/ after eve
   assert.match(pages, /github\.event_name != 'workflow_run' \|\| github\.event\.workflow_run\.conclusion == 'success'/);
 });
 
-test('CodeQL (#498): a workflow of its own, at a release only (#607); its token writes the findings only; its actions pinned', () => {
+test('CodeQL (#498): a workflow of its own, nightly on main and at a release (#607); its token writes the findings only; its actions pinned', () => {
   const yml = read('.github/workflows/codeql.yml');
-  assert.match(yml, /^on:\n  push:\n    tags: \['v\*'\]\n  workflow_dispatch:\nconcurrency:\n  group: codeql-\$\{\{ github\.ref \}\}\n  cancel-in-progress: true\n/m);
-  assert.doesNotMatch(yml, /pull_request|schedule:|branches:/);
+  assert.match(yml, /^on:\n  push:\n    tags: \['v\*'\]\n  schedule:\n    - cron: '\d+ \d+ \* \* \*' +# nightly.*\n  workflow_dispatch:\nconcurrency:\n  group: codeql-\$\{\{ github\.ref \}\}\n  cancel-in-progress: true\n/m);
+  assert.doesNotMatch(yml, /pull_request|branches:/);
   assert.match(yml, /^permissions:\n  contents: read\n/m, 'a read-only token at the top');
   const j = jobs(yml);
   assert.deepEqual(Object.keys(j), ['analyze']);

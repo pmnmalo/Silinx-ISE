@@ -1,11 +1,14 @@
 name: CodeQL
 # GitHub's static analysis of the JavaScript (#498): injection, path traversal and the like in server/,
-# web/js and core/, at a release only (#607): when a version tag v* is pushed, alongside CI, and on demand.
-# A workflow of its own, not a job of ci.yml: the Release does not wait for it. Its findings are in Security ▸ Code scanning. The vendored data
+# web/js and core/: nightly on main (Security ▸ Code scanning tracks the default branch's alerts, and new
+# query sets find old code), at a release (a version tag v*, alongside CI) and on demand; not on pull
+# requests (#607). A workflow of its own, not a job of ci.yml: the Release does not wait for it. Its findings are in Security ▸ Code scanning. The vendored data
 # (research/'s corpora and records) and node_modules are left out: no code of ours there.
 on:
   push:
     tags: ['v*']
+  schedule:
+    - cron: '41 3 * * *'      # nightly, 03:41 UTC, on main
   workflow_dispatch:
 concurrency:
   group: codeql-${{ github.ref }}
