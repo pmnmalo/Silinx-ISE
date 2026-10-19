@@ -86,8 +86,9 @@ export function sdfPeriod(vhdl, sdf) {
   return Math.max(0, ...ends.map(([n, su]) => (arr.has(n) ? arr.get(n) + su : 0)));
 }
 
-// An example's test bench on its post-place & route model with its timing (above)
-export async function exampleTimesim(name) {
+// An example's test bench on its post-place & route model with its timing (above), in VHDL and Verilog or in one
+// of them (vga's, in two files that run alongside each other, #566)
+export async function exampleTimesim(name, langs = ['vhdl', 'verilog']) {
   const ex = example(name);
   const design = ex.design.map(f => ({ path: f.path, lang: f.lang, text: f.text })), sim = ex.sim.map(f => ({ path: f.path, lang: f.lang, text: f.text }));
   const r = await flow({ top: ex.project.top, steps: orderOpenSteps(['postpar']), simTop: ex.project.simTop }, design, sim, fs.readFileSync(path.join(ex.dir, ex.project.constraints), 'utf8'));
@@ -98,7 +99,7 @@ export async function exampleTimesim(name) {
   // the SDF's longest path, the minimum period of the static timing (gates: no clock)
   const period = /minimum period ([\d.]+) ns$/m.exec(r.lines.join('\n'));
   assert.ok(Math.abs(sdfPeriod(r.store[`netgen/par/${top}_timesim.vhd`], sdf) - (period ? Math.round(+period[1] * 1000) : 0)) <= 10, `${name}: ${sdfPeriod(r.store[`netgen/par/${top}_timesim.vhd`], sdf)} ps by the SDF, ${period?.[1]} ns by the static timing`);
-  for (const lang of ['vhdl', 'verilog']) {
+  for (const lang of langs) {
     const file = `netgen/par/${top}_timesim.${lang === 'vhdl' ? 'vhd' : 'v'}`;
     const a = annotateSdf(r.store[file], lang, sdf);
     assert.deepEqual(a.missing, [], `${name} ${lang}`);

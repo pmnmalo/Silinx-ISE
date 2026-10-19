@@ -113,6 +113,7 @@ for (const name of EXAMPLES) {
       const d = elaborate(lib, ex.project.simTop);
       assert.deepEqual([...lib.errors, ...d.diags].filter(x => x.severity === 'error').map(x => x.message), [], `${name} ${lang}`);
       const s = new Simulator(d);
+      for (const sig of d.signals) sig.wave = null;   // (no waveforms: vga's would take gigabytes, #566)
       for (let t = 1e9; t <= 1e11; t += 1e9) { const st = s.run(t); if (st.finished || s.log.some(e => /Simulation finished OK|ERROR/.test(e.text))) break; }
       const log = s.log.map(e => e.text);
       assert.ok(log.some(l => /Simulation finished OK/.test(l)) && !log.some(l => /ERROR/.test(l)), `${name} ${lang}: ${log.filter(l => /ERROR|expected/.test(l)).slice(0, 4).join(' | ')}`);

@@ -271,7 +271,7 @@ test('the flow\'s postpar step: the routed design\'s model, its SDF with every c
 });
 
 // every example's test bench, on the post-place & route model of the example (its generics the test bench's: the
-// model's design placed and routed), with its timing, VHDL and Verilog, with no warnings: no timing violation (vga,
+// the longest, in test/sim-model-par-vga.test.js and test/sim-model-par-vga-verilog.test.js: run beside these)
 // the longest, in test/sim-model-par-vga.test.js: run beside these)
 for (const name of EXAMPLES.filter(n => n !== 'vga')) {
   test(`example ${name}: its test bench passes on the post-place & route model with its timing (SDF), VHDL and Verilog (#122)`, { timeout: 1800000 }, () => exampleTimesim(name));
