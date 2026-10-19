@@ -38,7 +38,7 @@ test('the Yosys script and the device families', () => {
     + 'xilinx_srl -fixed -minlen 3; techmap -map silinx_srl_map.v; synth_xilinx -family xc3se -ise -flatten -top top -run map_ffs:map_luts; opt_expr -mux_undef -noclkinv; '
     + 'abc -luts 1,1,1,1; clean; techmap -map +/xilinx/ff_map.v; techmap -map +/xilinx/lut_map.v -map +/xilinx/cells_map.v -D LUT_WIDTH=4; '
     + 'xilinx_dffopt -lut4; opt_lut_ins -tech xilinx; synth_xilinx -family xc3se -ise -flatten -top top -run finalize:; '
-    + 'delete t:$scopeinfo; select -module top; write_json -selected top.json; select -clear; write_verilog -noattr top_yosys.v; tee -q -o top_stat.txt stat');
+    + 'delete t:$scopeinfo; setattr -mod -unset blackbox =A:top; select =A:top; write_json -selected top.json; select -clear; write_verilog -noattr top_yosys.v; tee -q -o top_stat.txt stat');
   assert.equal(synthCommands('m', 'spartan3'), synthCommands('m', 'spartan3e').replaceAll('xc3se', 'xc3s'));
   assert.match(synthCommands('m', 'spartan3e', { srl: false }), /^synth_xilinx -family xc3se -ise -flatten -top m -run :map_luts; /);
   assert.doesNotMatch(yosysScript('m', 'spartan3e', { srl: false }), /xilinx_srl|silinx_srl/);
