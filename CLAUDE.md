@@ -77,7 +77,7 @@ the code and the lessons learnt.
   development build and the site's `dev/` are published after every push to `main` (no tests).
   The security checks
   (#498, `SECURITY.md`): CodeQL analyses the JavaScript (`codeql.yml`, a workflow of its own, nightly
-  on main and at a release), Dependabot's alerts report a dependency with a known vulnerability, and CI scans the
+  on main when its code changed, and at a release), Dependabot's alerts report a dependency with a known vulnerability, and CI scans the
   tagged commit's history for
   private data (`scripts/check-private-data.mjs --history`, HEAD's history only, #555; a harmless match goes to its `ALLOW` list with its reason).
   The ISE tests (nightly) and the quality comparison against

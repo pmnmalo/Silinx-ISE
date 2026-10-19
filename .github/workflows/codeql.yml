@@ -1,8 +1,8 @@
 name: CodeQL
 # GitHub's static analysis of the JavaScript (#498): injection, path traversal and the like in server/,
-# web/js and core/: nightly on main (Security ▸ Code scanning tracks the default branch's alerts, and new
-# query sets find old code), at a release (a version tag v*, alongside CI) and on demand; not on pull
-# requests (#607). A workflow of its own, not a job of ci.yml: the Release does not wait for it. Its findings are in Security ▸ Code scanning. The vendored data
+# web/js and core/: nightly on main when its JavaScript changed since the last successful run
+# (scheduled-changes.yml; Security ▸ Code scanning tracks the default branch's alerts), at a release (a
+# version tag v*, alongside CI) and on demand, which always run; not on pull requests (#607). A workflow of its own, not a job of ci.yml: the Release does not wait for it. Its findings are in Security ▸ Code scanning. The vendored data
 # (research/'s corpora and records) and node_modules are left out: no code of ours there.
 on:
   push:
@@ -16,7 +16,19 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  # whether main's code changed since this workflow's last successful run (a nightly run with nothing new is
+  # skipped; a tag's or one by hand always runs)
+  changes:
+    uses: ./.github/workflows/scheduled-changes.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      workflow: codeql.yml
+      only: core/,server/,web/,scripts/,bin/,test/,.github/workflows/codeql.yml
   analyze:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

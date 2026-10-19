@@ -71,13 +71,17 @@ test('CI at a release only: the development build and the site\'s dev/ after eve
   assert.match(pages, /github\.event_name != 'workflow_run' \|\| github\.event\.workflow_run\.conclusion == 'success'/);
 });
 
-test('CodeQL (#498): a workflow of its own, nightly on main and at a release (#607); its token writes the findings only; its actions pinned', () => {
+test('CodeQL (#498): a workflow of its own, nightly on main when its code changed, and at a release (#607); its token writes the findings only; its actions pinned', () => {
   const yml = read('.github/workflows/codeql.yml');
   assert.match(yml, /^on:\n  push:\n    tags: \['v\*'\]\n  schedule:\n    - cron: '\d+ \d+ \* \* \*' +# nightly.*\n  workflow_dispatch:\nconcurrency:\n  group: codeql-\$\{\{ github\.ref \}\}\n  cancel-in-progress: true\n/m);
   assert.doesNotMatch(yml, /pull_request|branches:/);
   assert.match(yml, /^permissions:\n  contents: read\n/m, 'a read-only token at the top');
   const j = jobs(yml);
-  assert.deepEqual(Object.keys(j), ['analyze']);
+  assert.deepEqual(Object.keys(j), ['changes', 'analyze']);
+  // the nightly run skipped when none of the JavaScript changed since the last successful one
+  const ch = j.changes.join('\n');
+  assert.match(ch, /uses: \.\/\.github\/workflows\/scheduled-changes\.yml\n[\s\S]*workflow: codeql\.yml\n\s+only: core\/,server\/,web\/,scripts\/,bin\/,test\/,\.github\/workflows\/codeql\.yml$/m);
+  assert.ok(j.analyze.includes('    needs: changes') && j.analyze.includes("    if: needs.changes.outputs.run == 'true'"));
   const a = j.analyze.join('\n');
   assert.match(a, /^    permissions:\n      contents: read\n      security-events: write\s*(#.*)?\n      actions: read\s*(#.*)?\n/m);
   assert.match(a, /uses: github\/codeql-action\/init@[0-9a-f]{40} # v\d+\.\d+\.\d+\n[\s\S]*languages: javascript-typescript\n\s+build-mode: none\n/);
