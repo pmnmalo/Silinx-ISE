@@ -21,6 +21,7 @@ import { newStimuli, normalizeStimuli, cyclePs, editInput, editExpected, checkEx
 import { esc, h } from './dom.js';
 import { mountConsole } from './isim-console.js';
 import { mountForces } from './isim-forces.js';
+import { mountRun } from './isim-run.js';
 
 // ------------------------------------------------------------------------------- constants
 const ROW_H = 20;
@@ -343,7 +344,7 @@ export function mountISim(container, opts = {}) {
   tb.appendChild(rfVal); tb.appendChild(rfUnit);
   rfVal.addEventListener('keydown', e => { if (e.key === 'Enter') runForUi(); });
   addBtn('step', 'Step (advance to the next scheduled event)', () => api.step());
-  addBtn('brk', 'Break', () => { st.breakReq = true; cmdGen++; });
+  addBtn('brk', 'Break', () => breakCommands());
   sep();
   addBtn('zoomIn', 'Zoom In', () => zoomAt(0.5));
   addBtn('zoomOut', 'Zoom Out', () => zoomAt(2));
@@ -1720,7 +1721,7 @@ export function mountISim(container, opts = {}) {
   // ---------------------------------------------------------------- console (isim-console.js)
   // (made here, in mount order: nothing logs before; api, made below, is read when a command runs)
   const { logLine, echo, execCommand } = mountConsole({ st, sim, design, cons, cmdInput, $, cleanups, onOpenSource, rfVal, rfUnit,
-    api: () => api, enqueue, findSignal, findInst, addSignals, addInstance, addForce, removeForces, addMarker, zoomFit, zoomAt });
+    api: () => api, enqueue: (...a) => enqueue(...a), findSignal, findInst, addSignals, addInstance, addForce, removeForces, addMarker, zoomFit, zoomAt });
 
   // ---------------------------------------------------------------- splitters
   function hookSplit(el, dirV, get, set) {
@@ -1743,101 +1744,16 @@ export function mountISim(container, opts = {}) {
   hookSplit($('.isim-split-left'), false, () => instH ?? $('.isim-inst-panel').getBoundingClientRect().height, (v) => { instH = clamp(v, 60, 900); applySizes(); });
   applySizes();
 
-  // ---------------------------------------------------------------- simulation control
-  const yieldUI = () => new Promise(r => setTimeout(r, 0));
-  // Commands run in turn, as in ISim's console: one typed (or a Run button pressed) while a run goes on
-  // or before ISim's first run of 1 us starts waits for that run and for the commands given before it;
-  // it used to be dropped without a word (#215). Break cancels the commands still waiting.
-  // runDone: the end of the run going on; cmdGen counts the Breaks.
-  let runDone = Promise.resolve(), cmdGen = 0, destroyed = false, cmdTail = Promise.resolve(), cmdPending = 0;
-  function enqueue(s, fn) {
-    const gen = cmdGen;
-    const go = async () => {
-      try {
-        while (st.running) await runDone;
-        if (destroyed) return;
-        if (gen !== cmdGen) { logLine(`Command '${s}' cancelled (Break)`, 'warning'); return; }
-        await fn();
-      } catch (e) { console.error(e); } finally { cmdPending--; }
-    };
-    // (nothing before it: started at once, so a command's output follows its echo at once)
-    return (cmdTail = cmdPending++ || st.running ? cmdTail.then(go) : go());
-  }
-  // runs for `dur` ps from the time the run starts: a run asked for during another (the Run for field
-  // while ISim's first run goes on) waits for it
-  async function runTo(dur, label) {
-    const gen = cmdGen;
-    while (st.running) await runDone;
-    if (destroyed || gen !== cmdGen) return;
-    if (sim.finished) { logLine(`Simulation has already finished (${sim.finished}); use Restart to run again.`, 'warning'); return; }
-    const target = sim.now + dur;
-    let endRun;
-    runDone = new Promise((r) => { endRun = r; });
-    st.running = true; st.breakReq = false; st.runStart = sim.now; st.runTarget = target;
-    const follow = st.fit || (sim.now >= st.t0 && sim.now <= tOf(WW) + 1);
-    setMsg(label || 'Running...');
-    invalidate(false);
-    let lastYield = performance.now();
-    let chunk = 10_000; // ps
-    let stalled = false;
-    try {
-      while (!sim.finished && sim.now < target && !st.breakReq) {
-        if (label === 'Run All' && sim.started && !sim.heap.size && !sim.active.length && !sim.nbaQ.length) { stalled = true; break; }
-        const tgt = Math.min(target, sim.now + chunk);
-        const a = performance.now();
-        const r = sim.run(tgt);
-        const dt = performance.now() - a;
-        if (dt < 8) chunk = Math.min(chunk * 2, 1e12); else if (dt > 25) chunk = Math.max(1, Math.floor(chunk / 3));
-        if (!r.pending && !sim.finished) {
-          // nothing left to simulate: Run All stops here, Run for just advances time
-          if (label === 'Run All') stalled = true; else sim.run(target);
-          break;
-        }
-        if (performance.now() - lastYield > 30 || st.breakReq) {
-          lastYield = performance.now();
-          setMsg(`${label || 'Running'}... ${fmtTime(sim.now)}`);
-          if (follow) followEnd();
-          setCursor(sim.now);
-          invalidate();
-          await yieldUI();
-        }
-      }
-    } catch (e) {
-      logLine(`ERROR: internal simulator error: ${e.message}`, 'error');
-      console.error(e);
-    }
-    st.running = false;
-    endRun();   // (whoever waits for it goes on after the rest of this, all synchronous)
-    if (st.breakReq) logLine(`Simulation interrupted (Break) at ${fmtTime(sim.now)}`, 'warning');
-    else if (stalled) logLine(`Simulation stopped: no more events scheduled (time ${fmtTime(sim.now)})`, 'info');
-    else if (!sim.finished && target !== Infinity && sim.now >= st.runStart + (runAllCap) && label === 'Run All') logLine(`Run All stopped at the ${fmtTime(runAllCap)} limit (time ${fmtTime(sim.now)})`, 'warning');
-    if (sim.waveTruncated) setMsg('Waveform recording limit reached');
-    else setMsg(sim.finished ? `Simulation ${sim.finished === 'error' ? 'stopped with an error' : 'finished'} at ${fmtTime(sim.now)}` : `Ready`);
-    if (follow) followEnd();
-    setCursor(sim.now);
-    objDirty = true;
-    invalidate();
-  }
-  function followEnd() {
-    if (st.fit) { applyFit(); return; }
-    const span = WW * st.scale;
-    if (sim.now > st.t0 + span) st.t0 = sim.now - span * 0.9;
-  }
+  // ---------------------------------------------------------------- simulation control (isim-run.js)
+  const { enqueue, runTo, followEnd, step: stepEvent, breakCommands, destroy: stopRuns, isDestroyed } = mountRun({ st, sim, runAllCap,
+    logLine, setMsg, invalidate, setCursor, tOf, width: () => WW, applyFit, objectsChanged: () => { objDirty = true; } });
 
   // ---------------------------------------------------------------- public API
   const api = {
     refresh() { readColors(); renderTree(); renderObjects(); rebuildFlat(); layout(); },
     runFor(ps) { return runTo(Math.max(1, Math.round(ps)), 'Run'); },
     runAll() { return runTo(runAllCap, 'Run All'); },
-    step() {
-      if (st.running) return;
-      if (sim.finished) { logLine('Simulation has finished; use Restart.', 'warning'); return; }
-      if (!sim.started) sim.run(sim.now); // time-0 initialisation
-      const top = sim.heap.peek();
-      if (!top) { sim.run(sim.now); logLine('No more events scheduled', 'info'); }
-      else { sim.run(top.t); logLine(`Stepped to ${fmtTime(sim.now)}`, 'info'); }
-      followEnd(); setCursor(sim.now); invalidate();
-    },
+    step() { stepEvent(); },
     restart(silentEcho) {
       if (st.running) { st.breakReq = true; }
       if (!silentEcho) echo('restart');
@@ -1854,7 +1770,7 @@ export function mountISim(container, opts = {}) {
     },
     addSignals(sigs) { addSignals(sigs); },
     destroy() {
-      st.breakReq = true; destroyed = true;
+      st.breakReq = true; stopRuns();
       if (rafId) cancelAnimationFrame(rafId);
       closeDialog();
       for (const c of cleanups.splice(0)) c();
@@ -1944,7 +1860,7 @@ export function mountISim(container, opts = {}) {
   logLine('Finished circuit initialization process.');
   requestAnimationFrame(() => layout());
   // (saved stimuli: run at once, after the first layout; runStim queues its run itself)
-  if (st.stim.m) setTimeout(() => { if (!destroyed) runStim(); }, 0);
+  if (st.stim.m) setTimeout(() => { if (!isDestroyed()) runStim(); }, 0);
   else if (opts.initialRun > 0) {
     // run after first layout so the view can follow (a command given before it waits for it, #215)
     const s = `run ${fmtTime(opts.initialRun)}`;
