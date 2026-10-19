@@ -588,18 +588,35 @@ clock's pad through a flip-flop to an output pad, `OFFSET = OUT … AFTER`), **p
 pin (`clockArrivals`): the input pad's delay, the routed nets to the global buffer and from it, the buffer's delay.
 The UCF's OFFSET constraints (on all pads or a NET) are checked in the flows (timing.txt, warnings, the report).
 
-What is not measured, so estimates (`SPEED_4.clock`, the report says so):
+**Fitted to trce** (#26, the second part): its data sheet of lab11 placed and routed twice, by Silinx and by ISE.
+The routed XDL and trce's reports were kept from the 10 October runs: 20 setup / hold, 34 clock-to-pad and 14
+pad-to-pad figures.
 
-- **The clock network.** `timing-fit.mjs` leaves the clock nets out of the wire fit, so the GCLK class's delay and
-  branch load were never fitted: by the model a clock net of blinky spreads 2.07-2.69 ns over its loads (the branch
-  loads of the GCLK nodes), far more than a global clock's skew. So **no clock skew** is counted in the period or the
-  hold check; the clock's arrival is used only for the pads' paths. The global buffer: 0.22 ns.
-- **Hold times**: 0 for every input (trce's not measured), so the hold check reports the shortest path's margin.
-- **The pads**: Tiopi 1.3 and Tioop 3.25 ns are estimates too (no trce report of a Silinx design had a pad path).
+- **The global clock reaches every flip-flop at once.** trce gives a clock path skew of 0.000 ns (-0.001 at most)
+  between flip-flops on the global lines. The model's routed clock nets spread 0.4 ns over their loads (the GCLK
+  class was never fitted), so `clockArrivals` gives every load of a global buffer `Tgclk` = 3.045 ns after the pad,
+  and `minScale` x that at the earliest.
+- **trce's minimum delays** are 0.751 (`minScale`) of the model's: the slope of the inputs' hold against the model's
+  shortest data paths.
+- **Setup uses the clock's earliest arrival, clock-to-pad its latest.** With one arrival for both, pad to pad did not
+  close: it predicted 5.27 ns over the model's paths, and trce measures 4.51.
+- `Tiopi` = 1.253 ns and `Tioop` = 3.257 ns solve the three together: setup (Tiopi - minScale x Tgclk = -1.034),
+  clock to pad (Tgclk + Tioop = 6.302) and pad to pad (Tiopi + Tioop = 4.51).
+- `hold` = -1.018 ns is a flip-flop's data hold time as trce times an input's hold: hold = Tgclk - minScale x
+  (Tiopi + path) + hold. The hold between flip-flops of one global clock is minScale x (clock-to-out + path) - hold,
+  so at least 1.4 ns: it cannot fail, as trce finds (0 hold errors on every design checked).
+- An asynchronous set / reset (`SYNC_ATTR::ASYNC`) is not a data input: trce leaves it out of the data sheet.
 
-To fit them (the Mac mini): designs routed by Silinx with OFFSET IN / OUT constraints, `trce -a -v 100 -fastpaths`
-(the fast paths give the hold analysis and its clock skew), then `timing-fit.mjs` extended to read trce's offset and
-hold paths ("Offset (setup paths)", "Slack (hold path)", "Clock Path Skew") and `reportgen -delay` of the clock nets.
+Model - trce (ns):
+
+| | setup | hold | clock to pad | pad to pad |
+|---|---|---|---|---|
+| estimates (#600) | mean -1.88, rms 1.89 | (none) | mean +1.18 / +1.28 | rms 0.106 / 0.087 |
+| lab11, Silinx's routing | rms 0.134, max 0.260 | rms 0.194, max 0.339 | rms 0.139, max 0.296 | rms 0.078, max 0.120 |
+| lab11, ISE's routing | rms 0.139, max 0.264 | rms 0.146, max 0.339 | rms 0.181, max 0.575 | rms 0.098, max 0.192 |
+
+That is the connection model's accuracy (rms 0.1 per connection). Still estimates: the IOB registers' delays (#96).
+A clock from a DCM (deskewed, about 0 insertion delay, not Tgclk) and paths between two clocks are left to #601.
 blinky's pad-to-pad paths (sw<3> -> led<1> 9.81 ns on main's seed-1 placement) are what its test bench's invert check
 waits for: half a clock period was too little for another placement (#591).
 

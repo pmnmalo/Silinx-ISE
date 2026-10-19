@@ -401,11 +401,14 @@ ${net('clk', [['ck', 'I']], [['a', 'CLK'], ['b', 'CLK']])}${net('din', [['i', 'I
 test('pads and hold (#26): pad to setup, clock to pad, pad to pad, the shortest flip-flop to flip-flop path', () => {
   const tg = timingGraph(PADS);
   assert.deepEqual(tg.conns.map(c => `${c.fromPin.inst}.${c.fromPin.pin} -> ${c.toPin.inst}.${c.toPin.pin}`), ['i.I -> a.F1', 'i.I -> c.G1', 'a.XQ -> o.O1', 'a.XQ -> b.BY', 'c.Y -> p.O1']);
-  const { Tiopi, Tioop } = SPEED_4.pad;
+  const { Tiopi, Tioop } = SPEED_4.pad, { minScale: sc, hold: Th } = SPEED_4.clock;
   const r = tg.pads(Float64Array.from([1, 2, 3, 0.5, 4]), new Map([['a', 2], ['b', 2.25]]));
-  // pad to setup: the data at a's flip-flop (pad, net, LUT, setup) less the clock's arrival at a
+  // pad to setup: the data at a's flip-flop (pad, net, LUT, setup) less the clock's earliest arrival at a
+  // (minScale x it); hold: the clock's arrival less the data's earliest (minScale x the pad and the net), plus
+  // the hold time
   assert.deepEqual(r.inputs.map(x => [x.pad, x.clock]), [['i', 'clk']]);
-  close(r.inputs[0].setup, Tiopi + 1 + S.Tilo[0] + S.Tdxck[0] - 2);
+  close(r.inputs[0].setup, Tiopi + 1 + S.Tilo[0] + S.Tdxck[0] - sc * 2);
+  close(r.inputs[0].hold, 2 - sc * (Tiopi + 1) + Th);
   assert.deepEqual(r.inputs[0].path.map(s => `${s.kind} ${s.inst}.${s.pin}`), ['pad i.I', 'net a.F1', 'setup a.F1']);
   // clock to pad: the clock's arrival at a, its clock to out, the net, the output pad
   assert.deepEqual(r.outputs.map(x => [x.pad, x.clock]), [['o', 'clk']]);
@@ -414,13 +417,18 @@ test('pads and hold (#26): pad to setup, clock to pad, pad to pad, the shortest 
   // pad to pad: through c's LUT only
   assert.deepEqual(r.padToPad.map(x => [x.from, x.to]), [['i', 'p']]);
   close(r.padToPad[0].delay, Tiopi + 2 + S.Tilo[0] + 4 + Tioop);
-  // hold: a's clock to out and the 0.5 ns net into b's BY, less the hold time (0); no skew counted
+  // hold: a's clock to out and the 0.5 ns net into b's BY at their earliest, less the hold time; one clock time
   assert.deepEqual(r.hold.map(h => h.clock), ['clk']);
-  close(r.hold[0].slack, S.TckoX[0] + 0.5 - SPEED_4.clock.hold);
+  close(r.hold[0].slack, sc * (S.TckoX[0] + 0.5) - Th);
   assert.deepEqual(r.hold[0].path.map(s => `${s.kind} ${s.inst}.${s.pin}`), ['clock-to-out a.XQ', 'net b.BY', 'hold b.BY']);
   // a flip-flop with no clock arrival (a clock through a DCM, or made by logic) is left out of the pads' paths
   const none = tg.pads(Float64Array.from([1, 2, 3, 0.5, 4]), new Map());
   assert.deepEqual([none.inputs, none.outputs, none.padToPad.length, none.hold.length], [[], [], 1, 1]);
+  // an asynchronous reset is not a data input: a pad that reaches only one is not in the data sheet (as trce)
+  const text = writeXdl(PADS).replace(/(inst "b"[\s\S]*?cfg ")/, '$1 SYNC_ATTR::ASYNC');
+  const asy = parseXdl(text.replace(/(\nnet "clk")/, `\n${inst('r', 'IBUF', 'CLB_X1Y0', 'P5', ' ')}${net('rst', [['r', 'I']], [['b', 'SR']])}$1`));
+  const ra = timingGraph(asy).pads(new Float64Array(6).fill(0.5), new Map([['a', 2], ['b', 2]]));
+  assert.deepEqual(ra.inputs.map(x => x.pad), ['i']);
 });
 
 test('OFFSET constraints (#26): read from the UCF\'s statements; met / not met per pad, on all pads or one NET; missing; a TIMEGRP\'s not analyzed', () => {
@@ -445,10 +453,10 @@ test('OFFSET constraints (#26): read from the UCF\'s statements; met / not met p
   assert.equal(lines[4], 'constraint TIMEGRP "outs" OFFSET = OUT 8 ns AFTER "clk": not analyzed (only OFFSET on a NET or on all pads)');
   // the report's sections after the clocks' critical paths
   const text = lines.join('\n');
-  assert.match(text, /\nOFFSET IN \(pad to setup\), clock clk \(its path from its pad estimated\):\n {2}i +-?\d+\.\d{3} ns\n/);
-  assert.match(text, /\nOFFSET OUT \(clock to pad\), clock clk \(its path from its pad estimated\):\n {2}o +\d+\.\d{3} ns\n/);
+  assert.match(text, /\nOFFSET IN \(pad to setup; hold\), clock clk:\n {2}i +-?\d+\.\d{3} ns; hold +-?\d+\.\d{3} ns\n/);
+  assert.match(text, /\nOFFSET OUT \(clock to pad\), clock clk:\n {2}o +\d+\.\d{3} ns\n/);
   assert.match(text, /\npad to pad:\n {2}i +-> p +\d+\.\d{3} ns\n/);
-  assert.match(text, /\nhold, clock clk: met, worst slack \d+\.\d{3} ns \(the shortest path; no clock skew counted, hold times estimated\)\n {2}clock-to-out/);
+  assert.match(text, /\nhold, clock clk: met, worst slack \d+\.\d{3} ns \(the shortest path at its earliest; the global clock reaches both flip-flops at once\)\n {2}clock-to-out/);
 });
 
 test('clock arrivals (#26): from the clock\'s pad through the global buffer to every clock pin, on a routed design (stopwatch)', async () => {
@@ -461,10 +469,8 @@ test('clock arrivals (#26): from the clock\'s pad through the global buffer to e
   const clocked = new Set(d.nets.filter(n => /^BUFG/.test(typeOf.get(n.outpins[0]?.inst) || '')).flatMap(n => n.inpins.filter(p => /^CLK[AB]?$/.test(p.pin)).map(p => p.inst)));
   assert.ok(clocked.size > 100, clocked.size);
   assert.deepEqual([...clocked].filter(i => !arr.has(i)), []);
-  // the pad's delay, the pad to the buffer, the buffer, the clock net: more than the pad and the buffer, a spread of the net
-  const v = [...arr.values()];
-  assert.ok(Math.min(...v) > SPEED_4.pad.Tiopi + SPEED_4.clock.Tgio, Math.min(...v));
-  assert.ok(Math.max(...v) - Math.min(...v) < 1.5, `${Math.min(...v)} .. ${Math.max(...v)}`);
+  // through the global buffer, every clock pin at once, Tgclk after the pad (trce: no clock skew on the global lines)
+  assert.deepEqual([...new Set(arr.values())], [SPEED_4.clock.Tgclk]);
 });
 
 test('delayTable: the fastest routes from a CLB\'s outputs to the inputs at each offset, on the allowed PIPs only; cached', () => {
