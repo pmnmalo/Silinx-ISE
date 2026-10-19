@@ -2,8 +2,8 @@ name: CI
 # The tests, all of them, at a release only (#607): when a version tag v* is pushed (the Release workflow
 # waits for this run of the tagged commit, scripts/wait-for-ci.mjs), and by hand (Actions ▸ CI ▸ Run
 # workflow, on main or a branch). Not on pull requests nor on pushes to main: a change is merged after
-# the tests related to it, run locally (CLAUDE.md); the scheduled workflows (nightly, ISE, Quality) and
-# the code scanning of main (its own workflow) keep watching between releases.
+# the tests related to it, run locally (CLAUDE.md); the scheduled workflows (nightly, ISE, Quality) keep
+# watching between releases.
 on:
   push:
     tags: ['v*']

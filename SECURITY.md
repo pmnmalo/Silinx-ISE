@@ -38,8 +38,8 @@ whoever has the address with its token has the server, as the warning says at st
   settings that choose which program runs, and with what arguments, are read from the user's
   configuration file only, never from the page.
 - At every release, CI scans for private data (e-mail addresses, computer names and network addresses,
-  keys and tokens, Xilinx files) the tracked files and every line ever added to `main`; CodeQL analyses
-  the JavaScript on every push to `main`; Dependabot's alerts report a dependency with a known
+  keys and tokens, Xilinx files) the tracked files and every line ever added to `main`, and CodeQL analyses
+  the JavaScript; Dependabot's alerts report a dependency with a known
   vulnerability, and Dependabot updates the dependencies weekly and opens security updates at once.
   Before every push, `node scripts/check-private-data.mjs` checks the tracked files.
 - Every release lists its files' SHA-256 checksums (`SHA256SUMS`, also in its notes) and carries GitHub's

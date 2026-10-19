@@ -1,13 +1,12 @@
 name: CodeQL
 # GitHub's static analysis of the JavaScript (#498): injection, path traversal and the like in server/,
-# web/js and core/, on every push to main (#607: not on pull requests, no weekly run), and on demand.
-# A workflow of its own, not a job of ci.yml (which runs at a release only). Its findings are in Security ▸ Code scanning. The vendored data
+# web/js and core/, at a release only (#607): when a version tag v* is pushed, alongside CI, and on demand.
+# A workflow of its own, not a job of ci.yml: the Release does not wait for it. Its findings are in Security ▸ Code scanning. The vendored data
 # (research/'s corpora and records) and node_modules are left out: no code of ours there.
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
-# a newer push to main cancels the run still going: the newest commit's analysis covers the older's
 concurrency:
   group: codeql-${{ github.ref }}
   cancel-in-progress: true
