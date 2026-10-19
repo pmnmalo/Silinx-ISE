@@ -103,6 +103,22 @@ In short:
 
 In detail:
 
+- **The simulation models' example tests and the board's model (#632):** since #622 the flow writes the board's model
+  beside a model made with a test bench's generics; `test/sim-model-lib.mjs` expected only the model's two files and
+  `test/sim-model.test.js` ran the test bench on the board's model too, whose entity has no generics (the release CI
+  failed 15 tests). The tests now list the board's files and run the test bench on the simulation's model only.
+- **The netlist's top selected by its attribute (#631):** since #86 each Yosys run writes its top module alone
+  (`select -module <top>; write_json -selected`), which left two kinds of top out of the netlist ("netlist: no
+  module …" in the Nightly's Yosys test designs): a top with no logic left, which read_verilog marks a black box
+  and write_json -selected skips (ifdef_1, specify.v, f6_adder…), and an escaped identifier such as `\1dff`, which
+  select -module does not take. The runs now clear the top's black-box mark and select it by its `top` attribute
+  (`TOP_ONLY` in core/synth-open.js, in every run's outputs and the coarse run of the carry chains); the netlists
+  of the examples and the EPFL adder are the same as before. Test: `test/synth-open.test.js` (an empty top and
+  `\1dff`, at Normal and High).
+- **CodeQL nightly on main and at a release (#607):** `codeql.yml` runs every night on main when its
+  JavaScript changed since the last successful run (`scheduled-changes.yml`; Security ▸ Code scanning tracks the
+  default branch's alerts), when a version tag `v*` is pushed and on demand, which always run; not on pull
+  requests. Test: `test/ci-workflow.test.js`.
 - **The earlier runs' models kept (#625):** each run of the browser flow replaced the project's report with its own,
   which lists only the models that run made, though the earlier ones' files were still in the build; the browser
   edition now keeps the earlier runs' models whose files are there (all of them in a workspace folder). The server
