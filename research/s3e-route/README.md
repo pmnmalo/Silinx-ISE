@@ -385,6 +385,13 @@ timing weights 0.1-0.3 and 2-3. The branch-load penalty with weights above 1 is 
   offsets with no CLB (clock rows, block-RAM columns) from their neighbours. 0.25-0.5 s, once per
   device and process (cached). Same CLB 0.16 ns (direct connections), next CLB 0.37-0.55, 7 rows
   0.72, 15 columns 1.0: hexes and long lines make it far from linear.
+  Since #104 two tables (`DELAY_KIND`): from X / Y, and from XQ / YQ. The fastest of the four outputs
+  hid that a flip-flop's output goes through an OMUX to every input: X / Y -> a LUT of the same CLB
+  0.105 ns (the fast connects), XQ / YQ 0.450 (OMUX2, 6, 9 or 13, the only four that turn back into
+  the CLB); the next CLB 0.374 (X / Y straight onto a double) against 0.450-0.554; two rows 0.643
+  against 0.719-0.771. The old 0.159 for the same CLB was X / Y's 0.105 to a LUT and 0.374 to BX / BY.
+  Telling the loads apart too (a LUT input or BX / BY: four tables) made the placer pack LUT chains
+  tighter and lost on some designs (traffic on the XC3S100E +4 % over 8 seeds): the loads stay averaged.
 - **Timing-driven placement** (`place.js`): VPR's cost, `(1 - lambda) x wirelength / its value +
   lambda x sum(criticality^exp x delay) / its value`, both normalised at every temperature, the
   delay of a connection from the table (or the old linear model without one), the exponent from 1

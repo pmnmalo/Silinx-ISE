@@ -13,7 +13,7 @@ import { packDevice, loadDevice } from '../core/fpga/device.js';
 import { readYosysJson } from '../core/fpga/netlist.js';
 import { pack } from '../core/fpga/pack.js';
 import { deviceSites, place, placedXdl, PlaceError, rng, timingGraph, analyzeTiming, connDelay } from '../core/fpga/place.js';
-import { SPEED_4 } from '../core/fpga/timing.js';
+import { SPEED_4, DELAY_KIND, delayKind } from '../core/fpga/timing.js';
 import { writeXdl } from '../core/xdl.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
@@ -185,6 +185,21 @@ test('placement timing with the device\'s delay table: connections by their offs
   const asL = pos.map(([x, y], i) => (p.insts[i].kind === 'slice' ? [Math.floor(x) + 0.5, y] : [x, y]));
   const asM = pos.map(([x, y], i) => (p.insts[i].kind === 'slice' ? [Math.floor(x), y] : [x, y]));
   assert.ok(analyzeTiming(tg, asM, rows).dmax > analyzeTiming(tg, asL, rows).dmax);
+});
+
+test('placement timing by kind of driver (#104): a connection from a flip-flop\'s output (XQ, YQ) reads the delay table\'s flip-flop table', () => {
+  const p = pack(load('counter'), { ucf: 'NET "clk" LOC = "P3";' });
+  const tg = timingGraph(p);
+  for (const c of tg.conns) assert.equal(c.kind, delayKind(c.srcPin));
+  assert.ok(tg.conns.some(c => c.kind === DELAY_KIND.REG) && tg.conns.some(c => c.kind === DELAY_KIND.COMB));
+  // a made-up table: 0.25 ns more from a flip-flop
+  const table = { at: (dc, dr, kind = 0) => 0.2 + 0.1 * (Math.abs(dc) + Math.abs(dr)) + 0.25 * kind };
+  close(connDelay([1.5, 4], [3, 2.5], SPEED_4, table, DELAY_KIND.REG), 0.2 + 0.1 * 4 + 0.25);
+  const r = place(p, dev, { seed: 1, effort: 0.3, delays: table });
+  const pos = r.sites.map(s => { const x = [...dev.slices.values()].find(v => v.name === s.site) || dev.pads.get(s.site) || dev.bufgmux.find(b => b.name === s.site); return [x.px, x.py]; });
+  const t = analyzeTiming(tg, pos, table);
+  close(t.dmax, r.delay);
+  for (const c of t.conns) close(c.delay, c.dedicated ? 0 : 0.2 + 0.1 * (Math.abs(Math.floor(pos[c.dst][0]) - Math.floor(pos[c.src][0])) + Math.abs(Math.floor(pos[c.src][1]) - Math.floor(pos[c.dst][1]))) + 0.25 * c.kind);
 });
 
 test('a clock with no LOC goes on a GCLK pin: the free pad whose known dedicated path reaches the best global buffer, kept there (#49)', () => {

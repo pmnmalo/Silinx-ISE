@@ -242,15 +242,24 @@ export function distanceDelay(a, b, device, model = SPEED_4) {
   return base + perTile * Math.min(d, knee) + far * Math.max(0, d - knee);
 }
 
+/** The kinds of connection the delay table tells apart (#104): from a combinational output (X, Y,
+ *  and any other driver pin) or from a flip-flop's (XQ, YQ). A flip-flop's output reaches every input
+ *  through an output multiplexer (OMUX), its own CLB's too, where X / Y have the CLB's fast connects
+ *  and drive doubles straight from the pin. */
+export const DELAY_KIND = { COMB: 0, REG: 1 };
+export const delayKind = fromPin => (fromPin === 'XQ' || fromPin === 'YQ' ? DELAY_KIND.REG : DELAY_KIND.COMB);
+
 /**
  * The delay of the fastest route from a slice's outputs to the slices' inputs at each offset, by the
  * model and the device's own wires (for the placer: what a connection over a distance costs once
  * routed, the direct connections to the neighbours and the reach of hexes and long lines included).
  * From each of a few CLBs spread over the device, a search by delay (Dijkstra, no congestion) from
- * the X, Y, XQ and YQ pins of its slices to the LUT and BX / BY pins of every slice; the delay at an
- * offset (columns, rows: tiles) is the mean over the target's pins of the fastest arrival, averaged
- * over the source CLBs. allowPip(tileName, from, to): only these PIPs (as the router). Returns
- * { at(dc, dr) -> ns, dc0, dr0, w, h, d: Float32Array } (cached on the device per allowPip and model).
+ * the X and Y pins of its slices, and another from their XQ and YQ pins (DELAY_KIND), to the LUT and
+ * BX / BY pins of every slice; the delay at an offset (columns, rows: tiles) is the mean over the
+ * target's pins of the fastest arrival, averaged over the source CLBs. allowPip(tileName, from, to):
+ * only these PIPs (as the router). Returns { at(dc, dr, kind = COMB) -> ns, dc0, dr0, w, h, d:
+ * Float32Array (the two kinds' tables one after the other, w x h each) } (cached on the device per
+ * allowPip and model).
  */
 export function delayTable(device, { allowPip = null, model = SPEED_4, sources = null } = {}) {
   device._delayTable ||= new Map();
@@ -276,7 +285,8 @@ export function delayTable(device, { allowPip = null, model = SPEED_4, sources =
   const rows = tiles.map(k => device.tileRow[k]), cols = tiles.map(k => device.tileCol[k]);
   const r0 = Math.min(...rows), r1 = Math.max(...rows), c0 = Math.min(...cols), c1 = Math.max(...cols);
   const h = 2 * (r1 - r0) + 1, w = 2 * (c1 - c0) + 1, dc0 = c1 - c0, dr0 = r1 - r0;
-  const sum = new Float64Array(w * h), cnt = new Float64Array(w * h);
+  const WH = w * h;
+  const sum = new Float64Array(2 * WH), cnt = new Float64Array(2 * WH);
   // source CLBs: the one nearest the centre and four around it, halfway to the corners
   const nearest = (r, c) => tiles.reduce((b, k) => (Math.abs(device.tileRow[k] - r) + Math.abs(device.tileCol[k] - c) < Math.abs(device.tileRow[b] - r) + Math.abs(device.tileCol[b] - c) ? k : b), tiles[0]);
   const mr = (r0 + r1) / 2, mc = (c0 + c1) / 2, qr = (r1 - r0) / 4, qc = (c1 - c0) / 4;
@@ -296,11 +306,11 @@ export function delayTable(device, { allowPip = null, model = SPEED_4, sources =
     heapK[i] = k; heapV[i] = v;
     return top;
   };
-  const IN_PINS = ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'G3', 'G4', 'BX', 'BY'];
-  for (const st of srcTiles) {
+  const OUT_PINS = [['X', 'Y'], ['XQ', 'YQ']], IN_PINS = ['F1', 'F2', 'F3', 'F4', 'G1', 'G2', 'G3', 'G4', 'BX', 'BY'];
+  for (const st of srcTiles) for (const kind of [DELAY_KIND.COMB, DELAY_KIND.REG]) {
     g.fill(Infinity);
     heapK.length = 0; heapV.length = 0;
-    for (const s of clbs.get(st)) for (const p of ['X', 'Y', 'XQ', 'YQ']) { const n = device.sitePinNode(s, p); if (n >= 0) { g[n] = 0; push(0, n); } }
+    for (const s of clbs.get(st)) for (const p of OUT_PINS[kind]) { const n = device.sitePinNode(s, p); if (n >= 0) { g[n] = 0; push(0, n); } }
     while (heapK.length) {
       const d = heapK[0], n = pop();
       if (d > g[n]) continue;
@@ -313,32 +323,36 @@ export function delayTable(device, { allowPip = null, model = SPEED_4, sources =
       let s = 0, c = 0;
       for (const sn of names) for (const p of IN_PINS) { const n = device.sitePinNode(sn, p); if (n >= 0 && g[n] < Infinity) { s += g[n]; c++; } }
       if (!c) continue;
-      const i = (device.tileRow[k] - device.tileRow[st] + dr0) * w + (device.tileCol[k] - device.tileCol[st] + dc0);
+      const i = kind * WH + (device.tileRow[k] - device.tileRow[st] + dr0) * w + (device.tileCol[k] - device.tileCol[st] + dc0);
       sum[i] += s / c + model.base; cnt[i]++;
     }
   }
-  const d = new Float32Array(w * h);
+  // a device whose slices have no flip-flop outputs (a test's): their table is the X / Y outputs'
+  if (!cnt.subarray(WH).some(Boolean)) { sum.copyWithin(WH, 0, WH); cnt.copyWithin(WH, 0, WH); }
+  const d = new Float32Array(2 * WH);
   for (let i = 0; i < d.length; i++) if (cnt[i]) d[i] = sum[i] / cnt[i];
   // offsets no source CLB has a CLB at (rows of clock tiles, block-RAM columns, beyond the
   // device): from their neighbours, outwards
-  for (let filled = true; filled;) {
-    filled = false;
-    const next = cnt.slice();
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (cnt[i]) continue;
-      let s = 0, c = 0;
-      for (const [u, v] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) if (u >= 0 && v >= 0 && u < w && v < h && cnt[v * w + u]) { s += d[v * w + u]; c++; }
-      if (c) { d[i] = s / c; next[i] = 1; filled = true; }
+  for (const o of [0, WH]) {
+    for (let filled = true; filled;) {
+      filled = false;
+      const next = cnt.slice(o, o + WH);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = o + y * w + x;
+        if (cnt[i]) continue;
+        let s = 0, c = 0;
+        for (const [u, v] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) if (u >= 0 && v >= 0 && u < w && v < h && cnt[o + v * w + u]) { s += d[o + v * w + u]; c++; }
+        if (c) { d[i] = s / c; next[i - o] = 1; filled = true; }
+      }
+      cnt.set(next, o);
     }
-    cnt.set(next);
   }
   // rows count down the device: dr is in tile rows, as the placer's y counts up (dr = -dy)
   const table = {
     dc0, dr0, w, h, d,
-    at(dc, dr) {
+    at(dc, dr, kind = DELAY_KIND.COMB) {
       const x = Math.max(0, Math.min(w - 1, Math.round(dc) + dc0)), y = Math.max(0, Math.min(h - 1, Math.round(dr) + dr0));
-      return d[y * w + x];
+      return d[kind * WH + y * w + x];
     },
   };
   if (!sources) device._delayTable.set(key, { model, table });

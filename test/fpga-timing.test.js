@@ -12,7 +12,7 @@ import { routeDesign, checkRouting, netEndpoints } from '../core/fpga/route.js';
 import { parseXdl, writeXdl } from '../core/xdl.js';
 import {
   WIRE, SPEED_4, classOfWires, nodeClasses, nodeDelays, netTree, treePath, pathDelay, distanceDelay,
-  instArcs, timingGraph, analyzeTiming, timingReport, clockPort, checkPeriods, delayTable, clockArrivals, parseOffsets, checkOffsets,
+  instArcs, timingGraph, analyzeTiming, timingReport, clockPort, checkPeriods, delayTable, clockArrivals, parseOffsets, checkOffsets, DELAY_KIND, delayKind,
 } from '../core/fpga/timing.js';
 import zlib from 'node:zlib';
 import { parseDly, twrArcs, memArcs, hardArcs } from '../research/s3e-route/timing-fit.mjs';
@@ -470,14 +470,16 @@ test('clock arrivals (#26): from the clock\'s pad through the global buffer to e
 test('delayTable: the fastest routes from a CLB\'s outputs to the inputs at each offset, on the allowed PIPs only; cached', () => {
   // route-device: two CLBs joined by doubles; east, a slice output reaches F1 of both slices of the
   // next CLB by OMUX + a double, BX0 by one more input multiplexer and BX1 by two (BX0 =- BX1);
-  // F2 only from the west; west, only F2 of the lower slice
+  // F2 only from the west; west, only F2 of the lower slice. Its slices have no flip-flop outputs
+  // (XQ, YQ): their table is the X / Y outputs' (#104)
   const rdev = loadDevice(packDevice(fs.readFileSync(path.join(FIX, 'route-device.xdlrc'), 'utf8')));
   const W = SPEED_4.wire, hop = W[WIRE.OMUX] + W[WIRE.DOUBLE];
   const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);   // (a Float32Array)
   const t = delayTable(rdev);
-  assert.deepEqual([t.w, t.h], [3, 1]);
+  assert.deepEqual([t.w, t.h, t.d.length], [3, 1, 2 * 3]);
   near(t.at(1, 0), SPEED_4.base + (hop + hop + (hop + W[WIRE.IMUX]) + (hop + 2 * W[WIRE.IMUX])) / 4);
   near(t.at(-1, 0), SPEED_4.base + hop);
+  for (const dc of [-1, 0, 1]) assert.equal(t.at(dc, 0, DELAY_KIND.REG), t.at(dc, 0, DELAY_KIND.COMB));
   // beyond the table: its edge
   assert.equal(t.at(5, 3), t.at(1, 0));
   assert.equal(delayTable(rdev), t, 'cached on the device');
@@ -487,6 +489,25 @@ test('delayTable: the fastest routes from a CLB\'s outputs to the inputs at each
   assert.notEqual(r, t);
   near(r.at(1, 0), SPEED_4.base + (hop + (hop + W[WIRE.IMUX]) + (hop + 2 * W[WIRE.IMUX])) / 3);
   assert.equal(delayTable(rdev, { allowPip: allow }), r);
+});
+
+test('delayTable (XC3S250E graph, #104): a flip-flop\'s output reaches its own CLB through an output multiplexer, the X / Y outputs by the fast connects; never faster', async () => {
+  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { loadDb } = await import('../core/fpga/bitdb-node.js');
+  const { knownRouting } = await import('../core/fpga/bitgen.js');
+  const dev = loadDeviceCache('xc3s250ecp132-4');
+  const t = delayTable(dev, { allowPip: knownRouting(loadDb('xc3s250ecp132-4', { graph: dev })).allowPip });
+  const W = SPEED_4.wire, near = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
+  // own CLB: X / Y -> a LUT input by an input multiplexer only (8 of the 10 inputs), BX / BY by a
+  // double (2); XQ / YQ through OMUX first, to any input
+  near(t.at(0, 0, DELAY_KIND.COMB), SPEED_4.base + (8 * W[WIRE.IMUX] + 2 * (W[WIRE.DOUBLE] + W[WIRE.IMUX])) / 10);
+  near(t.at(0, 0, DELAY_KIND.REG), SPEED_4.base + W[WIRE.OMUX] + W[WIRE.IMUX]);
+  // the next CLB up: X / Y straight onto a double, XQ / YQ to the neighbour's inputs through OMUX
+  near(t.at(0, -1, DELAY_KIND.COMB), SPEED_4.base + W[WIRE.DOUBLE] + W[WIRE.IMUX]);
+  near(t.at(0, -1, DELAY_KIND.REG), SPEED_4.base + W[WIRE.OMUX] + W[WIRE.IMUX]);
+  assert.equal(t.at(0, -1), t.at(0, -1, DELAY_KIND.COMB), 'the default kind');
+  for (let dr = -4; dr <= 4; dr++) for (let dc = -4; dc <= 4; dc++) assert.ok(t.at(dc, dr, DELAY_KIND.REG) >= t.at(dc, dr, DELAY_KIND.COMB) - 1e-6, `${dc},${dr}`);
+  assert.deepEqual(['XQ', 'YQ', 'X', 'Y', 'I', 'DOA0', 'P0'].map(delayKind), [1, 1, 0, 0, 0, 0, 0]);
 });
 
 test('timing-driven routing: branch loads (XC3S250E graph): a net of 17 timed loads branches less at its driver and gets faster', async () => {

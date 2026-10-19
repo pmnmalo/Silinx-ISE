@@ -27,7 +27,7 @@
 //   placedXdl(packed, r) -> a design for writeXdl (core/xdl.js)
 //   place(packed, dev, { seed, start: { at, rlim, t } })   a warm start (#87): from a placement given
 
-import { instArcs, SPEED_4 } from './timing.js';
+import { instArcs, delayKind, SPEED_4 } from './timing.js';
 
 // (hint: what to change, printed after the error by the flow; core/open-flow-core.js)
 export class PlaceError extends Error {
@@ -122,7 +122,7 @@ export function timingGraph(packed, model = SPEED_4) {
     if (n.type !== 'wire' || !n.outpins.length) return;
     const src = n.outpins[0];
     if (packed.insts[src.inst].kind === 'bufg') return;
-    for (const p of n.inpins) if (p.pin !== 'CLK') conns.push({ net: k, src: src.inst, srcPin: src.pin, dst: p.inst, dstPin: p.pin, dedicated: DEDICATED_PINS.has(p.pin) });
+    for (const p of n.inpins) if (p.pin !== 'CLK') conns.push({ net: k, src: src.inst, srcPin: src.pin, dst: p.inst, dstPin: p.pin, dedicated: DEDICATED_PINS.has(p.pin), kind: delayKind(src.pin) });
   });
   const none = { deps: {}, start: {}, setup: {} };
   const arcs = packed.insts.map(inst => {
@@ -151,10 +151,10 @@ export function timingGraph(packed, model = SPEED_4) {
 }
 
 /** The estimated delay of a connection between two positions ([x, y] in tiles, y upward): from the
- *  device's table of the fastest routes (timing.js delayTable: by tile offset) when given, else from
- *  the Manhattan distance (the model's dist). */
-export function connDelay(a, b, model = SPEED_4, delays = null) {
-  if (delays) return delays.at(Math.floor(b[0]) - Math.floor(a[0]), Math.floor(a[1]) - Math.floor(b[1]));
+ *  device's table of the fastest routes (timing.js delayTable: by tile offset, and by the kind of its
+ *  driver, timing.js DELAY_KIND) when given, else from the Manhattan distance (the model's dist). */
+export function connDelay(a, b, model = SPEED_4, delays = null, kind = 0) {
+  if (delays) return delays.at(Math.floor(b[0]) - Math.floor(a[0]), Math.floor(a[1]) - Math.floor(b[1]), kind);
   const { base, perTile, knee, far } = model.dist;
   const d = Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
   return base + perTile * Math.min(d, knee) + far * Math.max(0, d - knee);
@@ -212,7 +212,7 @@ export function analyzeTiming(tg, pos, delays = null) {
   // the arcs of each instance on its site: a SLICEM (an even column of slices) at a whole x
   const vOf = i => V[pos[i] && pos[i][0] % 1 === 0 ? 1 : 0];
   const delay = new Float64Array(conns.length);
-  conns.forEach((c, j) => { c.delay = delay[j] = c.dedicated ? 0 : connDelay(pos[c.src], pos[c.dst], model, delays); });
+  conns.forEach((c, j) => { c.delay = delay[j] = c.dedicated ? 0 : connDelay(pos[c.src], pos[c.dst], model, delays, c.kind); });
   // arrival at an input pin / an output pin (memoised depth-first; a loop counts as no path)
   const arr = new Float64Array(P), arrDone = new Uint8Array(P), busy = new Uint8Array(P);
   const arrIn = p => { let t = -Infinity; const l = into[p]; if (l) for (const j of l) t = Math.max(t, arrOut(cSrc[j]) + delay[j]); return t; };
@@ -772,7 +772,7 @@ export function place(packed, dev, { seed = 1, effort = 1, timing = 1.5, clockSi
   const lambda = tg ? timing / (2 + timing) : 0;
   const tconns = tg ? tg.conns.filter(c => !c.dedicated && c.src !== c.dst) : [];
   const NC = tconns.length;
-  const cSrc = Int32Array.from(tconns, c => c.src), cDst = Int32Array.from(tconns, c => c.dst);
+  const cSrc = Int32Array.from(tconns, c => c.src), cDst = Int32Array.from(tconns, c => c.dst), cKind = Int32Array.from(tconns, c => c.kind);
   const cW = new Float64Array(NC), cD = new Float64Array(NC);
   const instConnCount = new Int32Array(N + 1);
   for (let j = 0; j < NC; j++) { instConnCount[cSrc[j] + 1]++; instConnCount[cDst[j] + 1]++; }
@@ -786,14 +786,15 @@ export function place(packed, dev, { seed = 1, effort = 1, timing = 1.5, clockSi
   // the estimated delay of connection j (connDelay, inlined)
   const DT = delays && delays.d && Number.isInteger(delays.w) && Number.isInteger(delays.dc0) ? delays : null;   // timing.js delayTable's table: read directly
   const dtW = DT ? DT.w : 0, dtH = DT ? DT.h : 0, dtC0 = DT ? DT.dc0 : 0, dtR0 = DT ? DT.dr0 : 0, dtD = DT ? DT.d : null;
+  const dtK = DT && DT.d.length >= 2 * dtW * dtH ? dtW * dtH : 0;   // (a table per kind of driver)
   const cdelay = DT
     ? j => {
-      // (its at(dc, dr): the offsets of whole tiles, clamped to the table)
+      // (its at(dc, dr, kind): the offsets of whole tiles, clamped to the table)
       let x = Math.floor(posX[cDst[j]]) - Math.floor(posX[cSrc[j]]) + dtC0, y = Math.floor(posY[cSrc[j]]) - Math.floor(posY[cDst[j]]) + dtR0;
       x = x < 0 ? 0 : x > dtW - 1 ? dtW - 1 : x; y = y < 0 ? 0 : y > dtH - 1 ? dtH - 1 : y;
-      return dtD[y * dtW + x];
+      return dtD[cKind[j] * dtK + y * dtW + x];
     }
-    : delays ? j => delays.at(Math.floor(posX[cDst[j]]) - Math.floor(posX[cSrc[j]]), Math.floor(posY[cSrc[j]]) - Math.floor(posY[cDst[j]]))
+    : delays ? j => delays.at(Math.floor(posX[cDst[j]]) - Math.floor(posX[cSrc[j]]), Math.floor(posY[cSrc[j]]) - Math.floor(posY[cDst[j]]), cKind[j])
     : j => {
       const d = Math.abs(posX[cSrc[j]] - posX[cDst[j]]) + Math.abs(posY[cSrc[j]] - posY[cDst[j]]);
       return dist.base + dist.perTile * Math.min(d, dist.knee) + dist.far * Math.max(0, d - dist.knee);
