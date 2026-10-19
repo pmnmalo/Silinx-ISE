@@ -80,7 +80,7 @@ test('the open flow on the shipped graph: blinky from VHDL to a complete bitstre
   const [placed, routed] = ['placed.xdl', 'routed.xdl'].map(f => parseXdl(fs.readFileSync(path.join(out, f), 'utf8')));
   const pinNets = d => new Map(d.nets.flatMap(n => n.inpins.map(p => [`${p.inst}.${p.pin}`, n.name])));
   const pa = pinNets(placed), pb = pinNets(routed), byName = new Map(routed.insts.map(i => [i.name, i]));
-  let luts = 0, swapped = 0;
+  let luts = 0, swapped = 0, cyLuts = 0, cySwapped = 0;
   for (const ia of placed.insts.filter(i => /^SLICE/.test(i.type))) {
     for (const L of ['F', 'G']) {
       const ea = ia.cfg.find(c => c.attr === L && /^#LUT:/.test(c.value));
@@ -89,6 +89,9 @@ test('the open flow on the shipped graph: blinky from VHDL to a complete bitstre
       const na = [1, 2, 3, 4].map(k => pa.get(`${ia.name}.${L}${k}`)), nb = [1, 2, 3, 4].map(k => pb.get(`${ia.name}.${L}${k}`));
       luts++;
       if (na.join() !== nb.join()) swapped++;
+      // the carry's data input on pin 1 or 2: the same net before and after (#25: its pin may change)
+      const cyA = ia.cfg.find(c => c.attr === `CY0${L}`)?.value, cyB = byName.get(ia.name).cfg.find(c => c.attr === `CY0${L}`)?.value;
+      if (/^[FG][12]$/.test(cyA || '')) { assert.equal(pb.get(`${ia.name}.${cyB}`), pa.get(`${ia.name}.${cyA}`), `${ia.name} CY0${L}`); cyLuts++; if (cyA !== cyB) cySwapped++; }
       const nets = [...new Set(na.filter(Boolean))];
       assert.deepEqual([...new Set(nb.filter(Boolean))].sort(), [...nets].sort(), `${ia.name} ${L}: the same nets`);
       for (let v = 0; v < 1 << nets.length; v++) {
@@ -98,6 +101,7 @@ test('the open flow on the shipped graph: blinky from VHDL to a complete bitstre
     }
   }
   assert.ok(luts > 50 && swapped > 10, `${swapped} of ${luts} LUTs with their inputs swapped`);
+  assert.ok(cyLuts >= 2 && cySwapped >= 1, `${cySwapped} of ${cyLuts} carry data inputs moved`);
 });
 
 test('the open flow with --tries 2: two placements routed, the one with the shorter critical path kept', { timeout: 300000 }, () => {

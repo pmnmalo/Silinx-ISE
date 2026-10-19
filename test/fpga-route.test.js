@@ -243,9 +243,17 @@ test('routeDesign: LUT inputs are swapped when the pin a net reaches is not the 
   // the input design is not changed
   assert.deepEqual(d.nets[0].inpins, [{ inst: 'b0', pin: 'F2' }]);
   assert.equal(d.insts.find(i => i.name === 'b0').cfg[0].value, '#LUT:D=(~A2*A3)');
-  // not swapped: the option off, the carry's data input on that pin, a LUT that is not an equation
-  for (const [cfg, opts] of [[' F:b0_f:#LUT:D=~A2 ', { swapLutPins: false }], [' F:b0_f:#LUT:D=~A2 CY0F::F2 ', {}], [' F:b0_f:#RAM:D=~A2 ', {}], [' A::B ', {}]]) {
-    const x = routeDesign(lut(cfg, net('n', '', [['a0', 'X']], [['b0', 'F2']])), device, opts);
+  // the carry's data input on F2 (#25): its net may take F1, the setting follows it
+  const c = routeDesign(lut(' F:b0_f:#LUT:D=(~A2*A3) CY0F::F2 ', net('n', '', [['a0', 'X']], [['b0', 'F2']])), device);
+  assert.deepEqual(c.failed, []);
+  assert.deepEqual(c.design.nets.find(x => x.name === 'n').inpins, [{ inst: 'b0', pin: 'F1' }]);
+  assert.match(writeXdl(c.design), /cfg " F:b0_f:#LUT:D=\(~A1\*A3\) CY0F::F1 "/);
+  assert.ok(checkRouting(parseXdl(writeXdl(c.design)), device).ok);
+  // not swapped: the option off, a LUT that is not an equation; the carry's data input when the
+  // other of pins 1 and 2 is taken by a net the router does not route
+  for (const [cfg, opts, more] of [[' F:b0_f:#LUT:D=~A2 ', { swapLutPins: false }, ''], [' F:b0_f:#RAM:D=~A2 ', {}, ''], [' A::B ', {}, ''],
+    [' F:b0_f:#LUT:D=(A1*~A2) CY0F::F2 ', {}, net('z', '', [], [['b0', 'F1']])]]) {
+    const x = routeDesign(lut(cfg, net('n', '', [['a0', 'X']], [['b0', 'F2']]) + more), device, opts);
     assert.deepEqual(x.failed, ['n'], cfg);
     assert.deepEqual(x.unreached, [{ net: 'n', inst: 'b0', pin: 'F2' }]);
   }

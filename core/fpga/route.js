@@ -517,9 +517,13 @@ function lutPinGroups(design, work, device) {
       if (Object.keys(node).length > 1) {
         // (a pin the site does not have keeps its variable)
         const fixed = new Set([1, 2, 3, 4].map(k => `${pin[0]}${k}`).filter(p => !(p in node)));
+        // the carry's data input (CY0F / CY0G) on pin 1 or 2: its net may take either (#25), the
+        // setting follows it; on another pin it stays
         const cy = cfg.find(c => c.attr === `CY0${pin[0]}`);
-        if (cy && LUT_PIN.test(cy.value)) fixed.add(cy.value);
-        grp = { inst, letter: pin[0], node, fixed, sinks: [] };
+        const cyPins = [`${pin[0]}1`, `${pin[0]}2`];
+        let cyPin = null;
+        if (cy && LUT_PIN.test(cy.value)) { if (cyPins.includes(cy.value) && cyPins.every(p => p in node)) cyPin = cy.value; else fixed.add(cy.value); }
+        grp = { inst, letter: pin[0], node, fixed, sinks: [], cyPin, cySink: null };
       }
     }
     groups.set(key, grp);
@@ -530,7 +534,7 @@ function lutPinGroups(design, work, device) {
     if (!LUT_PIN.test(s.pin.pin)) continue;
     const grp = groupOf(s.pin.inst, s.pin.pin);
     if (!grp) continue;
-    if (movable.has(s) && !grp.fixed.has(s.pin.pin)) grp.sinks.push(s); else grp.fixed.add(s.pin.pin);
+    if (movable.has(s) && !grp.fixed.has(s.pin.pin)) { grp.sinks.push(s); if (s.pin.pin === grp.cyPin) grp.cySink = s; } else grp.fixed.add(s.pin.pin);
   }
   // the pins of nets the router does not route (no source…) stay too
   for (const n of design.nets) for (const p of n.inpins) {
@@ -543,8 +547,16 @@ function lutPinGroups(design, work, device) {
     if (!grp || !grp.sinks.length) continue;
     grp.free = Object.keys(grp.node).filter(p => !grp.fixed.has(p));
     if (grp.free.length < 2) continue;
-    const targets = grp.free.map(p => grp.node[p]);
-    for (const s of grp.sinks) { s.targets = targets; s.orig = s.pin.pin; }
+    // (the carry's data input: pin 1 or 2 only, when both are free; else it stays where it is)
+    const cyPins = grp.cyPin && [`${grp.letter}1`, `${grp.letter}2`];
+    if (grp.cyPin && !(grp.cySink && cyPins.every(p => !grp.fixed.has(p)))) {
+      if (grp.cySink) grp.sinks = grp.sinks.filter(s => s !== grp.cySink);
+      grp.fixed.add(grp.cyPin); grp.cyPin = null; grp.cySink = null;
+      grp.free = Object.keys(grp.node).filter(p => !grp.fixed.has(p));
+      if (grp.free.length < 2 || !grp.sinks.length) continue;
+    }
+    const tFree = grp.free.map(p => grp.node[p]);
+    for (const s of grp.sinks) { s.targets = s === grp.cySink ? cyPins.map(p => grp.node[p]) : tFree; s.orig = s.pin.pin; }
     out.push(grp);
   }
   return out;
@@ -574,6 +586,8 @@ function applyLutSwaps(insts, groups) {
     for (const k of ['1', '2', '3', '4']) if (!(k in perm)) perm[k] = left.shift();
     if (!changed.has(grp.inst)) changed.set(grp.inst, {});
     changed.get(grp.inst)[grp.letter] = perm;
+    // the carry's data input follows its net (#25)
+    if (grp.cyPin) changed.get(grp.inst)[`CY0${grp.letter}`] = `${grp.letter}${perm[grp.cyPin[1]]}`;
   }
   if (!changed.size) return { insts, pinOf };
   return {
@@ -581,7 +595,8 @@ function applyLutSwaps(insts, groups) {
     insts: insts.map(inst => {
       const perms = changed.get(inst);
       if (!perms) return inst;
-      const cfg = inst.cfg.map(c => (perms[c.attr] && /^#LUT:/.test(c.value) ? { ...c, value: c.value.replace(/A([1-4])/g, (_, k) => `A${perms[c.attr][k]}`) } : c));
+      const cfg = inst.cfg.map(c => (typeof perms[c.attr] === 'string' ? { ...c, value: perms[c.attr] }
+        : perms[c.attr] && /^#LUT:/.test(c.value) ? { ...c, value: c.value.replace(/A([1-4])/g, (_, k) => `A${perms[c.attr][k]}`) } : c));
       const { cfgRaw, ...rest } = inst;
       return { ...rest, cfg };
     }),
