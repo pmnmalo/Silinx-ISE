@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// A release only of a commit that main's CI passed (#416): the Release workflow does not run the tests
-// again (12-29 minutes), it waits for the CI run of the tagged commit on main (a push to main runs
-// everything, on Linux, macOS and Windows) and fails when that run failed, or when the commit has no CI run
-// on main (a tag on a commit main never had). The release commit and its tag are pushed together, so CI is
-// usually still running: the script waits for it.
+// A release only of a commit that CI passed (#416): the Release workflow does not run the tests itself, it
+// waits for the CI run of the tagged commit and fails when that run failed, or when the commit has no CI
+// run. CI runs at a release only (#607): the push of the tag v* starts it (a run of the tag), alongside the
+// Release workflow, so it is usually still running and the script waits for it; a run of main started by
+// hand (Actions ▸ CI ▸ Run workflow) on that commit counts too. A pull request's or a branch's does not.
 //
 //   node scripts/wait-for-ci.mjs <sha> [--timeout <minutes, 60>] [--appear <minutes, 10>]
 //   (in GitHub Actions: GITHUB_TOKEN with actions: read, GITHUB_REPOSITORY)
@@ -11,14 +11,14 @@ import { fileURLToPath } from 'node:url';
 
 /** { state: 'success' | 'failure' | 'pending' | 'none', reason } from the CI runs of a commit (the API's workflow_runs). */
 export function verdict(runs) {
-  const main = runs.filter(r => r.event === 'push' && r.head_branch === 'main');
+  const ours = runs.filter(r => (r.event === 'push' && /^v\d/.test(r.head_branch)) || (['push', 'workflow_dispatch'].includes(r.event) && r.head_branch === 'main'));
   const url = r => r.html_url || `run ${r.id}`;
-  const passed = main.find(r => r.status === 'completed' && r.conclusion === 'success');
-  if (passed) return { state: 'success', reason: `CI passed on main: ${url(passed)}` };
-  const going = main.find(r => r.status !== 'completed');
-  if (going) return { state: 'pending', reason: `CI on main is ${going.status.replace('_', ' ')}: ${url(going)}` };
-  if (main.length) return { state: 'failure', reason: `CI on main did not pass (${main.map(r => r.conclusion).join(', ')}): ${main.map(url).join(', ')}` };
-  return { state: 'none', reason: 'no CI run on main for this commit' };
+  const passed = ours.find(r => r.status === 'completed' && r.conclusion === 'success');
+  if (passed) return { state: 'success', reason: `CI passed (${passed.head_branch}): ${url(passed)}` };
+  const going = ours.find(r => r.status !== 'completed');
+  if (going) return { state: 'pending', reason: `CI (${going.head_branch}) is ${going.status.replace('_', ' ')}: ${url(going)}` };
+  if (ours.length) return { state: 'failure', reason: `CI did not pass (${ours.map(r => r.conclusion).join(', ')}): ${ours.map(url).join(', ')}` };
+  return { state: 'none', reason: 'no CI run of the tag or of main for this commit' };
 }
 
 async function main() {
@@ -38,7 +38,7 @@ async function main() {
     console.log(`${sha.slice(0, 7)}: ${reason}`);
     if (state === 'success') return;
     if (state === 'failure') throw new Error(reason);
-    if (state === 'none' && minutes >= appear) throw new Error(`${reason} after ${appear} minutes: is the tag on a commit of main?`);
+    if (state === 'none' && minutes >= appear) throw new Error(`${reason} after ${appear} minutes: did CI start on the tag?`);
     if (minutes >= timeout) throw new Error(`${reason} after ${timeout} minutes`);
     await new Promise(res => setTimeout(res, 60000));
   }

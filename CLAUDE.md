@@ -48,11 +48,11 @@ the code and the lessons learnt.
 - **Tests while working, locally**: only the tests related to the change (the files it touches and
   their neighbours), a few at a time; no full suites and no parallel stress runs on the developer's
   machine. To check a fix against load, use `SILINX_UI_THROTTLE` on one or two processes.
-- **The full suites run on GitHub**: push the branch and open a pull request
-  (`gh pr create`, its description saying `Fixes #N`). CI runs everything on it.
-- **Merging**: when the pull request's CI is green, merge it into `main` (rebased, fast-forward, no
-  merge commit) without running the suites again locally. If `main` moved meanwhile, rebase the
-  branch and push it again (CI runs again). Then check the CI run of `main`.
+- **CI runs at a release only** (#607): not on pull requests nor on pushes to `main`. Push the branch and
+  open a pull request (`gh pr create`, its description saying `Fixes #N`) for the record and the review.
+- **Merging**: when the tests related to the change pass locally, merge it into `main` (rebased,
+  fast-forward, no merge commit; rebase the branch first if `main` moved). A break found later (by the
+  release's CI, the nightly or ISE runs, the CI watcher) becomes an issue, fixed in the next change.
 - **Reviewing** another session's pull request: its intent and its evidence, not every line. Does it do
   what its issue asks and nothing more; do its tests prove it (a regression test, the warnings asserted);
   does it keep the rules above; is its changelog fragment right. Read the lines closely only where the
@@ -66,21 +66,19 @@ the code and the lessons learnt.
   quality comparison against ISE is run by hand (Actions ▸ Quality ▸ Run workflow) and reviewed. The
   sources pinned outside npm are checked monthly (`pins.yml`: one issue lists what is behind).
 - **`main` is protected** (repository rulesets): no deletion and no force push, for anyone; a linear
-  history, rebase merging only (the check is not strict: a pull request need not be up to date to merge); a commit
-  reaches `main` only with CI's one required check, `ci-ok`, green (every CI job passed or was skipped),
-  the repository's admin excepted (for the release commit). The weekly quality
+  history, rebase merging only; no check is required to merge (CI runs at a release only). The weekly quality
   comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
   maintainer merges.
-- **CI** (`.github/workflows/ci.yml`): a pull request runs the unit tests on Linux, the UI tests in
-  both interfaces and Firefox / WebKit; a push to main runs everything (the unit tests on macOS and
-  Windows too, the operating systems' smoke tests, WebKit memory, the standalone build, the release
-  zip). A failure on main only (an OS-specific bug) becomes an issue, fixed in the next change.
-  A docs-only change (`scripts/ci-changes.mjs`) runs the unit tests only, the documentation's among them;
-  the Markdown files a build reads (CHANGELOG, THIRD-PARTY-NOTICES) count as code, the changelog fragments do not.
+- **CI** (`.github/workflows/ci.yml`) runs everything when a version tag `v*` is pushed, and by hand
+  (Actions ▸ CI ▸ Run workflow): the unit tests on Linux, macOS and Windows, the UI tests in both
+  interfaces, Firefox / WebKit, the operating systems' smoke tests, WebKit memory, the standalone build,
+  the release zip. The unit tests run in three parts of about the same time (`scripts/test-shard.mjs`, by
+  `test/timings.json`; refresh it now and then with `node scripts/update-test-timings.mjs <run id>`). The
+  development build and the site's `dev/` are published after every push to `main` (no tests).
   The security checks
-  (#498, `SECURITY.md`): CodeQL analyses the JavaScript (`codeql.yml`, a workflow of its own, on pull
-  requests, pushes to main and weekly), a dependency review fails a pull request that adds a dependency
-  with a known vulnerability, and every run scans main's history and the pull request's commits for
+  (#498, `SECURITY.md`): CodeQL analyses the JavaScript (`codeql.yml`, a workflow of its own, on every
+  push to main), Dependabot's alerts report a dependency with a known vulnerability, and CI scans the
+  tagged commit's history for
   private data (`scripts/check-private-data.mjs --history`, HEAD's history only, #555; a harmless match goes to its `ALLOW` list with its reason).
   The ISE tests (nightly) and the quality comparison against
   XST (weekly) run on a self-hosted runner, only when main changed since their last run.
@@ -94,7 +92,7 @@ the code and the lessons learnt.
   2. `npm version X --no-git-tag-version`, then `node scripts/sync-version.mjs` (it refuses a version with no
      section or with fragments left);
   3. commit `core/version.js`, `package.json`, `package-lock.json`, the CHANGELOG and the deleted fragments;
-  4. tag `vX` and push; the Release workflow publishes it once main's CI has passed on that commit (it does
-     not run the tests again).
+  4. tag `vX` and push; the tag starts CI, and the Release workflow publishes the release once that run has
+     passed (it does not run the tests itself; the commit must be on `main`).
 
   The Pages site serves the latest release at the root and `main` under `dev/`.

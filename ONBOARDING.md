@@ -29,9 +29,10 @@ npm start          # http://127.0.0.1:8642
 
 1. **An issue for everything**, even a bug fixed at once. Commits and PRs say `Fixes #N`. Issues are
    public: no personal data, no hosts, no course code.
-2. **A branch and a pull request for every change.** `main` is protected: no force push, and a commit
-   reaches it only with CI's required check `ci-ok` green (it needs every CI job). Merge with
-   `gh pr merge --rebase` (fast-forward, no merge commits).
+2. **A branch and a pull request for every change.** `main` is protected: no force push, a linear
+   history. **CI runs at a release only** (#607), not on pull requests nor on pushes to main: merge when
+   the tests related to the change pass locally, with `gh pr merge --rebase` (fast-forward, no merge
+   commits). The release's CI, the nightly and ISE runs and the CI watcher find what slipped through.
 3. **Tests with every change**: unit tests (`test/*.test.js`) and UI tests (`test/ui/*.test.js`), in
    **both interfaces** (`SILINX_UI_INTERFACE=classic`) and in Portuguese when labels change. A bug fix
    gets a regression test that fails on the old code. **Tests assert the exact warnings**, not only "no
@@ -66,7 +67,8 @@ Several sessions work on the repository at the same time, each in its own clone 
   redone when a pull request merged in between).
 - **Review by intent and evidence** (CLAUDE.md, Integration): what the change is for, its tests and its
   warnings, the product's rules; line by line only where the risk is.
-- **A CI watcher** (a scheduled session) checks main's CI every hour: it reruns a flaky job once, opens or
+- **A CI watcher** (a scheduled session) checks the workflows every hour (the release's CI, the nightly, ISE
+  and Quality runs, CodeQL, the dev build): it reruns a flaky job once, opens or
   updates an issue (`bug`, `tests & CI`) and tells the core session of real breaks.
 - **Conflicts:** CHANGELOG.md no longer conflicts: when every pull request edited its unreleased section, each
   merge made the others' pull requests conflict there (a rebase and a new CI run each time); each change now
@@ -125,9 +127,6 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
 - **WebUSB is slow per transfer** (about 1 ms). Batch JTAG work into few commands. JTAG ISC operations
   only start in Run-Test/Idle.
 - **Yosys 0.70** colours its log and splits lines; `core/synth-open.js` `lineStream` handles it.
-- **A docs-only PR runs the unit tests only** (`scripts/ci-changes.mjs`), and `ci-ok` passes it: no need
-  to fold docs into a code PR. CHANGELOG.md and THIRD-PARTY-NOTICES.md count as code (a build reads them);
-  the changelog fragments (`changes/*.md`) do not.
 - **The ISE tests and the quality comparison** run on the self-hosted runner (the Mac mini).
   - They run only on code from `main`, never a PR's.
   - The runner refuses every other job before its first step, and is on line only in the two workflows'
@@ -142,14 +141,13 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
   run) and `failure-report.yml` (a scheduled job's failure as an issue), called by the nightly, ISE and
   Quality workflows.
 - **Before pushing,** `node scripts/check-private-data.mjs` checks that no private data goes into the
-  repository; CI scans the history too (`--history`: HEAD's, main's on a push, a pull
-  request's commits on a pull request, never the other branches, #555), so a harmless match in an old
+  repository; the release's CI scans the history too (`--history`: the tagged commit's, never the other
+  branches, #555), so a harmless match in an old
   commit goes to the script's `ALLOW` list with its reason.
 - **The security checks** (#498, [SECURITY.md](SECURITY.md)): CodeQL (`.github/workflows/codeql.yml`)
-  analyses the JavaScript on every pull request, push to main and weekly, its findings under Security ▸
-  Code scanning; the dependency review job of CI fails a pull request that adds a dependency with a known
-  vulnerability (licences are tracked by `scripts/third-party.mjs`, not by it). Secret scanning, push
-  protection and Dependabot's alerts are the repository's settings, on.
+  analyses the JavaScript on every push to main, its findings under Security ▸ Code scanning; Dependabot's
+  alerts report a dependency with a known vulnerability (licences are tracked by `scripts/third-party.mjs`).
+  Secret scanning, push protection and Dependabot's alerts are the repository's settings, on.
 
 ## 7. Talking with Pedro
 

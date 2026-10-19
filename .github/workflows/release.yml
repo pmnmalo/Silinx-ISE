@@ -2,8 +2,9 @@
 #   Silinx-ISE.html                         single-file edition (no install, runs in the browser)
 #   silinx-ise-<version>.zip                full app (server + UI + examples), production node_modules included
 #   silinx-ise-docker-kit-<version>.zip builder kit for the private Xilinx ISE 14.7 Docker image
-# The tests are not run again (#416): the tagged commit must have passed main's CI (a push to main runs
-# everything); the job waits for that run (scripts/wait-for-ci.mjs), then checks the packages it publishes.
+# The tests are not run here (#416): CI runs at a release only (#607), started by the same tag, and the
+# job waits for that run (scripts/wait-for-ci.mjs), then checks the packages it publishes. The tagged
+# commit must be on main.
 name: Release
 on:
   push:
@@ -14,14 +15,18 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 80
+    timeout-minutes: 170
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: The commit is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - uses: ./.github/actions/setup
-      # main's CI on this commit, waited for when it is still running (the release commit and its tag are
-      # pushed together); no run on main, or a failed one: no release
-      - name: CI passed on main
-        run: node scripts/wait-for-ci.mjs "$GITHUB_SHA" --timeout 60 --appear 10
+      # CI on this commit, started by the same tag and waited for (the unit tests on Windows take about
+      # 45 minutes, a queue more); a failed run, or none: no release
+      - name: CI passed
+        run: node scripts/wait-for-ci.mjs "$GITHUB_SHA" --timeout 150 --appear 10
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Build the single-file edition

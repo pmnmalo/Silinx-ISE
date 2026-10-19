@@ -1,50 +1,34 @@
 name: CI
-# on every push to main and every pull request, the documentation's too (#409): the one check that main
-# requires, ci-ok, is always reported; a change of documentation only (scripts/ci-changes.mjs) runs the
-# unit tests alone (the documentation's tests among them), not the long jobs
+# The tests, all of them, at a release only (#607): when a version tag v* is pushed (the Release workflow
+# waits for this run of the tagged commit, scripts/wait-for-ci.mjs), and by hand (Actions ▸ CI ▸ Run
+# workflow, on main or a branch). Not on pull requests nor on pushes to main: a change is merged after
+# the tests related to it, run locally (CLAUDE.md); the scheduled workflows (nightly, ISE, Quality) and
+# the code scanning of main (its own workflow) keep watching between releases.
 on:
   push:
-    branches: [main]
-  pull_request:
-# a newer push to a pull request cancels its run still going; on main every push's run completes (the
-# development site is deployed from a green run of main: cancelled runs, merges in quick succession,
-# would leave it behind)
+    tags: ['v*']
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || 'pr' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-# A pull request runs the unit tests on Linux, the UI tests in both interfaces and Firefox / WebKit;
-# a push to main runs everything: the unit tests on macOS and Windows too, the operating systems' smoke
-# tests, WebKit memory and the standalone build, the release zip. A failure there only (an OS-specific
-# bug) becomes an issue, fixed in the next change. main requires one check to merge (a ruleset): ci-ok,
-# green when every job passed or was skipped.
+  group: ci-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+# Everything runs: the unit tests on Linux, macOS and Windows, the UI tests in both interfaces, Firefox /
+# WebKit, the operating systems' smoke tests, WebKit memory and the standalone build, the release zip, the
+# history's private-data scan. ci-ok is green when every job passed.
 jobs:
-  # whether more than the documentation changed (scripts/ci-changes.mjs): a pull request's merge commit
-  # against its base, a push against the commit main had before it
-  changes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    outputs:
-      code: ${{ steps.changes.outputs.code }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          filter: blob:none
-      - id: changes
-        run: node scripts/ci-changes.mjs "$BASE" HEAD
-        env:
-          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
-
-  # the unit tests, in three parts at once (node --test --test-shard), on Linux, macOS and Windows
-  # (Linux only for a pull request). A file's tests run one after another: the end of the output lists
-  # each file's time, and a file over 15 minutes is a warning (scripts/test-file-times.mjs, #566)
+  # the unit tests, in three parts at once of about the same time (scripts/test-shard.mjs, by each file's
+  # time in test/timings.json, #573), on Linux, macOS and Windows: about
+  # 105 minutes one after another on Linux, a part about 17 (its files two at a time or so). A part takes
+  # as long as its longest file at least (sim-model.test.js, about 16 minutes, #575): four parts were no
+  # faster. The Linux parts upload each file's time, to refresh the timings now and then:
+  # node scripts/update-test-timings.mjs <run id>. The end of the output lists each file's time, and a file
+  # over 15 minutes is a warning (scripts/test-file-times.mjs, #566)
   unit:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest", "windows-latest"]') }}
+        os: [ubuntu-latest, macos-latest, windows-latest]
         shard: [1, 2, 3]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -52,15 +36,24 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: node --test --test-shard="$SHARD/3" --test-reporter=tap --test-reporter-destination=stdout --test-reporter=./scripts/test-file-times.mjs --test-reporter-destination=stdout "test/*.test.js"
+      - run: >-
+          node scripts/test-shard.mjs "$SHARD/3"
+          --test-reporter=tap --test-reporter-destination=stdout
+          --test-reporter=./scripts/test-file-times.mjs --test-reporter-destination=stdout
+          --test-reporter=./scripts/test-times-reporter.mjs --test-reporter-destination=test-times.json
         shell: bash   # (Windows: PowerShell would not expand $SHARD)
         env:
           SHARD: ${{ matrix.shard }}
+      - if: always() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-times-${{ matrix.shard }}
+          path: test-times.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   # the UI tests in headless Chrome, with each interface (alongside the unit tests)
   ui:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -80,8 +73,6 @@ jobs:
 
   # the memory test in WebKit (Safari's engine), and the single-file edition builds
   webkit-standalone:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -101,8 +92,6 @@ jobs:
   # the release zip as users get it: packaged as the Release workflow does, unzipped, started with its
   # launcher, and the open synthesis run in Chrome from it without the Internet
   release-zip:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -115,8 +104,6 @@ jobs:
 
   # the main UI flows in Firefox and in WebKit (Safari's engine)
   browsers:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -133,8 +120,6 @@ jobs:
   # macOS and Windows: a small UI smoke test in the installed Chrome (and on macOS the release zip,
   # with its .command launcher); their unit tests are in the unit job
   os:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -158,9 +143,8 @@ jobs:
 
   # the private-data scan of the whole history (#498): every line ever added and every commit message
   # of HEAD's history (about 3 s; the tracked files are scanned on every run, by test/private-data.test.js
-  # in the unit job). HEAD's history only, not every branch (#555): on a push to main, main's; on a pull
-  # request, its merge commit's (main and the pull request's commits), so that a line added and removed
-  # again on a branch is found before it reaches main, and an open branch never fails main.
+  # in the unit job). HEAD's history only, not every branch (#555): the tagged commit's, main's history
+  # up to it; an open branch never fails a release.
   # Only node's built-ins: no npm ci.
   private-data-history:
     runs-on: ubuntu-latest
@@ -174,28 +158,11 @@ jobs:
           node-version: 22
       - run: node scripts/check-private-data.mjs --history
 
-  # the dependencies a pull request adds or updates (#498): red when one has a known vulnerability of
-  # moderate severity or worse. No licence list here: the licences in use are tracked by
-  # scripts/third-party.mjs and THIRD-PARTY-NOTICES.md (CLAUDE.md, Programming). No comment on the pull
-  # request (a Dependabot's or a fork's token is read-only): the findings are in the job's summary.
-  dependency-review:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-        with:
-          fail-on-severity: moderate
-          comment-summary-in-pr: never
-
-  # the one check that main requires (a ruleset, #409): green when every job above passed or was skipped
-  # (documentation only, or a pull request's run), red when one failed or was cancelled
+  # the verdict of the run (#409), which the Release workflow waits for: green when every job above passed,
+  # red when one failed or was cancelled
   ci-ok:
     if: always()
-    needs: [changes, unit, ui, webkit-standalone, release-zip, browsers, os, private-data-history, dependency-review]
+    needs: [unit, ui, webkit-standalone, release-zip, browsers, os, private-data-history]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

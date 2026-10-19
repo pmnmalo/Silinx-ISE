@@ -2,18 +2,20 @@ name: Pages
 # The single-file edition (Silinx-ISE.html: no install, runs in the browser) published on GitHub
 # Pages, so that a course page (e.g. Moodle, as a URL resource) can link to it:
 #   https://pmnmalo.github.io/Silinx-ISE/       the stable edition: the latest release
-#   https://pmnmalo.github.io/Silinx-ISE/dev/   the development edition: main, after every CI run
-#                                               that passed (its title says "dev:<commit> (<date>)";
+#   https://pmnmalo.github.io/Silinx-ISE/dev/   the development edition: main, after every push
+#                                               (its title says "dev:<commit> (<date>)";
 #                                               its browser storage is its own)
-# Built after every CI run on main that passed (the dev edition: the commit CI tested), after every
-# release (the stable edition: its tag), and on demand (Actions ▸ Pages ▸ Run workflow). A CI run
-# that failed or was cancelled (a newer push) publishes nothing: the site keeps what it had.
+# Built after every push to main (the dev edition: that commit; no tests, CI runs at a release only,
+# #607), after every release (the stable edition: its tag), and on demand (Actions ▸ Pages ▸ Run
+# workflow). A release that failed publishes nothing: the site keeps what it had.
 # (The github-pages environment deploys from main only: both editions are built in a run on main.)
 # (Uploading the HTML file to Moodle itself does not work: Moodle's filtering of uploaded HTML files
 # removes its <script> tags and shows the code as text.)
 on:
+  push:
+    branches: [main]
   workflow_run:
-    workflows: [CI, Release]
+    workflows: [Release]
     types: [completed]
   workflow_dispatch:
 permissions:
@@ -25,19 +27,17 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    # after CI: when it passed on a push to main (not a pull request's run); after a release: when
-    # it was published
+    # after a push to main; after a release: when it was published
     if: >-
-      github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
-      && (github.event.workflow_run.name == 'Release' || github.event.workflow_run.head_branch == 'main'))
+      github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          # the commit CI tested; after a release or on demand, main's latest commit
-          ref: ${{ github.event.workflow_run.name == 'CI' && github.event.workflow_run.head_sha || 'main' }}
+          # the commit pushed; after a release or on demand, main's latest commit
+          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22

@@ -1,14 +1,14 @@
 name: Development build
 # A pre-release "Development build" (tag dev) with the files of main as a release has them (the app zip,
-# the Docker builder kit, Silinx-ISE.html), updated in place after every CI run on main that passed:
+# the Docker builder kit, Silinx-ISE.html), updated in place after every push to main (no tests: CI runs at
+# a release only, #607; the build itself must work):
 #   https://github.com/pmnmalo/Silinx-ISE/releases/tag/dev
 # One pre-release, moved and its files replaced (no new release, no notification each time); a
 # pre-release is never "Latest", so Check for Updates and the stable site keep to the releases.
 # Its browser edition is also on the site: https://pmnmalo.github.io/Silinx-ISE/dev/ (pages.yml).
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
@@ -17,16 +17,14 @@ concurrency:
   cancel-in-progress: true
 jobs:
   dev:
-    if: >-
-      github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success'
-      && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.workflow_run.head_sha || 'main' }}
+          ref: ${{ github.sha }}
       - uses: ./.github/actions/setup
       - name: Build the single-file edition
         run: node scripts/build-standalone.mjs
