@@ -49,9 +49,13 @@ the code and the lessons learnt.
   their neighbours), a few at a time; no full suites and no parallel stress runs on the developer's
   machine. To check a fix against load, use `SILINX_UI_THROTTLE` on one or two processes.
 - **CI runs at a release only** (#607): not on pull requests nor on pushes to `main`. Push the branch and
-  open a pull request (`gh pr create`, its description saying `Fixes #N`) for the record and the review.
-- **Merging**: when the tests related to the change pass locally, merge it into `main` (rebased,
-  fast-forward, no merge commit; rebase the branch first if `main` moved). A break found later (by the
+  open a pull request (`gh pr create`, its description saying `Fixes #N`). A pull request runs the whole test
+  file of every module it changes (`.github/workflows/pr-tests.yml`, `scripts/related-tests.mjs`, #637: the
+  unit test files that import a changed file, directly or through a test helper; a changed test; the UI test
+  of a changed page script); `main` requires its check, `related-tests`. Before pushing, run the same files
+  locally: `node scripts/related-tests.mjs origin/main HEAD`.
+- **Merging**: when `related-tests` is green, merge it into `main` (rebased, fast-forward, no merge commit;
+  rebase the branch first if `main` moved). A break found later (by the
   release's CI, the nightly or ISE runs, the CI watcher) becomes an issue, fixed in the next change.
 - **Reviewing** another session's pull request: its intent and its evidence, not every line. Does it do
   what its issue asks and nothing more; do its tests prove it (a regression test, the warnings asserted);
@@ -66,7 +70,7 @@ the code and the lessons learnt.
   quality comparison against ISE is run by hand (Actions ▸ Quality ▸ Run workflow) and reviewed. The
   sources pinned outside npm are checked monthly (`pins.yml`: one issue lists what is behind).
 - **`main` is protected** (repository rulesets): no deletion and no force push, for anyone; a linear
-  history, rebase merging only; no check is required to merge (CI runs at a release only). The weekly quality
+  history, rebase merging only; a pull request's `related-tests` check required to merge. The weekly quality
   comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
   maintainer merges.
 - **CI** (`.github/workflows/ci.yml`) runs everything when a version tag `v*` is pushed, and by hand

@@ -18,8 +18,8 @@ Contributions are welcome: bug reports, ideas and pull requests.
   The file is named for Claude Code, which reads it at the start of every session, but its rules are
   the same for everyone, people and AI agents alike.
 - **Before opening a pull request:**
-  - run the tests related to your change (`node --test test/<file>.test.js`, `test/ui/<file>.test.js`): CI
-    runs the full suites at a release only, not on pull requests;
+  - run the test files of the modules your change touches (`node scripts/related-tests.mjs origin/main HEAD`);
+    the pull request runs the same on GitHub, and the full suites run at a release;
   - add a changelog fragment, a new file `changes/<issue>-<slug>.md` (not an edit of CHANGELOG.md), as
     [changes/README.md](changes/README.md) says;
   - reference the issue (`Fixes #N`).

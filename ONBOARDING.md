@@ -30,9 +30,10 @@ npm start          # http://127.0.0.1:8642
 1. **An issue for everything**, even a bug fixed at once. Commits and PRs say `Fixes #N`. Issues are
    public: no personal data, no hosts, no course code.
 2. **A branch and a pull request for every change.** `main` is protected: no force push, a linear
-   history. **CI runs at a release only** (#607), not on pull requests nor on pushes to main: merge when
-   the tests related to the change pass locally, with `gh pr merge --rebase` (fast-forward, no merge
-   commits). The release's CI, the nightly and ISE runs and the CI watcher find what slipped through.
+   history. **CI runs at a release only** (#607), not on pull requests nor on pushes to main. A pull
+   request runs the whole test file of every module it changes (`pr-tests.yml`, #637); merge when its
+   check `related-tests` is green, with `gh pr merge --rebase` (fast-forward, no merge commits). Run the
+   same files locally first: `node scripts/related-tests.mjs origin/main HEAD`. The release's CI, the nightly and ISE runs and the CI watcher find what slipped through.
 3. **Tests with every change**: unit tests (`test/*.test.js`) and UI tests (`test/ui/*.test.js`), in
    **both interfaces** (`SILINX_UI_INTERFACE=classic`) and in Portuguese when labels change. A bug fix
    gets a regression test that fails on the old code. **Tests assert the exact warnings**, not only "no

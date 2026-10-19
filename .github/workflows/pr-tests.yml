@@ -1,0 +1,45 @@
+name: PR tests
+# The test files of the modules a pull request changes, before the merge (#637): CI runs at a release only
+# (#607), so each pull request runs here, on GitHub's runners, the whole test file of every module it touches
+# (scripts/related-tests.mjs: the unit test files that import a changed file, directly or through a test
+# helper; a changed test file; the UI test of a changed page script), in three parts of about the same time.
+# main requires related-tests, green when every part passed (or had nothing to run).
+on:
+  pull_request:
+permissions:
+  contents: read
+# a newer push to the pull request cancels its run still going
+concurrency:
+  group: pr-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    name: tests (${{ matrix.shard }}/3)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - run: >-
+          node scripts/related-tests.mjs "origin/$BASE" HEAD --shard "$SHARD/3"
+          --test-reporter=tap --test-reporter-destination=stdout
+        env:
+          BASE: ${{ github.base_ref }}
+          SHARD: ${{ matrix.shard }}
+          CHROME_PATH: /usr/bin/google-chrome
+
+  # the one check main requires (#637): green when every part passed
+  related-tests:
+    if: always()
+    needs: [tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
