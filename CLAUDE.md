@@ -53,6 +53,12 @@ the code and the lessons learnt.
 - **Merging**: when the pull request's CI is green, merge it into `main` (rebased, fast-forward, no
   merge commit) without running the suites again locally. If `main` moved meanwhile, rebase the
   branch and push it again (CI runs again). Then check the CI run of `main`.
+- **Reviewing** another session's pull request: its intent and its evidence, not every line. Does it do
+  what its issue asks and nothing more; do its tests prove it (a regression test, the warnings asserted);
+  does it keep the rules above; is its changelog fragment right. Read the lines closely only where the
+  risk is: the project lifecycle, the board and PROM programming, the bitstream, security, the workflows.
+- **During a release** nothing merges to `main` until the releaser says the tag is pushed: a merge in
+  between moves `main` under the release commit and the tag has to be redone.
 - **Dependencies** (`.github/dependabot.yml`): Dependabot's weekly pull requests are merged as any other.
   A **"yosys update" pull request is never merged on green alone**: the maintainer (or the session) reviews
   the comparison `yosys-update.yml` writes (the open synthesis's size and speed with the new Yosys and

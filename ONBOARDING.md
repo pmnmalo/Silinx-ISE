@@ -62,6 +62,12 @@ Several sessions work on the repository at the same time, each in its own clone 
 - **Before starting, announce** the issue and the files you will touch to the other sessions
   (SendMessage: `ListAgents` gives their names). Ask before touching another session's area.
 - **Tell the others when your PR merges** if it touches files they are in, so they can rebase.
+- **Hold merges during a release** until the releaser says the tag is pushed (15.11.1's tag had to be
+  redone when a pull request merged in between).
+- **Review by intent and evidence** (CLAUDE.md, Integration): what the change is for, its tests and its
+  warnings, the product's rules; line by line only where the risk is.
+- **A CI watcher** (a scheduled session) checks main's CI every hour: it reruns a flaky job once, opens or
+  updates an issue (`bug`, `tests & CI`) and tells the core session of real breaks.
 - **Conflicts:** CHANGELOG.md no longer conflicts: when every pull request edited its unreleased section, each
   merge made the others' pull requests conflict there (a rebase and a new CI run each time); each change now
   adds its own fragment in `changes/`. (A pull request opened before the fragments that still edits
