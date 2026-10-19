@@ -91,7 +91,7 @@ test('the flow\'s postsynth step: the model synthesized with the test bench\'s g
   // the steps: after the synthesis when it runs; alone it synthesizes itself
   assert.deepEqual(openSteps(['synth', 'postsynth']), ['synth', 'postsynth']);
   assert.deepEqual(openSteps(['postsynth']), ['postsynth']);
-  assert.throws(() => openSteps(['postmap']), /not available in the Silinx toolchain/);
+  assert.throws(() => openSteps(['postpar']), /not available in the Silinx toolchain/);
 });
 
 // every example's test bench, on the model of the example (its generics the test bench's), VHDL and Verilog

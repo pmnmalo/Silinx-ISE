@@ -673,9 +673,10 @@ const SUMMARY_PROC = { id: 'summary', label: 'Design Summary/Reports', ico: 'sum
 // (the browser edition: the Silinx toolchain, unless the project chose XST)
 export const openMode = () => (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx');
 const OPEN_SYNTH = 'Synthesize - Yosys';
-// (Back-annotate Pin Locations, View Technology Schematic and the Post-Synthesis Simulation Model are
-// the Silinx toolchain's own: the pads its placer chose, the netlist of its synthesis, #120)
-const ISE_ONLY = new Set(['posttrans', 'postmap', 'postpar']);
+// (Back-annotate Pin Locations, View Technology Schematic and the Post-Synthesis, Post-Translate and Post-Map
+// Simulation Models are the Silinx toolchain's own: the pads its placer chose, the netlist of its synthesis,
+// its packed design, #120, #121)
+const ISE_ONLY = new Set(['postpar']);
 const ISE_ONLY_TIP = 'Needs Xilinx ISE: not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings)';
 function forOpenMode(defs) {
   const conv = p => {
@@ -1778,7 +1779,8 @@ async function netlistSources(step, { hier = false, action = 'Simulate', title =
   return [...primitiveSources([net]), net];
 }
 // The dialog of a model not generated yet (#490): "Generate and <action>" runs its process when the
-// toolchain can (the Post-Synthesis model: the Silinx toolchain and ISE; the later ones: ISE), else it
+// toolchain can (the Post-Synthesis, Post-Translate and Post-Map models: the Silinx toolchain and ISE; the
+// Post-Place & Route model: ISE), else it
 // says why. true when the process ran and ended without errors.
 const SIM_MODEL_THEN = { Simulate: 'the simulation starts', Emulate: 'the emulator opens', Show: 'the technology schematic opens' };
 async function offerSimModel(step, action, title) {

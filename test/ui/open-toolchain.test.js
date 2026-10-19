@@ -85,13 +85,14 @@ uiTest('Toolchain Settings: the open mode, the status of the project\'s device, 
   const procs = await procLabels(page);
   assert.ok(procs.some((p) => p.label === 'Synthesize - Yosys' && !p.disabled));
   assert.ok(!procs.some((p) => p.label === 'Synthesize - Yosys (open)' || p.label === 'Synthesize - XST'));
-  for (const l of ['Generate Post-Map Simulation Model', 'Generate Post-Place & Route Simulation Model']) {
+  for (const l of ['Generate Post-Place & Route Simulation Model']) {
     const p = procs.find((x) => x.label === l);
     assert.ok(p?.disabled, l);
     assert.equal(p.title, 'Needs Xilinx ISE: not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings)');
   }
-  // (the Post-Synthesis Simulation Model: the Silinx toolchain's own since #120)
-  for (const l of ['Implement Design', 'Generate Programming File', 'View Implemented Design (FPGA)', 'Back-annotate Pin Locations', 'View Technology Schematic', 'Configure Target Device', 'Generate Post-Synthesis Simulation Model', 'Generate Text Power Report']) assert.ok(!procs.find((x) => x.label === l).disabled, l);
+  // (the Post-Synthesis Simulation Model: the Silinx toolchain's own since #120; Post-Translate and Post-Map since #121)
+  for (const l of ['Implement Design', 'Generate Programming File', 'View Implemented Design (FPGA)', 'Back-annotate Pin Locations', 'View Technology Schematic', 'Configure Target Device', 'Generate Post-Synthesis Simulation Model',
+    'Generate Post-Translate Simulation Model', 'Generate Post-Map Simulation Model', 'Generate Text Power Report']) assert.ok(!procs.find((x) => x.label === l).disabled, l);
   await setLang('pt');
   const ptProcs = await procLabels(page);
   assert.ok(ptProcs.some((p) => p.label === 'Sintetizar - Yosys'));
@@ -487,6 +488,53 @@ uiTest('open mode: Generate Post-Synthesis Simulation Model of blinky, then Simu
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
 }, { timeout: 300000 });
 
+// #121: the Post-Translate and Post-Map Simulation Models in the Silinx toolchain: the processes enabled (in
+// Portuguese too), each generates its model (the console's lines, no warning), and the test bench passes on the
+// post-map netlist (Simulate Post-Map Model); Simulate Post-Translate Model offers to generate its model
+uiTest('#121 open mode: Generate Post-Translate / Post-Map Simulation Model of blinky, then Simulate Post-Map Model: the test bench passes on the packed design', E, async (page) => {
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await makeProject(env, { name: 'OpenPostMap', template: 'blinky' });
+  await page.openProject('OpenPostMap');
+  await reloadToolchain(page);
+  const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
+  // the processes, enabled, in both languages
+  const enabled = async (labels) => { const procs = await procLabels(page); for (const l of labels) { const p = procs.find((x) => x.label === l); assert.ok(p && !p.disabled && !p.title, `${l}: ${JSON.stringify(p)}`); } };
+  await enabled(['Generate Post-Translate Simulation Model', 'Generate Post-Map Simulation Model']);
+  await setLang('pt');
+  await enabled(['Gerar Modelo de Simulação Pós-Translate', 'Gerar Modelo de Simulação Pós-Map']);
+  await setLang('en');
+  const before = (await page.consoleText()).length;
+  await page.treeRow('#procs', 'Generate Post-Translate Simulation Model', { dbl: true, exact: true });
+  await page.waitConsole(DONE('Generate Post-Translate Simulation Model'), { timeout: 180000 });
+  await page.waitConsole(/Post-Translate simulation model: /, { timeout: 30000 });
+  await page.treeRow('#procs', 'Generate Post-Map Simulation Model', { dbl: true, exact: true });
+  await page.waitConsole(/Process "Generate Post-Map Simulation Model" (completed successfully|failed)/, { timeout: 180000 });
+  await page.waitConsole(/Post-Map simulation model: /, { timeout: 30000 });
+  const text = (await page.consoleText()).slice(before);
+  assert.match(text, /Process "Generate Post-Translate Simulation Model" completed successfully/, text.slice(-3000));
+  assert.match(text, /Process "Generate Post-Map Simulation Model" completed successfully/, text.slice(-3000));
+  assert.match(text, /^Post-Translate Simulation Model: build\/netgen\/translate\/top_translate\.vhd \(VHDL, SIMPRIM primitives\) and build\/netgen\/translate\/top_translate\.v \(Verilog\), \d+ primitives$/m);
+  assert.match(text, /^Post-Map Simulation Model: build\/netgen\/map\/top_map\.vhd \(VHDL, SIMPRIM primitives\) and build\/netgen\/map\/top_map\.v \(Verilog\), \d+ primitives$/m);
+  assert.match(text, /Post-Map simulation model: build\/netgen\/map\/top_map\.vhd \(simulate it in the Simulation view, or emulate it on the board\)\./);
+  assert.deepEqual(text.split('\n').filter((l) => /WARNING|ERROR/.test(l)), []);
+  // the Simulation view: Simulate Post-Map Model of the test bench
+  await page.click('input[name=view][value=sim]');
+  await page.treeRow('#hier', 'tb_top');
+  await page.treeRow('#procs', 'Simulate Post-Map Model', { dbl: true, exact: true });
+  await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 60000, what: 'ISim ready' });
+  for (let k = 0; ; k++) {
+    await page.fill('.doc:not([hidden]) .isim-cmdline input', 'run all');
+    await page.key('Enter');
+    try { await page.waitFor(() => window.Silinx.active.view.state.running || /Simulation finished OK/.test(document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''), [], { what: 'run all started', timeout: 5000 }); break; } catch (e) { if (k >= 3) throw e; }
+  }
+  const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return window.Silinx.active?.id === 'isim' && /Simulation finished OK|ERROR/.test(t) ? t : null; }, [], { timeout: 120000, what: 'the simulation of the model' });
+  assert.match(out, /Simulation finished OK/);
+  assert.doesNotMatch(out, /ERROR/);
+  assert.equal(await page.eval(() => window.Silinx.active.title), 'ISim (tb_top, Post-Map)');
+  assert.match(await page.consoleText(), /with the post-map netlist of 'top'/);
+  await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
+}, { timeout: 420000 });
+
 // #490: Simulate Post-Synthesis Model with no model yet: a dialog offers to generate it ("Generate and
 // Simulate"); Cancel (or Escape) runs nothing; in Portuguese; Enter generates it and the simulation starts
 const modelDialog = (page) => page.eval(() => {
@@ -590,7 +638,7 @@ uiTest('#490 open mode: Emulate Post-Synthesis Model with no model: "Generate an
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
 }, { timeout: 300000 });
 
-uiTest('#490 a model that needs ISE: the dialog says why, without the button (Silinx toolchain: Post-Map, Post-Place & Route; ISE not available: Post-Synthesis)', E, async (page) => {
+uiTest('#490 a model that needs ISE: the dialog says why, without the button (Silinx toolchain: Post-Place & Route; ISE not available: Post-Synthesis)', E, async (page) => {
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'NeedsIse', template: 'blinky' });
   await page.openProject('NeedsIse');
@@ -603,8 +651,8 @@ uiTest('#490 a model that needs ISE: the dialog says why, without the button (Si
     await page.key('Enter');
     await page.waitNoDialog();
   };
-  await check('Emulate Post-Map Model', 'Emulate Post-Map Model', ["There is no post-map simulation model of 'top' yet.",
-    '"Generate Post-Map Simulation Model" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings).']);
+  await check('Emulate Post-Place & Route Model', 'Emulate Post-Place & Route Model', ["There is no post-place & route simulation model of 'top' yet.",
+    '"Generate Post-Place & Route Simulation Model" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings).']);
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('pt');
   await check('Emular Modelo Pós-Place & Route', 'Emular Modelo Pós-Place & Route', ["Ainda não há modelo de simulação pós-place & route de 'top'.",
@@ -612,8 +660,8 @@ uiTest('#490 a model that needs ISE: the dialog says why, without the button (Si
   await setLang('en');
   await page.click('input[name=view][value=sim]');
   await page.treeRow('#hier', 'tb_top');
-  await check('Simulate Post-Translate Model', 'Simulate Post-Translate Model', ["There is no post-translate simulation model of 'top' yet.",
-    '"Generate Post-Translate Simulation Model" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings).']);
+  await check('Simulate Post-Place & Route Model', 'Simulate Post-Place & Route Model', ["There is no post-place & route simulation model of 'top' yet.",
+    '"Generate Post-Place & Route Simulation Model" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings).']);
   // an ISE mode with no ISE: even the Post-Synthesis model cannot be generated
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
   await reloadToolchain(page);

@@ -31,10 +31,12 @@ test('server and browser: the same order for every set of the Silinx toolchain\'
       assert.deepEqual(chain, OPEN_CHAIN.slice(from, from + chain.length), `${steps} -> ${s}`);
       for (const x of ['pin2ucf', 'xpwr', 'fpgaview']) if (s.includes(x)) assert.ok(s.indexOf('trce') >= 0 && s.indexOf('trce') < s.indexOf(x), `${steps} -> ${s}`);
       if (s.includes('postsynth')) assert.ok(!s.includes('synth') || s.indexOf('synth') < s.indexOf('postsynth'), `${steps} -> ${s}`);
+      // the post-translate and post-map models (#121): right after Translate and Map
+      for (const [m, after] of [['posttrans', 'translate'], ['postmap', 'map']]) if (s.includes(m)) assert.equal(s[s.indexOf(m) - 1], after, `${steps} -> ${s}`);
       n++;
     }
   }
-  assert.equal(n, 2 * 2048);
+  assert.equal(n, 2 * 2 ** 13);
 });
 
 test('the order of a run: examples', () => {
@@ -44,6 +46,11 @@ test('the order of a run: examples', () => {
   assert.deepEqual(orderOpenSteps(['par']), ['synth', 'translate', 'map', 'par', 'trce']);
   assert.deepEqual(orderOpenSteps(['bitgen', 'pin2ucf', 'xpwr']), ['synth', 'translate', 'map', 'par', 'trce', 'pin2ucf', 'xpwr', 'bitgen', 'prombit']);
   assert.deepEqual(orderOpenSteps(['postsynth', 'fpgaview']), ['synth', 'postsynth', 'translate', 'map', 'par', 'trce', 'fpgaview']);
+  // the post-translate and post-map models (#121): the chain to Translate / Map, each right after its step
+  assert.deepEqual(orderOpenSteps(['posttrans']), ['synth', 'translate', 'posttrans']);
+  assert.deepEqual(orderOpenSteps(['postmap']), ['synth', 'translate', 'map', 'postmap']);
+  assert.deepEqual(orderOpenSteps(['postmap', 'posttrans', 'postsynth', 'bitgen']), ['synth', 'postsynth', 'translate', 'posttrans', 'map', 'postmap', 'par', 'trce', 'bitgen', 'prombit']);
+  assert.deepEqual(orderOpenSteps(['postmap'], { synthUpToDate: true }), ['translate', 'map', 'postmap']);
   // the synthesis up to date, not asked for: from Translate on (#280); asked for: from it
   assert.deepEqual(orderOpenSteps(['bitgen'], { synthUpToDate: true }), full.slice(1));
   assert.deepEqual(orderOpenSteps(['synth', 'bitgen'], { synthUpToDate: true }), full);

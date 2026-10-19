@@ -114,7 +114,9 @@ test('openSteps: the chain up to the last step; the ISE-only steps are refused',
   assert.deepEqual(OF.openSteps(['bitgen', 'pin2ucf', 'xpwr']), ['synth', 'translate', 'map', 'par', 'trce', 'pin2ucf', 'xpwr', 'bitgen', 'prombit']);
   // (as the application asks for it: the steps up to Place & Route, then xpwr)
   assert.deepEqual(OF.openSteps(['translate', 'map', 'par', 'xpwr'], { synthUpToDate: true }), ['translate', 'map', 'par', 'trce', 'xpwr']);
-  assert.throws(() => OF.openSteps(['synth', 'postmap', 'postpar']), /not available in the Silinx toolchain \(they need Xilinx ISE\): postmap, postpar/);
+  // the Post-Translate and Post-Map Simulation Models: the Silinx toolchain's own since #121; Post-Place & Route needs ISE
+  assert.deepEqual(OF.openSteps(['synth', 'translate', 'map', 'postmap', 'posttrans']), ['synth', 'translate', 'posttrans', 'map', 'postmap']);
+  assert.throws(() => OF.openSteps(['synth', 'postmap', 'postpar']), /not available in the Silinx toolchain \(they need Xilinx ISE\): postpar/);
   // the synthesis up to date (#280): from Translate on when it is not asked for; asked for, it runs
   const up = { synthUpToDate: true };
   assert.deepEqual(OF.openSteps(['translate', 'map', 'par', 'bitgen'], up), ['translate', 'map', 'par', 'trce', 'bitgen', 'prombit']);
@@ -251,9 +253,9 @@ test('open mode: a device without a bit database fails with the reason; the ISE-
   assert.equal(j.status, 'error');
   assert.match(j.error, /^Silinx toolchain not available for xc3s1600efg320-4: no bit database for xc3s1600e yet \(only the XC3S100E \(CP132\)/);
   assert.ok(j.lines.some(l => /^ERROR: the Silinx toolchain cannot implement this design: no bit database for xc3s1600e yet/.test(l)));
-  const r = await app.call('POST', '/projects/Big/implement', { steps: ['synth', 'postmap'] });
+  const r = await app.call('POST', '/projects/Big/implement', { steps: ['synth', 'postpar'] });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /not available in the Silinx toolchain \(they need Xilinx ISE\): postmap/);
+  assert.match(r.body.error, /not available in the Silinx toolchain \(they need Xilinx ISE\): postpar/);
 });
 
 test('open mode: a VHDL top with capital letters (its netlist is named in lower case) goes through Translate and Map (#31)', { timeout: 300000 }, async () => {
@@ -448,4 +450,25 @@ test('open mode: Generate Post-Synthesis Simulation Model writes the model with 
   const j2 = await waitJob(jobs, await implement('PostSyn', { steps: ['synth'] }), { timeoutMs: 280000 });
   assert.equal(j2.status, 'ok');
   assert.equal((await app.call('GET', '/projects/PostSyn/reports')).body.simModels.postsynth.path, `build/netgen/synthesis/${top}_synthesis.vhd`);
+});
+
+test('open mode: Generate Post-Translate and Post-Map Simulation Models write the models, in the reports; a later run keeps them there (#121)', { timeout: 300000 }, async () => {
+  await writeConfig({ mode: 'silinx' });
+  await app.call('POST', '/projects', { name: 'PostMap', template: 'blinky', device: DEV('xc3s250e', 'cp132') });
+  const j = await waitJob(jobs, await implement('PostMap', { steps: ['synth', 'translate', 'posttrans', 'map', 'postmap'] }), { timeoutMs: 280000 });
+  const log = j.lines.join('\n');
+  assert.equal(j.status, 'ok', log);
+  const top = (await app.call('GET', '/projects/PostMap')).body.top;
+  assert.deepEqual(j.result.completedSteps, ['synth', 'translate', 'posttrans', 'map', 'postmap']);
+  assert.deepEqual(j.lines.filter(l => /^(WARNING|ERROR|INFO)/.test(l)), []);
+  assert.match(log, new RegExp(`^Post-Translate Simulation Model: build/netgen/translate/${top}_translate\\.vhd \\(VHDL, SIMPRIM primitives\\) and build/netgen/translate/${top}_translate\\.v \\(Verilog\\), \\d+ primitives$`, 'm'));
+  assert.match(log, new RegExp(`^Post-Map Simulation Model: build/netgen/map/${top}_map\\.vhd \\(VHDL, SIMPRIM primitives\\) and build/netgen/map/${top}_map\\.v \\(Verilog\\), \\d+ primitives$`, 'm'));
+  const paths = async () => Object.fromEntries(Object.entries((await app.call('GET', '/projects/PostMap/reports')).body.simModels).map(([k, v]) => [k, v.path]));
+  assert.deepEqual(await paths(), { posttrans: `build/netgen/translate/${top}_translate.vhd`, postmap: `build/netgen/map/${top}_map.vhd` });
+  const vhd = (await app.call('GET', `/projects/PostMap/file?path=build/netgen/map/${top}_map.vhd`)).body;
+  assert.match(String(vhd.text ?? vhd), /^-- Post-Map Simulation Model of /);
+  // a later run without the steps: the models, still in build/, still in the reports
+  const j2 = await waitJob(jobs, await implement('PostMap', { steps: ['synth'] }), { timeoutMs: 280000 });
+  assert.equal(j2.status, 'ok');
+  assert.deepEqual(await paths(), { posttrans: `build/netgen/translate/${top}_translate.vhd`, postmap: `build/netgen/map/${top}_map.vhd` });
 });

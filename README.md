@@ -99,15 +99,15 @@ for Xilinx FPGAs supported by ISE 14.7.
   compiled engine, a **VGA monitor** shows the 640×480 picture the design scans out on the board's
   VGA connector, its sync timing measured (line period, frame rate, lines, pulses, polarities) and
   what is not 640×480 at 60 Hz pointed out.
-  It can also run what the tools built: the post-synthesis netlist (the Silinx toolchain's own, or
-  ISE's netgen) and, with ISE, the post-translate, post-map or post-place & route netlist, on the
+  It can also run what the tools built: the post-synthesis, post-translate and post-map netlists (the
+  Silinx toolchain's own, or ISE's netgen) and, with ISE, the post-place & route netlist, on the
   board or in ISim, with Silinx's own models of the
   UNISIM / SIMPRIM primitives (functional, no SDF timing): LUTs, flip-flops, latches, carry
   logic, SRLs, distributed and block RAM, multipliers, clock buffers and DCMs (CLK0/90/180/270,
   CLK2X, CLKDV and CLKFX at their real frequencies).
 - **ISE processes** beyond the main flow (with the Silinx toolchain too: View Technology Schematic,
-  the Post-Synthesis Simulation Model, Back-annotate Pin Locations and, as an estimate, the Text
-  Power Report; the others with ISE): View
+  the Post-Synthesis, Post-Translate and Post-Map Simulation Models, Back-annotate Pin Locations and,
+  as an estimate, the Text Power Report; the others with ISE): View
   Technology Schematic (the post-synthesis netlist, regrouped by the design's modules), Generate Post-Synthesis / Translate / Map / Place & Route
   Simulation Model, Post-Place & Route Static Timing, Text Power Report (xpwr), Back-annotate Pin
   Locations (pin2ucf, merged into the UCF).
@@ -423,13 +423,17 @@ pads the placer chose to the UCF and *View Technology Schematic* draws the netli
 (Yosys's LUTs, flip-flops, carry chains, block RAMs…, by instance of the design); *Generate
 Post-Synthesis Simulation Model* writes that netlist as a VHDL model of UNISIM primitives (and in
 Verilog), synthesized with the generics the test bench gives the design, for *Simulate
-Post-Synthesis Model*; *Generate Text Power Report* writes an estimate of the design's power
+Post-Synthesis Model*; *Generate Post-Translate* and *Post-Map Simulation Model* write, as ISE's
+netgen does, models of SIMPRIM primitives in VHDL and Verilog: the translated netlist, and the packed
+design with each slice as the elements its configuration uses (LUTs, F5 / FX multiplexers, the carry
+chain, flip-flops or latches with their inverters), the pads, clock buffers, block RAMs, multipliers
+and DCMs (functional, no timing); *Generate Text Power Report* writes an estimate of the design's power
 (`build/<top>.pwr`, laid out as XPower's report and said to be an estimate): the device's static
 power and the dynamic power of the routed design's clocks, logic, signals and I/Os at the switching
 rates of XPower's vectorless estimate, with coefficients fitted to XPower 14.7 on the examples
 (there its total is within 10 % of XPower's, its dynamic power alone within 0.35 to 2.2 times;
-`node scripts/measure-power.mjs --compare`). The processes that need ISE (the later simulation
-models) are disabled in that mode. Besides logic, carry chains, wide multiplexers and flip-flops it takes block
+`node scripts/measure-power.mjs --compare`). The processes that need ISE (the Post-Place & Route
+simulation model) are disabled in that mode. Besides logic, carry chains, wide multiplexers and flip-flops it takes block
 RAMs, multipliers, distributed RAMs, shift registers (SRL16) and DCMs (any DCM site, more than one
 per design, each clock output on a global buffer its dedicated path reaches; `INST "u" LOC =
 "DCM_X1Y0"` picks the site). A design the Silinx toolchain cannot implement yet (a feature not in the bit
