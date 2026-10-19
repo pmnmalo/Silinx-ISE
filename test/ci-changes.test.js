@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { BUILD_INPUTS, documentation, decide, changedFiles } from '../scripts/ci-changes.mjs';
+import { BUILD_INPUTS, documentation, decide, changedFiles, interfaceFile, decideUi } from '../scripts/ci-changes.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -29,6 +29,21 @@ test('ci changes: the decision and its reason', () => {
   assert.deepEqual(decide(['README.md', 'CHANGELOG.md']), { code: true, reason: '1 file(s) besides the documentation changed: CHANGELOG.md' });
   assert.deepEqual(decide(['a.js', 'b.js', 'c.js', 'd.js', 'e.js', 'f.js', 'g.md']),
     { code: true, reason: '6 file(s) besides the documentation changed: a.js, b.js, c.js, d.js, e.js, …' });
+});
+
+test('ci changes: the interface, for the classic interface\'s and the other browsers\' UI tests on a pull request (#573)', () => {
+  for (const f of ['web/js/app.js', 'web/index.html', 'web/css/classic.css', 'test/ui/undo.test.js', 'test/ui/harness.js', 'scripts/test-browsers.mjs',
+    'scripts/build-standalone.mjs', 'package.json', 'package-lock.json', '.github/workflows/ci.yml', '.github/actions/setup/action.yml'])
+    assert.ok(interfaceFile(f), f);
+  for (const f of ['core/synth-open.js', 'core/fpga/route.js', 'server/ise.js', 'test/synth-open.test.js', 'scripts/ci-changes.mjs', 'examples/vga/vga.vhd',
+    'changes/573-ci-parts.md', 'README.md', 'webx/a.js', 'test/uix.test.js'])
+    assert.ok(!interfaceFile(f), f);
+  assert.deepEqual(decideUi(null), { ui: true, reason: 'the changed files are not known' });
+  assert.deepEqual(decideUi(['core/synth-open.js', 'test/synth-open.test.js', 'changes/1-x.md']),
+    { ui: false, reason: 'the interface did not change: on a pull request, the modern interface in Chrome only' });
+  assert.deepEqual(decideUi([]), { ui: false, reason: 'the interface did not change: on a pull request, the modern interface in Chrome only' });
+  assert.deepEqual(decideUi(['core/a.js', 'web/js/a.js', 'web/js/b.js', 'web/js/c.js', 'web/js/d.js', 'web/js/e.js', 'test/ui/f.test.js']),
+    { ui: true, reason: '6 file(s) of the interface changed: web/js/a.js, web/js/b.js, web/js/c.js, web/js/d.js, web/js/e.js, …' });
 });
 
 test('ci changes: the files a build reads are the Markdown files the scripts read', () => {
@@ -65,9 +80,22 @@ test('ci changes: the files changed in a git history; a base not in it, or none,
     fs.writeFileSync(out, '');
     const r = spawnSync(process.execPath, [SCRIPT, base, head], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: '' } });
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout.trim(), line);
+    const [first$, second$] = r.stdout.trim().split('\n');
+    assert.match(first$, line);
+    assert.equal(second$, 'no interface: the interface did not change: on a pull request, the modern interface in Chrome only');
     assert.equal(r.stderr, '', 'no warnings');
-    assert.equal(fs.readFileSync(out, 'utf8'), `code=${code}\n`);
+    assert.equal(fs.readFileSync(out, 'utf8'), `code=${code}\nui=false\n`);
+  }
+  // a change of the interface (#573); an unknown base: everything
+  fs.mkdirSync(path.join(dir, 'web'));
+  fs.writeFileSync(path.join(dir, 'web', 'app.js'), '1\n');
+  git('add', '.'); git('commit', '-q', '-m', '4');
+  for (const [base, ui] of [['HEAD^1', /^interface: 1 file\(s\) of the interface changed: web\/app\.js$/], ['f'.repeat(40), /^interface: the changed files are not known$/]]) {
+    fs.writeFileSync(out, '');
+    const r = spawnSync(process.execPath, [SCRIPT, base, 'HEAD'], { cwd: dir, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: '' } });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout.trim().split('\n')[1], ui);
+    assert.equal(fs.readFileSync(out, 'utf8'), 'code=true\nui=true\n');
   }
 });
 
@@ -94,7 +122,16 @@ test('CI: on every push to main and pull request; the long jobs gated on the cha
   assert.match(j.changes.join('\n'), /fetch-depth: 0[\s\S]*node scripts\/ci-changes\.mjs "\$BASE" HEAD[\s\S]*BASE: \$\{\{ github\.event_name == 'pull_request' && 'HEAD\^1' \|\| github\.event\.before \}\}/);
   // the unit tests always (the documentation's tests are among them), the others only for code
   assert.ok(!j.unit.some(l => /needs:|^    if:/.test(l)), 'unit: not gated');
-  assert.match(j.unit.join('\n'), /node --test --test-shard="\$SHARD\/3" .*"test\/\*\.test\.js"/);
+  // in three parts of about the same time (#573), each Linux part's file times uploaded
+  const unit = j.unit.join('\n');
+  assert.match(unit, /^        shard: \[1, 2, 3\]$/m);
+  assert.match(unit, /node scripts\/test-shard\.mjs "\$SHARD\/3"\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-file-times\.mjs --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-times-reporter\.mjs --test-reporter-destination=test-times\.json\n\s+shell: bash/);
+  assert.match(unit, /- if: always\(\) && matrix\.os == 'ubuntu-latest'\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: unit-times-\$\{\{ matrix\.shard \}\}\n\s+path: test-times\.json\n/);
+  assert.doesNotMatch(unit, /--test-shard=/, "node's own shards split by order, not time");
+  // a pull request: the modern interface always, the classic one and the other browsers when the interface changed (#573)
+  assert.match(ci, /^      ui: \$\{\{ steps\.changes\.outputs\.ui \}\}$/m);
+  assert.ok(j.ui.includes(`        interface: \${{ fromJSON((github.event_name != 'pull_request' || needs.changes.outputs.ui == 'true') && '["modern", "classic"]' || '["modern"]') }}`));
+  assert.ok(j.browsers.includes(`    if: needs.changes.outputs.code == 'true' && (github.event_name != 'pull_request' || needs.changes.outputs.ui == 'true')`));
   for (const t of ['docs', 'changelog', 'quality-page']) assert.ok(fs.existsSync(path.join(ROOT, `test/${t}.test.js`)), t);
   for (const job of ['ui', 'webkit-standalone', 'release-zip', 'browsers', 'os']) {
     assert.ok(j[job].includes('    needs: changes'), job);

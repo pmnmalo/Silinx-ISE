@@ -14,8 +14,8 @@ permissions:
 concurrency:
   group: ci-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || 'pr' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-# A pull request runs the unit tests on Linux, the UI tests in both interfaces and Firefox / WebKit;
-# a push to main runs everything: the unit tests on macOS and Windows too, the operating systems' smoke
+# A pull request runs the unit tests on Linux and the UI tests of the modern interface; the classic
+# interface's and Firefox / WebKit only when it changes the interface (#573); a push to main runs everything: the unit tests on macOS and Windows too, the operating systems' smoke
 # tests, WebKit memory and the standalone build, the release zip. A failure there only (an OS-specific
 # bug) becomes an issue, fixed in the next change. main requires one check to merge (a ruleset): ci-ok,
 # green when every job passed or was skipped.
@@ -27,6 +27,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       code: ${{ steps.changes.outputs.code }}
+      ui: ${{ steps.changes.outputs.ui }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,9 +38,13 @@ jobs:
         env:
           BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || github.event.before }}
 
-  # the unit tests, in three parts at once (node --test --test-shard), on Linux, macOS and Windows
-  # (Linux only for a pull request). A file's tests run one after another: the end of the output lists
-  # each file's time, and a file over 15 minutes is a warning (scripts/test-file-times.mjs, #566)
+  # the unit tests, in three parts at once of about the same time (scripts/test-shard.mjs, by each file's
+  # time in test/timings.json, #573), on Linux, macOS and Windows (Linux only for a pull request): about
+  # 105 minutes one after another on Linux, a part about 17 (its files two at a time or so). A part takes
+  # as long as its longest file at least (sim-model.test.js, about 16 minutes, #575): four parts were no
+  # faster. The Linux parts upload each file's time, to refresh the timings now and then:
+  # node scripts/update-test-timings.mjs <run id>. The end of the output lists each file's time, and a file
+  # over 15 minutes is a warning (scripts/test-file-times.mjs, #566)
   unit:
     strategy:
       fail-fast: false
@@ -52,19 +57,31 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: node --test --test-shard="$SHARD/3" --test-reporter=tap --test-reporter-destination=stdout --test-reporter=./scripts/test-file-times.mjs --test-reporter-destination=stdout "test/*.test.js"
+      - run: >-
+          node scripts/test-shard.mjs "$SHARD/3"
+          --test-reporter=tap --test-reporter-destination=stdout
+          --test-reporter=./scripts/test-file-times.mjs --test-reporter-destination=stdout
+          --test-reporter=./scripts/test-times-reporter.mjs --test-reporter-destination=test-times.json
         shell: bash   # (Windows: PowerShell would not expand $SHARD)
         env:
           SHARD: ${{ matrix.shard }}
+      - if: always() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-times-${{ matrix.shard }}
+          path: test-times.json
+          retention-days: 30
+          if-no-files-found: ignore
 
-  # the UI tests in headless Chrome, with each interface (alongside the unit tests)
+  # the UI tests in headless Chrome, with each interface (alongside the unit tests); on a pull request the
+  # classic interface only when it changes the interface (#573)
   ui:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
-        interface: [modern, classic]
+        interface: ${{ fromJSON((github.event_name != 'pull_request' || needs.changes.outputs.ui == 'true') && '["modern", "classic"]' || '["modern"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     name: ui (${{ matrix.interface }})
@@ -113,10 +130,11 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
 
-  # the main UI flows in Firefox and in WebKit (Safari's engine)
+  # the main UI flows in Firefox and in WebKit (Safari's engine); on a pull request only when it changes
+  # the interface (#573)
   browsers:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && (github.event_name != 'pull_request' || needs.changes.outputs.ui == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

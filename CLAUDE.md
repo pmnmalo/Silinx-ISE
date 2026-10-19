@@ -71,8 +71,11 @@ the code and the lessons learnt.
   the repository's admin excepted (for the release commit). The weekly quality
   comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
   maintainer merges.
-- **CI** (`.github/workflows/ci.yml`): a pull request runs the unit tests on Linux, the UI tests in
-  both interfaces and Firefox / WebKit; a push to main runs everything (the unit tests on macOS and
+- **CI** (`.github/workflows/ci.yml`): a pull request runs the unit tests on Linux and the UI tests of
+  the modern interface; the classic interface's and Firefox / WebKit too when it changes the interface
+  (`web/`, the UI tests, the dependencies, the workflows: `scripts/ci-changes.mjs`). The unit tests run in
+  three parts of about the same time (`scripts/test-shard.mjs`, by `test/timings.json`; refresh it now and
+  then with `node scripts/update-test-timings.mjs <run id of main>`). A push to main runs everything (the unit tests on macOS and
   Windows too, the operating systems' smoke tests, WebKit memory, the standalone build, the release
   zip). A failure on main only (an OS-specific bug) becomes an issue, fixed in the next change.
   A docs-only change (`scripts/ci-changes.mjs`) runs the unit tests only, the documentation's among them;
