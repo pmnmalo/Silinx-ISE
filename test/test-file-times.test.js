@@ -48,7 +48,7 @@ test('test file times: as node --test\'s reporter, the files of a run and their 
     fs.writeFileSync(path.join(dir, 'lib.mjs'), "import { test } from 'node:test';\nexport const t = n => test(n, () => {});\n");
     fs.writeFileSync(path.join(dir, 'one.test.mjs'), "import { t } from './lib.mjs';\nt('a'); t('b');\n");
     fs.writeFileSync(path.join(dir, 'two.test.mjs'), "import { test } from 'node:test';\ntest('c', () => {});\n");
-    const r = spawnSync(process.execPath, ['--test', '--test-reporter', path.join(ROOT, 'scripts', 'test-file-times.mjs'),
+    const r = spawnSync(process.execPath, ['--test', '--test-reporter', './scripts/test-file-times.mjs',   // (as CI gives it: on Windows an absolute path is not a module URL)
       path.join(dir, 'one.test.mjs'), path.join(dir, 'two.test.mjs')], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, NODE_TEST_CONTEXT: undefined, SILINX_TEST_FILE_MINUTES: '' } });
     assert.equal(r.status, 0, r.stderr);
     const lines = r.stdout.trim().split('\n');
