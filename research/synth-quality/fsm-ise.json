@@ -314,7 +314,15 @@
   ],
   "xstEncodings": [
    "stato[1:11]: one-hot"
-  ]
+  ],
+  "trce": {
+   "core": {
+    "1": 4.812
+   },
+   "stock": {
+    "1": 5.959
+   }
+  }
  },
  "itc99-b11": {
   "part": "xc3s1200efg320-4",
@@ -327,7 +335,15 @@
   ],
   "xstEncodings": [
    "stato[1:9]: one-hot"
-  ]
+  ],
+  "trce": {
+   "core": {
+    "1": 9.481
+   },
+   "stock": {
+    "1": 9.376
+   }
+  }
  },
  "itc99-b12": {
   "part": "xc3s1200efg320-4",
@@ -375,13 +391,29 @@
   "part": "xc3s1200efg320-4",
   "xstFsms": [],
   "xstEncodings": [],
-  "error": "ISE flow failed in step 'synth' (exit code 6)"
+  "error": "ISE flow failed in step 'synth' (exit code 6)",
+  "trce": {
+   "core": {
+    "1": 18.975
+   },
+   "stock": {
+    "1": 19.92
+   }
+  }
  },
  "itc99-b17": {
   "part": "xc3s1200efg320-4",
   "xstFsms": [],
   "xstEncodings": [],
-  "error": "ISE flow failed in step 'synth' (exit code 6)"
+  "error": "ISE flow failed in step 'synth' (exit code 6)",
+  "trce": {
+   "core": {
+    "1": 20.923
+   },
+   "stock": {
+    "1": 21.923
+   }
+  }
  },
  "itc99-b20": {
   "part": "xc3s1200efg320-4",

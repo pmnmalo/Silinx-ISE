@@ -897,6 +897,13 @@ designs, seeds 1-3):
 - The cost: one quiet run up to `fsm` on every design at High, started beside the usual run (the examples'
   synthesis as long as before, 1.7 to 2.6 s with the Yosys workers); a design with such a machine is synthesized
   twice (after #86: b10 2.5 → 5.1 s, b17 16 → 43 s, one Yosys at a time).
+- ISE's trce on the routed designs (2026-10-20, main 2f6ca16, seed 1: `fsm.mjs --effort high --ways stock,core
+  --seeds 1 --routed <dir>`, then `fsm-ise.mjs --no-flow --routed <dir>`; the DRC clean, 0 errors and 0 warnings,
+  on all eight), minimum period stock → core: b10 5.959 → 4.812 ns (**−19.2 %**), b11 9.376 → 9.481 (+1.1 %), b15
+  19.920 → 18.975 (−4.7 %), b17 21.923 → 20.923 (**−4.6 %**); 0.928 of the period (geometric mean). Silinx's timing
+  analysis of the same routings: 5.85 → 4.62, 9.32 → 9.54, 20.10 → 19.36, 22.80 → 21.74 (0.928 as well), within
+  4 % of trce's and the same direction on each design. (b11's +1.1 % is one seed's: −0.9 % in the
+  mean of three seeds above.)
 
 ## Where the speed is lost: logic or routing (#656)
 
