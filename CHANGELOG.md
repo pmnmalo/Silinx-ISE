@@ -1111,6 +1111,9 @@ In detail:
   ISE's bitstreams explained, the switch removed by codewords changes none; the multiplier cascade's bits were known
   already); the packer packs a chain of up to four as ISE's map does (a macro of the two slices, the SHIFTOUT -> SHIFTIN
   net) and refuses a longer chain or Q15 into anything else; a new open-flow fixture, feat_srl_chain.
+- **The release zip's budget 40 MB (#884):** the Spartan-6 device descriptions shipped by #723 (4.2 MB zipped)
+  took the zip from 31.6 MB to 36.6 MB, over the 32 MB of `test/release/release.test.js`; they stay in the zip,
+  and the budget is 40 MB.
 
 ## 15.11.3
 
