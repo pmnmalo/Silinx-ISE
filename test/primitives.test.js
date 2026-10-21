@@ -300,6 +300,12 @@ test('a primitive\'s unconnected inputs: the ones it needs a warning, the others
   const dcm = fb => generateHdl(sheet('clk', [{ type: 'dcm_sp', params: { CLK_FEEDBACK: fb }, wired: ['CLKIN', 'CLKFX'] }]));
   assert.deepEqual(msgs(dcm('1X').diagnostics), ['warning: input pin CLKFB of U1 (DCM_SP) is not connected']);
   assert.deepEqual(msgs(dcm('NONE').diagnostics), []);
+  // a multiplier's operand B: from B (DIRECT), from BCIN (CASCADE, #848): the unconnected one needed warns, the other not
+  const mult = (bi, wired) => msgs(generateHdl(sheet('m', [{ type: 'mult18x18sio', params: { B_INPUT: bi }, wired: ['A', 'CLK', 'P', ...wired] }])).diagnostics);
+  assert.deepEqual(mult('DIRECT', ['B']), []);
+  assert.deepEqual(mult('CASCADE', ['BCIN']), []);
+  assert.deepEqual(mult('CASCADE', ['B']), ['warning: input pin BCIN of U1 (MULT18X18SIO) is not connected']);
+  assert.deepEqual(mult('DIRECT', ['BCIN']), ['warning: input pin B of U1 (MULT18X18SIO) is not connected']);
   // a DSP48A1's clock enables tied to 1, its resets to 0, its wide inputs to zeros
   const dsp = generateHdl(sheet('mac', [{ type: 'dsp48a1', wired: ['A', 'B', 'P'] }], 'verilog'));
   assert.deepEqual(msgs(dsp.diagnostics), []);

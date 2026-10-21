@@ -210,9 +210,10 @@ P.mult18x18sio = {
   name: 'MULT18X18SIO', title: 'MULT18X18SIO', families: ['spartan3e'], description: '18 × 18 signed multiplier with optional input and output registers',
   text: [tx('Dedicated 18 × 18 bit multiplier of two\'s complement numbers, P = A × B on 36 bits, with an optional register on A, on B and on the product (AREG, BREG, PREG), each with its clock enable and synchronous reset; B from its input or from the multiplier below (BCIN).',
     'Multiplicador dedicado de 18 × 18 bits de números em complemento para dois, P = A × B em 36 bits, com um registo opcional em A, em B e no produto (AREG, BREG, PREG), cada um com a sua habilitação e o seu reset síncrono; B da sua entrada ou do multiplicador de baixo (BCIN).')],
-  of: () => ({ name: 'MULT18X18SIO', pins: [
-    pin('A', 'in', 18, tx('Operand A (signed)', 'Operando A (com sinal)'), { need: true }), pin('B', 'in', 18, tx('Operand B (signed)', 'Operando B (com sinal)'), { need: true }),
-    pin('BCIN', 'in', 18, tx('Operand B from the multiplier below (B_INPUT CASCADE)', 'Operando B do multiplicador de baixo (B_INPUT CASCADE)')),
+  // (B needed from its input with B_INPUT DIRECT, BCIN with CASCADE, #848)
+  of: p => ({ name: 'MULT18X18SIO', pins: [
+    pin('A', 'in', 18, tx('Operand A (signed)', 'Operando A (com sinal)'), { need: true }), pin('B', 'in', 18, tx('Operand B (signed)', 'Operando B (com sinal)'), { need: p.B_INPUT !== 'CASCADE' }),
+    pin('BCIN', 'in', 18, tx('Operand B from the multiplier below (B_INPUT CASCADE)', 'Operando B do multiplicador de baixo (B_INPUT CASCADE)'), { need: p.B_INPUT === 'CASCADE' }),
     pin('CEA', 'in', 1, tx('Clock enable of the A register; unconnected 1', 'Habilitação do registo de A; desligado, 1'), { tie: '1' }),
     pin('CEB', 'in', 1, tx('Clock enable of the B register; unconnected 1', 'Habilitação do registo de B; desligado, 1'), { tie: '1' }),
     pin('CEP', 'in', 1, tx('Clock enable of the product register; unconnected 1', 'Habilitação do registo do produto; desligado, 1'), { tie: '1' }),
