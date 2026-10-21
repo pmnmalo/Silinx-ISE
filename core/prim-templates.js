@@ -62,6 +62,7 @@ export function primitiveTemplate(type, lang, part = null) {
     const v = genericValue(g, params[g.name], lang);
     return [g.name, keys.includes(g.name) ? ph(v) : v, range(g)];
   });
+  for (const [k, v] of r.fixed || []) gens.push([k, `"${v}"`, 'fixed']);
   if (r.contents) gens.push(['INIT_00', vl ? `256'h${'0'.repeat(64)}` : `X"${'0'.repeat(64)}"`, INIT_NOTE]);
   // the pins: a signal (a placeholder) on the needed inputs and on the outputs, the others tied
   const conns = r.pins.map(q => {

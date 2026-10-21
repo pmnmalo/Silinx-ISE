@@ -1501,6 +1501,7 @@ export function generateHdl(docIn, opts = {}) {
       const range = g.options ? g.options.join(', ') : g.kind === 'hex' ? `${g.bits} bits, hexadecimal` : g.kind === 'bool' ? 'TRUE, FALSE' : `${g.min} … ${g.max}`;
       diags.push({ severity: 'error', message: `${s.name}: ${g.name} = '${p[g.name]}' is not a value of ${r.name}'s ${g.name} (${range})`, ref });
     }
+    for (const [k, v] of r.fixed || []) gens.push([k, `"${v}"`]);
     if (r.contents && String(p.contents || '').trim()) {
       try {
         for (const [k, h] of Object.entries(initWords(p.contents, r.contents.width, r.contents.inits))) gens.push([k, ci ? `X"${h}"` : `256'h${h}`]);
@@ -1515,6 +1516,9 @@ export function generateHdl(docIn, opts = {}) {
       const n = inNet(s, q.name);
       return [q.name, n ? outRead.get(n) || netName(n) : lit(q.width, q.tie)];
     });
+    for (const [x, y] of r.exclusive || []) {
+      if (conns.find(([k]) => k === x)?.[1] && conns.find(([k]) => k === y)?.[1]) diags.push({ severity: 'error', message: `${s.name}: ${r.name}'s outputs ${x} and ${y} cannot both be used: connect one of them`, ref });
+    }
     // (VHDL: a pin of one bit that UNISIM declares a vector, DIP(0 downto 0), associated by its bit 0)
     const formal = (k, a) => (ci && a != null && r.pins.find(q => q.name === k)?.vec && r.pins.find(q => q.name === k).width === 1 ? `${k}(0)` : k);
     if (ci) {
@@ -1869,6 +1873,12 @@ export function generateHdl(docIn, opts = {}) {
         const msb = int(p.msb, 0), lsb = int(p.lsb, 0);
         const ow = Math.abs(msb - lsb) + 1;
         const outIsVec = ci ? clsOf(o) !== 'sl' : true;
+        // (a tap of bit 0 of a net of one bit, a scalar: the net itself, no index, #859)
+        const n1 = inNet(s, 'I');
+        if (msb === 0 && lsb === 0 && n1?.width === 1 && (!ci || clsOf(i) === 'sl')) {
+          if (ci) body.push(`${outIsVec ? `${o}(0)` : o} <= ${i};`); else assign(o, i);
+          break;
+        }
         if (ci) body.push(`${o} <= ${ow === 1 && !outIsVec ? `${i}(${msb})` : `${i}(${msb} ${msb >= lsb ? 'downto' : 'to'} ${lsb})`};`);
         else assign(o, ow === 1 ? `${i}[${msb}]` : `${i}[${msb}:${lsb}]`);
         break;

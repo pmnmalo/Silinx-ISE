@@ -19,7 +19,9 @@
 //   DEVICE_PRIMITIVES             { type: primitive }: every one, the schematic symbols' types (ramb16_s, dcm_sp …)
 //   PRIMITIVE_FAMILIES            the families with primitives offered
 //   devicePrimitives(family)      the primitives of a family, in the palette's order
-//   primitiveOf(type, params)     the UNISIM primitive a symbol's parameters make: { name, pins, generics, contents }
+//   primitiveOf(type, params)     the UNISIM primitive a symbol's parameters make: { name, pins, generics, contents, fixed,
+//                                 exclusive } (fixed: [attribute, value] always written; exclusive: [[pin, pin]] not both used, Symbol Info
+//                                 leaving the first out)
 //   genericValue(g, v, lang)      an attribute's value written in VHDL or Verilog (null: not a valid value)
 //   initWords(text, width, bits)  a block RAM's contents (hex words from address 0) as its INIT_xx: { 'INIT_00': hex }
 //   primitiveResource(type, family, params)  the resource (core/resources.js id) a primitive takes on a family
@@ -31,7 +33,8 @@ const tx = (en, pt) => ({ en, pt });
 const pin = (name, dir, width, func, o = {}) => ({ name, dir, width, tie: dir === 'in' ? (o.tie ?? '0') : null, need: !!o.need, clock: !!o.clock, ...(o.vec ? { vec: true } : {}), func });
 const int = (name, def, min, max, meaning) => ({ name, kind: 'int', default: def, min, max, meaning });
 const real = (name, def, min, max, meaning, options) => ({ name, kind: 'real', default: def, min, max, meaning, ...(options ? { options } : {}) });
-const str = (name, def, options, meaning) => ({ name, kind: 'string', default: def, options, meaning });
+const str = (name, def, options, meaning, num) => ({ name, kind: 'string', default: def, options, meaning, ...(num ? { num: true } : {}) });
+// (num: one of a list of integers, chosen as a string but an integer in UNISIM, written unquoted: DATA_WIDTH_A, #859)
 const bool = (name, def, meaning) => ({ name, kind: 'bool', default: def, meaning });
 const hex = (name, bits, meaning) => ({ name, kind: 'hex', bits, default: '0'.repeat(Math.ceil(bits / 4)), meaning });
 
@@ -55,13 +58,13 @@ function ramb16Pins(w, x, needed) {
   const f = (en, pt) => tx(en + of.en, pt + of.pt);
   return {
     ins: [pin(`ADDR${x}`, 'in', aw, f(`Address (${2 ** aw} words of ${w} bits)`, `Endereço (${2 ** aw} palavras de ${w} bits)`), { need: needed }),
-      pin(`DI${x}`, 'in', dw, f('Data written', 'Dados escritos')),
+      pin(`DI${x}`, 'in', dw, f('Data written', 'Dados escritos'), { vec: dw === 1 }),
       ...(pw ? [pin(`DIP${x}`, 'in', pw, f('Parity bits written', 'Bits de paridade escritos'), { vec: true })] : []),
       pin(`WE${x}`, 'in', 1, f('Write enable: 1 writes DI at ADDR on the clock edge', 'Habilitação da escrita: a 1 escreve DI em ADDR no flanco do relógio')),
       pin(`EN${x}`, 'in', 1, f('Enable: 0 holds the port (no read, no write); unconnected 1', 'Habilitação: a 0 o porto fica parado (sem leitura nem escrita); desligado, 1'), { tie: '1' }),
       pin(`SSR${x}`, 'in', 1, f('Synchronous set / reset: 1 loads SRVAL into the output on the clock edge', 'Set / reset síncrono: a 1 carrega SRVAL na saída no flanco do relógio')),
       pin(`CLK${x}`, 'in', 1, f('Clock (rising edge)', 'Relógio (flanco ascendente)'), { need: needed, clock: true })],
-    outs: [pin(`DO${x}`, 'out', dw, f('Data read (synchronous: after the clock edge)', 'Dados lidos (síncrono: após o flanco do relógio)')),
+    outs: [pin(`DO${x}`, 'out', dw, f('Data read (synchronous: after the clock edge)', 'Dados lidos (síncrono: após o flanco do relógio)'), { vec: dw === 1 }),
       ...(pw ? [pin(`DOP${x}`, 'out', pw, f('Parity bits read', 'Bits de paridade lidos'), { vec: true })] : [])],
   };
 }
@@ -101,7 +104,7 @@ function bwerPins(name) {
 function bwerGens(name) {
   const k = BWER[name];
   const per = x => [
-    str(`DATA_WIDTH_${x}`, x === 'A' ? '9' : '0', k.widths, tx(`Port ${x}'s width in bits (0: the port unused${k.sdp ? '; 36: the simple dual port mode, RAM_MODE = SDP' : ''}).`, `Largura do porto ${x} em bits (0: porto por usar${k.sdp ? '; 36: o modo de duplo porto simples, RAM_MODE = SDP' : ''}).`)),
+    str(`DATA_WIDTH_${x}`, x === 'A' ? '9' : '0', k.widths, tx(`Port ${x}'s width in bits (0: the port unused${k.sdp ? '; 36: the simple dual port mode, RAM_MODE = SDP' : ''}).`, `Largura do porto ${x} em bits (0: porto por usar${k.sdp ? '; 36: o modo de duplo porto simples, RAM_MODE = SDP' : ''}).`), true),
     int(`DO${x}_REG`, 0, 0, 1, tx(`1: port ${x}'s output through a register (a clock cycle later), 0: the latch only.`, `1: a saída do porto ${x} passa por um registo (um ciclo de relógio depois), 0: só o latch.`)),
     bool(`EN_RSTRAM_${x}`, true, tx(`Whether port ${x}'s reset acts (TRUE) or is ignored (FALSE).`, `Se o reset do porto ${x} atua (TRUE) ou é ignorado (FALSE).`)),
     hex(`INIT_${x}`, k.iw, initMeaning(x)), hex(`SRVAL_${x}`, k.iw, srvalMeaning(x)),
@@ -267,7 +270,8 @@ P.ramb16bwer = {
   text: [BWER_TEXT('RAMB16BWER', 'Block RAM of 16 Kbit of data and 2 Kbit of parity (18 Kbit), synchronous, with two independent ports, each with its own clock.',
     'RAM de bloco de 16 Kbit de dados e 2 Kbit de paridade (18 Kbit), síncrona, com dois portos independentes, cada um com o seu relógio.')],
   params: [contentsParam], meanings: { contents: contentsMeaning },
-  of: p => ({ name: 'RAMB16BWER', pins: bwerPins('RAMB16BWER'), generics: bwerGens('RAMB16BWER'), contents: bwerContents('RAMB16BWER', p) }),
+  // (fixed: SIM_DEVICE, whose default in UNISIM is the Spartan-3A DSP's: ngdbuild warns and changes it otherwise, #859)
+  of: p => ({ name: 'RAMB16BWER', pins: bwerPins('RAMB16BWER'), generics: bwerGens('RAMB16BWER'), fixed: [['SIM_DEVICE', 'SPARTAN6']], contents: bwerContents('RAMB16BWER', p) }),
 };
 // a BWER block RAM's contents in port A's data words (DATA_WIDTH_A; 36 in SDP mode)
 function bwerContents(name, p) {
@@ -286,7 +290,8 @@ P.dsp48a1 = {
   name: 'DSP48A1', title: 'DSP48A1', families: ['spartan6'], description: 'DSP slice: pre-adder, 18 × 18 multiplier and 48-bit post-adder / accumulator',
   text: [tx('DSP slice: a pre-adder (D ± B, OPMODE(4) and (6)), an 18 × 18 signed multiplier (M = A × B) and a 48-bit post-adder / subtracter (P = Z ± (X + CIN), OPMODE(7)), the X and Z multiplexers chosen by OPMODE(1:0) and OPMODE(3:2): a multiply-accumulate on its own, with optional registers on every stage.',
     'Slice DSP: um pré-somador (D ± B, OPMODE(4) e (6)), um multiplicador de 18 × 18 com sinal (M = A × B) e um pós-somador / subtrator de 48 bits (P = Z ± (X + CIN), OPMODE(7)), os multiplexadores X e Z escolhidos por OPMODE(1:0) e OPMODE(3:2): uma multiplicação-acumulação por si só, com registos opcionais em cada andar.')],
-  of: () => ({ name: 'DSP48A1', pins: [
+  // (M and P not both used: ISE's map refuses it, PhysDesignRules:2136, #859)
+  of: () => ({ name: 'DSP48A1', exclusive: [['M', 'P']], pins: [
     pin('A', 'in', 18, tx('Operand A of the multiplier', 'Operando A do multiplicador')), pin('B', 'in', 18, tx('Operand B (of the pre-adder and the multiplier)', 'Operando B (do pré-somador e do multiplicador)')),
     pin('D', 'in', 18, tx('Operand D of the pre-adder', 'Operando D do pré-somador')), pin('C', 'in', 48, tx('Operand C of the post-adder (Z = C)', 'Operando C do pós-somador (Z = C)')),
     pin('PCIN', 'in', 48, tx('P of the DSP slice below (cascade, Z = PCIN)', 'P do slice DSP de baixo (cascata, Z = PCIN)')),
@@ -383,7 +388,7 @@ export function genericValue(g, v, lang) {
       if (g.options ? !g.options.some(o => +o === n) : n < g.min || n > g.max) return null;
       return realText(n);
     }
-    case 'string': return g.options.includes(s) ? `"${s}"` : null;
+    case 'string': return g.options.includes(s) ? (g.num ? s : `"${s}"`) : null;
     case 'bool': {
       const b = v === true || /^true$/i.test(s) ? true : v === false || /^false$/i.test(s) ? false : null;
       if (b == null) return null;

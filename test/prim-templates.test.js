@@ -51,6 +51,15 @@ test('the Device Primitives templates of each family: the library\'s list, their
   assert.match(primitiveTemplate('ramb16_s', 'verilog').text, /^ {2}\.INIT_00 {3}\(256'h0{64}\)  \/\/ INIT_00 … INIT_3F/m);
 });
 
+test('#859 the Spartan-6 block RAMs\' templates: DATA_WIDTH an integer, RAMB16BWER\'s SIM_DEVICE written', () => {
+  for (const t of ['ramb8bwer', 'ramb16bwer']) {
+    assert.match(primitiveTemplate(t, 'vhdl').text, /DATA_WIDTH_A +=> \$\{\d+:9\}/, t);
+    assert.match(primitiveTemplate(t, 'verilog').text, /\.DATA_WIDTH_A +\(\$\{\d+:9\}\)/, t);
+    assert.equal(/SIM_DEVICE +=> "SPARTAN6"/.test(primitiveTemplate(t, 'vhdl').text), t === 'ramb16bwer', t);
+    assert.equal(/\.SIM_DEVICE +\("SPARTAN6"\)/.test(primitiveTemplate(t, 'verilog').text), t === 'ramb16bwer', t);
+  }
+});
+
 for (const lang of ['vhdl', 'verilog']) {
   test(`${lang}: every Device Primitives template, inserted in a module, compiles, elaborates and simulates with no warning`, () => {
     for (const family of ['spartan3e', 'spartan6']) for (const tp of primitiveTemplates(family, lang, PART[family])) {

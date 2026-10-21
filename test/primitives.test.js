@@ -239,7 +239,8 @@ for (const lang of ['vhdl', 'verilog']) {
     h.set({ CLK: 0, CARRYIN: 0, D: 0, PCIN: 0, ...Object.fromEntries(['A', 'B', 'C', 'CARRYIN', 'D', 'M', 'OPMODE', 'P'].flatMap(r => [[`CE${r}`, 1], [`RST${r}`, 0]])) });
     h.set({ A: -5, B: 7, C: 1000, OPMODE: 0b00000001 });
     assert.equal(h.get('P'), BigInt.asUintN(48, -35n));
-    assert.equal(h.get('M'), BigInt.asUintN(36, -35n));
+    // (M not on a port: not usable with P, #859)
+    assert.ok(h.code.includes(lang === 'vhdl' ? 'M => open' : '.M()'), 'M open');
     h.set({ OPMODE: 0b00001101 });
     assert.equal(h.get('P'), 965n);
   });
@@ -310,6 +311,49 @@ test('a primitive\'s unconnected inputs: the ones it needs a warning, the others
   const dsp = generateHdl(sheet('mac', [{ type: 'dsp48a1', wired: ['A', 'B', 'P'] }], 'verilog'));
   assert.deepEqual(msgs(dsp.diagnostics), []);
   for (const x of [".CEP(1'b1)", ".RSTP(1'b0)", ".C(48'b0)", ".OPMODE(8'b0)", '.PCOUT()']) assert.ok(dsp.code.includes(x), x);
+});
+
+// #859: what ISE refused or warned about in the generated HDL
+test('#859 a 1-bit data port of RAMB16 as UNISIM\'s vector, DATA_WIDTH unquoted, RAMB16BWER\'s SIM_DEVICE, DSP48A1\'s M and P not both', () => {
+  // RAMB16_S1, a dual-port RAMB16_S1_S4's port A: DI(0) / DO(0) in VHDL (std_logic_vector(0 downto 0)); Verilog unchanged
+  const s1 = lang => generateHdl(sheet('m', [{ type: 'ramb16_s', params: { portWidth: '1' }, wired: ['ADDR', 'CLK', 'DI', 'DO'] }], lang));
+  assert.deepEqual(msgs(s1('vhdl').diagnostics), []);
+  for (const x of ['DI(0) => di', 'DO(0) => do']) assert.ok(s1('vhdl').code.includes(x), x);
+  for (const x of ['.DI(di)', '.DO(do)']) assert.ok(s1('verilog').code.includes(x), x);
+  const dp = generateHdl(sheet('m', [{ type: 'ramb16_s_s', params: { widthA: '1', widthB: '4' }, wired: ['ADDRA', 'CLKA', 'DIA', 'DOA', 'DOB'] }]));
+  for (const x of ['DIA(0) => dia', 'DOA(0) => doa', 'DOB => dob']) assert.ok(dp.code.includes(x), x);
+  // unconnected: tied / open as before (DIP's form)
+  assert.ok(generateHdl(sheet('m', [{ type: 'ramb16_s', params: { portWidth: '1' }, wired: ['ADDR', 'CLK'] }])).code.includes('DI(0) => \'0\''));
+  // DATA_WIDTH_A / _B: integers in UNISIM
+  for (const t of ['ramb8bwer', 'ramb16bwer']) {
+    const g = lang => generateHdl(sheet('m', [{ type: t, params: { DATA_WIDTH_A: '18', DATA_WIDTH_B: '9' }, wired: ['ADDRA', 'CLKA', 'DOA'] }], lang)).code;
+    for (const x of ['DATA_WIDTH_A => 18', 'DATA_WIDTH_B => 9']) assert.ok(g('vhdl').includes(x), `${t} ${x}`);
+    for (const x of ['.DATA_WIDTH_A(18)', '.DATA_WIDTH_B(9)']) assert.ok(g('verilog').includes(x), `${t} ${x}`);
+    assert.doesNotMatch(g('vhdl'), /DATA_WIDTH_\w => "/);
+    // SIM_DEVICE: RAMB16BWER's UNISIM default is the Spartan-3A DSP's (ngdbuild changes it, a warning); RAMB8BWER has none
+    assert.equal(/SIM_DEVICE => "SPARTAN6"/.test(g('vhdl')), t === 'ramb16bwer', t);
+    assert.equal(/\.SIM_DEVICE\("SPARTAN6"\)/.test(g('verilog')), t === 'ramb16bwer', t);
+  }
+  assert.equal(genericValue(primitiveOf('ramb8bwer', {}).generics.find(g => g.name === 'DATA_WIDTH_A'), '36', 'vhdl'), '36');
+  // DSP48A1: M and P both connected, an error (ISE's map: PhysDesignRules:2136); one of them, none
+  const dsp = wired => msgs(generateHdl(sheet('mac', [{ type: 'dsp48a1', wired: ['A', 'B', ...wired] }])).diagnostics);
+  assert.deepEqual(dsp(['M', 'P']), ["error: U1: DSP48A1's outputs M and P cannot both be used: connect one of them"]);
+  assert.deepEqual(dsp(['P']), []);
+  assert.deepEqual(dsp(['M']), []);
+});
+
+test('#859 a bus tap of bit 0 of a 1-bit net: the net itself, not an index of a scalar', () => {
+  for (const lang of ['vhdl', 'verilog']) {
+    const doc = newDoc('t', lang);
+    const sym = { id: 'S1', type: 'slice', x: 400, y: 200, rot: 0, mirror: false, name: 'U1', params: { ...defaultParams('slice'), msb: 0, lsb: 0 } };
+    doc.symbols.push(sym);
+    for (const q of symbolDef(sym).pins) doc.ports.push({ id: `P${doc.ports.length + 1}`, name: q.dir === 'out' ? 'q' : 'a', dir: q.dir === 'out' ? 'out' : 'in', width: 1, x: sym.x + q.x, y: sym.y + q.y });
+    const g = generateHdl(doc, { lang });
+    assert.deepEqual(msgs(g.diagnostics), [], lang);
+    assert.ok(g.code.includes(lang === 'vhdl' ? 'q <= a;' : 'assign q = a;'), g.code);
+    const lib = compile([{ path: g.filename, lang, text: g.code }]);
+    assert.deepEqual(lib.errors.map(e => e.message), [], lang);
+  }
 });
 
 test('a primitive\'s attribute out of its range, a dual-port RAM with port A the wider, contents too wide: errors', () => {

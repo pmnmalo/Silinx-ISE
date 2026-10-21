@@ -610,7 +610,10 @@ export function oneSymbolDoc(type, params = {}, { lang = 'vhdl', modules = {}, h
   doc.symbols.push(sym);
   const def = symbolDef(sym, modules);
   const ports = [];
+  // (a primitive's outputs not both usable, DSP48A1's M and P: the first left out, #859)
+  const left = new Set(SYMBOLS[type]?.prim ? (primitiveOf(type, sym.params).exclusive || []).map(([x]) => x) : []);
   for (const q of symbolPins(sym, modules, def)) {
+    if (left.has(q.name)) continue;
     let w = q.width;
     if (w == null) w = type === 'slice' ? Math.max(int(sym.params.msb, 0), int(sym.params.lsb, 0)) + 1 : 1;
     const port = { id: `P${ports.length + 1}`, name: q.name, dir: q.dir === 'out' ? 'out' : q.dir === 'inout' ? 'inout' : 'in', width: w, x: q.x, y: q.y, pin: q.name };
