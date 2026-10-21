@@ -7,8 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
+// (fileURLToPath: on Windows a URL's pathname keeps a slash before the drive letter, #886)
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIRS = ['core', 'web/js', 'server', 'scripts'];
 const MAX_FILE = 1000, MAX_FUNCTION = 300;
 
