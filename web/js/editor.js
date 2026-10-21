@@ -405,9 +405,19 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
     let s = text.replace(/\$\{name\}/g, name);
     const baseIndent = (view.state.doc.lineAt(from).text.match(/^\s*/) || [''])[0];
     s = s.split('\n').map((l, i) => (i ? baseIndent + l : l)).join('\n');
+    // placeholders ${1:text} … (the Device Primitives' templates, #792): their texts, the first one selected
+    let first = null, out = '', last = 0;
+    for (const m of s.matchAll(/\$\{(\d+):([^}]*)\}/g)) {
+      out += s.slice(last, m.index);
+      if (m[1] === '1' && !first) first = { at: out.length, len: m[2].length };
+      out += m[2];
+      last = m.index + m[0].length;
+    }
+    s = out + s.slice(last);
     const idx = s.indexOf('$0');
     s = s.replace('$0', '');
-    view.dispatch({ changes: { from, to, insert: s }, selection: { anchor: from + (idx >= 0 ? idx : s.length) }, userEvent: 'input.complete', scrollIntoView: true });
+    const selection = first ? { anchor: from + first.at, head: from + first.at + first.len } : { anchor: from + (idx >= 0 ? idx : s.length) };
+    view.dispatch({ changes: { from, to, insert: s }, selection, userEvent: 'input.complete', scrollIntoView: true });
   }
 
   // ---- keys

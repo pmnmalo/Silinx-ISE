@@ -14,6 +14,8 @@ import { initTasks } from './tasks.js';
 import { createHistory } from './history.js';
 import { viewHdl } from '/core/view-hdl.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
+import { primitiveTemplates } from '/core/prim-templates.js';
+import { deviceFamily } from '/core/family.js';
 import { setActionRunner, longPressMenu } from './ui.js';
 import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { openProject, closeProject, reloadProject, updateTitle, renderStartPage, updateStorageStatus } from './project.js';
@@ -212,6 +214,12 @@ setActionRunner((label, fn) => (NOT_RECORDED.test(String(label || '')) ? fn() : 
 
 // Undo / Redo (Edit menu, toolbar, Ctrl+Z / Ctrl+Y outside an editor): the project's last command
 // when it is newer than the last edit of the active document, else the document's own undo
+// the Language Templates' Device Primitives (#792): an instantiation template of each primitive of the project's family,
+// its count on the part in its comment; none for a family without them
+function primTemplatesMenu(d, lang) {
+  const part = projectPart(), list = primitiveTemplates(part?.family || deviceFamily(S.project?.device), lang, part);
+  return { label: 'Device Primitives', disabled: !list.length, submenu: list.map(t => ({ label: t.name, action: () => d.editor.insertText(t.text) })) };
+}
 export const docEditor = d => d && (d.editor ? { undo: () => d.editor.exec('undo'), redo: () => d.editor.exec('redo') } : d.schEditor || d.asmEditor || d.fsmEditor || d.ttEditor || d.petriEditor || d.pinPlanner || null);
 export const undoesProject = () => history.canUndo() && !(S.active?._editedAt > history.lastAt() && docEditor(S.active));
 export const redoesProject = () => history.canRedo() && !(S.active?._editedAt > history.redoAt() && docEditor(S.active));
@@ -496,6 +504,7 @@ export async function openFile(path, line, col) {
           popupMenu([
             ...SNIPPETS[lang].map(s => ({ label: s.name, action: () => d.editor.insertText(s.text) })),
             '-',
+            primTemplatesMenu(d, lang),
             { label: 'Instantiate module', submenu: S.modules.filter(m => m.file !== path).map(m => ({ label: m.name, action: () => d.editor.insertText(instTemplate(m, lang) + '$0') })) },
           ], r.left, r.bottom);
         });
@@ -548,6 +557,7 @@ export async function openFile(path, line, col) {
             hdl ? { label: 'Quick Fix…', shortcut: 'Ctrl+.', action: () => { ed.setCursor(at); d.editor.showFixMenu(at.line); }, disabled: !d.editor.fixesOnLine(at.line).length } : null,
             hdl ? '-' : null,
             hdl ? { label: 'Language Templates', submenu: SNIPPETS[lang].map(sn => ({ label: sn.name, action: () => d.editor.insertText(sn.text) })) } : null,
+            hdl ? primTemplatesMenu(d, lang) : null,
             hdl ? { label: 'Instantiate module', submenu: S.modules.filter(m => m.file !== path).map(m => ({ label: m.name, action: () => d.editor.insertText(instTemplate(m, lang) + '$0') })) } : null,
             hdl ? '-' : null,
             hdl ? { label: 'Check Syntax', action: () => checkFileSyntax(path) } : null,
