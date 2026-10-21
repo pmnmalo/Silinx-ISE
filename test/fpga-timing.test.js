@@ -397,7 +397,7 @@ net "slow" , outpin "div" YQ , inpin "div" BY , ;
 
 // #601: the clocks of a DCM, from the pad clk: CLK0 (the feedback), CLK2X, CLKDV (/ 4), CLKFX (x 3 / 2), CLK90 through a
 // second DCM fed by CLKFX; a flip-flop of each, CLK0's into CLKFX's and CLK2X's, a second pad's clock (unrelated)
-const DCMS = parseXdl(`design "t" xc3s250ecp132-4 v3.2 , cfg "";
+const DCMS_TEXT = `design "t" xc3s250ecp132-4 v3.2 , cfg "";
 inst "clk" "IBUF",placed BIOIS_X1Y0 P11 , cfg " " ;
 inst "clk2" "IBUF",placed BIOIS_X2Y0 P12 , cfg " " ;
 inst "u_dcm" "DCM",placed DCM_BL_CENTER_X9Y0 DCM_X0Y0 , cfg " CLKDV_DIVIDE::4.0 CLKFX_DIVIDE::2 CLKFX_MULTIPLY::3 CLK_FEEDBACK::1X CLKOUT_PHASE_SHIFT::NONE PHASE_SHIFT::0 " ;
@@ -421,7 +421,8 @@ net "c90_u" , outpin "u_dcm2" CLKFX180 , inpin "b90" I0 , ;
 net "c90" , outpin "b90" O , inpin "e" CLK , ;
 net "c2_in" , outpin "clk2" I , inpin "bu" I0 , ;
 net "c2" , outpin "bu" O , inpin "f" CLK , ;
-`);
+`;
+const DCMS = parseXdl(DCMS_TEXT);
 test('#601 clockSources: a clock through the global buffers and DCMs to its pad, its period and first rising edge in the pad\'s periods', () => {
   const s = clockSources(DCMS);
   const of = n => { const x = s.get(n); return x && [x.port, +x.f.toFixed(6), +x.o.toFixed(6), x.via.map(v => `${v.pin} of ${v.dcm}`).join(', ')]; };
@@ -434,6 +435,15 @@ test('#601 clockSources: a clock through the global buffers and DCMs to its pad,
   assert.deepEqual(of('c90'), ['clk', +((2 / 3) * 2 / 4).toFixed(6), +((2 / 3) * (1 / 4 + 64 / 256)).toFixed(6), 'CLKFX of u_dcm, CLKFX180 of u_dcm2']);
   assert.deepEqual(of('c2'), ['clk2', 1, 0, '']);
   assert.equal(s.has('clk_in'), false);   // (no clock pin on it)
+});
+// #847: a half-integer CLKDV_DIVIDE as XDL writes it (2.5 -> 2_5): CLKDV 2.5 input periods, not 2
+test('#847 clockSources: CLKDV of a DCM whose CLKDV_DIVIDE is 2_5 (or 1_5, 7_5), the half-integer divider\'s period', () => {
+  for (const [v, f] of [['2_5', 2.5], ['1_5', 1.5], ['7_5', 7.5], ['16', 16]]) {
+    const s = clockSources(parseXdl(DCMS_TEXT.replace('CLKDV_DIVIDE::4.0', `CLKDV_DIVIDE::${v}`)));
+    assert.equal(s.get('clkdv').f, f, v);
+  }
+  const pc = checkPeriods({ clocks: [{ clock: 'clkdv', period: 4 }], cross: [] }, parseXdl(DCMS_TEXT.replace('CLKDV_DIVIDE::4.0', 'CLKDV_DIVIDE::2_5')), [{ net: 'clk', period: 20 }]);
+  assert.deepEqual(pc.filter(k => k.clock === 'clkdv').map(k => [k.via, k.required]), [['CLKDV of u_dcm', 50]]);
 });
 test('#601 clockRequirement: from each launching edge to the next capturing one, the shortest over the common period', () => {
   const r = (a, b) => clockRequirement(a, b);

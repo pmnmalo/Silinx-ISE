@@ -904,7 +904,7 @@ function dcmOutput(inst, pin) {
   const div2 = cfg('CLKIN_DIVIDE_BY_2') ? 2 : 1;
   let f, o;
   if (DCM_OUT[pin]) [f, o] = DCM_OUT[pin];
-  else if (pin === 'CLKDV') [f, o] = [parseFloat(cfg('CLKDV_DIVIDE') || '2'), 0];
+  else if (pin === 'CLKDV') [f, o] = [parseFloat(String(cfg('CLKDV_DIVIDE') || '2').replace('_', '.')), 0];   // (2.5 written 2_5, #847)
   else if (pin === 'CLKFX' || pin === 'CLKFX180') { f = (parseInt(cfg('CLKFX_DIVIDE') || '1', 10) || 1) / (parseInt(cfg('CLKFX_MULTIPLY') || '4', 10) || 4); o = pin === 'CLKFX' ? 0 : f / 2; }
   else return null;
   // a fixed phase shift: every output, PHASE_SHIFT / 256 of CLKIN's period later
