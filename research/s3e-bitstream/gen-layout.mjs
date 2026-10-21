@@ -68,6 +68,9 @@ for (const type of Object.keys(tilesOf)) if (/^(GCLKH_PCI_CE_[NS]|BRAM\w*_(UP|DN
   typeRows[type] = Object.fromEntries(tilesOf[type].map(([, y]) => [y, typeRows.GCLKH[y]]));
   typeBits[type] = 1;
 }
+// (in the left I/O column, X0, the clock rows' switches are GCLKH's 2 frames further: the column's two extra
+// frames come first; in the right one at GCLKH's frames, #671: every switch of every row measured)
+for (const type of ['GCLKH_PCI_CE_N', 'GCLKH_PCI_CE_S']) if (tilesOf[type]) typeCols[type] = Object.fromEntries(tilesOf[type].map(([x]) => [x, cols[x] + (x === 0 ? 2 : 0)]));
 // the XC3S1200E's long-line splitters at the centre row (CLKH_LL): one bit each in the I/O rows of the
 // frame, stored as bits of the whole frame (row bit 0; clkh-ll.mjs)
 if (tilesOf.CLKH_LL) { typeRows.CLKH_LL = Object.fromEntries(tilesOf.CLKH_LL.map(([, y]) => [y, 0])); typeBits.CLKH_LL = FB; }

@@ -443,6 +443,8 @@ export function siteKind(inst, db) {
 // general routing wires (doubles, hexes, long lines, the output multiplexers): a switch into one is
 // a multiplexer setting, never free
 const GENERAL_WIRE = /^([EWNS](2|6)(BEG|MID|END|[A-D])\d+|[EWNS]2END_[NS]\d+|L[HV]\d+|OMUX\w*)$/;
+// the clock wires of an I/O tile (into its registers' ICLK1 / OTCLK1… pins)
+const IO_CLOCK = /^IOIS_CLK\d$/;
 
 /**
  * What the database lets a router use, so that its output turns into a complete bitstream
@@ -494,6 +496,9 @@ export function knownRouting(db, { exceptions = true } = {}) {
   const allowPip = (tileName, from, to) => {
     const { type } = tileInfo(tileName);
     if (type?.noRoute && !type.shared?.has(`${from}->${to}`)) return false;
+    // an I/O tile's clock pin (IOIS_CLKj) from the global lines only, never from general routing: ISE clocks the
+    // IOBs from the global lines, and the packer puts in the IOBs only registers on a global clock (#671)
+    if (IO_CLOCK.test(to) && GENERAL_WIRE.test(from)) return false;
     const bits = bitsOf(tileName, `${from}->${to}`);
     return !!bits && (bits.length > 0 || !GENERAL_WIRE.test(to)) && !(exceptions && pipAbsent(type, tileName, from, to));
   };

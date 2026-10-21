@@ -1,0 +1,313 @@
+{
+ "source": "#671: the pad each bit of R:ICLK2INV:#OFF belongs to. #44 / #96 solved the IOB registers' settings per pad from designs where both pads of every I/O tile had an input register, so a bit of one pad's register could go to the other pad (B4's 3,71 of TIOIS_X3Y35 was C4's), or to a pad of the next tile (C18's to B18). Measured with ISE 14.7: two designs per device, an input register (IOB = TRUE, no clock enable, no set / reset) on only the first, then only the second, pad of every I/O tile where such a bit lies (open flow, xdl -xdl2ncd, bitgen: check-open-flow.mjs); each bit is set in exactly one of the two, by its owner. pad-owners.mjs moves each bit to its owner's R:ICLK2INV:#OFF.",
+ "moves": {
+  "xc3s100e-cp132": [
+   {
+    "bit": "27,49",
+    "from": "B2",
+    "to": "B3"
+   },
+   {
+    "bit": "27,71",
+    "from": "B2",
+    "to": "A3"
+   },
+   {
+    "bit": "217,49",
+    "from": "C11",
+    "to": "C12"
+   },
+   {
+    "bit": "217,71",
+    "from": "C11",
+    "to": "A13"
+   }
+  ],
+  "xc3s250e-cp132": [
+   {
+    "bit": "542,71",
+    "from": "C4",
+    "to": "B4"
+   },
+   {
+    "bit": "103,49",
+    "from": "C5",
+    "to": "C6"
+   },
+   {
+    "bit": "103,71",
+    "from": "C5",
+    "to": "B6"
+   },
+   {
+    "bit": "65,71",
+    "from": "C5",
+    "to": "B5"
+   }
+  ],
+  "xc3s500e-fg320": [
+   {
+    "bit": "27,49",
+    "from": "C1",
+    "to": "B3"
+   },
+   {
+    "bit": "27,71",
+    "from": "C1",
+    "to": "C3"
+   },
+   {
+    "bit": "521,2865",
+    "from": "T17",
+    "to": "T18"
+   },
+   {
+    "bit": "521,2887",
+    "from": "T17",
+    "to": "R18"
+   },
+   {
+    "bit": "521,497",
+    "from": "E18",
+    "to": "F14"
+   },
+   {
+    "bit": "521,519",
+    "from": "E18",
+    "to": "F15"
+   },
+   {
+    "bit": "521,625",
+    "from": "E18",
+    "to": "G13"
+   },
+   {
+    "bit": "521,753",
+    "from": "H13",
+    "to": "F17"
+   },
+   {
+    "bit": "521,775",
+    "from": "H13",
+    "to": "F18"
+   },
+   {
+    "bit": "521,881",
+    "from": "H13",
+    "to": "G16"
+   },
+   {
+    "bit": "521,1009",
+    "from": "G18",
+    "to": "H15"
+   },
+   {
+    "bit": "521,1031",
+    "from": "G18",
+    "to": "H14"
+   },
+   {
+    "bit": "521,1137",
+    "from": "G18",
+    "to": "H17"
+   },
+   {
+    "bit": "521,1265",
+    "from": "H18",
+    "to": "J13"
+   },
+   {
+    "bit": "521,1287",
+    "from": "H18",
+    "to": "J12"
+   },
+   {
+    "bit": "521,2033",
+    "from": "L13",
+    "to": "L15"
+   },
+   {
+    "bit": "521,2055",
+    "from": "L13",
+    "to": "L16"
+   },
+   {
+    "bit": "521,2545",
+    "from": "N17",
+    "to": "M13"
+   },
+   {
+    "bit": "521,2567",
+    "from": "N17",
+    "to": "M14"
+   },
+   {
+    "bit": "521,2655",
+    "from": "N17",
+    "to": "P15"
+   },
+   {
+    "bit": "521,1905",
+    "from": "K13",
+    "to": "L17"
+   },
+   {
+    "bit": "521,1927",
+    "from": "K13",
+    "to": "L18"
+   },
+   {
+    "bit": "521,177",
+    "from": "B18",
+    "to": "C17"
+   },
+   {
+    "bit": "521,305",
+    "from": "D18",
+    "to": "D16"
+   },
+   {
+    "bit": "521,327",
+    "from": "D18",
+    "to": "D17"
+   },
+   {
+    "bit": "521,415",
+    "from": "D18",
+    "to": "E17"
+   },
+   {
+    "bit": "521,2737",
+    "from": "R17",
+    "to": "R16"
+   },
+   {
+    "bit": "521,2759",
+    "from": "R17",
+    "to": "R15"
+   }
+  ],
+  "xc3s1200e-fg320": [
+   {
+    "bit": "28,49",
+    "from": "C1",
+    "to": "B3"
+   },
+   {
+    "bit": "28,71",
+    "from": "C1",
+    "to": "C3"
+   },
+   {
+    "bit": "750,2353",
+    "from": "K13",
+    "to": "L17"
+   },
+   {
+    "bit": "750,2375",
+    "from": "L16",
+    "to": "L18"
+   },
+   {
+    "bit": "750,2481",
+    "from": "L16",
+    "to": "L15"
+   },
+   {
+    "bit": "750,2609",
+    "from": "N18",
+    "to": "M18"
+   },
+   {
+    "bit": "750,3377",
+    "from": "N15",
+    "to": "P16"
+   },
+   {
+    "bit": "750,3761",
+    "from": "T17",
+    "to": "T18"
+   },
+   {
+    "bit": "750,3783",
+    "from": "T17",
+    "to": "R18"
+   },
+   {
+    "bit": "750,177",
+    "from": "B18",
+    "to": "C17"
+   },
+   {
+    "bit": "750,433",
+    "from": "D18",
+    "to": "E16"
+   },
+   {
+    "bit": "750,455",
+    "from": "D18",
+    "to": "E15"
+   },
+   {
+    "bit": "750,817",
+    "from": "E17",
+    "to": "F14"
+   },
+   {
+    "bit": "750,1073",
+    "from": "E18",
+    "to": "G13"
+   },
+   {
+    "bit": "750,1201",
+    "from": "H13",
+    "to": "F17"
+   },
+   {
+    "bit": "750,1223",
+    "from": "H13",
+    "to": "F18"
+   },
+   {
+    "bit": "750,1329",
+    "from": "H13",
+    "to": "G16"
+   },
+   {
+    "bit": "750,1457",
+    "from": "G18",
+    "to": "H15"
+   },
+   {
+    "bit": "750,1479",
+    "from": "G18",
+    "to": "H14"
+   },
+   {
+    "bit": "750,1585",
+    "from": "G18",
+    "to": "H17"
+   },
+   {
+    "bit": "750,1713",
+    "from": "H18",
+    "to": "J13"
+   },
+   {
+    "bit": "750,1735",
+    "from": "H18",
+    "to": "J12"
+   },
+   {
+    "bit": "750,3633",
+    "from": "R17",
+    "to": "R16"
+   },
+   {
+    "bit": "750,3655",
+    "from": "R17",
+    "to": "R15"
+   }
+  ]
+ }
+}

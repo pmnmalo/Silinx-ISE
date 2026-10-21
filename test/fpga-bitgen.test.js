@@ -481,6 +481,40 @@ test('knownRouting: the PIPs and GND sources a router may use so that every feat
   assert.equal(allowConstSource('vcc', { name: 'VCC_X1Y1', tileName: 'CLB_X1Y1', type: 'VCC' }), true);
 });
 
+// #671: B4's register was clocked through general routing (W2END4 -> IOIS_CLK0) though a global path of known bits was
+// there; as ISE clocks the IOBs, the router reaches the I/O clock pins from the global lines only
+test('knownRouting: an I/O tile\'s clock pin (IOIS_CLKj) only from the global lines, never from general routing (#671)', () => {
+  const { allowPip } = knownRouting(measured());
+  assert.equal(allowPip('TIOIS_X3Y35', 'GCLK4', 'IOIS_CLK0'), true);
+  for (const from of ['W2END4', 'W2MID4', 'N6BEG4', 'S6D4']) assert.equal(allowPip('TIOIS_X3Y35', from, 'IOIS_CLK0'), false, from);
+  assert.equal(allowPip('LIOIS_X0Y5', 'W2END4', 'IOIS_CLK0'), false);
+  assert.equal(allowPip('TIOIS_X3Y35', 'IOIS_CLK0', 'ICLK10'), true);
+  // the left and right I/O tiles' clock pins from every global line (only line 4 was measured before: measure-671.sh)
+  for (let k = 0; k < 8; k++) for (const [tile, j] of [['LIOIS_X0Y5', 0], ['LIOIS_X0Y5', 3], ['LIBUFS_X0Y22', 2], ['RIOIS_X27Y24', 1], ['RIBUFS_PCI_X27Y21', 2]]) assert.equal(allowPip(tile, `GCLK${k}`, `IOIS_CLK${j}`), true, `${tile} GCLK${k} -> IOIS_CLK${j}`);
+  // (a CLB's clock pin: unchanged)
+  assert.equal(allowPip('CLB_X9Y5', 'GCLK4', 'CLK0'), true);
+});
+
+// #671: the horizontal clock rows of the I/O columns (GCLKH_PCI_CE_S / _N) have GCLKH's switches, in the right column at
+// GCLKH's frames, in the left one 2 frames further (the column's two extra frames first): measured with ISE on every
+// switch of every row (measure-671.sh); GCLKH_GCLK4 -> GCLKH_GCLK_DN4 of GCLKH_PCI_CE_S_X0Y5 is frame 12, bit 2335 (the
+// writer had 10, 2335: one of the 3 bits feat_iob_plain differed by from ISE's bitgen)
+test('the I/O columns\' clock rows: GCLKH\'s switches, 2 frames further in the left column (#671)', () => {
+  const db = measured();
+  const net = (tile, k, dir) => parseXdl(`design "t" xc3s250ecp132-4 v3.2 , cfg "";
+net "c" ,
+  outpin "a" O ,
+  inpin "b" ICLK1 ,
+  pip ${tile} GCLKH_GCLK${k} -> GCLKH_GCLK_${dir}${k} ,
+  ;`);
+  const ones = d => { const { frames, unknown } = frameData(d, db); assert.deepEqual(unknown, []); return diffFrames(new Uint32Array(frames.length), frames, FW).map(x => `${x.frame},${x.bit}`).filter(b => !db.layout.defaults.some(([f, i]) => `${f},${i}` === b)); };
+  assert.deepEqual(ones(net('GCLKH_PCI_CE_S_X0Y5', 4, 'DN')), ['12,2335']);
+  assert.deepEqual(ones(net('GCLKH_PCI_CE_S_X27Y5', 4, 'DN')), ['373,2335']);   // the right column: frame 366 + 7, as GCLKH
+  assert.deepEqual(ones(net('GCLKH_X9Y5', 4, 'DN')), [`${db.layout.cols[9] + 7},2335`]);
+  assert.deepEqual(ones(net('GCLKH_PCI_CE_N_X0Y29', 0, 'UP')), ['21,3']);       // 3 + 18: GCLKH's 16, 2 frames further
+  assert.deepEqual(ones(net('GCLKH_PCI_CE_N_X27Y21', 7, 'DN')), ['367,2']);
+});
+
 test('padsFromDevice: the bonded I/O sites of the device, by their index among the I/O sites of the tile', () => {
   // a synthetic device in the form of core/fpga/device.js: an I/O tile with other sites first, an
   // unbonded pad, and an input-only pad; a CLB tile

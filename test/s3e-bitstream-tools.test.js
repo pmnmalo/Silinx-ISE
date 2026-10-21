@@ -250,23 +250,23 @@ test('want-pips: the PIPs of the database the batches have not measured yet, one
   try {
     let r = tool('want-pips.mjs', ['db', W]);
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(r.stderr.trim(), '17027 PIPs (per tile type) known to the reference database, 0 measured, 17027 left');
+    assert.equal(r.stderr.trim(), '17749 PIPs (per tile type) known to the reference database, 0 measured, 17749 left');
     const all = JSON.parse(r.stdout);
     // a type sharing another's switch box: only its own features (the CLB's are measured in the CLB)
-    assert.deepEqual([all.CENTER_SMALL.length, all.CENTER_SMALL_BRK.length, all.LIOIS.length, all.LIOIS_PCI.length, all.BRAM0_SMALL.length, all.UR.length], [2837, 948, 193, 138, 1793, 6]);
+    assert.deepEqual([all.CENTER_SMALL.length, all.CENTER_SMALL_BRK.length, all.LIOIS.length, all.LIOIS_PCI.length, all.BRAM0_SMALL.length, all.UR.length], [2837, 948, 249, 194, 1793, 6]);
     assert.equal(all.LIOIS_PCI.includes('E2BEG4->IOIS_CLK0'), true);
     fs.mkdirSync(path.join(W, 'pips', 't1'), { recursive: true });
     const pip = (tile, type, from, to) => ({ tile, type, from, dir: '->', to, bits: [] });
     fs.writeFileSync(path.join(W, 'pips', 't1', 'pips.json'), JSON.stringify({ pips: [pip('LIOIS_PCI_X0Y16', 'LIOIS_PCI', 'E2BEG4', 'IOIS_CLK0'), pip('CLB_X1Y1', 'CENTER_SMALL', 'BX0', 'BX_PINWIRE0'), pip('BRAM1_SMALL_X5Y1', 'BRAM1_SMALL', 'BRAM_DOA0', 'BRAM_ADDRA_B2')] }));
     assert.deepEqual([...measuredPips(W)], ['LIOIS E2BEG4->IOIS_CLK0', 'CENTER_SMALL BX0->BX_PINWIRE0', 'BRAM0_SMALL BRAM_DOA0->BRAM_ADDRA_B2']);
     r = tool('want-pips.mjs', ['db', W]);
-    assert.equal(r.stderr.trim(), '17027 PIPs (per tile type) known to the reference database, 3 measured, 17014 left');
+    assert.equal(r.stderr.trim(), '17749 PIPs (per tile type) known to the reference database, 3 measured, 17736 left');
     const left = JSON.parse(r.stdout);
     // measured in LIOIS_PCI: no longer wanted on the left side's I/O tiles; in BRAM1_SMALL: in the four block-RAM interconnect tiles
     for (const t of [...UNIFY[0], ...UNIFY[4], 'CENTER_SMALL']) assert.equal(all[t].length - left[t].length, 1, t);
     assert.equal(left.RIOIS.length, all.RIOIS.length);
     r = tool('want-pips.mjs', ['db', W, '--types', 'LIOIS,CLKC']);
-    assert.equal(r.stderr.trim(), '201 PIPs (per tile type) known to the reference database, 3 measured, 200 left');
+    assert.equal(r.stderr.trim(), '257 PIPs (per tile type) known to the reference database, 3 measured, 256 left');
     assert.deepEqual(Object.keys(JSON.parse(r.stdout)), ['LIOIS', 'CLKC']);
   } finally { fs.rmSync(W, { recursive: true, force: true }); }
 });
@@ -385,5 +385,21 @@ test('impl-remote: a design folder an earlier run left on the remote machine is 
     assert.deepEqual(ranOn(path.join(R, 'rw', 'runs')), ['b', 'c']);
     const xdl = d => fs.readFileSync(path.join(T, 'W', 'impl', d, 'top.xdl'), 'utf8').trim();
     assert.deepEqual([xdl('a'), xdl('b'), xdl('c')], ['old a', 'new', 'new']);
+  } finally { fs.rmSync(T, { recursive: true, force: true }); }
+});
+
+test('gen-iobreg --bufg: only rd and rd2, their clock buffer on the given BUFGMUX (one global line each, #671)', () => {
+  const T = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-iobclk-'));
+  try {
+    const r = tool('gen-iobreg.mjs', [T, '--bufg', 'BUFGMUX_X2Y1'], { env: { ...process.env, PART: 'xc3s250ecp132-4' } });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /: rd, rd2 \(clock buffer BUFGMUX_X2Y1\)\n$/);
+    assert.deepEqual(fs.readdirSync(T).sort(), ['rd', 'rd2']);
+    for (const d of ['rd', 'rd2']) {
+      const ucf = fs.readFileSync(path.join(T, d, 'top.ucf'), 'utf8');
+      assert.match(ucf, /^NET "clk" LOC = "B8" ;\n/);
+      assert.match(ucf, /\nINST "u_b" LOC = "BUFGMUX_X2Y1" ;\nNET "clk" CLOCK_DEDICATED_ROUTE = FALSE ;\n$/);
+      assert.match(fs.readFileSync(path.join(T, d, 'top.vhd'), 'utf8'), /^ {2}u_b : BUFG port map \(I => clk, O => clkb\);$/m);
+    }
   } finally { fs.rmSync(T, { recursive: true, force: true }); }
 });

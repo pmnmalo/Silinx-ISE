@@ -1,6 +1,6 @@
 {
   "name": "feat_iob_plain",
-  "description": "Board test: plain registers in the IOBs (no enable, no set / reset) on every switch and LED, tristate outputs with the enable from the fabric and from an IOB register (#96)",
+  "description": "Board test: plain registers in the IOBs (no enable, no set / reset) on every switch, button, LED and display anode, on the four sides; tristate outputs with the enable from the fabric and from an IOB register (#96, #671)",
   "version": 1,
   "device": {
     "family": "spartan3e",

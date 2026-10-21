@@ -1,0 +1,24 @@
+{
+  "name": "feat_iob_lines",
+  "description": "Board test: registers in the IOBs of the left and right pads clocked from each of the eight global lines (#671)",
+  "version": 1,
+  "device": {
+    "family": "spartan3e",
+    "part": "xc3s250e",
+    "package": "cp132",
+    "speed": "-4"
+  },
+  "board": "basys2",
+  "top": "top",
+  "files": [
+    {
+      "path": "top.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    }
+  ],
+  "constraints": "top.ucf",
+  "impl": {
+    "startupClk": "JtagClk"
+  }
+}

@@ -10,6 +10,8 @@ import { loadDb } from '../core/fpga/bitdb-node.js';
 import { loadDeviceCache } from '../core/fpga/device-node.js';
 import { deviceSites } from '../core/fpga/place.js';
 import { bufgReach } from '../core/fpga/route.js';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const cfgOf = s => s.trim().split(/\s+/).map(t => { const m = /^([^:]+):([^:]*):(.*)$/.exec(t); return { attr: m[1], name: m[2], value: m[3] }; });
 
@@ -87,4 +89,30 @@ test('I/O registers in the measured database: every pad of the four devices has 
     for (let k = 1; k <= 12; k++) assert.ok(n(`IBUF:DLY${k}`) >= inputs - gclk.size - 3, `${part} IBUF:DLY${k}: ${n(`IBUF:DLY${k}`)} pads`);
     for (const [name, f] of Object.entries(db.padFeats)) if (gclk.has(name)) assert.deepEqual(Object.keys(f).filter(x => /^(IFD|IBUF):/.test(x) && x !== `IFD:${auto}`), [], `${part} ${name}`);
   }
+});
+
+// #671: #44 / #96 solved the registers' settings per pad from designs whose registers were all clocked from line 4 and in
+// which both pads of every I/O tile had an input register; two kinds of bits went to the wrong place, measured with ISE
+test('I/O registers in the measured database: no pad feature holds the I/O columns\' clock-row bits, each bit of R:ICLK2INV:#OFF its owner\'s (#671)', () => {
+  const tool = s => spawnSync(process.execPath, [fileURLToPath(new URL(`../research/s3e-bitstream/${s}`, import.meta.url)), '--check'], { encoding: 'utf8' });
+  // (the writer had the left column's clock rows 2 frames early; the solution gave one pad of each row the difference)
+  for (const s of ['pad-clock-rows.mjs', 'pad-owners.mjs']) { const r = tool(s); assert.equal(r.status, 0, `${s}: ${r.stdout}${r.stderr}`); }
+  // a lone input register on a pad: its tile's bits set as ISE sets them (measured: B4 alone sets 3,71 of TIOIS_X3Y35, C4
+  // alone does not, as on the board test feat_iob_plain; B18 alone, on the XC3S500E, not 3,33 of the tile below, C17's)
+  const lone = (part, tile, pad, iob) => parseXdl(`design "t" ${part} v3.2 , cfg "";
+inst "d" "IBUF",placed ${tile} ${pad} ,
+  cfg " ICLK1INV::ICLK1 IDDRIN_MUX::2 IFD_DELAY_VALUE::DLY3 IFF1:r:#FF IFF1_INIT_ATTR::INIT0 IFFDELMUX::0 IFFDMUX::1 IOATTRBOX::LVCMOS25 PRE_DELAY_MUX::0 IFD_DELAY:d.IFD_DELAY: INBUF:d_IBUF: PAD:d: "
+  ;
+net "q" ,
+  outpin "d" IQ${iob} ,
+  ;
+`);
+  const bit = (part, tile, pad, iob, fr, b) => { const db = loadDb(part); const r = frameData(lone(part, tile, pad, iob), db); assert.deepEqual(r.unknown, []); return getBit(r.frames, r.frames.frameWords, fr, b); };
+  assert.equal(bit('xc3s250ecp132-4', 'TIOIS_X3Y35', 'B4', 1, 542, 71), 1);
+  assert.equal(bit('xc3s250ecp132-4', 'TIOIS_X3Y35', 'C4', 1, 542, 71), 0);
+  assert.equal(bit('xc3s500efg320-4', 'RIBUFS_X35Y46', 'B18', 1, 521, 177), 0);
+  assert.equal(bit('xc3s500efg320-4', 'RIOIS_X35Y45', 'C17', 1, 521, 177), 1);
+  // the left column's top clock row of the XC3S250E (bit 3): no pad sets or clears it any more (B3's R:REVINV held it)
+  const db = loadDb('xc3s250ecp132-4');
+  assert.deepEqual(Object.values(db.padFeats.B3).flat().filter(s => /^!?1[0-3],3$/.test(s)), []);
 });

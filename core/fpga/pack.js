@@ -467,12 +467,19 @@ function packWith(nl, { ucf = null, part = 'xc3s250ecp132-4', carryOut = 'pin', 
   }
   const asked = (kind, name) => { let v; for (const [k, re, x] of iobAsked) if (k === kind && name !== null && re.test(name)) v = x; return v; };
   const portName = n => { for (const p of nl.ports) for (const b of p.bits) if (b.net === n) return b.name; return null; };
+  // (an IOB register's clock comes from a global buffer, as ISE clocks the IOBs: the router reaches an I/O
+  // tile's clock pin from the global lines only, #671)
+  const onGlobal = n => driverCell(n)?.type === 'BUFG';
   const wantsIob = (f, port, role) => {
-    const a = asked('INST', f.name) ?? asked('NET', port);
-    if (a !== undefined) return a;
-    const h = cells[f.cell].attrs?.IOB ?? cells[f.cell].attrs?.iob;
-    if (h !== undefined) return /^(TRUE|FORCE|1)$/i.test(String(h).replace(/"/g, ''));
-    return iobRegs === 'b' || iobRegs === (role === 'I' ? 'i' : 'o');
+    const want = (() => {
+      const a = asked('INST', f.name) ?? asked('NET', port);
+      if (a !== undefined) return a;
+      const h = cells[f.cell].attrs?.IOB ?? cells[f.cell].attrs?.iob;
+      if (h !== undefined) return /^(TRUE|FORCE|1)$/i.test(String(h).replace(/"/g, ''));
+      return iobRegs === 'b' || iobRegs === (role === 'I' ? 'i' : 'o');
+    })();
+    if (want && !onGlobal(f.ctrl.clk)) { warnings.push(`flip-flop ${f.name} kept out of the IOB of ${port}: its clock ${nets[f.ctrl.clk].name} is not on a global clock buffer`); return false; }
+    return want;
   };
   const iobFf = new Map();   // pad buffer cell -> { I | O | T: ffInfo }
   const soleFf = n => { const d = driverCell(n); const f = d && ffs.get(ci(d)); return f && f.q === n && loadsOf(n).length === 1 ? f : null; };

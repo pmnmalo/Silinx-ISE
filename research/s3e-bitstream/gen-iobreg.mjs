@@ -28,6 +28,10 @@ const kr = te !== null ? +te : rot;
 // and rik never have an input register on those eight, so their plain input register was not measured)
 const outsLast = args.includes('--outs-last');
 if (outsLast) args.splice(args.indexOf('--outs-last'), 1);
+// --bufg SITE: only rd and rd2, their clock buffer on that BUFGMUX (the clock pad reaching it through general
+// routing), so that the I/O tiles' clock pins are clocked from its global line (#671: lines 0-7, each buffer
+// of the top and bottom drives one)
+const bufg = opt('--bufg', null);
 const [out] = args;
 const pads = [...deviceSites(loadDeviceCache(PART)).pads.values()].sort((a, b) => (a.tile < b.tile ? -1 : a.tile > b.tile ? 1 : a.name < b.name ? -1 : 1));
 const rest = pads.filter(p => p.name !== clkPin);
@@ -38,16 +42,16 @@ use IEEE.NUMERIC_STD.ALL;
 library UNISIM;
 use UNISIM.VCOMPONENTS.ALL;
 `;
-const write = (name, vhd, ucf) => {
+const write = (name, vhd, ucf, extra = []) => {
   fs.mkdirSync(`${out}/${name}`, { recursive: true });
   fs.writeFileSync(`${out}/${name}/top.vhd`, vhd);
-  fs.writeFileSync(`${out}/${name}/top.ucf`, ucf.map(([n, p]) => `NET "${n}" LOC = "${p}" ;`).join('\n') + '\n');
+  fs.writeFileSync(`${out}/${name}/top.ucf`, [...ucf.map(([n, p]) => `NET "${n}" LOC = "${p}" ;`), ...extra].join('\n') + '\n');
 };
 // an XOR tree of a vector into one bit (the registers' loads)
 const xorOf = (v, n) => Array.from({ length: n }, (_, i) => `${v}(${i})`).join(' xor ') || "'0'";
 
 // ri: input registers; ctl(0) enable, ctl(1) reset; q: eight outputs (input-only pads cannot drive them)
-for (const name of outsLast ? [rot ? `rio${rot}` : 'rio'] : te !== null ? [] : rot ? [`rik${rot}`] : ['ri']) {
+for (const name of bufg ? [] : outsLast ? [rot ? `rio${rot}` : 'rio'] : te !== null ? [] : rot ? [`rik${rot}`] : ['ri']) {
   const outs = outsLast ? io.slice(-8) : io.slice(0, 8), ctl = rest.filter(p => !outs.includes(p)).slice(0, 2);
   const ins = rest.filter(p => !outs.includes(p) && !ctl.includes(p));
   const n = ins.length;
@@ -82,7 +86,7 @@ end rtl;
 
 // ro, ro2, ro3: output registers (and one in three with a registered output enable: the pads i % 3 ==
 // 0, 1, 2); a shift register feeds them
-for (const [name, ph] of outsLast ? [] : te !== null ? [[`rtek${te}`, -1]] : rot ? [[`rok${rot}`, rot % 3]] : [['ro', 0], ['ro2', 1], ['ro3', 2]]) {
+for (const [name, ph] of outsLast || bufg ? [] : te !== null ? [[`rtek${te}`, -1]] : rot ? [[`rok${rot}`, rot % 3]] : [['ro', 0], ['ro2', 1], ['ro3', 2]]) {
   const ctl = rest.filter(p => p.inputOnly).slice(0, 2).concat(rest.filter(p => !p.inputOnly)).slice(0, 2);
   const outs = io.filter(p => !ctl.includes(p));
   const n = outs.length;
@@ -147,11 +151,12 @@ ${outs.map((_, i) => `  u_o${i} : ODDR2 generic map (DDR_ALIGNMENT => "NONE", IN
     port map (D0 => x(${i}), D1 => x(${(i + 1) % Math.max(ni, no)}), C0 => clkb, C1 => clkn, CE => ${i % 2 ? "'1'" : 'ctl(0)'}, R => ${i % 3 === 1 ? "'0'" : 'ctl(1)'}, S => ${i % 3 === 1 ? 'ctl(1)' : "'0'"}, Q => q(${i}));`).join('\n')}
 end rtl;
 `;
-  write(name, vhd, [['clk', clkPin], ...ctl.map((p, i) => [`ctl<${i}>`, p.name]), ...ins.map((p, i) => [`d<${i}>`, p.name]), ...outs.map((p, i) => [`q<${i}>`, p.name])]);
+  write(name, vhd, [['clk', clkPin], ...ctl.map((p, i) => [`ctl<${i}>`, p.name]), ...ins.map((p, i) => [`d<${i}>`, p.name]), ...outs.map((p, i) => [`q<${i}>`, p.name])],
+    bufg ? [`INST "u_b" LOC = "${bufg}" ;`, 'NET "clk" CLOCK_DEDICATED_ROUTE = FALSE ;'] : []);
 }
 // rt (#96): every pad that can drive an output a tristate output, its enable from the fabric (TMUX T1: a
 // flip-flop kept out of the IOB, one in two through an inverter), its data from a shift register
-if (!rot && te === null && !outsLast) {
+if (!rot && te === null && !outsLast && !bufg) {
   const ctl = rest.filter(p => p.inputOnly).slice(0, 1).concat(rest.filter(p => !p.inputOnly)).slice(0, 1);
   const outs = io.filter(p => !ctl.includes(p));
   const n = outs.length;
@@ -174,7 +179,7 @@ end rtl;
 }
 // rb: every pad a direct input (no register; their input delays: gen-iobrand.mjs --delays), eight
 // outputs (XORs of the inputs)
-for (const name of outsLast ? (rot ? [] : ['rbo']) : rot || te !== null ? [] : ['rb']) {
+for (const name of bufg ? [] : outsLast ? (rot ? [] : ['rbo']) : rot || te !== null ? [] : ['rb']) {
   const outs = outsLast ? io.slice(-8) : io.slice(0, 8);
   const ins = rest.filter(p => !outs.includes(p));
   const n = ins.length;
@@ -191,4 +196,4 @@ end rtl;
 `;
   write(name, vhd, [...ins.map((p, i) => [`d<${i}>`, p.name]), ...outs.map((p, i) => [`q<${i}>`, p.name])]);
 }
-console.log(`${pads.length} pads (${io.length + 1} that can drive an output): ${outsLast ? (rot ? `rio${rot}` : 'rio, rbo') : te !== null ? `rtek${te}` : rot ? `rik${rot}, rok${rot}` : 'ri, ro, ro2, ro3, rd, rd2, rt, rb'}`);
+console.log(`${pads.length} pads (${io.length + 1} that can drive an output): ${bufg ? `rd, rd2 (clock buffer ${bufg})` : outsLast ? (rot ? `rio${rot}` : 'rio, rbo') : te !== null ? `rtek${te}` : rot ? `rik${rot}, rok${rot}` : 'ri, ro, ro2, ro3, rd, rd2, rt, rb'}`);

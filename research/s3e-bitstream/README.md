@@ -56,6 +56,7 @@ reference design implemented by ISE (`top.xdl`, `top.bit`, from `top.v` / `top.u
 | `gen-dcmvcc.mjs` | #190: the DCM tiles' switches from their VCC site, one constant-1 net per DCM tile (then `gen-pipdrop.mjs`) |
 | `gen-iobreg.mjs`, `gen-iobrand.mjs`, `ana-iobreg.mjs` | Stage G: designs with registers in the IOBs of every pad (implemented by ISE), their settings and input delays at random (xdl variants), the bits of each pad's settings solved |
 | `gen-dcmhdl.mjs`, `gen-sidebufg.mjs` | Stage G: designs of several DCMs with settings of their own, and of subsets of the side global buffers, implemented by ISE from HDL (settings xdl refuses in an edited design; inputs in combination); `gen-sitevar.mjs` variants with other values on each instance (`perSite`) |
+| `measure-671.sh` (`gen-iobreg.mjs --bufg`), `pad-clock-rows.mjs`, `pad-owners.mjs` | #671: the I/O registers' clocks from every global line: rd / rd2 with their clock buffer on each top / bottom BUFGMUX in turn, implemented by ISE and measured by PIP drop; the clock rows' bits out of the pads' features, each bit of R:ICLK2INV:#OFF to its pad |
 | `dcm-pads.mjs`, `gen-dcmpad.mjs`, `measure-92.sh` | #92: every pad's dedicated path to a DCM's CLKIN and the switches on it the database lacks; designs whose DCMs take CLKIN from each of their clock pads in turn, implemented by ISE and measured by PIP drop |
 | `pip-exceptions.mjs` | The PIPs a tile type's features offer that some or all of its tiles do not have (#74), from the device descriptions, checked with ISE's arc probe: `absent` / `absentIn` in `db/s3e-tiles.json` and `db/<device>-tiles.json`, honoured by the router |
 | `impl-remote.sh`, `who-sets.mjs`, `gen-sitedrop.mjs`, `ana-sitedrop.mjs`, `gen-iorand.mjs`, `clkh-ll.mjs`, `dcm-mirror.mjs` | Stage F: `ise-impl.sh` on the remote machine for any part (`PART`); which feature of the database sets a bit; the settings of I/O, DCM and clock-buffer sites removed one at a time from a design routed by ISE; every pad at random settings; the XC3S1200E's long-line splitters; the other DCMs' settings as mirror images of the top-left one's |
@@ -805,8 +806,8 @@ enable from a flip-flop kept out of the IOB), implemented by ISE, with 24 random
 - **The packer** writes an output register as ISE's map does, with `O1_DDRMUX::1` (and `PCICE_MUX::OCE` with a clock
   enable): xdl -xdl2ncd refused it without on P6 / P7 of the XC3S250E-CP132. `test/fixtures/open-flow/feat_iob_plain`
   (Basys2-250: plain input and output registers, the enable from the fabric and from an IOB register) passes
-  `scripts/check-open-flow.mjs` (DRC clean, byte-identical); an input register on a left or top pad does not yet
-  (#671: the clocks of I/O registers through the left / right clock rows, and from general routing).
+  `scripts/check-open-flow.mjs` (DRC clean, byte-identical); an input register on a left or top pad did not yet
+  (#671, below).
 
 ### Every input delay on every pad but the clock pins (2026-10-20, #97)
 
@@ -872,6 +873,62 @@ That holds with no exception for the splitters' frames. Of the 1031 IOB designs,
 differ only by switches still unmeasured (12 of CLKV_LL, 40 of CLKT_LL / CLKB_LL, 20 per I/O column: the rounds'
 router reaches no path through them). 136 differ only by the left and right I/O columns' clock-row bits (#671). The
 rest have the input delays the database refuses on the clock pins (#97).
+
+### The I/O registers' clocks from every global line (2026-10-21, #671)
+
+`feat_iob_plain` with an input register on a left or top pad was DRC clean but 3 bits from ISE's bitgen. Two causes:
+the horizontal clock rows of the I/O columns (GCLKH_PCI_CE_S / _N) took GCLKH's bits at GCLKH's frames, and the router
+brought the top pad B4's register clock through general routing (`W2END4 -> IOIS_CLK0`; ISE's bitgen also set 3,71 of
+the tile, which no switch changed: B4's own bit, below) although a global path of known bits was there: the clock search
+kept to the GCLK wires and the sink, and an I/O register's clock pin is one switch further (`GCLKk -> IOIS_CLKj ->
+ICLK1x`).
+Besides, the left and right I/O tiles' clock pins were measured from line 4 only (#44).
+
+`measure-671.sh`: rd and rd2 of `gen-iobreg.mjs` (IDDR2 / ODDR2 on every pad: every clock pin of every I/O tile) with
+their clock buffer on each of the eight top and bottom BUFGMUXes in turn (`--bufg`: line k from BUFGMUX_X2Y1, X2Y0,
+X1Y1, X1Y0, X2Y11, X2Y10, X1Y11, X1Y10, the same sites on the four devices), implemented by ISE, every PIP removed by
+codewords (`gen-pipdrop.mjs`, 20 variants), solved (`ana-pipdrop.mjs`, `pips-to-db.mjs`): 48 designs and 1 008
+xdl + bitgen runs on the XC3S250E (every bonded pad), the XC3S100E (a right-side tile's third IOB, K13, which the
+XC3S250E does not bond) and the XC3S1200E (the RIBUFS_BRK pads); about 2 hours of wall time with two containers.
+
+- **The switches the database had** (2 037 / 2 009 / 3 435 features on the XC3S100E / 250E / 1200E): the same bits,
+  but for 7 far bits of the XC3S1200E's long-line splitters' and the clock rows below.
+- **The I/O columns' clock rows** have GCLKH's 16 switches, every one in every row and on the three devices: in the
+  right column at GCLKH's frames, in the left one **2 frames further** (the column's two extra frames come first;
+  the writer had them 2 frames early there: GCLKH_PCI_CE_S_X0Y5 `GCLKH_GCLK4 -> GCLKH_GCLK_DN4` is frame 12, bit 2335,
+  not 10). The layouts give these two types a column start of their own (`typeCols`, `gen-layout.mjs`): the left
+  column's first frame + 2, the right one's.
+- **The side I/O tiles' clock pins from every line**: `GCLKk -> IOIS_CLKj` (and `GCLKk_BRK` in the break rows'
+  tiles), 3 bits each, the same in every tile type of a side, the right side's the left side's 2 frames earlier (50
+  of 50 measured on both): 1 078 features given to every I/O tile type of their side (as `unify-io.mjs` shares the
+  switch box), with 8 inputs of the clock tiles' CLKDUB the designs' clock pad took (CLOCK_DEDICATED_ROUTE = FALSE):
+  `measured/learn-16iob-clk-lines.json`. What stays unknown are the third sites of the BRK tiles, which no package
+  bonds.
+
+**Two kinds of bits in the pads' own features** (#44 / #96's solution, from designs whose registers were all clocked
+from line 4 and where both pads of every I/O tile had an input register), found by `scripts/check-open-flow.mjs` on the
+designs below (DRC clean, but up to 7 bits from ISE's):
+
+- **The clock rows' bits**: one pad of each clock row's group (B3, M2 on the XC3S250E) had in its `R:REVINV:…` line
+  4's clock-row bits at the wrong frames cleared and at the right ones set: the writer's error, made up for. With a
+  register on line 5 they cleared line 5's bits. `pad-clock-rows.mjs` removes every bit of the I/O columns' clock
+  rows from the pads' features (24 / 42 / 48 / 12 bits on the XC3S100E / 250E / 500E / 1200E).
+- **`R:ICLK2INV:#OFF`'s bits** (4 / 4 / 28 / 24) went to a pad other than their own: the other pad of the tile (the 3,71
+  of TIOIS_X3Y35 the issue saw is B4's, given to C4) or a pad of the next tile (C17's to B18). Two designs per device, an
+  input register on only the first, then only the second, pad of every tile where such a bit lies: each bit set in
+  exactly one, by its owner (`measured/fix-27iclk2-owners.json`, applied by `pad-owners.mjs`; both scripts run at the
+  end of `build-db.sh`).
+- Still open (#751): 5 bits of `IFD:DLY3` on the XC3S500E / 1200E that ISE sets only when both pads of the tile have an
+  input register.
+
+**The Silinx toolchain:** the router's clock search also takes an I/O tile's IOIS_CLKj on its way to the sink (a node
+with a switch straight into it, as a DCM's CLKIN), and `knownRouting` never offers a switch from general routing into
+IOIS_CLKj (ISE clocks the IOBs from the global lines); the packer keeps out of the IOB a register whose clock is not on
+a global buffer (with a warning). The two IOBs of an I/O tile share each clock wire (`IOIS_CLK1 -> OTCLK10 /
+OTCLK11`): two registers of one tile on different clocks do not route (#749). `feat_iob_plain` (its registers on pads
+of the four sides) and `feat_iob_lines` (new: eight global clocks, lines 0-7, each clocking IOB registers of left and
+right pads; on the four devices with pads of each picked by `test/ise/open-flow.test.js`) and the lone-register designs
+pass `scripts/check-open-flow.mjs`: DRC clean, byte-identical to ISE's bitgen (CRC on and off).
 
 ### The PIPs a tile does not have (2026-10-13, #74)
 

@@ -89,3 +89,7 @@ fi
 # the PIPs of the shared tile types that some or all of a type's tiles do not have (#74)
 unset PART
 node pip-exceptions.mjs
+# the I/O columns' clock rows' bits out of the pads' own features (#671: #44's solution held the writer's error there)
+node pad-clock-rows.mjs
+# the bits of R:ICLK2INV:#OFF given to the pads they belong to (#671, measured/fix-27iclk2-owners.json)
+node pad-owners.mjs

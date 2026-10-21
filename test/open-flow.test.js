@@ -243,9 +243,19 @@ const FEATURES = {
   feat_iobreg: [/^pack \(1 slices\)/m, 'IOB', [/^inst "sw<0>" "IBUF",placed \S+ P11 +,\n {2}cfg "[^"]* IFF1:[^"]* ICEINV::ICE [^"]*IFD_DELAY_VALUE::DLY3 /m,
     /^inst "led<0>" "IOB",placed \S+ M5 +,\n {2}cfg "[^"]* OMUX::OFF1 [^"]* OFF1:/m, /^inst "led<1>" "IOB",placed \S+ P6 +,\n {2}cfg "[^"]* OMUX::OFF1 [^"]* TMUX::TFF1 [^"]* TFF1:/m]],
   // plain registers in the IOBs (no enable, no set / reset), a tristate output's enable from the fabric and from an IOB
-  // register (#96: measured on every pad in its second round)
+  // register (#96: measured on every pad in its second round); on pads of the four sides, every register's clock from
+  // the global lines (#671: B4's, on the top, came through general routing, W2END4 -> IOIS_CLK0), the left and right
+  // pads' through the I/O columns' clock rows
   feat_iob_plain: [/^pack \(\d+ slices\)/m, 'IOB', [/^inst "sw<0>" "IBUF",placed \S+ P11 +,\n {2}cfg "[^"]* IFF1:/m, /^inst "led<4>" "IOB",placed \S+ N5 +,\n {2}cfg "[^"]* TMUX::T1 /m,
-    /^inst "led<5>" "IOB",placed \S+ N4 +,\n {2}cfg "[^"]* TMUX::TFF1 [^"]* O1_DDRMUX::1 /m]],
+    /^inst "led<5>" "IOB",placed \S+ N4 +,\n {2}cfg "[^"]* TMUX::TFF1 [^"]* O1_DDRMUX::1 /m, /^inst "sw<3>" "IBUF",placed TIOIS_X3Y35 B4 +,\n {2}cfg "[^"]* IFF1:/m,
+    /^inst "btn<0>" "IBUF",placed RIBUFS_PCI_X27Y21 G12 +,\n {2}cfg "[^"]* IFF1:/m, /^inst "an<0>" "IOB",placed RIOIS_X27Y24 F12 +,\n {2}cfg "[^"]* OFF1:/m,
+    /^ {2}pip TIOIS_X3Y35 GCLK\d -> IOIS_CLK0 ,$/m, /^ {2}pip GCLKH_PCI_CE_S_X0Y5 GCLKH_GCLK\d -> GCLKH_GCLK_DN\d ,$/m, /^ {2}pip GCLKH_PCI_CE_N_X27Y21 GCLKH_GCLK\d -> GCLKH_GCLK_UP\d ,$/m],
+    [/^ {2}pip \S+ (?:[EWNS][26]\w+|L[HV]\d+|OMUX\w*) -> IOIS_CLK\d ,$/m]],
+  // eight global clocks (the eight top and bottom buffers: lines 0-7), each clocking IOB registers of left and right pads
+  // (#671: the side I/O tiles' clock pins were measured from line 4 only)
+  feat_iob_lines: [/^pack \(\d+ slices\)/m, 'IOB', [...[0, 1, 2, 3, 4, 5, 6, 7].map(k => new RegExp(`^ {2}pip [LR]I(?:OIS|BUFS)\\w*_X\\d+Y\\d+ GCLK${k} -> IOIS_CLK\\d ,$`, 'm')),
+    /^inst "btn<0>" "IBUF",placed RIBUFS_PCI_X27Y21 G12 +,\n {2}cfg "[^"]* IFF1:/m, /^inst "led<7>" "IOB",placed LIOIS_PCI_X0Y19 G1 +,\n {2}cfg "[^"]* OFF1:/m],
+    [/^ {2}pip \S+ (?:[EWNS][26]\w+|L[HV]\d+|OMUX\w*) -> IOIS_CLK\d ,$/m]],
   feat_starter: [/^pack \(\d+ slices\)/m, 'IOB', [/IOATTRBOX::LVTTL\b/, /DRIVEATTRBOX::8\b/, /DRIVEATTRBOX::4\b/, /SLEW::FAST\b/, /PULL::PULLUP\b/, /PULL::PULLDOWN\b/]],
 };
 for (const [name, [packLine, type, settings = [], absent = []]] of Object.entries(FEATURES)) {

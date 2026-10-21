@@ -330,14 +330,15 @@ test('the XC3S1200E\'s other long-line splitters (#709): the centre column\'s an
 test('the PIPs a tile type\'s features offer that its tiles do not have (#74): measured on ISE\'s device descriptions, refused to the router', () => {
   const t = JSON.parse(fs.readFileSync(path.join(DB_DIR, 's3e-tiles.json'), 'utf8')).types;
   // every tile of the type, on every device: [wires (every PIP into or out of it), PIPs]; the left and
-  // right I/O tiles also lack GCLK4_BRK (their features have the clock-row tiles' GCLK4_BRK -> IOIS_CLKk, #48); the
+  // right I/O tiles also lack GCLK0-7_BRK (their features have the clock-row tiles' GCLKk_BRK -> IOIS_CLKj: line 4's, #48,
+  // the others', #671); the
   // tiles with the CLB's switch box but no SLICEM lack SHIFTOUT2 and SHIFTIN0 (the CLB's SHIFTOUT2 -> SHIFTIN0, #2)
   const counts = Object.fromEntries(Object.entries(t).filter(([, v]) => v.absent).map(([k, v]) => [k, [v.absent.filter(x => !x.includes('->')).length, v.absent.filter(x => x.includes('->')).length]]));
-  const io = [102, 433], io4 = [103, 433], sb = [142, 218], cnr = [142, 250], bram = [142, 0], gclkh = [8, 0];
+  const io = [102, 433], io4 = [110, 433], sb = [142, 218], cnr = [142, 250], bram = [142, 0], gclkh = [8, 0];
   assert.deepEqual(counts, {
-    CENTER_SMALL_BRK: [8, 0], BIOIS: io, BIBUFS: io, LIOIS_PCI: io4, LIBUFS_PCI: io4, RIOIS: io4, RIBUFS_PCI: io4, RIOIS_PCI: [103, 436],
-    RIBUFS_CLK_PCI: [99, 446], RIOIS_CLK_PCI: [99, 452], LIOIS_CLK_PCI: [99, 449], LIBUFS_CLK_PCI: [99, 449], RIBUFS: [103, 425], RIBUFS_BRK: [110, 425],
-    TIBUFS: [102, 429], TIOIS: [102, 429], LIOIS: [103, 430], LIOIS_BRK: [110, 430], LIBUFS: [103, 422],
+    CENTER_SMALL_BRK: [8, 0], BIOIS: io, BIBUFS: io, LIOIS_PCI: io4, LIBUFS_PCI: io4, RIOIS: io4, RIBUFS_PCI: io4, RIOIS_PCI: [110, 436],
+    RIBUFS_CLK_PCI: [106, 446], RIOIS_CLK_PCI: [106, 452], LIOIS_CLK_PCI: [106, 449], LIBUFS_CLK_PCI: [106, 449], RIBUFS: [110, 425], RIBUFS_BRK: [110, 425],
+    TIBUFS: [102, 429], TIOIS: [102, 429], LIOIS: [110, 430], LIOIS_BRK: [110, 430], LIBUFS: [110, 422],
     BRAM0_SMALL: bram, BRAM1_SMALL: bram, BRAM2_SMALL: bram, BRAM3_SMALL: bram, BRAM3_SMALL_BRK: [150, 0],
     LL: cnr, LR: cnr, UL: cnr, UR: cnr,
     DCM_BL_CENTER: sb, DCM_BR_CENTER: sb, DCM_TL_CENTER: sb, DCM_TR_CENTER: sb, DCMAUX_BL_CENTER: [142, 219], DCMAUX_TL_CENTER: [142, 219],

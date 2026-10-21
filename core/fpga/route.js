@@ -120,6 +120,18 @@ class Heap {
 }
 
 // ------------------------------------------------------------------ the router
+/** Nodes of the I/O tiles' clock wires (IOIS_CLK0-7: the clock multiplexers before the I/O registers' clock pins). */
+function ioClockMask(device) {
+  if (device._ioClockMask) return device._ioClockMask;
+  const mask = new Uint8Array(device.nodeCount);
+  const name = device.names.map(n => /^IOIS_CLK\d$/.test(n));
+  for (let w = 0; w < device.wireCount; w++) {
+    const k = device.wireTile[w], tp = device.templates[device.tileTemplate[k]];
+    if (name[tp.wires[w - device.tileWireBase[k]]]) mask[device.nodeOf[w]] = 1;
+  }
+  return (device._ioClockMask = mask);
+}
+
 /** Nodes of the dedicated global clock network: nodes with a GCLK wire (CLKT_GCLK_MAIN, GCLKVC, GCLKH, the CLBs' GCLK0-7…). */
 function globalClockMask(device) {
   if (device._gclkMask) return device._gclkMask;
@@ -296,8 +308,8 @@ export function routeDesign(design, device, opts = {}) {
         if (owner[m] >= 0 && owner[m] !== netIdx) continue;
         if (blockUsed && occ[m] > 0 && !stealPen) continue;
         // (on the clock network: its nodes, and the one switch off it into the sink, a DCM's CLKIN /
-        // CLKFB through DCM_CLKIN, #93)
-        if (restrict && !restrict[m] && m !== sink && !(dcmClockPin.has(sink) && into(m, sink))) continue;
+        // CLKFB through DCM_CLKIN, #93, an I/O register's clock pin through its tile's IOIS_CLKj, #671)
+        if (restrict && !restrict[m] && m !== sink && !((dcmClockPin.has(sink) || ioClock[m]) && into(m, sink))) continue;
         if (inBox && (nodeR1[m] < boxR0 || nodeR0[m] > boxR1 || nodeC1[m] < boxC0 || nodeC0[m] > boxC1)) continue;
         if (allowed && allowed[e] !== 1 && !edgeOk(e)) continue;
         const over = occ[m];      // other nets on this node (this net is ripped up)
@@ -313,7 +325,9 @@ export function routeDesign(design, device, opts = {}) {
     }
     return null;
   };
-  // the DCMs' clock inputs, and a node with a switch straight into the sink
+  // the DCMs' clock inputs, the I/O tiles' clock wires (IOIS_CLKj -> ICLK1 / OTCLK1…), and a node with a
+  // switch straight into the sink
+  const ioClock = ioClockMask(device);
   const dcmClockPin = new Set(device.sites('DCM').flatMap(d => ['CLKIN', 'CLKFB'].map(p => device.sitePinNode(d.name, p))).filter(n => n >= 0));
   const into = (m, sink) => { for (let e = edgeStart[m], e1 = edgeStart[m + 1]; e < e1; e++) if (edgeTo[e] === sink && !(edgeFlags[e] & PIP_ROUTETHRU) && (!allowed || allowed[e] === 1 || edgeOk(e))) return true; return false; };
   const ripUp = i => { if (trees[i]) for (const n of trees[i].keys()) occ[n]--; trees[i] = null; };

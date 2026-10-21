@@ -87,6 +87,24 @@ test('IOB registers: the UCF\'s IOB = TRUE / FALSE on a net (UCF wildcards) or a
   same(att, pack(att, { iobRegs: 'b' }));
 });
 
+// #671: the router reaches an I/O register's clock pin from the global lines only (as ISE clocks the IOBs): a register
+// asked into the IOB whose clock is not on a global buffer stays in a slice
+test('IOB registers: a register whose clock is not on a global clock buffer stays out of the IOB, with a warning (#671)', () => {
+  // dclk: a clock divided in the fabric (a flip-flop's output, no BUFG); ra on it, rb on the global clock
+  const nl = design({
+    rd: fdre('nd', 'dclk'), nd: ['LUT1', { I0: 'dclk', O: 'nd' }, { INIT: '01' }],
+    ra: ['FDRE', { C: 'dclk', CE: '1', R: '0', D: 'a', Q: 'qa' }], rb: fdre('b', 'qb'), x: lut2('qa', 'qb', 'q'),
+  }, { ins: ['a', 'b'], outs: ['q'] });
+  const regs = p => p.insts.filter(i => i.kind === 'iob').flatMap(i => i.cfg.filter(c => /^[IOT]FF1$/.test(c.attr)).map(c => c.name)).sort();
+  const p = pack(nl, { ucf: 'NET "a" IOB = TRUE ;\nNET "b" IOB = TRUE ;' });
+  assert.deepEqual(regs(p), ['rb']);
+  assert.equal(p.warnings.length, 1);
+  assert.match(p.warnings[0], /^flip-flop ra kept out of the IOB of a: its clock \S+ is not on a global clock buffer$/);
+  // not asked: no warning
+  assert.deepEqual(pack(nl, { ucf: 'NET "b" IOB = TRUE ;' }).warnings, []);
+  same(nl, p);
+});
+
 test('IOB registers: the input register\'s settings as ISE\'s map writes them, its delay the one ISE chooses (DLY2 on the XC3S100E), its site pins', () => {
   // with an asynchronous clear and a clock enable from inputs, read by an output's logic; the pad's input not used directly
   const nl = design({ ra: fdce('a', 'qa', 'ce', 'clr'), x: lut2('qa', 'ce', 'q') }, { ins: ['a', 'ce', 'clr'], outs: ['q'] });
