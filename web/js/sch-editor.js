@@ -480,8 +480,9 @@ export function mountSchEditor(container, opts = {}) {
   namesBox.addEventListener('change', () => { showNames = namesBox.checked; try { localStorage.setItem('xl.sch.names', showNames ? '1' : '0'); } catch { /* ignore */ } render(); });
   // Hop-overs (#692): a small arc where two wires cross without connecting (a view only: the nets, the HDL
   // the same)
-  let showHops = false;
-  try { showHops = localStorage.getItem('xl.sch.hops') === '1'; } catch { /* default */ }
+  // hop-overs on by default (#756), off only when the user turned them off (remembered)
+  let showHops = true;
+  try { showHops = localStorage.getItem('xl.sch.hops') !== '0'; } catch { /* default */ }
   const hopsBox = h('input', { type: 'checkbox', checked: showHops });
   hopsBox.addEventListener('change', () => { showHops = hopsBox.checked; try { localStorage.setItem('xl.sch.hops', showHops ? '1' : '0'); } catch { /* ignore */ } render(); });
   const optBox = h('span', { class: 'se-opts' });
