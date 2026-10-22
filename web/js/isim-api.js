@@ -1,18 +1,23 @@
 // ISim's public API (#405: out of mountISim in isim.js): what the app calls on a simulation window (refresh, run,
 // step, restart, add signals, destroy, redraw, a command), its state saved and restored (the rows and their groups,
-// the cursor and markers, the view, the panels' sizes, the run time, the forces), and the waveform exported as VCD.
+// the cursor and markers, the view, the panels' sizes, the run time, the forces), its wave configuration as a .wcfg
+// file (isim-wcfg.js, #1019), and the waveform exported as VCD.
 import * as V from '/core/values.js';
+import { mountWcfg } from './isim-wcfg.js';
 import { applyStimuli } from '/core/stimuli.js';
 import { toVCD } from '/core/simulator.js';
 
 /** { api, exportVCD } of mountISim (consoleH(), leftW(), needScroll(), objDirty(), rafId(): its current values). */
 export function mountApi(ctx) {
   const {
-    addSignals, applyFit, applySizes, cleanups, clearBits, newRow, rebuildFlat, closeDialog, consoleH, design, draw, echo, execCommand, findInst, injectForce,
+    opts, addSignals, applyFit, applySizes, cleanups, clearBits, newRow, rebuildFlat, closeDialog, consoleH, design, draw, echo, execCommand, findInst, injectForce,
     invalidate, layout, leftW, logLine, needScroll, objDirty, rafId, readColors, renderObjects, renderTree, rfUnit,
     rfVal, root, runAllCap, runTo, setMsg, sim, st, stepEvent, stopRuns, topSig, setObjDirty, setLeftW, setConsoleH,
     setRafId, setNeedScroll
   } = ctx;
+
+  // the wave configuration (#1019)
+  const { wcfgText, applyWcfg, saveWcfg, loadWcfg } = mountWcfg({ opts, st, design, newRow, rebuildFlat, invalidate, logLine });
 
   // ---------------------------------------------------------------- public API
   const api = {
@@ -94,6 +99,7 @@ export function mountApi(ctx) {
     redraw() { if (rafId()) { cancelAnimationFrame(rafId()); setRafId(0); } setNeedScroll(true); draw(); },
     exec: (cmd) => execCommand(cmd),
     exportVCD: () => exportVCD(),
+    wcfg: () => wcfgText(), setWcfg: (text, name) => applyWcfg(text, name), saveWcfg, loadWcfg,
     get state() { return st; },
   };
 

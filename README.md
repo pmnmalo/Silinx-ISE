@@ -115,7 +115,7 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Behavioural simulation** with Silinx's own simulator, SSim (the Silinx Simulator), written from scratch in JavaScript:
   4-state logic, delta cycles, VHDL/Verilog testbenches (`wait`, `#delay`, `assert`/`report`,
   `$display`, `$readmemh`…), a waveform window in the style of Xilinx's ISim (dividers, groups of signals), force/clock to
-  simulate modules without a testbench, VCD export.
+  simulate modules without a testbench, its wave configuration saved and loaded as a file of the project (.wcfg, as ISim's).
 - **Stimuli drawn on the waveforms**, as the HDL Bencher (Test Bench Waveform) of the old ISE: simulating a
   module without a test bench, *Edit Stimuli* in SSim lays its inputs out as a grid of cycles (a clock and its
   period, or combinational with a time step). A click on a cycle of an input changes it there and up to its

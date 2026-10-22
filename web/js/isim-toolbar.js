@@ -1,13 +1,13 @@
 // ISim's toolbar (#405: out of mountISim in isim.js): restart, run all, run for a time (its value and unit), step,
-// break, the zooms, the cursor's moves, a marker, the radix, the VCD export, and Edit Stimuli with its bar of
-// commands (#336, #853) when the window can draw stimuli.
+// break, the zooms, the cursor's moves, a marker, the radix, Save and Load Wave Configuration (#1019: with
+// opts.wcfg; no VCD export), and Edit Stimuli with its bar of commands (#336, #853) when the window can draw stimuli.
 import { h } from './dom.js';
 import { ICON, UNITS, parseTime } from './isim.js';
 
 /** { btns, rfUnit, rfVal, stimBar } of mountISim (api(): its current values). */
 export function mountToolbar(ctx) {
   const {
-    opts, $, addMarker, api, breakCommands, echo, enqueue, ensureVisible, exportVCD, fillStim, jumpEdge, logLine,
+    opts, $, addMarker, api, breakCommands, echo, enqueue, ensureVisible, fillStim, jumpEdge, logLine,
     radixItems, setCursor, showMenu, sim, st, stimOpt, timingDialog, toggleStim, zoomAt, zoomFit
   } = ctx;
 
@@ -45,8 +45,11 @@ export function mountToolbar(ctx) {
     const r = radixBtn.getBoundingClientRect();
     showMenu(r.left, r.bottom, radixItems());
   });
-  sep();
-  addBtn('vcd', 'Export waveform as VCD', () => exportVCD());
+  if (opts.wcfg) {
+    sep();
+    addBtn('wcfgSave', 'Save Wave Configuration', () => api().saveWcfg());
+    addBtn('wcfgLoad', 'Load Wave Configuration', () => api().loadWcfg());
+  }
   // the stimuli drawn on the inputs' waveforms (#336), with their bar of commands
   const stimBar = h('div', { class: 'isim-stimbar' });
   stimBar.hidden = true;

@@ -127,6 +127,15 @@ test('emulator (#347): the manual clock note is translated', () => {
   assert.equal(t('Manual clock ck (SW): one edge per press · not emulated: x'), 'Relógio manual ck (SW): um flanco em cada pressão · não emulado: x');
 });
 
+test('the wave configuration (#1019): its buttons, dialogs and messages translated', () => {
+  assert.deepEqual(['Save Wave Configuration', 'Load Wave Configuration', 'File name in the project:', 'Wave configuration:', 'Load',
+    'The project has no wave configuration (.wcfg) yet: save one first.',
+    "'a b' is not a valid file name (letters, digits, _ . - and folders; .wcfg).", 'sim/tb.wcfg already exists. Overwrite it?'].map(t),
+  ['Guardar Configuração de Formas de Onda', 'Carregar Configuração de Formas de Onda', 'Nome do ficheiro no projeto:', 'Configuração de formas de onda:', 'Carregar',
+    'O projeto ainda não tem configurações de formas de onda (.wcfg): guarde uma primeiro.',
+    "'a b' não é um nome de ficheiro válido (letras, algarismos, _ . - e pastas; .wcfg).", 'sim/tb.wcfg já existe. Substituí-lo?']);
+});
+
 test('SSim (#920): the simulator\'s labels translated with its name, SSim; no label of it says ISim', () => {
   assert.deepEqual(['SSim Simulator', 'Type an SSim command (help)', 'SSim (VHDL/Verilog; Silinx Simulator)'].map(t),
     ['Simulador SSim', 'Escreva um comando do SSim (help)', 'SSim (VHDL/Verilog; Simulador Silinx)']);
