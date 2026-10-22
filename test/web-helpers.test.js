@@ -88,7 +88,7 @@ const ALU_V = `module valu #(parameter N = 4) (input [N-1:0] a, input [N-1:0] b,
 endmodule
 `;
 
-test('instantiation templates (View HDL Instantiation Template, Instantiate module) compile in a parent design', () => {
+test('instantiation templates (Instantiate module) compile in a parent design', () => {
   const mv = moduleInfo(ALU_VHDL, 'vhdl', 'alu');
   assert.deepEqual(mv.portList.map((p) => `${p.dir} ${p.name}: ${p.type}`.toLowerCase()), ['in a: std_logic_vector(n-1 downto 0)', 'in b: std_logic_vector(n-1 downto 0)', 'in op: std_logic', 'out y: std_logic_vector(n-1 downto 0)']);
   const vinst = instTemplate(mv, 'vhdl');

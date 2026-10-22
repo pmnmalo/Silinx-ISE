@@ -213,7 +213,7 @@ uiTest('Design hierarchy: modules, instances, files, views; set top by right-cli
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#libs-page .lbl')].map((e) => e.textContent)), ['work', 'top', 'sub', 'tb_top']);
 });
 
-uiTest('processes that need no ISE: templates, RTL schematic, constraints, pin planning, summary, emulator, iMPACT, properties', E, async (page) => {
+uiTest('processes that need no ISE: RTL schematic, constraints, pin planning, summary, emulator, iMPACT, properties', E, async (page) => {
   await project('ProcPj', { 'constraints/top.ucf': 'NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;\nNET "sw<0>" LOC = "P11" ;\n' });
   await page.openProject('ProcPj');
   await page.treeRow('#hier', 'top');
@@ -222,7 +222,8 @@ uiTest('processes that need no ISE: templates, RTL schematic, constraints, pin p
     await page.treeRow('#procs', label, { dbl: true, exact: true });
     await page.waitFor(check, [], { what: what || label, timeout: 15000 });
   };
-  await run('View HDL Instantiation Template', () => window.Silinx.active?.id === 'tpl:top' && /u_top : entity work\.top/.test(window.Silinx.active.editor.getValue()));
+  // no Design Utilities, no View HDL Instantiation Template (#1072)
+  assert.ok(!(await page.eval(() => [...document.querySelectorAll('#procs .lbl')].some((l) => /Design Utilities|Instantiation Template/.test(l.textContent)))));
   await run('View RTL Schematic', () => window.Silinx.active?.id === 'rtl:top' && document.querySelectorAll('.doc:not([hidden]) .se-svg [data-kind=sym]').length >= 2);
   // the RTL schematic pushes into an instance and comes back up
   assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .rtl-crumbs').innerText), /top : top/);

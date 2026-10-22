@@ -25,7 +25,7 @@ test('taskOfDoc: each kind of document belongs to one task (the editors and the 
   const cases = {
     isim: 'sim', emulator: 'emu', impact: 'prog',
     summary: 'impl', pins: 'impl', fpgaview: 'impl', 'text:pong.pwr': 'impl', 'tech:pong': 'impl', 'rtl:pong': 'impl',
-    'file:src/pong.v': 'edit', 'file:constraints/top.ucf': 'edit', 'tpl:debounce': 'edit',
+    'file:src/pong.v': 'edit', 'file:constraints/top.ucf': 'edit',
     'asm:src/speed_ctrl.asm.json': 'edit', 'sch:src/gates.sch.json': 'edit', 'fsm:src/traffic.fsm.json': 'edit',
     'tt:src/lamps.tt.json': 'edit', 'ttsch:src/lamps.tt.json': 'edit', 'pn:src/net.pn.json': 'edit',
   };

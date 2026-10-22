@@ -7,7 +7,7 @@ import { compile, elaborate } from '/core/compile.js';
 import { reservedModuleDiags } from '/core/reserved.js';
 import * as wiz from './wizards.js';
 import { designDiags, sevWord } from './diaghelp.js';
-import { S, flushDoc, openFile, openFpgaView, openImpact, openInstTemplate, openPinPlanner, openSummary, openUcf,
+import { S, flushDoc, openFile, openFpgaView, openImpact, openPinPlanner, openSummary, openUcf,
   status, withPrimitives } from './app.js';
 import { log, showConsolePage, setDiagnostics } from './console.js';
 import { SYNTH_OPEN, backAnnotatePins, checkUcfFile, generateSimModel, postParTiming, runImpl, stopProcesses,
@@ -94,9 +94,6 @@ function selectionProcesses() {
     ] : []),
     ...(sel.wizard ? [{ id: 'wiz-open', label: wizardProcessOf(sel.file), ico: 'template', run: () => openWizardModule(sel.file) }] : []),
     SUMMARY_PROC,
-    { id: 'utils', label: 'Design Utilities', ico: 'procGroup', children: [
-      { id: 'template', label: 'View HDL Instantiation Template', ico: 'template', run: () => openInstTemplate(mod) },
-    ] },
     { id: 'constraints', label: 'User Constraints', ico: 'procGroup', children: [
       { id: 'pins', label: 'I/O Pin Planning', ico: 'pins', run: () => openPinPlanner(mod) },
       { id: 'ucf-edit', label: 'Edit Constraints (Text)', ico: 'ucf', run: () => openUcf() },

@@ -491,7 +491,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
 }
 
 
-// Instantiation template for a module (used by completion and "View HDL Instantiation Template").
+// Instantiation template for a module (used by completion and Instantiate module).
 export function instTemplate(m, lang) {
   const ports = m.portList || [];
   const params = m.paramList || [];

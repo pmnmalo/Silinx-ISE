@@ -614,24 +614,6 @@ export async function openUcf() {
   openFile(pj.constraints);
 }
 
-export function openInstTemplate(mod) {
-  const m = moduleInfo(mod);
-  if (!m) return;
-  const lang = m.lang;
-  const txt = (lang === 'vhdl'
-    ? `-- Instantiation template for ${m.name} (copy into the architecture body)\n\n`
-    : `// Instantiation template for ${m.name}\n\n`) + instTemplate(m, lang) + '\n';
-  openDoc({
-    id: `tpl:${mod}`, title: `${mod}.${lang === 'vhdl' ? 'vhi' : 'tfi'}`, icon: 'template',
-    create(el, d) {
-      const host = h('div', { class: 'editor-host' });
-      el.append(host);
-      d.editor = createEditor(host, { text: txt, lang, readOnly: true, path: '' });
-      return { onActivate: () => setTimeout(() => d.editor.refresh(), 0) };
-    },
-  });
-}
-
 // ------------------------------------------------------------------ viewers: schematics, ISim, Board Emulator (web/js/viewers.js)
 
 // ------------------------------------------------------------------ drawings and their HDL (web/js/drawings.js)
