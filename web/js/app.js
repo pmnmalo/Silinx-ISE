@@ -883,7 +883,6 @@ async function boot() {
   for (const k of [$('palette-kbd'), ...document.querySelectorAll('.pal-key')]) k.textContent = mac ? '⌘ K' : 'Ctrl K';
   $('palette-btn').addEventListener('click', () => showPalette());
   $('theme-btn').addEventListener('click', () => toggleTheme());
-  $('title-project').addEventListener('click', () => wiz.openProjectDialog());
   document.querySelectorAll('#left-tabs .tab').forEach(t => t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.click(); } }));
   initTasks(app);   // the Tasks interface's switchers and bar (built in every interface, shown in that one: #804)
   for (const ev of ['click', 'keyup']) addEventListener(ev, () => setTimeout(refreshSteps), true);

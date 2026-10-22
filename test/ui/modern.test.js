@@ -44,7 +44,7 @@ uiTest('modern interface by default: header with search, activity bar, tabs on t
       tabsOnTop: r('doc-tabs').top < r('workspace').top,
       consoleTabsOnTop: r('console-tabs').top < r('console-body').top,
       empty: vis('#ws-empty'),
-      project: document.getElementById('title-project').textContent,
+      project: document.getElementById('title-project'),
       titlebar: document.getElementById('titlebar').innerText,
       steps: [...document.querySelectorAll('#toolbar .m-step')].map((b) => [b.textContent, b.disabled]),
       hiddenIcons: [...document.querySelectorAll('#toolbar .tb-btn')].filter((b) => !b.getClientRects().length).map((b) => b.dataset.cmd),
@@ -56,17 +56,16 @@ uiTest('modern interface by default: header with search, activity bar, tabs on t
   assert.ok(L.tabsOnTop, 'document tabs above the editor');
   assert.ok(L.consoleTabsOnTop, 'Console / Errors / Warnings above the log');
   assert.ok(L.empty, 'empty state when no document is open');
-  assert.equal(L.project, 'No project open');
+  assert.equal(L.project, null, 'no project chip in the header (#1042)');
   assert.doesNotMatch(L.titlebar, /Silinx|\d+\.\d+\.\d+/, 'no product and version in the header (#987)');
   // without a project only Program (iMPACT) can run
   assert.deepEqual(L.steps, [['Check', true], ['Simulate', true], ['Implement', true], ['Emulate', true], ['Program', false]]);
   assert.deepEqual(L.hiddenIcons.sort(), ['asm', 'impact', 'run', 'wave'], 'icons covered by the labelled steps are hidden (Cut / Copy / Paste shown: they reach every editor, #677)');
   assert.equal(L.classicTitle, false);
-  // a project: its name in the header chip, the empty state goes away with the first document
+  // a project: the empty state goes away with the first document (its name is in Design: no header chip, #1042)
   await makeProject(env, { name: 'ModernPj', template: 'blinky' });
   await page.openProject('ModernPj');
   await page.waitFor(() => window.Silinx.docs.length > 0);
-  assert.equal(await page.eval(() => document.getElementById('title-project').textContent), 'ModernPj');
   assert.equal(await page.eval(() => document.getElementById('ws-empty').getClientRects().length), 0);
   // the activity bar is reachable with the keyboard
   await page.eval(() => document.querySelector('#left-tabs .tab[data-page=files]').focus());
@@ -156,7 +155,7 @@ uiTest('#987 the header: the project and its document, not the product and versi
     const pj = await head();
     assert.doesNotMatch(pj.text, /Silinx|\d+\.\d+\.\d+/, look);
     assert.match(pj.window, /^HeadPj — Silinx ISE \S/, look);
-    assert.match(pj.text, look === 'Classic' ? /^S HeadPj - \[.+\]$/ : /^S HeadPj$/, look);
+    assert.match(pj.text, look === 'Classic' ? /^S HeadPj - \[.+\]$/ : /^S$/, look);   // (modern: no project chip, #1042; the project in the window's title and in Design)
   }
   // in Portuguese the classic title bar's Design Summary too (#1007)
   await subMenu(page, 'View', 'Interface', 'Classic');
@@ -298,14 +297,13 @@ uiTest('Portuguese: the modern header, buttons, empty state and palette are tran
   const T = await page.eval(() => ({
     search: document.querySelector('.m-search-text').textContent,
     steps: [...document.querySelectorAll('#toolbar .m-step')].map((b) => b.textContent),
-    project: document.getElementById('title-project').textContent,
     empty: document.querySelector('#ws-empty p').textContent,
     // the start page's one key: the command search (no Save, nothing to save there; Undo goes without saying)
     keys: [...document.querySelectorAll('#ws-empty .ws-keys > span')].map((k) => k.querySelector('span').textContent),
     theme: document.getElementById('theme-btn').getAttribute('title'),
   }));
   assert.deepEqual(T, {
-    search: 'Procurar comandos e ficheiros…', steps: ['Verificar', 'Simular', 'Implementar', 'Emular', 'Programar'], project: 'Nenhum projeto aberto',
+    search: 'Procurar comandos e ficheiros…', steps: ['Verificar', 'Simular', 'Implementar', 'Emular', 'Programar'], 
     empty: 'Abra uma fonte no painel Projeto, ou procure qualquer comando ou ficheiro.', keys: ['Procurar comandos e ficheiros'], theme: 'Alternar entre tema claro e escuro',
   });
   const subs = await subMenu(page, 'Ver', 'Interface');

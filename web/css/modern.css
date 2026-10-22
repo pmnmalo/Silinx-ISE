@@ -4,7 +4,6 @@
    Preferences and command palette: web/js/modern.js, web/js/palette.js. */
 
 /* ------------------------------------------------------------------ parts of the modern interface only */
-html:not([data-ui="modern"]) #title-project,
 html:not([data-ui="modern"]) #top-actions, html:not([data-ui="modern"]) .m-steps,
 html:not([data-ui="modern"]) .tab-ico, html:not([data-ui="modern"]) #ws-empty { display: none !important; }
 #ws-empty { display: none; }
@@ -140,9 +139,6 @@ html[data-ui="modern"] #topbar { flex-direction: row; align-items: center; gap: 
 html[data-ui="modern"] #titlebar { height: auto; padding: 0; background: none; border: none; gap: 10px; color: var(--m-fg); font-size: 13px; flex: none; }
 html[data-ui="modern"] .app-logo { width: 26px; height: 26px; border-radius: 7px; font-size: 15px; background: linear-gradient(135deg, #e0252c, #a5121a); box-shadow: var(--m-shadow); font-family: var(--font); }
 html[data-ui="modern"] #title-text { display: none; }
-.m-chip { border: 1px solid var(--m-border); background: var(--m-surface-2); color: var(--m-fg); border-radius: 999px; height: 26px; padding: 0 12px; font-weight: 500; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.m-chip:hover { border-color: var(--m-border-strong); }
-.m-chip.none { color: var(--m-muted); }
 html[data-ui="modern"] #menubar { height: 32px; background: none; border: none; padding: 0; gap: 2px; margin-left: 6px; flex: none; }
 html[data-ui="modern"] .menubar .item { padding: 0 10px; border: none; border-radius: 6px; color: var(--m-fg); }
 html[data-ui="modern"] .menubar .item:hover { background: var(--m-hover); border: none; }
@@ -507,6 +503,5 @@ html[data-ui="modern"][data-theme="dark"] .sch-editor .lv-clock { background: tr
   html[data-ui="modern"] #drawer-scrim { left: 64px; }
 }
 @media (max-width: 720px) {
-  html[data-ui="modern"] #title-project { display: none; }
   html[data-ui="modern"] #left { min-width: 64px; }
 }

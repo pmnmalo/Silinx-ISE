@@ -38,10 +38,6 @@ html[data-layout="tasks"] #task-switch { display: flex; gap: 2px; padding: 3px; 
    a shorter project name too */
 html[data-layout="tasks"] #topbar[data-fit="current"] .task-btn:not([aria-current="true"]) .lbl,
 html[data-layout="tasks"] #topbar:is([data-fit="icons"], [data-fit="tight"]) .task-btn .lbl { display: none; }
-html[data-layout="tasks"] #topbar[data-fit="tight"] #title-project { max-width: 80px; }
-@media (max-width: 1279px) {
-  html[data-layout="tasks"] #title-project { max-width: 120px; }
-}
 
 /* ------------------------------------------------------------------ the Design pane: one tree, no views (#799) */
 html[data-layout="tasks"] :is(#design-panel .view-select, #left-split, #proc-panel) { display: none; }

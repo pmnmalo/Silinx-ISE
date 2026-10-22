@@ -170,7 +170,7 @@ test('menuCommands: enabled items with an action, submenus as paths, separators 
 
 test('index.html: one page for both interfaces (header, activity bar icons, empty state, early theme script)', () => {
   const html = fs.readFileSync(path.join(ROOT, 'web/index.html'), 'utf8');
-  for (const id of ['topbar', 'titlebar', 'menubar', 'toolbar', 'title-project', 'palette-btn', 'theme-btn', 'ws-empty', 'left-tabs', 'doc-tabs', 'console-wrap', 'statusbar'])
+  for (const id of ['topbar', 'titlebar', 'menubar', 'toolbar', 'palette-btn', 'theme-btn', 'ws-empty', 'left-tabs', 'doc-tabs', 'console-wrap', 'statusbar'])
     assert.match(html, new RegExp(`id="${id}"`), id);
   assert.match(html, /<link rel="stylesheet" href="\/css\/modern.css">/);
   // the interface and theme are set before the first paint (no flash of the other look)

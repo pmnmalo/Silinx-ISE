@@ -130,8 +130,6 @@ export function updateTitle() {
   // window's title, Help ▸ About
   $('title-text').textContent = pj ? `${pj.name} - [${S.active?.title || 'Design Summary'}]` : 'Project Navigator';
   document.querySelector('#titlebar .app-logo').title = `${PRODUCT} ${VERSION_LABEL}`;
-  $('title-project').textContent = pj ? pj.name : 'No project open';
-  $('title-project').classList.toggle('none', !pj);
   document.title = pj ? `${pj.name} — ${PRODUCT} ${VERSION_LABEL}` : `${PRODUCT} ${VERSION_LABEL} Project Navigator`;
   $('status-device').textContent = pj ? `${pj.device.part}${pj.device.speed}-${pj.device.package}${pj.board ? ` · ${pj.board}` : ''}` : '';
 }

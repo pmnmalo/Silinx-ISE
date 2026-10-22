@@ -266,9 +266,10 @@ uiTest('#839 Tasks in a development build: with the Development menu, in Portugu
     await page.waitFor(() => { const t = document.getElementById('topbar'); return t.scrollWidth <= t.clientWidth; }, [], { what: `the header fits at ${w} px`, timeout: 3000 });
     const f = await fit(page);
     assert.ok(f.inside, `${w} px: every task inside the header`);
-    // (the current task's label down to a tablet in landscape; at the narrowest width, icons with their tips)
+    // (the current task's label down to a tablet in landscape; at the narrowest width the current label at most, or icons
+    // with their tips: with no project chip, #1042, the current label may still fit)
     if (w >= 1180) assert.ok(f.labels.includes('edit'), `${w} px: the current task's label`);
-    else assert.ok(['icons', 'tight'].includes(f.fit) && !f.labels.length, `${w} px: icons only (${f.fit}; how short the header is depends on the system's fonts)`);
+    else assert.ok(['current', 'icons', 'tight'].includes(f.fit) && f.labels.length <= 1, `${w} px: the current label at most (${f.fit}; how short the header is depends on the system's fonts)`);
     assert.deepEqual(await noOverflow(page), { page: true, over: [] }, `${w} px`);
   }
   // 1280 × 800: the other tasks' labels gave way; their names in their tips
@@ -448,6 +449,24 @@ uiTest('#993 Tasks ▸ Edit: Check Schematic\'s errors and warnings in the conso
   await page.waitFor(() => !document.documentElement.dataset.layout);
   await page.click(`${ED} .se-btn[data-act=check]`);
   await page.waitFor((sel) => { const d = document.querySelector(`${sel} .se-diags`); return d && !d.hidden && /^Check Schematic: 1 error/.test(d.textContent); }, [ED], { what: 'the editor\'s panel' });
+}, { build: DEV });
+
+// #1042: no project chip in the header, in any interface (a project is opened from File and the Start page, its
+// name is in Design)
+uiTest('#1042 no project chip in the header: Tasks, modern and classic', E, async (page) => {
+  await makeProject(env, { name: 'TasksChip', template: 'gates' });
+  await page.setViewport(1366, 768);
+  await tasksInterface(page);
+  await page.openProject('TasksChip');
+  for (const ui of ['tasks', 'modern', 'classic']) {
+    if (ui !== 'tasks') await page.eval(async (x) => (await import('/js/modern.js')).setInterface(x), ui);
+    await page.waitFor((x) => (x === 'tasks') === (document.documentElement.dataset.layout === 'tasks'), [ui], { what: ui });
+    assert.equal(await page.eval(() => document.getElementById('title-project')), null, ui);
+    // (classic's title is ISE's, "TasksChip - [Design Summary]": the project there is the window's title, not a chip)
+    if (ui !== 'classic') assert.doesNotMatch(await page.eval(() => document.getElementById('titlebar').innerText), /TasksChip/, ui);
+  }
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
+  await noWarnings(page);
 }, { build: DEV });
 
 // #800: Simulate gives the waves the screen (ISim's title bar is the task's; its Instances and Objects the task's
