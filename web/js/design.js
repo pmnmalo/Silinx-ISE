@@ -19,10 +19,11 @@ import { openSchematic, runSimulation } from './viewers.js';
 import { renameDialog } from './rename.js';
 import { openWizardModule, wizardLabelOf } from './wizard-modules.js';
 import { t, onLanguageChange } from './i18n.js';
+import { showTestTree } from './tasks-test.js';
 
 const $ = id => document.getElementById(id);
-// the Tasks interface (#799): one tree, no views: the design (as the Implementation view shows it), then the test
-// benches and the constraints, each a group
+// the Tasks interface (#799): one tree, no views: the design (as the Implementation view shows it), then the
+// constraints, a group; the test benches a tree of their own, Edit's Test page (#1016, web/js/tasks-test.js)
 const oneTree = () => document.documentElement.dataset.layout === 'tasks';
 onLanguageChange(() => { if (oneTree() && S.project) renderHierarchy(); });   // (its groups' names: the tree is not translated)
 
@@ -30,7 +31,7 @@ export function renderHierarchy() {
   const host = $('hier');
   const focused = host.contains(document.activeElement) ? (document.activeElement.closest('.badge') ? 'badge' : 'tree') : null;
   host.innerHTML = '';
-  if (!S.project) { host.append(h('div', { class: 'tree empty' }, 'No project open. Use File > New Project or File > Open Project.')); return; }
+  if (!S.project) { host.append(h('div', { class: 'tree empty' }, 'No project open. Use File > New Project or File > Open Project.')); showTestTree(null, 0); return; }
   const pj = S.project;
   const one = oneTree(), sim = S.view === 'sim' && !one;
   const tree = h('ul', { class: 'tree', tabindex: '0', 'aria-label': 'Design hierarchy', onkeydown: treeKeys });
@@ -88,10 +89,16 @@ export function renderHierarchy() {
     const it = treeItem({ label: p.name, meta: `(${p.file.split('/').pop()})`, ico: 'vhdl', key: `pkg:${p.name}`, onSelect: () => select({ type: 'file', file: p.file }), onOpen: () => openFile(p.file, p.loc?.line), onContext: e => fileContextMenu(e, p.file) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
-  // (one tree: the test benches and their units under test, then the constraints, each a group)
+  // (one tree: the constraints a group; the test benches and their units under test, the Test page's tree)
   const group = (label, ico, key) => { const g = treeItem({ label, ico, open: true, key }); root.ul.append(g.li); return g.ul; };
-  const benches = one ? viewRoots(true).filter(n => moduleInfo(n)?.role === 'sim') : [];
-  if (benches.length) { const ul = group(t('Test Benches'), 'sim', 'group:tb'); for (const r of benches) addModule(ul, r, null, 0, r); }
+  if (one) {
+    const benches = viewRoots(true).filter(n => moduleInfo(n)?.role === 'sim');
+    const tests = h('ul', { class: 'tree', tabindex: '0', 'aria-label': 'Test benches', onkeydown: treeKeys });
+    for (const r of benches) addModule(tests, r, null, 0, r);
+    const kept = $('test-tree')?.contains(document.activeElement);
+    showTestTree(tests, benches.length);
+    if (kept) tests.focus({ preventScroll: true });
+  }
   if (!sim && pj.constraints && S.fileTree?.includes(pj.constraints)) {
     const it = treeItem({ label: pj.constraints.split('/').pop(), ico: 'ucf', key: 'ucf', onSelect: () => select({ type: 'ucf', file: pj.constraints }), onOpen: () => openFile(pj.constraints), onContext: e => fileContextMenu(e, pj.constraints) });
     it.setLeaf(); (one ? group(t('Constraints'), 'ucf', 'group:ucf') : devItem.ul).append(it.li);
@@ -124,9 +131,9 @@ export function renderHierarchy() {
     it.setLeaf(); devItem.ul.append(it.li);
   }
   host.append(tree);
-  // restore selection
+  // restore selection (a test bench's: the Test page's tree, #1016)
   const key = S.selKey;
-  const row = key && host.querySelector(`[data-key="${CSS.escape(key)}"]`);
+  const row = key && (host.querySelector(`[data-key="${CSS.escape(key)}"]`) || (one && $('test-tree')?.querySelector(`[data-key="${CSS.escape(key)}"]`)));
   if (row) markSelRow(row);
   else {
     const first = host.querySelector(`[data-key^="m:"]`);
@@ -187,7 +194,7 @@ export function treeItem({ label, meta, ico, open = false, onSelect, onOpen, onC
 }
 function selectRow(row, key, onSelect) {
   markSelRow(row);
-  if (row.closest('#hier')) S.selKey = key;
+  if (row.closest('#hier, #test-tree')) S.selKey = key;
   onSelect?.();
 }
 function markSelRow(row) {

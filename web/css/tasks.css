@@ -237,3 +237,8 @@ html[data-layout="tasks"][data-task="edit"] #left-tabs .tab:not(.active) .tab-lb
   html[data-layout="tasks"][data-task="edit"]:not([data-drawer="open"]) #left-tabs { display: none; }
   html[data-layout="tasks"][data-task="edit"] #drawer-scrim { left: 0; }
 }
+
+/* ------------------------------------------------------------------ Edit's Test page (#1016, web/js/tasks-test.js) */
+/* the test benches' tree, what the page says with none, the wizard's button */
+html[data-layout="tasks"] #test-page .test-none { margin: 10px 14px 4px; color: var(--m-muted); font-size: 12px; }
+html[data-layout="tasks"] #test-page .test-new { margin: 8px 14px; }

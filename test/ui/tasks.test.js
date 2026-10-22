@@ -343,11 +343,11 @@ uiTest('#854 Tasks: no tab bar in a task with a single document; its module and 
   await noWarnings(page);
 }, { build: DEV });
 
-// #799: Edit's Design pane is one tree, no views: the design, then the test benches and the constraints; Check checks
-// the selected module, a test bench with the simulation's sources
+// #799: Edit's Design pane is one tree, no views: the design, then the constraints; the test benches are the Test
+// page's (#1016, test/ui/tasks-test.test.js); Check checks the selected module, a test bench with the simulation's sources
 const hierRows = (page) => page.eval(() => [...document.querySelectorAll('#hier .row')].filter((r) => r.getClientRects().length)
   .map((r) => [r.querySelector('.lbl').textContent, ...[...r.querySelectorAll('.badge')].map((b) => b.textContent)].join(' ')));
-uiTest('#799 Tasks ▸ Edit: one design tree (the design, Test Benches, Constraints), no views; Check of a test bench', E, async (page) => {
+uiTest('#799 Tasks ▸ Edit: one design tree (the design, Constraints), no views; Check of a test bench (the Test page\'s)', E, async (page) => {
   await makeProject(env, { name: 'TasksTree', template: 'blinky' });
   await page.setViewport(1366, 768);
   await tasksInterface(page);
@@ -359,23 +359,24 @@ uiTest('#799 Tasks ▸ Edit: one design tree (the design, Test Benches, Constrai
   // the design first (its top, its modules with their drawings' badges), then the groups
   assert.ok(at('TasksTree') === 0 && at('xc3s250e-4-cp132') === 1 && at('top') === 2, rows.join(' | '));
   assert.ok(rows.includes('u_speed - speed_ctrl ASM VHDL'), 'a drawing\'s badge first, its HDL last');
-  assert.ok(at('Test Benches') > at('top') && at('tb_top') === at('Test Benches') + 1, rows.join(' | '));
-  assert.ok(at('Constraints') > at('tb_top') && at('top.ucf') === at('Constraints') + 1, rows.join(' | '));
+  assert.ok(at('Test Benches') === -1 && at('tb_top') === -1, rows.join(' | '));   // (the Test page's, #1016)
+  assert.ok(at('Constraints') > at('top') && at('top.ucf') === at('Constraints') + 1, rows.join(' | '));
   // Check of the test bench: the simulation's sources (Behavioral Check Syntax), no error
-  await page.treeRow('#hier', 'tb_top', { exact: true });
+  await page.click('#left-tabs .tab[data-page="test"]');
+  await page.treeRow('#test-tree', 'tb_top', { exact: true });
   await page.click('#task-bar [data-act="main"]');
   await page.waitConsole(/Elaborating top module <tb_top>/);
   await page.waitConsole(/Process "Check Syntax" completed successfully/);
   assert.match(await page.eval(() => document.getElementById('console-log').innerText), /Started : "Behavioral Check Syntax"/);
   assert.equal(await page.eval(() => document.getElementById('err-count').textContent), '');
   // the UCF from its group: in Edit
+  await page.click('#left-tabs .tab[data-page="design"]');
   await page.treeRow('#hier', 'top.ucf', { dbl: true, exact: true });
   await page.waitFor(() => document.querySelector('#doc-tabs > .tab.active')?.textContent.includes('top.ucf'), [], { what: 'the UCF' });
   assert.equal((await state(page)).task, 'edit');
   // in Portuguese: the groups' names
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((l) => l.textContent === 'Bancadas de Teste'), [], { what: 'Portuguese' });
-  assert.ok((await hierRows(page)).some((r) => r === 'Restrições'));
+  await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((l) => l.textContent === 'Restrições'), [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the modern interface: its views and Processes again, no groups
   await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
@@ -714,9 +715,10 @@ uiTest('#802 Tasks ▸ Implement: the top\'s Processes, the Design Summary as ca
   await tasksInterface(page);
   await page.openProject('TasksImpl');
   await page.eval(async () => { window.SilinxApp.S.toolchain = await (await import('/js/api.js')).api.toolchain(); window.SilinxApp.renderProcesses(); });
-  // a module selected in Edit: Implement still lists the top's processes
+  // a module selected in Edit (a test bench, the Test page's: #1016): Implement still lists the top's processes, Design's page
   await page.click('#task-switch .task-btn[data-task="edit"]');
-  await page.treeRow('#hier', 'tb_top', { exact: true });
+  await page.click('#left-tabs .tab[data-page="test"]');
+  await page.treeRow('#test-tree', 'tb_top', { exact: true });
   await page.click('#task-switch .task-btn[data-task="impl"]');
   await page.waitFor(() => document.getElementById('proc-caption')?.textContent === 'Processes: top', [], { what: 'the top\'s processes' });
   assert.ok(await shown(page, '#proc-panel') && !(await shown(page, '#design-panel')), 'the Processes, not the tree');
@@ -860,7 +862,7 @@ uiTest('#984 Tasks ▸ Edit: its pages are tabs at the top of the side panel; fo
       titles: [...document.querySelectorAll('#left-tabs .tab')].map((b) => b.title),
     };
   });
-  assert.deepEqual(await T(), { row: true, names: ['design'], titles: ['Start', 'Design', 'Files', 'Libraries'] });
+  assert.deepEqual(await T(), { row: true, names: ['design'], titles: ['Start', 'Design', 'Test', 'Files', 'Libraries'] });   // (Test: #1016)
   // (no column of its own: the hierarchy from the window's left edge)
   assert.ok(await page.eval(() => document.querySelector('#hier').getBoundingClientRect().left) < 12);
   await page.click('#left-tabs .tab[data-page="files"]');
@@ -892,7 +894,7 @@ uiTest('#984 Tasks ▸ Edit: its pages are tabs at the top of the side panel; fo
   await page.setViewport(1366, 768);
   // Portuguese: the tooltips
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  assert.deepEqual((await T()).titles, ['Início', 'Projeto', 'Ficheiros', 'Bibliotecas']);
+  assert.deepEqual((await T()).titles, ['Início', 'Projeto', 'Teste', 'Ficheiros', 'Bibliotecas']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the modern interface: the activity bar as before, a column with every name, no tooltips
   await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));

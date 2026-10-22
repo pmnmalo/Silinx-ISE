@@ -68,6 +68,7 @@ export const icons = {
   mMoon: L('<path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/>'),
   mCheck: L('<path d="M4 12.5l5 5L20 6.5"/>'),
   mPlay: L('<path d="M7 4.5v15l12-7.5z"/>'),
+  mTest: L('<path d="M9 3h6M10 3v6.5L4.8 18.2A1.9 1.9 0 006.4 21h11.2a1.9 1.9 0 001.6-2.8L14 9.5V3"/><path d="M7.2 15h9.6"/>'),
   mWave: L('<path d="M2 16h3V8h4v8h4V8h4v8h5"/>'),
   mBolt: L('<path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z"/>'),
   mBoard: L('<rect x="2.5" y="5" width="19" height="14" rx="2"/><rect x="6" y="8.5" width="6" height="4" rx=".5"/><path d="M15.5 9h2.5M15.5 12h2.5M6 16h1.5M10 16h1.5"/>'),

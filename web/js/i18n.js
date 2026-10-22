@@ -326,6 +326,8 @@ const PT = {
   'The model to simulate': 'O modelo a simular',
   // the Edit task's one tree: its groups (#799)
   'Test Benches': 'Bancadas de Teste', 'Constraints': 'Restrições',
+  // the Edit task's Test page (web/js/tasks-test.js, #1016)
+  'Test': 'Teste', 'Test benches': 'Bancadas de teste', 'The project has no test bench yet.': 'O projeto ainda não tem bancada de teste.',
   // a single document's module and model in the task's bar (#854)
   'Post-Synthesis': 'Pós-Síntese', 'Post-Translate': 'Pós-Translate', 'Post-Map': 'Pós-Map', 'Post-Place & Route': 'Pós-Place & Route',
   // its message centre (web/js/messages.js, #798)
@@ -762,7 +764,7 @@ export function t(text) {
 }
 
 // ---------------------------------------------------------------- DOM translation
-const SKIP = '.cm-editor, .console-page, pre, code, textarea, [data-no-i18n], #hier .lbl, #libs-page .lbl, svg text, .sch-svg, .xl-hover-tip';
+const SKIP = '.cm-editor, .console-page, pre, code, textarea, [data-no-i18n], #hier .lbl, #test-tree .lbl, #libs-page .lbl, svg text, .sch-svg, .xl-hover-tip';
 const ATTRS = ['title', 'placeholder', 'aria-label'];
 const textState = new WeakMap();   // text node -> { orig, last }
 const attrState = new WeakMap();   // element -> { [attr]: { orig, last } }
