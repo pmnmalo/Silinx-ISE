@@ -61,7 +61,8 @@ test('t(): exact strings, patterns, surrounding whitespace, unknown text unchang
   assert.equal(t('Example: blinky'), 'Exemplo: blinky');
   // a task's button with its dot (#991): the task and its state
   assert.equal(t('Implement — done with warnings'), 'Implementar — concluído com avisos');
-  assert.equal(t('Edit — done, no warnings'), 'Editar — concluído, sem avisos');
+  assert.equal(t('Design — done, no warnings'), 'Design — concluído, sem avisos', 'the Design task: Design in Portuguese too (#1046)');
+  assert.equal(t('Design'), 'Projeto', 'elsewhere (the Design pane, the console\'s filter): Projeto; the task keeps Design with data-i18n-keep');
   assert.equal(t('Simulate — out of date (a source changed)'), 'Simular — desatualizado (uma fonte mudou)');
   assert.equal(t('Implement — errors'), 'Implementar — erros');
   assert.equal(t('Implement — running…'), 'Implementar — em curso…');

@@ -18,7 +18,7 @@ const CHECK = await import('../web/js/tasks-check.js');
 
 test('the five tasks, in the order of a lab session, with the names of the modern toolbar\'s steps', () => {
   assert.deepEqual(T.TASKS, ['edit', 'sim', 'emu', 'impl', 'prog']);
-  assert.deepEqual(T.TASKS.map((t) => T.TASK_LABEL[t]), ['Edit', 'Simulate', 'Emulate', 'Implement', 'Program']);
+  assert.deepEqual(T.TASKS.map((t) => T.TASK_LABEL[t]), ['Design', 'Simulate', 'Emulate', 'Implement', 'Program']);
 });
 
 test('taskOfDoc: each kind of document belongs to one task (the editors and the viewers of the design to Edit)', () => {
@@ -159,8 +159,8 @@ test('checkLines: a schematic\'s Check in the console below, as a process\'s mes
 });
 
 test('taskTitle: the task button\'s tooltip says what its dot means (#991)', () => {
-  assert.equal(T.taskTitle('edit', null), 'Edit');
-  assert.equal(T.taskTitle('edit', 'ok'), 'Edit — done, no warnings');
+  assert.equal(T.taskTitle('edit', null), 'Design');
+  assert.equal(T.taskTitle('edit', 'ok'), 'Design — done, no warnings');
   assert.equal(T.taskTitle('sim', 'warn'), 'Simulate — done with warnings');
   assert.equal(T.taskTitle('impl', 'err'), 'Implement — errors');
   assert.equal(T.taskTitle('impl', 'stale'), 'Implement — out of date (a source changed)');

@@ -35,7 +35,8 @@ import { arrangeProgram, initProgram } from './tasks-prog.js';
 import { initCheckMessages } from './tasks-check.js';
 
 export const TASKS = ['edit', 'sim', 'emu', 'impl', 'prog'];
-export const TASK_LABEL = { edit: 'Edit', sim: 'Simulate', emu: 'Emulate', impl: 'Implement', prog: 'Program' };
+// (the first task is Design, its id 'edit' kept: the kept state, the documents; 'Design' in Portuguese too, #1046)
+export const TASK_LABEL = { edit: 'Design', sim: 'Simulate', emu: 'Emulate', impl: 'Implement', prog: 'Program' };
 export const TASKS_KEY = 'silinx.tasks';
 // the design-flow button of the modern toolbar (web/js/menus.js, data-step) each task runs
 const STEP = { edit: 'check', sim: 'simulate', emu: 'emulate', impl: 'implement', prog: 'program' };
@@ -213,6 +214,7 @@ function tagDocs() {
   if (empty) {
     empty.hidden = !on() || mine > 0;
     empty.querySelector('h2').textContent = TASK_LABEL[current()];
+    empty.querySelector('h2').dataset.i18nKeep = 'Design';   // (not "Projeto": the Project menu's, #1046)
     // (Simulate with no test bench yet: one to create, or the top simulated with stimuli drawn in ISim: #917)
     const noBench = current() === 'sim' && !!app.S.project && !simChoices(app.S.project, app.S.modules).benches.length;
     empty.querySelector('p').textContent = noBench ? NO_BENCH : HINT[current()];
@@ -279,7 +281,7 @@ function refreshDots() {
 }
 
 function taskButton(t) {
-  return h('button', { class: 'task-btn', type: 'button', 'data-task': t, title: TASK_LABEL[t], onclick: () => setTask(t) },
+  return h('button', { class: 'task-btn', type: 'button', 'data-task': t, title: TASK_LABEL[t], 'data-i18n-keep': 'Design', onclick: () => setTask(t) },
     h('span', { class: 'ico-inline', html: ICON[t] }), h('span', { class: 'lbl' }, TASK_LABEL[t]), h('span', { class: 'task-dot' }));
 }
 

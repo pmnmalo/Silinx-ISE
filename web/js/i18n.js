@@ -585,7 +585,7 @@ Object.assign(PT, {
 // the classic title bar (web/js/project.js updateTitle, #987): "<project> - [Design Summary]", its name translated (#1007)
 PT_PATTERNS.push([/^(.+) - \[Design Summary\]$/, (m, pj) => `${pj} - [${PT['Design Summary']}]`]);
 // a task's button with its dot (web/js/tasks.js taskTitle, #991): "Implement — done with warnings"
-PT_PATTERNS.push([/^(Edit|Simulate|Implement) — (done, no warnings|done with warnings|errors|out of date \(a source changed\)|running…)$/, (m, a, b) => `${PT[a]} — ${PT[b]}`]);
+PT_PATTERNS.push([/^(Design|Simulate|Implement) — (done, no warnings|done with warnings|errors|out of date \(a source changed\)|running…)$/, (m, a, b) => `${a === 'Design' ? 'Design' : PT[a]} — ${PT[b]}`]);   // (the Design task: 'Design' in Portuguese too, #1046)
 PT_PATTERNS.push(
   [/^Cannot try it out: (\d+) error\(s\), (\d+) warning\(s\)$/, 'Não é possível experimentar: $1 erro(s), $2 aviso(s)'],
   [/^Cannot try it out: (.*)$/s, 'Não é possível experimentar: $1'],
@@ -768,6 +768,9 @@ const textState = new WeakMap();   // text node -> { orig, last }
 const attrState = new WeakMap();   // element -> { [attr]: { orig, last } }
 
 function skipEl(el) { return !el || (el.closest && el.closest(SKIP)); }
+// a text kept as it is inside an element that says so (data-i18n-keep="Design": the Tasks interface's Design task, not
+// "Projeto" as the Design pane, #1046); other texts there translated as usual
+const kept = (el, text) => el?.closest?.('[data-i18n-keep]')?.dataset.i18nKeep === text.trim();
 
 function translateText(node) {
   const parent = node.parentElement;
@@ -775,7 +778,7 @@ function translateText(node) {
   const cur = node.nodeValue;
   let st = textState.get(node);
   if (!st || cur !== st.last) { st = { orig: cur, last: cur }; textState.set(node, st); }
-  const next = t(st.orig);
+  const next = kept(parent, st.orig) ? st.orig : t(st.orig);
   if (next !== cur) { st.last = next; node.nodeValue = next; } else st.last = cur;
 }
 
@@ -788,7 +791,7 @@ function translateAttrs(el) {
     if (!map) { map = {}; attrState.set(el, map); }
     let st = map[a];
     if (!st || cur !== st.last) st = map[a] = { orig: cur, last: cur };
-    const next = t(st.orig);
+    const next = kept(el, st.orig) ? st.orig : t(st.orig);
     if (next !== cur) { st.last = next; el.setAttribute(a, next); }
   }
 }
