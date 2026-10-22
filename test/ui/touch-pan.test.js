@@ -213,5 +213,25 @@ uiTest('touch (#674): in the waveform viewer two fingers scroll the time (the cu
   near(s1.scale / s2.scale, 2, 0.02, 'the time zoomed in by the pinch');
   near(tAt(s2), tAt(s1), 2 * s1.scale, 'the time under the fingers kept');
   assert.equal(s2.cursor, s0.cursor, 'the cursor as it was');
+  // the time's scrollbar follows a frame later: its scroll event, from where the view put it a frame before, may come
+  // after the fingers moved the time on (#915, the time taken back 12 px on a loaded runner); here the two-finger
+  // scroll and that event in one task, before the view's next frame
+  const s3 = await page.eval((p) => {
+    const cw = document.querySelector('.doc:not([hidden]) .isim-waves'), hsc = document.querySelector('.doc:not([hidden]) .isim-hscroll');
+    const fire = (type, k, x) => cw.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, composed: true, view: window, pointerId: 201 + k,
+      pointerType: 'touch', isPrimary: k === 0, clientX: x, clientY: p.y, button: type === 'pointermove' ? -1 : 0, buttons: type === 'pointerup' ? 0 : 1, width: 1, height: 1 }));
+    fire('pointerdown', 0, p.x); fire('pointerdown', 1, p.x + 60);
+    fire('pointermove', 0, p.x - 50); fire('pointermove', 1, p.x + 10);
+    fire('pointerup', 0, p.x - 50); fire('pointerup', 1, p.x + 10);
+    hsc.dispatchEvent(new Event('scroll'));
+    const st = window.Silinx.active.view.state;
+    return { t0: st.t0, scale: st.scale };
+  }, c);
+  near(s3.t0 - s2.t0, 50 * s2.scale, s2.scale / 100, 'the time scrolled, a late scroll event of the scrollbar ignored');
+  await frame(page);
+  near((await state()).t0, s3.t0, s2.scale / 100, 'the time kept once the scrollbar followed it');
+  // the scrollbar moved by the user still scrolls the time: back to its start, the time from 0
+  await page.eval(() => { document.querySelector('.doc:not([hidden]) .isim-hscroll').scrollLeft = 0; });
+  await page.waitFor(() => window.Silinx.active.view.state.t0 === 0, [], { what: 'the time from 0' });
   assert.deepEqual(warnings(page), []);
 });

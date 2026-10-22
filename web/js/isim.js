@@ -461,13 +461,17 @@ export function mountISim(container, opts = {}) {
   }
 
   // ---------------------------------------------------------------- scrollbars
-  let progScroll = 0;
+  // where the view last put the time's scrollbar: a scroll event that finds it there is the view's own, not the
+  // user's (#915: the view's scrolls were counted, a count that drifted when the browser fired an event the view
+  // had not caused, and the view's own scroll of a frame before, arriving late, took the time back from a
+  // two-finger scroll). The rows' scrollbar is the rows' scroll itself (st.scrollY follows it).
+  let setLeft = null;
   function totalRowsH() { return flat().length * ROW_H + RULER_H + ROW_H; }
   function updateVScroll() {
     const inner = vsc.firstElementChild;
     inner.style.height = totalRowsH() + 'px';
     st.scrollY = clamp(st.scrollY, 0, Math.max(0, totalRowsH() - WH));
-    if (Math.abs(vsc.scrollTop - st.scrollY) > 0.5) { progScroll++; vsc.scrollTop = st.scrollY; }
+    if (Math.abs(vsc.scrollTop - st.scrollY) > 0.5) { vsc.scrollTop = st.scrollY; }
   }
   let hTotal = 1, hSpacer = 1;
   function updateHScroll() {
@@ -477,14 +481,13 @@ export function mountISim(container, opts = {}) {
     hSpacer = Math.min(4e6, Math.max(cw2, cw2 * hTotal / span));
     hsc.firstElementChild.style.width = hSpacer + 'px';
     const sl = (st.t0 / hTotal) * hSpacer;
-    if (Math.abs(hsc.scrollLeft - sl) > 1) { progScroll++; hsc.scrollLeft = sl; }
+    if (Math.abs(hsc.scrollLeft - sl) > 1) { hsc.scrollLeft = sl; setLeft = hsc.scrollLeft; }
   }
   on(vsc, 'scroll', () => {
-    if (progScroll) { progScroll = Math.max(0, progScroll - 1); }
     st.scrollY = vsc.scrollTop; invalidate(false);
   });
   on(hsc, 'scroll', () => {
-    if (progScroll) { progScroll = Math.max(0, progScroll - 1); return; }
+    if (setLeft !== null && Math.abs(hsc.scrollLeft - setLeft) <= 1) return;
     st.t0 = (hsc.scrollLeft / hSpacer) * hTotal; st.fit = false; invalidate(false);
   });
 
