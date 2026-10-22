@@ -182,7 +182,8 @@ html[data-layout="tasks"] .task-program button { font-weight: 600; }
 /* iMPACT arranged for the task: the programming file and its state first, then the chain and Program FPGA / PROM;
    the board, tool and cable folded away (a board chooses them), the PROM's other operations behind More… */
 .task-prog-state, .task-prog-more, .task-prog-settings { display: none; }
-html[data-layout="tasks"] #workspace > .doc[data-task="prog"] > .page { display: flex; flex-direction: column; gap: 10px; max-width: 920px; }
+/* (the whole width available, as in the modern and classic interfaces: #1023) */
+html[data-layout="tasks"] #workspace > .doc[data-task="prog"] > .page { display: flex; flex-direction: column; gap: 10px; }
 html[data-layout="tasks"] .task-prog-state { display: flex; align-items: center; gap: 12px; order: 0; padding: 12px 14px; border: 1px solid var(--m-border);
   border-radius: 10px; background: var(--m-surface-2); font-weight: 600; }
 html[data-layout="tasks"] .task-prog-state[data-state="ok"] { color: var(--m-success); }
