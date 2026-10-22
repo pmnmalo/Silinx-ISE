@@ -284,7 +284,7 @@ export function mountSchEditor(container, opts = {}) {
     renderOverlay, renderProps, sel: () => sel, setTool, spaceDown: () => spaceDown, svg, toSheet, tool: () => tool,
     updateStatus, view: () => view, wireClick, wireDraw: () => wireDraw, zoomAt, setCursor: (v) => { cursor = v; },
     setDoc: (v) => { doc = v; }, setDrag: (v) => { drag = v; }, setHoverPin: (v) => { hoverPin = v; },
-    setSel: (v) => { sel = v; }
+    setSel: (v) => { sel = v; }, setWireDraw: (v) => { wireDraw = v; }
   });
 
   // ---------------- keyboard (sch-keys.js)

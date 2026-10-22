@@ -122,6 +122,8 @@ export function mountRender(ctx) {
       const pts = [...wireDraw.pts, ...routeTo(wireDraw.pts[wireDraw.pts.length - 1], snapPoint(cursor), wireDraw)];
       s += `<polyline class="wire-preview" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}"/>`;
     }
+    // a freehand stroke (#1052): its ink trail
+    if (drag?.kind === 'stroke' && drag.inking) s += `<polyline class="wire-ink" points="${drag.ink.map(p => `${p.x},${p.y}`).join(' ')}"/>`;
     if ((tool === 'wire' || tool === 'io' || tool === 'net') && hoverPin) s += `<rect class="pinhover" x="${hoverPin.x - 4}" y="${hoverPin.y - 4}" width="8" height="8"/>`;
     if (tool === 'wire' || tool === 'io') { const c = snapPoint(cursor); s += `<path class="xhair" d="M${c.x - 6},${c.y} H${c.x + 6} M${c.x},${c.y - 6} V${c.y + 6}"/>`; }
     if (drag && drag.kind === 'band') {
@@ -144,7 +146,7 @@ export function mountRender(ctx) {
   }
   const TOOL_HINT = {
     select: 'Click to select, drag to move (connected wires follow), drag on empty space to select a region. Double-click a module to open it.',
-    wire: 'Add Wire: click to start, click to add a bend, click on a pin/wire or double-click to finish. Esc ends the wire.',
+    wire: 'Add Wire: click to start, click to add a bend, click on a pin/wire or double-click to finish; or draw a stroke from a pin/wire to another. Esc ends the wire.',
     net: 'Add Net Name: type a name, then click a wire to attach it.',
     io: 'Add I/O Marker: click a wire end, a pin or empty space to add a port marker (a wire to its tip connects it later).',
     place: 'Click to place the symbol (Ctrl+R rotate, Ctrl+M mirror). Esc to stop placing.',

@@ -579,6 +579,12 @@ PT_PATTERNS.unshift(
     'Desenho: $1 × $2 px. Diagramas grandes: várias páginas na horizontal (mosaico) ou A3; texto abaixo de ~5 pt é difícil de ler em papel. Para um PDF escolha "Guardar como PDF" no diálogo de impressão (mantenha as margens em "Predefinição").'],
 );
 
+// the schematic editor's Add Wire hint (sch-render.js): a wire drawn as a stroke too (#1052)
+Object.assign(PT, {
+  'Add Wire: click to start, click to add a bend, click on a pin/wire or double-click to finish; or draw a stroke from a pin/wire to another. Esc ends the wire.':
+    'Adicionar Fio: clique para começar, clique para fazer um canto, clique num pino/fio ou faça duplo clique para terminar; ou desenhe um traço de um pino/fio até outro. Esc termina o fio.',
+});
+
 // live schematic simulation (sch-live.js): Try it, not Simulate (the design flow's, #992)
 Object.assign(PT, {
   'Simulate': 'Simular', 'Try it': 'Experimentar', 'Try it: click the inputs and watch the circuit work (Esc to stop)': 'Experimentar: clique nas entradas e veja o circuito a funcionar (Esc para parar)',

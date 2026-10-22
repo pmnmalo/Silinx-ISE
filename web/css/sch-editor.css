@@ -202,6 +202,7 @@
 
 /* overlay */
 .sch-editor svg .ghost { opacity: .55; pointer-events: none; }
+.sch-editor svg .wire-ink { fill: none; stroke: var(--se-highlight); stroke-width: 3; stroke-opacity: .35; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .sch-editor svg .wire-preview { fill: none; stroke: var(--se-highlight); stroke-width: 1.4; stroke-dasharray: 4 3; pointer-events: none; }
 .sch-editor svg .pinhover { fill: none; stroke: var(--se-highlight); stroke-width: 1.5; pointer-events: none; }
 .sch-editor svg .xhair { stroke: #888; stroke-width: .8; pointer-events: none; }

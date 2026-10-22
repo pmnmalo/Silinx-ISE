@@ -7,6 +7,7 @@ import { connectionsKept, connectivity, placementClashes, rerouteAfterMove } fro
 import { twoFingerView } from './ui.js';
 import { untangleNew } from '/core/schpath.js';
 import { clone, snap } from './sch-editor.js';
+import { mountStroke } from './sch-stroke.js';
 
 /** { finishMove, onMove, onUp } of mountSchEditor (cursor(), destroyed(), doc(), drag(), hoverPin(), keepConn(), live(), modules(), sel(), spaceDown(), tool(), view(), wireDraw(): its current values). */
 export function mountSchMouse(ctx) {
@@ -15,8 +16,10 @@ export function mountSchMouse(ctx) {
     cursor, destroyed, doc, drag, finishSegMove, finishWire, flash, hoverPin, ioClick, itemAt, keepConn, live, modules,
     netClick, pinNear, placeAt, propBody, pushUndo, readOnly, refusedShort, render, renderOverlay, renderProps, sel,
     setTool, spaceDown, svg, toSheet, tool, updateStatus, view, wireClick, wireDraw, zoomAt, setCursor, setDoc, setDrag,
-    setHoverPin, setSel
+    setHoverPin, setSel, setWireDraw
   } = ctx;
+  // a wire drawn as a freehand stroke (#1052)
+  const { strokeStart, strokeMove, strokeEnd, strokeCancel } = mountStroke({ doc, modules, view, pinNear, finishWire, renderOverlay, setWireDraw });
 
   function onDown(e) {
     if (e.button === 2) { e.preventDefault(); if (wireDraw()) finishWire(); else if (tool() !== 'select') setTool('select'); return; }
@@ -28,7 +31,13 @@ export function mountSchMouse(ctx) {
     // live simulation: the inputs are controls, the rest of the sheet pans
     if (live()) { if (!live().pointerDown(e, itemAt(e.target))) setDrag({ kind: 'pan', cx: e.clientX, cy: e.clientY, tx: view().tx, ty: view().ty }); return; }
     if (tool() === 'place') { placeAt(pt); return; }
-    if (tool() === 'wire') { wireClick(pt, e.detail >= 2); return; }
+    if (tool() === 'wire') {
+      // (a press on a pin, a marker or a wire, no wire being drawn: a click, or the start of a stroke, #1052)
+      const st = !readOnly && !wireDraw() && e.detail < 2 ? strokeStart(pt, e) : null;
+      wireClick(pt, e.detail >= 2);
+      if (st) setDrag(st);
+      return;
+    }
     if (tool() === 'net') { netClick(pt); return; }
     if (tool() === 'io') { ioClick(pt); return; }
     const it = itemAt(e.target);
@@ -57,6 +66,7 @@ export function mountSchMouse(ctx) {
     if (drag()?.kind === 'move') { applyMove(drag(), snap(pt.x) - drag().start.x, snap(pt.y) - drag().start.y); return; }
     if (drag()?.kind === 'seg') { applySegMove(drag(), drag().hz ? snap(pt.y) - drag().start.y : snap(pt.x) - drag().start.x); return; }
     if (drag()?.kind === 'band') { drag().cur = pt; renderOverlay(); return; }
+    if (drag()?.kind === 'stroke') { setHoverPin(pinNear(pt)); strokeMove(drag(), pt, e); return; }
     if (!svg.contains(e.target) && e.target !== svg) { live()?.hideTip(); return; }
     if (live()) { live().hover(e, pt, view().s); updateStatus(); return; }
     if (tool() === 'wire' || tool() === 'io' || tool() === 'net') setHoverPin(pinNear(pt)); else setHoverPin(null);
@@ -106,6 +116,7 @@ export function mountSchMouse(ctx) {
     const d = drag(); setDrag(null);
     if (d.kind === 'pan') { canvas.classList.remove('panning'); return; }
     if (d.kind === 'seg') { if (d.d) finishSegMove(d); return; }
+    if (d.kind === 'stroke') { strokeEnd(d, toSheet(e.clientX, e.clientY)); return; }
     if (d.kind === 'move') {
       if (d.dx || d.dy) finishMove(d);
       else if (d.synth?.length) { doc().wires = doc().wires.filter(w => !d.synth.includes(w.id)); render(); }   // just a click
@@ -133,6 +144,7 @@ export function mountSchMouse(ctx) {
       if (d.sel0) setSel(d.sel0);
       render(); renderProps();
     } else if (d?.kind === 'band') renderOverlay();
+    else if (d?.kind === 'stroke') strokeCancel();
   }
   function onDouble(it) {
     if (it.kind === 'sym') {
