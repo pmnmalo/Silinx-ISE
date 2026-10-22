@@ -565,6 +565,52 @@ uiTest('#1021 Tasks ▸ Emulate: the board keeps its size; the Watch and the VGA
   await noWarnings(page);
 }, { build: DEV });
 
+// #1022: the emulator's status (t = … ns · … cycles · … kHz (…% of real time)) right below the board, in place of the
+// board's line ("Digilent Basys2 — top · Clock clk: 50 MHz on the board"), in English and Portuguese; the modern and
+// classic interfaces keep it at the end of the emulator's bar, the board's line below the board
+const emuStatus = (page) => page.eval(() => {
+  const emu = document.querySelector('.doc:not([hidden]) .emu'), stat = emu.querySelector('.stat'), note = emu.querySelector('.emu-board-note');
+  const pr = emu.querySelector('.emu-pcb').getBoundingClientRect(), sr = stat.getBoundingClientRect();
+  const hit = document.elementFromPoint(sr.left + sr.width / 2, sr.top + sr.height / 2);
+  return { where: stat.parentNode.classList.contains('emu-bar') ? 'bar' : stat.parentNode.classList.contains('emu-board-wrap') ? 'board' : '?',
+    below: sr.top >= pr.bottom - 1 && sr.top - pr.bottom < 16 && sr.left >= pr.left - 1, seen: !!hit && stat.contains(hit),
+    note: note.getClientRects().length > 0, text: stat.textContent, noteText: note.textContent };
+});
+uiTest('#1022 Tasks ▸ Emulate: the emulation\'s time and rate right below the board, in place of the board\'s line; in Portuguese; modern and classic as before', E, async (page) => {
+  await makeProject(env, { name: 'TasksStat', template: 'blinky' });
+  await page.setViewport(1280, 800);
+  await tasksInterface(page);
+  await page.openProject('TasksStat');
+  await page.click('#task-switch .task-btn[data-task="emu"]');
+  await page.click('#task-empty button');
+  await page.waitConsole(/Board Emulator: 'top'/, { timeout: 30000 });
+  await page.waitFor(() => /^t = .* cycles .* kHz \(.*% of real time\)$/.test(document.querySelector('.doc:not([hidden]) .emu-board-wrap > .stat')?.textContent || ''), [], { what: 'the status below the board' });
+  let s = await emuStatus(page);
+  assert.deepEqual({ ...s, text: undefined }, { where: 'board', below: true, seen: true, note: false, text: undefined, noteText: s.noteText });
+  assert.match(s.noteText, /^Digilent Basys2 — top · Clock clk: 50 MHz on the board/);
+  assert.equal(await page.eval(() => document.querySelectorAll('.doc:not([hidden]) .emu-bar .stat').length), 0, 'no status in the emulator\'s bar');
+  // in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.waitFor(() => /^t = .* ciclos .* kHz \(.*% do tempo real\)$/.test(document.querySelector('.doc:not([hidden]) .emu-board-wrap > .stat')?.textContent || ''), [], { what: 'the status in Portuguese' });
+  s = await emuStatus(page);
+  assert.ok(s.where === 'board' && s.below && s.seen && !s.note, JSON.stringify(s));
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  // the modern and classic interfaces: at the end of the emulator's bar, the board's line below the board
+  for (const ui of ['modern', 'classic']) {
+    await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
+    await page.waitFor(() => !document.documentElement.dataset.layout);
+    await page.waitFor(() => /^t = .* cycles .* kHz \(.*% of real time\)$/.test(document.querySelector('.doc:not([hidden]) .emu .stat')?.textContent || ''), [], { what: `the status in ${ui}` });
+    s = await emuStatus(page);
+    assert.deepEqual({ where: s.where, note: s.note, last: await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-bar').lastElementChild.classList.contains('stat')) },
+      { where: 'bar', note: true, last: true }, ui);
+    assert.match(s.noteText, /^Digilent Basys2 — top · Clock clk: 50 MHz on the board/, ui);
+  }
+  // and back to Tasks: below the board again
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('tasks'));
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .emu-board-wrap > .stat'), [], { what: 'the status below the board again' });
+  await noWarnings(page);
+}, { build: DEV });
+
 // #1020: Emulate opens with its Watch shown (the task's side panel open), the design's signals to add; folded by the
 // viewer, it stays folded; the modern and classic interfaces show it as before
 uiTest('#1020 Tasks ▸ Emulate: the Watch shown at first; folded, it stays folded; modern and classic as before', E, async (page) => {

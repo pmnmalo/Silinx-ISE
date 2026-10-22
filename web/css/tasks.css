@@ -161,6 +161,10 @@ html[data-layout="tasks"] .emu-board-wrap { flex: none; }
 html[data-layout="tasks"] .emu-side { flex: none; width: 300px; min-width: 0; order: 1; }
 html[data-layout="tasks"] .emu-vga { order: 2; }
 html[data-layout="tasks"][data-task="emu"][data-side="folded"] .emu-side { display: none; }
+/* the emulator's status right below the board (moved there by tasks-emu.js), in place of the board's line (#1022) */
+html[data-layout="tasks"] .emu-board-note { display: none; }
+html[data-layout="tasks"] .emu-board-wrap > .stat { align-self: flex-start; color: var(--grey-3); font: 11px var(--mono, monospace);
+  font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------------ Implement (#802, web/js/tasks-impl.js) */
 /* its side panel: the top's Processes (ISE's names and states), not the tree */

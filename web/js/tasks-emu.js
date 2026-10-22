@@ -6,7 +6,8 @@
 //   beside the board; when the width runs short, it and the VGA monitor wrap to the next row, below the board, and the
 //   task's area scrolls (web/css/tasks.css); the Design pane is not shown in Emulate.
 // - The emulator's own bar stays its controls (Model, Engine, Run, Step, Power cycle, Clock), right under the task's
-//   bar; its Messages box is in the message centre (#798).
+//   bar; its status (the emulated time and rate) is right below the board, in place of the board's line (#1022); its
+//   Messages box is in the message centre (#798).
 // boardZoom has no DOM and is unit tested (test/tasks.test.js).
 
 export const MAX_ZOOM = 1.5, MIN_ZOOM = 1;   // (never smaller than its proper size: the panels wrap instead, #1021)
@@ -21,11 +22,20 @@ export function boardZoom(room, board) {
 }
 
 const shown = el => !!el && el.getClientRects().length > 0;
+/** The emulator's status (t = … ns · … cycles · … kHz (…% of real time)) right below the board in the Tasks interface,
+ *  in place of the board's line (hidden by web/css/tasks.css); at the end of the emulator's bar in the others (#1022). */
+function placeStat(emu, wrap) {
+  const stat = emu.querySelector('.emu-bar > .stat, .emu-board-wrap > .stat'), bar = emu.querySelector('.emu-bar');
+  if (!stat || !bar) return;
+  if (document.documentElement.dataset.layout === 'tasks') { if (stat.parentNode !== wrap) wrap.append(stat); }
+  else if (stat.parentNode !== bar) bar.append(stat);
+}
 /** Zooms each open emulator's board to its room (`on`: the Tasks interface's Emulate; else its own size). */
 export function fitBoard(on) {
   for (const emu of document.querySelectorAll('#workspace .doc .emu')) {
     const wrap = emu.querySelector('.emu-board-wrap');
     if (!wrap) continue;
+    placeStat(emu, wrap);
     wrap.style.zoom = '';
     if (!on || !shown(emu)) continue;
     const main = emu.querySelector('.emu-main'), side = emu.querySelector('.emu-side'), bar = emu.querySelector('.emu-bar');
