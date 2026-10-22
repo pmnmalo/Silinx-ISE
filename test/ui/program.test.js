@@ -1,7 +1,7 @@
 // UI: Program (iMPACT, web/js/impact.js; the Tasks interface's Program task, web/js/tasks-prog.js and
 // web/css/tasks.css): the programming panel uses the whole width available in every interface (#1023); Program FPGA
 // with no programming file, or one older than the sources, asks whether to implement the design first and programs
-// it once it is built, No programming nothing (#1024).
+// it once it is built, No programming nothing (#1024); every operation of the PROM shown at once, no More… (#1025).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -138,3 +138,33 @@ uiTest('#1024 Program FPGA with no programming file, or an old one: implement fi
   await noWarnings(page);
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
 }, { build: DEV, timeout: 240000 });
+
+// #1025: the PROM selected in the chain: Program PROM and every other operation shown at once, no More…, in the Tasks,
+// modern and classic interfaces; in Portuguese
+uiTest('#1025 Program PROM: every operation shown, no More…; in Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'ProgProm', template: 'gates' });
+  const prom = () => page.eval(() => {
+    const p = document.querySelector('#workspace > .doc:not([hidden]) > .page'), vis = (e) => e.getClientRects().length > 0;
+    return { buttons: [...p.querySelectorAll('.prom-box .btn')].filter(vis).map((b) => b.textContent),
+      more: [...p.querySelectorAll('.btn')].filter((b) => vis(b) && /^(More…|Mais…)$/.test(b.textContent)).length };
+  });
+  for (const ui of ['tasks', 'modern', 'classic']) {
+    await useInterface(page, ui);
+    await page.openProject('ProgProm');
+    if (ui === 'tasks') await page.click('#task-switch .task-btn[data-task="prog"]');
+    else await page.eval(() => window.SilinxApp.openImpact());
+    await page.waitFor(() => !!document.querySelector('#workspace > .doc:not([hidden]) .impact-chain .impact-dev'), [], { what: 'iMPACT' });
+    // the FPGA selected: no PROM operation
+    assert.deepEqual(await prom(), { buttons: [], more: 0 }, ui);
+    // the PROM (the Basys2's XCF02S)
+    await page.click('#workspace > .doc:not([hidden]) .impact-chain .impact-dev', { text: 'XCF02S' });
+    await page.waitFor(() => !document.querySelector('#workspace > .doc:not([hidden]) .prom-box').hidden, [], { what: 'the PROM selected' });
+    assert.deepEqual(await prom(), { buttons: ['Program PROM', 'Verify', 'Erase', 'Back up PROM', 'Reload FPGA from PROM'], more: 0 }, ui);
+  }
+  // in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.waitFor(() => document.querySelector('#workspace > .doc:not([hidden]) .prom-box .btn')?.textContent === 'Programar PROM', [], { what: 'Portuguese' });
+  assert.deepEqual(await prom(), { buttons: ['Programar PROM', 'Verificar', 'Apagar', 'Copiar PROM', 'Recarregar FPGA a partir da PROM'], more: 0 });
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await noWarnings(page);
+}, { build: DEV, timeout: 120000 });

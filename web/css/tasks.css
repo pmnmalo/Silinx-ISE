@@ -183,8 +183,8 @@ html[data-layout="tasks"] .task-program button { font-weight: 600; }
 
 /* ------------------------------------------------------------------ Program (#803, web/js/tasks-prog.js) */
 /* iMPACT arranged for the task: the chain and Program FPGA / PROM; the board, tool and cable folded away (a board
-   chooses them), the PROM's other operations behind More… */
-.task-prog-more, .task-prog-settings { display: none; }
+   chooses them); every operation of the PROM shown (#1025) */
+.task-prog-settings { display: none; }
 /* (the whole width available, as in the modern and classic interfaces: #1023) */
 html[data-layout="tasks"] #workspace > .doc[data-task="prog"] > .page { display: flex; flex-direction: column; gap: 10px; }
 html[data-layout="tasks"] .doc[data-task="prog"] > .page > h2 { order: 1; margin: 0; }
@@ -197,8 +197,6 @@ html[data-layout="tasks"] .doc[data-task="prog"] > .page > .task-prog-settings {
 html[data-layout="tasks"] .doc[data-task="prog"] > .page > .imp-settings { order: 8; }
 html[data-layout="tasks"] .doc[data-task="prog"] > .page > .note-box { order: 9; }
 html[data-layout="tasks"] .doc[data-task="prog"] > .page:not(.settings-open) > .imp-settings { display: none; }
-html[data-layout="tasks"] .task-prog-more { display: inline-flex; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page:not(.more-open) .imp-more { display: none; }
 
 /* ------------------------------------------------------------------ the activity bar is Edit's (#876) */
 /* Start, Design, Files and Libraries are Edit's pages: Simulate and Emulate have their document's own side panel,

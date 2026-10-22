@@ -173,11 +173,11 @@ export function mountImpact(el) {
       h('label', { style: { margin: 0 } }, reload, ' Reload the FPGA from the PROM afterwards (mode jumper on ROM)')),
     h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
       h('button', { class: 'btn primary', onclick: () => prom('program') }, 'Program PROM'),
-      // (imp-*: the parts the Tasks interface arranges, web/js/tasks-prog.js, #803)
-      h('button', { class: 'btn imp-more', onclick: () => prom('verify') }, 'Verify'),
-      h('button', { class: 'btn imp-more', onclick: () => prom('erase') }, 'Erase'),
-      h('button', { class: 'btn imp-more', onclick: () => prom('read') }, 'Back up PROM'),
-      h('button', { class: 'btn imp-more', onclick: () => prom('reconfigure') }, 'Reload FPGA from PROM')),
+      // (every operation shown, in every interface: #1025)
+      h('button', { class: 'btn', onclick: () => prom('verify') }, 'Verify'),
+      h('button', { class: 'btn', onclick: () => prom('erase') }, 'Erase'),
+      h('button', { class: 'btn', onclick: () => prom('read') }, 'Back up PROM'),
+      h('button', { class: 'btn', onclick: () => prom('reconfigure') }, 'Reload FPGA from PROM')),
     h('div', { style: { color: 'var(--grey-4)', marginTop: '6px' } },
       'The PROM image is build/<top>_prom.bit (generated with StartUpClk:CCLK by "Generate Programming File"). ',
       'To boot from flash at power-up, set the mode jumper to ROM (Basys2: JP3). ',

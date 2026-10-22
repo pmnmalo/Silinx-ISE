@@ -792,9 +792,9 @@ uiTest('#802 Tasks ▸ Implement: the top\'s Processes, the Design Summary as ca
   await noWarnings(page);
 }, { build: DEV, timeout: 180000 });
 
-// #803: Program arranges iMPACT: the chain and Program FPGA / PROM; the board's tool and cable folded away; the PROM's
-// other operations behind More…; the programming file's state no line of its own (Program FPGA asks: #1024)
-uiTest('#803 Tasks ▸ Program: the chain and Program; settings folded; the PROM\'s others behind More…', E, async (page) => {
+// #803: Program arranges iMPACT: the chain and Program FPGA / PROM; the board's tool and cable folded away; every
+// operation of the PROM shown, no More… (#1025); the programming file's state no line of its own (Program FPGA asks: #1024)
+uiTest('#803 Tasks ▸ Program: the chain and Program; settings folded; every PROM operation shown', E, async (page) => {
   await makeProject(env, { name: 'TasksProg', template: 'blinky' });
   await page.setViewport(1366, 768);
   await tasksInterface(page);
@@ -804,32 +804,30 @@ uiTest('#803 Tasks ▸ Program: the chain and Program; settings folded; the PROM
   const P = () => page.eval(() => {
     const p = document.querySelector('.doc:not([hidden]) > .page'), vis = (s) => !!p.querySelector(s)?.getClientRects().length;
     const top = (s) => Math.round(p.querySelector(s).getBoundingClientRect().top);
-    return { state: p.querySelectorAll('.task-prog-state, .task-prog-impl').length, chainFirst: top('.impact-chain') < top('.imp-fpga'), settings: vis('.imp-settings'), more: vis('.imp-more') };
+    return { added: p.querySelectorAll('.task-prog-state, .task-prog-impl, .task-prog-more').length, chainFirst: top('.impact-chain') < top('.imp-fpga'), settings: vis('.imp-settings'),
+      prom: [...p.querySelectorAll('.prom-box .btn')].filter((b) => b.getClientRects().length).map((b) => b.textContent) };
   });
   // no implementation yet: no line about it (#1024); the board (Basys2) chose the tool and cable: folded
-  assert.deepEqual(await P(), { state: 0, chainFirst: true, settings: false, more: false });
+  assert.deepEqual(await P(), { added: 0, chainFirst: true, settings: false, prom: [] });
   assert.doesNotMatch(await page.eval(() => document.querySelector('.doc:not([hidden]) > .page').innerText), /No programming file yet|Up to date with the sources/);
   await page.click('.doc:not([hidden]) .task-prog-settings');
   assert.equal((await P()).settings, true);
-  // the PROM selected in the chain: Program PROM, its other operations behind More…
+  // the PROM selected in the chain: Program PROM and its other operations, all shown (#1025)
   await page.click('.doc:not([hidden]) .impact-chain .impact-dev', { index: 0 });
   await page.waitFor(() => !document.querySelector('.doc:not([hidden]) .prom-box').hidden, [], { what: 'the PROM selected' });
-  assert.equal((await P()).more, false);
-  await page.click('.doc:not([hidden]) .task-prog-more');
-  assert.equal((await P()).more, true);
+  assert.deepEqual((await P()).prom, ['Program PROM', 'Verify', 'Erase', 'Back up PROM', 'Reload FPGA from PROM']);
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-prog-more')?.textContent === 'Mais…', [], { what: 'Portuguese' });
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) :is(.task-prog-more, .task-prog-settings)')].map((b) => b.textContent)),
-    ['Placa, ferramenta de programação e cabo…', 'Mais…']);
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-prog-settings')?.textContent === 'Placa, ferramenta de programação e cabo…', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the modern interface: iMPACT as it was (its fields and every PROM button, nothing added)
   await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.deepEqual(await page.eval(() => {
     const p = document.querySelector('.doc:not([hidden]) > .page');
-    return [p.querySelectorAll('.task-prog-more, .task-prog-settings').length, !!p.querySelector('.imp-settings').getClientRects().length, !!p.querySelector('.imp-more').getClientRects().length];
-  }), [0, true, true]);
+    return [p.querySelectorAll('.task-prog-more, .task-prog-settings').length, !!p.querySelector('.imp-settings').getClientRects().length,
+      [...p.querySelectorAll('.prom-box .btn')].filter((b) => b.getClientRects().length).length];
+  }), [0, true, 5]);
   await noWarnings(page);
 }, { build: DEV });
 
