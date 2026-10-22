@@ -120,6 +120,8 @@ html[data-layout="tasks"][data-console="folded"] #mc-cmd { display: none; }
 /* the waves get the screen: ISim's title bar is the task's bar's; its side panel is ISim's Instances and Objects
    (folded at first), not the Design pane */
 html[data-layout="tasks"] .isim-title { display: none; }
+/* no status line ("Ready … Sim Time"): the time is where the waves are, the state in the message centre (#1017) */
+html[data-layout="tasks"] .isim-status { display: none; }
 html[data-layout="tasks"][data-task="sim"] :is(#left-pages, #v-split, #drawer-btn, #drawer-scrim) { display: none !important; }
 /* (#left the activity bar only, open or folded: no empty column of the Design pane's width, #882) */
 html[data-layout="tasks"]:is([data-task="sim"], [data-task="emu"]) #left { width: auto !important; min-width: 0; }
