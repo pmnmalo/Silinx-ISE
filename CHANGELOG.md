@@ -24,6 +24,11 @@ Development menu and a third interface, Tasks, still in progress.
 
 In short:
 
+- **Paste in Firefox and Safari:** Edit ▸ Paste no longer opens the browser's own Paste prompt nor waits for it; it
+  pastes what was copied in Silinx, and is off until something is (Ctrl+V still pastes from other applications).
+- **The Board Emulator's Model menu offers every model:** a netlist model not generated yet (Post-Synthesis,
+  Post-Translate, Post-Map, Post-Place & Route) can be chosen; the emulator asks to generate it, as Emulate from the
+  Processes list does.
 - **Device Primitives built with ISE:** a schematic's RAMB16_S1, Spartan-6 block RAMs and DSP48A1 now give HDL that
   Xilinx ISE synthesizes and implements; a DSP48A1 with both M and P connected is an error.
 - **Edit Stimuli is seen:** ISim's toolbar shows the button with its label, "Edit Stimuli", next to its icon,
@@ -216,6 +221,32 @@ In short:
 
 In detail:
 
+- **CI: the UI tests' time limit 25 minutes (#912):** the UI tests grew to about 15 minutes in each interface
+  (the Tasks interface, the device primitives and wizards, the clipboard), their step's limit; the 15.12.0 release
+  CI stopped there after 196 tests that passed. The step's limit is 25 minutes, the job's 30; the UI tests are to
+  run in parts, as the unit tests do.
+- **The compiled engine's speed test on CI (#909):** `test/compiled-words.test.js`'s #670 speed check compares two
+  wall-clock measurements, which on a shared CI runner vary with its load (6 against 5, then 4 against 4 million
+  cycles a second on the 15.12.0 release CI). On CI the ratio is now reported, not checked; it is still checked on a
+  developer's machine, and the work the activity saves is checked everywhere, deterministically.
+- **The #490 emulator test waits for simulated time (#908):** blinky's light first steps 400 ms after the start
+  (2.5 steps a second). The test watched the Post-Translate model's LEDs for 4 s of wall time, which on a slow
+  runner (8.5 % of real time) was 365 ms simulated, before the first step. It now watches until 1.2 s of
+  simulated time, 90 s of wall time at most (test/ui/open-toolchain.test.js).
+- **The ISE runner's hook in a folder without spaces (#891):** the GitHub runner runs its job-started hook
+  without quoting its path, so `…/Library/Application Support/Silinx-ISE-runner/job-started.sh` split at the
+  space and every job on the ISE runner failed before its first step. `scripts/ise-runner/install.sh` now copies
+  the scripts to `/Library/Silinx-ISE-runner` (`--system`) or `~/Library/Silinx-ISE-runner`, and removes the old
+  folder. Tests: `test/ise-runner.test.js` (the hook's path in `.env` has no whitespace; the old folder removed).
+- **Edit ▸ Paste and the system clipboard (#888):** the system clipboard is read only where the browser has a
+  clipboard-read permission (Chromium), and waited for 300 ms at most. Firefox and Safari answer a read with a
+  Paste prompt of their own, which held the paste and stayed open in the way of the next clicks
+  (web/js/clipboard.js). There a text Paste is enabled once something was copied in the session (`canPasteText`):
+  before, it was on with nothing to paste, and did nothing.
+- **The emulator's Model menu: a model not generated chosen offers "Generate and Emulate" (#878):** its options are no
+  longer disabled (still marked "(not generated)"); choosing one goes through the question of #490 and the emulator
+  opens on the model once it is generated; cancelled, the emulator and its menu stay on the model running. The Tasks
+  interface's Emulate task (#801), which has no Processes list, had no way to emulate a netlist model.
 - **Memory: closed documents no longer kept by the Tasks interface's Emulate (#879):** its watcher for an emulator's
   board put an observer on every document opened, in every interface, for up to two minutes, so closed documents
   (ISim, the editors, the FPGA view) stayed in memory and `test/ui/memory.test.js` failed. It is now one observer on
