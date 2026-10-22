@@ -272,9 +272,15 @@ uiTest('#839 Tasks in a development build: with the Development menu, in Portugu
     else assert.ok(['current', 'icons', 'tight'].includes(f.fit) && f.labels.length <= 1, `${w} px: the current label at most (${f.fit}; how short the header is depends on the system's fonts)`);
     assert.deepEqual(await noOverflow(page), { page: true, over: [] }, `${w} px`);
   }
-  // 1280 × 800: the other tasks' labels gave way; their names in their tips
-  await page.setViewport(1280, 800);
-  await page.waitFor(() => document.getElementById('topbar').dataset.fit === 'current', [], { what: 'the current label only' });
+  // narrower: the other tasks' labels give way; their names in their tips (the width it happens at depends on the
+  // header's other parts: with no project chip, #1042, below 1280 px; looked for between 1280 and 1025 px)
+  let current = 0;
+  for (const w of [1280, 1240, 1200, 1160, 1120, 1080, 1040]) {
+    await page.setViewport(w, 800);
+    await page.waitFor(() => { const t = document.getElementById('topbar'); return t.scrollWidth <= t.clientWidth; }, [], { what: `the header fits at ${w} px`, timeout: 3000 });
+    if ((await fit(page)).fit === 'current') { current = w; break; }
+  }
+  assert.ok(current, 'a width where only the current task\'s label shows');
   assert.deepEqual((await fit(page)).labels, ['edit']);
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#task-switch .task-btn')].map((b) => b.title)), ['Design', 'Simular', 'Emular', 'Implementar', 'Programar']);
   // with room again (a lab desktop): every label
