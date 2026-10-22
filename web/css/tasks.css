@@ -134,7 +134,8 @@ html[data-layout="tasks"][data-task="sim"] :is(#left-pages, #v-split, #drawer-bt
 /* (#left the activity bar only, open or folded: no empty column of the Design pane's width, #882) */
 html[data-layout="tasks"]:is([data-task="sim"], [data-task="emu"]) #left { width: auto !important; min-width: 0; }
 html[data-layout="tasks"][data-task="sim"][data-side="folded"] .isim :is(.isim-left, .isim-split-main) { display: none; }
-/* the model to simulate */
+/* the model to simulate; no Simulate button beside it: choosing the model or the test bench simulates (#1018) */
+html[data-layout="tasks"][data-task="sim"] #task-bar .task-main { display: none; }
 #task-model, #task-bench, .task-bench-edit { display: none; }
 html[data-layout="tasks"][data-task="sim"] #task-bench { display: inline-block; height: 32px; margin-left: 8px; max-width: 200px;
   border: 1px solid var(--m-border-strong); border-radius: 7px; background: var(--m-surface); color: var(--m-fg); font: inherit; padding: 0 6px; }

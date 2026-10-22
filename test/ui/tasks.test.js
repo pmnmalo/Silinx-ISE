@@ -822,10 +822,9 @@ uiTest('#917 Tasks ▸ Simulate: no test bench, the wizard from its page; the te
   await page.waitFor(() => document.getElementById('task-bench').value === 'tb_and2', [], { what: 'the choice' });
   assert.deepEqual((await bench()).options.map(([v]) => v), ['Test Benches', 'tb_and2', 'Design modules', 'and2', '+new']);
   assert.ok(await shown(page, '#task-empty') && !(await shown(page, '#task-empty .task-empty-bench')), 'a test bench: no offer');
-  // a design module chosen instead: the simulation top (as Set as Top Module in the Simulation view), Simulate runs it
+  // a design module chosen instead: the simulation top (as Set as Top Module in the Simulation view), simulated at once (#1018)
   await page.eval(() => { const s = document.getElementById('task-bench'); s.value = 'and2'; s.dispatchEvent(new Event('change')); });
   await page.waitFor(() => window.Silinx.project.simTop === 'and2' && document.getElementById('task-bench').value === 'and2', [], { what: 'and2 chosen' });
-  await page.click('#task-bar [data-act="main"]');
   await page.waitFor(() => document.querySelector('#task-doc .task-doc-mod')?.textContent === 'and2', [], { what: 'ISim of and2', timeout: 30000 });
   // Edit: the chosen module's source, in Edit
   await page.click('#task-bar .task-bench-edit');

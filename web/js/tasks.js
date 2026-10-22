@@ -11,7 +11,7 @@
 // - the messages: the bottom panel's message centre (web/js/messages.js, #798; every interface's: #925), its filter
 //   following the task;
 // - Simulate (web/js/tasks-sim.js, #800): the waves get the screen, its side panel ISim's Instances and Objects;
-//   it runs the test bench with the model chosen in the task's bar;
+//   it runs the test bench with the model chosen in the task's bar, as soon as either is chosen (no Simulate button, #1018);
 // - Emulate (web/js/tasks-emu.js, #801): the board at its proper size or larger (#1021), its side panel the emulator's Watch;
 // - Implement (web/js/tasks-impl.js, #802): its side panel the top's Processes, its page the Design Summary as cards;
 // - Program (web/js/tasks-prog.js, #803): iMPACT's programming file and its state first, then the chain and Program;
@@ -301,7 +301,7 @@ function build() {
       h('button', { class: 'tb-btn', type: 'button', 'data-act': 'close', title: 'Close', 'aria-label': 'Close', html: ICON.close })),
     benchSelect(app),
     h('button', { class: 'btn task-bench-edit', type: 'button', title: 'Open the test bench\'s source', onclick: () => editBench(app) }, 'Edit'),
-    modelSelect(),
+    modelSelect(app),
     Object.assign(h('button', { class: 'm-step task-main', type: 'button', 'data-act': 'main', onclick: runMain }, h('span', { class: 'ico-inline' }), h('span', { class: 'lbl' })),
       { _enabled: mainEnabled })));   // (disabled as its design-flow button: menus.js refreshSteps)
   $('task-bar').addEventListener('click', e => {

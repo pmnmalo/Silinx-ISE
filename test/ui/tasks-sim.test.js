@@ -106,3 +106,57 @@ uiTest('#1026 Tasks ▸ Simulate: the simulator\'s icons in the wave window\'s l
   assert.equal(await toolbarAt(page), 'caption');
   await noWarnings(page);
 }, { build: DEV });
+
+// #1018: the task's bar's choices simulate at once, with no Simulate button beside them
+// (the log's text: the messages may be folded, so not its innerText)
+const logText = (page) => page.eval(() => document.getElementById('console-log').textContent);
+const started = async (page, from) => [...(await logText(page)).slice(from).matchAll(/Started : "Simulate (?:Behavioral|Post-Synthesis|Post-Translate|Post-Map|Post-Place & Route) Model"\./g)].map((m) => m[0]);
+const choose = (page, id, value) => page.eval((i, v) => { const s = document.getElementById(i); s.value = v; s.dispatchEvent(new Event('change')); }, id, value);
+// the simulator shown: its module and model (the task's bar), ready
+const simShown = (page, module, model) => page.waitFor((m, k) => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running
+  && document.querySelector('#task-doc .task-doc-mod')?.textContent === m && document.querySelector('#task-doc .task-doc-model')?.textContent === k, [module, model], { what: `ISim of ${module}, ${model}`, timeout: 180000 });
+uiTest('#1018 Tasks ▸ Simulate: choosing the test bench or the model simulates it once (the model generated first), no Simulate button', E, async (page) => {
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await simulateBench(page, 'TasksSimChoice');
+  // no Simulate button in the task's bar (the other tasks keep their action)
+  assert.ok(!(await shown(page, '#task-bar [data-act="main"]')), 'no Simulate button');
+  assert.ok(await shown(page, '#task-bench') && await shown(page, '#task-model'));
+  // a module chosen: simulated once, at once
+  let from = (await logText(page)).length;
+  await choose(page, 'task-bench', 'top');
+  await simShown(page, 'top', 'Behavioral');
+  assert.deepEqual(await started(page, from), ['Started : "Simulate Behavioral Model".']);
+  // the test bench again, then a design module while it is being prepared: the last choice is the one shown
+  from = (await logText(page)).length;
+  await choose(page, 'task-bench', 'tb_top');
+  await choose(page, 'task-bench', 'top');
+  await page.waitFor(() => window.Silinx.project.simTop === 'top', [], { what: 'top chosen' });
+  await simShown(page, 'top', 'Behavioral');
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(await page.eval(() => document.querySelector('#task-doc .task-doc-mod').textContent), 'top', 'the last choice stays');
+  assert.equal(await page.eval(() => window.SilinxApp.S.docs.filter((d) => d.id === 'isim').length), 1);
+  // back to the test bench
+  from = (await logText(page)).length;
+  await choose(page, 'task-bench', 'tb_top');
+  await simShown(page, 'tb_top', 'Behavioral');
+  assert.deepEqual(await started(page, from), ['Started : "Simulate Behavioral Model".']);
+  // a model not generated yet: offered first ("Generate and Simulate", #490), generated, then simulated once
+  from = (await logText(page)).length;
+  await choose(page, 'task-model', 'postsynth');
+  await page.waitDialog('Simulate Post-Synthesis Model');
+  await page.dialogButton('Generate and Simulate');
+  await page.waitNoDialog();
+  await simShown(page, 'tb_top', 'Post-Synthesis');
+  const log = (await logText(page)).slice(from);
+  assert.match(log, /Process "Generate Post-Synthesis Simulation Model" completed successfully/);
+  assert.deepEqual(await started(page, from), ['Started : "Simulate Post-Synthesis Model".']);
+  // and Behavioral again: at once, no dialog
+  from = (await logText(page)).length;
+  await choose(page, 'task-model', '');
+  await simShown(page, 'tb_top', 'Behavioral');
+  assert.deepEqual(await started(page, from), ['Started : "Simulate Behavioral Model".']);
+  // the other tasks: their action in the bar
+  await page.click('#task-switch .task-btn[data-task="edit"]');
+  assert.ok(await shown(page, '#task-bar [data-act="main"]'), 'Edit\'s Check');
+  await noWarnings(page);
+}, { build: DEV, timeout: 300000 });

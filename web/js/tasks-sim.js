@@ -3,7 +3,8 @@
 //   Simulate); ISim's title bar is the task's bar's (the module and the model, #854); its run controls stay its
 //   toolbar, in the wave window's line (placeSimToolbar, #1026); no status line (#1017; web/css/tasks.css).
 // - Simulate runs the project's test bench whatever module is selected (simTarget), with the model chosen in the
-//   task's bar: Behavioral, or a netlist (Post-Synthesis … Post-Place & Route; web/js/viewers.js runSimulation).
+//   task's bar: Behavioral, or a netlist (Post-Synthesis … Post-Place & Route; web/js/viewers.js runSimulation). Choosing
+//   the model or the test bench simulates at once, the bar has no Simulate button (#1018; the task's page still has one).
 // - The task's bar chooses the test bench (or a design module, simulated with stimuli drawn in ISim), makes a new one
 //   with the Test Bench Wizard, and opens the chosen one's source (#917): the design tree is Edit's.
 // simTarget and simChoices have no DOM and are unit tested (test/tasks.test.js).
@@ -32,19 +33,24 @@ export function simTarget(project, modules = []) {
   return has(project?.top) ? project.top : null;
 }
 
-/** The task's bar's choice of the model to simulate (shown in Simulate only). */
-export function modelSelect() {
-  return h('select', { id: 'task-model', title: 'The model to simulate', 'aria-label': 'The model to simulate' },
+/** The task's bar's choice of the model to simulate (shown in Simulate only): a choice simulates it at once (#1018;
+ *  a netlist not generated yet offered to be generated first, #490). */
+export function modelSelect(app) {
+  const sel = h('select', { id: 'task-model', title: 'The model to simulate', 'aria-label': 'The model to simulate' },
     ...SIM_MODELS.map(([v, label]) => h('option', { value: v }, label)));
+  sel.addEventListener('change', () => simulate(app));
+  return sel;
 }
 
-/** Simulate: the test bench, with the model chosen. */
+/** Simulate: the test bench, with the model chosen; a choice made while another is being prepared replaces it (#1018). */
+let simSeq = 0;
 export async function simulate(app) {
   const mod = simTarget(app.S.project, app.S.modules);
   if (!mod) return;
   const model = document.getElementById('task-model')?.value || undefined;
+  const seq = ++simSeq;
   const { runSimulation } = await import('./viewers.js');   // (not at load: viewers.js loads the app)
-  return runSimulation(mod, model);
+  return runSimulation(mod, model, { stale: () => seq !== simSeq });
 }
 
 /** The modules Simulate can run: the test benches, then the design's modules (its top first). */
@@ -56,14 +62,15 @@ export function simChoices(project, modules = []) {
 }
 
 export const NEW_BENCH = '+new';
-/** The task's bar's choice of the test bench (shown in Simulate only; its options follow the project: refreshBench). */
+/** The task's bar's choice of the test bench (shown in Simulate only; its options follow the project: refreshBench): a
+ *  test bench or a module chosen is simulated at once (#1018). */
 export function benchSelect(app) {
   const sel = h('select', { id: 'task-bench', title: 'The test bench to simulate', 'aria-label': 'The test bench to simulate' });
   sel.addEventListener('change', () => {
     const v = sel.value;
     sel.value = simTarget(app.S.project, app.S.modules) || '';   // (until the choice is made: a wizard may be cancelled)
     if (v === NEW_BENCH) newBench(app);
-    else if (v) app.setTop(v, true).then(() => refreshBench(app));
+    else if (v) app.setTop(v, true).then(() => { refreshBench(app); return simulate(app); });
   });
   return sel;
 }

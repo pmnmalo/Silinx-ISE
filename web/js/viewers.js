@@ -223,13 +223,15 @@ async function readDataFiles() {
 }
 
 // model: undefined = behavioural (the HDL sources); postsynth / posttrans / postmap / postpar =
-// the testbench against that netgen netlist (compiled after the sources: its entity replaces the RTL one)
-export async function runSimulation(mod, model) {
+// the testbench against that netgen netlist (compiled after the sources: its entity replaces the RTL one).
+// stale(): true when another simulation was asked for meanwhile (the Tasks interface's choices, #1018): this one
+// opens no window, so that the last choice's is the one shown.
+export async function runSimulation(mod, model, { stale } = {}) {
   countEvent('simulate');
-  try { return await runSimulationInner(mod, model); }
+  try { return await runSimulationInner(mod, model, stale); }
   catch (e) { setStatus(model ? `sim-${model}` : 'sim-run', 'err'); log(`ERROR: simulation: ${e.message}`, 'err'); }
 }
-async function runSimulationInner(mod, model) {
+async function runSimulationInner(mod, model, stale) {
   await saveAll();
   if (!await checkSyntax(mod, true)) return;
   const net = model ? await netlistSources(model) : null;
@@ -249,6 +251,7 @@ async function runSimulationInner(mod, model) {
   log(`Simulation model ready: ${design.signals.length} signals, ${design.procs.length} processes. Launching SSim view.`, 'ok');
   setStatus(procId, 'ok');
   const { mountISim } = await import('./isim.js');
+  if (stale?.()) return;
   const id = 'isim';
   const old = findDoc(id);
   if (old) await closeDoc(old);
