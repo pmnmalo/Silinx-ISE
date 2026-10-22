@@ -60,6 +60,7 @@ uiTest('View ▸ Interface ▸ Tasks: the task switcher in the header, the task\
   // the modern interface has none of it
   assert.ok(!(await shown(page, '#task-switch')) && !(await shown(page, '#task-bar')) && !(await shown(page, '#task-tabs')));
   assert.ok(await shown(page, '.m-steps'));
+  assert.ok(await shown(page, '#statusbar'), 'the modern interface keeps its status bar');
   const items = await page.openMenu('View');
   await page.hover(await page.point('body > .menu-popup > .mi', { index: items.findIndex((x) => x.label === 'Interface') }));
   await page.waitForSelector('.menu-popup.sub .mi');
@@ -79,6 +80,7 @@ uiTest('View ▸ Interface ▸ Tasks: the task switcher in the header, the task\
   });
   assert.ok(await shown(page, '#task-switch'));
   assert.ok(!(await shown(page, '#task-tabs')), 'the bottom tab bar: on a narrow screen only');
+  assert.ok(!(await shown(page, '#statusbar')), 'no status bar in the Tasks interface (#1039)');
   // with no project: Edit, its page says what it does; its action (Check) needs a project
   assert.deepEqual(await state(page), { task: 'edit', side: 'open', console: 'open', max: 'off', current: ['edit'], tabs: [], empty: true });
   assert.equal(await page.eval(() => document.querySelector('#task-empty button').disabled), true);
@@ -95,6 +97,7 @@ uiTest('View ▸ Interface ▸ Tasks: the task switcher in the header, the task\
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.ok(!(await shown(page, '#task-switch')) && !(await shown(page, '#task-bar')));
   assert.ok(await shown(page, '.m-steps'));
+  assert.ok(await shown(page, '#statusbar'), 'back in the modern interface, the status bar again');
   // (a project opened: the start-up checks' warnings, which depend on the computer, are cleared)
   await makeProject(env, { name: 'TasksMenu', template: 'gates' });
   await page.openProject('TasksMenu');

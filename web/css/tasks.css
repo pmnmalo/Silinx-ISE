@@ -5,6 +5,8 @@
 
 #task-switch, #task-tabs, #task-bar, #task-empty { display: none; }
 html[data-layout="tasks"] #ws-empty { display: none !important; }
+/* no status bar (#1039): the messages are in the message centre, the device and board in Design, the storage in File */
+html[data-layout="tasks"] #statusbar { display: none; }
 
 /* ------------------------------------------------------------------ the task switcher */
 html[data-layout="tasks"] #task-switch { display: flex; gap: 2px; padding: 3px; margin: 0 auto; flex: none;
