@@ -1,7 +1,7 @@
 // The Tasks interface's Simulate task (#800, #782): the waves get the screen.
 // - ISim's own Instances and Objects are the task's side panel, folded at first (the Design pane is not shown in
 //   Simulate); ISim's title bar is the task's bar's (the module and the model, #854); its run controls stay its
-//   toolbar, right under the task's bar (web/css/tasks.css).
+//   toolbar, in the wave window's line (placeSimToolbar, #1026); no status line (#1017; web/css/tasks.css).
 // - Simulate runs the project's test bench whatever module is selected (simTarget), with the model chosen in the
 //   task's bar: Behavioral, or a netlist (Post-Synthesis … Post-Place & Route; web/js/viewers.js runSimulation).
 // - The task's bar chooses the test bench (or a design module, simulated with stimuli drawn in ISim), makes a new one
@@ -9,6 +9,17 @@
 // simTarget and simChoices have no DOM and are unit tested (test/tasks.test.js).
 
 import { h } from './ui.js';
+
+/** ISim's toolbar in its wave window's line, where its name ("Default.wcfg") and the cursor's text were (`tasks`: the
+ *  Tasks interface, #1026; web/css/tasks.css hides them), else back under its title bar, as ISim made it. */
+export function placeSimToolbar(tasks) {
+  for (const root of document.querySelectorAll('#workspace .isim')) {
+    const tb = root.querySelector('.isim-toolbar'), cap = root.querySelector('.isim-wavewin > .caption');
+    if (!tb || !cap) continue;
+    if (tasks && tb.parentElement !== cap) cap.prepend(tb);
+    else if (!tasks && tb.parentElement === cap) root.querySelector('.isim-title').after(tb);
+  }
+}
 
 export const SIM_MODELS = [['', 'Behavioral'], ['postsynth', 'Post-Synthesis'], ['posttrans', 'Post-Translate'], ['postmap', 'Post-Map'], ['postpar', 'Post-Place & Route']];
 

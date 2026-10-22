@@ -28,7 +28,7 @@ import { h } from './ui.js';
 import { icons } from './icons.js';
 import { isNarrow, setDrawer, drawerOpen } from './narrow.js';
 import { messagesTask, initMessages } from './messages.js';
-import { benchSelect, editBench, modelSelect, newBench, refreshBench, simChoices, simTarget, simulate } from './tasks-sim.js';
+import { benchSelect, editBench, modelSelect, newBench, placeSimToolbar, refreshBench, simChoices, simTarget, simulate } from './tasks-sim.js';
 import { fitBoard, initEmulate } from './tasks-emu.js';
 import { implementationEnded, showTopProcesses } from './tasks-impl.js';
 import { arrangeProgram, initProgram } from './tasks-prog.js';
@@ -150,7 +150,7 @@ export function setTask(t, { fromDoc = false } = {}) {
 /** Puts the current task and its arrangement on the page. */
 function apply() {
   const r = root();
-  if (!on()) { if (document.getElementById('task-bar')) { unbuild(); fitBoard(false); arrangeProgram(false, PROG); dispatchEvent(new Event('resize')); } return; }
+  if (!on()) { if (document.getElementById('task-bar')) { unbuild(); placeSimToolbar(false); fitBoard(false); arrangeProgram(false, PROG); dispatchEvent(new Event('resize')); } return; }
   build();
   const t = current(), a = arr(t);
   if (t !== shownTask) { shownTask = t; messagesTask(t); if (t === 'impl' && app) showTopProcesses(app); }
@@ -182,6 +182,7 @@ function apply() {
 function tagDocs() {
   const S = app?.S;
   if (!S) return;
+  placeSimToolbar(on());   // (ISim's toolbar in its wave window's line: #1026)
   let mine = 0, only = null;
   for (const d of S.docs) {
     const t = taskOfDoc(d.id);
