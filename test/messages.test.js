@@ -59,6 +59,7 @@ test('sourceOf: the processes\' headers', () => {
     'Started : "Synthesize - XST".': 'synth',
     'Started : "Synthesize - Yosys (open)".': 'synth',
     'Started : "Implement Design".': 'synth',
+    'Started : "Check Schematic" of gates.': 'check',   // (a schematic's, in the Tasks interface: #993)
     'Started : "Translate".': 'impl',
     'Started : "Generate Post-Synthesis Simulation Model".': 'impl',
     'Started : "Generate Text Power Report".': 'impl',
@@ -77,7 +78,7 @@ test('sourceOf: the processes\' headers', () => {
 
 test('filterSources: a picked filter, All, or the task\'s own sources (Implement: synthesis and implementation)', () => {
   assert.deepEqual(M.SOURCES, ['check', 'sim', 'emu', 'synth', 'impl', 'prog']);
-  assert.deepEqual(['all', ...M.SOURCES].map((s) => M.SOURCE_LABEL[s]), ['All', 'Check Syntax', 'Simulation', 'Emulator', 'Synthesis', 'Implementation', 'Board']);
+  assert.deepEqual(['all', ...M.SOURCES].map((s) => M.SOURCE_LABEL[s]), ['All', 'Design', 'Simulation', 'Emulator', 'Synthesis', 'Implementation', 'Board']);
   assert.equal(M.filterSources('all', 'sim'), null);
   assert.deepEqual(M.filterSources('emu', 'sim'), ['emu']);
   assert.deepEqual(M.filterSources(null, 'edit'), ['check']);

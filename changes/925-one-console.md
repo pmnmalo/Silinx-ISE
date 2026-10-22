@@ -1,7 +1,7 @@
 In short:
 
 - One console in the modern and classic interfaces too: the simulator's (SSim's) console and command line and the board
-  emulator's messages are in the Console at the bottom, with filters by source (All, Check Syntax, Simulation,
+  emulator's messages are in the Console at the bottom, with filters by source (All, Design, Simulation,
   Emulator, Synthesis, Implementation, Board).
 
 In detail:

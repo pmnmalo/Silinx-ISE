@@ -804,8 +804,8 @@ export function mountSchEditor(container, opts = {}) {
     container.focus({ preventScroll: true });
   }
   function showDiags(what = 'Check Schematic') {
-    diagPanel.hidden = false;
-    diagPanel.innerHTML = '';
+    if (!container.dispatchEvent(new CustomEvent('silinx-diagnostics', { bubbles: true, cancelable: true, detail: { what, name: doc.name, diags: lastDiags, focus: focusDiag } }))) { diagPanel.hidden = true; return; }   // (in the console below: the Tasks interface's, web/js/tasks-check.js, #993)
+    diagPanel.hidden = false; diagPanel.innerHTML = '';
     const errs = lastDiags.filter(d => d.severity === 'error').length, warns = lastDiags.filter(d => d.severity === 'warning').length;
     const head = h('div', { class: 'se-cap' }, h('span', { text: `${what}: ${errs} error(s), ${warns} warning(s)` }), h('span', { class: 'sp' }), h('button', { type: 'button', class: 'se-x', title: 'Close', text: '×', onclick: () => { diagPanel.hidden = true; } }));
     const list = h('div', { class: 'se-dlist' });

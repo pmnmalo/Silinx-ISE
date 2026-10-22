@@ -15,7 +15,8 @@
 import { h } from './ui.js';
 
 export const SOURCES = ['check', 'sim', 'emu', 'synth', 'impl', 'prog'];
-export const SOURCE_LABEL = { all: 'All', check: 'Check Syntax', sim: 'Simulation', emu: 'Emulator', synth: 'Synthesis', impl: 'Implementation', prog: 'Board' };
+export const SOURCE_LABEL = { all: 'All', check: 'Design',   // (the design's checks: Check Syntax, Check Constraints, Check Schematic, #994)
+  sim: 'Simulation', emu: 'Emulator', synth: 'Synthesis', impl: 'Implementation', prog: 'Board' };
 // the sources a task shows when the viewer has not picked a filter
 const TASK_SOURCES = { edit: ['check'], sim: ['sim'], emu: ['emu'], impl: ['synth', 'impl'], prog: ['prog'] };
 
@@ -26,7 +27,7 @@ export function sourceOf(line, cur = 'app') {
   let m = /^Started : "([^"]+)"/.exec(s);
   if (m) {
     const p = m[1];
-    if (/Check Syntax|Check Constraints/.test(p)) return 'check';
+    if (/Check Syntax|Check Constraints|Check Schematic/.test(p)) return 'check';
     if (/^Simulate\b|^Save as Test Bench/.test(p)) return 'sim';
     if (/^Synthesize\b|^Implement Design$|^Generate Programming File$/.test(p)) return 'synth';   // (the flow's first step; its steps say the next ones)
     return 'impl';   // Translate, Map, Place & Route and their models, timing, power, back-annotation, the FPGA view

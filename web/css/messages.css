@@ -25,3 +25,6 @@ html[data-ui="modern"] #mc-cmd { grid-row: 3; grid-column: 1 / 3; height: 32px; 
 .isim-bottom { position: absolute !important; width: 0 !important; height: 0 !important; min-height: 0 !important; overflow: hidden !important;
   border: 0 !important; padding: 0 !important; margin: 0 !important; opacity: 0; pointer-events: none; }
 .emu-box:has(> .emu-log) { display: none; }
+/* a line that shows its item in a drawing (a schematic's Check in the Tasks interface, #993) */
+#console-log .ln.mc-link { cursor: pointer; }
+#console-log .ln.mc-link:hover { text-decoration: underline; }

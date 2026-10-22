@@ -8,6 +8,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
+import { newDoc, normalizeDoc, symbolPins } from '../../core/schdoc.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -223,7 +224,7 @@ uiTest('Tasks in Portuguese: the switcher, the task\'s bar and its page translat
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#task-switch .lbl')].map((l) => l.textContent)), ['Editar', 'Simular', 'Emular', 'Implementar', 'Programar']);
   assert.equal(await page.eval(() => document.querySelector('#task-empty p').textContent), 'Abra uma fonte no painel Projeto, ou verifique o projeto.');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#mc-filters .filt')].map((b) => b.textContent)),
-    ['Todas', 'Verificar Sintaxe', 'Simulação', 'Emulador', 'Síntese', 'Implementação', 'Placa']);
+    ['Todas', 'Projeto', 'Simulação', 'Emulador', 'Síntese', 'Implementação', 'Placa']);
   // the longer labels (the menus too) fit the header: a laptop, a tablet in landscape (the switcher's labels giving
   // way once the header has measured itself, #839)
   for (const [w, hgt] of [[1280, 800], [1180, 820], [1025, 768]]) {
@@ -400,6 +401,50 @@ uiTest('#991 Tasks: a task\'s dot explained by its button\'s tooltip; in Portugu
   assert.equal(await tip('emu'), 'Emular');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await noWarnings(page);
+}, { build: DEV });
+
+// #993: in the Tasks interface a schematic's Check writes its errors and warnings in the console below (the Design
+// source), each line showing its item in the drawing; the editor's own panel only in the other interfaces
+uiTest('#993 Tasks ▸ Edit: Check Schematic\'s errors and warnings in the console below, under Design; not in the editor\'s panel', E, async (page) => {
+  // (two inverters' outputs on one net: an error)
+  const doc = newDoc('bad', 'vhdl');
+  doc.symbols.push({ id: 'S1', type: 'inv', x: 200, y: 100, rot: 0, mirror: false, name: 'U1', params: {} }, { id: 'S2', type: 'inv', x: 200, y: 200, rot: 0, mirror: false, name: 'U2', params: {} });
+  const pins = doc.symbols.map((s) => symbolPins(normalizeDoc({ ...doc, symbols: [s] }).symbols[0]));
+  const o1 = pins[0].find((p) => p.name === 'O'), o2 = pins[1].find((p) => p.name === 'O');
+  doc.wires.push({ id: 'W1', points: [{ x: o1.x, y: o1.y }, { x: o1.x + 30, y: o1.y }, { x: o1.x + 30, y: o2.y }, { x: o2.x, y: o2.y }] });
+  await makeProject(env, { name: 'TasksCheck', files: { 'src/bad.sch.json': JSON.stringify(doc) } });
+  await page.setViewport(1366, 768);
+  await tasksInterface(page);
+  await page.openProject('TasksCheck');
+  await page.eval(() => window.SilinxApp.openSch('src/bad.sch.json'));
+  const ED = '.doc:not([hidden]) .sch-editor';
+  await page.waitFor((sel) => document.querySelector(`${sel} .se-btn[data-act=check]`), [ED], { what: 'the schematic' });
+  // (the messages folded first: the Check opens them)
+  if (await page.eval(() => document.documentElement.dataset.console === 'open')) await page.click('#task-bar [data-act="console"]');
+  await page.click(`${ED} .se-btn[data-act=check]`);
+  await page.waitConsole(/Process "Check Schematic" failed/);
+  assert.equal(await page.eval(() => document.documentElement.dataset.console), 'open');
+  assert.ok(!(await shown(page, `${ED} .se-diags`)), 'not in the editor\'s panel');
+  const lines = await page.eval(() => [...document.querySelectorAll('#console-log .ln')].filter((l) => l.getClientRects().length).map((l) => [l.dataset.src, l.textContent, l.classList.contains('mc-link')]));
+  const at = lines.findIndex(([, t]) => t === 'Started : "Check Schematic" of bad.');
+  assert.ok(at >= 0, JSON.stringify(lines));
+  const err = lines.slice(at).find(([, t]) => /^ERROR: .*2 drivers/.test(t));
+  assert.deepEqual(err && [err[0], err[2]], ['check', true], JSON.stringify(lines));
+  // (in the Errors tab: the error, not the process's result)
+  await page.waitFor(() => document.getElementById('err-count').textContent === '(1)', [], { what: 'the Errors tab' });
+  // the Design filter (#994) in front, the line's tooltip; a click shows its item (no error)
+  assert.equal(await page.eval(() => document.querySelector('#mc-filters .filt[aria-pressed="true"]').textContent), 'Design');
+  assert.equal(await page.eval(() => document.querySelector('#console-log .ln.mc-link').title), 'Show it in the drawing');
+  await page.eval(() => document.querySelector('#console-log .ln.mc-link').click());
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.waitFor(() => document.querySelector('#console-log .ln.mc-link').title === 'Mostrar no desenho', [], { what: 'Portuguese' });
+  assert.equal(await page.eval(() => document.querySelector('#mc-filters .filt[data-src="check"]').textContent), 'Projeto');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  // the modern interface: the editor's panel, as before
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
+  await page.waitFor(() => !document.documentElement.dataset.layout);
+  await page.click(`${ED} .se-btn[data-act=check]`);
+  await page.waitFor((sel) => { const d = document.querySelector(`${sel} .se-diags`); return d && !d.hidden && /^Check Schematic: 1 error/.test(d.textContent); }, [ED], { what: 'the editor\'s panel' });
 }, { build: DEV });
 
 // #800: Simulate gives the waves the screen (ISim's title bar is the task's; its Instances and Objects the task's

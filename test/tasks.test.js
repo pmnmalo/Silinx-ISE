@@ -14,6 +14,7 @@ const SIM = await import('../web/js/tasks-sim.js');
 const EMU = await import('../web/js/tasks-emu.js');
 const IMPL = await import('../web/js/tasks-impl.js');
 const PROG = await import('../web/js/tasks-prog.js');
+const CHECK = await import('../web/js/tasks-check.js');
 
 test('the five tasks, in the order of a lab session, with the names of the modern toolbar\'s steps', () => {
   assert.deepEqual(T.TASKS, ['edit', 'sim', 'emu', 'impl', 'prog']);
@@ -136,6 +137,19 @@ test('taskDot: the worst status of the task\'s processes (errors, then running, 
   assert.equal(T.taskDot('impl', { synth: null, bitgen: 'ok' }), 'ok');
   assert.equal(T.taskDot('emu', { check: 'ok', synth: 'ok' }), null);
   assert.equal(T.taskDot('prog', { bitgen: 'ok' }), null);
+});
+
+test('checkLines: a schematic\'s Check in the console below, as a process\'s messages (#993)', () => {
+  const E = { severity: 'error', message: 'Net n1 has 2 drivers' }, W = { severity: 'warning', message: 'Input A is not connected' };
+  assert.deepEqual(CHECK.checkLines('Check Schematic', 'gates', [E, W]), [
+    { text: '\nStarted : "Check Schematic" of gates.\n', cls: 'hdr' },
+    { text: 'ERROR: Net n1 has 2 drivers', cls: 'err', diag: E },
+    { text: 'WARNING: Input A is not connected', cls: 'warn', diag: W },
+    { text: '\nProcess "Check Schematic" failed', cls: 'err' },
+  ]);
+  assert.deepEqual(CHECK.checkLines('Check Schematic', 'gates', [W]).at(-1), { text: '\nProcess "Check Schematic" completed successfully with 1 warning(s)', cls: 'ok' });
+  assert.deepEqual(CHECK.checkLines('Check Schematic', 'gates', []).map((l) => l.text.trim()), ['Started : "Check Schematic" of gates.', 'Process "Check Schematic" completed successfully']);
+  assert.deepEqual(CHECK.checkLines('Check Schematic', 'x', [{ severity: 'info', message: 'm' }])[1], { text: 'INFO: m', cls: '', diag: { severity: 'info', message: 'm' } });
 });
 
 test('taskTitle: the task button\'s tooltip says what its dot means (#991)', () => {
