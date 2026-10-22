@@ -52,21 +52,22 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-  # the UI tests in headless Chrome, with each interface (alongside the unit tests)
+  # the UI tests in headless Chrome, with each interface (alongside the unit tests): about 15 minutes in
+  # October 2026, its limit 25 (#912; to be run in parts)
   ui:
     strategy:
       fail-fast: false
       matrix:
         interface: [modern, classic]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     name: ui (${{ matrix.interface }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: UI tests (headless Chrome, ${{ matrix.interface }} interface)
         run: npm run test:ui -- --test-concurrency=1
-        timeout-minutes: 15
+        timeout-minutes: 25
         env:
           CHROME_PATH: /usr/bin/google-chrome
           SILINX_UI_INTERFACE: ${{ matrix.interface == 'classic' && 'classic' || '' }}
