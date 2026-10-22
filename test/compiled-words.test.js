@@ -201,7 +201,9 @@ test('#650 #659 every example\'s Post-Synthesis Simulation Model at word level, 
     assert.ok(work.step <= WORK[name] * work.all, `${name}: ${JSON.stringify(work)}`);
   }
 });
-test('#670 speed: pong\'s Post-Synthesis Simulation Model, at least 1.4 times as fast with the activity as without it', { timeout: 300000 }, async () => {
+// (on a shared CI runner the two measurements vary with its load, #909: 6 against 5, 4 against 4 million cycles a
+// second: there the ratio is reported, not checked; the work the activity saves is checked above, deterministically)
+test('#670 speed: pong\'s Post-Synthesis Simulation Model, at least 1.4 times as fast with the activity as without it', { timeout: 300000 }, async (t) => {
   const { postsynth } = await models('pong', ['postsynth']);
   const { json, top, warnings } = await netlistOf(postsynth, { run: yosysNode });
   assert.deepEqual(warnings, []);
@@ -210,7 +212,9 @@ test('#670 speed: pong\'s Post-Synthesis Simulation Model, at least 1.4 times as
   for (const s of sims) s.cycle(300000);   // (compiled by the JIT)
   for (let k = 0; k < 5; k++) sims.forEach((s, i) => { const t0 = performance.now(); s.cycle(500000); best[i] = Math.max(best[i], 500000 / ((performance.now() - t0) / 1000)); });
   // (about 1.65 times on a laptop: 30 against 18 million cycles a second; 1.29 times before #670)
-  assert.ok(best[0] > 1.4 * best[1], `${best.map(x => Math.round(x / 1e6)).join(' against ')} million cycles a second`);
+  const said = `${best.map(x => Math.round(x / 1e6)).join(' against ')} million cycles a second`;
+  if (process.env.CI) t.diagnostic(`#670 speed: ${said} (${(best[0] / best[1]).toFixed(2)} times; not checked on CI, #909)`);
+  else assert.ok(best[0] > 1.4 * best[1], said);
   for (const p of postsynth.top.ports.filter(x => x.dir === 'out')) assert.equal(sims[0].get(p.name), sims[1].get(p.name), p.name);
 });
 test('#650 #659 blinky\'s post-translate, post-map and post-place & route models at word level, with tables (SIMPRIM; the router\'s LUT pins in any order)', { timeout: 600000 }, async () => {
