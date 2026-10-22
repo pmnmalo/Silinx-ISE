@@ -24,8 +24,8 @@ test('the five tasks, in the order of a lab session, with the names of the moder
 test('taskOfDoc: each kind of document belongs to one task (the editors and the viewers of the design to Edit)', () => {
   const cases = {
     isim: 'sim', emulator: 'emu', impact: 'prog',
-    summary: 'impl', pins: 'impl', fpgaview: 'impl', 'text:pong.pwr': 'impl', 'tech:pong': 'impl',
-    'file:src/pong.v': 'edit', 'file:constraints/top.ucf': 'edit', 'rtl:pong': 'edit', 'tpl:debounce': 'edit',
+    summary: 'impl', pins: 'impl', fpgaview: 'impl', 'text:pong.pwr': 'impl', 'tech:pong': 'impl', 'rtl:pong': 'impl',
+    'file:src/pong.v': 'edit', 'file:constraints/top.ucf': 'edit', 'tpl:debounce': 'edit',
     'asm:src/speed_ctrl.asm.json': 'edit', 'sch:src/gates.sch.json': 'edit', 'fsm:src/traffic.fsm.json': 'edit',
     'tt:src/lamps.tt.json': 'edit', 'ttsch:src/lamps.tt.json': 'edit', 'pn:src/net.pn.json': 'edit',
   };

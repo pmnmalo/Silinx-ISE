@@ -75,7 +75,8 @@ export function taskOfDoc(id) {
   if (s === 'isim') return 'sim';
   if (s === 'emulator') return 'emu';
   if (s === 'impact') return 'prog';
-  if (/^(summary|pins|fpgaview)$/.test(s) || /^(text|tech):/.test(s) || s.startsWith('file:build/')) return 'impl';   // (a build file: a report, #802)
+  // (a build file: a report, #802; the RTL Schematic, Synthesize's view, as the Technology one, #1063)
+  if (/^(summary|pins|fpgaview)$/.test(s) || /^(text|tech|rtl):/.test(s) || s.startsWith('file:build/')) return 'impl';
   return 'edit';
 }
 

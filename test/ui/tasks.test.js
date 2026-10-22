@@ -716,6 +716,28 @@ uiTest('#1020 Tasks ▸ Emulate: the Watch shown at first; folded, it stays fold
 
 // #802: Implement's side panel is the top's Processes (ISE's names and states), its page the Design Summary as cards,
 // which comes forward when the implementation ends, its Programming File linking to Program, its reports in Implement
+// #1063: Synthesize ▸ View RTL Schematic opens in Implement (its process's task), as the Technology Schematic does
+uiTest('#1063 Tasks ▸ Implement: View RTL Schematic opens in Implement, not in Design', E, async (page) => {
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await makeProject(env, { name: 'TasksRtl', template: 'gates' });
+  await page.setViewport(1366, 768);
+  await tasksInterface(page);
+  await page.openProject('TasksRtl');
+  await page.eval(async () => { window.SilinxApp.S.toolchain = await (await import('/js/api.js')).api.toolchain(); window.SilinxApp.renderProcesses(); });
+  await page.click('#task-switch .task-btn[data-task="impl"]');
+  await page.waitFor(() => document.getElementById('proc-caption')?.textContent === 'Processes: gates', [], { what: 'the top\'s processes' });
+  await page.treeRow('#procs', 'View RTL Schematic', { dbl: true, exact: true });
+  await page.waitFor(() => String(window.SilinxApp.S.active?.id).startsWith('rtl:'), [], { what: 'the RTL Schematic', timeout: 60000 });
+  assert.equal((await state(page)).task, 'impl', 'Implement in front');
+  assert.ok((await state(page)).current.includes('impl'));
+  assert.ok(await shown(page, '#workspace > .doc:not([hidden])'), 'the RTL Schematic shown in Implement');
+  // Design does not list it: its documents are the sources
+  await page.click('#task-switch .task-btn[data-task="edit"]');
+  await page.waitFor(() => document.documentElement.dataset.task === 'edit', [], { what: 'Design' });
+  assert.ok(!(await state(page)).tabs.some((t) => /RTL/.test(t)), 'not among Design\'s documents');
+  await noWarnings(page);
+}, { build: DEV });
+
 uiTest('#802 Tasks ▸ Implement: the top\'s Processes, the Design Summary as cards; it comes forward, links to Program', E, async (page) => {
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'TasksImpl', template: 'blinky' });
