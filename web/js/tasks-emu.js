@@ -2,7 +2,7 @@
 // - The board fits the task's area, its LEDs, display, switches and buttons always on screen: its picture, drawn at
 //   a fixed size by web/js/emulator.js, is zoomed (CSS zoom, which keeps the pointer's aim) to the room it has,
 //   measured again when the window, the task's panels or the board change (fitBoard).
-// - The emulator's side column (Watch, the timing generics, the hints) is the task's side panel, folded at first:
+// - The emulator's side column (Watch, the timing generics, the hints) is the task's side panel, shown at first (#1020):
 //   beside the board, below it on a narrow screen; the Design pane is not shown in Emulate (web/css/tasks.css).
 // - The emulator's own bar stays its controls (Model, Engine, Run, Step, Power cycle, Clock), right under the task's
 //   bar; its Messages box is in the message centre (#798).

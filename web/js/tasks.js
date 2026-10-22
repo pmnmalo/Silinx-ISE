@@ -61,7 +61,7 @@ const ICON = {
 const DEFAULTS = {
   edit: { side: true, console: true },
   sim: { side: false, console: false },
-  emu: { side: false, console: false },
+  emu: { side: true, console: false },   // (the emulator's Watch shown: #1020)
   impl: { side: true, console: true },
   prog: { side: false, console: true },
 };

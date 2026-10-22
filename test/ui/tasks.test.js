@@ -460,14 +460,11 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
   await page.waitConsole(/Board Emulator: 'top'/, { timeout: 30000 });
   await page.waitFor(() => +document.querySelector('.doc:not([hidden]) .emu-board-wrap')?.style.zoom > 0, [], { what: 'the board zoomed' });
   assert.ok(!(await shown(page, '#left-pages')), 'no Design pane in Emulate');
-  let f = await boardFit(page);
-  assert.ok(f.controls >= 12 && f.inside && f.aim && f.noScroll && f.side === 'folded', JSON.stringify(f));
-  // the side panel: the emulator's Watch, beside the board; the board still fits
-  await page.click('#task-bar [data-act="side"]');
+  // the side panel: the emulator's Watch, shown at first (#1020), beside the board; the board still fits
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .emu-side')?.getClientRects().length > 0, [], { what: 'Watch' });
   await page.waitFor(() => new Promise((r) => requestAnimationFrame(() => r(true))));
-  f = await boardFit(page);
-  assert.ok(f.inside && f.aim && f.side === 'beside', JSON.stringify(f));
+  let f = await boardFit(page);
+  assert.ok(f.controls >= 12 && f.inside && f.aim && f.noScroll && f.side === 'beside', JSON.stringify(f));
   // a tablet in portrait: the board across, Watch below it
   await page.setViewport(820, 1180);
   await page.waitFor(() => { const e = document.querySelector('.doc:not([hidden]) .emu'); const s = e.querySelector('.emu-side').getBoundingClientRect(); return s.top >= e.querySelector('.emu-board-wrap').getBoundingClientRect().bottom - 1; }, [], { what: 'Watch below the board' });
@@ -485,6 +482,36 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
   await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-board-wrap').style.zoom), '');
+  await noWarnings(page);
+}, { build: DEV });
+
+// #1020: Emulate opens with its Watch shown (the task's side panel open), the design's signals to add; folded by the
+// viewer, it stays folded; the modern and classic interfaces show it as before
+uiTest('#1020 Tasks ▸ Emulate: the Watch shown at first; folded, it stays folded; modern and classic as before', E, async (page) => {
+  await makeProject(env, { name: 'TasksWatch', template: 'blinky' });
+  await page.setViewport(1366, 768);
+  await tasksInterface(page);
+  await page.openProject('TasksWatch');
+  await page.click('#task-switch .task-btn[data-task="emu"]');
+  await page.click('#task-empty button');
+  await page.waitConsole(/Board Emulator: 'top'/, { timeout: 30000 });
+  const watch = () => page.eval(() => {
+    const side = document.querySelector('.doc:not([hidden]) .emu-side');
+    return { side: document.documentElement.dataset.side ?? null, pressed: document.querySelector('#task-bar [data-act="side"]')?.getAttribute('aria-pressed') ?? null,
+      shown: !!side && side.getClientRects().length > 0, title: side?.querySelector('.emu-box h4')?.textContent, add: side?.querySelector('select option')?.textContent };
+  });
+  assert.deepEqual(await watch(), { side: 'open', pressed: 'true', shown: true, title: 'Watch', add: 'Add a signal to watch…' });
+  // folded by the viewer: folded again when Emulate comes back to the front
+  await page.click('#task-bar [data-act="side"]');
+  await page.click('#task-switch .task-btn[data-task="edit"]');
+  await page.click('#task-switch .task-btn[data-task="emu"]');
+  assert.deepEqual(await watch(), { side: 'folded', pressed: 'false', shown: false, title: 'Watch', add: 'Add a signal to watch…' });
+  // the modern and classic interfaces: the emulator's side column shown, as before
+  for (const ui of ['modern', 'classic']) {
+    await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
+    await page.waitFor(() => !document.documentElement.dataset.layout);
+    assert.deepEqual(await watch(), { side: null, pressed: null, shown: true, title: 'Watch', add: 'Add a signal to watch…' }, ui);
+  }
   await noWarnings(page);
 }, { build: DEV });
 
