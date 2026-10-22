@@ -68,7 +68,38 @@ function definesModule(text, lang, name) {
   const n = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return lang === 'vhdl' ? new RegExp(`\\bentity\\s+${n}\\s+is\\b`, 'i').test(text) : new RegExp(`\\bmodule\\s+${n}\\b`).test(text);
 }
-const langOf = s => s.lang || (/\.(vhd|vhdl)$/i.test(s.path) ? 'vhdl' : /\.(v|vh|sv)$/i.test(s.path) ? 'verilog' : null);
+// the clocks of the device primitives (a netlist's: the technology schematic, #1064): their models are native,
+// read on any edge, so a flip-flop's, a RAM's, a shift register's clock pin by its name, and the clock buffers'
+// inputs (IBUFG, BUFG…) when their output is a clock
+const CLOCK_PIN = /^(c|clk|clka|clkb|c0|c1)$/i;
+const CLOCK_BUF = /^(ibufg?|bufgp?|bufgce(_1)?|bufgmux(_1)?|ibufgds|ibufds)$/i;
+function primitiveClocks(design, clocks) {
+  const natives = design.procs.filter(p => p.kind === 'native' && p.inst);
+  for (const p of natives) {
+    if (CLOCK_BUF.test(p.name)) continue;
+    for (const q of p.inst.ports || []) if (q.dir === 'in' && CLOCK_PIN.test(q.name) && q.sig && q.t?.w === 1) clocks.add(q.sig);
+  }
+  const bufs = natives.filter(p => CLOCK_BUF.test(p.name));
+  for (let more = true; more;) {
+    more = false;
+    for (const p of bufs) {
+      if (![...(p.writes || [])].some(s => clocks.has(s))) continue;
+      for (const s of p.reads || []) if (!clocks.has(s) && s.t?.w === 1) { clocks.add(s); more = true; }
+    }
+  }
+}
+/** The integer generics / parameters of an elaborated instance ({ NAME: number }), for buildLiveSim. */
+export function instanceGenerics(inst) {
+  const out = {};
+  for (const p of inst?.params || []) {
+    const v = p.value;
+    if (p.t?.kind === 'int' && isVal(v) && !v.x) out[p.name] = Number(BigInt.asIntN(v.w, v.v));
+  }
+  return out;
+}
+// how many entities / modules a source file defines
+const unitCount = (text, lang) => (text.match(lang === 'vhdl' ? /\bentity\s+[A-Za-z]\w*\s+is\b/gi : /\bmodule\s+[A-Za-z_]\w*/g) || []).length;
+const langOf = s =>s.lang || (/\.(vhd|vhdl)$/i.test(s.path) ? 'vhdl' : /\.(v|vh|sv)$/i.test(s.path) ? 'verilog' : null);
 
 /**
  * Build the live simulation of a schematic.
@@ -77,9 +108,11 @@ const langOf = s => s.lang || (/\.(vhd|vhdl)$/i.test(s.path) ? 'vhdl' : /\.(v|vh
  * @param sources   project HDL sources [{ path, text, lang? }] (bodies of the module symbols); the file the
  *                  schematic is linked to (or any other definition of its module) is replaced by the schematic
  * @param lang      HDL language to generate (default: the schematic's; HDL blocks force their own)
+ * @param generics  { NAME: integer } the values of the module's generics / parameters (an instance's, drawn by
+ *                  the RTL or the Technology Schematic: instanceGenerics), else their defaults
  * @returns { ok, errors: [string], warnings: [string], live: LiveSim | null, code, filename }
  */
-export function buildLiveSim(docIn, { modules = {}, sources = [], lang } = {}) {
+export function buildLiveSim(docIn, { modules = {}, sources = [], lang, generics } = {}) {
   const doc = normalizeDoc(JSON.parse(JSON.stringify(docIn)));
   modules = normModules(modules);
   const out = { ok: false, errors: [], warnings: [], diagnostics: [], live: null, code: '', filename: '' };
@@ -89,26 +122,30 @@ export function buildLiveSim(docIn, { modules = {}, sources = [], lang } = {}) {
   if (!doc.symbols.length && !doc.ports.length) { err('The schematic is empty: nothing to simulate.'); return out; }
   let g;
   try { g = generateHdl(doc, { lang: L, modules }); } catch (e) { err(`HDL generation failed: ${e.message}`); return out; }
+  // (the schematic's own entity / module: its blocks' own ones come first in the file, #175)
+  let top = g.filename.replace(/\.(vhd|v)$/, '') || doc.name;
+  const hdl = sources.filter(s => { const sl = langOf(s); return (sl === 'vhdl' || sl === 'verilog') && !(doc.generatedFile && s.path === doc.generatedFile); });
+  // a file that defines the schematic's module with others (a netlist of the technology schematic, a module with
+  // its submodules, #1064) stays, the others' bodies in it: the schematic's model then gets a name of its own
+  if (hdl.some(s => definesModule(String(s.text || ''), langOf(s), top) && unitCount(String(s.text || ''), langOf(s)) > 1)) {
+    let k = 1, nm = `${top}_live`;
+    while (hdl.some(s => definesModule(String(s.text || ''), langOf(s), nm))) nm = `${top}_live${++k}`;
+    try { g = generateHdl({ ...doc, name: nm }, { lang: L, modules }); } catch (e) { err(`HDL generation failed: ${e.message}`); return out; }
+    top = g.filename.replace(/\.(vhd|v)$/, '') || nm;
+  }
   out.code = g.code; out.filename = g.filename;
   for (const d of g.diagnostics) {
     if (d.severity === 'error') err(d.message, d);
     else { out.warnings.push(d.message); out.diagnostics.push({ ...d }); }
   }
   if (out.errors.length) return out;
-  // (the schematic's own entity / module: its blocks' own ones come first in the file, #175)
-  const top = g.filename.replace(/\.(vhd|v)$/, '') || doc.name;
   const genPath = `<schematic>/${g.filename}`;
-  const srcs = sources.filter(s => {
-    const sl = langOf(s);
-    if (sl !== 'vhdl' && sl !== 'verilog') return false;
-    if (doc.generatedFile && s.path === doc.generatedFile) return false;
-    return !definesModule(String(s.text || ''), sl, top);
-  });
+  const srcs = hdl.filter(s => !definesModule(String(s.text || ''), langOf(s), top));
   srcs.push({ path: genPath, text: g.code, lang: L });
   let lib, design;
   try {
     lib = compile(srcs);
-    design = elaborate(lib, top);
+    design = elaborate(lib, top, generics ? { generics } : {});
   } catch (e) { err(`Cannot build the simulation model: ${e.message}`); return out; }
   // errors that matter: in the generated HDL and the files of the modules it uses
   const files = new Set([genPath]);
@@ -159,6 +196,7 @@ export class LiveSim {
     // clock inputs: read on an edge by some process, or wired to a clock pin (C of a flip-flop…)
     const clockSigs = new Set();
     for (const p of design.procs) { try { for (const c of clocksOf(p).clocks) clockSigs.add(c); } catch { /* not a clocked process */ } }
+    primitiveClocks(design, clockSigs);
     const clockPin = net => net.endpoints.some(e => e.kind === 'pin' && (() => {
       const s = doc.symbols.find(x => x.id === e.sym);
       try { return !!symbolDef(s, modules).pins.find(q => q.name === e.pin)?.clock; } catch { return false; }

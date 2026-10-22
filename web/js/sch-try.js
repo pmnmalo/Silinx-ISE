@@ -26,7 +26,7 @@ export function mountSchTry(ctx) {
       const [{ startLiveSim }, sources] = await Promise.all([import('./sch-live.js'), Promise.resolve(opts.simSources ? opts.simSources() : [])]);
       if (destroyed() || live()) return;
       const res = startLiveSim({
-        doc: clone(doc()), modules: modules(), sources: sources || [], lang: opts.simLang || genLang(), h,
+        doc: clone(doc()), modules: modules(), sources: sources || [], lang: opts.simLang || genLang(), generics: opts.simGenerics?.(), h,
         layer: simG, content: contentG, bar: simBar, canvas, toCanvas, onExit: leaveSim,
       });
       if (!res.ok) {

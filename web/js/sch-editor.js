@@ -8,7 +8,9 @@
 //     onOpenModule(moduleName) {},
 //   });
 //   readOnly: true             // view only: pan/zoom/select/inspect, no edits (RTL schematic viewer)
-//   simulate: true             // with readOnly: Simulate kept, the drawing not editable (a truth table's schematic, #946)
+//   simulate: true             // with readOnly: Simulate kept, the drawing not editable (a truth table's schematic, #946;
+//                              // the RTL and Technology Schematics, #1064)
+//   simGenerics: () => ({ N: 8 })  // Try it: the values of the module's generics (the instance drawn, #1064)
 //   device                     // the project's part (a record of S.devices.parts): its family's Device Primitives in the
 //                              // palette, their count in Symbol Info (#791); ed.setDevice(part) when it changes
 //   ed.getDoc(); ed.setDoc(doc); ed.setLink(file); ed.setModules(modules); ed.fit(); ed.destroy();

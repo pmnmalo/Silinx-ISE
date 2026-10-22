@@ -146,6 +146,7 @@ export async function openSchematic(mod, { netlist = null } = {}) {
   const kindName = netlist ? 'Technology' : 'RTL';
   const { mountSchEditor } = await import('./sch-editor.js');
   const { schematicFromHdl, modulesFromLibrary } = await import('/core/schdoc.js');
+  const { instanceGenerics } = await import('/core/schlive.js');
   const sources = Object.fromEntries(srcs.map(x => [x.path, x.text]));
   // the names as written in the sources (VHDL is lower-cased by the elaborator, #131), the primitives' too (LUT4, FDRE)
   const modules = modulesFromLibrary(lib, { sources: Object.fromEntries(all.map(x => [x.path, x.text])), asWritten: true });
@@ -194,6 +195,9 @@ export async function openSchematic(mod, { netlist = null } = {}) {
           if (!ed) {
             ed = mountSchEditor(host, {
               doc, modules, readOnly: true,
+              // Try it (#1064): the instance drawn simulated with the design's sources (the RTL's, the netlist's
+              // device primitives) and its generics' values
+              simulate: true, simSources: () => all, simGenerics: () => instanceGenerics(cur),
               onSelect: s => { intoBtn.disabled = !canEnter(s); },
               onUp: () => cur?.parent && show(cur.parent),
               onOpenModule: (name, { instance } = {}) => {

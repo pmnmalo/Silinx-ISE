@@ -20,13 +20,13 @@ const isReg = s => !!(SYMBOLS[s.type]?.ff || s.type === 'register' || s.type ===
 
 /**
  * Start the live simulation of a schematic.
- * ctx: { doc, modules, sources, lang, h, layer (svg <g> above the content), content (svg <g> of the drawing),
+ * ctx: { doc, modules, sources, lang, generics? ({ NAME: integer }: an instance's, #1064), h, layer (svg <g> above the content), content (svg <g> of the drawing),
  *        bar (HTML strip above the canvas), canvas (positioned HTML box of the svg), toCanvas(pt) -> {x,y} px,
  *        onExit(), onRepaint?() }
  * Returns { ok: false, errors, warnings } or { ok: true, warnings, ctl }.
  */
 export function startLiveSim(ctx) {
-  const r = buildLiveSim(ctx.doc, { modules: ctx.modules, sources: ctx.sources, lang: ctx.lang });
+  const r = buildLiveSim(ctx.doc, { modules: ctx.modules, sources: ctx.sources, lang: ctx.lang, generics: ctx.generics });
   if (!r.ok) return { ok: false, errors: r.errors, warnings: r.warnings, diagnostics: r.diagnostics };
   return { ok: true, warnings: r.warnings, ctl: liveController(ctx, r.live) };
 }
