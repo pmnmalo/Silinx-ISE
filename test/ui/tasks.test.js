@@ -380,6 +380,28 @@ uiTest('#799 Tasks ▸ Edit: one design tree (the design, Test Benches, Constrai
   await noWarnings(page);
 }, { build: DEV });
 
+// #991: a task's dot is explained by its button's tooltip (the task and its state), in English and Portuguese
+uiTest('#991 Tasks: a task\'s dot explained by its button\'s tooltip; in Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'TasksDot', template: 'gates' });
+  await page.setViewport(1366, 768);
+  await tasksInterface(page);
+  await page.openProject('TasksDot');
+  const tip = (t) => page.eval((x) => document.querySelector(`#task-switch .task-btn[data-task="${x}"]`).title, t);
+  assert.equal(await tip('edit'), 'Edit');
+  await page.click('#task-switch .task-btn[data-task="edit"]');
+  await page.treeRow('#hier', 'gates', { exact: true });
+  await page.click('#task-bar [data-act="main"]');
+  await page.waitConsole(/Process "Check Syntax" completed successfully/);
+  await page.waitFor(() => document.querySelector('#task-switch .task-btn[data-task="edit"] .task-dot').dataset.state === 'ok', [], { what: 'Edit\'s dot' });
+  assert.equal(await tip('edit'), 'Edit — done, no warnings');
+  assert.equal(await tip('emu'), 'Emulate', 'no dot: the task\'s name');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.waitFor(() => document.querySelector('#task-switch .task-btn[data-task="edit"]').title === 'Editar — concluído, sem avisos', [], { what: 'Portuguese' });
+  assert.equal(await tip('emu'), 'Emular');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await noWarnings(page);
+}, { build: DEV });
+
 // #800: Simulate gives the waves the screen (ISim's title bar is the task's; its Instances and Objects the task's
 // side panel, folded at first; no Design pane) and runs the test bench whatever is selected, the model chosen
 uiTest('#800 Tasks ▸ Simulate: the waves get the screen; Simulate runs the test bench, the model in the task\'s bar', E, async (page) => {

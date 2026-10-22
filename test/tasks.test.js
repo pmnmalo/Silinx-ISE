@@ -138,6 +138,18 @@ test('taskDot: the worst status of the task\'s processes (errors, then running, 
   assert.equal(T.taskDot('prog', { bitgen: 'ok' }), null);
 });
 
+test('taskTitle: the task button\'s tooltip says what its dot means (#991)', () => {
+  assert.equal(T.taskTitle('edit', null), 'Edit');
+  assert.equal(T.taskTitle('edit', 'ok'), 'Edit — done, no warnings');
+  assert.equal(T.taskTitle('sim', 'warn'), 'Simulate — done with warnings');
+  assert.equal(T.taskTitle('impl', 'err'), 'Implement — errors');
+  assert.equal(T.taskTitle('impl', 'stale'), 'Implement — out of date (a source changed)');
+  assert.equal(T.taskTitle('impl', 'running'), 'Implement — running…');
+  assert.equal(T.taskTitle('prog', null), 'Program');
+  // every state a dot can have (taskDot) has its text
+  for (const s of ['ok', 'warn', 'err', 'stale', 'running']) assert.ok(T.DOT_TEXT[s], s);
+});
+
 test('tasks.css: its rules apply in the Tasks interface only (or to its own elements), with the modern look\'s colours', () => {
   const css = fs.readFileSync(path.join(ROOT, 'web/css/tasks.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const parts = (sel) => { const out = []; let depth = 0, cur = ''; for (const c of sel) { if (c === ',' && !depth) { out.push(cur.trim()); cur = ''; continue; } depth += c === '(' ? 1 : c === ')' ? -1 : 0; cur += c; } out.push(cur.trim()); return out; };

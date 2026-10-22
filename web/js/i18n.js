@@ -305,6 +305,9 @@ const PT = {
   'Emulate the design on the board: the board opens here.': 'Emule o projeto na placa: a placa abre aqui.',
   'Implement the design: synthesis, place & route and the programming file.': 'Implemente o projeto: síntese, place & route e o ficheiro de programação.',
   'Program the board: the FPGA, or its flash to keep the design.': 'Programe a placa: a FPGA, ou a sua flash para guardar o projeto.',
+  // a task's dot, its button's tooltip (#991): "<task> — <state>"
+  'done, no warnings': 'concluído, sem avisos', 'done with warnings': 'concluído com avisos', 'errors': 'erros',
+  'out of date (a source changed)': 'desatualizado (uma fonte mudou)', 'running…': 'em curso…',
   // the Program task (#803)
   'Up to date with the sources': 'Atualizado com as fontes', 'Out of date: the sources changed since the last implementation': 'Desatualizado: as fontes mudaram desde a última implementação',
   'The last implementation failed': 'A última implementação falhou', 'Being implemented…': 'A ser implementado…', 'No programming file yet': 'Ainda não há ficheiro de programação',
@@ -575,6 +578,8 @@ Object.assign(PT, {
 });
 // the classic title bar (web/js/project.js updateTitle, #987): "<project> - [Design Summary]", its name translated (#1007)
 PT_PATTERNS.push([/^(.+) - \[Design Summary\]$/, (m, pj) => `${pj} - [${PT['Design Summary']}]`]);
+// a task's button with its dot (web/js/tasks.js taskTitle, #991): "Implement — done with warnings"
+PT_PATTERNS.push([/^(Edit|Simulate|Implement) — (done, no warnings|done with warnings|errors|out of date \(a source changed\)|running…)$/, (m, a, b) => `${PT[a]} — ${PT[b]}`]);
 PT_PATTERNS.push(
   [/^Cannot try it out: (\d+) error\(s\), (\d+) warning\(s\)$/, 'Não é possível experimentar: $1 erro(s), $2 aviso(s)'],
   [/^Cannot try it out: (.*)$/s, 'Não é possível experimentar: $1'],
