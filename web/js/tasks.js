@@ -32,6 +32,7 @@ import { benchSelect, editBench, modelSelect, newBench, placeSimToolbar, refresh
 import { fitBoard, initEmulate } from './tasks-emu.js';
 import { implementationEnded, showTopProcesses } from './tasks-impl.js';
 import { arrangeProgram, initProgram } from './tasks-prog.js';
+import { initCheckMessages } from './tasks-check.js';
 
 export const TASKS = ['edit', 'sim', 'emu', 'impl', 'prog'];
 export const TASK_LABEL = { edit: 'Edit', sim: 'Simulate', emu: 'Emulate', impl: 'Implement', prog: 'Program' };
@@ -350,6 +351,7 @@ export function initTasks(a) {
   initMessages(app);   // (the message centre: every interface's, #925)
   fitSoon = initEmulate(() => on() && current() === 'emu');
   initProgram(() => arrangeProgram(on(), PROG));
+  initCheckMessages(on, () => { if (!arr().console) arrange({ console: true }); }, (...a) => app.log(...a));
   const $ = id => document.getElementById(id);
   // a folded side panel or messages open again when one of their tabs is clicked
   $('left-tabs').addEventListener('click', () => { if (on() && !isNarrow() && !arr().side) arrange({ side: true }); });

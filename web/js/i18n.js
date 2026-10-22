@@ -326,6 +326,7 @@ const PT = {
   'Post-Synthesis': 'Pós-Síntese', 'Post-Translate': 'Pós-Translate', 'Post-Map': 'Pós-Map', 'Post-Place & Route': 'Pós-Place & Route',
   // its message centre (web/js/messages.js, #798)
   'Emulator': 'Emulador', 'Synthesis': 'Síntese', 'Messages from': 'Mensagens de', 'Command line': 'Linha de comandos',
+  'Show it in the drawing': 'Mostrar no desenho',   // a schematic's Check's line in the console below (#993)
   'Type an SSim command (help)': 'Escreva um comando do SSim (help)', 'Type a command or a file name': 'Escreva um comando ou o nome de um ficheiro',
   // modern interface (web/js/modern.js, web/js/palette.js): View ▸ Interface / Theme, header, design flow, command palette
   'Interface': 'Interface', 'Modern': 'Moderna', 'Classic': 'Clássica',
