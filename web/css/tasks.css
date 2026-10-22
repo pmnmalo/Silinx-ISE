@@ -182,17 +182,11 @@ html[data-layout="tasks"] .task-program { display: table-row; }
 html[data-layout="tasks"] .task-program button { font-weight: 600; }
 
 /* ------------------------------------------------------------------ Program (#803, web/js/tasks-prog.js) */
-/* iMPACT arranged for the task: the programming file and its state first, then the chain and Program FPGA / PROM;
-   the board, tool and cable folded away (a board chooses them), the PROM's other operations behind More… */
-.task-prog-state, .task-prog-more, .task-prog-settings { display: none; }
+/* iMPACT arranged for the task: the chain and Program FPGA / PROM; the board, tool and cable folded away (a board
+   chooses them), the PROM's other operations behind More… */
+.task-prog-more, .task-prog-settings { display: none; }
 /* (the whole width available, as in the modern and classic interfaces: #1023) */
 html[data-layout="tasks"] #workspace > .doc[data-task="prog"] > .page { display: flex; flex-direction: column; gap: 10px; }
-html[data-layout="tasks"] .task-prog-state { display: flex; align-items: center; gap: 12px; order: 0; padding: 12px 14px; border: 1px solid var(--m-border);
-  border-radius: 10px; background: var(--m-surface-2); font-weight: 600; }
-html[data-layout="tasks"] .task-prog-state[data-state="ok"] { color: var(--m-success); }
-html[data-layout="tasks"] .task-prog-state:is([data-state="stale"], [data-state="none"]) { color: var(--m-warning); }
-html[data-layout="tasks"] .task-prog-state[data-state="err"] { color: var(--m-danger); }
-html[data-layout="tasks"] .task-prog-state:is([data-state="ok"], [data-state="running"]) .task-prog-impl { display: none; }
 html[data-layout="tasks"] .doc[data-task="prog"] > .page > h2 { order: 1; margin: 0; }
 html[data-layout="tasks"] .doc[data-task="prog"] > .page > .imp-file { order: 2; margin: 0; }
 html[data-layout="tasks"] .doc[data-task="prog"] > .page > .impact-chain { order: 3; }

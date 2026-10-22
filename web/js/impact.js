@@ -1,9 +1,11 @@
 // iMPACT-like device configuration: JTAG chain view, scan, program the FPGA (SRAM, volatile)
 // or the board's Platform Flash PROM (non-volatile: the design loads at power-up).
 import { api, followJob } from './api.js';
-import { h, toast, alertDlg, confirmDlg } from './ui.js';
+import { h, toast, alertDlg, confirmDlg, dialog } from './ui.js';
 import { S, app } from './app.js';
 import { countEvent } from './analytics.js';
+import { runImpl } from './implement.js';
+import { programFileState, implementFirstText } from './impact-file.js';
 
 const roleOf = name => (/^xcf/i.test(name) ? 'prom' : /^(xc)?(3s|6s|4v|5v|6v|7[akvz])/i.test(name) ? 'fpga' : /^(xc)?(2c|95)/i.test(name) ? 'cpld' : 'other');
 
@@ -115,7 +117,25 @@ export function mountImpact(el) {
     }
   };
 
-  const programFpga = () => runJob('Programming FPGA (SRAM)', () => api.program({
+  // the project's programming file not built, or older than the sources: implement the design first, then program
+  // it (#1024; as Generate and Simulate, #490); false when it is not built (No, or the implementation failed)
+  const fileReady = async () => {
+    if (bitData || !pj?.top || bitfile.value.trim() !== fpgaFile) return true;   // (a file of the student's choice)
+    const st = programFileState(S.status);
+    if (st === 'running') { toast('The design is being implemented: program it when it ends', 'error'); return false; }
+    const text = implementFirstText(st, pj.top);
+    if (!text) return true;
+    const go = await dialog({
+      title: 'Program FPGA', width: 440, className: 'impact-implement-dlg',
+      body: h('div', { class: 'msg msg-question' }, h('div', { class: 'msg-icon' }, '?'),
+        h('div', { class: 'msg-text' }, ...text.map((l, i) => h('div', { style: i ? { marginTop: '8px' } : {} }, l)))),
+      buttons: [{ label: 'Yes', value: true, primary: true }, { label: 'No', value: false }],
+    });
+    if (!go || !await runImpl(pj.top, ['synth', 'translate', 'map', 'par', 'bitgen'])) return false;
+    loadBitInfo();
+    return true;
+  };
+  const programFpga = async () => (await fileReady()) && runJob('Programming FPGA (SRAM)', () => api.program({
     project: pj?.name, tool: toolSel.value || undefined, cable: cable.value.trim() || undefined, board: board?.id, position: selPos + 1, bitfile: bitfile.value.trim(),
     ...(bitData ? { bitData } : {}),
   }), "'1': Programmed successfully.").then(r => { if (r?.status === 'ok') countEvent('program'); return r; });

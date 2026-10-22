@@ -158,7 +158,7 @@ export function setTask(t, { fromDoc = false } = {}) {
 /** Puts the current task and its arrangement on the page. */
 function apply() {
   const r = root();
-  if (!on()) { if (document.getElementById('task-bar')) { unbuild(); placeSimToolbar(false); fitBoard(false); arrangeProgram(false, PROG); dispatchEvent(new Event('resize')); } return; }
+  if (!on()) { if (document.getElementById('task-bar')) { unbuild(); placeSimToolbar(false); fitBoard(false); arrangeProgram(false); dispatchEvent(new Event('resize')); } return; }
   build();
   const t = current(), a = arr(t);
   if (t !== shownTask) { shownTask = t; messagesTask(t); if (t === 'impl' && app) showTopProcesses(app); }
@@ -183,7 +183,7 @@ function apply() {
   // (the editors, the waves and the board measure their space again)
   dispatchEvent(new Event('resize'));
   fitSoon();
-  arrangeProgram(true, PROG);
+  arrangeProgram(true);
 }
 
 // each document and its tab say their task (the CSS shows the current task's only)
@@ -263,8 +263,6 @@ function followActive() {
   if (t !== current()) setTask(t, { fromDoc: true }); else tagDocs();
 }
 
-// Program's iMPACT: the programming file's state from Implement's, Implement offered when it is not up to date (#803)
-const PROG = { implDot: () => taskDot('impl', app?.S.status || {}), implement: () => setTask('impl') };
 let implDot = null;
 function refreshDots() {
   const st = app?.S.status || {};
@@ -272,7 +270,7 @@ function refreshDots() {
   const now = taskDot('impl', st);
   if (implementationEnded(implDot, now) && on() && current() === 'impl' && app.S.project) app.openSummary();
   implDot = now;
-  if (on()) arrangeProgram(true, PROG);
+  if (on()) arrangeProgram(true);   // (Program's iMPACT, also once its document has its task: #803)
   for (const b of document.querySelectorAll('.task-btn')) {
     const dot = taskDot(b.dataset.task, st);
     const el = b.querySelector('.task-dot');
@@ -357,7 +355,7 @@ export function initTasks(a) {
   load();
   initMessages(app);   // (the message centre: every interface's, #925)
   fitSoon = initEmulate(() => on() && current() === 'emu');
-  initProgram(() => arrangeProgram(on(), PROG));
+  initProgram(() => arrangeProgram(on()));
   initCheckMessages(on, () => { if (!arr().console) arrange({ console: true }); }, (...a) => app.log(...a));
   const $ = id => document.getElementById(id);
   // a folded side panel or messages open again when one of their tabs is clicked

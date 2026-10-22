@@ -218,3 +218,19 @@ test('schematic editor and its RTL / Technology views (#130): every symbol descr
   assert.equal(t('Open file'), 'Abrir ficheiro');
   assert.equal(t('Open the project'), 'Open the project');
 });
+
+test('#1024 Program FPGA with no programming file, or one older than the sources: the question in Portuguese', async () => {
+  const { implementFirstText } = await import('../web/js/impact-file.js');
+  const T = {
+    "There is no programming file of 'top' yet.": "Ainda não há ficheiro de programação de 'top'.",
+    "The programming file of 'counter_top' is older than the sources.": "O ficheiro de programação de 'counter_top' é mais antigo do que as fontes.",
+    "The last implementation of 'top' failed.": "A última implementação de 'top' falhou.",
+    'Implement the design first? When it ends without errors, the FPGA is programmed.': 'Implementar o projeto primeiro? Quando terminar sem erros, a FPGA é programada.',
+    'The design is being implemented: program it when it ends': 'O projeto está a ser implementado: programe-o quando terminar',
+  };
+  for (const [en, pt] of Object.entries(T)) assert.equal(t(en), pt, en);
+  // every line the question can have
+  for (const st of ['none', 'stale', 'err']) for (const l of implementFirstText(st, 'top')) assert.notEqual(t(l), l, l);
+  // the lines of the Tasks interface's Program that #1024 removed: no longer translated
+  for (const s of ['Up to date with the sources', 'No programming file yet']) assert.equal(PT[s], undefined, s);
+});

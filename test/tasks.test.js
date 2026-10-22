@@ -13,7 +13,6 @@ const T = await import('../web/js/tasks.js');
 const SIM = await import('../web/js/tasks-sim.js');
 const EMU = await import('../web/js/tasks-emu.js');
 const IMPL = await import('../web/js/tasks-impl.js');
-const PROG = await import('../web/js/tasks-prog.js');
 const CHECK = await import('../web/js/tasks-check.js');
 
 test('the five tasks, in the order of a lab session, with the names of the modern toolbar\'s steps', () => {
@@ -121,15 +120,6 @@ test('#802 implementationEnded: Implement\'s dot from running to done, with or w
   assert.equal(IMPL.implementationEnded('ok', 'ok'), false);
   assert.equal(IMPL.implementationEnded(null, 'ok'), false);
   assert.equal(IMPL.implementationEnded('running', 'running'), false);
-});
-
-test('#803 fileState: the programming file\'s state from Implement\'s dot', () => {
-  assert.deepEqual(PROG.fileState('ok'), ['ok', 'Up to date with the sources']);
-  assert.deepEqual(PROG.fileState('warn'), ['ok', 'Up to date with the sources']);
-  assert.deepEqual(PROG.fileState('stale'), ['stale', 'Out of date: the sources changed since the last implementation']);
-  assert.deepEqual(PROG.fileState('err'), ['err', 'The last implementation failed']);
-  assert.deepEqual(PROG.fileState('running'), ['running', 'Being implemented…']);
-  assert.deepEqual(PROG.fileState(null), ['none', 'No programming file yet']);
 });
 
 test('taskDot: the worst status of the task\'s processes (errors, then running, out of date, warnings, done)', () => {

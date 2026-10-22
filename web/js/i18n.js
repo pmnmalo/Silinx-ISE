@@ -313,8 +313,8 @@ const PT = {
   'done, no warnings': 'concluído, sem avisos', 'done with warnings': 'concluído com avisos', 'errors': 'erros',
   'out of date (a source changed)': 'desatualizado (uma fonte mudou)', 'running…': 'em curso…',
   // the Program task (#803)
-  'Up to date with the sources': 'Atualizado com as fontes', 'Out of date: the sources changed since the last implementation': 'Desatualizado: as fontes mudaram desde a última implementação',
-  'The last implementation failed': 'A última implementação falhou', 'Being implemented…': 'A ser implementado…', 'No programming file yet': 'Ainda não há ficheiro de programação',
+  'Implement the design first? When it ends without errors, the FPGA is programmed.': 'Implementar o projeto primeiro? Quando terminar sem erros, a FPGA é programada.',
+  'The design is being implemented: program it when it ends': 'O projeto está a ser implementado: programe-o quando terminar',
   'Board, programming tool and cable…': 'Placa, ferramenta de programação e cabo…',
   // the Implement task (#802)
   'Program the board…': 'Programar a placa…',
@@ -529,6 +529,10 @@ PT_PATTERNS.unshift(
     (m, p) => `"${t(p)}" requer a toolchain Xilinx ISE: não está disponível com a toolchain Silinx (escolha um modo ISE nas Definições da Toolchain).`],
   [/^"(.+)" needs the Xilinx ISE toolchain, which is not available \(configure it in Tools ▸ Toolchain Settings\)\.$/,
     (m, p) => `"${t(p)}" requer a toolchain Xilinx ISE, que não está disponível (configure-a em Ferramentas ▸ Definições da Toolchain).`],
+  // Program FPGA with no programming file, or one older than the sources (#1024): implement the design first
+  [/^There is no programming file of '(.+)' yet\.$/, "Ainda não há ficheiro de programação de '$1'."],
+  [/^The programming file of '(.+)' is older than the sources\.$/, "O ficheiro de programação de '$1' é mais antigo do que as fontes."],
+  [/^The last implementation of '(.+)' failed\.$/, "A última implementação de '$1' falhou."],
   // board emulator
   [/^Divide the timing generics \((.*)\) so that the design runs visibly at the emulator's speed$/, 'Dividir os genéricos de temporização ($1) para que o projeto avance visivelmente à velocidade do emulador'],
   [/^(Post-Synthesis|Post-Translate|Post-Map|Post-Place & Route) netlist( \(not generated\))?$/, (m, n, ng) => `Netlist ${PT_POST[n]}${ng ? ' (não gerada)' : ''}`],

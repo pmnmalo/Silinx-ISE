@@ -792,23 +792,23 @@ uiTest('#802 Tasks ▸ Implement: the top\'s Processes, the Design Summary as ca
   await noWarnings(page);
 }, { build: DEV, timeout: 180000 });
 
-// #803: Program arranges iMPACT: the programming file's state first (Implement offered when it is not up to date),
-// then the chain and Program FPGA / PROM; the board's tool and cable folded away; the PROM's other operations behind More…
-uiTest('#803 Tasks ▸ Program: the file\'s state first, the chain and Program; settings folded; the PROM\'s others behind More…', E, async (page) => {
+// #803: Program arranges iMPACT: the chain and Program FPGA / PROM; the board's tool and cable folded away; the PROM's
+// other operations behind More…; the programming file's state no line of its own (Program FPGA asks: #1024)
+uiTest('#803 Tasks ▸ Program: the chain and Program; settings folded; the PROM\'s others behind More…', E, async (page) => {
   await makeProject(env, { name: 'TasksProg', template: 'blinky' });
   await page.setViewport(1366, 768);
   await tasksInterface(page);
   await page.openProject('TasksProg');
   await page.click('#task-switch .task-btn[data-task="prog"]');
-  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-prog-state')?.dataset.state, [], { what: 'iMPACT arranged' });
+  await page.waitFor(() => !!document.querySelector('.doc:not([hidden]) .task-prog-settings'), [], { what: 'iMPACT arranged' });
   const P = () => page.eval(() => {
     const p = document.querySelector('.doc:not([hidden]) > .page'), vis = (s) => !!p.querySelector(s)?.getClientRects().length;
     const top = (s) => Math.round(p.querySelector(s).getBoundingClientRect().top);
-    return { state: p.querySelector('.task-prog-state').dataset.state, text: p.querySelector('.task-prog-text').textContent, implement: vis('.task-prog-impl'),
-      firstState: top('.task-prog-state') < top('.impact-chain') && top('.impact-chain') < top('.imp-fpga'), settings: vis('.imp-settings'), more: vis('.imp-more') };
+    return { state: p.querySelectorAll('.task-prog-state, .task-prog-impl').length, chainFirst: top('.impact-chain') < top('.imp-fpga'), settings: vis('.imp-settings'), more: vis('.imp-more') };
   });
-  // no implementation yet: said, Implement offered; the board (Basys2) chose the tool and cable: folded
-  assert.deepEqual(await P(), { state: 'none', text: 'No programming file yet', implement: true, firstState: true, settings: false, more: false });
+  // no implementation yet: no line about it (#1024); the board (Basys2) chose the tool and cable: folded
+  assert.deepEqual(await P(), { state: 0, chainFirst: true, settings: false, more: false });
+  assert.doesNotMatch(await page.eval(() => document.querySelector('.doc:not([hidden]) > .page').innerText), /No programming file yet|Up to date with the sources/);
   await page.click('.doc:not([hidden]) .task-prog-settings');
   assert.equal((await P()).settings, true);
   // the PROM selected in the chain: Program PROM, its other operations behind More…
@@ -819,20 +819,16 @@ uiTest('#803 Tasks ▸ Program: the file\'s state first, the chain and Program; 
   assert.equal((await P()).more, true);
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-prog-text')?.textContent === 'Ainda não há ficheiro de programação', [], { what: 'Portuguese' });
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) :is(.task-prog-impl, .task-prog-more, .task-prog-settings)')].map((b) => b.textContent)),
-    ['Implementar', 'Placa, ferramenta de programação e cabo…', 'Mais…']);
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-prog-more')?.textContent === 'Mais…', [], { what: 'Portuguese' });
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) :is(.task-prog-more, .task-prog-settings)')].map((b) => b.textContent)),
+    ['Placa, ferramenta de programação e cabo…', 'Mais…']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  // Implement: to the task that makes the file
-  await page.click('.doc:not([hidden]) .task-prog-impl');
-  assert.equal((await state(page)).task, 'impl');
   // the modern interface: iMPACT as it was (its fields and every PROM button, nothing added)
-  await page.click('#task-switch .task-btn[data-task="prog"]');
   await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.deepEqual(await page.eval(() => {
     const p = document.querySelector('.doc:not([hidden]) > .page');
-    return [p.querySelectorAll('.task-prog-state, .task-prog-more, .task-prog-settings').length, !!p.querySelector('.imp-settings').getClientRects().length, !!p.querySelector('.imp-more').getClientRects().length];
+    return [p.querySelectorAll('.task-prog-more, .task-prog-settings').length, !!p.querySelector('.imp-settings').getClientRects().length, !!p.querySelector('.imp-more').getClientRects().length];
   }), [0, true, true]);
   await noWarnings(page);
 }, { build: DEV });

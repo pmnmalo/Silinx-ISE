@@ -129,10 +129,19 @@ uiTest('standalone edition (dist build): loads from file://, creates a project f
   await page.waitConsole(/This project synthesizes with XST, which needs Xilinx ISE 14\.7: not available in the browser edition\./, { timeout: 15000 });
   await page.waitFor(() => !window.Silinx.busy);
   await page.eval(async () => { window.Silinx.project.synthTool = 'silinx'; await window.SilinxApp.saveProjectJson(); });
-  // programming with no bitstream yet: the reason at the end of the failure line; no "install
-  // openFPGALoader…" at startup
+  // programming with no bitstream yet: Program FPGA asks whether to implement the design first (#1024), No programs
+  // nothing; no "install openFPGALoader…" at startup
   assert.doesNotMatch(await page.consoleText(), /Programmers found/);
   await page.eval(() => window.SilinxApp.openImpact());
+  await page.click('.doc:not([hidden]) .btn.primary', { text: 'Program FPGA' });
+  await page.waitDialog('Program FPGA');
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .msg-text').innerText), /Implement the design first\? When it ends without errors, the FPGA is programmed\./);
+  await page.dialogButton('No');
+  await page.waitNoDialog();
+  assert.doesNotMatch(await page.consoleText(), /Programming FPGA/);
+  // a build said done whose bitstream this browser does not have (its files were in the memory of a page since
+  // reloaded): the reason at the end of the failure line
+  await page.eval(() => { window.Silinx.status.bitgen = 'ok'; });
   await page.click('.doc:not([hidden]) .btn.primary', { text: 'Program FPGA' });
   await page.waitConsole(/Programming FPGA \(SRAM\) failed: no bitstream build\/top\.bit in this browser: run Generate Programming File first, or choose a \.bit file/);
   assert.doesNotMatch(await page.consoleText(), /see log/);
