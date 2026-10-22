@@ -98,7 +98,8 @@ the code and the lessons learnt.
 - **CI** (`.github/workflows/ci.yml`) runs everything when a version tag `v*` is pushed, and by hand
   (Actions ▸ CI ▸ Run workflow): the unit tests on Linux, macOS and Windows, the UI tests in both
   interfaces, Firefox / WebKit, the operating systems' smoke tests, WebKit memory, the standalone build,
-  the release zip. The unit tests run in three parts of about the same time (`scripts/test-shard.mjs`, by
+  the release zip. The unit tests run in three parts of about the same time, and the UI tests in three parts
+  per interface, one file at a time (`scripts/test-shard.mjs`, `--ui` for the UI tests, by
   `test/timings.json`; refresh it now and then with `node scripts/update-test-timings.mjs <run id>`). The
   development build and the site's `dev/` are published after every push to `main` (no tests).
   The security checks

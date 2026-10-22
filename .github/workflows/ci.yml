@@ -52,25 +52,40 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-  # the UI tests in headless Chrome, with each interface (alongside the unit tests): about 15 minutes in
-  # October 2026, its limit 25 (#912; to be run in parts)
+  # the UI tests in headless Chrome, with each interface (alongside the unit tests), in three parts of about
+  # the same time, one file at a time (scripts/test-shard.mjs --ui, by test/timings.json's test/ui/ files,
+  # #912): about 30 minutes of files in October 2026, a part about 10 (its longest file, open-toolchain, 7).
+  # Each part uploads its files' times, merged by node scripts/update-test-timings.mjs <run id>
   ui:
     strategy:
       fail-fast: false
       matrix:
         interface: [modern, classic]
+        part: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    name: ui (${{ matrix.interface }})
+    name: ui (${{ matrix.interface }}, ${{ matrix.part }}/3)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - name: UI tests (headless Chrome, ${{ matrix.interface }} interface)
-        run: npm run test:ui -- --test-concurrency=1
+      - name: UI tests (headless Chrome, ${{ matrix.interface }} interface, part ${{ matrix.part }}/3)
+        run: >-
+          node scripts/test-shard.mjs "$PART/3" --ui --test-concurrency=1
+          --test-reporter=tap --test-reporter-destination=stdout
+          --test-reporter=./scripts/test-file-times.mjs --test-reporter-destination=stdout
+          --test-reporter=./scripts/test-times-reporter.mjs --test-reporter-destination=test-times.json
         timeout-minutes: 25
         env:
+          PART: ${{ matrix.part }}
           CHROME_PATH: /usr/bin/google-chrome
           SILINX_UI_INTERFACE: ${{ matrix.interface == 'classic' && 'classic' || '' }}
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-times-${{ matrix.interface }}-${{ matrix.part }}
+          path: test-times.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   # the memory test in WebKit (Safari's engine), and the single-file edition builds
   webkit-standalone:

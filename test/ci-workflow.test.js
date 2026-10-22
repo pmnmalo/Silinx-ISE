@@ -43,8 +43,17 @@ test('CI: at a release only (a tag v*) and by hand; every job, none gated; ci-ok
   assert.match(unit, /- if: always\(\) && matrix\.os == 'ubuntu-latest'\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: unit-times-\$\{\{ matrix\.shard \}\}\n\s+path: test-times\.json\n/);
   assert.doesNotMatch(unit, /--test-shard=/, "node's own shards split by order, not time");
   for (const t of ['docs', 'changelog', 'quality-page']) assert.ok(fs.existsSync(path.join(ROOT, `test/${t}.test.js`)), t);
-  // the UI tests in both interfaces; the macOS and Windows smoke tests
-  assert.ok(j.ui.includes('        interface: [modern, classic]'));
+  // the UI tests in both interfaces, each in three parts of about the same time, one file at a time (#912;
+  // --test-concurrency=1 before the files: after them node --test took it for nothing), each part's file times uploaded
+  const ui = j.ui.join('\n');
+  assert.match(ui, /^        interface: \[modern, classic\]\n        part: \[1, 2, 3\]$/m);
+  assert.match(ui, /^    name: ui \(\$\{\{ matrix\.interface \}\}, \$\{\{ matrix\.part \}\}\/3\)$/m);
+  assert.match(ui, /node scripts\/test-shard\.mjs "\$PART\/3" --ui --test-concurrency=1\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-file-times\.mjs --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-times-reporter\.mjs --test-reporter-destination=test-times\.json\n/);
+  assert.match(ui, /^ {10}PART: \$\{\{ matrix\.part \}\}\n {10}CHROME_PATH: \/usr\/bin\/google-chrome\n {10}SILINX_UI_INTERFACE: \$\{\{ matrix\.interface == 'classic' && 'classic' \|\| '' \}\}$/m);
+  assert.match(ui, /- if: always\(\)\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: ui-times-\$\{\{ matrix\.interface \}\}-\$\{\{ matrix\.part \}\}\n\s+path: test-times\.json\n/);
+  assert.doesNotMatch(ui, /npm run test:ui/, 'the parts, not every file');
+  assert.match(ui, /^ {8}timeout-minutes: 25$/m);
+  // the macOS and Windows smoke tests
   assert.ok(j.os.includes('        os: [macos-latest, windows-latest]'));
   // the history's private-data scan (#498, #555): the tagged commit's history, node's built-ins only
   const hist = j['private-data-history'].join('\n');
