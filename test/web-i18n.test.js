@@ -59,6 +59,12 @@ test('t(): exact strings, patterns, surrounding whitespace, unknown text unchang
   assert.equal(t('Processes: top'), 'Processos: top');
   assert.equal(t('Number of DCMs'), 'Número de DCMs');
   assert.equal(t('Example: blinky'), 'Exemplo: blinky');
+  // a task's button with its dot (#991): the task and its state
+  assert.equal(t('Implement — done with warnings'), 'Implementar — concluído com avisos');
+  assert.equal(t('Edit — done, no warnings'), 'Editar — concluído, sem avisos');
+  assert.equal(t('Simulate — out of date (a source changed)'), 'Simular — desatualizado (uma fonte mudou)');
+  assert.equal(t('Implement — errors'), 'Implementar — erros');
+  assert.equal(t('Implement — running…'), 'Implementar — em curso…');
   assert.equal(t('Version 15.5.0'), 'Versão 15.5.0');
   assert.equal(t('SW3 = sw(3) (pin P11) — click to toggle'), 'SW3 = sw(3) (pino P11) — clique para comutar');
   assert.equal(t('Clock clk: 50 MHz on the board · not emulated: vga_red'), 'Relógio clk: 50 MHz na placa · não emulado: vga_red');

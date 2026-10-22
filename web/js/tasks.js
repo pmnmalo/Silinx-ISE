@@ -117,6 +117,10 @@ export function taskDot(task, status = {}) {
   for (const id of ids) { const s = status[id]; if (s in RANK && (worst === null || RANK[s] > RANK[worst])) worst = s; }
   return worst;
 }
+// a dot's meaning: the task button's tooltip (#991)
+export const DOT_TEXT = { ok: 'done, no warnings', warn: 'done with warnings', err: 'errors', stale: 'out of date (a source changed)', running: 'running…' };
+/** The tooltip of task `t`'s button with its dot `dot` (taskDot; null: no dot, its name only). */
+export const taskTitle = (t, dot) => dot ? `${TASK_LABEL[t]} — ${DOT_TEXT[dot]}` : TASK_LABEL[t];
 
 // ------------------------------------------------------------------ the page
 const root = () => document.documentElement;
@@ -267,6 +271,8 @@ function refreshDots() {
     const dot = taskDot(b.dataset.task, st);
     const el = b.querySelector('.task-dot');
     if (el.dataset.state !== (dot || '')) el.dataset.state = dot || '';
+    const title = taskTitle(b.dataset.task, dot);
+    if (b.dataset.title !== title) { b.dataset.title = title; b.title = title; }   // (once per change: translated in Portuguese)
   }
 }
 
