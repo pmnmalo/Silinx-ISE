@@ -12,7 +12,7 @@
 //   following the task;
 // - Simulate (web/js/tasks-sim.js, #800): the waves get the screen, its side panel ISim's Instances and Objects;
 //   it runs the test bench with the model chosen in the task's bar;
-// - Emulate (web/js/tasks-emu.js, #801): the board fits the task's area, its side panel the emulator's Watch;
+// - Emulate (web/js/tasks-emu.js, #801): the board at its proper size or larger (#1021), its side panel the emulator's Watch;
 // - Implement (web/js/tasks-impl.js, #802): its side panel the top's Processes, its page the Design Summary as cards;
 // - Program (web/js/tasks-prog.js, #803): iMPACT's programming file and its state first, then the chain and Program;
 // - a task whose document is single by nature (Simulate: ISim; Emulate: the board; Program: iMPACT, one each,

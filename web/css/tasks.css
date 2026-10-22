@@ -148,16 +148,16 @@ html[data-layout="tasks"][data-task="sim"] #task-model { display: inline-block; 
 @media (pointer: coarse) { html[data-layout="tasks"][data-task="sim"] #task-model { height: 40px; } }
 
 /* ------------------------------------------------------------------ Emulate (#801, web/js/tasks-emu.js) */
-/* the board gets the screen (zoomed to fit by tasks-emu.js); its side column (Watch, timing generics) the task's side
-   panel, shown at first (#1020): beside the board, below it on a narrow screen; no Design pane */
+/* the board gets the screen at its proper size at least (zoomed up by tasks-emu.js, never down: #1021); its side
+   column (Watch, timing generics) the task's side panel, shown at first (#1020): beside the board, then the VGA
+   monitor; when the width runs short they wrap to the next row, below the board, and the task's area scrolls;
+   no Design pane */
 html[data-layout="tasks"][data-task="emu"] :is(#left-pages, #v-split, #drawer-btn, #drawer-scrim) { display: none !important; }
-html[data-layout="tasks"] .emu-main { flex-wrap: nowrap; align-items: flex-start; }
-html[data-layout="tasks"] .emu-side { flex: none; width: 300px; min-width: 0; }
+html[data-layout="tasks"] .emu-main { flex-wrap: wrap; align-items: flex-start; }
+html[data-layout="tasks"] .emu-board-wrap { flex: none; }
+html[data-layout="tasks"] .emu-side { flex: none; width: 300px; min-width: 0; order: 1; }
+html[data-layout="tasks"] .emu-vga { order: 2; }
 html[data-layout="tasks"][data-task="emu"][data-side="folded"] .emu-side { display: none; }
-@media (max-width: 1024px) {
-  html[data-layout="tasks"] .emu-main { flex-direction: column; align-items: center; }
-  html[data-layout="tasks"] .emu-side { width: 100%; }
-}
 
 /* ------------------------------------------------------------------ Implement (#802, web/js/tasks-impl.js) */
 /* its side panel: the top's Processes (ISE's names and states), not the tree */

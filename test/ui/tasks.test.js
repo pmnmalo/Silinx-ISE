@@ -486,8 +486,9 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .emu-side')?.getClientRects().length > 0, [], { what: 'Watch' });
   await page.waitFor(() => new Promise((r) => requestAnimationFrame(() => r(true))));
   let f = await boardFit(page);
-  assert.ok(f.controls >= 12 && f.inside && f.aim && f.noScroll && f.side === 'beside', JSON.stringify(f));
-  // a tablet in portrait: the board across, Watch below it
+  // (the board at its proper size at least, #1021: on a screen 768 high its note may be scrolled to)
+  assert.ok(f.controls >= 12 && f.inside && f.aim && f.side === 'beside', JSON.stringify(f));
+  // a tablet in portrait: the board at its size (#1021), Watch below it
   await page.setViewport(820, 1180);
   await page.waitFor(() => { const e = document.querySelector('.doc:not([hidden]) .emu'); const s = e.querySelector('.emu-side').getBoundingClientRect(); return s.top >= e.querySelector('.emu-board-wrap').getBoundingClientRect().bottom - 1; }, [], { what: 'Watch below the board' });
   f = await boardFit(page);
@@ -504,6 +505,60 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
   await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-board-wrap').style.zoom), '');
+  await noWarnings(page);
+}, { build: DEV });
+
+// #1021: the board keeps its proper size (zoomed up on a large window, never down): when the width runs short, the Watch
+// and the VGA monitor wrap to the next row, below the board, and the emulator's area scrolls; a laptop, a tablet in
+// landscape and in portrait; the modern and classic interfaces as before
+const emuLayout = (page) => page.eval(() => {
+  const emu = document.querySelector('.doc:not([hidden]) .emu'), wrap = emu.querySelector('.emu-board-wrap'), pcb = wrap.querySelector('.emu-pcb');
+  const wr = wrap.getBoundingClientRect(), pr = pcb.getBoundingClientRect();
+  const where = (el) => { const r = el.getBoundingClientRect(); return !el.getClientRects().length ? 'folded' : r.left >= wr.right - 1 ? 'beside' : r.top >= wr.bottom - 1 ? 'below' : 'over'; };
+  return { zoom: +wrap.style.zoom || 1, proper: pr.width >= parseFloat(pcb.style.width) - 0.5 && pr.height >= parseFloat(pcb.style.height) - 0.5,
+    watch: where(emu.querySelector('.emu-side')), vga: where(emu.querySelector('.emu-vga')),
+    scrollsDown: emu.scrollHeight > emu.clientHeight + 1, scrollsAcross: emu.scrollWidth > emu.clientWidth + 1 };
+});
+uiTest('#1021 Tasks ▸ Emulate: the board keeps its size; the Watch and the VGA monitor wrap below it, scrolling; modern and classic as before', E, async (page) => {
+  await makeProject(env, { name: 'TasksWrap', template: 'vga' });
+  await page.setViewport(1280, 800);
+  await tasksInterface(page);
+  await page.openProject('TasksWrap');
+  await page.click('#task-switch .task-btn[data-task="emu"]');
+  await page.click('#task-empty button');
+  await page.waitConsole(/Board Emulator: 'vga'/, { timeout: 60000 });
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .emu-vga'), [], { what: 'the VGA monitor' });
+  const at = async (w, hgt) => {
+    await page.setViewport(w, hgt);
+    await page.eval(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    return emuLayout(page);
+  };
+  // a laptop: the board a little larger, the Watch beside it, the VGA monitor below (scrolled to)
+  let L = await at(1280, 800);
+  assert.ok(L.zoom >= 1, JSON.stringify(L));
+  assert.deepEqual({ ...L, zoom: undefined }, { zoom: undefined, proper: true, watch: 'beside', vga: 'below', scrollsDown: true, scrollsAcross: false });
+  // a tablet in landscape: the board at its proper size, the Watch and the VGA monitor below it
+  L = await at(1024, 768);
+  assert.deepEqual(L, { zoom: 1, proper: true, watch: 'below', vga: 'below', scrollsDown: true, scrollsAcross: false });
+  // a tablet in portrait: narrower than the board, which keeps its size: the area scrolls across too, not the page
+  L = await at(768, 1024);
+  assert.deepEqual(L, { zoom: 1, proper: true, watch: 'below', vga: 'below', scrollsDown: true, scrollsAcross: true });
+  assert.deepEqual(await noOverflow(page), { page: true, over: [] });
+  // the Watch folded on the laptop: the VGA monitor still below the board
+  L = await at(1280, 800);
+  await page.click('#task-bar [data-act="side"]');
+  await page.eval(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  L = await emuLayout(page);
+  assert.ok(L.zoom >= 1 && L.proper && L.watch === 'folded' && L.vga === 'below', JSON.stringify(L));
+  // the modern and classic interfaces: the board at its own size, the side column and the VGA monitor in their order
+  for (const ui of ['modern', 'classic']) {
+    await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
+    await page.waitFor(() => !document.documentElement.dataset.layout);
+    assert.deepEqual(await page.eval(() => {
+      const emu = document.querySelector('.doc:not([hidden]) .emu'), cs = (s) => getComputedStyle(emu.querySelector(s));
+      return [emu.querySelector('.emu-board-wrap').style.zoom, cs('.emu-main').flexWrap, cs('.emu-side').order, cs('.emu-vga').order, cs('.emu-side').width !== '300px'];
+    }), ['', 'wrap', '0', '0', true], ui);
+  }
   await noWarnings(page);
 }, { build: DEV });
 

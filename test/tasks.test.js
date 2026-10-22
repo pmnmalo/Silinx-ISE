@@ -97,13 +97,17 @@ test('#917 simChoices: the test benches, then the design\'s modules with the top
   assert.equal(SIM.NEW_BENCH, '+new');
 });
 
-test('#801 boardZoom: as large as fits the room, at most 1.5, at least 0.3; nothing to measure: 1', () => {
+test('#801 #1021 boardZoom: as large as fits the room, at most 1.5, never below its proper size (1); nothing to measure: 1', () => {
   const board = { w: 700, h: 520 };
   assert.equal(EMU.boardZoom({ w: 1400, h: 1040 }, board), 1.5);                       // (a lab desktop: larger, not huge)
   assert.equal(EMU.boardZoom({ w: 1000, h: 520 }, board), 1);
-  assert.equal(EMU.boardZoom({ w: 1300, h: 390 }, board), 0.75);                       // (the height decides)
-  assert.equal(EMU.boardZoom({ w: 350, h: 1000 }, board), 0.5);                        // (a narrow window: the width)
-  assert.equal(EMU.boardZoom({ w: 70, h: 52 }, board), 0.3);
+  assert.equal(EMU.boardZoom({ w: 1000, h: 650 }, board), 1.25);                       // (the height decides)
+  assert.equal(EMU.boardZoom({ w: 900, h: 1000 }, board), 1.28);                       // (the width: to the hundredth below, 1.2857…)
+  // (a room too small: its proper size, the panels below it and the task's area scrolling; #801 made it 0.75, 0.5, 0.3)
+  assert.equal(EMU.boardZoom({ w: 1300, h: 390 }, board), 1);
+  assert.equal(EMU.boardZoom({ w: 350, h: 1000 }, board), 1);
+  assert.equal(EMU.boardZoom({ w: 70, h: 52 }, board), 1);
+  assert.equal(EMU.MIN_ZOOM, 1);
   assert.equal(EMU.boardZoom({ w: 0, h: 500 }, board), 1);
   assert.equal(EMU.boardZoom({ w: 800, h: 600 }, { w: 0, h: 0 }), 1);
   assert.equal(EMU.boardZoom(null, board), 1);
