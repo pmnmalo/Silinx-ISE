@@ -141,6 +141,8 @@ In short:
 
 In detail:
 
+- **CI: the browsers job's time (#1126):** Firefox and then WebKit take about 25 minutes now, so the step has 40 minutes
+  and the job 60 (.github/workflows/ci.yml).
 - **The release's tests (#1117, #1118):** after #1111, pong's open-synthesis netlist is 1012 cells and its word-level
   model 1203 / 439 cells, and the clock's tables are 32 (test/compiled-words.test.js, test/ui/open-toolchain.test.js).
   The UI tests read SSim's console from its lines' text: since #925 the simulation tab's copy is hidden, and WebKit's

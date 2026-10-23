@@ -121,7 +121,8 @@ jobs:
   # the main UI flows in Firefox and in WebKit (Safari's engine)
   browsers:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # (Firefox, then WebKit, one file at a time: about 25 minutes, #1126)
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
@@ -131,7 +132,7 @@ jobs:
           key: playwright-${{ runner.os }}-firefox-webkit-${{ hashFiles('node_modules/playwright-core/package.json') }}
       - run: npx playwright install --with-deps firefox webkit
       - run: npm run test:browsers
-        timeout-minutes: 20
+        timeout-minutes: 40
 
   # macOS and Windows: a small UI smoke test in the installed Chrome (and on macOS the release zip,
   # with its .command launcher); their unit tests are in the unit job

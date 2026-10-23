@@ -53,6 +53,10 @@ test('CI: at a release only (a tag v*) and by hand; every job, none gated; ci-ok
   assert.match(ui, /- if: always\(\)\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: ui-times-\$\{\{ matrix\.interface \}\}-\$\{\{ matrix\.part \}\}\n\s+path: test-times\.json\n/);
   assert.doesNotMatch(ui, /npm run test:ui/, 'the parts, not every file');
   assert.match(ui, /^ {8}timeout-minutes: 25$/m);
+  // Firefox and WebKit, one after the other (#1126)
+  const br = j.browsers.join('\n');
+  assert.match(br, /^ {4}timeout-minutes: 60$/m);
+  assert.match(br, /- run: npm run test:browsers\n {8}timeout-minutes: 40$/m);
   // the macOS and Windows smoke tests
   assert.ok(j.os.includes('        os: [macos-latest, windows-latest]'));
   // the history's private-data scan (#498, #555): the tagged commit's history, node's built-ins only
