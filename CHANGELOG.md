@@ -141,6 +141,11 @@ In short:
 
 In detail:
 
+- **The release's tests (#1117, #1118):** after #1111, pong's open-synthesis netlist is 1012 cells and its word-level
+  model 1203 / 439 cells, and the clock's tables are 32 (test/compiled-words.test.js, test/ui/open-toolchain.test.js).
+  The UI tests read SSim's console from its lines' text: since #925 the simulation tab's copy is hidden, and WebKit's
+  innerText of a hidden element is empty. #967's test needs the Chrome DevTools Protocol (chromeOnly), and
+  test/timings.json is measured again.
 - **A clock marker ticked (#1110):** one cycle left the marker at its level (0), so nothing showed the click. It is
   green TICK_MS (300 ms) after a click, and while the clock runs (web/js/sch-live.js, sch-live-inputs.js,
   sch-editor.css); back to its level after, or on Pause.

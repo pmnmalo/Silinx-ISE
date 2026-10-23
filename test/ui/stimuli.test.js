@@ -41,7 +41,7 @@ const rowOf = (page, name) => page.eval((n) => window.Silinx.active.view.state.r
 const stim = (page) => page.eval(() => JSON.parse(JSON.stringify(window.Silinx.active.view.state.stim.m)));
 const status = (page) => page.eval((d) => document.querySelector(`${d} .isim-stim-st`).textContent, DOC);
 const value = (page, name) => page.eval((n) => { const s = window.Silinx.active.view.state.rows.find((r) => r.sig?.name === n).sig; return [...Array(s.val.w)].map((_, i) => { const b = BigInt(s.val.w - 1 - i); return (s.val.x >> b) & 1n ? ((s.val.v >> b) & 1n ? 'z' : 'x') : String((s.val.v >> b) & 1n); }).join(''); }, name);
-const consoleText = (page) => page.eval((d) => document.querySelector(`${d} .isim-console`).innerText, DOC);
+const consoleText = (page) => page.eval((d) => Array.from(document.querySelector(`${d} .isim-console`)?.children || [], (e) => e.textContent).join('\n'), DOC);
 const saved = async (pj) => (await env.server.api('GET', `/api/projects/${pj}`)).stimuli?.ctr;
 // a click on cycle k of a port (P = the cycle in ps)
 const clickCycle = async (page, name, k, P) => page.click(await waveAt(page, k * P + P / 2, await rowOf(page, name)));
@@ -173,7 +173,7 @@ uiTest('ISim stimuli (#336): Edit Stimuli, timing, clicks on the inputs, a bus v
   await page.click('.dlg-overlay .dlg-buttons button', { text: 'OK' });
   await page.waitFor(async () => (await (await fetch('/api/projects/StimPj')).json()).files.some((f) => f.path === 'src/tb_ctr.vhd' && f.role === 'sim'), [], { what: 'tb_ctr.vhd, simulation', timeout: 20000 });
   await simulate(page, 'tb_ctr');
-  await page.waitFor((d) => /TEST PASSED: 8 vector/.test(document.querySelector(`${d} .isim-console`)?.innerText || ''), [DOC], { what: 'TEST PASSED', timeout: 20000 });
+  await page.waitFor((d) => /TEST PASSED: 8 vector/.test(Array.from(document.querySelector(`${d} .isim-console`)?.children || [], (e) => e.textContent).join('\n')), [DOC], { what: 'TEST PASSED', timeout: 20000 });
   assert.doesNotMatch(await consoleText(page), /Error|Warning/);
   assert.deepEqual(page.dialogs, []);
 });
@@ -220,7 +220,7 @@ uiTest('ISim stimuli (#336) of a test bench: the inputs of its unit under test, 
   await page.click('.dlg-overlay .dlg-buttons button', { text: 'OK' });
   await page.waitFor(async () => (await (await fetch('/api/projects/StimTb')).json()).files.some((f) => f.path === 'src/tb_ctr_2.vhd' && f.role === 'sim'), [], { what: 'tb_ctr_2.vhd', timeout: 20000 });
   await simulate(page, 'tb_ctr_2');
-  await page.waitFor((d) => /TEST PASSED: 6 vector/.test(document.querySelector(`${d} .isim-console`)?.innerText || ''), [DOC], { what: 'TEST PASSED', timeout: 20000 });
+  await page.waitFor((d) => /TEST PASSED: 6 vector/.test(Array.from(document.querySelector(`${d} .isim-console`)?.children || [], (e) => e.textContent).join('\n')), [DOC], { what: 'TEST PASSED', timeout: 20000 });
   assert.deepEqual(page.dialogs, []);
 });
 
@@ -317,7 +317,7 @@ uiTest('#919 ISim stimuli: a bus expanded, its bits clicked one at a time (an in
   await page.click('.dlg-overlay .dlg-buttons button', { text: 'OK' });
   await page.waitFor(async () => (await (await fetch('/api/projects/StimBits')).json()).files.some((f) => f.path === 'src/tb_ctr.vhd' && f.role === 'sim'), [], { what: 'tb_ctr.vhd', timeout: 20000 });
   await simulate(page, 'tb_ctr');
-  await page.waitFor((d) => /TEST PASSED: 8 vector/.test(document.querySelector(`${d} .isim-console`)?.innerText || ''), [DOC], { what: 'TEST PASSED', timeout: 20000 });
+  await page.waitFor((d) => /TEST PASSED: 8 vector/.test(Array.from(document.querySelector(`${d} .isim-console`)?.children || [], (e) => e.textContent).join('\n')), [DOC], { what: 'TEST PASSED', timeout: 20000 });
   assert.doesNotMatch(await consoleText(page), /Error|Warning/);
   assert.deepEqual(page.dialogs, []);
 });

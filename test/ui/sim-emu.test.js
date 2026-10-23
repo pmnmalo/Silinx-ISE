@@ -53,7 +53,7 @@ uiTest('ISim: Simulate Behavioral Model runs the test bench; waveforms and objec
   await page.type('run 500 ns');
   await page.key('Enter');
   await page.waitFor(() => /Sim Time: 1,500,000 ps/.test(document.querySelector('.isim-st-time').textContent), [], { what: 'run 500 ns' });
-  assert.match(await page.eval(() => document.querySelector('.isim-console').innerText), /run 500 ns/);
+  assert.match(await page.eval(() => Array.from(document.querySelector('.isim-console')?.children || [], (e) => e.textContent).join('\n')), /run 500 ns/);
   // the LEDs move every 64 clock cycles (1.28 us) in this test bench
   assert.ok(await page.eval(() => window.Silinx.active.view.state.rows.find((r) => r.name === 'led').sig.wave.t.length) >= 2, 'led changes');
   // the simulation process is marked OK
@@ -625,7 +625,7 @@ endmodule
   await page.treeRow('#hier', 'tb_top');
   await page.treeRow('#procs', 'Simulate Behavioral Model', { dbl: true, exact: true });
   await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 20000, what: 'ISim ready' });
-  const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return /TEST (PASSED|FAILED)/.test(t) ? t : null; }, [], { timeout: 20000, what: 'TEST PASSED / FAILED' });
+  const out = await page.waitFor(() => { const t = Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n'); return /TEST (PASSED|FAILED)/.test(t) ? t : null; }, [], { timeout: 20000, what: 'TEST PASSED / FAILED' });
   assert.match(out, /TEST PASSED/);
 });
 
@@ -662,7 +662,7 @@ end sim;
   await page.treeRow('#hier', 'tb_add');
   await page.treeRow('#procs', 'Simulate Behavioral Model', { dbl: true, exact: true });
   await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 20000, what: 'ISim ready' });
-  const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return /TEST DONE/.test(t) ? t : null; }, [], { timeout: 20000, what: 'TEST DONE in the console' });
+  const out = await page.waitFor(() => { const t = Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n'); return /TEST DONE/.test(t) ? t : null; }, [], { timeout: 20000, what: 'TEST DONE in the console' });
   assert.match(out, /3 \+ 4 =   7\n15 \+ 15 =  30\n9 \+ 1 =  10\nTEST DONE/);
   assert.doesNotMatch(out, /not supported/);
 });

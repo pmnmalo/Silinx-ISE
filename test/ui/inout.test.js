@@ -143,7 +143,7 @@ const simulateAll = async (page, tb) => {
   await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 20000, what: 'ISim ready' });
   await page.fill('.doc:not([hidden]) .isim-cmdline input', 'run all');
   await page.key('Enter');
-  return page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return /TEST (PASSED|FAILED)/.test(t) ? t : null; }, [], { timeout: 30000, what: 'TEST PASSED / FAILED' });
+  return page.waitFor(() => { const t = Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n'); return /TEST (PASSED|FAILED)/.test(t) ? t : null; }, [], { timeout: 30000, what: 'TEST PASSED / FAILED' });
 };
 const headers = (page) => page.eval(() => [...document.querySelectorAll('.dlg-overlay .tbw-table th')].map((e) => e.textContent));
 

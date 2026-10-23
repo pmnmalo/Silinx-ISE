@@ -643,7 +643,7 @@ uiTest('#967 browser edition: what Implement needs is downloaded when a project 
   assert.match(log, /Process "Generate Programming File" completed successfully/);
   assert.ok(versioned().some((p) => p.endsWith('yosys.core.wasm')) && versioned().some((p) => p.endsWith('.json.gz')));
   await page.waitFor(() => caches.open('silinx-assets').then((c) => c.keys()).then((ks) => ks.length >= 8), [], { what: 'kept by the run' });
-}, { url: () => 'about:blank', timeout: 300000 });
+}, { url: () => 'about:blank', timeout: 300000, skip: chromeOnly });   // (Page.addScriptToEvaluateOnNewDocument)
 
 uiTest('#1051 the site installable as an app: its manifest, icons and service worker; with the site out of reach the page opens and Generate Programming File runs', E, async (page) => {
   const boot = async (url = siteUrl) => {
@@ -1104,9 +1104,9 @@ uiTest('browser edition: Generate Post-Synthesis Simulation Model in the browser
   for (let k = 0; ; k++) {
     await page.fill('.doc:not([hidden]) .isim-cmdline input', 'run all');
     await page.key('Enter');
-    try { await page.waitFor(() => window.Silinx.active.view.state.running || /Simulation finished OK/.test(document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''), [], { what: 'run all started', timeout: 5000 }); break; } catch (e) { if (k >= 3) throw e; }
+    try { await page.waitFor(() => window.Silinx.active.view.state.running || /Simulation finished OK/.test(Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n')), [], { what: 'run all started', timeout: 5000 }); break; } catch (e) { if (k >= 3) throw e; }
   }
-  const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return /Simulation finished OK|ERROR/.test(t) ? t : null; }, [], { timeout: 120000, what: 'the simulation of the model' });
+  const out = await page.waitFor(() => { const t = Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n'); return /Simulation finished OK|ERROR/.test(t) ? t : null; }, [], { timeout: 120000, what: 'the simulation of the model' });
   assert.match(out, /Simulation finished OK/);
   assert.doesNotMatch(out, /ERROR/);
 }, { url: () => 'about:blank', timeout: 300000 });

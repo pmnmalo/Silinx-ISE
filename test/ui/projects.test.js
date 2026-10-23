@@ -210,7 +210,7 @@ uiTest('Example gates (New Project…): the schematic of the gates, synchronized
   await page.click('input[name=view][value=sim]');
   await page.treeRow('#hier', 'tb_gates');
   await page.treeRow('#procs', 'Simulate Behavioral Model', { dbl: true, exact: true });
-  const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return window.Silinx.active?.id === 'isim' && /Simulation finished OK/.test(t) ? t : null; }, [], { timeout: 30000, what: 'Simulation finished OK' });
+  const out = await page.waitFor(() => { const t = Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n'); return window.Silinx.active?.id === 'isim' && /Simulation finished OK/.test(t) ? t : null; }, [], { timeout: 30000, what: 'Simulation finished OK' });
   assert.doesNotMatch(out, /ERROR|Warning/i);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });
@@ -268,8 +268,8 @@ uiTest('Example traffic (New Project…), the second example: the state diagram 
   await page.fill('.doc:not([hidden]) .isim-cmdline input', 'run all');
   await page.key('Enter');
   // (a timeout says what ISim was doing: the end of its console, its time, whether it runs)
-  const out = await page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return window.Silinx.active?.id === 'isim' && /Simulation finished OK/.test(t) ? t : null; }, [], { timeout: 60000, what: 'Simulation finished OK' })
-    .catch(async (e) => { throw new Error(`${e.message}\n--- ISim: ${JSON.stringify(await page.eval(() => ({ active: window.Silinx.active?.id, running: window.Silinx.active?.view?.state?.running, time: document.querySelector('.isim-st-time')?.textContent, console: (document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || '').split('\n').slice(-15) })))}`); });
+  const out = await page.waitFor(() => { const t = Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n'); return window.Silinx.active?.id === 'isim' && /Simulation finished OK/.test(t) ? t : null; }, [], { timeout: 60000, what: 'Simulation finished OK' })
+    .catch(async (e) => { throw new Error(`${e.message}\n--- ISim: ${JSON.stringify(await page.eval(() => ({ active: window.Silinx.active?.id, running: window.Silinx.active?.view?.state?.running, time: document.querySelector('.isim-st-time')?.textContent, console: (Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n')).split('\n').slice(-15) })))}`); });
   assert.doesNotMatch(out, /ERROR|Warning/i);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });

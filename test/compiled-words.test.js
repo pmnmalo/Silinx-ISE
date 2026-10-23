@@ -172,9 +172,9 @@ const EXPECTED = {
   gates: { chains: 0, registers: 0, cells: [1, 1] },
   traffic: { chains: 1, registers: 1, cells: [194, 141] },
   blinky: { chains: 5, registers: 5, cells: [549, 301] },
-  pong: { chains: 9, registers: 8, cells: [1204, 440] },
+  pong: { chains: 9, registers: 8, cells: [1203, 439] },
   stopwatch: { chains: 3, registers: 3, cells: [391, 254] },
-  clock: { chains: 6, registers: 6, cells: [924, 438] },
+  clock: { chains: 6, registers: 6, cells: [920, 434] },
   vga: { chains: 2, registers: 2, cells: [498, 426] },
 };
 // (#659, #670: the equalities with a constant; the tables (their inputs at most, their words, their outputs), the
@@ -183,9 +183,9 @@ const TABLES = {
   gates: [0, { tables: 0, inputs: 12, words: 0, outputs: 0, cells: [1, 1] }, 0],
   traffic: [1, { tables: 8, inputs: 12, words: 7632, outputs: 42, cells: [137, 39] }, 4],
   blinky: [2, { tables: 29, inputs: 12, words: 20368, outputs: 58, cells: [297, 146] }, 7],
-  pong: [10, { tables: 39, inputs: 12, words: 40084, outputs: 99, cells: [380, 204] }, 6],
+  pong: [9, { tables: 39, inputs: 12, words: 40084, outputs: 99, cells: [379, 203] }, 6],
   stopwatch: [1, { tables: 31, inputs: 12, words: 12112, outputs: 62, cells: [250, 166] }, 9],
-  clock: [9, { tables: 36, inputs: 12, words: 49912, outputs: 80, cells: [426, 149] }, 4],
+  clock: [9, { tables: 32, inputs: 12, words: 49880, outputs: 76, cells: [422, 149] }, 4],
   vga: [2, { tables: 19, inputs: 12, words: 48864, outputs: 55, cells: [425, 110] }, 2],
 };
 // (#670: the part of its operations a step evaluates at most, as the profile estimates it: clock's and vga's models,

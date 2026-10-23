@@ -47,7 +47,7 @@ const simulateAll = async (page, tb) => {
   await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 20000, what: 'ISim ready' });
   await page.fill('.doc:not([hidden]) .isim-cmdline input', 'run all');
   await page.key('Enter');
-  return page.waitFor(() => { const t = document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''; return /TEST (PASSED|FAILED)/.test(t) ? t : null; }, [], { timeout: 30000, what: 'TEST PASSED / FAILED' });
+  return page.waitFor(() => { const t = Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n'); return /TEST (PASSED|FAILED)/.test(t) ? t : null; }, [], { timeout: 30000, what: 'TEST PASSED / FAILED' });
 };
 
 uiTest('Test Bench Wizard: exhaustive test of a combinational adder, expected values from the design; a changed value fails', E, async (page) => {
@@ -171,5 +171,5 @@ uiTest('Test Bench Wizard: "No vectors" makes a skeleton (clock, reset, the modu
   await page.waitFor(() => window.Silinx.active?.id === 'isim' && window.Silinx.active.view && !window.Silinx.active.view.state.running, [], { timeout: 20000, what: 'ISim ready' });
   await page.fill('.doc:not([hidden]) .isim-cmdline input', 'run all');
   await page.key('Enter');
-  await page.waitFor(() => /Simulation finished/.test(document.querySelector('.doc:not([hidden]) .isim-console')?.innerText || ''), [], { timeout: 30000, what: 'Simulation finished' });
+  await page.waitFor(() => /Simulation finished/.test(Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n')), [], { timeout: 30000, what: 'Simulation finished' });
 });
