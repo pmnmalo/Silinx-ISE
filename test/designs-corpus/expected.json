@@ -1076,9 +1076,6 @@
     "WARNING:Silinx (case-default) - T80_MCode.vhd:1484: Case statement without 'when others' choice",
     "WARNING:Silinx (case-default) - T80_MCode.vhd:257: Case statement without 'when others' choice",
     "WARNING:Silinx (case-default) - T80_MCode.vhd:920: Case statement without 'when others' choice"
-   ],
-   "flow": [
-    "WARNING:Silinx (timing) - PERIOD 20 ns on clk_n not met"
    ]
   },
   "quality": {

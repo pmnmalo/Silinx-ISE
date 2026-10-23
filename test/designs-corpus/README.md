@@ -221,7 +221,7 @@ stage, repeats counted. The I/O wrapper, the times and the cell counts of Yosys 
 | femtorv32-quark | Verilog | BSD-3-Clause | pass | - | pass | pass | complete | XC3S250E | 410 | 816 | 224 | 16.235 | 0 |
 | neorv32 | VHDL | BSD-3-Clause | pass | - | pass | pass | complete | XC3S250E | 1679 | 3344 | 1319 | 15.704 | 72 (frontend 47, synth 25) |
 | light8080 | VHDL | LGPL-2.1 | pass | pass | pass | pass | complete | XC3S250E | 189 | 374 | 206 | 12.173 | 17 (frontend 17) |
-| t80 | VHDL | BSD-3-Clause-style | pass | - | pass | pass | complete | XC3S250E | 1146 | 2283 | 361 | 21.935 | 6 (frontend 5, flow 1) |
+| t80 | VHDL | BSD-3-Clause-style | pass | - | pass | pass | complete | XC3S250E | 1146 | 2283 | 361 | 21.935 | 5 (frontend 5) |
 | verilog-uart | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 125 | 244 | 79 | 8.431 | 0 |
 | verilog-i2c-master | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 114 | 225 | 72 | 10.091 | 4 (frontend 4) |
 | verilog-lfsr-crc | Verilog | MIT | pass | - | pass | pass | complete | XC3S250E | 50 | 99 | 64 | 3.869 | 0 |
