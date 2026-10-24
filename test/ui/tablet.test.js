@@ -63,7 +63,7 @@ for (const orientation of ['landscape', 'portrait']) {
     assert.deepEqual(await fits(page), { page: true, over: [] }, 'a file open');
   }, { tablet: orientation });
 
-  uiTest(`#1130 tablet in ${orientation}: Simulate, Emulate (the switch and the LEDs), Implement and Program by taps on the tasks`, E, async (page) => {
+  uiTest(`#1130 tablet in ${orientation}: Simulate, Emulate (the switch and the LEDs), Implement and the board's programming by taps on the tasks`, E, async (page) => {
     await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
     try {
       await makeProject(env, { name: `TabFlow${orientation}`, template: 'blinky' });
@@ -90,9 +90,9 @@ for (const orientation of ['landscape', 'portrait']) {
       await tapAction(page);
       await page.waitFor(() => ['ok', 'warn'].includes(window.Silinx.status.bitgen), [], { what: 'Generate Programming File done', timeout: 180000 });
       await page.waitConsole(/=== SILINX DONE ===/);
-      // Program: iMPACT
-      await tapTask(page, 'prog');
-      if (await page.eval(() => !!document.getElementById('task-empty')?.getClientRects().length)) await tapAction(page);
+      // iMPACT, from the Design Summary's Program the board… (Implement's, no Program task: #1172)
+      await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-program button')?.getClientRects().length, [], { what: 'the summary\'s Program the board…' });
+      await page.tap('.doc:not([hidden]) .task-program button');
       await page.waitFor(() => [...document.querySelectorAll('.doc:not([hidden]) .btn.primary')].some((b) => b.textContent === 'Program FPGA'), [], { what: 'iMPACT' });
       // the programming panel: Program FPGA on the screen, for a finger
       assert.equal(await onScreen(page, '.doc:not([hidden]) .btn.primary'), true, 'Program FPGA on the screen');
@@ -110,7 +110,7 @@ for (const orientation of ['landscape', 'portrait']) {
     await page.openProject(`TabTasks${orientation}`);
     assert.deepEqual(await fits(page), { page: true, over: [] });
     const bar = orientation === 'portrait' ? '#task-tabs' : '#task-switch';
-    for (const task of ['sim', 'emu', 'impl', 'prog', 'edit']) {
+    for (const task of ['sim', 'emu', 'impl', 'edit']) {
       await page.tap(`${bar} .task-btn[data-task="${task}"]`);
       await page.waitFor((t) => document.documentElement.dataset.task === t, [task], { what: `task ${task}` });
       assert.deepEqual(await fits(page), { page: true, over: [] }, task);

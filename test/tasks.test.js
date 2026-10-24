@@ -15,14 +15,15 @@ const EMU = await import('../web/js/tasks-emu.js');
 const IMPL = await import('../web/js/tasks-impl.js');
 const CHECK = await import('../web/js/tasks-check.js');
 
-test('the five tasks, in the order of a lab session, with the names of the modern toolbar\'s steps', () => {
-  assert.deepEqual(T.TASKS, ['edit', 'sim', 'emu', 'impl', 'prog']);
-  assert.deepEqual(T.TASKS.map((t) => T.TASK_LABEL[t]), ['Design', 'Simulate', 'Emulate', 'Implement', 'Program']);
+// (#1172: no Program task, programming Implement's)
+test('the four tasks, in the order of a lab session, with the names of the modern toolbar\'s steps', () => {
+  assert.deepEqual(T.TASKS, ['edit', 'sim', 'emu', 'impl']);
+  assert.deepEqual(T.TASKS.map((t) => T.TASK_LABEL[t]), ['Design', 'Simulate', 'Emulate', 'Implement']);
 });
 
 test('taskOfDoc: each kind of document belongs to one task (the editors and the viewers of the design to Edit)', () => {
   const cases = {
-    isim: 'sim', emulator: 'emu', impact: 'prog',
+    isim: 'sim', emulator: 'emu', impact: 'impl',
     summary: 'impl', pins: 'impl', fpgaview: 'impl', 'text:pong.pwr': 'impl', 'tech:pong': 'impl', 'rtl:pong': 'impl',
     'file:src/pong.v': 'edit', 'file:constraints/top.ucf': 'edit',
     'asm:src/speed_ctrl.asm.json': 'edit', 'sch:src/gates.sch.json': 'edit', 'fsm:src/traffic.fsm.json': 'edit',
@@ -40,7 +41,7 @@ test('taskOfDoc: each kind of document belongs to one task (the editors and the 
 });
 
 test('readState: the kept state checked; anything else falls back to Edit and the defaults', () => {
-  const empty = { edit: {}, sim: {}, emu: {}, impl: {}, prog: {} };
+  const empty = { edit: {}, sim: {}, emu: {}, impl: {} };
   assert.deepEqual(T.readState(null), { task: 'edit', tasks: empty });
   assert.deepEqual(T.readState('not json'), { task: 'edit', tasks: empty });
   assert.deepEqual(T.readState('[1,2]'), { task: 'edit', tasks: empty });
@@ -48,8 +49,10 @@ test('readState: the kept state checked; anything else falls back to Edit and th
   const kept = { task: 'sim', tasks: { sim: { side: true, console: false, max: true, doc: 'isim', extra: 3 }, emu: { doc: 7 }, bogus: { side: true } } };
   assert.deepEqual(T.readState(JSON.stringify(kept)), {
     task: 'sim',
-    tasks: { edit: {}, sim: { side: true, console: false, max: true, doc: 'isim' }, emu: {}, impl: {}, prog: {} },
+    tasks: { edit: {}, sim: { side: true, console: false, max: true, doc: 'isim' }, emu: {}, impl: {} },
   });
+  // the Program task of before (#1172): Implement
+  assert.equal(T.readState(JSON.stringify({ task: 'prog' })).task, 'impl');
 });
 
 test('arrangement: the task in front gets the space; what the viewer left wins; a narrow screen closes the drawer', () => {
@@ -57,7 +60,6 @@ test('arrangement: the task in front gets the space; what the viewer left wins; 
   assert.deepEqual(T.arrangement('sim'), { side: false, console: false, max: false });
   assert.deepEqual(T.arrangement('emu'), { side: true, console: false, max: false });   // (the Watch shown: #1020)
   assert.deepEqual(T.arrangement('impl'), { side: true, console: true, max: false });
-  assert.deepEqual(T.arrangement('prog'), { side: false, console: true, max: false });
   assert.deepEqual(T.arrangement('sim', { side: true, max: true, doc: 'isim' }), { side: true, console: false, max: true, doc: 'isim' });
   assert.deepEqual(T.arrangement('edit', {}, true), { side: false, console: true, max: false });
   assert.deepEqual(T.arrangement('edit', { side: true }, true), { side: false, console: true, max: false });
@@ -70,7 +72,7 @@ test('arrangement: the task in front gets the space; what the viewer left wins; 
 });
 
 test('#854 docDetail: the module and the model a single document\'s title says; the tasks whose document is single', () => {
-  assert.deepEqual(T.SINGLE, ['sim', 'emu', 'prog']);
+  assert.deepEqual(T.SINGLE, ['sim', 'emu']);
   assert.deepEqual(T.docDetail('SSim (top)'), { module: 'top', model: null });
   assert.deepEqual(T.docDetail('SSim (tb_pong, Post-Synthesis)'), { module: 'tb_pong', model: 'Post-Synthesis' });
   assert.deepEqual(T.docDetail('Board Emulator (pong, Post-Place & Route)'), { module: 'pong', model: 'Post-Place & Route' });
@@ -132,7 +134,6 @@ test('taskDot: the worst status of the task\'s processes (errors, then running, 
   assert.equal(T.taskDot('impl', { 'synth-open': 'ok', translate: 'err', par: 'running' }), 'err');
   assert.equal(T.taskDot('impl', { synth: null, bitgen: 'ok' }), 'ok');
   assert.equal(T.taskDot('emu', { check: 'ok', synth: 'ok' }), null);
-  assert.equal(T.taskDot('prog', { bitgen: 'ok' }), null);
 });
 
 test('checkLines: a schematic\'s Check in the console below, as a process\'s messages (#993)', () => {
@@ -155,7 +156,6 @@ test('taskTitle: the task button\'s tooltip says what its dot means (#991)', () 
   assert.equal(T.taskTitle('impl', 'err'), 'Implement — errors');
   assert.equal(T.taskTitle('impl', 'stale'), 'Implement — out of date (a source changed)');
   assert.equal(T.taskTitle('impl', 'running'), 'Implement — running…');
-  assert.equal(T.taskTitle('prog', null), 'Program');
   // every state a dot can have (taskDot) has its text
   for (const s of ['ok', 'warn', 'err', 'stale', 'running']) assert.ok(T.DOT_TEXT[s], s);
 });

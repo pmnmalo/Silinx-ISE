@@ -55,7 +55,7 @@ uiTest('modern interface by default: the Tasks layout, header with search and th
   });
   assert.deepEqual(L.layout, ['tasks', 'edit']);
   assert.deepEqual(L.header, [true, true]);
-  assert.deepEqual(L.tasks, ['Design', 'Simulate', 'Emulate', 'Implement', 'Program']);
+  assert.deepEqual(L.tasks, ['Design', 'Simulate', 'Emulate', 'Implement']);   // (no Program: Implement's, #1172)
   assert.deepEqual(L.pages, { dir: 'row', above: true, icons: await page.eval(() => document.querySelectorAll('#left-tabs .tab').length) });
   assert.ok(L.tabsOnTop, 'document tabs above the editor');
   assert.ok(L.consoleTabsOnTop, 'Console / Errors / Warnings above the log');
@@ -255,7 +255,7 @@ uiTest('Portuguese: the modern header, buttons, empty state and palette are tran
   }));
   assert.deepEqual(T, {
     // ('Design' in Portuguese too, #1046)
-    search: 'Procurar comandos e ficheiros…', tasks: ['Design', 'Simular', 'Emular', 'Implementar', 'Programar'],
+    search: 'Procurar comandos e ficheiros…', tasks: ['Design', 'Simular', 'Emular', 'Implementar'],
     empty: 'Abra uma fonte no painel Projeto, ou verifique o projeto.', theme: 'Alternar entre tema claro e escuro',
   });
   const subs = await subMenu(page, 'Ver', 'Interface');

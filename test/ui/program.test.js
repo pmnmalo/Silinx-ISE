@@ -38,16 +38,13 @@ uiTest('#1023 Program: the panel uses the whole width available, in the Tasks, m
     const inner = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), full = (s) => Math.abs(w(p.querySelector(s)) - inner) <= 1;
     return { doc: w(doc), page: w(p), chain: full('.impact-chain'), fpga: full('.imp-fpga') };
   });
-  for (const ui of ['tasks', 'modern', 'classic']) {
+  // (the modern interface: iMPACT in Implement, arranged there, #1172)
+  for (const ui of ['modern', 'classic']) {
     await useInterface(page, ui);
     await page.openProject('ProgWide');
-    if (ui === 'tasks') {
-      await page.click('#task-switch .task-btn[data-task="prog"]');
-      await page.waitFor(() => !!document.querySelector('.doc:not([hidden]) .task-prog-settings'), [], { what: 'Program arranged' });
-    } else {
-      await page.eval(() => window.SilinxApp.openImpact());
-      await page.waitFor(() => document.querySelector('#workspace > .doc:not([hidden]) .impact-chain'), [], { what: 'iMPACT' });
-    }
+    await page.eval(() => window.SilinxApp.openImpact());
+    if (ui === 'modern') await page.waitFor(() => !!document.querySelector('.doc:not([hidden]) .task-prog-settings'), [], { what: 'iMPACT arranged' });
+    else await page.waitFor(() => document.querySelector('#workspace > .doc:not([hidden]) .impact-chain'), [], { what: 'iMPACT' });
     for (const [w, h] of [[1920, 1080], [1366, 768]]) {
       await page.setViewport(w, h);
       await page.waitFor((vw) => innerWidth === vw, [w], { what: `${w} px` });
@@ -85,11 +82,10 @@ uiTest('#1024 Program FPGA with no programming file, or an old one: implement fi
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'ProgImpl', template: 'gates' });
   const ask = ['Program FPGA', "There is no programming file of 'gates' yet.", 'Implement the design first? When it ends without errors, the FPGA is programmed.', 'Yes', 'No'];
-  for (const ui of ['tasks', 'modern', 'classic']) {
+  for (const ui of ['modern', 'classic']) {
     await useInterface(page, ui);
     await page.openProject('ProgImpl');
-    if (ui === 'tasks') await page.click('#task-switch .task-btn[data-task="prog"]');
-    else await page.eval(() => window.SilinxApp.openImpact());
+    await page.eval(() => window.SilinxApp.openImpact());
     await page.waitFor((s) => !!document.querySelector(s), [PROGRAM_FPGA], { what: 'Program FPGA' });
     await standInProgrammer(page);
     // the file's state is not a line of the page (it was the Tasks interface's)
@@ -159,11 +155,10 @@ uiTest('#1025 Program PROM: every operation shown, no More…; in Portuguese', E
     return { buttons: [...p.querySelectorAll('.prom-box .btn')].filter(vis).map((b) => b.textContent),
       more: [...p.querySelectorAll('.btn')].filter((b) => vis(b) && /^(More…|Mais…)$/.test(b.textContent)).length };
   });
-  for (const ui of ['tasks', 'modern', 'classic']) {
+  for (const ui of ['modern', 'classic']) {
     await useInterface(page, ui);
     await page.openProject('ProgProm');
-    if (ui === 'tasks') await page.click('#task-switch .task-btn[data-task="prog"]');
-    else await page.eval(() => window.SilinxApp.openImpact());
+    await page.eval(() => window.SilinxApp.openImpact());
     await page.waitFor(() => !!document.querySelector('#workspace > .doc:not([hidden]) .impact-chain .impact-dev'), [], { what: 'iMPACT' });
     // the FPGA selected: no PROM operation
     assert.deepEqual(await prom(), { buttons: [], more: 0 }, ui);

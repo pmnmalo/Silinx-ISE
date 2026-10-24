@@ -61,8 +61,7 @@ html[data-layout="tasks"] #task-doc:not([hidden]) { display: inline-flex; align-
 html[data-layout="tasks"][data-task="edit"] :is(#workspace > .doc, #doc-tabs > .tab):not([data-task="edit"]),
 html[data-layout="tasks"][data-task="sim"] :is(#workspace > .doc, #doc-tabs > .tab):not([data-task="sim"]),
 html[data-layout="tasks"][data-task="emu"] :is(#workspace > .doc, #doc-tabs > .tab):not([data-task="emu"]),
-html[data-layout="tasks"][data-task="impl"] :is(#workspace > .doc, #doc-tabs > .tab):not([data-task="impl"]),
-html[data-layout="tasks"][data-task="prog"] :is(#workspace > .doc, #doc-tabs > .tab):not([data-task="prog"]) { display: none !important; }
+html[data-layout="tasks"][data-task="impl"] :is(#workspace > .doc, #doc-tabs > .tab):not([data-task="impl"]) { display: none !important; }
 /* a task with no document: what it does and its action */
 html[data-layout="tasks"] #task-empty:not([hidden]) { display: flex; position: absolute; inset: 0; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; padding: 24px; color: var(--m-muted); text-align: center; }
@@ -166,8 +165,8 @@ html[data-layout="tasks"] .emu-board-wrap > .stat { align-self: flex-start; colo
 /* its side panel: the top's Processes (ISE's names and states), not the tree */
 html[data-layout="tasks"][data-task="impl"] #design-panel { display: none; }
 html[data-layout="tasks"][data-task="impl"] #proc-panel { display: flex; flex: 1; height: auto !important; }
-/* (Emulate on Board and Configure Target Device are the Emulate and Program tasks', not Implement's: #923) */
-html[data-layout="tasks"][data-task="impl"] #procs li:is([data-proc="emulate"], [data-proc="config"]) { display: none; }
+/* (Emulate on Board is the Emulate task's, not Implement's: #923; Configure Target Device Implement's, #1172) */
+html[data-layout="tasks"][data-task="impl"] #procs li[data-proc="emulate"] { display: none; }
 /* (nor the top's drawing to view or edit: Design's, #1160) */
 html[data-layout="tasks"][data-task="impl"] #procs li:is([data-proc="sch-open"], [data-proc="wiz-open"]) { display: none; }
 /* its page: the Design Summary as cards */
@@ -183,29 +182,28 @@ html[data-layout="tasks"] .summary-table :is(th, td) { border: none; border-top:
 html[data-layout="tasks"] .task-program { display: table-row; }
 html[data-layout="tasks"] .task-program button { font-weight: 600; }
 
-/* ------------------------------------------------------------------ Program (#803, web/js/tasks-prog.js) */
+/* ------------------------------------------------------------------ iMPACT, in Implement (#803, #1172, web/js/tasks-prog.js) */
 /* iMPACT arranged for the task: the chain and Program FPGA / PROM; the board, tool and cable folded away (a board
    chooses them); every operation of the PROM shown (#1025) */
 .task-prog-settings { display: none; }
 /* (the whole width available, as in the modern and classic interfaces: #1023) */
-html[data-layout="tasks"] #workspace > .doc[data-task="prog"] > .page { display: flex; flex-direction: column; gap: 10px; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > h2 { order: 1; margin: 0; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > .imp-file { order: 2; margin: 0; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > .impact-chain { order: 3; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > .imp-scan { order: 4; margin: 0; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > .imp-fpga { order: 5; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > .prom-box { order: 6; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > .task-prog-settings { display: inline-flex; order: 7; align-self: flex-start; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > .imp-settings { order: 8; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page > .note-box { order: 9; }
-html[data-layout="tasks"] .doc[data-task="prog"] > .page:not(.settings-open) > .imp-settings { display: none; }
+html[data-layout="tasks"] #workspace > .doc.task-impact > .page { display: flex; flex-direction: column; gap: 10px; }
+html[data-layout="tasks"] .doc.task-impact > .page > h2 { order: 1; margin: 0; }
+html[data-layout="tasks"] .doc.task-impact > .page > .imp-file { order: 2; margin: 0; }
+html[data-layout="tasks"] .doc.task-impact > .page > .impact-chain { order: 3; }
+html[data-layout="tasks"] .doc.task-impact > .page > .imp-scan { order: 4; margin: 0; }
+html[data-layout="tasks"] .doc.task-impact > .page > .imp-fpga { order: 5; }
+html[data-layout="tasks"] .doc.task-impact > .page > .prom-box { order: 6; }
+html[data-layout="tasks"] .doc.task-impact > .page > .task-prog-settings { display: inline-flex; order: 7; align-self: flex-start; }
+html[data-layout="tasks"] .doc.task-impact > .page > .imp-settings { order: 8; }
+html[data-layout="tasks"] .doc.task-impact > .page > .note-box { order: 9; }
+html[data-layout="tasks"] .doc.task-impact > .page:not(.settings-open) > .imp-settings { display: none; }
 
 /* ------------------------------------------------------------------ the activity bar is Edit's (#876) */
 /* Start, Design, Files and Libraries are Edit's pages: Simulate and Emulate have their document's own side panel,
    Program none (no left column); Implement its Processes, whichever page Edit left in front */
 html[data-layout="tasks"]:not([data-task="edit"], [data-task="impl"]) #left-tabs { display: none; }
-html[data-layout="tasks"]:is([data-task="sim"], [data-task="emu"], [data-task="prog"]) :is(#left, #v-split, #drawer-btn, #drawer-scrim) { display: none !important; }
-html[data-layout="tasks"][data-task="prog"] #task-bar [data-act="side"] { display: none; }
+html[data-layout="tasks"]:is([data-task="sim"], [data-task="emu"]) :is(#left, #v-split, #drawer-btn, #drawer-scrim) { display: none !important; }
 html[data-layout="tasks"][data-task="impl"] .left-page[data-page="design"] { display: flex !important; }
 html[data-layout="tasks"][data-task="impl"] .left-page:not([data-page="design"]) { display: none !important; }
 
