@@ -353,8 +353,8 @@ test('One-hot state machines (#539) with Yosys: 8 states one-hot at High, equal 
     for (const k of ['ns', 'luts', 'slices']) assert.ok(Number.isFinite(high.depth.fsm[k]), `${lang}: ${k}`);
     assert.equal(utilization(high.cells).flipFlops, high.depth.fsm.kept ? 8 : binary, lang);
     simulated(design, high, `${lang} High`);
-    // Normal, and fsm false: not tried, the binary state register of 4 bits
-    for (const opts of [{ effort: 'normal' }, { fsm: false }]) {
+    // Normal (its own synthesis: not a small design's as at High, #652), and fsm false: not tried, the binary state register
+    for (const opts of [{ effort: 'normal', smallRule: { maxLuts: -1 } }, { fsm: false }]) {
       const r = await synthesizeOpen(design, { run: yosysNode, ...opts });
       assert.equal(r.depth.fsm, undefined, `${lang} ${JSON.stringify(opts)}`);
       assert.equal(utilization(r.cells).flipFlops, binary);
@@ -519,7 +519,7 @@ test('One-hot state machines (#652) with Yosys: a machine refused for its users 
     assert.ok(criticalDelay(high.files[`${top}.json`], top) < criticalDelay(off.files[`${top}.json`], top), `${lang}: faster`);
     assert.ok(utilization(high.cells).luts < utilization(off.cells).luts, `${lang}: fewer LUTs`);
     // Normal: tried too (the forced machines alone, #539's stay High's), kept, equal to the RTL
-    const normal = await synthesizeOpen(design, { run: yosysNode, effort: 'normal' });
+    const normal = await synthesizeOpen(design, { run: yosysNode, effort: 'normal', smallRule: { maxLuts: -1 } });
     assert.deepEqual(normal.depth.fsm.machines, [{ wire: 'st', states: 9 }], lang);
     assert.equal(normal.depth.fsm.kept, true, lang);
     assert.equal(utilization(normal.cells).flipFlops, 11, lang);

@@ -275,8 +275,9 @@ test('#280 the synthesis up to date: its netlist used, its report kept; no netli
     '=== SILINX STEP synth ===', '=== SILINX STEP translate ===', '=== SILINX STEP map ===', '=== SILINX DONE ===']);
 });
 
-// #282: the synthesis's Optimization Effort in the flow: Normal one Yosys run, and the console says which
-test('#282 the flow\'s synthesis with Optimization Effort Normal: one Yosys run, said; High: the mappings tried; Normal on a deep design (#468): the mappings tried, said', { timeout: 300000 }, async () => {
+// #282: the synthesis's Optimization Effort in the flow: Normal one Yosys run, and the console says which; a small design
+// (#652, SMALL_RULE: blinky) synthesized at Normal as at High, said
+test('#282 the flow\'s synthesis with Optimization Effort Normal: one Yosys run, said; High: the mappings tried; Normal on a small design (#652) or a deep one (#468): the mappings tried, said', { timeout: 300000 }, async () => {
   const run = async (synthEffort, deep = null) => {
     const lines = [];
     let runs = 0;
@@ -292,12 +293,36 @@ test('#282 the flow\'s synthesis with Optimization Effort Normal: one Yosys run,
     assert.ok(res.ok, `${res.error}\n${lines.join('\n')}`);
     return { runs, lines: lines.filter(l => /^Optimization Effort/.test(l)), report: res.report };
   };
-  const n = await run('normal'), h = await run('high');
+  const { SMALL_RULE } = await import('../core/synth-open.js');
+  assert.deepEqual(SMALL_RULE, { maxLuts: 250, gain: 0 });
+  // (blinky not small: a rule of no LUTs, Normal's one mapping)
+  spec.smallRule = { maxLuts: 0 };
+  let n;
+  try { n = await run('normal'); } finally { delete spec.smallRule; }
+  const h = await run('high');
   assert.equal(n.runs, 1);
-  assert.deepEqual(n.lines, ['Optimization Effort Normal: one mapping, and the mappings for speed for a design limited by its logic depth (High tries them for every design, a slower synthesis).']);
+  assert.deepEqual(n.lines, ['Optimization Effort Normal: one mapping, and the mappings for speed for a small design or one limited by its logic depth (High tries them for every design, a slower synthesis).']);
   assert.ok(h.runs > 1, String(h.runs));
   assert.deepEqual(h.lines, ['Optimization Effort High: the mappings for speed tried too, the fastest kept.']);
   assert.ok(n.report.synthesis.summary.luts.used > 0);
+  // blinky, small (its usual mapping's LUTs, at most 250): High's mappings at Normal, said; High's netlist (as fast)
+  const sm = await run('normal');
+  assert.ok(sm.runs > h.runs, `${sm.runs} against High's ${h.runs}: the usual mapping more`);
+  const luts = n.report.synthesis.summary.luts.used;
+  assert.ok(luts <= SMALL_RULE.maxLuts);
+  assert.equal(sm.lines.length, 2);
+  assert.equal(sm.lines[0], 'Optimization Effort Normal: one mapping, and the mappings for speed for a small design or one limited by its logic depth (High tries them for every design, a slower synthesis).');
+  assert.match(sm.lines[1], /^Optimization Effort Normal: a small design \(\d+ LUTs\): the mappings for speed tried too, the fastest kept\.$/);
+  assert.deepEqual(sm.report.synthesis.summary, h.report.synthesis.summary);
+  assert.equal(sm.report.synthesis.warnings, 0);
+  // High's netlist not faster by the rule (a rule asking for 99 % less): Normal's own kept, said
+  spec.smallRule = { ...SMALL_RULE, gain: 0.99 };
+  let ns;
+  try { ns = await run('normal'); } finally { delete spec.smallRule; }
+  assert.equal(ns.lines.length, 2);
+  assert.match(ns.lines[1], /^Optimization Effort Normal: a small design \(\d+ LUTs\): the mappings for speed tried too, not faster \(\d+\.\d ns estimated against \d+\.\d\): the one mapping kept\.$/);
+  assert.deepEqual(ns.report.synthesis.summary, n.report.synthesis.summary, 'Normal\'s own netlist');
+  assert.equal(ns.report.synthesis.warnings, 0);
   // a comparator chain of 48 bits: 17 levels of logic at Normal's first mapping, the mappings for speed too
   const d = await run('normal', { path: 'chain.v', lang: 'verilog', text: `module chain(input clk, input [47:0] a, input [47:0] b, output reg gt);
   reg [47:0] ra, rb; integer i; reg g;
@@ -305,7 +330,7 @@ test('#282 the flow\'s synthesis with Optimization Effort Normal: one Yosys run,
   always @(posedge clk) begin ra <= a; rb <= b; gt <= g; end
 endmodule` });
   assert.ok(d.runs > 1, String(d.runs));
-  assert.deepEqual(d.lines, ['Optimization Effort Normal: one mapping, and the mappings for speed for a design limited by its logic depth (High tries them for every design, a slower synthesis).',
+  assert.deepEqual(d.lines, ['Optimization Effort Normal: one mapping, and the mappings for speed for a small design or one limited by its logic depth (High tries them for every design, a slower synthesis).',
     'Optimization Effort Normal: 17 levels of logic: the mappings for speed tried too, the fastest kept.']);
   // (#611: not a quarter faster than Normal's own netlist, that one kept and said; a rule asking for 99 % less)
   const chainText = `module chain(input clk, input [47:0] a, input [47:0] b, output reg gt);

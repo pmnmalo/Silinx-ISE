@@ -619,7 +619,7 @@ export async function implProperties() {
       ...field('FPGA Start-Up Clock:', clk),
       // the Silinx toolchain's synthesis: what its effort does (#282)
       app.openMode() ? h('div', { class: 'effort-hint', style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } },
-        'Silinx toolchain: Optimization Effort Normal synthesizes once, fast, and tries the mappings for speed only on a design limited by its logic depth or with wide multiplexers; High tries them on every design (a slower synthesis, a circuit about 5-10 % faster).') : null,
+        'Silinx toolchain: Optimization Effort Normal synthesizes once, fast, and tries the mappings for speed only on a small design (250 LUTs at most), a design limited by its logic depth or one with wide multiplexers; High tries them on every design (a slower synthesis, a circuit about 5-10 % faster).') : null,
       h('div', { style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } }, 'Use JTAG Clock when programming over JTAG (iMPACT, xc3sprog, djtgcfg); CCLK when booting from the PROM/flash.')),
   });
   if (!r) return;

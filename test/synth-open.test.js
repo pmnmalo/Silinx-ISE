@@ -4,12 +4,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { synthesizeOpen, synthEffort, yosysScript, yosysFiles, synthCommands, remapCommands, abc9RemapCommands, muxfRemapCommands, muxTrees, MUXF_MAP, MUXF_MAP_FILE, LUT6_MAP, LUT6_MAP_FILE, MUX_COUNT_FILE, criticalDelay, keepDepth, keepSecond, keepChains, sliceCount, cellCounts, utilization, lineStream, YOSYS_FAMILY, QUIET, DEPTH_ABC, DEPTH_ABC2, DEPTH_ABC3, DEPTH_ABC2_LUT4, MFS, DEPTH_ABC_FILE, PREMAP_FILE, DEPTH_RULE, LUT_LIB, LUT_LIB_FILE, abcInline, logicLevels, deepDesign, DEEP_RULE, DEPTH_SOPB, SOPB_RULE, pathEnds, criticalEnables, foldRemapCommands, speedRemapCommands, FOLD_CE_MAP, FOLD_CE_MAP_FILE, FOLD_CE_FILE, SPEED_ABC, SPEED_RULE, TOP_ONLY, memorySteps, logicMemories, MEMORIES_FILE, LUTRAM_COST, asText } from '../core/synth-open.js';
+import { synthesizeOpen as synthesizeOpenAll, synthEffort, yosysScript, yosysFiles, synthCommands, remapCommands, abc9RemapCommands, muxfRemapCommands, muxTrees, MUXF_MAP, MUXF_MAP_FILE, LUT6_MAP, LUT6_MAP_FILE, MUX_COUNT_FILE, criticalDelay, keepDepth, keepSecond, keepChains, sliceCount, cellCounts, utilization, lineStream, YOSYS_FAMILY, QUIET, DEPTH_ABC, DEPTH_ABC2, DEPTH_ABC3, DEPTH_ABC2_LUT4, MFS, DEPTH_ABC_FILE, PREMAP_FILE, DEPTH_RULE, LUT_LIB, LUT_LIB_FILE, abcInline, logicLevels, deepDesign, DEEP_RULE, DEPTH_SOPB, SOPB_RULE, pathEnds, criticalEnables, foldRemapCommands, speedRemapCommands, FOLD_CE_MAP, FOLD_CE_MAP_FILE, FOLD_CE_FILE, SPEED_ABC, SPEED_RULE, TOP_ONLY, memorySteps, logicMemories, MEMORIES_FILE, LUTRAM_COST, asText } from '../core/synth-open.js';
 import { compareNetlist } from './diff-synth.js';
 import { yosysNode } from '../core/synth-open-node.js';
 import { readYosysJson } from '../core/fpga/netlist.js';
 import { netlistSim } from './fpga-sim.js';
 import { toVerilog } from '../core/synth-verilog.js';
+// Normal's own synthesis (its mappings on these small designs), not a small design's as at High (SMALL_RULE, #652: its
+// own test in open-flow-core.test.js)
+const synthesizeOpen = (d, o = {}) => synthesizeOpenAll(d, { smallRule: { maxLuts: -1 }, ...o });
 // the search for state machines (#539, #652: its runs at Normal too), apart from the runs the tests count
 const FSM_PROBE = /silinx_fsm_(pre|forced)\.il/;
 

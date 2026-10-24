@@ -26,7 +26,7 @@ A project is a directory under the workspace (default `~/Silinx-projects`, overr
 * `synthTool`: `'silinx'` (the Silinx toolchain: Yosys, Silinx's place & route and bitstream) or
   `'xst'` (Xilinx ISE 14.7); without it, the mode of Toolchain Settings.
 * `impl.optLevel`: the synthesis's Optimization Effort, 1 Normal (the default; with the Silinx
-  toolchain one mapping, fast, and every mapping for a design limited by its logic depth; its wide multiplexers
+  toolchain one mapping, fast, and every mapping for a design of 250 LUTs at most (the faster kept) or limited by its logic depth; its wide multiplexers
   on MUXF5 … MUXF7, the mapping with the wider functions and the state machines Yosys leaves as written (of 8
   states or more) one-hot when that is better; Place & Route's two placements, the faster kept, for a design of 500
   slices at most) or 2 High (every mapping tried, and the state machines of 8 states or more one-hot, the best kept;

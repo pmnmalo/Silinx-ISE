@@ -453,6 +453,13 @@ export const PREMAP_FILE = 'silinx_premap.il';
 // The mappings for speed (#652, #653): on designs of `maxLuts` LUTs at most; the clock enables folded those of the
 // flip-flops whose CE ends a path `margin` ns from the critical one at most
 export const SPEED_RULE = { maxLuts: 1500, margin: 0.05 };
+// Optimization Effort Normal (#652): a design whose usual mapping has at most `maxLuts` LUTs is synthesized as at High too,
+// that netlist kept when no slower than Normal's by the estimate (by ISE's trce High's netlists are 2.5 % faster on the
+// designs of 500 LUTs at most, up to 19 %; itc99-b08's, 13 % slower by the estimate, 15 % by trce). The two syntheses take
+// two to three times as long as Normal's one (blinky 2.0 -> 4.3 s, a design of 460 LUTs 5.5 -> 13 s), hence 250 LUTs: the
+// designs that gain most are small (epfl-router, itc99-b10, b13, iwls05-sasc, the traffic example), as Place & Route makes
+// two placements of a small design at Normal (#651)
+export const SMALL_RULE = { maxLuts: 250, gain: 0 };
 export const DEPTH_RULE = { gain: 0.03, luts: 0.1, maxLuts: 5000, area: 0.05, slack: 0.01 };
 /** Is the depth-oriented mapping kept? ns, luts (and slices, when known): [usual, depth-oriented]. */
 export function keepDepth(ns, luts, rule = DEPTH_RULE, slices = null) {
@@ -634,7 +641,9 @@ export const synthEffort = impl => (String(impl?.optLevel) === '2' ? 'high' : 'n
  * wider functions, r.depth.wide, measured against the netlist chosen of the others, #54; wide: false leaves it out), but for a design limited by its depth (#468:
  * deepDesign, its levels in r.depth.levels; r.depth.auto true), which gets High's mappings too, kept when deepRule.gain
  * (DEEP_RULE's) faster than Normal's own netlist (#611: r.depth.normal { ns, luts, kept: Normal's own kept }, r.depth.high { ns, luts }
- * of High's then), and for a design
+ * of High's then), for a small design (SMALL_RULE: its usual mapping of SMALL_RULE.maxLuts LUTs at most), synthesized as at
+ * High too, High's netlist kept when smallRule.gain (0: no slower) faster by the estimate than Normal's (r.depth.small { luts: the
+ * usual mapping's, ns: [Normal's, High's], kept }; smallRule: SMALL_RULE, for tests), and for a design
  * with wide multiplexers (#511: their mapping onto MUXF5 … MUXF7, r.depth.muxf, at both efforts); a design
  * written as gates also has its adders' carry chains recovered (#77, #377), the faster netlist kept. At High a
  * design whose state machines of FSM_RULE.states states or more the init values keep out of Yosys's fsm is
@@ -647,7 +656,7 @@ export const synthEffort = impl => (String(impl?.optLevel) === '2' ? 'high' : 'n
  * name of the candidate shown: usual, wide, depth, second, delays, third, lut4, abc9; null, the variant's own choice), ns,
  * luts, slices, kept } (lutram: false leaves it out).
  */
-export async function synthesizeOpen(design, { family = 'spartan3e', run, onLine = () => {}, depth = true, effort = 'high', abc9: withAbc9 = true, deepRule = DEEP_RULE, fsm: withFsm = true, speed: withSpeed = true, wide = true, resynth: withResynth = true, lutram: withLutram = true } = {}) {
+export async function synthesizeOpen(design, { family = 'spartan3e', run, onLine = () => {}, depth = true, effort = 'high', abc9: withAbc9 = true, deepRule = DEEP_RULE, smallRule = SMALL_RULE, fsm: withFsm = true, speed: withSpeed = true, wide = true, resynth: withResynth = true, lutram: withLutram = true } = {}) {
   const { text, top, warnings, shiftArrays = [] } = toVerilog(design);
   const lut4 = LUT4_FAMILIES.has(YOSYS_FAMILY[family]);
   const normal = effort === 'normal';
@@ -710,6 +719,22 @@ export async function synthesizeOpen(design, { family = 'spartan3e', run, onLine
     const json = out[`${top}.json`];
     if (json) deep = { levels: logicLevels(json, top), deep: deepDesign(json, top, deepRule) };
     if (deep?.deep) tryDepth = true;
+    // (a small design: synthesized as at Normal and as at High, the faster by the estimate kept, High's when no slower,
+    // its messages said, #652)
+    const luts = json ? utilization(cellCounts(json, top)).luts : Infinity;
+    if (!deep?.deep && luts <= smallRule.maxLuts) {
+      const both = { family, run, depth, abc9: withAbc9, deepRule, fsm: withFsm, speed: withSpeed, wide, resynth: withResynth, lutram: withLutram };
+      const linesN = [], linesH = [];
+      // (side by side: Yosys runs in workers of their own)
+      const [own, high] = await Promise.all([
+        synthesizeOpen(design, { ...both, onLine: l => linesN.push(l), effort: 'normal', smallRule: { ...smallRule, maxLuts: -1 } }),
+        synthesizeOpen(design, { ...both, onLine: l => linesH.push(l), effort: 'high' })]);
+      const ns = [criticalDelay(own.files[`${top}.json`], top), criticalDelay(high.files[`${top}.json`], top)];
+      const small = { luts, ns, kept: ns[1] <= ns[0] * (1 - (smallRule.gain ?? 0)) + 1e-9 };
+      const pick = small.kept ? high : own;
+      for (const l of small.kept ? linesH : linesN) onLine(l);
+      return { ...pick, depth: { ...pick.depth, small } };
+    }
   }
   const highMappings = !normal || !!deep?.deep;
   // a mapping (its run's output) and the depth-oriented ones, the faster kept (core/synth-open-depth.js)

@@ -1339,6 +1339,25 @@ routings (main against the change): **−4.3 %** in geometric mean (femtorv32-qu
 the clock example −4.8 % at both efforts, vga +2.0 % at Normal and −1.3 % at High); every DRC 0 errors, 0 warnings, every
 `.bit` byte-identical to ISE's bitgen. The synthesis takes about 8 % longer on the corpus at Normal.
 
+### A small design at Normal synthesized as at High too (#652, 2026-10-24)
+
+ISE's trce of today's main on the corpus's 53 designs of 1500 LUTs at most and the 7 examples (the routings of the app's
+flow, seed 1): the critical path 6.6 % shorter than ISE's at Normal (14 of 38 slower), 9.3 % at High (12 slower). The
+largest gaps at Normal that are the synthesis's: itc99-b05 1.21× (logic 8.70 against 6.82 ns), but 1.05× at High. On
+the 48 designs of 500 LUTs at most, High's netlists are 2.5 % faster than Normal's by trce with Normal's two placements
+(3.3 % with High's three): epfl-router, itc99-b10 −19.3 %, itc99-b13 −18.0 %, iwls05-sasc −16.8 %, itc99-b05 −12.9 %, the
+traffic example −12.6 %; slower: itc99-b08 +14.9 %, itc99-b11 +4.1 %, iwls05-i2c +3.5 %.
+
+So Normal (`SMALL_RULE`) now synthesizes a design whose usual mapping has 250 LUTs at most both as at Normal and as at
+High, side by side, and keeps High's netlist when the estimate says it is no slower than Normal's (compared with Normal's
+final netlist, its remaps included: against the usual mapping alone itc99-b08's High netlist, 6.00 ns, looked faster than
+6.19, while Normal's final one is 5.32). The two syntheses take two to three times as long as Normal's one (the app's worker
+pool: blinky 2.0 → 4.3 s, pong 3.1 → 6.2, itc99-b11 2.6 → 8.4, epfl-i2c's 460 LUTs 5.5 → 13 s), hence 250 LUTs rather than
+500: the designs that gain most are small.
+
+ISE's check (the routings that change at Normal, 16; 14 timed): trce 8.0 % shorter in geometric mean (2.0 % over the 57
+timed designs at Normal), every DRC 0 errors and 0 warnings, every `.bit` byte-identical to ISE's bitgen.
+
 ## 4:1 multiplexers in the wider mapping (#54)
 
 The EPFL barrel shifter (`bar`, 128 bits shifted by 7, written as gates: decoded 4:1 multiplexers on the shift

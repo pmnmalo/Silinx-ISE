@@ -6,10 +6,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen, criticalDelay } from '../core/synth-open.js';
+import { synthesizeOpen as synthesizeOpenAll, criticalDelay } from '../core/synth-open.js';
 import { yosysNode } from '../core/synth-open-node.js';
 import { gateAssignments, rewriteCarryChains, GATE_MIN, MIN_CHAIN, ADDER_MIN } from '../core/carry-chain.js';
 import { compareNetlist } from './diff-synth.js';
+// Normal's own synthesis (its mappings on these small designs), not a small design's as at High (SMALL_RULE, #652: its
+// own test in open-flow-core.test.js)
+const synthesizeOpen = (d, o = {}) => synthesizeOpenAll(d, { smallRule: { maxLuts: -1 }, ...o });
 
 const syn = async (text, top, lang = 'verilog', opts = {}) => {
   const design = elaborate(compile([{ path: lang === 'vhdl' ? 'd.vhd' : 'd.v', lang, text }]), top);
