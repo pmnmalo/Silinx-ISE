@@ -14,7 +14,8 @@
 //   it runs the test bench with the model chosen in the task's bar, as soon as either is chosen (no Simulate button, #1018);
 // - Emulate (web/js/tasks-emu.js, #801): the board at its proper size or larger (#1021), its side panel the emulator's Watch;
 // - Implement (web/js/tasks-impl.js, #802): its side panel the top's Processes, its page the Design Summary as cards;
-// - Program (web/js/tasks-prog.js, #803): iMPACT's programming file and its state first, then the chain and Program;
+// - Implement programs the board too (#1172: no Program task): iMPACT, arranged by web/js/tasks-prog.js (#803), opens
+//   there, its Processes' Configure Target Device and the Design Summary's Program the board… open it;
 // - a task whose document is single by nature (Simulate: ISim; Emulate: the board; Program: iMPACT, one each,
 //   web/js/viewers.js) shows no tab bar: what the tab said (the module, the model) and its close are in the task's
 //   bar (#854);
@@ -35,25 +36,24 @@ import { arrangeProgram, initProgram } from './tasks-prog.js';
 import { initCheckMessages } from './tasks-check.js';
 import { buildTestPage, unbuildTestPage } from './tasks-test.js';
 
-export const TASKS = ['edit', 'sim', 'emu', 'impl', 'prog'];
+export const TASKS = ['edit', 'sim', 'emu', 'impl'];
 // (the first task is Design, its id 'edit' kept: the kept state, the documents; 'Design' in Portuguese too, #1046)
-export const TASK_LABEL = { edit: 'Design', sim: 'Simulate', emu: 'Emulate', impl: 'Implement', prog: 'Program' };
+export const TASK_LABEL = { edit: 'Design', sim: 'Simulate', emu: 'Emulate', impl: 'Implement' };
 export const TASKS_KEY = 'silinx.tasks';
 // the design-flow button of the modern toolbar (web/js/menus.js, data-step) each task runs
-const STEP = { edit: 'check', sim: 'simulate', emu: 'emulate', impl: 'implement', prog: 'program' };
-const ACTION = { edit: 'Check', sim: 'Simulate', emu: 'Emulate', impl: 'Implement', prog: 'Program' };
+const STEP = { edit: 'check', sim: 'simulate', emu: 'emulate', impl: 'implement' };
+const ACTION = { edit: 'Check', sim: 'Simulate', emu: 'Emulate', impl: 'Implement' };
 const NO_BENCH = 'The project has no test bench yet: create one with the wizard, or simulate the top with stimuli drawn in ISim.';
 const HINT = {
   edit: 'Open a source from the Design panel, or check the design.',
   sim: 'Simulate the design: its waves open here.',
   emu: 'Emulate the design on the board: the board opens here.',
   impl: 'Implement the design: synthesis, place & route and the programming file.',
-  prog: 'Program the board: the FPGA, or its flash to keep the design.',
 };
 const L = body => `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 const ICON = {
   edit: L('<path d="M4 20l1.2-4.8L15.5 4.9a2.1 2.1 0 0 1 3 3L8.2 18.2z"/><path d="M14 6.5l3.5 3.5"/>'),
-  sim: icons.mWave, emu: icons.mBoard, impl: icons.mBolt, prog: icons.mUpload,
+  sim: icons.mWave, emu: icons.mBoard, impl: icons.mBolt,
   max: L('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
   side: icons.mPanel,
   msgs: L('<path d="M4 4h16v12H9l-5 4z"/>'),
@@ -66,7 +66,6 @@ const DEFAULTS = {
   sim: { side: false, console: false },
   emu: { side: true, console: false },   // (the emulator's Watch shown: #1020)
   impl: { side: true, console: true },
-  prog: { side: false, console: true },
 };
 
 /** The task a document belongs to, by its id (web/js/app.js openDoc and its callers). */
@@ -74,9 +73,8 @@ export function taskOfDoc(id) {
   const s = String(id || '');
   if (s === 'isim') return 'sim';
   if (s === 'emulator') return 'emu';
-  if (s === 'impact') return 'prog';
-  // (a build file: a report, #802; the RTL Schematic, Synthesize's view, as the Technology one, #1063)
-  if (/^(summary|pins|fpgaview)$/.test(s) || /^(text|tech|rtl):/.test(s) || s.startsWith('file:build/')) return 'impl';
+  // (a build file: a report, #802; the RTL Schematic, Synthesize's view, as the Technology one, #1063; iMPACT, #1172)
+  if (/^(summary|pins|fpgaview|impact)$/.test(s) || /^(text|tech|rtl):/.test(s) || s.startsWith('file:build/')) return 'impl';
   return 'edit';
 }
 
@@ -84,7 +82,9 @@ export function taskOfDoc(id) {
 export function readState(raw) {
   let v = null;
   try { v = JSON.parse(raw); } catch { /* none kept, or not ours */ }
-  const out = { task: TASKS.includes(v?.task) ? v.task : 'edit', tasks: {} };
+  // (the Program task of before, #1172: Implement)
+  const task = v?.task === 'prog' ? 'impl' : v?.task;
+  const out = { task: TASKS.includes(task) ? task : 'edit', tasks: {} };
   for (const t of TASKS) {
     const k = v?.tasks?.[t] || {}, a = {};
     for (const f of ['side', 'console', 'max']) if (typeof k[f] === 'boolean') a[f] = k[f];
@@ -104,8 +104,8 @@ export function arrangement(task, kept = {}, narrow = false) {
   return a;
 }
 
-// the tasks whose document is single by nature: a new simulation, emulation or iMPACT replaces the old one
-export const SINGLE = ['sim', 'emu', 'prog'];
+// the tasks whose document is single by nature: a new simulation or emulation replaces the old one
+export const SINGLE = ['sim', 'emu'];
 /** What a document's title says of it: "ISim (top, Post-Synthesis)" → { module: 'top', model: 'Post-Synthesis' }
  *  (a behavioural model: null); a title with no module (iMPACT): { module: null, model: null }. */
 export function docDetail(title) {
@@ -150,7 +150,6 @@ export function setTask(t, { fromDoc = false } = {}) {
     if (want && want !== S.active) app.openDoc({ id: want.id });
     // the task's own page, cheap to open: the Design Summary, iMPACT
     else if (!want && S.project && t === 'impl') app.openSummary();
-    else if (!want && S.project && t === 'prog') app.openImpact();
   }
   apply();
 }

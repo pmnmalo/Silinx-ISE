@@ -75,7 +75,7 @@ uiTest('View ▸ Interface ▸ Modern: the task switcher in the header, the task
     bar: [...document.querySelectorAll('#task-bar [title]')].map((b) => b.title),
   }));
   assert.deepEqual(L, {
-    ui: 'modern', stored: 'modern', tasks: ['Design', 'Simulate', 'Emulate', 'Implement', 'Program'],
+    ui: 'modern', stored: 'modern', tasks: ['Design', 'Simulate', 'Emulate', 'Implement'],   // (no Program: Implement's, #1172)
     bar: ['Show or hide the side panel', 'Show or hide the messages', 'Maximize the document (double-click its tab)', 'Close', 'The test bench to simulate', "Open the test bench's source", 'The model to simulate', 'Check'],   // (Close: a single document's, #854; the test bench, #917, and the model, #800: Simulate's)
   });
   assert.ok(await shown(page, '#task-switch'));
@@ -140,14 +140,14 @@ uiTest('Tasks at 1366 × 768: each task its arrangement and documents, a task wi
   assert.deepEqual([s.task, s.side, s.console, s.empty], ['edit', 'open', 'open', false]);
   assert.ok(s.tabs.includes('top.vhd') && !s.tabs.some((t) => t.startsWith('SSim')), s.tabs.join());
   assert.ok(await shown(page, '.doc:not([hidden]) .cm-editor'));
-  // Implement: the Design Summary opens by itself; Program: iMPACT
+  // Implement: the Design Summary opens by itself; iMPACT opens there too, beside it (#1172: no Program task)
   await page.click('#task-switch .task-btn[data-task="impl"]');
   await page.waitFor(() => document.querySelector('#doc-tabs > .tab.active')?.textContent.includes('Design Summary'), [], { what: 'the Design Summary' });
   assert.deepEqual((await state(page)).tabs, ['Design Summary']);
-  await page.click('#task-switch .task-btn[data-task="prog"]');
+  await page.eval(() => window.SilinxApp.openImpact());
   await page.waitFor(() => document.querySelector('#doc-tabs > .tab.active')?.textContent.includes('iMPACT'), [], { what: 'iMPACT' });
   s = await state(page);
-  assert.deepEqual([s.task, s.side, s.console, s.tabs], ['prog', 'folded', 'open', []]);   // (iMPACT, its one document: no tab bar, #854)
+  assert.deepEqual([s.task, s.tabs], ['impl', ['Design Summary', 'iMPACT']]);
   // a document of another task brought to the front (the Window menu, a link…): its task comes to the front
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   await page.waitFor(() => document.documentElement.dataset.task === 'edit', [], { what: 'Edit in front' });
@@ -222,7 +222,7 @@ uiTest('Tasks in Portuguese: the switcher, the task\'s bar and its page translat
   await page.waitFor(() => document.querySelector('#task-switch .task-btn[data-task="sim"] .lbl').textContent === 'Simular', [], { what: 'Portuguese' });
   const pt = await texts();
   assert.deepEqual(untranslated(en, pt), ['@Design', 'Design'], 'Design: the task\'s name in Portuguese too (#1046), its text and its tooltip');
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#task-switch .lbl')].map((l) => l.textContent)), ['Design', 'Simular', 'Emular', 'Implementar', 'Programar']);   // (Design: not "Projeto", the Project menu's, #1046)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#task-switch .lbl')].map((l) => l.textContent)), ['Design', 'Simular', 'Emular', 'Implementar']);   // (Design: not "Projeto", the Project menu's, #1046)
   assert.equal(await page.eval(() => document.querySelector('#task-empty p').textContent), 'Abra uma fonte no painel Projeto, ou verifique o projeto.');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#mc-filters .filt')].map((b) => b.textContent)),
     ['Todas', 'Projeto', 'Simulação', 'Emulação', 'Implementação']);
@@ -255,7 +255,7 @@ uiTest('#839 Tasks in a development build: with the Development menu, in Portugu
     };
   });
   // English, a lab desktop's width: every label
-  assert.deepEqual(await fit(page), { fit: '', labels: ['edit', 'sim', 'emu', 'impl', 'prog'], inside: true });
+  assert.deepEqual(await fit(page), { fit: '', labels: ['edit', 'sim', 'emu', 'impl'], inside: true });
   assert.deepEqual(await noOverflow(page), { page: true, over: [] });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor(() => [...document.querySelectorAll('#menubar .item')].some((e) => e.textContent.trim() === 'Desenvolvimento'), [], { what: 'Portuguese' });
@@ -280,18 +280,18 @@ uiTest('#839 Tasks in a development build: with the Development menu, in Portugu
   }
   assert.ok(current, 'a width where only the current task\'s label shows');
   assert.deepEqual((await fit(page)).labels, ['edit']);
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#task-switch .task-btn')].map((b) => b.title)), ['Design', 'Simular', 'Emular', 'Implementar', 'Programar']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#task-switch .task-btn')].map((b) => b.title)), ['Design', 'Simular', 'Emular', 'Implementar']);
   // with room again (a lab desktop): every label
   await page.setViewport(1920, 1080);
   await page.waitFor(() => document.getElementById('topbar').dataset.fit === '', [], { what: 'every label' });
-  assert.deepEqual((await fit(page)).labels, ['edit', 'sim', 'emu', 'impl', 'prog']);
+  assert.deepEqual((await fit(page)).labels, ['edit', 'sim', 'emu', 'impl']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await makeProject(env, { name: 'TasksDev', template: 'gates' });
   await page.openProject('TasksDev');
   await noWarnings(page);
 }, { build: FULL });
 
-// #854: Simulate, Emulate and Program have one document each (a new one replaces the old): no tab bar there; the
+// #854: Simulate and Emulate have one document each (iMPACT Implement's, among its documents, #1172) (a new one replaces the old): no tab bar there; the
 // document's module and model, and its close, in the task's bar; Edit keeps its tabs
 const docInfo = (page) => page.eval(() => {
   const vis = (e) => !!e && e.getClientRects().length > 0;
@@ -326,10 +326,6 @@ uiTest('#854 Tasks: no tab bar in a task with a single document; its module and 
   await page.waitFor(() => !window.SilinxApp.findDoc('emulator'), [], { what: 'the emulator closed' });
   assert.deepEqual(await docInfo(page), { tabs: false, info: null });
   assert.ok(await shown(page, '#task-empty'));
-  // Program: iMPACT, named by its title
-  await page.click('#task-switch .task-btn[data-task="prog"]');
-  await page.waitFor(() => !!window.SilinxApp.findDoc('impact'), [], { what: 'iMPACT' });
-  assert.deepEqual(await docInfo(page), { tabs: false, info: ['iMPACT'] });
   // in Portuguese: the model's name
   await page.click('#task-switch .task-btn[data-task="sim"]');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
@@ -774,14 +770,15 @@ uiTest('#802 Tasks ▸ Implement: the top\'s Processes, the Design Summary as ca
   await page.click('#task-switch .task-btn[data-task="impl"]');
   await page.eval(() => window.SilinxApp.openSummary());
   await page.waitFor(() => window.SilinxApp.S.active?.id === 'summary', [], { what: 'the summary' });
+  // (iMPACT opens in Implement: no Program task, #1172)
   await page.click('.doc:not([hidden]) .task-program button');
-  await page.waitFor(() => document.documentElement.dataset.task === 'prog' && !!window.SilinxApp.findDoc('impact'), [], { what: 'Program' });
+  await page.waitFor(() => document.documentElement.dataset.task === 'impl' && window.SilinxApp.S.active?.id === 'impact', [], { what: 'iMPACT in Implement' });
   // in Portuguese: the link
-  await page.click('#task-switch .task-btn[data-task="impl"]');
+  await page.eval(() => window.SilinxApp.openSummary());
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-program button')?.textContent === 'Programar a placa…', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  // the modern interface: the summary's tables as before, no link; its tree and its views
+  // the classic interface: the summary's tables as before, no link; its tree and its views
   await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.ok(!(await shown(page, '.doc:not([hidden]) .task-program')));
@@ -792,12 +789,15 @@ uiTest('#802 Tasks ▸ Implement: the top\'s Processes, the Design Summary as ca
 
 // #803: Program arranges iMPACT: the chain and Program FPGA / PROM; the board's tool and cable folded away; every
 // operation of the PROM shown, no More… (#1025); the programming file's state no line of its own (Program FPGA asks: #1024)
-uiTest('#803 Tasks ▸ Program: the chain and Program; settings folded; every PROM operation shown', E, async (page) => {
+// (#1172: iMPACT in Implement, the Program task gone)
+uiTest('#803 #1172 Tasks ▸ Implement ▸ iMPACT: the chain and Program; settings folded; every PROM operation shown', E, async (page) => {
   await makeProject(env, { name: 'TasksProg', template: 'blinky' });
   await page.setViewport(1366, 768);
   await tasksInterface(page);
   await page.openProject('TasksProg');
-  await page.click('#task-switch .task-btn[data-task="prog"]');
+  await page.click('#task-switch .task-btn[data-task="impl"]');
+  await page.eval(() => window.SilinxApp.openImpact());
+  await page.waitFor(() => document.documentElement.dataset.task === 'impl', [], { what: 'in Implement' });
   await page.waitFor(() => !!document.querySelector('.doc:not([hidden]) .task-prog-settings'), [], { what: 'iMPACT arranged' });
   const P = () => page.eval(() => {
     const p = document.querySelector('.doc:not([hidden]) > .page'), vis = (s) => !!p.querySelector(s)?.getClientRects().length;
@@ -831,7 +831,7 @@ uiTest('#803 Tasks ▸ Program: the chain and Program; settings folded; every PR
 
 // #876: the activity bar (Start, Design, Files, Libraries) is Edit's: none in the other tasks; Implement's side panel
 // its Processes whichever page Edit left in front; Program no side panel
-uiTest('#876 Tasks: the activity bar in Edit only; Implement\'s Processes whatever page Edit left; Program no side panel', E, async (page) => {
+uiTest('#876 Tasks: the activity bar in Edit only; Implement\'s Processes whatever page Edit left', E, async (page) => {
   await makeProject(env, { name: 'TasksBar', template: 'gates' });
   await page.setViewport(1366, 768);
   await tasksInterface(page);
@@ -855,8 +855,6 @@ uiTest('#876 Tasks: the activity bar in Edit only; Implement\'s Processes whatev
   }
   await page.click('#task-switch .task-btn[data-task="impl"]');
   assert.deepEqual(await L(), { bar: true, left: true, side: true, procs: true, files: false }, 'Implement: its Processes (under their tab, #1160), not the Files page');
-  await page.click('#task-switch .task-btn[data-task="prog"]');
-  assert.deepEqual(await L(), { bar: false, left: false, side: false, procs: false, files: false }, 'Program: no side panel');
   // back to Edit: its Files page as it was left
   await page.click('#task-switch .task-btn[data-task="edit"]');
   assert.deepEqual(await L(), { bar: true, left: true, side: true, procs: false, files: true });
@@ -982,10 +980,10 @@ uiTest('#917 Tasks ▸ Simulate: no test bench, the wizard from its page; the te
   await noWarnings(page);
 }, { build: DEV });
 
-// #923: Implement lists the implementation's processes only (Emulate on Board and Configure Target Device are the Emulate
-// and Program tasks'); the Design Summary's cards, their captions with them, never overlap
+// #923: Implement lists the implementation's processes only (Emulate on Board is the Emulate task's; Configure Target
+// Device Implement's since #1172, no Program task); the Design Summary's cards, their captions with them, never overlap
 const procRows = (page) => page.eval(() => [...document.querySelectorAll('#procs .lbl')].filter((l) => l.getClientRects().length).map((l) => l.textContent));
-uiTest('#923 Tasks ▸ Implement: no Emulate or Configure processes; the Design Summary\'s cards do not overlap', E, async (page) => {
+uiTest('#923 #1172 Tasks ▸ Implement: no Emulate processes, Configure Target Device there; the Design Summary\'s cards do not overlap', E, async (page) => {
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'TasksCards', template: 'vga' });
   await tasksInterface(page);
@@ -995,8 +993,8 @@ uiTest('#923 Tasks ▸ Implement: no Emulate or Configure processes; the Design 
   await page.waitFor(() => document.getElementById('proc-caption')?.textContent === 'Processes: vga', [], { what: 'the top\'s processes' });
   let procs = await procRows(page);
   assert.ok(procs.includes('Generate Programming File') && procs.includes('Generate Post-Synthesis Simulation Model'), procs.join(', '));
-  for (const p of ['Emulate on Board', 'Emulate Behavioral Model (RTL)', 'Emulate Post-Synthesis Model', 'Configure Target Device', 'Manage Configuration Project (iMPACT)'])
-    assert.ok(!procs.includes(p), `${p} in Implement`);
+  for (const p of ['Emulate on Board', 'Emulate Behavioral Model (RTL)', 'Emulate Post-Synthesis Model']) assert.ok(!procs.includes(p), `${p} in Implement`);
+  for (const p of ['Configure Target Device', 'Manage Configuration Project (iMPACT)']) assert.ok(procs.includes(p), `${p} in Implement`);
   // no card over another, its caption included, at every width from a tablet's to a lab desktop's
   const overlaps = () => page.eval(() => {
     const boxes = [...document.querySelectorAll('.doc:not([hidden]) .summary-table')].map((t) => {

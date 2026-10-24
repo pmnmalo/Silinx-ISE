@@ -1,4 +1,4 @@
-// The Tasks interface's Program task (#803, #782): iMPACT (web/js/impact.js) arranged for the task.
+// iMPACT (web/js/impact.js) arranged for the Tasks interface (#803, #782), in Implement (#1172: no Program task).
 // - The chain, Initialize Chain, and Program FPGA or Program PROM (as the chip selected in the chain), each with
 //   its line, and every operation of the PROM (Verify, Erase, Back up, Reload: no More…, #1025). (Program FPGA offers
 //   to implement the design when its programming file is not up to date, in every interface: #1024.)
@@ -10,10 +10,11 @@
 import { h } from './ui.js';
 
 const ADDED = ['task-prog-settings'];   // (the classes of the elements added)
-/** Arranges each open iMPACT page for the Program task (`on`), or puts it back. */
+/** Arranges each open iMPACT page for the Tasks interface (`on`; its document .task-impact), or puts it back. */
 export function arrangeProgram(on) {
-  for (const page of document.querySelectorAll('#workspace .doc[data-task="prog"] > .page')) {
+  for (const page of document.querySelectorAll('#workspace .doc > .page')) {
     if (!page.querySelector('.impact-chain')) continue;
+    page.parentNode.classList.toggle('task-impact', on);
     if (!on) { for (const c of ADDED) page.querySelectorAll(`.${c}`).forEach(e => e.remove()); page.classList.remove('settings-open'); continue; }
     if (!page.querySelector('.task-prog-settings')) {
       page.querySelector('.imp-settings')?.before(h('button', { class: 'btn task-prog-settings', type: 'button', onclick: () => page.classList.toggle('settings-open') },

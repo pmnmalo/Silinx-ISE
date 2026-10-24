@@ -474,15 +474,14 @@ class PageBase {
       const done = await this.tasksTreeRow(container, label, { dbl, exact, right });
       if (done) return;
     }
-    const idx = await this.waitFor((c, l, ex) => {
-      const rows = [...document.querySelectorAll(`${c} .row`)].filter((r) => r.getClientRects().length);
-      const i = rows.findIndex((r) => { const t = r.querySelector('.lbl')?.textContent?.trim() || ''; return ex ? t === l : t === l || t.startsWith(l); });
-      return i >= 0 ? i + 1 : 0;
-    }, [container, label, exact], { what: `tree row '${label}' in ${container}` });
-    // (on its name: the badges after it open the module's views, #207)
+    // its name's index among all the rows' names (on its name: the badges after it open the module's views, #207),
+    // found in one go (the list may be drawn again between two looks)
+    const absolute = await this.waitFor((c, l, ex) => {
+      const row = [...document.querySelectorAll(`${c} .row`)].filter((r) => r.getClientRects().length)
+        .find((r) => { const t = r.querySelector('.lbl')?.textContent?.trim() || ''; return ex ? t === l : t === l || t.startsWith(l); });
+      return row ? [...document.querySelectorAll(`${c} .row .lbl`)].indexOf(row.querySelector('.lbl')) + 1 : 0;
+    }, [container, label, exact], { what: `tree row '${label}' in ${container}` }) - 1;
     const sel = `${container} .row .lbl`;
-    // index among visible rows
-    const absolute = await this.eval((c, k) => { const all = [...document.querySelectorAll(`${c} .row`)]; const vis = all.filter((r) => r.getClientRects().length); return [...document.querySelectorAll(`${c} .row .lbl`)].indexOf(vis[k - 1].querySelector('.lbl')); }, container, idx);
     if (dbl) return this.dblclick(sel, { index: absolute });
     if (right) return this.rightClick(sel, { index: absolute });
     return this.click(sel, { index: absolute });
@@ -490,7 +489,8 @@ class PageBase {
   // (the modern interface: a row shown is clicked as it is; one not shown acted on; false: none, waited for as before)
   async tasksTreeRow(container, label, { dbl, exact, right }) {
     const isShown = () => this.eval((c, l, ex) => [...document.querySelectorAll(`${c} .row`)].some((r) => r.getClientRects().length && ((t) => (ex ? t === l : t === l || t.startsWith(l)))(r.querySelector('.lbl')?.textContent?.trim() || '')), container, label, exact);
-    if (await isShown()) return false;
+    // (a Processes row: acted on where the list has it, shown or not, its task coming and going under the test)
+    if (container !== '#procs' && await isShown()) return false;
     // (the hierarchy: Design's page; its row there clicked as it is)
     if (container === '#hier') {
       const inTree = await this.eval((l, ex) => [...document.querySelectorAll('#hier .row')].some((r) => ((t) => (ex ? t === l : t === l || t.startsWith(l)))(r.querySelector('.lbl')?.textContent?.trim() || '')), label, exact);
