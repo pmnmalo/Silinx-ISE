@@ -370,6 +370,8 @@ const PT_PATTERNS = [
   [/^Pointers down at once: (\d+) \(most: (\d+)\)$/, 'Ponteiros premidos ao mesmo tempo: $1 (máximo: $2)'],
   [/^This Build on GitHub \(commit (\w+)\)$/, 'Esta Versão no GitHub (commit $1)'], [/^Open Issue #(\d+) on GitHub$/, 'Abrir a Issue #$1 no GitHub'],
   // the tip of a drawing's link banner, shortened on a narrow screen (#266)
+  // the HDL editor's banner of a file generated from a drawing, out of sync (#1176)
+  [/^— the (schematic|state machine|Petri net) has errors: ([\s\S]*)$/, (m, w, why) => `— ${{ schematic: 'o esquemático tem', 'state machine': 'a máquina de estados tem', 'Petri net': 'a rede de Petri tem' }[w]} erros: ${why}`],
   [/^HDL: (\S+) — generated from the (diagram|net|table)$/, (m, f, w) => `HDL: ${f} — gerado a partir ${{ diagram: 'do diagrama', net: 'da rede', table: 'da tabela' }[w]}`],
   // a process run on the top module while another module is selected (#223)
   [/^(.+) (implements|synthesizes|emulates) the top module '(.+)', not the selected module '(.+)'\.$/,
@@ -445,6 +447,8 @@ const PT_PATTERNS = [
 for (const k of Object.keys(PT)) { const tk = k.trim(); if (tk !== k) { if (!(tk in PT)) PT[tk] = PT[k].trim(); delete PT[k]; } }
 Object.assign(PT, {
   'Not in sync with': 'Não sincronizado com', 'Generated from': 'Gerado a partir de', 
+  // the HDL editor's banner of a file generated from a drawing (#1176)
+  'Read-only, generated from': 'Só de leitura, gerado a partir de', 'Read-only, not in sync with': 'Só de leitura, não sincronizado com',
   
   
   

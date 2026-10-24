@@ -1,5 +1,5 @@
 // The truth tables (#405: out of drawings.js): a table (.tt.json) opened in its editor and kept in sync with its HDL
-// module both ways, the module a table is read back from, a table loaded from a module, and the table's schematic
+// module (the table its base, #1176), the module a table is read back from, a table loaded from a module, and the table's schematic
 // view (#694).
 import { S, activateDoc, compileProject, findDoc, flushDoc, openDoc, openFile, setDirty, status } from './app.js';
 import { alertDlg, confirmDlg, dialog, h, popupMenu, toast } from './ui.js';
@@ -12,10 +12,9 @@ import {
   clashItem, drawnHdlLanguage, freshHdl, refreshOpenEditor, refreshSyncBanner, setViewAsTop, staleHdl
 } from './drawings.js';
 
-// ---- truth tables (.tt.json): table <-> HDL module, synchronized like ASM charts
-// The generated HDL module is linked by generatedFile: every change of the table rewrites it, and a
-// saved edit of the HDL updates the table (exhaustive simulation of the module, don't cares kept
-// in its "don't care:" comments). Truth Table / Karnaugh Map editor: truthtable.js; logic: core/logic.js.
+// ---- truth tables (.tt.json): table -> HDL module, synchronized like ASM charts
+// The generated HDL module is linked by generatedFile: every change of the table rewrites it (its HDL
+// file is read-only, #1176). Truth Table / Karnaugh Map editor: truthtable.js; logic: core/logic.js.
 const ttDesignSources = () => S.sources.filter(s => s.role === 'design' && (s.lang === 'vhdl' || s.lang === 'verilog'));
 
 export async function openTt(path) {
@@ -81,35 +80,6 @@ export async function syncHdlFromTt(ttPath, model) {
   } finally { S.syncing = false; }
 }
 
-// a saved edit of the linked HDL: the table follows (exhaustive simulation of the module)
-export async function syncTtFromHdl(hdlPath, { quiet = false } = {}) {
-  const ttPath = S.hdlToSch[hdlPath];
-  S.outOfSync ||= {};
-  const fail = why => {
-    if (S.outOfSync[hdlPath] !== why && !quiet) log(`WARNING: ${ttPath} not updated: ${why}`, 'warn');
-    S.outOfSync[hdlPath] = why; refreshSyncBanner(hdlPath); refreshTtLink(ttPath);
-    status(`${ttPath.split('/').pop()} not updated: ${why}`);
-  };
-  const errs = [...(S.lib?.errors || [])].filter(d => d.severity === 'error' && d.file === hdlPath);
-  if (errs.length) return fail(`${hdlPath.split('/').pop()} has errors`);
-  let old;
-  try { old = JSON.parse(await api.readFile(S.project.name, ttPath)); } catch { return; }
-  let next;
-  try { next = await ttFromHdl(hdlPath, old); } catch (e) { return fail(e.message); }
-  const { normalizeTable } = await import('/core/logic.js');
-  if (S.outOfSync[hdlPath]) { delete S.outOfSync[hdlPath]; refreshSyncBanner(hdlPath); }
-  if (JSON.stringify(next) !== JSON.stringify(normalizeTable(old))) {
-    S.syncing = true;
-    try {
-      await api.writeFile(S.project.name, ttPath, JSON.stringify(next, null, 2));
-      const d = findDoc(`tt:${ttPath}`);
-      if (d?.ttEditor && !d.dirty) d.ttEditor.setModel(next);
-      refreshTtSchematic(ttPath, next);
-      status(`${ttPath.split('/').pop()} updated from ${hdlPath.split('/').pop()}`);
-    } finally { S.syncing = false; }
-  }
-  refreshTtLink(ttPath);
-}
 // the table `old` made again from its HDL module (by exhaustive simulation of it, the don't cares
 // written in its comments kept); throws why it cannot be
 export async function ttFromHdl(hdlPath, old) {

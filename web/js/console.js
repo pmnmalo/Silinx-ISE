@@ -105,7 +105,8 @@ onLanguageChange(() => renderDiagnostics());
 const fixModules = () => S.modules.map(m => ({ name: m.name, ports: (m.portList || []).map(p => p.name), params: m.paramList || [] }));
 function diagFixes(d) {
   const src = d.file && S.sources.find(s => s.path === d.file);
-  if (!src || src.view || (src.lang !== 'vhdl' && src.lang !== 'verilog')) return [];   // (not a drawing's generated HDL)
+  // (not a drawing's generated HDL, with a file of its own or not: read-only, #1176)
+  if (!src || src.view || S.hdlToSch?.[src.path] || (src.lang !== 'vhdl' && src.lang !== 'verilog')) return [];
   const text = S.docs.find(o => o.path === d.file && o.editor)?.editor.getValue() ?? src.text;
   try { return quickFixes(text, src.lang, d, { modules: fixModules() }).slice(0, 3); } catch { return []; }
 }

@@ -108,6 +108,8 @@ async function reloadProjectNow(render = true, depth = 0) {
   await drawnHdlClashes();
   // the open drawings show their links as they are now (one linked meanwhile, #245)
   for (const d of S.docs) (d.ttEditor || d.fsmEditor || d.petriEditor)?.refreshLink?.();
+  // the open HDL editors: read-only when their file is generated from a drawing (#1176)
+  for (const d of S.docs) d.applyReadOnly?.();
   updateTitle();
   renderHierarchy();
   renderFilesPage();

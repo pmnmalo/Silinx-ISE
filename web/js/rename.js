@@ -17,9 +17,9 @@ export function renameSymbolIn(d, lang, path) {
   const findModule = name => S.modules.find(m => m.name.toLowerCase() === String(name).toLowerCase());
   return renameSymbolAtCursor({
     editor: d.editor, lang, path,
-    // (not the HDL generated from a drawing without a file of its own: it follows the drawing)
-    sources: () => S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && !s.view).map(s => ({ ...s, text: S.docs.find(o => o.path === s.path && o.editor)?.editor.getValue() ?? s.text })),
-    drawings: () => S.sources.filter(s => s.view),
+    // (not the HDL generated from a drawing, with a file of its own or not: it follows the drawing, read-only, #1176)
+    sources: () => S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && !s.view && !S.hdlToSch?.[s.path]).map(s => ({ ...s, text: S.docs.find(o => o.path === s.path && o.editor)?.editor.getValue() ?? s.text })),
+    drawings: () => S.sources.filter(s => s.view || S.hdlToSch?.[s.path]).map(s => (s.view ? s : { ...s, path: S.hdlToSch[s.path] })),
     isModule: name => !!findModule(name),
     renameModule: name => renameDialog(findModule(name)?.file || path, findModule(name)?.name || name),
     // an open file is edited in its editor (its own Undo); the others are written

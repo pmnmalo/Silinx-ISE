@@ -1,7 +1,7 @@
 // UI: Truth Table / Karnaugh Map tool. A new table (Tools menu ▸ New Source wizard), cells clicked,
 // the K-map groups and the minimal SOP shown; its VHDL module (made with it, linked: a cell change
-// rewrites the HDL, which simulates to the new table; a saved edit of the HDL updates the table; a
-// sequential edit shows the out-of-sync banner); its schematic, always generated, a badge of its row
+// rewrites the HDL, which simulates to the new table; the HDL read-only, its editor's banner linking to
+// the table, #1176); its schematic, always generated, a badge of its row
 // in the Design pane, in the HDL logic form, NAND gates only too (#694: netlist without errors,
 // simulates to the table; no Generate Schematic, no Check my answer); renaming the module keeps the
 // link; Truth Table from Module; Apply of the input / output names; a Verilog project's table: its
@@ -36,7 +36,7 @@ const ttFile = async (pj, p) => JSON.parse(await readWs(env, pj, p));
 const ttSchematic = (page, tt) => page.eval((p) => window.Silinx.docs.find((d) => d.id === `ttsch:${p}`)?.viewer?.getDoc() || null, tt);
 const symTypes = (sch) => [...new Set(sch.symbols.map((x) => x.type))].sort();
 
-uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module kept in sync both ways, its schematic in the hierarchy (NAND gates only), rename', E, async (page) => {
+uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module following it (read-only, #1176), its schematic in the hierarchy (NAND gates only), rename', E, async (page) => {
   await makeProject(env, { name: 'TtPj', files: { 'src/add1.vhd': ADDER } });
   await page.openProject('TtPj');
   await page.menu('Tools', 'Truth Table / Karnaugh Map…');
@@ -100,8 +100,9 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module kept in
   // schematic (#694), the HDL (#207)
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => /maj3/.test(r.textContent) && /maj3\.tt\.json/.test(r.textContent)), [], { what: 'maj3 (maj3.tt.json) in the hierarchy' });
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#hier .row')].filter((r) => r.querySelector('.lbl').textContent === 'maj3').map((r) => [...r.querySelectorAll('.badge')].map((b) => `${b.textContent}${b.classList.contains('base') ? '*' : ''}`))), [['Table*', 'Schematic', 'VHDL']]);
-  // the HDL editor (opened) shows the banner
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/maj3.vhd' && (() => { const b = document.querySelector('.doc:not([hidden]) [data-sync-banner]'); return !!b && b.hidden && b.textContent === ''; })(), [], { what: 'HDL editor banner' });
+  // the HDL editor (opened) is read-only, its banner says so and links to the table (#1176)
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/maj3.vhd' && /^Read-only, generated from maj3\.tt\.json$/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'HDL editor banner' });
+  assert.equal(await page.eval(() => window.Silinx.active.editor.readOnly()), true);
 
   // ---- table -> HDL: a cell change rewrites the module
   await page.eval(() => window.SilinxApp.openTt('src/maj3.tt.json'));
@@ -116,27 +117,12 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module kept in
   await page.click(`${T} .tt-cell[data-out=f][data-row="1"]`);       // row 1 = X
   await page.waitFor(async () => /don't care: f = d\(1\)/.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'don\'t care in the HDL' });
 
-  // ---- HDL -> table: a saved edit of the module updates the table (don't cares kept)
-  await page.eval(() => window.SilinxApp.openFile('src/maj3.vhd'));
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/maj3.vhd' && window.Silinx.active.editor);
-  await page.eval(() => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().replace(/ {4}f <= .*;/, '    f <= a xor b xor c;')); });
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.tt.json')).json()).table.f === '0X101001', [], { what: 'table updated from the HDL', timeout: 15000 });
-  // the open table shows it
-  await page.eval(() => window.SilinxApp.openTt('src/maj3.tt.json'));
-  await page.waitFor((t) => [...document.querySelectorAll(`${t} .tt-cell[data-out=f]`)].map((c) => c.textContent).join('') === '0X101001', [T], { what: 'editor updated' });
-  // a sequential module cannot be a truth table: out-of-sync banner with the reason
-  await page.eval(() => window.SilinxApp.openFile('src/maj3.vhd'));
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/maj3.vhd');
-  await page.eval(() => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().replace(/ {4}f <= .*;/, '    f <= a when rising_edge(b);')); });
-  await page.waitFor(() => /Not in sync with maj3\.tt\.json — 'maj3' is sequential/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'out-of-sync banner', timeout: 15000 });
-  assert.equal((await ttFile('TtPj', 'src/maj3.tt.json')).table.f, '0X101001');
-  // editing the table again rewrites the HDL: back in sync
-  await page.eval(() => window.SilinxApp.openTt('src/maj3.tt.json'));
-  await page.waitFor((t) => /Not in sync with maj3\.vhd/.test(document.querySelector(`${t} .tt-link`).textContent), [T]);
-  await page.click(`${T} .tt-cell[data-out=f][data-row="7"]`);       // 1 -> X
-  await page.waitFor((t) => /^HDL: maj3\.vhd — generated from the table$/.test(document.querySelector(`${t} .tt-link`).textContent), [T], { what: 'back in sync', timeout: 15000 });
-  // (the link says so as the HDL is written: the file on the disk a moment later)
-  for (let k = 0; /rising_edge/.test(vhd = await readWs(env, 'TtPj', 'src/maj3.vhd')) && k < 100; k++) await new Promise((r) => setTimeout(r, 100));
+  // ---- the table edited further, the HDL follows (it is not edited: read-only, #1176): f = 0X10100X
+  // (a cell goes 0 -> 1 -> X -> 0)
+  for (const [row, n] of [[0, 2], [2, 1], [3, 2], [4, 1], [5, 2], [6, 2], [7, 1]]) for (let k = 0; k < n; k++) await page.click(`${T} .tt-cell[data-out=f][data-row="${row}"]`);
+  assert.equal(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-cell[data-out=f]`)].map((c) => c.textContent).join(''), T), '0X10100X');
+  await page.waitFor(async () => /don't care: f = d\(1, 7\)/.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'HDL regenerated', timeout: 15000 });
+  vhd = await readWs(env, 'TtPj', 'src/maj3.vhd');
   const sim = simTable(vhd, 'maj3.vhd', 'maj3').f;
   assert.ok([...'0X10100X'].every((c, i) => c === 'X' || c === sim[i]), sim);
 
@@ -189,7 +175,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module kept in
   assert.match(await readWs(env, 'TtPj', 'src/maj4.vhd'), /entity maj4 is/);
 });
 
-uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6, its K-map and SOP, the table scrolls, linked VHDL and schematic; an old project\'s generated schematic kept (#694)', E, async (page) => {
+uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6, its K-map and SOP, the table scrolls, linked VHDL (read-only, #1176) and schematic; an old project\'s generated schematic kept (#694)', E, async (page) => {
   const four = { version: 1, name: 'many', inputs: ['a', 'b', 'c'], outputs: ['y0', 'y1', 'y2', 'y3'], table: { y0: '00000001', y1: '01111111', y2: '01101001', y3: '00010111' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
   // a schematic made by the former Generate Schematic (#694): a module of its own, not linked to the table
   const old = schematicFromTable(four, { form: 'nand', name: 'many_sch' });
@@ -242,7 +228,7 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   assert.deepEqual(saved.outputs, outs);
   assert.deepEqual([saved.table.y3, saved.table.y5, saved.table.y15, saved.table.y9], ['00010111', '1X000011', '00100000', '00000000']);
 
-  // ---- its VHDL module (linked, following it): 16 outputs, simulates to the table; an HDL edit of output 6 comes back
+  // ---- its VHDL module (linked, following it, read-only: #1176): 16 outputs, simulates to the table
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/many.vhd'] === 'src/many.tt.json', [], { what: 'linked HDL' });
   await page.waitFor(async () => /y15 = Σm\(2\)/.test(await (await fetch('/api/projects/TtMany/file?path=src%2Fmany.vhd')).text()), [], { what: 'the HDL follows the table', timeout: 15000 });
   const vhd = await readWs(env, 'TtMany', 'src/many.vhd');
@@ -256,14 +242,11 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   const st = simTable(vhd, 'many.vhd', 'many');
   assert.deepEqual(Object.keys(st), outs);
   assert.deepEqual([st.y3, st.y5, st.y15, st.y9], ['00010111', '11000011', '00100000', '00000000']);
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/many.vhd' && window.Silinx.active.editor, [], { what: 'HDL editor' });
-  await page.eval(() => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().replace(/ {4}y5 <= .*;/, '    y5 <= a xor c;')); });
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtMany/file?path=src%2Fmany.tt.json')).json()).table.y5 === '0X011010', [], { what: 'table updated from the HDL', timeout: 15000 });
-  assert.deepEqual((await ttFile('TtMany', 'src/many.tt.json')).outputs, outs);
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/many.vhd' && window.Silinx.active.editor?.readOnly(), [], { what: 'HDL editor, read-only' });
 
   // ---- its schematic (#694), from its row's badge: 16 output markers, simulates to the table
   await page.eval(() => window.SilinxApp.openTt('src/many.tt.json'));
-  await page.waitFor((t) => window.Silinx.active?.id === 'tt:src/many.tt.json' && [...document.querySelectorAll(`${t} .tt-cell[data-out=y5]`)].map((c) => c.textContent).join('') === '0X011010', [T], { what: 'editor updated' });
+  await page.waitFor((t) => window.Silinx.active?.id === 'tt:src/many.tt.json' && [...document.querySelectorAll(`${t} .tt-cell[data-out=y5]`)].map((c) => c.textContent).join('') === '1X000011', [T], { what: 'the table' });
   await page.eval(() => { const r = [...document.querySelectorAll('#hier .row')].find((e) => e.querySelector('.lbl').textContent === 'many'); [...r.querySelectorAll('.badge')].find((b) => b.textContent === 'Schematic').click(); });
   await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/many.tt.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
   const sch = await ttSchematic(page, 'src/many.tt.json');
@@ -272,7 +255,7 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   assert.deepEqual(sch.ports.filter((p) => p.dir === 'out').map((p) => p.name), outs);
   const ss = simTable(generateHdl(sch).code, 'many.vhd', 'many');
   assert.deepEqual([ss.y3, ss.y15, ss.y9], ['00010111', '00100000', '00000000']);
-  assert.ok([...'0X011010'].every((c, i) => c === 'X' || c === ss.y5[i]), ss.y5);
+  assert.ok([...'1X000011'].every((c, i) => c === 'X' || c === ss.y5[i]), ss.y5);
   // the old schematic unchanged
   assert.deepEqual(JSON.parse(await readWs(env, 'TtMany', 'src/many_sch.sch.json')).symbols.map((x) => x.type), old.symbols.map((x) => x.type));
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
@@ -397,7 +380,7 @@ uiTest('Truth Table (#196): Apply input / output names (columns follow their nam
   const t1 = await ttFile('TtVlog', 'src/tv.tt.json');
   assert.deepEqual([t1.generatedFile, t1.lang], ['src/tv.v', 'verilog']);
   await page.eval(() => window.SilinxApp.openFile('src/tv.v'));
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/tv.v' && (() => { const b = document.querySelector('.doc:not([hidden]) [data-sync-banner]'); return !!b && b.hidden && b.textContent === ''; })(), [], { what: 'Verilog editor banner' });
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/tv.v' && /^Read-only, generated from tv\.tt\.json$/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'Verilog editor banner' });
   // a cell change rewrites the Verilog
   await page.eval(() => window.SilinxApp.openTt('src/tv.tt.json'));
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/tv.tt.json');

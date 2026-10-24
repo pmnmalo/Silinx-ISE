@@ -228,14 +228,17 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
   await setField(page, 'Outputs', 'busy, ready');
   await untilWs('PnSim', 'src/ctl.vhd', (t) => /ready : out std_logic/.test(t), 'the HDL file follows the net');
   assert.equal((await saved('PnSim')).generatedFile, 'src/ctl.vhd');
-  // an edit of the HDL file saved: the net stays as it is, and no warning (it was read as a schematic, #222)
-  const net = await readWs(env, 'PnSim', 'src/ctl.pn.json');
+  // the HDL file is read-only (#1176): typed text changes nothing, the net and the file stay as they are, and no
+  // warning (it was read as a schematic, #222)
+  const net = await readWs(env, 'PnSim', 'src/ctl.pn.json'), hdl = await readWs(env, 'PnSim', 'src/ctl.vhd');
   await page.eval(() => window.SilinxApp.openFile('src/ctl.vhd'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/ctl.vhd' && window.Silinx.active.editor);
-  assert.equal(await page.eval(() => (() => { const b = document.querySelector('.doc:not([hidden]) [data-sync-banner]'); return !!b && b.hidden && b.textContent === ''; })()), true, 'in sync: no banner (#224)');
-  await page.eval(() => { const ed = window.Silinx.active.editor; ed.setValue(`-- a note\n${ed.getValue()}`); });
-  await page.waitFor(async () => (await (await fetch('/api/projects/PnSim/file?path=src%2Fctl.vhd')).text()).startsWith('-- a note\n'), [], { what: 'the HDL saved', timeout: 15000 });
+  assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) [data-sync-banner]').textContent), 'Read-only, generated from ctl.pn.json');
+  await page.click('.doc:not([hidden]) .cm-content');
+  await page.type('-- a note\n');
   await new Promise((r) => setTimeout(r, 1000));
+  assert.equal(await page.eval(() => window.Silinx.active.editor.getValue()), hdl);
+  assert.equal(await readWs(env, 'PnSim', 'src/ctl.vhd'), hdl);
   assert.equal(await readWs(env, 'PnSim', 'src/ctl.pn.json'), net);
   assert.doesNotMatch(await page.consoleText(), /WARNING|not synchronized/);
 });

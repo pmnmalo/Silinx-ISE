@@ -257,13 +257,17 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
   // ---- quick fixes of the errors (core/quickfix.js): in the lint tooltip, on a click on the
   // marker of the line, with Ctrl+. (Cmd+.) on the line; one undoable edit, then the lint runs again
   const modules = () => (project()?.modules || []).map(m => ({ name: m.name, ports: (m.portList || []).map(p => p.name), params: m.paramList || [] }));
-  const fixesOf = d => (d ? quickFixes(view.state.doc.toString(), lang, d, { modules: modules() }) : []);
+  // (a read-only editor, the HDL generated from a drawing (#1176): no fixes, no rename, no completion, no Tab)
+  const ro = () => view.state.readOnly;
+  const fixesOf = d => (d && !ro() ? quickFixes(view.state.doc.toString(), lang, d, { modules: modules() }) : []);
   const fixLabel = f => `${t('Fix:')} ${t(f.title)}`;
   /** Replace ranges [{ from: { line, ch }, to, text }] of the current text in one undoable step. */
   function replaceRanges(edits, userEvent = 'input') {
+    if (ro()) return;
     view.dispatch({ changes: edits.map(e => ({ from: offsetOf(e.from), to: offsetOf(e.to), insert: e.text })), userEvent });
   }
   function applyFix(fix) {
+    if (ro()) return;
     replaceRanges(fix.edits.map(e => ({ from: { line: e.line - 1, ch: e.col - 1 }, to: { line: (e.endLine ?? e.line) - 1, ch: (e.endCol ?? e.col) - 1 }, text: e.text })), 'input.quickfix');
     hideLintTip();
     view.focus();
@@ -328,6 +332,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
 
   // ---- keys
   function insertSoftTab(v) {
+    if (ro()) return true;
     const sel = v.state.selection.main;
     const col = sel.head - v.state.doc.lineAt(sel.head).from;
     v.dispatch(v.state.replaceSelection(' '.repeat(2 - (col % 2))), { userEvent: 'input' });
@@ -340,13 +345,13 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
     { key: 'Mod-f', run: openSearchPanel }, { key: 'Mod-Alt-f', run: openSearchPanel }, { key: 'Ctrl-h', run: openSearchPanel },
     { key: 'Cmd-g', run: findNext }, { key: 'Ctrl-g', run: gotoLinePanel },
     { key: 'F12', run: v => { gotoDef(getCursor()); return true; } },
-    { key: 'F2', run: () => { onRename?.(); return true; } },
-    { key: 'Mod-.', run: () => { showFixMenu(); return true; } },
+    { key: 'F2', run: () => { if (!ro()) onRename?.(); return true; } },
+    { key: 'Mod-.', run: () => { if (!ro()) showFixMenu(); return true; } },
     { key: 'Tab', run: v => (v.state.selection.ranges.some(r => !r.empty) ? indentMore(v) : insertSoftTab(v)), shift: indentLess },
   ];
 
   const lints = lang === 'vhdl' || lang === 'verilog' || lang === 'ucf';
-  const phrasing = new Compartment();
+  const phrasing = new Compartment(), readOnliness = new Compartment();
   view = new EditorView({
     parent: container,
     state: EditorState.create({
@@ -358,8 +363,8 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
         history(), drawSelection(), highlightActiveLine(), bracketMatching(), closeBrackets(),
         highlightSelectionMatches({ wholeWords: true }), search({ top: true }), flashField,
         languageOf(lang), syntaxHighlighting(highlighter), EditorView.editorAttributes.of({ class: 'xl-editor' }),
-        indentUnit.of('  '), EditorState.tabSize.of(2), EditorState.readOnly.of(readOnly), phrasing.of(EditorState.phrases.of(phrases())),
-        lang === 'vhdl' || lang === 'verilog' ? autocompletion({ override: [completions], icons: false, maxRenderedOptions: 200, addToOptions: [{ render: renderKind, position: 20 }] }) : [],
+        indentUnit.of('  '), EditorState.tabSize.of(2), readOnliness.of(EditorState.readOnly.of(readOnly)), phrasing.of(EditorState.phrases.of(phrases())),
+        lang === 'vhdl' || lang === 'verilog' ? autocompletion({ override: [ctx => (ro() ? null : completions(ctx))], icons: false, maxRenderedOptions: 200, addToOptions: [{ render: renderKind, position: 20 }] }) : [],
         keymap.of([...keys, ...closeBracketsKeymap, ...completionKeymap, ...searchKeymap, ...historyKeymap, ...defaultKeymap]),
         EditorView.updateListener.of(u => {
           if (u.docChanged) {
@@ -471,7 +476,10 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
     setDiagnostics(diags) { externalDiags = diags || []; lintNow(); },
     /** Lint the text again now (the parser's errors and the diagnostics of setDiagnostics). */
     lintNow,
-    insertText(s) { const at = view.state.selection.main.head; insertSnippet(s, at, at); view.focus(); },
+    insertText(s) { if (ro()) return; const at = view.state.selection.main.head; insertSnippet(s, at, at); view.focus(); },
+    /** Read-only or editable again (setValue still writes it: the HDL generated from a drawing, #1176). */
+    setReadOnly: v => view.dispatch({ effects: readOnliness.reconfigure(EditorState.readOnly.of(!!v)) }),
+    readOnly: ro,
     markClean: () => { cleanDoc = view.state.doc; },
     isClean: () => view.state.doc.eq(cleanDoc),
     destroy() { offLang(); tip.remove(); hideLintTip(); view.destroy(); },
@@ -483,7 +491,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
     getCursor, setCursor, posAt, replaceRanges,
     somethingSelected: () => view.state.selection.ranges.some(r => !r.empty),
     getSelection: () => view.state.selection.ranges.map(r => view.state.sliceDoc(r.from, r.to)).join('\n'),
-    replaceSelection: s => view.dispatch(view.state.replaceSelection(s), { userEvent: 'input', scrollIntoView: true }),
+    replaceSelection: s => !ro() && view.dispatch(view.state.replaceSelection(s), { userEvent: 'input', scrollIntoView: true }),
     historySize: () => ({ undo: undoDepth(view.state), redo: redoDepth(view.state) }),
     /** The lint annotations shown: [{ line (1-based), severity, message }]. */
     diagnostics: () => anns.map(a => ({ line: a.line + 1, severity: a.severity, message: a.diag.message })),

@@ -2,8 +2,8 @@
 // a state added by double-click and named in place, a transition drawn from the rim of a state,
 // conditions edited in place and in the properties panel; the tables (transition, state, encoded)
 // and the truth tables of the next-state logic; its HDL (generated from it: an edit of a transition
-// rewrites the HDL, which simulates like the diagram; a saved edit of the HDL updates the diagram;
-// an HDL edit the diagram cannot show gives the out-of-sync banner with the reason); step-by-step
+// rewrites the HDL, which simulates like the diagram; the HDL is read-only, #1176; a diagram with
+// errors leaves it as it was and gives the out-of-sync banner with the reason); step-by-step
 // simulation; HDL module -> diagram and diagram -> ASM chart; Portuguese texts; the priority of the
 // transitions (▼ Later), Straighten, Export CSV, the simulator's ⟲ Reset and Clock ↑, Delete state /
 // transition, + Input / + Output, Zoom / Fit, ↶ ↷ and Edit ▸ Undo / Redo (#195).
@@ -72,7 +72,7 @@ const statePos = (page, id) => page.eval((ed, sid) => {
   return { x: b.left + b.width / 2, y: b.top + b.height / 2, r: b.width / 2 };
 }, ED, id);
 
-uiTest('State diagram (FSM): New Source, states and transitions drawn and edited, tables, truth tables, linked HDL kept in sync both ways', E, async (page) => {
+uiTest('State diagram (FSM): New Source, states and transitions drawn and edited, tables, truth tables, linked HDL following it (read-only, #1176)', E, async (page) => {
   await makeProject(env, { name: 'FsmPj', files: {} });
   await page.openProject('FsmPj');
   await page.menu('Project', 'New Source…');
@@ -162,7 +162,8 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   let vhd = await readWs(env, 'FsmPj', 'src/det.vhd');
   let r = hdlVsModel(vhd, await fsmFile('FsmPj', 'src/det.fsm.json'));
   assert.deepEqual(r.got, r.want);
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/det.vhd' && (() => { const b = document.querySelector('.doc:not([hidden]) [data-sync-banner]'); return !!b && b.hidden && b.textContent === ''; })(), [], { what: 'HDL editor banner' });
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/det.vhd' && /^Read-only, generated from det\.fsm\.json$/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'HDL editor banner' });
+  assert.equal(await page.eval(() => window.Silinx.active.editor.readOnly()), true);
   // the hierarchy shows the module with its diagram the base, its views as badges (#207)
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((x) => x.querySelector('.lbl').textContent === 'det' && x.querySelector('.meta')?.textContent === '(det.fsm.json)' && [...x.querySelectorAll('.badge')].map((b) => b.textContent).join(' ') === 'FSM VHDL'), [], { what: 'det [FSM] [VHDL] (det.fsm.json)' });
 
@@ -176,28 +177,15 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   r = hdlVsModel(vhd, await fsmFile('FsmPj', 'src/det.fsm.json'));
   assert.deepEqual(r.got, r.want);
 
-  // ---- HDL -> diagram: a saved edit of the module updates the diagram (S1 --x--> S3 instead of S2)
+  // ---- a condition with an error: the HDL stays as it was, out of sync; the HDL editor's banner says why
+  await selectTrans(page, 't1');
+  await page.fill(`${ED} .fsm-cond`, 'x and');
+  await page.waitFor((ed) => /Not in sync with det\.vhd/.test(document.querySelector(`${ed} .fsm-link`).textContent), [ED], { what: 'out of sync', timeout: 15000 });
+  assert.match(await readWs(env, 'FsmPj', 'src/det.vhd'), /S0 +: x and x -> S1/);
   await page.eval(() => window.SilinxApp.openFile('src/det.vhd'));
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/det.vhd' && window.Silinx.active.editor);
-  await page.eval(() => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().replace(/(when S_S1 =>\n\s+if [^\n]+\n\s+state_next <= )S_S2;/, '$1S_S3;')); });
-  await page.waitFor(async (s) => (await (await fetch('/api/projects/FsmPj/file?path=src%2Fdet.fsm.json')).json()).transitions.some((t) => t.from === 's2' && t.to === s && t.cond === 'x'), [sid], { what: 'diagram updated from the HDL', timeout: 15000 });
-  m = await fsmFile('FsmPj', 'src/det.fsm.json');
-  assert.ok(!m.transitions.some((t) => t.from === 's2' && t.to === 's3'));
-  assert.deepEqual(m.states.map((s) => s.name), ['S0', 'S1', 'S2', 'S3']);
-  // the open diagram shows it
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/det.vhd' && /^Read-only, not in sync with det\.fsm\.json — the state diagram has errors: ./.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'out-of-sync banner' });
   await page.eval(() => window.SilinxApp.openFsm('src/det.fsm.json'));
-  await page.waitFor((ed, s) => [...document.querySelectorAll(`${ed} [data-trans]`)].length === 7 && window.Silinx.active.fsmEditor.getModel().transitions.some((t) => t.from === 's2' && t.to === s), [ED, sid], { what: 'editor updated' });
-  // an edit the diagram cannot show (a counter process): out-of-sync banner with the reason
-  await page.eval(() => window.SilinxApp.openFile('src/det.vhd'));
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/det.vhd');
-  await page.eval(() => {
-    const ed = window.Silinx.active.editor;
-    ed.setValue(ed.getValue().replace('    signal state_next : state_t;', '    signal state_next : state_t;\n    signal cnt : std_logic := \'0\';')
-      .replace('end architecture rtl;', '    counter : process (clk)\n    begin\n        if rising_edge(clk) then\n            cnt <= not cnt;\n        end if;\n    end process counter;\n\nend architecture rtl;'));
-  });
-  await page.waitFor(() => /Not in sync with det\.fsm\.json — the diagram cannot show it: process at line \d+ is not part of the state machine \(it drives 'cnt'\)/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'out-of-sync banner', timeout: 15000 });
-  await page.eval(() => window.SilinxApp.openFsm('src/det.fsm.json'));
-  await page.waitFor((ed) => /Not in sync with det\.vhd/.test(document.querySelector(`${ed} .fsm-link`).textContent), [ED]);
+  await page.waitFor(() => window.Silinx.active?.id === 'fsm:src/det.fsm.json');
   // editing the diagram again rewrites the HDL: back in sync, and said so only once the file is
   // written (the save is slowed down here: a slow disk / server, as on CI)
   await page.eval(() => {
@@ -210,7 +198,7 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   await page.waitFor((ed) => /^HDL: det\.vhd — generated from the diagram$/.test(document.querySelector(`${ed} .fsm-link`).textContent), [ED], { what: 'back in sync', timeout: 15000 });
   vhd = await readWs(env, 'FsmPj', 'src/det.vhd');
   await page.eval(() => window.__restoreFetch());
-  assert.doesNotMatch(vhd, /cnt/);
+  assert.match(vhd, /S0 +: x -> S1/);
   r = hdlVsModel(vhd, await fsmFile('FsmPj', 'src/det.fsm.json'));
   assert.deepEqual(r.got, r.want);
 

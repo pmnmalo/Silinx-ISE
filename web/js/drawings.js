@@ -15,10 +15,10 @@ import { removeModule, renderHierarchy, saveProjectJson, setTop } from './design
 import { downloadUrl } from './menus.js';
 import { renameDialog } from './rename.js';
 import {
-  openTt, openTtSchematic, syncHdlFromTt, syncTtFromHdl, ttContextMenu, ttFromHdl
+  openTt, openTtSchematic, syncHdlFromTt, ttContextMenu, ttFromHdl
 } from './drawings-tt.js';
 export {
-  openTt, openTtSchematic, syncHdlFromTt, syncTtFromHdl, ttContextMenu
+  openTt, openTtSchematic, syncHdlFromTt, ttContextMenu
 };
 
 // ---- ASM
@@ -51,7 +51,7 @@ export async function openAsm(path) {
   });
 }
 
-// ---- ASM chart <-> HDL synchronization
+// ---- ASM chart -> HDL synchronization (the chart is the base: its HDL file is read-only, #1176)
 // The HDL files a drawing could not generate again (it has errors, #303): S.staleHdl[file] = { from, why }.
 // Check Syntax (and so the simulation and the implementation) stops on them: they no longer say what the
 // drawing does (a schematic net with two drivers, its HDL as it was before)
@@ -87,31 +87,6 @@ async function asmFromHdlFile(hdlPath, opts = {}) {
   return mod.asmFromHdl(text, { path: hdlPath, lang: /\.v$/i.test(hdlPath) ? 'verilog' : 'vhdl', ...opts });
 }
 
-export async function syncAsmFromHdl(hdlPath, { quiet = false } = {}) {
-  const asmPath = S.hdlToSch[hdlPath];
-  const errs = [...(S.lib?.errors || [])].filter(d => d.severity === 'error' && d.file === hdlPath);
-  if (errs.length) { status(`${asmPath.split('/').pop()} not updated yet: ${hdlPath.split('/').pop()} has errors`); return; }
-  let old;
-  try { old = JSON.parse(await api.readFile(S.project.name, asmPath)); } catch { return; }
-  let r;
-  try { r = await asmFromHdlFile(hdlPath, { module: old.name, previous: old }); }
-  catch (e) {
-    const msg = `${asmPath} not updated: ${hdlPath} is no longer a plain state machine (${e.message})`;
-    if (quiet) status(msg); else log(`WARNING: ${msg}`, 'warn');
-    return;
-  }
-  const next = { ...r.model, generatedFile: hdlPath };
-  if (JSON.stringify(next) === JSON.stringify(old)) return;
-  S.syncing = true;
-  try {
-    await api.writeFile(S.project.name, asmPath, JSON.stringify(next, null, 2));
-    const d = findDoc(`asm:${asmPath}`);
-    if (d?.asmEditor && !d.dirty) d.asmEditor.setModel(next);
-    status(`${asmPath.split('/').pop()} updated from ${hdlPath.split('/').pop()}`);
-    for (const w of r.warnings || []) if (!quiet) log(`WARNING: ${asmPath}: ${w}`, 'warn');
-  } finally { S.syncing = false; }
-}
-
 // HDL module -> ASM chart, linked to the HDL file (the chart becomes the base).
 export async function convertToAsm(mod) {
   const info = moduleInfo(mod);
@@ -142,11 +117,10 @@ export function asmContextMenu(e, file) {
   ].filter(Boolean), e.clientX, e.clientY);
 }
 
-// ---- state diagrams (.fsm.json): bubble diagram <-> HDL module, synchronized like ASM charts
-// The generated module is linked by generatedFile: every change of the diagram rewrites it, and a
-// saved edit of the HDL updates the diagram whenever it can be read back as a state machine
-// (core/fsm.js fsmFromHdl, through the ASM reader); otherwise the HDL editor and the diagram show
-// the out-of-sync banner with the reason. Editor: fsm-editor.js; model, tables, HDL: core/fsm.js.
+// ---- state diagrams (.fsm.json): bubble diagram -> HDL module, synchronized like ASM charts
+// The generated module is linked by generatedFile: every change of the diagram rewrites it (its HDL
+// file is read-only, #1176); a diagram with errors leaves it as it was, and the HDL editor and the
+// diagram show the out-of-sync banner with the reason. Editor: fsm-editor.js; model, tables, HDL: core/fsm.js.
 export async function openFsm(path) {
   const id = `fsm:${path}`;
   if (findDoc(id)) return activateDoc(findDoc(id));
@@ -220,36 +194,6 @@ export async function syncHdlFromFsm(fsmPath, model) {
   } finally { S.syncing = false; }
 }
 
-// a saved edit of the linked HDL: the diagram follows when the module is still a plain state machine
-export async function syncFsmFromHdl(hdlPath, { quiet = false } = {}) {
-  const fsmPath = S.hdlToSch[hdlPath];
-  S.outOfSync ||= {};
-  const fail = why => {
-    if (S.outOfSync[hdlPath] !== why && !quiet) log(`WARNING: ${fsmPath} not updated: ${why}`, 'warn');
-    S.outOfSync[hdlPath] = why; refreshSyncBanner(hdlPath); refreshFsmLink(fsmPath);
-    status(`${fsmPath.split('/').pop()} not updated: ${why}`);
-  };
-  const errs = [...(S.lib?.errors || [])].filter(d => d.severity === 'error' && d.file === hdlPath);
-  if (errs.length) return fail(`${hdlPath.split('/').pop()} has errors`);
-  let old;
-  try { old = JSON.parse(await api.readFile(S.project.name, fsmPath)); } catch { return; }
-  let r;
-  try { r = await fsmFromHdlFile(hdlPath, old); } catch (e) { return fail(e.message); }
-  const { normalizeFsm } = await import('/core/fsm.js');
-  const next = r.model;
-  if (S.outOfSync[hdlPath]) { delete S.outOfSync[hdlPath]; refreshSyncBanner(hdlPath); }
-  if (JSON.stringify(next) !== JSON.stringify(normalizeFsm(old))) {
-    S.syncing = true;
-    try {
-      await api.writeFile(S.project.name, fsmPath, JSON.stringify(next, null, 2));
-      const d = findDoc(`fsm:${fsmPath}`);
-      if (d?.fsmEditor && !d.dirty) d.fsmEditor.setModel(next);
-      status(`${fsmPath.split('/').pop()} updated from ${hdlPath.split('/').pop()}`);
-      for (const w of r.warnings || []) if (!quiet) log(`WARNING: ${fsmPath}: ${w}`, 'warn');
-    } finally { S.syncing = false; }
-  }
-  refreshFsmLink(fsmPath);
-}
 // the state diagram `old` made again from its HDL module: { model, warnings }; throws why it cannot be
 async function fsmFromHdlFile(hdlPath, old) {
   const mods = S.modules.filter(m => m.file === hdlPath && m.kind !== 'package');
@@ -614,39 +558,20 @@ export async function resolveHdlClash(path) {
   return true;
 }
 
-// ---- schematic <-> HDL synchronization
-// Structure of a schematic: symbols (name, type, params), ports and net connectivity. When an HDL
-// edit keeps the structure, only the HDL kept in the schematic (HDL blocks, declarations) changes
-// and the drawing stays as it is; otherwise the schematic is regenerated and laid out again.
-async function schStructure(doc, modules) {
-  const { netlist } = await import('/core/schdoc.js');
-  const nl = netlist(doc, { modules });
-  const symName = id => doc.symbols.find(x => x.id === id)?.name;
-  const portName = id => doc.ports.find(x => x.id === id)?.name;
-  const key = JSON.stringify({
-    syms: doc.symbols.map(x => `${x.name}:${x.type}:${JSON.stringify(x.params || {})}`).sort(),
-    ports: doc.ports.map(x => `${x.name}:${x.dir}:${x.width}`).sort(),
-    nets: nl.nets.map(n => n.endpoints.map(e => (e.kind === 'pin' ? `${symName(e.sym)}.${e.pin}` : `port:${portName(e.port)}`)).sort().join(',')).sort(),
-  });
-  // VHDL names in any case (a schematic made before the names were kept as written, #131)
-  return doc.lang === 'vhdl' ? key.toLowerCase() : key;
-}
-
-// banner of an HDL editor of a file generated from a drawing (the drawing is the base, #220; an edit
-// here updates the drawing, but a Petri net's); shows when it is out of sync and why
-export function syncBanner(path, sch) {
+// banner of an HDL editor: a file generated from a drawing (the drawing is the base, #220) is read-only,
+// edited in the drawing (#1176): it says so, links to the drawing, and says when it is out of sync and
+// why. Any other file: the element stays, empty and hidden, for a file linked to a drawing later
+export function syncBanner(path) {
+  const sch = S.hdlToSch?.[path];
+  if (!sch) return h('span', { class: 'gen-banner', hidden: true, 'data-sync-banner': path });
   const why = S.outOfSync?.[path];
-  // in sync: nothing to say (the Design pane's badges say where the file comes from, #224); the
-  // element stays, empty and hidden, so that it shows when the file gets out of sync
-  if (!why) return h('span', { class: 'gen-banner', hidden: true, 'data-sync-banner': path });
-  const el = h('span', { class: `gen-banner${why ? ' out-of-sync' : ''}`, 'data-sync-banner': path },
-    'Not in sync with ', h('a', { onclick: () => openView(sch) }, sch.split('/').pop()),
+  const link = h('a', { onclick: () => openView(sch) }, sch.split('/').pop());
+  if (!why) return h('span', { class: 'gen-banner read-only', 'data-sync-banner': path }, 'Read-only, generated from ', link);
+  return h('span', { class: 'gen-banner read-only out-of-sync', 'data-sync-banner': path }, 'Read-only, not in sync with ', link,
     isTt(sch) || isFsm(sch) ? ` — ${why}` : ` — the ${viewNoun(sch)} has errors: ${why}`);
-  return el;
 }
 export function refreshSyncBanner(path) {
-  const sch = S.hdlToSch?.[path];
-  for (const el of document.querySelectorAll('[data-sync-banner]')) if (el.dataset.syncBanner === path && sch) el.replaceWith(syncBanner(path, sch));
+  for (const el of document.querySelectorAll('[data-sync-banner]')) if (el.dataset.syncBanner === path) el.replaceWith(syncBanner(path));
 }
 
 // a top port as the UCF sees it: vectors (also 1-bit ones, x<0>) have msb / lsb
@@ -698,49 +623,6 @@ export async function syncHdlFromSchematic(schPath, doc) {
     refreshOpenEditor(target, g.code);
     compileProject(); renderHierarchy(); markStale();
     status(`${target} updated from ${schPath.split('/').pop()}`);
-  } finally { S.syncing = false; }
-}
-
-export async function syncSchematicFromHdl(hdlPath, { quiet = false } = {}) {
-  const schPath = S.hdlToSch[hdlPath];
-  const errs = [...(S.lib?.errors || [])].filter(d => d.severity === 'error' && d.file === hdlPath);
-  if (errs.length && quiet) { status(`${schPath.split('/').pop()} not updated yet: ${hdlPath.split('/').pop()} has errors`); return; }
-  if (errs.length) { log(`WARNING: ${schPath} not updated: ${hdlPath} has errors (it is updated once the HDL compiles)`, 'warn'); return; }
-  let old;
-  try { old = JSON.parse(await api.readFile(S.project.name, schPath)); } catch { return; }
-  const mods = S.modules.filter(m => m.file === hdlPath);
-  const mod = mods.find(m => m.name.toLowerCase() === String(old.name || '').toLowerCase()) || mods[0];
-  if (!mod) return;
-  const design = elaborate(S.lib, mod.name);
-  if (!design.top) return;
-  const { schematicFromHdl } = await import('/core/schdoc.js');
-  const sources = Object.fromEntries(S.sources.map(x => [x.path, x.text]));
-  const modules = await schModules();
-  const elk = window.ELK ? new window.ELK() : null;
-  let fresh;
-  try { fresh = await schematicFromHdl(design.top, { sources, modules, layout: elk ? g => elk.layout(g) : undefined, lang: mod.lang }); }
-  catch (e) { log(`WARNING: ${schPath} not updated from ${hdlPath}: ${e.message}`, 'warn'); return; }
-  let next, relaid = false;
-  if (await schStructure(fresh, modules) === await schStructure(old, modules)) {
-    // same structure: keep the drawing, take the HDL kept in the blocks and declarations
-    next = structuredClone(old);
-    const same = (a, b) => a === b || (fresh.lang === 'vhdl' && a.toLowerCase() === b.toLowerCase());
-    for (const x of fresh.symbols) { const o = next.symbols.find(y => same(y.name, x.name) && y.type === x.type); if (o) { o.hdl = x.hdl; o.params = x.params; } }
-    next.hdl = fresh.hdl;
-    for (const p of fresh.ports) { const o = next.ports.find(y => same(y.name, p.name)); if (o) o.type = p.type; }
-  } else {
-    next = { ...fresh, generatedFile: hdlPath };
-    relaid = true;
-  }
-  next.generatedFile = hdlPath;
-  if (JSON.stringify(next) === JSON.stringify(old)) return;
-  S.syncing = true;
-  try {
-    await api.writeFile(S.project.name, schPath, JSON.stringify(next, null, 1));
-    const d = findDoc(`sch:${schPath}`);
-    if (d?.schEditor && !d.dirty) d.schEditor.setDoc(next);
-    log(relaid ? `${schPath} regenerated from ${hdlPath} (the design structure changed, so the schematic was laid out again).`
-               : `${schPath} updated from ${hdlPath} (same structure: layout kept).`, 'info');
   } finally { S.syncing = false; }
 }
 

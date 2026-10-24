@@ -482,3 +482,30 @@ end rtl;
   assert.equal(await page.eval(() => document.querySelectorAll('#console-errors .diag-fix').length), 0);
   await unchanged();
 });
+
+// ---------------------------------------------------------------- the HDL file generated from a drawing (#1176)
+uiTest('#1176 Rename Symbol never writes the HDL file generated from a drawing (read-only): the dialog names the drawing, its instance not changed', E, async (page) => {
+  const { COUNTER, schematicOf } = await import('../drawn-lib.mjs');
+  const drawn = JSON.stringify(schematicOf('drawn', 'counter'), null, 1);
+  await makeProject(env, { name: 'GenPj', top: 'drawn', files: { 'src/counter.vhd': COUNTER, 'src/drawn.sch.json': drawn } });
+  await page.openProject('GenPj');
+  // the schematic gets its HDL file (#207), generated from it
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/drawn.vhd'] === 'src/drawn.sch.json', [], { what: 'the HDL file of the schematic', timeout: 15000 });
+  const hdl = await readWs(env, 'GenPj', 'src/drawn.vhd'), sch = await readWs(env, 'GenPj', 'src/drawn.sch.json');
+  assert.match(hdl, /counter/);
+  await page.eval(() => window.SilinxApp.openFile('src/counter.vhd'));
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/counter.vhd' && window.Silinx.active.editor);
+  await cursorOn(page, 'q', 0);
+  await page.key('F2');
+  await page.waitDialog('Rename Symbol');
+  assert.equal(await dlgText(page), "New name:\nRenames the port 'q' everywhere it is used in this file: 2 places.\nNot changed: the instances of 'counter' in src/drawn.sch.json (made from the drawing: change them there).");
+  assert.equal(await page.eval(() => document.querySelectorAll('.rename-dlg input[type=checkbox]').length), 0);
+  await page.fill('.rename-dlg input[type=text]', 'count');
+  await page.dialogButton('Rename');
+  await page.waitNoDialog();
+  await page.key('s', { modifiers: process.platform === 'darwin' ? 4 : 2 });
+  for (let k = 0; k < 50 && !/count {3}: out/.test(await readWs(env, 'GenPj', 'src/counter.vhd')); k++) await tick(100);
+  assert.match(await readWs(env, 'GenPj', 'src/counter.vhd'), /count {3}: out/);
+  assert.equal(await readWs(env, 'GenPj', 'src/drawn.vhd'), hdl);
+  assert.equal(await readWs(env, 'GenPj', 'src/drawn.sch.json'), sch);
+});

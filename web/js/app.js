@@ -22,9 +22,8 @@ import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clear
 import { isOwnFailure } from './own-error.js';
 import { openProject, closeProject, reloadProject, updateTitle, renderStartPage, updateStorageStatus } from './project.js';
 import { FLOW_UP_TO, checkUcfFile, regenerateUcf, runImpl, stepTracker, ucfDiagnostics } from './implement.js';
-import { adoptDrawnHdl, drawnHdlClashes, freshHdl, isAsm, isFsm, isPn, isTt, openAsm, openFsm, openPetri, openSch,
-  openTt, openTtSchematic, openView, projectPart, schModules, staleHdl, syncAsmFromHdl, syncBanner, syncFsmFromHdl, syncSchematicFromHdl,
-  syncTtFromHdl, viewNoun, viewTitle } from './drawings.js';
+import { adoptDrawnHdl, drawnHdlClashes, freshHdl, openAsm, openFsm, openPetri, openSch,
+  openTt, openTtSchematic, openView, projectPart, refreshSyncBanner, schModules, staleHdl, syncBanner, viewTitle } from './drawings.js';
 import { checkFileSyntax, hdlDiagnostics, markStale, openMode, renderProcesses, saveAll } from './processes.js';
 import { fileContextMenu, inView, renderHierarchy, saveProjectJson, select, serialOp, setTop, treeItem } from './design.js';
 import { printActive, refreshSteps, setupMenus, setupToolbar, showPalette } from './menus.js';
@@ -491,16 +490,21 @@ export async function openFile(path, line, col) {
     doc = openDoc({
       id, path, title: path.split('/').pop(), tooltip: path, icon: lang === 'vhdl' ? 'vhdl' : lang === 'verilog' ? 'verilog' : lang === 'ucf' ? 'ucf' : 'file',
       create(el, d) {
+        // the HDL generated from a drawing is read-only: the drawing is the base, edited instead (#1176)
+        const generated = () => !!S.hdlToSch?.[path];
         const tplBtn = h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Language Templates' }, 'Templates ▾');
-        const bar = h('div', { class: 'editor-bar' },
+        const editing = [
           h('button', { class: 'tb-btn', title: 'Undo', html: icons.undo, onclick: () => d.editor.exec('undo') }),
           h('button', { class: 'tb-btn', title: 'Redo', html: icons.redo, onclick: () => d.editor.exec('redo') }),
-          h('div', { class: 'tb-sep' }),
+          h('div', { class: 'tb-sep' })];
+        const bar = h('div', { class: 'editor-bar' },
+          ...editing,
           h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findPersistent') }),
           (lang === 'vhdl' || lang === 'verilog') ? tplBtn : null,
           (lang === 'vhdl' || lang === 'verilog' || lang === 'ucf') ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file', onclick: () => (lang === 'ucf' ? checkUcfFile(path) : checkFileSyntax(path)) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
           h('span', { class: 'path' }, path),
-          ...Object.entries(S.schOwners || {}).filter(([, gen]) => gen === path).map(([sch]) => syncBanner(path, sch)));
+          syncBanner(path));
+        if (lang === 'vhdl' || lang === 'verilog') editing.push(tplBtn);
         tplBtn.addEventListener('click', e => {
           const r = tplBtn.getBoundingClientRect();
           popupMenu([
@@ -513,7 +517,7 @@ export async function openFile(path, line, col) {
         const host = h('div', { class: 'editor-host' });
         el.append(bar, host);
         d.editor = createEditor(host, {
-          text, lang, path,
+          text, lang, path, readOnly: generated(),
           project: () => ({ modules: S.modules }),
           onChange: (info) => { setDirty(d, !d.editor.isClean(), info); if (lang === 'ucf') liveUcf(); else if (lang === 'vhdl' || lang === 'verilog') liveHdl(); },
           onSave: () => flushDoc(d),
@@ -537,6 +541,14 @@ export async function openFile(path, line, col) {
         };
         if (lang === 'vhdl' || lang === 'verilog') liveHdl();
         d.liveCheck = lang === 'ucf' ? liveUcf : (lang === 'vhdl' || lang === 'verilog') ? liveHdl : null;
+        // (a file linked to a drawing, or no longer, while open: read-only or editable again, after a reload)
+        d.applyReadOnly = () => {
+          const ro = generated();
+          d.editor.setReadOnly(ro);
+          for (const b of editing) b.hidden = ro;
+          refreshSyncBanner(path);
+        };
+        d.applyReadOnly();
         const ed = d.editor;
         ed.view.dom.addEventListener('contextmenu', e => {
           e.preventDefault();
@@ -544,23 +556,24 @@ export async function openFile(path, line, col) {
           const hasSel = ed.somethingSelected();
           const sch = S.hdlToSch?.[path];
           const at = ed.posAt(e.clientX, e.clientY);
+          const edit = hdl && !sch;   // (the HDL generated from a drawing: read-only, #1176)
           popupMenu([
-            { label: 'Undo', action: () => ed.exec('undo'), disabled: !ed.historySize().undo },
-            { label: 'Redo', action: () => ed.exec('redo'), disabled: !ed.historySize().redo },
-            '-',
-            { label: 'Cut', action: () => { navigator.clipboard?.writeText(ed.getSelection()); ed.replaceSelection(''); }, disabled: !hasSel },
+            sch ? null : { label: 'Undo', action: () => ed.exec('undo'), disabled: !ed.historySize().undo },
+            sch ? null : { label: 'Redo', action: () => ed.exec('redo'), disabled: !ed.historySize().redo },
+            sch ? null : '-',
+            sch ? null : { label: 'Cut', action: () => { navigator.clipboard?.writeText(ed.getSelection()); ed.replaceSelection(''); }, disabled: !hasSel },
             { label: 'Copy', action: () => navigator.clipboard?.writeText(ed.getSelection()), disabled: !hasSel },
-            { label: 'Paste', action: async () => { try { ed.replaceSelection(await navigator.clipboard.readText()); ed.focus(); } catch { toast('Use Ctrl+V to paste', 'info'); } } },
+            sch ? null : { label: 'Paste', action: async () => { try { ed.replaceSelection(await navigator.clipboard.readText()); ed.focus(); } catch { toast('Use Ctrl+V to paste', 'info'); } } },
             { label: 'Select All', action: () => ed.exec('selectAll') },
             '-',
-            hdl ? { label: 'Toggle Comment', action: () => ed.exec('toggleComment') } : null,
+            edit ? { label: 'Toggle Comment', action: () => ed.exec('toggleComment') } : null,
             { label: 'Find…', action: () => ed.exec('findPersistent') },
-            hdl ? { label: 'Rename Symbol…', shortcut: 'F2', action: () => { if (!hasSel) ed.setCursor(at); renameSymbolIn(d, lang, path); } } : null,
-            hdl ? { label: 'Quick Fix…', shortcut: 'Ctrl+.', action: () => { ed.setCursor(at); d.editor.showFixMenu(at.line); }, disabled: !d.editor.fixesOnLine(at.line).length } : null,
-            hdl ? '-' : null,
-            hdl ? { label: 'Language Templates', submenu: SNIPPETS[lang].map(sn => ({ label: sn.name, action: () => d.editor.insertText(sn.text) })) } : null,
-            hdl ? primTemplatesMenu(d, lang) : null,
-            hdl ? { label: 'Instantiate module', submenu: S.modules.filter(m => m.file !== path).map(m => ({ label: m.name, action: () => d.editor.insertText(instTemplate(m, lang) + '$0') })) } : null,
+            edit ? { label: 'Rename Symbol…', shortcut: 'F2', action: () => { if (!hasSel) ed.setCursor(at); renameSymbolIn(d, lang, path); } } : null,
+            edit ? { label: 'Quick Fix…', shortcut: 'Ctrl+.', action: () => { ed.setCursor(at); d.editor.showFixMenu(at.line); }, disabled: !d.editor.fixesOnLine(at.line).length } : null,
+            edit ? '-' : null,
+            edit ? { label: 'Language Templates', submenu: SNIPPETS[lang].map(sn => ({ label: sn.name, action: () => d.editor.insertText(sn.text) })) } : null,
+            edit ? primTemplatesMenu(d, lang) : null,
+            edit ? { label: 'Instantiate module', submenu: S.modules.filter(m => m.file !== path).map(m => ({ label: m.name, action: () => d.editor.insertText(instTemplate(m, lang) + '$0') })) } : null,
             hdl ? '-' : null,
             hdl ? { label: 'Check Syntax', action: () => checkFileSyntax(path) } : null,
             lang === 'ucf' ? '-' : null,
@@ -573,7 +586,9 @@ export async function openFile(path, line, col) {
         return {
           lang,
           onActivate: () => setTimeout(() => d.editor?.refresh(), 0),
-          save: async ({ auto = false } = {}) => {
+          save: async () => {
+            // (the HDL generated from a drawing is written by the drawing only, #1176)
+            if (generated()) { setDirty(d, false); return; }
             const text = d.editor.getValue();
             await api.writeFile(S.project.name, path, text);
             // (only the text written is clean: an edit made meanwhile is saved next, see flushDoc)
@@ -586,8 +601,6 @@ export async function openFile(path, line, col) {
             status(`Saved ${path}`);
             // the other open editors depend on this file (ports, instances): check them again
             for (const od of S.docs) if (od !== d) od.liveCheck?.();
-            // the drawing it is generated from follows the edit (not a Petri net: its HDL follows it only, #222)
-            if (S.hdlToSch?.[path] && !isPn(S.hdlToSch[path]) && !S.syncing) (isAsm(S.hdlToSch[path]) ? syncAsmFromHdl : isTt(S.hdlToSch[path]) ? syncTtFromHdl : isFsm(S.hdlToSch[path]) ? syncFsmFromHdl : syncSchematicFromHdl)(path, { quiet: auto }).catch(e => log(`WARNING: ${viewNoun(S.hdlToSch[path])} not synchronized: ${e.message}`, 'warn'));
           },
           destroy: () => d.editor.destroy(),
         };
