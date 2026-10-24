@@ -77,15 +77,17 @@ export async function runOpenFlow(spec, io) {
     if (errs.length) throw new StepError('the design has errors', errs.map(e => `${e.file}:${e.line} ${e.message}`), 'Fix them (Check Syntax shows them in the Errors tab).');
     log(`Writing <${top}> as one flat module for Yosys; Yosys (WebAssembly) maps it onto the ${spec.family} cells.`);
     // (the synthesis's Optimization Effort, #282)
-    if (spec.synthEffort) log(spec.synthEffort === 'normal' ? 'Optimization Effort Normal: one mapping, and the mappings for speed for a design limited by its logic depth (High tries them for every design, a slower synthesis).'
+    if (spec.synthEffort) log(spec.synthEffort === 'normal' ? 'Optimization Effort Normal: one mapping, and the mappings for speed for a small design or one limited by its logic depth (High tries them for every design, a slower synthesis).'
       : 'Optimization Effort High: the mappings for speed tried too, the fastest kept.');
     let r;
     try {
-      r = await synthesizeOpen(design, { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(spec.deepRule && { deepRule: spec.deepRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
+      r = await synthesizeOpen(design, { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
     } catch (e) {
       for (const l of e.lines || []) if (/ERROR/.test(l)) log(l);
       throw new StepError(`synthesis failed: ${e.message}`);
     }
+    // (Normal: a small design synthesized as at High, #652)
+    if (r.depth?.small) log(`Optimization Effort Normal: a small design (${r.depth.small.luts} LUTs): the mappings for speed tried too, ${r.depth.small.kept ? 'the fastest kept.' : `not faster (${r.depth.small.ns[1].toFixed(1)} ns estimated against ${r.depth.small.ns[0].toFixed(1)}): the one mapping kept.`}`);
     // (Normal: a design limited by its depth got the mappings for speed too, #468)
     if (r.depth?.auto) log(`Optimization Effort Normal: ${r.depth.levels} levels of logic: the mappings for speed tried too, ${r.depth.normal?.kept ? `not a quarter faster (${r.depth.high.ns.toFixed(1)} ns estimated against ${r.depth.normal.ns.toFixed(1)}): the one mapping kept.` : 'the fastest kept.'}`);
     for (const w of r.warnings.filter(w => !/^Warning:/.test(w))) log(`WARNING:Synthesis - ${w}`);

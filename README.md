@@ -462,7 +462,7 @@ Implementation uses the Silinx toolchain by default (below), or the ISE 14.7 com
 **Without ISE (Silinx toolchain):** the synthesis (*Synthesize - Yosys*, with Silinx as
 the project's synthesis tool; *Synthesize - Yosys (open)* in a project that synthesizes with XST)
 synthesizes any design with Yosys compiled to WebAssembly, in parallel Web Workers. Its *Optimization
-Effort* (Process Properties) Normal, the default, maps the design once (fast; a state machine of 8 states or more
+Effort* (Process Properties) Normal, the default, maps the design once (fast; a design of 250 LUTs at most as High does too, the faster kept; a state machine of 8 states or more
 that Yosys leaves as written also one-hot, when that is better; Place & Route makes two placements of a design of
 500 slices at most and keeps the faster); High also tries the mappings for speed, and its state machines of 8 states
 or more one-hot, and keeps the best, and Place & Route makes two placements of any design and keeps the faster (a third
