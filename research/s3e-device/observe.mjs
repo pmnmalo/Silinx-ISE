@@ -88,7 +88,8 @@ export function observeNet(net, instSite) {
   for (const p of dangling) {
     const cands = candsOf(p);
     if (cands.length === 1) { res.joins.push([cands[0], key(p.tile, p.from)]); continue; }
-    if (cands.length > 1) { res.ambiguous.push({ from: key(p.tile, p.from), candidates: cands }); continue; }
+    // (src: the net's source tile, where the wire may be the source pin's own, a side BUFGMUX's CLKL_GCLK_PWOk)
+    if (cands.length > 1) { res.ambiguous.push({ from: key(p.tile, p.from), candidates: cands, ...(p.tile === srcTile ? { src: true } : {}) }); continue; }
     if (p.tile === srcTile && srcWires.length === 1 && srcWires[0] === p && srcInst.site) {
       res.pins.push({ site: srcInst.site, pin: net.outpins[0].pin, dir: 'o', tile: p.tile, wire: p.from });
       continue;
@@ -140,6 +141,25 @@ export function resolveAmbiguous(ambiguous, joins) {
     if (!n) break;
   }
   return { joins: found, ambiguous: left };
+}
+
+/** The ambiguous from-wires of many nets (#3, the clock network): a wire is driven by the same join in every net that
+ *  leaves it undriven, so its driver is in the intersection of their candidates; the nets' source tiles left out (the wire
+ *  may be the source pin's there). Returns { joins: [[candidate, from]] (one left), ambiguous: [{ from, candidates }]
+ *  (the intersection, two or more left; src entries as they were) }. */
+export function intersectAmbiguous(ambiguous) {
+  const by = new Map(), src = [];
+  for (const x of ambiguous) {
+    if (x.src) { src.push(x); continue; }
+    if (!by.has(x.from)) by.set(x.from, x.candidates.slice());
+    else { const s = new Set(x.candidates); by.set(x.from, by.get(x.from).filter(c => s.has(c))); }
+  }
+  const joins = [], left = [];
+  for (const [from, c] of by) {
+    if (c.length === 1) joins.push([c[0], from]);
+    else if (c.length > 1) left.push({ from, candidates: c });
+  }
+  return { joins, ambiguous: [...left, ...src] };
 }
 
 /** Where a block RAM's output enters its interconnect tile, in an ISE-routed design (#3, round 6): for each net from a

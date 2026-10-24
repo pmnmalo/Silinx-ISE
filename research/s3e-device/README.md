@@ -536,3 +536,37 @@ node prototype.mjs pins obs.json obs-ft256.json
 node gen-obspins.mjs pins && impl-remote.sh ramwide ramnarrow multcasc dcmpins iobddr iobclk2-0 iobclk2-1 iobclk2-2
 node prototype.mjs observe obs.json …/top.xdl pins/*/top.xdl && node prototype.mjs pins obs.json
 ```
+
+## 8. Step 4: the irregular tiles, part 1: the clock network observed (2026-10-24)
+
+Per tile type of the shipped graph, against what the observations and rounds 1-8 measured: the switch boxes and the I/O
+and block-RAM tiles are tested; **the global clock network had no join known** (GCLKH, GCLKV / GCLKVC, CLKV, CLKH, the
+block-RAM columns' GCLKH feed-throughs), though ISE's routes use all its PIPs. On a clock net, every clock wire of the
+net in another tile is a candidate for each undriven one (`observeNet`: one family, `gclk`), so all of them stayed
+ambiguous (9432 wires, 406 550 candidates), and no test round drove a clock line.
+
+- **The intersection** (`intersectAmbiguous`, `prototype.mjs observe` with `INTERSECT=1`): a wire is driven by the
+  same join in every net that leaves it undriven, so its driver is in the intersection of their candidates. In the
+  net's source tile the wire may be the source pin's own (a side BUFGMUX's `CLKL_GCLK_PWOk`), so `observeNet` marks
+  those entries (`src`) and the intersection leaves them out. Before that mark, 14 of the first 465 single survivors were
+  such pins. On the 102 designs of step 3: 664 more joins, every one right in the shipped graph; 3494 wires left
+  ambiguous.
+- **Clock observation designs** (`gen-obsclk.mjs`, 6 designs implemented by ISE, 267 s): 8 global clocks (the top and
+  bottom BUFGMUX, LOC'd), each on the flip-flops (FD, LOC'd) of every CLB tile in a random half of the 104 clock cells (a
+  CLB column by a band of rows round a GCLKH row), at most 4 clocks a tile. With them, 108 designs: 41 774 joins, 9389
+  more, all right but 2 rule-decided E2 doubles across the block-RAM column (`resolveAmbiguous`'s joins stay hypotheses:
+  4 of its 7354 are wrong). Clock joins: 55 known (CLKT, CLKB, CLKC, GCLKVC), all right.
+- **What the intersection cannot settle:** 5793 clock wires stay ambiguous, the true driver always among the candidates
+  (in all 5793). What remains: the spine wires every net of a line carries (CLKC, CLKT / CLKB, GCLKVC, GCLKVML / R) and,
+  for a CLB's GCLKk, the GCLKH rows above and below in its column (`GCLKH_GCLK_DNk`, `_UPk`). Observation cannot remove
+  a wire every net contains.
+
+Next (#3): **tests of the clock joins**. The test sources are a BUFGMUX's output: its pin wire is known since step 3,
+`CLKT_GCLK_PINWIREk`. The tests go down the spine join by join, each verdict making the next one's path, as rounds 1-3
+did across the switch boxes. They are few per design, since a global line is one node across the chip. Then the edge
+(terminal) tiles and the corners.
+
+```
+node gen-obsclk.mjs clk 6 1 && impl-remote.sh clk0 … clk5
+INTERSECT=1 node prototype.mjs observe obs.json …/top.xdl clk/*/top.xdl
+```

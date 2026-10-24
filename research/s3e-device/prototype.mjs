@@ -25,7 +25,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { parseXdl } from '../../core/xdl.js';
 import { loadDevice, PIP_BIDI } from '../../core/fpga/device.js';
-import { observeDesign, resolveAmbiguous, tileXY, wireFamily, blockRamOutputJoins } from './observe.mjs';
+import { observeDesign, resolveAmbiguous, intersectAmbiguous, tileXY, wireFamily, blockRamOutputJoins } from './observe.mjs';
 import { switchGrid, gridRule, applyRules, closeRules, segmentRules, nodesOf } from './model.mjs';
 import { joinTestDesigns, parseJoinTests, testSources } from './hypotheses.mjs';
 import { clbSlices } from './gen-observe.mjs';
@@ -85,15 +85,18 @@ if (cmd === 'observe') {
   const [out, ...files] = args;
   const all = { pips: [], sites: [], joins: [], pins: [], ambiguous: [], unexplained: [] };
   for (const f of files) { const o = observeDesign(parseXdl(fs.readFileSync(f, 'utf8'))); for (const k in all) all[k].push(...o[k]); }
-  const amb = [...new Map(all.ambiguous.map(x => [`${x.from}<${x.candidates.join(',')}`, x])).values()];
-  const r = resolveAmbiguous(amb, all.joins);
-  const joins = [...new Map([...all.joins, ...r.joins].map(j => [j.join('|'), j])).values()];
+  const amb = [...new Map(all.ambiguous.map(x => [`${x.from}<${x.candidates.join(',')}${x.src ? '<src' : ''}`, x])).values()];
+  // (INTERSECT=1: first the intersection of each wire's candidates over the nets, intersectAmbiguous)
+  const ix = process.env.INTERSECT === '1' ? intersectAmbiguous(amb) : { joins: [], ambiguous: amb };
+  const r = resolveAmbiguous(ix.ambiguous, [...all.joins, ...ix.joins]);
+  const joins = [...new Map([...all.joins, ...ix.joins, ...r.joins].map(j => [j.join('|'), j])).values()];
   const pips = [...new Map(all.pips.map(p => [`${p.tile} ${p.from} ${p.dir} ${p.to}`, p])).values()];
   const pins = [...new Map(all.pins.map(p => [`${p.site}.${p.pin}`, p])).values()];
   const sites = [...new Map(all.sites.map(s => [s.site, s])).values()];
   fs.writeFileSync(out, JSON.stringify({ pips, sites, pins, joins, ambiguous: r.ambiguous, unexplained: [...new Set(all.unexplained)] }));
   const direct = new Set(all.joins.map(j => j.join('|'))).size;
-  console.log(`${files.length} designs: ${all.pips.length} PIPs (${pips.length} distinct), ${sites.length} sites, ${pins.length} pin wires, ${joins.length} joins (${direct} with one candidate, ${joins.length - direct} decided by rules), ${r.ambiguous.length} ambiguous, ${new Set(all.unexplained).size} unexplained`);
+  const byIx = new Set(ix.joins.map(j => j.join('|'))).size;
+  console.log(`${files.length} designs: ${all.pips.length} PIPs (${pips.length} distinct), ${sites.length} sites, ${pins.length} pin wires, ${joins.length} joins (${direct} with one candidate, ${byIx ? `${byIx} by the intersection, ` : ''}${joins.length - direct - byIx} decided by rules), ${r.ambiguous.length} ambiguous, ${new Set(all.unexplained).size} unexplained`);
 } else if (cmd === 'predict') {
   const [obsFile, sbFile, out, ...tested] = args;
   const obs = readJson(obsFile);

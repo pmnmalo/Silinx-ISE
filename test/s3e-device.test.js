@@ -2,11 +2,12 @@
 // the observation of ISE-routed nets, the join rules, the xdl2ncd probes, the DRC join tests.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { wireFamily, tileXY, observeNet, observeDesign, resolveAmbiguous, joinRule, blockRamOutputJoins } from '../research/s3e-device/observe.mjs';
+import { wireFamily, tileXY, observeNet, observeDesign, resolveAmbiguous, intersectAmbiguous, joinRule, blockRamOutputJoins } from '../research/s3e-device/observe.mjs';
 import { switchGrid, gridRule, applyRules, closeRules, segmentRules, nodesOf } from '../research/s3e-device/model.mjs';
 import { measuredLines, packMeasured } from '../research/s3e-device/build.mjs';
 import { pinCensus, renamePads } from '../research/s3e-device/pins.mjs';
 import { ram, multCascade, dcmPins, iobDdr, iobClk2, devicePads, observedPads } from '../research/s3e-device/gen-obspins.mjs';
+import { clockDesign } from '../research/s3e-device/gen-obsclk.mjs';
 import { loadDevice, PIP_BIDI } from '../core/fpga/device.js';
 import { probeXdl, probeFirstLine, parseProbeLog, sortPips, sortSites } from '../research/s3e-device/probe.mjs';
 import { joinTestDesigns, parseJoinTests, testSources } from '../research/s3e-device/hypotheses.mjs';
@@ -544,4 +545,45 @@ test('observedPads, renamePads: another package\'s pads, each the k-th I/O site 
   const d = iobDdr(null, 'B8', 'xc3s250eft256-4', [{ name: 'B8', tile: 'TIBUFS_X13Y35', inputOnly: true, pos: 2 }, ...observedPads(ft), ...Array.from({ length: 16 }, (_, i) => ({ name: `X${i}`, tile: 'T', inputOnly: false, pos: 0 }))]);
   assert.match(d.ucf, /^NET "clk" LOC = "B8" ;$/m);
   assert.match(d.v, /^\/\/ xc3s250eft256-4: /);
+});
+
+// #3, the irregular tiles: the clock network's joins, ambiguous in each net (every clock wire of the net a candidate)
+test('intersectAmbiguous: a wire\'s driver in every net\'s candidates; the nets\' source tiles left out (#3, the clock network)', () => {
+  const r = intersectAmbiguous([
+    { from: 'CLB_X5Y10/GCLK3', candidates: ['GCLKH_X5Y13/GCLKH_GCLK_DN3', 'GCLKH_X7Y13/GCLKH_GCLK_DN3', 'GCLKH_X5Y5/GCLKH_GCLK_UP3'] },
+    { from: 'CLB_X5Y10/GCLK3', candidates: ['GCLKH_X5Y13/GCLKH_GCLK_DN3', 'GCLKH_X9Y13/GCLKH_GCLK_DN3', 'GCLKH_X5Y5/GCLKH_GCLK_UP3'] },
+    { from: 'CLB_X5Y10/GCLK3', candidates: ['GCLKH_X5Y13/GCLKH_GCLK_DN3', 'GCLKH_X7Y13/GCLKH_GCLK_DN3'] },
+    // two left: still ambiguous, with the intersection
+    { from: 'CLB_X6Y10/GCLK1', candidates: ['A/x', 'B/y', 'C/z'] }, { from: 'CLB_X6Y10/GCLK1', candidates: ['A/x', 'B/y'] },
+    // in the source's tile the wire may be the source pin's: kept as it is, and out of the intersection
+    { from: 'CLKL_X0Y17/CLKL_GCLK_PWO1', candidates: ['GCLKVML_X6Y17/GCLKVMLR_GCLK_UP1', 'X/w'], src: true },
+    { from: 'CLKL_X0Y17/CLKL_GCLK_PWO1', candidates: ['GCLKVML_X6Y17/GCLKVMLR_GCLK_UP1'] },
+  ]);
+  assert.deepEqual(r.joins, [['GCLKH_X5Y13/GCLKH_GCLK_DN3', 'CLB_X5Y10/GCLK3'], ['GCLKVML_X6Y17/GCLKVMLR_GCLK_UP1', 'CLKL_X0Y17/CLKL_GCLK_PWO1']]);
+  assert.deepEqual(r.ambiguous, [{ from: 'CLB_X6Y10/GCLK1', candidates: ['A/x', 'B/y'] }, { from: 'CLKL_X0Y17/CLKL_GCLK_PWO1', candidates: ['GCLKVML_X6Y17/GCLKVMLR_GCLK_UP1', 'X/w'], src: true }]);
+  // observeNet marks an ambiguous wire of the source's tile
+  const ins = new Map([['bg', { name: 'bg', tile: 'CLKL_X0Y17', site: 'BUFGMUX_X0Y3' }], ['s', { name: 's', tile: 'CLB_X3Y17', site: 'SLICE_X4Y34' }]]);
+  const a = observeNet({ name: 'g', outpins: [{ inst: 'bg', pin: 'O' }], inpins: [{ inst: 's', pin: 'CLK' }], pips: [
+    { tile: 'CLKL_X0Y17', from: 'CLKL_GCLK_PWO1', dir: '->', to: 'CLKL_GCLKH_MAIN1' },
+    { tile: 'GCLKVML_X6Y17', from: 'GCLKVML_GCLK1', dir: '->', to: 'GCLKVMLR_GCLK_UP1' },
+    { tile: 'GCLKVML_X6Y17', from: 'GCLKVML_GCLK1', dir: '->', to: 'GCLKVMLR_GCLK_DN1' },
+  ] }, ins);
+  assert.deepEqual(a.ambiguous.find(x => x.from === 'CLKL_X0Y17/CLKL_GCLK_PWO1')?.src, true);
+});
+
+test('gen-obsclk: 8 global clocks, each on a random half of the clock cells, one slice a clock, at most 4 a tile, read by Silinx\'s front end (#3, the clock network)', () => {
+  const dev = loadDeviceCache('xc3s250ecp132-4');
+  let seed = 1;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x80000000; };
+  const d = clockDesign(dev, rnd);
+  // the top and bottom buffers, one line each
+  assert.deepEqual([...d.ucf.matchAll(/^INST "u_b\d" LOC = "(\S+)" ;$/gm)].map(m => m[1]), ['BUFGMUX_X1Y0', 'BUFGMUX_X1Y1', 'BUFGMUX_X1Y10', 'BUFGMUX_X1Y11', 'BUFGMUX_X2Y0', 'BUFGMUX_X2Y1', 'BUFGMUX_X2Y10', 'BUFGMUX_X2Y11']);
+  // every slice once; 26 columns by 4 bands, about half of them each clock
+  const slices = [...d.ucf.matchAll(/^INST "r\d_\d+" LOC = "(SLICE_X\d+Y\d+)" ;$/gm)].map(m => m[1]);
+  assert.equal(new Set(slices).size, slices.length);
+  assert.equal(slices.length, d.ffs.reduce((a, b) => a + b, 0));
+  for (const k in d.cells) assert.ok(d.cells[k].length > 30 && d.cells[k].length < 74, `${k}: ${d.cells[k].length} of 104 cells`);
+  const srcs = [{ path: 'top.v', lang: 'verilog', text: d.v }];
+  const lib = compile([...primitiveSources(srcs), ...srcs]);
+  assert.deepEqual([lib.errors, elaborate(lib, 'top').diags], [[], []]);
 });
