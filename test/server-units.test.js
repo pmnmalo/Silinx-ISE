@@ -159,10 +159,12 @@ test('ISE scripts for Spartan-6 / 7-series: no legacy XST options, MAP placement
   assert.throws(() => ise.generateXst({ top: 'top', device: S6, impl: { xstOptions: { 'bad key': 1 } } }), /invalid XST option/);
   assert.throws(() => ise.generateXst({ top: 'top', device: S6, impl: { xstOptions: { ok: 'a\nb' } } }), /invalid XST option/);
   // a value is one word: spaces would add options after Silinx's (-ifn, -ofn, …), a leading '-' would be one
-  for (const v of ['Yes -ofn /tmp/x', 'Yes\t-ifn /etc/passwd', '-ofn', '"a b"', ''])
+  for (const v of ['Yes -ofn /tmp/x', 'Yes\t-ifn /etc/passwd', '-ofn', '"a b"', '', '{a} -ofn /tmp/x', '{a b', 'a}', '{a {b}}', '{a\nb}', '{"a b"}', 'x{a b}'])
     assert.throws(() => ise.generateXst({ top: 'top', device: S6, impl: { xstOptions: { keep_hierarchy: v } } }), /invalid XST option 'keep_hierarchy'/);
   const words = ise.generateXst({ top: 'top', device: S6, impl: { xstOptions: { bus_delimiter: '()', hierarchy_separator: '_', max_fanout: 500 } } });
   for (const re of [/^-bus_delimiter \(\)$/m, /^-hierarchy_separator _$/m, /^-max_fanout 500$/m]) assert.match(words, re);
+  // or a list in braces, as XST's -generics takes it (#1281: ISE's timing simulation test, blinky's generics)
+  assert.match(ise.generateXst({ top: 'top', device: S6, impl: { xstOptions: { generics: '{div=2 debounce=2 refresh=4}' } } }), /^-generics \{div=2 debounce=2 refresh=4\}$/m);
   // the options naming files, folders, the device or the top stay Silinx's (an imported project's silinx.json)
   for (const k of ['ofn', 'IFN', 'tmpdir', 'xsthdpdir', 'p', 'top', 'uc', 'sd', 'vlgincdir'])
     assert.throws(() => ise.generateXst({ top: 'top', device: S6, impl: { xstOptions: { [k]: '/tmp/x' } } }), new RegExp(`XST option '${k}' is set by Silinx and cannot be changed`));

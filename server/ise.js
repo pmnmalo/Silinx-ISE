@@ -149,8 +149,9 @@ export function generateXst({ top, device, impl = {}, includeDirs = [] }) {
   // User extras: impl.xstOptions = { "keep_hierarchy": "Yes", ... }; never the options that name
   // the files, folders, device or top Silinx sets (silinx.json may come from an imported project)
   for (const [k, v] of Object.entries(impl.xstOptions || {})) {
-    // a value is one word: a space would start another option, after the ones Silinx sets
-    if (!/^[a-z_0-9]+$/i.test(k) || !/^[^\s\-"'][^\s"']*$/.test(String(v))) throw Object.assign(new Error(`invalid XST option '${k}'`), { status: 400 });
+    // a value is one word (a space would start another option, after the ones Silinx sets), or a
+    // list in braces, XST's grouping (-generics {DIV=2 DEBOUNCE=2}), with no brace or quote inside (#1281)
+    if (!/^[a-z_0-9]+$/i.test(k) || !/^(?:[^\s\-"'{}][^\s"'{}]*|\{[^\r\n"'{}]*\})$/.test(String(v))) throw Object.assign(new Error(`invalid XST option '${k}'`), { status: 400 });
     if (XST_FIXED.has(k.toLowerCase())) throw Object.assign(new Error(`XST option '${k}' is set by Silinx and cannot be changed`), { status: 400 });
     const i = opts.findIndex(o => o[0] === k);
     if (i >= 0) opts[i] = [k, v]; else opts.push([k, v]);
