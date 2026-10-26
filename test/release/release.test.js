@@ -22,8 +22,9 @@ const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf
 // the zip and the unzipped app (2026-10: about 20 MB and 100 MB, 3/4 of it Yosys's WebAssembly)
 // zipMB 30 → 32 by Yosys 0.70 (#368, #380): its WebAssembly is 69 MB, its resources 11 MB, all of it
 // needed; the zip 30.4 MB. zipMB 32 → 40 by the Spartan-6 device descriptions (#723, #884: 4.2 MB zipped);
-// the zip 36.6 MB
-const BUDGET = { zipMB: 40, appMB: 140 };
+// the zip 36.6 MB. zipMB 40 → 50 by the measured XC3S250E description in research/ (#1538: 6.7 MB); the zip
+// 44.1 MB, unzipped 134.2 MB
+const BUDGET = { zipMB: 50, appMB: 140 };
 
 const has = (cmd) => { try { execFileSync(cmd, ['-v'], { stdio: 'ignore' }); return true; } catch { return false; } };
 const SKIP = process.platform === 'win32' ? 'the release is packaged on Linux (zip): not on Windows'
