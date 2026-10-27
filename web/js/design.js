@@ -30,7 +30,13 @@ export function renderHierarchy() {
   const host = $('hier');
   const focused = host.contains(document.activeElement) ? (document.activeElement.closest('.badge') ? 'badge' : 'tree') : null;
   host.innerHTML = '';
-  if (!S.project) { host.append(h('div', { class: 'tree empty' }, 'No project open. Use File > New Project or File > Open Project.')); return; }
+  // (no project: its two commands here, the modern interface has no File menu, #1585)
+  if (!S.project) {
+    host.append(h('div', { class: 'tree empty' }, h('div', {}, 'No project open'),
+      h('div', { class: 'empty-actions' }, h('a', { href: '#', 'data-act': 'new-project', onclick: e => { e.preventDefault(); wiz.newProjectWizard(); } }, 'New Project…'),
+        ' · ', h('a', { href: '#', 'data-act': 'open-project', onclick: e => { e.preventDefault(); wiz.openProjectDialog(); } }, 'Open Project…'))));
+    return;
+  }
   const pj = S.project;
   const one = oneTree(), sim = S.view === 'sim' && !one;
   const tree = h('ul', { class: 'tree', tabindex: '0', 'aria-label': 'Design hierarchy', onkeydown: treeKeys });

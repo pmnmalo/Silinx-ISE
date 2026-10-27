@@ -353,6 +353,21 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   await page.menu('File', 'Close Project');
   await page.waitFor(() => window.Silinx.project === null && !document.querySelector('[data-page=start]').hidden);
   assert.match(await page.eval(() => document.getElementById('hier').innerText), /No project open/);
+  // its two commands right there, no File menu named (the modern interface has none, #1585)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#hier .empty a')].map((a) => a.textContent)), ['New Project…', 'Open Project…']);
+  assert.doesNotMatch(await page.eval(() => document.getElementById('hier').textContent), /File >/);
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.waitFor(() => document.querySelector('#hier .empty')?.textContent === 'Nenhum projeto abertoNovo Projeto… · Abrir Projeto…', [], { what: 'Portuguese' });
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await page.waitFor(() => document.querySelector('#hier .empty a')?.textContent === 'New Project…', [], { what: 'English again' });
+  await page.eval(() => document.querySelector('#hier [data-act=open-project]').click());
+  await page.waitDialog('Open Project');
+  await page.key('Escape');
+  await page.waitNoDialog();
+  await page.eval(() => document.querySelector('#hier [data-act=new-project]').click());
+  await page.waitDialog('New Project Wizard');
+  await page.key('Escape');
+  await page.waitNoDialog();
   assert.equal(await page.eval(() => window.Silinx.docs.length), 0);
   const file = await page.openMenu('File');
   assert.equal(file.find((i) => i.label === 'Close Project').disabled, true);
