@@ -185,21 +185,21 @@ least its slowest design's time (the testbench included: uart-for-fpga's is most
 <!-- the run times: generated from times.json by `node test/designs-corpus/run.mjs --table`; do not edit by hand -->
 | machine class | designs | synthesis (s) | flow (s) | all the stages (s) |
 | --- | ---: | ---: | ---: | ---: |
-| `ci` | 38 | 1614 | 2341 | 4423 |
-| `local` | 67 | 1674 | 2563 | 4707 |
+| `ci` | 67 | 6615 | 7714 | 16101 |
+| `local` | 67 | 1718 | 2601 | 4790 |
 
 The 8 slowest designs (s: synthesis / flow / all the stages):
 
 | design | `ci` | `local` |
 | --- | ---: | ---: |
-| epfl-multiplier | - | 351 / 869 / 1263 |
-| secworks-aes | 325 / 852 / 1253 | 105 / 535 / 658 |
-| epfl-log2 | - | 405 / 116 / 790 |
-| secworks-sha256 | 149 / 275 / 443 | 43 / 98 / 146 |
-| secworks-sha1 | 102 / 194 / 309 | 20 / 61 / 83 |
-| neorv32 | 158 / 81 / 261 | 60 / 35 / 99 |
-| uart-for-fpga | 10 / 2 / 246 | 6 / 2 / 63 |
-| t80 | 114 / 52 / 174 | 38 / 38 / 79 |
+| epfl-multiplier | 1358 / 2062 / 3721 | 351 / 869 / 1263 |
+| epfl-log2 | 1643 / 331 / 2753 | 405 / 116 / 790 |
+| secworks-aes | 91 / 1228 / 1384 | 105 / 535 / 658 |
+| epfl-voter | 340 / 415 / 792 | 68 / 81 / 159 |
+| itc99-b17 | 146 / 495 / 676 | 44 / 103 / 153 |
+| epfl-max | 274 / 364 / 647 | 67 / 95 / 164 |
+| epfl-sin | 275 / 57 / 385 | 30 / 9 / 49 |
+| epfl-adder | 155 / 192 / 349 | 35 / 45 / 80 |
 <!-- end of the run times -->
 
 ## Results (Yosys 0.70 / YoWASP)
