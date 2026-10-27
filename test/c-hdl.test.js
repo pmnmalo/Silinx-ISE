@@ -7,56 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cToHdl } from '../core/c-hdl.js';
-import { simulate } from '../core/compile.js';
 import { binaryType, compareType, literalType, wrap } from '../core/c-types.js';
-import { noCC, rng, mask, values, runC } from './c-helpers.js';
-
-/** The generated HDL's outputs on the vectors (Silinx's simulator), in the same form; vld outputs checked against
- *  the C's "changed" (a write of the same value is a write the C cannot see). */
-function runHdl(gen, lang, ins, outs, ret, vectors) {
-  const port = (n) => gen.ports.find((p) => p.name === n);
-  const L = ['module tb;'];
-  for (const p of gen.ports) L.push(`  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
-  L.push(`  ${gen.top} dut(${gen.ports.map((p) => `.${p.name}(${p.name})`).join(', ')});`, '  initial begin');
-  if (port('ap_start')) L.push('    ap_start = 1;');
-  const hex = (v, w) => `${w}'h${(BigInt(v) & mask(w)).toString(16)}`;
-  for (const v of vectors) {
-    const asg = ins.map((i) => `${port(i.ptrIn ? `${i.name}_i` : i.name) ? (i.ptrIn ? `${i.name}_i` : i.name) : i.name} = ${hex(v[i.name], i.w)};`).join(' ');
-    const shown = [ret ? 'ap_return' : null, ...outs.flatMap((o) => [o.name, `${o.name}_ap_vld`]), ...ins.filter((i) => i.ptrIn).map((i) => `${i.name}_o`)].filter(Boolean);
-    L.push(`    ${asg} #1 $display("${shown.map(() => '%h').join(' ')}", ${shown.join(', ')});`);
-  }
-  L.push('    $finish;', '  end', 'endmodule');
-  const r = simulate([{ path: lang === 'vhdl' ? 'dut.vhd' : 'dut.v', text: gen.hdl }, { path: 'tb.v', text: L.join('\n') }], 'tb', { until: 1e9 });
-  const diags = [...r.lib.errors, ...r.design.diags].filter((d) => !/tb\.v/.test(d.file || ''));
-  assert.deepEqual(diags.map((d) => `${d.severity}: ${d.message}`), [], `${lang}: the generated HDL compiles and elaborates with no message`);
-  return r.sim.log.map((e) => String(e.text).trim()).filter((s) => !/finished/.test(s)).map((s) => s.split(/\s+/).map((x) => BigInt(`0x${x}`)));
-}
-
-/** Checks a C program's generated HDL against the C on random and edge inputs (both languages). */
-function against(src, top, { ins, outs = [], ret = null, n = 40, seed = 1 }) {
-  const r = rng(seed);
-  const cols = ins.map((i) => values(i.w, i.s, n, r));
-  const vectors = Array.from({ length: n }, (_, k) => Object.fromEntries(ins.map((i, j) => [i.name, cols[j][k]])));
-  const c = runC(src, top, ins, outs, ret, vectors).map((l) => l.split(' ').map((x) => BigInt(`0x${x}`)));
-  for (const lang of ['vhdl', 'verilog']) {
-    const gen = cToHdl(src, { file: `${top}.c`, lang });
-    assert.deepEqual(gen.diagnostics.filter((d) => d.severity === 'error'), [], `${lang}: generated`);
-    const h = runHdl(gen, lang, ins, outs, ret, vectors);
-    assert.equal(h.length, n, `${lang}: ${n} calls simulated`);
-    for (let k = 0; k < n; k++) {
-      const exp = c[k], got = h[k];
-      const at = `${lang}, call ${k} (${JSON.stringify(vectors[k], (_, x) => (typeof x === 'bigint' ? String(x) : x))})`;
-      let p = 0, q = 0;
-      if (ret) assert.equal(got[q++], exp[p++], `${at}: ap_return`);
-      for (const o of outs) {
-        const val = exp[p++], changed = exp[p++], gv = got[q++], vld = got[q++];
-        if (changed) assert.equal(vld, 1n, `${at}: ${o.name} written, ${o.name}_ap_vld`);
-        if (vld) assert.equal(gv, val, `${at}: ${o.name}`);
-      }
-      for (const i of ins.filter((x) => x.ptrIn)) assert.equal(got[q++], exp[p++], `${at}: ${i.name}_o`);
-    }
-  }
-}
+import { noCC, rng, mask, values, runHdl, against } from './c-helpers.js';
 
 test('c-types: C\'s integer constants, promotions and conversions; ap_int results wide enough (Vitis HLS)', () => {
   assert.deepEqual(literalType(5n), { w: 32, s: true, ap: false });
@@ -199,7 +151,7 @@ void apx(ap_uint<8> a, ap_uint<8> b, ap_int<4> c, ap_uint<9> *sum, ap_int<9> *di
   }
 });
 
-test('C to HDL: what is not combinational is a sequential module (#1526): a loop whose count depends on the inputs, static and global variables; what is not supported yet is said: division by a non-constant or a non-power of 2; array arguments are sequential (ap_memory)', () => {
+test('C to HDL: what is not combinational is a sequential module (#1526): a loop whose count depends on the inputs, static and global variables; divisions by any value combinational (#1656); array arguments are sequential (ap_memory)', () => {
   const msgs = (src) => cToHdl(src).diagnostics.map((d) => `${d.line}:${d.col} ${d.message}`);
   const seq = (src) => { const r = cToHdl(src); return [r.ok, r.sequential, r.diagnostics.length]; };
   assert.deepEqual(msgs('int f(int n) {\n  int s = 0;\n  for (int i = 0; i < n; i++) s += i;\n  return s;\n}'),
@@ -208,8 +160,9 @@ test('C to HDL: what is not combinational is a sequential module (#1526): a loop
   assert.deepEqual(seq('int f(int a) {\n  static int acc = 0;\n  acc += a;\n  return acc;\n}'), [true, true, 0]);
   assert.deepEqual(seq('int total;\nint f(int a) { total += a; return total; }'), [true, true, 0]);
   assert.deepEqual(seq('int f(int a) { return a + 1; }'), [true, false, 0]);
-  assert.deepEqual(msgs('int f(int a, int b) { return a / b; }'), ['1:32 a division by a value that is not a constant is not supported yet (#1526)']);
-  assert.deepEqual(msgs('int f(int a) { return a / 3; }'), ['1:25 a division by 3 (not a power of 2) is not supported yet (#1526)']);
+  // (a division by a variable or a constant not a power of 2: a divider, #1656)
+  assert.deepEqual(seq('int f(int a, int b) { return a / b; }'), [true, false, 0]);
+  assert.deepEqual(seq('int f(int a) { return a / 3; }'), [true, false, 0]);
   assert.deepEqual(seq('int f(int a[4]) { return a[0]; }'), [true, true, 0]);   // (ap_memory, #1527)
   // constants divide at any value (folded)
   assert.deepEqual(msgs('int f(int a) { return a + 100 / 3 + 7 % 3; }'), []);

@@ -160,8 +160,11 @@ A function with a loop called by the top, or given an array, is **inlined** into
 top's (each call its own), its array parameters the arguments (a memory too), its pointer and reference parameters
 the variables passed, its by-value parameters local variables, its `static` variables one register per function
 shared by every call; an early `return` ends it through a flag. Such a call in an expression is made before it;
-in a loop's condition, or after `&&`, `||` or `?:`, it is refused. A division by a value other than a constant
-power of 2 is not supported yet. The machine shown as an ASM chart: #1575.
+in a loop's condition, or after `&&`, `||` or `?:`, it is refused. A division or remainder (#1656) by a constant
+power of 2 is shifts, by another constant a multiplication by its reciprocal and a shift, by a variable a restoring
+divider (one compare-and-subtract per bit, combinational: in one cycle); all written with + - * and comparisons, as
+XST takes them. A division by zero gives every quotient bit 1 and the dividend as the remainder (the C simulation
+stops on it). The machine shown as an ASM chart: #1575.
 
 **Arrays and memories** (#1527). A local array of up to 64 elements is registers (one per element; an index that
 is not a constant a multiplexer). An array argument is a memory outside the module, `ap_memory`: one port, its

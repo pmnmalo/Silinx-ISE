@@ -284,7 +284,8 @@ export class Flow {
 // the expressions are in a module of their own (core/c-dataflow-expr.js), mixed into Flow
 import { exprMethods } from './c-dataflow-expr.js';
 import { fixedMethods } from './c-dataflow-fixed.js';
-Object.assign(Flow.prototype, exprMethods, fixedMethods);
+import { divMethods } from './c-dataflow-div.js';
+Object.assign(Flow.prototype, exprMethods, fixedMethods, divMethods);
 
 // ---------------------------------------------------------------------- the ports
 Flow.prototype.finish = function finish(fn) {

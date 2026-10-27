@@ -125,10 +125,14 @@
   },
   "interface-memory-ecc-flags": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C synthesis: 22: a division by a value that is not a constant is not supported yet (#1526)"
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 118,
+      "max": 118,
+      "avg": 118
+    },
+    "reason": null
   },
   "interface-memory-lmem-2rw": {
     "csim": "fail",
@@ -385,10 +389,10 @@
   },
   "modeling-using-arbitrary-precision-arith": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
+    "synth": "pass",
+    "cosim": "pass",
     "latency": null,
-    "reason": "C synthesis: 27: a division by a value that is not a constant is not supported yet (#1526)"
+    "reason": null
   },
   "modeling-using-arbitrary-precision-casting": {
     "csim": "pass",
@@ -466,17 +470,25 @@
   },
   "pipelining-loops-imperfect-loop": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C synthesis: 33: a division by 20 (not a power of 2) is not supported yet (#1526)"
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 1723,
+      "max": 1723,
+      "avg": 1723
+    },
+    "reason": null
   },
   "pipelining-loops-perfect-loop": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C synthesis: 33: a division by 20 (not a power of 2) is not supported yet (#1526)"
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 1723,
+      "max": 1723,
+      "avg": 1723
+    },
+    "reason": null
   },
   "pipelining-loops-using-free-running-pipeline": {
     "csim": "fail",

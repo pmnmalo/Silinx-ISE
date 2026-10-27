@@ -42,7 +42,7 @@ Not part of `npm test` (it needs the network once).
 | interface-aggregation-disaggregation-struct-ii-issue | C++ | fail | fail | skip | - | C simulation: example.cpp:23: the pointer to a struct 'a_in' indexed: write the parameter as an array, a_in[N] |
 | interface-memory-burst-rw | C++ | fail | fail | skip | - | C simulation: vadd_test.cpp:16: the header 'vector' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | interface-memory-coefficient-filter | C | fail | fail | skip | - | C simulation: 43: 'real_val': floating point (float) is not supported in Silinx HLS yet: use integers or ap_int<W> |
-| interface-memory-ecc-flags | C++ | pass | fail | skip | - | C synthesis: 22: a division by a value that is not a constant is not supported yet (#1526) |
+| interface-memory-ecc-flags | C++ | pass | pass | pass | 118 |  |
 | interface-memory-lmem-2rw | C++ | fail | fail | skip | - | C simulation: vadd_test.cpp:20: the header 'vector' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | interface-memory-manual-burst-manual-burst-example-auto-burst-inference-failure | C++ | fail | fail | skip | - | C simulation: 19: 'NUM' is declared twice |
 | interface-memory-manual-burst-manual-burst-example-manual-burst-inference-success | C++ | fail | fail | skip | - | C simulation: example.h:19: the header 'hls_burst_maxi.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
@@ -74,7 +74,7 @@ Not part of `npm test` (it needs the network once).
 | modeling-cpp-templates-for-multiple-instances | C++ | pass | pass | pass | 1 |  |
 | modeling-fixed-point-sqrt | C++ | pass | pass | pass | - |  |
 | modeling-free-running-kernel-remerge-ii4to1 | C++ | fail | fail | skip | - | C simulation: 24: a type expected, not '"in_stream"' |
-| modeling-using-arbitrary-precision-arith | C++ | pass | fail | skip | - | C synthesis: 27: a division by a value that is not a constant is not supported yet (#1526) |
+| modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | - |  |
 | modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | - |  |
 | modeling-using-array-stencil-1d | C++ | fail | fail | skip | - | C simulation: 23: the parameter 'in': floating point (float) is not supported in Silinx HLS yet: use integers or ap_int<W> |
 | modeling-using-array-stencil-2d | C++ | fail | fail | skip | - | C simulation: test.cpp:19: the header 'malloc.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
@@ -85,8 +85,8 @@ Not part of `npm test` (it needs the network once).
 | modeling-variable-bound-loops | C++ | fail | fail | skip | - | C simulation: 26: the number of iterations of this loop is not known: give its bound (a 'for' from a constant to a constant, its variable not changed in its body), or #pragma HLS LOOP_TRIPCOUNT max=N in it |
 | pipelining-functions-function-instantiate | C++ | pass | pass | pass | - |  |
 | pipelining-functions-hier-func | C++ | fail | fail | skip | - | C simulation: 81: 'fp1': structures (FILE) are not supported in Silinx HLS yet |
-| pipelining-loops-imperfect-loop | C++ | pass | fail | skip | - | C synthesis: 33: a division by 20 (not a power of 2) is not supported yet (#1526) |
-| pipelining-loops-perfect-loop | C++ | pass | fail | skip | - | C synthesis: 33: a division by 20 (not a power of 2) is not supported yet (#1526) |
+| pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 1723 |  |
+| pipelining-loops-perfect-loop | C++ | pass | pass | pass | 1723 |  |
 | pipelining-loops-using-free-running-pipeline | C++ | fail | fail | skip | - | C simulation: free_pipe_mult.h:18: the header 'ap_axi_sdata.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | task-level-parallelism-control-driven-channels-autorestart | C++ | fail | fail | skip | - | C simulation: diamond_test.cpp:22: the header 'hls_task.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | task-level-parallelism-control-driven-channels-merge-split-merge-load-balance | C++ | fail | fail | skip | - | C simulation: test.h:19: the header 'hls_np_channel.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | fail | fail | skip | - | C simulation: test.h:17: the header 'hls_task.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | fail | fail | skip | - | C simulation: test.h:19: the header 'hls_task.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 
-73 designs: 19 through co-simulation.
+73 designs: 23 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS
