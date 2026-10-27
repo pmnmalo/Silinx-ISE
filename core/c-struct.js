@@ -464,8 +464,9 @@ function uses(toks, cx) {
         const vals = list?.get(l.suffix) ?? defaults(S, l, all);
         if (vals) {
           dst.push(L(name, '='));
-          if (all.length) { dst.push(L(name, '{')); vals.forEach((v, i) => { if (i) dst.push(L(name, ',')); dst.push(...v); }); dst.push(L(name, '}')); }
-          else dst.push(...vals[0]);
+          // (the values' own struct members rewritten: S v = {w.a, w.b};, #1703)
+          if (all.length) { dst.push(L(name, '{')); vals.forEach((v, i) => { if (i) dst.push(L(name, ',')); rewrite(v, dst, false); }); dst.push(L(name, '}')); }
+          else rewrite(vals[0], dst, false);
         }
         dst.push(L(name, ';'));
       }

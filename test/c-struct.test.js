@@ -158,3 +158,14 @@ test('#1590 structs: what is not supported said', () => {
   assert.deepEqual(errs('struct s { int a; };\nstruct s mk(int x) { struct s r; r.a = x; return r; }\nint f(int x) { return mk(x).a; }\n'), ["3 'mk' returns a struct: call it as a statement, x = mk(…); or S x = mk(…);"]);
   assert.deepEqual(errs('struct s { int a; };\nint f(int x) { s v(x); return v.a; }\n', 'e.cpp'), ["2 'v': s has no constructor of 1 argument(s)"]);
 });
+
+test('#1703 a struct initialized from another struct\'s members (S v = {w.a, w.b};), an array of structs from them, nested: the C simulation as cc\'s, co-simulated in VHDL and Verilog', { skip: noCC }, () => {
+  const src = '#include <stdio.h>\nstruct in { short a; char b; };\nstruct out { int s; struct in c; };\nint f(int x) {\n  struct in w = {x, x + 1};\n  struct out o = {w.a * 3, {w.b, w.a}};\n  struct in t[2] = {{o.c.b, w.b}, {o.s, o.c.a}};\n  return o.s + o.c.a * 10 + t[1].a + t[0].b;\n}\nint main(void) { for (int x = -3; x < 4; x++) printf("%d\\n", f(x * 7)); return 0; }\n';
+  const sim = simulateC(src, { file: 'init.c' });
+  assert.deepEqual([sim.error, sim.diagnostics], [null, []]);
+  assert.equal(sim.output, compiledRun(src).output);
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(src, { file: 'init.c', lang });
+    assert.deepEqual([r.errors, r.pass, r.gen.diagnostics], [[], true, []], JSON.stringify(r.mismatches, big));
+  }
+});
