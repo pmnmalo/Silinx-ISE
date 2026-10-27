@@ -7,10 +7,10 @@
   "flow": "complete",
   "quality": {
    "part": "xc3s250ecp132-4",
-   "slices": 194,
-   "luts": 171,
+   "slices": 232,
+   "luts": 464,
    "ffs": 386,
-   "period": 12.975
+   "period": 10.33
   }
  },
  "epfl-bar": {
