@@ -38,6 +38,7 @@ export function loopPragma(loop, name) {
 export function checkPragmas(ast, funcs, report) {
   const one = (p, loc, where) => {
     const { name, args } = p;
+    if (p.dup) return;   // (a stream of a struct's pragma made for each of its members' streams but the first: said once, #1662)
     if (IGNORED.has(name)) { report(loc, `#pragma HLS ${name} is accepted and ignored: Silinx does not make it`, 'warning'); return; }
     if (!MADE.has(name)) { report(loc, `#pragma HLS ${name} is not a pragma Silinx knows: ignored`, 'warning'); return; }
     if (LOOP_ONLY.has(name) && where !== 'loop') {
@@ -56,7 +57,7 @@ export function checkPragmas(ast, funcs, report) {
     }
     if (name === 'INTERFACE' && args.port && args.port !== 'return') {
       const mode = String(args.mode || Object.keys(args).find((k) => /^(ap_|s_axi|m_axi|axis|bram)/.test(k)) || '').toLowerCase();
-      if (mode && !ARG_MODES.has(mode)) report(loc, `#pragma HLS INTERFACE ${mode} port=${args.port} is not made yet: ignored (its default interface made)`, 'warning');
+      if (mode && !ARG_MODES.has(mode)) report(loc, `#pragma HLS INTERFACE ${mode} port=${p.of ?? args.port} is not made yet: ignored (its default interface made)`, 'warning');
     }
   };
   for (const p of ast.pragmas) one(p, p.loc, 'file');

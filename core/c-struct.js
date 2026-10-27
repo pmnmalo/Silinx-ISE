@@ -10,6 +10,7 @@
 //   cStructs(tokens, report, cpp) -> { tokens, structArgs: Map(function -> [{ name, members: [names] }]) }
 import { closing, splitTop, constTokens } from './cpp-template.js';
 import { parseMethod, methodFunctions, foldDefaultCtor } from './cpp-method.js';
+import { structStreams } from './c-struct-stream.js';
 
 const op = (t, v) => t && t.t === 'op' && t.v === v;
 const isId = (t, v) => t && t.t === 'id' && (v === undefined || t.v === v);
@@ -18,13 +19,40 @@ const STMT_START = (t) => !t || op(t, ';') || op(t, '{') || op(t, '}') || t.t ==
 
 const L = (t, v, tt = 'op') => ({ ...t, t: tt, v });
 
+/** The constant arguments of the ap types folded: ap_uint<(32 + 7) / 8> is ap_uint<4> (a class template's member
+ *  once its parameters are given). */
+function foldApWidths(toks) {
+  const out = [];
+  for (let k = 0; k < toks.length; k++) {
+    const t = toks[k];
+    out.push(t);
+    if (!(isId(t) && /^ap_u?(int|fixed)$/.test(t.v) && op(toks[k + 1], '<'))) continue;
+    const end = closing(toks, k + 1);
+    if (end < 0 || !toks[end] || !op(toks[end], '>')) continue;
+    const args = splitTop(toks.slice(k + 2, end));
+    if (!args.some((a) => a.length > 1)) continue;
+    const vals = args.map((a) => (a.length > 1 ? constTokens(a) : null));
+    out.push(toks[k + 1]);
+    args.forEach((a, i) => {
+      if (i) out.push(L(a[0], ','));
+      out.push(...(vals[i] !== null ? [L(a[0], String(vals[i]), 'num')] : a));
+    });
+    out.push(toks[end]);
+    k = end;
+  }
+  return out;
+}
+
 export function cStructs(input, report, cpp) {
   // (structs: name -> { name, members: [{ name, type: tokens, dims: [tokens], struct, init }] }; sigs: the functions
   // with struct parameters or results, name -> { params: [{ name, S, kind: 'val' | 'ref' | 'ptr' | 'arr', dims }],
   // ret }; structArgs: their members, the top's ports, core/c-hdl.js)
   const cx = { structs: new Map(), enums: new Set(), enumVals: new Map(), sigs: new Map(), structArgs: new Map(), report, cpp };
-  const toks = definitions(input, cx);
+  const defs = definitions(foldApWidths(input), cx);
+  const streamArgs = new Map();
+  const toks = cpp ? structStreams(defs, cx.structs, report, streamArgs) : defs;
   signatures(toks, cx);
+  for (const [f, a] of streamArgs) cx.structArgs.set(f, [...a, ...(cx.structArgs.get(f) || [])]);
   return { tokens: uses(toks, cx), structArgs: cx.structArgs };
 }
 
@@ -114,6 +142,16 @@ function definitions(input, cx) {
       k = end;
       continue;
     }
+    // typedef [struct] S A; (S a struct or an enum already defined): A another name of it
+    if (td) {
+      const j = isId(input[k + 1], 'struct') || isId(input[k + 1], 'class') || isId(input[k + 1], 'enum') ? k + 2 : k + 1;
+      const s = input[j], a = input[j + 1];
+      if (isId(s) && isId(a) && op(input[j + 2], ';') && (structs.has(s.v) || enums.has(s.v))) {
+        if (structs.has(s.v)) structs.set(a.v, structs.get(s.v)); else enums.add(a.v);
+        k = j + 2;
+        continue;
+      }
+    }
     // (C: struct S x; the tag a type's name)
     if ((isId(t, 'struct') || isId(t, 'enum') || isId(t, 'class')) && isId(input[k + 1]) && (structs.has(input[k + 1].v) || enums.has(input[k + 1].v))) continue;
     if (t.t === 'id' && enums.has(t.v)) { toks.push(L(t, 'int', 'id')); continue; }
@@ -140,6 +178,8 @@ function definitions(input, cx) {
       const nameAt = declaratorName(first);
       if (nameAt < 0) { report(decl[0], `the struct '${sname}': a member expected`); continue; }
       const type = first.slice(0, nameAt);
+      // (ap_uint<0> x;: no bits, left out, as AMD's ap_axis's side channels of width 0)
+      if (type.length === 4 && /^ap_u?int$/.test(type[0].v) && op(type[1], '<') && type[2].v === '0' && op(type[3], '>')) continue;
       if (type.some((x) => op(x, '*') || op(x, '&'))) { report(first[nameAt], `the member '${first[nameAt].v}': a pointer in a struct is not possible in Silinx HLS`); continue; }
       for (const [i, p] of parts.entries()) {
         const d = i === 0 ? p.slice(nameAt) : p;

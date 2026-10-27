@@ -14,6 +14,7 @@
 
 // the headers Silinx HLS knows (docs/c-to-hdl.md); hls_stream.h and the others refused
 import { cppTokens, CPP_HEADERS, isCpp } from './cpp-lex.js';
+import { CPP_OWN_HEADERS } from './cpp-headers.js';
 import { readPragma } from './c-pragma.js';
 import { cppTemplates } from './cpp-template.js';
 import { cppSugar } from './cpp-sugar.js';
@@ -290,6 +291,8 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
           continue;
         }
         if (cpp && m[1] === 'hls_stream.h') continue;   // (hls::stream: C++'s, #1590)
+        // (a header Silinx HLS writes itself: core/cpp-headers.js, #1662)
+        if (cpp && CPP_OWN_HEADERS[m[1]]) { if (!once.has(`<${m[1]}>`)) run(CPP_OWN_HEADERS[m[1]], `<${m[1]}>`, depth + 1); continue; }
         if (!KNOWN_HEADERS.has(m[1])) e(m[1] === 'hls_stream.h' ? 'hls_stream.h: hls::stream is C++: write the source as a .cpp file'
           : `the header '${m[1]}' is not one of Silinx HLS's (${[...KNOWN_HEADERS].join(', ')})`);
         for (const [k, v] of Object.entries(HEADER_MACROS[m[1]] || {})) if (!macros.has(k)) macros.set(k, { params: null, body: scan(v, line, bad).map((t) => ({ ...t, line })) });

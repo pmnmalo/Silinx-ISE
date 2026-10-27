@@ -210,14 +210,14 @@
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: example.h:20: the header 'ap_axi_sdata.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "C simulation: 20: a type expected, not 'packet'"
   },
   "interface-streaming-axi-stream-to-master": {
     "csim": "fail",
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: example.h:18: the header 'ap_axi_sdata.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "C simulation: 25: the number of iterations of this loop is not known: give its bound (a 'for' from a constant to a constant, its variable not changed in its body), or #pragma HLS LOOP_TRIPCOUNT max=N in it"
   },
   "interface-streaming-axis-array-stream-no-side-channel-data": {
     "csim": "pass",
@@ -238,18 +238,22 @@
     "reason": "C simulation: 23: '.write' is not a member function Silinx HLS knows (ap_int / ap_uint: range, to_double, to_float, to_int, to_uint, to_long, to_ulong, to_int64, to_uint64, length, and_reduce, or_reduce, xor_reduce)"
   },
   "interface-streaming-using-axi-stream-with-side-channel-data": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: example.h:20: the header 'ap_axi_sdata.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 31,
+      "max": 34,
+      "avg": 31.8
+    },
+    "reason": null
   },
   "interface-streaming-using-axi-stream-with-struct": {
     "csim": "fail",
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: example.h:1: the header 'ap_axi_sdata.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "C simulation: example.h:3: the header 'complex' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
   },
   "migration-python-scripts": {
     "csim": "pass",
@@ -495,7 +499,7 @@
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: free_pipe_mult.h:18: the header 'ap_axi_sdata.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "C simulation: 21: the parameter 'A': floating point (data_t) is not supported in Silinx HLS yet: use integers or ap_int<W>"
   },
   "task-level-parallelism-control-driven-channels-autorestart": {
     "csim": "fail",

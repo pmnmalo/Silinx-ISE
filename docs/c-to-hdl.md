@@ -15,7 +15,9 @@ Spartan-3E, so it is not Silinx's oracle: the C itself is (see *Checking it* bel
   (see *C++* below).
 - Known headers: `ap_int.h`, `stdint.h`, `stdbool.h`, `stdio.h`, `stdlib.h`, `string.h`, `math.h`,
   `stddef.h`, `limits.h` (the library for test benches, ignored by synthesis); in C++ their `<c…>` names,
-  `<iostream>`, `<fstream>`, `<iomanip>` and `hls_stream.h`. The project's own headers (`#include "x.h"`)
+  `<iostream>`, `<fstream>`, `<iomanip>`, `hls_stream.h` and `ap_axi_sdata.h` (Silinx HLS's own: `ap_axis<D, U, TI,
+  TD>` and `ap_axiu<…>`, a beat's data, keep, strb, user, last, id and dest; a side channel of width 0 left out, #1662).
+  The project's own headers (`#include "x.h"`)
   are read in place.
 - The **top function**: the one named by `#pragma HLS TOP name=…`, else the file's last function
   that is not `main`. The other functions are inlined into it. `main()` is the test bench (C
@@ -84,7 +86,10 @@ so its hardware is the C's:
 - `auto x = e;` (the type `e` is declared with) and the **range for** over an array (`for (auto &x : a)`); over
   an array argument it is refused, as C++ does (the argument is a pointer).
 - **`hls::stream<T>`** arguments: the `ap_fifo` interface (`_dout`, `_empty_n`, `_read`; `_din`, `_full_n`,
-  `_write`), each access a state of its own that waits while the FIFO is empty or full.
+  `_write`), each access a state of its own that waits while the FIFO is empty or full. A **stream of a struct**
+  (`hls::stream<S>`, #1662) is a stream per member of `S` (`A_data`, `A_last`…), all written or read together:
+  `write`, `<<`, `read()` in a declaration, an assignment or a `return`, `read(v)`, `>>`, `empty`, `full`, passed to a
+  function, named by a pragma. Vitis HLS makes one stream of them (a warning says so: not yet, #1628).
 - Test benches: `std::cout` / `cerr` (with `<iomanip>`'s `setw`, `left` / `right`, `setfill('0')`, `hex` /
   `oct` / `dec`), `ofstream` / `ifstream` (files in memory), `>>` and `<<` on streams.
 - Macros are expanded in pragmas (`#define F 4` … `#pragma HLS UNROLL factor=F`), as Vitis HLS does.
@@ -99,7 +104,7 @@ its own, named by the variable and the member (`p.x` is `p_x`, `line[2].a.b` is 
 structs is an array per member; a member array of an array of structs is one array of both sizes (`a[i].v[j]` is
 `a_v[i * 4 + j]`). So each member is a register, or a memory when its array is large, of its own.
 
-- Definitions: `struct S { … };`, `typedef struct { … } S;`, `class` (its data members); nested structs, member
+- Definitions: `struct S { … };`, `typedef struct { … } S;`, `typedef S T;`, `class` (its data members); nested structs, member
   arrays, members' default values (`int n = 0;`).
 - Uses: members (`.`, `->`), whole structs copied (`a = b;`, `S c = d;`), initializer lists (`{ … }`, nested or
   not, the missing members zero), passed to functions by value, by reference (`S &`, `const S &`) or by address

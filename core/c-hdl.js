@@ -39,6 +39,7 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // a struct argument (#1590): its members ports of their own (Vitis HLS aggregates them into one port: #1628)
   for (const a of checked.ast.structArgs?.get(checked.top) || []) {
     diagnostics.push({ file, line: a.loc.line, col: a.loc.col, message: a.name === 'return' ? `the struct returned by '${checked.top}': its members are outputs of their own (${a.members.join(', ')}); Vitis HLS makes one port of them (not yet, #1628)`
+      : a.stream ? `the stream of a struct '${a.name}': its members are streams of their own (${a.members.join(', ')}); Vitis HLS makes one stream of them (not yet, #1628)`
       : `the struct argument '${a.name}': its members are ports of their own (${a.members.join(', ')}); Vitis HLS makes one port of them (not yet, #1628)`, severity: 'warning' });
   }
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
