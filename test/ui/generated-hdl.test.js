@@ -1,7 +1,8 @@
 // UI: only a source's main type is editable (#1176). The HDL file generated from a drawing (a schematic here, the
 // example gates) opens read-only: typed text, Tab, a paste or a template change nothing; its bar says it is
-// generated from the drawing and links to it, without Undo / Redo or Templates ▾ (Find and Check Syntax kept); its
-// right-click menu has no editing commands (Copy, Select All, Find…, Check Syntax and Open Schematic kept); an edit of
+// generated from the drawing and links to it, without Undo / Redo or Templates ▾, not rendered either (#1636; Find and
+// Check Syntax kept); its right-click menu has no editing commands (Copy, Select All, Find…, Check Syntax and Open
+// Schematic kept); an edit of
 // the schematic still reaches it. A module written in HDL stays editable, and becomes read-only when it is converted
 // to a schematic while its editor is open. The same in the Tasks interface. The truth table's, the state
 // diagram's and the Petri net's HDL: truthtable.test.js, drawings-tt.test.js, fsm.test.js, petri.test.js.
@@ -18,8 +19,14 @@ const D = '.doc:not([hidden])';
 const INV = 'library ieee;\nuse ieee.std_logic_1164.all;\n\nentity inv is\n  port (a : in std_logic; y : out std_logic);\nend inv;\n\narchitecture rtl of inv is\nbegin\n  y <= not a;\nend rtl;\n';
 
 const banner = (page) => page.eval((d) => { const b = document.querySelector(`${d} [data-sync-banner]`); return b && !b.hidden ? b.textContent : null; }, D);
-// the bar's buttons shown (their titles), in order
-const barButtons = (page) => page.eval((d) => [...document.querySelectorAll(`${d} .editor-bar button`)].filter((b) => !b.hidden).map((b) => b.title), D);
+// the bar's buttons shown (their titles), in order: rendered, not only without the hidden attribute (#1636)
+const barButtons = (page) => page.eval((d) => {
+  const bs = [...document.querySelectorAll(`${d} .editor-bar button`)];
+  if (bs.some((b) => b.hidden !== !b.getClientRects().length)) return 'a button hidden but rendered, or the reverse';
+  return bs.filter((b) => b.getClientRects().length).map((b) => b.title);
+}, D);
+// the bar's separators hidden with the attribute and still rendered (#1636)
+const hiddenShown = (page) => page.eval((d) => [...document.querySelectorAll(`${d} .editor-bar [hidden]`)].filter((e) => e.getClientRects().length).length, D);
 // the labels of the editor's right-click menu
 async function editorMenu(page) {
   const at = await page.eval((d) => { const r = document.querySelector(`${d} .cm-editor`).getBoundingClientRect(); return { x: r.left + 80, y: r.top + 40 }; }, D);
@@ -51,6 +58,7 @@ uiTest('#1176 the HDL generated from a schematic opens read-only: nothing typed 
   // the bar: read-only, generated from the schematic; Find and Check Syntax, no Undo / Redo / Templates ▾
   assert.equal(await banner(page), 'Read-only, generated from gates.sch.json');
   assert.deepEqual(await barButtons(page), ['Find (Ctrl+F)', 'Check Syntax of this file']);
+  assert.equal(await hiddenShown(page), 0);
 
   // nothing typed reaches it, nor the file
   const [was, now] = await tryEdits(page);
@@ -126,6 +134,7 @@ uiTest('#1176 Tasks interface: the HDL generated from a schematic is read-only t
     assert.equal(await page.eval(() => window.Silinx.active.editor.readOnly()), true);
     assert.equal(await banner(page), 'Read-only, generated from gates.sch.json');
     assert.deepEqual(await barButtons(page), ['Find (Ctrl+F)', 'Check Syntax of this file']);
+    assert.equal(await hiddenShown(page), 0);
     const [was, now] = await tryEdits(page);
     assert.equal(now, was);
     await page.click(`${D} [data-sync-banner] a`);

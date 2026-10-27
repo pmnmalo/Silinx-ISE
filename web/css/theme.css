@@ -108,6 +108,8 @@ button, input, select, textarea { font: inherit; }
 .tb-btn:disabled { opacity: .4; }
 .tb-btn svg { width: 16px; height: 16px; }
 .tb-sep { width: 1px; height: 18px; background: #c0c0c0; margin: 0 4px; box-shadow: 1px 0 #fff; }
+/* hidden (the read-only generated HDL's Undo / Redo, #1636): above any toolbar's display */
+.tb-btn[hidden], .tb-sep[hidden] { display: none !important; }
 
 /* Trees */
 .tree { list-style: none; margin: 0; padding: 0 0 0 2px; user-select: none; }
