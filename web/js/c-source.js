@@ -135,8 +135,10 @@ export async function runCReport(path) {
   if (!r.ok) { log('\nProcess "View C Synthesis Report" failed', 'err', { diag: false }); return false; }
   const rep = r.report;
   const L = [`C Synthesis Report of '${r.top}' (${path}, ${lang === 'vhdl' ? 'VHDL' : 'Verilog'})`, ''];
-  if (rep.dataflow) L.push(`Module: DATAFLOW, ap_ctrl_hs (ap_clk, ap_rst, ap_start / ap_done / ap_idle / ap_ready), ${rep.processes.length} processes running at once`);
-  else L.push(rep.sequential ? `Module: sequential, ap_ctrl_hs (ap_clk, ap_rst, ap_start / ap_done / ap_idle / ap_ready), ${rep.states} states, ${rep.registerBits} register bits` : 'Module: combinational');
+  // (ap_ctrl_none: no ap_start / ap_done / ap_idle / ap_ready, #1900)
+  const ctrl = r.ports.some((p) => p.name === 'ap_start') ? 'ap_ctrl_hs (ap_clk, ap_rst, ap_start / ap_done / ap_idle / ap_ready)' : 'ap_ctrl_none (ap_clk, ap_rst: running by itself)';
+  if (rep.dataflow) L.push(`Module: DATAFLOW, ${ctrl}, ${rep.processes.length} processes running at once`);
+  else L.push(rep.sequential ? `Module: sequential, ${ctrl}, ${rep.states} states, ${rep.registerBits} register bits` : 'Module: combinational');
   L.push('', 'Ports:');
   for (const p of r.ports) L.push(`  ${p.name.padEnd(16)} ${p.dir === 'in' ? 'in ' : 'out'} ${String(p.w).padStart(3)} bit${p.w > 1 ? 's' : ''}`);
   // (DATAFLOW, #1707: each process a module, the FIFOs between them)

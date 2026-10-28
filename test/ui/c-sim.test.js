@@ -145,6 +145,42 @@ uiTest('#1707 View C Synthesis Report of a DATAFLOW module: its processes (each 
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });
 
+const FREE = `#include "hls_stream.h"
+void inc(hls::stream<int> &a, hls::stream<int> &b) { b.write(a.read() + 1); }
+void dbl(hls::stream<int> &a, hls::stream<int> &b) { b.write(a.read() * 2); }
+void free_run(hls::stream<int> &src, hls::stream<int> &dst) {
+#pragma HLS INTERFACE ap_ctrl_none port=return
+#pragma HLS DATAFLOW
+  hls::stream<int> mid;
+  inc(src, mid);
+  dbl(mid, dst);
+}
+int main() {
+  hls::stream<int> a, b;
+  int t = 0;
+  for (int i = 0; i < 3; i++) { a.write(i); free_run(a, b); t += b.read(); }
+  return t == 12 ? 0 : 1;
+}
+`;
+
+uiTest('#1900 View C Synthesis Report of a module with ap_ctrl_none: ap_clk and ap_rst only (no ap_start / ap_done / ap_idle / ap_ready), running by itself; C/RTL Co-simulation PASS', E, async (page) => {
+  await makeProject(env, { name: 'CFree', top: 'free_run', files: { 'src/free_run.cpp': FREE } });
+  await page.openProject('CFree');
+  await page.showMessages();
+  await page.treeRow('#hier', 'free_run');
+  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+  await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
+  const log = await page.consoleText();
+  assert.match(log, /\nModule: DATAFLOW, ap_ctrl_none \(ap_clk, ap_rst: running by itself\), 2 processes running at once\n\nPorts:\n {2}ap_clk {11}in {4}1 bit\n {2}ap_rst {11}in {4}1 bit\n {2}src_dout /);
+  assert.doesNotMatch(log, /ap_start|WARNING:SilinxC/);
+  await page.setView('sim');
+  await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
+  await page.waitConsole(/Process "C\/RTL Co-simulation" completed successfully/, { timeout: 60000 });
+  assert.match(await page.consoleText(), /C\/RTL co-simulation PASS: 3 call\(s\), the same results/);
+  await page.setView('impl');
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+});
+
 uiTest('#1852 C Simulation with the Console\'s filter on Design: its lines shown, the filter turned to Simulation', E, async (page) => {
   await makeProject(env, { name: 'CSimFilter', top: '', files: { 'src/gcd.c': GCD } });
   await page.openProject('CSimFilter');

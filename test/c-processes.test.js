@@ -163,14 +163,14 @@ int main() {
 }
 `;
 
-test('#1719 hls::task in hardware: each task a process running by itself (its ap_start 1, its state kept across calls), its streams FIFOs; co-simulated in VHDL and Verilog', () => {
+test('#1719 hls::task in hardware: each task a process running by itself (its ap_start 1, its state kept across calls), its streams FIFOs; the top data-driven, ap_clk and ap_rst only (#1900); co-simulated in VHDL and Verilog', () => {
   assert.equal(simulateC(TASKS, { file: 'tasks.cpp' }).output, '112 | 135 158\n');
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(TASKS, { file: 'tasks.cpp', lang });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
     assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ['5 the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)']);
-    assert.deepEqual(r.gen.ports.map((p) => p.name), ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'in_r_dout', 'in_r_empty_n', 'in_r_read', 'out_r_din', 'out_r_full_n', 'out_r_write']);
+    assert.deepEqual(r.gen.ports.map((p) => p.name), ['ap_clk', 'ap_rst', 'in_r_dout', 'in_r_empty_n', 'in_r_read', 'out_r_din', 'out_r_full_n', 'out_r_write']);
     assert.deepEqual([r.gen.report.tasks, r.gen.report.processes.map((p) => `${p.instance} ${p.task}`), r.gen.report.fifos], [true, ['pairs_U0 t1', 'count_U1 t2'], [{ name: 'mid', depth: 4 }]]);
     assert.match(r.gen.hdl, lang === 'vhdl' ? /pairs_U0_ap_start <= '1';/ : /assign pairs_U0_ap_start = 1'b1;/);
   }

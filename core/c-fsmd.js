@@ -5,7 +5,8 @@
 // symbolically (core/c-dataflow.js) on the registers' values, giving their next values and the next state.
 // The block protocol is Vitis HLS's ap_ctrl_hs: in the idle state the arguments are read when ap_start is 1; the
 // last state of a call has ap_done and ap_ready 1, ap_return valid; a pointer output's _ap_vld is 1 one cycle after
-// each write, its value then valid. Isomorphic ES module: no DOM and no Node APIs.
+// each write, its value then valid. With ap_ctrl_none (a function with a stream) the machine starts its next call
+// when one is done, as if ap_start were 1 (#1900). Isomorphic ES module: no DOM and no Node APIs.
 //
 //   fsmd(checked) -> { graph, regs, states, entry, idle, done, ports, outputs, diagnostics }
 //     regs:    [{ name, w, s, reset: BigInt, latch?: node id (its value read at the start of a call) }]
@@ -200,7 +201,12 @@ class SeqFlow extends Flow {
       if (st.kind !== 'pragma' || st.pragma.name !== 'INTERFACE') continue;
       const a = st.pragma.args;
       const mode = String(a.mode || Object.keys(a).find((k) => /^ap_/.test(k)) || '').toLowerCase();
-      if (a.port === 'return' && mode === 'ap_ctrl_none') this.warn(st.loc, 'ap_ctrl_none: this function is sequential, it needs its block protocol: ap_ctrl_hs is made');
+      // (ap_ctrl_none: running by itself, its calls one after the other, when it has a stream to be fed through, as
+      // Vitis HLS co-simulates it, #1900; else its block protocol is made)
+      if (a.port === 'return' && mode === 'ap_ctrl_none') {
+        if (fn.params.some((pa) => pa.type.kind === 'stream')) this.ctrl = 'ap_ctrl_none';
+        else this.warn(st.loc, 'ap_ctrl_none: this function is sequential, it needs its block protocol: ap_ctrl_hs is made');
+      }
       else if (a.port && a.port !== 'return') this.modes.set(a.port, mode);
     }
     this.retType = fn.ret.kind === 'void' ? null : typeOf(fn.ret);
@@ -492,7 +498,7 @@ class SeqFlow extends Flow {
     if (this.retReg) { ports.push({ name: 'ap_return', dir: 'out', w: this.retType.w, s: this.retType.s, role: 'return' }); outputs.set('ap_return', { reg: this.retReg.name }); }
     return {
       graph: this.g, regs: [...(this.regs?.values() || [])], states: this.states || [], entry: this.entry?.num ?? 1, idle: 0, done: this.doneNum ?? 1,
-      stateT: this.stateT, ports, outputs, ctrl: 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
+      stateT: this.stateT, ports, outputs, ctrl: this.ctrl ?? 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
       loops: this.loops || [], blocks: this.reached || [], fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}) })), extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written })),
     };
   }

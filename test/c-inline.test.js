@@ -101,12 +101,13 @@ test('#1632 functions with loops given a memory, called by the top (a chain of t
   assert.deepEqual([sim.output, sim.exitCode], [ref.output, ref.exitCode]);
 });
 
-test('#1632 functions with loops called by the top: inlined, co-simulated in VHDL and Verilog, no warning; the memory one, its loops the top\'s', () => {
+test('#1632 functions with loops called by the top: inlined, co-simulated in VHDL and Verilog, one warning (pos named pos_r, #1902); the memory one, its loops the top\'s', () => {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(SEARCH, { file: 'search.c', lang });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics, []);
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), ["28 warning: 'pos' is a name Vitis HLS reserves: it is named pos_r in the module"]);
+    assert.deepEqual(r.gen.ports.filter((p) => p.param === 'pos').map((p) => p.name), ['pos_r', 'pos_r_ap_vld']);
     assert.deepEqual(r.gen.report.memories, [{ name: 'buf', words: 100, bits: 32, kind: 'RAM' }]);
     // (each call's loops its own: refill's two fills, find twice, sum twice, first_above's two)
     assert.equal(r.gen.report.loops.length, 8);

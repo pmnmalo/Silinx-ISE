@@ -172,9 +172,9 @@ Names and behaviour as Vitis HLS makes them (UG1399, "Interface synthesis"):
 
 | Source | Ports |
 |---|---|
-| (clock and reset) | `ap_clk`, `ap_rst` (active high, synchronous) — none for a combinational module |
+| (clock and reset) | `ap_clk`, `ap_rst` (active high, synchronous); a combinational module with `ap_ctrl_hs` only `ap_rst` (not read) and no `ap_clk`, as Vitis HLS's (#1900) |
 | the block protocol `ap_ctrl_hs` (default) | `ap_start` in; `ap_done`, `ap_idle`, `ap_ready` out |
-| `#pragma HLS INTERFACE ap_ctrl_none port=return` | no block protocol ports |
+| `#pragma HLS INTERFACE ap_ctrl_none port=return` | no block protocol ports (a sequential module: `ap_clk` and `ap_rst` only, running by itself, #1900) |
 | the returned value | `ap_return` (its type's width) |
 | a scalar argument `int a` | input `a` (`ap_none`) |
 | a pointer argument only read | input `p` (`ap_none`) |
@@ -189,6 +189,10 @@ Ports are `std_logic_vector(W-1 downto 0)` (VHDL) or `[W-1:0]` (Verilog), a 1-bi
 are read and the next call may start; `ap_done` (one cycle) says the outputs and `ap_return` are
 valid; `ap_idle` is 1 while no call runs.
 
+An argument named as a reserved word of VHDL or Verilog (`in`, `out`, `signal`…), or as one of the names Vitis HLS
+reserves (`pos`, `neg`, #1902), has its ports named `<name>_r` (`in_r_dout`, `pos_r`), with a warning, as Vitis HLS
+names them.
+
 A function with no `static` variable whose loops all have constant bounds (fully unrolled) is
 **combinational**: with `ap_ctrl_hs`, `ap_done` and `ap_ready` follow `ap_start` and `ap_idle` is 1;
 with `ap_ctrl_none`, only the data ports. Any other function (a loop whose count depends on its inputs, a
@@ -198,6 +202,10 @@ run in one clock cycle; its variables are registers (a `static` or a global keep
 initial value set at the reset); its loops, `break`, `continue` and `return` choose the next state. The arguments
 are read when `ap_start` is 1 in the idle state; the call's last state has `ap_done` and `ap_ready` at 1 for one
 cycle, `ap_return` valid; a pointer output's `_ap_vld` is 1 for one cycle after each write, its value then valid.
+With `ap_ctrl_none` (#1900) a sequential function with a stream argument has only `ap_clk` and `ap_rst`: it runs by
+itself, starting its next call when one is done (Vitis HLS's free-running kernel), and the co-simulation feeds its
+streams and waits for each call's values; one with no stream keeps `ap_ctrl_hs`, with a warning (its calls could not
+be told apart: Vitis HLS's co-simulation refuses it too).
 A function with a loop called by the top, or given an array, is **inlined** into it (#1632): its loops are the
 top's (each call its own), its array parameters the arguments (a memory too), its pointer and reference parameters
 the variables passed, its by-value parameters local variables, its `static` variables one register per function
@@ -236,7 +244,9 @@ channels between them:
 - the top's arguments are passed to the process that uses them: a stream or an array to one process, a scalar to
   any (an argument of a call is an argument of the top, a constant, a local stream or array).
 
-The top's `ap_ctrl_hs` starts every process once a call and is done when every one is. The C simulation runs the
+The top's `ap_ctrl_hs` starts every process once a call and is done when every one is. With `ap_ctrl_none` (and a
+stream argument), or when every process is an `hls::task` (a data-driven top), the top has only `ap_clk` and
+`ap_rst`, as Vitis HLS's (#1900): its processes start again once all are done. The C simulation runs the
 calls in order; the co-simulation drives the top's ports as for any module, and when a call does not end it names
 the streams that may be too shallow (a stream to a process that waits for its writer to be done, through a buffer,
 must hold all a call writes). Not yet: a process giving back a value (a pointer output or a result), an argument of
