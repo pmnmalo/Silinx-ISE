@@ -15,7 +15,7 @@ import { cToHdl } from '../core/c-hdl.js';
 import { cosimulate } from '../core/c-cosim.js';
 import { checkC } from '../core/c-check.js';
 import { testBenchFiles } from '../core/c-interp-lib.js';
-import { CC, noCC, lf, against } from './c-helpers.js';
+import { CC, CC_WARN, noCC, lf, against, compiledRun } from './c-helpers.js';
 
 // the top function writes a trace file of each call, only in the C simulation (as AMD's hier_func example)
 const TOP = `#include <stdio.h>
@@ -34,7 +34,8 @@ void sumsub(int a, int b, int *c, int *d) {
 }
 `;
 // its test bench: the inputs read from a file of the project, the results written to a file and compared with a golden one
-const TB = `${TOP}
+const TB = `#include <stdlib.h>
+${TOP}
 int main() {
   int a[4], c, d, tmp, retval = 0;
   FILE *fp = fopen("tb_data/in.dat", "r");
@@ -58,7 +59,7 @@ function compiled(src, files) {
   try {
     for (const [f, t] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); }
     fs.writeFileSync(path.join(dir, 't.c'), src);
-    execFileSync(CC, ['-std=c99', '-w', '-o', path.join(dir, 't'), path.join(dir, 't.c')]);
+    execFileSync(CC, ['-std=c99', ...CC_WARN, '-o', path.join(dir, 't'), path.join(dir, 't.c')], { stdio: ['ignore', 'ignore', 'pipe'] });
     let r;
     try { r = { output: lf(execFileSync(path.join(dir, 't'), { cwd: dir, encoding: 'utf8' })), exitCode: 0 }; } catch (e) { r = { output: lf(e.stdout), exitCode: e.status }; }
     r.files = Object.fromEntries(fs.readdirSync(dir).filter((f) => f.endsWith('.dat')).map((f) => [f, lf(fs.readFileSync(path.join(dir, f), 'utf8'))]));
@@ -86,6 +87,15 @@ test('#1897 a FILE in the top function under #ifndef __SYNTHESIS__ (AMD\'s hier_
   assert.deepEqual([bad.output, bad.exitCode], [badRef.output, badRef.exitCode]);
   assert.equal(bad.exitCode, 1);
   assert.equal(bad.output, 'Files out.dat and tb_data/out.golden.dat differ\nMismatch\n');
+});
+
+test('#1936 the reference compiler refuses a library function called without its header, on Linux as clang on macOS (the test bench\'s system() needs <stdlib.h>); with it, compiled', { skip: noCC }, () => {
+  const undeclared = /implicit declaration of function 'system'|call to undeclared function 'system'/;
+  const prog = (inc) => `${inc}int main(void) { return system("exit 3") != 0 ? 0 : 1; }\n`;
+  assert.throws(() => compiled(prog(''), {}), undeclared);
+  assert.throws(() => compiledRun(prog('')), undeclared);
+  assert.deepEqual(compiled(prog('#include <stdlib.h>\n'), {}), { output: '', exitCode: 0, files: {} });
+  assert.deepEqual(compiledRun(prog('#include <stdlib.h>\n')), { output: '', exitCode: 0 });
 });
 
 test('#1897 the synthesis defines __SYNTHESIS__: the trace code is not synthesized (no message), the HDL compiled, elaborated and simulated in VHDL and Verilog: the co-simulation passes, the outputs the C\'s on random inputs', { skip: noCC }, () => {

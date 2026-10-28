@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { simulateC } from '../core/c-interp.js';
 import { cToHdl } from '../core/c-hdl.js';
-import { CC, noCC, values, rng, lf } from './c-helpers.js';
+import { CC, CC_WARN, noCC, values, rng, lf } from './c-helpers.js';
 import { apIntHeaders, runWithApInt } from './ap-int-ref.js';
 
 const AP = await apIntHeaders();
@@ -22,7 +22,7 @@ function compiled(src) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ci-'));
   try {
     fs.writeFileSync(path.join(dir, 't.c'), src);
-    execFileSync(CC, ['-std=c99', '-w', '-fsigned-char', '-fwrapv', '-O0', '-o', path.join(dir, 't'), path.join(dir, 't.c')]);
+    execFileSync(CC, ['-std=c99', ...CC_WARN, '-fsigned-char', '-fwrapv', '-O0', '-o', path.join(dir, 't'), path.join(dir, 't.c')], { stdio: ['ignore', 'ignore', 'pipe'] });
     try { return { output: lf(execFileSync(path.join(dir, 't'), { encoding: 'utf8' })), exitCode: 0 }; }
     catch (e) { return { output: lf(e.stdout), exitCode: e.status }; }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
@@ -205,7 +205,7 @@ int main() {
   try {
     fs.writeFileSync(path.join(dir, 't.c'), src);
     fs.writeFileSync(path.join(dir, 'golden.dat'), golden);
-    execFileSync(CC, ['-std=c99', '-w', '-o', path.join(dir, 't'), path.join(dir, 't.c')]);
+    execFileSync(CC, ['-std=c99', ...CC_WARN, '-o', path.join(dir, 't'), path.join(dir, 't.c')], { stdio: ['ignore', 'ignore', 'pipe'] });
     let ref;
     try { ref = { output: lf(execFileSync(path.join(dir, 't'), { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })), exitCode: 0 }; } catch (e) { ref = { output: lf(e.stdout), exitCode: e.status }; }
     const sim = simulateC(src, { file: 't.c', files: { 'data/golden.dat': golden } });
