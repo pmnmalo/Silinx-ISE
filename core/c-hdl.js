@@ -12,6 +12,7 @@ import { fsmd } from './c-fsmd.js';
 import { vhdlSeq, verilogSeq } from './c-hdl-seq.js';
 import { aggregate, aggregable } from './c-aggregate.js';
 import { cProcesses } from './c-processes.js';
+import { dataflowCall, hasStreams } from './c-dataflow-call.js';
 import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
 
@@ -33,10 +34,19 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   const flatErrs = [];
   flattenArrays(checked, (loc, message) => flatErrs.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'error' }));
   if (flatErrs.length) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, ...flatErrs] };
-  // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said)
+  // (a region in a function the top calls alone: the top's, #1931)
+  const callErrs = [];
+  dataflowCall(checked, (loc, message) => callErrs.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'error' }));
+  if (callErrs.length) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, ...callErrs].sort((a, b) => a.line - b.line || a.col - b.col) };
+  // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
+  // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {
     const r = cProcesses(source, checked, { file, lang, headers, cToHdl });
     if (!r.fallback) return r;
+    if (hasStreams(checked.funcs.get(checked.top))) {
+      const why = { ...r.fallback, severity: 'error', message: r.fallback.message.replace(/: made sequential \(not as processes\)$/, ': its streams are FIFOs between processes, so it cannot be made sequential') };
+      return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics.filter((d) => !/^#pragma HLS DATAFLOW is accepted and ignored/.test(d.message)), why].sort((a, b) => a.line - b.line || a.col - b.col) };
+    }
     // (said once: why it is made sequential)
     diagnostics.splice(0, diagnostics.length, ...diagnostics.filter((d) => !/^#pragma HLS DATAFLOW is accepted and ignored/.test(d.message)), r.fallback);
   }

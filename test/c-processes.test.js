@@ -194,7 +194,9 @@ int main() { hls::stream<int> a, r; for (int i = 0; i < 4; i++) a.write(i); dut(
     assert.deepEqual([r.errors, r.pass, r.output, r.gen.diagnostics], [[], true, '0 12 24 36 ', []], JSON.stringify(r.mismatches));
     assert.deepEqual(r.gen.report.processes.map((p) => p.instance), ['sc_U0', 'sc_U1']);
   }
-  // (a variable: not a constant, the region made sequential as before)
-  assert.deepEqual(cToHdl(src('  int K = 3;'), { file: 'd.cpp' }).diagnostics.filter((d) => d.severity === 'warning').map((d) => d.message),
-    ["#pragma HLS DATAFLOW: the region has 'K': only streams and arrays are declared in a DATAFLOW region: made sequential (not as processes)"]);
+  // (a variable never changed: the same, #1931; changed: not a constant, the region of streams said)
+  const v = cosimulate(src('  int K = 3;'), { file: 'd.cpp', lang: 'verilog' });
+  assert.deepEqual([v.errors, v.pass, v.output, v.gen.diagnostics], [[], true, '0 12 24 36 ', []]);
+  assert.deepEqual(cToHdl(src('  int K = 3;\n  K++;'), { file: 'd.cpp' }).diagnostics.map((d) => `${d.severity}: ${d.message}`),
+    ["error: #pragma HLS DATAFLOW: the region has 'K': only streams and arrays are declared in a DATAFLOW region: its streams are FIFOs between processes, so it cannot be made sequential"]);
 });
