@@ -249,7 +249,9 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
   if (cpp) {
     // (a test bench's std::vector, generate / fill, <random> first: C tokens, core/cpp-stl.js, #1734)
     // (then the arrays of streams: a stream each element, core/c-stream-array.js, #1739; of tasks before, #1898)
-    const st = cStructs(cppSugar(cppTemplates(streamArrays(taskArrays(npChannels(cppStl(tokens, report), report), report), report), report), report), report, true);
+    // (a template's: once it is made, its parameters known, #1898)
+    const channels = (t, later) => streamArrays(taskArrays(npChannels(t, report, later), report, later), report, later);
+    const st = cStructs(cppSugar(channels(cppTemplates(channels(cppStl(tokens, report), true), report), false), report), report, true);
     return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs };
   }
   const st = cStructs(tokens, report, false);
