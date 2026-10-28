@@ -6,6 +6,7 @@ import zlib from 'node:zlib';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { wireFamily, tileXY, observeNet, observeDesign, resolveAmbiguous, intersectAmbiguous, joinRule, blockRamOutputJoins } from '../research/s3e-device/observe.mjs';
 import { switchGrid, gridRule, applyRules, closeRules, segmentRules, nodesOf } from '../research/s3e-device/model.mjs';
@@ -1141,6 +1142,17 @@ test('build-measured: the die of a part; a part with no die or no measurements r
   assert.throws(() => buildMeasured({ part: 'xc3s500efg320-4' }), /build-measured: xc3s500e has no obs\.json\.gz in .*data[\/\\]xc3s500e$/);
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-measured-'));
   try { assert.deepEqual(measuredDies(empty), []); } finally { fs.rmSync(empty, { recursive: true }); }
+});
+
+test('research scripts: the command line recognised on Windows too (#1877: not `file://${process.argv[1]}`, a C:\\ path)', () => {
+  // (on Windows process.argv[1] is C:\\…\\gen-obshdl.mjs and import.meta.url file:///C:/…/gen-obshdl.mjs: the old check
+  // never matched, so measure.mjs's generators wrote nothing)
+  // (the scripts git tracks: not a sync tool's copies)
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const files = execFileSync('git', ['ls-files', 'research'], { cwd: root, encoding: 'utf8' }).split('\n').filter(f => /\.mjs$/.test(f));
+  assert.ok(files.length > 50);
+  const old = files.filter(f => fs.readFileSync(path.join(root, f), 'utf8').includes('import.meta.url === `file://${process.argv[1]}`'));
+  assert.deepEqual(old, []);
 });
 
 test('measure designs: every observation design of a part in one folder, sized to it; observe names the ones ISE did not implement (#3)', () => {

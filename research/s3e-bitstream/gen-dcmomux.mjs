@@ -15,6 +15,8 @@ import { knownRouting } from '../../core/fpga/bitgen.js';
 import { PIP_ROUTETHRU } from '../../core/fpga/device.js';
 import { PART, loadDb } from './db.mjs';
 import { dcmPadPaths } from './dcm-pads.mjs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const OUTPUTS = ['CLK0', 'CLK90', 'CLK180', 'CLK270', 'CLK2X', 'CLK2X180', 'CLKDV', 'CLKFX', 'CLKFX180'];
 const GENERAL = /^([NSEW](2|6)(BEG|MID|END|[A-D])\d|L[HV]\d)/;
@@ -57,7 +59,7 @@ export function dcmOmuxPairs() {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const out = process.argv[2];
   const pairs = dcmOmuxPairs();
   if (process.argv.includes('--list') || !out) {

@@ -17,6 +17,8 @@ import { loadDeviceCache } from '../../core/fpga/device-node.js';
 import { knownRouting, tileOf } from '../../core/fpga/bitgen.js';
 import { PIP_ROUTETHRU } from '../../core/fpga/device.js';
 import { PART, loadDb } from './db.mjs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const GENERAL = /^([NSEW](2|6)(BEG|MID|END|[A-D])\d|L[HV]\d|OMUX)/;
 const dev = loadDeviceCache(PART);
@@ -115,7 +117,7 @@ end rtl;
   return { vhd, ucf };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const out = process.argv[2];
   const { bufgs, pairs } = bramClockPairs();
   // a switch (tile type, from -> to) is measured once it is in a design; the pairs that use it

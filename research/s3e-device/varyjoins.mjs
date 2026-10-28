@@ -32,6 +32,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { tileXY, wireFamily } from './observe.mjs';
 import { switchGrid } from './model.mjs';
+import { fileURLToPath } from 'node:url';
 
 /** The pairs of wire names a pair takes with its last number varied over 0..n-1: the same index at both ends when they
  *  had the same, else each end alone; okA / okB: the names that exist. [[a, b]], the pair itself among them. */
@@ -218,7 +219,7 @@ export function pinVariants(ambiguous, done) {
   return [...out.values()];
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [cmd, gf, of, out, ...rest] = process.argv.slice(2);
   const { loadDevice } = await import('../../core/fpga/device.js');
   const G = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(gf))));

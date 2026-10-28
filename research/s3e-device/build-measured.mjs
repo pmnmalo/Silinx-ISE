@@ -55,7 +55,7 @@ export function buildMeasured(dev, dir) {
   return packMeasured(m);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = k => { const i = args.indexOf(k); return i < 0 ? null : args.splice(i, 2)[1]; };
   const part = opt('--part') || PARTS.xc3s250e, devFile = opt('--dev') || path.join(HERE, '../../core/fpga/devices', `${part}.json.gz`);

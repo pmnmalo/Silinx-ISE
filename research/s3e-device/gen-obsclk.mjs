@@ -10,6 +10,8 @@
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
 import { clbSlices } from './gen-observe.mjs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 const xy = n => n.match(/X(\d+)Y(\d+)$/).slice(1).map(Number);
@@ -52,7 +54,7 @@ endmodule
   return { v, ucf, cells, ffs: ffs.map(l => l.length) };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [out, n = '6', seed0 = '1', p = '0.5'] = process.argv.slice(2);
   let seed = +seed0;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x80000000; };
