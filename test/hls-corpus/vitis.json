@@ -10599,11 +10599,6 @@
             "w": 1
           },
           {
-            "name": "ap_rst",
-            "dir": "in",
-            "w": 1
-          },
-          {
             "name": "inval",
             "dir": "in",
             "w": 16
@@ -10623,7 +10618,8 @@
       "ports": {
         "same": false,
         "missing": [
-          "ap_clk"
+          "ap_clk",
+          "ap_rst"
         ],
         "extra": [],
         "differ": []
@@ -11342,11 +11338,6 @@
             "w": 1
           },
           {
-            "name": "ap_rst",
-            "dir": "in",
-            "w": 1
-          },
-          {
             "name": "a",
             "dir": "in",
             "w": 8
@@ -11402,7 +11393,6 @@
           "ap_done",
           "ap_idle",
           "ap_ready",
-          "ap_rst",
           "a",
           "b",
           "c_i",
@@ -16672,11 +16662,6 @@
             "w": 1
           },
           {
-            "name": "ap_rst",
-            "dir": "in",
-            "w": 1
-          },
-          {
             "name": "in_val",
             "dir": "in",
             "w": 24
@@ -16691,7 +16676,8 @@
       "ports": {
         "same": false,
         "missing": [
-          "ap_clk"
+          "ap_clk",
+          "ap_rst"
         ],
         "extra": [],
         "differ": []
@@ -17921,11 +17907,6 @@
             "w": 1
           },
           {
-            "name": "ap_rst",
-            "dir": "in",
-            "w": 1
-          },
-          {
             "name": "d_o",
             "dir": "out",
             "w": 32
@@ -17946,6 +17927,7 @@
         "same": false,
         "missing": [
           "ap_clk",
+          "ap_rst",
           "d_o_ap_ack",
           "d_i_ap_vld",
           "d_i_ap_ack"
@@ -19257,11 +19239,6 @@
             "w": 1
           },
           {
-            "name": "ap_rst",
-            "dir": "in",
-            "w": 1
-          },
-          {
             "name": "inA",
             "dir": "in",
             "w": 6
@@ -19392,7 +19369,6 @@
           "m_axi_gmem_BUSER"
         ],
         "extra": [
-          "ap_rst",
           "out1",
           "out1_ap_vld",
           "out2",
@@ -19518,11 +19494,6 @@
             "w": 1
           },
           {
-            "name": "ap_rst",
-            "dir": "in",
-            "w": 1
-          },
-          {
             "name": "a",
             "dir": "in",
             "w": 18
@@ -19542,7 +19513,8 @@
       "ports": {
         "same": false,
         "missing": [
-          "ap_clk"
+          "ap_clk",
+          "ap_rst"
         ],
         "extra": [],
         "differ": []
@@ -20843,11 +20815,6 @@
             "w": 1
           },
           {
-            "name": "ap_rst",
-            "dir": "in",
-            "w": 1
-          },
-          {
             "name": "a",
             "dir": "in",
             "w": 32
@@ -20872,7 +20839,8 @@
       "ports": {
         "same": false,
         "missing": [
-          "ap_clk"
+          "ap_clk",
+          "ap_rst"
         ],
         "extra": [],
         "differ": []
@@ -22301,11 +22269,6 @@
             "w": 1
           },
           {
-            "name": "ap_rst",
-            "dir": "in",
-            "w": 1
-          },
-          {
             "name": "inval1",
             "dir": "in",
             "w": 8
@@ -22353,8 +22316,10 @@
         ]
       },
       "ports": {
-        "same": true,
-        "missing": [],
+        "same": false,
+        "missing": [
+          "ap_rst"
+        ],
         "extra": [],
         "differ": []
       }

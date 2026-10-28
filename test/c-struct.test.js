@@ -140,7 +140,7 @@ test('#1590 a struct argument or result of the top function: one port each (#162
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(src, { file: 'p.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true]);
-    assert.deepEqual(r.gen.ports.map((p) => `${p.name}:${p.w}`), ['ap_start:1', 'ap_done:1', 'ap_idle:1', 'ap_ready:1', 'ap_rst:1', 'a:32', 'b:32', 'ap_return:32']);
+    assert.deepEqual(r.gen.ports.map((p) => `${p.name}:${p.w}`), ['ap_start:1', 'ap_done:1', 'ap_idle:1', 'ap_ready:1', 'a:32', 'b:32', 'ap_return:32']);
     assert.deepEqual(r.gen.diagnostics, []);
   }
 });

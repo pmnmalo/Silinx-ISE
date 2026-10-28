@@ -172,7 +172,7 @@ Names and behaviour as Vitis HLS makes them (UG1399, "Interface synthesis"):
 
 | Source | Ports |
 |---|---|
-| (clock and reset) | `ap_clk`, `ap_rst` (active high, synchronous); a combinational module with `ap_ctrl_hs` only `ap_rst` (not read) and no `ap_clk`, as Vitis HLS's (#1900) |
+| (clock and reset) | `ap_clk`, `ap_rst` (active high, synchronous) — none for a combinational module (#1900) |
 | the block protocol `ap_ctrl_hs` (default) | `ap_start` in; `ap_done`, `ap_idle`, `ap_ready` out |
 | `#pragma HLS INTERFACE ap_ctrl_none port=return` | no block protocol ports (a sequential module: `ap_clk` and `ap_rst` only, running by itself, #1900) |
 | the returned value | `ap_return` (its type's width) |

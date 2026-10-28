@@ -73,10 +73,10 @@ test('#1590 C++: a reference parameter has a pointer\'s ports (y, y_ap_vld; one 
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
     assert.equal(r.gen.top, 'scale');
     assert.deepEqual(r.gen.diagnostics, []);
-    assert.deepEqual(r.gen.ports.map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'x', 'y', 'y_ap_vld', 'sat', 'sat_ap_vld']);
+    assert.deepEqual(r.gen.ports.map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'x', 'y', 'y_ap_vld', 'sat', 'sat_ap_vld']);
   }
   const acc = cToHdl('void acc(int x, int &total) {\n  total += x;\n}\n', { file: 'acc.cpp' });
-  assert.deepEqual(acc.ports.map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'x', 'total_i', 'total_o', 'total_o_ap_vld']);
+  assert.deepEqual(acc.ports.map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'x', 'total_i', 'total_o', 'total_o_ap_vld']);
 });
 
 test('#1590 C++ as tokens: a namespace\'s braces and using gone, qualified names their last part, the casts and constants; what is not supported said', () => {
@@ -100,7 +100,7 @@ test('#1603 C: a pointer written then read in the same function: its value the o
   const r = cosimulate('#include <stdio.h>\nvoid f(int x, int *y, int *s) {\n  *s = x > 3;\n  *y = *s ? 1 : 2;\n}\nint main(void) { int y, s; for (int x = 0; x < 6; x++) { f(x, &y, &s); printf("%d %d\\n", y, s); } return 0; }\n', { file: 'p.c' });
   assert.deepEqual(r.errors, []);
   assert.equal(r.pass, true);
-  assert.deepEqual(r.gen.ports.map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'x', 'y', 'y_ap_vld', 's', 's_ap_vld']);
+  assert.deepEqual(r.gen.ports.map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'x', 'y', 'y_ap_vld', 's', 's_ap_vld']);
 });
 
 test('#1605 C: a call of a function declared but not defined: said (it crashed the C synthesis)', () => {
