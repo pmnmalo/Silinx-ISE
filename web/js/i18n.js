@@ -554,7 +554,7 @@ Object.assign(PT, {
   'HDL type': 'Tipo HDL', 'Rename net': 'Mudar o nome da rede',
   // print dialog
   'Paper': 'Papel', 'Orientation': 'Orientação', 'Pages across': 'Páginas na horizontal', 'PNG resolution': 'Resolução PNG', 'Automatic': 'Automática',
-  'Landscape': 'Horizontal', 'Portrait': 'Vertical', '1× (screen size)': '1× (tamanho do ecrã)', 'Save PNG': 'Guardar PNG', 'Save SVG': 'Guardar SVG',
+  'Landscape': 'Horizontal', 'Portrait': 'Vertical', 'Automatic: landscape when what is shown is wider than the page. For a PDF choose "Save as PDF" in the print dialog.': 'Automática: horizontal quando o que é mostrado é mais largo do que a página. Para um PDF escolha "Guardar como PDF" no diálogo de impressão.', '1× (screen size)': '1× (tamanho do ecrã)', 'Save PNG': 'Guardar PNG', 'Save SVG': 'Guardar SVG',
   // placeholders
   'name': 'nome', 'Search symbols…': 'Procurar símbolos…', 'net name': 'nome da rede', 'auto': 'automático', 'e.g. my-ise:14.7': 'p.ex. my-ise:14.7',
 });

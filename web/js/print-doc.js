@@ -1,11 +1,12 @@
 // Silinx - what Print prints (File ▸ Print…, Ctrl+P, the toolbar's Print): the document in front, whichever it is
 // (#1509). A drawing (ASM chart, state diagram, schematic, Petri net, a read-only schematic: View RTL / Technology
 // Schematic, a truth table's) opens the print dialog of diagrams (paper, tiles, SVG / PNG); a source its text; a
-// document that gives a print view of its own (doc.printView()) that one; any other one a copy of what it shows.
+// document that gives a print view of its own (doc.printView()) that one; any other one a copy of what it shows; on the
+// paper and in the orientation chosen in its print dialog (#1923).
 import { S } from './app.js';
 import { t } from './i18n.js';
 import { setPrintMeta } from './print.js';
-import { TEXT_CSS, domSnapshot, metaLine, openPrintView, printPageHtml, textBody } from './print-view.js';
+import { TEXT_CSS, domSnapshot, metaLine, openPrintView, printOptions, printPageHtml, textBody } from './print-view.js';
 
 // what a copy of a document leaves out: its toolbars, buttons and fields of commands, tips and menus
 const CHROME = ['.doc-toolbar', '.editor-bar', '.tb-btn', 'button', '.fv-tip', '.fv-search', '.ctx-menu', '.print-frame'];
@@ -48,12 +49,14 @@ function diagramPrint(d) {
 export const printable = () => !!S.active;
 
 /** Print the document in front. */
-export function printActive() {
+export async function printActive() {
   const d = S.active;
   if (!d) return;
   setPrintMeta(docMeta(d));
   const draw = diagramPrint(d);
   if (draw) { draw(); return; }
   const v = printView(d);
-  if (v) openPrintView(v);
+  if (!v) return;
+  const o = await printOptions(v.title);
+  if (o) openPrintView(v, o);
 }

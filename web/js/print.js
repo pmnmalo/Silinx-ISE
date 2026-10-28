@@ -59,9 +59,9 @@ export function withLightTheme(fn) {
 let printMeta = '';
 export function setPrintMeta(meta = '') { printMeta = String(meta); }
 
-const PAPERS = { A4: [210, 297], A3: [297, 420], Letter: [216, 279] };
+export const PAPERS = { A4: [210, 297], A3: [297, 420], Letter: [216, 279] };
 // each paper's name in the page's @page rule (from this table, never from the dialog's text)
-const PAGE_SIZE = { A4: 'A4', A3: 'A3', Letter: 'letter' };
+export const PAGE_SIZE = { A4: 'A4', A3: 'A3', Letter: 'letter' };
 const MARGIN = 10;   // mm, page margin
 const CAPTION = 7;   // mm, page caption (title, page number)
 const SLACK = 0.5;   // mm, the page box stays this much shorter than the printable area (no blank extra page)
