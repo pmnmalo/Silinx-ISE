@@ -1,0 +1,5 @@
+In short:
+- Silinx HLS: Vitis HLS's mixed control and data driven example now builds: an `hls::split` / `hls::merge` whose number of channels is a named constant (`const int NP = 4;`), and an array of tasks (`hls::task t[NP];`) started in an unrolled loop.
+
+In detail:
+- **Silinx HLS: `hls::split::round_robin<int, NP>` with NP a named constant, and arrays of `hls::task` (#1898):** the number of channels of a split or a merge is a constant expression whose names are constants declared before it (`const` / `constexpr` integers), where it had to be a literal. `hls::task t[N];` is an array of tasks, each started as `t[k](f, a…);` or in a loop of constant bounds (`for (int i = 0; i < N; i++) t[i](f, a…);`, its body unrolled), each element a task of its own in the C simulation and in hardware; another use, an element outside the array or started twice is said. The C simulation tells two tasks started at the same place apart by their names. The example passes the C simulation, the synthesis and the co-simulation (the corpus's `expected.json`).

@@ -19,11 +19,11 @@ function forever(fn) {
 }
 
 export const taskMethods = {
-  /** The statement after #pragma HLS TASK: its call a task, started once. */
-  spawn(s) {
+  /** The statement after #pragma HLS TASK name=…: its call a task, started once (by its name: an array's at one place, #1898). */
+  spawn(s, name) {
     const e = s.e, f = this.frames.at(-1);
     if (e.kind !== 'call' || e.callee.kind !== 'id') this.fail(s, 'hls::task: a function and its arguments');
-    const key = `${f.fn.name}:${s.loc.line}:${s.loc.col}`;
+    const key = `${f.fn.name}:${s.loc.line}:${s.loc.col}:${name}`;
     (this.tasks ||= []);
     if (this.tasks.some((t) => t.key === key)) return;
     const fn = this.c.funcs.get(e.callee.name);

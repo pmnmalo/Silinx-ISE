@@ -220,7 +220,7 @@ class Machine {
   items(list) {
     for (let k = 0; k < list.length; k++) {
       const x = list[k];
-      if (x.kind === 'pragma' && x.pragma.name === 'TASK' && list[k + 1]?.kind === 'expr') { this.spawn(list[++k]); continue; }
+      if (x.kind === 'pragma' && x.pragma.name === 'TASK' && list[k + 1]?.kind === 'expr') { this.spawn(list[++k], x.pragma.args?.name); continue; }
       const r = this.stmt(x);
       if (r !== undefined) return r;
     }

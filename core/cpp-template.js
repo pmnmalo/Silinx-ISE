@@ -8,6 +8,8 @@
 //
 //   cppTemplates(tokens, report) -> tokens
 //   constTokens(tokens) -> the value (BigInt) of a constant expression of numbers, or null
+//   constDecl(tokens, k, consts) -> consts with the constant declared at k (const int N = e;), if one is
+//   named(tokens, consts) -> tokens with the names of consts their values
 //   declType(tokens, name) -> the type tokens a name is declared with last in tokens, or null
 import { readPragma } from './c-pragma.js';
 
@@ -62,6 +64,20 @@ const BIN = { '||': (a, b) => B(a || b), '&&': (a, b) => B(a && b), '|': (a, b) 
   '==': (a, b) => B(a === b), '!=': (a, b) => B(a !== b), '<': (a, b) => B(a < b), '>': (a, b) => B(a > b), '<=': (a, b) => B(a <= b),
   '>=': (a, b) => B(a >= b), '<<': (a, b) => a << b, '>>': (a, b) => a >> b, '+': (a, b) => a + b, '-': (a, b) => a - b, '*': (a, b) => a * b,
   '/': (a, b) => (b ? a / b : null), '%': (a, b) => (b ? a % b : null) };
+const INTS = new Set(['int', 'unsigned', 'signed', 'short', 'long', 'char', 'size_t']);
+export const named = (toks, consts) => toks.map((x) => (isId(x) && consts.has(x.v) ? { ...x, t: 'num', v: String(consts.get(x.v)) } : x));
+export function constDecl(toks, k, consts) {
+  if (!isId(toks[k], 'const') && !isId(toks[k], 'constexpr')) return consts;
+  let j = k + 1;
+  while (isId(toks[j]) && INTS.has(toks[j].v)) j++;
+  if (j === k + 1 || !isId(toks[j]) || !op(toks[j + 1], '=')) return consts;
+  let e = j + 2;
+  while (toks[e] && !op(toks[e], ';') && !op(toks[e], ',')) e++;
+  const v = constTokens(named(toks.slice(j + 2, e), consts));
+  if (v !== null) consts.set(toks[j].v, v);
+  return consts;
+}
+
 export function constTokens(toks) {
   let k = 0;
   const num = (t) => { try { return BigInt(String(t.v).replace(/[uUlL]+$/, '')); } catch { return null; } };

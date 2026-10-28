@@ -650,11 +650,15 @@
     "reason": "C simulation: diamond.h:19: the header 'hls_streamofblocks.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
   },
   "task-level-parallelism-data-driven-mixed-control-and-data-driven": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: test.cpp:38: hls::split::round_robin: hls::split::round_robin<T, N> name; (N a constant)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 162,
+      "max": 162,
+      "avg": 162
+    },
+    "reason": null
   },
   "task-level-parallelism-data-driven-simple-data-driven": {
     "csim": "pass",
