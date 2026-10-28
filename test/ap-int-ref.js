@@ -56,7 +56,8 @@ export function runWithApInt(src, headers) {
     fs.writeFileSync(path.join(tmp, 't.cpp'), src);
     const exe = path.join(tmp, process.platform === 'win32' ? 't.exe' : 't');
     // (ap_int_special.h and ap_fixed_special.h left out, std::complex of ap_int and ap_fixed: its own declaration of std::complex is ambiguous with libc++)
-    execFileSync(CXX, ['-std=c++11', '-w', '-D__AP_INT_SPECIAL_H__', '-D__AP_FIXED_SPECIAL_H__', '-fsigned-char', '-fwrapv', '-ffp-contract=off', '-O0', '-I', headers, '-o', exe, path.join(tmp, 't.cpp')], { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
+    // (-Wa,-mbig-obj: MinGW's object files hold at most 32 768 sections, ap_fixed's templates make more, #1876)
+    execFileSync(CXX, ['-std=c++11', '-w', '-D__AP_INT_SPECIAL_H__', '-D__AP_FIXED_SPECIAL_H__', '-fsigned-char', '-fwrapv', '-ffp-contract=off', '-O0', ...(process.platform === 'win32' ? ['-Wa,-mbig-obj'] : []), '-I', headers, '-o', exe, path.join(tmp, 't.cpp')], { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
     return lf(execFileSync(exe, { encoding: 'utf8' }));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }

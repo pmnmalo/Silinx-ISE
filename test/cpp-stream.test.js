@@ -12,6 +12,7 @@ import { simulateC } from '../core/c-interp.js';
 import { cosimulate } from '../core/c-cosim.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { CXX } from './ap-int-ref.js';
+import { lf } from './c-helpers.js';
 
 // (a stream for the reference: a queue)
 const STREAM_H = `#pragma once
@@ -67,7 +68,7 @@ test('#1590 hls::stream in the C simulation: a queue (read, write, empty, >> and
     fs.writeFileSync(path.join(dir, 't.cpp'), SRC);
     execFileSync(CXX, ['-std=c++14', '-w', '-I', dir, '-o', path.join(dir, 't'), path.join(dir, 't.cpp')]);
     let ref;
-    try { ref = { output: execFileSync(path.join(dir, 't'), { encoding: 'utf8' }), exitCode: 0 }; } catch (e) { ref = { output: e.stdout, exitCode: e.status }; }
+    try { ref = { output: lf(execFileSync(path.join(dir, 't'), { encoding: 'utf8' })), exitCode: 0 }; } catch (e) { ref = { output: lf(e.stdout), exitCode: e.status }; }
     assert.equal(sim.output, ref.output);
     assert.equal(sim.exitCode, ref.exitCode);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

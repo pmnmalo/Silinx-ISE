@@ -13,6 +13,7 @@ import { simulateC } from '../core/c-interp.js';
 import { cosimulate } from '../core/c-cosim.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { CXX } from './ap-int-ref.js';
+import { lf } from './c-helpers.js';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
 const VADD = `#include <vector>
@@ -52,7 +53,7 @@ test('#1734 std::vector, generate, fill, an array of a size known when it runs: 
   try {
     fs.writeFileSync(path.join(dir, 't.cpp'), VADD.replace(/^#pragma.*$/gm, ''));
     execFileSync(CXX, ['-std=c++11', '-w', '-o', path.join(dir, 't'), path.join(dir, 't.cpp')]);
-    assert.equal(sim.output, execFileSync(path.join(dir, 't'), { encoding: 'utf8' }));
+    assert.equal(sim.output, lf(execFileSync(path.join(dir, 't'), { encoding: 'utf8' })));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
