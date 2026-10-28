@@ -175,3 +175,26 @@ test('#1719 hls::task in hardware: each task a process running by itself (its ap
     assert.match(r.gen.hdl, lang === 'vhdl' ? /pairs_U0_ap_start <= '1';/ : /assign pairs_U0_ap_start = 1'b1;/);
   }
 });
+
+test('#1898 DATAFLOW: a const integer of the region (its value where it is used, a call\'s argument), as Vitis HLS folds it; co-simulated in VHDL and Verilog, no warning', () => {
+  const src = (decl) => `#include "hls_stream.h"
+#include <stdio.h>
+void sc(hls::stream<int>& a, hls::stream<int>& b, int k) { for (int i = 0; i < 4; i++) b.write(a.read() * k); }
+void dut(hls::stream<int>& in, hls::stream<int>& r) {
+${decl}
+#pragma HLS dataflow
+  hls::stream<int> t;
+  sc(in, t, K);
+  sc(t, r, K + 1);
+}
+int main() { hls::stream<int> a, r; for (int i = 0; i < 4; i++) a.write(i); dut(a, r); for (int i = 0; i < 4; i++) printf("%d ", r.read()); return 0; }
+`;
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(src('  const int K = 3;'), { file: 'd.cpp', lang });
+    assert.deepEqual([r.errors, r.pass, r.output, r.gen.diagnostics], [[], true, '0 12 24 36 ', []], JSON.stringify(r.mismatches));
+    assert.deepEqual(r.gen.report.processes.map((p) => p.instance), ['sc_U0', 'sc_U1']);
+  }
+  // (a variable: not a constant, the region made sequential as before)
+  assert.deepEqual(cToHdl(src('  int K = 3;'), { file: 'd.cpp' }).diagnostics.filter((d) => d.severity === 'warning').map((d) => d.message),
+    ["#pragma HLS DATAFLOW: the region has 'K': only streams and arrays are declared in a DATAFLOW region: made sequential (not as processes)"]);
+});

@@ -85,6 +85,9 @@ test('#1898 an array of tasks: what is not supported said, once', () => {
   assert.deepEqual(errors(SRC('  for (int i = 0; i < n; i++) t[i](worker, sp.out[i], mg.in[i]);')), [FORM]);
   assert.deepEqual(errors(SRC('  for (int i = 0; i < NP; i++) { t[i](worker, sp.out[i], mg.in[i]); n++; }')), [FORM]);
   assert.deepEqual(errors(SRC('  t[0].stop();')), [FORM]);
+  // (a template's, said once, by the pass after the templates; nothing after it)
+  const tpl = '#include "hls_np_channel.h"\n#include "hls_task.h"\ntemplate <int K> void g() { hls::split::round_robin<int, K> s; hls::task t[K]; }\nvoid h() { g<0>(); }\nint main() { return 0; }\n';
+  assert.deepEqual(errors(tpl), ['3 error: hls::split::round_robin: hls::split::round_robin<T, N> name; (N a constant)', "3 error: the array of tasks 't': hls::task t[N]; (N a constant)"]);
 });
 
 test('#1898 hls::split and hls::merge: N a named constant, its expression; a variable said', () => {
@@ -112,4 +115,66 @@ int main() { hls::stream<int> r; dut(r); for (int i = 0; i < 4; i++) printf("%d 
   assert.deepEqual([r.errors, r.pass, say(r.gen.diagnostics)], [[], true, []], JSON.stringify(r.mismatches, big));
   assert.deepEqual(say(simulateC(src('int NP = 2;', 'NP'), { file: 'd.cpp' }).diagnostics).filter((d) => d.includes('round_robin')),
     ['9 error: hls::split::round_robin: hls::split::round_robin<T, N> name; (N a constant)', '10 error: hls::merge::round_robin: hls::merge::round_robin<T, N> name; (N a constant)']);
+});
+
+// (N of each form C++ allows a template's argument, as Vitis HLS takes it; a loop of each step)
+const FORMS = (decl, chan, n, start, extra = '') => `#include "hls_np_channel.h"
+#include "hls_task.h"
+#include <stdio.h>
+${decl}
+void worker(hls::stream<int>& in, hls::stream<int>& out) { int v = in.read(); out.write(v * 5 - 2); }
+void read_in(int *in, hls::stream<int>& out) { for (int i = 0; i < 8; i++) out.write(in[i]); }
+void write_out(hls::stream<int>& in, int *out) { for (int i = 0; i < 8; i++) out[i] = in.read(); }
+${extra}void dut(int in[8], int out[8]) {
+${chan}  hls_thread_local hls::split::round_robin<int, ${n}> sp;
+  hls_thread_local hls::merge::round_robin<int, ${n}> mg;
+  hls_thread_local hls::task t[${n}];
+#pragma HLS dataflow
+  read_in(in, sp.in);
+${start}
+  write_out(mg.out, out);
+}
+int main() { int a[8], b[8]; for (int i = 0; i < 8; i++) a[i] = i; dut(a, b); for (int i = 0; i < 8; i++) printf("%d ", b[i]); printf("\\n"); return 0; }
+`;
+const LOOP2 = (head) => `  for (${head}) {\n#pragma HLS unroll\n    t[i](worker, sp.out[i], mg.in[i]);\n  }`;
+const OUT8 = '-2 3 8 13 18 23 28 33 \n';
+
+test('#1898 N of each form C++ allows (an enum, a list, a class\'s member, sizeof, a local constant), a loop of each step: as the C simulation in VHDL and Verilog', () => {
+  const cases = [
+    ['enum', FORMS('enum { NP = 2 };', '', 'NP', LOOP2('int i = 0; i < NP; i++'))],
+    ['a list', FORMS('const int A = 1, NP = A + 1;', '', 'NP', LOOP2('int i = 0; i < NP; i++'))],
+    ['a class\'s member', FORMS('struct C { static const int NP = 2; };', '', 'C::NP', LOOP2('int i = 0; i < C::NP; i++'))],
+    ['sizeof', FORMS('', '', 'sizeof(short)', LOOP2('unsigned i = 0; i < sizeof(short); i++'))],
+    ['a local constant', FORMS('', '  const int NP = 2;\n', 'NP', LOOP2('int i = 0; i < NP; i++'))],
+    ['i += 1', FORMS('const int NP = 2;', '', 'NP', LOOP2('int i = 0; i < NP; i += 1'))],
+    ['i = i + 1', FORMS('const int NP = 2;', '', 'NP', LOOP2('int i = 0; i < NP; i = i + 1'))],
+    ['i-- (the last first)', FORMS('const int NP = 2;', '', 'NP', LOOP2('int i = NP - 1; i >= 0; i--'))],
+    ['i != N', FORMS('const int NP = 2;', '', 'NP', LOOP2('int i = 0; i != NP; ++i'))],
+  ];
+  for (const [what, src] of cases) {
+    const c = simulateC(src, { file: 'd.cpp' });
+    assert.deepEqual([c.error, c.output, say(c.diagnostics)], [null, OUT8, [DF(src.split('\n').indexOf('#pragma HLS dataflow') + 1)]], what);
+    for (const lang of ['vhdl', 'verilog']) {
+      const r = cosimulate(src, { file: 'd.cpp', lang });
+      assert.deepEqual([r.errors, r.pass, r.output, say(r.gen.diagnostics)], [[], true, OUT8, []], `${what} ${lang} ${JSON.stringify(r.mismatches, big)}`);
+      assert.deepEqual(r.gen.report.processes.filter((p) => p.task?.startsWith('t_')).map((p) => p.task).sort(), ['t_0', 't_1'], what);
+    }
+  }
+});
+
+test('#1898 arrays of streams of N a named constant, between two arrays of tasks; N a template\'s parameter (the C simulation: a DATAFLOW region in a function the top calls is not made in hardware yet)', () => {
+  const two = FORMS('const int NP = 2;', '  hls_thread_local hls::stream<int> mid[NP];\n  hls_thread_local hls::task u[NP];\n', 'NP',
+    '  for (int i = 0; i < NP; i++) {\n#pragma HLS unroll\n    t[i](worker, sp.out[i], mid[i]);\n    u[i](worker, mid[i], mg.in[i]);\n  }');
+  const OUT2 = '-12 13 38 63 88 113 138 163 \n';
+  assert.equal(simulateC(two, { file: 'd.cpp' }).output, OUT2);
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(two, { file: 'd.cpp', lang });
+    assert.deepEqual([r.errors, r.pass, r.output, say(r.gen.diagnostics)], [[], true, OUT2, []], JSON.stringify(r.mismatches, big));
+    assert.deepEqual(r.gen.report.fifos.map((f) => f.name).filter((f) => f.startsWith('mid')), ['mid_0', 'mid_1']);
+  }
+  const tpl = FORMS('', '', 'NP', LOOP2('int i = 0; i < NP; i++'))
+    .replace('void dut(int in[8], int out[8]) {', 'template <int NP> void dutT(int in[8], int out[8]) {')
+    .replace('\nint main()', '\nvoid dut(int in[8], int out[8]) { dutT<2>(in, out); }\nint main()');
+  const c = simulateC(tpl, { file: 'd.cpp' });
+  assert.deepEqual([c.error, c.output, say(c.diagnostics).filter((d) => / error: /.test(d))], [null, OUT8, []]);
 });

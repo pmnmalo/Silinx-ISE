@@ -19,10 +19,11 @@ const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
 const SAID = /^#pragma HLS (DATAFLOW|STREAM) is accepted and ignored|^#pragma HLS INLINE off is ignored/;
 
-/** The region of the top function: { calls: [{ callee, args, loc }], locals: Map name -> { kind, type, depth, loc } }, or
+/** The region of the top function: { calls: [{ callee, args, loc }], locals: Map name -> { kind, type, depth, loc }, consts:
+ *  Map name -> its value (a const integer of the region) }, or
  *  { fallback: why }. */
 export function region(fn) {
-  const calls = [], locals = new Map(), depths = new Map();
+  const calls = [], locals = new Map(), depths = new Map(), consts = new Map();
   let task = null;
   for (const st of fn.body.items) {
     if (st.kind === 'pragma') {
@@ -32,6 +33,9 @@ export function region(fn) {
     }
     if (st.kind === 'decl') {
       for (const v of st.vars) {
+        // (a constant: its value, where it is used, #1898)
+        const k = v.const && !v.static && v.init && v.type.kind === 'int' && v.init.kind !== 'init' ? constValue(v.init, consts) : null;
+        if (k !== null) { consts.set(v.name, k); continue; }
         // (hls_thread_local: a static, a stream living across calls)
         if (v.init || (v.static && v.type.kind !== 'stream') || !['stream', 'array'].includes(v.type.kind)) return { fallback: `'${v.name}': only streams and arrays are declared in a DATAFLOW region` };
         locals.set(v.name, { kind: v.type.kind, type: v.type, loc: v.loc });
@@ -49,7 +53,7 @@ export function region(fn) {
     const d = l.type.depth ? constValue(l.type.depth) : null;
     l.depth = depths.get(n) ?? (d !== null ? Number(d) : 2);
   }
-  return { calls, locals };
+  return { calls, locals, consts };
 }
 
 export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
@@ -105,7 +109,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
       if (port.role === 'arg_vld') continue;
       if (port.role === 'return' || (port.role === 'arg' && port.dir === 'out')) { fail(p.call.loc, `'${p.call.callee}' gives back a value (${port.name}): not supported in a DATAFLOW region yet (a stream or an array)`); continue; }
       if (port.role === 'arg') {
-        const v = a?.kind === 'id' && params.get(a.name) && params.get(a.name).type.kind !== 'ptr' ? { top: a.name } : constValue(a) !== null ? { k: constValue(a) } : null;
+        const v = a?.kind === 'id' && params.get(a.name) && params.get(a.name).type.kind !== 'ptr' ? { top: a.name } : constValue(a, rg.consts) !== null ? { k: constValue(a, rg.consts) } : null;
         if (!v) { fail(p.call.loc, `the argument of '${port.param}' of '${p.call.callee}': an argument of '${fn.name}' or a constant (not an expression, yet)`); continue; }
         p.wires.push({ port, ...v });
         continue;

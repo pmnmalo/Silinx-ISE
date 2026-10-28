@@ -5,11 +5,14 @@
 //   s (an array passed whole, an argument)   s_0, s_1, …
 //   a statement using s[e] (an index a variable)   the statement for each element, on the index (if (e == 0) …
 //   else if …), a declaration's variable declared first; its pragmas (port=s) one per element, said once
-// Also a stream's name for the C simulation's messages, hls::stream<T> s("name"), dropped. Before core/cpp-template.js.
+// N and k constant expressions, their names the constants declared before (core/cpp-consts.js, #1898). Also a stream's
+// name for the C simulation's messages, hls::stream<T> s("name"), dropped. Before core/cpp-template.js.
 // Isomorphic ES module.
 //
-//   streamArrays(tokens, report) -> tokens
-import { closing, constTokens } from './cpp-template.js';
+//   streamArrays(tokens, report, later) -> tokens (later: a size naming what is not known yet, a template's parameter, left
+//     as it is for the pass after core/cpp-template.js, #1898)
+import { closing } from './cpp-template.js';
+import { constants } from './cpp-consts.js';
 
 const op = (t, v) => t && t.t === 'op' && t.v === v;
 const isId = (t, v) => t && t.t === 'id' && (v === undefined || t.v === v);
@@ -25,18 +28,19 @@ function streamType(toks, k) {
   return e > 0 ? e : -1;
 }
 
-export function streamArrays(input, report) {
+export function streamArrays(input, report, later = false) {
   // the arrays: their declarations and parameters (name -> N)
-  const arrays = new Map();
+  const arrays = new Map(), consts = constants();
   const toks = [];
   for (let k = 0; k < input.length; k++) {
+    consts.at(input, k);   // (N a named constant, #1898)
     const e = streamType(input, k);
     if (e < 0 || op(input[k - 1], '::') || op(input[k - 1], '<')) { toks.push(input[k]); continue; }
     const ty = input.slice(k, e + 1);
     const param = op(input[k - 1], '(') || op(input[k - 1], ',') || isId(input[k - 1], 'const');
     // a list of declarators: name, name[N], (&name)[N], name("…")
-    const out = [];
-    let j = e + 1, first = true;
+    const out = [], mine = [];
+    let j = e + 1, first = true, wait = false;
     for (;;) {
       let name = null, ref = false, n = null;
       if (op(input[j], '(') && op(input[j + 1], '&') && isId(input[j + 2]) && op(input[j + 3], ')') && op(input[j + 4], '[')) {
@@ -46,9 +50,10 @@ export function streamArrays(input, report) {
       if (!name) break;
       if (op(input[j], '[')) {
         const c = closing(input, j);
-        const v = constTokens(input.slice(j + 1, c));
+        const v = consts.value(input.slice(j + 1, c));
+        if (v === null && later && input.slice(j + 1, c).some((x) => isId(x))) { wait = true; break; }
         if (v === null || v < 1n) report(name, `the array of streams '${name.v}': its size must be a constant`);
-        n = Number(v ?? 1n);
+        n = v !== null && v >= 1n ? Number(v) : 1;   // (its first, said)
         j = c + 1;
       }
       // (a stream's name: the C simulation's, dropped)
@@ -58,12 +63,14 @@ export function streamArrays(input, report) {
       if (n === null) out.push(...(first ? [] : [L(name, ',')]), ...one(name.v, first));
       else {
         arrays.set(name.v, n);
+        mine.push(name.v);
         for (let i = 0; i < n; i++) out.push(...(first && i === 0 ? [] : [L(name, ',')]), ...one(`${name.v}_${i}`, first && i === 0));
       }
       first = false;
       if (!param && op(input[j], ',')) { j++; continue; }
       break;
     }
+    if (wait) { mine.forEach((x) => arrays.delete(x)); toks.push(input[k]); continue; }
     toks.push(...ty, ...out);
     k = j - 1;
   }
@@ -73,9 +80,10 @@ export function streamArrays(input, report) {
 
 /** The uses of the arrays: s[k], s whole, a statement with s[e]. */
 function uses(toks, arrays, report) {
-  const out = [];
+  const out = [], consts = constants();
   for (let k = 0; k < toks.length; k++) {
     const t = toks[k];
+    consts.at(toks, k);
     // a pragma naming an array (port=, variable=): one per element, said once (core/c-pragma.js)
     if (t.t === 'pragma' && !t.v.of) {
       const key = ['port', 'variable'].find((x) => typeof t.v.args?.[x] === 'string' && arrays.has(t.v.args[x]));
@@ -89,7 +97,7 @@ function uses(toks, arrays, report) {
     const n = arrays.get(t.v);
     if (op(toks[k + 1], '[')) {
       const c = closing(toks, k + 1);
-      const v = constTokens(toks.slice(k + 2, c));
+      const v = consts.value(toks.slice(k + 2, c));
       if (v !== null) {
         const bad = v < 0n || v >= BigInt(n);
         if (bad) report(t, `'${t.v}[${v}]': outside the array of ${n} streams`);

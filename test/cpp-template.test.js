@@ -9,7 +9,7 @@ import { simulateC } from '../core/c-interp.js';
 import { cosimulate } from '../core/c-cosim.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { lex } from '../core/c-lex.js';
-import { constTokens, constDecl, named } from '../core/cpp-template.js';
+import { constTokens } from '../core/cpp-template.js';
 import { apIntHeaders, runWithApInt } from './ap-int-ref.js';
 
 const AP = await apIntHeaders();
@@ -87,13 +87,6 @@ test('#1590 C++ templates as tokens: an instance per list of arguments (its name
   assert.equal(toks('int sh_1;\ntemplate <int N> int sh() { return N; }\nint f() { return sh<1>() + sh_1; }\n'), 'int sh_1 ; int sh_1_t ( ) { return 1 ; } int f ( ) { return sh_1_t ( ) + sh_1 ; }');
   assert.equal(constTokens(lex('(3 + 4) * 2 == 14 ? 1 << 4 : -1', 'a.cpp').tokens.slice(0, -1)), 16n);
   assert.equal(constTokens(lex('N + 1', 'a.cpp').tokens.slice(0, -1)), null);
-});
-
-test('#1898 named constants: const int N = e; (e of the constants before it) gives N its value in a constant expression; a variable, a float, no value: none', () => {
-  const consts = (src) => { const t = lex(src, 'a.cpp').tokens, c = new Map(); t.forEach((_, k) => constDecl(t, k, c)); return Object.fromEntries(c); };
-  assert.deepEqual(consts('const int N = 16; constexpr unsigned NP = N / 4; static const long long W = (NP << 2) + 1;'), { N: 16n, NP: 4n, W: 17n });
-  assert.deepEqual(consts('int n = 2; const float F = 1.5; const int M = n * 2; const int E; const int A = 3, B = A;'), { A: 3n });
-  assert.equal(constTokens(named(lex('NP * 2 - 1', 'a.cpp').tokens.slice(0, -1), new Map([['NP', 4n]]))), 7n);
 });
 
 test('#1590 C++ templates: a pragma\'s value a template\'s parameter, #pragma HLS if (cond) kept when cond holds; a macro in a pragma expanded (C too)', () => {
