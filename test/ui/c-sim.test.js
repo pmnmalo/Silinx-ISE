@@ -193,3 +193,45 @@ uiTest('#1855 the C editor\'s Templates ▾: Silinx HLS\'s templates (C++\'s in 
   await page.closeMenus();
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
 });
+
+// #1897: a test bench reading its inputs from the project's files and comparing its results with a golden one; its top
+// function writing a trace file only in the C simulation (#ifndef __SYNTHESIS__)
+const TRACE = `#include <stdio.h>
+int twice(int a) {
+#ifndef __SYNTHESIS__
+  FILE *fp = fopen("trace.dat", "a");
+  fprintf(fp, "%d\\n", a);
+  fclose(fp);
+#endif
+  return 2 * a;
+}
+int main(void) {
+  int x, n = 0;
+  FILE *in = fopen("tb_data/in.dat", "r");
+  FILE *out = fopen("out.dat", "w");
+  while (fscanf(in, "%d", &x) == 1) { fprintf(out, "%d\\n", twice(x)); n++; }
+  fclose(in);
+  fclose(out);
+  int bad = system("diff -w out.dat tb_data/golden.dat");
+  printf("%d values, %s\\n", n, bad ? "Mismatch" : "Results are good");
+  return bad;
+}
+`;
+
+uiTest('#1897 C Simulation of a test bench with files: the project\'s data files read, its golden file compared (diff), the files it wrote said (in memory); C/RTL Co-simulation PASS', E, async (page) => {
+  await makeProject(env, { name: 'CFiles', top: '', files: { 'src/twice.c': TRACE, 'src/tb_data/in.dat': '3\n-4\n10\n', 'src/tb_data/golden.dat': '6\n-8\n20\n' } });
+  await page.openProject('CFiles');
+  await page.showMessages();
+  await page.eval(() => window.SilinxApp.openFile('src/twice.c'));
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/twice.c' && window.Silinx.active.editor);
+  const btn = (t) => page.click('.doc:not([hidden]) .editor-bar .btn', { text: t });
+  await btn('C Simulation');
+  await page.waitConsole(/Process "C Simulation" completed successfully/);
+  const log = await page.consoleText();
+  assert.match(log, /\n3 values, Results are good\n2 file\(s\) written by the test bench, in memory \(not saved to the project\): out\.dat, trace\.dat\nmain\(\) returned 0; 3 call\(s\) of 'twice'\./);
+  assert.doesNotMatch(log, /ERROR:SilinxC|WARNING:SilinxC/);
+  await btn('C/RTL Co-simulation');
+  await page.waitConsole(/Process "C\/RTL Co-simulation" completed successfully/, { timeout: 60000 });
+  assert.match(await page.consoleText(), /C\/RTL co-simulation PASS: 3 call\(s\), the same results/);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+});

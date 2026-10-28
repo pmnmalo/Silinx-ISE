@@ -25,7 +25,7 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
 // name, its struct arguments' members ports of their own)
 export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false } = {}) {
-  const checked = checkC(source, file, { headers, top, depths });
+  const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   const diagnostics = [...checked.diagnostics];
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
