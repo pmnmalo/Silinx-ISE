@@ -260,7 +260,7 @@ The front end imports nothing else of the IDE today (its 39 modules include the 
 simulator that `compile` uses), so its steps are the toolchain's, shorter:
 
 1. **A boundary test** ([#1709](https://github.com/pmnmalo/Silinx-ISE/issues/1709)): its modules listed, no
-   import from them into the rest of the IDE.
+   import from them into the rest of the IDE. Done: `test/hdl-boundary.test.js`.
 2. **The workspace package** ([#1710](https://github.com/pmnmalo/Silinx-ISE/issues/1710)):
    `packages/silinx-hdl/`, the modules moved as they are, the old paths re-exporting; after the toolchain's
    workspace (step 6, #1677), which sets the workspaces up.
