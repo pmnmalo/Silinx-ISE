@@ -1,6 +1,6 @@
 {
   "name": "silinx-ise",
-  "version": "15.19.0",
+  "version": "15.19.1",
   "description": "Silinx ISE (Integrated Synthesis Environment): HDL design platform in the style of Xilinx ISE 14.x: VHDL/Verilog projects, schematic and ASM editors, behavioural simulation, synthesis, place & route and bitstreams (its own toolchain for the Basys2 / Nexys2, or Xilinx ISE 14.7) and board programming from the browser",
   "type": "module",
   "bin": {

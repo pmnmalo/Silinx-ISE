@@ -3,7 +3,62 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.19.1
+
+15.19.0's changes (below), published: 15.19.0's tests failed at the release, on Windows and in the release zip; they
+are fixed here.
+
+In short:
+
+- Everything of 15.19.0: Silinx HLS (C and C++ high-level synthesis, its C simulation and C/RTL co-simulation, the C
+  editor's Language Templates), schematics closer to ISE's, two documents side by side.
+
+In detail:
+
+- **Windows (#1904):** test/c-interp.test.js finds its folder with `fileURLToPath`, not a URL's pathname (`D:\\D:\\…`).
+- **A code owner's review on `main` (#1888):** `main` requires a pull request approved by a code owner (the
+  maintainer), which the admin bypasses; CLAUDE.md and ONBOARDING.md say the maintainer's sessions merge with
+  `gh pr merge <N> --rebase --admin` once `gh pr checks <N> --required` is green.
+- **The research scripts run from the command line on Windows (#1877):** their check `import.meta.url ===
+  file://${process.argv[1]}` never matched a `C:\` path, so `measure.mjs designs` found no designs (its generators wrote
+  nothing). The 19 scripts now compare `path.resolve(process.argv[1])` with `fileURLToPath(import.meta.url)`, as
+  `scripts/` does. Tests: test/s3e-device.test.js (no research script keeps the old check).
+- **The ap_fixed reference compiled on Windows (#1876):** MinGW's assembler failed on the ap_fixed test's reference
+  program ("too many sections", "file too big"): test/ap-int-ref.js passes `-Wa,-mbig-obj` on Windows.
+- **The C and C++ tests on Windows, the rest of the line ends (#1875):** after #1860 four tests still failed on Windows
+  in the release's CI: the C simulation's output against the program's when the program exits with an error code, the
+  file the test bench writes (`result.dat`), and the C++ tests of std::vector and hls::stream, which read the program's
+  output on their own; all read through `lf()` now, and a test in test/c-interp.test.js fails on any test file that
+  reads a compiled program's output without it. The printf test's `%ld` takes a value of 32 bits: `long` is 32 bits on
+  Windows, 64 on Linux and macOS.
+- **The release zip without a link to the workspace package (#1874):** since packages/silinx-fpga became an npm
+  workspace (#1677), `npm ci` in the release's folder linked it into node_modules, and the release zip's test found
+  silinx-fpga among the third-party dependencies (the v15.19.0 tag's CI). scripts/package-release.mjs now removes
+  npm's links to this repository's own packages, which are in the zip as files (packages/) and not third-party (a
+  symbolic link is no use in a zip unpacked on Windows). Test: test/release/release.test.js (the package's files in the
+  zip, no link in node_modules; it failed without the change).
+- **Contributors from outside (#1872):** CONTRIBUTING.md says how to contribute from a fork (the maintainer
+  reviews, merges, labels and releases; a pull request changing `.github/` is read before its runs are approved;
+  ISE not needed); CLAUDE.md and ONBOARDING.md say merging is the maintainer's; `.github/CODEOWNERS` and a pull
+  request template.
+- **The classic interface's menu test within its budget again (#1861):** since File ▸ Print… is enabled with any
+  document (#1509, 15.18.1), the test of every menu clicked it and opened the browser's print of a new window, which
+  held it about 77 s: 85 s of its 90 s on CI, then over. Print is left to test/ui/print-docs.test.js, which tests it
+  with every document; the menu test takes about 18 s again in the classic interface.
+- **Spartan-6: the pads' bits (#727):** research/s6/db/xc6slx16-iob.json, measured with ISE: designs with every bonded pad
+  of the CSG324 an IOB of one setting (research/s6/gen-iob6.mjs; the output and input, the drives, slews, I/O standards
+  and pulls, as Silinx writes them) and id designs that tell the pads apart (ana-iob6.mjs): 6 bits an output and 9 an
+  input on every pad of both parts, in the I/O words; an output's path and the I/O route-throughs from the examples'
+  residual, which no bit of the I/O is left in. Tests: test/s6-iob.test.js.
+- **Device measurements, the XC3S100E's open-flow designs (#3):** the 32 `test/fixtures/open-flow` designs that route
+  on the XC3S100E's shipped graph route on its measured description too, and pass ISE (DRC 0 / 0, `.bit`
+  byte-identical with CRC on and off). Its measurements now take ISE's routes of 33 of those designs and `iobddr-b`
+  (`gen-obspins.mjs`: the DDR registers of the pads `iobddr` leaves out), and 161 more clock tests, every verdict
+  agreeing with the shipped graph. Tests: test/s3e-device.test.js (`iobDdr` `alt`, the rebuild of `data/xc3s100e/`).
+
 ## 15.19.0
+
+Not published (its tests failed at the release): its changes come with 15.19.1.
 
 Silinx HLS: C and C++ high-level synthesis, as Vitis HLS makes it, with its C simulation and C/RTL co-simulation;
 and a schematic editor closer to ISE's.
