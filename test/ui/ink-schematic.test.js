@@ -29,18 +29,20 @@ const HALF_ADDER = { gates: [{ type: 'xor', x: 2.6, y: 0, n: 2 }, { type: 'and',
   { name: 'A', at: [0.5, -0.2], to: [[0, 0], [1, 0]], j: 0.4 }, { name: 'B', at: [0.5, 1.0], to: [[0, 1], [1, 1]], j: 0.7 },
   { from: 0, name: 'S' }, { from: 1, name: 'C' }] };
 
+// a stroke's points sent at once, in order, each not waited for (#1906: Chrome handles one input event a frame, so a
+// drawing of 1600 points waited for 1600 frames, 90 s on a slow runner)
 async function stroke(page, p, kind) {
   if (kind === 'touch') {
     const at = (q) => [{ x: q.x, y: q.y, id: 1, radiusX: 1, radiusY: 1, force: 1 }];
     await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(p[0]) });
-    for (const q of p.slice(1)) await page.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(q) });
+    await Promise.all(p.slice(1).map((q) => page.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(q) })));
     await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     return;
   }
   const ev = (type, q, buttons) => page.send('Input.dispatchMouseEvent', { type, x: q.x, y: q.y, button: type === 'mouseMoved' && !buttons ? 'none' : 'left', buttons, clickCount: 1, pointerType: kind });
   await ev('mouseMoved', p[0], 0);
   await ev('mousePressed', p[0], 1);
-  for (const q of p.slice(1)) await ev('mouseMoved', q, 1);
+  await Promise.all(p.slice(1).map((q) => ev('mouseMoved', q, 1)));
   await ev('mouseReleased', p.at(-1), 0);
 }
 const canvasAt = (page) => page.eval((d) => { const r = document.querySelector(`${d} .ink-canvas`).getBoundingClientRect(); return { x: r.left, y: r.top }; }, D);
