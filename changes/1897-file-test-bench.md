@@ -13,5 +13,6 @@ In detail:
   synthesis and the co-simulation (the HLS corpus: 50 designs through co-simulation). `sprintf` / `snprintf` into a
   char array, a char array's string for `fopen`, `%s`, `system`; `sizeof` of an array variable all its elements. The
   app's C Simulation and C/RTL Co-simulation give the test bench the project's files its strings name, in memory
-  (never a file outside the project), and list the files it wrote (kept in memory). A `FILE` in the synthesized code
+  (never a file outside the project: an absolute path or one through `..` refused with a message, in `fopen` and
+  `diff`), and list the files it wrote (kept in memory). A `FILE` in the synthesized code
   is refused with a clear message (the test bench's; `#ifndef __SYNTHESIS__`).

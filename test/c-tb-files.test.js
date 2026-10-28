@@ -171,18 +171,65 @@ int main() {
     ['sprintf() runs in the C simulation only (the test bench), not in the synthesized code']);
 });
 
-test('#1897 a test bench reaches only the project\'s files: a host file named by its path is not opened (NULL), a path out of the project only the project\'s file of that name', () => {
+test('#1897 a test bench reaches only the project\'s files: a path out of it (absolute, through \'..\', a drive, ~) refused with a message, even when the project has a file of that name, in fopen and diff; a file the project has not: NULL; system() only diff', () => {
   const host = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-host-'));
   try {
     fs.writeFileSync(path.join(host, 'secret.dat'), 'host\n');
-    const src = `#include <stdio.h>\nint f(int a) { return a; }\nint main() {\n  char s[8] = "none";\n  FILE *a = fopen("${path.join(host, 'secret.dat').replace(/\\/g, '/')}", "r");\n  FILE *b = fopen("../../in.dat", "r");\n  if (b) fscanf(b, "%s", s);\n  printf("%d %s\\n", a == NULL, s);\n  return f(0);\n}\n`;
-    const sim = simulateC(src, { file: 'src/t.c', files: { 'src/in.dat': 'mine\n' } });
-    assert.deepEqual([sim.error, sim.output, sim.exitCode], [null, '1 mine\n', 0]);
-    assert.deepEqual(simulateC(src, { file: 'src/t.c' }).output, '1 none\n');
+    const abs = path.join(host, 'secret.dat').replace(/\\/g, '/');
+    const files = { 'src/in.dat': 'mine\n', 'src/secret.dat': 'project\n' };
+    const run = (call) => simulateC(`#include <stdio.h>\n#include <stdlib.h>\nint f(int a) { return a; }\nint main() {\n  ${call};\n  return f(0);\n}\n`, { file: 'src/t.c', files });
+    const refused = (name, what = 'fopen') => `${what}: '${name}' is outside the project (a test bench opens only the project's files: a path inside it, without '..')`;
+    for (const name of [abs, '../../in.dat', 'tb/../../in.dat', '..\\in.dat', 'C:\\data\\in.dat', '\\\\host\\share\\in.dat', '~/in.dat']) {
+      const r = run(`FILE *fp = fopen(${JSON.stringify(name)}, "r")`);
+      assert.deepEqual([r.ok, r.error], [false, { line: 5, col: 14, message: refused(name) }], name);
+    }
+    // (written too: never outside the project)
+    assert.equal(run('FILE *fp = fopen("../out.dat", "w")').error.message, refused('../out.dat'));
+    const d = run('system("diff -w in.dat ../../etc/passwd")');
+    assert.equal(d.error.message, refused('../../etc/passwd', 'system("diff -w in.dat ../../etc/passwd")'));
+    // a path inside the project: its file; one the project has not: NULL, as C's fopen of a missing file
+    const ok = run('char s[8] = "none"; FILE *a = fopen("./in.dat", "r"); fscanf(a, "%s", s); FILE *b = fopen("tb/none.dat", "r"); printf("%s %d\\n", s, b == NULL)');
+    assert.deepEqual([ok.error, ok.output, ok.exitCode], [null, 'mine 1\n', 0]);
   } finally { fs.rmSync(host, { recursive: true, force: true }); }
   // system(): only diff, any other command refused
   const sys = simulateC('#include <stdlib.h>\nint f(int a) { return a; }\nint main() { return system("cat /etc/passwd") + f(0); }\n', { file: 'y.c' });
   assert.equal(sys.error.message, 'system("cat /etc/passwd") cannot be run in Silinx\'s C simulation (only diff)');
+});
+
+test('#1897 the browser edition\'s files: the C simulation and the co-simulation run the test bench\'s files with no file system (node:fs\'s functions throwing, as in a browser), their modules importing no Node API', async () => {
+  // the modules the C simulation loads: none imports a Node built-in (they run in the browser as they are)
+  const seen = new Set(), todo = [new URL('../core/c-interp.js', import.meta.url), new URL('../core/c-cosim.js', import.meta.url)];
+  while (todo.length) {
+    const u = todo.pop();
+    if (seen.has(u.href)) continue;
+    seen.add(u.href);
+    const text = fs.readFileSync(u, 'utf8');
+    for (const m of text.matchAll(/(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+      const spec = m[1] || m[2];
+      assert.ok(spec.startsWith('.'), `${u.pathname.split('/').slice(-2).join('/')} imports '${spec}' (not a module of the project)`);
+      todo.push(new URL(spec, u));
+    }
+  }
+  assert.ok(seen.size > 10);
+  // every file function of node:fs throwing during the run: the files are the in-memory map's only
+  const { syncBuiltinESMExports } = await import('node:module');
+  const saved = {};
+  for (const k of Object.keys(fs)) if (typeof fs[k] === 'function' && /^(read|open|stat|lstat|exists|access|write|append|readdir|createRead|createWrite|watch)/.test(k)) { saved[k] = fs[k]; fs[k] = () => { throw new Error(`fs.${k} called`); }; }
+  for (const k of Object.keys(fs.promises)) if (typeof fs.promises[k] === 'function') { saved[`p.${k}`] = fs.promises[k]; fs.promises[k] = () => { throw new Error(`fs.promises.${k} called`); }; }
+  syncBuiltinESMExports();
+  let sim, co;
+  try {
+    const files = { 'src/tb_data/in.dat': IN, 'src/tb_data/out.golden.dat': GOLDEN };
+    sim = simulateC(TB, { file: 'src/hier.c', files });
+    co = cosimulate(TB, { file: 'src/hier.c', lang: 'verilog', files });
+  } finally {
+    for (const [k, f] of Object.entries(saved)) { if (k.startsWith('p.')) fs.promises[k.slice(2)] = f; else fs[k] = f; }
+    syncBuiltinESMExports();
+  }
+  assert.deepEqual([sim.error, sim.diagnostics, sim.output, sim.exitCode], [null, [], 'Results are good\n', 0]);
+  assert.deepEqual(Object.keys(sim.files).sort(), ['out.dat', 'trace_056.dat', 'trace_063.dat', 'trace_092.dat']);
+  assert.equal(sim.files['out.dat'], GOLDEN);
+  assert.deepEqual([co.errors, co.pass, co.calls], [[], true, 3]);
 });
 
 test('#1897 the project\'s files the app reads for a test bench: those its strings name with their extensions (a format\'s conversions any text, diff\'s names), not the build\'s', () => {

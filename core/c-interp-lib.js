@@ -35,6 +35,11 @@ export const libMethods = {
     for (let k = x.arr ? 0 : x.ptr.index; k < arr.length && arr[k].v; k++) s += String.fromCharCode(Number(BigInt.asUintN(8, BigInt(arr[k].v))));
     return s;
   },
+  /** A path a test bench names, refused when it leaves the project: absolute (/x, C:\x, \\host, ~/x) or through '..'
+   *  (#1897). */
+  inProject(name, e, what) {
+    if (/^([\\/~]|[A-Za-z]:)/.test(name) || name.split(/[\\/]/).includes('..')) this.fail(e, `${what}: '${name}' is outside the project (a test bench opens only the project's files: a path inside it, without '..')`);
+  },
   /** The file `name` names, as the test bench opens it: one written by the run, else one of the design's files
    *  (by its path, else the one whose path ends with it, as tb_data/in.dat a source's folder's, else by its name
    *  alone). Only these: a test bench never reaches a file outside them (#1897). */
@@ -81,6 +86,7 @@ export const libMethods = {
       case 'fopen': {
         const [path, mode] = A().map((x) => this.cString(x));
         if (path === undefined || mode === undefined) this.fail(e, 'fopen: its name and mode must be strings');
+        this.inProject(path, e, 'fopen');
         if (/^[wa]/.test(mode)) {
           const fh = { name: path, text: mode[0] === 'a' ? (this.fileText(path) ?? '') : '', pos: 0, w: true };
           this.fs.set(path, fh.text);
@@ -205,6 +211,7 @@ export const libMethods = {
     if (w[0] !== 'diff') this.fail(e, `system("${cmd}") cannot be run in Silinx's C simulation (only diff)`);
     const opts = w.slice(1).filter((x) => x.startsWith('-')), names = w.slice(1).filter((x) => !x.startsWith('-'));
     if (names.length !== 2) this.fail(e, `system("${cmd}"): diff compares two files`);
+    for (const n of names) this.inProject(n, e, `system("${cmd}")`);
     const [a, b] = names.map((n) => this.fileText(n));
     if (a === null || b === null) { this.out.push(`diff: ${a === null ? names[0] : names[1]}: No such file or directory\n`); return 2; }
     const flags = opts.flatMap((o) => (o.startsWith('--') ? [o] : [...o.slice(1)].map((c) => `-${c}`)));
