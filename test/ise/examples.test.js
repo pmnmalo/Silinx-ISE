@@ -15,6 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { EXAMPLES, TARGETS, ROOT, exampleProject } from '../examples-lib.mjs';
+import { iseExamplesConfig } from '../ise-examples-config.mjs';
 
 const IMAGE = process.env.SILINX_ISE_IMAGE || 'xilinx/ise:14.7';
 const enabled = process.env.SILINX_ISE_TESTS === '1';
@@ -39,11 +40,11 @@ let tmp;
 before(() => {
   if (skip) return;
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ise-examples-'));
+  // the user's remoteDir, read before the test's own configuration replaces theirs (#1916)
+  const config = iseExamplesConfig({ host: LOCAL ? null : { user: HOST[1], host: HOST[2] }, image: IMAGE });
   process.env.SILINX_CONFIG_DIR = path.join(tmp, 'cfg');
   fs.mkdirSync(process.env.SILINX_CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), JSON.stringify({
-    ...(LOCAL ? { mode: 'docker', docker: { image: IMAGE, platform: 'linux/amd64', settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }
-      : { mode: 'ssh', ssh: { host: HOST[2], user: HOST[1] || '', remoteDir: 'silinx-ise-examples', image: IMAGE, settings: '/opt/Xilinx/14.7/ISE_DS/settings64.sh' } }) }));
+  fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), JSON.stringify(config));
 });
 
 // ISE's warnings, without the parts that change from run to run or device to device
