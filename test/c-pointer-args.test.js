@@ -101,8 +101,8 @@ test('#1895 a pointer to a pointer resolved at compile time (sub\'s **flagPtr is
     const r = cosimulate(DOUBLE, { file: 'double.c', lang });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), [`4 ${LOOP}`]);
-    assert.deepEqual(r.gen.ports.filter((p) => !/^ap_/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['pos:32', 'x:32', 'flag:32']);
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), [`4 ${LOOP}`, "8 warning: 'pos' is a name Vitis HLS reserves: it is named pos_r in the module"]);
+    assert.deepEqual(r.gen.ports.filter((p) => !/^ap_/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['pos_r:32', 'x:32', 'flag:32']);
   }
 });
 
