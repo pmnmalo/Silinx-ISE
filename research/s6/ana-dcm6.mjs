@@ -1,7 +1,8 @@
 // Stage S6-E (#727): the DCM_SP's and PLL_BASE's settings from gen-dcm6.mjs's designs ISE implemented. Each design's
 // bits the databases leave over (residual6.mjs's prediction taken away: the slices, the routing, the pads) and, per
 // variant, the leftover bits it sets and clears against its base's: the setting's bits at that site.
-//   node research/s6/ana-dcm6.mjs <dir> [part]   (<dir>/<design>/top.xdl, top.bit)   -> research/s6/db/<device>-cmt.json
+//   node research/s6/ana-dcm6.mjs <dir> [part]   (<dir>/<design>/top.xdl, top.bit: gen-dcm6.mjs's and its --fields
+//     designs together)   -> research/s6/db/<device>-cmt.json
 // { part, dcm: { site, base: ['frame,bit' left over], variants: { name: { params, set, clear } } }, pll: { … } }
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,7 +12,7 @@ import { readBit6, emptyFdri, bitFormat6 } from '../../core/fpga/s6/bitstream.js
 import { bitsOf } from './ana-iob6.mjs';
 import { predictDesign } from './residual6.mjs';
 import { loadDb } from './check-slice6.mjs';
-import { dcmVariants } from './gen-dcm6.mjs';
+import { dcmVariants, fieldVariants } from './gen-dcm6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
 
 /** A variant's leftover bits against its base's: { set, clear } (sorted). */
@@ -37,7 +38,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const kind of ['dcm', 'pll']) {
     const base = left(kind);
     out[kind].base = [...base].sort();
-    for (const [name, v] of Object.entries(dcmVariants())) {
+    for (const [name, v] of Object.entries({ ...dcmVariants(), ...fieldVariants() })) {
       if (v.kind !== kind || name === kind) continue;
       const mine = left(name);
       if (!mine) { console.log(`${name}: no bitstream (ISE refused it)`); continue; }
