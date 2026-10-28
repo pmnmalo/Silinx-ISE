@@ -1,12 +1,13 @@
 // Silinx HLS: the top's block-level ports and port names as Vitis HLS's (#1900, #1902; test/hls-corpus/vitis.json, Vitis
-// HLS 2025.2, the reference): a combinational ap_ctrl_hs module's ap_rst (no ap_clk); ap_ctrl_none, and a data-driven
+// HLS 2025.2, the reference): a combinational module with no clock nor reset (its test bench none either); ap_ctrl_none, and a data-driven
 // top (every process an hls::task), with no ap_start / ap_done / ap_idle / ap_ready, running by itself; a C name Vitis
 // HLS reserves renamed <name>_r (pos -> pos_r). Each co-simulated in VHDL and in Verilog (Silinx's simulator: compiled,
 // elaborated, simulated), its warnings asserted.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cToHdl } from '../core/c-hdl.js';
-import { cosimulate } from '../core/c-cosim.js';
+import { cosimulate, cosimBench } from '../core/c-cosim.js';
+import { simulateC } from '../core/c-interp.js';
 import { renamed, portOf, renamedWhy, ctrlNone } from '../core/c-names.js';
 import { checkC } from '../core/c-check.js';
 
@@ -61,7 +62,7 @@ int main() {
 
 test('#1902 an argument named pos: its port pos_r (neg neg_r), a warning each, as Vitis HLS; co-simulated in VHDL and Verilog', () => {
   assert.equal(cToHdl(POS, { file: 'pick.c' }).ok, true);
-  cosim(POS, 'pick.c', ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return'], [
+  cosim(POS, 'pick.c', ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return'], [
     "1 warning: 'pos' is a name Vitis HLS reserves: it is named pos_r in the module",
     "1 warning: 'neg' is a name Vitis HLS reserves: it is named neg_r in the module",
     "1 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"]);
@@ -75,7 +76,7 @@ test('#1902 an argument named pos: its port pos_r (neg neg_r), a warning each, a
   }
 });
 
-test('#1900 a combinational top (ap_ctrl_hs): ap_rst after the protocol\'s, no ap_clk (Vitis HLS\'s latency 0: pipelining-functions-function-instantiate); ap_ctrl_none: none of them', () => {
+test('#1900 a combinational top: no ap_clk nor ap_rst, its test bench none either (ap_ctrl_hs: ap_start / ap_done / ap_idle / ap_ready only); ap_ctrl_none: only the data ports', () => {
   // (function-instantiate's)
   const src = `char foo(char inval, char incr) {
 #pragma HLS INLINE OFF
@@ -92,11 +93,13 @@ int main() {
   return a == 4 && b == 9 && c == 96 ? 0 : 1;
 }
 `;
-  const hdl = cosim(src, 'example.cpp', ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'inval1', 'inval2', 'inval3', 'outval1', 'outval1_ap_vld', 'outval2', 'outval2_ap_vld', 'outval3', 'outval3_ap_vld'],
+  const hdl = cosim(src, 'example.cpp', ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'inval1', 'inval2', 'inval3', 'outval1', 'outval1_ap_vld', 'outval2', 'outval2_ap_vld', 'outval3', 'outval3_ap_vld'],
     ['2 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function']);
-  assert.match(hdl.vhdl.hdl, /    ap_ready : out std_logic;\n    ap_rst : in std_logic;\n/);
-  assert.match(hdl.verilog.hdl, /  output wire ap_ready,\n  input  wire ap_rst,\n/);
+  for (const lang of LANGS) assert.doesNotMatch(hdl[lang].hdl, /ap_clk|ap_rst/, lang);
   assert.equal(hdl.vhdl.latency, null);
+  const g = cToHdl(src, { file: 'example.cpp', lang: 'verilog' });
+  const tb = cosimBench(g, simulateC(src, { file: 'example.cpp' }).calls).text;
+  assert.deepEqual([tb.includes('ap_clk'), tb.includes('ap_rst'), /^ {4}ap_start = 1;$/m.test(tb)], [false, false, true]);
   const none = cToHdl('int g(int a) {\n#pragma HLS INTERFACE ap_ctrl_none port=return\n  return a + 1;\n}');
   assert.deepEqual([none.ports.map((p) => p.name), none.diagnostics], [['a', 'ap_return'], []]);
 });
@@ -174,7 +177,7 @@ void t(int k, int b[4]) {
   assert.deepEqual([g.ok, g.ports.slice(0, 6).map((p) => p.name), msgs(g)], [true, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'], ['4 warning: ap_ctrl_none: this function is sequential, it needs its block protocol: ap_ctrl_hs is made']]);
 });
 
-test('#1900 the modules with ap_rst not read and with ap_ctrl_none through the open synthesis (Yosys, Spartan-3E), from the VHDL and from the Verilog: no warning', async () => {
+test('#1900 a combinational module and the modules with ap_ctrl_none through the open synthesis (Yosys, Spartan-3E), from the VHDL and from the Verilog: no warning', async () => {
   const { compile, elaborate } = await import('../core/compile.js');
   const { synthesizeOpen } = await import('../core/synth-open.js');
   const { yosysNode } = await import('../core/synth-open-node.js');

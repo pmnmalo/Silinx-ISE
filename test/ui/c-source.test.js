@@ -32,7 +32,7 @@ uiTest('#1531 Silinx HLS: a .c file a module of the project (its Design row, its
   await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'mac'), [], { what: 'the module mac' });
   assert.deepEqual(await row(page, 'mac'), { badges: ['C*', 'VHDL'], meta: '(mac.c)' });
   assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('mac').ports.map((p) => p.name)),
-    ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'a', 'b', 'acc_i', 'acc_o', 'acc_o_ap_vld', 'ap_return']);
+    ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a', 'b', 'acc_i', 'acc_o', 'acc_o_ap_vld', 'ap_return']);
   // its VHDL, read-only, from the badge
   await page.click('#hier .row .badge', { text: 'VHDL' });
   await page.waitFor(() => window.Silinx.active?.id === 'chdl:src/mac.c' && window.Silinx.active.editor, [], { what: 'the generated VHDL' });
