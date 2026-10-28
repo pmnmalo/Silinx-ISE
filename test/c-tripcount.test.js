@@ -47,7 +47,7 @@ test('#1921 max= / min= / avg= of const globals: the loop\'s bound, no warning (
   assert.deepEqual(check(SRC('min = c_dim* c_dim max = c_dim * c_dim avg = c_dim * 2')), { max: 16, messages: [] });
   assert.deepEqual(check(SRC('max=c_dim*c_dim', 'const unsigned int c_dim = 4;\n'), 'sum.cpp'), { max: 16, messages: [] });
   assert.deepEqual(check(SRC('max=MAX_SIZE * K', '#define MAX_SIZE 8\nconst int K = MAX_SIZE / 4;\n')), { max: 16, messages: [] });
-  assert.deepEqual(check(SRC('max=c_dim * c_dim').replace('  int s = 0;\n', '  const int c_dim = 3;\n  int s = 0;\n')).max, 9);
+  assert.deepEqual(check(SRC('max=c_dim * c_dim').replace('  int s = 0;\n', '  const int c_dim = 3;\n  int s = 0;\n')), { max: 9, messages: [] });
 });
 
 test('#1921 a name that is not a constant (a variable, an unknown name), a negative or wrong value: said, naming it; the bound unknown as before', () => {
