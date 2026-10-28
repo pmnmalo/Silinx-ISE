@@ -4,7 +4,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
-import { capturePrints, printOn, printed } from './print-helpers.js';
+import { capturePrints, confirmPrint, printOn, printed } from './print-helpers.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -34,6 +34,7 @@ uiTest('#1511 SSim\'s waveform prints its names, values and waves over the time 
   const before = await page.eval(() => { const st = window.Silinx.active.view.state; return { scrollY: st.scrollY, sel: [...st.sel] }; });
   assert.ok(await printOn(page));
   await page.click('#toolbar .tb-btn[data-cmd=print]');
+  await confirmPrint(page);
   const html = await printed(page, 1);
   assert.match(html, /<header class="pv-head"><b>SSim \(tb_gates\)<\/b><span>Project: PrSim<\/span><\/header>/);
   assert.match(html, /^<html data-ui="\w+" data-theme="light"/);
@@ -50,6 +51,7 @@ uiTest('#1511 SSim\'s waveform prints its names, values and waves over the time 
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.key('p', { modifiers: 2 });
+  await confirmPrint(page, { title: 'Imprimir — ', print: 'Imprimir…' });
   const pt = await printed(page, 2);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.match(pt, /<span>Projeto: PrSim<\/span>/);

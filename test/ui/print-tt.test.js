@@ -3,7 +3,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
-import { capturePrints, fileMenuPrint, printOn, printed } from './print-helpers.js';
+import { capturePrints, confirmPrint, fileMenuPrint, printOn, printed } from './print-helpers.js';
 import { newTable } from '../../core/logic.js';
 
 let env;
@@ -22,6 +22,7 @@ uiTest('#1510 a truth table prints its table, the Karnaugh map of the output in 
   assert.ok(await printOn(page));
   assert.equal(!!(await fileMenuPrint(page)).disabled, false, 'File ▸ Print… enabled');
   await page.click('#toolbar .tb-btn[data-cmd=print]');
+  await confirmPrint(page);
   let html = await printed(page, 1);
   assert.match(html, /<header class="pv-head"><b>Truth table maj5<\/b><span>Project: PrTt {2}· {2}File: src\/maj5\.tt\.json<\/span><\/header>/);
   assert.match(html, /^<html data-ui="\w+" data-theme="light"/);
@@ -40,6 +41,7 @@ uiTest('#1510 a truth table prints its table, the Karnaugh map of the output in 
   await page.eval(() => document.querySelector('.doc:not([hidden]) .tt-k3d-on').click());
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .tt-k3d-layer'), [], { what: 'the 3D map' });
   await page.key('p', { modifiers: 2 });
+  await confirmPrint(page);
   html = await printed(page, 2);
   assert.ok((html.match(/class="tt-k3d-layer/g) || []).length >= 2, 'its layers');
   assert.doesNotMatch(html, /class="btn tt-k3d-reset"/);
@@ -48,6 +50,7 @@ uiTest('#1510 a truth table prints its table, the Karnaugh map of the output in 
   await page.eval(() => { const n = document.querySelector('.doc:not([hidden]) .tt-notes'); n.value = 'majority of five'; n.dispatchEvent(new Event('input')); });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.click('#toolbar .tb-btn[data-cmd=print]');
+  await confirmPrint(page, { title: 'Imprimir — ', print: 'Imprimir…' });
   html = await printed(page, 3);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.match(html, /<b>Tabela de verdade maj5<\/b><span>Projeto: PrTt {2}· {2}Ficheiro: src\/maj5\.tt\.json<\/span>/);

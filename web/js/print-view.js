@@ -1,9 +1,11 @@
 // Silinx - the print view of a document that is not a diagram (#1509): a clean page with its content (the text of a
 // source, a copy of what the document shows), its title, the project and the file, in light colours (also in the
-// dark theme), fitted to the page; printed by the browser's print dialog (which also saves PDF).
+// dark theme), fitted to the page of the paper and orientation chosen (#1923); printed by the browser's print dialog
+// (which also saves PDF).
 import { esc } from './dom.js';
 import { t } from './i18n.js';
-import { openPrintPage, withLightTheme } from './print.js';
+import { h, dialog } from './ui.js';
+import { PAGE_SIZE, PAPERS, openPrintPage, withLightTheme } from './print.js';
 import { highlightHdl } from './highlight.js';
 
 const PX_PER_MM = 96 / 25.4;
@@ -48,20 +50,32 @@ ${css}
 }
 
 /**
- * The print view's fit, run in the print window before it prints: a copy of a document (`.pv-copy`) wider than the
- * page turns the page to landscape and is zoomed down to its width; `page`: to its height too (one page).
+ * The page of a print view: `paper` (A4, A3, Letter) in `orient` (portrait, landscape, or auto: a copy of a document
+ * `w` px wide and `hh` px high, wider than the page in portrait, turns it to landscape); its size in mm and its @page rule.
  */
-export function fitToPage(win, { page = false } = {}) {
+export function printPage({ paper = 'A4', orient = 'auto' } = {}, w = 0, hh = 0) {
+  if (!Object.hasOwn(PAPERS, paper)) paper = 'A4';
+  const [a, b] = PAPERS[paper];
+  const land = orient === 'landscape' || (orient === 'auto' && w > (a - 2 * MARGIN) * PX_PER_MM && w > hh);
+  const [pw, ph] = land ? [b, a] : [a, b];
+  return { paper, land, pw, ph, rule: `@page { size: ${PAGE_SIZE[paper]} ${land ? 'landscape' : 'portrait'}; margin: ${MARGIN}mm; }` };
+}
+
+/**
+ * The print view's fit, run in the print window before it prints: the page of `paper` and `orient` (printPage); a copy
+ * of a document (`.pv-copy`) is zoomed down to the page's width; `page`: to its height too (one page).
+ */
+export function fitToPage(win, { page = false, paper, orient } = {}) {
   const d = win.document, copy = d.querySelector('.pv-copy');
-  if (!copy) return;
-  const w = copy.scrollWidth, hh = copy.scrollHeight;
-  const land = w > (210 - 2 * MARGIN) * PX_PER_MM && w > hh;
-  const [pw, ph] = land ? [297, 210] : [210, 297];
-  const aw = (pw - 2 * MARGIN) * PX_PER_MM, ah = (ph - 2 * MARGIN - HEAD - 4) * PX_PER_MM;
-  const k = Math.min(1, aw / Math.max(1, w), page ? ah / Math.max(1, hh) : 1);
-  copy.style.zoom = String(+k.toFixed(4));
+  const w = copy?.scrollWidth || 0, hh = copy?.scrollHeight || 0;
+  const P = printPage({ paper, orient }, w, hh);
+  if (copy) {
+    const aw = (P.pw - 2 * MARGIN) * PX_PER_MM, ah = (P.ph - 2 * MARGIN - HEAD - 4) * PX_PER_MM;
+    const k = Math.min(1, aw / Math.max(1, w), page ? ah / Math.max(1, hh) : 1);
+    copy.style.zoom = String(+k.toFixed(4));
+  }
   const st = d.createElement('style');
-  st.textContent = `@page { size: A4 ${land ? 'landscape' : 'portrait'}; margin: ${MARGIN}mm; }`;
+  st.textContent = P.rule;
   d.head.append(st);
 }
 
@@ -115,7 +129,26 @@ export const TEXT_CSS = `.pv-code { border-collapse: collapse; width: 100%; font
 .pv-code tr { break-inside: avoid; }
 .tk-com { color: #008000; } .tk-kw { color: #0000c0; font-weight: 600; } .tk-lit { color: #a31515; } .tk-attr { color: #7f007f; } .tk-st { color: #6f42c1; }`;
 
-/** Print view `{ title, meta, html, fit }` opened and printed (`fit`: options of fitToPage, or false). */
-export function openPrintView(v) {
-  openPrintPage(v.html, v.fit === false ? null : (win) => fitToPage(win, v.fit || {}));
+// the paper and orientation chosen last (the dialog opens with them)
+let chosen = { paper: 'A4', orient: 'auto' };
+
+/** The print dialog of a print view: its paper and orientation (`{ paper, orient }`), or null (cancelled). */
+export async function printOptions(title) {
+  const paper = h('select', {}, ...Object.keys(PAPERS).map((p) => h('option', { value: p, selected: p === chosen.paper }, p)));
+  const orient = h('select', {}, ...[['auto', 'Automatic'], ['portrait', 'Portrait'], ['landscape', 'Landscape']]
+    .map(([v, l]) => h('option', { value: v, selected: v === chosen.orient }, l)));
+  const body = h('div', {},
+    h('table', { class: 'form' },
+      h('tr', {}, h('td', {}, 'Paper'), h('td', {}, paper)),
+      h('tr', {}, h('td', {}, 'Orientation'), h('td', {}, orient))),
+    h('div', { class: 'muted', style: { marginTop: '6px' } }, 'Automatic: landscape when what is shown is wider than the page. For a PDF choose "Save as PDF" in the print dialog.'));
+  const r = await dialog({ title: `Print — ${title}`, body, width: 420, buttons: [{ label: 'Print…', value: 'print', primary: true }, { label: 'Cancel', value: null }] });
+  if (r !== 'print') return null;
+  chosen = { paper: paper.value, orient: orient.value };
+  return { ...chosen };
+}
+
+/** Print view `{ title, meta, html, fit }` opened and printed on the page of `opts` (`{ paper, orient }`; `fit`: options of fitToPage). */
+export function openPrintView(v, opts = {}) {
+  openPrintPage(v.html, (win) => fitToPage(win, { ...(v.fit || {}), ...opts }));
 }

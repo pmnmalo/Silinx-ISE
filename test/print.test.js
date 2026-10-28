@@ -72,3 +72,45 @@ test('#1509 the print view of a source: every line numbered, HDL highlighted, es
   assert.match(page, /background: #fff !important/);
   assert.doesNotMatch(page, /<script/i);
 });
+
+// #1923: the page of a print view: the paper and orientation chosen; automatic turns a wide copy to landscape
+test('#1923 the page of a print view: paper and orientation chosen, automatic by the copy\'s width', async () => {
+  const { printPage, fitToPage } = await import('../web/js/print-view.js');
+  const px = (mm) => mm * 96 / 25.4;
+  assert.deepEqual(printPage(), { paper: 'A4', land: false, pw: 210, ph: 297, rule: '@page { size: A4 portrait; margin: 10mm; }' });
+  assert.deepEqual(printPage({ orient: 'landscape' }), { paper: 'A4', land: true, pw: 297, ph: 210, rule: '@page { size: A4 landscape; margin: 10mm; }' });
+  assert.equal(printPage({ paper: 'A3', orient: 'landscape' }).rule, '@page { size: A3 landscape; margin: 10mm; }');
+  assert.deepEqual([printPage({ paper: 'A3', orient: 'landscape' }).pw, printPage({ paper: 'A3' }).ph], [420, 420]);
+  assert.equal(printPage({ paper: 'Letter', orient: 'portrait' }).rule, '@page { size: letter portrait; margin: 10mm; }');
+  // automatic: landscape only when the copy is wider than the portrait page's width and than it is high
+  assert.equal(printPage({ orient: 'auto' }, px(190) + 1, 100).land, true);
+  assert.equal(printPage({ orient: 'auto' }, px(190) - 1, 100).land, false, 'fits the portrait width');
+  assert.equal(printPage({ orient: 'auto' }, px(250), px(300)).land, false, 'higher than wide');
+  assert.equal(printPage({ paper: 'A3', orient: 'auto' }, px(250), 100).land, false, 'fits A3 in portrait');
+  // the choice wins over the copy's shape
+  assert.equal(printPage({ orient: 'portrait' }, 5000, 100).land, false);
+  assert.equal(printPage({ orient: 'landscape' }, 100, 5000).land, true);
+  // an unknown paper or orientation: A4, automatic; the rule only from the module's table
+  for (const paper of ['A4; } </style><script>', 'toString', undefined]) assert.equal(printPage({ paper }).rule, '@page { size: A4 portrait; margin: 10mm; }');
+  assert.equal(printPage({ orient: 'sideways' }).land, false);
+  // fitToPage: the rule written in the window; a copy zoomed to the page's width (one page: its height too)
+  const win = (w, hh) => {
+    const styles = [], copy = w == null ? null : { scrollWidth: w, scrollHeight: hh, style: {} };
+    return { styles, copy, document: { querySelector: () => copy, createElement: () => ({}), head: { append: (s) => styles.push(s.textContent) } } };
+  };
+  let W = win();
+  fitToPage(W, { orient: 'landscape', paper: 'A3' });
+  assert.deepEqual(W.styles, ['@page { size: A3 landscape; margin: 10mm; }'], 'a source: the page only');
+  W = win(px(190) * 2, 100);
+  fitToPage(W, { orient: 'portrait' });
+  assert.deepEqual([W.styles[0], W.copy.style.zoom], ['@page { size: A4 portrait; margin: 10mm; }', '0.5']);
+  W = win(px(190) * 2, 100);
+  fitToPage(W, {});
+  assert.deepEqual([W.styles[0], +W.copy.style.zoom], ['@page { size: A4 landscape; margin: 10mm; }', +(277 / 380).toFixed(4)]);
+  W = win(100, px(400));
+  fitToPage(W, { page: true, orient: 'landscape' });
+  assert.equal(+W.copy.style.zoom, +((210 - 20 - 14 - 4) / 400).toFixed(4), 'one page: the landscape page\'s height');
+  W = win(100, 100);
+  fitToPage(W, { page: true });
+  assert.equal(W.copy.style.zoom, '1', 'never enlarged');
+});

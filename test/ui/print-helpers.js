@@ -19,3 +19,13 @@ export const printed = async (page, n) => {
 // (the toolbar's buttons follow the document in front within a second)
 export const printOn = (page) => page.waitFor(() => !document.querySelector('#toolbar .tb-btn[data-cmd=print]').disabled, [], { what: 'Print enabled' }).then(() => true);
 export const fileMenuPrint = async (page) => (await page.openMenu('File').finally(() => page.closeMenus())).find((i) => i.label === 'Print…');
+// the print dialog of a document that is not a drawing (#1923): its paper and orientation set (when given), Print… pressed
+export const confirmPrint = async (page, { paper, orient, title = 'Print — ', print = 'Print…' } = {}) => {
+  await page.waitDialog(title);
+  await page.eval((p, o) => {
+    const sel = [...document.querySelectorAll('.dlg-overlay')].pop().querySelectorAll('select');
+    for (const [s, v] of [[sel[0], p], [sel[1], o]]) if (v) { s.value = v; s.dispatchEvent(new Event('input', { bubbles: true })); }
+  }, paper ?? null, orient ?? null);
+  await page.dialogButton(print);
+  await page.waitNoDialog();
+};

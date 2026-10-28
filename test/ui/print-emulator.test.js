@@ -3,7 +3,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
-import { capturePrints, printOn, printed } from './print-helpers.js';
+import { capturePrints, confirmPrint, printOn, printed } from './print-helpers.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -37,6 +37,7 @@ uiTest('#1512 the Board Emulator prints the board in its current state, the Watc
   }));
   assert.ok(await printOn(page));
   await page.click('#toolbar .tb-btn[data-cmd=print]');
+  await confirmPrint(page);
   const html = await printed(page, 1);
   assert.match(html, /<header class="pv-head"><b>Board Emulator \(top\)<\/b><span>Project: PrEmu<\/span><\/header>/);
   assert.match(html, /^<html data-ui="\w+" data-theme="light"/);
