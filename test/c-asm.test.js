@@ -1,8 +1,9 @@
 // Silinx HLS, the state machine as an ASM chart (#1575): core/c-asm.js (and core/c-print.js, the C written back). A
 // sequential function's chart: the protocol's IDLE and DONE, a state per block of the C with its statements, its ifs
 // decision boxes and the statements under them conditional outputs, a return / break / continue its jump, a memory's
-// accesses; each state of the machine (core/c-fsmd.js) one state of the chart; laid out (every box placed). A
-// combinational function has none: said.
+// accesses; a stream's read and write in the C's terms, the wait on the FIFO and its handshake (#1941); each state of
+// the machine (core/c-fsmd.js) one state of the chart; laid out (every box placed). A combinational function has none:
+// said.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cAsm } from '../core/c-asm.js';
@@ -136,7 +137,11 @@ test('#1927 the ASM chart of a free-running function (ap_ctrl_none): IDLE goes o
     assert.deepEqual(lines(r.model), [
       'IDLE -next-> S1', 'DONE -next-> IDLE',
       'S1 -next-> S2', 'S2 -next-> <i < 3>', '<i < 3> -true-> S3', '<i < 3> -false-> S6',
-      'S3 -next-> S4', 'S4 -next-> S5', 'S5 -next-> S2', 'S6 -next-> S7', 'S7 -next-> DONE',
+      // (each read and write: its wait on the FIFO's flag and its handshake, under the module's ports' names, #1941)
+      'S3 -next-> <in_r_empty_n>', '<in_r_empty_n> -false-> S3', '<in_r_empty_n> -true-> (in_r_read = 1; ap_fifo_in_0 = in_r_dout)',
+      '(in_r_read = 1; ap_fifo_in_0 = in_r_dout) -next-> S4', 'S4 -next-> S5', 'S5 -next-> S2',
+      'S6 -next-> <out_r_full_n>', '<out_r_full_n> -false-> S6', '<out_r_full_n> -true-> (out_r_din = s; out_r_write = 1)',
+      '(out_r_din = s; out_r_write = 1) -next-> S7', 'S7 -next-> DONE',
     ], lang);
     const st = (n) => r.model.nodes.find((x) => x.name === n);
     assert.deepEqual([st('IDLE').actions, st('DONE').actions], [[], []], lang);
@@ -170,4 +175,79 @@ test('#1927 the block protocol (ap_ctrl_hs, the default, or written) keeps its c
     assert.deepEqual(io(r.model), [['ap_start:1', 'a:32', 'b:32'], ['ap_done:1', 'ap_idle:1', 'ap_ready:1', 'ap_return:32 reg']]);
     assert.deepEqual([r.model.inputs.map((p) => p.name), r.model.outputs.map((p) => p.name)], portsOf(cToHdl(src, { file: 'gcd.c' })));
   }
+});
+
+// (a stream read as a statement, into a variable, inside an expression and polled; a stream written, #1941)
+const STREAMS = `#include "hls_stream.h"
+void sums(hls::stream<int> &xs, hls::stream<int> &ys) {
+  int s = 0;
+  for (int i = 0; i < 2; i++) s += xs.read();
+  int t = xs.read();
+  xs.read(t);
+  if (!xs.empty()) s += xs.read() * 2;
+  ys.write(s + t);
+}
+int main() {
+  hls::stream<int> xs, ys;
+  int r = 0;
+  for (int c = 0; c < 3; c++) {
+    for (int i = 0; i < 5; i++) xs.write(c * 10 + i);
+    sums(xs, ys);
+    r += ys.read();
+  }
+  return r == 186 ? 0 : 1;
+}
+`;
+
+test('#1941 a stream\'s read and write in the ASM chart in the C\'s terms (ap_fifo_xs_0 = xs.read(), ys.write(s + t)), the state waiting while the FIFO is empty (full), its handshake under it; co-simulated in VHDL and Verilog', () => {
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cAsm(STREAMS, { file: 'sums.cpp', lang });
+    assert.equal(r.ok, true, lang);
+    assert.deepEqual(r.diagnostics, [], lang);
+    const rd = (k, from, to) => [`${from} -next-> <xs_empty_n>`, `<xs_empty_n> -false-> ${from}`, `<xs_empty_n> -true-> (xs_read = 1; ap_fifo_xs_${k} = xs_dout)`,
+      `(xs_read = 1; ap_fifo_xs_${k} = xs_dout) -next-> ${to}`];
+    // each read: its state, then the wait (back to the state while xs_empty_n is 0), the value taken under it; the write
+    // the same with ys_full_n
+    assert.deepEqual(lines(r.model), [
+      'IDLE -next-> <ap_start>', '<ap_start> -true-> S1', '<ap_start> -false-> IDLE', 'DONE -next-> IDLE',
+      'S1 -next-> S2', 'S2 -next-> <i < 2>', '<i < 2> -true-> S3', '<i < 2> -false-> S6',
+      ...rd(0, 'S3', 'S4'), 'S4 -next-> S5', 'S5 -next-> S2',
+      ...rd(1, 'S6', 'S7'), 'S7 -next-> S8',
+      ...rd(2, 'S8', 'S9'), 'S9 -next-> <!xs.empty()>', '<!xs.empty()> -true-> S10', '<!xs.empty()> -false-> S12',
+      ...rd(3, 'S10', 'S11'), 'S11 -next-> S12',
+      'S12 -next-> <ys_full_n>', '<ys_full_n> -false-> S12', '<ys_full_n> -true-> (ys_din = s + t; ys_write = 1)', '(ys_din = s + t; ys_write = 1) -next-> S13',
+      'S13 -next-> DONE',
+    ], lang);
+    const st = (n) => r.model.nodes.find((x) => x.name === n);
+    // the C's statements in their states: the value read in a register, used by the statement after it; read(t) as t = …
+    assert.deepEqual(['S3', 'S4', 'S6', 'S7', 'S8', 'S9', 'S10', 'S11', 'S12'].map((n) => st(n).actions), [
+      ['ap_fifo_xs_0 = xs.read()'], ['s += ap_fifo_xs_0'], ['ap_fifo_xs_1 = xs.read()'], ['int t = ap_fifo_xs_1'], ['ap_fifo_xs_2 = xs.read()'],
+      ['t = ap_fifo_xs_2'], ['ap_fifo_xs_3 = xs.read()'], ['s += ap_fifo_xs_3 * 2'], ['ys.write(s + t)']], lang);
+    assert.deepEqual(st('DONE').actions, ['ap_done = 1', 'ap_ready = 1'], lang);
+    // the handshake's ports among the chart's; as many states as the module; every box placed apart
+    assert.deepEqual([r.model.inputs.map((p) => p.name), r.model.outputs.map((p) => p.name)], [
+      ['ap_start', 'xs_dout', 'xs_empty_n', 'ys_full_n'], ['ap_done', 'ap_idle', 'ap_ready', 'xs_read', 'ys_din', 'ys_write']], lang);
+    const gen = cToHdl(STREAMS, { file: 'sums.cpp', lang });
+    assert.equal(r.model.nodes.filter((n) => n.type === 'state').length, gen.states, lang);
+    const pos = r.model.nodes.map((n) => `${n.x},${n.y}`);
+    assert.equal(new Set(pos).size, pos.length, lang);
+    assert.equal(normalizeModel(r.model).nodes.length, r.model.nodes.length, lang);
+    // the module the chart is of: compiled, elaborated and simulated against the C; no warnings
+    const c = cosimulate(STREAMS, { file: 'sums.cpp', lang });
+    assert.deepEqual([c.errors, c.pass, c.sim.exitCode], [[], true, 0], lang);
+    assert.deepEqual(c.gen.diagnostics, [], lang);
+  }
+});
+
+test('#1941 every statement the HLS compiler makes and every literal written back: a stream\'s read and write, a floating-point literal (no <kind>)', () => {
+  assert.equal(stmtText({ kind: 'fiforead', fifo: 'xs', tmp: 'ap_fifo_xs_0' }), 'ap_fifo_xs_0 = xs.read()');
+  assert.equal(stmtText({ kind: 'fifowrite', fifo: 'ys', v: parse('void f(void) { a + 1; }').items[0].body.items[0].e }), 'ys.write(a + 1)');
+  const e = (src) => exprText(parse(`void f(void) { x = ${src}; }`).items[0].body.items[0].e.r);
+  assert.equal(e('a * 1.5 + 0.5f'), 'a * 1.5 + 0.5f');
+  const r = cAsm('float f(float a[4]) { float s = 0.5f; for (int i = 0; i < 4; i++) s += a[i] * 1.5; return s; }', { file: 'f.c' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.diagnostics, []);
+  const acts = r.model.nodes.filter((n) => n.type === 'state').flatMap((n) => n.actions);
+  assert.ok(acts.includes('float s = 0.5f') && acts.includes('s += ap_mem_a_0 * 1.5'), acts.join(' | '));
+  assert.ok(!acts.some((a) => /<[a-z]+>/.test(a)), acts.join(' | '));
 });

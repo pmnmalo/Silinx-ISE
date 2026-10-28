@@ -4,7 +4,8 @@
 // (core/c-hdl.js's, #1927); a state per block of the C, its statements its register transfers (in the C's order, as
 // the C writes them), its ifs decision boxes and the statements under them conditional output boxes, a return, break
 // or continue its exit to the state it goes to; the block's own end its next state (a decision when it is a loop's
-// condition). Isomorphic ES module.
+// condition); a stream's read or write its C, the wait on the FIFO's flag a decision and its handshake under it
+// (#1941). Isomorphic ES module.
 //
 //   cAsm(source, { file, lang }) -> { ok, model, diagnostics }   (no model for a combinational function)
 import { checkC } from './c-check.js';
@@ -35,6 +36,8 @@ const HS = ['ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
 
 function chart(top, m, lang, ports) {
   const hs = ports.some((p) => p.name === 'ap_start');
+  // (a stream's handshake under its port's name: an argument renamed, in_r for in, #1902)
+  const fifoPort = (f) => { const p = ports.find((q) => q.role === 'fifo' && q.param === f); return p ? p.name.replace(/_(dout|empty_n|read|din|full_n|write)$/, '') : f; };
   const nodes = [], edges = [];
   let nid = 0, eid = 0;
   const node = (n) => { const x = { id: `n${++nid}`, x: 0, y: 0, ...n }; nodes.push(x); return x; };
@@ -90,6 +93,19 @@ function chart(top, m, lang, ports) {
         case 'memread': act(`${x.mem}_address0 = ${exprText(x.i)}; ${x.mem}_ce0 = 1`); return;
         case 'memlatch': act(`${x.tmp} = ${x.mem}_q0`); return;
         case 'memwrite': act(`${x.mem}_address0 = ${exprText(x.i)}; ${x.mem}_we0 = 1; ${x.mem}_d0 = ${exprText(x.v)}`); return;
+        // a stream's read or write (#1941): the C's, then the state waits while the FIFO is empty (full), the
+        // handshake under it
+        case 'fiforead': case 'fifowrite': {
+          if (!cur && !pending.length) return;
+          const rd = x.kind === 'fiforead', f = fifoPort(x.fifo);
+          act(stmtText(x));
+          const d = node({ type: 'decision', cond: `${f}_${rd ? 'empty_n' : 'full_n'}` });
+          for (const p of pending) edge(p.from, d, p.port);
+          edge(d, s, 'false');
+          cur = null; pending = [{ from: d, port: 'true' }];
+          act(rd ? `${f}_read = 1; ${x.tmp} = ${f}_dout` : `${f}_din = ${exprText(x.v)}; ${f}_write = 1`);
+          return;
+        }
         case 'for': case 'while': case 'do': act(`${x.kind} (…) unrolled: ${loopText(x)}`); return;
         case 'switch': act(`switch (${exprText(x.e)}) { … }`); return;
         default: act(stmtText(x));

@@ -2,7 +2,7 @@
 // the C and its HDL; none for a combinational one) and its process open the chart made from the C (its states and
 // decisions drawn), nothing in it can be edited (no tools, a box not moved nor deleted, its properties disabled);
 // Portuguese; both interfaces. No warnings. A free-running module's (ap_ctrl_none, #1927): IDLE going on at once, its
-// inputs and outputs the module's ports (no ap_start, ap_done, ap_idle, ap_ready).
+// inputs and outputs the module's ports (no ap_start, ap_done, ap_idle, ap_ready). A stream's read and write in the C's terms (#1941).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -106,6 +106,41 @@ uiTest('#1927 the ASM chart of a free-running C module (ap_ctrl_none): no ap_sta
   assert.deepEqual(view, {
     banner: 'Read-only, the state machine made from sums.cpp', states: ['IDLE', 'S1', 'S7', 'DONE'], protocol: [], decisions: ['i < 3'],
     inputs: ['in_r_dout', 'in_r_empty_n', 'out_r_full_n'], outputs: ['in_r_read', 'out_r_din', 'out_r_write'], readOnly: true,
+  });
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+const STREAMS = `#include "hls_stream.h"
+void sums(hls::stream<int> &xs, hls::stream<int> &ys) {
+  int s = 0;
+  for (int i = 0; i < 2; i++) s += xs.read();
+  ys.write(s);
+}
+`;
+
+uiTest('#1941 a stream\'s read and write in the ASM chart in the C\'s terms, the wait on the FIFO\'s flag and its handshake drawn (no <fiforead> / <fifowrite>)', E, async (page) => {
+  await makeProject(env, { name: 'CAsmStreams', top: 'sums', files: { 'src/sums.cpp': STREAMS } });
+  await page.openProject('CAsmStreams');
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'sums'), [], { what: 'the module' });
+  assert.deepEqual(await row(page, 'sums'), ['C++*', 'ASM', 'VHDL']);
+  await page.click('#hier .row .badge', { text: 'ASM' });
+  await page.waitFor(() => window.Silinx.active?.id === 'casm:src/sums.cpp' && window.Silinx.active.asmEditor, [], { what: 'the ASM chart' });
+  const view = await page.eval(() => {
+    const el = document.querySelector('.doc:not([hidden])');
+    const texts = [...el.querySelectorAll('.asm-nodes text')].map((t) => t.textContent);
+    const want = ['ap_fifo_xs_0 = xs.read()', 'xs_empty_n', 'xs_read = 1; ap_fifo_xs_0 = xs_dout', 's += ap_fifo_xs_0', 'ys.write(s)', 'ys_full_n', 'ys_din = s; ys_write = 1'];
+    return {
+      banner: el.querySelector('.gen-banner')?.textContent,
+      shown: want.filter((w) => texts.some((t) => t.includes(w))),
+      fallback: texts.filter((t) => /<[a-z]+>/.test(t)),
+      readOnly: el.querySelector('.asm-editor').classList.contains('asm-readonly'),
+    };
+  });
+  assert.deepEqual(view, {
+    banner: 'Read-only, the state machine made from sums.cpp',
+    shown: ['ap_fifo_xs_0 = xs.read()', 'xs_empty_n', 'xs_read = 1; ap_fifo_xs_0 = xs_dout', 's += ap_fifo_xs_0', 'ys.write(s)', 'ys_full_n', 'ys_din = s; ys_write = 1'],
+    fallback: [], readOnly: true,
   });
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });

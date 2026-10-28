@@ -1,7 +1,7 @@
 // Silinx HLS (#1575): a parsed C expression or simple statement back to text, as it would be written (parentheses where
 // the operators' precedence needs them), for the state machine's ASM chart (core/c-asm.js). Isomorphic ES module.
 //
-//   exprText(e) -> 'a + b * (c - 1)'      stmtText(s) -> 'x = a[i] + 1' (a decl: 'int x = 3')
+//   exprText(e) -> 'a + b * (c - 1)'      stmtText(s) -> 'x = a[i] + 1' (a decl: 'int x = 3'; a stream's read: 't = in.read()')
 
 const PREC = {
   ',': 1, '=': 2, '?': 3, '||': 4, '&&': 5, '|': 6, '^': 7, '&': 8, '==': 9, '!=': 9, '<': 10, '>': 10, '<=': 10, '>=': 10,
@@ -37,6 +37,7 @@ export function exprText(e, min = 0) {
   const wrap = (s) => (p < min ? `(${s})` : s);
   switch (e.kind) {
     case 'num': return e.text ?? String(e.value);
+    case 'float': return e.text;
     case 'chr': return e.text ?? `'${String.fromCharCode(Number(e.value))}'`;
     case 'str': return JSON.stringify(e.value);
     case 'id': return e.name;
@@ -63,6 +64,9 @@ export function stmtText(s) {
     case 'decl': return s.vars.map((v) => `${v.static ? 'static ' : ''}${typeText(v.type)} ${v.name}${v.type?.kind === 'array' ? `[${v.type.length ?? ''}]` : ''}${v.init && v.init.kind !== 'init' ? ` = ${exprText(v.init, PREC['='])}` : v.init ? ' = { … }' : ''}`).join('; ');
     case 'return': return s.e ? `return ${exprText(s.e)}` : 'return';
     case 'break': case 'continue': return s.kind;
+    // (a stream's read and write, core/c-fifo.js: the value read in its register, #1941)
+    case 'fiforead': return `${s.tmp} = ${s.fifo}.read()`;
+    case 'fifowrite': return `${s.fifo}.write(${exprText(s.v)})`;
     default: return `<${s.kind}>`;
   }
 }
