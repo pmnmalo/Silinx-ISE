@@ -20,6 +20,20 @@ const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
 const SAID = /^#pragma HLS (DATAFLOW|STREAM) is accepted and ignored|^#pragma HLS INLINE off is ignored/;
 
+/** Whether name is assigned in body (=, op=, ++, --) or its address taken. */
+function changed(body, name) {
+  let hit = false;
+  const is = (e) => e?.kind === 'id' && e.name === name;
+  const walk = (x) => {
+    if (hit || !x || typeof x !== 'object') return;
+    if (Array.isArray(x)) { x.forEach(walk); return; }
+    if ((x.kind === 'assign' && is(x.l)) || ((x.kind === 'unary' || x.kind === 'postfix') && ['++', '--', '&'].includes(x.op) && is(x.e))) { hit = true; return; }
+    for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') walk(v);
+  };
+  walk(body);
+  return hit;
+}
+
 /** The region of the top function: { calls: [{ callee, args, loc }], locals: Map name -> { kind, type, depth, loc }, consts:
  *  Map name -> its value (the global constants, #1895, and the const integers of the region) }, or { fallback: why }. */
 export function region(fn, globals = new Map()) {
@@ -33,8 +47,8 @@ export function region(fn, globals = new Map()) {
     }
     if (st.kind === 'decl') {
       for (const v of st.vars) {
-        // (a constant: its value, where it is used, #1898)
-        const k = v.const && !v.static && v.init && v.type.kind === 'int' && v.init.kind !== 'init' ? constValue(v.init, consts) : null;
+        // (a constant: its value, where it is used, #1898; a variable never changed too, as Vitis HLS folds it, #1931)
+        const k = (v.const || !changed(fn.body, v.name)) && !v.static && v.init && v.type.kind === 'int' && v.init.kind !== 'init' ? constValue(v.init, consts) : null;
         if (k !== null) { consts.set(v.name, k); continue; }
         // (hls_thread_local: a static, a stream living across calls)
         if (v.init || (v.static && v.type.kind !== 'stream') || !['stream', 'array'].includes(v.type.kind)) return { fallback: `'${v.name}': only streams and arrays are declared in a DATAFLOW region` };

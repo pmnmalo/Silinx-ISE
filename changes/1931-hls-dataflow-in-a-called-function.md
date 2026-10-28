@@ -1,0 +1,5 @@
+In short:
+- Silinx HLS: a DATAFLOW region in a function the top calls (a function template's instance too) is made in hardware, as Vitis HLS makes it, where its synthesis failed.
+
+In detail:
+- **Silinx HLS: a DATAFLOW region in a function the top calls (#1931):** when the top's only statement is a call of a function holding a DATAFLOW region of streams (through one call or more, a function template's instance too), the region is made as the top's processes, its parameters the top's arguments or the constants given, so the behaviour at the top's ports is the same (`core/c-dataflow-call.js`); the synthesis failed with an unclear error. A variable of a DATAFLOW region never changed (`int K = 5;`) is folded as a constant, as Vitis HLS folds it. A region of streams that cannot be made as processes (another shape of call, a variable changed in it) is said as an error with its reason, where it was made sequential and failed; a region of no streams of its own in a called function is inlined, sequential, as before.
