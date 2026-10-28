@@ -10,6 +10,11 @@ import { cosimulate, cosimBench } from '../core/c-cosim.js';
 import { simulateC } from '../core/c-interp.js';
 import { renamed, portOf, renamedWhy, ctrlNone } from '../core/c-names.js';
 import { checkC } from '../core/c-check.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { comparePorts } from '../scripts/hls-vitis.mjs';
+import { sourceDir } from '../scripts/fetch-design-corpus.mjs';
+import { unitOf } from './hls-corpus/lib.mjs';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
 const msgs = (gen) => gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`);
@@ -22,7 +27,7 @@ function cosim(src, file, ports, warnings) {
     const r = cosimulate(src, { file, lang });
     assert.deepEqual(r.errors, [], lang);
     assert.equal(r.pass, true, `${lang} ${JSON.stringify(r.mismatches, big)}`);
-    assert.ok(r.calls > 1, lang);
+    assert.deepEqual([r.sim.exitCode, r.calls > 1], [0, true], lang);
     assert.deepEqual(r.gen.ports.map((p) => p.name), ports, lang);
     assert.deepEqual(msgs(r.gen), warnings, lang);
     hdl[lang] = { hdl: r.gen.hdl, latency: r.latency };
@@ -60,23 +65,20 @@ int main() {
 }
 `;
 
-test('#1902 an argument named pos: its port pos_r (neg neg_r), a warning each, as Vitis HLS; co-simulated in VHDL and Verilog', () => {
+test('#1902 an argument named pos: its port pos_r (neg neg_r), a warning each, as Vitis HLS; #1900 a combinational top: no ap_clk nor ap_rst, its test bench none either; co-simulated in VHDL and Verilog', () => {
   assert.equal(cToHdl(POS, { file: 'pick.c' }).ok, true);
   cosim(POS, 'pick.c', ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return'], [
     "1 warning: 'pos' is a name Vitis HLS reserves: it is named pos_r in the module",
     "1 warning: 'neg' is a name Vitis HLS reserves: it is named neg_r in the module",
     "1 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"]);
-  // sequential (a loop of a count given): the same names
-  const seq = POS.replace('  return pos * 2;', '  int s = 0;\n  for (int i = 0; i < sel + 3; i++) {\n#pragma HLS LOOP_TRIPCOUNT max=4\n    s += pos;\n  }\n  return s;');
-  const g = cToHdl(seq, { file: 'pick.c' });
-  assert.deepEqual([g.sequential, g.ports.map((p) => p.name)], [true, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return']]);
+  // #1900 combinational: no clock nor reset, in the HDL and in the co-simulation's test bench (ap_ctrl_hs: ap_start /
+  // ap_done / ap_idle / ap_ready only); ap_ctrl_none, only the data ports
   for (const lang of LANGS) {
-    const r = cosimulate(seq, { file: 'pick.c', lang });
-    assert.deepEqual([r.errors, r.pass], [[], true], lang);
+    const g = cToHdl(POS, { file: 'pick.c', lang });
+    assert.doesNotMatch(g.hdl, /ap_clk|ap_rst/, lang);
+    const tb = cosimBench(g, simulateC(POS, { file: 'pick.c' }).calls).text;
+    assert.deepEqual([tb.includes('ap_clk'), tb.includes('ap_rst'), /^ {4}ap_start = 1;$/m.test(tb), tb.includes('.pos_r(pos_r)')], [false, false, true, true], lang);
   }
-});
-
-test('#1900 a combinational top: no ap_clk nor ap_rst, its test bench none either (ap_ctrl_hs: ap_start / ap_done / ap_idle / ap_ready only); ap_ctrl_none: only the data ports', () => {
   // (function-instantiate's)
   const src = `char foo(char inval, char incr) {
 #pragma HLS INLINE OFF
@@ -97,12 +99,21 @@ int main() {
     ['2 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function']);
   for (const lang of LANGS) assert.doesNotMatch(hdl[lang].hdl, /ap_clk|ap_rst/, lang);
   assert.equal(hdl.vhdl.latency, null);
-  const g = cToHdl(src, { file: 'example.cpp', lang: 'verilog' });
-  const tb = cosimBench(g, simulateC(src, { file: 'example.cpp' }).calls).text;
-  assert.deepEqual([tb.includes('ap_clk'), tb.includes('ap_rst'), /^ {4}ap_start = 1;$/m.test(tb)], [false, false, true]);
+  const gi = cToHdl(src, { file: 'example.cpp', lang: 'verilog' });
+  const tbi = cosimBench(gi, simulateC(src, { file: 'example.cpp' }).calls).text;
+  assert.deepEqual([tbi.includes('ap_clk'), tbi.includes('ap_rst'), /^ {4}ap_start = 1;$/m.test(tbi)], [false, false, true]);
   const none = cToHdl('int g(int a) {\n#pragma HLS INTERFACE ap_ctrl_none port=return\n  return a + 1;\n}');
   assert.deepEqual([none.ports.map((p) => p.name), none.diagnostics], [['a', 'ap_return'], []]);
+  // sequential (a loop of a count given): the same names
+  const seq = POS.replace('  return pos * 2;', '  int s = 0;\n  for (int i = 0; i < sel + 3; i++) {\n#pragma HLS LOOP_TRIPCOUNT max=4\n    s += pos;\n  }\n  return s;');
+  const g = cToHdl(seq, { file: 'pick.c' });
+  assert.deepEqual([g.sequential, g.ports.map((p) => p.name)], [true, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return']]);
+  for (const lang of LANGS) {
+    const r = cosimulate(seq, { file: 'pick.c', lang });
+    assert.deepEqual([r.errors, r.pass], [[], true], lang);
+  }
 });
+
 
 // a sequential function with ap_ctrl_none: running by itself, a call after the other (Vitis HLS's free-running kernel)
 const FREE = `#include "hls_stream.h"
@@ -181,13 +192,92 @@ test('#1900 a combinational module and the modules with ap_ctrl_none through the
   const { compile, elaborate } = await import('../core/compile.js');
   const { synthesizeOpen } = await import('../core/synth-open.js');
   const { yosysNode } = await import('../core/synth-open-node.js');
+  const ctrl = { 'pick.c': ['ap_start', 'ap_done', 'ap_idle', 'ap_ready'], 'sums.cpp': ['ap_clk', 'ap_rst'], 'example.cpp': ['ap_clk', 'ap_rst'] };
   for (const [src, file] of [[POS, 'pick.c'], [FREE, 'sums.cpp'], [DF, 'example.cpp']]) {
     for (const lang of LANGS) {
       const g = cToHdl(src, { file, lang });
+      assert.deepEqual(g.ports.filter((p) => /^ap_(clk|rst|start|done|idle|ready)$/.test(p.name)).map((p) => p.name), ctrl[file], `${file} ${lang}`);
+      assert.ok(file !== 'pick.c' || g.ports.some((p) => p.name === 'pos_r'), lang);
       const design = elaborate(compile([{ path: `${g.top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text: g.hdl }]), g.top);
       const r = await synthesizeOpen(design, { family: 'spartan3e', run: yosysNode });
       assert.deepEqual(r.warnings, [], `${file} ${lang}`);
       assert.ok(Object.keys(r.cells).length > 0, `${file} ${lang}`);
     }
+  }
+});
+
+// ------------------------------------------------------------------ against Vitis HLS's ports (test/hls-corpus/vitis.json)
+const VITIS = JSON.parse(fs.readFileSync(new URL('./hls-corpus/vitis.json', import.meta.url), 'utf8')).designs;
+const vitisPorts = (name) => VITIS[name].vitis.ports;
+const ours = (g) => g.ports.map(({ name, dir, w }) => ({ name, dir, w }));
+
+// the corpus designs' forms (their tops' signatures and types, AMD's examples, Apache-2.0), of our own bodies
+const FORMS = {
+  'modeling-pointers-multiple-pointers': { file: 'pointer_multi.c', src: `#include <stdbool.h>
+typedef bool sel_t;
+typedef unsigned char din_t;
+typedef int dout_t;
+dout_t pointer_multi(sel_t sel, din_t pos) {
+  static const dout_t a[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+  static const dout_t b[8] = {8, 7, 6, 5, 4, 3, 2, 1};
+  return sel ? a[pos & 7] : b[pos & 7];
+}
+int main(void) { int s = 0; for (int i = 0; i < 16; i++) s += pointer_multi(i & 1, i); return s == 80 ? 0 : 1; }
+` },
+  'modeling-free-running-kernel-remerge-ii4to1': { file: 'example.cpp', src: DF },
+  'task-level-parallelism-data-driven-simple-data-driven': { file: 'test.cpp', src: `#include "hls_task.h"
+void splitter(hls::stream<int> &in, hls::stream<int> &odds_buf, hls::stream<int> &evens_buf) {
+  int data = in.read();
+  if (data % 2 == 0) evens_buf.write(data); else odds_buf.write(data);
+}
+void odds(hls::stream<int> &in, hls::stream<int> &out) { out.write(in.read() + 1); }
+void evens(hls::stream<int> &in, hls::stream<int> &out) { out.write(in.read() + 2); }
+void odds_and_evens(hls::stream<int> &in, hls::stream<int> &out1, hls::stream<int> &out2) {
+  hls_thread_local hls::stream<int, 5> s1;
+  hls_thread_local hls::stream<int, 5> s2;
+  hls_thread_local hls::task t1(splitter, in, s1, s2);
+  hls_thread_local hls::task t2(odds, s1, out1);
+  hls_thread_local hls::task t3(evens, s2, out2);
+}
+int main() {
+  hls::stream<int, 10> in;
+  hls::stream<int, 5> out1, out2;
+  for (int i = 0; i < 10; i++) in.write(i);
+  odds_and_evens(in, out1, out2);
+  int s1 = 0, s2 = 0;
+  for (int i = 0; i < 5; i++) s1 += out1.read();
+  for (int i = 0; i < 5; i++) s2 += out2.read();
+  return s1 == 30 && s2 == 30 ? 0 : 1;
+}
+` },
+};
+
+test('#1900 #1902 the corpus designs Vitis HLS 2025.2 made (vitis.json): ap_ctrl_none, a data-driven top and an argument pos, in their forms, the same ports as Vitis HLS\'s (names, directions, widths); co-simulated in VHDL and Verilog', () => {
+  for (const [name, { file, src }] of Object.entries(FORMS)) {
+    for (const lang of LANGS) {
+      const r = cosimulate(src, { file, lang });
+      assert.deepEqual([r.errors, r.sim.exitCode, r.pass], [[], 0, true], `${name} ${lang} ${JSON.stringify(r.mismatches, big)}`);
+      assert.deepEqual(comparePorts(ours(r.gen), vitisPorts(name)), { same: true, missing: [], extra: [], differ: [] }, `${name} ${lang}`);
+    }
+  }
+});
+
+// (the corpus itself, when fetched: npm run test:hls fetches it into .cache/, never committed)
+const manifest = JSON.parse(fs.readFileSync(new URL('./hls-corpus/manifest.json', import.meta.url), 'utf8'));
+const corpusDir = sourceDir(manifest.sources['vitis-hls-examples']);
+const fetched = fs.existsSync(corpusDir) ? false : 'the HLS corpus is not fetched (npm run test:hls fetches it)';
+const corpusGen = (name) => {
+  const d = manifest.designs.find((x) => x.name === name);
+  const texts = Object.fromEntries([...d.files, ...d.tb, ...d.headers].map((f) => [f, fs.readFileSync(path.join(corpusDir, f), 'utf8')]));
+  const { unit, headers } = unitOf(d, texts);
+  return cToHdl(unit, { file: d.language === 'c' ? 'unit.c' : 'unit.cpp', headers, top: d.top, lang: 'vhdl' });
+};
+
+test('#1900 #1902 the corpus designs themselves (AMD\'s sources, when fetched): the three with Vitis HLS\'s ports; the combinational ones with no clock nor reset', { skip: fetched }, () => {
+  for (const name of Object.keys(FORMS)) assert.deepEqual(comparePorts(ours(corpusGen(name)), vitisPorts(name)), { same: true, missing: [], extra: [], differ: [] }, name);
+  for (const name of ['interface-memory-rom-lookup-table-math', 'modeling-fixed-point-sqrt', 'modeling-using-arbitrary-precision-casting', 'modeling-using-cpp-templates', 'pipelining-functions-function-instantiate']) {
+    const g = corpusGen(name);
+    assert.deepEqual([g.sequential, g.ports.filter((p) => /^ap_(clk|rst)$/.test(p.name))], [false, []], name);
+    assert.deepEqual(g.ports.slice(0, 4).map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready'], name);
   }
 });
