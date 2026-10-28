@@ -2,16 +2,24 @@
   "array-array-partition-block-cyclic": {
     "csim": "pass",
     "synth": "pass",
-    "cosim": "fail",
-    "latency": null,
-    "reason": "co-simulation: a call did not end in 100000 cycles"
+    "cosim": "pass",
+    "latency": {
+      "min": 221257,
+      "max": 221257,
+      "avg": 221257
+    },
+    "reason": null
   },
   "array-array-partition-complete": {
     "csim": "pass",
     "synth": "pass",
-    "cosim": "fail",
-    "latency": null,
-    "reason": "co-simulation: a call did not end in 100000 cycles"
+    "cosim": "pass",
+    "latency": {
+      "min": 282441,
+      "max": 282441,
+      "avg": 282441
+    },
+    "reason": null
   },
   "dsp-fft-interface-array": {
     "csim": "fail",
