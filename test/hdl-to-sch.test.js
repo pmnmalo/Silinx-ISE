@@ -8,7 +8,8 @@ import { compile, elaborate, simulate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import * as V from '../core/values.js';
 import { convertModuleToSchematic, designUnits, moduleUnitRanges } from '../core/hdl-to-sch.js';
-import { schematicFromHdl, generateHdl, normalizeDoc, netlist, modulesFromLibrary, symbolBox } from '../core/schdoc.js';
+import { schematicFromHdl, generateHdl, normalizeDoc, netlist, modulesFromLibrary, symbolBox, tokenize } from '../core/schdoc.js';
+import { exportIseSch } from '../core/isesch-export.js';
 import fs from 'node:fs';
 import { example, runTestbench, EXAMPLES } from './examples-lib.mjs';
 import { CASES } from './fixtures/hdl-to-sch-cases.js';
@@ -218,6 +219,120 @@ endmodule
   // a name that is not an identifier, without its backslash: still refused
   const bad = generateHdl({ ...g.doc, ports: [{ ...g.doc.ports[0], name: 'a[0]' }, ...g.doc.ports.slice(1)] }, { lang: 'verilog' });
   assert.deepEqual(bad.diagnostics.filter(d => d.severity === 'error').map(d => d.message), ["I/O marker name 'a[0]' is not a valid VERILOG identifier"]);
+});
+
+// #1809: an escaped internal wire (\t[0] ) is a net as any other: its assigns drawn as gates, a pin of the blocks
+// that use it, in Verilog and (an extended identifier, \t[0]\) in VHDL
+const ESC_V = String.raw`module esc (clk, \a[0] , \b[0] , \r[0] , \q[0] );
+  input clk, \a[0] , \b[0] ;
+  output \r[0] ;
+  output reg \q[0] ;
+  wire \t[0] ;
+  assign \t[0]  = \a[0]  & ~\b[0] ;
+  assign \r[0]  = \t[0]  | \b[0] ;
+  always @(posedge clk) \q[0]  <= \t[0]  ^ \b[0] ;
+endmodule
+`;
+const ESC_TB_V = String.raw`${'`'}timescale 1ns / 1ps
+module tb_esc;
+  reg clk = 0, a0 = 0, b0 = 0;
+  wire r, q;
+  esc uut (.clk(clk), .\a[0] (a0), .\b[0] (b0), .\r[0] (r), .\q[0] (q));
+  always #5 clk = ~clk;
+  initial begin
+    repeat (12) begin #6 a0 = ~a0; #6 b0 = a0 ^ b0; end
+    $finish;
+  end
+endmodule
+`;
+const ESC_VHD = String.raw`library ieee;
+use ieee.std_logic_1164.all;
+entity esc is
+  port (clk, \a[0]\, \b[0]\ : in std_logic; \r[0]\, \q[0]\ : out std_logic);
+end esc;
+architecture rtl of esc is
+  signal \t[0]\ : std_logic;
+begin
+  \t[0]\ <= \a[0]\ and not \b[0]\;
+  \r[0]\ <= \t[0]\ or \b[0]\;
+  process (clk) begin
+    if rising_edge(clk) then \q[0]\ <= \t[0]\ xor \b[0]\; end if;
+  end process;
+end rtl;
+`;
+const ESC_TB_VHD = String.raw`library ieee;
+use ieee.std_logic_1164.all;
+entity tb_esc is end tb_esc;
+architecture sim of tb_esc is
+  signal clk, a0, b0 : std_logic := '0';
+  signal r, q : std_logic;
+begin
+  uut : entity work.esc port map (clk => clk, \a[0]\ => a0, \b[0]\ => b0, \r[0]\ => r, \q[0]\ => q);
+  clk <= not clk after 5 ns when now < 140 ns;
+  process begin
+    for k in 1 to 12 loop
+      wait for 6 ns; a0 <= not a0; wait for 6 ns; b0 <= a0 xor b0;
+    end loop;
+    wait;
+  end process;
+end sim;
+`;
+// the waves of the testbench's signals at esc's ports, from the first clock edge on (before it: x in Verilog, U in VHDL;
+// the inputs change at even times, off the rising edges at 5, 15, 25 ns…)
+const escWaves = (sources, until = 140e3) => {
+  const w = waves(sources, 'tb_esc', until).waves;
+  return Object.fromEntries(['a0', 'b0', 'r', 'q'].map(n => [n, w[n].split(' ').filter(p => +p.split(':')[0] >= 5e3).join(' ')]));
+};
+
+test('#1809 an escaped internal wire (\\t[0] ) between blocks: its assigns drawn as gates, a pin of the always block; the same waves in Verilog and VHDL; exported to ISE the block reads it through a pin', async () => {
+  const sources = srcList({ 'src/esc.v': ESC_V, 'sim/tb_esc.v': ESC_TB_V });
+  const r = await convertModuleToSchematic({ sources, module: 'esc', layout });
+  assert.deepEqual(r.warnings, []);
+  assert.deepEqual(kinds(r.doc), { and2b1: 1, or2: 1, hdlblock: 1 });
+  const blk = r.doc.symbols.find(s => s.type === 'hdlblock');
+  assert.deepEqual(blk.params.inputs.map(q => q.name), ['clk', '\\t[0]', '\\b[0]']);
+  assert.deepEqual(blk.params.outputs.map(q => q.name), ['\\q[0]']);
+  // the net \t[0] joins the AND2B1's output, the OR2's input and the block's pin
+  const nl = netlist(r.doc);
+  assert.deepEqual(nl.diagnostics, []);
+  const t = nl.nets.find(n => n.name === '\\t[0]');
+  assert.ok(t, 'a net \\t[0]');
+  assert.deepEqual(t.endpoints.map(e => r.doc.symbols.find(s => s.id === e.sym)?.type || 'port').sort(), ['and2b1', 'hdlblock', 'or2']);
+  const code = r.writes['src/esc.v'];
+  assert.equal(code.match(/^ {2}wire \\t\[0\] ;$/gm)?.length, 1, 'declared once');
+  assert.match(code, /^ {2}assign \\t\[0\] {2}= ~\\b\[0\] {2}& \\a\[0\] ;$/m);
+  assert.match(code, /^ {2}assign \\r\[0\] {2}= \\t\[0\] {2}\| \\b\[0\] ;$/m);
+  const after = applied(sources, r);
+  assert.deepEqual(messages(after, 'tb_esc'), messages(sources, 'tb_esc'));
+  const a = escWaves(sources);
+  assert.ok(a.q.split(' ').length > 3 && a.r.split(' ').length > 3, 'the testbench makes activity');
+  assert.deepEqual(escWaves(after), a);
+  // the same design in VHDL (extended identifiers): converted, its schematic's HDL compiles, elaborates and behaves
+  // the same under a VHDL testbench
+  const g = await convertModuleToSchematic({ sources: srcList({ 'src/esc.vhd': ESC_VHD, 'sim/tb_esc.vhd': ESC_TB_VHD }), module: 'esc', layout });
+  assert.deepEqual(g.warnings, []);
+  assert.deepEqual(kinds(g.doc), { and2b1: 1, or2: 1, hdlblock: 1 });
+  assert.deepEqual(g.doc.symbols.find(s => s.type === 'hdlblock').params.inputs.map(q => q.name), ['clk', '\\t[0]', '\\b[0]']);
+  const gv = g.writes['src/esc.vhd'];
+  assert.equal(gv.match(/^ {2}signal \\t\[0\]\\ : std_logic;$/gm)?.length, 1, 'declared once');
+  assert.match(gv, /^ {2}\\t\[0\]\\ <= \(not \\b\[0\]\\\) and \\a\[0\]\\;$/m);
+  const vsrc = srcList({ 'src/esc.vhd': ESC_VHD, 'sim/tb_esc.vhd': ESC_TB_VHD });
+  const vafter = applied(vsrc, g);
+  assert.deepEqual(messages(vafter, 'tb_esc'), messages(vsrc, 'tb_esc'));
+  assert.deepEqual(escWaves(vafter), escWaves(vsrc));
+  assert.deepEqual(escWaves(vsrc), a, 'the VHDL module behaves as the Verilog one');
+  // exported to ISE: the block's own module reads \t[0] through a pin (t_0), not a wire of its own left undriven
+  const x = exportIseSch(r.doc, { timestamp: 'T' });
+  const bv = x.files.find(f => f.kind === 'hdl')?.text;
+  assert.match(bv, /^ {2}input wire t_0,$/m);
+  assert.match(bv, /^ {2}assign \\t\[0\] {2}= t_0;$/m);
+  const blib = compile([{ path: 'b.v', text: bv }]);
+  assert.deepEqual(blib.errors, []);
+});
+
+test('#1809 the schematic\'s VHDL tokens: an extended identifier is one identifier (a doubled backslash in it)', () => {
+  assert.deepEqual(tokenize(String.raw`port (\a[0]\, \x\\y\ , B : in std_logic);`, 'vhdl').map(t => `${t.k}:${t.raw || t.v}`),
+    ['id:port', 'op:(', 'id:\\a[0]\\', 'op:,', 'id:\\x\\\\y\\', 'op:,', 'id:B', 'op::', 'id:in', 'id:std_logic', 'op:)', 'op:;']);
 });
 
 // ------------------------------------------------------------------ every module of every example

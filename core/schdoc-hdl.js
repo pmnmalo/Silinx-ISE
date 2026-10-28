@@ -26,8 +26,10 @@ export function vhdlClass(type) {
 // identifier \opcode[0]\ in VHDL. Other names as they are.
 export const escapedName = n => /^\\[!-~]+$/.test(String(n ?? ''));
 export const hdlName = (n, lang) => (!escapedName(n) ? n : lang === 'vhdl' ? `\\${n.slice(1).replace(/\\/g, '\\\\')}\\` : `${n} `);
-// a name declared in HDL as the schematic names it: an escaped one with its backslash
-const schName = (n, lang) => (validIdent(n, lang) || !/^[!-~]+$/.test(n) ? n : `\\${n}`);
+// a name declared in HDL as the schematic names it: an escaped one with its backslash (a VHDL extended identifier,
+// \t[0]\, without its closing one, #1809)
+export const schName = (n, lang) => (validIdent(n, lang) || !/^[!-~]+$/.test(n) ? n
+  : lang === 'vhdl' && /^\\.+\\$/.test(n) ? `\\${n.slice(1, -1).replace(/\\\\/g, '\\')}` : `\\${n}`);
 
 // declarations found in a verbatim declaration text: Map(name(lower for VHDL) -> { type, kind, reg })
 export function declaredIn(decls, lang) {
