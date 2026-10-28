@@ -5,6 +5,8 @@ import { loadDeviceCache } from '../../core/fpga/device-node.js';
 import { knownRouting } from '../../core/fpga/bitgen.js';
 import { PIP_ROUTETHRU } from '../../core/fpga/device.js';
 import { PART, loadDb } from './db.mjs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const dev = loadDeviceCache(PART);
 const known = knownRouting(loadDb(PART)).allowPip;
@@ -42,7 +44,7 @@ export function dcmPadPaths() {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const paths = dcmPadPaths();
   const unknown = new Map();
   for (const p of paths) {

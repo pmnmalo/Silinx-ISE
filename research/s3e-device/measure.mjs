@@ -81,7 +81,7 @@ export function roundSummary(verdicts) {
   return { ...n, again: n.join > 0 };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [cmd, dir, out, ...rest] = process.argv.slice(2);
   if (cmd === 'designs') {
     const names = observationDesigns(PART, dir);

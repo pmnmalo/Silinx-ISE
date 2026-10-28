@@ -10,6 +10,8 @@ import { parseXdl, writeXdl } from '../../core/xdl.js';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
 import { knownRouting } from '../../core/fpga/bitgen.js';
 import { PART, loadDb } from './db.mjs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const dev = loadDeviceCache(PART);
 const known = knownRouting(loadDb(PART)).allowPip;
@@ -28,7 +30,7 @@ function unknownOut(tile, from) {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [out, ...files] = process.argv.slice(2);
   const done = new Set();   // tile type \t switch, scheduled once
   const typeOf = tile => tile.replace(/_X\d+Y\d+$/, '');

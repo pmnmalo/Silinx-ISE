@@ -6,6 +6,8 @@
 //   node gen-obsslice.mjs outdir      (folder slices: top.v, top.ucf)
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 
@@ -26,7 +28,7 @@ endmodule
   return { v, ucf, slices: slices.length };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [out] = process.argv.slice(2);
   const { v, ucf, slices } = sliceDesign(loadDeviceCache(PART));
   fs.mkdirSync(`${out}/slices`, { recursive: true });

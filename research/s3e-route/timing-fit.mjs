@@ -15,6 +15,7 @@ import { parseXdl } from '../../core/xdl.js';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
 import { netEndpoints } from '../../core/fpga/route.js';
 import { WIRE_NAMES, nodeClasses, netTree, treePath, pathDelay, SPEED_4 } from '../../core/fpga/timing.js';
+import { fileURLToPath } from 'node:url';
 
 /** reportgen -delay's report: Map net name -> { driver: 'inst.PIN', loads: Map 'inst.PIN' -> ns }. */
 export function parseDly(text) {
@@ -161,7 +162,7 @@ const stats = (errs) => {
   return `n=${errs.length} mean ${(errs.reduce((s, e) => s + e, 0) / errs.length).toFixed(3)} rms ${rms.toFixed(3)} median|e| ${a[a.length >> 1].toFixed(3)} p95|e| ${a[Math.floor(a.length * 0.95)].toFixed(3)} max|e| ${a.at(-1).toFixed(3)} ns`;
 };
 
-if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--arcs')) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--arcs')) {
   // the logic delays of the SLICEM memories, block RAMs and multipliers as trce gives them (each folder: routed.xdl
   // and a verbose trce report, full.twr): their values by delay type, memory or block, clock edge and pins (a block's
   // bus pins without their bit: ADDRA, DOB; a multiplier's product bits apart, Tmult and Tmsckp grow with them)
@@ -179,7 +180,7 @@ if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--
     const u = [...new Set(v)].sort((p, q) => p - q);
     console.log(`${k.padEnd(34)} n ${String(v.length).padStart(4)}  ${u.length === 1 ? u[0].toFixed(3) : `${u[0].toFixed(3)} .. ${u.at(-1).toFixed(3)} (${u.length} values)`}`);
   }
-} else if (import.meta.url === `file://${process.argv[1]}`) {
+} else if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dirs = process.argv.slice(2).filter(a => !a.startsWith('--'));
   const device = loadDeviceCache('xc3s250ecp132-4');
   const all = dirs.flatMap(d => samples(d, device));

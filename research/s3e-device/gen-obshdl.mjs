@@ -13,6 +13,8 @@
 //   node gen-obshdl.mjs outdir --inputs 171                                 (folder inputs)
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 const sitesOf = (dev, type) => dev.sites(type).map(s => s.name).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
@@ -105,7 +107,7 @@ endmodule
   return { v, ucf: '' };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2), ii = argv.indexOf('--inputs');
   if (ii >= 0) {
     const { v, ucf } = inputs(+argv[ii + 1]);

@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { joinRule, tileXY, wireFamily } from './observe.mjs';
+import { fileURLToPath } from 'node:url';
 
 /** An edge tile or a corner. */
 export const edgeTile = tile => /^(LTERM|RTERM|TTERM|BTERM|COB_|CNR_|UL_|UR_|LL_|LR_)/.test(tile);
@@ -54,7 +55,7 @@ export function edgeHypotheses(obs, tiles, known, refused = [], wiresOf = null) 
   return { rules: [...out.values()], ambiguous: [...amb.values()] };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [obsFile, outFile, ...dirs] = process.argv.slice(2);
   const obs = JSON.parse(fs.readFileSync(obsFile, 'utf8'));
   const { loadDeviceCache } = await import('../../core/fpga/device-node.js');

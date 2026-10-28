@@ -205,7 +205,7 @@ export function chipMeasurements({ dev, tilesDb, layout, obs, others = [], probe
   return { part: dev.part || PART, family: 'spartan3e', rows: dev.rows, cols: dev.cols, types, tiles, joins: all, dropped: obs.joins.length + joins.length - all.length, byRule, joinsByRule };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = k => { const i = args.indexOf(k); return i < 0 ? null : args.splice(i, 2)[1]; };
   const devFile = opt('--dev'), ft = opt('--ft'), probeFile = opt('--probe'), tests = opt('--tests'), clock = opt('--clock');

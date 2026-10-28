@@ -8,6 +8,8 @@
 //   node gen-obscarry.mjs outdir      (folders carry-m0, carry-m8, carry-l0, carry-l8: top.v, top.ucf)
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 
@@ -50,7 +52,7 @@ endmodule
   return { v, ucf, counters: groups.length };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [out] = process.argv.slice(2);
   const dev = loadDeviceCache(PART);
   for (const [name, parity, off] of [['carry-m0', 0, 0], ['carry-m8', 0, 8], ['carry-l0', 1, 0], ['carry-l8', 1, 8]]) {

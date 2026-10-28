@@ -20,6 +20,8 @@
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
 import { deviceSites } from '../../core/fpga/place.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 const sitesOf = (dev, type) => dev.sites(type).map(s => s.name).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
@@ -200,7 +202,7 @@ ${iddr}`;
   return { v, ucf: loc.map(([nm, pd]) => `NET "${nm}" LOC = "${pd}" ;`).join('\n') + '\nNET "clk" TNM_NET = "clk" ;\nTIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50% ;\n' };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2), ci = args.indexOf('--clk'), clkArg = ci >= 0 ? args.splice(ci, 2)[1] : null;
   const pi = args.indexOf('--pads'), padsObs = pi >= 0 ? JSON.parse(fs.readFileSync(args.splice(pi, 2)[1], 'utf8')) : null;
   const [out] = args;

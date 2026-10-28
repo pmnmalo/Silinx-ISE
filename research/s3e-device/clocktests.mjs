@@ -19,6 +19,7 @@ import path from 'node:path';
 import { parseXdl } from '../../core/xdl.js';
 import { wireFamily, joinRule } from './observe.mjs';
 import { parseJoinTests } from './hypotheses.mjs';
+import { fileURLToPath } from 'node:url';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 const typeOf = tile => tile.replace(/_X\d+Y\d+$/, '');
@@ -86,7 +87,7 @@ export function clockTestDesigns(hyps, designs, { controlEvery = 10 } = {}) {
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [cmd, ...args] = process.argv.slice(2);
   if (cmd === 'tests') {
     const [obsFile, dir, ...files] = args;

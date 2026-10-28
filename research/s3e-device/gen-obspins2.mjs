@@ -15,6 +15,8 @@ import fs from 'node:fs';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
 import { wrap } from './gen-obspins.mjs';
 import { DCM_PAD } from '../../core/fpga/place.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 const xy = s => s.match(/X(\d+)Y(\d+)$/).slice(1).map(Number);
@@ -122,7 +124,7 @@ endmodule
   return { v, ucf, n: pads.length };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [out] = process.argv.slice(2);
   const dev = loadDeviceCache(PART);
   const designs = [['srlcasc', () => srlCascade(dev)], ...[0, 1].flatMap(o => [0, 1].map(c => [`f8-${o}${c}`, () => f8Muxes(dev, o, c)])), ['ramclkb', () => ramClkB(dev)],

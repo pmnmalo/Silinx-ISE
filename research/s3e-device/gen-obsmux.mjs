@@ -7,6 +7,8 @@
 //                                                             XC3S250E)
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 
@@ -44,7 +46,7 @@ endmodule
   return { v, ucf: '' };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [out, n = muxCount(loadDeviceCache(PART)), c = '60'] = process.argv.slice(2);
   const { v, ucf } = muxDesign(+n, +c);
   fs.mkdirSync(`${out}/muxes`, { recursive: true });
