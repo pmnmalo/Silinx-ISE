@@ -53,7 +53,7 @@ Not part of `npm test` (it needs the network once).
 | interface-memory-using-axi-master | C++ | fail | fail | skip | - | C simulation: 37: memcpy is a system call: not possible in the synthesized code (Silinx HLS, as Vitis HLS) |
 | interface-register-using-axi-lite-with-user-defined-offset | C++ | pass | pass | pass | - |  |
 | interface-streaming-axi-stream-custom-side-channel-data-2 | C++ | pass | pass | pass | 9-10 |  |
-| interface-streaming-axi-stream-to-master | C++ | fail | fail | skip | - | C simulation: 32: 'out_memory' is an array: give an index |
+| interface-streaming-axi-stream-to-master | C++ | pass | pass | pass | 18998 |  |
 | interface-streaming-axis-array-stream-no-side-channel-data | C++ | pass | pass | pass | 203 |  |
 | interface-streaming-using-array-of-streams | C++ | pass | pass | pass | 348 |  |
 | interface-streaming-using-axi-stream-with-side-channel-data | C++ | pass | pass | pass | 31-34 |  |
@@ -65,10 +65,10 @@ Not part of `npm test` (it needs the network once).
 | misc-rtl-as-blackbox | C++ | fail | fail | skip | - | C simulation: 29: 'rtl_model' is declared but not defined |
 | modeling-pointers-basic-arithmetic | C | pass | pass | pass | 19 |  |
 | modeling-pointers-multiple-pointers | C | pass | pass | pass | 1 |  |
-| modeling-pointers-native-casts | C | fail | fail | skip | - | C simulation: 114: a cast of a pointer is not possible in Silinx HLS |
+| modeling-pointers-native-casts | C | pass | pass | pass | 1635 |  |
 | modeling-pointers-stream-better | C | pass | pass | pass | - |  |
 | modeling-pointers-stream-good | C | pass | pass | pass | 5 |  |
-| modeling-pointers-using-double | C | fail | fail | skip | - | C simulation: 19: the parameter 'flagPtr': a pointer to a pointer is not possible (Silinx HLS: pointers only to arguments) |
+| modeling-pointers-using-double | C | pass | pass | pass | - |  |
 | modeling-conditional-control-of-pragmas-using-defines | C++ | pass | pass | pass | 71 |  |
 | modeling-conditional-control-of-pragmas-using-template-function | C++ | pass | pass | pass | 80 |  |
 | modeling-cpp-templates-for-multiple-instances | C++ | pass | pass | pass | 1 |  |
@@ -80,7 +80,7 @@ Not part of `npm test` (it needs the network once).
 | modeling-using-array-stencil-2d | C++ | fail | fail | skip | - | C simulation: test.cpp:19: the header 'malloc.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | modeling-using-cpp-templates | C++ | pass | pass | pass | - |  |
 | modeling-using-fixed-point | C++ | pass | pass | pass | 1 |  |
-| modeling-using-float-and-double | C | fail | fail | skip | - | C simulation: fp_mul_pow2.c:29: 'bexp' is not a member of float_num_t |
+| modeling-using-float-and-double | C | pass | pass | pass | - |  |
 | modeling-using-vectors | C++ | fail | fail | skip | - | C simulation: example.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | modeling-variable-bound-loops | C++ | pass | pass | pass | 3-127 |  |
 | pipelining-functions-function-instantiate | C++ | pass | pass | pass | - |  |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 
-73 designs: 50 through co-simulation.
+73 designs: 55 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

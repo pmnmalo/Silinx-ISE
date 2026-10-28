@@ -4,7 +4,7 @@
 // uniform_int_distribution (#1734). What AMD's Vitis
 // HLS examples' test benches use: they write their results to a file and compare it with a golden one. Isomorphic.
 import { convert } from './c-interp-expr.js';
-import { MATH, F64, F32 } from './c-float.js';
+import { MATH, F64, F32, BITCASTS } from './c-float.js';
 
 const INT = { w: 32, s: true };
 const num = (v) => ({ v: BigInt(v), t: INT });
@@ -142,6 +142,19 @@ export const libMethods = {
       // library's)
       case 'srand': { const [x] = A(); this.seed = this.intOf(x, e) & 0x7fffffffn; return num(0); }
       case 'rand': { this.seed = ((this.seed ?? 1n) * 1103515245n + 12345n) & 0x7fffffffn; return num(this.seed); }
+      case 'ap_float_bits': case 'ap_double_bits': case 'ap_bits_float': case 'ap_bits_double': {
+        // (a union's float or double member: its bits, core/c-union.js, #1896; a NaN's own bits not kept: a number)
+        const { fl, bits } = BITCASTS[name], [x] = A();
+        const dv = new DataView(new ArrayBuffer(8));
+        if (bits) {
+          if (fl === 32) dv.setFloat32(0, this.as(x, F32, e)); else dv.setFloat64(0, this.as(x, F64, e));
+          return { v: fl === 32 ? BigInt(dv.getUint32(0)) : dv.getBigUint64(0), t: { w: fl, s: false } };
+        }
+        const v = BigInt.asUintN(fl, this.intOf(x, e));
+        if (fl === 32) { dv.setUint32(0, Number(v)); return { v: dv.getFloat32(0), t: F32 }; }
+        dv.setBigUint64(0, v);
+        return { v: dv.getFloat64(0), t: F64 };
+      }
       default: {
         // math.h's (core/c-float.js): on doubles, a float's (sqrtf, …) in float
         const m = MATH[name];

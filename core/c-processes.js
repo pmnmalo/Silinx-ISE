@@ -21,10 +21,9 @@ const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
 const SAID = /^#pragma HLS (DATAFLOW|STREAM) is accepted and ignored|^#pragma HLS INLINE off is ignored/;
 
 /** The region of the top function: { calls: [{ callee, args, loc }], locals: Map name -> { kind, type, depth, loc }, consts:
- *  Map name -> its value (a const integer of the region) }, or
- *  { fallback: why }. */
-export function region(fn) {
-  const calls = [], locals = new Map(), depths = new Map(), consts = new Map();
+ *  Map name -> its value (the global constants, #1895, and the const integers of the region) }, or { fallback: why }. */
+export function region(fn, globals = new Map()) {
+  const calls = [], locals = new Map(), depths = new Map(), consts = new Map(globals);
   let task = null;
   for (const st of fn.body.items) {
     if (st.kind === 'pragma') {
@@ -51,7 +50,7 @@ export function region(fn) {
   if (!calls.length) return { fallback: 'no function called in it' };
   for (const [n, l] of locals) {
     if (l.kind !== 'stream') continue;
-    const d = l.type.depth ? constValue(l.type.depth) : null;
+    const d = l.type.depth ? constValue(l.type.depth, consts) : null;
     l.depth = depths.get(n) ?? (d !== null ? Number(d) : 2);
   }
   return { calls, locals, consts };
@@ -59,7 +58,7 @@ export function region(fn) {
 
 export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
   const fn = checked.funcs.get(checked.top);
-  const rg = region(fn);
+  const rg = region(fn, checked.consts);
   const loc = fn.body.items.find((s) => s.kind === 'pragma' && (s.pragma.name === 'DATAFLOW' || s.pragma.name === 'TASK')).loc;
   const diag = (l, message, severity = 'error') => ({ file, line: l.line, col: l.col, message, severity });
   if (rg.fallback) return { fallback: diag(loc, `#pragma HLS DATAFLOW: the region has ${rg.fallback}: made sequential (not as processes)`, 'warning') };

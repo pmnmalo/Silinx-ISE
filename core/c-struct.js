@@ -96,13 +96,13 @@ function definitions(input, cx) {
     }
     // struct S { … };  typedef struct [S] { … } A;  class C { … };
     const s0 = td ? k + 1 : k;
-    if ((isId(input[s0], 'struct') || isId(input[s0], 'class') || isId(input[s0], 'union')) && !op(toks.at(-1), '(') && !op(toks.at(-1), ',')) {
+    // (a union: core/c-union.js's, before)
+    if ((isId(input[s0], 'struct') || isId(input[s0], 'class')) && !op(toks.at(-1), '(') && !op(toks.at(-1), ',')) {
       let j = s0 + 1;
       const tag = isId(input[j]) ? input[j++].v : null;
       if (isId(input[j], 'final')) j++;
       if (op(input[j], ':')) { report(input[j], `the struct '${tag}': a base class is not supported yet`); while (input[j] && !op(input[j], '{')) j++; }
       if (op(input[j], '{')) {
-        if (isId(input[s0], 'union')) report(input[s0], 'a union is not possible in Silinx HLS (its members share their bits: write the conversions)');
         const end = closing(input, j);
         let e = end + 1;
         const alias = td && isId(input[e]) ? input[e++].v : null;
@@ -183,7 +183,7 @@ function definitions(input, cx) {
       if (type.some((x) => op(x, '*') || op(x, '&'))) { report(first[nameAt], `the member '${first[nameAt].v}': a pointer in a struct is not possible in Silinx HLS`); continue; }
       for (const [i, p] of parts.entries()) {
         const d = i === 0 ? p.slice(nameAt) : p;
-        if (d.some((x) => op(x, ':')) && !d.some((x) => op(x, '='))) { report(d[0], `the member '${d[0].v}': a bit field is not supported (write ap_uint<W>)`); continue; }
+        if (d.some((x) => op(x, ':')) && !d.some((x) => op(x, '='))) { report(d[0], `the member '${d[0].v}': a bit field is not supported here (write ap_uint<W>)`); continue; }
         const { name, dims, init } = declarator(d);
         if (!name) continue;
         const st = type.find((x) => x.t === 'id' && structs.has(x.v));

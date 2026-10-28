@@ -149,7 +149,8 @@ function pointerVariable(f, v, decl, types, report) {
   const fail = (loc, m) => { if (!bad) report(loc, `the pointer '${name}': ${m}`); bad = true; v.said = true; };   // (said once: core/c-check.js's own error left out)
   const sameType = (a, b) => a && b && a.kind === b.kind && a.bits === b.bits && !!a.signed === !!b.signed && !!a.fixed === !!b.fixed;
   const target = (e) => {
-    while (e.kind === 'cast') e = e.e;   // (its target's own type checked below)
+    const cast = e.kind === 'cast';
+    while (e.kind === 'cast') { e.said = true; e = e.e; }   // (a cast of a pointer said here, not by core/c-check.js)   // (its target's own type checked below)
     let base = null, off = num(0, e.loc), scalar = false;
     if (e.kind === 'id') base = e.name;
     else if (e.kind === 'unary' && e.op === '&' && e.e.kind === 'id') { base = e.e.name; scalar = true; }
@@ -158,16 +159,22 @@ function pointerVariable(f, v, decl, types, report) {
     if (!base || base === name) { fail(e.loc, 'set to something other than an array, &x, &a[i] or a + i: not supported yet'); return null; }
     const bt = types.get(base);
     const et = scalar ? bt : bt?.kind === 'array' || bt?.kind === 'ptr' ? bt.of ?? bt.to : null;
-    if (!sameType(et, v.type.to)) { fail(e.loc, `set to '${base}', of another type (a cast of a pointer): not supported (Silinx HLS: a pointer to its own type)`); return null; }
+    // (a cast to a narrower integer type, char *p = (char *)&a[i] (#1895): its elements the target's, r of them in one,
+    // from its least significant bits, as on x86; its offset counted in its own elements)
+    const to = v.type.to;
+    const r = sameType(et, to) ? 1 : cast && !scalar && et?.kind === 'int' && to.kind === 'int' && !et.fixed && !to.fixed && et.bits && to.bits && et.bits % to.bits === 0 ? et.bits / to.bits : 0;
+    if (!r || (r & (r - 1))) { fail(e.loc, `set to '${base}', of another type (a cast of a pointer): not supported (Vitis HLS: a cast of a pointer between native integer types, ${scalar ? 'to an array' : 'to a narrower one'})`); return null; }
     let j = bases.findIndex((b) => b.base === base);
-    if (j < 0) { j = bases.length; bases.push({ base, scalar }); }
-    return { j, off };
+    if (j < 0) { j = bases.length; bases.push({ base, scalar, r }); }
+    if (bases[j].r !== r) { fail(e.loc, `set to '${base}' as another type before: not supported`); return null; }
+    return { j, off: r === 1 ? off : off.kind === 'num' ? num(off.value * BigInt(r), e.loc) : { kind: 'binary', op: '*', l: off, r: num(r, e.loc), loc: e.loc } };
   };
   // its uses
-  const sets = [], moves = [], reads = [];
+  const sets = [], moves = [], reads = [], passes = [];
   if (v.init) sets.push({ init: true, t: target(v.init) });
   walkP(f.body, (n, parent, key) => {
     if (n.kind !== 'id' || n.name !== name || bad) return;
+    if (parent.kind === 'unary' && parent.op === '&' && parent.said) { bad = true; v.said = true; return; }   // (&p to a pointer to a pointer refused: said, core/c-pointer-args.js)
     if (parent.kind === 'assign' && key === 'l') {
       if (parent.op === '=') sets.push({ node: parent, t: target(parent.r) });
       else if (parent.op === '+=' || parent.op === '-=') moves.push({ node: parent });
@@ -175,6 +182,7 @@ function pointerVariable(f, v, decl, types, report) {
     } else if ((parent.kind === 'postfix' || (parent.kind === 'unary' && (parent.op === '++' || parent.op === '--')))) moves.push({ node: parent });
     else if (parent.kind === 'unary' && parent.op === '*') reads.push({ node: parent, i: num(0, parent.loc) });
     else if (parent.kind === 'index' && key === 'e') reads.push({ node: parent, i: parent.i });
+    else if (parent.kind === 'call' && key === 'args') passes.push(n);
     else fail(n.loc, 'used other than *p, p[i], p = …, p += …, p++ (passed on, compared): not supported yet');
   });
   if (bad || sets.some((s) => !s.t)) return;
@@ -182,6 +190,9 @@ function pointerVariable(f, v, decl, types, report) {
   const many = bases.length > 1;
   const moving = moves.length > 0 || sets.some((s) => !(s.t.off.kind === 'num' && s.t.off.value === 0n));
   const sel = `${name}_sel`, off = `${name}_off`;
+  // passed on to a function: its target (one, not moved, its own type)
+  if (passes.length && (many || moving || bases[0].r > 1)) { report(passes[0].loc, `the pointer '${name}': passed on to a function ${many ? 'with several targets' : moving ? 'after it moves' : 'as another type'}: not supported yet`); v.said = true; return; }
+  for (const n of passes) replace(n, bases[0].scalar ? { kind: 'unary', op: '&', e: id(bases[0].base, n.loc), loc: n.loc } : id(bases[0].base, n.loc));
   // its variables in its declaration's place
   const vars = [];
   if (many) vars.push({ kind: 'var', name: sel, type: { ...INT_T }, init: v.init ? num(sets[0].t.j, v.loc) : null, static: false, const: false, loc: v.loc });
@@ -202,13 +213,19 @@ function pointerVariable(f, v, decl, types, report) {
   // *p, p[i]: the element (a written one: its target one)
   const elem = (b, i, loc) => {
     if (bases[b].scalar) return id(bases[b].base, loc);
-    return { kind: 'index', e: id(bases[b].base, loc), i: moving ? { kind: 'binary', op: '+', l: id(off, loc), r: i, loc } : i, loc };
+    const k = moving ? { kind: 'binary', op: '+', l: id(off, loc), r: i, loc } : i, r = bases[b].r;
+    if (r === 1) return { kind: 'index', e: id(bases[b].base, loc), i: k, loc };
+    // (a narrower type's: its bits of the target's element, a[k / r] >> (k % r * W))
+    const bin = (op, l, rr) => ({ kind: 'binary', op, l, r: rr, loc });
+    const word = { kind: 'index', e: id(bases[b].base, loc), i: bin('>>', k, num(Math.log2(r), loc)), loc };
+    return { kind: 'cast', type: { ...v.type.to }, e: bin('>>', word, bin('*', bin('&', structuredClone(k), num(r - 1, loc)), num(v.type.to.bits, loc))), loc };
   };
   walkP(f.body, (n, parent, key) => {
     const r = reads.find((x) => x.node === n);
     if (!r) return;
     const written = (parent?.kind === 'assign' && key === 'l') || parent?.kind === 'postfix' || (parent?.kind === 'unary' && (parent.op === '++' || parent.op === '--' || parent.op === '&'));
     if (bases.some((b) => b.scalar) && !(r.i.kind === 'num' && r.i.value === 0n && !moving)) { report(n.loc, `the pointer '${name}' to a variable: only *${name} (${name}[0])`); replace(n, elem(0, r.i, n.loc)); return; }
+    if (written && bases.some((b) => b.r > 1)) { report(n.loc, `the pointer '${name}' (cast to a narrower type): written through it: not supported yet (only read)`); replace(n, elem(0, r.i, n.loc)); return; }
     if (written && many) { report(n.loc, `the pointer '${name}' (to one of ${bases.map((b) => b.base).join(', ')}): written through it: not supported yet (only read)`); replace(n, elem(0, r.i, n.loc)); return; }   // (said once: its first target's)
     let e = elem(bases.length - 1, r.i, n.loc);
     for (let b = bases.length - 2; b >= 0; b--) e = { kind: 'cond', c: { kind: 'binary', op: '==', l: id(sel, n.loc), r: num(b, n.loc), loc: n.loc }, a: elem(b, r.i, n.loc), b: e, loc: n.loc };

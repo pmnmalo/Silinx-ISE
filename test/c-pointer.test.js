@@ -74,8 +74,9 @@ test('#1599 a C name as part of an HDL name: no \'__\', no \'_\' at its ends', (
 test('#1599 what is not supported, said once', () => {
   const errs = (src) => cToHdl(src, { file: 'e.c' }).diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`);
   assert.deepEqual(errs('int a[4], b[4];\nint f(int s, int v) {\n  int *p;\n  if (s) p = a; else p = b;\n  p[1] = v;\n  return p[0];\n}\n'), ["5 the pointer 'p' (to one of a, b): written through it: not supported yet (only read)"]);
-  assert.deepEqual(errs('int g(int *q) { return *q; }\nint f(int a[4]) {\n  int *p = a;\n  return g(p);\n}\n'), ["4 the pointer 'p': used other than *p, p[i], p = …, p += …, p++ (passed on, compared): not supported yet"]);
-  assert.deepEqual(errs('int f(short a[4]) {\n  int *p = (int *)a;\n  return *p;\n}\n'), ["2 a cast of a pointer is not possible in Silinx HLS", "2 the pointer 'p': set to 'a', of another type (a cast of a pointer): not supported (Silinx HLS: a pointer to its own type)"]);
+  assert.deepEqual(errs('int g(int *q) { return *q; }\nint f(int a[4]) {\n  int *p = a;\n  p++;\n  return g(p);\n}\n'), ["5 the pointer 'p': passed on to a function after it moves: not supported yet"]);   // (not moved: its target passed, #1895)
+  assert.deepEqual(errs('int f(int a[4]) {\n  int *p = a;\n  return p == a;\n}\n'), ["3 the pointer 'p': used other than *p, p[i], p = …, p += …, p++ (passed on, compared): not supported yet"]);
+  assert.deepEqual(errs('int f(short a[4]) {\n  int *p = (int *)a;\n  return *p;\n}\n'), ["2 the pointer 'p': set to 'a', of another type (a cast of a pointer): not supported (Vitis HLS: a cast of a pointer between native integer types, to a narrower one)"]);
   assert.deepEqual(errs('int f(int v) {\n  int x = v;\n  int *p = &x;\n  return p[1];\n}\n'), ["4 the pointer 'p' to a variable: only *p (p[0])"]);
   assert.deepEqual(errs('int f(int v) {\n  int *p;\n  return v;\n}\n'), ["2 the pointer 'p' is never set"]);
 });

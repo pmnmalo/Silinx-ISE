@@ -23,6 +23,7 @@ import { npChannels } from './cpp-np-channel.js';
 import { taskArrays } from './cpp-task-array.js';
 import { cppSugar } from './cpp-sugar.js';
 import { cStructs } from './c-struct.js';
+import { cUnions } from './c-union.js';
 
 // (C++'s headers of a test bench whose names core/cpp-lex.js makes C: std::vector, generate / fill, the random engines, #1734)
 const TB_HEADERS = new Set(['vector', 'algorithm', 'random']);
@@ -255,12 +256,13 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
   if (cpp) {
     // (a test bench's std::vector, generate / fill, <random> first: C tokens, core/cpp-stl.js, #1734)
     // (then the arrays of streams: a stream each element, core/c-stream-array.js, #1739; of tasks before, #1898)
-    // (a template's: once it is made, its parameters known, #1898)
+    // (a template's: once it is made, its parameters known, #1898; the unions and bit-fields before the structs,
+    // core/c-union.js, #1896)
     const channels = (t, later) => streamArrays(taskArrays(npChannels(t, report, later), report, later), report, later);
-    const st = cStructs(cppSugar(channels(cppTemplates(channels(cppStl(tokens, report), true), report), false), report), report, true);
+    const st = cStructs(cUnions(cppSugar(channels(cppTemplates(channels(cppStl(tokens, report), true), report), false), report), report, true), report, true);
     return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs };
   }
-  const st = cStructs(tokens, report, false);
+  const st = cStructs(cUnions(tokens, report), report, false);
   return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs };
 
   function run(src, fname, depth, simOuter = false) {

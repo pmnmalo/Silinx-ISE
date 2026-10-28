@@ -144,8 +144,18 @@ structs is an array per member; a member array of an array of structs is one arr
   is 32 bits: `x` bits 15–0, `z` bit 16, `w` bits 28–24). A struct read is an input `s`; written (by reference or
   address), `s_i`, `s_o` and `s_o_ap_vld`, its members not written given back as they were; returned, `ap_return`.
   A stream or an array of structs is still a stream or a memory per member, with a warning (#1668).
-- Not possible: unions, pointers in a struct, a pointer to a struct as a variable, bit fields (`ap_uint<W>`
-  instead). Not yet: base classes; a static object or an array of objects whose constructor is not of constants.
+- **Bit-fields** (#1896): a member `T m : W;` is a member of `W` bits (`ap_uint<W>`, `ap_int<W>` of a signed `T`),
+  wrapped as C wraps it; an unnamed one (`T : W;`) is padding.
+- **Unions** (#1896): a union is one word, an unsigned integer of its size (up to 64 bits), its members views of its
+  bits laid out as GCC lays them out on x86: from the least significant bit; an integer at an offset of its own size;
+  a bit-field after the one before it when it fits in a unit of its type, else at the next. `u.m` reads the member's
+  bits (a `float` or a `double` member's as one, the same bits), `u.m = e` writes them, the others kept; a struct
+  member's members, anonymous (`union { float f; uint32_t raw; struct { uint32_t mant : 23, bexp : 8, sign : 1; }; }`:
+  `u.bexp`) or named (`u.s.m`); an array member's elements (`u.b[i]`). A union variable, parameter, pointer
+  (`p->m`), array (`a[i].m`) or port is its word; `{ e }` is its first member's value. Not yet: a union of more than
+  64 bits, a union inside a struct, `++` and `--` on a member, designated initializers.
+- Not possible: pointers in a struct or a union, a pointer to a struct as a variable. Not yet: base classes; a static
+  object or an array of objects whose constructor is not of constants.
 
 ## What can be synthesized (UG1399's rules)
 
@@ -155,12 +165,16 @@ structs is an array per member; a member array of an array of structs is one arr
 3. Fixed sizes: no dynamic memory, no recursion (direct or through other functions). A loop whose count depends on
    its inputs is made, as Vitis HLS makes it (#1699): a state machine that runs until its condition is false, its
    latency unknown (a warning; `#pragma HLS LOOP_TRIPCOUNT max=` gives the report a bound).
-4. Unambiguous: a pointer only to an argument, an array or a variable, never cast between types, no
-   function pointers, no `goto`. Pointer arithmetic (#1599) as Vitis HLS takes it: `*(p + e)` is `p[e]`; a
-   local pointer is set to an array, `&x`, `&a[i]` or `a + i` (`p = sel ? a : b` in an `if`), read as `*p` or
-   `p[i]` and moved with `p += n` or `p++`: Silinx makes it the target it points to (a multiplexer of their
-   elements when it has several; written only when it has one) and an offset. A pointer passed on, compared or
-   to a pointer is refused.
+4. Unambiguous: a pointer only to an argument, an array or a variable, no function pointers, no `goto`. Pointer
+   arithmetic (#1599) as Vitis HLS takes it: `*(p + e)` is `p[e]`; a local pointer is set to an array, `&x`,
+   `&a[i]` or `a + i` (`p = sel ? a : b` in an `if`), read as `*p` or `p[i]` and moved with `p += n` or `p++`:
+   Silinx makes it the target it points to (a multiplexer of their elements when it has several; written only when
+   it has one) and an offset. Vitis HLS's other forms (#1895): a local pointer passed to a function (its target
+   passed; one target, not moved); a pointer cast to a narrower native integer type (`char *p = (char *)&a[i]`,
+   read only: the bytes of `a`'s elements from their least significant, as on x86); a pointer to a pointer
+   parameter of a function the top calls, resolved at compile time (each call passes `&q`, `q` a pointer; read
+   through only, `**pp`); a pointer argument moved by arithmetic (`p += n`, `p++`, `p = p + n`), then indexed from
+   its new base. A pointer compared, or one that does not resolve so, is refused, with the rule.
 5. No undefined behaviour Silinx can see.
 
 Each refused construct has its own message, at its line and column, saying what is not possible
