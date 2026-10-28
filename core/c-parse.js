@@ -2,6 +2,7 @@
 // Isomorphic ES module: no DOM and no Node APIs.
 //
 //   parse(source, file) -> { file, items, pragmas, includes, errors }
+//   parseExpression(text) -> Expr | null
 // The parser never throws on its input: an error is recorded and the parser skips to the next ';' or '}'.
 // Every node has loc { line, col }. The tree:
 //   items:  Func | Var (a global) | Typedef
@@ -434,6 +435,18 @@ function stmtParser(T, E, typedefs) {
   }
 
   return { declarations, block, statement };
+}
+/** The expression of a text (a pragma's value: `c_dim * c_dim`, #1921), or null when it is not one expression. */
+export function parseExpression(text) {
+  const lx = lex(text, 'pragma.c', { cpp: false });
+  const T = tokenTools(lx.tokens, 'pragma.c', []);
+  try {
+    const e = exprParser(T, new Map(), false).expression();
+    return lx.errors.length || T.toks[T.S.p].t !== 'eof' ? null : e;
+  } catch (e) {
+    if (e instanceof T.Stop) return null;
+    throw e;
+  }
 }
 export function parse(source, file = 'input.c', opts = {}) {
   const lx = lex(source, file, opts);

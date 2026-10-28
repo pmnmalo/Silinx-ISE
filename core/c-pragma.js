@@ -6,6 +6,7 @@
 //   checkPragmas(ast, funcs, report)   report(loc, message, severity)
 //   loopPragma(loop, name) -> its pragma's args, or null
 //   readPragma(text after #pragma) -> { name, args, text } | null
+//   tripcountArgs(a LOOP_TRIPCOUNT's text) -> { min?, max?, avg? }: its values' texts
 //   unrollBy(loop, n) -> the loop with n copies of its body (a 'for'), each after the first if its condition holds
 
 // what Silinx makes of the pragmas it knows
@@ -23,6 +24,14 @@ export function readPragma(rest) {
   const args = {};
   for (const a of m[2].matchAll(/(\w+)\s*(?:=\s*("[^"]*"|[^\s,]+))?/g)) args[a[1].toLowerCase()] = a[2] === undefined ? true : a[2].replace(/^"|"$/g, '');
   return { name: m[1].toUpperCase(), args, text: rest.trim() };
+}
+
+/** A LOOP_TRIPCOUNT's min= / max= / avg= from its text, each value the text up to the next key, spaces included
+ *  (`max = c_dim * c_dim`, Vitis HLS's examples, #1921): { min?, max?, avg? }. */
+export function tripcountArgs(text) {
+  const body = text.replace(/^\s*HLS\s+LOOP_TRIPCOUNT\b/i, '');
+  const keys = [...body.matchAll(/\b(min|max|avg)\s*=(?!=)/gi)];
+  return Object.fromEntries(keys.map((k, i) => [k[1].toLowerCase(), body.slice(k.index + k[0].length, keys[i + 1]?.index).trim()]));
 }
 
 const LOOP_ONLY = new Set(['PIPELINE', 'UNROLL', 'LOOP_TRIPCOUNT']);
