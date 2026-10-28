@@ -1,8 +1,9 @@
 // Silinx HLS: the top's block-level ports and port names as Vitis HLS's (#1900, #1902; test/hls-corpus/vitis.json, Vitis
 // HLS 2025.2, the reference): a combinational module with no clock nor reset (its test bench none either); ap_ctrl_none, and a data-driven
 // top (every process an hls::task), with no ap_start / ap_done / ap_idle / ap_ready, running by itself; a C name Vitis
-// HLS reserves renamed <name>_r (pos -> pos_r). Each co-simulated in VHDL and in Verilog (Silinx's simulator: compiled,
-// elaborated, simulated), its warnings asserted.
+// HLS reserves renamed <name>_r (pos -> pos_r); arrays of nested structs one memory of their words each (#1668: a_q0 of
+// compact=byte, b_q0 of compact=bit, c a BRAM), a struct with a stream in it disaggregated. Each co-simulated in VHDL
+// and in Verilog (Silinx's simulator: compiled, elaborated, simulated), its warnings asserted.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cToHdl } from '../core/c-hdl.js';
@@ -230,6 +231,52 @@ dout_t pointer_multi(sel_t sel, din_t pos) {
 int main(void) { int s = 0; for (int i = 0; i < 16; i++) s += pointer_multi(i & 1, i); return s == 80 ? 0 : 1; }
 ` },
   'modeling-free-running-kernel-remerge-ii4to1': { file: 'example.cpp', warnings: [], src: DF },
+  'interface-aggregation-disaggregation-aggregation-of-nested-structs': { file: 'example.cpp', warnings: [], src: `#define N 8
+struct T { int m; int n; bool o; };
+struct S { int p; T q; };
+void top(S a[N], S b[N], S c[N]) {
+#pragma HLS interface bram port = c
+#pragma HLS interface ap_memory port = a
+#pragma HLS aggregate variable = a compact = byte
+#pragma HLS aggregate variable = c compact = byte
+  for (int i = 0; i < N; i++) {
+    c[i].p = a[i].p - b[i].q.n;
+    c[i].q.m = a[i].q.m * 2 + b[i].p;
+    c[i].q.n = b[i].q.m;
+    c[i].q.o = a[i].q.o != b[i].q.o;
+  }
+}
+int main() {
+  S a[N], b[N], c[N];
+  int t = 0;
+  for (int r = 0; r < 2; r++) {
+    for (int i = 0; i < N; i++) { a[i].p = i + r; a[i].q.m = -3 * i; a[i].q.n = 0; a[i].q.o = i & 1; b[i].p = 5 - i; b[i].q.m = i * i; b[i].q.n = r - i; b[i].q.o = i > 3; }
+    top(a, b, c);
+    for (int i = 0; i < N; i++) t += c[i].p + c[i].q.m + c[i].q.n + c[i].q.o;
+  }
+  return t == 0;
+}
+` },
+  'interface-aggregation-disaggregation-auto-disaggregation-of-struct': { file: 'example.cpp', warnings: ['6 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)'], src: `#include "hls_stream.h"
+#define N 10
+struct A { hls::stream<int> s_in; long arr[N]; };
+long dut(struct A &d) {
+  long t = 0;
+  while (!d.s_in.empty()) t = t * 3 + d.s_in.read();
+  for (unsigned i = 0; i < N; i++) t -= d.arr[i] * i;
+  return t;
+}
+int main() {
+  A d;
+  long t = 0;
+  for (int r = 0; r < 2; r++) {
+    for (int i = 0; i < 4 + r; i++) d.s_in.write(i * 7 - r);
+    for (int i = 0; i < N; i++) d.arr[i] = 100 - i * r;
+    t += dut(d);
+  }
+  return t == 0;
+}
+` },
   'task-level-parallelism-data-driven-simple-data-driven': { file: 'test.cpp', warnings: [], src: `#include "hls_task.h"
 void splitter(hls::stream<int> &in, hls::stream<int> &odds_buf, hls::stream<int> &evens_buf) {
   int data = in.read();
@@ -257,7 +304,7 @@ int main() {
 ` },
 };
 
-test('#1900 #1902 the corpus designs Vitis HLS 2025.2 made (vitis.json): ap_ctrl_none, a data-driven top and an argument pos, in their forms, the same ports as Vitis HLS\'s (names, directions, widths); co-simulated in VHDL and Verilog', () => {
+test('#1900 #1902 #1668 the corpus designs Vitis HLS 2025.2 made (vitis.json): ap_ctrl_none, a data-driven top, an argument pos, arrays of nested structs and a struct with a stream, in their forms, the same ports as Vitis HLS\'s (names, directions, widths); co-simulated in VHDL and Verilog', () => {
   for (const [name, { file, src, warnings }] of Object.entries(FORMS)) {
     for (const lang of LANGS) {
       const r = cosimulate(src, { file, lang });
@@ -286,6 +333,8 @@ const CORPUS_WARNINGS = {
     '30 warning: #pragma HLS LATENCY is accepted and ignored: Silinx does not make it', '40 warning: #pragma HLS PIPELINE II=1: II=10 made (it accesses a memory, an access a state)',
     '52 warning: #pragma HLS PIPELINE II=1: II=9 made (it accesses a memory, an access a state)'],
   'task-level-parallelism-data-driven-simple-data-driven': [],
+  'interface-aggregation-disaggregation-aggregation-of-nested-structs': ['28 warning: #pragma HLS PIPELINE II=3: II=5 made (it accesses a memory, an access a state)'],
+  'interface-aggregation-disaggregation-auto-disaggregation-of-struct': ['22 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)'],
   'interface-memory-rom-lookup-table-math': [],
   'modeling-fixed-point-sqrt': ['77 warning: assert is ignored by synthesis (the C simulation checks it)'],
   'modeling-using-arbitrary-precision-casting': [],
@@ -294,7 +343,7 @@ const CORPUS_WARNINGS = {
     '20 warning: #pragma HLS FUNCTION_INSTANTIATE is accepted and ignored: Silinx does not make it'],
 };
 
-test('#1900 #1902 the corpus designs themselves (AMD\'s sources, when fetched): the three with Vitis HLS\'s ports; the combinational ones with no clock nor reset; each one\'s warnings', { skip: fetched }, () => {
+test('#1900 #1902 #1668 the corpus designs themselves (AMD\'s sources, when fetched): the five with Vitis HLS\'s ports; the combinational ones with no clock nor reset; each one\'s warnings', { skip: fetched }, () => {
   for (const name of Object.keys(FORMS)) {
     const g = corpusGen(name);
     assert.deepEqual(comparePorts(ours(g), vitisPorts(name)), { same: true, missing: [], extra: [], differ: [] }, name);

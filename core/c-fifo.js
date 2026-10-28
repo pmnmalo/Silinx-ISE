@@ -21,6 +21,7 @@ export const fifoMethods = {
    *  register (the expression reads it). */
   hoistFifoRead(e, at) {
     const f = this.slots.get(e.callee.e.name);
+    if (f.group) return this.hoistFifoField(e, f, at);   // (a member of a stream of structs: its word's field, #1668)
     if (e.args.length) this.error(e.loc, `'${f.name}.read(x)' inside an expression: write x = ${f.name}.read(); or ${f.name}.read(x); as a statement`);
     const tmp = `ap_fifo_${f.name}_${f.reads++}`;
     this.slots.set(tmp, { kind: 'var', t: f.t, reg: this.reg(tmp, f.t), name: tmp });
@@ -34,6 +35,7 @@ export const fifoMethods = {
   /** s.write(v); as a statement: v's reads first, then a state that waits while the FIFO is full. */
   lowerFifoWrite(e, at) {
     const f = this.slots.get(e.callee.e.name);
+    if (f.group) return this.lowerFifoField(e, f, at);
     if (e.args.length !== 1) this.error(e.loc, `'${f.name}.write' takes one value`);
     if (this.hasSide(e.args[0])) this.error(e.loc, `a write of the stream '${f.name}' with another side effect in it: write them as statements of their own`);
     const v = this.hoist(e.args[0], at);
@@ -44,7 +46,7 @@ export const fifoMethods = {
     return at.cur;
   },
   // ------------------------------------------------------------------ run in a state
-  fifoIn(f, port) { return this.g.add('in', [], port === 'dout' ? f.t : BOOL, { port: { key: `${f.name}_${port}`, name: `${f.name}_${port}`, param: f.name, suffix: `_${port}` } }); },
+  fifoIn(f, port) { const P = f.port ?? f.name; return this.g.add('in', [], port === 'dout' ? f.t : BOOL, { port: { key: `${P}_${port}`, name: `${P}_${port}`, param: P, suffix: `_${port}` } }); },
   fifoStmt(s, base) {
     const f = this.slots.get(s.fifo);
     const g = this.guard(base);
@@ -63,12 +65,13 @@ export const fifoMethods = {
   member(e, g) {
     const op = this.fifoOp(e);
     if (op === null) return exprMethods.member.call(this, e, g);
-    const f = this.slots.get(e.callee.e.name);
+    const f0 = this.slots.get(e.callee.e.name), f = f0.group ? this.slots.get(f0.group) : f0;
     // (a stream polled: the co-simulation's FIFO never empty nor full but when it is, core/c-cosim.js, #1823)
     if (op === 'empty' || op === 'full') f.polled = true;
     if (op === 'empty') return this.v(this.not(this.fifoIn(f, 'empty_n')), BOOL);
     if (op === 'full') return this.v(this.not(this.fifoIn(f, 'full_n')), BOOL);
-    this.error(e.loc, `'${f.name}.${op}()' is not supported here yet (a stream read or written as a statement of the top function, x = ${f.name}.read(); ${f.name}.write(v);)`);
+    const n = f.port ?? f.name;
+    this.error(e.loc, `'${n}.${op}()' is not supported here yet (a stream read or written as a statement of the top function, x = ${n}.read(); ${n}.write(v);)`);
     return null;
   },
   /** The streams' ports, driven by the states that access them: [{ name, dir, t, read, d, write }]. */
@@ -76,8 +79,8 @@ export const fifoMethods = {
     const cs = this.g.add('reg', [], this.stateT, { port: { key: 'reg:ap_CS_fsm', name: 'ap_CS_fsm' } });
     const out = [];
     for (const f of this.slots.values()) {
-      if (f.kind !== 'fifo') continue;
-      if (f.read && f.written) this.error(f.loc, `the stream '${f.name}' is read and written: a stream argument is one or the other (ap_fifo)`);
+      if (f.kind !== 'fifo' || f.group) continue;
+      if (f.read && f.written) this.error(f.loc, `the stream '${f.port ?? f.name}' is read and written: a stream argument is one or the other (ap_fifo)`);
       let go = this.F, d = this.g.const(0, f.t);
       for (const st of states) {
         const a = st.fifo?.get(f.name);
@@ -86,7 +89,7 @@ export const fifoMethods = {
         go = this.or(go, here);
         if (a.d !== undefined) d = this.mux(this.g.add('eq', [cs, this.g.const(st.id, this.stateT)], BOOL), a.d, d, f.t);
       }
-      out.push({ name: f.name, dir: f.written ? 'out' : 'in', t: f.t, go, d: f.written ? d : null, used: f.read || f.written, polled: !!f.polled });
+      out.push({ name: f.name, dir: f.written ? 'out' : 'in', t: f.t, go, d: f.written ? d : null, used: f.read || f.written, polled: !!f.polled, ...(f.port ? { port: f.port, fields: f.fields } : {}) });
     }
     return out;
   },

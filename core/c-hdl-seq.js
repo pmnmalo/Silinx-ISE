@@ -67,6 +67,7 @@ export function vhdlSeq(name, src, ports, m, agg) {
   L.push('        else', `          ap_CS_fsm <= ${S(m.idle)};`, '        end if;', '      end if;', '    end if;', '  end process;');
   L.push(`  ap_done <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_ready <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_idle <= '1' when ap_CS_fsm = ${S(m.idle)} else '0';`);
   for (const [p, o] of m.outputs) {
+    if (o.wire) { L.push(`  ${p} <= ${o.wire};`); continue; }   // (a BRAM's clock and reset, core/c-mem.js)
     const v = o.node != null ? sig(g.get(o.node)) : byName.get(o.reg).sig, port = [...ports, ...(agg?.inner || [])].find((x) => x.name === p);
     L.push(`  ${p} <= ${port.w === 1 ? `${v}(0)` : `std_logic_vector(${v})`};`);
   }
@@ -112,7 +113,7 @@ export function verilogSeq(name, src, ports, m, agg) {
   }
   L.push(`        default: ap_CS_fsm <= ${S(m.idle)};`, '      endcase', '    end', '  end');
   L.push(`  assign ap_done = ap_CS_fsm == ${S(m.done)};`, `  assign ap_ready = ap_CS_fsm == ${S(m.done)};`, `  assign ap_idle = ap_CS_fsm == ${S(m.idle)};`);
-  for (const [p, o] of m.outputs) L.push(`  assign ${p} = ${o.node != null ? sig(g.get(o.node)) : byName.get(o.reg).sig};`);
+  for (const [p, o] of m.outputs) L.push(`  assign ${p} = ${o.wire ?? (o.node != null ? sig(g.get(o.node)) : byName.get(o.reg).sig)};`);
   L.push('endmodule', '');
   return L.join('\n');
 }

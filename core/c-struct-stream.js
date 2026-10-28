@@ -85,7 +85,7 @@ function declarations(toks, structs, found, report, streamArgs) {
       const fn = out[p - 1];
       if (isId(fn)) {
         const a = (streamArgs.get(fn.v) || []).filter((x) => x.name !== name.v);
-        streamArgs.set(fn.v, [...a, { name: name.v, members: leaves.map((l) => `${name.v}${l.suffix}`), loc: name, stream: true }]);
+        streamArgs.set(fn.v, [...a, { name: name.v, members: leaves.map((l) => `${name.v}${l.suffix}`), loc: name, stream: true, ks: leaves.map(() => 1) }]);
       }
       // a parameter: one per member, hls::stream<T> &name_m
       leaves.forEach((l, i) => {

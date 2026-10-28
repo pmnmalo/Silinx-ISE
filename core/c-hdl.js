@@ -11,7 +11,7 @@ import { dataflow } from './c-dataflow.js';
 import { portOf, renamedWhy } from './c-names.js';
 import { fsmd } from './c-fsmd.js';
 import { vhdlSeq, verilogSeq } from './c-hdl-seq.js';
-import { aggregate, aggregable } from './c-aggregate.js';
+import { aggregate, aggregable, structPragmas, wordGroups } from './c-aggregate.js';
 import { cProcesses } from './c-processes.js';
 import { dataflowCall, hasStreams } from './c-dataflow-call.js';
 import { foldTables } from './c-const-init.js';
@@ -52,26 +52,37 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
     diagnostics.splice(0, diagnostics.length, ...diagnostics.filter((d) => !/^#pragma HLS DATAFLOW is accepted and ignored/.test(d.message)), r.fallback);
   }
   let df = dataflow(checked);
+  const fn = checked.funcs.get(checked.top);
+  const sargs = checked.ast.structArgs?.get(checked.top) || [];
+  // (a stream or an array of structs one of its words, #1668; AGGREGATE / DISAGGREGATE: how, or not)
+  const prag = flat ? { how: new Map(), named: [] } : structPragmas(fn);
+  const groups = flat ? [] : wordGroups(sargs, fn, prag.how);
   // not combinational (a loop whose count depends on the inputs, a static or global variable): a sequential module,
   // a state machine (core/c-fsmd.js, #1526)
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
-  if (seqOnly) df = { ...fsmd(checked), seq: true };
+  if (seqOnly) df = { ...fsmd(checked, { groups }), seq: true };
   diagnostics.push(...df.diagnostics);
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   if (df.diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // a name that is a reserved word of VHDL or Verilog, or one of Vitis HLS's: its port named <name>_r (a warning, #1902)
   const rn = portOf;
-  const fn = checked.funcs.get(checked.top);
-  const sargs = checked.ast.structArgs?.get(checked.top) || [];
-  // (a struct argument's port its name's, #1628)
-  for (const n of [checked.top, ...fn.params.map((p) => p.name), ...sargs.filter((a) => a.name !== 'return' && aggregable(a, fn.params)).map((a) => a.name)]) {
+  const own = (a) => !prag.how.get(a.name)?.disaggregate && (aggregable(a, fn.params) || groups.some((x) => x.name === a.name));
+  // (a struct argument's port its name's, #1628; a stream's or a memory's of structs, #1668)
+  for (const n of [checked.top, ...fn.params.map((p) => p.name), ...sargs.filter((a) => a.name !== 'return' && own(a)).map((a) => a.name)]) {
     if (renamedWhy(n)) diagnostics.push({ file, line: fn.loc.line, col: fn.loc.col, message: renamedWhy(n), severity: 'warning' });
   }
-  // a struct argument or result (#1590): one port (#1628, core/c-aggregate.js); a stream or an array of structs, a
-  // stream or a memory per member for now (#1668)
-  for (const a of sargs.filter((x) => !flat && !aggregable(x, fn.params))) {
-    diagnostics.push({ file, line: a.loc.line, col: a.loc.col, message: a.stream ? `the stream of a struct '${a.name}': its members are streams of their own (${a.members.join(', ')}); Vitis HLS makes one stream of them (not yet, #1668)`
-      : `the struct argument '${a.name}': its members are memories of their own (${a.members.join(', ')}); Vitis HLS makes one memory of them (not yet, #1668)`, severity: 'warning' });
+  // a struct argument or result (#1590): one port (#1628, core/c-aggregate.js); a stream or an array of structs one of
+  // its words (#1668); DISAGGREGATE, or a struct with a stream in it (as Vitis HLS disaggregates it), a port, a stream or a
+  // memory per member; else said
+  for (const a of sargs.filter((x) => !flat && !own(x) && !prag.how.get(x.name)?.disaggregate)) {
+    const kinds = a.members.map((m) => fn.params.find((p) => p.name === m)?.type.kind);
+    if (!a.stream && kinds.includes('stream')) continue;
+    diagnostics.push({ file, line: a.loc.line, col: a.loc.col, message: a.stream ? `the stream of a struct '${a.name}': its members are streams of their own (${a.members.join(', ')}); Vitis HLS makes one stream of them (not yet: a member not an integer)`
+      : a.kind === 'arr' || (a.kind === 'ptr' && kinds.every((k) => k === 'array')) ? `the struct argument '${a.name}': its members are memories of their own (${a.members.join(', ')}); Vitis HLS makes one memory of them (not yet: a member not an integer)`
+        : `the struct argument '${a.name}': its members are ports of their own (${a.members.join(', ')}), a member array a memory; Vitis HLS makes one port of them (not yet)`, severity: 'warning' });
+  }
+  for (const p of prag.named) {
+    if (!sargs.some((a) => a.name === p.name && a.name !== 'return')) diagnostics.push({ file, line: p.loc.line, col: p.loc.col, message: `#pragma HLS ${p.pragma} variable=${p.name}: not a struct argument of the top function: ignored`, severity: 'warning' });
   }
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   for (const node of df.graph.nodes) if (node.op === 'in') node.port.name = node.port.param ? rn(node.port.param) + node.port.suffix : rn(node.port.name);
@@ -87,7 +98,7 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   const renamed = new Map(df.ports.map((p) => [p.name, portName(p)]));
   df.outputs = new Map([...df.outputs].map(([k, v]) => [renamed.get(k) ?? rn(k), v]));
   // a struct's members' ports signals inside the module, its port theirs (#1628)
-  const agg = aggregate(flat ? [] : sargs, fn.params, flatPorts, { seq: !!df.seq, rn });
+  const agg = aggregate(flat ? [] : sargs, fn.params, flatPorts, { seq: !!df.seq, rn, how: prag.how });
   const ports = agg.ports;
   const inner = new Map(agg.groups.flatMap((x) => [...x.renamed])), drop = new Set(agg.groups.flatMap((x) => x.drop));
   for (const node of df.graph.nodes) if (node.op === 'in' && inner.has(node.port.name)) node.port.name = inner.get(node.port.name);

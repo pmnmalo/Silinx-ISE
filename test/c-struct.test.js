@@ -125,13 +125,13 @@ test('#1590 structs in C++: an array of structs with member arrays (an argument)
   assert.equal(sim.output, runWithApInt(CPP, AP.dir));
 });
 
-test('#1590 structs in C++: co-simulated in VHDL and Verilog; an array of structs argument an ap_memory per member', () => {
+test('#1590 structs in C++: co-simulated in VHDL and Verilog; an array of structs argument one ap_memory of its words (#1668: foo[0..2] then bar, 119 bits), a member written read-modify-write', () => {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(CPP, { file: 'acc.cpp', lang });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics.map((d) => d.message), ["the struct argument 'arr': its members are memories of their own (arr_foo, arr_bar); Vitis HLS makes one memory of them (not yet, #1668)"]);
-    assert.deepEqual(r.gen.ports.filter((p) => /^arr_/.test(p.name)).map((p) => p.name), ['arr_foo_address0', 'arr_foo_ce0', 'arr_foo_we0', 'arr_foo_d0', 'arr_foo_q0', 'arr_bar_address0', 'arr_bar_ce0', 'arr_bar_q0']);
+    assert.deepEqual(r.gen.diagnostics, []);
+    assert.deepEqual(r.gen.ports.filter((p) => /^arr_/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['arr_address0:3', 'arr_ce0:1', 'arr_we0:1', 'arr_d0:119', 'arr_q0:119']);
   }
 });
 

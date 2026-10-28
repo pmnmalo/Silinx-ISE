@@ -112,21 +112,18 @@ int main() {
 }
 `;
 
-test('#1662 a stream of ap_axiu co-simulated in VHDL and Verilog: one ap_fifo per member (side channels of width 0 none); its warnings once, by the stream\'s name', () => {
+test('#1662 a stream of ap_axiu co-simulated in VHDL and Verilog: one ap_fifo of its words (#1668: data, keep, strb, last from the LSB; side channels of width 0 none); its warnings once, by the stream\'s name', () => {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(TOP, { file: 'add.cpp', lang });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
+    // (the stream named in and out: in_r and out_r, as Vitis HLS names them; axis's TDATA, TKEEP… ports are #1894's)
     assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), [
-      '5 #pragma HLS INTERFACE axis port=in is not made yet: ignored (its default interface made)',
-      "4 the stream of a struct 'in': its members are streams of their own (in_data, in_keep, in_strb, in_last); Vitis HLS makes one stream of them (not yet, #1668)",
-      "4 the stream of a struct 'out': its members are streams of their own (out_data, out_keep, out_strb, out_last); Vitis HLS makes one stream of them (not yet, #1668)",
-    ].sort((a, b) => a.localeCompare(b)).sort((a, b) => parseInt(a) - parseInt(b)));
+      "4 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
+      "4 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
+      '5 #pragma HLS INTERFACE axis port=in is not made yet: ignored (its default interface made)']);
     assert.deepEqual(r.gen.ports.filter((p) => /^(in|out)_/.test(p.name)).map((p) => `${p.name}:${p.w}`), [
-      'in_data_dout:12', 'in_data_empty_n:1', 'in_data_read:1', 'in_keep_dout:2', 'in_keep_empty_n:1', 'in_keep_read:1',
-      'in_strb_dout:2', 'in_strb_empty_n:1', 'in_strb_read:1', 'in_last_dout:1', 'in_last_empty_n:1', 'in_last_read:1',
-      'out_data_din:12', 'out_data_full_n:1', 'out_data_write:1', 'out_keep_din:2', 'out_keep_full_n:1', 'out_keep_write:1',
-      'out_strb_din:2', 'out_strb_full_n:1', 'out_strb_write:1', 'out_last_din:1', 'out_last_full_n:1', 'out_last_write:1']);
+      'in_r_dout:17', 'in_r_empty_n:1', 'in_r_read:1', 'out_r_din:17', 'out_r_full_n:1', 'out_r_write:1']);
   }
   const sim = simulateC(TOP, { file: 'add.cpp' });
   assert.deepEqual([sim.error, sim.exitCode], [null, 0]);
@@ -144,7 +141,7 @@ test('#1662 typedef of a struct; the ap types\' widths as constant expressions; 
   assert.deepEqual(errs(`${S}struct R { int c[2]; };\nvoid f(hls::stream<R> &s) { R r; r.c[0] = 1; r.c[1] = 2; s.write(r); }\n`), ["4 the stream of 'R': its member 'c' is an array (not possible in a stream yet)"]);
 });
 
-test('#1819 hls::axis_user (AMD\'s ap_axi_sdata.h: user, last when AXIS_ENABLE_LAST, id, dest; no data): get_user / set_user, a stream of them co-simulated in VHDL and Verilog; a signal not enabled not a member', () => {
+test('#1819 hls::axis_user (AMD\'s ap_axi_sdata.h: user, last when AXIS_ENABLE_LAST, id, dest; no data): get_user / set_user, a stream of them co-simulated in VHDL and Verilog (one stream of its words, #1668); a signal not enabled not a member', () => {
   const src = `#include "ap_axi_sdata.h"
 #include "hls_stream.h"
 typedef hls::axis_user<13, (AXIS_ENABLE_USER | AXIS_ENABLE_LAST)> packet;
@@ -172,7 +169,7 @@ int main() {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(src, { file: 'u.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true], JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.ports.filter((p) => /_(dout|din)$/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['A_user_dout:13', 'A_last_dout:1', 'B_user_din:13', 'B_last_din:1']);
+    assert.deepEqual(r.gen.ports.filter((p) => /_(dout|din)$/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['A_dout:14', 'B_din:14']);   // (user, then last: one word, #1668)
   }
   const errs = (s) => cToHdl(s, { file: 'e.cpp' }).diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`);
   assert.deepEqual(errs('#include "ap_axi_sdata.h"\nint f(int x) { hls::axis_user<8> p; p.user = x; return p.last; }\n'), ["2 'last' is not a member of axis_user_8_64_0_0"]);

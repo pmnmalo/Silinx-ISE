@@ -7,11 +7,17 @@
 //   written: <name>_i, <name>_o and <name>_o_ap_vld (1 when one of its members is written), each member not written
 //   its value read (a sequential module reads them all at the start of a call: core/c-fsmd.js);
 //   returned: ap_return.
-// A stream of structs and an array of structs keep a stream or a memory per member for now (a warning, #1668).
+// A stream of structs is one stream of its words, an array of structs (or a pointer to structs indexed) one memory of
+// them (#1668, core/c-agg-mem.js): its members packed the same, the first at the LSB, each its bits (compact=bit, Vitis
+// HLS's default for them: a bool 1 bit); a member array's elements one after the other. #pragma HLS AGGREGATE
+// compact=bit | byte (each member whole bytes) | none (its C size) | auto (the default) chooses, of a scalar struct too;
+// #pragma HLS DISAGGREGATE keeps a port, a stream or a memory per member.
 // Isomorphic ES module: no DOM and no Node APIs.
 //
-//   aggregate(structArgs, params, ports, { seq, rn }) ->
+//   aggregate(structArgs, params, ports, { seq, rn, how }) ->
 //     { ports: the module's, inner: the members' ports as signals, vhdl: [lines], verilog: [lines], groups }
+//   structPragmas(fn) -> Map(struct argument -> { disaggregate, compact, loc }), and their warnings
+//   wordGroups(structArgs, fn, how) -> [{ name, kind: 'mem' | 'fifo', fields, w, n }]
 //   cBits(bits) -> the size of a C integer of that width, in bits
 
 /** The size of a C integer of `bits` bits: whole bytes, a power of 2 of them. */
@@ -21,32 +27,97 @@ export function cBits(bits) {
   return b;
 }
 
-/** The fields of a struct's port: [{ param, off, w (the member's bits), size (its C size) }] and its width. */
-export function layout(members, params) {
+/** The bits a member of `bits` takes in a word, packed compact=bit, byte or none (its C size). */
+export const memberBits = (bits, compact = 'none') => (compact === 'bit' ? bits : compact === 'byte' ? Math.ceil(bits / 8) * 8 : cBits(bits));
+
+/** The fields of a struct's port: [{ param, off, w (the member's bits), size (its C size, or compact's) }] and its
+ *  width. */
+export function layout(members, params, compact = 'none') {
   const fields = [];
   let off = 0;
   for (const m of members) {
     const pa = params.find((p) => p.name === m);
     const t = pa?.type.kind === 'ptr' ? pa.type.to : pa?.type;
     if (!t || t.bits == null) return null;
-    fields.push({ param: m, off, w: t.bits, size: cBits(t.bits) });
-    off += cBits(t.bits);
+    fields.push({ param: m, off, w: t.bits, size: memberBits(t.bits, compact) });
+    off += memberBits(t.bits, compact);
   }
   return { fields, w: off };
 }
 
-/** Whether a struct argument is made one port: its members scalars (an array or a stream of structs: not yet). */
+const COMPACT = new Set(['bit', 'byte', 'none', 'auto']);
+/** The top's pragmas AGGREGATE and DISAGGREGATE (said of a struct by its members, core/c-struct.js: `of` its name):
+ *  { how: Map(struct -> { disaggregate, compact, loc }), named: [{ name, pragma, loc }] }. */
+export function structPragmas(fn) {
+  const how = new Map(), named = [];
+  const walk = (x) => {
+    if (!x || typeof x !== 'object') return;
+    if (Array.isArray(x)) { x.forEach(walk); return; }
+    if (x.kind === 'pragma') {
+      const p = x.pragma;
+      if ((p.name !== 'AGGREGATE' && p.name !== 'DISAGGREGATE') || p.dup) return;
+      const name = p.of ?? p.args.variable;
+      if (typeof name !== 'string') return;
+      const c = String(p.args.compact ?? 'auto').toLowerCase();
+      how.set(name, { disaggregate: p.name === 'DISAGGREGATE', compact: COMPACT.has(c) && c !== 'auto' ? c : null, loc: x.loc });
+      named.push({ name, pragma: p.name, loc: x.loc });
+      return;
+    }
+    for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') walk(v);
+  };
+  walk(fn.body);
+  return { how, named };
+}
+
+/** The streams and the memories of structs made one (#1668): [{ name, kind: 'fifo' | 'mem', fields: [{ param, off,
+ *  w, size, k (its elements in a word) }], w, n (a memory's words) }]; a member not an integer, or the members' sizes
+ *  not of the same words: none. (A pointer to structs indexed: a member never used, a pointer, the others' depth.) */
+export function wordGroups(structArgs, fn, how = new Map()) {
+  const out = [];
+  const used = new Set();
+  const walk = (x) => { if (!x || typeof x !== 'object') return; if (Array.isArray(x)) { x.forEach(walk); return; } if (x.kind === 'id') used.add(x.name); for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') walk(v); };
+  walk(fn.body);
+  for (const a of structArgs) {
+    if (a.name === 'return' || how.get(a.name)?.disaggregate) continue;
+    const ps = a.members.map((m) => fn.params.find((p) => p.name === m));
+    if (!ps.length || ps.some((p) => !p)) continue;
+    const unused = (p) => a.kind === 'ptr' && p.type.kind === 'ptr' && !used.has(p.name);
+    const kind = a.stream && ps.every((p) => p.type.kind === 'stream') ? 'fifo'
+      : (a.kind === 'arr' || a.kind === 'ptr') && ps.every((p) => p.type.kind === 'array' || unused(p)) && ps.some((p) => p.type.kind === 'array') ? 'mem' : null;
+    if (!kind) continue;
+    const compact = how.get(a.name)?.compact || 'bit';
+    const fields = [];
+    let off = 0, n = null, ok = true;
+    ps.forEach((p, i) => {
+      const et = p.type.of ?? p.type.to;
+      const bits = et?.kind === 'int' ? et.bits : null;
+      const k = a.ks?.[i] || 1;
+      if (!bits || et.fixed) { ok = false; return; }
+      if (kind === 'mem' && p.type.kind === 'array') {
+        const len = Number(p.type.length ?? 0);
+        if (!len || len % k || (n !== null && n !== len / k)) ok = false;
+        n = len / k;
+      }
+      fields.push({ param: p.name, off, w: bits, size: memberBits(bits, compact), k });
+      off += memberBits(bits, compact) * k;
+    });
+    if (ok) out.push({ name: a.name, kind, fields, w: off, n });
+  }
+  return out;
+}
+
+/** Whether a struct argument is made one port: its members scalars (an array or a stream of structs: wordGroups). */
 export const aggregable = (a, params) => !a.stream && a.members.every((m) => {
   const pa = params.find((p) => p.name === m);
   return pa && pa.type.kind !== 'array' && pa.type.kind !== 'stream' && !(pa.type.kind === 'ptr' && pa.type.to.kind === 'array');
 });
 
-export function aggregate(structArgs, params, ports, { seq = false, rn = (n) => n } = {}) {
+export function aggregate(structArgs, params, ports, { seq = false, rn = (n) => n, how = new Map() } = {}) {
   const inner = [], vhdl = [], verilog = [], groups = [];
   let outer = ports;
   for (const a of structArgs) {
-    if (!aggregable(a, params)) continue;
-    const lay = layout(a.members, params);
+    if (!aggregable(a, params) || how.get(a.name)?.disaggregate) continue;
+    const lay = layout(a.members, params, how.get(a.name)?.compact || 'none');
     const own = ports.filter((p) => a.members.includes(p.param));
     if (!lay || !own.length) continue;
     const ins = own.filter((p) => p.dir === 'in'), outs = own.filter((p) => p.dir === 'out' && p.role === 'arg'), vlds = own.filter((p) => p.role === 'arg_vld');
