@@ -1,5 +1,5 @@
 {
- "version": 5,
+ "version": 6,
  "name": "vcc_gnd",
  "lang": "vhdl",
  "sheet": {
@@ -311,7 +311,7 @@
    "id": "W12",
    "points": [
     {
-     "x": 380,
+     "x": 400,
      "y": 360
     },
     {

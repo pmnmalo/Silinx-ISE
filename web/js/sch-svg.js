@@ -118,8 +118,9 @@ export function bodySvg(sym, def) {
       break;
     }
     case 'join': {
-      s += `<rect class="ripper" x="18" y="0" width="4" height="${h}"/>`;
-      for (const p of pins) s += p.side === 'W' ? lead(0, p.y, 18, p.y, bus(p)) : lead(22, p.y, p.x, p.y, true);
+      const b = def.body.x;
+      s += `<rect class="ripper" x="${b}" y="0" width="4" height="${h}"/>`;
+      for (const p of pins) s += p.side === 'W' ? lead(0, p.y, b, p.y, bus(p)) : lead(b + 4, p.y, p.x, p.y, true);
       break;
     }
     case 'const': {
@@ -218,9 +219,11 @@ function textsSvg(sym, def, ctx = {}) {
   } else if (def.shape === 'join') {
     // each input's bits of the output on its wire, inside the symbol, as the bus tap's (I0 the most significant
     // part): (7:4), (3); no width of its own: its indices say it (#1908); the output's width as every symbol's bus pins (#1488)
+    // (centred on its lead; turned 90° / 270°, its inputs 20 px apart: every other one further along, never side by side, #1910)
+    const turned = sym.rot === 90 || sym.rot === 270, L = def.body.x;
     let hi = def.pins.reduce((n, p) => n + (p.dir === 'in' ? p.width : 0), 0) - 1;
-    for (const p of def.pins.filter(q => q.dir === 'in')) {
-      const lo = hi - p.width + 1, m = cx(9, p.y);
+    for (const [i, p] of def.pins.filter(q => q.dir === 'in').entries()) {
+      const lo = hi - p.width + 1, m = cx(turned ? (i % 2 ? L - 10 : 10) : L / 2, p.y);
       s += `<text class="stext on" x="${m.x}" y="${m.y + 3}" text-anchor="middle">${esc(hi === lo ? `(${hi})` : `(${hi}:${lo})`)}</text>`;
       hi = lo - 1;
     }

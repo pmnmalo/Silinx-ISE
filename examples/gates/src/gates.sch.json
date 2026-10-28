@@ -1,5 +1,5 @@
 {
- "version": 5,
+ "version": 6,
  "name": "gates",
  "lang": "vhdl",
  "sheet": {
@@ -1479,7 +1479,7 @@
    "id": "W65",
    "points": [
     {
-     "x": 1140,
+     "x": 1160,
      "y": 980
     },
     {

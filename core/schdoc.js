@@ -27,7 +27,7 @@ import { VHDL93_WORDS, VERILOG_WORDS, reservedError } from './reserved.js';
 import { BLOCK_MARK, blockMarkOf, declaredIn, generateHdl, isBlockSymbol } from './schdoc-hdl.js';
 import { mergeNetWires } from './schdoc-place.js';
 import { normalizeCurve, splitCurve } from './schcurve.js';
-import { moveTaps, widenMuxes } from './schdoc-upgrade.js';
+import { moveTaps, widenJoins, widenMuxes } from './schdoc-upgrade.js';
 import { symbolDiff } from './schdoc-modsym.js';
 import {
   modulesFromLibrary, schematicFromHdl
@@ -44,7 +44,7 @@ export {
   findMod, freePortName, gateVariant, int, normModules, oppositeSide, portBox, portSide, rotSize, symbolBox, symbolDef,
   symbolParams, symbolPins, symbolTypeName, turnSide, xform, xformSide
 };
-export { COMPARE_OPS, COMPARE_SYM, compareOps, comparePin, constWidth, MUX_BODY_W, MUX_OLD_BODY_W, MUX_SEL_X } from './schdoc-symbols.js';
+export { COMPARE_OPS, COMPARE_SYM, compareOps, comparePin, constWidth, JOIN_BAR, JOIN_OLD_W, JOIN_W, MUX_BODY_W, MUX_OLD_BODY_W, MUX_SEL_X } from './schdoc-symbols.js';
 export { followPins, otherPins, repinSymbol } from './schdoc-repin.js';
 export { symbolDiff, updateModuleSymbols, updatedPorts } from './schdoc-modsym.js';
 export {
@@ -65,7 +65,9 @@ export const GRID = 10;
 // connections moved with them: core/schdoc-upgrade.js)
 // 5 (#1726): the bus tap drawn as ISE's, its input on its bus a grid step from its output's line (a document of
 // version 4 has what met its input taken there: core/schdoc-upgrade.js)
-export const DOC_VERSION = 5;
+// 6 (#1910): the bus join 60 px wide, its inputs' leads long enough for their bits' labels (a document of version 5 has
+// its joins' outputs moved, what met them following: core/schdoc-upgrade.js)
+export const DOC_VERSION = 6;
 
 export const snap = v => Math.round(v / GRID) * GRID;
 export const r10 = v => Math.ceil(v / GRID) * GRID;
@@ -84,6 +86,7 @@ export function normalizeDoc(d, { modules } = {}) {
   const before678 = !(+doc.version >= 3);
   const before1136 = !(+doc.version >= 4);
   const before1726 = !(+doc.version >= 5);
+  const before1910 = !(+doc.version >= 6);
   doc.version = DOC_VERSION;
   doc.name = String(doc.name || 'schematic');
   doc.lang = doc.lang === 'verilog' ? 'verilog' : 'vhdl';
@@ -140,6 +143,7 @@ export function normalizeDoc(d, { modules } = {}) {
   const stays2 = before678 && doc.symbols.some(s => symbolDef(s, mods).missing);
   if (before1136 && !stays2) widenMuxes(doc, mods);
   if (before1726 && !stays2) moveTaps(doc, mods);
+  if (before1910 && !stays2) widenJoins(doc, mods);
   if (before678) {
     joinOnWires(doc, mods);
     if (stays2) doc.version = 2;

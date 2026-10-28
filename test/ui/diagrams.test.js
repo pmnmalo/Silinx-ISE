@@ -312,7 +312,7 @@ uiTest('#301 #313 #334 schematic palette: one MUX and one DEMUX (no M4_1 … / D
   await page.waitFor(async () => JSON.parse(await (await fetch('/api/projects/SchMux/file?path=src%2Fmx.sch.json')).text()).symbols[0].type === 'mux4', [], { what: 'M4_1 saved' });
   await page.key('Escape');
   const saved = JSON.parse(await readWs(env, 'SchMux', 'src/mx.sch.json'));
-  assert.deepEqual([saved.version, saved.symbols[0].type, saved.symbols[0].params.selBus, saved.symbols[0].params.en], [5, 'mux4', false, false]);
+  assert.deepEqual([saved.version, saved.symbols[0].type, saved.symbols[0].params.selBus, saved.symbols[0].params.en], [6, 'mux4', false, false]);
   const texts = (cls) => page.eval((d, c) => [...document.querySelectorAll(`${d} .se-svg g.sym ${c}`)].map((t) => t.textContent), D, cls);
   const names = await texts('text');
   for (const n of ['S1', 'S0']) assert.ok(names.includes(n), names.join(' '));

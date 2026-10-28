@@ -1,5 +1,5 @@
 {
- "version": 5,
+ "version": 6,
  "name": "bus_taps",
  "lang": "vhdl",
  "sheet": {
@@ -479,7 +479,7 @@
    "id": "W23",
    "points": [
     {
-     "x": 370,
+     "x": 390,
      "y": 280
     },
     {
