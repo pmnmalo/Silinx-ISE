@@ -47,6 +47,24 @@ function copyTracked(dest) {
   }
 }
 
+/** npm's links in node_modules to this repository's own packages (its workspaces, packages/*: silinx-fpga, #1677)
+ *  removed: they are in the app as files (packages/), are not third-party, and a symbolic link is no use in a zip
+ *  unpacked on Windows (#1874). */
+function unlinkWorkspaces(app) {
+  const dir = path.join(app, 'packages');
+  if (!fs.existsSync(dir)) return [];
+  const names = fs.readdirSync(dir, { withFileTypes: true }).filter(e => e.isDirectory())
+    .map(e => { try { return JSON.parse(fs.readFileSync(path.join(dir, e.name, 'package.json'), 'utf8')).name; } catch { return null; } }).filter(Boolean);
+  const gone = [];
+  for (const name of names) {
+    const link = path.join(app, 'node_modules', name);
+    let st = null;
+    try { st = fs.lstatSync(link); } catch { continue; }
+    if (st.isSymbolicLink()) { fs.rmSync(link); gone.push(name); }
+  }
+  return gone;
+}
+
 /** The full app: tracked files + production dependencies, in a folder silinx-ise/. */
 function packageApp() {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-pkg-'));
@@ -54,6 +72,7 @@ function packageApp() {
     const app = path.join(work, 'silinx-ise');
     copyTracked(app);
     run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], app);
+    unlinkWorkspaces(app);
     fs.rmSync(path.join(app, '.github'), { recursive: true, force: true });
     const zip = path.join(out, `silinx-ise-${version}.zip`);
     fs.rmSync(zip, { force: true });

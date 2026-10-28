@@ -79,6 +79,9 @@ test('release zip: the app with its production dependencies only, Yosys\'s WebAs
     assert.deepEqual(files(f).slice(0, 5), [], `${f} must not be in the release`);
   assert.equal(JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8')).version, VERSION);
   // every package shipped has its notice (and nothing listed is missing)
+  // this repository's own packages are in it as files, not as npm's links in node_modules (#1874)
+  assert.ok(exists('packages/silinx-fpga/package.json') && exists('packages/silinx-fpga/LICENSE'), 'packages/silinx-fpga in the zip');
+  assert.ok(!fs.existsSync(path.join(APP, 'node_modules/silinx-fpga')), 'no link to packages/silinx-fpga in node_modules');
   const { THIRD_PARTY } = await import(pathToFileURL(path.join(APP, 'core/third-party.js')).href);
   // (code ported into Silinx, e.g. adepttool, is listed but is not a package)
   const listed = THIRD_PARTY.filter((c) => !c.ported).map((c) => `${c.name}@${c.version}`).sort();
