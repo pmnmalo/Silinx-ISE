@@ -140,6 +140,12 @@ test('contributors from outside (#1872): the maintainer owns every file, merges 
   assert.match(read('CLAUDE.md'), /\*\*Merging is the maintainer's\*\*/);
   assert.doesNotMatch(read('CLAUDE.md'), /- \*\*Merging\*\*: when `related-tests` is green, merge it/);
   assert.match(read('ONBOARDING.md'), /\*\*Contributing from outside\*\*[^]*leave the merge, the labels and the releases/);
+  // a code owner's review on main, the admin's bypass (#1888): the check green first, then --admin
+  for (const f of ['CLAUDE.md', 'ONBOARDING.md']) {
+    assert.match(read(f), /`gh pr checks <N> --required`[^]*`gh pr merge <N> --rebase --admin`/, f);
+    assert.doesNotMatch(read(f), /`gh pr merge --rebase`/, f);
+  }
+  assert.match(read('CLAUDE.md'), /a code owner's approving review\n\s+\(`\.github\/CODEOWNERS`, #1888\) required to merge, which the admin bypasses/);
   // the template asks for what CLAUDE.md asks of every change
   const t = read('.github/pull_request_template.md');
   assert.match(t, /^Fixes #$/m);

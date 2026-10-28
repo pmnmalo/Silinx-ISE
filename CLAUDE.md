@@ -79,7 +79,8 @@ the code and the lessons learnt.
   locally: `node scripts/related-tests.mjs origin/main HEAD`.
 - **Merging is the maintainer's** (#1872): the maintainer, or a session the maintainer runs, merges a pull request
   when `related-tests` is green, into `main` (rebased, fast-forward, no merge commit; rebase the branch first if
-  `main` moved). A contributor from outside (a fork) opens the pull request and leaves the merge, the labels and
+  `main` moved): `gh pr checks <N> --required` green first, then `gh pr merge <N> --rebase --admin` (#1888: the
+  admin's bypass of the code owner's review, which skips the check too). A contributor from outside (a fork) opens the pull request and leaves the merge, the labels and
   the releases to the maintainer ([CONTRIBUTING.md](CONTRIBUTING.md#contributing-from-outside)). A break found later (by the
   release's CI, the nightly or ISE runs, the CI watcher) becomes an issue, fixed in the next change.
 - **Reviewing** another session's pull request: its intent and its evidence, not every line. Does it do
@@ -95,7 +96,8 @@ the code and the lessons learnt.
   quality comparison against ISE is run by hand (Actions ▸ Quality ▸ Run workflow) and reviewed. The
   sources pinned outside npm are checked monthly (`pins.yml`: one issue lists what is behind).
 - **`main` is protected** (repository rulesets): no deletion and no force push, for anyone; a linear
-  history, rebase merging only; a pull request's `related-tests` check required to merge. Only the admin
+  history, rebase merging only; a pull request's `related-tests` check and a code owner's approving review
+  (`.github/CODEOWNERS`, #1888) required to merge, which the admin bypasses. Only the admin
   creates, moves or deletes a `v*` tag (a tag ruleset: a workflow's token cannot make a release). The weekly quality
   comparison cannot push to `main`: it pushes its results to the branch `quality-results`, which a
   maintainer merges.
