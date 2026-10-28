@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { simulateC } from '../core/c-interp.js';
 import { cToHdl } from '../core/c-hdl.js';
@@ -47,7 +48,7 @@ test('a compiled program\'s output with LF line ends (#1860)', () => {
 
 // #1875: every test that reads a compiled program's output (or a file it wrote) reads it through lf()
 test('the compiled programs\' outputs all read through lf (#1875)', () => {
-  const dirname = path.dirname(new URL(import.meta.url).pathname);
+  const dirname = path.dirname(fileURLToPath(import.meta.url));   // (a URL's pathname is not a Windows path, #1904)
   const bad = [];
   for (const f of fs.readdirSync(dirname).filter((n) => n.endsWith('.js'))) {
     fs.readFileSync(path.join(dirname, f), 'utf8').split('\n').forEach((l, i) => {
