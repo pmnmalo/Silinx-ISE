@@ -84,7 +84,7 @@ Not part of `npm test` (it needs the network once).
 | modeling-using-vectors | C++ | fail | fail | skip | - | C simulation: example.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | modeling-variable-bound-loops | C++ | pass | pass | pass | 3-127 |  |
 | pipelining-functions-function-instantiate | C++ | pass | pass | pass | - |  |
-| pipelining-functions-hier-func | C++ | fail | fail | skip | - | C simulation: 81: 'fp1': structures (FILE) are not supported in Silinx HLS yet |
+| pipelining-functions-hier-func | C++ | pass | pass | pass | - |  |
 | pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 1723 |  |
 | pipelining-loops-perfect-loop | C++ | pass | pass | pass | 1723 |  |
 | pipelining-loops-using-free-running-pipeline | C++ | pass | fail | skip | - | C synthesis: 66: 'strm_out' is not an integer |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 58 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 
-73 designs: 47 through co-simulation.
+73 designs: 48 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

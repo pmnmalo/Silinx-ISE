@@ -75,6 +75,9 @@ export const exprMethods = {
         return r.row || r.get();
       }
       case 'sizeof': {
+        // (an array variable's: all its elements, snprintf(buf, sizeof buf, …), #1897)
+        const c = !e.type && e.e?.kind === 'id' ? this.find(e.e.name) : null;
+        if (c?.arr) return num(BigInt(Math.ceil((c.t?.w || 32) / 8) * c.arr.length), { w: 64, s: false, ap: false });
         const t = e.type ? typeOf(e.type) : this.typeOfExpr(e.e);
         const n = e.type?.kind === 'array' ? (e.type.length || 1) : 1;
         return num(BigInt(Math.ceil((t?.w || 32) / 8) * n), { w: 64, s: false, ap: false });
@@ -318,7 +321,7 @@ export const exprMethods = {
       if (prec === '*') prec = String(this.intOf(next(), e));
       const a = next();
       let s;
-      if (conv === 's') { s = a.str ?? ''; if (prec !== undefined) s = s.slice(0, Number(prec)); }
+      if (conv === 's') { s = this.cString(a) ?? ''; if (prec !== undefined) s = s.slice(0, Number(prec)); }
       else if ('fFeEgG'.includes(conv)) {
         s = fmtFloat(conv, Number(a.v ?? this.intOf(a, e)), prec === undefined ? undefined : Number(prec), flags);
         if (flags.includes('0') && !flags.includes('-') && width && /^[-+ ]?\d/.test(s)) { const sg = /^[-+ ]/.test(s) ? s[0] : ''; s = sg + s.slice(sg.length).padStart(Number(width) - sg.length, '0'); }

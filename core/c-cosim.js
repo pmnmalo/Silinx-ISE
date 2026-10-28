@@ -104,8 +104,9 @@ export function cosimBench(gen, calls, { maxCycles = MAX_CYCLES } = {}) {
   return { text: L.join('\n'), shown, seq, reads: free ? reads : null };
 }
 
-export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null } = {}) {
-  const sim = simulateC(source, { file, headers, top });
+// (files: the test bench's, core/c-interp.js's, #1897)
+export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null } = {}) {
+  const sim = simulateC(source, { file, headers, top, files });
   const gen = cToHdl(source, { file, lang, headers, top });
   if (alter && gen.ok) gen.hdl = alter(gen.hdl);   // (the tests: an HDL that differs, its mismatches reported)
   const base = { ok: false, pass: false, calls: 0, mismatches: [], latency: null, output: sim.output, sim, gen, errors: [] };

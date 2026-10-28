@@ -23,6 +23,15 @@ Spartan-3E, so it is not Silinx's oracle: the C itself is (see *Checking it* bel
   that is not `main`. The other functions are inlined into it. `main()` is the test bench (C
   simulation, C/RTL co-simulation); it is never synthesized.
 - `#define` constants and function-like macros of one expression; `#if`/`#ifdef` on them.
+- `__SYNTHESIS__` is defined in synthesis, as Vitis HLS's (#1897): code under `#ifndef __SYNTHESIS__` runs only in the
+  C simulation, even in the top function (a trace file of each call, as AMD's examples write), checked as the test
+  bench's.
+- The test bench's files (#1598, #1897): `FILE *` with `fopen` / `fprintf` / `fscanf` / `fgets` / `fclose`, a name
+  made with `sprintf` / `snprintf`, and `system("diff [-w | -b | -B | --brief] a b")` comparing two files (any other
+  command refused). The files are the project's, in memory (the browser edition too): those the test bench's strings
+  name are read (`"tb_data/in.dat"`, a format's `"out_%03d.dat"`), never a file outside the project; the files it
+  writes stay in memory (the Console lists them), the project's are not changed. A `FILE` in the synthesized code is
+  refused.
 
 ### Types
 

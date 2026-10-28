@@ -530,11 +530,11 @@
     "reason": null
   },
   "pipelining-functions-hier-func": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
     "latency": null,
-    "reason": "C simulation: 81: 'fp1': structures (FILE) are not supported in Silinx HLS yet"
+    "reason": null
   },
   "pipelining-loops-imperfect-loop": {
     "csim": "pass",
