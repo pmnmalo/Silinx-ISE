@@ -32,8 +32,9 @@ npm start          # http://127.0.0.1:8642
 2. **A branch and a pull request for every change.** `main` is protected: no force push, a linear
    history. **CI runs at a release only** (#607), not on pull requests nor on pushes to main. A pull
    request runs the whole test file of every module it changes (`pr-tests.yml`, #637); Pedro (or a
-   session of Pedro's) merges when its check `related-tests` is green, with `gh pr merge --rebase` (fast-forward, no
-   merge commits). **Contributing from outside** (a fork, not Pedro's sessions): open the pull request and
+   session of Pedro's) merges when its check `related-tests` is green (`gh pr checks <N> --required`), with
+   `gh pr merge <N> --rebase --admin` (fast-forward, no merge commits; `--admin` bypasses the code owner's
+   review `main` requires, and the check too, #1888). **Contributing from outside** (a fork, not Pedro's sessions): open the pull request and
    leave the merge, the labels and the releases to Pedro; sections 3 and 7 are about the maintainer's own sessions
    ([CONTRIBUTING.md](CONTRIBUTING.md#contributing-from-outside)). Run the
    same files locally first: `node scripts/related-tests.mjs origin/main HEAD`. The release's CI, the nightly and ISE runs and the CI watcher find what slipped through.
