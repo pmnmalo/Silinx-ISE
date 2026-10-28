@@ -220,9 +220,13 @@ uiTest('open mode: Back-annotate Pin Locations writes the pins the placer chose 
   await page.treeRow('#procs', 'Back-annotate Pin Locations', { dbl: true, exact: true });
   await page.waitDialog('Back-annotate Pin Locations', { timeout: 120000 });
   const msg = () => page.eval(() => document.querySelector('.dlg-overlay .msg-text').textContent);
-  const BA_PINS = baPins(await readWs(env, 'OpenPins', 'build/top_pins.ucf'));
-  assert.equal(await msg(), `Add the 5 pin location(s) chosen by the tools to constraints/top.ucf?\n\n${BA_PINS.join('\n')}`);
+  const pinsUcf = await readWs(env, 'OpenPins', 'build/top_pins.ucf');
+  const BA_PINS = baPins(pinsUcf);
   const text = await page.consoleText();
+  // (a dialog that disagrees with the run's pin file: both and the run's log in the failure, #1822)
+  const dialog = await msg();
+  assert.equal(dialog, `Add the 5 pin location(s) chosen by the tools to constraints/top.ucf?\n\n${BA_PINS.join('\n')}`,
+    `the dialog:\n${dialog}\nbuild/top_pins.ucf:\n${pinsUcf}\nthe run:\n${text.slice(text.lastIndexOf('Started : "Back-annotate Pin Locations"'))}`);
   assert.match(text, /=== SILINX STEP pin2ucf ===/);
   assert.match(text, /Pin locations of 27 port bit\(s\), 5 of them chosen by the placer \(no LOC in the constraints\): build\/top_pins\.ucf/);
   assert.deepEqual(text.split('\n').filter((l) => /warning/i.test(l)),
