@@ -12,6 +12,7 @@ import { simulateC } from '../core/c-interp.js';
 import { cosimulate } from '../core/c-cosim.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { CXX } from './ap-int-ref.js';
+import { lf } from './c-helpers.js';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
 // (a stream for the reference: a queue, with its name and its depth, as hls_stream.h)
@@ -68,7 +69,7 @@ test('#1739 arrays of streams in the C simulation (variable and constant indices
   try {
     fs.writeFileSync(path.join(dir, 't.cpp'), SRC.replace('#include "hls_stream.h"', STREAM_H).replace(/^#pragma.*$/gm, ''));
     execFileSync(CXX, ['-std=c++11', '-w', '-o', path.join(dir, 't'), path.join(dir, 't.cpp')]);
-    assert.equal(sim.output, execFileSync(path.join(dir, 't'), { encoding: 'utf8' }));
+    assert.equal(sim.output, lf(execFileSync(path.join(dir, 't'), { encoding: 'utf8' })));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

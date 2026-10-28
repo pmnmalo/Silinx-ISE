@@ -14,6 +14,7 @@ import { cosimulate } from '../core/c-cosim.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { lex } from '../core/c-lex.js';
 import { CXX } from './ap-int-ref.js';
+import { lf } from './c-helpers.js';
 
 function compiledCpp(src) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-cpp-'));
@@ -21,7 +22,7 @@ function compiledCpp(src) {
     fs.writeFileSync(path.join(dir, 't.cpp'), src);
     const exe = path.join(dir, process.platform === 'win32' ? 't.exe' : 't');
     execFileSync(CXX, ['-std=c++14', '-w', '-o', exe, path.join(dir, 't.cpp')]);
-    try { return { output: execFileSync(exe, { encoding: 'utf8' }), exitCode: 0 }; } catch (e) { return { output: e.stdout, exitCode: e.status }; }
+    try { return { output: lf(execFileSync(exe, { encoding: 'utf8' })), exitCode: 0 }; } catch (e) { return { output: lf(e.stdout), exitCode: e.status }; }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);

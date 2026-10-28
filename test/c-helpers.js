@@ -9,6 +9,9 @@ import { wrap } from '../core/c-types.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { simulate } from '../core/compile.js';
 
+/** A compiled program's output with LF line ends: on Windows the C runtime writes CRLF in text mode (#1860). */
+export const lf = (s) => (typeof s === 'string' ? s.replace(/\r\n/g, '\n') : s);
+
 export const CC = (() => { for (const c of ['cc', 'gcc', 'clang']) { try { execFileSync(c, ['--version'], { stdio: 'ignore' }); return c; } catch { /* next */ } } return null; })();
 export const noCC = CC ? false : 'no C compiler on this machine';
 
@@ -47,7 +50,7 @@ export function runC(src, top, ins, outs, ret, vectors) {
   const prog = `#include <stdio.h>\n#include <stdbool.h>\n${src}\nint main(void) {\n${calls.join('\n')}\n  return 0;\n}\n`;
   fs.writeFileSync(path.join(dir, 't.c'), prog);
   execFileSync(CC, ['-std=c99', '-w', '-Werror=incompatible-pointer-types', '-fsigned-char', '-fwrapv', '-O0', '-o', path.join(dir, 't'), path.join(dir, 't.c')]);
-  const out = execFileSync(path.join(dir, 't'), { encoding: 'utf8' }).trim().split('\n');
+  const out = lf(execFileSync(path.join(dir, 't'), { encoding: 'utf8' })).trim().split('\n');
   fs.rmSync(dir, { recursive: true, force: true });
   return out;
 }
@@ -62,8 +65,8 @@ export function compiledRun(src) {
     // (math.h's functions: libm, a library of its own on Linux; -ffp-contract=off: a * b + c two roundings, as C's
     // abstract machine and the C simulation, not a fused multiply-add, clang's default on arm64, #1773)
     execFileSync(CC, ['-std=c99', '-w', '-fsigned-char', '-fwrapv', '-ffp-contract=off', '-O0', '-o', exe, path.join(dir, 't.c'), '-lm']);
-    try { return { output: execFileSync(exe, { encoding: 'utf8' }), exitCode: 0 }; }
-    catch (e) { return { output: e.stdout, exitCode: e.status }; }
+    try { return { output: lf(execFileSync(exe, { encoding: 'utf8' })), exitCode: 0 }; }
+    catch (e) { return { output: lf(e.stdout), exitCode: e.status }; }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 

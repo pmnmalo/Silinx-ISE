@@ -11,7 +11,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { simulateC } from '../core/c-interp.js';
 import { cToHdl } from '../core/c-hdl.js';
-import { CC, noCC, values, rng } from './c-helpers.js';
+import { CC, noCC, values, rng, lf } from './c-helpers.js';
 import { apIntHeaders, runWithApInt } from './ap-int-ref.js';
 
 const AP = await apIntHeaders();
@@ -22,7 +22,7 @@ function compiled(src) {
   try {
     fs.writeFileSync(path.join(dir, 't.c'), src);
     execFileSync(CC, ['-std=c99', '-w', '-fsigned-char', '-fwrapv', '-O0', '-o', path.join(dir, 't'), path.join(dir, 't.c')]);
-    try { return { output: execFileSync(path.join(dir, 't'), { encoding: 'utf8' }), exitCode: 0 }; }
+    try { return { output: lf(execFileSync(path.join(dir, 't'), { encoding: 'utf8' })), exitCode: 0 }; }
     catch (e) { return { output: e.stdout, exitCode: e.status }; }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
@@ -35,6 +35,15 @@ function same(src, { exit = null } = {}) {
   if (exit !== null) assert.equal(sim.exitCode, exit);
   return sim;
 }
+
+// #1860: on Windows the compiled program writes CRLF (the C runtime's text mode), the simulator LF; the reference's
+// output is compared with its line ends made LF, its other characters (a lone \r, a printf("\r")) kept
+test('a compiled program\'s output with LF line ends (#1860)', () => {
+  assert.equal(lf('3\r\n-1 1e+10\r\n'), '3\n-1 1e+10\n');
+  assert.equal(lf('a\rb\n'), 'a\rb\n');
+  assert.equal(lf(''), '');
+  assert.equal(lf(undefined), undefined);
+});
 
 test('C simulation against cc: printf\'s conversions, flags, widths and lengths; integer arithmetic, promotions and conversions', { skip: noCC }, () => {
   same(`#include <stdio.h>
@@ -184,7 +193,7 @@ int main() {
     fs.writeFileSync(path.join(dir, 'golden.dat'), golden);
     execFileSync(CC, ['-std=c99', '-w', '-o', path.join(dir, 't'), path.join(dir, 't.c')]);
     let ref;
-    try { ref = { output: execFileSync(path.join(dir, 't'), { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), exitCode: 0 }; } catch (e) { ref = { output: e.stdout, exitCode: e.status }; }
+    try { ref = { output: lf(execFileSync(path.join(dir, 't'), { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })), exitCode: 0 }; } catch (e) { ref = { output: lf(e.stdout), exitCode: e.status }; }
     const sim = simulateC(src, { file: 't.c', files: { 'data/golden.dat': golden } });
     assert.equal(sim.error, null);
     assert.equal(sim.output, ref.output);

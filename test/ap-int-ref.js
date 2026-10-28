@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { lf } from './c-helpers.js';
 
 export const AP_INT_COMMIT = '200a9aecaadf471592558540dc5a88256cbf880f';
 const FILES = {
@@ -56,6 +57,6 @@ export function runWithApInt(src, headers) {
     const exe = path.join(tmp, process.platform === 'win32' ? 't.exe' : 't');
     // (ap_int_special.h and ap_fixed_special.h left out, std::complex of ap_int and ap_fixed: its own declaration of std::complex is ambiguous with libc++)
     execFileSync(CXX, ['-std=c++11', '-w', '-D__AP_INT_SPECIAL_H__', '-D__AP_FIXED_SPECIAL_H__', '-fsigned-char', '-fwrapv', '-ffp-contract=off', '-O0', '-I', headers, '-o', exe, path.join(tmp, 't.cpp')], { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
-    return execFileSync(exe, { encoding: 'utf8' });
+    return lf(execFileSync(exe, { encoding: 'utf8' }));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }

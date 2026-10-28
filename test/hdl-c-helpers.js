@@ -8,7 +8,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { compile, elaborate, simulate } from '../core/compile.js';
 import { hdlToC } from '../core/hdl-c.js';
-import { CC } from './c-helpers.js';
+import { CC, lf } from './c-helpers.js';
 
 const mask = (w) => (1n << BigInt(w)) - 1n;
 
@@ -25,7 +25,7 @@ export function runModel(sources, top, vectors) {
     fs.writeFileSync(path.join(dir, 'm.c'), m.text + main);
     const exe = path.join(dir, process.platform === 'win32' ? 'm.exe' : 'm');
     execFileSync(CC, ['-std=c99', '-Wall', '-Werror', '-Wno-unused-function', '-O1', ...(process.platform !== 'win32' ? ['-fsanitize=undefined', '-fno-sanitize-recover=all'] : []), '-o', exe, path.join(dir, 'm.c')], { stdio: ['ignore', 'ignore', 'pipe'] });
-    return { model: m, lines: execFileSync(exe, { encoding: 'utf8' }).trim().split('\n') };
+    return { model: m, lines: lf(execFileSync(exe, { encoding: 'utf8' })).trim().split('\n') };
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
