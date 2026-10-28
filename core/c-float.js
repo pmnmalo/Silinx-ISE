@@ -5,10 +5,13 @@
 //   F64, F32                          the types (t.fl: their bits)
 //   fmtFloat(conv, x, prec, flags)    printf's conversion (f F e E g G) of the number x, without its width
 //   MATH                              name -> { n: its arguments, f: (...numbers) -> number, int: an integer result }
+//   BITCASTS                          a union's float and double members (core/c-union.js, #1896): name -> { fl: the
+//                                     float's bits, bits: true for float -> bits, else bits -> float }
 
 export const F64 = { fl: 64, w: 64, s: true };
 export const F32 = { fl: 32, w: 32, s: true };
 export const floatType = (t) => (t.name === 'float' ? F32 : F64);
+export const BITCASTS = { ap_float_bits: { fl: 32, bits: true }, ap_double_bits: { fl: 64, bits: true }, ap_bits_float: { fl: 32 }, ap_bits_double: { fl: 64 } };
 
 /** x = m * 2^e exactly (m a BigInt, x finite and positive). */
 function parts(x) {

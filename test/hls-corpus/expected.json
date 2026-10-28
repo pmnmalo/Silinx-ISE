@@ -253,11 +253,15 @@
     "reason": null
   },
   "interface-streaming-axi-stream-to-master": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: 32: 'out_memory' is an array: give an index"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 18998,
+      "max": 18998,
+      "avg": 18998
+    },
+    "reason": null
   },
   "interface-streaming-axis-array-stream-no-side-channel-data": {
     "csim": "pass",
@@ -424,11 +428,15 @@
     "reason": null
   },
   "modeling-pointers-native-casts": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: 114: a cast of a pointer is not possible in Silinx HLS"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 1635,
+      "max": 1635,
+      "avg": 1635
+    },
+    "reason": null
   },
   "modeling-pointers-stream-better": {
     "csim": "pass",
@@ -449,11 +457,11 @@
     "reason": null
   },
   "modeling-pointers-using-double": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
     "latency": null,
-    "reason": "C simulation: 19: the parameter 'flagPtr': a pointer to a pointer is not possible (Silinx HLS: pointers only to arguments)"
+    "reason": null
   },
   "modeling-using-arbitrary-precision-arith": {
     "csim": "pass",
@@ -506,11 +514,11 @@
     "reason": null
   },
   "modeling-using-float-and-double": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
     "latency": null,
-    "reason": "C simulation: fp_mul_pow2.c:29: 'bexp' is not a member of float_num_t"
+    "reason": null
   },
   "modeling-using-vectors": {
     "csim": "fail",

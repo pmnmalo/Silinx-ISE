@@ -3,9 +3,10 @@
 // system calls, fixed or bounded sizes, unambiguous constructs, no visible undefined behaviour).
 // Isomorphic ES module: no DOM and no Node APIs.
 //
-//   checkC(source, file) -> { ast, top, funcs, loops, diagnostics, ok }
+//   checkC(source, file) -> { ast, top, funcs, consts, loops, diagnostics, ok }
 //     top:         the top function's name (#pragma HLS TOP name=, else the file's last function other than main)
 //     funcs:       Map name -> Func, the functions defined
+//     consts:      Map name -> BigInt, the global constant integers
 //     loops:       [{ loc, trip }]: each loop of the synthesized code, its trip count (a constant, or a
 //                  LOOP_TRIPCOUNT max), null when it has none
 //     diagnostics: [{ file, line, col, message, severity: 'error' | 'warning' }], in the order of the source
@@ -13,9 +14,10 @@
 // The synthesized code is the top function and the functions it calls; main() and what only it calls are the
 // test bench, checked for names and calls only.
 import { pointerArithmetic, pointerVariables } from './c-pointer.js';
+import { pointerToPointer, pointerArgsMoved } from './c-pointer-args.js';
 import { parse } from './c-parse.js';
 import { checkPragmas } from './c-pragma.js';
-import { MATH } from './c-float.js';
+import { MATH, BITCASTS } from './c-float.js';
 import { Q_MODES, O_MODES } from './c-fixed.js';
 
 // the library calls Silinx HLS refuses in synthesized code (UG1399: no system calls), and the ones it ignores there
@@ -165,6 +167,8 @@ export function checkC(source, file = 'input.c', opts = {}) {
   // ---------------------------------------------------------------- each function: names, calls, constructs
   const loops = [];
   // (opts.depths: a DATAFLOW process's pointer arguments, its caller's arrays' sizes, core/c-processes.js, #1707)
+  pointerToPointer(funcs, synth, top, report);   // (int **pp of a function the top calls: resolved at compile time, #1895)
+  pointerArgsMoved(funcs, synth, report);   // (a pointer argument moved, p += n: an offset of its own, #1895)
   pointerArithmetic(funcs, globals, synth, report, ast.structArgs, top, opts.depths);   // (*(p + e) is p[e]; a pointer argument indexed an array, #1599)
   pointerVariables(funcs, globals, synth, report);   // (a local pointer: its target and offset)
   for (const f of funcs.values()) {
@@ -175,7 +179,7 @@ export function checkC(source, file = 'input.c', opts = {}) {
   // the HLS pragmas of the synthesized functions (#1529)
   checkPragmas(ast, new Map([...funcs].filter(([n]) => synth.has(n))), report);
   diags.sort((a, b) => a.line - b.line || a.col - b.col);
-  return { ast, top, funcs, loops, diagnostics: diags, ok: !diags.some((d) => d.severity === 'error'), dataflow: !!top && hasDataflow(funcs.get(top)) };
+  return { ast, top, funcs, loops, consts, diagnostics: diags, ok: !diags.some((d) => d.severity === 'error'), dataflow: !!top && hasDataflow(funcs.get(top)) };
 }
 
 /** The checks of one function's body (hw: it is synthesized). */
@@ -189,7 +193,7 @@ function checkFunction(f, ctx) {
   for (const pa of f.params) {
     if (!pa.name) { if (f.name !== 'main') report(pa.loc, `a parameter of '${f.name}' has no name`); continue; }   // (main(int, char **), C++)
     else scopes[0].set(pa.name, { kind: 'param', type: pa.type });
-    if (hw) typeHw(pa.type, pa.loc, `the parameter '${pa.name}'`);
+    if (hw && !pa.said) typeHw(pa.type, pa.loc, `the parameter '${pa.name}'`);   // (said: core/c-pointer-args.js)
   }
   if (hw) typeHw(f.ret, f.loc, `the result of '${f.name}'`);
   const lookup = (name) => { for (let k = scopes.length - 1; k >= 0; k--) if (scopes[k].has(name)) return scopes[k].get(name); return globals.has(name) ? { kind: 'global', type: globals.get(name).type } : null; };
@@ -200,7 +204,7 @@ function checkFunction(f, ctx) {
     else if (t.kind === 'struct') report(loc, `${what}: structures (${t.name}) are not supported in Silinx HLS yet`);
     else if (t.kind === 'array') typeHw(t.of, loc, what);
     else if (t.kind === 'ptr') {
-      if (t.to.kind === 'ptr') report(loc, `${what}: a pointer to a pointer is not possible (Silinx HLS: pointers only to arguments)`);
+      if (t.to.kind === 'ptr') report(loc, `${what}: a pointer to a pointer is not possible here (Vitis HLS: a pointer to a pointer only resolved at compile time, a parameter of a function the top calls)`);
       else typeHw(t.to, loc, what);
     }
   }
@@ -263,7 +267,7 @@ function checkFunction(f, ctx) {
       case 'cast':
         typeOk(e.type, e.loc);
         if (hw) {
-          if (e.type.kind === 'ptr' || isPtr(e.e)) report(e.loc, 'a cast of a pointer is not possible in Silinx HLS');
+          if ((e.type.kind === 'ptr' || isPtr(e.e)) && !e.said) report(e.loc, 'a cast of a pointer is possible only as a pointer variable\'s value, to a narrower integer type (Vitis HLS: native types, char *p = (char *)&a[i])');
           typeHw(e.type, e.loc, 'a cast');
         }
         expr(e.e); return;
@@ -320,7 +324,7 @@ function checkFunction(f, ctx) {
     }
     // (math.h's: the test bench's, core/c-float.js; in hardware of constants only, a table computed at synthesis, said
     // by core/c-dataflow-float.js, #1779)
-    if (MATH[name] && !lookup(name)) {
+    if ((MATH[name] || BITCASTS[name]) && !lookup(name)) {
       for (const a of e.args) expr(a, { printf: true });
       return;
     }

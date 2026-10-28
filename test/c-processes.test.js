@@ -100,6 +100,13 @@ test('#1707 a stream to a process that starts once its writer is done (through a
   assert.deepEqual(r.errors, ["a call did not end in 2000 cycles: DATAFLOW's processes may wait for each other: 'join' starts once 'twice' is done, and the stream 's2_a' from 'twice' to it holds 4 values; the stream 's2_last' from 'twice' to it holds 4 values (a call may write more)"]);
 });
 
+test('#1895 a stream\'s depth a named constant (hls::stream<T, DEPTH>, static constexpr int DEPTH): its value, not the default 2', () => {
+  const src = SRC.replace('hls::stream<pair, 8> s2;', 'hls::stream<pair, S2_DEPTH> s2;').replace('#define N 8', '#define N 8\nstatic constexpr int S2_DEPTH = 2 * 4;');
+  const r = cToHdl(src, { file: 'top.cpp' });
+  assert.deepEqual(r.diagnostics, []);
+  assert.deepEqual(r.report.fifos, [{ name: 's1', depth: 2 }, { name: 's2_a', depth: 8 }, { name: 's2_last', depth: 8 }]);
+});
+
 test('#1707 DATAFLOW: what is not supported, said; a region of other statements made sequential (said); a local stream outside DATAFLOW refused', () => {
   const H = '#include "hls_stream.h"\nstatic void p(hls::stream<int> &o, int k) { o.write(k); }\nstatic void q(hls::stream<int> &i, int *r) { *r = i.read(); }\nstatic void c(hls::stream<int> &i, int a[2]) { a[0] = i.read(); }\n';
   const msgs = (src) => cToHdl(src, { file: 'e.cpp' }).diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`);
