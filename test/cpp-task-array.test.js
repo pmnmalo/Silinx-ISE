@@ -178,3 +178,18 @@ test('#1898 arrays of streams of N a named constant, between two arrays of tasks
   const c = simulateC(tpl, { file: 'd.cpp' });
   assert.deepEqual([c.error, c.output, say(c.diagnostics).filter((d) => / error: /.test(d))], [null, OUT8, []]);
 });
+
+test('#1898 a task constructed empty, `hls::task t;`, started by t(f, a…); (hls_task.h\'s operator()): as one constructed with them; started twice or used otherwise said', () => {
+  const src = (start) => FORMS('', '  hls_thread_local hls::task t0;\n  hls_thread_local hls::task t1;\n', '2', start).replace('  hls_thread_local hls::task t[2];\n', '');
+  const ok = src('  t0(worker, sp.out[0], mg.in[0]);\n  t1(worker, sp.out[1], mg.in[1]);');
+  const c = simulateC(ok, { file: 'd.cpp' });
+  assert.deepEqual([c.error, c.output, say(c.diagnostics)], [null, OUT8, [DF(13)]]);
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(ok, { file: 'd.cpp', lang });
+    assert.deepEqual([r.errors, r.pass, r.output, say(r.gen.diagnostics)], [[], true, OUT8, []], JSON.stringify(r.mismatches, big));
+    assert.deepEqual(r.gen.report.processes.filter((p) => p.task?.startsWith('t')).map((p) => p.task), ['t0', 't1']);
+  }
+  const errors = (s) => say(simulateC(s, { file: 'd.cpp' }).diagnostics.filter((d) => d.severity === 'error'));
+  assert.deepEqual(errors(src('  t0(worker, sp.out[0], mg.in[0]);\n  t0(worker, sp.out[1], mg.in[1]);\n  t1(worker, sp.out[1], mg.in[1]);')), ["16 error: the task 't0': started twice"]);
+  assert.deepEqual(errors(src('  t0(worker, sp.out[0], mg.in[0]);\n  t1.stop();')), ["16 error: the task 't1': started as t1(f, a…);"]);
+});
