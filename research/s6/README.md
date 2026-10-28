@@ -420,8 +420,10 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
 - **The DCM_SP and the PLL_BASE** (`gen-dcm6.mjs`, `ana-dcm6.mjs`: `db/xc6slx16-cmt.json`): a DCM at DCM_X0Y1 and a PLL
   at PLL_ADV_X0Y0, one setting changed per design from the base's (16 designs; a PLL multiplier of 2 puts the VCO out
   of range and ISE refuses it). Each variant sets or clears 1 to 9 bits: the DCM's in frame 357 (CLKFX_MULTIPLY - 1
-  and CLKFX_DIVIDE - 1 binary counters: bits 416, 413 … and 432, 431 …), the PLL's in frame 1101. `--fields` (28
-  designs) sets each counter's other bits.
+  and CLKFX_DIVIDE - 1 binary counters), the PLL's in frame 1101. `--fields` (28 designs; a PLL with a VCO out of range
+  refused) sets each counter's other bits: CLKFX_MULTIPLY - 1 in bits 417, 416, 413, 412, 409 (1 … 16) of frame 357,
+  CLKFX_DIVIDE - 1 in 432, 431, 429, 428, 425; the CLKDV divisors, the PLL's multiplier, divider, output divider
+  and phase as their own bit patterns in the database.
 
 ## The order of the work
 

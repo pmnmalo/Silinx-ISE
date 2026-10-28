@@ -56,4 +56,9 @@ test('the XC6SLX16\'s DCM and PLL settings, measured: the counters\' bits, one o
   assert.deepEqual(v.dcmD2.set, ['357,432']);
   assert.deepEqual(v.dcmD3.set, ['357,431']);
   assert.ok(Object.values(db.pll.variants).every(x => x.set.every(b => b.startsWith('1101,'))));
+  // the --fields designs: CLKFX_MULTIPLY - 1 in bits 417 (1), 416 (2), 413 (4), 412 (8), 409 (16); CLKFX_DIVIDE - 1 in
+  // 432, 431, 429, 428, 425 (M = 32: 31, all five; D = 32: all five)
+  assert.deepEqual(v.dcmM32.set, ['357,409', '357,412', '357,413', '357,416', '357,429', '357,431', '357,432']);
+  assert.deepEqual(v.dcmD32.set, ['357,425', '357,428', '357,429', '357,431', '357,432']);
+  assert.deepEqual(v.dcmD17.set, ['357,425']);
 });
