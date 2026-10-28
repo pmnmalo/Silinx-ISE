@@ -10,6 +10,7 @@ import { exprText, stmtText } from '../core/c-print.js';
 import { parse } from '../core/c-parse.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { normalizeModel } from '../core/asm.js';
+import { cosimulate } from '../core/c-cosim.js';
 
 /** The chart as lines: a box 'name or condition [actions]', then each connection 'from -port-> to'. */
 function lines(model) {
@@ -103,4 +104,70 @@ test('#1575 a return, break and continue inside a block\'s ifs: their jumps; a m
   const comb = cAsm('int f(int a) { return a + 1; }');
   assert.equal(comb.ok, false);
   assert.deepEqual(comb.diagnostics.map((d) => d.message), ["'f' is combinational: it has no state machine"]);
+});
+
+// (a free-running kernel: ap_ctrl_none and a stream argument, #1900; its arguments renamed in_r and out_r, #1902)
+const FREE = `#include "hls_stream.h"
+void sums(hls::stream<int> &in, hls::stream<int> &out) {
+#pragma HLS INTERFACE ap_ctrl_none port=return
+  int s = 0;
+  for (int i = 0; i < 3; i++) s += in.read();
+  out.write(s);
+}
+int main() {
+  hls::stream<int> in, out;
+  int t = 0;
+  for (int c = 0; c < 4; c++) {
+    for (int i = 0; i < 3; i++) in.write(c * 10 + i);
+    sums(in, out);
+    t += out.read();
+  }
+  return t == 192 ? 0 : 1;
+}
+`;
+const io = (model) => [model.inputs.map((p) => `${p.name}:${p.width}`), model.outputs.map((p) => `${p.name}:${p.width}${p.registered ? ' reg' : ''}`)];
+const portsOf = (gen) => [gen.ports.filter((p) => p.dir === 'in' && !['ap_clk', 'ap_rst'].includes(p.name)).map((p) => p.name), gen.ports.filter((p) => p.dir === 'out').map((p) => p.name)];
+
+test('#1927 the ASM chart of a free-running function (ap_ctrl_none): IDLE goes on to the first state at once, DONE sets nothing; its inputs and outputs the module\'s ports (no ap_start, ap_done, ap_idle, ap_ready); co-simulated in VHDL and Verilog', () => {
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cAsm(FREE, { file: 'sums.cpp', lang });
+    assert.equal(r.ok, true, lang);
+    assert.deepEqual(r.diagnostics, [], lang);
+    assert.deepEqual(lines(r.model), [
+      'IDLE -next-> S1', 'DONE -next-> IDLE',
+      'S1 -next-> S2', 'S2 -next-> <i < 3>', '<i < 3> -true-> S3', '<i < 3> -false-> S6',
+      'S3 -next-> S4', 'S4 -next-> S5', 'S5 -next-> S2', 'S6 -next-> S7', 'S7 -next-> DONE',
+    ], lang);
+    const st = (n) => r.model.nodes.find((x) => x.name === n);
+    assert.deepEqual([st('IDLE').actions, st('DONE').actions], [[], []], lang);
+    assert.ok(!r.model.nodes.some((n) => n.cond === 'ap_start' || (n.actions || []).some((a) => /\bap_(start|done|idle|ready)\b/.test(a))), lang);
+    assert.deepEqual(io(r.model), [['in_r_dout:32', 'in_r_empty_n:1', 'out_r_full_n:1'], ['in_r_read:1 reg', 'out_r_din:32 reg', 'out_r_write:1 reg']], lang);
+    // the module's ports, as generated; its states as many
+    const gen = cToHdl(FREE, { file: 'sums.cpp', lang });
+    assert.deepEqual([r.model.inputs.map((p) => p.name), r.model.outputs.map((p) => p.name)], portsOf(gen), lang);
+    assert.equal(r.model.nodes.filter((n) => n.type === 'state').length, gen.states, lang);
+    assert.deepEqual([r.model.clock, r.model.reset.name], ['ap_clk', 'ap_rst'], lang);
+    assert.equal(normalizeModel(r.model).nodes.length, r.model.nodes.length, lang);
+    // the module the chart is of: compiled, elaborated and simulated against the C, its warnings asserted
+    const c = cosimulate(FREE, { file: 'sums.cpp', lang });
+    assert.deepEqual([c.errors, c.pass, c.sim.exitCode], [[], true, 0], lang);
+    assert.deepEqual(c.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), [
+      "2 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
+      "2 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"], lang);
+  }
+});
+
+test('#1927 the block protocol (ap_ctrl_hs, the default, or written) keeps its chart: IDLE waits for ap_start, DONE sets ap_done and ap_ready; ap_start, ap_done, ap_idle, ap_ready among the ports, as the module\'s; ap_ctrl_none without a stream: the block protocol made, its chart too', () => {
+  const hsSrc = GCD.replace('{\n', '{\n#pragma HLS INTERFACE ap_ctrl_hs port=return\n');
+  const noneSrc = GCD.replace('{\n', '{\n#pragma HLS INTERFACE ap_ctrl_none port=return\n');
+  for (const src of [GCD, hsSrc, noneSrc]) {
+    const r = cAsm(src, { file: 'gcd.c' });
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), src === noneSrc ? ['2 warning: ap_ctrl_none: this function is sequential, it needs its block protocol: ap_ctrl_hs is made'] : []);
+    assert.deepEqual(lines(r.model).slice(0, 5), ['IDLE -next-> <ap_start>', '<ap_start> -true-> (read a, b)', '(read a, b) -next-> S1', '<ap_start> -false-> IDLE', 'DONE -next-> IDLE']);
+    const st = (n) => r.model.nodes.find((x) => x.name === n);
+    assert.deepEqual([st('IDLE').actions, st('DONE').actions], [['ap_idle = 1'], ['ap_done = 1', 'ap_ready = 1']]);
+    assert.deepEqual(io(r.model), [['ap_start:1', 'a:32', 'b:32'], ['ap_done:1', 'ap_idle:1', 'ap_ready:1', 'ap_return:32 reg']]);
+    assert.deepEqual([r.model.inputs.map((p) => p.name), r.model.outputs.map((p) => p.name)], portsOf(cToHdl(src, { file: 'gcd.c' })));
+  }
 });
