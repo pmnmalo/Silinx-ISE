@@ -114,6 +114,9 @@ test('Back-annotate Pin Locations (pin2ucf): the placer\'s pads as UCF; built ag
   const placed = placedPins(parseXdl(one.store['open/routed.xdl']));
   assert.equal(placed.length, 27);
   assert.ok(pinsText.startsWith('# Pin locations of \'top\' on xc3s250ecp132-4: the pads of the placed design (Silinx toolchain), as Xilinx pin2ucf writes them\n\nNET "an<0>"  LOC = "F12" ;\n'), pinsText);
+  // the same design and UCF built again: the same pads (the placement reproducible, #1822)
+  const same = await run(ucf, steps);
+  assert.equal(same.store['top_pins.ucf'], pinsText);
   // the user's LOCs are where they asked
   for (const [net, loc] of [['clk', 'B8'], ['led<0>', 'M5'], ['sw<2>', 'K3']]) assert.equal(placed.find(p => p.net === net).loc, loc, net);
   // the UCF back-annotated: the five pins the placer chose added, the rest as written
