@@ -14,6 +14,10 @@ export const lf = (s) => (typeof s === 'string' ? s.replace(/\r\n/g, '\n') : s);
 
 export const CC = (() => { for (const c of ['cc', 'gcc', 'clang']) { try { execFileSync(c, ['--version'], { stdio: 'ignore' }); return c; } catch { /* next */ } } return null; })();
 export const noCC = CC ? false : 'no C compiler on this machine';
+/** The reference programs' warnings: those of a function called without its header an error, as clang's (macOS,
+ *  #1936), the others unprinted (stderr piped: the compiler's errors in the exception's message). Not -w, under which
+ *  GCC drops even a -Werror= diagnostic. */
+export const CC_WARN = ['-Werror=implicit-function-declaration'];
 
 export function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s; }; }
 export const mask = (w) => (1n << BigInt(w)) - 1n;
@@ -49,7 +53,7 @@ export function runC(src, top, ins, outs, ret, vectors) {
   });
   const prog = `#include <stdio.h>\n#include <stdbool.h>\n${src}\nint main(void) {\n${calls.join('\n')}\n  return 0;\n}\n`;
   fs.writeFileSync(path.join(dir, 't.c'), prog);
-  execFileSync(CC, ['-std=c99', '-w', '-Werror=incompatible-pointer-types', '-fsigned-char', '-fwrapv', '-O0', '-o', path.join(dir, 't'), path.join(dir, 't.c')]);
+  execFileSync(CC, ['-std=c99', ...CC_WARN, '-Werror=incompatible-pointer-types', '-fsigned-char', '-fwrapv', '-O0', '-o', path.join(dir, 't'), path.join(dir, 't.c')], { stdio: ['ignore', 'ignore', 'pipe'] });
   const out = lf(execFileSync(path.join(dir, 't'), { encoding: 'utf8' })).trim().split('\n');
   fs.rmSync(dir, { recursive: true, force: true });
   return out;
@@ -64,7 +68,7 @@ export function compiledRun(src) {
     const exe = path.join(dir, process.platform === 'win32' ? 't.exe' : 't');
     // (math.h's functions: libm, a library of its own on Linux; -ffp-contract=off: a * b + c two roundings, as C's
     // abstract machine and the C simulation, not a fused multiply-add, clang's default on arm64, #1773)
-    execFileSync(CC, ['-std=c99', '-w', '-fsigned-char', '-fwrapv', '-ffp-contract=off', '-O0', '-o', exe, path.join(dir, 't.c'), '-lm']);
+    execFileSync(CC, ['-std=c99', ...CC_WARN, '-fsigned-char', '-fwrapv', '-ffp-contract=off', '-O0', '-o', exe, path.join(dir, 't.c'), '-lm'], { stdio: ['ignore', 'ignore', 'pipe'] });
     try { return { output: lf(execFileSync(exe, { encoding: 'utf8' })), exitCode: 0 }; }
     catch (e) { return { output: lf(e.stdout), exitCode: e.status }; }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
