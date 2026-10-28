@@ -2,7 +2,8 @@ node_modules
 .DS_Store
 *.vcd
 .claude/
-.cache/
+.cache
+.cache *
 
 # local notes for Claude Code (not shared)
 CLAUDE.local.md
