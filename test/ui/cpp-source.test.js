@@ -34,7 +34,7 @@ uiTest('#1590 a C++ source: its Design row [C++] and its HDL, its C Simulation (
   await page.showMessages();
   await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'twice'), [], { what: 'the module twice' });
   assert.deepEqual(await row(page, 'twice'), ['C++*', 'VHDL']);
-  assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('twice').ports.map((p) => p.name)), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'x', 'y', 'y_ap_vld']);
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('twice').ports.map((p) => p.name)), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'x', 'y', 'y_ap_vld']);
   await page.treeRow('#hier', 'twice');
   await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
   await page.waitConsole(/Process "C Simulation" completed successfully/);
@@ -54,7 +54,7 @@ uiTest('#1590 a C++ source: its Design row [C++] and its HDL, its C Simulation (
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/adder4.cpp', [], { what: 'adder4.cpp opened' });
   assert.match(await page.eval(() => window.Silinx.active.editor.getValue()), /void adder4\(ap_uint<4> a, ap_uint<4> b, ap_uint<5> &sum, bool &carry\)/);
   assert.deepEqual(await row(page, 'adder4'), ['C++*', 'VHDL']);
-  assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('adder4').ports.map((p) => p.name)), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a', 'b', 'sum', 'sum_ap_vld', 'carry', 'carry_ap_vld']);
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('adder4').ports.map((p) => p.name)), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'a', 'b', 'sum', 'sum_ap_vld', 'carry', 'carry_ap_vld']);
   await page.treeRow('#hier', 'adder4');
   await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
   await page.waitConsole(/9 \+ 8 = 17 \(carry 1\)\nmain\(\) returned 0; 1 call\(s\) of 'adder4'\./);

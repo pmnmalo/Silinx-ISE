@@ -1,5 +1,6 @@
 // Silinx HLS (#1525): a C source to VHDL or Verilog. The top function becomes a module with Vitis HLS's ports (the block
-// protocol ap_ctrl_hs, or none with #pragma HLS INTERFACE ap_ctrl_none port=return; the arguments; ap_return); a
+// protocol ap_ctrl_hs, or none with #pragma HLS INTERFACE ap_ctrl_none port=return, #1900; the arguments, named as
+// Vitis HLS names them, core/c-names.js; ap_return); a
 // combinational function is a combinational module (its graph, core/c-dataflow.js), one signal per operation.
 // Isomorphic ES module: no DOM and no Node APIs.
 //
@@ -7,7 +8,7 @@
 //     ports: [{ name, dir, w }] in the module's order (the block protocol's first, as Vitis HLS)
 import { checkC } from './c-check.js';
 import { dataflow } from './c-dataflow.js';
-import { isReservedWord } from './reserved.js';
+import { portOf, renamedWhy } from './c-names.js';
 import { fsmd } from './c-fsmd.js';
 import { vhdlSeq, verilogSeq } from './c-hdl-seq.js';
 import { aggregate, aggregable } from './c-aggregate.js';
@@ -48,13 +49,13 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   diagnostics.push(...df.diagnostics);
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   if (df.diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
-  // a name that is a reserved word of VHDL or Verilog: its port named <name>_r (a warning)
-  const rn = (n) => (isReservedWord(n) ? `${n}_r` : n);
+  // a name that is a reserved word of VHDL or Verilog, or one of Vitis HLS's: its port named <name>_r (a warning, #1902)
+  const rn = portOf;
   const fn = checked.funcs.get(checked.top);
   const sargs = checked.ast.structArgs?.get(checked.top) || [];
   // (a struct argument's port its name's, #1628)
   for (const n of [checked.top, ...fn.params.map((p) => p.name), ...sargs.filter((a) => a.name !== 'return' && aggregable(a, fn.params)).map((a) => a.name)]) {
-    if (isReservedWord(n)) diagnostics.push({ file, line: fn.loc.line, col: fn.loc.col, message: `'${n}' is a reserved word of VHDL or Verilog: it is named ${n}_r in the module`, severity: 'warning' });
+    if (renamedWhy(n)) diagnostics.push({ file, line: fn.loc.line, col: fn.loc.col, message: renamedWhy(n), severity: 'warning' });
   }
   // a struct argument or result (#1590): one port (#1628, core/c-aggregate.js); a stream or an array of structs, a
   // stream or a memory per member for now (#1668)
@@ -64,11 +65,12 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   }
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   for (const node of df.graph.nodes) if (node.op === 'in') node.port.name = node.port.param ? rn(node.port.param) + node.port.suffix : rn(node.port.name);
-  const ctrl = df.seq
-    ? [{ name: 'ap_clk', dir: 'in', w: 1 }, { name: 'ap_rst', dir: 'in', w: 1 }, { name: 'ap_start', dir: 'in', w: 1 }, { name: 'ap_done', dir: 'out', w: 1 }, { name: 'ap_idle', dir: 'out', w: 1 }, { name: 'ap_ready', dir: 'out', w: 1 }]
-    : df.ctrl === 'ap_ctrl_hs'
-    ? [{ name: 'ap_start', dir: 'in', w: 1 }, { name: 'ap_done', dir: 'out', w: 1 }, { name: 'ap_idle', dir: 'out', w: 1 }, { name: 'ap_ready', dir: 'out', w: 1 }]
-    : [];
+  // the block protocol's ports, as Vitis HLS's (#1900): ap_ctrl_hs's, a sequential module's clock and reset first; a
+  // combinational one's ap_rst last (not read: Vitis HLS has it, no ap_clk); ap_ctrl_none, none of ap_start, ap_done,
+  // ap_idle, ap_ready (a sequential module running by itself, core/c-fsmd.js)
+  const hs = [{ name: 'ap_start', dir: 'in', w: 1 }, { name: 'ap_done', dir: 'out', w: 1 }, { name: 'ap_idle', dir: 'out', w: 1 }, { name: 'ap_ready', dir: 'out', w: 1 }];
+  const clk = { name: 'ap_clk', dir: 'in', w: 1 }, rst = { name: 'ap_rst', dir: 'in', w: 1 };
+  const ctrl = df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst] : [clk, rst, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? [...hs, rst] : [];
   const portName = (p) => (p.param ? rn(p.param) + p.name.slice(p.param.length) : p.name);
   const flatPorts = [...ctrl, ...df.ports.map((p) => ({ name: portName(p), dir: p.dir, w: p.w, role: p.role, ...(p.param ? { param: p.param } : {}) }))];
   // (each output by its port's name: an argument named as a reserved word, in, its ports in_r_…: a memory's, a stream's too, #1590)

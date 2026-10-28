@@ -6,14 +6,15 @@
 //   a local array a buffer (PIPO within a call): its readers started once its writer is done;
 //   the top's arguments passed to the processes (a stream or an array to one process, scalars to any).
 // The top's ap_ctrl_hs starts every process once a call (each when the buffers it reads are written) and is done when
-// every one is. A region of other statements than declarations and calls: a warning, made sequential (as Vitis HLS).
+// every one is; with ap_ctrl_none, or every process an hls::task, the top has no ap_start, ap_done, ap_idle, ap_ready
+// (as Vitis HLS's), its processes started again once all are done (#1900). A region of other statements than declarations and calls: a warning, made sequential (as Vitis HLS).
 // Isomorphic ES module: no DOM and no Node APIs.
 //
 //   cProcesses(source, checked, { file, lang, headers, cToHdl }) -> cToHdl's result, or { fallback: diagnostic }
 import { constValue } from './c-check.js';
 import { typeOf } from './c-types.js';
 import { hdlName } from './c-graph.js';
-import { isReservedWord } from './reserved.js';
+import { portOf, ctrlNone } from './c-names.js';
 
 const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
@@ -62,7 +63,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
   const loc = fn.body.items.find((s) => s.kind === 'pragma' && (s.pragma.name === 'DATAFLOW' || s.pragma.name === 'TASK')).loc;
   const diag = (l, message, severity = 'error') => ({ file, line: l.line, col: l.col, message, severity });
   if (rg.fallback) return { fallback: diag(loc, `#pragma HLS DATAFLOW: the region has ${rg.fallback}: made sequential (not as processes)`, 'warning') };
-  const rn = (n) => (isReservedWord(n) ? `${n}_r` : n);
+  const rn = portOf;
   const params = new Map(fn.params.map((p) => [p.name, p]));
   const errors = [];
   const fail = (l, m) => errors.push(diag(l, `DATAFLOW: ${m}`));
@@ -94,7 +95,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
   const add = (d) => { const s = `${d.line}:${d.col}:${d.severity}:${d.message}`; if (!seen.has(s) && !SAID.test(d.message)) { seen.add(s); diagnostics.push(d); } };
   checked.diagnostics.forEach(add);
   // (a process's own names as VHDL or Verilog's reserved words: inside the module, the top's ports their own)
-  for (const m of mods.values()) m.gen.diagnostics.filter((d) => !/is a reserved word of VHDL or Verilog/.test(d.message)).forEach(add);
+  for (const m of mods.values()) m.gen.diagnostics.filter((d) => !/is a reserved word of VHDL or Verilog|is a name Vitis HLS reserves/.test(d.message)).forEach(add);
   if ([...mods.values()].some((m) => !m.gen.ok)) return { ok: false, hdl: '', top: rn(checked.top), ports: [], diagnostics: diagnostics.sort(byLine) };
   // the channels and the top's arguments: who writes and who reads each
   const use = new Map();   // name -> { writers: [{ p, port }], readers, scalar: [{ p, port }] }
@@ -151,8 +152,13 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
   }
   errors.forEach(add);
   if (errors.length) return { ok: false, hdl: '', top: rn(checked.top), ports: [], diagnostics: diagnostics.sort(byLine) };
-  // the top's ports: the block protocol, then each argument's (as its process's)
-  const ports = CTRL.map((name) => ({ name, dir: ['ap_clk', 'ap_rst', 'ap_start'].includes(name) ? 'in' : 'out', w: 1 }));
+  // the top's ports: the block protocol, then each argument's (as its process's); with ap_ctrl_none, or every process an
+  // hls::task (data-driven), only the clock and the reset, as Vitis HLS's (#1900)
+  // (ap_ctrl_none: a stream argument to feed it through, as Vitis HLS co-simulates it; else its block protocol made)
+  const none = ctrlNone(fn), streamed = fn.params.some((pa) => pa.type.kind === 'stream');
+  if (none && !streamed) add(diag(fn.body.items.find((st) => st.kind === 'pragma' && st.pragma.name === 'INTERFACE' && st.pragma.args.port === 'return').loc, 'ap_ctrl_none: this function is sequential, it needs its block protocol: ap_ctrl_hs is made', 'warning'));
+  const free = (none && streamed) || procs.every((p) => p.task);
+  const ports = CTRL.slice(0, free ? 2 : CTRL.length).map((name) => ({ name, dir: ['ap_clk', 'ap_rst', 'ap_start'].includes(name) ? 'in' : 'out', w: 1 }));
   const memories = [], fifos = [];
   for (const pa of fn.params) {
     const u = use.get(pa.name);
@@ -170,7 +176,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
   }
   const name = rn(checked.top);
   const src = file.split('/').pop();
-  const net = { name, src, procs, use, locals: rg.locals, params, ports, rn, fn };
+  const net = { name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free };
   const top = lang === 'vhdl' ? vhdlTop(net) : verilogTop(net);
   const hdl = [...[...mods.values()].map((m) => m.gen.hdl), ...top].join('\n');
   const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
@@ -241,6 +247,9 @@ function vhdlTop(net) {
   for (const s of sigs) L.push(`  signal ${s.name} : ${T(s.w)};`);
   for (const p of procs) if (!p.task) L.push(`  signal ${p.inst}_pend, ${p.inst}_fin : std_logic := '0';`);
   L.push('  signal ap_all_done : std_logic;');
+  // (ap_ctrl_none: the block protocol's signals inside the module, ap_start 1: the processes started again once all are
+  // done, #1900)
+  if (net.free) L.push("  signal ap_start : std_logic := '1';", '  signal ap_done, ap_idle, ap_ready : std_logic;');
   for (const b of bufs) L.push(`  type ${b.name}_t is array (0 to ${b.n - 1}) of std_logic_vector(${b.w - 1} downto 0);`, `  signal ${b.name} : ${b.name}_t;`,
     `  signal ${b.name}_addr : unsigned(${b.aw - 1} downto 0);`, `  signal ${b.name}_ce, ${b.name}_we : std_logic;`, `  signal ${b.name}_d, ${b.name}_q : std_logic_vector(${b.w - 1} downto 0);`);
   L.push('begin');
@@ -312,6 +321,7 @@ function verilogTop(net) {
   for (const s of sigs) L.push(`  wire ${W(s.w)}${s.name};`);
   for (const p of procs) if (!p.task) L.push(`  reg ${p.inst}_pend, ${p.inst}_fin;`);
   L.push('  wire ap_all_done;');
+  if (net.free) L.push("  wire ap_start = 1'b1;", '  wire ap_done, ap_idle, ap_ready;');
   for (const b of bufs) L.push(`  reg [${b.w - 1}:0] ${b.name} [0:${b.n - 1}];`, `  reg [${b.w - 1}:0] ${b.name}_q;`, `  wire [${b.aw - 1}:0] ${b.name}_addr;`, `  wire ${b.name}_ce, ${b.name}_we;`, `  wire [${b.w - 1}:0] ${b.name}_d;`);
   for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${['ap_clk', 'ap_rst'].includes(port.name) ? port.name : sig(p, port)})`).join(', ')});`);
   const conv = (s0, sw, dw, sg = false) => (dw > sw && sg && sw > 1 ? `{{${dw - sw}{${s0}[${sw - 1}]}}, ${s0}}` : dw < sw ? (dw === 1 ? `${s0}[0]` : `${s0}[${dw - 1}:0]`) : s0);

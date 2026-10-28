@@ -28,9 +28,11 @@ export const pack = (fields, value) => fields.reduce((acc, f) => acc | (B(value(
 /** The Verilog test bench replaying the calls: one line of hex values per call (and the protocol's faults last). */
 export function cosimBench(gen, calls, { maxCycles = MAX_CYCLES } = {}) {
   const port = (n) => gen.ports.find((p) => p.name === n);
-  const seq = !!port('ap_clk');
+  const seq = !!port('ap_clk'), hs = !!port('ap_start');
   const L = ['module silinx_cosim_tb;', '  integer cyc, bad = 0;'];
-  if (seq) L.push('  reg ap_clk = 0, ap_rst = 1, ap_start = 0;');
+  // (ap_ctrl_none: no ap_start, the module running by itself; a combinational module's ap_rst not read, #1900)
+  if (seq) L.push(`  reg ap_clk = 0, ap_rst = 1${hs ? ', ap_start = 0' : ''};`);
+  else if (port('ap_rst')) L.push('  reg ap_rst = 0;');
   for (const p of gen.ports) if (!['ap_clk', 'ap_rst', 'ap_start'].includes(p.name)) L.push((p.role === 'mem' || p.role === 'fifo') && p.dir === 'in' ? `  wire [${p.w - 1}:0] ${p.name};` : `  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
   const outs = gen.ports.filter((p) => p.dir === 'out' && p.role === 'arg');
   for (const o of outs) L.push(`  reg [${o.w - 1}:0] cap_${o.name}; reg got_${o.name};`);
@@ -43,9 +45,10 @@ export function cosimBench(gen, calls, { maxCycles = MAX_CYCLES } = {}) {
   // (a stream: a FIFO in the test bench, its values the C's before each call; empty and full now and then, the
   // module's waits exercised, #1590; one the design polls, s.empty() / s.full(), only when it is, #1823)
   const fifos = gen.fifos || [];
-  // (hls::task's run by themselves, #1719: an input stream's values kept across calls, each call adding the test
-  // bench's new ones; the values read counted from the start, at least the C's: a task may read ahead)
-  const free = !!gen.report?.tasks;
+  // (hls::task's run by themselves, #1719, and a module with ap_ctrl_none, #1900: an input stream's values kept across
+  // calls, each call adding the test bench's new ones; the values read counted from the start, at least the C's: a task
+  // may read ahead)
+  const free = !!gen.report?.tasks || (seq && !hs);
   const fresh = new Map(), reads = new Map();
   if (free) for (const f of fifos.filter((x) => x.dir === 'in')) {
     let left = 0, total = 0;
@@ -94,9 +97,12 @@ export function cosimBench(gen, calls, { maxCycles = MAX_CYCLES } = {}) {
       })).join(' ');
     // (per call: the values each stream gives back, as many as the C's)
     const each = [...shown, ...fifos.flatMap((f) => (f.dir === 'in' ? [`fi_${f.name}`] : [`fo_${f.name}`, ...(c.streamOut[f.name] || []).map((_, k) => `fout_${f.name}[${k}]`)])), ...(seq ? ['cyc'] : [])];
-    if (seq) {
+    if (seq && !hs) L.push(`    ${asg} ${outs.map((o) => `got_${o.name} = 0;`).join(' ')} cyc = 0;`);
+    else if (seq) {
       L.push('    if (!ap_idle) bad = bad + 1;', `    ${asg} ${outs.map((o) => `got_${o.name} = 0;`).join(' ')} ap_start = 1; cyc = 0;`, '    @(posedge ap_clk); #1 ap_start = 0;');
       L.push(`    while (!ap_done && cyc < ${callCycles(c, maxCycles)}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`, '    if (!ap_ready) bad = bad + 1;', '    @(posedge ap_clk); #1;');
+    }
+    if (seq) {
       // (hls::task's run by themselves: the call's values, read and written, waited for, #1719)
       const want = free ? fifos.map((f) => (f.dir === 'in' ? `fi_${f.name} < ${reads.get(f.name)[ci]}` : `fo_${f.name} < ${(c.streamOut[f.name] || []).length}`)) : [];
       if (want.length) L.push(`    while ((${want.join(' || ')}) && cyc < ${callCycles(c, maxCycles)}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`);

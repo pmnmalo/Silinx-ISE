@@ -1,6 +1,7 @@
 // Silinx HLS (#1526): the VHDL and the Verilog of a sequential C function's machine (core/c-fsmd.js): its registers and
 // its state (ap_CS_fsm, as Vitis HLS names it) in one clocked process, the operations of its states one signal each
-// (core/c-hdl.js), Vitis HLS's ports (ap_clk, ap_rst, ap_start, ap_done, ap_idle, ap_ready, the arguments, ap_return).
+// (core/c-hdl.js), Vitis HLS's ports (ap_clk, ap_rst, ap_start, ap_done, ap_idle, ap_ready, the arguments, ap_return;
+// with ap_ctrl_none ap_start, ap_done, ap_idle and ap_ready signals inside it, #1900).
 // Isomorphic ES module: no DOM and no Node APIs.
 import { bin, sig, vhdlNodes, verilogNodes, innerSignals } from './c-hdl.js';
 import { hdlName } from './c-graph.js';
@@ -39,6 +40,8 @@ export function vhdlSeq(name, src, ports, m, agg) {
     L.push(`  signal ap_m_${hdlName(x.name)} : ap_m_${hdlName(x.name)}_t${init};`, `  signal ap_m_${hdlName(x.name)}_q0 : ${ty(x.t)};`);
   }
   innerSignals(agg, 'vhdl', L);
+  // (ap_ctrl_none, #1900: the block protocol's signals inside the module, ap_start 1: a call after the other)
+  if (!ports.some((p) => p.name === 'ap_start')) L.push("  signal ap_start : std_logic := '1';", '  signal ap_done, ap_idle, ap_ready : std_logic;');
   L.push('begin');
   vhdlNodes(nodes, g, L);
   L.push(...(agg?.vhdl || []));
@@ -82,6 +85,7 @@ export function verilogSeq(name, src, ports, m, agg) {
   for (const r of regs) L.push(`  reg ${r.s ? 'signed ' : ''}[${r.w - 1}:0] ${r.sig};`);
   for (const n of nodes) L.push(`  wire ${n.s ? 'signed ' : ''}[${n.w - 1}:0] ${sig(n)};`);
   innerSignals(agg, 'verilog', L);
+  if (!ports.some((p) => p.name === 'ap_start')) L.push("  wire ap_start = 1'b1;", '  wire ap_done, ap_idle, ap_ready;');
   for (const x of m.mems || []) {
     L.push(`  reg [${x.t.w - 1}:0] ap_m_${hdlName(x.name)} [0:${depth(x) - 1}];`, `  reg ${x.t.s ? 'signed ' : ''}[${x.t.w - 1}:0] ap_m_${hdlName(x.name)}_q0;`);
     if (x.init) L.push('  initial begin', ...words(x).map((v, k) => `    ap_m_${hdlName(x.name)}[${k}] = ${x.t.w}'b${bin(v, x.t.w)};`), '  end');

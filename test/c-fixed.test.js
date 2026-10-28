@@ -260,7 +260,7 @@ test('#1643 a template square root on ap_ufixed (combinational: its loop unrolle
     const r = cosimulate(SQRT, { file: 'sqrt.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true], lang);
     assert.deepEqual(r.gen.diagnostics.map((x) => `${x.line} ${x.message}`), ['11 assert is ignored by synthesis (the C simulation checks it)']);
-    assert.deepEqual(r.gen.ports.map((x) => x.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'x', 'ap_return']);
+    assert.deepEqual(r.gen.ports.map((x) => x.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_rst', 'x', 'ap_return']);
   }
 });
 
