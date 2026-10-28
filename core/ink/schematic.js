@@ -72,7 +72,10 @@ function shapes(items, minHg = 0) {
   // a gate: tall, with the square lines all in its box (its back, an AND's or a triangle's; an XOR's a little before
   // it), and shaped as one (a name's letter, even the tallest thing drawn, is not)
   const ring = (i, b) => i.closed && Math.hypot(i.box.w, i.box.h) < 0.45 * b.box.h && i.box.cx > b.box.minX + 0.6 * b.box.w;
-  const within = (w, b) => w.s.filter(p => inside(p, b, { l: 0.3 * Hg, r: 0.1 * Hg, t: 0.1 * Hg })).length >= 0.85 * w.s.length;
+  // (not a level line that starts well before it: an input's lead, run into the gate, #1750)
+  const level = w => w.box.h <= 0.3 * w.box.w;
+  const within = (w, b) => w.s.filter(p => inside(p, b, { l: 0.3 * Hg, r: 0.1 * Hg, t: 0.1 * Hg })).length >= 0.85 * w.s.length &&
+    !(level(w) && w.box.minX < b.minX - 0.15 * Hg);
   const gates = [];
   for (const b of blobs.filter(x => x.box.h >= 0.6 * Hg)) {
     const lines = squareOpen.filter(w => within(w, b.box));
@@ -80,8 +83,11 @@ function shapes(items, minHg = 0) {
     if (classify(items.filter(i => !ring(i, b)).map(i => i.s), gateTemplates())[0].d > GATE_DISTANCE) continue;
     gates.push({ items, box: boxOf(items.map(i => i.s)) });
   }
-  // the wires: the other square lines, longer than a name is tall
-  const wires = squareOpen.filter(w => !gates.some(g => g.items.includes(w)) && Math.max(w.box.w, w.box.h) >= 0.7 * Hg);
+  // the wires: the other square lines, longer than a name is tall, or a short level lead from a gate's left side or
+  // from its tip (#1750: half a gate long)
+  const lead = w => w.box.w >= 0.25 * Hg && level(w) && [w.s[0], w.s.at(-1)].some(e => gates.some(({ box: b }) =>
+    e.y >= b.minY && e.y <= b.maxY && ((e.x >= b.minX - 0.15 * Hg && e.x <= b.minX + 0.3 * Hg) || (e.x >= b.maxX - 0.1 * Hg && e.x <= b.maxX + 0.35 * Hg && Math.abs(e.y - b.cy) <= 0.25 * Hg))));
+  const wires = squareOpen.filter(w => !gates.some(g => g.items.includes(w)) && (Math.max(w.box.w, w.box.h) >= 0.7 * Hg || lead(w)));
   const rest = items.filter(i => !wires.includes(i) && !gates.some(g => g.items.includes(i)));
   // a small ring at a gate's tip (drawn touching it, or apart): an inversion
   for (const g of gates) {
@@ -98,11 +104,16 @@ function shapes(items, minHg = 0) {
   return { gates, wires, text: rest, Hg };
 }
 
-// the names: the strokes close together, each group read as one word
+// the names: the strokes close together, each group read as one word; a stroke joins the word on its line (the
+// centre of one in the other's height: not a name written under another, #1750: an AND2's A and B, a third of a gate
+// apart), a flat one (a bar, a dot) also one just above or below it; the word it overlaps most
 function names(text, Hg, templates) {
   const groups = [];
+  const overlap = (t, x) => Math.min(t.box.maxY, x.box.maxY) - Math.max(t.box.minY, x.box.minY);
+  const within = (y, b) => y >= b.minY && y <= b.maxY;
+  const line = (t, x) => (Math.min(t.box.h, x.box.h) <= 0.15 * Hg ? overlap(t, x) >= -0.1 * Hg : within(t.box.cy, x.box) || within(x.box.cy, t.box));
   for (const t of [...text].sort((a, b) => a.box.minX - b.box.minX)) {
-    const g = groups.find(x => t.box.minX <= x.box.maxX + 0.35 * Hg && t.box.minY <= x.box.maxY + 0.1 * Hg && t.box.maxY >= x.box.minY - 0.1 * Hg);
+    const g = groups.filter(x => t.box.minX <= x.box.maxX + 0.35 * Hg && line(t, x)).sort((a, b) => overlap(t, b) - overlap(t, a))[0];
     if (g) { g.items.push(t); g.box = boxOf(g.items.map(i => i.s)); } else groups.push({ items: [t], box: t.box });
   }
   return groups.map(g => ({ text: recognizeWords(g.items.map(i => i.s), { templates, gap: 2 }).map(w => w.text).join(''), box: g.box }));
@@ -152,10 +163,12 @@ export function readSchematic(strokes, { templates = builtinTemplates() } = {}) 
   let loose = 0;
   const dBox = (e, b) => Math.hypot(Math.max(b.minX - e.x, 0, e.x - b.maxX), Math.max(b.minY - e.y, 0, e.y - b.maxY));
   wires.forEach((w, wi) => {
-    for (const e of [w.s[0], w.s.at(-1)]) {
+    for (const [e, o] of [[w.s[0], w.s.at(-1)], [w.s.at(-1), w.s[0]]]) {
+      // (a gate's input: the end nearer its left side, a short lead's other end being near it too)
+      const onLeft = (g, p) => p.x >= g.body.minX - 0.4 * Hg && p.x <= g.body.minX + 0.3 * Hg && p.y >= g.body.minY - 0.05 * Hg && p.y <= g.body.maxY + 0.05 * Hg;
       const options = [
         ...gates.filter(g => near(e, g.tip, 0.35 * Hg)).map(g => ({ d: Math.hypot(e.x - g.tip.x, e.y - g.tip.y), f: () => ends.push({ wi, out: g }) })),
-        ...gates.filter(g => e.x >= g.body.minX - 0.4 * Hg && e.x <= g.body.minX + 0.3 * Hg && e.y >= g.body.minY - 0.05 * Hg && e.y <= g.body.maxY + 0.05 * Hg)
+        ...gates.filter(g => onLeft(g, e) && !(onLeft(g, o) && Math.abs(o.x - g.body.minX) < Math.abs(e.x - g.body.minX)))
           .map(g => ({ d: Math.abs(e.x - g.body.minX), f: () => g.ins.push({ wi, y: e.y }) })),
         ...ffs.filter(f => e.y >= f.box.minY && e.y <= f.box.maxY && e.x >= f.box.minX - 0.4 * Hg && e.x <= f.box.minX + 0.15 * Hg)
           .map(f => ({ d: Math.abs(e.x - f.box.minX), f: () => f.ins.push({ wi, y: e.y }) })),
