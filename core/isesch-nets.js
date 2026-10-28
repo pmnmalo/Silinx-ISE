@@ -146,12 +146,13 @@ export function readIseNets(model, opts, { lang, modules, docName, warn }) {
   }
 
   // ------------------------------------------------------------- names (Silinx identifiers)
+  // identifiers of the schematic's language: a VHDL keyword (next, block) kept in a Verilog schematic, and the reverse (#1808)
   const owner = new Map();     // lower-case identifier -> owner tag
   const claim = (want, tag) => {
     let b = String(want || 'n').replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '') || 'n';
     if (!/^[A-Za-z]/.test(b)) b = 'n' + b;
     let nm = b, k = 0;
-    while ((owner.has(lc(nm)) && owner.get(lc(nm)) !== tag) || !validIdent(nm, 'vhdl') || !validIdent(nm, 'verilog')) nm = `${b}_${++k}`;
+    while ((owner.has(lc(nm)) && owner.get(lc(nm)) !== tag) || !validIdent(nm, lang)) nm = `${b}_${++k}`;
     owner.set(lc(nm), tag);
     return nm;
   };
