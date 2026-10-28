@@ -117,9 +117,10 @@ uiTest('every menu opens and every enabled item acts or opens its dialog', E, as
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   await page.waitFor(() => window.Silinx.active?.editor);
   await page.eval(() => { const ed = window.Silinx.active.editor; ed.focus(); ed.setCursor({ line: 0, ch: 0 }); ed.replaceSelection('-- edited by the menu test\n'); });
-  // File ▸ Close Project is tested with the projects; Print needs a diagram (diagram tests)
+  // File ▸ Close Project is tested with the projects; File ▸ Print… with every document by print-docs.test.js (#1509):
+  // here it would open the browser's print of a new window, which held the test past its budget (#1861)
   // Unset as Top Module (#1220): tested by itself; here it would leave the processes below with no top
-  const SKIP = new Set(['Close Project', 'Unset as Top Module']);
+  const SKIP = new Set(['Close Project', 'Print…', 'Unset as Top Module']);
   const modern = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
   const GONE = ['File', 'Edit', 'View', 'Project', 'Process', 'Tools', 'Window', 'Help'];   // (Window: #1253; File, Edit: #1307; View, Help: no menu bar, #1321)
   const shownMenus = await page.eval(() => [...document.querySelectorAll('#menubar .item')].filter((e) => e.getClientRects().length).map((e) => e.textContent.trim()));
