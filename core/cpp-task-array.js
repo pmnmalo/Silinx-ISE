@@ -3,7 +3,8 @@
 // mixed control and data driven example: its body unrolled; any start, <, <=, >, >=, !=, a step of ++, --, +=, -=,
 // i = i ± c, its values as C++ runs it), made `hls::task t_k(f, a…);` for each k, i its value in
 // the arguments (core/cpp-lex.js: a task of its own). Any other use is said. After core/cpp-np-channel.js, before
-// core/c-stream-array.js (s[i] its element). Isomorphic ES module.
+// core/c-stream-array.js (s[i] its element). A task constructed empty, `hls::task t;`, started by t(f, a…); the same.
+// Isomorphic ES module.
 //
 //   taskArrays(tokens, report, later) -> tokens (later: N naming what is not known yet, a template's parameter, left as
 //     it is for the pass after core/cpp-template.js)
@@ -16,7 +17,7 @@ const L = (at, v, t = 'op') => ({ ...at, t, v });
 const FORM = (nm) => `the array of tasks '${nm}': each started as ${nm}[k](f, a…); or in a loop for (int i = 0; i < N; i++) ${nm}[i](f, a…);`;
 
 export function taskArrays(toks, report, later = false) {
-  const out = [], arrays = new Map(), consts = constants(), started = new Set();
+  const out = [], arrays = new Map(), singles = new Map(), consts = constants(), started = new Set();   // (singles: a task constructed empty, started)
   // t[e](f, a…); at k, i given its value: the tokens of hls::task t_v(f, a…); or null (dry: only looked at)
   const start = (k, i, iv, dry = false) => {
     const nm = toks[k].v, n = arrays.get(nm);
@@ -45,6 +46,26 @@ export function taskArrays(toks, report, later = false) {
       while (isId(out.at(-1), 'hls_thread_local') || isId(out.at(-1), 'static')) out.pop();
       arrays.set(toks[k + 3].v, Number(n ?? 1n) || 1);
       k = c + 1;
+      continue;
+    }
+    // hls::task t; then t(f, a…); (a task constructed empty, started by its operator(), as an array's element)
+    if (isId(t, 'hls') && op(toks[k + 1], '::') && isId(toks[k + 2], 'task') && isId(toks[k + 3]) && op(toks[k + 4], ';')) {
+      while (isId(out.at(-1), 'hls_thread_local') || isId(out.at(-1), 'static')) out.pop();
+      singles.set(toks[k + 3].v, false);
+      k += 4;
+      continue;
+    }
+    if (isId(t) && singles.has(t.v) && !op(toks[k - 1], '.') && !op(toks[k - 1], '->') && !op(toks[k - 1], '::')) {
+      const e = op(toks[k + 1], '(') ? closing(toks, k + 1) : -1;
+      if (e > 0 && isId(toks[k + 2]) && op(toks[e + 1], ';') && !singles.get(t.v)) {
+        singles.set(t.v, true);
+        out.push(L(t, 'hls', 'id'), L(t, '::'), L(t, 'task', 'id'), ...toks.slice(k, e + 2));
+        k = e + 1;
+        continue;
+      }
+      // (else said, its statement dropped)
+      report(t, singles.get(t.v) && e > 0 ? `the task '${t.v}': started twice` : `the task '${t.v}': started as ${t.v}(f, a…);`);
+      for (let d = 0; k < toks.length && !(d === 0 && op(toks[k], ';')); k++) d += op(toks[k], '(') ? 1 : op(toks[k], ')') ? -1 : 0;
       continue;
     }
     if (!arrays.size) { out.push(t); continue; }
