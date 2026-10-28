@@ -26,8 +26,8 @@ Not part of `npm test` (it needs the network once).
 <!-- results -->
 | Design | Language | C simulation | C synthesis | Co-simulation | Latency | Why not |
 |---|---|---|---|---|---|---|
-| array-array-partition-block-cyclic | C++ | pass | pass | fail | - | co-simulation: a call did not end in 100000 cycles |
-| array-array-partition-complete | C++ | pass | pass | fail | - | co-simulation: a call did not end in 100000 cycles |
+| array-array-partition-block-cyclic | C++ | pass | pass | pass | 221257 |  |
+| array-array-partition-complete | C++ | pass | pass | pass | 282441 |  |
 | dsp-fft-interface-array | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-array-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-stream | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 58 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 
-73 designs: 47 through co-simulation.
+73 designs: 49 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

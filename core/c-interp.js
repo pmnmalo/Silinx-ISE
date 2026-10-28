@@ -6,8 +6,9 @@
 //   simulateC(source, { file, maxSteps, entry = 'main' }) ->
 //     { ok, output, exitCode, calls, error, steps, top, diagnostics }
 //     calls: [{ args: { name: BigInt }, ptrIn: { name: BigInt }, ptrOut: { name: BigInt }, memIn: { name: [BigInt] },
-//              memOut: { name: [BigInt] }, ret: BigInt | null }]: each call of the top function: the scalar arguments,
-//              each pointer's value before (ptrIn) and after (ptrOut), each array's values before and after (#1527)
+//              memOut: { name: [BigInt] }, ret: BigInt | null, steps }]: each call of the top function: the scalar arguments,
+//              each pointer's value before (ptrIn) and after (ptrOut), each array's values before and after (#1527), the
+//              steps it took (#1899)
 //     error: { line, col, message } when the run stopped (a division by zero, an index outside an array, an endless loop)
 import { checkC, constValue } from './c-check.js';
 import { typeOf } from './c-types.js';
@@ -161,10 +162,13 @@ class Machine {
         else if (!a.arr) rec.args[pa.name] = this.as(a, typeOf(pa.type), e);
       });
     }
+    const s0 = this.steps;
     const r = this.invoke(fn, args, e);
     // (the top's tasks run with it: what they read and write in its call, #1721)
     if (isTop) this.runTasks();
     if (rec) {
+      // (the call's steps: the co-simulation's bound on its cycles, #1899)
+      rec.steps = this.steps - s0;
       fn.params.forEach((pa, k) => {
         if (args[k].ptr) rec.ptrOut[pa.name] = args[k].ptr.get().v;
         if (args[k].arr) rec.memOut[pa.name] = args[k].arr.map((c) => c.v);

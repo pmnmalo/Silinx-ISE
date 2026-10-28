@@ -143,3 +143,74 @@ test('#1622 a pointer read and written named as a reserved word (out): its ports
     }
   }
 });
+
+// (#1899: the corpus's partitioned matrix products, small: their arrays partitioned block, cyclic or complete, the
+// product made rep times, as the corpus's 16 times; the arrays copied in and out as the corpus's)
+const MATMUL = (pragma) => `#include <stdio.h>
+#define N 4
+void matmul(int in1[N * N], int in2[N * N], int res[N * N], int rep) {
+  int A[N * N], B[N * N], C[N * N];
+${pragma}
+  for (int k = 0; k < N * N; k++) { A[k] = in1[k]; B[k] = in2[k]; }
+  for (int x = 0; x < rep; x++) {
+#pragma HLS LOOP_TRIPCOUNT max=16
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        int result = 0;
+        for (int k = 0; k < N; k++) result += A[i * N + k] * B[k * N + j];
+        C[i * N + j] = result;
+      }
+    }
+  }
+  for (int k = 0; k < N * N; k++) res[k] = C[k];
+}
+int main(void) {
+  int a[N * N], b[N * N], c[N * N];
+  for (int k = 0; k < N * N; k++) { a[k] = k % 7 - 3; b[k] = (k * 5) % 11; }
+  matmul(a, b, c, 16);
+  for (int i = 0; i < N; i++) for (int j = 0; j < N; j++) {
+    int g = 0;
+    for (int k = 0; k < N; k++) g += a[i * N + k] * b[k * N + j];
+    if (c[i * N + j] != g) { printf("mismatch %d %d\\n", i, j); return 1; }
+  }
+  printf("%d %d\\n", c[0], c[N * N - 1]);
+  return 0;
+}
+`;
+const PARTITIONS = [
+  ['block', '#pragma HLS ARRAY_PARTITION variable=B dim=1 block factor=4',
+    ["warning: #pragma HLS ARRAY_PARTITION type=block is not made yet: ignored (type=complete is: the array's elements registers)"]],
+  ['cyclic', '#pragma HLS ARRAY_PARTITION variable=A dim=1 cyclic factor=4',
+    ["warning: #pragma HLS ARRAY_PARTITION type=cyclic is not made yet: ignored (type=complete is: the array's elements registers)"]],
+  ['complete', '#pragma HLS ARRAY_PARTITION variable=B dim=1 complete', []],
+];
+
+test('#1899 co-simulation: a call that does more cycles than maxCycles, as many as its C steps at most, ends: partitioned matrix products (block, cyclic, complete) in VHDL and Verilog, their results the C\'s', () => {
+  for (const [kind, pragma, warnings] of PARTITIONS) {
+    const src = MATMUL(pragma);
+    const sim = simulateC(src, { file: 'matmul.c' });
+    assert.deepEqual([sim.error, sim.exitCode, sim.calls.length], [null, 0, 1], kind);
+    assert.equal(sim.output, '-25 -4\n', kind);   // (by hand: 0 - 18 - 7 + 0, 8 + 6 + 0 - 18)
+    for (const lang of ['vhdl', 'verilog']) {
+      // (300 cycles: fewer than the call's, as the corpus's 100000 were fewer than its 221257)
+      const r = cosimulate(src, { file: 'matmul.c', lang, maxCycles: 300 });
+      assert.deepEqual(r.errors, [], `${kind} ${lang}`);
+      assert.deepEqual([r.ok, r.pass, r.calls, r.mismatches], [true, true, 1, []], `${kind} ${lang}`);
+      // (the call's steps, its bound: more than the cycles it takes)
+      assert.ok(r.latency.min > 300 && r.latency.min < sim.calls[0].steps, `${kind} ${lang}: ${JSON.stringify(r.latency)}, ${sim.calls[0].steps} steps`);
+      assert.deepEqual(r.gen.diagnostics.map((d) => `${d.severity}: ${d.message}`), warnings, `${kind} ${lang}`);
+    }
+  }
+});
+
+test('#1899 co-simulation: a call that never ends (ap_done never 1) stops at its bound, maxCycles or its C steps, and says it', () => {
+  const src = MATMUL(PARTITIONS[2][1]);
+  const steps = simulateC(src, { file: 'matmul.c' }).calls[0].steps;
+  const never = { vhdl: (h) => h.replace(/ap_done <= '1' when [^;]*;/, "ap_done <= '0';"), verilog: (h) => h.replace(/assign ap_done = [^;]*;/, "assign ap_done = 1'b0;") };
+  for (const lang of ['vhdl', 'verilog']) {
+    for (const [maxCycles, bound] of [[300, steps], [steps + 50, steps + 50]]) {
+      const r = cosimulate(src, { file: 'matmul.c', lang, maxCycles, alter: never[lang] });
+      assert.deepEqual([r.ok, r.pass, r.errors], [true, false, [`a call did not end in ${bound} cycles`]], `${lang} ${maxCycles}`);
+    }
+  }
+});

@@ -15,6 +15,9 @@ import { simulate } from './compile.js';
 import { f32Bits, f64Bits } from './c-dataflow-float.js';
 
 export const MAX_CYCLES = 100000;
+/** A call's limit of cycles (#1899): maxCycles, or more, as many as the steps of its C simulation: a design that does
+ *  much work in a call (a matrix product's 65536 multiplications) ends it, a call that never ends stops there. */
+export const callCycles = (call, maxCycles = MAX_CYCLES) => Math.max(maxCycles, call?.steps ?? 0);
 const mask = (w) => (1n << BigInt(w)) - 1n;
 // (a float's value: its IEEE bits, as its port holds them, #1768)
 const B = (v, w) => (typeof v === 'number' ? (w > 32 ? f64Bits(v) : f32Bits(v)) : BigInt(v)) & mask(w);
@@ -93,10 +96,10 @@ export function cosimBench(gen, calls, { maxCycles = MAX_CYCLES } = {}) {
     const each = [...shown, ...fifos.flatMap((f) => (f.dir === 'in' ? [`fi_${f.name}`] : [`fo_${f.name}`, ...(c.streamOut[f.name] || []).map((_, k) => `fout_${f.name}[${k}]`)])), ...(seq ? ['cyc'] : [])];
     if (seq) {
       L.push('    if (!ap_idle) bad = bad + 1;', `    ${asg} ${outs.map((o) => `got_${o.name} = 0;`).join(' ')} ap_start = 1; cyc = 0;`, '    @(posedge ap_clk); #1 ap_start = 0;');
-      L.push(`    while (!ap_done && cyc < ${maxCycles}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`, '    if (!ap_ready) bad = bad + 1;', '    @(posedge ap_clk); #1;');
+      L.push(`    while (!ap_done && cyc < ${callCycles(c, maxCycles)}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`, '    if (!ap_ready) bad = bad + 1;', '    @(posedge ap_clk); #1;');
       // (hls::task's run by themselves: the call's values, read and written, waited for, #1719)
       const want = free ? fifos.map((f) => (f.dir === 'in' ? `fi_${f.name} < ${reads.get(f.name)[ci]}` : `fo_${f.name} < ${(c.streamOut[f.name] || []).length}`)) : [];
-      if (want.length) L.push(`    while ((${want.join(' || ')}) && cyc < ${maxCycles}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`);
+      if (want.length) L.push(`    while ((${want.join(' || ')}) && cyc < ${callCycles(c, maxCycles)}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`);
     } else L.push(`    ${asg} #1;`);
     L.push(`    $display("${each.map(() => '%h').join(' ')}", ${each.join(', ')});`);
   });
@@ -156,11 +159,12 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
     }
     if (tb.seq) cycles.push(Number(row[q] ?? 0n));
   });
-  if (tb.seq && cycles.some((x) => x >= maxCycles)) {
+  const over = tb.seq ? cycles.findIndex((x, k) => x >= callCycles(sim.calls[k], maxCycles)) : -1;
+  if (over >= 0) {
     // (DATAFLOW's processes waiting for each other: a stream too shallow for a call's values, core/c-processes.js, #1707)
     const w = gen.report?.waits || [];
     const why = w.length ? `: DATAFLOW's processes may wait for each other: ${[...new Set(w.map((x) => `${x.to}|${x.from}`))].map((k) => { const [to, from] = k.split('|'); return `'${to}' starts once '${from}' is done, and ${w.filter((x) => x.to === to && x.from === from).map((x) => `the stream '${x.stream}' from '${from}' to it holds ${x.depth} values`).join('; ')} (a call may write more)`; }).join('; ')}` : '';
-    return { ...base, ok: true, errors: [`a call did not end in ${maxCycles} cycles${why}`], calls: sim.calls.length, mismatches };
+    return { ...base, ok: true, errors: [`a call did not end in ${callCycles(sim.calls[over], maxCycles)} cycles${why}`], calls: sim.calls.length, mismatches };
   }
   if (bad) mismatches.push({ call: null, port: 'ap_ctrl_hs', expected: 'ap_idle between calls, ap_done with ap_ready', got: `${bad} fault(s)` });
   const latency = tb.seq ? { min: Math.min(...cycles), max: Math.max(...cycles), avg: cycles.reduce((a, b) => a + b, 0) / cycles.length } : null;
