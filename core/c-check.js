@@ -15,8 +15,8 @@
 // test bench, checked for names and calls only.
 import { pointerArithmetic, pointerVariables } from './c-pointer.js';
 import { pointerToPointer, pointerArgsMoved } from './c-pointer-args.js';
-import { parse } from './c-parse.js';
-import { checkPragmas } from './c-pragma.js';
+import { parse, parseExpression } from './c-parse.js';
+import { checkPragmas, tripcountArgs } from './c-pragma.js';
 import { MATH, BITCASTS } from './c-float.js';
 import { Q_MODES, O_MODES } from './c-fixed.js';
 
@@ -373,12 +373,23 @@ function checkFunction(f, ctx) {
     n = (span + step - (step > 0n ? 1n : -1n)) / step;
     return n > 0n ? Number(n) : 0;
   }
+  // (min=, max=, avg=: constant expressions of the constants known, `max=c_dim*c_dim`, as Vitis HLS's examples, #1921)
   const tripPragma = (body) => {
     const items = body?.kind === 'block' ? body.items : [body];
     const pg = items.find((s) => s?.kind === 'pragma' && s.pragma.name === 'LOOP_TRIPCOUNT');
     if (!pg) return null;
-    const max = Number(pg.pragma.args.max);
-    return Number.isFinite(max) && max >= 0 ? max : null;
+    let max = null;
+    for (const [k, text] of Object.entries(tripcountArgs(pg.pragma.text))) {
+      const e = parseExpression(text);
+      const v = constValue(e, consts);
+      if (v !== null && v >= 0n) { if (k === 'max') max = Number(v); continue; }
+      const names = [];
+      const ids = (x) => { if (x?.kind === 'id') { if (!consts.has(x.name) && !names.includes(x.name)) names.push(x.name); } else if (x && typeof x === 'object') for (const [f, y] of Object.entries(x)) if (f !== 'loc') ids(y); };
+      ids(e);
+      const why = names.length ? `${names.map((n) => `'${n}'`).join(', ')} ${names.length > 1 ? 'are not constants' : 'is not a constant'}` : 'not a constant whole number';
+      report(pg.loc, `#pragma HLS LOOP_TRIPCOUNT ${k}=${text}: ${why}: ignored (a number, or an expression of const integers)`, 'warning');
+    }
+    return max;
   };
   // ------------------------------------------------ statements
   function stmt(s) {
