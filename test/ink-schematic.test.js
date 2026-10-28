@@ -126,6 +126,24 @@ test('the names corrected: a name that is not one, a name twice', () => {
   assert.deepEqual(built(c).tt.outputs.sort(), ['carry', 's']);
 });
 
+test('an AND2 drawn as on a tablet (#1750): A and B at its pins, a third of a gate apart, its leads half a gate long or more', () => {
+  const names = [];
+  for (const lead of [0.5, 0.6, 1.2]) {
+    for (let seed = 1; seed <= 6; seed++) {
+      const spec = { gates: [{ type: 'and', x: 1.2, y: 0, n: 2 }], nets: [{ name: 'A', at: [1.2 - lead, 1 / 3], to: [[0, 0]] }, { name: 'B', at: [1.2 - lead, 2 / 3], to: [[0, 1]] }, { from: 0, name: 'Z' }] };
+      const c = readSchematic(writeSchematic(spec, { seed }).strokes), at = `lead ${lead}, seed ${seed}`;
+      assert.deepEqual([circuitErrors(c), c.warnings], [[], []], at);
+      assert.deepEqual(c.gates.map((g) => [g.type, g.inputs.map((n) => c.nets.find((x) => x.id === n).name)]), [['and2', ['A', 'B']]], at);
+      names.push(c.nets.find((n) => n.id === c.gates[0].output).name);
+    }
+  }
+  // (seed 2's Z is read as an I, the letters' recognizer, not the circuit's)
+  assert.deepEqual(names, ['Z', 'I', 'Z', 'Z', 'Z', 'Z', 'Z', 'I', 'Z', 'Z', 'Z', 'Z', 'Z', 'I', 'Z', 'Z', 'Z', 'Z']);
+  const c = readSchematic(writeSchematic({ gates: [{ type: 'and', x: 1.2, y: 0, n: 2 }], nets: [{ name: 'A', at: [0.7, 1 / 3], to: [[0, 0]] }, { name: 'B', at: [0.7, 2 / 3], to: [[0, 1]] }, { from: 0, name: 'Z' }] }, { seed: 3 }).strokes);
+  const b = built(c);
+  assert.deepEqual([b.warnings, b.diags, b.clashes, b.tt.inputs, b.tt.table], [[], [], 0, ['a', 'b'], { z: '0001' }]);
+});
+
 test('drawings that are not a circuit: no ink, no gate, a gate without its wires, outputs joined, names and wire ends astray', () => {
   const inkError = (msg) => (e) => e instanceof InkError && e.message === msg;
   for (const ink of [[], [[]], null]) assert.throws(() => readSchematic(ink), inkError('Nothing drawn: draw the circuit on the pad.'));
