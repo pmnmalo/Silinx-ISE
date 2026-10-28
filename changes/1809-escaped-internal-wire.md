@@ -1,0 +1,5 @@
+In short:
+- Convert to Schematic: an internal wire with an escaped name (Verilog `\t[0] `, VHDL `\t[0]\`) is a wire of the drawing as any other: its assignments are drawn as gates, and it is a pin of the HDL blocks that use it (exported to ISE, the blocks stay connected).
+
+In detail:
+- Convert to Schematic: a module's signal whose escaped name has a `[` or a `.` (`\t[0] `) was taken for a generate block's signal and left out of the module's nets: its assigns stayed HDL blocks and it was a pin of none of them, the blocks joined only through its declaration (exported to ISE, each block had a `\t[0]` of its own, `'t[0]' is not declared`). The signals the module declares are its nets. In VHDL, an extended identifier (`\t[0]\`) is named as the schematic names escaped names (`\t[0]`), its declaration is not written twice, its type is read from the declarations, and the schematic's VHDL tokenizer reads it as one identifier: VHDL modules whose ports are extended identifiers, which could not be converted, convert too (#1809).

@@ -2,13 +2,15 @@
 // holds another module too, a VHDL module whose file holds a package; the [Schematic] badge on the
 // module's row (the base), its HDL generated from it at once, the other design units kept in a file
 // of their own; the console says what was done; a module that does not elaborate is not converted
-// (the dialog says why, in English and in Portuguese).
+// (the dialog says why, in English and in Portuguese); an escaped internal wire (\\t[0] ) is a wire of the drawing
+// (#1809).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
 import { CASES } from '../fixtures/hdl-to-sch-cases.js';
+import { netlist } from '../../core/schdoc.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -93,4 +95,33 @@ uiTest('Convert to Schematic of a VHDL module whose file holds its package: the 
   } finally {
     await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
   }
+});
+
+uiTest('#1809 Convert to Schematic of a Verilog module with an escaped internal wire (\\t[0] ): its assigns drawn as gates, the wire joining them and the always block', E, async (page) => {
+  const v = String.raw`module esc (clk, \a[0] , \b[0] , \r[0] , \q[0] );
+  input clk, \a[0] , \b[0] ;
+  output \r[0] ;
+  output reg \q[0] ;
+  wire \t[0] ;
+  assign \t[0]  = \a[0]  & ~\b[0] ;
+  assign \r[0]  = \t[0]  | \b[0] ;
+  always @(posedge clk) \q[0]  <= \t[0]  ^ \b[0] ;
+endmodule
+`;
+  await makeProject(env, { name: 'Conv_esc', files: { 'src/esc.v': v }, top: 'esc' });
+  await page.openProject('Conv_esc');
+  await convert(page, 'esc');
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/esc.v'] === 'src/esc.sch.json' && window.Silinx.active?.id === 'sch:src/esc.sch.json', [], { what: 'converted, linked, open', timeout: 20000 });
+  assert.deepEqual((await linesFrom(page, /^'esc' converted/)).slice(0, 1), [
+    "'esc' converted to the schematic src/esc.sch.json (2 symbols drawn, 1 HDL block keeping the HDL that is not drawn): it is now the module's base, src/esc.v generated from it.",
+  ]);
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+  const doc = JSON.parse(await readWs(env, 'Conv_esc', 'src/esc.sch.json'));
+  assert.deepEqual(doc.symbols.map((s) => s.type).sort(), ['and2b1', 'hdlblock', 'or2']);
+  const t = netlist(doc).nets.find((n) => n.name === '\\t[0]');
+  assert.deepEqual(t.endpoints.map((e) => `${doc.symbols.find((s) => s.id === e.sym).type}.${e.pin}`).sort(), ['and2b1.O', 'hdlblock.\\t[0]', 'or2.I0']);
+  // the schematic open in its editor: the block's pin \t[0] drawn
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .sch-editor g.sym'), [], { what: 'the schematic drawn' });
+  assert.ok(await page.eval(() => document.querySelector('.doc:not([hidden]) .sch-editor').textContent.includes('\\t[0]')), 'the pin \\t[0] drawn');
+  assert.equal((await readWs(env, 'Conv_esc', 'src/esc.v')).match(/^ {2}wire \\t\[0\] ;$/gm)?.length, 1);
 });

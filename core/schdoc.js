@@ -714,6 +714,14 @@ export function tokenize(text, lang) {
       toks.push({ v: vh ? raw.toLowerCase() : raw, raw, s, e: i, k: 'id' }); continue;
     }
     if (!vh && c === '\\') { while (i < n && !/\s/.test(text[i])) i++; toks.push({ v: text.slice(s, i), s, e: i, k: 'id' }); continue; }
+    // (a VHDL extended identifier, \t[0]\, a doubled backslash in it, #1809)
+    if (vh && c === '\\' && /^\\(?:[^\\\n]|\\\\)+\\/.test(text.slice(i, text.indexOf('\n', i) < 0 ? n : text.indexOf('\n', i)))) {
+      i++;
+      while (i < n && !(text[i] === '\\' && text[i + 1] !== '\\')) i += text[i] === '\\' ? 2 : 1;
+      i++;
+      const raw = text.slice(s, i);
+      toks.push({ v: raw.toLowerCase(), raw, s, e: i, k: 'id' }); continue;
+    }
     if (/[0-9]/.test(c) || (!vh && c === "'" && /[sSbBhHdDoO]/.test(text[i + 1] || ''))) {
       if (!vh) {
         while (i < n && /[0-9_]/.test(text[i])) i++;

@@ -97,9 +97,11 @@ export function mountSourcePieces(ctx) {
         if (beginIdx > isTok) {
           const raw = archText.slice(toks[isTok].e, toks[beginIdx].s);
           doc.hdl.decls = dedentBlock(raw);
-          for (const m of stripComments(raw, 'vhdl').matchAll(/\bsignal\s+([A-Za-z][\w\s,]*?)\s*:\s*([^;]*);/gi)) {
+          // (a name: an identifier or an extended identifier, \t[0]\, #1809)
+          const id = String.raw`(?:\\(?:[^\\\n]|\\\\)+\\|[A-Za-z]\w*)`;
+          for (const m of stripComments(raw, 'vhdl').matchAll(new RegExp(String.raw`\bsignal\s+(${id}(?:\s*,\s*${id})*)\s*:\s*([^;]*);`, 'gi'))) {
             const t = squash(m[2].split(':=')[0]);
-            for (const nm of m[1].split(',')) typeText.set(nm.trim().toLowerCase(), t);
+            for (const [nm] of m[1].matchAll(new RegExp(id, 'g'))) typeText.set(nm.toLowerCase(), t);
           }
         }
       }

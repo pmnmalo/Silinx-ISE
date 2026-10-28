@@ -3,7 +3,7 @@
 // flip-flops and HDL blocks where no gate fits, placed and routed by schdoc-place.js), and the modules of a compiled
 // library as module symbols' pins (modulesFromLibrary). schdoc.js re-exports them. Isomorphic ES module: no DOM and
 // no Node APIs.
-import { blockMarkOf } from './schdoc-hdl.js';
+import { blockMarkOf, schName } from './schdoc-hdl.js';
 import { clocksOf } from './schematic.js';
 import { elaborate } from './elaborate.js';
 import { placeAndRoute } from './schdoc-place.js';
@@ -186,7 +186,9 @@ export async function schematicFromHdl(inst, opts = {}) {
   const sigByName = new Map();
   const portSig = new Set();
   for (const p of inst.ports) { sigByName.set(nk(p.name), p.sig); portSig.add(p.sig); }
-  for (const s of inst.signals) if (!/[.[]/.test(s.name)) sigByName.set(nk(s.name), s);
+  // (a signal of a generate's block, g[0].w, is not; an escaped identifier the module declares, \t[0] , is, #1809)
+  const declared = new Set((mod?.decls || []).map(d => nk(d.name)));
+  for (const s of inst.signals) if (!/[.[]/.test(s.name) || declared.has(nk(s.name))) sigByName.set(nk(s.name), s);
   const moduleLevel = s => s && sigByName.get(nk(s.name)) === s;
   // (a null range, a port of width 0 with its generics' defaults, #1717: drawn of width 1, as normalizeDoc keeps a
   // marker, its type written as the module has it)
@@ -248,7 +250,9 @@ export async function schematicFromHdl(inst, opts = {}) {
     }
   }
   // (Verilog: an escaped identifier, \opcode[0] , named with its backslash, #1697: generateHdl writes it escaped)
-  const sp = name => (ci ? spell.get(String(name).toLowerCase()) ?? name : validIdent(name, 'verilog') || /^\\/.test(name) ? name : `\\${name}`);
+  // (VHDL: an extended identifier, \t[0]\, named so too, its closing backslash dropped, #1809)
+  const vhdlName = n => (/^\\.+\\$/.test(n) ? schName(n, 'vhdl') : n);
+  const sp = name => (ci ? vhdlName(spell.get(String(name).toLowerCase()) ?? name) : validIdent(name, 'verilog') || /^\\/.test(name) ? name : `\\${name}`);
   if (!opts.name) doc.name = sp(doc.name);
   const modsN = normModules(opts.modules);
 
