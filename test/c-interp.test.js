@@ -23,7 +23,7 @@ function compiled(src) {
     fs.writeFileSync(path.join(dir, 't.c'), src);
     execFileSync(CC, ['-std=c99', '-w', '-fsigned-char', '-fwrapv', '-O0', '-o', path.join(dir, 't'), path.join(dir, 't.c')]);
     try { return { output: lf(execFileSync(path.join(dir, 't'), { encoding: 'utf8' })), exitCode: 0 }; }
-    catch (e) { return { output: e.stdout, exitCode: e.status }; }
+    catch (e) { return { output: lf(e.stdout), exitCode: e.status }; }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 function same(src, { exit = null } = {}) {
@@ -45,6 +45,19 @@ test('a compiled program\'s output with LF line ends (#1860)', () => {
   assert.equal(lf(undefined), undefined);
 });
 
+// #1875: every test that reads a compiled program's output (or a file it wrote) reads it through lf()
+test('the compiled programs\' outputs all read through lf (#1875)', () => {
+  const dirname = path.dirname(new URL(import.meta.url).pathname);
+  const bad = [];
+  for (const f of fs.readdirSync(dirname).filter((n) => n.endsWith('.js'))) {
+    fs.readFileSync(path.join(dirname, f), 'utf8').split('\n').forEach((l, i) => {
+      if (/execFileSync\((?:exe|path\.join\(dir, 't'\))[,)]/.test(l) && /encoding: 'utf8'/.test(l) && !/lf\(execFileSync\(/.test(l)) bad.push(`${f}:${i + 1}`);
+      if (/output: e\.stdout\b/.test(l)) bad.push(`${f}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(bad, []);
+});
+
 test('C simulation against cc: printf\'s conversions, flags, widths and lengths; integer arithmetic, promotions and conversions', { skip: noCC }, () => {
   same(`#include <stdio.h>
 #include <stdint.h>
@@ -53,7 +66,7 @@ int main(void) {
   printf("%d|%5d|%-5d|%05d|%+d|% d|%i\\n", a, 42, 42, 42, 42, 42, a);
   printf("%u|%x|%X|%#x|%o|%#o|%08x\\n", u, u, 255, 255, 8, 8, 48879);
   printf("%c|%s|%.2s|%5s|%-5s|%%\\n", c, "text", "text", "ab", "ab");
-  printf("%hd|%hhd|%hu|%hhu|%ld|%lld|%llu|%lx\\n", 70000, 300, 70000, 300, ll, ll, (unsigned long long)ll, 4096L);
+  printf("%hd|%hhd|%hu|%hhu|%ld|%lld|%llu|%lx\\n", 70000, 300, 70000, 300, -2000000000L, ll, (unsigned long long)ll, 4096L);
   printf("%.5d|%8.3d|%-8.3d|\\n", 42, 42, -42);
   uint8_t b = 250; b += 10; int8_t sb = 127; sb++;
   printf("%d %d %d %d\\n", b, sb, (unsigned char)-1 > 0, -1 < 1u);
@@ -199,7 +212,7 @@ int main() {
     assert.equal(sim.output, ref.output);
     assert.equal(sim.exitCode, ref.exitCode);
     assert.equal(sim.exitCode, 0);
-    assert.equal(sim.files['result.dat'], fs.readFileSync(path.join(dir, 'result.dat'), 'utf8'));
+    assert.equal(sim.files['result.dat'], lf(fs.readFileSync(path.join(dir, 'result.dat'), 'utf8')));
     // a golden file that differs: diff says so, exit(3)
     const bad = simulateC(src, { file: 't.c', files: { 'golden.dat': golden.replace('55', '56') } });
     assert.deepEqual([bad.exitCode, /Files result\.dat and golden\.dat differ\nsame=0 none=1\n$/.test(bad.output)], [3, true]);
