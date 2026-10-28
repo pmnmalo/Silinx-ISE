@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './ui/core-hooks.js';
-import { SYMBOLS, defaultParams, symbolDef, symbolPins, symbolBox, portBox } from '../core/schdoc.js';
+import { SYMBOLS, defaultParams, symbolDef, symbolPins, symbolBox, portBox, xform } from '../core/schdoc.js';
 
 const { symbolSvg, symbolDrawingSvg, portSvg, bodySvg, hopPath, inLineRuns, wireRun, r1 } = await import('../web/js/sch-svg.js');
 
@@ -254,19 +254,45 @@ test('#1486 schematic drawing: a gate wider than a bit, its width at its input a
   assert.deepEqual(widths(symbolSvg(sym, symbolDef(sym))).map((t) => t.x), [6, 6, 10, 70]);
 });
 
-// #1488: the bus join and the bus tap show their width on their pins, as every other symbol: the join's on each input
-// wider than a bit and on its output, the tap's on its output when wider than a bit (its input takes its bus's); in
-// every orientation; the tap's none (#1800)
-test('#1488 #1800 schematic drawing: the bus join\'s width on its inputs and output; the bus tap shows none', () => {
+// #1488: the bus join and the bus tap show their width on their pins, as every other symbol: the join's on its output
+// (its inputs their indices instead, #1908); the tap's none (#1800)
+test('#1488 #1800 schematic drawing: the bus join\'s width on its output; the bus tap shows none', () => {
   const widths = (svg) => [...svg.matchAll(/<text class="pwidth on" x="([\d.-]+)" y="([\d.-]+)" text-anchor="middle">([^<]*)</g)].map((m) => `${m[3]} at ${m[1]},${m[2]}`);
   const draw = (type, params, rot = 0, mirror = false, ctx) => { const sym = { id: 'S1', type, x: 200, y: 100, rot, mirror, name: 'U1', params: { ...defaultParams(type), ...params } }; return symbolSvg(sym, symbolDef(sym), '', ctx); };
-  // (the join's inputs' leads 0..18, its output's 22..40; the tap's output's 25..40: each 10 px in from its pin's end)
-  assert.deepEqual(widths(draw('busjoin', { widths: '4,4' })), ['4 at 210,113', '4 at 210,133', '8 at 230,123']);
-  assert.deepEqual(widths(draw('busjoin', { widths: '1,7' })), ['7 at 210,133', '8 at 230,123'], 'a one-bit input: none');
+  // (the join's output's lead 22..40: 10 px in from its pin's end)
+  assert.deepEqual(widths(draw('busjoin', { widths: '4,4' })), ['8 at 230,123']);
+  assert.deepEqual(widths(draw('busjoin', { widths: '1,7' })), ['8 at 230,123']);
   // (the bus tap shows none: its indices say it, #1800)
   for (const { rot, mirror } of ORIENTS) {
     assert.deepEqual(widths(draw('slice', { msb: 7, lsb: 4 }, rot, mirror, { busName: 'DATA' })), [], `rot ${rot}${mirror ? ' mirrored' : ''}`);
   }
+});
+
+// #1908: the bus join's inputs each show their bits of its output on their wire, inside the symbol, as the bus tap's
+// (#1800): (7:4) for a bus, (3) for a bit, I0 the most significant part; centred on the input's lead (0..18), with the
+// widths' halo; no width of their own; in every orientation
+test('#1908 schematic drawing: the bus join\'s inputs show their bits of its output on their wire, (7:4)', () => {
+  const draw = (rot, mirror, widths) => {
+    const sym = { id: 'S1', type: 'busjoin', x: 200, y: 100, rot, mirror, name: 'U1', params: { ...defaultParams('busjoin'), widths } };
+    const def = symbolDef(sym);
+    return { svg: symbolSvg(sym, def), def, sym };
+  };
+  const labels = (svg) => [...svg.matchAll(/<text class="stext on"[^>]*>([^<]*)</g)].map((m) => ({ ...attrs(m[0]), text: m[1] }));
+  for (const [widths, want] of [['4,4', ['(7:4)', '(3:0)']], ['1,7', ['(7)', '(6:0)']], ['2,1,5', ['(7:6)', '(5)', '(4:0)']], ['1,1', ['(1)', '(0)']], ['16', ['(15:0)']]]) {
+    for (const { rot, mirror } of ORIENTS) {
+      const where = `${widths} rot ${rot}${mirror ? ' mirrored' : ''}`;
+      const { svg, def, sym } = draw(rot, mirror, widths);
+      const ls = labels(svg);
+      assert.deepEqual(ls.map((l) => l.text), want, where);
+      // each on its input's lead, half way along it
+      const ins = def.pins.filter((p) => p.dir === 'in');
+      assert.deepEqual(ls.map((l) => [+l.x, +l.y, l['text-anchor']]), ins.map((p) => { const m = xform(sym, def, 9, p.y); return [m.x, m.y + 3, 'middle']; }), where);
+      assert.equal([...svg.matchAll(/class="pwidth/g)].length, 1, `${where}: the output's width only`);
+    }
+  }
+  // the widths of no input: no label, no width
+  const none = draw(0, false, '').svg;
+  assert.deepEqual([labels(none), [...none.matchAll(/class="pwidth/g)].length], [[], 0]);
 });
 
 // #1726: the bus tap drawn as ISE's: its input (I) on the bus, a diagonal entry from there to the line of the bit(s)

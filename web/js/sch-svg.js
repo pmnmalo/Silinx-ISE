@@ -216,8 +216,16 @@ function textsSvg(sym, def, ctx = {}) {
     const m = cx(25, 10);
     s += `<text class="stext on" x="${m.x}" y="${m.y + 3}" text-anchor="middle">${esc(`${ctx.busName || ''}${def.text}`)}</text>`;
   } else if (def.shape === 'join') {
-    // the width of each input and of the output, as every symbol's bus pins (#1488)
-    for (const p of symbolPins(sym, null, def)) if ((p.width || 1) > 1) s += pinWidth(p);
+    // each input's bits of the output on its wire, inside the symbol, as the bus tap's (I0 the most significant
+    // part): (7:4), (3); no width of its own: its indices say it (#1908); the output's width as every symbol's bus pins (#1488)
+    let hi = def.pins.reduce((n, p) => n + (p.dir === 'in' ? p.width : 0), 0) - 1;
+    for (const p of def.pins.filter(q => q.dir === 'in')) {
+      const lo = hi - p.width + 1, m = cx(9, p.y);
+      s += `<text class="stext on" x="${m.x}" y="${m.y + 3}" text-anchor="middle">${esc(hi === lo ? `(${hi})` : `(${hi}:${lo})`)}</text>`;
+      hi = lo - 1;
+    }
+    const o = symbolPins(sym, null, def).find(p => p.dir === 'out');
+    if ((o.width || 1) > 1) s += pinWidth(o);
   } else if (def.shape === 'const') {
     const t = cx((def.w - 20) / 2, 10);
     s += `<text class="cval" x="${t.x}" y="${t.y + 4}" text-anchor="middle">${esc(def.text)}</text>`;

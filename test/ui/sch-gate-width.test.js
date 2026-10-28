@@ -1,6 +1,6 @@
 // UI: a gate wider than one bit (AND, INV, BUFE…) shows its width at its input and output pins, as the other symbols
 // (a constant, an adder), and nothing inside its shape; a one-bit gate none; the same in the dark theme and in the
-// printed SVG (#1486); the bus join and the bus tap their widths on their pins too (#1488).
+// printed SVG (#1486); the bus join and the bus tap their widths on their pins too (#1488), the join each input's bits of its output (#1908).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, waitDownload } from './harness.js';
@@ -58,25 +58,30 @@ uiTest('#1486 schematic: a bus-wide AND and INV show their width at their pins, 
   await page.key('Escape');
 });
 
-uiTest('#1488 #1800 schematic: the bus join shows its width on its inputs and output, as the other symbols; the bus tap none (its indices)', E, async (page) => {
+uiTest('#1488 #1800 #1908 schematic: the bus join shows its output\'s width, each input its bits of it, (7:4); the bus tap none (its indices)', E, async (page) => {
   const doc = newDoc('bj', 'vhdl');
   const add = (id, type, x, y, rot, params) => doc.symbols.push({ id, type, x, y, rot, mirror: false, name: `XLXI_${id}`, params });
-  add('J', 'busjoin', 100, 60, 0, { widths: '4,4' }); add('J1', 'busjoin', 300, 60, 0, { widths: '1,7' });
+  add('J', 'busjoin', 100, 60, 0, { widths: '4,4' }); add('J1', 'busjoin', 300, 60, 0, { widths: '1,7' }); add('J90', 'busjoin', 500, 60, 90, { widths: '2,1,5' });
   add('T', 'slice', 100, 200, 0, { msb: 7, lsb: 4 }); add('T90', 'slice', 300, 200, 90, { msb: 7, lsb: 4 }); add('T1', 'slice', 500, 200, 0, { msb: 3, lsb: 3 });
   await makeProject(env, { name: 'BusW', files: { 'src/bj.sch.json': JSON.stringify(doc) }, top: '' });
   await page.openProject('BusW');
   await page.eval(() => window.SilinxApp.openSch('src/bj.sch.json'));
-  await page.waitFor((ed) => document.querySelectorAll(`${ed} .se-svg g.sym`).length === 5, [ED], { what: 'the symbols drawn' });
-  // each symbol's widths, the same style as a constant's, and the tap's range clear of them
+  await page.waitFor((ed) => document.querySelectorAll(`${ed} .se-svg g.sym`).length === 6, [ED], { what: 'the symbols drawn' });
+  // each symbol's widths, the same style as a constant's; its labels (the tap's range, the join's indices) with the
+  // same halo, clear of the widths and of each other
   const drawn = await page.eval((ed) => Object.fromEntries([...document.querySelectorAll(`${ed} .se-svg g.sym`)].map((g) => {
-    const ws = [...g.querySelectorAll('.pwidth')], r = g.querySelector('.stext')?.getBoundingClientRect();
-    const clear = !r || ws.every((t) => { const b = t.getBoundingClientRect(); return b.right <= r.left || r.right <= b.left || b.bottom <= r.top || r.bottom <= b.top; });
-    return [g.dataset.id, { widths: ws.map((t) => t.textContent), on: ws.every((t) => t.classList.contains('on')), clear }];
+    const ws = [...g.querySelectorAll('.pwidth')], ls = [...g.querySelectorAll('.stext')];
+    const apart = (a, b) => { const r = a.getBoundingClientRect(), q = b.getBoundingClientRect(); return q.right <= r.left || r.right <= q.left || q.bottom <= r.top || r.bottom <= q.top; };
+    const clear = ls.every((l, i) => ws.every((t) => apart(l, t)) && ls.every((m, j) => i === j || apart(l, m)));
+    return [g.dataset.id, { widths: ws.map((t) => t.textContent), labels: ls.map((t) => t.textContent), on: [...ws, ...ls].every((t) => t.classList.contains('on')), clear }];
   })), ED);
   assert.deepEqual(drawn, {
-    J: { widths: ['4', '4', '8'], on: true, clear: true }, J1: { widths: ['7', '8'], on: true, clear: true },
-    T: { widths: [], on: true, clear: true }, T90: { widths: [], on: true, clear: true }, T1: { widths: [], on: true, clear: true },
+    J: { widths: ['8'], labels: ['(7:4)', '(3:0)'], on: true, clear: true }, J1: { widths: ['8'], labels: ['(7)', '(6:0)'], on: true, clear: true },
+    J90: { widths: ['8'], labels: ['(7:6)', '(5)', '(4:0)'], on: true, clear: true },
+    T: { widths: [], labels: ['(7:4)'], on: true, clear: true }, T90: { widths: [], labels: ['(7:4)'], on: true, clear: true }, T1: { widths: [], labels: ['(3)'], on: true, clear: true },
   });
-  // (the tap's label in the size of the widths it replaced, #1812)
-  assert.deepEqual(await page.eval((ed) => [document.querySelector(`${ed} .se-svg g.sym[data-id="T"] .stext`), document.querySelector(`${ed} .se-svg g.sym[data-id="J"] .pwidth`)].map((t) => getComputedStyle(t).fontSize), ED), ['8px', '8px']);
+  // (the labels in the size of the widths they replaced, #1812, with the widths' halo)
+  assert.deepEqual(await page.eval((ed) => ['T', 'J'].flatMap((id) => [`g.sym[data-id="${id}"] .stext`, `g.sym[data-id="${id}"] .pwidth`])
+    .map((q) => document.querySelector(`${ed} .se-svg ${q}`)).filter(Boolean).map((t) => [getComputedStyle(t).fontSize, getComputedStyle(t).paintOrder]), ED),
+  [['8px', 'stroke'], ['8px', 'stroke'], ['8px', 'stroke']]);
 });
