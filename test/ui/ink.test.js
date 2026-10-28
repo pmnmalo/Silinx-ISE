@@ -25,20 +25,22 @@ const recognized = (page) => page.eval((d) => document.querySelector(`${d} .ink-
 const message = (page) => page.eval((d) => document.querySelector(`${d} .ink-msg`).innerText.trim(), D);
 const cells = (page, out) => page.eval((t, o) => [...document.querySelectorAll(`${t} .tt-cell[data-out="${o}"]`)].map((c) => c.textContent).join(''), T, out);
 
-/** One stroke through the client points, with the mouse, a pen or a finger. */
+/** One stroke through the client points, with the mouse, a pen or a finger: its points sent at once, in order, each
+ *  not waited for (#1906: Chrome handles one input event a frame, so a drawing of 1600 points waited for 1600 frames,
+ *  90 s on a slow runner). */
 async function stroke(page, pts, kind) {
   const p = pts.map((q) => ({ x: Math.round(q.x * 10) / 10, y: Math.round(q.y * 10) / 10 }));
   if (kind === 'touch') {
     const at = (q) => [{ x: q.x, y: q.y, id: 1, radiusX: 1, radiusY: 1, force: 1 }];
     await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(p[0]) });
-    for (const q of p.slice(1)) await page.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(q) });
+    await Promise.all(p.slice(1).map((q) => page.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(q) })));
     await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     return;
   }
   const ev = (type, q, buttons) => page.send('Input.dispatchMouseEvent', { type, x: q.x, y: q.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons, clickCount: 1, pointerType: kind, force: kind === 'pen' ? 0.5 : undefined });
   await ev('mouseMoved', p[0], 0);
   await ev('mousePressed', p[0], 1);
-  for (const q of p.slice(1)) await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: q.x, y: q.y, button: 'left', buttons: 1, pointerType: kind });
+  await Promise.all(p.slice(1).map((q) => page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: q.x, y: q.y, button: 'left', buttons: 1, pointerType: kind })));
   await ev('mouseReleased', p.at(-1), 0);
 }
 
@@ -292,7 +294,14 @@ uiTest('Handwritten expressions: Copy Drawing and Paste Drawing; a drawing of an
   const copied = await page.waitFor(() => window.__copied.at(-1), [], { what: 'the drawing copied' });
   const d = JSON.parse(copied);
   assert.deepEqual([d.silinx, d.version, d.kind, d.devices, d.vars, d.read], ['ink-drawing', 1, 'expression', ['pen'], ['A', 'B'], 'F = A + B']);
-  assert.ok(d.strokes.length >= 7 && d.strokes.every((s) => s.length >= 4), String(d.strokes.length));
+  // every point sent reached the pad, in its place and order (the points sent not waited for, #1906)
+  const c = await canvasAt(page), r1 = (v) => Math.round(v * 10) / 10;
+  const sent = writeText('F=A+B', { seed: 2, amount: 0.4, size: 64, x: 24, y: 30 }).strokes.map((st) => st.flatMap((q) => [r1(r1(c.x + q.x) - c.x), r1(r1(c.y + q.y) - c.y)]));
+  assert.equal(d.strokes.length, sent.length);
+  for (const [i, st] of d.strokes.entries()) {
+    assert.equal(st.length, sent[i].length, `stroke ${i}`);
+    assert.ok(st.every((v, k) => Math.abs(v - sent[i][k]) <= 0.2), `stroke ${i}: ${st} / ${sent[i]}`);
+  }
   await page.waitFor(() => /^Drawing copied/.test(document.querySelector('.toast')?.textContent || ''), [], { what: 'the toast' });
   // pasted back after a Clear: read again; Undo: the pad empty again
   await page.click(`${D} .ink-clear`);
