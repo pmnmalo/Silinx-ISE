@@ -80,6 +80,8 @@ export const MUX_INPUTS = { mux2: 2, mux4: 4, mux8: 8, mux16: 16 };
 export const MUX_OLD_BODY_W = k => Math.max(40, 20 * k);
 export const MUX_BODY_W = k => Math.max(70, MUX_OLD_BODY_W(k));
 export const MUX_SEL_X = k => 20 + MUX_OLD_BODY_W(k) / 2;
+// the bus join (#1910): its bar's middle and its width; before document version 6, 20 and 40
+export const JOIN_BAR = 40, JOIN_W = 60, JOIN_OLD_W = 40;
 SYMBOLS.demux = {
   // (one entry, DEMUX, the enable E, the select bits and the select bus its parameters, #313, #334; drawn DEMUX1_4…)
   category: 'Mux', title: 'DEMUX', description: '1:2^n demultiplexer: output O<S> = D, the other outputs 0 (bitwise when Width > 1)',
@@ -444,8 +446,9 @@ export function symbolDef(sym, modules = {}) {
     const ws = widthsOf(p.widths);
     const n = Math.max(1, ws.length), h = n * 20;
     const pins = ws.map((w, i) => ({ name: `I${i}`, dir: 'in', x: 0, y: 10 + 20 * i, side: 'W', width: w }));
-    pins.push({ name: 'O', dir: 'out', x: 40, y: h / 2, side: 'E', width: ws.reduce((a, b) => a + b, 0) || null });
-    return { w: 40, h, shape: 'join', body: { x: 18, y: 0, w: 4, h }, pins };
+    // (its inputs' leads long enough for their bits' labels, (15:8), #1910: its bar at JOIN_BAR, its output at JOIN_W)
+    pins.push({ name: 'O', dir: 'out', x: JOIN_W, y: h / 2, side: 'E', width: ws.reduce((a, b) => a + b, 0) || null });
+    return { w: JOIN_W, h, shape: 'join', body: { x: JOIN_BAR - 2, y: 0, w: 4, h }, pins };
   }
   if (t === 'constant') {
     const txt = String(p.value ?? '0');

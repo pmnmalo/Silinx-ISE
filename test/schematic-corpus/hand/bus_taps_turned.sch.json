@@ -1,5 +1,5 @@
 {
- "version": 5,
+ "version": 6,
  "name": "bus_taps_turned",
  "lang": "vhdl",
  "sheet": {
@@ -75,7 +75,7 @@
   {
    "id": "S6",
    "type": "busjoin",
-   "x": 620,
+   "x": 600,
    "y": 280,
    "rot": 180,
    "mirror": false,
@@ -313,20 +313,6 @@
      "y": 290
     }
    ]
-  },
-  {
-   "id": "W35",
-   "points": [
-    {
-     "x": 620,
-     "y": 330
-    },
-    {
-     "x": 600,
-     "y": 330
-    }
-   ],
-   "bus": true
   }
  ],
  "labels": [

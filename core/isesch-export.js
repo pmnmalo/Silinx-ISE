@@ -3,7 +3,7 @@
 // name, with their .sym files), wires, bus taps, net names and I/O markers. isesch.js re-exports exportIseSch,
 // decodeXlSymbol and iseTimestamp. Isomorphic (no DOM, no Node APIs).
 import {
-  SYMBOLS, compareOps, normalizeDoc, symbolDef, symbolPins, symbolBox, portBox, portSide, netlist, normModules, generateHdl, constBits, newDoc, xform,
+  JOIN_BAR, SYMBOLS, compareOps, normalizeDoc, symbolDef, symbolPins, symbolBox, portBox, portSide, netlist, normModules, generateHdl, constBits, newDoc, xform,
 } from './schdoc.js';
 import { LIB_GFX, LIB_TS, findModule, gfxShapes, iomarkerOrien, iseXform, lc, libPins, xaiToIseOrien } from './isesch.js';
 import { blockHdlDecls } from './isesch-blockhdl.js';
@@ -290,13 +290,16 @@ export function exportIseSch(docIn, opts = {}) {
         const I = pp.get('I'), O = pp.get('O');
         bustaps.push(`        <bustap x2="${X(O.x)}" y1="${X(I.y)}" y2="${X(O.y)}" x1="${X(I.x)}" />`);
       } else {
-        // bus spine through the output pin, one tap per input
+        // bus spine along its bar, one tap per input (as long as before #1910, when the bar was at the output pin),
+        // and the bus from the bar to its output pin
         const ins = def.pins.filter(q => q.dir === 'in');
         const O = def.pins.find(q => q.name === 'O');
-        const spine = ins.map(q => xform(s, def, O.x, q.y));
+        const spine = ins.map(q => xform(s, def, JOIN_BAR, q.y));
         const ys = def.pins.map(q => q.y);
-        const a = xform(s, def, O.x, Math.min(...ys)), b = xform(s, def, O.x, Math.max(...ys));
+        const a = xform(s, def, JOIN_BAR, Math.min(...ys)), b = xform(s, def, JOIN_BAR, Math.max(...ys));
         if (a.x !== b.x || a.y !== b.y) addExtra(netOfPin('O'), [X(a.x), X(a.y), X(b.x), X(b.y)]);
+        const c = xform(s, def, JOIN_BAR, O.y), o = xform(s, def, O.x, O.y);
+        addExtra(netOfPin('O'), [X(c.x), X(c.y), X(o.x), X(o.y)]);
         ins.forEach((q, i) => { const P = pp.get(q.name); bustaps.push(`        <bustap x2="${X(P.x)}" y1="${X(spine[i].y)}" y2="${X(P.y)}" x1="${X(spine[i].x)}" />`); });
       }
       continue;

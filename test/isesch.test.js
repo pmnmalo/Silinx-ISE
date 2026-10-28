@@ -894,3 +894,32 @@ test('export -> import: XOR2B1 / XOR2B2 / XNOR2B1 as Silinx symbols, AND2B1 the 
   assert.deepEqual(b.doc.symbols.map(s => s.type), ['xor2b1', 'xor2b2', 'and2b1', 'xnor2b1']);
   assert.deepEqual(b.warnings, []);
 });
+
+// #1910: the bus join 60 px wide (its bar at 40, its output at 60): exported to ISE as before, one bus tap per input from
+// its bar (as long as before, when the bar was at its output: 40 px, 128 units), the bus along the bar, and the bus from
+// the bar to its output pin
+test('#1910 export: a bus join as ISE bus taps from its bar, as long as before, and the bus on to its output', () => {
+  const doc = newDoc('joins', 'vhdl');
+  doc.symbols.push({ id: 'J', type: 'busjoin', x: 400, y: 300, rot: 0, mirror: false, name: 'J1', params: { widths: '4,4' } });
+  const [i0, i1, o] = symbolPins(normalizeDoc(doc).symbols[0]);
+  // (its inputs internal nets, from two constants: a join of ports' nets is drawn as a symbol of its own)
+  for (const [k, p] of [[1, i0], [2, i1]]) {
+    const c = { id: `K${k}`, type: 'constant', rot: 0, mirror: false, name: `K${k}`, params: { value: String(k), width: 4 } };
+    const co = symbolDef(c).pins[0];
+    doc.symbols.push({ ...c, x: p.x - 40 - co.x, y: p.y - co.y });
+  }
+  doc.ports.push({ id: 'PY', name: 'y', dir: 'out', width: 8, x: o.x + 40, y: o.y });
+  doc.wires.push({ id: 'W1', points: [{ x: i0.x - 40, y: i0.y }, i0], bus: true }, { id: 'W2', points: [{ x: i1.x - 40, y: i1.y }, i1], bus: true },
+    { id: 'W3', points: [o, { x: o.x + 40, y: o.y }], bus: true });
+  assert.deepEqual([i0, i1, o].map(p => `${p.name} ${p.x},${p.y}`), ['I0 400,310', 'I1 400,330', 'O 460,320']);
+  const ex = exportIseSch(doc, { family: 'spartan3e', timestamp: '2024-1-2T3:4:5' });
+  assertIseGeometry(ex.xml, ex.files);
+  const m = parseIseSch(ex.xml), sh = m.sheets[0];
+  const taps = sh.bustaps.map(t => [t.x1 - t.x2, t.y1 - t.y2]);
+  assert.deepEqual(taps, [[128, 0], [128, 0]], 'from the bar to each input, 40 px');
+  // (the bus y: along the bar, from the bar to the output, then the wire drawn on)
+  const y = sh.branches.find(b => b.name === 'y(7:0)');
+  const bar = sh.bustaps[0].x1, oy = sh.bustaps[0].y1 + (sh.bustaps[1].y1 - sh.bustaps[0].y1) / 2;
+  assert.ok(y.wires.some(([x1, y1, x2, y2]) => x1 === bar && x2 === bar && Math.min(y1, y2) <= sh.bustaps[0].y1 && Math.max(y1, y2) >= sh.bustaps[1].y1), 'the bus along the bar');
+  assert.ok(y.wires.some(([x1, y1, x2, y2]) => y1 === oy && y2 === oy && Math.min(x1, x2) === bar && Math.max(x1, x2) === bar + 64), 'the bus from the bar to the output');
+});

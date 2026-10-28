@@ -1,5 +1,5 @@
 {
- "version": 5,
+ "version": 6,
  "name": "flipflops",
  "lang": "vhdl",
  "sheet": {
@@ -1036,7 +1036,7 @@
    "id": "W61",
    "points": [
     {
-     "x": 620,
+     "x": 640,
      "y": 450
     },
     {

@@ -8,8 +8,10 @@
 // 5 (#1726): the bus tap drawn as ISE's, a diagonal entry from its bus: its input I a grid step from its output's line
 // (local (0, 0), it was (0, 10)). The tap stays, its output O where it was; what met its old I follows as above (a wire
 // whose last run goes that way has its end moved, else a bus wire joins the old place to the new I).
+// 6 (#1910): the bus join 60 px wide, its inputs' leads long enough for their bits' labels (it was 40, its bar at 20).
+// Each is placed so that its inputs stay where they were; its output O moves along its lead, what met it following.
 // Isomorphic (no DOM).
-import { MUX_BODY_W, MUX_INPUTS, MUX_OLD_BODY_W, symbolDef, xform } from './schdoc-symbols.js';
+import { JOIN_OLD_W, MUX_BODY_W, MUX_INPUTS, MUX_OLD_BODY_W, symbolDef, xform } from './schdoc-symbols.js';
 
 const same = (a, b) => a.x === b.x && a.y === b.y;
 
@@ -55,6 +57,21 @@ export function moveTaps(doc, modules = {}) {
   for (const s of taps) {
     const def = symbolDef(s, {}), i = def.pins.find(p => p.name === 'I');
     follow(doc, xform(s, def, 0, 10), xform(s, def, i.x, i.y), others, true);
+  }
+  return doc;
+}
+
+/** The bus joins of doc (version 5) widened (#1910), their output moved, doc changed in place. */
+export function widenJoins(doc, modules = {}) {
+  const joins = doc.symbols.filter(s => s.type === 'busjoin');
+  if (!joins.length) return doc;
+  const others = pinsOfOthers(doc, modules, s => s.type === 'busjoin');
+  for (const s of joins) {
+    const def = symbolDef(s, {}), old = { ...def, w: JOIN_OLD_W }, o = def.pins.find(p => p.name === 'O');
+    // placed so that its inputs stay where they were (its box grows on their other side, turned or mirrored)
+    const a = xform(s, old, 0, 0), b = xform(s, def, 0, 0), before = xform(s, old, JOIN_OLD_W, o.y);
+    s.x += a.x - b.x; s.y += a.y - b.y;
+    follow(doc, before, xform(s, def, o.x, o.y), others, true);
   }
   return doc;
 }

@@ -259,9 +259,9 @@ test('#1486 schematic drawing: a gate wider than a bit, its width at its input a
 test('#1488 #1800 schematic drawing: the bus join\'s width on its output; the bus tap shows none', () => {
   const widths = (svg) => [...svg.matchAll(/<text class="pwidth on" x="([\d.-]+)" y="([\d.-]+)" text-anchor="middle">([^<]*)</g)].map((m) => `${m[3]} at ${m[1]},${m[2]}`);
   const draw = (type, params, rot = 0, mirror = false, ctx) => { const sym = { id: 'S1', type, x: 200, y: 100, rot, mirror, name: 'U1', params: { ...defaultParams(type), ...params } }; return symbolSvg(sym, symbolDef(sym), '', ctx); };
-  // (the join's output's lead 22..40: 10 px in from its pin's end)
-  assert.deepEqual(widths(draw('busjoin', { widths: '4,4' })), ['8 at 230,123']);
-  assert.deepEqual(widths(draw('busjoin', { widths: '1,7' })), ['8 at 230,123']);
+  // (the join's output's lead 42..60, #1910: 10 px in from its pin's end)
+  assert.deepEqual(widths(draw('busjoin', { widths: '4,4' })), ['8 at 250,123']);
+  assert.deepEqual(widths(draw('busjoin', { widths: '1,7' })), ['8 at 250,123']);
   // (the bus tap shows none: its indices say it, #1800)
   for (const { rot, mirror } of ORIENTS) {
     assert.deepEqual(widths(draw('slice', { msb: 7, lsb: 4 }, rot, mirror, { busName: 'DATA' })), [], `rot ${rot}${mirror ? ' mirrored' : ''}`);
@@ -269,14 +269,18 @@ test('#1488 #1800 schematic drawing: the bus join\'s width on its output; the bu
 });
 
 // #1908: the bus join's inputs each show their bits of its output on their wire, inside the symbol, as the bus tap's
-// (#1800): (7:4) for a bus, (3) for a bit, I0 the most significant part; centred on the input's lead (0..18), with the
-// widths' halo; no width of their own; in every orientation
-test('#1908 schematic drawing: the bus join\'s inputs show their bits of its output on their wire, (7:4)', () => {
+// (#1800): (7:4) for a bus, (3) for a bit, I0 the most significant part; with the widths' halo; no width of their own;
+// in every orientation. #1910: the join 60 px wide, its inputs' leads 0..38 (its bar 38..42), each label centred on its
+// lead; turned 90° / 270° (its inputs 20 px apart), every other one further along it, 10 px from either end
+test('#1908 #1910 schematic drawing: the bus join\'s inputs show their bits of its output on their wire, (7:4)', () => {
   const draw = (rot, mirror, widths) => {
     const sym = { id: 'S1', type: 'busjoin', x: 200, y: 100, rot, mirror, name: 'U1', params: { ...defaultParams('busjoin'), widths } };
     const def = symbolDef(sym);
     return { svg: symbolSvg(sym, def), def, sym };
   };
+  const sym0 = { type: 'busjoin', params: { widths: '4,4' } };
+  assert.deepEqual([symbolDef(sym0).w, symbolDef(sym0).h, symbolDef(sym0).pins.map((p) => `${p.name} ${p.x},${p.y}`)], [60, 40, ['I0 0,10', 'I1 0,30', 'O 60,20']]);
+  assert.match(draw(0, false, '4,4').svg, /<rect class="ripper" x="38" y="0" width="4" height="40"\/>/);
   const labels = (svg) => [...svg.matchAll(/<text class="stext on"[^>]*>([^<]*)</g)].map((m) => ({ ...attrs(m[0]), text: m[1] }));
   for (const [widths, want] of [['4,4', ['(7:4)', '(3:0)']], ['1,7', ['(7)', '(6:0)']], ['2,1,5', ['(7:6)', '(5)', '(4:0)']], ['1,1', ['(1)', '(0)']], ['16', ['(15:0)']]]) {
     for (const { rot, mirror } of ORIENTS) {
@@ -284,9 +288,9 @@ test('#1908 schematic drawing: the bus join\'s inputs show their bits of its out
       const { svg, def, sym } = draw(rot, mirror, widths);
       const ls = labels(svg);
       assert.deepEqual(ls.map((l) => l.text), want, where);
-      // each on its input's lead, half way along it
-      const ins = def.pins.filter((p) => p.dir === 'in');
-      assert.deepEqual(ls.map((l) => [+l.x, +l.y, l['text-anchor']]), ins.map((p) => { const m = xform(sym, def, 9, p.y); return [m.x, m.y + 3, 'middle']; }), where);
+      // each on its input's lead: half way along it; turned, at 10 and 28 in turn
+      const ins = def.pins.filter((p) => p.dir === 'in'), turned = rot === 90 || rot === 270;
+      assert.deepEqual(ls.map((l) => [+l.x, +l.y, l['text-anchor']]), ins.map((p, i) => { const m = xform(sym, def, turned ? [10, 28][i % 2] : 19, p.y); return [m.x, m.y + 3, 'middle']; }), where);
       assert.equal([...svg.matchAll(/class="pwidth/g)].length, 1, `${where}: the output's width only`);
     }
   }
