@@ -47,20 +47,20 @@ test('#1684 pointers to structs indexed, passed on and copied: the C simulation 
   assert.equal(sim.output, compiledRun(SRC).output);
 });
 
-test('#1684 co-simulated in VHDL and Verilog: a memory per member, its depth the pragma\'s (port= the struct\'s name) or 1024 (said once, of the top function only)', () => {
+test('#1684 co-simulated in VHDL and Verilog: one memory of the struct\'s words (#1668), its depth the pragma\'s (port= the struct\'s name) or 1024 (said once, of the top function only)', () => {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(SRC, { file: 'blend.c', lang });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
+    // (in and out reserved words: in_r and out_r, the struct's port's name; a word: v at bits 0-15, k 16-23)
     assert.deepEqual(r.gen.ports.filter((p) => /^(in|out|w)_/.test(p.name)).map((p) => `${p.name}:${p.w}`), [
-      'in_v_address0:3', 'in_v_ce0:1', 'in_v_q0:16', 'in_k_address0:3', 'in_k_ce0:1', 'in_k_q0:8',
-      'out_v_address0:3', 'out_v_ce0:1', 'out_v_we0:1', 'out_v_d0:16', 'out_k_address0:3', 'out_k_ce0:1', 'out_k_we0:1', 'out_k_d0:8',
-      'w_v_address0:10', 'w_v_ce0:1', 'w_v_q0:16']);
+      'in_r_address0:3', 'in_r_ce0:1', 'in_r_q0:24',
+      'out_r_address0:3', 'out_r_ce0:1', 'out_r_we0:1', 'out_r_d0:24',
+      'w_address0:10', 'w_ce0:1', 'w_q0:24']);
     assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), [
-      "9 warning: the struct argument 'in': its members are memories of their own (in_v, in_k); Vitis HLS makes one memory of them (not yet, #1668)",
-      "9 warning: the struct argument 'out': its members are memories of their own (out_v, out_k); Vitis HLS makes one memory of them (not yet, #1668)",
-      "9 warning: the pointer to structs 'w' is indexed: a memory (ap_memory) of 1024 elements per member, its depth not given (#pragma HLS INTERFACE port=w depth=N)",
-      "9 warning: the struct argument 'w': its members are memories of their own (w_v, w_k); Vitis HLS makes one memory of them (not yet, #1668)"]);
+      "9 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
+      "9 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
+      "9 warning: the pointer to structs 'w' is indexed: a memory (ap_memory) of 1024 structs, its depth not given (#pragma HLS INTERFACE port=w depth=N)"]);
   }
 });
 
@@ -74,16 +74,15 @@ test('#1684 an integer pointer argument passed to a function that indexes it: a 
   }
 });
 
-test('#1684 C++: auto x = p[i] of a pointer to structs (AMD\'s aggregation_of_m_axi_ports), its pragmas once by the struct\'s name', () => {
+test('#1684 C++: auto x = p[i] of a pointer to structs (AMD\'s aggregation_of_m_axi_ports), its pragmas once by the struct\'s name; one memory of its words (#1668)', () => {
   const src = 'struct A { char foo; short bar; };\nint dut(A *arr) {\n#pragma HLS interface m_axi port = arr depth = 10\n#pragma HLS interface ap_memory port = arr depth = 10\n  int sum = 0;\n  for (unsigned i = 0; i < 10; i++) {\n    auto tmp = arr[i];\n    sum += tmp.foo + tmp.bar;\n  }\n  return sum;\n}\nint main() { A arr[10]; for (int i = 0; i < 10; i++) { arr[i].foo = i; arr[i].bar = -3 * i; } return dut(arr) == -90 ? 0 : 1; }\n';
   const sim = simulateC(src, { file: 'm.cpp' });
   assert.deepEqual([sim.error, sim.exitCode], [null, 0]);
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(src, { file: 'm.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true], JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), [
-      "2 the struct argument 'arr': its members are memories of their own (arr_foo, arr_bar); Vitis HLS makes one memory of them (not yet, #1668)",
-      '3 #pragma HLS INTERFACE m_axi port=arr is not made yet: ignored (its default interface made)']);
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ['3 #pragma HLS INTERFACE m_axi port=arr is not made yet: ignored (its default interface made)']);
+    assert.deepEqual(r.gen.ports.filter((p) => /^arr_/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['arr_address0:4', 'arr_ce0:1', 'arr_q0:24']);
   }
 });
 

@@ -89,7 +89,7 @@ export function pointerArithmetic(funcs, globals, synth, report, structArgs = ne
         if (f.name === top && !S) report(pa.loc, `the pointer argument '${pa.name}' is indexed: a memory (ap_memory) of ${DEFAULT_DEPTH} elements, its depth not given (#pragma HLS INTERFACE port=${pa.name} depth=N)`, 'warning');
         else if (f.name === top && !S.said) {
           S.said = true;
-          report(S.loc, `the pointer to structs '${S.name}' is indexed: a memory (ap_memory) of ${DEFAULT_DEPTH} elements per member, its depth not given (#pragma HLS INTERFACE port=${S.name} depth=N)`, 'warning');
+          report(S.loc, `the pointer to structs '${S.name}' is indexed: a memory (ap_memory) of ${DEFAULT_DEPTH} structs, its depth not given (#pragma HLS INTERFACE port=${S.name} depth=N)`, 'warning');
         }
       }
       pa.type = { kind: 'array', of: pa.type.to, size: null, length: depth, fromPtr: true };

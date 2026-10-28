@@ -7,7 +7,7 @@
 // parameters added for it (its call a statement: x = f(…); or S x = f(…);). Initializer lists ({ … }, nested or
 // not) give each member its values. An enum's constants are constants, its type an int.
 //
-//   cStructs(tokens, report, cpp) -> { tokens, structArgs: Map(function -> [{ name, members: [names] }]) }
+//   cStructs(tokens, report, cpp) -> { tokens, structArgs: Map(function -> [{ name, members: [names], kind, ks }]) }
 import { closing, splitTop, constTokens } from './cpp-template.js';
 import { parseMethod, methodFunctions, foldDefaultCtor } from './cpp-method.js';
 import { structStreams } from './c-struct-stream.js';
@@ -216,7 +216,10 @@ function signatures(toks, cx) {
     if (!rs && !params.some((p) => p?.S)) continue;
     if (rs && head.some((x) => op(x, '*') || op(x, '&'))) report(rs, `'${t.v}' returns a pointer or a reference to a struct: not possible in Silinx HLS`);
     sigs.set(t.v, { params, ret: rs ? structs.get(rs.v) : null });
-    structArgs.set(t.v, [...params.filter((p) => p?.S && p.name).map((p) => ({ name: p.name, members: leaves(p.S).map((l) => `${p.name}${l.suffix}`), loc: p.loc })),
+    // (kind: an array of structs, 'arr', or a pointer, 'ptr', one memory of its words, #1668; ks: each member's elements
+    // in a word, a member array's)
+    structArgs.set(t.v, [...params.filter((p) => p?.S && p.name).map((p) => ({ name: p.name, members: leaves(p.S).map((l) => `${p.name}${l.suffix}`), loc: p.loc,
+      kind: p.kind, ks: leaves(p.S).map((l) => (l.dims.length ? Number(constTokens(product(l.dims)) ?? 0n) : 1)) })),
       ...(rs ? [{ name: 'return', members: leaves(structs.get(rs.v)).map((l) => `ap_ret${l.suffix}`), loc: t }] : [])]);
   }
   function atTop(k) { let d = 0; for (let i = 0; i < k; i++) { if (op(toks[i], '{')) d++; if (op(toks[i], '}')) d--; } return d === 0; }

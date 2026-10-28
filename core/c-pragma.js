@@ -3,17 +3,18 @@
 // accepts and ignores (Vitis HLS's others). The loops' transformations a sequential module makes of them
 // (core/c-fsmd.js): UNROLL factor=N, N copies of the body an iteration. Isomorphic ES module: no DOM and no Node APIs.
 //
-//   checkPragmas(ast, funcs, report)   report(loc, message, severity)
+//   checkPragmas(ast, funcs, report, top)   report(loc, message, severity)
 //   loopPragma(loop, name) -> its pragma's args, or null
 //   readPragma(text after #pragma) -> { name, args, text } | null
 //   tripcountArgs(a LOOP_TRIPCOUNT's text) -> { min?, max?, avg? }: its values' texts
 //   unrollBy(loop, n) -> the loop with n copies of its body (a 'for'), each after the first if its condition holds
 
 // what Silinx makes of the pragmas it knows
-export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK']);   // (TASK: an hls::task's, core/cpp-lex.js, #1721)
+// (TASK: an hls::task's, core/cpp-lex.js, #1721; AGGREGATE and DISAGGREGATE: of the top's struct arguments, core/c-aggregate.js, #1668)
+export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE']);
 // Vitis HLS's others: accepted, ignored with a warning
 export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'LATENCY', 'BIND_OP', 'BIND_STORAGE', 'RESOURCE', 'ALLOCATION', 'DEPENDENCE',
-  'LOOP_FLATTEN', 'LOOP_MERGE', 'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE', 'AGGREGATE', 'DISAGGREGATE',
+  'LOOP_FLATTEN', 'LOOP_MERGE', 'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
   'ARRAY_RESHAPE', 'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
 export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram']);
@@ -44,11 +45,11 @@ export function loopPragma(loop, name) {
   return items.find((s) => s?.kind === 'pragma' && s.pragma.name === name)?.pragma.args ?? null;
 }
 
-export function checkPragmas(ast, funcs, report) {
-  const one = (p, loc, where) => {
+export function checkPragmas(ast, funcs, report, top = null) {
+  const one = (p, loc, where, fname) => {
     const { name, args } = p;
     if (p.dup) return;   // (a stream of a struct's pragma made for each of its members' streams but the first: said once, #1662)
-    if (IGNORED.has(name)) { report(loc, `#pragma HLS ${name} is accepted and ignored: Silinx does not make it`, 'warning'); return; }
+    if (IGNORED.has(name) || ((name === 'AGGREGATE' || name === 'DISAGGREGATE') && fname !== top)) { report(loc, `#pragma HLS ${name} is accepted and ignored: Silinx does not make it`, 'warning'); return; }
     if (!MADE.has(name)) { report(loc, `#pragma HLS ${name} is not a pragma Silinx knows: ignored`, 'warning'); return; }
     if (LOOP_ONLY.has(name) && where !== 'loop') {
       if (name === 'PIPELINE' && where === 'function') report(loc, "a function's #pragma HLS PIPELINE is not made yet: ignored (a loop's is: put it in the loop's body)", 'warning');
@@ -57,6 +58,7 @@ export function checkPragmas(ast, funcs, report) {
     }
     if (name === 'UNROLL' && args.factor !== undefined && !posInt(args.factor)) report(loc, `#pragma HLS UNROLL factor=${args.factor}: the factor must be a whole number, 1 or more`);
     if (name === 'PIPELINE' && args.ii !== undefined && !posInt(args.ii)) report(loc, `#pragma HLS PIPELINE II=${args.ii}: II must be a whole number, 1 or more`);
+    if (name === 'AGGREGATE' && args.compact !== undefined && !['bit', 'byte', 'none', 'auto'].includes(String(args.compact).toLowerCase())) report(loc, `#pragma HLS AGGREGATE compact=${args.compact} is not one of bit, byte, none and auto: ignored (its default made)`, 'warning');
     if (name === 'INLINE' && args.off) report(loc, '#pragma HLS INLINE off is ignored: Silinx inlines every function', 'warning');
     if (name === 'ARRAY_PARTITION') {
       if (!args.variable) { report(loc, '#pragma HLS ARRAY_PARTITION needs variable=<the array>'); return; }
@@ -69,19 +71,19 @@ export function checkPragmas(ast, funcs, report) {
       if (mode && !ARG_MODES.has(mode)) report(loc, `#pragma HLS INTERFACE ${mode} port=${p.of ?? args.port} is not made yet: ignored (its default interface made)`, 'warning');
     }
   };
-  for (const p of ast.pragmas) one(p, p.loc, 'file');
-  const walk = (items, where) => {
+  for (const p of ast.pragmas) one(p, p.loc, 'file', null);
+  const walk = (items, where, fname) => {
     for (const s of items || []) {
       if (!s) continue;
-      if (s.kind === 'pragma') { one(s.pragma, s.loc, where); continue; }
-      if (isLoop(s)) { const b = s.body; walk(b?.kind === 'block' ? b.items : [b], 'loop'); continue; }
-      if (s.kind === 'block') walk(s.items, 'block');
-      else if (s.kind === 'if') walk([s.then, s.else], 'block');
-      else if (s.kind === 'switch') walk([s.body], 'block');
-      else if (s.kind === 'label') walk([s.stmt], 'block');
+      if (s.kind === 'pragma') { one(s.pragma, s.loc, where, fname); continue; }
+      if (isLoop(s)) { const b = s.body; walk(b?.kind === 'block' ? b.items : [b], 'loop', fname); continue; }
+      if (s.kind === 'block') walk(s.items, 'block', fname);
+      else if (s.kind === 'if') walk([s.then, s.else], 'block', fname);
+      else if (s.kind === 'switch') walk([s.body], 'block', fname);
+      else if (s.kind === 'label') walk([s.stmt], 'block', fname);
     }
   };
-  for (const f of funcs.values()) if (f.body) walk(f.body.items, 'function');
+  for (const f of funcs.values()) if (f.body) walk(f.body.items, 'function', f.name);
 }
 
 /** `for (init; cond; step) body` with `n` copies of body (and step) an iteration: copy k + 1 runs if cond still holds. */

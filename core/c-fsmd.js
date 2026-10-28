@@ -8,7 +8,8 @@
 // each write, its value then valid. With ap_ctrl_none (a function with a stream) the machine starts its next call
 // when one is done, as if ap_start were 1 (#1900). Isomorphic ES module: no DOM and no Node APIs.
 //
-//   fsmd(checked) -> { graph, regs, states, entry, idle, done, ports, outputs, diagnostics }
+//   fsmd(checked, { groups }) -> { graph, regs, states, entry, idle, done, ports, outputs, diagnostics }
+//     groups:  the top's streams and memories of structs made one (core/c-aggregate.js's wordGroups, #1668)
 //     regs:    [{ name, w, s, reset: BigInt, latch?: node id (its value read at the start of a call) }]
 //     states:  [{ id, name, updates: Map reg -> node, next: node, line? }] (the blocks; idle and done apart)
 //     outputs: Map port -> { reg } (a register shown on the port)
@@ -17,11 +18,14 @@ import { hdlName } from './c-graph.js';
 import { BOOL, typeOf } from './c-types.js';
 import { memMethods, MEM_MIN } from './c-mem.js';
 import { fifoMethods } from './c-fifo.js';
+import { wordMethods } from './c-agg-mem.js';
 import { loopPragma, unrollBy } from './c-pragma.js';
 import { inlineCalls } from './c-inline.js';
 
-export function fsmd(checked) {
-  return new SeqFlow(checked).runSeq();
+export function fsmd(checked, { groups = [] } = {}) {
+  const f = new SeqFlow(checked);
+  f.groups = groups;
+  return f.runSeq();
 }
 
 const hasLoop = (n) => {
@@ -95,15 +99,20 @@ class SeqFlow extends Flow {
     const seq = (list, after, lp) => {
       let cur = mk(lp);
       const entry = cur;
+      let compound = false;
       for (let s of list) {
+        // (the words of a memory of structs held: forgotten after a branch or a loop, written before one, #1668)
+        if (compound) { this.wordsAfter(null); compound = false; }
         // (a labelled statement: the statement, its label the loop's name in the report, #1601)
         let label = null;
         while (s?.kind === 'label') { label = s.name; s = s.stmt; }
         if (label && (s.kind === 'for' || s.kind === 'while' || s.kind === 'do')) s = { ...s, label };
         const mem = this.hasMem(s);
-        if (!hasLoop(s) && !mem) { cur.stmts.push(s); continue; }
+        if (!hasLoop(s) && !mem) { cur = this.wordsBefore(s, cur, mk, lp); cur.stmts.push(s); this.wordsAfter(s); continue; }
         // (a memory's accesses: their states, #1527)
-        if (!hasLoop(s) && ['expr', 'decl', 'return'].includes(s.kind)) { cur = this.lowerMem(s, cur, mk, lp); continue; }
+        if (!hasLoop(s) && ['expr', 'decl', 'return'].includes(s.kind)) { cur = this.lowerMem(s, this.wordsBefore(s, cur, mk, lp), mk, lp); this.wordsAfter(s); continue; }
+        cur = this.wordsBefore(null, cur, mk, lp);
+        compound = true;
         if (s.kind === 'block') {
           const join = mk(lp);
           const e = seq(s.items, join, lp);
@@ -144,7 +153,7 @@ class SeqFlow extends Flow {
             const bad = this.hasMem(s) ? 'it accesses a memory, an access a state' : hasLoop(s.body) ? 'a loop is in it' : hasContinue(s.body) ? "a 'continue' is in it" : s.kind === 'do' ? 'a do-while' : null;
             if (!bad) {
               // one state an iteration: if its condition holds, the body and the step; else out
-              if (s.kind === 'for' && s.init) { if (this.hasMem(s.init)) cur = this.lowerMem(s.init, cur, mk, lp); else cur.stmts.push(s.init); }
+              if (s.kind === 'for' && s.init) { if (this.hasMem(s.init)) cur = this.wordsBefore(null, this.lowerMem(s.init, cur, mk, lp), mk, lp); else cur.stmts.push(s.init); }
               const exit = mk(lp);
               const L = { exit, cont: null };
               const it = mk(L);
@@ -166,14 +175,15 @@ class SeqFlow extends Flow {
           const contTo = s.kind === 'do' ? head : (step || head);
           const L = { exit, cont: contTo };
           const body = seq([s.body], s.kind === 'do' ? head : (step || head), L);
-          if (s.kind === 'for' && s.init) { if (this.hasMem(s.init)) cur = this.lowerMem(s.init, cur, mk, lp); else cur.stmts.push(s.init); }
+          if (s.kind === 'for' && s.init) { if (this.hasMem(s.init)) cur = this.wordsBefore(null, this.lowerMem(s.init, cur, mk, lp), mk, lp); else cur.stmts.push(s.init); }
           cur.term = { goto: s.kind === 'do' ? body : head };
           const hc = s.cond ? this.hoistCond(s.cond, head, mk, lp) : { e: null, cur: head };
+          this.wordsAfter(null);   // (the head's words: not the step's)
           hc.cur.term = hc.e ? { cond: hc.e, t: body, f: exit, loopHead: s } : { goto: body };
           if (s.kind === 'do') head.loopHead = s;
           if (step) {
             const se = { kind: 'expr', e: s.step, loc: s.loc };
-            const last = this.hasMem(se) ? this.lowerMem(se, step, mk, lp) : (step.stmts.push(se), step);
+            const last = this.hasMem(se) ? this.wordsBefore(null, this.lowerMem(se, step, mk, lp), mk, lp) : (step.stmts.push(se), step);
             last.term = { goto: head };
           }
           info.blocks = blocks.slice(before + 1);
@@ -182,6 +192,7 @@ class SeqFlow extends Flow {
         }
         this.error(s.loc, hasLoop(s) ? `a '${s.kind}' with a loop in it is not supported yet in a sequential module` : `a '${s.kind}' that accesses a memory is not supported yet in a sequential module (write the access as a statement of its own before it)`);
       }
+      cur = this.wordsBefore(null, cur, mk, lp);
       cur.term = after ? { goto: after } : { done: true };
       return entry;
     };
@@ -200,7 +211,7 @@ class SeqFlow extends Flow {
     for (const st of fn.body.items) {
       if (st.kind !== 'pragma' || st.pragma.name !== 'INTERFACE') continue;
       const a = st.pragma.args;
-      const mode = String(a.mode || Object.keys(a).find((k) => /^ap_/.test(k)) || '').toLowerCase();
+      const mode = String(a.mode || Object.keys(a).find((k) => /^(ap_|bram$)/.test(k)) || '').toLowerCase();
       // (ap_ctrl_none: running by itself, its calls one after the other, when it has a stream to be fed through, as
       // Vitis HLS co-simulates it, #1900; else its block protocol is made)
       if (a.port === 'return' && mode === 'ap_ctrl_none') {
@@ -245,11 +256,14 @@ class SeqFlow extends Flow {
     const walkP = (x) => { if (!x || typeof x !== 'object') return; if (Array.isArray(x)) { x.forEach(walkP); return; } if (x.kind === 'pragma' && x.pragma.name === 'ARRAY_PARTITION' && x.pragma.args.variable) { const a = x.pragma.args; if (!a.type || String(a.type).toLowerCase() === 'complete' || a.complete) this.partitioned.add(a.variable); } for (const [k, y] of Object.entries(x)) if (k !== 'loc' && k !== 'type' && k !== 'pragma') walkP(y); };
     walkP(fn.body);
     for (const pa of fn.params) if (this.partitioned.has(pa.name)) this.warn(pa.loc, `#pragma HLS ARRAY_PARTITION of the argument '${pa.name}' is not made yet: it is ap_memory`);
-    // the arguments: read at the start of a call (latched), a pointer's value its register
+    // the arguments: read at the start of a call (latched), a pointer's value its register; a member of a stream or an
+    // array of structs, its group's (#1668)
+    this.wordSlots(this.groups || []);
     for (const pa of fn.params) {
       const t = pa.type;
+      if (this.wordOf.has(pa.name)) { this.slots.set(pa.name, this.fieldSlot(pa)); continue; }
       if (t.kind === 'ptr' && t.to.kind === 'array') this.error(pa.loc, `the argument '${pa.name}': a pointer to an array is not supported: write it as an array, ${pa.name}[N]`);
-      if (t.kind === 'array') { this.slots.set(pa.name, this.memSlot({ ...pa, const: !!t.of.const }, { ext: true })); continue; }
+      if (t.kind === 'array') { this.slots.set(pa.name, this.bramOf(this.memSlot({ ...pa, const: !!t.of.const }, { ext: true }), pa.name)); continue; }
       if (t.kind === 'stream') { this.slots.set(pa.name, this.fifoSlot(pa)); continue; }   // (ap_fifo, #1590)
       if (t.kind === 'ptr') {
         const et = typeOf(t.to);
@@ -381,7 +395,10 @@ class SeqFlow extends Flow {
       return { line: l.line, ...(l.name ? { name: l.name } : {}), trip: l.trip, max: l.max, unroll: l.unroll, pipeline: l.pipeline, ii, cycles: n === null ? null : l.unroll === 'whole' ? 0 : Math.ceil(n / (typeof l.unroll === 'number' ? l.unroll : 1)) * ii + 1 };
     });
   }
-  stmt(s, base) { return s && /^mem(read|write|latch)$/.test(s.kind) ? this.memStmt(s, base) : s && /^fifo(read|write)$/.test(s.kind) ? this.fifoStmt(s, base) : super.stmt(s, base); }
+  stmt(s, base) {
+    if (s && /^word(get|set|load|write)$/.test(s.kind)) return this.wordStmt(s, base);
+    return s && /^mem(read|write|latch)$/.test(s.kind) ? this.memStmt(s, base) : s && /^fifo(read|write)$/.test(s.kind) ? this.fifoStmt(s, base) : super.stmt(s, base);
+  }
   runBlocks() {
     const st = (n) => this.g.const(n, this.stateT);
     this.states = [];
@@ -457,6 +474,7 @@ class SeqFlow extends Flow {
       if (os.some((o) => o.written)) for (const o of os) { this.readOut(o); o.written = true; }
     }
     for (const pa of this.fn.params) {
+      if (this.wordOf?.has(pa.name)) { this.wordPorts(pa.name, ports, outputs); continue; }
       const o = this.outs.get(pa.name);
       const fifo = this.fifos?.find((x) => x.name === pa.name);
       if (fifo) {
@@ -468,15 +486,7 @@ class SeqFlow extends Flow {
         continue;
       }
       const mem = this.mems?.find((x) => x.ext && x.name === pa.name);
-      if (mem) {
-        // ap_memory: the address and its enable, the write's enable and data, the value read
-        const p = (sfx, dir, w, node) => { ports.push({ name: `${pa.name}${sfx}`, dir, w, s: false, role: 'mem', param: pa.name }); if (node != null) outputs.set(`${pa.name}${sfx}`, { node }); };
-        p('_address0', 'out', mem.aw, mem.addr);
-        p('_ce0', 'out', 1, mem.ce);
-        if (mem.written) { p('_we0', 'out', 1, mem.we); p('_d0', 'out', mem.t.w, mem.d); }
-        if (mem.read) p('_q0', 'in', mem.t.w, null);
-        continue;
-      }
+      if (mem) { this.memIface(pa.name, mem, ports, outputs); continue; }
       if (!o) {
         const i = this.inputs.get(pa.name);
         if (i) ports.push({ name: pa.name, dir: 'in', w: i.t.w, s: i.t.s, role: 'arg', param: pa.name });
@@ -499,8 +509,9 @@ class SeqFlow extends Flow {
     return {
       graph: this.g, regs: [...(this.regs?.values() || [])], states: this.states || [], entry: this.entry?.num ?? 1, idle: 0, done: this.doneNum ?? 1,
       stateT: this.stateT, ports, outputs, ctrl: this.ctrl ?? 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
-      loops: this.loops || [], blocks: this.reached || [], fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}) })), extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written })),
+      loops: this.loops || [], blocks: this.reached || [], fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.port ?? x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}), ...(x.fields ? { fields: x.fields } : {}) })),
+      extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.port ?? x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written, ...(x.fields ? { fields: x.fields } : {}), ...(x.bram ? { bram: x.bram } : {}) })),
     };
   }
 }
-Object.assign(SeqFlow.prototype, memMethods, fifoMethods);
+Object.assign(SeqFlow.prototype, memMethods, fifoMethods, wordMethods);

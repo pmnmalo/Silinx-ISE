@@ -177,7 +177,7 @@ export function checkC(source, file = 'input.c', opts = {}) {
     checkFunction(f, { hw, funcs, globals, consts, report, loops, typeOk, dataflow: hasDataflow(f) });   // (a region's streams: any function's, its C simulation; the hardware the top's, core/c-processes.js)
   }
   // the HLS pragmas of the synthesized functions (#1529)
-  checkPragmas(ast, new Map([...funcs].filter(([n]) => synth.has(n))), report);
+  checkPragmas(ast, new Map([...funcs].filter(([n]) => synth.has(n))), report, top);
   diags.sort((a, b) => a.line - b.line || a.col - b.col);
   return { ast, top, funcs, loops, consts, diagnostics: diags, ok: !diags.some((d) => d.severity === 'error'), dataflow: !!top && hasDataflow(funcs.get(top)) };
 }

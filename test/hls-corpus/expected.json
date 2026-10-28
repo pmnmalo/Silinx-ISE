@@ -68,9 +68,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 53,
-      "max": 53,
-      "avg": 53
+      "min": 43,
+      "max": 43,
+      "avg": 43
     },
     "reason": null
   },
@@ -79,9 +79,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 83,
-      "max": 83,
-      "avg": 83
+      "min": 43,
+      "max": 43,
+      "avg": 43
     },
     "reason": null
   },
@@ -246,9 +246,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 9,
-      "max": 10,
-      "avg": 9.8
+      "min": 6,
+      "max": 7,
+      "avg": 6.6
     },
     "reason": null
   },
@@ -290,9 +290,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 31,
-      "max": 34,
-      "avg": 31.8
+      "min": 6,
+      "max": 7,
+      "avg": 6.6
     },
     "reason": null
   },
@@ -579,7 +579,7 @@
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C synthesis: 66: 'strm_out' is not an integer"
+    "reason": "C synthesis: 58: #pragma HLS DATAFLOW: the region has its statements other than calls of functions and declarations of streams and arrays: its streams are FIFOs between processes, so it cannot be made sequential"
   },
   "task-level-parallelism-control-driven-channels-autorestart": {
     "csim": "fail",

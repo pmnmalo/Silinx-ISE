@@ -34,8 +34,8 @@ Not part of `npm test` (it needs the network once).
 | dsp-fft-interface-stream-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-logicore-fft-float-ssr | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fir-decimator | C++ | fail | fail | skip | - | C simulation: fir_top.h:19: the header 'hls_fir.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 53 |  |
-| interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 83 |  |
+| interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 43 |  |
+| interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 43 |  |
 | interface-aggregation-disaggregation-aggregation-of-struct | C++ | pass | pass | pass | 183 |  |
 | interface-aggregation-disaggregation-auto-disaggregation-of-struct | C++ | pass | pass | pass | 75 |  |
 | interface-aggregation-disaggregation-disaggregation-of-axis-port | C++ | pass | pass | pass | 53 |  |
@@ -52,11 +52,11 @@ Not part of `npm test` (it needs the network once).
 | interface-memory-rom-lookup-table-math | C++ | pass | pass | pass | - |  |
 | interface-memory-using-axi-master | C++ | fail | fail | skip | - | C simulation: 37: memcpy is a system call: not possible in the synthesized code (Silinx HLS, as Vitis HLS) |
 | interface-register-using-axi-lite-with-user-defined-offset | C++ | pass | pass | pass | - |  |
-| interface-streaming-axi-stream-custom-side-channel-data-2 | C++ | pass | pass | pass | 9-10 |  |
+| interface-streaming-axi-stream-custom-side-channel-data-2 | C++ | pass | pass | pass | 6-7 |  |
 | interface-streaming-axi-stream-to-master | C++ | pass | pass | pass | 18998 |  |
 | interface-streaming-axis-array-stream-no-side-channel-data | C++ | pass | pass | pass | 203 |  |
 | interface-streaming-using-array-of-streams | C++ | pass | pass | pass | 348 |  |
-| interface-streaming-using-axi-stream-with-side-channel-data | C++ | pass | pass | pass | 31-34 |  |
+| interface-streaming-using-axi-stream-with-side-channel-data | C++ | pass | pass | pass | 6-7 |  |
 | interface-streaming-using-axi-stream-with-struct | C++ | fail | fail | skip | - | C simulation: example.h:3: the header 'complex' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | migration-python-scripts | C | pass | pass | pass | 1 |  |
 | migration-vitis-unified-cli | C | pass | pass | pass | 1 |  |
@@ -87,7 +87,7 @@ Not part of `npm test` (it needs the network once).
 | pipelining-functions-hier-func | C++ | pass | pass | pass | - |  |
 | pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 1723 |  |
 | pipelining-loops-perfect-loop | C++ | pass | pass | pass | 1723 |  |
-| pipelining-loops-using-free-running-pipeline | C++ | pass | fail | skip | - | C synthesis: 66: 'strm_out' is not an integer |
+| pipelining-loops-using-free-running-pipeline | C++ | pass | fail | skip | - | C synthesis: 58: #pragma HLS DATAFLOW: the region has its statements other than calls of functions and declarations of streams and arrays: its streams are FIFOs between processes, so it cannot be made sequential |
 | task-level-parallelism-control-driven-channels-autorestart | C++ | fail | fail | skip | - | C simulation: diamond_test.cpp:23: the header 'ap_float.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | task-level-parallelism-control-driven-channels-merge-split-merge-load-balance | C++ | pass | pass | pass | 600 |  |
 | task-level-parallelism-control-driven-channels-merge-split-merge-round-robin | C++ | pass | pass | pass | 600 |  |

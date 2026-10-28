@@ -24,9 +24,37 @@ const B = (v, w) => (typeof v === 'number' ? (w > 32 ? f64Bits(v) : f32Bits(v)) 
 const hex = (v, w) => `${w}'h${B(v, w).toString(16)}`;
 /** A struct's port's value (#1628): its members' (value(member)) at their fields, the padding 0. */
 export const pack = (fields, value) => fields.reduce((acc, f) => acc | (B(value(f.param) ?? 0n, f.w) << BigInt(f.off)), 0n);
+/** A word of a stream or a memory of structs (#1668): its members' (value(member, j): a member array's element j) at
+ *  their fields, the padding 0. */
+export const packWord = (fields, value) => fields.reduce((acc, f) => {
+  for (let j = 0; j < (f.k ?? 1); j++) acc |= B(value(f.param, j) ?? 0n, f.w) << BigInt(f.off + j * f.size);
+  return acc;
+}, 0n);
+
+/** The calls with the values of each stream and memory of structs, its words, from its members' (#1668). */
+export function wordCalls(gen, calls) {
+  const gs = [...(gen.memories || []), ...(gen.fifos || [])].filter((x) => x.fields);
+  if (!gs.length) return calls;
+  const words = (src, fields) => {
+    const f0 = fields[0];
+    if (!src[f0.param]) return undefined;
+    return Array.from({ length: Math.floor(src[f0.param].length / f0.k) }, (_, i) => packWord(fields, (m, j) => src[m]?.[i * (fields.find((f) => f.param === m).k) + j]));
+  };
+  return calls.map((c) => {
+    const r = { ...c };
+    for (const key of ['memIn', 'memOut', 'streamIn', 'streamOut', 'streamRead']) r[key] = { ...(c[key] || {}) };
+    for (const x of gs) {
+      const keys = gen.memories?.includes(x) ? ['memIn', 'memOut'] : ['streamIn', 'streamOut'];
+      for (const key of keys) { const v = words(c[key] || {}, x.fields); if (v !== undefined) r[key][x.name] = v; }
+      if (!keys.includes('memIn') && c.streamRead?.[x.fields[0].param] !== undefined) r.streamRead[x.name] = c.streamRead[x.fields[0].param];
+    }
+    return r;
+  });
+}
 
 /** The Verilog test bench replaying the calls: one line of hex values per call (and the protocol's faults last). */
-export function cosimBench(gen, calls, { maxCycles = MAX_CYCLES } = {}) {
+export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
+  const calls = wordCalls(gen, calls0);
   const port = (n) => gen.ports.find((p) => p.name === n);
   const seq = !!port('ap_clk'), hs = !!port('ap_start');
   const L = ['module silinx_cosim_tb;', '  integer cyc, bad = 0;'];
@@ -37,9 +65,12 @@ export function cosimBench(gen, calls, { maxCycles = MAX_CYCLES } = {}) {
   for (const o of outs) L.push(`  reg [${o.w - 1}:0] cap_${o.name}; reg got_${o.name};`);
   const mems = gen.memories || [];
   const P = (x) => x.port ?? x.name;
+  // (a memory's port: ap_memory's, or a BRAM's, its address in bytes, a write enable a byte, #1668)
+  const M = (x) => (x.bram ? { a: `(${P(x)}_Addr_A >> ${x.bram.shift})`, ce: `${P(x)}_EN_A`, we: `(|${P(x)}_WEN_A)`, d: `${P(x)}_Din_A`, q: `${P(x)}_Dout_A` }
+    : { a: `${P(x)}_address0`, ce: `${P(x)}_ce0`, we: `${P(x)}_we0`, d: `${P(x)}_d0`, q: `${P(x)}_q0` });
   for (const x of mems) {
     L.push(`  reg [${x.w - 1}:0] mem_${x.name} [0:${x.n - 1}];`);
-    if (x.read) L.push(`  reg [${x.w - 1}:0] q_${x.name};`, `  assign ${P(x)}_q0 = q_${x.name};`);
+    if (x.read || x.bram) L.push(`  reg [${x.w - 1}:0] q_${x.name};`, `  assign ${M(x).q} = q_${x.name};`);
   }
   // (a stream: a FIFO in the test bench, its values the C's before each call; empty and full now and then, the
   // module's waits exercised, #1590; one the design polls, s.empty() / s.full(), only when it is, #1823)
@@ -70,7 +101,7 @@ export function cosimBench(gen, calls, { maxCycles = MAX_CYCLES } = {}) {
     L.push('  always #5 ap_clk = ~ap_clk;', '  always @(posedge ap_clk) begin');
     for (const o of outs) if (port(`${o.name}_ap_vld`)) L.push(`    if (${o.name}_ap_vld) begin cap_${o.name} <= ${o.name}; got_${o.name} <= 1; end`);
     // (a memory: one port, the value read on _q0 the cycle after its address; an address outside it: x)
-    for (const x of mems) L.push(`    if (${P(x)}_ce0) begin${x.written ? ` if (${P(x)}_we0 && ${P(x)}_address0 < ${x.n}) mem_${x.name}[${P(x)}_address0] <= ${P(x)}_d0;` : ''}${x.read ? ` q_${x.name} <= ${P(x)}_address0 < ${x.n} ? mem_${x.name}[${P(x)}_address0] : ${x.w}'bx;` : ''} end`);
+    for (const x of mems) { const m = M(x); L.push(`    if (${m.ce}) begin${x.written ? ` if (${m.we} && ${m.a} < ${x.n}) mem_${x.name}[${m.a}] <= ${m.d};` : ''}${x.read ? ` q_${x.name} <= ${m.a} < ${x.n} ? mem_${x.name}[${m.a}] : ${x.w}'bx;` : ''} end`); }
     if (fifos.length) L.push('    ap_tick <= ap_tick + 1;');
     for (const f of fifos) {
       if (f.dir === 'in') L.push(`    if (${P(f)}_read && ${P(f)}_empty_n) fi_${f.name} <= fi_${f.name} + 1;`);
@@ -131,7 +162,7 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
   const port = (n) => gen.ports.find((p) => p.name === n);
   const mismatches = [];
   const cycles = [];
-  sim.calls.forEach((c, k) => {
+  wordCalls(gen, sim.calls).forEach((c, k) => {
     const row = rows[k] || [];
     let q = 0;
     const say = (p, expected, got) => mismatches.push({ call: k + 1, port: p, expected, got });

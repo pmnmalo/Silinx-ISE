@@ -110,9 +110,10 @@ so its hardware is the C's:
   an array argument it is refused, as C++ does (the argument is a pointer).
 - **`hls::stream<T>`** arguments: the `ap_fifo` interface (`_dout`, `_empty_n`, `_read`; `_din`, `_full_n`,
   `_write`), each access a state of its own that waits while the FIFO is empty or full. A **stream of a struct**
-  (`hls::stream<S>`, #1662) is a stream per member of `S` (`A_data`, `A_last`…), all written or read together:
-  `write`, `<<`, `read()` in a declaration, an assignment or a `return`, `read(v)`, `>>`, `empty`, `full`, passed to a
-  function, named by a pragma. Vitis HLS makes one stream of them (a warning says so: not yet, #1668).
+  (`hls::stream<S>`, #1662): `write`, `<<`, `read()` in a declaration, an assignment or a `return`, `read(v)`, `>>`,
+  `empty`, `full`, passed to a function, named by a pragma. The top's is one `ap_fifo` of the struct's words (#1668,
+  below), a word a struct read or written; an `ap_axis`'s side channels are members of its words (`axis`'s ports of
+  their own, `TDATA`, `TKEEP`…, are #1894's).
 - **Arrays of streams** (#1739): `hls::stream<T> s[N]`, a parameter `s[N]` or `(&s)[N]`: each element a stream of its
   own (its ap_fifo ports `s_0_dout`…, a FIFO in a DATAFLOW region); `s[k]` by a constant that stream, `s[i]` by a
   variable the statement made for each element (an `if` on the index); the array passed whole, its elements; its
@@ -143,7 +144,16 @@ structs is an array per member; a member array of an array of structs is one arr
   `short` 16, an `ap_int<W>` 8, 16, 32, 64… bits), the padding bits 0 (`struct { short x; bool z; ap_int<5> w; }`
   is 32 bits: `x` bits 15–0, `z` bit 16, `w` bits 28–24). A struct read is an input `s`; written (by reference or
   address), `s_i`, `s_o` and `s_o_ap_vld`, its members not written given back as they were; returned, `ap_return`.
-  A stream or an array of structs is still a stream or a memory per member, with a warning (#1668).
+  A **stream or an array of structs** (or a pointer to structs indexed) is one `ap_fifo` / one `ap_memory` of words
+  (#1668), as Vitis HLS aggregates them: the members in their order from the LSB, each of its bits (`compact=bit`,
+  Vitis HLS's default here: a `bool` 1 bit), a member array's elements one after the other (`struct { int foo[3];
+  ap_int<23> bar; }` is 119 bits). An element's word is read once while its index and the memory do not change, its
+  members' reads its fields; its members' writes go into it and it is written whole (read first when some of its
+  fields were not written). The co-simulation packs the test bench's words from the C's members.
+  `#pragma HLS AGGREGATE variable=s compact=bit | byte | none | auto` chooses the packing (`byte`: each member whole
+  bytes; `none`: its C size, as above; of a struct argument too); `#pragma HLS DISAGGREGATE variable=s` keeps a port,
+  a stream or a memory per member (`s_x`, `s_y_address0`…). A struct with a stream in it is disaggregated, as Vitis
+  HLS does.
 - **Bit-fields** (#1896): a member `T m : W;` is a member of `W` bits (`ap_uint<W>`, `ap_int<W>` of a signed `T`),
   wrapped as C wraps it; an unnamed one (`T : W;`) is padding.
 - **Unions** (#1896): a union is one word, an unsigned integer of its size (up to 64 bits), its members views of its
@@ -195,8 +205,10 @@ Names and behaviour as Vitis HLS makes them (UG1399, "Interface synthesis"):
 | a pointer argument only written | output `p` and `p_ap_vld` (`ap_vld`) |
 | a pointer argument read and written | input `p_i`, output `p_o` and `p_o_ap_vld` (`ap_ovld`) |
 | a struct argument (#1628) | one port of its members (above): read, input `s`; written, `s_i`, `s_o`, `s_o_ap_vld`; returned, `ap_return` |
-| an array argument | `ap_memory`: `a_address0`, `a_ce0`, `a_we0`, `a_d0`, `a_q0`; one of two or more dimensions (`a[N][M]`, #1786) one memory of N*M words, `a[i][j]` at `i*M + j` |
-| a pointer argument indexed (`p[i]`, `*(p + i)`, #1599), or passed to a function that indexes it (#1684) | `ap_memory`, its depth the INTERFACE pragma's `depth=` (else 1024, a warning); a pointer to structs a memory per member, a pragma naming the struct applying to each |
+| an array argument | `ap_memory`: `a_address0`, `a_ce0`, `a_we0`, `a_d0`, `a_q0`; one of two or more dimensions (`a[N][M]`, #1786) one memory of N*M words, `a[i][j]` at `i*M + j`; an array of structs one memory of its words (#1668) |
+| an array argument with `#pragma HLS INTERFACE bram` (#1668) | a BRAM's port: `a_Addr_A` (32 bits, an address in bytes), `a_EN_A`, `a_WEN_A` (a write enable a byte), `a_Din_A`, `a_Dout_A` (its words a power of 2 of bytes), `a_Clk_A`, `a_Rst_A` |
+| a pointer argument indexed (`p[i]`, `*(p + i)`, #1599), or passed to a function that indexes it (#1684) | `ap_memory`, its depth the INTERFACE pragma's `depth=` (else 1024, a warning); a pointer to structs one memory of their words (#1668), a pragma naming the struct applying to it |
+| a stream argument, `hls::stream<T>` | `ap_fifo`: `s_dout`, `s_empty_n`, `s_read`; `s_din`, `s_full_n`, `s_write`; a stream of structs one of their words (#1668) |
 
 Ports are `std_logic_vector(W-1 downto 0)` (VHDL) or `[W-1:0]` (Verilog), a 1-bit type a
 `std_logic` / plain wire. The block protocol: `ap_start` starts a call; `ap_ready` says the inputs
@@ -287,7 +299,8 @@ values a call reads and writes (an input stream's values kept across calls: a ta
 |---|---|
 | `TOP name=` | the top function |
 | `INTERFACE ap_ctrl_none / ap_ctrl_hs port=return` | the block protocol |
-| `INTERFACE ap_none / ap_vld / ap_ovld / ap_memory port=` | the argument's interface |
+| `INTERFACE ap_none / ap_vld / ap_ovld / ap_memory / bram port=` | the argument's interface |
+| `AGGREGATE variable= compact=` / `DISAGGREGATE variable=` (the top's, #1668) | a struct argument, a stream or an array of structs one port, stream or memory of its words, packed `compact=bit` (an array's or a stream's default), `byte`, `none` (a scalar struct's default) / a port, a stream or a memory per member |
 | `INLINE` / `INLINE off` | every function is inlined (`off` is ignored, with a warning) |
 | `LOOP_TRIPCOUNT min= max=` | the report's bound of a loop whose count depends on the inputs (its latency, else unknown) |
 | `PIPELINE [II=]` (in a loop's body) | a sequential module's loop: an iteration a state (II=1: its condition, body and step in one clock cycle); a loop that accesses a memory, has a loop or a `continue` in it keeps its states, a warning saying the II made |
