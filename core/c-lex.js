@@ -234,10 +234,16 @@ function headerKey(headers, from, name) {
 }
 // (headers: the project's own, { 'name.h': text }, #include "name.h" reads them in place, #1597; their macros the
 // source's; #pragma once and include guards as C's)
-export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file) } = {}) {
+// (synthesis: __SYNTHESIS__ defined, as Vitis HLS's synthesis defines it; otherwise, the C simulation's view, the tokens
+// only it compiles (#ifndef __SYNTHESIS__) marked sim: their statements the test bench's, #1897)
+export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file), synthesis = false } = {}) {
   const errors = [];
   const tokens = [], pragmas = [], includes = [];
   const macros = new Map();
+  const SYN = { params: null, body: [{ t: 'num', v: '1', line: 1, col: 1 }] };
+  if (synthesis) macros.set('__SYNTHESIS__', SYN);
+  // (the macros as the synthesis sees them, for a directive that names __SYNTHESIS__)
+  const synMacros = (text) => (text.includes('__SYNTHESIS__') && !macros.has('__SYNTHESIS__') ? new Map(macros).set('__SYNTHESIS__', SYN) : macros);
   // (C++, #1590: true and false its keywords)
   if (cpp) for (const [k, v] of [['true', '1'], ['false', '0']]) macros.set(k, { params: null, body: [{ t: 'num', v, line: 1, col: 1 }] });
   const once = new Set();
@@ -257,11 +263,12 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
   const st = cStructs(tokens, report, false);
   return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs };
 
-  function run(src, fname, depth) {
+  function run(src, fname, depth, simOuter = false) {
   const bad = [];
   const lines = logicalLines(src, bad);
-  const cond = [];   // [{ on, done, line }]: the #if stack (on: this branch taken; done: one branch taken)
+  const cond = [];   // [{ on, done, line, syn, synDone }]: the #if stack (on: this branch taken; done: one branch taken; syn, synDone: the same with __SYNTHESIS__ defined)
   const live = () => cond.every((c) => c.on);
+  const liveSyn = () => !simOuter && cond.every((c) => c.syn);
   const err = (line, col, message, severity = 'error') => errors.push({ file: fname, line, col, message, severity });
   const own = (t) => (fname === file ? t : { ...t, file: fname });
   for (const { text, line, pos } of lines) {
@@ -274,16 +281,20 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
       const e = (m, sev) => err(line, col, m, sev);
       const toks = () => scan(rest, line, bad).map((t) => ({ ...t, line }));
       if (dir === 'if' || dir === 'ifdef' || dir === 'ifndef') {
-        const on = !live() ? false : dir === 'if' ? !!ifValue(toks(), macros, e) : (dir === 'ifdef') === macros.has(rest.trim().split(/\s/)[0]);
-        cond.push({ on, done: on, line, outer: live() });
+        const value = (ms, er) => (dir === 'if' ? !!ifValue(toks(), ms, er) : (dir === 'ifdef') === ms.has(rest.trim().split(/\s/)[0]));
+        const on = live() && value(macros, e);
+        const syn = liveSyn() && value(synMacros(rest), () => {});
+        cond.push({ on, done: on, syn, synDone: syn, line, outer: live() });
         continue;
       }
       if (dir === 'elif' || dir === 'else') {
         const c = cond.at(-1);
         if (!c) { e(`#${dir} with no #if`); continue; }
-        const outer = cond.slice(0, -1).every((x) => x.on);
+        const outer = cond.slice(0, -1).every((x) => x.on), outerSyn = cond.slice(0, -1).every((x) => x.syn);
         c.on = outer && !c.done && (dir === 'else' || !!ifValue(toks(), macros, e));
         c.done = c.done || c.on;
+        c.syn = outerSyn && !c.synDone && (dir === 'else' || !!ifValue(toks(), synMacros(rest), () => {}));
+        c.synDone = c.synDone || c.syn;
         continue;
       }
       if (dir === 'endif') { if (!cond.pop()) e('#endif with no #if'); continue; }
@@ -297,7 +308,7 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
         const key = headers && !KNOWN_HEADERS.has(m[1]) ? headerKey(headers, fname, m[1]) : null;
         if (key !== null) {
           if (depth > 16) e(`#include "${m[1]}": headers included too deep (a header including itself?)`);
-          else if (!once.has(key)) run(headers[key], key, depth + 1);
+          else if (!once.has(key)) run(headers[key], key, depth + 1, !liveSyn());
           continue;
         }
         if (cpp && (m[1] === 'hls_stream.h' || m[1] === 'hls_task.h')) continue;   // (hls::stream, hls::task: C++'s, #1590, #1721)
@@ -341,7 +352,8 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     const lineBad = [];
     for (const t of scan(text, line, lineBad)) scanned.push(place(t));
     for (const b of lineBad) bad.push({ ...b, ...place({ col: b.col }) });
-    tokens.push(...expand(scanned, macros, (m) => err(line, scanned[0]?.col || 1, m)).map(own));
+    const sim = !liveSyn();
+    tokens.push(...expand(scanned, macros, (m) => err(line, scanned[0]?.col || 1, m)).map((t) => (sim ? { ...own(t), sim } : own(t))));
   }
   for (const c of cond) err(c.line, 1, '#if with no #endif');
   for (const b of bad) err(b.line, b.col, b.message);

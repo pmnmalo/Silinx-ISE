@@ -23,7 +23,7 @@ const REFUSED = new Set(['malloc', 'calloc', 'realloc', 'free', 'exit', 'abort',
   'fread', 'fwrite', 'fgets', 'fscanf', 'scanf', 'getchar', 'system', 'memcpy', 'memset', 'strlen', 'strcpy']);
 const IGNORED = new Set(['printf', 'fprintf', 'puts', 'putchar']);
 const STREAMS = new Set(['stdout', 'stderr', 'stdin']);
-const TB_LIB = new Set(['abs', 'labs', 'llabs', 'feof', 'fputs', 'fputc', 'putc', 'fflush', 'ap_uniform_int']);   // (ap_uniform_int: <random>'s, core/cpp-lex.js, #1734)
+const TB_LIB = new Set(['abs', 'labs', 'llabs', 'feof', 'fputs', 'fputc', 'putc', 'fflush', 'ap_uniform_int', 'sprintf', 'snprintf']);   // (ap_uniform_int: <random>'s, core/cpp-lex.js, #1734; sprintf: a file's name, #1897)
 // the member functions of ap_int / ap_uint Silinx HLS knows
 // the member functions of hls::stream Silinx HLS knows (#1590)
 const STREAM_MEMBERS = new Set(['read', 'write', 'empty', 'full', 'read_nb', 'write_nb', 'size']);
@@ -183,7 +183,8 @@ export function checkC(source, file = 'input.c', opts = {}) {
 export const hasDataflow = (f) => !!f?.body?.items.some((st) => st.kind === 'pragma' && (st.pragma.name === 'DATAFLOW' || st.pragma.name === 'TASK'));   // (an hls::task's region too, #1721)
 
 function checkFunction(f, ctx) {
-  const { hw, funcs, globals, consts, report, loops, typeOk, dataflow } = ctx;
+  const { funcs, globals, consts, report, loops, typeOk, dataflow } = ctx;
+  let { hw } = ctx;
   const scopes = [new Map()];
   for (const pa of f.params) {
     if (!pa.name) { if (f.name !== 'main') report(pa.loc, `a parameter of '${f.name}' has no name`); continue; }   // (main(int, char **), C++)
@@ -195,7 +196,8 @@ function checkFunction(f, ctx) {
   function typeHw(t, loc, what) {
     if (!t) return;
     // (float and double: their operations the soft-float library's, core/c-dataflow-float.js, #1768, #1773)
-    if (t.kind === 'struct') report(loc, `${what}: structures (${t.name}) are not supported in Silinx HLS yet`);
+    if (t.kind === 'struct' && t.name === 'FILE') report(loc, `${what}: a FILE (stdio.h's files) is the test bench's, not possible in the synthesized code (Silinx HLS, as Vitis HLS; the C simulation's code only: #ifndef __SYNTHESIS__)`);
+    else if (t.kind === 'struct') report(loc, `${what}: structures (${t.name}) are not supported in Silinx HLS yet`);
     else if (t.kind === 'array') typeHw(t.of, loc, what);
     else if (t.kind === 'ptr') {
       if (t.to.kind === 'ptr') report(loc, `${what}: a pointer to a pointer is not possible (Silinx HLS: pointers only to arguments)`);
@@ -210,7 +212,7 @@ function checkFunction(f, ctx) {
       typeHw(v.type, v.loc, `'${v.name}'`);
       // (a DATAFLOW region's: a FIFO between its processes, #1707)
       if (v.type.kind === 'stream' && !dataflow) report(v.loc, `'${v.name}': a stream inside the module (a FIFO between its parts, DATAFLOW) is not supported yet: a stream is an argument (ap_fifo)`);
-      if (v.type.kind === 'ptr' && !v.said) report(v.loc, `'${v.name}': a pointer variable is not possible in Silinx HLS (pointers only as arguments; use an array index)`);
+      if (v.type.kind === 'ptr' && !v.said && v.type.to.name !== 'FILE') report(v.loc, `'${v.name}': a pointer variable is not possible in Silinx HLS (pointers only as arguments; use an array index)`);
       if (v.type.kind === 'array' && !v.type.length && !v.type.size && !v.init) report(v.loc, `'${v.name}': an array needs its size`);
     }
     if (v.init) expr(v.init);
@@ -377,6 +379,8 @@ function checkFunction(f, ctx) {
   // ------------------------------------------------ statements
   function stmt(s) {
     if (!s) return;
+    // (a synthesized function's statement only the C simulation compiles (#ifndef __SYNTHESIS__): the test bench's, #1897)
+    if (hw && s.loc?.sim) { hw = false; try { stmt(s); } finally { hw = true; } return; }
     switch (s.kind) {
       case 'block': scopes.push(new Map()); s.items.forEach(stmt); scopes.pop(); return;
       case 'decl': s.vars.forEach(declare); return;

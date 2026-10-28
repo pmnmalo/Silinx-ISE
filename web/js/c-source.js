@@ -73,14 +73,25 @@ export function cBadges(file, lang, context) {
 // ------------------------------------------------------------------ C simulation and C/RTL co-simulation (#1528)
 const text = async (path) => { const d = findDoc(`file:${path}`); if (d?.editor) return d.editor.getValue(); return (await import('./api.js')).api.readFile(S.project.name, path); };
 const hdlLang = () => (S.project?.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
+/** The test bench's files (#1897): the project's files its strings name (core/c-interp-lib.js), read from the project
+ *  only, the C simulation's in-memory files (in the browser edition too). */
+async function tbFiles(src) {
+  const { testBenchFiles } = await import('/core/c-interp-lib.js');
+  const paths = testBenchFiles(src, S.diskTree || S.fileTree || []);
+  return Object.fromEntries(await Promise.all(paths.map(async (p) => [p, await text(p)])));
+}
 
 /** C Simulation: the C source's main() run (core/c-interp.js), its output in the Console. */
 export async function runCSimulation(path) {
   const { simulateC } = await import('/core/c-interp.js');
   log(`\nStarted : "C Simulation" of ${path}.\n`, 'hdr');
   showConsolePage('console');
-  const r = simulateC(await text(path), { file: path });
+  const src = await text(path);
+  const r = simulateC(src, { file: path, files: await tbFiles(src) });
   if (r.output) for (const l of r.output.replace(/\n$/, '').split('\n')) log(l);
+  // (the files it wrote: in memory, the project's left as they are)
+  const wrote = Object.keys(r.files || {});
+  if (wrote.length) log(`${wrote.length} file(s) written by the test bench, in memory (not saved to the project): ${wrote.slice(0, 5).join(', ')}${wrote.length > 5 ? ', …' : ''}`);
   if (!r.ok) {
     const why = r.error ? `line ${r.error.line}: ${r.error.message}` : r.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`).join('; ');
     log(`ERROR:SilinxC - "${path}" ${why}`, 'err');
@@ -98,7 +109,8 @@ export async function runCosimulation(path) {
   const lang = hdlLang();
   log(`\nStarted : "C/RTL Co-simulation" of ${path} (${lang === 'vhdl' ? 'VHDL' : 'Verilog'}).\n`, 'hdr');
   showConsolePage('console');
-  const r = cosimulate(await text(path), { file: path, lang });
+  const src = await text(path);
+  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src) });
   for (const e of r.errors) log(`ERROR:SilinxC - "${path}" ${e}`, 'err');
   if (!r.ok || r.errors.length) { log('\nProcess "C/RTL Co-simulation" failed', 'err', { diag: false }); return false; }
   log(`C simulation: ${r.calls} call(s) of '${r.gen.top}' replayed on its ${lang === 'vhdl' ? 'VHDL' : 'Verilog'}.`);

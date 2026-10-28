@@ -43,7 +43,8 @@ function tokenTools(toks, file, errors) {
   const S = { p: 0 };
 
   const at = (v) => toks[S.p].v === v && (toks[S.p].t === 'op' || toks[S.p].t === 'id');
-  const loc = (t = toks[S.p]) => ({ line: t.line, col: t.col });
+  // (sim: a statement only the C simulation compiles, #ifndef __SYNTHESIS__, core/c-lex.js, #1897)
+  const loc = (t = toks[S.p]) => (t.sim ? { line: t.line, col: t.col, sim: true } : { line: t.line, col: t.col });
   class Stop extends Error {}
   const fail = (message, t = toks[S.p]) => { errors.push({ file, line: t.line, col: t.col, message, severity: 'error' }); throw new Stop(); };
   const expect = (v, what) => {

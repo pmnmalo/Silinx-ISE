@@ -10,16 +10,44 @@ const INT = { w: 32, s: true };
 const num = (v) => ({ v: BigInt(v), t: INT });
 export class Exit { constructor(code) { this.code = code; } }
 
+/** The project's files a test bench may open (#1897): of paths (the project's, nothing outside it), those whose names
+ *  the source's strings give with their extensions ("tb_data/in.dat", diff's in system("diff a.dat b.dat"); a printf
+ *  format's conversions any text, "out_%03d.dat"), not the build's.
+ *  The app reads them for the C simulation's in-memory files (web/js/c-source.js). */
+export function testBenchFiles(source, paths) {
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const words = [...source.matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].flatMap((m) => m[1].split(/\s+/));   // (system("diff a b")'s names too)
+  const names = new Set(words.map((w) => w.split('/').pop()).filter((n) => /[^%\s]\.[A-Za-z]\w*$/.test(n)));   // (a name with its extension)
+  const pats = [...names].map((n) => new RegExp(`^${n.split(/%[-+ 0#]*\d*(?:\.\d+)?(?:hh|h|ll|l|z|j)?[diuxXoscfFeEgG]/).map(esc).join('.*')}$`));
+  return paths.filter((p) => !/^build\//.test(p) && pats.some((re) => re.test(p.split('/').pop())));
+}
+
 /** A file of the test bench: { name, text, pos, w: written }. */
 const handle = (fh) => ({ fh, v: fh ? 1n : 0n, t: INT });
 
 export const libMethods = {
+  /** A string's text: a literal's, or a char array's (a pointer into one) up to its '\0' (#1897); undefined otherwise. */
+  cString(x) {
+    if (x?.str !== undefined) return x.str;
+    const arr = x?.arr || x?.ptr?.arr;
+    if (!arr) return undefined;
+    let s = '';
+    for (let k = x.arr ? 0 : x.ptr.index; k < arr.length && arr[k].v; k++) s += String.fromCharCode(Number(BigInt.asUintN(8, BigInt(arr[k].v))));
+    return s;
+  },
+  /** A path a test bench names, refused when it leaves the project: absolute (/x, C:\x, \\host, ~/x) or through '..'
+   *  (#1897). */
+  inProject(name, e, what) {
+    if (/^([\\/~]|[A-Za-z]:)/.test(name) || name.split(/[\\/]/).includes('..')) this.fail(e, `${what}: '${name}' is outside the project (a test bench opens only the project's files: a path inside it, without '..')`);
+  },
   /** The file `name` names, as the test bench opens it: one written by the run, else one of the design's files
-   *  (by its path, else by its name alone). */
+   *  (by its path, else the one whose path ends with it, as tb_data/in.dat a source's folder's, else by its name
+   *  alone). Only these: a test bench never reaches a file outside them (#1897). */
   fileText(name) {
     if (this.fs.has(name)) return this.fs.get(name);
     const files = this.files || {};
-    const k = name in files ? name : Object.keys(files).find((f) => f.split('/').pop() === name.split('/').pop());
+    const rel = name.replace(/^(\.\/)+/, '');
+    const k = name in files ? name : Object.keys(files).find((f) => f.endsWith(`/${rel}`)) ?? Object.keys(files).find((f) => f.split('/').pop() === name.split('/').pop());
     return k === undefined ? null : files[k];
   },
   library(name, e) {
@@ -28,7 +56,7 @@ export const libMethods = {
       case 'printf': case 'fprintf': {
         const args = A();
         const at = name === 'fprintf' ? 1 : 0;
-        const fmt = args[at]?.str;
+        const fmt = this.cString(args[at]);
         if (fmt === undefined) this.fail(e, `${name}: its format must be a string`);
         const fh = name === 'fprintf' ? args[0].fh : { std: 'out' };
         if (!fh) this.fail(e, 'fprintf: its file is not open (NULL)');
@@ -36,20 +64,36 @@ export const libMethods = {
         this.write(fh, s, e);
         return num(s.length);
       }
-      case 'puts': { const a = this.eval(e.args[0]); this.out.push(`${a.str ?? ''}\n`); return num(0); }
-      case 'fputs': { const [a, f] = A(); this.write(f.fh, a.str ?? '', e); return num(0); }
+      // (sprintf, snprintf: into a char array, a file's name, #1897)
+      case 'sprintf': case 'snprintf': {
+        const args = A();
+        const at = name === 'snprintf' ? 2 : 1;
+        const fmt = this.cString(args[at]);
+        if (fmt === undefined) this.fail(e, `${name}: its format must be a string`);
+        const buf = args[0], arr = buf.arr || buf.ptr?.arr, k0 = buf.arr ? 0 : buf.ptr?.index;
+        if (!arr) this.fail(e, `${name}: it writes into a char array`);
+        const s = this.format(fmt, args.slice(at + 1), e);
+        const max = name === 'snprintf' ? Number(this.intOf(args[1], e)) : Infinity;
+        const put = max > 0 ? s.slice(0, max - 1) : null;
+        if (put !== null && k0 + put.length >= arr.length) this.fail(e, `${name}: ${put.length + 1} chars written into an array of ${arr.length - k0} (outside the array)`);
+        if (put !== null) [...put, '\0'].forEach((ch, j) => { arr[k0 + j].v = BigInt(ch.charCodeAt(0)); });
+        return num(s.length);
+      }
+      case 'puts': { const a = this.eval(e.args[0]); this.out.push(`${this.cString(a) ?? ''}\n`); return num(0); }
+      case 'fputs': { const [a, f] = A(); this.write(f.fh, this.cString(a) ?? '', e); return num(0); }
       case 'putchar': { const a = this.eval(e.args[0]); this.out.push(String.fromCharCode(Number(this.intOf(a, e) & 255n))); return a; }
       case 'fputc': case 'putc': { const [a, f] = A(); this.write(f.fh, String.fromCharCode(Number(this.intOf(a, e) & 255n)), e); return a; }
       case 'fopen': {
-        const [n, m] = A();
-        if (n.str === undefined || m.str === undefined) this.fail(e, 'fopen: its name and mode must be strings');
-        if (/^[wa]/.test(m.str)) {
-          const fh = { name: n.str, text: m.str[0] === 'a' ? (this.fileText(n.str) ?? '') : '', pos: 0, w: true };
-          this.fs.set(n.str, fh.text);
+        const [path, mode] = A().map((x) => this.cString(x));
+        if (path === undefined || mode === undefined) this.fail(e, 'fopen: its name and mode must be strings');
+        this.inProject(path, e, 'fopen');
+        if (/^[wa]/.test(mode)) {
+          const fh = { name: path, text: mode[0] === 'a' ? (this.fileText(path) ?? '') : '', pos: 0, w: true };
+          this.fs.set(path, fh.text);
           return handle(fh);
         }
-        const text = this.fileText(n.str);
-        return handle(text === null ? null : { name: n.str, text, pos: 0, w: false });
+        const text = this.fileText(path);
+        return handle(text === null ? null : { name: path, text, pos: 0, w: false });
       }
       case 'fclose': { const [f] = A(); if (f.fh?.w) this.fs.set(f.fh.name, f.fh.text); if (f.fh) f.fh.closed = true; return num(0); }
       case 'feof': { const [f] = A(); return num(f.fh && f.fh.pos >= f.fh.text.length ? 1 : 0); }
@@ -67,7 +111,7 @@ export const libMethods = {
       }
       case 'system': {
         const [c] = A();
-        return num(this.system(c.str ?? '', e));
+        return num(this.system(this.cString(c) ?? '', e));
       }
       case 'exit': { const [c] = A(); throw new Exit(Number(this.as(c, INT, e))); }
       case 'ap_uniform_int': {
@@ -122,8 +166,9 @@ export const libMethods = {
   /** fscanf(f, format, &x, …): the conversions %d %i %u %x %o %c %s (h, l, ll), the format's spaces any space. */
   scan(e) {
     const [f, fmtA, ...ptrs] = e.args.map((a) => this.eval(a));
-    if (!f.fh || fmtA.str === undefined) this.fail(e, 'fscanf: an open file and a format');
-    const fh = f.fh, fmt = fmtA.str;
+    const fmt = this.cString(fmtA);
+    if (!f.fh || fmt === undefined) this.fail(e, 'fscanf: an open file and a format');
+    const fh = f.fh;
     let got = 0, k = 0;
     const skip = () => { while (fh.pos < fh.text.length && /\s/.test(fh.text[fh.pos])) fh.pos++; };
     for (let i = 0; i < fmt.length; i++) {
@@ -166,6 +211,7 @@ export const libMethods = {
     if (w[0] !== 'diff') this.fail(e, `system("${cmd}") cannot be run in Silinx's C simulation (only diff)`);
     const opts = w.slice(1).filter((x) => x.startsWith('-')), names = w.slice(1).filter((x) => !x.startsWith('-'));
     if (names.length !== 2) this.fail(e, `system("${cmd}"): diff compares two files`);
+    for (const n of names) this.inProject(n, e, `system("${cmd}")`);
     const [a, b] = names.map((n) => this.fileText(n));
     if (a === null || b === null) { this.out.push(`diff: ${a === null ? names[0] : names[1]}: No such file or directory\n`); return 2; }
     const flags = opts.flatMap((o) => (o.startsWith('--') ? [o] : [...o.slice(1)].map((c) => `-${c}`)));
