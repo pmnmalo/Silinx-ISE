@@ -12,25 +12,25 @@ const alert = (number, state = 'open', path = 'server/projects.js', more = {}) =
 });
 const issue = (number, n, state = 'open') => ({ number, state, body: `text\n\n(Opened by the workflow.) ${marker(n)}` });
 
-test('codeql-issues: the issue of an alert (its rule, file and line, message once per line, link, labels, marker)', () => {
-  const it = alertIssue(alert(86));
-  assert.equal(it.title, 'CodeQL: Uncontrolled data used in path expression in server/projects.js:62');
+test('codeql-issues: the issue of an alert says nothing of it but its number and link (public issues, SECURITY.md)', () => {
+  const a = alert(86, 'open', 'server/projects.js', { dismissed_comment: 'secret detail' }), it = alertIssue(a);
+  assert.equal(it.title, 'CodeQL: a new alert to review (Security ▸ Code scanning, alert #86)');
   assert.equal(it.body, [
-    "CodeQL's alert https://github.com/o/r/security/code-scanning/86: **js/path-injection** (high) in `server/projects.js:62`, on the default branch since 2026-10-28.",
+    'CodeQL found something to review on the default branch: https://github.com/o/r/security/code-scanning/86 (the maintainers only).',
     '',
-    '> This path depends on a user-provided value.',
-    '',
-    'To decide: fix it (a regression test, `Fixes #N`), or dismiss the alert with its reason (Security ▸ Code scanning): the next analysis closes this issue then.',
+    'To decide: fix it (a regression test, `Fixes #N`), or dismiss the alert with its reason: the next analysis closes this issue then. Its details stay in Security ▸ Code scanning, not here (SECURITY.md).',
     '',
     '(Opened by the workflow, scripts/codeql-issues.mjs.) <!-- codeql-alert:86 -->',
   ].join('\n'));
   assert.deepEqual(it.labels, ['bug', 'security']);
   assert.equal(alertOf(it), 86);
-  // a test's alert: tests & CI too; a rule with no security severity: its severity; no description: its id
-  const t = alertIssue(alert(81, 'open', 'test/resource-check.test.js', { rule: { id: 'js/identity-replacement', severity: 'warning' } }));
-  assert.deepEqual(t.labels, ['bug', 'security', 'tests & CI']);
-  assert.equal(t.title, 'CodeQL: js/identity-replacement in test/resource-check.test.js:62');
-  assert.match(t.body, /\*\*js\/identity-replacement\*\* \(warning\)/);
+  // no rule, file, line, message or severity, wherever the alert is (a test's too)
+  for (const x of [a, alert(81, 'open', 'test/resource-check.test.js', { rule: { id: 'js/identity-replacement', severity: 'warning' } })]) {
+    const t = alertIssue(x), text = `${t.title}\n${t.body}\n${t.labels.join(',')}`;
+    for (const no of [x.rule.id, x.rule.description, x.rule.severity, x.rule.security_severity_level, x.most_recent_instance.location.path, 'projects', 'resource-check', ':62', 'user-provided', 'secret'].filter(Boolean))
+      assert.ok(!text.includes(no), `${x.number}: ${no}`);
+    assert.deepEqual(t.labels, ['bug', 'security']);
+  }
   assert.equal(alertOf({ body: 'no marker' }), null);
   assert.equal(alertOf({ body: null }), null);
 });
@@ -49,9 +49,9 @@ test('codeql-issues: the plan, an open alert with no issue opened, never twice; 
   assert.deepEqual(plan([], []), { open: [], close: [] });
 });
 
-test('codeql-issues: the comment that closes an issue says fixed, or dismissed with its reason', () => {
+test('codeql-issues: the comment that closes an issue says fixed, or dismissed with its reason, never the dismissal\'s comment', () => {
   assert.equal(closeComment(alert(3, 'fixed')), "CodeQL's alert https://github.com/o/r/security/code-scanning/3 is fixed: no longer found on the default branch.");
   assert.equal(closeComment(alert(4, 'dismissed', 'x', { dismissed_reason: 'false positive', dismissed_comment: 'through safeJoin' })),
-    "CodeQL's alert https://github.com/o/r/security/code-scanning/4 was dismissed (false positive: through safeJoin).");
+    "CodeQL's alert https://github.com/o/r/security/code-scanning/4 was dismissed (false positive).");
   assert.equal(closeComment(alert(5, 'dismissed')), "CodeQL's alert https://github.com/o/r/security/code-scanning/5 was dismissed.");
 });

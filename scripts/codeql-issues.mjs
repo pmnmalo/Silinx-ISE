@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // Code scanning's alerts as issues (#2021): CodeQL's findings are seen only in Security ▸ Code scanning, where they
 // piled up between reviews (#585, #2011). After each analysis (codeql.yml's job `issues`) every open alert of the
-// default branch with no issue yet gets one ('CodeQL: <rule> in <file>:<line>', labels bug and security, and tests &
-// CI for an alert in test/), to be decided there: fixed (Fixes #N) or dismissed with its reason. An issue holds its
-// alert's number in a marker, so an alert is never opened twice (its issue closed by hand included); an open issue
-// whose alert is fixed or dismissed is closed with a comment saying which.
+// default branch with no issue yet gets one, to be decided there: fixed (Fixes #N) or dismissed with its reason.
+// Issues are public and a vulnerability is reported privately (SECURITY.md): an issue says nothing of the alert
+// but its number and its link, which only the maintainers can open ('CodeQL: a new alert to review (alert #N)',
+// labels bug and security; no rule, file, line or message, no dismissal's comment). An issue holds its alert's
+// number in a marker, so an alert is never opened twice (its issue closed by hand included); an open issue whose
+// alert is fixed or dismissed is closed with a comment saying which.
 //
 //   node scripts/codeql-issues.mjs
 //   (in GitHub Actions: GITHUB_TOKEN with issues: write and security-events: read, GITHUB_REPOSITORY);
@@ -17,24 +19,18 @@ export const marker = (n) => `<!-- codeql-alert:${n} -->`;
 /** The alert's number an issue's body holds (its marker), or null. */
 export const alertOf = (issue) => { const m = MARK.exec(issue.body || ''); return m ? +m[1] : null; };
 
-/** The issue of an alert: { title, body, labels }. CodeQL repeats its message once per path of the flow: each
- *  line once. */
+/** The issue of an alert: { title, body, labels }, with nothing of the alert but its number and link. */
 export function alertIssue(a) {
-  const loc = a.most_recent_instance?.location || {}, where = `${loc.path}:${loc.start_line}`;
-  const lines = [...new Set(String(a.most_recent_instance?.message?.text || '').split('\n').map((l) => l.trim()).filter(Boolean))];
-  const severity = a.rule.security_severity_level || a.rule.severity;
   return {
-    title: `CodeQL: ${a.rule.description || a.rule.id} in ${where}`,
+    title: `CodeQL: a new alert to review (Security ▸ Code scanning, alert #${a.number})`,
     body: [
-      `CodeQL's alert ${a.html_url}: **${a.rule.id}** (${severity}) in \`${where}\`, on the default branch since ${String(a.created_at).slice(0, 10)}.`,
+      `CodeQL found something to review on the default branch: ${a.html_url} (the maintainers only).`,
       '',
-      ...lines.map((l) => `> ${l}`),
-      '',
-      'To decide: fix it (a regression test, `Fixes #N`), or dismiss the alert with its reason (Security ▸ Code scanning): the next analysis closes this issue then.',
+      'To decide: fix it (a regression test, `Fixes #N`), or dismiss the alert with its reason: the next analysis closes this issue then. Its details stay in Security ▸ Code scanning, not here (SECURITY.md).',
       '',
       `(Opened by the workflow, scripts/codeql-issues.mjs.) ${marker(a.number)}`,
     ].join('\n'),
-    labels: ['bug', 'security', ...(String(loc.path).startsWith('test/') ? ['tests & CI'] : [])],
+    labels: ['bug', 'security'],
   };
 }
 
@@ -51,11 +47,11 @@ export function plan(alerts, issues) {
   };
 }
 
-/** The comment that closes an alert's issue. */
+/** The comment that closes an alert's issue: fixed, or dismissed with its reason (one of GitHub's: false positive,
+ *  won't fix, used in tests), never its comment. */
 export function closeComment(a) {
   if (a.state === 'fixed') return `CodeQL's alert ${a.html_url} is fixed: no longer found on the default branch.`;
-  const why = [a.dismissed_reason, a.dismissed_comment].filter(Boolean).join(': ');
-  return `CodeQL's alert ${a.html_url} was dismissed${why ? ` (${why})` : ''}.`;
+  return `CodeQL's alert ${a.html_url} was dismissed${a.dismissed_reason ? ` (${a.dismissed_reason})` : ''}.`;
 }
 
 async function main() {
