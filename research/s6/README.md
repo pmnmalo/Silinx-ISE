@@ -64,7 +64,7 @@ them and this table is corrected then.
 | S6-E | I/O and clocking: every pad's settings at random, the BUFIO2 / BUFG / BUFH paths, DCM and PLL settings | about 500 | 1–2 nights | from `gen-iob.mjs`, `gen-iorand.mjs`, `gen-sitevar.mjs`, `gen-dcmhdl.mjs` | #727 |
 | S6-F | block RAM content and settings, DSP48A1 settings | about 300 | 1 night | from `gen-bram.mjs`, `gen-sitevar.mjs` | #728 |
 | S6-G | timing: trce on the examples and on generated paths (each cell and wire kind) | about 200 | 1 night | from `research/s3e-route` (`ise-timing-check.sh`, `timing-fit.mjs`) | #731 |
-| S6-H | the XC6SLX45 from the XC6SLX16's tile types (stage F of the Spartan-3E: the larger part's layout and residuals) | about 100 | 1 night | from `impl-remote.sh`, `ana-residual.mjs` | #725–#728 |
+| S6-G | the XC6SLX45 from the XC6SLX16's tile types (stage F of the Spartan-3E: the larger part's layout and residuals) | about 100 | 1 night | from `impl-remote.sh`, `ana-residual.mjs` | #725–#728 |
 
 ISE's raw outputs (`.bit`, `.ncd`, `.xdl`, `.xdlrc`, the logs) never enter the repository: the scripts keep
 them in a work folder outside it, and only Silinx's own records of the observations (counts, bit
@@ -446,6 +446,23 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   CLKFX_DIVIDE - 1 in 432, 431, 429, 428, 425; the CLKDV divisors, the PLL's multiplier, divider, output divider
   and phase as their own bit patterns in the database.
 
+### Static timing (#731, S6-G, 2026-10-29, the first part)
+
+- **trce's reports read** (`twr6.mjs`): each constraint's detailed paths (the slow corner's maximum data path) with
+  their slack, requirement, skew and uncertainty, and their elements in order (a logic arc: its site.pin, type and
+  delay; a net: its load's site.pin, fanout and delay, its driver the element before).
+- **The wires** (`timing-fit6.mjs`): each net of night 1's 28 reports (both boards, ISE's flow and the open
+  synthesis's netlist through ISE) found in the routed XDL (the net's tree from its driver's pin, `timing.js`
+  `netTree` / `treePath`, which the Spartan-6's device answers as the Spartan-3E's) and its nodes counted by class.
+  A non-negative least-squares fit of delay = base + Σ count × class delay + fanout × load delay on the 341
+  connections: rms 0.110 ns, 95% within 0.21 ns, max 0.38 ns (single 0.159, double 0.190, quad 0.233 ns, a logic
+  input 0.203, a logic output 0.142). trce's verbose report gives only the 10 worst paths of a constraint: the
+  delays of every connection (`reportgen -delay`) will widen it.
+- **The logic arcs** read from the same reports are near constants by kind and context (Tilo 0.203 to 0.259 ns,
+  Tcko 0.391 / 0.408 / 0.447 by the flip-flop, Tas 0.289 to 0.341, Tceck 0.276 to 0.363 by the flip-flop): a table
+  by arc, slice kind and flip-flop or multiplexer is the next step, then the STA of a routed design against trce's
+  slack (within 5%).
+
 ### The CMT sites (#1951, S6-E2, 2026-10-29)
 
 - **Every CMT site** (`gen-cmtsites6.mjs`: a DCM or PLL at each of the XC6SLX16's six sites, from 4 clock pads of its
@@ -514,7 +531,7 @@ XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the par
    built end to end with a placer and a router of a first kind (#729, #730).
 5. **I/O and clocks** (S6-E, #727): every example with a clock.
 6. **Block RAM and DSP** (S6-F, #728): stopwatch.
-7. **Timing** (S6-G, #731), the **XC6SLX45** (S6-H), and the **flow end to end** (#732): the examples
+7. **Timing** (S6-G, #731), the **XC6SLX45** (S6-G), and the **flow end to end** (#732): the examples
    byte-identical with ISE on both boards, the flag removed.
 
 ## The issues
@@ -540,7 +557,7 @@ XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the par
 
 Recorded here because the work was planned without the author's answers (2026-10-21):
 
-- **Both boards from the start**, the XC6SLX16 first: the tile types are shared, the XC6SLX45 is stage S6-H.
+- **Both boards from the start**, the XC6SLX16 first: the tile types are shared, the XC6SLX45 is stage S6-G.
 - **New files for the Spartan-6** (`core/fpga/s6/`, `research/s6/`), the Spartan-3E modules unchanged but
   for the shared models (UNISIM, the compiled primitives), whose new primitives add to them.
 - **Silinx's synthesis remaps stay for the LUT4 families**: the Spartan-6 netlist is Yosys's `xc6s`
@@ -596,6 +613,8 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `gen-cmtsites6.mjs` | Every CMT site's designs: pads of its half and the sides, outputs on the BUFGMUXes in turn; `--outputs` each alone (#1951) |
 | `ana-cmtsites6.mjs` | A CMT's settings at any site: `db/<device>-cmt-settings.json` (#1951) |
 | `gen-cmtprobe6.mjs`, `ana-cmtprobe6.mjs` | The PIPs the drop could not take apart, probed one by one: `db/s6-pips-probe.json` (#1951) |
+| `twr6.mjs` | trce's report read: each constraint's paths, their figures and elements (#731) |
+| `timing-fit6.mjs` | The wire delay model fitted to trce's nets on ISE's routing (#731) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |
