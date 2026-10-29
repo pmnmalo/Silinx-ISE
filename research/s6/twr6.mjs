@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const num = s => (s === undefined ? null : parseFloat(s));
 
-/** A .twr's paths: [{ constraint, slack, requirement, dataPath, skew, uncertainty, source, dest, elements: [{ loc, type, delay, fanout?, name }] }]. */
+/** A .twr's paths: [{ constraint, slack, requirement, dataPath, skew, uncertainty, source, dest, srcClock, destClock, elements: [{ loc, type, delay, fanout?, name }] }]. */
 export function parseTwr(text) {
   const lines = text.split('\n'), out = [];
   let constraint = null;
@@ -27,6 +27,8 @@ export function parseTwr(text) {
       else if ((m = x.match(/^\s+Data Path Delay:\s+(-?[\d.]+)ns/))) p.dataPath = num(m[1]);
       else if ((m = x.match(/^\s+Clock Path Skew:\s+(-?[\d.]+)ns/))) p.skew = num(m[1]);
       else if ((m = x.match(/^\s+Clock Uncertainty:\s+(-?[\d.]+)ns/))) p.uncertainty = num(m[1]);
+      else if ((m = x.match(/^\s+Source Clock:\s+(\S+) (rising|falling)/))) p.srcClock = m[1];
+      else if ((m = x.match(/^\s+Destination Clock:\s+(\S+) (rising|falling)/))) p.destClock = m[1];
       else if ((m = x.match(/^\s{4}(\S+)\s+net \(fanout=(\d+)\)\s+(-?[\d.]+)\s+(\S+)/))) p.elements.push({ loc: m[1], type: 'net', fanout: +m[2], delay: num(m[3]), name: m[4] });
       else if ((m = x.match(/^\s{4}(\S+\.\S+)\s+(T\S+)\s+(-?[\d.]+)\s+(\S+)/))) p.elements.push({ loc: m[1], type: m[2], delay: num(m[3]), name: m[4] });
       else if (/^\s+Total\s+-?[\d.]+ns/.test(x)) break;
