@@ -236,7 +236,8 @@ test('the three flows (the app\'s, open-flow.mjs, the design corpus\'s) place an
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   for (const f of ['packages/silinx-fpga/src/open-flow-core.js', 'research/s3e-route/open-flow.mjs', 'test/designs-corpus/run.mjs']) {
     const src = fs.readFileSync(path.join(root, f), 'utf8');
-    assert.match(src, /placeRouteBest\(netlist, packed, /, f);
+    // (the app's: placeRouteBest unless its io gives another place and route, #1678)
+    assert.match(src, /placeRouteBest\)?\(netlist, packed, /, f);
     // no placement, routing or replication of their own
     for (const call of ['place(', 'routeDesign(', 'replicationPlan(', 'replicateCells(', 'placedXdl(']) assert.ok(!new RegExp(`[^\\w.]${call.replace('(', '\\(')}`).test(src), `${f}: ${call}`);
   }

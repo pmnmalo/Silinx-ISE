@@ -180,7 +180,9 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
 7. **The public API** ([#1678](https://github.com/pmnmalo/Silinx-ISE/issues/1678)): the package's entry
    (`exports`): netlist and UCF in, `.bit`, XDL and the reports out, the devices and bit databases, the flow
    with its `io`; the IDE's importers switch to it, the re-exporting shims go, and the boundary test then says
-   that the IDE imports nothing but the API.
+   that the IDE imports nothing but the API. Started: the entries `silinx-fpga` (`src/index.js`, Node and the
+   browser) and `silinx-fpga/node` (the disk's loaders, Yosys in Node), documented in the package's README; the
+   flow places and routes through `io.placeRoute` when given (nextpnr: #1953, #1954).
 8. **The command line** ([#1679](https://github.com/pmnmalo/Silinx-ISE/issues/1679)): `silinx-fpga build`,
    from `research/s3e-route/open-flow.mjs`, and a README with a blinky for the Basys2. A new feature with its
    tests.
