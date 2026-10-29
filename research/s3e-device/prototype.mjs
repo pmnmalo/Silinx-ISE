@@ -34,7 +34,7 @@ import { packMeasured } from './build.mjs';
 import { pinCensus, renamePads } from './pins.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DB = path.join(HERE, '../../core/fpga/bitdb');
+const DB = path.join(HERE, '../../packages/silinx-fpga/bitdb');
 const PART = process.env.PART || 'xc3s250ecp132-4';
 const readJson = f => JSON.parse(/\.gz$/.test(f) ? zlib.gunzipSync(fs.readFileSync(f)).toString() : fs.readFileSync(f, 'utf8'));
 const lines = f => fs.readFileSync(f, 'utf8').split('\n').map(s => s.trim()).filter(Boolean);
@@ -155,7 +155,7 @@ if (cmd === 'observe') {
   // UNBONDED: round 8, testSources; BUFGSRC=1: the global buffers' outputs, for the clock spine's joins)
   const extra = process.env.SOURCES === '1' ? testSources(obs, {
     sourceObs: process.env.SOURCEOBS ? readJson(process.env.SOURCEOBS) : null, joins,
-    device: process.env.UNBONDED === '1' ? loadDevice(readJson(path.join(HERE, '../../core/fpga/devices', `${PART}.json.gz`))) : null,
+    device: process.env.UNBONDED === '1' ? loadDevice(readJson(path.join(HERE, '../../packages/silinx-fpga/devices', `${PART}.json.gz`))) : null,
     bufg: process.env.BUFGSRC === '1',
   }) : new Map();
   const r = joinTestDesigns({
@@ -222,7 +222,7 @@ if (cmd === 'observe') {
   fs.writeFileSync(out, zlib.gzipSync(JSON.stringify(packed), { level: 9 }));
   console.log(`${clbs.length} CLB tiles, ${joins.length} joins (${confirmed.length} confirmed by tests): ${JSON.stringify(packed.counts)}`);
 } else if (cmd === 'compare') {
-  const [measFile, refFile = path.join(HERE, '../../core/fpga/devices', `${PART}.json.gz`)] = args;
+  const [measFile, refFile = path.join(HERE, '../../packages/silinx-fpga/devices', `${PART}.json.gz`)] = args;
   const M = loadDevice(readJson(measFile)), R = loadDevice(readJson(refFile));
   // BAND=y0,y1: only the tiles of those rows (a prototype tested on part of the chip)
   const [y0, y1] = (process.env.BAND || '0,999').split(',').map(Number);
@@ -308,7 +308,7 @@ if (cmd === 'observe') {
   console.log('split examples:\n  ' + splitEx.join('\n  '));
 } else if (cmd === 'score') {
   // ISE's verdicts against the shipped graph (local scoring only), by the kinds of the two tiles
-  const R = loadDevice(readJson(path.join(HERE, '../../core/fpga/devices', `${PART}.json.gz`)));
+  const R = loadDevice(readJson(path.join(HERE, '../../packages/silinx-fpga/devices', `${PART}.json.gz`)));
   const kind = k => { const p = tileXY(k.slice(0, k.indexOf('/')))?.prefix || ''; return /^CLB/.test(p) ? 'CLB' : /IOIS|IBUFS/.test(p) ? 'IO' : /^BRAM/.test(p) ? 'BRAM' : p; };
   const node = k => { const i = k.indexOf('/'); return R.node(k.slice(0, i), k.slice(i + 1)); };
   const count = new Map(), wrong = [];
@@ -324,7 +324,7 @@ if (cmd === 'observe') {
   for (const [c, s] of [...count].sort()) console.log(`${c}: ${s.join} joins, ${s['no-join']} islands, ${s.agree} of ${s.join + s['no-join']} agree with the shipped graph${s.other ? `, ${s.other} unclear or not run` : ''}`);
   if (wrong.length) console.log('disagree:\n  ' + wrong.join('\n  '));
 } else if (cmd === 'pins') {
-  const R = loadDevice(readJson(path.join(HERE, '../../core/fpga/devices', `${PART}.json.gz`)));
+  const R = loadDevice(readJson(path.join(HERE, '../../packages/silinx-fpga/devices', `${PART}.json.gz`)));
   const others = args.slice(1).map(f => renamePads(readJson(f), R));
   for (const [i, o] of others.entries()) if (o.dropped.length) console.log(`${args[i + 1]}: ${o.dropped.length} I/O sites with no I pin fact left out`);
   const c = pinCensus({ pins: [...readJson(args[0]).pins, ...others.flatMap(o => o.pins)] }, R);

@@ -1,5 +1,5 @@
 // core/fpga/bitgen.js: XDL -> features -> frame data -> .bit, with a small hand-made database and
-// with the measured database (core/fpga/bitdb), without ISE.
+// with the measured database (packages/silinx-fpga/bitdb), without ISE.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -230,7 +230,7 @@ test('bitgen: a complete .bit file whose frame data is the design', () => {
 });
 
 // the measured database
-const dbDir = new URL('../core/fpga/bitdb/', import.meta.url);
+const dbDir = new URL('../packages/silinx-fpga/bitdb/', import.meta.url);
 const measured = () => {
   const read = f => JSON.parse(fs.readFileSync(new URL(f, dbDir), 'utf8'));
   // (with the DCM settings that follow from the routing: DCM:CLKIN:GCLK, DCM:DFS:OFF, as loadDb adds them)
@@ -527,7 +527,7 @@ test('padsFromDevice: the bonded I/O sites of the device, by their index among t
   };
   assert.deepEqual(padsFromDevice(device), { A3: ['TIOIS_X1Y35', 0], B3: ['TIOIS_X1Y35', 1], C4: ['TIOIS_X1Y35', 3] });
   // the committed database has no pad table (it comes from the user's device report)
-  const tiles = JSON.parse(fs.readFileSync(new URL('../core/fpga/bitdb/s3e-tiles.json', import.meta.url), 'utf8'));
+  const tiles = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s3e-tiles.json', import.meta.url), 'utf8'));
   assert.equal(tiles.pads, undefined);
 });
 

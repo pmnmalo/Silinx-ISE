@@ -106,7 +106,7 @@ test('CodeQL (#498): a workflow of its own, nightly on main when its code change
   assert.deepEqual(Object.keys(j), ['changes', 'analyze']);
   // the nightly run skipped when none of the JavaScript changed since the last successful one
   const ch = j.changes.join('\n');
-  assert.match(ch, /uses: \.\/\.github\/workflows\/scheduled-changes\.yml\n[\s\S]*workflow: codeql\.yml\n\s+only: core\/,server\/,web\/,scripts\/,bin\/,test\/,\.github\/workflows\/codeql\.yml$/m);
+  assert.match(ch, /uses: \.\/\.github\/workflows\/scheduled-changes\.yml\n[\s\S]*workflow: codeql\.yml\n\s+only: core\/,packages\/,server\/,web\/,scripts\/,bin\/,test\/,\.github\/workflows\/codeql\.yml$/m);
   assert.ok(j.analyze.includes('    needs: changes') && j.analyze.includes("    if: needs.changes.outputs.run == 'true'"));
   const a = j.analyze.join('\n');
   assert.match(a, /^    permissions:\n      contents: read\n      security-events: write\s*(#.*)?\n      actions: read\s*(#.*)?\n/m);

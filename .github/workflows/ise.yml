@@ -30,7 +30,7 @@ jobs:
       contents: read
     with:
       workflow: ise.yml
-      only: core/,server/,scripts/,bin/,docker/,examples/,research/s3e-,test/ise/,test/examples-lib.mjs,test/fixtures/,package.json,package-lock.json,.github/workflows/ise.yml
+      only: core/,packages/,server/,scripts/,bin/,docker/,examples/,research/s3e-,test/ise/,test/examples-lib.mjs,test/fixtures/,package.json,package-lock.json,.github/workflows/ise.yml
   ise:
     # never from a fork: scheduled or by hand, on main only (#482; test/workflows.test.js)
     needs: changes

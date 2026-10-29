@@ -4,10 +4,10 @@
 // A3's register, given to B3's), and a design with only some pads used differed from ISE's bitstream. Each feature the
 // measurement has replaces the database's; the others (the delays the database refuses on the global clock pins, #97;
 // the registers never measured) stay as they are.
-//   node pad-delays.mjs [--check]      (rewrites core/fpga/bitdb/<device>-<package>-pads.json; --check: only counts the features to change)
+//   node pad-delays.mjs [--check]      (rewrites packages/silinx-fpga/bitdb/<device>-<package>-pads.json; --check: only counts the features to change)
 import fs from 'node:fs';
 
-const DB = new URL('../../core/fpga/bitdb/', import.meta.url);
+const DB = new URL('../../packages/silinx-fpga/bitdb/', import.meta.url);
 const check = process.argv.includes('--check');
 const ser = o => JSON.stringify(o, null, 0).replace(/("[^"]+":\[[^\]]*\]),/g, '$1,\n');
 const { devices } = JSON.parse(fs.readFileSync(new URL('./measured/fix-28-pad-delays.json', import.meta.url), 'utf8'));

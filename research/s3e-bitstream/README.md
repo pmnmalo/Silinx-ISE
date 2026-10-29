@@ -20,7 +20,7 @@ Yosys 0.66 (`hdlc/ghdl:yosys` image); Node 22+.
 | `gen-e4.mjs`, `gen-e5.mjs`, `compose3.mjs` | Steps 3-4: the reference design taken apart (empty, pads, the net's pin connections, each routing switch in context), then rebuilt from those parts and compared with ISE's bitstream |
 
 The scripts work on one part, `PART` in the environment (default `xc3s250ecp132-4`): its device
-description (`core/fpga/devices/`, or `~/.silinx/devices/`) gives the graph (`xdlrc-graph.mjs`
+description (`packages/silinx-fpga/devices/`, or `~/.silinx/devices/`) gives the graph (`xdlrc-graph.mjs`
 `loadGraph(part)`: the device reports of the larger chips are too large to read as one string) and
 `db.mjs` its database.
 
@@ -34,9 +34,9 @@ reference design implemented by ISE (`top.xdl`, `top.bit`, from `top.v` / `top.u
 | `gen-map.mjs`, `decode-map.mjs` | Stage A: one design with every slice numbered in its LUT F (one per 4000 slices), and an empty design; the frame of every slice column, the bit of every slice row, the bitstream format |
 | `gen-slice.mjs`, `analyze-slice.mjs` | Stage B: the settings inside a slice (flip-flops, inverters, multiplexers, carry), one design per setting |
 | `gen-harness.mjs`, `gen-hvar.mjs` | Stage B2: the slice under test with all its pins connected, routed once by ISE; one variant per setting |
-| `core/fpga/bitdb/xc3s250e-slice.json` | Result of stages B and C: the bits of each slice setting, per slice position (any slice; a table generated from `core/fpga/bitdb/s3e-tiles.json`) |
+| `packages/silinx-fpga/bitdb/xc3s250e-slice.json` | Result of stages B and C: the bits of each slice setting, per slice position (any slice; a table generated from `packages/silinx-fpga/bitdb/s3e-tiles.json`) |
 | `compare-sim.mjs` | Does the netlist of open synthesis behave like the design? Simulates both with Silinx |
-| `core/fpga/bitdb/<device>-lut.json` | Result of stage A (stage F for the XC3S100E, XC3S500E, XC3S1200E): where every LUT of the chip is in the bitstream |
+| `packages/silinx-fpga/bitdb/<device>-lut.json` | Result of stage A (stage F for the XC3S100E, XC3S500E, XC3S1200E): where every LUT of the chip is in the bitstream |
 | `xdlrc-graph.mjs`, `router.mjs` | The device's routing graph from `xdl -report -pips -all_conns` (cached), and a small router for test designs |
 | `run-many.sh` | Inside the ISE container: `xdl -xdl2ncd -force` + `bitgen` for every `.xdl` of several folders, 3 at a time (`-c`: also with CRC) |
 | `gen-pipdrop.mjs`, `gen-pipcover.mjs`, `gen-clock.mjs`, `ana-pipdrop.mjs`, `pips-to-db.mjs` | Stage C: routing switches in batches (variants remove PIPs by codewords); a design routed by ISE, designs routed by `router.mjs`, the global clock tree |
@@ -44,15 +44,15 @@ reference design implemented by ISE (`top.xdl`, `top.bit`, from `top.v` / `top.u
 | `gen-attrdrop.mjs`, `ana-attrdrop.mjs`, `gen-slicedb.mjs`, `gen-slicetable.mjs` | Stage C: slice settings in every slice position |
 | `ana-residual.mjs`, `explain-diff.mjs` | What the database does not explain in designs implemented by ISE, per tile and feature |
 | `measure-db.sh`, `want-pips.mjs`, `diff-db.mjs` | #48: the XC3S250E's experiments made again with ISE (the PIPs to measure: those of the database; resumable, also from the remote work folders), and the rebuilt database compared with the committed one (`--resolved`: as bitgen reads it; `--missing`: what the experiments do not reach) |
-| `gen-layout.mjs`, `merge-db.mjs`, `build-db.sh`, `db.mjs` | Build the database (`core/fpga/bitdb/*.json`) from the experiments' results; `db.mjs` gives the experiments the one loader, `core/fpga/bitdb-node.js` (the open flow's and the interface's, #407: `loadDb(part)`); the pads of the package (pin -> I/O tile) are not in it: it takes them from the device description (`padsFromDevice`) |
+| `gen-layout.mjs`, `merge-db.mjs`, `build-db.sh`, `db.mjs` | Build the database (`packages/silinx-fpga/bitdb/*.json`) from the experiments' results; `db.mjs` gives the experiments the one loader, `core/fpga/bitdb-node.js` (the open flow's and the interface's, #407: `loadDb(part)`); the pads of the package (pin -> I/O tile) are not in it: it takes them from the device description (`padsFromDevice`) |
 | `measured/` | Results of the analyses that `build-db.sh` merges (slice harnesses, learned and corrected features: our own observations, no Xilinx files) |
 | `learn-single.mjs`, `unify-io.mjs` | Features measured in the reference designs; shared switch boxes of the I/O tile types |
 | `check-writer.mjs` | Acceptance test of the writer (`core/fpga/bitgen.js`): byte comparison with ISE's bitgen |
 | `fuzz-remote.sh` | Stage D: `run-many.sh` on another machine with Docker and the ISE image (`SILINX_FUZZ_HOST=user@host`, set on the command line only) |
 | `share-sb.mjs`, `gen-branch.mjs`, `ana-perpad.mjs`, `ise-impl.sh` | Stage D: the CLB switch box shared by the I/O, block-RAM and DCM tiles; PIPs measured as dead-end branches of routed nets; I/O settings per pad (`gen-iob.mjs --perpad / --perstd`); designs implemented by ISE from HDL (reference designs) |
-| `gen-bram.mjs`, `ana-bram.mjs`, `core/fpga/bitdb/<device>-bram.json` | Stage D: every memory bit of the block RAMs, by binary codes |
+| `gen-bram.mjs`, `ana-bram.mjs`, `packages/silinx-fpga/bitdb/<device>-bram.json` | Stage D: every memory bit of the block RAMs, by binary codes |
 | `gen-sitevar.mjs`, `ana-sitevar.mjs`, `sitevar-features.mjs`, `bram-features.mjs` | Stage D: the settings of block RAMs, multipliers and DCMs, changed one at a time in designs implemented by ISE |
-| `core/fpga/bitdb/<device>-layout.json`, `core/fpga/bitdb/s3e-tiles.json`, `core/fpga/bitdb/<device>-<package>-pads.json` | Result of stages C-F: where every tile is in the frame data and the bitstream format, per device; the bits of every measured feature (PIPs, site settings) per tile type, shared by the devices (`core/fpga/bitdb/<device>-tiles.json`, if present, adds or replaces features of one device); the pads' own bits per device and package |
+| `packages/silinx-fpga/bitdb/<device>-layout.json`, `packages/silinx-fpga/bitdb/s3e-tiles.json`, `packages/silinx-fpga/bitdb/<device>-<package>-pads.json` | Result of stages C-F: where every tile is in the frame data and the bitstream format, per device; the bits of every measured feature (PIPs, site settings) per tile type, shared by the devices (`packages/silinx-fpga/bitdb/<device>-tiles.json`, if present, adds or replaces features of one device); the pads' own bits per device and package |
 | `gen-dcmvcc.mjs` | #190: the DCM tiles' switches from their VCC site, one constant-1 net per DCM tile (then `gen-pipdrop.mjs`) |
 | `gen-iobreg.mjs`, `gen-iobrand.mjs`, `ana-iobreg.mjs` | Stage G: designs with registers in the IOBs of every pad (implemented by ISE), their settings and input delays at random (xdl variants), the bits of each pad's settings solved |
 | `gen-dcmhdl.mjs`, `gen-sidebufg.mjs` | Stage G: designs of several DCMs with settings of their own, and of subsets of the side global buffers, implemented by ISE from HDL (settings xdl refuses in an edited design; inputs in combination); `gen-sitevar.mjs` variants with other values on each instance (`perSite`) |
@@ -64,7 +64,7 @@ reference design implemented by ISE (`top.xdl`, `top.bit`, from `top.v` / `top.u
 | `gen-dcmomux.mjs`, `measure-dcmomux.sh` | #2: the DCMs' output multiplexer (`DCM_<output> -> OMUXk`); designs with every output of every DCM through each line, its BUFG LOC'd on the line's buffer, implemented by ISE and measured by PIP drop (`--list`: the pairs and the unknown ones) |
 | `gen-bramclk.mjs`, `gen-clkpad.mjs`, `measure-bramclk.sh` | #2: the block RAMs' and multipliers' clock pins from every global line (`GCLKk -> BRAM_CLKj`) and the global clock pads' dedicated paths to the top and bottom buffers (`CKIk -> GCLKj`); designs implemented by ISE, measured by PIP drop (`--list`: the pairs and the unknown ones) |
 | `gen-clkdata.mjs`, `measure-clkdata.sh` | #957: a clock into the fabric (`DCM_<output> -> OMUXk`, `CLK[TB]_GCLK_MAINk -> CLK[TB]_TO_OMUXj`): the unknown switches added as branches to designs ISE routed, measured by PIP drop |
-| `pip-exceptions.mjs` | The PIPs a tile type's features offer that some or all of its tiles do not have (#74), from the device descriptions, checked with ISE's arc probe: `absent` / `absentIn` in `core/fpga/bitdb/s3e-tiles.json` and `core/fpga/bitdb/<device>-tiles.json`, honoured by the router |
+| `pip-exceptions.mjs` | The PIPs a tile type's features offer that some or all of its tiles do not have (#74), from the device descriptions, checked with ISE's arc probe: `absent` / `absentIn` in `packages/silinx-fpga/bitdb/s3e-tiles.json` and `packages/silinx-fpga/bitdb/<device>-tiles.json`, honoured by the router |
 | `impl-remote.sh`, `who-sets.mjs`, `gen-sitedrop.mjs`, `ana-sitedrop.mjs`, `gen-iorand.mjs`, `clkh-ll.mjs`, `ll-splitters.mjs`, `dcm-mirror.mjs` | Stage F: `ise-impl.sh` on the remote machine for any part (`PART`); which feature of the database sets a bit; the settings of I/O, DCM and clock-buffer sites removed one at a time from a design routed by ISE; every pad at random settings; the XC3S1200E's long-line splitters (CLKH_LL's; the others', #709); the other DCMs' settings as mirror images of the top-left one's |
 
 ## Results
@@ -139,7 +139,7 @@ One design numbers every one of the 2448 slices in its LUT F; one bitstream loca
 - Columns: slice columns X = 0 … 51 in frames 24, 27, 43, 46, … The two slices of a CLB are 3
   frames apart; CLB columns are 19 frames apart, except where the block-RAM and clock columns
   are, so the order follows the device's column addresses rather than X (table in
-  `core/fpga/bitdb/xc3s250e-lut.json`).
+  `packages/silinx-fpga/bitdb/xc3s250e-lut.json`).
 
 ### Stage B: the settings inside a slice
 
@@ -151,7 +151,7 @@ chain comes from the slice below and goes to the one above. ISE's `par -p` route
 (placement kept, 58 routing switches); every variant (`gen-hvar.mjs`) is that routed XDL with only
 the slice's settings changed, so the routing never changes between variants.
 
-All settings but CYINIT were measured (`core/fpga/bitdb/xc3s250e-slice.json`): the five inverters (clock,
+All settings but CYINIT were measured (`packages/silinx-fpga/bitdb/xc3s250e-slice.json`): the five inverters (clock,
 enable, set/reset, BX, BY) are one bit each in the frame 2 after the LUT frame; the flip-flop
 settings (initial value, set or reset, synchronous, latch), the D-input and output multiplexers
 and the carry-chain settings (CYSEL, CY0 with a 3-bit code) are in the frame before. Still to do:
@@ -174,7 +174,7 @@ RCRC and the check word reset it; with the CRC off both check words are `DEFC`.
 **Model.** A design is a set of *features*, each of a tile: a routing switch (`from->to`, on nets
 with pins only), a site setting (`SLICE2:CYSELF:F`, `IOB1:…`, `BUFGMUX_X2Y11:…`), a pad's
 direction and I/O standard (`@M5 O:LVCMOS33`), plus the LUT contents (stage A). Every feature sets
-a few bits at fixed offsets from its tile's first frame and bit (`core/fpga/bitdb/xc3s250e-layout.json`:
+a few bits at fixed offsets from its tile's first frame and bit (`packages/silinx-fpga/bitdb/xc3s250e-layout.json`:
 `cols[x]`, `rows[y]` by the X / Y of the tile name; the I/O columns are 21 frames at frames 3 and
 366, frames 0-2 hold the centre clock columns). The frame data of an empty design has 18 bits set
 (`defaults`). Features compose by OR (and a few clears), which is what makes batch measurements
@@ -201,7 +201,7 @@ the column (`GCLKk -> UPk` / `DNk`); the vertical spines (GCLKVC) need no bits; 
 GCLKVML / GCLKVMR / CLKC are frames 0 / 1 / 2. The BUFGMUX settings used here (`I0_USED`,
 `SINV:S_B`, `DISABLE_ATTR:LOW`) set no bits beyond the switches into and out of the buffer.
 
-**Slices** (`core/fpga/bitdb/xc3s250e-slice.json`, any slice: position i = 2 x (X odd) + (Y odd) of the CLB
+**Slices** (`packages/silinx-fpga/bitdb/xc3s250e-slice.json`, any slice: position i = 2 x (X odd) + (Y odd) of the CLB
 tile). The harness results of the four positions (SLICEM / SLICEL, lower / upper), plus rules
 found by comparing whole designs with ISE (`ana-residual.mjs`, `explain-diff.mjs`) and by removing
 one setting per slice position from a routed design (`gen-attrdrop.mjs`): a used slice of a SLICEM
@@ -312,7 +312,7 @@ out; LVCMOS25 16 mA with FAST does not compose yet.
 
 **Block RAM** (`gen-bram.mjs`, `ana-bram.mjs`: all 12 block RAMs, 17 designs): every one of the
 18432 memory bits (INIT_xx, INITP_xx) has the same place relative to its block RAM in all 12, stored
-as is (`core/fpga/bitdb/xc3s250e-bram.json`: a column frame per X, a row bit per Y, and the place of each bit).
+as is (`packages/silinx-fpga/bitdb/xc3s250e-bram.json`: a column frame per X, a row bit per Y, and the place of each bit).
 The settings are in the interconnect column before the RAM's (`gen-sitevar.mjs` on a design of
 block RAMs and multipliers, one instance changed at a time; `ana-sitevar.mjs --dx -1`,
 `bram-features.mjs`): the port widths are a 3-bit code per port, the write modes one bit each, the
@@ -489,7 +489,7 @@ byte-identical bitstreams on the three other devices for every design above. Wha
 - **The XC3S1200E's long-line splitters** (CLKH_LL, the centre row: each vertical long line joined
   across the centre in either direction, one bit each in the I/O rows; `gen-pipcover.mjs --types
   CLKH_LL --long 1`, 298 PIPs in 38 tiles, all 48 switches the same in every tile, `clkh-ll.mjs`;
-  `core/fpga/bitdb/xc3s1200e-tiles.json`). A routed design names them `a =- b` with the line's driver in another
+  `packages/silinx-fpga/bitdb/xc3s1200e-tiles.json`). A routed design names them `a =- b` with the line's driver in another
   tile, so the writer could not tell the direction and the router did not use them (`noRoute`). Since
   #23 bitgen takes it from the device description (`pipFeatures`: the half of the line the net drives,
   by a PIP in any tile or its output pin, is the splitter's input), and the router uses them where they
@@ -910,7 +910,7 @@ new rounds' bits to the wrong tile. Instead, each time a switch is in a round, t
 are its candidates, relative to its tile; its bit is the one candidate all its observations share (other tiles of
 the type, other rounds with other codewords). The first pass, analysed again this way, gives the same 92 bits.
 
-**Result** (`measured/ll-splitters-709.json`, merged into `core/fpga/bitdb/xc3s1200e-tiles.json`): all 336 switches, one bit each,
+**Result** (`measured/ll-splitters-709.json`, merged into `packages/silinx-fpga/bitdb/xc3s1200e-tiles.json`): all 336 switches, one bit each,
 no two of a type on one bit:
 
 - CLKV_LL `-364,b` (the clock column's frame 3, the tile's row: LH0 62 / 61, … LH23 2 / 1), CLKT_LL and CLKB_LL the
@@ -1258,15 +1258,15 @@ tile of each type (47 542 / 56 959 / 56 959 / 59 707).
 ### Rebuilding the database (2026-10-14, #48)
 
 `build-db.sh` needed the folders of the stage A-E experiments, which were not kept; it also no longer
-ran (it removed `core/fpga/bitdb/s3e-tiles.json` before the analyses that load the database). The experiments are
+ran (it removed `packages/silinx-fpga/bitdb/s3e-tiles.json` before the analyses that load the database). The experiments are
 now made again from nothing by `measure-db.sh`, with fixed parameters, on a machine with ISE's Docker
 image (only Silinx's scripts' designs, the fixtures' HDL, and ISE's outputs left in the work folder,
 never in the repository):
 
 ```
 SILINX_FUZZ_HOST=user@host research/s3e-bitstream/measure-db.sh /path/W    # ISE: about 6-8 hours on one Intel Mac mini shared with other work
-research/s3e-bitstream/build-db.sh /path/W                                   # seconds; rewrites core/fpga/bitdb/ in place
-node research/s3e-bitstream/diff-db.mjs <copy of the db before> core/fpga/bitdb --resolved
+research/s3e-bitstream/build-db.sh /path/W                                   # seconds; rewrites packages/silinx-fpga/bitdb/ in place
+node research/s3e-bitstream/diff-db.mjs <copy of the db before> packages/silinx-fpga/bitdb --resolved
 ```
 
 | W | Experiment | ISE runs |

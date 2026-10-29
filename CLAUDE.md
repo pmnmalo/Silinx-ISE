@@ -59,7 +59,7 @@ the code and the lessons learnt.
   net) is the base and its HDL file is always generated from it; the badges show the drawing first,
   `[VHDL]` / `[Verilog]` last.
 - Never commit Xilinx files: ISE itself, its Docker image, or ISE's raw outputs (`.bit`, `.ncd`,
-  `.xdl`, `.xdlrc`, logs). The routing graphs in `core/fpga/devices/` are shipped for the supported
+  `.xdl`, `.xdlrc`, logs). The routing graphs in `packages/silinx-fpga/devices/` are shipped for the supported
   boards only.
 - Licence: AGPL-3.0-only with the elkjs permission (NOTICE). Keep NOTICE and THIRD-PARTY-NOTICES in
   sync when dependencies change. Copyright lines: "Copyright 2026 Pedro Maló".

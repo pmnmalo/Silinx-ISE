@@ -1,10 +1,10 @@
 // The I/O tile types of one side of the chip (and the block-RAM interconnect tiles) have the same switch box (the PIPs measured in both
 // have the same bits): their PIP features are shared. When two measurements disagree, the one with
 // bits wins (a PIP measured without bits is usually a bit given to a neighbouring tile).
-//   node unify-io.mjs      (rewrites core/fpga/bitdb/s3e-tiles.json)
+//   node unify-io.mjs      (rewrites packages/silinx-fpga/bitdb/s3e-tiles.json)
 import fs from 'node:fs';
 
-const file = new URL('../../core/fpga/bitdb/s3e-tiles.json', import.meta.url);
+const file = new URL('../../packages/silinx-fpga/bitdb/s3e-tiles.json', import.meta.url);
 const db = JSON.parse(fs.readFileSync(file, 'utf8'));
 const groups = [
   ['LIOIS', 'LIOIS_PCI', 'LIOIS_CLK_PCI', 'LIOIS_BRK', 'LIBUFS', 'LIBUFS_PCI', 'LIBUFS_CLK_PCI'],

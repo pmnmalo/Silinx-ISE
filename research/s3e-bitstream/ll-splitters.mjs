@@ -7,7 +7,7 @@
 // its codeword) does not hold here. Instead, each time a switch is in a round (a tile, a codeword), the bits that
 // change with its codeword are its candidates, relative to its tile (tileBase); its bit is the one candidate every
 // observation shares (in other tiles of the type, in other rounds with other codewords). The features: each switch's
-// bits relative to its tile, for core/fpga/bitdb/xc3s1200e-tiles.json (merge-db.mjs --device).
+// bits relative to its tile, for packages/silinx-fpga/bitdb/xc3s1200e-tiles.json (merge-db.mjs --device).
 //   PART=xc3s1200efg320-4 node ll-splitters.mjs round-dir… > ll-splitters.json      (each dir: key.json, BASE.bit, V*.bit)
 import fs from 'node:fs';
 import { readBit, diffFrames } from '../../core/fpga/bitstream.js';

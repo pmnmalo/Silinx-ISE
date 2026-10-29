@@ -16,8 +16,8 @@ import { fileURLToPath } from 'node:url';
 import { loadDeviceCache } from './device-node.js';
 import { splitPart, dbFileNames, dbFilesFrom, makeBitDb } from './bitdb.js';
 
-/** The folder of the bit database: core/fpga/bitdb, where the experiments write it (core/fpga/bitdb until #1676). */
-export const DB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'bitdb');
+/** The folder of the bit database: packages/silinx-fpga/bitdb, where the experiments write it (research/s3e-bitstream/db until #1676, core/fpga/bitdb until #1677). */
+export const DB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'packages', 'silinx-fpga', 'bitdb');
 
 const readJson = f => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null);
 

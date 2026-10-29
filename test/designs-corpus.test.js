@@ -195,7 +195,7 @@ test('design corpus: the devices of the flow, smallest first, each with a device
   }
   // the board clock's pad (B8) is on every package of the flow
   for (const pkg of ['cp132', 'fg320']) {
-    const pads = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'core/fpga/bitdb', `${pkg === 'cp132' ? 'xc3s250e' : 'xc3s500e'}-${pkg}-pads.json`), 'utf8'));
+    const pads = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'packages/silinx-fpga/bitdb', `${pkg === 'cp132' ? 'xc3s250e' : 'xc3s500e'}-${pkg}-pads.json`), 'utf8'));
     assert.ok(JSON.stringify(pads).includes('"B8"'), `B8 on the ${pkg}`);
   }
 });

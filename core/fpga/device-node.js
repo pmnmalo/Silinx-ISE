@@ -1,6 +1,6 @@
 // Silinx - the device routing graph cache, Node side (the only Node-only part of core/fpga).
 //
-// The graph of the XC3S250E-CP132 (Basys2-250) ships with Silinx (core/fpga/devices/, built from
+// The graph of the XC3S250E-CP132 (Basys2-250) ships with Silinx (packages/silinx-fpga/devices/, built from
 // ISE's device report; see docs/OPEN-TOOLCHAIN.md). The graph of any other device is built once per
 // user from the device report of their own ISE installation, then cached as gzipped JSON:
 //
@@ -26,8 +26,8 @@ export function devicesDir() {
 /** Default cache file of a part (e.g. 'xc3s250ecp132-4'). */
 export function deviceCachePath(part) { return path.join(devicesDir(), `${part}.json.gz`); }
 
-/** The graphs that ship with Silinx (core/fpga/devices/<part>.json.gz). */
-export const SHIPPED_DEVICES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'devices');
+/** The graphs that ship with Silinx (packages/silinx-fpga/devices/<part>.json.gz). */
+export const SHIPPED_DEVICES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'packages', 'silinx-fpga', 'devices');
 export function shippedDevicePath(part) { return path.join(SHIPPED_DEVICES_DIR, `${part}.json.gz`); }
 
 /**

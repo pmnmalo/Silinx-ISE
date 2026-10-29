@@ -1,10 +1,10 @@
-// core/fpga/bitdb/xc3s250e-slice.json: the slice settings of the database (core/fpga/bitdb/s3e-tiles.json, CLB tile
+// packages/silinx-fpga/bitdb/xc3s250e-slice.json: the slice settings of the database (packages/silinx-fpga/bitdb/s3e-tiles.json, CLB tile
 // features SLICE<i>:…) as a table per slice position, with the formula that places them in any slice.
-//   node gen-slicetable.mjs > core/fpga/bitdb/xc3s250e-slice.json
+//   node gen-slicetable.mjs > packages/silinx-fpga/bitdb/xc3s250e-slice.json
 import fs from 'node:fs';
 
-const tiles = JSON.parse(fs.readFileSync(new URL('../../core/fpga/bitdb/s3e-tiles.json', import.meta.url), 'utf8'));
-const layout = JSON.parse(fs.readFileSync(new URL('../../core/fpga/bitdb/xc3s250e-layout.json', import.meta.url), 'utf8'));
+const tiles = JSON.parse(fs.readFileSync(new URL('../../packages/silinx-fpga/bitdb/s3e-tiles.json', import.meta.url), 'utf8'));
+const layout = JSON.parse(fs.readFileSync(new URL('../../packages/silinx-fpga/bitdb/xc3s250e-layout.json', import.meta.url), 'utf8'));
 const positions = {};
 for (const [f, bits] of Object.entries(tiles.types.CENTER_SMALL.features)) {
   const m = /^SLICE(\d):(.*)$/.exec(f);

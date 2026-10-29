@@ -101,7 +101,7 @@ test('release zip: the launchers are executable (Linux, macOS) and the Windows o
 
 test('release zip: the device measurements left out, the bit database the app reads kept (#1541)', { skip: SKIP }, () => {
   assert.equal(exists('research/s3e-device/data'), false, 'research/s3e-device/data (#3) not packaged');
-  for (const f of ['core/fpga/bitdb/s3e-tiles.json', 'research/s3e-device/build-measured.mjs']) assert.ok(exists(f), f);
+  for (const f of ['packages/silinx-fpga/bitdb/s3e-tiles.json', 'research/s3e-device/build-measured.mjs']) assert.ok(exists(f), f);
 });
 
 test('release zip: within its size budget', { skip: SKIP }, () => {

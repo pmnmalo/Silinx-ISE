@@ -1,4 +1,4 @@
-// Compares two bit databases (folders of core/fpga/bitdb/*.json): what a rebuild (build-db.sh) changed against the
+// Compares two bit databases (folders of packages/silinx-fpga/bitdb/*.json): what a rebuild (build-db.sh) changed against the
 // committed database (#48). Per file: identical, or what differs: for the tile types (s3e-tiles.json,
 // <device>-tiles.json) the features only in one, those with other bits, and the types' other keys;
 // for the pads (<device>-<package>-pads.json) the same per pad; for the others the top-level keys.

@@ -1,11 +1,11 @@
 // Where each tile of the XC3S250E is in the frame data: its frames (a column of the device) and its
-// bits (a row). Provisional, from the chip map of stage A (core/fpga/bitdb/xc3s250e-lut.json) and from the
+// bits (a row). Provisional, from the chip map of stage A (packages/silinx-fpga/bitdb/xc3s250e-lut.json) and from the
 // device grid: CLB rows are 64-bit windows (row k from the bottom: bits 2192 - 64 k …), the I/O rows
 // at the top and bottom 80 bits; a CLB column is 19 frames starting at the frame of the LUTs of its
 // even slices. Other columns (I/O, clock, block RAM) are filled in when measured (COLS below).
 import fs from 'node:fs';
 
-const lut = JSON.parse(fs.readFileSync(new URL('../../core/fpga/bitdb/xc3s250e-lut.json', import.meta.url), 'utf8')).lutF;
+const lut = JSON.parse(fs.readFileSync(new URL('../../packages/silinx-fpga/bitdb/xc3s250e-lut.json', import.meta.url), 'utf8')).lutF;
 // columns measured later (grid column -> { frame, frames }), filled in by the experiments
 export const COLS = {};
 

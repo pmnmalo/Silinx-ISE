@@ -138,12 +138,12 @@ test('related tests: the repository — the bit database, a device description, 
   const files = sources();
   assert.ok(Object.keys(files).includes('research/s3e-bitstream/db.mjs'), 'the research tools, which read the database too');
   // #748: the database alone changed, its tests not run; a file of the database that is not there yet, the same
-  for (const f of ['core/fpga/bitdb/xc3s1200e-tiles.json', 'core/fpga/bitdb/xc3s9999e-lut.json']) {
+  for (const f of ['packages/silinx-fpga/bitdb/xc3s1200e-tiles.json', 'packages/silinx-fpga/bitdb/xc3s9999e-lut.json']) {
     const { unit } = relatedTests(files, [f]);
     for (const t of ['test/fpga-hard.test.js', 'test/open-flow.test.js', 'test/s3e-devices.test.js', 'test/fpga-bitgen.test.js', 'test/open-flow-core.test.js']) assert.ok(unit.includes(t), `${f}: ${t}`);
     assert.ok(!unit.includes('test/schdoc.test.js') && !unit.includes('test/code-size.test.js'), f);
   }
-  const dev = relatedTests(files, ['core/fpga/devices/xc3s500efg320-4.json.gz']).unit;
+  const dev = relatedTests(files, ['packages/silinx-fpga/devices/xc3s500efg320-4.json.gz']).unit;
   for (const t of ['test/fpga-device.test.js', 'test/open-flow.test.js', 'test/s3e-devices.test.js']) assert.ok(dev.includes(t), t);
   const ex = relatedTests(files, ['examples/gates/silinx.json']).unit;
   for (const t of ['test/examples.test.js', 'test/gates-example.test.js']) assert.ok(ex.includes(t), t);

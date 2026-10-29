@@ -1,6 +1,6 @@
 // The Silinx toolchain (toolchain mode 'silinx'): Implement Design and Generate
 // Programming File without Xilinx ISE, for the devices with a device description (the routing
-// graph: core/fpga/devices/ or ~/.silinx/devices) and a bit database (core/fpga/bitdb).
+// graph: packages/silinx-fpga/devices/ or ~/.silinx/devices) and a bit database (packages/silinx-fpga/bitdb).
 //
 // runOpenImplementation() is the job of POST /projects/:p/implement in that mode. The flow runs in
 // a child process (server/open-flow-run.js: synthesis with Yosys compiled to WebAssembly, pack,
@@ -39,7 +39,7 @@ import { loadConfig, detectIse, iseStatus, iseModeOf, which } from './toolchain.
 import { generateBuild, partStrings, collectReports, runLocal, runDocker, runSsh, normalizeSteps, STEPS, SIM_MODELS } from './ise.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-/** The bit database (core/fpga/bitdb: <device>-*.json, s3e-tiles.json; SILINX_BIT_DB_DIR:
+/** The bit database (packages/silinx-fpga/bitdb: <device>-*.json, s3e-tiles.json; SILINX_BIT_DB_DIR:
  *  another folder, for tests). */
 export const BIT_DB_DIR = process.env.SILINX_BIT_DB_DIR || DB_DIR;
 // the devices whose bitstream format Silinx writes (core/fpga/bitstream.js)

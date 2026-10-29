@@ -1,6 +1,6 @@
 // Merges feature tables ({ types: { TYPE: { features: { feature: [bits] } } } }) into the shared
-// core/fpga/bitdb/s3e-tiles.json (with --device: into core/fpga/bitdb/<device>-tiles.json, the features of one device), and
-// the pads' features ({ padFeatures }) into core/fpga/bitdb/<device>-<package>-pads.json (PART). Later files win
+// packages/silinx-fpga/bitdb/s3e-tiles.json (with --device: into packages/silinx-fpga/bitdb/<device>-tiles.json, the features of one device), and
+// the pads' features ({ padFeatures }) into packages/silinx-fpga/bitdb/<device>-<package>-pads.json (PART). Later files win
 // for a feature they both have, unless --keep.
 //   [PART=xc3s250ecp132-4] node merge-db.mjs [--keep] [--device] a.json b.json …
 // --reset-tiles / --reset-pads: the tile types / the pads' features emptied first (a rebuild,
@@ -11,8 +11,8 @@ import { PART, splitPart } from './db.mjs';
 const args = process.argv.slice(2);
 const keep = args.includes('--keep');
 const { device, pkg } = splitPart(PART);
-const file = new URL(args.includes('--device') ? `../../core/fpga/bitdb/${device}-tiles.json` : '../../core/fpga/bitdb/s3e-tiles.json', import.meta.url);
-const padFile = new URL(`../../core/fpga/bitdb/${device}-${pkg}-pads.json`, import.meta.url);
+const file = new URL(args.includes('--device') ? `../../packages/silinx-fpga/bitdb/${device}-tiles.json` : '../../packages/silinx-fpga/bitdb/s3e-tiles.json', import.meta.url);
+const padFile = new URL(`../../packages/silinx-fpga/bitdb/${device}-${pkg}-pads.json`, import.meta.url);
 const pads = fs.existsSync(padFile) ? JSON.parse(fs.readFileSync(padFile, 'utf8')) : {
   device: PART.replace(/^(xc3s\d+e)([a-z]+\d+)-(\d+)$/, '$1-$3-$2'),
   source: 'research/s3e-bitstream (see README.md): the pads of the package, absolute bits per pad (gen-iob.mjs; ana-pads.mjs, ana-perpad.mjs); ISE 14.7 xdl P.20131013 + bitgen; 2026-10-11',

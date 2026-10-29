@@ -2,7 +2,7 @@
 // vertical long lines can be joined across the centre in either direction, one bit each, in the I/O
 // row at the top or at the bottom of the frame (measured with gen-pipcover.mjs --types CLKH_LL --long
 // 1, ana-pipdrop.mjs). The features: frame offset from the tile's column, the bit of the frame (layout
-// typeRows CLKH_LL: bit 0), for core/fpga/bitdb/xc3s1200e-tiles.json (the bottom bits are the device's own).
+// typeRows CLKH_LL: bit 0), for packages/silinx-fpga/bitdb/xc3s1200e-tiles.json (the bottom bits are the device's own).
 //   PART=xc3s1200efg320-4 node clkh-ll.mjs dir/pips.json > clkh-ll.json
 import fs from 'node:fs';
 import { loadDb } from './db.mjs';

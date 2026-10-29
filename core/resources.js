@@ -58,7 +58,7 @@ const BUFH = { xc6slx4: 128, xc6slx9: 128, xc6slx16: 128, xc6slx25: 160, xc6slx4
  *  a fixed number is the family's own (the same on every part, the data sheet's or the user guide's). */
 const FAMILY_RESOURCES = {
   // DS312 Table 1; the global clock buffers: 24 BUFGMUX on every part (DS312 "Clocking Infrastructure",
-  // and the device reports of the shipped devices, core/fpga/devices/)
+  // and the device reports of the shipped devices, packages/silinx-fpga/devices/)
   spartan3e: [
     ...LUT4_COMMON,
     { id: 'ramb16', label: label('Block RAM (18 Kb)', 'RAM de bloco (18 Kb)'), report: 'Number of RAMB16s', count: p => p.brams, primitives: RAMB16_PRIMS },

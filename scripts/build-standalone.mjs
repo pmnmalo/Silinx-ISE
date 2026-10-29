@@ -4,8 +4,8 @@
 //   node scripts/build-standalone.mjs --assets-only <assets dir>
 // --site also writes the GitHub Pages site (.github/workflows/pages.yml): the page as index.html and
 // Silinx-ISE.html, index.html's web app manifest and service worker (scripts/pwa.mjs, #1051), and assets/ with what the Silinx toolchain fetches in the browser
-// (web/js/open-flow-browser.js): the device descriptions (core/fpga/devices), the bit database
-// (core/fpga/bitdb) and Yosys in WebAssembly (node_modules/@yowasp/yosys/gen).
+// (web/js/open-flow-browser.js): the device descriptions (packages/silinx-fpga/devices), the bit database
+// (packages/silinx-fpga/bitdb) and Yosys in WebAssembly (node_modules/@yowasp/yosys/gen).
 // The assets are versioned (#487): assets/<version>/ (a development build: assets/dev-<commit>/) holds
 // the device descriptions and the bit database, assets/vendor/yowasp-yosys/<its version>/ Yosys (the
 // versions with the same Yosys share it); the page knows its folder, and the single file the site it
@@ -40,8 +40,8 @@ const LAYOUT = {
 };
 // the assets this version publishes (writeAssets): their folder under assets/, where they come from, which files
 const ASSET_DIRS = [
-  [`${LAYOUT.dir}devices`, 'core/fpga/devices', f => f.endsWith('.json.gz')],
-  [`${LAYOUT.dir}bitdb`, 'core/fpga/bitdb', f => f.endsWith('.json')],
+  [`${LAYOUT.dir}devices`, 'packages/silinx-fpga/devices', f => f.endsWith('.json.gz')],
+  [`${LAYOUT.dir}bitdb`, 'packages/silinx-fpga/bitdb', f => f.endsWith('.json')],
   [`vendor/yowasp-yosys/${YOSYS_VERSION}/gen`, 'node_modules/@yowasp/yosys/gen', () => true],
 ];
 // each one's SHA-256 by its path under assets/, checked by the browser's cache before it keeps or uses a copy (#1237)

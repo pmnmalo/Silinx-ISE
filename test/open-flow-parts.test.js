@@ -17,7 +17,7 @@ import { yosysNode } from '../core/synth-open-node.js';
 import { shippedDevicePath } from '../core/fpga/device-node.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DB_DIR = path.join(ROOT, 'core/fpga/bitdb');
+const DB_DIR = path.join(ROOT, 'packages/silinx-fpga/bitdb');
 const PJ = path.join(ROOT, 'examples/gates');
 
 test('#405 open flow parts: the mounts are the modules\'', () => {

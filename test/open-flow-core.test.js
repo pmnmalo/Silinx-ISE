@@ -17,7 +17,7 @@ import { yosysNode } from '../core/synth-open-node.js';
 import { shippedDevicePath } from '../core/fpga/device-node.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DB_DIR = path.join(ROOT, 'core/fpga/bitdb');
+const DB_DIR = path.join(ROOT, 'packages/silinx-fpga/bitdb');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-open-flow-core-'));
 test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 

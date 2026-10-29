@@ -138,10 +138,10 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
   if (cmd === 'tiles') { const o = read(input); res = { part: PART, ...tileCandidates([...o.pips.map(p => p.tile), ...o.sites.map(s => s.tile)]) }; }
   else if (cmd === 'sites') res = { part: PART, sites: siteCandidates(lines(input)) };
   else if (cmd === 'census') {
-    const db = path.join(HERE, '../../core/fpga/bitdb');
+    const db = path.join(HERE, '../../packages/silinx-fpga/bitdb');
     res = { part: PART, pips: censusCandidates(lines(input), read(path.join(db, 's3e-tiles.json')), read(path.join(db, `${DEVICE}-layout.json`)).brkRows || []) };
   } else if (cmd === 'io') {
-    const db = read(path.join(HERE, '../../core/fpga/bitdb/s3e-tiles.json'));
+    const db = read(path.join(HERE, '../../packages/silinx-fpga/bitdb/s3e-tiles.json'));
     const pips = ioCandidates(read(input), db, t => tileXY(t).prefix);
     res = { part: PART, pips: tests ? leftCandidates(pips, read(tests).untestable) : pips };
   } else if (cmd === 'rest') {

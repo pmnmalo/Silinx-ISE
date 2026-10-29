@@ -29,7 +29,7 @@ export const device = () => (DEVICE ||= loadDevice(JSON.parse(zlib.gunzipSync(fs
 export const bitDb = () => {
   if (DB) return DB;
   const json = {};
-  for (const [k, f] of Object.entries(dbFileNames('xc3s250e', 'cp132'))) { const p = path.join(ROOT, 'core/fpga/bitdb', f); json[k] = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null; }
+  for (const [k, f] of Object.entries(dbFileNames('xc3s250e', 'cp132'))) { const p = path.join(ROOT, 'packages/silinx-fpga/bitdb', f); json[k] = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null; }
   return (DB = makeBitDb(dbFilesFrom(json, 'cp132'), device(), PART));
 };
 export const flow = (spec, sources, sims, ucf = null) => {

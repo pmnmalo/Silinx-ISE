@@ -1,4 +1,4 @@
-// The bit database of a Spartan-3E device (core/fpga/bitdb/*.json) for the experiments that build it: the loader is
+// The bit database of a Spartan-3E device (packages/silinx-fpga/bitdb/*.json) for the experiments that build it: the loader is
 // core/fpga/bitdb-node.js (the open flow's, #407), here with the experiments' default part (PART) and
 // their helpers (edges, windowKeyOf). The files are described there.
 import { splitPart, mergeTiles, withDcmClkinGclk, DCM_ROUTED } from '../../core/fpga/bitdb.js';

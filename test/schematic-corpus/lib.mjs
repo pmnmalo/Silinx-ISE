@@ -216,7 +216,7 @@ export async function runFlow(doc, uses = [], hdlUses = [], lang = 'vhdl', parts
   const { yosysNode } = await import('../../core/synth-open-node.js');
   const { shippedDevicePath } = await import('../../core/fpga/device-node.js');
   const { boardClockUcf } = await import('../designs-corpus/lib.mjs');
-  const DB = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../core/fpga/bitdb');
+  const DB = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../packages/silinx-fpga/bitdb');
   const m = modulesOf(uses, lang, hdlUses);
   const h = hdlOf(doc, lang, m.modules);
   const sources = [...m.sources, { path: h.path, text: h.code }].map(s => ({ ...s, lang: /\.s?v$/i.test(s.path) ? 'verilog' : 'vhdl' }));

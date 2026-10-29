@@ -1,4 +1,4 @@
-// The device descriptions of the Spartan-6 boards' parts (#723: core/fpga/devices/xc6slx16csg324-3.json.gz,
+// The device descriptions of the Spartan-6 boards' parts (#723: packages/silinx-fpga/devices/xc6slx16csg324-3.json.gz,
 // xc6slx45csg324-3.json.gz, Silinx's packed graphs computed from ISE's device reports on night 1): they load, their
 // tiles and PIPs are the reports' (research/s6/measured/night1.json), their sites by type the reports' and DS160's,
 // every pin of the Nexys3 and the Atlys a bonded pad, a switch from a slice's COUT to the CIN of the slice above.

@@ -13,7 +13,7 @@
 // wires join across tiles; that is stored as the list of *nodes* (sets of tile wires joined by
 // metal). Packed this way the graph is a few MB, small enough for the browser.
 //
-// The description of the XC3S250E-CP132 (Basys2-250) ships with Silinx (core/fpga/devices/); for
+// The description of the XC3S250E-CP132 (Basys2-250) ships with Silinx (packages/silinx-fpga/devices/); for
 // any other device each user builds it once from their own ISE installation (core/fpga/device-node.js,
 // Node only). See docs/OPEN-TOOLCHAIN.md.
 //
