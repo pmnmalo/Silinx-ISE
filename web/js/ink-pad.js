@@ -1,7 +1,8 @@
 // The drawing pad of the handwritten input (#1056): a canvas a pen, a finger or the mouse writes on, one stroke at a
 // time (a second pointer is ignored; once a pen has written, a touch is the hand resting on the screen). Two fingers
 // pinch and move the writing area, the mouse wheel zooms it, Fit shows the whole drawing (#1088); with Move on, a drag
-// moves it, and the mouse's middle button drags it at any time (#2003). The strokes are kept
+// moves it, and the mouse's middle button drags it at any time (#2003); with Erase on, a drag rubs out the ink under
+// it, in a circle wider than a line, one step of Undo (#2004). The strokes are kept
 // in the pad's own coordinates (CSS pixels at zoom 1): what is recognized does not change with the view; the
 // characters recognized can be shown under their ink.
 //
@@ -15,6 +16,8 @@
 import { h, twoFingerView } from './ui.js';
 
 const ZOOM = [0.25, 4];
+// the eraser's radius (screen px; a line is 3 px wide)
+const ERASE = 12;
 
 export function mountInkPad(host, { onStroke } = {}) {
   const canvas = h('canvas', { class: 'ink-canvas' });
@@ -22,10 +25,15 @@ export function mountInkPad(host, { onStroke } = {}) {
   const fitBtn = h('button', { type: 'button', class: 'btn ink-fit', title: 'Show the whole drawing', onclick: () => fit() }, 'Fit');
   // Move (#2003): while it is on, a drag with a pen, a finger or the mouse moves the drawing in the pad (the view) instead
   // of writing; the mouse's middle button drags it too
-  const moveBtn = h('button', { type: 'button', class: 'btn ink-move', title: 'Drag the drawing to move it in the pad (on: a drag moves, not writes)', 'aria-pressed': 'false',
-    onclick: () => moveBtn.setAttribute('aria-pressed', String(moveBtn.getAttribute('aria-pressed') !== 'true')) }, 'Move');
-  host.append(h('div', { class: 'ink-tools' }, moveBtn, fitBtn));
-  let strokes = [], cur = null, penSeen = false, labels = [], panning = null;
+  // Erase (#2004): while it is on, a drag rubs out the ink under it, in a circle wider than a line; Move and Erase are
+  // one at a time
+  const tool = (cls, label, title) => h('button', { type: 'button', class: `btn ${cls}`, title, 'aria-pressed': 'false', onclick: e => toggle(e.currentTarget) }, label);
+  const moveBtn = tool('ink-move', 'Move', 'Drag the drawing to move it in the pad (on: a drag moves, not writes)');
+  const eraseBtn = tool('ink-erase', 'Erase', 'Rub out the ink under a drag (on: a drag erases, not writes)');
+  const on = b => b.getAttribute('aria-pressed') === 'true';
+  const toggle = b => { const was = on(b); for (const x of [moveBtn, eraseBtn]) x.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-pressed', String(!was)); };
+  host.append(h('div', { class: 'ink-tools' }, eraseBtn, moveBtn, fitBtn));
+  let strokes = [], cur = null, penSeen = false, labels = [], panning = null, erasing = null;
   // what was done ({ add: stroke } | { was: the strokes before, now: after }, a Clear or a drawing loaded) and what was
   // undone, to redo
   const done = [], undone = [], listeners = new Set();
@@ -80,11 +88,40 @@ export function mountInkPad(host, { onStroke } = {}) {
     ctx.fillStyle = css.getPropertyValue('--ink-label').trim() || css.color;
     ctx.font = `${13 / v.s}px sans-serif`; ctx.textAlign = 'center';
     for (const l of labels) ctx.fillText(l.ch, (l.box.minX + l.box.maxX) / 2, Math.min((ht - 4 - v.oy) / v.s, l.box.maxY + 16 / v.s));
+    // the eraser, where it rubs
+    if (erasing?.at) { ctx.lineWidth = 1 / v.s; ctx.beginPath(); ctx.arc(erasing.at.x, erasing.at.y, ERASE / v.s, 0, 2 * Math.PI); ctx.stroke(); }
   }
 
+  // the ink within ERASE screen px of p (pad coordinates) rubbed out: a stroke through it cut in two, a piece of one
+  // point (none left of a line) dropped; a dot drawn alone (one point) rubbed out whole
+  const rubOut = p => {
+    const r = ERASE / v.s, near = q => Math.hypot(q.x - p.x, q.y - p.y) <= r;
+    erasing.at = p;
+    let hit = false;
+    const next = strokes.flatMap(st => {
+      if (!st.some(near)) return [st];
+      hit = true;
+      const parts = [];
+      let part = [];
+      for (const q of st) {
+        if (near(q)) { if (part.length) parts.push(part); part = []; } else part.push(q);
+      }
+      if (part.length) parts.push(part);
+      return parts.filter(x => x.length > 1).map(x => Object.assign(x, { device: st.device }));
+    });
+    if (hit) strokes = next;
+    draw();
+  };
   const down = e => {
-    if (cur || panning) return;
-    if (e.isPrimary && (moveBtn.getAttribute('aria-pressed') === 'true' || (e.pointerType === 'mouse' && e.button === 1))) {
+    if (cur || panning || erasing) return;
+    if (e.isPrimary && on(eraseBtn) && !(e.pointerType === 'mouse' && e.button !== 0)) {
+      e.preventDefault();
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* not an active pointer */ }
+      erasing = { id: e.pointerId, was: strokes, at: null };
+      rubOut(point(e));
+      return;
+    }
+    if (e.isPrimary && (on(moveBtn) || (e.pointerType === 'mouse' && e.button === 1))) {
       e.preventDefault();
       try { canvas.setPointerCapture(e.pointerId); } catch { /* not an active pointer */ }
       panning = { id: e.pointerId, x: e.clientX, y: e.clientY };
@@ -100,6 +137,12 @@ export function mountInkPad(host, { onStroke } = {}) {
     draw();
   };
   const move = e => {
+    if (erasing && e.pointerId === erasing.id) {
+      e.preventDefault();
+      const all = e.getCoalescedEvents?.();
+      for (const ev of all?.length ? all : [e]) rubOut(point(ev));
+      return;
+    }
     if (panning && e.pointerId === panning.id) {
       e.preventDefault();
       v.ox += e.clientX - panning.x; v.oy += e.clientY - panning.y;
@@ -116,6 +159,13 @@ export function mountInkPad(host, { onStroke } = {}) {
   };
   const up = e => {
     if (panning && e.pointerId === panning.id) { panning = null; return; }
+    if (erasing && e.pointerId === erasing.id) {
+      const { was } = erasing;
+      erasing = null;
+      if (strokes !== was) { done.push({ was, now: strokes }); undone.length = 0; labels = []; changed(); }
+      draw();
+      return;
+    }
     if (!cur || e.pointerId !== cur.id) return;
     done.push({ add: cur.pts });
     undone.length = 0;
@@ -153,14 +203,14 @@ export function mountInkPad(host, { onStroke } = {}) {
     canvas,
     strokes: () => strokes.map(s => s.map(p => ({ ...p }))),
     undo() {
-      const a = !cur && done.pop();
+      const a = !cur && !erasing && done.pop();
       if (!a) return;
       if (a.add) strokes.splice(strokes.lastIndexOf(a.add), 1); else strokes = a.was;
       undone.push(a);
       labels = []; draw(); changed();
     },
     redo() {
-      const a = !cur && undone.pop();
+      const a = !cur && !erasing && undone.pop();
       if (!a) return;
       if (a.add) strokes.push(a.add); else strokes = a.now;
       done.push(a);

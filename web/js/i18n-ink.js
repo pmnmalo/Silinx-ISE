@@ -7,7 +7,8 @@ export const INK_PT = {
   'Handwritten Schematic…': 'Esquemático Manuscrito…',
   "Write the expression with a pen, a finger or the mouse, e.g. F = A·B' + C. A bar over letters is NOT; a dot or a * is AND.":
     "Escreva a expressão com uma caneta, um dedo ou o rato, p.ex. F = A·B' + C. Uma barra sobre letras é NOT; um ponto ou um * é AND.",
-  'Show the whole drawing': 'Mostrar todo o desenho', 'Move': 'Mover',
+  'Show the whole drawing': 'Mostrar todo o desenho', 'Move': 'Mover', 'Erase': 'Apagar',
+  'Rub out the ink under a drag (on: a drag erases, not writes)': 'Apagar a tinta por onde se arrasta (ligado: arrastar apaga, não escreve)',
   'Drag the drawing to move it in the pad (on: a drag moves, not writes)': 'Arrastar o desenho para o mover na área de escrita (ligado: arrastar move, não escreve)',
   // Copy Drawing and Paste Drawing (#1749)
   'Copy Drawing': 'Copiar Desenho', 'Paste Drawing': 'Colar Desenho', 'Load': 'Carregar',

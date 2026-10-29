@@ -187,7 +187,7 @@ uiTest('Handwritten expressions: Teach Silinx my handwriting, and the dialog in 
     const labels = await page.eval((d) => [...document.querySelector(d).closest('.dlg').querySelectorAll('button:not(.dlg-x), summary, label, .hint')].map((e) => e.textContent.trim()).filter(Boolean), D);
     assert.deepEqual(labels, [
       "Escreva a expressão com uma caneta, um dedo ou o rato, p.ex. F = A·B' + C. Uma barra sobre letras é NOT; um ponto ou um * é AND.",
-      'Mover', 'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Ensinar ao Silinx a minha letra',
+      'Apagar', 'Mover', 'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Ensinar ao Silinx a minha letra',
       'Escreva um símbolo na área de escrita, escreva-o aqui e guarde-o: o Silinx passa a ler também a sua maneira de o escrever. As amostras ficam só neste navegador.',
       'Símbolo:', 'Guardar Amostra', 'Esquecer as Minhas Amostras', 'Inserir', 'Cancelar',
     ]);
@@ -320,6 +320,41 @@ uiTest('Handwritten expressions: Move, the drawing dragged in the pad with the m
   await page.click(`${D} .ink-undo`);
   await waitText(page, 'F = A + B');
   assert.equal(await undoable(), true);
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  assert.deepEqual(warnings(page), []);
+}, { skip: chromeOnly });
+
+// #2004: Erase: on, a drag rubs out the ink under it (the B written, rubbed out in zigzags), read again; one Undo brings
+// it back, Redo rubs it out again; Erase and Move one at a time
+uiTest('Handwritten expressions: Erase, the ink under a drag rubbed out, read again; one step of Undo; Erase or Move', E, async (page) => {
+  void page.eval(async () => { window.__ink = (await import('/js/ink-dialog.js')).handwrittenExpression(); });
+  await page.waitDialog('Handwritten Expression');
+  const boxes = await write(page, 'F=A+B', { seed: 2 });
+  await waitText(page, 'F = A + B');
+  const pressed = () => page.eval((d) => ['ink-erase', 'ink-move'].map((k) => document.querySelector(`${d} .${k}`).getAttribute('aria-pressed')), D);
+  await page.click(`${D} .ink-erase`);
+  assert.deepEqual(await pressed(), ['true', 'false']);
+  // the B, rubbed out with a pen in a zigzag across its box, a row every 10 px
+  const b = boxes[4], zig = [];
+  for (let y = b.minY - 4, k = 0; y <= b.maxY + 4; y += 10, k++) zig.push({ x: k % 2 ? b.maxX + 4 : b.minX - 4, y });
+  const path = zig.flatMap((q, i) => (i ? Array.from({ length: 8 }, (_, j) => ({ x: zig[i - 1].x + (q.x - zig[i - 1].x) * (j + 1) / 8, y: zig[i - 1].y + (q.y - zig[i - 1].y) * (j + 1) / 8 })) : [q]));
+  await stroke(page, path, 'pen');
+  await waitText(page, 'F = A +');
+  // the rest untouched: the A and the + read as before; one Undo brings the B back, Redo rubs it out again
+  await page.click(`${D} .ink-undo`);
+  await waitText(page, 'F = A + B');
+  await page.click(`${D} .ink-redo`);
+  await waitText(page, 'F = A +');
+  // Move on: Erase off; Erase on: Move off; off, a drag writes
+  await page.click(`${D} .ink-move`);
+  assert.deepEqual(await pressed(), ['false', 'true']);
+  await page.click(`${D} .ink-erase`);
+  assert.deepEqual(await pressed(), ['true', 'false']);
+  await page.click(`${D} .ink-erase`);
+  assert.deepEqual(await pressed(), ['false', 'false']);
+  await page.click(`${D} .ink-undo`);
+  await waitText(page, 'F = A + B');
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   assert.deepEqual(warnings(page), []);
