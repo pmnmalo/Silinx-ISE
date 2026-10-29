@@ -9,6 +9,8 @@ void sort(int a[N]) {
   for (int i = 0; i < N - 1; i++) {
     for (int j = 0; j < N - 1 - i; j++) {
 #pragma HLS LOOP_TRIPCOUNT max=7
+#pragma HLS PIPELINE off
+      // (not pipelined: its swap reads and writes the memory's one port, a state each)
       if (a[j] > a[j + 1]) {
         int t = a[j];
         a[j] = a[j + 1];

@@ -215,8 +215,10 @@ export const memMethods = {
         if (!a) continue;
         const here = this.g.add('eq', [cs, this.g.const(st.id, this.stateT)], BOOL);
         addr = this.mux(here, a.addr, addr, at);
-        ce = this.or(ce, this.and(here, a.ce));
-        if (a.d !== null) { we = this.or(we, this.and(here, a.we)); d = this.mux(here, a.d, d, mem.t); }
+        // (a state that waits for a stream: no access while it waits, the value read before it kept on q0, #1919)
+        const go = st.stall !== this.F ? this.and(here, this.not(st.stall)) : here;
+        ce = this.or(ce, this.and(go, a.ce));
+        if (a.d !== null) { we = this.or(we, this.and(go, a.we)); d = this.mux(here, a.d, d, mem.t); }
       }
       mems.push({ ...mem, addr, ce, we: mem.written ? we : null, d: mem.written ? d : null });
     }

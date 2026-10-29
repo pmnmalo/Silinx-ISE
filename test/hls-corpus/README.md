@@ -26,77 +26,77 @@ Not part of `npm test` (it needs the network once).
 <!-- results -->
 | Design | Language | C simulation | C synthesis | Co-simulation | Latency | Why not |
 |---|---|---|---|---|---|---|
-| array-array-partition-block-cyclic | C++ | pass | pass | pass | 221257 |  |
-| array-array-partition-complete | C++ | pass | pass | pass | 282441 |  |
+| array-array-partition-block-cyclic | C++ | pass | pass | pass | 5705 |  |
+| array-array-partition-complete | C++ | pass | pass | pass | 83784 |  |
 | dsp-fft-interface-array | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-array-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-stream | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-stream-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-logicore-fft-float-ssr | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fir-decimator | C++ | pass | pass | pass | 132 |  |
-| interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 43 |  |
-| interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 43 |  |
-| interface-aggregation-disaggregation-aggregation-of-struct | C++ | pass | pass | pass | 183 |  |
-| interface-aggregation-disaggregation-auto-disaggregation-of-struct | C++ | pass | pass | pass | 75 |  |
-| interface-aggregation-disaggregation-disaggregation-of-axis-port | C++ | pass | pass | pass | 53 |  |
-| interface-aggregation-disaggregation-struct-ii-issue | C++ | pass | pass | pass | 2715 |  |
-| interface-memory-burst-rw | C++ | pass | pass | pass | 20531 |  |
-| interface-memory-coefficient-filter | C | pass | pass | pass | 1283 |  |
-| interface-memory-ecc-flags | C++ | pass | pass | pass | 118 |  |
-| interface-memory-lmem-2rw | C++ | pass | pass | pass | 67627 |  |
-| interface-memory-manual-burst-manual-burst-example-auto-burst-inference-failure | C++ | pass | pass | pass | 22573 |  |
+| interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 13 |  |
+| interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 19 |  |
+| interface-aggregation-disaggregation-aggregation-of-struct | C++ | pass | pass | pass | 93 |  |
+| interface-aggregation-disaggregation-auto-disaggregation-of-struct | C++ | pass | pass | pass | 35 |  |
+| interface-aggregation-disaggregation-disaggregation-of-axis-port | C++ | pass | pass | pass | 23 |  |
+| interface-aggregation-disaggregation-struct-ii-issue | C++ | pass | pass | pass | 1815 |  |
+| interface-memory-burst-rw | C++ | pass | pass | pass | 8243 |  |
+| interface-memory-coefficient-filter | C | pass | pass | pass | 515 |  |
+| interface-memory-ecc-flags | C++ | pass | pass | pass | 47 |  |
+| interface-memory-lmem-2rw | C++ | pass | pass | pass | 20523 |  |
+| interface-memory-manual-burst-manual-burst-example-auto-burst-inference-failure | C++ | pass | pass | pass | 5677 |  |
 | interface-memory-manual-burst-manual-burst-example-manual-burst-inference-success | C++ | fail | fail | skip | - | C simulation: example.h:19: the header 'hls_burst_maxi.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | interface-memory-manual-burst-manual-burst-with-conditionals | C++ | fail | fail | skip | - | C simulation: example.h:18: the header 'hls_burst_maxi.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| interface-memory-max-widen-port-width | C++ | pass | pass | pass | 259 |  |
+| interface-memory-max-widen-port-width | C++ | pass | pass | pass | 67 |  |
 | interface-memory-ram-uram | C++ | pass | pass | pass | 4-5 |  |
 | interface-memory-rom-lookup-table-math | C++ | pass | pass | pass | - |  |
 | interface-memory-using-axi-master | C++ | fail | fail | skip | - | C simulation: 37: memcpy is a system call: not possible in the synthesized code (Silinx HLS, as Vitis HLS) |
 | interface-register-using-axi-lite-with-user-defined-offset | C++ | pass | pass | pass | - |  |
 | interface-streaming-axi-stream-custom-side-channel-data-2 | C++ | pass | pass | pass | 6-7 |  |
-| interface-streaming-axi-stream-to-master | C++ | pass | pass | pass | 18998 |  |
-| interface-streaming-axis-array-stream-no-side-channel-data | C++ | pass | pass | pass | 203 |  |
-| interface-streaming-using-array-of-streams | C++ | pass | pass | pass | 348 |  |
+| interface-streaming-axi-stream-to-master | C++ | pass | pass | pass | 18549 |  |
+| interface-streaming-axis-array-stream-no-side-channel-data | C++ | pass | pass | pass | 53 |  |
+| interface-streaming-using-array-of-streams | C++ | pass | pass | pass | 71 |  |
 | interface-streaming-using-axi-stream-with-side-channel-data | C++ | pass | pass | pass | 6-7 |  |
 | interface-streaming-using-axi-stream-with-struct | C++ | fail | fail | skip | - | C simulation: example.h:3: the header 'complex' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | migration-python-scripts | C | pass | pass | pass | 1 |  |
 | migration-vitis-unified-cli | C | pass | pass | pass | 1 |  |
 | misc-initialization-and-reset-static-array-rom | C++ | pass | pass | pass | 1 |  |
-| misc-malloc-removed | C | pass | pass | pass | 253 |  |
+| misc-malloc-removed | C | pass | pass | pass | 98 |  |
 | misc-rtl-as-blackbox | C++ | fail | fail | skip | - | C simulation: 29: 'rtl_model' is declared but not defined |
-| modeling-pointers-basic-arithmetic | C | pass | pass | pass | 19 |  |
+| modeling-pointers-basic-arithmetic | C | pass | pass | pass | 10 |  |
 | modeling-pointers-multiple-pointers | C | pass | pass | pass | 1 |  |
-| modeling-pointers-native-casts | C | pass | pass | pass | 1635 |  |
+| modeling-pointers-native-casts | C | pass | pass | pass | 411 |  |
 | modeling-pointers-stream-better | C | pass | pass | pass | - |  |
 | modeling-pointers-stream-good | C | pass | pass | pass | 5 |  |
 | modeling-pointers-using-double | C | pass | pass | pass | - |  |
-| modeling-conditional-control-of-pragmas-using-defines | C++ | pass | pass | pass | 71 |  |
-| modeling-conditional-control-of-pragmas-using-template-function | C++ | pass | pass | pass | 80 |  |
+| modeling-conditional-control-of-pragmas-using-defines | C++ | pass | pass | pass | 35 |  |
+| modeling-conditional-control-of-pragmas-using-template-function | C++ | pass | pass | pass | 58 |  |
 | modeling-cpp-templates-for-multiple-instances | C++ | pass | pass | pass | 1 |  |
 | modeling-fixed-point-sqrt | C++ | pass | pass | pass | - |  |
-| modeling-free-running-kernel-remerge-ii4to1 | C++ | pass | pass | pass | 455 |  |
+| modeling-free-running-kernel-remerge-ii4to1 | C++ | pass | pass | pass | 80 |  |
 | modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | - |  |
 | modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | - |  |
-| modeling-using-array-stencil-1d | C++ | pass | pass | pass | 59203 |  |
+| modeling-using-array-stencil-1d | C++ | pass | pass | pass | 29803 |  |
 | modeling-using-array-stencil-2d | C++ | fail | fail | skip | - | C simulation: test.cpp:19: the header 'malloc.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | modeling-using-cpp-templates | C++ | pass | pass | pass | - |  |
 | modeling-using-fixed-point | C++ | pass | pass | pass | 1 |  |
 | modeling-using-float-and-double | C | pass | pass | pass | - |  |
 | modeling-using-vectors | C++ | fail | fail | skip | - | C simulation: example.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| modeling-variable-bound-loops | C++ | pass | pass | pass | 3-127 |  |
+| modeling-variable-bound-loops | C++ | pass | pass | pass | 3-34 |  |
 | pipelining-functions-function-instantiate | C++ | pass | pass | pass | - |  |
 | pipelining-functions-hier-func | C++ | pass | pass | pass | - |  |
-| pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 1723 |  |
+| pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 523 |  |
 | pipelining-loops-perfect-loop | C++ | pass | pass | pass | 1723 |  |
 | pipelining-loops-using-free-running-pipeline | C++ | pass | fail | skip | - | C synthesis: 66: 'strm_out' is not an integer |
 | task-level-parallelism-control-driven-channels-autorestart | C++ | fail | fail | skip | - | C simulation: diamond_test.cpp:23: the header 'ap_float.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| task-level-parallelism-control-driven-channels-merge-split-merge-load-balance | C++ | pass | pass | pass | 600 |  |
-| task-level-parallelism-control-driven-channels-merge-split-merge-round-robin | C++ | pass | pass | pass | 600 |  |
-| task-level-parallelism-control-driven-channels-merge-split-split-load-balance | C++ | pass | pass | pass | 158 |  |
-| task-level-parallelism-control-driven-channels-merge-split-split-round-robin | C++ | pass | pass | pass | 158 |  |
-| task-level-parallelism-control-driven-channels-simple-fifos | C++ | pass | pass | pass | 1315 |  |
+| task-level-parallelism-control-driven-channels-merge-split-merge-load-balance | C++ | pass | pass | pass | 594 |  |
+| task-level-parallelism-control-driven-channels-merge-split-merge-round-robin | C++ | pass | pass | pass | 594 |  |
+| task-level-parallelism-control-driven-channels-merge-split-split-load-balance | C++ | pass | pass | pass | 152 |  |
+| task-level-parallelism-control-driven-channels-merge-split-split-round-robin | C++ | pass | pass | pass | 152 |  |
+| task-level-parallelism-control-driven-channels-simple-fifos | C++ | pass | pass | pass | 415 |  |
 | task-level-parallelism-control-driven-channels-using-fifos | C++ | fail | fail | skip | - | C simulation: diamond.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | task-level-parallelism-control-driven-channels-using-stream-of-blocks | C++ | fail | fail | skip | - | C simulation: diamond.h:19: the header 'hls_streamofblocks.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| task-level-parallelism-data-driven-mixed-control-and-data-driven | C++ | pass | pass | pass | 162 |  |
+| task-level-parallelism-data-driven-mixed-control-and-data-driven | C++ | pass | pass | pass | 157 |  |
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 

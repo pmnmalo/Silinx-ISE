@@ -48,7 +48,9 @@ test('#1786 arrays of two and three dimensions (arguments, a static constant, a 
 test('#1786 arrays of more dimensions co-simulated in VHDL and Verilog: each argument one ap_memory of N*M words (row-major)', () => {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(SRC, { file: 'st.c', lang });
-    assert.deepEqual([r.errors, r.pass, r.calls, r.gen.diagnostics], [[], true, 3, []], JSON.stringify(r.mismatches, big));
+    // (the inner loop pipelined automatically, #1919: a, b one port each)
+    assert.deepEqual([r.errors, r.pass, r.calls, r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`)], [[], true, 3,
+      ['9 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=5 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off']], JSON.stringify(r.mismatches, big));
     assert.deepEqual(r.gen.memories.map((m) => `${m.name} ${m.n}x${m.w}`), ['a 15x32', 'b 9x16']);
     assert.deepEqual(r.gen.ports.filter((p) => /_address0$/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['a_address0:4', 'b_address0:4']);
   }
@@ -65,7 +67,8 @@ test('#1820 the test bench\'s main() passing a row of an array of two dimensions
     + 'int main(void) {\n  int t[3][N] = {{5, -2, 9, 0, 7, 7, -8, 1}, {8, 7, 6, 5, 4, 3, 2, 1}, {1, 2, 3, 4, 5, 6, 7, 8}};\n  for (int k = 0; k < 3; k++) sort(t[k]);\n  return 0;\n}\n';
   const r = cToHdl(src, { file: 's.c' });
   assert.equal(r.ok, true, JSON.stringify(r.diagnostics));
-  const W = ['4 warning the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)'];
+  const W = ['4 warning the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
+    '4 warning this loop is pipelined automatically, as Vitis HLS does (II=1): II=9 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off'];
   const said = (ds) => ds.map((d) => `${d.line} ${d.severity} ${d.message}`);
   assert.deepEqual(said(r.diagnostics), W);
   for (const lang of ['vhdl', 'verilog']) {

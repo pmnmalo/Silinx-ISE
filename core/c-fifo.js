@@ -85,7 +85,9 @@ export const fifoMethods = {
       for (const st of states) {
         const a = st.fifo?.get(f.name);
         if (!a) continue;
-        const here = this.and(this.g.add('eq', [cs, this.g.const(st.id, this.stateT)], BOOL), this.and(a.g, a.ok));
+        // (a state with another access that waits: none taken while it waits, #1919)
+        const ok = st.stall !== this.F ? this.and(a.ok, this.not(st.stall)) : a.ok;
+        const here = this.and(this.g.add('eq', [cs, this.g.const(st.id, this.stateT)], BOOL), this.and(a.g, ok));
         go = this.or(go, here);
         if (a.d !== undefined) d = this.mux(this.g.add('eq', [cs, this.g.const(st.id, this.stateT)], BOOL), a.d, d, f.t);
       }

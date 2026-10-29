@@ -71,7 +71,7 @@ export function region(fn, globals = new Map()) {
   return { calls, locals, consts };
 }
 
-export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
+export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops }) {
   const fn = checked.funcs.get(checked.top);
   const rg = region(fn, checked.consts);
   // (a top running an hls::FIR has none, #1942)
@@ -104,7 +104,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
       const fir = checked.ast.firs?.get(c.callee);
       const elem = (t) => typeOf(t.kind === 'ptr' ? t.to : t.kind === 'array' || t.kind === 'stream' ? t.of : t);
       mods.set(key, { callee: c.callee, module, gen: fir ? firHdl(fir, { lang, module, src: file.split('/').pop(), types: Object.fromEntries(f.params.map((pa) => [pa.name, elem(pa.type)])) })
-        : cToHdl(source, { file, lang, headers, top: c.callee, depths, module, flat: true }) });
+        : cToHdl(source, { file, lang, headers, top: c.callee, depths, module, flat: true, pipelineLoops }) });
     }
     const m = mods.get(key);
     procs.push({ k, call: c, f, mod: m, inst: `${m.module}_U${k}`, deps: new Set(), task: !!c.task });

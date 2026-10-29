@@ -77,7 +77,9 @@ test('#1739 arrays of streams co-simulated in VHDL and Verilog: an ap_fifo per e
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(SRC, { file: 'dut.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true], JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ['5 #pragma HLS INTERFACE axis port=s_in is not made yet: ignored (its default interface made)']);
+    // (the inner loop pipelined automatically, #1919: s_out[j] written in both branches of its if, each element twice)
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ['5 #pragma HLS INTERFACE axis port=s_in is not made yet: ignored (its default interface made)',
+      '8 this loop is pipelined automatically, as Vitis HLS does (II=1): II=23 made (it accesses a stream in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off']);
     assert.deepEqual(r.gen.ports.filter((p) => /_dout$|_din$/.test(p.name)).map((p) => p.name), ['s_in_0_dout', 's_in_1_dout', 's_in_2_dout', 's_out_0_din', 's_out_1_din', 's_out_2_din']);
   }
 });

@@ -90,8 +90,13 @@ int main() {
   return s == 12345 ? 1 : 0;
 }
 `;
+// (the loops pipelined automatically, #1919: the copy of t's 3 elements in b[i] = a[5 - i] (the loop's inner one) a,
+// b one port each; the while's condition reads a)
+const AUTO = (line, ii, why) => `${line} warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=${ii} made (${why}); #pragma HLS PIPELINE off in it turns that off`;
 const LOOPS = ['4 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
-  '16 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)'];
+  AUTO(8, 2, 'it accesses a memory, an access a state'),
+  '16 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
+  AUTO(16, 3, 'its condition or step accesses a memory')];
 
 test('#1668 an array of structs one ap_memory of 118-bit words (v 0-15, f 16, k 17-21, t 22-117): read, written in part, copied; co-simulated in VHDL and Verilog; a field read from other bits found', () => {
   cosim(RMW, 'upd.cpp', ['a_address0:3', 'a_ce0:1', 'a_we0:1', 'a_d0:118', 'a_q0:118', 'b_address0:3', 'b_ce0:1', 'b_we0:1', 'b_d0:118', 'b_q0:118', 'n:32', 'j:32'], LOOPS);
@@ -133,8 +138,12 @@ int main() {
 }
 `;
 
+// (the loops pipelined automatically, #1919: a struct's stream written in a branch, its word's; the while's condition
+// polls a)
 const STREAM_LOOPS = ['7 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
-  '16 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)'];
+  AUTO(7, 12, 'it accesses a stream in a branch, an access a state'),
+  '16 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
+  AUTO(16, 2, 'it reads or writes a stream, an access a state')];
 
 test('#1668 a stream of nested structs one ap_fifo of 14-bit words (x 0-3, y 4-9, tag 10-12, ok 13), a word a struct read or written; co-simulated in VHDL and Verilog; a field read from other bits found', () => {
   cosim(STREAM, 'move.cpp', ['a_dout:14', 'a_empty_n:1', 'a_read:1', 'b_din:14', 'b_full_n:1', 'b_write:1', 'n:32'], STREAM_LOOPS);
@@ -174,12 +183,15 @@ test('#1668 #pragma HLS AGGREGATE compact=none, byte, bit (an array, a stream, a
   cosim(PRAGMAS, 'f.cpp', ['x_address0:2', 'x_ce0:1', 'x_we0:1', 'x_d0:32', 'x_q0:32', 'y_a_address0:2', 'y_a_ce0:1', 'y_a_q0:5', 'y_b_address0:2', 'y_b_ce0:1', 'y_c_address0:2', 'y_c_ce0:1', 'y_c_q0:16',
     's_dout:32', 's_empty_n:1', 's_read:1', 'q_i:32', 'q_o:32', 'q_o_ap_vld:1', 'r:22', 'z:32', 'ap_return:32'], [
     '9 warning: #pragma HLS AGGREGATE compact=wide is not one of bit, byte, none and auto: ignored (its default made)',
-    '10 warning: #pragma HLS AGGREGATE variable=z: not a struct argument of the top function: ignored']);
+    '10 warning: #pragma HLS AGGREGATE variable=z: not a struct argument of the top function: ignored',
+    AUTO(12, 3, 'it accesses a memory, an access a state')]);
   // (in a function the top calls: accepted and ignored, as before)
   const g = cToHdl('struct P { int a; };\nstatic int g(P p) {\n#pragma HLS AGGREGATE variable=p\n  return p.a;\n}\nint f(P p) { return g(p) + 1; }\n', { file: 'g.cpp' });
   assert.deepEqual(msgs(g), ['3 warning: #pragma HLS AGGREGATE is accepted and ignored: Silinx does not make it']);
 });
 
+// (its loops pipelined automatically, #1919: d read and written, one port; q's elements read and one written)
+const BRAM_LOOPS = [AUTO(6, 2, 'it accesses a memory, an access a state'), AUTO(7, 3, 'it accesses a memory, an access a state')];
 const BRAM = `struct Q { short a; char b; };
 int acc(int d[5], Q q[3]) {
 #pragma HLS INTERFACE bram port=d
@@ -200,14 +212,14 @@ int main() {
 
 test('#1668 #pragma HLS INTERFACE bram: Vitis HLS\'s BRAM port (an address in bytes, a write enable a byte, words of a power of 2 of bytes, its clock and reset), of an int array and of an array of structs; co-simulated in VHDL and Verilog', () => {
   cosim(BRAM, 'acc.cpp', ['d_Addr_A:32', 'd_EN_A:1', 'd_WEN_A:4', 'd_Din_A:32', 'd_Dout_A:32', 'd_Clk_A:1', 'd_Rst_A:1',
-    'q_Addr_A:32', 'q_EN_A:1', 'q_WEN_A:4', 'q_Din_A:32', 'q_Dout_A:32', 'q_Clk_A:1', 'q_Rst_A:1', 'ap_return:32'], []);
+    'q_Addr_A:32', 'q_EN_A:1', 'q_WEN_A:4', 'q_Din_A:32', 'q_Dout_A:32', 'q_Clk_A:1', 'q_Rst_A:1', 'ap_return:32'], BRAM_LOOPS);
 });
 
 test('#1668 a BRAM of structs and a stream of structs through the open synthesis (Yosys, Spartan-3E), from the VHDL and from the Verilog: no warning of Yosys', async () => {
   const { compile, elaborate } = await import('../core/compile.js');
   const { synthesizeOpen } = await import('../core/synth-open.js');
   const { yosysNode } = await import('../core/synth-open-node.js');
-  for (const [src, file, warnings] of [[BRAM, 'acc.cpp', []], [STREAM, 'move.cpp', STREAM_LOOPS]]) {
+  for (const [src, file, warnings] of [[BRAM, 'acc.cpp', BRAM_LOOPS], [STREAM, 'move.cpp', STREAM_LOOPS]]) {
     for (const lang of LANGS) {
       const g = cToHdl(src, { file, lang });
       assert.deepEqual(msgs(g), warnings, `${file} ${lang}`);

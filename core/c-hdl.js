@@ -25,8 +25,9 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 
 // (headers, top: a source of several files, its top function named, #1597)
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
-// name, its struct arguments' members ports of their own)
-export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false } = {}) {
+// name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
+// threshold of the loops pipelined automatically, 0 none, #1919)
+export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops } = {}) {
   const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   const diagnostics = [...checked.diagnostics];
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
@@ -49,7 +50,7 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops });
     if (!r.fallback) return r;
     if (hasStreams(checked.funcs.get(checked.top))) {
       const why = { ...r.fallback, severity: 'error', message: r.fallback.message.replace(/: made sequential \(not as processes\)$/, ': its streams are FIFOs between processes, so it cannot be made sequential') };
@@ -67,7 +68,7 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // not combinational (a loop whose count depends on the inputs, a static or global variable): a sequential module,
   // a state machine (core/c-fsmd.js, #1526)
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
-  if (seqOnly) df = { ...fsmd(checked, { groups }), seq: true };
+  if (seqOnly) df = { ...fsmd(checked, { groups, pipelineLoops }), seq: true };
   diagnostics.push(...df.diagnostics);
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   if (df.diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
