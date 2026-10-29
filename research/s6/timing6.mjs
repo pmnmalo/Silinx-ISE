@@ -2,14 +2,15 @@
 // type, slice kind and, for a flip-flop's setup through its LUT, its FFMUX: the median of what trce reports) and the
 // wires' (timing-fit6.mjs's model on the net's path in the routed XDL) give each path's data path delay; with trce's
 // clock skew and uncertainty, its slack: compared with trce's (the issue's measure: within 5 % of the slack).
-//   node research/s6/timing6.mjs <dir> …   (each with top.xdl and top.twr, ISE's routing: night 1's impl-* and edif-*)
+//   node research/s6/timing6.mjs <dir> …   (each with top.xdl and top.twr, ISE's routing: night 1's impl-* and edif-*;
+//   with top.dly, reportgen -delay's, the wires fitted on every connection)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 import { nnls } from '../s3e-route/timing-fit.mjs';
 import { parseTwr } from './twr6.mjs';
-import { connection, connections, features } from './timing-fit6.mjs';
+import { connection, connections, dlySamples, features } from './timing-fit6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
 
 /** An arc's key: its type, the slice kind, and a setup through the LUT its flip-flop's input mux. */
@@ -49,9 +50,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const devices = {}, designs = dirs.map(d => {
     const xt = fs.readFileSync(path.join(d, 'top.xdl'), 'utf8'), part = xt.match(/^design "[^"]*" (\S+)/m)[1];
     const device = (devices[part] ??= s6Device(part.replace(/^(xc6slx\d+)-?(csg\d+)(-\d)?$/, '$1$2-3')).device);
-    return { name: d, xdl: parseXdl(xt), paths: parseTwr(fs.readFileSync(path.join(d, 'top.twr'), 'utf8')), device };
+    const dly = path.join(d, 'top.dly');
+    return { name: d, xdl: parseXdl(xt), paths: parseTwr(fs.readFileSync(path.join(d, 'top.twr'), 'utf8')), device, dly: fs.existsSync(dly) ? fs.readFileSync(dly, 'utf8') : null };
   });
-  const table = arcTable(designs), conns = designs.flatMap(x => connections(x.xdl, null, x.device, x.paths).conns);
+  // the wires' weights from every connection (reportgen's .dly) when there, else from trce's paths'
+  const table = arcTable(designs), conns = designs.flatMap(x => (x.dly ? dlySamples(x.xdl, x.dly, x.device) : connections(x.xdl, null, x.device, x.paths).conns));
   const weights = nnls(conns.map(features), conns.map(c => c.delay));
   const errs = [], slackErr = [], periodErr = [], worst = [];
   for (const x of designs) {
