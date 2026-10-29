@@ -5,7 +5,7 @@
 // the wire grabbed on its curve.
 import { GRID, defaultParams, normalizeDoc, splitWiresAt, symbolPins } from '/core/schdoc.js';
 import { connectionsKept, connectivity, placementClashes, rerouteAfterMove } from '/core/schroute.js';
-import { twoFingerView } from './ui.js';
+import { closeMenus, twoFingerView } from './ui.js';
 import { untangleNew } from '/core/schpath.js';
 import { clone, snap } from './sch-editor.js';
 import { mountStroke } from './sch-stroke.js';
@@ -79,6 +79,8 @@ export function mountSchMouse(ctx) {
     const pt = toSheet(e.clientX, e.clientY);
     setCursor(pt);
     if (drag()?.kind === 'pan') { view().tx = drag().tx + e.clientX - drag().cx; view().ty = drag().ty + e.clientY - drag().cy; applyView(); return; }
+    // (a drag begun: a menu open, a symbol's from a right click or a long press, closed at once, #1992)
+    if (drag() && drag().kind !== 'pan') closeMenus();
     if (drag()?.kind === 'move') { applyMove(drag(), snap(pt.x) - drag().start.x, snap(pt.y) - drag().start.y); return; }
     if (drag()?.kind === 'seg') { applySegMove(drag(), drag().hz ? snap(pt.y) - drag().start.y : snap(pt.x) - drag().start.x); return; }
     if (drag()?.kind === 'band') { drag().cur = pt; renderOverlay(); return; }

@@ -162,3 +162,16 @@ uiTest('#1179 the mouse: a symbol dropped from the palette is selected, Select t
   await dropSymbol(page, 'and2', at);
   assert.deepEqual(await placing(page), { tool: 'select', n: n0 + 1 });
 });
+// #1992: a symbol's menu (a long press, or a right click) closed as soon as the symbol is dragged
+uiTest('#1992 tablet: a symbol\'s menu from a long press closes as soon as the finger drags the symbol', E, async (page) => {
+  await openGates(page, 'TabMenuMove');
+  const at = await page.eval(() => { const g = document.querySelector('.doc:not([hidden]) .sch-editor [data-kind="sym"]'); const r = g.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: at.x, y: at.y }] });
+  // (the long press: its contextmenu event, the symbol's menu opened)
+  await page.eval((x, y) => document.elementFromPoint(x, y).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y })), at.x, at.y);
+  const opened = await page.eval(() => !!document.querySelector('.menu-popup'));
+  for (let i = 1; i <= 4; i++) await page.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: at.x + 10 * i, y: at.y + 6 * i }] });
+  const afterMove = await page.eval(() => !!document.querySelector('.menu-popup'));
+  await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  assert.deepEqual({ opened, afterMove }, { opened: true, afterMove: false });
+}, { tablet: 'landscape' });
