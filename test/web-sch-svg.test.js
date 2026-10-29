@@ -334,3 +334,31 @@ test('#1726 schematic drawing: the bus tap as ISE\'s, a diagonal entry from its 
   const one = draw(0, false, { msb: 3, lsb: 3 }).svg;
   assert.match(one, /<line class="pin" x1="10" y1="10" x2="40" y2="10"\/>/);
 });
+
+// #2042: VCC's and GND's label past their bars, away from the pin, in every orientation: never over the drawing (turned
+// 90° / 270° it was centred on the bars); upright, where it was
+test('#2042 VCC and GND: the label clear of the symbol\'s bars in every orientation', () => {
+  // the bars (local): VCC's at y = 10 from x = 2 to 18; GND's at y = 20 to 28 from x = 1 to 19
+  const BARS = { vcc: [2, 10, 18, 10], gnd: [1, 20, 19, 28] };
+  const UPRIGHT = { vcc: ['10', '4', 'middle'], gnd: ['10', '40', 'middle'] };
+  for (const type of ['vcc', 'gnd']) {
+    for (const rot of [0, 90, 180, 270]) {
+      for (const mirror of [false, true]) {
+        const sym = { id: 'S1', type, x: 200, y: 100, rot, mirror, name: 'X', params: defaultParams(type) };
+        const def = symbolDef(sym), what = `${type} rot ${rot}${mirror ? ' mirrored' : ''}`;
+        const t = attrs(symbolSvg(sym, def).match(/<text class="stype"[^>]*>/)[0]);
+        // the text's box (9 px type, 3 capitals about 18 px wide): from its anchor and baseline
+        const w = 18, x = +t.x, y = +t.y, left = t['text-anchor'] === 'start' ? x : t['text-anchor'] === 'end' ? x - w : x - w / 2;
+        const tb = { x0: left, x1: left + w, y0: y - 8, y1: y + 2 };
+        const [a, b] = [xform(sym, def, BARS[type][0], BARS[type][1]), xform(sym, def, BARS[type][2], BARS[type][3])];
+        const bb = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
+        const over = tb.x0 < bb.x1 && bb.x0 < tb.x1 && tb.y0 < bb.y1 && bb.y0 < tb.y1;
+        assert.ok(!over, `${what}: the label ${JSON.stringify(tb)} over the bars ${JSON.stringify(bb)}`);
+        // and near them: within 16 px of the bars' box
+        const gap = Math.max(tb.x0 - bb.x1, bb.x0 - tb.x1, tb.y0 - bb.y1, bb.y0 - tb.y1);
+        assert.ok(gap <= 16, `${what}: the label ${gap} px from the bars`);
+        if (rot === 0 && !mirror) assert.deepEqual([t.x, t.y, t['text-anchor']].map(String), [String(200 + +UPRIGHT[type][0]), String(100 + +UPRIGHT[type][1]), 'middle'], `${what}: where it was`);
+      }
+    }
+  }
+});
