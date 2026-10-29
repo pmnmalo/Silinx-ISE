@@ -317,12 +317,12 @@ test('#1024 Program FPGA with no programming file, or one older than the sources
   for (const s of ['Up to date with the sources', 'No programming file yet']) assert.equal(PT[s], undefined, s);
 });
 
-// #1405: every key of the Portuguese dictionary is a text of the sources (a string or template literal of web/, core/ or
-// server/, or a page's), or a text a template of theirs makes (each ${…} any text: `Simulate ${name} Model`); a key the
+// #1405: every key of the Portuguese dictionary is a text of the sources (a string or template literal of web/, core/,
+// server/ or the toolchain's package, #1973, or a page's), or a text a template of theirs makes (each ${…} any text: `Simulate ${name} Model`); a key the
 // interface no longer has fails here (it is removed with its label)
 test('#1405 every Portuguese translation is of a text the sources still have', () => {
   const ROOT = path.join(WEB, '..', '..');
-  const tracked = execSync('git ls-files web core server', { cwd: ROOT, encoding: 'utf8' }).split('\n');
+  const tracked = execSync('git ls-files web core server packages/silinx-fpga/src', { cwd: ROOT, encoding: 'utf8' }).split('\n');
   const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
   const texts = new Set(), made = [];
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
