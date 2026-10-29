@@ -47,7 +47,7 @@ uiTest('Module (HDL) ▸ Wizard: sequential VHDL module, asynchronous reset, ena
   await page.fill('.dlg-overlay .mw-pname', 'wrap', { index: 4 });
   await page.fill('.dlg-overlay .mw-pdesc', 'the counter wrapped around', { index: 4 });
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .mw-pwidth')].map((e) => e.value)), ['1', '1', '1', '8', '1']);
-  assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay .mw-pbits')[3].textContent), '(7 downto 0)');
+  assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay .mw-pbits')[3].textContent), '(7:0)');
   await next(page, 'Kind of Logic');
   // clk found: sequential, reset with an asynchronous reset, the enable
   assert.ok(await page.eval(() => document.querySelector('.dlg-overlay input[name=mw-kind][value=seq]').checked));

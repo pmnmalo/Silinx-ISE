@@ -99,7 +99,7 @@ export function portEditor(ports, { lang, onChange = () => {}, dirs = ['in', 'ou
       const w = h('input', { type: 'number', class: 'mw-pwidth', min: 1, max: MAX_WIDTH, value: p.width, style: { width: '60px' } });
       const ds = h('input', { type: 'text', class: 'mw-pdesc', value: p.desc || '', placeholder: 'optional', style: { width: '100%', boxSizing: 'border-box' } });
       const bits = h('span', { class: 'hint mw-pbits', 'data-no-i18n': '', style: { marginLeft: '4px' } });
-      const syncBits = () => { const n = +w.value; bits.textContent = Number.isInteger(n) && n > 1 ? `(${n - 1} downto 0)` : ''; };
+      const syncBits = () => { const n = +w.value; bits.textContent = Number.isInteger(n) && n > 1 ? `(${n - 1}:0)` : ''; };   // (as the symbols show it, #1995)
       syncBits();
       nm.addEventListener('input', () => { p.name = nm.value.trim(); renderQuick(); onChange(); });
       dir.addEventListener('change', () => { p.dir = dir.value; onChange(); });
