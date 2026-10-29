@@ -50,3 +50,33 @@ uiTest('#1444 Check for Updates: anchors only to GitHub\'s URLs; a javascript: p
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: s1.identifier });
   }
 }, { skip: chromeOnly });   // (Page.addScriptToEvaluateOnNewDocument)
+
+uiTest('#2013 Check for Updates: Refresh checks again (GitHub asked anew), the dialog shown with its answer; Portuguese', E, async (page) => {
+  const stub = `(() => { window.__asked = 0; const orig = window.fetch; window.fetch = (u, o) => String(u).includes('raw.githubusercontent.com') ? Promise.resolve(new Response('', { status: 404 }))
+    : String(u).includes('api.github.com') ? (window.__asked++, Promise.resolve(new Response(${JSON.stringify(JSON.stringify({ ...RELEASE, html_url: 'https://github.com/pmnmalo/Silinx-ISE/releases/tag/v99.0.0' }))}, { status: 200, headers: { 'content-type': 'application/json' } })))
+    : orig(u, o); })();`;
+  const s1 = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: stub });
+  try {
+    await page.eval(() => localStorage.removeItem('silinx.updateCheck'));
+    await page.reload();
+    await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
+    await page.menu('Help', 'Check for Updates…');
+    await page.waitDialog('Check for Updates');
+    await page.waitFor(() => /99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'the answer' });
+    const n0 = await page.eval(() => window.__asked);
+    assert.deepEqual(await page.eval(() => [...[...document.querySelectorAll('.dlg-overlay')].pop().querySelectorAll('.dlg-buttons button')].map((b) => b.textContent)), ['Refresh', 'OK']);
+    await page.dialogButton('Refresh');
+    await page.waitFor((n) => window.__asked > n, [n0], { what: 'GitHub asked again' });
+    await page.waitDialog('Check for Updates');
+    await page.waitFor(() => /99\.0\.0/.test([...document.querySelectorAll('.dlg-overlay')].pop()?.innerText || ''), [], { what: 'the new answer' });
+    assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay').length), 1, 'one dialog');
+    // in Portuguese: Atualizar
+    await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+    await page.waitFor(() => [...[...document.querySelectorAll('.dlg-overlay')].pop().querySelectorAll('.dlg-buttons button')].some((b) => b.textContent === 'Atualizar'), [], { what: 'Atualizar' });
+    await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+    await page.dialogButton('OK');
+    await page.waitNoDialog();
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: s1.identifier });
+  }
+}, { skip: chromeOnly });
