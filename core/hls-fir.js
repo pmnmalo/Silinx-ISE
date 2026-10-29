@@ -18,21 +18,14 @@
 //     phase), 0 past the end
 //   firCModel(fn, p, args) -> the C++ text of the function fn(in, out[, config])
 
-// hls::ip_fir's constants (the options of PG149's parameters, in their order)
-export const FIR_CONSTANTS = {
-  single_rate: 0, interpolation: 1, decimation: 2, hilbert_filter: 3, interpolated: 4,
-  integer: 0, fixed_fractional: 1,
-  frequency: 0, period: 1, input_period: 2, output_period: 3,
-  integer_coefficients: 0, quantize_only: 1, maximize_dynamic_range: 2,
-  inferred: 0, non_symmetric: 1, symmetric: 2, negative_symmetric: 3, half_band: 4, hilbert: 5,
-  full_precision: 0, truncate_lsbs: 1, non_symmetric_rounding_to_zero: 2, non_symmetric_rounding_to_infinity: 3,
-  symmetric_rounding_to_zero: 4, symmetric_rounding_to_infinity: 5, convergent_rounding_to_even: 6, convergent_rounding_to_odd: 7,
-  systolic_multiply_accumulate: 0, transpose_multiply_accumulate: 1,
-  area: 0, speed: 1,
-  on_vector: 0, on_packet: 1,
-  single: 0, by_channel: 1,
-  value_signed: 0, value_unsigned: 1,
-};
+import { CPP_OWN_HEADERS } from './cpp-headers.js';
+
+// hls::ip_fir's constants and params_t's defaults, read from Silinx's hls_fir.h (core/cpp-headers.js): an integer field's
+// default a BigInt, a double's a number; coeff_vec has none, total_num_coeff is num_coeffs * coeff_sets
+const HEADER = CPP_OWN_HEADERS['hls_fir.h'];
+export const FIR_CONSTANTS = Object.fromEntries([...HEADER.matchAll(/(\w+) = (\d+)[,\s}]/g)].filter((m) => !/static/.test(HEADER.slice(HEADER.lastIndexOf('\n', m.index), m.index))).map((m) => [m[1], Number(m[2])]));
+export const FIR_DEFAULTS = Object.fromEntries([...HEADER.matchAll(/static (?:const|constexpr) (unsigned|bool|double) (\w+) = ([\w.]+);/g)].filter((m) => m[2] !== 'total_num_coeff')
+  .map(([, ty, name, v]) => [name, ty === 'double' ? Number(v) : v === 'false' ? 0n : v === 'true' ? 1n : /^\d+$/.test(v) ? BigInt(v) : BigInt(FIR_CONSTANTS[v])]));
 const C = FIR_CONSTANTS;
 const nameOf = (field, v) => {
   const groups = { filter_type: ['single_rate', 'interpolation', 'decimation', 'hilbert_filter', 'interpolated'], rate_change: ['integer', 'fixed_fractional'],
@@ -42,16 +35,6 @@ const nameOf = (field, v) => {
   return groups[field]?.[Number(v)] ?? String(v);
 };
 
-// hls::ip_fir::params_t's fields and their defaults (UG1399's FIR static parameters); coeff_vec has none
-export const FIR_DEFAULTS = {
-  input_width: 16n, input_fractional_bits: 0n, output_width: 24n, output_fractional_bits: 0n, coeff_width: 16n, coeff_fractional_bits: 0n,
-  num_coeffs: 21n, coeff_sets: 1n, input_length: 21n, output_length: 21n, num_channels: 1n, reloadable: 0n,
-  filter_type: 0n, rate_change: 0n, interp_rate: 1n, decim_rate: 1n, zero_pack_factor: 1n, rate_specification: 1n,
-  hardware_oversampling_rate: 1, sample_period: 1, sample_frequency: 0.001,
-  quantization: 0n, best_precision: 0n, coeff_structure: 1n, output_rounding_mode: 0n, filter_arch: 0n, optimization_goal: 0n,
-  inter_column_pipe_length: 4n, column_config: 1n, config_sync_mode: 0n, config_method: 0n, coeff_padding: 0n, num_paths: 1n,
-  data_sign: 0n, coeff_sign: 0n,
-};
 const MAX_TAPS = 1024;
 
 /** The parameters of the config struct `name` from its fields (the defaults for those it does not set): { p, errors }. */

@@ -320,9 +320,8 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
         // (a test bench's std::vector, <algorithm>, <random>: core/cpp-stl.js, #1734; their stdlib.h's macros, as libstdc++'s
         // headers bring them, EXIT_FAILURE)
         if (cpp && m[1] === 'hls_np_channel.h') continue;   // (hls::split, hls::merge: core/cpp-np-channel.js, #1743)
-        if (cpp && m[1] === 'hls_fir.h') continue;   // (hls::FIR: core/cpp-fir.js, #1942)
         if (cpp && TB_HEADERS.has(m[1])) { for (const [k, v] of Object.entries(HEADER_MACROS['stdlib.h'])) if (!macros.has(k)) macros.set(k, { params: null, body: scan(v, line, bad).map((t) => ({ ...t, line })) }); continue; }
-        // (a header Silinx HLS writes itself: core/cpp-headers.js, #1662)
+        // (a header Silinx HLS writes itself: core/cpp-headers.js, #1662; hls_fir.h's, #1942)
         if (cpp && CPP_OWN_HEADERS[m[1]]) { if (!once.has(`<${m[1]}>`)) run(CPP_OWN_HEADERS[m[1]], `<${m[1]}>`, depth + 1); continue; }
         if (!KNOWN_HEADERS.has(m[1])) e(m[1] === 'hls_stream.h' || m[1] === 'hls_fir.h' ? `${m[1]}: ${m[1] === 'hls_fir.h' ? 'hls::FIR' : 'hls::stream'} is C++: write the source as a .cpp file`
           : `the header '${m[1]}' is not one of Silinx HLS's (${[...KNOWN_HEADERS].join(', ')})`);
