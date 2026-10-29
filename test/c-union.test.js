@@ -96,6 +96,9 @@ test('#1896 unions and bit-fields in the C simulation: as cc\'s (their layout, t
   for (const [name, src] of [['unions', UNIONS], ['pow2', POW2]]) {
     const sim = simulateC(src, { file: `${name}.c` });
     assert.deepEqual([sim.error, sim.exitCode, sim.diagnostics], [null, 0, []], name);
+    // (a bit-field's layout is the implementation's: the C simulation lays them out as GCC and clang do on Linux and
+    // macOS, the System V ABI; MinGW lays the unions' 30-bit field out otherwise, even with -mno-ms-bitfields, #1975)
+    if (name === 'unions' && process.platform === 'win32') continue;
     assert.equal(sim.output, compiledRun(src).output, name);
   }
 });
