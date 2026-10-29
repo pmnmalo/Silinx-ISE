@@ -636,9 +636,13 @@ export function utilization(counts) {
 // other 4-input-LUT families) on every run, whatever the design (its shift registers become
 // flip-flops). (Not -nosrl instead: that option also skips pmux2shiftx, which changes netlists.)
 // Its block-RAM mapping (brams_map.v: ports of 64 data and 8 parity bits narrowed to the RAMB16's)
-// prints "Resizing cell port <memory>.<i>.<j>.DI from 64 bits to 8 bits" for every block RAM it infers.
+// prints "Resizing cell port <memory>.<i>.<j>.DI from 64 bits to 8 bits" for every block RAM it infers;
+// the Spartan-6's (brams_xc3sda_map.v) likewise for the RAMB8BWER's and RAMB16BWER's DIADI … DOPBDOP, and a
+// RAMB8BWER's address from 14 bits to 13 (its rule's abits 13, the 14th never used, #2045).
 export const QUIET = [/^Warning: Shift register inference not yet supported for family \w+\.$/,
-  /^Warning: Resizing cell port \S+\.\d+\.\d+\.(DI|DO|DIP|DOP)[AB]? from (64|8) bits to \d+ bits\.$/];
+  /^Warning: Resizing cell port \S+\.\d+\.\d+\.(DI|DO|DIP|DOP)[AB]? from (64|8) bits to \d+ bits\.$/,
+  /^Warning: Resizing cell port \S+\.\d+\.\d+\.(DIADI|DIBDI|DOADO|DOBDO|DIPADIP|DIPBDIP|DOPADOP|DOPBDOP) from (64|8) bits to \d+ bits\.$/,
+  /^Warning: Resizing cell port \S+\.\d+\.\d+\.ADDR(AWRADDR|BRDADDR) from 14 bits to 13 bits\.$/];
 
 /** The open synthesis's effort from a project's implementation properties (#282): its Optimization Effort,
  *  as XST's: High (optLevel 2) 'high', else (Normal, the default) 'normal'. */
