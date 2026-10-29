@@ -220,3 +220,22 @@ uiTest('#1815 schematic: a bus tap\'s Properties refuse an MSB below its LSB (an
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   }
 });
+
+// #2036: a name the user gives a symbol drawn inside its shape (its body's centre): a gate, an inverter, a multiplexer,
+// a flip-flop, turned too; a name too long for the body above it, as before
+uiTest('#2036 schematic: the instance name inside the symbol\'s shape (gates, INV, MUX, FDCE, turned); a long one above it', E, async (page) => {
+  const doc = newDoc('inside', 'vhdl');
+  const add = (type, x, y, name, rot = 0) => doc.symbols.push({ id: `S${doc.symbols.length + 1}`, type, x, y, rot, mirror: false, name, params: { width: 1 } });
+  add('and2', 100, 60, 'u1'); add('inv', 260, 70, 'n1'); add('mux2', 400, 60, 'm1'); add('fdce', 100, 220, 'ff1'); add('or2', 300, 240, 'g2', 90);
+  add('and2', 450, 240, 'a_very_long_instance_name');
+  await makeProject(env, { name: 'Inside', files: { 'src/inside.sch.json': JSON.stringify(doc) } });
+  await page.openProject('Inside');
+  await page.eval(() => window.SilinxApp.openSch('src/inside.sch.json'));
+  await page.waitFor((ed) => document.querySelectorAll(`${ed} svg .sym`).length === 6, [ED], { what: 'the symbols drawn' });
+  const where = await page.eval((ed) => [...document.querySelectorAll(`${ed} svg .sym`)].map((g) => {
+    const t = g.querySelector('.iname'), body = g.querySelector('.hitbox').getBBox(), r = t.getBBox();
+    const inBox = r.x >= body.x - 0.5 && r.x + r.width <= body.x + body.width + 0.5 && r.y >= body.y - 0.5 && r.y + r.height <= body.y + body.height + 0.5;
+    return `${t.textContent}:${t.classList.contains('inside') ? 'inside' : 'above'}:${inBox ? 'in' : 'out'}:${r.y + r.height <= body.y + 0.5 ? 'over' : ''}`;
+  }), ED);
+  assert.deepEqual(where, ['u1:inside:in:', 'n1:inside:in:', 'm1:inside:in:', 'ff1:inside:in:', 'g2:inside:in:', 'a_very_long_instance_name:above:out:over']);
+});

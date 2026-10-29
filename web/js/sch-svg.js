@@ -180,7 +180,15 @@ function textsSvg(sym, def, ctx = {}) {
   const pinLabels = ['module', 'hdl', 'ff', 'arith', 'mux', 'demux', 'lib'].includes(def.shape);
   // (a multiplexer / demultiplexer: its type above it, the instance name above that, #313)
   const muxType = def.shape === 'mux' || def.shape === 'demux';
-  if (showName) {
+  // (inside the body, at its centre, when it fits its width (9 px text, about 5.4 px a character): the gates, the
+  // multiplexers and the others, #2036; else above it, as before)
+  const bodyW = sym.rot === 90 || sym.rot === 270 ? def.body.h : def.body.w;
+  const inside = showName && sym.name.length * 5.4 <= bodyW - (def.shape === 'inv' || def.shape === 'buf' ? 6 : 10);
+  if (inside) {
+    // (a triangle, inv / buf / tbuf: nearer its wide side, where it has room)
+    const c = ['inv', 'buf', 'tbuf'].includes(def.shape) ? cx(def.body.x + def.body.w * 0.38, def.body.y + def.body.h / 2) : center;
+    s += `<text class="iname inside" x="${c.x}" y="${c.y + 3}" text-anchor="middle">${esc(sym.name)}</text>`;
+  } else if (showName) {
     // above the symbol; when pins stick out of the top (turned symbols), beside the top right corner instead
     const topPins = (def.shape === 'lib' || def.shape === 'demux' || def.shape === 'mux' || def.shape === 'ff') && symbolPins(sym, null, def).some(p => p.side === 'N');
     s += topPins ? `<text class="iname" x="${box.x + box.w + 3}" y="${box.y - 2 - (muxType ? 11 : 0)}" text-anchor="start">${esc(sym.name)}</text>`
