@@ -1443,7 +1443,7 @@ uiTest('#1321 Tasks: no menu bar, the toolbar in the header in its place, withou
     return { menubar: vis(document.getElementById('menubar')), inHeader: tb.parentElement.id === 'topbar',
       cmds: [...tb.querySelectorAll('.tb-btn')].filter(vis).map((b) => b.dataset.cmd), oneLine: document.getElementById('topbar').getBoundingClientRect().height <= 64 };
   });
-  assert.deepEqual(await L(), { menubar: false, inHeader: true, cmds: ['newProject', 'open', 'print', 'undo', 'redo', 'cut', 'copy', 'paste', 'find'], oneLine: true });
+  assert.deepEqual(await L(), { menubar: false, inHeader: true, cmds: ['newProject', 'open', 'closeProject', 'print', 'undo', 'redo', 'cut', 'copy', 'paste', 'find'], oneLine: true });
   assert.ok(await page.eval(() => document.getElementById('toolbar').getBoundingClientRect().left < document.getElementById('task-switch').getBoundingClientRect().left), 'before the tasks');
   await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
