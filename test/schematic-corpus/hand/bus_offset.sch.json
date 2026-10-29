@@ -1,5 +1,5 @@
 {
- "version": 6,
+ "version": 7,
  "name": "bus_offset",
  "lang": "vhdl",
  "sheet": {
@@ -70,20 +70,6 @@
     },
     {
      "x": 340,
-     "y": 90
-    }
-   ],
-   "bus": true
-  },
-  {
-   "id": "W7",
-   "points": [
-    {
-     "x": 420,
-     "y": 90
-    },
-    {
-     "x": 440,
      "y": 90
     }
    ],
