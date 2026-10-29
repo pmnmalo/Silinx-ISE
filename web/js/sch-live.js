@@ -3,7 +3,7 @@
 // bus and can drive it from outside or release it (Z), every wire is coloured by its value,
 // buses carry their value, outputs light up, registers show what they store, hovering shows values.
 // The model is core/schlive.js; sch-editor.js owns the drawing and calls this module.
-import { buildLiveSim, level, fmtValue } from '/core/schlive.js';
+import { buildLiveSim, level, fmtValue, DEC_RADIXES } from '/core/schlive.js';
 import { symbolPins, symbolBox, SYMBOLS } from '/core/schdoc.js';
 import { alongMarker, valueBoxAt } from '/core/sch-live-place.js';
 import { formatTime } from '/core/interp.js';
@@ -13,6 +13,8 @@ import { esc } from './dom.js';
 import { mountLiveInputs } from './sch-live-inputs.js';
 import { mountLiveInstance } from './sch-live-instance.js';
 import { prefKey } from './prefs.js';
+// a bus's value as shown on the sheet: in a decimal reading, its bits and their value (1110 = -2, #2064)
+const shown = (v, radix) => (DEC_RADIXES.includes(radix) && v && !Array.isArray(v) && v.w > 1 && !v.x ? `${fmtValue(v, 'bin')} = ${fmtValue(v, radix)}` : fmtValue(v, radix));
 
 const LV = ['lv-1', 'lv-0', 'lv-x', 'lv-z', 'lv-n'];
 export const lvClass = v => `lv-${level(v) ?? 'n'}`;
@@ -81,8 +83,8 @@ function liveController(ctx, live) {
   const errEl = h('span', { class: 'lv-err', hidden: true });
   const radixSel = h('select', { class: 'lv-radix', title: 'Number format of the bus values' },
     h('option', { value: 'hex', text: 'Hex' }), h('option', { value: 'bin', text: 'Binary' }),
-    // (the decimal readings of a bus, as the simulator's, #2015)
-    h('option', { value: 'dec', text: 'Decimal (Unsigned)' }), h('option', { value: 'sdec', text: "Decimal (Two's Complement)" }), h('option', { value: 'c1dec', text: "Decimal (One's Complement)" }));
+    // (a bus's bits and their value read unsigned, in two's or in one's complement: 1110 = -2, #2015, #2064)
+    h('option', { value: 'dec', text: 'Binary (Unsigned)' }), h('option', { value: 'sdec', text: "Binary (Two's Complement)" }), h('option', { value: 'c1dec', text: "Binary (One's Complement)" }));
   radixSel.value = radix;
   radixSel.addEventListener('change', () => { radix = radixSel.value; try { localStorage.setItem(prefKey('xl.sch.liveRadix'), radix); } catch { /* ignore */ } update(true); });
   const clocks = live.inputs.filter(i => i.clock);
@@ -148,7 +150,7 @@ function liveController(ctx, live) {
             + `<circle class="lv-led" cx="${led.x}" cy="${led.y}" r="5"/>`
             + `<text class="lv-val" x="${led.x}" y="${led.y - 9}" text-anchor="middle">${esc(bd.value ?? 'Z')}</text></g>`;
         } else {
-          const txt = `${bd.value == null ? '' : '▸'}${fmtValue(v, radix)}`, b = box(txt);
+          const txt = `${bd.value == null ? '' : '▸'}${shown(v, radix)}`, b = box(txt);
           s += `<g class="lv-ctl lv-out lv-bidir lv-bus ${lv}" data-lv="bidir" data-port="${esc(p.id)}"><title>${esc(tip)}</title>`
             + `<rect class="lv-box" x="${b.x}" y="${b.y}" width="${b.w}" height="13" rx="2"/>`
             + `<text class="lv-val" x="${b.x + b.w / 2}" y="${b.y + 10}" text-anchor="middle">${esc(txt)}</text></g>`;
@@ -165,14 +167,14 @@ function liveController(ctx, live) {
           + `<rect class="lv-box" x="${x}" y="${y - 6}" width="16" height="12" rx="2"/>`
           + `<rect class="lv-knob" x="${on ? x + 9 : x + 2}" y="${y - 4}" width="5" height="8" rx="1"/></g>`;
       } else if (inp) {
-        const txt = fmtValue(v, radix), b = box(txt);
+        const txt = shown(v, radix), b = box(txt);
         s += `<g class="lv-ctl lv-bus ${lv}" data-lv="edit" data-port="${esc(p.id)}"><title>${esc(p.name)}: ${esc(t('click to change the value'))}</title>`
           + `<rect class="lv-box" x="${b.x}" y="${b.y}" width="${b.w}" height="13" rx="2"/>`
           + `<text class="lv-val" x="${b.x + b.w / 2}" y="${b.y + 10}" text-anchor="middle">${esc(txt)}</text></g>`;
       } else if ((p.width || 1) === 1 && (v == null || v.w === 1)) {
         s += `<g class="lv-out ${lv}" data-port="${esc(p.id)}"><circle class="lv-led" cx="${led.x}" cy="${led.y}" r="5"/></g>`;
       } else {
-        const txt = fmtValue(v, radix), b = box(txt);
+        const txt = shown(v, radix), b = box(txt);
         s += `<g class="lv-out lv-bus ${lv}" data-port="${esc(p.id)}"><rect class="lv-box" x="${b.x}" y="${b.y}" width="${b.w}" height="13" rx="2"/>`
           + `<text class="lv-val" x="${b.x + b.w / 2}" y="${b.y + 10}" text-anchor="middle">${esc(txt)}</text></g>`;
       }
@@ -184,7 +186,7 @@ function liveController(ctx, live) {
       if (v == null) continue;
       let b;
       try { b = symbolBox(s2, modules); } catch { continue; }
-      const txt = fmtValue(v, radix);
+      const txt = shown(v, radix);
       s += `<g class="lv-store ${lvClass(v)}"><rect class="lv-box" x="${b.x + b.w + 2}" y="${b.y - 2}" width="${textW(txt)}" height="13" rx="2"/>`
         + `<text class="lv-val" x="${b.x + b.w + 6}" y="${b.y + 8}">${esc(txt)}</text></g>`;
     }
@@ -192,7 +194,7 @@ function liveController(ctx, live) {
     for (const [nid, seg] of busLabelAt) {
       const net = live.netById(nid), v = live.netValue(net);
       if (v == null) continue;
-      const txt = fmtValue(v, radix);
+      const txt = shown(v, radix);
       const horiz = seg.a.y === seg.b.y;
       const x = horiz ? (seg.a.x + seg.b.x) / 2 : seg.a.x + 5, y = horiz ? seg.a.y - 5 : (seg.a.y + seg.b.y) / 2 + 3;
       s += `<text class="lv-busval ${lvClass(v)}" x="${x}" y="${y}" text-anchor="${horiz ? 'middle' : 'start'}">${esc(txt)}</text>`;

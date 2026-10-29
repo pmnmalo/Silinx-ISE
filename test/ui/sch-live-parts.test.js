@@ -81,18 +81,25 @@ uiTest('#405 Try it parts: the bus value editor, the clock\'s Run and Pause, the
   await page.key('Escape');
   await page.waitFor((sel) => !document.querySelector(`${sel} .lv-editor`), [ED], { what: 'closed by Escape' });
   assert.equal(await page.eval((s) => document.querySelector(s).textContent, rVal), '6');
-  // ---- the bus values' decimal readings (#2015): the bar's formats; p typed as -1 in one's complement, r read so
+  // ---- the bus values' readings (#2015): the bar's formats, a bus's bits and their value (#2064); p typed as -1 in one's
+  // complement, r read so
   assert.deepEqual(await ev((sel) => [...document.querySelectorAll(`${sel} .lv-radix option`)].map((o) => o.textContent)),
-    ['Hex', 'Binary', 'Decimal (Unsigned)', "Decimal (Two's Complement)", "Decimal (One's Complement)"]);
+    ['Hex', 'Binary', 'Binary (Unsigned)', "Binary (Two's Complement)", "Binary (One's Complement)"]);
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  assert.deepEqual(await ev((sel) => [...document.querySelectorAll(`${sel} .lv-radix option`)].slice(2).map((o) => o.textContent)),
+    ['Binário (sem sinal)', 'Binário (complemento para 2)', 'Binário (complemento para 1)']);
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await page.eval((sel) => { const s = document.querySelector(`${sel} .lv-radix`); s.value = 'c1dec'; s.dispatchEvent(new Event('change')); }, ED);
   await page.click(`${ED} .lv-ctl[data-port="${portId(doc, 'p')}"]`);
   await page.waitFor(() => document.activeElement?.matches('.lv-edit-in'), [], { what: 'bus editor, one\'s complement' });
   assert.equal(await ev((sel) => document.querySelector(`${sel} .lv-editor select`).value), 'c1dec');
   await page.eval((sel) => { document.querySelector(`${sel} .lv-edit-in`).value = '-1'; }, ED);
   await page.click(`${ED} .lv-editor .btn`, { text: 'Set' });
-  await page.waitFor((s) => document.querySelector(s)?.textContent === '-1', [rVal], { what: 'r = 1110, -1 in one\'s complement' });
+  await page.waitFor((s) => document.querySelector(s)?.textContent === '1110 = -1', [rVal], { what: 'r = 1110, -1 in one\'s complement' });
   await page.eval((sel) => { const s = document.querySelector(`${sel} .lv-radix`); s.value = 'sdec'; s.dispatchEvent(new Event('change')); }, ED);
-  await page.waitFor((s) => document.querySelector(s)?.textContent === '-2', [rVal], { what: 'r = 1110, -2 in two\'s complement' });
+  await page.waitFor((s) => document.querySelector(s)?.textContent === '1110 = -2', [rVal], { what: 'r = 1110, -2 in two\'s complement' });
+  await page.eval((sel) => { const s = document.querySelector(`${sel} .lv-radix`); s.value = 'dec'; s.dispatchEvent(new Event('change')); }, ED);
+  await page.waitFor((s) => document.querySelector(s)?.textContent === '1110 = 14', [rVal], { what: 'r = 1110, 14 unsigned' });
   await page.eval((sel) => { const s = document.querySelector(`${sel} .lv-radix`); s.value = 'hex'; s.dispatchEvent(new Event('change')); }, ED);
   // ---- the clock: Run (Pause shown, on), Step stops it
   const run = `${ED} .se-simbar .lv-run`;
