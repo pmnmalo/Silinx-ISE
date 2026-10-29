@@ -4,7 +4,7 @@
 // the table, #1176); its schematic, always generated, a badge of its row
 // in the Design pane, in the HDL logic form, NAND gates only too (#694: netlist without errors,
 // simulates to the table; no Generate Schematic, no Check my answer); renaming the module keeps the
-// link; Boolean Algebra from Module; Apply of the input / output names; a Verilog project's table: its
+// link; Algebra from Module; Apply of the input / output names; a Verilog project's table: its
 // Verilog module; the / notation by default and the XOR form when simpler, in its HDL and its
 // schematic too, the NAND and NOR forms, in Portuguese (#434, #435, #694).
 import { before, after } from 'node:test';
@@ -87,8 +87,8 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   // ---- its VHDL module, made with the table (every source has its HDL, #207), linked to it, following
   // it (no Generate VHDL / Verilog module any more, #220)
   // (no Generate Schematic, no NAND gates only check box: the schematic is always generated, #694; expressions
-  // written by hand: Handwritten…, #2010)
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Apply', 'Boolean Algebra from Module…', 'Handwritten…']);
+  // written by hand: Handwritten Algebra…, #2010, #2047)
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Apply', 'Algebra from Module…', 'Handwritten Algebra…']);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-toolbar input[type=checkbox]`).length, T), 0);
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj3.vhd'] === 'src/maj3.tt.json', [], { what: 'linked HDL' });
   assert.equal((await ttFile('TtPj', 'src/maj3.tt.json')).generatedFile, 'src/maj3.vhd');
@@ -112,7 +112,8 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   // ---- table -> HDL: a cell change rewrites the module
   await page.eval(() => window.SilinxApp.openTt('src/maj3.tt.json'));
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.tt.json');
-  await page.waitFor((t) => /^HDL: maj3\.vhd — generated from the table$/.test(document.querySelector(`${t} .tt-link`).textContent), [T]);
+  // (in sync: its HDL file not shown in the toolbar, #2047)
+  await page.waitFor((t) => { const l = document.querySelector(`${t} .tt-link`); return l.dataset.hdl === 'maj3.vhd' && l.textContent === ''; }, [T]);
   await page.click(`${T} .tt-cell[data-out=f][data-row="0"]`);       // f(0,0,0) = 1
   await page.waitFor(async () => /f = Σm\(0, 3, 5, 6, 7\)/.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'HDL regenerated' });
   vhd = await readWs(env, 'TtPj', 'src/maj3.vhd');
@@ -291,7 +292,7 @@ uiTest("Truth Table expressions (#180): '/' NOT and '.' AND typed in the Express
   await page.waitFor(async () => (await (await fetch('/api/projects/TtOps/file?path=src%2Fops.tt.json')).json()).exprs?.f === '/a.b + a./b', [], { what: 'saved' });
 });
 
-uiTest('Boolean Algebra from Module: a vector adder read into a table (exhaustive simulation); the table has its HDL; no truth table from a module\'s context menu (#220)', E, async (page) => {
+uiTest('Algebra from Module: a vector adder read into a table (exhaustive simulation); the table has its HDL; no truth table from a module\'s context menu (#220)', E, async (page) => {
   await makeProject(env, { name: 'TtMod', files: { 'src/add1.vhd': ADDER } });
   await page.openProject('TtMod');
   // a module is made from a truth table, not a truth table from a module: the module's menu has none (#220)
@@ -302,7 +303,7 @@ uiTest('Boolean Algebra from Module: a vector adder read into a table (exhaustiv
     'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…',
   ]);
   await page.closeMenus();
-  // the editor's "Boolean Algebra from Module…" on a new table (with its HDL file, #207)
+  // the editor's "Algebra from Module…" on a new table (with its HDL file, #207)
   const T = '.doc:not([hidden]) .tt-editor';
   await page.menu('Project', 'New Source…');
   await page.waitDialog('New Source Wizard');
@@ -314,10 +315,10 @@ uiTest('Boolean Algebra from Module: a vector adder read into a table (exhaustiv
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/blank.tt.json');
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/blank.vhd'] === 'src/blank.tt.json', [], { what: 'the table linked to its HDL' });
-  await page.click(`${T} .tt-btn`, { text: 'Boolean Algebra from Module…' });
-  await page.waitDialog('Boolean Algebra from Module');
+  await page.click(`${T} .tt-btn`, { text: 'Algebra from Module…' });
+  await page.waitDialog('Algebra from Module');
   await page.dialogButton('OK');
-  await page.waitDialog('Boolean Algebra from Module');
+  await page.waitDialog('Algebra from Module');
   await page.dialogButton('Yes');
   await page.waitNoDialog();
   await page.waitFor((x) => document.querySelector(`${x} .tt-outputs`).value === 's_2, s_1, s_0', [T]);

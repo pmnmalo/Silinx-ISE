@@ -114,9 +114,9 @@ async function moduleTable(title, mod) {
   catch (e) { alertDlg(title, e.message, 'error'); return null; }
 }
 
-// "Boolean Algebra from Module…" in the editor: replace the table's contents
+// "Algebra from Module…" in the editor: replace the table's contents
 async function loadTtFromModule(ttPath) {
-  const T = 'Boolean Algebra from Module';
+  const T = 'Algebra from Module';
   const d = findDoc(`tt:${ttPath}`);
   const m = d?.ttEditor?.getModel();
   const mod = await pickModule(T, m?.generatedFile);

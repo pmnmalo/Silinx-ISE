@@ -133,7 +133,7 @@ export function mountTtEditor(container, opts = {}) {
     h('span', { class: 'tt-sep' }),
     h('label', { title: FORM_TIP }, 'HDL logic:'), formSel, h('label', { title: 'HDL language' }, 'Language:'), langSel,
     h('span', { class: 'tt-sep' }),
-    btn('Boolean Algebra from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()), btn('Handwritten…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
+    btn('Algebra from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()), btn('Handwritten Algebra…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
     link);
 
   // ------------------------------------------------------------------ body
@@ -327,9 +327,11 @@ export function mountTtEditor(container, opts = {}) {
   function renderLink() {
     link.innerHTML = '';
     const info = opts.linkInfo?.();
-    if (!info?.file) return;
-    link.append(h('span', { class: `gen-banner${info.why ? ' out-of-sync' : ''}` }, info.why ? 'Not in sync with ' : 'HDL: ',
-      h('a', { onclick: () => opts.onOpenFile?.(info.file) }, info.file.split('/').pop()), info.why ? ` — ${info.why}` : ' — generated from the table'));
+    // (only when its HDL is not in sync: the file in sync unsaid, its name in data-hdl, #2047)
+    link.dataset.hdl = info?.file && !info.why ? info.file.split('/').pop() : '';
+    if (!info?.why) return;
+    link.append(h('span', { class: 'gen-banner out-of-sync' }, 'Not in sync with ',
+      h('a', { onclick: () => opts.onOpenFile?.(info.file) }, info.file.split('/').pop()), ` — ${info.why}`));
   }
 
   function render() {
