@@ -1,8 +1,10 @@
 // Silinx toolchain - the Spartan-6's configuration bits of a placed and routed design (#732; the databases measured
 // in research/s6 against ISE's bitgen, #724 … #1951: bitdb/s6): every bit of the rows' frames, the block RAMs' frames
 // and the I/O words the design sets beyond an empty device's, from its instances' settings (the pads, the slices, the
-// DCMs and PLLs, the block RAMs and DSP48A1s) and its nets' PIPs, and what the databases do not know. Browser + Node.
+// DCMs and PLLs, the block RAMs and DSP48A1s) and its nets' PIPs, and what the databases do not know; its .bit
+// (bitstreamS6), byte for byte as ISE's bitgen writes the same routed design. Browser + Node.
 import { s6Sites } from './sites.js';
+import { S6_DEVICES, FRAME_WORDS, bitFormat6, emptyFdri, writeBit6 } from './bitstream.js';
 import { tileRegion, gridRegion, columnOf } from './bitgen-regions.js';
 import { kindModel, predictSlice } from './bitgen-slice.js';
 import { pipDirections, pipLookup } from './bitgen-pips.js';
@@ -136,4 +138,46 @@ export function predictDesign(design, device, dev, db) {
     });
   }
   return { bits, unknown };
+}
+
+/**
+ * The frames bitgen writes again after the frame data (#724, #728, measured on a design with one RAMB8BWER, stopwatch
+ * on both boards): minor 23 of the block RAM's column in its row, as in the frame data but for two bits it clears
+ * (bit 1 of word w, bit 14 of word w + 15, counting from the word's lowest; w the first word of the four switch boxes' rows the block RAM's tile
+ * spans), then a frame of pad (all ones). { rewrites: [{ far, words }], unknown: [what was not measured] }.
+ */
+export function bramRewrites(design, device, dev, fdri) {
+  const brams = design.insts.filter(i => /^RAMB(8|16)BWER$/.test(i.type) && i.placed), unknown = [];
+  if (!brams.length) return { rewrites: [], unknown };
+  if (brams.length > 1) unknown.push(`${brams.length} block RAMs: the frame bitgen writes again measured with one`);
+  if (brams[0].type !== 'RAMB8BWER') unknown.push(`a ${brams[0].type}: the frame bitgen writes again measured with a RAMB8BWER`);
+  const [f0, b0] = gridRegion(device, dev, brams[0].tile), row = Math.floor(f0 / dev.rowFrames), [c0] = columnOf(dev, f0);
+  let column = 0;
+  for (let f = row * dev.rowFrames; f < c0; f += dev.columns[column]) column++;
+  const main = (c0 + 23) * FRAME_WORDS, words = new Uint16Array(2 * FRAME_WORDS).fill(0xffff), w = (b0 >> 4) - 12;
+  words.set(fdri.subarray(main, main + FRAME_WORDS), 0);
+  words[w] &= ~0x0002;
+  words[w + 15] &= ~0x4000;
+  return { rewrites: [{ far: [(row << 8) | column, 23], words }], unknown };
+}
+
+/**
+ * The .bit of a placed and routed Spartan-6 design (parseXdl's) from the bit databases (bitdb-node.js
+ * loadBitDbS6, or the same object in the browser): the empty device's frame data with every bit predictDesign gives,
+ * the block RAM's frame written again, bitstream.js's writer. opts: { name, date, time, crc, startupClk } (the
+ * header's and the configuration's). { bytes (Uint8Array), unknown: Map what -> count (the bitstream may not be
+ * the design's when not empty: a feature the databases do not have, a DCM or PLL) }.
+ */
+export function bitstreamS6(design, device, db, { name = 'top.ncd;UserID=0xFFFFFFFF', date, time, crc = true, startupClk = 'Cclk' } = {}) {
+  const part = db.part.replace(/-\d$/, ''), type = part.match(/^xc6slx\d+/)[0], dev = bitFormat6(part.replace(/^xc/, ''));
+  const { bits, unknown } = predictDesign(design, device, dev, db);
+  // a DCM's or PLL's bits are measured for some sites, pads and outputs only, and some of those not exactly (#2025):
+  // never a bitstream that might not be the design's without saying so
+  for (const i of design.insts) if (/^(DCM|PLL_ADV)$/.test(i.type) && i.placed) unknown.set(`${i.type} ${i.site}: a clock manager's bits not measured for every configuration (#2025)`, 1);
+  const fdri = emptyFdri(dev).slice();
+  for (const x of bits) { const [f, b] = x.split(',').map(Number); fdri[f * FRAME_WORDS + (b >> 4)] ^= 1 << (15 - (b & 15)); }
+  const again = bramRewrites(design, device, dev, fdri);
+  for (const u of again.unknown) unknown.set(u, (unknown.get(u) || 0) + 1);
+  const bytes = writeBit6({ fdri, rewrites: again.rewrites, name, part: part.replace(/^xc/, ''), ...(date && { date }), ...(time && { time }), crc, startupClk, device: S6_DEVICES[type] });
+  return { bytes, unknown };
 }

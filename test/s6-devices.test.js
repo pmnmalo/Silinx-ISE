@@ -12,6 +12,11 @@ import { fileURLToPath } from 'node:url';
 import { S6_DEVICES, S6_OPEN_STEPS, spartan6Open, s6OpenStatus } from '../packages/silinx-fpga/src/fpga/s6/devices.js';
 import { resolveBoard } from '../server/devices.js';
 import * as OF from '../server/open-flow.js';
+import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { readBit6, bitFormat6, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
+import { predictDesign } from '../packages/silinx-fpga/src/fpga/s6/bitgen.js';
+import { loadBitDbS6 } from '../packages/silinx-fpga/src/fpga/s6/bitdb-node.js';
+import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FLAG = { SILINX_SPARTAN6_OPEN: '1' };
@@ -40,7 +45,7 @@ test('openStatus: a Spartan-6 refused without the flag; with it the boards\' par
   assert.equal(off.steps, undefined);
   const on = OF.openStatus(DEV('xc6slx16'), { env: FLAG });
   assert.deepEqual([on.available, on.part, on.device, on.steps], [true, 'xc6slx16csg324-3', 'xc6slx16', S6_OPEN_STEPS]);
-  assert.equal(on.reason, 'xc6slx16csg324-3: the Spartan-6 under development (SILINX_SPARTAN6_OPEN): synthesis, its post-synthesis simulation model, Map, Place & Route, the static timing only, no bitstream yet (#732)');
+  assert.equal(on.reason, 'xc6slx16csg324-3: the Spartan-6 under development (SILINX_SPARTAN6_OPEN): synthesis, its post-synthesis simulation model, Map, Place & Route, the static timing, the bitstream only (#732)');
   assert.equal(OF.openStatus(DEV('xc6slx45'), { env: FLAG }).available, true);
   const lx9 = OF.openStatus(DEV('xc6slx9'), { env: FLAG });
   assert.equal(lx9.available, false);
@@ -50,7 +55,7 @@ test('openStatus: a Spartan-6 refused without the flag; with it the boards\' par
   assert.equal(ftg.reason, 'the Silinx toolchain for the Spartan-6 has the xc6slx16 in the csg324 package only (SILINX_SPARTAN6_OPEN): use an ISE mode for the ftg256');
   // the Spartan-3E as before, with or without the flag
   for (const env of [{}, FLAG]) assert.equal(OF.openStatus({ family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, { env }).available, true);
-  assert.deepEqual(s6OpenStatus('xc6slx16', 'csg324', 'p').steps, ['synth', 'postsynth', 'translate', 'map', 'par', 'trce']);
+  assert.deepEqual(s6OpenStatus('xc6slx16', 'csg324', 'p').steps, ['synth', 'postsynth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit']);
   // the shipped device description for Map and Place & Route
   assert.match(on.graph, /xc6slx16csg324-3\.json\.gz$/);
   assert.equal(on.shipped, true);
@@ -67,7 +72,7 @@ function nexys3Gates() {
 }
 const job = () => { const lines = []; return { lines, log: l => lines.push(l), procs: new Set(), cancelled: false }; };
 
-test('runOpenImplementation under the flag: the gates example on the Nexys3, synthesized for the XC6SLX16 with its post-synthesis model, mapped, placed, routed and timed; bitgen refused', { timeout: 300000 }, async () => {
+test('runOpenImplementation under the flag: the gates example on the Nexys3, synthesized for the XC6SLX16 with its post-synthesis model, mapped, placed, routed and timed; the power estimate refused', { timeout: 300000 }, async () => {
   const before = process.env.SILINX_SPARTAN6_OPEN;
   process.env.SILINX_SPARTAN6_OPEN = '1';
   const { dir, project } = nexys3Gates();
@@ -77,7 +82,7 @@ test('runOpenImplementation under the flag: the gates example on the Nexys3, syn
     assert.deepEqual(r.completedSteps, ['synth', 'postsynth'], j.lines.join('\n'));
     // (the one warning: the design has no pins, as any design without a UCF)
     assert.deepEqual(j.lines.filter(l => /^(WARNING|ERROR)/.test(l)), ['WARNING: 6 port bit(s) have no LOC constraint (sw<0>, sw<1>, sw<2>, sw<3>, led<0>, led<1>): Silinx assigns free I/O pins automatically - do NOT program real hardware with this bitstream']);
-    assert.ok(j.lines.includes('Device: xc6slx16csg324-3: the Spartan-6 under development (SILINX_SPARTAN6_OPEN): synthesis, its post-synthesis simulation model, Map, Place & Route, the static timing only, no bitstream yet (#732).'), j.lines.join('\n'));
+    assert.ok(j.lines.includes('Device: xc6slx16csg324-3: the Spartan-6 under development (SILINX_SPARTAN6_OPEN): synthesis, its post-synthesis simulation model, Map, Place & Route, the static timing, the bitstream only (#732).'), j.lines.join('\n'));
     const model = fs.readFileSync(path.join(dir, 'build/netgen/synthesis/gates_synthesis.vhd'), 'utf8');
     assert.match(model, /^-- Post-Synthesis Simulation Model of 'gates' \(xc6slx16csg324-3\)/);
     assert.match(model, /: LUT\d\n/);
@@ -93,8 +98,7 @@ test('runOpenImplementation under the flag: the gates example on the Nexys3, syn
     assert.match(timing, /pad to pad:\n {2}sw<0> +-> led<0> +\d+\.\d{3} ns/);
     // the steps it does not have: refused before anything runs
     const j2 = job();
-    await assert.rejects(OF.runOpenImplementation(j2, { project, projectDir: dir, steps: ['bitgen'] }), /^Error: Silinx toolchain: no bitgen, prombit for xc6slx16csg324-3 yet \(only synth, postsynth, translate, map, par, trce\)$/);
-    assert.equal(j2.lines.at(-1), `ERROR: the Silinx toolchain has no bitgen, prombit for this device yet: ${'xc6slx16csg324-3: the Spartan-6 under development (SILINX_SPARTAN6_OPEN): synthesis, its post-synthesis simulation model, Map, Place & Route, the static timing only, no bitstream yet (#732)'}.`);
+    await assert.rejects(OF.runOpenImplementation(j2, { project, projectDir: dir, steps: ['xpwr'] }), /^Error: Silinx toolchain: no xpwr for xc6slx16csg324-3 yet \(only synth, postsynth, translate, map, par, trce, bitgen, prombit\)$/);
   } finally {
     if (before === undefined) delete process.env.SILINX_SPARTAN6_OPEN; else process.env.SILINX_SPARTAN6_OPEN = before;
     fs.rmSync(dir, { recursive: true, force: true });
@@ -108,9 +112,10 @@ test('runOpenImplementation under the flag: the gates example on the Nexys3, syn
 });
 
 // an example with the board's pins and clock (its UCF for the board, test/examples-lib.mjs): the blinky example on
-// the Nexys3 through Map, Place & Route and the timing, no warning, its PERIOD constraint met (the Atlys has no
+// the Nexys3 through Map, Place & Route, the timing and the bitstream (its frame data every bit the bit databases give
+// the routed design), no warning, its PERIOD constraint met (the Atlys has no
 // seven-segment display: the board's check refuses blinky there; its placement and routing: s6-place, s6-route)
-test('runOpenImplementation under the flag: the blinky example on the Nexys3, placed, routed and timed against its PERIOD', { timeout: 600000 }, async () => {
+test('runOpenImplementation under the flag: the blinky example on the Nexys3, placed, routed, timed against its PERIOD and written as a bitstream', { timeout: 600000 }, async () => {
   const { exampleUcf } = await import('./examples-lib.mjs');
   const before = process.env.SILINX_SPARTAN6_OPEN;
   process.env.SILINX_SPARTAN6_OPEN = '1';
@@ -123,8 +128,9 @@ test('runOpenImplementation under the flag: the blinky example on the Nexys3, pl
         fs.mkdirSync(path.join(dir, path.dirname(project.constraints)), { recursive: true });
         fs.writeFileSync(path.join(dir, project.constraints), exampleUcf('blinky', { board }).text);
         const j = job();
-        const r = await OF.runOpenImplementation(j, { project: { ...project, name: 'blinky', board, device: resolveBoard(board).device }, projectDir: dir, steps: ['synth', 'translate', 'map', 'par', 'trce'] });
-        assert.deepEqual(r.completedSteps, ['synth', 'translate', 'map', 'par', 'trce'], `${board}\n${j.lines.join('\n')}`);
+        const r = await OF.runOpenImplementation(j, { project: { ...project, name: 'blinky', board, device: resolveBoard(board).device }, projectDir: dir, steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] });
+        // (bitgen with its PROM file, the start-up clock Cclk)
+        assert.deepEqual(r.completedSteps, ['synth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit'], `${board}\n${j.lines.join('\n')}`);
         assert.deepEqual(j.lines.filter(l => /^(WARNING|ERROR)/.test(l)), [], `${board}\n${j.lines.join('\n')}`);
         assert.ok(j.lines.some(l => /^constraint PERIOD 10 ns on clk: met \(period \d+\.\d{3} ns, slack \d+\.\d{3} ns\)$/.test(l)), `${board}\n${j.lines.join('\n')}`);
         assert.ok(j.lines.includes('All constraints were met.'), board);
@@ -132,6 +138,18 @@ test('runOpenImplementation under the flag: the blinky example on the Nexys3, pl
         assert.equal(r.reports.timing?.met, true, board);
         assert.ok(r.reports.timing.minPeriodNs > 2 && r.reports.timing.minPeriodNs < 10, `${board} ${r.reports.timing.minPeriodNs}`);
         for (const f of ['placed.xdl', 'routed.xdl', 'timing.txt']) assert.ok(fs.existsSync(path.join(dir, 'build/open', f)), `${board} ${f}`);
+        // the bitstream: the part's, CRC on, JTAG start-up (the project's), its frame data every bit the routed design has
+        const bit = readBit6(fs.readFileSync(path.join(dir, 'build/top.bit')));
+        assert.deepEqual([bit.header.a, bit.header.b, bit.crc, bit.startupClk, bit.rewrites.length], ['top.ncd;UserID=0xFFFFFFFF', '6slx16csg324', true, 'JtagClk', 0], board);
+        assert.ok(bit.crcChecks.length && bit.crcChecks.every(c => c.expected === c.computed), board);
+        assert.equal(readBit6(fs.readFileSync(path.join(dir, 'build/top_prom.bit'))).startupClk, 'Cclk', board);
+        const routed = parseXdl(fs.readFileSync(path.join(dir, 'build/open/routed.xdl'), 'utf8')), dev = bitFormat6('6slx16csg324');
+        const { bits, unknown } = predictDesign(routed, loadDeviceCache('xc6slx16csg324-3'), dev, loadBitDbS6('xc6slx16csg324-3'));
+        assert.deepEqual([...unknown], [], board);
+        const empty = emptyFdri(dev), set = [];
+        for (let w = 0; w < bit.fdri.length; w++) { const x = bit.fdri[w] ^ empty[w]; for (let i = 0; i < 16; i++) if ((x >> (15 - i)) & 1) set.push(`${Math.floor(w / FRAME_WORDS)},${(w % FRAME_WORDS) * 16 + i}`); }
+        assert.deepEqual(set.sort(), [...bits].sort(), board);
+        assert.ok(j.lines.some(l => /^Bitstream: build\/top\.bit \(\d+ bytes/.test(l)), board);
       } finally { fs.rmSync(dir, { recursive: true, force: true }); }
     }
   } finally { if (before === undefined) delete process.env.SILINX_SPARTAN6_OPEN; else process.env.SILINX_SPARTAN6_OPEN = before; }
