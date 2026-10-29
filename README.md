@@ -214,15 +214,18 @@ for Xilinx FPGAs supported by ISE 14.7.
   NAND or NOR gates only): the *Schematic* badge of the table's row in the Design pane opens it
   (read-only, redrawn whenever the table changes). *Truth Table from Module…* fills the table with the table of any combinational module
   of up to 8 input bits.
-- **Handwritten input, a preview** (development builds only, from the *Development* menu, while it does not read
-  real handwriting well enough yet). **Handwritten expressions** (*Development ▸ Handwritten Expression…*, on the open
-  truth table: the column of its output; the New Source wizard's *Truth Table* takes a typed expression, which gives
-  the table's inputs, its output and its column): write `F = A·B' + C` on a pad with a pen, a finger or the mouse — on
-  an interactive whiteboard or a tablet too. Silinx's own recognizer reads it, offline (a point-cloud recognizer with
-  built-in templates; nothing is sent anywhere): letters, digits, `_`, `+ · * ' ¬ ~ ( ) = ⊕ ^ & |`, and a bar over
-  letters as NOT. The text is shown for you to correct before it is inserted; *Teach Silinx my handwriting* keeps
-  samples of your own way of writing a symbol in the browser. On the pad, two fingers zoom and move the writing area,
-  the mouse wheel zooms it, *Fit* shows the whole drawing; the Handwritten Schematic dialog uses the whole page.
+- **Handwritten expressions** (the truth table editor's *Handwritten…*): write one or more equations on a pad, one a
+  line, with any names (`F = A·B' + C`, `G = A ⊕ D`), with a pen, a finger or the mouse — on an interactive
+  whiteboard or a tablet too. Silinx's own recognizer reads them, offline (a point-cloud recognizer with built-in
+  templates; nothing is sent anywhere): letters, digits, `_`, `+ · * ' ¬ ~ ( ) = ⊕ ^ & |`, and a bar over letters as
+  NOT; the text is shown in the editor's notation (`F = /A.B + C`) for you to correct, and inserted, the equations
+  become the editor's: its inputs, its outputs, their columns and expressions (one step of Undo). *Teach Silinx my
+  handwriting* keeps samples of your own way of writing a symbol in the browser. On the pad, two fingers zoom and
+  move the writing area, the mouse wheel zooms it, *Move* drags it with a pen or the mouse, *Erase* rubs out ink,
+  *Fit* shows the whole drawing. The New Source wizard's *Truth Table* takes a typed expression, which gives the
+  table's inputs, its output and its column.
+- **Handwritten tables and schematics, a preview** (development builds only, from the *Development* menu, while it
+  does not read real handwriting well enough yet); the Handwritten Schematic dialog uses the whole page.
 - **Hand-drawn truth tables** (a preview, *Development ▸ Handwritten Truth Table…*, on the open truth table): draw
   the whole table — the names in a header, a line under it, a line between the inputs and the outputs, a row of 0, 1
   or X for each combination — and Silinx reads it offline into its text (`A B | F`, then a row a line), which you

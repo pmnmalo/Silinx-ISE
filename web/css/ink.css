@@ -4,10 +4,10 @@
 .ink-dlg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .ink-dlg input, .ink-dlg textarea { -webkit-user-select: text; user-select: text; }
 .ink-pad { border: 1px solid var(--border, #a0a0a0); border-radius: 3px; background: var(--panel, #fff); }
-.ink-canvas { display: block; width: 100%; height: min(240px, 38vh); touch-action: none; cursor: crosshair; color: var(--fg, #000);
+.ink-canvas { display: block; width: 100%; height: min(320px, 44vh); touch-action: none; cursor: crosshair; color: var(--fg, #000);
   --ink-guide: var(--border, #a0a0a0); --ink-label: var(--accent, #316ac5); }
 .ink-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.ink-text { flex: 1; min-width: 200px; font-family: var(--mono, monospace); font-size: 15px; }
+.ink-text { flex: 1; min-width: 200px; font-family: var(--mono, monospace); font-size: 15px; resize: vertical; }
 .ink-sym { width: 3em; text-align: center; font-family: var(--mono, monospace); }
 .ink-msg { min-height: 16px; }
 /* (the dialog is centred: what grows under the pad would move the pad under the pen, so the parts below it keep
