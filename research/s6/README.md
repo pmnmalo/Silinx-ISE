@@ -465,8 +465,16 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   and, for a setup through the LUT, the flip-flop's input mux) and its nets from the wire model on ISE's routing; with
   trce's skew and uncertainty, its slack. On night 1's 240 paths the data path's rms error is 0.219 ns (95% within
   0.49 ns); each constraint's worst slack is within 5% of trce's in 14 of 24 constraints, the others the small slacks
-  (0.2 ns of a 0.68 ns slack is 29%), every error under 6% of the period. Next: every connection's delay
-  (`reportgen -delay`) for the wire fit, and the STA that finds the worst path itself (its own skew).
+  (0.2 ns of a 0.68 ns slack is 29%), every error under 6% of the period.
+- **Every connection** (part 3: `reportgen -delay` on night 1's 28 routed designs, a `.dly` each beside its `.twr`;
+  `timing-fit6.mjs`'s `dlySamples`): 5581 connections, each net's delay to each load, the same numbers as trce's
+  for the connections both have. The class counts alone leave rms 0.146 ns; **the load pin** is the rest
+  (`pinKind`: a LUT input by its index, A1 0.29 ns and A2 0.27 ns more than A4 to A6, the bypass, the carry 0.32 ns,
+  an I/O's 0.56 ns): with it rms 0.089 ns, 95% within 0.19 ns, max 0.52 ns. On trce's 240 paths (a sample of the
+  critical, longer nets) the data path's rms is 0.236 ns and 15 of 24 constraints' worst slacks are within 5% of
+  trce's, every error under 5.5% of the period; the arc table alone accounts for 0.077 ns of it (Tilo is 0.203 or
+  0.259 ns for no reason the pin, the LUT's settings or the load show). Next: the STA that finds the worst path
+  itself, with its own clock skew.
 
 ### The CMT sites (#1951, S6-E2, 2026-10-29)
 
@@ -640,7 +648,7 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `gen-cmtdrop6.mjs`, `ana-cmtdrop6.mjs` | The CMT paths' PIPs dropped one at a time in context: `db/s6-pips-cmt.json` (#1951) |
 | `ana-cmtinput6.mjs` | A CMT's bits beyond its settings and PIPs, by its site, outputs and BUFIO2: `db/<device>-cmt-input.json` (#1951) |
 | `twr6.mjs` | trce's report read: each constraint's paths, their figures and elements (#731) |
-| `timing-fit6.mjs` | The wire delay model fitted to trce's nets on ISE's routing (#731) |
+| `timing-fit6.mjs` | The wire delay model fitted to trce's nets, or every connection of reportgen's `.dly`, on ISE's routing (#731) |
 | `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |

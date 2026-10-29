@@ -1,13 +1,18 @@
 // research/s6 stage S6-G (#731), without ISE: a trce report's paths read (twr6.mjs), the Spartan-6's wire classes and
-// a connection's features (timing-fit6.mjs), the non-negative least squares the fit uses (research/s3e-route), the arcs'
-// table and a path re-evaluated by the model (timing6.mjs).
+// a connection's features and load pin (timing-fit6.mjs), every connection of reportgen's report on a routed design
+// (dlySamples), the non-negative least squares the fit uses (research/s3e-route), the arcs' table and a path
+// re-evaluated by the model (timing6.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseTwr } from '../research/s6/twr6.mjs';
-import { wireClass6, CLASSES6, nodeWire, features } from '../research/s6/timing-fit6.mjs';
+import { wireClass6, CLASSES6, nodeWire, features, pinKind, PIN_KINDS, dlySamples } from '../research/s6/timing-fit6.mjs';
 import { nnls } from '../research/s3e-route/timing-fit.mjs';
 import { arcKey, arcTable, modelPath } from '../research/s6/timing6.mjs';
-import { s6Device } from './s6-lib.mjs';
+import { placeS6 } from '../packages/silinx-fpga/src/fpga/s6/place.js';
+import { placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xdl.js';
+import { routeS6, routedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/route.js';
+import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { s6Device, s6Phys, s6Verilog } from './s6-lib.mjs';
 
 // a report in trce's layout, its numbers made up
 const TWR = `Timing constraint: TS_clk = PERIOD TIMEGRP "clk" 10 ns HIGH 50%;
@@ -73,7 +78,11 @@ test('timing-fit6: the wire classes, a node\'s first wire, a connection\'s featu
   const [tile, wire] = nodeWire(device, n);
   assert.match(tile, /^(CLEX[LM]|INT)_X\d+Y\d+$/);
   assert.match(wire, /A1|LOGICIN/);
-  assert.deepEqual(features({ counts: [0, 1, 2, 0, 1, 1, 0, 0, 0], fanout: 3 }), [1, 0, 1, 2, 0, 1, 1, 0, 0, 0, 2]);
+  // the counts, the fanout beyond one, the load pin's kind one-hot
+  assert.deepEqual(features({ counts: [0, 1, 2, 0, 1, 1, 0, 0, 0], fanout: 3, pin: 0 }), [1, 0, 1, 2, 0, 1, 1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(features({ counts: new Array(9).fill(0), fanout: 1, pin: 11 }).at(-1), 1);
+  assert.deepEqual(['M_A1', 'L_B6', 'XX_C3', 'X_D4', 'M_AX', 'XX_DX', 'L_CE', 'M_SR', 'M_CIN', 'BIOB_O0_PINW', 'D1_OLOGIC_SITE', 'RAMB8BWER_1_DIA3'].map(n => PIN_KINDS[pinKind(n)]),
+    ['1', '6', '3', '4', 'X', 'X', 'CE', 'SR', 'CIN', 'IO', 'IO', 'other']);
   // y = 0.1 + 0.2 a + 0.5 b, found back
   const X = [[1, 1, 0], [1, 0, 1], [1, 2, 1], [1, 3, 2]], y = X.map(([, a, b]) => 0.1 + 0.2 * a + 0.5 * b), w = nnls(X, y);
   assert.deepEqual(w.map(v => +v.toFixed(6)), [0.1, 0.2, 0.5]);
@@ -95,4 +104,26 @@ test('timing6: an arc\'s key (a setup through its LUT by the flip-flop\'s input 
   // a path of arcs only: the table's; a net not in the XDL: null
   assert.equal(modelPath(paths[0], xdl, null, table, []), 0.65);
   assert.equal(modelPath({ elements: [paths[0].elements[0], { loc: 'SLICE_X3Y3.A1', type: 'net', fanout: 1, delay: 1, name: 'n' }] }, xdl, null, table, []), null);
+});
+
+test('timing-fit6: every connection of reportgen\'s report on a routed design, the clock left out', async () => {
+  const part = 'xc6slx16csg324-3', { device, sites } = s6Device(part);
+  const d = s6Phys(await s6Verilog('module m(input clk, input a, input b, output reg y); always @(posedge clk) y <= a ^ b; endmodule'));
+  const x = placedXdlS6(d.nl, d.packed, d.phys, placeS6(d.phys, sites, { nl: d.nl, seed: 1 }), { part, device });
+  const xdl = parseXdl(writeXdl(routedXdlS6(x, device, routeS6(x, device))));
+  // reportgen's layout: the net, its driver, each load's delay and name; a clock net and an unknown load too
+  const nets = xdl.nets.filter(n => n.outpins.length && n.inpins.length && n.pips?.length);
+  const data = nets.find(n => !n.inpins.some(p => /CLK/.test(p.pin))), clock = nets.find(n => n.inpins.some(p => /CLK/.test(p.pin)) && n !== data);
+  const block = (n, v) => `${n.name}\n   ${n.outpins[0].inst}.${n.outpins[0].pin}\n${n.inpins.map(p => `         ${v}  ${p.inst}.${p.pin}`).join('\n')}\n         9.999  nowhere.A1\n`;
+  const dly = `File: top.dly\n\n-------\n                               Net Delays\n-------\n\n${block(data, '0.777')}\n${clock ? block(clock, '0.500') : ''}`;
+  const s = dlySamples(xdl, dly, device);
+  assert.equal(s.length, data.inpins.length);
+  for (const c of s) {
+    assert.equal(c.net, data.name);
+    assert.equal(c.delay, 0.777);
+    assert.equal(c.fanout, data.inpins.length);
+    assert.equal(c.counts.reduce((a, v) => a + v, 0), c.nodes.length - 1);
+    assert.ok(c.pin >= 0 && c.pin < PIN_KINDS.length);
+  }
+  assert.deepEqual(dlySamples(xdl, 'Net Delays\n', device), []);
 });
