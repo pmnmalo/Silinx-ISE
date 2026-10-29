@@ -225,6 +225,7 @@ const PT = {
   'Delete Marker': 'Apagar Marcador', 'Delete All Markers': 'Apagar Todos os Marcadores', 'Radix': 'Base', 'Radix of selected signals': 'Base dos sinais selecionados',
   'Default': 'Predefinida', 'Binary': 'Binário', 'Hexadecimal': 'Hexadecimal', 'Octal': 'Octal', 'Decimal (Unsigned)': 'Decimal (sem sinal)',
   "Decimal (Two's Complement)": 'Decimal (complemento para 2)', "Decimal (One's Complement)": 'Decimal (complemento para 1)', 'Decimal': 'Decimal',
+  "Dec (two's)": 'Dec (compl. 2)', "Dec (one's)": 'Dec (compl. 1)',   // (Try it's value editor, #2015)
   // the wave configuration (#1019)
   'Save Wave Configuration': 'Guardar Configuração de Formas de Onda', 'Load Wave Configuration': 'Carregar Configuração de Formas de Onda',
   'File name in the project:': 'Nome do ficheiro no projeto:', 'Wave configuration:': 'Configuração de formas de onda:', 'Load': 'Carregar',
