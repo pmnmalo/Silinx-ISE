@@ -71,7 +71,7 @@ const PT = {
   ': no cookies, no personal data, never the content of a project.': ': sem cookies, sem dados pessoais, nunca o conteúdo de um projeto.',
   'None: this copy sends nothing.': 'Nenhuma: esta cópia não envia nada.',
   // the start-up check for updates and its setting (#488)
-  'Check for Updates at Start-up': 'Procurar Atualizações no Arranque', 'Update check:': 'Procura de atualizações:',
+  'Refresh': 'Atualizar', 'Check for Updates at Start-up': 'Procurar Atualizações no Arranque', 'Update check:': 'Procura de atualizações:',
   'At start-up, the latest release is asked of GitHub (api.github.com and raw.githubusercontent.com, at most once an hour): the version only, nothing about you or your projects; the published site asks only itself. Help > Check for Updates at Start-up turns it off.':
     'No arranque, a última versão é pedida ao GitHub (api.github.com e raw.githubusercontent.com, no máximo uma vez por hora): só a versão, nada sobre si ou sobre os seus projetos; o site publicado só pergunta a si próprio. Ajuda > Procurar Atualizações no Arranque desliga-a.',
   'Off: nothing is asked at start-up. Help > Check for Updates… checks by hand; Help > Check for Updates at Start-up turns it on again.':

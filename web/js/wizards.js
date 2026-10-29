@@ -929,8 +929,9 @@ export async function checkUpdatesDialog({ rel: known = null, served = undefined
   // GitHub's release, it came over whatever was done meanwhile: #441); on the site, Reload is added
   // when it serves another page
   let ui = null;
-  const done = dialog({ title: 'Check for Updates', width: 520, body, buttons: [{ label: 'OK', primary: true, value: true }], onOpen: x => { ui = x; } })
-    .then(v => { if (v === 'reload') location.reload(); return v; });
+  // (Refresh: checked again, the dialog opened anew with the answer of now, #2013)
+  const done = dialog({ title: 'Check for Updates', width: 520, body, buttons: [{ label: 'Refresh', value: 'refresh' }, { label: 'OK', primary: true, value: true }], onOpen: x => { ui = x; } })
+    .then(v => { if (v === 'reload') location.reload(); if (v === 'refresh') return checkUpdatesDialog(); return v; });
   // on the site: a newer page served (reload), or this one is the site's
   if (served === undefined && !known) served = await siteVersion();
   if (served) {
