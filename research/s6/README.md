@@ -417,6 +417,17 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   of a clock: a bit of the REGC tile per clock (in frame 1840 of the XC6SLX16, 5104 of the XC6SLX45, bits 976 to 1007:
   not the BUFGMUX's index alone, the pad-to-BUFG path's selection: to take apart), a bit in the clock pad's I/O
   words, and two of the centre column's (REG_V) for some clock indices.
+- **The clock pads and the BUFGs** (`gen-clock6.mjs --bufg`: a BUFG LOC'd on each BUFGMUX from each of the two clock
+  pads that reach it, 32 designs; `ana-clock6.mjs`: `db/s6-clocks.json`): a clock pad on a BUFG sets a bit of the REGC
+  frame (1840 on the XC6SLX16, 5104 on the XC6SLX45; bits 976 to 1007, one per clock pad: the BUFGMUX's input
+  selection) and a bit in its I/O words (its clock input, an offset from its first output bit, the same on both
+  parts). The PIP drop of the 32 designs (64 more) resolves the spines' PIPs to 643; those of a BUFG's spine that are
+  always together have their bits, in the centre's clock column, on the first of them (`db/s6-pips-clock.json`).
+  With them the clock designs' and the examples' residual has no clock bit left but the clock example's HCLK bits
+  (minors 16 to 19 of one column's clock row).
+- **The CMT sites**: a DCM's or a PLL's bits are at minor 30 of the CMT column (the XC6SLX16's column 12, frame 357
+  in row 0; the XC6SLX45's column 19, 565) in its site's row, the same bits on both parts; a DCM of even Y (DCM_X0Y0,
+  X0Y2) has them 283 bits on (measured on DCM_X0Y0 / X0Y2 / X0Y3 and PLL_ADV_X0Y1, and on the XC6SLX45).
 - **The DCM_SP and the PLL_BASE** (`gen-dcm6.mjs`, `ana-dcm6.mjs`: `db/xc6slx16-cmt.json`): a DCM at DCM_X0Y1 and a PLL
   at PLL_ADV_X0Y0, one setting changed per design from the base's (16 designs; a PLL multiplier of 2 puts the VCO out
   of range and ISE refuses it). Each variant sets or clears 1 to 9 bits: the DCM's in frame 357 (CLKFX_MULTIPLY - 1
@@ -513,6 +524,7 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `residual6.mjs` | Every bit of ISE's implemented examples predicted from the databases; what is left, by tile type (#725, #726) |
 | `gen-iob6.mjs` | The pads' designs: every bonded pad an IOB of one setting, the id designs (#727) |
 | `gen-clock6.mjs` | The clock path's designs (ISE implements them): one or more clocks to fixed flip-flops, k16 (#727) |
+| `ana-clock6.mjs` | A clock pad's REGC and I/O bits, the spines' PIP groups: `db/s6-clocks.json`, `db/s6-pips-clock.json` (#727) |
 | `gen-dcm6.mjs` | The DCM's and PLL's designs, one setting per design (`--fields`: the counters' bits) (#727) |
 | `ana-dcm6.mjs` | Their settings' bits: `db/<device>-cmt.json` (#727) |
 | `gen-iologic6.mjs` | The I/O logic's route-throughs on every site (they set no bits without a net) (#727) |

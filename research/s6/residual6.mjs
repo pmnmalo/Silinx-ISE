@@ -1,6 +1,7 @@
 // Stages S6-B … S6-D (#725, #726), the residual: every bit of a design ISE implemented, predicted from the databases
 // (the slices: check-slice6.mjs; the INT-like tiles' PIPs: check-pips6.mjs; the other tiles' PIPs: db/s6-pips-other.json
-// placed by gridRegion; the pads: db/<device>-iob.json, from each IOB's settings) and compared with ISE's bitstream,
+// placed by gridRegion; the pads: db/<device>-iob.json, from each IOB's settings; a clock pad's selection and input
+// bits: db/s6-clocks.json) and compared with ISE's bitstream,
 // over the rows' frames and the I/O words (the block RAM's frames are #728's). A bit left over goes to the tiles whose
 // region holds it, by type (the I/O words: 'IOB words').
 //   node research/s6/residual6.mjs <dir> …        (each with top.xdl and top.bit, e.g. night 1's impl-nexys3/*)
@@ -66,6 +67,18 @@ export function predictDesign(design, device, dev, db) {
     }
     if (used) for (const x of db.iob.globals) bits.add(x);
   }
+  // a clock pad on a BUFG: its bit of the REGC frame (the BUFGMUX's input selection) and its clock input's I/O bit
+  if (db.clocks && db.iob) {
+    const inst = new Map(design.insts.map(i => [i.name, i])), regc = db.clocks.regcFrame[db.part.replace(/csg.*/, '')];
+    for (const net of design.nets) {
+      const src = inst.get(net.outpins[0]?.inst);
+      if (src?.type !== 'IOB' || !net.inpins.some(p => /^BUFG/.test(inst.get(p.inst)?.type || ''))) continue;
+      const c = db.clocks.pads[src.site];
+      if (!c) { note(`clock pad ${src.site} not measured`); continue; }
+      bits.add(`${regc},${c.regc}`);
+      bits.add(padBit(db.iob.pads[src.site], c.iob));
+    }
+  }
   const kindOf = new Map([...s6Device(db.part).sites.slices.values()].map(s => [s.name, s.kind])), models = {};
   for (const inst of design.insts) {
     if (!/^SLICE/.test(inst.type) || !inst.placed) continue;
@@ -117,14 +130,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!dirs.length) { console.error('usage: node research/s6/residual6.mjs <dir> …'); process.exit(1); }
   const int = { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips };
   // the other tiles' PIPs (the PIP drop) and the I/O path's pairs it could not take apart (the examples' residual)
-  const other = { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips } };
+  const clockPips = fs.existsSync(new URL('./db/s6-pips-clock.json', import.meta.url)) ? read('s6-pips-clock').pips : {};
+  const other = { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...clockPips } };
   const left = new Map(), extra = new Map(), unknown = new Map();
   for (const dir of dirs) {
     const bit = fs.readFileSync(path.join(dir, 'top.bit')), r6 = readBit6(bit), dev = bitFormat6(r6.device.part);
     const part = `${r6.device.device}${r6.device.part.slice(r6.device.device.length - 2)}-3`, { device } = s6Device(part);
     const design = parseXdl(fs.readFileSync(path.join(dir, 'top.xdl'), 'utf8'));
     const iobFile = new URL(`./db/${r6.device.device}-iob.json`, import.meta.url), iob = fs.existsSync(iobFile) ? JSON.parse(fs.readFileSync(iobFile, 'utf8')) : null;
-    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob });
+    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob, clocks: read('s6-clocks') });
     for (const [w, n] of u) unknown.set(w, (unknown.get(w) || 0) + n);
     const empty = emptyFdri(dev), rows = dev.rows * dev.rowFrames * FRAME_WORDS, iobStart = (dev.rows * dev.rowFrames + dev.bramFrames) * FRAME_WORDS, have = new Set(), w0 = typesAt(device, dev);
     const where = (f, b) => (f >= dev.rows * dev.rowFrames + dev.bramFrames ? 'IOB words' : w0(f, b));

@@ -4,7 +4,8 @@
 // not explain yet, by clock row and column.
 // k16: a clock on each BUFGMUX (a clock pad whose dedicated path reaches it), each to a flip-flop in another clock row
 // and column: every global clock's spine, rows and buffers, taken apart by gen-pipdrop6.mjs on ISE's routed design.
-//   node research/s6/gen-clock6.mjs <out dir> [part]   -> <out dir>/<name>/{top.v, top.ucf, top.txt}
+// --bufg: one design per BUFGMUX and clock pad that reaches it (two pads where two do): the selection bits.
+//   node research/s6/gen-clock6.mjs [--bufg] <out dir> [part]   -> <out dir>/<name>/{top.v, top.ucf, top.txt}
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,25 @@ export function manyClocks(pads, sites, { d = 'U16', q = 'V16' } = {}) {
 export function padsForBufgs(pads) {
   const used = new Set(), out = [];
   for (const p of pads) { const b = p.bufg.find(x => !used.has(x)); if (b) { used.add(b); out.push(p.name); } }
+  return out;
+}
+
+/**
+ * A design with one clock from pad through a BUFG placed at site (an instance of its own, LOC'd) to a flip-flop: the
+ * BUFGMUX's and the pad's selection bits.
+ */
+export function bufgDesign(pad, site, ff, { d = 'U16', q = 'V16' } = {}) {
+  const v = ['module top(input clk, input d, output reg q = 1\'b0);', '  wire c;', '  BUFG b(.I(clk), .O(c));', '  always @(posedge c) q <= d;', 'endmodule', ''];
+  const u = [`NET "clk" LOC = "${pad}" ;`, `NET "d" LOC = "${d}" ;`, `NET "q" LOC = "${q}" ;`, `INST "b" LOC = "${site}" ;`, `INST "q" LOC = "${ff}" ;`];
+  return { v: v.join('\n'), ucf: `${u.join('\n')}\n` };
+}
+
+/** The selection designs: every BUFGMUX from the first pad that reaches it and, when another does, from that too. */
+export function bufgSelections(pads) {
+  const by = new Map();
+  for (const p of pads) for (const b of p.bufg) (by.get(b) ?? by.set(b, []).get(b)).push(p.name);
+  const out = [];
+  for (const [b, ps] of [...by].sort()) { out.push({ bufg: b, pad: ps[0] }); if (ps.length > 1) out.push({ bufg: b, pad: ps[ps.length - 1] }); }
   return out;
 }
 
@@ -55,8 +75,18 @@ export function sliceAt(bases, dev, col, row, y = 8) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [out, part = 'xc6slx16csg324-3'] = process.argv.slice(2);
-  if (!out) { console.error('usage: node research/s6/gen-clock6.mjs <out dir> [part]'); process.exit(1); }
+  const args = process.argv.slice(2), bufg = args[0] === '--bufg', [out, part = 'xc6slx16csg324-3'] = bufg ? args.slice(1) : args;
+  if (!out) { console.error('usage: node research/s6/gen-clock6.mjs [--bufg] <out dir> [part]'); process.exit(1); }
+  if (bufg) {
+    const sel = bufgSelections([...s6Device(part).sites.pads.values()].filter(p => p.bufg.length));
+    for (const { bufg: b, pad } of sel) {
+      const dir = path.join(out, `b-${b}-${pad}`), { v, ucf } = bufgDesign(pad, b, 'SLICE_X16Y9');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'top.v'), v); fs.writeFileSync(path.join(dir, 'top.ucf'), ucf); fs.writeFileSync(path.join(dir, 'top.txt'), 'top\n');
+    }
+    console.log(`${part}: ${sel.length} designs`);
+    process.exit(0);
+  }
   const dev = S6_DEVICES[part.replace(/csg.*/, '')], bases = JSON.parse(fs.readFileSync(new URL(`./db/${dev.device}-lut.json`, import.meta.url), 'utf8')).slices;
   // the CLB columns' first frames (in row 0)
   const cols = [...new Set(Object.values(bases).map(([f]) => columnOf(dev, f)[0]).filter(c => c < dev.rowFrames))].sort((a, b) => a - b);
