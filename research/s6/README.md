@@ -446,6 +446,38 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   CLKFX_DIVIDE - 1 in 432, 431, 429, 428, 425; the CLKDV divisors, the PLL's multiplier, divider, output divider
   and phase as their own bit patterns in the database.
 
+### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
+
+XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the part holding an instance (`gen-hard6.mjs`;
+`ise-xdl-bits.sh`; `ana-hard6.mjs`: `db/<device>-hard.json`; the prediction, `hard6.mjs`, in `residual6.mjs`):
+
+- **The settings**: a base (the settings as `core/fpga/s6/xdl.js` writes them), id designs (which site each bit is) and
+  variants (one element's other option per site, from the primitive definitions). A site's bits are offsets from its
+  tile's region (`gridRegion`; a BRAMSITE2 or MACCSITE2 tile spans its INT row and the 3 above), the same at every
+  site: the RAMB16BWER's 50 base bits (its settings in two copies, one per half), the DSP48A1's 1. The RAMB8BWERs are two
+  to a tile and share its rows, by slot (the lower and upper site): 24 bits each, 2 of them either one's. Their
+  variants measured with the tile's other site empty (`a<slot>v<k>`) are the ones a RAM alone in its tile has; with
+  the other site there (`s<slot>v<k>`) some options also change the other's bits, and the alone ones predict a tile of
+  two RAMs of different settings bit for bit. A RAMB8BWER's SDP mode (36-bit ports) is measured as one combination
+  (`HARD_COMBOS`). The inverters set no bit on a pin with no net (Silinx writes them uninverted).
+- **The contents** (`c<j>`: INIT_xx, INITP_xx, INIT_A … with bit i set when bit j of i is; `cpar` the parity alone;
+  `cf0` / `cf1` which of INIT_A, INIT_B, SRVAL_A, SRVAL_B; `cid<j>` which site): each site's 18432 bits (9216 a RAMB8's)
+  in the BRAM frames from its first, the data bit i's and the parity bit i's offsets the same at every site.
+  `w<j>`, each site on a pair of port widths (A alone, B alone, both, one at the widest): a RAMB16BWER with neither port
+  36 bits wide has its contents in another order (`narrow`), on the same positions; a RAMB8BWER one order. INIT_x and
+  SRVAL_x are as wide as their ports: value bit k below the width at index k, a 9- or 18-bit port's parity bits also
+  at the parity's (`fieldIndices`, checked on every pair).
+- **With nets** (`ise-s6.sh impl`: block RAMs in both slots, at 36 and 18 / 9 bits, on one clock or two, a DSP48A1
+  with every register): a block RAM's clock pin with a net sets one bit per half (`--pins`: measured on the designs
+  with one clock, checked on the others). With them the stopwatch (its RAMB8BWER and three DSP48A1s) and the nine
+  designs on the XC6SLX16 have every bit explained, the BRAM frames included, but one PIP of routing (a
+  BRAM_HCLK_FEEDTHRU's clock to the lower half of the clock row, `HCLK_GCLK12_INT -> HCLK_GCLK12`): #1957.
+- **The XC6SLX45** (the same designs, 109 XDL and 6 HDL; `db/xc6slx45-hard.json`): the same offsets, options, fields,
+  clock pins and contents' orders as the XC6SLX16's, on its 116 RAMB16BWER, 232 RAMB8BWER and 58 DSP48A1 sites. Its
+  Atlys stopwatch has every bit explained; the HDL designs leave only its folded columns' HCLK PIPs (#1957). Its XDL
+  designs of RAMB8BWERs or DSP48A1s also set minors 16 to 19 of two SLICEM columns' clock row words in the top row
+  (`outside`; in no design ISE implemented).
+
 ## The order of the work
 
 1. **Without ISE** (night 0, this one): the plan and the issues; the simulation models of the Spartan-6
@@ -538,6 +570,9 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `ana-cmt6.mjs`, `cmt6.mjs` | A DCM's and PLL's clock path: `db/xc6slx16-cmt-paths.json`; the shared helpers (#727) |
 | `gen-dcm6.mjs` | The DCM's and PLL's designs, one setting per design (`--fields`: the counters' bits) (#727) |
 | `ana-dcm6.mjs` | Their settings' bits: `db/<device>-cmt.json` (#727) |
+| `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
+| `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
+| `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |
 | `gen-iologic6.mjs` | The I/O logic's route-throughs on every site (they set no bits without a net) (#727) |
 | `ana-iob6.mjs` | The pads' bits: `db/<device>-iob.json` (#727) |
 | `check-writer6.mjs` | ISE's `.bit` files written again by `core/fpga/s6/bitstream.js`, compared byte for byte; `--json` writes `measured/format.json` |
