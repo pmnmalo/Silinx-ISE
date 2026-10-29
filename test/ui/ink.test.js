@@ -103,48 +103,49 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   const tool = (k) => (owner[k] < 2 ? 'mouse' : owner[k] < 6 ? 'touch' : 'pen');
   assert.deepEqual([...new Set(owner.map((_, k) => tool(k)))], ['mouse', 'touch', 'pen']);
   await write(page, text, { kind: tool });
-  await waitText(page, "F = A·B' + C");
+  await waitText(page, 'F = A./B + C');
   assert.equal(await message(page), '');
   // a hand resting on the screen while the pen writes: no stroke
   const c = await canvasAt(page);
   await stroke(page, [{ x: c.x + c.w - 40, y: c.y + 30 }, { x: c.x + c.w - 30, y: c.y + 120 }], 'touch');
   await page.eval(() => new Promise((r) => setTimeout(r, 400)));
-  assert.equal(await recognized(page), "F = A·B' + C");
+  assert.equal(await recognized(page), 'F = A./B + C');
   // a stroke more, undone, redone, undone by the keys (#1092)
   const states = () => page.eval((d) => ['ink-undo', 'ink-redo', 'ink-clear'].map((k) => !document.querySelector(`${d} .${k}`).disabled), D);
   assert.deepEqual(await states(), [true, false, true]);
   await stroke(page, [{ x: c.x + c.w - 60, y: c.y + 40 }, { x: c.x + c.w - 60, y: c.y + 110 }], 'pen');
+  // (C| does not parse: the text as written, #2001)
   const more = await page.waitFor((d) => { const v = document.querySelector(`${d} .ink-text`).value; return /^F = A·B' \+ C.+/.test(v) && v; }, [D], { what: 'a character more' });
   await page.click(`${D} .ink-undo`);
-  await waitText(page, "F = A·B' + C");
+  await waitText(page, 'F = A./B + C');
   assert.deepEqual(await states(), [true, true, true]);
   await page.click(`${D} .ink-redo`);
   await waitText(page, more);
   assert.deepEqual(await states(), [true, false, true]);
   await page.key('z', { modifiers: 2 });
-  await waitText(page, "F = A·B' + C");
+  await waitText(page, 'F = A./B + C');
   await page.key('y', { modifiers: 2 });
   await waitText(page, more);
   await page.key('z', { modifiers: 2 });
-  await waitText(page, "F = A·B' + C");
+  await waitText(page, 'F = A./B + C');
   // Clear empties the pad; undone, the drawing is back; redone, gone again; a stroke written then: nothing to redo
   await page.click(`${D} .ink-clear`);
   await waitText(page, '');
   assert.deepEqual(await states(), [true, false, false]);
   await page.click(`${D} .ink-undo`);
-  await waitText(page, "F = A·B' + C");
+  await waitText(page, 'F = A./B + C');
   await page.click(`${D} .ink-redo`);
   await waitText(page, '');
   await page.click(`${D} .ink-undo`);
-  await waitText(page, "F = A·B' + C");
+  await waitText(page, 'F = A./B + C');
   await page.click(`${D} .ink-redo`);
   await waitText(page, '');
   await write(page, text, { kind: () => 'pen' });
-  await waitText(page, "F = A·B' + C");
+  await waitText(page, 'F = A./B + C');
   assert.deepEqual(await states(), [true, false, true]);
   await page.dialogButton('Insert');
   await page.waitNoDialog();
-  await page.waitFor((t) => document.querySelector(`${t} .tt-expr-in`).value === "A·B' + C", [T], { what: 'the expression written' });
+  await page.waitFor((t) => document.querySelector(`${t} .tt-expr-in`).value === 'A./B + C', [T], { what: 'the expression written' });
   assert.equal(await cells(page, 'F'), '01011101');
 
   // the editor: F = A | C, its | drawn by a finger with page.touchDrag
@@ -153,10 +154,10 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   const boxes = await write(page, 'F=A C', { kind: () => 'mouse', seed: 5 });
   const x = (boxes[2].maxX + boxes[4].minX) / 2;
   await page.touchDrag({ x, y: boxes[2].minY - 6 }, { x, y: boxes[2].maxY + 4 }, { steps: 10 });
-  await waitText(page, 'F = A|C');
+  await waitText(page, 'F = A + C');
   await page.dialogButton('Insert');
   await page.waitNoDialog();
-  await page.waitFor((t) => document.querySelector(`${t} .tt-expr-in`).value === 'A|C', [T], { what: 'the expression inserted' });
+  await page.waitFor((t) => document.querySelector(`${t} .tt-expr-in`).value === 'A + C', [T], { what: 'the expression inserted' });
   assert.equal(await cells(page, 'F'), '01011111');
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-expr-err`).textContent, T), '');
   // an expression with an input the table does not have: the parser's error, the dialog stays open

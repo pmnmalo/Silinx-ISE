@@ -20,15 +20,15 @@ const corpus = () => fs.readdirSync(DIR).filter((f) => f.endsWith('.json')).sort
 
 test('a drawing kept as text: its strokes, kind, devices, what was read; read back the same', () => {
   const w = writeText("F=A·B'+C", { seed: 3, amount: 0.4 });
-  const e = encodeDrawing({ kind: 'expression', strokes: w.strokes, devices: ['pen', 'pen', 'touch', 'stylus'], read: "F = A·B' + C", vars: ['A', 'B', 'C'] });
+  const e = encodeDrawing({ kind: 'expression', strokes: w.strokes, devices: ['pen', 'pen', 'touch', 'stylus'], read: 'F = A./B + C', vars: ['A', 'B', 'C'] });
   assert.deepEqual(Object.keys(e), ['silinx', 'version', 'kind', 'devices', 'vars', 'read', 'strokes']);
-  assert.deepEqual([e.silinx, e.version, e.kind, e.devices, e.vars, e.read], ['ink-drawing', 1, 'expression', ['pen', 'touch'], ['A', 'B', 'C'], "F = A·B' + C"]);
+  assert.deepEqual([e.silinx, e.version, e.kind, e.devices, e.vars, e.read], ['ink-drawing', 1, 'expression', ['pen', 'touch'], ['A', 'B', 'C'], 'F = A./B + C']);
   assert.equal(e.strokes.length, w.strokes.length);
   // a tenth of a pixel
   assert.ok(e.strokes.flat().every((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9));
   const d = decodeDrawing(JSON.stringify(e));
-  assert.deepEqual([d.kind, d.devices, d.vars, d.read, d.expect, d.note], ['expression', ['pen', 'touch'], ['A', 'B', 'C'], "F = A·B' + C", null, '']);
-  assert.equal(readDrawing(d), "F = A·B' + C");
+  assert.deepEqual([d.kind, d.devices, d.vars, d.read, d.expect, d.note], ['expression', ['pen', 'touch'], ['A', 'B', 'C'], 'F = A./B + C', null, '']);
+  assert.equal(readDrawing(d), 'F = A./B + C');
   // the other kinds: a table's text, a schematic's circuit
   const t = decodeDrawing(encodeDrawing({ kind: 'table', strokes: writeTable([['A', 'B', 'F'], ['0', '0', '0'], ['0', '1', '1'], ['1', '0', '1'], ['1', '1', '0']], { seed: 9, amount: 0.4 }).strokes }));
   assert.equal(readDrawing(t), 'A B | F\n0 0 | 0\n0 1 | 1\n1 0 | 1\n1 1 | 0');

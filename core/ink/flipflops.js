@@ -73,7 +73,7 @@ function labels(inner, box, templates) {
       if (FF_INPUTS[text]) left.push({ label: FF_INPUTS[text], y }); else unknown.push({ text, y, side: 'left' });
     } else {
       // (Q with a bar over it, or a prime after it: Q̄; a ring read as O or 0 is a Q)
-      const text = recognizeExpression(strokes, { templates }).text.replace(/\s+/g, '').toUpperCase().replace(/^[O0]/, 'Q');
+      const text = recognizeExpression(strokes, { templates }).written.replace(/\s+/g, '').toUpperCase().replace(/^[O0]/, 'Q');
       const bar = segment(strokes).bars.length > 0;
       if (text === 'Q' && !bar) right.push({ label: 'Q', y });
       else if (text === "Q'" || (bar && /^Q'?$/.test(text))) right.push({ label: 'QN', y });
