@@ -2,8 +2,8 @@
 // the cell's inputs on any of the site pins A1..A4.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initToEquation, equationToInit, initToTable, equationTable } from '../packages/silinx-fpga/src/fpga/lut.js';
-import { evalLut, lutTable } from '../packages/silinx-fpga/src/xdl.js';
+import { initToEquation, equationToInit, initToTable, equationTable } from '../src/fpga/lut.js';
+import { evalLut, lutTable } from '../src/xdl.js';
 
 // every function of k inputs (k <= 3) and a sample of the 4-input ones, on every pin assignment
 const perms = a => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(p => [x, ...p])));

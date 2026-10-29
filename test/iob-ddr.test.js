@@ -2,7 +2,7 @@
 // event-driven simulator's; core/compiled-prims.js, the compiled engine's) against values computed here, in VHDL and
 // in Verilog; the packer putting them in their pads' IOBs with the settings and pins ISE's map writes (read from its
 // routed IDDR2 / ODDR2 on every pad: research/s3e-bitstream/gen-iobreg.mjs rd / rd2), and refusing what it cannot do;
-// the packed design behaving as the netlist (test/fpga-sim.js); the static timing's two clock edges; the
+// the packed design behaving as the netlist (packages/silinx-fpga/test/fpga-sim.js); the static timing's two clock edges; the
 // post-translate and post-map models behaving as the netlist.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js
 import { loadDb } from '../packages/silinx-fpga/src/fpga/bitdb-node.js';
 import { instArcs, timingGraph } from '../packages/silinx-fpga/src/fpga/timing.js';
 import { postTranslateModels, postMapModels } from '../core/sim-model.js';
-import { compareSims } from './fpga-sim.js';
+import { compareSims } from '../packages/silinx-fpga/test/fpga-sim.js';
 import { compareWithNetlist } from './sim-model-lib.mjs';
 import { diffCycles, designOf, rng } from './compiled-diff.js';
 

@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { testFiles, weights, balance, parseShard, readTimings, TIMINGS } from '../scripts/test-shard.mjs';
+import { testFiles, unitFiles, UNIT_DIRS, UNIT_TESTS, weights, balance, parseShard, readTimings, TIMINGS } from '../scripts/test-shard.mjs';
 import { merge, readParts } from '../scripts/update-test-timings.mjs';
 import { addFileTime } from '../scripts/test-times-reporter.mjs';
 
@@ -54,8 +54,13 @@ function assertBalanced(files, t, n) {
 }
 
 test('test shard: the repository\'s timings — measured files that exist, in seconds; the unit tests\' three parts and each interface\'s three UI parts within a fifth of each other or one file long', () => {
-  const files = testFiles(), uiFiles = testFiles(ROOT, 'test/ui');
-  assert.ok(files.length > 100 && files.every(f => /^test\/[\w.-]+\.test\.js$/.test(f)), String(files.length));
+  // the unit tests: the IDE's and the toolchain package's (#1680)
+  const files = unitFiles(), uiFiles = testFiles(ROOT, 'test/ui');
+  assert.deepEqual(UNIT_DIRS, ['test', 'packages/silinx-fpga/test']);
+  assert.ok(files.length > 100 && files.every(f => UNIT_TESTS.test(f)), String(files.length));
+  assert.deepEqual(files, [...testFiles(), ...testFiles(ROOT, 'packages/silinx-fpga/test')].sort());
+  assert.ok(files.includes('packages/silinx-fpga/test/fpga-route.test.js') && files.includes('test/flow-ide.test.js'));
+  assert.ok(!files.includes('packages/silinx-fpga/test/fpga-sim.js'), 'test files only');
   assert.ok(uiFiles.length > 50 && uiFiles.every(f => /^test\/ui\/[\w.-]+\.test\.js$/.test(f)), String(uiFiles.length));
   assert.ok(!uiFiles.includes('test/ui/harness.js'), 'test files only');
   for (const l of [files, uiFiles]) assert.deepEqual(l, [...l].sort());
@@ -86,7 +91,7 @@ test('test shard: the command line — the dry run lists the parts, a part runs 
   const lines = dry.stdout.trim().split('\n');
   assert.equal(lines.length, 4);
   lines.forEach((l, k) => assert.match(l, new RegExp(`^${k + 1}/4: \\d+ files, ~\\d+ min$`)));
-  assert.equal(lines.reduce((s, l) => s + Number(/: (\d+) files/.exec(l)[1]), 0), testFiles().length);
+  assert.equal(lines.reduce((s, l) => s + Number(/: (\d+) files/.exec(l)[1]), 0), unitFiles().length);
   // the UI tests' parts (#912): every UI file in one of them
   const uiDry = run('2/3', '--ui', '--dry-run');
   assert.equal(uiDry.status, 0, uiDry.stderr);

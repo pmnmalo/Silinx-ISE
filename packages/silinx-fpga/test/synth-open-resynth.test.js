@@ -4,10 +4,10 @@
 // input; left out without speed or resynth, or past SPEED_RULE.maxLuts; a run that fails: its warning, the netlist kept.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resynthStage } from '../packages/silinx-fpga/src/synth-open-resynth.js';
-import { cellCounts, utilization, SPEED_RULE } from '../packages/silinx-fpga/src/synth-open.js';
-import { netlistLevels } from '../packages/silinx-fpga/src/lut-resynth.js';
-import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { resynthStage } from '../src/synth-open-resynth.js';
+import { cellCounts, utilization, SPEED_RULE } from '../src/synth-open.js';
+import { netlistLevels } from '../src/lut-resynth.js';
+import { yosysNode } from '../src/synth-open-node.js';
 
 // en = load | (sp & ~sc & ~cs), load = vld & ((cs & ~busy) | rx), rx = sc & ~sp & last: en on 3 levels, on a CE; the
 // signals registered (flip-flops of the ports), so that the enable is on a path between flip-flops

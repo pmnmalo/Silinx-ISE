@@ -1,8 +1,8 @@
 // A small made-up device in the format of `xdl -report` (no pips) for the unit tests of the placer
-// (test/fixtures/fpga/place-device.xdlrc): a grid of 6 x 6 CLBs (slices X0..X11, Y0..Y11; SLICEM
+// (packages/silinx-fpga/test/fixtures/fpga/place-device.xdlrc): a grid of 6 x 6 CLBs (slices X0..X11, Y0..Y11; SLICEM
 // on even X), one CLB missing (a hole the carry chains must avoid), pads on the four edges (some
 // input-only), and four global clock buffers top and bottom. Not a real chip.
-//   node research/s3e-place/gen-test-device.mjs > test/fixtures/fpga/place-device.xdlrc
+//   node research/s3e-place/gen-test-device.mjs > packages/silinx-fpga/test/fixtures/fpga/place-device.xdlrc
 const C = 6, R = 6;
 const rows = R + 2, cols = C + 2;
 const out = [];

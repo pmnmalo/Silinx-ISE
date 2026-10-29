@@ -1,9 +1,9 @@
-// The packed design against its netlist, in the small simulators of test/fpga-sim.js (no ISE):
+// The packed design against its netlist, in the small simulators of packages/silinx-fpga/test/fpga-sim.js (no ISE):
 //   node check-pack.mjs net.json [cycles]
 import fs from 'node:fs';
 import { readYosysJson } from '../../packages/silinx-fpga/src/fpga/netlist.js';
 import { pack } from '../../packages/silinx-fpga/src/fpga/pack.js';
-import { compareSims } from '../../test/fpga-sim.js';
+import { compareSims } from '../../packages/silinx-fpga/test/fpga-sim.js';
 const nl = readYosysJson(fs.readFileSync(process.argv[2], 'utf8'));
 const p = pack(nl);
 const t = Date.now();

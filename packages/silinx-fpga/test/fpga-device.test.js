@@ -8,8 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { packDevice, loadDevice, DeviceBuilder, toBase64, fromBase64, PIP_ROUTETHRU, PIP_BIDI, DEVICE_FORMAT_VERSION } from '../packages/silinx-fpga/src/fpga/device.js';
-import { buildDeviceCache, loadDeviceCache, packDeviceFile } from '../packages/silinx-fpga/src/fpga/device-node.js';
+import { packDevice, loadDevice, DeviceBuilder, toBase64, fromBase64, PIP_ROUTETHRU, PIP_BIDI, DEVICE_FORMAT_VERSION } from '../src/fpga/device.js';
+import { buildDeviceCache, loadDeviceCache, packDeviceFile } from '../src/fpga/device-node.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const RC = path.join(FIX, 'route-device.xdlrc');

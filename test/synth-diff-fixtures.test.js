@@ -2,7 +2,7 @@
 // fixtures were made from): RTL simulated by Silinx and the Yosys netlist (synthesizeOpen), with the
 // stimulus of the design's design.json, cycle by cycle (see test/diff-synth.js).
 //
-// The netlist runs on netlistSim (test/fpga-sim.js) when it models every cell, else (block RAMs,
+// The netlist runs on netlistSim (packages/silinx-fpga/test/fpga-sim.js) when it models every cell, else (block RAMs,
 // DCM, BUFGMUX, tri-state buffers, a second clock) it is Yosys's Verilog netlist simulated by Silinx
 // with its primitive models. Note: the latch design is compared on netlistSim; with the primitive
 // models its gate (g AND ge, a LUT) closes one delta cycle after a data input that changes at the

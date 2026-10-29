@@ -20,7 +20,7 @@ import { shippedDevicePath } from '../packages/silinx-fpga/src/fpga/device-node.
 import { example } from './examples-lib.mjs';
 import { diffCycles, designOf, rng } from './compiled-diff.js';
 import { compileDesign } from '../core/compiled-sim.js';
-import { netlistSim } from './fpga-sim.js';
+import { netlistSim } from '../packages/silinx-fpga/test/fpga-sim.js';
 
 // the device description Map's report needs (loaded once)
 let DEVICE = null;

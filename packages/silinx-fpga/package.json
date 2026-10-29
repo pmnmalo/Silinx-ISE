@@ -11,6 +11,9 @@
   "bin": {
     "silinx-fpga": "bin/silinx-fpga.js"
   },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
   "private": true,
   "license": "Apache-2.0",
   "author": "Pedro Maló",

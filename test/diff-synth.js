@@ -6,7 +6,7 @@
 //            YoWASP), or (from: 'source') the original Verilog read by Yosys's own front end
 //            (synthesizeSource: this checks Silinx's parser, elaborator and simulator, which the
 //            first path shares between both sides), simulated cell by cell:
-//              engine 'cells'   test/fpga-sim.js netlistSim on the JSON netlist (LUTs, MUXF*, carry
+//              engine 'cells'   packages/silinx-fpga/test/fpga-sim.js netlistSim on the JSON netlist (LUTs, MUXF*, carry
 //                               chain, FD* / LD*, distributed RAMs, MULT18X18, buffers), an
 //                               independent model of the cells
 //              engine 'unisim'  Yosys's Verilog netlist compiled by Silinx with its primitive models
@@ -55,7 +55,7 @@ import { cellCounts, QUIET } from '../packages/silinx-fpga/src/synth-open.js';
 import { SynthError } from '../core/synth-verilog.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
-import { netlistSim, CELLS_SIMULATED } from './fpga-sim.js';
+import { netlistSim, CELLS_SIMULATED } from '../packages/silinx-fpga/test/fpga-sim.js';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 

@@ -5,7 +5,7 @@
 // weighs the median), and the files go, the longest first, each into the part with the least time so far.
 //
 //   node scripts/test-shard.mjs <i>/<n> [--ui] [node --test options …]
-//   → runs node --test with those options on the files of part i of n (test/*.test.js; with --ui the UI
+//   → runs node --test with those options on the files of part i of n (the unit tests, UNIT_DIRS; with --ui the UI
 //     tests, test/ui/*.test.js, #912); --dry-run prints the parts and their estimated times instead
 //
 // The options go before the files: after them node --test takes no option (CI's UI tests were given
@@ -21,9 +21,19 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const TIMINGS = 'test/timings.json';
 
-/** The unit test files (dir 'test') or the UI tests' ('test/ui'), relative to the root with '/', sorted. */
+/** The unit tests' folders: the IDE's and the toolchain package's (#1680). */
+export const UNIT_DIRS = ['test', 'packages/silinx-fpga/test'];
+/** A unit test file's path. */
+export const UNIT_TESTS = /^(?:test|packages\/silinx-fpga\/test)\/[^/]+\.test\.js$/;
+
+/** The test files of a folder (dir 'test', the UI tests' 'test/ui'), relative to the root with '/', sorted. */
 export function testFiles(root = ROOT, dir = 'test') {
   return fs.readdirSync(path.join(root, dir)).filter(f => f.endsWith('.test.js')).sort().map(f => `${dir}/${f}`);
+}
+
+/** The unit test files of all their folders (UNIT_DIRS, those there are), sorted. */
+export function unitFiles(root = ROOT) {
+  return UNIT_DIRS.filter(d => fs.existsSync(path.join(root, d))).flatMap(d => testFiles(root, d)).sort();
 }
 
 /** The weight of each file: its time, or the median of the known ones (1 when none is known). */
@@ -67,7 +77,7 @@ function main() {
   const ui = args.includes('--ui');
   const rest = args.filter(a => a !== '--ui');
   const dry = rest.includes('--dry-run');
-  const files = testFiles(ROOT, ui ? 'test/ui' : 'test');
+  const files = ui ? testFiles(ROOT, 'test/ui') : unitFiles(ROOT);
   const w = weights(files, readTimings());
   const parts = balance(files, w, shard.n);
   if (dry) {

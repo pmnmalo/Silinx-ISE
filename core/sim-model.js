@@ -111,7 +111,7 @@ export function postSynthesisModels(synth, { top, part = '', generics = {}, test
 //   configuration uses (the LUTs F and G, the F5 and FX multiplexers, the carry chain's multiplexers and XORs,
 //   the flip-flops or latches with their clock, enable and set / reset inverters), the pads, the global clock
 //   buffers, the block RAMs, multipliers and DCMs, as map's settings say (the same reading of them as the
-//   packer's tests, test/fpga-sim.js packedSim). Functional: no timing.
+//   packer's tests, packages/silinx-fpga/test/fpga-sim.js packedSim). Functional: no timing.
 
 /** The SIMPRIM primitives Silinx simulates (upper case). */
 export const SIMPRIM_PRIMITIVES = new Set([...SIMPRIM_SOURCE.text.matchAll(/^\s*entity\s+(\w+)\s+is/gim)].map(m => m[1].toUpperCase()));
@@ -614,7 +614,7 @@ function hardArcs(inst, model, formal, clock) {
   return out;
 }
 
-// A Spartan-3E slice from its configuration (the elements it uses), as packedSim reads it (test/fpga-sim.js).
+// A Spartan-3E slice from its configuration (the elements it uses), as packedSim reads it (packages/silinx-fpga/test/fpga-sim.js).
 // T(name): a delay of the timing's slice model (packages/silinx-fpga/src/fpga/timing.js SPEED_4.slice), mem: its SLICEM memories'
 // (the post-place & route model); each path through the slice (an input pin to an output pin) is split over
 // the elements it goes through so that their sum is the timing's delay of that path (the carry: CIN -> COUT

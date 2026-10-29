@@ -5,10 +5,10 @@
 // chain and a distributed RAM's address reached through them (the T80's path).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bddRemap, collapseCandidates, BDD_RULE } from '../packages/silinx-fpga/src/synth-open-bdd.js';
-import { pathEnds } from '../packages/silinx-fpga/src/synth-open-path.js';
-import { netlistLevels } from '../packages/silinx-fpga/src/lut-resynth.js';
-import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { bddRemap, collapseCandidates, BDD_RULE } from '../src/synth-open-bdd.js';
+import { pathEnds } from '../src/synth-open-path.js';
+import { netlistLevels } from '../src/lut-resynth.js';
+import { yosysNode } from '../src/synth-open-node.js';
 
 // a netlist of n registered inputs x0 … (flip-flops r<i> of ports p<i>), a chain of LUT2s y1 = f(x0, x1), y2 = f(y1, x2) …
 // (n - 1 levels) on the D of flip-flop `out`, read by a second LUT (`also`) too; f: (a, b) => bit

@@ -5,9 +5,9 @@
 // limit's report line.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as timing from '../packages/silinx-fpga/src/fpga/timing.js';
-import { instArcs } from '../packages/silinx-fpga/src/fpga/timing-arcs.js';
-import { clockRequirement, parseOffsets, switchingLine, checkSwitching, timingReport, clockSources } from '../packages/silinx-fpga/src/fpga/timing-checks.js';
+import * as timing from '../src/fpga/timing.js';
+import { instArcs } from '../src/fpga/timing-arcs.js';
+import { clockRequirement, parseOffsets, switchingLine, checkSwitching, timingReport, clockSources } from '../src/fpga/timing-checks.js';
 
 const S = timing.SPEED_4.slice;
 

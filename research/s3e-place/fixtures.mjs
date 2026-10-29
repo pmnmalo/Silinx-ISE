@@ -1,4 +1,4 @@
-// The small netlists of the unit tests (test/fixtures/fpga/*.json): the designs in designs/
+// The small netlists of the unit tests (packages/silinx-fpga/test/fixtures/fpga/*.json): the designs in designs/
 // synthesized by Yosys (synth_xilinx -family xc3se -ise -flatten), with Yosys's cell library (the
 // black-box modules) removed so the files stay small. Needs `yosys` on PATH.
 //   node research/s3e-place/fixtures.mjs
@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, '../../test/fixtures/fpga');
+const out = path.join(here, '../../packages/silinx-fpga/test/fixtures/fpga');
 for (const f of fs.readdirSync(path.join(here, 'designs')).filter(f => f.endsWith('.v'))) {
   const top = f.replace(/\.v$/, '');
   const tmp = fs.mkdtempSync('/tmp/silinx-fix-');
