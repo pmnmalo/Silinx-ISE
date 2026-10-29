@@ -2,11 +2,14 @@
 // (segment.js), each one recognized ($P, pdollar.js) or, a small mark, read by its place (a prime at the top, a dot
 // of AND in the middle); the case of the letters written alike in both (c C, o O, s S...) follows their size; the
 // symbols written alike (O o 0, l 1 | I...) are chosen by the expression parser (core/logic.js parseExpr): the
-// reading that parses; overbars become NOT. The text is for the user to correct before it is used.
+// reading that parses; overbars become NOT. The text is for the user to correct before it is used, an expression that
+// parses in the editor's notation (/A.B + C, #2001).
 //
-//   recognizeExpression(strokes, { templates, vars }) -> { text, name, expr, chars, warnings, error }
+//   recognizeExpression(strokes, { templates, vars }) -> { text, written, name, expr, chars, warnings, error }
 //     strokes: [[{x, y}, ...], ...]; templates: the built-in ones by default (templates.js), with the user's;
-//     vars: the inputs' names, if known; name / expr: the two sides of "name = expr" (name '' without '=');
+//     vars: the inputs' names, if known; text: in the editor's notation when it parses (/A.B + C, #2001), else as
+//     written; written: as written (A'·B + C, the letters' case); name / expr: the two sides of "name = expr" (name ''
+//     without '=');
 //     chars: [{ ch, box, ink, alts }] (ink: the indexes of its strokes); warnings: what to check; error: the
 //     parser's message, if the text does not parse
 //   recognizeWords(strokes, { templates, gap, capH }) -> [{ text, box, ink }] names on a line (letters, digits, _)
@@ -14,7 +17,7 @@
 import { segment, boxOf, InkError } from './segment.js';
 import { classify } from './pdollar.js';
 import { builtinTemplates } from './templates.js';
-import { parseExpr, exprVars, LogicError } from '../logic.js';
+import { parseExpr, exprVars, formatExpr, LogicError } from '../logic.js';
 
 export { InkError };
 
@@ -268,13 +271,19 @@ export function recognizeExpression(strokes, { templates = builtinTemplates(), v
   balance(rhs);
   if (rhs.length) repair(rhs, parse);
   fixCase(gs);
-  const text = spaced(withBars(gs, bars, H));
-  const { name, expr } = splitEquation(text);
+  const read = spaced(withBars(gs, bars, H));
+  const { name, expr: written } = splitEquation(read);
   const warnings = [];
   const unknown = gs.filter(g => g.ch === '?').length;
   if (unknown) warnings.push(`${unknown === 1 ? 'A symbol was' : `${unknown} symbols were`} not recognized (shown as ?): write ${unknown === 1 ? 'it' : 'them'} again, or teach Silinx your handwriting.`);
   if (gs.filter(g => g.ch === '=').length > 1) warnings.push("More than one '=': only the first one separates the name from the expression.");
-  let error = null;
-  try { if (!expr) throw new LogicError('the expression is empty'); parse(expr); } catch (e) { if (!(e instanceof LogicError)) throw e; error = e.message; }
-  return { text, name, expr, chars: gs.map(g => ({ ch: g.ch, box: g.box, ink: g.ink, alts: g.alts.map(a => ({ ch: a.ch, d: +a.d.toFixed(3) })) })), warnings, error };
+  let error = null, expr = written;
+  try {
+    if (!expr) throw new LogicError('the expression is empty');
+    parse(expr);
+    // in the editor's notation (#2001): /A.B + C, /(A + B)
+    expr = formatExpr(parseExpr(expr, { vars: vars ?? expressionInputs(expr) }), 'slash');
+  } catch (e) { if (!(e instanceof LogicError)) throw e; error = e.message; }
+  const text = error ? read : name ? `${name} = ${expr}` : expr;
+  return { text, written: read, name, expr, chars: gs.map(g => ({ ch: g.ch, box: g.box, ink: g.ink, alts: g.alts.map(a => ({ ch: a.ch, d: +a.d.toFixed(3) })) })), warnings, error };
 }

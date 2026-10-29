@@ -101,13 +101,13 @@ test('held-out expressions are read: at least 88% exactly (76 of 84), every one 
     for (const [written, want] of EXPRESSIONS) {
       const r = read(written, { seed: 100 + seed });
       n++;
-      if (r.text === want) ok++; else wrong.push(`${written} -> ${r.text}`);
+      if (r.written === want) ok++; else wrong.push(`${written} -> ${r.written}`);
     }
   }
   assert.ok(ok / n >= 0.88, `${ok}/${n}: ${wrong.join('; ')}`);
   for (const [written, want] of EXPRESSIONS) {
     const r = read(written, { seed: 7, amount: 0.4 });
-    assert.equal(r.text, want, written);
+    assert.equal(r.written, want, written);
     assert.deepEqual(r.warnings, [], written);
     assert.equal(r.error, null, written);
   }
@@ -115,9 +115,11 @@ test('held-out expressions are read: at least 88% exactly (76 of 84), every one 
 
 test('a recognized expression: its two sides, its characters, no warnings; it fills a truth table', () => {
   const r = read("F=A·B'+C", { seed: 3, amount: 0.4 });
-  assert.equal(r.text, "F = A·B' + C");
+  // as written, and in the editor's notation (#2001)
+  assert.equal(r.written, "F = A·B' + C");
+  assert.equal(r.text, 'F = A./B + C');
   assert.equal(r.name, 'F');
-  assert.equal(r.expr, "A·B' + C");
+  assert.equal(r.expr, 'A./B + C');
   assert.deepEqual(r.chars.map((c) => c.ch), [...'F=A·B\'+C']);
   assert.deepEqual(r.warnings, []);
   assert.equal(r.error, null);
@@ -130,11 +132,34 @@ test('a recognized expression: its two sides, its characters, no warnings; it fi
   assert.deepEqual([e.text, e.name, e.expr, e.error], ['a + b', '', 'a + b', null]);
 });
 
+test("the text read in the editor's notation (#2001): /A.B + C, a bar over a group /(…); as written when it does not parse", () => {
+  const cases = [
+    ["F=A'·B+C", {}, "F = A'·B + C", 'F = /A.B + C'],
+    ['H=AB', { bars: [[2, 2]] }, "H = A'B", 'H = /A.B'],
+    ['H=A+B', { bars: [[2, 4]] }, "H = (A + B)'", 'H = /(A + B)'],
+    ['H=AB', { bars: [[2, 2], [2, 3]] }, "H = (A'B)'", 'H = /(/A.B)'],
+    ['S=x*y+z', {}, 'S = x*y + z', 'S = x.y + z'],
+  ];
+  for (const [w, o, written, text] of cases) {
+    const r = read(w, { seed: 4, amount: 0.4, ...o });
+    assert.deepEqual([r.written, r.text, r.error], [written, text, null], w);
+    // the same expression: the editor reads the text back as the function written
+    const { expr } = splitEquation(written), vars = expressionInputs(expr);
+    assert.equal(exprColumn(parseExpr(r.expr, { vars }), vars), exprColumn(parseExpr(expr, { vars }), vars), w);
+  }
+  // no '=': the expression alone
+  assert.equal(read('AB', { seed: 4, amount: 0.4, bars: [[0, 0]] }).text, '/A.B');
+  // not an expression: as written, for the user to correct
+  const open = read('F=(A+B', { seed: 3, amount: 0.4 });
+  assert.deepEqual([open.text, open.written], ['F = (A + B', 'F = (A + B']);
+  assert.ok(open.error);
+});
+
 test('segmentation: the dots of i and j with them, a prime apart, the slant made upright', () => {
   const s = segment(writeText("ij+A'", { seed: 5, amount: 0.4 }).strokes);
   assert.deepEqual(s.chars.map((c) => c.strokes.length), [2, 2, 2, 2, 1]);
   assert.deepEqual(s.bars, []);
-  assert.equal(read("ij+A'", { seed: 5, amount: 0.4 }).text, "ij + A'");
+  assert.equal(read("ij+A'", { seed: 5, amount: 0.4 }).written, "ij + A'");
   // the slant: none upright, the shear of a leaning hand
   const h = handGlyph('H', { amount: 0 });
   assert.equal(slantOf(h), 0);
@@ -145,37 +170,37 @@ test('segmentation: the dots of i and j with them, a prime apart, the slant made
   const w = writeText(text, { seed: 9, amount: 0, spacing: 0.9 });
   const lean = w.strokes.map((st) => st.map((p) => ({ x: p.x + 0.35 * (80 - p.y), y: p.y })));
   assert.equal(segment(lean).chars.length, 4);
-  assert.equal(recognizeExpression(lean).text, 'F = AB');
+  assert.equal(recognizeExpression(lean).written, 'F = AB');
   // a dot of AND in the middle, a prime at the top
   assert.deepEqual(read("A·B'", { seed: 2, amount: 0.4 }).chars.map((c) => c.ch), ['A', '·', 'B', "'"]);
   assert.deepEqual(boxOf([[{ x: 1, y: 2 }, { x: 3, y: 6 }]]), { minX: 1, minY: 2, maxX: 3, maxY: 6, w: 2, h: 4, cx: 2, cy: 4 });
 });
 
 test('overbars are NOT: over one letter a prime, over more a bracket, nested ones too; = is not a bar', () => {
-  assert.equal(read('H=AB', { seed: 4, amount: 0.4, bars: [[2, 2]] }).text, "H = A'B");
-  assert.equal(read('H=A+B', { seed: 4, amount: 0.4, bars: [[2, 4]] }).text, "H = (A + B)'");
-  assert.equal(read('H=AB', { seed: 4, amount: 0.4, bars: [[2, 2], [2, 3]] }).text, "H = (A'B)'");
-  assert.equal(read('H=A+BC', { seed: 6, amount: 0.4, bars: [[4, 5], [2, 5]] }).text, "H = (A + (BC)')'");
+  assert.equal(read('H=AB', { seed: 4, amount: 0.4, bars: [[2, 2]] }).written, "H = A'B");
+  assert.equal(read('H=A+B', { seed: 4, amount: 0.4, bars: [[2, 4]] }).written, "H = (A + B)'");
+  assert.equal(read('H=AB', { seed: 4, amount: 0.4, bars: [[2, 2], [2, 3]] }).written, "H = (A'B)'");
+  assert.equal(read('H=A+BC', { seed: 6, amount: 0.4, bars: [[4, 5], [2, 5]] }).written, "H = (A + (BC)')'");
   const r = read('H=AB', { seed: 4, amount: 0.4, bars: [[2, 3]] });
   assert.equal(segment(writeText('H=AB', { seed: 4, amount: 0.4, bars: [[2, 3]] }).strokes).bars.length, 1);
-  assert.equal(r.expr, "(AB)'");
+  assert.equal(r.expr, '/(A.B)');
   assert.equal(exprColumn(parseExpr(r.expr, { vars: ['A', 'B'] }), ['A', 'B']), '1110');
   // the strokes of = and of a T, E or F touching: not bars
   for (const t of ['A=B', 'T', 'E+F', 't+f', 'Z+7']) assert.deepEqual(segment(writeText(t, { seed: 1, amount: 0.4 }).strokes).bars, [], t);
   // held-out hands: the bars still read
   let ok = 0;
-  for (let seed = 1; seed <= 6; seed++) if (read('H=A+B', { seed, bars: [[2, 4]] }).text === "H = (A + B)'") ok++;
+  for (let seed = 1; seed <= 6; seed++) if (read('H=A+B', { seed, bars: [[2, 4]] }).written === "H = (A + B)'") ok++;
   assert.ok(ok >= 5, `${ok}/6`);
 });
 
 test('the symbols written alike: case by size, the ring and the line by their place, the reading that parses', () => {
   // c / C, o / O, x / X by the height of the letter
-  assert.equal(read('F=Cc+Xx+Oo', { seed: 3, amount: 0.3 }).text, 'F = Cc + Xx + Oo');
-  assert.equal(read('S=x*y+z', { seed: 3, amount: 0.3 }).text, 'S = x*y + z');
+  assert.equal(read('F=Cc+Xx+Oo', { seed: 3, amount: 0.3 }).written, 'F = Cc + Xx + Oo');
+  assert.equal(read('S=x*y+z', { seed: 3, amount: 0.3 }).written, 'S = x*y + z');
   // a ring alone is 0, a line alone 1, a line between operands |
-  assert.equal(read('f=o+a', { seed: 2, amount: 0.3 }).text, 'f = 0 + a');
-  assert.equal(read('f=a|b', { seed: 2, amount: 0.3 }).text, 'f = a|b');
-  assert.equal(read('f=l+a', { seed: 2, amount: 0.3 }).text, 'f = 1 + a');
+  assert.equal(read('f=o+a', { seed: 2, amount: 0.3 }).written, 'f = 0 + a');
+  assert.equal(read('f=a|b', { seed: 2, amount: 0.3 }).written, 'f = a|b');
+  assert.equal(read('f=l+a', { seed: 2, amount: 0.3 }).written, 'f = 1 + a');
   // the inputs known: a letter that is not one of them is read as one that parses (a 'q' for the input 'g')
   const g = writeText('f=g+a', { seed: 11, amount: 0.3 });
   const gq = [...g.strokes];
@@ -183,8 +208,8 @@ test('the symbols written alike: case by size, the ring and the line by their pl
   const box = boxOf(gq.slice(4, 6));
   const qBox = boxOf(q);
   gq.splice(4, 2, ...q.map((st) => st.map((p) => ({ x: p.x - qBox.minX + box.minX, y: p.y - qBox.minY + box.minY }))));
-  assert.equal(recognizeExpression(gq).text, 'f = q + a');
-  assert.equal(recognizeExpression(gq, { vars: ['g', 'a'] }).text, 'f = g + a');
+  assert.equal(recognizeExpression(gq).written, 'f = q + a');
+  assert.equal(recognizeExpression(gq, { vars: ['g', 'a'] }).written, 'f = g + a');
   assert.equal(recognizeExpression(gq, { vars: ['g', 'a'] }).error, null);
 });
 
@@ -208,17 +233,17 @@ test('errors and warnings: no ink, a symbol not recognized, a text that does not
   for (let i = 1; i < 40; i++) scribble[0].push({ x: scribble[0][i - 1].x + rand() * 30 - 15, y: scribble[0][i - 1].y + rand() * 30 - 15 });
   const w = writeText('F=A+', { seed: 1, amount: 0.3 });
   const r = recognizeExpression([...w.strokes, ...scribble]);
-  assert.equal(r.text, 'F = A + ?');
+  assert.equal(r.written, 'F = A + ?');
   assert.deepEqual(r.warnings, ['A symbol was not recognized (shown as ?): write it again, or teach Silinx your handwriting.']);
   assert.equal(r.error, "unexpected character '?' (at position 5)");
   // a star, twice
   const star = (x0) => Array.from({ length: 5 }, (_, j) => [{ x: x0 + 30 * Math.cos(j * 1.2566), y: 50 + 30 * Math.sin(j * 1.2566) }, { x: x0 + 30 * Math.cos(j * 1.2566 + 2.5), y: 50 + 30 * Math.sin(j * 1.2566 + 2.5) }]);
   const two = recognizeExpression([...star(100), ...star(200)]);
-  assert.equal(two.text, '??');
+  assert.equal(two.written, '??');
   assert.deepEqual(two.warnings, ['2 symbols were not recognized (shown as ?): write them again, or teach Silinx your handwriting.']);
   // the text that does not parse: the parser's message
   const open = read('F=(A+B', { seed: 1, amount: 0.3 });
-  assert.equal(open.text, 'F = (A + B');
+  assert.equal(open.written, 'F = (A + B');
   assert.deepEqual(open.warnings, []);
   assert.equal(open.error, "missing ')' (opened at position 1) (at position 7)");
   const empty = read('F=', { seed: 1, amount: 0.3 });
@@ -228,7 +253,7 @@ test('errors and warnings: no ink, a symbol not recognized, a text that does not
   assert.equal(twice.error, "unexpected character '=' (at position 3)");
   // inputs given: an unknown variable is the parser's error
   const unknown = read('F=A+D', { seed: 1, amount: 0.3, vars: ['A', 'B'] });
-  assert.equal(unknown.text, 'F = A + D');
+  assert.equal(unknown.written, 'F = A + D');
   assert.equal(unknown.error, "unknown variable 'D' (the inputs are A, B) (at position 5)");
 });
 
@@ -236,11 +261,11 @@ test('teach Silinx my handwriting: the user\'s samples are templates, preferred;
   // an A written as a five-pointed star: not a symbol of the set, until the user teaches it
   const star = (x0, y0, r, turn) => Array.from({ length: 5 }, (_, j) => [{ x: x0 + r * Math.cos(j * 1.2566 + turn), y: y0 + r * Math.sin(j * 1.2566 + turn) }, { x: x0 + r * Math.cos(j * 1.2566 + 2.5 + turn), y: y0 + r * Math.sin(j * 1.2566 + 2.5 + turn) }]);
   const strokes = [...star(60, 50, 30, 0.05), ...writeText('+B', { seed: 2, amount: 0.3, x: 110, y: 20 }).strokes];
-  assert.equal(recognizeExpression(strokes).text, 'M + B');
+  assert.equal(recognizeExpression(strokes).written, 'M + B');
   const samples = [encodeSample('A', star(0, 0, 40, 0)), encodeSample('A', star(0, 0, 25, -0.1))];
   const templates = [...builtinTemplates(), ...userTemplates(samples)];
   const r = recognizeExpression(strokes, { templates });
-  assert.equal(r.text, 'A + B');
+  assert.equal(r.written, 'A + B');
   assert.deepEqual(r.warnings, []);
   assert.equal(r.chars[0].alts[0].ch, 'A');
   assert.equal(userTemplates(samples)[0].k, USER_WEIGHT);
