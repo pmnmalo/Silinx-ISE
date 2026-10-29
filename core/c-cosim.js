@@ -144,9 +144,9 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
 }
 
 // (files: the test bench's, core/c-interp.js's, #1897)
-export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null } = {}) {
+export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops } = {}) {
   const sim = simulateC(source, { file, headers, top, files });
-  const gen = cToHdl(source, { file, lang, headers, top });
+  const gen = cToHdl(source, { file, lang, headers, top, pipelineLoops });
   if (alter && gen.ok) gen.hdl = alter(gen.hdl);   // (the tests: an HDL that differs, its mismatches reported)
   const base = { ok: false, pass: false, calls: 0, mismatches: [], latency: null, output: sim.output, sim, gen, errors: [] };
   if (!sim.ok) return { ...base, errors: [sim.error ? `the C simulation failed: line ${sim.error.line}: ${sim.error.message}` : 'the C simulation cannot run: the source has errors'] };

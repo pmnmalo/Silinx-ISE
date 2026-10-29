@@ -15,14 +15,14 @@ import { synthesizeOpen } from '../core/synth-open.js';
 import { yosysNode } from '../core/synth-open-node.js';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
-/** The design co-simulated in both languages: a pass, no warning; the C simulation's output cc's. */
-function passes(src, file, { calls } = {}) {
+/** The design co-simulated in both languages: a pass, its warnings (none by default); the C simulation's output cc's. */
+function passes(src, file, { calls, warnings = [] } = {}) {
   if (CC) assert.equal(simulateC(src, { file }).output, compiledRun(src).output);
   const out = [];
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(src, { file, lang });
     assert.deepEqual(r.errors, [], lang);
-    assert.deepEqual(r.gen.diagnostics, [], lang);
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), warnings, lang);
     assert.equal(r.pass, true, `${lang}: ${JSON.stringify(r.mismatches, big)}`);
     if (calls !== undefined) assert.equal(r.calls, calls);
     out.push(r);
@@ -61,9 +61,11 @@ test('#1527 an array argument is ap_memory: address0 (its size\'s bits) and ce0;
 
 test('#1527 co-simulation of array arguments (read; read and written, one access a cycle): a pass in VHDL and Verilog, the memory compared after each call; an HDL writing a wrong value: the word that differs', () => {
   const [sum] = passes(ARGS.replace('TOPNAME', 'sum'), 'sum.c', { calls: 3 });
-  // a read a state, its value the next: 8 reads, their adds, the loop
-  assert.deepEqual(sum.latency, { min: 27, max: 39, avg: 33 });
-  passes(ARGS.replace('TOPNAME', 'scale'), 'scale.c', { calls: 2 });
+  // a read a state, its value the next; the loop pipelined automatically (#1919): the next read in the state of an
+  // add (made whatever i < n, its value then unused), the loop's head and step in it
+  assert.deepEqual(sum.latency, { min: 11, max: 11, avg: 11 });
+  // (v[i] and v[5 - i] read, v[i] written: one port, a state each, #1919)
+  passes(ARGS.replace('TOPNAME', 'scale'), 'scale.c', { calls: 2, warnings: ['9 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off'] });
   const r = cosimulate(ARGS.replace('TOPNAME', 'scale'), { file: 'scale.c', lang: 'verilog', alter: (h) => h.replace(/assign v_d0 = (\w+);/, 'assign v_d0 = $1 ^ 16\'h0100;') });
   assert.equal(r.pass, false);
   const where = r.mismatches.map((m) => `${m.call} ${m.port}`);

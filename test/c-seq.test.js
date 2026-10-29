@@ -189,7 +189,8 @@ test('C to HDL, sequential: the module made: ap_clk / ap_rst and the block proto
   assert.deepEqual(v.ports.map((p) => p.name), ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'n', 'ap_return']);
   assert.match(v.hdl, /signal ap_CS_fsm : unsigned\(\d+ downto 0\);/);
   assert.match(v.hdl, /process \(ap_clk\)/);
-  assert.match(v.hdl, /-- line 5\n/);
+  // (the loop pipelined automatically, #1919: its iteration's state named by the loop's line)
+  assert.deepEqual(v.hdl.match(/-- line \d+/g), ['-- line 2', '-- line 3', '-- line 7']);
   const msgs = (src) => cToHdl(src).diagnostics.map((d) => `${d.line}:${d.col} ${d.severity}: ${d.message}`);
   assert.deepEqual(msgs('int g(int n) { int s = 0; while (s < n) {\n#pragma HLS LOOP_TRIPCOUNT max=4\n s++; } return s; }\nint f(int n) {\n#pragma HLS INTERFACE ap_ctrl_none port=return\n  return g(n);\n}'), [
     '5:1 warning: ap_ctrl_none: this function is sequential, it needs its block protocol: ap_ctrl_hs is made',

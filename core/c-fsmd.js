@@ -21,10 +21,13 @@ import { fifoMethods } from './c-fifo.js';
 import { wordMethods } from './c-agg-mem.js';
 import { loopPragma, unrollBy } from './c-pragma.js';
 import { inlineCalls } from './c-inline.js';
+import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from './c-pipeline.js';
 
-export function fsmd(checked, { groups = [] } = {}) {
+// (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
+export function fsmd(checked, { groups = [], pipelineLoops = PIPELINE_LOOPS } = {}) {
   const f = new SeqFlow(checked);
   f.groups = groups;
+  f.pipelineLoops = pipelineLoops;
   return f.runSeq();
 }
 
@@ -33,7 +36,7 @@ const hasLoop = (n) => {
   const w = (x) => {
     if (!x || typeof x !== 'object' || hit) return;
     if (Array.isArray(x)) { x.forEach(w); return; }
-    if (x.kind === 'for' || x.kind === 'while' || x.kind === 'do') { hit = true; return; }
+    if ((x.kind === 'for' || x.kind === 'while' || x.kind === 'do') && !x.unroll) { hit = true; return; }   // (unrolled: in its state, #1919)
     for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') w(v);
   };
   w(n);
@@ -120,6 +123,8 @@ class SeqFlow extends Flow {
           cur = join;
           continue;
         }
+        // (in a pipelined loop: an if in the state of the values it reads, its writes made only if it runs them, #1919)
+        if (s.kind === 'if' && this.inPipe && this.flatOk(s)) { cur = this.flatIf(s, cur, mk, lp); continue; }
         if (s.kind === 'if') {
           const c = this.hoistCond(s.cond, cur, mk, lp);
           cur = c.cur;
@@ -132,9 +137,9 @@ class SeqFlow extends Flow {
         }
         if (s.kind === 'for' || s.kind === 'while' || s.kind === 'do') {
           // the loop's pragmas (#1529): UNROLL (whole: its iterations in the state it is in; factor=N: N an
-          // iteration), PIPELINE (an iteration a state)
+          // iteration), PIPELINE (an iteration a state; with no pragma, as Vitis HLS pipelines it automatically, #1919)
           const info = this.loopInfo(s);
-          const un = loopPragma(s, 'UNROLL'), pp = loopPragma(s, 'PIPELINE');
+          const un = loopPragma(s, 'UNROLL'), pp = loopPragma(s, 'PIPELINE') ?? (s.autoPipe ? { ii: 1, auto: true } : null);
           if (un) {
             const n = un.factor !== undefined ? Number(un.factor) : Infinity;
             const why = this.hasMem(s) ? 'it accesses a memory: an access a state' : hasLoop(s.body) ? 'a loop is in it' : null;
@@ -150,7 +155,10 @@ class SeqFlow extends Flow {
           }
           if (pp && !pp.off) {
             info.pipeline = Number(pp.ii ?? 1);
-            const bad = this.hasMem(s) ? 'it accesses a memory, an access a state' : hasLoop(s.body) ? 'a loop is in it' : hasContinue(s.body) ? "a 'continue' is in it" : s.kind === 'do' ? 'a do-while' : null;
+            if (pp.auto) info.auto = true;
+            const bad = this.pipeWhy(s);
+            // (its memory accesses: a state each, the loop's head and step in them, #1919)
+            if (!bad && this.hasMem(s)) { cur = this.pipeMem(s, cur, mk, lp, info); continue; }
             if (!bad) {
               // one state an iteration: if its condition holds, the body and the step; else out
               if (s.kind === 'for' && s.init) { if (this.hasMem(s.init)) cur = this.wordsBefore(null, this.lowerMem(s.init, cur, mk, lp), mk, lp); else cur.stmts.push(s.init); }
@@ -158,7 +166,8 @@ class SeqFlow extends Flow {
               const L = { exit, cont: null };
               const it = mk(L);
               L.cont = it;
-              const then = { kind: 'block', items: [s.body, ...(s.kind === 'for' && s.step ? [{ kind: 'expr', e: s.step, loc: s.loc }] : [])], loc: s.loc };
+              // (its inner loops unrolled whole, in its state, as Vitis HLS unrolls them, #1919)
+              const then = { kind: 'block', items: [this.unrollInner(s.body), ...(s.kind === 'for' && s.step ? [{ kind: 'expr', e: s.step, loc: s.loc }] : [])], loc: s.loc };
               it.stmts.push(s.cond ? { kind: 'if', cond: s.cond, then, else: { kind: 'break', loc: s.loc }, loc: s.loc } : then);
               it.term = { goto: it };
               cur.term = { goto: it };
@@ -229,6 +238,7 @@ class SeqFlow extends Flow {
       this.fn = inl;
       const { body, decls } = this.renameLocals(inl);
       this.makeRegisters(inl, decls);
+      markAutoPipeline(body.items, { threshold: this.pipelineLoops, trip: (l) => this.tripOf(l), why: (l) => this.pipeWhy(l) });
       this.entry = this.cfg(body.items, null, null);
       this.thread();
       this.runBlocks();
@@ -377,22 +387,67 @@ class SeqFlow extends Flow {
     }
     slot.val = this.mux(g, this.conv(this.expr(v.init, g), slot.t).id, slot.val, slot.t);
   }
-  loop(s, base) { if (s.unroll) return super.loop(s, base); this.error(s.loc, 'internal: a loop inside a block'); return undefined; }
+  loop(s, base) {
+    if (!s.unroll) { this.error(s.loc, 'internal: a loop inside a block'); return; }
+    const g = this.guard(base);
+    if (this.g.isConst(g)) { super.loop(s, base); return; }
+    // (under a condition, as in a pipelined loop's state: unrolled as if it held, what it writes then kept only if it
+    // holds, #1919)
+    const keep = new Map();
+    for (const slot of this.slots.values()) {
+      if (slot.kind === 'var') keep.set(slot, slot.val);
+      if (slot.kind === 'array') keep.set(slot, [...slot.elems]);
+      if (slot.kind === 'out') keep.set(slot, [slot.out.val, slot.out.vld]);
+    }
+    super.loop(s, this.T);
+    const m = (a, b, t) => (a === b ? a : this.mux(g, a, b, t));
+    for (const [slot, old] of keep) {
+      if (slot.kind === 'var') slot.val = m(slot.val, old, slot.t);
+      if (slot.kind === 'array') slot.elems = slot.elems.map((e, k) => m(e, old[k], slot.t));
+      if (slot.kind === 'out') { slot.out.val = m(slot.out.val, old[0], slot.out.t); slot.out.vld = m(slot.out.vld, old[1], BOOL); }
+    }
+  }
+  /** Why a loop cannot be pipelined, an iteration a state (its inner loops unrolled whole), or null. */
+  pipeWhy(s) {
+    const unrollable = (x) => innerLoops(x).every((l) => l.kind === 'for' && this.tripOf(l) !== null && unrollable(l.body));
+    return !unrollable(s.body) ? 'a loop is in it whose count is not a constant: it cannot be unrolled' : this.hasMem(s) ? this.pipeMemWhy(s)
+      : hasContinue(s.body) ? "a 'continue' is in it" : s.kind === 'do' ? 'a do-while' : null;
+  }
+  /** A pipelined loop's body with its inner loops unrolled whole (each in the report). */
+  unrollInner(x) {
+    if (!x || typeof x !== 'object') return x;
+    if (Array.isArray(x)) return x.map((y) => this.unrollInner(y));
+    const loop = x.kind === 'for' || x.kind === 'while' || x.kind === 'do';
+    if (loop) this.loopInfo(x).unroll = 'whole';
+    const y = loop ? { ...x, unroll: true } : { ...x };
+    for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') y[k] = this.unrollInner(v);
+    return y;
+  }
+  tripOf(s) { return this.loopCount(s).trip; }
+  loopCount(s) { return this.c.loops.find((l) => l.loc.line === s.loc.line && l.loc.col === s.loc.col) || { trip: null, max: null }; }
   /** The record of a loop for the report: its line, its count (checkC's), what its pragmas made. */
   loopInfo(s) {
-    const c = this.c.loops.find((l) => l.loc.line === s.loc.line && l.loc.col === s.loc.col) || { trip: null, max: null };
+    const c = this.loopCount(s);
     const info = { line: s.loc.line, name: s.label || null, trip: c.trip, max: c.max, unroll: null, pipeline: null, blocks: [], loc: s.loc };
     (this.loopReport ||= []).push(info);
     return info;
   }
   /** The loops' report, once the states are numbered: the states an iteration (II), the cycles of the loop. */
   loopsDone() {
+    const said = new Set();
     return (this.loopReport || []).map((l) => {
       const ii = l.unroll === 'whole' ? 0 : l.blocks.filter((b) => b.num).length;
-      if (l.pipeline && l.notPipelined) this.warn(l.loc, `#pragma HLS PIPELINE II=${l.pipeline}: II=${ii} made (${l.notPipelined})`);
-      else if (l.pipeline && ii > l.pipeline) this.warn(l.loc, `#pragma HLS PIPELINE II=${l.pipeline}: II=${ii} made`);
+      // (the II asked, or Vitis HLS's 1 for a loop pipelined automatically, not met: said, and why, #1919)
+      if (l.pipeline && (l.notPipelined || ii > l.pipeline)) {
+        const why = l.notPipelined || l.memII || null;
+        const what = l.auto ? 'this loop is pipelined automatically, as Vitis HLS does (II=1)' : `#pragma HLS PIPELINE II=${l.pipeline}`;
+        const m = `${what}: II=${ii} made${why ? ` (${why})` : ''}${l.auto ? '; #pragma HLS PIPELINE off in it turns that off' : ''}`;
+        // (once for the loops of a function inlined at each of its calls)
+        const key = `${l.loc.file}:${l.loc.line}:${l.loc.col}:${m}`;
+        if (!said.has(key)) { said.add(key); this.warn(l.loc, m); }
+      }
       const n = l.trip ?? l.max;
-      return { line: l.line, ...(l.name ? { name: l.name } : {}), trip: l.trip, max: l.max, unroll: l.unroll, pipeline: l.pipeline, ii, cycles: n === null ? null : l.unroll === 'whole' ? 0 : Math.ceil(n / (typeof l.unroll === 'number' ? l.unroll : 1)) * ii + 1 };
+      return { line: l.line, ...(l.name ? { name: l.name } : {}), trip: l.trip, max: l.max, unroll: l.unroll, pipeline: l.pipeline, ...(l.auto ? { auto: true } : {}), ii, cycles: n === null ? null : l.unroll === 'whole' ? 0 : Math.ceil(n / (typeof l.unroll === 'number' ? l.unroll : 1)) * ii + 1 };
     });
   }
   stmt(s, base) {
@@ -443,7 +498,15 @@ class SeqFlow extends Flow {
         }
       }
       if (this.retReg && this.frame.ret !== this.regNode(this.retReg)) updates.set(this.retReg.name, this.frame.ret);
-      this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc });
+      // (a pipelined loop's state, a stream's access with other work in it: while it waits, nothing written, #1919)
+      const stall = b.gate ? this.stall : this.F;
+      if (stall !== this.F) {
+        for (const [k, v] of updates) {
+          const r = this.regs.get(k);
+          updates.set(k, r.t === BOOL && k.endsWith('_vld_reg') ? this.and(this.not(stall), v) : this.mux(stall, this.regNode(r), v, r.t));
+        }
+      }
+      this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc, stall });
     }
     this.mems = this.memPorts(this.states);
     this.fifos = this.fifoPorts(this.states);
@@ -514,4 +577,4 @@ class SeqFlow extends Flow {
     };
   }
 }
-Object.assign(SeqFlow.prototype, memMethods, fifoMethods, wordMethods);
+Object.assign(SeqFlow.prototype, memMethods, fifoMethods, wordMethods, pipelineMethods);

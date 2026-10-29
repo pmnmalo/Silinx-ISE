@@ -231,7 +231,8 @@ dout_t pointer_multi(sel_t sel, din_t pos) {
 int main(void) { int s = 0; for (int i = 0; i < 16; i++) s += pointer_multi(i & 1, i); return s == 80 ? 0 : 1; }
 ` },
   'modeling-free-running-kernel-remerge-ii4to1': { file: 'example.cpp', warnings: [], src: DF },
-  'interface-aggregation-disaggregation-aggregation-of-nested-structs': { file: 'example.cpp', warnings: [], src: `#define N 8
+  // (its loop pipelined automatically, #1919: a, b and c one port each)
+  'interface-aggregation-disaggregation-aggregation-of-nested-structs': { file: 'example.cpp', warnings: ['9 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off'], src: `#define N 8
 struct T { int m; int n; bool o; };
 struct S { int p; T q; };
 void top(S a[N], S b[N], S c[N]) {
@@ -257,7 +258,8 @@ int main() {
   return t == 0;
 }
 ` },
-  'interface-aggregation-disaggregation-auto-disaggregation-of-struct': { file: 'example.cpp', warnings: ['6 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)'], src: `#include "hls_stream.h"
+  // (its loop until the stream is empty pipelined automatically, #1919: its condition a state of its own)
+  'interface-aggregation-disaggregation-auto-disaggregation-of-struct': { file: 'example.cpp', warnings: ['6 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)', '6 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it reads or writes a stream, an access a state); #pragma HLS PIPELINE off in it turns that off'], src: `#include "hls_stream.h"
 #define N 10
 struct A { hls::stream<int> s_in; long arr[N]; };
 long dut(struct A &d) {
@@ -329,12 +331,13 @@ const corpusGen = (name) => {
 // (each corpus design's warnings: those of its pragmas Silinx does not make as Vitis HLS, its pos renamed)
 const CORPUS_WARNINGS = {
   'modeling-pointers-multiple-pointers': ["19 warning: 'pos' is a name Vitis HLS reserves: it is named pos_r in the module"],
-  'modeling-free-running-kernel-remerge-ii4to1': ['28 warning: #pragma HLS PIPELINE II=4: II=6 made (it accesses a memory, an access a state)',
-    '30 warning: #pragma HLS LATENCY is accepted and ignored: Silinx does not make it', '40 warning: #pragma HLS PIPELINE II=1: II=10 made (it accesses a memory, an access a state)',
-    '52 warning: #pragma HLS PIPELINE II=1: II=9 made (it accesses a memory, an access a state)'],
+  // (each loop's reads and writes in one state, #1919: the II asked met; mux's and demux's streams chosen by an index,
+  // each access made only on its branch)
+  'modeling-free-running-kernel-remerge-ii4to1': ['30 warning: #pragma HLS LATENCY is accepted and ignored: Silinx does not make it'],
   'task-level-parallelism-data-driven-simple-data-driven': [],
-  'interface-aggregation-disaggregation-aggregation-of-nested-structs': ['28 warning: #pragma HLS PIPELINE II=3: II=5 made (it accesses a memory, an access a state)'],
-  'interface-aggregation-disaggregation-auto-disaggregation-of-struct': ['22 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)'],
+  // (its loop's II=3 met, #1919: an iteration two states)
+  'interface-aggregation-disaggregation-aggregation-of-nested-structs': [],
+  'interface-aggregation-disaggregation-auto-disaggregation-of-struct': ['22 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)', '22 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it reads or writes a stream, an access a state); #pragma HLS PIPELINE off in it turns that off'],
   'interface-memory-rom-lookup-table-math': [],
   'modeling-fixed-point-sqrt': ['77 warning: assert is ignored by synthesis (the C simulation checks it)'],
   'modeling-using-arbitrary-precision-casting': [],

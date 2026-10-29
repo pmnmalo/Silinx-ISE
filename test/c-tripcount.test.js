@@ -72,10 +72,11 @@ test('#1921 the bound in the report, the design co-simulated in VHDL and Verilog
   const ref = run('max=16');
   const got = run('min = c_dim max = c_dim * c_dim');
   assert.deepEqual(got, ref);
-  for (const g of got) assert.deepEqual(g, { latency: { min: 3, max: 67, avg: 31 }, loops: [{ line: 5, trip: null, max: 16, ii: 4, cycles: 65 }], messages: [] });
+  // (the loop pipelined automatically, #1919: an iteration a cycle)
+  for (const g of got) assert.deepEqual(g, { latency: { min: 3, max: 19, avg: 10 }, loops: [{ line: 5, trip: null, max: 16, ii: 1, cycles: 17 }], messages: [] });
   // (a variable: the loop made as before, its cycles unknown, both warnings)
   for (const g of run('max=n')) {
-    assert.deepEqual(g.loops, [{ line: 5, trip: null, max: null, ii: 4, cycles: null }]);
+    assert.deepEqual(g.loops, [{ line: 5, trip: null, max: null, ii: 1, cycles: null }]);
     assert.deepEqual(g.messages, [LOOP.replace(/^5:3/, '5'), "6 warning: #pragma HLS LOOP_TRIPCOUNT max=n: 'n' is not a constant: ignored (a number, or an expression of const integers)"]);
   }
 });

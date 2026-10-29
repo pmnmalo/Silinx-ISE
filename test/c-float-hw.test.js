@@ -39,7 +39,9 @@ test('#1768 float in a sequential module co-simulated in VHDL and Verilog: a flo
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(MAC, { file: 'mac.c', lang });
     assert.deepEqual([r.errors, r.pass, r.calls, r.gen.sequential], [[], true, 4, true], JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ["2 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"]);
+    // (the loop pipelined automatically, #1919: a[i] read three times, a state each)
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ["2 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
+      '4 this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off']);
     assert.deepEqual(r.gen.ports.filter((p) => !/^ap_(clk|rst|start|done|idle|ready)$/.test(p.name)).map((p) => `${p.name}:${p.w}`),
       ['a_address0:3', 'a_ce0:1', 'a_q0:32', 'b:32', 'k:32', 'out_r:32', 'out_r_ap_vld:1', 'ap_return:32']);
   }

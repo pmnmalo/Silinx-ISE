@@ -349,7 +349,7 @@ void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
 | `AGGREGATE variable= compact=` / `DISAGGREGATE variable=` (the top's, #1668) | a struct argument, a stream or an array of structs one port, stream or memory of its words, packed `compact=bit` (an array's or a stream's default), `byte`, `none` (a scalar struct's default) / a port, a stream or a memory per member |
 | `INLINE` / `INLINE off` | every function is inlined (`off` is ignored, with a warning) |
 | `LOOP_TRIPCOUNT min= max=` | the report's bound of a loop whose count depends on the inputs (its latency, else unknown) |
-| `PIPELINE [II=]` (in a loop's body) | a sequential module's loop: an iteration a state (II=1: its condition, body and step in one clock cycle); a loop that accesses a memory, has a loop or a `continue` in it keeps its states, a warning saying the II made |
+| `PIPELINE [II=]` / `PIPELINE off` (in a loop's body) | a sequential module's loop: an iteration a state (II=1: its condition, body and step in one clock cycle), its inner loops of constant count unrolled in it; one that accesses a memory or a stream: an iteration its accesses' states (below); a warning saying the II made when it is more than asked. `off`: not pipelined, not even automatically |
 | `UNROLL` / `UNROLL factor=N` (in a loop's body) | whole: a loop of constant count run in the state it is in (no state of its own); `factor=N`: N iterations a state. A combinational module's loops are all unrolled |
 | `ARRAY_PARTITION variable= type=complete` | the array's elements registers, whatever its size (not a memory); `block` / `cyclic` ignored with a warning |
 | `DATAFLOW` (the top function's, #1707) | its calls processes running at once (below); a region of other statements: a warning, made sequential |
@@ -357,7 +357,20 @@ void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
 | `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `BIND_STORAGE`, `DEPENDENCE`, `LOOP_FLATTEN`, … and AXI interfaces (`s_axilite`, `m_axi`, `axis`) | accepted and ignored, with a warning; an unknown pragma: a warning |
 
 A loop's pragma is its body's first statements; one elsewhere is ignored with a warning (a function's `PIPELINE`
-too). The generation's report (`cToHdl(…).report`) gives a sequential module's states, register bits, memories
+too).
+
+**Loops pipelined automatically** (#1919), as Vitis HLS's default (UG1399): with no `PIPELINE` pragma, an innermost
+loop of more than 64 iterations is pipelined (II=1 aimed at); one of 64 or fewer has its parent pipelined instead,
+the inner loop unrolled in it, when Silinx can make the parent so (else the inner loop is pipelined); an innermost
+loop with no parent is pipelined whatever its count. The threshold is Vitis HLS's `syn.compile.pipeline_loops`:
+`cToHdl(…, { pipelineLoops: N })` (and `cosimulate`'s), 0 for none; `#pragma HLS PIPELINE off` in a loop leaves it
+as it is. A pipelined loop that accesses a memory or a stream keeps a state per access (a memory's read is in its
+register a cycle later), its condition and step in its last state, consecutive states merged when they use no port
+of the same memory or stream; its first state's work is done in its last for the next iteration when they share no
+port: `s += a[i]` takes a cycle an iteration, `a[i] = a[i] + 1` two (one port). A state that waits for a stream
+writes nothing while it waits. Where the II of 1 is not met, a warning gives the II made and why: a memory's accesses
+a state each, or a loop that cannot be made so (a branch or a `break` around an access, a `do`-while, an inner loop
+that cannot be unrolled), then made as before. The generation's report (`cToHdl(…).report`) gives a sequential module's states, register bits, memories
 and, for each loop, what its pragmas made: its II (states an iteration) and its cycles.
 
 ## HDL to C (the other way)

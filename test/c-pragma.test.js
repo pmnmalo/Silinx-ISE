@@ -22,10 +22,10 @@ ${prag}
 int main(void) { for (int k = -3; k < 4; k += 2) printf("%d ", acc(k)); return 0; }
 `;
 /** Co-simulated in both languages: a pass; its cycles a call, its loop's report, its messages. */
-function run(src, file = 'acc.c') {
+function run(src, file = 'acc.c', opts = {}) {
   const out = [];
   for (const lang of ['vhdl', 'verilog']) {
-    const r = cosimulate(src, { file, lang });
+    const r = cosimulate(src, { file, lang, ...opts });
     assert.deepEqual(r.errors, [], lang);
     assert.equal(r.pass, true, `${lang}: ${JSON.stringify(r.mismatches, big)}`);
     out.push(r);
@@ -36,25 +36,27 @@ function run(src, file = 'acc.c') {
 }
 
 test('#1529 a loop\'s PIPELINE and UNROLL: the cycles of a call (co-simulated: the same results) and the report\'s II', () => {
-  const none = run(ACC(''));
+  // (each pragma on its own: no loop pipelined automatically, #1919, core/c-pipeline.js's tests)
+  const alone = (src) => run(src, 'acc.c', { pipelineLoops: 0 });
+  const none = alone(ACC(''));
   assert.equal(none.cycles, 51);
   assert.deepEqual(none.loops, [{ line: 4, unroll: null, pipeline: null, ii: 3, cycles: 49 }]);
   assert.deepEqual(none.messages, []);
-  const pipe = run(ACC('#pragma HLS PIPELINE II=1'));
+  const pipe = alone(ACC('#pragma HLS PIPELINE II=1'));
   assert.equal(pipe.cycles, 19);
   assert.deepEqual(pipe.loops, [{ line: 4, unroll: null, pipeline: 1, ii: 1, cycles: 17 }]);
   assert.deepEqual(pipe.messages, []);
-  const whole = run(ACC('#pragma HLS UNROLL'));
+  const whole = alone(ACC('#pragma HLS UNROLL'));
   assert.equal(whole.cycles, 1);
   assert.deepEqual(whole.loops, [{ line: 4, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
-  const by4 = run(ACC('#pragma HLS UNROLL factor=4'));
+  const by4 = alone(ACC('#pragma HLS UNROLL factor=4'));
   assert.equal(by4.cycles, 11);
   assert.deepEqual(by4.loops, [{ line: 4, unroll: 4, pipeline: null, ii: 2, cycles: 9 }]);
-  const both = run(ACC('#pragma HLS UNROLL factor=4\n#pragma HLS PIPELINE'));
+  const both = alone(ACC('#pragma HLS UNROLL factor=4\n#pragma HLS PIPELINE'));
   assert.equal(both.cycles, 7);
   assert.deepEqual(both.loops, [{ line: 4, unroll: 4, pipeline: 1, ii: 1, cycles: 5 }]);
   // a factor that does not divide the count: the last iteration's copies skipped
-  const by5 = run(ACC('#pragma HLS UNROLL factor=5'));
+  const by5 = alone(ACC('#pragma HLS UNROLL factor=5'));
   assert.deepEqual(by5.loops, [{ line: 4, unroll: 5, pipeline: null, ii: 2, cycles: 9 }]);
   assert.deepEqual(by5.messages, []);
 });
@@ -71,12 +73,16 @@ ${prag}
 }
 int main(void) { int t[8] = {1, 2, 3, 4, 5, 6, 7, 8}; printf("%d\\n", sum(t)); return 0; }
 `;
+  // (made since #1919: the next iteration's read in the last state of one, core/c-pipeline.js; a read in a branch is
+  // not, said there)
   const p = run(MEM('#pragma HLS PIPELINE II=1'), 'sum.c');
-  assert.deepEqual(p.messages, ['4 warning: #pragma HLS PIPELINE II=1: II=4 made (it accesses a memory, an access a state)']);
+  assert.deepEqual(p.messages, []);
+  assert.deepEqual(p.loops, [{ line: 4, unroll: null, pipeline: 1, ii: 1, cycles: 9 }]);
   const u = run(MEM('#pragma HLS UNROLL'), 'sum.c');
   assert.deepEqual(u.messages, ['4 warning: #pragma HLS UNROLL: this loop is not unrolled: it accesses a memory: an access a state']);
   const c = run(ACC('#pragma HLS UNROLL factor=2\n    if (i == 3) continue;'));
-  assert.deepEqual(c.messages, ["4 warning: #pragma HLS UNROLL factor=2: this loop is not unrolled: a 'continue' is in it"]);
+  assert.deepEqual(c.messages, ["4 warning: #pragma HLS UNROLL factor=2: this loop is not unrolled: a 'continue' is in it",
+    "4 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (a 'continue' is in it); #pragma HLS PIPELINE off in it turns that off"]);
   const v = run(`#include <stdio.h>
 int count(unsigned n) {
   int k = 0;
