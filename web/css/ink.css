@@ -20,8 +20,18 @@
 /* the New Source wizard's expression of a truth table */
 .ns-tt-row { display: flex; align-items: center; gap: 6px; }
 .ns-tt-expr { flex: 1; font-family: var(--mono, monospace); }
-/* the Handwritten Truth Table dialog */
-.ink-pad-table .ink-canvas { height: min(420px, 52vh); }
+/* the Handwritten Truth Table dialog: the pad tall, on the left, the rest in a column beside it (#2007); on a narrow
+   screen one under the other */
+.ink-portrait { flex-direction: row; align-items: flex-start; gap: 10px; }
+.ink-portrait .ink-pad-table { flex: none; width: min(460px, 52vw); }
+.ink-pad-table .ink-canvas { height: min(720px, calc(100vh - 230px)); }
+.ink-portrait .ink-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ink-portrait .ink-side .ink-table-text { min-height: 12em; }
+@media (max-width: 700px) {
+  .ink-portrait { flex-direction: column; align-items: stretch; }
+  .ink-portrait .ink-pad-table { width: auto; }
+  .ink-pad-table .ink-canvas { height: min(420px, 52vh); }
+}
 .ink-table-text { width: 100%; box-sizing: border-box; font-family: var(--mono, monospace); font-size: 14px; resize: vertical; }
 /* the Handwritten Schematic dialog: the circuit read */
 .ink-circuit { display: flex; flex-direction: column; gap: 3px; height: 150px; overflow: auto; }
