@@ -90,7 +90,7 @@ test('#1897 a FILE in the top function under #ifndef __SYNTHESIS__ (AMD\'s hier_
 });
 
 test('#1936 the reference compiler refuses a library function called without its header, on Linux as clang on macOS (the test bench\'s system() needs <stdlib.h>); with it, compiled', { skip: noCC }, () => {
-  const undeclared = /implicit declaration of function 'system'|call to undeclared function 'system'/;
+  const undeclared = /implicit declaration of function .system.|call to undeclared function .system./;   // (GCC quotes it ‘system’ in a UTF-8 locale)
   const prog = (inc) => `${inc}int main(void) { return system("exit 3") != 0 ? 0 : 1; }\n`;
   assert.throws(() => compiled(prog(''), {}), undeclared);
   assert.throws(() => compiledRun(prog('')), undeclared);
