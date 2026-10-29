@@ -267,12 +267,12 @@ async function asmToFsmDiagram(asmPath) {
   openFsm(target);
 }
 
-// "Create Truth Tables": next-state bits and outputs as functions of the state bits and the inputs
+// "Create Boolean Algebra": next-state bits and outputs as functions of the state bits and the inputs
 async function fsmTruthTables(fsmPath) {
   const { truthTablesOf, normalizeFsm } = await import('/core/fsm.js');
   const m = normalizeFsm(await fsmModel(fsmPath));
   const r = truthTablesOf(m);
-  if (r.error) { alertDlg('Create Truth Tables', r.error, 'error'); return; }
+  if (r.error) { alertDlg('Create Boolean Algebra', r.error, 'error'); return; }
   const dir = fsmDir(fsmPath);
   const made = [];
   for (const t of r.tables) {
@@ -281,7 +281,7 @@ async function fsmTruthTables(fsmPath) {
     await api.writeFile(S.project.name, target, JSON.stringify({ ...t.doc, name }, null, 2));
     made.push(target);
   }
-  log(`State diagram '${fsmPath}' -> truth tables ${made.join(', ')} (next-state and output logic of the ${m.encoding} encoding; unused codes are don't cares).`, 'ok');
+  log(`State diagram '${fsmPath}' -> Boolean algebra ${made.join(', ')} (next-state and output logic of the ${m.encoding} encoding; unused codes are don't cares).`, 'ok');
   await reloadProject(false);
   for (const f of made.reverse()) await openTt(f);
 }
@@ -406,14 +406,14 @@ export const isAsm = p => /\.asm\.json$/i.test(p || '');
 export const isTt = p => /\.tt\.json$/i.test(p || '');
 export const isFsm = p => /\.fsm\.json$/i.test(p || '');
 export const isPn = p => /\.pn\.json$/i.test(p || '');
-export const viewNoun = p => (isAsm(p) ? 'state machine' : isTt(p) ? 'truth table' : isFsm(p) ? 'state diagram' : isPn(p) ? 'Petri net' : 'schematic');
-export const viewTitle = p => (isAsm(p) ? 'State Machine' : isTt(p) ? 'Truth Table' : isFsm(p) ? 'State Diagram' : isPn(p) ? 'Petri Net' : 'Schematic');
+export const viewNoun = p => (isAsm(p) ? 'state machine' : isTt(p) ? 'Boolean algebra' : isFsm(p) ? 'state diagram' : isPn(p) ? 'Petri net' : 'schematic');
+export const viewTitle = p => (isAsm(p) ? 'State Machine' : isTt(p) ? 'Boolean Algebra' : isFsm(p) ? 'State Diagram' : isPn(p) ? 'Petri Net' : 'Schematic');
 export const viewIcon = p => (isAsm(p) ? 'asm' : isTt(p) ? 'truthtable' : isFsm(p) ? 'fsm' : isPn(p) ? 'petri' : 'schematic');
 export const viewKind = p => (isAsm(p) ? 'asm' : isTt(p) ? 'tt' : isFsm(p) ? 'fsm' : isPn(p) ? 'pn' : 'sch');
 export const viewContextMenu = (e, f) => (isAsm(f) ? asmContextMenu : isTt(f) ? ttContextMenu : isFsm(f) ? fsmContextMenu : isPn(f) ? petriContextMenu : schContextMenu)(e, f);
 export function openView(p) { return isAsm(p) ? openAsm(p) : isTt(p) ? openTt(p) : isFsm(p) ? openFsm(p) : isPn(p) ? openPetri(p) : openSch(p); }
 // a view's badge in the Design tree (#207)
-export const viewBadge = p => (isAsm(p) ? 'ASM' : isTt(p) ? 'Table' : isFsm(p) ? 'FSM' : isPn(p) ? 'Petri' : 'Schematic');
+export const viewBadge = p => (isAsm(p) ? 'ASM' : isTt(p) ? 'Algebra' : isFsm(p) ? 'FSM' : isPn(p) ? 'Petri' : 'Schematic');
 
 // the commands of a module's drawing (its badge in the Design tree): the drawing is the base, its HDL
 // file generated from it (#220)

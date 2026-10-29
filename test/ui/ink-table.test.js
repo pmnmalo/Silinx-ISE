@@ -1,4 +1,4 @@
-// UI: hand-drawn truth tables (#1066), Development ▸ Handwritten Truth Table… while a preview (#1098): a table
+// UI: hand-drawn truth tables (#1066), Development ▸ Handwritten Boolean Algebra… while a preview (#1098): a table
 // drawn on the pad with the mouse, a finger and a pen (CDP input) is read into its text, corrected there, and fills the editor's table
 // (inputs, outputs, columns), one step of Undo; a table with no line between the inputs and the outputs (the
 // warning), a cell left empty (the error, the dialog stays open); the dialog in Portuguese. No console warnings.
@@ -50,7 +50,7 @@ const waitText = (page, text) => page.waitFor((d, t) => document.querySelector(`
 async function newTable(page, name) {
   await makeProject(env, { name, files: {} });
   await page.openProject(name);
-  await page.menu('Tools', 'Truth Table / Karnaugh Map…');
+  await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
   await page.waitDialog('New Source Wizard');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'drawn');
@@ -62,8 +62,8 @@ async function newTable(page, name) {
 
 uiTest('Handwritten Table…: a table drawn with the mouse, a finger and a pen fills the editor\'s table; corrected; Undo', E, async (page) => {
   await newTable(page, 'InkTable');
-  await page.menu('Development', 'Handwritten Truth Table…');
-  await page.waitDialog('Handwritten Truth Table');
+  await page.menu('Development', 'Handwritten Boolean Algebra…');
+  await page.waitDialog('Handwritten Boolean Algebra');
   // the pad tall, on the left; the hint, the buttons and the table read on its right (#2007)
   const [pad, side] = await page.eval((d) => ['.ink-pad-table', '.ink-side'].map((k) => { const r = document.querySelector(`${d} ${k}`).getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, w: r.width, h: r.height }; }), D);
   assert.ok(pad.h > pad.w && side.left >= pad.right && Math.abs(side.top - pad.top) < 2, JSON.stringify({ pad, side }));
@@ -91,8 +91,8 @@ uiTest('Handwritten Table…: no line between the inputs and the outputs, a cell
   await newTable(page, 'InkTable2');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
-    await page.menu('Desenvolvimento', 'Tabela de Verdade Manuscrita…');
-    await page.waitDialog('Tabela de Verdade Manuscrita');
+    await page.menu('Desenvolvimento', 'Álgebra Booleana Manuscrita…');
+    await page.waitDialog('Álgebra Booleana Manuscrita');
     const labels = await page.eval((d) => [...document.querySelector(d).closest('.dlg').querySelectorAll('button:not(.dlg-x), label, .hint')].map((e) => e.textContent.trim()), D);
     assert.deepEqual(labels, [
       'Apagar', 'Mover', 'Ajustar',

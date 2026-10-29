@@ -10,8 +10,8 @@ The tests of the recognizers otherwise use synthetic hands (`core/ink/synth*.js`
 
 ## Adding a drawing
 
-1. In a development build, open the handwriting dialog (*Development ▸ Handwritten Expression… / Truth Table… /
-   Schematic…*), draw, and press **Copy Drawing** (where the browser does not let the page copy, the drawing's text
+1. Open the handwriting dialog (the Boolean Algebra editor's *Handwritten…*; in a development build *Development ▸
+   Handwritten Boolean Algebra… / Schematic…*), draw, and press **Copy Drawing** (where the browser does not let the page copy, the drawing's text
    is shown to copy by hand).
 2. Paste it into an issue (or straight into a new file here), with what it should read as.
 3. Save it here as `<kind>-<what>-<device>.json` (e.g. `schematic-and2-ipad.json`), and add to the object:

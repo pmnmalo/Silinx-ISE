@@ -1,4 +1,4 @@
--- lamps: combinational module generated from the truth table lamps.tt.json (Silinx Truth Table / Karnaugh Map).
+-- lamps: combinational module generated from the Boolean algebra lamps.tt.json (Silinx Boolean Algebra / Karnaugh Map).
 -- Edit the table, not this file: the file is generated from it. Inputs: phase2, phase1, phase0, blink (phase2 is the
 -- most significant bit of a row).
 --

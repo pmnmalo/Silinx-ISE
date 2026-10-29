@@ -55,7 +55,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   await page.eval(() => localStorage.removeItem('silinx.ink.samples'));
   await makeProject(env, { name: 'Ink', files: {} });
   await page.openProject('Ink');
-  await page.menu('Tools', 'Truth Table / Karnaugh Map…');
+  await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
   await page.waitDialog('New Source Wizard');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'hand');
@@ -66,7 +66,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   assert.equal(await page.eval(() => document.querySelector('.ns-tt-expr').value), "F = A·B' + C");
   await page.dialogButton('Next >');
   const summary = await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main pre')?.textContent, [], { what: 'the summary' });
-  assert.match(summary, /\nSource Type: Truth Table\nSource Name: hand\.tt\.json\n\nExpression: F = A·B' \+ C$/);
+  assert.match(summary, /\nSource Type: Boolean Algebra\nSource Name: hand\.tt\.json\n\nExpression: F = A·B' \+ C$/);
   await page.dialogButton('Finish');
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/hand.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
@@ -76,7 +76,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   const lines = (await page.consoleText()).split('\n');
   assert.deepEqual(lines.slice(lines.findIndex((l) => /^Project ".*" opened/.test(l)) + 1), [
     'src/hand.vhd generated from src/hand.tt.json (every source has its HDL)',
-    "Created Truth Table 'src/hand.tt.json'.",
+    "Created Boolean Algebra 'src/hand.tt.json'.",
   ]);
 
   // the editor's Handwritten… (#2010): the same expression written with the mouse, a finger and a pen

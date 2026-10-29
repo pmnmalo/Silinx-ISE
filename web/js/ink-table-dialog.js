@@ -1,4 +1,4 @@
-// The Handwritten Truth Table dialog (#1066): the user draws a truth table on the pad (ink-pad.js) — the names in a
+// The Handwritten Boolean Algebra dialog (#1066, named so #2017): the user draws a truth table on the pad (ink-pad.js) — the names in a
 // header, a line under it, a line between the inputs and the outputs, a row of 0, 1 or X for each combination — and
 // Silinx's own recognizer (core/ink/table.js, offline) reads it after each stroke into the table's text, which the
 // user corrects before it fills the table. The user's samples of their handwriting (ink-dialog.js) are used too.
@@ -13,7 +13,7 @@ import { inkTemplates } from './ink-dialog.js';
 import { readTable, tableFromText } from '/core/ink/table.js';
 import { InkError } from '/core/ink/segment.js';
 
-export function handwrittenTable({ check = () => null, title = 'Handwritten Truth Table' } = {}) {
+export function handwrittenTable({ check = () => null, title = 'Handwritten Boolean Algebra' } = {}) {
   const templates = inkTemplates();
   let timer = null;
   const text = h('textarea', { class: 'ink-table-text', spellcheck: 'false', rows: 8, placeholder: 'A B | F\n0 0 | 0\n0 1 | 1' });

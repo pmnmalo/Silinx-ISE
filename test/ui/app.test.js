@@ -375,7 +375,7 @@ uiTest('About shows the version and the GitHub link', E, async (page) => {
   assert.match(info.text, new RegExp(`Version ${VERSION.replace(/\./g, '\\.')}`));
   assert.ok(info.links.some((l) => l.href === `https://github.com/${REPOSITORY}` && l.target === '_blank'), JSON.stringify(info.links));
   // copyright, licence and the open-source components (collapsed, then opened)
-  assert.match(info.text, /Digital design platform for Xilinx FPGAs[\s\S]*made for teaching[\s\S]*FSM and ASM state machine editors[\s\S]*truth tables and Karnaugh maps[\s\S]*board emulator/);
+  assert.match(info.text, /Digital design platform for Xilinx FPGAs[\s\S]*made for teaching[\s\S]*FSM and ASM state machine editors[\s\S]*Boolean algebra: truth tables, expressions and Karnaugh maps[\s\S]*board emulator/);
   // what synthesizes and programs (#299): the Silinx toolchain, or ISE; programming from the browser too
   assert.ok(info.text.includes('a board emulator; synthesis, place & route and bitstreams with the Silinx toolchain (the Basys2 and Nexys2 boards) or with ISE 14.7; programming of the FPGA and its Platform Flash, also from the browser over USB.'), info.text);
   assert.ok(info.text.includes('Synthesis, place & route and bitstream generation use the Silinx toolchain (Yosys, and the place & route and bitstream writer of Silinx) for the Spartan-3E boards, or the Xilinx ISE 14.7 command-line tools.'), info.text);

@@ -53,7 +53,7 @@ uiTest('#1621 a view clicked again in the Design pane stays open and in front: e
   await page.eval(() => document.querySelectorAll('#hier ul[hidden]').forEach((u) => { u.hidden = false; }));
   const rows = await page.eval(() => [...document.querySelectorAll('#hier .row')].map((r) => ({ lbl: r.querySelector('.lbl')?.textContent.trim(), badges: [...r.querySelectorAll('.badge')].map((b) => b.textContent) })));
   const kinds = new Set(rows.flatMap((r) => r.badges));
-  for (const k of ['FSM', 'Table', 'Schematic', 'Petri', 'VHDL', 'Verilog', 'C', 'ASM']) assert.ok(kinds.has(k), `a ${k} badge`);
+  for (const k of ['FSM', 'Algebra', 'Schematic', 'Petri', 'VHDL', 'Verilog', 'C', 'ASM']) assert.ok(kinds.has(k), `a ${k} badge`);
   const opened = [];
   for (const [i, r] of rows.entries()) {
     const act = (how, b) => page.eval((i, b, how) => {

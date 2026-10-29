@@ -59,7 +59,7 @@ const answer = async (page, button = 'Yes', title = 'Remove Source') => {
 const DRAWN = [
   { kind: 'Petri net', file: 'src/ctl.pn.json', mod: 'ctl', ico: 'petri', badge: 'Petri', model: newPetri('ctl', 'vhdl') },
   { kind: 'schematic', file: 'src/gate.sch.json', mod: 'gate', ico: 'schematic', badge: 'Schematic', model: newDoc('gate', 'vhdl') },
-  { kind: 'truth table', file: 'src/maj.tt.json', mod: 'maj', ico: 'truthtable', badge: 'Table', views: ' [Schematic]', model: { ...newTable('maj', ['a', 'b', 'c'], ['f']), lang: 'vhdl', table: { f: '00010111' } } },
+  { kind: 'truth table', file: 'src/maj.tt.json', mod: 'maj', ico: 'truthtable', badge: 'Algebra', views: ' [Schematic]', model: { ...newTable('maj', ['a', 'b', 'c'], ['f']), lang: 'vhdl', table: { f: '00010111' } } },
   { kind: 'ASM chart', file: 'src/seq.asm.json', mod: 'seq', ico: 'asm', badge: 'ASM', model: newModel('seq', 'vhdl') },
   { kind: 'state diagram', file: 'src/st.fsm.json', mod: 'st', ico: 'fsm', badge: 'FSM', model: newFsm('st', 'vhdl') },
 ];

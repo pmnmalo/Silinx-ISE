@@ -87,7 +87,7 @@ export function mountFsmBottom(ctx) {
           h('td', { class: 'fsm-note' }, r.unused ? 'unused code' : `${r.state} → ${r.next}`))));
       const csv = [cols, ...et.rows.map((r) => [...r.q, ...r.in, ...r.d, ...r.out])];
       wrap.append(h('div', { class: 'fsm-tcap' }, h('b', {}, 'Encoded transition table'), csvButton(`${M().name}_encoded.csv`, csv),
-        btn('Create Truth Tables', 'Create truth tables (.tt.json) of the next-state bits and of the outputs, to simplify them with Karnaugh maps', () => opts.onTruthTables?.(), 'asm-small fsm-mktt')),
+        btn('Create Boolean Algebra', 'Create Boolean Algebra sources (.tt.json) of the next-state bits and of the outputs, to simplify them with Karnaugh maps', () => opts.onTruthTables?.(), 'asm-small fsm-mktt')),
       h('p', { class: 'asm-muted' }, `${et.stateBits.join(' ')}: present state (flip-flop outputs), ${et.nextBits.join(' ')}: next state (D flip-flop inputs). Unused codes: X (don't care).`), t3);
     }
     panelBody.append(wrap);
