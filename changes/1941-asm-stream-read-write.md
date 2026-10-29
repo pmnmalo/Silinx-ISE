@@ -1,8 +1,9 @@
 In short:
 
-- **Silinx HLS, the ASM chart of a C function:** a stream's read and write show as the C writes them,
-  `t = in.read()` and `out.write(s)`, with the FIFO's wait and handshake, instead of `<fiforead>` / `<fifowrite>`; a
-  floating-point constant shows as written (`0.5f`) instead of `<float>`.
+- **Silinx HLS, the ASM chart of a C function:** a stream's read and write show in the C's terms,
+  `ap_fifo_in_0 = in.read()` (the register the value is kept in) and `out.write(s)`, with the FIFO's wait and
+  handshake, instead of `<fiforead>` / `<fifowrite>`; a floating-point constant shows as written (`0.5f`) instead of
+  `<float>`.
 
 In detail:
 
