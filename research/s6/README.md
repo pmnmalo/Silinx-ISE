@@ -644,8 +644,11 @@ Recorded here because the work was planned without the author's answers (2026-10
 
 The Spartan-6 parts of the flow are behind a developer flag (#722): with `SILINX_SPARTAN6_OPEN=1` in the server's
 environment (`SILINX_SPARTAN6_OPEN=1 npm start`), a project on the Nexys3 or the Atlys in the Silinx toolchain mode
-runs the steps that exist (the synthesis for the Spartan-6 and its Post-Synthesis Simulation Model) and refuses the
-others; without it the Spartan-6 is refused as before. The browser edition has no flag.
+runs the steps that exist (the synthesis for the Spartan-6 and its Post-Synthesis Simulation Model; Map, Place &
+Route and the static timing, #732: `packages/silinx-fpga/src/open-flow-s6.js`, `fpga/s6/timing.js`) and refuses the
+others (the bitstream, next); without it the Spartan-6 is refused as before. The browser edition has no flag. On the
+Nexys3 with its UCF, blinky places in 0.9 s and routes in 0.4 s (54 slices, 5.6 ns against its 10 ns), stopwatch in
+2.2 s and 0.8 s (84 slices, a RAMB8BWER and three DSP48A1s, 8.9 ns).
 
 ## Files
 
