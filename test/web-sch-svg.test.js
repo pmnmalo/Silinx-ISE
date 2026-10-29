@@ -241,9 +241,9 @@ test('#1486 schematic drawing: a gate wider than a bit, its width at its input a
         return { x: r1(p.x + d * v[0]), y: r1(p.y + d * v[1] + 3), w: '8' };
       });
       assert.deepEqual(widths(svg), at, what);
-      // nothing in the shape: no pin name, no other text but the type under it
+      // no pin name, no other text but the type (inside or under it, #2041; BUFE's under it)
       assert.doesNotMatch(svg, /class="pname"/, what);
-      assert.deepEqual([...svg.matchAll(/<text class="(\w+)/g)].map((m) => m[1]).filter((c) => c !== 'pwidth'), type === 'tbuf' ? [] : ['stype'], what);
+      assert.deepEqual([...svg.matchAll(/<text class="(\w+)/g)].map((m) => m[1]).filter((c) => c !== 'pwidth'), ['stype'], what);
     }
     const one = { id: 'S1', type, x: 200, y: 100, rot: 0, mirror: false, name: 'U1', params: { ...defaultParams(type), width: 1 } };
     assert.deepEqual(widths(symbolSvg(one, symbolDef(one))), [], `${type} one bit`);

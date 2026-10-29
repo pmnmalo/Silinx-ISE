@@ -221,21 +221,28 @@ uiTest('#1815 schematic: a bus tap\'s Properties refuse an MSB below its LSB (an
   }
 });
 
-// #2036: a name the user gives a symbol drawn inside its shape (its body's centre): a gate, an inverter, a multiplexer,
-// a flip-flop, turned too; a name too long for the body above it, as before
-uiTest('#2036 schematic: the instance name inside the symbol\'s shape (gates, INV, MUX, FDCE, turned); a long one above it', E, async (page) => {
+// #2041 (#2036 corrected): a symbol's type (AND2, INV, M2_1, BUFE, FDCE…) drawn inside its shape, turned symbols too; the
+// name the user gives it above it, as before #2036; a type a little long for the body squeezed to it (NAND3B3); a turned
+// inverter's beside it (a triangle 20 px across)
+uiTest('#2041 schematic: the symbol\'s type inside its shape (gates, INV, MUX, FDCE, turned; BUFE under it), the instance name above it', E, async (page) => {
   const doc = newDoc('inside', 'vhdl');
-  const add = (type, x, y, name, rot = 0) => doc.symbols.push({ id: `S${doc.symbols.length + 1}`, type, x, y, rot, mirror: false, name, params: { width: 1 } });
+  const add = (type, x, y, name, rot = 0, params = {}) => doc.symbols.push({ id: `S${doc.symbols.length + 1}`, type, x, y, rot, mirror: false, name, params: { width: 1, ...params } });
   add('and2', 100, 60, 'u1'); add('inv', 260, 70, 'n1'); add('mux2', 400, 60, 'm1'); add('fdce', 100, 220, 'ff1'); add('or2', 300, 240, 'g2', 90);
-  add('and2', 450, 240, 'a_very_long_instance_name');
+  add('nand3b3', 450, 240, 'a_very_long_instance_name'); add('tbuf', 600, 60, 'b1', 0, { enable: 'E' }); add('inv', 620, 220, 'n2', 90);
   await makeProject(env, { name: 'Inside', files: { 'src/inside.sch.json': JSON.stringify(doc) } });
   await page.openProject('Inside');
   await page.eval(() => window.SilinxApp.openSch('src/inside.sch.json'));
-  await page.waitFor((ed) => document.querySelectorAll(`${ed} svg .sym`).length === 6, [ED], { what: 'the symbols drawn' });
+  await page.waitFor((ed) => document.querySelectorAll(`${ed} svg .sym`).length === 8, [ED], { what: 'the symbols drawn' });
   const where = await page.eval((ed) => [...document.querySelectorAll(`${ed} svg .sym`)].map((g) => {
-    const t = g.querySelector('.iname'), body = g.querySelector('.hitbox').getBBox(), r = t.getBBox();
-    const inBox = r.x >= body.x - 0.5 && r.x + r.width <= body.x + body.width + 0.5 && r.y >= body.y - 0.5 && r.y + r.height <= body.y + body.height + 0.5;
-    return `${t.textContent}:${t.classList.contains('inside') ? 'inside' : 'above'}:${inBox ? 'in' : 'out'}:${r.y + r.height <= body.y + 0.5 ? 'over' : ''}`;
+    const box = g.querySelector('.hitbox').getBBox();
+    const place = (t) => {
+      const r = t.getBBox();
+      const inBox = r.x >= box.x - 0.5 && r.x + r.width <= box.x + box.width + 0.5 && r.y >= box.y - 0.5 && r.y + r.height <= box.y + box.height + 0.5;
+      return inBox ? 'in' : r.y + r.height <= box.y + 0.5 ? 'over' : r.y >= box.y + box.height - 0.5 ? 'under' : 'beside';
+    };
+    const n = g.querySelector('.iname'), t = g.querySelector('.stype');
+    return `${n.textContent}:${place(n)} ${t.textContent}:${place(t)}${t.getAttribute('textLength') ? ' squeezed' : ''}`;
   }), ED);
-  assert.deepEqual(where, ['u1:inside:in:', 'n1:inside:in:', 'm1:inside:in:', 'ff1:inside:in:', 'g2:inside:in:', 'a_very_long_instance_name:above:out:over']);
+  assert.deepEqual(where, ['u1:over AND2:in', 'n1:over INV:in', 'm1:over M2_1:in', 'ff1:over FDCE:in', 'g2:over OR2:in',
+    'a_very_long_instance_name:over NAND3B3:in squeezed', 'b1:over BUFE:under', 'n2:over INV:beside']);
 });
