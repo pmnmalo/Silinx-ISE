@@ -39,7 +39,7 @@ function liveController(ctx, live) {
   const nl = live.nl;
   let radix = 'hex';
   try { radix = localStorage.getItem(prefKey('xl.sch.liveRadix')) || 'hex'; } catch { /* default */ }
-  if (!['hex', 'dec', 'bin'].includes(radix)) radix = 'hex';
+  if (!['hex', 'bin', 'dec', 'sdec', 'c1dec'].includes(radix)) radix = 'hex';
   let last = new Map();           // net id -> painted signature
   let wireEls = new Map();        // wire id -> <g class="wire">
   let junctionNet = [];           // [{ el, net }]
@@ -80,7 +80,9 @@ function liveController(ctx, live) {
   const tEl = h('span', { class: 'lv-time', 'data-no-i18n': '' });
   const errEl = h('span', { class: 'lv-err', hidden: true });
   const radixSel = h('select', { class: 'lv-radix', title: 'Number format of the bus values' },
-    h('option', { value: 'hex', text: 'Hex' }), h('option', { value: 'dec', text: 'Decimal' }), h('option', { value: 'bin', text: 'Binary' }));
+    h('option', { value: 'hex', text: 'Hex' }), h('option', { value: 'bin', text: 'Binary' }),
+    // (the decimal readings of a bus, as the simulator's, #2015)
+    h('option', { value: 'dec', text: 'Decimal (Unsigned)' }), h('option', { value: 'sdec', text: "Decimal (Two's Complement)" }), h('option', { value: 'c1dec', text: "Decimal (One's Complement)" }));
   radixSel.value = radix;
   radixSel.addEventListener('change', () => { radix = radixSel.value; try { localStorage.setItem(prefKey('xl.sch.liveRadix'), radix); } catch { /* ignore */ } update(true); });
   const clocks = live.inputs.filter(i => i.clock);

@@ -50,7 +50,8 @@ export function mountLiveInputs(parts) {   // (parts: ctx is the editor's, as in
     const setv = n => (bd ? live.drive(portId, n) : live.set(portId, n));
     const pos = ctx.toCanvas({ x: p.x - 30, y: p.y + 10 });
     const field = h('input', { type: 'text', class: 'lv-edit-in', spellcheck: 'false' });
-    const rsel = h('select', { title: 'Number format' }, h('option', { value: 'bin', text: 'Bin' }), h('option', { value: 'hex', text: 'Hex' }), h('option', { value: 'dec', text: 'Dec' }));
+    const rsel = h('select', { title: 'Number format' }, h('option', { value: 'bin', text: 'Bin' }), h('option', { value: 'hex', text: 'Hex' }), h('option', { value: 'dec', text: 'Dec' }),
+      h('option', { value: 'sdec', text: "Dec (two's)" }), h('option', { value: 'c1dec', text: "Dec (one's)" }));   // (two's / one's complement, #2015)
     rsel.value = radix();
     const show = () => { field.value = fmtValue(live.portValue(portId), rsel.value).replace(/^X+$|^Z+$/, ''); };
     const apply = () => {

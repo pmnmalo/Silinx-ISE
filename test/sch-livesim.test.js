@@ -438,3 +438,19 @@ for (const lang of ['vhdl', 'verilog']) {
     assert.deepEqual(back.symbols.map(x => [x.type, x.params.width ?? x.params.n]).sort(), [['decoder', 2], ['fdce', 4], ['mux2', 4]]);
   });
 }
+
+test('#2015 Try it: a bus as a decimal unsigned, in two\'s complement, in one\'s complement; typed back the same way', () => {
+  const v = (w, n) => ({ w, v: BigInt(n), x: 0n });
+  const all = (x) => ['dec', 'sdec', 'c1dec'].map((r) => fmtValue(x, r));
+  assert.deepEqual(all(v(4, 0b1110)), ['14', '-2', '-1']);
+  assert.deepEqual(all(v(4, 0b1111)), ['15', '-1', '-0']);
+  assert.deepEqual(all(v(4, 0b1000)), ['8', '-8', '-7']);
+  assert.deepEqual(all(v(4, 0b0101)), ['5', '5', '5']);
+  assert.deepEqual(all(v(8, 0x80)), ['128', '-128', '-127']);
+  // X and Z: the letter, whatever the decimal reading
+  assert.deepEqual(all({ w: 4, v: 0n, x: 0b0001n }), ['X', 'X', 'X']);
+  // a 1-bit value: its bit, in any format (a wire is never -1)
+  assert.deepEqual(['hex', 'dec', 'sdec', 'c1dec'].map((r) => fmtValue(v(1, 1), r)), ['1', '1', '1', '1']);
+  // typed: a negative decimal its two's complement, or its one's complement in c1dec
+  assert.deepEqual([parseValue('-2', 4, 'sdec'), parseValue('-1', 4, 'c1dec'), parseValue('-0', 4, 'c1dec'), parseValue('7', 4, 'c1dec'), parseValue('-8', 4, 'sdec')], [14n, 14n, 15n, 7n, 8n]);
+});

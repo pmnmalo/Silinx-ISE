@@ -33,14 +33,21 @@ export function level(v) {
   return v.v ? '1' : '0';
 }
 
-/** Text of a value: 1 bit as 0/1/X/Z, a bus in hex / dec / bin (X / Z digits kept). */
+/** Text of a value: 1 bit as 0/1/X/Z, a bus in hex / bin / decimal: dec unsigned, sdec two's complement, c1dec one's
+ *  complement (1110 = -1, 1111 = -0, #2015) (X / Z digits kept). */
+export const DEC_RADIXES = ['dec', 'sdec', 'c1dec'];
 export function fmtValue(v, radix = 'hex') {
   if (v == null) return '';
   if (Array.isArray(v)) return '…';
   if (!isVal(v)) return String(v.str ?? '');
-  if (v.w === 1 && radix !== 'dec') return V.toBin(v).toUpperCase();
+  const dec = DEC_RADIXES.includes(radix);
+  if (v.w === 1) return V.toBin(v).toUpperCase();   // (a wire: its bit, 1 never -1)
   if (radix === 'bin') return V.toBin(v).toUpperCase();
-  if (radix === 'dec') { const d = V.toDec(v, false); return d === 'x' || d === 'X' ? (level(v) === 'z' ? 'Z' : 'X') : d; }
+  if (dec) {
+    if (v.x) return level(v) === 'z' ? 'Z' : 'X';
+    if (radix === 'c1dec' && V.msb(v)) return `-${(~v.v & V.mask(v.w)).toString()}`;
+    return V.toDec(v, radix === 'sdec');
+  }
   return `${V.toHex(v)}`;
 }
 
@@ -58,7 +65,8 @@ export function parseValue(text, width, radix = 'dec') {
   try {
     if (base === 16) { if (!/^[0-9a-f]+$/i.test(s)) return null; n = BigInt(`0x${s}`); }
     else if (base === 2) { if (!/^[01]+$/.test(s)) return null; n = BigInt(`0b${s}`); }
-    else { if (!/^-?\d+$/.test(s)) return null; n = BigInt(s); }
+    // (a negative decimal: its two's complement, or its one's complement in c1dec, #2015)
+    else { if (!/^-?\d+$/.test(s)) return null; n = radix === 'c1dec' && s[0] === '-' ? ~BigInt(s.slice(1)) : BigInt(s); }
   } catch { return null; }
   return BigInt.asUintN(width, n);
 }
