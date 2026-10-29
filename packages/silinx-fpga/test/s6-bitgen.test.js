@@ -1,15 +1,16 @@
 // packages/silinx-fpga/src/fpga/s6/bitgen*.js and bitdb-node.js (#732): the Spartan-6's configuration bits of a design
 // from the bit databases measured in research/s6 (bitdb/s6), moved into the toolchain as they were. The databases
 // read for both parts, the regions of the frame data, a slice's and a pad's bits as their databases give them, a
-// design's bits the union of its instances' and its PIPs', and what the databases do not know named.
+// design's bits the union of its instances' and its PIPs', and what the databases do not know named; its .bit
+// (bitstreamS6) with them and the block RAM's frame bitgen writes again.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadBitDbS6 } from '../src/fpga/s6/bitdb-node.js';
-import { predictDesign, predictIob, padBit } from '../src/fpga/s6/bitgen.js';
+import { predictDesign, predictIob, padBit, bramRewrites, bitstreamS6 } from '../src/fpga/s6/bitgen.js';
 import { kindModel, predictSlice, lutEntries, baseSettings } from '../src/fpga/s6/bitgen-slice.js';
 import { tileRegion, gridRegion, columnOf } from '../src/fpga/s6/bitgen-regions.js';
 import { pipLookup } from '../src/fpga/s6/bitgen-pips.js';
-import { bitFormat6 } from '../src/fpga/s6/bitstream.js';
+import { bitFormat6, emptyFdri, readBit6, FRAME_WORDS } from '../src/fpga/s6/bitstream.js';
 import { s6Sites } from '../src/fpga/s6/sites.js';
 import { loadDeviceCache } from '../src/fpga/device-node.js';
 
@@ -80,4 +81,35 @@ test('bitgen: a pad\'s bits by its settings, a design\'s the union of its instan
   // a PIP the databases do not have: named, no bits
   const u = predictDesign({ insts: [], nets: [{ name: 'n', outpins: [], inpins: [], pips: [{ tile: 'NOSUCH_X1Y1', from: 'A', dir: '->', to: 'B' }] }] }, device, dev, db);
   assert.deepEqual([u.bits.size, [...u.unknown]], [0, [['NOSUCH A -> B', 1]]]);
+});
+
+test('bitgen: the block RAM\'s frame written again (minor 23 of its column, two bits cleared, a pad frame), the unmeasured named', () => {
+  const site = s6Sites(device).brams[0], ramb8 = { name: 'r', type: 'RAMB8BWER', site: site.r8[0], tile: site.tile, placed: true, cfg: [] };
+  const fdri = emptyFdri(dev).slice().fill(0xffff), [f0, b0] = gridRegion(device, dev, site.tile), w = (b0 >> 4) - 12;
+  const r = bramRewrites({ insts: [ramb8], nets: [] }, device, dev, fdri);
+  assert.deepEqual(r.unknown, []);
+  assert.equal(r.rewrites.length, 1);
+  const x = r.rewrites[0], row = Math.floor(f0 / dev.rowFrames);
+  assert.equal(x.far[1], 23);
+  assert.equal(x.far[0] >> 8, row);
+  assert.equal(x.words.length, 2 * FRAME_WORDS);
+  assert.deepEqual([x.words[w], x.words[w + 15]], [0xfffd, 0xbfff]);
+  assert.equal(x.words.filter(v => v === 0xffff).length, 2 * FRAME_WORDS - 2);
+  // two block RAMs, or a RAMB16BWER: not measured
+  assert.match(bramRewrites({ insts: [ramb8, { ...ramb8, name: 's', site: site.r8[1] }], nets: [] }, device, dev, fdri).unknown[0], /^2 block RAMs/);
+  assert.match(bramRewrites({ insts: [{ ...ramb8, type: 'RAMB16BWER', site: site.r16 }], nets: [] }, device, dev, fdri).unknown[0], /^a RAMB16BWER/);
+  assert.deepEqual(bramRewrites({ insts: [], nets: [] }, device, dev, fdri), { rewrites: [], unknown: [] });
+});
+
+test('bitgen: a design\'s .bit, its frame data the empty device\'s with the design\'s bits; a DCM named as not measured', () => {
+  const slice = [...s6Sites(device).slices.values()].find(s => s.kind === 'L');
+  const design = { insts: [{ name: 's', type: 'SLICEL', site: slice.name, tile: slice.tile, placed: true, cfg: cfg({ A6LUT: '#LUT:O6=A1' }) }], nets: [] };
+  const { bytes, unknown } = bitstreamS6(design, device, db, { name: 'm.ncd;UserID=0xFFFFFFFF', date: '2026/10/29', time: '12:00:00', crc: true, startupClk: 'JtagClk' });
+  assert.deepEqual([...unknown], []);
+  const r = readBit6(bytes), empty = emptyFdri(dev), set = [];
+  assert.deepEqual([r.header.a, r.header.b, r.header.c, r.crc, r.startupClk], ['m.ncd;UserID=0xFFFFFFFF', '6slx16csg324', '2026/10/29', true, 'JtagClk']);
+  for (let w = 0; w < r.fdri.length; w++) { const x = r.fdri[w] ^ empty[w]; for (let i = 0; i < 16; i++) if ((x >> (15 - i)) & 1) set.push(`${Math.floor(w / FRAME_WORDS)},${(w % FRAME_WORDS) * 16 + i}`); }
+  assert.deepEqual(set.sort(), [...predictDesign(design, device, dev, db).bits].sort());
+  const dcm = bitstreamS6({ insts: [{ name: 'd', type: 'DCM', site: 'DCM_X0Y0', tile: 'CMT_DCM_BOT_X11Y8', placed: true, cfg: [] }], nets: [] }, device, db);
+  assert.ok([...dcm.unknown.keys()].some(k => /^DCM DCM_X0Y0: a clock manager's bits not measured/.test(k)));
 });

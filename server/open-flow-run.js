@@ -9,7 +9,7 @@
 // build/open/report.json after every step (what the Design Summary shows).
 import fs from 'node:fs';
 import path from 'node:path';
-import { yosysWorkers, loadDeviceCache, loadDb } from '../packages/silinx-fpga/src/node.js';
+import { yosysWorkers, loadDeviceCache, loadDb, loadBitDbS6 } from '../packages/silinx-fpga/src/node.js';
 import { runOpenFlow } from '../core/flow-ide.js';
 
 const spec = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -26,7 +26,8 @@ const io = {
   ucf: spec.ucf ? fs.readFileSync(spec.ucf, 'utf8') : null,
   ucfName: spec.ucf ? path.basename(spec.ucf) : null,
   device: () => (dev ||= loadDeviceCache(spec.graph)),
-  bitDb: () => (db ||= loadDb(`${spec.device}${spec.pkg}`, { graph: io.device(), dir: spec.bitDbDir })),
+  // (the Spartan-6's bit databases, packages/silinx-fpga/bitdb/s6, #732)
+  bitDb: () => (db ||= spec.family === 'spartan6' ? loadBitDbS6(spec.part) : loadDb(`${spec.device}${spec.pkg}`, { graph: io.device(), dir: spec.bitDbDir })),
   yosys: yosysWorkers(),   // (the synthesis's mappings from the same netlist in parallel, #86)
   write: (name, data) => {
     const f = fileOf(name);
