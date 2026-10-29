@@ -429,11 +429,12 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   flip-flop): a SLICEM as a shift register or RAM on a clock sets minors 16 to 19 of its column's clock row word (bit
   527), a flip-flop does not. With it the examples' residual (both boards) has no clock bit left: only the block RAM's
   and DSP's (stopwatch's, #728).
-- **Left for #727**: a DCM's or PLL's own clock path, which their designs leave over: the pad's input to the CMT
-  (BUFIO2, in the I/O tile and the centre's column, and a bit of the pad's I/O words), the BUFGs' inputs from the CMT
-  (REGC bits) and the CMT's settings themselves (frame 357: 179 bits of the base); the PIP drop of the DCM and PLL
-  designs (8 more) brings the PIPs to 659 but these are sites' settings, not PIPs: designs from other pads and to
-  other BUFGs take them apart.
+- **A DCM's and a PLL's clock path** (`gen-dcm6.mjs --paths`: the base from the clock pads U10, T9, R8 and to BUFGs at
+  three other BUFGMUXes, 12 designs; `ana-cmt6.mjs`, `cmt6.mjs`: `db/xc6slx16-cmt-paths.json`): a design's bits beyond
+  the other databases' are the base's (the CMT's settings, its input from V10, its outputs' BUFGs) with its pad's
+  change (5 bits of the pad's I/O words, its I/O tile's path, the CMT's input selection) and its BUFGMUX's (2 bits of
+  the REGC frame, the centre column's path). Two designs of combinations never measured (U10 to BUFGMUX_X2Y1, T9 to
+  X2Y9) are predicted bit for bit (142 and 187 bits). The other CMT sites, pads and BUFGs, and the XC6SLX45's: #1951.
 - **The CMT sites**: a DCM's or a PLL's bits are at minor 30 of the CMT column (the XC6SLX16's column 12, frame 357
   in row 0; the XC6SLX45's column 19, 565) in its site's row, the same bits on both parts; a DCM of even Y (DCM_X0Y0,
   X0Y2) has them 283 bits on (measured on DCM_X0Y0 / X0Y2 / X0Y3 and PLL_ADV_X0Y1, and on the XC6SLX45).
@@ -534,6 +535,7 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `gen-iob6.mjs` | The pads' designs: every bonded pad an IOB of one setting, the id designs (#727) |
 | `gen-clock6.mjs` | The clock path's designs (ISE implements them): one or more clocks to fixed flip-flops, k16 (#727) |
 | `ana-clock6.mjs` | A clock pad's REGC and I/O bits, the spines' PIP groups: `db/s6-clocks.json`, `db/s6-pips-clock.json` (#727) |
+| `ana-cmt6.mjs`, `cmt6.mjs` | A DCM's and PLL's clock path: `db/xc6slx16-cmt-paths.json`; the shared helpers (#727) |
 | `gen-dcm6.mjs` | The DCM's and PLL's designs, one setting per design (`--fields`: the counters' bits) (#727) |
 | `ana-dcm6.mjs` | Their settings' bits: `db/<device>-cmt.json` (#727) |
 | `gen-iologic6.mjs` | The I/O logic's route-throughs on every site (they set no bits without a net) (#727) |

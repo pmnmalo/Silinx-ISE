@@ -123,3 +123,31 @@ test('a SLICEM as a shift register on a clock: minors 16 to 19 of its column\'s 
   assert.ok(!predictDesign(srl('A6LUT:s.A:#RAM:O6=0x0000000000000000 A6RAMMODE::SRL16'), device, dev, db).bits.has(want[0]));
   assert.ok(!predictDesign(srl('A6LUT:s.A:#LUT:O6=A1 AFF:s.f:#FF CLKINV::CLK'), device, dev, db).bits.has(want[0]));
 });
+
+test('cmt6: a DCM\'s clock pad and BUFGs from its nets; its bits, the base\'s with the pad\'s and the BUFG\'s changes', async () => {
+  const { cmtPath, cmtCfg, predictCmt } = await import('../research/s6/cmt6.mjs');
+  const { parseXdl } = await import('../core/xdl.js');
+  const design = parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";
+inst "clk" "IOB",placed BIOB_X12Y0 U10 , cfg " PAD:clk: " ;
+inst "io" "BUFIO2",placed REG_B_X1Y0 BUFIO2_X1Y1 , cfg " " ;
+inst "cm" "DCM",placed CMT_DCM_BOT_X11Y8 DCM_X0Y1 , cfg " CLKFX_MULTIPLY::2 CLKDV_DIVIDE::2.0 _NO_X:: " ;
+inst "bo" "BUFG",placed CLKC_X11Y31 BUFGMUX_X2Y1 , cfg " BUFG:bo: " ;
+net "a" , outpin "clk" I , inpin "io" I , ;
+net "b" , outpin "io" DIVCLK , inpin "cm" CLKIN , ;
+net "c" , outpin "cm" CLKFX , inpin "bo" I0 , ;
+`);
+  const cm = design.insts.find(i => i.name === 'cm');
+  assert.deepEqual(cmtPath(design, cm), { pad: 'U10', bufgs: ['BUFGMUX_X2Y1'] });
+  assert.equal(cmtCfg(cm), 'CLKDV_DIVIDE::2.0 CLKFX_MULTIPLY::2');
+  const kind = { basePad: 'V10', baseBufgs: ['BUFGMUX_X3Y13'], base: ['1,1', '2,2', '3,3'], pads: { U10: { set: ['4,4'], clear: ['1,1'] } }, bufgs: { BUFGMUX_X2Y1: { set: ['5,5'], clear: ['3,3'] } } };
+  assert.deepEqual([...predictCmt(kind, { pad: 'U10', bufgs: ['BUFGMUX_X2Y1'] })].sort(), ['2,2', '4,4', '5,5']);
+  assert.deepEqual([...predictCmt(kind, { pad: 'V10', bufgs: ['BUFGMUX_X3Y13'] })].sort(), ['1,1', '2,2', '3,3']);
+  assert.equal(predictCmt(kind, { pad: 'K3', bufgs: [] }), null);
+  assert.equal(predictCmt(kind, { pad: 'V10', bufgs: ['BUFGMUX_X3Y16'] }), null);
+  // the measured database: three other pads and three other BUFGMUXes for each
+  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-cmt-paths.json', import.meta.url), 'utf8'));
+  assert.deepEqual(Object.keys(db.dcm.pads).sort(), ['R8', 'T9', 'U10']);
+  assert.equal(db.dcm.site, 'DCM_X0Y1');
+  assert.equal(db.pll.site, 'PLL_ADV_X0Y0');
+  assert.equal(Object.keys(db.pll.bufgs).length, 3);
+});

@@ -16,6 +16,7 @@ import { pipDirections, pipLookup } from './check-pips6.mjs';
 import { tileRegion } from './ana-pipprobe6.mjs';
 import { gridRegion } from './ana-pipdrop6.mjs';
 import { columnOf } from './ana-slice6.mjs';
+import { cmtCfg, cmtPath, predictCmt } from './cmt6.mjs';
 
 const INT_LIKE = /^(INT|INT_BRK|INT_BRAM|INT_BRAM_BRK|IOI_INT|LIOI_INT|INT_GCLK)_X/;
 const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8'));
@@ -94,6 +95,16 @@ export function predictDesign(design, device, dev, db) {
       for (let m = 16; m < 20; m++) bits.add(`${c0 + m},527`);
     }
   }
+  // a DCM or PLL at the site measured, with the base's settings: the base's bits with its pad's and BUFGs' changes
+  if (db.cmt) {
+    for (const inst of design.insts) {
+      const kind = { DCM: db.cmt.dcm, PLL_ADV: db.cmt.pll }[inst.type];
+      if (!kind || !inst.placed) continue;
+      const p = kind.site === inst.site && kind.cfg === cmtCfg(inst) ? predictCmt(kind, cmtPath(design, inst)) : null;
+      if (!p) { note(`${inst.type} ${inst.site} (its settings or clock path not measured)`); continue; }
+      for (const x of p) bits.add(x);
+    }
+  }
   for (const net of design.nets) {
     const dirs = (net.pips || []).some(p => p.dir === '=-') ? pipDirections(device, net, design) : null;
     (net.pips || []).forEach((p, i) => {
@@ -144,7 +155,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const part = `${r6.device.device}${r6.device.part.slice(r6.device.device.length - 2)}-3`, { device } = s6Device(part);
     const design = parseXdl(fs.readFileSync(path.join(dir, 'top.xdl'), 'utf8'));
     const iobFile = new URL(`./db/${r6.device.device}-iob.json`, import.meta.url), iob = fs.existsSync(iobFile) ? JSON.parse(fs.readFileSync(iobFile, 'utf8')) : null;
-    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob, clocks: read('s6-clocks') });
+    const cmtFile = new URL(`./db/${r6.device.device}-cmt-paths.json`, import.meta.url), cmt = fs.existsSync(cmtFile) ? JSON.parse(fs.readFileSync(cmtFile, 'utf8')) : null;
+    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob, clocks: read('s6-clocks'), cmt });
     for (const [w, n] of u) unknown.set(w, (unknown.get(w) || 0) + n);
     const empty = emptyFdri(dev), rows = dev.rows * dev.rowFrames * FRAME_WORDS, iobStart = (dev.rows * dev.rowFrames + dev.bramFrames) * FRAME_WORDS, have = new Set(), w0 = typesAt(device, dev);
     const where = (f, b) => (f >= dev.rows * dev.rowFrames + dev.bramFrames ? 'IOB words' : w0(f, b));
