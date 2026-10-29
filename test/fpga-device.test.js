@@ -115,6 +115,11 @@ test('base64: round trip of bytes of every length (no Buffer or btoa needed in t
   }
   assert.equal(toBase64(new Uint8Array([77, 97, 110])), 'TWFu');
   assert.throws(() => fromBase64('a*b'), /bad base64/);
+  // (#2011: linear on many '=' not at the end, CodeQL js/polynomial-redos; the padding still cut)
+  const t = performance.now();
+  assert.throws(() => fromBase64(`${'='.repeat(200000)}x`), /bad base64/);
+  assert.ok(performance.now() - t < 1000);
+  assert.deepEqual(Array.from(fromBase64('TQ==')), [77]);
 });
 
 test('device-node: the cache is built from the report file, gzipped, and loads back', async () => {

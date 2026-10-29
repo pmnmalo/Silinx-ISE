@@ -130,7 +130,7 @@ test('#795 MAP: every resource used of the device\'s sites (block RAMs, multipli
   const text = `module top(input clk, input [17:0] a, input [17:0] b, input [1:0] c, output [9:0] q);
 genvar i;
 generate for (i = 0; i < 4; i = i + 1) begin : g
-${BRAM.replace('q[i]', 'q[i]')}
+${BRAM}
 end endgenerate
 generate for (i = 0; i < 4; i = i + 1) begin : h
 ${MULT.replace('q[i]', 'q[4 + i]')}

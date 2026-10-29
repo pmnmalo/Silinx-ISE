@@ -199,3 +199,10 @@ test('writeXdl: the one XDL writer, for designs built by the packer / placer (no
   assert.equal(back.cfgRaw, d.cfg);
   assert.deepEqual(back.nets.map(n => [n.name, n.type, n.pips.length]), [['n', 'wire', 1], ['gnd', 'gnd', 0]]);
 });
+
+test('#2011 parseXdl: a quoted string with no closing quote is an error, at once (CodeQL js/polynomial-redos); escapes kept', () => {
+  const t = performance.now();
+  assert.throws(() => parseXdl(`design "top" xc3s100ecp132-4 v3.2 , cfg "${'\\"!'.repeat(70000)}`), /no closing quote/);
+  assert.ok(performance.now() - t < 1000);
+  assert.throws(() => parseXdl('design "top xc3s100ecp132-4 v3.2 ;'), /XDL: a quoted string with no closing quote: "top xc3s100ecp132-4 v3\.2 ;/);
+});

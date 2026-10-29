@@ -480,3 +480,17 @@ test('ucfPlacesPins: a LOC on any net places the pins; no UCF, an empty one, com
   for (const none of [null, undefined, '', '# nothing yet\n', 'NET "clk" IOSTANDARD = LVCMOS33;', 'NET "clk" TNM_NET = "clk";\nTIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50%;'])
     assert.equal(ucfPlacesPins(none), false, JSON.stringify(none));
 });
+
+test('#2011 normalizePort, periodNs, backAnnotateUcf: linear on a long run of spaces (CodeQL js/polynomial-redos), same results', () => {
+  const sp = ' '.repeat(100000), ms = f => { const t = performance.now(); f(); return performance.now() - t; };
+  assert.ok(ms(() => assert.throws(() => normalizePort(`A${sp}x`), /bad port spec/)) < 1000);
+  assert.ok(ms(() => assert.throws(() => periodNs(`.${sp}x`), /bad clock period/)) < 1000);
+  assert.ok(ms(() => backAnnotateUcf(`${sp}x`, 'NET "led" LOC = "P1";')) < 1000);
+  // (the spaces around still allowed)
+  assert.deepEqual(normalizePort('  led [7:0]  '), { name: 'led', msb: 7, lsb: 0, width: 8, bus: true });
+  assert.deepEqual(normalizePort(' clk '), { name: 'clk', msb: null, lsb: null, width: 1, bus: false });
+  assert.equal(periodNs(' 50 MHz '), 20);
+  assert.equal(periodNs('20ns'), 20);
+  assert.equal(backAnnotateUcf('NET "clk" LOC = "B8";  \n\n ', 'NET "led" LOC = "P1";', { date: 'D' }).text,
+    'NET "clk" LOC = "B8";\n\n# Back-annotated pin locations (pin2ucf, D)\nNET "led" LOC = "P1";\n');
+});
