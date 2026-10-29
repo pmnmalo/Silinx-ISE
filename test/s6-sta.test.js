@@ -1,11 +1,12 @@
 // research/s6 stage S6-G (#731), without ISE: the static timing of a routed Spartan-6 design (sta6.mjs). A slice's
 // arcs from its settings (the LUTs' equations, the output multiplexers, the carry chain stage by stage, the
 // flip-flops and the second ones, a flip-flop set as a gate), a block RAM's and a DSP48A1's, the arcs' delays by site
-// class, the PERIOD analysis on a small design against a hand count; reportgen's loads by logical pin
+// class, the PERIOD and OFFSET IN / OUT analyses on a small design against a hand count, trce's OFFSET sections read; reportgen's loads by logical pin
 // (timing-fit6.mjs loadDelay) and the wire model by wire type (fitWires).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sliceArcs6, hardArcs6, lutInputs, periodSlack, siteClass, classArcs, ARC_DEFAULTS } from '../research/s6/sta6.mjs';
+import { sliceArcs6, hardArcs6, lutInputs, periodSlack, offsetIn, offsetOut, siteClass, classArcs, ARC_DEFAULTS } from '../research/s6/sta6.mjs';
+import { parseOffsets } from '../research/s6/twr6.mjs';
 import { loadDelay, fitWires, wireType } from '../research/s6/timing-fit6.mjs';
 
 const slice = (cfg, site = 'SLICE_X2Y2', type = 'SLICEL') => ({ name: 's', type, site, tile: 'CLEXL_X1Y2', cfg: Object.entries(cfg).map(([attr, value]) => ({ attr, name: '', value })) });
@@ -104,4 +105,43 @@ test('timing-fit6: the wire model by wire type, found back from its delays', () 
   assert.deepEqual(m.vocab, ['EE#B#', 'NN#B#']);
   assert.equal(+m.predict(c(2, 1)).toFixed(6), 0.5);
   assert.equal(+m.predict(c(0, 0)).toFixed(6), 0);
+});
+
+test('sta6: a shift register\'s data in before the clock and its output after it; the OFFSET IN and OUT of a small design', () => {
+  const srl = sliceArcs6(slice({ A6LUT: '#RAM:O6=0x0', A6RAMMODE: 'SRL16', AOUTMUX: 'O6' }, 'SLICE_X2Y2', 'SLICEM'));
+  assert.deepEqual(srl.setup.map(x => x[0]), ['AI']);
+  assert.deepEqual(srl.clkToOut.map(x => x[0]), ['A', 'AMUX']);
+  // pad i -> l.A1 -> l.A -> f.D (setup through the LUT); f.AQ -> pad o's O
+  const xdl = {
+    insts: [{ name: 'i', type: 'IOB', site: 'P1', cfg: [] }, { name: 'o', type: 'IOB', site: 'P2', cfg: [] }, { ...slice({ A6LUT: '#LUT:O6=A1' }), name: 'l' }, { ...slice({ D6LUT: '#LUT:O6=A1', DFF: '#FF', DFFMUX: 'O6', AFF: '#FF', AFFMUX: 'AX' }), name: 'f' }],
+    nets: [
+      { name: 'clk', outpins: [{ inst: 'g', pin: 'O' }], inpins: [{ inst: 'f', pin: 'CLK' }] },
+      { name: 'a', outpins: [{ inst: 'i', pin: 'I' }], inpins: [{ inst: 'l', pin: 'A1' }] },
+      { name: 'b', outpins: [{ inst: 'l', pin: 'A' }], inpins: [{ inst: 'f', pin: 'D1' }] },
+      { name: 'q', outpins: [{ inst: 'f', pin: 'AQ' }], inpins: [{ inst: 'o', pin: 'O' }] },
+    ],
+  };
+  const netDelay = (n) => ({ a: 2.0, b: 0.5, q: 1.5 })[n.name] ?? null, Tp = { ...ARC_DEFAULTS, Tilo: 0.2, Tas: 0.3, Tcko: 0.4 };
+  // 0.8 + 2.0 + 0.2 + 0.5 + 0.3 - 2.5 + 0.025
+  const i = offsetIn(xdl, 'clk', { netDelay, clockMin: () => 2.5, tiopi: 0.8, uncertainty: 0.025, T: Tp });
+  assert.equal(+i.offset.toFixed(6), 1.325);
+  assert.deepEqual(i.path, ['i.I', 'l.A1', 'l.A', 'f.D1']);
+  // 2.7 + 0.4 + 1.5 + 2.0 + 0.025
+  const o = offsetOut(xdl, 'clk', { netDelay, clockMax: () => 2.7, tioop: 2.0, uncertainty: 0.025, T: Tp });
+  assert.equal(+o.offset.toFixed(6), 6.625);
+  assert.deepEqual(o.path, ['f.AQ', 'o.O']);
+});
+
+test('twr6: trce\'s OFFSET IN and OUT sections: the allowable offset, each path\'s data and clock tables apart', () => {
+  const sec = (kind, word, head, tables) => `Timing constraint: Unconstrained OFFSET ${kind} analysis for clock \n"clk_BUFGP" \n 3 paths analyzed\n ${word} allowable offset is   ${head}ns.\n` +
+    `----\nOffset:                 ${head}ns (x)\n  Source:               a (PAD)\n  Destination:          b (FF)\n  Data Path Delay:      5.306ns (Levels of Logic = 1)\n  Clock Path Delay:     2.460ns (Levels of Logic = 2)\n  Clock Uncertainty:    0.025ns\n  Clock Uncertainty:          0.025ns  (x)\n${tables}\n`;
+  const data = `  Maximum Data Path at Slow Process Corner: a to b\n    Location             Delay type         Delay(ns)  Physical Resource\n    B8.I                 Tiopi                 0.790   a\n    SLICE_X18Y15.AI      net (fanout=1)        4.478   a_IBUF\n    SLICE_X18Y15.CLK     Tds                   0.038   b\n    ---\n    Total                                      5.306ns (x)\n`;
+  const clk = `  Minimum Clock Path at Slow Process Corner: clk to b\n    V10.I                Tiopi                 0.684   clk\n    BUFGMUX_X3Y13.I0     net (fanout=1)        0.768   clk_BUFGP/IBUFG\n    BUFGMUX_X3Y13.O      Tgi0o                 0.197   clk_BUFGP/BUFG\n    ---\n    Total                                      1.649ns (x)\n`;
+  const r = parseOffsets(`${sec('IN BEFORE', 'Minimum', '2.871', data + clk)}${sec('OUT AFTER', 'Maximum', '12.244', clk + data)}Timing constraint: Unconstrained path analysis \n`);
+  assert.deepEqual(r.map(o => [o.kind, o.clock, o.offset, o.paths.length]), [['in', 'clk_BUFGP', 2.871, 1], ['out', 'clk_BUFGP', 12.244, 1]]);
+  const p = r[0].paths[0];
+  assert.deepEqual({ ...p, data: undefined, clk: undefined }, { offset: 2.871, source: 'a', dest: 'b', dataPath: 5.306, clockPath: 2.46, uncertainty: 0.025, data: undefined, clk: undefined });
+  assert.deepEqual(p.data.map(e => e.type), ['Tiopi', 'net', 'Tds']);
+  assert.deepEqual(p.clk.map(e => [e.type, e.delay]), [['Tiopi', 0.684], ['net', 0.768], ['Tgi0o', 0.197]]);
+  assert.deepEqual(r[1].paths[0].clk.map(e => e.type), ['Tiopi', 'net', 'Tgi0o']);
 });

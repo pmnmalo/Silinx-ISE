@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 import { netTree, treePath } from '../../packages/silinx-fpga/src/fpga/timing.js';
 import { nnls, parseDly } from '../s3e-route/timing-fit.mjs';
-import { parseTwr } from './twr6.mjs';
+import { parseTwr, parseOffsets } from './twr6.mjs';
 import { arcTable, arcKey } from './timing6.mjs';
 import { dlySamples, fitWires, pathCounts, loadDelay } from './timing-fit6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
@@ -21,7 +21,7 @@ const LETTERS = ['A', 'B', 'C', 'D'];
 
 /** The arcs' delays by trce's type (ns), and a setup through the carry's XOR apart from one through the LUT. */
 export const ARC_DEFAULTS = { Tilo: 0.235, TiloMux: 0.261, Topab: 0.45, Topcyb: 0.375, Tbyp: 0.08, Tcinb: 0.27, Tas: 0.32, TasXor: 0.27,
-  Tdick: 0.11, Tceck: 0.32, Tsrck: 0.43, Tcko: 0.41, Tcinck: 0.3, Tito: 0.75 };
+  Tdick: 0.11, Tceck: 0.32, Tsrck: 0.43, Tcko: 0.41, Tcinck: 0.3, Tito: 0.75, Tds: 0.04, Tshcko: 1.2, Tiopi: 0.79, Tioop: 2.3 };
 
 /** The median of a family of trce's arc types (names matching re), undefined when none. */
 function familyMedian(types = {}, re) {
@@ -64,6 +64,8 @@ export function sliceArcs6(inst, T = ARC_DEFAULTS) {
     const om = m.get(`${L}OUTMUX`);
     if (/5Q$/.test(om ?? '')) { clkToOut.push([`${L}MUX`, T.Tcko]); clocked = true; }
     else if (om) for (const [p, d] of source(om, L, k)) comb.push([p, `${L}MUX`, d]);
+    // a shift register (L6RAMMODE SRL16 / SRL32): its data in (LI) before the clock, its output after it
+    if (/^SRL/.test(m.get(`${L}6RAMMODE`) ?? '')) { clocked = true; setup.push([`${L}I`, T.Tds]); clkToOut.push([L, T.Tshcko]); if (om === 'O6') clkToOut.push([`${L}MUX`, T.Tshcko]); }
     // the second flip-flop (L5FF, out on LMUX): its data the LUT's O5, else the bypass
     if (m.has(`${L}5FF`)) { clocked = true; for (const p of o5(L).length ? o5(L) : [`${L}X`]) setup.push([p, /X$/.test(p) ? T.Tdick : T.Tas]); }
     const ff = m.get(`${L}FF`);
@@ -132,11 +134,12 @@ export function arcDelays(table) {
 }
 
 /**
- * The PERIOD analysis of a routed design on one clock net: { slack, arrival, path: [pin …] } for the worst
- * endpoint. netDelay(net, driver pin, load pin) gives a connection's delay (null: not on a path); clockAt(inst) the
- * clock's arrival at its clock pin; period and uncertainty trce's.
+ * The timing graph of a routed design on one clock net: the pins (name: 'inst.pin') and their edges (the slices'
+ * and hard blocks' arcs, each net's connections by netDelay(net, driver pin, load pin), null: none), the clocked
+ * elements' starts and ends on that clock ([pin, ns, inst]: a clock-to-out, a setup), the input pads' I pins and
+ * the output pads' O pins ([pin, inst]).
  */
-export function periodSlack(xdl, clock, { period, uncertainty = 0, netDelay, clockAt, T = ARC_DEFAULTS }) {
+export function timingGraph6(xdl, clock, { netDelay, T = ARC_DEFAULTS }) {
   const id = new Map(), name = [], eOut = [], eIn = [];
   const pid = (i, p) => { const k = `${i}.${p}`; let v = id.get(k); if (v === undefined) { v = name.length; id.set(k, v); name.push(k); eOut.push([]); eIn.push(0); } return v; };
   const edge = (a, b, d) => { eOut[a].push([b, d]); eIn[b]++; };
@@ -145,39 +148,87 @@ export function periodSlack(xdl, clock, { period, uncertainty = 0, netDelay, clo
     for (const p of n.inpins) { if (/^CLK/.test(p.pin)) clockOf.set(p.inst, n.name); else add(ins, p.inst, p.pin); }
     for (const p of n.outpins) add(outs, p.inst, p.pin);
   }
-  const starts = [], ends = [];
+  const starts = [], ends = [], padIns = [], padOuts = [];
   for (const inst of xdl.insts) {
+    if (inst.type === 'IOB') {
+      if ((outs.get(inst.name) ?? []).includes('I')) padIns.push([pid(inst.name, 'I'), inst.name]);
+      if ((ins.get(inst.name) ?? []).includes('O')) padOuts.push([pid(inst.name, 'O'), inst.name]);
+      continue;
+    }
     // a slice's arcs by its site's class when the delays have them (T.classes, classArcs)
     const a = /^SLICE/.test(inst.type) ? sliceArcs6(inst, T.classes?.[siteClass(inst)] ? { ...T, ...T.classes[siteClass(inst)] } : T) : hardArcs6(inst, ins.get(inst.name) ?? [], outs.get(inst.name) ?? [], T);
     for (const [i, o, d] of a.comb) edge(pid(inst.name, i), pid(inst.name, o), d);
     if (clockOf.get(inst.name) !== clock) continue;
-    const c = clockAt(inst.name) ?? 0;
-    for (const [o, d] of a.clkToOut) starts.push([pid(inst.name, o), c + d]);
-    for (const [i, d] of a.setup) ends.push([pid(inst.name, i), d, c]);
+    for (const [o, d] of a.clkToOut) starts.push([pid(inst.name, o), d, inst.name]);
+    for (const [i, d] of a.setup) ends.push([pid(inst.name, i), d, inst.name]);
   }
   for (const n of xdl.nets) {
     const src = n.outpins[0];
     if (!src || n.name === clock) continue;
     for (const p of n.inpins) { const d = netDelay(n, src, p); if (d !== null) edge(pid(src.inst, src.pin), pid(p.inst, p.pin), d); }
   }
-  // the longest arrival at each pin, in an order of its inputs first (a combinational loop's pins left out)
-  const N = name.length, arr = new Float64Array(N).fill(-Infinity), from = new Int32Array(N).fill(-1), deg = Int32Array.from(eIn), q = [];
-  for (const [s, t] of starts) if (t > arr[s]) arr[s] = t;
+  return { name, eOut, eIn, starts, ends, padIns, padOuts };
+}
+
+/** The longest arrival at each pin of a graph from its sources ([pin, ns]), in an order of its inputs first (a loop's pins left out): { arr, from }. */
+export function longest(g, sources) {
+  const N = g.name.length, arr = new Float64Array(N).fill(-Infinity), from = new Int32Array(N).fill(-1), deg = Int32Array.from(g.eIn), q = [];
+  for (const [v, t] of sources) if (t > arr[v]) arr[v] = t;
   for (let v = 0; v < N; v++) if (!deg[v]) q.push(v);
   while (q.length) {
     const v = q.pop();
-    for (const [w, d] of eOut[v]) { if (arr[v] + d > arr[w]) { arr[w] = arr[v] + d; from[w] = v; } if (!--deg[w]) q.push(w); }
+    for (const [w, d] of g.eOut[v]) { if (arr[v] + d > arr[w]) { arr[w] = arr[v] + d; from[w] = v; } if (!--deg[w]) q.push(w); }
   }
+  return { arr, from };
+}
+
+const pathTo = (g, from, v) => { const p = []; for (; v >= 0; v = from[v]) p.unshift(g.name[v]); return p; };
+
+/**
+ * The PERIOD analysis of a routed design on one clock net: { slack, arrival, path: [pin …] } for the worst
+ * endpoint (null: none). netDelay(net, driver pin, load pin) gives a connection's delay (null: not on a path);
+ * clockAt(inst) the clock's arrival at its clock pin; period and uncertainty trce's.
+ */
+export function periodSlack(xdl, clock, { period, uncertainty = 0, netDelay, clockAt, T = ARC_DEFAULTS }) {
+  const g = timingGraph6(xdl, clock, { netDelay, T }), { arr, from } = longest(g, g.starts.map(([v, d, i]) => [v, (clockAt(i) ?? 0) + d]));
   let worst = null;
-  for (const [v, d, c] of ends) {
+  for (const [v, d, i] of g.ends) {
     if (arr[v] === -Infinity) continue;
-    const slack = period + c - (arr[v] + d) - uncertainty;
+    const slack = period + (clockAt(i) ?? 0) - (arr[v] + d) - uncertainty;
     if (!worst || slack < worst.slack) worst = { slack, arrival: arr[v] + d, end: v };
   }
-  if (!worst) return null;
-  const p = [];
-  for (let v = worst.end; v >= 0; v = from[v]) p.unshift(name[v]);
-  return { slack: worst.slack, arrival: worst.arrival, path: p };
+  return worst && { slack: worst.slack, arrival: worst.arrival, path: pathTo(g, from, worst.end) };
+}
+
+/**
+ * trce's OFFSET IN BEFORE on a clock: the largest data path from an input pad (its Tiopi, then the nets and arcs to
+ * a flip-flop's setup) less the clock's earliest arrival there (clockMin(inst): from its pad through its BUFG), plus
+ * the uncertainty: { offset, path } (null: no such path).
+ */
+export function offsetIn(xdl, clock, { netDelay, clockMin, tiopi, uncertainty = 0, T = ARC_DEFAULTS }) {
+  const g = timingGraph6(xdl, clock, { netDelay, T }), { arr, from } = longest(g, g.padIns.map(([v]) => [v, tiopi]));
+  let worst = null;
+  for (const [v, d, i] of g.ends) {
+    if (arr[v] === -Infinity) continue;
+    const offset = arr[v] + d - clockMin(i) + uncertainty;
+    if (!worst || offset > worst.offset) worst = { offset, end: v };
+  }
+  return worst && { offset: worst.offset, path: pathTo(g, from, worst.end) };
+}
+
+/**
+ * trce's OFFSET OUT AFTER on a clock: the clock's latest arrival at a flip-flop (clockMax(inst)), its clock-to-out,
+ * the nets and arcs to an output pad's O pin and its Tioop, plus the uncertainty: { offset, path } (null: none).
+ */
+export function offsetOut(xdl, clock, { netDelay, clockMax, tioop, uncertainty = 0, T = ARC_DEFAULTS }) {
+  const g = timingGraph6(xdl, clock, { netDelay, T }), { arr, from } = longest(g, g.starts.map(([v, d, i]) => [v, clockMax(i) + d]));
+  let worst = null;
+  for (const [v] of g.padOuts) {
+    if (arr[v] === -Infinity) continue;
+    const offset = arr[v] + tioop + uncertainty;
+    if (!worst || offset > worst.offset) worst = { offset, end: v };
+  }
+  return worst && { offset: worst.offset, path: pathTo(g, from, worst.end) };
 }
 
 /** A clock net's arrival at each load (inst → ns) from the routed tree: base + per node, fitted on a clock's .dly delays. */
@@ -201,7 +252,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const devices = {}, designs = dirs.map(d => {
     const xt = fs.readFileSync(path.join(d, 'top.xdl'), 'utf8'), part = xt.match(/^design "[^"]*" (\S+)/m)[1];
     const device = (devices[part] ??= s6Device(part.replace(/^(xc6slx\d+)-?(csg\d+)(-\d)?$/, '$1$2-3')).device);
-    return { name: d, xdl: parseXdl(xt), paths: parseTwr(fs.readFileSync(path.join(d, 'top.twr'), 'utf8')), device, dly: fs.readFileSync(path.join(d, 'top.dly'), 'utf8') };
+    const twr = fs.readFileSync(path.join(d, 'top.twr'), 'utf8');
+    return { name: d, xdl: parseXdl(xt), paths: parseTwr(twr), offsets: parseOffsets(twr), device, dly: fs.readFileSync(path.join(d, 'top.dly'), 'utf8') };
   });
   const fitOn = designs.filter(x => !train || x.name.includes(train));
   const T = { ...arcDelays(arcTable(fitOn)), classes: classArcs(fitOn) }, model = fitWires(fitOn.flatMap(x => dlySamples(x.xdl, x.dly, x.device)));
@@ -214,13 +266,28 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     for (const [inst, n] of ones) for (const [k, v] of d.loads) if (k.startsWith(`${inst}.`)) clk.push([n, v]);
   }
   const cw = nnls(clk.map(([n]) => [1, n]), clk.map(([, v]) => v));
-  const rows = [];
+  // the OFFSETs' pads (Tiopi into the data path, Tioop out of it) and the clock from its pad through its BUFG to a
+  // flip-flop, earliest (OFFSET IN) and latest (OUT): a + b × the clock net's arrival there, fitted on trce's paths
+  const med = a => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  const offPaths = kind => fitOn.flatMap(x => x.offsets.filter(o => o.kind === kind).flatMap(o => o.paths.map(p => ({ x, p }))));
+  const tiopi = med(offPaths('in').flatMap(({ p }) => p.data.filter(e => e.type === 'Tiopi').map(e => e.delay))) ?? T.Tiopi;
+  const tioop = med(offPaths('out').flatMap(({ p }) => p.data.filter(e => e.type === 'Tioop').map(e => e.delay))) ?? T.Tioop;
+  const clockFit = kind => {
+    const pts = offPaths(kind).map(({ x, p }) => {
+      const site = p.clk.at(-1)?.loc.split('.')[0], i = x.xdl.insts.find(z => z.site === site), c = i && clockArrivals(x.xdl, x.device, x.offsets[0].clock, cw).get(i.name);
+      return c === undefined || p.clockPath === undefined ? null : [c, p.clockPath];
+    }).filter(Boolean);
+    return pts.length ? nnls(pts.map(([c]) => [1, c]), pts.map(([, v]) => v)) : [0, 1];
+  };
+  const [cin, cout] = [clockFit('in'), clockFit('out')];
+  const close = (a, b) => Math.abs(a - b) <= Math.max(0.05 * Math.abs(b), 0.1);
+  const rows = [], offRows = [];
   for (const x of designs.filter(d => !train || !fitOn.includes(d))) {
     const pc = x.paths.find(p => /PERIOD/.test(p.constraint) && p.requirement !== undefined);
     if (!pc) continue;
     const nets = new Map(x.xdl.nets.map(n => [n.name, n])), inst = new Map(x.xdl.insts.map(i => [i.name, i])), trees = new Map();
     const netDelay = (n, src, p) => {
-      if (!/^(SLICE|RAMB|DSP)/.test(inst.get(src.inst)?.type ?? '') || !/^(SLICE|RAMB|DSP)/.test(inst.get(p.inst)?.type ?? '')) return null;
+      if (!/^(SLICE|RAMB|DSP|IOB)/.test(inst.get(src.inst)?.type ?? '') || !/^(SLICE|RAMB|DSP|IOB)/.test(inst.get(p.inst)?.type ?? '')) return null;
       let t = trees.get(n.name);
       if (t === undefined) { const a = x.device.sitePinNode(inst.get(src.inst).site, src.pin); t = a >= 0 ? netTree(n.pips || [], [a], x.device) : null; trees.set(n.name, t); }
       const b = x.device.sitePinNode(inst.get(p.inst).site, p.pin), nodes = t && b >= 0 ? treePath(t, b) : null;
@@ -234,8 +301,21 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (!r) continue;
     rows.push({ name: `${path.basename(path.dirname(x.name))}/${path.basename(x.name)}`, trce: pc.slack, sta: r.slack, period: pc.requirement });
     if (args.includes('--paths')) console.log(`  ${rows.at(-1).name}: ${r.path.map(p => p.replace(/^.*\//, '')).join(' > ')}`);
+    // the OFFSET IN and OUT on the same clock, against trce's minimum / maximum allowable offset
+    const nd = measured ? (n, src, p) => ld(n, p) : netDelay;
+    for (const o of x.offsets.filter(z => z.clock === pc.destClock && z.offset !== null)) {
+      const c = o.kind === 'in' ? cin : cout, at = i => c[0] + c[1] * (ca.get(i) ?? 0), u = o.paths[0]?.uncertainty ?? 0;
+      const q = o.kind === 'in' ? offsetIn(x.xdl, pc.destClock, { netDelay: nd, clockMin: at, tiopi, uncertainty: u, T }) : offsetOut(x.xdl, pc.destClock, { netDelay: nd, clockMax: at, tioop, uncertainty: u, T });
+      if (q) offRows.push({ name: rows.at(-1).name, kind: o.kind, trce: o.offset, sta: q.offset });
+    }
   }
-  const within = rows.filter(r => Math.abs(r.sta - r.trce) <= 0.05 * Math.abs(r.trce)).length;
+  const within = rows.filter(r => Math.abs(r.sta - r.trce) <= 0.05 * Math.abs(r.trce)).length, within1 = rows.filter(r => close(r.sta, r.trce)).length;
   console.log(`clock: ${cw[0].toFixed(3)} + ${cw[1].toFixed(3)} a node (${clk.length} loads); ${rows.length} PERIOD constraints: worst slack within 5% of trce's in ${within}, the error at most ${(Math.max(...rows.map(r => Math.abs(r.sta - r.trce) / r.period)) * 100).toFixed(1)}% of the period`);
+  console.log(`  within 5% or 0.1 ns, whichever is larger: ${within1} of ${rows.length}`);
   for (const r of rows) console.log(`  ${r.name}: trce ${r.trce.toFixed(3)}, sta ${r.sta.toFixed(3)} (${(100 * (r.sta - r.trce) / Math.abs(r.trce)).toFixed(1)}%)`);
+  for (const k of ['in', 'out']) {
+    const rs = offRows.filter(r => r.kind === k);
+    console.log(`OFFSET ${k.toUpperCase()} (Tiopi ${tiopi}, Tioop ${tioop}; clock ${(k === 'in' ? cin : cout).map(v => v.toFixed(3)).join(' + ')} × arrival): ${rs.length} designs, within 5% or 0.1 ns of trce's in ${rs.filter(r => close(r.sta, r.trce)).length}, the error at most ${Math.max(...rs.map(r => Math.abs(r.sta - r.trce))).toFixed(3)} ns`);
+    for (const r of rs) console.log(`  ${r.name}: trce ${r.trce.toFixed(3)}, sta ${r.sta.toFixed(3)} (${(r.sta - r.trce).toFixed(3)} ns)`);
+  }
 }

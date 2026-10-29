@@ -38,6 +38,43 @@ export function parseTwr(text) {
   return out;
 }
 
+/**
+ * A .twr's OFFSET analyses (unconstrained or not): [{ kind: 'in' | 'out', clock, offset (the minimum / maximum
+ * allowable), paths: [{ offset, source, dest, dataPath, clockPath, uncertainty, data: [element], clk: [element] }] }],
+ * each path's data and clock tables apart (an element as parseTwr's).
+ */
+export function parseOffsets(text) {
+  const lines = text.split('\n'), out = [];
+  let cur = null, path = null, table = null;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    let m;
+    if (/^Timing constraint:/.test(l)) {
+      cur = null;
+      if ((m = l.match(/OFFSET (IN|OUT)\b/))) {
+        const clock = (l + (lines[i + 1] ?? '')).match(/clock\s+"([^"]+)"/)?.[1] ?? null;
+        out.push(cur = { kind: m[1].toLowerCase(), clock, offset: null, paths: [] });
+      }
+      continue;
+    }
+    if (!cur) continue;
+    if ((m = l.match(/^\s+(?:Minimum|Maximum) allowable offset is\s+(-?[\d.]+)ns/))) cur.offset = num(m[1]);
+    else if ((m = l.match(/^Offset:\s+(-?[\d.]+)ns/))) { cur.paths.push(path = { offset: num(m[1]), data: [], clk: [] }); table = null; }
+    else if (!path) continue;
+    else if ((m = l.match(/^\s+Source:\s+(\S+)/))) path.source = m[1];
+    else if ((m = l.match(/^\s+Destination:\s+(\S+)/))) path.dest = m[1];
+    else if ((m = l.match(/^\s+Data Path Delay:\s+(-?[\d.]+)ns/))) path.dataPath = num(m[1]);
+    else if ((m = l.match(/^\s+Clock Path Delay:\s+(-?[\d.]+)ns/))) path.clockPath = num(m[1]);
+    else if ((m = l.match(/^\s+Clock Uncertainty:\s+(-?[\d.]+)ns/))) path.uncertainty ??= num(m[1]);
+    else if (/^\s+Maximum Data Path/.test(l)) table = path.data;
+    else if (/^\s+(Minimum|Maximum) Clock Path/.test(l)) table = path.clk;
+    else if (/^\s+Total\s+-?[\d.]+ns/.test(l)) table = null;
+    else if (table && (m = l.match(/^\s{4}(\S+)\s+net \(fanout=(\d+)\)\s+(-?[\d.]+)\s+(\S+)/))) table.push({ loc: m[1], type: 'net', fanout: +m[2], delay: num(m[3]), name: m[4] });
+    else if (table && (m = l.match(/^\s{4}(\S+\.\S+)\s+(T\S+)\s+(-?[\d.]+)\s+(\S+)/))) table.push({ loc: m[1], type: m[2], delay: num(m[3]), name: m[4] });
+  }
+  return out;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const files = process.argv.slice(2);
   if (!files.length) { console.error('usage: node research/s6/twr6.mjs <file.twr> …'); process.exit(1); }
