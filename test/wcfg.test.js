@@ -27,6 +27,10 @@ test('#1019 wcfg: written and read back the same', () => {
     const c = { tops: ['t'], rows: [{ kind: 'sig', path: '/t/x', name: 'x', type: 'array', radix, expanded: false }], markers: [] };
     assert.deepEqual(readWcfg(writeWcfg(c)), c, radix);
   }
+  // one's complement has no ISE radix (#1983): no Radix written, read back as Default
+  const c1 = { tops: ['t'], rows: [{ kind: 'sig', path: '/t/x', name: 'x', type: 'array', radix: 'c1dec', expanded: false }], markers: [] };
+  assert.doesNotMatch(writeWcfg(c1), /Radix/);
+  assert.equal(readWcfg(writeWcfg(c1)).rows[0].radix, 'default');
   // nothing shown, no top
   assert.deepEqual(readWcfg(writeWcfg({})), { tops: [], rows: [], markers: [] });
   // names with XML's special characters

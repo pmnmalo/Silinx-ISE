@@ -96,7 +96,8 @@ test('#405 ISim rows: groups and dividers, Delete, the radix and the rows\' menu
   // the radix of c, the only signal selected; its menu: c forced
   w.st.sel = new Set(['1']);
   const radix = w.radixItems();
-  assert.deepEqual(radix.map((it) => it.label), ['Default', 'Binary', 'Hexadecimal', 'Octal', 'Unsigned Decimal', 'Signed Decimal', 'ASCII']);
+  assert.deepEqual(radix.map((it) => it.label), ['Default', 'Binary', 'Hexadecimal', 'Octal', 'Decimal (Unsigned)',
+    "Decimal (Two's Complement)", "Decimal (One's Complement)", 'ASCII']);
   assert.equal(radix[0].checked, true);
   radix[2].action();
   assert.equal(w.st.rows[0].radix, 'hex');

@@ -147,6 +147,7 @@ export function formatValue(v, t, radix = 'default') {
     case 'oct': return hexFull(v, 3);
     case 'udec': return V.toDec(v, false);
     case 'sdec': return V.toDec(v, true);
+    case 'c1dec': return onesDec(v);
     case 'ascii': {
       if (v.x) return 'X';
       let s = '';
@@ -160,7 +161,13 @@ export function formatValue(v, t, radix = 'default') {
   return V.toBin(v);
 }
 
-// Parse a user-entered value for a signal. radix: bin|hex|oct|dec|udec|sdec|ascii|default
+// A value in one's complement (#1983): a top bit of 1 is the negative of the complement (1110 = -1, 1111 = -0).
+function onesDec(v) {
+  if (v.x || !V.msb(v)) return V.toDec(v, false);
+  return `-${(~v.v & ((1n << BigInt(v.w)) - 1n)).toString()}`;
+}
+
+// Parse a user-entered value for a signal. radix: bin|hex|oct|dec|udec|sdec|c1dec|ascii|default
 export function parseValue(text, t, radix = 'default') {
   let s = String(text).trim();
   if (!s) throw new Error('empty value');
@@ -183,7 +190,8 @@ export function parseValue(text, t, radix = 'default') {
   if (m) { radix = 'hex'; s = m[1]; }
   s = s.replace(/_/g, '');
   if (radix === 'default') radix = (t.kind === 'int' || t.kind === 'enum') ? 'dec' : 'bin';
-  if (radix === 'udec' || radix === 'sdec') radix = 'dec';
+  const ones = radix === 'c1dec';
+  if (radix === 'udec' || radix === 'sdec' || ones) radix = 'dec';
   let val;
   if (radix === 'bin' || radix === 'hex' || radix === 'oct') {
     const per = radix === 'bin' ? 1 : radix === 'hex' ? 4 : 3;
@@ -205,7 +213,7 @@ export function parseValue(text, t, radix = 'default') {
     if (s.length === 1 && /[xzuw-]/i.test(s)) val = V.fromBits(s[0].toLowerCase() === 'z' ? 'z'.repeat(w) : 'x'.repeat(w));
   } else if (radix === 'dec') {
     if (!/^-?\d+$/.test(s)) throw new Error(`invalid decimal value '${s}'`);
-    const n = BigInt(s);
+    const n = ones && s[0] === '-' ? ~BigInt(s.slice(1)) : BigInt(s);
     val = V.mk(w, BigInt.asUintN(w, n), 0n, t.s);
   } else if (radix === 'ascii') {
     let n = 0n;

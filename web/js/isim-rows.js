@@ -7,7 +7,8 @@ import { isBitsType } from './isim.js';
 
 const RADIXES = [
   ['default', 'Default'], ['bin', 'Binary'], ['hex', 'Hexadecimal'], ['oct', 'Octal'],
-  ['udec', 'Unsigned Decimal'], ['sdec', 'Signed Decimal'], ['ascii', 'ASCII'],
+  ['udec', 'Decimal (Unsigned)'], ['sdec', "Decimal (Two's Complement)"], ['c1dec', "Decimal (One's Complement)"],
+  ['ascii', 'ASCII'],
 ];
 const BIT_VALS = [V.ZERO, V.ONE, V.X1, V.mk(1, 1n, 1n)];
 const bitKey = (b) => Number(b.v & 1n) | (Number(b.x & 1n) << 1);

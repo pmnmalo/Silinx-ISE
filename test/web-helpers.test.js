@@ -50,6 +50,36 @@ test('ISim values: default radix per type, hex / octal / decimal / ASCII, X and 
   assert.equal(formatValue([V.ONE], logic(1)), '(array)');
 });
 
+test('#1983 ISim values: decimal in one\'s complement, shown and typed, against the definition', () => {
+  // the definition: a top bit of 1 is the negative of the value's complement
+  const ref = (n, w) => (n >> (w - 1) ? `-${(2 ** w - 1) - n}` : String(n));
+  for (const w of [1, 4, 8]) {
+    for (let n = 0; n < 2 ** w; n++) {
+      const v = V.fromInt(n, w);
+      assert.equal(formatValue(v, logic(w), 'c1dec'), ref(n, w), `${n} on ${w} bits`);
+      // what is shown, typed back, is the same bits (-0 included)
+      assert.equal(formatValue(parseValue(ref(n, w), logic(w), 'c1dec'), logic(w), 'bin'), V.toBin(v), `${ref(n, w)} typed on ${w} bits`);
+    }
+  }
+  assert.equal(formatValue(V.fromBits('1110'), logic(4), 'c1dec'), '-1');
+  assert.equal(formatValue(V.fromBits('1111'), logic(4), 'c1dec'), '-0');
+  assert.equal(formatValue(V.fromBits('1000'), logic(4), 'c1dec'), '-7');
+  assert.equal(formatValue(V.fromBits('0111'), logic(4), 'c1dec'), '7');
+  // the same bits in two's complement, and a signed signal's own sign ignored
+  assert.equal(formatValue(V.fromBits('1110'), logic(4), 'sdec'), '-2');
+  assert.equal(formatValue(V.fromInt(-2, 4, true), logic(4, true), 'c1dec'), '-1');
+  // X and Z as in the other decimals
+  assert.equal(formatValue(V.fromBits('1x10'), logic(4), 'c1dec'), 'X');
+  assert.equal(formatValue(V.fromBits('xxxx'), logic(4), 'c1dec'), 'x');
+  // typed: -1 is 1110, -0 is 1111, a positive is itself; too wide is cut to the signal
+  const bin4 = (s) => formatValue(parseValue(s, logic(4), 'c1dec'), logic(4), 'bin');
+  assert.equal(bin4('-1'), '1110');
+  assert.equal(bin4('-0'), '1111');
+  assert.equal(bin4('5'), '0101');
+  assert.equal(bin4('-7'), '1000');
+  assert.equal(bin4('17'), '0001');
+});
+
 test('ISim values: parse what the user types (force / set value) in every notation', () => {
   const t8 = logic(8);
   const hex = (v) => formatValue(v, t8, 'hex');
@@ -69,6 +99,7 @@ test('ISim values: parse what the user types (force / set value) in every notati
   assert.throws(() => parseValue('', t8), /empty/);
   assert.throws(() => parseValue('12G', t8, 'hex'), /invalid hex digit/);
   assert.throws(() => parseValue('1.5', t8, 'udec'), /invalid decimal/);
+  assert.throws(() => parseValue('-1.5', t8, 'c1dec'), /invalid decimal/);
   // values wider than the signal are cut to its width
   assert.equal(hex(parseValue('1FF', t8, 'hex')), 'FF');
 });
