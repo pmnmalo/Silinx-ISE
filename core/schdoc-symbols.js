@@ -46,12 +46,12 @@ export function gateVariant(type, k, n) {
   return SYMBOLS[t] ? t : null;
 }
 SYMBOLS.inv = { category: 'Logic', title: 'INV', gate: 'not', inputs: 1, description: 'Inverter', params: [P_WIDTH] };
-SYMBOLS.buf = { category: 'Logic', title: 'BUF', gate: 'buf', inputs: 1, description: 'Buffer', params: [P_WIDTH] };
+SYMBOLS.buf = { category: 'Buffers', title: 'BUF', gate: 'buf', inputs: 1, description: 'Buffer', params: [P_WIDTH] };
 // tri-state buffers (Xilinx BUFE / BUFT families): O = I while enabled, Z (released) otherwise, so that
-// several of them (and bidirectional pins / I/O markers) may drive one net, a bus
+// several of them (and bidirectional pins / I/O markers) may drive one net, a bus; with BUF the category Buffers (#1987)
 SYMBOLS.tbuf = {
   // (BUFE and BUFT only in the palette, their Width and Pins per bit making BUFE4, BUFT8…, #326)
-  category: 'Tri-State', title: 'TBUF', presetsOnly: true,
+  category: 'Buffers', title: 'TBUF', presetsOnly: true,
   description: 'Tri-state buffer: O = I while enabled, Z (high impedance, released) otherwise; E active high (BUFE) or T active low (BUFT)',
   params: [P_WIDTH, { name: 'enable', label: 'Enable input', kind: 'select', options: ['E', 'T'], default: 'E' },
     { name: 'bits', label: 'Pins per bit (I0.., O0..)', kind: 'bool', default: false }],
@@ -238,7 +238,7 @@ export function symbolParams(sym) {
   return [...own, ...primitiveOf(sym.type, { ...defaultParams(sym.type), ...(sym.params || {}) }).generics.map(attrParam)];
 }
 
-export const SYMBOL_CATEGORIES = ['Logic', 'Tri-State', 'Arithmetic', 'Flip-Flops', 'Mux', 'Decoders/Encoders', 'Bus', 'General', 'Device Primitives', 'Project modules'];
+export const SYMBOL_CATEGORIES = ['Logic', 'Buffers', 'Arithmetic', 'Flip-Flops', 'Mux', 'Decoders/Encoders', 'Bus', 'General', 'Device Primitives', 'Project modules'];
 
 export function defaultParams(type) {
   const s = SYMBOLS[type];

@@ -62,8 +62,11 @@ const errorsOf = d => d.diagnostics.filter(x => x.severity === 'error').map(x =>
 // ------------------------------------------------------------------ library
 test('tri-state buffer symbol: parameters, presets with the Xilinx names, pins and geometry', () => {
   const S = SYMBOLS.tbuf;
-  assert.equal(S.category, 'Tri-State');
-  assert.ok(SYMBOL_CATEGORIES.includes('Tri-State'));
+  // (BUFE / BUFT with BUF in the category Buffers, the Tri-State one gone, #1987)
+  assert.equal(S.category, 'Buffers');
+  assert.equal(SYMBOLS.buf.category, 'Buffers');
+  assert.ok(SYMBOL_CATEGORIES.includes('Buffers') && !SYMBOL_CATEGORIES.includes('Tri-State'));
+  assert.deepEqual(SYMBOL_CATEGORIES.slice(0, 2), ['Logic', 'Buffers']);
   assert.deepEqual(S.params.map(p => p.name), ['width', 'enable', 'bits']);
   // (#326: BUFE and BUFT only; their Width and Pins per bit make BUFE4, BUFT8…)
   assert.deepEqual(S.presets.map(p => p.title), ['BUFE', 'BUFT']);
