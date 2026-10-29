@@ -763,7 +763,8 @@ uiTest('toolbar: Print, enabled with a document in front, opens its print previe
   const cmds = () => page.eval(() => [...document.querySelectorAll('#toolbar .tb-btn')].map((b) => b.dataset.cmd));
   const printOff = () => page.eval(() => document.querySelector('#toolbar .tb-btn[data-cmd=print]').disabled);
   const list = await cmds();
-  assert.ok(list.indexOf('print') === list.indexOf('open') + 1, list.join(' '));
+  // (Close Project between Open Project and Print, #2027)
+  assert.ok(list.indexOf('closeProject') === list.indexOf('open') + 1 && list.indexOf('print') === list.indexOf('open') + 2, list.join(' '));
   for (const gone of ['summary', 'schematic', 'pins']) assert.ok(!list.includes(gone), `${gone}: ${list.join(' ')}`);
   assert.equal(await page.eval(() => document.querySelector('#toolbar .tb-btn[data-cmd=print]').title), 'Print');
   assert.equal(await printOff(), true, 'no document: Print off');
@@ -901,4 +902,23 @@ uiTest('#1128 the document tabs: one width, every close button shown (not only o
     await page.waitFor((n) => [...document.querySelectorAll('#doc-tabs .tab')].filter((t) => t.getClientRects().length).length === n, [t0.length - k], { what: `${k} closed` });
   }
   assert.deepEqual((await tabs()).map((t) => t.label), [t0[3].label, ...t0.slice(4).map((t) => t.label)]);
+});
+
+// #2027: the toolbar's Close Project (as File ▸ Close Project): off with no project, on with one, closing it
+uiTest('#2027 toolbar: Close Project, between Open Project and Print, closes the project; off with none; Portuguese', E, async (page) => {
+  const btn = '#toolbar .tb-btn[data-cmd=closeProject]';
+  const off = () => page.eval((b) => document.querySelector(b).disabled, btn);
+  await page.eval(async () => { if (window.SilinxApp.S.project) await window.SilinxApp.closeProject?.(); });
+  await page.waitFor(() => !window.SilinxApp.S.project, [], { what: 'no project' });
+  assert.equal(await page.eval((b) => document.querySelector(b).title, btn), 'Close Project');
+  assert.equal(await off(), true, 'no project: off');
+  await makeProject(env, { name: 'TbClose', template: 'blinky' });
+  await page.openProject('TbClose');
+  await page.waitFor((b) => !document.querySelector(b).disabled, [btn], { what: 'a project: on' });
+  await page.click(btn);
+  await page.waitFor(() => !window.SilinxApp.S.project, [], { what: 'the project closed' });
+  await page.waitFor((b) => document.querySelector(b).disabled, [btn], { what: 'off again' });
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.waitFor((b) => document.querySelector(b).title === 'Fechar Projeto', [btn], { what: 'Fechar Projeto' });
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
 });

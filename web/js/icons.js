@@ -5,6 +5,7 @@ const L = body => `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" f
 
 export const icons = {
   newProject: S('<path d="M2 4h5l1 1.5h6v8.5H2z" fill="#f4d27a" stroke="#b48a2c"/><path d="M11 1v6M8 4h6" stroke="#2a8a2a" stroke-width="2"/>'),
+  closeProject: S('<path d="M2 4h5l1 1.5h6v8.5H2z" fill="#f4d27a" stroke="#b48a2c"/><path d="M9.5 1.5l4 4M13.5 1.5l-4 4" stroke="#c0392b" stroke-width="2"/>'),
   open: S('<path d="M1.5 4h5l1 1.5h6v8H1.5z" fill="#f4d27a" stroke="#b48a2c"/><path d="M3 8h12l-2 5.5H1.5z" fill="#fbe7a6" stroke="#b48a2c"/>'),
   save: S('<rect x="2" y="2" width="12" height="12" rx="1" fill="#4a72b8" stroke="#24467e"/><rect x="4.5" y="2.5" width="7" height="4.5" fill="#fff"/><rect x="4" y="9" width="8" height="5" fill="#d9e4f5"/>'),
   saveAll: S('<rect x="4" y="1" width="11" height="11" rx="1" fill="#7f9fd6" stroke="#24467e"/><rect x="1" y="4" width="11" height="11" rx="1" fill="#4a72b8" stroke="#24467e"/><rect x="3.5" y="4.5" width="6" height="4" fill="#fff"/>'),

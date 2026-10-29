@@ -184,6 +184,7 @@ export function setupToolbar() {
   tb.append(
     btn('newProject', 'New Project', () => wiz.newProjectWizard()),
     btn('open', 'Open Project', () => wiz.openProjectDialog()),
+    btn('closeProject', 'Close Project', () => closeProject(), () => !!S.project),   // as File ▸ Close Project (#2027)
     btn('print', 'Print', () => printActive(), printable),   // as File ▸ Print… (#1251)
     h('div', { class: 'tb-sep' }),
     btn('undo', 'Undo', () => undoAny(), () => undoesProject() || !!docEditor(S.active)),   // as Edit ▸ Undo (enabled as it is, #1192)
@@ -227,7 +228,7 @@ export function setupToolbar() {
 // enable / disable the labelled buttons of the modern toolbar (cheap: run on clicks and changes)
 export function refreshSteps() {
   for (const b of document.querySelectorAll('#toolbar .m-step')) b.disabled = !b._enabled();
-  for (const b of document.querySelectorAll('#toolbar .tb-btn:is([data-cmd=cut], [data-cmd=copy], [data-cmd=paste], [data-cmd=undo], [data-cmd=redo], [data-cmd=print])')) b.disabled = !b._enabled();
+  for (const b of document.querySelectorAll('#toolbar .tb-btn:is([data-cmd=cut], [data-cmd=copy], [data-cmd=paste], [data-cmd=undo], [data-cmd=redo], [data-cmd=print], [data-cmd=closeProject])')) b.disabled = !b._enabled();
 }
 
 // Command palette: every enabled menu command and every project file
