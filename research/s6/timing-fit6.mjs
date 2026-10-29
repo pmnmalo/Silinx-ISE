@@ -34,20 +34,27 @@ export function nodeWire(device, n) {
   return [device.tileNames[k], device.names[device.templates[device.tileTemplate[k]].wires[w - device.tileWireBase[k]]]];
 }
 
-/** The connections of a design's report: [{ net, delay, fanout, counts: [per class], nodes }], and those not found. */
-export function connections(xdl, twr, device) {
+/** One net of a path in the routed XDL: { net, delay, fanout, counts: [per class], nodes } or null (not found). */
+export function connection(nets, device, from, e) {
+  const [ds, dp] = from.split('.'), [ls, lp] = e.loc.split('.'), net = nets.get(e.name);
+  if (!net) return null;
+  const a = device.sitePinNode(ds, dp), b = device.sitePinNode(ls, lp), tree = net && a >= 0 ? netTree(net.pips || [], [a], device) : null, nodes = tree && b >= 0 ? treePath(tree, b) : null;
+  if (!nodes) return null;
+  const counts = new Array(CLASSES6.length).fill(0);
+  for (const n of nodes.slice(1)) counts[wireClass6(nodeWire(device, n)[1])]++;
+  return { net: e.name, delay: e.delay, fanout: e.fanout, counts, nodes };
+}
+
+/** The connections of a design's report (each once): [{ net, delay, fanout, counts, nodes }], and those not found. */
+export function connections(xdl, twr, device, paths = parseTwr(twr)) {
   const nets = new Map(xdl.nets.map(n => [n.name, n])), out = [], missed = [], seen = new Set();
-  for (const p of parseTwr(twr)) p.elements.forEach((e, i) => {
+  for (const p of paths) p.elements.forEach((e, i) => {
     if (e.type !== 'net' || i === 0) return;
     const key = `${p.elements[i - 1].loc} ${e.loc}`;
     if (seen.has(key)) return;
     seen.add(key);
-    const [ds, dp] = p.elements[i - 1].loc.split('.'), [ls, lp] = e.loc.split('.'), net = nets.get(e.name);
-    const a = device.sitePinNode(ds, dp), b = device.sitePinNode(ls, lp), tree = net && a >= 0 ? netTree(net.pips || [], [a], device) : null, nodes = tree && b >= 0 ? treePath(tree, b) : null;
-    if (!nodes) { missed.push(`${e.name} ${key}`); return; }
-    const counts = new Array(CLASSES6.length).fill(0);
-    for (const n of nodes.slice(1)) counts[wireClass6(nodeWire(device, n)[1])]++;
-    out.push({ net: e.name, delay: e.delay, fanout: e.fanout, counts, nodes });
+    const c = connection(nets, device, p.elements[i - 1].loc, e);
+    if (c) out.push(c); else missed.push(`${e.name} ${key}`);
   });
   return { conns: out, missed };
 }
