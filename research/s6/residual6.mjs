@@ -164,7 +164,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const int = { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips };
   // the other tiles' PIPs (the PIP drop) and the I/O path's pairs it could not take apart (the examples' residual)
   const clockPips = fs.existsSync(new URL('./db/s6-pips-clock.json', import.meta.url)) ? read('s6-pips-clock').pips : {};
-  const other = { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...clockPips } };
+  // and the PIPs it could not take apart, probed one by one (#1951)
+  const probePips = fs.existsSync(new URL('./db/s6-pips-probe.json', import.meta.url)) ? read('s6-pips-probe').pips : {};
+  const other = { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...clockPips, ...probePips } };
   const left = new Map(), extra = new Map(), unknown = new Map();
   for (const dir of dirs) {
     const bit = fs.readFileSync(path.join(dir, 'top.bit')), r6 = readBit6(bit), dev = bitFormat6(r6.device.part);

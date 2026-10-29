@@ -30,7 +30,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!dirs.length) { console.error('usage: node research/s6/ana-cmtsites6.mjs <part> <dir> …'); process.exit(1); }
   const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, ''), { device } = s6Device(part);
   const db = { part, slices: loadDb(dv), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
-    other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...read('s6-pips-clock').pips } }, iob: read(`${dv}-iob`), clocks: read('s6-clocks') };
+    other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...read('s6-pips-clock').pips, ...(fs.existsSync(new URL('./db/s6-pips-probe.json', import.meta.url)) ? read('s6-pips-probe').pips : {}) } }, iob: read(`${dv}-iob`), clocks: read('s6-clocks') };
   const seen = new Map();
   let dev = null, column = null;
   for (const dir of dirs) for (const n of fs.readdirSync(dir)) {

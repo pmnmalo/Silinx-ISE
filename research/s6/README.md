@@ -458,8 +458,16 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   X0Y3, DCM_X0Y0 and X0Y2), the two DCMs of a CMT tile with different bits (not a shift of each other: #727's "283
   bits on" held for its base only). A pattern per kind and setting (`cmtCfg`), from every design measured; the even
   DCM's settings measured as the odd one's were (`gen-dcm6.mjs --dcm DCM_X0Y0`, `ana-dcm6.mjs --dcm`: `dcmEven`).
-- Still to do: the paths of the other sites (the CMT tile's output chains, the centre column's and REGC's bits of a
-  CMT output on a BUFGMUX, a pad's BUFIO2), with designs of one output each; and the XC6SLX45.
+- **Each output alone** (`gen-cmtsites6.mjs --outputs`: 44 designs, the pad and BUFGMUX fixed per site): in the CMT
+  column a DCM's bits beyond its settings do not depend on the output (its input path, the same per site and pad)
+  but for 2 when CLKFX or CLKFX180 is used (the DFS); an output's own bits, 1 to 3, are in the centre column (its
+  path to the BUFGMUX).
+- **The probe** (`gen-cmtprobe6.mjs`, `ana-cmtprobe6.mjs`: `db/s6-pips-probe.json`): the PIPs the PIP drop could not
+  take apart, each on a TIEOFF net of its own (59 XDL designs, one PIP per region each): 222 PIPs, 148 with bits. The
+  REG_V_HCLK tile's are left out: alone a BUFH route-through and a spine mux set bits they do not set in a design.
+  The site designs' residual goes from 1404 to 1094 bits (about 27 a design), nothing predicted that ISE does not set.
+- Still to do: the sites on the paths (a BUFGMUX's input from a CMT in the centre column and its REGC selection, a
+  pad's BUFIO2 in the I/O words and its IOI), a rule each as #727's clock pads; then the XC6SLX45.
 
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
@@ -585,8 +593,9 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `ana-cmt6.mjs`, `cmt6.mjs` | A DCM's and PLL's clock path: `db/xc6slx16-cmt-paths.json`; the shared helpers (#727) |
 | `gen-dcm6.mjs` | The DCM's and PLL's designs, one setting per design (`--fields`: the counters' bits) (#727) |
 | `ana-dcm6.mjs` | Their settings' bits: `db/<device>-cmt.json` (#727) |
-| `gen-cmtsites6.mjs` | Every CMT site's designs: pads of its half and the sides, outputs on the BUFGMUXes in turn (#1951) |
+| `gen-cmtsites6.mjs` | Every CMT site's designs: pads of its half and the sides, outputs on the BUFGMUXes in turn; `--outputs` each alone (#1951) |
 | `ana-cmtsites6.mjs` | A CMT's settings at any site: `db/<device>-cmt-settings.json` (#1951) |
+| `gen-cmtprobe6.mjs`, `ana-cmtprobe6.mjs` | The PIPs the drop could not take apart, probed one by one: `db/s6-pips-probe.json` (#1951) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |

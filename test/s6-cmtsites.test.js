@@ -1,14 +1,18 @@
-// research/s6 stage S6-E2 (#1951), without ISE: the designs of every CMT site (gen-cmtsites6.mjs), an even DCM's
-// (gen-dcm6.mjs --dcm), the settings' key and their prediction at any site (cmt6.mjs) and the database measured
-// (db/xc6slx16-cmt-settings.json, xc6slx16-cmt.json's dcmEven).
+// research/s6 stage S6-E2 (#1951), without ISE: the designs of every CMT site (gen-cmtsites6.mjs, --outputs), an even
+// DCM's (gen-dcm6.mjs --dcm), the settings' key and their prediction at any site (cmt6.mjs), the probe of the PIPs the
+// drop could not take apart (gen-cmtprobe6.mjs, ana-cmtprobe6.mjs) and the databases measured
+// (db/xc6slx16-cmt-settings.json, xc6slx16-cmt.json's dcmEven, s6-pips-probe.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { cmtSiteDesigns, cmtSiteDesign } from '../research/s6/gen-cmtsites6.mjs';
+import { cmtSiteDesigns, cmtSiteDesign, cmtOutputDesigns, DCM_ALL, PLL_ALL } from '../research/s6/gen-cmtsites6.mjs';
+import { cmtProbes, intTieoffs } from '../research/s6/gen-cmtprobe6.mjs';
+import { probeBits, CONTEXT } from '../research/s6/ana-cmtprobe6.mjs';
+import { gridRegion } from '../research/s6/ana-pipdrop6.mjs';
 import { cmtKind, predictCmtSettings, CMT_FRAME } from '../research/s6/cmt6.mjs';
 import { cmtWindow } from '../research/s6/ana-cmtsites6.mjs';
 import { columnOf } from '../research/s6/ana-slice6.mjs';
-import { S6_DEVICES } from '../core/fpga/s6/bitstream.js';
+import { S6_DEVICES, emptyFdri } from '../core/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
 const db = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${n}.json`, import.meta.url), 'utf8'));
@@ -60,8 +64,9 @@ test('db: the settings the same at every site of a kind, the two DCMs of a tile 
   const s = db('xc6slx16-cmt-settings');
   assert.equal(s.column, 327);
   const many = Object.values(s.patterns).filter(p => p.sites.length > 1);
-  // the three outputs' designs: each kind measured at both its sites, the same bits
-  assert.deepEqual(many.map(p => p.sites.join(' ')).sort(), ['DCM_X0Y0 DCM_X0Y2', 'DCM_X0Y1 DCM_X0Y3', 'PLL_ADV_X0Y0 PLL_ADV_X0Y1']);
+  // each kind measured at both its sites (a DCM's settings, each PLL's: the three outputs' and the one-output designs')
+  assert.deepEqual([...new Set(many.map(p => p.sites.join(' ')))].sort(), ['DCM_X0Y0 DCM_X0Y2', 'DCM_X0Y1 DCM_X0Y3', 'PLL_ADV_X0Y0 PLL_ADV_X0Y1']);
+  assert.ok(many.filter(p => p.sites[0] === 'PLL_ADV_X0Y0').length >= 7);
   const odd = many.find(p => p.sites.includes('DCM_X0Y1')).bits, even = many.find(p => p.sites.includes('DCM_X0Y0')).bits;
   assert.equal(odd.length, even.length);
   // a few bits the two DCMs share, most apart (not a shift: measured at each)
@@ -74,4 +79,40 @@ test('db: the settings the same at every site of a kind, the two DCMs of a tile 
   const mo = cmt.dcm.variants.dcmM3, me = cmt.dcmEven.variants.dcmM3;
   assert.ok(mo.set.length && me.set.length);
   assert.notDeepEqual(mo.set, me.set);
+});
+
+test('gen-cmtsites6 --outputs: each output of a CMT alone, the pad and the BUFGMUX fixed per site', () => {
+  const ds = cmtOutputDesigns('xc6slx16csg324-3');
+  assert.equal(ds.length, 4 * DCM_ALL.length + 2 * PLL_ALL.length);
+  const y1 = ds.filter(d => d.site === 'DCM_X0Y1');
+  assert.deepEqual(y1.map(d => d.outs[0]), DCM_ALL);
+  assert.equal(new Set(y1.map(d => `${d.pad} ${d.bufgs}`)).size, 1);
+  assert.deepEqual(PLL_ALL.map(([, n]) => n), [4, 8, 16, 4, 8, 16]);
+  const one = cmtSiteDesign(ds.find(d => d.name === 'PLL_ADV_X0Y1-CLKOUT5'));
+  assert.match(one.v, /wire \[0:0\] o, g;\n {2}reg \[0:0\] r = 1'b0;/);
+  assert.match(one.v, /\.CLKOUT5_DIVIDE\(16\)\) cm\(\.CLKIN\(clk\), \.CLKFBIN\(fb\), \.CLKFBOUT\(fb\), \.CLKOUT5\(o\[0\]\), \.RST\(1'b0\)\);/);
+  assert.match(one.v, /always @\(posedge g\[0\]\) r\[0\] <= d \^ r\[0\];/);
+});
+
+test('gen-cmtprobe6 / ana-cmtprobe6: the PIPs not taken apart, each on a TIEOFF net, one per region per design', () => {
+  const { device } = s6Device('xc6slx16csg324-3'), dev = S6_DEVICES.xc6slx16;
+  const list = ['CMT_DCM_BOT A -> B', 'CMT_DCM_BOT C -> D', 'BIOI_INNER E -> F', 'NO_SUCH_TYPE G -> H'];
+  const probes = cmtProbes(device, dev, list);
+  // the one CMT_DCM_BOT tile: its two PIPs in two designs; a type with no tile on the part left out
+  assert.equal(probes.length, 2);
+  assert.deepEqual(probes[0].CMT_DCM_BOT_X11Y8, { from: 'A', dir: '->', to: 'B' });
+  assert.deepEqual(probes[1].CMT_DCM_BOT_X11Y8, { from: 'C', dir: '->', to: 'D' });
+  assert.equal(Object.keys(probes[0]).filter(t => /^BIOI_INNER/.test(t)).length, 1);
+  for (const p of probes) assert.equal(new Set(Object.keys(p).map(t => gridRegion(device, dev, t).join())).size, Object.keys(p).length);
+  assert.ok(intTieoffs(device).every(s => /^TIEOFF_X\d+Y\d+$/.test(s)));
+  // a probe's bits by its tile's region
+  const [c0, b0] = gridRegion(device, dev, 'CMT_DCM_BOT_X11Y8'), fdri = emptyFdri(dev).slice(), word = c0 * 65 + Math.floor((b0 + 5) / 16);
+  fdri[word] ^= 1 << (15 - ((b0 + 5) % 16));
+  const r = probeBits(device, dev, fdri, { CMT_DCM_BOT_X11Y8: 'A -> B' });
+  assert.deepEqual(r, { pips: { 'CMT_DCM_BOT A -> B': ['0,5'] }, unplaced: [] });
+  assert.ok(CONTEXT.test('REG_V_HCLK I_BUFH_RIGHT_SITE0 -> O_BUFH_RIGHT_SITE0'));
+  // the database: no REG_V_HCLK PIP (their probed bits are not theirs in a design)
+  const probe = db('s6-pips-probe').pips;
+  assert.ok(Object.keys(probe).length > 200);
+  assert.ok(!Object.keys(probe).some(k => CONTEXT.test(k)));
 });
