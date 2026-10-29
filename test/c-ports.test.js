@@ -72,16 +72,18 @@ const POS_WARNINGS = [
   "1 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"];
 const FREE_WARNINGS = ["2 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module", "2 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"];
 
-test('#1902 an argument named pos: its port pos_r (neg neg_r), a warning each, as Vitis HLS; #1900 a combinational top: no ap_clk nor ap_rst, its test bench none either; co-simulated in VHDL and Verilog', () => {
+test('#1902 an argument named pos: its port pos_r (neg neg_r), a warning each, as Vitis HLS; #1900 a combinational top: no ap_clk, its ap_rst unused (#1924), its test bench holding it low; co-simulated in VHDL and Verilog', () => {
   assert.equal(cToHdl(POS, { file: 'pick.c' }).ok, true);
-  cosim(POS, 'pick.c', ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return'], POS_WARNINGS);
-  // #1900 combinational: no clock nor reset, in the HDL and in the co-simulation's test bench (ap_ctrl_hs: ap_start /
-  // ap_done / ap_idle / ap_ready only); ap_ctrl_none, only the data ports
+  cosim(POS, 'pick.c', ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return'], POS_WARNINGS);
+  // #1900 combinational: no clock, in the HDL and in the co-simulation's test bench; ap_ctrl_hs: its reset (unused, as
+  // Vitis HLS's of latency 0, #1924, held low by the test bench), ap_start / ap_done / ap_idle / ap_ready; ap_ctrl_none,
+  // only the data ports
   for (const lang of LANGS) {
     const g = cToHdl(POS, { file: 'pick.c', lang });
-    assert.doesNotMatch(g.hdl, /ap_clk|ap_rst/, lang);
+    assert.doesNotMatch(g.hdl, /ap_clk/, lang);
+    assert.match(g.hdl, /ap_rst/, lang);
     const tb = cosimBench(g, simulateC(POS, { file: 'pick.c' }).calls).text;
-    assert.deepEqual([tb.includes('ap_clk'), tb.includes('ap_rst'), /^ {4}ap_start = 1;$/m.test(tb), tb.includes('.pos_r(pos_r)')], [false, false, true, true], lang);
+    assert.deepEqual([tb.includes('ap_clk'), /^ {2}reg ap_rst = 0;$/m.test(tb), tb.includes('.ap_rst(ap_rst)'), /^ {4}ap_start = 1;$/m.test(tb), tb.includes('.pos_r(pos_r)')], [false, true, true, true, true], lang);
   }
   // (function-instantiate's)
   const src = `char foo(char inval, char incr) {
@@ -99,13 +101,14 @@ int main() {
   return a == 4 && b == 9 && c == 96 ? 0 : 1;
 }
 `;
-  const hdl = cosim(src, 'example.cpp', ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'inval1', 'inval2', 'inval3', 'outval1', 'outval1_ap_vld', 'outval2', 'outval2_ap_vld', 'outval3', 'outval3_ap_vld'],
+  const hdl = cosim(src, 'example.cpp', ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'inval1', 'inval2', 'inval3', 'outval1', 'outval1_ap_vld', 'outval2', 'outval2_ap_vld', 'outval3', 'outval3_ap_vld'],
     ['2 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function']);
-  for (const lang of LANGS) assert.doesNotMatch(hdl[lang].hdl, /ap_clk|ap_rst/, lang);
+  // (latency 0: ap_rst, no ap_clk, as Vitis HLS 2025.2 makes function-instantiate, #1924)
+  for (const lang of LANGS) assert.doesNotMatch(hdl[lang].hdl, /ap_clk/, lang);
   assert.equal(hdl.vhdl.latency, null);
   const gi = cToHdl(src, { file: 'example.cpp', lang: 'verilog' });
   const tbi = cosimBench(gi, simulateC(src, { file: 'example.cpp' }).calls).text;
-  assert.deepEqual([tbi.includes('ap_clk'), tbi.includes('ap_rst'), /^ {4}ap_start = 1;$/m.test(tbi)], [false, false, true]);
+  assert.deepEqual([tbi.includes('ap_clk'), tbi.includes('ap_rst'), /^ {4}ap_start = 1;$/m.test(tbi)], [false, true, true]);
   const none = cToHdl('int g(int a) {\n#pragma HLS INTERFACE ap_ctrl_none port=return\n  return a + 1;\n}');
   assert.deepEqual([none.ports.map((p) => p.name), none.diagnostics], [['a', 'ap_return'], []]);
   // sequential (a loop of a count given): the same names
@@ -196,7 +199,7 @@ test('#1900 a combinational module and the modules with ap_ctrl_none through the
   const { compile, elaborate } = await import('../core/compile.js');
   const { synthesizeOpen } = await import('../core/synth-open.js');
   const { yosysNode } = await import('../core/synth-open-node.js');
-  const ctrl = { 'pick.c': ['ap_start', 'ap_done', 'ap_idle', 'ap_ready'], 'sums.cpp': ['ap_clk', 'ap_rst'], 'example.cpp': ['ap_clk', 'ap_rst'] };
+  const ctrl = { 'pick.c': ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'], 'sums.cpp': ['ap_clk', 'ap_rst'], 'example.cpp': ['ap_clk', 'ap_rst'] };
   const warnings = { 'pick.c': POS_WARNINGS, 'sums.cpp': FREE_WARNINGS, 'example.cpp': [] };
   for (const [src, file] of [[POS, 'pick.c'], [FREE, 'sums.cpp'], [DF, 'example.cpp']]) {
     for (const lang of LANGS) {
@@ -346,7 +349,7 @@ const CORPUS_WARNINGS = {
     '20 warning: #pragma HLS FUNCTION_INSTANTIATE is accepted and ignored: Silinx does not make it'],
 };
 
-test('#1900 #1902 #1668 the corpus designs themselves (AMD\'s sources, when fetched): the five with Vitis HLS\'s ports; the combinational ones with no clock nor reset; each one\'s warnings', { skip: fetched }, () => {
+test('#1900 #1902 #1668 the corpus designs themselves (AMD\'s sources, when fetched): the five with Vitis HLS\'s ports; the combinational ones with no clock, their reset unused (#1924); each one\'s warnings', { skip: fetched }, () => {
   for (const name of Object.keys(FORMS)) {
     const g = corpusGen(name);
     assert.deepEqual(comparePorts(ours(g), vitisPorts(name)), { same: true, missing: [], extra: [], differ: [] }, name);
@@ -355,7 +358,8 @@ test('#1900 #1902 #1668 the corpus designs themselves (AMD\'s sources, when fetc
   for (const name of ['interface-memory-rom-lookup-table-math', 'modeling-fixed-point-sqrt', 'modeling-using-arbitrary-precision-casting', 'modeling-using-cpp-templates', 'pipelining-functions-function-instantiate']) {
     const g = corpusGen(name);
     assert.deepEqual(msgs(g), CORPUS_WARNINGS[name], name);
-    assert.deepEqual([g.sequential, g.ports.filter((p) => /^ap_(clk|rst)$/.test(p.name))], [false, []], name);
-    assert.deepEqual(g.ports.slice(0, 4).map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready'], name);
+    // (a combinational top: ap_rst, no ap_clk, as Vitis HLS's of latency 0, #1924; scheduled over cycles as Vitis HLS's: not yet)
+    assert.deepEqual([g.sequential, g.ports.filter((p) => /^ap_(clk|rst)$/.test(p.name)).map((p) => p.name)], [false, ['ap_rst']], name);
+    assert.deepEqual(g.ports.slice(0, 5).map((p) => p.name), ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'], name);
   }
 });

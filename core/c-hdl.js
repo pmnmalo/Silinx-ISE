@@ -95,11 +95,11 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   for (const node of df.graph.nodes) if (node.op === 'in') node.port.name = node.port.param ? rn(node.port.param) + node.port.suffix : rn(node.port.name);
   // the block protocol's ports, as Vitis HLS's (#1900): ap_ctrl_hs's, a sequential module's clock and reset first (a
-  // combinational one has neither); ap_ctrl_none, none of ap_start, ap_done, ap_idle, ap_ready (a sequential module
-  // running by itself, core/c-fsmd.js)
+  // combinational one its reset, unused, but no clock, as Vitis HLS 2025.2 makes a top of latency 0, #1924); ap_ctrl_none,
+  // none of ap_start, ap_done, ap_idle, ap_ready (a sequential module running by itself, core/c-fsmd.js)
   const hs = [{ name: 'ap_start', dir: 'in', w: 1 }, { name: 'ap_done', dir: 'out', w: 1 }, { name: 'ap_idle', dir: 'out', w: 1 }, { name: 'ap_ready', dir: 'out', w: 1 }];
   const clk = { name: 'ap_clk', dir: 'in', w: 1 }, rst = { name: 'ap_rst', dir: 'in', w: 1 };
-  const ctrl = df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst] : [clk, rst, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? hs : [];
+  const ctrl = df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst] : [clk, rst, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? [rst, ...hs] : [];
   const portName = (p) => (p.param ? rn(p.param) + p.name.slice(p.param.length) : p.name);
   const flatPorts = [...ctrl, ...df.ports.map((p) => ({ name: portName(p), dir: p.dir, w: p.w, role: p.role, ...(p.param ? { param: p.param } : {}) }))];
   // (each output by its port's name: an argument named as a reserved word, in, its ports in_r_…: a memory's, a stream's too, #1590)
