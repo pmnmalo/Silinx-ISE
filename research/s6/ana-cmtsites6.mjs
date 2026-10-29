@@ -4,7 +4,7 @@
 // a kind (a DCM's by its Y's parity: the two DCMs of a CMT tile have different bits) and setting. What residual6.mjs
 // leaves there (without the CMT databases) in every design of a kind and setting (cmtCfg) is its pattern.
 //   node research/s6/ana-cmtsites6.mjs <part> <dir> …   (each <dir>/<design>/{top.xdl, top.bit})
-//     -> research/s6/db/<device>-cmt-settings.json: { column: first frame, patterns: { 'kind cfg': { sites, bits: ['frame in
+//     -> packages/silinx-fpga/bitdb/s6/<device>-cmt-settings.json: { column: first frame, patterns: { 'kind cfg': { sites, bits: ['frame in
 //        row,bit'] } } }
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,9 +28,9 @@ export function cmtWindow(device, dev, inst, column) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [part, ...dirs] = process.argv.slice(2);
   if (!dirs.length) { console.error('usage: node research/s6/ana-cmtsites6.mjs <part> <dir> …'); process.exit(1); }
-  const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, ''), { device } = s6Device(part);
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, ''), { device } = s6Device(part);
   const db = { part, slices: loadDb(dv), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
-    other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...read('s6-pips-clock').pips, ...(fs.existsSync(new URL('./db/s6-pips-probe.json', import.meta.url)) ? read('s6-pips-probe').pips : {}) } }, iob: read(`${dv}-iob`), clocks: read('s6-clocks') };
+    other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...read('s6-pips-clock').pips, ...(fs.existsSync(new URL('../../packages/silinx-fpga/bitdb/s6/s6-pips-probe.json', import.meta.url)) ? read('s6-pips-probe').pips : {}) } }, iob: read(`${dv}-iob`), clocks: read('s6-clocks') };
   const seen = new Map();
   let dev = null, column = null;
   for (const dir of dirs) for (const n of fs.readdirSync(dir)) {
@@ -56,5 +56,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const extra = l.map(s => s.mine.size - core.length);
     console.log(`${key.slice(0, 60)}…: ${l.length} designs (${[...new Set(l.map(s => s.site))].join(' ')}), ${core.length} bits${extra.some(Boolean) ? `; beyond them ${extra.join(' ')}` : ''}`);
   }
-  fs.writeFileSync(new URL(`./db/${dv}-cmt-settings.json`, import.meta.url), `${JSON.stringify({ column: column[0], patterns })}\n`);
+  fs.writeFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${dv}-cmt-settings.json`, import.meta.url), `${JSON.stringify({ column: column[0], patterns })}\n`);
 }

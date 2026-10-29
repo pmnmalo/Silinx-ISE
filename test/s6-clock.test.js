@@ -22,7 +22,7 @@ test('gen-clock6: flip-flops at fixed slices on one or two clocks; a clock on ev
   assert.deepEqual(padsForBufgs(pads), ['P', 'R']);
   const { sites } = s6Device('xc6slx16csg324-3');
   assert.equal(padsForBufgs([...sites.pads.values()].filter(p => p.bufg.length)).length, 16);
-  const bases = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
+  const bases = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
   assert.equal(sliceAt(bases, S6_DEVICES.xc6slx16, 327, 0), 'SLICE_X16Y9');
   assert.equal(sliceAt(bases, S6_DEVICES.xc6slx16, 1, 0), null);
 });
@@ -47,7 +47,7 @@ test('gen-dcm6: a DCM or PLL at a site, its output through a BUFG; the variants;
 });
 
 test('the XC6SLX16\'s DCM and PLL settings, measured: the counters\' bits, one or a few per value', () => {
-  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-cmt.json', import.meta.url), 'utf8'));
+  const db = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-cmt.json', import.meta.url), 'utf8'));
   const v = db.dcm.variants;
   // CLKFX_MULTIPLY - 1 in binary: 2 (the base: 1), 3 (2), 4 (3), 5 (4), 8 (7)
   assert.deepEqual(v.dcmM3.set, ['357,416']);
@@ -75,7 +75,7 @@ test('the clock pads: a BUFG per BUFGMUX from two pads; each pad\'s REGC and I/O
     [{ bufg: 'B1', pad: 'P' }, { bufg: 'B1', pad: 'R' }, { bufg: 'B2', pad: 'Q' }]);
   const { sites } = s6Device('xc6slx16csg324-3');
   assert.equal(bufgSelections([...sites.pads.values()].filter(p => p.bufg.length)).length, 32);
-  const read = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${n}.json`, import.meta.url), 'utf8'));
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8'));
   const clocks = read('s6-clocks'), iob = read('xc6slx16-iob');
   // the 32 clock pads, a REGC bit each (976 … 1007, all different) and an I/O offset
   assert.equal(Object.keys(clocks.pads).length, 32);
@@ -95,7 +95,7 @@ net "c" , outpin "clk" I , inpin "g" I0 , ;
 });
 
 test('the CMT sites: a DCM\'s or PLL\'s bits at minor 30 of the CMT column in its row, an even DCM\'s 283 bits on', () => {
-  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-cmt.json', import.meta.url), 'utf8'));
+  const db = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-cmt.json', import.meta.url), 'utf8'));
   // DCM_X0Y1 (row 0) frame 357 = column 12's first (327) + 30; PLL_ADV_X0Y0 (row 1) 744 + 357
   const dev = S6_DEVICES.xc6slx16;
   let c12 = 0;
@@ -113,7 +113,7 @@ test('a SLICEM as a shift register on a clock: minors 16 to 19 of its column\'s 
   const dev = S6_DEVICES.xc6slx16, { device } = s6Device('xc6slx16csg324-3');
   const db = { part: 'xc6slx16csg324-3', slices: loadDb('xc6slx16'), int: { pips: {}, cover: {} }, other: { pips: {} } };
   const srl = cfg => parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";\ninst "s" "SLICEM",placed CLEXM_X12Y42 SLICE_X18Y42 , cfg " ${cfg} " ;\n`);
-  const bases = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
+  const bases = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
   const c0 = columnOf(dev, bases.SLICE_X18Y42[0])[0], want = [16, 17, 18, 19].map(m => `${c0 + m},527`);
   // measured: SLICE_X18Y42's column at frame 1846 (row 2), the bits 1862 … 1865, 527
   assert.deepEqual(want, ['1862,527', '1863,527', '1864,527', '1865,527']);
@@ -145,7 +145,7 @@ net "c" , outpin "cm" CLKFX , inpin "bo" I0 , ;
   assert.equal(predictCmt(kind, { pad: 'K3', bufgs: [] }), null);
   assert.equal(predictCmt(kind, { pad: 'V10', bufgs: ['BUFGMUX_X3Y16'] }), null);
   // the measured database: three other pads and three other BUFGMUXes for each
-  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-cmt-paths.json', import.meta.url), 'utf8'));
+  const db = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-cmt-paths.json', import.meta.url), 'utf8'));
   assert.deepEqual(Object.keys(db.dcm.pads).sort(), ['R8', 'T9', 'U10']);
   assert.equal(db.dcm.site, 'DCM_X0Y1');
   assert.equal(db.pll.site, 'PLL_ADV_X0Y0');

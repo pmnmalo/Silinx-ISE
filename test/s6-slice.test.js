@@ -148,8 +148,8 @@ test('ana-slice6: a frame\'s column; a slice\'s bits in its column and band; the
 });
 
 test('the XC6SLX16\'s slice settings, measured: the flip-flops\', the SLICEX\'s frame its neighbour\'s', () => {
-  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-slice.json', import.meta.url), 'utf8'));
-  const luts = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-lut.json', import.meta.url), 'utf8'));
+  const db = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-slice.json', import.meta.url), 'utf8'));
+  const luts = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-lut.json', import.meta.url), 'utf8'));
   const v = (k, n) => db.kinds[k].variants[n];
   // SYNC_ATTR: SYNC sets one bit, ASYNC clears it; a flip-flop as a latch, AND2L or OR2L: one bit for the four
   assert.deepEqual(v('L', 'SYNC_ATTR=ASYNC'), { set: [], clear: [[4, 27]] });
@@ -169,7 +169,7 @@ test('the XC6SLX16\'s slice settings, measured: the flip-flops\', the SLICEX\'s 
 });
 
 test('the XC6SLX16\'s slice settings with nets on the pins, measured: CLKINV, CE and SR used, the outputs\' muxes', () => {
-  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-slice-nets.json', import.meta.url), 'utf8'));
+  const db = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-slice-nets.json', import.meta.url), 'utf8'));
   const v = (k, n) => db.kinds[k].variants[n];
   for (const [k, f] of [['L', 4], ['M', 5], ['X', -1]]) {
     assert.deepEqual(v(k, 'CLKINV=CLK_B'), { set: [[f, k === 'X' ? 24 : 35]], clear: [] }, k);
@@ -182,12 +182,12 @@ test('the XC6SLX16\'s slice settings with nets on the pins, measured: CLKINV, CE
   assert.deepEqual(v('L', 'AFFMUX=AX'), { set: [[4, 56], [4, 58]], clear: [] });
   assert.deepEqual(v('M', 'WEMUX=CE'), { set: [[2, 40]], clear: [] });
   // the settings without a pin are as without nets
-  const plain = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-slice.json', import.meta.url), 'utf8'));
+  const plain = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-slice.json', import.meta.url), 'utf8'));
   for (const k of ['X', 'L', 'M']) for (const n of ['SYNC_ATTR=ASYNC', 'AFF=#LATCH', 'BFFSRINIT=SRINIT1', 'CFFMUX=XOR'].filter(x => plain.kinds[k].variants[x])) assert.deepEqual(v(k, n), plain.kinds[k].variants[n], `${k} ${n}`);
 });
 
 test('the XC6SLX16\'s slice settings with the carry, F7 / F8 and the 5-input flip-flops in use, measured', () => {
-  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-slice-full.json', import.meta.url), 'utf8'));
+  const db = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-slice-full.json', import.meta.url), 'utf8'));
   for (const [k, f] of [['L', 4], ['M', 5]]) {
     const v = n => db.kinds[k].variants[n];
     // CY0 = O5 one bit per LUT, AX none; COUTUSED off clears the four; PRECYINIT 0 none, 1 and AX a bit each
@@ -206,7 +206,7 @@ test('the XC6SLX16\'s slice settings with the carry, F7 / F8 and the 5-input fli
 });
 
 test('the XC6SLX16\'s SLICEX settings by tile type: the flip-flops\' SRINIT bits in minor 20 of the column', () => {
-  const read = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/xc6slx16-${n}.json`, import.meta.url), 'utf8'));
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/xc6slx16-${n}.json`, import.meta.url), 'utf8'));
   const m = read('slice-full-clexm').kinds.X.variants, l = read('slice-full-clexl13').kinds.X.variants;
   // a SLICEX's base is minor 26 of a CLEXL column, 27 of a CLEXM: the same bits one frame apart from it
   for (const [n, b] of [['A5FFSRINIT=SRINIT1', 46], ['B5FFSRINIT=SRINIT1', 42], ['CFFSRINIT=SRINIT1', 22], ['C5FFSRINIT=SRINIT1', 23], ['D5FFSRINIT=SRINIT1', 17]]) {

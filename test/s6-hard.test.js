@@ -10,7 +10,7 @@ import { gridRegion } from '../research/s6/ana-pipdrop6.mjs';
 import { S6_DEVICES } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
-const hard = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-hard.json', import.meta.url), 'utf8'));
+const hard = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-hard.json', import.meta.url), 'utf8'));
 const { device } = s6Device('xc6slx16csg324-3'), dev = S6_DEVICES.xc6slx16;
 const sitesOf = type => device.sites().filter(s => s.type === type).sort((a, b) => (a.name < b.name ? -1 : 1));
 
@@ -154,7 +154,7 @@ test('hard6: a hex value\'s bits; INIT and SRVAL as wide as their ports; an inst
 });
 
 test('db/xc6slx45-hard.json: the XC6SLX16\'s offsets, contents\' orders, fields and clock pins; its own sites', () => {
-  const h45 = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx45-hard.json', import.meta.url), 'utf8'));
+  const h45 = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx45-hard.json', import.meta.url), 'utf8'));
   for (const t of ['RAMB16BWER', 'RAMB8BWER', 'DSP48A1']) {
     h45[t].slots.forEach((s, j) => {
       const o = hard[t].slots[j];

@@ -3,7 +3,7 @@
 // by the id designs (pad n's bits are in design id<j> / inid<j> when bit j of n is set); a bit only a variant sets or
 // clears goes to the pad that has it in either, else whose bits are nearest. Each pad's settings: its base bits and,
 // per variant, the bits it sets and clears against the base (an input's variants against the input).
-//   node research/s6/ana-iob6.mjs <dir> [part]   -> research/s6/db/<device>-iob.json
+//   node research/s6/ana-iob6.mjs <dir> [part]   -> packages/silinx-fpga/bitdb/s6/<device>-iob.json
 // { part, globals: ['frame,bit' any pad in use sets], pads: { pad: { base: ['frame,bit'] (an output's), input: [an
 // input's], variants: { name: { set, clear } } } } }
 import fs from 'node:fs';
@@ -68,5 +68,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const none = pads.filter(x => !out[x].base.length);
   console.log(`${part}: ${pads.length} pads, base ${base.size} bits; ${none.length} pads with no base bits${none.length ? ` (${none.slice(0, 8).join(' ')}…)` : ''}; global bits ${[...new Set(globals)].join(' ')}${problems.length ? `; ${problems.slice(0, 4).join('; ')}` : ''}`);
   for (const [n, c] of Object.entries(counts)) console.log(`  ${n}: ${Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, m]) => `${k}×${m}`).join(' ')}`);
-  fs.writeFileSync(new URL(`./db/${dev.device}-iob.json`, import.meta.url), `${JSON.stringify({ part, globals: [...new Set(globals)], pads: out })}\n`);
+  fs.writeFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${dev.device}-iob.json`, import.meta.url), `${JSON.stringify({ part, globals: [...new Set(globals)], pads: out })}\n`);
 }

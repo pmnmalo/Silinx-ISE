@@ -2,7 +2,7 @@
 // design's base, all its changed bits that PIP's (one PIP per drop: no region to tell apart), as offsets from its
 // tile's region (gridRegion; the CLKC tile's bits are far from it, its region the same in every design). A bit two
 // PIPs share by an OR (another of the group still there) does not change: those are cmt6.mjs's rules.
-//   node research/s6/ana-cmtdrop6.mjs <dir> [part]   -> research/s6/db/s6-pips-cmt.json ({ pips: { 'TYPE from dir to': ['minor,bit'] } })
+//   node research/s6/ana-cmtdrop6.mjs <dir> [part]   -> packages/silinx-fpga/bitdb/s6/s6-pips-cmt.json ({ pips: { 'TYPE from dir to': ['minor,bit'] } })
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,5 +28,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     pips[`${tile.replace(/_X\d+Y\d+$/, '')} ${pip}`] = dropBits(device, dev, readBit6(fs.readFileSync(bit(`${design}.base.bit`))).fdri, readBit6(fs.readFileSync(bit(`${name}.drop.bit`))).fdri, tile);
   }
   console.log(`${Object.keys(pips).length} PIPs, ${Object.values(pips).filter(b => b.length).length} with bits; ${missing} drops without a bitstream`);
-  fs.writeFileSync(new URL('./db/s6-pips-cmt.json', import.meta.url), `${JSON.stringify({ note: 'The CMT paths\' PIPs dropped one at a time in context (#1951); offsets from gridRegion.', pips })}\n`);
+  fs.writeFileSync(new URL('../../packages/silinx-fpga/bitdb/s6/s6-pips-cmt.json', import.meta.url), `${JSON.stringify({ note: 'The CMT paths\' PIPs dropped one at a time in context (#1951); offsets from gridRegion.', pips })}\n`);
 }

@@ -33,7 +33,7 @@ export function clockPadBits(left, pad, regcFrame, iobStart) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [dir, part = 'xc6slx16csg324-3'] = process.argv.slice(2);
   if (!dir) { console.error('usage: node research/s6/ana-clock6.mjs <dir> [part]'); process.exit(1); }
-  const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, ''), { device } = s6Device(part);
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, ''), { device } = s6Device(part);
   const db = { part, slices: loadDb(dv), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
     other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips } }, iob: read(`${dv}-iob`) };
   const pads = {}, problems = [], spine = {};
@@ -55,7 +55,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   const offsets = new Set(Object.values(pads).map(p => p.iob));
   console.log(`${part}: ${Object.keys(pads).length} clock pads; their I/O offsets ${[...offsets].join(' ')}; ${problems.length} problems${problems.length ? `: ${problems.join('; ')}` : ''}`);
-  fs.writeFileSync(new URL('./db/s6-clocks.json', import.meta.url), `${JSON.stringify({ regcFrame: REGC_FRAME, pads })}\n`);
-  fs.writeFileSync(new URL('./db/s6-pips-clock.json', import.meta.url), `${JSON.stringify({ note: 'A BUFG spine\'s PIPs the PIP drop could not take apart (#727): its leftover bits in the centre\'s clock column on the first, the others none; offsets from gridRegion.', pips: spine })}\n`);
+  fs.writeFileSync(new URL('../../packages/silinx-fpga/bitdb/s6/s6-clocks.json', import.meta.url), `${JSON.stringify({ regcFrame: REGC_FRAME, pads })}\n`);
+  fs.writeFileSync(new URL('../../packages/silinx-fpga/bitdb/s6/s6-pips-clock.json', import.meta.url), `${JSON.stringify({ note: 'A BUFG spine\'s PIPs the PIP drop could not take apart (#727): its leftover bits in the centre\'s clock column on the first, the others none; offsets from gridRegion.', pips: spine })}\n`);
   console.log(`spine PIPs: ${Object.keys(spine).length}, ${Object.values(spine).filter(b => b.length).length} with bits`);
 }
