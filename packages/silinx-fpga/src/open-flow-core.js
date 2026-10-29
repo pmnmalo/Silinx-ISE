@@ -17,6 +17,9 @@
 //   io.frontEnd(sources, top)          the HDL front end (core/synth-front.js flowFrontEnd): { errors, input() } of the
 //                                      synthesis; without it the sources are the flat Verilog Yosys synthesizes (#1675)
 //   io.simModels(ctx)                  the simulation models' steps (core/flow-models.js mountSimModels), optional
+//   io.placeRoute(netlist, packed, device, knownPips, options)
+//                                      the place and route (#1678), optional: fpga/place-route.js placeRouteBest by default;
+//                                      another engine (nextpnr, #1953) returns its result's shape
 // core/flow-ide.js runOpenFlow is runFlow with the IDE's front end and simulation models (#1675).
 // spec.resources: the part's resources (core/resources.js resourcesOf(part, pkg)), for the synthesis's used of
 // available and its check (#795); without them the synthesis gives the used ones only.
@@ -202,7 +205,7 @@ export async function runFlow(spec, io) {
     let pr;
     const tried = [], placeWarned = new Set();
     try {
-      pr = placeRouteBest(netlist, packed, d, k, {
+      pr = (io.placeRoute || placeRouteBest)(netlist, packed, d, k, {
         seed: spec.seed || 1, tries: parTries(packed.stats.slices), extra: parExtra(), effort: spec.effort || 1, replicate: spec.replicate !== false, routeIterations: spec.routeIterations || null, pack: { ucf: ucfText, part: spec.part },
         onRouted: (p, info) => {
           if (info.replication) return;
