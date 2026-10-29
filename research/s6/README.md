@@ -679,7 +679,15 @@ traffic, blinky and pong on the Atlys):
   no ISE design of night 1 used (a left I/O tile's output path, the BIOB_SINGLE pads), routed on every switch by the
   fallback; their measurement is next.
 - The Atlys's stopwatch, clock and vga were left out: routing them on the known switches took over an hour (the
-  router's search when a net cannot be routed on them), to be made fast first.
+  router's search when a net cannot be routed on them), made fast since (#2074: 142 s).
+- **The PIPs the open flow needs, measured** (round b: `gen-flowdrop6.mjs`, each PIP `predictDesign` names as not in
+  the databases dropped alone from the first open-flow design that has it; `ana-cmtdrop6.mjs <dir> <part>
+  s6-pips-flow`: `bitdb/s6/s6-pips-flow.json`): 21 PIPs, 5 with bits (a right I/O tile's input route-through, a left
+  one's output path, a top tile's IBUF0, an Atlys clock feed-through), the others none (the BIOB_SINGLE and LIOB pads,
+  the block RAM's clock and reset pins). **With them, the eleven open-flow designs left are byte-identical with ISE's
+  bitgen** (the Atlys's stopwatch, clock, vga, blinky and traffic, the Nexys3's, and gates on the Nexys3 with no UCF,
+  its pads on the right side), every one with no DRC error: **all seven examples on both boards** come out of the
+  open flow with ISE's own bitstream for their routing.
 
 ## Trying the parts that exist
 
@@ -740,6 +748,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
 | `sta6.mjs` | The static timing of a routed design (its XDL): the slices' and hard blocks' arcs, PERIOD slack and OFFSET IN / OUT against trce's (#731) |
 | `flow-xdl6.mjs` | The examples routed as the open flow routes them, written as XDL for ISE's DRC and bitgen (#732) |
+| `gen-flowdrop6.mjs` | The PIPs of the open flow's designs not in the databases, each dropped alone in context for ISE (#732) |
 | `check-bitgen6.mjs` | The Silinx toolchain's .bit of each routed XDL against ISE's bitgen's, byte for byte (#732) |
 | `fit-model6.mjs` | The timing model of the Silinx toolchain fitted on routed designs: `packages/silinx-fpga/src/fpga/s6/timing-model.js` (#732) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |

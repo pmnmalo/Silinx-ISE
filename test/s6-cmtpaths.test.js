@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { cmtMuxDesigns, cmtSiteDesign } from '../research/s6/gen-cmtsites6.mjs';
 import { xdlPips, oneDrops } from '../research/s6/gen-cmtdrop6.mjs';
+import { unknownPips } from '../research/s6/gen-flowdrop6.mjs';
+import { loadBitDbS6 } from '../packages/silinx-fpga/src/fpga/s6/bitdb-node.js';
 import { dropBits } from '../research/s6/ana-cmtdrop6.mjs';
 import { cmtInputTable } from '../research/s6/ana-cmtinput6.mjs';
 import { gridRegion } from '../research/s6/ana-pipdrop6.mjs';
@@ -122,4 +124,12 @@ test('residual6: a bitstream\'s bits set against the empty one, the block RAM\'s
   flip(fdri, bram + 1, 5);
   assert.deepEqual([...setBits({ fdri }, dev, false)], ['3,64']);
   assert.deepEqual([...setBits({ fdri }, dev, true)].sort(), ['3,64', `${bram + 1},5`].sort());
+});
+
+test('gen-flowdrop6: the PIPs of the open flow\'s designs the databases do not have (not the settings, not the known PIPs)', () => {
+  const { device } = s6Device('xc6slx16csg324-3'), dev = S6_DEVICES.xc6slx16, db = loadBitDbS6('xc6slx16csg324-3');
+  const xdl = pips => `design "d" xc6slx16csg324-3 v3.2 ,\n  cfg "";\nnet "n" ,\n${pips.map(p => `  pip ${p} ,`).join('\n')}\n  ;\n`;
+  const known = 'RIOI D_ILOGIC_SITE -> FABRICOUT_ILOGIC_SITE', unknown = 'RIOI NOSUCH_A -> NOSUCH_B';
+  const u = unknownPips([['a', xdl([`RIOI_X28Y5 ${known.split(' ').slice(1).join(' ')}`, `RIOI_X28Y5 ${unknown.split(' ').slice(1).join(' ')}`])]], device, dev, db);
+  assert.deepEqual([...u], [unknown]);
 });

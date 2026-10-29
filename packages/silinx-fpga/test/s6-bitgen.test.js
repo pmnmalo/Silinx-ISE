@@ -145,3 +145,16 @@ test('bitgen-slice: a flip-flop set as a gate, #AND2L / #OR2L in the XDL, by the
     assert.notDeepEqual([...predictSlice(m, cfg({ BFF: '#AND2L' })).bits].sort(), [...predictSlice(m, cfg({ BFF: '#FF' })).bits].sort(), kind);
   }
 });
+
+test('bitdb-node: the open flow\'s PIPs measured one at a time (#732: a right I/O tile\'s input, a left one\'s output, the BIOB_SINGLE pads)', () => {
+  const p = db.other.pips;
+  assert.deepEqual(p['RIOI D_ILOGIC_SITE -> FABRICOUT_ILOGIC_SITE'], ['23,57', '29,28']);
+  assert.deepEqual(p['RIOI RIOI_IOB_IBUF1 -> D_ILOGIC_IDATAIN_IODELAY_S'], []);
+  assert.deepEqual(p['LIOI D1_OLOGIC_SITE -> OQ_OLOGIC_SITE'], ['27,29', '28,49', '29,32']);
+  assert.deepEqual(p['BIOB_SINGLE BIOB_O0 -> BIOB_O0_PINW'], []);
+  // the router may take them now
+  const allow = knownPipS6(device, db), k = device.tileNames.findIndex(n => /^RIOI_X/.test(n)), tp = device.templates[device.tileTemplate[k]];
+  let i = 0;
+  for (; i < tp.from.length; i++) { const q = device.pip(k, i); if (q.from === 'D_ILOGIC_SITE' && q.to === 'FABRICOUT_ILOGIC_SITE') break; }
+  assert.ok(i < tp.from.length && allow(k, i));
+});
