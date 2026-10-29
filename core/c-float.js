@@ -8,6 +8,8 @@
 //   BITCASTS                          a union's float and double members (core/c-union.js, #1896): name -> { fl: the
 //                                     float's bits, bits: true for float -> bits, else bits -> float }
 
+import { JS_MATH } from './c-mathlib.js';
+
 export const F64 = { fl: 64, w: 64, s: true };
 export const F32 = { fl: 32, w: 32, s: true };
 export const floatType = (t) => (t.name === 'float' ? F32 : F64);
@@ -83,14 +85,15 @@ const R = (f) => ({ n: 1, f });
 const CMIN = (a, b) => (Number.isNaN(a) ? b : Number.isNaN(b) ? a : Math.min(a, b));
 const CMAX = (a, b) => (Number.isNaN(a) ? b : Number.isNaN(b) ? a : Math.max(a, b));
 const CSIGN = (a, b) => (b < 0 || Object.is(b, -0) ? -Math.abs(a) : Math.abs(a));
+// (exp, log, sin, cos, pow and their float ones: Silinx's own (core/c-mathlib.js), the hardware's algorithm, #1761)
 export const MATH = {
-  sqrt: R(Math.sqrt), sqrtf: R(Math.sqrt), fabs: R(Math.abs), fabsf: R(Math.abs), exp: R(Math.exp), log: R(Math.log), log2: R(Math.log2),
-  log10: R(Math.log10), sin: R(Math.sin), cos: R(Math.cos), tan: R(Math.tan), asin: R(Math.asin), acos: R(Math.acos),
+  sqrt: R(Math.sqrt), sqrtf: R(Math.sqrt), fabs: R(Math.abs), fabsf: R(Math.abs), exp: R(JS_MATH.exp), log: R(JS_MATH.log), log2: R(Math.log2),
+  log10: R(Math.log10), sin: R(JS_MATH.sin), cos: R(JS_MATH.cos), tan: R(Math.tan), asin: R(Math.asin), acos: R(Math.acos),
   atan: R(Math.atan), sinh: R(Math.sinh), cosh: R(Math.cosh), tanh: R(Math.tanh), floor: R(Math.floor), ceil: R(Math.ceil),
-  trunc: R(Math.trunc), cbrt: R(Math.cbrt), expf: R(Math.exp), logf: R(Math.log), sinf: R(Math.sin), cosf: R(Math.cos),
+  trunc: R(Math.trunc), cbrt: R(Math.cbrt), expf: R(JS_MATH.expf), logf: R(JS_MATH.logf), sinf: R(JS_MATH.sinf), cosf: R(JS_MATH.cosf),
   // (round: half away from zero, as C's)
   round: R((x) => Math.sign(x) * Math.round(Math.abs(x))), roundf: R((x) => Math.sign(x) * Math.round(Math.abs(x))),
-  pow: { n: 2, f: Math.pow }, powf: { n: 2, f: Math.pow }, atan2: { n: 2, f: Math.atan2 }, hypot: { n: 2, f: Math.hypot },
+  pow: { n: 2, f: JS_MATH.pow }, powf: { n: 2, f: JS_MATH.powf }, atan2: { n: 2, f: Math.atan2 }, hypot: { n: 2, f: Math.hypot },
   fmod: { n: 2, f: (a, b) => a % b },
   // (fmin, fmax: a NaN and a number the number, as C's; copysign: a NaN's sign not known, +, #1843)
   fmin: { n: 2, f: CMIN }, fmax: { n: 2, f: CMAX }, fminf: { n: 2, f: CMIN }, fmaxf: { n: 2, f: CMAX },

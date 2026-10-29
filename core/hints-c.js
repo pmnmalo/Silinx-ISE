@@ -39,9 +39,9 @@ export const C_HINTS = [
   },
   {
     id: 'c-float', re: /^(\w+): floating point is not supported in Silinx HLS yet|floating point \((.+)\) is not supported in Silinx HLS yet/,
-    en: { explain: 'Silinx HLS makes float and double in hardware (IEEE-754: + - * /, the comparisons and the conversions, each a circuit of its own, as Vitis HLS\'s cores), sqrt, fabs, floor, ceil, trunc, round, fmin, fmax and copysign too; $1 (math.h) only of constants (a table, computed at synthesis), not yet of other values.',
+    en: { explain: 'Silinx HLS makes float and double in hardware (IEEE-754: + - * /, the comparisons and the conversions, each a circuit of its own, as Vitis HLS\'s cores), sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos and pow too (#1761); $1 (math.h) only of constants (a table, computed at synthesis), not yet of other values.',
       fix: 'Compute it with + - * (a polynomial, a table), or keep it in the test bench (main and what only it calls).' },
-    pt: { explain: 'O Silinx HLS faz float e double em hardware (IEEE-754: + - * /, as comparações e as conversões, cada uma um circuito, como os cores do Vitis HLS), sqrt, fabs, floor, ceil, trunc, round, fmin, fmax e copysign também; $1 (math.h) só de constantes (uma tabela, calculada na síntese), ainda não de outros valores.',
+    pt: { explain: 'O Silinx HLS faz float e double em hardware (IEEE-754: + - * /, as comparações e as conversões, cada uma um circuito, como os cores do Vitis HLS), sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos e pow também (#1761); $1 (math.h) só de constantes (uma tabela, calculada na síntese), ainda não de outros valores.',
       fix: 'Calcule-o com + - * (um polinómio, uma tabela), ou deixe-o no test bench (o main e o que só ele chama).' },
   },
   {

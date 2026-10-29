@@ -53,10 +53,10 @@ test('#1779 the tables computed at synthesis (ROMs of the C simulation\'s values
 
 test('#1779 not a table (an argument read, an array written elsewhere): not folded; math.h of a value that is not a constant, said', () => {
   const errs = (src) => cToHdl(src, { file: 'e.c' }).diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`);
-  assert.deepEqual(errs('#include <math.h>\ndouble f(double x) { return sin(x); }\n'),
-    ['2 sin: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax and copysign, the others only of constants, a table computed at synthesis, #1761)']);
-  assert.deepEqual(errs('#include <math.h>\nstatic void fill(int t[4], int k) { for (int i = 0; i < 4; i++) t[i] = (int)sin(i * k); }\nint f(int k) {\n  int t[4];\n  fill(t, k);\n  return t[k & 3];\n}\n'),
-    ['2 sin: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax and copysign, the others only of constants, a table computed at synthesis, #1761)']);
+  assert.deepEqual(errs('#include <math.h>\ndouble f(double x) { return tan(x); }\n'),
+    ['2 tan: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos and pow, the others only of constants, a table computed at synthesis, #1761)']);
+  assert.deepEqual(errs('#include <math.h>\nstatic void fill(int t[4], int k) { for (int i = 0; i < 4; i++) t[i] = (int)tan(i * k); }\nint f(int k) {\n  int t[4];\n  fill(t, k);\n  return t[k & 3];\n}\n'),
+    ['2 tan: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos and pow, the others only of constants, a table computed at synthesis, #1761)']);
   // (a division of constants: folded)
   assert.deepEqual(errs('double f(double x) { return x * (1.0 / 3.0); }\n'), []);
 });

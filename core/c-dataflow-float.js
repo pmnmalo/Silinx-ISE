@@ -8,13 +8,14 @@ import { BOOL, INT, typeOf } from './c-types.js';
 import { F32, F64, MATH } from './c-float.js';
 import { parse } from './c-parse.js';
 import { SOFTFLOAT32, SOFTFLOAT64 } from './c-softfloat.js';
+import { MATHLIB } from './c-mathlib.js';
 
 const U32 = { w: 32, s: false, ap: false };
 let LIB = null;
 /** The library's functions (parsed once, their loops unrolled). */
 function lib() {
   if (LIB) return LIB;
-  const ast = parse(`${SOFTFLOAT32}\n${SOFTFLOAT64}`, 'silinx-softfloat.c');
+  const ast = parse(`${SOFTFLOAT32}\n${SOFTFLOAT64}\n${MATHLIB}`, 'silinx-softfloat.c');
   const walk = (n) => {
     if (!n || typeof n !== 'object') return;
     if (Array.isArray(n)) { n.forEach(walk); return; }
@@ -38,6 +39,8 @@ const TYPE = { 32: F32, 64: F64 };
 // (floor, ceil, trunc, round, fmin, fmax, copysign too, #1843)
 const HW_MATH = { sqrt: [64, 'sqrt'], sqrtf: [32, 'sqrt'], fabs: [64, 'abs'], fabsf: [32, 'abs'] };
 for (const op of ['floor', 'ceil', 'trunc', 'round', 'fmin', 'fmax', 'copysign']) { HW_MATH[op] = [64, op]; HW_MATH[`${op}f`] = [32, op]; }
+// (exp, log, sin, cos, pow: Silinx's own library, core/c-mathlib.js, #1761)
+for (const op of ['exp', 'log', 'sin', 'cos', 'pow']) { HW_MATH[op] = [64, op]; HW_MATH[`${op}f`] = [32, op]; }
 
 export const floatMethods = {
   /** The library's function `name` called on the values args, where the operation is: its result of type rt. */
@@ -113,7 +116,7 @@ export const floatMethods = {
       if (op === 'abs') return this.v(this.g.add('and', [as[0].id, this.g.const((1n << BigInt(fl - 1)) - 1n, TYPE[fl])], TYPE[fl]), TYPE[fl]);
       return this.softfloat(`ap_f${fl}_${op}`, as, TYPE[fl], g, e.loc);
     }
-    if (xs.some((x) => x === null)) this.error(e.loc, `${name}: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax and copysign, the others only of constants, a table computed at synthesis, #1761)`);
+    if (xs.some((x) => x === null)) this.error(e.loc, `${name}: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos and pow, the others only of constants, a table computed at synthesis, #1761)`);
     const r = m.f(...xs);
     if (m.int) return this.v(this.g.const(BigInt(r), { w: 64, s: true }), { w: 64, s: true });
     return name.endsWith('f') ? this.v(this.g.const(f32Bits(Math.fround(r)), F32), F32) : this.v(this.g.const(f64Bits(r), F64), F64);

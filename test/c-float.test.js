@@ -92,7 +92,7 @@ test('C++\'s cout of doubles (6 significant digits), fixed / scientific / defaul
 
 test('floating point in hardware: math.h of values but sqrt and fabs refused (float and double made: test/c-float-hw.test.js, #1768, #1773, #1783)', () => {
   // (sqrt made, #1783; exp of a value not yet)
-  assert.deepEqual(errs('#include <math.h>\nint f(int x) {\n  return (int)sqrt(x) + (int)exp(x);\n}\n'), ['3 exp: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax and copysign, the others only of constants, a table computed at synthesis, #1761)']);
+  assert.deepEqual(errs('#include <math.h>\nint f(int x) {\n  return (int)sqrt(x) + (int)tan(x);\n}\n'), ['3 tan: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos and pow, the others only of constants, a table computed at synthesis, #1761)']);
   // (a double and a double constant: made, #1773)
   assert.deepEqual(errs('int f(int x) {\n  double d = x * 0.5;\n  return d;\n}\n'), []);
   assert.deepEqual(errs('int f(int x) {\n  return x * 0.5;\n}\n'), []);
