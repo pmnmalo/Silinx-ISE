@@ -67,8 +67,10 @@ export function compiledRun(src) {
     fs.writeFileSync(path.join(dir, 't.c'), src);
     const exe = path.join(dir, process.platform === 'win32' ? 't.exe' : 't');
     // (math.h's functions: libm, a library of its own on Linux; -ffp-contract=off: a * b + c two roundings, as C's
-    // abstract machine and the C simulation, not a fused multiply-add, clang's default on arm64, #1773)
-    execFileSync(CC, ['-std=c99', ...CC_WARN, '-fsigned-char', '-fwrapv', '-ffp-contract=off', '-O0', '-o', exe, path.join(dir, 't.c'), '-lm'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    // abstract machine and the C simulation, not a fused multiply-add, clang's default on arm64, #1773; on Windows,
+    // MinGW's bit-fields laid out as GCC's elsewhere, not Microsoft's, #1975)
+    const ms = process.platform === 'win32' ? ['-mno-ms-bitfields'] : [];
+    execFileSync(CC, ['-std=c99', ...CC_WARN, ...ms, '-fsigned-char', '-fwrapv', '-ffp-contract=off', '-O0', '-o', exe, path.join(dir, 't.c'), '-lm'], { stdio: ['ignore', 'ignore', 'pipe'] });
     try { return { output: lf(execFileSync(exe, { encoding: 'utf8' })), exitCode: 0 }; }
     catch (e) { return { output: lf(e.stdout), exitCode: e.status }; }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
