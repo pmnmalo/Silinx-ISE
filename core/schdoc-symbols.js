@@ -45,8 +45,10 @@ export function gateVariant(type, k, n) {
   const t = `${S.gate}${n ?? S.inputs}${k > 0 ? `b${k}` : ''}`;
   return SYMBOLS[t] ? t : null;
 }
-SYMBOLS.inv = { category: 'Logic', title: 'INV', gate: 'not', inputs: 1, description: 'Inverter', params: [P_WIDTH] };
-SYMBOLS.buf = { category: 'Buffers', title: 'BUF', gate: 'buf', inputs: 1, description: 'Buffer', params: [P_WIDTH] };
+// (INV and BUF wider than a bit: one pin per bit when asked, as the Xilinx INV4 / BUF4, one triangle each, #2067)
+const P_GATE_BITS = { name: 'bits', label: 'Pins per bit (I0.., O0..)', kind: 'bool', default: false };
+SYMBOLS.inv = { category: 'Logic', title: 'INV', gate: 'not', inputs: 1, description: 'Inverter', params: [P_WIDTH, P_GATE_BITS] };
+SYMBOLS.buf = { category: 'Buffers', title: 'BUF', gate: 'buf', inputs: 1, description: 'Buffer', params: [P_WIDTH, P_GATE_BITS] };
 // tri-state buffers (Xilinx BUFE / BUFT families): O = I while enabled, Z (released) otherwise, so that
 // several of them (and bidirectional pins / I/O markers) may drive one net, a bus; with BUF the category Buffers (#1987)
 SYMBOLS.tbuf = {
@@ -318,7 +320,13 @@ export function symbolDef(sym, modules = {}) {
   }
   // (INV, BUF and the tri-state buffers as wide as the 2-input gates, 80, their triangle 34 or 36 long: room for an
   // instance name inside and for a bus width on the output's lead, #1988; they were 60, BUF_OLD_W)
+  // (Pins per bit: a row each, I0 / O0 at the top, #2067)
   if (t === 'inv' || t === 'buf') {
+    if (W > 1 && p.bits) {
+      const pins = [...Array(W).keys()].map(k => ({ name: `I${k}`, dir: 'in', x: 0, y: 10 + 20 * k, side: 'W', width: 1 }));
+      for (let k = 0; k < W; k++) pins.push({ name: `O${k}`, dir: 'out', x: 80, y: 10 + 20 * k, side: 'E', width: 1 });
+      return { w: 80, h: 20 * W, shape: t, rows: W, body: { x: 20, y: 0, w: 34, h: 20 * W }, pins };
+    }
     return { w: 80, h: 20, shape: t, body: { x: 20, y: 0, w: 34, h: 20 },
       pins: [{ name: 'I', dir: 'in', x: 0, y: 10, side: 'W', width: W }, { name: 'O', dir: 'out', x: 80, y: 10, side: 'E', width: W }] };
   }

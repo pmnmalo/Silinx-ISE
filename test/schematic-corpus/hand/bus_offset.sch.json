@@ -16,7 +16,8 @@
    "mirror": false,
    "name": "XLXI_1",
    "params": {
-    "width": 4
+    "width": 4,
+    "bits": false
    }
   },
   {
