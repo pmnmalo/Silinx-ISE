@@ -16,6 +16,14 @@ function gateInputEnd(def, y) {
   return base === 'or' ? 20 + 24 * t * (1 - t) : base === 'xor' ? 14 + 24 * t * (1 - t) : 20;
 }
 
+// a multiplexer's / demultiplexer's enable with a pin per bit (#2081): its pin on the last row, a line at x = 10 up to
+// the first row's, a lead and a dot into each row's body at its E row
+function muxEnable(p, bh, n) {
+  const ys = [...Array(n).keys()].map(r => p.y - (n - 1 - r) * bh);
+  return lead(0, p.y, 10, p.y, false) + `<path class="gate nofill" d="M10,${ys[0]} V${p.y}"/>`
+    + ys.map(y => lead(10, y, 20, y, false) + (y !== p.y ? `<circle class="gate pdot" cx="10" cy="${y}" r="2"/>` : '')).join('');
+}
+
 export function bodySvg(sym, def) {
   const pins = def.pins;
   const bus = p => (p.width || 1) > 1;
@@ -76,21 +84,25 @@ export function bodySvg(sym, def) {
       break;
     }
     case 'mux': {
-      const bh = def.body.h, bw = def.body.w, x1 = 20 + bw;
-      s += `<path class="gate" d="M20,0 L${x1},10 L${x1},${bh - 10} L20,${bh} Z"/>`;
+      // (Pins per bit, #2081: a trapezoid a row, rh high; the select lines from their pins up to the first one's bottom
+      // edge, through the others, and the enable's on the left joining each row's E, as BUFE4's enable line)
+      const n = def.rows || 1, bh = def.rh || def.body.h, bw = def.body.w, x1 = 20 + bw, last = (n - 1) * bh;
+      for (let r = 0; r < n; r++) s += `<path class="gate" d="M20,${r * bh} L${x1},${r * bh + 10} L${x1},${r * bh + bh - 10} L20,${r * bh + bh} Z"/>`;
       for (const p of pins) {
-        if (p.side === 'W') s += lead(0, p.y, 20, p.y, bus(p));
-        else if (p.side === 'S') s += lead(p.x, r1(bh - 10 * (p.x - 20) / bw), p.x, p.y, bus(p));   // (from the slanted bottom edge)
+        if (p.side === 'W' && p.name === 'E' && n > 1) s += muxEnable(p, bh, n);
+        else if (p.side === 'W') s += lead(0, p.y, 20, p.y, bus(p));
+        else if (p.side === 'S') s += lead(p.x, r1(last + bh - 10 * (p.x - 20) / bw), p.x, p.y, bus(p)) + (n > 1 ? `<path class="gate nofill" d="M${p.x},${r1(bh - 10 * (p.x - 20) / bw)} V${r1(last + bh - 10 * (p.x - 20) / bw)}"/>` : '');   // (from the slanted bottom edge)
         else s += lead(x1, p.y, p.x, p.y, bus(p));
       }
       break;
     }
     case 'demux': {
-      const b = def.body, bh = b.h, x1 = b.x + b.w;
-      s += `<path class="gate" d="M${b.x},20 L${x1},0 L${x1},${bh} L${b.x},${bh - 20} Z"/>`;
+      const b = def.body, n = def.rows || 1, bh = def.rh || b.h, x1 = b.x + b.w, last = (n - 1) * bh;
+      for (let r = 0; r < n; r++) s += `<path class="gate" d="M${b.x},${r * bh + 20} L${x1},${r * bh} L${x1},${r * bh + bh} L${b.x},${r * bh + bh - 20} Z"/>`;
       for (const p of pins) {
-        if (p.side === 'W') s += lead(0, p.y, b.x, p.y, bus(p));
-        else if (p.side === 'S') s += lead(p.x, bh - 20 + 20 * (p.x - b.x) / b.w, p.x, p.y, bus(p));
+        if (p.side === 'W' && p.name === 'E' && n > 1) s += muxEnable(p, bh, n);
+        else if (p.side === 'W') s += lead(0, p.y, b.x, p.y, bus(p));
+        else if (p.side === 'S') s += lead(p.x, last + bh - 20 + 20 * (p.x - b.x) / b.w, p.x, p.y, bus(p)) + (n > 1 ? `<path class="gate nofill" d="M${p.x},${r1(bh - 20 + 20 * (p.x - b.x) / b.w)} V${r1(last + bh - 20 + 20 * (p.x - b.x) / b.w)}"/>` : '');
         else s += lead(x1, p.y, p.x, p.y, bus(p));
       }
       break;
@@ -207,7 +219,7 @@ function textsSvg(sym, def, ctx = {}) {
   // (a multiplexer / demultiplexer: its type inside it, upright (#2041); turned, or a DEMUX, above it, the instance
   // name above that, #313)
   const muxType = def.shape === 'mux' || def.shape === 'demux';
-  const muxIn = muxType && def.title && def.shape === 'mux' && sym.rot !== 90 && sym.rot !== 270 ? typeInside(sym, def, def.title) : null;
+  const muxIn = muxType && def.title && def.shape === 'mux' && sym.rot !== 90 && sym.rot !== 270 && !(def.rows > 1) ? typeInside(sym, def, def.title) : null;
   const muxAbove = muxType && !muxIn;
   if (showName) {
     // above the symbol; when pins stick out of the top (turned symbols), beside the top right corner instead
@@ -295,13 +307,15 @@ function textsSvg(sym, def, ctx = {}) {
     for (const p of pins) {
       // demux select: the lead ends on the sloped edge; clock pins: room for the clock triangle
       const L = 20 + (def.shape === 'demux' && p.ly === def.h ? 6 : 0) + (p.clock ? 8 : 0);
-      s += pinName(p, L, p.name, vertical);
+      // (a demultiplexer a bit, #2081: each row's names as the one-bit one's, D and O0, O1…)
+      s += pinName(p, L, def.rows > 1 ? p.name.replace(/_\d+$/, '').replace(/^D\d+$/, 'D') : p.name, vertical);
       if ((p.width || 1) > 1) s += pinWidth(p);
     }
   } else if (pinLabels) {
     // (each pin's own side, not turned, says which one it is; the turned side, where its name goes, #1134)
     const pins = symbolPins(sym, null, def);
-    const label = p => (def.shape === 'mux' && p.name.startsWith('D') ? p.name.slice(1) : p.name);
+    // (a multiplexer a bit, #2081: each row's names as the one-bit one's, its row the bit: D0_1 is 0)
+    const label = p => { const n = def.rows > 1 ? p.name.replace(/_\d+$/, '') : p.name; return def.shape === 'mux' && n.startsWith('D') ? n.slice(1) : n; };
     const vertical = verticalNames(pins.filter((p, i) => !(def.shape === 'mux' && def.pins[i].side === 'E')), label);
     for (const [i, p] of pins.entries()) {
       const own = def.pins[i].side;

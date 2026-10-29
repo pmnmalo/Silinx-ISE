@@ -29,6 +29,7 @@ export const SCH_PT = {
   // parameters of the symbols (as in the Symbol Info datasheets, core/symdocs.js) and their options
   'for a Width of 2 or more': 'para uma Largura de 2 ou mais',   // (Pins per bit at Width 1, #2076)
   'Pins per bit (I0_0.., O0..)': 'Um pino por bit (I0_0.., O0..)',   // (a gate a bit, #2079)
+  'Pins per bit (D0_0.., O0..)': 'Um pino por bit (D0_0.., O0..)', 'Pins per bit (D0.., O0_0..)': 'Um pino por bit (D0.., O0_0..)',   // (a MUX / DEMUX a bit, #2081)
   'Pins per bit (A0.., B0.., S0..)': 'Um pino por bit (A0.., B0.., S0..)', 'Pins per bit (A0.., B0..)': 'Um pino por bit (A0.., B0..)', 'Pins per bit (Q0..)': 'Um pino por bit (Q0..)', 'Pins per bit (A0.., B0.., D0..)': 'Um pino por bit (A0.., B0.., D0..)', 'Borrow in (BI)': 'Empréstimo de entrada (BI)', 'Borrow out (BO)': 'Empréstimo de saída (BO)',
   'Subtractor D = A - B (- BI), optional borrow out': 'Subtrator D = A - B (- BI), empréstimo de saída opcional',
   'Carry in': 'Transporte de entrada (carry in)', 'Carry out': 'Transporte de saída (carry out)', 'Operation': 'Operação', 'Signed': 'Com sinal',

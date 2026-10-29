@@ -184,6 +184,7 @@
 .sch-editor svg .stitle.hdl { fill: #6a5a00; }
 .sch-editor svg .stype { font-size: 9px; font-weight: bold; fill: var(--se-symbol); }
 .sch-editor svg .stype.inside { font-size: 8px; }
+.sch-editor svg circle.gate.pdot { fill: var(--se-symbol); }   /* (a symbol's own junction: a MUX's shared enable, #2081) */
 .sch-editor svg .stype.inside.tri { font-size: 7px; }
 .sch-editor svg .sop { font-size: 15px; font-weight: bold; fill: var(--se-symbol); }
 .sch-editor svg .stext { font-size: 9px; fill: var(--se-pin); }

@@ -10,77 +10,94 @@ export function mountSymbolCases(ctx) {
     warnOpen, zero
   } = ctx;
 
+  // a multiplexer's assignment, its pins named through P (a pin per bit: those of one row, #2081)
+  const muxRow = (s, p, cmt, P, IN) => {
+    const o = OUTN(s, P('O')); if (!o) return;
+    if (s.type === 'mux2' && !p.en) {
+      const d0 = IN('D0'), d1 = IN('D1'), sel = IN('S0');
+      if (ci) body.push(`${o} <= ${d1} when ${sel} = '1' else ${d0};`); else assign(o, `${sel} ? ${d1} : ${d0}`);
+    } else if (s.type === 'mux4' && !p.en && p.selBus) {
+      const d = [0, 1, 2, 3].map(i => IN(`D${i}`)), sel = IN('S', true);
+      if (ci) body.push(`with ${sel} select ${o} <=\n  ${d[0]} when "00",\n  ${d[1]} when "01",\n  ${d[2]} when "10",\n  ${d[3]} when others;`);
+      else assign(o, `${sel}[1] ? (${sel}[0] ? ${d[3]} : ${d[2]}) : (${sel}[0] ? ${d[1]} : ${d[0]})`);
+    } else {
+      // the select bits (S1 S0, or the bus S's) and the enable E (#301): O = D<S> when E = 1, else 0
+      const n = MUX_INPUTS[s.type], k = Math.log2(n);
+      const d = [...Array(n).keys()].map(i => IN(`D${i}`));
+      const bus = k > 1 && p.selBus ? IN('S', true) : null;
+      const sel = [...Array(k).keys()].map(j => (bus ? (ci ? `${bus}(${j})` : `${bus}[${j}]`) : IN(`S${j}`, true)));
+      const e = p.en ? IN('E', true) : null, z = zero(PW(s, P('O')));
+      if (ci) {
+        const when = i => [...(e ? [`${e} = '1'`] : []), ...sel.map((x, j) => `${x} = '${(i >> j) & 1}'`).reverse()].join(' and ');
+        const arms = d.map((x, i) => (i === n - 1 && !e ? x : `${x} when ${when(i)}`));
+        body.push(`${o} <= ${arms.join(' else\n  ')}${e ? ` else\n  ${z}` : ''};`);
+      } else {
+        const tree = (j, base) => (j < 0 ? d[base] : `${sel[j]} ? ${wrap(tree(j - 1, base | (1 << j)), j)} : ${wrap(tree(j - 1, base), j)}`);
+        const wrap = (x, j) => (j > 0 ? `(${x})` : x);
+        assign(o, e ? `${e} ? (${tree(k - 1, 0)}) : ${z}` : tree(k - 1, 0));
+      }
+    }
+  };
+  // a demultiplexer's assignments, its pins named through P
+  const demuxRow = (s, p, cmt, P, first = true) => {
+    const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k;
+    const dn = inNet(s, P('D'));
+    if (!dn) warnOpen(s, P('D'));
+    const d = dn ? (outRead.get(dn) || netName(dn)) : null;
+    // (a shared pin, the select or the enable, said once: by the first row, #2081)
+    const net = pin => { const x = inNet(s, pin); if (!x && first) warnOpen(s, pin); return x ? (outRead.get(x) || netName(x)) : null; };
+    // the enable E (#301): an unconnected one is 0, the outputs then 0
+    const e = p.en ? net('E') : true;
+    const lines = [];
+    if (k === 1 || p.selBus) {
+      const sp = k === 1 ? 'S0' : 'S', sel = net(sp);
+      const on = e === true ? '' : ci ? `${e} = '1' and ` : `${e} && `;
+      for (let i = 0; i < n; i++) {
+        const o = OUTN(s, P(`O${i}`)); if (!o) continue;
+        const w = PW(s, P(`O${i}`));
+        const z = zero(w);
+        let rhs;
+        if (!d || (!sel && i) || e === null) rhs = z;
+        else if (!sel) rhs = e === true ? d : ci ? `${d} when ${e} = '1' else ${z}` : `${e} ? ${d} : ${z}`;
+        else if (ci) rhs = `${d} when ${on}${sel} = ${k === 1 ? `'${i}'` : `"${i.toString(2).padStart(k, '0')}"`} else ${z}`;
+        else rhs = `(${on}${sel} == ${k}'d${i}) ? ${d} : ${z}`;
+        lines.push(ci ? `${o} <= ${rhs};` : `assign ${o} = ${rhs};`);
+      }
+    } else {
+      // the select bits S<k-1> … S0 on pins of their own (#301); an unconnected one is 0
+      const sel = [...Array(k).keys()].map(j => net(`S${j}`));
+      for (let i = 0; i < n; i++) {
+        const o = OUTN(s, P(`O${i}`)); if (!o) continue;
+        const z = zero(PW(s, P(`O${i}`)));
+        const terms = e === true ? [] : [ci ? `${e} = '1'` : e];
+        let never = !d || e === null;
+        for (let j = k - 1; j >= 0; j--) {
+          const bit = (i >> j) & 1;
+          if (sel[j] === null) { if (bit) never = true; continue; }
+          terms.push(ci ? `${sel[j]} = '${bit}'` : bit ? sel[j] : `!${sel[j]}`);
+        }
+        const rhs = never ? z : !terms.length ? d : ci ? `${d} when ${terms.join(' and ')} else ${z}` : `(${terms.join(' && ')}) ? ${d} : ${z}`;
+        lines.push(ci ? `${o} <= ${rhs};` : `assign ${o} = ${rhs};`);
+      }
+    }
+    if (lines.length) body.push([cmt, ...lines].join('\n'));
+  };
+
   const symbolCases = (s, def, p, S, cmt) => {
     switch (s.type) {
       case 'mux2': case 'mux4': case 'mux8': case 'mux16': {
-        const o = OUTN(s, 'O'); if (!o) return;
-        if (s.type === 'mux2' && !p.en) {
-          const d0 = INN(s, 'D0'), d1 = INN(s, 'D1'), sel = INN(s, 'S0');
-          if (ci) body.push(`${o} <= ${d1} when ${sel} = '1' else ${d0};`); else assign(o, `${sel} ? ${d1} : ${d0}`);
-        } else if (s.type === 'mux4' && !p.en && p.selBus) {
-          const d = [0, 1, 2, 3].map(i => INN(s, `D${i}`)), sel = INN(s, 'S', true);
-          if (ci) body.push(`with ${sel} select ${o} <=\n  ${d[0]} when "00",\n  ${d[1]} when "01",\n  ${d[2]} when "10",\n  ${d[3]} when others;`);
-          else assign(o, `${sel}[1] ? (${sel}[0] ? ${d[3]} : ${d[2]}) : (${sel}[0] ? ${d[1]} : ${d[0]})`);
-        } else {
-          // the select bits (S1 S0, or the bus S's) and the enable E (#301): O = D<S> when E = 1, else 0
-          const n = MUX_INPUTS[s.type], k = Math.log2(n);
-          const d = [...Array(n).keys()].map(i => INN(s, `D${i}`));
-          const bus = k > 1 && p.selBus ? INN(s, 'S', true) : null;
-          const sel = [...Array(k).keys()].map(j => (bus ? (ci ? `${bus}(${j})` : `${bus}[${j}]`) : INN(s, `S${j}`, true)));
-          const e = p.en ? INN(s, 'E', true) : null, z = zero(PW(s, 'O'));
-          if (ci) {
-            const when = i => [...(e ? [`${e} = '1'`] : []), ...sel.map((x, j) => `${x} = '${(i >> j) & 1}'`).reverse()].join(' and ');
-            const arms = d.map((x, i) => (i === n - 1 && !e ? x : `${x} when ${when(i)}`));
-            body.push(`${o} <= ${arms.join(' else\n  ')}${e ? ` else\n  ${z}` : ''};`);
-          } else {
-            const tree = (j, base) => (j < 0 ? d[base] : `${sel[j]} ? ${wrap(tree(j - 1, base | (1 << j)), j)} : ${wrap(tree(j - 1, base), j)}`);
-            const wrap = (x, j) => (j > 0 ? `(${x})` : x);
-            assign(o, e ? `${e} ? (${tree(k - 1, 0)}) : ${z}` : tree(k - 1, 0));
-          }
-        }
+        // (Pins per bit, #2081: a multiplexer a bit, D<i>_<r> to O<r>, the select and the enable shared)
+        // (the select and the enable read once, shared by the rows: an unconnected one tied to 0 once)
+        const shared = new Map();
+        const IN = (P) => (pin, named) => (P(pin) !== pin ? INN(s, P(pin), named) : shared.get(pin) ?? shared.set(pin, INN(s, pin, named)).get(pin));
+        if (def.rows > 1) for (let r = 0; r < def.rows; r++) { const P = (x) => (x === 'O' ? `O${r}` : /^D\d+$/.test(x) ? `${x}_${r}` : x); muxRow(s, p, cmt, P, IN(P)); }
+        else muxRow(s, p, cmt, (x) => x, (pin, named) => INN(s, pin, named));
         break;
       }
       case 'demux': {
-        const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k;
-        const dn = inNet(s, 'D');
-        if (!dn) warnOpen(s, 'D');
-        const d = dn ? (outRead.get(dn) || netName(dn)) : null;
-        const net = pin => { const x = inNet(s, pin); if (!x) warnOpen(s, pin); return x ? (outRead.get(x) || netName(x)) : null; };
-        // the enable E (#301): an unconnected one is 0, the outputs then 0
-        const e = p.en ? net('E') : true;
-        const lines = [];
-        if (k === 1 || p.selBus) {
-          const sp = k === 1 ? 'S0' : 'S', sel = net(sp);
-          const on = e === true ? '' : ci ? `${e} = '1' and ` : `${e} && `;
-          for (let i = 0; i < n; i++) {
-            const o = OUTN(s, `O${i}`); if (!o) continue;
-            const w = PW(s, `O${i}`);
-            const z = zero(w);
-            let rhs;
-            if (!d || (!sel && i) || e === null) rhs = z;
-            else if (!sel) rhs = e === true ? d : ci ? `${d} when ${e} = '1' else ${z}` : `${e} ? ${d} : ${z}`;
-            else if (ci) rhs = `${d} when ${on}${sel} = ${k === 1 ? `'${i}'` : `"${i.toString(2).padStart(k, '0')}"`} else ${z}`;
-            else rhs = `(${on}${sel} == ${k}'d${i}) ? ${d} : ${z}`;
-            lines.push(ci ? `${o} <= ${rhs};` : `assign ${o} = ${rhs};`);
-          }
-        } else {
-          // the select bits S<k-1> … S0 on pins of their own (#301); an unconnected one is 0
-          const sel = [...Array(k).keys()].map(j => net(`S${j}`));
-          for (let i = 0; i < n; i++) {
-            const o = OUTN(s, `O${i}`); if (!o) continue;
-            const z = zero(PW(s, `O${i}`));
-            const terms = e === true ? [] : [ci ? `${e} = '1'` : e];
-            let never = !d || e === null;
-            for (let j = k - 1; j >= 0; j--) {
-              const bit = (i >> j) & 1;
-              if (sel[j] === null) { if (bit) never = true; continue; }
-              terms.push(ci ? `${sel[j]} = '${bit}'` : bit ? sel[j] : `!${sel[j]}`);
-            }
-            const rhs = never ? z : !terms.length ? d : ci ? `${d} when ${terms.join(' and ')} else ${z}` : `(${terms.join(' && ')}) ? ${d} : ${z}`;
-            lines.push(ci ? `${o} <= ${rhs};` : `assign ${o} = ${rhs};`);
-          }
-        }
-        if (lines.length) body.push([cmt, ...lines].join('\n'));
+        // (Pins per bit, #2081: a demultiplexer a bit, D<r> to O<i>_<r>, the select and the enable shared)
+        if (def.rows > 1) for (let r = 0; r < def.rows; r++) demuxRow(s, p, cmt, (x) => (x === 'D' ? `D${r}` : /^O\d+$/.test(x) ? `${x}_${r}` : x), r === 0);
+        else demuxRow(s, p, cmt, (x) => x);
         break;
       }
       case 'tbuf': {
