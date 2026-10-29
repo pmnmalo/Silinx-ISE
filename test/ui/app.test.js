@@ -550,7 +550,7 @@ uiTest('Check for Updates opens its dialog at once, then fills it in when the si
   await page.eval(() => window.__answer(new Response(JSON.stringify({ version: '99.0.0', build: null }), { status: 200, headers: { 'content-type': 'application/json' } })));
   await page.waitFor(() => /This site now serves Silinx ISE 99\.0\.0\./.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'newer page served' });
   assert.equal(await page.dialogCount(), 1);
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons button')].map((b) => b.textContent)), ['Reload', 'OK']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .dlg-buttons button')].map((b) => b.textContent)), ['Reload', 'Refresh', 'OK']);   // (Refresh, #2013)
   await page.key('Escape');
   await page.waitNoDialog();
   // closed before the answer: the late answer opens nothing
