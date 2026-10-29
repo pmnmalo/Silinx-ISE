@@ -6,6 +6,10 @@ import { vgaPins } from '/core/vga.js';
 import { BOARD_LAYOUTS, makeDigit } from './emulator.js';
 
 /** { digits, leds, powerSwitches, vgaWired } of mountEmulator (compiled(), knobEnd(), lcdView(), powered(), running(): its current values). */
+/** No context menu over the emulated board: on a tablet a long press is one, and it released a push button held down
+ *  (#1985). */
+export const noMenu = (el) => el.addEventListener('contextmenu', (e) => e.preventDefault());
+
 export function mountBoardParts(ctx) {
   const {
     board, title, after, bitFor, compiled, hasLcd, inVal, knobEnd, lcdView, main, manual, period, powered, refresh,
@@ -109,6 +113,7 @@ export function mountBoardParts(ctx) {
     // generic board: rows of displays, LEDs, switches and buttons
     const boardEl = h('div', { class: 'emu-board' }, h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' } },
       h('h3', { style: { margin: 0 } }, `${board.name}${title ? ` — ${title}` : ''}`), h('span', { class: 'emu-silk' }, 'POWER'), mkPower()));
+    noMenu(boardEl);
     main.append(boardEl);
     const cell = (kind, idx, widget) => h('div', { class: `emu-cell${bitFor(kind, idx) ? '' : ' nc'}`, title: tip(kind, idx) },
       widget, h('span', { class: 'res' }, `${resLabel[kind] || kind}${idx}`), h('span', { class: 'port' }, portLabel(kind, idx)));

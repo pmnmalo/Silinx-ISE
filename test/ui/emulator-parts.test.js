@@ -75,3 +75,25 @@ uiTest('#405 Board Emulator parts: the toolbar, the board, a watched signal, the
   await page.eval(() => document.querySelector('.emu-power').click());
   await page.waitFor(() => document.querySelector('.emu .stat').textContent === 'Power off', [], { what: 'Power off' });
 });
+
+uiTest('#1985 a tablet\'s long press on a push button: no context menu over the board, the button stays pressed until released', E, async (page) => {
+  await makeProject(env, { name: 'EmuTouch', board: 'basys2', files: { 'src/cnt.vhd': COUNTER }, top: 'cnt' });
+  await page.openProject('EmuTouch');
+  assert.equal(await page.eval(() => window.SilinxApp.regenerateUcf()), true);
+  await page.eval(() => window.SilinxApp.openFile('src/cnt.vhd'));
+  await openEmulator(page);
+  const at = await page.eval(() => { const b = document.querySelector('.emu-btn').getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; });
+  // a finger down on the button (a real touch), then the browser's long press: its contextmenu event
+  await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: at.x, y: at.y }] });
+  await page.waitFor(() => document.querySelector('.emu-btn').classList.contains('on'), [], { what: 'the button pressed' });
+  const r = await page.eval(() => {
+    const btn = document.querySelector('.emu-btn');
+    const onBtn = !btn.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const onBoard = !document.querySelector('.emu-board-wrap, .emu-board').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    return { onBtn, onBoard, stillHeld: btn.classList.contains('on'), touchAction: getComputedStyle(btn).touchAction };
+  });
+  await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitFor(() => !document.querySelector('.emu-btn').classList.contains('on'), [], { what: 'the button released' });
+  assert.deepEqual(r, { onBtn: true, onBoard: true, stillHeld: true, touchAction: 'none' });
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
