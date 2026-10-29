@@ -189,7 +189,9 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    the imports as before.
 8. **The command line** ([#1679](https://github.com/pmnmalo/Silinx-ISE/issues/1679)): `silinx-fpga build`,
    from `research/s3e-route/open-flow.mjs`, and a README with a blinky for the Basys2. A new feature with its
-   tests.
+   tests. Done: `packages/silinx-fpga/bin/silinx-fpga.js` (`src/cli.js`): Verilog or a Yosys JSON netlist and a UCF
+   to the `.bit`, through `runFlow`; the Verilog checked by Yosys first, file by file (the flow has no front end to
+   say where an error is); the README's blinky byte for byte the IDE's `.bit` (`test/silinx-fpga-cli.test.js`).
 9. **Its tests, oracle and research with it** ([#1680](https://github.com/pmnmalo/Silinx-ISE/issues/1680)):
    the 64 unit test files, `check:open-flow`, the data-building research; the test globs, the shards,
    related-tests and the workflows (ISE, Quality, Yosys update) follow.
