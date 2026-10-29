@@ -496,8 +496,17 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   period (the others the small slacks, 0.68 to 1.96 ns, where 5% is 0.03 to 0.1 ns). Fitted on half the designs and
   checked on the other half (`--train=`): every error under 2.3 to 3.6% of the period, but 9.4% when fitted on ISE's
   flow alone and checked on the open synthesis's (an unregistered DSP48A1 and a gate flip-flop the fit had not seen,
-  their delays the defaults). Still to do: the OFFSET IN / OUT paths and a second clock's; the placer's estimate
-  (`place-timing.js`) replaced by this model (#729).
+  their delays the defaults).
+- **The OFFSET IN and OUT** (part 5, `offsetIn`, `offsetOut`; `twr6.mjs`'s `parseOffsets` reads trce's sections,
+  each path's data and clock tables apart): IN, the largest path from an input pad (Tiopi) to a flip-flop's setup
+  less the clock's earliest arrival there; OUT, the clock's latest arrival at a flip-flop, its clock-to-out, the path
+  to an output pad's O and its Tioop. The clock from its pad through its BUFG is a + b × the clock net's arrival at
+  the flip-flop, fitted on trce's OFFSET paths (earliest 1.88 + 0.68 ×, latest 2.14 + 0.65 ×); Tiopi 0.79 ns, Tioop
+  2.0 ns; a shift register's data in (Tds) and output (Tshcko) among the slice's arcs. On night 1's 24 designs both
+  are within 5% or 0.1 ns of trce's allowable offset in 24 of 24 (the error at most 0.35 ns on offsets of 2 to
+  12 ns). With that criterion (5% of the slack or 0.1 ns, the larger), PERIOD stays at 20 of 24: the four left
+  are 0.11 to 0.25 ns off on slacks of 0.68 to 4.5 ns (every PERIOD error under 2.5% of the period). Still to do: a
+  second clock's paths; the placer's estimate (`place-timing.js`) replaced by this model (#729).
 
 ### The CMT sites (#1951, S6-E2, 2026-10-29)
 
@@ -670,10 +679,10 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `gen-cmtprobe6.mjs`, `ana-cmtprobe6.mjs` | The PIPs the drop could not take apart, probed one by one: `db/s6-pips-probe.json` (#1951) |
 | `gen-cmtdrop6.mjs`, `ana-cmtdrop6.mjs` | The CMT paths' PIPs dropped one at a time in context: `db/s6-pips-cmt.json` (#1951) |
 | `ana-cmtinput6.mjs` | A CMT's bits beyond its settings and PIPs, by its site, outputs and BUFIO2: `db/<device>-cmt-input.json` (#1951) |
-| `twr6.mjs` | trce's report read: each constraint's paths, their figures and elements (#731) |
+| `twr6.mjs` | trce's report read: each constraint's paths, their figures and elements, the OFFSET sections (#731) |
 | `timing-fit6.mjs` | The wire delay model fitted to trce's nets, or every connection of reportgen's `.dly`, on ISE's routing (#731) |
 | `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
-| `sta6.mjs` | The static timing of a routed design (its XDL): the slices' and hard blocks' arcs, PERIOD slack against trce's (#731) |
+| `sta6.mjs` | The static timing of a routed design (its XDL): the slices' and hard blocks' arcs, PERIOD slack and OFFSET IN / OUT against trce's (#731) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |
