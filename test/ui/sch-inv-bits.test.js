@@ -23,7 +23,7 @@ uiTest('#2067 schematic: INV and BUF, Width 4 and Pins per bit in their properti
   for (const id of ['S1', 'S2']) {
     await page.click(`${D} g.sym[data-id="${id}"] .hitbox`);
     await page.waitFor((d) => document.querySelector(`${d} [data-param=bits]`), [D], { what: `${id}: Pins per bit` });
-    assert.equal(await page.eval((d) => document.querySelector(`${d} [data-param=bits]`).closest('.se-field, label')?.textContent.trim(), D), 'Pins per bit (I0.., O0..)');
+    assert.equal(await page.eval((d) => document.querySelector(`${d} [data-param=bits]`).closest('.se-field').querySelector('label').textContent, D), 'Pins per bit (I0.., O0..)');
     await page.fill(`${D} [data-param=width]`, '4');
     await page.waitFor((d) => document.querySelector(`${d} [data-param=bits]`), [D], { what: 'Pins per bit again' });
     await page.click(`${D} [data-param=bits]`);
@@ -37,7 +37,7 @@ uiTest('#2067 schematic: INV and BUF, Width 4 and Pins per bit in their properti
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.click(`${D} g.sym[data-id="S1"] .hitbox`);
   await page.waitFor((d) => document.querySelector(`${d} [data-param=bits]`), [D], { what: 'Pins per bit, Portuguese' });
-  assert.equal(await page.eval((d) => document.querySelector(`${d} [data-param=bits]`).closest('.se-field, label')?.textContent.trim(), D), 'Um pino por bit (I0.., O0..)');
+  assert.equal(await page.eval((d) => document.querySelector(`${d} [data-param=bits]`).closest('.se-field').querySelector('label').textContent, D), 'Um pino por bit (I0.., O0..)');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(page.dialogs, []);
 });
