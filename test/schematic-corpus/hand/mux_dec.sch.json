@@ -69,7 +69,8 @@
    "name": "XLXI_5",
    "params": {
     "width": 2,
-    "en": false
+    "en": false,
+    "bits": false
    }
   },
   {
@@ -135,7 +136,8 @@
    "params": {
     "width": 1,
     "en": false,
-    "selBus": false
+    "selBus": false,
+    "bits": false
    }
   },
   {
@@ -201,7 +203,8 @@
    "params": {
     "width": 1,
     "en": true,
-    "selBus": true
+    "selBus": true,
+    "bits": false
    }
   },
   {
@@ -268,7 +271,8 @@
     "width": 1,
     "sel": 1,
     "en": false,
-    "selBus": false
+    "selBus": false,
+    "bits": false
    }
   },
   {

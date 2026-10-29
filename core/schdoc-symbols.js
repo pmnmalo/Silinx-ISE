@@ -69,13 +69,17 @@ SYMBOLS.tbuf = {
 // selBus: the select as one bus pin S, as a M4_1 / DEMUX saved before #301 has it (normalizeDoc)
 const P_EN = { name: 'en', label: 'Enable input E', kind: 'bool', default: false };
 const P_SELBUS = { name: 'selBus', label: 'Select as a bus (S)', kind: 'bool', default: false };
+// (a multiplexer / demultiplexer wider than a bit: one a bit when asked, one under the other, the select and the
+// enable shared, #2081)
+const P_MUX_BITS = { name: 'bits', label: 'Pins per bit (D0_0.., O0..)', kind: 'bool', default: false };
+const P_DEMUX_BITS = { name: 'bits', label: 'Pins per bit (D0.., O0_0..)', kind: 'bool', default: false };
 // (one palette entry each, the enable E their parameter, #313; one MUX, the M2_1, its Select bits making M4_1 …
 // M16_1, #334)
-SYMBOLS.mux2 = { category: 'Mux', title: 'M2_1', description: '2:1 multiplexer (O = S0 ? D1 : D0)', params: [P_WIDTH, P_EN],
+SYMBOLS.mux2 = { category: 'Mux', title: 'M2_1', description: '2:1 multiplexer (O = S0 ? D1 : D0)', params: [P_WIDTH, P_EN, P_MUX_BITS],
   paletteTitle: 'MUX', paletteDescription: 'Multiplexer of 2, 4, 8 or 16 data inputs, its select bits (1 to 4), select bus and enable in its properties (bitwise when Width > 1)' };
-SYMBOLS.mux4 = { category: 'Mux', title: 'M4_1', hidden: true, description: '4:1 multiplexer (select S1 S0)', params: [P_WIDTH, P_EN, P_SELBUS] };
-SYMBOLS.mux8 = { category: 'Mux', title: 'M8_1', hidden: true, description: '8:1 multiplexer (select S2 S1 S0)', params: [P_WIDTH, P_EN, P_SELBUS] };
-SYMBOLS.mux16 = { category: 'Mux', title: 'M16_1', hidden: true, description: '16:1 multiplexer (select S3 S2 S1 S0)', params: [P_WIDTH, P_EN, P_SELBUS] };
+SYMBOLS.mux4 = { category: 'Mux', title: 'M4_1', hidden: true, description: '4:1 multiplexer (select S1 S0)', params: [P_WIDTH, P_EN, P_SELBUS, P_MUX_BITS] };
+SYMBOLS.mux8 = { category: 'Mux', title: 'M8_1', hidden: true, description: '8:1 multiplexer (select S2 S1 S0)', params: [P_WIDTH, P_EN, P_SELBUS, P_MUX_BITS] };
+SYMBOLS.mux16 = { category: 'Mux', title: 'M16_1', hidden: true, description: '16:1 multiplexer (select S3 S2 S1 S0)', params: [P_WIDTH, P_EN, P_SELBUS, P_MUX_BITS] };
 // the multiplexers' number of data inputs
 export const MUX_INPUTS = { mux2: 2, mux4: 4, mux8: 8, mux16: 16 };
 // the multiplexers' body width (#1136: the DEMUX's, 70 px; M16_1's 80, room for its 4 select bits), and where their
@@ -91,7 +95,7 @@ export const BUF_OLD_W = 60;
 SYMBOLS.demux = {
   // (one entry, DEMUX, the enable E, the select bits and the select bus its parameters, #313, #334; drawn DEMUX1_4…)
   category: 'Mux', title: 'DEMUX', description: '1:2^n demultiplexer: output O<S> = D, the other outputs 0 (bitwise when Width > 1)',
-  params: [P_WIDTH, { name: 'sel', label: 'Select bits', kind: 'int', default: 1, min: 1, max: 4 }, P_EN, P_SELBUS],
+  params: [P_WIDTH, { name: 'sel', label: 'Select bits', kind: 'int', default: 1, min: 1, max: 4 }, P_EN, P_SELBUS, P_DEMUX_BITS],
 };
 // (one palette entry each, #324: DECODER as D2_4E, ENCODER as PENC4_2 (a priority encoder by default, #1553); their
 // options make D3_8E, ENC8_3…, the Xilinx-style name drawn)
@@ -357,23 +361,33 @@ export function symbolDef(sym, modules = {}) {
     // (the enable E: a data row more, on the left below the data inputs, as the Xilinx M2_1E … M16_1E)
     // (the body 70 px wide, as the DEMUX's, #1136, M16_1's 80; the select bits, 20 apart, where they were on the narrower body
     // of before, MUX_SEL_X, so that a schematic of before keeps them: only its output moves, schdoc-upgrade.js)
-    const n = MUX_INPUTS[t], k = Math.log2(n), en = !!p.en, bh = n * 20 + 20 + (en ? 20 : 0), h = bh + 10, bw = MUX_BODY_W(k);
-    const pins = [];
-    for (let i = 0; i < n; i++) pins.push({ name: `D${i}`, dir: 'in', x: 0, y: 20 + 20 * i, side: 'W', width: W });
-    if (en) pins.push({ name: 'E', dir: 'in', x: 0, y: 20 + 20 * n, side: 'W', width: 1 });
-    pins.push(...selPins(k, MUX_SEL_X(k), h));
-    pins.push({ name: 'O', dir: 'out', x: bw + 40, y: bh / 2, side: 'E', width: W });
-    return { w: bw + 40, h, shape: 'mux', title: `M${n}_1${en ? 'E' : ''}`, body: { x: 20, y: 0, w: bw, h: bh }, pins };
+    const n = MUX_INPUTS[t], k = Math.log2(n), en = !!p.en, bh = n * 20 + 20 + (en ? 20 : 0), bw = MUX_BODY_W(k);
+    // (Pins per bit, #2081: a multiplexer a row, bit 0 at the top, D<i>_<r> and O<r>; E on the last row's place, the
+    // select under the last one, both shared)
+    const rows = W > 1 && p.bits ? W : 1, one = rows > 1 ? 1 : W, h = bh * rows + 10;
+    const pins = [], outs = [];
+    for (let r = 0; r < rows; r++) {
+      for (let i = 0; i < n; i++) pins.push({ name: rows > 1 ? `D${i}_${r}` : `D${i}`, dir: 'in', x: 0, y: bh * r + 20 + 20 * i, side: 'W', width: one });
+      outs.push({ name: rows > 1 ? `O${r}` : 'O', dir: 'out', x: bw + 40, y: bh * r + bh / 2, side: 'E', width: one });
+    }
+    if (en) pins.push({ name: 'E', dir: 'in', x: 0, y: bh * (rows - 1) + 20 + 20 * n, side: 'W', width: 1 });
+    pins.push(...selPins(k, MUX_SEL_X(k), h), ...outs);
+    return { w: bw + 40, h, shape: 'mux', title: `M${n}_1${en ? 'E' : ''}`, ...(rows > 1 ? { rows, rh: bh } : {}), body: { x: 20, y: 0, w: bw, h: bh * rows }, pins };
   }
   if (t === 'demux') {
     // trapezoid wide on the output side (mirror of M2_1/M4_1), 70 px wide so that the pin names fit inside
     // (the enable E: on the left, below D, the body a row taller)
-    const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k, bh = n * 20 + 40 + (p.en ? 20 : 0), h = bh + 10;   // a free row at the bottom for S
-    const pins = [{ name: 'D', dir: 'in', x: 0, y: bh / 2, side: 'W', width: W }];
-    if (p.en) pins.push({ name: 'E', dir: 'in', x: 0, y: bh - 30, side: 'W', width: 1 });
-    pins.push(...selPins(k, 60, h));
-    for (let i = 0; i < n; i++) pins.push({ name: `O${i}`, dir: 'out', x: 110, y: 20 + 20 * i, side: 'E', width: W });
-    return { w: 110, h, shape: 'demux', title: `DEMUX1_${n}${p.en ? 'E' : ''}`, body: { x: 20, y: 0, w: 70, h: bh }, pins };
+    const k = Math.max(1, Math.min(4, int(p.sel, 1))), n = 1 << k, bh = n * 20 + 40 + (p.en ? 20 : 0);   // a free row at the bottom for S
+    // (Pins per bit, #2081: a demultiplexer a row, D<r> and O<i>_<r>; E and the select shared, as the multiplexers')
+    const rows = W > 1 && p.bits ? W : 1, one = rows > 1 ? 1 : W, h = bh * rows + 10;
+    const pins = [], outs = [];
+    for (let r = 0; r < rows; r++) {
+      pins.push({ name: rows > 1 ? `D${r}` : 'D', dir: 'in', x: 0, y: bh * r + bh / 2, side: 'W', width: one });
+      for (let i = 0; i < n; i++) outs.push({ name: rows > 1 ? `O${i}_${r}` : `O${i}`, dir: 'out', x: 110, y: bh * r + 20 + 20 * i, side: 'E', width: one });
+    }
+    if (p.en) pins.push({ name: 'E', dir: 'in', x: 0, y: bh * rows - 30, side: 'W', width: 1 });
+    pins.push(...selPins(k, 60, h), ...outs);
+    return { w: 110, h, shape: 'demux', title: `DEMUX1_${n}${p.en ? 'E' : ''}`, ...(rows > 1 ? { rows, rh: bh } : {}), body: { x: 20, y: 0, w: 70, h: bh * rows }, pins };
   }
   if (t === 'decoder' || t === 'encoder') {
     const west = [], east = [];
