@@ -96,13 +96,16 @@ export function runHdl(gen, lang, ins, outs, ret, vectors) {
 }
 
 /** Checks a C program's generated HDL against the C on random and edge inputs (both languages). */
+// (a clock slow enough for any path: a function these tests drive as combinational stays so, #1924)
+export const COMB = 1e6;
+
 export function against(src, top, { ins, outs = [], ret = null, n = 40, seed = 1 }) {
   const r = rng(seed);
   const cols = ins.map((i) => values(i.w, i.s, n, r));
   const vectors = Array.from({ length: n }, (_, k) => Object.fromEntries(ins.map((i, j) => [i.name, cols[j][k]])));
   const c = runC(src, top, ins, outs, ret, vectors).map((l) => l.split(' ').map((x) => BigInt(`0x${x}`)));
   for (const lang of ['vhdl', 'verilog']) {
-    const gen = cToHdl(src, { file: `${top}.c`, lang });
+    const gen = cToHdl(src, { file: `${top}.c`, lang, clock: COMB });
     assert.deepEqual(gen.diagnostics.filter((d) => d.severity === 'error'), [], `${lang}: generated`);
     const h = runHdl(gen, lang, ins, outs, ret, vectors);
     assert.equal(h.length, n, `${lang}: ${n} calls simulated`);

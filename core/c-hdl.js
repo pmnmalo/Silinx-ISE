@@ -16,6 +16,7 @@ import { cProcesses } from './c-processes.js';
 import { dataflowCall, hasStreams } from './c-dataflow-call.js';
 import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
+import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
 
 export const bits = (k, w) => {
   const m = (1n << BigInt(w)) - 1n;
@@ -27,7 +28,7 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
 // name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
 // threshold of the loops pipelined automatically, 0 none, #1919)
-export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops } = {}) {
+export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK } = {}) {
   const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   const diagnostics = [...checked.diagnostics];
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
@@ -69,6 +70,12 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // a state machine (core/c-fsmd.js, #1526)
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
   if (seqOnly) df = { ...fsmd(checked, { groups, pipelineLoops }), seq: true };
+  // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
+  // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
+  else if (!flat && df.ctrl === 'ap_ctrl_hs' && !df.diagnostics.some((d) => d.severity === 'error') && !fitsClock(df.graph, clock)) {
+    const sq = fsmd(checked, { groups, pipelineLoops });
+    if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
+  }
   diagnostics.push(...df.diagnostics);
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   if (df.diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };

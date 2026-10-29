@@ -349,17 +349,19 @@ const CORPUS_WARNINGS = {
     '20 warning: #pragma HLS FUNCTION_INSTANTIATE is accepted and ignored: Silinx does not make it'],
 };
 
-test('#1900 #1902 #1668 the corpus designs themselves (AMD\'s sources, when fetched): the five with Vitis HLS\'s ports; the combinational ones with no clock, their reset unused (#1924); each one\'s warnings', { skip: fetched }, () => {
+test('#1900 #1902 #1668 the corpus designs themselves (AMD\'s sources, when fetched): the five with Vitis HLS\'s ports; those too slow for the clock sequential, the others with no clock, their reset unused (#1924); each one\'s warnings', { skip: fetched }, () => {
   for (const name of Object.keys(FORMS)) {
     const g = corpusGen(name);
     assert.deepEqual(comparePorts(ours(g), vitisPorts(name)), { same: true, missing: [], extra: [], differ: [] }, name);
     assert.deepEqual(msgs(g), CORPUS_WARNINGS[name], name);
   }
+  // (a function whose longest path does not fit Vitis HLS's 10 ns: scheduled over cycles, as Vitis HLS does, ap_clk and
+  // ap_rst; one that fits, latency 0 in Vitis HLS: combinational, ap_rst but no ap_clk, #1924)
   for (const name of ['interface-memory-rom-lookup-table-math', 'modeling-fixed-point-sqrt', 'modeling-using-arbitrary-precision-casting', 'modeling-using-cpp-templates', 'pipelining-functions-function-instantiate']) {
     const g = corpusGen(name);
     assert.deepEqual(msgs(g), CORPUS_WARNINGS[name], name);
-    // (a combinational top: ap_rst, no ap_clk, as Vitis HLS's of latency 0, #1924; scheduled over cycles as Vitis HLS's: not yet)
-    assert.deepEqual([g.sequential, g.ports.filter((p) => /^ap_(clk|rst)$/.test(p.name)).map((p) => p.name)], [false, ['ap_rst']], name);
-    assert.deepEqual(g.ports.slice(0, 5).map((p) => p.name), ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'], name);
+    const comb = name === 'pipelining-functions-function-instantiate';
+    assert.deepEqual([g.sequential, g.ports.filter((p) => /^ap_(clk|rst)$/.test(p.name)).map((p) => p.name)], [!comb, comb ? ['ap_rst'] : ['ap_clk', 'ap_rst']], name);
+    assert.deepEqual(g.ports.slice(0, comb ? 5 : 6).map((p) => p.name), [...(comb ? [] : ['ap_clk']), 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'], name);
   }
 });

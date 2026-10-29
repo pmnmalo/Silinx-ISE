@@ -173,7 +173,7 @@ uiTest('#1900 View C Synthesis Report of a module with ap_ctrl_none: ap_clk and 
   await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
   await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
   const log = await page.consoleText();
-  assert.match(log, /\nModule: DATAFLOW, ap_ctrl_none \(ap_clk, ap_rst: running by itself\), 2 processes running at once\n\nPorts:\n {2}ap_clk {11}in {4}1 bit\n {2}ap_rst {11}in {4}1 bit\n {2}src_dout /);
+  assert.match(log, /\nModule: DATAFLOW, ap_ctrl_none \(ap_clk, ap_rst: running by itself\), 2 processes running at once\nTarget clock: 20 ns \(the board's oscillator\)\n\nPorts:\n {2}ap_clk {11}in {4}1 bit\n {2}ap_rst {11}in {4}1 bit\n {2}src_dout /);
   assert.doesNotMatch(log, /ap_start|WARNING:SilinxC/);
   await page.setView('sim');
   await page.treeRow('#procs', 'C/RTL Co-simulation', { dbl: true, exact: true });
@@ -272,4 +272,18 @@ uiTest('#1897 C Simulation of a test bench with files: the project\'s data files
   await page.waitConsole(/Process "C\/RTL Co-simulation" completed successfully/, { timeout: 60000 });
   assert.match(await page.consoleText(), /C\/RTL co-simulation PASS: 3 call\(s\), the same results/);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+});
+
+// #1924: a function's HDL scheduled for the board's clock (Basys2: 50 MHz, 20 ns): four additions in a row fit it,
+// a combinational module (at Vitis HLS's 10 ns they would not); the report says the clock
+uiTest('#1924 View C Synthesis Report: the target clock the board\'s (20 ns), a chain of four additions combinational there', E, async (page) => {
+  await makeProject(env, { name: 'CClock', top: 'sum4', files: { 'src/sum4.c': 'int sum4(int a, int b, int c, int d, int e) {\n  return a + b + c + d + e;\n}\n' } });
+  await page.openProject('CClock');
+  await page.showMessages();
+  await page.treeRow('#hier', 'sum4');
+  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+  await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
+  const log = await page.consoleText();
+  assert.match(log, /C Synthesis Report of 'sum4' \(src\/sum4\.c, VHDL\)\n\nModule: combinational\nTarget clock: 20 ns \(the board's oscillator\)\n/);
+  assert.doesNotMatch(log, /WARNING|ERROR/);
 });

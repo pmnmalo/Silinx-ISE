@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { simulateC } from '../core/c-interp.js';
 import { cosimulate } from '../core/c-cosim.js';
 import { cToHdl } from '../core/c-hdl.js';
-import { noCC, compiledRun } from './c-helpers.js';
+import { noCC, compiledRun, COMB } from './c-helpers.js';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
 const MAC = `#include <stdio.h>
@@ -60,7 +60,7 @@ int main(void) {
 }
 `;
   for (const lang of ['vhdl', 'verilog']) {
-    const r = cosimulate(src, { file: 'f.c', lang });
+    const r = cosimulate(src, { file: 'f.c', lang, clock: COMB });
     assert.deepEqual([r.errors, r.pass, r.calls, r.gen.sequential, r.gen.diagnostics], [[], true, 100, false, []], JSON.stringify(r.mismatches.slice(0, 3), big));
   }
 });

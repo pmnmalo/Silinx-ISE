@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cToHdl } from '../core/c-hdl.js';
 import { cosimulate } from '../core/c-cosim.js';
+import { COMB } from './c-helpers.js';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
 const ACC = (prag) => `#include <stdio.h>
@@ -152,7 +153,7 @@ test('#1529 the pragmas accepted and ignored, unknown, misplaced or wrong: their
     '8 error: #pragma HLS ARRAY_PARTITION needs variable=<the array>',
   ]);
   // a combinational module: its loops unrolled whatever the pragmas, no message
-  const comb = cToHdl('int f(int a) {\n  int s = 0;\n  for (int i = 0; i < 4; i++) {\n#pragma HLS PIPELINE II=1\n    s += a;\n  }\n  return s;\n}');
+  const comb = cToHdl('int f(int a) {\n  int s = 0;\n  for (int i = 0; i < 4; i++) {\n#pragma HLS PIPELINE II=1\n    s += a;\n  }\n  return s;\n}', { clock: COMB });
   assert.deepEqual(comb.diagnostics, []);
   assert.deepEqual(comb.report, { sequential: false });
 });

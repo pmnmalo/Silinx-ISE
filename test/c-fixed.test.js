@@ -10,6 +10,7 @@ import { simulateC } from '../core/c-interp.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { cosimulate } from '../core/c-cosim.js';
 import { apIntHeaders, runWithApInt } from './ap-int-ref.js';
+import { COMB } from './c-helpers.js';
 
 const AP = await apIntHeaders();
 const errs = (src) => cToHdl(src, { file: 'e.cpp' }).diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`);
@@ -257,7 +258,7 @@ test('#1643 a template square root on ap_ufixed (combinational: its loop unrolle
   assert.deepEqual([sim.error, sim.exitCode], [null, 0]);
   assert.equal(sim.output, runWithApInt(SQRT, AP.dir));
   for (const lang of ['vhdl', 'verilog']) {
-    const r = cosimulate(SQRT, { file: 'sqrt.cpp', lang });
+    const r = cosimulate(SQRT, { file: 'sqrt.cpp', lang, clock: COMB });
     assert.deepEqual([r.errors, r.pass], [[], true], lang);
     assert.deepEqual(r.gen.diagnostics.map((x) => `${x.line} ${x.message}`), ['11 assert is ignored by synthesis (the C simulation checks it)']);
     assert.deepEqual(r.gen.ports.map((x) => x.name), ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'x', 'ap_return']);

@@ -11,6 +11,7 @@ import { cToHdl } from '../core/c-hdl.js';
 import { lex } from '../core/c-lex.js';
 import { constTokens } from '../core/cpp-template.js';
 import { apIntHeaders, runWithApInt } from './ap-int-ref.js';
+import { COMB } from './c-helpers.js';
 
 const AP = await apIntHeaders();
 const toks = (src) => lex(src, 'a.cpp').tokens.filter((x) => x.t !== 'eof').map((x) => (x.t === 'pragma' ? `#pragma ${x.v.text}` : x.v)).join(' ');
@@ -118,7 +119,7 @@ test('#1590 C++ templates and classes of static members: the C simulation as the
 
 test('#1590 C++ templates: co-simulated in VHDL and Verilog, no warning', () => {
   for (const lang of ['vhdl', 'verilog']) {
-    const r = cosimulate(TEMPLATES, { file: 'tpl.cpp', lang });
+    const r = cosimulate(TEMPLATES, { file: 'tpl.cpp', lang, clock: COMB });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
     assert.deepEqual(r.gen.diagnostics, []);
