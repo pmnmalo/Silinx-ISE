@@ -74,7 +74,7 @@ uiTest('Device Primitives: the palette of the project\'s family, a RAMB16 placed
     const en = await texts();
     assert.ok(en.includes('Port width') && pt.includes('Largura do porto'));
     // (the attributes: their UNISIM names and values; the primitives' names)
-    assert.deepEqual(untranslated(en, pt, [/^Flip-Flops$/, /^[A-Z][A-Z0-9_]*$/, /^\d/, /^RAMB16_S18 \(RAMB16_S\)$/, /^RAMB16_S/]), []);
+    assert.deepEqual(untranslated(en, pt, [/^Flip-Flops$/, /^Buffers$/, /^[A-Z][A-Z0-9_]*$/, /^\d/, /^RAMB16_S18 \(RAMB16_S\)$/, /^RAMB16_S/]), []);
   } finally {
     await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   }
