@@ -40,7 +40,7 @@ export function mountConsole(ctx) {
     'Available commands:',
     '  run [<time> [<unit>]] | run all       advance the simulation (default run time from the toolbar)',
     '  restart                               restart the simulation from time 0 (forces are kept)',
-    '  ssim force add <path> <value> [-radix bin|hex|dec|oct|ascii] [-time <t>] [-value <v> -time <t>]... [-repeat <period>] [-cancel <t>]',
+    '  ssim force add <path> <value> [-radix bin|hex|dec|c1dec|oct|ascii] [-time <t>] [-value <v> -time <t>]... [-repeat <period>] [-cancel <t>]',
     '  ssim force remove <path>              release a forced signal',
     '  wave add <path>                       add a signal (or every signal of an instance) to the wave window',
     '  show value <path> [-radix <r>]        print the current value of a signal',

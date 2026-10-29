@@ -117,7 +117,8 @@ uiTest('ISim Wave window: zoom, markers, radix, force constant / clock / remove,
   // ---- radix of q (100 at 1 us): default hex 64, then binary, signed decimal, octal
   assert.deepEqual(await drawnNames(page), ['Name', 'Value', 'clk', '0', 'q[7:0]', '64']);
   // (right-clicked at the left, then near the right edge: the submenu opens to the left, inside the window, #201)
-  for (const [label, key, shown, at] of [['Binary', 'bin', '01100100', 50000], ['Signed Decimal', 'sdec', '100', 980000], ['Octal', 'oct', '144', 500000], ['Hexadecimal', 'hex', '64', 980000]]) {
+  for (const [label, key, shown, at] of [['Binary', 'bin', '01100100', 50000], ["Decimal (Two's Complement)", 'sdec', '100', 980000], ['Octal', 'oct', '144', 500000],
+    ['Decimal (Unsigned)', 'udec', '100', 50000], ["Decimal (One's Complement)", 'c1dec', '100', 980000], ['Hexadecimal', 'hex', '64', 980000]]) {
     await page.rightClick(await waveAt(page, at, 1));
     await page.hover(await page.point('.isim-menu-item', { text: 'Radix' }));
     await page.waitForSelector('.isim-menu-root .isim-menu');
@@ -127,6 +128,16 @@ uiTest('ISim Wave window: zoom, markers, radix, force constant / clock / remove,
     assert.equal(await page.eval(() => window.Silinx.active.view.state.rows[1].radix), key);
     assert.equal((await drawnNames(page))[5], shown, `q in ${label}`);
   }
+
+  // the decimals named by their encoding, in Portuguese (#1983)
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.rightClick(await waveAt(page, 500000, 1));
+  await page.hover(await page.point('.isim-menu-item', { text: 'Base' }));
+  await page.waitForSelector('.isim-menu-root .isim-menu');
+  const ptRadix = await page.eval(() => Array.from(document.querySelectorAll('.isim-menu-root .isim-menu .isim-menu-item'), (e) => e.textContent.trim()));
+  for (const label of ['Decimal (sem sinal)', 'Decimal (complemento para 2)', 'Decimal (complemento para 1)']) assert.ok(ptRadix.some((t) => t.includes(label)), `${label} in ${JSON.stringify(ptRadix)}`);
+  await page.key('Escape');
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
 
   // ---- force constant: clk (1 at 1 us) forced to 0, no transition while it runs 100 ns, q stays 0x64
   const qShown = async () => { await tbBtn('Go to Latest Time'); return (await drawnNames(page)).at(-1); };

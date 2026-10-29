@@ -223,8 +223,8 @@ const PT = {
   'Previous Transition (selected signal)': 'Transição Anterior (sinal selecionado)', 'Next Transition (selected signal)': 'Transição Seguinte (sinal selecionado)',
   'Add Marker at Cursor': 'Adicionar Marcador no Cursor', 'Add Marker at cursor': 'Adicionar marcador no cursor', 'Add Marker Here': 'Adicionar Marcador Aqui',
   'Delete Marker': 'Apagar Marcador', 'Delete All Markers': 'Apagar Todos os Marcadores', 'Radix': 'Base', 'Radix of selected signals': 'Base dos sinais selecionados',
-  'Default': 'Predefinida', 'Binary': 'Binário', 'Hexadecimal': 'Hexadecimal', 'Octal': 'Octal', 'Unsigned Decimal': 'Decimal sem Sinal',
-  'Signed Decimal': 'Decimal com Sinal', 'Decimal': 'Decimal',
+  'Default': 'Predefinida', 'Binary': 'Binário', 'Hexadecimal': 'Hexadecimal', 'Octal': 'Octal', 'Decimal (Unsigned)': 'Decimal (sem sinal)',
+  "Decimal (Two's Complement)": 'Decimal (complemento para 2)', "Decimal (One's Complement)": 'Decimal (complemento para 1)', 'Decimal': 'Decimal',
   // the wave configuration (#1019)
   'Save Wave Configuration': 'Guardar Configuração de Formas de Onda', 'Load Wave Configuration': 'Carregar Configuração de Formas de Onda',
   'File name in the project:': 'Nome do ficheiro no projeto:', 'Wave configuration:': 'Configuração de formas de onda:', 'Load': 'Carregar',

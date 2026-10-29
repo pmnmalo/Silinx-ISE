@@ -7,7 +7,7 @@
 //
 // rows: { kind: 'sig', path: '/tb_top/uut/cnt', name: 'cnt', type: 'logic' | 'array' | 'other', radix, expanded }
 //       { kind: 'div', name }       { kind: 'group', name, expanded, rows: [ …its signals and dividers ] }
-// radix: 'default' | 'bin' | 'hex' | 'oct' | 'udec' | 'sdec' | 'ascii' (the simulator's); markers: times in ps.
+// radix: 'default' | 'bin' | 'hex' | 'oct' | 'udec' | 'sdec' | 'c1dec' | 'ascii' (the simulator's; c1dec, one's complement, has no ISE radix and is not written); markers: times in ps.
 // wcfgPath and wcfgList: the configurations' files in a project (web/js/sim-wcfg.js).
 
 const RADIX = { bin: 'BINARYRADIX', hex: 'HEXRADIX', oct: 'OCTALRADIX', udec: 'UNSIGNEDDECRADIX', sdec: 'SIGNEDDECRADIX', ascii: 'ASCIIRADIX' };
