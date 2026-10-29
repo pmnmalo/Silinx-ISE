@@ -3,7 +3,8 @@
 // release only (#607), and a change merged after a single test of its module, run by name, broke the
 // module's other tests (#635). For each file the change touches, every unit test file (test/*.test.js) that
 // imports it, directly or through one of the tests' helper modules (test/*.js and test/*.mjs that are not
-// tests); a changed test file itself; test/<name>.test.js for a changed <name>.js; a test that names a changed
+// tests), and through a module that only re-exports it (core/'s old paths of the toolchain's package, #1677); a
+// changed test file itself; test/<name>.test.js for a changed <name>.js; a test that names a changed
 // file in quotes, by its path or its name (one that reads it: docs.test.js CLAUDE.md, ci-workflow.test.js the
 // workflows); test/code-size.test.js for a changed source of core/, web/js/, server/ or scripts/ (it measures them
 // all, #405). The UI tests (test/ui/) run when they changed, or when the page script of their name did
@@ -35,7 +36,7 @@ export function imports(text) {
 }
 
 /** The folders of the repository's JavaScript (sources()). */
-const SOURCE_DIRS = ['core', 'server', 'web', 'scripts', 'test', 'bin', 'research'];
+const SOURCE_DIRS = ['core', 'packages', 'server', 'web', 'scripts', 'test', 'bin', 'research'];
 // a source's own folder; path.join / path.resolve of it (or of a constant) and literal parts; new URL(…, import.meta.url)
 const HERE = String.raw`(?:path\.)?dirname\(\s*(?:fileURLToPath\(\s*import\.meta\.url\s*\)|new URL\(\s*import\.meta\.url\s*\)\.pathname)\s*\)`;
 const LIT = String.raw`'[^'\n]*'|"[^"\n]*"`;
@@ -70,6 +71,12 @@ export function dataPaths(file, text) {
   return [...out];
 }
 
+/** Does a module only re-export others (export … from, comments)? */
+export function reexportsOnly(text) {
+  const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').trim();
+  return code !== '' && code.split(/;\s*/).filter(Boolean).every(s => /^export\s+(\*|\{[^}]*\})\s+from\s+['"][^'"]+['"]$/.test(s.trim()));
+}
+
 /** files: { 'test/a.test.js': text, … } (paths relative to the root, with '/'); changed: the paths changed. */
 export function relatedTests(files, changed) {
   const resolve = (from, spec) => path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
@@ -87,6 +94,11 @@ export function relatedTests(files, changed) {
     for (const f of Object.keys(files)) if (!f.startsWith('test/') && !readers.has(f) && deps[f].some(d => readers.has(d))) { readers.add(f); grew = true; }
   }
   const ch = new Set([...changed, ...readers]);
+  // a module that only re-exports a changed one (core/'s old paths of the toolchain's package, #1677) counts as changed
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const f of Object.keys(files)) if (!ch.has(f) && reexportsOnly(files[f]) && deps[f].some(d => ch.has(d))) { ch.add(f); grew = true; }
+  }
   // a helper of the tests that imports a changed file (or changed itself) counts as changed for its tests
   const touched = new Set(ch);
   for (const f of Object.keys(files)) if (isHelper(f) && deps[f].some(d => ch.has(d))) touched.add(f);
@@ -103,7 +115,7 @@ export function relatedTests(files, changed) {
       if ((isUnit(t) || isUi(t)) && t !== f && names.some(r => r.test(text))) (isUnit(t) ? unit : ui).add(t);
   }
   // the size of every source (#405): a source changed may have grown past the limit
-  if (files['test/code-size.test.js'] != null && changed.some(f => /^(core|web\/js|server|scripts)\/.+\.m?js$/.test(f))) unit.add('test/code-size.test.js');
+  if (files['test/code-size.test.js'] != null && changed.some(f => /^(core|packages\/silinx-fpga\/src|web\/js|server|scripts)\/.+\.m?js$/.test(f))) unit.add('test/code-size.test.js');
   for (const f of ch) {
     if (!/\.m?js$/.test(f) || f.startsWith('test/')) continue;
     const name = path.posix.basename(f).replace(/\.m?js$/, '');

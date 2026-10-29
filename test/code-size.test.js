@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 // (fileURLToPath: on Windows a URL's pathname keeps a slash before the drive letter, #886)
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DIRS = ['core', 'web/js', 'server', 'scripts'];
+const DIRS = ['core', 'packages/silinx-fpga/src', 'web/js', 'server', 'scripts'];
 const MAX_FILE = 1000, MAX_FUNCTION = 300;
 
 // over the limit on 2026-10-22; split them, never add to these lists

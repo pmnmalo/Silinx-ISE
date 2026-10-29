@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { imports, dataPaths, relatedTests, shardOf, sources } from '../scripts/related-tests.mjs';
+import { imports, dataPaths, relatedTests, reexportsOnly, shardOf, sources } from '../scripts/related-tests.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -182,6 +182,29 @@ test('related tests: the repository — the synthesis\'s tests for a change of c
   const { unit } = relatedTests(files, ['core/synth-open.js']);
   for (const f of ['test/synth-open.test.js', 'test/carry-chain.test.js']) assert.ok(unit.includes(f), f);
   assert.ok(!unit.includes('test/schdoc.test.js'));
+});
+
+test('related tests: a module of the toolchain\'s package, through core/\'s old path that re-exports it (#1677)', () => {
+  assert.equal(reexportsOnly("// moved\nexport * from '../packages/p/src/a.js';\nexport { b, c } from './b.js';\n"), true);
+  assert.equal(reexportsOnly("export * from './a.js';\nexport const x = 1;\n"), false);
+  assert.equal(reexportsOnly("import { a } from './a.js';\nexport { a };\n"), false);
+  assert.equal(reexportsOnly('// nothing\n'), false);
+  const files = {
+    'packages/p/src/fpga/route.js': '',
+    'packages/p/src/fpga/place.js': "import { r } from './route.js';",
+    'core/fpga/route.js': "// moved\nexport * from '../../packages/p/src/fpga/route.js';\n",
+    'core/fpga/place.js': "export * from '../../packages/p/src/fpga/place.js';\n",
+    'core/flow.js': "import { r } from './fpga/route.js';\nexport const flow = r;",
+    'test/fpga-route.test.js': "import { r } from '../core/fpga/route.js';",
+    'test/fpga-place.test.js': "import { p } from '../core/fpga/place.js';",
+    'test/flow.test.js': "import { flow } from '../core/flow.js';",
+  };
+  // the module, its re-export, the tests that import the re-export; not the importers of a module that does more
+  assert.deepEqual(relatedTests(files, ['packages/p/src/fpga/route.js']).unit, ['test/fpga-route.test.js']);
+  assert.deepEqual(relatedTests(files, ['packages/p/src/fpga/place.js']).unit, ['test/fpga-place.test.js']);
+  // the repository: a change of the package's router runs the router's tests
+  const { unit } = relatedTests(sources(), ['packages/silinx-fpga/src/fpga/route.js']);
+  for (const f of ['test/fpga-route.test.js', 'test/code-size.test.js']) assert.ok(unit.includes(f), f);
 });
 
 test('related tests: the command line, in a repository of its own — the list, a part, a failing test, no test', (t) => {

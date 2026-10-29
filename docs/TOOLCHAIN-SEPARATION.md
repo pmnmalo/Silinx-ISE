@@ -175,7 +175,8 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    as they are, in a few PRs; every old path re-exports, the server serves the package to the browser, the
    standalone build and the release zip take it. Done in agreement with the sessions working in `core/fpga/`
    (a move conflicts with every open change there). Started: `packages/silinx-fpga/` with its
-   `package.json` and LICENSE, then its data (`devices/`, `bitdb/`).
+   `package.json` and LICENSE, then its data (`devices/`, `bitdb/`), then the toolchain's 75 modules (`src/`, `core/`'s
+   old paths re-exporting them; the boundary test's list empty).
 7. **The public API** ([#1678](https://github.com/pmnmalo/Silinx-ISE/issues/1678)): the package's entry
    (`exports`): netlist and UCF in, `.bit`, XDL and the reports out, the devices and bit databases, the flow
    with its `io`; the IDE's importers switch to it, the re-exporting shims go, and the boundary test then says

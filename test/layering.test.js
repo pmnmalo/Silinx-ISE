@@ -17,7 +17,7 @@ const files = dir => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true 
 test('the application imports nothing from research/ (#407)', () => {
   const imports = /(?:\bimport\s[^;]*?from\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"`]([^'"`]+)['"`]/g;
   const bad = [];
-  for (const f of ['server', 'core', 'web', 'bin'].flatMap(files)) {
+  for (const f of ['server', 'core', 'packages', 'web', 'bin'].flatMap(files)) {
     for (const m of fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(imports)) {
       if (m[1].startsWith('.') && path.resolve(path.dirname(path.join(ROOT, f)), m[1]).startsWith(path.join(ROOT, 'research') + path.sep)) bad.push(`${f}: ${m[1]}`);
       else if (/^\/?research\//.test(m[1])) bad.push(`${f}: ${m[1]}`);

@@ -83,6 +83,8 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   });
   app.use('/', express.static(path.join(ROOT, 'web')));
   app.use('/core', express.static(path.join(ROOT, 'core')));
+  // the toolchain's package (silinx-fpga, #1677): its code, which core/'s re-exports import
+  app.use('/packages/silinx-fpga/src', express.static(path.join(ROOT, 'packages/silinx-fpga/src')));
   app.use('/vendor/elk', express.static(path.join(ROOT, 'node_modules/elkjs/lib')));
   // the editor's ES modules (CodeMirror 6): the packages the import map of web/index.html names, only
   for (const pkg of importMapPackages()) {
