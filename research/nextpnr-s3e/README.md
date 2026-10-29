@@ -13,6 +13,7 @@ XC3S250E (Basys2-250).
 | `export-unknown-pips.mjs` | The PIPs whose bits Silinx's bit database does not know (Silinx's own router is kept off them: `knownRouting`), per tile, for the generator to leave out |
 | `nextpnr-to-xdl.mjs` | nextpnr's routed design (`--write`) to XDL: one instance per used site with its settings, each net's site pins and PIPs |
 | `xdl-to-bit.mjs` | Silinx's bitgen on that XDL |
+| `export-timing.mjs` | Silinx's delay model (`SPEED_4`, fitted to trce) for the chip database: the class of the node each PIP drives, per template, and the model's delays |
 | `xdl-report.mjs` | The size (slices, LUTs, flip-flops) and speed (each clock's minimum period, Silinx's static timing analysis fitted to trce) of a routed XDL: nextpnr's result and Silinx's measured the same way |
 
 The site model, per slice: two LUT4s (F, G, inputs on F1…F4 / G1…G4), their outputs to X / Y
@@ -25,11 +26,12 @@ chain) are left out.
 ```
 # in the nextpnr fork
 cmake -S . -B build-s3e -DARCH=himbaechel -DHIMBAECHEL_UARCH=spartan3e -DBUILD_PYTHON=OFF -DBUILD_GUI=OFF \
-  -DSILINX_DEVICES=<silinx>/packages/silinx-fpga/devices -DSILINX_UNKNOWN_PIPS=<dir of unknown-pips-xc3s250e.json>
+  -DSILINX_DEVICES=<silinx>/packages/silinx-fpga/devices -DSILINX_UNKNOWN_PIPS=<dir> -DSILINX_TIMING=<dir>
 cmake --build build-s3e -j6
 
 # in Silinx
 node research/nextpnr-s3e/export-unknown-pips.mjs xc3s250ecp132-4 <dir>/unknown-pips-xc3s250e.json
+node research/nextpnr-s3e/export-timing.mjs xc3s250ecp132-4 <dir>/timing-xc3s250e.json
 yosys -p "read_verilog blink.v; synth_xilinx -family xc3se -nocarry -nowidelut -top blink; write_json blink.json"
 nextpnr-himbaechel --device xc3s250ecp132-4 --json blink.json --write routed.json
 node research/nextpnr-s3e/nextpnr-to-xdl.mjs routed.json <build-s3e>/himbaechel/uarch/spartan3e/sites-xc3s250e.json routed.xdl
@@ -47,16 +49,28 @@ The chip database of the XC3S250E: 19 s in Python, a 75 MB `.bba`, a 24 MB `.bin
 
 `blink.v`, the same Yosys netlist (37 LUTs, 24 flip-flops, 10 IOBs, 1 BUFGMUX) placed and routed by both:
 
-| | nextpnr, LUT–FF pairs | nextpnr, slices packed | Silinx |
-|---|---|---|---|
-| P&R time | 0.3 s | 0.3 s | 0.6 s (place 0.1 s, route 0.5 s) |
-| slices | 28 | 19 | 19 |
-| PIPs | 448 | 450 | 351 |
-| routing check against the graph | OK | OK | OK |
-| ISE: `xdl -xdl2ncd`, `drc` | 0 errors, 0 warnings | 0 errors, 0 warnings | 0 errors, 0 warnings |
-| ISE: `trce` minimum period | 9.269 ns | 10.343 ns | 6.717 ns |
-| Silinx's timing analysis (`xdl-report.mjs`) | 9.432 ns | 10.421 ns | 6.821 ns |
-| Silinx's bitgen against ISE's `bitgen` | byte-identical | byte-identical | byte-identical |
+| | nextpnr, LUT–FF pairs | nextpnr, slices packed | nextpnr, packed and timed | Silinx |
+|---|---|---|---|---|
+| P&R time | 0.3 s | 0.3 s | 0.5 s | 0.6 s (place 0.1 s, route 0.5 s) |
+| slices | 28 | 19 | 19 | 19 |
+| ISE: `xdl -xdl2ncd`, `drc` | clean | clean | clean | clean |
+| ISE: `trce` minimum period | 9.269 ns | 10.343 ns | 8.430 ns | 6.717 ns |
+| Silinx's timing analysis (`xdl-report.mjs`) | 9.432 ns | 10.421 ns | 8.536 ns | 6.821 ns |
+| nextpnr's own estimate | — | — | 7.56 ns | — |
+| Silinx's bitgen against ISE's `bitgen` | byte-identical | byte-identical | byte-identical | byte-identical |
+
+Packed and timed, five seeds: 8.32 to 8.81 ns by Silinx's analysis (nextpnr's estimate 7.49 to 8.05 ns);
+`--router router2`, `--placer sa`, `--placer-heap-timingweight 50` and `--tmg-ripup` no better.
+
+The timing model (`export-timing.mjs`, the generator's `--timing`): nextpnr counts a PIP's delay, not a
+wire's, so each PIP takes Silinx's delay of the class of the node it drives (double, hex, long, OMUX,
+IMUX, global clock…; 407 template PIPs whose tiles disagree take the most frequent class); a LUT's
+input arcs Silinx's Tilo with the pin's own offset and the connection's fixed part; a flip-flop's
+clock to Q, setup on D, CE, SR; BX to the flip-flop as a PIP of its own delay; the placer's and the
+router's estimates Silinx's distance model. Silinx's loads (a delay per extra branch off a node) are
+left out: as nextpnr's RC model they are not seen by its router (fast PIP delays while routing), and
+with them the routes came out slower (8.96 to 10.51 ns). nextpnr's estimate stays about 1 ns below the
+analysis of its result for want of them.
 
 The slices packed (`pack_slices`): a LUT with the flip-flop it feeds, or either alone, is a unit; two
 units with the same control set go into one slice, chosen by the nets they share (each net weighing
@@ -70,9 +84,9 @@ a BUFGMUX's select S is tied to VCC through its tile's VCC site (`XDL_DUMMY_<til
 
 ## What is left for a decision
 
-- **Timing.** No timing model yet (all delays the default), so the placer and the router do not see
-  speed: 10.3 ns against Silinx's 6.7 ns. Silinx's model (fitted to trce) to be written into the chip
-  database's speed grade.
+- **Speed.** With Silinx's delays nextpnr gets 8.4 ns where Silinx gets 6.7 ns on the same netlist:
+  Silinx's placer and router are the better ones here (its timing-driven placement, the LUT inputs
+  assigned to the faster pins, the loads in its router's costs). nextpnr has no LUT pin permutation yet.
 - **Constants**, the carry chain, MUXF5…F8, SLICEM's RAMs and shift registers, the IOB's registers,
   BRAM, MULT18X18, DCM: each a cell type, its BELs and its settings in the converter.
 - **The clock pads.** nextpnr routes a pad to its BUFGMUX on general routing where a dedicated path
