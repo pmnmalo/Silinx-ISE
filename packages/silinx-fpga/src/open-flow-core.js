@@ -46,7 +46,6 @@ function noSimModels() {
   return { runPostMap: none, runPostPar: none, runPostSynth: none, runPostTranslate: none };
 }
 
-export { runOpenFlow } from './flow-ide.js';
 
 export const ISE_HINT = 'The Silinx toolchain does not support this yet: implement the design in an ISE mode (Toolchain Settings).';
 

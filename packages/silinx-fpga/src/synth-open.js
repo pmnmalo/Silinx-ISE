@@ -22,7 +22,6 @@ import { bddStage } from './synth-open-resynth.js';
 export {
   DEEP_RULE, criticalDelay, deepDesign, logicLevels, pathEnds
 };
-export { synthesizeOpen, synthesisInput } from './synth-front.js';
 export { asText, lineStream, readableBlobs, runYosysOnce, verifiedYosysUrl, yosysError, yosysWorkerSource } from './synth-open-yosys.js';
 
 // Silinx's device families -> synth_xilinx -family

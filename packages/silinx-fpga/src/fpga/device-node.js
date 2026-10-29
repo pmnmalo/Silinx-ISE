@@ -27,7 +27,7 @@ export function devicesDir() {
 export function deviceCachePath(part) { return path.join(devicesDir(), `${part}.json.gz`); }
 
 /** The graphs that ship with Silinx (packages/silinx-fpga/devices/<part>.json.gz). */
-export const SHIPPED_DEVICES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'packages', 'silinx-fpga', 'devices');
+export const SHIPPED_DEVICES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'devices');
 export function shippedDevicePath(part) { return path.join(SHIPPED_DEVICES_DIR, `${part}.json.gz`); }
 
 /**

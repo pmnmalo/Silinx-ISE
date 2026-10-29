@@ -1,7 +1,7 @@
 // The Silinx toolchain's boundary (#1672, step 1 of #1651, docs/TOOLCHAIN-SEPARATION.md): the toolchain's modules
-// (synthesis, pack, place, route, timing, bitgen, the device data, the flow, their formats and parts) import
-// nothing of the IDE but the modules listed below, each with its importer. A new import across the boundary
-// fails; an entry must leave the list once its import is gone (the list only shrinks, as test/code-size.test.js).
+// (synthesis, pack, place, route, timing, bitgen, the flow, their formats and parts), in its package since #1677
+// (packages/silinx-fpga/src; core/'s old paths re-export them), import nothing of the IDE. ALLOWED lists the imports
+// across that were left, each with its importer; it only shrinks (as test/code-size.test.js), and is empty since #1677.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,20 +10,12 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// the toolchain's modules of core/
-const TOOLCHAIN = [
-  /^core\/fpga\//,
-  /^core\/synth-open[\w-]*\.js$/,
-  /^core\/open-flow-[\w-]+\.js$/,
-  /^core\/(carry-chain|synth-fsm|lut-resynth|open-steps|xdl|ucf|resources|resource-check|family|power)\.js$/,
-];
+// the toolchain's modules: its package's
+const TOOLCHAIN = [/^packages\/silinx-fpga\//];
 const inToolchain = (f) => TOOLCHAIN.some((r) => r.test(f));
 
 // the IDE's modules the toolchain imports on 2026-10-27, `importer -> imported`; never add to it
 const ALLOWED = new Set([
-  'core/fpga/techview.js -> core/techview.js', // #1673: the old path of the view, until its importers switch (step 7)
-  'core/open-flow-core.js -> core/flow-ide.js', // #1675: runOpenFlow with the IDE's hooks, until its importers switch (step 7)
-  'core/synth-open.js -> core/synth-front.js', // #1674: synthesizeOpen from the front end, until its importers switch (step 7)
 ]);
 // the npm packages it imports (its dependencies once it is a package of its own)
 const PACKAGES = new Set(['@yowasp/yosys']);
@@ -52,7 +44,7 @@ function crossings(file, text) {
   return out;
 }
 
-const toolchain = sources('core').filter(inToolchain).sort();
+const toolchain = sources('packages/silinx-fpga/src').filter(inToolchain).sort();
 const found = toolchain.flatMap((f) => crossings(f, fs.readFileSync(path.join(ROOT, f), 'utf8')));
 // a module of the repository is a .js path; a package, its name
 const isPackage = (c) => !/\.m?js$/.test(c.split(' -> ')[1]);
@@ -60,27 +52,27 @@ const isPackage = (c) => !/\.m?js$/.test(c.split(' -> ')[1]);
 test('#1672 toolchain boundary: how the imports across are found', () => {
   const text = [
     "import { a } from './route.js';", // within
-    "import * as c from '../compile.js';", // across, relative
-    "export { s } from '../schdoc.js';", // a re-export
+    "import * as c from '../../../../core/compile.js';", // across, relative
+    "export { s } from '../../../../core/schdoc.js';", // a re-export
     "const m = await import('/core/sim-model.js');", // dynamic, the browser's URL
     "import fs from 'node:fs';", // a built-in
     "import { runYosys } from '@yowasp/yosys/x.js';", // a package
     "import elk from 'elkjs/lib/elk.bundled.js';",
   ].join('\n');
-  assert.deepEqual(crossings('core/fpga/x.js', text), [
-    'core/fpga/x.js -> core/compile.js',
-    'core/fpga/x.js -> core/schdoc.js',
-    'core/fpga/x.js -> core/sim-model.js',
-    'core/fpga/x.js -> @yowasp/yosys',
-    'core/fpga/x.js -> elkjs',
+  assert.deepEqual(crossings('packages/silinx-fpga/src/fpga/x.js', text), [
+    'packages/silinx-fpga/src/fpga/x.js -> core/compile.js',
+    'packages/silinx-fpga/src/fpga/x.js -> core/schdoc.js',
+    'packages/silinx-fpga/src/fpga/x.js -> core/sim-model.js',
+    'packages/silinx-fpga/src/fpga/x.js -> @yowasp/yosys',
+    'packages/silinx-fpga/src/fpga/x.js -> elkjs',
   ]);
-  assert.deepEqual(crossings('core/synth-open.js', "import { x } from './synth-open-yosys.js';\nimport { u } from './ucf.js';"), []);
+  assert.deepEqual(crossings('packages/silinx-fpga/src/synth-open.js', "import { x } from './synth-open-yosys.js';\nimport { u } from './ucf.js';"), []);
 });
 
 test('#1672 toolchain boundary: the toolchain\'s modules are found', () => {
-  for (const f of ['core/fpga/route.js', 'core/fpga/bitgen.js', 'core/fpga/s6/bitstream.js', 'core/synth-open.js',
-    'core/open-flow-core.js', 'core/xdl.js', 'core/ucf.js', 'core/family.js']) assert.ok(toolchain.includes(f), f);
-  for (const f of ['core/compile.js', 'core/sim-model.js', 'core/schdoc.js']) assert.ok(!toolchain.includes(f), f);
+  for (const f of ['fpga/route.js', 'fpga/bitgen.js', 'fpga/s6/bitstream.js', 'synth-open.js', 'open-flow-core.js', 'xdl.js',
+    'ucf.js', 'family.js']) assert.ok(toolchain.includes(`packages/silinx-fpga/src/${f}`), f);
+  for (const f of ['core/compile.js', 'core/sim-model.js', 'core/schdoc.js', 'core/synth-open.js', 'core/fpga/techview.js']) assert.ok(!toolchain.includes(f), f);
   assert.ok(toolchain.length >= 70, `${toolchain.length} modules`);
 });
 
