@@ -12,9 +12,12 @@ before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
+// (the loops not pipelined, #pragma HLS PIPELINE off: a state machine of a state a step, as the charts show it; since
+// #1919 a loop is pipelined unless it says so, #1968)
 const GCD = `unsigned gcd(unsigned a, unsigned b) {
   while (b != 0) {
 #pragma HLS LOOP_TRIPCOUNT max=64
+#pragma HLS PIPELINE off
     unsigned t = b;
     b = a >= b ? a - b : b - a;
     a = t;
@@ -77,7 +80,10 @@ const FREE = `#include "hls_stream.h"
 void sums(hls::stream<int> &in, hls::stream<int> &out) {
 #pragma HLS INTERFACE ap_ctrl_none port=return
   int s = 0;
-  for (int i = 0; i < 3; i++) s += in.read();
+  for (int i = 0; i < 3; i++) {
+#pragma HLS PIPELINE off
+    s += in.read();
+  }
   out.write(s);
 }
 `;
