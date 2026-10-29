@@ -13,7 +13,7 @@ export const waitNewSourcePage = (page, title) => page.waitFor((t) => document.q
 // Project ▸ New Source…, the type `type`, Next >, the file name `name`, then Wizard: the wizard `title` opens
 // (labels: { menu, item, dialog, next, wizard, file } in another language)
 export async function newSourceWizardOf(page, type, name, title, {
-  menu = 'Project', item = 'New Source…', dialog = 'New Source Wizard', next = 'Next >', wizard = 'Wizard', file = 'File Name and Location',
+  menu = 'Project', item = 'New Source…', dialog = 'New Source', next = 'Next >', wizard = 'Wizard', file = 'File Name and Location',
 } = {}) {
   await page.menu(menu, item);
   await page.waitDialog(dialog);

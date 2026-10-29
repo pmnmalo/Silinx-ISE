@@ -1,4 +1,4 @@
-// Wizards and dialogs modelled on ISE (New Project Wizard, New Source Wizard, properties...).
+// Wizards and dialogs modelled on ISE (New Project Wizard, New Source, properties...).
 import { api } from './api.js';
 import { PRODUCT, PRODUCT_FULL, VERSION, VERSION_LABEL, BUILD, REPOSITORY, compareVersions, versionLabel } from '/core/version.js';
 import { icons } from './icons.js';

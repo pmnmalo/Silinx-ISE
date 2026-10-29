@@ -44,7 +44,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   await makeProject(env, { name: 'TtPj', files: { 'src/add1.vhd': ADDER } });
   await page.openProject('TtPj');
   await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .src-types .st.sel').textContent), /^\s*Boolean Algebra\s*$/);
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj3');
@@ -306,7 +306,7 @@ uiTest('Algebra from Module: a vector adder read into a table (exhaustive simula
   // the editor's "Algebra from Module…" on a new table (with its HDL file, #207)
   const T = '.doc:not([hidden]) .tt-editor';
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => /Boolean Algebra/.test(e.textContent)); r.scrollIntoView(); r.click(); });
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'blank');
@@ -340,7 +340,7 @@ uiTest('Truth Table (#196): Apply input / output names (columns follow their nam
   await makeProject(env, { name: 'TtVlog', preferredLanguage: 'verilog' });
   await page.openProject('TtVlog');
   await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'tv');
   await page.dialogButton('Next >');

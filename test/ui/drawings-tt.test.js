@@ -21,7 +21,7 @@ uiTest('Truth tables\' module: a new table, its HDL following it, read-only (#11
   await makeProject(env, { name: 'TtMod', files: {} });
   await page.openProject('TtMod');
   await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj3');
   await page.dialogButton('Next >');

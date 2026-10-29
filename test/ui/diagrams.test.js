@@ -18,7 +18,7 @@ const PROBLEMS_ASM_NO_E7 = ["error: State 'DONE' has no exit (next state path)"]
 // New Source wizard: a type of the list, a file name, then Next until Finish
 async function newSource(page, type, name) {
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.click('.dlg-overlay .src-types .st', { text: type });
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', name);
@@ -598,7 +598,7 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
   await page.openProject('AsmPj');
   // Tools ▸ ASM State Machine Editor… opens the New Source wizard on the ASM type
   await page.menu('Tools', 'ASM State Machine Editor…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .src-types .st.sel').textContent), 'Algorithmic State Machine (ASM)');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctrl');

@@ -18,7 +18,7 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
   await makeProject(env, { name: 'PnPj', top: '' });
   await page.openProject('PnPj');
   await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
   await page.dialogButton('Next >');
@@ -71,7 +71,7 @@ async function newNet(page, pj) {
   await makeProject(env, { name: pj, top: '' });
   await page.openProject(pj);
   await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
   await page.dialogButton('Next >');
@@ -288,7 +288,7 @@ uiTest('Petri Net Wizard (#208): New Source ▸ Petri Net ▸ Wizard (#958), nam
   await page.openProject('PnWiz');
   // New Source: one 'Petri Net' type; the Wizard button of its File Name and Location page opens the wizard
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.textContent.trim()).filter((t) => /Petri/.test(t))), ['Petri Net']);
   await page.dialogButton('Cancel');
   await page.waitNoDialog();

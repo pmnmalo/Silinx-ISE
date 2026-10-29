@@ -62,7 +62,7 @@ const expectPage = async (page, t, i, what) => {
 };
 const openNewSource = async (page) => {
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await waitNewSourcePage(page, 'Select Source Type');
 };
 const forward = async (page, title) => { await page.dialogButton('Next >'); await waitNewSourcePage(page, title); };

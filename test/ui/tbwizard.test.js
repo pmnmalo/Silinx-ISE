@@ -110,7 +110,7 @@ uiTest('New Source ▸ Test Bench in VHDL and in Verilog, Module (HDL) in Verilo
   await page.openProject('TbwNs');
   const newSource = async (type, name, lang) => {
     await page.menu('Project', 'New Source…');
-    await page.waitDialog('New Source Wizard');
+    await page.waitDialog('New Source');
     await page.eval((t) => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim().endsWith(t)); r.scrollIntoView(); r.click(); }, type);
     await page.dialogButton('Next >');
     await page.fill('.dlg-overlay .wiz-main input[type=text]', name);

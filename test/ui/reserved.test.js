@@ -17,7 +17,7 @@ uiTest('a reserved word refused: New Source (a schematic named AND) and Rename (
   await makeProject(env, { name: 'RwPj' });
   await page.openProject('RwPj');
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.lastChild.textContent.trim() === 'Schematic').click());
   await page.dialogButton('Next >');
   await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'File Name and Location');

@@ -56,7 +56,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   await makeProject(env, { name: 'Ink', files: {} });
   await page.openProject('Ink');
   await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'hand');
   // the expression row: a truth table's only

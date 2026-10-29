@@ -177,7 +177,7 @@ uiTest('Portuguese: the New Source list and every page of the Module and Schemat
   };
   for (const [type, title, pages] of [['Module (HDL)', 'Module Wizard', 4], ['Schematic', 'Schematic Wizard', 3]]) {
     await page.menu('Project', 'New Source…');
-    await page.waitDialog('New Source Wizard');
+    await page.waitDialog('New Source');
     await setLang('pt');
     const list = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.lastChild.textContent.trim()));
     for (const s of ['Módulo (HDL)', 'Esquemático']) assert.ok(list.includes(s), `${s} in ${list}`);
@@ -229,7 +229,7 @@ uiTest('New Source: page 1 is only the type; the file name and the location on t
   await makeProject(env, { name: 'NsPages', top: '' });
   await page.openProject('NsPages');
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   const pick = (t) => page.eval((x) => { [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.lastChild.textContent.trim() === x).click(); }, t);
   const h3 = () => page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent);
   const labels = () => page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main .form-grid > label')].map((l) => l.textContent));
@@ -269,7 +269,7 @@ uiTest('New Source: page 1 is only the type; the file name and the location on t
   // in Portuguese
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
   await page.menu('Projeto', 'Nova Fonte…');
-  await page.waitFor(() => /Assistente de Nova Fonte/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'the wizard in Portuguese' });
+  await page.waitFor(() => /Nova Fonte/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'the wizard in Portuguese' });
   await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')][0].click());
   await page.click('.dlg-overlay .dlg-buttons .btn.primary');
   await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Nome do Ficheiro e Localização', [], { what: 'page 2 in Portuguese' });

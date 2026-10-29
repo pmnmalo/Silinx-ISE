@@ -76,7 +76,7 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   await makeProject(env, { name: 'FsmPj', files: {} });
   await page.openProject('FsmPj');
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   const types = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.textContent.trim()));
   assert.equal(types.indexOf('Finite State Machine (FSM)') + 1, types.indexOf('Algorithmic State Machine (ASM)'), types.join(' | '));   // FSM listed just before ASM
   await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim() === 'Finite State Machine (FSM)'); r.scrollIntoView(); r.click(); });

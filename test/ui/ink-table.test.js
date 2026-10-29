@@ -51,7 +51,7 @@ async function newTable(page, name) {
   await makeProject(env, { name, files: {} });
   await page.openProject(name);
   await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'drawn');
   await page.dialogButton('Next >');
