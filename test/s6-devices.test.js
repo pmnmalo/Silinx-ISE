@@ -154,3 +154,30 @@ test('runOpenImplementation under the flag: the blinky example on the Nexys3, pl
     }
   } finally { if (before === undefined) delete process.env.SILINX_SPARTAN6_OPEN; else process.env.SILINX_SPARTAN6_OPEN = before; }
 });
+
+// stopwatch on the Nexys3 (a block RAM, three DSP48A1s): routed on the switches whose bits the databases have, through
+// the bitstream; its warnings exactly the synthesis's eight on the block RAM's ports (#2045)
+test('runOpenImplementation under the flag: the stopwatch example on the Nexys3 through the bitstream, its block RAM\'s frame written again', { timeout: 600000 }, async () => {
+  const { exampleUcf } = await import('./examples-lib.mjs');
+  const before = process.env.SILINX_SPARTAN6_OPEN;
+  process.env.SILINX_SPARTAN6_OPEN = '1';
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-s6-'));
+  try {
+    const project = JSON.parse(fs.readFileSync(path.join(ROOT, 'examples/stopwatch/silinx.json'), 'utf8'));
+    for (const f of project.files) { fs.mkdirSync(path.join(dir, path.dirname(f.path)), { recursive: true }); fs.copyFileSync(path.join(ROOT, 'examples/stopwatch', f.path), path.join(dir, f.path)); }
+    fs.mkdirSync(path.join(dir, path.dirname(project.constraints)), { recursive: true });
+    fs.writeFileSync(path.join(dir, project.constraints), exampleUcf('stopwatch', { board: 'nexys3' }).text);
+    const j = job();
+    const r = await OF.runOpenImplementation(j, { project: { ...project, name: 'stopwatch', board: 'nexys3', device: resolveBoard('nexys3').device }, projectDir: dir, steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] });
+    assert.deepEqual(r.completedSteps, ['synth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit'], j.lines.join('\n'));
+    const ports = [['ADDRBRDADDR', 14, 13], ['ADDRAWRADDR', 14, 13], ['DOPBDOP', 8, 2], ['DOBDO', 64, 16], ['DIPADIP', 8, 2], ['DIADI', 64, 16], ['DOPADOP', 8, 2], ['DOADO', 64, 16]];
+    assert.deepEqual(j.lines.filter(l => /^(WARNING|ERROR)/.test(l)).sort(), ports.map(([p, a, b]) => `WARNING:Yosys - Resizing cell port stopwatch.laps_ram.0.0.${p} from ${a} bits to ${b} bits.`).sort(), j.lines.join('\n'));
+    assert.ok(j.lines.includes('All constraints were met.'));
+    const bit = readBit6(fs.readFileSync(path.join(dir, `build/${project.top}.bit`)));
+    assert.equal(bit.rewrites.length, 1);
+    assert.equal(bit.rewrites[0].far[1], 23);
+  } finally {
+    if (before === undefined) delete process.env.SILINX_SPARTAN6_OPEN; else process.env.SILINX_SPARTAN6_OPEN = before;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

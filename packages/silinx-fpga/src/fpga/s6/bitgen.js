@@ -12,6 +12,13 @@ import { cmtCfg, cmtPath, predictCmt, predictCmtSettings, cmtRegcBits, cmtInputB
 import { HARD_TYPES, predictHard } from './bitgen-hard.js';
 
 const INT_LIKE = /^(INT|INT_BRK|INT_BRAM|INT_BRAM_BRK|IOI_INT|LIOI_INT|INT_GCLK)_X/;
+
+/**
+ * The PIPs with no bits of their own, by family (#732: every one of them measured had none; the fixed connections of
+ * a block RAM's or DSP48A1's pins to its switch boxes, their outputs 14 + 11 and inputs 44 + 127, and an interface
+ * tile's LOGICOUT_n to LOGICOUTn, 17): one the PIP databases do not have is taken as none, not as unknown.
+ */
+export const NO_BITS = /^(MACCSITE2 \S+_DSP48A1_SITE -> MACC_LOGICOUT\S+|MACCSITE2 \S+ -> \S+_DSP48A1_SITE|BRAMSITE2 RAMB\S+ -> BRAM_LOGICOUT\S+|BRAMSITE2 BRAM_LOGICIN\S+ -> RAMB\S+|INT_INTERFACE INT_INTERFACE_LOGICOUT_(\d+) -> INT_INTERFACE_LOGICOUT\2)$/;
 const sitesCache = new WeakMap();
 const sitesOf = device => sitesCache.get(device) ?? sitesCache.set(device, s6Sites(device)).get(device);
 
@@ -129,7 +136,7 @@ export function predictDesign(design, device, dev, db) {
         rel = pipLookup(db.int, from, p.dir, to);
         r = tileRegion(dev, p.tile);
       } else {
-        const x = db.other.pips[`${p.tile.replace(/_X\d+Y\d+$/, '')} ${p.from} ${p.dir} ${p.to}`];
+        const k = `${p.tile.replace(/_X\d+Y\d+$/, '')} ${p.from} ${p.dir} ${p.to}`, x = db.other.pips[k] ?? (NO_BITS.test(k) ? [] : undefined);
         rel = x?.map(s => s.split(',').map(Number));
         r = gridRegion(device, dev, p.tile);
       }
@@ -180,4 +187,25 @@ export function bitstreamS6(design, device, db, { name = 'top.ncd;UserID=0xFFFFF
   for (const u of again.unknown) unknown.set(u, (unknown.get(u) || 0) + 1);
   const bytes = writeBit6({ fdri, rewrites: again.rewrites, name, part: part.replace(/^xc/, ''), ...(date && { date }), ...(time && { time }), crc, startupClk, device: S6_DEVICES[type] });
   return { bytes, unknown };
+}
+
+/**
+ * The routing switches whose bits the databases have, for the router (route.js routeS6's allowPip(tile, pip)): a
+ * switch box's PIP that pipLookup finds (either way, a bidirectional one), a slice tile's (no bits of their own), any
+ * other tile's in the other PIPs' database (measured, with bits or none) or of a family with none (NO_BITS), as
+ * predictDesign reads them.
+ */
+export function knownPipS6(device, db) {
+  const memo = new Map();
+  return (k, i) => {
+    const key = `${device.tileTemplate[k]} ${i}`;
+    let ok = memo.get(key);
+    if (ok !== undefined) return ok;
+    const p = device.pip(k, i), name = device.tileNames[k];
+    if (/^CLEX[LM]_/.test(name)) ok = true;
+    else if (INT_LIKE.test(name)) ok = !!(pipLookup(db.int, p.from, p.dir, p.to) ?? (p.dir === '=-' ? pipLookup(db.int, p.to, p.dir, p.from) : null));
+    else { const t = `${name.replace(/_X\d+Y\d+$/, '')} ${p.from} ${p.dir} ${p.to}`; ok = !!db.other.pips[t] || NO_BITS.test(t); }
+    memo.set(key, ok);
+    return ok;
+  };
 }

@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadBitDbS6 } from '../src/fpga/s6/bitdb-node.js';
-import { predictDesign, predictIob, padBit, bramRewrites, bitstreamS6 } from '../src/fpga/s6/bitgen.js';
+import { predictDesign, predictIob, padBit, bramRewrites, bitstreamS6, NO_BITS, knownPipS6 } from '../src/fpga/s6/bitgen.js';
 import { kindModel, predictSlice, lutEntries, baseSettings } from '../src/fpga/s6/bitgen-slice.js';
 import { tileRegion, gridRegion, columnOf } from '../src/fpga/s6/bitgen-regions.js';
 import { pipLookup } from '../src/fpga/s6/bitgen-pips.js';
@@ -112,4 +112,23 @@ test('bitgen: a design\'s .bit, its frame data the empty device\'s with the desi
   assert.deepEqual(set.sort(), [...predictDesign(design, device, dev, db).bits].sort());
   const dcm = bitstreamS6({ insts: [{ name: 'd', type: 'DCM', site: 'DCM_X0Y0', tile: 'CMT_DCM_BOT_X11Y8', placed: true, cfg: [] }], nets: [] }, device, db);
   assert.ok([...dcm.unknown.keys()].some(k => /^DCM DCM_X0Y0: a clock manager's bits not measured/.test(k)));
+});
+
+test('bitgen: the PIP families with no bits (a hard block\'s pins, an interface tile\'s LOGICOUT), the switches the router may take', () => {
+  for (const k of ['MACCSITE2 P15_DSP48A1_SITE -> MACC_LOGICOUT10_INT1', 'MACCSITE2 MACC_LOGICINB14_INT0 -> C11_DSP48A1_SITE', 'BRAMSITE2 RAMB8BWER_1_DOPB0 -> BRAM_LOGICOUT3_INT2',
+    'BRAMSITE2 BRAM_LOGICINB31_INT0 -> RAMB8BWER_1_ADDRA0', 'INT_INTERFACE INT_INTERFACE_LOGICOUT_8 -> INT_INTERFACE_LOGICOUT8']) assert.ok(NO_BITS.test(k), k);
+  for (const k of ['INT_INTERFACE INT_INTERFACE_LOGICOUT_8 -> INT_INTERFACE_LOGICOUT9', 'INT EE2B0 -> NN2B1', 'CLKC CLKC_PLL_L0 -> CLKC_GCLK0']) assert.ok(!NO_BITS.test(k), k);
+  // every measured one of those families has no bits indeed
+  for (const [k, b] of Object.entries(db.other.pips)) if (NO_BITS.test(k)) assert.deepEqual(b, [], k);
+  // a PIP of such a family the databases do not have: no bits, not unknown
+  const r = predictDesign({ insts: [], nets: [{ name: 'n', outpins: [], inpins: [], pips: [{ tile: 'MACCSITE2_X18Y28', from: 'P47_DSP48A1_SITE', dir: '->', to: 'MACC_LOGICOUT99_INT1' }] }] }, device, dev, db);
+  assert.deepEqual([r.bits.size, r.unknown.size], [0, 0]);
+  // the router's switches: the measured ones and those families; not an unmeasured one of another tile
+  const allow = knownPipS6(device, db), find = (tile, test) => { const k = device.tile(tile), tp = device.templates[device.tileTemplate[k]]; for (let i = 0; i < tp.from.length; i++) if (test(device.pip(k, i))) return [k, i]; return null; };
+  const clexl = device.tileNames.find(n => /^CLEXL_/.test(n));
+  assert.equal(allow(...find(clexl, () => true)), true);
+  const intTile = device.tileNames.find(n => /^INT_X\d+Y\d+$/.test(n)), known = find(intTile, p => !!pipLookup(db.int, p.from, p.dir, p.to));
+  assert.equal(allow(...known), true);
+  const maccTile = device.tileNames.find(n => /^MACCSITE2_/.test(n)), out = find(maccTile, p => /_DSP48A1_SITE$/.test(p.from) && /^MACC_LOGICOUT/.test(p.to));
+  assert.equal(allow(...out), true);
 });
