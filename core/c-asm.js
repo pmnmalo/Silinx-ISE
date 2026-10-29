@@ -14,6 +14,7 @@ import { fsmd } from './c-fsmd.js';
 import { exprText, stmtText } from './c-print.js';
 import { asmLayout } from './asm-layout.js';
 import { cToHdl } from './c-hdl.js';
+import { portOf } from './c-names.js';
 
 export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null } = {}) {
   const checked = checkC(source, file, { headers, top, synthesis: true });
@@ -36,8 +37,6 @@ const HS = ['ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
 
 function chart(top, m, lang, ports) {
   const hs = ports.some((p) => p.name === 'ap_start');
-  // (a stream's handshake under its port's name: an argument renamed, in_r for in, #1902)
-  const fifoPort = (f) => { const p = ports.find((q) => q.role === 'fifo' && q.param === f); return p ? p.name.replace(/_(dout|empty_n|read|din|full_n|write)$/, '') : f; };
   const nodes = [], edges = [];
   let nid = 0, eid = 0;
   const node = (n) => { const x = { id: `n${++nid}`, x: 0, y: 0, ...n }; nodes.push(x); return x; };
@@ -94,10 +93,10 @@ function chart(top, m, lang, ports) {
         case 'memlatch': act(`${x.tmp} = ${x.mem}_q0`); return;
         case 'memwrite': act(`${x.mem}_address0 = ${exprText(x.i)}; ${x.mem}_we0 = 1; ${x.mem}_d0 = ${exprText(x.v)}`); return;
         // a stream's read or write (#1941): the C's, then the state waits while the FIFO is empty (full), the
-        // handshake under it
+        // handshake under it (by the module's ports: a stream named in, in_r_empty_n, core/c-hdl.js)
         case 'fiforead': case 'fifowrite': {
           if (!cur && !pending.length) return;
-          const rd = x.kind === 'fiforead', f = fifoPort(x.fifo);
+          const rd = x.kind === 'fiforead', f = portOf(x.fifo);
           act(stmtText(x));
           const d = node({ type: 'decision', cond: `${f}_${rd ? 'empty_n' : 'full_n'}` });
           for (const p of pending) edge(p.from, d, p.port);

@@ -239,6 +239,47 @@ test('#1941 a stream\'s read and write in the ASM chart in the C\'s terms (ap_fi
   }
 });
 
+// (the issue's own: streams named in and out, reserved words, their ports in_r_… and out_r_…, #1902)
+const INOUT = `#include "hls_stream.h"
+void pass2(hls::stream<int> &in, hls::stream<int> &out) {
+  int t = in.read();
+  out.write(t + 1);
+}
+int main() {
+  hls::stream<int> in, out;
+  int r = 0;
+  for (int c = 0; c < 3; c++) { in.write(c); pass2(in, out); r += out.read(); }
+  return r == 6 ? 0 : 1;
+}
+`;
+
+test('#1941 streams named in and out: t = in.read() and out.write(t + 1) as the C writes them, the handshake by the module\'s ports (in_r_empty_n, out_r_full_n); co-simulated in VHDL and Verilog, the renames\' warnings', () => {
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cAsm(INOUT, { file: 'pass2.cpp', lang });
+    assert.equal(r.ok, true, lang);
+    assert.deepEqual(r.diagnostics, [], lang);
+    assert.deepEqual(lines(r.model), [
+      'IDLE -next-> <ap_start>', '<ap_start> -true-> S1', '<ap_start> -false-> IDLE', 'DONE -next-> IDLE',
+      'S1 -next-> <in_r_empty_n>', '<in_r_empty_n> -false-> S1', '<in_r_empty_n> -true-> (in_r_read = 1; ap_fifo_in_0 = in_r_dout)', '(in_r_read = 1; ap_fifo_in_0 = in_r_dout) -next-> S2',
+      'S2 -next-> S3',
+      'S3 -next-> <out_r_full_n>', '<out_r_full_n> -false-> S3', '<out_r_full_n> -true-> (out_r_din = t + 1; out_r_write = 1)', '(out_r_din = t + 1; out_r_write = 1) -next-> S4',
+      'S4 -next-> DONE',
+    ], lang);
+    const st = (n) => r.model.nodes.find((x) => x.name === n);
+    assert.deepEqual(['S1', 'S2', 'S3', 'S4'].map((n) => st(n).actions), [['ap_fifo_in_0 = in.read()'], ['int t = ap_fifo_in_0'], ['out.write(t + 1)'], []], lang);
+    // the handshake's names the module's ports
+    const gen = cToHdl(INOUT, { file: 'pass2.cpp', lang });
+    const names = new Set(gen.ports.map((p) => p.name));
+    for (const n of ['in_r_empty_n', 'in_r_read', 'in_r_dout', 'out_r_full_n', 'out_r_din', 'out_r_write']) assert.ok(names.has(n), `${n}: ${[...names].join(' ')}`);
+    assert.equal(r.model.nodes.filter((n) => n.type === 'state').length, gen.states, lang);
+    const c = cosimulate(INOUT, { file: 'pass2.cpp', lang });
+    assert.deepEqual([c.errors, c.pass, c.sim.exitCode], [[], true, 0], lang);
+    assert.deepEqual(c.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), [
+      "2 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
+      "2 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"], lang);
+  }
+});
+
 test('#1941 every statement the HLS compiler makes and every literal written back: a stream\'s read and write, a floating-point literal (no <kind>)', () => {
   assert.equal(stmtText({ kind: 'fiforead', fifo: 'xs', tmp: 'ap_fifo_xs_0' }), 'ap_fifo_xs_0 = xs.read()');
   assert.equal(stmtText({ kind: 'fifowrite', fifo: 'ys', v: parse('void f(void) { a + 1; }').items[0].body.items[0].e }), 'ys.write(a + 1)');
