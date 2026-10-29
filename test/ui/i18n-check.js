@@ -33,6 +33,7 @@ const SAME = [
   /^@?<workspace>/,
   /^@?(Default\.wcfg)$/,
   /^@?Interface$/,                                 // the same word in Portuguese
+  /^@?Buffers( \(\d+\))?$/,                         // the same word in Portuguese (the palette's category, #1987)
 ];
 export const isSame = (s) => SAME.some((re) => re.test(s));
 
