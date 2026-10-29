@@ -3,7 +3,8 @@
 // per design from the base's. residual6.mjs and the designs' differences give each setting's bits in the CMT tile.
 // --fields: the values that set each bit of the counters (CLKFX_MULTIPLY / DIVIDE - 1, the PLL's multiplier, divider and
 // output divider, CLKDV), the PLL's VCO kept between 400 and 1080 MHz (a 100 MHz input).
-//   node research/s6/gen-dcm6.mjs [--fields] <out dir> [part]   -> <out dir>/<name>/{top.v, top.ucf, top.txt}
+// --paths: the base from other clock pads and to BUFGs at fixed BUFGMUXes (the CMT's clock path).
+//   node research/s6/gen-dcm6.mjs [--fields | --paths] <out dir> [part]   -> <out dir>/<name>/{top.v, top.ucf, top.txt}
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,8 +40,21 @@ export function fieldVariants() {
   return v;
 }
 
+/**
+ * The CMT's clock path: the base DCM (and PLL) from other clock pads (their path into the CMT), and its outputs on
+ * BUFGs at fixed BUFGMUXes (the BUFGs' inputs from the CMT): [{ name, kind, clk, bo, bf }].
+ */
+export function pathVariants() {
+  const v = [];
+  for (const clk of ['U10', 'T9', 'R8']) v.push({ name: `dcm-${clk}`, kind: 'dcm', clk }, { name: `pll-${clk}`, kind: 'pll', clk });
+  for (const [bo, bf] of [['BUFGMUX_X2Y1', 'BUFGMUX_X2Y2'], ['BUFGMUX_X2Y9', 'BUFGMUX_X2Y10'], ['BUFGMUX_X3Y15', 'BUFGMUX_X3Y16']]) {
+    v.push({ name: `dcm-${bo.slice(8)}`, kind: 'dcm', bo, bf }, { name: `pll-${bo.slice(8)}`, kind: 'pll', bo });
+  }
+  return v;
+}
+
 /** A design's Verilog and UCF: the DCM or PLL at site, its output out through a BUFG to a flip-flop. */
-export function dcmDesign({ kind, params, out }, { clk = 'V10', d = 'T10', q = 'U16', site }) {
+export function dcmDesign({ kind, params, out }, { clk = 'V10', d = 'T10', q = 'U16', site, bo = null, bf = null }) {
   const p = { ...(kind === 'dcm' ? DCM_BASE : PLL_BASE), ...params }, gen = Object.entries(p).map(([k, v]) => `.${k}(${v})`).join(', ');
   const v = ['module top(input clk, input d, output reg q = 1\'b0);', '  wire fb, o, g;'];
   if (kind === 'dcm') {
@@ -52,13 +66,24 @@ export function dcmDesign({ kind, params, out }, { clk = 'V10', d = 'T10', q = '
     v.push(`  PLL_BASE #(${gen}) cm(.CLKIN(clk), .CLKFBIN(fb), .CLKFBOUT(fb), .${out}(o), .RST(1'b0));`);
   }
   v.push('  BUFG bo(.I(o), .O(g));', '  always @(posedge g) q <= d;', 'endmodule', '');
-  const u = [`NET "clk" LOC = "${clk}" ;`, `NET "d" LOC = "${d}" ;`, `NET "q" LOC = "${q}" ;`, `INST "cm" LOC = "${site}" ;`];
+  const u = [`NET "clk" LOC = "${clk}" ;`, `NET "d" LOC = "${d}" ;`, `NET "q" LOC = "${q}" ;`, `INST "cm" LOC = "${site}" ;`,
+    ...(bo ? [`INST "bo" LOC = "${bo}" ;`] : []), ...(bf ? [`INST "bf" LOC = "${bf}" ;`] : [])];
   return { v: v.filter(Boolean).join('\n'), ucf: `${u.join('\n')}\n` };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2), fields = args[0] === '--fields', [out, part = 'xc6slx16csg324-3'] = fields ? args.slice(1) : args;
-  if (!out) { console.error('usage: node research/s6/gen-dcm6.mjs [--fields] <out dir> [part]'); process.exit(1); }
+  const args = process.argv.slice(2), fields = args[0] === '--fields', paths = args[0] === '--paths';
+  const [out, part = 'xc6slx16csg324-3'] = fields || paths ? args.slice(1) : args;
+  if (!out) { console.error('usage: node research/s6/gen-dcm6.mjs [--fields | --paths] <out dir> [part]'); process.exit(1); }
+  if (paths) {
+    for (const x of pathVariants()) {
+      const dir = path.join(out, x.name), { v, ucf } = dcmDesign({ kind: x.kind, params: {}, out: x.kind === 'dcm' ? 'CLKFX' : 'CLKOUT0' }, { site: x.kind === 'dcm' ? 'DCM_X0Y1' : 'PLL_ADV_X0Y0', ...(x.clk ? { clk: x.clk } : {}), bo: x.bo, bf: x.bf });
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'top.v'), v); fs.writeFileSync(path.join(dir, 'top.ucf'), ucf); fs.writeFileSync(path.join(dir, 'top.txt'), 'top\n');
+    }
+    console.log(`${part}: ${pathVariants().length} designs`);
+    process.exit(0);
+  }
   const vs = fields ? fieldVariants() : dcmVariants();
   for (const [name, x] of Object.entries(vs)) {
     const dir = path.join(out, name), site = x.kind === 'dcm' ? 'DCM_X0Y1' : 'PLL_ADV_X0Y0';
