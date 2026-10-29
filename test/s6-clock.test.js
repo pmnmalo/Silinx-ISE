@@ -62,3 +62,45 @@ test('the XC6SLX16\'s DCM and PLL settings, measured: the counters\' bits, one o
   assert.deepEqual(v.dcmD32.set, ['357,425', '357,428', '357,429', '357,431', '357,432']);
   assert.deepEqual(v.dcmD17.set, ['357,425']);
 });
+
+test('the clock pads: a BUFG per BUFGMUX from two pads; each pad\'s REGC and I/O bits, predicted on both parts', async () => {
+  const { bufgDesign, bufgSelections } = await import('../research/s6/gen-clock6.mjs');
+  const { clockPadBits, REGC_FRAME } = await import('../research/s6/ana-clock6.mjs');
+  const { predictDesign, padBit } = await import('../research/s6/residual6.mjs');
+  const { parseXdl } = await import('../core/xdl.js');
+  const b = bufgDesign('V10', 'BUFGMUX_X3Y13', 'SLICE_X16Y9');
+  assert.match(b.v, /BUFG b\(\.I\(clk\), \.O\(c\)\);/);
+  assert.match(b.ucf, /INST "b" LOC = "BUFGMUX_X3Y13" ;\nINST "q" LOC = "SLICE_X16Y9" ;\n$/);
+  assert.deepEqual(bufgSelections([{ name: 'P', bufg: ['B1'] }, { name: 'Q', bufg: ['B1', 'B2'] }, { name: 'R', bufg: ['B1'] }]),
+    [{ bufg: 'B1', pad: 'P' }, { bufg: 'B1', pad: 'R' }, { bufg: 'B2', pad: 'Q' }]);
+  const { sites } = s6Device('xc6slx16csg324-3');
+  assert.equal(bufgSelections([...sites.pads.values()].filter(p => p.bufg.length)).length, 32);
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${n}.json`, import.meta.url), 'utf8'));
+  const clocks = read('s6-clocks'), iob = read('xc6slx16-iob');
+  // the 32 clock pads, a REGC bit each (976 … 1007, all different) and an I/O offset
+  assert.equal(Object.keys(clocks.pads).length, 32);
+  assert.equal(new Set(Object.values(clocks.pads).map(p => p.regc)).size, 32);
+  assert.ok(Object.values(clocks.pads).every(p => p.regc >= 976 && p.regc <= 1007));
+  assert.deepEqual(clocks.pads.V10, { regc: 996, iob: clocks.pads.V10.iob });
+  assert.equal(padBit(iob.pads.V10, clocks.pads.V10.iob), '3554,202');
+  assert.deepEqual(clockPadBits(['1840,996', '3554,202', '5,5'], iob.pads.V10, REGC_FRAME.xc6slx16, 3552), { regc: [996], iob: [clocks.pads.V10.iob] });
+  // the residual: a pad on a BUFG adds its two bits
+  const design = parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";
+inst "clk" "IOB",placed BIOB_X12Y0 V10 , cfg " BYPASS_MUX::I IMUX:clk.IMUX:I INBUF:clk_IBUF: PAD:clk: ISTANDARD::LVCMOS25 " ;
+inst "g" "BUFG",placed CLKC_X11Y31 BUFGMUX_X3Y13 , cfg " BUFG:g: " ;
+net "c" , outpin "clk" I , inpin "g" I0 , ;
+`);
+  const { bits } = predictDesign(design, s6Device('xc6slx16csg324-3').device, S6_DEVICES.xc6slx16, { part: 'xc6slx16csg324-3', iob, clocks, int: { pips: {}, cover: {} }, other: { pips: {} }, slices: null });
+  assert.ok(bits.has('1840,996') && bits.has('3554,202'));
+});
+
+test('the CMT sites: a DCM\'s or PLL\'s bits at minor 30 of the CMT column in its row, an even DCM\'s 283 bits on', () => {
+  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-cmt.json', import.meta.url), 'utf8'));
+  // DCM_X0Y1 (row 0) frame 357 = column 12's first (327) + 30; PLL_ADV_X0Y0 (row 1) 744 + 357
+  const dev = S6_DEVICES.xc6slx16;
+  let c12 = 0;
+  for (let i = 0; i < 12; i++) c12 += dev.columns[i];
+  assert.equal(c12 + 30, 357);
+  assert.ok(db.dcm.variants.dcmM32.set.every(x => x.startsWith('357,')));
+  assert.ok(db.pll.variants.pllO65.set.every(x => x.startsWith(`${dev.rowFrames + 357},`)));
+});
