@@ -11,7 +11,7 @@ import { resourceCount } from '/packages/silinx-fpga/src/parts.js';
 import { identError } from '/core/modgen.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
-import { cleanLoc } from './wizard-util.js';
+import { cleanLoc, namedPages } from './wizard-util.js';
 
 const LANGS = [['vhdl', 'VHDL'], ['verilog', 'Verilog']];
 const INIT_RE = /\.(mem|coe)$/i;
@@ -41,7 +41,7 @@ async function contentsOf(spec) {
  * The wizard: a new module (location, lang), or the module of `path` again (spec: its settings, from its header).
  * Returns the path written, or undefined when cancelled.
  */
-export async function blockMemoryWizard({ name = '', location = 'src', lang = null, path: editPath = null, spec: old = null } = {}) {
+export async function blockMemoryWizard({ name = '', location = 'src', lang = null, path: editPath = null, spec: old = null, named = false } = {}) {
   if (!S.project) return;
   const pj = S.project;
   const family = old?.family || pj.device.family;
@@ -66,6 +66,7 @@ export async function blockMemoryWizard({ name = '', location = 'src', lang = nu
   [nameIn, locIn].forEach(e => e.addEventListener('input', syncFile));
   langSel.addEventListener('change', syncFile);
   if (editPath) [nameIn, langSel, locIn].forEach(e => { e.disabled = true; });
+  const countNote = () => (have === null ? '' : h('div', { class: 'hint bw-count', style: { marginTop: '10px' } }, family === 'spartan6' ? `Block RAMs on this device: ${have / 2} of 18 Kbit (${have} halves of 9 Kbit)` : `Block RAMs on this device: ${have} RAMB16 of 18 Kbit`));
   const p1 = {
     title: 'Name and Language',
     render: () => h('div', {},
@@ -74,7 +75,7 @@ export async function blockMemoryWizard({ name = '', location = 'src', lang = nu
         : 'The wizard writes a module with a RAM or a ROM of the Spartan-3E\'s block RAMs (RAMB16), or the HDL synthesis maps to them.'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         ...field('Module name:', nameIn), ...field('Language:', langSel), ...field('Location:', locIn), ...field('File:', fileHint)),
-      have === null ? '' : h('div', { class: 'hint bw-count', style: { marginTop: '10px' } }, family === 'spartan6' ? `Block RAMs on this device: ${have / 2} of 18 Kbit (${have} halves of 9 Kbit)` : `Block RAMs on this device: ${have} RAMB16 of 18 Kbit`),
+      countNote(),
       edited ? h('div', { class: 'hint bw-edited', style: { marginTop: '10px', color: 'var(--danger)' } }, 'This module was changed by hand since the wizard wrote it: Finish writes it again from the wizard\'s settings, and those changes are lost.') : ''),
     onShow: syncFile,
     validate: async () => {
@@ -152,7 +153,8 @@ export async function blockMemoryWizard({ name = '', location = 'src', lang = nu
     },
     validate: () => (editPath ? null : guard(path())),
   };
-  const ok = await wizard('Block Memory', [p1, p2, pSum], { width: 820 });
+  // (from New Source: the count under the memory, #2082)
+  const ok = await wizard('Block Memory', namedPages(p1, [p1, p2, pSum], named, countNote), { width: 820 });
   if (!ok) return;
   spec.name = nameIn.value.trim(); spec.lang = langSel.value;
   const c = await contentsOf(spec);

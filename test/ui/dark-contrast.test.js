@@ -256,8 +256,10 @@ for (const theme of ['dark', 'light']) {
     const types = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.textContent.trim()));
     assert.ok(types.length >= 10, types.join(' | '));
     await closeDialogs(page);
-    // every type, then the Module, Schematic, Petri Net and Test Bench wizards through the Wizard button (#958)
-    const runs = [...types.map((t) => [t, false]), ...['Module (HDL)', 'Schematic', 'Petri Net', 'Test Bench'].map((t) => [types.find((x) => x.endsWith(t)), true])];
+    // every type, then the Module, Schematic, FSM, ASM, Petri Net, Test Bench and UCF wizards through the Wizard >
+    // button (#958, #2082)
+    const runs = [...types.map((t) => [t, false]), ...['Module (HDL)', 'Schematic', 'Finite State Machine (FSM)', 'Algorithmic State Machine (ASM)', 'Petri Net', 'Test Bench',
+      'Implementation Constraints File'].map((t) => [types.find((x) => x.endsWith(t)), true])];
     for (const [k, [type, wiz]] of runs.entries()) {
       await page.menu('Project', 'New Source…');
       await page.waitDialog('New Source');
@@ -267,11 +269,11 @@ for (const theme of ['dark', 'light']) {
       let named = false;
       const name = async () => { if (!named && await page.eval(() => !!document.querySelector('.dlg-overlay .wiz-main input[type=text]'))) { await page.fill('.dlg-overlay .wiz-main input[type=text]', `s${k}`); named = true; } };
       if (!wiz) while (await nextPage(page)) { await name(); await check(`New Source ${type}, next page`); }
-      // the wizards: Wizard on the File Name and Location page opens them; every page, the Test Bench wizard's vectors filled in
+      // the wizards: Wizard > on the File Name and Location page opens them; every page, the Test Bench wizard's vectors filled in
       if (wiz) {
         await nextPage(page);
         await name();
-        await page.dialogButton('Wizard');
+        await page.dialogButton('Wizard >');
         await page.waitFor(() => document.querySelector('.dlg-overlay .dlg-title span')?.textContent.endsWith('Wizard') && !/New Source/.test(document.querySelector('.dlg-overlay .dlg-title span').textContent));
         for (let p = 1; ; p++) {
           const title = await page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent || '');

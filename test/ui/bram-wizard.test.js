@@ -42,9 +42,9 @@ uiTest('Block Memory on the Basys2: the block RAMs it takes, a memory too large 
   await makeProject(env, { name: 'BwPj', board: 'basys2', files: { 'src/msg.mem': MEM, 'src/wide.mem': '3ff\n' } });
   await page.openProject('BwPj');
   await openMemoryWizard(page);
-  assert.equal(await text(page, '.bw-file'), 'src/bram.vhd');
+  // its first page, the memory (#2082: the name, the location and the language typed on New Source)
+  assert.equal(await pageTitle(page), 'Memory');
   assert.equal(await text(page, '.bw-count'), 'Block RAMs on this device: 12 RAMB16 of 18 Kbit');
-  await next(page, 'Memory');
   // the default: 1024 x 8, one RAMB16_S9
   assert.equal(await text(page, '.bw-usage'), 'Block RAMs: 1 RAMB16 of the 12 on this device; RAMB16_S9 of 2048 x 9, 1 side by side.');
   // too large: refused, said under the fields
@@ -116,9 +116,8 @@ uiTest('Block Memory on the Nexys3 (Spartan-6): its 9 Kbit halves, a Verilog mod
   await makeProject(env, { name: 'BwS6', board: 'nexys3', preferredLanguage: 'verilog' });
   await page.openProject('BwS6');
   await openMemoryWizard(page);
-  assert.equal(await text(page, '.bw-file'), 'src/bram.v');
+  assert.equal(await pageTitle(page), 'Memory');
   assert.equal(await text(page, '.bw-count'), 'Block RAMs on this device: 32 of 18 Kbit (64 halves of 9 Kbit)');
-  await next(page, 'Memory');
   assert.equal(await text(page, '.bw-usage'), 'Block RAMs: 1 RAMB8BWER (1 of the 64 halves of 9 Kbit on this device); RAMB8BWER of 1024 x 9, 1 side by side.');
   await page.fill('.dlg-overlay .bw-width', '64');
   await page.fill('.dlg-overlay .bw-depth', '16384');
@@ -165,8 +164,7 @@ uiTest('Portuguese: the Block Memory wizard\'s pages, its messages, the Design p
     await setLang('en');
   };
   await openMemoryWizard(page);
-  await both(await pageTitle(page));
-  await next(page, 'Memory');
+  assert.equal(await pageTitle(page), 'Memory');
   await both('Memory');
   await page.fill('.dlg-overlay .bw-width', '64');
   await page.fill('.dlg-overlay .bw-depth', '16384');

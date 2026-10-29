@@ -124,7 +124,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   it draws the inputs of its unit under test, over what the bench drives them with. The stimuli are saved
   in the project and run when SSim opens; *Save as Test Bench…* writes them as a self-checking VHDL / Verilog
   test bench.
-- **Test Bench Wizard** (*New Source ▸ Test Bench ▸ Wizard*, or right-click a module): writes a
+- **Test Bench Wizard** (*New Source ▸ Test Bench ▸ Wizard >*, or right-click a module): writes a
   self-checking VHDL or Verilog test bench for a module. Input vectors: every combination of the
   inputs (exhaustive), random, counting, walking ones/zeros, or typed in; clock and reset detected
   (sequential designs get one vector per clock cycle). The expected outputs of each vector are
@@ -141,12 +141,23 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **New Source types**: *Boolean Algebra*, *Module (HDL)* (the ISE Define Module page: language, entity/module and
   architecture names, a port table), *Schematic* (a blank sheet), *Finite State Machine (FSM)*, *Algorithmic State
   Machine (ASM)*, *Petri Net*, *Clock Manager (DCM / PLL)*, *Block Memory*, *Test Bench*, *Implementation
-  Constraints File*, *Memory Initialization File (.mem)*. Page 2 asks the file name and location, with the buttons
-  *Wizard | < Back | Next > | Cancel*: *Next >* makes the plain source, *Wizard* opens the type's wizard (Module,
-  Schematic, Petri Net, Test Bench, Clocking Wizard, Block Memory) with that name and location; it is disabled for
-  a type that has none, and *Next >* for a type that has only the wizard (Clock Manager, Block Memory).
-- **Module Wizard** (*New Source ▸ Module (HDL) ▸ Wizard*), for beginners: name, language (VHDL/Verilog)
-  and a description (it goes into the header comment); the inputs, outputs and bidirectional ports
+  Constraints File*, *Memory Initialization File (.mem)*. Page 2 asks the file name, the location and (an HDL file, a
+  drawing's HDL) the language, with the buttons *Wizard > | < Back | Next > | Cancel*: *Next >* makes the plain
+  source, *Wizard >* opens the type's wizard (Module, Schematic, FSM, ASM, Petri Net, Test Bench, Clocking Wizard,
+  Block Memory, UCF) at its own pages, with that name, location and language; it is disabled for a type that has
+  none, and *Next >* for a type that has only the wizard (Clock Manager, Block Memory).
+- **FSM Wizard** and **ASM Wizard** (*New Source ▸ Finite State Machine (FSM) / Algorithmic State Machine (ASM) ▸
+  Wizard >*): the inputs and outputs (the port table, no quick-add buttons), the clock and the reset (an FSM: Moore
+  or Mealy), then the states (an FSM's transitions too: from, to and a condition over the inputs, in priority
+  order; an ASM's state boxes each followed by the next, the last by the first); it creates the chart and opens it
+  in its editor, where the outputs and the decisions are drawn. Builder: `core/chart-wizard.js`.
+- **UCF Wizard** (*New Source ▸ Implementation Constraints File ▸ Wizard >*): each bit of a module's ports (the
+  top by default) on a pin of the project's board, assigned from the board as I/O Pin Planning's *Auto-assign*
+  (by the names, then the inputs on the switches and the outputs on the LEDs) and changed in a list of the board's
+  pins (with no board: the package pins typed); a pin given twice is refused; it writes the `.ucf`, the project's
+  constraints file when it has none.
+- **Module Wizard** (*New Source ▸ Module (HDL) ▸ Wizard >*), for beginners: the name, the location and the
+  language typed on New Source; the inputs, outputs and bidirectional ports
   in a friendly table (name, input/output/bidirectional, width — 1 is a single bit, N a bus N-1
   downto 0 — and a description per port), with quick-add buttons for the usual ports (clk, reset,
   enable, a/b [7:0], sw, btn, y, sum, q, led, seg, an, data [7:0] / sda bidirectional…) and checks (valid identifiers, no reserved word of the chosen language, no
@@ -154,15 +165,15 @@ for Xilinx FPGAs supported by ISE 14.7.
   `always @(*)` that reads every input with every output given a default — no latches) or
   **sequential** (clock, reset none / synchronous / asynchronous, active high or low, optional
   enable; the registered outputs reset to 0, a TODO comment where the next-state logic goes), and
-  optional integer generics; a summary with a preview of the code. The file is written to `src/`,
-  added to the project and opened; it compiles as generated (VHDL: `ieee.numeric_std`, entity,
+  optional integer generics; a description (it goes into the header comment); a summary with a preview of the
+  code. The file is written to `src/`, added to the project and opened; it compiles as generated (VHDL: `ieee.numeric_std`, entity,
   `architecture rtl`; Verilog: ANSI ports, `reg` for the registered outputs). A **bidirectional
   (inout) port** gets the tri-state pattern, commented: an output enable `<port>_oe` and a value
   `<port>_out` (internal signals, with a TODO for the condition; `'0'` = released until written),
   the driver `data <= data_out when data_oe = '1' else (others => 'Z');` /
   `assign data = data_oe ? data_out : 8'bz;`, and the bus read from the port itself. Generator:
   `core/modgen.js`.
-- **Clocking Wizard** (*New Source ▸ Clock Manager (DCM / PLL) ▸ Wizard*): a module with the target device's clock
+- **Clocking Wizard** (*New Source ▸ Clock Manager (DCM / PLL) ▸ Wizard >*): a module with the target device's clock
   manager, a DCM_SP on the Spartan-3E, a PLL_BASE on the Spartan-6, for the frequencies asked: the
   input clock (the board's oscillator by default; from a pin through an IBUFG or not), the reset and
   LOCKED; on the Spartan-3E the DCM's outputs (CLK0 / 90 / 180 / 270, CLK2X / 2X180, CLKDV, CLKFX /
@@ -173,7 +184,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   with the primitive and a BUFG per output, its parameters computed and commented, and its settings
   in a header line: the Design pane shows it as *[Clocking Wizard] [VHDL]*, and a double-click, the
   badge or *View/Edit Clocking Wizard* reopen the wizard with them. Generator: `core/clocking.js`.
-- **Block Memory** (*New Source ▸ Block Memory ▸ Wizard*): a RAM or a ROM of the target device's block RAMs, width ×
+- **Block Memory** (*New Source ▸ Block Memory ▸ Wizard >*): a RAM or a ROM of the target device's block RAMs, width ×
   depth, one port or two (each with its own clock), read-first or write-first, its initial contents from a
   `.mem` (hexadecimal words, `@address`) or `.coe` file of the project. It shows the block RAMs it takes
   against the device's (Spartan-3E RAMB16s; Spartan-6 9 Kbit halves) and refuses one that does not fit. It
@@ -182,8 +193,8 @@ for Xilinx FPGAs supported by ISE 14.7.
   a deeper one, the high address bits choosing the row), their INIT_xx from the file, or the inferable HDL (an
   array that synthesis maps to the same block RAMs). Like the Clocking Wizard's, the module shows as
   *[Block Memory] [VHDL]* and reopens the wizard (which reads the file again). Generator: `core/blockram.js`.
-- **Schematic Wizard** (*New Source ▸ Schematic ▸ Wizard*): the same port table and quick-add
-  buttons, an optional clock input and the language of the synchronized HDL; it creates the
+- **Schematic Wizard** (*New Source ▸ Schematic ▸ Wizard >*): the same port table (no quick-add buttons) and
+  a description; it creates the
   `.sch.json` with the I/O markers placed tidily (inputs on the left edge, outputs on the right,
   bidirectional markers on the right below the outputs, bus markers with their width), the
   description written on the sheet, and opens it in the schematic editor, ready for the symbols and

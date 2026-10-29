@@ -1,9 +1,10 @@
-// UI: New Source's Wizard button (#958). The list has no "(Wizard)" types; the File Name and Location page has the
-// buttons Wizard | < Back | Next > | Cancel (Wizard on that page only): Next > the plain source, Wizard the type's
-// wizard with the name and the location typed (Module, Schematic, Petri Net, Test Bench, Clocking Wizard, Block
-// Memory); Wizard disabled for a type with none, Next > for a type that is only a wizard; in Portuguese; in the
-// Tasks interface's Edit task. Each wizard's module, compiled and simulated: modwizard, inout, petri, tbwizard,
-// clock-wizard and bram-wizard.test.js (through the same button).
+// UI: New Source's Wizard > button (#958, #2082). The list has no "(Wizard)" types; the File Name and Location page
+// has the buttons Wizard > | < Back | Next > | Cancel (Wizard > on that page only): Next > the plain source, Wizard >
+// the type's wizard at its own pages, with the name, the location and the language typed (Module, Schematic, FSM, ASM,
+// Petri Net, Test Bench, Clocking Wizard, Block Memory, UCF; no page "Name and Language", #2082); Wizard > disabled
+// for a type with none, Next > for a type that is only a wizard; in Portuguese; in the Tasks interface's Edit task.
+// Each wizard's module, compiled and simulated: modwizard, inout, petri, chart-wizards, tbwizard, clock-wizard and
+// bram-wizard.test.js (through the same button).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
@@ -20,9 +21,22 @@ const TYPES = ['Boolean Algebra', 'Module (HDL)', 'Schematic', 'Finite State Mac
   'Clock Manager (DCM / PLL)', 'Block Memory', 'Test Bench', 'Implementation Constraints File', 'Memory Initialization File (.mem)', 'C Function (HLS)', 'C++ Function (HLS)'];
 // each type: its wizard's dialog (null: none), only a wizard (Next > disabled)
 const WIZARD = {
-  'Module (HDL)': 'Module Wizard', 'Schematic': 'Schematic Wizard', 'Petri Net': 'Petri Net Wizard',
+  'Module (HDL)': 'Module Wizard', 'Schematic': 'Schematic Wizard', 'Finite State Machine (FSM)': 'FSM Wizard',
+  'Algorithmic State Machine (ASM)': 'ASM Wizard', 'Petri Net': 'Petri Net Wizard',
   'Clock Manager (DCM / PLL)': 'Clocking Wizard', 'Block Memory': 'Block Memory', 'Test Bench': 'Test Bench Wizard',
+  'Implementation Constraints File': 'UCF Wizard',
 };
+// each wizard's pages opened from New Source: its own, no "Name and Language" (#2082)
+const STEPS = {
+  'Module Wizard': ['Inputs and Outputs', 'Kind of Logic', 'Summary'], 'Schematic Wizard': ['Inputs and Outputs', 'Summary'],
+  'FSM Wizard': ['Inputs and Outputs', 'States and Transitions', 'Summary'], 'ASM Wizard': ['Inputs and Outputs', 'States', 'Summary'],
+  'Petri Net Wizard': ['Inputs and Outputs', 'Summary'], 'Clocking Wizard': ['Input Clock', 'Output Clocks', 'Summary'], 'Block Memory': ['Memory', 'Summary'],
+  'Test Bench Wizard': ['Unit Under Test', 'Clock and Reset', 'Input Vectors', 'Vectors and Expected Outputs', 'Summary'], 'UCF Wizard': ['Ports and Pins', 'Summary'],
+};
+// the types whose File Name and Location page asks the language (an HDL file's, the extension follows it, or a
+// drawing's HDL, #2082)
+const LANGUAGE = new Set(['Boolean Algebra', 'Module (HDL)', 'Schematic', 'Finite State Machine (FSM)', 'Algorithmic State Machine (ASM)', 'Petri Net',
+  'Clock Manager (DCM / PLL)', 'Block Memory', 'Test Bench']);
 const ONLY = new Set(['Clock Manager (DCM / PLL)', 'Block Memory']);
 const ADDER = 'library ieee;\nuse ieee.std_logic_1164.all;\nentity adder is\n  port (a, b : in std_logic; s : out std_logic);\nend adder;\narchitecture rtl of adder is\nbegin\n  s <= a xor b;\nend rtl;\n';
 
@@ -32,7 +46,7 @@ const buttons = (page) => page.eval(() => [...document.querySelectorAll('.dlg-ov
 const listed = (page) => page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.lastChild.textContent.trim()));
 const h3 = (page) => page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent);
 
-uiTest('New Source (#958): no "(Wizard)" types; Wizard | < Back | Next > | Cancel on File Name and Location only; Wizard disabled for a type with none, Next > for a wizard-only type', E, async (page) => {
+uiTest('New Source (#958, #2082): no "(Wizard)" types; Wizard > | < Back | Next > | Cancel on File Name and Location only; Wizard > disabled for a type with none, Next > for a wizard-only type', E, async (page) => {
   await makeProject(env, { name: 'NsWiz', top: 'adder', files: { 'src/adder.vhd': ADDER } });
   await page.openProject('NsWiz');
   for (const type of TYPES) {
@@ -49,11 +63,13 @@ uiTest('New Source (#958): no "(Wizard)" types; Wizard | < Back | Next > | Cance
     await page.dialogButton('Next >');
     await waitNewSourcePage(page, 'File Name and Location');
     const last = ONLY.has(type) ? 'Finish' : 'Next >';
-    assert.deepEqual(await buttons(page), [`Wizard${WIZARD[type] ? '' : ' (disabled)'}`, '< Back', `${last}${ONLY.has(type) ? ' (disabled)' : ''}`, 'Cancel'], type);
-    // an invalid name: Wizard refuses it on this page too
+    assert.deepEqual(await buttons(page), [`Wizard >${WIZARD[type] ? '' : ' (disabled)'}`, '< Back', `${last}${ONLY.has(type) ? ' (disabled)' : ''}`, 'Cancel'], type);
+    // the language asked on this page by the HDL types only
+    assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main label')].some((l) => l.textContent === 'Language:')), LANGUAGE.has(type), type);
+    // an invalid name: Wizard > refuses it on this page too
     if (WIZARD[type]) {
       await page.fill('.dlg-overlay .wiz-main input[type=text]', '9x');
-      await page.dialogButton('Wizard');
+      await page.dialogButton('Wizard >');
       await page.waitFor(() => /Enter a valid file name/.test(document.querySelector('.dlg-overlay').innerText), [], { what: 'the name refused' });
       assert.equal(await h3(page), 'File Name and Location');
       assert.equal(await page.dialogCount(), 1);
@@ -95,17 +111,20 @@ uiTest('New Source (#958): Next > keeps the plain path (Module (HDL): Define Mod
   assert.deepEqual([...lib.errors, ...d.diags].map((x) => `${x.severity}: ${x.message}`), []);
 });
 
-uiTest('New Source (#958): Wizard opens each type\'s wizard with the file name and the location typed', E, async (page) => {
+uiTest('New Source (#958, #2082): Wizard > opens each type\'s wizard at its own pages, no "Name and Language"', E, async (page) => {
   await makeProject(env, { name: 'NsOpen', top: 'adder', files: { 'src/adder.vhd': ADDER } });
   await page.openProject('NsOpen');
   await page.treeRow('#hier', 'adder');   // (the Test Bench Wizard's module)
   for (const [type, title] of Object.entries(WIZARD)) {
     await newSourceWizardOf(page, type, 'w_one', title);
     assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay').length), 1, `${type}: New Source closed`);
-    assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main input[type=text]').value), 'w_one', type);
-    // the location typed (the Test Bench's sim, the others' src)
-    const loc = type === 'Test Bench' ? 'sim' : 'src';
-    assert.ok(await page.eval((l) => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].some((i) => i.value === l), loc), `${type}: location ${loc}`);
+    assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-side .step')].map((e) => e.textContent)), STEPS[title], type);
+    assert.equal(await h3(page), STEPS[title][0], type);
+    // the Test Bench Wizard's own first page has the name and the location typed (the others': their summaries,
+    // modwizard, petri, chart-wizards, clock-wizard and bram-wizard.test.js)
+    if (type === 'Test Bench') {
+      assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].map((i) => i.value).filter((v) => v === 'w_one' || v === 'sim')), ['w_one', 'sim']);
+    }
     await page.dialogButton('Cancel');
     await page.waitNoDialog();
   }
@@ -113,7 +132,7 @@ uiTest('New Source (#958): Wizard opens each type\'s wizard with the file name a
   assert.deepEqual(await page.eval(() => window.Silinx.project.files.map((f) => f.path)), ['src/adder.vhd']);
 });
 
-uiTest('New Source (#958) in Portuguese: Assistente | < Anterior | Seguinte > | Cancelar, the types translated', E, async (page) => {
+uiTest('New Source (#958, #2082) in Portuguese: Assistente > | < Anterior | Seguinte > | Cancelar, the types translated', E, async (page) => {
   await makeProject(env, { name: 'NsPt', top: '' });
   await page.openProject('NsPt');
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
@@ -126,13 +145,17 @@ uiTest('New Source (#958) in Portuguese: Assistente | < Anterior | Seguinte > | 
     await pickSourceType(page, 'Gestor de Relógio (DCM / PLL)');
     await page.dialogButton('Seguinte >');
     await waitNewSourcePage(page, 'Nome do Ficheiro e Localização');
-    assert.deepEqual(await buttons(page), ['Assistente', '< Anterior', 'Concluir (disabled)', 'Cancelar']);
+    assert.deepEqual(await buttons(page), ['Assistente >', '< Anterior', 'Concluir (disabled)', 'Cancelar']);
+    assert.ok(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main label')].some((l) => l.textContent === 'Linguagem:')));
     await page.dialogButton('Cancelar');
     await page.waitNoDialog();
     await newSourceWizardOf(page, 'Memória de Bloco', 'mem_pt', 'Memória de Bloco', {
-      menu: 'Projeto', item: 'Nova Fonte…', dialog: 'Nova Fonte', next: 'Seguinte >', wizard: 'Assistente', file: 'Nome do Ficheiro e Localização',
+      menu: 'Projeto', item: 'Nova Fonte…', dialog: 'Nova Fonte', next: 'Seguinte >', wizard: 'Assistente >', file: 'Nome do Ficheiro e Localização',
     });
-    assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .bw-name').value), 'mem_pt');
+    assert.equal(await h3(page), 'Memória');
+    await page.dialogButton('Seguinte >');
+    await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Resumo', [], { what: 'the summary' });
+    assert.match(await page.eval(() => document.querySelector('.dlg-overlay .bw-summary').textContent), /src\/mem_pt\.vhd/);
     await page.dialogButton('Cancelar');
     await page.waitNoDialog();
   } finally {
@@ -140,7 +163,7 @@ uiTest('New Source (#958) in Portuguese: Assistente | < Anterior | Seguinte > | 
   }
 });
 
-uiTest('New Source (#958) in the Tasks interface\'s Edit task: the same buttons, Wizard opens the Module Wizard', E, async (page) => {
+uiTest('New Source (#958) in the Tasks interface\'s Edit task: the same buttons, Wizard > opens the Module Wizard', E, async (page) => {
   await makeProject(env, { name: 'NsTasks', top: '' });
   await page.eval(() => localStorage.setItem('silinx.ui', 'tasks'));
   try {
@@ -153,11 +176,11 @@ uiTest('New Source (#958) in the Tasks interface\'s Edit task: the same buttons,
     await pickSourceType(page, 'Module (HDL)');
     await page.dialogButton('Next >');
     await waitNewSourcePage(page, 'File Name and Location');
-    assert.deepEqual(await buttons(page), ['Wizard', '< Back', 'Next >', 'Cancel']);
+    assert.deepEqual(await buttons(page), ['Wizard >', '< Back', 'Next >', 'Cancel']);
     await page.fill('.dlg-overlay .wiz-main input[type=text]', 'tk');
-    await page.dialogButton('Wizard');
+    await page.dialogButton('Wizard >');
     await page.waitDialog('Module Wizard');
-    assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .mw-name').value), 'tk');
+    assert.equal(await h3(page), 'Inputs and Outputs');
     await page.dialogButton('Cancel');
     await page.waitNoDialog();
   } finally {

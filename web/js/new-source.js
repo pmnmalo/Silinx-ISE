@@ -1,6 +1,6 @@
 // The New Source wizard (moved from wizards.js, #405): the source type, its file name and location, then the
-// type's pages; Finish writes the skeleton source. The Wizard button of the File Name and Location page opens the
-// type's wizard instead (#958).
+// type's pages; Finish writes the skeleton source. The Wizard > button of the File Name and Location page opens the
+// type's wizard instead (#958), at its own pages: the name, the location and the language are this page's (#2082).
 import { api } from './api.js';
 import { icons, icon } from './icons.js';
 import { h } from './ui.js';
@@ -15,17 +15,18 @@ export { cTemplate, cppTemplate } from './c-templates.js';
 
 const SOURCE_TYPES = [
   // hdl / tb: VHDL or Verilog, chosen in the wizard (the extension follows the language)
-  // wiz: the wizard the Wizard button opens (#958); only: no plain source, Next > disabled
-  { id: 'tt', label: 'Boolean Algebra', ico: 'truthtable', ext: '.bool.json', dir: 'src' },
+  // wiz: the wizard the Wizard > button opens (#958); only: no plain source, Next > disabled; drawn: a drawing, its
+  // HDL in the language of the File Name and Location page (#2082)
+  { id: 'tt', label: 'Boolean Algebra', ico: 'truthtable', ext: '.bool.json', dir: 'src', drawn: true },
   { id: 'hdl', label: 'Module (HDL)', ico: 'vhdl', ext: null, dir: 'src', wiz: 'module' },
-  { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src', wiz: 'schematic' },
-  { id: 'fsm', label: 'Finite State Machine (FSM)', ico: 'fsm', ext: '.fsm.json', dir: 'src' },
-  { id: 'asm', label: 'Algorithmic State Machine (ASM)', ico: 'asm', ext: '.asm.json', dir: 'src' },
-  { id: 'petri', label: 'Petri Net', ico: 'petri', ext: '.pn.json', dir: 'src', wiz: 'petri' },
+  { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src', wiz: 'schematic', drawn: true },
+  { id: 'fsm', label: 'Finite State Machine (FSM)', ico: 'fsm', ext: '.fsm.json', dir: 'src', wiz: 'fsm', drawn: true },
+  { id: 'asm', label: 'Algorithmic State Machine (ASM)', ico: 'asm', ext: '.asm.json', dir: 'src', wiz: 'asm', drawn: true },
+  { id: 'petri', label: 'Petri Net', ico: 'petri', ext: '.pn.json', dir: 'src', wiz: 'petri', drawn: true },
   { id: 'clkwiz', label: 'Clock Manager (DCM / PLL)', ico: 'template', ext: null, dir: 'src', wiz: 'clock', only: true },
   { id: 'bramwiz', label: 'Block Memory', ico: 'template', ext: null, dir: 'src', wiz: 'memory', only: true },
   { id: 'tb', label: 'Test Bench', ico: 'vhdl', ext: null, dir: 'sim', wiz: 'testbench' },
-  { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints' },
+  { id: 'ucf', label: 'Implementation Constraints File', ico: 'ucf', ext: '.ucf', dir: 'constraints', wiz: 'ucf' },
   { id: 'mem', label: 'Memory Initialization File (.mem)', ico: 'file', ext: '.mem', dir: 'src' },
   { id: 'c', label: 'C Function (HLS)', ico: 'file', ext: '.c', dir: 'src' },   // (Silinx HLS, compatible with Vitis HLS: #1531)
   { id: 'cpp', label: 'C++ Function (HLS)', ico: 'file', ext: '.cpp', dir: 'src' },   // (#1590)
@@ -76,9 +77,17 @@ export async function newSourceWizard({ type } = {}) {
   // a truth table: an optional expression (#1056) gives its inputs, its output and its column
   const ttExpr = h('input', { type: 'text', class: 'ns-tt-expr', spellcheck: 'false', placeholder: "optional, e.g. F = A·B' + C" });
   const [ttLbl, ttRow] = field('Expression:', h('div', { class: 'ns-tt-row' }, ttExpr));
+  // the language of a module, a test bench, a clock manager or a block memory (the extension follows it) or of a
+  // drawing's HDL, here for their wizards too (#2082); the module's and the test bench's next pages show it again
+  const langHere = h('span');
+  const [langLbl, langRow] = field('Language:', langHere);
   const fileGrid = h('div', { class: 'form-grid' }, ...field('Source type:', typeShown), ...field('File name:', fname), ...field('Location:', loc));
-  // (the expression's row on the page of a truth table only)
-  const typeShownAt = () => { typeShown.textContent = st.label; if (st.id === 'tt') fileGrid.append(ttLbl, ttRow); else { ttLbl.remove(); ttRow.remove(); } };
+  // (the expression's row on the page of a truth table only, the language's on the pages of the HDL types)
+  const typeShownAt = () => {
+    typeShown.textContent = st.label;
+    if (st.id === 'tt') fileGrid.append(ttLbl, ttRow); else { ttLbl.remove(); ttRow.remove(); }
+    if (!st.ext || st.drawn) { langHere.replaceChildren(langSel); fileGrid.append(langLbl, langRow); } else { langLbl.remove(); langRow.remove(); }
+  };
   const pFile = {
     title: 'File Name and Location',
     render: () => h('div', {},
@@ -105,13 +114,25 @@ export async function newSourceWizard({ type } = {}) {
       if (isView(p)) {
         const mod = n.split('/').pop().replace(/[^A-Za-z0-9_]/g, '_');
         if (moduleElsewhere(mod, p)) return `A module named '${mod}' already exists.`;
-        const taken = drawnHdlTaken(p, mod, S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
+        const taken = drawnHdlTaken(p, mod, langSel.value);
         if (taken) return taken;
       }
       const r = await guard(p);
       if (r) setTimeout(() => { fname.focus(); fname.select(); }, 0);   // Cancel: the name kept, to edit (#1467)
       return r;
     },
+  };
+  // Wizard > (#2082): the wizard has no page of the name any more, so the name is checked here as the module the wizard
+  // names after it (a test bench's is asked on its wizard's first page; a UCF names no module)
+  const wizardError = () => {
+    const e = fileError();
+    if (e || ['tb', 'ucf'].includes(st.id)) return e;
+    const mod = identOf(nameOf().split('/').pop());
+    const r = reservedError(mod);
+    if (r) return `${r}: choose another name.`;
+    const p = `${loc.value.trim().replace(/\/+$/, '')}/${nameOf()}${extOf(st)}`;
+    if (moduleElsewhere(mod, p)) return `A module named '${mod}' already exists.`;
+    return isView(p) ? drawnHdlTaken(p, mod, langSel.value) : null;
   };
   // ports page (modules)
   const ports = [{ name: 'clk', dir: 'in', bus: false, msb: '', lsb: '' }, { name: 'rst', dir: 'in', bus: false, msb: '', lsb: '' }];
@@ -208,10 +229,10 @@ export async function newSourceWizard({ type } = {}) {
   pSum.validate = () => guard(`${loc.value.trim().replace(/\/+$/, '')}/${nameOf()}${extOf(st)}`);
   const ok = await wizard('New Source', pages, {
     width: 760, bind: r => { refresh = r; },
-    extra: { label: 'Wizard', value: 'wizard', shown: p => p === pFile, disabled: () => !st.wiz, validate: fileError },
+    extra: { label: 'Wizard >', value: 'wizard', shown: p => p === pFile, disabled: () => !st.wiz, validate: wizardError },
   });
   if (!ok) return;
-  if (ok === 'wizard') return openWizard(st.wiz, { name: nameOf(), location: loc.value.trim().replace(/\/+$/, ''), lang: langSel.value });
+  if (ok === 'wizard') return openWizard(st.wiz, { name: nameOf(), location: loc.value.trim().replace(/\/+$/, ''), lang: langSel.value, ext: st.ext });
   const n = nameOf();
   const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
   let text;
@@ -231,23 +252,23 @@ export async function newSourceWizard({ type } = {}) {
     case 'cpp': text = cppTemplate(n.replace(/[^A-Za-z0-9_]/g, '_')); break;
     case 'sch': {
       const { newDoc } = await import('/core/schdoc.js');
-      text = JSON.stringify(newDoc(n.replace(/[^A-Za-z0-9_]/g, '_'), pj.preferredLanguage || 'vhdl'), null, 1);
+      text = JSON.stringify(newDoc(n.replace(/[^A-Za-z0-9_]/g, '_'), langSel.value), null, 1);
       break;
     }
     case 'asm': {
       const { newModel } = await import('/core/asm.js');
-      const m = newModel(n.replace(/[^A-Za-z0-9_]/g, '_'), pj.preferredLanguage || 'vhdl');
+      const m = newModel(n.replace(/[^A-Za-z0-9_]/g, '_'), langSel.value);
       text = JSON.stringify(m, null, 2);
       break;
     }
     case 'fsm': {
       const { newFsm } = await import('/core/fsm.js');
-      text = JSON.stringify(newFsm(n.replace(/[^A-Za-z0-9_]/g, '_'), pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'), null, 2);
+      text = JSON.stringify(newFsm(n.replace(/[^A-Za-z0-9_]/g, '_'), langSel.value), null, 2);
       break;
     }
     case 'petri': {
       const { newPetri } = await import('/core/petri.js');
-      text = JSON.stringify(newPetri(n.replace(/[^A-Za-z0-9_]/g, '_'), pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'), null, 2);
+      text = JSON.stringify(newPetri(n.replace(/[^A-Za-z0-9_]/g, '_'), langSel.value), null, 2);
       break;
     }
     case 'tt': {
@@ -255,7 +276,7 @@ export async function newSourceWizard({ type } = {}) {
       const e = ttExpr.value.trim() ? await ttFromExpression(ttExpr.value) : null;
       const table = e ? { ...newTable(n.replace(/[^A-Za-z0-9_]/g, '_'), e.inputs, [e.output]), table: { [e.output]: e.column }, exprs: { [e.output]: e.expr } }
         : newTable(n.replace(/[^A-Za-z0-9_]/g, '_'), ['a', 'b', 'c'], ['f']);
-      text = JSON.stringify({ ...table, lang: pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl' }, null, 2);
+      text = JSON.stringify({ ...table, lang: langSel.value }, null, 2);
       break;
     }
   }
@@ -289,17 +310,23 @@ async function ttFromExpression(text) {
   return { inputs, output, expr, column: exprColumn(parseExpr(expr, { vars: inputs }), inputs) };
 }
 
-// the wizard of a source type (New Source ▸ Wizard, #958) with the file name and location typed; a file name that is
-// not an identifier (e.g. with -) becomes the suggested module name
-async function openWizard(wiz, { name, location, lang }) {
-  const ident = name.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/_$/, '');
+// a file name that is not an identifier (e.g. with -) as the module's name
+const identOf = name => name.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/_$/, '');
+
+// the wizard of a source type (New Source ▸ Wizard >, #958) with the file name, the location and the language typed:
+// it opens at its own pages, without its page of the name (named, #2082)
+async function openWizard(wiz, { name, location, lang, ext }) {
+  const o = { name: identOf(name), location, lang, named: true };
   switch (wiz) {
-    case 'module': return (await import('./modwizard.js')).moduleWizard({ name: ident, location, lang });
-    case 'schematic': return (await import('./modwizard.js')).schematicWizard({ name: ident, location, lang });
-    case 'petri': return (await import('./petri-wizard.js')).petriWizard({ name: ident, location, lang });
+    case 'module': return (await import('./modwizard.js')).moduleWizard(o);
+    case 'schematic': return (await import('./modwizard.js')).schematicWizard(o);
+    case 'petri': return (await import('./petri-wizard.js')).petriWizard(o);
+    case 'fsm': return (await import('./chart-wizards.js')).fsmWizard(o);
+    case 'asm': return (await import('./chart-wizards.js')).asmWizard(o);
+    case 'ucf': return (await import('./ucf-wizard.js')).ucfWizard({ path: `${location}/${name}${ext}` });
     case 'testbench': return (await import('./tbwizard.js')).testBenchWizard({ module: S.sel?.module, name: name || null, location, lang });
-    case 'clock': return (await import('./clock-wizard.js')).clockWizard({ name: ident, location, lang });
-    case 'memory': return (await import('./bram-wizard.js')).blockMemoryWizard({ name: ident, location, lang });
+    case 'clock': return (await import('./clock-wizard.js')).clockWizard(o);
+    case 'memory': return (await import('./bram-wizard.js')).blockMemoryWizard(o);
   }
 }
 

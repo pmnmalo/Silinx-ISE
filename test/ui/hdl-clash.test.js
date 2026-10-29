@@ -176,18 +176,16 @@ uiTest('#230 New Source: a Petri net, a truth table and the Petri Net Wizard ref
     await page.dialogButton('Cancel');
     await page.waitNoDialog();
   }
-  // the Petri Net Wizard (its first page)
+  // the Petri Net Wizard: refused by New Source's Wizard > (#958), on the page of the name (#2082: the wizard has none)
   await page.menu('Project', 'New Source…');
   await page.waitDialog('New Source');
   await pickType('Petri Net');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj');
-  await page.dialogButton('Wizard');   // (#958)
-  await page.waitDialog('Petri Net Wizard');
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .mw-name').value), 'maj');
-  await page.dialogButton('Next >');
+  await page.dialogButton('Wizard >');
   await page.waitFor(() => /src\/maj\.vhd already exists: the HDL generated from the new source would be written there\. Choose another name\./.test(document.querySelector('.dlg-overlay .wiz').innerText), [], { what: 'refused' });
-  assert.match(await wizText(), /Name and Language/);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent), 'File Name and Location');
+  assert.equal(await page.dialogCount(), 1);
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   // another name: created, its HDL file at once, nothing to warn about

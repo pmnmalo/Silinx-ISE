@@ -1,5 +1,5 @@
 // UI: every path through New Source follows the type selected last (#974): a type, Next >, < Back, another type, Next >:
-// the pages, the steps on the side, the Source type shown, the buttons (Next > / Finish, Wizard) and the source made
+// the pages, the steps on the side, the Source type shown, the buttons (Next > / Finish, Wizard >) and the source made
 // are the new type's; < Back works from every page; Cancel and New Source again start afresh.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,18 +12,18 @@ after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
 const ADDER = 'library ieee;\nuse ieee.std_logic_1164.all;\nentity adder is\n  port (a, b : in std_logic; s : out std_logic);\nend adder;\narchitecture rtl of adder is\nbegin\n  s <= a xor b;\nend rtl;\n';
-// each type: the pages after Select Source Type, its wizard (Wizard enabled), only a wizard, the file it makes
+// each type: the pages after Select Source Type, its wizard (Wizard > enabled), only a wizard, the file it makes
 const TYPES = {
   'Boolean Algebra': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.bool.json' },
   'Module (HDL)': { pages: ['File Name and Location', 'Define Module', 'Summary'], wiz: true, file: 'src/NAME.vhd' },
   'Schematic': { pages: ['File Name and Location', 'Summary'], wiz: true, file: 'src/NAME.sch.json' },
-  'Finite State Machine (FSM)': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.fsm.json' },
-  'Algorithmic State Machine (ASM)': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.asm.json' },
+  'Finite State Machine (FSM)': { pages: ['File Name and Location', 'Summary'], wiz: true, file: 'src/NAME.fsm.json' },   // (its wizard: #2082)
+  'Algorithmic State Machine (ASM)': { pages: ['File Name and Location', 'Summary'], wiz: true, file: 'src/NAME.asm.json' },
   'Petri Net': { pages: ['File Name and Location', 'Summary'], wiz: true, file: 'src/NAME.pn.json' },
   'Clock Manager (DCM / PLL)': { pages: ['File Name and Location'], wiz: true, only: true },
   'Block Memory': { pages: ['File Name and Location'], wiz: true, only: true },
   'Test Bench': { pages: ['File Name and Location', 'Associate Source', 'Summary'], wiz: true, file: 'sim/NAME.vhd' },
-  'Implementation Constraints File': { pages: ['File Name and Location', 'Summary'], file: 'constraints/NAME.ucf' },
+  'Implementation Constraints File': { pages: ['File Name and Location', 'Summary'], wiz: true, file: 'constraints/NAME.ucf' },
   'Memory Initialization File (.mem)': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.mem' },
   'C Function (HLS)': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.c' },   // (#1531)
   'C++ Function (HLS)': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.cpp' },   // (#1590)
@@ -48,7 +48,7 @@ const state = (page) => page.eval(() => {
 const expectButtons = (t, i) => {
   const T = TYPES[t], last = i === T.pages.length;
   const primary = `${last ? 'Finish' : 'Next >'}${T.only && i === 1 ? ' (disabled)' : ''}`;
-  return [...(i === 1 ? [`Wizard${T.wiz ? '' : ' (disabled)'}`] : []), `< Back${i === 0 ? ' (disabled)' : ''}`, primary, 'Cancel'];
+  return [...(i === 1 ? [`Wizard >${T.wiz ? '' : ' (disabled)'}`] : []), `< Back${i === 0 ? ' (disabled)' : ''}`, primary, 'Cancel'];
 };
 const expectPage = async (page, t, i, what) => {
   const s = await state(page);
@@ -121,7 +121,7 @@ uiTest('New Source: after another type, every page of the type selected last for
   assert.ok(!(await page.eval(() => (window.Silinx.fileTree || []).some((f) => /\/first\./.test(f)))));
 });
 
-uiTest('New Source: Cancel and New Source again start afresh (the default type, an empty file name); Wizard follows the type selected last', E, async (page) => {
+uiTest('New Source: Cancel and New Source again start afresh (the default type, an empty file name); Wizard > follows the type selected last', E, async (page) => {
   await makeProject(env, { name: 'NsAgain', top: 'adder', files: { 'src/adder.vhd': ADDER } });
   await page.openProject('NsAgain');
   await openNewSource(page);
@@ -133,7 +133,7 @@ uiTest('New Source: Cancel and New Source again start afresh (the default type, 
   await expectPage(page, 'Module (HDL)', 0, 'New Source again');
   await forward(page, 'File Name and Location');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main input[type=text]').value), '');
-  // a type with no wizard, back, a type with one: Wizard opens that one
+  // a type with no wizard, back, a type with one: Wizard > opens that one
   await back(page, 'Select Source Type');
   await pickSourceType(page, 'Boolean Algebra');
   await forward(page, 'File Name and Location');
@@ -143,8 +143,10 @@ uiTest('New Source: Cancel and New Source again start afresh (the default type, 
   await forward(page, 'File Name and Location');
   // the file name typed is kept across a change of type (as ISE does)
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main input[type=text]').value), 'w1');
-  await page.dialogButton('Wizard');
+  await page.dialogButton('Wizard >');
   await page.waitDialog('Petri Net Wizard');
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .mw-name').value), 'w1');
+  // its own first page (#2082), the name typed: in its summary
+  await page.dialogButton('Next >');
+  await page.waitFor(() => /src\/w1\.pn\.json/.test(document.querySelector('.dlg-overlay .mw-summary')?.textContent || ''), [], { what: 'the summary with w1' });
   await close(page);
 }, { timeout: 120000 });

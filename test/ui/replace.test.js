@@ -67,7 +67,7 @@ uiTest('Test Bench Wizard and Module Wizard on an existing file: replace after c
   await pickType(page, 'Test Bench');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'tb_inv');
-  await page.dialogButton('Wizard');   // (#958)
+  await page.dialogButton('Wizard >');   // (#958)
   await page.waitDialog('Test Bench Wizard');
   await page.dialogButton('Next >');
   await page.waitFor(() => document.querySelectorAll('.dlg-overlay').length === 2);
@@ -89,7 +89,7 @@ uiTest('Test Bench Wizard and Module Wizard on an existing file: replace after c
   await pickType(page, 'Module (HDL)');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'inv');
-  await page.dialogButton('Wizard');   // (#958)
+  await page.dialogButton('Wizard >');   // (#958)
   await page.waitDialog('Module Wizard');
   await page.dialogButton('Next >');
   // the same file (src/inv.vhd defines inv): the replace question
