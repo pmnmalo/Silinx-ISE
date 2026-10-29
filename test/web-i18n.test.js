@@ -248,8 +248,8 @@ test('ISim stimuli (#336): the bar, the dialogs, the status, the errors and Save
 test('tri-state buffers: the palette category, parameter labels and the descriptions of TBUF and every preset are translated', async () => {
   const { SYMBOLS } = await import('../core/schdoc.js');
   const S = SYMBOLS.tbuf;
-  assert.equal(t('Tri-State'), 'Três estados');
-  assert.equal(t('Tri-State (2)'), 'Três estados (2)');
+  assert.equal(t('Buffers'), 'Buffers');
+  assert.equal(t('Buffers (3)'), 'Buffers (3)');
   for (const p of S.params) assert.notEqual(t(p.label), p.label, p.label);
   assert.equal(t('Enable input'), 'Entrada de habilitação');
   for (const d of [S.description, ...S.presets.map(p => p.description)]) {

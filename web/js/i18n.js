@@ -307,7 +307,7 @@ const PT = {
   'Output bits': 'Bits de saída', 'Bus pins (I, A)': 'Pinos em barramento (I, A)', 'Select bits': 'Bits de seleção', 'Type': 'Tipo',
   'priority': 'prioridade',
   // tri-state buffers (BUFE / BUFT)
-  'Tri-State': 'Três estados', 'Enable input': 'Entrada de habilitação', 'Pins per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)',
+  'Buffers': 'Buffers', 'Enable input': 'Entrada de habilitação', 'Pins per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)',
   'Tri-state buffer: O = I while enabled, Z (high impedance, released) otherwise; E active high (BUFE) or T active low (BUFT)': 'Buffer de três estados: O = I enquanto habilitado, Z (alta impedância, libertado) caso contrário; E ativo a 1 (BUFE) ou T ativo a 0 (BUFT)',
   'Tri-state buffer, active-high enable: O = I when E = 1, Z when E = 0': 'Buffer de três estados, habilitação ativa a 1: O = I quando E = 1, Z quando E = 0',
   'Tri-state buffer, active-low enable T: O = I when T = 0, Z when T = 1': 'Buffer de três estados, habilitação T ativa a 0: O = I quando T = 0, Z quando T = 1',
@@ -434,7 +434,7 @@ const PT_PATTERNS = [
   [/^(\d+):(\d+) one-hot encoder: A = OR of the indices of the inputs at 1, V = some input is 1$/, 'Codificador one-hot $1:$2: A = OU dos índices das entradas a 1, V = alguma entrada a 1'],
   [/^1:(\d+) demultiplexer \((select S0|(\d)-bit select S)\): O<S> = D, the other outputs 0 \(bitwise when Width > 1\)$/,
     (m, n, sel, k) => `Desmultiplexador 1:${n} (${k ? `seleção S de ${k} bits` : 'seleção S0'}): O<S> = D, as outras saídas a 0 (bit a bit quando Largura > 1)`],
-  [/^(Logic|Tri-State|Arithmetic|Flip-Flops|Mux|Decoders\/Encoders|Bus|General|Device Primitives|Project modules) \((\d+)\)$/, (m, c, n) => `${t(c)} (${n})`],
+  [/^(Logic|Buffers|Arithmetic|Flip-Flops|Mux|Decoders\/Encoders|Bus|General|Device Primitives|Project modules) \((\d+)\)$/, (m, c, n) => `${t(c)} (${n})`],
   [/^Silinx - (.*) - \[(.*)\]$/, (m, a, b) => `Silinx - ${a} - [${t(b)}]`],
   [/^(.*) \(RTL\)$/, '$1 (RTL)'],
   [/^(.*) \(Technology\)$/, '$1 (Tecnológico)'],

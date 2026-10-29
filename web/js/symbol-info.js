@@ -216,7 +216,7 @@ export function openSymbolInfo(opts) {
     body.scrollTop = scroll;
     if (focusParam) { const f = box.querySelector(`[data-param="${focusParam}"]`); if (f) f.focus(); }
   }
-  const CAT_PT = { 'Logic': 'Lógica', 'Tri-State': 'Três estados', 'Arithmetic': 'Aritmética', 'Flip-Flops': 'Flip-Flops', 'Mux': 'Multiplexadores', 'Decoders/Encoders': 'Descodificadores/Codificadores', 'Bus': 'Barramento', 'General': 'Geral', 'Device Primitives': 'Primitivas do Dispositivo', 'Project modules': 'Módulos do projeto' };
+  const CAT_PT = { 'Logic': 'Lógica', 'Buffers': 'Buffers', 'Arithmetic': 'Aritmética', 'Flip-Flops': 'Flip-Flops', 'Mux': 'Multiplexadores', 'Decoders/Encoders': 'Descodificadores/Codificadores', 'Bus': 'Barramento', 'General': 'Geral', 'Device Primitives': 'Primitivas do Dispositivo', 'Project modules': 'Módulos do projeto' };
   function catPt(c) { return CAT_PT[c] || c; }
 
   container.append(modal);

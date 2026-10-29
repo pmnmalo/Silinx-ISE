@@ -1,4 +1,4 @@
-// UI: tri-state buffers in the schematic editor — the Tri-State palette category (BUFE / BUFT presets,
+// UI: tri-state buffers in the schematic editor — the Buffers palette category (BUF, the BUFE / BUFT presets, #1987;
 // placing a BUFE made BUFE4 by its properties), the live simulation of two BUFE on a bus to an inout marker (enables toggled: the
 // bus wire is Z / 1 / 0 / X, the marker drives it from outside), and the Symbol Info of BUFT in
 // Portuguese (function table with Z, HDL).
@@ -46,11 +46,11 @@ uiTest('tri-state buffers: palette (BUFE / BUFT only, a BUFE made BUFE4), live s
   // the symbols are drawn as triangles with the enable line; the check finds no problem
   assert.equal(await page.eval((sel) => document.querySelectorAll(`${sel} g.sym .gate`).length >= 4, ED), true);
 
-  // ---- palette: the Tri-State category, BUFE / BUFT only (#326); place a BUFE, Width 4 + Pins per bit make it BUFE4, delete it
-  assert.ok(await page.eval((sel) => [...document.querySelectorAll(`${sel} .se-cat option`)].some((o) => o.value === 'Tri-State'), ED));
-  await page.fill(`${ED} .se-cat`, 'Tri-State');
+  // ---- palette: the Buffers category, BUF and BUFE / BUFT (#326, #1987); place a BUFE, Width 4 + Pins per bit make it BUFE4, delete it
+  assert.ok(await page.eval((sel) => [...document.querySelectorAll(`${sel} .se-cat option`)].some((o) => o.value === 'Buffers'), ED));
+  await page.fill(`${ED} .se-cat`, 'Buffers');
   const names = await page.eval((sel) => [...document.querySelectorAll(`${sel} .se-symrow .nm`)].map((e) => e.textContent), ED);
-  assert.deepEqual(names, ['BUFE', 'BUFT']);
+  assert.deepEqual(names, ['BUF', 'BUFE', 'BUFT']);
   await page.click(`${ED} .se-symrow`, { text: 'BUFE' });
   await page.waitFor((sel) => /^BUFE: /.test(document.querySelector(`${sel} .se-syminfo`)?.textContent || ''), [ED], { what: 'BUFE info box' });
   const r = await page.eval((sel) => { const b = document.querySelector(`${sel} .se-canvas`).getBoundingClientRect(); return { x: b.left + b.width * 0.8, y: b.top + b.height * 0.8 }; }, ED);
