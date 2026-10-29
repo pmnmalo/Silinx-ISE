@@ -592,9 +592,10 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
   await noWarnings(page);
 }, { build: DEV });
 
-// #1021: the board keeps its proper size (zoomed up on a large window, never down): when the width runs short, the Watch
-// and the VGA monitor wrap to the next row, below the board, and the emulator's area scrolls; a laptop, a tablet in
-// landscape and in portrait; the classic interface as before
+// #1021, #1999: the board fits the window (zoomed up on a large window; down on a smaller one, a tablet, to 0.7 at
+// least), the emulator's bar above it, never under it; when the width runs short, the Watch and the VGA monitor wrap to
+// the next row, below the board, and the emulator's area scrolls down, not across; a laptop, a tablet in landscape and
+// in portrait; the classic interface as before
 const emuLayout = (page) => page.eval(() => {
   const emu = document.querySelector('.doc:not([hidden]) .emu'), wrap = emu.querySelector('.emu-board-wrap'), pcb = wrap.querySelector('.emu-pcb');
   const wr = wrap.getBoundingClientRect(), pr = pcb.getBoundingClientRect();
@@ -603,7 +604,7 @@ const emuLayout = (page) => page.eval(() => {
     watch: where(emu.querySelector('.emu-side')), vga: where(emu.querySelector('.emu-vga')),
     scrollsDown: emu.scrollHeight > emu.clientHeight + 1, scrollsAcross: emu.scrollWidth > emu.clientWidth + 1 };
 });
-uiTest('#1021 Tasks ▸ Emulate: the board keeps its size; the Watch and the VGA monitor wrap below it, scrolling; classic as before', E, async (page) => {
+uiTest('#1021 #1999 Tasks ▸ Emulate: the board fits the window; the Watch and the VGA monitor wrap below it, scrolling down; classic as before', E, async (page) => {
   await makeProject(env, { name: 'TasksWrap', template: 'vga' });
   await page.setViewport(1280, 800);
   await tasksInterface(page);
@@ -622,23 +623,29 @@ uiTest('#1021 Tasks ▸ Emulate: the board keeps its size; the Watch and the VGA
   let L = await at(1680, 1050);
   assert.ok(L.zoom >= 1, JSON.stringify(L));
   assert.deepEqual({ ...L, zoom: undefined }, { zoom: undefined, proper: true, watch: 'beside', vga: 'below', scrollsDown: true, scrollsAcross: false });
+  // (smaller than its proper size, down to 0.7, and the bar above the board, #1999)
+  const fits = (L, what) => assert.ok(L.zoom >= 0.7 && L.zoom < 1 && !L.proper && L.watch === 'below' && L.vga === 'below' && !L.scrollsAcross, `${what}: ${JSON.stringify(L)}`);
+  const barAbove = () => page.eval(() => { const e = document.querySelector('.doc:not([hidden]) .emu'); return e.querySelector('.emu-bar').getBoundingClientRect().bottom <= e.querySelector('.emu-board-wrap').getBoundingClientRect().top; });
   L = await at(1280, 800);
-  assert.deepEqual({ ...L, zoom: undefined }, { zoom: undefined, proper: true, watch: 'below', vga: 'below', scrollsDown: true, scrollsAcross: false });
-  // a tablet in landscape: the side panel docked, not a drawer (#1418); the board at its proper size beside it, the area
-  // scrolling across, the Watch and the VGA monitor below it
+  fits(L, 'a smaller laptop');
+  // a tablet in landscape: the side panel docked, not a drawer (#1418); the board smaller beside it, the Watch and the
+  // VGA monitor below it, the area scrolling down only; the emulator's bar (two rows) above the board
   L = await at(1024, 768);
-  assert.deepEqual(L, { zoom: 1, proper: true, watch: 'below', vga: 'below', scrollsDown: true, scrollsAcross: true });
+  fits(L, 'a tablet in landscape');
+  assert.equal(await barAbove(), true, 'the bar above the board');
   assert.deepEqual(await page.eval(() => [document.getElementById('task-emu-panel').getClientRects().length > 0, !!document.getElementById('drawer-btn').getClientRects().length]), [true, false], 'docked');
-  // a tablet in portrait: narrower than the board, which keeps its size: the area scrolls across too, not the page
+  // a tablet in portrait: the board smaller, the area scrolling down only, not the page
   L = await at(768, 1024);
-  assert.deepEqual(L, { zoom: 1, proper: true, watch: 'below', vga: 'below', scrollsDown: true, scrollsAcross: true });
+  fits(L, 'a tablet in portrait');
+  assert.equal(await barAbove(), true, 'the bar above the board');
   assert.deepEqual(await noOverflow(page), { page: true, over: [] });
   // the side panel folded on the smaller laptop: the Watch kept, beside the board again (#1399), the VGA monitor below it
   L = await at(1280, 800);
   await page.click('#task-view [data-act="side"]');
   await page.eval(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   L = await emuLayout(page);
-  assert.ok(L.zoom >= 1 && L.proper && L.watch === 'beside' && L.vga === 'below', JSON.stringify(L));
+  // (the board fitting the height: a little smaller than its proper size, #1999)
+  assert.ok(L.zoom >= 0.7 && L.watch === 'beside' && L.vga === 'below' && !L.scrollsAcross, JSON.stringify(L));
   // the modern and classic interfaces: the board at its own size, the side column and the VGA monitor in their order
   for (const ui of ['classic']) {
     await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);

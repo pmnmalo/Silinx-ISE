@@ -38,7 +38,7 @@ function injectStyle() {
   styled = true;
   document.head.append(h('style', {}, `
 .emu { display: flex; flex-direction: column; height: 100%; background: var(--bg, #f0f0f0); font: 12px var(--font, system-ui); overflow: auto; }
-.emu-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border, #aaa); background: var(--panel-alt, #f7f7f7); flex-wrap: wrap; }
+.emu-bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border, #aaa); background: var(--panel-alt, #f7f7f7); flex-wrap: wrap; }
 .emu-bar .sep { width: 1px; height: 20px; background: var(--frame); margin: 0 4px; }
 .emu-bar .stat { margin-left: auto; color: var(--grey-3); font-family: var(--mono, monospace); font-variant-numeric: tabular-nums;
   flex: 1 1 0; min-width: min(100%, 84ch); text-align: right; }   /* (the whole line, t = … ns · … cycles · … kHz (…% of real time): a row of its own when the controls leave it no room, two lines on a window too narrow for one, never cut, #918) */
