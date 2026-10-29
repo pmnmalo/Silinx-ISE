@@ -119,7 +119,7 @@ uiTest('Handwritten… (schematic): in Portuguese, a drawing that is not a circu
     assert.deepEqual(labels, [
       'Desenhe o circuito com uma caneta, um dedo ou o rato: as portas (AND, OR, XOR, um triângulo para um buffer, um pequeno círculo na saída para NOT) maiores do que os nomes, as suas entradas à esquerda, fios em esquadria, e o nome de cada entrada e saída na ponta do seu fio.',
       'Um flip-flop: uma caixa com os seus pinos escritos dentro, à esquerda D, T, ou J e K, o relógio (C, CLK ou uma cunha), CE, CLR, PRE; à direita Q, e Q com uma barra.',
-      'Mover', 'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Criar Esquemático', 'Cancelar',
+      'Apagar', 'Mover', 'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Criar Esquemático', 'Cancelar',
     ]);
     await page.dialogButton('Criar Esquemático');
     assert.equal(await message(page), 'Nada desenhado: desenhe o circuito na área de escrita.');
