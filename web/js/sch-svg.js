@@ -244,8 +244,12 @@ function textsSvg(sym, def, ctx = {}) {
     const o = symbolPins(sym, null, def)[0];
     if ((o.width || 1) > 1) s += pinWidth(o);
   } else if (def.shape === 'vcc' || def.shape === 'gnd') {
-    const t = cx(10, def.shape === 'vcc' ? 6 : 34);
-    s += `<text class="stype" x="${t.x}" y="${t.y + (def.shape === 'vcc' ? -2 : 6)}" text-anchor="middle">${esc(def.shape.toUpperCase())}</text>`;
+    // (past the end away from its pin, the bar of VCC or the last bar of GND, in every orientation: beside it when
+    // turned 90° / 270°, not over it, #2042)
+    const end = def.shape === 'vcc' ? 10 : 28, tip = cx(10, end), far = cx(10, def.shape === 'vcc' ? end - 10 : end + 10);
+    const dx = Math.sign(far.x - tip.x), dy = Math.sign(far.y - tip.y);
+    const [x, y, anchor] = dx ? [tip.x + 4 * dx, tip.y + 3, dx > 0 ? 'start' : 'end'] : [tip.x, tip.y + (dy < 0 ? -6 : 12), 'middle'];
+    s += `<text class="stype" x="${x}" y="${y}" text-anchor="${anchor}">${esc(def.shape.toUpperCase())}</text>`;
     // (a VCC / GND wider than a bit: its width by its output, #953)
     const o = symbolPins(sym, null, def)[0];
     if ((o.width || 1) > 1) s += pinWidth(o);
