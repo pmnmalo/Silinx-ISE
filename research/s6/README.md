@@ -425,6 +425,15 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   always together have their bits, in the centre's clock column, on the first of them (`db/s6-pips-clock.json`).
   With them the clock designs' and the examples' residual has no clock bit left but the clock example's HCLK bits
   (minors 16 to 19 of one column's clock row).
+- **A shift register's clock** (four designs: an SRL16 in the upper or lower half of a clock row, in two columns, and a
+  flip-flop): a SLICEM as a shift register or RAM on a clock sets minors 16 to 19 of its column's clock row word (bit
+  527), a flip-flop does not. With it the examples' residual (both boards) has no clock bit left: only the block RAM's
+  and DSP's (stopwatch's, #728).
+- **Left for #727**: a DCM's or PLL's own clock path, which their designs leave over: the pad's input to the CMT
+  (BUFIO2, in the I/O tile and the centre's column, and a bit of the pad's I/O words), the BUFGs' inputs from the CMT
+  (REGC bits) and the CMT's settings themselves (frame 357: 179 bits of the base); the PIP drop of the DCM and PLL
+  designs (8 more) brings the PIPs to 659 but these are sites' settings, not PIPs: designs from other pads and to
+  other BUFGs take them apart.
 - **The CMT sites**: a DCM's or a PLL's bits are at minor 30 of the CMT column (the XC6SLX16's column 12, frame 357
   in row 0; the XC6SLX45's column 19, 565) in its site's row, the same bits on both parts; a DCM of even Y (DCM_X0Y0,
   X0Y2) has them 283 bits on (measured on DCM_X0Y0 / X0Y2 / X0Y3 and PLL_ADV_X0Y1, and on the XC6SLX45).

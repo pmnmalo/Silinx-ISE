@@ -15,6 +15,7 @@ import { loadDb, kindModel, predictSlice } from './check-slice6.mjs';
 import { pipDirections, pipLookup } from './check-pips6.mjs';
 import { tileRegion } from './ana-pipprobe6.mjs';
 import { gridRegion } from './ana-pipdrop6.mjs';
+import { columnOf } from './ana-slice6.mjs';
 
 const INT_LIKE = /^(INT|INT_BRK|INT_BRAM|INT_BRAM_BRK|IOI_INT|LIOI_INT|INT_GCLK)_X/;
 const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8'));
@@ -87,6 +88,11 @@ export function predictDesign(design, device, dev, db) {
     if (p.ram) note(`${inst.site} a RAM's contents`);
     for (const u of p.unknown) note(`SLICE${kind} ${u}`);
     for (const x of p.bits) { const [f, b] = x.split(',').map(Number); bits.add(`${f0 + f},${b0 + b}`); }
+    // a SLICEM as a shift register or RAM on a clock: minors 16 to 19 of its column's clock row word (bit 527)
+    if (inst.cfg.some(c => /RAMMODE$/.test(c.attr) && c.value !== '#OFF') && inst.cfg.some(c => c.attr === 'CLKINV' && c.value !== '#OFF')) {
+      const c0 = columnOf(dev, f0)[0];
+      for (let m = 16; m < 20; m++) bits.add(`${c0 + m},527`);
+    }
   }
   for (const net of design.nets) {
     const dirs = (net.pips || []).some(p => p.dir === '=-') ? pipDirections(device, net, design) : null;

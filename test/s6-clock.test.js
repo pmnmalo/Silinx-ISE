@@ -104,3 +104,22 @@ test('the CMT sites: a DCM\'s or PLL\'s bits at minor 30 of the CMT column in it
   assert.ok(db.dcm.variants.dcmM32.set.every(x => x.startsWith('357,')));
   assert.ok(db.pll.variants.pllO65.set.every(x => x.startsWith(`${dev.rowFrames + 357},`)));
 });
+
+test('a SLICEM as a shift register on a clock: minors 16 to 19 of its column\'s clock row word', async () => {
+  const { predictDesign } = await import('../research/s6/residual6.mjs');
+  const { loadDb } = await import('../research/s6/check-slice6.mjs');
+  const { parseXdl } = await import('../core/xdl.js');
+  const { columnOf } = await import('../research/s6/ana-slice6.mjs');
+  const dev = S6_DEVICES.xc6slx16, { device } = s6Device('xc6slx16csg324-3');
+  const db = { part: 'xc6slx16csg324-3', slices: loadDb('xc6slx16'), int: { pips: {}, cover: {} }, other: { pips: {} } };
+  const srl = cfg => parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";\ninst "s" "SLICEM",placed CLEXM_X12Y42 SLICE_X18Y42 , cfg " ${cfg} " ;\n`);
+  const bases = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
+  const c0 = columnOf(dev, bases.SLICE_X18Y42[0])[0], want = [16, 17, 18, 19].map(m => `${c0 + m},527`);
+  // measured: SLICE_X18Y42's column at frame 1846 (row 2), the bits 1862 … 1865, 527
+  assert.deepEqual(want, ['1862,527', '1863,527', '1864,527', '1865,527']);
+  const on = predictDesign(srl('A6LUT:s.A:#RAM:O6=0x0000000000000000 A6RAMMODE::SRL16 CLKINV::CLK WEMUX::CE'), device, dev, db).bits;
+  assert.ok(want.every(x => on.has(x)));
+  // not without a clock, not as a LUT
+  assert.ok(!predictDesign(srl('A6LUT:s.A:#RAM:O6=0x0000000000000000 A6RAMMODE::SRL16'), device, dev, db).bits.has(want[0]));
+  assert.ok(!predictDesign(srl('A6LUT:s.A:#LUT:O6=A1 AFF:s.f:#FF CLKINV::CLK'), device, dev, db).bits.has(want[0]));
+});
