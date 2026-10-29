@@ -1,5 +1,5 @@
 {
- "version": 6,
+ "version": 7,
  "name": "gates_inverted",
  "lang": "vhdl",
  "sheet": {
@@ -866,7 +866,7 @@
    "id": "W54",
    "points": [
     {
-     "x": 440,
+     "x": 460,
      "y": 780
     },
     {
