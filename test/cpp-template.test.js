@@ -122,7 +122,7 @@ test('#1590 C++ templates: co-simulated in VHDL and Verilog, no warning', () => 
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
     assert.deepEqual(r.gen.diagnostics, []);
-    assert.deepEqual(r.gen.ports.map((p) => p.name), ['ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a', 'b', 'c', 'f', 'f_ap_vld', 'm', 'm_ap_vld', 's', 's_ap_vld']);
+    assert.deepEqual(r.gen.ports.map((p) => p.name), ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a', 'b', 'c', 'f', 'f_ap_vld', 'm', 'm_ap_vld', 's', 's_ap_vld']);
   }
 });
 
