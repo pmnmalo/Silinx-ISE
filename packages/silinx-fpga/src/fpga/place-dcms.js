@@ -1,4 +1,4 @@
-// Silinx toolchain - the placer's DCMs (#405: out of place in core/fpga/place.js, #47): each on a DCM site from
+// Silinx toolchain - the placer's DCMs (#405: out of place in fpga/place.js, #47): each on a DCM site from
 // which its clock outputs reach global buffers of their own through dedicated paths of known bits; of the
 // placements, the most outputs matched, then the most buffers serving their loads, then CLKIN on a dedicated path.
 import { LINE_BUFG, PlaceError, sideBufg } from './place.js';

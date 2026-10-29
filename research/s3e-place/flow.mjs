@@ -1,11 +1,11 @@
 // Silinx's packer and placer on a Yosys JSON netlist: the placed XDL that ISE routes.
 //   node flow.mjs <netlist.json> <ucf | -> <device.xdlrc> <out.xdl> [seed] [effort]
 import fs from 'node:fs';
-import { parseXdlrc, parseXdl } from '../../core/xdl.js';
-import { readYosysJson } from '../../core/fpga/netlist.js';
-import { pack } from '../../core/fpga/pack.js';
-import { deviceSites, place, placedXdl } from '../../core/fpga/place.js';
-import { writeXdl } from '../../core/xdl.js';
+import { parseXdlrc, parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readYosysJson } from '../../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../../packages/silinx-fpga/src/fpga/pack.js';
+import { deviceSites, place, placedXdl } from '../../packages/silinx-fpga/src/fpga/place.js';
+import { writeXdl } from '../../packages/silinx-fpga/src/xdl.js';
 
 const [netFile, ucfFile, devFile, outFile, seed = '1', effort = '1', timing = '1'] = process.argv.slice(2);
 let t = Date.now();

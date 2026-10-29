@@ -1,20 +1,20 @@
-// Fits the wire delay model of core/fpga/timing.js to ISE's own delays of designs routed by Silinx.
+// Fits the wire delay model of packages/silinx-fpga/src/fpga/timing.js to ISE's own delays of designs routed by Silinx.
 //   node research/s3e-route/timing-fit.mjs <folder>...   (each with routed.xdl and routed.dly:
 //   reportgen -delay of ISE on the same design, as scripts/check-open-flow.mjs keeps them with SILINX_KEEP=1)
 //   node research/s3e-route/timing-fit.mjs --arcs <folder>...   (each with routed.xdl and full.twr, a verbose trce
 //   report on it, trce -a -v 1000: the logic delays of the SLICEM's shift registers and RAMs, #443, and of the block
 //   RAMs and multipliers, #457)
 // For every connection (driver pin -> load pin) reportgen gives ISE's delay; Silinx finds the path of
-// that connection in the routed XDL (core/fpga/timing.js netTree / treePath) and counts the nodes of
+// that connection in the routed XDL (packages/silinx-fpga/src/fpga/timing.js netTree / treePath) and counts the nodes of
 // each class on it and the branches the net takes off them. A least-squares fit (non-negative) of
 // delay = base + sum(count x wire delay) + sum(branches x branch delay) gives the model; printed with
 // the error of the model over the connections (and, --check, the error of the current SPEED_4).
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseXdl } from '../../core/xdl.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { netEndpoints } from '../../core/fpga/route.js';
-import { WIRE_NAMES, nodeClasses, netTree, treePath, pathDelay, SPEED_4 } from '../../core/fpga/timing.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { netEndpoints } from '../../packages/silinx-fpga/src/fpga/route.js';
+import { WIRE_NAMES, nodeClasses, netTree, treePath, pathDelay, SPEED_4 } from '../../packages/silinx-fpga/src/fpga/timing.js';
 import { fileURLToPath } from 'node:url';
 
 /** reportgen -delay's report: Map net name -> { driver: 'inst.PIN', loads: Map 'inst.PIN' -> ns }. */

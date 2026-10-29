@@ -2,7 +2,7 @@
 // manifest's validation, the comparison of a run with the expectations (results and warnings), the
 // normalization of warnings, the I/O wrapper of a design with more ports than the package has pins.
 // Unit-tested on synthetic data (test/designs-corpus.test.js).
-import { yosysScript, yosysFiles } from '../../core/synth-open.js';
+import { yosysScript, yosysFiles } from '../../packages/silinx-fpga/src/synth-open.js';
 
 /** The stages of a design, in order. Each records 'pass' (the flow: 'complete') or a reason. */
 export const STAGES = ['frontend', 'tb', 'synth', 'diff', 'flow'];

@@ -1,4 +1,4 @@
-// A design's use of the device's resources against what the device has (core/resource-check.js, #795, #796): the
+// A design's use of the device's resources against what the device has (packages/silinx-fpga/src/resource-check.js, #795, #796): the
 // resources of a netlist's cells, the ones over the part's counts and their message; the Silinx toolchain's
 // synthesis and MAP give every resource used of available and fail, with the resource named, on a design
 // over any of them (block RAMs, multipliers, DCMs, global buffers, I/O, flip-flops; the Spartan-6's DSP
@@ -6,14 +6,14 @@
 // their equivalent, and the resources over the new part's counts, each said; none for a compatible change.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { usedOfPrimitives, overResources, overMessage, resourceNoun, primitiveEquivalent, primitiveInstances, usedOfReport, deviceChangeIssues } from '../core/resource-check.js';
+import { usedOfPrimitives, overResources, overMessage, resourceNoun, primitiveEquivalent, primitiveInstances, usedOfReport, deviceChangeIssues } from '../packages/silinx-fpga/src/resource-check.js';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { resourcesOf } from '../core/resources.js';
+import { resourcesOf } from '../packages/silinx-fpga/src/resources.js';
 import { findPart } from '../server/devices.js';
-import { runOpenFlow } from '../core/open-flow-core.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { shippedDevicePath, loadDeviceCache } from '../core/fpga/device-node.js';
+import { runOpenFlow } from '../core/flow-ide.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { shippedDevicePath, loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 
 const S100 = resourcesOf(findPart('xc3s100e'), 'cp132');
 const LX4 = resourcesOf(findPart('xc6slx4'), 'cpg196');

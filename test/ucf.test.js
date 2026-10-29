@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateUcf, parseUcf, expandPort, normalizePort, periodNs, bitName, ucfPortName, boardAutoAssign, pinsUcf, backAnnotateUcf, ucfPlacesPins } from '../core/ucf.js';
+import { generateUcf, parseUcf, expandPort, normalizePort, periodNs, bitName, ucfPortName, boardAutoAssign, pinsUcf, backAnnotateUcf, ucfPlacesPins } from '../packages/silinx-fpga/src/ucf.js';
 
 test('bus naming: led[7:0] bit 3 -> led<3>', () => {
   assert.equal(bitName('led', 3), 'led<3>');
@@ -82,7 +82,7 @@ TIMESPEC "TS_x" = PERIOD "grp_x" 10 ns LOW 30 %;
 });
 
 test('boardAutoAssign maps blinky ports to the Basys2 and locsNotOnBoard flags foreign pins', async () => {
-  const { boardAutoAssign, locsNotOnBoard, generateUcf, parseUcf } = await import('../core/ucf.js');
+  const { boardAutoAssign, locsNotOnBoard, generateUcf, parseUcf } = await import('../packages/silinx-fpga/src/ucf.js');
   const { resolveBoard } = await import('../server/devices.js');
   const rb = resolveBoard('basys2');
   const board = { ...rb.board, device: rb.device, resources: rb.resources };
@@ -114,7 +114,7 @@ test('boardAutoAssign maps blinky ports to the Basys2 and locsNotOnBoard flags f
 });
 
 // ---- checkUcf
-import { checkUcf } from '../core/ucf.js';
+import { checkUcf } from '../packages/silinx-fpga/src/ucf.js';
 const PORTS = [{ name: 'clk', dir: 'in', width: 1 }, { name: 'led', dir: 'out', width: 8, msb: 7, lsb: 0 }, { name: 'sw', dir: 'in', width: 4, msb: 3, lsb: 0 }];
 const chk = (t, o = {}) => checkUcf(t, { top: 'top', ports: PORTS, iostandards: ['LVCMOS33', 'LVTTL'], package: 'cp132', ...o });
 
@@ -318,9 +318,9 @@ end rtl;
 
 test('VHDL extended identifiers through the open synthesis: the netlist\'s pads are XST\'s names (#65)', { timeout: 120000 }, async () => {
   const { compile, elaborate } = await import('../core/compile.js');
-  const { synthesizeOpen } = await import('../core/synth-open.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
-  const { readYosysJson } = await import('../core/fpga/netlist.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { readYosysJson } = await import('../packages/silinx-fpga/src/fpga/netlist.js');
   const V = `library ieee; use ieee.std_logic_1164.all;
 entity t is port (\\Mixed\\, \\a.b\\ : in std_logic; \\Bus\\ : in std_logic_vector(1 downto 0); y : out std_logic_vector(1 downto 0)); end t;
 architecture rtl of t is begin
@@ -424,7 +424,7 @@ NET "sw" LOC = "J14";
 // last statement's that sets it (an exact name after a wildcard overrides it, a wildcard after an exact name too);
 // a wildcard that matches no port bit is reported (unmatched)
 test('portAssignments: NET wildcards <*>, * and ? on the port bits, the last statement per attribute, the ones matching nothing (#773)', async () => {
-  const { portAssignments, ucfPattern } = await import('../core/ucf.js');
+  const { portAssignments, ucfPattern } = await import('../packages/silinx-fpga/src/ucf.js');
   const names = ['clk', 'sw<0>', 'sw<1>', 'sw<10>', 'led<0>', 'led<1>', 'ld7'];
   const u = parseUcf(`NET "led<0>" LOC = "M5" | IOSTANDARD = LVTTL;
 NET "led<*>" IOSTANDARD = LVCMOS33;

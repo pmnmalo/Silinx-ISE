@@ -7,7 +7,7 @@
 // enable; the hierarchy kept, for the AREA_GROUP.
 //   node gen-obscarry.mjs outdir      (folders carry-m0, carry-m8, carry-l0, carry-l8: top.v, top.ucf)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

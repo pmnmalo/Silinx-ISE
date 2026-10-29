@@ -7,8 +7,8 @@
 //   PART=xc3s500efg320-4 node gen-iobidir.mjs outdir [--clk B8]
 // Writes outdir/rbd-<standard> (top.vhd, top.ucf) for LVCMOS33, LVCMOS25, LVTTL, LVCMOS18, LVCMOS15, LVCMOS12.
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 import { PART } from './db.mjs';
 
 const BIDIR_STDS = ['LVCMOS33', 'LVCMOS25', 'LVTTL', 'LVCMOS18', 'LVCMOS15', 'LVCMOS12'];

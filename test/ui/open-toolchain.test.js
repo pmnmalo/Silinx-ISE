@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { setupUi, uiTest, makeProject, readWs, writeWs } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
-import { DB_DIR } from '../../core/fpga/bitdb-node.js';
+import { DB_DIR } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
 
 let env;
 // the server's bit database: the shipped one, plus the (empty) pads of the XC3S250E in the TQ144
@@ -200,7 +200,7 @@ const BA_UCF = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).p
   .split('\n').map((l) => (/"(led<[4-7]>|sw<3>)"/.test(l) ? l.replace(/LOC = "\w+" \| /, '') : l)).join('\n');
 const BA_NETS = ['led<4>', 'led<5>', 'led<6>', 'led<7>', 'sw<3>'];
 const BA_TAKEN = new Set([...BA_UCF.matchAll(/LOC = "(\w+)"/g)].map((m) => m[1]));
-// the placer's pads of the five (core/ucf.js pinsUcf: the names padded to a column), in the dialog's order: five
+// the placer's pads of the five (packages/silinx-fpga/src/ucf.js pinsUcf: the names padded to a column), in the dialog's order: five
 // different pads, none of them one the UCF gives
 const baPins = (pinsUcf) => {
   const pads = BA_NETS.map((n) => pinsUcf.match(new RegExp(`NET "${n.replace(/[<>]/g, '\\$&')}"\\s+LOC = "(\\w+)"`))?.[1]);

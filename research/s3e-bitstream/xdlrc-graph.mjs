@@ -10,7 +10,7 @@
 //   g.pips[t] = [[from, to, bidir, routeThrough], …] (wire names of tile t)
 import fs from 'node:fs';
 import v8 from 'node:v8';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 
 const W = 1 << 16;   // wire name ids per tile in a wire key (key = tile * W + name id)
 
@@ -71,7 +71,7 @@ function parse(file) {
   return { names, tiles, keys: Float64Array.from(keys), roots: Float64Array.from(roots), pipT, pipA, pipB, pipBi, rt };
 }
 
-/** The same graph from Silinx's device description (core/fpga/device.js; a part such as
+/** The same graph from Silinx's device description (packages/silinx-fpga/src/fpga/device.js; a part such as
  *  'xc3s500efg320-4', or a .json.gz file): the reports of the larger devices are too large to read
  *  as one string, and the description has everything the experiments use. A node is numbered as
  *  tile * W + name of one of its wires, so Math.floor(node / W) is a tile of the node. */

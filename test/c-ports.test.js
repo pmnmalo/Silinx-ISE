@@ -197,8 +197,8 @@ void t(int k, int b[4]) {
 
 test('#1900 a combinational module and the modules with ap_ctrl_none through the open synthesis (Yosys, Spartan-3E), from the VHDL and from the Verilog: no warning of Yosys; the C synthesis\'s own warnings', async () => {
   const { compile, elaborate } = await import('../core/compile.js');
-  const { synthesizeOpen } = await import('../core/synth-open.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   const ctrl = { 'pick.c': ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'], 'sums.cpp': ['ap_clk', 'ap_rst'], 'example.cpp': ['ap_clk', 'ap_rst'] };
   const warnings = { 'pick.c': POS_WARNINGS, 'sums.cpp': FREE_WARNINGS, 'example.cpp': [] };
   for (const [src, file] of [[POS, 'pick.c'], [FREE, 'sums.cpp'], [DF, 'example.cpp']]) {

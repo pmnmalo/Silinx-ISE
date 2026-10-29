@@ -1,8 +1,8 @@
 # Quality of the open synthesis (size and speed against XST)
 
 The open synthesis is Silinx's front end (`core/synth-verilog.js`: the elaborated design as one flat
-SystemVerilog module) + Yosys (`core/synth-open.js`, YoWASP 0.70 since 15.10.23, 0.68 before) + Silinx's packer
-(`core/fpga/pack.js`). Until 15.10.1 its netlists were about 2.5 times larger than XST's
+SystemVerilog module) + Yosys (`packages/silinx-fpga/src/synth-open.js`, YoWASP 0.70 since 15.10.23, 0.68 before) + Silinx's packer
+(`packages/silinx-fpga/src/fpga/pack.js`). Until 15.10.1 its netlists were about 2.5 times larger than XST's
 (research/s3e-bitstream/README.md, "To do later"). This page says where the size came from, what
 changed in 15.10.2 and what is left. `measure.mjs` reproduces the tables:
 
@@ -33,7 +33,7 @@ mapping fixed, lab11's LUT and flip-flop counts are at or below XST's.
 
 ## What changed (15.10.2)
 
-- **LUT mapping** (`core/synth-open.js` `synthCommands`, 4-input-LUT families): `synth_xilinx` up
+- **LUT mapping** (`packages/silinx-fpga/src/synth-open.js` `synthCommands`, 4-input-LUT families): `synth_xilinx` up
   to its `map_luts` step, then the steps of `map_luts` with `abc -luts 1,1,1,1,2,4` (a LUT5 costs
   two LUT4s, a LUT6 four: what they cost once split), then `synth_xilinx` from `finalize`. Tried:
   `-nowidelut` (LUT4 only: lab11 316 LUTs / 166 slices but 16.2 ns), costs 1,1,1,1,2 / 1,1,1,1,3 /
@@ -52,7 +52,7 @@ mapping fixed, lab11's LUT and flip-flop counts are at or below XST's.
 
 ## Shift registers in SRL16 (15.10.2)
 
-`core/synth-open.js` (synthCommands, SRL_MAP, SRL_CELLS): `synth_xilinx … -run :map_ffs`, then
+`packages/silinx-fpga/src/synth-open.js` (synthCommands, SRL_MAP, SRL_CELLS): `synth_xilinx … -run :map_ffs`, then
 `xilinx_srl -fixed -minlen 3` on the bit-level flip-flops (before map_ffs: after it xc3se's
 dfflegalize has made them `$_SDFFE_` cells with a reset, which xilinx_srl skips), then Silinx's
 own map file for `$__XILINX_SHREG_` (`silinx_srl_map.v`, given to Yosys with the design): a chain
@@ -68,7 +68,7 @@ through BX / BY with DIF_MUX / DIG_MUX, the shift enable on SR through WSGEN, `C
 SRL16E_1), two in a slice when they share the clock and the enable; an always-enabled one (SR = 1)
 may feed the flip-flop of its side when that flip-flop has no CE and no set / reset (as ISE's map
 packs them: `FFX_SR_ATTR::SRLOW`, the flip-flop does not see SR). The placer keeps SLICEM
-instances on the SLICEM sites (the left column of a CLB); `core/fpga/timing.js` has their arcs
+instances on the SLICEM sites (the left column of a CLB); `packages/silinx-fpga/src/fpga/timing.js` has their arcs
 (clock to the output after a shift, setup of BX / BY and SR); both simulators of
 `test/fpga-sim.js` model them; the bitstream has the measured shift-register features (stage D).
 ISE converts the open flow's designs to the same .bit with no DRC error or warning (srl fixture,
@@ -193,11 +193,11 @@ halves max's depth for 7 % more LUTs, and on most designs it is as good or bette
 and 4 GB. ABC's `read_lut` (LUT delays by size) crashes in YoWASP, so ABC cannot be told that a
 6-input function (LUT, F5, F6) is slower than a LUT4.
 
-So the open synthesis (`core/synth-open.js`, `synthesizeOpen`) maps the 4-input-LUT families as
+So the open synthesis (`packages/silinx-fpga/src/synth-open.js`, `synthesizeOpen`) maps the 4-input-LUT families as
 before, writes the design as it was before the LUT mapping (`write_rtlil`), maps that again with the
 bold script (`DEPTH_ABC`, a second Yosys run from the LUT mapping on) and keeps the second netlist
 when its estimated critical path (`criticalDelay`: the netlist's cells with the -4 logic delays of
-`core/fpga/timing.js`, 0.45 ns per connection between slices, none inside one) is 3 % shorter
+`packages/silinx-fpga/src/fpga/timing.js`, 0.45 ns per connection between slices, none inside one) is 3 % shorter
 without more LUTs in proportion than it gains (10 % more at least), or when it is no slower and
 smaller (`keepDepth`). Designs above 5000 LUTs keep the usual mapping. `r.depth` says what happened;
 `depth: false` turns it off.
@@ -232,7 +232,7 @@ bit and never onto the carry chain (the EPFL adder: 84 ns estimated, 75 ns by tr
 Yosys's `extract_fa` finds almost none of the full adders of such a graph (1 chained full adder of 128 in
 the EPFL adder: it takes half adders where the carry runs through AND gates).
 
-`core/carry-chain.js` finds them on the netlist of Yosys's coarse synthesis (written as JSON at the start
+`packages/silinx-fpga/src/carry-chain.js` finds them on the netlist of Yosys's coarse synthesis (written as JSON at the start
 of synth_xilinx's `fine` step, the rest of the flow then run from the rewritten JSON):
 
 - the 3-cuts of every 1-bit logic cell, with their truth tables (k-cut enumeration, up to 48 cuts per
@@ -409,7 +409,7 @@ examples as before.
 
 ABC maps for depth taking every function as fast as a LUT4: `abc -luts` gives it costs, not delays.
 Its LUT library (`read_lut`, lines of inputs / area / delay) can: here the -4 delays of
-`core/fpga/timing.js` and a connection, 1.21 ns for a LUT4 (Tilo + 0.45), 1.60 for a 5-input function
+`packages/silinx-fpga/src/fpga/timing.js` and a connection, 1.21 ns for a LUT4 (Tilo + 0.45), 1.60 for a 5-input function
 (Tif5x + 0.45), 1.89 for a 6-input one (Tif5 + Tif6y + 0.45), at 1, 2 and 4 LUT4s (`LUT_LIB`).
 
 YoWASP's ABC (0.68 and 0.70) crashes on `read_lut` in a script file (`abc -script x.abc`, which ABC
@@ -461,7 +461,7 @@ designs with a clock (2026-10-17, `abc9-results.json`):
   test/designs-corpus/README.md). Against *now*, which also tries the wider and the depth-oriented mappings, it
   is 7 % slower (EPFL priority 52 ns against 11).
 - So abc9-4 would be one more candidate of the mappings kept by `DEPTH_RULE`, not a replacement: left to the
-  synthesis-speed work (#377); not wired into `core/synth-open.js`.
+  synthesis-speed work (#377); not wired into `packages/silinx-fpga/src/synth-open.js`.
 
 Per design, abc9-4 against *now* (the 18 designs with a clock; better in bold). The last column is what
 `keepDepth` (DEPTH_RULE) would keep between the two, given the routed periods and the LUTs. The open synthesis
@@ -744,8 +744,8 @@ The time was in `write_json`: synth_xilinx reads Yosys's Xilinx cell library (`c
 whatever the design (blinky 13.4 MB, its own module 0.27 MB), about 0.9 s of every run (blinky's remap: 0.15 s
 without writing, 1.10 s with the JSON, 0.17 s with the top module's alone). write_verilog and stat already leave the
 black boxes out. So every run writes the top module alone (`outputs`: `select -module <top>; write_json -selected`);
-every reader takes the top module anyway (core/fpga/netlist.js, sim-model.js, compiled-sim.js, compiled-prims.js,
-the estimates of core/synth-open.js).
+every reader takes the top module anyway (packages/silinx-fpga/src/fpga/netlist.js, sim-model.js, compiled-sim.js, compiled-prims.js,
+the estimates of packages/silinx-fpga/src/synth-open.js).
 
 Before → after (the same machine, best of two; the netlist kept, the choices of r.depth, the statistics and the
 warnings compared: identical on every design):
@@ -792,7 +792,7 @@ the remaps need them).
   - then: SRL16E in the packer (a SLICEM: the LUT as `#RAM` with `F_ATTR::SHIFT_REG`, D through
     BX / BY with DIF_MUX / DIG_MUX, the shift enable through SR (SRINV, WSGEN), no flip-flops in
     that slice since SR would reset them), slices of type SLICEM kept on SLICEM sites by the
-    placer (place.js allowedAt), its clock-to-out and setup in core/fpga/timing.js, SRL16E in
+    placer (place.js allowedAt), its clock-to-out and setup in packages/silinx-fpga/src/fpga/timing.js, SRL16E in
     test/fpga-sim.js (netlistSim and packedSim), and a check of the bitstream against ISE's
     (the bit database has the SLICEM shift-register features, measured with ISE's designs).
 - **Tri-state buffers in the packer** (distributed RAM, block RAM, multipliers and the DCM are in
@@ -907,13 +907,13 @@ the open synthesis smaller or faster on average, and not on the examples; it pay
 (ITC'99 b01, b07, b10, 17 to 31 % fewer slices) and costs as much on others. Tried as one more candidate kept by
 DEPTH_RULE, it gains about 3 % of the slices and 1 % of the period beyond the noise on the 21 designs concerned, for
 one more Yosys run on each, a script in three runs (the init values written back between them), and Yosys's crash
-on a port's register to avoid. Not wired into `core/synth-open.js` (#438: the author's decision); the larger machines
+on a port's register to avoid. Not wired into `packages/silinx-fpga/src/synth-open.js` (#438: the author's decision); the larger machines
 alone are, at High (#539, below).
 
 ### One-hot at Optimization Effort High (#539)
 
 XST re-encodes one-hot from about 8 states, and in the table above one-hot won on the larger machines (b01, b10)
-and lost on the 7-state ones (b02, b06). So at Optimization Effort High, `core/synth-fsm.js` tries the machines of
+and lost on the 7-state ones (b02, b06). So at Optimization Effort High, `packages/silinx-fpga/src/synth-fsm.js` tries the machines of
 **8 states or more** that the init values alone keep out: a quiet run up to `fsm` finds them (the init values off,
 fsm_detect, the machines extracted one-hot: their states and codes), and a design with some is synthesized once more
 with them one-hot (their power-up state kept, as fsm.mjs does), High's mappings made on that netlist too, the better
@@ -968,7 +968,7 @@ bit. Yosys's fsm_detect turns it down: "Users of register don't seem to benefit 
 cells that read it; fsm-detect.json lists the corpus's 18 registers refused so, most of them counters).
 
 A register marked by hand (`fsm_encoding`) is extracted whatever that heuristic says, so the search for state
-machines (`core/synth-fsm.js`) now does it for these:
+machines (`packages/silinx-fpga/src/synth-fsm.js`) now does it for these:
 
 - run 1 (`fsmProbeCommands`) writes fsm_detect's messages too (`tee -q -o`); the registers refused for their users
   alone (`refusedForUsers`; not those a port reads, which crash Yosys 0.70 when forced, nor any other reason);
@@ -1188,7 +1188,7 @@ by 12 and 33 flip-flops: folding it costs 43 % more LUTs; b05's is slower folded
 ### The critical LUTs made shallower, their fan-out kept (#652)
 
 What spi-fpga-slave needed is a mapping that changes only the critical cone and makes nothing shared again. It is done
-after the LUT mapping, on the netlist (`core/lut-resynth.js`): the LUT that drives the end of a critical path, at level L,
+after the LUT mapping, on the netlist (`packages/silinx-fpga/src/lut-resynth.js`): the LUT that drives the end of a critical path, at level L,
 is made again with level L-1 at most, its output kept (so its fan-out is), every other LUT left as it is.
 
 - **Its cone, cut twice.** X: the cone's signals of level L-2 at most, where the cone stops (what the new last LUT, h,
@@ -1271,7 +1271,7 @@ iwls05-ss-pcm and uart-for-fpga. Two other ideas measured first, on the cached n
 - the critical inputs of a root made shallower in its place (a recursive form, depth 1 to 4): 1-2 designs changed;
 - an AND / OR of literals rebuilt balanced: 3 designs, each with another end that stays.
 
-**The change** (`core/lut-resynth.js`, `shallowerTree`): when neither h nor h(g(A), S) exists, the root's cone is cut
+**The change** (`packages/silinx-fpga/src/lut-resynth.js`, `shallowerTree`): when neither h nor h(g(A), S) exists, the root's cone is cut
 (the latest LUT expanded first) at up to `RESYNTH_RULE.treeLeaves` (12) leaves, its function over them made a tree of
 LUT4s by disjoint decompositions F = h(g(A), rest), A of 2 to 4 leaves (g's level the lowest first, then the larger A:
 the first whose values give F two columns), then the same with h, until 4 inputs are left; kept when the root's level
@@ -1379,7 +1379,7 @@ function: four LUT4s, two MUXF5 and a MUXF6 (1664 LUTs and 1152 MUXFs, so the ma
 first select instead, a 4:1 multiplexer is two 2:1 multiplexers into a MUXF5: two LUT4s in one slice, as XST
 builds it.
 
-`LUT6_MAP` (`core/synth-open.js`, a techmap file given to the remaps on `LUT4_COSTS`, before `lut_map.v`, on the
+`LUT6_MAP` (`packages/silinx-fpga/src/synth-open.js`, a techmap file given to the remaps on `LUT4_COSTS`, before `lut_map.v`, on the
 6-input `$lut`s alone) finds the input whose two cofactors each depend on 4 of the other inputs at most and makes
 those two LUT4s and a MUXF5; a function without such an input fails it and goes on to `lut_map.v` as before. Its
 tables are computed by Yosys's constant functions (the dependencies on 64-bit words: about 1 s more per remap of

@@ -2,7 +2,7 @@
 
 Designs placed and routed by the Silinx toolchain (research/s3e-route/open-flow.mjs, XC3S250E-CP132,
 seed 1), gzipped, and the minimum period ISE 14.7's `trce -a` gives for the same routed design. Silinx's
-static timing analysis (core/fpga/timing.js) is checked against those numbers in
+static timing analysis (packages/silinx-fpga/src/fpga/timing.js) is checked against those numbers in
 test/fpga-timing.test.js (#457). They are Silinx's own XDL files, not ISE's outputs.
 
 | File | Design | Block RAMs, multipliers | trce (ns) |

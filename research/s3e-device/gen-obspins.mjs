@@ -18,8 +18,8 @@
 //                                                                     observation (the FT256: the I/O sites the CP132
 //                                                                     leaves without a pad; the die's description, PART's)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

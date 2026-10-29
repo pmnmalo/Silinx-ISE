@@ -1,13 +1,12 @@
 // A change of the target device in Design Properties (#796, part of #787): before it is made, the design checked
-// against the new device (core/resource-check.js deviceChangeIssues): the modules that use a primitive the new
+// against the new device (packages/silinx-fpga/src/resource-check.js deviceChangeIssues): the modules that use a primitive the new
 // family lacks, with its equivalent there, and the resources the design needs more of than the new part has
 // (from the last synthesis or implementation's report, and the design's own primitive instances and ports). The
 // user is told and may still change the device; the issues stay in the console as warnings.
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
-import { resourcesOf } from '/core/resources.js';
-import { deviceChangeIssues, primitiveInstances, usedOfReport } from '/core/resource-check.js';
+import { resourcesOf, deviceChangeIssues, primitiveInstances, usedOfReport } from '/packages/silinx-fpga/src/parts.js';
 import { S, app, withPrimitives } from './app.js';
 import { inView } from './design.js';
 

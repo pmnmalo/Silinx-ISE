@@ -1,19 +1,19 @@
 // Test helper (not a test file): two small cycle simulators that check the packer without ISE.
 //
-//   netlistSim(nl)     the Yosys netlist (core/fpga/netlist.js): LUT1..4, INV, MUXF5..8, MUXCY, XORCY,
+//   netlistSim(nl)     the Yosys netlist (packages/silinx-fpga/src/fpga/netlist.js): LUT1..4, INV, MUXF5..8, MUXCY, XORCY,
 //                      FD*/LD* flip-flops and latches, IBUF / OBUF / OBUFT (z: high impedance) / BUFG, distributed RAMs
 //                      (RAM16X1S / RAM32X1S / RAM64X1S / RAM16X1D), MULT18X18; and the combinational
 //                      gates of Yosys's internal cell library ($_AND_, $_MUX_… after a generic
 //                      `synth`) (CELLS_SIMULATED)
-//   packedSim(packed)  the packed design (core/fpga/pack.js) read from its XDL configuration strings
+//   packedSim(packed)  the packed design (packages/silinx-fpga/src/fpga/pack.js) read from its XDL configuration strings
 //                      and site-pin nets, with the slice as the Spartan-3E slice works (as the
 //                      XDLRC primitive_def SLICEL describes its elements and connections)
 //
 // Both: sim.step({ port bit name: 0 | 1 }) applies the inputs and settles; sim.out() -> { port bit: v }.
 // Flip-flops start at their INIT (as after configuration). Clock edges are found by comparing a
 // clock pin with its value at the previous step.
-import { evalLut } from '../core/xdl.js';
-import { paramBits, paramInt } from '../core/fpga/netlist.js';
+import { evalLut } from '../packages/silinx-fpga/src/xdl.js';
+import { paramBits, paramInt } from '../packages/silinx-fpga/src/fpga/netlist.js';
 
 const LUT_K = { LUT1: 1, LUT2: 2, LUT3: 3, LUT4: 4 };
 const RAM_A = { RAM16X1S: 4, RAM32X1S: 5, RAM64X1S: 6, RAM16X1D: 4 };

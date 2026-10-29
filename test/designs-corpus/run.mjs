@@ -10,7 +10,7 @@
 //   diff      the netlist simulated against the RTL, cycle by cycle (test/diff-synth.js)
 //   flow      the open back end on the XC3S250E (Basys2-250), or the larger XC3S500E / XC3S1200E
 //             (Nexys2) for a design too large for it: pack, then place and route as the app's flow
-//             does (core/fpga/place-route.js: the delay table, routing on the PIPs of known bits,
+//             does (packages/silinx-fpga/src/fpga/place-route.js: the delay table, routing on the PIPs of known bits,
 //             static timing, register replication), bitgen ('complete' when the bitstream is complete). The
 //             clock is put on the board's oscillator pin (B8, PERIOD 20 ns). A design with more port
 //             bits than the package has pins goes through an I/O wrapper (lib.mjs ioWrapper); cells
@@ -83,9 +83,10 @@ async function runDesign(manifest, d, opts) {
   const { primitiveSources } = await import('../../core/unisim.js');
   const { designChecks } = await import('../../core/lint.js');
   const { Simulator } = await import('../../core/simulator.js');
-  const { synthesizeOpen, yosysScript, cellCounts, utilization } = await import('../../core/synth-open.js');
+  const { synthesizeOpen } = await import('../../core/synth-front.js');
+  const { yosysScript, cellCounts, utilization } = await import('../../packages/silinx-fpga/src/synth-open.js');
   const { toVerilog, SynthError } = await import('../../core/synth-verilog.js');
-  const { yosysNode } = await import('../../core/synth-open-node.js');
+  const { yosysNode } = await import('../../packages/silinx-fpga/src/synth-open-node.js');
   const { compareNetlist } = await import('../diff-synth.js');
   const { sourceDir } = await import(pathToFileURL(path.join(ROOT, 'scripts', 'fetch-design-corpus.mjs')).href);
 
@@ -208,17 +209,17 @@ async function synthWith(design, flags, m) {
 }
 
 async function backEnd(d, design, syn, srcs, res, opts, m, forceWrap = false, part = PARTS[0]) {
-  const { readYosysJson } = await import('../../core/fpga/netlist.js');
-  const { pack, PackError } = await import('../../core/fpga/pack.js');
-  const { deviceSites } = await import('../../core/fpga/place.js');
-  const { placeRouteBest } = await import('../../core/fpga/place-route.js');
-  const { loadDeviceCache } = await import('../../core/fpga/device-node.js');
-  const { checkRouting } = await import('../../core/fpga/route.js');
-  const { bitgen, knownRouting } = await import('../../core/fpga/bitgen.js');
-  const { analyzeTiming, checkPeriods } = await import('../../core/fpga/timing.js');
-  const { parseUcf } = await import('../../core/ucf.js');
-  const { parseXdl, writeXdl } = await import('../../core/xdl.js');
-  const { loadDb } = await import('../../core/fpga/bitdb-node.js');
+  const { readYosysJson } = await import('../../packages/silinx-fpga/src/fpga/netlist.js');
+  const { pack, PackError } = await import('../../packages/silinx-fpga/src/fpga/pack.js');
+  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/place.js');
+  const { placeRouteBest } = await import('../../packages/silinx-fpga/src/fpga/place-route.js');
+  const { loadDeviceCache } = await import('../../packages/silinx-fpga/src/fpga/device-node.js');
+  const { checkRouting } = await import('../../packages/silinx-fpga/src/fpga/route.js');
+  const { bitgen, knownRouting } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { analyzeTiming, checkPeriods } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
+  const { parseUcf } = await import('../../packages/silinx-fpga/src/ucf.js');
+  const { parseXdl, writeXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
+  const { loadDb } = await import('../../packages/silinx-fpga/src/fpga/bitdb-node.js');
   const w = [], steps = {};
   let again = false;
   res.details.flowSteps = steps;
@@ -282,7 +283,7 @@ async function backEnd(d, design, syn, srcs, res, opts, m, forceWrap = false, pa
       if (larger) { await tryLarger(); return; }
       res.flow = `too large: ${packed.stats.slices} slices, the ${chipOf(part)} has ${sites.slices.size}`; return;
     }
-    // place and route as the app's flow does (core/fpga/place-route.js: the delay table, the clock
+    // place and route as the app's flow does (packages/silinx-fpga/src/fpga/place-route.js: the delay table, the clock
     // and global buffer sites of known bits, the timing-driven router), with its register
     // replication (#79, #88)
     t = Date.now();

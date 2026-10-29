@@ -8,13 +8,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './examples-lib.mjs';
 import { designOf } from './compiled-diff.js';
-import { parseUcf } from '../core/ucf.js';
+import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
 import { resolveBoard } from '../server/devices.js';
 import { boardWiring, emulatorClocks } from '../core/emulate.js';
 import { netlistOf } from '../core/compiled-sim.js';
 import { CompiledBoard } from '../core/emulate-compiled.js';
 import { vgaPins, vgaPalette, vgaPixels } from '../core/vga.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 const BARS = fs.readFileSync(path.join(ROOT, 'test/fixtures/compiled-sim/vga_bars.vhd'), 'utf8');
 const boardOf = (id) => { const r = resolveBoard(id); return { id, name: r.board.name, device: r.device, resources: r.resources }; };

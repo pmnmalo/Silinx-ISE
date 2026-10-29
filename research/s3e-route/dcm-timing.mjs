@@ -14,9 +14,9 @@ import os from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { generateBuild } from '../../server/ise.js';
-import { parseXdl } from '../../core/xdl.js';
-import { parseUcf } from '../../core/ucf.js';
-import { clockSources } from '../../core/fpga/timing.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { parseUcf } from '../../packages/silinx-fpga/src/ucf.js';
+import { clockSources } from '../../packages/silinx-fpga/src/fpga/timing.js';
 
 /** A PCF for a design routed by Silinx (XDL text) and its UCF, as ISE's map writes one: each clock's flip-flops in a
  *  TIMEGRP; the pad's PERIOD on the first DCM's CLKIN (or on the clock's flip-flops when it has no DCM); a DCM's clocks

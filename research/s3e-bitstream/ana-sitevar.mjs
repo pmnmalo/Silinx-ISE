@@ -9,9 +9,9 @@
 // per tile type of the instances (key.sites: only those instances were changed). Code variants
 // (code: [attr, k]) give the place of every bit of a hexadecimal value: feature ATTR:<bit i>.
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { parseXdl } from '../../core/xdl.js';
-import { tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 
 const args = process.argv.slice(2);

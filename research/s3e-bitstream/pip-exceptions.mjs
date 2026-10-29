@@ -15,7 +15,7 @@
 // misses, on every device, goes to the type in packages/silinx-fpga/bitdb/s3e-tiles.json (`absent`); what one device's tiles
 // of the type all miss besides, to the type in packages/silinx-fpga/bitdb/<device>-tiles.json (`absent`); what only some tiles
 // miss, there too, by tile (`absentIn: [{ tiles, absent }]`). The router honours them
-// (core/fpga/bitgen.js knownRouting); a device description built from the database needs them too.
+// (packages/silinx-fpga/src/fpga/bitgen.js knownRouting); a device description built from the database needs them too.
 // Only the features the router may use are considered (knownRouting before the exceptions); the
 // types whose PIPs set no bits (pipsWithoutBits: the terminal tiles) have no list of features.
 //
@@ -28,12 +28,12 @@
 //        routes on it; the router must not take them)
 import fs from 'node:fs';
 import { loadDb, DB_DIR, splitPart } from './db.mjs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { tileOf, knownRouting } from '../../core/fpga/bitgen.js';
-import { PIP_ROUTETHRU, toBase64, fromBase64 } from '../../core/fpga/device.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { tileOf, knownRouting } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { PIP_ROUTETHRU, toBase64, fromBase64 } from '../../packages/silinx-fpga/src/fpga/device.js';
 import zlib from 'node:zlib';
 import path from 'node:path';
-import { findDeviceGraph } from '../../core/fpga/device-node.js';
+import { findDeviceGraph } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 
 export const PARTS = ['xc3s100ecp132-4', 'xc3s250ecp132-4', 'xc3s500efg320-4', 'xc3s1200efg320-4'];
 

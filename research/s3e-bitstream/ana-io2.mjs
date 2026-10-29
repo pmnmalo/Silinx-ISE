@@ -6,9 +6,9 @@
 // feature IOB<k>:<O|I>:<standard> with bits "df,db" or "df,db@dx,dy" (in the tile dx, dy away).
 //   node ana-io2.mjs dir [more dirs…] > io-features.json
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { frameData, tileOf } from '../../core/fpga/bitgen.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { frameData, tileOf } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb, edges } from './db.mjs';
 
 const db = loadDb();

@@ -1,7 +1,7 @@
 // Silinx - the router: a placed XDL design in, the same design with every net's PIPs out (browser + Node).
 //
 // Algorithm: PathFinder (McMurchie and Ebeling, 1995), negotiated congestion. Every net is routed
-// as a tree over the device's routing nodes (core/fpga/device.js), each sink found by an A* search
+// as a tree over the device's routing nodes (fpga/device.js), each sink found by an A* search
 // from the whole tree built so far. At first nets may share nodes; after each pass the cost of a
 // node that is used by more than one net goes up (present congestion, growing every pass) and
 // stays higher (history), so nets negotiate who gets the contested wires until no node is shared.
@@ -23,7 +23,7 @@
 //   would need that site configured for it, so they are never used.
 // - Timing (opts.timing): PathFinder's criticality term, as in VPR's timing-driven router. Each
 //   connection (driver pin -> load pin) has a criticality c (0..1) from a static timing analysis of
-//   the design (core/fpga/timing.js: the delay model of the device, the logic of the slices); the
+//   the design (fpga/timing.js: the delay model of the device, the logic of the slices); the
 //   cost of a node for it is c x its delay + (1 - c) x its congestion cost, and the search starts
 //   from the tree with each node's delay from the source, so a critical load gets a direct, fast path
 //   while the others share wires. The criticalities start from the distances and are recomputed
@@ -44,7 +44,7 @@
 //   its fastest or least congested path reaches; the LUT's equation is rewritten for the inputs
 //   taken (not the carry's data input CY0F / CY0G, nor the pins of nets the router does not route).
 // - Known switches only (opts.allowPip): the router can be restricted to the PIPs a bitstream writer
-//   knows the bits of (core/fpga/bitgen.js knownRouting(db)), so the routed design can be turned
+//   knows the bits of (fpga/bitgen.js knownRouting(db)), so the routed design can be turned
 //   into a complete bitstream without Xilinx's bitgen; a sink that cannot be reached that way makes
 //   its net fail (listed in `failed`), never a route through an unknown switch.
 
@@ -72,7 +72,7 @@ function siteOfInst(name, instByName, device) {
 }
 
 /**
- * The routing problem of a parsed design (core/xdl.js parseXdl): for each net its source nodes and
+ * The routing problem of a parsed design (xdl.js parseXdl): for each net its source nodes and
  * sink nodes. Problems (unplaced instances, pins the device does not have) are listed in `errors`.
  */
 export function netEndpoints(design, device) {
@@ -155,7 +155,7 @@ function globalClockMask(device) {
  * default all), allowConstSource('vcc' | 'gnd', site) (sites that may be made the source of a
  * VCC / GND net without one; site: { name, tileName, type }; default all), timing (false: route
  * for wirelength and congestion only; true: timing-driven, with the delay model of
- * core/fpga/timing.js), timingPasses (4: passes after the routing is legal, for timing only), timingPf (1: the present
+ * fpga/timing.js), timingPasses (4: passes after the routing is legal, for timing only), timingPf (1: the present
  * congestion factor of those passes; null: as the passes before left it), polish (300: the changes the polish of the critical path may make;
  * 0: none), stealCost (1: the cost, in units of 0.3 ns at criticality 1, of a wire of another net in
  * the polish; 0: free wires only), stealNets (8: the nets it may route again around a connection),
@@ -389,7 +389,7 @@ export function routeDesign(design, device, opts = {}) {
   };
 
   // timing: each sink's connection in the timing graph, and its criticality: from the distances at
-  // first, then from the routed delays after each pass (core/fpga/timing.js)
+  // first, then from the routed delays after each pass (fpga/timing.js)
   let tg = null, sinkCrit = null, period = null, exp = 1;
   if (timing) {
     tg = timingGraph(design, model);

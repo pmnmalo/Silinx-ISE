@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import { diffCycles, designOf, rng } from './compiled-diff.js';
 import { compileDesign, compileNetlist, CompiledSim, netlistOf } from '../core/compiled-sim.js';
 import { coneTables, equalities, gateModel, inputOrder } from '../core/compiled-tables.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { synthesizeOpen } from '../core/synth-open.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { synthesizeOpen } from '../core/synth-front.js';
 import { postSynthesisModels } from '../core/sim-model.js';
 
 const src = (name, text) => [{ path: name, lang: 'verilog', role: 'design', text }];

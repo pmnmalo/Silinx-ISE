@@ -12,7 +12,7 @@ import { schematicFromCircuit } from '../core/ink/schematic-doc.js';
 import { netlist, generateHdl } from '../core/schdoc.js';
 import { wireClashes } from '../core/schpath.js';
 import { compileDesign } from '../core/compiled-sim.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { designOf, rng } from './compiled-diff.js';
 
 const CIRCUITS = {

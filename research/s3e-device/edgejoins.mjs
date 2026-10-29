@@ -58,14 +58,14 @@ export function edgeHypotheses(obs, tiles, known, refused = [], wiresOf = null) 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [obsFile, outFile, ...dirs] = process.argv.slice(2);
   const obs = JSON.parse(fs.readFileSync(obsFile, 'utf8'));
-  const { loadDeviceCache } = await import('../../core/fpga/device-node.js');
+  const { loadDeviceCache } = await import('../../packages/silinx-fpga/src/fpga/device-node.js');
   const tiles = loadDeviceCache(process.env.PART || 'xc3s250ecp132-4').tileNames;
   const verdicts = dirs.flatMap(d => JSON.parse(fs.readFileSync(path.join(d, 'verdicts.json'), 'utf8')));
   const known = [...obs.joins, ...verdicts.filter(v => v[2] === 'join').map(v => [v[0], v[1]])];
   // (WIRES=measured.json.gz: the tiles' wires a measured graph has, chip.mjs's)
   let wiresOf = null;
   if (process.env.WIRES) {
-    const { loadDevice } = await import('../../core/fpga/device.js');
+    const { loadDevice } = await import('../../packages/silinx-fpga/src/fpga/device.js');
     const zlib = await import('node:zlib');
     const G = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(process.env.WIRES))));
     const cache = new Map();

@@ -21,7 +21,7 @@ function epflSection(epfl) {
   L.push('The [EPFL combinational benchmarks](https://github.com/lsils/benchmarks) keep the best results of a logic',
     'synthesis competition, in 6-input LUTs: the fewest LUTs (size) and the fewest levels of LUTs (depth). The',
     'Spartan-3E has 4-input LUTs, so the table above does not compare with them; here Silinx\'s front end and its',
-    'Yosys / ABC mapping (core/synth-open.js) map each benchmark to LUT-6: *area*, ABC\'s default LUT mapping, against',
+    'Yosys / ABC mapping (packages/silinx-fpga/src/synth-open.js) map each benchmark to LUT-6: *area*, ABC\'s default LUT mapping, against',
     'the size record; *depth*, the logic balanced first as Silinx\'s depth-oriented mapping does, against the depth',
     `record (geometric means: LUTs ${fmt(gSize, 2)}× the size records, levels ${fmt(gDepth, 2)}× the depth records; the`,
     'records come from exact SAT-based resynthesis and long optimization runs, the targets of research, not of a',

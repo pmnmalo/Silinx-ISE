@@ -1,7 +1,7 @@
 // The page's Yosys client (web/js/yosys-client.js) with several workers (#276): two runs at once in two
 // workers, a third queued until one ends, the workers kept for the next runs; one worker on a device with
 // few cores or little memory; after a crash one Yosys at a time. The flow worker's pool (#279): its
-// workers' code (core/synth-open.js yosysWorkerSource) run against a stand-in for Yosys; a worker that
+// workers' code (packages/silinx-fpga/src/synth-open.js yosysWorkerSource) run against a stand-in for Yosys; a worker that
 // cannot start says so (the flow worker then runs Yosys in its own thread).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { yosysWorkerSource, readableBlobs } from '../core/synth-open.js';
+import { yosysWorkerSource, readableBlobs } from '../packages/silinx-fpga/src/synth-open.js';
 
 // a fake Web Worker: its run ends when the test says so (done(i, reply)), in the order the runs came
 const workers = [], runs = [];
@@ -188,7 +188,7 @@ test('#403 the Blob worker\'s code from the minified single-file edition: the sh
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-yw-'));
   const out = path.join(dir, 'synth-open.min.mjs');
   // (resolveDir: a file path, on Windows too, #447)
-  await esbuild.build({ stdin: { contents: "export { yosysWorkerSource } from './core/synth-open.js';", resolveDir: path.join(path.dirname(fileURLToPath(import.meta.url)), '..') },
+  await esbuild.build({ stdin: { contents: "export { yosysWorkerSource } from './packages/silinx-fpga/src/synth-open.js';", resolveDir: path.join(path.dirname(fileURLToPath(import.meta.url)), '..') },
     bundle: true, format: 'esm', minify: true, target: 'es2022', outfile: out, logLevel: 'silent' });
   const { yosysWorkerSource: minified } = await import(pathToFileURL(out).href);
   await checkWorkerCode(minified(pathToFileURL(fakeBundle(dir)).href), dir);

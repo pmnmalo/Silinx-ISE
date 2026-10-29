@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
 import { Simulator } from '../core/simulator.js';
 import * as V from '../core/values.js';
-import { parseUcf } from '../core/ucf.js';
+import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
 import { boardWiring, boardOutputs, portBits, emulatorClocks, manualClocks } from '../core/emulate.js';
 
 const BOARD = { resources: [

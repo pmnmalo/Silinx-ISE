@@ -70,7 +70,7 @@ documentation: the Spartan-3 Generation Configuration User Guide (UG332) and XAP
   of observations. It does not contain any file produced by Xilinx. The device descriptions shipped
   for the Spartan-3E boards' devices (XC3S100E-CP132, XC3S250E-CP132, XC3S500E-FG320,
   XC3S1200E-FG320) and the Spartan-6 boards' (XC6SLX16-CSG324, XC6SLX45-CSG324) are Silinx's own packed descriptions of the chips' wires and switches
-  (`core/fpga/device.js`), computed from the output of ISE's documented `xdl -report -pips
+  (`packages/silinx-fpga/src/fpga/device.js`), computed from the output of ISE's documented `xdl -report -pips
   -all_conns` command; it is neither that report nor any file of ISE's installation.
 - **No redistribution of ISE.** The Docker image with ISE that Silinx's developers use is private
   and is never published. Users of Silinx install ISE themselves, under its own licence, if they

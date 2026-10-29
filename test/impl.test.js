@@ -25,7 +25,7 @@ const dev = await import('../server/devices.js');
 const jobs = await import('../server/jobs.js');
 const xise = await import('../server/xise.js');
 const tc = await import('../server/toolchain.js');
-const { generateUcf, parseUcf } = await import('../core/ucf.js');
+const { generateUcf, parseUcf } = await import('../packages/silinx-fpga/src/ucf.js');
 
 const DEVICE = { family: 'spartan3e', part: 'xc3s500e', package: 'fg320', speed: '-4' };
 

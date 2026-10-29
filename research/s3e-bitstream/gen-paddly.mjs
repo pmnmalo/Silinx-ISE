@@ -14,10 +14,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { project, openFlow, withDelays, CLK, Q } from './gen-pairdly.mjs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
-import { bufgReach } from '../../core/fpga/route.js';
-import { loadDb } from '../../core/fpga/bitdb-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
+import { bufgReach } from '../../packages/silinx-fpga/src/fpga/route.js';
+import { loadDb } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
 
 const PART = process.env.PART || 'xc3s250ecp132-4';
 const argv = process.argv.slice(2), qi = argv.indexOf('--q'), qPad = qi >= 0 ? argv.splice(qi, 2)[1] : null;

@@ -1,7 +1,7 @@
 // The carry connections (COUT -> CIN) of placed XDL designs: which slice rows they cross.
 //   node carry-rows.mjs a.xdl b.xdl …
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 const cross = new Map();
 for (const f of process.argv.slice(2)) {
   const d = parseXdl(fs.readFileSync(f, 'utf8'));

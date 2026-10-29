@@ -1,7 +1,7 @@
 // Pack a Yosys JSON netlist and print the result: node try-pack.mjs net.json [ucf]
 import fs from 'node:fs';
-import { readYosysJson } from '../../core/fpga/netlist.js';
-import { pack } from '../../core/fpga/pack.js';
+import { readYosysJson } from '../../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../../packages/silinx-fpga/src/fpga/pack.js';
 const nl = readYosysJson(fs.readFileSync(process.argv[2], 'utf8'));
 const p = pack(nl, { ucf: process.argv[3] ? fs.readFileSync(process.argv[3], 'utf8') : null });
 console.log(JSON.stringify(p.stats), p.warnings);

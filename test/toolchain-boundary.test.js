@@ -1,7 +1,8 @@
 // The Silinx toolchain's boundary (#1672, step 1 of #1651, docs/TOOLCHAIN-SEPARATION.md): the toolchain's modules
 // (synthesis, pack, place, route, timing, bitgen, the flow, their formats and parts), in its package since #1677
-// (packages/silinx-fpga/src; core/'s old paths re-export them), import nothing of the IDE. ALLOWED lists the imports
-// across that were left, each with its importer; it only shrinks (as test/code-size.test.js), and is empty since #1677.
+// (packages/silinx-fpga/src), import nothing of the IDE. ALLOWED lists the imports across that were left, each with
+// its importer; it only shrinks (as test/code-size.test.js), and is empty since #1677. The other way (#1678): the IDE
+// imports the package through its API only, its entries (src/index.js, src/parts.js, src/node.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -72,7 +73,7 @@ test('#1672 toolchain boundary: how the imports across are found', () => {
 test('#1672 toolchain boundary: the toolchain\'s modules are found', () => {
   for (const f of ['fpga/route.js', 'fpga/bitgen.js', 'fpga/s6/bitstream.js', 'synth-open.js', 'open-flow-core.js', 'xdl.js',
     'ucf.js', 'family.js']) assert.ok(toolchain.includes(`packages/silinx-fpga/src/${f}`), f);
-  for (const f of ['core/compile.js', 'core/sim-model.js', 'core/schdoc.js', 'core/synth-open.js', 'core/fpga/techview.js']) assert.ok(!toolchain.includes(f), f);
+  for (const f of ['core/compile.js', 'core/sim-model.js', 'core/schdoc.js', 'core/synth-front.js', 'core/fpga/techview.js']) assert.ok(!toolchain.includes(f), f);
   assert.ok(toolchain.length >= 70, `${toolchain.length} modules`);
 });
 
@@ -86,4 +87,44 @@ test('#1672 toolchain boundary: no npm package but its dependencies', () => {
   const pkgs = new Set(found.filter(isPackage).map((c) => c.split(' -> ')[1]));
   assert.deepEqual([...pkgs].filter((p) => !PACKAGES.has(p)), []);
   assert.deepEqual([...PACKAGES].filter((p) => !pkgs.has(p)), [], 'no longer imported: remove it from PACKAGES');
+});
+
+// #1678: the IDE (server/, web/, core/, scripts/, bin/) imports the package's entries only: parts.js and index.js (Node
+// and the browser), node.js (Node: server/, scripts/, bin/); the tests and the research may read its modules
+const ENTRIES = ['packages/silinx-fpga/src/index.js', 'packages/silinx-fpga/src/parts.js', 'packages/silinx-fpga/src/node.js'];
+function ideImports(dir) {
+  if (!fs.existsSync(path.join(ROOT, dir))) return [];
+  return sources(dir).flatMap((f) => [...fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(IMPORTS)].map(([, spec]) => {
+    const target = spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(f), spec)) : spec.startsWith('/') ? spec.slice(1) : null;
+    return target && inToolchain(target) ? [f, target] : null;
+  }).filter(Boolean));
+}
+
+test('#1678 the IDE imports the toolchain through its API only, each import its lightest entry', async () => {
+  const all = ['server', 'web', 'core', 'scripts', 'bin'].flatMap(ideImports);
+  assert.deepEqual(all.filter(([, t]) => !ENTRIES.includes(t)).map((x) => x.join(' -> ')), [], 'import the package\'s API (src/index.js, parts.js, node.js), or add the name to it');
+  const browser = all.filter(([f]) => /^(web|core)\//.test(f) && !/-node(-worker)?\.js$/.test(f));
+  assert.deepEqual(browser.filter(([, t]) => t.endsWith('/node.js')).map((x) => x.join(' -> ')), []);
+  // each entry used (the pages the light one)
+  for (const e of ENTRIES) assert.ok(all.some(([, t]) => t === e), e);
+  assert.ok(all.some(([f, t]) => f.startsWith('web/') && t.endsWith('/parts.js')));
+  // each import the lightest entry with its names: parts.js, then index.js, then node.js (server/'s modules go into the
+  // browser's bundle too, the standalone edition's: none of them may take node.js for a name the others have)
+  const parts = Object.keys(await import('../packages/silinx-fpga/src/parts.js'));
+  const index = Object.keys(await import('../packages/silinx-fpga/src/index.js'));
+  const heavier = [];
+  for (const dir of ['server', 'web', 'core', 'scripts', 'bin']) {
+    if (!fs.existsSync(path.join(ROOT, dir))) continue;
+    for (const f of sources(dir)) {
+      const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
+      for (const [, a, b, entry] of text.matchAll(/(?:import \{([^}]*)\} from |const \{([^}]*)\} = await import\()'[^']*silinx-fpga\/src\/(index|node)\.js'/g)) {
+        const names = (a || b).split(',').map((n) => n.trim().split(/\s+as\s+|\s*:\s*/)[0]).filter(Boolean);
+        const lightest = names.every((n) => parts.includes(n)) ? 'parts' : names.every((n) => index.includes(n)) ? 'index' : 'node';
+        if (lightest !== entry) heavier.push(`${f}: ${entry}.js for ${names.join(', ')} (${lightest}.js has them)`);
+      }
+    }
+  }
+  assert.deepEqual(heavier, []);
+  // no old path left: core/ re-exports none of the package's modules
+  assert.deepEqual(sources('core').filter((f) => /^export \* from '(\.\.\/)+packages\//m.test(fs.readFileSync(path.join(ROOT, f), 'utf8'))), []);
 });

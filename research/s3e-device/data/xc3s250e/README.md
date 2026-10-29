@@ -12,6 +12,6 @@ the bit database and the device report's grid and sites; `test/s3e-device.test.j
 | `probes.json.gz` | The arc probe's answers (`xdl -xdl2ncd`): `yes` / `no` per PIP and tile, by probe |
 | `verdicts.json.gz` | The verdicts of every round of join tests and clock tests (ISE's DRC), by round, in the order they were taken: `[a, b, 'join' \| 'no-join' \| …]` |
 | `switch-tiles.txt` | The tiles that hold a switch box (the tile probe), for the rules in switch-box coordinates |
-| `measured.json.gz` | The measured description, Silinx's packed format (`core/fpga/device.js` `loadDevice`) |
+| `measured.json.gz` | The measured description, Silinx's packed format (`packages/silinx-fpga/src/fpga/device.js` `loadDevice`) |
 
 None of these is a file of ISE's: they are Silinx's own measurements of what ISE accepts and how it routes.

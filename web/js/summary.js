@@ -1,7 +1,7 @@
 // Design Summary page (ISE "Design Summary/Reports").
 import { api } from './api.js';
 import { PRODUCT, VERSION_LABEL } from '/core/version.js';
-import { resourcesOf } from '/core/resources.js';
+import { resourcesOf } from '/packages/silinx-fpga/src/parts.js';
 import { h } from './ui.js';
 import { S, app } from './app.js';
 
@@ -34,7 +34,7 @@ export function mountSummary(el) {
       row('Product Version:', `${PRODUCT} ${VERSION_LABEL} (${open ? 'Silinx toolchain, no ISE' : 'Xilinx ISE 14.7 flow'})`, 'Constraints:', pj.constraints || '(none)'),
       row('Design Goal:', `Balanced (${pj.impl?.optMode || 'Speed'})`, 'Sources:', `${pj.files.length} HDL files`),
     ));
-    // utilization: every resource of the part (core/resources.js, #790), used of available (#795): MAP's report's
+    // utilization: every resource of the part (packages/silinx-fpga/src/resources.js, #790), used of available (#795): MAP's report's
     // lines (and the part's resources it does not list, ISE's leaves the unused ones out), or before an
     // implementation the synthesis's (the Silinx toolchain's), or the part's counts alone
     const syn = open ? (rep?.synthesis?.utilization || []).filter(u => u.total) : [];

@@ -1,6 +1,6 @@
 // Stage S6-F (#728): the block RAM's and the DSP48A1's settings and the block RAM's contents. Designs in XDL with no nets,
 // every site of a type (RAMB16BWER, RAMB8BWER, DSP48A1) holding an instance:
-//   <type>-base     every site the base settings (as ISE and Silinx write them, core/fpga/s6/xdl.js bramCfg / dspCfg)
+//   <type>-base     every site the base settings (as ISE and Silinx write them, packages/silinx-fpga/src/fpga/s6/xdl.js bramCfg / dspCfg)
 //   <type>-id<j>    the base on the sites whose index has bit j set (which site each bit is)
 //   <type>-v<k>     the base, a variant on the first sites (one element's option each, from the primitive definitions);
 //                   -s<slot>v<k> for a type of two sites to a tile, a variant on one site of each tile (-a<slot>v<k>

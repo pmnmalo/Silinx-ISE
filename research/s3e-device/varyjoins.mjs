@@ -221,7 +221,7 @@ export function pinVariants(ambiguous, done) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [cmd, gf, of, out, ...rest] = process.argv.slice(2);
-  const { loadDevice } = await import('../../core/fpga/device.js');
+  const { loadDevice } = await import('../../packages/silinx-fpga/src/fpga/device.js');
   const G = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(gf))));
   const obs = JSON.parse(fs.readFileSync(of, 'utf8'));
   const cache = new Map();

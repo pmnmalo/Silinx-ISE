@@ -3,16 +3,14 @@
 //   node server/open-flow-run.js build/open/flow.json
 // flow.json: { top, part, device, family, pkg, graph, bitDbDir, sources: [{ path, lang, file }], ucf,
 //   buildDir, outDir, steps, seed, effort, startupClk, simTop, simSources: [{ path, lang, file }] }.
-// The flow itself is core/open-flow-core.js (the browser edition runs the same, web/js/open-flow-worker.js);
+// The flow itself is packages/silinx-fpga/src/open-flow-core.js (the browser edition runs the same, web/js/open-flow-worker.js);
 // this file gives it the files on disk: the log on stdout ("=== SILINX STEP <step> ===", "=== SILINX
 // FAILED <step> (exit 1) ===", "=== SILINX DONE ===": the protocol of ISE's run.sh) and
 // build/open/report.json after every step (what the Design Summary shows).
 import fs from 'node:fs';
 import path from 'node:path';
-import { yosysWorkers } from '../core/synth-open-node.js';
-import { loadDeviceCache } from '../core/fpga/device-node.js';
-import { loadDb } from '../core/fpga/bitdb-node.js';
-import { runOpenFlow } from '../core/open-flow-core.js';
+import { yosysWorkers, loadDeviceCache, loadDb } from '../packages/silinx-fpga/src/node.js';
+import { runOpenFlow } from '../core/flow-ide.js';
 
 const spec = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const { outDir, buildDir } = spec;

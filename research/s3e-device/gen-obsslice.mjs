@@ -5,7 +5,7 @@
 // position in its tile (4 of each: one sink per tile), the flip-flops a chain into the output.
 //   node gen-obsslice.mjs outdir      (folder slices: top.v, top.ucf)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

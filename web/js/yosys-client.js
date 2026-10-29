@@ -1,4 +1,4 @@
-// The page's side of web/js/yosys-worker.js: run(args, files, onLine) for core/synth-open.js, with
+// The page's side of web/js/yosys-worker.js: run(args, files, onLine) for packages/silinx-fpga/src/synth-open.js, with
 // Yosys in Web Workers (kept: the WebAssembly module is fetched and compiled once in each). The runs the
 // open synthesis makes at once (its mappings from the same netlist) go in parallel, up to WORKERS at a
 // time, the others queued (#276): 2 when the device has the cores and the memory for them (each Yosys
@@ -7,7 +7,7 @@
 // its WebAssembly module, e.g. out of memory), the worker is replaced and the run made once more in
 // the new one, whose memory is fresh (#153); from then on one Yosys at a time.
 // The browser edition's flow worker (web/js/open-flow-worker.js) keeps a pool of its own (#279), its
-// workers started from core/synth-open.js yosysWorkerSource (it has no file to start them from in the
+// workers started from packages/silinx-fpga/src/synth-open.js yosysWorkerSource (it has no file to start them from in the
 // single-file edition).
 const nav = globalThis.navigator || {};
 export const WORKERS = (nav.hardwareConcurrency || 1) >= 4 && (nav.deviceMemory === undefined || nav.deviceMemory >= 8) ? 2 : 1;
@@ -78,13 +78,13 @@ export function yosysPool({ spawn = () => new Worker('/js/yosys-worker.js', { ty
 
   const run = (args, files, onLine = () => {}, onProgress) =>
     new Promise((resolve, reject) => { queue.push({ resolve, reject, onLine, onProgress, args, files }); next(); });
-  // (how many at a time, for core/synth-open.js)
+  // (how many at a time, for packages/silinx-fpga/src/synth-open.js)
   Object.defineProperty(run, 'parallel', { get: () => max });
   return run;
 }
 
 const page = yosysPool();
-/** run() for core/synth-open.js. onProgress(0…1) while the WebAssembly module is being fetched. */
+/** run() for packages/silinx-fpga/src/synth-open.js. onProgress(0…1) while the WebAssembly module is being fetched. */
 export function yosysBrowser(args, files, onLine = () => {}, onProgress) {
   return page(args, files, onLine, onProgress);
 }

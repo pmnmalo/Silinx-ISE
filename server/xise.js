@@ -6,7 +6,7 @@
 // Only the properties that differ from ISE defaults are written; ISE fills in the rest on open.
 // Top-level values use ISE's "Module|name" (Verilog) / "Architecture|entity|arch" (VHDL) syntax.
 
-import { FAMILY_INFO, deviceFamily, familyFromXise, familyOfPart, familyName } from '../core/family.js';
+import { FAMILY_INFO, deviceFamily, familyFromXise, familyOfPart, familyName } from '../packages/silinx-fpga/src/parts.js';
 import { convertIseSchematics, exportIseSch, iseTimestamp } from '../core/isesch.js';
 import { compile, langOfPath } from '../core/compile.js';
 import { modulesFromLibrary } from '../core/schdoc.js';

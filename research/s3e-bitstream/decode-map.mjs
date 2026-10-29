@@ -6,7 +6,7 @@
 //   PART=xc3s250ecp132-4 node decode-map.mjs dir      (writes dir/map.json, and dir/lut.json: packages/silinx-fpga/bitdb/<device>-lut.json)
 import fs from 'node:fs';
 import { readBit } from './bits.mjs';
-import { readBit as readBitFile } from '../../core/fpga/bitstream.js';
+import { readBit as readBitFile } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
 
 const dir = process.argv[2];
 const slices = JSON.parse(fs.readFileSync(`${dir}/slices.json`, 'utf8'));

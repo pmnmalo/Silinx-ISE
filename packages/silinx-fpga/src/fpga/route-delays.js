@@ -1,4 +1,4 @@
-// Silinx toolchain - the router's connection delays (#405: out of routeDesign in core/fpga/route.js): each timing
+// Silinx toolchain - the router's connection delays (#405: out of routeDesign in fpga/route.js): each timing
 // connection's delay on its routed path (its branch's loads counted), or estimated from the distance when not routed.
 import { distanceDelay, pathDelay } from './timing.js';
 

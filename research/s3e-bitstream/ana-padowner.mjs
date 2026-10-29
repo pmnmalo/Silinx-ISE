@@ -11,12 +11,12 @@
 //   PART=… node ana-padowner.mjs --pads out.json dir…   (each: *.xdl + *.bit)
 // --pads: { padFeatures: { PAD: { feature: [bits] } } }, the features changed, whole, for merge-db.mjs.
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { parseXdl } from '../../core/xdl.js';
-import { frameData, iobRegFeatures } from '../../core/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { frameData, iobRegFeatures } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb, PART } from './db.mjs';
-import { deviceSites } from '../../core/fpga/place.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 
 const args = process.argv.slice(2);
 const opt = k => { const i = args.indexOf(k); if (i < 0) return null; const v = args[i + 1]; args.splice(i, 2); return v; };

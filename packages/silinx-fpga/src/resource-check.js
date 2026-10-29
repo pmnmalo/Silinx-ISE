@@ -1,7 +1,7 @@
 // Silinx - a design's use of the device's resources against what the device has (#795, #796; part of #787):
-// the resources a design's cells or primitives use (core/resources.js: each UNISIM primitive's resource) and
+// the resources a design's cells or primitives use (resources.js: each UNISIM primitive's resource) and
 // the ones it needs more of than the part has, with the message that names them ("14 block RAMs needed, the
-// XC3S100E has 4"). Read by the Silinx toolchain's synthesis and MAP (core/open-flow-core.js) and by the
+// XC3S100E has 4"). Read by the Silinx toolchain's synthesis and MAP (open-flow-core.js) and by the
 // check of a change of the target device (#796).
 //
 // Isomorphic ES module (browser + Node), no DOM.
@@ -39,7 +39,7 @@ export function usedOfPrimitives(family, counts) {
 }
 
 /**
- * The resources a design uses more of than the part has: resources, core/resources.js resourcesOf(part, pkg)
+ * The resources a design uses more of than the part has: resources, resources.js resourcesOf(part, pkg)
  * (or the same entries with counts of the device's own, the MAP's sites); used, { resourceId: n }. A resource
  * of unknown count (null) is not checked. A resource sharing another's sites (Spartan-6's RAMB8BWER, half a
  * RAMB16BWER's) counts in the other's: two halves are one block RAM, and the check is the other's.
@@ -79,7 +79,7 @@ const RESOURCE_AS = {
 const resourceAs = (from, to, id) => (from === to ? id : (RESOURCE_AS[`${from}>${to}`] || { ffs: 'ffs', iob: 'iob' })[id] ?? null);
 
 /** The equivalent of a primitive on a family that lacks it (its name; null: none); undefined when the family has it
- *  or neither family described here (core/resources.js) counts it. */
+ *  or neither family described here (resources.js) counts it. */
 export function primitiveEquivalent(family, name) {
   const n = String(name || '').toUpperCase();
   if (!RESOURCE_FAMILIES.includes(family) || resourceOfPrimitive(family, n) || !RESOURCE_FAMILIES.some(f => resourceOfPrimitive(f, n))) return undefined;

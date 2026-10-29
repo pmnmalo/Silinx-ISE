@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { diffSynth, expectWarnings, stimulus, rng, isReset, activeLow, compareRuns, netlistClocks } from './diff-synth.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8');
@@ -78,7 +78,7 @@ test('a mismatch is reported with the design, the cycle, the inputs and the outp
 });
 
 test('a netlist with one wrong LUT is caught (the comparison sees the cells)', { timeout: 120000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   // Yosys, then the INIT of the first 2-input LUT that feeds an output inverted
   const run = async (args, files, onLine) => {
     const out = await yosysNode(args, files, onLine);
@@ -143,7 +143,7 @@ test('a case taking its default on an X state at power-up is not a mismatch (#20
 });
 
 test('a real difference is still reported with both power-up runs (#20)', { timeout: 120000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   // Yosys, then the cell that drives y's output buffer inverted (an INV made a BUF, a LUT's INIT)
   const run = async (args, files, onLine) => {
     const out = await yosysNode(args, files, onLine);
@@ -338,8 +338,8 @@ test('open synthesis: the stopwatch\'s to_decimal (to_unsigned of an integer in 
   const fs = await import('node:fs');
   const text = fs.readFileSync(new URL('../examples/stopwatch/src/to_decimal.vhd', import.meta.url), 'utf8');
   const { compile, elaborate } = await import('../core/compile.js');
-  const { synthesizeOpen } = await import('../core/synth-open.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   const { compareNetlist } = await import('./diff-synth.js');
   const design = elaborate(compile([{ path: 'to_decimal.vhd', lang: 'vhdl', text }]), 'to_decimal');
   const r = await synthesizeOpen(design, { family: 'spartan3e', run: yosysNode });

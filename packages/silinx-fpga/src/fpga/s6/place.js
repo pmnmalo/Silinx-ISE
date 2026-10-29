@@ -1,6 +1,6 @@
 // Silinx - the Spartan-6 placer (#729; the plan: research/s6/README.md, #1): the instances of a physical design
-// (core/fpga/s6/phys.js) on the sites of the device (core/fpga/s6/sites.js), legally, by simulated annealing in the
-// manner of the Spartan-3E placer (core/fpga/place.js, VPR) (browser + Node).
+// (fpga/s6/phys.js) on the sites of the device (fpga/s6/sites.js), legally, by simulated annealing in the
+// manner of the Spartan-3E placer (fpga/place.js, VPR) (browser + Node).
 //
 // The objects: every slice, every carry chain (its slices up a column of SLICEL / SLICEM, each the next stage of
 // the one below: COUT -> CIN in the routing graph), every IOB without a LOC, every block RAM and DSP48A1 (a cascade
@@ -28,7 +28,7 @@ export { PlaceError };
 export const sliceFits = (need, site) => need === 'X' || site === need || (need === 'L' && site === 'M');
 const needOf = inst => inst.type.slice(5);
 // the expected wirelength of a net of n pins against its bounding box (VPR's crossing count)
-export { crossing };   // (core/fpga/place.js's)
+export { crossing };   // (fpga/place.js's)
 /** The VCCO of an IOB: its I/O standard's (ISE's default LVCMOS25). */
 export const vccoOfIob = inst => vccoOfStandard(inst.cons?.iostandard || 'LVCMOS25');
 

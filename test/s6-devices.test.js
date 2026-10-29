@@ -1,4 +1,4 @@
-// The Spartan-6 devices of the Silinx toolchain (#722, core/fpga/s6/devices.js): the parts of the Nexys3 and the
+// The Spartan-6 devices of the Silinx toolchain (#722, packages/silinx-fpga/src/fpga/s6/devices.js): the parts of the Nexys3 and the
 // Atlys with UG380's configuration facts, and the developer flag SILINX_SPARTAN6_OPEN under which the open flow
 // takes them with the steps it has for them (the synthesis and its simulation model); without the flag the
 // Spartan-6 is refused as before. The flagged flow end to end: the gates example on the Nexys3.
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { S6_DEVICES, S6_OPEN_STEPS, spartan6Open, s6OpenStatus } from '../core/fpga/s6/devices.js';
+import { S6_DEVICES, S6_OPEN_STEPS, spartan6Open, s6OpenStatus } from '../packages/silinx-fpga/src/fpga/s6/devices.js';
 import { resolveBoard } from '../server/devices.js';
 import * as OF from '../server/open-flow.js';
 

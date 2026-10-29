@@ -1,7 +1,7 @@
 # Device descriptions shipped with Silinx
 
 `<part>.json.gz`: the routing graph of a device (its tiles, sites, wires and routing switches) in
-Silinx's own packed format (`core/fpga/device.js`, `packDevice`), used by the Silinx toolchain's
+Silinx's own packed format (`packages/silinx-fpga/src/fpga/device.js`, `packDevice`), used by the Silinx toolchain's
 placer, router and bitstream writer (`core/fpga/`).
 
 | File | Device | Board |

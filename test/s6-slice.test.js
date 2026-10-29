@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { primitiveDefs } from '../research/s6/prim-defs6.mjs';
 import { baseSettings, sliceVariants, sliceXdl, oneSlicePerTile, sliceDesign, harnessNets, designName, tileFilter } from '../research/s6/gen-slice6.mjs';
 import { columnOf, sliceBits, sliceSettings } from '../research/s6/ana-slice6.mjs';
-import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../core/fpga/s6/bitstream.js';
+import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
 const DEFS = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/prim-defs.json', import.meta.url), 'utf8'));
 

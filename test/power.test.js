@@ -1,4 +1,4 @@
-// The Silinx toolchain's estimated power (core/power.js, #123): the switching activity of a LUT against
+// The Silinx toolchain's estimated power (packages/silinx-fpga/src/power.js, #123): the switching activity of a LUT against
 // a simulation of its inputs; the clocks, rates and power of a routed design; the report as XPower's
 // text report (its summary read by server/ise.js parsePwr); and the estimate on the examples against
 // XPower 14.7's (test/fixtures/power/xpower-examples.json, scripts/measure-power.mjs), within
@@ -6,8 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { lutActivity, designClocks, designActivity, estimatePower, powerReport, COEFFICIENTS, DEVICES, DEFAULT_CLOCK_MHZ, ESTIMATE_ERROR_PERCENT, DYNAMIC_RANGE } from '../core/power.js';
-import { parseXdl } from '../core/xdl.js';
+import { lutActivity, designClocks, designActivity, estimatePower, powerReport, COEFFICIENTS, DEVICES, DEFAULT_CLOCK_MHZ, ESTIMATE_ERROR_PERCENT, DYNAMIC_RANGE } from '../packages/silinx-fpga/src/power.js';
+import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
 import { parsePwr } from '../server/ise.js';
 import { FIXTURE, fit, mergeRuns, silinxEstimate } from '../scripts/measure-power.mjs';
 import { EXAMPLE_ORDER } from '../core/examples.js';

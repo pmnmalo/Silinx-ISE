@@ -61,7 +61,7 @@ export function assetFetch(scope = globalThis, name = 'silinx-assets') {
   return true;
 }
 
-/** The code that installs assetFetch in a worker, for the front of a Yosys Blob worker's code (core/synth-open.js
+/** The code that installs assetFetch in a worker, for the front of a Yosys Blob worker's code (packages/silinx-fpga/src/synth-open.js
  *  yosysWorkerSource): run before its import of YoWASP's bundle. */
 export const assetFetchSource = (integrity = globalThis.SILINX_ASSET_INTEGRITY) =>
   `self.SILINX_ASSET_INTEGRITY = ${JSON.stringify(integrity || null)};\n(${assetFetch})(self, ${JSON.stringify(ASSET_CACHE)});\n`;

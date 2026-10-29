@@ -1,6 +1,6 @@
 // What the device report says about the slice grid: node devinfo.mjs dev.xdlrc
 import fs from 'node:fs';
-import { parseXdlrc } from '../../core/xdl.js';
+import { parseXdlrc } from '../../packages/silinx-fpga/src/xdl.js';
 const dev = parseXdlrc(fs.readFileSync(process.argv[2], 'utf8'));
 console.log(dev.part, dev.family, dev.rows, dev.cols);
 const types = {};

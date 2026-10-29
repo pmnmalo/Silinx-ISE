@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadGraph } from './xdlrc-graph.mjs';
 import { loadDb, PART } from './db.mjs';
-import { tileOf, featureBits, pipAbsent } from '../../core/fpga/bitgen.js';
+import { tileOf, featureBits, pipAbsent } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 
 // the tile types whose switches unify-io.mjs shares (one measurement serves the group)
 export const UNIFY = [

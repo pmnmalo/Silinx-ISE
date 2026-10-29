@@ -8,10 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { orderOpenSteps } from '../core/open-steps.js';
+import { orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { writeSdf, parseSdf, annotateSdf, CHECKS_FROM } from '../core/sdf.js';
-import { parseXdl } from '../core/xdl.js';
-import { analyzeTiming } from '../core/fpga/timing.js';
+import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { analyzeTiming } from '../packages/silinx-fpga/src/fpga/timing.js';
 import { device, flow, simulate, sdfPeriod, exampleTimesim } from './timesim-lib.mjs';
 import { EXAMPLES } from './examples-lib.mjs';
 

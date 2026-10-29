@@ -91,7 +91,7 @@ test('#1709 HDL boundary: the front end\'s modules exist, and are what the entry
   for (const f of FRONT_END) assert.ok(fs.existsSync(path.join(ROOT, f)), `${f}: gone, remove it from FRONT_END`);
   for (const f of ENTRIES) assert.ok(FRONT_END.has(f), f);
   // not the front end: the toolchain's synth-*.js, the drawings, the IDE's simulation model
-  for (const f of ['core/synth-open.js', 'core/synth-fsm.js', 'core/synth-front.js', 'core/schdoc.js', 'core/sim-model.js']) {
+  for (const f of ['packages/silinx-fpga/src/synth-open.js', 'packages/silinx-fpga/src/synth-fsm.js', 'core/synth-front.js', 'core/schdoc.js', 'core/sim-model.js']) {
     assert.ok(!FRONT_END.has(f), f);
   }
   assert.deepEqual([...FRONT_END].filter((f) => !reached().includes(f)), [], 'no longer reached: remove them from FRONT_END');

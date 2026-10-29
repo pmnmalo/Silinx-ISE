@@ -43,7 +43,7 @@ uiTest('Clocking Wizard on the Basys2: a DCM_SP module, the nearest frequencies,
   await openClockWizard(page);
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-name').value), 'clkgen');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-file').textContent), 'src/clkgen.vhd');
-  // the XC3S250E's DCMs (core/resources.js)
+  // the XC3S250E's DCMs (packages/silinx-fpga/src/resources.js)
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-count').textContent), 'DCMs on this device: 4');
   await next(page, 'Input Clock');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-fin').value), '50');

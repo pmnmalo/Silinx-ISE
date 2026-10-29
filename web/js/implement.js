@@ -89,7 +89,7 @@ export function stepTracker(steps) {
 // Catch board/device/UCF mismatches before spending minutes in ISE.
 // ---- UCF check (nets that do not exist, bus bits, duplicate pins, I/O standards, syntax…)
 export async function ucfDiagnostics(text, file) {
-  const { checkUcf } = await import('/core/ucf.js');
+  const { checkUcf } = await import('/packages/silinx-fpga/src/parts.js');
   const pj = S.project;
   let ports = [], lang = 'vhdl';
   if (pj.top && S.lib) {
@@ -149,7 +149,7 @@ async function checkConstraints(warnings = null) {
     return false;
   }
   if (!pj.constraints || !S.fileTree.includes(pj.constraints)) return true;
-  const { parseUcf, locsNotOnBoard } = await import('/core/ucf.js');
+  const { parseUcf, locsNotOnBoard } = await import('/packages/silinx-fpga/src/parts.js');
   let bad = [];
   try { bad = locsNotOnBoard(parseUcf(await api.readFile(pj.name, pj.constraints), { ports: topUcfPorts() }).assignments, board); } catch { return true; }
   if (!bad.length) return true;
@@ -164,7 +164,7 @@ async function checkConstraints(warnings = null) {
 export async function regenerateUcf(board = projectBoard()) {
   const pj = S.project;
   if (!board || !pj.top) return false;
-  const { boardAutoAssign, generateUcf } = await import('/core/ucf.js');
+  const { boardAutoAssign, generateUcf } = await import('/packages/silinx-fpga/src/parts.js');
   const design = elaborate(S.lib, pj.top);
   if (!design.top) return false;
   const ports = design.top.ports.map(ucfPort);
@@ -304,7 +304,7 @@ async function runImplInner(mod, steps, opts, pjName) {
 }
 
 // ---- optional ISE processes: simulation models, timing, power, pins
-// Synthesize - Yosys (open): the open synthesis in the browser, without Xilinx ISE (core/synth-open.js):
+// Synthesize - Yosys (open): the open synthesis in the browser, without Xilinx ISE (packages/silinx-fpga/src/synth-open.js):
 // Silinx's front end writes the design as one flat module, Yosys compiled to WebAssembly maps it
 // onto the cells of the device family in a Web Worker; the netlist goes to build/open/
 export const SYNTH_OPEN = 'Synthesize - Yosys (open)';
@@ -326,7 +326,7 @@ export async function synthOpen(mod) {
     const family = S.project.device?.family || 'spartan3e';
     const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, false));
     const design = elaborate(compile([...primitiveSources(srcs), ...srcs]), mod);
-    const { synthesizeOpen, synthEffort } = await import('/core/synth-open.js');
+    const [{ synthesizeOpen }, { synthEffort }] = await Promise.all([import('/core/synth-front.js'), import('/packages/silinx-fpga/src/index.js')]);
     const { yosysBrowser } = await import('./yosys-client.js');
     log(`Writing <${mod}> as one flat module for Yosys; Yosys (WebAssembly) maps it onto the ${family} cells.`);
     const t0 = performance.now();
@@ -379,7 +379,7 @@ export async function textPowerReport(mod) {
 export async function backAnnotatePins(mod) {
   if (!await runImpl(mod, [...FLOW_UP_TO.par, 'pin2ucf'])) return;
   await loadUcfText();
-  const { backAnnotateUcf } = await import('/core/ucf.js');
+  const { backAnnotateUcf } = await import('/packages/silinx-fpga/src/parts.js');
   let r;
   try { r = backAnnotateUcf(S.ucfText, await readBuildFile(`build/${S.project.top}_pins.ucf`), { ports: topUcfPorts(), tool: openMode() ? 'Silinx toolchain' : 'pin2ucf' }); } catch (e) { log(`WARNING: no pin file: ${e.message}`, 'warn'); return; }
   const { added: add, lines, text } = r;

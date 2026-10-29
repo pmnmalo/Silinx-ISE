@@ -7,9 +7,8 @@
 import { api } from './api.js';
 import { h, alertDlg, toast } from './ui.js';
 import { clockModule, planClock, fxChoices, dvChoices, DCM_PINS, PLL_OUTPUTS } from '/core/clocking.js';
-import { resourceCount } from '/core/resources.js';
+import { resourceCount, periodNs } from '/packages/silinx-fpga/src/parts.js';
 import { identError } from '/core/modgen.js';
-import { periodNs } from '/core/ucf.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
 import { cleanLoc } from './wizard-util.js';

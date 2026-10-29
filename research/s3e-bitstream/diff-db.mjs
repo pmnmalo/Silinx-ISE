@@ -9,7 +9,7 @@
 // kept as numbers: measured/kept-xc3s250e.json).
 import fs from 'node:fs';
 import path from 'node:path';
-import { makeDb, featureBits } from '../../core/fpga/bitgen.js';
+import { makeDb, featureBits } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); if (i < 0) return d; const v = args[i + 1]; args.splice(i, 2); return v; };

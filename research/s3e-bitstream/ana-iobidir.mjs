@@ -7,9 +7,9 @@
 //   PART=… node ana-iobidir.mjs [--pads out.json] dir…      (each dir: top.xdl + top.bit)
 // --pads: { padFeatures: { PAD: { 'IO:<standard>': [bits] } } } for merge-db.mjs.
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { parseXdl } from '../../core/xdl.js';
-import { frameData } from '../../core/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { frameData } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 
 const args = process.argv.slice(2);

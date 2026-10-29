@@ -1,7 +1,7 @@
 // Open synthesis of a Silinx project (or of plain HDL files) into Yosys's JSON netlist: Silinx's front
 // end (core/synth-verilog.js) writes the elaborated design as one flat Verilog module, Yosys maps it
 // onto Spartan-3E cells (synth_xilinx -family xc3se -ise -flatten) and writes it as JSON (the input of
-// core/fpga/netlist.js) and as Verilog (for simulation against the design).
+// packages/silinx-fpga/src/fpga/netlist.js) and as Verilog (for simulation against the design).
 //
 //   node synth.mjs <project folder | file.v/.vhd ...> <top> <out folder>
 import fs from 'node:fs';

@@ -6,7 +6,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { boardAutoAssign, generateUcf } from '../core/ucf.js';
+import { boardAutoAssign, generateUcf } from '../packages/silinx-fpga/src/parts.js';
 import { resolveBoard } from './devices.js';
 import { within } from './paths.js';
 import { topNameError } from './ident.js';

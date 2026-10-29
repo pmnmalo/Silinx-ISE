@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's site pins of every connection (#405: out of packWith in core/fpga/pack.js): the nets
+// Silinx toolchain - the packer's site pins of every connection (#405: out of packWith in fpga/pack.js): the nets
 // of the packed design, the constants, the carry and shift-register chains between slices.
 import { LUT_K, PackError } from './pack.js';
 

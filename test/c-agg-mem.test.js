@@ -217,8 +217,8 @@ test('#1668 #pragma HLS INTERFACE bram: Vitis HLS\'s BRAM port (an address in by
 
 test('#1668 a BRAM of structs and a stream of structs through the open synthesis (Yosys, Spartan-3E), from the VHDL and from the Verilog: no warning of Yosys', async () => {
   const { compile, elaborate } = await import('../core/compile.js');
-  const { synthesizeOpen } = await import('../core/synth-open.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   for (const [src, file, warnings] of [[BRAM, 'acc.cpp', BRAM_LOOPS], [STREAM, 'move.cpp', STREAM_LOOPS]]) {
     for (const lang of LANGS) {
       const g = cToHdl(src, { file, lang });

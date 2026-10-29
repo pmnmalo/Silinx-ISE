@@ -1,4 +1,4 @@
-// The packer (core/fpga/pack.js) on small Yosys netlists (test/fixtures/fpga/*.json): the slices
+// The packer (packages/silinx-fpga/src/fpga/pack.js) on small Yosys netlists (test/fixtures/fpga/*.json): the slices
 // and their XDL settings, the shapes the placer must keep, and - the main check - the packed
 // design simulated from its own XDL settings behaves like the netlist (test/fpga-sim.js).
 import { test } from 'node:test';
@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack, PackError, WIDE_MUX, connectionCriticality } from '../core/fpga/pack.js';
-import { criticalDelay } from '../core/synth-open.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack, PackError, WIDE_MUX, connectionCriticality } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { criticalDelay } from '../packages/silinx-fpga/src/synth-open.js';
 import { compareSims } from './fpga-sim.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');

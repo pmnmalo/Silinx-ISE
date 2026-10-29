@@ -1,4 +1,4 @@
-// Silinx - a worker thread of yosysWorkers (core/synth-open-node.js): Yosys from @yowasp/yosys, one run
+// Silinx - a worker thread of yosysWorkers (synth-open-node.js): Yosys from @yowasp/yosys, one run
 // at a time.
 //   in:  { id, args, files }        out: { id, line } … then { id, files } or { id, error, code, crash }
 import { parentPort } from 'node:worker_threads';

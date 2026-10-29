@@ -12,11 +12,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../../core/compile.js';
-import { boardAutoAssign, generateUcf } from '../../core/ucf.js';
+import { boardAutoAssign, generateUcf } from '../../packages/silinx-fpga/src/ucf.js';
 import { resolveBoard } from '../../server/devices.js';
 import { EXAMPLE_ORDER } from '../../core/examples.js';
-import { synthesizeOpen } from '../../core/synth-open.js';
-import { yosysNode } from '../../core/synth-open-node.js';
+import { synthesizeOpen } from '../../core/synth-front.js';
+import { yosysNode } from '../../packages/silinx-fpga/src/synth-open-node.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 /** The boards of night 1 and their parts as ISE names them. */

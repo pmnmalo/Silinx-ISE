@@ -398,7 +398,7 @@ export async function openEmulator(mod, { scale, model = null, engine = null, qu
     gens = model ? [] : timingGenerics(design.top?.params);   // a netlist has its constants built in
   } catch (e) { if (quiet) log(`ERROR: Board Emulator: cannot build the design: ${e.message}`, 'err'); else alertDlg('Board Emulator', `Cannot build the design: ${e.message}`, 'error'); return; }
   if (quiet ? diagsFor(lib, design).some(d => (d.severity || 'error') === 'error') : !await confirmElabErrors('Board Emulator', lib, design)) return;
-  const { parseUcf } = await import('/core/ucf.js');
+  const { parseUcf } = await import('/packages/silinx-fpga/src/parts.js');
   const assignments = S.ucfText ? parseUcf(S.ucfText, { ports: design.top.ports.map(ucfPort) }).assignments : {};
   if (!S.ucfText) log('WARNING: the project has no UCF: the ports are not connected to the board (use I/O Pin Planning).', 'warn');
   const files = await readDataFiles();

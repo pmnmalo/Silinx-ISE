@@ -1,4 +1,4 @@
-// Silinx toolchain - the routed design (#405: out of routeDesign in core/fpga/route.js): each net's PIPs, the
+// Silinx toolchain - the routed design (#405: out of routeDesign in fpga/route.js): each net's PIPs, the
 // LUTs' pins as swapped, ISE's own power nets with their names and the made-up sources declared as instances.
 import { applyLutSwaps } from './route.js';
 

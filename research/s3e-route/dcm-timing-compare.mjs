@@ -7,10 +7,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl } from '../../core/xdl.js';
-import { parseUcf } from '../../core/ucf.js';
-import { analyzeTiming, checkCross } from '../../core/fpga/timing.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { parseUcf } from '../../packages/silinx-fpga/src/ucf.js';
+import { analyzeTiming, checkCross } from '../../packages/silinx-fpga/src/fpga/timing.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 
 /** trce's verbose report: { cross: [{ from, launch, to, capture, required, delay, slack }] (the worst setup path of each
  *  pair of different clocks and edges), setup: [{ pad, clock, setup, hold }], toPad: [{ pad, clock, edge, delay }] }. */

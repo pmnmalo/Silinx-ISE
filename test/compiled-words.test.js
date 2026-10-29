@@ -10,7 +10,7 @@ import { diffCycles, designOf, rng } from './compiled-diff.js';
 import { compileDesign, compileNetlist, CompiledSim, netlistOf } from '../core/compiled-sim.js';
 import { wordLevel } from '../core/compiled-words.js';
 import { gateModel } from '../core/compiled-tables.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 const src = (name, text) => [{ path: name, lang: 'verilog', role: 'design', text }];
 const types = json => {
@@ -122,14 +122,14 @@ test('#650 a chain longer than a word: its pieces\' carries (a 40-bit counter pa
 
 // the examples' models, from the Silinx toolchain's flow on the Basys2-250
 async function models(name, steps) {
-  const { runOpenFlow } = await import('../core/open-flow-core.js');
+  const { runOpenFlow } = await import('../core/flow-ide.js');
   const ex = example(name), top = ex.project.top, written = {};
   const io = { log: () => {}, sources: () => ex.design, simSources: () => ex.sim, yosys: yosysNode, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {} };
   if (steps.includes('par')) {
     const fs = await import('node:fs'), zlib = await import('node:zlib');
-    const { loadDevice } = await import('../core/fpga/device.js');
-    const { shippedDevicePath } = await import('../core/fpga/device-node.js');
-    const { dbFileNames, dbFilesFrom, makeBitDb } = await import('../core/fpga/bitdb.js');
+    const { loadDevice } = await import('../packages/silinx-fpga/src/fpga/device.js');
+    const { shippedDevicePath } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+    const { dbFileNames, dbFilesFrom, makeBitDb } = await import('../packages/silinx-fpga/src/fpga/bitdb.js');
     const device = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(shippedDevicePath('xc3s250ecp132-4'))).toString('utf8')));
     const db = {};
     for (const [k, f] of Object.entries(dbFileNames('xc3s250e', 'cp132'))) {

@@ -9,8 +9,8 @@ import { firParams, FIR_CONSTANTS as C } from '../core/hls-fir.js';
 import { firHdl } from '../core/hls-fir-hdl.js';
 import { cosimBench, cosimulate } from '../core/c-cosim.js';
 import { simulate, compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { firReference, firSource } from './hls-fir-ref.js';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);

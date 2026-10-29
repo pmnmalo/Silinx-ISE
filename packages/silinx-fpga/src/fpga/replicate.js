@@ -2,7 +2,7 @@
 // path is copied, each copy driving the loads of one region of the chip, as XST and ISE's map do
 // (#4). Every copy has the flip-flop's D, clock, enable, set / reset and initial value, so the
 // circuit computes exactly what it did; its loads are nearer and each net lighter (the routing
-// delay of a net grows with its spread and its branches: core/fpga/timing.js). A LUT too (#522): a
+// delay of a net grows with its spread and its branches: fpga/timing.js). A LUT too (#522): a
 // reset or clock enable computed by logic that drives the SR / CE pins of many flip-flops, copied
 // with its inputs (its loads in its own slice stay on it).
 //
@@ -37,7 +37,7 @@ const tileXY = name => { const m = /X(\d+)Y(\d+)$/.exec(name || ''); return m ? 
 /**
  * The flip-flops to copy and the groups of their loads. nl: readYosysJson's netlist; packed:
  * pack(nl) (its cellSites); placement: place()'s result (sites[inst] = { tile, site }); sta: the
- * timing analysis of the routed design (core/fpga/timing.js analyzeTiming: conns { from: 'inst.pin',
+ * timing analysis of the routed design (fpga/timing.js analyzeTiming: conns { from: 'inst.pin',
  * crit }). Returns [{ cell, groups: [[{ cell, pin }]] }] (groups[0] stays on the flip-flop).
  */
 export function replicationPlan(nl, packed, placement, sta, opts = {}) {

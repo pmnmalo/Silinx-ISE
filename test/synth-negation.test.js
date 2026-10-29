@@ -6,9 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate, simulate } from '../core/compile.js';
-import { synthesizeOpen } from '../core/synth-open.js';
+import { synthesizeOpen } from '../core/synth-front.js';
 import { toVerilog } from '../core/synth-verilog.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { compareNetlist } from './diff-synth.js';
 
 const DUT = `module neg(input signed [4:0] s4, input signed [4:0] a, output [15:0] y4, output [15:0] y5, output [15:0] y6);

@@ -6,7 +6,7 @@
 //   node gen-obsmux.mjs outdir [muxes] [comparators=60]      (folder muxes: top.v, top.ucf; muxes: muxCount, 300 on the
 //                                                             XC3S250E)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

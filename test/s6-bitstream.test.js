@@ -1,4 +1,4 @@
-// core/fpga/s6/bitstream.js: Spartan-6 .bit files (#724), without ISE: the writer against what ISE's bitgen
+// packages/silinx-fpga/src/fpga/s6/bitstream.js: Spartan-6 .bit files (#724), without ISE: the writer against what ISE's bitgen
 // wrote (research/s6/measured/format.json: the SHA-256 of the empty designs' files, the CRCs of a design with
 // a block RAM), the CRC against bitgen's multi-frame writes, the frame layout, the reader on built bitstreams.
 import test from 'node:test';
@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { S6_DEVICES, FRAME_WORDS, REG6, bitFormat6, fdriLayout, frameOffset, emptyFdri, crc6Update, cor1Value, writeBit6, readBit6, readHeader6, packetLine6 }
-  from '../core/fpga/s6/bitstream.js';
+  from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { checkBit, recordBit } from '../research/s6/check-writer6.mjs';
 
 const { xc6slx16: LX16, xc6slx45: LX45 } = S6_DEVICES;

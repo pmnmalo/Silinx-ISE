@@ -94,7 +94,7 @@ export function relatedTests(files, changed) {
     for (const f of Object.keys(files)) if (!f.startsWith('test/') && !readers.has(f) && deps[f].some(d => readers.has(d))) { readers.add(f); grew = true; }
   }
   const ch = new Set([...changed, ...readers]);
-  // a module that only re-exports a changed one (core/'s old paths of the toolchain's package, #1677) counts as changed
+  // a module that only re-exports a changed one (the toolchain package's entries, #1677, #1678) counts as changed
   for (let grew = true; grew;) {
     grew = false;
     for (const f of Object.keys(files)) if (!ch.has(f) && reexportsOnly(files[f]) && deps[f].some(d => ch.has(d))) { ch.add(f); grew = true; }

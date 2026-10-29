@@ -36,7 +36,7 @@ export function parseXdlrc(text) {
   return out;
 }
 
-/** The same grid as parseXdlrc() from a device routing graph (core/fpga/device.js Device: the
+/** The same grid as parseXdlrc() from a device routing graph (fpga/device.js Device: the
  *  description of the Silinx toolchain), for the FPGA view of a design routed by Silinx. */
 export function deviceGrid(dev) {
   const tiles = [];
@@ -157,7 +157,7 @@ const cfgText = items => items.map(c => `${c.attr}:${String(c.name).replace(/([:
  * XDL text of a design (parseXdl's structure; insts and nets in their order): what xdl -xdl2ncd
  * reads, and parseXdl reads back unchanged. The one XDL writer of Silinx: for designs read from XDL
  * (the router, the bitstream tools) and for designs built by the packer and the placer
- * (core/fpga/place.js placedXdl). The configuration strings are written back as they were read
+ * (fpga/place.js placedXdl). The configuration strings are written back as they were read
  * (cfgRaw) when known; otherwise an instance's cfg items ({ attr, name, value }) have their blanks
  * and '\' (and ':' in names) escaped, and the design's own cfg is taken as raw XDL text (only its
  * quotes escaped: its fields keep their '\' escapes). design.ncdVersion: the version after the part

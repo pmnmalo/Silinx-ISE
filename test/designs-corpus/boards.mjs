@@ -84,7 +84,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const { Simulator } = await import('../../core/simulator.js');
   const { toVerilog } = await import('../../core/synth-verilog.js');
   const { flaggedSynth } = await import('./lib.mjs');
-  const { yosysNode } = await import('../../core/synth-open-node.js');
+  const { yosysNode } = await import('../../packages/silinx-fpga/src/synth-open-node.js');
   const args = process.argv.slice(2);
   const fi = args.indexOf('--filter');
   const filter = fi >= 0 ? args.splice(fi, 2)[1] : '';

@@ -1,14 +1,14 @@
 // #751: gen-pairdly.mjs's variants against ISE's bitgen: for every variant with ISE's .bit, the bits where Silinx's
-// writer (core/fpga/bitgen.js) differs, and ISE's value of the watched bits (the group's first pad's bits that #44 /
+// writer (packages/silinx-fpga/src/fpga/bitgen.js) differs, and ISE's value of the watched bits (the group's first pad's bits that #44 /
 // #97 gave to one pad), one line per variant:
 //   <design> <variant> <pad>=<kind><delay>… | <bit>=<ISE><Silinx>… | other differing bits
 //   node ana-pairdly.mjs dir [--json]      (dir: gen-pairdly.mjs's, with ISE's V###.bit next to each V###.xdl)
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseXdl } from '../../core/xdl.js';
-import { frameData } from '../../core/fpga/bitgen.js';
-import { readBit, getBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { loadDb } from '../../core/fpga/bitdb-node.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { frameData } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { readBit, getBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { loadDb } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
 
 // the bits of #751 (issue), per device
 export const WATCH = {

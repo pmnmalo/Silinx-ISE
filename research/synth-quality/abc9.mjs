@@ -2,7 +2,7 @@
 // This measures its LUT mapping against the open synthesis's, on the examples and the design corpus's
 // representative subset (scripts/yosys-update-report.mjs DESIGN_SUBSET), each mapping through the open back end
 // (pack, place and route as the app's flow, Silinx's static timing analysis of the routed design). Four mappings,
-// the same front end (core/synth-verilog.js) and the same steps up to the LUT mapping (core/synth-open.js
+// the same front end (core/synth-verilog.js) and the same steps up to the LUT mapping (packages/silinx-fpga/src/synth-open.js
 // synthCommands: tables, shift registers in SRL16E):
 //   now    what the open synthesis does (synthesizeOpen: LUT4s alone, the wider and the depth-oriented
 //          mappings tried, carry chains of gates, each kept by DEPTH_RULE)
@@ -22,7 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { synthCommands, yosysFiles, SRL_CELLS_FILE, YOSYS_FAMILY } from '../../core/synth-open.js';
+import { synthCommands, yosysFiles, SRL_CELLS_FILE, YOSYS_FAMILY } from '../../packages/silinx-fpga/src/synth-open.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
@@ -119,17 +119,18 @@ async function measure(argv) {
   const outFile = arg('--out', path.join(HERE, 'abc9-results.json'));
   const routedDir = arg('--routed', null);
   const { toVerilog } = await import('../../core/synth-verilog.js');
-  const { synthesizeOpen, cellCounts, utilization } = await import('../../core/synth-open.js');
-  const { yosysNode } = await import('../../core/synth-open-node.js');
+  const { synthesizeOpen } = await import('../../core/synth-front.js');
+  const { cellCounts, utilization } = await import('../../packages/silinx-fpga/src/synth-open.js');
+  const { yosysNode } = await import('../../packages/silinx-fpga/src/synth-open-node.js');
   const { compareNetlist } = await import('../../test/diff-synth.js');
-  const { readYosysJson } = await import('../../core/fpga/netlist.js');
-  const { pack } = await import('../../core/fpga/pack.js');
-  const { deviceSites } = await import('../../core/fpga/place.js');
-  const { placeRouteBest } = await import('../../core/fpga/place-route.js');
-  const { loadDeviceCache } = await import('../../core/fpga/device-node.js');
-  const { knownRouting } = await import('../../core/fpga/bitgen.js');
-  const { analyzeTiming, delayTable } = await import('../../core/fpga/timing.js');
-  const { writeXdl, parseXdl } = await import('../../core/xdl.js');
+  const { readYosysJson } = await import('../../packages/silinx-fpga/src/fpga/netlist.js');
+  const { pack } = await import('../../packages/silinx-fpga/src/fpga/pack.js');
+  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/place.js');
+  const { placeRouteBest } = await import('../../packages/silinx-fpga/src/fpga/place-route.js');
+  const { loadDeviceCache } = await import('../../packages/silinx-fpga/src/fpga/device-node.js');
+  const { knownRouting } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { analyzeTiming, delayTable } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
+  const { writeXdl, parseXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
   const { loadDb } = await import('../s3e-bitstream/db.mjs');
   const { designs, compile, elaborate, primitiveSources, lib } = await load(only || []);
   const devices = new Map();

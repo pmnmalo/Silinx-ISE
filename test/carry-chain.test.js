@@ -1,4 +1,4 @@
-// Carry chains of logic written as gates (core/carry-chain.js, #77): found in the coarse netlist and made
+// Carry chains of logic written as gates (packages/silinx-fpga/src/carry-chain.js, #77): found in the coarse netlist and made
 // $alu cells, which synth_xilinx maps onto the carry chain (MUXCY / XORCY). Ripple adders written as
 // gates (Verilog, an AND-inverter graph as the EPFL benchmarks, a VHDL schematic of full adders), a
 // comparator; each synthesized and its netlist simulated against the design (test/diff-synth.js); a chain
@@ -6,9 +6,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen as synthesizeOpenAll, criticalDelay } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { gateAssignments, rewriteCarryChains, GATE_MIN, MIN_CHAIN, ADDER_MIN } from '../core/carry-chain.js';
+import { synthesizeOpen as synthesizeOpenAll } from '../core/synth-front.js';
+import { criticalDelay } from '../packages/silinx-fpga/src/synth-open.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { gateAssignments, rewriteCarryChains, GATE_MIN, MIN_CHAIN, ADDER_MIN } from '../packages/silinx-fpga/src/carry-chain.js';
 import { compareNetlist } from './diff-synth.js';
 // Normal's own synthesis (its mappings on these small designs), not a small design's as at High (SMALL_RULE, #652: its
 // own test in open-flow-core.test.js)
@@ -178,7 +179,7 @@ endmodule`;
 });
 
 test('#377 rewriteCarryChains: each chain\'s sums; adders: a comparator\'s chain left out, an adder\'s kept', { timeout: 300000 }, async () => {
-  const { splitCommands, yosysFiles, SRL_CELLS_FILE, asText } = await import('../core/synth-open.js');
+  const { splitCommands, yosysFiles, SRL_CELLS_FILE, asText } = await import('../packages/silinx-fpga/src/synth-open.js');
   const { toVerilog } = await import('../core/synth-verilog.js');
   const coarse = async (text, top) => {
     const { text: v } = toVerilog(elaborate(compile([{ path: 'd.v', lang: 'verilog', text }]), top));
@@ -229,7 +230,7 @@ function multiplyDriven(mod) {
 }
 
 test('#746 rewriteCarryChains: a chain whose first bit is another chain\'s sum starts at its next bit, the sum its carry in; every bit driven once', { timeout: 300000 }, async () => {
-  const { splitCommands, yosysFiles, SRL_CELLS_FILE, asText } = await import('../core/synth-open.js');
+  const { splitCommands, yosysFiles, SRL_CELLS_FILE, asText } = await import('../packages/silinx-fpga/src/synth-open.js');
   const { toVerilog } = await import('../core/synth-verilog.js');
   const { text: v } = toVerilog(elaborate(compile([{ path: 'd.v', lang: 'verilog', text: sumIntoAdder }]), 'two'));
   const [first] = splitCommands('two', 'spartan3e');

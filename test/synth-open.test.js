@@ -1,13 +1,14 @@
-// Open synthesis (core/synth-open.js): Silinx's front end + Yosys compiled to WebAssembly (YoWASP),
+// Open synthesis (packages/silinx-fpga/src/synth-open.js): Silinx's front end + Yosys compiled to WebAssembly (YoWASP),
 // here in Node (in the browser the same module runs in a Web Worker: test/ui/synth-open.test.js).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { synthesizeOpen as synthesizeOpenAll, synthEffort, yosysScript, yosysFiles, synthCommands, remapCommands, abc9RemapCommands, muxfRemapCommands, muxTrees, MUXF_MAP, MUXF_MAP_FILE, LUT6_MAP, LUT6_MAP_FILE, MUX_COUNT_FILE, criticalDelay, keepDepth, keepSecond, keepChains, sliceCount, cellCounts, utilization, lineStream, YOSYS_FAMILY, QUIET, DEPTH_ABC, DEPTH_ABC2, DEPTH_ABC3, DEPTH_ABC2_LUT4, MFS, DEPTH_ABC_FILE, PREMAP_FILE, DEPTH_RULE, LUT_LIB, LUT_LIB_FILE, abcInline, logicLevels, deepDesign, DEEP_RULE, DEPTH_SOPB, SOPB_RULE, pathEnds, criticalEnables, foldRemapCommands, speedRemapCommands, FOLD_CE_MAP, FOLD_CE_MAP_FILE, FOLD_CE_FILE, SPEED_ABC, SPEED_RULE, TOP_ONLY, memorySteps, logicMemories, MEMORIES_FILE, LUTRAM_COST, asText } from '../core/synth-open.js';
+import { synthesizeOpen as synthesizeOpenAll } from '../core/synth-front.js';
+import { synthEffort, yosysScript, yosysFiles, synthCommands, remapCommands, abc9RemapCommands, muxfRemapCommands, muxTrees, MUXF_MAP, MUXF_MAP_FILE, LUT6_MAP, LUT6_MAP_FILE, MUX_COUNT_FILE, criticalDelay, keepDepth, keepSecond, keepChains, sliceCount, cellCounts, utilization, lineStream, YOSYS_FAMILY, QUIET, DEPTH_ABC, DEPTH_ABC2, DEPTH_ABC3, DEPTH_ABC2_LUT4, MFS, DEPTH_ABC_FILE, PREMAP_FILE, DEPTH_RULE, LUT_LIB, LUT_LIB_FILE, abcInline, logicLevels, deepDesign, DEEP_RULE, DEPTH_SOPB, SOPB_RULE, pathEnds, criticalEnables, foldRemapCommands, speedRemapCommands, FOLD_CE_MAP, FOLD_CE_MAP_FILE, FOLD_CE_FILE, SPEED_ABC, SPEED_RULE, TOP_ONLY, memorySteps, logicMemories, MEMORIES_FILE, LUTRAM_COST, asText } from '../packages/silinx-fpga/src/synth-open.js';
 import { compareNetlist } from './diff-synth.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
 import { netlistSim } from './fpga-sim.js';
 import { toVerilog } from '../core/synth-verilog.js';
 // Normal's own synthesis (its mappings on these small designs), not a small design's as at High (SMALL_RULE, #652: its
@@ -553,7 +554,7 @@ test('logic depth: the mapping balanced once more is kept when better than the d
   assert.ok(!keepSecond([20, 10, 10.5], [100, 110, 100]), 'slower than the first');
 });
 
-// #377: the slices too, when known (sliceCount: core/fpga/pack.js's count): a netlist with 5 % fewer slices is
+// #377: the slices too, when known (sliceCount: packages/silinx-fpga/src/fpga/pack.js's count): a netlist with 5 % fewer slices is
 // smaller even with more LUTs; fewer LUTs, more slices is not; a faster one is not larger in slices either
 // Regression (#742): the netlist with the carry chains against the one without them, both ways. The EPFL adder in the
 // corpus's I/O wrapper: its chains' netlist 17.81 ns estimated, 171 LUTs, 194 slices; without them the SOP-balanced

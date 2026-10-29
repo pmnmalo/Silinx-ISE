@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { intTiles, probePips, probeXdl, probePins } from '../research/s6/gen-pipprobe6.mjs';
 import { intRegion, regionBits, pipBits } from '../research/s6/ana-pipprobe6.mjs';
-import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../core/fpga/s6/bitstream.js';
+import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
 const { device, sites } = s6Device('xc6slx16csg324-3');
@@ -142,7 +142,7 @@ test('gen-pipdrop6 / ana-pipdrop6: the other tiles\' PIPs dropped (all or a quar
 test('residual6: a design\'s bits predicted from every database (slices, INT-like PIPs, the other tiles\' PIPs)', async () => {
   const { predictDesign, typesAt } = await import('../research/s6/residual6.mjs');
   const { loadDb } = await import('../research/s6/check-slice6.mjs');
-  const { parseXdl } = await import('../core/xdl.js');
+  const { parseXdl } = await import('../packages/silinx-fpga/src/xdl.js');
   const read = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${n}.json`, import.meta.url), 'utf8'));
   const db = { part: 'xc6slx16csg324-3', slices: loadDb('xc6slx16'), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips }, other: read('s6-pips-other') };
   const design = parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";

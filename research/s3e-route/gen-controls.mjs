@@ -6,8 +6,8 @@
 //                         "BY0 =- BX2"): is the orientation of the text significant? (compare the bitstreams)
 //   node research/s3e-route/gen-controls.mjs ise.xdl outdir/name
 import fs from 'node:fs';
-import { parseXdl, writeXdl } from '../../core/xdl.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { parseXdl, writeXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 
 const [src, out] = process.argv.slice(2);
 const text = fs.readFileSync(src, 'utf8');

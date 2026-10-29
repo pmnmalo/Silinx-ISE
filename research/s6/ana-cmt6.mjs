@@ -7,8 +7,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl } from '../../core/xdl.js';
-import { readBit6, emptyFdri, bitFormat6 } from '../../core/fpga/s6/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit6, emptyFdri, bitFormat6 } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { bitsOf } from './ana-iob6.mjs';
 import { variantBits } from './ana-dcm6.mjs';
 import { loadDb } from './check-slice6.mjs';

@@ -1,4 +1,4 @@
-// Silinx toolchain - the placer's global clock buffers (#405: out of place in core/fpga/place.js): each on a
+// Silinx toolchain - the placer's global clock buffers (#405: out of place in fpga/place.js): each on a
 // buffer its driver (a DCM's output, a clock pad) reaches through dedicated paths of known bits, whose lines reach
 // its clock's loads; the two buffers of a pair only with their input lines shared as they must be (#846).
 import { BUFG_ORDER, PlaceError } from './place.js';

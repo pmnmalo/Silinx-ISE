@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { PIP_BIDI } from '../../core/fpga/device.js';
+import { PIP_BIDI } from '../../packages/silinx-fpga/src/fpga/device.js';
 import { tileXY } from './observe.mjs';
 import { packMeasured } from './build.mjs';
 import { renamePads } from './pins.mjs';
@@ -210,7 +210,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const opt = k => { const i = args.indexOf(k); return i < 0 ? null : args.splice(i, 2)[1]; };
   const devFile = opt('--dev'), ft = opt('--ft'), probeFile = opt('--probe'), tests = opt('--tests'), clock = opt('--clock');
   const [out, obsFile] = args;
-  const { loadDevice } = await import('../../core/fpga/device.js');
+  const { loadDevice } = await import('../../packages/silinx-fpga/src/fpga/device.js');
   const dev = loadDevice(readJson(devFile || path.join(HERE, '../../packages/silinx-fpga/devices', `${PART}.json.gz`)));
   const DB = path.join(HERE, '../../packages/silinx-fpga/bitdb');
   const joins = [

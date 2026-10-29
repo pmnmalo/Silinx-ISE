@@ -11,11 +11,11 @@
 //   node ana-paddly.mjs dir… > measured/fix-28-pad-delays.json      (dirs of one device)
 import fs from 'node:fs';
 import path from 'node:path';
-import { readBit, getBit } from '../../core/fpga/bitstream.js';
-import { tileOf, tileBase } from '../../core/fpga/bitgen.js';
-import { loadDb } from '../../core/fpga/bitdb-node.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { readBit, getBit } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { loadDb } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 
 const dirs = process.argv.slice(2);
 const part = JSON.parse(fs.readFileSync(path.join(dirs[0], 'key.json'), 'utf8')).part;

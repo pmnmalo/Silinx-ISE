@@ -3,11 +3,11 @@
 // the pad features of the design that hold each bit somewhere in the database.
 //   PART=xc3s500efg320-4 node ana-padalone.mjs dir…      (dir: a design folder with top.xdl, top.bit)
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { frameData } from '../../core/fpga/bitgen.js';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { loadDb } from '../../core/fpga/bitdb-node.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { frameData } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { loadDb } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 import { PART } from './db.mjs';
 
 const db = loadDb(PART, { graph: loadDeviceCache(PART) });

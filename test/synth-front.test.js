@@ -1,14 +1,14 @@
 // core/synth-front.js (#1674, the toolchain's separation, #1651): the HDL front end's part of the open synthesis, an
-// elaborated design as the flat Verilog and its hints, which core/synth-open.js synthesizeVerilog synthesizes; and
+// elaborated design as the flat Verilog and its hints, which packages/silinx-fpga/src/synth-open.js synthesizeVerilog synthesizes; and
 // synthesizeVerilog on a flat Verilog given by hand, the toolchain's own input.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
 import { toVerilog } from '../core/synth-verilog.js';
-import { gateAssignments, GATE_MIN } from '../core/carry-chain.js';
+import { gateAssignments, GATE_MIN } from '../packages/silinx-fpga/src/carry-chain.js';
 import { synthesisInput, synthesizeOpen } from '../core/synth-front.js';
-import * as synthOpen from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import * as synthOpen from '../packages/silinx-fpga/src/synth-open.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { example } from './examples-lib.mjs';
 
 const designOf = (name) => {
@@ -32,9 +32,10 @@ test('#1674 synthesisInput: the flat Verilog, its top and warnings as toVerilog 
   assert.ok(synthesisInput(designOf('blinky')).gates < GATE_MIN);
 });
 
-test('#1674 core/synth-open.js keeps exporting synthesizeOpen (and synthesisInput) from core/synth-front.js', () => {
-  assert.equal(synthOpen.synthesizeOpen, synthesizeOpen);
-  assert.equal(synthOpen.synthesisInput, synthesisInput);
+test('#1674 #1678 the IDE\'s synthesis (synthesizeOpen, synthesisInput) in core/synth-front.js, not in the package', () => {
+  assert.equal(typeof synthesizeOpen, 'function');
+  assert.equal(typeof synthesisInput, 'function');
+  assert.ok(!('synthesizeOpen' in synthOpen) && !('synthesisInput' in synthOpen));
   assert.equal(typeof synthOpen.synthesizeVerilog, 'function');
 });
 

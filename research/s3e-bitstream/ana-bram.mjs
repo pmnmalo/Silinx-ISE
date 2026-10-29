@@ -4,7 +4,7 @@
 // db] for memory bit i, relative to its block RAM's origin], inverted } when every block RAM has the
 // same layout relative to its origin (reported otherwise).
 import fs from 'node:fs';
-import { readBit, diffFrames, getBit } from '../../core/fpga/bitstream.js';
+import { readBit, diffFrames, getBit } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
 import { PART, splitPart, readDbFiles } from './db.mjs';
 
 const dir = process.argv[2];

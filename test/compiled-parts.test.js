@@ -20,7 +20,7 @@ import { mountActivity } from '../core/compiled-activity.js';
 import { mountWatch } from '../core/compiled-watch.js';
 import { mountSteps } from '../core/compiled-steps.js';
 import { mountGenerate } from '../core/compiled-generate.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 const FIX = path.join(ROOT, 'test/fixtures/compiled-sim');
 const netlist = async (file, top) => (await sim.netlistOf(designOf([{ path: file, lang: 'verilog', role: 'design', text: fs.readFileSync(path.join(FIX, file), 'utf8') }], top), { run: yosysNode })).json;

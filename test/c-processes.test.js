@@ -124,8 +124,8 @@ test('#1707 DATAFLOW: what is not supported, said; a region of other statements 
 
 test('#1707 DATAFLOW\'s module through the open synthesis (Yosys, Spartan-3E), from the VHDL and from the Verilog: no warning', async () => {
   const { compile, elaborate } = await import('../core/compile.js');
-  const { synthesizeOpen } = await import('../core/synth-open.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   for (const lang of ['vhdl', 'verilog']) {
     const g = cToHdl(SRC, { file: 'top.cpp', lang });
     const design = elaborate(compile([{ path: `top.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text: g.hdl }]), 'top');

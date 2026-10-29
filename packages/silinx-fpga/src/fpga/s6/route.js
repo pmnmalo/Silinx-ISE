@@ -1,7 +1,7 @@
-// Silinx - the Spartan-6 router (#730; the plan: research/s6/README.md, #1): a placed design (core/fpga/s6/xdl.js
+// Silinx - the Spartan-6 router (#730; the plan: research/s6/README.md, #1): a placed design (fpga/s6/xdl.js
 // placedXdlS6) routed on the device's routing graph (packages/silinx-fpga/devices/xc6slx*.json.gz) (browser + Node).
 //
-// PathFinder (McMurchie and Ebeling, 1995), negotiated congestion, as the Spartan-3E router (core/fpga/route.js):
+// PathFinder (McMurchie and Ebeling, 1995), negotiated congestion, as the Spartan-3E router (fpga/route.js):
 // every net a tree over the routing nodes, each sink found by an A* search from the whole tree built so far; nodes
 // shared by several nets cost more after each pass (present congestion, growing) and keep a history, until no node
 // is shared. A node costs 1 plus a tenth of its span in tiles (a quad costs more than a single but goes further),
@@ -23,7 +23,7 @@
 //   const r = routeS6(design, device, { maxPasses, allowPip, log })
 //     r = { trees: [Map node -> edge (-1 a source)] by net, nets (netEndpointsS6's), failed: [net names], warnings,
 //           stats: { passes, seconds, overused, pips } }
-//   routedXdlS6(design, device, r) -> the routed design for writeXdl (core/xdl.js)
+//   routedXdlS6(design, device, r) -> the routed design for writeXdl (xdl.js)
 import { PIP_ROUTETHRU } from '../device.js';
 import { routingResources, netEndpointsS6, powerSources, routeThruSite, FREE_ROUTETHRU } from './route-nets.js';
 import { mountRoutedS6 } from './route-output.js';

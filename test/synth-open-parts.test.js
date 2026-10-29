@@ -1,16 +1,17 @@
-// The parts of the open synthesis (#405: out of core/synth-open.js): running Yosys (synth-open-yosys.js: a failed run's
+// The parts of the open synthesis (#405: out of packages/silinx-fpga/src/synth-open.js): running Yosys (synth-open-yosys.js: a failed run's
 // message, its output as lines, the worker's source), the critical path of a netlist (synth-open-path.js) and the
 // depth-oriented mappings of synthesizeOpen (synth-open-depth.js). synth-open.js still exports what moved. A small
 // design synthesized: the depth mappings tried (the depth-oriented one, the wide, ABC9 and speed remaps), none kept,
 // their estimates the usual netlist's; its levels, critical path and estimate.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as so from '../core/synth-open.js';
-import { yosysError, lineStream, yosysWorkerSource, asText } from '../core/synth-open-yosys.js';
-import { pathEnds, logicLevels, criticalDelay, deepDesign, DEEP_RULE } from '../core/synth-open-path.js';
-import { mountDepth } from '../core/synth-open-depth.js';
+import * as so from '../packages/silinx-fpga/src/synth-open.js';
+import { yosysError, lineStream, yosysWorkerSource, asText } from '../packages/silinx-fpga/src/synth-open-yosys.js';
+import { pathEnds, logicLevels, criticalDelay, deepDesign, DEEP_RULE } from '../packages/silinx-fpga/src/synth-open-path.js';
+import { mountDepth } from '../packages/silinx-fpga/src/synth-open-depth.js';
+import { synthesizeOpen } from '../core/synth-front.js';
 import { compile, elaborate } from '../core/compile.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 test('#405 open synthesis parts: synth-open.js exports what moved', () => {
   assert.deepEqual([so.yosysError, so.lineStream, so.yosysWorkerSource, so.asText], [yosysError, lineStream, yosysWorkerSource, asText]);
@@ -40,7 +41,7 @@ test('#405 open synthesis parts: a comparator synthesized, the depth mappings tr
   assign m = (a & b) ^ {a[7:0], b[15:8]};
 endmodule
 `;
-  const r = await so.synthesizeOpen(elaborate(compile([{ path: 'cmp.v', lang: 'verilog', text: V }]), 'cmp'), { run: yosysNode });
+  const r = await synthesizeOpen(elaborate(compile([{ path: 'cmp.v', lang: 'verilog', text: V }]), 'cmp'), { run: yosysNode });
   assert.deepEqual(r.warnings, []);
   assert.deepEqual([r.util.luts, r.util.carry, r.util.ios], [32, 8, 49]);
   // every depth mapping tried at High, none faster: the usual netlist kept

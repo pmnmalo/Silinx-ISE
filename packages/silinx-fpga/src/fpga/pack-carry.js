@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's carry chains (#405: out of packWith in core/fpga/pack.js): the MUXCY / XORCY stages
+// Silinx toolchain - the packer's carry chains (#405: out of packWith in fpga/pack.js): the MUXCY / XORCY stages
 // in chains, each a column of slices, its first stage's carry in and DI, the sums and the carry out (carryOut).
 import { LUT_K } from './pack.js';
 

@@ -1,5 +1,5 @@
 // Silinx - device measurements: the measured description in Silinx's packed format
-// (core/fpga/device.js), from Silinx's own measurements only (research/s3e-device/README.md).
+// (packages/silinx-fpga/src/fpga/device.js), from Silinx's own measurements only (research/s3e-device/README.md).
 //
 // The measurements are given as:
 //   { part, family, rows?, cols?,
@@ -11,7 +11,7 @@
 // the shipped graphs and loads with loadDevice(). Rows and columns: the device's grid when the measurements
 // carry it (rows, cols, each tile's r, c: the device report's, as its tile names; the placer's distances and its halves
 // of the chip are on it, #3), else tile Y counted from the top, tile X (tiles of one X / Y then share a place).
-import { DeviceBuilder, PIP_BIDI } from '../../core/fpga/device.js';
+import { DeviceBuilder, PIP_BIDI } from '../../packages/silinx-fpga/src/fpga/device.js';
 import { tileXY } from './observe.mjs';
 
 const splitKey = k => { const i = k.indexOf('/'); return [k.slice(0, i), k.slice(i + 1)]; };

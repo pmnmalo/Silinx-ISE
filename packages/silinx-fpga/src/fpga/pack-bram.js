@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's block RAMs (#405: out of packWith in core/fpga/pack.js): RAMB16_S<w> and
+// Silinx toolchain - the packer's block RAMs (#405: out of packWith in fpga/pack.js): RAMB16_S<w> and
 // RAMB16_S<wa>_S<wb>, their ports' pins and settings as ISE's map writes them.
 import { paramBits } from './netlist.js';
 import { BRAM_TYPE, BRAM_WIDTH } from './pack.js';

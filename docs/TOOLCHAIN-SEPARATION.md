@@ -8,7 +8,7 @@ has moved yet.
 
 ## 1. What the toolchain is
 
-The flow is `runOpenFlow(spec, io)` in `core/open-flow-core.js`. It already runs the same way in Node
+The flow is `runOpenFlow(spec, io)` in `packages/silinx-fpga/src/open-flow-core.js`. It already runs the same way in Node
 (`server/open-flow-run.js`, a process of its own, files on disk) and in the browser
 (`web/js/open-flow-worker.js`, a Web Worker, files in memory): everything outside the flow comes through
 `io` (the sources, the UCF, the device, the bit database, Yosys, the files written). That interface is where the
@@ -18,21 +18,21 @@ separation starts.
 
 | Part | Files | Lines | KB | Tests that cover it |
 |---|---|---|---|---|
-| Netlist (Yosys JSON in) `core/fpga/netlist.js` | 1 | 128 | 6 | `test/fpga-netlist.test.js`, `test/ucf.test.js` |
-| Pack `core/fpga/pack.js`, `pack-*.js` | 14 | 2024 | 118 | `test/fpga-pack.test.js`, `test/pack-parts.test.js`, `test/iob-*.test.js` |
-| Place `core/fpga/place.js`, `place-*.js`, `replicate.js` | 10 | 1690 | 105 | `test/fpga-place.test.js`, `test/place-parts.test.js`, `test/fpga-replicate.test.js`, `test/fpga-hard.test.js` |
-| Route `core/fpga/route.js`, `route-*.js` | 5 | 1069 | 59 | `test/fpga-route.test.js`, `test/route-parts.test.js`, `test/fpga-place-route.test.js` |
-| Timing (trce-like) `core/fpga/timing.js`, `timing-*.js` | 3 | 1226 | 72 | `test/fpga-timing.test.js`, `test/timing-parts.test.js` |
-| Bitstream and bit database `core/fpga/bitgen.js`, `bitstream.js`, `bitdb.js`, `bitdb-node.js`, `lut.js` | 5 | 1030 | 59 | `test/fpga-bitgen.test.js`, `test/fpga-bitstream.test.js`, `test/fpga-lut.test.js`, `test/s3e-devices.test.js` |
-| Device description `core/fpga/device.js`, `device-node.js` | 2 | 545 | 28 | `test/fpga-device.test.js`, `test/s3e-device.test.js`, `test/open-toolchain.test.js` |
-| Spartan-6 (in development, #1) `core/fpga/s6/` | 15 | 2475 | 140 | `test/s6-*.test.js` |
-| Synthesis (Yosys WASM, FSM, carry chains, LUT resynthesis) `core/synth-open*.js`, `core/carry-chain.js`, `core/synth-fsm.js`, `core/lut-resynth.js` | 9 | 2610 | 164 | `test/synth-open*.test.js`, `test/synth-fsm.test.js`, `test/synth-abc9.test.js`, `test/carry-*.test.js`, `test/lut-resynth.test.js`, `test/yosys-*.test.js` |
-| The flow and its reports `core/open-flow-core.js`, `open-flow-models.js`, `open-flow-reports.js`, `open-steps.js` | 4 | 633 | 45 | `test/open-flow*.test.js`, `test/open-steps.test.js` |
-| Formats `core/xdl.js`, `core/ucf.js` | 2 | 1029 | 55 | `test/xdl.test.js`, `test/ucf.test.js` |
-| Parts and resources `core/resources.js`, `resource-check.js`, `family.js`, `power.js` | 4 | 764 | 46 | `test/resources.test.js`, `test/resource-check.test.js`, `test/power.test.js` |
+| Netlist (Yosys JSON in) `packages/silinx-fpga/src/fpga/netlist.js` | 1 | 128 | 6 | `test/fpga-netlist.test.js`, `test/ucf.test.js` |
+| Pack `packages/silinx-fpga/src/fpga/pack.js`, `pack-*.js` | 14 | 2024 | 118 | `test/fpga-pack.test.js`, `test/pack-parts.test.js`, `test/iob-*.test.js` |
+| Place `packages/silinx-fpga/src/fpga/place.js`, `place-*.js`, `replicate.js` | 10 | 1690 | 105 | `test/fpga-place.test.js`, `test/place-parts.test.js`, `test/fpga-replicate.test.js`, `test/fpga-hard.test.js` |
+| Route `packages/silinx-fpga/src/fpga/route.js`, `route-*.js` | 5 | 1069 | 59 | `test/fpga-route.test.js`, `test/route-parts.test.js`, `test/fpga-place-route.test.js` |
+| Timing (trce-like) `packages/silinx-fpga/src/fpga/timing.js`, `timing-*.js` | 3 | 1226 | 72 | `test/fpga-timing.test.js`, `test/timing-parts.test.js` |
+| Bitstream and bit database `packages/silinx-fpga/src/fpga/bitgen.js`, `bitstream.js`, `bitdb.js`, `bitdb-node.js`, `lut.js` | 5 | 1030 | 59 | `test/fpga-bitgen.test.js`, `test/fpga-bitstream.test.js`, `test/fpga-lut.test.js`, `test/s3e-devices.test.js` |
+| Device description `packages/silinx-fpga/src/fpga/device.js`, `device-node.js` | 2 | 545 | 28 | `test/fpga-device.test.js`, `test/s3e-device.test.js`, `test/open-toolchain.test.js` |
+| Spartan-6 (in development, #1) `packages/silinx-fpga/src/fpga/s6/` | 15 | 2475 | 140 | `test/s6-*.test.js` |
+| Synthesis (Yosys WASM, FSM, carry chains, LUT resynthesis) `core/synth-open*.js`, `packages/silinx-fpga/src/carry-chain.js`, `packages/silinx-fpga/src/synth-fsm.js`, `packages/silinx-fpga/src/lut-resynth.js` | 9 | 2610 | 164 | `test/synth-open*.test.js`, `test/synth-fsm.test.js`, `test/synth-abc9.test.js`, `test/carry-*.test.js`, `test/lut-resynth.test.js`, `test/yosys-*.test.js` |
+| The flow and its reports `packages/silinx-fpga/src/open-flow-core.js`, `open-flow-models.js`, `open-flow-reports.js`, `open-steps.js` | 4 | 633 | 45 | `test/open-flow*.test.js`, `test/open-steps.test.js` |
+| Formats `packages/silinx-fpga/src/xdl.js`, `packages/silinx-fpga/src/ucf.js` | 2 | 1029 | 55 | `test/xdl.test.js`, `test/ucf.test.js` |
+| Parts and resources `packages/silinx-fpga/src/resources.js`, `resource-check.js`, `family.js`, `power.js` | 4 | 764 | 46 | `test/resources.test.js`, `test/resource-check.test.js`, `test/power.test.js` |
 
 About 75 files and 15 700 lines, 64 unit test files. The routing graphs are checked against ISE by DRC; the DRC
-is ISE's (the oracle), the toolchain's own checks are `checkRouting` (`core/fpga/route.js`) and the resource
+is ISE's (the oracle), the toolchain's own checks are `checkRouting` (`packages/silinx-fpga/src/fpga/route.js`) and the resource
 check.
 
 Around it, outside the toolchain: the technology view (`core/fpga/techview.js`, which draws with the schematic
@@ -84,7 +84,7 @@ from the IDE. It imports neither `core/version.js` nor `core/third-party.js` nor
 
 - **server/**: `open-flow.js` (the processes, the devices, the bit database), `open-flow-run.js` (the flow's
   process), `impl-routes.js` (the FPGA view's data), and `devices.js`, `ise.js`, `programmer.js`,
-  `projects.js`, `xise.js` (for `core/family.js`, `core/ucf.js`, `core/resources.js`); `bin/silinx-ise.js`
+  `projects.js`, `xise.js` (for `packages/silinx-fpga/src/family.js`, `packages/silinx-fpga/src/ucf.js`, `packages/silinx-fpga/src/resources.js`); `bin/silinx-ise.js`
   (its `ucf` command).
 - **web/js** (by absolute URL, `/core/…`, served by `server/server.js`, bundled by the standalone build):
   `open-flow-worker.js` (the flow, the device, the bit database, Yosys), `open-flow-browser.js`,
@@ -99,9 +99,9 @@ from the IDE. It imports neither `core/version.js` nor `core/third-party.js` nor
 
 ### The shared helpers
 
-- **Go with the toolchain, the IDE imports them from it**: `core/xdl.js` and `core/ucf.js` (formats),
-  `core/resources.js` and `core/family.js` (the parts' resources and families: the toolchain's data, used by
-  the IDE's palettes and wizards), `core/open-steps.js` (the steps' names).
+- **Go with the toolchain, the IDE imports them from it**: `packages/silinx-fpga/src/xdl.js` and `packages/silinx-fpga/src/ucf.js` (formats),
+  `packages/silinx-fpga/src/resources.js` and `packages/silinx-fpga/src/family.js` (the parts' resources and families: the toolchain's data, used by
+  the IDE's palettes and wizards), `packages/silinx-fpga/src/open-steps.js` (the steps' names).
 - **Stay in the IDE**: the HDL front end, `core/unisim.js`, `core/sim-model.js`, `core/sdf.js`,
   `core/netlist-hier.js`, the technology view, the i18n, the version.
 - **A contract to keep**: the flow's log lines and warnings are English; the IDE translates some of them
@@ -158,7 +158,7 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
 3. **Synthesis from flat Verilog** ([#1674](https://github.com/pmnmalo/Silinx-ISE/issues/1674)):
    `synthesizeOpen(design)` becomes the front end (`toVerilog`, the gate count) followed by a synthesis of the
    flat Verilog; `synthesizeOpen` keeps its signature. The same netlists on the corpus. Done: `core/synth-front.js`
-   (`synthesisInput`, `synthesizeOpen`) and `synthesizeVerilog` in `core/synth-open.js`.
+   (`synthesisInput`, `synthesizeOpen`) and `synthesizeVerilog` in `packages/silinx-fpga/src/synth-open.js`.
 4. **The flow's front end and simulation models as hooks**
    ([#1675](https://github.com/pmnmalo/Silinx-ISE/issues/1675)): `runOpenFlow` gets the HDL front end and the
    simulation models through `io`; a wrapper in the IDE gives them, so `server/open-flow-run.js` and
@@ -182,7 +182,11 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    with its `io`; the IDE's importers switch to it, the re-exporting shims go, and the boundary test then says
    that the IDE imports nothing but the API. Started: the entries `silinx-fpga` (`src/index.js`, Node and the
    browser) and `silinx-fpga/node` (the disk's loaders, Yosys in Node), documented in the package's README; the
-   flow places and routes through `io.placeRoute` when given (nextpnr: #1953, #1954).
+   flow places and routes through `io.placeRoute` when given (nextpnr: #1953, #1954). Done: the light entry
+   `silinx-fpga/parts` for the IDE's pages; the IDE imports the entries only (`test/toolchain-boundary.test.js`),
+   the tests and the research the package's modules; `core/`'s old paths are gone. The IDE and the server reach
+   the package by its path (the release zip has no workspace link, #1677), so `scripts/related-tests.mjs` follows
+   the imports as before.
 8. **The command line** ([#1679](https://github.com/pmnmalo/Silinx-ISE/issues/1679)): `silinx-fpga build`,
    from `research/s3e-route/open-flow.mjs`, and a README with a blinky for the Basys2. A new feature with its
    tests.

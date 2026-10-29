@@ -7,16 +7,16 @@
 // measured on every DIFFM pad of the four devices): a complete bitstream.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack } from '../core/fpga/pack.js';
-import { deviceSites, place, placedXdl, secondFlipFlops } from '../core/fpga/place.js';
-import { placeRoute } from '../core/fpga/place-route.js';
-import { loadDeviceCache } from '../core/fpga/device-node.js';
-import { loadDb } from '../core/fpga/bitdb-node.js';
-import { knownRouting, frameData } from '../core/fpga/bitgen.js';
-import { instArcs } from '../core/fpga/timing.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { deviceSites, place, placedXdl, secondFlipFlops } from '../packages/silinx-fpga/src/fpga/place.js';
+import { placeRoute } from '../packages/silinx-fpga/src/fpga/place-route.js';
+import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
+import { loadDb } from '../packages/silinx-fpga/src/fpga/bitdb-node.js';
+import { knownRouting, frameData } from '../packages/silinx-fpga/src/fpga/bitgen.js';
+import { instArcs } from '../packages/silinx-fpga/src/fpga/timing.js';
 import { postParModels } from '../core/sim-model.js';
-import { parseXdl, writeXdl } from '../core/xdl.js';
+import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
 
 const PARTS = ['xc3s100ecp132-4', 'xc3s250ecp132-4', 'xc3s500efg320-4', 'xc3s1200efg320-4'];
 

@@ -1,11 +1,11 @@
-// The device resources model (core/resources.js, #790): its counts against Xilinx's data sheets (an
+// The device resources model (packages/silinx-fpga/src/resources.js, #790): its counts against Xilinx's data sheets (an
 // independent copy of their tables, below), against the device reports of the shipped devices and ISE's
 // MAP report of the Spartan-6 parts, and its primitives against core/unisim.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { resourcesOf, resourceCount, familyResources, primitivesOf, resourceOfPrimitive, RESOURCE_FAMILIES } from '../core/resources.js';
+import { resourcesOf, resourceCount, familyResources, primitivesOf, resourceOfPrimitive, RESOURCE_FAMILIES } from '../packages/silinx-fpga/src/resources.js';
 import { findPart, partsOfFamily, PARTS } from '../server/devices.js';
 import { UNISIM_SOURCE } from '../core/unisim.js';
 
@@ -82,8 +82,8 @@ test('Spartan-6: every part\'s resources as DS160 gives them (a CMT 2 DCM + 1 PL
 });
 
 test('the Silinx toolchain\'s devices: the sites of each shipped device report equal to the model\'s counts', async () => {
-  const { loadDeviceCache, SHIPPED_DEVICES_DIR } = await import('../core/fpga/device-node.js');
-  const { deviceSites } = await import('../core/fpga/place.js');
+  const { loadDeviceCache, SHIPPED_DEVICES_DIR } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const { deviceSites } = await import('../packages/silinx-fpga/src/fpga/place.js');
   const shipped = fs.readdirSync(SHIPPED_DEVICES_DIR).filter(f => f.endsWith('.json.gz')).map(f => f.replace(/\.json\.gz$/, ''));
   // (the Spartan-6 ones, #723, their sites in a description of their own: core/fpga/s6, #826)
   assert.deepEqual(shipped.sort(), ['xc3s100ecp132-4', 'xc3s1200efg320-4', 'xc3s250ecp132-4', 'xc3s500efg320-4', 'xc6slx16csg324-3', 'xc6slx45csg324-3']);
@@ -176,7 +176,7 @@ test('familyResources: ids, labels in English and Portuguese, the MAP report\'s 
 
 test('other families: the Spartan-3, 3A, 3A DSP and Virtex-4 the common resources and their global clock buffers (#821), the others the common ones only', () => {
   const COMMON = ['ffs', 'luts', 'slices', 'distRam', 'iob'];
-  assert.deepEqual(RESOURCE_FAMILIES, ['spartan3e', 'spartan6'], 'the families with all their own resources: the others\' global buffers only (core/resource-check.js checks a device change between the first)');
+  assert.deepEqual(RESOURCE_FAMILIES, ['spartan3e', 'spartan6'], 'the families with all their own resources: the others\' global buffers only (packages/silinx-fpga/src/resource-check.js checks a device change between the first)');
   for (const f of ['spartan3', 'spartan3a', 'spartan3adsp', 'virtex4']) {
     assert.deepEqual(familyResources(f).map(r => r.id), [...COMMON, 'bufgmux'], f);
     assert.equal(familyResources(f)[1].label.en, '4-input LUTs', f);

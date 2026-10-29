@@ -1,9 +1,9 @@
 // #92: the dedicated paths from the pads to the DCMs' CLKIN (no general routing, no route-throughs)
 // on a part, and the switches on them the bit database does not have.
 //   PART=xc3s500efg320-4 node dcm-pads.mjs [--all]
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { knownRouting } from '../../core/fpga/bitgen.js';
-import { PIP_ROUTETHRU } from '../../core/fpga/device.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { knownRouting } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { PIP_ROUTETHRU } from '../../packages/silinx-fpga/src/fpga/device.js';
 import { PART, loadDb } from './db.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

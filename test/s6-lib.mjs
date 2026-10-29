@@ -1,13 +1,13 @@
 // The Spartan-6 designs of the placer's and the router's tests (#729, #730): a design synthesized for the Spartan-6
 // (the open synthesis, Yosys xc6s), packed, its physical design, on the boards' parts.
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { loadDeviceCache } from '../core/fpga/device-node.js';
-import { packS6 } from '../core/fpga/s6/pack.js';
-import { physS6 } from '../core/fpga/s6/phys.js';
-import { s6Sites } from '../core/fpga/s6/sites.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
+import { packS6 } from '../packages/silinx-fpga/src/fpga/s6/pack.js';
+import { physS6 } from '../packages/silinx-fpga/src/fpga/s6/phys.js';
+import { s6Sites } from '../packages/silinx-fpga/src/fpga/s6/sites.js';
 import { example, exampleUcf } from './examples-lib.mjs';
 
 /** The boards of the Spartan-6 toolchain: their part (the device description) and board id (the UCF). */
