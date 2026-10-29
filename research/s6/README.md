@@ -505,8 +505,11 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   2.0 ns; a shift register's data in (Tds) and output (Tshcko) among the slice's arcs. On night 1's 24 designs both
   are within 5% or 0.1 ns of trce's allowable offset in 24 of 24 (the error at most 0.35 ns on offsets of 2 to
   12 ns). With that criterion (5% of the slack or 0.1 ns, the larger), PERIOD stays at 20 of 24: the four left
-  are 0.11 to 0.25 ns off on slacks of 0.68 to 4.5 ns (every PERIOD error under 2.5% of the period). Still to do: a
-  second clock's paths; the placer's estimate (`place-timing.js`) replaced by this model (#729).
+  are 0.11 to 0.25 ns off on slacks of 0.68 to 4.5 ns (every PERIOD error under 2.5% of the period).
+- **#731's criterion** (the maintainer's decision, 2026-10-29): each constraint within 5% of trce's slack or 2.5% of
+  the period, whichever is larger (5% of a small slack, 0.034 ns on 0.68 ns, is about one switch). Met: PERIOD
+  24 of 24, OFFSET IN and OUT 24 of 24 (their errors at most 0.36 ns). Still to do: a second clock's paths; the
+  placer's estimate (`place-timing.js`) replaced by this model (#729, #732).
 
 ### The CMT sites (#1951, S6-E2, 2026-10-29)
 
