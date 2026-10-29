@@ -49,17 +49,23 @@ The chip database of the XC3S250E: 19 s in Python, a 75 MB `.bba`, a 24 MB `.bin
 
 `blink.v`, the same Yosys netlist (37 LUTs, 24 flip-flops, 10 IOBs, 1 BUFGMUX) placed and routed by both:
 
-| | nextpnr, LUT–FF pairs | nextpnr, slices packed | nextpnr, packed and timed | Silinx |
-|---|---|---|---|---|
-| P&R time | 0.3 s | 0.3 s | 0.5 s | 0.6 s (place 0.1 s, route 0.5 s) |
-| slices | 28 | 19 | 19 | 19 |
-| ISE: `xdl -xdl2ncd`, `drc` | clean | clean | clean | clean |
-| ISE: `trce` minimum period | 9.269 ns | 10.343 ns | 8.430 ns | 6.717 ns |
-| Silinx's timing analysis (`xdl-report.mjs`) | 9.432 ns | 10.421 ns | 8.536 ns | 6.821 ns |
-| nextpnr's own estimate | — | — | 7.56 ns | — |
-| Silinx's bitgen against ISE's `bitgen` | byte-identical | byte-identical | byte-identical | byte-identical |
+| | nextpnr, LUT–FF pairs | slices packed | packed and timed | LUT pins permuted | Silinx |
+|---|---|---|---|---|---|
+| P&R time | 0.3 s | 0.3 s | 0.5 s | 0.5 s | 0.6 s (place 0.1 s, route 0.5 s) |
+| slices | 28 | 19 | 19 | 19 | 19 |
+| ISE: `xdl -xdl2ncd`, `drc` | clean | clean | clean | clean | clean |
+| ISE: `trce` minimum period | 9.269 ns | 10.343 ns | 8.430 ns | 7.150 ns (seed 3) | 6.717 ns |
+| Silinx's timing analysis (`xdl-report.mjs`) | 9.432 ns | 10.421 ns | 8.536 ns | 7.350 ns | 6.821 ns |
+| nextpnr's own estimate | — | — | 7.56 ns | 6.90 ns | — |
+| Silinx's bitgen against ISE's `bitgen` | byte-identical | byte-identical | byte-identical | byte-identical | byte-identical |
 
-Packed and timed, five seeds: 8.32 to 8.81 ns by Silinx's analysis (nextpnr's estimate 7.49 to 8.05 ns);
+LUT pins permuted, five seeds: 7.35 to 7.80 ns by Silinx's analysis (nextpnr's estimate 6.63 to 7.13 ns).
+A LUT's inputs I0..I3 are wires of their own, each reached from every site pin F1..F4 (G1..G4) by a PIP
+carrying that pin's own delay (Silinx's `lutPin`), so the router puts the critical inputs on the fast pins;
+the converter rewrites each LUT's equation for the pins chosen, and checks that every input's net is the
+net on the site pin the equation reads it from.
+
+Packed and timed, before the permutation, five seeds: 8.32 to 8.81 ns by Silinx's analysis (nextpnr's estimate 7.49 to 8.05 ns);
 `--router router2`, `--placer sa`, `--placer-heap-timingweight 50` and `--tmg-ripup` no better.
 
 The timing model (`export-timing.mjs`, the generator's `--timing`): nextpnr counts a PIP's delay, not a
@@ -84,9 +90,9 @@ a BUFGMUX's select S is tied to VCC through its tile's VCC site (`XDL_DUMMY_<til
 
 ## What is left for a decision
 
-- **Speed.** With Silinx's delays nextpnr gets 8.4 ns where Silinx gets 6.7 ns on the same netlist:
-  Silinx's placer and router are the better ones here (its timing-driven placement, the LUT inputs
-  assigned to the faster pins, the loads in its router's costs). nextpnr has no LUT pin permutation yet.
+- **Speed.** With Silinx's delays nextpnr got 8.4 ns where Silinx gets 6.7 ns on the same netlist:
+  Silinx's placer and router are the better ones here (its timing-driven placement, the loads in its
+  router's costs). With the LUT pins permuted, 7.15 ns against 6.72 ns.
 - **Constants**, the carry chain, MUXF5…F8, SLICEM's RAMs and shift registers, the IOB's registers,
   BRAM, MULT18X18, DCM: each a cell type, its BELs and its settings in the converter.
 - **The clock pads.** nextpnr routes a pad to its BUFGMUX on general routing where a dedicated path

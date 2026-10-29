@@ -55,12 +55,13 @@ for (const [name, c] of Object.entries(mod.cells)) {
   let inst = insts.get(site);
   if (!inst) {
     const s = device.site(site);
-    inst = { name: null, siteType: s.type, tile: device.tileName(k), site, cells: {}, mux: {} };
+    inst = { name: null, siteType: s.type, tile: device.tileName(k), site, cells: {}, mux: {}, lutPins: {} };
     insts.set(site, inst);
   }
   inst.cells[belName.slice(m[0].length)] = { name, ...c };
 }
-// the slices' multiplexers, from the route's PIPs inside the sites
+// the slices' multiplexers, from the route's PIPs inside the sites, and the site pin each LUT input was routed
+// to (its inputs are permutable: S<i>_FI<j> is reached from any of F1..F4)
 for (const n of Object.values(mod.netnames)) {
   const r = n.attributes?.ROUTING;
   if (!r) continue;
@@ -71,12 +72,23 @@ for (const n of Object.values(mod.netnames)) {
     const m = /^S(\d+)_(\w+)$/.exec(src) || /^S(\d+)_(\w+)$/.exec(dst);
     if (!m) continue;
     const inst = insts.get(siteName(tile, +m[1]));
-    if (/OUT$/.test(src) && !/^S\d+_D/.test(dst)) inst.mux[src.endsWith('FOUT') ? 'X' : 'Y'] = 'used';        // LUT -> X / Y pin
+    const li = /^S\d+_([FG])I(\d)$/.exec(dst);
+    if (li) {
+      const pin = pinOfWire(tileAt.get(tile)).get(src).pin;   // F1..F4 / G1..G4
+      (inst.lutPins[li[1]] ||= [])[+li[2]] = +pin[1];
+    } else if (/OUT$/.test(src) && !/^S\d+_D/.test(dst)) inst.mux[src.endsWith('FOUT') ? 'X' : 'Y'] = 'used';        // LUT -> X / Y pin
     else if (/OUT$/.test(src)) inst.mux[`D${dst.slice(-1)}`] = 'lut';                                       // LUT -> flip-flop
     else inst.mux[`D${dst.slice(-1)}`] = 'bypass';                                                           // BX / BY -> flip-flop
   }
 }
 
+// a LUT's site pins by input (I0..I3), the unconnected inputs on the pins left (their values do not matter: the
+// INIT repeats over them)
+const lutPins = chosen => {
+  const pins = [0, 1, 2, 3].map(i => chosen?.[i]);
+  const free = [1, 2, 3, 4].filter(k => !pins.includes(k));
+  return pins.map(k => k ?? free.shift());
+};
 const esc = x => String(x).replace(/:/g, '_');
 const xdlInsts = [];
 for (const inst of insts.values()) {
@@ -85,7 +97,7 @@ for (const inst of insts.values()) {
   const c = inst.cells;
   if (inst.siteType === 'SLICEL' || inst.siteType === 'SLICEM') {
     inst.type = 'SLICEL';                // (logic on a SLICEM site too: ISE's DRC wants a SLICEL comp there)
-    for (const [side, lut] of [['F', c.FLUT], ['G', c.GLUT]]) if (lut) add(side, esc(lut.name), `#LUT:${initToEquation(bit(param(lut, 'INIT')), 4)}`);
+    for (const [side, lut] of [['F', c.FLUT], ['G', c.GLUT]]) if (lut) add(side, esc(lut.name), `#LUT:${initToEquation(bit(param(lut, 'INIT')), 4, lutPins(inst.lutPins[side]))}`);
     let ctrl = null;
     for (const [X, ff] of [['X', c.FFX], ['Y', c.FFY]]) {
       if (!ff) continue;
@@ -163,6 +175,24 @@ for (const [name, n] of Object.entries(mod.netnames)) {
     net.pips.push({ tile: x.tile, from: x.from, dir: x.dir, to: x.to });
   }
   if (net.outpins.length || net.inpins.length) xdlNets.push(net);
+}
+
+// the check of the LUTs' pins: each input's net is the net on the site pin its equation reads it from
+{
+  const netAt = new Map();   // "inst pin" -> the net's first bit
+  for (const net of xdlNets) for (const p of net.inpins) netAt.set(`${p.inst} ${p.pin}`, mod.netnames[net.name].bits[0]);
+  for (const inst of insts.values()) {
+    for (const [side, lut] of [['F', inst.cells.FLUT], ['G', inst.cells.GLUT]]) {
+      if (!lut) continue;
+      const pins = lutPins(inst.lutPins[side]);
+      for (let i = 0; i < 4; i++) {
+        const b = portNet(lut, `I${i}`);
+        if (b === undefined || typeof b === 'string') continue;
+        const at = netAt.get(`${inst.name} ${side}${pins[i]}`);
+        if (at !== b) throw new Error(`${lut.name}: I${i} on ${side}${pins[i]} carries another net`);
+      }
+    }
+  }
 }
 
 // a BUFGMUX's select S tied to VCC, from its tile's VCC site, as ISE's map and Silinx write it
