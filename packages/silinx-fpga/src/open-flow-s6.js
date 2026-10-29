@@ -10,6 +10,7 @@ import { placeS6 } from './fpga/s6/place.js';
 import { placedXdlS6 } from './fpga/s6/xdl.js';
 import { routeS6, routedXdlS6 } from './fpga/s6/route.js';
 import { checkRoutingS6 } from './fpga/s6/route-check.js';
+import { knownPipS6 } from './fpga/s6/bitgen.js';
 import { parseXdl, writeXdl } from './xdl.js';
 
 /**
@@ -73,7 +74,16 @@ export function mountS6Steps(ctx) {
     log(`Placed ${placement.site.length} sites in ${ms(t)} (estimated critical path ${placement.delay.toFixed(1)} ns): ${report.files.placed}`);
     const t2 = now();
     let r;
-    try { r = routeS6(placed, device, { maxPasses: spec.routeIterations || 50 }); } catch (e) { throw new StepError(`routing failed: ${e.message}`); }
+    // on the switches whose bits the bit databases have (#732); a net that needs others (a pad whose I/O path is not
+    // measured yet) routed on every switch, and bitgen names what its bitstream lacks
+    const allowPip = io.bitDb ? knownPipS6(device, io.bitDb()) : null, opts = { maxPasses: spec.routeIterations || 50 };
+    try {
+      r = routeS6(placed, device, { ...opts, allowPip });
+      if (allowPip && r.failed.length) {
+        log(`${r.failed.length} net(s) need routing switches the bit database does not have yet: routed on every switch (the bitstream step names them).`);
+        r = routeS6(placed, device, opts);
+      }
+    } catch (e) { throw new StepError(`routing failed: ${e.message}`); }
     for (const w of r.warnings || []) log(`WARNING:Route - ${w}`);
     report.par = { routed: false, unroutedSignals: r.failed.length, nets: r.trees.filter(Boolean).length, pips: r.stats.pips, iterations: r.stats.passes };
     if (r.failed.length) throw new StepError(`${r.failed.length} net(s) cannot be routed`, r.failed.slice(0, 50));
