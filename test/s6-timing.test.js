@@ -53,11 +53,11 @@ Hold Paths: TS_clk = PERIOD TIMEGRP "clk" 10 ns HIGH 50%;
 Slack (hold path):      0.400ns (requirement - (clock path skew + uncertainty - data path))
 `;
 
-test('twr6: a report\'s paths, their slack and figures and their elements in order (no hold path)', () => {
+test('twr6: a report\'s paths, their slack, figures and clocks and their elements in order (no hold path)', () => {
   const ps = parseTwr(TWR);
   assert.equal(ps.length, 1);
   const p = ps[0];
-  assert.deepEqual({ ...p, elements: undefined }, { constraint: 'TS_clk = PERIOD TIMEGRP "clk" 10 ns HIGH 50%;', slack: 6.5, source: 'a', dest: 'b', requirement: 10, dataPath: 3.4, skew: -0.02, uncertainty: 0.035, elements: undefined });
+  assert.deepEqual({ ...p, elements: undefined }, { constraint: 'TS_clk = PERIOD TIMEGRP "clk" 10 ns HIGH 50%;', slack: 6.5, source: 'a', dest: 'b', requirement: 10, dataPath: 3.4, skew: -0.02, uncertainty: 0.035, srcClock: 'clk_BUFGP', destClock: 'clk_BUFGP', elements: undefined });
   assert.deepEqual(p.elements, [
     { loc: 'SLICE_X1Y1.AQ', type: 'Tcko', delay: 0.4, name: 'a' },
     { loc: 'SLICE_X2Y2.B3', type: 'net', fanout: 2, delay: 1.1, name: 'a' },
@@ -102,8 +102,8 @@ test('timing6: an arc\'s key (a setup through its LUT by the flip-flop\'s input 
   assert.deepEqual(table.arcs, { 'Tcko CLEXL': 0.45, 'Tdick CLEXM': 0.2 });
   assert.deepEqual(table.types, { Tcko: 0.45, Tdick: 0.2 });
   // a path of arcs only: the table's; a net not in the XDL: null
-  assert.equal(modelPath(paths[0], xdl, null, table, []), 0.65);
-  assert.equal(modelPath({ elements: [paths[0].elements[0], { loc: 'SLICE_X3Y3.A1', type: 'net', fanout: 1, delay: 1, name: 'n' }] }, xdl, null, table, []), null);
+  assert.equal(modelPath(paths[0], xdl, null, table, () => 0), 0.65);
+  assert.equal(modelPath({ elements: [paths[0].elements[0], { loc: 'SLICE_X3Y3.A1', type: 'net', fanout: 1, delay: 1, name: 'n' }] }, xdl, null, table, () => 0), null);
 });
 
 test('timing-fit6: every connection of reportgen\'s report on a routed design, the clock left out', async () => {

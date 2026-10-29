@@ -475,6 +475,29 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   trce's, every error under 5.5% of the period; the arc table alone accounts for 0.077 ns of it (Tilo is 0.203 or
   0.259 ns for no reason the pin, the LUT's settings or the load show). Next: the STA that finds the worst path
   itself, with its own clock skew.
+- **The static timing** (part 4, `sta6.mjs`): trce's PERIOD analysis on the routed XDL, every path from a
+  flip-flop's clock to a flip-flop's setup on the constraint's clock. A slice's arcs come from its settings
+  (`sliceArcs6`): a LUT's inputs are those its equation reads; the carry chain goes stage by stage (an XOR reads the
+  selects at and below it and the data, O5 or bypass, below it; a CY and COUT the data at it too), each arc with
+  trce's own type (`Topad`, `Tbxd`, `Tcind`, `Topcya` …); a flip-flop's data by its input mux, the second flip-flop
+  (L5FF) from O5; one set as a gate (`#AND2L`) passes through (Tito_logic, 0.75 ns). A block RAM's data out and a
+  DSP48A1's inputs and P by its registers (`hardArcs6`). The slice arcs' delays depend on the **site class**
+  (`siteClass`: an odd column's SLICEX has Tilo 0.259, Tcko 0.391, Tas 0.322 ns; an even column's SLICEL / SLICEM
+  0.203 to 0.205, 0.408 / 0.447 ns by the tile), not on the instance's type. The clock's arrival at each flip-flop
+  is a base plus a delay per node of its routed tree (fitted on the clock nets' `.dly` delays).
+- **reportgen names a LUT's input by its logical pin** (before ISE swapped the LUT's pins: trce's and the XDL's D6
+  can be its D5): `loadDelay` matches by the pin, else by the instance and the pin's letter; that brings the fit
+  from 5581 to 19008 connections. **The wire model by wire type** (`fitWires`: a count per wire type seen 20 times,
+  111 types, with the classes and the pin kind): rms 0.045 ns per connection, 95% within 0.089 ns (by class only
+  0.082 ns); on designs it was not fitted on 0.052 ns (0.085 by class). trce's 240 paths: data path rms 0.139 ns.
+- **Results on night 1's 24 PERIOD constraints** (both boards, ISE's flow and the open synthesis's netlists):
+  with reportgen's own delays for the nets and the clock (`--measured`, the STA's error alone) 23 within 5% of
+  trce's slack, every error under 1.5% of the period; with the model, 20 within 5%, every error under 2.5% of the
+  period (the others the small slacks, 0.68 to 1.96 ns, where 5% is 0.03 to 0.1 ns). Fitted on half the designs and
+  checked on the other half (`--train=`): every error under 2.3 to 3.6% of the period, but 9.4% when fitted on ISE's
+  flow alone and checked on the open synthesis's (an unregistered DSP48A1 and a gate flip-flop the fit had not seen,
+  their delays the defaults). Still to do: the OFFSET IN / OUT paths and a second clock's; the placer's estimate
+  (`place-timing.js`) replaced by this model (#729).
 
 ### The CMT sites (#1951, S6-E2, 2026-10-29)
 
@@ -650,6 +673,7 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `twr6.mjs` | trce's report read: each constraint's paths, their figures and elements (#731) |
 | `timing-fit6.mjs` | The wire delay model fitted to trce's nets, or every connection of reportgen's `.dly`, on ISE's routing (#731) |
 | `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
+| `sta6.mjs` | The static timing of a routed design (its XDL): the slices' and hard blocks' arcs, PERIOD slack against trce's (#731) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |
