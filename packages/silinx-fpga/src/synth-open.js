@@ -1,9 +1,9 @@
 // Silinx - open synthesis (browser + Node): Silinx's front end writes the elaborated design as one
 // flat SystemVerilog module (core/synth-verilog.js, through core/synth-front.js, #1674), and Yosys compiled to WebAssembly (YoWASP,
 // package @yowasp/yosys, ISC licence) maps it onto the cells of the device family (synth_xilinx)
-// and writes the netlist: JSON (as core/fpga/netlist.js reads it) and Verilog, with its statistics.
+// and writes the netlist: JSON (as fpga/netlist.js reads it) and Verilog, with its statistics.
 // No Xilinx tool is involved. The caller says how Yosys runs: in a Web Worker in the browser
-// (web/js/yosys-worker.js), directly in Node (core/synth-open-node.js).
+// (web/js/yosys-worker.js), directly in Node (synth-open-node.js).
 //
 //   const r = await synthesizeOpen(design, { family: 'spartan3e', run, onLine })
 //   const r = await synthesizeVerilog({ text, top }, { family: 'spartan3e', run, onLine })   (the flat Verilog given)
@@ -459,7 +459,7 @@ export const DEPTH_SOPB = 'strash; &get -n; &sopb; &if -g -K 6; &synch2; &sopb; 
 export const SOPB_RULE = { levels: 16, maxLuts: 20000 };
 // LUT delays (#78): ABC maps for depth with every function as fast as a LUT4 (-luts gives costs, not
 // delays); its LUT library (read_lut) tells it what a 5-input function (a LUT4 into the MUXF5) and a
-// 6-input one (into the MUXF6 too) cost and take: the -4 delays of core/fpga/timing.js (Tilo, Tif5x,
+// 6-input one (into the MUXF6 too) cost and take: the -4 delays of fpga/timing.js (Tilo, Tif5x,
 // Tif5 + Tif6y) and a connection (0.45 ns). YoWASP's ABC crashes on read_lut from a script file
 // (codeberg.org/YoWASP/yosys/issues/41), not from a script given inline (abcInline). The balancing of
 // DEPTH_ABC2 is made both ways, the better kept (EPFL max 21.4 ns and 1055 LUTs with the delays,
@@ -531,7 +531,7 @@ export function keepChains(n, c, { linesN = [], linesC = [] } = {}, rule = DEPTH
   return !times && !keepDepth([c.ns, n.ns], [c.luts, n.luts], rule, [c.slices, n.slices]);
 }
 
-/** The slices of a mapped netlist of a 4-input-LUT family (Yosys's JSON), as core/fpga/pack.js packs them for
+/** The slices of a mapped netlist of a 4-input-LUT family (Yosys's JSON), as fpga/pack.js packs them for
  *  the open flow; null when it does not pack (a cell it does not support yet). */
 export function sliceCount(json, top) {
   try { return pack(readYosysJson(asText(json) || json, { top })).stats.slices; } catch { return null; }
@@ -569,7 +569,7 @@ export const ABC9_UNKEEP_CLOCKS = 'setattr -unset keep @silinx_clocks';
 // $scopeinfo cells (kept hierarchy names) are not cells of the device: deleted before writing. The JSON has the
 // top module alone (#86): synth_xilinx reads Yosys's whole Xilinx cell library as black boxes (430 modules of every
 // family), which write_json wrote too: 9 MB for blinky instead of 0.3, and about 0.9 s of every run (its LUT
-// mapping 0.15 s); every reader of the netlist takes its top module (core/fpga/netlist.js, sim-model.js,
+// mapping 0.15 s); every reader of the netlist takes its top module (fpga/netlist.js, sim-model.js,
 // compiled-sim.js…). (write_verilog leaves the black boxes out by itself.) The top is selected by its attribute,
 // not by its name, and is not a black box (#631): a top that ends empty is one (read_verilog marks a module with no
 // body so: Yosys's ifdef_1, specify.v), which write_json -selected leaves out, and a name such as \1dff (an escaped
@@ -580,7 +580,7 @@ export const outputs = top => `delete t:$scopeinfo; ${TOP_ONLY}; write_json -sel
 
 // the netlist between the two runs of a design with carry chains written as gates (#77)
 export const CHAIN_FILE = 'silinx_chains.json';
-// the mapped netlist with its critical LUTs made shallower (#652, core/lut-resynth.js), read by Yosys to write the
+// the mapped netlist with its critical LUTs made shallower (#652, lut-resynth.js), read by Yosys to write the
 // outputs (the Verilog netlist, the statistics) as of every other netlist; the cells' library for their ports
 export const RESYNTH_FILE = 'silinx_resynth.json';
 export const resynthCommands = top => `read_verilog -lib +/xilinx/cells_sim.v; read_verilog -lib +/xilinx/cells_xtra.v; read_verilog -lib ${SRL_CELLS_FILE}; read_json ${RESYNTH_FILE}; hierarchy -top ${top}; ${outputs(top)}`;
@@ -666,9 +666,9 @@ export const synthEffort = impl => (String(impl?.optLevel) === '2' ? 'high' : 'n
  * the mapping with the clock enables that end the critical path folded into D (#653), both from the netlist before the
  * LUT mapping, measured against the netlist chosen of the others, on both efforts (speed: false leaves them out); resynth:
  * { rounds, changed, ns, luts, slices, kept } of the netlist chosen of all of them with its critical LUTs made one level
- * shallower, their fan-out kept (#652, core/lut-resynth.js; resynth: false leaves it out); bdd: { rounds, cones, ns, luts,
+ * shallower, their fan-out kept (#652, lut-resynth.js; resynth: false leaves it out); bdd: { rounds, cones, ns, luts,
  * slices, kept } of the netlist chosen of all (the memories' choice, #54, included) with the critical path's wide decodes
- * collapsed to BDDs and mapped again (#1360, core/synth-open-bdd.js; bdd: false leaves it out).
+ * collapsed to BDDs and mapped again (#1360, synth-open-bdd.js; bdd: false leaves it out).
  * effort ('high'): 'normal', the synthesis's Optimization Effort Normal (#282), is one Yosys run, the
  * usual mapping alone (beside it the quiet search for the state machines fsm_detect refuses for their users, #652; no
  * other mapping tried: as depth false; but the critical path's remaps, #652, and the mapping with the
@@ -681,7 +681,7 @@ export const synthEffort = impl => (String(impl?.optLevel) === '2' ? 'high' : 'n
  * with wide multiplexers (#511: their mapping onto MUXF5 … MUXF7, r.depth.muxf, at both efforts); a design
  * written as gates also has its adders' carry chains recovered (#77, #377), the faster netlist kept. At High a
  * design whose state machines of FSM_RULE.states states or more the init values keep out of Yosys's fsm is
- * synthesized once more with them one-hot (#539, core/synth-fsm.js), and at both efforts a design whose machines of as many
+ * synthesized once more with them one-hot (#539, synth-fsm.js), and at both efforts a design whose machines of as many
  * states fsm_detect refuses for their users alone (#652), that netlist kept when better by DEPTH_RULE:
  * r.depth.fsm { machines: [{ wire, states }], ns, luts, slices, kept } (fsm: false leaves it out, 'always' keeps it). A design
  * whose usual run left memories written to in logic is synthesized once more with them as distributed RAM (#54, LUTRAM_COST),
@@ -744,7 +744,7 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
     yosysFiles(top, text, opts), l => { if (!quiet(l)) lines1.push(l); });
   const preRun = normal && gates ? coarse() : null;
   preRun?.catch(() => {});
-  // High (#539): the state machines the init values keep out, found by a quiet run up to fsm (core/synth-fsm.js),
+  // High (#539): the state machines the init values keep out, found by a quiet run up to fsm (synth-fsm.js),
   // started at once, and, at both efforts, those fsm_detect refuses for their users alone, extracted by hand from its
   // netlist (#652); its failure leaves the design as it is
   const synth = `synth_xilinx -family ${YOSYS_FAMILY[family]} -ise -flatten -top ${top}`;
@@ -795,12 +795,12 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
     }
   }
   const highMappings = !normal || !!deep?.deep;
-  // a mapping (its run's output) and the depth-oriented ones, the faster kept (core/synth-open-depth.js)
+  // a mapping (its run's output) and the depth-oriented ones, the faster kept (synth-open-depth.js)
   const { withDepth } = mountDepth({
     deepRule, depth, family, run, wide, withAbc9, withResynth, log, normal, quiet, speed, top, tryDepth: () => tryDepth
   });
 
-  // a design with logic written as gates: its carry chains (adders, comparators: core/carry-chain.js, #77)
+  // a design with logic written as gates: its carry chains (adders, comparators: carry-chain.js, #77)
   // made $alu cells between two runs of Yosys (up to synth_xilinx's fine step, the netlist rewritten, then on
   // from it); mapped both with and without them, the faster kept (as the depth-oriented mapping: a chain of
   // a comparator that then combines several bits at once, EPFL max, is slower). A design without such a
@@ -911,7 +911,7 @@ async function synthesizeOnce(input, { family = 'spartan3e', run, onLine = () =>
     }
     res.info.lutram = lutram;
   }
-  // the critical path's wide decodes of the netlist chosen of all collapsed and mapped again (#1360, core/synth-open-bdd.js):
+  // the critical path's wide decodes of the netlist chosen of all collapsed and mapped again (#1360, synth-open-bdd.js):
   // the T80's register file in distributed RAM is only chosen above, after withDepth's candidates
   const sayOnce = l => { if (!log.includes(l)) line(l); };
   const b = await bddStage({ run, speed, top, withBdd }, { chosen: res.chosen, cells: res.cells, info: res.info, slices: j => sliceCount(j, top), sayNew: sayOnce });

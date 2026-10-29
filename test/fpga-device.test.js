@@ -1,4 +1,4 @@
-// core/fpga/device.js: the routing graph from the device report (xdl -report -pips -all_conns).
+// packages/silinx-fpga/src/fpga/device.js: the routing graph from the device report (xdl -report -pips -all_conns).
 // Fixture: test/fixtures/fpga/route-device.xdlrc (hand-made, in the format of ISE 14.7's xdl; the
 // real report is ~200 MB and comes from the user's own ISE installation, so it is never used here).
 import { test } from 'node:test';
@@ -8,8 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { packDevice, loadDevice, DeviceBuilder, toBase64, fromBase64, PIP_ROUTETHRU, PIP_BIDI, DEVICE_FORMAT_VERSION } from '../core/fpga/device.js';
-import { buildDeviceCache, loadDeviceCache, packDeviceFile } from '../core/fpga/device-node.js';
+import { packDevice, loadDevice, DeviceBuilder, toBase64, fromBase64, PIP_ROUTETHRU, PIP_BIDI, DEVICE_FORMAT_VERSION } from '../packages/silinx-fpga/src/fpga/device.js';
+import { buildDeviceCache, loadDeviceCache, packDeviceFile } from '../packages/silinx-fpga/src/fpga/device-node.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const RC = path.join(FIX, 'route-device.xdlrc');

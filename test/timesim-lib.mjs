@@ -9,13 +9,13 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { runOpenFlow } from '../core/open-flow-core.js';
-import { orderOpenSteps } from '../core/open-steps.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { runOpenFlow } from '../core/flow-ide.js';
+import { orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { parseSdf, annotateSdf } from '../core/sdf.js';
-import { loadDevice } from '../core/fpga/device.js';
-import { shippedDevicePath } from '../core/fpga/device-node.js';
-import { dbFileNames, dbFilesFrom, makeBitDb } from '../core/fpga/bitdb.js';
+import { loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
+import { shippedDevicePath } from '../packages/silinx-fpga/src/fpga/device-node.js';
+import { dbFileNames, dbFilesFrom, makeBitDb } from '../packages/silinx-fpga/src/fpga/bitdb.js';
 import { scalarizeNetlist, parseNetgenVhdl, primitiveInterface } from '../core/netlist-hier.js';
 import { Simulator } from '../core/simulator.js';
 import { example } from './examples-lib.mjs';
@@ -55,7 +55,7 @@ export function simulate(sources, file, text, top, until, stop = /Simulation fin
   return { diags: [], log: s.log.map(e => `${e.kind === 'warning' ? 'WARNING: ' : e.kind === 'error' || e.kind === 'failure' ? 'ERROR: ' : ''}${e.text}`), events: s.log };
 }
 
-// The minimum period of a model by its SDF, computed apart from the static timing (core/fpga/timing.js works on the
+// The minimum period of a model by its SDF, computed apart from the static timing (packages/silinx-fpga/src/fpga/timing.js works on the
 // sites, this on the model's elements): the longest path from an output driven at the clock's edge (its clock to
 // out) through the elements' paths and their inputs' connection delays to an input with a setup check (ps)
 export function sdfPeriod(vhdl, sdf) {

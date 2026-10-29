@@ -1,5 +1,5 @@
 // silinx-fpga's public API (#1678, step 7 of the toolchain's separation, #1651): the package's entries (exports),
-// the same in Node and in the browser (./node adds the disk's loaders), and a design from Verilog and a UCF to its
+// the same in Node and in the browser (./parts: the light part of it; ./node adds the disk's loaders), and a design from Verilog and a UCF to its
 // .bit through them alone, Silinx's place and route or one given through io.placeRoute.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,14 +8,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as api from '../packages/silinx-fpga/src/index.js';
 import * as node from '../packages/silinx-fpga/src/node.js';
+import * as parts from '../packages/silinx-fpga/src/parts.js';
 import { readBit } from '../packages/silinx-fpga/src/fpga/bitstream.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'packages', 'silinx-fpga');
 const pkg = JSON.parse(fs.readFileSync(path.join(DIR, 'package.json'), 'utf8'));
 
-test('#1678 silinx-fpga: its entries, the API and the API in Node', () => {
-  assert.deepEqual(pkg.exports, { '.': './src/index.js', './node': './src/node.js' });
+test('#1678 silinx-fpga: its entries, the API, its light part and the API in Node', () => {
+  assert.deepEqual(pkg.exports, { '.': './src/index.js', './parts': './src/parts.js', './node': './src/node.js' });
   for (const f of Object.values(pkg.exports)) assert.ok(fs.existsSync(path.join(DIR, f)), f);
 });
 
@@ -23,15 +24,22 @@ test('#1678 silinx-fpga: its entries, the API and the API in Node', () => {
 const API = ['FAMILY_INFO', 'ISE_HINT', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PackError', 'S3E_DEVICES', 'SPEED_4', 'StepError',
   'analyzeTiming', 'asText', 'backAnnotateUcf', 'bitName', 'bitgen', 'boardAutoAssign', 'cellCounts', 'checkRouting', 'checkUcf',
   'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'estimatePower', 'familyFromXise', 'familyName',
-  'familyOfPart', 'fpgaModel', 'gateAssignments', 'generateUcf', 'instArcs', 'knownRouting', 'loadDevice', 'lutTable', 'makeBitDb',
-  'orderOpenSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'periodNs', 'placeRouteBest', 'powerReport',
+  'familyOfPart', 'fpgaModel', 'gateAssignments', 'generateUcf', 'instArcs', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
+  'orderOpenSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'placeRouteBest', 'powerReport',
   'primitiveInstances', 'readBit', 'readYosysJson', 'readableBlobs', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
   'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6OpenStatus', 'spartan6Open', 'splitBitPart', 'splitPart', 'synthEffort',
   'synthesizeVerilog', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'writeBit', 'writeXdl', 'yosysWorkerSource'];
 const NODE = ['DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'loadDb',
   'loadDeviceCache', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];
 
-test('#1678 the API\'s names, each defined; ./node: the same and the loaders', () => {
+const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'checkUcf',
+  'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'familyFromXise', 'familyName', 'familyOfPart', 'fpgaModel', 'generateUcf',
+  'locsNotOnBoard', 'lutTable', 'orderOpenSteps', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'primitiveInstances', 'resourceCount',
+  'resourceOfPrimitive', 'resourcesOf', 'splitBitPart', 'ucfPlacesPins', 'usedOfReport', 'writeXdl'];
+
+test('#1678 the API\'s names, each defined; ./parts: some of them; ./node: all and the loaders', () => {
+  assert.deepEqual(Object.keys(parts).sort(), [...PARTS].sort());
+  for (const k of PARTS) assert.equal(parts[k], api[k], k);
   assert.deepEqual(Object.keys(api).sort(), [...API].sort());
   assert.deepEqual(Object.keys(node).sort(), [...API, ...NODE].sort());
   for (const k of Object.keys(node)) assert.notEqual(node[k], undefined, k);
@@ -39,7 +47,7 @@ test('#1678 the API\'s names, each defined; ./node: the same and the loaders', (
 });
 
 // what the browser loads: the entry and every module it imports, none of Node's
-test('#1678 the API (its entry) imports nothing of Node: it runs in the browser too', () => {
+function modulesOf(entry) {
   const seen = new Set(), nodeOnly = [];
   (function walk(file) {
     if (seen.has(file)) return;
@@ -49,10 +57,23 @@ test('#1678 the API (its entry) imports nothing of Node: it runs in the browser 
       if (m[1].startsWith('.')) walk(path.join(path.dirname(file), m[1]));
       else if (m[1].startsWith('node:')) nodeOnly.push(`${path.relative(DIR, file)}: ${m[1]}`);
     }
-  })(path.join(DIR, 'src', 'index.js'));
+  })(path.join(DIR, 'src', entry));
+  return { seen, nodeOnly };
+}
+
+test('#1678 the API (its entry) imports nothing of Node: it runs in the browser too', () => {
+  const { seen, nodeOnly } = modulesOf('index.js');
   assert.deepEqual(nodeOnly, []);
   assert.ok(seen.size > 40, `${seen.size} modules`);
   for (const f of seen) assert.ok(f.startsWith(path.join(DIR, 'src') + path.sep), f);
+});
+
+// what Silinx ISE's pages load before the toolchain runs (#1678: these 7 modules, not the toolchain's 58)
+test('#1678 ./parts: light, nothing of Node and none of the synthesis, pack, place, route, timing or bitgen', () => {
+  const { seen, nodeOnly } = modulesOf('parts.js');
+  assert.deepEqual(nodeOnly, []);
+  const rel = [...seen].map(f => path.relative(path.join(DIR, 'src'), f).split(path.sep).join('/')).sort();
+  assert.deepEqual(rel, ['family.js', 'open-steps.js', 'parts.js', 'resource-check.js', 'resources.js', 'ucf.js', 'xdl.js']);
 });
 
 const COUNTER = 'module cnt(input clk, input rst, output reg [3:0] q);\n  always @(posedge clk) if (rst) q <= 0; else q <= q + 1;\nendmodule\n';

@@ -1,4 +1,4 @@
-// The parts of the packer (#405: out of packWith in core/fpga/pack.js): the netlist prepared (pack-prep.js) and the
+// The parts of the packer (#405: out of packWith in packages/silinx-fpga/src/fpga/pack.js): the netlist prepared (pack-prep.js) and the
 // slices under construction (pack-slices.js) mounted alone on a counter's netlist: own copies of the cells and nets,
 // INST LOC constraints read, the cells the packer cannot pack refused; a slice's LUT slot taken twice refused. The
 // other parts (pack-iobregs.js, pack-carry.js, pack-muxes.js, pack-mems.js, pack-luts.js, pack-iobcfg.js,
@@ -9,21 +9,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack, PackError } from '../core/fpga/pack.js';
-import { mountPrep } from '../core/fpga/pack-prep.js';
-import { mountSlices } from '../core/fpga/pack-slices.js';
-import { mountIobRegs } from '../core/fpga/pack-iobregs.js';
-import { mountCarry } from '../core/fpga/pack-carry.js';
-import { mountMuxes } from '../core/fpga/pack-muxes.js';
-import { mountMemories } from '../core/fpga/pack-mems.js';
-import { mountLuts } from '../core/fpga/pack-luts.js';
-import { mountIobSettings } from '../core/fpga/pack-iobcfg.js';
-import { mountBram } from '../core/fpga/pack-bram.js';
-import { mountDcmMult } from '../core/fpga/pack-dcm-mult.js';
-import { mountPads } from '../core/fpga/pack-pads.js';
-import { mountNets } from '../core/fpga/pack-nets.js';
-import { mountConfig } from '../core/fpga/pack-cfg.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack, PackError } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { mountPrep } from '../packages/silinx-fpga/src/fpga/pack-prep.js';
+import { mountSlices } from '../packages/silinx-fpga/src/fpga/pack-slices.js';
+import { mountIobRegs } from '../packages/silinx-fpga/src/fpga/pack-iobregs.js';
+import { mountCarry } from '../packages/silinx-fpga/src/fpga/pack-carry.js';
+import { mountMuxes } from '../packages/silinx-fpga/src/fpga/pack-muxes.js';
+import { mountMemories } from '../packages/silinx-fpga/src/fpga/pack-mems.js';
+import { mountLuts } from '../packages/silinx-fpga/src/fpga/pack-luts.js';
+import { mountIobSettings } from '../packages/silinx-fpga/src/fpga/pack-iobcfg.js';
+import { mountBram } from '../packages/silinx-fpga/src/fpga/pack-bram.js';
+import { mountDcmMult } from '../packages/silinx-fpga/src/fpga/pack-dcm-mult.js';
+import { mountPads } from '../packages/silinx-fpga/src/fpga/pack-pads.js';
+import { mountNets } from '../packages/silinx-fpga/src/fpga/pack-nets.js';
+import { mountConfig } from '../packages/silinx-fpga/src/fpga/pack-cfg.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const counter = () => readYosysJson(fs.readFileSync(path.join(FIX, 'counter.json'), 'utf8'));

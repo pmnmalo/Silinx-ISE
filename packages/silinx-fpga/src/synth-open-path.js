@@ -1,4 +1,4 @@
-// The critical path of a mapped netlist (#405: out of core/synth-open.js): the estimated critical path of a
+// The critical path of a mapped netlist (#405: out of synth-open.js): the estimated critical path of a
 // 4-input-LUT family's netlist and its ends, its logic levels, and the rule that tells a design limited by its depth.
 import {
   DEPTH_RULE, cellCounts, utilization
@@ -8,7 +8,7 @@ import { LEVEL_CELL, COMB_CELL } from './lut-resynth.js';   // (the cells that a
 // ------------------------------------------------------------- the critical path of a netlist
 // An estimate of the critical path (ns) of a mapped netlist of a 4-input-LUT family, from its cells
 // only (before packing, placement and routing): the Spartan-3E -4's logic delays (of
-// core/fpga/timing.js) and a fixed delay per connection between slices, none inside a slice (a LUT
+// fpga/timing.js) and a fixed delay per connection between slices, none inside a slice (a LUT
 // into its MUXF5, carry or flip-flop; the carry chain; MUXF5 into MUXF6…). Paths from flip-flop to
 // flip-flop (block RAMs, multipliers, shift registers and distributed RAMs as their sources and
 // ends too); a design without them: from its inputs to its outputs. It chooses between two

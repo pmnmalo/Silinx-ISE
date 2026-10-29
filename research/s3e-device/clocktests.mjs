@@ -16,7 +16,7 @@
 //   node clocktests.mjs verdicts dir                        dir/verdicts.json: [c, f, 'join' | 'no-join' | 'control' …]
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseXdl } from '../../core/xdl.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 import { wireFamily, joinRule } from './observe.mjs';
 import { parseJoinTests } from './hypotheses.mjs';
 import { fileURLToPath } from 'node:url';

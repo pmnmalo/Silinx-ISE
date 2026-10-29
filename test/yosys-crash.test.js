@@ -1,9 +1,9 @@
-// A crash of Yosys in the browser (#153): what it says (core/synth-open.js yosysError: never
+// A crash of Yosys in the browser (#153): what it says (packages/silinx-fpga/src/synth-open.js yosysError: never
 // "Yosys failed: undefined"), and the page's Yosys client (web/js/yosys-client.js) running the
 // synthesis once more in a new worker after a crash, not after an error of the design.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { yosysError } from '../core/synth-open.js';
+import { yosysError } from '../packages/silinx-fpga/src/synth-open.js';
 
 test('Yosys crash: a message for every kind of failure, and whether it is a crash', () => {
   assert.deepEqual(yosysError(Object.assign(new Error('Exited with status 1'), { code: 1 })), { message: 'Yosys failed (exit code 1)', code: 1, crash: false });

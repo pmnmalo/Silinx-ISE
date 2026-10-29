@@ -2,7 +2,7 @@
 import { api } from './api.js';
 import { icons } from './icons.js';
 import { h, toast, confirmDlg } from './ui.js';
-import { generateUcf, parseUcf, bitName, boardAutoAssign } from '/core/ucf.js';
+import { generateUcf, parseUcf, bitName, boardAutoAssign } from '/packages/silinx-fpga/src/parts.js';
 import { elaborate } from '/core/compile.js';
 import { S, app, setDirty } from './app.js';
 
@@ -144,7 +144,7 @@ export function mountPinPlanner(el, doc, top) {
   }
 
   // by name (clk, led, sw, btn, seg, an…), then the ports left by direction: inputs on the free
-  // switches and buttons, outputs on the LEDs (core/ucf.js boardAutoAssign)
+  // switches and buttons, outputs on the LEDs (packages/silinx-fpga/src/ucf.js boardAutoAssign)
   function autoAssign() {
     const r = boardAutoAssign(ports.map(p => ({ name: p.name, dir: p.dir, width: p.width, msb: p.msb, lsb: p.lsb })), board, { byDirection: true });
     for (const [net, a] of Object.entries(r.assignments)) asg[net] = { ...(asg[net] || {}), ...a };

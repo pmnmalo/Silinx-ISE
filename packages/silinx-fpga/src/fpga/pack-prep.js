@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's netlist (#405: out of packWith in core/fpga/pack.js): the constraints, own copies of
+// Silinx toolchain - the packer's netlist (#405: out of packWith in fpga/pack.js): the constraints, own copies of
 // the nets and cells, inverters on clock and control pins as their slices' inversions (#80, #527), INV / BUF as LUTs,
 // carry stages that pass their carry in left out (#591), a RAM64X1S as two RAM32X1S, the clock switches' inputs and
 // constant selects (#846); the cells it cannot pack refused.

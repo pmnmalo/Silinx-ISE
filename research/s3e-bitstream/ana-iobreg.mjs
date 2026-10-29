@@ -14,9 +14,9 @@
 // the settings the database lacks on a pad are solved, the writer writing the others (#759: the second flip-flop alone,
 // whose settings occur only there), their bits against what it writes (a bit a new setting clears: "!frame,bit")
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { parseXdl } from '../../core/xdl.js';
-import { frameData, iobRegFeatures, IOB_REG_ATTRS as REG_ATTRS } from '../../core/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { frameData, iobRegFeatures, IOB_REG_ATTRS as REG_ATTRS } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 
 /** The pad features of an I/O site's register settings, as the writer names them. */

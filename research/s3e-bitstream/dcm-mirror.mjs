@@ -11,8 +11,8 @@
 // every value; sv-dcmh-b = top left + bottom right, a subset) are the same four images.
 import fs from 'node:fs';
 
-// (the mirror functions are core/fpga/bitdb.js's, shared with the browser)
-import { MIRRORS, mirrorFeatures } from '../../core/fpga/bitdb.js';
+// (the mirror functions are packages/silinx-fpga/src/fpga/bitdb.js's, shared with the browser)
+import { MIRRORS, mirrorFeatures } from '../../packages/silinx-fpga/src/fpga/bitdb.js';
 export { MIRRORS, mirrorFeatures };
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^.*\//, ''))) {

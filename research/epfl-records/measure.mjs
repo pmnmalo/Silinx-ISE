@@ -5,7 +5,7 @@
 // and Yosys / ABC, but the LUTs 6 inputs wide, their count and their levels (the longest path in LUTs) against the
 // best-known count (the size record) and the best-known levels (the depth record), from records.json.
 //
-// Two mappings of each benchmark, as the open synthesis makes them (core/synth-open.js):
+// Two mappings of each benchmark, as the open synthesis makes them (packages/silinx-fpga/src/synth-open.js):
 //   area:  Yosys's synth -lut 6 (ABC's default LUT script: strash; …; dch -f; if; mfs2)
 //   depth: the logic balanced first (DEPTH_ABC: strash; dc2; balance; dch -f; if -g; …; if; mfs2), mapped to LUT-6
 //
@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../../core/compile.js';
 import { toVerilog } from '../../core/synth-verilog.js';
-import { DEPTH_ABC } from '../../core/synth-open.js';
+import { DEPTH_ABC } from '../../packages/silinx-fpga/src/synth-open.js';
 import { corpusPaths } from '../../scripts/fetch-design-corpus.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -32,7 +32,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 export function scripts(file, top) {
   const head = `read_verilog -sv ${file}; hierarchy -top ${top}`;
   const tail = 'opt_clean; tee -q -o stat.txt stat; tee -q -o ltp.txt ltp -noff';
-  // (an inline ABC script: commas for spaces, as core/synth-open.js abcInline writes it)
+  // (an inline ABC script: commas for spaces, as packages/silinx-fpga/src/synth-open.js abcInline writes it)
   const depth = `+${DEPTH_ABC.split(';').map(c => c.trim().replace(/\s+/g, ',')).join(';')}`;
   return {
     area: `${head}; synth -flatten -top ${top} -lut 6; ${tail}`,
@@ -48,7 +48,7 @@ export function parseCounts(stat, ltp) {
 }
 
 async function measure(name, rec, dir, timeoutS) {
-  const { yosysNode } = await import('../../core/synth-open-node.js');
+  const { yosysNode } = await import('../../packages/silinx-fpga/src/synth-open-node.js');
   const text = fs.readFileSync(path.join(dir, rec.file), 'utf8');
   const lib = compile([{ path: rec.file, lang: 'verilog', text }]);
   const design = elaborate(lib, rec.top || 'top');

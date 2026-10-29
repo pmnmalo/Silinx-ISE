@@ -9,8 +9,8 @@ import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
 import { schematicFromHdl, modulesFromLibrary } from '../core/schdoc.js';
 import { example } from './examples-lib.mjs';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 // a small netlist as Yosys writes it (write_json after synth_xilinx): a register of the instance
 // u_r, a LUT whose output Yosys did not name, an adder bit (MUXCY / XORCY on a constant carry in),

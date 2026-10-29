@@ -17,7 +17,7 @@
 // `DEVICES` (the original Spartan-3E-only view) is kept unchanged for compatibility; the
 // multi-family data is in FAMILIES / PARTS, with findPart / validateDevice covering all parts.
 
-import { familyOfPart } from '../core/family.js';
+import { familyOfPart } from '../packages/silinx-fpga/src/parts.js';
 import { FAMILY } from './family.js';
 import { BOARDS } from './boards.js';
 export { FAMILY } from './family.js';

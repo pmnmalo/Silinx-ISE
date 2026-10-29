@@ -1,4 +1,4 @@
-// Silinx toolchain - the placer's pads and clock reach (#405: out of place in core/fpga/place.js): the I/Os with a
+// Silinx toolchain - the placer's pads and clock reach (#405: out of place in fpga/place.js): the I/Os with a
 // LOC on their pads, the banks' VCCO, the clocks of the IOBs' registers and a pair's clash (#749), the global
 // buffers' loads, the reach of their lines (#56, #95), the buffers taken, and the buffers a pad reaches.
 import { BUFG_ORDER, LINE_BUFG, PlaceError, bankOfPad, sideBufg, vccoOfStandard } from './place.js';

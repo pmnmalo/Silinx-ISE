@@ -10,7 +10,7 @@ import path from 'node:path';
 import { EXAMPLES, example, ROOT } from './examples-lib.mjs';
 import { diffCycles, designOf, rng } from './compiled-diff.js';
 import { compileDesign, compileNetlist, CompiledSim, CompileError, netlistOf, portBit, segmentsOf, clustered, chunks, prepCommands, gateLevel } from '../core/compiled-sim.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { timingGenerics, autoTimeScale, scaledGenerics } from '../core/emulate.js';
 import { clockModule } from '../core/clocking.js';
 
@@ -906,7 +906,7 @@ test('#629 a gate-level model: its LUTs read without a helper, its constants fol
   assert.match(sim.model.code, /\(\(\d+ >>> /);
 });
 test('#629 pong\'s Post-Synthesis Simulation Model: its run() split by itself (106 000 characters in one piece, never optimized), the same outputs as before', { timeout: 300000 }, async () => {
-  const { runOpenFlow } = await import('../core/open-flow-core.js');
+  const { runOpenFlow } = await import('../core/flow-ide.js');
   const ex = example('pong'), top = ex.project.top, written = {};
   const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', family: 'spartan3e', steps: ['postsynth'], simTop: ex.project.simTop },
     { log: () => {}, sources: () => ex.design, simSources: () => ex.sim, yosys: yosysNode, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {} });

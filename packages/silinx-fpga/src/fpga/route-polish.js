@@ -1,4 +1,4 @@
-// Silinx toolchain - the router's polish (#405: out of routeDesign in core/fpga/route.js, #662, #651): the critical
+// Silinx toolchain - the router's polish (#405: out of routeDesign in fpga/route.js, #662, #651): the critical
 // path's connections routed again one at a time, the slowest first (on free wires, else on less critical nets'),
 // whole nets of the path with their branch loads weighted by the most critical, and a lookahead; a change kept when
 // the critical path ends shorter.

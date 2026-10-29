@@ -1,4 +1,4 @@
-// Silinx - the legality of a Spartan-6 placement (#729): every rule the placer (core/fpga/s6/place.js) keeps,
+// Silinx - the legality of a Spartan-6 placement (#729): every rule the placer (fpga/s6/place.js) keeps,
 // checked on its result on its own, for the tests and the flow (browser + Node).
 //
 //   checkPlacementS6(phys, sites, r) -> [errors]   r: placeS6's result (r.site by instance)

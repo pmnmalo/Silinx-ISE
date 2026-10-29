@@ -6,9 +6,9 @@
 // Output: per tile, the bits of each kind; with --json the per-pad features (pad -> 'IFD:DLYv' / 'IBUF:DLYv' ->
 // bits) and the pair features (tile -> 'j0=a,j1=b' -> bits) found.
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { parseXdl } from '../../core/xdl.js';
-import { frameData, IOB_REG_ATTRS as REG_ATTRS } from '../../core/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { frameData, IOB_REG_ATTRS as REG_ATTRS } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 
 const args = process.argv.slice(2);

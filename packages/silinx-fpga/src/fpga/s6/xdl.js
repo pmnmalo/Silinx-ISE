@@ -3,7 +3,7 @@
 // (the elements and values of the device report's primitive definitions of SLICEX / SLICEL / SLICEM, IOB, BUFG,
 // RAMB8BWER / RAMB16BWER, DSP48A1).
 //
-//   placedXdlS6(nl, packed, phys, placement, { part, name, device }) -> a design for writeXdl (core/xdl.js); with the
+//   placedXdlS6(nl, packed, phys, placement, { part, name, device }) -> a design for writeXdl (xdl.js); with the
 //     device (its routing graph) each power net is split into one net a TIEOFF, the one each pin is tied from, its
 //     source an XDL_DUMMY instance of the TIEOFF (as ISE; xdl -xdl2ncd refuses a power net with no source)
 //   lutEquation(init bits, inputs) -> 'O6' / 'O5' equation of XDL ('(A1*~A2)+…', '0', '1')

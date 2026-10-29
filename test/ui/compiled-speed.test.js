@@ -9,8 +9,8 @@ import { setupUi, uiTest, BROWSER } from './harness.js';
 import { example, exampleUcf } from '../examples-lib.mjs';
 import { designOf } from '../compiled-diff.js';
 import { compileNetlist, CompiledSim, netlistOf, portBit } from '../../core/compiled-sim.js';
-import { yosysNode } from '../../core/synth-open-node.js';
-import { parseUcf } from '../../core/ucf.js';
+import { yosysNode } from '../../packages/silinx-fpga/src/synth-open-node.js';
+import { parseUcf } from '../../packages/silinx-fpga/src/ucf.js';
 import { resolveBoard } from '../../server/devices.js';
 import { boardWiring, emulatorClocks, outputWatch } from '../../core/emulate.js';
 import { vgaPins } from '../../core/vga.js';
@@ -18,7 +18,7 @@ import { vgaPins } from '../../core/vga.js';
 let env, net, opts;
 before(async () => {
   env = await setupUi();
-  const { runOpenFlow } = await import('../../core/open-flow-core.js');
+  const { runOpenFlow } = await import('../../core/flow-ide.js');
   const ex = example('vga'), top = ex.project.top, written = {};
   const r = await runOpenFlow({ top, part: 'xc3s250ecp132-4', family: 'spartan3e', steps: ['postsynth'], simTop: ex.project.simTop },
     { log: () => {}, sources: () => ex.design, simSources: () => ex.sim, yosys: yosysNode, write: (n, d) => { written[n] = d; return `build/${n}`; }, read: () => null, save: () => {} });

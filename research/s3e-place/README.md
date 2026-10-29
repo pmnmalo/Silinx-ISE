@@ -56,7 +56,7 @@ half-perimeter wirelength with VPR's correction for nets with many pins, mixed (
 timing-driven placer, 15.10.2) with a timing cost: the sum over the connections of
 criticality^exp x their estimated delay (the device's delay table, `timing.js delayTable`: the
 fastest routes by offset; criticalities from a static timing estimate in ns with the delay model
-of `core/fpga/timing.js`, SLICEL / SLICEM arcs by the site, recomputed at every temperature; exp
+of `packages/silinx-fpga/src/fpga/timing.js`, SLICEL / SLICEM arcs by the site, recomputed at every temperature; exp
 from 1 to 8), each part normalised, lambda = timing / (2 + timing) (default timing 1.5;
 research/s3e-route/README.md, "Closing the routing gap"); clock nets (from a BUFGMUX) are left out. BUFGMUX: on the edge of the pad that drives
 it (B8 -> BUFGMUX_X2Y11, as ISE). Deterministic: the same seed gives the same placement.
@@ -128,7 +128,7 @@ simulation. The wirelength is about the same (2 927 / 2 984 / 2 901 CLB units).
 - **Clock buffer choice** follows the pad's edge with ISE's order (X2Y11 first at the top, X2Y1 at
   the bottom); the dedicated pad -> BUFGMUX routes of every GCLK pin are not known yet (par routes
   a non-dedicated one through general routing).
-- **Timing**: the timing term now uses the delay model of `core/fpga/timing.js` (fitted to ISE's
+- **Timing**: the timing term now uses the delay model of `packages/silinx-fpga/src/fpga/timing.js` (fitted to ISE's
   timing reports: the slice arcs, a connection's delay from its distance) on flip-flop to flip-flop
   paths (research/s3e-route/README.md, "Timing"); it was a rough model (a LUT 1, a connection 0.6 +
   0.12 per CLB). The routed delay depends on the router as much as on the distance.

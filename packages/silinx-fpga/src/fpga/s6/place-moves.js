@@ -1,4 +1,4 @@
-// Silinx - the Spartan-6 placer's moves (#729, core/fpga/s6/place.js): a move proposed (an object to a site in the
+// Silinx - the Spartan-6 placer's moves (#729, fpga/s6/place.js): a move proposed (an object to a site in the
 // window, swapping with what is there when that fits), its change of cost applied and measured, kept or undone.
 import { sliceFits } from './place.js';
 

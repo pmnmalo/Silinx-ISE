@@ -1,4 +1,4 @@
-// The Silinx toolchain's flow (core/open-flow-core.js) as the browser edition runs it
+// The Silinx toolchain's flow (packages/silinx-fpga/src/open-flow-core.js) as the browser edition runs it
 // (web/js/open-flow-worker.js: the device description and the bit database given as JSON, the
 // build in memory) makes the same bitstream as the application's runner (server/open-flow-run.js:
 // the files on disk): blinky on the Basys2 (XC3S250E-CP132).
@@ -10,11 +10,11 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { runOpenFlow } from '../core/open-flow-core.js';
-import { loadDevice } from '../core/fpga/device.js';
-import { dbFileNames, dbFilesFrom, makeBitDb } from '../core/fpga/bitdb.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { shippedDevicePath } from '../core/fpga/device-node.js';
+import { runOpenFlow } from '../core/flow-ide.js';
+import { loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
+import { dbFileNames, dbFilesFrom, makeBitDb } from '../packages/silinx-fpga/src/fpga/bitdb.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { shippedDevicePath } from '../packages/silinx-fpga/src/fpga/device-node.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DB_DIR = path.join(ROOT, 'packages/silinx-fpga/bitdb');
@@ -77,8 +77,8 @@ test('the browser edition\'s flow (in memory, the database as JSON) writes the b
 });
 
 test('Back-annotate Pin Locations (pin2ucf): the placer\'s pads as UCF; built again from the back-annotated UCF, the pads stay where they were (#118)', { timeout: 300000 }, async () => {
-  const { parseXdl, placedPins } = await import('../core/xdl.js');
-  const { backAnnotateUcf } = await import('../core/ucf.js');
+  const { parseXdl, placedPins } = await import('../packages/silinx-fpga/src/xdl.js');
+  const { backAnnotateUcf } = await import('../packages/silinx-fpga/src/ucf.js');
   const device = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(spec.graph)).toString('utf8')));
   const json = {};
   for (const [k, f] of Object.entries(dbFileNames(spec.device, spec.pkg))) {
@@ -296,7 +296,7 @@ test('#282 the flow\'s synthesis with Optimization Effort Normal: one Yosys run,
     assert.ok(res.ok, `${res.error}\n${lines.join('\n')}`);
     return { runs, lines: lines.filter(l => /^Optimization Effort/.test(l)), report: res.report };
   };
-  const { SMALL_RULE } = await import('../core/synth-open.js');
+  const { SMALL_RULE } = await import('../packages/silinx-fpga/src/synth-open.js');
   assert.deepEqual(SMALL_RULE, { maxLuts: 250, gain: 0 });
   // (blinky not small: a rule of no LUTs, Normal's one mapping)
   spec.smallRule = { maxLuts: 0 };
@@ -341,7 +341,7 @@ endmodule` });
   always @* begin g = 1'b0; for (i = 0; i < 48; i = i + 1) g = (ra[i] & ~rb[i]) | (~(ra[i] ^ rb[i]) & g); end
   always @(posedge clk) begin ra <= a; rb <= b; gt <= g; end
 endmodule`;
-  const { DEEP_RULE } = await import('../core/synth-open.js');
+  const { DEEP_RULE } = await import('../packages/silinx-fpga/src/synth-open.js');
   spec.deepRule = { ...DEEP_RULE, gain: 0.99 };
   try {
     const f = await run('normal', { path: 'chain.v', lang: 'verilog', text: chainText });
@@ -358,7 +358,7 @@ endmodule`;
 // comes from this port"), and a register from CLK0's flip-flops into CLKFX's is timed against the two clocks' edges
 test('Implement Design: a DCM\'s clocks with their derived PERIOD constraints, the paths from one into the other timed (#601)', { timeout: 300000 }, async () => {
   const { flow } = await import('./timesim-lib.mjs');
-  const { orderOpenSteps } = await import('../core/open-steps.js');
+  const { orderOpenSteps } = await import('../packages/silinx-fpga/src/open-steps.js');
   const src = (m, d) => [{ path: 'top.vhd', lang: 'vhdl', text: `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
 library unisim; use unisim.vcomponents.all;
 entity top is port (clk : in std_logic; led : out std_logic_vector(1 downto 0)); end;
@@ -400,7 +400,7 @@ end;` }];
 // deskewed, a falling-edge flip-flop's clock to pad from its edge, half CLK0's period later, as trce times it
 test('Implement Design: the OFFSET constraints of a DCM\'s clocks, a pad on two of them, a falling edge half a period later (#601)', { timeout: 300000 }, async () => {
   const { flow } = await import('./timesim-lib.mjs');
-  const { orderOpenSteps } = await import('../core/open-steps.js');
+  const { orderOpenSteps } = await import('../packages/silinx-fpga/src/open-steps.js');
   const src = [{ path: 'top.vhd', lang: 'vhdl', text: `library ieee; use ieee.std_logic_1164.all;
 library unisim; use unisim.vcomponents.all;
 entity top is port (clk, a : in std_logic; q, f : out std_logic); end;
@@ -440,7 +440,7 @@ end;` }];
 
 test('Implement Design: the UCF\'s OFFSET constraints checked, in the timing report and the warnings (#26)', { timeout: 300000 }, async () => {
   const { flow } = await import('./timesim-lib.mjs');
-  const { orderOpenSteps } = await import('../core/open-steps.js');
+  const { orderOpenSteps } = await import('../packages/silinx-fpga/src/open-steps.js');
   const src = [{ path: 'top.vhd', lang: 'vhdl', text: `library ieee; use ieee.std_logic_1164.all;
 entity top is port (clk, a, b : in std_logic; q, y : out std_logic); end;
 architecture rtl of top is signal r : std_logic; begin
@@ -469,7 +469,7 @@ OFFSET = IN 20 ns BEFORE "clk" ;\nNET "q" OFFSET = OUT 1 ns AFTER "clk" ;\nTIMEG
 
 test('#1103 Implement Design: a PERIOD on the clock of a single register stage (no path between two of its flip-flops) is met with no path to time, no warning; VHDL and Verilog', { timeout: 300000 }, async () => {
   const { flow } = await import('./timesim-lib.mjs');
-  const { orderOpenSteps } = await import('../core/open-steps.js');
+  const { orderOpenSteps } = await import('../packages/silinx-fpga/src/open-steps.js');
   const ucf = 'NET "clk" LOC = "B8" ;\nNET "clk" PERIOD = 20 ns ;\nNET "other" PERIOD = 10 ns ;\n';
   for (const src of [
     { path: 'top.vhd', lang: 'vhdl', text: `library ieee; use ieee.std_logic_1164.all;
@@ -495,7 +495,7 @@ end;` },
 // timing error, in the report, the warnings and the report's constraints; x 2 / 5 (100 ns, its fixture now) is met
 test('Implement Design: a DCM\'s pins against their switching limits, as trce (#661)', { timeout: 300000 }, async () => {
   const { flow } = await import('./timesim-lib.mjs');
-  const { orderOpenSteps } = await import('../core/open-steps.js');
+  const { orderOpenSteps } = await import('../packages/silinx-fpga/src/open-steps.js');
   const src = (m, d) => [{ path: 'top.vhd', lang: 'vhdl', text: `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
 library unisim; use unisim.vcomponents.all;
 entity top is port (clk : in std_logic; led : out std_logic_vector(1 downto 0)); end;

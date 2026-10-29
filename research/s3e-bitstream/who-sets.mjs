@@ -2,8 +2,8 @@
 // and ISE differ (explain-diff.mjs), the feature of the database that put it there.
 //   PART=… node who-sets.mjs design.xdl frame bit [frame bit …]
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { designFeatures, tileOf, tileBase, featureBits, parseBit } from '../../core/fpga/bitgen.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { designFeatures, tileOf, tileBase, featureBits, parseBit } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 
 const [xdl, ...pos] = process.argv.slice(2);

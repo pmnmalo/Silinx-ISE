@@ -10,8 +10,8 @@
 // (#751: an IDDR2 on one pad of each I/O tile only, the first in rdi2, the second in rdi3, the tile's other pads plain
 // inputs: ISE sets some bits only when both pads of a tile have an input register). Each: top.vhd, top.ucf.
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 import { PART } from './db.mjs';
 
 const args = process.argv.slice(2);

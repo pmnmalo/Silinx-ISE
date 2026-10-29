@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's DCMs and multipliers (#405: out of packWith in core/fpga/pack.js): a DCM_SP's pins
+// Silinx toolchain - the packer's DCMs and multipliers (#405: out of packWith in fpga/pack.js): a DCM_SP's pins
 // and settings; MULT18X18, MULT18X18S and MULT18X18SIO, their chains through BCIN (#2).
 import { paramInt } from './netlist.js';
 import { PackError } from './pack.js';

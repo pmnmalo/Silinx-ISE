@@ -9,8 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl } from '../../core/xdl.js';
-import { readBit6, bitFormat6, emptyFdri, FRAME_WORDS } from '../../core/fpga/s6/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit6, bitFormat6, emptyFdri, FRAME_WORDS } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from '../../test/s6-lib.mjs';
 import { loadDb, kindModel, predictSlice } from './check-slice6.mjs';
 import { pipDirections, pipLookup } from './check-pips6.mjs';

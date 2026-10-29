@@ -1,4 +1,4 @@
-// Yosys's JSON netlist as the packer reads it (core/fpga/netlist.js). The fixtures in
+// Yosys's JSON netlist as the packer reads it (packages/silinx-fpga/src/fpga/netlist.js). The fixtures in
 // test/fixtures/fpga/*.json are small designs (research/s3e-place/designs) synthesized by Yosys
 // (synth_xilinx -family xc3se), regenerated with research/s3e-place/fixtures.mjs.
 import { test } from 'node:test';
@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readYosysJson, paramBits, paramInt } from '../core/fpga/netlist.js';
+import { readYosysJson, paramBits, paramInt } from '../packages/silinx-fpga/src/fpga/netlist.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const load = n => readYosysJson(fs.readFileSync(path.join(FIX, `${n}.json`), 'utf8'));

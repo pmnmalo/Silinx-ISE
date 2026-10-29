@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { findDeviceGraph, shippedDevicePath, loadDeviceCache } from '../core/fpga/device-node.js';
+import { findDeviceGraph, shippedDevicePath, loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 import { resolveBoard } from '../server/devices.js';
 
 const night1 = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/night1.json', import.meta.url), 'utf8'));

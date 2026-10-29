@@ -7,7 +7,7 @@
 // the tiles its routing goes through; the clock network on its own. Selecting a module here selects
 // it in the Design hierarchy, and the other way round.
 //
-//   const v = mountFpgaView(el, { model, top, entities, onSelectModule });   // model: core/xdl.js fpgaModel
+//   const v = mountFpgaView(el, { model, top, entities, onSelectModule });   // model: packages/silinx-fpga/src/xdl.js fpgaModel
 //   v.highlightModule('Inst_data' | null); v.select(instIndex); v.showNet(netIndex); v.destroy();
 // Styles: web/css/fpgaview.css.
 import { h } from './ui.js';

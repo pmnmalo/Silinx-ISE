@@ -1,4 +1,4 @@
-// Silinx toolchain - the placer's block RAMs and multipliers (#405: out of place in core/fpga/place.js): on their
+// Silinx toolchain - the placer's block RAMs and multipliers (#405: out of place in fpga/place.js): on their
 // sites, a block RAM and the multiplier of one tile together only with ports of 18 bits at most, where their clocks'
 // lines reach; a multiplier cascade on consecutive sites of a column; the slices each clock may reach.
 import { PlaceError } from './place.js';

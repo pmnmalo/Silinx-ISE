@@ -8,7 +8,7 @@ import { cmtSiteDesigns, cmtSiteDesign } from '../research/s6/gen-cmtsites6.mjs'
 import { cmtKind, predictCmtSettings, CMT_FRAME } from '../research/s6/cmt6.mjs';
 import { cmtWindow } from '../research/s6/ana-cmtsites6.mjs';
 import { columnOf } from '../research/s6/ana-slice6.mjs';
-import { S6_DEVICES } from '../core/fpga/s6/bitstream.js';
+import { S6_DEVICES } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
 const db = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${n}.json`, import.meta.url), 'utf8'));

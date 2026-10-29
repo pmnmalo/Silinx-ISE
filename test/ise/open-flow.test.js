@@ -15,8 +15,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ROOT } from '../examples-lib.mjs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 
 const enabled = process.env.SILINX_ISE_TESTS === '1';
 // the host only from the environment (never written in a file)

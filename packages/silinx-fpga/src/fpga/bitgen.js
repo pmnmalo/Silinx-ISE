@@ -1,5 +1,5 @@
 // Silinx - bitstream generation for the Spartan-3E (browser + Node: XC3S100E, XC3S250E, XC3S500E,
-// XC3S1200E): a placed and routed design (XDL, core/xdl.js parseXdl) -> frame data -> a .bit file.
+// XC3S1200E): a placed and routed design (XDL, xdl.js parseXdl) -> frame data -> a .bit file.
 //
 // The configuration is the sum of the design's features. A feature belongs to a tile of the device
 // and sets a few bits at fixed positions relative to the tile (its column of frames and its row of
@@ -20,7 +20,7 @@ import { XC3S250E, S3E_DEVICES, writeBit, setBit } from './bitstream.js';
 /**
  * The I/O sites of the package's pins: pad name -> [tile, index of the pad among the I/O sites of
  * its tile (IOB, IBUF, DIFFM/DIFFS…, bonded or not)], so that an IOB's settings can be stored once
- * per tile type (features IOB<index>:…). It comes from the device (core/fpga/device.js, built on the
+ * per tile type (features IOB<index>:…). It comes from the device (fpga/device.js, built on the
  * device description: shipped for the XC3S250E-CP132, else built from the user's ISE), never from
  * the bit database.
  */
@@ -452,7 +452,7 @@ const IO_CLOCK = /^IOIS_CLK\d$/;
 
 /**
  * What the database lets a router use, so that its output turns into a complete bitstream
- * (core/fpga/route.js routeDesign options; exceptions: false leaves out the PIPs tiles lack, only to
+ * (fpga/route.js routeDesign options; exceptions: false leaves out the PIPs tiles lack, only to
  * measure them, research/s3e-bitstream/pip-exceptions.mjs):
  *   allowPip(tileName, from, to)   the PIP "from->to" (direction of the signal) is a feature of the
  *                                  tile's type and the layout knows where the tile is; a feature

@@ -1,7 +1,7 @@
-// The open synthesis's last depth candidates (#405: out of withDepth in core/synth-open-depth.js), each kept by
+// The open synthesis's last depth candidates (#405: out of withDepth in synth-open-depth.js), each kept by
 // DEPTH_RULE: the netlist chosen of all the others with its critical LUTs made one level shallower, their fan-out kept
-// (core/lut-resynth.js), then with its critical path's wide decodes collapsed and mapped again (#1360,
-// core/synth-open-bdd.js).
+// (lut-resynth.js), then with its critical path's wide decodes collapsed and mapped again (#1360,
+// synth-open-bdd.js).
 import { asText } from './synth-open-yosys.js';
 import { criticalDelay, pathEnds } from './synth-open-path.js';
 import { resynthCritical } from './lut-resynth.js';
@@ -13,7 +13,7 @@ import {
 /** The critical-LUT resynthesis of withDepth's chosen netlist (its ctx: run, speed, top, withResynth; its state: chosen,
  *  cells, info (info.resynth set), slices(json), sayNew(line)): { chosen, cells }, the new ones when it is kept. */
 export async function resynthStage({ run, speed, top, withResynth }, { chosen, cells, info, slices, sayNew }) {
-  // the chosen netlist's critical LUTs made one level shallower, their fan-out kept (#652, core/lut-resynth.js): the
+  // the chosen netlist's critical LUTs made one level shallower, their fan-out kept (#652, lut-resynth.js): the
   // last candidate, of the netlist chosen of all the others, kept by DEPTH_RULE
   if (speed && withResynth && !info.muxf?.failed && !info.failed && !info.sopb?.failed && !info.speedFailed && !info.wide?.failed && utilization(cells).luts <= SPEED_RULE.maxLuts) {
     try {

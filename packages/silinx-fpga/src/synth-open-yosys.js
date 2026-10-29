@@ -1,4 +1,4 @@
-// Running Yosys (#405: out of core/synth-open.js): what a failed run says (#153), its output as lines, the readable
+// Running Yosys (#405: out of synth-open.js): what a failed run says (#153), its output as lines, the readable
 // blobs of a scope, and the source of a worker that runs Yosys's WebAssembly build.
 
 

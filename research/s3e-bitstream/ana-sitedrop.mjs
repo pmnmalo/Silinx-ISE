@@ -5,9 +5,9 @@
 // of a tile type is kept, the others are reported.
 //   PART=… node ana-sitedrop.mjs dir > features.json
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { parseXdl } from '../../core/xdl.js';
-import { tileOf, tileBase, siteKind } from '../../core/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { tileOf, tileBase, siteKind } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb, edges } from './db.mjs';
 
 const dir = process.argv[2];

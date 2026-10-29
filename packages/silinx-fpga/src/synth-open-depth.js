@@ -1,4 +1,4 @@
-// The open synthesis's depth-oriented mappings (#405: out of synthesizeOpen in core/synth-open.js): a mapping's run
+// The open synthesis's depth-oriented mappings (#405: out of synthesizeOpen in synth-open.js): a mapping's run
 // and, from the design as it was before its LUT mapping, the mappings made for speed, the fastest kept by DEPTH_RULE,
 // their messages apart.
 import { asText } from './synth-open-yosys.js';
@@ -270,7 +270,7 @@ export function mountDepth(ctx) {
         sayNew(`Warning: the mapping with the wider functions failed (${e.message}): the netlist chosen before is kept`);
       }
     }
-    // the chosen netlist's critical LUTs made one level shallower (#652, core/synth-open-resynth.js)
+    // the chosen netlist's critical LUTs made one level shallower (#652, synth-open-resynth.js)
     ({ chosen, cells } = await resynthStage({ run, speed, top, withResynth }, { chosen, cells, info, slices, sayNew }));
     return { chosen, cells, info, ns: criticalDelay(chosen[`${top}.json`], top), slices: () => slices(chosen[`${top}.json`]), memories, pool };
   }

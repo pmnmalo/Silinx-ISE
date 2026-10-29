@@ -1,4 +1,4 @@
-// Web Worker: the Silinx toolchain's flow (core/open-flow-core.js: synthesis with Yosys in
+// Web Worker: the Silinx toolchain's flow (packages/silinx-fpga/src/open-flow-core.js: synthesis with Yosys in
 // WebAssembly, pack, place and route, timing, bitstream) in the browser edition, off the page's thread.
 // The device description, the bit database and Yosys are fetched from `assets` (the site's
 // assets/ folder; web/js/open-flow-browser.js chooses it).
@@ -7,12 +7,10 @@
 //   in:  { prepare: { graph, device, pkg }, assets, yosys, root }: what a run of that device fetches, fetched into
 //        Cache Storage (web/js/asset-cache.js, #967), this edition's other versions deleted from it
 //   out: { done: { fetched, bytes, pruned } }
-import { runOpenFlow } from '/core/open-flow-core.js';
-import { loadDevice } from '/core/fpga/device.js';
-import { dbFileNames, dbFilesFrom, makeBitDb } from '/core/fpga/bitdb.js';
-import { runYosysOnce, yosysWorkerSource, readableBlobs } from '/core/synth-open.js';
+import { runOpenFlow } from '/core/flow-ide.js';
+import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
-import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/core/xdl.js';
+import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
 import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES } from './asset-cache.js';
 
 // (Yosys in this worker's own thread, where it cannot start workers of its own: its Blobs readable, #556)
@@ -36,7 +34,7 @@ async function gunzipJson(res) {
 // the Yosys workers, by the URL of Yosys: kept from one run of the flow to the next
 const pools = new Map();
 const loaded = new Set();   // (the URLs of Yosys a run of this worker has loaded)
-// a Yosys worker's code: the cache first, then Yosys (core/synth-open.js)
+// a Yosys worker's code: the cache first, then Yosys (packages/silinx-fpga/src/synth-open.js)
 const yosysSource = bundle => assetFetchSource() + yosysWorkerSource(bundle);
 
 /** What a run of the device fetches, fetched into the cache: { fetched, bytes, pruned }. */

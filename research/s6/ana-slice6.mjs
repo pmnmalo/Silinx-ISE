@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readBit6, bitFormat6, FRAME_WORDS } from '../../core/fpga/s6/bitstream.js';
+import { readBit6, bitFormat6, FRAME_WORDS } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
 /** The first frame and the frame count of the column holding a frame (index in FDRI's frames). */
 export function columnOf(dev, frame) {

@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
 import { scratchEnv, makeFakes, isolatedPath, startApp, waitJob, waitLine, writeConfig, makeBit, POSIX_ONLY } from './server-helpers.js';
-import { checkUcf } from '../core/ucf.js';
+import { checkUcf } from '../packages/silinx-fpga/src/ucf.js';
 
 let tmp, fakes, app, jobs, P, oldPath;
 const FAKE_ENV = ['FAKE_ISE_FAIL', 'FAKE_ISE_SLEEP', 'FAKE_ISE_LOG', 'FAKE_DOCKER_NO_IMAGE', 'FAKE_DOCKER_LOG', 'FAKE_SSH_LOG', 'FAKE_SSH_FAIL'];

@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's LUTs and flip-flops (#405: out of packWith in core/fpga/pack.js): the LUTs and
+// Silinx toolchain - the packer's LUTs and flip-flops (#405: out of packWith in fpga/pack.js): the LUTs and
 // flip-flops left, in units packed into slices by their affinity, the critical ones first (the timing-driven packing).
 import { CRIT_BONUS, CRIT_PAIR, connectionCriticality } from './pack.js';
 

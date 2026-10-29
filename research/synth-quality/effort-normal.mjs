@@ -11,8 +11,9 @@ import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL }
 const R = new URL('../../', import.meta.url).pathname;
 const { compile, elaborate } = await import(R + 'core/compile.js');
 const { primitiveSources } = await import(R + 'core/unisim.js');
-const { synthesizeOpen, criticalDelay, logicLevels } = await import(R + 'core/synth-open.js');
-const { yosysNode } = await import(R + 'core/synth-open-node.js');
+const { synthesizeOpen } = await import(R + 'core/synth-front.js');
+const { criticalDelay, logicLevels } = await import(R + 'packages/silinx-fpga/src/synth-open.js');
+const { yosysNode } = await import(R + 'packages/silinx-fpga/src/synth-open-node.js');
 const { sourceDir } = await import(pathToFileURL(R + 'scripts/fetch-design-corpus.mjs').href);
 const manifest = JSON.parse(fs.readFileSync(R + 'test/designs-corpus/manifest.json', 'utf8'));
 const HERE = R + 'test/designs-corpus';

@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
 import { toVerilog } from '../core/synth-verilog.js';
-import { synthCommands, yosysFiles, cellCounts, utilization } from '../core/synth-open.js';
+import { synthCommands, yosysFiles, cellCounts, utilization } from '../packages/silinx-fpga/src/synth-open.js';
 import { abc9Commands, wayScript, table, WAYS } from '../research/synth-quality/abc9.mjs';
 import { compareNetlist } from './diff-synth.js';
 
@@ -29,7 +29,7 @@ test('ABC9 measurement: the open synthesis up to its LUT mapping, then synth_xil
 });
 
 test('ABC9 with Yosys: an AND of 12 is 4 LUT4s, a 5-stage shift register one SRL16E and a flip-flop, each mapping equal to the RTL', { timeout: 300000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   const src = 'module top(input clk, input [11:0] a, input d, output y, output q); reg [4:0] r = 0;\n'
     + '  always @(posedge clk) r <= {r[3:0], d};\n  assign y = &a; assign q = r[4];\nendmodule\n';
   const design = elaborate(compile([{ path: 'top.v', lang: 'verilog', text: src }]), 'top');

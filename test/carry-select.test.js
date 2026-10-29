@@ -1,4 +1,4 @@
-// Carry-select adders (#1361, core/synth-open.js CSEL_RULE / CSEL_MAP): a netlist with a carry chain of CSEL_RULE.chain stages
+// Carry-select adders (#1361, packages/silinx-fpga/src/synth-open.js CSEL_RULE / CSEL_MAP): a netlist with a carry chain of CSEL_RULE.chain stages
 // or more is synthesized once more with its $alu cells that wide as segments of CSEL_RULE.segment bits, each but the first
 // computed for a carry in of 0 and of 1 and chosen by the carry out of the segment below; kept when faster by the estimate
 // with no more slices in proportion. Wide adders, a subtractor and a comparator (the $alu's BI and carries), in Verilog and
@@ -6,8 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen, longestCarryChain, criticalDelay, cellCounts, CSEL_RULE, CSEL_FILE, CSEL_MAP } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { longestCarryChain, criticalDelay, cellCounts, CSEL_RULE, CSEL_FILE, CSEL_MAP } from '../packages/silinx-fpga/src/synth-open.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { compareNetlist } from './diff-synth.js';
 
 test('#1361 longestCarryChain: the MUXCY cells one after the other, the longest of the netlist', () => {

@@ -22,8 +22,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generate, moduleText, reductions, moduleSize, FAMILIES } from './vloghammer-gen.mjs';
 import { frontEnd, compareNetlist, diffSynth } from '../diff-synth.js';
-import { cellCounts } from '../../core/synth-open.js';
-import { yosysNode } from '../../core/synth-open-node.js';
+import { cellCounts } from '../../packages/silinx-fpga/src/synth-open.js';
+import { yosysNode } from '../../packages/silinx-fpga/src/synth-open-node.js';
 
 const VECTORS = 64;
 

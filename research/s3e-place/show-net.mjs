@@ -1,6 +1,6 @@
 // Print the cells of a Yosys JSON netlist with their connections: node show-net.mjs net.json [type regex]
 import fs from 'node:fs';
-import { readYosysJson } from '../../core/fpga/netlist.js';
+import { readYosysJson } from '../../packages/silinx-fpga/src/fpga/netlist.js';
 const nl = readYosysJson(fs.readFileSync(process.argv[2], 'utf8'));
 const re = new RegExp(process.argv[3] || '.');
 const nn = k => nl.nets[k].name;

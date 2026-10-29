@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { compile, elaborate } from '../core/compile.js';
 import { toVerilog } from '../core/synth-verilog.js';
-import { DEPTH_ABC } from '../core/synth-open.js';
+import { DEPTH_ABC } from '../packages/silinx-fpga/src/synth-open.js';
 import { scripts, parseCounts, table } from '../research/epfl-records/measure.mjs';
 import { qualityPage } from '../test/designs-corpus/quality-page.mjs';
 
@@ -39,7 +39,7 @@ test('EPFL measurement: the area and depth scripts (Silinx\'s depth-oriented ABC
 });
 
 test('EPFL measurement with Yosys: circuits whose LUT-6 mapping is known (an AND of 12: 3 LUTs in 2 levels; an XOR of 6: 1)', { timeout: 300000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   const design = elaborate(compile([{ path: 'a.v', lang: 'verilog', text: 'module top(input [11:0] a, input [5:0] b, output y, output z); assign y = &a; assign z = ^b; endmodule' }]), 'top');
   const flat = toVerilog(design);
   for (const [kind, script] of Object.entries(scripts('flat.v', flat.top))) {

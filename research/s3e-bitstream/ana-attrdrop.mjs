@@ -2,9 +2,9 @@
 // relative to the CLB tile (the pattern found in most tiles; the others are reported).
 //   node ana-attrdrop.mjs dir > features.json
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { parseXdl } from '../../core/xdl.js';
-import { tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 
 const dir = process.argv[2];

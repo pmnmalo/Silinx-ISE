@@ -7,7 +7,7 @@ import { hardBase, hardVariants, contents, hardDesigns, siteSlots, widthPairs, H
 import { bitY, tileRegions, tileOf, bitsByTile, siteById } from '../research/s6/ana-hard6.mjs';
 import { hexBits, fieldIndices, predictHard } from '../research/s6/hard6.mjs';
 import { gridRegion } from '../research/s6/ana-pipdrop6.mjs';
-import { S6_DEVICES } from '../core/fpga/s6/bitstream.js';
+import { S6_DEVICES } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
 const hard = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-hard.json', import.meta.url), 'utf8'));
@@ -16,7 +16,7 @@ const sitesOf = type => device.sites().filter(s => s.type === type).sort((a, b) 
 
 test('gen-hard6: the base settings as Silinx writes them, the variants one element each, the combinations', () => {
   const r8 = new Map(hardBase('RAMB8BWER')), r16 = new Map(hardBase('RAMB16BWER')), dsp = new Map(hardBase('DSP48A1'));
-  // the inverters as their pins, the widths the widest of TDP, no register, SYNC (core/fpga/s6/xdl.js bramCfg / dspCfg)
+  // the inverters as their pins, the widths the widest of TDP, no register, SYNC (packages/silinx-fpga/src/fpga/s6/xdl.js bramCfg / dspCfg)
   assert.equal(r8.get('CLKAWRCLKINV'), 'CLKAWRCLK');
   assert.equal(r8.get('DATA_WIDTH_A'), '18');
   assert.equal(r8.get('RAM_MODE'), 'TDP');

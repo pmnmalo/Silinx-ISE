@@ -1,4 +1,4 @@
-// The parts of the placer (#405: out of place in core/fpga/place.js): the pads (place-pads.js) and the slices
+// The parts of the placer (#405: out of place in packages/silinx-fpga/src/fpga/place.js): the pads (place-pads.js) and the slices
 // (place-slices.js) mounted alone on a packed counter and the test device: the LOC'd I/Os on their pads, the free
 // pads the others may take, two ports on one pad refused; every slice on a slice site of its own, the occupancy
 // kept, too many slices refused. The DCMs, I/O pads, clock buffers, block RAMs and multipliers and the moves
@@ -8,17 +8,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdlrc } from '../core/xdl.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack } from '../core/fpga/pack.js';
-import { deviceSites, place, rng, PlaceError } from '../core/fpga/place.js';
-import { mountPads } from '../core/fpga/place-pads.js';
-import { mountSlices } from '../core/fpga/place-slices.js';
-import { mountDcms } from '../core/fpga/place-dcms.js';
-import { mountIobs } from '../core/fpga/place-iobs.js';
-import { mountBufgs } from '../core/fpga/place-bufgs.js';
-import { mountHard } from '../core/fpga/place-hard.js';
-import { mountMoves } from '../core/fpga/place-moves.js';
+import { parseXdlrc } from '../packages/silinx-fpga/src/xdl.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { deviceSites, place, rng, PlaceError } from '../packages/silinx-fpga/src/fpga/place.js';
+import { mountPads } from '../packages/silinx-fpga/src/fpga/place-pads.js';
+import { mountSlices } from '../packages/silinx-fpga/src/fpga/place-slices.js';
+import { mountDcms } from '../packages/silinx-fpga/src/fpga/place-dcms.js';
+import { mountIobs } from '../packages/silinx-fpga/src/fpga/place-iobs.js';
+import { mountBufgs } from '../packages/silinx-fpga/src/fpga/place-bufgs.js';
+import { mountHard } from '../packages/silinx-fpga/src/fpga/place-hard.js';
+import { mountMoves } from '../packages/silinx-fpga/src/fpga/place-moves.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const dev = deviceSites(parseXdlrc(fs.readFileSync(path.join(FIX, 'place-device.xdlrc'), 'utf8')));

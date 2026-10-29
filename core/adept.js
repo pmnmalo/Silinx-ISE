@@ -12,7 +12,7 @@
 // out on endpoint 3 and in on endpoint 4, then the command again with bit 7 set returns how many
 // bits were sent and received.
 
-import { splitBitPart } from './family.js';
+import { splitBitPart } from '../packages/silinx-fpga/src/parts.js';
 
 export const ADEPT_VENDOR = 0x1443;
 export const ADEPT_FILTERS = [{ vendorId: ADEPT_VENDOR }];

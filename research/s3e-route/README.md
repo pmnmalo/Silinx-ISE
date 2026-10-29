@@ -3,15 +3,15 @@
 Silinx's router for the Xilinx Spartan-3E XC3S250E-4CP132 (Digilent Basys2), checked against
 Xilinx ISE 14.7, following the method in [docs/OPEN-TOOLCHAIN.md](../../docs/OPEN-TOOLCHAIN.md).
 
-- `core/fpga/device.js`: the routing graph of the device (browser + Node).
-- `core/fpga/device-node.js`: its cache file (Node only).
-- `core/fpga/route.js`: the router (PathFinder) and a routing check.
-- `core/xdl.js` `writeXdl()`: a design back to XDL text.
+- `packages/silinx-fpga/src/fpga/device.js`: the routing graph of the device (browser + Node).
+- `packages/silinx-fpga/src/fpga/device-node.js`: its cache file (Node only).
+- `packages/silinx-fpga/src/fpga/route.js`: the router (PathFinder) and a routing check.
+- `packages/silinx-fpga/src/xdl.js` `writeXdl()`: a design back to XDL text.
 
 | Script | What it does |
 |---|---|
 | `build-device.mjs` | Builds the graph cache from the full device report; prints sizes and load time |
-| `timing-fit.mjs` | Fits the wire delay model of `core/fpga/timing.js` to ISE's `reportgen -delay` of routed designs |
+| `timing-fit.mjs` | Fits the wire delay model of `packages/silinx-fpga/src/fpga/timing.js` to ISE's `reportgen -delay` of routed designs |
 | `route.mjs` | Removes a design's PIPs, routes it, writes the XDL, checks it against the graph (`--known`: only PIPs of known bits) |
 | `open-flow.mjs` | The fully open flow for a project: synthesis (Silinx + Yosys), pack, place, route on known PIPs, Silinx's bitgen |
 | `ise-open-check.sh` | Inside the ISE container, the oracle of the open flow: `xdl -xdl2ncd`, `drc`, `bitgen` (CRC on / off), `trce -a`, `reportgen -delay` |
@@ -160,7 +160,7 @@ node research/s3e-route/open-flow.mjs ~/Silinx-projects/lab11 out/lab11
 What it took, besides chaining the steps:
 
 - **Router restricted to known switches** (`routeDesign(design, device, knownRouting(db))`,
-  `core/fpga/bitgen.js`): a PIP may be used only if its feature `from->to` (wires in the direction
+  `packages/silinx-fpga/src/fpga/bitgen.js`): a PIP may be used only if its feature `from->to` (wires in the direction
   of the signal, so a bidirectional `BX0 =- BY1` is checked the way it is used) is in the database
   for the tile's type (named as bitgen names it: `CLB` -> `CENTER_SMALL` / `CENTER_SMALL_BRK`…) and
   the layout knows the tile. A feature with no bits counts only for dedicated wires (carry chain,
@@ -225,10 +225,10 @@ Still missing for every placement to route (for the measurement of the database)
 21.3-23.9 ns; blinky 11.5 ns from 12.1-13.3 ns** — still fully open (known PIPs only, bitstream
 complete, byte-identical to ISE's bitgen, DRC clean). Pieces:
 
-- `core/fpga/timing.js`: a delay model of the XC3S250E -4 and a static timing analysis (STA).
-- `core/fpga/route.js`: timing-driven routing (`routeDesign(…, { timing: true })`), the default of
+- `packages/silinx-fpga/src/fpga/timing.js`: a delay model of the XC3S250E -4 and a static timing analysis (STA).
+- `packages/silinx-fpga/src/fpga/route.js`: timing-driven routing (`routeDesign(…, { timing: true })`), the default of
   `open-flow.mjs` (`--timing-route 0` turns it off); `clockReach()`.
-- `core/fpga/place.js`: the timing term in ns with the same model; `clockSites` keeps each clock's
+- `packages/silinx-fpga/src/fpga/place.js`: the timing term in ns with the same model; `clockSites` keeps each clock's
   flip-flops on the slices its global line reaches through known switches.
 - `timing-fit.mjs`: fits the wire model; `scripts/check-open-flow.mjs` now takes open-flow options
   per project and, with `SILINX_KEEP=1`, keeps ISE's `routed.twr` (`trce -a -v 3`) and
@@ -467,7 +467,7 @@ designs: the corpus on the XC3S1200E, the examples on the XC3S250E):
 3. **Logic depth** (the synthesis, research/synth-quality/README.md "Logic depth"): a second LUT
    mapping with ABC's SOP balancing, kept when faster. EPFL max 71 -> 37 ns, priority 43 -> 17,
    geometric mean -6.0 %.
-4. **Register replication** (`core/fpga/replicate.js`, #4): after placing and routing, the
+4. **Register replication** (`packages/silinx-fpga/src/fpga/replicate.js`, #4): after placing and routing, the
    flip-flops with at least 8 loads whose output has a connection of criticality >= 0.98 and
    >= 1.0 ns (at most 8 of them) are copied, one copy per group of up to 16 loads (k-means on the
    tiles the loads were placed on; the group nearest the flip-flop keeps it); the netlist is packed,
@@ -491,7 +491,7 @@ designs: the corpus on the XC3S1200E, the examples on the XC3S250E):
    each from 3-4 flip-flops, which ISE's map packs shallower; and sync resets as logic in the D
    LUTs (Yosys `dffunmap -srst-only` before map_ffs) was -2 % on ch-intrinsics, +4 % on usb-phy
    (median of 6 seeds), not kept.
-   The flows place and route through one helper, `core/fpga/place-route.js` (`placeRouteBest`:
+   The flows place and route through one helper, `packages/silinx-fpga/src/fpga/place-route.js` (`placeRouteBest`:
    the placer with the delay table, tries, routing, STA, replication): the app's
    (`server/open-flow-run.js`), `open-flow.mjs` and the design corpus's
    (`test/designs-corpus/run.mjs`, which placed without the delay table and did not replicate
@@ -529,7 +529,7 @@ not comparable).
 The Silinx toolchain's *Post-Place & Route Simulation Model* (`core/sim-model.js` postParModels) writes the routed
 design as SIMPRIM primitives and its timing as an SDF file (`core/sdf.js`): every connection's delay (PORT, the
 static timing's, on the elements that read the site pin) and every element's paths (IOPATH; each path through a
-slice of `core/fpga/timing.js` split over the elements it goes through, so that their sum is the timing's) and setup
+slice of `packages/silinx-fpga/src/fpga/timing.js` split over the elements it goes through, so that their sum is the timing's) and setup
 checks (SETUPHOLD). Silinx's simulator applies an SDF by building it into the netlist (`annotateSdf`: transport wire
 delays, inertial gate delays, clock to out, setup checks from 100 ns on, as glbl's GSR).
 
@@ -689,7 +689,7 @@ PERIOD) by ISE's own flow on the Basys2-250 and brings back trce's reports; 23 d
 - The flip-flops' Tcp (1.596 ns, a 0.798 ns pulse each way) and the global buffers have their limits too, far beyond
   any period a design meets here: left out.
 
-`core/fpga/timing.js checkSwitching` checks these (DCM_LIMITS), in the flows' timing report, warnings and Design
+`packages/silinx-fpga/src/fpga/timing.js checkSwitching` checks these (DCM_LIMITS), in the flows' timing report, warnings and Design
 Summary. They are not checked in the packer: map and par accept such a DCM; it is a timing error, from the PERIOD.
 
 ## The critical path's routing against ISE's (#651, 2026-10-20)
@@ -755,7 +755,7 @@ What it says:
   ones are 1.3–1.8 times the table at every distance (the table has no fanout and no congestion), about evenly,
   so it does not mislead the placer at short distances more than at long ones.
 
-**The change (#662): the router's polish of the critical path** (`core/fpga/route.js`). Once the routing is
+**The change (#662): the router's polish of the critical path** (`packages/silinx-fpga/src/fpga/route.js`). Once the routing is
 legal, the timing passes are 4 (were 2), at a present factor of 1 (`timingPf`), so that a critical net can take
 a contested wire; then the critical path's connections one at a time, the slowest first: its own branch (from
 the load up to where it leaves the net's tree) routed again on the wires no other net uses, else on those of
@@ -876,7 +876,7 @@ Tried (each on the same placements; geometric mean of the period by the analysis
 | the branch-load term without counting the node's own branches twice | −0.05 % (7 worse, 7 better) | | no |
 | **the polish: the whole net routed again with the max weighting, and a 16-step lookahead with free moves** | **−0.33 %** (none worse) | **−0.49 %** (none worse) | **yes** |
 
-The polish (core/fpga/route.js) now has, besides #662's moves (a connection's own branch on free wires, then on
+The polish (packages/silinx-fpga/src/fpga/route.js) now has, besides #662's moves (a connection's own branch on free wires, then on
 other nets' wires): the whole net of a connection of the critical path routed again on free wires (and its own),
 its branch loads weighted by the most critical load below a node (`polishNet`, default on); and, when no move
 gains, a lookahead (`lookahead`, 16): one of the path's three slowest connections made faster on free wires (else
@@ -932,7 +932,7 @@ mean of the period; place and route time):
 
 The routed delays fed back into the placer gain least: the cool annealing from the first placement stays in its
 neighbourhood, and the connections that routed slowly are those of many loads, which a move does not make shorter. A
-placement from another seed is a different neighbourhood. So the flows (`core/open-flow-core.js`) make `HIGH_TRIES` (2)
+placement from another seed is a different neighbourhood. So the flows (`packages/silinx-fpga/src/open-flow-core.js`) make `HIGH_TRIES` (2)
 placements at Optimization Effort High, seeds 1 and 2, and keep the faster, then register replication from it, as
 before; Normal makes one (its place and route stays as fast).
 
@@ -957,7 +957,7 @@ At Normal, the default, the designs furthest from ISE were small ones (the weekl
 static timing on today's main: itc99-b05 1.21×, b10 1.20×, b12 1.15×, epfl-i2c and uart-for-fpga 1.09×), whose critical
 path is mostly routing above the placement's floor; at High, with its two placements, they were 0.94-1.06×. So Normal
 now makes two placements too (`NORMAL_TRIES`: seeds 1 and 2, the faster kept, then register replication) for a design
-of 500 slices at most, and one for a larger one (`effortTries` in core/fpga/place-route.js).
+of 500 slices at most, and one for a larger one (`effortTries` in packages/silinx-fpga/src/fpga/place-route.js).
 
 The corpus's 53 designs of 1500 LUTs at most and the 7 examples at Normal (main 1d895f9, the same netlists placed and
 routed by each variant, seed 1; Silinx's static timing):

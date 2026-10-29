@@ -16,7 +16,7 @@ const jobs = await import('../server/jobs.js');
 const ise = await import('../server/ise.js');
 const tc = await import('../server/toolchain.js');
 const xise = await import('../server/xise.js');
-const fam = await import('../core/family.js');
+const fam = await import('../packages/silinx-fpga/src/family.js');
 const { createZip, readZip } = await import('../core/zip.js');
 const { IDENT, topNameError } = await import('../server/ident.js');
 

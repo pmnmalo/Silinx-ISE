@@ -1,7 +1,7 @@
 // Silinx - the FPGA view's site details (#405: out of mountFpgaView in web/js/fpgaview.js): the selected site's
 // kind, module, configuration, pins and their nets, and how its LUTs implement their functions (their contents).
 import { h } from './ui.js';
-import { lutTable } from '/core/xdl.js';
+import { lutTable } from '/packages/silinx-fpga/src/parts.js';
 import { isIo, isSlice, moduleAt, sliceDiagram } from './fpgaview.js';
 
 /** { details } of mountFpgaView (level(), selInst(): its current values). */

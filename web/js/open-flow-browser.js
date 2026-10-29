@@ -1,14 +1,14 @@
 // The Silinx toolchain in the browser edition (the single-file Silinx-ISE.html, on GitHub Pages):
 // Implement Design / Generate Programming File without any server or Xilinx tool. The flow is
-// core/open-flow-core.js, run in a Web Worker (web/js/open-flow-worker.js); the device descriptions,
+// packages/silinx-fpga/src/open-flow-core.js, run in a Web Worker (web/js/open-flow-worker.js); the device descriptions,
 // the bit database and Yosys (WebAssembly) are fetched from the site's assets/ folder (published
 // with the page: .github/workflows/pages.yml).
 import { unconstrainedPorts } from '/core/auto-pins.js';
 import { isGeneratedSource, viewHdl } from '/core/view-hdl.js';
 import { compile } from '/core/compile.js';
-import { synthEffort } from '/core/synth-open.js';
+import { synthEffort } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
-import { OPEN_STEPS, orderOpenSteps } from '/core/open-steps.js';
+import { OPEN_STEPS, orderOpenSteps } from '/packages/silinx-fpga/src/parts.js';
 
 // the devices whose device description and bit database are published (packages/silinx-fpga/devices,
 // packages/silinx-fpga/bitdb): device/package -> the description's file
@@ -56,7 +56,7 @@ export function browserOpenStatus(device = {}) {
 }
 
 const ALIASES = { implement: 'par', impl: 'par', synthesize: 'synth', xst: 'synth', ngdbuild: 'translate', place: 'par', route: 'par', timing: 'trce', bit: 'bitgen' };
-/** The steps of a run: the chain from synthesis to the last step asked for (core/open-steps.js, as the server's openSteps). */
+/** The steps of a run: the chain from synthesis to the last step asked for (packages/silinx-fpga/src/open-steps.js, as the server's openSteps). */
 export function browserSteps(steps, { synthUpToDate = false } = {}) {
   const set = new Set((Array.isArray(steps) ? steps : [steps]).filter(Boolean).map(s => ALIASES[String(s).toLowerCase()] || String(s).toLowerCase()));
   const bad = [...set].filter(s => !OPEN_STEPS.includes(s));
@@ -94,7 +94,7 @@ function stopWorker(error) {
 /**
  * Run the flow for a project. project: { name, top, device, board, files: [{ path, lang, role }],
  * constraints, impl }; files: { path: text } (the project's files, and build/ of an earlier run);
- * steps as the processes ask; resources: the part's (core/resources.js resourcesOf), for the synthesis's used of available (#795); synthUpToDate ({ report }), the synthesis up to date (#280). onLine(line); onWrite(path, data) for each file of the build.
+ * steps as the processes ask; resources: the part's (packages/silinx-fpga/src/resources.js resourcesOf), for the synthesis's used of available (#795); synthUpToDate ({ report }), the synthesis up to date (#280). onLine(line); onWrite(path, data) for each file of the build.
  * signal (an AbortSignal): Stop; the worker is terminated and the run rejects with { cancelled: true }.
  * Resolves { ok, report, error, view }.
  */

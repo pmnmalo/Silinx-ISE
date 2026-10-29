@@ -13,13 +13,13 @@ import path from 'node:path';
 import { EXAMPLES, example, exampleUcf, ROOT } from './examples-lib.mjs';
 import { designOf, rng } from './compiled-diff.js';
 import * as V from '../core/values.js';
-import { parseUcf } from '../core/ucf.js';
+import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
 import { resolveBoard } from '../server/devices.js';
 import { boardWiring, emulatorClocks, lcdState, lcdText, timingGenerics, autoTimeScale, scaledGenerics } from '../core/emulate.js';
 import { netlistOf } from '../core/compiled-sim.js';
 import { CompiledBoard } from '../core/emulate-compiled.js';
 import { hostBoard, RemoteBoard, boardInit } from '../core/emulate-remote.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 const boardOf = (id) => { const r = resolveBoard(id); return { id, name: r.board.name, device: r.device, resources: r.resources }; };
 const ucfPort = (p) => { const t = p.sig.t, bus = t.w > 1 || (t.kind === 'logic' && !t.scalar); return { name: p.name, dir: p.dir, width: t.w, msb: bus ? t.left : null, lsb: bus ? t.right : null }; };

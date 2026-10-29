@@ -1,5 +1,5 @@
 // Silinx toolchain - the packer's placed elements and the slices under construction (#405: out of packWith in
-// core/fpga/pack.js): the sites' pins of the cells, the LUTs (a cell, a copy, a route-through) in a slice's slots, the
+// fpga/pack.js): the sites' pins of the cells, the LUTs (a cell, a copy, a route-through) in a slice's slots, the
 // flip-flops' control sets.
 import { paramBits, paramInt } from './netlist.js';
 import { LUT_K, PackError, clean, ffKind } from './pack.js';

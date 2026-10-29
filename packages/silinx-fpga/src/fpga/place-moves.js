@@ -1,4 +1,4 @@
-// Silinx toolchain - the placer's moves (#405: out of place in core/fpga/place.js): a move proposed (a group of
+// Silinx toolchain - the placer's moves (#405: out of place in fpga/place.js): a move proposed (a group of
 // slices to another anchor, an I/O to another pad, a block RAM or multiplier to another site, swapping with what is
 // there), its change of cost (the nets' bounding boxes kept up to date, the connections' delays), and its commit.
 import { BOX_SCAN, bankOfPad } from './place.js';

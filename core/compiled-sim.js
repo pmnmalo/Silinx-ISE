@@ -27,7 +27,7 @@
 // here, a cascaded DCM with its RST driven) is a CompileError with the reason: the emulator then keeps the
 // event-driven simulator.
 //
-//   const sim = await compileDesign(design, { run })   // run: Yosys (core/synth-open-node.js yosysNode, the browser's worker)
+//   const sim = await compileDesign(design, { run })   // run: Yosys (packages/silinx-fpga/src/synth-open-node.js yosysNode, the browser's worker)
 //   sim.set('sw', 5); sim.cycle(1000); sim.get('led') -> 0x2an
 //
 // Isomorphic ES module (browser + Node), no DOM.
@@ -57,7 +57,7 @@ export const gateLevel = primitives => primitives.some(p => /^(X_)?LUT\d/.test(p
 
 /**
  * The design's word-level netlist (Yosys's JSON, parsed): { json, top, warnings: [messages] }.
- * run(args, files, onLine): Yosys (as core/synth-open.js synthesizeOpen's); words: a gate-level model at word level
+ * run(args, files, onLine): Yosys (as core/synth-front.js synthesizeOpen's); words: a gate-level model at word level
  * and its irregular logic as tables (core/compiled-words.js, #650, core/compiled-tables.js, #659; false: bit by bit, as
  * Yosys reads it).
  */

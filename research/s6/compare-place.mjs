@@ -9,9 +9,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl } from '../../core/xdl.js';
-import { placeS6, crossing } from '../../core/fpga/s6/place.js';
-import { checkPlacementS6 } from '../../core/fpga/s6/place-check.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { placeS6, crossing } from '../../packages/silinx-fpga/src/fpga/s6/place.js';
+import { checkPlacementS6 } from '../../packages/silinx-fpga/src/fpga/s6/place-check.js';
 import { EXAMPLE_ORDER } from '../../core/examples.js';
 import { S6_BOARDS, s6Device, s6Example } from '../../test/s6-lib.mjs';
 

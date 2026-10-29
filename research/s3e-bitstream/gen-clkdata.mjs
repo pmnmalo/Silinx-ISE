@@ -6,9 +6,9 @@
 // (gen-pipdrop.mjs, ana-pipdrop.mjs, pips-to-db.mjs: measure-clkdata.sh).
 //   PART=xc3s250ecp132-4 node gen-clkdata.mjs outdir routed.xdl…   (outdir/a0/top.xdl, a1/…: one per round and design)
 import fs from 'node:fs';
-import { parseXdl, writeXdl } from '../../core/xdl.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { knownRouting } from '../../core/fpga/bitgen.js';
+import { parseXdl, writeXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { knownRouting } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { PART, loadDb } from './db.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

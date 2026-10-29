@@ -176,7 +176,7 @@ test('open mode: Implement + Generate Programming File of blinky, for real: step
   assert.match(log, /constraint PERIOD 20 ns on clk: met/);
   assert.match(log, /Bitstream: build\/top\.bit \(\d+ bytes, every feature in the bit database\)/);
   // the warnings, exactly: none for blinky (Yosys's "Shift register inference not yet supported
-  // for family xc3se", printed on every run, is not one: core/synth-open.js QUIET)
+  // for family xc3se", printed on every run, is not one: packages/silinx-fpga/src/synth-open.js QUIET)
   assert.deepEqual(j.lines.filter(l => /warning/i.test(l)), []);
   assert.deepEqual(j.result.warnings, []);
   const dir = P.projectDir('Blinky');
@@ -353,7 +353,7 @@ test('open mode: a design with errors fails in Synthesize with the messages; Sto
 });
 
 test('Build Device Description: xdl -report through docker, gzipped there, packed into ~/.silinx/devices', { skip: POSIX_ONLY, timeout: 60000 }, async () => {
-  const { devicesDir, findDeviceGraph, loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { devicesDir, findDeviceGraph, loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   await writeConfig({ mode: 'silinx', open: { iseMode: 'docker' }, docker: { image: 'silinx/ise:14.7' } });
   const tcr = (await app.call('GET', '/toolchain')).body;
   assert.equal(tcr.deviceBuilder.mode, 'docker');
@@ -396,7 +396,7 @@ test('Build Device Description: xdl -report through docker, gzipped there, packe
 });
 
 test('Build Device Description: over ssh (ISE on the host, then a docker image there); ISE not configured', { skip: POSIX_ONLY, timeout: 60000 }, async () => {
-  const { devicesDir } = await import('../core/fpga/device-node.js');
+  const { devicesDir } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   await fs.rm(path.join(devicesDir(), 'xc3s50etq144-4.json.gz'), { force: true });
   await writeConfig({ mode: 'silinx', open: { iseMode: 'ssh' }, ssh: { host: 'build-box', user: 'me', remoteDir: 'sx' } });
   process.env.FAKE_SSH_LOG = path.join(tmp, 'ssh.log');
@@ -421,9 +421,9 @@ test('Build Device Description: over ssh (ISE on the host, then a docker image t
 });
 
 test('deviceGrid: the FPGA view\'s grid from a device description equals the one from the device report', async () => {
-  const { deviceGrid, parseXdlrc } = await import('../core/xdl.js');
-  const { packDeviceFile } = await import('../core/fpga/device-node.js');
-  const { loadDevice } = await import('../core/fpga/device.js');
+  const { deviceGrid, parseXdlrc } = await import('../packages/silinx-fpga/src/xdl.js');
+  const { packDeviceFile } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const { loadDevice } = await import('../packages/silinx-fpga/src/fpga/device.js');
   const g = deviceGrid(loadDevice(await packDeviceFile(XDLRC)));
   const x = parseXdlrc(await fs.readFile(XDLRC, 'utf8'));
   assert.equal(g.part, x.part);

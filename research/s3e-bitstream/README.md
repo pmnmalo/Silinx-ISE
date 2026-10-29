@@ -44,10 +44,10 @@ reference design implemented by ISE (`top.xdl`, `top.bit`, from `top.v` / `top.u
 | `gen-attrdrop.mjs`, `ana-attrdrop.mjs`, `gen-slicedb.mjs`, `gen-slicetable.mjs` | Stage C: slice settings in every slice position |
 | `ana-residual.mjs`, `explain-diff.mjs` | What the database does not explain in designs implemented by ISE, per tile and feature |
 | `measure-db.sh`, `want-pips.mjs`, `diff-db.mjs` | #48: the XC3S250E's experiments made again with ISE (the PIPs to measure: those of the database; resumable, also from the remote work folders), and the rebuilt database compared with the committed one (`--resolved`: as bitgen reads it; `--missing`: what the experiments do not reach) |
-| `gen-layout.mjs`, `merge-db.mjs`, `build-db.sh`, `db.mjs` | Build the database (`packages/silinx-fpga/bitdb/*.json`) from the experiments' results; `db.mjs` gives the experiments the one loader, `core/fpga/bitdb-node.js` (the open flow's and the interface's, #407: `loadDb(part)`); the pads of the package (pin -> I/O tile) are not in it: it takes them from the device description (`padsFromDevice`) |
+| `gen-layout.mjs`, `merge-db.mjs`, `build-db.sh`, `db.mjs` | Build the database (`packages/silinx-fpga/bitdb/*.json`) from the experiments' results; `db.mjs` gives the experiments the one loader, `packages/silinx-fpga/src/fpga/bitdb-node.js` (the open flow's and the interface's, #407: `loadDb(part)`); the pads of the package (pin -> I/O tile) are not in it: it takes them from the device description (`padsFromDevice`) |
 | `measured/` | Results of the analyses that `build-db.sh` merges (slice harnesses, learned and corrected features: our own observations, no Xilinx files) |
 | `learn-single.mjs`, `unify-io.mjs` | Features measured in the reference designs; shared switch boxes of the I/O tile types |
-| `check-writer.mjs` | Acceptance test of the writer (`core/fpga/bitgen.js`): byte comparison with ISE's bitgen |
+| `check-writer.mjs` | Acceptance test of the writer (`packages/silinx-fpga/src/fpga/bitgen.js`): byte comparison with ISE's bitgen |
 | `fuzz-remote.sh` | Stage D: `run-many.sh` on another machine with Docker and the ISE image (`SILINX_FUZZ_HOST=user@host`, set on the command line only) |
 | `share-sb.mjs`, `gen-branch.mjs`, `ana-perpad.mjs`, `ise-impl.sh` | Stage D: the CLB switch box shared by the I/O, block-RAM and DCM tiles; PIPs measured as dead-end branches of routed nets; I/O settings per pad (`gen-iob.mjs --perpad / --perstd`); designs implemented by ISE from HDL (reference designs) |
 | `gen-bram.mjs`, `ana-bram.mjs`, `packages/silinx-fpga/bitdb/<device>-bram.json` | Stage D: every memory bit of the block RAMs, by binary codes |
@@ -159,11 +159,11 @@ CYINIT, the X / Y outputs, and checking the same layout on SLICEM and on the low
 
 ### Stage C: the bit database and the bitstream writer (2026-10-10)
 
-**Result: Silinx's writer (`core/fpga/bitgen.js`) turns ISE's routed XDL of the switch -> LED
+**Result: Silinx's writer (`packages/silinx-fpga/src/fpga/bitgen.js`) turns ISE's routed XDL of the switch -> LED
 design, blinky and lab11 into `.bit` files byte-identical to the ones ISE's bitgen writes from the
 same XDL, with `-g CRC:Disable` and with the default CRC** (`check-writer.mjs`).
 
-**Packets and CRC.** The packet sequence is fixed (`core/fpga/bitstream.js`): sync, CMD RCRC, FLR
+**Packets and CRC.** The packet sequence is fixed (`packages/silinx-fpga/src/fpga/bitstream.js`): sync, CMD RCRC, FLR
 72, COR, IDCODE, MASK, CMD SWITCH, FAR 0, CMD WCFG, one Type 2 FDRI write of all 578 frames,
 the CRC check word, CMD GRESTORE, CMD LFRM, one frame of NOOPs, CMD START, CTL 0, CRC, CMD
 DESYNC, 4 NOOPs. COR = `000031E5` (+ `20000000` with the CRC off, + `00010000` for
@@ -541,7 +541,7 @@ bottom right + top left, whose bits cannot mix; `ana-sitevar.mjs` now gives the 
   CLKDV one bit each; CLKFX, CLKFX180, LOCKED, PSDONE and STATUS none. CLK0, CLK2X and CLKDV were in
   `DCM:USED` (the outputs of the stage-D design): a design without them would have had wrong bits.
 - **The input period** (`X_CLKIN_PERIOD`, 5-1000 ns and CLKFX settings around the limits: 40 runs;
-  `core/fpga/bitgen.js dcmPeriodFeatures`): `DCM:CLKIN:LOW` (two bits) for 25 ns or more (24.9 ns sets
+  `packages/silinx-fpga/src/fpga/bitgen.js dcmPeriodFeatures`): `DCM:CLKIN:LOW` (two bits) for 25 ns or more (24.9 ns sets
   nothing); `DCM:CLKFX_IN:LOW` (the pair's two shared bits; what made CLKFX_DIVIDE 31 / 32 look like
   they had two more bits) when the CLKFX output is under 5 MHz, computed by ISE from CLKIN's period
   less a margin of 0.4-0.64 ns and CLKFX_MULTIPLY / CLKFX_DIVIDE as given, or when CLKIN is 3.33 MHz or
@@ -618,7 +618,7 @@ mixed, xdl refusing these settings in an edited design) and xdl variants of the 
   period neither. Stage F's "margin of 0.4-0.64 ns" was the truncation: 20.9 ns x 30 / 3 is "200 ns"
   and fast, 14.1 x 29 / 2 "203 ns" and slow (a margin would have made it fast), 12.9 ns halved "24 ns"
   and not LOW, 200.99 ns fast, 201 ns slow. All 164 cases measured (stage F's 86 and 78 new ones,
-  `per*` variants of 2 DCMs of different pairs at a time) follow it (`core/fpga/bitgen.js
+  `per*` variants of 2 DCMs of different pairs at a time) follow it (`packages/silinx-fpga/src/fpga/bitgen.js
   dcmPeriodFeatures`); nothing is refused any more.
 - **The DCMs' own switches**: the designs of every DCM of each device with these settings (2 / 4 / 4 /
   8 DCMs, the phase-shift and reset pins from the fabric) and `gen-pipdrop.mjs` on each gave 125 PIPs
@@ -665,7 +665,7 @@ then exactly ISE's. Solved:
 the earlier ones with side buffers (bufgside, the DCM designs of the XC3S500E) are byte-identical to
 ISE's bitgen, CRC on and off, but for the XC3S1200E's long-line splitters (`a =- b`, direction unknown).
 
-**What placement needs to use them** (core/fpga/place.js, not changed here): each side has eight
+**What placement needs to use them** (packages/silinx-fpga/src/fpga/place.js, not changed here): each side has eight
 buffers, `BUFGMUX_X0Y(2+k)` / `BUFGMUX_X3Y(2+k)` on line k (k = 0-7), each reaching only the
 flip-flops of its half of the chip (left / right: `route.js clockReach` gives that from the known
 switches). In each half, the centre tile (`GCLKVML` / `GCLKVMR`) drives line k of the upper and of the
@@ -712,7 +712,7 @@ the four devices:
   elements, else xdl's DRC refuses them; IFD_DELAY_VALUE 0-6 (ISE's map writes 7 and 8 as 0; from 5 on
   with the PRE_DELAY element) and IBUF_DELAY_VALUE 0-12 (from 8 on with PRE_DELAY), measured with
   designs of every value implemented by ISE).
-- **Features** (`core/fpga/bitgen.js iobRegFeatures`, the writer's names, all of the pad: `@M11`): the
+- **Features** (`packages/silinx-fpga/src/fpga/bitgen.js iobRegFeatures`, the writer's names, all of the pad: `@M11`): the
   input register's delay (`IFD:DLY3`, with the delay line's multiplexers and elements), a direct
   input's (`IBUF:DLY5`), a registered output or tristate path (`OMUX:OFF1`, `OMUX:OFFDDR`,
   `TMUX:TFF1` and their inverters and DDR multiplexers), a direct output inverted (`O1INV:O1_B`), every
@@ -773,7 +773,7 @@ every PIP by codewords (`gen-pipdrop.mjs`, 20 variants), and solves them (`ana-p
 
 With them the 16 designs are byte-identical to ISE's bitgen (CRC on and off), the XC3S1200E's but for a bit
 of its long-line splitters, and every pad's path to every DCM is known (`dcm-pads.mjs`: 72 paths, 0 unknown).
-**The placer** (`core/fpga/place.js` `DCM_PAD`) gives a clock with no LOC the pad ISE's placer gives it (designs
+**The placer** (`packages/silinx-fpga/src/fpga/place.js` `DCM_PAD`) gives a clock with no LOC the pad ISE's placer gives it (designs
 of one DCM on each site, the clock free, implemented by ISE: A9 / M6 on the XC3S100E, C8 / A9 / N5 / M6 on the
 XC3S250E, B9 / A10 / V9 / U10 on the XC3S500E and the top / bottom DCMs of the XC3S1200E, K3 / J4 / K13 / J15 on
 its side DCMs: the second pad of the top DCMs' paths, the first of the bottom ones', but J15), else the first
@@ -875,7 +875,7 @@ bitstreams is explained by the database's other features (`check-writer.mjs`, th
 switch changes none (`measured/learn-16srl-cascade.json`). The multiplier cascade was in the database already (its
 bits equal ISE's on the four devices).
 
-The packer (`core/fpga/pack.js`) now packs SRLC16E chains through Q15 as ISE's map does (up to 4, a macro of the two
+The packer (`packages/silinx-fpga/src/fpga/pack.js`) now packs SRLC16E chains through Q15 as ISE's map does (up to 4, a macro of the two
 slices for the placer, the SHIFTOUT -> SHIFTIN net); the lower slice's SHIFTOUT leaves the CLB only through XB (not
 measured), so a longer chain, or Q15 into anything but the next shift register's D, is refused.
 
@@ -1103,7 +1103,7 @@ bank: `gen-iobidir.mjs` now gives the clock the design's standard).
 
 ### Clock switching: a BUFGMUX with I1 and S, and BUFGMUX_1 (2026-10-21, #846)
 
-- **The open flow builds a BUFGMUX that switches** (I0, I1, S: `core/fpga/pack.js`, `place.js`): its settings as ISE's
+- **The open flow builds a BUFGMUX that switches** (I0, I1, S: `packages/silinx-fpga/src/fpga/pack.js`, `place.js`): its settings as ISE's
   map writes them (`DISABLE_ATTR::LOW I0_USED::0 I1_USED::0 SINV::S GCLKMUX:<name>.GCLKMUX:`); the select inverter
   `SINV:S` of every buffer was measured in stages D and G, I1_USED and the switches into I1 (`GCLKk -> GCLKIN1j`) set
   no bits. The two buffers of a pair (`BUFGMUX_XxYy` and `XxY(y^1)`) share their input lines: buffer k's I1 is line
@@ -1239,7 +1239,7 @@ of the shared file and a few per device. (With the pads' paths to the DCMs, #92:
 without `IOIS_IBUF0` lack `IOIS_IBUF1` too, two `LIOIS_PCI` / `RIOIS_PCI` tiles of each side their `IBUF0 / 1`,
 the XC3S100E's CLKT `CLKT_DLL_CLKPAD4-7`: 46 165 / 74 643 / 100 695 / 134 729 facts.)
 
-**The router never takes them** (`core/fpga/bitgen.js` `knownRouting`: `pipAbsent`). With ISE's own
+**The router never takes them** (`packages/silinx-fpga/src/fpga/bitgen.js` `knownRouting`: `pipAbsent`). With ISE's own
 descriptions (the shipped ones and those built from the user's ISE) the router only meets PIPs a tile
 has, so no bitstream was wrong; a description built from the database's features per type (the
 measured descriptions of research/s3e-device) offers them all. Shown on such descriptions

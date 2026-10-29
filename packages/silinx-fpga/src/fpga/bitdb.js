@@ -1,5 +1,5 @@
 // The bit database of a Spartan-3E device, the part that needs no file system (Node and the
-// browser): its files merged into what core/fpga/bitgen.js reads. The files (packages/silinx-fpga/bitdb,
+// browser): its files merged into what fpga/bitgen.js reads. The files (packages/silinx-fpga/bitdb,
 // read by research/s3e-bitstream/db.mjs in Node, fetched by web/js/open-flow-browser.js in the browser):
 //   s3e-tiles.json             the tile types' features (PIPs, site settings), shared by the devices
 //   <device>-tiles.json        (optional) features of one device that add to or replace the shared ones,

@@ -8,7 +8,7 @@ supported boards in `devices/`, their bit databases in `bitdb/`. Not published y
 
 ## The API
 
-Two entries; a name they do not export is the package's own and may change in any version.
+Three entries; a name they do not export is the package's own and may change in any version.
 
 - `silinx-fpga` (`src/index.js`): the same in Node and in the browser. The flow (`runFlow`, `OPEN_STEPS`,
   `StepError`), the synthesis (`synthesizeVerilog`), the netlist and the constraints in (`readYosysJson`,
@@ -16,6 +16,9 @@ Two entries; a name they do not export is the package's own and may change in an
   and routed design and the bitstream out (`parseXdl`, `writeXdl`, `readBit`), the reports (`analyzeTiming`,
   `timingReport`, `estimatePower`, `powerReport`), the devices and bit databases from their files' contents
   (`loadDevice`, `makeBitDb`), the parts (`familyOfPart`, `resourcesOf`).
+- `silinx-fpga/parts` (`src/parts.js`): the light part of it, for an interface that shows a design and its board
+  and loads the toolchain only when it runs: the parts (`familyOfPart`, `resourcesOf`), the constraints
+  (`parseUcf`, `generateUcf`), the steps by name (`OPEN_STEPS`), the XDL format (`parseXdl`, `lutTable`).
 - `silinx-fpga/node` (`src/node.js`): all of it, with the device graphs and bit databases read from the disk
   (`findDeviceGraph`, `loadDeviceCache`, `loadDb`) and Yosys run in Node (`yosysNode`, `yosysWorkers`).
 

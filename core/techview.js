@@ -26,7 +26,7 @@
 //         groups: { label: cells }, cells: n }
 //   lutFunction('X"AC"', 3) = { inputs: ['I2', 'I1', 'I0'], equation: 'O = I0*I2 + I1*!I2', rows }
 
-import { readYosysJson, paramBits, paramInt } from './fpga/netlist.js';
+import { readYosysJson, paramBits, paramInt } from '../packages/silinx-fpga/src/index.js';
 import { primitiveInterface, regroupNetlist } from './netlist-hier.js';
 import { validIdent } from './schdoc.js';
 

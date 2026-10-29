@@ -1,12 +1,12 @@
-// Acceptance test of the bitstream writer (core/fpga/bitgen.js): for designs implemented by ISE,
+// Acceptance test of the bitstream writer (packages/silinx-fpga/src/fpga/bitgen.js): for designs implemented by ISE,
 // the .bit written from ISE's routed XDL is compared byte for byte with the .bit ISE's bitgen wrote
 // from the same XDL (same options: -g CRC:Disable, or the default with CRC). The header's name,
 // date and time are taken from ISE's file. Differences are listed per bit with their tile.
 //   node check-writer.mjs a.xdl a.bit [a.xdl a.crc.bit …]
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { readBit, diffFrames, corValue } from '../../core/fpga/bitstream.js';
-import { bitgen, tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit, diffFrames, corValue } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { bitgen, tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 
 // the database of each design's part (from its XDL header), loaded once per part

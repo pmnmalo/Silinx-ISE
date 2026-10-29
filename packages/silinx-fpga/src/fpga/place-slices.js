@@ -1,4 +1,4 @@
-// Silinx toolchain - the placer's slices (#405: out of place in core/fpga/place.js): the slice grid, the anchors a
+// Silinx toolchain - the placer's slices (#405: out of place in fpga/place.js): the slice grid, the anchors a
 // group of slices may take (its clocks' reach, SLICEM sites), the occupancy, and the initial placement (a warm
 // start's targets first, then near the middle of the chip); every instance's position.
 import { PlaceError } from './place.js';

@@ -1,13 +1,14 @@
 // The open flow's front end and simulation models as hooks of its io (#1675, the toolchain's separation, #1651):
-// core/open-flow-core.js runFlow, the toolchain's, without them (the sources are the flat Verilog Yosys synthesizes;
+// packages/silinx-fpga/src/open-flow-core.js runFlow, the toolchain's, without them (the sources are the flat Verilog Yosys synthesizes;
 // the simulation models' steps fail), and core/flow-ide.js runOpenFlow, the IDE's, with core/synth-front.js
 // flowFrontEnd and core/flow-models.js mountSimModels.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as core from '../core/open-flow-core.js';
+import * as core from '../packages/silinx-fpga/src/open-flow-core.js';
+import * as api from '../packages/silinx-fpga/src/index.js';
 import { runOpenFlow } from '../core/flow-ide.js';
 import { flowFrontEnd } from '../core/synth-front.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 const COUNTER = 'module cnt(input clk, input rst, output reg [3:0] q);\n  always @(posedge clk) if (rst) q <= 0; else q <= q + 1;\nendmodule\n';
 const spec = { top: 'cnt', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', synthEffort: 'normal' };
@@ -18,9 +19,11 @@ function memoryIo(sources, extra = {}) {
     save: () => {}, ...extra } };
 }
 
-test('#1675 core/open-flow-core.js keeps exporting runOpenFlow, the IDE\'s', () => {
-  assert.equal(core.runOpenFlow, runOpenFlow);
+test('#1675 #1678 the toolchain\'s flow (runFlow, the package\'s API) and the IDE\'s (runOpenFlow, core/flow-ide.js) apart', () => {
   assert.equal(typeof core.runFlow, 'function');
+  assert.equal(api.runFlow, core.runFlow);
+  assert.ok(!('runOpenFlow' in core) && !('runOpenFlow' in api));
+  assert.equal(typeof runOpenFlow, 'function');
 });
 
 test('#1675 flowFrontEnd: the errors of the sources and of the elaboration, the synthesis input on demand', () => {

@@ -8,13 +8,13 @@
 //   ramclkb:  every block RAM (LOC'd) a RAMB16_S1_S1 with port B on a clock of its own (CLKB its net's one sink there)
 //   bufg-l0/l1/r0/…: the BUFGMUXes of one clock tile at even or odd places (LOC'd), I0, I1 and S on signals of their
 //             own, O a clock
-//   dcmpads:  every DCM (LOC'd) fed from the clock pad ISE gives it (core/fpga/place.js DCM_PAD) through an IBUFG, its
+//   dcmpads:  every DCM (LOC'd) fed from the clock pad ISE gives it (packages/silinx-fpga/src/fpga/place.js DCM_PAD) through an IBUFG, its
 //             CLK0 on a global buffer clocking a counter: the pads' dedicated paths to the DCMs
 //   node gen-obspins2.mjs outdir      (folders srlcasc, f8-00 … f8-11, ramclkb, bufg-l0 … bufg-b1, dcmpads)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 import { wrap } from './gen-obspins.mjs';
-import { DCM_PAD } from '../../core/fpga/place.js';
+import { DCM_PAD } from '../../packages/silinx-fpga/src/fpga/place.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

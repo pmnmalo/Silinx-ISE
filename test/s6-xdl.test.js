@@ -1,13 +1,13 @@
-// The placed Spartan-6 design as XDL (#729, core/fpga/s6/xdl.js): the LUT equations against an independent
-// evaluation (core/xdl.js evalLut) of every LUT of the examples, the sites' configurations (the elements and
+// The placed Spartan-6 design as XDL (#729, packages/silinx-fpga/src/fpga/s6/xdl.js): the LUT equations against an independent
+// evaluation (packages/silinx-fpga/src/xdl.js evalLut) of every LUT of the examples, the sites' configurations (the elements and
 // values of ISE's primitive definitions), the XDL read back (parseXdl) as it was written, every pin a pin of its
 // site in the device description.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lutEquation, placedXdlS6 } from '../core/fpga/s6/xdl.js';
-import { placeS6 } from '../core/fpga/s6/place.js';
-import { parseXdl, writeXdl, evalLut } from '../core/xdl.js';
-import { paramBits } from '../core/fpga/netlist.js';
+import { lutEquation, placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xdl.js';
+import { placeS6 } from '../packages/silinx-fpga/src/fpga/s6/place.js';
+import { parseXdl, writeXdl, evalLut } from '../packages/silinx-fpga/src/xdl.js';
+import { paramBits } from '../packages/silinx-fpga/src/fpga/netlist.js';
 import { EXAMPLES } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 

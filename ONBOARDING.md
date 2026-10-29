@@ -136,7 +136,7 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
 - **Windows:** import modules by URL (`pathToFileURL`), not by path. File renames can hit EPERM, so retry.
 - **WebUSB is slow per transfer** (about 1 ms). Batch JTAG work into few commands. JTAG ISC operations
   only start in Run-Test/Idle.
-- **Yosys 0.70** colours its log and splits lines; `core/synth-open.js` `lineStream` handles it.
+- **Yosys 0.70** colours its log and splits lines; `packages/silinx-fpga/src/synth-open.js` `lineStream` handles it.
 - **The ISE tests and the quality comparison** run on the self-hosted runner (the Mac mini).
   - They run only on code from `main`, never a PR's.
   - The runner refuses every other job before its first step, and is on line only in the two workflows'

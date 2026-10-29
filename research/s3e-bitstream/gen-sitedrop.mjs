@@ -7,8 +7,8 @@
 // The I/O settings already in the database (standard, drive, slew, the buffers and the plain input
 // and output paths) are left alone (SKIP).
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { siteKind } from '../../core/fpga/bitgen.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { siteKind } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 
 const [src, out, types = 'IOB,IBUF,DCM,BUFGMUX'] = process.argv.slice(2);

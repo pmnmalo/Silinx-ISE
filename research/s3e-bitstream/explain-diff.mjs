@@ -2,9 +2,9 @@
 // the tile it is in (relative position) and the features the design has in that tile.
 //   node explain-diff.mjs a.xdl a.bit [--tile CLB_X…]
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { frameData, designFeatures, tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { frameData, designFeatures, tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb, edges } from './db.mjs';
 
 const [xdl, bit] = process.argv.slice(2);

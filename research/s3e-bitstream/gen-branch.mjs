@@ -9,7 +9,7 @@
 // want.json: { TYPE: ['from->to', …] } the PIPs to measure, per tile type.
 import fs from 'node:fs';
 import { loadGraph } from './xdlrc-graph.mjs';
-import { parseXdl } from '../../core/xdl.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 import { windowKeyOf } from './db.mjs';
 import { separateWindows } from './lib.mjs';
 

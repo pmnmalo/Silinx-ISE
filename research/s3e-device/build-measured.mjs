@@ -60,7 +60,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const opt = k => { const i = args.indexOf(k); return i < 0 ? null : args.splice(i, 2)[1]; };
   const part = opt('--part') || PARTS.xc3s250e, devFile = opt('--dev') || path.join(HERE, '../../packages/silinx-fpga/devices', `${part}.json.gz`);
   const [out, dir] = args;
-  const { loadDevice } = await import('../../core/fpga/device.js');
+  const { loadDevice } = await import('../../packages/silinx-fpga/src/fpga/device.js');
   const packed = buildMeasured(loadDevice(gz(devFile)), dir);
   fs.writeFileSync(out, zlib.gzipSync(JSON.stringify(packed), { level: 9 }));
   console.log(`${out}: ${JSON.stringify(packed.counts)}`);

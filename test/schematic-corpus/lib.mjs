@@ -192,8 +192,8 @@ function diffKey(a, b, at = '') {
 
 /** Yosys's synthesis of the schematic's VHDL: { synth, quality: { luts, ffs }, warnings }. */
 export async function runSynth(doc, uses = [], hdlUses = [], lang = 'vhdl') {
-  const { synthesizeOpen } = await import('../../core/synth-open.js');
-  const { yosysNode } = await import('../../core/synth-open-node.js');
+  const { synthesizeOpen } = await import('../../core/synth-front.js');
+  const { yosysNode } = await import('../../packages/silinx-fpga/src/synth-open-node.js');
   const m = modulesOf(uses, lang, hdlUses);
   const h = hdlOf(doc, lang, m.modules);
   const fe = frontEnd([...m.sources, { path: h.path, text: h.code }], doc.name);
@@ -210,11 +210,11 @@ export async function runFlow(doc, uses = [], hdlUses = [], lang = 'vhdl', parts
   const path = await import('node:path');
   const zlib = await import('node:zlib');
   const { fileURLToPath } = await import('node:url');
-  const { runOpenFlow } = await import('../../core/open-flow-core.js');
-  const { loadDevice } = await import('../../core/fpga/device.js');
-  const { dbFileNames, dbFilesFrom, makeBitDb } = await import('../../core/fpga/bitdb.js');
-  const { yosysNode } = await import('../../core/synth-open-node.js');
-  const { shippedDevicePath } = await import('../../core/fpga/device-node.js');
+  const { runOpenFlow } = await import('../../core/flow-ide.js');
+  const { loadDevice } = await import('../../packages/silinx-fpga/src/fpga/device.js');
+  const { dbFileNames, dbFilesFrom, makeBitDb } = await import('../../packages/silinx-fpga/src/fpga/bitdb.js');
+  const { yosysNode } = await import('../../packages/silinx-fpga/src/synth-open-node.js');
+  const { shippedDevicePath } = await import('../../packages/silinx-fpga/src/fpga/device-node.js');
   const { boardClockUcf } = await import('../designs-corpus/lib.mjs');
   const DB = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../packages/silinx-fpga/bitdb');
   const m = modulesOf(uses, lang, hdlUses);

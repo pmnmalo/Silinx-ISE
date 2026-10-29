@@ -6,7 +6,7 @@
 // method and errors in research/s3e-route/README.md, "Timing"). No Xilinx data file is read or copied:
 // only the fitted numbers below.
 //
-// - Wires: every routing node of the device graph (core/fpga/device.js) gets a class from the names
+// - Wires: every routing node of the device graph (fpga/device.js) gets a class from the names
 //   of its wires (OMUX, double, hex, long line, input multiplexer, clock, site pin…); the delay of a
 //   connection (driver pin -> load pin) is the sum of the delays of the nodes it goes through after
 //   the driver's pin, each node's delay growing with the number of branches the net takes off it.
@@ -19,7 +19,7 @@
 //   sta.clocks                                      // [{ clock (net name), period, path: [{ inst, pin, kind, delay, arrival }] }]
 //   sta.conns                                       // every connection: { net, from, to, delay, slack, crit }
 //
-// The router (core/fpga/route.js) uses nodeDelays() for its timing-driven cost and timingGraph() to
+// The router (fpga/route.js) uses nodeDelays() for its timing-driven cost and timingGraph() to
 // recompute the criticalities of the connections as the routing changes.
 import { clockSources } from './timing-checks.js';
 import { instArcs } from './timing-arcs.js';
@@ -312,7 +312,7 @@ export function delayTable(device, { allowPip = null, model = SPEED_4, sources =
   const ok = new Uint8Array(E.edgeTo.length);   // 0 undecided, 1 allowed, 2 not
   const edgeOk = e => {
     if (!ok[e]) {
-      if (E.edgeFlags[e] & 2) ok[e] = 2;     // route-through (core/fpga/device.js PIP_ROUTETHRU)
+      if (E.edgeFlags[e] & 2) ok[e] = 2;     // route-through (fpga/device.js PIP_ROUTETHRU)
       else if (!allowPip) ok[e] = 1;
       else { const [a, b] = device.pipWires(E.edgeTile[e], E.edgePip[e]); ok[e] = allowPip(device.tileNames[E.edgeTile[e]], a, b) ? 1 : 2; }
     }

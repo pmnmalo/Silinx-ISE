@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { lutSlices, lutDesign, lutMapDesigns, idBits, sampleSlices, LUTS } from '../research/s6/gen-lutmap6.mjs';
 import { setBits, lutBits, lutMap, extendBases } from '../research/s6/ana-lutmap6.mjs';
 import fs from 'node:fs';
-import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../core/fpga/s6/bitstream.js';
+import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
 const SLICES = [{ name: 'SLICE_X0Y0', kind: 'L', tile: 'CLEXL_X1Y0' }, { name: 'SLICE_X1Y0', kind: 'X', tile: 'CLEXL_X1Y0' },
   { name: 'SLICE_X2Y1', kind: 'M', tile: 'CLEXM_X2Y1' }];

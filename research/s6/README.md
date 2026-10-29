@@ -28,10 +28,10 @@ not yet measured it says so; the measurements replace it.
 | Clocking | BUFGMUX, DCM | 16 BUFGMUX, BUFIO2 / BUFIO2FB from the clock pads (map inserts them), BUFH per clock region, CMTs of 2 DCM_SP + 1 PLL_BASE (2 CMTs in the LX16, 4 in the LX45), BUFPLL | #727 |
 | I/O | IOB with its registers | IOB pairs (master / slave), the IOI tiles with ILOGIC2 / OLOGIC2 (registers, SERDES) and IODELAY2; the boards' banks at 3.3 V (and 1.8 / 2.5 V on the Atlys) | #727 |
 | Routing fabric | singles, doubles, hexes, long lines, the Spartan-3E switch box | a new INT switch box: single, double and quad wires (the device report will say whether there is anything longer), its own logic inputs and outputs, the clock spines and BUFH rows; every tile type new | #723, #726, #730 |
-| Device descriptions | the four Spartan-3E parts' (`packages/silinx-fpga/devices/`) | `xc6slx16csg324-3` and `xc6slx45csg324-3`, from `xdl -report -pips -all_conns`; `core/fpga/device.js` taught the new tile types | [#723](https://github.com/pmnmalo/Silinx-ISE/issues/723) |
+| Device descriptions | the four Spartan-3E parts' (`packages/silinx-fpga/devices/`) | `xc6slx16csg324-3` and `xc6slx45csg324-3`, from `xdl -report -pips -all_conns`; `packages/silinx-fpga/src/fpga/device.js` taught the new tile types | [#723](https://github.com/pmnmalo/Silinx-ISE/issues/723) |
 | Bitstream | UG332: 32-bit words, frames of 73 words (XC3S250E), FAR one word | UG380: **16-bit configuration words**, Type 1 headers with a 6-bit register address, FAR_MAJ (block type, row, major) and FAR_MIN (minor), frames of 65 words for every part, new registers (COR1 / COR2, CWDT, HC_OPT_REG, MODE_REG, GENERAL1–5…), the block RAM content in frames of its own | [#724](https://github.com/pmnmalo/Silinx-ISE/issues/724) |
 | Bit database | LUT, slice, routing, I/O, block RAM, multiplier, DCM bits of the Spartan-3E tile types | all of it again for the Spartan-6 tile types | #725–#728 |
-| Place, route, timing | `core/fpga/place.js`, `route.js`, `timing.js` | placer and router on the new sites and graph, a delay model of the -3 speed grade fitted to trce | #729, #730, #731 |
+| Place, route, timing | `packages/silinx-fpga/src/fpga/place.js`, `route.js`, `timing.js` | placer and router on the new sites and graph, a delay model of the -3 speed grade fitted to trce | #729, #730, #731 |
 
 The Spartan-3E code stays as it is: the Spartan-6 code goes into new files (`core/fpga/s6/`) or behind the
 device's family, so that the Spartan-3E work of the other sessions is never disturbed.
@@ -174,7 +174,7 @@ the O6 equation does not name (PhysDesignRules:1709).
 
 ### The router (#730, 2026-10-24)
 
-`core/fpga/s6/route.js` (PathFinder, as the Spartan-3E router), `route-nets.js` (the general interconnect, which
+`packages/silinx-fpga/src/fpga/s6/route.js` (PathFinder, as the Spartan-3E router), `route-nets.js` (the general interconnect, which
 the global clocks never take; the route-through sites; the TIEOFFs), `route-output.js` (the routed XDL, its
 XDL_DUMMY instances: the I/O logic an input or output passes through, ILOGIC2 D -> FABRICOUT and OLOGIC2 D1 -> OQ, a
 clock region's BUFH, the TIEOFFs), `route-check.js` (the rules against the graph). Every example routes completely
@@ -191,7 +191,7 @@ Stage S6-A on the Mac mini (`ise-format.sh`, 2 minutes): the two empty designs t
 Silinx's `.ut` for the Spartan-6 (`server/ise.js`: the CRC on, StartUpClk Cclk / JtagClk; UserClk is refused by
 bitgen without a STARTUP_SPARTAN6 in the design), with `-g CRC:Disable`, and with `-g Compress`. The compressed
 files write one frame and copy it everywhere with MFWR, one FAR per frame: they gave the frame order, and auto CRCs
-a few words apart, from which the CRC was found. `core/fpga/s6/bitstream.js` has the reader and the writer;
+a few words apart, from which the CRC was found. `packages/silinx-fpga/src/fpga/s6/bitstream.js` has the reader and the writer;
 `check-writer6.mjs` reads an ISE `.bit` and writes it again from its frame data and options.
 
 - **The CRC** is 22 bits and takes one step per word written to a register (not one per bit):
@@ -386,7 +386,7 @@ routing switch's:
 ### The pads (#727, S6-E, 2026-10-29)
 
 `gen-iob6.mjs` writes designs with every bonded pad of the package (232 on the XC6SLX16's CSG324) an IOB of the same
-settings, as Silinx writes them (`core/fpga/s6/xdl.js` iobCfg), no nets: an output (LVCMOS25, drive 12, SLOW: the
+settings, as Silinx writes them (`packages/silinx-fpga/src/fpga/s6/xdl.js` iobCfg), no nets: an output (LVCMOS25, drive 12, SLOW: the
 boards' UCFs give no I/O standard, so ISE's and Silinx's default), an input, a bidirectional pad, a tristate one, the
 id designs (output and input, the pads whose index has bit j: which pad each bit is) and one design per variant
 (drives 2 to 16, slews FAST and QUIETIO, the output and input standards LVCMOS33, LVTTL, LVCMOS18, 15, 12, the pulls);
@@ -466,7 +466,7 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
 XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the part holding an instance (`gen-hard6.mjs`;
 `ise-xdl-bits.sh`; `ana-hard6.mjs`: `db/<device>-hard.json`; the prediction, `hard6.mjs`, in `residual6.mjs`):
 
-- **The settings**: a base (the settings as `core/fpga/s6/xdl.js` writes them), id designs (which site each bit is) and
+- **The settings**: a base (the settings as `packages/silinx-fpga/src/fpga/s6/xdl.js` writes them), id designs (which site each bit is) and
   variants (one element's other option per site, from the primitive definitions). A site's bits are offsets from its
   tile's region (`gridRegion`; a BRAMSITE2 or MACCSITE2 tile spans its INT row and the 3 above), the same at every
   site: the RAMB16BWER's 50 base bits (its settings in two copies, one per half), the DSP48A1's 1. The RAMB8BWERs are two
@@ -592,4 +592,4 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |
 | `gen-iologic6.mjs` | The I/O logic's route-throughs on every site (they set no bits without a net) (#727) |
 | `ana-iob6.mjs` | The pads' bits: `db/<device>-iob.json` (#727) |
-| `check-writer6.mjs` | ISE's `.bit` files written again by `core/fpga/s6/bitstream.js`, compared byte for byte; `--json` writes `measured/format.json` |
+| `check-writer6.mjs` | ISE's `.bit` files written again by `packages/silinx-fpga/src/fpga/s6/bitstream.js`, compared byte for byte; `--json` writes `measured/format.json` |

@@ -1,4 +1,4 @@
-// Silinx - placer: the sites of a packed design (core/fpga/pack.js) on a Spartan-3E device
+// Silinx - placer: the sites of a packed design (fpga/pack.js) on a Spartan-3E device
 // (browser + Node).
 //
 // Simulated annealing (in the manner of VPR): every slice, every group of slices that must keep
@@ -24,7 +24,7 @@
 //   const dev = deviceSites(parseXdlrc(text))   the sites with their positions
 //   const r = place(packed, dev, { seed, effort })
 //     r = { sites: [{ tile, site }] by instance, cost, warnings, stats: { moves, temps, seconds, initialCost } }
-//   placedXdl(packed, r) -> a design for writeXdl (core/xdl.js)
+//   placedXdl(packed, r) -> a design for writeXdl (xdl.js)
 //   place(packed, dev, { seed, start: { at, rlim, t } })   a warm start (#87): from a placement given
 
 import { instArcs, delayKind, SPEED_4 } from './timing.js';
@@ -36,7 +36,7 @@ import { mountHard } from './place-hard.js';
 import { mountSlices } from './place-slices.js';
 import { mountMoves } from './place-moves.js';
 
-// (hint: what to change, printed after the error by the flow; core/open-flow-core.js)
+// (hint: what to change, printed after the error by the flow; open-flow-core.js)
 export class PlaceError extends Error {
   constructor(message, hint) { super(message); if (hint !== undefined) this.hint = hint; }
 }
@@ -54,7 +54,7 @@ export const vccoOfStandard = std => VCCO.find(([re]) => re.test(String(std || '
 
 // ------------------------------------------------------------------ the device
 /** Sites of the device by kind, with positions: slices by (x, y), pads by name, clock buffers.
- *  dev: parseXdlrc() of the device report, or the routing graph (core/fpga/device.js Device);
+ *  dev: parseXdlrc() of the device report, or the routing graph (fpga/device.js Device);
  *  allowBufg(tileName, site): the global buffers the flow can use (bitgen.js knownRouting). */
 export function deviceSites(dev, { allowBufg = null } = {}) {
   const rows = dev.rows;
@@ -134,7 +134,7 @@ export const DCM_PAD = {
 };
 
 // ------------------------------------------------------------------ timing
-// The delays of core/fpga/timing.js (fitted to ISE's timing analyzer): the paths through a slice from
+// The delays of fpga/timing.js (fitted to ISE's timing analyzer): the paths through a slice from
 // its settings (LUTs, F5 / F6 multiplexers, carry chain), the flip-flops' clock-to-out and setup,
 // and a connection's delay from the distance it spans (dedicated ones, carry and multiplexer chains:
 // none). The paths analysed are those of trce's clock period: flip-flop to flip-flop.

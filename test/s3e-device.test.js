@@ -24,17 +24,17 @@ import { srlCascade, f8Muxes, ramClkB, bufgs, dcmPads } from '../research/s3e-de
 import { observationDesigns, implemented, GENERATORS, tileLists, roundPaths, roundSummary } from '../research/s3e-device/measure.mjs';
 import { buildMeasured, DATA_DIR, PARTS, dieOf, dataDir, measuredDies } from '../research/s3e-device/build-measured.mjs';
 import { indexVariants, pipVariants, joinVariants, clockLineVariants, clockRowVariants, longLineVariants, tapVariants, spineVariants, pinVariants, DCM_SWITCH } from '../research/s3e-device/varyjoins.mjs';
-import { loadDevice, PIP_BIDI } from '../core/fpga/device.js';
+import { loadDevice, PIP_BIDI } from '../packages/silinx-fpga/src/fpga/device.js';
 import { probeXdl, probeFirstLine, parseProbeLog, sortPips, sortSites } from '../research/s3e-device/probe.mjs';
 import { joinTestDesigns, parseJoinTests, testSources } from '../research/s3e-device/hypotheses.mjs';
 import { rng, clbSlices, observeXdl } from '../research/s3e-device/gen-observe.mjs';
 import { tileCandidates, siteCandidates, censusCandidates, ioCandidates, leftCandidates, restCandidates } from '../research/s3e-device/candidates.mjs';
 import { bram, mult, pads, inputs, padDefaults } from '../research/s3e-device/gen-obshdl.mjs';
-import { loadDeviceCache } from '../core/fpga/device-node.js';
-import { deviceSites } from '../core/fpga/place.js';
+import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../packages/silinx-fpga/src/fpga/place.js';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { parseXdl } from '../core/xdl.js';
+import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
 
 test('wireFamily: doubles, hexes, long lines, output multiplexers, carry, clock, block-RAM pins', () => {
   assert.equal(wireFamily('E2BEG0'), 'seg:E2');

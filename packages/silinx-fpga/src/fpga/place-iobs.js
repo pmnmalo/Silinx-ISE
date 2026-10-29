@@ -1,4 +1,4 @@
-// Silinx toolchain - the placer's I/O pads (#405: out of place in core/fpga/place.js): a clock input with no LOC on
+// Silinx toolchain - the placer's I/O pads (#405: out of place in fpga/place.js): a clock input with no LOC on
 // a pad whose dedicated path reaches its DCM's CLKIN or a global buffer, the other I/Os on free pads of a bank of
 // their VCCO (with their registers' pads, #96; apart from a pair's clash, #749); no pad: why, and what to do.
 import { DCM_PAD, PlaceError, bankOfPad } from './place.js';

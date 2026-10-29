@@ -4,8 +4,8 @@
 // post-map models.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack } from '../core/fpga/pack.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
 import { postTranslateModels, postMapModels } from '../core/sim-model.js';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';

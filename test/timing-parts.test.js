@@ -1,13 +1,13 @@
-// The parts of the timing model (#405: out of core/fpga/timing.js): the logic's arcs (timing-arcs.js) and the clock
+// The parts of the timing model (#405: out of packages/silinx-fpga/src/fpga/timing.js): the logic's arcs (timing-arcs.js) and the clock
 // and constraint checks (timing-checks.js); timing.js still exports them. A slice's LUT and flip-flop arcs and a pad's
 // in the model; two clocks' requirement (the same period, half of it shifted, a clock with no period); OFFSET
 // constraints read (a NET's IN in ns, a TIMEGRP's OUT unsupported, a line that is no OFFSET left out); a switching
 // limit's report line.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as timing from '../core/fpga/timing.js';
-import { instArcs } from '../core/fpga/timing-arcs.js';
-import { clockRequirement, parseOffsets, switchingLine, checkSwitching, timingReport, clockSources } from '../core/fpga/timing-checks.js';
+import * as timing from '../packages/silinx-fpga/src/fpga/timing.js';
+import { instArcs } from '../packages/silinx-fpga/src/fpga/timing-arcs.js';
+import { clockRequirement, parseOffsets, switchingLine, checkSwitching, timingReport, clockSources } from '../packages/silinx-fpga/src/fpga/timing-checks.js';
 
 const S = timing.SPEED_4.slice;
 

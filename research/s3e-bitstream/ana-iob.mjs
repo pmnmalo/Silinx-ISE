@@ -3,8 +3,8 @@
 // and pad index. Bits outside the windows of the changed tiles are reported.
 //   node ana-iob.mjs dir > iob-changes.json
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb, edges } from './db.mjs';
 
 const dir = process.argv[2];

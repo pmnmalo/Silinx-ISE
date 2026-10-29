@@ -1,12 +1,12 @@
 // Size (and the placer's estimate of the critical path) of the open synthesis's netlists, three ways:
 //   stock   core/synth-verilog.js without tables + Yosys's own synth_xilinx (Silinx 15.10.1)
-//   luts    without tables + the LUT mapping of core/synth-open.js (ABC on LUT4_COSTS)
+//   luts    without tables + the LUT mapping of packages/silinx-fpga/src/synth-open.js (ABC on LUT4_COSTS)
 //   nosrl   tables + that mapping, shift registers left in flip-flops (Silinx 15.10.2 before SRL16)
 //   now     what the open synthesis does (tables of expressions of few input bits + that mapping,
 //           shift registers in SRL16E)
 // on the fixture designs the packer supports, the blinky example and the Silinx projects given:
 //   node research/synth-quality/measure.mjs [--place] [project folder…]
-// Columns: cells, LUTs, MUXF5-8, carry cells, flip-flops, slices after core/fpga/pack.js (carryOut
+// Columns: cells, LUTs, MUXF5-8, carry cells, flip-flops, slices after packages/silinx-fpga/src/fpga/pack.js (carryOut
 // 'xor', as the open flow packs), with --place the placer's estimated critical path (ns, seed 1).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,12 +14,12 @@ import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../../core/compile.js';
 import { primitiveSources } from '../../core/unisim.js';
 import { toVerilog } from '../../core/synth-verilog.js';
-import { synthCommands, yosysFiles, SRL_CELLS_FILE, cellCounts, utilization, YOSYS_FAMILY } from '../../core/synth-open.js';
-import { yosysNode } from '../../core/synth-open-node.js';
-import { readYosysJson } from '../../core/fpga/netlist.js';
-import { pack } from '../../core/fpga/pack.js';
-import { deviceSites, place } from '../../core/fpga/place.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { synthCommands, yosysFiles, SRL_CELLS_FILE, cellCounts, utilization, YOSYS_FAMILY } from '../../packages/silinx-fpga/src/synth-open.js';
+import { yosysNode } from '../../packages/silinx-fpga/src/synth-open-node.js';
+import { readYosysJson } from '../../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../../packages/silinx-fpga/src/fpga/pack.js';
+import { deviceSites, place } from '../../packages/silinx-fpga/src/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2);

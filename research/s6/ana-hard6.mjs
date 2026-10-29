@@ -14,13 +14,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readBit6, emptyFdri, bitFormat6 } from '../../core/fpga/s6/bitstream.js';
+import { readBit6, emptyFdri, bitFormat6 } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { bitsOf } from './ana-iob6.mjs';
 import { gridRegion } from './ana-pipdrop6.mjs';
 import { siteSlots } from './gen-hard6.mjs';
 import { fieldIndices } from './hard6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
-import { parseXdl } from '../../core/xdl.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 import { loadDb } from './check-slice6.mjs';
 import { predictDesign } from './residual6.mjs';
 

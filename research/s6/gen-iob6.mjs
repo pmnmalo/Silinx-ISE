@@ -1,5 +1,5 @@
 // Stage S6-E (#727): the I/O pads' settings. Designs in XDL with every bonded pad of the package an IOB of the same
-// settings (no nets): the base (an output, LVCMOS25, drive 12, slew SLOW, as Silinx writes it, core/fpga/s6/xdl.js
+// settings (no nets): the base (an output, LVCMOS25, drive 12, slew SLOW, as Silinx writes it, packages/silinx-fpga/src/fpga/s6/xdl.js
 // iobCfg), an input, a bidirectional one, the id designs (the base, and the input as inid, on the pads whose index
 // has bit j set: which pad each bit is), and one design per variant (a drive, a slew, an output or input standard,
 // a pull, the tristate; drive 24 is not LVCMOS25's in every bank: bitgen refuses it).

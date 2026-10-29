@@ -1,4 +1,4 @@
-// Silinx - packer: the cells of a Spartan-3E netlist (core/fpga/netlist.js) grouped into the sites
+// Silinx - packer: the cells of a Spartan-3E netlist (fpga/netlist.js) grouped into the sites
 // of the chip (browser + Node).
 //
 // A Spartan-3E slice has two 4-input LUTs (F, G), two flip-flops (FFX fed from the F side, FFY from
@@ -103,13 +103,13 @@ export function ucfPortsOf(nl) {
 
 // ------------------------------------------------------------------ criticality before placement
 // The criticality (0..1) of every connection of the netlist, from its cells only, by the model of
-// core/synth-open.js criticalDelay (the same critical path): the Spartan-3E -4's logic delays and a
+// synth-open.js criticalDelay (the same critical path): the Spartan-3E -4's logic delays and a
 // fixed delay for every connection between cells, but those inside a slice (the carry chain, a LUT
 // into its carry stage, the levels of a wide multiplexer, a LUT into its flip-flop). crit = 1 -
 // slack / (the critical path's delay), as the placer's (place.js analyzeTiming). Paths from
 // flip-flop to flip-flop (block RAMs, multipliers, shift registers and distributed RAMs as their
 // sources and ends too); a design without them: from its inputs to its outputs. cells / nets: the
-// netlist's (core/fpga/netlist.js), with their index (idx), cells marked `lowered` left out.
+// netlist's (fpga/netlist.js), with their index (idx), cells marked `lowered` left out.
 // Returns { dmax, crit: Map `${cell}:${pin}` (an input pin) -> criticality }.
 const CRIT_NET = 0.45;
 // The packer (#528): a connection this critical (CRIT_PAIR) puts its two units in one slice, first

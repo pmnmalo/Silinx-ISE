@@ -5,11 +5,11 @@
 //   node ana-pipdrop.mjs dir device.xdlrc > dir/pips.json
 // Output: { pips: [{ tile, type, from, dir, to, bits: [[frame, bit, value]] }], unexplained: [...] }
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
 import { loadGraph } from './xdlrc-graph.mjs';
 import { tileWindow, setGrid } from './layout.mjs';
-import { parseXdl } from '../../core/xdl.js';
-import { pipFeatures, tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { pipFeatures, tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb, edges } from './db.mjs';
 
 const [dir, xdlrc] = process.argv.slice(2);

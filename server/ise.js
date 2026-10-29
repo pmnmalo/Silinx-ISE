@@ -14,16 +14,14 @@
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
-import { deviceFamily } from '../core/family.js';
+import { deviceFamily, parseUcf, bitName, resourceCount } from '../packages/silinx-fpga/src/parts.js';
 import { compile, elaborate } from '../core/compile.js';
-import { parseUcf, bitName } from '../core/ucf.js';
 import { clocksOf, latchGates } from '../core/schematic.js';
 import { primitiveSources } from '../core/unisim.js';
 import { spawn } from 'node:child_process';
 import { runCommand, JobCancelled } from './jobs.js';
 import { loadConfig, detectIse, iseStatus, iseModeOf, which } from './toolchain.js';
 import { validateDevice, findPart } from './devices.js';
-import { resourceCount } from '../core/resources.js';
 import { parseBitHeader } from './programmer.js';
 import { within } from './paths.js';
 import { IDENT } from './ident.js';
@@ -92,7 +90,7 @@ export function generatePrj(files) {
 /** The XST options that name files, folders, the device or the top: Silinx's own (generateXst). */
 const XST_FIXED = new Set(['ifn', 'ofn', 'ifmt', 'ofmt', 'p', 'top', 'uc', 'sd', 'lso', 'iuc', 'vlgincdir', 'tmpdir', 'xsthdpdir', 'xsthdpini']);
 
-/** XST's -bufg: the part's global clock buffers (core/resources.js, #821); 24, the Spartan-3E's, for a part
+/** XST's -bufg: the part's global clock buffers (packages/silinx-fpga/src/resources.js, #821); 24, the Spartan-3E's, for a part
  *  outside the device database. */
 const globalBuffers = device => { const p = findPart(device.part); return (p && resourceCount(p, 'bufgmux')) || 24; };
 

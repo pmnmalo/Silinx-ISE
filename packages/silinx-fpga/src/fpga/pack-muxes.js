@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's wide multiplexers (#405: out of packWith in core/fpga/pack.js): trees of MUXF5 ..
+// Silinx toolchain - the packer's wide multiplexers (#405: out of packWith in fpga/pack.js): trees of MUXF5 ..
 // MUXF8 on the dedicated F5 / FX connections in their CLB pattern, any other multiplexer a LUT3.
 import { MUXF, WIDE_MUX } from './pack.js';
 

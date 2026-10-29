@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readBit6, bitFormat6, emptyFdri, FRAME_WORDS } from '../../core/fpga/s6/bitstream.js';
+import { readBit6, bitFormat6, emptyFdri, FRAME_WORDS } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
 /** The bits a design's frame data differs from another's in: Set 'frame,bit' (frame: FDRI's 65-word frames). */
 export function bitsOf(fdri, base) {

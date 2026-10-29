@@ -14,7 +14,7 @@
 // from the ff flags of the symbol ({ k, ce, clr, pre, r, s, sp }), so FD*, FT* and FJK* agree.
 import { SYMBOLS, MUX_INPUTS, COMPARE_SYM, compareOps, defaultParams, symbolParams, symbolDef, newDoc, generateHdl, validIdent, symbolPins, normModules } from './schdoc.js';
 import { DEVICE_PRIMITIVES, primitiveOf, primitiveResource } from './primitives.js';
-import { resourcesOf } from './resources.js';
+import { resourcesOf } from '../packages/silinx-fpga/src/parts.js';
 import { intOr as int } from './util.js';
 
 const pick = lang => (en, pt) => (lang === 'pt' ? pt : en);

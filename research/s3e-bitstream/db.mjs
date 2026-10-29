@@ -1,11 +1,11 @@
 // The bit database of a Spartan-3E device (packages/silinx-fpga/bitdb/*.json) for the experiments that build it: the loader is
-// core/fpga/bitdb-node.js (the open flow's, #407), here with the experiments' default part (PART) and
+// packages/silinx-fpga/src/fpga/bitdb-node.js (the open flow's, #407), here with the experiments' default part (PART) and
 // their helpers (edges, windowKeyOf). The files are described there.
-import { splitPart, mergeTiles, withDcmClkinGclk, DCM_ROUTED } from '../../core/fpga/bitdb.js';
-import { DB_DIR, dbPackages, hasBitDb, readDbFiles, loadDb as loadPartDb } from '../../core/fpga/bitdb-node.js';
-import { tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { splitPart, mergeTiles, withDcmClkinGclk, DCM_ROUTED } from '../../packages/silinx-fpga/src/fpga/bitdb.js';
+import { DB_DIR, dbPackages, hasBitDb, readDbFiles, loadDb as loadPartDb } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
+import { tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 
-// (the database's logic is core/fpga/bitdb.js, shared with the browser; its loader core/fpga/bitdb-node.js,
+// (the database's logic is packages/silinx-fpga/src/fpga/bitdb.js, shared with the browser; its loader packages/silinx-fpga/src/fpga/bitdb-node.js,
 // the open flow's, #407: this module gives the experiments both, with their default part)
 export { splitPart, mergeTiles, withDcmClkinGclk, DCM_ROUTED, DB_DIR, dbPackages, hasBitDb, readDbFiles };
 
@@ -17,7 +17,7 @@ export function edges(layout) {
   return { maxX: Math.max(...Object.keys(layout.cols).map(Number)), maxY: Math.max(...Object.keys(layout.rows).map(Number)) };
 }
 
-/** The bit database of a part (default PART), ready for bitgen() (core/fpga/bitdb-node.js loadDb). */
+/** The bit database of a part (default PART), ready for bitgen() (packages/silinx-fpga/src/fpga/bitdb-node.js loadDb). */
 export const loadDb = (part = PART, opts = {}) => loadPartDb(part, opts);
 
 /** The window of a tile in the frame data by tile name ("frame:bit" where it starts, from the layout;

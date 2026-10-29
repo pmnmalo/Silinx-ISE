@@ -1,4 +1,4 @@
-// The parts of the open flow (#405: out of runOpenFlow in core/open-flow-core.js): the simulation models
+// The parts of the open flow (#405: out of runOpenFlow in packages/silinx-fpga/src/open-flow-core.js): the simulation models
 // (flow-models.js, the IDE's, #1675) and the timing, bitstream, pins and power (open-flow-reports.js), through runOpenFlow on the
 // gates example (XC3S250E): every step, from the synthesis to the PROM bitstream; the files each step writes, no
 // warning or error in the log.
@@ -8,13 +8,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { runOpenFlow } from '../core/open-flow-core.js';
+import { runOpenFlow } from '../core/flow-ide.js';
 import { mountSimModels } from '../core/flow-models.js';
-import { mountFlowReports } from '../core/open-flow-reports.js';
-import { loadDevice } from '../core/fpga/device.js';
-import { dbFileNames, dbFilesFrom, makeBitDb } from '../core/fpga/bitdb.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { shippedDevicePath } from '../core/fpga/device-node.js';
+import { mountFlowReports } from '../packages/silinx-fpga/src/open-flow-reports.js';
+import { loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
+import { dbFileNames, dbFilesFrom, makeBitDb } from '../packages/silinx-fpga/src/fpga/bitdb.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { shippedDevicePath } from '../packages/silinx-fpga/src/fpga/device-node.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DB_DIR = path.join(ROOT, 'packages/silinx-fpga/bitdb');

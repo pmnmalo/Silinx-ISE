@@ -8,7 +8,7 @@
 // CLKFX180, at CLKIN x CLKFX_MULTIPLY / CLKFX_DIVIDE), CLK0 through a BUFG fed back to CLKFB (CLK_FEEDBACK
 // 1X), every output used on a BUFG of its own; CLKIN_DIVIDE_BY_2, a fixed phase shift (PHASE_SHIFT / 256 of
 // the period), RST and LOCKED. With CLKIN_DIVIDE_BY_2, trce 14.7 halves every switching limit of the DCM
-// (core/fpga/timing.js, #661): the lowest frequency of each output is doubled here so that trce passes.
+// (packages/silinx-fpga/src/fpga/timing.js, #661): the lowest frequency of each output is doubled here so that trce passes.
 // Spartan-6 (DS162 v3.1.1 Table 52, UG382 "Phase-Locked Loops"): a PLL_BASE with up to six outputs
 // (CLKOUT0-5 = VCO / CLKOUTn_DIVIDE, VCO = CLKIN x CLKFBOUT_MULT / DIVCLK_DIVIDE), its feedback internal
 // (CLKFBOUT to CLKFBIN, COMPENSATION "INTERNAL"), each output on a BUFG, a phase in steps of 45 / divide

@@ -1,13 +1,14 @@
-// The critical LUTs made one level shallower, their fan-out kept (core/lut-resynth.js, #652): the decomposition
+// The critical LUTs made one level shallower, their fan-out kept (packages/silinx-fpga/src/lut-resynth.js, #652): the decomposition
 // F = h(g(A), S) against functions built so (and one that is not), a netlist written by hand (spi-fpga-slave's shift
 // register enable) checked against its expressions on every input, a round undone, and the open synthesis's candidate
 // (the same design in VHDL and in Verilog, its netlist simulated against the design, test/diff-synth.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen, criticalDelay, logicLevels, pathEnds, cellCounts, utilization } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { decompose, shallower, netlistLevels, resynthCritical, RESYNTH_RULE } from '../core/lut-resynth.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { criticalDelay, logicLevels, pathEnds, cellCounts, utilization } from '../packages/silinx-fpga/src/synth-open.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { decompose, shallower, netlistLevels, resynthCritical, RESYNTH_RULE } from '../packages/silinx-fpga/src/lut-resynth.js';
 import { compareNetlist } from './diff-synth.js';
 
 // a table of n variables from a function of the row's bits

@@ -25,7 +25,7 @@ showed it.
 | `hypotheses.mjs` | Test designs for joins: one net per hypothesis; ISE's DRC says which are joined. A tile with no slice is driven from a neighbouring CLB across known joins |
 | `gen-observe.mjs` | Random designs over the CLB slices for ISE to route |
 | `gen-obshdl.mjs` | Observation designs in HDL for ISE to implement: every block RAM's and multiplier's outputs, every pad's input (round 5) |
-| `build.mjs` | Measurements -> the packed format of the shipped graphs (`core/fpga/device.js`) |
+| `build.mjs` | Measurements -> the packed format of the shipped graphs (`packages/silinx-fpga/src/fpga/device.js`) |
 | `measure.mjs` | The XC3S250E's recipe for another die, in stages: `designs` (every observation design, sized to the part), `observe`, `tiles` (the tile probe: switch-tiles.txt, clb-tiles.txt), `random`, `round k` and `verdicts k` (the join tests' rounds) (#3, the other devices) |
 | `prototype.mjs` | The phase-2 prototype: observe, predict, tests, verdicts, build the measured CLB array, compare it with the shipped graph; `score`: the tests' verdicts against the shipped graph |
 
@@ -36,7 +36,7 @@ working folders, out of the repository; only the scripts and this record are her
 
 ### What the description holds, and what Silinx needs of it
 
-The packed description (`core/fpga/device.js`) holds, per device: the tile grid (name, row, column,
+The packed description (`packages/silinx-fpga/src/fpga/device.js`) holds, per device: the tile grid (name, row, column,
 type of every tile); per tile *template* the wires, the PIPs (from, to, bidirectional, route-through)
 and the sites with the tile wire of each pin; per tile its sites' names and whether a pad is bonded;
 and the *nodes*, the sets of tile wires joined by metal. The open flow uses it to place (sites), route
@@ -45,7 +45,7 @@ fastest routes over the graph) and write the bitstream (the PIP and pin names, w
 database knows by tile type).
 
 The router of the open flow only takes PIPs whose bits are measured (`knownRouting`,
-`core/fpga/bitgen.js`). So a measured description needs, for routing, the PIPs of the bit database
+`packages/silinx-fpga/src/fpga/bitgen.js`). So a measured description needs, for routing, the PIPs of the bit database
 and the nodes of their wires; the other PIPs of the chip are of no use to the open flow until their
 bits are measured too (and measuring their bits needs to know they exist: the same probe).
 
@@ -475,7 +475,7 @@ ise-remote.sh -f t8 && ise-remote.sh -f t8b && node prototype.mjs verdicts t8 t8
 
 Which tile wire each pin of a site is attached to, for the sites the open flow places: the I/O blocks (IOB, IBUF, DIFFM /
 DIFFS and their input-only kinds), RAMB16, MULT18X18SIO, DCM and BUFGMUX (the slices: section 2). The others (BSCAN, ICAP,
-CAPTURE, STARTUP, PCILOGICSE, PMV, the RESERVED_* sites) are hidden from the open flow (`HIDDEN_SITES`, core/xdl.js) and
+CAPTURE, STARTUP, PCILOGICSE, PMV, the RESERVED_* sites) are hidden from the open flow (`HIDDEN_SITES`, packages/silinx-fpga/src/xdl.js) and
 left out. Observed in ISE's routes: a net's source pin is on the from-wire its PIPs leave and no other PIP drives, a sink
 pin on the to-wire its PIPs end on, when the sink is the net's one sink in its tile.
 
@@ -1010,7 +1010,7 @@ node prototype.mjs compare measured.json.gz        (the split nodes: with two pi
 A dry run of the open flow's tests on the measured graph (`REPLACING.md`) found two things it lacked:
 
 - **A clock pad's dedicated path to its DCM.** Pad A9 reached no DCM on switches of known bits, so the placer gave
-  DCM_X1Y1 pad B9 where ISE gives it A9 (`core/fpga/place.js` `DCM_PAD`): no design of ISE's had taken A9 as a clock
+  DCM_X1Y1 pad B9 where ISE gives it A9 (`packages/silinx-fpga/src/fpga/place.js` `DCM_PAD`): no design of ISE's had taken A9 as a clock
   input (`TIOIS_X14Y35`'s `I1_PINWIRE -> IOIS_IBUF1`, `IOIS_IBUF1 ~ CLKT_CKI3`). A design of the four DCMs, each fed
   from the pad ISE gives it (C8, A9, N5, M6) through an IBUFG, implemented by ISE: its routes give the four dedicated
   paths (`gen-obspins2.mjs dcmpads`). A9, B9, C8, B8, N5 and M6 now reach their DCMs, as on the shipped graph.

@@ -160,12 +160,12 @@ end architecture;`, 'tb.vhd')], 'tb');
 });
 
 test('placer: the I/Os of a bank share its VCCO (ISE DRC PhysDesignRules:755: a 3.3 V clock on B8 and 2.5 V outputs in bank 0)', async () => {
-  const { synthesizeOpen } = await import('../core/synth-open.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
-  const { readYosysJson } = await import('../core/fpga/netlist.js');
-  const { pack } = await import('../core/fpga/pack.js');
-  const { deviceSites, place, PlaceError, bankOfPad, vccoOfStandard } = await import('../core/fpga/place.js');
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { readYosysJson } = await import('../packages/silinx-fpga/src/fpga/netlist.js');
+  const { pack } = await import('../packages/silinx-fpga/src/fpga/pack.js');
+  const { deviceSites, place, PlaceError, bankOfPad, vccoOfStandard } = await import('../packages/silinx-fpga/src/fpga/place.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   assert.equal(vccoOfStandard('LVCMOS33'), 3.3);
   assert.equal(vccoOfStandard('lvttl'), 3.3);
   assert.equal(vccoOfStandard('LVCMOS25'), 2.5);
@@ -197,12 +197,12 @@ endmodule`)]);
 });
 
 test('placer: no pad for I/Os because of the banks\' VCCO (every bank holds LVCMOS33 pins, the others LVCMOS25) is said, not "not enough pads" (#128)', async () => {
-  const { synthesizeOpen } = await import('../core/synth-open.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
-  const { readYosysJson } = await import('../core/fpga/netlist.js');
-  const { pack } = await import('../core/fpga/pack.js');
-  const { deviceSites, place, PlaceError } = await import('../core/fpga/place.js');
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { readYosysJson } = await import('../packages/silinx-fpga/src/fpga/netlist.js');
+  const { pack } = await import('../packages/silinx-fpga/src/fpga/pack.js');
+  const { deviceSites, place, PlaceError } = await import('../packages/silinx-fpga/src/fpga/place.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   const lib = compile([v(`module m (input clk, input [2:0] a, input [3:0] b, output reg [3:0] q);
   always @(posedge clk) q <= {a, 1'b0} ^ b;
 endmodule`)]);

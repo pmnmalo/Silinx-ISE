@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.js",
+    "./parts": "./src/parts.js",
     "./node": "./src/node.js"
   },
   "private": true,

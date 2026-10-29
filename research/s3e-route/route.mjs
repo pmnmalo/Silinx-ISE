@@ -1,14 +1,14 @@
-// Route an XDL design with Silinx's router (core/fpga/route.js), after removing all its PIPs.
+// Route an XDL design with Silinx's router (packages/silinx-fpga/src/fpga/route.js), after removing all its PIPs.
 //   node research/s3e-route/route.mjs in.xdl out.xdl [--known]
 // The input is normally a design placed and routed by ISE (xdl -ncd2xdl): its placement is kept,
 // its routing thrown away and redone. The output is checked against the device graph.
 // --known: only the PIPs (and GND sources) whose bits the bit database knows (bitgen.js
 // knownRouting), so that Silinx's bitgen can write the whole bitstream.
 import fs from 'node:fs';
-import { parseXdl, writeXdl } from '../../core/xdl.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { routeDesign, checkRouting } from '../../core/fpga/route.js';
-import { knownRouting } from '../../core/fpga/bitgen.js';
+import { parseXdl, writeXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { routeDesign, checkRouting } from '../../packages/silinx-fpga/src/fpga/route.js';
+import { knownRouting } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 
 const args = process.argv.slice(2);
 const known = args.includes('--known');
@@ -20,7 +20,7 @@ for (const n of design.nets) n.pips = [];
 let t = Date.now();
 const device = loadDeviceCache(design.part);
 console.log(`device ${design.part}: ${device.nodeCount} nodes, loaded in ${Date.now() - t} ms`);
-const r = routeDesign(design, device, { log: s => console.log('  ' + s), ...(known ? knownRouting((await import('../../core/fpga/bitdb-node.js')).loadDb(design.part, { graph: device })) : {}) });
+const r = routeDesign(design, device, { log: s => console.log('  ' + s), ...(known ? knownRouting((await import('../../packages/silinx-fpga/src/fpga/bitdb-node.js')).loadDb(design.part, { graph: device })) : {}) });
 console.log(`routed ${r.routed} nets in ${r.timeMs} ms, ${r.iterations} iterations, ${r.pips} PIPs (ISE: ${ise}), overused ${r.overused}, failed ${r.failed.length}`);
 for (const e of r.errors.slice(0, 20)) console.log('  error: ' + e);
 for (const f of r.failed.slice(0, 20)) console.log('  failed: ' + f);
