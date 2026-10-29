@@ -8,7 +8,7 @@ import { Graph } from '../core/c-graph.js';
 import { divMethods } from '../core/c-dataflow-div.js';
 import { wrap } from '../core/c-types.js';
 import { cToHdl } from '../core/c-hdl.js';
-import { noCC, rng, values, against } from './c-helpers.js';
+import { noCC, rng, values, against, COMB } from './c-helpers.js';
 
 /** A flow of only the division's methods over a graph of its own. */
 function flow() {
@@ -117,7 +117,7 @@ test('#1656 the generated VHDL and Verilog of divisions by constants and by vari
   against(src, 'div', { ins: [{ name: 'a', w: 32, s: true }, { name: 'b', w: 32, s: true }, { name: 'u', w: 32, s: false }, { name: 'v', w: 32, s: false }, { name: 'x', w: 64, s: true }],
     outs: [{ name: 'o', w: 32, s: true }], ret: { w: 32, s: true }, n: 40, seed: 1656 });
   for (const lang of ['vhdl', 'verilog']) {
-    const gen = cToHdl(src, { file: 'div.c', lang });
+    const gen = cToHdl(src, { file: 'div.c', lang, clock: COMB });
     assert.deepEqual(gen.diagnostics, [], `${lang}: no errors and no warnings`);
     assert.equal(gen.sequential, false, `${lang}: combinational`);
     assert.doesNotMatch(gen.hdl, lang === 'vhdl' ? /\s\/\s|\bmod\b|\brem\b/ : /\s[/%]\s/, `${lang}: no division operator`);

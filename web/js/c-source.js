@@ -5,6 +5,7 @@ import { S, findDoc, closeDoc, openDoc, openFile } from './app.js';
 import { createEditor } from './editor.js';
 import { icons } from './icons.js';
 import { log, showConsolePage } from './console.js';
+import { periodNs } from '/packages/silinx-fpga/src/parts.js';
 
 export const isC = (p) => /\.(c|cpp|cc|cxx)$/i.test(p || '');
 // (its badge: C or C++, #1590)
@@ -110,7 +111,7 @@ export async function runCosimulation(path) {
   log(`\nStarted : "C/RTL Co-simulation" of ${path} (${lang === 'vhdl' ? 'VHDL' : 'Verilog'}).\n`, 'hdr');
   showConsolePage('console');
   const src = await text(path);
-  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src) });
+  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src), clock: hlsClock() });
   for (const e of r.errors) log(`ERROR:SilinxC - "${path}" ${e}`, 'err');
   if (!r.ok || r.errors.length) { log('\nProcess "C/RTL Co-simulation" failed', 'err', { diag: false }); return false; }
   log(`C simulation: ${r.calls} call(s) of '${r.gen.top}' replayed on its ${lang === 'vhdl' ? 'VHDL' : 'Verilog'}.`);
@@ -123,6 +124,14 @@ export async function runCosimulation(path) {
   return true;
 }
 
+/** The clock Silinx HLS schedules a C function for (#1924): the period, in ns, of the project's board's oscillator, else
+ *  20 ns (50 MHz). */
+export function hlsClock() {
+  const b = S.devices?.boards?.find((x) => x.id === S.project?.board);
+  const r = b?.resources?.find((x) => x.group === 'Clock' && x.extra?.period);
+  return (r && periodNs(r.extra.period)) || 20;
+}
+
 /** View C Synthesis Report (#1531): what the C was made into (core/c-hdl.js's report): the module, its ports, its
  *  states and registers, its memories, each loop's pragmas, II and cycles. */
 export async function runCReport(path) {
@@ -130,7 +139,8 @@ export async function runCReport(path) {
   const lang = hdlLang();
   log(`\nStarted : "View C Synthesis Report" of ${path}.\n`, 'hdr');
   showConsolePage('console');
-  const r = cToHdl(await text(path), { file: path, lang });
+  const clock = hlsClock();
+  const r = cToHdl(await text(path), { file: path, lang, clock });
   for (const d of r.diagnostics) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:SilinxC - "${path}" line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn');
   if (!r.ok) { log('\nProcess "View C Synthesis Report" failed', 'err', { diag: false }); return false; }
   const rep = r.report;
@@ -139,6 +149,8 @@ export async function runCReport(path) {
   const ctrl = r.ports.some((p) => p.name === 'ap_start') ? 'ap_ctrl_hs (ap_clk, ap_rst, ap_start / ap_done / ap_idle / ap_ready)' : 'ap_ctrl_none (ap_clk, ap_rst: running by itself)';
   if (rep.dataflow) L.push(`Module: DATAFLOW, ${ctrl}, ${rep.processes.length} processes running at once`);
   else L.push(rep.sequential ? `Module: sequential, ${ctrl}, ${rep.states} states, ${rep.registerBits} register bits` : 'Module: combinational');
+  // (the clock it was scheduled for: the board's, #1924)
+  L.push(`Target clock: ${clock} ns (the board's oscillator)`);
   L.push('', 'Ports:');
   for (const p of r.ports) L.push(`  ${p.name.padEnd(16)} ${p.dir === 'in' ? 'in ' : 'out'} ${String(p.w).padStart(3)} bit${p.w > 1 ? 's' : ''}`);
   // (DATAFLOW, #1707: each process a module, the FIFOs between them)

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cToHdl } from '../core/c-hdl.js';
 import { binaryType, compareType, literalType, wrap } from '../core/c-types.js';
-import { noCC, rng, mask, values, runHdl, against } from './c-helpers.js';
+import { noCC, rng, mask, values, runHdl, against, COMB } from './c-helpers.js';
 
 test('c-types: C\'s integer constants, promotions and conversions; ap_int results wide enough (Vitis HLS)', () => {
   assert.deepEqual(literalType(5n), { w: 32, s: true, ap: false });
@@ -133,7 +133,7 @@ void apx(ap_uint<8> a, ap_uint<8> b, ap_int<4> c, ap_uint<9> *sum, ap_int<9> *di
     return [a + b, wrap(BigInt(a - b), { w: 9, s: true }), wrap(BigInt(a * c), { w: 12, s: true }), a >> 4, (a >> 7) & 1, b ? 1 : 0, b === 255 ? 1 : 0, pc(a), c + (a - b)].map(BigInt);
   };
   for (const lang of ['vhdl', 'verilog']) {
-    const gen = cToHdl(src, { file: 'apx.c', lang });
+    const gen = cToHdl(src, { file: 'apx.c', lang, clock: COMB });
     // (all: a reserved word of VHDL, its port all_r)
     assert.deepEqual(gen.diagnostics.map((d) => `${d.line}:${d.col} ${d.severity}: ${d.message}`), ["2:6 warning: 'all' is a reserved word of VHDL or Verilog: it is named all_r in the module"]);
     const outs = ['sum', 'diff', 'prod', 'hi', 'b7', 'any', 'all_r', 'par', 'as_int'];
@@ -152,8 +152,8 @@ void apx(ap_uint<8> a, ap_uint<8> b, ap_int<4> c, ap_uint<9> *sum, ap_int<9> *di
 });
 
 test('C to HDL: what is not combinational is a sequential module (#1526): a loop whose count depends on the inputs, static and global variables; divisions by any value combinational (#1656); array arguments are sequential (ap_memory)', () => {
-  const msgs = (src) => cToHdl(src).diagnostics.map((d) => `${d.line}:${d.col} ${d.message}`);
-  const seq = (src) => { const r = cToHdl(src); return [r.ok, r.sequential, r.diagnostics.length]; };
+  const msgs = (src) => cToHdl(src, { clock: COMB }).diagnostics.map((d) => `${d.line}:${d.col} ${d.message}`);
+  const seq = (src) => { const r = cToHdl(src, { clock: COMB }); return [r.ok, r.sequential, r.diagnostics.length]; };
   // (a loop of unknown count: a sequential module, its latency unknown, said, #1699)
   assert.deepEqual(msgs('int f(int n) {\n  int s = 0;\n  for (int i = 0; i < n; i++) s += i;\n  return s;\n}'),
     ['3:3 the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)']);

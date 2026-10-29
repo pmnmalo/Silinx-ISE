@@ -14,7 +14,7 @@ import { cosimulate } from '../core/c-cosim.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { lex } from '../core/c-lex.js';
 import { CXX } from './ap-int-ref.js';
-import { lf } from './c-helpers.js';
+import { lf, COMB } from './c-helpers.js';
 
 function compiledCpp(src) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-cpp-'));
@@ -68,7 +68,7 @@ test('#1590 C++: namespaces, using, constexpr, static_cast, static_assert, nullp
 
 test('#1590 C++: a reference parameter has a pointer\'s ports (y, y_ap_vld; one read and written y_i, y_o, y_o_ap_vld); co-simulated in VHDL and Verilog, no warning', () => {
   for (const lang of ['vhdl', 'verilog']) {
-    const r = cosimulate(SCALE, { file: 'scale.cpp', lang });
+    const r = cosimulate(SCALE, { file: 'scale.cpp', lang, clock: COMB });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
     assert.equal(r.gen.top, 'scale');
