@@ -5,7 +5,7 @@
 // drawn, Power off). The emulator's whole use: test/ui/sim-emu.test.js, emu-hidden.test.js, emu-engine.test.js.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupUi, uiTest, makeProject } from './harness.js';
+import { setupUi, uiTest, makeProject, chromeOnly } from './harness.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -96,4 +96,4 @@ uiTest('#1985 a tablet\'s long press on a push button: no context menu over the 
   await page.waitFor(() => !document.querySelector('.emu-btn').classList.contains('on'), [], { what: 'the button released' });
   assert.deepEqual(r, { onBtn: true, onBoard: true, stillHeld: true, touchAction: 'none' });
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
-});
+}, { skip: chromeOnly });   // (CDP touch: Chrome only, #2038)
