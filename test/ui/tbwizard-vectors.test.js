@@ -77,5 +77,6 @@ uiTest('Test Bench Wizard, the vectors page: typed in, a bad value refused, expe
   await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'sim/tb_vec.vhd'), [], { what: 'the bench written' });
   const tb = await readWs(env, 'TbwVec', 'sim/tb_vec.vhd');
   assert.match(tb, /constant VEXP/);
-  assert.match(await page.consoleText(), /Test Bench Wizard: created sim\/tb_vec\.vhd \(2 vector\(s\)\) for 'adder'/);
+  // (logged after the project is reloaded, later than the file is registered: waited for)
+  await page.waitConsole(/Test Bench Wizard: created sim\/tb_vec\.vhd \(2 vector\(s\)\) for 'adder'/);
 });
