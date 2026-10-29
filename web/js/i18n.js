@@ -226,6 +226,7 @@ const PT = {
   'Default': 'Predefinida', 'Binary': 'Binário', 'Hexadecimal': 'Hexadecimal', 'Octal': 'Octal', 'Decimal (Unsigned)': 'Decimal (sem sinal)',
   "Decimal (Two's Complement)": 'Decimal (complemento para 2)', "Decimal (One's Complement)": 'Decimal (complemento para 1)', 'Decimal': 'Decimal',
   "Dec (two's)": 'Dec (compl. 2)', "Dec (one's)": 'Dec (compl. 1)',   // (Try it's value editor, #2015)
+  'Binary (Unsigned)': 'Binário (sem sinal)', "Binary (Two's Complement)": 'Binário (complemento para 2)', "Binary (One's Complement)": 'Binário (complemento para 1)',   // (Try it's bar, #2064)
   // the wave configuration (#1019)
   'Save Wave Configuration': 'Guardar Configuração de Formas de Onda', 'Load Wave Configuration': 'Carregar Configuração de Formas de Onda',
   'File name in the project:': 'Nome do ficheiro no projeto:', 'Wave configuration:': 'Configuração de formas de onda:', 'Load': 'Carregar',
