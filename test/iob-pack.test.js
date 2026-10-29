@@ -1,13 +1,13 @@
-// #96: registers in the IOBs in the Silinx toolchain's packer (core/fpga/pack.js): which flip-flops go there (the UCF's
+// #96: registers in the IOBs in the Silinx toolchain's packer (packages/silinx-fpga/src/fpga/pack.js): which flip-flops go there (the UCF's
 // IOB = TRUE / FALSE on a net or an instance, the HDL's IOB attribute, the option iobRegs as map's -pr), their
 // settings as ISE's map writes them (the bit database's features, #44), their site pins, the tristate outputs; the
 // packed design behaving as the netlist (test/fpga-sim.js), the static timing's arcs and the simulation model.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack } from '../core/fpga/pack.js';
-import { instArcs, timingGraph } from '../core/fpga/timing.js';
-import { iobRegFeatures } from '../core/fpga/bitgen.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { instArcs, timingGraph } from '../packages/silinx-fpga/src/fpga/timing.js';
+import { iobRegFeatures } from '../packages/silinx-fpga/src/fpga/bitgen.js';
 import { postMapModels } from '../core/sim-model.js';
 import { compareSims, packedSim, netlistSim } from './fpga-sim.js';
 

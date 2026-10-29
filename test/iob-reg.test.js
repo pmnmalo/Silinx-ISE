@@ -1,15 +1,15 @@
 // #44: the I/O registers (IFF / OFF / TFF, DDR) and the input delays in the bit database: their
-// features (core/fpga/bitgen.js iobRegFeatures), bits of each pad's own (research/s3e-bitstream stage G:
+// features (packages/silinx-fpga/src/fpga/bitgen.js iobRegFeatures), bits of each pad's own (research/s3e-bitstream stage G:
 // gen-iobreg.mjs, gen-iobrand.mjs, ana-iobreg.mjs), without ISE.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseXdl } from '../core/xdl.js';
-import { designFeatures, frameData, iobRegFeatures, parseBit } from '../core/fpga/bitgen.js';
-import { getBit, diffFrames } from '../core/fpga/bitstream.js';
-import { loadDb } from '../core/fpga/bitdb-node.js';
-import { loadDeviceCache } from '../core/fpga/device-node.js';
-import { deviceSites } from '../core/fpga/place.js';
-import { bufgReach } from '../core/fpga/route.js';
+import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { designFeatures, frameData, iobRegFeatures, parseBit } from '../packages/silinx-fpga/src/fpga/bitgen.js';
+import { getBit, diffFrames } from '../packages/silinx-fpga/src/fpga/bitstream.js';
+import { loadDb } from '../packages/silinx-fpga/src/fpga/bitdb-node.js';
+import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../packages/silinx-fpga/src/fpga/place.js';
+import { bufgReach } from '../packages/silinx-fpga/src/fpga/route.js';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 

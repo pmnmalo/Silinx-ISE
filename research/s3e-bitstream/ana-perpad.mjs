@@ -7,7 +7,7 @@
 // padDriveDefault }: the I/O standards as whole pad features (the LVCMOS33 pad feature with the
 // change applied), DRIVE / SLEW / PULL as changes to apply ("f,b" set, "!f,b" cleared).
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
 import { loadDb } from './db.mjs';
 
 const dir = process.argv[2];

@@ -1,4 +1,4 @@
-// Silinx - the Spartan-6 router's routed design (#730, core/fpga/s6/route.js routedXdlS6): each net's PIPs, a
+// Silinx - the Spartan-6 router's routed design (#730, fpga/s6/route.js routedXdlS6): each net's PIPs, a
 // power net split into one net per TIEOFF it is routed from (GLOBAL_LOGIC1_0 …), the TIEOFFs and the sites of the
 // route-throughs declared as XDL_DUMMY instances (xdl -xdl2ncd rejects an outpin of an undeclared one), as ISE
 // writes them; a route-through out of a net's own source site as that instance's _ROUTETHROUGH setting.

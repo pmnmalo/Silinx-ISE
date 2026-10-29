@@ -1,4 +1,4 @@
-// Silinx toolchain - the router's power nets (#405: out of routeDesign in core/fpga/route.js): the nets the router
+// Silinx toolchain - the router's power nets (#405: out of routeDesign in fpga/route.js): the nets the router
 // works on, the power nets with no source (as a placer writes them) tied to made-up sources, as ISE does.
 import { tieConstants } from './route.js';
 

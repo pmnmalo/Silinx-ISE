@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's registers in the IOBs (#405: out of packWith in core/fpga/pack.js, #96): the
+// Silinx toolchain - the packer's registers in the IOBs (#405: out of packWith in fpga/pack.js, #96): the
 // flip-flops (and DDR registers) that go into an IOB, by the constraints and iobRegs; a flip-flop into the slot of the
 // side whose output feeds it.
 import { ucfPattern } from '../ucf.js';

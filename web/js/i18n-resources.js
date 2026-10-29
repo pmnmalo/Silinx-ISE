@@ -1,7 +1,7 @@
-// Portuguese texts of the device's resources checked against a design (core/resource-check.js; the change of the
+// Portuguese texts of the device's resources checked against a design (packages/silinx-fpga/src/resource-check.js; the change of the
 // target device, web/js/device-change.js, #796), merged into web/js/i18n.js.
 
-// core/resource-check.js resourceNoun's names
+// packages/silinx-fpga/src/resource-check.js resourceNoun's names
 const NOUN_PT = {
   'flip-flops': 'flip-flops', LUTs: 'LUTs', slices: 'slices', 'bits of distributed RAM': 'bits de RAM distribuída', 'I/O pads': 'pinos de E/S',
   'block RAMs': 'RAMs de bloco', 'block RAM halves (RAMB8BWER)': 'metades de RAM de bloco (RAMB8BWER)', multipliers: 'multiplicadores', 'DSP slices': 'slices DSP',

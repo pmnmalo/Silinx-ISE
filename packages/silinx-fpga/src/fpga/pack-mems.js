@@ -1,5 +1,5 @@
 // Silinx toolchain - the packer's distributed RAMs and shift registers on SLICEMs (#405: out of packWith in
-// core/fpga/pack.js): their clocks and enables, a shift register of more than 16 stages, SRLC16E chains through Q15
+// fpga/pack.js): their clocks and enables, a shift register of more than 16 stages, SRLC16E chains through Q15
 // (#2).
 import { paramBits, paramInt } from './netlist.js';
 import { PackError, SLICEM_MEM } from './pack.js';
@@ -70,7 +70,7 @@ export function mountMemories(ctx) {
     s.dmux = s.dmux || {};
     s.dmux[side] = side === 'F' ? 'BX' : 'BY';
   };
-  // a shift register longer than 16 stages (core/synth-open.js SRL_MAP: an SRL16E of 16 stages, read at address 15,
+  // a shift register longer than 16 stages (synth-open.js SRL_MAP: an SRL16E of 16 stages, read at address 15,
   // into the rest) is cascaded in one SLICEM, as ISE's map does: G the first 16 stages, F the next, F's data G's last
   // stage through SHIFTIN (DIF_MUX), inside the slice instead of through general routing (#24). (A longer chain goes
   // on through general routing.)

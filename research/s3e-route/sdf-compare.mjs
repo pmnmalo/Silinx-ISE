@@ -1,7 +1,7 @@
 // The Silinx toolchain's SDF (the post-place & route simulation model's timing, #122) against ISE's for the same
 // placed and routed design: ISE's netgen -sim on Silinx's routed.xdl (xdl -xdl2ncd), its <name>_timesim.vhd and
 // .sdf. Compares
-//   - the connections' delays: each site input pin's (Silinx: the static timing's, core/fpga/timing.js; ISE: the
+//   - the connections' delays: each site input pin's (Silinx: the static timing's, packages/silinx-fpga/src/fpga/timing.js; ISE: the
 //     PORT delay netgen writes on the element that reads that pin: the LUT inputs F1-F4 / G1-G4, BX, BY, CE, SR of
 //     the slices, the output pads' O1), by site (the LOC generic) and pin;
 //   - the minimum period: the longest path from a clock's edge to a setup check over each SDF's elements (ISE's
@@ -15,10 +15,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { parseSdf } from '../../core/sdf.js';
-import { parseXdl } from '../../core/xdl.js';
-import { analyzeTiming } from '../../core/fpga/timing.js';
-import { loadDevice } from '../../core/fpga/device.js';
-import { shippedDevicePath } from '../../core/fpga/device-node.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { analyzeTiming } from '../../packages/silinx-fpga/src/fpga/timing.js';
+import { loadDevice } from '../../packages/silinx-fpga/src/fpga/device.js';
+import { shippedDevicePath } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 import { parseNetgenVhdl, primitiveInterface } from '../../core/netlist-hier.js';
 
 const dir = process.argv[2];

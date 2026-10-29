@@ -1,9 +1,9 @@
-// The steps of a run of the Silinx toolchain (core/open-steps.js, #404): one rule for the server's
+// The steps of a run of the Silinx toolchain (packages/silinx-fpga/src/open-steps.js, #404): one rule for the server's
 // openSteps and the browser edition's browserSteps, which agree on every set of steps.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './ui/core-hooks.js';
-import { OPEN_STEPS, OPEN_CHAIN, orderOpenSteps } from '../core/open-steps.js';
+import { OPEN_STEPS, OPEN_CHAIN, orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { openSteps, OPEN_STEPS as SERVER_STEPS } from '../server/open-flow.js';
 
 const { browserSteps } = await import('../web/js/open-flow-browser.js');

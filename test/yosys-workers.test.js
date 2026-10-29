@@ -1,4 +1,4 @@
-// Yosys in worker threads for Node (core/synth-open-node.js yosysWorkers, #86): runs given at once go in
+// Yosys in worker threads for Node (packages/silinx-fpga/src/synth-open-node.js yosysWorkers, #86): runs given at once go in
 // parallel up to n, the others queued; outputs, lines and errors as yosysNode's; the open synthesis
 // gives the same netlist; idle workers do not keep the process alive. With 4 Yosys or more at a time,
 // the second balancing starts with the first mappings (#277), the netlist the same.
@@ -9,8 +9,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { yosysNode, yosysWorkers } from '../core/synth-open-node.js';
-import { synthesizeOpen, DEPTH_ABC2, DEPTH_ABC2_LUT4 } from '../core/synth-open.js';
+import { yosysNode, yosysWorkers } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { DEPTH_ABC2, DEPTH_ABC2_LUT4 } from '../packages/silinx-fpga/src/synth-open.js';
 import { compile, elaborate } from '../core/compile.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -61,7 +62,7 @@ test('yosysWorkers: the open synthesis gives the same netlist as with yosysNode,
 });
 
 test('yosysWorkers: idle workers do not keep the process alive', { timeout: 120000 }, () => {
-  const script = `import { yosysWorkers } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'core/synth-open-node.js')).href)};
+  const script = `import { yosysWorkers } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'packages/silinx-fpga/src/synth-open-node.js')).href)};
 const run = yosysWorkers(2);
 const o = await run(['-p', 'read_verilog m.v; write_json m.json'], { 'm.v': 'module m(input a, output y); assign y = a; endmodule' });
 console.log(Object.keys(o).includes('m.json') ? 'done' : 'no netlist');`;

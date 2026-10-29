@@ -1,7 +1,7 @@
-// core/fpga/bitstream.js: .bit files for the Spartan-3E (packets, CRC, header), without ISE.
+// packages/silinx-fpga/src/fpga/bitstream.js: .bit files for the Spartan-3E (packets, CRC, header), without ISE.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { XC3S250E, crcUpdate, corValue, writeBit, readBit, setBit, getBit, diffFrames, REG } from '../core/fpga/bitstream.js';
+import { XC3S250E, crcUpdate, corValue, writeBit, readBit, setBit, getBit, diffFrames, REG } from '../packages/silinx-fpga/src/fpga/bitstream.js';
 
 const emptyFrames = () => new Uint32Array(XC3S250E.frames * XC3S250E.frameWords);
 

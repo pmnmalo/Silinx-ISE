@@ -445,7 +445,7 @@ export function locsNotOnBoard(assignments, board) {
 // that have no LOC yet (the user's constraints are kept as written).
 
 /**
- * The pin file of a placement: pins [{ net, loc }] (core/xdl.js placedPins; net as the UCF names it,
+ * The pin file of a placement: pins [{ net, loc }] (xdl.js placedPins; net as the UCF names it,
  * buses as x<i>) as UCF text, one NET … LOC per port bit, sorted by name and bit.
  * header: the comment at the top.
  */

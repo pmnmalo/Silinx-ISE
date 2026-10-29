@@ -26,9 +26,9 @@ export const DEFAULT_CLOCK_MHZ = 50;
 
 // ------------------------------------------------------------------ the clocks
 /**
- * The clocks of a routed design (core/xdl.js parseXdl): [{ net (the global clock net), port (its pad,
+ * The clocks of a routed design (xdl.js parseXdl): [{ net (the global clock net), port (its pad,
  * or null), mhz, constrained, buffers (the BUFGMUX instances), loads (clock pins), slices }] from
- * the BUFGMUX outputs, their frequencies from the UCF's PERIOD constraints (core/ucf.js
+ * the BUFGMUX outputs, their frequencies from the UCF's PERIOD constraints (ucf.js
  * parseUcf().clocks: [{ net: the port, period }]).
  */
 export function designClocks(design, periods = []) {
@@ -252,9 +252,9 @@ const STD_VOLTS = [[/^(LVCMOS33|LVTTL|PCI33_3)/, 3.3], [/^LVCMOS25/, 2.5], [/^LV
 const stdVolts = std => (STD_VOLTS.find(([re]) => re.test(std)) || [null, 2.5])[1];
 
 /**
- * The estimate for a routed design (core/xdl.js parseXdl): { part, clocks, logic, signals, ios,
+ * The estimate for a routed design (xdl.js parseXdl): { part, clocks, logic, signals, ios,
  * clocksMw, logicMw, signalsMw, iosMw, dynamicMw, staticMw, totalMw, supplies, junctionC, warnings }.
- * periods: the UCF's PERIOD constraints (core/ucf.js parseUcf().clocks); device: 'xc3s250e'…
+ * periods: the UCF's PERIOD constraints (ucf.js parseUcf().clocks); device: 'xc3s250e'…
  */
 export function estimatePower(design, { device, periods = [], rates = DEFAULT_RATES, ambientC = 25 } = {}) {
   const K = COEFFICIENTS;

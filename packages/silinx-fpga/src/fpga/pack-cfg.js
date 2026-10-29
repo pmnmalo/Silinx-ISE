@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's configuration strings (#405: out of packWith in core/fpga/pack.js): the instances'
+// Silinx toolchain - the packer's configuration strings (#405: out of packWith in fpga/pack.js): the instances'
 // names and settings (slices, IOBs, clock buffers, block RAMs, multipliers, DCMs) as ISE's map writes them.
 import { initToEquation } from './lut.js';
 import { paramBits, paramInt } from './netlist.js';

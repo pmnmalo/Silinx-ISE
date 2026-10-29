@@ -1,5 +1,5 @@
 // Silinx - the sites of a Spartan-6 device for the placer (#729), from its description (packages/silinx-fpga/devices/
-// xc6slx*.json.gz, core/fpga/device.js Device; browser + Node).
+// xc6slx*.json.gz, fpga/device.js Device; browser + Node).
 //
 //   s6Sites(device) -> {
 //     part, rows, cols,
@@ -40,7 +40,7 @@ function padBufgs(dev, padName, bufIn) {
   return hits;
 }
 
-/** The sites of a Spartan-6 device (a Device of core/fpga/device.js), see above. */
+/** The sites of a Spartan-6 device (a Device of fpga/device.js), see above. */
 export function s6Sites(dev) {
   if (dev.family !== 'spartan6') throw new Error(`s6Sites: ${dev.part} is not a Spartan-6`);
   const rows = dev.rows;

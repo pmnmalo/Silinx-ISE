@@ -1,15 +1,15 @@
 // The fully open flow for a Silinx project, no Xilinx tool in it: Silinx's front end + Yosys compiled
-// to WebAssembly (core/synth-open.js) -> pack -> place -> route on the PIPs whose bits are known ->
+// to WebAssembly (packages/silinx-fpga/src/synth-open.js) -> pack -> place -> route on the PIPs whose bits are known ->
 // Silinx's bitgen. Needs the device cache (~/.silinx/devices, built from the user's own
 // device report: research/s3e-route/build-device.mjs).
 //   node research/s3e-route/open-flow.mjs <project folder> <out folder> [--json netlist.json] [--seed N] [--effort E] [--timing T] [--timing-route 0|1] [--tries N] [--no-replicate] [--replicate-opts JSON] [--no-crc] [--quality file]
-// (seed, effort, timing: the placer's options, core/fpga/place.js; --timing-route 0: route for
+// (seed, effort, timing: the placer's options, packages/silinx-fpga/src/fpga/place.js; --timing-route 0: route for
 // wirelength only, without the timing-driven router (default 1); --tries N: N placements from
 // seed on, each routed, the fastest kept (default 1); --no-replicate: no register replication
-// (core/fpga/replicate.js: by default the flip-flops of many loads on the critical path are copied,
+// (packages/silinx-fpga/src/fpga/replicate.js: by default the flip-flops of many loads on the critical path are copied,
 // the design placed and routed again, the faster kept; --replicate-opts '{"perCopy":8}' overrides
 // its REPLICATION settings)). After routing, the static timing
-// analysis of core/fpga/timing.js prints the critical path of each clock (also in timing.txt). Writes into the out folder: <top>.json (Yosys), placed.xdl, routed.xdl, <top>.bit;
+// analysis of packages/silinx-fpga/src/fpga/timing.js prints the critical path of each clock (also in timing.txt). Writes into the out folder: <top>.json (Yosys), placed.xdl, routed.xdl, <top>.bit;
 // --quality file: the circuit's size and speed as JSON ({ part, slices, luts, ffs, period }: the design
 // corpus's qualityOf, test/designs-corpus/lib.mjs), for the comparison of a Yosys update (#352,
 // scripts/yosys-update-report.mjs). Fails (exit 1)
@@ -19,18 +19,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { compile, elaborate } from '../../core/compile.js';
 import { primitiveSources } from '../../core/unisim.js';
-import { synthesizeOpen } from '../../core/synth-open.js';
-import { yosysWorkers } from '../../core/synth-open-node.js';
-import { parseXdl, writeXdl } from '../../core/xdl.js';
-import { readYosysJson } from '../../core/fpga/netlist.js';
-import { pack } from '../../core/fpga/pack.js';
-import { placeRouteBest } from '../../core/fpga/place-route.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { checkRouting } from '../../core/fpga/route.js';
-import { bitgen, knownRouting } from '../../core/fpga/bitgen.js';
-import { analyzeTiming, timingReport, checkPeriods, checkCross, checkOffsets, parseOffsets, delayTable } from '../../core/fpga/timing.js';
-import { parseUcf } from '../../core/ucf.js';
-import { loadDb } from '../../core/fpga/bitdb-node.js';
+import { synthesizeOpen } from '../../core/synth-front.js';
+import { yosysWorkers } from '../../packages/silinx-fpga/src/synth-open-node.js';
+import { parseXdl, writeXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readYosysJson } from '../../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../../packages/silinx-fpga/src/fpga/pack.js';
+import { placeRouteBest } from '../../packages/silinx-fpga/src/fpga/place-route.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { checkRouting } from '../../packages/silinx-fpga/src/fpga/route.js';
+import { bitgen, knownRouting } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { analyzeTiming, timingReport, checkPeriods, checkCross, checkOffsets, parseOffsets, delayTable } from '../../packages/silinx-fpga/src/fpga/timing.js';
+import { parseUcf } from '../../packages/silinx-fpga/src/ucf.js';
+import { loadDb } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
 import { qualityOf } from '../../test/designs-corpus/lib.mjs';
 
 const args = process.argv.slice(2);
@@ -78,7 +78,7 @@ const known = knownRouting(db);
 // the delays of the fastest routes on known switches, for the placer's timing estimate
 const delays = delayTable(device, { allowPip: known.delayPip });
 step('delay table', t);
-// place and route (core/fpga/place-route.js, the flows' one place and route): each clock's
+// place and route (packages/silinx-fpga/src/fpga/place-route.js, the flows' one place and route): each clock's
 // flip-flops on the slices its global line reaches through switches of known bits (a DCM's outputs
 // on the global buffers their dedicated paths of known bits reach); --tries N: N placements (seeds
 // seed .. seed + N - 1), each routed, the one with the shortest critical path (by the static timing
@@ -112,7 +112,7 @@ if (routed.overused) fail(`the routing did not converge: ${routed.overused} node
 if (best.retried) console.log(`placed again (seed ${best.seed}): the routing of ${best.retried} placement(s) before did not converge`);
 const check = checkRouting(parseXdl(routedText), device);
 if (!check.ok) fail('routing check', check.problems.slice(0, 50));
-// static timing analysis of the routed design (the delay model of core/fpga/timing.js)
+// static timing analysis of the routed design (the delay model of packages/silinx-fpga/src/fpga/timing.js)
 // against the PERIOD constraints of the project's UCF
 const routedDesign = parseXdl(routedText);
 const pu = ucf ? parseUcf(ucf) : { clocks: [], other: [] };

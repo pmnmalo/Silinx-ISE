@@ -7,9 +7,9 @@
 //   io.simSources()                    those of the simulation (the test benches), for the simulation models (optional)
 //   io.ucf                             the constraints' text, or null
 //   io.ucfName                         the constraints file's name (for the log)
-//   io.device()                        the device description (core/fpga/device.js Device), loaded once
-//   io.bitDb()                         the bit database (core/fpga/bitdb.js makeBitDb), loaded once
-//   io.yosys                           run(args, files, onLine) for core/synth-open.js
+//   io.device()                        the device description (fpga/device.js Device), loaded once
+//   io.bitDb()                         the bit database (fpga/bitdb.js makeBitDb), loaded once
+//   io.yosys                           run(args, files, onLine) for synth-open.js
 //   io.write(name, data)               a file of the build (string or Uint8Array); returns its path as
 //                                      the Design Summary shows it (build/open/…, build/top.bit)
 //   io.read(name)                      a file written by an earlier run (or null)
@@ -21,7 +21,7 @@
 //                                      the place and route (#1678), optional: fpga/place-route.js placeRouteBest by default;
 //                                      another engine (nextpnr, #1953) returns its result's shape
 // core/flow-ide.js runOpenFlow is runFlow with the IDE's front end and simulation models (#1675).
-// spec.resources: the part's resources (core/resources.js resourcesOf(part, pkg)), for the synthesis's used of
+// spec.resources: the part's resources (resources.js resourcesOf(part, pkg)), for the synthesis's used of
 // available and its check (#795); without them the synthesis gives the used ones only.
 // Prints "=== SILINX STEP <step> ===" before each step, "=== SILINX FAILED <step> (exit 1) ===" and the
 // ERROR lines when one fails, "=== SILINX DONE ===" at the end (the protocol of ISE's run.sh).
@@ -59,7 +59,7 @@ export class StepError extends Error {
 /**
  * Run the steps of spec ({ top, family, device, pkg, part, steps, seed, effort, replicate,
  * startupClk, synthUpToDate, synthEffort, deepRule }) with io (above). synthEffort: 'normal' | 'high' (the default), the
- * synthesis's Optimization Effort (#282; 'high' given, Place & Route makes HIGH_TRIES placements too, the fastest kept, and HIGH_EXTRA more routed when the placer's estimate is promising, #651; Normal NORMAL_TRIES for a small design); deepRule: Normal's rule of the deep designs (core/synth-open.js DEEP_RULE, for tests). synthUpToDate ({ report }: the synthesis part of the
+ * synthesis's Optimization Effort (#282; 'high' given, Place & Route makes HIGH_TRIES placements too, the fastest kept, and HIGH_EXTRA more routed when the placer's estimate is promising, #651; Normal NORMAL_TRIES for a small design); deepRule: Normal's rule of the deep designs (synth-open.js DEEP_RULE, for tests). synthUpToDate ({ report }: the synthesis part of the
  * report of the run that made it, or null), when the steps start after the synthesis: the netlist of that
  * run is the design's (#280); it is used as it is, or, when it is not there, the synthesis runs.
  */
@@ -108,7 +108,7 @@ export async function runFlow(spec, io) {
     const paths = {};
     for (const [name, text] of Object.entries(r.files)) paths[name] = io.write(`open/${name}`, text);
     const u = r.util;
-    // every resource used of the device's (#795): the family's own from the netlist's cells (core/resources.js),
+    // every resource used of the device's (#795): the family's own from the netlist's cells (resources.js),
     // the LUTs, flip-flops and I/O from the utilization; the others (latches, carry…) with no total
     const used = { ...usedOfPrimitives(spec.family, cellCounts(r.files[`${r.top}.json`], r.top)), luts: u.luts || 0, ffs: u.flipFlops || 0, iob: u.ios || 0 };
     const res = (spec.resources || []).filter(x => !['slices', 'distRam'].includes(x.id));
@@ -171,7 +171,7 @@ export async function runFlow(spec, io) {
   }
 
   // the Design Summary's map section, from the packed design (again after a register replication): every
-  // resource used of the device's sites, in the MAP report's order (core/resources.js); more than the device
+  // resource used of the device's sites, in the MAP report's order (resources.js); more than the device
   // has, the step fails with the resources named, the report kept (the summary shows them over 100 %, #795)
   function mapReport() {
     const s = packed.stats;
@@ -196,7 +196,7 @@ export async function runFlow(spec, io) {
   function runPar() {
     const d = io.device();
     const k = knownPips();
-    // place, route and their timing (core/fpga/place-route.js, the flows' one place and route): each
+    // place, route and their timing (fpga/place-route.js, the flows' one place and route): each
     // clock's flip-flops on the slices its global line reaches through switches of known bits; then
     // register replication (#4): the flip-flops and LUTs of many loads on the critical path copied
     // (#522), the design placed again from the first placement (#87) and routed; the faster kept. At Optimization Effort

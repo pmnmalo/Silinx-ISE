@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's IOB settings (#405: out of packWith in core/fpga/pack.js): the settings of an IOB's
+// Silinx toolchain - the packer's IOB settings (#405: out of packWith in fpga/pack.js): the settings of an IOB's
 // registers and DDR registers as ISE's map writes them (#96), their pins; and a site of its own whose pins are the
 // cell's.
 import { paramInt } from './netlist.js';

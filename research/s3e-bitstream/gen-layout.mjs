@@ -11,8 +11,8 @@
 //   defaults: the bits set in the frame data of an empty design
 //   PART=xc3s250ecp132-4 node gen-layout.mjs map.json EMPTY.bit [extra.json] > packages/silinx-fpga/bitdb/xc3s250e-layout.json
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 
 const [mapFile, emptyBit, extra] = process.argv.slice(2);
 const part = process.env.PART || 'xc3s250ecp132-4';

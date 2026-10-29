@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { resolvePatterns, stripLutRuns, separateWindows } from '../research/s3e-bitstream/lib.mjs';
 import { SHIFTS, TERMINAL_TYPES } from '../research/s3e-bitstream/share-sb.mjs';
 import { MIRRORS, mirrorFeatures } from '../research/s3e-bitstream/dcm-mirror.mjs';
-import { makeDb, featureBits } from '../core/fpga/bitgen.js';
+import { makeDb, featureBits } from '../packages/silinx-fpga/src/fpga/bitgen.js';
 import { measuredPips, UNIFY } from '../research/s3e-bitstream/want-pips.mjs';
 import { windowKeyOf } from '../research/s3e-bitstream/db.mjs';
 

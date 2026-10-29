@@ -8,7 +8,7 @@
 //   node gen-obsclk.mjs outdir [designs=6] [seed=1] [p=0.5]      (folders clk0, clk1…: top.v, top.ucf; p: the part of the
 //                                                                 cells each clock takes, sparser nets narrow faster)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 import { clbSlices } from './gen-observe.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

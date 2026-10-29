@@ -1,4 +1,4 @@
-// Acceptance test of the Spartan-6 bitstream writer (core/fpga/s6/bitstream.js, #724): each .bit written by
+// Acceptance test of the Spartan-6 bitstream writer (packages/silinx-fpga/src/fpga/s6/bitstream.js, #724): each .bit written by
 // ISE's bitgen is read, and written again from its frame data, its header and its options (the CRC on or
 // off, StartUpClk); the two files must be byte-identical, and every CRC the reader computes must be the
 // one bitgen wrote. The files stay outside the repository (ISE's outputs).
@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { readBit6, writeBit6 } from '../../core/fpga/s6/bitstream.js';
+import { readBit6, writeBit6 } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
 /** The check of one .bit: { same, bytes, crc, startupClk, device, crcOk, firstDiff } (firstDiff: the first byte that differs). */
 export function checkBit(iseBytes) {

@@ -10,8 +10,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl, evalLut } from '../../core/xdl.js';
-import { readBit6, bitFormat6, emptyFdri, FRAME_WORDS } from '../../core/fpga/s6/bitstream.js';
+import { parseXdl, evalLut } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit6, bitFormat6, emptyFdri, FRAME_WORDS } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { baseSettings } from './gen-slice6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
 import { LUTS } from './gen-lutmap6.mjs';

@@ -1,4 +1,4 @@
-// Silinx toolchain - the packer's pads and clock buffers (#405: out of packWith in core/fpga/pack.js): the IOBs, the
+// Silinx toolchain - the packer's pads and clock buffers (#405: out of packWith in fpga/pack.js): the IOBs, the
 // global clock buffers, the block RAMs, multipliers and DCMs on sites of their own; the multiplier chains (#2).
 import { BRAM_TYPE, DCM_TYPE, MULT_TYPE, PackError } from './pack.js';
 

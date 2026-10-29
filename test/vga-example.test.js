@@ -8,13 +8,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { example, exampleUcf } from './examples-lib.mjs';
 import { designOf } from './compiled-diff.js';
-import { parseUcf } from '../core/ucf.js';
+import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
 import { resolveBoard } from '../server/devices.js';
 import { boardWiring, emulatorClocks } from '../core/emulate.js';
 import { netlistOf } from '../core/compiled-sim.js';
 import { CompiledBoard } from '../core/emulate-compiled.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { synthesizeOpen } from '../core/synth-open.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { synthesizeOpen } from '../core/synth-front.js';
 import { postSynthesisModels } from '../core/sim-model.js';
 import { scalarizeNetlist } from '../core/netlist-hier.js';
 

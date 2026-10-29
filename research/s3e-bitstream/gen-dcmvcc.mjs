@@ -5,7 +5,7 @@
 // unrouted); gen-pipdrop.mjs then removes them by codewords and ana-pipdrop.mjs gives their bits.
 //   PART=xc3s250ecp132-4 node gen-dcmvcc.mjs out.xdl
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 import { PART } from './db.mjs';
 
 const dev = loadDeviceCache(PART);

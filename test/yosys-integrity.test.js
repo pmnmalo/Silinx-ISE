@@ -1,11 +1,11 @@
-// core/synth-open-yosys.js verifiedYosysUrl (#1445): Yosys's bundle, which the Yosys workers of the static editions
+// packages/silinx-fpga/src/synth-open-yosys.js verifiedYosysUrl (#1445): Yosys's bundle, which the Yosys workers of the static editions
 // import from the assets' site, checked against the SHA-256 the build wrote for it before it is imported: a tampered
 // bundle is refused; nothing checked where the build wrote none; the check in the Blob workers' code.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { verifiedYosysUrl, yosysWorkerSource } from '../core/synth-open-yosys.js';
-import { verifiedYosysUrl as reexported } from '../core/synth-open.js';
+import { verifiedYosysUrl, yosysWorkerSource } from '../packages/silinx-fpga/src/synth-open-yosys.js';
+import { verifiedYosysUrl as reexported } from '../packages/silinx-fpga/src/synth-open.js';
 
 const SITE = 'https://pmnmalo.github.io/Silinx-ISE/';
 const KEY = 'vendor/yowasp-yosys/0.70.1258/gen/bundle.js';
@@ -26,7 +26,7 @@ test('#1445 the bundle as the build wrote it: fetched once and its URL given to 
   const s = scope();
   assert.equal(await verifiedYosysUrl(URL_, s), URL_);
   assert.deepEqual(s.requests, [URL_]);
-  assert.equal(reexported, verifiedYosysUrl, 'core/synth-open.js exports it');
+  assert.equal(reexported, verifiedYosysUrl, 'the package\'s synth-open.js exports it');
 });
 
 test('#1445 a tampered bundle (a byte more, another text, empty) is refused; so is a failed fetch', async () => {

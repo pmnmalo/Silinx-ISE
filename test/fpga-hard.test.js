@@ -1,13 +1,13 @@
-// The packer (core/fpga/pack.js) on distributed RAMs and shift registers (SLICEM), block RAMs and
-// multipliers, the placer (core/fpga/place.js) on their sites, their timing arcs
-// (core/fpga/timing.js): small synthetic Yosys netlists, the XDL settings as ISE's map writes them
+// The packer (packages/silinx-fpga/src/fpga/pack.js) on distributed RAMs and shift registers (SLICEM), block RAMs and
+// multipliers, the placer (packages/silinx-fpga/src/fpga/place.js) on their sites, their timing arcs
+// (packages/silinx-fpga/src/fpga/timing.js): small synthetic Yosys netlists, the XDL settings as ISE's map writes them
 // (research/s3e-bitstream/README.md, stage D), and - the main check - the packed design simulated
 // from its own XDL settings behaves like the netlist (test/fpga-sim.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack, PackError, BRAM_WIDTH, ucfPortsOf } from '../core/fpga/pack.js';
-import { instArcs } from '../core/fpga/timing.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack, PackError, BRAM_WIDTH, ucfPortsOf } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { instArcs } from '../packages/silinx-fpga/src/fpga/timing.js';
 import { compareSims, netlistSim } from './fpga-sim.js';
 
 // A Yosys JSON netlist: ports { name: ['input' | 'output', width] } (bits name[i]); cells
@@ -321,8 +321,8 @@ test('netlistSim: SRL16E shifts on its clock when enabled, Q is the stage at the
 });
 
 // placement on the XC3S250E's own sites (the device description that ships with Silinx)
-const { loadDeviceCache } = await import('../core/fpga/device-node.js');
-const { deviceSites, place, PlaceError } = await import('../core/fpga/place.js');
+const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+const { deviceSites, place, PlaceError } = await import('../packages/silinx-fpga/src/fpga/place.js');
 let dev = null;
 const device = () => (dev ||= deviceSites(loadDeviceCache('xc3s250ecp132-4')));
 
@@ -471,9 +471,9 @@ test('DCM: the top-left DCM site (no INST LOC: the placer\'s choice, #47), the s
 });
 
 test('bufgReach: each output of the top-left DCM reaches its global buffer through switches of known bits (CLK0, CLK2X, CLKDV, CLKFX)', async () => {
-  const { bufgReach } = await import('../core/fpga/route.js');
-  const { knownRouting } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../core/fpga/bitdb-node.js');
+  const { bufgReach } = await import('../packages/silinx-fpga/src/fpga/route.js');
+  const { knownRouting } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
   const known = knownRouting(loadDb('xc3s250ecp132-4'));
   const g = loadDeviceCache('xc3s250ecp132-4');
   const got = Object.fromEntries(['CLK0', 'CLK2X', 'CLKDV', 'CLKFX', 'CLK90', 'CLKFX180'].map(p => [p, bufgReach(g, 'DCM_X0Y1', p, known.allowPip)]));
@@ -486,10 +486,10 @@ test('bufgReach: each output of the top-left DCM reaches its global buffer throu
 });
 
 test('clockReach: a side global buffer reaches only the slices of its half of the chip, never through general routing (#95)', async () => {
-  const { clockReach } = await import('../core/fpga/route.js');
-  const { knownRouting } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../core/fpga/bitdb-node.js');
-  const { deviceSites } = await import('../core/fpga/place.js');
+  const { clockReach } = await import('../packages/silinx-fpga/src/fpga/route.js');
+  const { knownRouting } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
+  const { deviceSites } = await import('../packages/silinx-fpga/src/fpga/place.js');
   const known = knownRouting(loadDb('xc3s250ecp132-4'));
   const g = loadDeviceCache('xc3s250ecp132-4');
   const dev = deviceSites(g, known);
@@ -643,11 +643,11 @@ function constMults() {
 }
 
 test('multipliers with constant inputs (x * 6554) on every multiplier site: every input tied to 1 routed on switches of known bits, from the VCC site of its own block-RAM interconnect tile, as ISE does (#35)', { timeout: 120000 }, async () => {
-  const { routeDesign, checkRouting } = await import('../core/fpga/route.js');
-  const { knownRouting, bitgen } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../core/fpga/bitdb-node.js');
-  const { placedXdl } = await import('../core/fpga/place.js');
-  const { parseXdl, writeXdl } = await import('../core/xdl.js');
+  const { routeDesign, checkRouting } = await import('../packages/silinx-fpga/src/fpga/route.js');
+  const { knownRouting, bitgen } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
+  const { placedXdl } = await import('../packages/silinx-fpga/src/fpga/place.js');
+  const { parseXdl, writeXdl } = await import('../packages/silinx-fpga/src/xdl.js');
   const g = loadDeviceCache('xc3s250ecp132-4');
   const db = loadDb('xc3s250ecp132-4', { graph: g });
   const nl = constMults();
@@ -681,11 +681,11 @@ test('multipliers with constant inputs (x * 6554) on every multiplier site: ever
 // CE / RST with and without registers, a DCM's RST / PS… / DSSEN): to VCC or GND, never inverted;
 // a DCM's DSSEN left open; a DCM's pins tied to 1 from the VCC site of its own tile (#190)
 test('control pins tied to 1 / 0: block RAM EN / WE / SSR, multiplier CE / RST and DCM RST / PS… on VCC / GND, not inverted, routed on switches of known bits; a DCM\'s DSSEN open (#50, #190)', { timeout: 120000 }, async () => {
-  const { routeDesign, checkRouting } = await import('../core/fpga/route.js');
-  const { knownRouting, bitgen, designFeatures } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../core/fpga/bitdb-node.js');
-  const { placedXdl } = await import('../core/fpga/place.js');
-  const { parseXdl, writeXdl } = await import('../core/xdl.js');
+  const { routeDesign, checkRouting } = await import('../packages/silinx-fpga/src/fpga/route.js');
+  const { knownRouting, bitgen, designFeatures } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
+  const { placedXdl } = await import('../packages/silinx-fpga/src/fpga/place.js');
+  const { parseXdl, writeXdl } = await import('../packages/silinx-fpga/src/xdl.js');
   const nl = yjson({ clk: ['input', 1], a: ['input', 10], q: ['output', 4] }, [
     ...clock, ...ibuf('a', 10),
     { name: 'b', type: 'RAMB16_S9_S9', conns: { ADDRA: bus('a_i', 10, 0).concat('a_i[0]'), DIA: bus('a_i', 8), DIPA: ['0'], DOA: bus('qa', 8), DOPA: ['qap'], CLKA: 'clk_g', ENA: '0', WEA: '1', SSRA: '1',
@@ -746,9 +746,9 @@ const SHIPPED = [['xc3s100ecp132-4', 'M4', 'G3'], ['xc3s250ecp132-4', 'M4', 'G3'
 const flows = new Map();
 async function flowOf(part) {
   if (flows.has(part)) return flows.get(part);
-  const { clockReach, bufgReach } = await import('../core/fpga/route.js');
-  const { knownRouting } = await import('../core/fpga/bitgen.js');
-  const { loadDb } = await import('../core/fpga/bitdb-node.js');
+  const { clockReach, bufgReach } = await import('../packages/silinx-fpga/src/fpga/route.js');
+  const { knownRouting } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
   const g = loadDeviceCache(part);
   const known = knownRouting(loadDb(part, { graph: g }));
   const reach = new Map();

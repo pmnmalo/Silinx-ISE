@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-open-flow-'));
 process.env.SILINX_CONFIG_DIR = path.join(tmp, 'cfg');   // no user cache: the shipped graph is used
-const { findDeviceGraph, shippedDevicePath, deviceCachePath, loadDeviceCache } = await import('../core/fpga/device-node.js');
+const { findDeviceGraph, shippedDevicePath, deviceCachePath, loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
 test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 test('the routing graph of the XC3S250E-CP132 ships with Silinx; the user\'s own one comes first; any speed grade', () => {
@@ -35,7 +35,7 @@ test('the routing graph of the XC3S250E-CP132 ships with Silinx; the user\'s own
 });
 
 test('every shipped device description loads and has the datasheet\'s slices and user I/O pins', async () => {
-  const { deviceSites } = await import('../core/fpga/place.js');
+  const { deviceSites } = await import('../packages/silinx-fpga/src/fpga/place.js');
   // DS312 (Spartan-3E family data sheet): CLB slices; user I/O of the package
   const want = { 'xc3s100ecp132-4': [960, 83], 'xc3s250ecp132-4': [2448, 92], 'xc3s500efg320-4': [4656, 232], 'xc3s1200efg320-4': [8672, 250] };
   for (const [part, [slices, pads]] of Object.entries(want)) {
@@ -90,7 +90,7 @@ test('the open flow on the shipped graph: blinky from VHDL to a complete bitstre
   for (const f of ['top.json', 'placed.xdl', 'routed.xdl', 'timing.txt']) assert.ok(fs.existsSync(path.join(out, f)), f);
   // the router swaps LUT inputs: every LUT of the routed design computes the same function of the
   // same nets as in the placed design (an input not connected reads 1 in both)
-  const { parseXdl, evalLut } = await import('../core/xdl.js');
+  const { parseXdl, evalLut } = await import('../packages/silinx-fpga/src/xdl.js');
   const [placed, routed] = ['placed.xdl', 'routed.xdl'].map(f => parseXdl(fs.readFileSync(path.join(out, f), 'utf8')));
   const pinNets = d => new Map(d.nets.flatMap(n => n.inpins.map(p => [`${p.inst}.${p.pin}`, n.name])));
   const pa = pinNets(placed), pb = pinNets(routed), byName = new Map(routed.insts.map(i => [i.name, i]));

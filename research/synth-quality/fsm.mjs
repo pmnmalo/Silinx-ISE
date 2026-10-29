@@ -37,7 +37,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load } from './abc9.mjs';
-import { keepDepth, DEPTH_RULE } from '../../core/synth-open.js';
+import { keepDepth, DEPTH_RULE } from '../../packages/silinx-fpga/src/synth-open.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
@@ -46,9 +46,8 @@ const RESULTS_FILE = path.join(HERE, 'fsm-results.json');
 export const WAYS = ['stock', 'base', 'binary', 'onehot', 'onehot-port', 'core'];
 const CORPUS_PART = 'xc3s1200efg320-4';
 
-// the parsers and the RTLIL edits, now the open synthesis's own (#539: core/synth-fsm.js)
-import { PREP_HEAD, PREP_TAIL, FSM_PRE_FILE as PRE_IL, FSM_MARKED_FILE as MARKED_IL, FSM_POST_FILE as POST_IL, FSM_ENC_FILE as ENC,
-  parseDetect, markWires, parseEncfile, newInit, setInits, rtlilName as ESC } from '../../core/synth-fsm.js';
+// the parsers and the RTLIL edits, now the open synthesis's own (#539: packages/silinx-fpga/src/synth-fsm.js)
+import { PREP_HEAD, PREP_TAIL, FSM_PRE_FILE as PRE_IL, FSM_MARKED_FILE as MARKED_IL, FSM_POST_FILE as POST_IL, FSM_ENC_FILE as ENC, parseDetect, markWires, parseEncfile, newInit, setInits, rtlilName as ESC } from '../../packages/silinx-fpga/src/synth-fsm.js';
 export { parseDetect, markWires, parseEncfile, newInit, setInits };
 const PORT = 'Register is connected to module port.';
 const BENEFIT = "Users of register don't seem to benefit from recoding.";
@@ -63,7 +62,7 @@ export function chosen(way, det) {
 }
 
 /**
- * run() for synthesizeOpen (core/synth-open.js) that extracts the state machines of `way`: the run of its first
+ * run() for synthesizeOpen (core/synth-front.js) that extracts the state machines of `way`: the run of its first
  * step (the script with `synth_xilinx … -run :fine`) made in three, the others (the remappings from the netlist
  * written before the LUT mapping) as they are. Each first step's detection and machines are pushed to `record`.
  */
@@ -226,8 +225,9 @@ async function main(argv) {
   const routedDir = arg('--routed', null);
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'test/designs-corpus/manifest.json'), 'utf8'));
   const { toVerilog } = await import('../../core/synth-verilog.js');
-  const { synthesizeOpen, utilization, yosysFiles, SRL_CELLS_FILE } = await import('../../core/synth-open.js');
-  const { yosysNode } = await import('../../core/synth-open-node.js');
+  const { synthesizeOpen } = await import('../../core/synth-front.js');
+  const { utilization, yosysFiles, SRL_CELLS_FILE } = await import('../../packages/silinx-fpga/src/synth-open.js');
+  const { yosysNode } = await import('../../packages/silinx-fpga/src/synth-open-node.js');
   const { designs, compile, elaborate, primitiveSources, lib } = await load(manifest.designs.map(d => d.name));
   const pick = designs.filter(d => !only || only.some(o => d.name === o || d.name === `examples/${o}`));
 
@@ -253,14 +253,14 @@ async function main(argv) {
 
 
   const { compareNetlist } = await import('../../test/diff-synth.js');
-  const { readYosysJson } = await import('../../core/fpga/netlist.js');
-  const { pack } = await import('../../core/fpga/pack.js');
-  const { deviceSites } = await import('../../core/fpga/place.js');
-  const { placeRouteBest } = await import('../../core/fpga/place-route.js');
-  const { loadDeviceCache } = await import('../../core/fpga/device-node.js');
-  const { knownRouting } = await import('../../core/fpga/bitgen.js');
-  const { analyzeTiming, delayTable } = await import('../../core/fpga/timing.js');
-  const { writeXdl, parseXdl } = await import('../../core/xdl.js');
+  const { readYosysJson } = await import('../../packages/silinx-fpga/src/fpga/netlist.js');
+  const { pack } = await import('../../packages/silinx-fpga/src/fpga/pack.js');
+  const { deviceSites } = await import('../../packages/silinx-fpga/src/fpga/place.js');
+  const { placeRouteBest } = await import('../../packages/silinx-fpga/src/fpga/place-route.js');
+  const { loadDeviceCache } = await import('../../packages/silinx-fpga/src/fpga/device-node.js');
+  const { knownRouting } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
+  const { analyzeTiming, delayTable } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
+  const { writeXdl, parseXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
   const { loadDb } = await import('../s3e-bitstream/db.mjs');
   const devices = new Map();
   const deviceOf = part => {

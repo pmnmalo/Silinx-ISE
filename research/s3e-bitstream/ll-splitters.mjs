@@ -10,9 +10,9 @@
 // bits relative to its tile, for packages/silinx-fpga/bitdb/xc3s1200e-tiles.json (merge-db.mjs --device).
 //   PART=xc3s1200efg320-4 node ll-splitters.mjs round-dir… > ll-splitters.json      (each dir: key.json, BASE.bit, V*.bit)
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
 import { loadDb } from './db.mjs';
-import { tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 
 const TYPES = /^(CLKV_LL|CLKT_LL|CLKB_LL|CLKL_IOIS_LL|CLKR_IOIS_LL|CLKLH_DCM_LL|CLKRH_DCM_LL)$/;
 const db = loadDb();

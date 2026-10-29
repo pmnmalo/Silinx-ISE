@@ -1,5 +1,5 @@
-// Quality of the open synthesis (Silinx's front end + Yosys, core/synth-open.js) and of the packer
-// (core/fpga/pack.js): size budgets of the designs in the repository, so that a change that makes
+// Quality of the open synthesis (Silinx's front end + Yosys, packages/silinx-fpga/src/synth-open.js) and of the packer
+// (packages/silinx-fpga/src/fpga/pack.js): size budgets of the designs in the repository, so that a change that makes
 // the netlists larger fails here (the measurements: research/synth-quality/README.md). Their
 // equivalence with the RTL is checked by test/synth-diff-fixtures.test.js.
 import { test } from 'node:test';
@@ -9,10 +9,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack } from '../core/fpga/pack.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
 import { expectWarnings } from './diff-synth.js';
 import { compareSims } from './fpga-sim.js';
 
@@ -150,8 +150,8 @@ test('a 2-stage chain (the stopwatch\'s button synchroniser) stays in flip-flops
   const fs = await import('node:fs');
   const text = fs.readFileSync(new URL('../examples/stopwatch/src/debounce.vhd', import.meta.url), 'utf8').replace('1_000_000', '20');
   const { compile, elaborate } = await import('../core/compile.js');
-  const { synthesizeOpen } = await import('../core/synth-open.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   const syn = async (src, top) => (await synthesizeOpen(elaborate(compile(src), top), { family: 'spartan3e', run: yosysNode })).cells;
   const db = await syn([{ path: 'debounce.vhd', lang: 'vhdl', text }], 'debounce');
   assert.equal(db.SRL16E, undefined, JSON.stringify(db));

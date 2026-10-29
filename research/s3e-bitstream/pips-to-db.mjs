@@ -2,7 +2,7 @@
 // PIP has the same bits in every tile of the type where it was measured.
 //   node pips-to-db.mjs pips1.json [pips2.json …] > pip-features.json   (report on stderr)
 import fs from 'node:fs';
-import { tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb } from './db.mjs';
 import { resolvePatterns, stripLutRuns } from './lib.mjs';
 

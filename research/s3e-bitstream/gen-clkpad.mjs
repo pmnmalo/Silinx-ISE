@@ -7,9 +7,9 @@
 // one), a counter on each clock, one bit of each to an output pad the placer chooses.
 //   PART=xc3s250ecp132-4 node gen-clkpad.mjs outdir [--list]   (folders c0, c1)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { knownRouting } from '../../core/fpga/bitgen.js';
-import { PIP_ROUTETHRU } from '../../core/fpga/device.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { knownRouting } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { PIP_ROUTETHRU } from '../../packages/silinx-fpga/src/fpga/device.js';
 import { PART, loadDb } from './db.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -7,9 +7,9 @@
 // With --learn, the candidates found in at least 2 tiles (or 1 with --min 1) are written as
 // { types: { TYPE: { features: { feature: ["df,db", …] } } } } for merging into the database.
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { frameData, designFeatures, tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { frameData, designFeatures, tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb, edges } from './db.mjs';
 
 const args = process.argv.slice(2);

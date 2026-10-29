@@ -122,7 +122,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const dir = path.join(P.projectDir(req.params.p), 'build');
     const f = name => path.join(dir, name);
     const mtime = p => { try { return fss.statSync(p).mtimeMs; } catch { return 0; } };
-    const { MODEL_VERSION } = await import('../core/xdl.js');
+    const { MODEL_VERSION } = await import('../packages/silinx-fpga/src/parts.js');
     const ncd = mtime(f(`${project.top}.ncd`)), xdl = mtime(f(`${project.top}.xdl`)), dev = mtime(f('device.xdlrc'));
     const openXdl = mtime(f('open/routed.xdl'));
     if (openXdl && openXdl >= ncd) {
@@ -130,8 +130,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
       if (!st.graph) return { available: false, reason: 'error', error: st.reason };
       const key = `open:${MODEL_VERSION}:${openXdl}:${st.graph}:${mtime(st.graph)}`;
       try { const c = JSON.parse(await fs.readFile(f('open/fpga-view.json'), 'utf8')); if (c.key === key) return c.model; } catch { /* not cached */ }
-      const { parseXdl, fpgaModel, deviceGrid } = await import('../core/xdl.js');
-      const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+      const { parseXdl, fpgaModel, deviceGrid, loadDeviceCache } = await import('../packages/silinx-fpga/src/node.js');
       const model = { available: true, source: 'open', ...fpgaModel(parseXdl(await fs.readFile(f('open/routed.xdl'), 'utf8')), deviceGrid(loadDeviceCache(st.graph))) };
       await fs.writeFile(f('open/fpga-view.json'), JSON.stringify({ key, model }));
       return model;
@@ -140,7 +139,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     if (!xdl || !dev || xdl < ncd) return { available: false, reason: xdl ? 'stale' : 'no-xdl' };
     const key = `${MODEL_VERSION}:${ncd}:${xdl}:${dev}`;   // a new model format rebuilds the cache
     try { const c = JSON.parse(await fs.readFile(f('fpga-view.json'), 'utf8')); if (c.key === key) return c.model; } catch { /* not cached */ }
-    const { parseXdl, parseXdlrc, fpgaModel } = await import('../core/xdl.js');
+    const { parseXdl, parseXdlrc, fpgaModel } = await import('../packages/silinx-fpga/src/parts.js');
     const model = { available: true, ...fpgaModel(parseXdl(await fs.readFile(f(`${project.top}.xdl`), 'utf8')), parseXdlrc(await fs.readFile(f('device.xdlrc'), 'utf8'))) };
     await fs.writeFile(f('fpga-view.json'), JSON.stringify({ key, model }));
     return model;

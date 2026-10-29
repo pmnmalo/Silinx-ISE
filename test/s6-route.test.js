@@ -1,4 +1,4 @@
-// The Spartan-6 router (#730): core/fpga/s6/route.js (PathFinder on the device's routing graph), route-nets.js
+// The Spartan-6 router (#730): packages/silinx-fpga/src/fpga/s6/route.js (PathFinder on the device's routing graph), route-nets.js
 // (the nets, the general interconnect, the route-throughs, the TIEOFFs), route-output.js (the routed design as
 // XDL), route-check.js (its rules): small designs and every example on the Nexys3's XC6SLX16 and the Atlys's
 // XC6SLX45 routed completely, no node of two nets, the clocks on the global network, the routes legal by the graph,
@@ -6,12 +6,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { placeS6 } from '../core/fpga/s6/place.js';
-import { placedXdlS6 } from '../core/fpga/s6/xdl.js';
-import { routeS6, routedXdlS6, RouteError } from '../core/fpga/s6/route.js';
-import { routingResources } from '../core/fpga/s6/route-nets.js';
-import { checkRoutingS6 } from '../core/fpga/s6/route-check.js';
-import { parseXdl, writeXdl } from '../core/xdl.js';
+import { placeS6 } from '../packages/silinx-fpga/src/fpga/s6/place.js';
+import { placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xdl.js';
+import { routeS6, routedXdlS6, RouteError } from '../packages/silinx-fpga/src/fpga/s6/route.js';
+import { routingResources } from '../packages/silinx-fpga/src/fpga/s6/route-nets.js';
+import { checkRoutingS6 } from '../packages/silinx-fpga/src/fpga/s6/route-check.js';
+import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
 import { EXAMPLES } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import * as T from '../web/js/templates.js';
 import { compile, elaborate } from '../core/compile.js';
 import { Simulator } from '../core/simulator.js';
-import { parseUcf, checkUcf } from '../core/ucf.js';
+import { parseUcf, checkUcf } from '../packages/silinx-fpga/src/ucf.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const project = { name: 'tpl', device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' } };

@@ -145,7 +145,7 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
     const pips = ioCandidates(read(input), db, t => tileXY(t).prefix);
     res = { part: PART, pips: tests ? leftCandidates(pips, read(tests).untestable) : pips };
   } else if (cmd === 'rest') {
-    const [{ default: zlib }, { loadDevice }] = await Promise.all([import('node:zlib'), import('../../core/fpga/device.js')]);
+    const [{ default: zlib }, { loadDevice }] = await Promise.all([import('node:zlib'), import('../../packages/silinx-fpga/src/fpga/device.js')]);
     const M = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(input))));
     const pips = [];
     for (let k = 0; k < M.tileCount; k++) for (let i = 0; i < M.templates[M.tileTemplate[k]].from.length; i++) pips.push(M.pip(k, i));

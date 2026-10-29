@@ -1,13 +1,13 @@
 // The tiles around the CLBs (I/O, corners, block-RAM interconnect, DCM) have the CLB's switch box:
 // every PIP measured in both has the same bits at a fixed offset (the left I/O column 2 frames later,
 // the top I/O row 16 bits further). Those tile types share the CLB's features (sameAs + shift, see
-// makeDb in core/fpga/bitgen.js); their own measurements that the CLB's give are dropped, and so are
+// makeDb in packages/silinx-fpga/src/fpga/bitgen.js); their own measurements that the CLB's give are dropped, and so are
 // own measurements without bits where the CLB's have bits (bits given to a neighbouring tile by
 // ana-pipdrop.mjs). A measurement that contradicts the CLB's is reported and kept. The I/O tiles'
 // own pin wires are renamed to the CLB's (RENAME).
 //   node share-sb.mjs [--check]      (rewrites packages/silinx-fpga/bitdb/s3e-tiles.json; --check: only the report)
 import fs from 'node:fs';
-import { shiftBit } from '../../core/fpga/bitgen.js';
+import { shiftBit } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 
 export const SHIFTS = {
   '0,0': ['BIOIS', 'BIBUFS', 'RIOIS', 'RIOIS_PCI', 'RIOIS_CLK_PCI', 'RIBUFS', 'RIBUFS_PCI', 'RIBUFS_CLK_PCI', 'RIBUFS_BRK', 'LR',

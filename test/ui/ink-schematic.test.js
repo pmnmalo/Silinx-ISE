@@ -11,7 +11,7 @@ import { writeText } from '../../core/ink/synth.js';
 import { newDoc, netlist, generateHdl } from '../../core/schdoc.js';
 import { truthTableFromModule } from '../../core/logic.js';
 import { compileDesign } from '../../core/compiled-sim.js';
-import { yosysNode } from '../../core/synth-open-node.js';
+import { yosysNode } from '../../packages/silinx-fpga/src/synth-open-node.js';
 import { designOf } from '../compiled-diff.js';
 
 let env;

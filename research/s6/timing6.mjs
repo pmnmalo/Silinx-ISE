@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl } from '../../core/xdl.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 import { nnls } from '../s3e-route/timing-fit.mjs';
 import { parseTwr } from './twr6.mjs';
 import { connection, connections, features } from './timing-fit6.mjs';

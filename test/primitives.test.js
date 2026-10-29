@@ -41,7 +41,7 @@ test('the Device Primitives of each family: the issue\'s list, in the palette\'s
 const variants = t => (t === 'ramb16_s' ? Object.keys(RAMB16_PORTS).map(w => ({ portWidth: w }))
   : t === 'ramb16_s_s' ? Object.keys(RAMB16_PORTS).flatMap((a, i) => Object.keys(RAMB16_PORTS).slice(i).map(b => ({ widthA: a, widthB: b }))) : [{}]);
 
-test('each primitive: its resource on its families (core/resources.js), the count of a part', () => {
+test('each primitive: its resource on its families (packages/silinx-fpga/src/resources.js), the count of a part', () => {
   const want = { ramb16_s: 'ramb16', ramb16_s_s: 'ramb16', mult18x18sio: 'mult18x18', dcm_sp: 'dcm', bufg: 'bufgmux', bufgmux: 'bufgmux', ibufg: 'iob',
     ramb8bwer: 'ramb8bwer', ramb16bwer: 'ramb16bwer', dsp48a1: 'dsp48a1', pll_base: 'pll', bufio2: 'bufio2' };
   for (const t of PRIMS) for (const f of SYMBOLS[t].families) for (const v of variants(t)) assert.equal(primitiveResource(t, f, v), want[t], `${t} ${f} ${JSON.stringify(v)}`);

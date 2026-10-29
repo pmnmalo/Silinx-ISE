@@ -175,11 +175,11 @@ test('related tests: in parts of about the same time, the UI tests balanced too,
   assert.ok(parts.every((p) => p.ui.length >= 7), parts.map((p) => p.ui.length).join(' '));
 });
 
-test('related tests: the repository — the synthesis\'s tests for a change of core/synth-open.js (#635\'s), its helpers read', () => {
+test('related tests: the repository — the synthesis\'s tests for a change of the package\'s synth-open.js (#635\'s), its helpers read', () => {
   const files = sources();
   assert.ok(Object.keys(files).some(f => f === 'test/examples-lib.mjs'), 'the helpers');
   assert.ok(!Object.keys(files).some(f => f.startsWith('node_modules/') || f.includes('/fixtures/')));
-  const { unit } = relatedTests(files, ['core/synth-open.js']);
+  const { unit } = relatedTests(files, ['packages/silinx-fpga/src/synth-open.js']);
   for (const f of ['test/synth-open.test.js', 'test/carry-chain.test.js']) assert.ok(unit.includes(f), f);
   assert.ok(!unit.includes('test/schdoc.test.js'));
 });

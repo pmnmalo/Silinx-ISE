@@ -93,7 +93,7 @@ Each design runs in a worker thread; each stage records a status, its time and i
 | `tb` | the design's own self-checking testbench in Silinx's simulator, until it prints its pass (or fail) message | `pass`, `fail: <line>`, `unsupported: …`, `skip: no self-checking testbench` |
 | `synth` | the open synthesis: Silinx's synthesis front end (`core/synth-verilog.js`) + Yosys (YoWASP) | `pass`, `unsupported: <construct>`, `error: <Yosys error>` |
 | `diff` | the netlist simulated against the RTL cycle by cycle, seeded random stimulus (`test/diff-synth.js`) | `pass`, `mismatch: cycle N: <outputs>` (the report in the results) |
-| `flow` | the open back end on the XC3S250E (Basys2-250), or the XC3S500E / XC3S1200E (Nexys2) for a design too large for it: pack, then place and route as the app's flow does (`core/fpga/place-route.js`: the placer with the delay table, routing on the PIPs of known bits, static timing, register replication), static timing against PERIOD 20 ns (or the design's `periodNs`, for a critical path too close to 20 ns: #440), bitgen | `complete` (every feature in the bit database), `too large: …`, `fail: route/bitgen: …`, `unsupported: …` |
+| `flow` | the open back end on the XC3S250E (Basys2-250), or the XC3S500E / XC3S1200E (Nexys2) for a design too large for it: pack, then place and route as the app's flow does (`packages/silinx-fpga/src/fpga/place-route.js`: the placer with the delay table, routing on the PIPs of known bits, static timing, register replication), static timing against PERIOD 20 ns (or the design's `periodNs`, for a critical path too close to 20 ns: #440), bitgen | `complete` (every feature in the bit database), `too large: …`, `fail: route/bitgen: …`, `unsupported: …` |
 
 For the flow, the clock goes on the Basys2's oscillator pin (B8, `boardClockUcf`). A design with
 more port bits than the package has pins (92) is wrapped (`lib.mjs ioWrapper`): its inputs are
@@ -103,7 +103,7 @@ checked before on the design's own ports (`diff`). Cells the packer does not sup
 and distributed RAM, shift registers, multipliers) are recorded as a warning and the design is
 synthesized again with `-nobram -nolutram -nosrl -nodsp` so the rest of the flow is still tested.
 The place and route is the one of the app's flow and of `research/s3e-route/open-flow.mjs`
-(`core/fpga/place-route.js`, #79, #88): the corpus measures what users get, register replication
+(`packages/silinx-fpga/src/fpga/place-route.js`, #79, #88): the corpus measures what users get, register replication
 (the flip-flops of many loads on the critical path copied, kept when faster) included.
 
 ### Expectations and warnings
@@ -128,7 +128,7 @@ circuit**, as the flow itself measures it:
 
 `part`: the device it was built on; `slices`, `luts`, `ffs`: the packer's counts (of the circuit
 kept: with the copies of register replication when it was kept);
-`period`: the critical path in ns by Silinx's STA (`core/fpga/timing.js`, the worst clock; `null`
+`period`: the critical path in ns by Silinx's STA (`packages/silinx-fpga/src/fpga/timing.js`, the worst clock; `null`
 for a design without a clock). The run **fails when a design gets larger or slower** beyond the
 placement noise:
 
@@ -355,7 +355,7 @@ board design's own testbench in Silinx's simulator when it has one, and the full
   block RAM (`core/synth-verilog.js`: loop variables get a plain name).
 - **Placer: I/O banks mixed voltages**: a 3.3 V clock on B8 and unconstrained (LVCMOS25) outputs in
   the same bank gave bitstreams ISE's DRC refuses (PhysDesignRules:755, "VCCO incompatible"); the
-  placer now keeps one VCCO per bank and refuses fixed I/Os that mix them (`core/fpga/place.js`).
+  placer now keeps one VCCO per bank and refuses fixed I/Os that mix them (`packages/silinx-fpga/src/fpga/place.js`).
 - **RAMB16 model**: port B reading the word port A writes at the same edge got the new word; the
   reads of both ports now come before the writes (old word, as Yosys's READ_FIRST mapping
   expects) (`core/unisim.js`; verilog-axis FIFO `diff`).

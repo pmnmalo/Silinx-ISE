@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readBit6, emptyFdri, bitFormat6 } from '../../core/fpga/s6/bitstream.js';
+import { readBit6, emptyFdri, bitFormat6 } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { gridRegion, diffBits, bitsByTile } from './ana-pipdrop6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
 

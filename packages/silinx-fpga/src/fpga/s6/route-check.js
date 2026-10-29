@@ -1,5 +1,5 @@
 // Silinx - the legality of a routed Spartan-6 design (#730) against the routing graph, on its own (browser + Node):
-// the rules of every routing (core/fpga/route.js checkRouting: every PIP the device's, every sink reached from its
+// the rules of every routing (fpga/route.js checkRouting: every PIP the device's, every sink reached from its
 // source, no PIP hanging off the tree, no node of two nets) and the Spartan-6's: a global clock on the global
 // network only, a route-through only through a site the design declares for it (an XDL_DUMMY instance of that
 // route-through, or the net's own source by its carry out to DMUX), one net through each such site, a power net from a TIEOFF or a slice's

@@ -23,7 +23,7 @@ export const S6_ESTIMATE = {
 const SEQ = /^(SRL16E?|SRLC16E|SRLC32E|RAMB8BWER|RAMB16BWER|RAM\d+X\d+[SD]|RAM32M|RAM64M)$/;
 const dspRegistered = c => ['AREG', 'BREG', 'MREG', 'PREG', 'CREG', 'DREG', 'OPMODEREG', 'CARRYINREG', 'B0REG', 'B1REG', 'A0REG', 'A1REG'].some(p => Number(c.params[p] ?? 0) > 0);
 
-/** The timing graph of a physical design (core/fpga/s6/phys.js) over its netlist's cells. */
+/** The timing graph of a physical design (fpga/s6/phys.js) over its netlist's cells. */
 export function timingGraphS6(nl, phys, model = S6_ESTIMATE) {
   const cells = nl.cells, C = cells.length;
   const kind = new Int8Array(C);       // 0 none (no paths: I/O, clock buffers), 1 comb, 2 clocked

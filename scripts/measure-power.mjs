@@ -1,9 +1,9 @@
-// The Silinx toolchain's estimated power (core/power.js, #123) against Xilinx XPower: ISE implements
+// The Silinx toolchain's estimated power (packages/silinx-fpga/src/power.js, #123) against Xilinx XPower: ISE implements
 // each example on each device of the Silinx toolchain and XPower 14.7 reports its power (xpwr -v, its
 // default activity rates, no simulation); the numbers of each report are kept in
 // test/fixtures/power/xpower-examples.json (never the reports themselves: ISE's outputs are not
 // committed), which test/power.test.js compares the estimate with, and from which the model's
-// coefficients (core/power.js COEFFICIENTS, DEVICES) are fitted.
+// coefficients (packages/silinx-fpga/src/power.js COEFFICIENTS, DEVICES) are fitted.
 //
 //   SILINX_ISE_HOST=user@host node scripts/measure-power.mjs        ISE over ssh (the host only from the
 //                                                                    environment, never written in a file)
@@ -109,7 +109,7 @@ function leastSquares(X, y) {
   return v.map((x, i) => (A[i][i] ? x / A[i][i] : 0));
 }
 
-/** The model's coefficients fitted to the runs of the JSON (core/power.js COEFFICIENTS and DEVICES). */
+/** The model's coefficients fitted to the runs of the JSON (packages/silinx-fpga/src/power.js COEFFICIENTS and DEVICES). */
 export function fit(runs) {
   const ok = l => l.filter(Boolean);
   const bufs = runs.flatMap(r => r.clocks);
@@ -141,14 +141,8 @@ export function fit(runs) {
 export async function silinxEstimate(example, target) {
   const zlib = await import('node:zlib');
   const { exampleProject } = await import('../test/examples-lib.mjs');
-  const { runOpenFlow } = await import('../core/open-flow-core.js');
-  const { loadDevice } = await import('../core/fpga/device.js');
-  const { dbFileNames, dbFilesFrom, makeBitDb } = await import('../core/fpga/bitdb.js');
-  const { yosysNode } = await import('../core/synth-open-node.js');
-  const { shippedDevicePath } = await import('../core/fpga/device-node.js');
-  const { estimatePower } = await import('../core/power.js');
-  const { parseXdl } = await import('../core/xdl.js');
-  const { parseUcf } = await import('../core/ucf.js');
+  const { runOpenFlow } = await import('../core/flow-ide.js');
+  const { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, yosysNode, shippedDevicePath, estimatePower, parseXdl, parseUcf } = await import('../packages/silinx-fpga/src/node.js');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-estimate-'));
   try {
     const { dir, project } = exampleProject(example, target, tmp);

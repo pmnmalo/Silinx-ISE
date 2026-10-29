@@ -2,7 +2,7 @@
 // messages and files (fsm_detect's log, fsm_recode's -encfile, RTLIL's init attributes), XST's report, the new
 // power-up state of a re-encoded machine, and a machine extracted with Yosys from the open synthesis's own script,
 // equal to the RTL from power-up in each encoding, with its exact warnings; and the tables. The open synthesis at
-// Optimization Effort High (#539, core/synth-fsm.js): the machines of 8 states or more tried one-hot, equal to the
+// Optimization Effort High (#539, packages/silinx-fpga/src/synth-fsm.js): the machines of 8 states or more tried one-hot, equal to the
 // RTL from power-up and with the resets, in VHDL and in Verilog; 7 states, Normal and an integer'left start left
 // as they are; a failed run said and the usual netlist kept. The machines fsm_detect refuses for their users alone
 // (#652), marked by hand at both efforts: in VHDL and in Verilog, with and without a power-up value, equal to the RTL,
@@ -13,7 +13,7 @@ import { compile, elaborate } from '../core/compile.js';
 import { parseDetect, chosen, markWires, parseEncfile, newInit, setInits, fsmRun, detectTable, resultsTable, WAYS } from '../research/synth-quality/fsm.mjs';
 import { parseSyrFsms } from '../research/synth-quality/fsm-ise.mjs';
 import { compareNetlist } from './diff-synth.js';
-import { wireInits, fsmChosen, fsmInits, fsmProbeCommands, fsmExtractCommands, fsmForceCommands, fsmRestCommands, refusedForUsers, quietForced, oldStateInits, FSM_RULE, PREP_HEAD, PREP_TAIL, USERS_REASON } from '../core/synth-fsm.js';
+import { wireInits, fsmChosen, fsmInits, fsmProbeCommands, fsmExtractCommands, fsmForceCommands, fsmRestCommands, refusedForUsers, quietForced, oldStateInits, FSM_RULE, PREP_HEAD, PREP_TAIL, USERS_REASON } from '../packages/silinx-fpga/src/synth-fsm.js';
 
 test('FSM measurement: fsm_detect\'s messages, the registers each way extracts', () => {
   const lines = [
@@ -136,8 +136,9 @@ end architecture;
 `;
 
 test('FSM measurement with Yosys: a machine with an initial value extracted, re-encoded, equal to the RTL from power-up', { timeout: 300000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
-  const { synthesizeOpen, utilization } = await import('../core/synth-open.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { utilization } = await import('../packages/silinx-fpga/src/synth-open.js');
   const design = elaborate(compile([{ path: 'top.vhd', lang: 'vhdl', text: FSM_VHDL }]), 'top');
   const sim = { cycles: 200, clock: 'clk' };
   const got = {};
@@ -334,8 +335,9 @@ const simulated = (design, syn, name) => {
 };
 
 test('One-hot state machines (#539) with Yosys: 8 states one-hot at High, equal to the RTL from power-up, VHDL and Verilog; 7 and Normal left', { timeout: 600000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
-  const { synthesizeOpen, utilization } = await import('../core/synth-open.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { utilization } = await import('../packages/silinx-fpga/src/synth-open.js');
   for (const [lang, src] of [['vhdl', machineVhdl], ['verilog', machineVerilog]]) {
     const design = elaborate(compile([{ path: lang === 'vhdl' ? 'top.vhd' : 'top.v', lang, text: src(8) }]), 'top');
     const binary = 3;   // (the state register's bits: VHDL's 8 states; Verilog's reg [3:0], narrowed by Yosys)
@@ -389,8 +391,9 @@ end architecture;
 `;
 
 test('One-hot state machines (#539) with Yosys: an integer\'left start left as it is; a failed run said, the usual netlist kept', { timeout: 300000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
-  const { synthesizeOpen, utilization } = await import('../core/synth-open.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { utilization } = await import('../packages/silinx-fpga/src/synth-open.js');
   const int = elaborate(compile([{ path: 'top.vhd', lang: 'vhdl', text: INTEGER_VHDL }]), 'top');
   const ri = await synthesizeOpen(int, { run: yosysNode });
   assert.equal(ri.depth.fsm, undefined);
@@ -492,8 +495,9 @@ end architecture;
 `;
 
 test('One-hot state machines (#652) with Yosys: a machine refused for its users alone forced one-hot at both efforts, equal to the RTL, VHDL and Verilog', { timeout: 600000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
-  const { synthesizeOpen, utilization, criticalDelay } = await import('../core/synth-open.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
+  const { synthesizeOpen } = await import('../core/synth-front.js');
+  const { utilization, criticalDelay } = await import('../packages/silinx-fpga/src/synth-open.js');
   for (const [lang, src] of [['verilog', FORCED_VERILOG], ['vhdl', FORCED_VHDL]]) {
     const design = elaborate(compile([{ path: lang === 'vhdl' ? 'top.vhd' : 'top.v', lang, text: src }]), 'top');
     // by the rule: tried, kept (one level and LUTs fewer), 9 state flip-flops and y's 2, no warning (Yosys's on the

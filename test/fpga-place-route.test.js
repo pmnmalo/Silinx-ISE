@@ -1,4 +1,4 @@
-// core/fpga/place-route.js: the one place and route of the Silinx toolchain's flows (the app's,
+// packages/silinx-fpga/src/fpga/place-route.js: the one place and route of the Silinx toolchain's flows (the app's,
 // research/s3e-route/open-flow.mjs, the design corpus's: #79, #88). A placement is exactly the
 // placer's with the delay table, the clock and global buffer sites of known bits; the routing the
 // timing-driven router's; tries keep the fastest; register replication (#4) is tried on the best
@@ -9,18 +9,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack } from '../core/fpga/pack.js';
-import { deviceSites, place, placedXdl } from '../core/fpga/place.js';
-import { loadDeviceCache } from '../core/fpga/device-node.js';
-import { routeDesign, clockReach, bufgReach, checkRouting } from '../core/fpga/route.js';
-import { knownRouting } from '../core/fpga/bitgen.js';
-import { analyzeTiming, delayTable } from '../core/fpga/timing.js';
-import { parseXdl, writeXdl } from '../core/xdl.js';
-import { loadDb } from '../core/fpga/bitdb-node.js';
-import { placeRoute, placeRouteBest, placeOnly, RETRY_SEEDS, HIGH_TRIES, NORMAL_TRIES, HIGH_EXTRA, effortTries, effortExtra } from '../core/fpga/place-route.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { deviceSites, place, placedXdl } from '../packages/silinx-fpga/src/fpga/place.js';
+import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
+import { routeDesign, clockReach, bufgReach, checkRouting } from '../packages/silinx-fpga/src/fpga/route.js';
+import { knownRouting } from '../packages/silinx-fpga/src/fpga/bitgen.js';
+import { analyzeTiming, delayTable } from '../packages/silinx-fpga/src/fpga/timing.js';
+import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { loadDb } from '../packages/silinx-fpga/src/fpga/bitdb-node.js';
+import { placeRoute, placeRouteBest, placeOnly, RETRY_SEEDS, HIGH_TRIES, NORMAL_TRIES, HIGH_EXTRA, effortTries, effortExtra } from '../packages/silinx-fpga/src/fpga/place-route.js';
 
 const PART = 'xc3s250ecp132-4';
 // a flip-flop (s) that selects 64 registers spread over the chip, on the critical path: replicated
@@ -337,7 +337,7 @@ test('placeRouteBest: the extra placements, routed only when their estimate is s
 
 test('the XC3S1200E\'s long-line splitters (#23, #709): the router takes one where it is faster, the placer\'s delay table leaves them out; bitgen gives it its direction', { timeout: 300000 }, async () => {
   const { example, exampleUcf } = await import('./examples-lib.mjs');
-  const { bitgen, pipFeatures } = await import('../core/fpga/bitgen.js');
+  const { bitgen, pipFeatures } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
   const part = 'xc3s1200efg320-4';
   // the traffic example (blinky's routing took none once the LUT inputs' delays were by pin, #1359)
   const ex = example('traffic');

@@ -3,9 +3,9 @@
 // every design that has it in such a tile agrees).
 //   node learn-single.mjs a.xdl a.bit [b.xdl b.bit …] > fix.json
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
-import { frameData, designFeatures, tileOf, tileBase } from '../../core/fpga/bitgen.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
+import { frameData, designFeatures, tileOf, tileBase } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
 import { loadDb, edges } from './db.mjs';
 
 const db = loadDb();

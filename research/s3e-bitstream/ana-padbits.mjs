@@ -2,7 +2,7 @@
 // setting or PIP it removed; with --bits f,b…: only those bits (each variant that clears or sets one).
 //   node ana-padbits.mjs dir [--bits 46,29 354,11]
 import fs from 'node:fs';
-import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
+import { readBit, diffFrames } from '../../packages/silinx-fpga/src/fpga/bitstream.js';
 
 const [dir, ...rest] = process.argv.slice(2);
 const only = rest[0] === '--bits' ? new Set(rest.slice(1)) : null;

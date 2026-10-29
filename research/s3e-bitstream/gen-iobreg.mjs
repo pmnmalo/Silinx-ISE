@@ -10,8 +10,8 @@
 // (every pad that can drive one a tristate output, its enable from the fabric: #96) and outdir/rb (every
 // pad a direct input). Each: top.vhd, top.ucf (the pins of the pads).
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 import { PART } from './db.mjs';
 
 const args = process.argv.slice(2);

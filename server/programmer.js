@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { runCommand } from './jobs.js';
 import { loadConfig, detectIse, resolveTool, which, configDir } from './toolchain.js';
 import { findBoard, resolveBoard } from './devices.js';
-import { splitBitPart, familyOfPart, familyName } from '../core/family.js';
+import { splitBitPart, familyOfPart, familyName } from '../packages/silinx-fpga/src/parts.js';
 
 import { TOOLS, VALUE } from './programmer-values.js';
 

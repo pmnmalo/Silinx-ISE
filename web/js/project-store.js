@@ -354,7 +354,7 @@ export async function saveBuildResults(store, name, { report, view, modelVersion
 
 /** The build's results read back from the project's build/ folder: { report, view } (null: none).
  *  The FPGA view only of the Silinx toolchain's routed design (reports.json of an ISE run: none)
- *  and of this model format (modelVersion: core/xdl.js MODEL_VERSION). */
+ *  and of this model format (modelVersion: packages/silinx-fpga/src/xdl.js MODEL_VERSION). */
 export async function readBuildResults(store, name, { modelVersion }) {
   const json = async path => { try { return JSON.parse(await store.readText(name, path)); } catch { return null; } };
   const report = await json(BUILD_REPORTS);

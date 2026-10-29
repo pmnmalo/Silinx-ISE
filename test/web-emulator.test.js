@@ -75,7 +75,7 @@ for (const [id, fn] of Object.entries(LAYOUTS)) {
 
 test('core wiring: a design with ports named after the board resources is connected through its UCF', async () => {
   const { boardWiring } = await import('../core/emulate.js');
-  const { boardAutoAssign } = await import('../core/ucf.js');
+  const { boardAutoAssign } = await import('../packages/silinx-fpga/src/ucf.js');
   for (const id of Object.keys(LAYOUTS)) {
     const board = boards.find((b) => b.id === id);
     const names = ['led', 'sw', 'btn', 'an', 'seg'].filter((n) => board.resources.some((r) => r.name === n));

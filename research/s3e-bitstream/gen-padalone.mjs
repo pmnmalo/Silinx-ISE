@@ -5,8 +5,8 @@
 // two outputs LOC'd far from it, every other pad unused. ana-padalone.mjs compares the bits ISE set with the database.
 //   PART=xc3s500efg320-4 node gen-padalone.mjs outdir A3,B3 [--clk B8]      (outdir/<pad>-r, <pad>-s: top.vhd, top.ucf)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 import { PART } from './db.mjs';
 
 const args = process.argv.slice(2);

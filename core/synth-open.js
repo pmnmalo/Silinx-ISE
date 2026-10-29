@@ -1,3 +1,0 @@
-// Silinx - moved to packages/silinx-fpga/src/synth-open.js (#1677, the toolchain's package, silinx-fpga): this path re-exports it.
-export * from '../packages/silinx-fpga/src/synth-open.js';
-export { synthesizeOpen, synthesisInput } from './synth-front.js';

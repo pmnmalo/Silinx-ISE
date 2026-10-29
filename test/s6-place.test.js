@@ -1,14 +1,14 @@
-// The Spartan-6 placer (#729): core/fpga/s6/phys.js (the physical design of a packed netlist), sites.js (the
+// The Spartan-6 placer (#729): packages/silinx-fpga/src/fpga/s6/phys.js (the physical design of a packed netlist), sites.js (the
 // device's sites), place.js (the annealing), place-check.js (the rules), on small designs and on every example on
 // the Nexys3's XC6SLX16 and the Atlys's XC6SLX45: legal, deterministic for a seed, the warnings expected, the
 // wirelength per connection near ISE's own placement of the same netlists (research/s6/measured/place-compare.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { placeS6, PlaceError, chainSites } from '../core/fpga/s6/place.js';
-import { checkPlacementS6 } from '../core/fpga/s6/place-check.js';
-import { PhysError } from '../core/fpga/s6/phys.js';
-import { S6_ESTIMATE, timingGraphS6, analyzeS6 } from '../core/fpga/s6/place-timing.js';
+import { placeS6, PlaceError, chainSites } from '../packages/silinx-fpga/src/fpga/s6/place.js';
+import { checkPlacementS6 } from '../packages/silinx-fpga/src/fpga/s6/place-check.js';
+import { PhysError } from '../packages/silinx-fpga/src/fpga/s6/phys.js';
+import { S6_ESTIMATE, timingGraphS6, analyzeS6 } from '../packages/silinx-fpga/src/fpga/s6/place-timing.js';
 import { EXAMPLES } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 

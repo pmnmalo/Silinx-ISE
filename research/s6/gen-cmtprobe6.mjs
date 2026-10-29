@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { probeXdl } from './gen-pipprobe6.mjs';
 import { gridRegion } from './ana-pipdrop6.mjs';
-import { bitFormat6 } from '../../core/fpga/s6/bitstream.js';
+import { bitFormat6 } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from '../../test/s6-lib.mjs';
 
 /**

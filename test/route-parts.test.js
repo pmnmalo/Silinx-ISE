@@ -1,4 +1,4 @@
-// The parts of the router (#405: out of routeDesign in core/fpga/route.js): the power nets (route-power.js) mounted
+// The parts of the router (#405: out of routeDesign in packages/silinx-fpga/src/fpga/route.js): the power nets (route-power.js) mounted
 // alone on the router's small device (test/fixtures/fpga/route-device.xdlrc): an ordinary net kept, a VCC net with no
 // source tied to one made-up source per sink tile, a net of no kind with no source said; and through routeDesign with
 // timing on (the connections' delays, route-delays.js; the polish, route-polish.js; the routed design written,
@@ -8,13 +8,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { packDevice, loadDevice } from '../core/fpga/device.js';
-import { routeDesign, checkRouting, netEndpoints } from '../core/fpga/route.js';
-import { mountPowerNets } from '../core/fpga/route-power.js';
-import { mountConnDelays } from '../core/fpga/route-delays.js';
-import { mountPolish } from '../core/fpga/route-polish.js';
-import { mountRoutedDesign } from '../core/fpga/route-output.js';
-import { parseXdl } from '../core/xdl.js';
+import { packDevice, loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
+import { routeDesign, checkRouting, netEndpoints } from '../packages/silinx-fpga/src/fpga/route.js';
+import { mountPowerNets } from '../packages/silinx-fpga/src/fpga/route-power.js';
+import { mountConnDelays } from '../packages/silinx-fpga/src/fpga/route-delays.js';
+import { mountPolish } from '../packages/silinx-fpga/src/fpga/route-polish.js';
+import { mountRoutedDesign } from '../packages/silinx-fpga/src/fpga/route-output.js';
+import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const device = loadDevice(packDevice(fs.readFileSync(path.join(FIX, 'route-device.xdlrc'), 'utf8')));

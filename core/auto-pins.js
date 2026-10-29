@@ -2,7 +2,7 @@
 // UCF names (as XST names them): the server (server/ise.js generateBuild) and the browser edition's
 // Silinx toolchain (web/js/open-flow-browser.js) check them before an implementation.
 import { compile, elaborate } from './compile.js';
-import { parseUcf, bitName } from './ucf.js';
+import { parseUcf, bitName } from '../packages/silinx-fpga/src/parts.js';
 import { clocksOf, latchGates } from './schematic.js';
 import { primitiveSources } from './unisim.js';
 

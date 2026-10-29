@@ -54,8 +54,8 @@ run: the full CI run by hand comes before any merge (below).
      rules, the BCIN names), the other three still computed from `xdl -report`;
    - `docs/OPEN-TOOLCHAIN.md`: where the device descriptions come from; a user's own ISE still builds a description of
      its own, which takes precedence (`~/.silinx/devices`, unchanged);
-   - the comments that say where the graph comes from: `core/fpga/device-node.js`, `server/open-flow.js`,
-     `web/js/open-flow-browser.js`, `scripts/build-standalone.mjs`, `core/resources.js`,
+   - the comments that say where the graph comes from: `packages/silinx-fpga/src/fpga/device-node.js`, `server/open-flow.js`,
+     `web/js/open-flow-browser.js`, `scripts/build-standalone.mjs`, `packages/silinx-fpga/src/resources.js`,
      `research/s3e-bitstream/pip-exceptions.mjs`;
    - `NOTICE` / `THIRD-PARTY-NOTICES`: unchanged (no dependency), unless the maintainer wants the measured graph's
      provenance stated there;

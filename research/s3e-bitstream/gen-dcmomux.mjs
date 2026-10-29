@@ -10,9 +10,9 @@
 //   PART=xc3s250ecp132-4 [DCMS=regexp] node gen-dcmomux.mjs outdir [--list]   (folders r0, r1, …; --list: the pairs only;
 //   DCMS: the DCM sites to measure, e.g. the XC3S1200E's side ones: the bits are the tile type's, the same on every device)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { knownRouting } from '../../core/fpga/bitgen.js';
-import { PIP_ROUTETHRU } from '../../core/fpga/device.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { knownRouting } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { PIP_ROUTETHRU } from '../../packages/silinx-fpga/src/fpga/device.js';
 import { PART, loadDb } from './db.mjs';
 import { dcmPadPaths } from './dcm-pads.mjs';
 import path from 'node:path';

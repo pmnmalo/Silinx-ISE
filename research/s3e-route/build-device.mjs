@@ -1,6 +1,6 @@
 // Build the routing graph cache of a device from its full report (see README.md).
 //   node research/s3e-route/build-device.mjs dev-full.xdlrc [out.json.gz]
-import { buildDeviceCache, loadDeviceCache } from '../../core/fpga/device-node.js';
+import { buildDeviceCache, loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
 
 const [src, out] = process.argv.slice(2);
 if (!src) { console.error('usage: build-device.mjs dev-full.xdlrc [out.json.gz]'); process.exit(1); }

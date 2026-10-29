@@ -1,7 +1,7 @@
 // Silinx - the Language Templates' *Device Primitives* (#792, part of #787): an instantiation template of each
 // primitive of the project's family, VHDL and Verilog, from the list the schematic library offers (core/primitives.js:
 // its pins as UNISIM's, its attributes at their defaults with their ranges), with what the primitive is and how many
-// the device has (core/resources.js).
+// the device has (packages/silinx-fpga/src/resources.js).
 //
 // A template's placeholders, ${1:text} … ${n:text}, are on what the user changes: the instance's name, the signals
 // of the pins it needs and of its outputs, the main attributes (a DCM's or a PLL's frequencies); an input it works
@@ -16,7 +16,7 @@
 //   fillTemplate(text)                       the template with its placeholders' texts, as inserted
 
 import { DEVICE_PRIMITIVES, devicePrimitives, primitiveOf, primitiveDefaults, genericValue, primitiveResource } from './primitives.js';
-import { resourcesOf } from './resources.js';
+import { resourcesOf } from '../packages/silinx-fpga/src/parts.js';
 
 // the attributes a template has on placeholders: the ones a design sets (the others at their defaults)
 const KEY_ATTRS = {

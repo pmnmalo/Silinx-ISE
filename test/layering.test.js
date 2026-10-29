@@ -27,7 +27,7 @@ test('the application imports nothing from research/ (#407)', () => {
 });
 
 test('the bit database loader of core/ reads packages/silinx-fpga/bitdb (#1676), the one research/s3e-bitstream/db.mjs re-exports (#407)', async () => {
-  const core = await import('../core/fpga/bitdb-node.js');
+  const core = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
   const research = await import('../research/s3e-bitstream/db.mjs');
   assert.equal(core.DB_DIR, path.join(ROOT, 'packages', 'silinx-fpga', 'bitdb'));
   for (const k of ['DB_DIR', 'dbPackages', 'hasBitDb', 'readDbFiles']) assert.equal(research[k], core[k], k);

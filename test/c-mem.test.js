@@ -11,8 +11,8 @@ import { cosimulate } from '../core/c-cosim.js';
 import { simulateC } from '../core/c-interp.js';
 import { CC, compiledRun } from './c-helpers.js';
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
 /** The design co-simulated in both languages: a pass, its warnings (none by default); the C simulation's output cc's. */

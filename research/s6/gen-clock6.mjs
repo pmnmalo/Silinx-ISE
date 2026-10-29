@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { S6_DEVICES } from '../../core/fpga/s6/bitstream.js';
+import { S6_DEVICES } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { columnOf } from './ana-slice6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
 

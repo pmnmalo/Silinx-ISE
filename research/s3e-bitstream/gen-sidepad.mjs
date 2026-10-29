@@ -7,9 +7,9 @@
 // clocks a counter, one output bit each.
 //   PART=xc3s500efg320-4 node gen-sidepad.mjs outdir      (folders s0, s1, …)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { bufgReach } from '../../core/fpga/route.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { bufgReach } from '../../packages/silinx-fpga/src/fpga/route.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 import { PART } from './db.mjs';
 
 const out = process.argv[2];

@@ -24,15 +24,8 @@ import fss from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deviceFamily } from '../core/family.js';
-import { resourcesOf } from '../core/resources.js';
+import { deviceFamily, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, spartan6Open, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
 import { findPart } from './devices.js';
-import { OPEN_STEPS, orderOpenSteps } from '../core/open-steps.js';
-import { synthEffort } from '../core/synth-open.js';
-import { findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR } from '../core/fpga/device-node.js';
-import { S3E_DEVICES } from '../core/fpga/bitstream.js';
-import { spartan6Open, s6OpenStatus } from '../core/fpga/s6/devices.js';
-import { DB_DIR, hasBitDb, dbPackages } from '../core/fpga/bitdb-node.js';
 import { runCommand } from './jobs.js';
 import { safeJoin } from './projects.js';
 import { loadConfig, detectIse, iseStatus, iseModeOf, which } from './toolchain.js';
@@ -42,7 +35,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The bit database (packages/silinx-fpga/bitdb: <device>-*.json, s3e-tiles.json; SILINX_BIT_DB_DIR:
  *  another folder, for tests). */
 export const BIT_DB_DIR = process.env.SILINX_BIT_DB_DIR || DB_DIR;
-// the devices whose bitstream format Silinx writes (core/fpga/bitstream.js)
+// the devices whose bitstream format Silinx writes (packages/silinx-fpga/src/fpga/bitstream.js)
 const BITSTREAM_DEVICES = Object.keys(S3E_DEVICES);
 /** The devices with a bit database, for the messages: 'XC3S100E (CP132), XC3S250E (CP132)…'. */
 const supported = (dir = BIT_DB_DIR) => BITSTREAM_DEVICES.map(d => [d, hasBitDatabase(d, null, dir) ? dbPackages(d, dir) : []]).filter(([, p]) => p.length)
@@ -280,7 +273,7 @@ echo "=== SILINX DONE ==="
 /**
  * Job body for POST /toolchain/build-device: { part } (e.g. 'xc3s500efg320-4'). Runs the device
  * report through the configured ISE (the ISE mode, or open.iseMode in the open mode), then packs it
- * into ~/.silinx/devices/<part>.json.gz (core/fpga/device-node.js). The report itself is deleted.
+ * into ~/.silinx/devices/<part>.json.gz (packages/silinx-fpga/src/fpga/device-node.js). The report itself is deleted.
  */
 export async function buildDeviceJob(job, { part }) {
   if (!/^xc[a-z0-9]+-\d+$/.test(String(part || ''))) throw Object.assign(new Error(`invalid part '${part}' (e.g. xc3s250ecp132-4)`), { status: 400 });

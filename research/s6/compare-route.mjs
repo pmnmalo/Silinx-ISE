@@ -10,11 +10,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl } from '../../core/xdl.js';
-import { placeS6 } from '../../core/fpga/s6/place.js';
-import { placedXdlS6 } from '../../core/fpga/s6/xdl.js';
-import { routeS6, routedXdlS6 } from '../../core/fpga/s6/route.js';
-import { checkRoutingS6 } from '../../core/fpga/s6/route-check.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { placeS6 } from '../../packages/silinx-fpga/src/fpga/s6/place.js';
+import { placedXdlS6 } from '../../packages/silinx-fpga/src/fpga/s6/xdl.js';
+import { routeS6, routedXdlS6 } from '../../packages/silinx-fpga/src/fpga/s6/route.js';
+import { checkRoutingS6 } from '../../packages/silinx-fpga/src/fpga/s6/route-check.js';
 import { EXAMPLE_ORDER } from '../../core/examples.js';
 import { S6_BOARDS, s6Device, s6Example } from '../../test/s6-lib.mjs';
 

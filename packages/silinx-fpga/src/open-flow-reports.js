@@ -1,5 +1,5 @@
 // Silinx toolchain - the open flow's timing, bitstream and reports (#405: out of runOpenFlow in
-// core/open-flow-core.js): the static timing and its report, the bitstream written, the pins back-annotated
+// open-flow-core.js): the static timing and its report, the bitstream written, the pins back-annotated
 // (pin2ucf) and the power estimate (#123).
 import { ESTIMATE_ERROR_PERCENT, estimatePower, powerReport } from './power.js';
 import { analyzeTiming, checkCross, checkOffsets, checkPeriods, checkSwitching, clockPort, parseOffsets, switchingLine, timingReport } from './fpga/timing.js';
@@ -88,7 +88,7 @@ export function mountFlowReports(ctx) {
     report.pinsUcf = { path: `build/${top}_pins.ucf` };
     log(`Pin locations of ${pins.length} port bit(s), ${chosen} of them chosen by the placer (no LOC in the constraints): build/${top}_pins.ucf`);
   }
-  // Generate Text Power Report (#123): an estimate (core/power.js), laid out as XPower's text report
+  // Generate Text Power Report (#123): an estimate (power.js), laid out as XPower's text report
   // (build/<top>.pwr); its summary in the Design Summary as XPower's
   function runPower() {
     routedOrEarlier();

@@ -8,8 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdl } from '../../core/xdl.js';
-import { readBit6, bitFormat6, emptyFdri } from '../../core/fpga/s6/bitstream.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readBit6, bitFormat6, emptyFdri } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { loadDb } from './check-slice6.mjs';
 import { intRegion, regionBits, tileRegion } from './ana-pipprobe6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';

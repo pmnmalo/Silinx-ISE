@@ -9,8 +9,8 @@
 // and outdir/rpo0-3 (every pair that can drive outputs two output registers, two output-enable registers with direct
 // outputs, or both, by turns: pair i has (i + k) % 3, the kinds moved by k). Each: top.vhd, top.ucf.
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { deviceSites } from '../../core/fpga/place.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { deviceSites } from '../../packages/silinx-fpga/src/fpga/place.js';
 import { PART } from './db.mjs';
 
 const args = process.argv.slice(2);

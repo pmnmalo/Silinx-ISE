@@ -1,13 +1,13 @@
-// The open synthesis's last depth candidate, the critical LUTs made one level shallower (core/synth-open-resynth.js,
-// #405: out of core/synth-open-depth.js's withDepth): mounted alone on a netlist written by hand (spi-fpga-slave's
+// The open synthesis's last depth candidate, the critical LUTs made one level shallower (packages/silinx-fpga/src/synth-open-resynth.js,
+// #405: out of packages/silinx-fpga/src/synth-open-depth.js's withDepth): mounted alone on a netlist written by hand (spi-fpga-slave's
 // shift register enable, as test/lut-resynth.test.js), through Yosys: kept by DEPTH_RULE, the same functions on every
 // input; left out without speed or resynth, or past SPEED_RULE.maxLuts; a run that fails: its warning, the netlist kept.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resynthStage } from '../core/synth-open-resynth.js';
-import { cellCounts, utilization, SPEED_RULE } from '../core/synth-open.js';
-import { netlistLevels } from '../core/lut-resynth.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { resynthStage } from '../packages/silinx-fpga/src/synth-open-resynth.js';
+import { cellCounts, utilization, SPEED_RULE } from '../packages/silinx-fpga/src/synth-open.js';
+import { netlistLevels } from '../packages/silinx-fpga/src/lut-resynth.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 // en = load | (sp & ~sc & ~cs), load = vld & ((cs & ~busy) | rx), rx = sc & ~sp & last: en on 3 levels, on a CE; the
 // signals registered (flip-flops of the ports), so that the enable is on a path between flip-flops

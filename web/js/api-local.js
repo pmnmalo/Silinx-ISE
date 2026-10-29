@@ -11,7 +11,7 @@
 // Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge),
 // and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
 import { getDeviceDb, findPart } from '../../server/devices.js';
-import { resourcesOf } from '../../core/resources.js';
+import { resourcesOf, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
 import { exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
 import EXAMPLES from 'silinx-examples';
 import { orderExamples } from '../../core/examples.js';
@@ -23,7 +23,6 @@ import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from 
 import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
 import { browserStore, folderStore, projectOps, copyProjects, emptyProjectJson, normalizeProjectJson, projectFromZip, safePath, NAME_RE, saveBuildResults, readBuildResults, BUILD_VIEW, DEV_SITE } from './project-store.js';
-import { MODEL_VERSION } from '../../core/xdl.js';
 
 const fail = msg => { throw new Error(msg); };
 

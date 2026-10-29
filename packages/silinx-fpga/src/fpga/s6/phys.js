@@ -1,5 +1,5 @@
 // Silinx - the Spartan-6 physical design (#729; the plan: research/s6/README.md, #1): a netlist packed by
-// core/fpga/s6/pack.js turned into the instances of sites the placer places and the nets of site pins the router
+// fpga/s6/pack.js turned into the instances of sites the placer places and the nets of site pins the router
 // routes (browser + Node).
 //
 // Each packed slice is a SLICEX / SLICEL / SLICEM instance; each I/O buffer an IOB (on the pad of its port's LOC),

@@ -11,13 +11,11 @@
 // design. As ISE's model, this one has no generics; it is synthesized with the generics the test bench
 // gives its instance of the top (dutGenerics), and says so in its header.
 import { technologyNetlist, vhdlName } from './fpga/techview.js';
-import { paramBits, paramInt } from './fpga/netlist.js';
+import { paramBits, paramInt, SPEED_4, instArcs, asText } from '../packages/silinx-fpga/src/index.js';
 import { primitiveInterface } from './netlist-hier.js';
 import { validIdent } from './schdoc.js';
-import { lutTable } from './xdl.js';
-import { SPEED_4, instArcs } from './fpga/timing.js';
+import { lutTable } from '../packages/silinx-fpga/src/parts.js';
 import { writeSdf } from './sdf.js';
-import { asText } from './synth-open.js';
 import { UNISIM_SOURCE, SIMPRIM_SOURCE } from './unisim.js';
 import * as V from './values.js';
 
@@ -58,7 +56,7 @@ export function dutGenerics(simDesign, top) {
  * netlist's buses, each primitive driving one bit of one, so that a change of a bit woke every primitive that
  * reads another bit of the bus (the Verilog model simulated about 4 times slower than the VHDL one, which is
  * read scalarized). The netlist's JSON split (splitnets: the top's ports stay buses), its aliases cleaned.
- * run: core/synth-open.js's run(args, files).
+ * run: packages/silinx-fpga/src/synth-open.js's run(args, files).
  */
 export async function scalarVerilog(synth, run) {
   const top = synth.top;
@@ -67,7 +65,7 @@ export async function scalarVerilog(synth, run) {
 }
 
 /**
- * The models from the synthesis's result (core/synth-open.js synthesizeOpen: its files):
+ * The models from the synthesis's result (core/synth-front.js synthesizeOpen: its files):
  * { vhdl, verilog, cells, unknown: [cell types with no simulation model] }.
  * o: { top, part, generics: { NAME: value } given to the synthesis, testbench: its name }
  */
@@ -109,7 +107,7 @@ export function postSynthesisModels(synth, { top, part = '', generics = {}, test
 // and in Verilog, with the top's ports.
 //   Post-Translate: the netlist of the synthesis, every cell as its SIMPRIM primitive (a MUXCY is an X_MUX2,
 //   an FDRE an X_SFF with its reset synchronous, a BUFG an X_CKBUF…), as ngdbuild expands it.
-//   Post-Map: the packed design (core/fpga/pack.js): each slice as the elements of the Spartan-3E slice its
+//   Post-Map: the packed design (packages/silinx-fpga/src/fpga/pack.js): each slice as the elements of the Spartan-3E slice its
 //   configuration uses (the LUTs F and G, the F5 and FX multiplexers, the carry chain's multiplexers and XORs,
 //   the flip-flops or latches with their clock, enable and set / reset inverters), the pads, the global clock
 //   buffers, the block RAMs, multipliers and DCMs, as map's settings say (the same reading of them as the
@@ -406,7 +404,7 @@ const WIDTH_OF_ATTR = { '16384X1': 1, '8192X2': 2, '4096X4': 4, '2048X9': 9, '10
 const BRAM_W = { 1: [1, 0, 14], 2: [2, 0, 13], 4: [4, 0, 12], 9: [8, 1, 11], 18: [16, 2, 10], 36: [32, 4, 9] };   // data, parity, address bits
 
 /**
- * The Post-Map Simulation Model: the packed design (core/fpga/pack.js pack()) as map's settings make it, of
+ * The Post-Map Simulation Model: the packed design (packages/silinx-fpga/src/fpga/pack.js pack()) as map's settings make it, of
  * SIMPRIM primitives; nl: the netlist it was packed from (its ports). Returns { vhdl, verilog, instances,
  * unknown: [kinds of site with no model] }. o: { top, part, generics, testbench } (the header).
  */
@@ -418,11 +416,11 @@ export function postMapModels(nl, packed, o = {}) {
 }
 
 /**
- * The Post-Place & Route Simulation Model (#122): the placed and routed design (core/xdl.js parseXdl of the
+ * The Post-Place & Route Simulation Model (#122): the placed and routed design (packages/silinx-fpga/src/xdl.js parseXdl of the
  * routed XDL) as the post-map model, each primitive with the LOC of its site, and its timing as an SDF file
- * (core/sdf.js): every element's delays (the static timing's delay model, core/fpga/timing.js, the delay of each
+ * (core/sdf.js): every element's delays (the static timing's delay model, packages/silinx-fpga/src/fpga/timing.js, the delay of each
  * path through a slice split over the elements it goes through) and every connection's (PORT, the routing's,
- * conns: core/fpga/timing.js analyzeTiming's). Returns { vhdl, verilog, sdf, instances, unknown }.
+ * conns: packages/silinx-fpga/src/fpga/timing.js analyzeTiming's). Returns { vhdl, verilog, sdf, instances, unknown }.
  * o: { top, part, generics, testbench, conns, model } (model: the delay model, SPEED_4 by default).
  */
 export function postParModels(nl, design, o = {}) {
@@ -552,7 +550,7 @@ function packedModel(M, packed, model = null) {
         const [d, p] = BRAM_W[ws[ports.indexOf(x)]] || [0, 0];
         return val(`${m[1]}_${x}`) === undefined ? undefined : bitsOfHex(val(`${m[1]}_${x}`), d + p);
       };
-      // its delays: the static timing's arcs of the site (core/fpga/timing.js instArcs), on the primitive's pins
+      // its delays: the static timing's arcs of the site (packages/silinx-fpga/src/fpga/timing.js instArcs), on the primitive's pins
       const formal = sp => {
         const m = /^(DOP|DIP|DO|DI|ADDR|EN|WE|SSR|CLK)([AB])(\d*)$/.exec(sp);
         const n = m ? ports.indexOf(m[2]) : -1;
@@ -604,7 +602,7 @@ function packedModel(M, packed, model = null) {
   return [...unknown].sort();
 }
 
-// The delays of a block RAM's or a multiplier's site as the static timing has them (core/fpga/timing.js instArcs: its
+// The delays of a block RAM's or a multiplier's site as the static timing has them (packages/silinx-fpga/src/fpga/timing.js instArcs: its
 // paths through, its clock to out, its setups), on the primitive's pins: formal(site pin) -> the pin (a vector's bit
 // as P[3]) or null, clock(site pin) -> the clock pin of an output or a setup
 function hardArcs(inst, model, formal, clock) {
@@ -617,7 +615,7 @@ function hardArcs(inst, model, formal, clock) {
 }
 
 // A Spartan-3E slice from its configuration (the elements it uses), as packedSim reads it (test/fpga-sim.js).
-// T(name): a delay of the timing's slice model (core/fpga/timing.js SPEED_4.slice), mem: its SLICEM memories'
+// T(name): a delay of the timing's slice model (packages/silinx-fpga/src/fpga/timing.js SPEED_4.slice), mem: its SLICEM memories'
 // (the post-place & route model); each path through the slice (an input pin to an output pin) is split over
 // the elements it goes through so that their sum is the timing's delay of that path (the carry: CIN -> COUT
 // half in each stage)

@@ -7,11 +7,11 @@
 // tree, a slower path where a free one was faster).
 //   node research/s3e-route/crit-path.mjs <routed.xdl> <part, e.g. xc3s1200efg320-4>
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { loadDb } from '../../core/fpga/bitdb-node.js';
-import { knownRouting } from '../../core/fpga/bitgen.js';
-import { analyzeTiming, nodeDelays, nodeClasses, netTree, treePath, pathDelay, SPEED_4 } from '../../core/fpga/timing.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { loadDb } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
+import { knownRouting } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { analyzeTiming, nodeDelays, nodeClasses, netTree, treePath, pathDelay, SPEED_4 } from '../../packages/silinx-fpga/src/fpga/timing.js';
 class Heap { constructor() { this.a = []; }
   get size() { return this.a.length; }
   push(k, v) { const a = this.a; a.push([k, v]); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (a[p][0] <= a[i][0]) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } }

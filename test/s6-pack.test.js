@@ -1,4 +1,4 @@
-// The Spartan-6 slice model and packer (#721, core/fpga/s6/pack.js): designs synthesized for the Spartan-6 (Yosys
+// The Spartan-6 slice model and packer (#721, packages/silinx-fpga/src/fpga/s6/pack.js): designs synthesized for the Spartan-6 (Yosys
 // xc6s) packed into SLICEX / SLICEL / SLICEM slices, every slice checked against the rules of the model (checkSlice:
 // one control set, latches only in the FFs and without a 5FF, O6 / O5 of 5 shared inputs, the carry and the wide
 // multiplexers in a SLICEL or SLICEM, the RAMs and shift registers in a SLICEM of one clock, write enable and write
@@ -8,10 +8,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { packS6, checkSlice, ctrlKey, lutInputs, PackError, AND2L } from '../core/fpga/s6/pack.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { packS6, checkSlice, ctrlKey, lutInputs, PackError, AND2L } from '../packages/silinx-fpga/src/fpga/s6/pack.js';
 import { example, EXAMPLES } from './examples-lib.mjs';
 
 // a design synthesized for the Spartan-6 and read as the packer reads it

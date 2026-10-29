@@ -1,5 +1,5 @@
 // UI: the Design Summary's Device Utilization before an implementation: the target part's resources from
-// the device model (core/resources.js, #790), the family's own and their counts, in English and Portuguese.
+// the device model (packages/silinx-fpga/src/resources.js, #790), the family's own and their counts, in English and Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, writeWs } from './harness.js';

@@ -1,4 +1,4 @@
-// Silinx - the Spartan-6 router's nets and resources (#730, core/fpga/s6/route.js): the endpoints of each net of a
+// Silinx - the Spartan-6 router's nets and resources (#730, fpga/s6/route.js): the endpoints of each net of a
 // placed design, the nodes of the general interconnect (which the global clocks do not take), the sites of the
 // route-through PIPs and which of them a net may take, the TIEOFFs the power nets are routed from (browser + Node).
 import { PIP_ROUTETHRU } from '../device.js';
@@ -47,7 +47,7 @@ export function routeThruSite(device, res, k, i) {
 }
 
 /**
- * The routing problem of a placed design (parseXdl's structure, core/fpga/s6/xdl.js placedXdlS6's): each net's
+ * The routing problem of a placed design (parseXdl's structure, fpga/s6/xdl.js placedXdlS6's): each net's
  * source nodes and sinks, its kind ('wire', a 'clock' from a global buffer, 'vcc' / 'gnd' with no source: routed
  * from the TIEOFFs near its sinks, as ISE), the site of its source; the problems in `errors`.
  */

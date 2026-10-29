@@ -77,7 +77,7 @@ async function main() {
       const { pj, sources } = await loadProject(dir);
       const { resolveBoard } = await import('../server/devices.js');
       const { compile, elaborate } = await import('../core/compile.js');
-      const { boardAutoAssign, generateUcf } = await import('../core/ucf.js');
+      const { boardAutoAssign, generateUcf } = await import('../packages/silinx-fpga/src/parts.js');
       const boardId = opt('board', pj.board);
       if (!boardId) { console.error('no board: give --board <id> (e.g. basys2, nexys2, s3e-starter) or set the board of the project'); process.exit(1); }
       const rb = resolveBoard(boardId, { part: opt('part') || pj.device?.part });

@@ -3,7 +3,7 @@
 // (web/js/viewers.js openEmulator) and iMPACT's Program FPGA (web/js/impact.js).
 
 import { dialog, h } from './ui.js';
-import { ucfPlacesPins } from '/core/ucf.js';
+import { ucfPlacesPins } from '/packages/silinx-fpga/src/parts.js';
 
 /** True when the pins are set; else the alert (`action`: 'emulate' or 'program'; `openPins()`: I/O Pin Planning) and false. */
 export async function pinsReady(ucfText, action, openPins) {

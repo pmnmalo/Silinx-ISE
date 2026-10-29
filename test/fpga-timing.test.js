@@ -1,5 +1,5 @@
-// core/fpga/timing.js: the delay model (wire classes, routed connection delays, slice arcs), the
-// static timing analysis, and the timing-driven router (core/fpga/route.js, opts.timing).
+// packages/silinx-fpga/src/fpga/timing.js: the delay model (wire classes, routed connection delays, slice arcs), the
+// static timing analysis, and the timing-driven router (packages/silinx-fpga/src/fpga/route.js, opts.timing).
 // Device: test/fixtures/fpga/timing-device.xdlrc (hand-made: three CLBs in a row, a slow way by two
 // double lines and a fast one by a long line). Designs: small XDL texts below.
 import { test } from 'node:test';
@@ -7,20 +7,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { packDevice, loadDevice } from '../core/fpga/device.js';
-import { routeDesign, checkRouting, netEndpoints } from '../core/fpga/route.js';
-import { parseXdl, writeXdl } from '../core/xdl.js';
-import {
-  WIRE, SPEED_4, classOfWires, nodeClasses, nodeDelays, lutPinIndex, netTree, treePath, pathDelay, distanceDelay,
-  instArcs, timingGraph, analyzeTiming, timingReport, clockPort, checkPeriods, delayTable, clockArrivals, parseOffsets, checkOffsets, DELAY_KIND, delayKind,
-  clockSources, clockRequirement, checkCross,
-} from '../core/fpga/timing.js';
-import { checkSwitching, switchingLine } from '../core/fpga/timing.js';
+import { packDevice, loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
+import { routeDesign, checkRouting, netEndpoints } from '../packages/silinx-fpga/src/fpga/route.js';
+import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { WIRE, SPEED_4, classOfWires, nodeClasses, nodeDelays, lutPinIndex, netTree, treePath, pathDelay, distanceDelay, instArcs, timingGraph, analyzeTiming, timingReport, clockPort, checkPeriods, delayTable, clockArrivals, parseOffsets, checkOffsets, DELAY_KIND, delayKind, clockSources, clockRequirement, checkCross } from '../packages/silinx-fpga/src/fpga/timing.js';
+import { checkSwitching, switchingLine } from '../packages/silinx-fpga/src/fpga/timing.js';
 import zlib from 'node:zlib';
 import { parseDly, twrArcs, memArcs, hardArcs } from '../research/s3e-route/timing-fit.mjs';
 import { parseTwrClocks } from '../research/s3e-route/dcm-timing-compare.mjs';
 import { silinxPcf } from '../research/s3e-route/dcm-timing.mjs';
-import { parseUcf } from '../core/ucf.js';
+import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const device = loadDevice(packDevice(fs.readFileSync(path.join(FIX, 'timing-device.xdlrc'), 'utf8')));
@@ -320,7 +316,7 @@ test('block RAM and multiplier arcs, as trce times them (#457): clock to out, se
 // analysis within 2 % of trce's minimum period. Before #457 (the block RAM and multiplier arcs estimated, their
 // interconnect wires counted as any other): hard_prim 8.390 ns (+17.4 %), mult_reg 9.098 (+4.3 %), stopwatch 12.867.
 test('static timing against trce on routed designs with block RAMs and multipliers (#457)', async () => {
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   const g = loadDeviceCache('xc3s250ecp132-4');
   for (const [name, trce, period] of [['hard_prim', 7.147, 7.170], ['mult_reg', 8.722, 8.711], ['stopwatch', 12.719, 12.602]]) {
     const d = parseXdl(zlib.gunzipSync(fs.readFileSync(path.join(FIX, 'trce', `${name}.xdl.gz`))).toString('utf8'));
@@ -375,7 +371,7 @@ test('timing-fit: reportgen -delay\'s report read back (names wrapped at 80 colu
 // Silinx's routing of vtr-ch-intrinsics (test/designs-corpus, XC3S1200E-FG320) and ISE's delay of each of its LUT inputs
 // (reportgen -delay on it, 531 connections): ISE's delay depends on the LUT's input, pins 3 and 4 the fastest (#1359)
 test('#1359 a LUT input\'s delay by its pin: the model against ISE\'s delays of a routed design, pins 3 and 4 faster than 1', async () => {
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   const d = parseXdl(zlib.gunzipSync(fs.readFileSync(path.join(FIX, 'trce', 'vtr-ch-intrinsics.xdl.gz'))).toString('utf8'));
   const g = loadDeviceCache(d.part);
   const ise = new Map(JSON.parse(fs.readFileSync(path.join(FIX, 'trce', 'vtr-ch-intrinsics-delay.json'), 'utf8')).map(([n, load, ns]) => [`${n}|${load}`, ns]));
@@ -414,7 +410,7 @@ test('#1359 a LUT input\'s delay by its pin: the model against ISE\'s delays of 
 });
 
 test('#1359 timing-driven routing: the critical loads of the LUTs on their fast inputs (3 and 4), the period shorter', async () => {
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   const g = loadDeviceCache('xc3s250ecp132-4');
   const d = parseXdl(zlib.gunzipSync(fs.readFileSync(path.join(FIX, 'trce', 'stopwatch.xdl.gz'))).toString('utf8'));
   const routed = model => {
@@ -629,7 +625,7 @@ test('#601 clock arrivals through a DCM: from its CLKIN\'s, deskewed by its taps
 // Silinx's routing of six DCM designs (test/fixtures/open-flow, the OFFSET ones' UCF in dcm-trce.json), timed by trce with the same
 // constraints (research/s3e-route/dcm-timing.mjs): its paths between two clocks and its data sheet (setup, hold, clock to pad)
 test('#601 static timing of a DCM\'s clocks against trce on routed designs: the paths between two clocks, the pads\' setup, hold and clock to pad', async () => {
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   const ref = JSON.parse(fs.readFileSync(path.join(FIX, 'trce', 'dcm-trce.json'), 'utf8'));
   const err = { setup: [], hold: [], toPad: [], cross: [] };
   for (const [name, t] of Object.entries(ref)) {
@@ -822,7 +818,7 @@ test('OFFSET constraints (#26): read from the UCF\'s statements; met / not met p
 });
 
 test('clock arrivals (#26): from the clock\'s pad through the global buffer to every clock pin, on a routed design (stopwatch)', async () => {
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   const d = parseXdl(zlib.gunzipSync(fs.readFileSync(path.join(FIX, 'trce', 'stopwatch.xdl.gz'))).toString('utf8'));
   const dev = loadDeviceCache('xc3s250ecp132-4');
   const arr = clockArrivals(d, dev);
@@ -860,9 +856,9 @@ test('delayTable: the fastest routes from a CLB\'s outputs to the inputs at each
 });
 
 test('delayTable (XC3S250E graph, #104): a flip-flop\'s output reaches its own CLB through an output multiplexer, the X / Y outputs by the fast connects; never faster', async () => {
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
-  const { loadDb } = await import('../core/fpga/bitdb-node.js');
-  const { knownRouting } = await import('../core/fpga/bitgen.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
+  const { knownRouting } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
   const dev = loadDeviceCache('xc3s250ecp132-4');
   const t = delayTable(dev, { allowPip: knownRouting(loadDb('xc3s250ecp132-4', { graph: dev })).allowPip });
   const W = SPEED_4.wire, near = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
@@ -880,7 +876,7 @@ test('delayTable (XC3S250E graph, #104): a flip-flop\'s output reaches its own C
 });
 
 test('timing-driven routing: branch loads (XC3S250E graph): a net of 17 timed loads branches less at its driver and gets faster', async () => {
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   const dev = loadDeviceCache('xc3s250ecp132-4');
   const at = (name, site, cfg) => inst(name, 'SLICEL', dev.site(site).tileName, site, cfg);
   const loads = Array.from({ length: 16 }, (_, k) => [`c${k}`, 'G1']);

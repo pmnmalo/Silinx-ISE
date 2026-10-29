@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { fromKiss2 } from '../../core/kiss2.js';
 import { generateFsm } from '../../core/fsm.js';
 import { compile, elaborate } from '../../core/compile.js';
-import { synthesizeOpen } from '../../core/synth-open.js';
-import { yosysNode } from '../../core/synth-open-node.js';
+import { synthesizeOpen } from '../../core/synth-front.js';
+import { yosysNode } from '../../packages/silinx-fpga/src/synth-open-node.js';
 import { compareNetlist } from '../diff-synth.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));

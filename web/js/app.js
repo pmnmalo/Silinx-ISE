@@ -17,7 +17,7 @@ import { createHistory } from './history.js';
 import { viewHdl } from '/core/view-hdl.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
 import { primitiveTemplates } from '/core/prim-templates.js';
-import { deviceFamily } from '/core/family.js';
+import { deviceFamily } from '/packages/silinx-fpga/src/parts.js';
 import { setActionRunner, longPressMenu } from './ui.js';
 import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';

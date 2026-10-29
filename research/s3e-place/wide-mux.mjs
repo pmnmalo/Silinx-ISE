@@ -2,8 +2,8 @@
 // the slice offsets (driver relative to the FiMUX's slice) and the multiplexer kind (from the
 // netlist: MUXF6 / F7 / F8 by cell name).   node wide-mux.mjs placed.xdl netlist.json
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { readYosysJson } from '../../core/fpga/netlist.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { readYosysJson } from '../../packages/silinx-fpga/src/fpga/netlist.js';
 const d = parseXdl(fs.readFileSync(process.argv[2], 'utf8'));
 const nl = readYosysJson(fs.readFileSync(process.argv[3], 'utf8'));
 const typeOf = new Map(nl.cells.map(c => [c.name, c.type]));

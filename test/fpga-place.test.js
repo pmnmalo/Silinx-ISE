@@ -1,20 +1,20 @@
-// The placer (core/fpga/place.js) and the XDL it is written as (core/xdl.js writeXdl), on a small made-up
+// The placer (packages/silinx-fpga/src/fpga/place.js) and the XDL it is written as (packages/silinx-fpga/src/xdl.js writeXdl), on a small made-up
 // device (test/fixtures/fpga/place-device.xdlrc, from research/s3e-place/gen-test-device.mjs):
 // legal placements (one instance per site, LOCs kept, carry chains up one column, wide multiplexers
 // in their CLB pattern), wirelength going down, the same seed giving the same placement, and the
-// placed XDL reading back through core/xdl.js.
+// placed XDL reading back through packages/silinx-fpga/src/xdl.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseXdlrc, parseXdl } from '../core/xdl.js';
-import { packDevice, loadDevice } from '../core/fpga/device.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack } from '../core/fpga/pack.js';
-import { deviceSites, place, placedXdl, PlaceError, rng, timingGraph, analyzeTiming, connDelay } from '../core/fpga/place.js';
-import { SPEED_4, DELAY_KIND, delayKind } from '../core/fpga/timing.js';
-import { writeXdl } from '../core/xdl.js';
+import { parseXdlrc, parseXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { packDevice, loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { deviceSites, place, placedXdl, PlaceError, rng, timingGraph, analyzeTiming, connDelay } from '../packages/silinx-fpga/src/fpga/place.js';
+import { SPEED_4, DELAY_KIND, delayKind } from '../packages/silinx-fpga/src/fpga/timing.js';
+import { writeXdl } from '../packages/silinx-fpga/src/xdl.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const load = n => readYosysJson(fs.readFileSync(path.join(FIX, `${n}.json`), 'utf8'));
@@ -22,7 +22,7 @@ const dev = deviceSites(parseXdlrc(fs.readFileSync(path.join(FIX, 'place-device.
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 const xy = s => { const m = /^SLICE_X(\d+)Y(\d+)$/.exec(s); return m ? [+m[1], +m[2]] : null; };
 
-test('the device from the routing graph (core/fpga/device.js) gives the same sites as from the report', () => {
+test('the device from the routing graph (packages/silinx-fpga/src/fpga/device.js) gives the same sites as from the report', () => {
   // (the router's small device: the placer's has no connections between tiles)
   const text = fs.readFileSync(path.join(FIX, 'route-device.xdlrc'), 'utf8');
   const fromReport = deviceSites(parseXdlrc(text)), fromGraph = deviceSites(loadDevice(packDevice(text)));
@@ -133,7 +133,7 @@ test('clockSites: the flip-flops of a clock stay on the slices its global buffer
   checkLegal(p, place(p, dev, { seed: 1, effort: 0.2, clockSites: () => null }));
 });
 
-test('placement timing: delays of core/fpga/timing.js (ns), flip-flop to flip-flop, growing with the distance', () => {
+test('placement timing: delays of packages/silinx-fpga/src/fpga/timing.js (ns), flip-flop to flip-flop, growing with the distance', () => {
   const p = pack(load('counter'), { ucf: 'NET "clk" LOC = "P3";' });
   const tg = timingGraph(p);
   const r = place(p, dev, { seed: 1, effort: 0.3 });
@@ -243,7 +243,7 @@ test('placement errors: unknown LOC, input-only pad for an output, too many slic
   assert.throws(() => place(big, small), /slices needed|no room/);
 });
 
-test('placed XDL: written, read back by core/xdl.js with the same instances, sites, settings and nets', () => {
+test('placed XDL: written, read back by packages/silinx-fpga/src/xdl.js with the same instances, sites, settings and nets', () => {
   const p = pack(load('counter'), { ucf: 'NET "clk" LOC = "P3";' });
   const r = place(p, dev, { seed: 2, effort: 0.2 });
   const d = placedXdl(p, r);

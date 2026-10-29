@@ -1,6 +1,6 @@
 // Silinx - the Spartan-6 slice model and packer (#721; the plan: research/s6/README.md, #1): the cells of a netlist
-// of the open synthesis for the Spartan-6 (Yosys synth_xilinx -family xc6s, read by core/fpga/netlist.js) grouped
-// into slices (browser + Node). The Spartan-3E packer, core/fpga/pack.js, is another module.
+// of the open synthesis for the Spartan-6 (Yosys synth_xilinx -family xc6s, read by fpga/netlist.js) grouped
+// into slices (browser + Node). The Spartan-3E packer, fpga/pack.js, is another module.
 //
 // A Spartan-6 slice (UG384) has four positions A, B, C, D, each with
 //   - a 6-input LUT with two outputs: O6 (a function of A1-A6), or O6 and O5 (two functions of the shared A1-A5,
@@ -101,7 +101,7 @@ const newSlice = kind => ({ kind, pos: Object.fromEntries(POS.map(p => [p, empty
 const KIND_RANK = { X: 0, L: 1, M: 2 };
 
 /**
- * Pack a Spartan-6 netlist (core/fpga/netlist.js readYosysJson of Yosys's xc6s netlist) into slices.
+ * Pack a Spartan-6 netlist (fpga/netlist.js readYosysJson of Yosys's xc6s netlist) into slices.
  * combine: 'off' (ISE map's default: a LUT per position) or 'area' (two LUTs of 5 shared inputs at most in one
  * position, O6 and O5).
  */

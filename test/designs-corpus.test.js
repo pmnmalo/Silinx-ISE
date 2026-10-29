@@ -16,7 +16,7 @@ import { validateManifest, compareExpectations, updatedExpectations, normalizeWa
 import { remoteFiles, mainCheckout, corpusPaths, CACHE } from '../scripts/fetch-design-corpus.mjs';
 import { compile, elaborate } from '../core/compile.js';
 import { Simulator } from '../core/simulator.js';
-import { parseUcf } from '../core/ucf.js';
+import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(HERE, 'designs-corpus', 'manifest.json'), 'utf8'));
@@ -184,8 +184,8 @@ test('boardClockUcf: the clock on B8 with a 20 ns PERIOD', () => {
 });
 
 test('design corpus: the devices of the flow, smallest first, each with a device description and a bit database (#7)', async () => {
-  const { findDeviceGraph } = await import('../core/fpga/device-node.js');
-  const { loadDb } = await import('../core/fpga/bitdb-node.js');
+  const { findDeviceGraph } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
   assert.deepEqual(FLOW_PARTS.map(chipOf), ['XC3S250E', 'XC3S500E', 'XC3S1200E']);
   assert.deepEqual(deviceOf('xc3s500efg320-4'), { family: 'spartan3e', part: 'xc3s500e', package: 'fg320', speed: '-4' });
   assert.throws(() => deviceOf('xc6slx16csg324-3'), /not a device of the flow/);
@@ -201,9 +201,9 @@ test('design corpus: the devices of the flow, smallest first, each with a device
 });
 
 test('flaggedSynth: synth_xilinx options on every step, all the files the script reads (#62)', { timeout: 180000 }, async () => {
-  const { yosysNode } = await import('../core/synth-open-node.js');
+  const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   const { toVerilog } = await import('../core/synth-verilog.js');
-  const { cellCounts, SRL_MAP_FILE, SRL_CELLS_FILE } = await import('../core/synth-open.js');
+  const { cellCounts, SRL_MAP_FILE, SRL_CELLS_FILE } = await import('../packages/silinx-fpga/src/synth-open.js');
   // an 8-bit shift register and a 16x4 memory
   const V = `module shmem(input clk, input d, input we, input [3:0] a, input [3:0] wd, output q, output [3:0] rd);
   reg [7:0] sh; reg [3:0] mem [0:15];

@@ -1,9 +1,9 @@
-// LUT contents both ways (core/fpga/lut.js): a cell's INIT <-> the XDL equation of a LUT site, with
+// LUT contents both ways (packages/silinx-fpga/src/fpga/lut.js): a cell's INIT <-> the XDL equation of a LUT site, with
 // the cell's inputs on any of the site pins A1..A4.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initToEquation, equationToInit, initToTable, equationTable } from '../core/fpga/lut.js';
-import { evalLut, lutTable } from '../core/xdl.js';
+import { initToEquation, equationToInit, initToTable, equationTable } from '../packages/silinx-fpga/src/fpga/lut.js';
+import { evalLut, lutTable } from '../packages/silinx-fpga/src/xdl.js';
 
 // every function of k inputs (k <= 3) and a sample of the 4-input ones, on every pin assignment
 const perms = a => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(p => [x, ...p])));
@@ -41,7 +41,7 @@ test('the equation only uses the pins the function depends on, in XDL syntax', (
   for (let a = 0; a < 8; a++) assert.equal(evalLut(mux, { A1: a & 1, A2: (a >> 1) & 1, A3: (a >> 2) & 1 }), (a & 4) ? (a >> 1) & 1 : a & 1);
 });
 
-test('the equation agrees with core/xdl.js lutTable (INIT as ISE writes it)', () => {
+test('the equation agrees with packages/silinx-fpga/src/xdl.js lutTable (INIT as ISE writes it)', () => {
   for (const v of [0x0001, 0x8000, 0x6996, 0xfe01, 0x7350]) {
     const init = bin(v, 16);
     const eq = initToEquation(init, 4);

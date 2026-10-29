@@ -1,4 +1,4 @@
-// Silinx toolchain - the timing checks (#405: out of core/fpga/timing.js): the clocks (ports, switches, DCM outputs)
+// Silinx toolchain - the timing checks (#405: out of fpga/timing.js): the clocks (ports, switches, DCM outputs)
 // and their requirements, the periods, cross-clock paths, OFFSET IN / OUT and switching limits checked against the
 // constraints, and the timing report.
 import { CLOCK_PIN } from './timing.js';
@@ -112,7 +112,7 @@ export function clockRequirement(a, b) {
 }
 
 /**
- * The clocks' periods against the PERIOD constraints of the UCF (core/ucf.js parseUcf().clocks:
+ * The clocks' periods against the PERIOD constraints of the UCF (ucf.js parseUcf().clocks:
  * [{ net, period }], the net being the clock's port): [{ clock, port, required, period, slack, met }]
  * for each constrained clock found; a clock from the port with no path between two of its flip-flops (one register
  * stage) { clock, port, required, period: 0, slack, met: true, noPaths: true } (trce's 0 paths analyzed, #1103); and
@@ -170,7 +170,7 @@ export function checkCross(r, design, constraints = []) {
 }
 
 /**
- * The OFFSET constraints of a UCF (#26; core/ucf.js parseUcf().other keeps them): `OFFSET = IN 5 ns BEFORE "clk"`
+ * The OFFSET constraints of a UCF (#26; ucf.js parseUcf().other keeps them): `OFFSET = IN 5 ns BEFORE "clk"`
  * (every input of that clock), `NET "sw<0>" OFFSET = IN …`, `… OFFSET = OUT 9 ns AFTER "clk"`; a VALID window and
  * RISING / FALLING are read past. [{ dir: 'in' | 'out', port (null: every pad of the clock), required (ns), clock
  * (the name after BEFORE / AFTER: a clock's port, or its TNM_NET), text }]; a TIMEGRP's is { unsupported: true }.

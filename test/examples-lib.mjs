@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../core/compile.js';
-import { boardAutoAssign, generateUcf } from '../core/ucf.js';
+import { boardAutoAssign, generateUcf } from '../packages/silinx-fpga/src/ucf.js';
 import { resolveBoard } from '../server/devices.js';
 import { EXAMPLE_ORDER } from '../core/examples.js';
 

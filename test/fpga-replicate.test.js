@@ -1,14 +1,14 @@
-// core/fpga/replicate.js: register replication (#4). The plan (which flip-flops or LUTs, #522, which
+// packages/silinx-fpga/src/fpga/replicate.js: register replication (#4). The plan (which flip-flops or LUTs, #522, which
 // loads each copy takes) from a placement and its timing; the replicated netlist computes exactly what
 // the netlist did (simulated, packed); its placement starts from the first one (#87).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compile, elaborate } from '../core/compile.js';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
-import { readYosysJson } from '../core/fpga/netlist.js';
-import { pack } from '../core/fpga/pack.js';
-import { replicationPlan, replicateCells, warmStart, REPLICATION, REPLICATE_MAX_SLICES, WARM } from '../core/fpga/replicate.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
+import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
+import { replicationPlan, replicateCells, warmStart, REPLICATION, REPLICATE_MAX_SLICES, WARM } from '../packages/silinx-fpga/src/fpga/replicate.js';
 import { compareSims } from './fpga-sim.js';
 
 // a flip-flop (s[0]) that selects 16 outputs: 16 loads

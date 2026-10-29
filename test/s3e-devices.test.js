@@ -7,10 +7,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { S3E_DEVICES, XC3S250E, bitFormat, writeBit, readBit, setBit, getBit, diffFrames } from '../core/fpga/bitstream.js';
-import { makeDb, layoutFormat, bitgen, frameData, padsFromDevice, knownRouting, featureBits, tileOf, tileBase, pipFeatures, designFeatures } from '../core/fpga/bitgen.js';
-import { parseXdl } from '../core/xdl.js';
-import { loadDeviceCache } from '../core/fpga/device-node.js';
+import { S3E_DEVICES, XC3S250E, bitFormat, writeBit, readBit, setBit, getBit, diffFrames } from '../packages/silinx-fpga/src/fpga/bitstream.js';
+import { makeDb, layoutFormat, bitgen, frameData, padsFromDevice, knownRouting, featureBits, tileOf, tileBase, pipFeatures, designFeatures } from '../packages/silinx-fpga/src/fpga/bitgen.js';
+import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 import { DB_DIR, splitPart, mergeTiles, hasBitDb, readDbFiles, dbPackages, loadDb, edges } from '../research/s3e-bitstream/db.mjs';
 import { graphFromDevice } from '../research/s3e-bitstream/xdlrc-graph.mjs';
 import { deviceExceptions, exceptionTables } from '../research/s3e-bitstream/pip-exceptions.mjs';
@@ -449,7 +449,7 @@ test('the PIPs a tile type\'s features offer that its tiles do not have (#74): m
 });
 
 test('the block RAMs\' and multipliers\' clock pins from every global line (#2): every top / bottom buffer reaches every CLKA, CLKB and multiplier CLK on known switches, on the four devices', async () => {
-  const { clockReach } = await import('../core/fpga/route.js');
+  const { clockReach } = await import('../packages/silinx-fpga/src/fpga/route.js');
   // (GCLKk -> BRAM_CLKj of the block-RAM interconnect tiles, two bits each: before, only lines 4 and 5 reached a CLKA,
   // line 4 alone a CLKB or a multiplier's CLK)
   const t = JSON.parse(fs.readFileSync(path.join(DB_DIR, 's3e-tiles.json'), 'utf8')).types;
@@ -469,7 +469,7 @@ test('the block RAMs\' and multipliers\' clock pins from every global line (#2):
 });
 
 test('the global clock pads\' dedicated paths to the top and bottom buffers (#2): every one on known switches, on the four devices (CKIk -> GCLKj, one bit each)', async () => {
-  const { bufgReach } = await import('../core/fpga/route.js');
+  const { bufgReach } = await import('../packages/silinx-fpga/src/fpga/route.js');
   const t = JSON.parse(fs.readFileSync(path.join(DB_DIR, 's3e-tiles.json'), 'utf8')).types;
   // (each buffer from two pads: CKIk and CKI(k+4) of its clock tile; before, three of the sixteen were known)
   assert.deepEqual(t.CLKT.features['CLKT_CKI0->CLKT_GCLK0'], ['2,67']);

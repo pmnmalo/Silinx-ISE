@@ -3,7 +3,7 @@
 // (core/schdoc.js) and the Language Templates' *Device Primitives* group (web/js/editor.js) offer them. One
 // list, read by both: each primitive's pins as UNISIM's (names, directions, widths), its attributes (the
 // generics / parameters, their kinds, ranges and defaults) and its texts in English and Portuguese; the
-// resource it takes and its count on a part come from core/resources.js.
+// resource it takes and its count on a part come from packages/silinx-fpga/src/resources.js.
 //
 //   Spartan-3E: RAMB16_S<w> (single port), RAMB16_S<a>_S<b> (dual port), MULT18X18SIO, DCM_SP, BUFG, BUFGMUX, IBUFG
 //   Spartan-6:  RAMB8BWER, RAMB16BWER, DSP48A1, PLL_BASE, DCM_SP, BUFG, BUFIO2
@@ -24,9 +24,9 @@
 //                                 leaving the first out)
 //   genericValue(g, v, lang)      an attribute's value written in VHDL or Verilog (null: not a valid value)
 //   initWords(text, width, bits)  a block RAM's contents (hex words from address 0) as its INIT_xx: { 'INIT_00': hex }
-//   primitiveResource(type, family, params)  the resource (core/resources.js id) a primitive takes on a family
+//   primitiveResource(type, family, params)  the resource (packages/silinx-fpga/src/resources.js id) a primitive takes on a family
 
-import { resourceOfPrimitive } from './resources.js';
+import { resourceOfPrimitive } from '../packages/silinx-fpga/src/parts.js';
 
 const tx = (en, pt) => ({ en, pt });
 // (vec: a vector of one bit in UNISIM, std_logic_vector(0 downto 0): the parity of a 9-bit port; free: an input the
@@ -363,7 +363,7 @@ export function primitiveOf(type, params = {}) {
   return d.of({ ...primitiveDefaults(type), ...params });
 }
 
-/** The resource (a core/resources.js id) a primitive of `type` takes on a family (null: none counted). */
+/** The resource (a packages/silinx-fpga/src/resources.js id) a primitive of `type` takes on a family (null: none counted). */
 export function primitiveResource(type, family, params = {}) {
   const r = primitiveOf(type, params);
   return r ? resourceOfPrimitive(family, r.name) : null;

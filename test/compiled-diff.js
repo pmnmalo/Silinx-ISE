@@ -16,7 +16,7 @@ import { Simulator } from '../core/simulator.js';
 import { primitiveSources } from '../core/unisim.js';
 import * as V from '../core/values.js';
 import { compileDesign, compileNetlist, CompiledSim } from '../core/compiled-sim.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 
 const P = 20000, EARLY = 40;
 

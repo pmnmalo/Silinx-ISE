@@ -1,14 +1,14 @@
-// core/fpga/route.js: the router (PathFinder) and the routing check; core/xdl.js writeXdl.
+// packages/silinx-fpga/src/fpga/route.js: the router (PathFinder) and the routing check; packages/silinx-fpga/src/xdl.js writeXdl.
 // Device: test/fixtures/fpga/route-device.xdlrc (hand-made). Designs: small XDL texts below.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { packDevice, loadDevice } from '../core/fpga/device.js';
-import { routeDesign, checkRouting, netEndpoints, clockReach } from '../core/fpga/route.js';
-import { parseXdl, writeXdl } from '../core/xdl.js';
-import { makeDb, knownRouting } from '../core/fpga/bitgen.js';
+import { packDevice, loadDevice } from '../packages/silinx-fpga/src/fpga/device.js';
+import { routeDesign, checkRouting, netEndpoints, clockReach } from '../packages/silinx-fpga/src/fpga/route.js';
+import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { makeDb, knownRouting } from '../packages/silinx-fpga/src/fpga/bitgen.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const device = loadDevice(packDevice(fs.readFileSync(path.join(FIX, 'route-device.xdlrc'), 'utf8')));
@@ -307,8 +307,8 @@ test('routeDesign with knownRouting: a PIP the tile lacks though its type\'s fea
 // pin's wire belongs to its net: b goes round it from the first pass, and no node is left shared (on
 // the XC3S1200E a Y -> BY net between neighbouring slices failed this way at some seeds).
 test('routeDesign: a pin\'s only entry wire (a slice\'s BY wire) is its net\'s; no other net passes through it (#82)', async () => {
-  const { loadDeviceCache } = await import('../core/fpga/device-node.js');
-  const { loadDb } = await import('../core/fpga/bitdb-node.js');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
   const part = 'xc3s250ecp132-4';
   const g = loadDeviceCache(part);
   const known = knownRouting(loadDb(part, { graph: g }));

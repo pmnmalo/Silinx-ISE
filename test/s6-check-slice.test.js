@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lutEntries, routeThroughs, loadDb, kindModel, predictSlice, checkDesign, CIN_BIT } from '../research/s6/check-slice6.mjs';
-import { S6_DEVICES, emptyFdri, writeBit6, FRAME_WORDS } from '../core/fpga/s6/bitstream.js';
+import { S6_DEVICES, emptyFdri, writeBit6, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
 const cfg = s => s.split(' ').map(x => { const [attr, name, ...v] = x.split(':'); return { attr, name, value: v.join(':') }; });
 

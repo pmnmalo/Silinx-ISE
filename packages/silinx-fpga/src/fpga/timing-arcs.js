@@ -1,4 +1,4 @@
-// Silinx toolchain - the timing of the logic (#405: out of core/fpga/timing.js): each instance's arcs (a slice's
+// Silinx toolchain - the timing of the logic (#405: out of fpga/timing.js): each instance's arcs (a slice's
 // LUTs, multiplexers, carry chain and flip-flops, an IOB's, a block RAM's, a multiplier's), their delays in the model.
 import { SPEED_4 } from './timing.js';
 

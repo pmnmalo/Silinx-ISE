@@ -7,7 +7,7 @@
 import { api } from './api.js';
 import { h, alertDlg, toast } from './ui.js';
 import { memoryModule, planMemory, readInitFile, MEMORY_FAMILIES } from '/core/blockram.js';
-import { resourceCount } from '/core/resources.js';
+import { resourceCount } from '/packages/silinx-fpga/src/parts.js';
 import { identError } from '/core/modgen.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';

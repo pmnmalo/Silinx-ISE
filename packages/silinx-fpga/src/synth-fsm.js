@@ -3,7 +3,7 @@
 // register its power-up value (an `init`), and fsm_detect refuses a register that has one. XST re-encodes the
 // machines it finds, one-hot from about 8 states. At Optimization Effort High a design whose machines of
 // FSM_RULE.states states or more are refused for their init value alone is synthesized once more with them
-// extracted and re-encoded one-hot, the power-up state kept, and that netlist kept when better (core/synth-open.js,
+// extracted and re-encoded one-hot, the power-up state kept, and that netlist kept when better (synth-open.js,
 // DEPTH_RULE). The measurement that chose this (#438, #539): research/synth-quality/README.md, "State machines".
 //
 // The runs (the open synthesis's own script, its first step split around `fsm`: the steps of synth_xilinx's

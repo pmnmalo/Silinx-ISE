@@ -247,7 +247,7 @@ function removeDead(mod) {
   }
 }
 
-/** The critical path's wide decodes collapsed and mapped again (run: core/synth-open.js's Yosys runner): { json, rounds,
+/** The critical path's wide decodes collapsed and mapped again (run: synth-open.js's Yosys runner): { json, rounds,
  *  cones, luts: [before, after], ns: [before, after] }, or null when no cone gets shallower. */
 export async function bddRemap(json, top, run, rule = BDD_RULE, log = () => {}) {
   const nl = typeof json === 'string' ? JSON.parse(json) : structuredClone(json);

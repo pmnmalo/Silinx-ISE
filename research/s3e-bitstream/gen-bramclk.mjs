@@ -13,9 +13,9 @@
 //   PART=xc3s250ecp132-4 node gen-bramclk.mjs outdir [--list] [--repeat 2]   (folders r0, r1, …: block RAMs; m0, m1, …:
 //   multipliers)
 import fs from 'node:fs';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { knownRouting, tileOf } from '../../core/fpga/bitgen.js';
-import { PIP_ROUTETHRU } from '../../core/fpga/device.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { knownRouting, tileOf } from '../../packages/silinx-fpga/src/fpga/bitgen.js';
+import { PIP_ROUTETHRU } from '../../packages/silinx-fpga/src/fpga/device.js';
 import { PART, loadDb } from './db.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

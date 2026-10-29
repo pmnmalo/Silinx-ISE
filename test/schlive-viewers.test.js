@@ -10,8 +10,8 @@ import { schematicFromHdl, modulesFromLibrary } from '../core/schdoc.js';
 import { buildLiveSim, instanceGenerics, fmtValue, LIVE_STEP } from '../core/schlive.js';
 import { primitiveSources } from '../core/unisim.js';
 import { technologyNetlist } from '../core/fpga/techview.js';
-import { synthesizeOpen } from '../core/synth-open.js';
-import { yosysNode } from '../core/synth-open-node.js';
+import { synthesizeOpen } from '../core/synth-front.js';
+import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { example } from './examples-lib.mjs';
 import * as V from '../core/values.js';
 

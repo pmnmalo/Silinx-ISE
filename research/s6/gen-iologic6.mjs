@@ -1,4 +1,4 @@
-// Stage S6-E (#727): the I/O logic's route-throughs Silinx's router uses (core/fpga/s6/route-nets.js FREE_ROUTETHRU):
+// Stage S6-E (#727): the I/O logic's route-throughs Silinx's router uses (packages/silinx-fpga/src/fpga/s6/route-nets.js FREE_ROUTETHRU):
 // OLOGIC2 D1 -> OQ and T1 -> TQ, ILOGIC2 D -> FABRICOUT, written as ISE writes them (an instance with no user logic
 // and the _ROUTETHROUGH setting). One design per route-through on every site of the kind, and the same on the sites of
 // even Y only (the two sites of an IOI tile apart); ana-iologic6.mjs places the bits by tile (gridRegion).

@@ -1,6 +1,6 @@
-// Silinx - open synthesis in Node: run() for core/synth-open.js with Yosys from @yowasp/yosys in
+// Silinx - open synthesis in Node: run() for synth-open.js with Yosys from @yowasp/yosys in
 // this process (the browser runs it in a Web Worker instead: web/js/yosys-worker.js). Kept apart
-// from core/synth-open.js so that the page never imports the Node-only loader.
+// from synth-open.js so that the page never imports the Node-only loader.
 import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import { runYosysOnce } from './synth-open.js';
@@ -54,7 +54,7 @@ export function yosysWorkers(n = Math.min(4, Math.max(1, (os.availableParallelis
     if (idle.length) next(idle.pop());
     else if (count < n) next(start());
   });
-  // (how many at a time: core/synth-open.js starts the runs it may not need when there are enough, #277)
+  // (how many at a time: synth-open.js starts the runs it may not need when there are enough, #277)
   run.parallel = n;
   return run;
 }

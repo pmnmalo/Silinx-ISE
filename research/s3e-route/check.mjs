@@ -2,9 +2,9 @@
 // no antenna, no shared node). Used on ISE's own routed designs to validate the graph.
 //   node research/s3e-route/check.mjs design.xdl [part]
 import fs from 'node:fs';
-import { parseXdl } from '../../core/xdl.js';
-import { loadDeviceCache } from '../../core/fpga/device-node.js';
-import { checkRouting } from '../../core/fpga/route.js';
+import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
+import { loadDeviceCache } from '../../packages/silinx-fpga/src/fpga/device-node.js';
+import { checkRouting } from '../../packages/silinx-fpga/src/fpga/route.js';
 
 const [file, part] = process.argv.slice(2);
 const design = parseXdl(fs.readFileSync(file, 'utf8'));
