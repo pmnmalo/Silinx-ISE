@@ -2,7 +2,8 @@
 // (the slices: check-slice6.mjs; the INT-like tiles' PIPs: check-pips6.mjs; the other tiles' PIPs: db/s6-pips-other.json
 // placed by gridRegion; the pads: db/<device>-iob.json, from each IOB's settings; a clock pad's selection and input
 // bits: db/s6-clocks.json) and compared with ISE's bitstream,
-// over the rows' frames and the I/O words (the block RAM's frames are #728's). A bit left over goes to the tiles whose
+// over the rows' frames and the I/O words, and the block RAM's frames with db/<device>-hard.json (#728: the block RAMs'
+// and DSP48A1s' settings and contents, hard6.mjs). A bit left over goes to the tiles whose
 // region holds it, by type (the I/O words: 'IOB words').
 //   node research/s6/residual6.mjs <dir> …        (each with top.xdl and top.bit, e.g. night 1's impl-nexys3/*)
 import fs from 'node:fs';
@@ -17,6 +18,7 @@ import { tileRegion } from './ana-pipprobe6.mjs';
 import { gridRegion } from './ana-pipdrop6.mjs';
 import { columnOf } from './ana-slice6.mjs';
 import { cmtCfg, cmtPath, predictCmt } from './cmt6.mjs';
+import { HARD_TYPES, predictHard } from './hard6.mjs';
 
 const INT_LIKE = /^(INT|INT_BRK|INT_BRAM|INT_BRAM_BRK|IOI_INT|LIOI_INT|INT_GCLK)_X/;
 const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8'));
@@ -105,6 +107,17 @@ export function predictDesign(design, device, dev, db) {
       for (const x of p) bits.add(x);
     }
   }
+  // a block RAM's or a DSP48A1's settings and contents
+  if (db.hard) {
+    const pins = new Map();
+    for (const net of design.nets) for (const q of net.inpins) (pins.get(q.inst) ?? pins.set(q.inst, new Set()).get(q.inst)).add(q.pin);
+    for (const inst of design.insts) {
+      if (!HARD_TYPES.includes(inst.type) || !inst.placed) continue;
+      const p = predictHard(inst, device, dev, db.hard, pins.get(inst.name));
+      for (const x of p.bits) bits.add(x);
+      for (const u of p.unknown) note(u);
+    }
+  }
   for (const net of design.nets) {
     const dirs = (net.pips || []).some(p => p.dir === '=-') ? pipDirections(device, net, design) : null;
     (net.pips || []).forEach((p, i) => {
@@ -156,12 +169,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const design = parseXdl(fs.readFileSync(path.join(dir, 'top.xdl'), 'utf8'));
     const iobFile = new URL(`./db/${r6.device.device}-iob.json`, import.meta.url), iob = fs.existsSync(iobFile) ? JSON.parse(fs.readFileSync(iobFile, 'utf8')) : null;
     const cmtFile = new URL(`./db/${r6.device.device}-cmt-paths.json`, import.meta.url), cmt = fs.existsSync(cmtFile) ? JSON.parse(fs.readFileSync(cmtFile, 'utf8')) : null;
-    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob, clocks: read('s6-clocks'), cmt });
+    const hardFile = new URL(`./db/${r6.device.device}-hard.json`, import.meta.url), hard = fs.existsSync(hardFile) ? JSON.parse(fs.readFileSync(hardFile, 'utf8')) : null;
+    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob, clocks: read('s6-clocks'), cmt, hard });
     for (const [w, n] of u) unknown.set(w, (unknown.get(w) || 0) + n);
     const empty = emptyFdri(dev), rows = dev.rows * dev.rowFrames * FRAME_WORDS, iobStart = (dev.rows * dev.rowFrames + dev.bramFrames) * FRAME_WORDS, have = new Set(), w0 = typesAt(device, dev);
-    const where = (f, b) => (f >= dev.rows * dev.rowFrames + dev.bramFrames ? 'IOB words' : w0(f, b));
+    const where = (f, b) => (f >= dev.rows * dev.rowFrames + dev.bramFrames ? 'IOB words' : f >= dev.rows * dev.rowFrames ? 'BRAM frames' : w0(f, b));
     for (let w = 0; w < r6.fdri.length; w++) {
-      if (w >= rows && w < iobStart) continue;
+      if (!hard && w >= rows && w < iobStart) continue;
       const x = r6.fdri[w] ^ empty[w];
       if (x) for (let i = 0; i < 16; i++) if ((x >> (15 - i)) & 1) have.add(`${Math.floor(w / FRAME_WORDS)},${(w % FRAME_WORDS) * 16 + i}`);
     }
