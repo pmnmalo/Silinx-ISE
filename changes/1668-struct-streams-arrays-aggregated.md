@@ -16,7 +16,3 @@ In detail:
   with a stream in it is disaggregated without a warning, as Vitis HLS does. A stream of `ap_axis` reads or writes a beat
   in one state (interface-streaming-using-axi-stream-with-side-channel-data: 6-7 cycles instead of 31-34; its `axis`
   ports, `TDATA`, `TKEEP`…, are #1894's); aggregation-of-m-axi-ports 43 cycles instead of 53.
-- **Silinx HLS: the BRAM interface (#1668, #1902):** an array argument with `#pragma HLS INTERFACE bram` has Vitis HLS's
-  BRAM port (`_Addr_A` in bytes, `_EN_A`, `_WEN_A`, `_Din_A`, `_Dout_A`, `_Clk_A`, `_Rst_A`, its words a power of 2 of
-  bytes). interface-aggregation-disaggregation-aggregation-of-nested-structs now has Vitis HLS's ports (`a_q0` of 104
-  bits, `b_q0` of 97, `c` a BRAM of 128-bit words), and a latency of 43 cycles instead of 83.
