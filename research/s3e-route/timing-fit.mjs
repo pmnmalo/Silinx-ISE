@@ -127,7 +127,7 @@ export function hardArcs(xdlText, twrText) {
 }
 
 // least squares with non-negative coefficients (active-set, small problems)
-function nnls(X, y, iters = 200) {
+export function nnls(X, y, iters = 200) {
   const m = X[0].length;
   const solve = (cols) => {
     const k = cols.length, A = Array.from({ length: k }, () => new Float64Array(k + 1));
