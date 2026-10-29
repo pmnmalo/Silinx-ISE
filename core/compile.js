@@ -63,13 +63,13 @@ export function compile(sources) {
 export { elaborate, topCandidates };
 
 // Convenience: compile + elaborate + simulate (used by tests and the CLI).
-export function simulate(sources, top, { until = Infinity, files } = {}) {
+export function simulate(sources, top, { until = Infinity, files, maxDeltas } = {}) {
   const lib = compile(sources);
   const design = elaborate(lib, top);
   const errors = [...lib.errors, ...design.diags].filter(d => d.severity === 'error');
   if (errors.length) return { lib, design, errors, sim: null };
   const fileMap = new Map(files || sources.map(s => [s.path, s.text]));
-  const sim = new Simulator(design, { files: fileMap });
+  const sim = new Simulator(design, { files: fileMap, maxDeltas });
   const status = sim.run(until);
   return { lib, design, errors, sim, status };
 }

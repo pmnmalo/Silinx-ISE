@@ -155,7 +155,9 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
   if (!gen.ok) return { ...base, errors: gen.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`) };
   if (!sim.calls.length) return { ...base, ok: true, pass: false, errors: [`the test bench (main) does not call the top function '${gen.top}': nothing to compare`] };
   const tb = cosimBench(gen, sim.calls, { maxCycles });
-  const r = simulate([{ path: `${gen.top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: gen.hdl }, { path: 'silinx_cosim_tb.v', text: tb.text }], 'silinx_cosim_tb', { until: 1e15 });
+  // (a deep combinational path, math.h's pow in soft-float, #1761, settles in more delta cycles than the simulator's
+  // default allows: up to a million)
+  const r = simulate([{ path: `${gen.top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: gen.hdl }, { path: 'silinx_cosim_tb.v', text: tb.text }], 'silinx_cosim_tb', { until: 1e15, maxDeltas: 1e6 });
   if (r.errors.length) return { ...base, errors: r.errors.map((d) => `${d.file || ''}: ${d.message}`) };
   // (the test bench's lines only: the simulator's own, as its waveform recording's limit, left out, #1734)
   const lines = r.sim.log.map((e) => String(e.text).trim()).filter((s) => /^(bad \d+|[0-9a-fxz]+( [0-9a-fxz]+)*)$/i.test(s));
