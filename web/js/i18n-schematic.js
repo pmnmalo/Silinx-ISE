@@ -27,6 +27,7 @@ export const SCH_PT = {
   'Instance of a project module/entity': 'Instância de um módulo/entidade do projeto',
   'Box with explicit pins carrying HDL statements emitted verbatim': 'Caixa com pinos explícitos e instruções HDL copiadas tal e qual',
   // parameters of the symbols (as in the Symbol Info datasheets, core/symdocs.js) and their options
+  'for a Width of 2 or more': 'para uma Largura de 2 ou mais',   // (Pins per bit at Width 1, #2076)
   'Pins per bit (A0.., B0.., S0..)': 'Um pino por bit (A0.., B0.., S0..)', 'Pins per bit (A0.., B0..)': 'Um pino por bit (A0.., B0..)', 'Pins per bit (Q0..)': 'Um pino por bit (Q0..)', 'Pins per bit (A0.., B0.., D0..)': 'Um pino por bit (A0.., B0.., D0..)', 'Borrow in (BI)': 'Empréstimo de entrada (BI)', 'Borrow out (BO)': 'Empréstimo de saída (BO)',
   'Subtractor D = A - B (- BI), optional borrow out': 'Subtrator D = A - B (- BI), empréstimo de saída opcional',
   'Carry in': 'Transporte de entrada (carry in)', 'Carry out': 'Transporte de saída (carry out)', 'Operation': 'Operação', 'Signed': 'Com sinal',
