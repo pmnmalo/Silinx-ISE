@@ -1,10 +1,12 @@
 // research/s6 stage S6-G (#731), without ISE: a trce report's paths read (twr6.mjs), the Spartan-6's wire classes and
-// a connection's features (timing-fit6.mjs), the non-negative least squares the fit uses (research/s3e-route).
+// a connection's features (timing-fit6.mjs), the non-negative least squares the fit uses (research/s3e-route), the arcs'
+// table and a path re-evaluated by the model (timing6.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseTwr } from '../research/s6/twr6.mjs';
 import { wireClass6, CLASSES6, nodeWire, features } from '../research/s6/timing-fit6.mjs';
 import { nnls } from '../research/s3e-route/timing-fit.mjs';
+import { arcKey, arcTable, modelPath } from '../research/s6/timing6.mjs';
 import { s6Device } from './s6-lib.mjs';
 
 // a report in trce's layout, its numbers made up
@@ -75,4 +77,22 @@ test('timing-fit6: the wire classes, a node\'s first wire, a connection\'s featu
   // y = 0.1 + 0.2 a + 0.5 b, found back
   const X = [[1, 1, 0], [1, 0, 1], [1, 2, 1], [1, 3, 2]], y = X.map(([, a, b]) => 0.1 + 0.2 * a + 0.5 * b), w = nnls(X, y);
   assert.deepEqual(w.map(v => +v.toFixed(6)), [0.1, 0.2, 0.5]);
+});
+
+test('timing6: an arc\'s key (a setup through its LUT by the flip-flop\'s input mux), the arcs\' table, a path re-evaluated', () => {
+  const inst = (tile, cfg) => ({ tile, cfg: Object.entries(cfg).map(([attr, value]) => ({ attr, name: '', value })) });
+  assert.equal(arcKey({ type: 'Tilo', loc: 'SLICE_X2Y2.B' }, inst('CLEXL_X1Y2', {})), 'Tilo CLEXL');
+  assert.equal(arcKey({ type: 'Tas', loc: 'SLICE_X2Y2.CLK' }, inst('CLEXM_X1Y2', { AFFMUX: 'O6', CFFMUX: '#OFF' })), 'Tas CLEXM LUT');
+  assert.equal(arcKey({ type: 'Tas', loc: 'SLICE_X2Y2.CLK' }, inst('CLEXM_X1Y2', { DFFMUX: 'XOR' })), 'Tas CLEXM XOR');
+  assert.equal(arcKey({ type: 'Tcko', loc: 'SLICE_X9Y9.AQ' }, undefined), 'Tcko SLICE');
+  const xdl = { insts: [{ site: 'SLICE_X1Y1', tile: 'CLEXL_X1Y1', cfg: [] }, { site: 'SLICE_X3Y3', tile: 'CLEXM_X3Y3', cfg: [] }], nets: [] };
+  const paths = [{ elements: [{ loc: 'SLICE_X1Y1.AQ', type: 'Tcko', delay: 0.4 }, { loc: 'SLICE_X3Y3.CLK', type: 'Tdick', delay: 0.1 }] },
+    { elements: [{ loc: 'SLICE_X1Y1.AQ', type: 'Tcko', delay: 0.5 }, { loc: 'SLICE_X3Y3.CLK', type: 'Tdick', delay: 0.2 }] },
+    { elements: [{ loc: 'SLICE_X1Y1.AQ', type: 'Tcko', delay: 0.45 }] }];
+  const table = arcTable([{ xdl, paths }]);
+  assert.deepEqual(table.arcs, { 'Tcko CLEXL': 0.45, 'Tdick CLEXM': 0.2 });
+  assert.deepEqual(table.types, { Tcko: 0.45, Tdick: 0.2 });
+  // a path of arcs only: the table's; a net not in the XDL: null
+  assert.equal(modelPath(paths[0], xdl, null, table, []), 0.65);
+  assert.equal(modelPath({ elements: [paths[0].elements[0], { loc: 'SLICE_X3Y3.A1', type: 'net', fanout: 1, delay: 1, name: 'n' }] }, xdl, null, table, []), null);
 });

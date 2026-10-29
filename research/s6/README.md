@@ -459,9 +459,14 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   input 0.203, a logic output 0.142). trce's verbose report gives only the 10 worst paths of a constraint: the
   delays of every connection (`reportgen -delay`) will widen it.
 - **The logic arcs** read from the same reports are near constants by kind and context (Tilo 0.203 to 0.259 ns,
-  Tcko 0.391 / 0.408 / 0.447 by the flip-flop, Tas 0.289 to 0.341, Tceck 0.276 to 0.363 by the flip-flop): a table
-  by arc, slice kind and flip-flop or multiplexer is the next step, then the STA of a routed design against trce's
-  slack (within 5%).
+  Tcko 0.391 / 0.408 / 0.447 by the flip-flop, Tas 0.289 to 0.341, Tceck 0.276 to 0.363 by the flip-flop; a setup
+  through the XOR 0.154 / 0.273).
+- **trce's paths re-evaluated** (`timing6.mjs`, part 2): each path's arcs from a table (the median by arc, slice kind
+  and, for a setup through the LUT, the flip-flop's input mux) and its nets from the wire model on ISE's routing; with
+  trce's skew and uncertainty, its slack. On night 1's 240 paths the data path's rms error is 0.219 ns (95% within
+  0.49 ns); each constraint's worst slack is within 5% of trce's in 14 of 24 constraints, the others the small slacks
+  (0.2 ns of a 0.68 ns slack is 29%), every error under 6% of the period. Next: every connection's delay
+  (`reportgen -delay`) for the wire fit, and the STA that finds the worst path itself (its own skew).
 
 ### The CMT sites (#1951, S6-E2, 2026-10-29)
 
@@ -615,6 +620,7 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `gen-cmtprobe6.mjs`, `ana-cmtprobe6.mjs` | The PIPs the drop could not take apart, probed one by one: `db/s6-pips-probe.json` (#1951) |
 | `twr6.mjs` | trce's report read: each constraint's paths, their figures and elements (#731) |
 | `timing-fit6.mjs` | The wire delay model fitted to trce's nets on ISE's routing (#731) |
+| `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |
