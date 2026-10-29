@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { TIMINGS, testFiles } from './test-shard.mjs';
+import { TIMINGS, testFiles, unitFiles } from './test-shard.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -40,7 +40,7 @@ function main() {
   } else { console.error('usage: node scripts/update-test-timings.mjs <run id> | --from <folder>'); process.exit(2); }
   const parts = readParts(dir);
   if (!parts.length) { console.error(`no test-times.json in ${dir}`); process.exit(1); }
-  const files = [...testFiles(ROOT), ...testFiles(ROOT, 'test/ui')].sort();
+  const files = [...unitFiles(ROOT), ...testFiles(ROOT, 'test/ui')].sort();
   const t = merge(parts, files);
   fs.writeFileSync(path.join(ROOT, TIMINGS), `${JSON.stringify(t, null, 2)}\n`);
   const missing = files.filter(f => !(f in t));

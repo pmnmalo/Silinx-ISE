@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readYosysJson, paramBits, paramInt } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { readYosysJson, paramBits, paramInt } from '../src/fpga/netlist.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
 const load = n => readYosysJson(fs.readFileSync(path.join(FIX, `${n}.json`), 'utf8'));

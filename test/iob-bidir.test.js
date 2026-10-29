@@ -1,6 +1,6 @@
 // #96: the bidirectional pads (IOBUF on an inout port) in the Silinx toolchain: the packer's IOB (its output buffer
 // from O1, its enable on T1, its input buffer to the fabric), the packed design behaving as the netlist
-// (test/fpga-sim.js: the pad's value from outside while the design does not drive it), the post-translate and
+// (packages/silinx-fpga/test/fpga-sim.js: the pad's value from outside while the design does not drive it), the post-translate and
 // post-map models.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
 import { postTranslateModels, postMapModels } from '../core/sim-model.js';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { compareSims } from './fpga-sim.js';
+import { compareSims } from '../packages/silinx-fpga/test/fpga-sim.js';
 
 // clk -> IBUFG -> BUFG (bit 4); io: an inout port of 2 bits (an IOBUF each); a flip-flop (r) captures io(0), drives
 // io(1); io(0)'s enable from the input oe, io(1)'s tied to 0 (always driving); b: an IOBUF whose input nothing reads

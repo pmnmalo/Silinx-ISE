@@ -14,7 +14,7 @@ import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
 import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
 import { expectWarnings } from './diff-synth.js';
-import { compareSims } from './fpga-sim.js';
+import { compareSims } from '../packages/silinx-fpga/test/fpga-sim.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const langOf = f => (/\.(vhd|vhdl)$/i.test(f) ? 'vhdl' : 'verilog');

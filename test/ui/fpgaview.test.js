@@ -1,6 +1,6 @@
 // UI: View Implemented Design (FPGA) — the chip with the used sites coloured by module, a site's
 // logic and connections, nets and the clock network, zoom, and the Design hierarchy and the chip
-// selecting each other's modules. The routed design is the XDL fixture (test/fixtures/fpga), put in
+// selecting each other's modules. The routed design is the XDL fixture (packages/silinx-fpga/test/fixtures/fpga), put in
 // the project's build folder as the 'fpgaview' step of ISE would (no ISE needed).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +40,7 @@ async function routedProject(name) {
   await fs.writeFile(path.join(build, 'top.ncd'), 'NCD');
   const old = new Date(Date.now() - 60000);
   await fs.utimes(path.join(build, 'top.ncd'), old, old);
-  for (const f of ['top.xdl', 'device.xdlrc']) await fs.copyFile(path.join(ROOT, 'test', 'fixtures', 'fpga', f), path.join(build, f));
+  for (const f of ['top.xdl', 'device.xdlrc']) await fs.copyFile(path.join(ROOT, 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga', f), path.join(build, f));
 }
 const V = '.doc:not([hidden]) .fv';
 const idxOf = (page, inst) => page.eval(async (n) => (await (await fetch(`/api/projects/${window.Silinx.project.name}/fpga-view`)).json()).insts.findIndex((i) => i.name === n), inst);

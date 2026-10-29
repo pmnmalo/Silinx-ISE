@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node bin/silinx-ise.js serve",
-    "test": "node --test test/*.test.js",
+    "test": "node --test test/*.test.js packages/silinx-fpga/test/*.test.js",
     "test:ui": "node --test test/ui/*.test.js",
     "test:ise": "SILINX_ISE_TESTS=1 node --test test/ise/*.test.js",
     "check:open-flow": "node scripts/check-open-flow.mjs",

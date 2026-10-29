@@ -9,7 +9,7 @@ import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
 import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
 import { replicationPlan, replicateCells, warmStart, REPLICATION, REPLICATE_MAX_SLICES, WARM } from '../packages/silinx-fpga/src/fpga/replicate.js';
-import { compareSims } from './fpga-sim.js';
+import { compareSims } from '../packages/silinx-fpga/test/fpga-sim.js';
 
 // a flip-flop (s[0]) that selects 16 outputs: 16 loads
 const FAN = `module fan(input clk, input [1:0] sel, input [15:0] a, output reg [15:0] q);

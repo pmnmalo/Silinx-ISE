@@ -1,7 +1,7 @@
 // UI: the FPGA view's site details (#405: web/js/fpgaview-details.js out of mountFpgaView in web/js/fpgaview.js):
 // an output pad, an input clock pad and the global clock buffer selected on the chip: their site, tile, module,
 // port, package pin, direction, I/O standard (and drive and slew of an output), the elements inside, and their
-// connections, as the details panel shows them. The routed design is the XDL fixture (test/fixtures/fpga), as in
+// connections, as the details panel shows them. The routed design is the XDL fixture (packages/silinx-fpga/test/fixtures/fpga), as in
 // test/ui/fpgaview.test.js (a slice's details, its LUT contents and pins: there).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +40,7 @@ async function routedProject(name) {
   await fs.writeFile(path.join(build, 'top.ncd'), 'NCD');
   const old = new Date(Date.now() - 60000);
   await fs.utimes(path.join(build, 'top.ncd'), old, old);
-  for (const f of ['top.xdl', 'device.xdlrc']) await fs.copyFile(path.join(ROOT, 'test', 'fixtures', 'fpga', f), path.join(build, f));
+  for (const f of ['top.xdl', 'device.xdlrc']) await fs.copyFile(path.join(ROOT, 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga', f), path.join(build, f));
 }
 const V = '.doc:not([hidden]) .fv';
 const idxOf = (page, inst) => page.eval(async (n) => (await (await fetch(`/api/projects/${window.Silinx.project.name}/fpga-view`)).json()).insts.findIndex((i) => i.name === n), inst);

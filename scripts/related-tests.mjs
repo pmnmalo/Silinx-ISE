@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // The test files of the modules a pull request changes (#637), run on GitHub before the merge: CI runs at a
 // release only (#607), and a change merged after a single test of its module, run by name, broke the
-// module's other tests (#635). For each file the change touches, every unit test file (test/*.test.js) that
-// imports it, directly or through one of the tests' helper modules (test/*.js and test/*.mjs that are not
-// tests), and through a module that only re-exports it (core/'s old paths of the toolchain's package, #1677); a
-// changed test file itself; test/<name>.test.js for a changed <name>.js; a test that names a changed
+// module's other tests (#635). For each file the change touches, every unit test file (test/*.test.js, and the
+// toolchain package's, packages/silinx-fpga/test/*.test.js, #1680) that imports it, directly or through one of the
+// tests' helper modules (the .js and .mjs of those folders that are not tests), and through a module that only
+// re-exports it (the toolchain package's entries, #1677, #1678); a changed test file itself; <name>.test.js of
+// those folders for a changed <name>.js; a test that names a changed
 // file in quotes, by its path or its name (one that reads it: docs.test.js CLAUDE.md, ci-workflow.test.js the
 // workflows); test/code-size.test.js for a changed source of core/, web/js/, server/ or scripts/ (it measures them
 // all, #405). The UI tests (test/ui/) run when they changed, or when the page script of their name did
@@ -22,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { weights, balance, parseShard, readTimings } from './test-shard.mjs';
+import { weights, balance, parseShard, readTimings, UNIT_DIRS, UNIT_TESTS } from './test-shard.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -81,9 +82,10 @@ export function reexportsOnly(text) {
 export function relatedTests(files, changed) {
   const resolve = (from, spec) => path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
   const deps = Object.fromEntries(Object.entries(files).map(([f, t]) => [f, imports(t).map(s => resolve(f, s))]));
-  const isUnit = f => /^test\/[^/]+\.test\.js$/.test(f);
+  const isUnit = f => UNIT_TESTS.test(f);
   const isUi = f => /^test\/ui\/[^/]+\.test\.js$/.test(f);
-  const isHelper = f => /^test\/[^/]+\.m?js$/.test(f) && !isUnit(f);
+  const isHelper = f => /^(?:test|packages\/silinx-fpga\/test)\/[^/]+\.m?js$/.test(f) && !isUnit(f);
+  const inTests = f => f.startsWith('test/') || f.startsWith('packages/silinx-fpga/test/');
   // a changed data file (#772): the sources that read it count as changed, and the modules that import one of them,
   // at any depth (what a module reads reaches its importers: the bit database, through bitdb-node.js, the open flow)
   const data = changed.filter(f => !/\.m?js$/.test(f));
@@ -91,7 +93,7 @@ export function relatedTests(files, changed) {
   const readers = new Set(data.length ? Object.keys(files).filter(reads) : []);
   for (let grew = readers.size > 0; grew;) {
     grew = false;
-    for (const f of Object.keys(files)) if (!f.startsWith('test/') && !readers.has(f) && deps[f].some(d => readers.has(d))) { readers.add(f); grew = true; }
+    for (const f of Object.keys(files)) if (!inTests(f) && !readers.has(f) && deps[f].some(d => readers.has(d))) { readers.add(f); grew = true; }
   }
   const ch = new Set([...changed, ...readers]);
   // a module that only re-exports a changed one (the toolchain package's entries, #1677, #1678) counts as changed
@@ -117,9 +119,9 @@ export function relatedTests(files, changed) {
   // the size of every source (#405): a source changed may have grown past the limit
   if (files['test/code-size.test.js'] != null && changed.some(f => /^(core|packages\/silinx-fpga\/src|web\/js|server|scripts)\/.+\.m?js$/.test(f))) unit.add('test/code-size.test.js');
   for (const f of ch) {
-    if (!/\.m?js$/.test(f) || f.startsWith('test/')) continue;
+    if (!/\.m?js$/.test(f) || inTests(f)) continue;
     const name = path.posix.basename(f).replace(/\.m?js$/, '');
-    if (files[`test/${name}.test.js`] != null) unit.add(`test/${name}.test.js`);
+    for (const dir of UNIT_DIRS) if (files[`${dir}/${name}.test.js`] != null) unit.add(`${dir}/${name}.test.js`);
     if (f.startsWith('web/js/') && files[`test/ui/${name}.test.js`] != null) ui.add(`test/ui/${name}.test.js`);
   }
   return { unit: [...unit].sort(), ui: [...ui].sort() };

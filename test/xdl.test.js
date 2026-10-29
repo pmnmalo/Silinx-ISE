@@ -1,5 +1,5 @@
 // packages/silinx-fpga/src/xdl.js: the implemented design inside the FPGA from XDL (xdl -ncd2xdl) and the device report
-// (xdl -report), for View Implemented Design (FPGA). Fixtures: test/fixtures/fpga (hand-made, in the
+// (xdl -report), for View Implemented Design (FPGA). Fixtures: packages/silinx-fpga/test/fixtures/fpga (hand-made, in the
 // format of ISE 14.7's xdl).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { parseXdl, parseXdlrc, parseCfg, prettyEquation, fpgaModel, evalLut, lutTable, writeXdl, placedPins } from '../packages/silinx-fpga/src/xdl.js';
 import * as ise from '../server/ise.js';
 
-const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
+const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga');
 const XDL = fs.readFileSync(path.join(FIX, 'top.xdl'), 'utf8');
 const XDLRC = fs.readFileSync(path.join(FIX, 'device.xdlrc'), 'utf8');
 

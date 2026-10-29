@@ -1,6 +1,6 @@
 // packages/silinx-fpga/src/fpga/timing.js: the delay model (wire classes, routed connection delays, slice arcs), the
 // static timing analysis, and the timing-driven router (packages/silinx-fpga/src/fpga/route.js, opts.timing).
-// Device: test/fixtures/fpga/timing-device.xdlrc (hand-made: three CLBs in a row, a slow way by two
+// Device: packages/silinx-fpga/test/fixtures/fpga/timing-device.xdlrc (hand-made: three CLBs in a row, a slow way by two
 // double lines and a fast one by a long line). Designs: small XDL texts below.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +18,7 @@ import { parseTwrClocks } from '../research/s3e-route/dcm-timing-compare.mjs';
 import { silinxPcf } from '../research/s3e-route/dcm-timing.mjs';
 import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
 
-const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');
+const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga');
 const device = loadDevice(packDevice(fs.readFileSync(path.join(FIX, 'timing-device.xdlrc'), 'utf8')));
 const S = SPEED_4.slice;
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg || ''} ${a} != ${b}`);
@@ -312,7 +312,7 @@ test('block RAM and multiplier arcs, as trce times them (#457): clock to out, se
   assert.deepEqual(['ADDRA13', 'DIA0', 'DIPA1', 'ENA', 'WEA', 'SSRA'].map(p => setupOf(bram, p)[0]), [0.377, 0.227, 0.227, 0.770, 1.253, 0.705]);
 });
 
-// Designs routed by Silinx, timed by ISE's trce -a on the same routing (test/fixtures/fpga/trce/README.md): Silinx's
+// Designs routed by Silinx, timed by ISE's trce -a on the same routing (packages/silinx-fpga/test/fixtures/fpga/trce/README.md): Silinx's
 // analysis within 2 % of trce's minimum period. Before #457 (the block RAM and multiplier arcs estimated, their
 // interconnect wires counted as any other): hard_prim 8.390 ns (+17.4 %), mult_reg 9.098 (+4.3 %), stopwatch 12.867.
 test('static timing against trce on routed designs with block RAMs and multipliers (#457)', async () => {

@@ -87,7 +87,7 @@ async function routedProject(name) {
   await fs.writeFile(path.join(build, 'top.ncd'), 'NCD');
   const old = new Date(Date.now() - 60000);
   await fs.utimes(path.join(build, 'top.ncd'), old, old);
-  for (const f of ['top.xdl', 'device.xdlrc']) await fs.copyFile(path.join(ROOT, 'test', 'fixtures', 'fpga', f), path.join(build, f));
+  for (const f of ['top.xdl', 'device.xdlrc']) await fs.copyFile(path.join(ROOT, 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga', f), path.join(build, f));
 }
 const openFpga = async (page) => {
   await page.menu('Tools', 'Implemented Design (FPGA View)');

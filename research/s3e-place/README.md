@@ -71,10 +71,10 @@ it (B8 -> BUFGMUX_X2Y11, as ISE). Deterministic: the same seed gives the same pl
 | `ise-ref.sh` | in the ISE container: ISE's own implementation of the same Yosys EDIF (ngdbuild, map, par) for comparison |
 | `compare.mjs` | the routed netgen model against the RTL, simulated by Silinx with the same random stimulus, outputs compared every cycle |
 | `validate.mjs` | all of the above for one design (`sims/*.json`) |
-| `check-pack.mjs` | the packed design against its netlist in the small simulators of `test/fpga-sim.js` (no ISE) |
+| `check-pack.mjs` | the packed design against its netlist in the small simulators of `packages/silinx-fpga/test/fpga-sim.js` (no ISE) |
 | `wide-mux.mjs`, `carry-rows.mjs` | how ISE places wide multiplexers and carry chains (from its placed XDL) |
-| `fixtures.mjs`, `designs/` | the small netlists of the unit tests (`test/fixtures/fpga/*.json`) |
-| `gen-test-device.mjs` | the made-up device of the unit tests (`test/fixtures/fpga/place-device.xdlrc`) |
+| `fixtures.mjs`, `designs/` | the small netlists of the unit tests (`packages/silinx-fpga/test/fixtures/fpga/*.json`) |
+| `gen-test-device.mjs` | the made-up device of the unit tests (`packages/silinx-fpga/test/fixtures/fpga/place-device.xdlrc`) |
 | `try-pack.mjs`, `show-net.mjs`, `count.cjs`, `devinfo.mjs` | inspection helpers |
 
 `node validate.mjs sims/blinky.json /tmp/work` (needs `yosys`, the private `xilinx/ise:14.7`

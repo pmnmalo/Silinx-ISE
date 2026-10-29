@@ -9,7 +9,7 @@ import { synthEffort, yosysScript, yosysFiles, synthCommands, remapCommands, abc
 import { compareNetlist } from './diff-synth.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
-import { netlistSim } from './fpga-sim.js';
+import { netlistSim } from '../packages/silinx-fpga/test/fpga-sim.js';
 import { toVerilog } from '../core/synth-verilog.js';
 // Normal's own synthesis (its mappings on these small designs), not a small design's as at High (SMALL_RULE, #652: its
 // own test in open-flow-core.test.js)
