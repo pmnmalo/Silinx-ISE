@@ -309,7 +309,7 @@ const TOP_TYPES = [
   { id: 'sch', label: 'Schematic', file: 'src/top.sch.json' },
   { id: 'fsm', label: 'Finite State Machine (FSM)', file: 'src/top.fsm.json' },
   { id: 'asm', label: 'Algorithmic State Machine (ASM)', file: 'src/top.asm.json' },
-  { id: 'tt', label: 'Boolean Algebra', file: 'src/top.tt.json' },
+  { id: 'tt', label: 'Boolean Algebra', file: 'src/top.bool.json' },
 ];
 
 /** The top document of a new project (type sch / fsm / asm / tt) and its synchronized HDL module 'top'. */

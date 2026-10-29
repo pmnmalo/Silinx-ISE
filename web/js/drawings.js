@@ -276,8 +276,8 @@ async function fsmTruthTables(fsmPath) {
   const dir = fsmDir(fsmPath);
   const made = [];
   for (const t of r.tables) {
-    const name = freeName(dir, t.doc.name, '.tt.json');
-    const target = `${dir}/${name}.tt.json`;
+    const name = freeName(dir, t.doc.name, '.bool.json');
+    const target = `${dir}/${name}.bool.json`;
     await api.writeFile(S.project.name, target, JSON.stringify({ ...t.doc, name }, null, 2));
     made.push(target);
   }
@@ -404,7 +404,7 @@ export async function openSch(path) {
 
 // ---- views of an HDL file: schematic or ASM chart
 export const isAsm = p => /\.asm\.json$/i.test(p || '');
-export const isTt = p => /\.tt\.json$/i.test(p || '');
+export const isTt = p => /\.(tt|bool)\.json$/i.test(p || '');
 export const isFsm = p => /\.fsm\.json$/i.test(p || '');
 export const isPn = p => /\.pn\.json$/i.test(p || '');
 export const viewNoun = p => (isAsm(p) ? 'state machine' : isTt(p) ? 'Boolean algebra' : isFsm(p) ? 'state diagram' : isPn(p) ? 'Petri net' : 'schematic');

@@ -133,7 +133,7 @@ test('#1481 nothing to draw: an empty sheet, a sheet with no wires', () => {
 // ------------------------------------------------------------------ the corpus
 test('#1481 the gates example\'s schematic, the truth tables\' gate schematics and the ISE schematics: the same meaning, never worse', () => {
   check(sd.normalizeDoc(JSON.parse(fs.readFileSync(new URL('../examples/gates/src/gates.sch.json', import.meta.url), 'utf8'))), {}, 'gates.sch.json');
-  const lamps = JSON.parse(fs.readFileSync(new URL('../examples/traffic/src/lamps.tt.json', import.meta.url), 'utf8'));
+  const lamps = JSON.parse(fs.readFileSync(new URL('../examples/traffic/src/lamps.bool.json', import.meta.url), 'utf8'));
   for (const form of ['sop', 'pos', 'nand', 'nor', 'xor']) for (const lang of ['vhdl', 'verilog']) {
     check(sd.normalizeDoc(schematicFromTable(lamps, { form, lang })), {}, `lamps ${form} ${lang}`);
   }

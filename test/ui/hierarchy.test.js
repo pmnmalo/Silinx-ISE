@@ -81,7 +81,7 @@ const EXAMPLES = {
       '    moduleTop top [VHDL*] (top.vhd)',
       '      fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
       '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
-      '      truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.tt.json)',
+      '      truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
       '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
     ],
     sim: [
@@ -91,7 +91,7 @@ const EXAMPLES = {
       '      vhdl uut - top [VHDL*] (top.vhd)',
       '        fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
       '        vhdl u_timer - timer [VHDL*] (timer.vhd)',
-      '        truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.tt.json)',
+      '        truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
       '        verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
     ],
     tips: [
@@ -283,7 +283,7 @@ const KINDS = [
   { type: 'sch', name: 'g1', file: 'src/g1.sch.json', ico: 'schematic', badge: 'Schematic', id: 'sch:src/g1.sch.json' },
   { type: 'asm', name: 'c1', file: 'src/c1.asm.json', ico: 'asm', badge: 'ASM', id: 'asm:src/c1.asm.json' },
   { type: 'fsm', name: 'f1', file: 'src/f1.fsm.json', ico: 'fsm', badge: 'FSM', id: 'fsm:src/f1.fsm.json' },
-  { type: 'tt', name: 't1', file: 'src/t1.tt.json', ico: 'truthtable', badge: 'Algebra', views: ' [Schematic]', id: 'tt:src/t1.tt.json' },
+  { type: 'tt', name: 't1', file: 'src/t1.bool.json', ico: 'truthtable', badge: 'Algebra', views: ' [Schematic]', id: 'tt:src/t1.bool.json' },
   { type: 'petri', name: 'p1', file: 'src/p1.pn.json', ico: 'petri', badge: 'Petri', id: 'pn:src/p1.pn.json' },
 ];
 for (const [lang, L, ext] of [['vhdl', 'VHDL', 'vhd'], ['verilog', 'Verilog', 'v']]) {
@@ -368,7 +368,7 @@ uiTest('Design pane (#207, #220) in Portuguese: the badges [FSM] [Álgebra] [VHD
     assert.deepEqual(await badgeMenu(page, 'u_fsm - traffic', 'FSM'), ['Abrir', 'Converter para fluxograma ASM', 'Remover do Projeto']);
     // the HDL editor's banner
     await badge(page, 'u_lamps - lamps', 'VHDL');
-    await page.waitFor(() => document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent === 'Só de leitura, gerado a partir de lamps.tt.json', [], { what: 'the banner in Portuguese' });
+    await page.waitFor(() => document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent === 'Só de leitura, gerado a partir de lamps.bool.json', [], { what: 'the banner in Portuguese' });
   } finally {
     await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
   }
@@ -403,7 +403,7 @@ uiTest('a drawing whose base was its HDL (before #220), its HDL what the drawing
 // (the classic interface's Design pane: its views, its tree without the modern one's groups, #1149)
 uiTest('drawings whose base was their HDL (before #220), the HDL edited by hand: the state diagram, the truth table and the ASM chart made again from it and made the base, the HDL kept as it is (said)', E, async (page) => {
   const files = {};
-  for (const [ex, f, hdl] of [['traffic', 'src/traffic.fsm.json', 'src/traffic.vhd'], ['traffic', 'src/lamps.tt.json', 'src/lamps.vhd'], ['blinky', 'src/speed_ctrl.asm.json', 'src/speed_ctrl.vhd']]) {
+  for (const [ex, f, hdl] of [['traffic', 'src/traffic.fsm.json', 'src/traffic.vhd'], ['traffic', 'src/lamps.bool.json', 'src/lamps.vhd'], ['blinky', 'src/speed_ctrl.asm.json', 'src/speed_ctrl.vhd']]) {
     (files[ex] ||= {})[f] = JSON.stringify(withBase(ex, f), null, 2);
     files[ex][hdl] = NOTE + example(ex, hdl);
   }
@@ -411,12 +411,12 @@ uiTest('drawings whose base was their HDL (before #220), the HDL edited by hand:
   await page.openProject('H_mig_fsm');
   await page.waitConsole(/src\/traffic\.fsm\.json made again/);
   assert.deepEqual(await consoleAfterOpen(page), [
-    'src/lamps.tt.json made again from src/lamps.vhd (its base until now) and now its base: that file is generated from the Boolean algebra from now on.',
-    'WARNING: src/lamps.tt.json: src/lamps.vhd is not what the Boolean algebra makes (edited by hand): it is kept as it is until the Boolean algebra is edited, which rewrites it',
+    'src/lamps.bool.json made again from src/lamps.vhd (its base until now) and now its base: that file is generated from the Boolean algebra from now on.',
+    'WARNING: src/lamps.bool.json: src/lamps.vhd is not what the Boolean algebra makes (edited by hand): it is kept as it is until the Boolean algebra is edited, which rewrites it',
     'src/traffic.fsm.json made again from src/traffic.vhd (its base until now) and now its base: that file is generated from the state diagram from now on.',
     'WARNING: src/traffic.fsm.json: src/traffic.vhd is not what the state diagram makes (edited by hand): it is kept as it is until the state diagram is edited, which rewrites it',
   ]);
-  for (const [f, hdl] of [['src/traffic.fsm.json', 'src/traffic.vhd'], ['src/lamps.tt.json', 'src/lamps.vhd']]) {
+  for (const [f, hdl] of [['src/traffic.fsm.json', 'src/traffic.vhd'], ['src/lamps.bool.json', 'src/lamps.vhd']]) {
     const d = JSON.parse(await readWs(env, 'H_mig_fsm', f));
     assert.deepEqual([d.generatedFile, d.base], [hdl, undefined], f);
     assert.equal(await readWs(env, 'H_mig_fsm', hdl), files.traffic[hdl], hdl);   // the user's HDL, as it was
@@ -486,7 +486,7 @@ end architecture rtl;
     '    moduleTop top [VHDL*] (top.vhd)',
     '      vhdl u_fsm - traffic [VHDL*] (traffic.vhd)',
     '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
-    '      truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.tt.json)',
+    '      truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
     '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
   ]);
 }, { ui: 'classic' });

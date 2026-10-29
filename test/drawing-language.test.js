@@ -16,7 +16,7 @@ import { example } from './examples-lib.mjs';
 const DRAWINGS = [
   ['gates', 'src/gates.sch.json', 'src/gates.vhd'],
   ['traffic', 'src/traffic.fsm.json', 'src/traffic.vhd'],
-  ['traffic', 'src/lamps.tt.json', 'src/lamps.vhd'],
+  ['traffic', 'src/lamps.bool.json', 'src/lamps.vhd'],
   ['blinky', 'src/speed_ctrl.asm.json', 'src/speed_ctrl.vhd'],
 ];
 const read = (ex, f) => fs.readFileSync(path.join(example(ex).dir, f), 'utf8');

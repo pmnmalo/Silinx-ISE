@@ -27,19 +27,19 @@ uiTest('Truth tables\' module: a new table, its HDL following it, read-only (#11
   await page.dialogButton('Next >');
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
   for (const r of [3, 5, 6, 7]) await page.click(`${T} .tt-cell[data-out=f][data-row="${r}"]`);
   assert.equal(await cells(page), '00010111');
 
   // the table -> its VHDL module, linked
-  await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj3.vhd'] === 'src/maj3.tt.json', [], { what: 'linked HDL' });
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj3.vhd'] === 'src/maj3.bool.json', [], { what: 'linked HDL' });
   await page.waitFor(async () => /f = Σm\(3, 5, 6, 7\)/.test(await (await fetch('/api/projects/TtMod/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'the HDL follows the table', timeout: 15000 });
   assert.equal(truthTableFromModule([{ path: 'maj3.vhd', text: await readWs(env, 'TtMod', 'src/maj3.vhd') }], 'maj3').table.f, '00010111');
-  assert.equal(JSON.parse(await fileText(page, 'src/maj3.tt.json')).generatedFile, 'src/maj3.vhd');
+  assert.equal(JSON.parse(await fileText(page, 'src/maj3.bool.json')).generatedFile, 'src/maj3.vhd');
   const lines = (await page.consoleText()).split('\n');
   assert.deepEqual(lines.slice(lines.findIndex((l) => /^Project ".*" opened/.test(l)) + 1), [
-    'src/maj3.vhd generated from src/maj3.tt.json (every source has its HDL)',
-    "Created Boolean Algebra 'src/maj3.tt.json'.",
+    'src/maj3.vhd generated from src/maj3.bool.json (every source has its HDL)',
+    "Created Boolean Algebra 'src/maj3.bool.json'.",
   ]);
 
   // the HDL is read-only (#1176): typed text, a paste or a template change nothing, a save writes nothing; the table
@@ -58,12 +58,12 @@ uiTest('Truth tables\' module: a new table, its HDL following it, read-only (#11
   await page.eval(async () => { const d = window.Silinx.active; d.editor.setValue('-- not the table'); await d.save(); });
   assert.equal(await page.eval(() => !!window.Silinx.active.dirty), false);
   assert.equal(await fileText(page, 'src/maj3.vhd'), hdl);
-  assert.equal(JSON.parse(await fileText(page, 'src/maj3.tt.json')).table.f, '00010111');
+  assert.equal(JSON.parse(await fileText(page, 'src/maj3.bool.json')).table.f, '00010111');
 
   // its schematic: a view generated from the table
-  await page.eval(() => window.SilinxApp.openTtSchematic('src/maj3.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/maj3.tt.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
-  assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .se-banner').textContent), /^Read-only, generated from maj3\.tt\.json$/);   // (at the end of its toolbar, #1193)
+  await page.eval(() => window.SilinxApp.openTtSchematic('src/maj3.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/maj3.bool.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
+  assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .se-banner').textContent), /^Read-only, generated from maj3\.bool\.json$/);   // (at the end of its toolbar, #1193)
   const sch = await page.eval(() => window.Silinx.active.viewer.getDoc());
   assert.deepEqual(netlist(sch).diagnostics, []);
   assert.ok(sch.symbols.length > 0);

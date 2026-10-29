@@ -10,7 +10,7 @@ import { S, app, findDoc, openDoc, openFile, setDirty } from './app.js';
 import { findPattern, findInText, findInDrawing, replaceInText } from '/core/find.js';
 
 const TEXT_FILE = /\.(vhdl?|v|sv|ucf|mem|hex|coe|txt)$/i;
-const DRAWING = /\.(sch|asm|tt|fsm|pn)\.json$/i;
+const DRAWING = /\.(sch|asm|tt|bool|fsm|pn)\.json$/i;
 const MAX = 2000;   // (results at most)
 
 /** The project's texts to search: [{ path, text, drawing, generated }], the open editors' as they are. */

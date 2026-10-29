@@ -9,7 +9,7 @@
 //   * An implicant (cube) is { value, mask }: the bits set in `mask` are eliminated variables,
 //     `value` holds the other bits (value & mask === 0). Bit (n-1-j) is variable j.
 //
-// Truth table documents (<name>.tt.json):
+// Boolean algebra documents (<name>.bool.json; <name>.tt.json before #2065):
 //   { version: 1, name, inputs: ['a', 'b'], outputs: ['f'], table: { f: '0110' }, exprs: { f: 'a^b' },
 //     notes: '', form: 'sop'|'pos'|'xor'|'nand'|'nor', lang: 'vhdl'|'verilog', generatedFile?: 'src/name.vhd' }
 //   form: the logic of the generated HDL module and of its schematic (#694): the minimal SOP, POS, the
@@ -852,7 +852,7 @@ export function generateTableHdl(docIn, lang = docIn.lang || 'vhdl', { form = do
   const n = doc.inputs.length;
   const res = doc.outputs.map(o => ({ o, a: canonical(doc.table[o]), m: outputForm(doc, o, form) }));
   const head = [
-    `${c} ${doc.name}: combinational module generated from the Boolean algebra ${source || `${doc.name}.tt.json`} (Silinx Boolean Algebra / Karnaugh Map).`,
+    `${c} ${doc.name}: combinational module generated from the Boolean algebra ${source || `${doc.name}.bool.json`} (Silinx Boolean Algebra / Karnaugh Map).`,
     `${c} Edit the table, not this file: the file is generated from it. Inputs: ${doc.inputs.join(', ')} (${doc.inputs[0]} is the`,
     `${c} most significant bit of a row).`,
     `${c}`,

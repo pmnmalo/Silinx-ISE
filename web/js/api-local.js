@@ -426,7 +426,7 @@ export const api = {
     // Xilinx ISE project: no Silinx-only files (silinx.json, ASM charts, Silinx schematics)
     const entries = [{ path: `${name}.xise`, data: xml },
       ...sch.files.map(f => ({ path: f.path, data: f.text })),
-      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k) && !/(^|\/)[^/]+\.(asm|sch|tt|fsm)\.json$/i.test(k)).map(([path, data]) => ({ path, data }))];
+      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k) && !/(^|\/)[^/]+\.(asm|sch|tt|bool|fsm)\.json$/i.test(k)).map(([path, data]) => ({ path, data }))];
     return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip`, warnings: sch.warnings };
   },
   // the zip's entries as a project (project-store.js projectFromZip: every path inside the project,

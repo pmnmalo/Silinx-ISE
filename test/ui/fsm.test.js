@@ -143,14 +143,14 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} .fsm-etable tr`).length - 2, ED), 8);
   // truth tables of the next-state bits and of the output
   await page.click(`${ED} .fsm-mktt`);
-  await page.waitFor(() => window.Silinx.fileTree?.includes('src/det_next.tt.json') && window.Silinx.fileTree.includes('src/det_out.tt.json'), [], { what: 'truth tables', timeout: 15000 });
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/det_next.tt.json' && window.Silinx.docs.some((d) => d.id === 'tt:src/det_out.tt.json'), [], { what: 'truth tables opened', timeout: 15000 });
-  const ttn = await fsmFile('FsmPj', 'src/det_next.tt.json');
+  await page.waitFor(() => window.Silinx.fileTree?.includes('src/det_next.bool.json') && window.Silinx.fileTree.includes('src/det_out.bool.json'), [], { what: 'truth tables', timeout: 15000 });
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/det_next.bool.json' && window.Silinx.docs.some((d) => d.id === 'tt:src/det_out.bool.json'), [], { what: 'truth tables opened', timeout: 15000 });
+  const ttn = await fsmFile('FsmPj', 'src/det_next.bool.json');
   const et = encodedTable(m);
   assert.deepEqual(ttn.inputs, ['q1', 'q0', 'x']);
   assert.equal(ttn.table.d1, et.rows.map((r) => r.d[0]).join(''));
   assert.equal(ttn.table.d0, et.rows.map((r) => r.d[1]).join(''));
-  assert.equal((await fsmFile('FsmPj', 'src/det_out.tt.json')).table.z, '00001111'.replace(/./g, (c, i) => et.rows[i].out));
+  assert.equal((await fsmFile('FsmPj', 'src/det_out.bool.json')).table.z, '00001111'.replace(/./g, (c, i) => et.rows[i].out));
 
   // ---- its HDL, generated from it (no Generate HDL any more, #220): linked to the diagram, simulates like it
   await page.eval(() => window.SilinxApp.openFsm('src/det.fsm.json'));
@@ -350,25 +350,25 @@ uiTest('State diagram (FSM): Create Boolean Algebra with more than 4 output bits
   await page.click(`${ED} .fsm-tab-btn`, { text: 'Tables' });
   await page.waitForSelector(`${ED} .fsm-mktt`);
   await page.click(`${ED} .fsm-mktt`);
-  await page.waitFor(() => window.Silinx.fileTree?.includes('src/wide_next.tt.json') && window.Silinx.fileTree.includes('src/wide_out.tt.json'), [], { what: 'truth tables', timeout: 15000 });
-  assert.deepEqual(await page.eval(() => window.Silinx.fileTree.filter((f) => /^src\/wide.*\.tt\.json$/.test(f)).sort()), ['src/wide_next.tt.json', 'src/wide_out.tt.json']);
+  await page.waitFor(() => window.Silinx.fileTree?.includes('src/wide_next.bool.json') && window.Silinx.fileTree.includes('src/wide_out.bool.json'), [], { what: 'truth tables', timeout: 15000 });
+  assert.deepEqual(await page.eval(() => window.Silinx.fileTree.filter((f) => /^src\/wide.*\.bool\.json$/.test(f)).sort()), ['src/wide_next.bool.json', 'src/wide_out.bool.json']);
   // each table has its HDL at once, generated from it (every source has its HDL, #207, #220)
   for (const t of ['wide_next', 'wide_out']) {
-    await page.waitFor((f, h) => window.Silinx.hdlToSch?.[h] === f, [`src/${t}.tt.json`, `src/${t}.vhd`], { what: `${t}.tt.json linked to its HDL`, timeout: 15000 });
-    assert.equal((await fsmFile('FsmWide', `src/${t}.tt.json`)).generatedFile, `src/${t}.vhd`);
-    await page.waitConsole(new RegExp(`src/${t}\\.vhd generated from src/${t}\\.tt\\.json \\(every source has its HDL\\)`));
+    await page.waitFor((f, h) => window.Silinx.hdlToSch?.[h] === f, [`src/${t}.bool.json`, `src/${t}.vhd`], { what: `${t}.bool.json linked to its HDL`, timeout: 15000 });
+    assert.equal((await fsmFile('FsmWide', `src/${t}.bool.json`)).generatedFile, `src/${t}.vhd`);
+    await page.waitConsole(new RegExp(`src/${t}\\.vhd generated from src/${t}\\.bool\\.json \\(every source has its HDL\\)`));
   }
-  const out = await fsmFile('FsmWide', 'src/wide_out.tt.json');
+  const out = await fsmFile('FsmWide', 'src/wide_out.bool.json');
   assert.deepEqual(out.inputs, ['q1', 'q0', 'go']);
   assert.deepEqual(out.outputs, ['busy', 'sel_1', 'sel_0', 'led_2', 'led_1', 'led_0']);
   // the table is the machine's: each state's outputs (unused code 11: don't cares)
   const et = encodedTable(m);
   for (const [k, o] of out.outputs.entries()) assert.equal(out.table[o], et.rows.map((r) => r.unused ? 'X' : r.out[k]).join(''), o);
   // opened: its 6 outputs in the editor
-  await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'tt:src/wide_out.tt.json'), [], { what: 'the output table opened' });
-  await page.eval(() => window.SilinxApp.openTt('src/wide_out.tt.json'));
+  await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'tt:src/wide_out.bool.json'), [], { what: 'the output table opened' });
+  await page.eval(() => window.SilinxApp.openTt('src/wide_out.bool.json'));
   // (its own document, whichever is in front: another one, e.g. a generated HDL file, may open after it)
-  await page.waitFor(() => window.Silinx.docs.find((d) => d.id === 'tt:src/wide_out.tt.json')?.el.querySelectorAll('.tt-editor .tt-cell[data-out=led_0]').length === 8, [], { what: 'led_0 column', timeout: 30000 });
+  await page.waitFor(() => window.Silinx.docs.find((d) => d.id === 'tt:src/wide_out.bool.json')?.el.querySelectorAll('.tt-editor .tt-cell[data-out=led_0]').length === 8, [], { what: 'led_0 column', timeout: 30000 });
 });
 
 uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simulator ⟲ Reset / Clock ↑, Delete state / transition, + Input / + Output, Zoom / Fit, ↶ ↷ and Edit ▸ Undo / Redo (#195)', E, async (page) => {

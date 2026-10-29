@@ -101,7 +101,7 @@ async function reloadProjectNow(render = true, depth = 0) {
   // schematics (.sch.json) and ASM charts (.asm.json) linked to an HDL file ("views" kept in sync); the maps made first
   // and set together, never empty while the drawings are read (#1543)
   const schOwners = {}, hdlToSch = {}, viewModule = {}, viewTexts = {};
-  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt|fsm|pn)\.json$|\.(c|cpp|cc|cxx)$/.test(f))) {   // (.c: Silinx HLS, its HDL made in memory, #1531; C++ too, #1590)
+  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt|bool|fsm|pn)\.json$|\.(c|cpp|cc|cxx)$/.test(f))) {   // (.c: Silinx HLS, its HDL made in memory, #1531; C++ too, #1590)
     try {
       const t = await api.readFile(pj.name, f);
       viewTexts[f] = t;

@@ -227,7 +227,7 @@ uiTest('Example traffic (New Project…), the second example: the state diagram 
   await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Project Summary');
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.project?.name === 'Traffic' && window.Silinx.hdlToSch?.['src/traffic.vhd'] === 'src/traffic.fsm.json' && window.Silinx.hdlToSch?.['src/lamps.vhd'] === 'src/lamps.tt.json', [], { what: 'project Traffic open, its state diagram and truth table linked to their VHDL' });
+  await page.waitFor(() => window.Silinx.project?.name === 'Traffic' && window.Silinx.hdlToSch?.['src/traffic.vhd'] === 'src/traffic.fsm.json' && window.Silinx.hdlToSch?.['src/lamps.vhd'] === 'src/lamps.bool.json', [], { what: 'project Traffic open, its state diagram and truth table linked to their VHDL' });
   const pj = await page.eval(() => window.Silinx.project);
   assert.deepEqual([pj.top, pj.simTop, pj.board, pj.constraints], ['top', 'tb_traffic', 'basys2', 'constraints/traffic.ucf']);
   const shipped = (f) => fs.readFile(path.join(ROOT, 'examples/traffic', f), 'utf8');
@@ -244,15 +244,15 @@ uiTest('Example traffic (New Project…), the second example: the state diagram 
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, FSM), /^Problems \(0 error\(s\), 0 warning\(s\)\)/);
   await page.waitFor((ed) => /^HDL: traffic\.vhd — generated from the diagram$/.test(document.querySelector(`${ed} .fsm-link`)?.textContent || ''), [FSM], { what: 'the diagram synchronized with traffic.vhd' });
   // the truth table: 4 inputs, its 5 lamp outputs, synchronized with lamps.vhd
-  await page.eval(() => window.SilinxApp.openTt('src/lamps.tt.json'));
+  await page.eval(() => window.SilinxApp.openTt('src/lamps.bool.json'));
   const TT = '.doc:not([hidden]) .tt-editor';
-  await page.waitFor((t) => window.Silinx.active?.id === 'tt:src/lamps.tt.json' && document.querySelector(t), [TT], { what: 'the truth table editor' });
+  await page.waitFor((t) => window.Silinx.active?.id === 'tt:src/lamps.bool.json' && document.querySelector(t), [TT], { what: 'the truth table editor' });
   assert.deepEqual(await page.eval((t) => [document.querySelector(`${t} .tt-inputs`).value, document.querySelector(`${t} .tt-outputs`).value], TT), ['phase2, phase1, phase0, blink', 'car_r, car_y, car_g, walk_r, walk_g']);
   const cols = await page.eval((t) => Object.fromEntries(['car_r', 'car_y', 'car_g', 'walk_r', 'walk_g'].map((o) => [o, [...document.querySelectorAll(`${t} .tt-cell[data-out=${o}]`)].map((c) => c.textContent).join('')])), TT);
   assert.deepEqual(cols, { car_r: '00001111111100XX', car_y: '00110000000001XX', car_g: '11000000000000XX', walk_r: '11111100001100XX', walk_g: '00000011010000XX' });
   await page.waitFor((t) => document.querySelector(`${t} .tt-link`)?.dataset.hdl === 'lamps.vhd', [TT], { what: 'the table synchronized with lamps.vhd' });
   // their VHDL: the banner of the synchronized file, the text the example ships (not rewritten)
-  for (const [f, from] of [['src/traffic.vhd', 'traffic.fsm.json'], ['src/lamps.vhd', 'lamps.tt.json']]) {
+  for (const [f, from] of [['src/traffic.vhd', 'traffic.fsm.json'], ['src/lamps.vhd', 'lamps.bool.json']]) {
     await page.eval((p) => window.SilinxApp.openFile(p), f);
     await page.waitFor((p) => window.Silinx.active?.id === `file:${p}` && window.Silinx.active.editor, [f]);
     assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent), `Read-only, generated from ${from}`, `${from}: in sync, read-only (#1176)`);
@@ -765,7 +765,7 @@ uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing im
 
 uiTest('New Project wizard: Top-Level Source Type Schematic / FSM / ASM / Truth Table starts the project with that top and its synchronized HDL', E, async (page) => {
   const cases = [['sch', 'top.sch.json', 'vhdl', 'Schematic'], ['fsm', 'top.fsm.json', 'verilog', 'Finite State Machine (FSM)'],
-    ['asm', 'top.asm.json', 'vhdl', 'Algorithmic State Machine (ASM)'], ['tt', 'top.tt.json', 'verilog', 'Boolean Algebra']];
+    ['asm', 'top.asm.json', 'vhdl', 'Algorithmic State Machine (ASM)'], ['tt', 'top.bool.json', 'verilog', 'Boolean Algebra']];
   for (const [type, file, lang, label] of cases) {
     const name = `Top_${type}`;
     const r = await newProject(page, { name, lang, top: type });

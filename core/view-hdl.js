@@ -1,5 +1,5 @@
 // The HDL of a source drawn as a schematic (.sch.json), an ASM chart (.asm.json), a state diagram
-// (.fsm.json), a truth table (.tt.json) or a Petri net (.pn.json) that has no HDL file of its own (#177): made in memory when
+// (.fsm.json), a Boolean algebra (.bool.json, .tt.json before #2065) or a Petri net (.pn.json) that has no HDL file of its own (#177): made in memory when
 // the project is compiled, simulated or implemented, so that such a source is a module of the
 // project like an HDL one (it can be the top, be instanced, be synthesized) without a file.
 // A source kept in sync with an HDL file (its generatedFile) is that file: nothing here, unless that
@@ -13,7 +13,7 @@ import { generateTableHdl, validateTable, normalizeTable } from './logic.js';
 import { generatePetri, petriErrors, normalizePetri } from './petri.js';
 import { cToHdl } from './c-hdl.js';
 
-export const VIEW_RE = /\.(sch|asm|fsm|tt|pn)\.json$/i;
+export const VIEW_RE = /\.(sch|asm|fsm|tt|bool|pn)\.json$/i;
 export const isView = path => VIEW_RE.test(String(path || ''));
 // a C source (Silinx HLS, #1531): its HDL made here from its top function (core/c-hdl.js), as a drawn source's
 // (C++ too, #1590: .cpp, .cc, .cxx)

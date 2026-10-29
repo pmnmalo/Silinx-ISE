@@ -35,7 +35,7 @@ export function renameSymbolIn(d, lang, path) {
 }
 
 // ---- rename a source (file and/or the module it defines), updating everything that refers to it
-const extOf = p => (/\.(sch|asm|tt|fsm|pn)\.json$/i.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
+const extOf = p => (/\.(sch|asm|tt|bool|fsm|pn)\.json$/i.exec(p) || /\.[^./]+$/.exec(p) || [''])[0];
 const dirOf = p => (p.includes('/') ? p.replace(/\/[^/]*$/, '/') : '');
 
 export async function renameDialog(file, mod = null) {
@@ -85,7 +85,7 @@ async function renameSource(from, to, oldMod, newMod) {
   const changed = new Map();                      // path -> new text
   const moved = new Map();                        // old path -> new path
   const views = {};                               // .sch.json / .asm.json -> parsed
-  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt|fsm|pn)\.json$/i.test(f))) {
+  for (const f of S.fileTree.filter(f => /\.(sch|asm|tt|bool|fsm|pn)\.json$/i.test(f))) {
     try { views[f] = JSON.parse(await api.readFile(pj.name, f)); } catch { /* skip */ }
   }
   S.syncing = true;
@@ -100,7 +100,7 @@ async function renameSource(from, to, oldMod, newMod) {
         let ch = false;
         if (/\.sch\.json$/i.test(f)) ch = renameModuleInSchematic(d, oldMod, newMod, { linked });
         else if (linked && String(d.name).toLowerCase() === oldMod.toLowerCase()) { d.name = newMod; ch = true; }
-        if (ch) changed.set(f, JSON.stringify(d, null, /\.(asm|tt|fsm)\.json$/i.test(f) ? 2 : 1));
+        if (ch) changed.set(f, JSON.stringify(d, null, /\.(asm|tt|bool|fsm)\.json$/i.test(f) ? 2 : 1));
         // a synchronized view named after the module follows it
         const vb = f.slice(dirOf(f).length, f.length - extOf(f).length);
         if (linked && vb.toLowerCase() === oldMod.toLowerCase()) moved.set(f, dirOf(f) + newMod + extOf(f));
@@ -113,7 +113,7 @@ async function renameSource(from, to, oldMod, newMod) {
     if (to && to !== from) {
       moved.set(from, to);
       for (const [f, d] of Object.entries(views)) {
-        if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.(asm|tt|fsm)\.json$/i.test(f) ? 2 : 1)); }
+        if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.(asm|tt|bool|fsm)\.json$/i.test(f) ? 2 : 1)); }
       }
     }
     // close the editors of files that move or change (reopened below)

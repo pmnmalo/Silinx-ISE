@@ -2,7 +2,7 @@
 -- Entity      : traffic
 -- Description : Moore finite state machine generated from the state diagram traffic.fsm.json
 --               Pedestrian crossing: the controller. One state per phase of the lights; the output phase
---               is its code (the truth table lamps.tt.json lights the lamps of each phase).
+--               is its code (the truth table lamps.bool.json lights the lamps of each phase).
 --               req: a pedestrian is waiting (BTN0, remembered); done: the phase has lasted its time
 --               (timer.vhd); night: night mode (SW1).
 -- Generator   : Silinx FSM editor (edit the diagram, not this file).

@@ -95,7 +95,7 @@ export function moveToSide(doc, s) {
 export function generatedOpener(doc) {
   const p = doc?.path || /^(?:sch|asm|tt|fsm|pn):(.+)$/.exec(String(doc?.id || ''))?.[1];
   if (!p) return null;
-  const hdl = /\.(sch|asm|tt|fsm|pn)\.json$/.test(p) && S.schOwners?.[p];
+  const hdl = /\.(sch|asm|tt|bool|fsm|pn)\.json$/.test(p) && S.schOwners?.[p];
   if (hdl) return () => openFile(hdl);
   if (isC(p) && S.sources.some(s => s.view && s.path === p)) return () => openCHdl(p);
   return null;

@@ -50,7 +50,7 @@ uiTest('Design Properties, Preferred Language Verilog: the state diagram and the
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) select[title="HDL language"]'), [], { what: 'the state diagram editor' });
   const before = await rows(page);
   const was = await state(page);
-  assert.deepEqual(was.links, { 'src/traffic.vhd': 'src/traffic.fsm.json', 'src/lamps.vhd': 'src/lamps.tt.json' });
+  assert.deepEqual(was.links, { 'src/traffic.vhd': 'src/traffic.fsm.json', 'src/lamps.vhd': 'src/lamps.bool.json' });
   const hand = { 'src/top.vhd': await readWs(env, 'PrefLang', 'src/top.vhd'), 'src/timer.vhd': await readWs(env, 'PrefLang', 'src/timer.vhd'), 'src/sevenseg.v': await readWs(env, 'PrefLang', 'src/sevenseg.v') };
 
   await preferLanguage(page, 'verilog');
@@ -60,11 +60,11 @@ uiTest('Design Properties, Preferred Language Verilog: the state diagram and the
   assert.deepEqual(now, {
     lang: 'verilog',
     files: was.files.map((f) => f.replace(/^src\/(traffic|lamps)\.vhd:vhdl$/, 'src/$1.v:verilog')).sort(),
-    links: { 'src/traffic.v': 'src/traffic.fsm.json', 'src/lamps.v': 'src/lamps.tt.json' },
+    links: { 'src/traffic.v': 'src/traffic.fsm.json', 'src/lamps.v': 'src/lamps.bool.json' },
     top: 'top', ucf: true, errors: [],
   });
   assert.deepEqual(['src/traffic.vhd', 'src/lamps.vhd'].map((f) => exists('PrefLang', f)), [false, false], 'the VHDL files removed');
-  for (const [f, hdl] of [['src/traffic.fsm.json', 'src/traffic.v'], ['src/lamps.tt.json', 'src/lamps.v']]) {
+  for (const [f, hdl] of [['src/traffic.fsm.json', 'src/traffic.v'], ['src/lamps.bool.json', 'src/lamps.v']]) {
     const d = JSON.parse(await readWs(env, 'PrefLang', f));
     assert.deepEqual([d.lang, d.generatedFile], ['verilog', hdl], f);
     assert.match(await readWs(env, 'PrefLang', hdl), /^\s*module \w+/m);
