@@ -17,92 +17,8 @@ import { arcTable, arcKey } from './timing6.mjs';
 import { dlySamples, fitWires, pathCounts, loadDelay } from './timing-fit6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
 
-const LETTERS = ['A', 'B', 'C', 'D'];
-
-/** The arcs' delays by trce's type (ns), and a setup through the carry's XOR apart from one through the LUT. */
-export const ARC_DEFAULTS = { Tilo: 0.235, TiloMux: 0.261, Topab: 0.45, Topcyb: 0.375, Tbyp: 0.08, Tcinb: 0.27, Tas: 0.32, TasXor: 0.27,
-  Tdick: 0.11, Tceck: 0.32, Tsrck: 0.43, Tcko: 0.41, Tcinck: 0.3, Tito: 0.75, Tds: 0.04, Tshcko: 1.2, Tiopi: 0.79, Tioop: 2.3 };
-
-/** The median of a family of trce's arc types (names matching re), undefined when none. */
-function familyMedian(types = {}, re) {
-  const v = Object.entries(types).filter(([k]) => re.test(k)).map(([, x]) => x).sort((a, b) => a - b);
-  return v.length ? v[Math.floor(v.length / 2)] : undefined;
-}
-
-/** The inputs a LUT's equation reads (its pins A1 … A6 as the slice's L1 … L6), [] for a LUT not used. */
-export function lutInputs(eq, L) {
-  return eq && /^#LUT:/.test(eq) ? [...new Set(eq.replace(/^#LUT:O[56]=/, '').match(/A[1-6]/g) || [])].sort().map(a => `${L}${a[1]}`) : [];
-}
-
-/**
- * The timing arcs of a placed slice from its settings: { comb: [[in pin, out pin, ns]], setup: [[in pin, ns]] (into
- * a flip-flop before the clock), clkToOut: [[out pin, ns]] }. A LUT's inputs (those its equation reads) to its
- * output (O6) and to its output multiplexer (O5 / O6, F7 / F8, the carry's XOR or CY: the chain's inputs at and below
- * it, each stage's select O6 and data O5 or bypass, and CIN); a flip-flop's data by its input multiplexer, its CE and
- * SR (the second flip-flop L5FF's from O5); one set as a gate (#AND2L, #OR2L) passes its data and SR through to its output (Tito); the carry out.
- */
-export function sliceArcs6(inst, T = ARC_DEFAULTS) {
-  const comb = [], setup = [], clkToOut = [];
-  if (!/^SLICE[LMX]$/.test(inst.type)) return { comb, setup, clkToOut };
-  const m = new Map(inst.cfg.filter(c => c.value !== '#OFF').map(c => [c.attr, c.value]));
-  const o6 = L => lutInputs(m.get(`${L}6LUT`), L), o5 = L => lutInputs(m.get(`${L}5LUT`), L);
-  // the carry: stage j's select (its O6) and data (its O5 or bypass, CY0); an XOR at stage k reads the selects at and
-  // below k and the data below it, a CY (stage k's carry out) and COUT the data at k too; each from CIN as well
-  const di = L => (m.get(`${L}CY0`) === 'O5' ? o5(L).map(p => [p, 'op']) : m.get(`${L}CY0`) === `${L}X` ? [[`${L}X`, 'x']] : []);
-  const chainIn = (k, own) => LETTERS.slice(0, k + 1).flatMap((L, j) => [...o6(L).map(p => [p, 'op', j]), ...(j < k || own ? di(L).map(([p, t]) => [p, t, j]) : [])]);
-  const ty = (name, family, d) => T.types?.[name] ?? familyMedian(T.types, family) ?? d;
-  const l = j => 'abcd'[j];
-  // an arc of the chain from an input (kind 'op' a LUT pin, 'x' a bypass) of stage j to the output of stage k (or COUT)
-  const chainDelay = (t, j, k) => (k === 'cout' ? (t === 'op' ? ty(`Topcy${l(j)}`, /^Topcy/, T.Topcyb) : ty(`T${l(j)}xcy`, /^T[a-d]xcy$/, T.Tbyp))
-    : t === 'op' ? ty(`Top${l(j)}${l(k)}`, /^Top[a-d][a-d]$/, T.Topab) : ty(`T${l(j)}x${l(k)}`, /^T[a-d]x[a-d]$/, T.Tdick));
-  const source = (v, L, k) => (v === 'O6' ? o6(L).map(p => [p, T.TiloMux]) : v === 'O5' ? o5(L).map(p => [p, T.TiloMux])
-    : v === 'XOR' || v === 'CY' ? [...chainIn(k, v === 'CY').map(([p, t, j]) => [p, chainDelay(t, j, k)]), ['CIN', ty(`Tcin${l(k)}`, /^Tcin[a-d]$/, T.Tcinb)]]
-    : /^F[78]$/.test(v ?? '') ? [...LETTERS.flatMap(o6), ...LETTERS.map(x => `${x}X`)].map(p => [p, T.TiloMux + T.Tilo]) : [[`${L}X`, T.Tdick]]);
-  let clocked = false;
-  LETTERS.forEach((L, k) => {
-    for (const p of o6(L)) comb.push([p, L, T.Tilo]);
-    const om = m.get(`${L}OUTMUX`);
-    if (/5Q$/.test(om ?? '')) { clkToOut.push([`${L}MUX`, T.Tcko]); clocked = true; }
-    else if (om) for (const [p, d] of source(om, L, k)) comb.push([p, `${L}MUX`, d]);
-    // a shift register (L6RAMMODE SRL16 / SRL32): its data in (LI) before the clock, its output after it
-    if (/^SRL/.test(m.get(`${L}6RAMMODE`) ?? '')) { clocked = true; setup.push([`${L}I`, T.Tds]); clkToOut.push([L, T.Tshcko]); if (om === 'O6') clkToOut.push([`${L}MUX`, T.Tshcko]); }
-    // the second flip-flop (L5FF, out on LMUX): its data the LUT's O5, else the bypass
-    if (m.has(`${L}5FF`)) { clocked = true; for (const p of o5(L).length ? o5(L) : [`${L}X`]) setup.push([p, /X$/.test(p) ? T.Tdick : T.Tas]); }
-    const ff = m.get(`${L}FF`);
-    if (!ff) return;
-    const fm = m.get(`${L}FFMUX`), data = source(fm, L, k);
-    if (/^#(AND2L|OR2L)$/.test(ff)) { for (const [p] of [...data, ...(m.has('SRUSED') ? [['SR']] : [])]) comb.push([p, `${L}Q`, T.Tito]); return; }
-    clocked = true;
-    clkToOut.push([`${L}Q`, T.Tcko]);
-    // into the flip-flop: the setup (Tas, Tdick) after the chain's arc to the stage's output, less its output mux
-    for (const [p, d] of data) setup.push([p, fm === 'XOR' || fm === 'CY' ? T.TasXor + Math.max(0, d - T.TiloMux) : fm === 'O6' || fm === 'O5' ? T.Tas : T.Tdick]);
-  });
-  if (m.has('COUTUSED')) { for (const [p, t, j] of chainIn(3, true)) comb.push([p, 'COUT', chainDelay(t, j, 'cout')]); comb.push(['CIN', 'COUT', T.Tbyp]); }
-  if (clocked && m.has('CEUSED')) setup.push(['CE', T.Tceck]);
-  if (clocked && m.has('SRUSED')) setup.push(['SR', T.Tsrck]);
-  return { comb, setup, clkToOut };
-}
-
-/**
- * A block RAM's or DSP48A1's arcs on its pins in use (ins, outs: pin names): a block RAM's data out after its clock,
- * its inputs before it; a DSP48A1 with its multiplier register (MREG) its A, B and D inputs before the clock and its P
- * after, without registers its inputs to P through it. Delays from trce's types by prefix (T.types), else T's.
- */
-export function hardArcs6(inst, ins, outs, T = ARC_DEFAULTS) {
-  const comb = [], setup = [], clkToOut = [], ty = (re, d) => { const v = Object.entries(T.types ?? {}).filter(([k]) => re.test(k)).map(([, x]) => x); return v.length ? Math.max(...v) : d; };
-  if (/^RAMB(8|16)BWER$/.test(inst.type)) {
-    for (const o of outs) if (/^DO/.test(o)) clkToOut.push([o, ty(/^Trcko_DO/, 1.85)]);
-    for (const i of ins) if (/^(ADDR|DI|WE|EN|RST|REGCE)/.test(i)) setup.push([i, ty(/^Trcck|^Trdck/, 0.3)]);
-  } else if (inst.type === 'DSP48A1') {
-    const reg = a => inst.cfg.some(c => c.attr === a && c.value === '1');
-    if (reg('MREG')) { for (const i of ins) if (/^[ABD]\d/.test(i)) setup.push([i, ty(/^Tdspdck_[ABD]_MREG/, 3.1)]); for (const o of outs) if (/^P\d/.test(o)) clkToOut.push([o, ty(/^Tdspcko_P_MREG/, 1.6)]); }
-    else if (!reg('PREG')) for (const i of ins) if (/^[ABDC]\d/.test(i)) for (const o of outs) if (/^P\d/.test(o)) comb.push([i, o, ty(/^Tdspdo_[AB]_P/, 4.0)]);
-  }
-  return { comb, setup, clkToOut };
-}
-
-/** A slice site's timing class: its tile's kind and its column's parity (an odd X a SLICEX; an even one a SLICEL or SLICEM by the tile). */
-export const siteClass = inst => `${inst.tile.replace(/_X\d+Y\d+$/, '')} ${+(/^SLICE_X(\d+)/.exec(inst.site)?.[1] ?? 0) % 2 ? 'x' : 'lm'}`;
+export { ARC_DEFAULTS, lutInputs, sliceArcs6, hardArcs6, siteClass } from '../../packages/silinx-fpga/src/fpga/s6/timing-arcs.js';
+import { ARC_DEFAULTS, sliceArcs6, hardArcs6, siteClass } from '../../packages/silinx-fpga/src/fpga/s6/timing-arcs.js';
 
 /**
  * The slice arcs' delays per site class (siteClass) from trce's paths: { class: { Tilo, TiloMux, Tcko, Tas, Tceck,
@@ -244,18 +160,23 @@ export function clockArrivals(xdl, device, clock, weights) {
   return out;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2), dirs = args.filter(a => !a.startsWith('--')), measured = args.includes('--measured');  // --paths: each worst path's pins
-  // --train=<text>: the arcs and wires fitted on the designs whose folder has it only, the others' slacks held out
-  const train = args.find(a => a.startsWith('--train='))?.slice(8);
-  if (!dirs.length) { console.error('usage: node research/s6/sta6.mjs [--measured] <dir> …'); process.exit(1); }
-  const devices = {}, designs = dirs.map(d => {
+/** Night 1's designs: [{ name, xdl, paths, offsets, device, dly }] from folders with top.xdl, top.twr and top.dly. */
+export function loadDesigns(dirs) {
+  const devices = {};
+  return dirs.map(d => {
     const xt = fs.readFileSync(path.join(d, 'top.xdl'), 'utf8'), part = xt.match(/^design "[^"]*" (\S+)/m)[1];
     const device = (devices[part] ??= s6Device(part.replace(/^(xc6slx\d+)-?(csg\d+)(-\d)?$/, '$1$2-3')).device);
     const twr = fs.readFileSync(path.join(d, 'top.twr'), 'utf8');
     return { name: d, xdl: parseXdl(xt), paths: parseTwr(twr), offsets: parseOffsets(twr), device, dly: fs.readFileSync(path.join(d, 'top.dly'), 'utf8') };
   });
-  const fitOn = designs.filter(x => !train || x.name.includes(train));
+}
+
+/**
+ * The timing model fitted on designs (loadDesigns's): T, the arcs (arcDelays, by site class classArcs); model, the
+ * wires (fitWires); cw, the clock net's [a, b] per node of its routed tree (on the .dly's clock delays); cin / cout,
+ * the clock from its pad at a flip-flop, earliest / latest, [a, b] × the net's (trce's OFFSET paths); tiopi, tioop.
+ */
+export function fitTiming(fitOn) {
   const T = { ...arcDelays(arcTable(fitOn)), classes: classArcs(fitOn) }, model = fitWires(fitOn.flatMap(x => dlySamples(x.xdl, x.dly, x.device)));
   // the clock nets' delays to their loads: base + per node on the routed tree, fitted on the .dly's
   const clk = [];
@@ -280,6 +201,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     return pts.length ? nnls(pts.map(([c]) => [1, c]), pts.map(([, v]) => v)) : [0, 1];
   };
   const [cin, cout] = [clockFit('in'), clockFit('out')];
+  return { T, model, cw, cin, cout, tiopi, tioop };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2), dirs = args.filter(a => !a.startsWith('--')), measured = args.includes('--measured');  // --paths: each worst path's pins
+  // --train=<text>: the arcs and wires fitted on the designs whose folder has it only, the others' slacks held out
+  const train = args.find(a => a.startsWith('--train='))?.slice(8);
+  if (!dirs.length) { console.error('usage: node research/s6/sta6.mjs [--measured] <dir> …'); process.exit(1); }
+  const designs = loadDesigns(dirs), fitOn = designs.filter(x => !train || x.name.includes(train));
+  const { T, model, cw, cin, cout, tiopi, tioop } = fitTiming(fitOn);
   const close = (a, b) => Math.abs(a - b) <= Math.max(0.05 * Math.abs(b), 0.1);
   const rows = [], offRows = [];
   for (const x of designs.filter(d => !train || !fitOn.includes(d))) {
@@ -310,7 +241,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
   }
   const within = rows.filter(r => Math.abs(r.sta - r.trce) <= 0.05 * Math.abs(r.trce)).length, within1 = rows.filter(r => close(r.sta, r.trce)).length;
-  console.log(`clock: ${cw[0].toFixed(3)} + ${cw[1].toFixed(3)} a node (${clk.length} loads); ${rows.length} PERIOD constraints: worst slack within 5% of trce's in ${within}, the error at most ${(Math.max(...rows.map(r => Math.abs(r.sta - r.trce) / r.period)) * 100).toFixed(1)}% of the period`);
+  console.log(`clock: ${cw[0].toFixed(3)} + ${cw[1].toFixed(3)} a node; ${rows.length} PERIOD constraints: worst slack within 5% of trce's in ${within}, the error at most ${(Math.max(...rows.map(r => Math.abs(r.sta - r.trce) / r.period)) * 100).toFixed(1)}% of the period`);
   console.log(`  within 5% or 0.1 ns, whichever is larger: ${within1} of ${rows.length}`);
   for (const r of rows) console.log(`  ${r.name}: trce ${r.trce.toFixed(3)}, sta ${r.sta.toFixed(3)} (${(100 * (r.sta - r.trce) / Math.abs(r.trce)).toFixed(1)}%)`);
   for (const k of ['in', 'out']) {

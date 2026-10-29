@@ -507,9 +507,15 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   12 ns). With that criterion (5% of the slack or 0.1 ns, the larger), PERIOD stays at 20 of 24: the four left
   are 0.11 to 0.25 ns off on slacks of 0.68 to 4.5 ns (every PERIOD error under 2.5% of the period).
 - **#731's criterion** (the maintainer's decision, 2026-10-29): each constraint within 5% of trce's slack or 2.5% of
-  the period, whichever is larger (5% of a small slack, 0.034 ns on 0.68 ns, is about one switch). Met: PERIOD
-  24 of 24, OFFSET IN and OUT 24 of 24 (their errors at most 0.36 ns). Still to do: a second clock's paths; the
-  placer's estimate (`place-timing.js`) replaced by this model (#729, #732).
+  the period, whichever is larger (5% of a small slack, 0.034 ns on 0.68 ns, is about one switch). PERIOD 23 of 24
+  (impl-nexys3/pong is 0.251 ns off, 0.001 ns over its 0.250 ns: an earlier count of 24, the error printed to one
+  decimal, was wrong), OFFSET IN and OUT 24 of 24 (their errors at most 0.36 ns). Still to do: a second clock's
+  paths; the placer's estimate (`place-timing.js`) replaced by this model (#729).
+- **In the Silinx toolchain** (#732): the arcs (`packages/silinx-fpga/src/fpga/s6/timing-arcs.js`) and the delays
+  (`fpga/s6/timing.js`) moved into the package, the model fitted by `fit-model6.mjs` into `fpga/s6/timing-model.js`
+  (`S6_SPEED_3`); `analyzeTimingS6` is `fpga/timing.js`'s analysis (its timing graph, now given the family's arcs
+  and clock pins, and the clocks' skew) on them, its result `analyzeTiming`'s for the open flow's reports. On night
+  1's 24 designs it gives the research STA's numbers within a few ps (a few ms a design).
 
 ### The CMT sites (#1951, S6-E2, 2026-10-29)
 
@@ -686,6 +692,7 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `timing-fit6.mjs` | The wire delay model fitted to trce's nets, or every connection of reportgen's `.dly`, on ISE's routing (#731) |
 | `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
 | `sta6.mjs` | The static timing of a routed design (its XDL): the slices' and hard blocks' arcs, PERIOD slack and OFFSET IN / OUT against trce's (#731) |
+| `fit-model6.mjs` | The timing model of the Silinx toolchain fitted on routed designs: `packages/silinx-fpga/src/fpga/s6/timing-model.js` (#732) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |

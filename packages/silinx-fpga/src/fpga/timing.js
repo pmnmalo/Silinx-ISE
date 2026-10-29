@@ -427,9 +427,11 @@ const edgeAt = (inst, clockPin) => {
  * connection is 1 - slack / period, the slack taken against the worst clock's period. A path between
  * the clock's two edges (a rising-edge flip-flop into a falling-edge one, CLKINV = CLK_B, or back)
  * has half a period: it limits the period to twice its delay, as trce counts it (#442; the clock's
- * `half`: its critical path is one).
+ * `half`: its critical path is one). analyze's clockAt (Map inst -> ns, optional) adds the clock's skew: its
+ * arrival at a path's start, less its arrival at the path's end. The family's arcs (arcs(inst, model), instArcs's
+ * shape) and clock pins (clockPin) are the Spartan-3E's unless given (the Spartan-6's, fpga/s6/timing.js, #732).
  */
-export function timingGraph(design, model = SPEED_4) {
+export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin = CLOCK_PIN } = {}) {
   const pinId = new Map(), pinName = [];
   const pid = (inst, pin) => { const k = `${inst}\u0000${pin}`; let i = pinId.get(k); if (i === undefined) { i = pinName.length; pinId.set(k, i); pinName.push({ inst, pin }); } return i; };
   const instByName = new Map(design.insts.map(i => [i.name, i]));
@@ -437,7 +439,7 @@ export function timingGraph(design, model = SPEED_4) {
   const clockOf = new Map();
   // (a block RAM's CLKA / CLKB: its clock too)
   const clockAt = new Map();   // 'inst\0clock pin' -> its clock net
-  for (const n of design.nets) for (const p of n.inpins) if (CLOCK_PIN.test(p.pin)) { clockOf.set(p.inst, n.name); clockAt.set(`${p.inst}\u0000${p.pin}`, n.name); }
+  for (const n of design.nets) for (const p of n.inpins) if (clockPin.test(p.pin)) { clockOf.set(p.inst, n.name); clockAt.set(`${p.inst}\u0000${p.pin}`, n.name); }
   // edges: from pin, to pin, delay, connection (-1: an arc through an instance)
   const eFrom = [], eTo = [], eDelay = [], eConn = [];
   const conns = [], connIndex = new Map();
@@ -446,7 +448,7 @@ export function timingGraph(design, model = SPEED_4) {
     const src = n.outpins[0];
     if (/^BUFG/.test(instByName.get(src.inst)?.type || '')) continue;
     for (const p of n.inpins) {
-      if (CLOCK_PIN.test(p.pin)) continue;
+      if (clockPin.test(p.pin)) continue;
       const c = conns.length;
       conns.push({ net: n.name, fromPin: src, toPin: p });
       connIndex.set(`${n.name}\u0000${p.inst}\u0000${p.pin}`, c);
@@ -456,7 +458,7 @@ export function timingGraph(design, model = SPEED_4) {
   const starts = [], ends = [];   // [pin, ns, clock, edge (0 rising, 1 falling)]
   const padIns = [], padOuts = [];   // [pin, ns]: an input pad's I (its delay from the pad), an output pad's O1 (to the pad)
   for (const inst of design.insts) {
-    const a = instArcs(inst, model);
+    const a = arcs(inst, model);
     const clk = clockOf.get(inst.name) || null;
     for (const [i, o, d] of a.comb) { eFrom.push(pid(inst.name, i)); eTo.push(pid(inst.name, o)); eDelay.push(d); eConn.push(-1); }
     for (const [i, d] of a.input) if (pinId.has(`${inst.name}\u0000${i}`)) padIns.push([pid(inst.name, i), d]);
@@ -480,7 +482,9 @@ export function timingGraph(design, model = SPEED_4) {
   for (let j = 0; j < order.length; j++) for (let x = outStart[order[j]]; x < outStart[order[j] + 1]; x++) { const q = eTo[outEdge[x]]; if (--indeg[q] === 0) order.push(q); }
   const clocks = [...new Set(starts.map(s => s[2]))].sort();
 
-  function analyze(connDelay) {
+  function analyze(connDelay, clockAt = null) {
+    // (clockAt: the clock's arrival at each instance, its skew in the paths: later at a start, earlier at an end)
+    const at = p => clockAt?.get(pinName[p].inst) ?? 0;
     const delay = Float64Array.from(eDelay);
     for (let e = 0; e < E; e++) if (eConn[e] >= 0) delay[e] = connDelay[eConn[e]];
     const req = new Float64Array(P), prevE = new Int32Array(P);
@@ -504,7 +508,7 @@ export function timingGraph(design, model = SPEED_4) {
         if (!starts.some(s => s[2] === clk && s[3] === launch)) continue;
         const arr = new Float64Array(P).fill(-Infinity);
         prevE.fill(-1);
-        for (const [p, d, c, ed] of starts) if (c === clk && ed === launch && d > arr[p]) arr[p] = d;
+        for (const [p, d, c, ed] of starts) if (c === clk && ed === launch && d + at(p) > arr[p]) arr[p] = d + at(p);
         for (const p of order) {
           if (arr[p] === -Infinity) continue;
           for (let x = outStart[p]; x < outStart[p + 1]; x++) { const e = outEdge[x], q = eTo[e], t = arr[p] + delay[e]; if (t > arr[q]) { arr[q] = t; prevE[q] = e; } }
@@ -514,14 +518,14 @@ export function timingGraph(design, model = SPEED_4) {
         const into = new Map();
         for (const end of ends) {
           if (end[2] === clk || arr[end[0]] === -Infinity) continue;
-          const k = `${end[2]}\u0000${end[3]}`, t = arr[end[0]] + end[1];
+          const k = `${end[2]}\u0000${end[3]}`, t = arr[end[0]] + end[1] - at(end[0]);
           if (!into.has(k) || t > into.get(k).t) into.set(k, { t, end });
         }
         for (const { t, end } of into.values()) cross.push({ from: clk, launch, to: end[2], capture: end[3], delay: t, path: traceBack(arr, end) });
         let worst = -Infinity, wEnd = null;
         for (const end of ends) {
           if (end[2] !== clk || arr[end[0]] === -Infinity) continue;
-          const t = (arr[end[0]] + end[1]) * (end[3] === launch ? 1 : 2);
+          const t = (arr[end[0]] + end[1] - at(end[0])) * (end[3] === launch ? 1 : 2);
           if (t > worst) { worst = t; wEnd = end; }
         }
         if (!wEnd || (best && best.period >= worst)) continue;
@@ -533,7 +537,7 @@ export function timingGraph(design, model = SPEED_4) {
     // required times against the worst period (half of it at the other edge)
     for (const c of passes) {
       req.fill(Infinity);
-      for (const [p, d, k, ed] of ends) { const r = (ed === c.launch ? period : period / 2) - d; if (k === c.clock && r < req[p]) req[p] = r; }
+      for (const [p, d, k, ed] of ends) { const r = (ed === c.launch ? period : period / 2) - d + at(p); if (k === c.clock && r < req[p]) req[p] = r; }
       for (let j = order.length - 1; j >= 0; j--) {
         const p = order[j];
         for (let x = outStart[p]; x < outStart[p + 1]; x++) { const e = outEdge[x], t = req[eTo[e]] - delay[e]; if (t < req[p]) req[p] = t; }
