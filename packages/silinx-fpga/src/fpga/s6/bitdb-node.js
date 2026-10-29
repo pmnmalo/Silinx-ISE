@@ -4,7 +4,7 @@
 //   <device>-lut.json                where every slice's LUTs are
 //   xc6slx16-slice[-nets|-full][-clexl13|-clexm].json   a slice's settings (offsets from its base; both parts')
 //   xc6slx16-int[-cover|-own].json   the switch boxes' PIPs (both parts')
-//   s6-pips-{other,io,clock,probe,cmt}.json   the other tiles' PIPs
+//   s6-pips-{other,io,clock,probe,cmt,flow}.json   the other tiles' PIPs
 //   <device>-iob.json, s6-clocks.json         the pads' settings, a clock pad's selection
 //   <device>-hard.json, s6-hard-base.json     the block RAMs' and DSP48A1s' settings and contents
 //   xc6slx16-cmt-{paths,settings,input}.json  the DCMs' and PLLs' (the XC6SLX16's)
@@ -32,8 +32,9 @@ export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtPaths = true, cmtInput =
       sliceX: { CLEXL: read('xc6slx16-slice-full-clexl13'), CLEXM: read('xc6slx16-slice-full-clexm') },
     },
     int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
-    // the other tiles' PIPs (the PIP drop), the I/O path's, the clocks', the probed ones and the CMT paths' one at a time
-    other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...pips('s6-pips-cmt') } },
+    // the other tiles' PIPs (the PIP drop), the I/O path's, the clocks', the probed ones, the CMT paths' and the open
+    // flow's (#732) one at a time
+    other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...pips('s6-pips-cmt'), ...pips('s6-pips-flow') } },
     iob: dev('iob'), clocks: read('s6-clocks'), cmt: cmtPaths ? dev('cmt-paths') : null, hard: dev('hard'), hardBase: read('s6-hard-base'),
     cmtSettings: dev('cmt-settings'), cmtInput: cmtInput ? dev('cmt-input') : null,
   };
