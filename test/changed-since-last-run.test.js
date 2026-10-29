@@ -30,7 +30,7 @@ test('changed since the last run: --only, the workflow\'s inputs (the ISE tests:
   const m = yml.match(/\n  changes:\n(?:    .*\n)*?      only: (\S+)\n/);
   assert.ok(m, 'ise.yml --only');
   const inputs = m[1].split(',');
-  for (const f of ['core/xcf.js', 'server/ise.js', 'examples/gates/src/gates.vhd', 'core/fpga/bitdb/s3e-tiles.json', 'test/ise/examples.test.js', 'package-lock.json'])
+  for (const f of ['core/xcf.js', 'server/ise.js', 'examples/gates/src/gates.vhd', 'packages/silinx-fpga/bitdb/s3e-tiles.json', 'test/ise/examples.test.js', 'package-lock.json'])
     assert.ok(inputs.some(p => f.startsWith(p)), f);
   for (const f of ['web/js/app.js', 'test/ui/touch.test.js', '.github/workflows/ci.yml', 'test/xcf.test.js'])
     assert.ok(!inputs.some(p => f.startsWith(p)), f);

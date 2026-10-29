@@ -26,10 +26,10 @@ test('the application imports nothing from research/ (#407)', () => {
   assert.deepEqual(bad, []);
 });
 
-test('the bit database loader of core/ reads core/fpga/bitdb (#1676), the one research/s3e-bitstream/db.mjs re-exports (#407)', async () => {
+test('the bit database loader of core/ reads packages/silinx-fpga/bitdb (#1676), the one research/s3e-bitstream/db.mjs re-exports (#407)', async () => {
   const core = await import('../core/fpga/bitdb-node.js');
   const research = await import('../research/s3e-bitstream/db.mjs');
-  assert.equal(core.DB_DIR, path.join(ROOT, 'core', 'fpga', 'bitdb'));
+  assert.equal(core.DB_DIR, path.join(ROOT, 'packages', 'silinx-fpga', 'bitdb'));
   for (const k of ['DB_DIR', 'dbPackages', 'hasBitDb', 'readDbFiles']) assert.equal(research[k], core[k], k);
   assert.deepEqual(core.dbPackages('xc3s250e'), ['cp132']);
   // research's loadDb: the experiments' default part; core's: the part given

@@ -1,5 +1,5 @@
 // Silinx - the Spartan-6 router (#730; the plan: research/s6/README.md, #1): a placed design (core/fpga/s6/xdl.js
-// placedXdlS6) routed on the device's routing graph (core/fpga/devices/xc6slx*.json.gz) (browser + Node).
+// placedXdlS6) routed on the device's routing graph (packages/silinx-fpga/devices/xc6slx*.json.gz) (browser + Node).
 //
 // PathFinder (McMurchie and Ebeling, 1995), negotiated congestion, as the Spartan-3E router (core/fpga/route.js):
 // every net a tree over the routing nodes, each sink found by an A* search from the whole tree built so far; nodes

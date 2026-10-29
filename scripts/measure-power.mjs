@@ -155,7 +155,7 @@ export async function silinxEstimate(example, target) {
     const d = project.device, part = `${d.part}${d.package}${d.speed}`;
     const spec = { top: project.top, part, device: d.part, pkg: d.package, family: 'spartan3e', graph: shippedDevicePath(part), steps: ['synth', 'translate', 'map', 'par', 'trce', 'xpwr'], seed: 1, effort: 1 };
     const device = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(spec.graph)).toString('utf8')));
-    const dbDir = path.join(ROOT, 'core/fpga/bitdb'), json = {};
+    const dbDir = path.join(ROOT, 'packages/silinx-fpga/bitdb'), json = {};
     for (const [k, f] of Object.entries(dbFileNames(spec.device, spec.pkg))) { const p = path.join(dbDir, f); json[k] = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null; }
     const db = makeBitDb(dbFilesFrom(json, spec.pkg), device, part);
     const ucf = fs.readFileSync(path.join(dir, project.constraints), 'utf8');

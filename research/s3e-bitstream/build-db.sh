@@ -1,8 +1,8 @@
 #!/bin/bash
 # Rebuilds the bit database from the experiments' results in $W (bitstreams made by ISE; nothing of it
-# is in the repository): core/fpga/bitdb/xc3s250e-layout.json, core/fpga/bitdb/xc3s250e-lut.json, the shared tile types
-# core/fpga/bitdb/s3e-tiles.json, the XC3S250E's pads (core/fpga/bitdb/xc3s250e-cp132-pads.json), core/fpga/bitdb/xc3s250e-slice.json and
-# core/fpga/bitdb/xc3s250e-bram.json, then (stage F) the other devices from $W2, and the PIPs the tiles do not have.
+# is in the repository): packages/silinx-fpga/bitdb/xc3s250e-layout.json, packages/silinx-fpga/bitdb/xc3s250e-lut.json, the shared tile types
+# packages/silinx-fpga/bitdb/s3e-tiles.json, the XC3S250E's pads (packages/silinx-fpga/bitdb/xc3s250e-cp132-pads.json), packages/silinx-fpga/bitdb/xc3s250e-slice.json and
+# packages/silinx-fpga/bitdb/xc3s250e-bram.json, then (stage F) the other devices from $W2, and the PIPs the tiles do not have.
 #   research/s3e-bitstream/build-db.sh [W] [W2]
 # measure-db.sh makes $W again from nothing, with ISE on another machine (#48; README "Rebuilding the
 # database"):
@@ -22,8 +22,8 @@ W=${1:-${TMPDIR:-/tmp}/silinx-bitdb}; W2=${2:-${TMPDIR:-/tmp}/silinx-bitdb-f}
 W=${W%/}; W2=${W2%/}
 cd "$(dirname "$0")"
 export PART=xc3s250ecp132-4
-node decode-map.mjs "$W/map" > /dev/null && cp "$W/map/lut.json" ../../core/fpga/bitdb/xc3s250e-lut.json
-node gen-layout.mjs "$W/map/map.json" "$W/map/EMPTY.bit" > ../../core/fpga/bitdb/xc3s250e-layout.json
+node decode-map.mjs "$W/map" > /dev/null && cp "$W/map/lut.json" ../../packages/silinx-fpga/bitdb/xc3s250e-lut.json
+node gen-layout.mjs "$W/map/map.json" "$W/map/EMPTY.bit" > ../../packages/silinx-fpga/bitdb/xc3s250e-layout.json
 node gen-slicedb.mjs measured/slice/*.json > "$W/slice-features.json"
 echo '{"types":{"CENTER_SMALL_BRK":{"sameAs":"CENTER_SMALL"}}}' > "$W/brk.json"
 PIPS=()
@@ -59,9 +59,9 @@ for f in measured/fix-*.json; do [ -f "$f" ] && node merge-db.mjs "$f"; done
 # the other three DCMs' settings: the top-left one's mirrored (stage F, dcm-mirror.mjs)
 node dcm-mirror.mjs > "$W/dcm-mirror.json" && node merge-db.mjs "$W/dcm-mirror.json"
 
-node gen-slicetable.mjs > ../../core/fpga/bitdb/xc3s250e-slice.json
+node gen-slicetable.mjs > ../../packages/silinx-fpga/bitdb/xc3s250e-slice.json
 # block-RAM contents (gen-bram.mjs, stage D)
-if [ -f "$W/br1/V14.bit" ]; then node ana-bram.mjs "$W/br1" > "$W/bram.json" && cp "$W/bram.json" ../../core/fpga/bitdb/xc3s250e-bram.json; fi
+if [ -f "$W/br1/V14.bit" ]; then node ana-bram.mjs "$W/br1" > "$W/bram.json" && cp "$W/bram.json" ../../packages/silinx-fpga/bitdb/xc3s250e-bram.json; fi
 
 # stage F: the other devices (the shared tile types above serve them; their own layout, LUTs, block
 # RAMs, pads, and the XC3S1200E's long-line splitters)
@@ -69,26 +69,26 @@ for d in s100:xc3s100ecp132-4:xc3s100e s500:xc3s500efg320-4:xc3s500e s1200:xc3s1
   IFS=: read -r s p dev <<< "$d"
   [ -d "$W2/$s/map" ] || continue
   export PART=$p
-  node decode-map.mjs "$W2/$s/map" > /dev/null && cp "$W2/$s/map/lut.json" "../../core/fpga/bitdb/$dev-lut.json"
-  node gen-layout.mjs "$W2/$s/map/map.json" "$W2/$s/map/EMPTY.bit" > "$W2/$s/layout.json" && cp "$W2/$s/layout.json" "../../core/fpga/bitdb/$dev-layout.json"
+  node decode-map.mjs "$W2/$s/map" > /dev/null && cp "$W2/$s/map/lut.json" "../../packages/silinx-fpga/bitdb/$dev-lut.json"
+  node gen-layout.mjs "$W2/$s/map/map.json" "$W2/$s/map/EMPTY.bit" > "$W2/$s/layout.json" && cp "$W2/$s/layout.json" "../../packages/silinx-fpga/bitdb/$dev-layout.json"
   node merge-db.mjs --reset-pads
   node ana-pads.mjs "$W2/$s/iot" "$W2/$s/ios" > "$W2/$s/pads.json" && node merge-db.mjs "$W2/$s/pads.json"
   [ -f "$W2/$s/iop/key.json" ] && node ana-perpad.mjs "$W2/$s/iop" > "$W2/$s/perpad.json" && node merge-db.mjs "$W2/$s/perpad.json"
   [ -f "$W2/$s/iostd/key.json" ] && node ana-perpad.mjs "$W2/$s/iostd" > "$W2/$s/perstd.json" && node merge-db.mjs "$W2/$s/perstd.json"
-  node ana-bram.mjs "$W2/$s/br" > "$W2/$s/bram.json" && cp "$W2/$s/bram.json" "../../core/fpga/bitdb/$dev-bram.json"
+  node ana-bram.mjs "$W2/$s/br" > "$W2/$s/bram.json" && cp "$W2/$s/bram.json" "../../packages/silinx-fpga/bitdb/$dev-bram.json"
 done
 if [ -f "$W2/s1200/clkhll/key.json" ]; then
   export PART=xc3s1200efg320-4
   node ana-pipdrop.mjs "$W2/s1200/clkhll" "$PART" > "$W2/s1200/clkhll/pips.json"
   node clkh-ll.mjs "$W2/s1200/clkhll/pips.json" > "$W2/s1200/clkh-ll.json"
-  rm -f ../../core/fpga/bitdb/xc3s1200e-tiles.json && node merge-db.mjs --device "$W2/s1200/clkh-ll.json"
+  rm -f ../../packages/silinx-fpga/bitdb/xc3s1200e-tiles.json && node merge-db.mjs --device "$W2/s1200/clkh-ll.json"
 fi
 # the XC3S1200E's other long-line splitters (#709: CLKV_LL, CLKT_LL, CLKB_LL, CLKL_IOIS_LL, CLKR_IOIS_LL, CLKLH_DCM_LL,
 # CLKRH_DCM_LL; ll-splitters.mjs)
 [ -f measured/ll-splitters-709.json ] && PART=xc3s1200efg320-4 node merge-db.mjs --device measured/ll-splitters-709.json
 # every splitter type: the router takes one where it is faster, the placer's delay table leaves them out (#23, #709;
 # core/fpga/bitgen.js knownRouting delayPip)
-node -e "const fs=require('fs'),f='../../core/fpga/bitdb/xc3s1200e-tiles.json',t=JSON.parse(fs.readFileSync(f,'utf8'));for(const k of ['CLKH_LL','CLKV_LL','CLKT_LL','CLKB_LL','CLKL_IOIS_LL','CLKR_IOIS_LL','CLKLH_DCM_LL','CLKRH_DCM_LL'])if(t.types[k]){delete t.types[k].noRoute;t.types[k].splitter=true}fs.writeFileSync(f,JSON.stringify(t))"
+node -e "const fs=require('fs'),f='../../packages/silinx-fpga/bitdb/xc3s1200e-tiles.json',t=JSON.parse(fs.readFileSync(f,'utf8'));for(const k of ['CLKH_LL','CLKV_LL','CLKT_LL','CLKB_LL','CLKL_IOIS_LL','CLKR_IOIS_LL','CLKLH_DCM_LL','CLKRH_DCM_LL'])if(t.types[k]){delete t.types[k].noRoute;t.types[k].splitter=true}fs.writeFileSync(f,JSON.stringify(t))"
 # the PIPs of the shared tile types that some or all of a type's tiles do not have (#74)
 unset PART
 node pip-exceptions.mjs

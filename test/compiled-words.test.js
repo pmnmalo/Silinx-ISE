@@ -133,7 +133,7 @@ async function models(name, steps) {
     const device = loadDevice(JSON.parse(zlib.gunzipSync(fs.readFileSync(shippedDevicePath('xc3s250ecp132-4'))).toString('utf8')));
     const db = {};
     for (const [k, f] of Object.entries(dbFileNames('xc3s250e', 'cp132'))) {
-      const p = new URL(`../core/fpga/bitdb/${f}`, import.meta.url);
+      const p = new URL(`../packages/silinx-fpga/bitdb/${f}`, import.meta.url);
       db[k] = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
     }
     const bitDb = makeBitDb(dbFilesFrom(db, 'cp132'), device, 'xc3s250ecp132-4');

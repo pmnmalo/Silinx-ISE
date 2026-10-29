@@ -16,7 +16,7 @@ import { MIRRORS, mirrorFeatures } from '../../core/fpga/bitdb.js';
 export { MIRRORS, mirrorFeatures };
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^.*\//, ''))) {
-  const tl = JSON.parse(fs.readFileSync(new URL('../../core/fpga/bitdb/s3e-tiles.json', import.meta.url), 'utf8')).types.DCM_TL_CENTER.features;
+  const tl = JSON.parse(fs.readFileSync(new URL('../../packages/silinx-fpga/bitdb/s3e-tiles.json', import.meta.url), 'utf8')).types.DCM_TL_CENTER.features;
   const args = process.argv.slice(2);
   if (args[0] === '--check') {
     let same = 0, diff = 0;

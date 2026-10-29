@@ -4,10 +4,10 @@
 // early: the solution gave one pad of each row its own copy of the difference (R:REVINV:…: line 4's bits at the wrong
 // frames cleared, at the right ones set), which clears line 5's bits in a design that uses it. With the clock rows at
 // their measured frames (the layouts' typeCols, gen-layout.mjs) the routing sets those bits, and no pad feature does.
-//   node pad-clock-rows.mjs [--check]      (rewrites core/fpga/bitdb/<device>-<package>-pads.json; --check: only counts them)
+//   node pad-clock-rows.mjs [--check]      (rewrites packages/silinx-fpga/bitdb/<device>-<package>-pads.json; --check: only counts them)
 import fs from 'node:fs';
 
-const DB = new URL('../../core/fpga/bitdb/', import.meta.url);
+const DB = new URL('../../packages/silinx-fpga/bitdb/', import.meta.url);
 const check = process.argv.includes('--check');
 const ser = o => JSON.stringify(o, null, 0).replace(/("[^"]+":\[[^\]]*\]),/g, '$1,\n');
 let total = 0;

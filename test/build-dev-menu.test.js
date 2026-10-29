@@ -39,7 +39,7 @@ before(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'silinx-devmenu-'));
   await fs.mkdir(path.join(root, 'scripts'));
   for (const f of ['build-standalone.mjs', 'build-info.mjs', 'changelog-release.mjs', 'pwa.mjs']) await fs.copyFile(path.join(ROOT, 'scripts', f), path.join(root, 'scripts', f));
-  for (const d of ['web', 'core', 'server', 'examples', 'test-designs', 'research']) await fs.symlink(path.join(ROOT, d), path.join(root, d), 'dir');
+  for (const d of ['web', 'core', 'packages', 'server', 'examples', 'test-designs', 'research']) await fs.symlink(path.join(ROOT, d), path.join(root, d), 'dir');
   for (const f of ['LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md']) await fs.copyFile(path.join(ROOT, f), path.join(root, f));
   await fs.symlink(modules, path.join(root, 'node_modules'), 'dir');
   await fs.mkdir(path.join(root, 'changes'));

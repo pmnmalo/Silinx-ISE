@@ -1,4 +1,4 @@
-// The device description shipped with Silinx (core/fpga/devices/) and the whole open flow on it:
+// The device description shipped with Silinx (packages/silinx-fpga/devices/) and the whole open flow on it:
 // blinky (examples/blinky, Basys2-250) synthesized, packed, placed, routed and written as a .bit
 // with no Xilinx tool (research/s3e-route/open-flow.mjs). That the .bit equals ISE's needs ISE:
 // npm run check:open-flow (see README, For developers).

@@ -4,10 +4,10 @@
 // Also (#897, measured/fix-897-owners.json) the bits of A3's register that #96 gave to B3, the two pads registered
 // together in every design: a move's feature (feature, default R:ICLK2INV:#OFF) and its owner's (toFeature, default the
 // same).
-//   node pad-owners.mjs [--check]      (rewrites core/fpga/bitdb/<device>-<package>-pads.json; --check: only counts the bits to move)
+//   node pad-owners.mjs [--check]      (rewrites packages/silinx-fpga/bitdb/<device>-<package>-pads.json; --check: only counts the bits to move)
 import fs from 'node:fs';
 
-const DB = new URL('../../core/fpga/bitdb/', import.meta.url);
+const DB = new URL('../../packages/silinx-fpga/bitdb/', import.meta.url);
 const check = process.argv.includes('--check');
 const FEATURE = 'R:ICLK2INV:#OFF';
 const ser = o => JSON.stringify(o, null, 0).replace(/("[^"]+":\[[^\]]*\]),/g, '$1,\n');

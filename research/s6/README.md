@@ -28,7 +28,7 @@ not yet measured it says so; the measurements replace it.
 | Clocking | BUFGMUX, DCM | 16 BUFGMUX, BUFIO2 / BUFIO2FB from the clock pads (map inserts them), BUFH per clock region, CMTs of 2 DCM_SP + 1 PLL_BASE (2 CMTs in the LX16, 4 in the LX45), BUFPLL | #727 |
 | I/O | IOB with its registers | IOB pairs (master / slave), the IOI tiles with ILOGIC2 / OLOGIC2 (registers, SERDES) and IODELAY2; the boards' banks at 3.3 V (and 1.8 / 2.5 V on the Atlys) | #727 |
 | Routing fabric | singles, doubles, hexes, long lines, the Spartan-3E switch box | a new INT switch box: single, double and quad wires (the device report will say whether there is anything longer), its own logic inputs and outputs, the clock spines and BUFH rows; every tile type new | #723, #726, #730 |
-| Device descriptions | the four Spartan-3E parts' (`core/fpga/devices/`) | `xc6slx16csg324-3` and `xc6slx45csg324-3`, from `xdl -report -pips -all_conns`; `core/fpga/device.js` taught the new tile types | [#723](https://github.com/pmnmalo/Silinx-ISE/issues/723) |
+| Device descriptions | the four Spartan-3E parts' (`packages/silinx-fpga/devices/`) | `xc6slx16csg324-3` and `xc6slx45csg324-3`, from `xdl -report -pips -all_conns`; `core/fpga/device.js` taught the new tile types | [#723](https://github.com/pmnmalo/Silinx-ISE/issues/723) |
 | Bitstream | UG332: 32-bit words, frames of 73 words (XC3S250E), FAR one word | UG380: **16-bit configuration words**, Type 1 headers with a 6-bit register address, FAR_MAJ (block type, row, major) and FAR_MIN (minor), frames of 65 words for every part, new registers (COR1 / COR2, CWDT, HC_OPT_REG, MODE_REG, GENERAL1–5…), the block RAM content in frames of its own | [#724](https://github.com/pmnmalo/Silinx-ISE/issues/724) |
 | Bit database | LUT, slice, routing, I/O, block RAM, multiplier, DCM bits of the Spartan-3E tile types | all of it again for the Spartan-6 tile types | #725–#728 |
 | Place, route, timing | `core/fpga/place.js`, `route.js`, `timing.js` | placer and router on the new sites and graph, a delay model of the -3 speed grade fitted to trce | #729, #730, #731 |
@@ -147,7 +147,7 @@ FLR is not the frame length of 65 words: its meaning, and the frames' order, are
 Built from the two reports by Silinx's generic builder (`research/s3e-route/build-device.mjs`, the Spartan-3E
 one, unchanged: it reads any `xdl -report`): the XC6SLX16 in 5 s, 1.4 MB gzipped (307 tile templates, 509 302
 nodes), the XC6SLX45 in 14 s, 2.9 MB (369 templates, 1 397 026 nodes, loaded in 136 ms); their tiles, sites by type
-and PIPs exactly the reports'. Shipped in `core/fpga/devices/` as the Spartan-3E boards' are. A slice's carry goes
+and PIPs exactly the reports'. Shipped in `packages/silinx-fpga/devices/` as the Spartan-3E boards' are. A slice's carry goes
 up by a switch of its own tile (`XL_COUT -> XL_COUT_N`, the CIN of the slice above), not by a wire.
 
 ### The placer (#729, 2026-10-24)

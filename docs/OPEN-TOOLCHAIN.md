@@ -29,7 +29,7 @@ or to get around any protection.
 | Synthesis | Yosys `synth_xilinx -family xc3se` (ISC), compiled to WebAssembly by YoWASP: it runs in the browser | independent open-source projects |
 | Place and route | Silinx (AGPL-3.0) | written for Silinx |
 | Bitstream | Silinx (AGPL-3.0), from the bit database below | written for Silinx |
-| Device description (the chip's wires and routing switches) | The Spartan-3E boards' devices (XC3S100E-CP132, XC3S250E-CP132, XC3S500E-FG320, XC3S1200E-FG320) and the Spartan-6 boards' (XC6SLX16-CSG324, XC6SLX45-CSG324, for the toolchain under development, #1): shipped with Silinx (`core/fpga/devices/`). Other devices: each user builds it once from their own ISE | computed by Silinx from the output of ISE's documented `xdl -report` command |
+| Device description (the chip's wires and routing switches) | The Spartan-3E boards' devices (XC3S100E-CP132, XC3S250E-CP132, XC3S500E-FG320, XC3S1200E-FG320) and the Spartan-6 boards' (XC6SLX16-CSG324, XC6SLX45-CSG324, for the toolchain under development, #1): shipped with Silinx (`packages/silinx-fpga/devices/`). Other devices: each user builds it once from their own ISE | computed by Silinx from the output of ISE's documented `xdl -report` command |
 
 The bitstream generator needs a **bit database**: which configuration bits set each feature of the
 chip (each LUT memory bit, each multiplexer setting inside a slice, each I/O setting, each routing

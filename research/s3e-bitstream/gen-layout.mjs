@@ -1,4 +1,4 @@
-// The layout of a Spartan-3E's frame data (core/fpga/bitdb/<device>-layout.json): where every tile starts, and the
+// The layout of a Spartan-3E's frame data (packages/silinx-fpga/bitdb/<device>-layout.json): where every tile starts, and the
 // bitstream format (IDCODE, frame length, frames). Tiles are named TYPE_X<x>Y<y>; tiles with the same
 // x share a column of frames, tiles with the same y a row of bits (special tile types have their own
 // tables in typeCols / typeRows).
@@ -9,7 +9,7 @@
 //            frames after the last CLB column of the main block (the block-RAM columns follow it)
 //   rows[y]: first bit of row y (CLB rows: 64 bits; the I/O rows at the top and bottom: 80 bits)
 //   defaults: the bits set in the frame data of an empty design
-//   PART=xc3s250ecp132-4 node gen-layout.mjs map.json EMPTY.bit [extra.json] > core/fpga/bitdb/xc3s250e-layout.json
+//   PART=xc3s250ecp132-4 node gen-layout.mjs map.json EMPTY.bit [extra.json] > packages/silinx-fpga/bitdb/xc3s250e-layout.json
 import fs from 'node:fs';
 import { readBit, diffFrames } from '../../core/fpga/bitstream.js';
 import { loadDeviceCache } from '../../core/fpga/device-node.js';

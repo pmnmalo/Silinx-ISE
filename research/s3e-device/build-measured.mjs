@@ -14,7 +14,7 @@ import { chipMeasurements } from './chip.mjs';
 import { packMeasured } from './build.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DB = path.join(HERE, '../../core/fpga/bitdb');
+const DB = path.join(HERE, '../../packages/silinx-fpga/bitdb');
 /** The part measured of each Spartan-3E die Silinx supports: the package of its board (Basys2, Nexys2). */
 export const PARTS = { xc3s100e: 'xc3s100ecp132-4', xc3s250e: 'xc3s250ecp132-4', xc3s500e: 'xc3s500efg320-4', xc3s1200e: 'xc3s1200efg320-4' };
 const DATA = path.join(HERE, 'data');
@@ -58,7 +58,7 @@ export function buildMeasured(dev, dir) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = k => { const i = args.indexOf(k); return i < 0 ? null : args.splice(i, 2)[1]; };
-  const part = opt('--part') || PARTS.xc3s250e, devFile = opt('--dev') || path.join(HERE, '../../core/fpga/devices', `${part}.json.gz`);
+  const part = opt('--part') || PARTS.xc3s250e, devFile = opt('--dev') || path.join(HERE, '../../packages/silinx-fpga/devices', `${part}.json.gz`);
   const [out, dir] = args;
   const { loadDevice } = await import('../../core/fpga/device.js');
   const packed = buildMeasured(loadDevice(gz(devFile)), dir);

@@ -4,7 +4,7 @@
 // The configuration is the sum of the design's features. A feature belongs to a tile of the device
 // and sets a few bits at fixed positions relative to the tile (its column of frames and its row of
 // bits): a routing switch (PIP) of a net, a setting of a site (slice, IOB, global buffer), and the
-// contents of a LUT. The positions come from the bit database (core/fpga/bitdb/*.json),
+// contents of a LUT. The positions come from the bit database (packages/silinx-fpga/bitdb/*.json),
 // built by observing which bits ISE's bitgen sets for small test designs (docs/OPEN-TOOLCHAIN.md).
 //
 //   const db = makeDb({ layout, lut, tiles, pads, padFeatures, bram })    the JSON files of the

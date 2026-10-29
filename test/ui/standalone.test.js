@@ -53,7 +53,7 @@ before(async () => {
   const git = (...a) => spawnSync('git', a, { cwd: root, encoding: 'utf8' });
   git('init', '-q'); git('-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'build');
   build = buildInfo(root, VERSION, devEnv());
-  for (const d of ['web', 'core', 'server', 'examples', 'test-designs', 'research', 'changes']) await fs.symlink(path.join(ROOT, d), path.join(root, d), 'dir');
+  for (const d of ['web', 'core', 'packages', 'server', 'examples', 'test-designs', 'research', 'changes']) await fs.symlink(path.join(ROOT, d), path.join(root, d), 'dir');
   for (const f of ['LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md']) await fs.copyFile(path.join(ROOT, f), path.join(root, f));   // the embedded notices
   await fs.symlink(modules, path.join(root, 'node_modules'), 'dir');
   site = path.join(root, 'site');

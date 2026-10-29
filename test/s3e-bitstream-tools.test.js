@@ -62,7 +62,7 @@ test('share-sb: every tile type shares the switch box at one offset', () => {
 });
 
 // the committed database
-const dbDir = new URL('../core/fpga/bitdb/', import.meta.url);
+const dbDir = new URL('../packages/silinx-fpga/bitdb/', import.meta.url);
 const read = f => JSON.parse(fs.readFileSync(new URL(f, dbDir), 'utf8'));
 const readMeasured = f => JSON.parse(fs.readFileSync(new URL(`../research/s3e-bitstream/measured/${f}`, import.meta.url), 'utf8'));
 
@@ -249,7 +249,7 @@ const tool = (script, args, opts = {}) => spawnSync(process.execPath, [path.join
 test('want-pips: the PIPs of the database the batches have not measured yet, one measurement serving the types that share a switch box (#48)', () => {
   const W = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-want-'));
   try {
-    let r = tool('want-pips.mjs', ['../../core/fpga/bitdb', W]);
+    let r = tool('want-pips.mjs', ['../../packages/silinx-fpga/bitdb', W]);
     assert.equal(r.status, 0, r.stderr);
     assert.equal(r.stderr.trim(), '18204 PIPs (per tile type) known to the reference database, 0 measured, 18204 left');
     const all = JSON.parse(r.stdout);
@@ -260,13 +260,13 @@ test('want-pips: the PIPs of the database the batches have not measured yet, one
     const pip = (tile, type, from, to) => ({ tile, type, from, dir: '->', to, bits: [] });
     fs.writeFileSync(path.join(W, 'pips', 't1', 'pips.json'), JSON.stringify({ pips: [pip('LIOIS_PCI_X0Y16', 'LIOIS_PCI', 'E2BEG4', 'IOIS_CLK0'), pip('CLB_X1Y1', 'CENTER_SMALL', 'BX0', 'BX_PINWIRE0'), pip('BRAM1_SMALL_X5Y1', 'BRAM1_SMALL', 'BRAM_DOA0', 'BRAM_ADDRA_B2')] }));
     assert.deepEqual([...measuredPips(W)], ['LIOIS E2BEG4->IOIS_CLK0', 'CENTER_SMALL BX0->BX_PINWIRE0', 'BRAM0_SMALL BRAM_DOA0->BRAM_ADDRA_B2']);
-    r = tool('want-pips.mjs', ['../../core/fpga/bitdb', W]);
+    r = tool('want-pips.mjs', ['../../packages/silinx-fpga/bitdb', W]);
     assert.equal(r.stderr.trim(), '18204 PIPs (per tile type) known to the reference database, 3 measured, 18191 left');
     const left = JSON.parse(r.stdout);
     // measured in LIOIS_PCI: no longer wanted on the left side's I/O tiles; in BRAM1_SMALL: in the four block-RAM interconnect tiles
     for (const t of [...UNIFY[0], ...UNIFY[4], 'CENTER_SMALL']) assert.equal(all[t].length - left[t].length, 1, t);
     assert.equal(left.RIOIS.length, all.RIOIS.length);
-    r = tool('want-pips.mjs', ['../../core/fpga/bitdb', W, '--types', 'LIOIS,CLKC']);
+    r = tool('want-pips.mjs', ['../../packages/silinx-fpga/bitdb', W, '--types', 'LIOIS,CLKC']);
     assert.equal(r.stderr.trim(), '257 PIPs (per tile type) known to the reference database, 3 measured, 256 left');
     assert.deepEqual(Object.keys(JSON.parse(r.stdout)), ['LIOIS', 'CLKC']);
   } finally { fs.rmSync(W, { recursive: true, force: true }); }

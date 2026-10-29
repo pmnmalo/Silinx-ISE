@@ -1,4 +1,4 @@
-// Silinx - the sites of a Spartan-6 device for the placer (#729), from its description (core/fpga/devices/
+// Silinx - the sites of a Spartan-6 device for the placer (#729), from its description (packages/silinx-fpga/devices/
 // xc6slx*.json.gz, core/fpga/device.js Device; browser + Node).
 //
 //   s6Sites(device) -> {

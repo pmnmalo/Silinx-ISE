@@ -25,7 +25,7 @@ jobs:
       contents: read
     with:
       workflow: codeql.yml
-      only: core/,server/,web/,scripts/,bin/,test/,.github/workflows/codeql.yml
+      only: core/,packages/,server/,web/,scripts/,bin/,test/,.github/workflows/codeql.yml
   analyze:
     needs: changes
     if: needs.changes.outputs.run == 'true'

@@ -5,7 +5,7 @@
 // own measurements without bits where the CLB's have bits (bits given to a neighbouring tile by
 // ana-pipdrop.mjs). A measurement that contradicts the CLB's is reported and kept. The I/O tiles'
 // own pin wires are renamed to the CLB's (RENAME).
-//   node share-sb.mjs [--check]      (rewrites core/fpga/bitdb/s3e-tiles.json; --check: only the report)
+//   node share-sb.mjs [--check]      (rewrites packages/silinx-fpga/bitdb/s3e-tiles.json; --check: only the report)
 import fs from 'node:fs';
 import { shiftBit } from '../../core/fpga/bitgen.js';
 
@@ -47,7 +47,7 @@ const renamed = f => RENAME.reduce((x, [a, b]) => x.replace(new RegExp(a, 'g'), 
 
 if (process.argv[1] && process.argv[1].endsWith('share-sb.mjs')) {
   const check = process.argv.includes('--check');
-  const file = new URL('../../core/fpga/bitdb/s3e-tiles.json', import.meta.url);
+  const file = new URL('../../packages/silinx-fpga/bitdb/s3e-tiles.json', import.meta.url);
   const db = JSON.parse(fs.readFileSync(file, 'utf8'));
   const clb = db.types.CENTER_SMALL.features;
   let same = 0, empty = 0, conflict = 0;

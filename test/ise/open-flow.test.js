@@ -119,7 +119,7 @@ test('feat_iob_ddr (IDDR2, ODDR2) and feat_iob_bidir (IOBUF) on every device, in
 // on pads where the plain register is measured; the eight clocks on the eight top and bottom buffers (lines 0-7)
 function sidePads(part, pkg) {
   const dev = loadDeviceCache(`${part}${pkg}-4`);
-  const feats = JSON.parse(fs.readFileSync(path.join(ROOT, 'core/fpga/bitdb', `${part}-${pkg}-pads.json`), 'utf8')).padFeatures;
+  const feats = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages/silinx-fpga/bitdb', `${part}-${pkg}-pads.json`), 'utf8')).padFeatures;
   const byTile = new Map();
   for (const p of deviceSites(dev).pads.values()) if (/^[LR]I(OIS|BUFS)/.test(p.tile)) byTile.set(p.tile, [...(byTile.get(p.tile) || []), p]);
   const y = t => +/Y(\d+)$/.exec(t)[1];

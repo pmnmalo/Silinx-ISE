@@ -1,6 +1,6 @@
 # Replacing the shipped XC3S250E graph with the measured one: the plan (#3)
 
-A plan for review, not the change: what replacing `core/fpga/devices/xc3s250ecp132-4.json.gz` (computed from ISE's
+A plan for review, not the change: what replacing `packages/silinx-fpga/devices/xc3s250ecp132-4.json.gz` (computed from ISE's
 `xdl -report`) with the measured description (README sections 9-14) would change in the repository, its tests and its
 documentation, in what order, and what is still open. Nothing here is decided; the decision is the maintainer's.
 
@@ -43,14 +43,14 @@ run: the full CI run by hand comes before any merge (below).
    `research/s3e-device/data/xc3s250e/` (measured on 2026-10-26: 79 MB of JSON, 6.8 MB gzipped, 3.8 MB with xz). A
    unit test rebuilds the graph and compares it with the shipped file (byte for
    byte, as `test/s3e-devices.test.js` does for the other graphs' descriptions).
-2. **`core/fpga/devices/xc3s250ecp132-4.json.gz`** replaced by the rebuilt graph; the shipped one of before kept only in
+2. **`packages/silinx-fpga/devices/xc3s250ecp132-4.json.gz`** replaced by the rebuilt graph; the shipped one of before kept only in
    git's history (or, for the research tools that measure against ISE's description — `pip-exceptions.mjs`,
    `prototype.mjs compare` —, as `research/s3e-device/data/xc3s250e/ise-report.json.gz`: a decision, as it is
    the one file computed from `xdl -report`).
 3. **The tests** of the table above: measure what is missing (the clock pads' paths, the third IOB's pins), re-pin
    the routing tests, re-record #601's trce, and move #74 / want-pips to the bit database or the kept ISE description.
 4. **The documentation:**
-   - `core/fpga/devices/README.md`: the XC3S250E's graph measured (how, its gaps: the split nodes that cost a route, the
+   - `packages/silinx-fpga/devices/README.md`: the XC3S250E's graph measured (how, its gaps: the split nodes that cost a route, the
      rules, the BCIN names), the other three still computed from `xdl -report`;
    - `docs/OPEN-TOOLCHAIN.md`: where the device descriptions come from; a user's own ISE still builds a description of
      its own, which takes precedence (`~/.silinx/devices`, unchanged);

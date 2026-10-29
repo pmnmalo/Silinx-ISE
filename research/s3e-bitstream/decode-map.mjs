@@ -3,7 +3,7 @@
 // 0101); find each number in the frames and derive the frame of each slice column and the bit offset
 // of each slice row. Also the bitstream format of the empty design (EMPTY.bit: IDCODE, frame length,
 // frames).
-//   PART=xc3s250ecp132-4 node decode-map.mjs dir      (writes dir/map.json, and dir/lut.json: core/fpga/bitdb/<device>-lut.json)
+//   PART=xc3s250ecp132-4 node decode-map.mjs dir      (writes dir/map.json, and dir/lut.json: packages/silinx-fpga/bitdb/<device>-lut.json)
 import fs from 'node:fs';
 import { readBit } from './bits.mjs';
 import { readBit as readBitFile } from '../../core/fpga/bitstream.js';
@@ -52,7 +52,7 @@ if (fs.existsSync(`${dir}/EMPTY.bit`)) {
   console.log('empty design:', JSON.stringify(out.empty), 'packets', e.packets.map(p => p.reg).join(' '));
 }
 fs.writeFileSync(`${dir}/map.json`, JSON.stringify(out, null, 1));
-// the database file of the LUTs (core/fpga/bitdb/<device>-lut.json)
+// the database file of the LUTs (packages/silinx-fpga/bitdb/<device>-lut.json)
 const part = process.env.PART || 'xc3s250ecp132-4';
 fs.writeFileSync(`${dir}/lut.json`, JSON.stringify({
   device: part.replace(/^(xc3s\d+e)([a-z]+\d+)-(\d+)$/, '$1-$3-$2'),

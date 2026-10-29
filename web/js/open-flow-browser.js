@@ -10,8 +10,8 @@ import { synthEffort } from '/core/synth-open.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
 import { OPEN_STEPS, orderOpenSteps } from '/core/open-steps.js';
 
-// the devices whose device description and bit database are published (core/fpga/devices,
-// core/fpga/bitdb): device/package -> the description's file
+// the devices whose device description and bit database are published (packages/silinx-fpga/devices,
+// packages/silinx-fpga/bitdb): device/package -> the description's file
 export const BROWSER_DEVICES = {
   'xc3s100e/cp132': 'xc3s100ecp132-4.json.gz',
   'xc3s250e/cp132': 'xc3s250ecp132-4.json.gz',
