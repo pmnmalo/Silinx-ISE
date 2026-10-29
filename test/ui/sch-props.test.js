@@ -88,7 +88,8 @@ uiTest('#405 schematic Properties: the sheet, a gate (inputs, inverted inputs, a
   assert.deepEqual(out.sheet.slice(0, 4), ['Module name', 'Language', 'Description', 'Sheet size']);
   assert.deepEqual(out.lang, ['verilog', 'verilog']);
   assert.equal(out.title, 'AND2');
-  assert.deepEqual(out.gate, ['Instance name', 'Width', 'Inputs', 'Inverted inputs']);
+  // (Pins per bit since #2079)
+  assert.deepEqual(out.gate, ['Instance name', 'Width', 'Pins per bit (I0_0.., O0..)', 'Inputs', 'Inverted inputs']);
   assert.deepEqual(out.inputs, ['2', '3', '4']);
   assert.equal(out.type, 'and3b1');
   assert.equal(out.refused, 'U1');
@@ -142,7 +143,8 @@ uiTest('#405 schematic Properties: read-only, the fields cannot be changed (Symb
     props.renderProps();
     return [...propBody.querySelectorAll('input, select, button')].map((el) => `${el.tagName}:${el.readOnly || el.disabled ? 'ro' : 'rw'}`);
   });
-  assert.deepEqual(out, ['BUTTON:rw', 'INPUT:ro', 'INPUT:ro', 'SELECT:ro', 'SELECT:ro']);
+  // (the gate's Pins per bit, #2079: read-only too)
+  assert.deepEqual(out, ['BUTTON:rw', 'INPUT:ro', 'INPUT:ro', 'INPUT:ro', 'SELECT:ro', 'SELECT:ro']);
 });
 
 uiTest('#953 schematic Properties: the Width of a VCC and of a GND (one saved without one: empty, its net\'s); in Portuguese', E, async (page) => {
