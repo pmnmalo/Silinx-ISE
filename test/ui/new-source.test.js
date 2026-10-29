@@ -37,7 +37,7 @@ uiTest('New Source (#958): no "(Wizard)" types; Wizard | < Back | Next > | Cance
   await page.openProject('NsWiz');
   for (const type of TYPES) {
     await page.menu('Project', 'New Source…');
-    await page.waitDialog('New Source Wizard');
+    await page.waitDialog('New Source');
     if (type === TYPES[0]) {
       const list = await listed(page);
       assert.deepEqual(list, TYPES);
@@ -74,7 +74,7 @@ uiTest('New Source (#958): Next > keeps the plain path (Module (HDL): Define Mod
   await makeProject(env, { name: 'NsPlain', top: '' });
   await page.openProject('NsPlain');
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await pickSourceType(page, 'Module (HDL)');
   await page.dialogButton('Next >');
   await waitNewSourcePage(page, 'File Name and Location');
@@ -119,7 +119,7 @@ uiTest('New Source (#958) in Portuguese: Assistente | < Anterior | Seguinte > | 
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
   try {
     await page.menu('Projeto', 'Nova Fonte…');
-    await page.waitFor(() => /Assistente de Nova Fonte/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'the wizard in Portuguese' });
+    await page.waitFor(() => /Nova Fonte/.test(document.querySelector('.dlg-overlay')?.innerText || ''), [], { what: 'the wizard in Portuguese' });
     const list = await listed(page);
     for (const s of ['Módulo (HDL)', 'Esquemático', 'Máquina de Estados Finitos (FSM)', 'Máquina de Estados Algorítmica (ASM)', 'Rede de Petri', 'Gestor de Relógio (DCM / PLL)', 'Memória de Bloco', 'Bancada de Teste']) assert.ok(list.includes(s), `${s} in ${list}`);
     assert.ok(!list.some((s) => /Assistente/.test(s)), list.join(' | '));
@@ -130,7 +130,7 @@ uiTest('New Source (#958) in Portuguese: Assistente | < Anterior | Seguinte > | 
     await page.dialogButton('Cancelar');
     await page.waitNoDialog();
     await newSourceWizardOf(page, 'Memória de Bloco', 'mem_pt', 'Memória de Bloco', {
-      menu: 'Projeto', item: 'Nova Fonte…', dialog: 'Assistente de Nova Fonte', next: 'Seguinte >', wizard: 'Assistente', file: 'Nome do Ficheiro e Localização',
+      menu: 'Projeto', item: 'Nova Fonte…', dialog: 'Nova Fonte', next: 'Seguinte >', wizard: 'Assistente', file: 'Nome do Ficheiro e Localização',
     });
     assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .bw-name').value), 'mem_pt');
     await page.dialogButton('Cancelar');
@@ -149,7 +149,7 @@ uiTest('New Source (#958) in the Tasks interface\'s Edit task: the same buttons,
     await page.openProject('NsTasks');
     assert.equal(await page.eval(() => document.documentElement.dataset.task), 'edit');
     await page.menu('Project', 'New Source…');
-    await page.waitDialog('New Source Wizard');
+    await page.waitDialog('New Source');
     await pickSourceType(page, 'Module (HDL)');
     await page.dialogButton('Next >');
     await waitNewSourcePage(page, 'File Name and Location');

@@ -1,5 +1,5 @@
 // UI (#1210): Tasks ▸ Design has New Source… and Import Source… (#1501) above the Design tree, half of the panel each:
-// they open the New Source Wizard and the Import Source dialog; disabled with no project; in Portuguese; not in
+// they open the New Source dialog and the Import Source dialog; disabled with no project; in Portuguese; not in
 // Implement; none in the classic interface. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,7 +50,7 @@ uiTest('#1210 #1501 Tasks ▸ Design: New Source and Import Source above the tre
   assert.deepEqual(await bar(page), { labels: ['New Source…', 'Import Source…'], enabled: [true, true], whole: true, halves: true, above: true });
   // New Source…: the wizard
   await page.click('#task-src-bar button:nth-child(1)');
-  assert.equal(await dlgTitle(page), 'New Source Wizard');
+  assert.equal(await dlgTitle(page), 'New Source');
   await page.click('.dlg-overlay .dlg-x');
   await page.waitFor(() => !document.querySelector('.dlg-overlay'), [], { what: 'closed' });
   // Import Source…: its dialog

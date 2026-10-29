@@ -293,7 +293,7 @@ for (const [lang, L, ext] of [['vhdl', 'VHDL', 'vhd'], ['verilog', 'Verilog', 'v
     await page.openProject(pj);
     for (const k of KINDS) {
       await page.eval(async (t) => { (await import('/js/wizards.js')).newSourceWizard({ type: t }); }, k.type);
-      await page.waitDialog('New Source Wizard');
+      await page.waitDialog('New Source');
       await page.dialogButton('Next >');
       await page.fill('.dlg-overlay .wiz-main input[type=text]', k.name);
       await page.dialogButton('Next >');
@@ -498,7 +498,7 @@ uiTest('a drawing\'s HDL language changed in its editor (ASM chart, state diagra
   await page.openProject('H_lang');
   for (const k of KINDS) {
     await page.eval(async (t) => { (await import('/js/wizards.js')).newSourceWizard({ type: t }); }, k.type);
-    await page.waitDialog('New Source Wizard');
+    await page.waitDialog('New Source');
     await page.dialogButton('Next >');
     await page.fill('.dlg-overlay .wiz-main input[type=text]', k.name);
     await page.dialogButton('Next >');

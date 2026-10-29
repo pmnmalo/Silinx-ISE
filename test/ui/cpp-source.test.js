@@ -41,7 +41,7 @@ uiTest('#1590 a C++ source: its Design row [C++] and its HDL, its C Simulation (
   assert.match(await page.consoleText(), /\ny=42\nmain\(\) returned 0; 1 call\(s\) of 'twice'\./);
   // New Source ▸ C++ Function (HLS): a .cpp from the template, a module at once, opened in the editor; its C simulation
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await pickSourceType(page, 'C++ Function (HLS)');
   await page.dialogButton('Next >');
   await waitNewSourcePage(page, 'File Name and Location');

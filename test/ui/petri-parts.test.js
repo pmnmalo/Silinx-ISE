@@ -17,7 +17,7 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
   await makeProject(env, { name: 'PnParts', top: '' });
   await page.openProject('PnParts');
   await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
   await page.dialogButton('Next >');

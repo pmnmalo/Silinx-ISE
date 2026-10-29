@@ -166,7 +166,7 @@ uiTest('#230 New Source: a Petri net, a truth table and the Petri Net Wizard ref
     ['Boolean Algebra', 'parity', "A module named 'parity' already exists."],
   ]) {
     await page.menu('Project', 'New Source…');
-    await page.waitDialog('New Source Wizard');
+    await page.waitDialog('New Source');
     await pickType(type);
     await page.dialogButton('Next >');
     await page.fill('.dlg-overlay .wiz-main input[type=text]', name);
@@ -178,7 +178,7 @@ uiTest('#230 New Source: a Petri net, a truth table and the Petri Net Wizard ref
   }
   // the Petri Net Wizard (its first page)
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await pickType('Petri Net');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj');
@@ -192,7 +192,7 @@ uiTest('#230 New Source: a Petri net, a truth table and the Petri Net Wizard ref
   await page.waitNoDialog();
   // another name: created, its HDL file at once, nothing to warn about
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await pickType('Petri Net');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj2');

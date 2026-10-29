@@ -252,7 +252,7 @@ for (const theme of ['dark', 'light']) {
     const { check, bad } = await themed(page, theme);
     await page.openProject(`Src_${theme}`);
     await page.menu('Project', 'New Source…');
-    await page.waitDialog('New Source Wizard');
+    await page.waitDialog('New Source');
     const types = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.textContent.trim()));
     assert.ok(types.length >= 10, types.join(' | '));
     await closeDialogs(page);
@@ -260,7 +260,7 @@ for (const theme of ['dark', 'light']) {
     const runs = [...types.map((t) => [t, false]), ...['Module (HDL)', 'Schematic', 'Petri Net', 'Test Bench'].map((t) => [types.find((x) => x.endsWith(t)), true])];
     for (const [k, [type, wiz]] of runs.entries()) {
       await page.menu('Project', 'New Source…');
-      await page.waitDialog('New Source Wizard');
+      await page.waitDialog('New Source');
       await page.eval((t) => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim() === t); r.scrollIntoView(); r.click(); }, type);
       if (!wiz) await check(`New Source ${type}`);
       // the name on the File Name and Location page (a wizard opens with it)
@@ -300,7 +300,7 @@ for (const theme of ['dark', 'light']) {
     await page.openProject(`Tools_${theme}`);
     for (const [item, sel] of [['ASM State Machine Editor…', '.asm-editor'], ['FSM State Diagram Editor…', '.fsm-editor'], ['Boolean Algebra / Karnaugh Map…', '.tt-editor']]) {
       await page.menu('Tools', item);
-      await page.waitDialog('New Source Wizard');
+      await page.waitDialog('New Source');
       await page.dialogButton('Next >');
       await page.fill('.dlg-overlay .wiz-main input[type=text]', sel.slice(1, 4));
       await page.dialogButton('Next >');

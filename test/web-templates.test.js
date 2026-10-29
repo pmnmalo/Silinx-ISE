@@ -1,4 +1,4 @@
-// web/js/templates.js (New Source Wizard skeletons) and the example projects (New Project ▸
+// web/js/templates.js (New Source skeletons) and the example projects (New Project ▸
 // Start from): every template compiles, elaborates and — test benches, examples — simulates.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

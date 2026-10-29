@@ -173,7 +173,7 @@ uiTest('narrow screen 820×1180: the FSM and Petri net editors, their properties
   await check('.fsm-editor', 'HDL: traffic.vhd — generated from the diagram');
   // a new Petri net (Tools ▸ Petri Net Editor…)
   await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
   await page.dialogButton('Next >');

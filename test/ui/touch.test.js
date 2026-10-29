@@ -47,7 +47,7 @@ uiTest('touch (#264): a finger drags a pane splitter and a dialog by its title; 
 
   // a dialog by its title: a finger, then the mouse
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   const T = '.dlg-overlay .dlg-title';
   assert.equal(await touchAction(page, T), 'none');
   const d0 = await rectOf(page, '.dlg-overlay .dlg');
@@ -116,7 +116,7 @@ uiTest('touch (#265): a finger drags a state of the FSM editor and a place of th
   await page.openProject('TouchDiag');
   // a state diagram
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim() === 'Finite State Machine (FSM)'); r.scrollIntoView(); r.click(); });
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'det');
@@ -135,7 +135,7 @@ uiTest('touch (#265): a finger drags a state of the FSM editor and a place of th
 
   // a Petri net
   await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
   await page.dialogButton('Next >');

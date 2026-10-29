@@ -44,7 +44,7 @@ export async function newSourceWizard({ type } = {}) {
   // language of HDL modules and test benches (Define Module / Associate Source pages)
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
   const extOf = t => t.ext ?? (langSel.value === 'verilog' ? '.v' : '.vhd');
-  const guard = replaceGuard('New Source Wizard');
+  const guard = replaceGuard('New Source');
   const fname = h('input', { type: 'text', placeholder: 'file name' });
   const loc = h('input', { type: 'text', value: st.dir });
   const list = h('div', { class: 'src-types' });
@@ -206,7 +206,7 @@ export async function newSourceWizard({ type } = {}) {
   // the language (extension) may have changed after page 1; the name as on the File Name page (#1467: x.fsm.json was
   // checked there as src/x.fsm.json and written as src/x.fsm.json.fsm.json)
   pSum.validate = () => guard(`${loc.value.trim().replace(/\/+$/, '')}/${nameOf()}${extOf(st)}`);
-  const ok = await wizard('New Source Wizard', pages, {
+  const ok = await wizard('New Source', pages, {
     width: 760, bind: r => { refresh = r; },
     extra: { label: 'Wizard', value: 'wizard', shown: p => p === pFile, disabled: () => !st.wiz, validate: fileError },
   });

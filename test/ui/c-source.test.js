@@ -57,7 +57,7 @@ uiTest('#1531 Silinx HLS: a .c file a module of the project (its Design row, its
   assert.ok((await page.eval(() => window.SilinxApp.S.lib.modules.get('mac2').ports.map((p) => p.name))).includes('c'));
   // New Source ▸ C Function (HLS): a .c from the template, a module at once, opened in the editor
   await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await pickSourceType(page, 'C Function (HLS)');
   await page.dialogButton('Next >');
   await waitNewSourcePage(page, 'File Name and Location');

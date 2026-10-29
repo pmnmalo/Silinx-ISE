@@ -164,7 +164,7 @@ uiTest('Edit ▸ Undo / Redo reach every editor: text, truth table, pin planner 
   await page.waitFor(() => window.Silinx.active.editor.getValue().startsWith('library'));
   // truth table: a cell clicked, Edit ▸ Undo / Redo
   await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
-  await page.waitDialog('New Source Wizard');
+  await page.waitDialog('New Source');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj');
   await page.dialogButton('Next >');
