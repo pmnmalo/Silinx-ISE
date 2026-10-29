@@ -62,7 +62,9 @@ export function toBase64(bytes) {
 }
 
 export function fromBase64(str) {
-  const s = String(str).replace(/=+$/, '');
+  let s = String(str), e = s.length;
+  while (e > 0 && s[e - 1] === '=') e--;   // (the padding cut by hand: /=+$/ is quadratic on many '=', #2011)
+  s = s.slice(0, e);
   const out = new Uint8Array(Math.floor(s.length * 3 / 4));
   let o = 0, acc = 0, bits = 0;
   for (let i = 0; i < s.length; i++) {

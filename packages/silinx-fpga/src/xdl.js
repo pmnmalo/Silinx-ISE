@@ -50,14 +50,18 @@ export function deviceGrid(dev) {
 }
 
 // ------------------------------------------------------------------ XDL design
-// tokens: "quoted strings" (\" escapes), ',' ';' and words
+// tokens: "quoted strings" (\" escapes), ',' ';' and words; a string with no closing quote is an error (it ran to
+// the end of the text again from each quote inside it, #2011)
 function tokenize(text) {
   const toks = [];
   const src = String(text).split('\n').filter(l => !/^\s*#/.test(l)).join('\n');
-  const re = /"((?:[^"\\]|\\.)*)"|([,;])|([^\s,;"]+)/g;
+  const re = /"((?:[^"\\]|\\[\s\S])*)("?)|([,;])|([^\s,;"]+)/g;
   let m;
   // quoted strings keep their raw text too (with its escapes), for writeXdl()
-  while ((m = re.exec(src))) toks.push(m[1] !== undefined ? { s: m[1].replace(/\\(.)/g, '$1'), raw: m[1] } : m[2] ? { p: m[2] } : { w: m[3] });
+  while ((m = re.exec(src))) {
+    if (m[1] !== undefined && !m[2]) throw new Error(`XDL: a quoted string with no closing quote: "${m[1].slice(0, 40)}`);
+    toks.push(m[1] !== undefined ? { s: m[1].replace(/\\([\s\S])/g, '$1'), raw: m[1] } : m[3] ? { p: m[3] } : { w: m[4] });
+  }
   return toks;
 }
 

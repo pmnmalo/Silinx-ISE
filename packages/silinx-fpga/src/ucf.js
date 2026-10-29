@@ -42,7 +42,7 @@ export function bitName(port, bit) {
  */
 export function normalizePort(p) {
   if (typeof p === 'string') {
-    const m = /^\s*([A-Za-z_][\w$]*)\s*(?:[[<]\s*(-?\d+)\s*:\s*(-?\d+)\s*[\]>])?\s*$/.exec(p);
+    const m = /^([A-Za-z_][\w$]*)\s*(?:[[<]\s*(-?\d+)\s*:\s*(-?\d+)\s*[\]>])?$/.exec(p.trim());   // (trimmed: no ReDoS, #2011)
     if (!m) throw new Error(`bad port spec '${p}'`);
     if (m[2] === undefined) return { name: m[1], msb: null, lsb: null, width: 1, bus: false };
     const msb = +m[2], lsb = +m[3];
@@ -71,7 +71,7 @@ export function expandPort(p) {
 /** Parse '20', '20 ns', '20ns', '50 MHz', '1.5 us' into nanoseconds (number). */
 export function periodNs(v) {
   if (typeof v === 'number') return v;
-  const m = /^\s*([\d.]+)\s*(ps|ns|us|ms|s|hz|khz|mhz|ghz)?\s*$/i.exec(String(v ?? ''));
+  const m = /^([\d.]+)\s*(ps|ns|us|ms|s|hz|khz|mhz|ghz)?$/i.exec(String(v ?? '').trim());   // (trimmed: no ReDoS, #2011)
   if (!m) throw new Error(`bad clock period '${v}'`);
   const x = parseFloat(m[1]);
   switch ((m[2] || 'ns').toLowerCase()) {
@@ -470,7 +470,7 @@ export function backAnnotateUcf(ucfText, pinsText, { ports, tool = 'pin2ucf', da
   const have = new Set(Object.keys(cur).filter(k => cur[k].loc).map(k => k.toLowerCase()));
   const added = Object.entries(pins).filter(([net, a]) => a.loc && !have.has(net.toLowerCase())).map(([net, a]) => ({ net, loc: a.loc }));
   const lines = added.map(({ net, loc }) => `NET "${net}" LOC = "${loc}";`);
-  const text = added.length ? `${ucfText?.trim() ? `${ucfText.replace(/\s*$/, '\n')}\n` : ''}# Back-annotated pin locations (${tool}, ${date})\n${lines.join('\n')}\n` : null;
+  const text = added.length ? `${ucfText?.trim() ? `${ucfText.trimEnd()}\n\n` : ''}# Back-annotated pin locations (${tool}, ${date})\n${lines.join('\n')}\n` : null;
   return { added, lines, text };
 }
 
