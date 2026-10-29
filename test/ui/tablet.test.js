@@ -5,7 +5,7 @@
 // the page a tablet's (uiTest's `tablet`: harness.js TABLET), in Chrome an Android tablet's, in WebKit an iPad's.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupUi, uiTest, makeProject, TABLET } from './harness.js';
+import { setupUi, uiTest, makeProject, TABLET, chromeOnly } from './harness.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -183,7 +183,7 @@ uiTest('#1992 tablet: a symbol\'s menu from a long press closes as soon as the f
   assert.ok(opened && s0.menu, 'the menu opened');
   assert.equal(s1.menu, s1.at === s0.at, `the jitter: ${JSON.stringify([s0, s1])}`);
   assert.deepEqual([s2.menu, s2.at !== s0.at], [false, true], 'moved a grid step: the menu closed');
-}, { tablet: 'landscape' });
+}, { tablet: 'landscape', skip: chromeOnly });   // (CDP touch: Chrome only, #2038)
 // #1990: a long press on a palette row (a finger): no menu; a mouse's right click: its menu (Symbol Info…, Place Symbol)
 uiTest('#1990 tablet: a long press on a symbol of the palette opens no menu; the mouse\'s right click does', E, async (page) => {
   await openGates(page, 'TabPalMenu');
@@ -202,4 +202,4 @@ uiTest('#1990 tablet: a long press on a symbol of the palette opens no menu; the
   const items = await page.eval(() => [...document.querySelectorAll('.menu-popup .mi .lbl')].map((l) => l.textContent));
   await page.closeMenus();
   assert.deepEqual({ prevented, menuTouch, items }, { prevented: true, menuTouch: false, items: ['Symbol Info…', 'Place Symbol'] });
-}, { tablet: 'landscape' });
+}, { tablet: 'landscape', skip: chromeOnly });   // (CDP touch: Chrome only, #2038)
