@@ -15,11 +15,11 @@ const ED = '.doc:not([hidden]) .sch-editor';
 const P = (x, y) => ({ x, y });
 
 uiTest('#688 schematic: a wire segment dragged moves alone, its neighbours stretch, its end stays on the pin; the HDL the same', E, async (page) => {
-  // U1 at (100, 90): I (100, 100), O (160, 100); W2 from U1.O to the marker y, the net name y on its vertical
+  // U1 at (80, 90): I (80, 100), O (160, 100); W2 from U1.O to the marker y, the net name y on its vertical
   const doc = newDoc('seg', 'vhdl');
-  doc.symbols.push({ id: 'S1', type: 'inv', x: 100, y: 90, rot: 0, mirror: false, name: 'U1', params: { width: 1 } });
+  doc.symbols.push({ id: 'S1', type: 'inv', x: 80, y: 90, rot: 0, mirror: false, name: 'U1', params: { width: 1 } });
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 400, y: 300 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(160, 100), P(250, 100), P(250, 300), P(400, 300)] });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(250, 100), P(250, 300), P(400, 300)] });
   doc.labels.push({ id: 'L1', x: 250, y: 200, net: 'y' });
   await makeProject(env, { name: 'SegPj', files: { 'src/seg.sch.json': JSON.stringify(doc) } });
   await page.openProject('SegPj');
@@ -43,7 +43,7 @@ uiTest('#688 schematic: a wire segment dragged moves alone, its neighbours stret
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.find((w) => w.id === 'W2').points[1].x === 290, [], { what: 'the segment moved' });
   assert.deepEqual(await w2(), [[160, 100], [290, 100], [290, 300], [400, 300]]);
   assert.deepEqual((await getDoc()).labels.map((l) => [l.x, l.y]), [[290, 200]], 'the net name went with it');
-  assert.deepEqual((await getDoc()).wires.find((w) => w.id === 'W1').points, [P(60, 100), P(100, 100)], 'the other wire stays');
+  assert.deepEqual((await getDoc()).wires.find((w) => w.id === 'W1').points, [P(60, 100), P(80, 100)], 'the other wire stays');
   await same('a middle segment');
 
   // the first segment (from U1.O) dragged up 40: its end stays on the pin, a short segment joins them
@@ -62,6 +62,6 @@ uiTest('#688 schematic: a wire segment dragged moves alone, its neighbours stret
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[0].y === 130, [], { what: 'the part moved' });
   const d = await getDoc();
   assert.deepEqual(d.wires.find((w) => w.id === 'W2').points[0], P(160, 140), 'W2 still starts on U1.O');
-  assert.deepEqual(d.wires.find((w) => w.id === 'W1').points.at(-1), P(100, 140), 'W1 still ends on U1.I');
+  assert.deepEqual(d.wires.find((w) => w.id === 'W1').points.at(-1), P(80, 140), 'W1 still ends on U1.I');
   await same('the part moved');
 });

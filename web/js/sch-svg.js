@@ -47,19 +47,20 @@ export function bodySvg(sym, def) {
       break;
     }
     case 'inv': case 'buf': {
-      s += `<path class="gate" d="M20,0 L44,10 L20,20 Z"/>`;
-      if (def.shape === 'inv') s += `<circle class="gate" cx="47" cy="10" r="3"/>`;
-      s += lead(0, 10, 20, 10, bus(pins[0])) + lead(def.shape === 'inv' ? 50 : 44, 10, 60, 10, bus(pins[1]));
+      // (the triangle to x = 54, the output's lead from it (or the bubble) to 80: #1988)
+      s += `<path class="gate" d="M20,0 L54,10 L20,20 Z"/>`;
+      if (def.shape === 'inv') s += `<circle class="gate" cx="57" cy="10" r="3"/>`;
+      s += lead(0, 10, 20, 10, bus(pins[0])) + lead(def.shape === 'inv' ? 60 : 54, 10, 80, 10, bus(pins[1]));
       break;
     }
     case 'tbuf': {
       // tri-state buffer: one triangle per row, the enable line from the pin (row 0) down to their top
-      // edges (x = 33), a bubble on it for the active-low T of BUFT
-      const n = def.rows, ex = 33, edge = k => 20 + 20 * k + (ex - 20) * 10 / 26;
+      // edges (x = 38), a bubble on it for the active-low T of BUFT; the triangles 36 long, to x = 56 (#1988)
+      const n = def.rows, ex = 38, edge = k => 20 + 20 * k + (ex - 20) * 10 / 36;
       s += lead(0, 10, ex, 10, false) + `<path class="gate nofill" d="M${ex},10 V${r1(edge(n - 1))}"/>`;
       for (let k = 0; k < n; k++) {
         const y = 30 + 20 * k, ip = pins[1 + k], op = pins[1 + n + k];
-        s += `<path class="gate" d="M20,${y - 10} L46,${y} L20,${y + 10} Z"/>` + lead(0, y, 20, y, bus(ip)) + lead(46, y, 60, y, bus(op));
+        s += `<path class="gate" d="M20,${y - 10} L56,${y} L20,${y + 10} Z"/>` + lead(0, y, 20, y, bus(ip)) + lead(56, y, 80, y, bus(op));
       }
       if (def.activeLow) s += `<circle class="gate" cx="${ex}" cy="${r1(edge(0) - 3.5)}" r="3"/>`;
       break;

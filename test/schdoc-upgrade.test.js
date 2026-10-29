@@ -231,3 +231,59 @@ test('#1910 a schematic of before: its bus joins widened, turned and mirrored, e
   const nl = netlist(d);
   assert.equal(nl.pinNet.get('J/O'), nl.pinNet.get('G/I'));
 });
+
+// #1988: a schematic of version 6 brought to version 7: INV, BUF and the tri-state buffers 80 px wide (they were 60, their
+// outputs at local x = 60). Their inputs stay (each placed so); their outputs move 20 px along their leads, what met them
+// following: a wire going on along the move has its end moved, a net name on the old lead moved with it.
+test('#1988 a schematic of before: its inverters, buffers and BUFE4 widened, turned and mirrored, every pin on its net, the HDL the same', () => {
+  const kinds = [['inv', {}, ['I'], ['O']], ['buf', {}, ['I'], ['O']], ['tbuf', { width: 4, bits: true, enable: 'E' }, ['E', 'I0', 'I1', 'I2', 'I3'], ['O0', 'O1', 'O2', 'O3']]];
+  for (const [type, params, ins, outs] of kinds) {
+    for (const [rot, mirror] of ORIENTS) {
+      const sym = { id: 'G', type, x: 400, y: 300, rot, mirror, name: 'U1', params: { width: 1, ...params } };
+      const def = symbolDef(sym), old = { w: 60, h: def.h };
+      const at = (n, w) => { const p = def.pins.find((q) => q.name === n); return place(sym, w, p.x === 0 ? 0 : w.w, p.y); };
+      const [wx, wy] = turned(sym, 'W'), [ex, ey] = turned(sym, 'E');
+      const far = (p, d, [dx, dy]) => ({ x: p.x + d * dx, y: p.y + d * dy });
+      const d6 = { version: 6, name: 'bufs', lang: 'vhdl', sheet: { w: 1700, h: 1100 }, symbols: [sym], wires: [], labels: [], ports: [] };
+      for (const n of ins) {
+        const p = at(n, old), q = far(p, 40, [wx, wy]);
+        d6.ports.push({ id: `P${n}`, name: `i_${n}`.toLowerCase(), dir: 'in', width: 1, ...q });
+        d6.wires.push({ id: `W${n}`, points: [q, p] });
+      }
+      for (const n of outs) {
+        const p = at(n, old), q = far(p, 60, [ex, ey]);
+        d6.ports.push({ id: `P${n}`, name: `o_${n}`.toLowerCase(), dir: 'out', width: 1, ...q });
+        d6.wires.push({ id: `W${n}`, points: [p, q] });
+        // a net name on the old lead, 10 px from the pin: moved with it
+        d6.labels.push({ id: `L${n}`, ...far(p, 10, [ex, ey]), net: `o_${n}`.toLowerCase() });   // (the marker's own name: no warning)
+      }
+      const where = `${type} rot ${rot}${mirror ? ' mirrored' : ''}`;
+      const d = normalizeDoc(structuredClone(d6));
+      assert.equal(d.version, DOC_VERSION, where);
+      const pins = Object.fromEntries(symbolPins(d.symbols[0], {}).map((p) => [p.name, p]));
+      for (const n of ins) assert.deepEqual([pins[n].x, pins[n].y], [at(n, old).x, at(n, old).y], `${where}: ${n} stays`);
+      for (const n of outs) {
+        const o = at(n, old), oNew = far(o, 20, [ex, ey]);
+        assert.deepEqual([pins[n].x, pins[n].y], [oNew.x, oNew.y], `${where}: ${n} 20 px further along its lead`);
+        assert.deepEqual(d.wires.find((w) => w.id === `W${n}`).points, [oNew, far(o, 60, [ex, ey])], `${where}: ${n}'s wire shortened`);
+        const l = d.labels.find((q) => q.id === `L${n}`);
+        assert.deepEqual([l.x, l.y], [far(o, 30, [ex, ey]).x, far(o, 30, [ex, ey]).y], `${where}: ${n}'s net name moved with it`);
+      }
+      assert.equal(d.wires.length, d6.wires.length, `${where}: no wire added`);
+      const nl = netlist(d);
+      assert.deepEqual(nl.diagnostics.map((x) => x.message), [], `${where}: no warnings`);
+      for (const n of [...ins, ...outs]) assert.equal(nl.pinNet.get(`G/${n}`), nl.portNet.get(`P${n}`), `${where}: ${n} on its net`);
+      for (const lang of ['vhdl', 'verilog']) assert.equal(generateHdl(d, { lang }).code, generateHdl(normalizeDoc(structuredClone(d6)), { lang }).code, where);
+      assert.deepEqual(normalizeDoc(structuredClone(d)), d, `${where}: converted once`);
+    }
+  }
+  // another symbol's pin on the old output: a wire from there to the new one (an inverter's output on a buffer's input)
+  const d6 = { version: 6, name: 'pair', lang: 'vhdl', sheet: { w: 1700, h: 1100 }, wires: [], labels: [], ports: [],
+    symbols: [{ id: 'A', type: 'inv', x: 100, y: 90, rot: 0, mirror: false, name: 'U1', params: { width: 1 } },
+      { id: 'B', type: 'buf', x: 160, y: 90, rot: 0, mirror: false, name: 'U2', params: { width: 1 } }] };
+  const d = normalizeDoc(d6);
+  assert.deepEqual(d.symbols.map((s) => [s.x, s.y]), [[100, 90], [160, 90]], 'each placed so that its input stays');
+  assert.deepEqual(d.wires.map((w) => w.points), [[{ x: 160, y: 100 }, { x: 180, y: 100 }]]);
+  const nl = netlist(d);
+  assert.equal(nl.pinNet.get('A/O'), nl.pinNet.get('B/I'));
+});

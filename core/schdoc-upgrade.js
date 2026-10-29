@@ -10,8 +10,11 @@
 // whose last run goes that way has its end moved, else a bus wire joins the old place to the new I).
 // 6 (#1910): the bus join 60 px wide, its inputs' leads long enough for their bits' labels (it was 40, its bar at 20).
 // Each is placed so that its inputs stay where they were; its output O moves along its lead, what met it following.
+// 7 (#1988): INV, BUF and the tri-state buffers (BUFE / BUFT) 80 px wide, as the 2-input gates (they were 60): each
+// placed so that its inputs stay where they were, its outputs (one a bit for BUFE4…) moved along their leads, what met
+// them following.
 // Isomorphic (no DOM).
-import { JOIN_OLD_W, MUX_BODY_W, MUX_INPUTS, MUX_OLD_BODY_W, symbolDef, xform } from './schdoc-symbols.js';
+import { BUF_OLD_W, JOIN_OLD_W, MUX_BODY_W, MUX_INPUTS, MUX_OLD_BODY_W, symbolDef, xform } from './schdoc-symbols.js';
 
 const same = (a, b) => a.x === b.x && a.y === b.y;
 
@@ -57,6 +60,42 @@ export function moveTaps(doc, modules = {}) {
   for (const s of taps) {
     const def = symbolDef(s, {}), i = def.pins.find(p => p.name === 'I');
     follow(doc, xform(s, def, 0, 10), xform(s, def, i.x, i.y), others, true);
+  }
+  return doc;
+}
+
+const BUFS = new Set(['inv', 'buf', 'tbuf']);
+/** The inverters and buffers of doc (version 6) widened (#1988), their outputs moved, doc changed in place. */
+// (split: a document of version 2, whose wires connected where they passed over a pin, #678: its wires split at the
+// old outputs first, so that what passed over one follows it)
+export function widenBuffers(doc, modules = {}, split = null) {
+  const bufs = doc.symbols.filter(s => BUFS.has(s.type));
+  if (!bufs.length) return doc;
+  const others = pinsOfOthers(doc, modules, s => BUFS.has(s.type));
+  // (and the buffers' own inputs, which stay: an inverter's output on another buffer's input gets a wire)
+  for (const s of bufs) {
+    const old = { ...symbolDef(s, {}), w: BUF_OLD_W };
+    for (const p of old.pins.filter(q => q.dir === 'in')) { const q = xform(s, old, p.x, p.y); others.add(`${q.x},${q.y}`); }
+  }
+  for (const s of bufs) {
+    const def = symbolDef(s, {}), old = { ...def, w: BUF_OLD_W };
+    // placed so that its inputs stay where they were (local x = 0; turned or mirrored, its box grows on their other side)
+    const a = xform(s, old, 0, 0), b = xform(s, def, 0, 0);
+    const outs = def.pins.filter(p => p.dir === 'out').map(o => ({ o, before: xform(s, old, BUF_OLD_W, o.y) }));
+    if (split) split(outs.map(o => o.before));
+    s.x += a.x - b.x; s.y += a.y - b.y;
+    for (const { o, before } of outs) {
+      const after = xform(s, def, o.x, o.y);
+      // (a net name on the output's lead the symbol now covers, between the old and the new end: moved as far, still on
+      // its wire)
+      const dx = after.x - before.x, dy = after.y - before.y;
+      for (const l of doc.labels) {
+        const on = dy === 0 ? l.y === before.y && (l.x - before.x) * Math.sign(dx) > 0 && (l.x - before.x) * Math.sign(dx) < Math.abs(dx)
+          : l.x === before.x && (l.y - before.y) * Math.sign(dy) > 0 && (l.y - before.y) * Math.sign(dy) < Math.abs(dy);
+        if (on) { l.x += dx; l.y += dy; }
+      }
+      follow(doc, before, after, others, (o.width || 1) > 1);
+    }
   }
   return doc;
 }

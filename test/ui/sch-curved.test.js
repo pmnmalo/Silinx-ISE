@@ -25,15 +25,15 @@ const nets = nl => nl.nets.map(n => n.endpoints.map(e => (e.kind === 'pin' ? `${
 const messages = nl => nl.diagnostics.map(d => `${d.severity}: ${d.message}`);
 const warnings = page => page.console.filter(m => /^warn/.test(m.type)).map(m => m.text);
 
-// U1 at (100, 90): I (100, 100), O (160, 100); U2 at (300, 190): I (300, 200), O (360, 200); U3 at (300, 390): I (300,
+// U1 at (80, 90): I (80, 100), O (160, 100); U2 at (280, 190): I (280, 200), O (360, 200); U3 at (280, 390): I (280,
 // 400), O (360, 400). a -> U1 -> (W3, square) -> U2 -> y; b and z free, U3 free
 function design() {
   const doc = newDoc('curved', 'vhdl');
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 300, 190), inv('S3', 'U3', 300, 390));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 280, 190), inv('S3', 'U3', 280, 390));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 420, y: 200 },
     { id: 'P3', name: 'b', dir: 'in', width: 1, x: 60, y: 300 }, { id: 'P4', name: 'z', dir: 'out', width: 1, x: 480, y: 300 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(360, 200), P(420, 200)] },
-    { id: 'W3', points: [P(160, 100), P(230, 100), P(230, 200), P(300, 200)] });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(360, 200), P(420, 200)] },
+    { id: 'W3', points: [P(160, 100), P(230, 100), P(230, 200), P(280, 200)] });
   return doc;
 }
 const NETS0 = ['S1.I port:P1', 'S1.O S2.I', 'S2.O port:P2'];
@@ -131,7 +131,7 @@ uiTest('#1144 schematic: Curved wires by the mouse: ticked, handles dragged, a c
   assert.deepEqual((await drawn(page)).map(x => x[1]), ['poly', 'poly', 'poly']);
   // ticked: W3 a curve rounding its two bends; Undo: square again; Redo: curved
   await tick(page);
-  assert.match((await drawn(page))[2][1], /^M160,100 C\S+ \S+ \S+ C\S+ \S+ \S+ C\S+ \S+ 300,200$/, 'W3: three Béziers, from U1.O to U2.I');
+  assert.match((await drawn(page))[2][1], /^M160,100 C\S+ \S+ \S+ C\S+ \S+ \S+ C\S+ \S+ 280,200$/, 'W3: three Béziers, from U1.O to U2.I');
   await page.click(`${ED} [data-act=undo]`);
   await page.waitFor(() => !window.Silinx.active.schEditor.getDoc().wireStyle, [], { what: 'undone' });
   assert.deepEqual((await drawn(page)).map(x => x[1]), ['poly', 'poly', 'poly']);
@@ -169,25 +169,25 @@ uiTest('#1144 schematic: Curved wires by the mouse: ticked, handles dragged, a c
   await page.drag(await at(page, P(320, 200)), await at(page, P(320, 240)));
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols.find(x => x.id === 'S2').y === 230, [], { what: 'U2 moved' });
   const wMoved = (await getDoc(page)).wires.find(x => x.id === 'W3');
-  assert.deepEqual([wMoved.points[0], wMoved.points.at(-1)], [P(160, 100), P(300, 240)], 'W3 still from U1.O to U2.I');
+  assert.deepEqual([wMoved.points[0], wMoved.points.at(-1)], [P(160, 100), P(280, 240)], 'W3 still from U1.O to U2.I');
   assert.deepEqual(wMoved.curve, wBefore.curve, 'its curve relative to its ends the same');
   assert.equal((await drawn(page)).find(x => x[0] === 'W3')[1], curveD(wMoved));
   assert.deepEqual(nets(netlist(await getDoc(page))), NETS0);
   await page.click(`${ED} [data-act=undo]`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols.find(x => x.id === 'S2').y === 190, [], { what: 'the move undone' });
 
-  // a wire by clicks: from b (60, 300) through (150, 360) and (250, 330) to U3.I (300, 400)
+  // a wire by clicks: from b (60, 300) through (150, 360) and (250, 330) to U3.I (280, 400)
   await page.click(`${ED} .se-btn[data-act=wire]`);
   await page.hover(await at(page, P(200, 450)));
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .hint`).textContent, ED), /^Add Wire \(curved\): click to start, click to add points the curve passes through/);
   const before = await getDoc(page);
   for (const p of [P(60, 300), P(150, 360), P(250, 330)]) await page.click(await at(page, p));
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} svg path.wire-preview`)?.getAttribute('d').startsWith('M60,300 C'), ED), true, 'its curve previewed');
-  await page.click(await at(page, P(300, 400)));
+  await page.click(await at(page, P(280, 400)));
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 4, [], { what: 'the wire clicked' });
   w = (await getDoc(page)).wires.at(-1);
   assert.deepEqual(curveAbs(w), [P(150, 360), P(250, 330)], 'through the points clicked');
-  assert.deepEqual(w.points, routePath(wireGrid(before), P(60, 300), P(300, 400)), 'its path routed square between its ends');
+  assert.deepEqual(w.points, routePath(wireGrid(before), P(60, 300), P(280, 400)), 'its path routed square between its ends');
   // a stroke of any shape from U3.O (360, 400) to z (480, 300)
   await strokeWire(page, 'mouse', P(360, 400), P(480, 300));
   const d = await getDoc(page);

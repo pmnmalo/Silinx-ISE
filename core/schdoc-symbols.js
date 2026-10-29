@@ -82,6 +82,8 @@ export const MUX_BODY_W = k => Math.max(70, MUX_OLD_BODY_W(k));
 export const MUX_SEL_X = k => 20 + MUX_OLD_BODY_W(k) / 2;
 // the bus join (#1910): its bar's middle and its width; before document version 6, 20 and 40
 export const JOIN_BAR = 40, JOIN_W = 60, JOIN_OLD_W = 40;
+// (INV, BUF, BUFE / BUFT before #1988: 60 wide)
+export const BUF_OLD_W = 60;
 SYMBOLS.demux = {
   // (one entry, DEMUX, the enable E, the select bits and the select bus its parameters, #313, #334; drawn DEMUX1_4…)
   category: 'Mux', title: 'DEMUX', description: '1:2^n demultiplexer: output O<S> = D, the other outputs 0 (bitwise when Width > 1)',
@@ -314,9 +316,11 @@ export function symbolDef(sym, modules = {}) {
     pins.push({ name: 'O', dir: 'out', x: 80, y: h / 2, side: 'E', width: W });
     return { w: 80, h, shape: 'gate', gate: S.gate, bubble: /^n|xnor/.test(S.gate), body: { x: 20, y: 0, w: 40, h }, pins };
   }
+  // (INV, BUF and the tri-state buffers as wide as the 2-input gates, 80, their triangle 34 or 36 long: room for an
+  // instance name inside and for a bus width on the output's lead, #1988; they were 60, BUF_OLD_W)
   if (t === 'inv' || t === 'buf') {
-    return { w: 60, h: 20, shape: t, body: { x: 20, y: 0, w: 24, h: 20 },
-      pins: [{ name: 'I', dir: 'in', x: 0, y: 10, side: 'W', width: W }, { name: 'O', dir: 'out', x: 60, y: 10, side: 'E', width: W }] };
+    return { w: 80, h: 20, shape: t, body: { x: 20, y: 0, w: 34, h: 20 },
+      pins: [{ name: 'I', dir: 'in', x: 0, y: 10, side: 'W', width: W }, { name: 'O', dir: 'out', x: 80, y: 10, side: 'E', width: W }] };
   }
   if (t === 'tbuf') {
     // the enable on the left, one row above the data (as the Xilinx BUFE / BUFT symbols); one triangle per
@@ -324,9 +328,9 @@ export function symbolDef(sym, modules = {}) {
     const en = p.enable === 'T' ? 'T' : 'E', bits = W > 1 && !!p.bits, n = bits ? W : 1;
     const pins = [{ name: en, dir: 'in', x: 0, y: 10, side: 'W', width: 1 }];
     for (let k = 0; k < n; k++) pins.push({ name: bits ? `I${k}` : 'I', dir: 'in', x: 0, y: 30 + 20 * k, side: 'W', width: bits ? 1 : W });
-    for (let k = 0; k < n; k++) pins.push({ name: bits ? `O${k}` : 'O', dir: 'out', x: 60, y: 30 + 20 * k, side: 'E', width: bits ? 1 : W, tri: true });
+    for (let k = 0; k < n; k++) pins.push({ name: bits ? `O${k}` : 'O', dir: 'out', x: 80, y: 30 + 20 * k, side: 'E', width: bits ? 1 : W, tri: true });
     const title = `BUF${en}${W > 1 ? W : ''}`;
-    return { w: 60, h: 20 + 20 * n, shape: 'tbuf', activeLow: en === 'T', rows: n, title, body: { x: 20, y: 20, w: 26, h: 20 * n }, pins };
+    return { w: 80, h: 20 + 20 * n, shape: 'tbuf', activeLow: en === 'T', rows: n, title, body: { x: 20, y: 20, w: 36, h: 20 * n }, pins };
   }
   // the select pins at the bottom, the most significant on the left, 20 apart around cx (#301): one bus pin S
   // (selBus) or S<k-1> … S0

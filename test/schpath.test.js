@@ -81,7 +81,7 @@ test('#948 a wire drawn across a symbol, over its pins: nudged around the symbol
   const doc = sd.newDoc('pins', 'verilog');
   doc.symbols.push(inv('S1', 'U1', 200, 290));
   const [I, O] = ['I', 'O'].map(n => sd.symbolPins(doc.symbols[0], {}).find(p => p.name === n));
-  assert.deepEqual([I, O].map(p => [p.x, p.y]), [[200, 300], [260, 300]]);
+  assert.deepEqual([I, O].map(p => [p.x, p.y]), [[200, 300], [280, 300]]);
   doc.ports.push(port('P1', 'd', 'in', 100, 300), port('P2', 'e', 'out', 400, 300));
   const drawn = [P(100, 300), P(400, 300)];
   const before = withWire(doc, 'W1', drawn);
@@ -120,10 +120,10 @@ test('#948 the router: out of a pin and into one by their sides, around bodies, 
   doc.symbols.push(inv('S1', 'U1', 200, 290), inv('S2', 'U2', 100, 290));
   doc.wires.push({ id: 'W1', points: [P(300, 200), P(300, 400)] });   // a wire to cross
   const g = wireGrid(doc);
-  // U1.O (260, 300) back to U2.I (100, 300): leaves east, arrives from the west, around both bodies
-  const pts = routePath(g, P(260, 300), P(100, 300));
+  // U1.O (280, 300) back to U2.I (100, 300): leaves east, arrives from the west, around both bodies
+  const pts = routePath(g, P(280, 300), P(100, 300));
   assert.ok(pts, 'a path');
-  assert.equal(pts[1].x > 260 && pts[1].y === 300, true, `leaves U1.O eastwards: ${JSON.stringify(pts)}`);
+  assert.equal(pts[1].x > 280 && pts[1].y === 300, true, `leaves U1.O eastwards: ${JSON.stringify(pts)}`);
   assert.equal(pts.at(-2).x < 100 && pts.at(-2).y === 300, true, 'enters U2.I from the west');
   assert.deepEqual(pathViolations(g, pts), []);
   // a path that would only run along the wire: none found inside it, around it instead

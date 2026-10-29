@@ -119,7 +119,7 @@ test('#1183 Update Symbol: several pins moving at once each keep their own wire 
   const doc = sheet(0, false, four);
   const b = symbolPins(doc.symbols[0], mods(four)).find((p) => p.name === 'b');
   doc.wires = doc.wires.filter((w) => w.id !== 'w_b'); doc.ports = doc.ports.filter((q) => q.id !== 'm_b');
-  doc.symbols.push({ id: 'I', type: 'inv', x: b.x - 60, y: b.y - 10, rot: 0, mirror: false, name: 'U2', params: {} });
+  doc.symbols.push({ id: 'I', type: 'inv', x: b.x - 80, y: b.y - 10, rot: 0, mirror: false, name: 'U2', params: {} });
   assert.equal(symbolPins(doc.symbols[1], {}).find((p) => p.name === 'O').x, b.x, '(the inverter\'s output on b)');
   const changed = mods([P('b'), P('c'), P('d'), P('y', 'out')]);
   updateModuleSymbols(doc, changed);

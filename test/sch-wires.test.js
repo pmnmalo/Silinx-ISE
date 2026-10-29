@@ -24,7 +24,7 @@ const messages = nl => nl.diagnostics.map(d => `${d.severity}: ${d.message}`);
 // drivers (U1.O, U2.O).
 function crossing(lang = 'vhdl') {
   const doc = newDoc('cross', lang);
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 240, 240));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 220, 240));
   const o1 = pin(doc, 'S1', 'O'), i1 = pin(doc, 'S1', 'I'), o2 = pin(doc, 'S2', 'O'), i2 = pin(doc, 'S2', 'I');
   assert.deepEqual([o1, o2].map(p => [p.x, p.y]), [[160, 100], [300, 250]]);
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: i1.x - 40, y: i1.y }, { id: 'P2', name: 'b', dir: 'in', width: 1, x: i2.x - 40, y: i2.y },
@@ -51,15 +51,15 @@ test('#678 a wire passing over a pin and over another wire\'s end does not conne
 
 test('#678 the ends connect: a wire ended on a pin, on a marker, on another wire\'s end; a bend does not', () => {
   const doc = newDoc('ends', 'vhdl');
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 300, 90), inv('S3', 'U3', 300, 290));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 300, 90), inv('S3', 'U3', 300, 290));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 });
   doc.wires.push(
-    { id: 'W1', points: [P(60, 100), P(100, 100)] },                 // marker a -> U1.I
+    { id: 'W1', points: [P(60, 100), P(80, 100)] },                 // marker a -> U1.I
     { id: 'W2', points: [P(160, 100), P(230, 100)] },                // U1.O -> (230, 100) ...
     { id: 'W3', points: [P(230, 100), P(300, 100)] },                // ... end to end -> U2.I
     { id: 'W4', points: [P(230, 100), P(230, 300), P(300, 300)] },   // a third end there -> U3.I: a dot
-    // a wire whose bend is on U2.O (360, 100) and whose ends are free: not connected to it
-    { id: 'W5', points: [P(360, 60), P(360, 100), P(420, 100)] });
+    // a wire whose bend is on U2.O (380, 100) and whose ends are free: not connected to it
+    { id: 'W5', points: [P(380, 60), P(380, 100), P(440, 100)] });
   const nl = netlist(doc);
   assert.deepEqual(nets(nl), ['S1.I port:P1', 'S1.O S2.I S3.I']);
   assert.equal(nl.wireNet.get('W2'), nl.wireNet.get('W4'));
@@ -149,10 +149,11 @@ test('#678 a document saved before (version 2) keeps its nets: converted on open
   assert.deepEqual(nets(netlist(d)), want, 'converted');
   assert.deepEqual(nets(netlist(v2)), want, 'netlist() of the document as saved');
   assert.deepEqual(normalizeDoc(d), d, 'converted once: the same again');
-  // the wires split at the joints: every connection now at wire ends
+  // the wires split at the joints: every connection now at wire ends (the inverters' outputs 20 further, #1988:
+  // U1.O's wire lengthened, a wire from U2.O's old place, where W6 was split, to it)
   assert.deepEqual(d.wires.map(w => w.points.map(p => `${p.x},${p.y}`).join(' ')), [
-    '60,100 100,100', '160,100 250,100', '250,100 500,100', '250,200 250,100', '250,200 300,200', '300,200 350,200 350,300 400,300',
-    '300,400 300,200', '100,450 460,450 460,300', '460,300 460,250 500,250']);
+    '60,100 100,100', '180,100 250,100', '250,100 500,100', '250,200 250,100', '250,200 300,200', '300,200 350,200 350,300 400,300',
+    '300,400 300,200', '100,450 460,450 460,300', '460,300 460,250 500,250', '460,300 480,300']);
   // its HDL the same as before the conversion
   for (const lang of ['vhdl', 'verilog']) assert.equal(generateHdl(d, { lang }).code, generateHdl(v2, { lang }).code, lang);
   // a module symbol whose module is not known yet: kept at version 2, converted when it is

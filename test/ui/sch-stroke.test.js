@@ -22,12 +22,12 @@ const nets = nl => nl.nets.map(n => n.endpoints.map(e => (e.kind === 'pin' ? `${
 const messages = nl => nl.diagnostics.map(d => `${d.severity}: ${d.message}`);
 const warnings = page => page.console.filter(m => /^warn/.test(m.type)).map(m => m.text);
 
-// U1 at (100, 90): I (100, 100), O (160, 100); U2 at (300, 190): I (300, 200), O (360, 200); a -> U1, U2 -> y
+// U1 at (80, 90): I (80, 100), O (160, 100); U2 at (280, 190): I (280, 200), O (360, 200); a -> U1, U2 -> y
 function design() {
   const doc = newDoc('stroke', 'vhdl');
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 300, 190));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 280, 190));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 420, y: 200 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(360, 200), P(420, 200)] });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(360, 200), P(420, 200)] });
   return doc;
 }
 // a curve from a to b (sheet points): a wave across the straight line, n steps
@@ -69,9 +69,9 @@ async function stroke(page, how, pts, { mid = 0, during } = {}) {
 // the stroke from U1.O to U2.I, the wire it makes checked against the router's; undone, the design as it was
 async function strokeBetweenPins(page, how) {
   const d0 = await getDoc(page);
-  const want = routePath(wireGrid(d0), P(160, 100), P(300, 200));
+  const want = routePath(wireGrid(d0), P(160, 100), P(280, 200));
   assert.ok(want && want.length >= 3, `the router's path: ${JSON.stringify(want)}`);
-  await stroke(page, how, curve(P(160, 100), P(300, 200)), {
+  await stroke(page, how, curve(P(160, 100), P(280, 200)), {
     mid: 8, during: async () => {
       assert.equal(await ink(page), true, `${how}: the ink trail shown while drawing`);
       assert.equal(await preview(page), false, `${how}: no corner-by-corner preview`);
@@ -109,10 +109,10 @@ uiTest('#1052 schematic: a curved stroke by the mouse between two pins becomes a
   // clicks: from U1.O, a bend at (230, 100), ended on U2.I: the wire drawn corner by corner, as before
   for (const p of [P(160, 100), P(230, 100)]) await page.click(await at(page, p));
   assert.equal(await preview(page), true, 'a wire being drawn by clicks');
-  await page.click(await at(page, P(300, 200)));
+  await page.click(await at(page, P(280, 200)));
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 3, [], { what: 'the wire clicked' });
   const d = await getDoc(page);
-  assert.deepEqual(d.wires.at(-1).points, [P(160, 100), P(230, 100), P(230, 200), P(300, 200)]);
+  assert.deepEqual(d.wires.at(-1).points, [P(160, 100), P(230, 100), P(230, 200), P(280, 200)]);
   assert.deepEqual(messages(netlist(d)), []);
   assert.deepEqual(warnings(page), []);
 });
@@ -125,7 +125,7 @@ uiTest('#1052 schematic: a curved stroke by a finger and by a pen between two pi
   assert.deepEqual(await page.eval(() => [...window.__types].sort()), ['pen', 'touch'], 'a finger\'s and a pen\'s pointer events on the sheet');
   // a second finger midway: pan and zoom (#674), the stroke dropped
   const d0 = await getDoc(page);
-  const a = await at(page, P(160, 100)), b = await at(page, P(300, 200));
+  const a = await at(page, P(160, 100)), b = await at(page, P(280, 200));
   await page.touchGesture([[a, b], [{ x: a.x + 120, y: a.y - 60 }, { x: b.x + 140, y: b.y - 40 }]]);
   await page.eval(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   assert.deepEqual((await getDoc(page)).wires, d0.wires, 'nothing drawn');

@@ -47,7 +47,7 @@ test('#1109 an edit that connects the marker to no new pin keeps its direction (
   assert.deepEqual(after(d1, wired(d1, [{ x: 400, y: 220 }, { x: 500, y: 220 }])), []);
   // another symbol's output wired onto a net the marker already had an input pin on: an output now drives it
   const d2 = wired(drawing({ dir: 'in', at: { x: 120, y: 210 } }), [{ x: 120, y: 210 }, { x: 200, y: 210 }]);
-  const inv = normalizeDoc({ ...d2, symbols: [...d2.symbols, { id: 'S2', type: 'inv', x: 20, y: 180 }] });   // (O at (80, 190))
+  const inv = normalizeDoc({ ...d2, symbols: [...d2.symbols, { id: 'S2', type: 'inv', x: 0, y: 180 }] });   // (O at (80, 190))
   assert.deepEqual(after(inv, wired(inv, [{ x: 80, y: 190 }, { x: 120, y: 190 }, { x: 120, y: 210 }])), [{ port: 'P1', dir: 'out' }]);
 });
 

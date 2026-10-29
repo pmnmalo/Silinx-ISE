@@ -76,7 +76,7 @@ test('paste into the same sheet: offset, fresh ids, instance, marker and net nam
   assert.deepEqual(Object.fromEntries(renamed.nets), { mid: 'mid_1' });
   const s3 = doc.symbols.find(s => s.id === 'S3');
   assert.deepEqual([s3.x, s3.y], [200, 300]);
-  assert.deepEqual(doc.wires.find(w => w.id === 'W5').points, [{ x: 260, y: 310 }, { x: 400, y: 310 }]);
+  assert.deepEqual(doc.wires.find(w => w.id === 'W5').points, [{ x: 280, y: 310 }, { x: 400, y: 310 }]);
   // two circuits, nothing shorted: four separate nets and no diagnostics
   assert.deepEqual(errorsAndWarnings(doc), []);
   const nl = netlist(doc);
