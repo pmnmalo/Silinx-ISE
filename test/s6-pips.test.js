@@ -29,7 +29,7 @@ test('gen-pipprobe6: the INT tiles next to a CLB, a PIP each in turn, the design
 });
 
 test('ana-pipprobe6: an INT tile\'s region, its bits; a PIP\'s bits checked between tiles', () => {
-  const dev = S6_DEVICES.xc6slx16, bases = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
+  const dev = S6_DEVICES.xc6slx16, bases = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
   assert.deepEqual(intRegion(sites, bases, dev, 'INT_X17Y15'), [511, 0]);
   assert.equal(intRegion(sites, bases, dev, 'INT_X99Y0'), null);
   const empty = emptyFdri(dev), fdri = Uint16Array.from(empty), set = (f, b) => { fdri[f * FRAME_WORDS + (b >> 4)] |= 0x8000 >> (b & 15); };
@@ -76,7 +76,7 @@ test('check-pips6: a bidirectional PIP\'s direction from its net; the bits by di
   assert.deepEqual(pipLookup(db, 'a', '->', 'b'), [[1, 1]]);
   assert.equal(pipLookup(db, 'x', '->', 'y'), undefined);
   // the measured INT switch box: the continuations measured on paths, the bidirectional PIPs both ways
-  const read = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/xc6slx16-${n}.json`, import.meta.url), 'utf8')).pips;
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/xc6slx16-${n}.json`, import.meta.url), 'utf8')).pips;
   const int = read('int'), cover = read('int-cover');
   assert.ok(Object.keys(int).length >= 3449);
   assert.deepEqual(cover['SR1E1 -> SR1B2'], [[8, 32], [8, 33]]);
@@ -88,7 +88,7 @@ test('the other INT-like tiles: their regions by the columns\' rule, their own P
   const { otherIntTiles, tilePips, tieoffs } = await import('../research/s6/gen-pipprobe6.mjs');
   const { tileRegion, intRegion: region } = await import('../research/s6/ana-pipprobe6.mjs');
   const { pipLookup } = await import('../research/s6/check-pips6.mjs');
-  const dev = S6_DEVICES.xc6slx16, bases = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
+  const dev = S6_DEVICES.xc6slx16, bases = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
   // the rule gives the INT tiles' regions found from their CLBs' slices
   for (const k of intTiles(device).filter((_, i) => i % 50 === 0)) assert.deepEqual(tileRegion(dev, device.tileNames[k]), region(sites, bases, dev, device.tileNames[k]));
   assert.deepEqual(tileRegion(dev, 'INT_BRAM_X3Y20'), [744 + 4 + 30 + 30 + 31, 11 * 64 + 16]);
@@ -102,7 +102,7 @@ test('the other INT-like tiles: their regions by the columns\' rule, their own P
   assert.ok(own.every(p => /_BRK$/.test(p.from)) && shared.length > 3000);
   assert.equal(Object.keys(tieoffs(device, [brk])).length, 1);
   // the measured own PIPs; an I/O tile's INT_IOI_ wires take the INT switch box's bits
-  const read = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/xc6slx16-${n}.json`, import.meta.url), 'utf8')).pips;
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/xc6slx16-${n}.json`, import.meta.url), 'utf8')).pips;
   const db = { pips: read('int'), cover: read('int-cover'), own: read('int-own') };
   assert.deepEqual(pipLookup(db, 'GCLK0', '->', 'INT_IOI_GFAN0'), [[20, 61], [20, 62], [20, 63]]);
   assert.deepEqual(pipLookup(db, 'EE2E1', '->', 'INT_IOI_LOGICIN_B4'), db.pips['EE2E1 -> LOGICIN_B4']);
@@ -143,7 +143,7 @@ test('residual6: a design\'s bits predicted from every database (slices, INT-lik
   const { predictDesign, typesAt } = await import('../research/s6/residual6.mjs');
   const { loadDb } = await import('../research/s6/check-slice6.mjs');
   const { parseXdl } = await import('../packages/silinx-fpga/src/xdl.js');
-  const read = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${n}.json`, import.meta.url), 'utf8'));
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8'));
   const db = { part: 'xc6slx16csg324-3', slices: loadDb('xc6slx16'), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips }, other: read('s6-pips-other') };
   const design = parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";
 inst "t" "TIEOFF",placed INT_X17Y15 TIEOFF_X31Y30 , cfg "" ;

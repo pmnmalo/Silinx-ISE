@@ -15,7 +15,7 @@ import { setBits } from '../research/s6/residual6.mjs';
 import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
-const db = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${n}.json`, import.meta.url), 'utf8'));
+const db = n => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8'));
 const flip = (fdri, f, b) => { fdri[f * FRAME_WORDS + Math.floor(b / 16)] ^= 1 << (15 - (b % 16)); };
 
 // a design as parseXdl gives it: its instances and nets (only what cmt6.mjs reads)

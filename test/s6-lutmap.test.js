@@ -91,7 +91,7 @@ test('ana-lutmap6: what it reports: a LUT not found, an entry twice, a slice lai
 });
 
 test('ana-lutmap6: every slice\'s base from the sample\'s: the XC6SLX16\'s measured map rebuilt from its sample', () => {
-  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-lut.json', import.meta.url), 'utf8'));
+  const db = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-lut.json', import.meta.url), 'utf8'));
   const all = Object.keys(db.slices).map(name => ({ name }));
   assert.equal(all.length, 2278);
   const sample = Object.fromEntries(sampleSlices(all).map(({ name }) => [name, db.slices[name]]));

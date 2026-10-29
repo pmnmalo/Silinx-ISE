@@ -1,5 +1,5 @@
 // research/s6 check-slice6.mjs (#725), without ISE: the slices of a design predicted from the LUT and slice
-// databases (research/s6/db), checked tile by tile against a bitstream; here one written from the prediction itself.
+// databases (packages/silinx-fpga/bitdb/s6), checked tile by tile against a bitstream; here one written from the prediction itself.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lutEntries, routeThroughs, loadDb, kindModel, predictSlice, checkDesign, CIN_BIT } from '../research/s6/check-slice6.mjs';

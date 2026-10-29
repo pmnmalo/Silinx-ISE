@@ -2,7 +2,7 @@
 // bits the databases leave over (residual6.mjs's prediction taken away: the slices, the routing, the pads) and, per
 // variant, the leftover bits it sets and clears against its base's: the setting's bits at that site.
 //   node research/s6/ana-dcm6.mjs <dir> [part]   (<dir>/<design>/top.xdl, top.bit: gen-dcm6.mjs's and its --fields
-//     designs together)   -> research/s6/db/<device>-cmt.json
+//     designs together)   -> packages/silinx-fpga/bitdb/s6/<device>-cmt.json
 // { part, dcm: { site, base: ['frame,bit' left over], variants: { name: { params, set, clear } } }, pll: { … }, dcmEven: { … } }
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,7 +25,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const all = process.argv.slice(2), at = all.indexOf('--dcm'), dcmSite = at < 0 ? null : all[at + 1];
   const [dir, part = 'xc6slx16csg324-3'] = at < 0 ? all : [...all.slice(0, at), ...all.slice(at + 2)];
   if (!dir) { console.error('usage: node research/s6/ana-dcm6.mjs [--dcm <site>] <dir> [part]'); process.exit(1); }
-  const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, '');
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, '');
   const { device } = s6Device(part);
   const db = { part, slices: loadDb(dv), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
     other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips } }, iob: read(`${dv}-iob`) };
@@ -36,7 +36,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const { bits } = predictDesign(x, device, dev, db);
     return new Set([...bitsOf(r.fdri, emptyFdri(dev))].filter(q => !bits.has(q)));
   };
-  const file = new URL(`./db/${dv}-cmt.json`, import.meta.url);
+  const file = new URL(`../../packages/silinx-fpga/bitdb/s6/${dv}-cmt.json`, import.meta.url);
   const out = dcmSite ? { ...JSON.parse(fs.readFileSync(file, 'utf8')), dcmEven: { site: dcmSite, variants: {} } } : { part, dcm: { site: 'DCM_X0Y1', variants: {} }, pll: { site: 'PLL_ADV_X0Y0', variants: {} } };
   for (const [key, kind] of dcmSite ? [['dcmEven', 'dcm']] : [['dcm', 'dcm'], ['pll', 'pll']]) {
     const base = left(kind);

@@ -68,7 +68,7 @@ them and this table is corrected then.
 
 ISE's raw outputs (`.bit`, `.ncd`, `.xdl`, `.xdlrc`, the logs) never enter the repository: the scripts keep
 them in a work folder outside it, and only Silinx's own records of the observations (counts, bit
-positions, fitted delays) go into `research/s6/measured/` and, later, `research/s6/db/`. The machine ISE
+positions, fitted delays) go into `research/s6/measured/` and, later, `packages/silinx-fpga/bitdb/s6/`. The machine ISE
 runs on is given on the command line only (`SILINX_ISE_HOST=user@host`), never in a file.
 
 ### Night 1 (S6-0): how to run it
@@ -651,6 +651,9 @@ Nexys3 with its UCF, blinky places in 0.9 s and routes in 0.4 s (54 slices, 5.6 
 2.2 s and 0.8 s (84 slices, a RAMB8BWER and three DSP48A1s, 8.9 ns).
 
 ## Files
+
+The databases the analyses write (`db/<name>.json` in this note) are in `packages/silinx-fpga/bitdb/s6/` since #732: the
+Silinx toolchain's Spartan-6 bitstream writer reads them there.
 
 | File | What it does |
 |---|---|

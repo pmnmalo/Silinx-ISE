@@ -4,7 +4,7 @@
 // I/O words: the BUFIO2's route to the CMT), each output that drives a net (the bits left in the CMT's frame, CMT_FRAME
 // of its row: kept where every design using the output has them), and its site (the other bits every design of the
 // site has: the clock spine's and the CMT column's, set by any CMT of the half).
-//   node research/s6/ana-cmtinput6.mjs <dir> …   (each with top.xdl and top.bit)  -> research/s6/db/<device>-cmt-input.json
+//   node research/s6/ana-cmtinput6.mjs <dir> …   (each with top.xdl and top.bit)  -> packages/silinx-fpga/bitdb/s6/<device>-cmt-input.json
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,5 +66,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   const table = cmtInputTable(samples);
   console.log(`${samples.length} designs (${skipped} without exactly one CMT): ${Object.entries(table.sites).map(([s, x]) => `${s} ${x.common.length} common, outputs ${Object.keys(x.outputs).join('/') || '-'}, BUFIO2 ${Object.keys(x.bufio2).join('/') || '-'}`).join('; ')}`);
-  fs.writeFileSync(new URL(`./db/${device0}-cmt-input.json`, import.meta.url), `${JSON.stringify({ note: 'A CMT\'s bits outside its settings and its paths\' PIPs, by its site, its outputs used and its CLKIN\'s BUFIO2 (#1951, ana-cmtinput6.mjs); absolute frame,bit.', ...table })}\n`);
+  fs.writeFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${device0}-cmt-input.json`, import.meta.url), `${JSON.stringify({ note: 'A CMT\'s bits outside its settings and its paths\' PIPs, by its site, its outputs used and its CLKIN\'s BUFIO2 (#1951, ana-cmtinput6.mjs); absolute frame,bit.', ...table })}\n`);
 }

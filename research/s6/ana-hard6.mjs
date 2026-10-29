@@ -209,7 +209,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(`${type}: ${sites.length} sites, ${t.slots.length} slots, base ${t.slots.map(s => s.base.length).join('/')} bits, options ${t.slots.map(s => `${Object.keys(s.options).length} (${Object.values(s.options).filter(o => !o.set.length && !o.clear.length).length} with no bit)`).join(' / ')}`);
   }
   if (pinDirs.length) {
-    const read6 = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8')), dev = bitFormat6(part.replace(/^xc/, '').replace(/-\d$/, ''));
+    const read6 = n => JSON.parse(fs.readFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8')), dev = bitFormat6(part.replace(/^xc/, '').replace(/-\d$/, ''));
     const rdb = { part, slices: loadDb(dv), int: { pips: read6('xc6slx16-int').pips, cover: read6('xc6slx16-int-cover').pips, own: read6('xc6slx16-int-own').pips },
       other: { pips: { ...read6('s6-pips-other').pips, ...read6('s6-pips-io').pips, ...read6('s6-pips-clock').pips } }, iob: read6(`${dv}-iob`), clocks: read6('s6-clocks'), hard: db };
     const designs = pinDirs.map(d => { const r = readBit6(fs.readFileSync(path.join(d, 'top.bit'))); return { xdl: parseXdl(fs.readFileSync(path.join(d, 'top.xdl'), 'utf8')), bits: bitsOf(r.fdri, emptyFdri(bitFormat6(r.device.part))) }; });
@@ -217,5 +217,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     for (const type of ['RAMB16BWER', 'RAMB8BWER']) console.log(`${type} clock pins: ${db[type].slots.map((sl, j) => `slot ${j} ${Object.entries(sl.pins || {}).map(([k, v]) => `${k} ${v.join(' ')}`).join(', ')}`).join('; ')}`);
   }
   console.log(`${problems.length} problems${problems.length ? `:\n  ${problems.slice(0, 20).join('\n  ')}` : ''}`);
-  fs.writeFileSync(new URL(`./db/${dv}-hard.json`, import.meta.url), `${JSON.stringify(db)}\n`);
+  fs.writeFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${dv}-hard.json`, import.meta.url), `${JSON.stringify(db)}\n`);
 }
