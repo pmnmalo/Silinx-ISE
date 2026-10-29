@@ -12,7 +12,7 @@ import * as V from '/core/values.js';
 import { formatTime } from '/core/interp.js';
 import { boardWiring, boardOutputs, lcdState, lcdFeed, emulatorClocks, manualClocks } from '/core/emulate.js';
 import { esc, h } from './dom.js';
-import { mountBoardParts } from './emulator-board.js';
+import { mountBoardParts, noMenu } from './emulator-board.js';
 import { mountEmuSide } from './emulator-side.js';
 import { mountEmuPaint } from './emulator-paint.js';
 import { mountEmuToolbar } from './emulator-toolbar.js';
@@ -54,7 +54,7 @@ function injectStyle() {
 .emu-sw { width: 20px; height: 38px; border-radius: 4px; background: #222; position: relative; cursor: pointer; border: 1px solid #000; }
 .emu-sw::after { content: ''; position: absolute; left: 2px; right: 2px; height: 16px; bottom: 2px; background: #ddd; border-radius: 3px; transition: bottom .08s; }
 .emu-sw.on::after { bottom: 18px; background: #fff; }
-.emu-btn { width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(#555, #111); border: 2px solid #999; cursor: pointer; user-select: none; }
+.emu-btn { width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(#555, #111); border: 2px solid #999; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
 .emu-btn.on { background: radial-gradient(#d33, #600); border-color: #fcc; }
 .emu-cell.nc .emu-sw, .emu-cell.nc .emu-btn { opacity: .45; }
 .emu-disp { background: #111; border-radius: 6px; padding: 8px 10px; display: flex; gap: 6px; }
@@ -67,7 +67,7 @@ function injectStyle() {
 .emu-log { font-family: var(--mono, monospace); max-height: 140px; overflow: auto; white-space: pre-wrap; color: var(--grey-1); }
 .emu-log .error { color: var(--log-error); } .emu-log .warning { color: var(--log-warning); }
 .emu-hint { color: var(--grey-4); }
-.emu-board-wrap { display: flex; flex-direction: column; gap: 6px; }
+.emu-board-wrap { display: flex; flex-direction: column; gap: 6px; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .emu-board-note { color: var(--grey-3); font-size: 11px; }
 .emu-pcb { position: relative; flex: none; }
 .emu-pcb-art { position: absolute; left: 0; top: 0; }
@@ -207,6 +207,7 @@ function basys2Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, por
   }
   const wrap = h('div', { class: 'emu-board-wrap' }, pcb,
     boardNote(h, board, title, clockNote));
+  noMenu(wrap);
   return wrap;
 }
 
@@ -229,6 +230,7 @@ function boardFrame({ h, W, H, art, board, title, clockNote }) {
   pcb.append(svgEl(W, H, art));
   const put = (el, x, y, cls = '') => { const w = h('div', { class: `emu-at ${cls}`, style: { left: `${x}px`, top: `${y}px` } }, el); pcb.append(w); return w; };
   const wrap = h('div', { class: 'emu-board-wrap' }, pcb, boardNote(h, board, title, clockNote));
+  noMenu(wrap);
   return { pcb, put, wrap };
 }
 
