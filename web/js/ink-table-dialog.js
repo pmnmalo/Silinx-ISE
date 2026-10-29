@@ -48,13 +48,15 @@ export function handwrittenTable({ check = () => null, title = 'Handwritten Trut
   // Undo, Redo, Clear; Copy Drawing and Paste Drawing (#1749)
   const padRow = padButtons(pad);
   padRow.append(...drawingButtons(pad, { kind: 'table', read: () => text.value }));
-  const body = h('div', { class: 'ink-dialog' },
-    h('div', { class: 'hint' }, "Draw the truth table with a pen, a finger or the mouse: the names in a header, a line under it, a line between the inputs and the outputs, then a row of 0, 1 or X (don't care) for each combination."),
+  // the pad tall, on the left (a table is written down the page, #2007); the hint, the buttons and the table read beside it
+  const body = h('div', { class: 'ink-dialog ink-portrait' },
     padHost,
-    padRow,
-    h('label', {}, 'Recognized:'), text, msg);
+    h('div', { class: 'ink-side' },
+      h('div', { class: 'hint' }, "Draw the truth table with a pen, a finger or the mouse: the names in a header, a line under it, a line between the inputs and the outputs, then a row of 0, 1 or X (don't care) for each combination."),
+      padRow,
+      h('label', {}, 'Recognized:'), text, msg));
   return dialog({
-    title, width: 'min(860px, 96vw)', body, className: 'ink-dlg',
+    title, width: 'min(940px, 96vw)', body, className: 'ink-dlg',
     onOpen: () => setTimeout(() => { if (body.contains(document.activeElement)) document.activeElement.blur(); }, 0),
     buttons: [
       { label: 'Fill Table', primary: true, validate: () => { flush(); return verdict(); }, value: () => ({ ...tableFromText(text.value), text: text.value }) },

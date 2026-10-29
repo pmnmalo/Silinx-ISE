@@ -64,6 +64,10 @@ uiTest('Handwritten Table…: a table drawn with the mouse, a finger and a pen f
   await newTable(page, 'InkTable');
   await page.menu('Development', 'Handwritten Truth Table…');
   await page.waitDialog('Handwritten Truth Table');
+  // the pad tall, on the left; the hint, the buttons and the table read on its right (#2007)
+  const [pad, side] = await page.eval((d) => ['.ink-pad-table', '.ink-side'].map((k) => { const r = document.querySelector(`${d} ${k}`).getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, w: r.width, h: r.height }; }), D);
+  assert.ok(pad.h > pad.w && side.left >= pad.right && Math.abs(side.top - pad.top) < 2, JSON.stringify({ pad, side }));
+  assert.equal(await page.eval((d) => [...document.querySelector(`${d} .ink-side`).children].map((e) => e.className || e.tagName).join(' '), D), 'hint ink-row LABEL ink-table-text ink-msg');
   await draw(page, XOR);
   await waitText(page, 'A B | F\n0 0 | 0\n0 1 | 1\n1 0 | 1\n1 1 | 0');
   assert.equal(await message(page), '');
@@ -91,8 +95,9 @@ uiTest('Handwritten Table…: no line between the inputs and the outputs, a cell
     await page.waitDialog('Tabela de Verdade Manuscrita');
     const labels = await page.eval((d) => [...document.querySelector(d).closest('.dlg').querySelectorAll('button:not(.dlg-x), label, .hint')].map((e) => e.textContent.trim()), D);
     assert.deepEqual(labels, [
+      'Apagar', 'Mover', 'Ajustar',
       'Desenhe a tabela de verdade com uma caneta, um dedo ou o rato: os nomes num cabeçalho, uma linha por baixo dele, uma linha entre as entradas e as saídas, depois uma linha de 0, 1 ou X (indiferente) para cada combinação.',
-      'Apagar', 'Mover', 'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Preencher Tabela', 'Cancelar',
+      'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Preencher Tabela', 'Cancelar',
     ]);
     // nothing drawn
     await page.dialogButton('Preencher Tabela');
