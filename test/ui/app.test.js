@@ -876,6 +876,8 @@ uiTest('#1101 #1225 the Start page: its buttons right under the pane\'s caption 
   assert.ok(g.buttons <= 20, `${g.buttons} px`);
   assert.ok(g.gap >= 0 && g.gap <= 14, `Project Commands ${g.gap} px under the buttons`);
   assert.ok(g.second > 0, 'the next heading keeps its space above');
+  // (where the projects are kept above the recent ones, #2029)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#start-page .start-box h3')].map((e) => e.textContent)), ['Project Commands', 'Where Projects Are Kept', 'Recent Projects']);
 });
 
 uiTest('#1128 the document tabs: one width, every close button shown (not only on hover), at the same place: three clicks at one point close three tabs', E, async (page) => {
