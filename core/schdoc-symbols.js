@@ -10,11 +10,13 @@ export { int };   // (core/util.js's intOr)
 const P_WIDTH = { name: 'width', label: 'Width', kind: 'int', default: 1, min: 1, max: 1024 };
 const P_INIT = { name: 'init', label: 'INIT', kind: 'select', options: ['0', '1'], default: '0' };
 
+// (a gate wider than a bit: one gate a bit when asked, its inputs I0_k, I1_k… and its output Ok, #2079)
+const P_GATES_BITS = { name: 'bits', label: 'Pins per bit (I0_0.., O0..)', kind: 'bool', default: false };
 function gateSym(op, n, title) {
   return {
     category: 'Logic', title, gate: op, inputs: n,
     description: `${n > 1 ? n + '-input ' : ''}${op.toUpperCase()} gate (bitwise when Width > 1)`,
-    params: [P_WIDTH],
+    params: [P_WIDTH, P_GATES_BITS],
   };
 }
 
@@ -309,14 +311,19 @@ export function symbolDef(sym, modules = {}) {
     const n = S.inputs, h = Math.max(40, n * 20);
     const pins = [];
     const k = S.invIn || 0;
-    // inverted-input gates follow the Xilinx library drawing: I0 at the bottom, bubbles on I0..I(k-1)
-    for (let i = 0; i < n; i++) {
-      const q = { name: `I${i}`, dir: 'in', x: 0, y: k ? h / 2 + (n - 1) * 10 - 20 * i : h / 2 - (n - 1) * 10 + 20 * i, side: 'W', width: W };
-      if (i < k) q.inv = true;
-      pins.push(q);
+    // (Pins per bit: a gate a bit, one under the other, bit 0 at the top: I0_0, I1_0…, O0, #2079)
+    const rows = W > 1 && p.bits ? W : 1, one = rows > 1 ? 1 : W;
+    for (let r = 0; r < rows; r++) {
+      const sfx = rows > 1 ? `_${r}` : '', oy = r * h;
+      // inverted-input gates follow the Xilinx library drawing: I0 at the bottom, bubbles on I0..I(k-1)
+      for (let i = 0; i < n; i++) {
+        const q = { name: `I${i}${sfx}`, dir: 'in', x: 0, y: oy + (k ? h / 2 + (n - 1) * 10 - 20 * i : h / 2 - (n - 1) * 10 + 20 * i), side: 'W', width: one };
+        if (i < k) q.inv = true;
+        pins.push(q);
+      }
+      pins.push({ name: rows > 1 ? `O${r}` : 'O', dir: 'out', x: 80, y: oy + h / 2, side: 'E', width: one });
     }
-    pins.push({ name: 'O', dir: 'out', x: 80, y: h / 2, side: 'E', width: W });
-    return { w: 80, h, shape: 'gate', gate: S.gate, bubble: /^n|xnor/.test(S.gate), body: { x: 20, y: 0, w: 40, h }, pins };
+    return { w: 80, h: h * rows, gh: h, ...(rows > 1 ? { rows } : {}), shape: 'gate', gate: S.gate, bubble: /^n|xnor/.test(S.gate), body: { x: 20, y: 0, w: 40, h: h * rows }, pins };
   }
   // (INV, BUF and the tri-state buffers as wide as the 2-input gates, 80: room for a bus width on the output's lead,
   // #1988, they were 60, BUF_OLD_W; BUF's and BUFE / BUFT's triangle 4 grid steps, 40, its type inside it, INV's 34 and

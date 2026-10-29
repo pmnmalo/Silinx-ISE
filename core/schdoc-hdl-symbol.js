@@ -111,6 +111,33 @@ export function mountSymbolHdl(ctx) {
     warnOpen, zero
   });
 
+  // a gate's output (pin `out`) as its operation on its input pins of `pins` (the inverted ones complemented)
+  const gateAssign = (s, S, pins, out) => {
+    const o = OUTN(s, out);
+    if (!o) { diags.push({ severity: 'warning', message: `${s.name}: output not connected, gate skipped`, ref: { kind: 'symbol', id: s.id } }); return; }
+    const ins = pins.filter(q => q.dir === 'in').map(q => {
+      if (!q.inv) return INN(s, q.name);
+      // inverted input (ANDnBk...): an unconnected one is tied to 0, i.e. reads as all ones
+      const n = inNet(s, q.name);
+      if (!n) { warnOpen(s, q.name); return tie(s, q.name, '1'); }
+      return ci ? `(not ${outRead.get(n) || netName(n)})` : `~${outRead.get(n) || netName(n)}`;
+    });
+    let rhs;
+    const g = S.gate;
+    if (ci) {
+      if (g === 'buf') rhs = ins[0];
+      else if (g === 'not') rhs = `not ${ins[0]}`;
+      else if (g === 'nand' || g === 'nor' || g === 'xnor') rhs = ins.length === 2 && g === 'xnor' ? `${ins[0]} xnor ${ins[1]}` : `not (${ins.join(` ${g === 'xnor' ? 'xor' : g.slice(1)} `)})`;
+      else rhs = ins.join(` ${g} `);
+    } else {
+      const op = { and: '&', or: '|', xor: '^', nand: '&', nor: '|', xnor: '^' }[g];
+      if (g === 'buf') rhs = ins[0];
+      else if (g === 'not') rhs = `~${ins[0]}`;
+      else if (g === 'nand' || g === 'nor' || g === 'xnor') rhs = `~(${ins.join(` ${op} `)})`;
+      else rhs = ins.join(` ${op} `);
+    }
+    assign(o, rhs);
+  };
   const symbolHdl = s => {
     const def = defs.get(s.id);
     const p = s.params;
@@ -119,37 +146,16 @@ export function mountSymbolHdl(ctx) {
     const cmt = ci ? `-- ${s.name}: ${def.title || S?.title || s.type}` : `// ${s.name}: ${def.title || S?.title || s.type}`;
     if (S?.prim) { primInstance(s); return; }
     // INV / BUF with a pin per bit (INV4…, #2067): each output its input, inverted or not
-    if (S && S.gate && def.rows > 1) {
+    if (S && S.gate && def.shape !== 'gate' && def.rows > 1) {
       for (let k = 0; k < def.rows; k++) { const x = INN(s, `I${k}`); assign(OUTN(s, `O${k}`), S.gate === 'buf' ? x : ci ? `not ${x}` : `~${x}`); }
       return;
     }
-    if (S && S.gate) {
-      const o = OUTN(s, 'O');
-      if (!o) { diags.push({ severity: 'warning', message: `${s.name}: output not connected, gate skipped`, ref: { kind: 'symbol', id: s.id } }); return; }
-      const ins = def.pins.filter(q => q.dir === 'in').map(q => {
-        if (!q.inv) return INN(s, q.name);
-        // inverted input (ANDnBk...): an unconnected one is tied to 0, i.e. reads as all ones
-        const n = inNet(s, q.name);
-        if (!n) { warnOpen(s, q.name); return tie(s, q.name, '1'); }
-        return ci ? `(not ${outRead.get(n) || netName(n)})` : `~${outRead.get(n) || netName(n)}`;
-      });
-      let rhs;
-      const g = S.gate;
-      if (ci) {
-        if (g === 'buf') rhs = ins[0];
-        else if (g === 'not') rhs = `not ${ins[0]}`;
-        else if (g === 'nand' || g === 'nor' || g === 'xnor') rhs = ins.length === 2 && g === 'xnor' ? `${ins[0]} xnor ${ins[1]}` : `not (${ins.join(` ${g === 'xnor' ? 'xor' : g.slice(1)} `)})`;
-        else rhs = ins.join(` ${g} `);
-      } else {
-        const op = { and: '&', or: '|', xor: '^', nand: '&', nor: '|', xnor: '^' }[g];
-        if (g === 'buf') rhs = ins[0];
-        else if (g === 'not') rhs = `~${ins[0]}`;
-        else if (g === 'nand' || g === 'nor' || g === 'xnor') rhs = `~(${ins.join(` ${op} `)})`;
-        else rhs = ins.join(` ${op} `);
-      }
-      assign(o, rhs);
+    // a gate a bit (Pins per bit, #2079): each row its own gate, its pins I0_k, I1_k… and Ok
+    if (S && S.gate && def.shape === 'gate' && def.rows > 1) {
+      for (let r = 0; r < def.rows; r++) gateAssign(s, S, def.pins.filter(q => q.name.endsWith(`_${r}`) || q.name === `O${r}`), `O${r}`);
       return;
     }
+    if (S && S.gate) { gateAssign(s, S, def.pins, 'O'); return; }
     if (S && S.ff) {
       // library flip-flops (FD*, FT*, FJK*; Width bits, bitwise): async CLR > PRE, then at the clock
       // edge R / S (in the order of the symbol), then CE, then the D / toggle / J-K update

@@ -16,7 +16,8 @@
    "mirror": false,
    "name": "XLXI_1",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -28,7 +29,8 @@
    "mirror": false,
    "name": "XLXI_2",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -40,7 +42,8 @@
    "mirror": false,
    "name": "XLXI_3",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -52,7 +55,8 @@
    "mirror": false,
    "name": "XLXI_4",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -64,7 +68,8 @@
    "mirror": false,
    "name": "XLXI_5",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -76,7 +81,8 @@
    "mirror": false,
    "name": "XLXI_6",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -88,7 +94,8 @@
    "mirror": false,
    "name": "XLXI_7",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -100,7 +107,8 @@
    "mirror": false,
    "name": "XLXI_8",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -125,7 +133,8 @@
    "mirror": false,
    "name": "XLXI_10",
    "params": {
-    "width": 3
+    "width": 3,
+    "bits": false
    }
   }
  ],
