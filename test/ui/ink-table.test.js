@@ -92,7 +92,7 @@ uiTest('Handwritten Table…: no line between the inputs and the outputs, a cell
     const labels = await page.eval((d) => [...document.querySelector(d).closest('.dlg').querySelectorAll('button:not(.dlg-x), label, .hint')].map((e) => e.textContent.trim()), D);
     assert.deepEqual(labels, [
       'Desenhe a tabela de verdade com uma caneta, um dedo ou o rato: os nomes num cabeçalho, uma linha por baixo dele, uma linha entre as entradas e as saídas, depois uma linha de 0, 1 ou X (indiferente) para cada combinação.',
-      'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Preencher Tabela', 'Cancelar',
+      'Mover', 'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Preencher Tabela', 'Cancelar',
     ]);
     // nothing drawn
     await page.dialogButton('Preencher Tabela');
