@@ -162,7 +162,8 @@ uiTest('#1179 the mouse: a symbol dropped from the palette is selected, Select t
   await dropSymbol(page, 'and2', at);
   assert.deepEqual(await placing(page), { tool: 'select', n: n0 + 1 });
 });
-// #1992: a symbol's menu (a long press, or a right click) closed as soon as the symbol is dragged
+// #1992: a symbol's menu (a long press, or a right click) closed as soon as the symbol is dragged a grid step, not on a
+// pixel's jitter
 uiTest('#1992 tablet: a symbol\'s menu from a long press closes as soon as the finger drags the symbol', E, async (page) => {
   await openGates(page, 'TabMenuMove');
   const at = await page.eval(() => { const g = document.querySelector('.doc:not([hidden]) .sch-editor [data-kind="sym"]'); const r = g.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
@@ -170,10 +171,18 @@ uiTest('#1992 tablet: a symbol\'s menu from a long press closes as soon as the f
   // (the long press: its contextmenu event, the symbol's menu opened)
   await page.eval((x, y) => document.elementFromPoint(x, y).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y })), at.x, at.y);
   const opened = await page.eval(() => !!document.querySelector('.menu-popup'));
+  // (a finger's jitter, a fraction of a pixel: the symbol not moved a grid step, the menu stays; the menu closes exactly
+  // when the symbol has moved)
+  const state = () => page.eval(() => { const S = window.Silinx.active.schEditor.getDoc().symbols[0]; return { menu: !!document.querySelector('.menu-popup'), at: `${S.x},${S.y}` }; });
+  const s0 = await state();
+  await page.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: at.x + 0.2, y: at.y + 0.2 }] });
+  const s1 = await state();
   for (let i = 1; i <= 4; i++) await page.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: at.x + 10 * i, y: at.y + 6 * i }] });
-  const afterMove = await page.eval(() => !!document.querySelector('.menu-popup'));
+  const s2 = await state();
   await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  assert.deepEqual({ opened, afterMove }, { opened: true, afterMove: false });
+  assert.ok(opened && s0.menu, 'the menu opened');
+  assert.equal(s1.menu, s1.at === s0.at, `the jitter: ${JSON.stringify([s0, s1])}`);
+  assert.deepEqual([s2.menu, s2.at !== s0.at], [false, true], 'moved a grid step: the menu closed');
 }, { tablet: 'landscape' });
 // #1990: a long press on a palette row (a finger): no menu; a mouse's right click: its menu (Symbol Info…, Place Symbol)
 uiTest('#1990 tablet: a long press on a symbol of the palette opens no menu; the mouse\'s right click does', E, async (page) => {

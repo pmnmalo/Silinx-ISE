@@ -79,10 +79,19 @@ export function mountSchMouse(ctx) {
     const pt = toSheet(e.clientX, e.clientY);
     setCursor(pt);
     if (drag()?.kind === 'pan') { view().tx = drag().tx + e.clientX - drag().cx; view().ty = drag().ty + e.clientY - drag().cy; applyView(); return; }
-    // (a drag begun: a menu open, a symbol's from a right click or a long press, closed at once, #1992)
-    if (drag() && drag().kind !== 'pan') closeMenus();
-    if (drag()?.kind === 'move') { applyMove(drag(), snap(pt.x) - drag().start.x, snap(pt.y) - drag().start.y); return; }
-    if (drag()?.kind === 'seg') { applySegMove(drag(), drag().hz ? snap(pt.y) - drag().start.y : snap(pt.x) - drag().start.x); return; }
+    // (a menu open, a symbol's from a right click or a long press, closed as soon as what is dragged moves a grid step:
+    // not on a pixel's jitter of the finger, #1992)
+    if (drag()?.kind === 'move') {
+      const dx = snap(pt.x) - drag().start.x, dy = snap(pt.y) - drag().start.y;
+      if (dx || dy) closeMenus();
+      applyMove(drag(), dx, dy); return;
+    }
+    if (drag()?.kind === 'seg') {
+      const d = drag().hz ? snap(pt.y) - drag().start.y : snap(pt.x) - drag().start.x;
+      if (d) closeMenus();
+      applySegMove(drag(), d); return;
+    }
+    if (drag() && drag().kind !== 'pan' && drag().kind !== 'band') closeMenus();
     if (drag()?.kind === 'band') { drag().cur = pt; renderOverlay(); return; }
     if (drag()?.kind === 'knot') { curve.moveKnot(drag(), pt); return; }
     if (drag()?.kind === 'stroke') { setHoverPin(pinNear(pt)); strokeMove(drag(), pt, e); return; }
