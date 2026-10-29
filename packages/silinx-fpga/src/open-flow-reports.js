@@ -5,6 +5,7 @@ import { ESTIMATE_ERROR_PERCENT, estimatePower, powerReport } from './power.js';
 import { analyzeTiming, checkCross, checkOffsets, checkPeriods, checkSwitching, clockPort, parseOffsets, switchingLine, timingReport } from './fpga/timing.js';
 import { bitgen } from './fpga/bitgen.js';
 import { analyzeTimingS6 } from './fpga/s6/timing.js';
+import { bitstreamS6 } from './fpga/s6/bitgen.js';
 import { parseUcf, pinsUcf } from './ucf.js';
 import { parseXdl, placedPins } from './xdl.js';
 import { StepError } from './open-flow-core.js';
@@ -70,6 +71,12 @@ export function mountFlowReports(ctx) {
 
   function bitfile(name, startupClk) {
     const sc = /^cclk$/i.test(startupClk) ? 'Cclk' : /^userclk$/i.test(startupClk) ? 'UserClk' : 'JtagClk';
+    // (the Spartan-6's: fpga/s6/bitgen.js, byte for byte as ISE's bitgen writes the routed design, #732)
+    if (spec.family === 'spartan6') {
+      const r = bitstreamS6(parseXdl(routedText()), io.device(), io.bitDb(), { name: `${top}.ncd;UserID=0xFFFFFFFF`, crc: true, startupClk: sc });
+      if (r.unknown.size) throw new StepError(`${r.unknown.size} feature(s) of the design are not in the bit database: no bitstream`, [...r.unknown.keys()].slice(0, 50));
+      return { path: io.write(name, r.bytes), size: r.bytes.length };
+    }
     const { bytes, unknown } = bitgen(routedText(), io.bitDb(), { name: `${top}.ncd`, crc: true, startupClk: sc, part: `${spec.device.replace(/^xc/, '')}${spec.pkg}` });
     if (unknown.length) {
       throw new StepError(`${unknown.length} feature(s) of the design are not in the bit database: no bitstream`, unknown.slice(0, 50).map(u => `${u.tile} ${u.feature}`));
