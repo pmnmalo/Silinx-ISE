@@ -15,8 +15,9 @@ Spartan-3E, so it is not Silinx's oracle: the C itself is (see *Checking it* bel
   (see *C++* below).
 - Known headers: `ap_int.h`, `stdint.h`, `stdbool.h`, `stdio.h`, `stdlib.h`, `string.h`, `math.h`,
   `stddef.h`, `limits.h` (the library for test benches, ignored by synthesis); in C++ their `<c…>` names,
-  `<iostream>`, `<fstream>`, `<iomanip>`, `hls_stream.h` and `ap_axi_sdata.h` (Silinx HLS's own: `ap_axis<D, U, TI,
-  TD>` and `ap_axiu<…>`, a beat's data, keep, strb, user, last, id and dest; a side channel of width 0 left out, #1662).
+  `<iostream>`, `<fstream>`, `<iomanip>`, `hls_stream.h`, `ap_axi_sdata.h` (Silinx HLS's own: `ap_axis<D, U, TI,
+  TD>` and `ap_axiu<…>`, a beat's data, keep, strb, user, last, id and dest; a side channel of width 0 left out, #1662)
+  and `hls_fir.h` (`hls::FIR`, below, #1942).
   The project's own headers (`#include "x.h"`)
   are read in place.
 - The **top function**: the one named by `#pragma HLS TOP name=…`, else the file's last function
@@ -292,6 +293,49 @@ as Vitis HLS's threads would: an invocation of `f` that would read an empty stre
 is a process running by itself (its `ap_start` 1: its machine starts again when done, its state kept across calls), its
 `hls_thread_local` streams FIFOs; the top's `ap_done` does not wait for the tasks, and the co-simulation waits for the
 values a call reads and writes (an input stream's values kept across calls: a task may read ahead of the C's).
+
+### The FIR filter: `hls::FIR` (`hls_fir.h`, #1942)
+
+Vitis HLS's FIR filter (the FIR Compiler, PG149), with Silinx's own C model and hardware:
+
+```cpp
+struct config1 : hls::ip_fir::params_t {
+  static const unsigned num_coeffs = 7;
+  static const unsigned coeff_sets = 3;
+  static const unsigned input_length = 20;
+  static const unsigned output_length = 10;
+  static const unsigned filter_type = hls::ip_fir::decimation;
+  static const unsigned decim_rate = 2;
+  static constexpr double coeff_vec[21] = { … };   // (or declared here, defined after: const double config1::coeff_vec[21] = { … };)
+};
+void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
+  static hls::FIR<config1> fir1;   // (static, or at file scope: its delay line lives across calls)
+  fir1.run(in, out, config);       // (run(in, out) with one set; arrays or hls::streams; a config stream)
+}
+```
+
+- **The parameters**: `hls::ip_fir::params_t`'s fields and defaults, as UG1399 describes them (`input_width` 16,
+  `input_fractional_bits` 0, `output_width` 24, `coeff_width` 16, `num_coeffs` 21, `coeff_sets` 1, `input_length` and
+  `output_length` 21, `filter_type` `single_rate`, …); `config1::num_coeffs` may be used in the code. Silinx makes single
+  rate, decimation and interpolation filters of an integer rate, one channel, coefficient sets chosen by the config
+  argument (its value the set), `integer_coefficients` and `quantize_only`, `full_precision` and `truncate_lsbs`; the
+  others (`reloadable`, `hilbert_filter`, `interpolated`, `fixed_fractional`, `num_channels` > 1, the rounding modes,
+  unsigned data or coefficients, `half_band`, …) are refused, each named with why. The fields of the hardware's speed and
+  structure (`filter_arch`, `optimization_goal`, `sample_period`, …) are taken: Silinx's structure is its own.
+- **What it computes** (the C model, the C simulation's): each input taken in the parameters' format
+  (`ap_fixed<input_width, input_width - input_fractional_bits>`), the sums in full precision (the fewest bits holding
+  every sum of a phase's coefficients times inputs of the input's range: PG149's `input_width + ceil(log2(sum |h|))`),
+  `truncate_lsbs` dropping the LSBs past `output_width`, then the output's type takes the value (an `ap_fixed`
+  conversion). Decimation by D gives an output once each D inputs (at the D-th: the single rate's y[mD + D - 1]);
+  interpolation by L gives L outputs an input (y[nL + p] = Σ h[p + kL] x[n − k]). A call reads `input_length` inputs
+  and writes `output_length` outputs (`input_length` × L / D).
+- **The hardware** (its own HDL, core/hls-fir-hdl.js): one multiply-accumulate (an 18×18 multiplier, its operands and
+  product registered), the coefficients a ROM and the delay line a RAM (block RAMs when large enough), a state machine:
+  each input read and written into the delay line, then a tap a cycle, the sum written out. Its ports are Vitis HLS's:
+  an array's `ap_memory` with its two ports (`in_r_address0` … `in_r_we1`; the second unused), a stream's `ap_fifo`, the
+  config an `ap_none` input (`config_r`). The top that runs it (its calls only, DATAFLOW or not) makes it a process of
+  its own; in a top of other statements its C model is inlined. Its latency is Silinx's: (D + 1) + taps + 3 cycles an
+  output for a decimator (dsp-fir-decimator: 132 cycles a call, Vitis HLS's FIR Compiler 32).
 
 ## Pragmas (`#pragma HLS …`)
 

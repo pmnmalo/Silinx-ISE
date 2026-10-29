@@ -39,6 +39,13 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   const callErrs = [];
   dataflowCall(checked, (loc, message) => callErrs.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'error' }));
   if (callErrs.length) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, ...callErrs].sort((a, b) => a.line - b.line || a.col - b.col) };
+  // (a top that runs an hls::FIR, its calls only: its processes too, the filter's hardware its own; of other statements,
+  // the filter's C model inlined, #1942)
+  const firTop = !checked.dataflow && checked.ast.firs?.size && checked.funcs.get(checked.top).body.items.some((st) => st.kind === 'expr' && st.e.kind === 'call' && checked.ast.firs.has(st.e.callee.name));
+  if (firTop) {
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl });
+    if (!r.fallback) return r;
+  }
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {

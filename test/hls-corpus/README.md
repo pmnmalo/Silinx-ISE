@@ -33,7 +33,7 @@ Not part of `npm test` (it needs the network once).
 | dsp-fft-interface-stream | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-stream-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-logicore-fft-float-ssr | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| dsp-fir-decimator | C++ | fail | fail | skip | - | C simulation: fir_top.h:19: the header 'hls_fir.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
+| dsp-fir-decimator | C++ | pass | pass | pass | 132 |  |
 | interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 43 |  |
 | interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 43 |  |
 | interface-aggregation-disaggregation-aggregation-of-struct | C++ | pass | pass | pass | 183 |  |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 
-73 designs: 55 through co-simulation.
+73 designs: 56 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

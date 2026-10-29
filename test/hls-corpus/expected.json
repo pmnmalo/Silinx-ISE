@@ -57,11 +57,15 @@
     "reason": "C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
   },
   "dsp-fir-decimator": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: fir_top.h:19: the header 'hls_fir.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 132,
+      "max": 132,
+      "avg": 132
+    },
+    "reason": null
   },
   "interface-aggregation-disaggregation-aggregation-of-m-axi-ports": {
     "csim": "pass",
