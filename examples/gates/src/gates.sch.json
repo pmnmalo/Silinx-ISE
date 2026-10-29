@@ -68,7 +68,8 @@
    "mirror": false,
    "name": "inv_c",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -80,7 +81,8 @@
    "mirror": false,
    "name": "inv_b",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -92,7 +94,8 @@
    "mirror": false,
    "name": "inv_a",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {

@@ -47,10 +47,14 @@ export function bodySvg(sym, def) {
       break;
     }
     case 'inv': case 'buf': {
-      // (the triangle to x = 54, the output's lead from it (or the bubble) to 80: #1988)
-      s += `<path class="gate" d="M20,0 L54,10 L20,20 Z"/>`;
-      if (def.shape === 'inv') s += `<circle class="gate" cx="57" cy="10" r="3"/>`;
-      s += lead(0, 10, 20, 10, bus(pins[0])) + lead(def.shape === 'inv' ? 60 : 54, 10, 80, 10, bus(pins[1]));
+      // (the triangle to x = 54, the output's lead from it (or the bubble) to 80: #1988; a row each with Pins per bit, #2067)
+      const n = def.rows || 1;
+      for (let k = 0; k < n; k++) {
+        const y = 20 * k;
+        s += `<path class="gate" d="M20,${y} L54,${y + 10} L20,${y + 20} Z"/>`;
+        if (def.shape === 'inv') s += `<circle class="gate" cx="57" cy="${y + 10}" r="3"/>`;
+        s += lead(0, y + 10, 20, y + 10, bus(pins[k])) + lead(def.shape === 'inv' ? 60 : 54, y + 10, 80, y + 10, bus(pins[n + k]));
+      }
       break;
     }
     case 'tbuf': {
@@ -163,7 +167,7 @@ function typeUnder(sym, def, box, center, name) {
 // caller draws it under)
 function typeInside(sym, def, name) {
   const turned = sym.rot === 90 || sym.rot === 270, tri = def.shape === 'inv' || def.shape === 'buf';
-  if (tri && turned) return null;
+  if (tri && (turned || def.rows > 1)) return null;   // (INV4…: under its triangles, #2067)
   const room = tri ? def.body.w * 0.55 - 2 : (turned ? def.body.h : def.body.w) - 6, need = name.length * 5.5;
   if (need > room * (tri ? 1 : 1.3)) return null;
   const c = xform(sym, def, def.body.x + (tri ? (def.body.w * 0.55) / 2 + 1 : def.body.w / 2), def.body.y + def.body.h / 2);

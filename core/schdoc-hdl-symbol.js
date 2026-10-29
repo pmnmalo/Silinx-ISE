@@ -118,6 +118,11 @@ export function mountSymbolHdl(ctx) {
     if (isBlock(s)) { blockInstance(s, def); return; }
     const cmt = ci ? `-- ${s.name}: ${def.title || S?.title || s.type}` : `// ${s.name}: ${def.title || S?.title || s.type}`;
     if (S?.prim) { primInstance(s); return; }
+    // INV / BUF with a pin per bit (INV4…, #2067): each output its input, inverted or not
+    if (S && S.gate && def.rows > 1) {
+      for (let k = 0; k < def.rows; k++) { const x = INN(s, `I${k}`); assign(OUTN(s, `O${k}`), S.gate === 'buf' ? x : ci ? `not ${x}` : `~${x}`); }
+      return;
+    }
     if (S && S.gate) {
       const o = OUTN(s, 'O');
       if (!o) { diags.push({ severity: 'warning', message: `${s.name}: output not connected, gate skipped`, ref: { kind: 'symbol', id: s.id } }); return; }

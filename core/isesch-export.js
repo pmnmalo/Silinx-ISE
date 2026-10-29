@@ -49,7 +49,7 @@ function iseSymbolFor(s, def, netW, modules) {
       return { lib: true, name: t, pins };
     }
     if ((t === 'inv' || t === 'buf') && (W === 8 || W === 16) && t === 'inv') return { lib: true, name: `inv${W}`, pins: { I: `I(${W - 1}:0)`, O: `O(${W - 1}:0)` } };
-    return { lib: false, name: `xl_${t}_w${W}` };
+    return { lib: false, name: `xl_${t}_w${W}${(t === 'inv' || t === 'buf') && W > 1 && p.bits ? '_bits' : ''}` };
   }
   if (S?.ff) {
     // FD*/FT*/FJK*: the library flip-flop when the INIT value is the library default and all its pin positions are
@@ -164,7 +164,7 @@ export function decodeXlSymbol(name) {
   if ((m = /^xl_mux2(e?)_w(\d+)$/.exec(s))) return { type: 'mux2', params: { width: +m[2], en: !!m[1] } };
   if ((m = /^xl_mux(8|16)(e?)(s?)_w(\d+)$/.exec(s))) return { type: `mux${m[1]}`, params: { width: +m[4], en: !!m[2], selBus: !m[3] } };
   if ((m = /^xl_mux4(e?)(s?)_w(\d+)$/.exec(s))) return { type: 'mux4', params: { width: +m[3], en: !!m[1], selBus: !m[2] } };
-  if ((m = /^xl_(inv|buf)_w(\d+)$/.exec(s))) return { type: m[1], params: { width: +m[2] } };
+  if ((m = /^xl_(inv|buf)_w(\d+)(_bits)?$/.exec(s))) return { type: m[1], params: { width: +m[2], ...(m[3] ? { bits: true } : {}) } };
   if ((m = /^xl_reg(\d+)(_ce)?(_ar|_sr)?_h([0-9a-f]+)$/.exec(s))) return { type: 'register', params: { width: +m[1], en: !!m[2], reset: m[3] === '_ar' ? 'async' : m[3] === '_sr' ? 'sync' : 'none', init: m[4] === '0' ? '0' : `0x${m[4]}` } };
   if ((m = /^xl_cnt(\d+)(_ce)?(_ar|_sr)?(_dn)?(_bits)?$/.exec(s))) return { type: 'counter', params: { width: +m[1], en: !!m[2], reset: m[3] === '_ar' ? 'async' : m[3] === '_sr' ? 'sync' : 'none', dir: m[4] ? 'down' : 'up', ...(m[5] ? { bits: true } : {}) } };
   if ((m = /^xl_add(\d+)(_ci)?(_co)?(_bits)?$/.exec(s))) return { type: 'add', params: { width: +m[1], cin: !!m[2], cout: !!m[3], ...(m[4] ? { bits: true } : {}) } };
