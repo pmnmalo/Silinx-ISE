@@ -185,7 +185,11 @@ int main(void) { int v = 7; for (int x = 0; x < 6; x += 2) { int r = f(x, &v); p
 });
 
 test('#1919 which loop is pipelined: an inner loop\'s PIPELINE off keeps its parent as it is; an UNROLL with no factor is unrolled in its parent; an inner loop that accesses a memory is pipelined itself', () => {
-  const loops = (body) => cToHdl(`int f(int a[8], int n) {\n  int s = 0;\n${body}\n  return s;\n}\n`).report.loops.map((l) => [l.line, l.unroll, l.pipeline, l.auto ?? false, l.ii]);
+  const loops = (body) => {
+    const g = cToHdl(`int f(int a[8], int n) {\n  int s = 0;\n${body}\n  return s;\n}\n`);
+    assert.deepEqual(g.diagnostics, []);   // (no warnings: every loop made at II=1, or not pipelined)
+    return g.report.loops.map((l) => [l.line, l.unroll, l.pipeline, l.auto ?? false, l.ii]);
+  };
   const nest = (inner, outer = '') => `  for (int i = 0; i < n; i++) {\n#pragma HLS LOOP_TRIPCOUNT max=8\n${outer}    for (int j = 0; j < 4; j++) {\n${inner}      s += i ^ j;\n    }\n  }`;
   assert.deepEqual(loops(nest('#pragma HLS PIPELINE off\n')), [[3, null, null, false, 6], [5, null, null, false, 3]]);
   assert.deepEqual(loops(nest('#pragma HLS UNROLL\n')), [[3, null, 1, true, 1], [5, 'whole', null, false, 0]]);
@@ -232,4 +236,8 @@ test('#1919 a pipelined loop that reads and writes streams: its accesses in one 
   // (a loop until a stream is empty: its condition a state of its own, after the read)
   const poll = run(STREAM('  int k = 0;\n  while (!src.empty()) {\n    int v = src.read();\n    dst.write(v + k);\n    k++;\n  }'), { file: 't.cpp' });
   assert.deepEqual(poll.loops, [{ line: 5, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: null }]);
+  assert.deepEqual(poll.messages, [
+    '5 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
+    `5 warning: ${AUTO}: II=2 made (it reads or writes a stream, an access a state); ${OFF}`,
+  ]);
 });
