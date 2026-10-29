@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { firParams, firPhases, firCModel, FIR_DEFAULTS, FIR_CONSTANTS } from '../core/hls-fir.js';
 import { simulateC } from '../core/c-interp.js';
 import { firReference, firSource } from './hls-fir-ref.js';
+import { CPP_OWN_HEADERS } from '../core/cpp-headers.js';
 
 const fields = (o) => new Map(Object.entries(o).map(([k, v]) => [k, typeof v === 'number' && !['sample_period', 'sample_frequency', 'hardware_oversampling_rate'].includes(k) ? BigInt(v) : v]));
 const C = FIR_CONSTANTS;
@@ -36,6 +37,20 @@ test('#1942 the parameters: the config\'s fields, UG1399\'s defaults for the oth
   const t = firParams('c', fields({ ...DECIM, output_rounding_mode: C.truncate_lsbs, output_width: 18 })).p;
   assert.deepEqual([t.accW, t.outW, t.outF], [24, 18, -6]);
   assert.equal(firParams('c', fields({ ...DECIM, output_width: 8 })).p.outW, 24);
+});
+
+test('#1942 Silinx\'s own hls_fir.h: hls::ip_fir\'s constants, params_t\'s fields and defaults (read from it), hls::FIR<CONFIG_T>::run; its names never the source\'s', () => {
+  const h = CPP_OWN_HEADERS['hls_fir.h'];
+  for (const s of ['namespace ip_fir', 'struct params_t {', 'static const unsigned input_width = 16;', 'static const unsigned output_width = 24;', 'static const unsigned num_coeffs = 21;',
+    'static const unsigned total_num_coeff = num_coeffs * coeff_sets;', 'static const double coeff_vec[total_num_coeff];', 'static const unsigned filter_type = single_rate;',
+    'static const unsigned output_rounding_mode = full_precision;', 'template <typename CONFIG_T> class FIR {', 'void run(IN_T *in, OUT_T *out, CONFIG *config);']) assert.ok(h.includes(s), s);
+  assert.equal(Object.keys(FIR_DEFAULTS).length, 35);
+  assert.deepEqual([FIR_DEFAULTS.coeff_structure, FIR_DEFAULTS.rate_specification, FIR_DEFAULTS.reloadable, FIR_DEFAULTS.sample_frequency], [1n, 1n, 0n, 0.001]);
+  assert.deepEqual([C.decimation, C.truncate_lsbs, C.quantize_only, C.value_unsigned, C.convergent_rounding_to_odd, Object.keys(C).length], [2, 1, 1, 1, 7, 38]);
+  // (a source's own names as the header's: its own)
+  const src = '#include "hls_fir.h"\n#include <stdio.h>\nint period = 3, area = 4;\nint top(int integer) { return integer + period * area; }\nint main() { printf("%d\\n", top(2)); return 0; }\n';
+  const r = simulateC(src, { file: 'n.cpp' });
+  assert.deepEqual([r.ok, r.output, r.diagnostics], [true, '14\n', []]);
 });
 
 test('#1942 what Silinx does not make: refused, each parameter named with why', () => {

@@ -1,4 +1,5 @@
-// Silinx HLS C++ (#1942): hls_fir.h's hls::FIR<config> in the source, as tokens (before core/cpp-stl.js): the config
+// Silinx HLS C++ (#1942): hls_fir.h's hls::FIR<config> in the source (the header Silinx's own, core/cpp-headers.js), as
+// tokens (before core/cpp-stl.js): the config
 // struct derived from hls::ip_fir::params_t read (its static members' values; coeff_vec defined in it or after it,
 // const double config::coeff_vec[N] = { … };), checked (core/hls-fir.js) and left a struct of its integer parameters
 // (config::num_coeffs); hls::ip_fir's constants numbers; a filter, static hls::FIR<config> f; (its state lives across
@@ -101,6 +102,8 @@ export function cppFir(toks, report) {
   };
   for (let k = 0; k < toks.length; k++) {
     const t = toks[k];
+    // (Silinx's hls_fir.h, core/cpp-headers.js: its constants and defaults core/hls-fir.js's, its tokens taken out)
+    if (t.file === '<hls_fir.h>') continue;
     consts.at(toks, k);
     if (op(t, '{')) depth++;
     if (op(t, '}')) depth--;

@@ -7,8 +7,9 @@ In short:
 
 In detail:
 
-- **Silinx HLS: hls::FIR, hls_fir.h's FIR filter (#1942, the first of the DSP libraries of #1892):** the config struct derived from `hls::ip_fir::params_t` is
-  read with UG1399's fields and defaults (`coeff_vec` in it or defined after it, `config::num_coeffs` usable,
+- **Silinx HLS: hls::FIR, hls_fir.h's FIR filter (#1942, the first of the DSP libraries of #1892):** Silinx's own `hls_fir.h` (`core/cpp-headers.js`: `hls::ip_fir`'s
+  constants, `params_t`'s fields and defaults as UG1399 gives them, `hls::FIR<CONFIG_T>::run`); the config struct derived
+  from `hls::ip_fir::params_t` is read with those defaults (`coeff_vec` in it or defined after it, `config::num_coeffs` usable,
   `hls::ip_fir`'s constants) and checked: single rate, decimation and interpolation by an integer rate, one channel,
   coefficient sets chosen by the config argument, `integer_coefficients` and `quantize_only`, `full_precision` and
   `truncate_lsbs`; the parameters Silinx does not make (`reloadable`, `fixed_fractional`, `num_channels` > 1, the

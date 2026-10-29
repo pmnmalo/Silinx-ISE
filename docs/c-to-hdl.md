@@ -314,6 +314,8 @@ void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
 }
 ```
 
+- **The header**: Silinx's own `hls_fir.h` (core/cpp-headers.js, none of AMD's): `hls::ip_fir`'s constants, `hls::ip_fir::params_t`
+  and `hls::FIR<CONFIG_T>::run`, the API UG1399 and PG149 describe; the compiler reads its constants and defaults from it.
 - **The parameters**: `hls::ip_fir::params_t`'s fields and defaults, as UG1399 describes them (`input_width` 16,
   `input_fractional_bits` 0, `output_width` 24, `coeff_width` 16, `num_coeffs` 21, `coeff_sets` 1, `input_length` and
   `output_length` 21, `filter_type` `single_rate`, …); `config1::num_coeffs` may be used in the code. Silinx makes single
