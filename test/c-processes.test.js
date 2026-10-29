@@ -207,3 +207,20 @@ int main() { hls::stream<int> a, r; for (int i = 0; i < 4; i++) a.write(i); dut(
   assert.deepEqual(cToHdl(src('  int K = 3;\n  K++;'), { file: 'd.cpp' }).diagnostics.map((d) => `${d.severity}: ${d.message}`),
     ["error: #pragma HLS DATAFLOW: the region has 'K': only streams and arrays are declared in a DATAFLOW region: its streams are FIFOs between processes, so it cannot be made sequential"]);
 });
+
+test('#1942 DATAFLOW: a pointer argument of the top a process only reads (an ap_none input, as Vitis HLS makes it), its value the call\'s; co-simulated in VHDL and Verilog, no warning', () => {
+  const src = `#include "hls_stream.h"
+#include <stdio.h>
+void scale(hls::stream<int>& a, hls::stream<int>& b, int *k) { for (int i = 0; i < 4; i++) b.write(a.read() * *k); }
+void dut(hls::stream<int>& in, hls::stream<int>& r, int *k) {
+#pragma HLS dataflow
+  scale(in, r, k);
+}
+int main() { hls::stream<int> a, r; for (int c = 1; c <= 3; c++) { for (int i = 0; i < 4; i++) a.write(i); dut(a, r, &c); for (int i = 0; i < 4; i++) printf("%d ", r.read()); } return 0; }
+`;
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(src, { file: 'd.cpp', lang });
+    assert.deepEqual([r.errors, r.pass, r.output, r.gen.diagnostics], [[], true, '0 1 2 3 0 2 4 6 0 3 6 9 ', []], JSON.stringify(r.mismatches, big));
+    assert.deepEqual(r.gen.ports.filter((p) => p.name === 'k').map((p) => `${p.dir} ${p.w}`), ['in 32']);
+  }
+});

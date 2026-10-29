@@ -20,6 +20,7 @@ import { cppTemplates } from './cpp-template.js';
 import { cppStl } from './cpp-stl.js';
 import { streamArrays } from './c-stream-array.js';
 import { npChannels } from './cpp-np-channel.js';
+import { cppFir } from './cpp-fir.js';
 import { taskArrays } from './cpp-task-array.js';
 import { cppSugar } from './cpp-sugar.js';
 import { cStructs } from './c-struct.js';
@@ -258,9 +259,11 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     // (then the arrays of streams: a stream each element, core/c-stream-array.js, #1739; of tasks before, #1898)
     // (a template's: once it is made, its parameters known, #1898; the unions and bit-fields before the structs,
     // core/c-union.js, #1896)
+    // (hls_fir.h's filters first: their config structs read, their run() a C model's call, core/cpp-fir.js, #1942)
     const channels = (t, later) => streamArrays(taskArrays(npChannels(t, report, later), report, later), report, later);
-    const st = cStructs(cUnions(cppSugar(channels(cppTemplates(channels(cppStl(tokens, report), true), report), false), report), report, true), report, true);
-    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs };
+    const fir = cppFir(tokens, report);
+    const st = cStructs(cUnions(cppSugar(channels(cppTemplates(channels(cppStl(fir.tokens, report), true), report), false), report), report, true), report, true);
+    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, firs: fir.firs };
   }
   const st = cStructs(cUnions(tokens, report), report, false);
   return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs };
@@ -317,10 +320,11 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
         // (a test bench's std::vector, <algorithm>, <random>: core/cpp-stl.js, #1734; their stdlib.h's macros, as libstdc++'s
         // headers bring them, EXIT_FAILURE)
         if (cpp && m[1] === 'hls_np_channel.h') continue;   // (hls::split, hls::merge: core/cpp-np-channel.js, #1743)
+        if (cpp && m[1] === 'hls_fir.h') continue;   // (hls::FIR: core/cpp-fir.js, #1942)
         if (cpp && TB_HEADERS.has(m[1])) { for (const [k, v] of Object.entries(HEADER_MACROS['stdlib.h'])) if (!macros.has(k)) macros.set(k, { params: null, body: scan(v, line, bad).map((t) => ({ ...t, line })) }); continue; }
         // (a header Silinx HLS writes itself: core/cpp-headers.js, #1662)
         if (cpp && CPP_OWN_HEADERS[m[1]]) { if (!once.has(`<${m[1]}>`)) run(CPP_OWN_HEADERS[m[1]], `<${m[1]}>`, depth + 1); continue; }
-        if (!KNOWN_HEADERS.has(m[1])) e(m[1] === 'hls_stream.h' ? 'hls_stream.h: hls::stream is C++: write the source as a .cpp file'
+        if (!KNOWN_HEADERS.has(m[1])) e(m[1] === 'hls_stream.h' || m[1] === 'hls_fir.h' ? `${m[1]}: ${m[1] === 'hls_fir.h' ? 'hls::FIR' : 'hls::stream'} is C++: write the source as a .cpp file`
           : `the header '${m[1]}' is not one of Silinx HLS's (${[...KNOWN_HEADERS].join(', ')})`);
         for (const [k, v] of Object.entries(HEADER_MACROS[m[1]] || {})) if (!macros.has(k)) macros.set(k, { params: null, body: scan(v, line, bad).map((t) => ({ ...t, line })) });
         continue;

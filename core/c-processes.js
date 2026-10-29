@@ -15,6 +15,7 @@ import { constValue } from './c-check.js';
 import { typeOf } from './c-types.js';
 import { hdlName } from './c-graph.js';
 import { portOf, ctrlNone } from './c-names.js';
+import { firHdl } from './hls-fir-hdl.js';
 
 const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
@@ -73,7 +74,8 @@ export function region(fn, globals = new Map()) {
 export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
   const fn = checked.funcs.get(checked.top);
   const rg = region(fn, checked.consts);
-  const loc = fn.body.items.find((s) => s.kind === 'pragma' && (s.pragma.name === 'DATAFLOW' || s.pragma.name === 'TASK')).loc;
+  // (a top running an hls::FIR has none, #1942)
+  const loc = fn.body.items.find((s) => s.kind === 'pragma' && (s.pragma.name === 'DATAFLOW' || s.pragma.name === 'TASK'))?.loc ?? fn.loc;
   const diag = (l, message, severity = 'error') => ({ file, line: l.line, col: l.col, message, severity });
   if (rg.fallback) return { fallback: diag(loc, `#pragma HLS DATAFLOW: the region has ${rg.fallback}: made sequential (not as processes)`, 'warning') };
   const rn = portOf;
@@ -98,7 +100,11 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
     if (!mods.has(key)) {
       const same = [...mods.values()].filter((m) => m.callee === c.callee).length;
       const module = `${rn(hdlName(c.callee))}${same ? `_${same}` : ''}`;
-      mods.set(key, { callee: c.callee, module, gen: cToHdl(source, { file, lang, headers, top: c.callee, depths, module, flat: true }) });
+      // (an hls::FIR's run(): the filter's own hardware, core/hls-fir-hdl.js, #1942)
+      const fir = checked.ast.firs?.get(c.callee);
+      const elem = (t) => typeOf(t.kind === 'ptr' ? t.to : t.kind === 'array' || t.kind === 'stream' ? t.of : t);
+      mods.set(key, { callee: c.callee, module, gen: fir ? firHdl(fir, { lang, module, src: file.split('/').pop(), types: Object.fromEntries(f.params.map((pa) => [pa.name, elem(pa.type)])) })
+        : cToHdl(source, { file, lang, headers, top: c.callee, depths, module, flat: true }) });
     }
     const m = mods.get(key);
     procs.push({ k, call: c, f, mod: m, inst: `${m.module}_U${k}`, deps: new Set(), task: !!c.task });
@@ -123,12 +129,15 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
       if (port.role === 'arg_vld') continue;
       if (port.role === 'return' || (port.role === 'arg' && port.dir === 'out')) { fail(p.call.loc, `'${p.call.callee}' gives back a value (${port.name}): not supported in a DATAFLOW region yet (a stream or an array)`); continue; }
       if (port.role === 'arg') {
-        const v = a?.kind === 'id' && params.get(a.name) && params.get(a.name).type.kind !== 'ptr' ? { top: a.name } : constValue(a, rg.consts) !== null ? { k: constValue(a, rg.consts) } : null;
+        // (a scalar argument of the top, or a pointer the process reads: its value, an input, #1942)
+        const v = a?.kind === 'id' && params.get(a.name) ? { top: a.name } : constValue(a, rg.consts) !== null ? { k: constValue(a, rg.consts) } : null;
         if (!v) { fail(p.call.loc, `the argument of '${port.param}' of '${p.call.callee}': an argument of '${fn.name}' or a constant (not an expression, yet)`); continue; }
         p.wires.push({ port, ...v });
         continue;
       }
       if (a?.kind !== 'id' || !(locals(a.name) || params.get(a.name))) { fail(p.call.loc, `the argument of '${port.param}' of '${p.call.callee}': a stream or an array of the region or of '${fn.name}'`); continue; }
+      // (a port of an hls::FIR's it never uses, Vitis HLS's: not a local array's, #1942)
+      if (port.unused && locals(a.name)) continue;
       const u = of(a.name);
       u.ports.push({ p, port });
       const w = port.role === 'fifo' ? /_din$|_write$|_full_n$/.test(port.name) : /_we0$|_d0$/.test(port.name);
@@ -184,8 +193,8 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl }) {
       if (f) fifos.push({ ...f, name: pa.name, port: rn(pa.name) });
       continue;
     }
-    const t = typeOf(pa.type);
-    if (t && pa.type.kind !== 'ptr' && pa.type.kind !== 'array' && procs.some((p) => p.wires.some((x) => x.top === pa.name))) ports.push({ name: rn(pa.name), dir: 'in', w: t.w, role: 'arg', param: pa.name, s: t.s });
+    const t = typeOf(pa.type.kind === 'ptr' ? pa.type.to : pa.type);
+    if (t && pa.type.kind !== 'array' && procs.some((p) => p.wires.some((x) => x.top === pa.name))) ports.push({ name: rn(pa.name), dir: 'in', w: t.w, role: 'arg', param: pa.name, s: t.s });
   }
   const name = rn(checked.top);
   const src = file.split('/').pop();
