@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = path.join(ROOT, 'packages', 'silinx-fpga');
@@ -66,7 +66,8 @@ test('#1677 the toolchain\'s modules are in the package, core/\'s old paths re-e
     assert.ok(fs.existsSync(path.join(ROOT, moved)), moved);
   }
   for (const [old, moved] of shims.filter(([f]) => !f.endsWith('-worker.js'))) {
-    const a = await import(path.join(ROOT, old)), b = await import(path.join(ROOT, moved));
+    // (a file URL: Windows's absolute paths are not import specifiers, #1974)
+    const a = await import(pathToFileURL(path.join(ROOT, old)).href), b = await import(pathToFileURL(path.join(ROOT, moved)).href);
     assert.deepEqual(Object.keys(a).sort(), [...Object.keys(b), ...(IDE_ADDS[old] || [])].sort(), old);
     for (const k of Object.keys(b)) assert.equal(a[k], b[k], `${old} ${k}`);
   }
