@@ -13,7 +13,7 @@
 -- The design, each part in the style that suits it best:
 --   traffic.fsm.json : the controller, a state diagram (a Moore machine: one state per phase of
 --                      the lights, its output the phase code); traffic.vhd is generated from it
---   lamps.tt.json    : which lamps are lit in each phase, a truth table (unused codes are don't
+--   lamps.bool.json  : which lamps are lit in each phase, a Boolean algebra (unused codes are don't
 --                      cares, so the circuit is smaller); lamps.vhd is generated from it
 --   timer.vhd        : the length of each phase, the 2 Hz blink and the seconds left (VHDL: a
 --                      counter is clearer written than drawn)

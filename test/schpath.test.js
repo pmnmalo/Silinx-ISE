@@ -215,7 +215,7 @@ function stubs(doc, modules) {
 test('#948 the examples\' schematics and truth tables\' gate schematics have no wire clash', () => {
   const gates = sd.normalizeDoc(JSON.parse(fs.readFileSync(new URL('../examples/gates/src/gates.sch.json', import.meta.url), 'utf8')));
   assert.deepEqual(wireClashes(gates), []);
-  const lamps = JSON.parse(fs.readFileSync(new URL('../examples/traffic/src/lamps.tt.json', import.meta.url), 'utf8'));
+  const lamps = JSON.parse(fs.readFileSync(new URL('../examples/traffic/src/lamps.bool.json', import.meta.url), 'utf8'));
   for (const form of ['sop', 'pos', 'nand', 'nor', 'xor']) for (const lang of ['vhdl', 'verilog']) {
     assert.deepEqual(wireClashes(schematicFromTable(lamps, { form, lang })), [], `lamps ${form} ${lang}`);
   }

@@ -1,6 +1,6 @@
 // The traffic example (examples/traffic, the second example): a pedestrian crossing. Its controller
 // is a state diagram (src/traffic.fsm.json, a Moore machine) and its lamps a truth table
-// (src/lamps.tt.json), each with its VHDL kept in sync (src/traffic.vhd, src/lamps.vhd); the timer
+// (src/lamps.bool.json), each with its VHDL kept in sync (src/traffic.vhd, src/lamps.vhd); the timer
 // and the top are plain VHDL, the display the clock example's Verilog. The drawn sources are clean
 // and the VHDL shipped is exactly what the FSM editor and the truth table tool write (and reads back
 // to the same diagram / table); the diagram has the 7 states and the transitions designed, the table
@@ -17,11 +17,11 @@ import { EXAMPLES, TARGETS, example, exampleUcf, runTestbench } from './examples
 const ex = example('traffic');
 const read = (f) => fs.readFileSync(path.join(ex.dir, f), 'utf8');
 const fsm = JSON.parse(read('src/traffic.fsm.json'));
-const tt = JSON.parse(read('src/lamps.tt.json'));
+const tt = JSON.parse(read('src/lamps.bool.json'));
 const fsmHdl = read('src/traffic.vhd');
 const ttHdl = read('src/lamps.vhd');
 const fsmCode = (m) => generateFsm(m, 'vhdl', { source: 'traffic.fsm.json' }).code;
-const ttCode = (t) => generateTableHdl(t, 'vhdl', { source: 'lamps.tt.json' }).code;
+const ttCode = (t) => generateTableHdl(t, 'vhdl', { source: 'lamps.bool.json' }).code;
 const PHASES = ['CARS', 'CARS_YELLOW', 'ALL_RED', 'WALK', 'WALK_END', 'ALL_RED_2', 'NIGHT'];
 
 test('traffic: the second example, after gates', () => {
@@ -35,7 +35,7 @@ test('traffic: the project (top top, test bench tb_traffic, Basys2, VHDL), its s
     'src/traffic.vhd:vhdl:design', 'src/lamps.vhd:vhdl:design', 'src/timer.vhd:vhdl:design', 'src/sevenseg.v:verilog:design',
     'src/top.vhd:vhdl:design', 'sim/tb_traffic.vhd:vhdl:sim',
   ]);
-  assert.deepEqual(fs.readdirSync(path.join(ex.dir, 'src')).sort(), ['lamps.tt.json', 'lamps.vhd', 'sevenseg.v', 'timer.vhd', 'top.vhd', 'traffic.fsm.json', 'traffic.vhd']);
+  assert.deepEqual(fs.readdirSync(path.join(ex.dir, 'src')).sort(), ['lamps.bool.json', 'lamps.vhd', 'sevenseg.v', 'timer.vhd', 'top.vhd', 'traffic.fsm.json', 'traffic.vhd']);
   // the display is the clock example's (only its header comment differs: the example is complete by itself)
   const body = (t) => t.replace(/^(\/\/.*\n)+/, '');
   assert.equal(body(read('src/sevenseg.v')), body(fs.readFileSync(path.join(example('clock').dir, 'src/sevenseg.v'), 'utf8')));

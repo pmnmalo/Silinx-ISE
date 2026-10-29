@@ -394,7 +394,7 @@ export async function flushDoc(doc, opts) {
     // a drawn source without an HDL file: its module follows (#177), and it gets its HDL file as soon
     // as it has no errors (#207)
     const vp = docPath(doc);
-    if (vp && /\.(sch|asm|tt|fsm|pn)\.json$/.test(vp) && !S.schOwners?.[vp] && S.project) {
+    if (vp && /\.(sch|asm|tt|bool|fsm|pn)\.json$/.test(vp) && !S.schOwners?.[vp] && S.project) {
       try {
         S.viewTexts = { ...(S.viewTexts || {}), [vp]: await api.readFile(S.project.name, vp) }; compileProject();
         if (await adoptDrawnHdl()) { await reloadProject(false); markStale(); } else { await drawnHdlClashes(); renderHierarchy(); }
@@ -496,7 +496,7 @@ export async function openFile(path, line, col, { task } = {}) {
   if (!S.project) return;
   if (path.endsWith('.asm.json')) return openAsm(path);
   if (path.endsWith('.sch.json')) return openSch(path);
-  if (path.endsWith('.tt.json')) return openTt(path);
+  if (/\.(tt|bool)\.json$/.test(path)) return openTt(path);
   if (path.endsWith('.fsm.json')) return openFsm(path);
   if (path.endsWith('.pn.json')) return openPetri(path);
   const id = `file:${path}`;
@@ -810,7 +810,7 @@ async function renameFolder(dir) {
   if (S.fileTree.some(f => f === to || f.startsWith(`${to}/`))) return alertDlg('Rename Folder', `'${to}' already exists.`);
   await saveAll();
   const remap = p => (p && p.startsWith(`${dir}/`) ? to + p.slice(dir.length) : p);
-  const views = S.fileTree.filter(f => /\.(sch|asm|tt|fsm|pn)\.json$/i.test(f));
+  const views = S.fileTree.filter(f => /\.(sch|asm|tt|bool|fsm|pn)\.json$/i.test(f));
   // the editors of moved files are closed and reopened at their new paths
   const reopen = [];
   for (const d of [...S.docs]) if (d.path && d.path.startsWith(`${dir}/`)) { reopen.push(remap(d.path)); d.dirty = false; clearTimeout(d._autosave); await closeDoc(d); }
@@ -823,7 +823,7 @@ async function renameFolder(dir) {
       try { d = JSON.parse(await api.readFile(S.project.name, at)); } catch { continue; }
       if (d.generatedFile && d.generatedFile.startsWith(`${dir}/`)) {
         d.generatedFile = remap(d.generatedFile);
-        await api.writeFile(S.project.name, at, JSON.stringify(d, null, /\.(asm|tt|fsm)\.json$/i.test(at) ? 2 : 1));
+        await api.writeFile(S.project.name, at, JSON.stringify(d, null, /\.(asm|tt|bool|fsm)\.json$/i.test(at) ? 2 : 1));
       }
     }
     log(`Folder ${dir} renamed to ${to}.`, 'ok');

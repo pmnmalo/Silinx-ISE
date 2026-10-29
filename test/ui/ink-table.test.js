@@ -57,7 +57,7 @@ async function newTable(page, name) {
   await page.dialogButton('Next >');
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/drawn.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/drawn.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
 }
 
 uiTest('Handwritten Table…: a table drawn with the mouse, a finger and a pen fills the editor\'s table; corrected; Undo', E, async (page) => {
@@ -79,7 +79,7 @@ uiTest('Handwritten Table…: a table drawn with the mouse, a finger and a pen f
   await page.waitFor((t) => document.querySelector(`${t} .tt-inputs`).value === 'A, B' && document.querySelector(`${t} .tt-outputs`).value === 'F, G', [T], { what: 'the names' });
   assert.equal(await cells(page, 'F'), '1001');
   assert.equal(await cells(page, 'G'), '011X');
-  await page.waitFor(async () => (await (await fetch('/api/projects/InkTable/file?path=src%2Fdrawn.tt.json')).json()).table.G === '011X', [], { what: 'saved', timeout: 15000 });
+  await page.waitFor(async () => (await (await fetch('/api/projects/InkTable/file?path=src%2Fdrawn.bool.json')).json()).table.G === '011X', [], { what: 'saved', timeout: 15000 });
   // one step of Undo: the table before
   await page.click(`${T} .tt-undo`);
   await page.waitFor((t) => document.querySelector(`${t} .tt-inputs`).value === 'a, b, c', [T], { what: 'undone' });

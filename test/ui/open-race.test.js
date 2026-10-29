@@ -13,7 +13,7 @@ uiTest('a file read when another project was opened meanwhile is not opened ther
   await makeProject(env, { name: 'RaceA', template: 'traffic' });
   await makeProject(env, { name: 'RaceB', template: 'traffic' });
   await page.openProject('RaceA');
-  for (const [path, opener] of [['src/top.vhd', 'openFile'], ['src/traffic.fsm.json', 'openFsm'], ['src/lamps.tt.json', 'openTt']]) {
+  for (const [path, opener] of [['src/top.vhd', 'openFile'], ['src/traffic.fsm.json', 'openFsm'], ['src/lamps.bool.json', 'openTt']]) {
     // RaceA's read of the file held back until RaceB is open
     await page.eval(async (p, fn) => {
       const { api } = await import('/js/api.js');

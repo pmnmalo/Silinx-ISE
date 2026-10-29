@@ -16,7 +16,7 @@ export { cTemplate, cppTemplate } from './c-templates.js';
 const SOURCE_TYPES = [
   // hdl / tb: VHDL or Verilog, chosen in the wizard (the extension follows the language)
   // wiz: the wizard the Wizard button opens (#958); only: no plain source, Next > disabled
-  { id: 'tt', label: 'Boolean Algebra', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
+  { id: 'tt', label: 'Boolean Algebra', ico: 'truthtable', ext: '.bool.json', dir: 'src' },
   { id: 'hdl', label: 'Module (HDL)', ico: 'vhdl', ext: null, dir: 'src', wiz: 'module' },
   { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src', wiz: 'schematic' },
   { id: 'fsm', label: 'Finite State Machine (FSM)', ico: 'fsm', ext: '.fsm.json', dir: 'src' },
@@ -66,7 +66,7 @@ export async function newSourceWizard({ type } = {}) {
     validate: () => null,
   };
   // the file name and the location; Wizard (#958) opens the type's wizard with them (it asks the rest on its pages)
-  const nameOf = () => fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|sch\.json|fsm\.json|pn\.json)$/i, '');
+  const nameOf = () => fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|bool\.json|sch\.json|fsm\.json|pn\.json)$/i, '');
   const fileError = () => {
     if (!FILE_RE.test(nameOf())) return 'Enter a valid file name (letters, digits, _ and -).';
     if (!/^[A-Za-z0-9_/-]+$/.test(loc.value.trim())) return 'Invalid location.';
@@ -189,7 +189,7 @@ export async function newSourceWizard({ type } = {}) {
     title: 'Summary',
     render: () => summary,
     onShow: () => {
-      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|sch\.json)$/i, '');
+      const n = fname.value.trim().replace(/\.(vhd|vhdl|v|ucf|mem|asm\.json|tt\.json|bool\.json|sch\.json)$/i, '');
       const lg = langSel.value === 'verilog' ? 'Verilog' : 'VHDL';
       summary.textContent = `Project Navigator will create a new skeleton source with the following specifications.\n\nAdd to Project: Yes\nSource Directory: ${loc.value}\nSource Type: ${st.label}${st.ext ? '' : ` (${lg})`}\nSource Name: ${n}${extOf(st)}\n` +
         (st.id === 'hdl' ? `\nEntity name: ${entName.value}\n${langSel.value === 'vhdl' ? `Architecture name: ${archName.value}\n` : ''}\nPort Definitions:\n${ports.map(p => `    ${p.name.padEnd(12)} ${p.bus ? `Bus[${p.msb}:${p.lsb}]` : 'Pin'.padEnd(8)}  ${p.dir}`).join('\n')}` : '') +

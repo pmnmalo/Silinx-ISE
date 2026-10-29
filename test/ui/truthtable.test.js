@@ -51,7 +51,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   await page.dialogButton('Next >');
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
   const T = '.doc:not([hidden]) .tt-editor';
   assert.deepEqual(await page.eval((t) => [document.querySelector(`${t} .tt-inputs`).value, document.querySelector(`${t} .tt-outputs`).value], T), ['a, b, c', 'f']);
   // majority: rows 3, 5, 6, 7
@@ -82,7 +82,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
     ['f = /(/(b.c)./(a.c)./(a.b))', '4 gate(s), 0 of them inverter(s)'], ['f = /(/(a + b) + /(a + c) + /(b + c))', '4 gate(s), 0 of them inverter(s)']]);
   // the table is saved (autosave)
   await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
-  assert.equal((await ttFile('TtPj', 'src/maj3.tt.json')).table.f, '00010111');
+  assert.equal((await ttFile('TtPj', 'src/maj3.bool.json')).table.f, '00010111');
 
   // ---- its VHDL module, made with the table (every source has its HDL, #207), linked to it, following
   // it (no Generate VHDL / Verilog module any more, #220)
@@ -90,28 +90,28 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   // written by hand: Handwritten Algebra…, #2010, #2047)
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Apply', 'Algebra from Module…', 'Handwritten Algebra…']);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-toolbar input[type=checkbox]`).length, T), 0);
-  await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj3.vhd'] === 'src/maj3.tt.json', [], { what: 'linked HDL' });
-  assert.equal((await ttFile('TtPj', 'src/maj3.tt.json')).generatedFile, 'src/maj3.vhd');
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj3.vhd'] === 'src/maj3.bool.json', [], { what: 'linked HDL' });
+  assert.equal((await ttFile('TtPj', 'src/maj3.bool.json')).generatedFile, 'src/maj3.vhd');
   await page.waitFor(async () => /f = Σm\(3, 5, 6, 7\)/.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'the HDL follows the table', timeout: 15000 });
   let vhd = await readWs(env, 'TtPj', 'src/maj3.vhd');
   assert.deepEqual(await consoleAfterOpen(page), [
-    'src/maj3.vhd generated from src/maj3.tt.json (every source has its HDL)',
-    "Created Boolean Algebra 'src/maj3.tt.json'.",
+    'src/maj3.vhd generated from src/maj3.bool.json (every source has its HDL)',
+    "Created Boolean Algebra 'src/maj3.bool.json'.",
   ]);
   await page.eval(() => window.SilinxApp.openFile('src/maj3.vhd'));
   assert.deepEqual(await problemRows(page), []);
   assert.equal(simTable(vhd, 'maj3.vhd', 'maj3').f, '00010111');
   // the hierarchy shows the module with its table, its views as badges: the table the base, its
   // schematic (#694), the HDL (#207)
-  await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => /maj3/.test(r.textContent) && /maj3\.tt\.json/.test(r.textContent)), [], { what: 'maj3 (maj3.tt.json) in the hierarchy' });
+  await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => /maj3/.test(r.textContent) && /maj3\.bool\.json/.test(r.textContent)), [], { what: 'maj3 (maj3.bool.json) in the hierarchy' });
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#hier .row')].filter((r) => r.querySelector('.lbl').textContent === 'maj3').map((r) => [...r.querySelectorAll('.badge')].map((b) => `${b.textContent}${b.classList.contains('base') ? '*' : ''}`))), [['Algebra*', 'Schematic', 'VHDL']]);
   // the HDL editor (opened) is read-only, its banner says so and links to the table (#1176)
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/maj3.vhd' && /^Read-only, generated from maj3\.tt\.json$/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'HDL editor banner' });
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/maj3.vhd' && /^Read-only, generated from maj3\.bool\.json$/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'HDL editor banner' });
   assert.equal(await page.eval(() => window.Silinx.active.editor.readOnly()), true);
 
   // ---- table -> HDL: a cell change rewrites the module
-  await page.eval(() => window.SilinxApp.openTt('src/maj3.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.tt.json');
+  await page.eval(() => window.SilinxApp.openTt('src/maj3.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.bool.json');
   // (in sync: its HDL file not shown in the toolbar, #2047)
   await page.waitFor((t) => { const l = document.querySelector(`${t} .tt-link`); return l.dataset.hdl === 'maj3.vhd' && l.textContent === ''; }, [T]);
   await page.click(`${T} .tt-cell[data-out=f][data-row="0"]`);       // f(0,0,0) = 1
@@ -136,33 +136,33 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   // the minimal SOP's gates (the HDL logic form)
   const badge = (mod, text) => page.eval((m, x) => { const r = [...document.querySelectorAll('#hier .row')].find((e) => e.querySelector('.lbl').textContent === m); [...r.querySelectorAll('.badge')].find((b) => b.textContent === x).click(); }, mod, text);
   await badge('maj3', 'Schematic');
-  await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/maj3.tt.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
-  assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .se-banner').textContent), /^Read-only, generated from maj3\.tt\.json$/);   // (at the end of its toolbar, #1193)
-  let sch = await ttSchematic(page, 'src/maj3.tt.json');
+  await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/maj3.bool.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
+  assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .se-banner').textContent), /^Read-only, generated from maj3\.bool\.json$/);   // (at the end of its toolbar, #1193)
+  let sch = await ttSchematic(page, 'src/maj3.bool.json');
   assert.deepEqual(netlist(sch).diagnostics, []);
   // (the table's, as core/logic.js draws it: AND, OR and NOT gates)
-  assert.deepEqual(sch.symbols.map((x) => x.type), schematicFromTable(await ttFile('TtPj', 'src/maj3.tt.json')).symbols.map((x) => x.type));
+  assert.deepEqual(sch.symbols.map((x) => x.type), schematicFromTable(await ttFile('TtPj', 'src/maj3.bool.json')).symbols.map((x) => x.type));
   assert.ok(symTypes(sch).every((x) => /^(and\d|or\d|inv)$/.test(x)), symTypes(sch));
   const careSim = (st) => assert.ok([...'0X10100X'].every((c, i) => c === 'X' || c === st[i]), st);
   careSim(simTable(generateHdl(sch).code, 'maj3.vhd', 'maj3').f);
   assert.ok(!(await page.eval(() => window.Silinx.fileTree)).some((f) => /\.sch\.json$/.test(f)), 'no schematic file');
   // HDL logic: NAND gates only: the HDL and the open schematic follow, NAND gates only
-  await page.eval(() => window.SilinxApp.openTt('src/maj3.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.tt.json');
+  await page.eval(() => window.SilinxApp.openTt('src/maj3.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/maj3.bool.json');
   await page.fill(`${T} .tt-form`, 'nand');
   await page.waitFor(async () => /\(NAND gates only, from the minimal SOP/.test(await (await fetch('/api/projects/TtPj/file?path=src%2Fmaj3.vhd')).text()), [], { what: 'the NAND-only HDL', timeout: 15000 });
   vhd = await readWs(env, 'TtPj', 'src/maj3.vhd');
   assert.doesNotMatch(vhd.slice(vhd.indexOf('begin')), /\b(or|nor|xor|xnor)\b/);
   careSim(simTable(vhd, 'maj3.vhd', 'maj3').f);
-  await page.waitFor((p) => window.Silinx.docs.find((d) => d.id === `ttsch:${p}`)?.viewer?.getDoc().symbols.every((x) => /^nand/.test(x.type)), ['src/maj3.tt.json'], { what: 'the schematic in NAND gates' });
-  sch = await ttSchematic(page, 'src/maj3.tt.json');
+  await page.waitFor((p) => window.Silinx.docs.find((d) => d.id === `ttsch:${p}`)?.viewer?.getDoc().symbols.every((x) => /^nand/.test(x.type)), ['src/maj3.bool.json'], { what: 'the schematic in NAND gates' });
+  sch = await ttSchematic(page, 'src/maj3.bool.json');
   assert.deepEqual(netlist(sch).diagnostics, []);
   assert.ok(symTypes(sch).every((x) => /^nand[234]$/.test(x)), symTypes(sch));
   careSim(simTable(generateHdl(sch).code, 'maj3.vhd', 'maj3').f);
   // a cell change: the schematic follows (row 0: 0 -> 1)
   await page.click(`${T} .tt-cell[data-out=f][data-row="0"]`);
-  await page.waitFor((p, before) => { const d = window.Silinx.docs.find((x) => x.id === `ttsch:${p}`)?.viewer?.getDoc(); return d && JSON.stringify(d.symbols) !== before; }, ['src/maj3.tt.json', JSON.stringify(sch.symbols)], { what: 'the schematic redrawn' });
-  const st = simTable(generateHdl(await ttSchematic(page, 'src/maj3.tt.json')).code, 'maj3.vhd', 'maj3').f;
+  await page.waitFor((p, before) => { const d = window.Silinx.docs.find((x) => x.id === `ttsch:${p}`)?.viewer?.getDoc(); return d && JSON.stringify(d.symbols) !== before; }, ['src/maj3.bool.json', JSON.stringify(sch.symbols)], { what: 'the schematic redrawn' });
+  const st = simTable(generateHdl(await ttSchematic(page, 'src/maj3.bool.json')).code, 'maj3.vhd', 'maj3').f;
   assert.ok([...'1X10100X'].every((c, i) => c === 'X' || c === st[i]), st);
   assert.deepEqual(await problemRows(page), []);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
@@ -175,8 +175,8 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   await page.fill('.dlg-overlay input[type=text]', 'maj4', { index: 0 });
   await page.dialogButton('Rename');
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj4.vhd'] === 'src/maj4.tt.json', [], { what: 'link after the rename', timeout: 15000 });
-  const t4 = await ttFile('TtPj', 'src/maj4.tt.json');
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj4.vhd'] === 'src/maj4.bool.json', [], { what: 'link after the rename', timeout: 15000 });
+  const t4 = await ttFile('TtPj', 'src/maj4.bool.json');
   assert.deepEqual([t4.name, t4.generatedFile], ['maj4', 'src/maj4.vhd']);
   assert.match(await readWs(env, 'TtPj', 'src/maj4.vhd'), /entity maj4 is/);
 });
@@ -186,10 +186,10 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   // a schematic made by the former Generate Schematic (#694): a module of its own, not linked to the table
   const old = schematicFromTable(four, { form: 'nand', name: 'many_sch' });
   delete old.fallbacks;
-  await makeProject(env, { name: 'TtMany', files: { 'src/many.tt.json': JSON.stringify(four, null, 2), 'src/many_sch.sch.json': JSON.stringify(old, null, 1) } });
+  await makeProject(env, { name: 'TtMany', files: { 'src/many.bool.json': JSON.stringify(four, null, 2), 'src/many_sch.sch.json': JSON.stringify(old, null, 1) } });
   await page.openProject('TtMany');
-  await page.eval(() => window.SilinxApp.openTt('src/many.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/many.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
+  await page.eval(() => window.SilinxApp.openTt('src/many.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/many.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
   const T = '.doc:not([hidden]) .tt-editor';
   // no outputs: refused
   await page.fill(`${T} .tt-outputs`, ' ');
@@ -233,13 +233,13 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   await page.click(`${T} .tt-cell[data-out=y15][data-row="2"]`);
   assert.equal(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-cell[data-out=y15]`)].map((c) => c.textContent).join(''), T), '00100000');
   // saved: 16 outputs
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtMany/file?path=src%2Fmany.tt.json')).json()).table?.y15 === '00100000', [], { what: 'saved' });
-  const saved = await ttFile('TtMany', 'src/many.tt.json');
+  await page.waitFor(async () => (await (await fetch('/api/projects/TtMany/file?path=src%2Fmany.bool.json')).json()).table?.y15 === '00100000', [], { what: 'saved' });
+  const saved = await ttFile('TtMany', 'src/many.bool.json');
   assert.deepEqual(saved.outputs, outs);
   assert.deepEqual([saved.table.y3, saved.table.y5, saved.table.y15, saved.table.y9], ['00010111', '1X000011', '00100000', '00000000']);
 
   // ---- its VHDL module (linked, following it, read-only: #1176): 16 outputs, simulates to the table
-  await page.waitFor(() => window.Silinx.hdlToSch?.['src/many.vhd'] === 'src/many.tt.json', [], { what: 'linked HDL' });
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/many.vhd'] === 'src/many.bool.json', [], { what: 'linked HDL' });
   await page.waitFor(async () => /y15 = Σm\(2\)/.test(await (await fetch('/api/projects/TtMany/file?path=src%2Fmany.vhd')).text()), [], { what: 'the HDL follows the table', timeout: 15000 });
   const vhd = await readWs(env, 'TtMany', 'src/many.vhd');
   assert.deepEqual(await consoleAfterOpen(page), []);
@@ -255,11 +255,11 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/many.vhd' && window.Silinx.active.editor?.readOnly(), [], { what: 'HDL editor, read-only' });
 
   // ---- its schematic (#694), from its row's badge: 16 output markers, simulates to the table
-  await page.eval(() => window.SilinxApp.openTt('src/many.tt.json'));
-  await page.waitFor((t) => window.Silinx.active?.id === 'tt:src/many.tt.json' && [...document.querySelectorAll(`${t} .tt-cell[data-out=y5]`)].map((c) => c.textContent).join('') === '1X000011', [T], { what: 'the table' });
+  await page.eval(() => window.SilinxApp.openTt('src/many.bool.json'));
+  await page.waitFor((t) => window.Silinx.active?.id === 'tt:src/many.bool.json' && [...document.querySelectorAll(`${t} .tt-cell[data-out=y5]`)].map((c) => c.textContent).join('') === '1X000011', [T], { what: 'the table' });
   await page.eval(() => { const r = [...document.querySelectorAll('#hier .row')].find((e) => e.querySelector('.lbl').textContent === 'many'); [...r.querySelectorAll('.badge')].find((b) => b.textContent === 'Schematic').click(); });
-  await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/many.tt.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
-  const sch = await ttSchematic(page, 'src/many.tt.json');
+  await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/many.bool.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
+  const sch = await ttSchematic(page, 'src/many.bool.json');
   assert.deepEqual(netlist(sch).diagnostics, []);
   assert.deepEqual(await problemRows(page), []);
   assert.deepEqual(sch.ports.filter((p) => p.dir === 'out').map((p) => p.name), outs);
@@ -272,10 +272,10 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
 });
 
 uiTest("Truth Table expressions (#180): '/' NOT and '.' AND typed in the Expression field fill the XOR's column; the operators shown", E, async (page) => {
-  await makeProject(env, { name: 'TtOps', files: { 'src/ops.tt.json': JSON.stringify({ version: 1, name: 'ops', inputs: ['a', 'b', 'c'], outputs: ['f'], table: { f: '00000000' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' }, null, 2) } });
+  await makeProject(env, { name: 'TtOps', files: { 'src/ops.bool.json': JSON.stringify({ version: 1, name: 'ops', inputs: ['a', 'b', 'c'], outputs: ['f'], table: { f: '00000000' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' }, null, 2) } });
   await page.openProject('TtOps');
-  await page.eval(() => window.SilinxApp.openTt('src/ops.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/ops.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
+  await page.eval(() => window.SilinxApp.openTt('src/ops.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/ops.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
   const T = '.doc:not([hidden]) .tt-editor';
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-ops`).textContent, T), "Operators: / ' ~ (NOT), . · * (AND), ⊕ ^ or xor (XOR), xnor, + (OR)");
   await page.fill(`${T} .tt-expr-in`, '/a.b + a./b');
@@ -289,7 +289,7 @@ uiTest("Truth Table expressions (#180): '/' NOT and '.' AND typed in the Express
   await page.fill(`${T} .tt-expr-in`, 'a..b');
   await page.click(`${T} .tt-btn`, { text: 'Fill Table' });
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-expr-err`).textContent, T), "expected a variable, 0, 1 or ( but found '.' (at position 3)");
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtOps/file?path=src%2Fops.tt.json')).json()).exprs?.f === '/a.b + a./b', [], { what: 'saved' });
+  await page.waitFor(async () => (await (await fetch('/api/projects/TtOps/file?path=src%2Fops.bool.json')).json()).exprs?.f === '/a.b + a./b', [], { what: 'saved' });
 });
 
 uiTest('Algebra from Module: a vector adder read into a table (exhaustive simulation); the table has its HDL; no truth table from a module\'s context menu (#220)', E, async (page) => {
@@ -313,8 +313,8 @@ uiTest('Algebra from Module: a vector adder read into a table (exhaustive simula
   await page.dialogButton('Next >');
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/blank.tt.json');
-  await page.waitFor(() => window.Silinx.hdlToSch?.['src/blank.vhd'] === 'src/blank.tt.json', [], { what: 'the table linked to its HDL' });
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/blank.bool.json');
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/blank.vhd'] === 'src/blank.bool.json', [], { what: 'the table linked to its HDL' });
   await page.click(`${T} .tt-btn`, { text: 'Algebra from Module…' });
   await page.waitDialog('Algebra from Module');
   await page.dialogButton('OK');
@@ -323,8 +323,8 @@ uiTest('Algebra from Module: a vector adder read into a table (exhaustive simula
   await page.waitNoDialog();
   await page.waitFor((x) => document.querySelector(`${x} .tt-outputs`).value === 's_2, s_1, s_0', [T]);
   assert.deepEqual(await page.eval((t) => [document.querySelector(`${t} .tt-inputs`).value, document.querySelector(`${t} .tt-outputs`).value], T), ['a_1, a_0, b_1, b_0', 's_2, s_1, s_0']);
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtMod/file?path=src%2Fblank.tt.json')).json()).outputs?.length === 3, [], { what: 'saved' });
-  const t = await ttFile('TtMod', 'src/blank.tt.json');
+  await page.waitFor(async () => (await (await fetch('/api/projects/TtMod/file?path=src%2Fblank.bool.json')).json()).outputs?.length === 3, [], { what: 'saved' });
+  const t = await ttFile('TtMod', 'src/blank.bool.json');
   for (let r = 0; r < 16; r++) assert.equal(t.table.s_2[r] + t.table.s_1[r] + t.table.s_0[r], ((r >> 2) + (r & 3)).toString(2).padStart(3, '0'));
   assert.equal(t.generatedFile, 'src/blank.vhd');
   // its HDL follows it: the adder's table
@@ -346,7 +346,7 @@ uiTest('Truth Table (#196): Apply input / output names (columns follow their nam
   await page.dialogButton('Next >');
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/tv.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/tv.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
   const T = '.doc:not([hidden]) .tt-editor';
   const cells = (o) => page.eval((t, x) => [...document.querySelectorAll(`${t} .tt-cell[data-out=${x}]`)].map((c) => c.textContent).join(''), T, o);
   // the names typed, then the Apply button (no change event)
@@ -375,25 +375,25 @@ uiTest('Truth Table (#196): Apply input / output names (columns follow their nam
   // g = c·b (rows 6, 7)
   await page.click(`${T} .tt-tab[data-out=g]`);
   for (const r of [6, 7]) await page.click(`${T} .tt-cell[data-out=g][data-row="${r}"]`);
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtVlog/file?path=src%2Ftv.tt.json')).json()).table.g === '00000011', [], { what: 'saved' });
-  const t0 = await ttFile('TtVlog', 'src/tv.tt.json');
+  await page.waitFor(async () => (await (await fetch('/api/projects/TtVlog/file?path=src%2Ftv.bool.json')).json()).table.g === '00000011', [], { what: 'saved' });
+  const t0 = await ttFile('TtVlog', 'src/tv.bool.json');
   assert.deepEqual([t0.inputs, t0.outputs, t0.table], [['c', 'b', 'a'], ['f', 'g'], { f: '01010101', g: '00000011' }]);
   // its Verilog module src/tv.v (the project's preferred language), made with it, linked, simulates to
   // the table (every source has its HDL, #207; no Generate VHDL / Verilog module any more, #220)
-  assert.equal((await ttFile('TtVlog', 'src/tv.tt.json')).generatedFile, 'src/tv.v');
-  await page.waitFor(() => window.Silinx.hdlToSch?.['src/tv.v'] === 'src/tv.tt.json' && !window.Silinx.fileTree.includes('src/tv.vhd'), [], { what: 'linked Verilog', timeout: 15000 });
+  assert.equal((await ttFile('TtVlog', 'src/tv.bool.json')).generatedFile, 'src/tv.v');
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/tv.v'] === 'src/tv.bool.json' && !window.Silinx.fileTree.includes('src/tv.vhd'), [], { what: 'linked Verilog', timeout: 15000 });
   await page.waitFor(async () => /g = Σm\(6, 7\)/.test(await (await fetch('/api/projects/TtVlog/file?path=src%2Ftv.v')).text()), [], { what: 'the Verilog follows the table', timeout: 15000 });
   assert.deepEqual(page.dialogs, []);
   const v = await readWs(env, 'TtVlog', 'src/tv.v');
   assert.match(v, /module tv\s*\(/);
   assert.deepEqual(simTable(v, 'tv.v', 'tv'), { f: '01010101', g: '00000011' });
-  const t1 = await ttFile('TtVlog', 'src/tv.tt.json');
+  const t1 = await ttFile('TtVlog', 'src/tv.bool.json');
   assert.deepEqual([t1.generatedFile, t1.lang], ['src/tv.v', 'verilog']);
   await page.eval(() => window.SilinxApp.openFile('src/tv.v'));
-  await page.waitFor(() => window.Silinx.active?.id === 'file:src/tv.v' && /^Read-only, generated from tv\.tt\.json$/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'Verilog editor banner' });
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/tv.v' && /^Read-only, generated from tv\.bool\.json$/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'Verilog editor banner' });
   // a cell change rewrites the Verilog
-  await page.eval(() => window.SilinxApp.openTt('src/tv.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/tv.tt.json');
+  await page.eval(() => window.SilinxApp.openTt('src/tv.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/tv.bool.json');
   await page.click(`${T} .tt-tab[data-out=g]`);
   await page.click(`${T} .tt-cell[data-out=g][data-row="0"]`);
   await page.waitFor(async () => /g = Σm\(0, 6, 7\)/.test(await (await fetch('/api/projects/TtVlog/file?path=src%2Ftv.v')).text()), [], { what: 'Verilog regenerated' });
@@ -413,10 +413,10 @@ begin
   u_fa : fa port map (a => x, b => y, c => z, s => s, co => co, x => w);
 end rtl;
 `;
-  await makeProject(env, { name: 'TtXor', top: 'top', files: { 'src/fa.tt.json': JSON.stringify(fa, null, 2), 'src/top.vhd': top } });
+  await makeProject(env, { name: 'TtXor', top: 'top', files: { 'src/fa.bool.json': JSON.stringify(fa, null, 2), 'src/top.vhd': top } });
   await page.openProject('TtXor');
-  await page.eval(() => window.SilinxApp.openTt('src/fa.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
+  await page.eval(() => window.SilinxApp.openTt('src/fa.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
   const T = '.doc:not([hidden]) .tt-editor';
   const texts = () => page.eval((t) => ({
     sop: document.querySelector(`${t} .tt-sop .tt-expr`).textContent,
@@ -471,7 +471,7 @@ end rtl;
   assert.equal((await texts()).xor, 'co = a.b + c.(a ⊕ b)');
 
   // ---- the HDL: the minimal SOP by default; "XOR form (when simpler)" puts it in the module
-  await page.waitFor(() => window.Silinx.hdlToSch?.['src/fa.vhd'] === 'src/fa.tt.json', [], { what: 'linked HDL' });
+  await page.waitFor(() => window.Silinx.hdlToSch?.['src/fa.vhd'] === 'src/fa.bool.json', [], { what: 'linked HDL' });
   await page.waitFor(async () => /co = Σm\(3, 5, 6, 7\)/.test(await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.vhd')).text()), [], { what: 'the HDL of the table', timeout: 15000 });
   assert.doesNotMatch(await readWs(env, 'TtXor', 'src/fa.vhd'), /xor/);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-form option`)].map((o) => `${o.value}:${o.textContent}`), T), ['sop:Minimal SOP', 'pos:Minimal POS', 'xor:XOR form (when simpler)', 'nand:NAND gates only', 'nor:NOR gates only', 'gates:Least number of gates', 'delay:Least delay']);
@@ -482,25 +482,25 @@ end rtl;
   assert.match(vhd, /^ {4}x <= c or \(a and b\);$/m);
   assert.match(vhd, /^-- co = a·b \+ c·\(a ⊕ b\) {3}\(XOR form, 5 literal\(s\), 4 gate\(s\), delay 3\)$/m);
   assert.deepEqual(simTable(vhd, 'fa.vhd', 'fa'), fa.table);
-  await page.waitFor(async () => (await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.tt.json')).json()).form === 'xor', [], { what: 'saved' });
+  await page.waitFor(async () => (await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.bool.json')).json()).form === 'xor', [], { what: 'saved' });
   await page.eval(() => window.SilinxApp.openFile('src/fa.vhd'));
   assert.deepEqual(await problemRows(page), []);
   // its schematic in the XOR form too (#694): s an XOR3; then NOR gates only, the HDL and the schematic
-  await page.eval(() => window.SilinxApp.openTtSchematic('src/fa.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/fa.tt.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
-  let sch = await ttSchematic(page, 'src/fa.tt.json');
+  await page.eval(() => window.SilinxApp.openTtSchematic('src/fa.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'ttsch:src/fa.bool.json' && window.Silinx.active.viewer, [], { what: 'schematic opened' });
+  let sch = await ttSchematic(page, 'src/fa.bool.json');
   assert.deepEqual(netlist(sch).diagnostics, []);
   assert.deepEqual(symTypes(sch), ['and2', 'or2', 'xor2', 'xor3']);
   assert.deepEqual(simTable(generateHdl(sch).code, 'fa.vhd', 'fa'), fa.table);
-  await page.eval(() => window.SilinxApp.openTt('src/fa.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.tt.json');
+  await page.eval(() => window.SilinxApp.openTt('src/fa.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.bool.json');
   await page.fill(`${T} .tt-form`, 'nor');
   await page.waitFor(async () => /\(NOR gates only, from the minimal POS/.test(await (await fetch('/api/projects/TtXor/file?path=src%2Ffa.vhd')).text()), [], { what: 'the NOR-only HDL', timeout: 15000 });
   const nor = await readWs(env, 'TtXor', 'src/fa.vhd');
   assert.doesNotMatch(nor.slice(nor.indexOf('begin')), /\b(and|nand|xor|xnor)\b/);
   assert.deepEqual(simTable(nor, 'fa.vhd', 'fa'), fa.table);
-  await page.waitFor((p) => window.Silinx.docs.find((d) => d.id === `ttsch:${p}`)?.viewer?.getDoc().symbols.every((x) => /^nor/.test(x.type)), ['src/fa.tt.json'], { what: 'the schematic in NOR gates' });
-  sch = await ttSchematic(page, 'src/fa.tt.json');
+  await page.waitFor((p) => window.Silinx.docs.find((d) => d.id === `ttsch:${p}`)?.viewer?.getDoc().symbols.every((x) => /^nor/.test(x.type)), ['src/fa.bool.json'], { what: 'the schematic in NOR gates' });
+  sch = await ttSchematic(page, 'src/fa.bool.json');
   assert.deepEqual(netlist(sch).diagnostics, []);
   assert.deepEqual(simTable(generateHdl(sch).code, 'fa.vhd', 'fa'), fa.table);
 
@@ -510,12 +510,12 @@ end rtl;
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-lang`).value, T), 'vhdl');
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-lang option`)].map((o) => `${o.value}:${o.textContent}`), T), ['vhdl:VHDL', 'verilog:Verilog']);
   for (const [lang, L, ext, other] of [['verilog', 'Verilog', 'v', 'vhd'], ['vhdl', 'VHDL', 'vhd', 'v']]) {
-    await page.eval(() => window.SilinxApp.openTt('src/fa.tt.json'));
-    await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.tt.json');
+    await page.eval(() => window.SilinxApp.openTt('src/fa.bool.json'));
+    await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.bool.json');
     await page.fill(`${T} .tt-lang`, lang);
-    await page.waitFor((h, o) => window.Silinx.hdlToSch?.[h] === 'src/fa.tt.json' && !window.Silinx.fileTree.includes(o), [`src/fa.${ext}`, `src/fa.${other}`], { what: `fa in ${L}`, timeout: 15000 });
-    await page.waitConsole(new RegExp(`src/fa\\.tt\\.json: its HDL is now in ${L}, src/fa\\.${ext} \\(src/fa\\.${other} removed\\)`));
-    const d = await ttFile('TtXor', 'src/fa.tt.json');
+    await page.waitFor((h, o) => window.Silinx.hdlToSch?.[h] === 'src/fa.bool.json' && !window.Silinx.fileTree.includes(o), [`src/fa.${ext}`, `src/fa.${other}`], { what: `fa in ${L}`, timeout: 15000 });
+    await page.waitConsole(new RegExp(`src/fa\\.bool\\.json: its HDL is now in ${L}, src/fa\\.${ext} \\(src/fa\\.${other} removed\\)`));
+    const d = await ttFile('TtXor', 'src/fa.bool.json');
     assert.deepEqual([d.lang, d.generatedFile, d.form], [lang, `src/fa.${ext}`, 'nor']);
     const code = await readWs(env, 'TtXor', `src/fa.${ext}`);
     assert.match(code, lang === 'verilog' ? /^module fa \(/m : /^entity fa is/m);
@@ -528,15 +528,15 @@ end rtl;
     await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.vhd');
     assert.deepEqual(await problemRows(page), []);
     // the schematic: in the language of the table, the same gates, simulates to the table
-    await page.eval(() => window.SilinxApp.openTtSchematic('src/fa.tt.json'));
-    await page.waitFor((l) => window.Silinx.active?.id === 'ttsch:src/fa.tt.json' && window.Silinx.active.viewer?.getDoc().lang === l, [lang], { what: `the schematic in ${L}` });
-    sch = await ttSchematic(page, 'src/fa.tt.json');
+    await page.eval(() => window.SilinxApp.openTtSchematic('src/fa.bool.json'));
+    await page.waitFor((l) => window.Silinx.active?.id === 'ttsch:src/fa.bool.json' && window.Silinx.active.viewer?.getDoc().lang === l, [lang], { what: `the schematic in ${L}` });
+    sch = await ttSchematic(page, 'src/fa.bool.json');
     assert.deepEqual(netlist(sch).diagnostics, []);
     assert.deepEqual(simTable(generateHdl(sch, { lang }).code, `fa.${ext}`, 'fa'), fa.table);
   }
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
-  await page.eval(() => window.SilinxApp.openTt('src/fa.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.tt.json');
+  await page.eval(() => window.SilinxApp.openTt('src/fa.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.bool.json');
 
   // ---- in Portuguese: every label of the editor (the XOR form shown) translated
   await page.click(`${T} .tt-tab[data-out=s]`);
@@ -553,7 +553,7 @@ end rtl;
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-nand b, ${t} .tt-nor b, ${t} .tt-nand .tt-cost`)].map((b) => b.textContent), T), ['Forma NAND', '8 porta(s), 3 delas inversora(s)', 'Forma NOR']);
   // the Design pane's badges and the schematic's bar
   assert.deepEqual(await page.eval(() => [...[...document.querySelectorAll('#hier .row')].find((r) => r.querySelector('.lbl').textContent === 'u_fa - fa').querySelectorAll('.badge')].map((b) => b.textContent)), ['Álgebra', 'Esquemático', 'VHDL']);
-  assert.equal(await page.eval(() => window.Silinx.docs.find((d) => d.id === 'ttsch:src/fa.tt.json').el.querySelector('.se-banner').textContent), 'Só de leitura, gerado a partir de fa.tt.json');
+  assert.equal(await page.eval(() => window.Silinx.docs.find((d) => d.id === 'ttsch:src/fa.bool.json').el.querySelector('.se-banner').textContent), 'Só de leitura, gerado a partir de fa.bool.json');
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-ops`).textContent, T), "Operadores: / ' ~ (NOT), . · * (AND), ⊕ ^ ou xor (XOR), xnor, + (OR)");
   await setLang('en');
 });
@@ -561,9 +561,9 @@ end rtl;
 uiTest('#1120 Truth Table: solid lines between the row number, the inputs and the outputs, in the header and every row', E, async (page) => {
   const { newTable } = await import('../../core/logic.js');
   const t = newTable('maj', ['a', 'b', 'c'], ['y', 'z'], 'vhdl');
-  await makeProject(env, { name: 'TtLines', files: { 'src/maj.tt.json': JSON.stringify(t) } });
+  await makeProject(env, { name: 'TtLines', files: { 'src/maj.bool.json': JSON.stringify(t) } });
   await page.openProject('TtLines');
-  await page.eval(() => window.SilinxApp.openTt('src/maj.tt.json'));
+  await page.eval(() => window.SilinxApp.openTt('src/maj.bool.json'));
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .tt-table tr:nth-child(2)'), [], { what: 'the table' });
   // each row's cells' left borders: width and style (# a b c | y z)
   const rows = await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .tt-table tr')].map((tr) => [...tr.children].map((c) => {
@@ -578,10 +578,10 @@ uiTest('#1120 Truth Table: solid lines between the row number, the inputs and th
 // two forms with theirs; the module in the form chosen; in Portuguese
 uiTest('#1427 Truth Table: Least number of gates and Least delay, every form\'s gates and delay; the HDL in the one chosen; Portuguese', E, async (page) => {
   const fa = { version: 1, name: 'fa', inputs: ['a', 'b', 'c'], outputs: ['s', 'co'], table: { s: '01101001', co: '00010111' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
-  await makeProject(env, { name: 'TtCost', files: { 'src/fa.tt.json': JSON.stringify(fa, null, 2) } });
+  await makeProject(env, { name: 'TtCost', files: { 'src/fa.bool.json': JSON.stringify(fa, null, 2) } });
   await page.openProject('TtCost');
-  await page.eval(() => window.SilinxApp.openTt('src/fa.tt.json'));
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor .tt-gates'), [], { what: 'truth table editor' });
+  await page.eval(() => window.SilinxApp.openTt('src/fa.bool.json'));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor .tt-gates'), [], { what: 'truth table editor' });
   const T = '.doc:not([hidden]) .tt-editor';
   const circuits = () => page.eval((t) => Object.fromEntries(['sop', 'pos', 'xor', 'nand', 'nor', 'gates', 'delay']
     .map((c) => [c, document.querySelector(`${t} .tt-${c} .tt-circuit`)?.textContent ?? null])), T);
@@ -608,13 +608,13 @@ uiTest('#1427 Truth Table: Least number of gates and Least delay, every form\'s 
 // #1492: the Notes box under a long table (5 or 6 inputs: 32, 64 rows) kept its rows, not squeezed by the scrolling column
 uiTest('#1492 Truth Table: the Notes box keeps its height under a table of 5 or 6 inputs, the column scrolling to it', E, async (page) => {
   const tt = (name, n) => JSON.stringify({ version: 1, name, inputs: ['a', 'b', 'c', 'd', 'e', 'g'].slice(0, n), outputs: ['f'], table: { f: '0'.repeat(2 ** n) }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' });
-  await makeProject(env, { name: 'TtNotes', files: { 'src/n3.tt.json': tt('n3', 3), 'src/n5.tt.json': tt('n5', 5), 'src/n6.tt.json': tt('n6', 6) } });
+  await makeProject(env, { name: 'TtNotes', files: { 'src/n3.bool.json': tt('n3', 3), 'src/n5.bool.json': tt('n5', 5), 'src/n6.bool.json': tt('n6', 6) } });
   await page.setViewport(1366, 768);
   await page.openProject('TtNotes');
   const heights = {};
   for (const n of [3, 5, 6]) {
-    await page.eval((p) => window.SilinxApp.openTt(p), `src/n${n}.tt.json`);
-    await page.waitFor((p) => window.Silinx.active?.id === `tt:${p}` && document.querySelector('.doc:not([hidden]) .tt-notes'), [`src/n${n}.tt.json`], { what: `n${n}` });
+    await page.eval((p) => window.SilinxApp.openTt(p), `src/n${n}.bool.json`);
+    await page.waitFor((p) => window.Silinx.active?.id === `tt:${p}` && document.querySelector('.doc:not([hidden]) .tt-notes'), [`src/n${n}.bool.json`], { what: `n${n}` });
     heights[n] = await page.eval(() => {
       const t = document.querySelector('.doc:not([hidden]) .tt-notes'), lh = parseFloat(getComputedStyle(t).lineHeight) || 16;
       return Math.round(t.getBoundingClientRect().height) >= 3 * lh - 1 && t.getBoundingClientRect().width >= 220;
@@ -638,7 +638,7 @@ uiTest('#1407 Truth Table: the Karnaugh map of 5 or 6 inputs in 3D, its groups a
   const k3 = { version: 1, name: 'k3', inputs: ['a', 'b', 'c'], outputs: ['f'], table: { f: '00010111' }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
   const col6 = Array.from({ length: 64 }, (_, m) => ((m & 0b000101) === 0b000101 ? '1' : '0')).join('');
   const k6 = { version: 1, name: 'k6', inputs: ['a', 'b', 'c', 'd', 'e', 'g'], outputs: ['f'], table: { f: col6 }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
-  await makeProject(env, { name: 'Tt3d', files: { 'src/k5.tt.json': JSON.stringify(k5), 'src/k3.tt.json': JSON.stringify(k3), 'src/k6.tt.json': JSON.stringify(k6) } });
+  await makeProject(env, { name: 'Tt3d', files: { 'src/k5.bool.json': JSON.stringify(k5), 'src/k3.bool.json': JSON.stringify(k3), 'src/k6.bool.json': JSON.stringify(k6) } });
   await page.openProject('Tt3d');
   const T = '.doc:not([hidden]) .tt-editor';
   const open = async (f) => {
@@ -646,10 +646,10 @@ uiTest('#1407 Truth Table: the Karnaugh map of 5 or 6 inputs in 3D, its groups a
     await page.waitFor((p) => window.Silinx.active?.id === `tt:${p}` && document.querySelector('.doc:not([hidden]) .tt-editor .tt-kmap-host'), [f], { what: f });
   };
   // under 5 inputs: no 3D box
-  await open('src/k3.tt.json');
+  await open('src/k3.bool.json');
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-k3d-on`).length, T), 0);
   // 5 inputs: flat at first; ticked, 2 layers, the group on both and a box (its 4 sides) between them
-  await open('src/k5.tt.json');
+  await open('src/k5.bool.json');
   assert.ok(await page.eval((t) => !!document.querySelector(`${t} svg.tt-kmap`) && !document.querySelector(`${t} .tt-k3d`), T), 'flat at first');
   await page.click(`${T} .tt-k3d-on`);
   await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d`), [T], { what: '3D' });
@@ -691,7 +691,7 @@ uiTest('#1407 Truth Table: the Karnaugh map of 5 or 6 inputs in 3D, its groups a
   await page.click(`${T} .tt-k3d-cell[data-row="0"]`);
   await page.waitFor((t) => document.querySelector(`${t} .tt-k3d-cell[data-row="0"]`)?.classList.contains('v0'), [T], { what: 'cell 0 back to 0' });
   // 6 inputs: 4 layers in Gray order, the group on all four, a box between each neighbouring pair
-  await open('src/k6.tt.json');
+  await open('src/k6.bool.json');
   await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d`), [T], { what: '3D kept' });
   const s6 = await shape();
   assert.deepEqual([s6.layers, s6.groups, s6.sides], [['ab = 00', 'ab = 01', 'ab = 11', 'ab = 10'], ['0', '1', '2', '3'], 12]);
@@ -715,7 +715,7 @@ uiTest('#1491 Truth Table: the 3D Karnaugh map draws each group as its exact sha
     ends: table('ends', I6, (m) => !(m & 0b010000) && !!(m & 0b000100)),      // b'·d: the first and last of four layers
     sides: table('sides', I6, (m) => !(m & 0b100000) && !(m & 0b000001)),     // a'·g': the left and right edges of layers 0 and 1
   };
-  await makeProject(env, { name: 'Tt3dShape', files: Object.fromEntries(Object.entries(tables).map(([k, d]) => [`src/${k}.tt.json`, JSON.stringify(d)])) });
+  await makeProject(env, { name: 'Tt3dShape', files: Object.fromEntries(Object.entries(tables).map(([k, d]) => [`src/${k}.bool.json`, JSON.stringify(d)])) });
   await page.openProject('Tt3dShape');
   const T = '.doc:not([hidden]) .tt-editor';
   const open = async (f) => {
@@ -732,19 +732,19 @@ uiTest('#1491 Truth Table: the 3D Karnaugh map draws each group as its exact sha
   // the flat map's cells on a layer: the 1s whose map variables (the bits above the rows and columns') are the layer's
   const cellsOf = (d, map) => [...d.table.f].flatMap((v, m) => (v === '1' && m >> 4 === [0, 1, 3, 2][map] ? [m] : []));
   // 5 inputs, c'·e': on each layer the four corners apart (each open on its two edges), joined by their 8 walls
-  await open('src/corners.tt.json');
+  await open('src/corners.bool.json');
   const c = await solid();
   assert.deepEqual(c.pieces, ['0@0:0:TopLeft', '0@0:10:BottomRight', '0@0:2:TopRight', '0@0:8:BottomLeft', '0@1:16:TopLeft', '0@1:18:TopRight', '0@1:24:BottomLeft', '0@1:26:BottomRight']);
   assert.deepEqual([0, 1].map((m) => c.pieces.filter((p) => p.startsWith(`0@${m}:`)).map((p) => +p.split(':')[1]).sort((a, b) => a - b)), [cellsOf(tables.corners, 0), cellsOf(tables.corners, 1)]);
   assert.deepEqual(c.walls, ['0@0-1:0-0,0-0:bottom', '0@0-1:0-0,0-0:right', '0@0-1:0-0,3-3:bottom', '0@0-1:0-0,3-3:left', '0@0-1:3-3,0-0:right', '0@0-1:3-3,0-0:top', '0@0-1:3-3,3-3:left', '0@0-1:3-3,3-3:top']);
   // 6 inputs, b'·d: on the first and last layers (neighbours in Gray order), no walls through the two between
-  await open('src/ends.tt.json');
+  await open('src/ends.bool.json');
   const e = await solid();
   assert.deepEqual(e.pieces.map((p) => p.split(':').slice(0, 1).concat(p.split(':')[2]).join(':')), ['0@0:', '0@3:']);
   assert.deepEqual(e.pieces.map((p) => p.split(':')[1]), [0, 3].map((m) => cellsOf(tables.ends, m).join(',')));
   assert.deepEqual(e.walls, []);
   // 6 inputs, a'·g': on layers 0 and 1 the left and right columns apart, each open on its edge, joined by 3 walls each
-  await open('src/sides.tt.json');
+  await open('src/sides.bool.json');
   const s = await solid();
   assert.deepEqual(s.pieces.map((p) => p.replace(/:[\d,]+:/, ':')), ['0@0:Left', '0@0:Right', '0@1:Left', '0@1:Right']);
   assert.deepEqual([0, 1].map((m) => s.pieces.filter((p) => p.startsWith(`0@${m}:`)).flatMap((p) => p.split(':')[1].split(',').map(Number)).sort((a, b) => a - b)), [cellsOf(tables.sides, 0), cellsOf(tables.sides, 1)]);

@@ -17,7 +17,7 @@ import { mountXiseRoutes } from './xise-routes.js';
 import { IDENT } from './ident.js';
 
 // files that only Silinx understands: not part of an exported Xilinx ISE project
-export const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|fsm)\.json)$/i;
+export const SILINX_ONLY = /(^|\/)(silinx\.json|[^/]+\.(asm|sch|tt|bool|fsm)\.json)$/i;
 
 const implJobs = new Map();   // project name -> id of its latest implementation job
 

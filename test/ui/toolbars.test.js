@@ -54,7 +54,7 @@ for (const theme of ['light', 'dark']) {
     await open(`Blinky-${theme}`, 'src/knight.vhd', 'hdl');
     await open(`Blinky-${theme}`, 'src/speed_ctrl.asm.json', 'asm');
     await open(`Gates-${theme}`, 'src/gates.sch.json', 'schematic');
-    await open(`Traffic-${theme}`, 'src/lamps.tt.json', 'truth table');
+    await open(`Traffic-${theme}`, 'src/lamps.bool.json', 'truth table');
     await open(`Traffic-${theme}`, 'src/traffic.fsm.json', 'fsm');
     await page.openProject(`Blinky-${theme}`);
     await go(page, 'sim');

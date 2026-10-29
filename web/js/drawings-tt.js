@@ -1,4 +1,4 @@
-// The truth tables (#405: out of drawings.js): a table (.tt.json) opened in its editor and kept in sync with its HDL
+// The truth tables (#405: out of drawings.js): a table (.bool.json, .tt.json before #2065) opened in its editor and kept in sync with its HDL
 // module (the table its base, #1176), the module a table is read back from, a table loaded from a module, and the table's schematic
 // view (#694).
 import { S, activateDoc, compileProject, findDoc, flushDoc, openDoc, openFile, setDirty, status } from './app.js';
@@ -13,7 +13,7 @@ import {
 } from './drawings.js';
 import { designSources as ttDesignSources } from './tbwizard.js';
 
-// ---- truth tables (.tt.json): table -> HDL module, synchronized like ASM charts
+// ---- truth tables (.bool.json, .tt.json): table -> HDL module, synchronized like ASM charts
 // The generated HDL module is linked by generatedFile: every change of the table rewrites it (its HDL
 // file is read-only, #1176). Boolean Algebra / Karnaugh Map editor: truthtable.js; logic: core/logic.js.
 
@@ -148,7 +148,7 @@ export async function openTtSchematic(ttPath) {
   const { mountSchEditor } = await import('./sch-editor.js');
   const first = await ttSchematicDoc(model);
   openDoc({
-    id, title: `${ttPath.split('/').pop().replace(/\.tt\.json$/i, '')} (Schematic)`, icon: 'schematic',
+    id, title: `${ttPath.split('/').pop().replace(/\.(tt|bool)\.json$/i, '')} (Schematic)`, icon: 'schematic',
     create(el, d) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);

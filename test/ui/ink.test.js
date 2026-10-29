@@ -66,17 +66,17 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   assert.equal(await page.eval(() => document.querySelector('.ns-tt-expr').value), "F = A·B' + C");
   await page.dialogButton('Next >');
   const summary = await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main pre')?.textContent, [], { what: 'the summary' });
-  assert.match(summary, /\nSource Type: Boolean Algebra\nSource Name: hand\.tt\.json\n\nExpression: F = A·B' \+ C$/);
+  assert.match(summary, /\nSource Type: Boolean Algebra\nSource Name: hand\.bool\.json\n\nExpression: F = A·B' \+ C$/);
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/hand.tt.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
-  const doc = JSON.parse(await page.eval(async () => (await fetch('/api/projects/Ink/file?path=src%2Fhand.tt.json')).text()));
+  await page.waitFor(() => window.Silinx.active?.id === 'tt:src/hand.bool.json' && document.querySelector('.doc:not([hidden]) .tt-editor'), [], { what: 'truth table editor' });
+  const doc = JSON.parse(await page.eval(async () => (await fetch('/api/projects/Ink/file?path=src%2Fhand.bool.json')).text()));
   assert.deepEqual([doc.inputs, doc.outputs, doc.table, doc.exprs], [['A', 'B', 'C'], ['F'], { F: '01011101' }, { F: "A·B' + C" }]);
   assert.equal(await cells(page, 'F'), '01011101');
   const lines = (await page.consoleText()).split('\n');
   assert.deepEqual(lines.slice(lines.findIndex((l) => /^Project ".*" opened/.test(l)) + 1), [
-    'src/hand.vhd generated from src/hand.tt.json (every source has its HDL)',
-    "Created Boolean Algebra 'src/hand.tt.json'.",
+    'src/hand.vhd generated from src/hand.bool.json (every source has its HDL)',
+    "Created Boolean Algebra 'src/hand.bool.json'.",
   ]);
 
   // the editor's Handwritten… (#2010): the same expression written with the mouse, a finger and a pen
@@ -179,7 +179,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   await page.waitFor((t) => document.querySelector(`${t} .tt-outputs`).value === 'S, K', [T], { what: 'the outputs written' });
   assert.deepEqual(await shape(), ['A, B, D', 'S, K']);
   assert.deepEqual([await cells(page, 'S'), await cells(page, 'K')], ['00111100', '00000101']);
-  const saved = await page.waitFor(async () => { const d = JSON.parse(await (await fetch('/api/projects/Ink/file?path=src%2Fhand.tt.json')).text()); return d.outputs.join() === 'S,K' && d; }, [], { what: 'saved' });
+  const saved = await page.waitFor(async () => { const d = JSON.parse(await (await fetch('/api/projects/Ink/file?path=src%2Fhand.bool.json')).text()); return d.outputs.join() === 'S,K' && d; }, [], { what: 'saved' });
   assert.deepEqual(saved.exprs, { S: 'A ⊕ B', K: 'A.D' });
   // one step of Undo: the table before
   await page.click(`${T} .tt-undo`);

@@ -20,7 +20,7 @@ const shipped = (ex, f) => fs.readFile(path.join(ROOT, 'examples', ex, 'src', f)
 uiTest('#2046 a module symbol double-clicked opens its drawing (schematic, state diagram, truth table), a module in VHDL its VHDL', E, async (page) => {
   const files = {};
   for (const f of ['gates.sch.json', 'gates.vhd']) files[`src/${f}`] = await shipped('gates', f);
-  for (const f of ['traffic.fsm.json', 'traffic.vhd', 'lamps.tt.json', 'lamps.vhd', 'timer.vhd']) files[`src/${f}`] = await shipped('traffic', f);
+  for (const f of ['traffic.fsm.json', 'traffic.vhd', 'lamps.bool.json', 'lamps.vhd', 'timer.vhd']) files[`src/${f}`] = await shipped('traffic', f);
   await makeProject(env, { name: 'OpenMod', files });
   await page.openProject('OpenMod');
   // the top: one instance of each, 300 px apart, their ports as the project's modules have them
@@ -39,6 +39,6 @@ uiTest('#2046 a module symbol double-clicked opens its drawing (schematic, state
   };
   await open('S1', 'sch:src/gates.sch.json');
   await open('S2', 'fsm:src/traffic.fsm.json');
-  await open('S3', 'tt:src/lamps.tt.json');
+  await open('S3', 'tt:src/lamps.bool.json');
   await open('S4', 'file:src/timer.vhd');
 });

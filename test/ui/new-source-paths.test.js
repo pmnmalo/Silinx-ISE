@@ -14,7 +14,7 @@ const E = () => env;
 const ADDER = 'library ieee;\nuse ieee.std_logic_1164.all;\nentity adder is\n  port (a, b : in std_logic; s : out std_logic);\nend adder;\narchitecture rtl of adder is\nbegin\n  s <= a xor b;\nend rtl;\n';
 // each type: the pages after Select Source Type, its wizard (Wizard enabled), only a wizard, the file it makes
 const TYPES = {
-  'Boolean Algebra': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.tt.json' },
+  'Boolean Algebra': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.bool.json' },
   'Module (HDL)': { pages: ['File Name and Location', 'Define Module', 'Summary'], wiz: true, file: 'src/NAME.vhd' },
   'Schematic': { pages: ['File Name and Location', 'Summary'], wiz: true, file: 'src/NAME.sch.json' },
   'Finite State Machine (FSM)': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.fsm.json' },

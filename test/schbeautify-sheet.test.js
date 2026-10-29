@@ -120,7 +120,7 @@ test('#1506 an empty sheet: nothing to lay out', async () => {
 // ------------------------------------------------------------------ the corpus
 test('#1506 the gates example\'s schematic, the truth tables\' gate schematics and ISE\'s schematics laid out: the same meaning', async () => {
   assert.equal((await check(JSON.parse(fs.readFileSync(new URL('../examples/gates/src/gates.sch.json', import.meta.url), 'utf8')), {}, 'gates.sch.json')).sheet, true);
-  const lamps = JSON.parse(fs.readFileSync(new URL('../examples/traffic/src/lamps.tt.json', import.meta.url), 'utf8'));
+  const lamps = JSON.parse(fs.readFileSync(new URL('../examples/traffic/src/lamps.bool.json', import.meta.url), 'utf8'));
   for (const form of ['sop', 'pos', 'nand', 'nor', 'xor']) for (const lang of ['vhdl', 'verilog']) {
     assert.equal((await check(schematicFromTable(lamps, { form, lang }), {}, `lamps ${form} ${lang}`)).sheet, true, `lamps ${form} ${lang}`);
   }

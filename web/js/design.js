@@ -57,7 +57,7 @@ export function renderHierarchy() {
     // "label - module" like ISE; just the name when the instance is labelled with the module name
     const label = instName && instName.toLowerCase() !== String(modName).toLowerCase() ? `${instName} - ${modName}` : modName;
     // a drawn source without an HDL file (#177): the module is the drawing itself
-    const drawn = info && /\.(sch|asm|tt|fsm|pn)\.json$/.test(file) ? file : null;
+    const drawn = info && /\.(sch|asm|tt|bool|fsm|pn)\.json$/.test(file) ? file : null;
     const sch = drawn || (info && viewOfModule(info.name, file));
     // an HDL module a wizard wrote from its settings (#793): the wizard is its base, the HDL generated from it
     const wz = !sch && info ? wizardLabelOf(file) : null;
@@ -105,7 +105,7 @@ export function renderHierarchy() {
     const it = treeItem({ label: f.split('/').pop(), ico: 'asm', key: `asm:${f}`, badges: [clashBadge(f)].filter(Boolean), onSelect: () => select({ type: 'asm', file: f }), onOpen: () => openAsm(f), onContext: e => asmContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
-  for (const f of (S.fileTree || []).filter(f => /\.tt\.json$/.test(f) && !S.schOwners?.[f] && !S.modules.some(m => m.file === f))) {
+  for (const f of (S.fileTree || []).filter(f => /\.(tt|bool)\.json$/.test(f) && !S.schOwners?.[f] && !S.modules.some(m => m.file === f))) {
     const it = treeItem({ label: f.split('/').pop(), ico: 'truthtable', key: `tt:${f}`, badges: [clashBadge(f)].filter(Boolean), onSelect: () => select({ type: 'tt', file: f }), onOpen: () => openTt(f), onContext: e => ttContextMenu(e, f) });
     it.setLeaf(); devItem.ul.append(it.li);
   }
@@ -162,7 +162,7 @@ function clashBadge(f) {
 export function moduleBadges(name) {
   const info = moduleInfo(name);
   if (!info) return [];
-  const drawn = /\.(sch|asm|tt|fsm|pn)\.json$/.test(info.file) ? info.file : null;
+  const drawn = /\.(sch|asm|tt|bool|fsm|pn)\.json$/.test(info.file) ? info.file : null;
   const sch = drawn || viewOfModule(info.name, info.file);
   const wz = !sch ? wizardLabelOf(info.file) : null;
   if (isC(info.file)) return [{ text: cBadge(info.file), base: true }, ...(cSequential(info.file) ? [{ text: 'ASM' }] : []), { text: info.lang === 'vhdl' ? 'VHDL' : 'Verilog' }];   // (#1531, #1575)
@@ -174,7 +174,7 @@ export function moduleBadges(name) {
 export function openModuleSource(name) {
   const info = moduleInfo(name);
   if (!info) return;
-  const drawn = /\.(sch|asm|tt|fsm|pn)\.json$/.test(info.file) ? info.file : null;
+  const drawn = /\.(sch|asm|tt|bool|fsm|pn)\.json$/.test(info.file) ? info.file : null;
   const sch = drawn || viewOfModule(info.name, info.file);
   const wz = !sch ? wizardLabelOf(info.file) : null;
   return sch ? openView(sch) : wz ? openWizardModule(info.file) : openFile(info.file, info.line);
