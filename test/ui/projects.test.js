@@ -250,7 +250,7 @@ uiTest('Example traffic (New Project…), the second example: the state diagram 
   assert.deepEqual(await page.eval((t) => [document.querySelector(`${t} .tt-inputs`).value, document.querySelector(`${t} .tt-outputs`).value], TT), ['phase2, phase1, phase0, blink', 'car_r, car_y, car_g, walk_r, walk_g']);
   const cols = await page.eval((t) => Object.fromEntries(['car_r', 'car_y', 'car_g', 'walk_r', 'walk_g'].map((o) => [o, [...document.querySelectorAll(`${t} .tt-cell[data-out=${o}]`)].map((c) => c.textContent).join('')])), TT);
   assert.deepEqual(cols, { car_r: '00001111111100XX', car_y: '00110000000001XX', car_g: '11000000000000XX', walk_r: '11111100001100XX', walk_g: '00000011010000XX' });
-  await page.waitFor((t) => /^HDL: lamps\.vhd — generated from the table$/.test(document.querySelector(`${t} .tt-link`)?.textContent || ''), [TT], { what: 'the table synchronized with lamps.vhd' });
+  await page.waitFor((t) => document.querySelector(`${t} .tt-link`)?.dataset.hdl === 'lamps.vhd', [TT], { what: 'the table synchronized with lamps.vhd' });
   // their VHDL: the banner of the synchronized file, the text the example ships (not rewritten)
   for (const [f, from] of [['src/traffic.vhd', 'traffic.fsm.json'], ['src/lamps.vhd', 'lamps.tt.json']]) {
     await page.eval((p) => window.SilinxApp.openFile(p), f);

@@ -4,7 +4,7 @@ export const TT_PT = {
   'Boolean Algebra / Karnaugh Map…': 'Álgebra Booleana / Mapa de Karnaugh…', 'Boolean Algebra / Karnaugh Map': 'Álgebra Booleana / Mapa de Karnaugh',
   'Boolean Algebra': 'Álgebra Booleana', 'View/Edit Boolean Algebra': 'Ver/Editar Álgebra Booleana',
   'Open Boolean Algebra': 'Abrir Álgebra Booleana',
-  'Boolean Algebra from Module': 'Álgebra Booleana de um Módulo',
+  'Algebra from Module': 'Álgebra de um Módulo',
   'Combinational module (at most 8 input bits): its truth table is computed by simulating every input combination.':
     'Módulo combinatório (no máximo 8 bits de entrada): a tabela de verdade é calculada simulando todas as combinações das entradas.',
   'The project has no design modules.': 'O projeto não tem módulos de projeto.',
@@ -21,9 +21,9 @@ export const TT_PT = {
   'The maps stacked in depth: a group across maps seen as one box': 'Os mapas empilhados em profundidade: um grupo que atravessa mapas visto como uma só caixa',
   'The form with the fewest gates, each symbol one gate whatever its number of inputs': 'A forma com menos portas, cada símbolo uma porta qualquer que seja o seu número de entradas',
   'The form with the fewest gates on its longest path, every gate the same delay': 'A forma com menos portas no caminho mais longo, todas as portas com o mesmo atraso',
-  'Boolean Algebra from Module…': 'Álgebra Booleana de um Módulo…',
+  'Algebra from Module…': 'Álgebra de um Módulo…',
   'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)': 'Preencher a tabela com a tabela de verdade de um módulo combinatório do projeto (simulação exaustiva)',
-  'Not in sync with': 'Não sincronizado com', '— generated from the table': '— gerado a partir da tabela',
+  'Not in sync with': 'Não sincronizado com',
   // editor body
   'Truth table': 'Tabela de verdade', 'Notes': 'Notas', 'Notes (saved with the table)': 'Notas (guardadas com a tabela)',
   'Click an output cell to change it: 0 → 1 → X (don\'t care).': 'Clique numa célula de saída para a mudar: 0 → 1 → X (indiferente).',

@@ -184,7 +184,7 @@ test('the handwritten input (#1056): the texts of its modules and the recognizer
     'Nothing written: write the expression on the pad.': 'Nada escrito: escreva a expressão na área de escrita.',
     'Expression: 1 to 6 inputs (it has 7).': 'Expressão: 1 a 6 entradas (tem 7).', "Expression: 'F-1' is not a valid output name.": "Expressão: 'F-1' não é um nome de saída válido.",
     "Expression: the output 'a' is also an input.": "Expressão: a saída 'a' é também uma entrada.", "Expression: unexpected '+' (at position 3)": "Expressão: unexpected '+' (at position 3)",
-    'Handwritten…': 'Manuscrito…', 'The output F has two expressions.': 'A saída F tem duas expressões.',
+    'Handwritten Algebra…': 'Álgebra Manuscrita…', 'Algebra from Module…': 'Álgebra de um Módulo…', 'The output F has two expressions.': 'A saída F tem duas expressões.',
     'F is both an output and an input: an expression of the inputs only.': 'F é uma saída e uma entrada: uma expressão só das entradas.',
     '7 inputs (A, B, C, D, E, G, H): at most 6.': '7 entradas (A, B, C, D, E, G, H): no máximo 6.',
     'Handwritten Expression': 'Expressão Manuscrita', 'Teach Silinx my handwriting': 'Ensinar ao Silinx a minha letra',

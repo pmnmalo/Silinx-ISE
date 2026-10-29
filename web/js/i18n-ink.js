@@ -10,7 +10,7 @@ export const INK_PT = {
   "Write the expressions with a pen, a finger or the mouse, one a line, with any names, e.g. F = A·B' + C. A bar over letters is NOT; a dot or a * is AND.":
     "Escreva as expressões com uma caneta, um dedo ou o rato, uma por linha, com quaisquer nomes, p.ex. F = A·B' + C. Uma barra sobre letras é NOT; um ponto ou um * é AND.",
   // the truth table editor's button (#2010) and the equations' messages (core/ink/equations.js)
-  'Handwritten…': 'Manuscrito…',
+  'Handwritten Algebra…': 'Álgebra Manuscrita…',
   "Write the expressions by hand, one a line, with any names: they become the table's inputs, outputs and expressions":
     'Escrever as expressões à mão, uma por linha, com quaisquer nomes: passam a ser as entradas, as saídas e as expressões da tabela',
   'The recognized text appears here, an expression a line': 'O texto reconhecido aparece aqui, uma expressão por linha',
