@@ -12,7 +12,7 @@ function lead(x1, y1, x2, y2, bus) { return `<line class="pin${bus ? ' bus' : ''
 
 // a gate's input lead ends at its body: the AND's straight back (x 20), the OR's / XOR's curved one
 function gateInputEnd(def, y) {
-  const base = def.gate.replace(/^n(?=and|or)/, '').replace(/^xn/, 'x'), t = y / def.h;
+  const gh = def.gh || def.h, base = def.gate.replace(/^n(?=and|or)/, '').replace(/^xn/, 'x'), t = (y % gh) / gh;   // (a gate a bit: its own, #2079)
   return base === 'or' ? 20 + 24 * t * (1 - t) : base === 'xor' ? 14 + 24 * t * (1 - t) : 20;
 }
 
@@ -26,10 +26,16 @@ export function bodySvg(sym, def) {
       const g = def.gate;
       const base = g.replace(/^n(?=and|or)/, '').replace(/^xn/, 'x');
       const isOr = base === 'or' || base === 'xor';
-      if (!isOr) s += `<path class="gate" d="M20,0 H40 A20,${h / 2} 0 0 1 40,${h} H20 Z"/>`;
-      else {
-        s += `<path class="gate" d="M20,0 Q48,0 60,${h / 2} Q48,${h} 20,${h} Q32,${h / 2} 20,0 Z"/>`;
-        if (base === 'xor') s += `<path class="gate nofill" d="M14,${h} Q26,${h / 2} 14,0"/>`;
+      // (a gate a row with Pins per bit, #2079: each drawn in its own band of gh)
+      const gh = def.gh || h;
+      for (let r = 0; r < (def.rows || 1); r++) {
+        const y0 = r * gh, Y = v => r1(y0 + v);
+        if (!isOr) s += `<path class="gate" d="M20,${Y(0)} H40 A20,${gh / 2} 0 0 1 40,${Y(gh)} H20 Z"/>`;
+        else {
+          s += `<path class="gate" d="M20,${Y(0)} Q48,${Y(0)} 60,${Y(gh / 2)} Q48,${Y(gh)} 20,${Y(gh)} Q32,${Y(gh / 2)} 20,${Y(0)} Z"/>`;
+          if (base === 'xor') s += `<path class="gate nofill" d="M14,${Y(gh)} Q26,${Y(gh / 2)} 14,${Y(0)}"/>`;
+        }
+        if (def.bubble) s += `<circle class="gate" cx="63" cy="${Y(gh / 2)}" r="3"/>`;
       }
       for (const p of pins) {
         if (p.dir === 'out') {
@@ -43,7 +49,6 @@ export function bodySvg(sym, def) {
           } else s += lead(0, p.y, xe, p.y, bus(p));
         }
       }
-      if (def.bubble) s += `<circle class="gate" cx="63" cy="${h / 2}" r="3"/>`;
       break;
     }
     case 'inv': case 'buf': {
@@ -169,6 +174,7 @@ function typeUnder(sym, def, box, center, name) {
 function typeInside(sym, def, name) {
   const turned = sym.rot === 90 || sym.rot === 270, tri = def.shape === 'inv' || def.shape === 'buf' || def.shape === 'tbuf';
   if (tri && (turned || def.rows > 1)) return null;   // (INV4, BUFE4…: under their triangles, #2067)
+  if (def.shape === 'gate' && def.rows > 1) return null;   // (gates a bit each: under them, #2079)
   const room = tri ? def.body.w * 0.55 - 1 : (turned ? def.body.h : def.body.w) - 6, need = name.length * (tri ? 4.8 : 5.5);
   if (need > room * 1.3) return null;
   const cy = def.shape === 'tbuf' ? def.body.y + 10 : def.body.y + def.body.h / 2;

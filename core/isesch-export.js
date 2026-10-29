@@ -49,7 +49,7 @@ function iseSymbolFor(s, def, netW, modules) {
       return { lib: true, name: t, pins };
     }
     if ((t === 'inv' || t === 'buf') && (W === 8 || W === 16) && t === 'inv') return { lib: true, name: `inv${W}`, pins: { I: `I(${W - 1}:0)`, O: `O(${W - 1}:0)` } };
-    return { lib: false, name: `xl_${t}_w${W}${(t === 'inv' || t === 'buf') && W > 1 && p.bits ? '_bits' : ''}` };
+    return { lib: false, name: `xl_${t}_w${W}${W > 1 && p.bits ? '_bits' : ''}` };   // (a pin per bit: INV / BUF #2067, the gates #2079)
   }
   if (S?.ff) {
     // FD*/FT*/FJK*: the library flip-flop when the INIT value is the library default and all its pin positions are
@@ -155,7 +155,7 @@ function iseSymbolFor(s, def, netW, modules) {
 export function decodeXlSymbol(name) {
   const s = lc(name);
   let m;
-  if ((m = /^xl_(and|or|nand|nor|xor|xnor)(\d(?:b\d)?)_w(\d+)$/.exec(s)) && SYMBOLS[m[1] + m[2]]) return { type: m[1] + m[2], params: { width: +m[3] } };
+  if ((m = /^xl_(and|or|nand|nor|xor|xnor)(\d(?:b\d)?)_w(\d+)(_bits)?$/.exec(s)) && SYMBOLS[m[1] + m[2]]) return { type: m[1] + m[2], params: { width: +m[3], ...(m[4] ? { bits: true } : {}) } };
   if ((m = /^xl_(f(?:d|t|jk)[a-z]*)_i([01])(?:_w(\d+))?$/.exec(s)) && SYMBOLS[m[1]]?.ff) return { type: m[1], params: { init: m[2], ...(m[3] ? { width: +m[3] } : {}) } };
   if ((m = /^xl_tbuf([et])_w(\d+)(_bits)?$/.exec(s))) return { type: 'tbuf', params: { width: +m[2], enable: m[1].toUpperCase(), bits: !!m[3] } };
   if ((m = /^xl_demux([1-4])(e?)(s?)_w(\d+)$/.exec(s))) return { type: 'demux', params: { sel: +m[1], width: +m[4], en: !!m[2], selBus: +m[1] > 1 && !m[3] } };

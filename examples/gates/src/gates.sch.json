@@ -107,7 +107,8 @@
    "mirror": false,
    "name": "and_p1",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -119,7 +120,8 @@
    "mirror": false,
    "name": "and_p2",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -131,7 +133,8 @@
    "mirror": false,
    "name": "and_p3",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -143,7 +146,8 @@
    "mirror": false,
    "name": "and_p4",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -155,7 +159,8 @@
    "mirror": false,
    "name": "or_sum",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -167,7 +172,8 @@
    "mirror": false,
    "name": "nand_c",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -179,7 +185,8 @@
    "mirror": false,
    "name": "nand_b",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -191,7 +198,8 @@
    "mirror": false,
    "name": "nand_a",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -203,7 +211,8 @@
    "mirror": false,
    "name": "nand_q1",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -215,7 +224,8 @@
    "mirror": false,
    "name": "nand_q2",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -227,7 +237,8 @@
    "mirror": false,
    "name": "nand_q3",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -239,7 +250,8 @@
    "mirror": false,
    "name": "nand_q4",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
@@ -251,7 +263,8 @@
    "mirror": false,
    "name": "nand_sum",
    "params": {
-    "width": 1
+    "width": 1,
+    "bits": false
    }
   },
   {
