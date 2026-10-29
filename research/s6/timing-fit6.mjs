@@ -2,8 +2,9 @@
 // driver the element before it, its load its site.pin, its delay) is found in the design's routed XDL (the routing
 // tree of the net from the driver's pin, timing.js netTree / treePath) and its nodes counted by class (wireClass6:
 // the singles, doubles, quads, the logic inputs and outputs, …), its load pin by kind (pinKind: a LUT's A1 to A6 are
-// not alike). A non-negative least-squares fit of delay = base + Σ count × class delay + fanout × per-load delay +
-// the pin kind's delay gives the model; printed with its error.
+// not alike) and by wire type (wireType: EE4B#, LOGICIN_B# …, fitWires). A non-negative least-squares fit of
+// delay = base + Σ count × class delay + fanout × per-load delay + the pin kind's + Σ count × wire type's delay gives
+// the model; printed with its error.
 //   node research/s6/timing-fit6.mjs <dir> …   (each with top.xdl and top.twr, ISE's routing: night 1's impl-* and edif-*;
 //   with top.dly, reportgen -delay's report, every connection instead)
 import fs from 'node:fs';
@@ -51,11 +52,14 @@ export function nodeWire(device, n) {
   return [device.tileNames[k], device.names[device.templates[device.tileTemplate[k]].wires[w - device.tileWireBase[k]]]];
 }
 
-/** A path's nodes (the driver's first) counted by class, and its load pin's kind: { counts, pin }. */
-function pathCounts(device, nodes) {
-  const counts = new Array(CLASSES6.length).fill(0);
-  for (const n of nodes.slice(1)) counts[wireClass6(nodeWire(device, n)[1])]++;
-  return { counts, pin: pinKind(nodeWire(device, nodes.at(-1))[1]) };
+/** A wire's type: its name without its index (EE4B#, LOGICIN_B#, …) and its tile kind's prefix. */
+export const wireType = name => name.replace(/\d+/g, '#').replace(/^(CLEX[LM]|INT_INTERFACE|IOI)_/, '');
+
+/** A path's nodes (the driver's first) counted by class, their wires' types and its load pin's kind: { counts, wires, pin }. */
+export function pathCounts(device, nodes) {
+  const counts = new Array(CLASSES6.length).fill(0), wires = [];
+  for (const n of nodes.slice(1)) { const w = nodeWire(device, n)[1]; counts[wireClass6(w)]++; wires.push(wireType(w)); }
+  return { counts, wires, pin: pinKind(nodeWire(device, nodes.at(-1))[1]) };
 }
 
 /** One net of a path in the routed XDL: { net, delay, fanout, counts: [per class], pin, nodes } or null (not found). */
@@ -82,6 +86,22 @@ export function connections(xdl, twr, device, paths = parseTwr(twr)) {
 }
 
 /**
+ * A load's delay in reportgen's report of its net (parseDly's { loads }): by inst.pin, else by the instance and the
+ * pin's letter, else by the instance, when one load of the net there matches (reportgen names a LUT input by its
+ * logical pin, before ISE swapped the LUT's pins: the XDL's and trce's D6 can be its D5, the letter the same);
+ * undefined when none or several do (with worst, the largest of several).
+ */
+export function loadDelay(entry, inst, pin, { worst = false } = {}) {
+  const v = entry.loads.get(`${inst}.${pin}`);
+  if (v !== undefined) return v;
+  const on = [...entry.loads].filter(([k]) => k.slice(0, k.lastIndexOf('.')) === inst), letter = on.filter(([k]) => k[k.lastIndexOf('.') + 1] === pin[0]);
+  if (letter.length === 1) return letter[0][1];
+  if (on.length === 1) return on[0][1];
+  // several (a net on two inputs of one LUT): with worst, the largest of the letter's (an STA's safe side)
+  return worst && letter.length ? Math.max(...letter.map(([, x]) => x)) : undefined;
+}
+
+/**
  * Every connection of a design from reportgen -delay's report (#731: every net's delay to each load, not only trce's
  * worst paths): [{ net, delay, fanout, counts, nodes }]; the global clocks' nets left out.
  */
@@ -93,7 +113,7 @@ export function dlySamples(xdl, dlyText, device) {
     const tree = netTree(n.net.pips || [], n.sources, device);
     if (!tree) continue;
     for (const s of n.sinks) {
-      const delay = d.loads.get(`${s.pin.inst}.${s.pin.pin}`), nodes = delay === undefined ? null : treePath(tree, s.node);
+      const delay = loadDelay(d, s.pin.inst, s.pin.pin), nodes = delay === undefined ? null : treePath(tree, s.node);
       if (!nodes || nodes.length < 2) continue;
       out.push({ net: n.name, delay, fanout: n.sinks.length, ...pathCounts(device, nodes), nodes });
     }
@@ -103,6 +123,20 @@ export function dlySamples(xdl, dlyText, device) {
 
 /** A connection's features: base, each class's count, the fanout beyond one, its load pin's kind (one of PIN_KINDS). */
 export const features = c => [1, ...c.counts, Math.max(0, c.fanout - 1), ...PIN_KINDS.map((_, k) => +(c.pin === k))];
+
+/**
+ * The wire model fitted on connections: features (the classes, fanout and pin kind) and a count per wire type seen
+ * at least min times (the rest one count), non-negative least squares. { vocab, weights, predict(c) } (c: pathCounts's
+ * and its fanout); predict is never below 0.
+ */
+export function fitWires(conns, { min = 20 } = {}) {
+  const seen = {};
+  for (const c of conns) for (const w of c.wires) seen[w] = (seen[w] || 0) + 1;
+  const vocab = Object.keys(seen).filter(w => seen[w] >= min).sort(), at = new Map(vocab.map((w, i) => [w, i]));
+  const f = c => { const v = new Array(vocab.length + 1).fill(0); for (const w of c.wires) v[at.get(w) ?? vocab.length]++; return [...features(c), ...v]; };
+  const weights = nnls(conns.map(f), conns.map(c => c.delay));
+  return { vocab, weights, predict: c => Math.max(0, f(c).reduce((a, v, j) => a + v * weights[j], 0)) };
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const dirs = process.argv.slice(2);
@@ -117,8 +151,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const r = connections(parseXdl(xt), fs.readFileSync(path.join(d, 'top.twr'), 'utf8'), device);
     all.push(...r.conns); missed += r.missed.length;
   }
-  const X = all.map(features), y = all.map(c => c.delay), w = nnls(X, y), pred = X.map(r => r.reduce((a, v, j) => a + v * w[j], 0));
-  const err = pred.map((p, i) => p - y[i]), abs = err.map(Math.abs).sort((a, b) => a - b), rms = Math.sqrt(err.reduce((a, e) => a + e * e, 0) / err.length);
-  console.log(`${all.length} connections (${missed} not found); rms ${rms.toFixed(3)} ns, 95% within ${abs[Math.floor(abs.length * 0.95)].toFixed(3)} ns, max ${abs.at(-1).toFixed(3)} ns`);
-  console.log(['base', ...CLASSES6, 'fanout', ...PIN_KINDS.map(k => `pin ${k}`)].map((n, j) => `${n} ${w[j].toFixed(3)}`).join(', '));
+  const m = fitWires(all), err = all.map(c => m.predict(c) - c.delay), abs = err.map(Math.abs).sort((a, b) => a - b), rms = Math.sqrt(err.reduce((a, e) => a + e * e, 0) / err.length);
+  console.log(`${all.length} connections (${missed} not found), ${m.vocab.length} wire types; rms ${rms.toFixed(3)} ns, 95% within ${abs[Math.floor(abs.length * 0.95)].toFixed(3)} ns, max ${abs.at(-1).toFixed(3)} ns`);
+  const n = ['base', ...CLASSES6, 'fanout', ...PIN_KINDS.map(k => `pin ${k}`)].length;
+  console.log(['base', ...CLASSES6, 'fanout', ...PIN_KINDS.map(k => `pin ${k}`)].map((x, j) => `${x} ${m.weights[j].toFixed(3)}`).join(', '));
+  console.log(`the largest wire types: ${m.vocab.map((w, j) => [w, m.weights[n + j]]).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w, v]) => `${w} ${v.toFixed(3)}`).join(', ')}`);
 }

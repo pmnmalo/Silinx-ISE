@@ -8,9 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
-import { nnls } from '../s3e-route/timing-fit.mjs';
 import { parseTwr } from './twr6.mjs';
-import { connection, connections, dlySamples, features } from './timing-fit6.mjs';
+import { connection, connections, dlySamples, fitWires } from './timing-fit6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
 
 /** An arc's key: its type, the slice kind, and a setup through the LUT its flip-flop's input mux. */
@@ -33,12 +32,12 @@ export function arcTable(designs) {
   return { arcs: Object.fromEntries(Object.entries(by).map(([k, v]) => [k, median(v)])), types: Object.fromEntries(Object.entries(byType).map(([k, v]) => [k, median(v)])) };
 }
 
-/** A path's data path delay by the model: its arcs from the table, its nets from the wire weights (null: a net not found). */
-export function modelPath(p, xdl, device, table, weights) {
+/** A path's data path delay by the model: its arcs from the table, its nets from the wire model (fitWires's predict; null: a net not found). */
+export function modelPath(p, xdl, device, table, predict) {
   const inst = new Map(xdl.insts.map(i => [i.site, i])), nets = new Map(xdl.nets.map(n => [n.name, n]));
   let d = 0;
   for (const [i, e] of p.elements.entries()) {
-    if (e.type === 'net') { const c = i > 0 && connection(nets, device, p.elements[i - 1].loc, e); if (!c) return null; d += Math.max(0, features(c).reduce((a, v, j) => a + v * weights[j], 0)); }
+    if (e.type === 'net') { const c = i > 0 && connection(nets, device, p.elements[i - 1].loc, e); if (!c) return null; d += predict(c); }
     else d += table.arcs[arcKey(e, inst.get(e.loc.split('.')[0]))] ?? table.types[e.type] ?? e.delay;
   }
   return d;
@@ -55,12 +54,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   });
   // the wires' weights from every connection (reportgen's .dly) when there, else from trce's paths'
   const table = arcTable(designs), conns = designs.flatMap(x => (x.dly ? dlySamples(x.xdl, x.dly, x.device) : connections(x.xdl, null, x.device, x.paths).conns));
-  const weights = nnls(conns.map(features), conns.map(c => c.delay));
+  const { predict } = fitWires(conns);
   const errs = [], slackErr = [], periodErr = [], worst = [];
   for (const x of designs) {
     const byConstraint = new Map();
     for (const p of x.paths) {
-      const d = modelPath(p, x.xdl, x.device, table, weights);
+      const d = modelPath(p, x.xdl, x.device, table, predict);
       if (d === null || p.requirement === undefined) continue;
       errs.push(d - p.dataPath);
       const slack = p.requirement - (d - (p.skew ?? 0) + (p.uncertainty ?? 0));
