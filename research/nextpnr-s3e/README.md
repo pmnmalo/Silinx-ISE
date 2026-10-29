@@ -13,6 +13,7 @@ XC3S250E (Basys2-250).
 | `export-unknown-pips.mjs` | The PIPs whose bits Silinx's bit database does not know (Silinx's own router is kept off them: `knownRouting`), per tile, for the generator to leave out |
 | `nextpnr-to-xdl.mjs` | nextpnr's routed design (`--write`) to XDL: one instance per used site with its settings, each net's site pins and PIPs |
 | `xdl-to-bit.mjs` | Silinx's bitgen on that XDL |
+| `xdl-report.mjs` | The size (slices, LUTs, flip-flops) and speed (each clock's minimum period, Silinx's static timing analysis fitted to trce) of a routed XDL: nextpnr's result and Silinx's measured the same way |
 
 The site model, per slice: two LUT4s (F, G, inputs on F1…F4 / G1…G4), their outputs to X / Y
 (FXMUX / GYMUX) and to the flip-flops (DXMUX / DYMUX, or BX / BY), two flip-flops on the site's
@@ -46,15 +47,20 @@ The chip database of the XC3S250E: 19 s in Python, a 75 MB `.bba`, a 24 MB `.bin
 
 `blink.v`, the same Yosys netlist (37 LUTs, 24 flip-flops, 10 IOBs, 1 BUFGMUX) placed and routed by both:
 
-| | nextpnr (spartan3e) | Silinx |
-|---|---|---|
-| P&R time | 0.3 s | 0.6 s (place 0.1 s, route 0.5 s) |
-| slices | 28 | 19 |
-| PIPs | 448 | 351 |
-| routing check against the graph | OK | OK |
-| ISE: `xdl -xdl2ncd`, `drc` | 0 errors, 0 warnings | 0 errors, 0 warnings |
-| ISE: `trce` minimum period | 9.269 ns | 6.717 ns |
-| Silinx's bitgen against ISE's `bitgen` | byte-identical | byte-identical |
+| | nextpnr, LUT–FF pairs | nextpnr, slices packed | Silinx |
+|---|---|---|---|
+| P&R time | 0.3 s | 0.3 s | 0.6 s (place 0.1 s, route 0.5 s) |
+| slices | 28 | 19 | 19 |
+| PIPs | 448 | 450 | 351 |
+| routing check against the graph | OK | OK | OK |
+| ISE: `xdl -xdl2ncd`, `drc` | 0 errors, 0 warnings | 0 errors, 0 warnings | 0 errors, 0 warnings |
+| ISE: `trce` minimum period | 9.269 ns | 10.343 ns | 6.717 ns |
+| Silinx's timing analysis (`xdl-report.mjs`) | 9.432 ns | 10.421 ns | 6.821 ns |
+| Silinx's bitgen against ISE's `bitgen` | byte-identical | byte-identical | byte-identical |
+
+The slices packed (`pack_slices`): a LUT with the flip-flop it feeds, or either alone, is a unit; two
+units with the same control set go into one slice, chosen by the nets they share (each net weighing
+1 / its fanout), the rest paired by control set; each slice a cluster (F, G, FFX, FFY at z 0…3).
 
 Not yet run on a Basys2.
 
@@ -64,10 +70,9 @@ a BUFGMUX's select S is tied to VCC through its tile's VCC site (`XDL_DUMMY_<til
 
 ## What is left for a decision
 
-- **Packing.** nextpnr places LUTs and flip-flops BEL by BEL; nothing yet makes it fill the slices
-  (28 against 19). Clusters per slice, as the xilinx micro-architecture does, are the next step.
-- **Timing.** No timing model yet (all delays the default): 9.3 ns against Silinx's 6.7 ns. Silinx's
-  (fitted to trce) to be written into the chip database's speed grade.
+- **Timing.** No timing model yet (all delays the default), so the placer and the router do not see
+  speed: 10.3 ns against Silinx's 6.7 ns. Silinx's model (fitted to trce) to be written into the chip
+  database's speed grade.
 - **Constants**, the carry chain, MUXF5…F8, SLICEM's RAMs and shift registers, the IOB's registers,
   BRAM, MULT18X18, DCM: each a cell type, its BELs and its settings in the converter.
 - **The clock pads.** nextpnr routes a pad to its BUFGMUX on general routing where a dedicated path
