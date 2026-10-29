@@ -1174,3 +1174,54 @@ xdl2ncd no warning, Silinx's `.bit` byte-identical to ISE's bitgen with CRC on a
 the shipped graph, that the DCM's CLKIN comes from B8 through general routing; the measured graph knows the dedicated
 path from B9 and A9, the shipped graph also from A10 and C9 (not measured yet). The measured graph now: 2930 split nodes,
 none a short can come from, 488 a route lost; 0 merged; 38 extra PIPs.
+
+### The recipe for the other dies, part 7: the XC3S500E's measured description (2026-10-29)
+
+Parts 1-6 on the XC3S500E-FG320 (Nexys2-500), ISE 14.7 on the Mac mini. Every valid verdict and every probe answer was
+scored against the shipped graph (local scoring only), and every one agrees. The measurements and the description are
+in `data/xc3s500e/`.
+
+- **Observation:** the 38 designs of `measure.mjs designs` and `iobddr-b`, all passing ISE, and the 12 sparser clock
+  designs (`gen-obsclk.mjs clkb 12 100 0.25`). The tile probe gives 1404 switch-box tiles, the shipped graph's exactly;
+  the 4 random designs follow. `observe` explains every join.
+- **Join rounds** in the CLBs' names: t1-t9, about 290 000 tests (with the I/O probe, the pads' and the block RAMs'
+  sources, the unbonded I/O tiles). The I/O probe: 11 737 PIPs exist and 2770 do not. The edge tiles: 11 163 tests,
+  3752 joins. 543 joins are left that no CLB can test.
+- **Clock tests by removal** (`clocktests.mjs`): c2, c3, cS and cM, 19 982 verdicts. cS2's 51 tests failed their
+  baseline, as on the XC3S100E.
+- **The arc probe of the rest** (`candidates.mjs rest`): 452 244 candidates in 181 rounds; 440 976 exist and 11 268 do
+  not. The extra PIPs go from 11 186 to 74.
+- **Whole-chip rounds** (part 5's, with `varyjoins.mjs spine` and `pins` in each round): u1c-u6c, 56 832 verdicts.
+  Round 6 found no join. Four of them were invalid. Each tested a GCLKVC tile's `GCLKC_GCLK_OUT_*n` against
+  `GCLKC_GCLKn` of another GCLKVC tile in its column. The test's own route drives `GCLKC_GCLKn` from the column's
+  `GCLKVMLR_GCLK_DN` / `_UP` line, and the other end is on that same line. So ISE saw it driven anyway and reported a
+  join. These joins are marked `invalid`, and from u3 on such pairs were left out of the hypotheses.
+- **XB / YB:** Silinx's routes of the 7 examples on the shipped graph, ISE's DRC clean (`others.json.gz`, pins only).
+
+| | First build | Now |
+|---|---|---|
+| Nodes split / merged | 18 658 / 0 | 3558 / 0 |
+| ... with two pieces a net can reach (a short) | 101 | **0** |
+| ... with a route lost | 15 931 | 932 |
+| PIPs extra / missing | 11 186 / 96 836 | 74 / 81 838 |
+| Pins missing | 38 073 | 33 417 |
+
+The 360 pins whose wire differs from the shipped graph's are the BCIN0-17 of 20 multipliers, named by the pin where
+the shipped graph has `MULT_CCARRY_BCINk`. These are likely each column's first multiplier, whose cascade input
+nothing drives; the XC3S100E has the same on its 4 multipliers.
+
+**ISE's verdict on the 7 examples** (gates, traffic, blinky, pong, stopwatch, clock, vga, on the Nexys2-500) routed by
+the open flow on the measured graph: every one clean. DRC gives 0 errors and 0 warnings, xdl2ncd no warning, and
+Silinx's `.bit` is byte-identical to ISE's bitgen with CRC on and off. ISE's `trce` periods, from the shipped graph to
+the measured one:
+
+| Example | Period (ns) |
+|---|---|
+| traffic | 7.558 -> 7.600 |
+| blinky | 6.623 -> 6.831 |
+| pong | 11.797 -> 11.920 |
+| stopwatch | 11.944 -> 12.481 |
+| clock | 6.531 -> 6.273 |
+| vga | 8.918 -> 8.672 |
+
+The shipped graph stays. The `test/fixtures/open-flow` designs are not run on the XC3S500E's measured graph yet.
