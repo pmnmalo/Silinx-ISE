@@ -4,6 +4,7 @@
 import { ESTIMATE_ERROR_PERCENT, estimatePower, powerReport } from './power.js';
 import { analyzeTiming, checkCross, checkOffsets, checkPeriods, checkSwitching, clockPort, parseOffsets, switchingLine, timingReport } from './fpga/timing.js';
 import { bitgen } from './fpga/bitgen.js';
+import { analyzeTimingS6 } from './fpga/s6/timing.js';
 import { parseUcf, pinsUcf } from './ucf.js';
 import { parseXdl, placedPins } from './xdl.js';
 import { StepError } from './open-flow-core.js';
@@ -19,16 +20,17 @@ export function mountFlowReports(ctx) {
     const pu = ucfText ? parseUcf(ucfText) : { clocks: [], other: [] };
     const constraints = pu.clocks || [];
     // (the PERIOD constraints: a DCM's clocks' phases at the pads, #601)
-    const sta = analyzeTiming(design, io.device(), { clocks: constraints });
+    // (the Spartan-6's: its arcs and delays fitted to ISE's trce, fpga/s6/timing.js, #732)
+    const s6 = spec.family === 'spartan6', sta = (s6 ? analyzeTimingS6 : analyzeTiming)(design, io.device(), { clocks: constraints });
     // the PERIOD constraints, then the OFFSET ones (#26)
     const offsets = checkOffsets(sta, design, parseOffsets(pu.other || []), constraints);
     // (#601: a DCM's clocks with their derived PERIOD; the paths between two related clocks)
     const periods = checkPeriods(sta, design, constraints), cross = checkCross(sta, design, constraints);
     // (#661: the DCMs' pins against their switching limits, as trce's Component Switching Limit checks)
-    const switching = checkSwitching(design, constraints);
+    const switching = s6 ? [] : checkSwitching(design, constraints);
     const checks = [...periods, ...switching, ...cross, ...offsets];
     const lines = timingReport(sta, checks);
-    report.files.timing = io.write('open/timing.txt', `Static timing analysis of ${top} (Silinx toolchain, delay model of core/fpga/timing.js)\n\n${lines.join('\n')}\n`);
+    report.files.timing = io.write('open/timing.txt', `Static timing analysis of ${top} (Silinx toolchain, delay model of ${s6 ? 'fpga/s6/timing.js, fitted to ISE\'s trce' : 'core/fpga/timing.js'})\n\n${lines.join('\n')}\n`);
     const failed = periods.filter(c => !c.missing && !c.met), offFailed = offsets.filter(c => !c.missing && !c.unsupported && !c.met);
     const crossFailed = cross.filter(c => c.related && !c.met);
     const swFailed = switching.filter(c => !c.met);

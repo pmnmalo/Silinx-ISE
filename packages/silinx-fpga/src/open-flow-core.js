@@ -37,6 +37,7 @@ import { deviceSites } from './fpga/place.js';
 import { checkRouting } from './fpga/route.js';
 import { bitgen, knownRouting } from './fpga/bitgen.js';
 import { mountFlowReports } from './open-flow-reports.js';
+import { mountS6Steps } from './open-flow-s6.js';
 
 // without the HDL front end (io.frontEnd): the sources are the flat Verilog given to Yosys, its top module `top` (#1675)
 function flatVerilog(srcs, top) {
@@ -252,6 +253,9 @@ export async function runFlow(spec, io) {
     log('All signals are completely routed.');
   }
 
+  // the Spartan-6's Map and Place & Route (#732: under its developer flag, open-flow-s6.js)
+  const s6 = spec.family === 'spartan6' ? mountS6Steps({ io, spec, log, report, util, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
+
   const { bitfile, runPins, runPower, runTiming } = mountFlowReports({
     io, spec, log, report, routedOrEarlier: (...a) => routedOrEarlier(...a), routedText: () => routedText, top, ucfText
   });
@@ -277,9 +281,9 @@ export async function runFlow(spec, io) {
     if (steps.includes('postsynth')) { step('postsynth'); await runPostSynth(); save(); }
     if (steps.includes('translate')) { step('translate'); runTranslate(); save(); }
     if (steps.includes('posttrans')) { step('posttrans'); await runPostTranslate(); save(); }
-    if (steps.includes('map')) { step('map'); runMap(); save(); }
+    if (steps.includes('map')) { step('map'); (s6 ? s6.runMap : runMap)(); save(); }
     if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
-    if (steps.includes('par')) { step('par'); runPar(); save(); }
+    if (steps.includes('par')) { step('par'); (s6 ? s6.runPar : runPar)(); save(); }
     if (steps.includes('trce')) { step('trce'); routedOrEarlier(); runTiming(); save(); }
     if (steps.includes('postpar')) { step('postpar'); await runPostPar(); save(); }
     if (steps.includes('pin2ucf')) { step('pin2ucf'); runPins(); save(); }

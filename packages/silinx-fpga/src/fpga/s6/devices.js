@@ -14,8 +14,12 @@ export const S6_DEVICES = {
   xc6slx45: { device: 'xc6slx45', pkg: 'csg324', board: 'Atlys', part: '6slx45csg324', idcode: 0x04008093, frameWords: 65, configBits: 11939296, measured: false },
 };
 
-/** The steps of the Silinx toolchain for the Spartan-6 so far: the synthesis and its simulation model (#720). */
-export const S6_OPEN_STEPS = ['synth', 'postsynth'];
+/**
+ * The steps of the Silinx toolchain for the Spartan-6 so far: the synthesis and its simulation model (#720), Map,
+ * Place & Route and the static timing (#732: open-flow-s6.js, fpga/s6/timing.js); no bitstream yet.
+ */
+export const S6_OPEN_STEPS = ['synth', 'postsynth', 'translate', 'map', 'par', 'trce'];
+const STEP_NAMES = { synth: 'synthesis', postsynth: 'its post-synthesis simulation model', translate: null, map: 'Map', par: 'Place & Route', trce: 'the static timing' };
 
 /** The developer flag: SILINX_SPARTAN6_OPEN=1 in the environment of the server (none in the browser). */
 const SPARTAN6_FLAG = 'SILINX_SPARTAN6_OPEN';
@@ -31,5 +35,5 @@ export function s6OpenStatus(dev, pkg, part) {
   if (!d) return { available: false, reason: `the Silinx toolchain for the Spartan-6 is for the ${list} only (${SPARTAN6_FLAG}): use an ISE mode for the ${dev}` };
   if (pkg !== d.pkg) return { available: false, reason: `the Silinx toolchain for the Spartan-6 has the ${dev} in the ${d.pkg} package only (${SPARTAN6_FLAG}): use an ISE mode for the ${pkg}` };
   return { available: true, steps: S6_OPEN_STEPS,
-    reason: `${part}: the Spartan-6 under development (${SPARTAN6_FLAG}): ${S6_OPEN_STEPS.map(s => ({ synth: 'synthesis', postsynth: 'the post-synthesis simulation model' })[s]).join(' and ')} only, no implementation yet (#1)` };
+    reason: `${part}: the Spartan-6 under development (${SPARTAN6_FLAG}): ${S6_OPEN_STEPS.map(x => STEP_NAMES[x]).filter(Boolean).join(', ')} only, no bitstream yet (#732)` };
 }

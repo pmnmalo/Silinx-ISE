@@ -86,7 +86,12 @@ export function openStatus(device, { dbDir = BIT_DB_DIR, env = process.env } = {
   const dev = String(device.part).toLowerCase();
   Object.assign(out, { part, device: dev });
   const fam = deviceFamily(device) || '';
-  if (fam === 'spartan6' && spartan6Open(env)) return Object.assign(out, s6OpenStatus(dev, String(device.package || '').toLowerCase(), part));
+  // (its device description for Map and Place & Route, #732: the boards' parts ship with Silinx)
+  if (fam === 'spartan6' && spartan6Open(env)) {
+    Object.assign(out, s6OpenStatus(dev, String(device.package || '').toLowerCase(), part));
+    if (out.available) { out.graph = findDeviceGraph(part); out.shipped = !!out.graph && path.dirname(out.graph) === SHIPPED_DEVICES_DIR; }
+    return out;
+  }
   if (fam !== 'spartan3e') {
     out.reason = `the Silinx toolchain does not support the ${fam || dev} family yet (only the Spartan-3E ${supported(dbDir)}): use an ISE mode`;
     return out;
