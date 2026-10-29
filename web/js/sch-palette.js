@@ -5,7 +5,7 @@ import { SYMBOLS, SYMBOL_CATEGORIES, defaultParams, symbolDef } from '/core/schd
 import { bodySvg, r1 } from './sch-svg.js';
 import { devicePrimitives } from '/core/primitives.js';
 import { esc, h } from './dom.js';
-import { longPressMenu, popupMenu } from './ui.js';
+import { popupMenu } from './ui.js';
 
 /** { catSel, renderPalette, search, symInfo } of mountSchEditor (device(), doc(), infoItem(), modules(), placing(): its current values). */
 export function mountSchPalette(ctx) {
@@ -71,13 +71,16 @@ export function mountSchPalette(ctx) {
           html: `${previewSvg(it)}<span class="nm" data-no-i18n>${esc(it.title)}</span>`,
         });
         row.addEventListener('click', () => { setInfoItem(it); startPlace(it); showSymInfo(it); });
+        // (on a tablet, a long press: no menu, its browser's nor ours; with a mouse, the right click's, #1990)
+        row.addEventListener('pointerdown', e => { row.pointerType = e.pointerType; });
         row.addEventListener('contextmenu', e => {
           e.preventDefault();
+          if (row.pointerType === 'touch' || row.pointerType === 'pen') return;
           setInfoItem(it); showSymInfo(it);
           popupMenu([{ label: 'Symbol Info…', shortcut: 'F1', action: () => openInfo(itemTarget(it)) }, ...(readOnly ? [] : [{ label: 'Place Symbol', action: () => startPlace(it) }])], e.clientX, e.clientY);
         });
         row.addEventListener('dragstart', e => { e.dataTransfer.setData('text/x-silinx-symbol', JSON.stringify(it)); e.dataTransfer.effectAllowed = 'copy'; });
-        longPressMenu(row);
+        Object.assign(row.style, { webkitTouchCallout: 'none', webkitUserSelect: 'none', userSelect: 'none' });
         symList.append(row);
       }
     }

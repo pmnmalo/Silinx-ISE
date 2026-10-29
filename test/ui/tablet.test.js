@@ -175,3 +175,22 @@ uiTest('#1992 tablet: a symbol\'s menu from a long press closes as soon as the f
   await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   assert.deepEqual({ opened, afterMove }, { opened: true, afterMove: false });
 }, { tablet: 'landscape' });
+// #1990: a long press on a palette row (a finger): no menu; a mouse's right click: its menu (Symbol Info…, Place Symbol)
+uiTest('#1990 tablet: a long press on a symbol of the palette opens no menu; the mouse\'s right click does', E, async (page) => {
+  await openGates(page, 'TabPalMenu');
+  const at = await page.eval(() => { const r = document.querySelector('.doc:not([hidden]) .sch-editor .se-symrow').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: at.x, y: at.y }] });
+  // (the long press's contextmenu event, as Android's Chrome sends it; and past the app's own long-press delay)
+  const prevented = await page.eval(() => !document.querySelector('.doc:not([hidden]) .sch-editor .se-symrow').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+  await new Promise((r) => setTimeout(r, 900));
+  const menuTouch = await page.eval(() => !!document.querySelector('.menu-popup'));
+  await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.closeMenus();
+  // the mouse: its right click, the menu
+  await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'right', clickCount: 1 });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button: 'right', clickCount: 1 });
+  await page.waitFor(() => !!document.querySelector('.menu-popup'), [], { what: 'the mouse\'s menu' });
+  const items = await page.eval(() => [...document.querySelectorAll('.menu-popup .mi .lbl')].map((l) => l.textContent));
+  await page.closeMenus();
+  assert.deepEqual({ prevented, menuTouch, items }, { prevented: true, menuTouch: false, items: ['Symbol Info…', 'Place Symbol'] });
+}, { tablet: 'landscape' });
