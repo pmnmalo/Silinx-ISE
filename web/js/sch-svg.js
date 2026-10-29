@@ -47,24 +47,25 @@ export function bodySvg(sym, def) {
       break;
     }
     case 'inv': case 'buf': {
-      // (the triangle to x = 54, the output's lead from it (or the bubble) to 80: #1988; a row each with Pins per bit, #2067)
-      const n = def.rows || 1;
+      // (the triangle to x = 20 + its body's width (INV's 54, its bubble to 60; BUF's 60, #2068), the output's lead from
+      // there to 80: #1988; a row each with Pins per bit, #2067)
+      const n = def.rows || 1, tip = 20 + def.body.w;
       for (let k = 0; k < n; k++) {
         const y = 20 * k;
-        s += `<path class="gate" d="M20,${y} L54,${y + 10} L20,${y + 20} Z"/>`;
-        if (def.shape === 'inv') s += `<circle class="gate" cx="57" cy="${y + 10}" r="3"/>`;
-        s += lead(0, y + 10, 20, y + 10, bus(pins[k])) + lead(def.shape === 'inv' ? 60 : 54, y + 10, 80, y + 10, bus(pins[n + k]));
+        s += `<path class="gate" d="M20,${y} L${tip},${y + 10} L20,${y + 20} Z"/>`;
+        if (def.shape === 'inv') s += `<circle class="gate" cx="${tip + 3}" cy="${y + 10}" r="3"/>`;
+        s += lead(0, y + 10, 20, y + 10, bus(pins[k])) + lead(def.shape === 'inv' ? tip + 6 : tip, y + 10, 80, y + 10, bus(pins[n + k]));
       }
       break;
     }
     case 'tbuf': {
       // tri-state buffer: one triangle per row, the enable line from the pin (row 0) down to their top
-      // edges (x = 38), a bubble on it for the active-low T of BUFT; the triangles 36 long, to x = 56 (#1988)
-      const n = def.rows, ex = 38, edge = k => 20 + 20 * k + (ex - 20) * 10 / 36;
+      // edges (x = 38), a bubble on it for the active-low T of BUFT; the triangles 40 long, to x = 60 (#1988, #2068)
+      const n = def.rows, ex = 38, edge = k => 20 + 20 * k + (ex - 20) * 10 / 40;
       s += lead(0, 10, ex, 10, false) + `<path class="gate nofill" d="M${ex},10 V${r1(edge(n - 1))}"/>`;
       for (let k = 0; k < n; k++) {
         const y = 30 + 20 * k, ip = pins[1 + k], op = pins[1 + n + k];
-        s += `<path class="gate" d="M20,${y - 10} L56,${y} L20,${y + 10} Z"/>` + lead(0, y, 20, y, bus(ip)) + lead(56, y, 80, y, bus(op));
+        s += `<path class="gate" d="M20,${y - 10} L60,${y} L20,${y + 10} Z"/>` + lead(0, y, 20, y, bus(ip)) + lead(60, y, 80, y, bus(op));
       }
       if (def.activeLow) s += `<circle class="gate" cx="${ex}" cy="${r1(edge(0) - 3.5)}" r="3"/>`;
       break;
@@ -162,17 +163,18 @@ function typeUnder(sym, def, box, center, name) {
   return `<text class="stype" x="${turned ? box.x + box.w + 3 : t.x}" y="${turned ? center.y + 3 : (sym.rot === 180 ? box.y - 3 : box.y + box.h + 10)}" text-anchor="${turned ? 'start' : 'middle'}">${esc(name)}</text>`;
 }
 // the symbol's type inside its body (AND2, INV, M2_1…), as ISE's symbols have it (#2041): at the body's centre, upright;
-// 8 px bold, about 5.5 px a character, squeezed to the body's width when a little longer. A triangle (INV, BUF) has
-// room for it only near its base, where it is 9 px tall, and only upright: no squeezing. Null when it does not fit (the
-// caller draws it under)
+// 8 px bold, about 5.5 px a character, squeezed to the body's width when a little longer. A triangle (INV, BUF, BUFE /
+// BUFT's first) has room for it only near its base, its first 55 %, and only upright, 7 px there (4.8 px a character). Null when it does
+// not fit (the caller draws it under)
 function typeInside(sym, def, name) {
-  const turned = sym.rot === 90 || sym.rot === 270, tri = def.shape === 'inv' || def.shape === 'buf';
-  if (tri && (turned || def.rows > 1)) return null;   // (INV4…: under its triangles, #2067)
-  const room = tri ? def.body.w * 0.55 - 2 : (turned ? def.body.h : def.body.w) - 6, need = name.length * 5.5;
-  if (need > room * (tri ? 1 : 1.3)) return null;
-  const c = xform(sym, def, def.body.x + (tri ? (def.body.w * 0.55) / 2 + 1 : def.body.w / 2), def.body.y + def.body.h / 2);
+  const turned = sym.rot === 90 || sym.rot === 270, tri = def.shape === 'inv' || def.shape === 'buf' || def.shape === 'tbuf';
+  if (tri && (turned || def.rows > 1)) return null;   // (INV4, BUFE4…: under their triangles, #2067)
+  const room = tri ? def.body.w * 0.55 - 1 : (turned ? def.body.h : def.body.w) - 6, need = name.length * (tri ? 4.8 : 5.5);
+  if (need > room * 1.3) return null;
+  const cy = def.shape === 'tbuf' ? def.body.y + 10 : def.body.y + def.body.h / 2;
+  const c = xform(sym, def, def.body.x + (tri ? room / 2 + 1 : def.body.w / 2), cy);
   const fit = need > room ? ` textLength="${r1(room)}" lengthAdjust="spacingAndGlyphs"` : '';
-  return `<text class="stype inside" x="${r1(c.x)}" y="${r1(c.y + 3)}" text-anchor="middle"${fit}>${esc(name)}</text>`;
+  return `<text class="stype inside${tri ? ' tri' : ''}" x="${r1(c.x)}" y="${r1(c.y + 3)}" text-anchor="middle"${fit}>${esc(name)}</text>`;
 }
 const AUTO_NAME = /^(XLXI_\d+|inst_\d+|U\d+)$/;
 // a pin's name inside the body, past its lead and clock triangle (L px from the pin's end); on the top or the bottom
@@ -271,8 +273,8 @@ function textsSvg(sym, def, ctx = {}) {
     // the type (AND2, OR3B1, INV…) inside the symbol (#2041), else under it, as ISE draws it (#172)
     s += typeInside(sym, def, symbolTypeName(sym)) ?? typeUnder(sym, def, box, center, symbolTypeName(sym));
   } else if (def.shape === 'tbuf') {
-    // (its type, BUFE / BUFT4…, under it: its triangles too small for it, #2041)
-    s += typeUnder(sym, def, box, center, def.title);
+    // (its type, BUFE / BUFT8…, inside its triangle, #2068; BUFE4…'s under them, #2041)
+    s += typeInside(sym, def, def.title) ?? typeUnder(sym, def, box, center, def.title);
   }
   if (def.shape === 'gate' || def.shape === 'inv' || def.shape === 'buf' || def.shape === 'tbuf') {
     // a gate wider than a bit: the width on each bus pin's lead, as the other symbols, nothing in its shape (#1486)

@@ -318,16 +318,17 @@ export function symbolDef(sym, modules = {}) {
     pins.push({ name: 'O', dir: 'out', x: 80, y: h / 2, side: 'E', width: W });
     return { w: 80, h, shape: 'gate', gate: S.gate, bubble: /^n|xnor/.test(S.gate), body: { x: 20, y: 0, w: 40, h }, pins };
   }
-  // (INV, BUF and the tri-state buffers as wide as the 2-input gates, 80, their triangle 34 or 36 long: room for an
-  // instance name inside and for a bus width on the output's lead, #1988; they were 60, BUF_OLD_W)
+  // (INV, BUF and the tri-state buffers as wide as the 2-input gates, 80: room for a bus width on the output's lead,
+  // #1988, they were 60, BUF_OLD_W; BUF's and BUFE / BUFT's triangle 4 grid steps, 40, its type inside it, INV's 34 and
+  // its bubble, #2068)
   // (Pins per bit: a row each, I0 / O0 at the top, #2067)
   if (t === 'inv' || t === 'buf') {
     if (W > 1 && p.bits) {
       const pins = [...Array(W).keys()].map(k => ({ name: `I${k}`, dir: 'in', x: 0, y: 10 + 20 * k, side: 'W', width: 1 }));
       for (let k = 0; k < W; k++) pins.push({ name: `O${k}`, dir: 'out', x: 80, y: 10 + 20 * k, side: 'E', width: 1 });
-      return { w: 80, h: 20 * W, shape: t, rows: W, body: { x: 20, y: 0, w: 34, h: 20 * W }, pins };
+      return { w: 80, h: 20 * W, shape: t, rows: W, body: { x: 20, y: 0, w: t === 'buf' ? 40 : 34, h: 20 * W }, pins };
     }
-    return { w: 80, h: 20, shape: t, body: { x: 20, y: 0, w: 34, h: 20 },
+    return { w: 80, h: 20, shape: t, body: { x: 20, y: 0, w: t === 'buf' ? 40 : 34, h: 20 },
       pins: [{ name: 'I', dir: 'in', x: 0, y: 10, side: 'W', width: W }, { name: 'O', dir: 'out', x: 80, y: 10, side: 'E', width: W }] };
   }
   if (t === 'tbuf') {
@@ -338,7 +339,7 @@ export function symbolDef(sym, modules = {}) {
     for (let k = 0; k < n; k++) pins.push({ name: bits ? `I${k}` : 'I', dir: 'in', x: 0, y: 30 + 20 * k, side: 'W', width: bits ? 1 : W });
     for (let k = 0; k < n; k++) pins.push({ name: bits ? `O${k}` : 'O', dir: 'out', x: 80, y: 30 + 20 * k, side: 'E', width: bits ? 1 : W, tri: true });
     const title = `BUF${en}${W > 1 ? W : ''}`;
-    return { w: 80, h: 20 + 20 * n, shape: 'tbuf', activeLow: en === 'T', rows: n, title, body: { x: 20, y: 20, w: 36, h: 20 * n }, pins };
+    return { w: 80, h: 20 + 20 * n, shape: 'tbuf', activeLow: en === 'T', rows: n, title, body: { x: 20, y: 20, w: 40, h: 20 * n }, pins };
   }
   // the select pins at the bottom, the most significant on the left, 20 apart around cx (#301): one bus pin S
   // (selBus) or S<k-1> … S0

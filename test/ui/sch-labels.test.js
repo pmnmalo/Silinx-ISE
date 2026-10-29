@@ -224,7 +224,7 @@ uiTest('#1815 schematic: a bus tap\'s Properties refuse an MSB below its LSB (an
 // #2041 (#2036 corrected): a symbol's type (AND2, INV, M2_1, BUFE, FDCE…) drawn inside its shape, turned symbols too; the
 // name the user gives it above it, as before #2036; a type a little long for the body squeezed to it (NAND3B3); a turned
 // inverter's beside it (a triangle 20 px across)
-uiTest('#2041 schematic: the symbol\'s type inside its shape (gates, INV, MUX, FDCE, turned; BUFE under it), the instance name above it', E, async (page) => {
+uiTest('#2041 schematic: the symbol\'s type inside its shape (gates, INV, BUFE, MUX, FDCE, turned), the instance name above it', E, async (page) => {
   const doc = newDoc('inside', 'vhdl');
   const add = (type, x, y, name, rot = 0, params = {}) => doc.symbols.push({ id: `S${doc.symbols.length + 1}`, type, x, y, rot, mirror: false, name, params: { width: 1, ...params } });
   add('and2', 100, 60, 'u1'); add('inv', 260, 70, 'n1'); add('mux2', 400, 60, 'm1'); add('fdce', 100, 220, 'ff1'); add('or2', 300, 240, 'g2', 90);
@@ -244,5 +244,5 @@ uiTest('#2041 schematic: the symbol\'s type inside its shape (gates, INV, MUX, F
     return `${n.textContent}:${place(n)} ${t.textContent}:${place(t)}${t.getAttribute('textLength') ? ' squeezed' : ''}`;
   }), ED);
   assert.deepEqual(where, ['u1:over AND2:in', 'n1:over INV:in', 'm1:over M2_1:in', 'ff1:over FDCE:in', 'g2:over OR2:in',
-    'a_very_long_instance_name:over NAND3B3:in squeezed', 'b1:over BUFE:under', 'n2:over INV:beside']);
+    'a_very_long_instance_name:over NAND3B3:in squeezed', 'b1:over BUFE:in', 'n2:over INV:beside']);
 });

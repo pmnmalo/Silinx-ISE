@@ -362,3 +362,20 @@ test('#2042 VCC and GND: the label clear of the symbol\'s bars in every orientat
     }
   }
 });
+
+// #2068: BUF's and BUFE / BUFT's triangle 4 grid steps long (x = 20 to 60), INV's to 54 with its bubble to 60; BUFE's and
+// BUFT8's type inside the triangle (7 px), BUFE4's under its triangles
+test('#2068 BUF, BUFE, BUFT: a 40 px triangle, their type inside it; INV its 34 px triangle and bubble', () => {
+  const draw = (type, params) => { const sym = { id: 'S1', type, x: 0, y: 0, rot: 0, mirror: false, name: 'U1', params: { width: 1, ...params } }; return symbolSvg(sym, symbolDef(sym)); };
+  assert.match(draw('buf', {}), /<path class="gate" d="M20,0 L60,10 L20,20 Z"\/>/);
+  assert.match(draw('inv', {}), /<path class="gate" d="M20,0 L54,10 L20,20 Z"\/><circle class="gate" cx="57" cy="10" r="3"\/>/);
+  assert.match(draw('tbuf', { enable: 'E' }), /<path class="gate" d="M20,20 L60,30 L20,40 Z"\/>/);
+  for (const [params, name] of [[{ enable: 'E' }, 'BUFE'], [{ enable: 'T' }, 'BUFT'], [{ enable: 'E', width: 8 }, 'BUFE8']]) {
+    const t = draw('tbuf', params).match(/<text class="stype inside tri" x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]*)</);
+    assert.ok(t, `${name}: inside`);
+    // (within the triangle's first 55 %, around its middle line y = 30)
+    assert.deepEqual([t[3], +t[1] > 20 && +t[1] < 42, Math.abs(+t[2] - 33) < 1], [name, true, true], name);
+  }
+  assert.match(draw('tbuf', { enable: 'E', width: 4, bits: true }), /<text class="stype" [^>]*>BUFE4</, 'BUFE4: under');
+  assert.doesNotMatch(draw('tbuf', { enable: 'E', width: 4, bits: true }), /stype inside/);
+});
