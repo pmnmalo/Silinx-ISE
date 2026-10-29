@@ -18,7 +18,9 @@
 //   unused by the design, one net each (an XDL_DUMMY instance each, as ISE); through a slice only out of the net's
 //   own source, the carry's COUT to DMUX when DMUX is free (through a LUT in use it would be a second input of the
 //   LUT: ISE's PhysDesignRules:2066). No other.
-// - Known switches only (opts.allowPip(tile, pip)): for a bitstream writer that knows only some PIPs' bits (#726).
+// - Known switches only (opts.allowPip(tile, pip)): for a bitstream writer that knows only some PIPs' bits (#726). A
+//   sink no allowed switch reaches is found once (its search sees every node it may reach) and not searched again;
+//   the passes end when nothing is shared and only such sinks are left (failedSinks' dead, #732).
 //
 //   const r = routeS6(design, device, { maxPasses, allowPip, log })
 //     r = { trees: [Map node -> edge (-1 a source)] by net, nets (netEndpointsS6's), failed: [net names], warnings,
@@ -128,6 +130,8 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
   // the A* search of one sink from the net's tree (and, a power net, from the sink's TIEOFFs)
   const g = new Float64Array(N).fill(Infinity), via = new Int32Array(N), touched = [];
   const heap = new Heap();
+  // (exhausted: the last search found no path having seen every node it may reach, not stopped at its limit)
+  let exhausted = false;
   const search = (wi, sink, starts, restrict) => {
     const w = work[wi], tree = trees[wi];
     heap.n = 0;
@@ -135,6 +139,7 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
     touched.length = 0;
     for (const n of starts) { g[n] = 0; via[n] = -1; touched.push(n); heap.push(0.6 * dist(n, sink), n); }
     let pops = 0;
+    exhausted = false;
     while (heap.n) {
       const n = heap.pop();
       if (n === sink) break;
@@ -149,7 +154,7 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
         if (c < g[m]) { if (g[m] === Infinity) touched.push(m); g[m] = c; via[m] = e; heap.push(c + 0.6 * dist(m, sink), m); }
       }
     }
-    if (g[sink] === Infinity) return null;
+    if (g[sink] === Infinity) { exhausted = true; return null; }
     // the path back to the tree (or a start)
     const path = [];
     for (let n = sink; via[n] !== -1 && !tree.has(n); ) { path.push(via[n]); n = fromOf(via[n]); }
@@ -170,6 +175,9 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
     for (const k of order) {
       const s = w.sinks[k];
       if (tree.has(s.node)) continue;
+      // (a sink no path reaches on the switches allowed: not searched again, #732; the congestion changes the costs,
+      // not which switches there are)
+      if (unreachable.has(`${wi} ${k}`)) { failed.push(s); continue; }
       let starts = [...tree.keys()];
       if (w.power) starts = [...starts, ...w.srcFor[k].filter(n => !tree.has(n))];
       let path = search(wi, s.node, starts, w.clock || w.dedicated);
@@ -180,7 +188,7 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
           warnings.push(w.clock ? `net ${w.name}: the global clock reaches ${s.pin.inst}.${s.pin.pin} through general routing (not a clock pin)` : `net ${w.name}: the pad reaches its global buffer through general routing (not a GCLK pin)`);
         }
       }
-      if (!path) { failed.push(s); continue; }
+      if (!path) { if (exhausted) unreachable.add(`${wi} ${k}`); failed.push(s); continue; }
       // the path's start: a node of the tree, or (a power net) a TIEOFF, a new root
       for (let j = path.length - 1; j >= 0; j--) {
         const e = path[j], m = E.edgeTo[e], from = fromOf(e);
@@ -197,7 +205,7 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
 
   // ---- the passes
   let passes = 0, failedSinks = [];
-  const incomplete = new Uint8Array(work.length);
+  const incomplete = new Uint8Array(work.length), unreachable = new Set();
   const overused = () => { let k = 0; for (let n = 0; n < M; n++) if (occ[n] > 1) k++; return k; };
   for (; passes < maxPasses; ) {
     passes++;
@@ -208,11 +216,12 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
       ripUp(wi);
       const f = routeNet(wi);
       incomplete[wi] = f.length > 0;
-      for (const s of f) failedSinks.push({ net: work[wi].name, sink: s });
+      for (const s of f) failedSinks.push({ net: work[wi].name, sink: s, dead: unreachable.has(`${wi} ${work[wi].sinks.indexOf(s)}`) });
     }
     const over = overused();
     if (log) log(`pass ${passes}: ${over} shared nodes, ${failedSinks.length} sinks not reached`);
-    if (!over && !failedSinks.length) break;
+    // (done when no node is shared and every sink left out has no path at all: more passes would not reach it)
+    if (!over && failedSinks.every(f => f.dead)) break;
     for (let n = 0; n < M; n++) if (occ[n] > 1) hist[n] += 0.5 * (occ[n] - 1);
     pf *= 1.8;
   }
