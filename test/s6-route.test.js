@@ -110,6 +110,12 @@ test('the router\'s errors and its restriction to known switches: an unplaced in
   const r = routeS6(x, device, { allowPip: k => !/^INT/.test(device.tileType(k)), maxPasses: 2 });
   assert.ok(r.failed.length >= 1);
   assert.deepEqual(r.stats.overused, 0);
+  // (#732) a sink no allowed switch reaches is not searched again: one pass, not the 50 allowed, every sink left out
+  // marked dead
+  const one = routeS6(x, device, { allowPip: k => !/^INT/.test(device.tileType(k)) });
+  assert.equal(one.stats.passes, 1);
+  assert.deepEqual(one.failed, r.failed);
+  assert.ok(one.failedSinks.length && one.failedSinks.every(f => f.dead));
 });
 
 test('every example routed on the XC6SLX16 and the XC6SLX45: complete, no node of two nets, legal, no warnings, in seconds', { timeout: 900000 }, async () => {
