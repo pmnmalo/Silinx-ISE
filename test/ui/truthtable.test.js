@@ -86,8 +86,9 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
 
   // ---- its VHDL module, made with the table (every source has its HDL, #207), linked to it, following
   // it (no Generate VHDL / Verilog module any more, #220)
-  // (no Generate Schematic, no NAND gates only check box: the schematic is always generated, #694)
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Apply', 'Truth Table from Module…']);
+  // (no Generate Schematic, no NAND gates only check box: the schematic is always generated, #694; expressions
+  // written by hand: Handwritten…, #2010)
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Apply', 'Truth Table from Module…', 'Handwritten…']);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-toolbar input[type=checkbox]`).length, T), 0);
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj3.vhd'] === 'src/maj3.tt.json', [], { what: 'linked HDL' });
   assert.equal((await ttFile('TtPj', 'src/maj3.tt.json')).generatedFile, 'src/maj3.vhd');

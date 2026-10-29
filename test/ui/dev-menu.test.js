@@ -27,7 +27,7 @@ uiTest('Development menu (#707): after Help, the changes by type, each with its 
     { label: 'All Changes since 15.11.3…', disabled: false }, { label: 'This Build on GitHub (commit abc1234)', disabled: false },
     { label: 'Pen and Touch Test…', disabled: false },
     // (the handwritten input, a preview, #1098: on an open truth table or schematic, none here)
-    { label: 'Handwritten Expression…', disabled: true }, { label: 'Handwritten Truth Table…', disabled: true }, { label: 'Handwritten Schematic…', disabled: true }]);
+    { label: 'Handwritten Truth Table…', disabled: true }, { label: 'Handwritten Schematic…', disabled: true }]);
   // Features ▸ the change: its window, its text as text (no element from it but its bold and code)
   await page.hover(await page.point('body > .menu-popup > .mi', { index: 0 }));
   await page.waitForSelector('.menu-popup.sub .mi');
@@ -57,7 +57,7 @@ uiTest('Development menu (#707): after Help, the changes by type, each with its 
   assert.equal((await menuTitles(page)).at(-1), 'Desenvolvimento');
   await page.openMenu('Desenvolvimento');
   assert.deepEqual((await rows(page, 'body > .menu-popup:not(.sub)')).map((r) => r.label), ['Funcionalidades (1)', 'Correções (1)', 'Outras (0)', 'Todas as Alterações desde a 15.11.3…', 'Esta Versão no GitHub (commit abc1234)', 'Teste de Caneta e Toque…',
-    'Expressão Manuscrita…', 'Tabela de Verdade Manuscrita…', 'Esquemático Manuscrito…']);
+    'Tabela de Verdade Manuscrita…', 'Esquemático Manuscrito…']);
   await page.hover(await page.point('body > .menu-popup > .mi', { index: 1 }));
   await page.waitForSelector('.menu-popup.sub .mi');
   assert.deepEqual((await rows(page, '.menu-popup.sub')).map((r) => r.label), ['#12 The router: a net routed at every seed']);
@@ -108,7 +108,7 @@ const HELD = 'Edits; held still: the context menu';
 
 uiTest('#1054 Development ▸ Pen and Touch Test: the mouse, a finger, a long press, two fingers and a pen, their readings and trails; the screen; Copy Report; in Portuguese', E, async (page) => {
   await page.openMenu('Development');
-  assert.deepEqual((await rows(page, 'body > .menu-popup:not(.sub)')).at(-4), { label: 'Pen and Touch Test…', disabled: false });
+  assert.deepEqual((await rows(page, 'body > .menu-popup:not(.sub)')).at(-3), { label: 'Pen and Touch Test…', disabled: false });
   await page.click('body > .menu-popup > .mi', { text: 'Pen and Touch Test…' });
   await page.waitDialog('Pen and Touch Test');
   await page.waitFor((s) => document.querySelector(s).width > 0, [PAD]);

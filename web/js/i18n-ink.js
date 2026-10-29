@@ -1,12 +1,22 @@
 // Portuguese strings of the handwritten input (#1056: web/js/ink-dialog.js, its messages from core/ink/; merged into
 // the dictionary of i18n.js).
+import { t } from './i18n.js';
+
 export const INK_PT = {
   'Handwritten Expression': 'Expressão Manuscrita',
   // the Development menu's items (#1098)
-  'Handwritten Expression…': 'Expressão Manuscrita…', 'Handwritten Truth Table…': 'Tabela de Verdade Manuscrita…',
+  'Handwritten Truth Table…': 'Tabela de Verdade Manuscrita…',
   'Handwritten Schematic…': 'Esquemático Manuscrito…',
-  "Write the expression with a pen, a finger or the mouse, e.g. F = A·B' + C. A bar over letters is NOT; a dot or a * is AND.":
-    "Escreva a expressão com uma caneta, um dedo ou o rato, p.ex. F = A·B' + C. Uma barra sobre letras é NOT; um ponto ou um * é AND.",
+  "Write the expressions with a pen, a finger or the mouse, one a line, with any names, e.g. F = A·B' + C. A bar over letters is NOT; a dot or a * is AND.":
+    "Escreva as expressões com uma caneta, um dedo ou o rato, uma por linha, com quaisquer nomes, p.ex. F = A·B' + C. Uma barra sobre letras é NOT; um ponto ou um * é AND.",
+  // the truth table editor's button (#2010) and the equations' messages (core/ink/equations.js)
+  'Handwritten…': 'Manuscrito…',
+  "Write the expressions by hand, one a line, with any names: they become the table's inputs, outputs and expressions":
+    'Escrever as expressões à mão, uma por linha, com quaisquer nomes: passam a ser as entradas, as saídas e as expressões da tabela',
+  'The recognized text appears here, an expression a line': 'O texto reconhecido aparece aqui, uma expressão por linha',
+  'Write an expression, e.g. F = /A.B + C.': 'Escreva uma expressão, p.ex. F = /A.B + C.',
+  'Name each expression of several: F = …, G = …': 'Dê um nome a cada uma das expressões: F = …, G = …',
+  'The expressions have no input.': 'As expressões não têm nenhuma entrada.',
   'Show the whole drawing': 'Mostrar todo o desenho', 'Move': 'Mover', 'Erase': 'Apagar',
   'Rub out the ink under a drag (on: a drag erases, not writes)': 'Apagar a tinta por onde se arrasta (ligado: arrastar apaga, não escreve)',
   'Drag the drawing to move it in the pad (on: a drag moves, not writes)': 'Arrastar o desenho para o mover na área de escrita (ligado: arrastar move, não escreve)',
@@ -31,7 +41,6 @@ export const INK_PT = {
   'Write the symbol on the pad first.': 'Escreva primeiro o símbolo na área de escrita.',
   'Your samples were forgotten.': 'As suas amostras foram esquecidas.',
   'The browser did not keep the sample (storage unavailable).': 'O navegador não guardou a amostra (armazenamento indisponível).',
-  "Write an expression, e.g. F = A·B' + C.": "Escreva uma expressão, p.ex. F = A·B' + C.",
   'Nothing written: write the expression on the pad.': 'Nada escrito: escreva a expressão na área de escrita.',
   "More than one '=': only the first one separates the name from the expression.": "Mais de um '=': só o primeiro separa o nome da expressão.",
   // the Handwritten Truth Table dialog (#1066) and its messages
@@ -71,6 +80,13 @@ export const INK_PT_PATTERNS = [
   [/^Expression: the output '(.+)' is also an input\.$/, "Expressão: a saída '$1' é também uma entrada."],
   [/^Expression: (.+)$/, 'Expressão: $1'],
   [/^This is a drawing of (an expression|a truth table|a schematic), not of (an expression|a truth table|a schematic)\.$/, (m, a, b) => { const k = { 'an expression': 'uma expressão', 'a truth table': 'uma tabela de verdade', 'a schematic': 'um esquemático' }; return `É um desenho de ${k[a]}, não de ${k[b]}.`; }],
+  [/^'(.+)' is not a name: a letter, then letters, digits or _\.$/, "'$1' não é um nome: uma letra, depois letras, algarismos ou _."],
+  [/^The output (.+) has two expressions\.$/, 'A saída $1 tem duas expressões.'],
+  [/^(\S+) has no expression\.$/, '$1 não tem expressão.'],
+  [/^(\S+) is both an output and an input: an expression of the inputs only\.$/, '$1 é uma saída e uma entrada: uma expressão só das entradas.'],
+  [/^(\d+) inputs \((.+)\): at most (\d+)\.$/, '$1 entradas ($2): no máximo $3.'],
+  // an equation's parser message, after its output's name (translated itself; a text that is not one, as it is)
+  [/^The expression of (\S+): (.+)$/, (m, n, msg) => `A expressão de ${n}: ${t(msg)}`],
   [/^A Silinx drawing of version (\S+): this Silinx reads version 1\.$/, 'Um desenho do Silinx da versão $1: este Silinx lê a versão 1.'],
   [/^A Silinx drawing of an unknown kind: '(.*)'\.$/, "Um desenho do Silinx de um tipo desconhecido: '$1'."],
   [/^Header: two names over column (\d+) \((.+)\)\.$/, 'Cabeçalho: dois nomes sobre a coluna $1 ($2).'],

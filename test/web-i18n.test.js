@@ -184,7 +184,10 @@ test('the handwritten input (#1056): the texts of its modules and the recognizer
     'Nothing written: write the expression on the pad.': 'Nada escrito: escreva a expressão na área de escrita.',
     'Expression: 1 to 6 inputs (it has 7).': 'Expressão: 1 a 6 entradas (tem 7).', "Expression: 'F-1' is not a valid output name.": "Expressão: 'F-1' não é um nome de saída válido.",
     "Expression: the output 'a' is also an input.": "Expressão: a saída 'a' é também uma entrada.", "Expression: unexpected '+' (at position 3)": "Expressão: unexpected '+' (at position 3)",
-    'Handwritten Expression…': 'Expressão Manuscrita…', 'Handwritten Expression': 'Expressão Manuscrita', 'Teach Silinx my handwriting': 'Ensinar ao Silinx a minha letra',
+    'Handwritten…': 'Manuscrito…', 'The output F has two expressions.': 'A saída F tem duas expressões.',
+    'F is both an output and an input: an expression of the inputs only.': 'F é uma saída e uma entrada: uma expressão só das entradas.',
+    '7 inputs (A, B, C, D, E, G, H): at most 6.': '7 entradas (A, B, C, D, E, G, H): no máximo 6.',
+    'Handwritten Expression': 'Expressão Manuscrita', 'Teach Silinx my handwriting': 'Ensinar ao Silinx a minha letra',
     // the truth tables drawn by hand (#1066)
     'Handwritten Truth Table…': 'Tabela de Verdade Manuscrita…', 'Handwritten Schematic…': 'Esquemático Manuscrito…', 'Header: two names over column 2 (A, B).': 'Cabeçalho: dois nomes sobre a coluna 2 (A, B).',
     'Row 3, column 1: no value.': 'Linha 3, coluna 1: sem valor.', 'Row 3, column 1: 2 symbols.': 'Linha 3, coluna 1: 2 símbolos.',

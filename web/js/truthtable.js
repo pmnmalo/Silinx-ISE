@@ -133,7 +133,7 @@ export function mountTtEditor(container, opts = {}) {
     h('span', { class: 'tt-sep' }),
     h('label', { title: FORM_TIP }, 'HDL logic:'), formSel, h('label', { title: 'HDL language' }, 'Language:'), langSel,
     h('span', { class: 'tt-sep' }),
-    btn('Truth Table from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()),
+    btn('Truth Table from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()), btn('Handwritten…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
     link);
 
   // ------------------------------------------------------------------ body
@@ -157,14 +157,12 @@ export function mountTtEditor(container, opts = {}) {
   };
   exprIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyExpr(); } });
   const exprLbl = h('span', { class: 'tt-expr-lbl' });
-  // written and drawn by hand (#1056, #1066; from the Development menu while a preview, #1098): web/js/tt-ink.js
+  // written by hand in the toolbar (#2010), drawn by hand from the Development menu while a preview (#1098): web/js/tt-ink.js
   const ink = {
-    model: () => M, alive: () => !destroyed,
-    select: o => { if (o !== out) { out = o; render(); } },
-    fill: e => { exprIn.value = e; applyExpr(); },
+    model: () => M, output: () => out, alive: () => !destroyed,
     replace: m => { M = m; if (!M.outputs.includes(out)) out = M.outputs[0]; changed(); },
   };
-  const handwritten = () => import('./tt-ink.js').then(m => m.handwrittenColumn(ink));
+  const handwritten = () => import('./tt-ink.js').then(m => m.handwrittenExpressions(ink));
   const handwrittenTable = () => import('./tt-ink.js').then(m => m.handwrittenWholeTable(ink));
   const exprRow = h('div', { class: 'tt-row' }, exprLbl, exprIn, btn('Fill Table', 'Fill the column of this output from the expression', applyExpr));
   const OPS = "Operators: / ' ~ (NOT), . · * (AND), ⊕ ^ or xor (XOR), xnor, + (OR)";

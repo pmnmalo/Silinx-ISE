@@ -7,7 +7,7 @@
 //   decodeDrawing(text | object) -> { kind, strokes: [[{x, y}]], devices, read, vars, expect, note }; throws Error
 //   readDrawing(d, { templates }) -> what its kind's recognizer reads (the text a test compares with `expect`)
 //   circuitText(circuit) -> a schematic's circuit as lines: `U1 and2 (A, B) -> Z`, a flip-flop's pins by name
-import { recognizeExpression } from './expression.js';
+import { recognizeEquations } from './equations.js';
 import { readTable } from './table.js';
 import { readSchematic, circuitErrors } from './schematic.js';
 import { builtinTemplates } from './templates.js';
@@ -61,7 +61,7 @@ export function circuitText(c) {
 
 export function readDrawing(d, { templates = builtinTemplates() } = {}) {
   try {
-    if (d.kind === 'expression') return recognizeExpression(d.strokes, { templates, vars: d.vars }).text;
+    if (d.kind === 'expression') return recognizeEquations(d.strokes, { templates }).text;
     if (d.kind === 'table') return readTable(d.strokes, { templates }).text;
     return circuitText(readSchematic(d.strokes, { templates }));
   } catch (e) {
