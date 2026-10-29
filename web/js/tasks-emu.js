@@ -1,7 +1,8 @@
 // The Tasks interface's Emulate task (#801, #782): the board gets the screen.
-// - The board keeps its proper size (#1021): its picture, drawn at a fixed size by web/js/emulator.js, is never made
-//   smaller; on a large window it is zoomed (CSS zoom, which keeps the pointer's aim) to the room beside the Watch, at
-//   most MAX_ZOOM, measured again when the window, the task's panels or the board change (fitBoard).
+// - The board fits the window (#1021, #1999): its picture, drawn at a fixed size by web/js/emulator.js, is zoomed (CSS
+//   zoom, which keeps the pointer's aim) to the room beside the Watch, at most MAX_ZOOM; on a small window (a tablet) it
+//   is made smaller, down to MIN_ZOOM, the Watch below it when beside it the board would be smaller than its proper
+//   size; measured again when the window, the task's panels or the board change (fitBoard).
 // - The emulator's side column (Watch, the timing generics, the hints) is shown at first (#1020): beside the board; when the width runs short, it and the VGA monitor wrap to the next row, below the board, and the
 //   task's area scrolls (web/css/tasks.css); the Design pane is not shown in Emulate.
 // - Its Processes (#1204): the top module's User Constraints (I/O Pin Planning, Edit Constraints (Text), Check
@@ -12,12 +13,12 @@
 //   Messages box is in the message centre (#798).
 // boardZoom has no DOM and is unit tested (test/tasks.test.js).
 
-export const MAX_ZOOM = 1.5, MIN_ZOOM = 1;   // (never smaller than its proper size: the panels wrap instead, #1021)
+export const MAX_ZOOM = 1.5, MIN_ZOOM = 0.7;   // (smaller on a tablet, but not below 0.7: its labels kept legible, #1999)
 const GAP = 12;   // (.emu-main's padding and gap, web/js/emulator.js)
 const BAR = 16;   // (a scrollbar's room: the area scrolling down once zoomed keeps the Watch beside the board, #1399)
 
 /** The zoom of a board of size `board` ({ w, h }) in the room `room` ({ w, h }): as large as fits, at most MAX_ZOOM,
- *  at least MIN_ZOOM (its proper size, the room too small: the task's area scrolls). */
+ *  at least MIN_ZOOM (the room smaller still: the task's area scrolls). */
 export function boardZoom(room, board) {
   if (!(board?.w > 0) || !(board?.h > 0) || !(room?.w > 0) || !(room?.h > 0)) return 1;
   // (to the hundredth below: a board that fills the room leaves the Watch beside it)
@@ -43,11 +44,11 @@ export function fitBoard(on) {
     if (!on || !shown(emu)) continue;
     const main = emu.querySelector('.emu-main'), side = emu.querySelector('.emu-side'), bar = emu.querySelector('.emu-bar');
     // (the room beside the Watch: the VGA monitor wraps below the board; the Watch too when the board leaves it no room)
-    const room = {
-      w: main.clientWidth - 2 * GAP - BAR - (shown(side) ? side.offsetWidth + GAP : 0),
-      h: emu.clientHeight - (bar?.offsetHeight || 0) - 2 * GAP,
-    };
-    wrap.style.zoom = String(boardZoom(room, { w: wrap.offsetWidth, h: wrap.offsetHeight }));
+    const h = emu.clientHeight - (bar?.offsetHeight || 0) - 2 * GAP, board = { w: wrap.offsetWidth, h: wrap.offsetHeight };
+    const beside = boardZoom({ w: main.clientWidth - 2 * GAP - BAR - (shown(side) ? side.offsetWidth + GAP : 0), h }, board);
+    // (smaller than its proper size beside the Watch: the whole width, the Watch wrapping below it, #1999)
+    const zoom = beside >= 1 ? beside : Math.max(beside, boardZoom({ w: main.clientWidth - 2 * GAP - BAR, h }, board));
+    wrap.style.zoom = String(zoom);
   }
 }
 
