@@ -11,7 +11,7 @@ import { S, activateDoc, closeDocByPath, compileProject, findDoc, flushDoc, hdlI
 import { log } from './console.js';
 import { reloadProject } from './project.js';
 import { markStale, saveAll } from './processes.js';
-import { removeModule, renderHierarchy, saveProjectJson, setTop, topMenuItem } from './design.js';
+import { openModuleSource, removeModule, renderHierarchy, saveProjectJson, setTop, topMenuItem } from './design.js';
 import { downloadUrl } from './menus.js';
 import { renameDialog } from './rename.js';
 import {
@@ -387,7 +387,8 @@ export async function openSch(path) {
         doc, modules, device: projectPart(),
         simSources: () => S.sources,   // live simulation: bodies of the module symbols
         onChange: () => setDirty(d, true),
-        onOpenModule: name => { const i = moduleInfo(name); if (i) openFile(i.file, i.line); },
+        // (its drawing when it has one, as its Design row's double-click, else its HDL, #2046)
+        onOpenModule: name => openModuleSource(name),
       });
       d.schEditor = ed;
       return {
