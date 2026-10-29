@@ -187,7 +187,7 @@ uiTest('Handwritten expressions: Teach Silinx my handwriting, and the dialog in 
     const labels = await page.eval((d) => [...document.querySelector(d).closest('.dlg').querySelectorAll('button:not(.dlg-x), summary, label, .hint')].map((e) => e.textContent.trim()).filter(Boolean), D);
     assert.deepEqual(labels, [
       "Escreva a expressão com uma caneta, um dedo ou o rato, p.ex. F = A·B' + C. Uma barra sobre letras é NOT; um ponto ou um * é AND.",
-      'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Ensinar ao Silinx a minha letra',
+      'Mover', 'Ajustar', 'Anular', 'Refazer', 'Limpar', 'Copiar Desenho', 'Colar Desenho', 'Reconhecido:', 'Ensinar ao Silinx a minha letra',
       'Escreva um símbolo na área de escrita, escreva-o aqui e guarde-o: o Silinx passa a ler também a sua maneira de o escrever. As amostras ficam só neste navegador.',
       'Símbolo:', 'Guardar Amostra', 'Esquecer as Minhas Amostras', 'Inserir', 'Cancelar',
     ]);
@@ -276,6 +276,50 @@ uiTest('Handwritten expressions: the pad zoomed and moved with two fingers and t
   const [s4] = await view(page);
   assert.ok(s4 > s3, `${s4} ${s3}`);
   assert.equal(await recognized(page), 'F = A + B');
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  assert.deepEqual(warnings(page), []);
+}, { skip: chromeOnly });
+
+// #2003: Move: on, a drag with the mouse or a pen moves the drawing in the pad (the view), no stroke, the same text;
+// the mouse's middle button drags it with Move off; off, a drag writes again
+uiTest('Handwritten expressions: Move, the drawing dragged in the pad with the mouse and a pen, the middle button; the same text', E, async (page) => {
+  void page.eval(async () => { window.__ink = (await import('/js/ink-dialog.js')).handwrittenExpression(); });
+  await page.waitDialog('Handwritten Expression');
+  await write(page, 'F=A+B', { seed: 2 });
+  await waitText(page, 'F = A + B');
+  const c = await canvasAt(page);
+  const mid = { x: c.x + c.w / 2, y: c.y + c.h / 2 };
+  const pressed = () => page.eval((d) => document.querySelector(`${d} .ink-move`).getAttribute('aria-pressed'), D);
+  const undoable = () => page.eval((d) => !document.querySelector(`${d} .ink-undo`).disabled, D);
+  assert.equal(await pressed(), 'false');
+  await page.click(`${D} .ink-move`);
+  assert.equal(await pressed(), 'true');
+  // the mouse: 40 px right, 30 down
+  await stroke(page, [mid, { x: mid.x + 20, y: mid.y + 15 }, { x: mid.x + 40, y: mid.y + 30 }], 'mouse');
+  assert.deepEqual(await view(page), [1, 40, 30]);
+  // a pen: 25 px left
+  await stroke(page, [mid, { x: mid.x - 10, y: mid.y }, { x: mid.x - 25, y: mid.y }], 'pen');
+  assert.deepEqual(await view(page), [1, 15, 30]);
+  await page.eval(() => new Promise((r) => setTimeout(r, 500)));
+  assert.equal(await recognized(page), 'F = A + B');
+  // Move off: the middle button still drags, 10 px up
+  await page.click(`${D} .ink-move`);
+  assert.equal(await pressed(), 'false');
+  const ev = (type, q, buttons) => page.send('Input.dispatchMouseEvent', { type, x: q.x, y: q.y, button: type === 'mouseMoved' && !buttons ? 'none' : 'middle', buttons, clickCount: 1 });
+  await ev('mouseMoved', mid, 0);
+  await ev('mousePressed', mid, 4);
+  await ev('mouseMoved', { x: mid.x, y: mid.y - 5 }, 4);
+  await ev('mouseMoved', { x: mid.x, y: mid.y - 10 }, 4);
+  await ev('mouseReleased', { x: mid.x, y: mid.y - 10 }, 0);
+  assert.deepEqual(await view(page), [1, 15, 20]);
+  assert.equal(await recognized(page), 'F = A + B');
+  // a drag writes again: a stroke more, undone
+  await stroke(page, [{ x: c.x + c.w - 60, y: c.y + 40 }, { x: c.x + c.w - 60, y: c.y + 110 }], 'pen');
+  await page.waitFor((d) => document.querySelector(`${d} .ink-text`).value !== 'F = A + B', [D], { what: 'a character more' });
+  await page.click(`${D} .ink-undo`);
+  await waitText(page, 'F = A + B');
+  assert.equal(await undoable(), true);
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   assert.deepEqual(warnings(page), []);

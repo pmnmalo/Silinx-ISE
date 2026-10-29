@@ -26,9 +26,12 @@
 /* the Handwritten Schematic dialog: the circuit read */
 .ink-circuit { display: flex; flex-direction: column; gap: 3px; height: 150px; overflow: auto; }
 .ink-circuit .ink-net-name { width: 10em; font-family: var(--mono, monospace); }
-/* the pad's Fit button, over its top right corner (#1088) */
+/* the pad's Move and Fit buttons, over its top right corner (#1088, #2003); Move on: pressed, a hand over the pad */
 .ink-pad { position: relative; }
-.ink-pad .ink-fit { position: absolute; top: 4px; right: 4px; padding: 1px 8px; opacity: 0.85; }
+.ink-pad .ink-tools { position: absolute; top: 4px; right: 4px; display: flex; gap: 4px; }
+.ink-pad .ink-tools .btn { padding: 1px 8px; opacity: 0.85; }
+.ink-pad .ink-move[aria-pressed="true"] { opacity: 1; background: var(--m-accent-soft, #dbe8fb); border-color: var(--m-accent, #316ac5); color: var(--m-accent, #15428b); }
+.ink-pad:has(.ink-move[aria-pressed="true"]) .ink-canvas { cursor: grab; }
 /* the Handwritten Schematic dialog: the whole page (#1088), the pad filling it, a column beside it */
 .dlg.ink-full { position: fixed; inset: 4px; width: auto !important; max-width: none; max-height: none; margin: 0; display: flex; flex-direction: column; }
 .dlg.ink-full > .dlg-body { flex: 1; min-height: 0; overflow: hidden; }

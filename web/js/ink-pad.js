@@ -1,6 +1,7 @@
 // The drawing pad of the handwritten input (#1056): a canvas a pen, a finger or the mouse writes on, one stroke at a
 // time (a second pointer is ignored; once a pen has written, a touch is the hand resting on the screen). Two fingers
-// pinch and move the writing area, the mouse wheel zooms it, Fit shows the whole drawing (#1088). The strokes are kept
+// pinch and move the writing area, the mouse wheel zooms it, Fit shows the whole drawing (#1088); with Move on, a drag
+// moves it, and the mouse's middle button drags it at any time (#2003). The strokes are kept
 // in the pad's own coordinates (CSS pixels at zoom 1): what is recognized does not change with the view; the
 // characters recognized can be shown under their ink.
 //
@@ -19,8 +20,12 @@ export function mountInkPad(host, { onStroke } = {}) {
   const canvas = h('canvas', { class: 'ink-canvas' });
   host.append(canvas);
   const fitBtn = h('button', { type: 'button', class: 'btn ink-fit', title: 'Show the whole drawing', onclick: () => fit() }, 'Fit');
-  host.append(fitBtn);
-  let strokes = [], cur = null, penSeen = false, labels = [];
+  // Move (#2003): while it is on, a drag with a pen, a finger or the mouse moves the drawing in the pad (the view) instead
+  // of writing; the mouse's middle button drags it too
+  const moveBtn = h('button', { type: 'button', class: 'btn ink-move', title: 'Drag the drawing to move it in the pad (on: a drag moves, not writes)', 'aria-pressed': 'false',
+    onclick: () => moveBtn.setAttribute('aria-pressed', String(moveBtn.getAttribute('aria-pressed') !== 'true')) }, 'Move');
+  host.append(h('div', { class: 'ink-tools' }, moveBtn, fitBtn));
+  let strokes = [], cur = null, penSeen = false, labels = [], panning = null;
   // what was done ({ add: stroke } | { was: the strokes before, now: after }, a Clear or a drawing loaded) and what was
   // undone, to redo
   const done = [], undone = [], listeners = new Set();
@@ -78,7 +83,14 @@ export function mountInkPad(host, { onStroke } = {}) {
   }
 
   const down = e => {
-    if (cur || (e.pointerType === 'touch' && penSeen) || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (cur || panning) return;
+    if (e.isPrimary && (moveBtn.getAttribute('aria-pressed') === 'true' || (e.pointerType === 'mouse' && e.button === 1))) {
+      e.preventDefault();
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* not an active pointer */ }
+      panning = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      return;
+    }
+    if ((e.pointerType === 'touch' && penSeen) || (e.pointerType === 'mouse' && e.button !== 0)) return;
     if (e.pointerType === 'pen') penSeen = true;
     e.preventDefault();
     try { canvas.setPointerCapture(e.pointerId); } catch { /* not an active pointer */ }
@@ -88,6 +100,13 @@ export function mountInkPad(host, { onStroke } = {}) {
     draw();
   };
   const move = e => {
+    if (panning && e.pointerId === panning.id) {
+      e.preventDefault();
+      v.ox += e.clientX - panning.x; v.oy += e.clientY - panning.y;
+      panning.x = e.clientX; panning.y = e.clientY;
+      draw();
+      return;
+    }
     if (!cur || e.pointerId !== cur.id) return;
     e.preventDefault();
     // the points the browser merged into this event too (a pen moves faster than the frames); none in an event made by a script
@@ -96,6 +115,7 @@ export function mountInkPad(host, { onStroke } = {}) {
     draw();
   };
   const up = e => {
+    if (panning && e.pointerId === panning.id) { panning = null; return; }
     if (!cur || e.pointerId !== cur.id) return;
     done.push({ add: cur.pts });
     undone.length = 0;
