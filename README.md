@@ -523,7 +523,8 @@ package). Developers can build another package's description from an ISE
 (`research/s3e-route/build-device.mjs`, into `~/.silinx/devices/`) once its pads are in the bit
 database. The open
 toolchain does **not yet support the Spartan-6 boards (Nexys3, Atlys)**; it will (they work with
-ISE, as every board does). From the command line: `node research/s3e-route/open-flow.mjs <project
+ISE, as every board does; the Silinx toolchain's whole flow for them, to a bitstream ISE's bitgen writes
+byte for byte, is under a developer flag: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node research/s3e-route/open-flow.mjs <project
 folder> <out folder>`.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);

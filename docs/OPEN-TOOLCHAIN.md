@@ -37,8 +37,16 @@ switch). It is built by black-box observation, as described below.
 
 **Devices.** The Silinx toolchain is developed for the Spartan-3E: the XC3S250E (Basys2-250) first,
 then the other Spartan-3E boards (XC3S100E, XC3S500E, XC3S1200E: their bit databases share the
-tile types' bits with the XC3S250E's; research/s3e-bitstream/README.md, stage F). It does not yet support the Spartan-6 boards (Nexys3, Atlys):
-that is planned ([#1](https://github.com/pmnmalo/Silinx-ISE/issues/1); the plan: [research/s6/README.md](../research/s6/README.md)).
+tile types' bits with the XC3S250E's; research/s3e-bitstream/README.md, stage F). **The Spartan-6 boards** (Nexys3,
+Atlys) are under development behind a developer flag (`SILINX_SPARTAN6_OPEN=1` in the server's environment; the
+users still build them with ISE): there the Silinx toolchain synthesizes, maps, places, routes, times and writes the
+bitstream of a design for the XC6SLX16 and the XC6SLX45 (#732). Its bit database (`packages/silinx-fpga/bitdb/s6`)
+was measured the same way against ISE 14.7's bitgen; the seven examples on both boards, routed by the Silinx
+toolchain, give byte for byte the bitstream ISE's bitgen writes for the same routing, which ISE's DRC finds no error
+in, and its static timing is fitted to ISE's trce (each constraint within 5 % of its slack or 2.5 % of the period,
+#731). What it does not cover yet: a DCM's or PLL's configurations beyond the ones measured (#2025), and the boards
+in the IDE without the flag ([#1](https://github.com/pmnmalo/Silinx-ISE/issues/1); the plan and the results:
+[research/s6/README.md](../research/s6/README.md)).
 
 ## Method: observation of a tool's behaviour (black-box)
 
