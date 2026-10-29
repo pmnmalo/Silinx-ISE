@@ -3,6 +3,254 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.20.0
+
+Silinx HLS closer to Vitis HLS (loops pipelined automatically, hls::FIR, unions, streams of structs, its corpus
+compared with Vitis HLS 2025.2), the C editor's templates, and the open toolchain in a package of its own.
+
+In short:
+
+- **Silinx HLS:** loops are pipelined automatically, as Vitis HLS does (`#pragma HLS PIPELINE off` turns it off);
+  `hls::FIR` filters; unions and bit-fields; streams and arrays of structs; DATAFLOW in a function the top calls;
+  more pointer forms; the block-level ports as Vitis HLS makes them; test benches reading the project's files.
+- **The C editor:** Language Templates (Templates ▾), and the ASM chart of a C function in the C's terms.
+- **Schematics:** a bus join shows each input's bits on its wire; Convert to Schematic and the ISE schematic import
+  take more designs.
+- **Print:** every document asks for the paper and the orientation.
+- **The open toolchain** (synthesis, place and route, bitstream) is a package of its own, `packages/silinx-fpga`, with
+  a public API; the IDE works as before.
+- Silinx HLS's corpus compared with AMD Vitis HLS 2025.2: the table in test/hls-corpus/README.md.
+
+In detail:
+
+- **The unions' test on Windows (#1975):** a bit-field's layout is the implementation's; the C simulation lays them
+  out as GCC and clang on Linux and macOS (the System V ABI), and MinGW lays the test's 30-bit field out otherwise, even
+  with `-mno-ms-bitfields` (which #1972's change tried and is taken back): that one program is not compared with the
+  compiler on Windows.
+- **The full CI after the toolchain's move (#1973, #1974):** the i18n test's check that every Portuguese translation is
+  of a text the sources still have reads the toolchain's package too (packages/silinx-fpga/src: its resource names,
+  'DCMs / PLLs', 'Multipliers / DSPs', moved there in #1677); test/silinx-fpga-package.test.js imports the modules by
+  their file URLs, as Windows needs.
+- **The tests' timings and the bit-fields on Windows (#1972, #1975):** test/timings.json measured again from the full
+  CI on main (512 files, after the moves of #1677); on Windows the C reference programs are compiled with
+  `-mno-ms-bitfields`, their bit-fields laid out as GCC lays them out elsewhere (MinGW's default is Microsoft's), as the
+  C simulation does.
+- **The ASM chart's UI test since #1919 (#1968):** its two designs' loops say `#pragma HLS PIPELINE off`, the state machine of a
+  state a step the test shows; since #1919 a loop is pipelined unless it says so.
+- **Spartan-6: the CMT sites' settings (#1951):** a DCM's or PLL's settings bits at every CMT site of the XC6SLX16,
+  measured with ISE: in its tile's row of the CMT column, the same at every site of a kind, the two DCMs of a CMT tile
+  apart (research/s6/gen-cmtsites6.mjs, ana-cmtsites6.mjs: research/s6/db/xc6slx16-cmt-settings.json; the even DCM's
+  settings, gen-dcm6.mjs --dcm; research/s6/residual6.mjs predicts them with cmt6.mjs); the designs' PIP drop adds 420
+  PIPs to research/s6/db/s6-pips-other.json. Tests: test/s6-cmtsites.test.js.
+- **Silinx HLS: hls::FIR, hls_fir.h's FIR filter (#1942, the first of the DSP libraries of #1892):** Silinx's own `hls_fir.h` (`core/cpp-headers.js`: `hls::ip_fir`'s
+  constants, `params_t`'s fields and defaults as UG1399 gives them, `hls::FIR<CONFIG_T>::run`); the config struct derived
+  from `hls::ip_fir::params_t` is read with those defaults (`coeff_vec` in it or defined after it, `config::num_coeffs` usable,
+  `hls::ip_fir`'s constants) and checked: single rate, decimation and interpolation by an integer rate, one channel,
+  coefficient sets chosen by the config argument, `integer_coefficients` and `quantize_only`, `full_precision` and
+  `truncate_lsbs`; the parameters Silinx does not make (`reloadable`, `fixed_fractional`, `num_channels` > 1, the
+  rounding modes, …) are refused, each named with why (`core/hls-fir.js`). A static filter's `run(in, out[, config])`,
+  on arrays or streams, is a call of its C model in the C simulation (the inputs in the parameters' format, the sums
+  in full precision as PG149 sizes them, the output's type taking the value; `core/cpp-fir.js`), and in synthesis a
+  process of its own hardware (`core/hls-fir-hdl.js`): one 18x18 multiply-accumulate, the coefficients a ROM and the
+  delay line a RAM (block RAMs when large enough), its ports Vitis HLS's (an array's two `ap_memory` ports, a stream's
+  `ap_fifo`, the config `ap_none`). A DATAFLOW process may read a pointer argument of the top (an `ap_none` input).
+  dsp-fir-decimator passes the C simulation, the synthesis and the co-simulation (latency 132 cycles, Vitis HLS's 32).
+- **Silinx HLS: a stream's read and write in the ASM chart (#1941):** `core/c-print.js` gives the statements
+  `core/c-fifo.js` makes their C (`ap_fifo_in_0 = in.read()`, `out.write(s)`), and a floating-point literal its text;
+  `core/c-asm.js` draws, after a read's (a write's) state action, a decision on the FIFO's `in_empty_n` (`out_full_n`)
+  that goes back to the state while it is 0, and under it the handshake as a conditional output
+  (`in_read = 1; ap_fifo_in_0 = in_dout`, `out_din = s; out_write = 1`), by the module's ports (a stream named `in`,
+  a reserved word: `in_r_empty_n`, `in_r_read`).
+- **Tests: the C reference programs as clang compiles them (#1936):** the test bench of `test/c-tb-files.test.js`
+  calls `system()` with `<stdlib.h>` included, which Apple's clang requires (it refused the implicit declaration on
+  macOS). The tests' `cc` calls (`c-helpers.js`'s `runC` and `compiledRun`, `c-tb-files`, `c-interp`) make a
+  function called without its header an error (`-Werror=implicit-function-declaration`, without `-w`, which made
+  GCC drop it), so Linux refuses what clang refuses; the compiler's other warnings stay unprinted.
+- **Silinx HLS: a DATAFLOW region in a function the top calls (#1931):** when the top's only statement is a call of a function holding a DATAFLOW region of streams (through one call or more, a function template's instance too), the region is made as the top's processes, its parameters the top's arguments or the constants given, so the behaviour at the top's ports is the same (`core/c-dataflow-call.js`); the synthesis failed with an unclear error. A variable of a DATAFLOW region never changed (`int K = 5;`) is folded as a constant, as Vitis HLS folds it. A region of streams that cannot be made as processes (another shape of call, a variable changed in it) is said as an error with its reason, where it was made sequential and failed; a region of no streams of its own in a called function is inlined, sequential, as before.
+- **Silinx HLS: the ASM chart of an ap_ctrl_none function (#1927):** View State Machine (ASM) takes the chart's
+  inputs and outputs from the ports the HDL is generated with (`core/c-hdl.js`), so the two cannot drift apart (an
+  argument Vitis HLS renames, `in` -> `in_r`, has its module's name in the chart too); with `ap_ctrl_none` and a
+  stream argument IDLE goes on to the first state with no `ap_start` decision, and neither IDLE nor DONE sets
+  `ap_idle`, `ap_done` or `ap_ready`. A function with the block protocol (`ap_ctrl_hs`, the default, or `ap_ctrl_none`
+  without a stream, made `ap_ctrl_hs`) keeps its chart.
+- **A combinational top's reset (#1924, first part):** a C function made combinational with the `ap_ctrl_hs` protocol
+  has an `ap_rst` input (it does not use it) and no `ap_clk`, as Vitis HLS 2025.2 makes a top of latency 0 (checked on
+  four designs: a plain function, a sub-function inlined or not, two instances); before, it had neither. The
+  co-simulation's test bench holds it low. A function too slow for the clock scheduled over cycles, as Vitis HLS does,
+  is the second part.
+- Print: a document that is not a drawing opens a print dialog: Paper (A4, A3, Letter) and Orientation (Automatic, Portrait, Landscape), the last choice kept for the next print. The page's `@page` rule had fixed A4 and the orientation (a source always portrait), so the browser's dialog could not change it either. Automatic stays as it was: landscape when a copy of a document is wider than the page; the copy is fitted to the page chosen (#1923).
+- **Silinx HLS: LOOP_TRIPCOUNT of constant expressions (#1921):** a LOOP_TRIPCOUNT's `min=`, `max=` and `avg=` are constant expressions of the integer constants known (the global `const` integers, the function's, macros), evaluated as a stream's depth is (`constValue`), and read up to the next key, spaces included (`min = c_dim* c_dim max = c_dim * c_dim`), where only a number with no spaces was read: the loop's max was null and "the number of iterations of this loop is not known" was said. A value that is not a constant is said, naming what is not (`#pragma HLS LOOP_TRIPCOUNT max=n*c_dim: 'n' is not a constant: ignored …`), the bound unknown as before.
+- **Silinx HLS: loops pipelined automatically (#1919):** a loop with no `PIPELINE` pragma is pipelined by Vitis HLS's
+  rule (UG1399, `syn.compile.pipeline_loops` 64): an innermost loop of more iterations than the threshold, or the
+  parent of one of the threshold or fewer, the inner loop then unrolled in it; an innermost loop with no parent
+  whatever its count (`core/c-pipeline.js`). The threshold is `cToHdl`'s and `cosimulate`'s option `pipelineLoops`
+  (0: none); `#pragma HLS PIPELINE off` leaves a loop as it is. A pipelined loop's inner loops of constant count are
+  unrolled (a `PIPELINE` pragma's too, where it was not pipelined). A pipelined loop that accesses a memory or a
+  stream keeps a state per access, its condition and step in its last state, its states merged when they use no port
+  of the same memory or stream, its first state's work in its last for the next iteration when they share no port
+  (`s += a[i]`: II=1), an if in it in one state (its memories read before it, its writes and its streams' accesses
+  made only on its branch); a state that waits for a stream makes no access and writes nothing while it waits.
+  Where II=1 is not met, a warning says the II made and why, as for the pragma; the report says a loop "pipelined
+  automatically". The HLS corpus's expectations updated: no design passes fewer stages, the latencies of 32 designs
+  lower (the partitioned matrix products 221257 and 282441 cycles to 5705 and 83784; Vitis HLS's 9029 and 9028: the
+  partitions `block` and `cyclic` not made yet, #1920). The test design sort's swap loop says `PIPELINE off`.
+- **The ISE examples test over ssh in the folder Docker shares (#1916):** `test/ise/examples.test.js` builds in a folder
+  of its own in `SILINX_ISE_REMOTE_DIR`, else the user's `ssh.remoteDir` (read before the test replaces the
+  configuration), as `scripts/check-open-flow.mjs` does, instead of `~/silinx-ise-examples`, which Docker on the ISE
+  machine does not share ("Mounts denied"); the configuration comes from `test/ise-examples-config.mjs`, tested
+  without ISE.
+- **The bus join 60 px wide, document version 6 (#1910):** its inputs' leads 0..38, its bar at 38..42, its output at 60;
+  each input's label centred on its lead, and turned 90° / 270° every other one further along it, never side by side.
+  A schematic of version 5 has each join placed so that its inputs stay where they were, its output moved along its
+  lead and what met it following (a wire's end moved, a wire of no length dropped, a bus wire from another symbol's
+  pin). The ISE export draws its bus taps from its bar, as long as before, and the bus from the bar to its output. The
+  gates example and the schematic corpus brought to version 6.
+- **The bus join's inputs labelled with their bits of its output (#1908):** each input's range in the output, I0 the
+  most significant part, on its wire inside the symbol in the bus tap's format and style ((msb:lsb), (x) for one bit,
+  the widths' size and halo), in every orientation; it replaces the input's width, and the output keeps its width.
+- **The handwriting UI tests about 15 times faster (#1906):** their strokes' points are sent to the browser at once, in
+  order, each not waited for: Chrome handles one input event a frame, so a drawing of 1600 points waited for 1600 frames
+  (37 s here, 90 s and a timeout on a release's CI runner). Each handwriting UI test now takes 2 to 8 s (test/ui/ink.test.js,
+  ink-table.test.js, ink-schematic.test.js); the Copy Drawing test checks that every point sent reached the pad, in its
+  place and order.
+- **Silinx HLS: the ports of an array of nested structs and the BRAM interface as Vitis HLS's (#1902):** an array
+  argument with `#pragma HLS INTERFACE bram` has Vitis HLS's BRAM port (`_Addr_A`, an address in bytes of 32 bits,
+  `_EN_A`, `_WEN_A` a write enable a byte, `_Din_A`, `_Dout_A`, its words a power of 2 of bytes, `_Clk_A`, `_Rst_A`);
+  with the arrays of structs aggregated (#1668), interface-aggregation-disaggregation-aggregation-of-nested-structs
+  now has Vitis HLS's ports, port by port (`a_address0`, `a_ce0`, `a_q0` of 104 bits, `b_q0` of 97, `c_Addr_A`… a
+  BRAM of 128-bit words), no longer one memory per member (`a_p_address0`, `a_q_m_address0`…), and a latency of 43
+  cycles instead of 83.
+- **Silinx HLS: the names Vitis HLS reserves renamed as it does (#1902):** an argument named `pos` (or `neg`) has
+  its ports named `pos_r`, with a warning, as a reserved word of VHDL or Verilog already was (#1622); the names in
+  one module, `core/c-names.js`. modeling-pointers-multiple-pointers's ports are now Vitis HLS's. The members of an
+  array of nested structs are left to their aggregation (#1668).
+- **Silinx HLS: the block-level ports as Vitis HLS's (#1900):** a DATAFLOW top with `ap_ctrl_none` and a stream
+  argument, a data-driven top (every process an `hls::task`) and a sequential top with `ap_ctrl_none` and a stream
+  argument have only `ap_clk` and `ap_rst` (`ap_start` 1 inside: a call after the other); without a stream argument
+  `ap_ctrl_hs` is kept, with the warning a sequential function already had. A combinational top has no `ap_clk` nor
+  `ap_rst`, nor its co-simulation's test bench. The co-simulation feeds a free-running module's streams and waits for
+  each call's values; View C Synthesis Report says `ap_ctrl_none (ap_clk, ap_rst: running by itself)`. The HLS
+  corpus: modeling-free-running-kernel-remerge-ii4to1 and task-level-parallelism-data-driven-simple-data-driven now
+  have Vitis HLS's ports (15 designs with the same ports with #1902's, 12 before).
+- **Silinx HLS: a co-simulated call's limit of cycles is its C simulation's steps (#1899):** a call stops at 100000
+  cycles, or at as many cycles as the steps its C simulation took when it took more (each call of the top records its
+  steps, `calls[k].steps`). The corpus's partitioned matrix products (`ARRAY_PARTITION` block, cyclic, complete) did
+  not hang: they end after 221257 and 282441 cycles (Vitis HLS: about 9000, its loops pipelined) and their results are
+  the C's; the HLS corpus's table says so.
+- **Silinx HLS: `hls::split::round_robin<int, NP>` with NP a named constant, and arrays of `hls::task` (#1898):** the number of channels of a split or a merge, and the size and the indexes of an array of streams, are constant expressions whose names are the integer constants declared before them, as C++ and Vitis HLS take them: `const` / `constexpr` integers (lists of them too), enum constants (`E::A` of an enum class), a class's `static const` members (`C::N`), `sizeof` of a type of C, a block's gone at its end (`core/cpp-consts.js`); where they had to be literals. A template's parameter too: those passes run again once the templates are made. `hls::task t[N];` is an array of tasks, each started as `t[k](f, a…);` or in a loop of constant bounds (any start, `<`, `<=`, `>`, `>=`, `!=`, a step of `++`, `--`, `+=`, `-=`, `i = i + c`; its body unrolled), each element a task of its own in the C simulation and in hardware; another use, an element outside the array or started twice is said, once. A task constructed empty, `hls::task t;`, is started by `t(f, a…);` (its operator(), as Vitis HLS's `hls_task.h`) as one constructed with them. The C simulation tells two tasks started at the same place apart by their names. A `const` integer declared in a DATAFLOW region is folded where it is used (a call's argument too) instead of making the region sequential. The example passes the C simulation, the synthesis and the co-simulation (the corpus's `expected.json`).
+- **Silinx HLS: `__SYNTHESIS__` and a test bench's files (#1897):** the synthesis defines `__SYNTHESIS__`, as Vitis
+  HLS's; the code only the C simulation compiles (`#ifndef __SYNTHESIS__`) is checked as the test bench's, even inside
+  the top function, so AMD's hier_func example's trace files (a `FILE *` in the top) pass the C simulation, the
+  synthesis and the co-simulation (the HLS corpus: 50 designs through co-simulation). `sprintf` / `snprintf` into a
+  char array, a char array's string for `fopen`, `%s`, `system`; `sizeof` of an array variable all its elements. The
+  app's C Simulation and C/RTL Co-simulation give the test bench the project's files its strings name, in memory
+  (never a file outside the project: an absolute path or one through `..` refused with a message, in `fopen` and
+  `diff`), and list the files it wrote (kept in memory). A `FILE` in the synthesized code
+  is refused with a clear message (the test bench's; `#ifndef __SYNTHESIS__`).
+- **Silinx HLS: unions and bit-fields (#1896):** a union is one word of its size (up to 64 bits), its members views of
+  its bits as GCC lays them out on x86 (from the least significant bit; a bit-field moved to the next unit of its type
+  when it does not fit): a member read is its bits (a float's or a double's the same bits, `ap_bits_float` /
+  `ap_bits_double`), written into the word with the others kept; an anonymous struct's members are the union's, a
+  named struct's and an array member's reached too; a union variable, parameter, pointer (`p->m`) or array is its
+  word, `{ e }` its first member's value. A struct's bit-field `T m : W` is a member of `W` bits, wrapped as C wraps
+  it. AMD's modeling-using-float-and-double now passes the C simulation, the synthesis and the co-simulation.
+- **Silinx HLS: a pointer cast, a pointer to a pointer, a pointer argument moved (#1895):** a local pointer set to a
+  cast to a narrower native integer type (`char *p = (char *)&a[i]`) reads the bytes of the array's elements, from
+  their least significant, as on x86 (written through it, said); a pointer to a pointer parameter of a function the
+  top calls is resolved at compile time when each call passes `&q` and the function only reads through it; a local
+  pointer with one target, not moved, is passed on to a function as its target; a pointer argument moved
+  (`p += n`, `p++`, `p = p + n`) has an offset of its own, its indices from its new base. A stream's depth may be a
+  named constant (`hls::stream<T, DEPTH>`: it was the default 2, and a DATAFLOW region could wait for ever). AMD's
+  modeling-pointers-native-casts, modeling-pointers-using-double and interface-streaming-axi-stream-to-master now
+  pass the C simulation, the synthesis and the co-simulation (the last one's AXI4-Stream port still made as FIFOs,
+  #1894). The messages of what is refused name Vitis HLS's rule.
+- **Back-annotate Pin Locations' tests: the placer's pads reproducible, a failure with its evidence (#1822):** the
+  pads the placer chose had changed with the placer, not by chance (its placements are made one after another, the
+  faster kept, the first of equal ones; nothing depends on the time); the UI tests already take them from the run
+  (#1771, #1840). The open flow's test now builds blinky twice from the same UCF and gets the same pin file, and the
+  open mode's UI test, when its dialog disagrees with the run's `build/top_pins.ucf`, prints both and the run's log.
+- Convert to Schematic: a module's signal whose escaped name has a `[` or a `.` (`\t[0] `) was taken for a generate block's signal and left out of the module's nets: its assigns stayed HDL blocks and it was a pin of none of them, the blocks joined only through its declaration (exported to ISE, each block had a `\t[0]` of its own, `'t[0]' is not declared`). The signals the module declares are its nets. In VHDL, an extended identifier (`\t[0]\`) is named as the schematic names escaped names (`\t[0]`), its declaration is not written twice, its type is read from the declarations, and the schematic's VHDL tokenizer reads it as one identifier: VHDL modules whose ports are extended identifiers, which could not be converted, convert too (#1809).
+- **ISE schematic import: names checked against the schematic's language only (#1808):** the import renamed a
+  marker, net or HDL block pin that was a keyword of VHDL or of Verilog, whichever the schematic's language; a
+  Verilog schematic's `next` and `block` (secworks-aes, -sha1, -sha256) became `next_1` and `block_1`, its ports
+  no longer the module's. A VHDL schematic still renames them, with a warning each.
+- **A hand-drawn AND2 read as one (#1750):** two input names written one under the other (an AND2's A and B,
+  a third of a gate apart) are two names, not one word (a stroke joins a word on its line; a bar or a dot also
+  one just above or below it); a short level lead (from half a gate long) at a gate's left side or its tip is a
+  wire, not a letter, even when it runs into the gate; a short lead's two ends are not both the gate's inputs.
+- **The HDL front end's boundary test (#1709, step 1 of `silinx-hdl`):** `test/hdl-boundary.test.js` lists the
+  front end's 39 modules (what `core/compile.js`, `core/synth-verilog.js` and `core/unisim.js` reach: the VHDL and
+  Verilog parsers, the elaborator, the interpreter and simulator, `core/values.js`, `core/native.js`,
+  `core/util.js`, the flat Verilog's `core/synth-*.js`); an import from them into the rest of the IDE, or of an npm
+  package, fails, and a module that is no longer reached must leave the list. No behaviour change.
+- **The toolchain package's public API (#1678):** the first part of step 7 of the toolchain's separation (#1651,
+  docs/TOOLCHAIN-SEPARATION.md). packages/silinx-fpga gets its entries (`exports`): `silinx-fpga`
+  (src/index.js, the same in Node and in the browser: the flow, runFlow with its io, and its steps; the synthesis;
+  the netlist and the UCF in; pack, place and route, bitgen for a flow of one's own; the XDL and the .bit out; the
+  timing and power reports; the devices and bit databases from their files' contents; the parts' families and
+  resources) and `silinx-fpga/node` (the same, with the device graphs and bit databases read from the disk and Yosys
+  in Node's workers). The flow places and routes through `io.placeRoute` when its io gives one (another engine, such
+  as nextpnr: #1953, #1954), Silinx's own placeRouteBest otherwise. The package's README documents the API with an
+  example. Tests: test/silinx-fpga-api.test.js (the API's names, none of Node's modules behind the browser's entry, a
+  counter from Verilog and a UCF to its routed XDL and .bit through the API alone, a place and route given through
+  io and its failure). The IDE's importers switch to the API in the second part. No behaviour change.
+- **The toolchain's code in its package (#1677):** the third part of step 6 of the toolchain's separation (#1651,
+  docs/TOOLCHAIN-SEPARATION.md). The toolchain's 75 modules (core/fpga/, Spartan-6 included, and core/'s synthesis,
+  flow, formats and parts: synth-open*, open-flow-core, open-flow-reports, open-steps, xdl, ucf, resources,
+  resource-check, family, power, carry-chain, synth-fsm, lut-resynth) move as they are into packages/silinx-fpga/src/.
+  Each old path in core/ re-exports its module, so their importers (server/, web/js, scripts/, research/, the tests)
+  are unchanged; core/synth-open.js and core/open-flow-core.js also give the IDE's synthesizeOpen and runOpenFlow, so
+  the package imports nothing of the IDE (test/toolchain-boundary.test.js, its list now empty). The server serves the
+  package's code to the browser (/packages/silinx-fpga/src); the related tests follow a change of the package through
+  core/'s re-exports (scripts/related-tests.mjs); the code-size and layering tests measure the package too. Tests:
+  test/silinx-fpga-package.test.js (every old path's names and values those of the moved module, as on main). No
+  behaviour change.
+- **The toolchain's data in its package (#1677):** the second part of step 6 of the toolchain's separation (#1651,
+  docs/TOOLCHAIN-SEPARATION.md). The device descriptions (the routing graphs of the Spartan-3E and Spartan-6
+  parts) and the Spartan-3E bit database move as they are from core/fpga/devices and core/fpga/bitdb to
+  packages/silinx-fpga/devices and packages/silinx-fpga/bitdb. Their loaders (core/fpga/device-node.js
+  `SHIPPED_DEVICES_DIR`, core/fpga/bitdb-node.js `DB_DIR`, re-exported by research/s3e-bitstream/db.mjs) read them
+  there, and the experiments that build them, the standalone build, the power measurement, the tests and the docs
+  name the new folders; the ISE and CodeQL workflows' inputs include packages/, and the tests that build the site from a copy
+  of the repository link it. The site's assets keep their names (assets/<version>/devices/, bitdb/). No behaviour change.
+- **Silinx HLS: a stream and an array of structs one ap_fifo / one ap_memory of words (#1668):** the members packed in
+  their order from the LSB, each of its bits (`compact=bit`, Vitis HLS's default for them), a member array's elements
+  one after the other; a pointer to structs indexed too. A struct read from a stream or written to it is one word; an
+  element's word is read once while its index and the memory do not change, its members written into it and the word
+  written whole (read first when some fields were not written). The co-simulation packs the test bench's words from
+  the C's members. `#pragma HLS AGGREGATE compact=bit | byte | none | auto` chooses the packing (of a scalar struct
+  argument too), `#pragma HLS DISAGGREGATE` keeps a port, a stream or a memory per member, with no warning; a struct
+  with a stream in it is disaggregated without a warning, as Vitis HLS does. A stream of `ap_axis` reads or writes a beat
+  in one state (interface-streaming-using-axi-stream-with-side-channel-data: 6-7 cycles instead of 31-34; its `axis`
+  ports, `TDATA`, `TKEEP`…, are #1894's); aggregation-of-m-axi-ports 43 cycles instead of 53.
+- Silinx HLS: the first full run of the HLS corpus (73 designs) through Vitis HLS 2025.2 on an Artix-7 (`scripts/hls-vitis.mjs`). The results are in `test/hls-corpus/vitis.json` and the corpus README's table: numbers and port names only. Vitis passes the C simulation on 72 designs and Silinx on 51; Silinx's ports are the same as Vitis's on 12 designs (#1624).
+- **Spartan-6: the block RAM's and the DSP48A1's bits (#728):** every RAMB16BWER, RAMB8BWER and DSP48A1 setting the
+  primitives offer, the block RAM's contents (in either of the RAMB16BWER's two orders, by its ports' widths), INIT and
+  SRVAL as wide as their ports, and a clock pin's bits when it has a net, measured with ISE (research/s6/gen-hard6.mjs,
+  ana-hard6.mjs: research/s6/db/xc6slx16-hard.json and xc6slx45-hard.json, the same offsets on both parts;
+  research/s6/residual6.mjs predicts them with hard6.mjs); the stopwatch example ISE implemented has every bit
+  explained on both boards, the BRAM frames included. The HCLK feedthrough PIPs to the lower half of a clock row are
+  #1957. Tests: test/s6-hard.test.js.
+- **Spartan-6: the clock pads, the BUFGs and the CMT sites (#727):** a clock pad's bits (the BUFGMUX's input selection in
+  the REGC frame, its clock input in the I/O words: research/s6/db/s6-clocks.json, ana-clock6.mjs), the global clocks'
+  spine PIPs (s6-pips-other.json, s6-pips-clock.json), measured with ISE on a BUFG at each BUFGMUX from each clock pad
+  (gen-clock6.mjs --bufg); a DCM's and a PLL's bits at minor 30 of the CMT column in their row on both parts. The
+  examples' and the clock designs' residual keeps no clock bit but the clock example's clock-row bits. Tests:
+  test/s6-clock.test.js.
+- **Spartan-6: the clock path, the DCM and the PLL (#727):** designs ISE implements (research/s6/gen-clock6.mjs: a clock
+  on every BUFGMUX; gen-dcm6.mjs: a DCM_SP and a PLL_BASE, one setting per design): every global clock's spine and
+  row PIPs by PIP drop (research/s6/db/s6-pips-other.json), the DCM's and PLL's settings' bits
+  (research/s6/db/xc6slx16-cmt.json, ana-dcm6.mjs). Tests: test/s6-clock.test.js.
+- **Spartan-6: the I/O and clocking bit database complete (#727):** a DCM's and a PLL's clock path, measured with ISE from
+  other clock pads and to other BUFGs (research/s6/gen-dcm6.mjs --paths, ana-cmt6.mjs: db/xc6slx16-cmt-paths.json); a
+  design's bits are the base's with its pad's and BUFG's changes, and combinations never measured are predicted bit for
+  bit. With the pads and the clock path the residual of the examples ISE implemented, of a DCM design and of a PLL
+  design is clean. The other CMT sites: #1951. Tests: test/s6-clock.test.js.
+- **Spartan-6: a shift register's clock bits (#727):** a SLICEM as a shift register or RAM on a clock sets four bits of its
+  column's clock row word, measured with ISE (research/s6/residual6.mjs predicts them); with them the residual of the
+  examples ISE implemented on both boards keeps no clock bit. The DCM's and PLL's PIPs by PIP drop
+  (research/s6/db/s6-pips-other.json). Tests: test/s6-clock.test.js.
+
 ## 15.19.1
 
 15.19.0's changes (below), published: 15.19.0's tests failed at the release, on Windows and in the release zip; they
