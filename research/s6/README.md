@@ -660,9 +660,9 @@ Recorded here because the work was planned without the author's answers (2026-10
   (`knownPipS6`; a net that needs others, a pad whose I/O path is not measured, is routed on every switch and the
   bitstream step names them), and **the PIP families with no bits** (`NO_BITS`: a block RAM's and a DSP48A1's pins to
   their switch boxes, 14 + 11 outputs and 44 + 127 inputs measured, and an interface tile's LOGICOUT_n to LOGICOUTn,
-  17, every one without bits) are taken as none when not measured. On the Nexys3, six of the seven examples go from
-  their HDL to their bitstream in the open flow (gates, traffic, blinky, pong, stopwatch, vga), every PERIOD met; clock
-  stops at bitgen on a flip-flop set as a gate (`#AND2L`, not measured: #2061).
+  17, every one without bits) are taken as none when not measured. On the Nexys3, the seven examples go from their HDL
+  to their bitstream in the open flow, every PERIOD met (clock's flip-flop set as a gate, `#AND2L`, was measured as
+  `AND2L`, the primitive's name: #2061).
 
 ## Trying the parts that exist
 
