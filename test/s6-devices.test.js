@@ -156,7 +156,7 @@ test('runOpenImplementation under the flag: the blinky example on the Nexys3, pl
 });
 
 // stopwatch on the Nexys3 (a block RAM, three DSP48A1s): routed on the switches whose bits the databases have, through
-// the bitstream; its warnings exactly the synthesis's eight on the block RAM's ports (#2045)
+// the bitstream, with no warning (#2045)
 test('runOpenImplementation under the flag: the stopwatch example on the Nexys3 through the bitstream, its block RAM\'s frame written again', { timeout: 600000 }, async () => {
   const { exampleUcf } = await import('./examples-lib.mjs');
   const before = process.env.SILINX_SPARTAN6_OPEN;
@@ -170,8 +170,8 @@ test('runOpenImplementation under the flag: the stopwatch example on the Nexys3 
     const j = job();
     const r = await OF.runOpenImplementation(j, { project: { ...project, name: 'stopwatch', board: 'nexys3', device: resolveBoard('nexys3').device }, projectDir: dir, steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] });
     assert.deepEqual(r.completedSteps, ['synth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit'], j.lines.join('\n'));
-    const ports = [['ADDRBRDADDR', 14, 13], ['ADDRAWRADDR', 14, 13], ['DOPBDOP', 8, 2], ['DOBDO', 64, 16], ['DIPADIP', 8, 2], ['DIADI', 64, 16], ['DOPADOP', 8, 2], ['DOADO', 64, 16]];
-    assert.deepEqual(j.lines.filter(l => /^(WARNING|ERROR)/.test(l)).sort(), ports.map(([p, a, b]) => `WARNING:Yosys - Resizing cell port stopwatch.laps_ram.0.0.${p} from ${a} bits to ${b} bits.`).sort(), j.lines.join('\n'));
+    // no warning (the synthesis's block-RAM port resizing is Yosys's mapping, not the design's: QUIET, #2045)
+    assert.deepEqual(j.lines.filter(l => /^(WARNING|ERROR)/.test(l)), [], j.lines.join('\n'));
     assert.ok(j.lines.includes('All constraints were met.'));
     const bit = readBit6(fs.readFileSync(path.join(dir, `build/${project.top}.bit`)));
     assert.equal(bit.rewrites.length, 1);

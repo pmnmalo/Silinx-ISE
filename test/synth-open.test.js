@@ -184,7 +184,7 @@ end rtl;
   sim.step({ ...ins(0, 0), clk: 0, g: 1 }); assert.equal(sim.out().q3, 0);
 });
 
-test('Yosys messages that say nothing about the design: its block-RAM mapping\'s port resizing', () => {
+test('Yosys messages that say nothing about the design: its block-RAM mapping\'s port resizing (the Spartan-3E\'s and the Spartan-6\'s)', () => {
   const quiet = l => QUIET.some(re => re.test(l));
   assert.ok(quiet('Warning: Resizing cell port top.ram_wf.0.0.DI from 64 bits to 8 bits.'));
   assert.ok(quiet('Warning: Resizing cell port top.tdp.0.0.DOPB from 8 bits to 2 bits.'));
@@ -192,6 +192,12 @@ test('Yosys messages that say nothing about the design: its block-RAM mapping\'s
   // a resized port of the design's own cells still counts
   assert.ok(!quiet('Warning: Resizing cell port top.u_add.A from 16 bits to 8 bits.'));
   assert.ok(!quiet('Warning: Resizing cell port top.ram.0.0.ADDR from 14 bits to 10 bits.'));
+  // the Spartan-6's (#2045): a RAMB8BWER's or RAMB16BWER's data ports, a RAMB8BWER's address of 14 bits to its 13
+  for (const [p, a, b] of [['DIADI', 64, 16], ['DOBDO', 64, 32], ['DIPADIP', 8, 2], ['DOPBDOP', 8, 4], ['ADDRAWRADDR', 14, 13], ['ADDRBRDADDR', 14, 13]]) {
+    assert.ok(quiet(`Warning: Resizing cell port stopwatch.laps_ram.0.0.${p} from ${a} bits to ${b} bits.`), p);
+  }
+  assert.ok(!quiet('Warning: Resizing cell port top.ram.0.0.ADDRAWRADDR from 15 bits to 13 bits.'));
+  assert.ok(!quiet('Warning: Resizing cell port top.u.DIADI from 64 bits to 16 bits.'));
 });
 
 // Regression (#14): VHDL's to_integer(u) as a bit index was a 32-bit signed index for Yosys (32-bit
