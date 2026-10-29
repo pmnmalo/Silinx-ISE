@@ -60,7 +60,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'hand');
   // the expression row: a truth table's only
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main .form-grid > label')].map((l) => l.textContent)), ['Source type:', 'File name:', 'Location:', 'Expression:']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main .form-grid > label')].map((l) => l.textContent)), ['Source type:', 'File name:', 'Location:', 'Expression:', 'Language:']);   // (the language of its HDL, #2082)
   // (typed: written by hand from the Development menu only while a preview, #1098)
   await page.fill('.dlg-overlay .ns-tt-expr', "F = A·B' + C");
   assert.equal(await page.eval(() => document.querySelector('.ns-tt-expr').value), "F = A·B' + C");
