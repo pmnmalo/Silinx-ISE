@@ -2,7 +2,7 @@
 // base's (gen-dcm6.mjs's dcm and pll). What residual6.mjs leaves of the base (the CMT's settings, its input from the
 // clock pad V10, its outputs' BUFGs at BUFGMUX_X3Y13 / X3Y14) and, per other clock pad and per other BUFGMUX, the bits
 // that design sets and clears against the base's: a design's are the base's with its pad's and its BUFGs' changes.
-//   node research/s6/ana-cmt6.mjs <base dir> <paths dir>   -> research/s6/db/xc6slx16-cmt-paths.json
+//   node research/s6/ana-cmt6.mjs <base dir> <paths dir>   -> packages/silinx-fpga/bitdb/s6/xc6slx16-cmt-paths.json
 // { dcm: { site, base: ['frame,bit'], pads: { pad: { set, clear } }, bufgs: { BUFGMUX: { set, clear } } }, pll: … }
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,7 @@ export { cmtCfg, cmtPath, predictCmt } from './cmt6.mjs';
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [baseDir, pathsDir] = process.argv.slice(2);
   if (!pathsDir) { console.error('usage: node research/s6/ana-cmt6.mjs <base dir> <paths dir>'); process.exit(1); }
-  const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8')), part = 'xc6slx16csg324-3', { device } = s6Device(part);
+  const read = n => JSON.parse(fs.readFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8')), part = 'xc6slx16csg324-3', { device } = s6Device(part);
   const db = { part, slices: loadDb('xc6slx16'), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
     other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...read('s6-pips-clock').pips } }, iob: read('xc6slx16-iob'), clocks: read('s6-clocks') };
   const load = d => { const x = parseXdl(fs.readFileSync(path.join(d, 'top.xdl'), 'utf8')), r = readBit6(fs.readFileSync(path.join(d, 'top.bit'))), dev = bitFormat6(r.device.part); const { bits } = predictDesign(x, device, dev, db); return { x, left: new Set([...bitsOf(r.fdri, emptyFdri(dev))].filter(q => !bits.has(q))) }; };
@@ -37,5 +37,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
     console.log(`${kind} at ${inst.site} from ${bp.pad} to ${bp.bufgs.join(' ')}: base ${k.base.length} bits; pads ${Object.keys(k.pads).join(' ')}; BUFGMUXes ${Object.keys(k.bufgs).join(' ')}`);
   }
-  fs.writeFileSync(new URL('./db/xc6slx16-cmt-paths.json', import.meta.url), `${JSON.stringify(out)}\n`);
+  fs.writeFileSync(new URL('../../packages/silinx-fpga/bitdb/s6/xc6slx16-cmt-paths.json', import.meta.url), `${JSON.stringify(out)}\n`);
 }

@@ -20,31 +20,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { s6Device } from '../../test/s6-lib.mjs';
 import { LUTS, lutSlices } from './gen-lutmap6.mjs';
+export { baseSettings } from '../../packages/silinx-fpga/src/fpga/s6/bitgen-slice.js';
+import { baseSettings } from '../../packages/silinx-fpga/src/fpga/s6/bitgen-slice.js';
 
 const TYPE = { X: 'SLICEX', L: 'SLICEL', M: 'SLICEM' };
 const EQN = '(A1*A2)';
 
-/**
- * The base slice's settings: [[element, BEL name, value]] (nets: the outputs AMUX … DMUX on O6; full: on the 5-input
- * flip-flops, with the 5-input LUTs, and a SLICEL's or SLICEM's carry chain and F7 / F8).
- */
-export function baseSettings({ nets = false, full = false, kind = 'L' } = {}) {
-  const out = [];
-  for (const p of LUTS) {
-    out.push([`${p}6LUT`, `s.${p}6`, `#LUT:O6=${EQN}`], [`${p}FF`, `s.${p}FF`, '#FF'], [`${p}FFMUX`, '', 'O6'],
-      [`${p}FFSRINIT`, '', 'SRINIT0'], [`${p}USED`, '', '0']);
-    if (full) {
-      out.push([`${p}5LUT`, `s.${p}5`, `#LUT:O5=${EQN}`], [`${p}5FF`, `s.${p}5FF`, ''], [`${p}5FFSRINIT`, '', 'SRINIT0'], [`${p}OUTMUX`, '', `${p}5Q`]);
-      if (kind !== 'X') out.push([`${p}CY0`, '', 'O5']);
-    } else if (nets) out.push([`${p}OUTMUX`, '', 'O6']);
-  }
-  out.push(['CLKINV', '', 'CLK'], ['SYNC_ATTR', '', 'SYNC'], ['CEUSED', '', '0'], ['SRUSED', '', '0']);
-  if (full && kind !== 'X') {
-    out.push(['CARRY4', 's.CARRY4', ''], ['CYINITGND', 's.CYINITGND', ''], ['PRECYINIT', '', '0'], ['COUTUSED', '', '0'],
-      ['F7AMUX', 's.F7AMUX', ''], ['F7BMUX', 's.F7BMUX', ''], ['F8MUX', 's.F8MUX', '']);
-  }
-  return out;
-}
 
 /**
  * The variants of a slice kind from its primitive definition ({ element: { bel, cfg } }): [{ name, settings }],

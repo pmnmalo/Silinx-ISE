@@ -15,7 +15,7 @@ import { columnOf } from '../research/s6/ana-slice6.mjs';
 import { S6_DEVICES, emptyFdri } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
-const db = n => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${n}.json`, import.meta.url), 'utf8'));
+const db = n => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8'));
 
 test('gen-cmtsites6: every CMT site from its half\'s pads and the sides\', three outputs on the BUFGMUXes in turn', () => {
   const ds = cmtSiteDesigns('xc6slx16csg324-3');

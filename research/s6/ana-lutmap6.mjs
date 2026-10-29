@@ -3,7 +3,7 @@
 // are the bits of a used LUT or slice, reported apart); the id designs say whose (the LUT's number, bit j
 // of it in design id<j>), the a<k> designs which entry (bit k - 1 of the entry's index in design a<k>: O6 = A<k>
 // is 1 at the entries whose index has that bit).
-//   node research/s6/ana-lutmap6.mjs <dir> [part …]   -> research/s6/db/<part>-lut.json
+//   node research/s6/ana-lutmap6.mjs <dir> [part …]   -> packages/silinx-fpga/bitdb/s6/<part>-lut.json
 // The designs may hold a sample of the slices (gen-lutmap6.mjs --sample): the other slices' bases follow from it.
 // The map is kept per slice kind and LUT as (frame, bit) offsets from the slice's base (its first frame and
 // lowest bit), the same for every slice of the kind (checked), and per slice its base.
@@ -100,7 +100,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const map = lutMap(luts, slices), ext = extendBases(map.slices, lutSlices(s6Device(part).sites), dev);
     const all = [...problems, ...map.problems, ...ext.problems];
     console.log(`${part}: ${luts.size} LUTs found of ${slices.length * 4}, ${used.length} bits of used LUTs or slices; ${all.length} problems${all.length ? `: ${all.slice(0, 10).join('; ')}` : ''}`);
-    fs.mkdirSync(new URL('./db/', import.meta.url), { recursive: true });
-    fs.writeFileSync(new URL(`./db/${dev.device}-lut.json`, import.meta.url), `${JSON.stringify({ part, kinds: map.kinds, slices: ext.slices })}\n`);
+    fs.mkdirSync(new URL('../../packages/silinx-fpga/bitdb/s6/', import.meta.url), { recursive: true });
+    fs.writeFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${dev.device}-lut.json`, import.meta.url), `${JSON.stringify({ part, kinds: map.kinds, slices: ext.slices })}\n`);
   }
 }

@@ -42,7 +42,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [out, part = 'xc6slx16csg324-3'] = process.argv.slice(2);
   if (!out) { console.error('usage: node research/s6/gen-cmtprobe6.mjs <out dir> [part]'); process.exit(1); }
   const { device } = s6Device(part), p = part.replace(/^(xc6slx\d+)(csg)/, '$1-$2');
-  const { unresolved } = JSON.parse(fs.readFileSync(new URL('./db/s6-pips-other.json', import.meta.url), 'utf8'));
+  const { unresolved } = JSON.parse(fs.readFileSync(new URL('../../packages/silinx-fpga/bitdb/s6/s6-pips-other.json', import.meta.url), 'utf8'));
   const probes = cmtProbes(device, bitFormat6(part.replace(/^xc/, '').replace(/-\d$/, '')), unresolved), ties = intTieoffs(device), tieTile = new Map(device.sites().map(s => [s.name, s.tileName]));
   fs.mkdirSync(out, { recursive: true });
   probes.forEach((pips, j) => {

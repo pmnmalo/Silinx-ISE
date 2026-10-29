@@ -1,7 +1,7 @@
 // Stage S6-E2 (#1951): the probed PIPs' bits (gen-cmtprobe6.mjs's designs ISE turned into bitstreams): each design's
 // bits, by the region of the probed tiles (bitsByTile: the tile whose column and band hold a bit, else the nearest),
 // as offsets from the tile's region: its PIP's. A PIP probed in tiles of other parts too: the same bits (checked).
-//   node research/s6/ana-cmtprobe6.mjs <dir>[=part] …   -> research/s6/db/s6-pips-probe.json ({ pips: { 'TYPE from dir to':
+//   node research/s6/ana-cmtprobe6.mjs <dir>[=part] …   -> packages/silinx-fpga/bitdb/s6/s6-pips-probe.json ({ pips: { 'TYPE from dir to':
 //     ['minor,bit'] } }, read by residual6.mjs with the PIP drop's)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,5 +42,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
   }
   console.log(`${Object.keys(pips).length} PIPs probed, ${Object.values(pips).filter(b => b.length).length} with bits; ${unplaced} bits near no probed tile; ${problems.length} problems${problems.length ? `: ${problems.slice(0, 4).join('; ')}` : ''}`);
-  fs.writeFileSync(new URL('./db/s6-pips-probe.json', import.meta.url), `${JSON.stringify({ note: 'The PIPs the PIP drop could not take apart, probed one by one on TIEOFF nets (#1951); offsets from gridRegion.', pips })}\n`);
+  fs.writeFileSync(new URL('../../packages/silinx-fpga/bitdb/s6/s6-pips-probe.json', import.meta.url), `${JSON.stringify({ note: 'The PIPs the PIP drop could not take apart, probed one by one on TIEOFF nets (#1951); offsets from gridRegion.', pips })}\n`);
 }

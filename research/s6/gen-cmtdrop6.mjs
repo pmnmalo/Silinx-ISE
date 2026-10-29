@@ -33,7 +33,7 @@ export function oneDrops(designs, known) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [out, ...dirs] = process.argv.slice(2);
   if (!dirs.length) { console.error('usage: node research/s6/gen-cmtdrop6.mjs <out dir> <design dir> …'); process.exit(1); }
-  const read = n => { const f = new URL(`./db/${n}.json`, import.meta.url); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).pips : {}; };
+  const read = n => { const f = new URL(`../../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).pips : {}; };
   const db = { ...read('s6-pips-other'), ...read('s6-pips-io'), ...read('s6-pips-clock'), ...read('s6-pips-probe') };
   const designs = dirs.map(d => [path.basename(d), fs.readFileSync(path.join(d, 'top.xdl'), 'utf8')]), text = new Map(designs);
   const drops = oneDrops(designs, k => db[k]?.length > 0);

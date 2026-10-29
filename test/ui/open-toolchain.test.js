@@ -18,7 +18,8 @@ let env;
 // package, whose device description does not ship (the case where Silinx offers to build it)
 const dbDir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-ui-bitdb-'));
 before(async () => {
-  for (const f of fs.readdirSync(DB_DIR)) fs.copyFileSync(path.join(DB_DIR, f), path.join(dbDir, f));
+  // (with its folders: the Spartan-6's databases, bitdb/s6, #732)
+  fs.cpSync(DB_DIR, dbDir, { recursive: true });
   fs.writeFileSync(path.join(dbDir, 'xc3s250e-tq144-pads.json'), '{"padFeatures":{}}');
   process.env.SILINX_BIT_DB_DIR = dbDir;
   env = await setupUi();

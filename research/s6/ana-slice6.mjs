@@ -3,20 +3,15 @@
 // from its base; a variant's settings are the bits it sets and clears against the base slice's (the two bases
 // equal, checked).
 //   node research/s6/ana-slice6.mjs [--nets | --full] [--tiles TYPE[:X]] <dir> [part …]
-//     -> research/s6/db/<device>-slice[-nets|-full][-<type>[X]].json (with --tiles, the kinds it has designs of)
+//     -> packages/silinx-fpga/bitdb/s6/<device>-slice[-nets|-full][-<type>[X]].json (with --tiles, the kinds it has designs of)
 // { kinds: { X|L|M: { base: [[frame, bit]], variants: { name: { set: [[frame, bit]], clear: [[frame, bit]] } } } } }
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readBit6, bitFormat6, FRAME_WORDS } from '../../packages/silinx-fpga/src/fpga/s6/bitstream.js';
+export { columnOf } from '../../packages/silinx-fpga/src/fpga/s6/bitgen-regions.js';
+import { columnOf } from '../../packages/silinx-fpga/src/fpga/s6/bitgen-regions.js';
 
-/** The first frame and the frame count of the column holding a frame (index in FDRI's frames). */
-export function columnOf(dev, frame) {
-  const row = Math.floor(frame / dev.rowFrames);
-  let f = row * dev.rowFrames;
-  for (const n of dev.columns) { if (frame < f + n) return [f, n]; f += n; }
-  throw new Error(`frame ${frame}: in no column (a pad frame)`);
-}
 
 /** A slice's set bits in its column and band: [[frame, bit] offsets from its base], sorted. */
 export function sliceBits(fdri, dev, [f0, b0]) {
@@ -54,7 +49,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!dir) { console.error('usage: node research/s6/ana-slice6.mjs [--nets | --full] <dir> [part …]'); process.exit(1); }
   for (const part of parts.length ? parts : ['xc6slx16csg324-3']) {
     const dev = bitFormat6(part), p = part.replace(/^(xc6slx\d+)(csg)/, '$1-$2');
-    const bases = JSON.parse(fs.readFileSync(new URL(`./db/${dev.device}-lut.json`, import.meta.url), 'utf8')).slices;
+    const bases = JSON.parse(fs.readFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${dev.device}-lut.json`, import.meta.url), 'utf8')).slices;
     const kinds = {};
     for (const kind of ['X', 'L', 'M']) {
       if (!fs.existsSync(path.join(dir, `${p}.${design}${kind}${suffix}.json`))) continue;
@@ -65,7 +60,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       console.log(`${part} SLICE${kind}: base ${base.length} bits, ${Object.keys(variants).length} variants, ${none.length} with no bits${none.length ? ` (${none.join(' ')})` : ''}; ${problems.length} problems${problems.length ? `: ${problems.join('; ')}` : ''}`);
       kinds[kind] = { base, variants };
     }
-    fs.mkdirSync(new URL('./db/', import.meta.url), { recursive: true });
-    fs.writeFileSync(new URL(`./db/${dev.device}-slice${mode ? `-${mode}` : ''}${tiles ? `-${tiles.toLowerCase()}` : ''}.json`, import.meta.url), `${JSON.stringify({ part, kinds })}\n`);
+    fs.mkdirSync(new URL('../../packages/silinx-fpga/bitdb/s6/', import.meta.url), { recursive: true });
+    fs.writeFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${dev.device}-slice${mode ? `-${mode}` : ''}${tiles ? `-${tiles.toLowerCase()}` : ''}.json`, import.meta.url), `${JSON.stringify({ part, kinds })}\n`);
   }
 }

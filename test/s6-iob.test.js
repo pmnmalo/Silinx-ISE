@@ -35,7 +35,7 @@ test('ana-iob6: the bits, their pads by the id designs, the nearest pad for the 
 });
 
 test('the XC6SLX16\'s pads, measured: 6 bits an output, 9 an input, each variant the same count on every pad', () => {
-  const db = JSON.parse(fs.readFileSync(new URL('../research/s6/db/xc6slx16-iob.json', import.meta.url), 'utf8'));
+  const db = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-iob.json', import.meta.url), 'utf8'));
   const pads = Object.values(db.pads);
   assert.equal(pads.length, 232);
   assert.deepEqual(db.globals, ['734,988']);
@@ -50,7 +50,7 @@ test('the XC6SLX16\'s pads, measured: 6 bits an output, 9 an input, each variant
 
 test('the pads in the residual: a pad\'s bits from its IOB\'s settings, an output\'s path bit; the XC6SLX45\'s pads', async () => {
   const { predictIob, padBit } = await import('../research/s6/residual6.mjs');
-  const read = d => JSON.parse(fs.readFileSync(new URL(`../research/s6/db/${d}-iob.json`, import.meta.url), 'utf8'));
+  const read = d => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/${d}-iob.json`, import.meta.url), 'utf8'));
   const db = read('xc6slx16'), pad = db.pads.U16;
   const cfg = s => s.split(' ').map(x => { const [attr, name, value] = x.split(':'); return { attr, name, value }; });
   // an output: its base and the path bit 15 before its first; drive 4, FAST

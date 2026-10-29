@@ -87,7 +87,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(`${part}: ${sel.length} designs`);
     process.exit(0);
   }
-  const dev = S6_DEVICES[part.replace(/csg.*/, '')], bases = JSON.parse(fs.readFileSync(new URL(`./db/${dev.device}-lut.json`, import.meta.url), 'utf8')).slices;
+  const dev = S6_DEVICES[part.replace(/csg.*/, '')], bases = JSON.parse(fs.readFileSync(new URL(`../../packages/silinx-fpga/bitdb/s6/${dev.device}-lut.json`, import.meta.url), 'utf8')).slices;
   // the CLB columns' first frames (in row 0)
   const cols = [...new Set(Object.values(bases).map(([f]) => columnOf(dev, f)[0]).filter(c => c < dev.rowFrames))].sort((a, b) => a - b);
   const at = (c, r) => sliceAt(bases, dev, c, r);
