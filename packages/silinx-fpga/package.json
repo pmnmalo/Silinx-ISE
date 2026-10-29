@@ -8,6 +8,9 @@
     "./parts": "./src/parts.js",
     "./node": "./src/node.js"
   },
+  "bin": {
+    "silinx-fpga": "bin/silinx-fpga.js"
+  },
   "private": true,
   "license": "Apache-2.0",
   "author": "Pedro Maló",

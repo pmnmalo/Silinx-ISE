@@ -6,6 +6,52 @@ Silinx ISE, the IDE that uses it ([#1651](https://github.com/pmnmalo/Silinx-ISE/
 [docs/TOOLCHAIN-SEPARATION.md](../../docs/TOOLCHAIN-SEPARATION.md)). Its code is in `src/`, the device graphs of the
 supported boards in `devices/`, their bit databases in `bitdb/`. Not published yet.
 
+## The command line
+
+```
+silinx-fpga build <file.v ...|netlist.json> --part <part> [--top name] [--ucf pins.ucf] [-o top.bit]
+  [--out-dir build] [--effort normal|high] [--seed N] [--no-replicate] [--quiet]
+```
+
+It synthesizes the Verilog with Yosys, or reads a Yosys JSON netlist, then packs, places, routes, checks the
+timing and writes the bitstream. The parts are those of the Basys2 (`xc3s250e-cp132-4`, `xc3s100e-cp132-4`) and of
+the Nexys2 (`xc3s500e-fg320-4`, `xc3s1200e-fg320-4`). The out folder (`build`) gets the netlist, the placed and
+routed design (`placed.xdl`, `routed.xdl`) and the timing report (`timing.txt`); the warnings and errors go to
+stderr. It exits with 0 when the `.bit` is written, 1 when the flow fails (the design, the constraints, the
+routing) and 2 when the command line is wrong. VHDL needs Silinx ISE, whose front end turns it into Verilog.
+
+A blinky for the Basys2: `blinky.v`,
+
+```verilog
+// The eight LEDs of the Basys2 count: the slowest bits of a counter of the 50 MHz clock
+module blinky(input clk, output [7:0] led);
+  reg [31:0] count = 0;
+  always @(posedge clk) count <= count + 1;
+  assign led = count[31:24];
+endmodule
+```
+
+its pins, `basys2.ucf`,
+
+```ucf
+NET "clk" LOC = "B8";
+NET "clk" PERIOD = 20 ns;
+NET "led<0>" LOC = "M5";
+NET "led<1>" LOC = "M11";
+NET "led<2>" LOC = "P7";
+NET "led<3>" LOC = "P6";
+NET "led<4>" LOC = "N5";
+NET "led<5>" LOC = "N4";
+NET "led<6>" LOC = "P4";
+NET "led<7>" LOC = "G1";
+```
+
+and its bitstream, for the board's programmer (Digilent Adept, or Silinx ISE's iMPACT):
+
+```
+silinx-fpga build blinky.v --part xc3s250e-cp132-4 --ucf basys2.ucf -o blinky.bit
+```
+
 ## The API
 
 Three entries; a name they do not export is the package's own and may change in any version.
