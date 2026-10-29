@@ -6,12 +6,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as api from '../packages/silinx-fpga/src/index.js';
-import * as node from '../packages/silinx-fpga/src/node.js';
-import * as parts from '../packages/silinx-fpga/src/parts.js';
-import { readBit } from '../packages/silinx-fpga/src/fpga/bitstream.js';
+import * as api from '../src/index.js';
+import * as node from '../src/node.js';
+import * as parts from '../src/parts.js';
+import { readBit } from '../src/fpga/bitstream.js';
 
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const DIR = path.join(ROOT, 'packages', 'silinx-fpga');
 const pkg = JSON.parse(fs.readFileSync(path.join(DIR, 'package.json'), 'utf8'));
 

@@ -70,7 +70,7 @@ may feed the flip-flop of its side when that flip-flop has no CE and no set / re
 packs them: `FFX_SR_ATTR::SRLOW`, the flip-flop does not see SR). The placer keeps SLICEM
 instances on the SLICEM sites (the left column of a CLB); `packages/silinx-fpga/src/fpga/timing.js` has their arcs
 (clock to the output after a shift, setup of BX / BY and SR); both simulators of
-`test/fpga-sim.js` model them; the bitstream has the measured shift-register features (stage D).
+`packages/silinx-fpga/test/fpga-sim.js` model them; the bitstream has the measured shift-register features (stage D).
 ISE converts the open flow's designs to the same .bit with no DRC error or warning (srl fixture,
 test/fixtures/open-flow/feat_srl, hard_prim).
 
@@ -793,7 +793,7 @@ the remaps need them).
     BX / BY with DIF_MUX / DIG_MUX, the shift enable through SR (SRINV, WSGEN), no flip-flops in
     that slice since SR would reset them), slices of type SLICEM kept on SLICEM sites by the
     placer (place.js allowedAt), its clock-to-out and setup in packages/silinx-fpga/src/fpga/timing.js, SRL16E in
-    test/fpga-sim.js (netlistSim and packedSim), and a check of the bitstream against ISE's
+    packages/silinx-fpga/test/fpga-sim.js (netlistSim and packedSim), and a check of the bitstream against ISE's
     (the bit database has the SLICEM shift-register features, measured with ISE's designs).
 - **Tri-state buffers in the packer** (distributed RAM, block RAM, multipliers and the DCM are in
   the open flow since 15.10.2: research/s3e-bitstream/README.md, stage E).

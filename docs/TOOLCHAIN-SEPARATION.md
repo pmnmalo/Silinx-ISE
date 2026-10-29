@@ -18,13 +18,13 @@ separation starts.
 
 | Part | Files | Lines | KB | Tests that cover it |
 |---|---|---|---|---|
-| Netlist (Yosys JSON in) `packages/silinx-fpga/src/fpga/netlist.js` | 1 | 128 | 6 | `test/fpga-netlist.test.js`, `test/ucf.test.js` |
-| Pack `packages/silinx-fpga/src/fpga/pack.js`, `pack-*.js` | 14 | 2024 | 118 | `test/fpga-pack.test.js`, `test/pack-parts.test.js`, `test/iob-*.test.js` |
-| Place `packages/silinx-fpga/src/fpga/place.js`, `place-*.js`, `replicate.js` | 10 | 1690 | 105 | `test/fpga-place.test.js`, `test/place-parts.test.js`, `test/fpga-replicate.test.js`, `test/fpga-hard.test.js` |
-| Route `packages/silinx-fpga/src/fpga/route.js`, `route-*.js` | 5 | 1069 | 59 | `test/fpga-route.test.js`, `test/route-parts.test.js`, `test/fpga-place-route.test.js` |
-| Timing (trce-like) `packages/silinx-fpga/src/fpga/timing.js`, `timing-*.js` | 3 | 1226 | 72 | `test/fpga-timing.test.js`, `test/timing-parts.test.js` |
-| Bitstream and bit database `packages/silinx-fpga/src/fpga/bitgen.js`, `bitstream.js`, `bitdb.js`, `bitdb-node.js`, `lut.js` | 5 | 1030 | 59 | `test/fpga-bitgen.test.js`, `test/fpga-bitstream.test.js`, `test/fpga-lut.test.js`, `test/s3e-devices.test.js` |
-| Device description `packages/silinx-fpga/src/fpga/device.js`, `device-node.js` | 2 | 545 | 28 | `test/fpga-device.test.js`, `test/s3e-device.test.js`, `test/open-toolchain.test.js` |
+| Netlist (Yosys JSON in) `packages/silinx-fpga/src/fpga/netlist.js` | 1 | 128 | 6 | `packages/silinx-fpga/test/fpga-netlist.test.js`, `test/ucf.test.js` |
+| Pack `packages/silinx-fpga/src/fpga/pack.js`, `pack-*.js` | 14 | 2024 | 118 | `packages/silinx-fpga/test/fpga-pack.test.js`, `packages/silinx-fpga/test/pack-parts.test.js`, `test/iob-*.test.js` |
+| Place `packages/silinx-fpga/src/fpga/place.js`, `place-*.js`, `replicate.js` | 10 | 1690 | 105 | `packages/silinx-fpga/test/fpga-place.test.js`, `packages/silinx-fpga/test/place-parts.test.js`, `test/fpga-replicate.test.js`, `packages/silinx-fpga/test/fpga-hard.test.js` |
+| Route `packages/silinx-fpga/src/fpga/route.js`, `route-*.js` | 5 | 1069 | 59 | `packages/silinx-fpga/test/fpga-route.test.js`, `packages/silinx-fpga/test/route-parts.test.js`, `test/fpga-place-route.test.js` |
+| Timing (trce-like) `packages/silinx-fpga/src/fpga/timing.js`, `timing-*.js` | 3 | 1226 | 72 | `test/fpga-timing.test.js`, `packages/silinx-fpga/test/timing-parts.test.js` |
+| Bitstream and bit database `packages/silinx-fpga/src/fpga/bitgen.js`, `bitstream.js`, `bitdb.js`, `bitdb-node.js`, `lut.js` | 5 | 1030 | 59 | `test/fpga-bitgen.test.js`, `packages/silinx-fpga/test/fpga-bitstream.test.js`, `packages/silinx-fpga/test/fpga-lut.test.js`, `test/s3e-devices.test.js` |
+| Device description `packages/silinx-fpga/src/fpga/device.js`, `device-node.js` | 2 | 545 | 28 | `packages/silinx-fpga/test/fpga-device.test.js`, `test/s3e-device.test.js`, `test/open-toolchain.test.js` |
 | Spartan-6 (in development, #1) `packages/silinx-fpga/src/fpga/s6/` | 15 | 2475 | 140 | `test/s6-*.test.js` |
 | Synthesis (Yosys WASM, FSM, carry chains, LUT resynthesis) `core/synth-open*.js`, `packages/silinx-fpga/src/carry-chain.js`, `packages/silinx-fpga/src/synth-fsm.js`, `packages/silinx-fpga/src/lut-resynth.js` | 9 | 2610 | 164 | `test/synth-open*.test.js`, `test/synth-fsm.test.js`, `test/synth-abc9.test.js`, `test/carry-*.test.js`, `test/lut-resynth.test.js`, `test/yosys-*.test.js` |
 | The flow and its reports `packages/silinx-fpga/src/open-flow-core.js`, `open-flow-models.js`, `open-flow-reports.js`, `open-steps.js` | 4 | 633 | 45 | `test/open-flow*.test.js`, `test/open-steps.test.js` |
@@ -195,6 +195,11 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
 9. **Its tests, oracle and research with it** ([#1680](https://github.com/pmnmalo/Silinx-ISE/issues/1680)):
    the 64 unit test files, `check:open-flow`, the data-building research; the test globs, the shards,
    related-tests and the workflows (ISE, Quality, Yosys update) follow.
+   Started: of the 101 test files that import the toolchain, the 16 that import the package alone, its simulators
+   of a packed design (`fpga-sim.js`) and its fixtures (`fixtures/fpga`) are in `packages/silinx-fpga/test`
+   (`npm test` in the package); the shards, the timings and the related tests know the folder. Most of the others
+   make their designs with the IDE's front end, and stay the IDE's integration tests (or follow with
+   `silinx-hdl`); those of the research move with it, at a time agreed with the sessions working there.
 10. **Licence, notices, versioning and publishing**
     ([#1681](https://github.com/pmnmalo/Silinx-ISE/issues/1681)): as decided (section 4): the package's NOTICE
     and THIRD-PARTY-NOTICES, the IDE's NOTICE naming it, its changelog fragments and 0.x version, a publishing

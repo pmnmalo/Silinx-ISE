@@ -128,3 +128,14 @@ test('#1678 the IDE imports the toolchain through its API only, each import its 
   // no old path left: core/ re-exports none of the package's modules
   assert.deepEqual(sources('core').filter((f) => /^export \* from '(\.\.\/)+packages\//m.test(fs.readFileSync(path.join(ROOT, f), 'utf8'))), []);
 });
+
+// #1680: the package's own tests (packages/silinx-fpga/test, their helper and fixtures) import nothing of the IDE either,
+// nor the research: the package is tested from itself
+test('#1680 the package\'s tests import the package alone', () => {
+  const tests = sources('packages/silinx-fpga/test').filter((f) => !f.includes('/fixtures/'));
+  assert.ok(tests.length >= 16 && tests.includes('packages/silinx-fpga/test/fpga-sim.js'), String(tests.length));
+  const out = tests.flatMap((f) => crossings(f, fs.readFileSync(path.join(ROOT, f), 'utf8'))).filter((c) => !isPackage(c));
+  assert.deepEqual(out, []);
+  // the IDE's tests that use its simulators of a packed design import them from the package
+  assert.ok(!fs.existsSync(path.join(ROOT, 'test/fpga-sim.js')) && !fs.existsSync(path.join(ROOT, 'test/fixtures/fpga')));
+});

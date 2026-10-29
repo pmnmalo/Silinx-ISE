@@ -12,8 +12,8 @@
 // Both: sim.step({ port bit name: 0 | 1 }) applies the inputs and settles; sim.out() -> { port bit: v }.
 // Flip-flops start at their INIT (as after configuration). Clock edges are found by comparing a
 // clock pin with its value at the previous step.
-import { evalLut } from '../packages/silinx-fpga/src/xdl.js';
-import { paramBits, paramInt } from '../packages/silinx-fpga/src/fpga/netlist.js';
+import { evalLut } from '../src/xdl.js';
+import { paramBits, paramInt } from '../src/fpga/netlist.js';
 
 const LUT_K = { LUT1: 1, LUT2: 2, LUT3: 3, LUT4: 4 };
 const RAM_A = { RAM16X1S: 4, RAM32X1S: 5, RAM64X1S: 6, RAM16X1D: 4 };

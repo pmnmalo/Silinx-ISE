@@ -1,7 +1,7 @@
 // The Post-Translate and Post-Map Simulation Models of the Silinx toolchain (core/sim-model.js, the flow's
 // posttrans and postmap steps, #121): the models' VHDL and Verilog (SIMPRIM primitives, the top's ports, the
 // generics they were synthesized with); both models simulated against an independent reference (the
-// netlist's cycle simulator of test/fpga-sim.js) on the packer's fixtures and on small designs with shift
+// netlist's cycle simulator of packages/silinx-fpga/test/fpga-sim.js) on the packer's fixtures and on small designs with shift
 // registers, distributed and block RAMs, multipliers and latches; the flow's steps, their report and their
 // exact log. Every example's test bench on both models: test/sim-model-examples.test.js and
 // test/sim-model-vga.test.js (three files, so they run alongside each other, #566).
@@ -22,7 +22,7 @@ import { pack } from '../packages/silinx-fpga/src/fpga/pack.js';
 import { simulate, device, compareWithNetlist } from './sim-model-lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const FPGA = path.join(HERE, 'fixtures', 'fpga'), DESIGNS = path.join(HERE, 'fixtures', 'designs');
+const FPGA = path.join(HERE, '..', 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga'), DESIGNS = path.join(HERE, 'fixtures', 'designs');
 
 const DUT = `library IEEE; use IEEE.STD_LOGIC_1164.ALL; use IEEE.NUMERIC_STD.ALL;
 entity cnt is generic ( N : integer := 1000; W : integer := 4 ); port ( clk : in std_logic; rst : in std_logic; q : out std_logic_vector(W - 1 downto 0) ); end;

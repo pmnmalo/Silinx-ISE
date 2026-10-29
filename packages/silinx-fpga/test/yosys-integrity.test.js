@@ -4,8 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { verifiedYosysUrl, yosysWorkerSource } from '../packages/silinx-fpga/src/synth-open-yosys.js';
-import { verifiedYosysUrl as reexported } from '../packages/silinx-fpga/src/synth-open.js';
+import { verifiedYosysUrl, yosysWorkerSource } from '../src/synth-open-yosys.js';
+import { verifiedYosysUrl as reexported } from '../src/synth-open.js';
 
 const SITE = 'https://pmnmalo.github.io/Silinx-ISE/';
 const KEY = 'vendor/yowasp-yosys/0.70.1258/gen/bundle.js';

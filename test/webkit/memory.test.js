@@ -104,7 +104,7 @@ async function routedProject(name) {
   await fsp.writeFile(path.join(build, 'top.ncd'), 'NCD');
   const old = new Date(Date.now() - 60000);
   await fsp.utimes(path.join(build, 'top.ncd'), old, old);
-  for (const f of ['top.xdl', 'device.xdlrc']) await fsp.copyFile(path.join(ROOT, 'test', 'fixtures', 'fpga', f), path.join(build, f));
+  for (const f of ['top.xdl', 'device.xdlrc']) await fsp.copyFile(path.join(ROOT, 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga', f), path.join(build, f));
 }
 async function openFpga(page) {
   await page.evaluate(() => [...document.querySelectorAll('#procs .row')].find((e) => /View Implemented Design \(FPGA\)/.test(e.textContent)).dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));

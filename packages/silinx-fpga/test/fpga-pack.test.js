@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
-import { pack, PackError, WIDE_MUX, connectionCriticality } from '../packages/silinx-fpga/src/fpga/pack.js';
-import { criticalDelay } from '../packages/silinx-fpga/src/synth-open.js';
+import { readYosysJson } from '../src/fpga/netlist.js';
+import { pack, PackError, WIDE_MUX, connectionCriticality } from '../src/fpga/pack.js';
+import { criticalDelay } from '../src/synth-open.js';
 import { compareSims } from './fpga-sim.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fpga');

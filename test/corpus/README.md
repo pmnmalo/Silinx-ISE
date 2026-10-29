@@ -3,7 +3,7 @@
 Silinx's Verilog / VHDL front end, its simulator and its open synthesis (`core/synth-verilog.js`
 + Yosys in WebAssembly, YoWASP) are checked by comparing simulations: a design is simulated as RTL
 by Silinx and as a Yosys netlist, with the same seeded random stimulus, cycle by cycle
-(`test/diff-synth.js`). The netlist is simulated cell by cell (`test/fpga-sim.js` netlistSim, or
+(`test/diff-synth.js`). The netlist is simulated cell by cell (`packages/silinx-fpga/test/fpga-sim.js` netlistSim, or
 Silinx's primitive models for block RAMs, DCMs, tri-state buffers).
 
 Two netlists are possible for a design:

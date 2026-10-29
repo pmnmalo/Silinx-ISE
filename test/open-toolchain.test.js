@@ -3,7 +3,7 @@
 // XC3S250E-CP132 and its bit database ship with Silinx), the clear failures (a device without a bit
 // database or a description, a design with errors, the ISE-only steps), Stop, the FPGA view of the
 // routed design, and the job that builds a device description from the user's ISE (fake xdl / docker /
-// ssh of test/server-helpers.js, the small report test/fixtures/fpga/route-device.xdlrc).
+// ssh of test/server-helpers.js, the small report packages/silinx-fpga/test/fixtures/fpga/route-device.xdlrc).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -13,7 +13,7 @@ import zlib from 'node:zlib';
 import { scratchEnv, makeFakes, isolatedPath, startApp, waitJob, waitLine, writeConfig, HERE, POSIX_ONLY } from './server-helpers.js';
 
 let tmp, fakes, app, jobs, P, oldPath, OF, tc;
-const XDLRC = path.join(HERE, 'fixtures', 'fpga', 'route-device.xdlrc');   // xc3s50etq144-4
+const XDLRC = path.join(HERE, '..', 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga', 'route-device.xdlrc');   // xc3s50etq144-4
 // fake xdl: "xdl -report -pips -all_conns <part> <out>" copies $FAKE_XDLRC (FAKE_XDL_FAIL: fails)
 const FAKE_XDL = `#!/bin/sh
 for a in "$@"; do last="$a"; done

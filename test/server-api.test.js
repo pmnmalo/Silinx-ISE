@@ -998,7 +998,7 @@ test('startServer listens (and rejects a used port); openBrowser runs the platfo
 });
 
 test('fpga-view: the implemented design inside the FPGA from build/<top>.xdl + device.xdlrc (states, model, cache)', async () => {
-  const FIX = path.join(HERE, 'fixtures', 'fpga');
+  const FIX = path.join(HERE, '..', 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga');
   let r = await call('POST', '/projects', { name: 'Fv' });
   assert.equal(r.status, 200);
   const pj = JSON.parse(await fs.readFile(path.join(P.projectDir('Fv'), 'silinx.json'), 'utf8'));

@@ -269,7 +269,7 @@ STA of lab11: 15-50 ms.
 **Block RAMs and multipliers (#457).** Their arcs were estimates until trce measured them (`timing-fit.mjs --arcs`
 on the verbose reports, `trce -a -v 1000`, of nine designs routed by Silinx: hard_prim, feat_bram, feat_const_bram,
 feat_mult, feat_const_mult, feat_constmult, stopwatch, and two of multipliers with input registers; the routed
-designs and trce's periods of three of them are test fixtures, `test/fixtures/fpga/trce/`). A block RAM's arcs are
+designs and trce's periods of three of them are test fixtures, `packages/silinx-fpga/test/fixtures/fpga/trce/`). A block RAM's arcs are
 the same at every width and write mode (clock to out Tbcko 2.812 ns; setups: address 0.377, data 0.227, EN 0.770,
 WE 1.253, SSR 0.705). A multiplier's path through it depends on the product bit only: A / B -> P 3.657 ns for P0..P5,
 then 4.086 .. 4.860, 4.873 from P17; from its input registers (AREG / BREG) to P the same plus 0.260 (P0..P5) or
