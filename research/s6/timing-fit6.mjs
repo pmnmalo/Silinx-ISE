@@ -17,50 +17,8 @@ import { netEndpointsS6 } from '../../packages/silinx-fpga/src/fpga/s6/route-net
 import { parseTwr } from './twr6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';
 
-/** The classes of a Spartan-6 node, by the name of its first wire. */
-export const CLASSES6 = ['site', 'logicout', 'single', 'double', 'quad', 'logicin', 'fan', 'clock', 'other'];
-
-/** A wire name's class (an index of CLASSES6). */
-export function wireClass6(name) {
-  if (/LOGICOUT/.test(name)) return 1;
-  if (/^[NSEW][NSEWLR]1[BEM]\d/.test(name)) return 2;
-  if (/^[NSEW][NSEWLR]2[BEM]\d/.test(name)) return 3;
-  if (/^[NSEW][NSEWLR]4[BEM]\d/.test(name)) return 4;
-  if (/LOGICIN/.test(name)) return 5;
-  if (/GFAN|FAN_B/.test(name)) return 6;
-  if (/GCLK|CLK\d|HCLK/.test(name)) return 7;
-  return /^(M|L|X)_|_SITE$|^[A-D]MUX$|BYP|DSP48|RAMB/.test(name) ? 0 : 8;
-}
-
-/** The kinds of a connection's load pin: a LUT input by its index (A1 the slowest), a bypass, CE, SR, the carry, an I/O's, another. */
-export const PIN_KINDS = ['1', '2', '3', '4', '5', '6', 'X', 'CE', 'SR', 'CIN', 'IO', 'other'];
-
-/** A load pin's kind (an index of PIN_KINDS), by its wire's name. */
-export function pinKind(name) {
-  const m = name.match(/^(?:[LMX]|XX)_[A-D]([1-6])$/);
-  if (m) return +m[1] - 1;
-  if (/^(?:[LMX]|XX)_[A-D]X$/.test(name)) return 6;
-  if (/CE$/.test(name)) return 7;
-  if (/SR$/.test(name)) return 8;
-  if (/_CIN$/.test(name)) return 9;
-  return /IOB_|OLOGIC|ILOGIC/.test(name) ? 10 : 11;
-}
-
-/** A node's first wire: [tile name, wire name]. */
-export function nodeWire(device, n) {
-  const w = device.nodeWires[device.nodeStart[n]], k = device.wireTile[w];
-  return [device.tileNames[k], device.names[device.templates[device.tileTemplate[k]].wires[w - device.tileWireBase[k]]]];
-}
-
-/** A wire's type: its name without its index (EE4B#, LOGICIN_B#, …) and its tile kind's prefix. */
-export const wireType = name => name.replace(/\d+/g, '#').replace(/^(CLEX[LM]|INT_INTERFACE|IOI)_/, '');
-
-/** A path's nodes (the driver's first) counted by class, their wires' types and its load pin's kind: { counts, wires, pin }. */
-export function pathCounts(device, nodes) {
-  const counts = new Array(CLASSES6.length).fill(0), wires = [];
-  for (const n of nodes.slice(1)) { const w = nodeWire(device, n)[1]; counts[wireClass6(w)]++; wires.push(wireType(w)); }
-  return { counts, wires, pin: pinKind(nodeWire(device, nodes.at(-1))[1]) };
-}
+export { CLASSES6, wireClass6, PIN_KINDS, pinKind, nodeWire, wireType, pathCounts, features } from '../../packages/silinx-fpga/src/fpga/s6/timing.js';
+import { CLASSES6, PIN_KINDS, pathCounts, features } from '../../packages/silinx-fpga/src/fpga/s6/timing.js';
 
 /** One net of a path in the routed XDL: { net, delay, fanout, counts: [per class], pin, nodes } or null (not found). */
 export function connection(nets, device, from, e) {
@@ -121,8 +79,6 @@ export function dlySamples(xdl, dlyText, device) {
   return out;
 }
 
-/** A connection's features: base, each class's count, the fanout beyond one, its load pin's kind (one of PIN_KINDS). */
-export const features = c => [1, ...c.counts, Math.max(0, c.fanout - 1), ...PIN_KINDS.map((_, k) => +(c.pin === k))];
 
 /**
  * The wire model fitted on connections: features (the classes, fanout and pin kind) and a count per wire type seen
