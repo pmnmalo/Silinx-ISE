@@ -446,6 +446,21 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   CLKFX_DIVIDE - 1 in 432, 431, 429, 428, 425; the CLKDV divisors, the PLL's multiplier, divider, output divider
   and phase as their own bit patterns in the database.
 
+### The CMT sites (#1951, S6-E2, 2026-10-29)
+
+- **Every CMT site** (`gen-cmtsites6.mjs`: a DCM or PLL at each of the XC6SLX16's six sites, from 4 clock pads of its
+  half and 4 of the sides, three outputs through BUFGs at the BUFGMUXes in turn; 48 designs, 40 built: 8 side pads
+  ISE does not pair with that DCM, `Place:1158`). Their PIP drop (`--split 2`, 120 XDL) resolves 420 more PIPs
+  (`db/s6-pips-other.json`: 1079); the CMT tiles' own paths (an output's chain, always together) stay unresolved.
+- **The settings** (`ana-cmtsites6.mjs`: `db/xc6slx16-cmt-settings.json`; `cmt6.mjs` predicts them): a DCM's or PLL's
+  settings bits are in the 31-frame column its tile is in (frames 327 to 357 of each row), in its tile's row, the
+  same at every site of a kind: the PLL's at both PLL sites, a DCM's at both DCMs of its parity (DCM_X0Y1 and
+  X0Y3, DCM_X0Y0 and X0Y2), the two DCMs of a CMT tile with different bits (not a shift of each other: #727's "283
+  bits on" held for its base only). A pattern per kind and setting (`cmtCfg`), from every design measured; the even
+  DCM's settings measured as the odd one's were (`gen-dcm6.mjs --dcm DCM_X0Y0`, `ana-dcm6.mjs --dcm`: `dcmEven`).
+- Still to do: the paths of the other sites (the CMT tile's output chains, the centre column's and REGC's bits of a
+  CMT output on a BUFGMUX, a pad's BUFIO2), with designs of one output each; and the XC6SLX45.
+
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
 XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the part holding an instance (`gen-hard6.mjs`;
@@ -570,6 +585,8 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `ana-cmt6.mjs`, `cmt6.mjs` | A DCM's and PLL's clock path: `db/xc6slx16-cmt-paths.json`; the shared helpers (#727) |
 | `gen-dcm6.mjs` | The DCM's and PLL's designs, one setting per design (`--fields`: the counters' bits) (#727) |
 | `ana-dcm6.mjs` | Their settings' bits: `db/<device>-cmt.json` (#727) |
+| `gen-cmtsites6.mjs` | Every CMT site's designs: pads of its half and the sides, outputs on the BUFGMUXes in turn (#1951) |
+| `ana-cmtsites6.mjs` | A CMT's settings at any site: `db/<device>-cmt-settings.json` (#1951) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |

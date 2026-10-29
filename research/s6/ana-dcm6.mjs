@@ -3,7 +3,7 @@
 // variant, the leftover bits it sets and clears against its base's: the setting's bits at that site.
 //   node research/s6/ana-dcm6.mjs <dir> [part]   (<dir>/<design>/top.xdl, top.bit: gen-dcm6.mjs's and its --fields
 //     designs together)   -> research/s6/db/<device>-cmt.json
-// { part, dcm: { site, base: ['frame,bit' left over], variants: { name: { params, set, clear } } }, pll: { … } }
+// { part, dcm: { site, base: ['frame,bit' left over], variants: { name: { params, set, clear } } }, pll: { … }, dcmEven: { … } }
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,8 +21,10 @@ export function variantBits(base, mine) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [dir, part = 'xc6slx16csg324-3'] = process.argv.slice(2);
-  if (!dir) { console.error('usage: node research/s6/ana-dcm6.mjs <dir> [part]'); process.exit(1); }
+  // --dcm <site>: an even DCM's designs (gen-dcm6.mjs --dcm), added to the database as dcmEven (#1951)
+  const all = process.argv.slice(2), at = all.indexOf('--dcm'), dcmSite = at < 0 ? null : all[at + 1];
+  const [dir, part = 'xc6slx16csg324-3'] = at < 0 ? all : [...all.slice(0, at), ...all.slice(at + 2)];
+  if (!dir) { console.error('usage: node research/s6/ana-dcm6.mjs [--dcm <site>] <dir> [part]'); process.exit(1); }
   const read = n => JSON.parse(fs.readFileSync(new URL(`./db/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, '');
   const { device } = s6Device(part);
   const db = { part, slices: loadDb(dv), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
@@ -34,17 +36,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const { bits } = predictDesign(x, device, dev, db);
     return new Set([...bitsOf(r.fdri, emptyFdri(dev))].filter(q => !bits.has(q)));
   };
-  const out = { part, dcm: { site: 'DCM_X0Y1', variants: {} }, pll: { site: 'PLL_ADV_X0Y0', variants: {} } };
-  for (const kind of ['dcm', 'pll']) {
+  const file = new URL(`./db/${dv}-cmt.json`, import.meta.url);
+  const out = dcmSite ? { ...JSON.parse(fs.readFileSync(file, 'utf8')), dcmEven: { site: dcmSite, variants: {} } } : { part, dcm: { site: 'DCM_X0Y1', variants: {} }, pll: { site: 'PLL_ADV_X0Y0', variants: {} } };
+  for (const [key, kind] of dcmSite ? [['dcmEven', 'dcm']] : [['dcm', 'dcm'], ['pll', 'pll']]) {
     const base = left(kind);
-    out[kind].base = [...base].sort();
+    out[key].base = [...base].sort();
     for (const [name, v] of Object.entries({ ...dcmVariants(), ...fieldVariants() })) {
       if (v.kind !== kind || name === kind) continue;
       const mine = left(name);
       if (!mine) { console.log(`${name}: no bitstream (ISE refused it)`); continue; }
-      out[kind].variants[name] = { params: v.params, out: v.out, ...variantBits(base, mine) };
-      console.log(`${name}: +${out[kind].variants[name].set.length} -${out[kind].variants[name].clear.length}`);
+      out[key].variants[name] = { params: v.params, out: v.out, ...variantBits(base, mine) };
+      console.log(`${name}: +${out[key].variants[name].set.length} -${out[key].variants[name].clear.length}`);
     }
   }
-  fs.writeFileSync(new URL(`./db/${dv}-cmt.json`, import.meta.url), `${JSON.stringify(out)}\n`);
+  fs.writeFileSync(file, `${JSON.stringify(out)}\n`);
 }

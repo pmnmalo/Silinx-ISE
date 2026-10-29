@@ -17,7 +17,7 @@ import { pipDirections, pipLookup } from './check-pips6.mjs';
 import { tileRegion } from './ana-pipprobe6.mjs';
 import { gridRegion } from './ana-pipdrop6.mjs';
 import { columnOf } from './ana-slice6.mjs';
-import { cmtCfg, cmtPath, predictCmt } from './cmt6.mjs';
+import { cmtCfg, cmtPath, predictCmt, predictCmtSettings } from './cmt6.mjs';
 import { HARD_TYPES, predictHard } from './hard6.mjs';
 
 const INT_LIKE = /^(INT|INT_BRK|INT_BRAM|INT_BRAM_BRK|IOI_INT|LIOI_INT|INT_GCLK)_X/;
@@ -97,14 +97,17 @@ export function predictDesign(design, device, dev, db) {
       for (let m = 16; m < 20; m++) bits.add(`${c0 + m},527`);
     }
   }
-  // a DCM or PLL at the site measured, with the base's settings: the base's bits with its pad's and BUFGs' changes
-  if (db.cmt) {
+  // a DCM or PLL at the site measured, with the base's settings: the base's bits with its pad's and BUFGs' changes;
+  // elsewhere its settings' (db/<device>-cmt-settings.json, #1951), its clock path not yet
+  if (db.cmt || db.cmtSettings) {
     for (const inst of design.insts) {
-      const kind = { DCM: db.cmt.dcm, PLL_ADV: db.cmt.pll }[inst.type];
-      if (!kind || !inst.placed) continue;
-      const p = kind.site === inst.site && kind.cfg === cmtCfg(inst) ? predictCmt(kind, cmtPath(design, inst)) : null;
-      if (!p) { note(`${inst.type} ${inst.site} (its settings or clock path not measured)`); continue; }
-      for (const x of p) bits.add(x);
+      if (!/^(DCM|PLL_ADV)$/.test(inst.type) || !inst.placed) continue;
+      const kind = db.cmt && { DCM: db.cmt.dcm, PLL_ADV: db.cmt.pll }[inst.type];
+      const p = kind && kind.site === inst.site && kind.cfg === cmtCfg(inst) ? predictCmt(kind, cmtPath(design, inst)) : null;
+      if (p) { for (const x of p) bits.add(x); continue; }
+      const s = db.cmtSettings && predictCmtSettings(inst, db.cmtSettings, Math.floor(gridRegion(device, dev, inst.tile)[0] / dev.rowFrames) * dev.rowFrames);
+      if (s) for (const x of s) bits.add(x);
+      note(`${inst.type} ${inst.site} (its ${s ? 'clock path' : 'settings or clock path'} not measured)`);
     }
   }
   // a block RAM's or a DSP48A1's settings and contents
@@ -170,7 +173,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const iobFile = new URL(`./db/${r6.device.device}-iob.json`, import.meta.url), iob = fs.existsSync(iobFile) ? JSON.parse(fs.readFileSync(iobFile, 'utf8')) : null;
     const cmtFile = new URL(`./db/${r6.device.device}-cmt-paths.json`, import.meta.url), cmt = fs.existsSync(cmtFile) ? JSON.parse(fs.readFileSync(cmtFile, 'utf8')) : null;
     const hardFile = new URL(`./db/${r6.device.device}-hard.json`, import.meta.url), hard = fs.existsSync(hardFile) ? JSON.parse(fs.readFileSync(hardFile, 'utf8')) : null;
-    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob, clocks: read('s6-clocks'), cmt, hard });
+    const setFile = new URL(`./db/${r6.device.device}-cmt-settings.json`, import.meta.url), cmtSettings = fs.existsSync(setFile) ? JSON.parse(fs.readFileSync(setFile, 'utf8')) : null;
+    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob, clocks: read('s6-clocks'), cmt, hard, cmtSettings });
     for (const [w, n] of u) unknown.set(w, (unknown.get(w) || 0) + n);
     const empty = emptyFdri(dev), rows = dev.rows * dev.rowFrames * FRAME_WORDS, iobStart = (dev.rows * dev.rowFrames + dev.bramFrames) * FRAME_WORDS, have = new Set(), w0 = typesAt(device, dev);
     const where = (f, b) => (f >= dev.rows * dev.rowFrames + dev.bramFrames ? 'IOB words' : f >= dev.rows * dev.rowFrames ? 'BRAM frames' : w0(f, b));

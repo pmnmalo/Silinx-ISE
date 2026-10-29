@@ -4,7 +4,8 @@
 // --fields: the values that set each bit of the counters (CLKFX_MULTIPLY / DIVIDE - 1, the PLL's multiplier, divider and
 // output divider, CLKDV), the PLL's VCO kept between 400 and 1080 MHz (a 100 MHz input).
 // --paths: the base from other clock pads and to BUFGs at fixed BUFGMUXes (the CMT's clock path).
-//   node research/s6/gen-dcm6.mjs [--fields | --paths] <out dir> [part]   -> <out dir>/<name>/{top.v, top.ucf, top.txt}
+//   node research/s6/gen-dcm6.mjs [--fields | --paths] [--dcm <site>] <out dir> [part]   -> <out dir>/<name>/{top.v, top.ucf, top.txt}
+// (--dcm: the DCM's designs only, at that site)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,9 +73,11 @@ export function dcmDesign({ kind, params, out }, { clk = 'V10', d = 'T10', q = '
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2), fields = args[0] === '--fields', paths = args[0] === '--paths';
+  // --dcm <site>: the DCM's designs only, at that site (#1951: an even DCM's settings bits are not the odd one's moved)
+  const all = process.argv.slice(2), at = all.indexOf('--dcm'), dcmSite = at < 0 ? null : all[at + 1];
+  const args = at < 0 ? all : [...all.slice(0, at), ...all.slice(at + 2)], fields = args[0] === '--fields', paths = args[0] === '--paths';
   const [out, part = 'xc6slx16csg324-3'] = fields || paths ? args.slice(1) : args;
-  if (!out) { console.error('usage: node research/s6/gen-dcm6.mjs [--fields | --paths] <out dir> [part]'); process.exit(1); }
+  if (!out) { console.error('usage: node research/s6/gen-dcm6.mjs [--fields | --paths] [--dcm <site>] <out dir> [part]'); process.exit(1); }
   if (paths) {
     for (const x of pathVariants()) {
       const dir = path.join(out, x.name), { v, ucf } = dcmDesign({ kind: x.kind, params: {}, out: x.kind === 'dcm' ? 'CLKFX' : 'CLKOUT0' }, { site: x.kind === 'dcm' ? 'DCM_X0Y1' : 'PLL_ADV_X0Y0', ...(x.clk ? { clk: x.clk } : {}), bo: x.bo, bf: x.bf });
@@ -84,9 +87,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(`${part}: ${pathVariants().length} designs`);
     process.exit(0);
   }
-  const vs = fields ? fieldVariants() : dcmVariants();
+  const vs = Object.fromEntries(Object.entries(fields ? fieldVariants() : dcmVariants()).filter(([, x]) => !dcmSite || x.kind === 'dcm'));
   for (const [name, x] of Object.entries(vs)) {
-    const dir = path.join(out, name), site = x.kind === 'dcm' ? 'DCM_X0Y1' : 'PLL_ADV_X0Y0';
+    const dir = path.join(out, name), site = x.kind === 'dcm' ? dcmSite ?? 'DCM_X0Y1' : 'PLL_ADV_X0Y0';
     fs.mkdirSync(dir, { recursive: true });
     const { v, ucf } = dcmDesign(x, { site });
     fs.writeFileSync(path.join(dir, 'top.v'), v);

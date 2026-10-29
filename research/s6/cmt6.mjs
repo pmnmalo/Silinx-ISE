@@ -24,3 +24,18 @@ export function predictCmt(kind, { pad, bufgs }) {
   if (extra.length) { const d = kind.bufgs[extra[0]]; if (!d) return null; apply(d); }
   return bits;
 }
+
+/** The frame of a part's CMT settings in row 0 (#727: minor 30 of the CMT's column). */
+export const CMT_FRAME = { xc6slx16: 357, xc6slx45: 565 };
+
+/** A CMT's settings key: its kind (a DCM's by its Y's parity, the two DCMs of a tile differ) and its settings (#1951). */
+export const cmtKind = inst => `${inst.type === 'DCM' ? `DCM${+inst.site.match(/Y(\d+)$/)[1] % 2 ? '1' : '0'}` : inst.type} ${cmtCfg(inst)}`;
+
+/**
+ * A DCM's or PLL's settings bits at its site (db/<device>-cmt-settings.json, ana-cmtsites6.mjs): its kind's pattern in
+ * its tile's row (rowFirst: the row's first frame); null when that setting is not measured.
+ */
+export function predictCmtSettings(inst, settings, rowFirst) {
+  const p = settings.patterns[cmtKind(inst)];
+  return p ? p.bits.map(q => { const [f, b] = q.split(',').map(Number); return `${rowFirst + f},${b}`; }) : null;
+}
