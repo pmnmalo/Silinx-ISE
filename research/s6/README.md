@@ -656,7 +656,13 @@ Recorded here because the work was planned without the author's answers (2026-10
   identical; the others are the clock managers' gaps (#2025), and a DCM or PLL is now always named as not measured,
   so no bitstream differs from ISE's without saying so.
 - **In the open flow** (under the flag): `bitgen` and `prombit` write `<top>.bit` and `<top>_prom.bit`; a feature the
-  databases do not have stops the step with the list.
+  databases do not have stops the step with the list. **The router takes the switches whose bits are known**
+  (`knownPipS6`; a net that needs others, a pad whose I/O path is not measured, is routed on every switch and the
+  bitstream step names them), and **the PIP families with no bits** (`NO_BITS`: a block RAM's and a DSP48A1's pins to
+  their switch boxes, 14 + 11 outputs and 44 + 127 inputs measured, and an interface tile's LOGICOUT_n to LOGICOUTn,
+  17, every one without bits) are taken as none when not measured. On the Nexys3, six of the seven examples go from
+  their HDL to their bitstream in the open flow (gates, traffic, blinky, pong, stopwatch, vga), every PERIOD met; clock
+  stops at bitgen on a flip-flop set as a gate (`#AND2L`, not measured: #2061).
 
 ## Trying the parts that exist
 
