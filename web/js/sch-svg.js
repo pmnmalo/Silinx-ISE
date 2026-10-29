@@ -157,6 +157,19 @@ function typeUnder(sym, def, box, center, name) {
   const turned = sym.rot === 90 || sym.rot === 270;
   return `<text class="stype" x="${turned ? box.x + box.w + 3 : t.x}" y="${turned ? center.y + 3 : (sym.rot === 180 ? box.y - 3 : box.y + box.h + 10)}" text-anchor="${turned ? 'start' : 'middle'}">${esc(name)}</text>`;
 }
+// the symbol's type inside its body (AND2, INV, M2_1…), as ISE's symbols have it (#2041): at the body's centre, upright;
+// 8 px bold, about 5.5 px a character, squeezed to the body's width when a little longer. A triangle (INV, BUF) has
+// room for it only near its base, where it is 9 px tall, and only upright: no squeezing. Null when it does not fit (the
+// caller draws it under)
+function typeInside(sym, def, name) {
+  const turned = sym.rot === 90 || sym.rot === 270, tri = def.shape === 'inv' || def.shape === 'buf';
+  if (tri && turned) return null;
+  const room = tri ? def.body.w * 0.55 - 2 : (turned ? def.body.h : def.body.w) - 6, need = name.length * 5.5;
+  if (need > room * (tri ? 1 : 1.3)) return null;
+  const c = xform(sym, def, def.body.x + (tri ? (def.body.w * 0.55) / 2 + 1 : def.body.w / 2), def.body.y + def.body.h / 2);
+  const fit = need > room ? ` textLength="${r1(room)}" lengthAdjust="spacingAndGlyphs"` : '';
+  return `<text class="stype inside" x="${r1(c.x)}" y="${r1(c.y + 3)}" text-anchor="middle"${fit}>${esc(name)}</text>`;
+}
 const AUTO_NAME = /^(XLXI_\d+|inst_\d+|U\d+)$/;
 // a pin's name inside the body, past its lead and clock triangle (L px from the pin's end); on the top or the bottom
 // side, upright, or turned to read upwards (vertical: names that would not fit 20 px apart, as ISE turns them, #1134)
@@ -179,23 +192,19 @@ function textsSvg(sym, def, ctx = {}) {
   const showName = !!sym.name && (ctx.allNames ? !['vcc', 'gnd'].includes(sym.type)
     : !['constant', 'vcc', 'gnd', 'slice', 'busjoin'].includes(sym.type) && !AUTO_NAME.test(sym.name || ''));
   const pinLabels = ['module', 'hdl', 'ff', 'arith', 'mux', 'demux', 'lib'].includes(def.shape);
-  // (a multiplexer / demultiplexer: its type above it, the instance name above that, #313)
+  // (a multiplexer / demultiplexer: its type inside it, upright (#2041); turned, or a DEMUX, above it, the instance
+  // name above that, #313)
   const muxType = def.shape === 'mux' || def.shape === 'demux';
-  // (inside the body, at its centre, when it fits its width (9 px text, about 5.4 px a character): the gates, the
-  // multiplexers and the others, #2036; else above it, as before)
-  const bodyW = sym.rot === 90 || sym.rot === 270 ? def.body.h : def.body.w;
-  const inside = showName && sym.name.length * 5.4 <= bodyW - (def.shape === 'inv' || def.shape === 'buf' ? 6 : 10);
-  if (inside) {
-    // (a triangle, inv / buf / tbuf: nearer its wide side, where it has room)
-    const c = ['inv', 'buf', 'tbuf'].includes(def.shape) ? cx(def.body.x + def.body.w * 0.38, def.body.y + def.body.h / 2) : center;
-    s += `<text class="iname inside" x="${c.x}" y="${c.y + 3}" text-anchor="middle">${esc(sym.name)}</text>`;
-  } else if (showName) {
+  const muxIn = muxType && def.title && def.shape === 'mux' && sym.rot !== 90 && sym.rot !== 270 ? typeInside(sym, def, def.title) : null;
+  const muxAbove = muxType && !muxIn;
+  if (showName) {
     // above the symbol; when pins stick out of the top (turned symbols), beside the top right corner instead
     const topPins = (def.shape === 'lib' || def.shape === 'demux' || def.shape === 'mux' || def.shape === 'ff') && symbolPins(sym, null, def).some(p => p.side === 'N');
-    s += topPins ? `<text class="iname" x="${box.x + box.w + 3}" y="${box.y - 2 - (muxType ? 11 : 0)}" text-anchor="start">${esc(sym.name)}</text>`
-      : `<text class="iname" x="${box.x + box.w / 2}" y="${box.y - 4 - (muxType ? 11 : 0)}" text-anchor="middle">${esc(sym.name)}</text>`;
+    s += topPins ? `<text class="iname" x="${box.x + box.w + 3}" y="${box.y - 2 - (muxAbove ? 11 : 0)}" text-anchor="start">${esc(sym.name)}</text>`
+      : `<text class="iname" x="${box.x + box.w / 2}" y="${box.y - 4 - (muxAbove ? 11 : 0)}" text-anchor="middle">${esc(sym.name)}</text>`;
   }
-  if (muxType && def.title) {
+  if (muxIn) s += muxIn;
+  else if (muxType && def.title) {
     const topPins = symbolPins(sym, null, def).some(p => p.side === 'N');
     s += topPins ? `<text class="stype" x="${box.x + box.w + 3}" y="${box.y + 9}" text-anchor="start">${esc(def.title)}</text>`
       : `<text class="stype" x="${box.x + box.w / 2}" y="${box.y - 4}" text-anchor="middle">${esc(def.title)}</text>`;
@@ -255,8 +264,11 @@ function textsSvg(sym, def, ctx = {}) {
     const o = symbolPins(sym, null, def)[0];
     if ((o.width || 1) > 1) s += pinWidth(o);
   } else if (def.shape === 'gate' || def.shape === 'inv' || def.shape === 'buf') {
-    // the type under the symbol (AND2, OR3B1, INV…), as ISE draws it (#172)
-    s += typeUnder(sym, def, box, center, symbolTypeName(sym));
+    // the type (AND2, OR3B1, INV…) inside the symbol (#2041), else under it, as ISE draws it (#172)
+    s += typeInside(sym, def, symbolTypeName(sym)) ?? typeUnder(sym, def, box, center, symbolTypeName(sym));
+  } else if (def.shape === 'tbuf') {
+    // (its type, BUFE / BUFT4…, under it: its triangles too small for it, #2041)
+    s += typeUnder(sym, def, box, center, def.title);
   }
   if (def.shape === 'gate' || def.shape === 'inv' || def.shape === 'buf' || def.shape === 'tbuf') {
     // a gate wider than a bit: the width on each bus pin's lead, as the other symbols, nothing in its shape (#1486)
