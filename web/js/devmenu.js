@@ -68,7 +68,7 @@ export function developmentMenu(build = BUILD) {
     // the handwritten input, a preview (#1055, #1098): on the open truth table or schematic (the expressions in the
     // truth table editor's toolbar, #2010)
     '-',
-    { label: 'Handwritten Truth Table…', disabled: !S.active?.ttEditor, action: () => S.active?.ttEditor?.handwrittenTable() },
+    { label: 'Handwritten Boolean Algebra…', disabled: !S.active?.ttEditor, action: () => S.active?.ttEditor?.handwrittenTable() },
     { label: 'Handwritten Schematic…', disabled: !S.active?.schEditor?.handwritten, action: () => S.active?.schEditor?.handwritten() },
   ] };
 }

@@ -328,7 +328,7 @@ uiTest('State diagram (FSM) in Portuguese: every label of the editor, the panels
   await setLang('en');
 });
 
-uiTest('State diagram (FSM): Create Truth Tables with more than 4 output bits makes one table of the outputs (#176)', E, async (page) => {
+uiTest('State diagram (FSM): Create Boolean Algebra with more than 4 output bits makes one table of the outputs (#176)', E, async (page) => {
   // a Moore machine with 6 output bits (busy, sel[1:0], led[2:0]): one _out table, not _out1 / _out2
   const m = normalizeFsm({
     name: 'wide', type: 'moore', lang: 'vhdl', reset: { name: 'rst', active: 'high', sync: true },

@@ -298,7 +298,7 @@ for (const theme of ['dark', 'light']) {
     await makeProject(env, { name: `Tools_${theme}`, files: { 'src/wide.tt.json': JSON.stringify(wide) } });
     const { check, bad } = await themed(page, theme);
     await page.openProject(`Tools_${theme}`);
-    for (const [item, sel] of [['ASM State Machine Editor…', '.asm-editor'], ['FSM State Diagram Editor…', '.fsm-editor'], ['Truth Table / Karnaugh Map…', '.tt-editor']]) {
+    for (const [item, sel] of [['ASM State Machine Editor…', '.asm-editor'], ['FSM State Diagram Editor…', '.fsm-editor'], ['Boolean Algebra / Karnaugh Map…', '.tt-editor']]) {
       await page.menu('Tools', item);
       await page.waitDialog('New Source Wizard');
       await page.dialogButton('Next >');

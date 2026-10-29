@@ -5,7 +5,7 @@ import { t } from './i18n.js';
 export const INK_PT = {
   'Handwritten Expression': 'Expressão Manuscrita',
   // the Development menu's items (#1098)
-  'Handwritten Truth Table…': 'Tabela de Verdade Manuscrita…',
+  'Handwritten Boolean Algebra…': 'Álgebra Booleana Manuscrita…',
   'Handwritten Schematic…': 'Esquemático Manuscrito…',
   "Write the expressions with a pen, a finger or the mouse, one a line, with any names, e.g. F = A·B' + C. A bar over letters is NOT; a dot or a * is AND.":
     "Escreva as expressões com uma caneta, um dedo ou o rato, uma por linha, com quaisquer nomes, p.ex. F = A·B' + C. Uma barra sobre letras é NOT; um ponto ou um * é AND.",
@@ -43,8 +43,8 @@ export const INK_PT = {
   'The browser did not keep the sample (storage unavailable).': 'O navegador não guardou a amostra (armazenamento indisponível).',
   'Nothing written: write the expression on the pad.': 'Nada escrito: escreva a expressão na área de escrita.',
   "More than one '=': only the first one separates the name from the expression.": "Mais de um '=': só o primeiro separa o nome da expressão.",
-  // the Handwritten Truth Table dialog (#1066) and its messages
-  'Handwritten Truth Table': 'Tabela de Verdade Manuscrita',
+  // the Handwritten Boolean Algebra dialog (#1066) and its messages
+  'Handwritten Boolean Algebra': 'Álgebra Booleana Manuscrita',
   "Draw the truth table with a pen, a finger or the mouse: the names in a header, a line under it, a line between the inputs and the outputs, then a row of 0, 1 or X (don't care) for each combination.":
     'Desenhe a tabela de verdade com uma caneta, um dedo ou o rato: os nomes num cabeçalho, uma linha por baixo dele, uma linha entre as entradas e as saídas, depois uma linha de 0, 1 ou X (indiferente) para cada combinação.',
   'Nothing written: draw the table on the pad.': 'Nada escrito: desenhe a tabela na área de escrita.',

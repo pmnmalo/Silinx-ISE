@@ -189,7 +189,7 @@ test('the handwritten input (#1056): the texts of its modules and the recognizer
     '7 inputs (A, B, C, D, E, G, H): at most 6.': '7 entradas (A, B, C, D, E, G, H): no máximo 6.',
     'Handwritten Expression': 'Expressão Manuscrita', 'Teach Silinx my handwriting': 'Ensinar ao Silinx a minha letra',
     // the truth tables drawn by hand (#1066)
-    'Handwritten Truth Table…': 'Tabela de Verdade Manuscrita…', 'Handwritten Schematic…': 'Esquemático Manuscrito…', 'Header: two names over column 2 (A, B).': 'Cabeçalho: dois nomes sobre a coluna 2 (A, B).',
+    'Handwritten Boolean Algebra…': 'Álgebra Booleana Manuscrita…', 'Handwritten Schematic…': 'Esquemático Manuscrito…', 'Header: two names over column 2 (A, B).': 'Cabeçalho: dois nomes sobre a coluna 2 (A, B).',
     'Row 3, column 1: no value.': 'Linha 3, coluna 1: sem valor.', 'Row 3, column 1: 2 symbols.': 'Linha 3, coluna 1: 2 símbolos.',
     'Column 3 has no name: out1.': 'A coluna 3 não tem nome: out1.', "Line 1: '1b' is not a name.": "Linha 1: '1b' não é um nome.",
     "Line 1: 'A' is named twice.": "Linha 1: 'A' aparece duas vezes.", '1 to 6 inputs (the table has 7).': '1 a 6 entradas (a tabela tem 7).',

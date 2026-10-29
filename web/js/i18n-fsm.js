@@ -4,7 +4,7 @@ export const FSM_PT = {
   'FSM State Diagram Editor…': 'Editor de Diagramas de Estados FSM…',
   'View/Edit State Diagram (FSM)': 'Ver/Editar Diagrama de Estados (FSM)', 'Convert to State Diagram (FSM)…': 'Converter para Diagrama de Estados (FSM)…',
   'Open State Diagram': 'Abrir Diagrama de Estados', 'Convert to ASM chart': 'Converter para fluxograma ASM',
-  'Convert to State Diagram': 'Converter para Diagrama de Estados', 'Create Truth Tables': 'Criar Tabelas de Verdade',
+  'Convert to State Diagram': 'Converter para Diagrama de Estados', 'Create Boolean Algebra': 'Criar Álgebra Booleana',
   
   '— generated from the diagram': '— gerado a partir do diagrama',
   // toolbar
@@ -51,7 +51,7 @@ export const FSM_PT = {
   'Transition table': 'Tabela de transições', 'State table': 'Tabela de estados', 'Encoded transition table': 'Tabela de transições codificada',
   'Present state': 'Estado presente', 'Code': 'Código', 'Input condition': 'Condição das entradas', 'Next state': 'Estado seguinte', 'Next code': 'Código seguinte',
   'otherwise (stays)': 'caso contrário (fica)', 'unused code': 'código não usado',
-  'Create truth tables (.tt.json) of the next-state bits and of the outputs, to simplify them with Karnaugh maps': 'Criar tabelas de verdade (.tt.json) dos bits do estado seguinte e das saídas, para as simplificar com mapas de Karnaugh',
+  'Create Boolean Algebra sources (.tt.json) of the next-state bits and of the outputs, to simplify them with Karnaugh maps': 'Criar fontes de Álgebra Booleana (.tt.json) dos bits do estado seguinte e das saídas, para as simplificar com mapas de Karnaugh',
   'The encoded table is made for the binary and gray encodings (choose one of them)': 'A tabela codificada é feita para as codificações binária e Gray (escolha uma delas)',
   'Correct the errors of the diagram first': 'Corrija primeiro os erros do diagrama',
   // simulation

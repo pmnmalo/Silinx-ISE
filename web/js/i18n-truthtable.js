@@ -1,10 +1,10 @@
-// Portuguese strings of the Truth Table / Karnaugh Map tool (merged into the dictionary of i18n.js).
+// Portuguese strings of the Boolean Algebra / Karnaugh Map tool (merged into the dictionary of i18n.js).
 export const TT_PT = {
   // menus, processes, New Source
-  'Truth Table / Karnaugh Map…': 'Tabela de Verdade / Mapa de Karnaugh…', 'Truth Table / Karnaugh Map': 'Tabela de Verdade / Mapa de Karnaugh',
-  'Truth Table': 'Tabela de Verdade', 'View/Edit Truth Table': 'Ver/Editar Tabela de Verdade',
-  'Open Truth Table': 'Abrir Tabela de Verdade',
-  'Truth Table from Module': 'Tabela de Verdade de um Módulo',
+  'Boolean Algebra / Karnaugh Map…': 'Álgebra Booleana / Mapa de Karnaugh…', 'Boolean Algebra / Karnaugh Map': 'Álgebra Booleana / Mapa de Karnaugh',
+  'Boolean Algebra': 'Álgebra Booleana', 'View/Edit Boolean Algebra': 'Ver/Editar Álgebra Booleana',
+  'Open Boolean Algebra': 'Abrir Álgebra Booleana',
+  'Boolean Algebra from Module': 'Álgebra Booleana de um Módulo',
   'Combinational module (at most 8 input bits): its truth table is computed by simulating every input combination.':
     'Módulo combinatório (no máximo 8 bits de entrada): a tabela de verdade é calculada simulando todas as combinações das entradas.',
   'The project has no design modules.': 'O projeto não tem módulos de projeto.',
@@ -21,7 +21,7 @@ export const TT_PT = {
   'The maps stacked in depth: a group across maps seen as one box': 'Os mapas empilhados em profundidade: um grupo que atravessa mapas visto como uma só caixa',
   'The form with the fewest gates, each symbol one gate whatever its number of inputs': 'A forma com menos portas, cada símbolo uma porta qualquer que seja o seu número de entradas',
   'The form with the fewest gates on its longest path, every gate the same delay': 'A forma com menos portas no caminho mais longo, todas as portas com o mesmo atraso',
-  'Truth Table from Module…': 'Tabela de Verdade de um Módulo…',
+  'Boolean Algebra from Module…': 'Álgebra Booleana de um Módulo…',
   'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)': 'Preencher a tabela com a tabela de verdade de um módulo combinatório do projeto (simulação exaustiva)',
   'Not in sync with': 'Não sincronizado com', '— generated from the table': '— gerado a partir da tabela',
   // editor body
@@ -39,7 +39,7 @@ export const TT_PT = {
   'NAND form': 'Forma NAND', 'NOR form': 'Forma NOR',
   'The minimal SOP with NAND gates only (double negation); an inverter is a NAND of one input': 'A SOP mínima só com portas NAND (dupla negação); um inversor é uma NAND de uma entrada',
   'The minimal POS with NOR gates only (double negation); an inverter is a NOR of one input': 'A POS mínima só com portas NOR (dupla negação); um inversor é uma NOR de uma entrada',
-  'Generated from the truth table, in its HDL logic form': 'Gerado a partir da tabela de verdade, na sua forma da lógica do HDL',
+  'Generated from the Boolean algebra, in its HDL logic form': 'Gerado a partir da álgebra booleana, na sua forma da lógica do HDL',
   'Notation:': 'Notação:', 'Notation of the expressions': 'Notação das expressões', 'Canonical forms': 'Formas canónicas',
   'essential': 'essencial',
   'No 1s: no groups (the output is always 0).': 'Sem 1s: sem grupos (a saída é sempre 0).',

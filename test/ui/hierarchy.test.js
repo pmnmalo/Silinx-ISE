@@ -1,6 +1,6 @@
 // UI: the Design pane's hierarchy (#207, #220): one row per module / instance, its base's icon on the
 // left and a badge for each of its views after its name: the drawing's first ([Schematic] [ASM] [FSM]
-// [Table] [Petri], the base, marked), its HDL's last, named by its language ([VHDL] / [Verilog]: first
+// [Algebra] [Petri], the base, marked), its HDL's last, named by its language ([VHDL] / [Verilog]: first
 // only when the module is only HDL); no child rows for the views. The examples in both views
 // (Implementation / Simulation); a badge opens its view, its right-click shows that view's commands
 // (no Convert to HDL / HDL as base / Remove Synchronized …, #220); the module's menu (no truth table
@@ -81,7 +81,7 @@ const EXAMPLES = {
       '    moduleTop top [VHDL*] (top.vhd)',
       '      fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
       '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
-      '      truthtable u_lamps - lamps [Table*] [Schematic] [VHDL] (lamps.tt.json)',
+      '      truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.tt.json)',
       '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
     ],
     sim: [
@@ -91,14 +91,14 @@ const EXAMPLES = {
       '      vhdl uut - top [VHDL*] (top.vhd)',
       '        fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
       '        vhdl u_timer - timer [VHDL*] (timer.vhd)',
-      '        truthtable u_lamps - lamps [Table*] [Schematic] [VHDL] (lamps.tt.json)',
+      '        truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.tt.json)',
       '        verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
     ],
     tips: [
       'top: VHDL (Open)',
       'u_fsm - traffic: FSM (Base: its HDL is generated from it) VHDL (Generated from the state diagram)',
       'u_timer - timer: VHDL (Open)',
-      'u_lamps - lamps: Table (Base: its HDL is generated from it) Schematic (Generated from the truth table, in its HDL logic form) VHDL (Generated from the truth table)',
+      'u_lamps - lamps: Algebra (Base: its HDL is generated from it) Schematic (Generated from the Boolean algebra, in its HDL logic form) VHDL (Generated from the Boolean algebra)',
       'u_display - sevenseg: Verilog (Open)',
     ],
   },
@@ -220,7 +220,7 @@ uiTest('Design pane (#220): a badge opens its view, its right-click shows that v
   await makeProject(env, { name: 'H_badges2', template: 'traffic' });
   await page.openProject('H_badges2');
   assert.deepEqual(await badgeMenu(page, 'u_fsm - traffic', 'FSM'), ['Open', 'Convert to ASM chart', 'Remove from Project']);
-  assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'Table'), ['Open', 'Remove from Project']);
+  assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'Algebra'), ['Open', 'Remove from Project']);
   const PLAIN = ['Set as Top Module', 'Open', 'Rename…', 'Check Syntax', 'View RTL Schematic', ...TB,
     'Convert to Schematic (editable)…', 'Convert to State Machine (ASM)…', 'Convert to State Diagram (FSM)…', 'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…'];
   assert.deepEqual(await badgeMenu(page, 'u_timer - timer', 'VHDL'), PLAIN);
@@ -283,7 +283,7 @@ const KINDS = [
   { type: 'sch', name: 'g1', file: 'src/g1.sch.json', ico: 'schematic', badge: 'Schematic', id: 'sch:src/g1.sch.json' },
   { type: 'asm', name: 'c1', file: 'src/c1.asm.json', ico: 'asm', badge: 'ASM', id: 'asm:src/c1.asm.json' },
   { type: 'fsm', name: 'f1', file: 'src/f1.fsm.json', ico: 'fsm', badge: 'FSM', id: 'fsm:src/f1.fsm.json' },
-  { type: 'tt', name: 't1', file: 'src/t1.tt.json', ico: 'truthtable', badge: 'Table', views: ' [Schematic]', id: 'tt:src/t1.tt.json' },
+  { type: 'tt', name: 't1', file: 'src/t1.tt.json', ico: 'truthtable', badge: 'Algebra', views: ' [Schematic]', id: 'tt:src/t1.tt.json' },
   { type: 'petri', name: 'p1', file: 'src/p1.pn.json', ico: 'petri', badge: 'Petri', id: 'pn:src/p1.pn.json' },
 ];
 for (const [lang, L, ext] of [['vhdl', 'VHDL', 'vhd'], ['verilog', 'Verilog', 'v']]) {
@@ -351,20 +351,20 @@ uiTest('Design pane (#207) from the keyboard: ↑ / ↓ select, ← / → collap
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#hier .badge[tabindex="0"]')].map((b) => b.closest('.row').querySelector('.lbl').textContent + ':' + b.textContent)), ['u_fsm - traffic:FSM', 'u_fsm - traffic:VHDL']);
 });
 
-uiTest('Design pane (#207, #220) in Portuguese: the badges [FSM] [Tabela] [VHDL] [Verilog] and their tips; a badge\'s menu', E, async (page) => {
+uiTest('Design pane (#207, #220) in Portuguese: the badges [FSM] [Álgebra] [VHDL] [Verilog] and their tips; a badge\'s menu', E, async (page) => {
   await makeProject(env, { name: 'H_pt', template: 'traffic' });
   await page.openProject('H_pt');
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
   try {
-    await page.waitFor(() => [...document.querySelectorAll('#hier .badge')].some((b) => b.textContent === 'Tabela'), [], { what: 'the badges in Portuguese' });
+    await page.waitFor(() => [...document.querySelectorAll('#hier .badge')].some((b) => b.textContent === 'Álgebra'), [], { what: 'the badges in Portuguese' });
     assert.deepEqual(await tips(page), [
       'top: VHDL (Abrir)',
       'u_fsm - traffic: FSM (Base: o seu HDL é gerado a partir daqui) VHDL (Gerado a partir do diagrama de estados)',
       'u_timer - timer: VHDL (Abrir)',
-      'u_lamps - lamps: Tabela (Base: o seu HDL é gerado a partir daqui) Esquemático (Gerado a partir da tabela de verdade, na sua forma da lógica do HDL) VHDL (Gerado a partir da tabela de verdade)',
+      'u_lamps - lamps: Álgebra (Base: o seu HDL é gerado a partir daqui) Esquemático (Gerado a partir da álgebra booleana, na sua forma da lógica do HDL) VHDL (Gerado a partir da álgebra booleana)',
       'u_display - sevenseg: Verilog (Abrir)',
     ]);
-    assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'Tabela'), ['Abrir', 'Remover do Projeto']);
+    assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'Álgebra'), ['Abrir', 'Remover do Projeto']);
     assert.deepEqual(await badgeMenu(page, 'u_fsm - traffic', 'FSM'), ['Abrir', 'Converter para fluxograma ASM', 'Remover do Projeto']);
     // the HDL editor's banner
     await badge(page, 'u_lamps - lamps', 'VHDL');
@@ -411,8 +411,8 @@ uiTest('drawings whose base was their HDL (before #220), the HDL edited by hand:
   await page.openProject('H_mig_fsm');
   await page.waitConsole(/src\/traffic\.fsm\.json made again/);
   assert.deepEqual(await consoleAfterOpen(page), [
-    'src/lamps.tt.json made again from src/lamps.vhd (its base until now) and now its base: that file is generated from the truth table from now on.',
-    'WARNING: src/lamps.tt.json: src/lamps.vhd is not what the truth table makes (edited by hand): it is kept as it is until the truth table is edited, which rewrites it',
+    'src/lamps.tt.json made again from src/lamps.vhd (its base until now) and now its base: that file is generated from the Boolean algebra from now on.',
+    'WARNING: src/lamps.tt.json: src/lamps.vhd is not what the Boolean algebra makes (edited by hand): it is kept as it is until the Boolean algebra is edited, which rewrites it',
     'src/traffic.fsm.json made again from src/traffic.vhd (its base until now) and now its base: that file is generated from the state diagram from now on.',
     'WARNING: src/traffic.fsm.json: src/traffic.vhd is not what the state diagram makes (edited by hand): it is kept as it is until the state diagram is edited, which rewrites it',
   ]);
@@ -486,7 +486,7 @@ end architecture rtl;
     '    moduleTop top [VHDL*] (top.vhd)',
     '      vhdl u_fsm - traffic [VHDL*] (traffic.vhd)',
     '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
-    '      truthtable u_lamps - lamps [Table*] [Schematic] [VHDL] (lamps.tt.json)',
+    '      truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.tt.json)',
     '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
   ]);
 }, { ui: 'classic' });

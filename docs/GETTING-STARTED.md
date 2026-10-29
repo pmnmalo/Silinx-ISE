@@ -21,7 +21,7 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, its projects kept apart) and go to st
 1. Open the **[latest release](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
 2. Under **Assets**, click **`Silinx-ISE.html`** to download it.
 3. Double-click the downloaded file. It opens in your browser (Chrome, Edge, Firefox or Safari).
-4. On the Start page click **New Project…** and choose in *Start from* **Example: gates** (logic gates drawn as a schematic: a good first example), **Example: traffic** (a pedestrian crossing: a state diagram and a truth table), **Example: blinky** (or *pong*, a game for two, *stopwatch*, *clock* or *vga*, a picture on a VGA monitor) or **Empty project**. After the examples come the **Test design: …** entries: designs Silinx itself is tested with (schematics, state diagrams, C programs for Silinx HLS), each with its test (a test bench, or the C program's `main()`), to see what Silinx does with each kind of source.
+4. On the Start page click **New Project…** and choose in *Start from* **Example: gates** (logic gates drawn as a schematic: a good first example), **Example: traffic** (a pedestrian crossing: a state diagram and a Boolean algebra), **Example: blinky** (or *pong*, a game for two, *stopwatch*, *clock* or *vga*, a picture on a VGA monitor) or **Empty project**. After the examples come the **Test design: …** entries: designs Silinx itself is tested with (schematics, state diagrams, C programs for Silinx HLS), each with its test (a test bench, or the C program's `main()`), to see what Silinx does with each kind of source.
 
 That's all. Things to know:
 
@@ -128,7 +128,7 @@ A black window (the Silinx server) opens and then your browser shows Silinx at
 
 - Start page ▸ **New Project…**, *Start from* **Example: gates** for a first look (AND, OR, NOT and NAND gates in
   a schematic: a 4-bit prime-number detector on the switches and two LEDs), **Example: traffic** next (a
-  pedestrian crossing: its controller a state diagram, its lamps a truth table), **Example: blinky** to explore a
+  pedestrian crossing: its controller a state diagram, its lamps a Boolean algebra), **Example: blinky** to explore a
   complete design, or **Empty project**.
 - Your projects are saved as normal folders in **`Silinx-projects`** in your user folder
   (Windows: `C:\Users\<you>\Silinx-projects`, macOS: `/Users/<you>/Silinx-projects`).

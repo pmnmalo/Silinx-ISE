@@ -1,4 +1,4 @@
-// Truth Table / Karnaugh Map editor (documents <name>.tt.json). The inputs (1–6) and outputs (any
+// Boolean Algebra / Karnaugh Map editor (#2017: it was Truth Table; documents <name>.tt.json). The inputs (1–6) and outputs (any
 // number: the table scrolls, one output at a time in the tabs) are named in the toolbar; the truth table is edited by clicking its output cells (0 → 1 → X) or by
 // typing an expression per output. For the selected output: Karnaugh map with the groups of the
 // minimal SOP (1s) or POS (0s), canonical forms Σm / ΠM, minimal SOP and POS with their literal and
@@ -133,7 +133,7 @@ export function mountTtEditor(container, opts = {}) {
     h('span', { class: 'tt-sep' }),
     h('label', { title: FORM_TIP }, 'HDL logic:'), formSel, h('label', { title: 'HDL language' }, 'Language:'), langSel,
     h('span', { class: 'tt-sep' }),
-    btn('Truth Table from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()), btn('Handwritten…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
+    btn('Boolean Algebra from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()), btn('Handwritten…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
     link);
 
   // ------------------------------------------------------------------ body

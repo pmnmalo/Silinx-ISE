@@ -1,6 +1,6 @@
 // Silinx - combinational logic: Boolean expressions, truth tables, canonical forms, minimisation
 // (Quine–McCluskey + exact cover), Karnaugh map layout and the circuits of a truth table (HDL module,
-// gate schematic). Isomorphic (no DOM). Used by the Truth Table / Karnaugh Map tool (web/js/truthtable.js).
+// gate schematic). Isomorphic (no DOM). Used by the Boolean Algebra / Karnaugh Map tool (web/js/truthtable.js).
 //
 // Conventions
 //   * A function of n inputs [x0, x1, …, x(n-1)] is a column of 2^n values, one per row; row r has
@@ -852,7 +852,7 @@ export function generateTableHdl(docIn, lang = docIn.lang || 'vhdl', { form = do
   const n = doc.inputs.length;
   const res = doc.outputs.map(o => ({ o, a: canonical(doc.table[o]), m: outputForm(doc, o, form) }));
   const head = [
-    `${c} ${doc.name}: combinational module generated from the truth table ${source || `${doc.name}.tt.json`} (Silinx Truth Table / Karnaugh Map).`,
+    `${c} ${doc.name}: combinational module generated from the Boolean algebra ${source || `${doc.name}.tt.json`} (Silinx Boolean Algebra / Karnaugh Map).`,
     `${c} Edit the table, not this file: the file is generated from it. Inputs: ${doc.inputs.join(', ')} (${doc.inputs[0]} is the`,
     `${c} most significant bit of a row).`,
     `${c}`,

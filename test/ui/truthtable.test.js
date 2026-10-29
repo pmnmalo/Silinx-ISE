@@ -1,10 +1,10 @@
-// UI: Truth Table / Karnaugh Map tool. A new table (Tools menu ▸ New Source wizard), cells clicked,
+// UI: Boolean Algebra / Karnaugh Map tool. A new table (Tools menu ▸ New Source wizard), cells clicked,
 // the K-map groups and the minimal SOP shown; its VHDL module (made with it, linked: a cell change
 // rewrites the HDL, which simulates to the new table; the HDL read-only, its editor's banner linking to
 // the table, #1176); its schematic, always generated, a badge of its row
 // in the Design pane, in the HDL logic form, NAND gates only too (#694: netlist without errors,
 // simulates to the table; no Generate Schematic, no Check my answer); renaming the module keeps the
-// link; Truth Table from Module; Apply of the input / output names; a Verilog project's table: its
+// link; Boolean Algebra from Module; Apply of the input / output names; a Verilog project's table: its
 // Verilog module; the / notation by default and the XOR form when simpler, in its HDL and its
 // schematic too, the NAND and NOR forms, in Portuguese (#434, #435, #694).
 import { before, after } from 'node:test';
@@ -43,9 +43,9 @@ const symTypes = (sch) => [...new Set(sch.symbols.map((x) => x.type))].sort();
 uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module following it (read-only, #1176), its schematic in the hierarchy (NAND gates only), rename', E, async (page) => {
   await makeProject(env, { name: 'TtPj', files: { 'src/add1.vhd': ADDER } });
   await page.openProject('TtPj');
-  await page.menu('Tools', 'Truth Table / Karnaugh Map…');
+  await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
   await page.waitDialog('New Source Wizard');
-  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .src-types .st.sel').textContent), /^\s*Truth Table\s*$/);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .src-types .st.sel').textContent), /^\s*Boolean Algebra\s*$/);
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj3');
   await page.dialogButton('Next >');
@@ -88,7 +88,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   // it (no Generate VHDL / Verilog module any more, #220)
   // (no Generate Schematic, no NAND gates only check box: the schematic is always generated, #694; expressions
   // written by hand: Handwritten…, #2010)
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Apply', 'Truth Table from Module…', 'Handwritten…']);
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Apply', 'Boolean Algebra from Module…', 'Handwritten…']);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-toolbar input[type=checkbox]`).length, T), 0);
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj3.vhd'] === 'src/maj3.tt.json', [], { what: 'linked HDL' });
   assert.equal((await ttFile('TtPj', 'src/maj3.tt.json')).generatedFile, 'src/maj3.vhd');
@@ -96,7 +96,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   let vhd = await readWs(env, 'TtPj', 'src/maj3.vhd');
   assert.deepEqual(await consoleAfterOpen(page), [
     'src/maj3.vhd generated from src/maj3.tt.json (every source has its HDL)',
-    "Created Truth Table 'src/maj3.tt.json'.",
+    "Created Boolean Algebra 'src/maj3.tt.json'.",
   ]);
   await page.eval(() => window.SilinxApp.openFile('src/maj3.vhd'));
   assert.deepEqual(await problemRows(page), []);
@@ -104,7 +104,7 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   // the hierarchy shows the module with its table, its views as badges: the table the base, its
   // schematic (#694), the HDL (#207)
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => /maj3/.test(r.textContent) && /maj3\.tt\.json/.test(r.textContent)), [], { what: 'maj3 (maj3.tt.json) in the hierarchy' });
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#hier .row')].filter((r) => r.querySelector('.lbl').textContent === 'maj3').map((r) => [...r.querySelectorAll('.badge')].map((b) => `${b.textContent}${b.classList.contains('base') ? '*' : ''}`))), [['Table*', 'Schematic', 'VHDL']]);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#hier .row')].filter((r) => r.querySelector('.lbl').textContent === 'maj3').map((r) => [...r.querySelectorAll('.badge')].map((b) => `${b.textContent}${b.classList.contains('base') ? '*' : ''}`))), [['Algebra*', 'Schematic', 'VHDL']]);
   // the HDL editor (opened) is read-only, its banner says so and links to the table (#1176)
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/maj3.vhd' && /^Read-only, generated from maj3\.tt\.json$/.test(document.querySelector('.doc:not([hidden]) [data-sync-banner]')?.textContent || ''), [], { what: 'HDL editor banner' });
   assert.equal(await page.eval(() => window.Silinx.active.editor.readOnly()), true);
@@ -244,7 +244,7 @@ uiTest('Truth Table with many outputs (#176): 4 -> 16 outputs, cells of output 6
   assert.deepEqual(await consoleAfterOpen(page), []);
   // the old schematic: a module of its own, beside the table's (Table, Schematic, VHDL)
   const rows = await page.eval(() => Object.fromEntries([...document.querySelectorAll('#hier .row')].filter((r) => /^many/.test(r.querySelector('.lbl').textContent)).map((r) => [r.querySelector('.lbl').textContent, [...r.querySelectorAll('.badge')].map((b) => `${b.textContent}${b.classList.contains('base') ? '*' : ''}`)])));
-  assert.deepEqual(rows, { many: ['Table*', 'Schematic', 'VHDL'], many_sch: ['Schematic*', 'VHDL'] });
+  assert.deepEqual(rows, { many: ['Algebra*', 'Schematic', 'VHDL'], many_sch: ['Schematic*', 'VHDL'] });
   await page.eval(() => window.SilinxApp.openFile('src/many.vhd'));
   assert.deepEqual(await problemRows(page), []);
   assert.match(vhd, /y0, y1, y2, y3, y4, y5, y6, y7, y8, y9, y10, y11, y12, y13, y14, y15 : out std_logic/);
@@ -291,7 +291,7 @@ uiTest("Truth Table expressions (#180): '/' NOT and '.' AND typed in the Express
   await page.waitFor(async () => (await (await fetch('/api/projects/TtOps/file?path=src%2Fops.tt.json')).json()).exprs?.f === '/a.b + a./b', [], { what: 'saved' });
 });
 
-uiTest('Truth Table from Module: a vector adder read into a table (exhaustive simulation); the table has its HDL; no truth table from a module\'s context menu (#220)', E, async (page) => {
+uiTest('Boolean Algebra from Module: a vector adder read into a table (exhaustive simulation); the table has its HDL; no truth table from a module\'s context menu (#220)', E, async (page) => {
   await makeProject(env, { name: 'TtMod', files: { 'src/add1.vhd': ADDER } });
   await page.openProject('TtMod');
   // a module is made from a truth table, not a truth table from a module: the module's menu has none (#220)
@@ -302,11 +302,11 @@ uiTest('Truth Table from Module: a vector adder read into a table (exhaustive si
     'New Source…', `${IMPORT}…`, 'Remove from Project', 'Source Properties…',
   ]);
   await page.closeMenus();
-  // the editor's "Truth Table from Module…" on a new table (with its HDL file, #207)
+  // the editor's "Boolean Algebra from Module…" on a new table (with its HDL file, #207)
   const T = '.doc:not([hidden]) .tt-editor';
   await page.menu('Project', 'New Source…');
   await page.waitDialog('New Source Wizard');
-  await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => /Truth Table/.test(e.textContent)); r.scrollIntoView(); r.click(); });
+  await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => /Boolean Algebra/.test(e.textContent)); r.scrollIntoView(); r.click(); });
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'blank');
   await page.dialogButton('Next >');
@@ -314,10 +314,10 @@ uiTest('Truth Table from Module: a vector adder read into a table (exhaustive si
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/blank.tt.json');
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/blank.vhd'] === 'src/blank.tt.json', [], { what: 'the table linked to its HDL' });
-  await page.click(`${T} .tt-btn`, { text: 'Truth Table from Module…' });
-  await page.waitDialog('Truth Table from Module');
+  await page.click(`${T} .tt-btn`, { text: 'Boolean Algebra from Module…' });
+  await page.waitDialog('Boolean Algebra from Module');
   await page.dialogButton('OK');
-  await page.waitDialog('Truth Table from Module');
+  await page.waitDialog('Boolean Algebra from Module');
   await page.dialogButton('Yes');
   await page.waitNoDialog();
   await page.waitFor((x) => document.querySelector(`${x} .tt-outputs`).value === 's_2, s_1, s_0', [T]);
@@ -338,7 +338,7 @@ uiTest('Truth Table from Module: a vector adder read into a table (exhaustive si
 uiTest('Truth Table (#196): Apply input / output names (columns follow their names, the errors shown); in a Verilog project its Verilog module (compiles to the table, follows it)', E, async (page) => {
   await makeProject(env, { name: 'TtVlog', preferredLanguage: 'verilog' });
   await page.openProject('TtVlog');
-  await page.menu('Tools', 'Truth Table / Karnaugh Map…');
+  await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
   await page.waitDialog('New Source Wizard');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'tv');
@@ -520,9 +520,9 @@ end rtl;
     assert.match(code, lang === 'verilog' ? /^module fa \(/m : /^entity fa is/m);
     assert.match(code, /\(NOR gates only, from the minimal POS/);
     assert.deepEqual(simTable(code, `fa.${ext}`, 'fa'), fa.table);
-    // the Design pane: top instances it, its row [Table*] [Schematic] [L]
+    // the Design pane: top instances it, its row [Algebra*] [Schematic] [L]
     await page.waitFor((l) => [...document.querySelectorAll('#hier .row')].some((r) => /fa$/.test(r.querySelector('.lbl').textContent) && [...r.querySelectorAll('.badge')].some((b) => b.textContent === l)), [L], { what: `the row of fa with [${L}]` });
-    assert.deepEqual(await row('u_fa - fa'), ['Table', 'Schematic', L]);
+    assert.deepEqual(await row('u_fa - fa'), ['Algebra', 'Schematic', L]);
     await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
     await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.vhd');
     assert.deepEqual(await problemRows(page), []);
@@ -551,7 +551,7 @@ end rtl;
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar label`)].map((l) => l.textContent), T), ['Entradas:', 'Saídas:', 'Lógica do HDL:', 'Linguagem:']);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-nand b, ${t} .tt-nor b, ${t} .tt-nand .tt-cost`)].map((b) => b.textContent), T), ['Forma NAND', '8 porta(s), 3 delas inversora(s)', 'Forma NOR']);
   // the Design pane's badges and the schematic's bar
-  assert.deepEqual(await page.eval(() => [...[...document.querySelectorAll('#hier .row')].find((r) => r.querySelector('.lbl').textContent === 'u_fa - fa').querySelectorAll('.badge')].map((b) => b.textContent)), ['Tabela', 'Esquemático', 'VHDL']);
+  assert.deepEqual(await page.eval(() => [...[...document.querySelectorAll('#hier .row')].find((r) => r.querySelector('.lbl').textContent === 'u_fa - fa').querySelectorAll('.badge')].map((b) => b.textContent)), ['Álgebra', 'Esquemático', 'VHDL']);
   assert.equal(await page.eval(() => window.Silinx.docs.find((d) => d.id === 'ttsch:src/fa.tt.json').el.querySelector('.se-banner').textContent), 'Só de leitura, gerado a partir de fa.tt.json');
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-ops`).textContent, T), "Operadores: / ' ~ (NOT), . · * (AND), ⊕ ^ ou xor (XOR), xnor, + (OR)");
   await setLang('en');

@@ -15,7 +15,7 @@ import { designSources as ttDesignSources } from './tbwizard.js';
 
 // ---- truth tables (.tt.json): table -> HDL module, synchronized like ASM charts
 // The generated HDL module is linked by generatedFile: every change of the table rewrites it (its HDL
-// file is read-only, #1176). Truth Table / Karnaugh Map editor: truthtable.js; logic: core/logic.js.
+// file is read-only, #1176). Boolean Algebra / Karnaugh Map editor: truthtable.js; logic: core/logic.js.
 
 export async function openTt(path) {
   const id = `tt:${path}`;
@@ -114,9 +114,9 @@ async function moduleTable(title, mod) {
   catch (e) { alertDlg(title, e.message, 'error'); return null; }
 }
 
-// "Truth Table from Module…" in the editor: replace the table's contents
+// "Boolean Algebra from Module…" in the editor: replace the table's contents
 async function loadTtFromModule(ttPath) {
-  const T = 'Truth Table from Module';
+  const T = 'Boolean Algebra from Module';
   const d = findDoc(`tt:${ttPath}`);
   const m = d?.ttEditor?.getModel();
   const mod = await pickModule(T, m?.generatedFile);

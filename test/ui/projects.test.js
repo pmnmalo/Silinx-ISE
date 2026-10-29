@@ -765,7 +765,7 @@ uiTest('Silinx and Xilinx zip: export, import as a new project, and a failing im
 
 uiTest('New Project wizard: Top-Level Source Type Schematic / FSM / ASM / Truth Table starts the project with that top and its synchronized HDL', E, async (page) => {
   const cases = [['sch', 'top.sch.json', 'vhdl', 'Schematic'], ['fsm', 'top.fsm.json', 'verilog', 'Finite State Machine (FSM)'],
-    ['asm', 'top.asm.json', 'vhdl', 'Algorithmic State Machine (ASM)'], ['tt', 'top.tt.json', 'verilog', 'Truth Table']];
+    ['asm', 'top.asm.json', 'vhdl', 'Algorithmic State Machine (ASM)'], ['tt', 'top.tt.json', 'verilog', 'Boolean Algebra']];
   for (const [type, file, lang, label] of cases) {
     const name = `Top_${type}`;
     const r = await newProject(page, { name, lang, top: type });

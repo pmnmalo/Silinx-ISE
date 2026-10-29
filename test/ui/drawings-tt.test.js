@@ -20,7 +20,7 @@ const cells = (page) => page.eval((t) => [...document.querySelectorAll(`${t} .tt
 uiTest('Truth tables\' module: a new table, its HDL following it, read-only (#1176), its schematic', E, async (page) => {
   await makeProject(env, { name: 'TtMod', files: {} });
   await page.openProject('TtMod');
-  await page.menu('Tools', 'Truth Table / Karnaugh Map…');
+  await page.menu('Tools', 'Boolean Algebra / Karnaugh Map…');
   await page.waitDialog('New Source Wizard');
   await page.dialogButton('Next >');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'maj3');
@@ -39,7 +39,7 @@ uiTest('Truth tables\' module: a new table, its HDL following it, read-only (#11
   const lines = (await page.consoleText()).split('\n');
   assert.deepEqual(lines.slice(lines.findIndex((l) => /^Project ".*" opened/.test(l)) + 1), [
     'src/maj3.vhd generated from src/maj3.tt.json (every source has its HDL)',
-    "Created Truth Table 'src/maj3.tt.json'.",
+    "Created Boolean Algebra 'src/maj3.tt.json'.",
   ]);
 
   // the HDL is read-only (#1176): typed text, a paste or a template change nothing, a save writes nothing; the table

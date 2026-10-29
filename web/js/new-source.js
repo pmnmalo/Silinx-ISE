@@ -16,7 +16,7 @@ export { cTemplate, cppTemplate } from './c-templates.js';
 const SOURCE_TYPES = [
   // hdl / tb: VHDL or Verilog, chosen in the wizard (the extension follows the language)
   // wiz: the wizard the Wizard button opens (#958); only: no plain source, Next > disabled
-  { id: 'tt', label: 'Truth Table', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
+  { id: 'tt', label: 'Boolean Algebra', ico: 'truthtable', ext: '.tt.json', dir: 'src' },
   { id: 'hdl', label: 'Module (HDL)', ico: 'vhdl', ext: null, dir: 'src', wiz: 'module' },
   { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src', wiz: 'schematic' },
   { id: 'fsm', label: 'Finite State Machine (FSM)', ico: 'fsm', ext: '.fsm.json', dir: 'src' },

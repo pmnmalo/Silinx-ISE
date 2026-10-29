@@ -138,7 +138,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   or `z`). The generated vectors (exhaustive, random, counting, walking) come in pairs: the bench
   drives the port like an input, then releases it (`Z`) with the same inputs so that the value the
   design drives is checked; any row can be changed by hand.
-- **New Source types**: *Truth Table*, *Module (HDL)* (the ISE Define Module page: language, entity/module and
+- **New Source types**: *Boolean Algebra*, *Module (HDL)* (the ISE Define Module page: language, entity/module and
   architecture names, a port table), *Schematic* (a blank sheet), *Finite State Machine (FSM)*, *Algorithmic State
   Machine (ASM)*, *Petri Net*, *Clock Manager (DCM / PLL)*, *Block Memory*, *Test Bench*, *Implementation
   Constraints File*, *Memory Initialization File (.mem)*. Page 2 asks the file name and location, with the buttons
@@ -190,8 +190,8 @@ for Xilinx FPGAs supported by ISE 14.7.
   wires. In the live simulation a bidirectional marker shows the value on the bus and can drive it
   from outside (click: Z → 0 → 1; a bus opens the value editor, *Z* releases it) — the circuit
   drives it through tri-state buffers (BUFE / BUFT) or a module symbol with an inout port.
-- **Truth Table / Karnaugh Map** (*Tools ▸ Truth Table / Karnaugh Map…*, New Source ▸ *Truth Table
-  (.tt.json)*): name 1–6 inputs and any number of outputs, click the cells (0 → 1 → X don't care)
+- **Boolean Algebra / Karnaugh Map** (it was Truth Table; *Tools ▸ Boolean Algebra / Karnaugh Map…*, New Source ▸
+  *Boolean Algebra (.tt.json)*): name 1–6 inputs and any number of outputs, click the cells (0 → 1 → X don't care)
   or type an expression per output (`ab' + c`, `a·b + c`, `/a.b + a./b`, `~a & b`,
   `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; 5–6 inputs as two/four 4×4 maps) with the groups of the minimal SOP
   (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
@@ -212,9 +212,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   reason in the editor banners).
   Its schematic is always drawn from it, in that logic (AND / OR / NOT gates, XOR / XNOR gates,
   NAND or NOR gates only): the *Schematic* badge of the table's row in the Design pane opens it
-  (read-only, redrawn whenever the table changes). *Truth Table from Module…* fills the table with the table of any combinational module
+  (read-only, redrawn whenever the table changes). *Boolean Algebra from Module…* fills the table with the table of any combinational module
   of up to 8 input bits.
-- **Handwritten expressions** (the truth table editor's *Handwritten…*): write one or more equations on a pad, one a
+- **Handwritten expressions** (the Boolean Algebra editor's *Handwritten…*): write one or more equations on a pad, one a
   line, with any names (`F = A·B' + C`, `G = A ⊕ D`), with a pen, a finger or the mouse — on an interactive
   whiteboard or a tablet too. Silinx's own recognizer reads them, offline (a point-cloud recognizer with built-in
   templates; nothing is sent anywhere): letters, digits, `_`, `+ · * ' ¬ ~ ( ) = ⊕ ^ & |`, and a bar over letters as
@@ -222,11 +222,11 @@ for Xilinx FPGAs supported by ISE 14.7.
   become the editor's: its inputs, its outputs, their columns and expressions (one step of Undo). *Teach Silinx my
   handwriting* keeps samples of your own way of writing a symbol in the browser. On the pad, two fingers zoom and
   move the writing area, the mouse wheel zooms it, *Move* drags it with a pen or the mouse, *Erase* rubs out ink,
-  *Fit* shows the whole drawing. The New Source wizard's *Truth Table* takes a typed expression, which gives the
+  *Fit* shows the whole drawing. The New Source wizard's *Boolean Algebra* takes a typed expression, which gives the
   table's inputs, its output and its column.
 - **Handwritten tables and schematics, a preview** (development builds only, from the *Development* menu, while it
   does not read real handwriting well enough yet); the Handwritten Schematic dialog uses the whole page.
-- **Hand-drawn truth tables** (a preview, *Development ▸ Handwritten Truth Table…*, on the open truth table): draw
+- **Hand-drawn truth tables** (a preview, *Development ▸ Handwritten Boolean Algebra…*, on the open Boolean Algebra): draw
   the whole table — the names in a header, a line under it, a line between the inputs and the outputs, a row of 0, 1
   or X for each combination — and Silinx reads it offline into its text (`A B | F`, then a row a line), which you
   correct before it fills the table.
@@ -248,7 +248,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   transitions true at once: the first listed wins), incomplete conditions (the machine stays),
   transitions never taken, outputs never set, invalid names and expressions. *Tables*: transition
   table, classic state table and, for binary/gray, the encoded transition table (state bits, next
-  state bits, outputs; unused codes as don't cares) — CSV export and *Create Truth Tables* of the
+  state bits, outputs; unused codes as don't cares) — CSV export and *Create Boolean Algebra* of the
   next-state bits and outputs for the K-map exercise. Its HDL: readable VHDL or Verilog (2- or
   3-process style; changing the language in the editor makes it again in that one) kept in sync
   both ways like ASM charts (an HDL edit that is no longer a plain state machine shows the reason); *Convert to State Diagram (FSM)* reads an HDL module or an
@@ -584,7 +584,7 @@ docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image
 scripts/    adepttool installer/patch, Platform Flash programmer, standalone build
 examples/   example projects for the Basys2 / Nexys2 (the Silinx toolchain's devices): gates (the first one: logic
             gates drawn as a schematic, a 4-bit prime-number detector with NOT / AND / OR and with NAND gates only),
-            traffic (a pedestrian crossing: a state diagram, a truth table, VHDL and a Verilog display),
+            traffic (a pedestrian crossing: a state diagram, a Boolean algebra, VHDL and a Verilog display),
             blinky (VHDL + Verilog, an ASM chart, its steps counted on the display),
             pong (a game for two, Verilog), stopwatch (VHDL, block RAM and multipliers), clock (Verilog, set
             with the buttons), vga (VHDL, a picture on a VGA monitor); each with a self-checking testbench

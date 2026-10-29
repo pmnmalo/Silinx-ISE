@@ -14,7 +14,7 @@ const E = () => env;
 const ADDER = 'library ieee;\nuse ieee.std_logic_1164.all;\nentity adder is\n  port (a, b : in std_logic; s : out std_logic);\nend adder;\narchitecture rtl of adder is\nbegin\n  s <= a xor b;\nend rtl;\n';
 // each type: the pages after Select Source Type, its wizard (Wizard enabled), only a wizard, the file it makes
 const TYPES = {
-  'Truth Table': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.tt.json' },
+  'Boolean Algebra': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.tt.json' },
   'Module (HDL)': { pages: ['File Name and Location', 'Define Module', 'Summary'], wiz: true, file: 'src/NAME.vhd' },
   'Schematic': { pages: ['File Name and Location', 'Summary'], wiz: true, file: 'src/NAME.sch.json' },
   'Finite State Machine (FSM)': { pages: ['File Name and Location', 'Summary'], file: 'src/NAME.fsm.json' },
@@ -125,7 +125,7 @@ uiTest('New Source: Cancel and New Source again start afresh (the default type, 
   await makeProject(env, { name: 'NsAgain', top: 'adder', files: { 'src/adder.vhd': ADDER } });
   await page.openProject('NsAgain');
   await openNewSource(page);
-  await pickSourceType(page, 'Truth Table');
+  await pickSourceType(page, 'Boolean Algebra');
   await forward(page, 'File Name and Location');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'kept');
   await close(page);
@@ -135,7 +135,7 @@ uiTest('New Source: Cancel and New Source again start afresh (the default type, 
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main input[type=text]').value), '');
   // a type with no wizard, back, a type with one: Wizard opens that one
   await back(page, 'Select Source Type');
-  await pickSourceType(page, 'Truth Table');
+  await pickSourceType(page, 'Boolean Algebra');
   await forward(page, 'File Name and Location');
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'w1');
   await back(page, 'Select Source Type');
