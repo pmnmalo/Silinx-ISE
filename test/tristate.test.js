@@ -78,7 +78,7 @@ test('tri-state buffer symbol: parameters, presets with the Xilinx names, pins a
   // enable on the left one row above the data, as the Xilinx symbols; on the 10 px grid
   const d = symbolDef({ type: 'tbuf', params: { width: 4, enable: 'T', bits: true } });
   assert.equal(d.shape, 'tbuf'); assert.equal(d.activeLow, true); assert.equal(d.rows, 4);
-  assert.deepEqual([d.w, d.h], [60, 100]);
+  assert.deepEqual([d.w, d.h], [80, 100]);   // (80 wide since #1988)
   for (const p of d.pins) assert.ok(p.x % 10 === 0 && p.y % 10 === 0, `${p.name} on the grid`);
   assert.deepEqual(d.pins.filter(p => p.side === 'W').map(p => p.y), [10, 30, 50, 70, 90]);
   // presets: width only names the preset when the preset sets it
@@ -130,7 +130,7 @@ test('netlist: several tri-state outputs and an inout marker may share a net; an
   // two ordinary outputs: the existing diagnostic, unchanged
   const two = normalizeDoc(bad);
   two.symbols = two.symbols.filter(s => s.type !== 'tbuf');
-  two.symbols.push({ id: 'S8', type: 'buf', x: A.O.x - 60, y: A.O.y - 10, rot: 0, mirror: false, name: 'uh', params: { width: 4 } });
+  two.symbols.push({ id: 'S8', type: 'buf', x: A.O.x - 80, y: A.O.y - 10, rot: 0, mirror: false, name: 'uh', params: { width: 4 } });
   errs = errorsOf(netlist(normalizeDoc(two)));
   assert.ok(errs.some(e => /^net 'data' has 2 drivers \(ug\.O, uh\.O\)$/.test(e)), errs.join('\n'));
 });

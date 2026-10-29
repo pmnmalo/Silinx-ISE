@@ -16,10 +16,10 @@ const inv = (id, name, x, y) => ({ id, type: 'inv', x, y, rot: 0, mirror: false,
 // a -> U1 -> a wire named s; another wire named s, not drawn to it -> U2 -> y: y = a
 function byName(lang, second = 's') {
   const doc = newDoc('byname', lang);
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 100, 290));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 80, 290));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 220, y: 300 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
-    { id: 'W3', points: [P(40, 300), P(100, 300)] }, { id: 'W4', points: [P(160, 300), P(220, 300)] });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
+    { id: 'W3', points: [P(40, 300), P(80, 300)] }, { id: 'W4', points: [P(160, 300), P(220, 300)] });
   doc.labels.push({ id: 'L1', x: 200, y: 100, net: 's' }, { id: 'L2', x: 60, y: 300, net: second });
   return doc;
 }

@@ -20,13 +20,13 @@ const P = (x, y) => ({ x, y });
 const nets = nl => nl.nets.map(n => n.endpoints.map(e => (e.kind === 'pin' ? `${e.sym}.${e.pin}` : `port:${e.port}`)).sort().join(' ')).filter(s => s.includes(' ')).sort();
 
 uiTest('#678 schematic: a wire drawn over a pin connects at its ends only; a T-junction and a symbol dropped onto it connect', E, async (page) => {
-  // U1 at (100, 90): I (100, 100), O (160, 100); U2 at (240, 240): I (240, 250), O (300, 250)
+  // U1 at (80, 90): I (80, 100), O (160, 100); U2 at (220, 240): I (220, 250), O (300, 250)
   const doc = newDoc('wires', 'vhdl');
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 240, 240));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 220, 240));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'b', dir: 'in', width: 1, x: 200, y: 250 },
     { id: 'P3', name: 'y', dir: 'out', width: 1, x: 500, y: 400 }, { id: 'P4', name: 'z', dir: 'out', width: 1, x: 500, y: 250 },
     { id: 'P5', name: 'w', dir: 'out', width: 1, x: 400, y: 480 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(200, 250), P(240, 250)] }, { id: 'W4', points: [P(300, 250), P(500, 250)] });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(200, 250), P(220, 250)] }, { id: 'W4', points: [P(300, 250), P(500, 250)] });
   await makeProject(env, { name: 'WiresPj', files: { 'src/wires.sch.json': JSON.stringify(doc) } });
   await page.openProject('WiresPj');
   await page.eval(() => window.SilinxApp.openSch('src/wires.sch.json'));
@@ -64,7 +64,7 @@ uiTest('#678 schematic: a wire drawn over a pin connects at its ends only; a T-j
   await page.key('Escape');
   await page.fill(`${ED} .se-search`, 'INV');
   await page.click(`${ED} .se-symrow`, { text: 'INV' });
-  await page.click(await at(330, 160));
+  await page.click(await at(340, 160));   // (its centre: the inverter 80 px wide, #1988)
   await page.key('Escape');
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols.length === 3, [], { what: 'placed' });
   d = await getDoc();

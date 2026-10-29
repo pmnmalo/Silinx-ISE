@@ -54,7 +54,7 @@ uiTest('#1486 schematic: a bus-wide AND and INV show their width at their pins, 
   const svg = await fs.readFile(await waitDownload(page, 'Schematic_src_gw.sch.json.svg'), 'utf8');
   // (its texts' styles inlined: the widths the 8 px ones, each 10 px in from its pin's end)
   const widths = [...svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)"[^>]*font-size:8px[^>]*>([^<]*)</g)].map((m) => `${m[3]} at ${m[1]},${m[2]}`);
-  assert.deepEqual(widths, ['8 at 110,73', '8 at 110,93', '8 at 170,83', '4 at 310,73', '4 at 350,73', '8 at 310,233', '8 at 350,233', '4 at 530,73']);
+  assert.deepEqual(widths, ['8 at 110,73', '8 at 110,93', '8 at 170,83', '4 at 310,73', '4 at 370,73', '8 at 310,233', '8 at 370,233', '4 at 530,73']);
   await page.key('Escape');
 });
 

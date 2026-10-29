@@ -53,9 +53,9 @@ test('#688 nothing to move: no offset, a diagonal segment, a segment index out o
 test('#688 the nets and the HDL do not change: a segment dragged between a gate and a marker', () => {
   for (const lang of ['vhdl', 'verilog']) {
     const doc = newDoc('seg', lang);
-    doc.symbols.push({ id: 'S1', type: 'inv', x: 100, y: 90, rot: 0, mirror: false, name: 'U1', params: { width: 1 } });
+    doc.symbols.push({ id: 'S1', type: 'inv', x: 80, y: 90, rot: 0, mirror: false, name: 'U1', params: { width: 1 } });
     doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 400, y: 300 });
-    doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(160, 100), P(250, 100), P(250, 300), P(400, 300)] });
+    doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(250, 100), P(250, 300), P(400, 300)] });
     const before = generateHdl(doc, { lang });
     assert.deepEqual(before.diagnostics, []);
     for (const [i, d] of [[1, 40], [1, -60], [0, 30], [2, -50]]) {

@@ -17,10 +17,10 @@ const inv = (id, name, x, y) => ({ id, type: 'inv', x, y, rot: 0, mirror: false,
 uiTest('#689 schematic: a net name another net has asks to connect them by name; Cancel keeps them apart, Connect makes one net (English, Portuguese)', E, async (page) => {
   // a -> U1 -> W2 named s; W3 (unnamed) -> U2 -> y
   const doc = newDoc('byname', 'vhdl');
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 100, 290));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 80, 290));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 220, y: 300 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
-    { id: 'W3', points: [P(40, 300), P(100, 300)] }, { id: 'W4', points: [P(160, 300), P(220, 300)] });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
+    { id: 'W3', points: [P(40, 300), P(80, 300)] }, { id: 'W4', points: [P(160, 300), P(220, 300)] });
   doc.labels.push({ id: 'L1', x: 200, y: 100, net: 's' });
   await makeProject(env, { name: 'ByNamePj', files: { 'src/byname.sch.json': JSON.stringify(doc) } });
   await page.openProject('ByNamePj');
@@ -73,10 +73,10 @@ uiTest('#689 schematic: a net name another net has asks to connect them by name;
 uiTest('#734 schematic: renaming a net name renames the whole net connected by name, its I/O marker too; one Undo (English, Portuguese)', E, async (page) => {
   // a -> U1 -> W2 named s; W3 named s too (one net, by name) -> U2 -> y; a second wire W5 named a: the input marker's net
   const doc = newDoc('rename', 'vhdl');
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 100, 290));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 80, 290));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 220, y: 300 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
-    { id: 'W3', points: [P(40, 300), P(100, 300)] }, { id: 'W4', points: [P(160, 300), P(220, 300)] }, { id: 'W5', points: [P(300, 100), P(360, 100)] });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
+    { id: 'W3', points: [P(40, 300), P(80, 300)] }, { id: 'W4', points: [P(160, 300), P(220, 300)] }, { id: 'W5', points: [P(300, 100), P(360, 100)] });
   doc.labels.push({ id: 'L1', x: 200, y: 100, net: 's' }, { id: 'L2', x: 60, y: 300, net: 'S' }, { id: 'L3', x: 320, y: 100, net: 'a' });
   await makeProject(env, { name: 'RenamePj', files: { 'src/rename.sch.json': JSON.stringify(doc) } });
   await page.openProject('RenamePj');
@@ -121,10 +121,10 @@ uiTest('#734 schematic: renaming a net name renames the whole net connected by n
 uiTest('#754 schematic: a wire between two named nets is refused with a note; to an unnamed net it is drawn (English, Portuguese)', E, async (page) => {
   // a -> U1 -> W2 named s; W3 named t -> U2 -> y; W6 (unnamed) -> U3
   const doc = newDoc('short', 'vhdl');
-  doc.symbols.push(inv('S1', 'U1', 100, 90), inv('S2', 'U2', 100, 290), inv('S3', 'U3', 100, 490));
+  doc.symbols.push(inv('S1', 'U1', 80, 90), inv('S2', 'U2', 80, 290), inv('S3', 'U3', 80, 490));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 220, y: 300 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
-    { id: 'W3', points: [P(40, 300), P(100, 300)] }, { id: 'W4', points: [P(160, 300), P(220, 300)] }, { id: 'W6', points: [P(40, 500), P(100, 500)] });
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
+    { id: 'W3', points: [P(40, 300), P(80, 300)] }, { id: 'W4', points: [P(160, 300), P(220, 300)] }, { id: 'W6', points: [P(40, 500), P(80, 500)] });
   doc.labels.push({ id: 'L1', x: 200, y: 100, net: 's' }, { id: 'L2', x: 60, y: 300, net: 't' });
   await makeProject(env, { name: 'ShortPj', files: { 'src/short.sch.json': JSON.stringify(doc) } });
   await page.openProject('ShortPj');
@@ -163,9 +163,9 @@ uiTest('#806 schematic: a segment dragged, a marker moved or a paste onto anothe
   // a -> U1 -> W2 named s, its end at (220, 100); W7 named t (free); W11 named u (free), 40 up-left of W2's end;
   // the input marker b (free)
   const doc = newDoc('moves', 'vhdl');
-  doc.symbols.push(inv('S1', 'U1', 100, 90));
+  doc.symbols.push(inv('S1', 'U1', 80, 90));
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'b', dir: 'in', width: 1, x: 400, y: 300 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(220, 100)] },
     { id: 'W7', points: [P(220, 160), P(280, 160)] }, { id: 'W11', points: [P(140, 60), P(180, 60)] });
   doc.labels.push({ id: 'L1', x: 200, y: 100, net: 's' }, { id: 'L7', x: 260, y: 160, net: 't' }, { id: 'L11', x: 160, y: 60, net: 'u' });
   await makeProject(env, { name: 'MovesPj', files: { 'src/moves.sch.json': JSON.stringify(doc) } });

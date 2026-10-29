@@ -29,10 +29,10 @@ end architecture rtl;
 uiTest('#1546 schematic: Rename… in the right-click menu of a symbol, an I/O marker, a net name; the refusals; one Undo; the HDL (English, Portuguese)', E, async (page) => {
   // a -> U1 -> s -> M1 (sub) -> y
   const doc = newDoc('top', 'vhdl');
-  doc.symbols.push({ id: 'S1', type: 'inv', name: 'U1', x: 100, y: 90, rot: 0, mirror: false, params: { width: 1 } },
+  doc.symbols.push({ id: 'S1', type: 'inv', name: 'U1', x: 80, y: 90, rot: 0, mirror: false, params: { width: 1 } },
     { id: 'S3', type: 'module', name: 'M1', x: 300, y: 100, rot: 0, mirror: false, params: { module: 'sub', ports: [{ name: 'i', dir: 'in', width: 1 }, { name: 'o', dir: 'out', width: 1 }] } });
   doc.ports.push({ id: 'P1', name: 'a', dir: 'in', width: 1, x: 60, y: 100 }, { id: 'P2', name: 'y', dir: 'out', width: 1, x: 480, y: 120 });
-  doc.wires.push({ id: 'W1', points: [P(60, 100), P(100, 100)] }, { id: 'W2', points: [P(160, 100), P(240, 100), P(240, 120), P(300, 120)] },
+  doc.wires.push({ id: 'W1', points: [P(60, 100), P(80, 100)] }, { id: 'W2', points: [P(160, 100), P(240, 100), P(240, 120), P(300, 120)] },
     { id: 'W3', points: [P(420, 120), P(480, 120)] });
   doc.labels.push({ id: 'L1', x: 200, y: 100, net: 's' });
   await makeProject(env, { name: 'RenSymPj', top: 'top', files: { 'src/sub.vhd': SUB, 'src/top.sch.json': JSON.stringify(doc) } });

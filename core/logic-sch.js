@@ -150,7 +150,7 @@ export function schematicFromTable(docIn, { form, lang, name } = {}) {
   const PX = 20 + 10 * Math.ceil(Math.max(...tt.inputs.map(v => v.length), 1) * 0.75 + 4);
   const portY = j => 40 + 30 * j;
   const yInv = portY(n - 1) + 30;
-  const invH = only ? 80 : 60;
+  const invH = 80;   // (an inverter as long as a 2-input gate, #1988)
   const xT = j => PX + 60 + 60 * j, xC = j => xT(j) + 30;
   const railsEnd = xT(n - 1) + 40;
   const bandTop0 = yInv + invH + 40;

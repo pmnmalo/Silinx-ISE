@@ -3,7 +3,7 @@
 // blocks of the buses and the bus taps, and the order-preserving maps from ISE coordinates to the Silinx grid, one per
 // sheet. Isomorphic (no DOM, no Node APIs).
 import { defaultParams, symbolPins } from './schdoc.js';
-import { AxisMap, INWARD_ROT, SIDE_VEC, S_IN, iseOrienToXai, lc } from './isesch.js';
+import { AxisMap, INWARD_ROT, S_IN, iseOrienToXai, lc } from './isesch.js';
 
 /** The blocks' macros and the coordinate maps of an ISE schematic's import: { MX, MY, macros, pinKey, pinsOf }. */
 export function blockGeometry({ blocks, claim, helpers, keyName, memberOf, model, modules, sheetGeo, warn }) {
@@ -33,13 +33,12 @@ export function blockGeometry({ blocks, claim, helpers, keyName, memberOf, model
       if (!xp) { if (key) warn(`${B.name} (${B.blk.symbol}): pin ${p.name} not found on the Silinx symbol`); continue; }
       let E = [xp.x, xp.y], inv = null;
       if (pm.invert) {
-        const [vx, vy] = SIDE_VEC[xp.side];
         inv = mkSym('inv', `${B.xname}_inv${p.name.replace(/\W/g, '')}`, {}, INWARD_ROT[xp.side]);
         inv.name = claim(inv.name, `#inst:${inv.name}`);
         const ip = pinsOf(inv);
-        const O = ip.find(q => q.name === 'O');
+        const O = ip.find(q => q.name === 'O'), I = ip.find(q => q.name === 'I');
         inv.x = xp.x - O.x; inv.y = xp.y - O.y;
-        E = [xp.x + 60 * vx, xp.y + 60 * vy];
+        E = [inv.x + I.x, inv.y + I.y];
         syms.push(inv);
         pinKey.set(`${inv.id}/O`, `#int:${B.name}/${p.name}`);
         pinKey.set(`${main.id}/${pm.xai}`, `#int:${B.name}/${p.name}`);
