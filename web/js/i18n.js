@@ -20,6 +20,7 @@ import { PETRI_PT, PETRI_PT_PATTERNS } from './i18n-petri.js';
 import { FPGA_PT, FPGA_PT_PATTERNS } from './i18n-fpga.js';
 import { SCH_PT, SCH_PT_PATTERNS } from './i18n-schematic.js';
 import { CLOCKING_PT, CLOCKING_PT_PATTERNS } from './i18n-clocking.js';
+import { WIZARDS_PT, WIZARDS_PT_PATTERNS } from './i18n-wizards.js';
 import { MEMORY_PT, MEMORY_PT_PATTERNS } from './i18n-memory.js';
 import { RESOURCES_PT, RESOURCES_PT_PATTERNS } from './i18n-resources.js';
 import { prefKey } from './prefs.js';
@@ -662,7 +663,7 @@ Object.assign(PT, {
   'C Simulation': 'Simulação de C', 'C/RTL Co-simulation': 'Co-simulação C/RTL', 'Run the test bench, main()': 'Correr o test bench, main()', "Replay main()'s calls of the top function on its HDL and compare": 'Repetir no seu HDL as chamadas que main() faz à função de topo, e comparar',
   // New Source's types (#975; Schematic and Petri Net: their own entries)
   'Finite State Machine (FSM)': 'Máquina de Estados Finitos (FSM)', 'Algorithmic State Machine (ASM)': 'Máquina de Estados Algorítmica (ASM)', 'Test Bench': 'Bancada de Teste',
-  'Wizard': 'Assistente', 'Clock Manager (DCM / PLL)': 'Gestor de Relógio (DCM / PLL)',   // New Source's Wizard button (#958)
+  'Clock Manager (DCM / PLL)': 'Gestor de Relógio (DCM / PLL)',
   'Module Wizard': 'Assistente de Módulo', 'Schematic Wizard': 'Assistente de Esquemático',
   'Name and Language': 'Nome e Linguagem', 'Inputs and Outputs': 'Entradas e Saídas', 'Kind of Logic': 'Tipo de Lógica',
   'The wizard creates a schematic with an I/O marker for each input and output, ready for you to place the symbols and wire them.':
@@ -798,6 +799,8 @@ for (const [k, v] of Object.entries(MEMORY_PT)) if (!(k in PT)) PT[k] = v;   // 
 PT_PATTERNS.unshift(...MEMORY_PT_PATTERNS);
 PT_PATTERNS.unshift(...CLOCKING_PT_PATTERNS,
   [/^(Input port|Reset input|LOCKED output|Output (\w+)): (.*)\.$/, (m, w, o, e) => `${{ 'Input port': 'Porto de entrada', 'Reset input': 'Entrada de reset', 'LOCKED output': 'Saída LOCKED' }[w] || `Saída ${o}`}: ${ptIdent(e)}.`]);
+for (const [k, v] of Object.entries(WIZARDS_PT)) if (!(k in PT)) PT[k] = v;   // the FSM, ASM and UCF wizards (#2082)
+PT_PATTERNS.unshift(...WIZARDS_PT_PATTERNS);
 for (const [k, v] of Object.entries(RESOURCES_PT)) if (!(k in PT)) PT[k] = v;   // the device's resources checked against the design (#796)
 PT_PATTERNS.unshift(...RESOURCES_PT_PATTERNS);
 

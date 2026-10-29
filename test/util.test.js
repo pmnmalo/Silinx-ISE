@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clone, hex2, lineStarts, isKw, isOp, tokenText, intOr } from '../core/util.js';
-import { cleanLoc, portText } from '../web/js/wizard-util.js';
+import { cleanLoc, portText, namedPages } from '../web/js/wizard-util.js';
 import { tokenize } from '../core/verilog/lexer.js';
 import { lex } from '../core/vhdl/lexer.js';
 
@@ -58,4 +58,24 @@ test('#1406 one copy: no module of core/ or web/js defines these helpers again',
   const found = files.flatMap(f => [...fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(COPY)].map(m => `${f} ${m[1]}`))
     .filter(x => !/^(core\/util\.js|web\/js\/wizard-util\.js) /.test(x) && !DIFFERENT.has(x));
   assert.deepEqual(found, []);
+});
+
+test('#2082 namedPages: opened by New Source, the name page left out, its checks made first by the next page', async () => {
+  const calls = [];
+  const name = { title: 'Name and Language', validate: async () => { calls.push('name'); return calls.length > 2 ? null : 'Name: bad.'; } };
+  const io = { title: 'Inputs and Outputs', render: () => 'io', validate: () => { calls.push('io'); return null; } };
+  const sum = { title: 'Summary' };
+  const pages = [name, io, sum];
+  assert.equal(namedPages(name, pages, false), pages);
+  const [first, second, ...rest] = namedPages(name, pages, true);
+  assert.deepEqual([first.title, second, rest], ['Inputs and Outputs', sum, []]);
+  assert.equal(first.render, io.render);   // (no tail: the page as it is)
+  assert.equal(await first.validate(), 'Name: bad.');   // the name's error, the page's own check not made
+  assert.deepEqual(calls, ['name']);
+  calls.push('x');
+  assert.equal(await first.validate(), null);
+  assert.deepEqual(calls, ['name', 'x', 'name', 'io']);
+  // a first page with no checks of its own
+  const [only] = namedPages(name, [name, sum], true);
+  assert.equal(await only.validate(), null);
 });

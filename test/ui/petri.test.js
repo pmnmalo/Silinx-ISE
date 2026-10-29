@@ -283,27 +283,21 @@ uiTest('Petri net editor: the analysis (#188): properties, places, transitions, 
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
 });
 
-uiTest('Petri Net Wizard (#208): New Source ▸ Petri Net ▸ Wizard (#958), name and location, the inputs and outputs (no bidirectional), the clock and the reset, a clash refused; the net created with its ports and its HDL file, opened', E, async (page) => {
+uiTest('Petri Net Wizard (#208): New Source ▸ Petri Net ▸ Wizard > (#958), the name and location typed there (no page of them, #2082), the inputs and outputs (no bidirectional, no quick-add, #2082), the clock and the reset, a clash refused; the net created with its ports and its HDL file, opened', E, async (page) => {
   await makeProject(env, { name: 'PnWiz', top: '' });
   await page.openProject('PnWiz');
-  // New Source: one 'Petri Net' type; the Wizard button of its File Name and Location page opens the wizard
+  // New Source: one 'Petri Net' type; the Wizard > button of its File Name and Location page opens the wizard
   await page.menu('Project', 'New Source…');
   await page.waitDialog('New Source');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.textContent.trim()).filter((t) => /Petri/.test(t))), ['Petri Net']);
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
-  await newSourceWizardOf(page, 'Petri Net', 'ctl', 'Petri Net Wizard');
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3').textContent), 'Name and Language');
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .mw-name').value), 'ctl');
-  await page.fill('.dlg-overlay .mw-name', 'ctl');
-  await page.fill('.dlg-overlay .mw-loc', 'nets');
-  await page.waitFor(() => document.querySelector('.dlg-overlay .mw-file').textContent === 'nets/ctl.pn.json', [], { what: 'the file' });
-  await page.dialogButton('Next >');
-  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Inputs and Outputs');
-  // inputs and outputs only
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .mw-quick > div > span:first-child')].map((s) => s.textContent)), ['Quick add (inputs):', 'Quick add (outputs):']);
-  // no clk / reset quick buttons: the clock and the reset have fields of their own
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .mw-qa')].map((b) => b.dataset.port).filter((n) => /^(clk|reset)$/.test(n))), []);
+  await newSourceWizardOf(page, 'Petri Net', 'ctl', 'Petri Net Wizard', { location: 'nets' });
+  // its first page: the inputs and outputs (#2082), no quick-add buttons (#2082: only the user's own ports)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-side .step')].map((e) => e.textContent)), ['Inputs and Outputs', 'Summary']);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3').textContent), 'Inputs and Outputs');
+  assert.deepEqual(await page.eval(() => [document.querySelectorAll('.dlg-overlay .mw-quick, .dlg-overlay .mw-qa').length, /Quick add/.test(document.querySelector('.dlg-overlay').innerText)]), [0, false]);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main').innerText), /No ports yet: use Add Port\.[\s\S]*Description \(optional\):/);
   for (let k = 0; k < 4; k++) await page.click('.dlg-overlay .mw-add');
   for (const [k, [n, d, w]] of [['go', 'in', 1], ['sel', 'in', 3], ['busy', 'out', 1], ['st', 'out', 2]].entries()) {
     await page.fill('.dlg-overlay .mw-pname', n, { index: k });

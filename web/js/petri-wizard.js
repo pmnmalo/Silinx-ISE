@@ -1,5 +1,6 @@
-// The Petri Net Wizard (#208), New Source ▸ 'Petri Net' ▸ Wizard (#958): the name, language and location ->
-// the inputs and outputs (the Schematic Wizard's table, inputs and outputs only), the clock and the
+// The Petri Net Wizard (#208), New Source ▸ 'Petri Net' ▸ Wizard > (#958): the name, language and location (not
+// shown from New Source, #2082) -> the inputs and outputs (the Schematic Wizard's table, inputs and outputs only, no
+// quick-add buttons), the clock and the
 // reset -> summary; it creates a .pn.json with those ports declared and no places yet, and opens it in
 // the Petri net editor. The pages: web/js/modwizard.js (namePage, portEditor).
 import { api } from './api.js';
@@ -9,7 +10,7 @@ import { reservedError } from '/core/reserved.js';
 import { wizard, field, replaceGuard, closeBeforeReplace } from './wizards.js';
 import { namePage, portEditor } from './modwizard.js';
 import { S, app } from './app.js';
-import { portText } from './wizard-util.js';
+import { portText, namedPages } from './wizard-util.js';
 
 
 /** The net the wizard makes: the ports, the clock and the reset, nothing drawn yet. */
@@ -23,7 +24,7 @@ export function petriFromPorts({ name, lang, description = '', ports, clock = 'c
   });
 }
 
-export async function petriWizard({ name = '', location = 'src', lang = null } = {}) {
+export async function petriWizard({ name = '', location = 'src', lang = null, named = false } = {}) {
   const guard = replaceGuard('Petri Net Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
@@ -32,7 +33,7 @@ export async function petriWizard({ name = '', location = 'src', lang = null } =
     hint: 'The wizard creates a Petri net with its inputs and outputs declared, ready for you to draw its places, transitions and arcs; its HDL is generated from it.',
   });
   const ports = [];
-  const pe = portEditor(ports, { lang: p1.lang, dirs: ['in', 'out'], noQuick: ['clk', 'reset'] });   // the clock and the reset: fields of their own
+  const pe = portEditor(ports, { lang: p1.lang, dirs: ['in', 'out'], quickAdd: false });   // only the user's own ports (#2082); the clock and the reset: fields of their own
   const clkIn = h('input', { type: 'text', class: 'pw-clock', value: 'clk', style: { width: '100px' } });
   const rstIn = h('input', { type: 'text', class: 'pw-reset', value: 'rst', style: { width: '100px' } });
   const net = () => petriFromPorts({ name: p1.name(), lang: p1.lang(), description: p1.desc.value, ports, clock: clkIn.value.trim(), reset: rstIn.value.trim() });
@@ -69,7 +70,7 @@ export async function petriWizard({ name = '', location = 'src', lang = null } =
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('Petri Net Wizard', [p1.page, p2, pSum], { width: 820 });
+  const ok = await wizard('Petri Net Wizard', namedPages(p1.page, [p1.page, p2, pSum], named, p1.tail), { width: 820 });
   if (!ok) return;
   let m;
   try { m = net(); } catch (e) { return alertDlg('Petri Net Wizard', e.message, 'error'); }

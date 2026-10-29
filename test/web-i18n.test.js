@@ -349,3 +349,21 @@ test('#1405 literalsOf: strings, a template\'s parts, comments and regular expre
   assert.deepEqual(strings, ["x'y", 'z']);
   assert.deepEqual(templates, [['in ', ''], ['Open ', ' now']]);
 });
+
+test('#2082 the FSM, ASM and UCF wizards\' messages in Portuguese', () => {
+  const T = {
+    'Wizard >': 'Assistente >',
+    "'x' is used twice (the clock and input)": "'x' é usado duas vezes (o relógio e entrada)",
+    "'rst' is used twice (the reset and output)": "'rst' é usado duas vezes (o reset e saída)",
+    "Two states are named 'idle'.": "Há dois estados com o nome 'idle'.",
+    'Not assigned: s[2..].': 'Por atribuir: s[2..].',
+    'The pin P11 is given to a and s<0>.': 'O pino P11 está dado a a e a s<0>.',
+    "The wizard will create constraints/pins.ucf, the project's constraints file:": 'O assistente vai criar constraints/pins.ucf, o ficheiro de restrições do projeto:',
+    'The wizard will create constraints/more.ucf:': 'O assistente vai criar constraints/more.ucf:',
+    'Each bit of the module\'s ports on a pin of the Digilent Basys2: assigned from the board by their names (clk, led, sw, btn…) and directions; change them at will.':
+      'Cada bit dos portos do módulo num pino da Digilent Basys2: atribuído pela placa pelos nomes (clk, led, sw, btn…) e pelas direções; mude-os à vontade.',
+  };
+  for (const [en, pt] of Object.entries(T)) assert.equal(t(en), pt, en);
+  // the old label of the button: gone with it
+  assert.equal(PT.strings.Wizard, undefined);
+});

@@ -15,7 +15,7 @@ after(async () => { await env?.teardown?.(); });
 const E = () => env;
 
 // New Source ▸ <type>, the file name, Wizard (#958): the wizard `title` opens with that name
-const openWizard = (page, type, name, title) => newSourceWizardOf(page, type, name, title);
+const openWizard = (page, type, name, title, lang = null) => newSourceWizardOf(page, type, name, title, { lang });   // (at its first page, #2082)
 const next = async (page, title) => {
   await page.dialogButton(title === null ? 'Finish' : 'Next >');
   if (title) await page.waitFor((t) => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === t, [title], { what: `wizard page ${title}` });
@@ -34,9 +34,7 @@ uiTest('Module Wizard: bidirectional ports (quick-add data[7:0], a typed inout r
   await page.openProject('IoMw');
   for (const lang of ['vhdl', 'verilog']) {
     const name = `busctl_${lang}`;
-    await openWizard(page, 'Module (HDL)', name, 'Module Wizard');
-    await page.fill('.dlg-overlay .wiz-main select', lang);
-    await next(page, 'Inputs and Outputs');
+    await openWizard(page, 'Module (HDL)', name, 'Module Wizard', lang);
     for (const p of ['a', 'data', 'y']) await quick(page, p);
     await page.click('.dlg-overlay .mw-add');
     await page.fill('.dlg-overlay .mw-pname', 'ack', { index: 3 });
@@ -73,7 +71,6 @@ uiTest('Schematic Wizard: bidirectional markers on the right edge; live simulati
   await makeProject(env, { name: 'IoSw' });
   await page.openProject('IoSw');
   await openWizard(page, 'Schematic', 'bus_io', 'Schematic Wizard');
-  await next(page, 'Inputs and Outputs');
   // the user's own rows (the Schematic Wizard suggests no ports, #950)
   for (const [k, [name, dir, width]] of [['sw', 'in', 4], ['led', 'out', 8], ['data', 'inout', 8], ['sda', 'inout', 1]].entries()) {
     await page.click('.dlg-overlay .mw-add');

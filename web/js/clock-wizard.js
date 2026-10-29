@@ -11,7 +11,7 @@ import { resourceCount, periodNs } from '/packages/silinx-fpga/src/parts.js';
 import { identError } from '/core/modgen.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
-import { cleanLoc } from './wizard-util.js';
+import { cleanLoc, namedPages } from './wizard-util.js';
 
 const LANGS = [['vhdl', 'VHDL'], ['verilog', 'Verilog']];
 const mhzText = x => `${(+x).toFixed(3).replace(/\.?0+$/, '')} MHz`;
@@ -36,7 +36,7 @@ function defaultSpec(family, fin, lang) {
  * The wizard: a new module (location, lang), or the module of `path` again (spec: its settings, from its header).
  * Returns the path written, or undefined when cancelled.
  */
-export async function clockWizard({ name = '', location = 'src', lang = null, path: editPath = null, spec: old = null } = {}) {
+export async function clockWizard({ name = '', location = 'src', lang = null, path: editPath = null, spec: old = null, named = false } = {}) {
   if (!S.project) return;
   const pj = S.project;
   const family = old?.family || pj.device.family;
@@ -65,6 +65,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
   if (editPath) [nameIn, langSel, locIn].forEach(e => { e.disabled = true; });
   // a module changed by hand since the wizard wrote it: said, Finish writes it again from the settings
   const edited = editPath && (S.sources || []).find(s => s.path === editPath)?.text !== clockModule(old).code;
+  const countNote = () => (count === null ? '' : h('div', { class: 'hint cw-count', style: { marginTop: '10px' } }, family === 'spartan6' ? `PLLs on this device: ${count}` : `DCMs on this device: ${count}`));
   const p1 = {
     title: 'Name and Language',
     render: () => h('div', {},
@@ -73,7 +74,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
         : 'The wizard writes a module with a DCM of the Spartan-3E (DCM_SP) for the frequencies you ask, its outputs on global clock buffers (BUFG).'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
         ...field('Module name:', nameIn), ...field('Language:', langSel), ...field('Location:', locIn), ...field('File:', fileHint)),
-      count === null ? '' : h('div', { class: 'hint cw-count', style: { marginTop: '10px' } }, family === 'spartan6' ? `PLLs on this device: ${count}` : `DCMs on this device: ${count}`),
+      countNote(),
       edited ? h('div', { class: 'hint cw-edited', style: { marginTop: '10px', color: 'var(--danger)' } }, 'This module was changed by hand since the wizard wrote it: Finish writes it again from the wizard\'s settings, and those changes are lost.') : ''),
     onShow: syncFile,
     validate: async () => {
@@ -236,7 +237,8 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
     },
     validate: () => (editPath ? null : guard(path())),
   };
-  const ok = await wizard('Clocking Wizard', [p1, p2, p3, pSum], { width: 900 });
+  // (from New Source: the count under the input clock, #2082)
+  const ok = await wizard('Clocking Wizard', namedPages(p1, [p1, p2, p3, pSum], named, countNote), { width: 900 });
   if (!ok) return;
   spec.name = nameIn.value.trim(); spec.lang = langSel.value;
   const { code, plan } = clockModule(spec);

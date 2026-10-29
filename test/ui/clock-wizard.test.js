@@ -41,11 +41,11 @@ uiTest('Clocking Wizard on the Basys2: a DCM_SP module, the nearest frequencies,
   await makeProject(env, { name: 'CwPj', board: 'basys2' });
   await page.openProject('CwPj');
   await openClockWizard(page);
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-name').value), 'clkgen');
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-file').textContent), 'src/clkgen.vhd');
+  // its first page, the input clock (#2082: the name, the location and the language typed on New Source; the file in
+  // the summary)
+  assert.equal(await pageTitle(page), 'Input Clock');
   // the XC3S250E's DCMs (packages/silinx-fpga/src/resources.js)
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-count').textContent), 'DCMs on this device: 4');
-  await next(page, 'Input Clock');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-fin').value), '50');
   assert.match(await page.eval(() => document.querySelector('.dlg-overlay .cw-in-note').textContent), /^The Digilent Basys2.*'s oscillator: 50 MHz\.$/);
   await page.fill('.dlg-overlay .cw-fin', '0');
@@ -154,9 +154,8 @@ uiTest('Clocking Wizard on the Nexys3 (Spartan-6): a PLL_BASE module in Verilog,
   await makeProject(env, { name: 'CwS6', board: 'nexys3', preferredLanguage: 'verilog' });
   await page.openProject('CwS6');
   await openClockWizard(page);
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-file').textContent), 'src/clkgen.v');
+  assert.equal(await pageTitle(page), 'Input Clock');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-count').textContent), 'PLLs on this device: 2');
-  await next(page, 'Input Clock');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-fin').value), '100');
   // (no divide by 2 nor PHASE_SHIFT: the DCM's)
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .cw-div2')?.isConnected ?? false), false);
@@ -212,8 +211,7 @@ uiTest('Portuguese: the Clocking Wizard\'s pages, its messages, the Design pane\
     await setLang('en');
   };
   await openClockWizard(page);
-  await both(await pageTitle(page));
-  await next(page, 'Input Clock');
+  assert.equal(await pageTitle(page), 'Input Clock');
   await page.fill('.dlg-overlay .cw-phase', '32');
   await both('Input Clock');
   await page.fill('.dlg-overlay .cw-fin', '300');

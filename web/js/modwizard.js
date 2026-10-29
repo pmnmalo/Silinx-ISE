@@ -1,5 +1,5 @@
-// Beginner wizards of the New Source dialog (the Wizard button of the types 'Module (HDL)' and 'Schematic', #958):
-// Finish on the New Source page 1 (the type) opens one of these; they ask the name and the location.
+// Beginner wizards of the New Source dialog (the Wizard > button of the types 'Module (HDL)' and 'Schematic', #958):
+// they ask the name and the location on their first page, left out when New Source opens them (its name, #2082).
 //
 //   moduleWizard:    name, language and description -> inputs, outputs and bidirectional (inout,
 //                    tri-state) ports (friendly table with quick-add buttons) -> kind of logic
@@ -15,7 +15,7 @@ import { h, alertDlg, toast } from './ui.js';
 import { generateModule, schematicFromPorts, checkPorts, identError, guessClockReset, QUICK_PORTS, MAX_WIDTH } from '/core/modgen.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere, drawnHdlTaken } from './wizards.js';
 import { S, app } from './app.js';
-import { cleanLoc, portText } from './wizard-util.js';
+import { cleanLoc, portText, namedPages } from './wizard-util.js';
 
 const LANGS = [['vhdl', 'VHDL'], ['verilog', 'Verilog']];
 const extOf = (lang, sch) => (sch ? '.sch.json' : lang === 'verilog' ? '.v' : '.vhd');
@@ -63,12 +63,17 @@ export function namePage({ title, name, lang, loc, sch, withArch, guard, ext = n
       return guard(path());
     },
   };
-  return { page, nameIn, langSel, archIn, desc, path, lang: () => langSel.value, name: () => nameIn.value.trim() };
+  sync();
+  // opened by New Source (#2082): the architecture's name and the description at the end of the first page left
+  const tail = () => h('div', { style: { marginTop: '10px' } },
+    withArch ? h('div', { class: 'form-grid' }, archLbl, archIn) : '',
+    h('label', { style: { display: 'block', marginTop: '10px' } }, 'Description (optional):'), desc);
+  return { page, tail, nameIn, langSel, archIn, desc, path, lang: () => langSel.value, name: () => nameIn.value.trim() };
 }
 
 // ---------------------------------------------------------------- the friendly port table
-/** The table of the ports (dirs: the directions offered, noQuick: quick-add buttons left out; the Petri Net Wizard: in and out only, no clk / reset, its own fields; quickAdd false: no quick-add buttons at all, the Schematic Wizard, #950). */
-export function portEditor(ports, { lang, onChange = () => {}, dirs = ['in', 'out', 'inout'], noQuick = [], quickAdd = true }) {
+/** The table of the ports (dirs: the directions offered, the Petri Net, FSM and ASM wizards: in and out only; quickAdd false: no quick-add buttons, the Schematic, Petri Net, FSM and ASM wizards, #950, #2082). */
+export function portEditor(ports, { lang, onChange = () => {}, dirs = ['in', 'out', 'inout'], quickAdd = true }) {
   const tbl = h('table', { class: 'grid mw-ports' });
   const quick = h('div', { class: 'mw-quick', style: { display: 'flex', flexDirection: 'column', gap: '4px', margin: '6px 0' } });
   const has = n => ports.some(p => p.name.toLowerCase() === n.toLowerCase());
@@ -80,7 +85,7 @@ export function portEditor(ports, { lang, onChange = () => {}, dirs = ['in', 'ou
       const row = h('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' } },
         h('span', { style: { width: '120px' } }, dir === 'in' ? 'Quick add (inputs):' : dir === 'out' ? 'Quick add (outputs):' : 'Quick add (bidirectional):'));
       const btns = h('span', { 'data-no-i18n': '', style: { display: 'flex', gap: '4px', flexWrap: 'wrap' } });
-      for (const q of QUICK_PORTS.filter(x => x.dir === dir && !noQuick.includes(x.name))) {
+      for (const q of QUICK_PORTS.filter(x => x.dir === dir)) {
         btns.append(h('button', { class: 'btn mw-qa', 'data-port': q.name, disabled: has(q.name), onclick: () => { if (!has(q.name)) add(q); } }, portText(q)));
       }
       row.append(btns);
@@ -134,7 +139,7 @@ export function portEditor(ports, { lang, onChange = () => {}, dirs = ['in', 'ou
 }
 
 // ---------------------------------------------------------------- Module Wizard
-export async function moduleWizard({ name = '', location = 'src', lang = null } = {}) {
+export async function moduleWizard({ name = '', location = 'src', lang = null, named = false } = {}) {
   const guard = replaceGuard('Module Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
@@ -276,7 +281,7 @@ export async function moduleWizard({ name = '', location = 'src', lang = null } 
     },
   };
 
-  const ok = await wizard('Module Wizard', [p1.page, p2, p3, pSum], { width: 820 });
+  const ok = await wizard('Module Wizard', namedPages(p1.page, [p1.page, p2, p3, pSum], named, p1.tail), { width: 820 });
   if (!ok) return;
   let code;
   try { code = text(); } catch (e) { return alertDlg('Module Wizard', e.message, 'error'); }
@@ -290,7 +295,7 @@ export async function moduleWizard({ name = '', location = 'src', lang = null } 
 }
 
 // ---------------------------------------------------------------- Schematic Wizard
-export async function schematicWizard({ name = '', location = 'src', lang = null } = {}) {
+export async function schematicWizard({ name = '', location = 'src', lang = null, named = false } = {}) {
   const guard = replaceGuard('Schematic Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
@@ -329,7 +334,7 @@ export async function schematicWizard({ name = '', location = 'src', lang = null
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('Schematic Wizard', [p1.page, p2, pSum], { width: 820 });
+  const ok = await wizard('Schematic Wizard', namedPages(p1.page, [p1.page, p2, pSum], named, p1.tail), { width: 820 });
   if (!ok) return;
   let d;
   try { d = doc(); } catch (e) { return alertDlg('Schematic Wizard', e.message, 'error'); }
