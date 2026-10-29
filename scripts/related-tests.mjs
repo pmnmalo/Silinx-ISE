@@ -3,7 +3,7 @@
 // release only (#607), and a change merged after a single test of its module, run by name, broke the
 // module's other tests (#635). For each file the change touches, every unit test file (test/*.test.js, and the
 // toolchain package's, packages/silinx-fpga/test/*.test.js, #1680) that imports it, directly or through one of the
-// tests' helper modules (the .js and .mjs of those folders that are not tests), and through a module that only
+// tests' helper modules (the .js and .mjs of those folders, at any depth but test/ui/, that are not tests), and through a module that only
 // re-exports it (the toolchain package's entries, #1677, #1678); a changed test file itself; <name>.test.js of
 // those folders for a changed <name>.js; a test that names a changed
 // file in quotes, by its path or its name (one that reads it: docs.test.js CLAUDE.md, ci-workflow.test.js the
@@ -84,7 +84,8 @@ export function relatedTests(files, changed) {
   const deps = Object.fromEntries(Object.entries(files).map(([f, t]) => [f, imports(t).map(s => resolve(f, s))]));
   const isUnit = f => UNIT_TESTS.test(f);
   const isUi = f => /^test\/ui\/[^/]+\.test\.js$/.test(f);
-  const isHelper = f => /^(?:test|packages\/silinx-fpga\/test)\/[^/]+\.m?js$/.test(f) && !isUnit(f);
+  // (a helper at any depth of the tests' folders but the UI tests': test/schematic-corpus/lib.mjs, #2058)
+  const isHelper = f => /^(?:test|packages\/silinx-fpga\/test)\/.+\.m?js$/.test(f) && !f.startsWith('test/ui/') && !isUnit(f);
   const inTests = f => f.startsWith('test/') || f.startsWith('packages/silinx-fpga/test/');
   // a changed data file (#772): the sources that read it count as changed, and the modules that import one of them,
   // at any depth (what a module reads reaches its importers: the bit database, through bitdb-node.js, the open flow)

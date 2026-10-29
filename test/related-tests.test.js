@@ -184,6 +184,21 @@ test('related tests: the repository — the synthesis\'s tests for a change of t
   assert.ok(!unit.includes('test/schdoc.test.js'));
 });
 
+test('#2058 related tests: through a helper in a subfolder of the tests (not the UI tests\' harness); the repository\'s schematic corpus for core/schdoc.js', () => {
+  const files = {
+    'core/d.js': '', 'core/e.js': '',
+    'test/corpus/lib.mjs': "import { d } from '../../core/d.js';",
+    'test/corpus.test.js': "import { run } from './corpus/lib.mjs';",
+    'test/ui/harness.js': "import { e } from '../../core/e.js';",
+    'test/ui/app.test.js': "import { uiTest } from './harness.js';",
+  };
+  assert.deepEqual(relatedTests(files, ['core/d.js']), { unit: ['test/corpus.test.js'], ui: [] });
+  assert.deepEqual(relatedTests(files, ['test/corpus/lib.mjs']), { unit: ['test/corpus.test.js'], ui: [] });
+  assert.deepEqual(relatedTests(files, ['core/e.js']), { unit: [], ui: [] }, 'the UI harness is not a unit test\'s helper');
+  // #1988's change of core/schdoc.js skipped the corpus (#2055): its helper test/schematic-corpus/lib.mjs imports it
+  assert.ok(relatedTests(sources(), ['core/schdoc.js']).unit.includes('test/schematic-corpus.test.js'));
+});
+
 test('related tests: a module of the toolchain\'s package, through core/\'s old path that re-exports it (#1677)', () => {
   assert.equal(reexportsOnly("// moved\nexport * from '../packages/p/src/a.js';\nexport { b, c } from './b.js';\n"), true);
   assert.equal(reexportsOnly("export * from './a.js';\nexport const x = 1;\n"), false);
