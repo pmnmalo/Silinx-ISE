@@ -5,7 +5,8 @@
 // over the rows' frames and the I/O words, and the block RAM's frames with db/<device>-hard.json (#728: the block RAMs'
 // and DSP48A1s' settings and contents, hard6.mjs). A bit left over goes to the tiles whose
 // region holds it, by type (the I/O words: 'IOB words').
-//   node research/s6/residual6.mjs <dir> …        (each with top.xdl and top.bit, e.g. night 1's impl-nexys3/*)
+//   node research/s6/residual6.mjs [--no-cmt-paths] <dir> …   (each with top.xdl and top.bit, e.g. night 1's impl-nexys3/*;
+//     --no-cmt-paths: a CMT by its settings, PIPs and cmt-input only, not #727's whole paths)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +18,7 @@ import { pipDirections, pipLookup } from './check-pips6.mjs';
 import { tileRegion } from './ana-pipprobe6.mjs';
 import { gridRegion } from './ana-pipdrop6.mjs';
 import { columnOf } from './ana-slice6.mjs';
-import { cmtCfg, cmtPath, predictCmt, predictCmtSettings } from './cmt6.mjs';
+import { cmtCfg, cmtPath, predictCmt, predictCmtSettings, cmtRegcBits, cmtInputBits } from './cmt6.mjs';
 import { HARD_TYPES, predictHard } from './hard6.mjs';
 
 const INT_LIKE = /^(INT|INT_BRK|INT_BRAM|INT_BRAM_BRK|IOI_INT|LIOI_INT|INT_GCLK)_X/;
@@ -107,7 +108,13 @@ export function predictDesign(design, device, dev, db) {
       if (p) { for (const x of p) bits.add(x); continue; }
       const s = db.cmtSettings && predictCmtSettings(inst, db.cmtSettings, Math.floor(gridRegion(device, dev, inst.tile)[0] / dev.rowFrames) * dev.rowFrames);
       if (s) for (const x of s) bits.add(x);
-      note(`${inst.type} ${inst.site} (its ${s ? 'clock path' : 'settings or clock path'} not measured)`);
+      // the BUFGMUXes it drives: their REGC bits (its paths' PIPs are the routing's)
+      const r = db.clocks && cmtRegcBits(design, inst, db.part.replace(/csg.*/, ''), db.clocks.regcFrame[db.part.replace(/csg.*/, '')]);
+      if (r) for (const x of r) bits.add(x);
+      // its site's, its outputs' and its BUFIO2's bits (db/<device>-cmt-input.json)
+      const c = db.cmtInput && cmtInputBits(design, inst, db.cmtInput);
+      if (c) for (const x of c) bits.add(x);
+      if (!s) note(`${inst.type} ${inst.site} (its settings not measured)`);
     }
   }
   // a block RAM's or a DSP48A1's settings and contents
@@ -158,33 +165,44 @@ export function typesAt(device, dev, cache = typesAt.cache ??= new WeakMap()) {
   return (f, b) => [...new Set(index.filter(([c0, b0, n, nb]) => f >= c0 && f < c0 + n && b >= b0 && b < b0 + nb).map(x => x[4]))].sort().join('+') || '?';
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const dirs = process.argv.slice(2);
-  if (!dirs.length) { console.error('usage: node research/s6/residual6.mjs <dir> …'); process.exit(1); }
+const dbFile = (device, n) => { const f = new URL(`./db/${device}-${n}.json`, import.meta.url); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; };
+
+/** The databases predictDesign reads, for a bitstream's device (readBit6's); cmtPaths: false leaves #727's whole CMT paths out. */
+export function residualDb(r6, { cmtPaths = true, cmtInput = true } = {}) {
   const int = { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips };
   // the other tiles' PIPs (the PIP drop) and the I/O path's pairs it could not take apart (the examples' residual)
   const clockPips = fs.existsSync(new URL('./db/s6-pips-clock.json', import.meta.url)) ? read('s6-pips-clock').pips : {};
   // and the PIPs it could not take apart, probed one by one (#1951)
   const probePips = fs.existsSync(new URL('./db/s6-pips-probe.json', import.meta.url)) ? read('s6-pips-probe').pips : {};
-  const other = { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...clockPips, ...probePips } };
+  // and the CMT paths' PIPs dropped one at a time in context (#1951)
+  const cmtPips = fs.existsSync(new URL('./db/s6-pips-cmt.json', import.meta.url)) ? read('s6-pips-cmt').pips : {};
+  const other = { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...clockPips, ...probePips, ...cmtPips } };
+  const d = r6.device.device, part = `${d}${r6.device.part.slice(d.length - 2)}-3`;
+  return { part, slices: loadDb(d), int, other, iob: dbFile(d, 'iob'), clocks: read('s6-clocks'), cmt: cmtPaths ? dbFile(d, 'cmt-paths') : null, hard: dbFile(d, 'hard'), cmtSettings: dbFile(d, 'cmt-settings'), cmtInput: cmtInput ? dbFile(d, 'cmt-input') : null };
+}
+
+/** A bitstream's bits set (against the empty one): 'frame,bit' (the block RAM's frames only with withBram). */
+export function setBits(r6, dev, withBram) {
+  const empty = emptyFdri(dev), rows = dev.rows * dev.rowFrames * FRAME_WORDS, iobStart = (dev.rows * dev.rowFrames + dev.bramFrames) * FRAME_WORDS, have = new Set();
+  for (let w = 0; w < r6.fdri.length; w++) {
+    if (!withBram && w >= rows && w < iobStart) continue;
+    const x = r6.fdri[w] ^ empty[w];
+    if (x) for (let i = 0; i < 16; i++) if ((x >> (15 - i)) & 1) have.add(`${Math.floor(w / FRAME_WORDS)},${(w % FRAME_WORDS) * 16 + i}`);
+  }
+  return have;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2), dirs = args.filter(a => !a.startsWith('--')), cmtPaths = !args.includes('--no-cmt-paths');
+  if (!dirs.length) { console.error('usage: node research/s6/residual6.mjs [--no-cmt-paths] <dir> …'); process.exit(1); }
   const left = new Map(), extra = new Map(), unknown = new Map();
   for (const dir of dirs) {
-    const bit = fs.readFileSync(path.join(dir, 'top.bit')), r6 = readBit6(bit), dev = bitFormat6(r6.device.part);
-    const part = `${r6.device.device}${r6.device.part.slice(r6.device.device.length - 2)}-3`, { device } = s6Device(part);
-    const design = parseXdl(fs.readFileSync(path.join(dir, 'top.xdl'), 'utf8'));
-    const iobFile = new URL(`./db/${r6.device.device}-iob.json`, import.meta.url), iob = fs.existsSync(iobFile) ? JSON.parse(fs.readFileSync(iobFile, 'utf8')) : null;
-    const cmtFile = new URL(`./db/${r6.device.device}-cmt-paths.json`, import.meta.url), cmt = fs.existsSync(cmtFile) ? JSON.parse(fs.readFileSync(cmtFile, 'utf8')) : null;
-    const hardFile = new URL(`./db/${r6.device.device}-hard.json`, import.meta.url), hard = fs.existsSync(hardFile) ? JSON.parse(fs.readFileSync(hardFile, 'utf8')) : null;
-    const setFile = new URL(`./db/${r6.device.device}-cmt-settings.json`, import.meta.url), cmtSettings = fs.existsSync(setFile) ? JSON.parse(fs.readFileSync(setFile, 'utf8')) : null;
-    const { bits, unknown: u } = predictDesign(design, device, dev, { part, slices: loadDb(r6.device.device), int, other, iob, clocks: read('s6-clocks'), cmt, hard, cmtSettings });
+    const bit = fs.readFileSync(path.join(dir, 'top.bit')), r6 = readBit6(bit), dev = bitFormat6(r6.device.part), db = residualDb(r6, { cmtPaths });
+    const { device } = s6Device(db.part), design = parseXdl(fs.readFileSync(path.join(dir, 'top.xdl'), 'utf8'));
+    const { bits, unknown: u } = predictDesign(design, device, dev, db);
     for (const [w, n] of u) unknown.set(w, (unknown.get(w) || 0) + n);
-    const empty = emptyFdri(dev), rows = dev.rows * dev.rowFrames * FRAME_WORDS, iobStart = (dev.rows * dev.rowFrames + dev.bramFrames) * FRAME_WORDS, have = new Set(), w0 = typesAt(device, dev);
+    const have = setBits(r6, dev, !!db.hard), w0 = typesAt(device, dev);
     const where = (f, b) => (f >= dev.rows * dev.rowFrames + dev.bramFrames ? 'IOB words' : f >= dev.rows * dev.rowFrames ? 'BRAM frames' : w0(f, b));
-    for (let w = 0; w < r6.fdri.length; w++) {
-      if (!hard && w >= rows && w < iobStart) continue;
-      const x = r6.fdri[w] ^ empty[w];
-      if (x) for (let i = 0; i < 16; i++) if ((x >> (15 - i)) & 1) have.add(`${Math.floor(w / FRAME_WORDS)},${(w % FRAME_WORDS) * 16 + i}`);
-    }
     let nl = 0, ne = 0;
     for (const x of have) if (!bits.has(x)) { const [f, b] = x.split(',').map(Number), t = where(f, b); left.set(t, [...(left.get(t) || []), `${path.basename(dir)} ${x}`]); nl++; }
     for (const x of bits) if (!have.has(x)) { const [f, b] = x.split(',').map(Number), t = where(f, b); extra.set(t, [...(extra.get(t) || []), `${path.basename(dir)} ${x}`]); ne++; }

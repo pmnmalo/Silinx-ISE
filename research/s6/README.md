@@ -488,8 +488,27 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   take apart, each on a TIEOFF net of its own (59 XDL designs, one PIP per region each): 222 PIPs, 148 with bits. The
   REG_V_HCLK tile's are left out: alone a BUFH route-through and a spine mux set bits they do not set in a design.
   The site designs' residual goes from 1404 to 1094 bits (about 27 a design), nothing predicted that ISE does not set.
-- Still to do: the sites on the paths (a BUFGMUX's input from a CMT in the centre column and its REGC selection, a
-  pad's BUFIO2 in the I/O words and its IOI), a rule each as #727's clock pads; then the XC6SLX45.
+- **The BUFGMUX designs** (`gen-cmtsites6.mjs --muxes`: per CMT site 8 designs from the board's clock pad, V10 for
+  the bottom half and C10 for the top, two outputs on BUFGMUXes k and k + 8, the DCM's feedback on a fixed one; 48).
+  **A BUFGMUX a CMT drives** sets one bit of the REGC frame (`cmt6.mjs`'s `CMT_REGC`, `cmtRegcBits`): 1008 + i for
+  a CMT of the bottom half, 1024 + i for the top, the BUFGMUXes in one order (X3Y16, X3Y15 … X2Y1); exact on the 48.
+- **The paths' PIPs one at a time** (`gen-cmtdrop6.mjs`: each PIP of the designs' other tiles the databases have no
+  bits for, dropped alone from the first design that has it, 354 XDL; `ana-cmtdrop6.mjs`: `db/s6-pips-cmt.json`,
+  331 PIPs, 94 with bits). The drop of many PIPs at once had given the CLKC tile's selections no bits (theirs are
+  far from its region and went to other tiles); alone, each is its own (`CLKC_PLL_Ln -> CLKC_GCLKn`).
+- **A CMT's input and outputs** (`ana-cmtinput6.mjs`: `db/xc6slx16-cmt-input.json`, from the BUFGMUX and one-output
+  designs of the bottom half; `cmt6.mjs`'s `cmtUses`, `cmtInputBits`): what is left with the settings, the PIPs and
+  the REGC bits predicted, by what the CMT uses. Each output that drives a net sets one bit of the CMT's frame (357
+  of its row), the frequency synthesizer three (CLKFX and CLKFX180 alike); the BUFIO2 that drives its CLKIN a bit of
+  the I/O words, V10's BUFIO2_X3Y7 3554,201, and another BUFIO2 also the CMT frame's input selection; any CMT of the
+  bottom half the clock spine's 3,64 3,66 3,69 3,74 and 1491,74, the PLL also 1491,64 to 69.
+- **The residual** (`residual6.mjs --no-cmt-paths`: a CMT by these rules, without #727's whole paths, which carry
+  the bits of the design they were measured in): the 16 BUFGMUX designs of the bottom DCMs, those the Nexys3 uses,
+  are exact; the PLL_ADV_X0Y0's leave 1 bit (1101,416, an output's enable its settings were measured without). On
+  #727's 32 bottom-half CMT designs, which the rules were not derived from, nothing is predicted that ISE does not
+  set; what is left is their output flip-flop's clock in the IOB (an OLOGIC2, 7 bits) and the BUFIO2s of the pads
+  not measured. The examples stay exact on both boards. The top half's CMTs (their CMT_PLL_TOP paths are not in the
+  drop) and the XC6SLX45's: #2025.
 
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
@@ -615,9 +634,11 @@ others; without it the Spartan-6 is refused as before. The browser edition has n
 | `ana-cmt6.mjs`, `cmt6.mjs` | A DCM's and PLL's clock path: `db/xc6slx16-cmt-paths.json`; the shared helpers (#727) |
 | `gen-dcm6.mjs` | The DCM's and PLL's designs, one setting per design (`--fields`: the counters' bits) (#727) |
 | `ana-dcm6.mjs` | Their settings' bits: `db/<device>-cmt.json` (#727) |
-| `gen-cmtsites6.mjs` | Every CMT site's designs: pads of its half and the sides, outputs on the BUFGMUXes in turn; `--outputs` each alone (#1951) |
+| `gen-cmtsites6.mjs` | Every CMT site's designs: pads of its half and the sides, outputs on the BUFGMUXes in turn; `--outputs` each alone, `--muxes` every BUFGMUX from the clock pad (#1951) |
 | `ana-cmtsites6.mjs` | A CMT's settings at any site: `db/<device>-cmt-settings.json` (#1951) |
 | `gen-cmtprobe6.mjs`, `ana-cmtprobe6.mjs` | The PIPs the drop could not take apart, probed one by one: `db/s6-pips-probe.json` (#1951) |
+| `gen-cmtdrop6.mjs`, `ana-cmtdrop6.mjs` | The CMT paths' PIPs dropped one at a time in context: `db/s6-pips-cmt.json` (#1951) |
+| `ana-cmtinput6.mjs` | A CMT's bits beyond its settings and PIPs, by its site, outputs and BUFIO2: `db/<device>-cmt-input.json` (#1951) |
 | `twr6.mjs` | trce's report read: each constraint's paths, their figures and elements (#731) |
 | `timing-fit6.mjs` | The wire delay model fitted to trce's nets on ISE's routing (#731) |
 | `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
