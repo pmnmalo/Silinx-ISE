@@ -103,7 +103,13 @@ test('CodeQL (#498): a workflow of its own, nightly on main when its code change
   assert.doesNotMatch(yml, /pull_request|branches:/);
   assert.match(yml, /^permissions:\n  contents: read\n/m, 'a read-only token at the top');
   const j = jobs(yml);
-  assert.deepEqual(Object.keys(j), ['changes', 'analyze']);
+  assert.deepEqual(Object.keys(j), ['changes', 'analyze', 'issues']);
+  // each alert an issue after the analysis (#2021): its token reads the alerts and writes issues, nothing else
+  const iss = j.issues.join('\n');
+  assert.ok(j.issues.includes('    needs: analyze'));
+  assert.match(iss, /^    permissions:\n      issues: write\n      security-events: read\s*(#.*)?\n    steps:/m);
+  assert.match(iss, /persist-credentials: false\n\s+- run: node scripts\/codeql-issues\.mjs\n\s+env:\n\s+GITHUB_TOKEN: \$\{\{ github\.token \}\}$/);
+  assert.doesNotMatch(iss, /npm ci|self-hosted/);
   // the nightly run skipped when none of the JavaScript changed since the last successful one
   const ch = j.changes.join('\n');
   assert.match(ch, /uses: \.\/\.github\/workflows\/scheduled-changes\.yml\n[\s\S]*workflow: codeql\.yml\n\s+only: core\/,packages\/,server\/,web\/,scripts\/,bin\/,test\/,\.github\/workflows\/codeql\.yml$/m);

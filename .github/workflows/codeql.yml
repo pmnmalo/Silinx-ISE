@@ -50,3 +50,18 @@ jobs:
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: /language:javascript-typescript
+  # each open alert an issue, an issue whose alert was fixed or dismissed closed (#2021, scripts/codeql-issues.mjs)
+  issues:
+    needs: analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      security-events: read     # the alerts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: node scripts/codeql-issues.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
