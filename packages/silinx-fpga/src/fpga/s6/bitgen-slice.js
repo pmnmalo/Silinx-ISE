@@ -64,10 +64,11 @@ export function kindModel(db, kind, tileType = 'CLEXL') {
   const baseCfg = new Map(baseSettings({ nets: true, full: true, kind }).filter(([e]) => !/[56]LUT$/.test(e)).map(([e, , v]) => [e, v]));
   const delta = (e, v) => {
     if (e === 'COUTUSED') return { set: [], clear: [] };
-    const name = v === '' ? e : `${e}=${v}`;
+    // (a flip-flop as a gate: the databases name it as its primitive does, AND2L / OR2L, the XDL as #AND2L, #2061)
+    const name = v === '' ? e : `${e}=${v}`, alt = /^#(AND2L|OR2L)$/.test(v) ? `${e}=${v.slice(1)}` : null;
     let seen = false;
     for (const r of ROUNDS) {
-      const x = db.rounds[r].kinds[kind].variants[name];
+      const vs = db.rounds[r].kinds[kind].variants, x = vs[name] ?? (alt && vs[alt]);
       if (!x) continue;
       seen = true;
       const set = x.set.map(key).filter(p => positions.has(p)), clear = x.clear.map(key).filter(p => positions.has(p));

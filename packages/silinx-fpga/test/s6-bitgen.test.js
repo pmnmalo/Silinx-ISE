@@ -132,3 +132,16 @@ test('bitgen: the PIP families with no bits (a hard block\'s pins, an interface 
   const maccTile = device.tileNames.find(n => /^MACCSITE2_/.test(n)), out = find(maccTile, p => /_DSP48A1_SITE$/.test(p.from) && /^MACC_LOGICOUT/.test(p.to));
   assert.equal(allow(...out), true);
 });
+
+test('bitgen-slice: a flip-flop set as a gate, #AND2L / #OR2L in the XDL, by the variant measured as AND2L / OR2L (#2061)', () => {
+  for (const kind of ['X', 'L', 'M']) {
+    const m = kindModel(db.slices, kind, 'CLEXL');
+    for (const v of ['AND2L', 'OR2L']) {
+      const a = predictSlice(m, cfg({ BFF: `#${v}` })), b = predictSlice(m, cfg({ BFF: v }));
+      assert.deepEqual(a.unknown, [], `${kind} ${v}`);
+      assert.deepEqual([...a.bits].sort(), [...b.bits].sort(), `${kind} ${v}`);
+    }
+    // the gate's bits differ from the flip-flop's (the base's #FF)
+    assert.notDeepEqual([...predictSlice(m, cfg({ BFF: '#AND2L' })).bits].sort(), [...predictSlice(m, cfg({ BFF: '#FF' })).bits].sort(), kind);
+  }
+});
