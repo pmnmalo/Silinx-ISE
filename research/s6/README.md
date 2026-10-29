@@ -640,13 +640,31 @@ Recorded here because the work was planned without the author's answers (2026-10
 - **The device descriptions** of the two parts will ship as the Spartan-3E boards' do, the decision of
   2026-10-11 (docs/OPEN-TOOLCHAIN.md) extended to the two Spartan-6 boards Silinx supports.
 
+### The bitstream (#732, S6-H, 2026-10-29)
+
+- **The databases and the prediction in the Silinx toolchain**: `packages/silinx-fpga/bitdb/s6` and
+  `packages/silinx-fpga/src/fpga/s6/bitgen*.js`, moved as they were (the residual and every research script read them
+  there); `bitdb-node.js` loads them for a part.
+- **The .bit** (`bitstreamS6`): the empty device's frame data with every bit `predictDesign` gives, the block RAM's
+  frame bitgen writes again, `bitstream.js`'s writer. **The frame written again** (a design with a block RAM): minor
+  23 of its column in its row, as in the frame data but for two bits bitgen clears, bit 1 of word w and bit 14 of
+  word w + 15 (w the first word of the four switch boxes' rows the block RAM's tile spans, its tile's band less 12
+  words), then a pad frame; measured with one RAMB8BWER (stopwatch, both boards); two block RAMs or a RAMB16BWER are
+  named as not measured.
+- **Against ISE's bitgen** (`check-bitgen6.mjs`: each routed XDL written with the header and options of ISE's own
+  .bit): night 1's 14 examples on both boards, CRC on and off, **28 of 28 byte-identical**. Of the 86 CMT designs, 30
+  identical; the others are the clock managers' gaps (#2025), and a DCM or PLL is now always named as not measured,
+  so no bitstream differs from ISE's without saying so.
+- **In the open flow** (under the flag): `bitgen` and `prombit` write `<top>.bit` and `<top>_prom.bit`; a feature the
+  databases do not have stops the step with the list.
+
 ## Trying the parts that exist
 
 The Spartan-6 parts of the flow are behind a developer flag (#722): with `SILINX_SPARTAN6_OPEN=1` in the server's
 environment (`SILINX_SPARTAN6_OPEN=1 npm start`), a project on the Nexys3 or the Atlys in the Silinx toolchain mode
 runs the steps that exist (the synthesis for the Spartan-6 and its Post-Synthesis Simulation Model; Map, Place &
 Route and the static timing, #732: `packages/silinx-fpga/src/open-flow-s6.js`, `fpga/s6/timing.js`) and refuses the
-others (the bitstream, next); without it the Spartan-6 is refused as before. The browser edition has no flag. On the
+others; without it the Spartan-6 is refused as before. The bitstream too since #732 (`fpga/s6/bitgen.js`). The browser edition has no flag. On the
 Nexys3 with its UCF, blinky places in 0.9 s and routes in 0.4 s (54 slices, 5.6 ns against its 10 ns), stopwatch in
 2.2 s and 0.8 s (84 slices, a RAMB8BWER and three DSP48A1s, 8.9 ns).
 
@@ -698,6 +716,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `timing-fit6.mjs` | The wire delay model fitted to trce's nets, or every connection of reportgen's `.dly`, on ISE's routing (#731) |
 | `timing6.mjs` | The logic arcs' table; trce's paths re-evaluated by the model, their slack against trce's (#731) |
 | `sta6.mjs` | The static timing of a routed design (its XDL): the slices' and hard blocks' arcs, PERIOD slack and OFFSET IN / OUT against trce's (#731) |
+| `check-bitgen6.mjs` | The Silinx toolchain's .bit of each routed XDL against ISE's bitgen's, byte for byte (#732) |
 | `fit-model6.mjs` | The timing model of the Silinx toolchain fitted on routed designs: `packages/silinx-fpga/src/fpga/s6/timing-model.js` (#732) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |

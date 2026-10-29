@@ -7,5 +7,6 @@ export * from './index.js';
 export { loadDeviceCache, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR } from './fpga/device-node.js';
 // the bit databases (bitdb/)
 export { loadDb, hasBitDb, dbPackages, DB_DIR } from './fpga/bitdb-node.js';
+export { loadBitDbS6, S6_DB_DIR } from './fpga/s6/bitdb-node.js';
 // Yosys: one run (yosysNode), or a pool of workers for the synthesis's mappings in parallel (yosysWorkers)
 export { yosysNode, yosysWorkers } from './synth-open-node.js';
