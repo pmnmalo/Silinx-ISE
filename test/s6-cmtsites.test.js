@@ -1,17 +1,17 @@
-// research/s6 stage S6-E2 (#1951), without ISE: the designs of every CMT site (gen-cmtsites6.mjs, --outputs), an even
+// packages/silinx-fpga/research/s6 stage S6-E2 (#1951), without ISE: the designs of every CMT site (gen-cmtsites6.mjs, --outputs), an even
 // DCM's (gen-dcm6.mjs --dcm), the settings' key and their prediction at any site (cmt6.mjs), the probe of the PIPs the
 // drop could not take apart (gen-cmtprobe6.mjs, ana-cmtprobe6.mjs) and the databases measured
 // (db/xc6slx16-cmt-settings.json, xc6slx16-cmt.json's dcmEven, s6-pips-probe.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { cmtSiteDesigns, cmtSiteDesign, cmtOutputDesigns, DCM_ALL, PLL_ALL } from '../research/s6/gen-cmtsites6.mjs';
-import { cmtProbes, intTieoffs } from '../research/s6/gen-cmtprobe6.mjs';
-import { probeBits, CONTEXT } from '../research/s6/ana-cmtprobe6.mjs';
-import { gridRegion } from '../research/s6/ana-pipdrop6.mjs';
-import { cmtKind, predictCmtSettings, CMT_FRAME } from '../research/s6/cmt6.mjs';
-import { cmtWindow } from '../research/s6/ana-cmtsites6.mjs';
-import { columnOf } from '../research/s6/ana-slice6.mjs';
+import { cmtSiteDesigns, cmtSiteDesign, cmtOutputDesigns, DCM_ALL, PLL_ALL } from '../packages/silinx-fpga/research/s6/gen-cmtsites6.mjs';
+import { cmtProbes, intTieoffs } from '../packages/silinx-fpga/research/s6/gen-cmtprobe6.mjs';
+import { probeBits, CONTEXT } from '../packages/silinx-fpga/research/s6/ana-cmtprobe6.mjs';
+import { gridRegion } from '../packages/silinx-fpga/research/s6/ana-pipdrop6.mjs';
+import { cmtKind, predictCmtSettings, CMT_FRAME } from '../packages/silinx-fpga/research/s6/cmt6.mjs';
+import { cmtWindow } from '../packages/silinx-fpga/research/s6/ana-cmtsites6.mjs';
+import { columnOf } from '../packages/silinx-fpga/research/s6/ana-slice6.mjs';
 import { S6_DEVICES, emptyFdri } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 

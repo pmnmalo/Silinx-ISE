@@ -1,4 +1,4 @@
-// research/s6: the scripts of the Spartan-6 measurements' night 1 (#733), checked without ISE: the
+// packages/silinx-fpga/research/s6: the scripts of the Spartan-6 measurements' night 1 (#733), checked without ISE: the
 // Spartan-6 .bit reader on bitstreams built here word by word (UG380's packets), the work folder of
 // night1.mjs, the parsers of summarize-night1.mjs on reports of ISE's format, the shell scripts' syntax.
 import test from 'node:test';
@@ -8,11 +8,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readBit6, readHeader, packetLine, REG6 } from '../research/s6/bits6.mjs';
-import { writeNight1, emptyXdl, xdlPart, BOARDS } from '../research/s6/night1.mjs';
-import { mapCounts, xdlSiteTypes, minPeriod, routed, times, reportSummary, summarize } from '../research/s6/summarize-night1.mjs';
+import { readBit6, readHeader, packetLine, REG6 } from '../packages/silinx-fpga/research/s6/bits6.mjs';
+import { writeNight1, emptyXdl, xdlPart, BOARDS } from '../packages/silinx-fpga/research/s6/night1.mjs';
+import { mapCounts, xdlSiteTypes, minPeriod, routed, times, reportSummary, summarize } from '../packages/silinx-fpga/research/s6/summarize-night1.mjs';
 
-const S6 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../research/s6');
+const S6 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../packages/silinx-fpga/research/s6');
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-s6-'));
 
 // a .bit: the header fields (a, b, c, d; e the length), then the 16-bit words of the configuration data

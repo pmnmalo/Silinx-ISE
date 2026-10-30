@@ -13,7 +13,7 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export const EXAMPLES = EXAMPLE_ORDER;   // gates, traffic, blinky, pong, stopwatch, clock, vga
 // the boards (and variants) of the devices of the Silinx toolchain: the examples run on all of them; the Spartan-3E's
 // also through ISE (test/ise/examples.test.js, the power estimates), the Spartan-6's (#732, no variants; the Atlys's
-// seven-segment display and VGA on its VHDCI connector) checked against ISE in research/s6 so far
+// seven-segment display and VGA on its VHDCI connector) checked against ISE in packages/silinx-fpga/research/s6 so far
 export const S3E_TARGETS = [
   { board: 'basys2', variant: '100' }, { board: 'basys2', variant: '250' },
   { board: 'nexys2', variant: '500' }, { board: 'nexys2', variant: '1200' },

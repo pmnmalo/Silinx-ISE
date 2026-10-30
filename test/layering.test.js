@@ -28,8 +28,8 @@ test('the application imports nothing from research/ (#407)', () => {
     }
   }
   assert.deepEqual(bad, []);
-  // the Spartan-3E research and the nextpnr spike are the package's (#1680)
-  for (const d of ['s3e-device', 's3e-bitstream', 's3e-place', 's3e-route', 'nextpnr-s3e']) {
+  // the Spartan-3E and Spartan-6 research and the nextpnr spike are the package's (#1680)
+  for (const d of ['s3e-device', 's3e-bitstream', 's3e-place', 's3e-route', 'nextpnr-s3e', 's6']) {
     assert.ok(!fs.existsSync(path.join(ROOT, 'research', d)) && fs.existsSync(path.join(ROOT, 'packages/silinx-fpga/research', d, 'README.md')), d);
   }
 });

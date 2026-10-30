@@ -90,13 +90,15 @@ test('#1672 toolchain boundary: no npm package but its dependencies', () => {
 });
 
 // #1678: the IDE (server/, web/, core/, scripts/, bin/) imports the package's entries only: parts.js and index.js (Node
-// and the browser), node.js (Node: server/, scripts/, bin/); the tests and the research may read its modules
+// and the browser), node.js (Node: server/, scripts/, bin/); the tests and the research may read its modules. The
+// package's research (#1680) is no API: the application never imports it (test/layering.test.js), the scripts may
 const ENTRIES = ['packages/silinx-fpga/src/index.js', 'packages/silinx-fpga/src/parts.js', 'packages/silinx-fpga/src/node.js'];
+const RESEARCH = /^packages\/silinx-fpga\/research\//;
 function ideImports(dir) {
   if (!fs.existsSync(path.join(ROOT, dir))) return [];
   return sources(dir).flatMap((f) => [...fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(IMPORTS)].map(([, spec]) => {
     const target = spec.startsWith('.') ? path.posix.normalize(path.posix.join(path.posix.dirname(f), spec)) : spec.startsWith('/') ? spec.slice(1) : null;
-    return target && inToolchain(target) ? [f, target] : null;
+    return target && inToolchain(target) && !RESEARCH.test(target) ? [f, target] : null;
   }).filter(Boolean));
 }
 

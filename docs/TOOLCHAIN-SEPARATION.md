@@ -50,7 +50,7 @@ model and elkjs: it belongs to the IDE although it lives in `core/fpga/`), the U
 - The Yosys update (`yosys-update.yml`, `scripts/yosys-update-report.mjs`): the open flow's size and speed with
   the new Yosys against the base's.
 - The research that builds the data: `packages/silinx-fpga/research/s3e-bitstream/` (the bit database), `packages/silinx-fpga/research/s3e-device/` and
-  `packages/silinx-fpga/research/s3e-route/build-device.mjs` (the device descriptions), `research/s6/`. They import the toolchain;
+  `packages/silinx-fpga/research/s3e-route/build-device.mjs` (the device descriptions), `packages/silinx-fpga/research/s6/`. They import the toolchain;
   the application never imports research (`test/layering.test.js`, #407).
 
 ### The data
@@ -203,7 +203,7 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    Second part: the Spartan-3E research (`s3e-device`, `s3e-bitstream`, `s3e-place`, `s3e-route`) and the
    nextpnr spike (`nextpnr-s3e`) are in `packages/silinx-fpga/research`, and the five tests that then import
    the package alone (`fpga-bitgen`, `iob-reg`, `s3e-bitstream-tools`, `s3e-devices`, `nextpnr-s3e`) in its
-   `test/`. `research/s6` follows when the Spartan-6 work settles. `open-flow.mjs` and `check:open-flow` still
+   `test/`. Third part: the Spartan-6 research, in `packages/silinx-fpga/research/s6`. `open-flow.mjs` and `check:open-flow` still
    make their designs with the IDE's front end (`core/compile.js`, `core/synth-front.js`): they stay the IDE's
    until the front end is a package of its own (`silinx-hdl`).
 10. **Licence, notices, versioning and publishing**

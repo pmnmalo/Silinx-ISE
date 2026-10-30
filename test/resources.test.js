@@ -95,8 +95,8 @@ test('the Silinx toolchain\'s devices: the sites of each shipped device report e
   }
 });
 
-test('Spartan-6: the totals of ISE\'s MAP report of the LX16 and the LX45 (research/s6/measured) equal to the model\'s, line by line', () => {
-  const night1 = JSON.parse(fs.readFileSync(fileURLToPath(new URL('../research/s6/measured/night1.json', import.meta.url)), 'utf8'));
+test('Spartan-6: the totals of ISE\'s MAP report of the LX16 and the LX45 (packages/silinx-fpga/research/s6/measured) equal to the model\'s, line by line', () => {
+  const night1 = JSON.parse(fs.readFileSync(fileURLToPath(new URL('../packages/silinx-fpga/research/s6/measured/night1.json', import.meta.url)), 'utf8'));
   for (const [key, part, pkg] of [['xc6slx16-csg324-3', 'xc6slx16', 'csg324'], ['xc6slx45-csg324-3', 'xc6slx45', 'csg324']]) {
     // every MAP line with a total, of every example built on the part (ISE's and the open synthesis's netlist)
     const totals = {};

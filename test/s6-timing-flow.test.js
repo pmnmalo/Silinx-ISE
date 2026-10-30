@@ -1,6 +1,6 @@
 // The Spartan-6's static timing in the Silinx toolchain (#732): packages/silinx-fpga/src/fpga/s6/timing.js (the
 // delays, analyzeTimingS6), timing-arcs.js (the arcs) and timing-model.js (S6_SPEED_3, fitted by
-// research/s6/fit-model6.mjs); fpga/timing.js's timing graph given a family's arcs, clock pins and the clocks' skew.
+// packages/silinx-fpga/research/s6/fit-model6.mjs); fpga/timing.js's timing graph given a family's arcs, clock pins and the clocks' skew.
 // A design synthesized, placed and routed by the open flow, timed: its clock's period and paths, its pads' paths.
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -3,7 +3,7 @@
 // one control set, latches only in the FFs and without a 5FF, O6 / O5 of 5 shared inputs, the carry and the wide
 // multiplexers in a SLICEL or SLICEM, the RAMs and shift registers in a SLICEM of one clock, write enable and write
 // address); the rules' own errors on slices built here; every example packed, its slices and warnings recorded (the
-// comparison with ISE's map comes with the first measurement night, research/s6/README.md).
+// comparison with ISE's map comes with the first measurement night, packages/silinx-fpga/research/s6/README.md).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -223,10 +223,10 @@ const EXAMPLE_PACK = {
   clock: { slices: 87, X: 36, L: 51, M: 0, luts: 161, ffs: 174, warnings: 0 },
   vga: { slices: 52, X: 22, L: 30, M: 0, luts: 129, ffs: 56, warnings: 0 },
 };
-// map's packing of the same netlists on ISE (research/s6/measured/night1.json, night 1): its SLICELs are the packer's
-// (the carry chains and the wide multiplexers); its SLICEX are a placement's, more (research/s6/README.md)
+// map's packing of the same netlists on ISE (packages/silinx-fpga/research/s6/measured/night1.json, night 1): its SLICELs are the packer's
+// (the carry chains and the wide multiplexers); its SLICEX are a placement's, more (packages/silinx-fpga/research/s6/README.md)
 test('the packer\'s SLICELs are those of ISE\'s map on the same netlists, every example on the Nexys3 and the Atlys (night 1)', () => {
-  const night1 = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/night1.json', import.meta.url), 'utf8'));
+  const night1 = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/night1.json', import.meta.url), 'utf8'));
   for (const board of ['nexys3', 'atlys']) {
     for (const name of EXAMPLES) {
       const open = night1.boards[board].examples[name].open;

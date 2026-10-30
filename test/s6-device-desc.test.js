@@ -1,6 +1,6 @@
 // The device descriptions of the Spartan-6 boards' parts (#723: packages/silinx-fpga/devices/xc6slx16csg324-3.json.gz,
 // xc6slx45csg324-3.json.gz, Silinx's packed graphs computed from ISE's device reports on night 1): they load, their
-// tiles and PIPs are the reports' (research/s6/measured/night1.json), their sites by type the reports' and DS160's,
+// tiles and PIPs are the reports' (packages/silinx-fpga/research/s6/measured/night1.json), their sites by type the reports' and DS160's,
 // every pin of the Nexys3 and the Atlys a bonded pad, a switch from a slice's COUT to the CIN of the slice above.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import { findDeviceGraph, shippedDevicePath, loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 import { resolveBoard } from '../server/devices.js';
 
-const night1 = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/night1.json', import.meta.url), 'utf8'));
+const night1 = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/night1.json', import.meta.url), 'utf8'));
 const PARTS = [
   // part, board, DS160's slices and the package's user I/O
   { part: 'xc6slx16csg324-3', board: 'nexys3', slices: 2278, io: 232 },

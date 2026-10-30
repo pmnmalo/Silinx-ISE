@@ -1,12 +1,12 @@
-// research/s6 stage S6-F (#728), without ISE: the block RAM's and the DSP48A1's designs (gen-hard6.mjs), their
+// packages/silinx-fpga/research/s6 stage S6-F (#728), without ISE: the block RAM's and the DSP48A1's designs (gen-hard6.mjs), their
 // analysis's helpers (ana-hard6.mjs), the database measured (db/xc6slx16-hard.json) and the prediction (hard6.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { hardBase, hardVariants, contents, hardDesigns, siteSlots, widthPairs, HARD_COMBOS } from '../research/s6/gen-hard6.mjs';
-import { bitY, tileRegions, tileOf, bitsByTile, siteById } from '../research/s6/ana-hard6.mjs';
-import { hexBits, fieldIndices, predictHard } from '../research/s6/hard6.mjs';
-import { gridRegion } from '../research/s6/ana-pipdrop6.mjs';
+import { hardBase, hardVariants, contents, hardDesigns, siteSlots, widthPairs, HARD_COMBOS } from '../packages/silinx-fpga/research/s6/gen-hard6.mjs';
+import { bitY, tileRegions, tileOf, bitsByTile, siteById } from '../packages/silinx-fpga/research/s6/ana-hard6.mjs';
+import { hexBits, fieldIndices, predictHard } from '../packages/silinx-fpga/research/s6/hard6.mjs';
+import { gridRegion } from '../packages/silinx-fpga/research/s6/ana-pipdrop6.mjs';
 import { S6_DEVICES } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
