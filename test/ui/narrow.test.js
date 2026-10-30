@@ -288,3 +288,56 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
     await noWarnings(page);
   });
 }
+
+// #2169: the project closed shows the side panel again (the Start page in it), whatever was left folded: in the modern
+// interface (the Tasks layout) Design's side panel open, no document maximized, kept so that the saved choice does not
+// fold it again (a reload); on a narrow screen in the classic interface the drawer open, kept too
+for (const [w, h] of [[1400, 900], [820, 1180]]) {
+  uiTest(`${w}×${h}: Close Project shows the side panel again, whatever was left folded (#2169)`, E, async (page) => {
+    const pj = `Closed_${w}`;
+    await makeProject(env, { name: pj, template: 'gates' });
+    await page.setViewport(w, h);
+    await page.openProject(pj);
+    const modern = await page.eval(() => document.documentElement.dataset.ui === 'modern');
+    const narrow = w < 1024;
+    const arranged = () => page.eval(() => {
+      const d = document.documentElement.dataset;
+      return { task: d.task, side: d.side, max: d.max };
+    });
+    const startShown = () => page.eval(() => !document.querySelector('.left-page[data-page=start]').hidden);
+    if (modern) {
+      // Design's side panel folded, its document maximized
+      await page.waitFor(() => document.documentElement.dataset.task === 'edit', [], { what: 'Design in front' });
+      if ((await arranged()).side === 'open') await sideButton(page);
+      await page.click('#task-view [data-act="max"]');
+      assert.deepEqual(await arranged(), { task: 'edit', side: 'folded', max: 'on' });
+      assert.equal(await shown(page, '#left'), false);
+      assert.equal(JSON.parse(await page.eval(() => localStorage.getItem('silinx.tasks'))).tasks.edit.side, false);
+    } else if (narrow) {
+      // the drawer closed
+      await page.click('#drawer-btn');
+      assert.deepEqual(await drawer(page), ['closed', 'closed', 'false']);
+      assert.equal(await shown(page, '#left'), false);
+    }
+    await page.eval(async () => { await window.SilinxApp.closeProject(); });
+    await page.waitFor(() => !window.SilinxApp.S.project, [], { what: 'the project closed' });
+    const visible = async (what) => {
+      assert.ok(await shown(page, '#left'), what);
+      assert.ok(await startShown(), what);
+      if (modern) assert.deepEqual(await arranged(), { task: 'edit', side: 'open', max: 'off' }, what);
+      else if (narrow) assert.deepEqual(await drawer(page), ['open', 'open', 'true'], what);
+    };
+    await visible('closed');
+    // kept: the saved "folded" does not fold it again
+    if (modern) assert.deepEqual(JSON.parse(await page.eval(() => localStorage.getItem('silinx.tasks'))).tasks.edit.side, true);
+    await noWarnings(page);
+    // (the reloaded page's Warnings tab has the start-up checks' lines of the machine: its console only, below)
+    await page.reload();
+    await page.setViewport(w, h);
+    await visible('reloaded');
+    // still folded by the viewer afterwards
+    if (modern) { await sideButton(page); assert.equal((await arranged()).side, 'folded'); await sideButton(page); }
+    else if (narrow) { await page.click('#drawer-btn'); assert.deepEqual(await drawer(page), ['closed', 'closed', 'false']); await page.click('#drawer-btn'); }
+    assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+  });
+}

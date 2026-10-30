@@ -39,8 +39,9 @@ export function initDrawer() {
   document.getElementById('drawer-btn')?.addEventListener('click', () => setDrawer(!drawerOpen()));
   document.getElementById('drawer-scrim')?.addEventListener('click', () => setDrawer(false));
   globalThis.addEventListener?.('silinx:project-opened', drawerProjectOpened);
+  globalThis.addEventListener?.('silinx:project-closed', drawerProjectOpened);
 }
-/** A project opened: on a narrow screen the drawer shown, its Design page with it (#1557). */
+/** A project opened or closed: on a narrow screen the drawer shown, its Design page (#1557) or its Start page (#2169) with it. */
 export function drawerProjectOpened() { if (asDrawer() && !drawerOpen()) setDrawer(true); }
 /** A document opened or brought to the front: on a narrow screen the open drawer gives way to it. */
 export function drawerGiveWay() { if (asDrawer() && drawerOpen()) setDrawer(false); }
