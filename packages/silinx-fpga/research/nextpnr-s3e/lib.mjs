@@ -67,6 +67,8 @@ export function timingExport(device) {
 }
 
 // ---------------------------------------------------------------- checking the result
+const DCM_DATA = /^(LOCKED|PSDONE|STATUS\d)$/;
+
 /** The netlist's simulation: its LUT4s by INIT, its flip-flops. */
 function netlistSim(mod, inputs) {
   const S = { val: new Map(), luts: [], ffs: [] };
@@ -79,6 +81,8 @@ function netlistSim(mod, inputs) {
     else if (c.type === 'FF') S.ffs.push({ name: esc(name), d: con('D'), q: con('Q'), ce: con('CE'), sr: con('SR'), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
     // the IOB's registers (an unconnected Q: an ODDR2's second flip-flop); REV sets; CLKINV: the falling edge
     else if (/^[IOT]FF$/.test(c.type)) S.ffs.push({ name: esc(name), d: con('D'), q: con('Q') ?? `${name}/Q`, ce: con('CE'), sr: con('SR'), rev: con('REV'), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), async: /ASYNC/.test(c.parameters.SRMODE), falling: parseInt(bitsOf(c.parameters.CLKINV ?? '0'), 2) === 1, init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
+    // a DCM's outputs but its clocks (LOCKED, PSDONE, STATUS): inputs of the design, the same in both simulations
+    else if (c.type === 'DCM') { for (const p of Object.keys(c.connections || {})) if (DCM_DATA.test(p) && con(p) !== undefined) S.pads.set(`${esc(name)}.${p}`, [con(p)]); }
     else if (c.type === 'IOB' && con('I') !== undefined) { for (const v of S.pads.values()) if (v[0] === con('PAD')) v.push(con('I')); }
     // the carry: a MUXCY passes CI when S, else DI (or its constant, CY0); an XORCY gives CI xor LI
     else if (c.type === 'MUXCY') S.luts.push({ out: con('O'), fn: () => (S.get(con('S')) ? S.get(con('CI')) : con('DI') !== undefined ? S.get(con('DI')) : +String(c.parameters.CY0 ?? 0).trim()) });
@@ -130,6 +134,8 @@ function xdlSim(design, inputs) {
           S.ffs.at(-1).hasSr = S.ffs.at(-1).sr !== undefined;
         }
       }
+    } else if (inst.type === 'DCM') {
+      for (const n of design.nets) for (const p of n.outpins) if (p.inst === inst.name && DCM_DATA.test(p.pin)) S.pads.set(`${inst.name}.${p.pin}`, [n.name]);
     } else if (inst.type === 'IOB' || inst.type === 'IBUF') {
       // the pad's input to the fabric (I) and to the input registers; the registers' clocks, enables, set / reset
       S.pads.set((inst.cfg.find(c => c.attr === 'PAD')?.name || '').replace(/<(\d+)>$/, '[$1]'), [`${inst.name}/PAD`, ...(pin('I') ? [pin('I')] : [])]);

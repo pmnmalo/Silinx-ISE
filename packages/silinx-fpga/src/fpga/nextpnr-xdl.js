@@ -7,6 +7,7 @@ import { initToEquation } from './lut.js';
 import { paramBits } from './netlist.js';
 import { BRAM_WIDTH } from './pack.js';
 import { iobSettings } from './nextpnr-iob.js';
+import { dcmCfgOf, dcmSettings } from './nextpnr-dcm.js';
 
 const topModule = json => Object.entries(json.modules).find(([, m]) => m.attributes?.top) || Object.entries(json.modules)[0];
 const esc = x => String(x).replace(/:/g, '_');
@@ -232,6 +233,10 @@ function instanceCfg(inst, mod, part) {
     }
     if (inst.mux.X) add('XUSED', '', '0');
     if (inst.mux.Y) add('YUSED', '', '0');
+  } else if (c.DCM) {
+    inst.type = 'DCM';
+    inst.name = esc(c.DCM.name);
+    for (const [attr, n, value] of dcmCfgOf(dcmSettings(c.DCM.parameters), inst.name)) add(attr, n, value);
   } else if (c.RAMB16) {
     bramCfg(inst, add);
   } else if (c.MULT18X18SIO) {
@@ -277,7 +282,7 @@ function netsOf(mod, insts, device, v) {
         const inst = p && insts.get(device.tileSites[k][p.site][0]);
         // (an F5 / FX pin only when the net leaves the site there: to X / Y it stays inside)
         // (a block RAM's or multiplier's pins: its cell's ports only, the pair's sites share nodes)
-        const hard = inst && (inst.cells.RAMB16 || inst.cells.MULT18X18SIO);
+        const hard = inst && (inst.cells.RAMB16 || inst.cells.MULT18X18SIO || inst.cells.DCM);
         if (inst && !(p.pin === 'F5' && !inst.f5out) && !(p.pin === 'FX' && !inst.fxout) && (!hard || portNet(hard, p.pin) !== undefined))
           (p.dir === 'o' ? net.outpins : net.inpins).push({ inst: inst.name, pin: p.pin });
       }
@@ -315,28 +320,38 @@ function checkLutPins(mod, insts, nets) {
 
 /** A BUFGMUX's select S tied to VCC, from its tile's VCC site, as ISE's map and Silinx write it. */
 function tieSelects(xdlInsts, nets, device) {
-  let vccs = 0;
+  const bySite = new Map();   // the tile's VCC site -> its net (one net per site: the buffers of a tile share its VCC wire)
   for (const inst of xdlInsts.filter(i => i.type === 'BUFGMUX')) {
     const k = device.tile(inst.tile), s = device.sitePin(inst.site, 'S');
     const vcc = device.tileSites[k].find(([name]) => device.site(name).type === 'VCC');
     const tp = device.templates[device.tileTemplate[k]];
-    let pip = null;
-    for (let i = 0; i < tp.from.length && !pip; i++) {
-      const [from, to] = device.pipWires(k, i);
-      if (to === s.wire && /VCC/.test(from)) pip = device.pip(k, i);
-    }
+    // the selects' PIP from the VCC wire
+    const pipOf = () => {
+      for (let i = 0; i < tp.from.length; i++) {
+        const [from, to] = device.pipWires(k, i);
+        if (to === s.wire && /VCC/.test(from)) return device.pip(k, i);
+      }
+      return null;
+    };
+    const pip = pipOf();
     if (!vcc || !pip) throw new Error(`${inst.site}: no VCC for its select`);
-    const dummy = `XDL_DUMMY_${inst.tile}_${vcc[0]}`;
-    xdlInsts.push({ name: dummy, type: 'VCC', placed: true, tile: inst.tile, site: vcc[0], cfg: [{ attr: '_NO_USER_LOGIC', name: '', value: '' }, { attr: '_VCC_SOURCE', name: '', value: 'VCCOUT' }] });
-    nets.push({ name: `GLOBAL_LOGIC1_${vccs++}`, type: 'vcc', outpins: [{ inst: dummy, pin: 'VCCOUT' }],
-      inpins: [{ inst: inst.name, pin: 'S' }], pips: [{ tile: pip.tile, from: pip.from, dir: pip.dir, to: pip.to }] });
+    let net = bySite.get(vcc[0]);
+    if (!net) {
+      const dummy = `XDL_DUMMY_${inst.tile}_${vcc[0]}`;
+      xdlInsts.push({ name: dummy, type: 'VCC', placed: true, tile: inst.tile, site: vcc[0], cfg: [{ attr: '_NO_USER_LOGIC', name: '', value: '' }, { attr: '_VCC_SOURCE', name: '', value: 'VCCOUT' }] });
+      net = { name: `GLOBAL_LOGIC1_${bySite.size}`, type: 'vcc', outpins: [{ inst: dummy, pin: 'VCCOUT' }], inpins: [], pips: [] };
+      bySite.set(vcc[0], net);
+      nets.push(net);
+    }
+    net.inpins.push({ inst: inst.name, pin: 'S' });
+    net.pips.push({ tile: pip.tile, from: pip.from, dir: pip.dir, to: pip.to });
   }
 }
 
 /**
  * nextpnr-himbaechel's routed design (spartan3e micro-architecture, its --write JSON) as an XDL design (parseXdl's
  * structure: writeXdl writes it): one instance per used site with its settings, each net's site pins and PIPs.
- * Its cells: LUT4, FF, MUXCY, XORCY, MUXF5, MUXF6, IOB (with its registers IFF, OFF, TFF), BUFGMUX. Throws when a LUT input
+ * Its cells: LUT4, FF, MUXCY, XORCY, MUXF5, MUXF6, IOB (with its registers IFF, OFF, TFF), BUFGMUX, DCM. Throws when a LUT input
  * is not on the pin its equation reads.
  */
 export function nextpnrToXdl(json, device, part = device.part) {

@@ -324,3 +324,39 @@ test('#2195 nextpnrToXdl: the pads\' IOSTANDARD, DRIVE, SLEW and pulls, each IOB
   assert.deepEqual(bitgen(parseXdl(writeXdl(ucfDesign)), loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' }).unknown, []);
   assert.equal(simCheck(ucfRouted(), ucfDesign, { cycles: 1000, randomInputs: true }).ok, true);
 });
+
+// nextpnr's routed design of test/fixtures/open-flow/feat_dcm: a DCM_SP's CLK0, CLKDV, CLKFX and CLK2X on global buffers (#2194).
+// ISE's DRC passed it (0 errors, 0 warnings), its bitgen's .bit byte-identical to Silinx's.
+const dcmRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/dcm-routed.json.gz', import.meta.url))));
+const dcmDesign = nextpnrToXdl(dcmRouted(), device, PART);
+
+test('#2194 nextpnrToXdl: the DCM\'s settings as Silinx\'s packer writes them; its outputs on the global buffers they reach; routed, every feature known', () => {
+  const engine = new URL('./fixtures/nextpnr-engine/', import.meta.url);
+  const nl = readYosysJson(JSON.parse(fs.readFileSync(new URL('feat_dcm.json', engine), 'utf8')));
+  const p = pack(nl, { ucf: fs.readFileSync(new URL('feat_dcm.ucf', engine), 'utf8'), part: PART });
+  const ours = dcmDesign.insts.find(i => i.type === 'DCM');
+  assert.equal(ours.name, 'u_dcm');
+  assert.equal(ours.site, 'DCM_X0Y1');
+  assert.equal(cfgText(ours), cfgText(p.insts.find(x => x.kind === 'dcm')));
+  assert.deepEqual(dcmDesign.insts.filter(i => i.type === 'BUFGMUX').map(i => i.site).sort(), ['BUFGMUX_X1Y10', 'BUFGMUX_X1Y11', 'BUFGMUX_X2Y10', 'BUFGMUX_X2Y11']);
+  // CLKIN from the pad by its dedicated path, as Silinx routes it
+  const clkin = dcmDesign.nets.find(n => n.inpins.some(q => q.inst === 'u_dcm' && q.pin === 'CLKIN'));
+  assert.deepEqual(clkin.pips.map(q => `${q.from} -> ${q.to}`), ['I0_PINWIRE -> IOIS_IBUF0', 'CLKT_CKI4 -> CLKT_DLL_CLKPAD4', 'DCM_DLL_CLKPAD0 -> DCM_CLKIN', 'DCM_CLKIN -> DCM_CLKIN_PINWIRE']);
+  assert.deepEqual(checkRouting(dcmDesign, device).problems, []);
+  assert.deepEqual(bitgen(parseXdl(writeXdl(dcmDesign)), loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' }).unknown, []);
+});
+
+test('#2194 tieSelects: the global buffers of a tile share one VCC net, from its VCC site (two nets on one wire: the routing check\'s error)', () => {
+  const vcc = dcmDesign.nets.filter(n => n.type === 'vcc' && n.outpins[0].pin === 'VCCOUT' && /^XDL_DUMMY_CLKT/.test(n.outpins[0].inst));
+  assert.equal(vcc.length, 1);
+  assert.equal(vcc[0].inpins.filter(q => q.pin === 'S').length, 4);
+  assert.equal(dcmDesign.insts.filter(i => /^XDL_DUMMY_CLKT/.test(i.name)).length, 1);
+});
+
+test('#2194 simCheck: the DCM\'s LOCKED as an input of both simulations (in feat_dcm it reaches only an LED: no flip-flop can tell it)', () => {
+  const json = dcmRouted();
+  const r = simCheck(json, dcmDesign, { cycles: 500, randomInputs: true });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.flipFlops, 108);
+  assert.equal(simCheck(json, dcmDesign, { cycles: 100, inputs: { 'u_dcm.LOCKED': 1 } }).ok, true);
+});

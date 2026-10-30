@@ -11,6 +11,7 @@ import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
 import { nextpnrNetlist, NEXTPNR_CELL } from '../src/open-flow-nextpnr.js';
 import { parseXdl } from '../src/xdl.js';
+import { loadDeviceCache } from '../src/fpga/device-node.js';
 
 const fixture = name => new URL(`./fixtures/nextpnr-engine/${name}`, import.meta.url);
 const gates = () => fs.readFileSync(fixture('gates.json'), 'utf8');
@@ -40,8 +41,8 @@ test('nextpnrNetlist: what the micro-architecture cannot implement yet is named'
 });
 
 test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants, the buffers, the IOBs\' DDR registers, the block RAMs and multipliers; not a falling edge, a latch, a distributed RAM', () => {
-  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'IDDR2', 'ODDR2', 'BUFG', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
-  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'SRL16E', 'RAM16X1S', 'RAMB16_S3', 'MULT18X18SX', 'DCM_SP', 'OBUFDS', 'BUFGMUX']) assert.ok(!NEXTPNR_CELL.test(t), t);
+  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'IDDR2', 'ODDR2', 'BUFG', 'DCM', 'DCM_SP', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
+  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'SRL16E', 'RAM16X1S', 'RAMB16_S3', 'MULT18X18SX', 'OBUFDS', 'BUFGMUX']) assert.ok(!NEXTPNR_CELL.test(t), t);
 });
 
 test('#2136 the gates example built with --engine nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
@@ -116,7 +117,7 @@ test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry 
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
   assert.ok(out.includes('  Number of Slice Flip Flops: 58 out of 4896 1%'), out.join('\n'));
-  assert.ok(out.includes('  Number of occupied Slices: 71 out of 2448 3%'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 69 out of 2448 3%'), out.join('\n'));
   assert.ok(out.includes('All constraints were met.'), out.join('\n'));
   assert.ok(out.includes('Bitstream: build/top.bit (169286 bytes, every feature in the bit database)'), out.join('\n'));
   // the wide multiplexers on the slices' own: twelve F5s, two F6s each reading two of them
@@ -196,4 +197,37 @@ test('#2195 --engine nextpnr with the whole UCF: no warnings (TIG and CLOCK_DEDI
   assert.ok(n.checks.includes('constraint OFFSET = OUT 15 ns AFTER "clk": met on led<0>'));
   assert.ok(n.out.includes('All constraints were met.'));
   assert.ok(n.out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), n.out.join('\n'));
+});
+
+test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its global buffer; an INST LOC as the DCM\'s BEL, a wrong site refused', () => {
+  const json = () => fs.readFileSync(fixture('feat_dcm.json'), 'utf8'), ucf = fs.readFileSync(fixture('feat_dcm.ucf'), 'utf8');
+  const { problems, sdc } = nextpnrNetlist(json(), 'top', ucf);
+  assert.deepEqual(problems, []);
+  // the 20 ns input: CLK0 20, CLKDV / 4 = 80, CLKFX x 3 / 2 = 13.333333, CLK2X 10; its input buffer's net as well
+  assert.deepEqual(sdc.trim().split('\n').map(l => +/-period (\S+)/.exec(l)[1]).sort((a, b) => a - b), [10, 13.333333, 20, 20, 80]);
+  const device = loadDeviceCache('xc3s250ecp132-4');
+  const at = nextpnrNetlist(json(), 'top', `${ucf}\nINST "u_dcm" LOC = "DCM_X1Y0" ;\n`, device);
+  assert.deepEqual(at.problems, []);
+  const s = device.site('DCM_X1Y0');
+  assert.equal(cellsOf(at.json).u_dcm.attributes.BEL, `X${device.tileCol[s.tile]}Y${device.tileRow[s.tile]}/S${s.index}_DCM`);
+  assert.deepEqual(nextpnrNetlist(json(), 'top', `${ucf}\nINST "u_dcm" LOC = "SLICE_X0Y0" ;\n`, device).problems, ['INST u_dcm: LOC SLICE_X0Y0 is not a DCM site of this device']);
+});
+
+
+test('#2194 a DCM_SP (Silinx\'s synthesis) built with --engine nextpnr: no warnings, each clock\'s PERIOD derived and met, on its buffers, a complete bitstream', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fixture('feat_dcm.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('feat_dcm.ucf').pathname, '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  // (the UCF's 20 ns on clk, each clock's derived by the timing step)
+  const checks = out.filter(l => /^constraint PERIOD/.test(l)).map(l => l.replace(/ \(period .*$/, '')).sort();
+  assert.deepEqual(checks, ['constraint PERIOD 20 ns on clk, CLK0 of u_dcm: 20 ns, met', 'constraint PERIOD 20 ns on clk, CLK2X of u_dcm: 10 ns, met',
+    'constraint PERIOD 20 ns on clk, CLKDV of u_dcm: 80 ns, met', 'constraint PERIOD 20 ns on clk, CLKFX of u_dcm: 13.333 ns, met']);
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  assert.equal(design.insts.find(i => i.type === 'DCM').site, 'DCM_X0Y1');
+  assert.deepEqual(design.insts.filter(i => i.type === 'BUFGMUX').map(i => i.site).sort(), ['BUFGMUX_X1Y10', 'BUFGMUX_X1Y11', 'BUFGMUX_X2Y10', 'BUFGMUX_X2Y11']);
 });
