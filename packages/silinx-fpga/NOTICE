@@ -1,0 +1,19 @@
+silinx-fpga
+Copyright 2026 Pedro Maló
+
+Licensed under the Apache License, Version 2.0 (see LICENSE): its code and its data alike (the bit
+databases in bitdb/ and the device graphs in devices/). Unless required by applicable law or agreed to
+in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+Source code: https://github.com/pmnmalo/Silinx-ISE (packages/silinx-fpga)
+
+It depends on open-source components from other projects, each under its own licence, which npm installs
+with it: Yosys (YoWASP, ISC) and nextpnr with the Spartan-3E (nextpnr-spartan, ISC; with Boost, BSL-1.0,
+and Eigen, MPL-2.0: source code at https://gitlab.com/libeigen/eigen). Their licence texts are in
+THIRD-PARTY-NOTICES.md.
+
+Your designs, and the netlists and bitstreams silinx-fpga makes of them, are not covered by this licence.
+
+silinx-fpga is an independent project, not affiliated with or endorsed by AMD/Xilinx. Xilinx, ISE and
+Spartan are trademarks of AMD. No Xilinx software or Xilinx output is included.

@@ -210,6 +210,9 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
     ([#1681](https://github.com/pmnmalo/Silinx-ISE/issues/1681)): as decided (section 4): the package's NOTICE
     and THIRD-PARTY-NOTICES, the IDE's NOTICE naming it, its changelog fragments and 0.x version, a publishing
     workflow from its own tag in this repository.
+    First part: the package's NOTICE and THIRD-PARTY-NOTICES.md (written by `scripts/third-party.mjs` with the
+    IDE's), the IDE's NOTICE naming it, and its `files` list: the npm package holds `src/`, `bin/`, `bitdb/`,
+    `devices/` and the notices (about 21 MB unpacked), not the research nor the tests (`test/third-party.test.js`).
 11. **Its own repository** ([#1651](https://github.com/pmnmalo/Silinx-ISE/issues/1651)): `silinx-fpga` moves
     to a GitHub repository of its own (decided, section 4), once steps 1 to 10 are done: `git filter-repo` keeps
     the moved files' history; there, its CI, the ISE oracle (the self-hosted runner registered for it too), CodeQL,
