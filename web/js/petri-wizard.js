@@ -1,28 +1,21 @@
 // The Petri Net Wizard (#208), New Source ▸ 'Petri Net' ▸ Wizard > (#958): the name, language and location (not
-// shown from New Source, #2082) -> the inputs and outputs (the Schematic Wizard's table, inputs and outputs only, no
-// quick-add buttons), the clock and the
-// reset -> summary; it creates a .pn.json with those ports declared and no places yet, and opens it in
-// the Petri net editor. The pages: web/js/modwizard.js (namePage, portEditor).
+// shown from New Source, #2082) -> a template (#2149: a cycle, producer/consumer…, core/chart-templates.js) -> the
+// inputs and outputs (the Schematic Wizard's table, inputs and outputs only), the clock and the reset -> summary; it
+// creates a .pn.json with those ports declared and the template's places (none: empty), and opens it in the Petri
+// net editor. The pages: web/js/modwizard.js (namePage, portEditor), web/js/template-page.js.
 import { api } from './api.js';
 import { h, alertDlg, toast } from './ui.js';
-import { normalizePetri, petriErrors } from '/core/petri.js';
+import { petriErrors } from '/core/petri.js';
+import { petriFromPorts } from '/core/chart-wizard.js';
+import { PETRI_TEMPLATES, petriTemplate } from '/core/chart-templates.js';
+import { templatePage } from './template-page.js';
+export { petriFromPorts } from '/core/chart-wizard.js';
 import { reservedError } from '/core/reserved.js';
 import { wizard, field, replaceGuard, closeBeforeReplace } from './wizards.js';
 import { namePage, portEditor } from './modwizard.js';
 import { S, app } from './app.js';
 import { portText, namedPages } from './wizard-util.js';
 
-
-/** The net the wizard makes: the ports, the clock and the reset, nothing drawn yet. */
-export function petriFromPorts({ name, lang, description = '', ports, clock = 'clk', reset = 'rst' }) {
-  return normalizePetri({
-    name, lang, clock, reset: { name: reset, active: 'high', sync: true },
-    ...(description.trim() ? { description: description.trim() } : {}),
-    inputs: ports.filter(p => p.dir === 'in').map(p => ({ name: p.name, width: +p.width })),
-    outputs: ports.filter(p => p.dir === 'out').map(p => ({ name: p.name, width: +p.width })),
-    places: [], transitions: [], arcs: [],
-  });
-}
 
 export async function petriWizard({ name = '', location = 'src', lang = null, named = false, back = null } = {}) {
   const guard = replaceGuard('Petri Net Wizard');
@@ -36,7 +29,15 @@ export async function petriWizard({ name = '', location = 'src', lang = null, na
   const pe = portEditor(ports, { lang: p1.lang, dirs: ['in', 'out'] });   // only the user's own ports (#2082); the clock and the reset: fields of their own
   const clkIn = h('input', { type: 'text', class: 'pw-clock', value: 'clk', style: { width: '100px' } });
   const rstIn = h('input', { type: 'text', class: 'pw-reset', value: 'rst', style: { width: '100px' } });
-  const net = () => petriFromPorts({ name: p1.name(), lang: p1.lang(), description: p1.desc.value, ports, clock: clkIn.value.trim(), reset: rstIn.value.trim() });
+  // a template (#2149): its ports in the table, its places, transitions and arcs in the net
+  let drawn = { places: [], transitions: [], arcs: [] };
+  const tpl = templatePage('petri', PETRI_TEMPLATES, (id, params) => {
+    const { ports: tp, ...rest } = petriTemplate(id, params);
+    ports.splice(0, ports.length, ...tp.map(q => ({ ...q, desc: '' })));
+    pe.render();
+    drawn = rest;
+  });
+  const net = () => petriFromPorts({ name: p1.name(), lang: p1.lang(), description: p1.desc.value, ports, clock: clkIn.value.trim(), reset: rstIn.value.trim(), ...drawn });
   const p2 = {
     title: 'Inputs and Outputs',
     render: () => h('div', {}, pe.node,
@@ -61,16 +62,18 @@ export async function petriWizard({ name = '', location = 'src', lang = null, na
         `The wizard will create the Petri net ${p1.path()} and open it in the Petri net editor.`,
         '',
         `Module: ${m.name} (${m.lang === 'vhdl' ? 'VHDL' : 'Verilog'})`,
+        ...(tpl.id() === 'empty' ? [] : [`Template: ${tpl.label()} (${m.places.length} places, ${m.transitions.length} transitions)`]),
         `Inputs: ${m.inputs.map(portText).join(', ') || 'none'}`,
         `Outputs: ${m.outputs.map(portText).join(', ') || 'none'}`,
         `Clock: ${m.clock}; reset: ${m.reset.name} (synchronous, active high)`,
         '',
-        'Then draw its places, transitions and arcs; the outputs are set by the places (while marked) and the transitions (when they fire).',
+        tpl.id() === 'empty' ? 'Then draw its places, transitions and arcs; the outputs are set by the places (while marked) and the transitions (when they fire).'
+          : 'Then change it in the editor as you wish; the outputs are set by the places (while marked) and the transitions (when they fire).',
       ].join('\n');
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('Petri Net Wizard', namedPages(p1.page, [p1.page, p2, pSum], named, p1.tail), { width: 820, back });
+  const ok = await wizard('Petri Net Wizard', namedPages(p1.page, [p1.page, tpl.page, p2, pSum], named, p1.tail), { width: 820, back });
   if (!ok) return;
   let m;
   try { m = net(); } catch (e) { return alertDlg('Petri Net Wizard', e.message, 'error'); }

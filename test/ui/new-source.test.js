@@ -30,8 +30,8 @@ const WIZARD = {
 const STEPS = {
   'Boolean Algebra Wizard': ['Inputs and Outputs', 'Summary'],
   'Module Wizard': ['Inputs and Outputs', 'Kind of Logic', 'Summary'], 'Schematic Wizard': ['Inputs and Outputs', 'Summary'],
-  'FSM Wizard': ['Inputs and Outputs', 'States and Transitions', 'Summary'], 'ASM Wizard': ['Inputs and Outputs', 'States', 'Summary'],
-  'Petri Net Wizard': ['Inputs and Outputs', 'Summary'], 'Clocking Wizard': ['Input Clock', 'Output Clocks', 'Summary'], 'Block Memory': ['Memory', 'Summary'],
+  'FSM Wizard': ['Template', 'Inputs and Outputs', 'States and Transitions', 'Summary'], 'ASM Wizard': ['Template', 'Inputs and Outputs', 'States', 'Summary'],
+  'Petri Net Wizard': ['Template', 'Inputs and Outputs', 'Summary'], 'Clocking Wizard': ['Input Clock', 'Output Clocks', 'Summary'], 'Block Memory': ['Memory', 'Summary'],
   'Test Bench Wizard': ['Unit Under Test', 'Clock and Reset', 'Input Vectors', 'Vectors and Expected Outputs', 'Summary'], 'UCF Wizard': ['Ports and Pins', 'Summary'],
 };
 // the File Name and Location page: the same for every type (#2140)

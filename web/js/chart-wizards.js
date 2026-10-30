@@ -1,11 +1,14 @@
 // The FSM and ASM wizards (#2082), New Source ▸ 'Finite State Machine (FSM)' / 'Algorithmic State Machine (ASM)' ▸
-// Wizard >: the name, language and location (not shown from New Source) -> the inputs and outputs (the Petri Net
+// Wizard >: the name, language and location (not shown from New Source) -> a template (#2149: a counter, a sequence
+// detector…, core/chart-templates.js), which fills in the next pages -> the inputs and outputs (the Petri Net
 // Wizard's table), the clock and the reset -> the states (an FSM's transitions too) -> summary; it creates the chart
-// with them (core/chart-wizard.js) and opens it in its editor, where the outputs and the decisions are drawn.
+// with them (core/chart-wizard.js) and opens it in its editor, where the rest is drawn.
 import { api } from './api.js';
 import { icons } from './icons.js';
 import { h, alertDlg, toast } from './ui.js';
 import { fsmFromSpec, asmFromSpec } from '/core/chart-wizard.js';
+import { FSM_TEMPLATES, ASM_TEMPLATES, fsmTemplate, asmTemplate } from '/core/chart-templates.js';
+import { templatePage } from './template-page.js';
 import { validateFsm } from '/core/fsm.js';
 import { validate as validateAsm } from '/core/asm.js';
 import { identError } from '/core/modgen.js';
@@ -41,12 +44,14 @@ function ioPage(p1, extra = []) {
       return null;
     },
   };
-  return { page, ports, clock: () => clkIn.value.trim(), reset: () => rstIn.value.trim() };
+  // (a template's ports: in place of those of the table)
+  const setPorts = list => { ports.splice(0, ports.length, ...list.map(p => ({ ...p, desc: '' }))); pe.render(); };
+  return { page, ports, setPorts, clock: () => clkIn.value.trim(), reset: () => rstIn.value.trim() };
 }
 
 // the table of the states: their names, the first the initial (reset) state; onChange(old, name): a state renamed
-// (name undefined: removed)
-function statesTable(states, onChange = () => {}) {
+// (name undefined: removed); fixed(): the states only renamed (an ASM template's boxes)
+function statesTable(states, onChange = () => {}, fixed = () => false) {
   const tbl = h('table', { class: 'grid cw-states' });
   const render = () => {
     tbl.innerHTML = '';
@@ -55,8 +60,9 @@ function statesTable(states, onChange = () => {}) {
       const nm = h('input', { type: 'text', class: 'cw-sname', value: s, style: { width: '140px' } });
       nm.addEventListener('input', () => { const old = states[k]; states[k] = nm.value.trim(); onChange(old, states[k]); });
       const del = h('button', { class: 'tb-btn cw-sdel', html: icons.remove, title: 'Remove', onclick: () => { const [old] = states.splice(k, 1); render(); onChange(old); } });
-      tbl.append(h('tr', {}, h('td', {}, nm, k === 0 ? h('span', { class: 'hint', style: { marginLeft: '6px' } }, '(initial)') : ''), h('td', {}, del)));
+      tbl.append(h('tr', {}, h('td', {}, nm, k === 0 ? h('span', { class: 'hint', style: { marginLeft: '6px' } }, '(initial)') : ''), h('td', {}, fixed() ? '' : del)));
     });
+    addBtn.style.display = fixed() ? 'none' : '';
   };
   const addBtn = h('button', { class: 'btn cw-sadd', onclick: () => {
     let k = states.length;
@@ -135,17 +141,29 @@ export async function fsmWizard({ name = '', location = 'src', lang = null, name
   const io = ioPage(p1, field('Machine type:', typeSel));
   const states = ['S0', 'S1'];
   const transitions = [];
+  let outs = {}, layout;   // a template's outputs of the states (by name) and its layout
   const tt = transitionsTable(states, transitions);
-  // the transitions follow a state renamed; those of a state removed go with it
+  // the transitions (and the outputs) follow a state renamed; those of a state removed go with it
   const st = statesTable(states, (old, nw) => {
     for (let k = transitions.length - 1; k >= 0; k--) {
       const t = transitions[k];
       if (nw === undefined && (t.from === old || t.to === old)) transitions.splice(k, 1);
       else { if (t.from === old) t.from = nw; if (t.to === old) t.to = nw; }
     }
+    if (old in outs) { if (nw !== undefined) outs[nw] = outs[old]; delete outs[old]; }
     tt.render();
   });
-  const model = () => fsmFromSpec({ name: p1.name(), lang: p1.lang(), type: typeSel.value, clock: io.clock(), reset: io.reset(), description: p1.desc.value, ports: io.ports, states, transitions });
+  const tpl = templatePage('fsm', FSM_TEMPLATES, (id, params) => {
+    const t = fsmTemplate(id, params);
+    io.setPorts(t.ports);
+    typeSel.value = t.type;
+    states.splice(0, states.length, ...t.states);
+    transitions.splice(0, transitions.length, ...t.transitions.map(x => ({ ...x })));
+    outs = structuredClone(t.outputs);
+    layout = t.layout;
+    st.render(); tt.render();
+  });
+  const model = () => fsmFromSpec({ name: p1.name(), lang: p1.lang(), type: typeSel.value, clock: io.clock(), reset: io.reset(), description: p1.desc.value, ports: io.ports, states, outputs: outs, transitions, layout });
   const p3 = {
     title: 'States and Transitions',
     render: () => h('div', {},
@@ -171,6 +189,7 @@ export async function fsmWizard({ name = '', location = 'src', lang = null, name
         `The wizard will create the state diagram ${p1.path()} and open it in the FSM editor.`,
         '',
         `Module: ${m.name} (${m.lang === 'vhdl' ? 'VHDL' : 'Verilog'}), ${m.type === 'mealy' ? 'Mealy' : 'Moore'} machine`,
+        ...(tpl.id() === 'empty' ? [] : [`Template: ${tpl.label()}`]),
         `Inputs: ${m.inputs.map(portText).join(', ') || 'none'}`,
         `Outputs: ${m.outputs.map(portText).join(', ') || 'none'}`,
         `Clock: ${m.clock}; reset: ${m.reset.name} (asynchronous, active high)`,
@@ -182,7 +201,7 @@ export async function fsmWizard({ name = '', location = 'src', lang = null, name
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('FSM Wizard', namedPages(p1.page, [p1.page, io.page, p3, pSum], named, p1.tail), { width: 860, back });
+  const ok = await wizard('FSM Wizard', namedPages(p1.page, [p1.page, tpl.page, io.page, p3, pSum], named, p1.tail), { width: 860, back });
   if (!ok) return;
   let m;
   try { m = model(); } catch (e) { return alertDlg('FSM Wizard', e.message, 'error'); }
@@ -199,12 +218,20 @@ export async function asmWizard({ name = '', location = 'src', lang = null, name
   });
   const io = ioPage(p1);
   const states = ['IDLE', 'RUN'];
-  const st = statesTable(states);
-  const model = () => asmFromSpec({ name: p1.name(), lang: p1.lang(), clock: io.clock(), reset: io.reset(), description: p1.desc.value, ports: io.ports, states });
+  // (st: made after, used only when the template is applied)
+  const tpl = templatePage('asm', ASM_TEMPLATES, (id, params) => {
+    const t = asmTemplate(id, params);
+    io.setPorts(t.ports);
+    states.splice(0, states.length, ...t.states);
+    st.render();
+  });
+  const st = statesTable(states, () => {}, () => tpl.id() !== 'empty');
+  const model = () => asmFromSpec({ name: p1.name(), lang: p1.lang(), clock: io.clock(), reset: io.reset(), description: p1.desc.value, ports: io.ports, states, template: tpl.id(), params: tpl.params() });
   const p3 = {
     title: 'States',
     render: () => h('div', {},
-      h('div', { class: 'hint' }, 'One state box per state, top to bottom: the first one is the initial state (after the reset); each one goes to the next, the last one back to the first. Add the decision boxes and the outputs in the editor.'),
+      h('div', { class: 'hint' }, tpl.id() === 'empty' ? 'One state box per state, top to bottom: the first one is the initial state (after the reset); each one goes to the next, the last one back to the first. Add the decision boxes and the outputs in the editor.'
+        : 'The template\'s state boxes, the first one the initial state (after the reset): rename them here; change the chart in the editor.'),
       h('div', { style: { marginTop: '8px' } }, st.node)),
     validate: () => st.check(p1.lang()) || validateAsm(model()).find(d => d.severity === 'error')?.message || null,
   };
@@ -218,17 +245,18 @@ export async function asmWizard({ name = '', location = 'src', lang = null, name
         `The wizard will create the ASM chart ${p1.path()} and open it in the ASM editor.`,
         '',
         `Module: ${m.name} (${m.lang === 'vhdl' ? 'VHDL' : 'Verilog'})`,
+        ...(tpl.id() === 'empty' ? [] : [`Template: ${tpl.label()}`]),
         `Inputs: ${m.inputs.map(portText).join(', ') || 'none'}`,
         `Outputs: ${m.outputs.map(portText).join(', ') || 'none'}`,
         `Clock: ${m.clock}; reset: ${m.reset.name} (asynchronous, active high)`,
-        `States: ${states.join(' → ')} → ${states[0]}`,
+        tpl.id() === 'empty' ? `States: ${states.join(' → ')} → ${states[0]}` : `States: ${states.join(', ')} (initial: ${states[0]})`,
         '',
         'Then add the decision boxes and the outputs in the editor.',
       ].join('\n');
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('ASM Wizard', namedPages(p1.page, [p1.page, io.page, p3, pSum], named, p1.tail), { width: 820, back });
+  const ok = await wizard('ASM Wizard', namedPages(p1.page, [p1.page, tpl.page, io.page, p3, pSum], named, p1.tail), { width: 820, back });
   if (!ok) return;
   let m;
   try { m = model(); } catch (e) { return alertDlg('ASM Wizard', e.message, 'error'); }

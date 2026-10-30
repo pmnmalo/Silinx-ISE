@@ -151,6 +151,12 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Boolean Algebra Wizard** (*New Source ▸ Boolean Algebra ▸ Wizard >*): the names of the inputs (1–6) and of the
   outputs, or an expression (`F = A·B' + C`) whose variables are the inputs and whose name the output, its column
   filled in.
+- **Templates** of the FSM, ASM and Petri net wizards (their first page, *Template*; `core/chart-templates.js`): they
+  fill in the next pages, which can still be changed. FSM: a counter of N states (its count on q), up/down (`up`), with
+  an enable (`en`), a ring (one-hot) and a Johnson counter, a sequence detector (a bit pattern, overlapping or not,
+  Moore or Mealy), a traffic light; ASM: a counter, an up/down counter, a start/done controller, a req/ack handshake;
+  Petri net: a cycle of N places, producer/consumer with a buffer of N, mutual exclusion of two processes, fork/join,
+  a semaphore of N resources for M users.
 - **FSM Wizard** and **ASM Wizard** (*New Source ▸ Finite State Machine (FSM) / Algorithmic State Machine (ASM) ▸
   Wizard >*): the inputs and outputs (the port table, no quick-add buttons), the clock and the reset (an FSM: Moore
   or Mealy), then the states (an FSM's transitions too: from, to and a condition over the inputs, in priority

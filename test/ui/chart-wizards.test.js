@@ -45,14 +45,16 @@ uiTest('#2082 FSM Wizard: inputs and outputs, Mealy, states and transitions (ren
   await makeProject(env, { name: 'FwPj', top: '' });
   await page.openProject('FwPj');
   await newSourceWizardOf(page, 'Finite State Machine (FSM)', 'det', 'FSM Wizard', { location: 'fsm', lang: 'verilog' });
-  assert.deepEqual(await steps(page), ['Inputs and Outputs', 'States and Transitions', 'Summary']);
-  assert.equal(await h3(page), 'Inputs and Outputs');
-  // no quick-add buttons, inputs and outputs only; the description at the end of the page
+  assert.deepEqual(await steps(page), ['Template', 'Inputs and Outputs', 'States and Transitions', 'Summary']);
+  // the empty template (#2149: the others, chart-templates.test.js); the description at the end of the first page
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .tp-template').value), 'empty');
+  await page.fill('.dlg-overlay .mw-desc', 'Detects 11.');
+  await next(page, 'Inputs and Outputs');
+  // no quick-add buttons, inputs and outputs only
   assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay .mw-qa').length), 0);
   await ports(page, [['x', 'in', 1], ['z', 'out', 1]]);
   assert.deepEqual(await page.eval(() => [...document.querySelector('.dlg-overlay .mw-pdir').options].map((o) => o.value)), ['in', 'out']);
   await page.fill('.dlg-overlay .cw-type', 'mealy');
-  await page.fill('.dlg-overlay .mw-desc', 'Detects 11.');
   // the clock named as an input: refused
   await page.fill('.dlg-overlay .cw-clock', 'x');
   await page.dialogButton('Next >');
@@ -107,7 +109,8 @@ uiTest('#2082 ASM Wizard: inputs and outputs, the states chained; the chart open
   await makeProject(env, { name: 'AwPj', top: '' });
   await page.openProject('AwPj');
   await newSourceWizardOf(page, 'Algorithmic State Machine (ASM)', 'ctl', 'ASM Wizard', { lang: 'vhdl' });
-  assert.deepEqual(await steps(page), ['Inputs and Outputs', 'States', 'Summary']);
+  assert.deepEqual(await steps(page), ['Template', 'Inputs and Outputs', 'States', 'Summary']);
+  await next(page, 'Inputs and Outputs');
   await ports(page, [['start', 'in', 1], ['n', 'in', 4], ['busy', 'out', 1]]);
   await next(page, 'States');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .cw-sname')].map((i) => i.value)), ['IDLE', 'RUN']);
@@ -217,7 +220,11 @@ uiTest('#2082 Portuguese: every page of the FSM, ASM and UCF wizards translated'
   };
   for (const [type, title] of [['Finite State Machine (FSM)', 'FSM Wizard'], ['Algorithmic State Machine (ASM)', 'ASM Wizard'], ['Implementation Constraints File', 'UCF Wizard']]) {
     await newSourceWizardOf(page, type, 'pt_w', title);
-    if (title !== 'UCF Wizard') await ports(page, [['x', 'in', 1], ['z', 'out', 1]]);
+    if (title !== 'UCF Wizard') {
+      await compare(`${title} Template`);
+      await next(page, 'Inputs and Outputs');
+      await ports(page, [['x', 'in', 1], ['z', 'out', 1]]);
+    }
     for (;;) {
       const t = await h3(page);
       if (t === 'States and Transitions') { await page.click('.dlg-overlay .cw-tadd'); await compare(`${title} ${t} (a transition)`); await page.click('.dlg-overlay .cw-tdel'); }
@@ -231,8 +238,8 @@ uiTest('#2082 Portuguese: every page of the FSM, ASM and UCF wizards translated'
   }
   // a message: translated
   await newSourceWizardOf(page, 'Algorithmic State Machine (ASM)', 'pt_w', 'ASM Wizard');
-  await page.dialogButton('Next >');
-  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'States');
+  await next(page, 'Inputs and Outputs');
+  await next(page, 'States');
   await page.click('.dlg-overlay .cw-sdel');
   await page.click('.dlg-overlay .cw-sdel');
   await page.dialogButton('Next >');
