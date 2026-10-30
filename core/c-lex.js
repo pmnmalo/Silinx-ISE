@@ -27,6 +27,7 @@ import { taskArrays } from './cpp-task-array.js';
 import { cppSugar } from './cpp-sugar.js';
 import { cStructs } from './c-struct.js';
 import { cUnions } from './c-union.js';
+import { cDesignated } from './c-designated.js';
 
 // (C++'s headers of a test bench whose names core/cpp-lex.js makes C: std::vector, generate / fill, the random engines, #1734)
 const TB_HEADERS = new Set(['vector', 'algorithm', 'random']);
@@ -259,18 +260,18 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
   if (cpp) {
     // (a test bench's std::vector, generate / fill, <random> first: C tokens, core/cpp-stl.js, #1734)
     // (then the arrays of streams: a stream each element, core/c-stream-array.js, #1739; of tasks before, #1898)
-    // (a template's: once it is made, its parameters known, #1898; the unions and bit-fields before the structs,
-    // core/c-union.js, #1896)
+    // (a template's: once it is made, its parameters known, #1898; the initializers written in full, core/c-designated.js,
+    // #1963; the unions and bit-fields before the structs, core/c-union.js, #1896)
     // (hls_fir.h's filters first: their config structs read, their run() a C model's call, core/cpp-fir.js, #1942)
     const channels = (t, later) => streamArrays(taskArrays(npChannels(t, report, later), report, later), report, later);
     // (hls::vector and the other library types their own first, core/cpp-hls-lib.js, #1891; its operators once the
     // templates are made, core/cpp-vector.js)
     const lib = cppHlsLibs(tokens, includes, report);
     const fir = cppFir(lib.tokens, report);
-    const st = cStructs(cUnions(cppVector(cppSugar(channels(cppTemplates(channels(cppStl(fir.tokens, report), true), report), false), report)), report, true), report, true);
+    const st = cStructs(cUnions(cDesignated(cppVector(cppSugar(channels(cppTemplates(channels(cppStl(fir.tokens, report), true), report), false), report)), report), report, true), report, true);
     return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, firs: fir.firs, apFloats: lib.apFloats };
   }
-  const st = cStructs(cUnions(tokens, report), report, false);
+  const st = cStructs(cUnions(cDesignated(tokens, report), report), report, false);
   return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs };
 
   function run(src, fname, depth, simOuter = false) {
