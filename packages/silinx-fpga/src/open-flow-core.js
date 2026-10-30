@@ -253,7 +253,7 @@ export async function runFlow(spec, io) {
     log('All signals are completely routed.');
   }
 
-  // the Spartan-6's Map and Place & Route (#732: under its developer flag, open-flow-s6.js)
+  // the Spartan-6's Map and Place & Route (#732: open-flow-s6.js)
   const s6 = spec.family === 'spartan6' ? mountS6Steps({ io, spec, log, report, util, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
 
   const { bitfile, runPins, runPower, runTiming } = mountFlowReports({

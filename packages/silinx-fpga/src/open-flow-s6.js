@@ -1,5 +1,5 @@
 // Silinx toolchain - the open flow's Map and Place & Route for the Spartan-6 (#732; the plan: research/s6/README.md,
-// #1), under its developer flag (fpga/s6/devices.js): the netlist packed (fpga/s6/pack.js) and turned into its
+// #1), for the parts of fpga/s6/devices.js: the netlist packed (fpga/s6/pack.js) and turned into its
 // physical design with the constraints (phys.js), placed (place.js), written as XDL (xdl.js), routed on the device's
 // routing graph (route.js) and checked (route-check.js); the Spartan-3E's steps in open-flow-core.js otherwise.
 // The timing (open-flow-reports.js) and the bitstream are their own steps.

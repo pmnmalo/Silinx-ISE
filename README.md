@@ -485,7 +485,9 @@ synthesize again while the synthesis is up to date (the design's sources, top, d
 unchanged). For the **Basys2-100 and Basys2-250
 (XC3S100E / XC3S250E-CP132) and the Nexys2-500 and Nexys2-1200 (XC3S500E / XC3S1200E-FG320)**
 Silinx also places, routes and writes the bitstream itself: the device descriptions ship with
-Silinx, and the bitstreams it writes for the tested designs are byte-identical to ISE's. It is the
+Silinx, and the bitstreams it writes for the tested designs are byte-identical to ISE's. The same holds in the
+local server for the Spartan-6 boards, the **Nexys3 and the Atlys** (XC6SLX16 / XC6SLX45-CSG324; the Atlys's
+seven-segment display and VGA on its VHDCI connector), not yet in the browser edition (#2103). It is the
 default execution mode of a new installation, so students need nothing else for these boards; for
 the other boards choose an ISE mode in *Tools ▸ Toolchain Settings ▸ Execution mode*. The
 usual processes then run Silinx's own flow on this machine: *Synthesize - Yosys* (Yosys),
@@ -522,9 +524,8 @@ needs no ISE at all (the Spartan-3E Starter Kit's XC3S500E-FG320 is the Nexys2-5
 package). Developers can build another package's description from an ISE
 (`research/s3e-route/build-device.mjs`, into `~/.silinx/devices/`) once its pads are in the bit
 database. The open
-toolchain does **not yet support the Spartan-6 boards (Nexys3, Atlys)**; it will (they work with
-ISE, as every board does; the Silinx toolchain's whole flow for them, to a bitstream ISE's bitgen writes
-byte for byte, is under a developer flag: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node research/s3e-route/open-flow.mjs <project
+toolchain also takes **the Spartan-6 boards (Nexys3, Atlys)** in the local server, to a bitstream ISE's bitgen
+writes byte for byte for the same routing (not yet in the browser edition: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node research/s3e-route/open-flow.mjs <project
 folder> <out folder>`.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);

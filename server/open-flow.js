@@ -24,7 +24,7 @@ import fss from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deviceFamily, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, spartan6Open, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
+import { deviceFamily, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
 import { findPart } from './devices.js';
 import { runCommand } from './jobs.js';
 import { safeJoin } from './projects.js';
@@ -77,9 +77,9 @@ export function flowHeapMb(totalBytes = os.totalmem(), nodeOptions = process.env
  * { available, reason, part, device, graph (file or null), shipped, bitDb, canBuild (a device
  * description built from an ISE would make it available: developers only, POST
  * /toolchain/build-device; the interface does not offer it, #8), steps (the steps it has for the
- * device, when not all of them: the Spartan-6's under the developer flag SILINX_SPARTAN6_OPEN, #722) }.
+ * device, when not all of them: the Spartan-6's, #722) }.
  */
-export function openStatus(device, { dbDir = BIT_DB_DIR, env = process.env } = {}) {
+export function openStatus(device, { dbDir = BIT_DB_DIR } = {}) {
   const out = { available: false, reason: '', part: null, device: null, graph: null, shipped: false, bitDb: false, canBuild: false };
   let part;
   try { part = reportPart(device || {}); } catch (e) { out.reason = e.message; return out; }
@@ -87,7 +87,7 @@ export function openStatus(device, { dbDir = BIT_DB_DIR, env = process.env } = {
   Object.assign(out, { part, device: dev });
   const fam = deviceFamily(device) || '';
   // (its device description for Map and Place & Route, #732: the boards' parts ship with Silinx)
-  if (fam === 'spartan6' && spartan6Open(env)) {
+  if (fam === 'spartan6') {
     Object.assign(out, s6OpenStatus(dev, String(device.package || '').toLowerCase(), part));
     if (out.available) { out.graph = findDeviceGraph(part); out.shipped = !!out.graph && path.dirname(out.graph) === SHIPPED_DEVICES_DIR; }
     return out;
@@ -139,7 +139,7 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
     job.log(`ERROR: the Silinx toolchain cannot implement this design: ${status.reason}.`);
     throw Object.assign(new Error(`Silinx toolchain not available for ${status.part || 'this device'}: ${status.reason}`), { result, openStatus: status });
   }
-  // (a device with some of the steps only: the Spartan-6 under its developer flag, #722)
+  // (a device with some of the steps only, #722)
   const missing = status.steps ? st.filter(s => !status.steps.includes(s)) : [];
   if (missing.length) {
     job.log(`ERROR: the Silinx toolchain has no ${missing.join(', ')} for this device yet: ${status.reason}.`);
