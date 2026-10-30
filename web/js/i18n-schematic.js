@@ -62,6 +62,9 @@ export const SCH_PT = {
   'Reset curve': 'Repor curva', 'Drop this wire\'s own curve: drawn again from its rectilinear path': 'Descartar a curva própria deste fio: desenhado de novo a partir do seu percurso retilíneo',
   'Net name already used': 'Nome de rede já usado', 'Connect by name': 'Ligar pelo nome',
   'Connect this net to it by name? They become one net, without a wire drawn between them.': 'Ligar esta rede a ela pelo nome? Passam a ser uma só rede, sem um fio desenhado entre elas.',
+  // an I/O marker given the name of a net (#2170)
+  'Join this I/O marker to it? The marker takes the width of the net.': 'Juntar este marcador de E/S a ela? O marcador fica com a largura da rede.',
+  'Join': 'Juntar', 'Choose another name': 'Escolher outro nome',
   'Rotate': 'Rodar', 'Mirror': 'Espelhar', 'Wire': 'Fio', 'I/O Marker': 'Marcador de E/S', 'Net Name': 'Nome de Rede',
   'Bidirectional': 'Bidirecional',
   // several objects selected: a property whose value differs between them (#1471)
@@ -109,6 +112,7 @@ export const SCH_PT_PATTERNS = [
     return p;
   }).join(' e ')}`],
   [/^Another net is already named '(.*)'\.$/, "Já há outra rede chamada '$1'."],
+  [/^A net is already named '(.*)'\.$/, "Já há uma rede chamada '$1'."],
   // a bus tap's MSB below its LSB refused (#1815)
   [/^A bus tap takes the bits MSB downto LSB: its MSB \((\d+)\) cannot be below its LSB \((\d+)\)$/, 'Um bus tap tira os bits MSB downto LSB: o seu MSB ($1) não pode ser menor que o seu LSB ($2)'],
   [/^A bus tap takes the bits MSB downto LSB: its LSB \((\d+)\) cannot be above its MSB \((\d+)\)$/, 'Um bus tap tira os bits MSB downto LSB: o seu LSB ($1) não pode ser maior que o seu MSB ($2)'],

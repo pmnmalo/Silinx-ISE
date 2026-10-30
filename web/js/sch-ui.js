@@ -23,7 +23,8 @@ export function mountSchUi(ctx) {
       const box = h('div', { class: 'se-prompt', style: `left:${x}px;top:${y}px` }, h('label', { text: label }), input);
       let done = false;
       const end = v => { if (done) return; done = true; box.remove(); container.focus({ preventScroll: true }); resolve(v); };
-      input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') end(input.value.trim() || null); else if (e.key === 'Escape') end(null); });
+      // (Enter's default prevented: its keypress would press the button of a dialog the name opens, #2170)
+      input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); end(input.value.trim() || null); } else if (e.key === 'Escape') end(null); });
       input.addEventListener('blur', () => setTimeout(() => end(input.value.trim() || null), 0));
       canvas.append(box);
       setTimeout(() => { input.focus(); input.select(); }, 0);

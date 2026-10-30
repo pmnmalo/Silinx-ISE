@@ -28,7 +28,7 @@ const MOUNT = async () => {
   const modules = { sub: { name: 'sub', ports: [{ name: 'x', dir: 'in', width: 1 }, { name: 'y', dir: 'out', width: 4 }] } };
   const calls = [];
   const rec = (name) => (...a) => { calls.push([name, ...a.filter((x) => typeof x !== 'object')]); };
-  let prompt = '';
+  let prompt = '', joins = [];
   // (curved wires, #1144: the editor's, on this document)
   const curve = mountSchCurve({ doc: () => doc, sel: () => sel, view: () => ({ s: 1 }), readOnly: false, edit: (fn) => fn(), render: () => {}, renderProps: () => {}, snapshot: () => '', pushUndo: () => {}, changed: () => {} });
   const t = mountTools({ curve, doc: () => doc, nl: () => nl, sel: () => sel, modules: () => modules, view: () => ({ s: 1 }), hoverPin: () => null,
@@ -38,8 +38,9 @@ const MOUNT = async () => {
     edit: (fn) => { fn(); doc = normalizeDoc(doc, { modules }); nl = netlist(doc, { modules }); calls.push(['edit']); },
     flash: (m) => calls.push(['flash', m.slice(0, 40)]), shortNote: (what, [a, b]) => calls.push(['short', what, a, b]), nextId: (p, arr) => `${p}${arr.length + 1}`, nextInstName: () => 'XLXI_9',
     promptBox: async (pt, label, value) => { calls.push(['prompt', label, value]); return prompt; }, renderPalette: () => {}, render: () => {},
-    renderOverlay: () => {}, renderProps: () => {}, updateToolbar: () => {}, updateStatus: () => {}, joinByName: async () => true, renamed: rec('renamed') });
-  window.__t = { t, calls, I, O, optBox, canvas, state: () => ({ doc, tool, placing, wireDraw, sel: [...sel] }), setPrompt: (v) => { prompt = v; } };
+    renderOverlay: () => {}, renderProps: () => {}, updateToolbar: () => {}, updateStatus: () => {}, joinByName: async () => true,
+    joinMarker: async (name) => { calls.push(['join', name]); return joins.length ? joins.shift() : null; }, renamed: rec('renamed') });
+  window.__t = { t, calls, I, O, optBox, canvas, state: () => ({ doc, tool, placing, wireDraw, sel: [...sel] }), setPrompt: (v) => { prompt = v; }, setJoins: (v) => { joins = v; } };
   return true;
 };
 
@@ -123,8 +124,31 @@ uiTest('#405 schematic tools: a net name attached (counted up), an I/O marker on
   assert.equal(out.next, 'd1');
   assert.deepEqual(out.netCalls, ['edit', 'flash Click on a wire to attach the net name']);
   assert.deepEqual(out.ports, ['A:in:1:0,0']);
-  assert.deepEqual(out.ioCalls, ['prompt Input port name ', 'edit', 'prompt Input port name in1']);
+  assert.deepEqual(out.ioCalls, ['prompt Input port name ', 'join A', 'edit', 'prompt Input port name in1']);
   assert.deepEqual(out.again, ['flash There is already an I/O marker here']);
+});
+
+uiTest('#2170 schematic tools: an I/O marker on empty space: the last marker\'s direction; a net\'s name: Choose another name asks again, Join takes its width and direction', E, async (page) => {
+  await page.eval(MOUNT);
+  const out = await page.eval(async () => {
+    const { t, calls, state, setPrompt, setJoins } = window.__t;
+    const r = {};
+    t.setTool('io');
+    // the first on empty space: an input (no marker yet)
+    setPrompt('x');
+    await t.ioClick({ x: 700, y: 700 });
+    // an output added (as by its properties): the next on empty space an output
+    state().doc.ports.push({ id: 'P9', name: 'o', dir: 'out', width: 1, x: 800, y: 800 });
+    setPrompt('b');
+    setJoins([false, { width: 4, net: { drivers: [] } }]);
+    await t.ioClick({ x: 700, y: 600 });
+    r.ports = state().doc.ports.map((p) => `${p.name}:${p.dir}:${p.width}`);
+    r.calls = calls.splice(0).map((c) => c.join(' '));
+    return r;
+  });
+  // (b: joined after Choose another name, a net of 4 bits not driven: an input of 4 bits)
+  assert.deepEqual(out.ports, ['x:in:1', 'o:out:1', 'b:in:4']);
+  assert.deepEqual(out.calls, ['prompt Input port name in1', 'join x', 'edit', 'prompt Output port name out1', 'join b', 'prompt Output port name out1', 'join b', 'edit']);
 });
 
 uiTest('#1144 schematic tools: Curved wires: a wire clicked through points keeps them as its curve, its path routed between its ends; ended on a curve, it splits that wire there', E, async (page) => {

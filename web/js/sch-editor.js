@@ -48,6 +48,7 @@ import { mountSchOptions } from './sch-options.js';
 import { mountSchCurve } from './sch-curve.js';
 import { mountSchBeautify } from './sch-beautify.js';
 import { mountSchPanels } from './sch-panels.js';
+import { mountSchJoin } from './sch-join.js';
 import { onLayoutToggled } from './layout-fit.js';
 import { clone } from '/core/util.js';
 export { clone };   // (core/util.js's)
@@ -216,8 +217,9 @@ export function mountSchEditor(container, opts = {}) {
     routeTo: (...a) => routeTo(...a), snapPoint: (...a) => snapPoint(...a), bandRect,
     infoTarget: (...a) => infoTarget(...a) });
 
-  // ---------------- properties panel (sch-props.js)
-  const { renderProps, openSelected, renamed, joinByName, renameLabel } = mountProps({ opts, container, propBody, readOnly, doc: () => doc, sel: () => sel, nl: () => nl,
+  // ---------------- properties panel (sch-props.js); an I/O marker given a net's name (sch-join.js, #2170)
+  const { joinMarker } = mountSchJoin({ doc: () => doc, nl: () => nl, container });
+  const { renderProps, openSelected, renamed, joinByName, renameLabel } = mountProps({ joinMarker, opts, container, propBody, readOnly, doc: () => doc, sel: () => sel, nl: () => nl,
     live: () => live, modules: () => modules, setGenLang: (v) => { genLang = v; }, edit: (...a) => edit(...a),
     flash: (...a) => flash(...a), rotateSel: (...a) => rotateSel(...a), mirrorSel: (...a) => mirrorSel(...a),
     deleteSel: (...a) => deleteSel(...a), nextId: (...a) => nextId(...a), openInfo: (...a) => openInfo(...a),
@@ -237,7 +239,7 @@ export function mountSchEditor(container, opts = {}) {
     set: (o) => { if ('tool' in o) tool = o.tool; if ('placing' in o) placing = o.placing; if ('wireDraw' in o) wireDraw = o.wireDraw; },
     readOnly, canvas, optBox, container, edit, flash: (...a) => flash(...a), shortNote, nextId, nextInstName,
     promptBox: (...a) => promptBox(...a), renderPalette, render, renderOverlay, renderProps,
-    updateToolbar, updateStatus, joinByName, renamed });
+    updateToolbar, updateStatus, joinByName, joinMarker, renamed });
   // a short of two named nets refused (#754, #806): the status line says why
   function shortNote(what, [a, b]) {
     flash(`${what} would short net '${a}' and net '${b}': two named nets cannot be joined. Rename one of them first (the same name connects them).`, 6000);
@@ -279,7 +281,7 @@ export function mountSchEditor(container, opts = {}) {
   const itemAt = target => { const g = target.closest?.('[data-kind]'); return g ? { kind: g.dataset.kind, id: g.dataset.id } : null; };
   let spaceDown = false;
   // the right-click menu (sch-context.js): Rename… (sch-rename.js, #1546), the selection's commands (#1556)
-  const { rename } = mountSchRename({ doc: () => doc, nl: () => nl, edit, joinByName, renameLabel });
+  const { rename } = mountSchRename({ doc: () => doc, nl: () => nl, edit, joinByName, joinMarker, renameLabel });
   const { contextMenu } = mountSchContext({ readOnly, doc: () => doc, live: () => live, sel: () => sel, tool: () => tool, render, renderProps,
     rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; } });
   const { finishMove, onMove, onUp } = mountSchMouse({

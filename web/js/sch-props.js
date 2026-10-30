@@ -15,11 +15,12 @@ import { reservedError } from '/core/reserved.js';
 import { clone, snap, KEYS } from './sch-editor.js';
 import { mountMultiProps } from './sch-multi.js';
 import { mountCompareTicks } from './sch-compare.js';
+import { setMarkerWidth } from '/core/schmarker.js';
 
 /** { renderProps, openSelected, renamed, joinByName, renameLabel } of a schematic editor (doc(), sel(), nl(), live(), modules(): its current ones). */
 export function mountProps(ctx) {
   const { opts, container, propBody, readOnly, doc, sel, nl, live, modules, setGenLang, edit, flash, rotateSel, mirrorSel, deleteSel, nextId,
-    openInfo, infoTarget } = ctx;
+    openInfo, infoTarget, joinMarker } = ctx;
 
   const multiProps = mountMultiProps({ propBody, doc, edit, field: (...a) => field(...a), keepFocus: (...a) => keepFocus(...a) });   // (#1471)
   const compareTicks = mountCompareTicks({ container, doc, nl, modules, edit, flash });   // (#1555)
@@ -258,9 +259,12 @@ export function mountProps(ctx) {
   }
   function portProps(p) {
     propBody.append(h('div', { class: 'se-ptitle', text: 'I/O Marker' }));
-    propBody.append(field('Name', inp(p.name, v => { p.name = newName(v, p.name); })));
+    propBody.append(field('Name', inp(p.name, async v => {   // (a net's name: joined, taking its width, if the user says so, #2170)
+      const name = newName(v, p.name), j = name === p.name ? false : await joinMarker(name, nl()?.nets.find(n => n.ports.includes(p.id)));
+      return j !== false && (() => { p.name = name; if (j) setMarkerWidth(p, j.width); });
+    })));
     propBody.append(field('Direction', selBox(p.dir, [['in', 'Input'], ['out', 'Output'], ['inout', 'Bidirectional']], v => { p.dir = v; })));
-    propBody.append(field('Width', inp(p.width, v => { p.width = Math.max(1, Math.round(+v || 1)); if (p.type && !/\(|\[/.test(p.type) && p.width > 1) delete p.type; }, { type: 'number', min: 1 })));
+    propBody.append(field('Width', inp(p.width, v => setMarkerWidth(p, v), { type: 'number', min: 1 })));
     propBody.append(field('HDL type', inp(p.type || '', v => { if (String(v).trim()) p.type = String(v).trim(); else delete p.type; }, { placeholder: doc().lang === 'vhdl' ? (p.width > 1 ? `std_logic_vector(${p.width - 1} downto 0)` : 'std_logic') : (p.width > 1 ? `[${p.width - 1}:0]` : ''), 'data-no-i18n': '' }), 'optional, overrides the type derived from the width'));
     // (no Rotate / Mirror / Delete buttons: the toolbar and Ctrl+R / Ctrl+M / Del do it, #949)
   }
