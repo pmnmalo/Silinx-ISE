@@ -15,7 +15,7 @@
 //
 //   node research/synth-quality/abc9.mjs [--filter blinky,serv] [--ways now,abc9] [--seed 1] [--cycles 200] [--out results.json] [--routed dir]
 // (--filter: also a design of the corpus outside the subset, e.g. epfl-max; --routed: each routed design written as
-// <dir>/<design>__<way>/routed.xdl, for ISE's trce: research/s3e-route/ise-open-check.sh on the ISE host)
+// <dir>/<design>__<way>/routed.xdl, for ISE's trce: packages/silinx-fpga/research/s3e-route/ise-open-check.sh on the ISE host)
 //   node research/synth-quality/abc9.mjs --table results.json     the Markdown table of a run (README.md, "ABC9")
 //
 // The corpus's sources: npm run fetch:designs. Research, not a test: nothing fails on a worse result.
@@ -131,7 +131,7 @@ async function measure(argv) {
   const { knownRouting } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
   const { analyzeTiming, delayTable } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
   const { writeXdl, parseXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
-  const { loadDb } = await import('../s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../../packages/silinx-fpga/research/s3e-bitstream/db.mjs');
   const { designs, compile, elaborate, primitiveSources, lib } = await load(only || []);
   const devices = new Map();
   const deviceOf = part => {

@@ -59,7 +59,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-  # the open synthesis with each Yosys: the examples through the open flow (research/s3e-route/open-flow.mjs
+  # the open synthesis with each Yosys: the examples through the open flow (packages/silinx-fpga/research/s3e-route/open-flow.mjs
   # --quality), the subset of the design corpus through test/designs-corpus/run.mjs (frontend, synth, flow;
   # its comparison with expected.json is not this job's verdict: the report compares the two sides)
   measure:
@@ -99,7 +99,7 @@ jobs:
         run: |
           mkdir -p "out/examples"
           for ex in gates traffic blinky pong stopwatch clock vga; do
-            node research/s3e-route/open-flow.mjs "examples/$ex" "$RUNNER_TEMP/flow/$ex" --quality "out/examples/$ex.json" > "out/examples/$ex.log" 2>&1 \
+            node packages/silinx-fpga/research/s3e-route/open-flow.mjs "examples/$ex" "$RUNNER_TEMP/flow/$ex" --quality "out/examples/$ex.json" > "out/examples/$ex.log" 2>&1 \
               || echo "::warning::$ex: the open flow failed (out/examples/$ex.log)"
             tail -3 "out/examples/$ex.log"
           done

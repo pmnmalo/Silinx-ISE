@@ -1,4 +1,4 @@
-// research/s3e-device: measuring the device description black-box (no device report, no ISE here):
+// packages/silinx-fpga/research/s3e-device: measuring the device description black-box (no device report, no ISE here):
 // the observation of ISE-routed nets, the join rules, the xdl2ncd probes, the DRC join tests.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,28 +8,28 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { wireFamily, tileXY, observeNet, observeDesign, resolveAmbiguous, intersectAmbiguous, joinRule, blockRamOutputJoins } from '../research/s3e-device/observe.mjs';
-import { switchGrid, gridRule, applyRules, closeRules, segmentRules, nodesOf } from '../research/s3e-device/model.mjs';
-import { measuredLines, packMeasured } from '../research/s3e-device/build.mjs';
-import { pinCensus, renamePads } from '../research/s3e-device/pins.mjs';
-import { ram, multCascade, dcmPins, iobDdr, iobClk2, devicePads, observedPads, dcmClockPad } from '../research/s3e-device/gen-obspins.mjs';
-import { clockDesign } from '../research/s3e-device/gen-obsclk.mjs';
-import { clockNets, clockTestDesigns, clockTile, rowTile } from '../research/s3e-device/clocktests.mjs';
-import { edgeHypotheses, edgeTile } from '../research/s3e-device/edgejoins.mjs';
-import { chipMeasurements } from '../research/s3e-device/chip.mjs';
-import { carryDesign } from '../research/s3e-device/gen-obscarry.mjs';
-import { sliceDesign } from '../research/s3e-device/gen-obsslice.mjs';
-import { muxDesign, muxCount } from '../research/s3e-device/gen-obsmux.mjs';
-import { srlCascade, f8Muxes, ramClkB, bufgs, dcmPads } from '../research/s3e-device/gen-obspins2.mjs';
-import { observationDesigns, implemented, GENERATORS, tileLists, roundPaths, roundSummary } from '../research/s3e-device/measure.mjs';
-import { buildMeasured, DATA_DIR, PARTS, dieOf, dataDir, measuredDies } from '../research/s3e-device/build-measured.mjs';
-import { indexVariants, pipVariants, joinVariants, clockLineVariants, clockRowVariants, longLineVariants, tapVariants, spineVariants, pinVariants, DCM_SWITCH } from '../research/s3e-device/varyjoins.mjs';
+import { wireFamily, tileXY, observeNet, observeDesign, resolveAmbiguous, intersectAmbiguous, joinRule, blockRamOutputJoins } from '../packages/silinx-fpga/research/s3e-device/observe.mjs';
+import { switchGrid, gridRule, applyRules, closeRules, segmentRules, nodesOf } from '../packages/silinx-fpga/research/s3e-device/model.mjs';
+import { measuredLines, packMeasured } from '../packages/silinx-fpga/research/s3e-device/build.mjs';
+import { pinCensus, renamePads } from '../packages/silinx-fpga/research/s3e-device/pins.mjs';
+import { ram, multCascade, dcmPins, iobDdr, iobClk2, devicePads, observedPads, dcmClockPad } from '../packages/silinx-fpga/research/s3e-device/gen-obspins.mjs';
+import { clockDesign } from '../packages/silinx-fpga/research/s3e-device/gen-obsclk.mjs';
+import { clockNets, clockTestDesigns, clockTile, rowTile } from '../packages/silinx-fpga/research/s3e-device/clocktests.mjs';
+import { edgeHypotheses, edgeTile } from '../packages/silinx-fpga/research/s3e-device/edgejoins.mjs';
+import { chipMeasurements } from '../packages/silinx-fpga/research/s3e-device/chip.mjs';
+import { carryDesign } from '../packages/silinx-fpga/research/s3e-device/gen-obscarry.mjs';
+import { sliceDesign } from '../packages/silinx-fpga/research/s3e-device/gen-obsslice.mjs';
+import { muxDesign, muxCount } from '../packages/silinx-fpga/research/s3e-device/gen-obsmux.mjs';
+import { srlCascade, f8Muxes, ramClkB, bufgs, dcmPads } from '../packages/silinx-fpga/research/s3e-device/gen-obspins2.mjs';
+import { observationDesigns, implemented, GENERATORS, tileLists, roundPaths, roundSummary } from '../packages/silinx-fpga/research/s3e-device/measure.mjs';
+import { buildMeasured, DATA_DIR, PARTS, dieOf, dataDir, measuredDies } from '../packages/silinx-fpga/research/s3e-device/build-measured.mjs';
+import { indexVariants, pipVariants, joinVariants, clockLineVariants, clockRowVariants, longLineVariants, tapVariants, spineVariants, pinVariants, DCM_SWITCH } from '../packages/silinx-fpga/research/s3e-device/varyjoins.mjs';
 import { loadDevice, PIP_BIDI } from '../packages/silinx-fpga/src/fpga/device.js';
-import { probeXdl, probeFirstLine, parseProbeLog, sortPips, sortSites } from '../research/s3e-device/probe.mjs';
-import { joinTestDesigns, parseJoinTests, testSources } from '../research/s3e-device/hypotheses.mjs';
-import { rng, clbSlices, observeXdl } from '../research/s3e-device/gen-observe.mjs';
-import { tileCandidates, siteCandidates, censusCandidates, ioCandidates, leftCandidates, restCandidates } from '../research/s3e-device/candidates.mjs';
-import { bram, mult, pads, inputs, padDefaults } from '../research/s3e-device/gen-obshdl.mjs';
+import { probeXdl, probeFirstLine, parseProbeLog, sortPips, sortSites } from '../packages/silinx-fpga/research/s3e-device/probe.mjs';
+import { joinTestDesigns, parseJoinTests, testSources } from '../packages/silinx-fpga/research/s3e-device/hypotheses.mjs';
+import { rng, clbSlices, observeXdl } from '../packages/silinx-fpga/research/s3e-device/gen-observe.mjs';
+import { tileCandidates, siteCandidates, censusCandidates, ioCandidates, leftCandidates, restCandidates } from '../packages/silinx-fpga/research/s3e-device/candidates.mjs';
+import { bram, mult, pads, inputs, padDefaults } from '../packages/silinx-fpga/research/s3e-device/gen-obshdl.mjs';
 import { loadDeviceCache } from '../packages/silinx-fpga/src/fpga/device-node.js';
 import { deviceSites } from '../packages/silinx-fpga/src/fpga/place.js';
 import { compile, elaborate } from '../core/compile.js';
@@ -1003,7 +1003,7 @@ test('prototype.mjs predict: the joins rules decided are hypotheses; a test not 
   fs.writeFileSync(path.join(dir, 'tiles.txt'), 'CLB_X1Y1\n');
   fs.mkdirSync(path.join(dir, 't'));
   fs.writeFileSync(path.join(dir, 't', 'verdicts.json'), JSON.stringify([[...b, 'no-join'], [...c, 'invalid'], [...d, 'not-run']]));
-  execFileSync(process.execPath, ['research/s3e-device/prototype.mjs', 'predict', path.join(dir, 'obs.json'), path.join(dir, 'tiles.txt'), path.join(dir, 'pred.json'), path.join(dir, 't')], { stdio: 'pipe' });
+  execFileSync(process.execPath, ['packages/silinx-fpga/research/s3e-device/prototype.mjs', 'predict', path.join(dir, 'obs.json'), path.join(dir, 'tiles.txt'), path.join(dir, 'pred.json'), path.join(dir, 't')], { stdio: 'pipe' });
   const pred = JSON.parse(fs.readFileSync(path.join(dir, 'pred.json'), 'utf8')).map(j => j.join(' ')).sort();
   assert.deepEqual(pred, [a, c, d].map(j => j.join(' ')).sort());
   fs.rmSync(dir, { recursive: true });
@@ -1095,7 +1095,7 @@ test('prototype.mjs predict, WIRES: a rule applied where a measured graph has th
   const tilesDb = { types: { CENTER_SMALL: { features: { 'X0->OMUX14': [], 'OMUX_W14->F1_B0': [] } }, TIOIS: { features: { 'X0->OMUX14': [], 'OMUX_W14->F1_B0': [] } } } };
   const m = chipMeasurements({ dev, tilesDb, layout: { brkRows: [] }, obs: { pips: [], pins: [], pinJoins: [], joins: [] } });
   fs.writeFileSync(path.join(dir, 'g.json.gz'), zlib.gzipSync(JSON.stringify(packMeasured(m))));
-  const run = env => { execFileSync(process.execPath, ['research/s3e-device/prototype.mjs', 'predict', path.join(dir, 'obs.json'), path.join(dir, 'tiles.txt'), path.join(dir, 'p.json')], { stdio: 'pipe', env: { ...process.env, ...env } }); return JSON.parse(fs.readFileSync(path.join(dir, 'p.json'), 'utf8')).map(j => j.join(' ')); };
+  const run = env => { execFileSync(process.execPath, ['packages/silinx-fpga/research/s3e-device/prototype.mjs', 'predict', path.join(dir, 'obs.json'), path.join(dir, 'tiles.txt'), path.join(dir, 'p.json')], { stdio: 'pipe', env: { ...process.env, ...env } }); return JSON.parse(fs.readFileSync(path.join(dir, 'p.json'), 'utf8')).map(j => j.join(' ')); };
   // the I/O tiles' OMUX14 / OMUX_W14: predicted only with the measured graph's wires
   assert.ok(!run({}).includes('TIOIS_X5Y35/OMUX14 TIOIS_X4Y35/OMUX_W14'));
   assert.ok(run({ WIRES: path.join(dir, 'g.json.gz') }).some(j => j.split(' ').sort().join(' ') === 'TIOIS_X4Y35/OMUX_W14 TIOIS_X5Y35/OMUX14'));
@@ -1200,7 +1200,7 @@ test('measure random, round, verdicts: the random designs of a part\'s CLBs; eac
     const clb100 = dev.tileNames.filter(t => /^CLB_X\d+Y\d+$/.test(t));
     assert.equal(clb100.length, 240);
     fs.writeFileSync(path.join(tmp, 'clb-tiles.txt'), clb100.join('\n') + '\n');
-    const out = execFileSync(process.execPath, [path.join('research/s3e-device/measure.mjs'), 'random', path.join(tmp, 'clb-tiles.txt'), path.join(tmp, 'rand')],
+    const out = execFileSync(process.execPath, [path.join('packages/silinx-fpga/research/s3e-device/measure.mjs'), 'random', path.join(tmp, 'clb-tiles.txt'), path.join(tmp, 'rand')],
       { env: { ...process.env, PART: 'xc3s100ecp132-4' }, encoding: 'utf8' });
     assert.equal(out, '4 designs, 240 CLB tiles\n');
     const files = fs.readdirSync(path.join(tmp, 'rand')).sort();

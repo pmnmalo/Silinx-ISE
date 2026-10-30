@@ -28,7 +28,7 @@ const appOnly = argv.includes('--app-only');
 const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: ['ignore', 'inherit', 'inherit'], shell: process.platform === 'win32' && cmd === 'npm' });
 
 /** The tracked files the app never reads, left out of the zip: the device measurements (#3, #1541). */
-const NOT_RELEASED = /^research\/s3e-device\/data\//;
+const NOT_RELEASED = /^packages\/silinx-fpga\/research\/s3e-device\/data\//;
 
 /**
  * The tracked files (as `git archive HEAD` gives them in a clean checkout, the release's case) with

@@ -261,7 +261,7 @@ async function main(argv) {
   const { knownRouting } = await import('../../packages/silinx-fpga/src/fpga/bitgen.js');
   const { analyzeTiming, delayTable } = await import('../../packages/silinx-fpga/src/fpga/timing.js');
   const { writeXdl, parseXdl } = await import('../../packages/silinx-fpga/src/xdl.js');
-  const { loadDb } = await import('../s3e-bitstream/db.mjs');
+  const { loadDb } = await import('../../packages/silinx-fpga/research/s3e-bitstream/db.mjs');
   const devices = new Map();
   const deviceOf = part => {
     if (!devices.has(part)) {

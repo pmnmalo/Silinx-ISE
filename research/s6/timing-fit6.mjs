@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 import { netTree, treePath } from '../../packages/silinx-fpga/src/fpga/timing.js';
-import { nnls, parseDly } from '../s3e-route/timing-fit.mjs';
+import { nnls, parseDly } from '../../packages/silinx-fpga/research/s3e-route/timing-fit.mjs';
 import { netEndpointsS6 } from '../../packages/silinx-fpga/src/fpga/s6/route-nets.js';
 import { parseTwr } from './twr6.mjs';
 import { s6Device } from '../../test/s6-lib.mjs';

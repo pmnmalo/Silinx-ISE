@@ -23,7 +23,7 @@ separation starts.
 | Place `packages/silinx-fpga/src/fpga/place.js`, `place-*.js`, `replicate.js` | 10 | 1690 | 105 | `packages/silinx-fpga/test/fpga-place.test.js`, `packages/silinx-fpga/test/place-parts.test.js`, `test/fpga-replicate.test.js`, `packages/silinx-fpga/test/fpga-hard.test.js` |
 | Route `packages/silinx-fpga/src/fpga/route.js`, `route-*.js` | 5 | 1069 | 59 | `packages/silinx-fpga/test/fpga-route.test.js`, `packages/silinx-fpga/test/route-parts.test.js`, `test/fpga-place-route.test.js` |
 | Timing (trce-like) `packages/silinx-fpga/src/fpga/timing.js`, `timing-*.js` | 3 | 1226 | 72 | `test/fpga-timing.test.js`, `packages/silinx-fpga/test/timing-parts.test.js` |
-| Bitstream and bit database `packages/silinx-fpga/src/fpga/bitgen.js`, `bitstream.js`, `bitdb.js`, `bitdb-node.js`, `lut.js` | 5 | 1030 | 59 | `test/fpga-bitgen.test.js`, `packages/silinx-fpga/test/fpga-bitstream.test.js`, `packages/silinx-fpga/test/fpga-lut.test.js`, `test/s3e-devices.test.js` |
+| Bitstream and bit database `packages/silinx-fpga/src/fpga/bitgen.js`, `bitstream.js`, `bitdb.js`, `bitdb-node.js`, `lut.js` | 5 | 1030 | 59 | `packages/silinx-fpga/test/fpga-bitgen.test.js`, `packages/silinx-fpga/test/fpga-bitstream.test.js`, `packages/silinx-fpga/test/fpga-lut.test.js`, `packages/silinx-fpga/test/s3e-devices.test.js` |
 | Device description `packages/silinx-fpga/src/fpga/device.js`, `device-node.js` | 2 | 545 | 28 | `packages/silinx-fpga/test/fpga-device.test.js`, `test/s3e-device.test.js`, `test/open-toolchain.test.js` |
 | Spartan-6 (in development, #1) `packages/silinx-fpga/src/fpga/s6/` | 15 | 2475 | 140 | `test/s6-*.test.js` |
 | Synthesis (Yosys WASM, FSM, carry chains, LUT resynthesis) `core/synth-open*.js`, `packages/silinx-fpga/src/carry-chain.js`, `packages/silinx-fpga/src/synth-fsm.js`, `packages/silinx-fpga/src/lut-resynth.js` | 9 | 2610 | 164 | `test/synth-open*.test.js`, `test/synth-fsm.test.js`, `test/synth-abc9.test.js`, `test/carry-*.test.js`, `test/lut-resynth.test.js`, `test/yosys-*.test.js` |
@@ -44,13 +44,13 @@ model and elkjs: it belongs to the IDE although it lives in `core/fpga/`), the U
 ### The oracle and the workflows
 
 - `npm run check:open-flow` (`scripts/check-open-flow.mjs`): the open flow's `.bit` against ISE's, byte for
-  byte, and ISE's DRC; it runs the research command line `research/s3e-route/open-flow.mjs`.
+  byte, and ISE's DRC; it runs the research command line `packages/silinx-fpga/research/s3e-route/open-flow.mjs`.
 - The ISE workflow (nightly, `ise.yml`) and the quality comparison (weekly, `quality.yml`,
   `test/designs-corpus/compare-ise.mjs`) on the self-hosted runner.
 - The Yosys update (`yosys-update.yml`, `scripts/yosys-update-report.mjs`): the open flow's size and speed with
   the new Yosys against the base's.
-- The research that builds the data: `research/s3e-bitstream/` (the bit database), `research/s3e-device/` and
-  `research/s3e-route/build-device.mjs` (the device descriptions), `research/s6/`. They import the toolchain;
+- The research that builds the data: `packages/silinx-fpga/research/s3e-bitstream/` (the bit database), `packages/silinx-fpga/research/s3e-device/` and
+  `packages/silinx-fpga/research/s3e-route/build-device.mjs` (the device descriptions), `research/s6/`. They import the toolchain;
   the application never imports research (`test/layering.test.js`, #407).
 
 ### The data
@@ -188,7 +188,7 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    the package by its path (the release zip has no workspace link, #1677), so `scripts/related-tests.mjs` follows
    the imports as before.
 8. **The command line** ([#1679](https://github.com/pmnmalo/Silinx-ISE/issues/1679)): `silinx-fpga build`,
-   from `research/s3e-route/open-flow.mjs`, and a README with a blinky for the Basys2. A new feature with its
+   from `packages/silinx-fpga/research/s3e-route/open-flow.mjs`, and a README with a blinky for the Basys2. A new feature with its
    tests. Done: `packages/silinx-fpga/bin/silinx-fpga.js` (`src/cli.js`): Verilog or a Yosys JSON netlist and a UCF
    to the `.bit`, through `runFlow`; the Verilog checked by Yosys first, file by file (the flow has no front end to
    say where an error is); the README's blinky byte for byte the IDE's `.bit` (`test/silinx-fpga-cli.test.js`).
@@ -200,6 +200,12 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
    (`npm test` in the package); the shards, the timings and the related tests know the folder. Most of the others
    make their designs with the IDE's front end, and stay the IDE's integration tests (or follow with
    `silinx-hdl`); those of the research move with it, at a time agreed with the sessions working there.
+   Second part: the Spartan-3E research (`s3e-device`, `s3e-bitstream`, `s3e-place`, `s3e-route`) and the
+   nextpnr spike (`nextpnr-s3e`) are in `packages/silinx-fpga/research`, and the five tests that then import
+   the package alone (`fpga-bitgen`, `iob-reg`, `s3e-bitstream-tools`, `s3e-devices`, `nextpnr-s3e`) in its
+   `test/`. `research/s6` follows when the Spartan-6 work settles. `open-flow.mjs` and `check:open-flow` still
+   make their designs with the IDE's front end (`core/compile.js`, `core/synth-front.js`): they stay the IDE's
+   until the front end is a package of its own (`silinx-hdl`).
 10. **Licence, notices, versioning and publishing**
     ([#1681](https://github.com/pmnmalo/Silinx-ISE/issues/1681)): as decided (section 4): the package's NOTICE
     and THIRD-PARTY-NOTICES, the IDE's NOTICE naming it, its changelog fragments and 0.x version, a publishing

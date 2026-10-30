@@ -1,6 +1,6 @@
 // The device description shipped with Silinx (packages/silinx-fpga/devices/) and the whole open flow on it:
 // blinky (examples/blinky, Basys2-250) synthesized, packed, placed, routed and written as a .bit
-// with no Xilinx tool (research/s3e-route/open-flow.mjs). That the .bit equals ISE's needs ISE:
+// with no Xilinx tool (packages/silinx-fpga/research/s3e-route/open-flow.mjs). That the .bit equals ISE's needs ISE:
 // npm run check:open-flow (see README, For developers).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -61,7 +61,7 @@ const dcmClockPips = routed => {
   return out;
 };
 const openFlow = (dir, out, args = []) => {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), dir, out, ...args],
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), dir, out, ...args],
     { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
   return { ...r, warnings: `${r.stdout}\n${r.stderr}`.split('\n').filter(l => /warning/i.test(l)).map(l => l.trim()) };
 };
@@ -121,7 +121,7 @@ test('the open flow on the shipped graph: blinky from VHDL to a complete bitstre
 test('the open flow with --tries 2: two placements routed, the one with the shorter critical path kept', { timeout: 300000 }, () => {
   const out = path.join(tmp, 'blinky-tries');
   const json = path.join(tmp, 'blinky', 'top.json');   // the netlist of the test above
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), path.join(ROOT, 'examples/blinky'), out, ...(fs.existsSync(json) ? ['--json', json] : []), '--tries', '2', '--seed', '3', '--no-replicate'],
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), path.join(ROOT, 'examples/blinky'), out, ...(fs.existsSync(json) ? ['--json', json] : []), '--tries', '2', '--seed', '3', '--no-replicate'],
     { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
   assert.doesNotMatch(`${r.stdout}\n${r.stderr}`, /warning/i);
@@ -171,7 +171,7 @@ test('the open flow replicates a flip-flop of many loads on the critical path, a
   const routed = fs.readFileSync(path.join(dir, 'out', 'routed.xdl'), 'utf8');
   assert.equal((routed.match(/_rep\d+"/g) || []).length > 0, m[4] === 'kept');
   // --no-replicate: none tried
-  const r0 = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), dir, path.join(dir, 'out0'), '--no-replicate', '--json', path.join(dir, 'out', 'fan.json')],
+  const r0 = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), dir, path.join(dir, 'out0'), '--no-replicate', '--json', path.join(dir, 'out', 'fan.json')],
     { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
   assert.equal(r0.status, 0, r0.stderr);
   assert.doesNotMatch(r0.stdout, /replication|place \(/);
@@ -304,7 +304,7 @@ const FEATURES = {
 for (const [name, [packLine, type, settings = [], absent = []]] of Object.entries(FEATURES)) {
   test(`the open flow: ${name} (${type}) to a complete bitstream, no warning`, { timeout: 300000 }, () => {
     const out = path.join(tmp, name);
-    const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), path.join(ROOT, 'test/fixtures/open-flow', name), out],
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), path.join(ROOT, 'test/fixtures/open-flow', name), out],
       { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
     assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
     assert.match(r.stdout, packLine);
@@ -387,11 +387,11 @@ for (const [part, pkg] of [['xc3s100e', 'cp132'], ['xc3s250e', 'cp132'], ['xc3s5
 }
 
 // #18: inputs that drive nothing get no pad, as ISE's map trims them (an XDL that has such a pad is
-// written as ISE's bitgen writes it: test/fpga-bitgen.test.js). Checked against ISE: the .bit is
+// written as ISE's bitgen writes it: packages/silinx-fpga/test/fpga-bitgen.test.js). Checked against ISE: the .bit is
 // byte-identical to ISE's bitgen of the same routed XDL, DRC 0 errors and 0 warnings.
 test('the open flow: inputs that drive nothing (the clock, the buttons) get no pad; complete bitstream, no warning', { timeout: 300000 }, () => {
   const out = path.join(tmp, 'feat_unused_in');
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), path.join(ROOT, 'test/fixtures/open-flow/feat_unused_in'), out],
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), path.join(ROOT, 'test/fixtures/open-flow/feat_unused_in'), out],
     { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
   assert.match(r.stdout, /top\.bit: complete \(every feature in the bit database\)/);
@@ -415,12 +415,12 @@ test('the open flow fails clearly for a DCM with more outputs on global buffers 
     // the constraints by an absolute path (on Windows a relative one across drives is absolute too: it was
     // joined onto the project folder, CI b898d8e)
     files: [{ path: 'top.vhd', lang: 'vhdl', role: 'design' }], constraints: path.join(ROOT, 'test/fixtures/open-flow/basys2.ucf') }));
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), dir, path.join(dir, 'out')], { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), dir, path.join(dir, 'out')], { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /u_b\w+: no free global clock buffer reachable from u_dcm\.CLK\w+ through switches of known bits/);
 });
 
-// blinky on the other boards (stage F of research/s3e-bitstream): the Basys2-100 with the Basys2's
+// blinky on the other boards (stage F of packages/silinx-fpga/research/s3e-bitstream): the Basys2-100 with the Basys2's
 // pins, the Nexys2-500 / -1200 with the Nexys2's (LD4-LD7 differ by die)
 const NEXYS2 = led => [['clk', 'B8'], ['sw<0>', 'G18'], ['sw<1>', 'H18'], ['sw<2>', 'K18'], ['sw<3>', 'K17'], ['btn<0>', 'B18'], ['btn<1>', 'D18'],
   ...led.map((p, i) => [`led<${i}>`, p])].map(([n, p]) => `NET "${n}" LOC = "${p}" | IOSTANDARD = LVCMOS33 ;`).join('\n') + '\nNET "clk" TNM_NET = "clk" ;\nTIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50% ;\n';

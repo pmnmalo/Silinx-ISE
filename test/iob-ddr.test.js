@@ -1,7 +1,7 @@
 // #96: the IOBs' DDR registers (IDDR2, ODDR2) in the Silinx toolchain. Their simulation models (core/unisim.js, the
 // event-driven simulator's; core/compiled-prims.js, the compiled engine's) against values computed here, in VHDL and
 // in Verilog; the packer putting them in their pads' IOBs with the settings and pins ISE's map writes (read from its
-// routed IDDR2 / ODDR2 on every pad: research/s3e-bitstream/gen-iobreg.mjs rd / rd2), and refusing what it cannot do;
+// routed IDDR2 / ODDR2 on every pad: packages/silinx-fpga/research/s3e-bitstream/gen-iobreg.mjs rd / rd2), and refusing what it cannot do;
 // the packed design behaving as the netlist (packages/silinx-fpga/test/fpga-sim.js); the static timing's two clock edges; the
 // post-translate and post-map models behaving as the netlist.
 import { test } from 'node:test';

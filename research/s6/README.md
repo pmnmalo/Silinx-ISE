@@ -6,8 +6,8 @@ and **Atlys (XC6SLX45-3CSG324)**, are built with ISE only ([#1](https://github.c
 This note is the plan of that work: what the Spartan-6 needs that the Spartan-3E flow lacks, how each part
 is measured with ISE, the order of the work and its issues. It follows the method of
 [docs/OPEN-TOOLCHAIN.md](../../docs/OPEN-TOOLCHAIN.md) and of the Spartan-3E notes
-([s3e-bitstream](../s3e-bitstream/README.md), [s3e-device](../s3e-device/README.md),
-[s3e-place](../s3e-place/README.md), [s3e-route](../s3e-route/README.md)): black-box observation of ISE's
+([s3e-bitstream](../../packages/silinx-fpga/research/s3e-bitstream/README.md), [s3e-device](../../packages/silinx-fpga/research/s3e-device/README.md),
+[s3e-place](../../packages/silinx-fpga/research/s3e-place/README.md), [s3e-route](../../packages/silinx-fpga/research/s3e-route/README.md)): black-box observation of ISE's
 documented command-line tools, ISE as the oracle (byte-identical `.bit`, a clean DRC, trce's timing).
 
 The architecture facts below come from Xilinx's public documentation: the Spartan-6 data sheets (DS160,
