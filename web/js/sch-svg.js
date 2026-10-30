@@ -88,22 +88,26 @@ export function bodySvg(sym, def) {
       // (Pins per bit, #2081: a trapezoid a row, rh high; the select lines from their pins up to the first one's bottom
       // edge, through the others, and the enable's on the left joining each row's E, as BUFE4's enable line)
       const n = def.rows || 1, bh = def.rh || def.body.h, bw = def.body.w, x1 = 20 + bw, last = (n - 1) * bh;
+      // (the shared selects' lines before the bodies, behind them: seen between the rows only, #2127)
+      if (n > 1) for (const p of pins.filter(q => q.side === 'S')) s += `<path class="gate nofill" d="M${p.x},${r1(bh - 10 * (p.x - 20) / bw)} V${r1(last + bh - 10 * (p.x - 20) / bw)}"/>`;
       for (let r = 0; r < n; r++) s += `<path class="gate" d="M20,${r * bh} L${x1},${r * bh + 10} L${x1},${r * bh + bh - 10} L20,${r * bh + bh} Z"/>`;
       for (const p of pins) {
         if (p.side === 'W' && p.name === 'E' && n > 1) s += muxEnable(p, bh, n);
         else if (p.side === 'W') s += lead(0, p.y, 20, p.y, bus(p));
-        else if (p.side === 'S') s += lead(p.x, r1(last + bh - 10 * (p.x - 20) / bw), p.x, p.y, bus(p)) + (n > 1 ? `<path class="gate nofill" d="M${p.x},${r1(bh - 10 * (p.x - 20) / bw)} V${r1(last + bh - 10 * (p.x - 20) / bw)}"/>` : '');   // (from the slanted bottom edge)
+        else if (p.side === 'S') s += lead(p.x, r1(last + bh - 10 * (p.x - 20) / bw), p.x, p.y, bus(p));   // (from the slanted bottom edge)
         else s += lead(x1, p.y, p.x, p.y, bus(p));
       }
       break;
     }
     case 'demux': {
       const b = def.body, n = def.rows || 1, bh = def.rh || b.h, x1 = b.x + b.w, last = (n - 1) * bh;
+      // (the shared selects' lines behind the bodies, as the multiplexer's, #2127)
+      if (n > 1) for (const p of pins.filter(q => q.side === 'S')) s += `<path class="gate nofill" d="M${p.x},${r1(bh - 20 + 20 * (p.x - b.x) / b.w)} V${r1(last + bh - 20 + 20 * (p.x - b.x) / b.w)}"/>`;
       for (let r = 0; r < n; r++) s += `<path class="gate" d="M${b.x},${r * bh + 20} L${x1},${r * bh} L${x1},${r * bh + bh} L${b.x},${r * bh + bh - 20} Z"/>`;
       for (const p of pins) {
         if (p.side === 'W' && p.name === 'E' && n > 1) s += muxEnable(p, bh, n);
         else if (p.side === 'W') s += lead(0, p.y, b.x, p.y, bus(p));
-        else if (p.side === 'S') s += lead(p.x, last + bh - 20 + 20 * (p.x - b.x) / b.w, p.x, p.y, bus(p)) + (n > 1 ? `<path class="gate nofill" d="M${p.x},${r1(bh - 20 + 20 * (p.x - b.x) / b.w)} V${r1(last + bh - 20 + 20 * (p.x - b.x) / b.w)}"/>` : '');
+        else if (p.side === 'S') s += lead(p.x, last + bh - 20 + 20 * (p.x - b.x) / b.w, p.x, p.y, bus(p));
         else s += lead(x1, p.y, p.x, p.y, bus(p));
       }
       break;
@@ -210,6 +214,10 @@ function pinName(p, L, label, vertical) {
 }
 // the names on the top and the bottom turned when one of them is longer than 2 letters
 const verticalNames = (pins, label = p => p.name) => pins.some(p => (p.side === 'N' || p.side === 'S') && label(p).length > 2);
+// (a MUX / DEMUX a bit: a shared select's pin (p, its local lp) where it would be under each row above the last, for
+// its name on every row, #2127)
+const rowSelects = (sym, def, p, lp) => (def.rows > 1 && lp.side === 'S'
+  ? [...Array(def.rows - 1).keys()].map(k => ({ ...p, ...xform(sym, def, lp.x, lp.y - (k + 1) * def.rh) })) : []);
 function textsSvg(sym, def, ctx = {}) {
   let s = '';
   const box = symbolBox(sym, null, def);
@@ -308,11 +316,12 @@ function textsSvg(sym, def, ctx = {}) {
   if (def.shape === 'lib' || def.shape === 'demux' || def.shape === 'ff') {
     // pin names inside the body, clear of the 20 px leads; bus widths beside the pin end
     const pins = symbolPins(sym, null, def), vertical = verticalNames(pins);
-    for (const p of pins) {
+    for (const [i, p] of pins.entries()) {
       // demux select: the lead ends on the sloped edge; clock pins: room for the clock triangle
       const L = 20 + (def.shape === 'demux' && p.ly === def.h ? 6 : 0) + (p.clock ? 8 : 0);
-      // (a demultiplexer a bit, #2081: each row's names as the one-bit one's, D and O0, O1…)
-      s += pinName(p, L, def.rows > 1 ? p.name.replace(/_\d+$/, '').replace(/^D\d+$/, 'D') : p.name, vertical);
+      // (a demultiplexer a bit, #2081: each row's names as the one-bit one's, D and O0, O1…; the selects' on each, #2127)
+      const name = def.rows > 1 ? p.name.replace(/_\d+$/, '').replace(/^D\d+$/, 'D') : p.name;
+      for (const q of [p, ...rowSelects(sym, def, p, def.pins[i])]) s += pinName(q, L, name, vertical);
       if ((p.width || 1) > 1) s += pinWidth(p);
     }
   } else if (pinLabels) {
@@ -332,7 +341,7 @@ function textsSvg(sym, def, ctx = {}) {
       // past the lead (20 px; a multiplexer's select, 10 to 20, from its slanted edge) and a clock's triangle
       const lp = def.pins[i];
       const L = (def.shape === 'mux' && own === 'S' ? 10 + 10 * (lp.x - def.body.x) / def.body.w : 20) + (p.clock && (def.shape === 'arith' || own === 'W') ? 8 : 0);
-      s += pinName(p, L, label(p), vertical);
+      for (const q of [p, ...rowSelects(sym, def, p, lp)]) s += pinName(q, L, label(p), vertical);
       // (the width of a bus pin by it: modules, HDL blocks, multiplexers and demultiplexers, #313; adders,
       // subtractors and comparators, #681)
       if ((p.width || 1) > 1 && ['module', 'hdl', 'mux', 'demux', 'arith'].includes(def.shape)) s += pinWidth(p);

@@ -434,3 +434,42 @@ test('#2122 pins per bit: the type inside each row\'s shape, in every orientatio
     assert.deepEqual(symbolSvg(sym, symbolDef(sym)).match(/<text class="stype[^>]*>[^<]*<\/text>/g), [label], type);
   }
 });
+
+// #2127: a MUX / DEMUX with Pins per bit: its selects' names on every row, where the last row's are; the shared selects'
+// lines drawn before the bodies (behind them, seen between the rows only); the multiplexer's type inside each (#2122)
+test('#2127 MUX / DEMUX pins per bit: the select names on every row, the select lines behind the bodies', () => {
+  const draw = (type, params, rot = 0) => {
+    const sym = { id: 'S1', type, x: 200, y: 100, rot, mirror: false, name: 'U1', params: { ...defaultParams(type), ...params } };
+    const def = symbolDef(sym);
+    return { sym, def, svg: symbolSvg(sym, def) };
+  };
+  const names = (svg) => [...svg.matchAll(/<text class="pname" x="([-\d.]+)" y="([-\d.]+)"[^>]*>([^<]*)</g)].map((m) => ({ x: +m[1], y: +m[2], name: m[3] }));
+  for (const [type, params, sels, n, title, inside] of [['mux4', { width: 3, bits: true }, ['S1', 'S0'], 3, 'M4_1', true],
+    ['mux4', { width: 2, bits: true, en: true }, ['S1', 'S0'], 2, 'M4_1E', true], ['mux2', { width: 3, bits: true }, ['S0'], 3, 'M2_1', true],
+    ['demux', { width: 2, bits: true, en: true }, ['S0'], 2, 'DEMUX1_2E', false]]) {
+    for (const rot of [0, 90, 180, 270]) {
+      const { def, svg } = draw(type, params, rot), what = `${type} ${JSON.stringify(params)} rot ${rot}`;
+      // each select's name n times, one in each row: at rot 0, inside that row's band
+      for (const s of sels) {
+        const ns = names(svg).filter((t) => t.name === s);
+        assert.equal(ns.length, n, `${what}: ${s} on each row`);
+        if (rot === 0) assert.deepEqual(ns.map((t) => Math.floor((t.y - 3 - 100) / def.rh)).sort(), [...Array(n).keys()], `${what}: ${s} ${JSON.stringify(ns)}`);
+      }
+      // the select lines (nofill paths down through the rows; the enable's, at x = 10, apart) before the first body
+      const lines = [...svg.matchAll(/<path class="gate nofill" d="M(?!10,)[\d.]+,[\d.]+ V[\d.]+"\/>/g)].map((m) => m.index);
+      const body = svg.indexOf('<path class="gate" d=');
+      assert.equal(lines.length, sels.length, `${what}: a line a select`);
+      assert.ok(lines.every((i) => i < body), `${what}: the select lines behind the bodies`);
+      // the type: inside each multiplexer upright (#2122), else once outside, as the one-bit symbol
+      const types = [...svg.matchAll(/<text class="(stype[^"]*)"[^>]*>([^<]*)</g)].map((m) => `${m[1]}:${m[2]}`);
+      const upright = rot === 0 || rot === 180;
+      assert.deepEqual(types, inside && upright ? Array(n).fill(`stype inside:${title}`) : [`stype:${title}`], `${what}: the type`);
+    }
+  }
+  // one bit: the selects' names once, no select line, as before
+  for (const [type, params] of [['mux4', { width: 4 }], ['demux', {}]]) {
+    const { svg } = draw(type, params);
+    assert.deepEqual(names(svg).filter((t) => /^S\d$/.test(t.name)).map((t) => t.name), type === 'mux4' ? ['S1', 'S0'] : ['S0'], type);
+    assert.doesNotMatch(svg, /class="gate nofill" d="M[\d.]+,[\d.]+ V/, `${type}: no select line`);
+  }
+});
