@@ -1,7 +1,8 @@
 // UI: the parts of the schematic's Try it (#405: out of liveController in web/js/sch-live.js): the inputs
 // (sch-live-inputs.js: a bus's value editor, its header, a bad value refused, the radix, +1, 0, Set, Escape; a clock's
 // Run and Pause, Step stopping it) and the panel (sch-live-instance.js: its title and notes, a module instance's pins);
-// the inputs' values kept from one Try it to the next, Reset setting them back (#2106).
+// the inputs' values kept from one Try it to the next, Reset setting them back (#2106); the buses' formats: no plain
+// Binary, Binary (Unsigned) by default and for a Binary saved before (#2160).
 // The whole Try it: test/ui/livesim.test.js.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -75,19 +76,19 @@ uiTest('#405 Try it parts: the bus value editor, the clock\'s Run and Pause, the
   await page.click(`${ED} .lv-editor .btn`, { text: 'Set' });
   await page.waitFor((sel) => !document.querySelector(`${sel} .lv-editor`), [ED], { what: 'the editor closed' });
   const rVal = `${ED} .se-simlayer .lv-out[data-port="${portId(doc, 'r')}"] .lv-val`;
-  await page.waitFor((s) => document.querySelector(s)?.textContent === '6', [rVal], { what: 'r = 6 + 0' });
+  await page.waitFor((s) => document.querySelector(s)?.textContent === '0110 = 6', [rVal], { what: 'r = 6 + 0' });
   // Escape closes it, the value kept
   await page.click(`${ED} .lv-ctl[data-port="${portId(doc, 'p')}"]`);
   await page.waitFor(() => document.activeElement?.matches('.lv-edit-in'), [], { what: 'bus editor again' });
   await page.key('Escape');
   await page.waitFor((sel) => !document.querySelector(`${sel} .lv-editor`), [ED], { what: 'closed by Escape' });
-  assert.equal(await page.eval((s) => document.querySelector(s).textContent, rVal), '6');
+  assert.equal(await page.eval((s) => document.querySelector(s).textContent, rVal), '0110 = 6');
   // ---- the bus values' readings (#2015): the bar's formats, a bus's bits and their value (#2064); p typed as -1 in one's
   // complement, r read so
   assert.deepEqual(await ev((sel) => [...document.querySelectorAll(`${sel} .lv-radix option`)].map((o) => o.textContent)),
-    ['Hex', 'Binary', 'Binary (Unsigned)', "Binary (Two's Complement)", "Binary (One's Complement)"]);
+    ['Hex', 'Binary (Unsigned)', "Binary (Two's Complement)", "Binary (One's Complement)"]);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
-  assert.deepEqual(await ev((sel) => [...document.querySelectorAll(`${sel} .lv-radix option`)].slice(2).map((o) => o.textContent)),
+  assert.deepEqual(await ev((sel) => [...document.querySelectorAll(`${sel} .lv-radix option`)].slice(1).map((o) => o.textContent)),
     ['Binário (sem sinal)', 'Binário (complemento para 2)', 'Binário (complemento para 1)']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   await page.eval((sel) => { const s = document.querySelector(`${sel} .lv-radix`); s.value = 'c1dec'; s.dispatchEvent(new Event('change')); }, ED);
@@ -137,7 +138,7 @@ uiTest('#2106 Try it keeps the inputs\' values of the last Try it; Reset sets th
   };
   const ctl = (n) => `${ED} .se-simlayer .lv-ctl[data-port="${portId(doc, n)}"]`;
   const out = (n) => `${ED} .se-simlayer .lv-out[data-port="${portId(doc, n)}"]`;
-  // the switches' and the buses' values, the output y's level and r's value
+  // the switches' and the buses' values (Binary (Unsigned), #2160), the output y's level and r's value
   const state = () => page.eval((sel, ids) => {
     const q = (id, c) => document.querySelector(`${sel} .se-simlayer [data-port="${id}"]${c}`);
     return {
@@ -147,7 +148,7 @@ uiTest('#2106 Try it keeps the inputs\' values of the last Try it; Reset sets th
     };
   }, ED, Object.fromEntries(['a', 'b', 'p', 'n', 'y', 'r'].map((n) => [n, portId(doc, n)])));
   await tryIt();
-  assert.deepEqual(await state(), { a: false, b: false, p: '0', n: '0', y: false, r: '0' });
+  assert.deepEqual(await state(), { a: false, b: false, p: '0000 = 0', n: '0000 = 0', y: false, r: '0000 = 0' });
   // a, b on; p = 5 (typed), n = 2
   await page.click(ctl('a'));
   await page.click(ctl('b'));
@@ -158,7 +159,7 @@ uiTest('#2106 Try it keeps the inputs\' values of the last Try it; Reset sets th
     await page.key('Enter');
     await page.waitFor((sel) => !document.querySelector(`${sel} .lv-editor`), [ED], { what: 'the editor closed' });
   }
-  const set = { a: true, b: true, p: '5', n: '2', y: true, r: '7' };
+  const set = { a: true, b: true, p: '0101 = 5', n: '0010 = 2', y: true, r: '0111 = 7' };
   assert.deepEqual(await state(), set);
   // stop Try it, start it again: the same values, the circuit on them
   await stop();
@@ -167,12 +168,12 @@ uiTest('#2106 Try it keeps the inputs\' values of the last Try it; Reset sets th
   assert.equal(await page.eval((id) => String(window.Silinx.active.schEditor.liveSim.input(id).value), portId(doc, 'p')), '5');
   // Reset: the inputs back to their initial values
   await page.click(`${ED} .se-simbar .lv-reset`);
-  await page.waitFor((s) => document.querySelector(s)?.textContent === '0', [`${out('r')} .lv-val`], { what: 'r = 0 after Reset' });
-  assert.deepEqual(await state(), { a: false, b: false, p: '0', n: '0', y: false, r: '0' });
+  await page.waitFor((s) => document.querySelector(s)?.textContent === '0000 = 0', [`${out('r')} .lv-val`], { what: 'r = 0 after Reset' });
+  assert.deepEqual(await state(), { a: false, b: false, p: '0000 = 0', n: '0000 = 0', y: false, r: '0000 = 0' });
   // and so they stay in the next Try it
   await stop();
   await tryIt();
-  assert.deepEqual(await state(), { a: false, b: false, p: '0', n: '0', y: false, r: '0' });
+  assert.deepEqual(await state(), { a: false, b: false, p: '0000 = 0', n: '0000 = 0', y: false, r: '0000 = 0' });
   // a set again, then its marker removed between two Try its: no error, the others kept
   await page.click(ctl('a'));
   await page.click(ctl('n'));
@@ -185,8 +186,51 @@ uiTest('#2106 Try it keeps the inputs\' values of the last Try it; Reset sets th
   await page.waitFor((sel, id) => !document.querySelector(`${sel} g.port[data-id="${id}"]`), [ED, portId(doc, 'a')], { what: 'marker a removed' });
   await tryIt();
   assert.equal(await page.eval((sel, id) => document.querySelector(`${sel} .se-simlayer [data-port="${id}"]`), ED, portId(doc, 'a')), null);
-  assert.equal(await page.eval((s) => document.querySelector(s).textContent, `${ctl('n')} .lv-val`), '3');
+  assert.equal(await page.eval((s) => document.querySelector(s).textContent, `${ctl('n')} .lv-val`), '0011 = 3');
   assert.equal(await page.eval((s) => document.querySelector(s).hidden, `${ED} .se-simbar .lv-err`), true, 'no error');
   assert.deepEqual(page.errors, []);
+  await stop();
+});
+
+uiTest('#2160 Try it\'s buses: no plain Binary, Binary (Unsigned) by default and for a Binary saved before', E, async (page) => {
+  const doc = schematic();
+  await makeProject(env, { name: 'LiveRadix', files: { 'src/half.vhd': HALF, 'src/live.sch.json': JSON.stringify(doc) } });
+  await page.openProject('LiveRadix');
+  await page.eval(() => window.SilinxApp.openSch('src/live.sch.json'));
+  await page.waitFor((sel) => window.Silinx.active?.id === 'sch:src/live.sch.json' && document.querySelector(`${sel} .se-btn[data-act=sim]`), [ED]);
+  const setSaved = (v) => page.eval(async (v) => { const k = (await import('/js/prefs.js')).prefKey('xl.sch.liveRadix'); if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); }, v);
+  const tryIt = async () => {
+    await page.click(`${ED} .se-btn[data-act=sim]`);
+    await page.waitFor((sel) => document.querySelector(`${sel} .se-simlayer .lv-ctl`), [ED], { what: 'Try it' });
+  };
+  const stop = async () => {
+    await page.click(`${ED} .se-simbar .lv-exit`);
+    await page.waitFor((sel) => !document.querySelector(`${sel} .se-simlayer .lv-ctl`), [ED], { what: 'Try it stopped' });
+  };
+  const radix = () => page.eval((sel) => { const s = document.querySelector(`${sel} .lv-radix`); return [s.value, s.selectedOptions[0].textContent]; }, ED);
+  const rVal = `${ED} .se-simlayer .lv-out[data-port="${portId(doc, 'r')}"] .lv-val`;
+  // nothing saved: Binary (Unsigned), r's bits and their value; the options, in English and in Portuguese
+  await setSaved(null);
+  await tryIt();
+  assert.deepEqual(await radix(), ['dec', 'Binary (Unsigned)']);
+  assert.deepEqual(await page.eval((sel) => [...document.querySelectorAll(`${sel} .lv-radix option`)].map((o) => o.value), ED), ['hex', 'dec', 'sdec', 'c1dec']);
+  await page.waitFor((s) => document.querySelector(s)?.textContent === '0000 = 0', [rVal], { what: 'r = 0000 = 0' });
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  assert.deepEqual(await page.eval((sel) => [...document.querySelectorAll(`${sel} .lv-radix option`)].map((o) => o.textContent), ED),
+    ['Hex', 'Binário (sem sinal)', 'Binário (complemento para 2)', 'Binário (complemento para 1)']);
+  assert.deepEqual(await radix(), ['dec', 'Binário (sem sinal)']);
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+  await stop();
+  // the plain Binary saved before: read as Binary (Unsigned)
+  await setSaved('bin');
+  await tryIt();
+  assert.deepEqual(await radix(), ['dec', 'Binary (Unsigned)']);
+  await page.waitFor((s) => document.querySelector(s)?.textContent === '0000 = 0', [rVal], { what: 'r = 0000 = 0 again' });
+  await stop();
+  // another choice saved is kept
+  await setSaved('hex');
+  await tryIt();
+  assert.deepEqual(await radix(), ['hex', 'Hex']);
+  assert.equal(await page.eval((s) => document.querySelector(s).textContent, rVal), '0');
   await stop();
 });

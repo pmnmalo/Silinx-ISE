@@ -40,7 +40,7 @@ async function checkPrimes(page, values) {
   assert.equal(await page.eval((sel, id) => document.querySelector(`${sel} .lv-ctl[data-port="${id}"]`)?.dataset.lv, ED, sw), 'edit');
   for (const v of values) {
     await setBus(page, sw, v);
-    const want = PRIMES.includes(v) ? '3' : '0';
+    const want = PRIMES.includes(v) ? '11 = 3' : '00 = 0';   // (Binary (Unsigned), the default, #2160)
     await page.waitFor((sel, id, w) => document.querySelector(`${sel} .se-simlayer .lv-out[data-port="${id}"] .lv-val`)?.textContent === w, [ED, led, want], { what: `sw = ${v}: led = ${want}` });
   }
 }

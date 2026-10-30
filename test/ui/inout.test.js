@@ -103,7 +103,8 @@ uiTest('Schematic Wizard: bidirectional markers on the right edge; live simulati
   await page.waitFor(() => document.querySelector('.lv-editor'));
   await page.fill('.lv-editor .lv-edit-in', '0x5A');
   await page.click('.lv-editor .btn.primary');
-  await page.waitFor((s) => /5A/.test(document.querySelector(s).textContent), [ctl(data.id)], { what: 'data driven with 5A' });
+  // (read in Binary (Unsigned), the default, #2160)
+  await page.waitFor((s) => /01011010 = 90/.test(document.querySelector(s).textContent), [ctl(data.id)], { what: 'data driven with 5A' });
   await page.click(ctl(data.id));
   await page.waitFor(() => document.querySelector('.lv-editor .lv-release'));
   await page.click('.lv-editor .lv-release');

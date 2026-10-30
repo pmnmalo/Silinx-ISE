@@ -90,9 +90,9 @@ uiTest('live schematic simulation: toggle inputs, wire colours, outputs, clock s
   for (let i = 0; i < 3; i++) await page.click(`${ED} .lv-editor .btn`, { text: '+1' });
   await page.click(`${ED} .lv-editor .lv-x`);
   const rVal = `${ED} .se-simlayer .lv-out[data-port="${portId(doc, 'r')}"] .lv-val`;
-  await page.waitFor((s) => document.querySelector(s)?.textContent === '8', [rVal], { what: 'r = 5 + 3' });
-  // bus values on the wires
-  assert.ok(await page.eval((sel) => [...document.querySelectorAll(`${sel} .lv-busval`)].some((t) => t.textContent === '5'), ED));
+  await page.waitFor((s) => document.querySelector(s)?.textContent === '1000 = 8', [rVal], { what: 'r = 5 + 3' });
+  // bus values on the wires (Binary (Unsigned) by default, #2160)
+  assert.ok(await page.eval((sel) => [...document.querySelectorAll(`${sel} .lv-busval`)].some((t) => t.textContent === '0101 = 5'), ED));
   // the module instance: its inputs drive its output; clicking it lists the pin values
   await page.click(`${ED} .lv-ctl[data-port="${portId(doc, 'x1')}"]`);
   const ledSum = `${ED} .se-simlayer .lv-out[data-port="${portId(doc, 'sum')}"]`;
