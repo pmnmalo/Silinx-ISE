@@ -11,7 +11,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs, waitDownload } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
-import { normalizeFsm, simulateFsm, encodedTable, generateFsm } from '../../core/fsm.js';
+import { newFsm, normalizeFsm, simulateFsm, encodedTable, generateFsm } from '../../core/fsm.js';
 import { simulate } from '../../core/compile.js';
 
 let env;
@@ -73,18 +73,15 @@ const statePos = (page, id) => page.eval((ed, sid) => {
 }, ED, id);
 
 uiTest('State diagram (FSM): New Source, states and transitions drawn and edited, tables, truth tables, linked HDL following it (read-only, #1176)', E, async (page) => {
-  await makeProject(env, { name: 'FsmPj', files: {} });
+  await makeProject(env, { name: 'FsmPj', files: { 'src/det.fsm.json': JSON.stringify(newFsm('det'), null, 2) } });
   await page.openProject('FsmPj');
   await page.menu('Project', 'New Source…');
   await page.waitDialog('New Source');
   const types = await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')].map((e) => e.textContent.trim()));
   assert.equal(types.indexOf('Finite State Machine (FSM)') + 1, types.indexOf('Algorithmic State Machine (ASM)'), types.join(' | '));   // FSM listed just before ASM
-  await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim() === 'Finite State Machine (FSM)'); r.scrollIntoView(); r.click(); });
-  await page.dialogButton('Next >');
-  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'det');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Finish');
+  await page.dialogButton('Cancel');
   await page.waitNoDialog();
+  await page.eval(() => window.SilinxApp.openFsm('src/det.fsm.json'));
   await page.waitFor((ed) => window.Silinx.active?.id === 'fsm:src/det.fsm.json' && document.querySelector(ed), [ED], { what: 'state diagram editor' });
   // the example machine: S0 -> S1 -> S2 (z = 1), the initial state with a double circle
   assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} .fsm-state`).length, ED), 3);
