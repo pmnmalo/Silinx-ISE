@@ -73,7 +73,7 @@ test('#2080 the state\'s register wide enough for the states added (from 1 state
   assert.ok(Math.max(...m.states.map((st) => st.id)) < 2 ** m.stateT.w);
 });
 
-test('#2080 a pipelined loop\'s state and a memory\'s access are not split: its II stays; a family\'s delays change the schedule', () => {
+test('#2080 a pipelined loop\'s state is not split: its II stays; a family\'s delays change the schedule', () => {
   const piped = 'int f(int x) {\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n#pragma HLS PIPELINE II=1\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n';
   const m = machine(piped, 10);
   assert.deepEqual(m.loops.map((l) => [l.pipeline, l.ii]), [[1, 1]]);
@@ -81,12 +81,51 @@ test('#2080 a pipelined loop\'s state and a memory\'s access are not split: its 
   // (an addition: 2.08 ns on an Artix-7, 4.06 ns on a Spartan-3E)
   assert.equal(machine(chain(8), 10, 'artix7').states.length, 3);
   assert.equal(machine(chain(8), 10, 'spartan3e').states.length, 8);
-  // (a state that accesses a memory: one state, whatever its path)
-  const mem = 'int f(int t[100], int i, int a) {\n  return t[i] + a + a + a + a + a + a + a + a + a + a;\n}\n';
-  const mm = machine(mem, 10);
-  const access = mm.states.filter((st) => st.access?.size);
-  assert.ok(access.length > 0);
-  for (const st of access) assert.equal(mm.subStates.has(st.id), false);
+});
+
+// a static memory read, a long computation of its value, written back; a memory argument read and written in a loop
+const MEM = `int acc(int i, int a, int b) {
+  static int t[100];
+  t[i] = t[i] * a + a * b + b + a + b + a;
+  return t[i] + t[(i + 1) % 100] * b;
+}
+int ext(int x[64], int y[64], int k) {
+  int s = 0;
+  for (int j = 0; j < 50; j++) {
+#pragma HLS PIPELINE off
+    y[j] = x[j] * k + x[(j + 3) & 63] * (k + 1) + s;
+    s += y[j] & 255;
+  }
+  return s;
+}
+`;
+const MEM_TB = { acc: `int main() {\n  int r = 0;\n  for (int c = 0; c < 30; c++) r += acc((c * 7) % 100, c - 11, 3 * c + 1);\n  return r == 0;\n}\n`,
+  ext: `int main() {\n  int x[64], y[64];\n  for (int i = 0; i < 64; i++) x[i] = i * 37 - 1000;\n  int r = ext(x, y, -7);\n  for (int i = 0; i < 50; i++) r ^= y[i];\n  return r == 0;\n}\n` };
+
+test('#2080 a state that accesses a memory split: the access in the chain\'s last state, its value read before held; co-simulated at 5, 10 and 20 ns', () => {
+  // [top, clock, cycles]
+  for (const [top, clock, cycles] of [['acc', 5, 23], ['acc', 10, 12], ['acc', 20, 7], ['ext', 5, 603], ['ext', 10, 453], ['ext', 20, 403]]) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const c = cosimulate(MEM + MEM_TB[top], { file: 't.c', top, lang, clock });
+      assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, cycles, []], `${top} at ${clock} ns, ${lang}`);
+    }
+  }
+  const m = scheduled(checkC(MEM, 't.c', { top: 'acc', synthesis: true }), {}, { clock: 10 });
+  const g = m.graph, budget = 10 * (1 - UNCERTAINTY);
+  assert.ok(m.subStates.size > 0);
+  for (const [first, rest] of m.subStates) {
+    const chain = [first, ...rest].map((id) => m.states.find((st) => st.id === id));
+    // (no access but in the last state of a chain)
+    assert.ok(chain.slice(0, -1).every((st) => !st.access.size), `chain ${first}`);
+  }
+  for (const st of m.states) {
+    const roots = [st.next, ...st.updates.values(), ...[...st.access.values()].flatMap((a) => [a.addr, a.ce, a.we, a.d].filter((x) => x != null))];
+    const at = new Map();
+    for (const n of g.needed(roots)) {
+      at.set(n.id, n.args.reduce((t, a) => Math.max(t, at.get(a) ?? 0), 0) + nodeDelay(g, n));
+      assert.ok(at.get(n.id) <= budget, `state ${st.id}: ${at.get(n.id)} ns`);
+    }
+  }
 });
 
 test('#2080 the ASM chart: a state split its chain, the register transfers in its last; the same states as the module', () => {
