@@ -122,7 +122,7 @@ async function create(title, path, model, open, what) {
   return path;
 }
 
-export async function fsmWizard({ name = '', location = 'src', lang = null, named = false } = {}) {
+export async function fsmWizard({ name = '', location = 'src', lang = null, named = false, back = null } = {}) {
   const guard = replaceGuard('FSM Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
@@ -182,14 +182,14 @@ export async function fsmWizard({ name = '', location = 'src', lang = null, name
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('FSM Wizard', namedPages(p1.page, [p1.page, io.page, p3, pSum], named, p1.tail), { width: 860 });
+  const ok = await wizard('FSM Wizard', namedPages(p1.page, [p1.page, io.page, p3, pSum], named, p1.tail), { width: 860, back });
   if (!ok) return;
   let m;
   try { m = model(); } catch (e) { return alertDlg('FSM Wizard', e.message, 'error'); }
   return create('FSM Wizard', p1.path(), m, p => app.openFsm(p), `${m.states.length} state(s)`);
 }
 
-export async function asmWizard({ name = '', location = 'src', lang = null, named = false } = {}) {
+export async function asmWizard({ name = '', location = 'src', lang = null, named = false, back = null } = {}) {
   const guard = replaceGuard('ASM Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
@@ -228,7 +228,7 @@ export async function asmWizard({ name = '', location = 'src', lang = null, name
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('ASM Wizard', namedPages(p1.page, [p1.page, io.page, p3, pSum], named, p1.tail), { width: 820 });
+  const ok = await wizard('ASM Wizard', namedPages(p1.page, [p1.page, io.page, p3, pSum], named, p1.tail), { width: 820, back });
   if (!ok) return;
   let m;
   try { m = model(); } catch (e) { return alertDlg('ASM Wizard', e.message, 'error'); }

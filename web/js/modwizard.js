@@ -139,7 +139,7 @@ export function portEditor(ports, { lang, onChange = () => {}, dirs = ['in', 'ou
 }
 
 // ---------------------------------------------------------------- Module Wizard
-export async function moduleWizard({ name = '', location = 'src', lang = null, named = false } = {}) {
+export async function moduleWizard({ name = '', location = 'src', lang = null, named = false, back = null } = {}) {
   const guard = replaceGuard('Module Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
@@ -281,7 +281,7 @@ export async function moduleWizard({ name = '', location = 'src', lang = null, n
     },
   };
 
-  const ok = await wizard('Module Wizard', namedPages(p1.page, [p1.page, p2, p3, pSum], named, p1.tail), { width: 820 });
+  const ok = await wizard('Module Wizard', namedPages(p1.page, [p1.page, p2, p3, pSum], named, p1.tail), { width: 820, back });
   if (!ok) return;
   let code;
   try { code = text(); } catch (e) { return alertDlg('Module Wizard', e.message, 'error'); }
@@ -295,7 +295,7 @@ export async function moduleWizard({ name = '', location = 'src', lang = null, n
 }
 
 // ---------------------------------------------------------------- Schematic Wizard
-export async function schematicWizard({ name = '', location = 'src', lang = null, named = false } = {}) {
+export async function schematicWizard({ name = '', location = 'src', lang = null, named = false, back = null } = {}) {
   const guard = replaceGuard('Schematic Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
@@ -334,7 +334,7 @@ export async function schematicWizard({ name = '', location = 'src', lang = null
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('Schematic Wizard', namedPages(p1.page, [p1.page, p2, pSum], named, p1.tail), { width: 820 });
+  const ok = await wizard('Schematic Wizard', namedPages(p1.page, [p1.page, p2, pSum], named, p1.tail), { width: 820, back });
   if (!ok) return;
   let d;
   try { d = doc(); } catch (e) { return alertDlg('Schematic Wizard', e.message, 'error'); }

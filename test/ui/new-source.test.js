@@ -125,6 +125,14 @@ uiTest('New Source (#958, #2082): Wizard > opens each type\'s wizard at its own 
     if (type === 'Test Bench') {
       assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].map((i) => i.value).filter((v) => v === 'w_one' || v === 'sim')), ['w_one', 'sim']);
     }
+    // < Back on its first page: New Source again, at File Name and Location, the type, the name and the location kept
+    assert.ok((await buttons(page)).includes('< Back'), `${type}: < Back enabled`);
+    await page.dialogButton('< Back');
+    await page.waitDialog('New Source');
+    await waitNewSourcePage(page, 'File Name and Location');
+    assert.equal(await page.dialogCount(), 1, type);
+    assert.deepEqual(await page.eval(() => [[...document.querySelectorAll('.dlg-overlay .wiz-main .form-grid > label')].find((l) => l.textContent === 'Source type:')?.nextElementSibling.textContent,
+      ...[...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].slice(0, 2).map((i) => i.value)]), [type, 'w_one', type === 'Test Bench' ? 'sim' : type === 'Implementation Constraints File' ? 'constraints' : 'src'], type);
     await page.dialogButton('Cancel');
     await page.waitNoDialog();
   }
@@ -207,4 +215,54 @@ uiTest('#1326 Add Copy of Source: the Files input inside the dialog, as wide as 
     await page.waitNoDialog();
   }
   await page.setViewport(1366, 768);
+});
+
+uiTest('#2082 < Back on a wizard\'s first page: New Source again, the name and the language changed there, Wizard > once more; in Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'NsBack', top: '' });
+  await page.openProject('NsBack');
+  await newSourceWizardOf(page, 'Module (HDL)', 'first', 'Module Wizard', { location: 'rtl', lang: 'vhdl' });
+  await page.dialogButton('< Back');
+  await page.waitDialog('New Source');
+  await waitNewSourcePage(page, 'File Name and Location');
+  // the language kept too; < Back once more: the type's list
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main select').value), 'vhdl');
+  await page.dialogButton('< Back');
+  await waitNewSourcePage(page, 'Select Source Type');
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .src-types .st.sel')?.lastChild.textContent.trim()), 'Module (HDL)');
+  await page.dialogButton('Next >');
+  await waitNewSourcePage(page, 'File Name and Location');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].slice(0, 2).map((i) => i.value)), ['first', 'rtl']);
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'second');
+  await page.fill('.dlg-overlay .wiz-main select', 'verilog');
+  await page.dialogButton('Wizard >');
+  await page.waitDialog('Module Wizard');
+  assert.equal(await h3(page), 'Inputs and Outputs');
+  await page.click('.dlg-overlay .mw-qa[data-port=clk]');
+  for (const t of ['Kind of Logic', 'Summary']) {
+    await page.dialogButton('Next >');
+    await page.waitFor((x) => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === x, [t], { what: t });
+  }
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .mw-summary').textContent), /^The wizard will create rtl\/second\.v \(Verilog\) and open it\./);
+  // < Back on a later page: the wizard's previous page, as before
+  await page.dialogButton('< Back');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Kind of Logic', [], { what: 'the previous page' });
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  assert.deepEqual(await page.eval(() => window.Silinx.project.files.map((f) => f.path)), []);
+  // in Portuguese: < Anterior
+  await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
+  try {
+    await newSourceWizardOf(page, 'Esquemático', 'pt_back', 'Assistente de Esquemático', {
+      menu: 'Projeto', item: 'Nova Fonte…', dialog: 'Nova Fonte', next: 'Seguinte >', wizard: 'Assistente >', file: 'Nome do Ficheiro e Localização',
+    });
+    assert.deepEqual(await buttons(page), ['< Anterior', 'Seguinte >', 'Cancelar']);
+    await page.dialogButton('< Anterior');
+    await page.waitDialog('Nova Fonte');
+    await waitNewSourcePage(page, 'Nome do Ficheiro e Localização');
+    assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main input[type=text]').value), 'pt_back');
+    await page.dialogButton('Cancelar');
+    await page.waitNoDialog();
+  } finally {
+    await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
+  }
 });

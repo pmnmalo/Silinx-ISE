@@ -30,7 +30,7 @@ function netsOf(ports) {
   return nets;
 }
 
-export async function ucfWizard({ path }) {
+export async function ucfWizard({ path, back = null }) {
   if (!S.project) return;
   const pj = S.project;
   const guard = replaceGuard('UCF Wizard');
@@ -111,7 +111,7 @@ export async function ucfWizard({ path }) {
     validate: () => guard(path),
   };
   load();
-  const ok = await wizard('UCF Wizard', [p1, pSum], { width: 760 });
+  const ok = await wizard('UCF Wizard', [p1, pSum], { width: 760, back });
   if (!ok) return;
   const noUcf = !S.fileTree.includes(pj.constraints);
   await closeBeforeReplace(path);

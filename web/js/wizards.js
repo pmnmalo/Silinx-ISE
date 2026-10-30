@@ -77,10 +77,12 @@ function devicePicker(db, device) {
 // way to show the change at once.
 // extra: a button before < Back on the pages it is shown on, closing the wizard with its value
 // ({ label, value, shown(page), disabled?(), validate?() -> string|null }; New Source's Wizard, #958)
-export function wizard(title, pages, { width = 720, finishLabel = 'Finish', extra = null, bind = null } = {}) {
+// back: < Back on the first page closes the wizard and calls it (a wizard opened by New Source goes back to it,
+// #2082); start: the page shown first
+export function wizard(title, pages, { width = 720, finishLabel = 'Finish', extra = null, bind = null, back = null, start = 0 } = {}) {
   const now = typeof pages === 'function' ? pages : () => pages;
   return new Promise(resolve => {
-    let idx = 0;
+    let idx = start;
     const side = h('div', { class: 'wiz-side' });
     const main = h('div', { class: 'wiz-main' });
     const err = h('div', { style: { color: 'var(--danger)', minHeight: '16px', marginTop: '6px' } });
@@ -93,7 +95,7 @@ export function wizard(title, pages, { width = 720, finishLabel = 'Finish', extr
       if (!ctl) return;
       const k = extra ? 1 : 0;
       if (extra) { const b = ctl.buttons[0].el; b.style.display = extra.shown(p) ? '' : 'none'; b.disabled = !!extra.disabled?.(); }
-      ctl.buttons[k].el.disabled = idx === 0;
+      ctl.buttons[k].el.disabled = idx === 0 && !back;
       ctl.buttons[k + 1].el.textContent = idx === ps.length - 1 ? finishLabel : 'Next >';
       ctl.buttons[k + 1].el.disabled = !!p.noNext?.();
     };
@@ -117,12 +119,12 @@ export function wizard(title, pages, { width = 720, finishLabel = 'Finish', extr
       title, width, body,
       buttons: [
         ...(extra ? [{ label: extra.label, value: extra.value, validate: async () => { const msg = await extra.validate?.(); err.textContent = msg || ''; return !msg; } }] : []),
-        { label: '< Back', validate: () => { if (idx > 0) { idx--; render(); } return false; } },
+        { label: '< Back', value: 'back', validate: () => { if (idx > 0) { idx--; render(); return false; } return !!back; } },
         { label: 'Next >', primary: true, value: true, validate: next },
         { label: 'Cancel', value: false },
       ],
       onOpen: c => { ctl = c; render(); },
-    }).then(resolve);
+    }).then(v => (v === 'back' ? Promise.resolve(back()).then(() => resolve(false)) : resolve(v)));
   });
 }
 

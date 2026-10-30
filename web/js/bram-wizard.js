@@ -41,7 +41,7 @@ async function contentsOf(spec) {
  * The wizard: a new module (location, lang), or the module of `path` again (spec: its settings, from its header).
  * Returns the path written, or undefined when cancelled.
  */
-export async function blockMemoryWizard({ name = '', location = 'src', lang = null, path: editPath = null, spec: old = null, named = false } = {}) {
+export async function blockMemoryWizard({ name = '', location = 'src', lang = null, path: editPath = null, spec: old = null, named = false, back = null } = {}) {
   if (!S.project) return;
   const pj = S.project;
   const family = old?.family || pj.device.family;
@@ -154,7 +154,7 @@ export async function blockMemoryWizard({ name = '', location = 'src', lang = nu
     validate: () => (editPath ? null : guard(path())),
   };
   // (from New Source: the count under the memory, #2082)
-  const ok = await wizard('Block Memory', namedPages(p1, [p1, p2, pSum], named, countNote), { width: 820 });
+  const ok = await wizard('Block Memory', namedPages(p1, [p1, p2, pSum], named, countNote), { width: 820, back });
   if (!ok) return;
   spec.name = nameIn.value.trim(); spec.lang = langSel.value;
   const c = await contentsOf(spec);

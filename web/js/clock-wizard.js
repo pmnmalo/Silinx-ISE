@@ -36,7 +36,7 @@ function defaultSpec(family, fin, lang) {
  * The wizard: a new module (location, lang), or the module of `path` again (spec: its settings, from its header).
  * Returns the path written, or undefined when cancelled.
  */
-export async function clockWizard({ name = '', location = 'src', lang = null, path: editPath = null, spec: old = null, named = false } = {}) {
+export async function clockWizard({ name = '', location = 'src', lang = null, path: editPath = null, spec: old = null, named = false, back = null } = {}) {
   if (!S.project) return;
   const pj = S.project;
   const family = old?.family || pj.device.family;
@@ -238,7 +238,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
     validate: () => (editPath ? null : guard(path())),
   };
   // (from New Source: the count under the input clock, #2082)
-  const ok = await wizard('Clocking Wizard', namedPages(p1, [p1, p2, p3, pSum], named, countNote), { width: 900 });
+  const ok = await wizard('Clocking Wizard', namedPages(p1, [p1, p2, p3, pSum], named, countNote), { width: 900, back });
   if (!ok) return;
   spec.name = nameIn.value.trim(); spec.lang = langSel.value;
   const { code, plan } = clockModule(spec);
