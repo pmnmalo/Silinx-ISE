@@ -19,6 +19,7 @@ import {
 } from './synth-open-path.js';
 import { mountDepth } from './synth-open-depth.js';
 import { bddStage } from './synth-open-resynth.js';
+import { s6SynthCommands, BRAMS_S6_FILE, BRAMS_S6 } from './synth-brams-s6.js';
 export {
   DEEP_RULE, criticalDelay, deepDesign, logicLevels, pathEnds
 };
@@ -351,7 +352,8 @@ export function synthCommands(top, family, { srl = true, premap = null, lutram =
   const fam = YOSYS_FAMILY[family];
   if (!fam) throw new Error(`open synthesis: no Yosys mapping for the device family '${family}'`);
   const synth = `synth_xilinx -family ${fam} -ise -flatten -top ${top}`;
-  if (!LUT4_FAMILIES.has(fam)) return synth;
+  // (the Spartan-6's inferred block RAMs whole, #2130)
+  if (!LUT4_FAMILIES.has(fam)) return fam === 'xc6s' ? s6SynthCommands(synth) : synth;
  // (the variable taps, #5: xilinx_srl -variable must see the word-level $shiftx, before synth_xilinx's
   // fine step maps it to multiplexers: memory_map (a shift-chain array's words as flip-flops), then
   // xilinx_srl and the map to SRL16E (before map_cells, whose own map writes SRLC32E), then the step;
@@ -599,8 +601,9 @@ export function yosysScript(top, family, opts = {}) {
   return `${cells}read_verilog -sv ${top}_syn.v; ${synthCommands(top, family, opts)}; ${outputs(top)}`;
 }
 
-/** The files yosysScript reads: the flat module and Silinx's shift-register map and cells (and its carry-select map, opts.csel). */
-export const yosysFiles = (top, text, opts = {}) => ({ [`${top}_syn.v`]: text, [SRL_MAP_FILE]: SRL_MAP, [SRL_CELLS_FILE]: SRL_CELLS, ...(opts.csel && { [CSEL_FILE]: CSEL_MAP }) });
+/** The files yosysScript reads: the flat module, Silinx's shift-register map and cells and the Spartan-6's block-RAM rule
+ *  (and its carry-select map, opts.csel). */
+export const yosysFiles = (top, text, opts = {}) => ({ [`${top}_syn.v`]: text, [SRL_MAP_FILE]: SRL_MAP, [SRL_CELLS_FILE]: SRL_CELLS, [BRAMS_S6_FILE]: BRAMS_S6, ...(opts.csel && { [CSEL_FILE]: CSEL_MAP }) });
 
 /** Cells of a Yosys JSON netlist by type: { LUT4: 286, FDRE: 48, … } (the top module's). */
 export function cellCounts(json, top) {

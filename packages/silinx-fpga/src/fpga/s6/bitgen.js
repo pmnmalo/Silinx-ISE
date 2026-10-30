@@ -151,21 +151,23 @@ export function predictDesign(design, device, dev, db) {
  * The frames bitgen writes again after the frame data (#724, #728, measured on a design with one RAMB8BWER, stopwatch
  * on both boards): minor 23 of the block RAM's column in its row, as in the frame data but for two bits it clears
  * (bit 1 of word w, bit 14 of word w + 15, counting from the word's lowest; w the first word of the four switch boxes' rows the block RAM's tile
- * spans), then a frame of pad (all ones). { rewrites: [{ far, words }], unknown: [what was not measured] }.
+ * spans), then a frame of pad (all ones). A RAMB16BWER (#2130, stopwatch's on both boards): no frame written again, the
+ * same words' other bits cleared in the frame data itself (bit 0 of word w, bit 15 of word w + 15). { rewrites: [{ far,
+ * words }], clears: [[the frame data's word, its bits cleared]], unknown: [what was not measured] }.
  */
 export function bramRewrites(design, device, dev, fdri) {
   const brams = design.insts.filter(i => /^RAMB(8|16)BWER$/.test(i.type) && i.placed), unknown = [];
-  if (!brams.length) return { rewrites: [], unknown };
+  if (!brams.length) return { rewrites: [], clears: [], unknown };
   if (brams.length > 1) unknown.push(`${brams.length} block RAMs: the frame bitgen writes again measured with one`);
-  if (brams[0].type !== 'RAMB8BWER') unknown.push(`a ${brams[0].type}: the frame bitgen writes again measured with a RAMB8BWER`);
   const [f0, b0] = gridRegion(device, dev, brams[0].tile), row = Math.floor(f0 / dev.rowFrames), [c0] = columnOf(dev, f0);
   let column = 0;
   for (let f = row * dev.rowFrames; f < c0; f += dev.columns[column]) column++;
   const main = (c0 + 23) * FRAME_WORDS, words = new Uint16Array(2 * FRAME_WORDS).fill(0xffff), w = (b0 >> 4) - 12;
+  if (brams[0].type === 'RAMB16BWER') return { rewrites: [], clears: [[main + w, 0x0001], [main + w + 15, 0x8000]], unknown };
   words.set(fdri.subarray(main, main + FRAME_WORDS), 0);
   words[w] &= ~0x0002;
   words[w + 15] &= ~0x4000;
-  return { rewrites: [{ far: [(row << 8) | column, 23], words }], unknown };
+  return { rewrites: [{ far: [(row << 8) | column, 23], words }], clears: [], unknown };
 }
 
 /**
@@ -185,6 +187,7 @@ export function bitstreamS6(design, device, db, { name = 'top.ncd;UserID=0xFFFFF
   for (const x of bits) { const [f, b] = x.split(',').map(Number); fdri[f * FRAME_WORDS + (b >> 4)] ^= 1 << (15 - (b & 15)); }
   const again = bramRewrites(design, device, dev, fdri);
   for (const u of again.unknown) unknown.set(u, (unknown.get(u) || 0) + 1);
+  for (const [i, m] of again.clears) fdri[i] &= ~m;
   const bytes = writeBit6({ fdri, rewrites: again.rewrites, name, part: part.replace(/^xc/, ''), ...(date && { date }), ...(time && { time }), crc, startupClk, device: S6_DEVICES[type] });
   return { bytes, unknown };
 }
