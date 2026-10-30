@@ -10,6 +10,7 @@
 //     of the states after it in its chain]
 import { fsmd } from './c-fsmd.js';
 import { hdlName } from './c-graph.js';
+import { splitMuls } from './c-mul-split.js';
 import { DEFAULT_CLOCK, UNCERTAINTY, nodeDelay } from './c-timing.js';
 
 /** A sequential function's machine (core/c-fsmd.js) with its states split by the clock (ns). */
@@ -19,6 +20,13 @@ export function scheduled(checked, opts = {}, { clock = DEFAULT_CLOCK, family = 
   const budget = clock * (1 - UNCERTAINTY);
   const plan = () => {
     const piped = new Set(m.loops.flatMap((l, k) => (l.pipeline ? m.loopStates[k] : [])));
+    // (a wide multiplication of a state split: 18 x 18 ones, chained as the other operations, core/c-mul-split.js)
+    m = { ...m, states: m.states.map((st) => {
+      if (piped.has(st.id) || !splittable(m, st)) return st;
+      const keys = [...st.updates.keys()];
+      const [next, ...vals] = splitMuls(m.graph, [st.next, ...st.updates.values()]);
+      return { ...st, next, updates: new Map(keys.map((k, i) => [k, vals[i]])) };
+    }) };
     return m.states.map((st) => (piped.has(st.id) ? null : stagesOf(m, st, budget, family)));
   };
   let plans = plan();
