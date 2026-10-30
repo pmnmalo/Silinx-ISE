@@ -42,6 +42,11 @@ test('FSM measurement: fsm_detect\'s messages, the registers each way extracts',
   // a port's register too, but not one refused for another reason as well (odd: self-resetting)
   assert.deepEqual(chosen('onehot-port', det), ['u_fsm.state_reg', 'top.inner', 'st_id']);
   assert.deepEqual(parseDetect([], 'top'), { marked: [], refused: [] });
+  // #2157: the top's name taken as it is, not as a pattern: an escaped Verilog identifier's characters neither throw nor match others
+  for (const top of ['a(b', 'a[b', 'a+b', 'a*', 'a$b', 'a\\b']) {
+    assert.deepEqual(parseDetect([`Found FSM state register ${top}.state.`], top), { marked: ['state'], refused: [] });
+  }
+  assert.deepEqual(parseDetect(['Found FSM state register aab.state.'], 'a+b'), { marked: ['aab.state'], refused: [] });
   assert.deepEqual(WAYS, ['stock', 'base', 'binary', 'onehot', 'onehot-port', 'core']);
   assert.deepEqual(chosen('core', det), []);
 });

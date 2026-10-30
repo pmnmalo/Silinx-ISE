@@ -42,7 +42,7 @@ export const FSM_RULE = { states: 8 };
 
 /** fsm_detect's messages (one run of it): { marked: [wire], refused: [{ wire, reasons }] }. */
 export function parseDetect(lines, top) {
-  const strip = n => n.replace(new RegExp(`^${top.replace(/[.$\\]/g, '\\$&')}\\.`), '');
+  const strip = n => (n.startsWith(`${top}.`) ? n.slice(top.length + 1) : n);
   const marked = [], refused = [];
   let cur = null;
   for (const l of lines) {
