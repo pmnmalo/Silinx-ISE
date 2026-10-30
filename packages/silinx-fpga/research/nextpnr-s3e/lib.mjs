@@ -74,15 +74,19 @@ function netlistSim(mod, inputs) {
   for (const [name, c] of Object.entries(mod.cells)) {
     const con = p => portNet(c, p);
     if (c.type === 'LUT4') S.luts.push({ init: bitsOf(c.parameters.INIT).padStart(16, '0'), ins: [0, 1, 2, 3].map(i => con(`I${i}`)), out: con('O') });
-    else if (c.type === 'FF') S.ffs.push({ name: esc(name), d: con('D'), q: con('Q'), ce: con('CE'), sr: con('SR'), set: /_SET$/.test(c.parameters.SRMODE), hasSr: c.parameters.SRMODE !== 'NONE', init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
+    else if (c.type === 'FF') S.ffs.push({ name: esc(name), d: con('D'), q: con('Q'), ce: con('CE'), sr: con('SR'), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
     else if (c.type === 'IOB' && con('I') !== undefined) S.val.set(con('I'), S.val.get(con('PAD')) || 0);
+    // the carry: a MUXCY passes CI when S, else DI (or its constant, CY0); an XORCY gives CI xor LI
+    else if (c.type === 'MUXCY') S.luts.push({ out: con('O'), fn: () => (S.get(con('S')) ? S.get(con('CI')) : con('DI') !== undefined ? S.get(con('DI')) : +String(c.parameters.CY0 ?? 0).trim()) });
+    else if (c.type === 'XORCY') S.luts.push({ out: con('O'), fn: () => S.get(con('CI')) ^ S.get(con('LI')) });
   }
   S.get = b => (b === undefined || b === '0' ? 0 : b === '1' ? 1 : S.val.get(b) || 0);
-  S.lut = l => +l.init[15 - l.ins.reduce((a, b, i) => a | (S.get(b) << i), 0)];
+  S.lut = l => (l.fn ? l.fn() : +l.init[15 - l.ins.reduce((a, b, i) => a | (S.get(b) << i), 0)]);
   return S;
 }
 
-/** The XDL's simulation: its slices' LUT equations on their site pins, FXMUX / DXMUX, the flip-flops' set / reset. */
+/** The XDL's simulation: its slices' LUT equations on their site pins, the carry (CYINIT, CY0F / CY0G, CYMUXF / CYMUXG,
+ *  XORF / XORG, COUT), FXMUX / DXMUX, the flip-flops' set / reset. */
 function xdlSim(design, inputs) {
   const S = { val: new Map(), luts: [], ffs: [] };
   const netOfPin = new Map();
@@ -90,13 +94,24 @@ function xdlSim(design, inputs) {
   for (const inst of design.insts) {
     const cfg = Object.fromEntries(inst.cfg.map(c => [c.attr, c])), pin = p => netOfPin.get(`${inst.name} ${p}`);
     if (/^SLICE[LM]$/.test(inst.type)) {
+      // the carry: its carry in (CYINIT), each side's MUXCY (S: the LUT; DI: CY0) and XORCY
+      const at = w => `${inst.name}/${w}`;
+      const cy0 = side => { const v = cfg[`CY0${side}`]?.value; return v === '0' || v === '1' ? +v : pin(v); };
+      if (cfg.CYINIT) S.luts.push({ out: at('CI'), fn: () => S.get(pin(cfg.CYINIT.value)) });
+      for (const [side, ci, co] of [['F', at('CI'), at('CYF')], ['G', at('CYF'), cfg.COUTUSED ? pin('COUT') : at('CYG')]]) {
+        const d = cy0(side);
+        if (cfg[`CYMUX${side}`]) S.luts.push({ out: co, fn: () => (S.get(at(side)) ? S.get(ci) : typeof d === 'number' ? d : S.get(d)) });
+        if (cfg[`XOR${side}`]) S.luts.push({ out: at(`XOR${side}`), fn: () => S.get(ci) ^ S.get(at(side)) });
+      }
       for (const [side, X] of [['F', 'X'], ['G', 'Y']]) {
         const out = `${inst.name}/${side}`, ff = `FF${X}`;   // the LUT's output, inside the slice
+        const mux = cfg[`${side === 'F' ? 'FX' : 'GY'}MUX`];
+        const fx = mux && /XOR$/.test(mux.value) ? at(`XOR${side}`) : out;   // FXMUX / GYMUX: the LUT or the sum
         if (cfg[side]) S.luts.push({ eq: cfg[side].value.replace(/^#LUT:/, ''), ins: [1, 2, 3, 4].map(k => pin(`${side}${k}`)), out });
-        if (cfg[`${side === 'F' ? 'FX' : 'GY'}MUX`] && pin(X)) S.luts.push({ copy: out, out: pin(X) });
+        if (mux && pin(X)) S.luts.push({ copy: fx, out: pin(X) });
         if (cfg[ff]) {
           S.ffs.push({
-            name: cfg[ff].name, d: cfg[`D${X}MUX`]?.value === '1' ? out : pin(`B${X}`), q: pin(`${X}Q`),
+            name: cfg[ff].name, d: cfg[`D${X}MUX`]?.value === '1' ? fx : pin(`B${X}`), q: pin(`${X}Q`),
             ce: cfg.CEINV ? pin('CE') : undefined, sr: cfg.SRINV ? pin('SR') : undefined,
             set: cfg[`${ff}_SR_ATTR`]?.value === 'SRHIGH', init: cfg[`${ff}_INIT_ATTR`]?.value === 'INIT1' ? 1 : 0,
           });
@@ -108,7 +123,7 @@ function xdlSim(design, inputs) {
     }
   }
   S.get = n => (n === undefined ? 0 : S.val.get(n) || 0);
-  S.lut = l => +(l.copy ? S.get(l.copy) : evalLut(l.eq, Object.fromEntries(l.ins.map((n, k) => [`A${k + 1}`, S.get(n)]))));
+  S.lut = l => +(l.fn ? l.fn() : l.copy ? S.get(l.copy) : evalLut(l.eq, Object.fromEntries(l.ins.map((n, k) => [`A${k + 1}`, S.get(n)]))));
   return S;
 }
 

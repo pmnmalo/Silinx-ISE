@@ -9,6 +9,8 @@ const topModule = json => Object.entries(json.modules).find(([, m]) => m.attribu
 const esc = x => String(x).replace(/:/g, '_');
 const bitsOf = v => (typeof v === 'string' ? v : (v >>> 0).toString(2));
 const portNet = (c, p) => c.connections?.[p]?.[0];
+// a cell's string parameter (nextpnr writes a string with a trailing space, to tell it from a bit string)
+const strParam = (c, p) => (typeof c.parameters?.[p] === 'string' ? c.parameters[p].replace(/ $/, '') : c.parameters?.[p]);
 
 // ---------------------------------------------------------------- nextpnr's result to XDL
 // BELs of a site: z = site index * Z_STRIDE + offset, BEL names S<site index>_<BEL> (s3e_gen.py)
@@ -58,7 +60,10 @@ function sitesOfCells(mod, device, v) {
 }
 
 /** The slices' multiplexers from the route's PIPs inside the sites (s3e_gen.py's S<i>_* wires), and the site pin
- *  each LUT input was routed to (its inputs are permutable: S<i>_FI<j> is reached from any of F1..F4). */
+ *  each LUT input was routed to (its inputs are permutable: S<i>_FI<j> is reached from any of F1..F4):
+ *  - the LUT's output (S<i>_FOUT / GOUT) or the carry's sum (S<i>_XORF / XORG) to X / Y (FXMUX / GYMUX) and to the
+ *    flip-flop's D (S<i>_DX / DY: DXMUX / DYMUX), or BX / BY to the flip-flop;
+ *  - the carry in (S<i>_CI: CYINIT) from CIN or BX; a MUXCY's DI (S<i>_DIF / DIG: CY0F / CY0G) from pin 1 or BX / BY. */
 function siteRoutes(mod, insts, v) {
   for (const n of Object.values(mod.netnames)) {
     for (const [, pip] of routing(n)) {
@@ -67,13 +72,17 @@ function siteRoutes(mod, insts, v) {
       const m = /^S(\d+)_(\w+)$/.exec(src) || /^S(\d+)_(\w+)$/.exec(dst);
       if (!m) continue;
       const inst = insts.get(v.siteName(tile, +m[1]));
-      const li = /^S\d+_([FG])I(\d)$/.exec(dst);
-      if (li) {
-        const pin = v.pinOfWire(v.tileAt.get(tile)).get(src).pin;   // F1..F4 / G1..G4
-        (inst.lutPins[li[1]] ||= [])[+li[2]] = +pin[1];
-      } else if (/OUT$/.test(src) && !/^S\d+_D/.test(dst)) inst.mux[src.endsWith('FOUT') ? 'X' : 'Y'] = 'used';   // LUT -> X / Y pin
-      else if (/OUT$/.test(src)) inst.mux[`D${dst.slice(-1)}`] = 'lut';                                          // LUT -> flip-flop
-      else inst.mux[`D${dst.slice(-1)}`] = 'bypass';                                                              // BX / BY -> flip-flop
+      const pinOf = w => v.pinOfWire(v.tileAt.get(tile)).get(w)?.pin;   // a site pin's name (F1, BX, CIN…)
+      let x;
+      if ((x = /^S\d+_([FG])I(\d)$/.exec(dst))) (inst.lutPins[x[1]] ||= [])[+x[2]] = +pinOf(src)[1];   // F1..F4 / G1..G4
+      else if (/^S\d+_CI$/.test(dst)) inst.mux.CYINIT = pinOf(src);                                     // CIN / BX
+      else if ((x = /^S\d+_DI([FG])$/.exec(dst))) inst.mux[`CY0${x[1]}`] = pinOf(src);                 // F1 / G1 / BX / BY
+      else {
+        const side = /^S\d+_(F|XORF)/.test(src) ? 'X' : /^S\d+_(G|XORG)/.test(src) ? 'Y' : null;
+        const what = /XOR[FG]$/.test(src) ? 'xor' : /OUT$/.test(src) ? 'lut' : 'bypass';
+        if (/^S\d+_D[XY]$/.test(dst)) inst.mux[`D${dst.slice(-1)}`] = what;                             // -> the flip-flop
+        else if (side) inst.mux[side] = what;                                                              // -> X / Y
+      }
     }
   }
 }
@@ -86,17 +95,40 @@ export function lutPins(chosen) {
   return pins.map(k => k ?? free.shift());
 }
 
+/** A slice's carry settings, as Silinx's packer writes them (pack-cfg.js): CYINIT, per side its MUXCY (CYMUXF, CYSELF,
+ *  CY0F and its constant's GNDF / C1VDD) and XORCY (XORF), COUTUSED when the chain goes on up the column. */
+function carryCfg(inst, add) {
+  const c = inst.cells;
+  if (!c.CYMUXF && !c.XORF && !c.CYMUXG && !c.XORG) return;
+  if (c.CYMUXF || c.XORF) add('CYINIT', '', inst.mux.CYINIT || 'BX');
+  for (const [side, vdd] of [['F', 'C1VDD'], ['G', 'C2VDD']]) {
+    const mux = c[`CYMUX${side}`], xr = c[`XOR${side}`];
+    if (mux) {
+      add(`CYMUX${side}`, esc(mux.name), '');
+      add(`CYSEL${side}`, '', side);
+      const k = strParam(mux, 'CY0');
+      const cy0 = k !== undefined ? String(k) : inst.mux[`CY0${side}`] || `${side}1`;
+      add(`CY0${side}`, '', cy0);
+      if (cy0 === '0') add(`GND${side}`, `${inst.name}.GND${side}`, '');
+      if (cy0 === '1') add(vdd, `${inst.name}.${vdd}`, '');
+    }
+    if (xr) add(`XOR${side}`, esc(xr.name), '');
+  }
+  if (c.CYMUXG && portNet(c.CYMUXG, 'O') !== undefined) add('COUTUSED', '', '0');
+}
+
 /** An instance's XDL type, name and settings (cfg items), as ISE's map writes them. */
 function instanceCfg(inst, mod) {
   const cfg = [], c = inst.cells;
   const add = (attr, name, value) => cfg.push({ attr, name, value });
   if (inst.siteType === 'SLICEL' || inst.siteType === 'SLICEM') {
     inst.type = 'SLICEL';                // (logic on a SLICEM site too: ISE's DRC wants a SLICEL comp there)
+    inst.name = esc((c.FFX || c.FFY || c.FLUT || c.GLUT || c.CYMUXF || c.XORF).name);
     for (const [side, lut] of [['F', c.FLUT], ['G', c.GLUT]]) if (lut) add(side, esc(lut.name), `#LUT:${initToEquation(bitsOf(lut.parameters.INIT), 4, lutPins(inst.lutPins[side]))}`);
     let ctrl = null;
     for (const [X, ff] of [['X', c.FFX], ['Y', c.FFY]]) {
       if (!ff) continue;
-      const init = parseInt(bitsOf(ff.parameters.INIT ?? '0'), 2) & 1, mode = ff.parameters.SRMODE ?? 'NONE';
+      const init = parseInt(bitsOf(ff.parameters.INIT ?? '0'), 2) & 1, mode = strParam(ff, 'SRMODE') ?? 'NONE';
       add(`FF${X}`, esc(ff.name), '#FF');
       add(`FF${X}_INIT_ATTR`, '', init ? 'INIT1' : 'INIT0');
       add(`FF${X}_SR_ATTR`, '', /_SET$/.test(mode) || (mode === 'NONE' && init) ? 'SRHIGH' : 'SRLOW');
@@ -109,13 +141,18 @@ function instanceCfg(inst, mod) {
       if (ctrl.sr) add('SRINV', '', 'SR');
       add('SYNC_ATTR', '', ctrl.sync ? 'SYNC' : 'ASYNC');
     }
-    if (inst.mux.DX === 'bypass') add('BXINV', '', 'BX');
-    if (inst.mux.DY === 'bypass') add('BYINV', '', 'BY');
-    if (inst.mux.X || inst.mux.DX === 'lut') add('FXMUX', '', 'F');
-    if (inst.mux.Y || inst.mux.DY === 'lut') add('GYMUX', '', 'G');
+    carryCfg(inst, add);
+    const bx = inst.mux.DX === 'bypass' || inst.mux.CYINIT === 'BX' || inst.mux.CY0F === 'BX';
+    const by = inst.mux.DY === 'bypass' || inst.mux.CY0G === 'BY';
+    if (bx) add('BXINV', '', 'BX');
+    if (by) add('BYINV', '', 'BY');
+    // FXMUX / GYMUX: the LUT or the carry's sum, to X / Y or to the flip-flop
+    for (const [X, mux, l, sum] of [['X', 'FXMUX', 'F', 'FXOR'], ['Y', 'GYMUX', 'G', 'GXOR']]) {
+      const from = [inst.mux[X], inst.mux[`D${X}`]].find(w => w === 'lut' || w === 'xor');
+      if (from) add(mux, '', from === 'xor' ? sum : l);
+    }
     if (inst.mux.X) add('XUSED', '', '0');
     if (inst.mux.Y) add('YUSED', '', '0');
-    inst.name = esc((c.FFX || c.FFY || c.FLUT || c.GLUT).name);
   } else if (c.IOB) {
     // the IOB's name: its port bit, as the UCF names it (led<3>: nextpnr writes a bus's bits as one port again)
     const pad = portNet(c.IOB, 'PAD');

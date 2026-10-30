@@ -135,3 +135,46 @@ test('the scripts the README and the usage lines name exist, from the repository
   assert.ok(named.length >= 13);
   for (const [f, script] of named) assert.ok(fs.existsSync(new URL(script, root)), `${f} names ${script}, which does not exist`);
 });
+
+// nextpnr's routed design of the counter as Silinx's synthesis maps it: a carry chain of 24 stages (23 MUXCY, 24
+// XORCY), constants (its carry in, the MUXCYs' DI), the micro-architecture's carry chains and constants (#2135)
+const carryRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/carry-routed.json.gz', import.meta.url))));
+const carry = nextpnrToXdl(carryRouted(), device, PART);
+const count = (design, re) => design.insts.reduce((n, i) => n + i.cfg.filter(c => re.test(`${c.attr}::${c.value}`)).length, 0);
+
+test('#2135 nextpnrToXdl: a carry chain, slice by slice up its column, as Silinx\'s packer writes it', () => {
+  assert.deepEqual(xdlSize(carry), { slices: 13, luts: 25, ffs: 24 });
+  // its first slice takes the carry in through BX, the others through CIN; COUT goes on up but from the last
+  assert.equal(count(carry, /^CYINIT::BX$/), 1);
+  assert.equal(count(carry, /^CYINIT::CIN$/), 11);
+  assert.equal(count(carry, /^COUTUSED::0$/), 11);
+  // DI: constants (the chain's first 1, the others 0), with their GND / VCC cells
+  assert.equal(count(carry, /^CY0F::1$/), 1);
+  assert.equal(count(carry, /^CY0[FG]::0$/), 22);
+  assert.equal(count(carry, /^C1VDD::$/), 1);
+  assert.equal(count(carry, /^GND[FG]::$/), 22);
+  assert.equal(count(carry, /^CYSEL[FG]::[FG]$/), 23);
+  // the sums out through FXOR / GXOR, to the flip-flops
+  assert.equal(count(carry, /^FXMUX::FXOR$/) + count(carry, /^GYMUX::GXOR$/), 24);
+  // the slices of the chain stacked: each continuing slice right above the one before (COUT -> CIN in the graph)
+  const r = checkRouting(carry, device);
+  assert.deepEqual(r.problems, []);
+  const { unknown } = bitgen(carry, loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' });
+  assert.deepEqual(unknown, []);
+});
+
+test('#2135 the carry chain\'s XDL implements its netlist; a wrong DI constant or carry in is caught', () => {
+  const json = carryRouted();
+  const r = simCheck(json, carry, { cycles: 2000, starts: 300 });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.flipFlops, 24);
+  // (nextpnr writes a string parameter with a trailing space, '0 ': the converter and the simulation read it trimmed)
+  const cy0 = Object.values(Object.values(json.modules)[0].cells).filter(c => c.type === 'MUXCY').map(c => c.parameters.CY0);
+  assert.ok(cy0.includes('0 ') && cy0.includes('1 '), cy0.join());
+  // a constant DI turned over, a carry in taken from BX instead of CIN: the flip-flops' values differ
+  const text = writeXdl(carry);
+  for (const [from, to] of [['CY0F::1', 'CY0F::0'], ['CYINIT::CIN', 'CYINIT::BX']]) {
+    const wrong = parseXdl(text.replace(from, to));
+    assert.equal(simCheck(json, wrong, { cycles: 0, starts: 300 }).ok, false, `${from} -> ${to}`);
+  }
+});
