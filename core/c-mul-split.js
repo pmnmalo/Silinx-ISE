@@ -3,7 +3,8 @@
 // where the multiplication alone was longer than the period. Each operand is taken at its own width (a value extended to
 // the product's is the value it extends), cut in limbs of 17 bits: the lower ones unsigned, the top one signed, each an
 // 18-bit signed operand; the partial product of limbs i and j is shifted by 17 (i + j), those beyond the product's width
-// left out, and the sum is the product, exact (it fits its width). Nodes of the graph both emitters write as they are.
+// left out, and their sum, in the width that holds the product (its operands' widths together), is the product, exact.
+// Nodes of the graph both emitters write as they are.
 // Isomorphic ES module: no DOM and no Node APIs.
 
 const LIMB = 17;
@@ -35,7 +36,8 @@ export function mulWidth(g, n) {
 /** The multiplication node n as 18 x 18 multiplications and their sum, or n itself when one block makes it. */
 export function splitMul(g, n) {
   if (mulWidth(g, n) <= 36) return n.id;
-  const t = { w: n.w, s: n.s };
+  // (the sum in the product's own width, which holds it: signed, its operands' widths together; then the node's)
+  const t = { w: mulWidth(g, n), s: true };
   const limbs = (x) => {
     const [id, e] = operandOf(g, x, n.s);
     const v = g.add('ext', [id], { w: e, s: true });
@@ -48,7 +50,7 @@ export function splitMul(g, n) {
   const parts = [];
   a.forEach((x, i) => b.forEach((y, j) => {
     const at = LIMB * (i + j);
-    if (at >= n.w) return;
+    if (at >= t.w) return;
     const p = g.add('ext', [g.add('mul', [x, y], S36)], t);
     parts.push(at ? g.add('shl', [p, g.const(at, t)], t) : p);
   }));
@@ -59,7 +61,7 @@ export function splitMul(g, n) {
     for (let k = 0; k < level.length; k += 2) next.push(k + 1 < level.length ? g.add('add', [level[k], level[k + 1]], t) : level[k]);
     level = next;
   }
-  return level[0];
+  return g.add('ext', [level[0]], { w: n.w, s: n.s });
 }
 
 /** The roots with every wide multiplication of their graph split (the nodes above one made again). */
