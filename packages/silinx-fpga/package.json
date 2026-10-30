@@ -22,7 +22,10 @@
   "scripts": {
     "test": "node --test test/*.test.js"
   },
-  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "license": "Apache-2.0",
   "author": "Pedro Maló",
   "dependencies": {

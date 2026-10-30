@@ -4,7 +4,8 @@ The Silinx toolchain for Spartan-3E FPGAs (Basys2, Nexys2) without Xilinx tools:
 WebAssembly, then pack, place, route, timing and bitstream, with the device data. It is being separated from
 Silinx ISE, the IDE that uses it ([#1651](https://github.com/pmnmalo/Silinx-ISE/issues/1651), the plan:
 [docs/TOOLCHAIN-SEPARATION.md](../../docs/TOOLCHAIN-SEPARATION.md)). Its code is in `src/`, the device graphs of the
-supported boards in `devices/`, their bit databases in `bitdb/`. Not published yet.
+supported boards in `devices/`, their bit databases in `bitdb/`. It is published on npm from its own tags
+(`npm install silinx-fpga`), with npm's provenance.
 
 ## The command line
 

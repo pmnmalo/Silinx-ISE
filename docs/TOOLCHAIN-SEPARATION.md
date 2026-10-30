@@ -213,6 +213,12 @@ in the layout and can start now; the decisions steps 6 and 10 needed are taken (
     First part: the package's NOTICE and THIRD-PARTY-NOTICES.md (written by `scripts/third-party.mjs` with the
     IDE's), the IDE's NOTICE naming it, and its `files` list: the npm package holds `src/`, `bin/`, `bitdb/`,
     `devices/` and the notices (about 21 MB unpacked), not the research nor the tests (`test/third-party.test.js`).
+    Second part: its own changelog, `packages/silinx-fpga/CHANGELOG.md` and its fragments
+    (`packages/silinx-fpga/changes/`), with `--package silinx-fpga` for `scripts/changelog-release.mjs` and
+    `scripts/sync-version.mjs`. Third part: its publishing on npm, `.github/workflows/silinx-fpga-release.yml`: the tag
+    `silinx-fpga-vX` starts CI and the workflow, which checks that the commit is on `main`, that the package's version
+    is X with its changelog section, waits for that CI run to pass and publishes with npm's provenance (the token in the
+    secret `NPM_TOKEN`); the package is no longer `private`.
 11. **Its own repository** ([#1651](https://github.com/pmnmalo/Silinx-ISE/issues/1651)): `silinx-fpga` moves
     to a GitHub repository of its own (decided, section 4), once steps 1 to 10 are done: `git filter-repo` keeps
     the moved files' history; there, its CI, the ISE oracle (the self-hosted runner registered for it too), CodeQL,

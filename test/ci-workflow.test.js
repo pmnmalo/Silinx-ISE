@@ -24,9 +24,9 @@ function jobs(yml) {
 }
 const on = yml => yml.slice(yml.indexOf('\non:\n') + 1, yml.search(/\n(?:permissions|concurrency|jobs):\n/) + 1);
 
-test('CI: at a release only (a tag v*) and by hand; every job, none gated; ci-ok needs them all', () => {
+test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v*, #1681) and by hand; every job, none gated; ci-ok needs them all', () => {
   const ci = read('.github/workflows/ci.yml');
-  assert.equal(on(ci).replace(/^#.*\n/gm, ''), "on:\n  push:\n    tags: ['v*']\n  workflow_dispatch:\n");
+  assert.equal(on(ci).replace(/^#.*\n/gm, ''), "on:\n  push:\n    tags: ['v*', 'silinx-fpga-v*']\n  workflow_dispatch:\n");
   assert.doesNotMatch(ci, /pull_request|branches:|paths(-ignore)?:/, 'not on pull requests nor on pushes to main');
   assert.ok(!fs.existsSync(path.join(ROOT, 'scripts/ci-changes.mjs')), 'no change detection: everything runs');
   assert.match(ci, /^concurrency:\n  group: ci-\$\{\{ github\.ref \}\}-\$\{\{ github\.sha \}\}\n  cancel-in-progress: false\n/m);
