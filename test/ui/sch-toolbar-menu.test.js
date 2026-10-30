@@ -126,3 +126,47 @@ uiTest('#2208 #2209 a read-only schematic: Curved wires and Hop-overs in the men
   });
   assert.deepEqual(shown, [true, true, true, false, false, false]);
 });
+
+uiTest('#2211 schematic: Select whole branch beside Keep connections: ticked, the whole wire; not ticked, the segment clicked, moved and deleted alone; remembered; in Portuguese', E, async (page) => {
+  const doc = newDoc('branch', 'vhdl');
+  doc.wires.push({ id: 'W1', points: [{ x: 100, y: 100 }, { x: 300, y: 100 }, { x: 300, y: 300 }, { x: 500, y: 300 }] });
+  await makeProject(env, { name: 'BranchPj', files: { 'src/b.sch.json': JSON.stringify(doc) } });
+  await page.openProject('BranchPj');
+  await page.eval(() => window.SilinxApp.openSch('src/b.sch.json'));
+  await page.waitFor((ed) => document.querySelector(`${ed} svg g.wire[data-id="W1"]`), [ED], { what: 'drawn' });
+  await page.eval(() => localStorage.removeItem('xl.sch.branch'));
+  const BOX = `${ED} .se-branch input`;
+  const look = () => page.eval((ed) => { const g = document.querySelector(`${ed} svg g.wire[data-id="W1"]`); return { sel: g.classList.contains('sel'), seg: g.querySelector('.segsel')?.getAttribute('points') ?? null }; }, ED);
+  // a sheet point on the screen
+  const at = (x, y) => page.eval((ed, px, py) => { const l = document.querySelector(`${ed} svg g.wire`); const q = l.ownerSVGElement.createSVGPoint(); q.x = px; q.y = py; const r = q.matrixTransform(l.getScreenCTM()); return { x: r.x, y: r.y }; }, ED, x, y);
+  const clickAt = async (x, y) => { const p = await at(x, y); await page.mouse('mouseMoved', p.x, p.y); await page.mouse('mousePressed', p.x, p.y); await page.mouse('mouseReleased', p.x, p.y); };
+  // beside Keep connections, ticked by default: the whole wire
+  assert.equal(await page.eval((ed) => document.querySelector(`${ed} .se-keep`).nextElementSibling.textContent.trim(), ED), 'Select whole branch');
+  assert.equal(await page.eval((b) => document.querySelector(b).checked, BOX), true);
+  await page.click(`${ED} .se-btn[data-act=fit]`);
+  await clickAt(200, 100);
+  assert.deepEqual(await look(), { sel: true, seg: null });
+  await page.click(`${ED} .se-svg`);
+  // not ticked: the segment clicked; another of the same wire
+  await page.click(BOX);
+  assert.equal(await page.eval(() => localStorage.getItem('xl.sch.branch')), '0');
+  await clickAt(200, 100);
+  assert.deepEqual(await look(), { sel: false, seg: '100,100 300,100' });
+  await clickAt(300, 200);
+  assert.deepEqual(await look(), { sel: false, seg: '300,100 300,300' });
+  // deleted: that segment only, the sides kept; undone
+  await page.key('Delete');
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 2, [], { what: 'split' });
+  assert.deepEqual((await getDoc(page)).wires.map((w) => w.points), [[{ x: 100, y: 100 }, { x: 300, y: 100 }], [{ x: 300, y: 300 }, { x: 500, y: 300 }]]);
+  await page.click(`${ED} [data-act=undo]`);
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 1, [], { what: 'undone' });
+  // in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  try {
+    await page.waitFor((ed) => document.querySelector(`${ed} .se-branch`)?.textContent.trim() === 'Selecionar todo o ramo', [ED], { what: 'Portuguese' });
+  } finally { await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en')); }
+  // ticked again: the whole wire
+  await page.click(BOX);
+  await clickAt(200, 100);
+  assert.deepEqual(await look(), { sel: true, seg: null });
+});

@@ -1,5 +1,5 @@
 // The schematic editor's toolbar (#405: out of mountSchEditor in sch-editor.js): its tools and buttons (Select, Wire,
-// Net Name, I/O Marker, Undo / Redo (#1696), Rotate, Mirror Horizontal / Vertical (#2209), Delete, the zooms, Keep connections, Names, Check, Try it, the panels on a narrow
+// Net Name, I/O Marker, Undo / Redo (#1696), Rotate, Mirror Horizontal / Vertical (#2209), Delete, the zooms, Keep connections, Select whole branch (#2211), Names, Check, Try it, the panels on a narrow
 // screen; the menu at the right of the first line, #2208: Rearrange Wires / Rearrange Schematic (#1481, #1506, #1730), Curved wires (#1144), Hop-overs), the editing ones hidden when read-only, and their clicks.
 import { PROPS_KEY, SYMBOLS_KEY, panelToggle } from './narrow.js';
 import { h } from './dom.js';
@@ -9,7 +9,7 @@ import { ICON } from './sch-editor.js';
 /** { optBox } of mountSchEditor (live(): its current values). */
 export function mountSchToolbar(ctx) {
   const {
-    rearrangeWires, rearrangeSheet, container, btn, canSim, curvedBox, deleteSel, enterSim, fit, hopsBox, keepBox, leaveSim, live, mirrorSel, mirrorVSel, namesBox,
+    branchBox, rearrangeWires, rearrangeSheet, container, btn, canSim, curvedBox, deleteSel, enterSim, fit, hopsBox, keepBox, leaveSim, live, mirrorSel, mirrorVSel, namesBox,
     readOnly, redo, rotateSel, runCheck, sep, setTool, tb, undo, zoomAt
   } = ctx;
 
@@ -45,6 +45,8 @@ export function mountSchToolbar(ctx) {
     // (Keep connections after the view's buttons, #1733)
     sep(), h('label', { class: 'se-keep', title: 'Moving components: keep the wires connected (re-routed around other parts) or detach them' },
       keepBox, h('span', { text: 'Keep connections' })),
+    h('label', { class: 'se-branch', title: 'A click on a wire selects its whole branch, from junction to junction; not ticked, only the straight segment clicked' },
+      branchBox, h('span', { text: 'Select whole branch' })),
     sep(),
     h('label', { class: 'se-names', title: 'Show the name of every instance and every net (the automatic ones too)' }, namesBox, h('span', { text: 'Names' })),
     h('button', { type: 'button', class: 'se-btn wide', 'data-act': 'check', title: 'Check Schematic', html: `${ICON.check}<span>Check</span>` }),
@@ -61,7 +63,7 @@ export function mountSchToolbar(ctx) {
     let prevSep = true;                                   // a separator at the start is not needed
     let lastSep = null;
     for (const el of tb.children) {
-      if (el.classList.contains('se-keep') || el.classList.contains('se-opts') || el.classList.contains('se-more') || ['wire', 'net', 'io', 'rotate', 'mirror', 'mirrorv', 'delete', 'undo', 'redo'].includes(el.dataset.act) || (el.dataset.act === 'sim' && !canSim)) continue;   // hidden by .read-only CSS
+      if (el.classList.contains('se-keep') || el.classList.contains('se-branch') || el.classList.contains('se-opts') || el.classList.contains('se-more') || ['wire', 'net', 'io', 'rotate', 'mirror', 'mirrorv', 'delete', 'undo', 'redo'].includes(el.dataset.act) || (el.dataset.act === 'sim' && !canSim)) continue;   // hidden by .read-only CSS
       if (el.classList.contains('se-sep')) { if (prevSep) el.style.display = 'none'; else { prevSep = true; lastSep = el; } }
       else { prevSep = false; lastSep = null; }
     }

@@ -174,7 +174,7 @@
 .sch-editor svg .wire.bus .wline { stroke: var(--se-bus); stroke-width: 3.2; }
 .sch-editor svg .wire .whit { fill: none; stroke: transparent; stroke-width: 9; }
 .sch-editor svg .wire:hover .wline { stroke: var(--se-highlight); }
-.sch-editor svg .wire.sel .wline { stroke: var(--se-select); }
+.sch-editor svg .wire.sel .wline, .sch-editor svg .wire .wline.segsel { stroke: var(--se-select); }
 .sch-editor svg .junction { fill: var(--se-wire); }
 .sch-editor svg .pin { stroke: var(--se-symbol); stroke-width: 1.2; }
 .sch-editor svg .pin.bus { stroke-width: 3.2; }
@@ -353,8 +353,8 @@
 .sch-editor.read-only .se-toolbar [data-act="undo"], .sch-editor.read-only .se-toolbar [data-act="redo"],
 .sch-editor.read-only .se-toolbar [data-act="rewire"], .sch-editor.read-only .se-toolbar [data-act="relayout"], .sch-editor.read-only .se-more-menu .se-sep { display: none; }
 
-.sch-editor .se-keep, .sch-editor .se-names, .sch-editor .se-hops, .sch-editor .se-curved { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; padding: 0 4px; cursor: pointer; }
-.sch-editor.read-only .se-keep { display: none; }
+.sch-editor .se-keep, .sch-editor .se-branch, .sch-editor .se-names, .sch-editor .se-hops, .sch-editor .se-curved { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; padding: 0 4px; cursor: pointer; }
+.sch-editor.read-only .se-keep, .sch-editor.read-only .se-branch { display: none; }
 /* a read-only view's note at the end of its toolbar, as the generated HDL's (#1193) */
 .sch-editor .se-toolbar .gen-banner { margin-left: 8px; padding: 1px 8px; background: #fff4ce; border: 1px solid #e6d690; border-radius: 3px; color: #5a4a00; white-space: nowrap; }
 .sch-editor .se-toolbar .gen-banner.out-of-sync { background: #fdecea; border-color: #e0a0a0; color: #900; }
@@ -383,7 +383,7 @@
 .sch-editor.sim-mode .se-left { opacity: .45; pointer-events: none; }
 /* (Try it: the drawing's options stay, #1175, in the menu, #2208) */
 .sch-editor.sim-mode .se-toolbar .se-btn:not([data-act="sim"]):not([data-act="zin"]):not([data-act="zout"]):not([data-act="fit"]):not([data-act="view"]):not([data-act="check"]):not([data-act="more"]),
-.sch-editor.sim-mode .se-toolbar .tb-btn, .sch-editor.sim-mode .se-toolbar .se-keep { opacity: .35; pointer-events: none; }
+.sch-editor.sim-mode .se-toolbar .tb-btn, .sch-editor.sim-mode .se-toolbar .se-keep, .sch-editor.sim-mode .se-toolbar .se-branch { opacity: .35; pointer-events: none; }
 .sch-editor.sim-mode .se-canvas { cursor: default; }
 /* wires by value: 1 bright green, 0 dark green, X/U red, Z blue, no value grey; a single-bit wire keeps its width,
    only a bus is thick (#1552) */

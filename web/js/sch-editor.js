@@ -28,6 +28,7 @@ import { h } from './dom.js';
 import { hasClip } from './clipboard.js';
 import { mountProps } from './sch-props.js';
 import { mountRender } from './sch-render.js';
+import { mountSchSegSel } from './sch-segsel.js';
 import { mountMove } from './sch-move.js';
 import { mountTools } from './sch-tools.js';
 import { mountSchInfo } from './sch-info.js';
@@ -151,7 +152,8 @@ export function mountSchEditor(container, opts = {}) {
 
   // ---------------- toolbar
   // Keep connections, Names, Hop-overs (sch-options.js)
-  const { hopsBox, keepBox, keepConn, namesBox, showHops, showNames } = mountSchOptions({ render: (...a) => render(...a) });
+  const { branchBox, hopsBox, keepBox, keepConn, namesBox, showHops, showNames, wholeBranch } = mountSchOptions({ render: (...a) => render(...a) });
+  const segSel = mountSchSegSel({ doc: () => doc, sel: () => sel });   // (the wire segment selected, #2211)
   const btn = (act, icon, title) => h('button', { type: 'button', class: 'se-btn', 'data-act': act, title, html: ICON[icon] });
   const sep = () => h('span', { class: 'se-sep' });
   // Curved wires (#1144, sch-curve.js): the schematic drawn with curves (saved with it), or the technical drawing
@@ -160,7 +162,7 @@ export function mountSchEditor(container, opts = {}) {
   // Rearrange Wires / Rearrange Schematic (#1481, #1730, sch-beautify.js)
   const { rearrangeWires, rearrangeSheet } = mountSchBeautify({ doc: () => doc, edit: (...a) => edit(...a), fit: (...a) => fit(...a), flash: (...a) => flash(...a), modules: () => modules, sel: () => sel, snapshot: (...a) => snapshot(...a) });
   const { optBox } = mountSchToolbar({
-    rearrangeWires, rearrangeSheet, container, btn, canSim, curvedBox: curve.box, deleteSel: (...a) => deleteSel(...a), enterSim: (...a) => enterSim(...a),
+    branchBox, rearrangeWires, rearrangeSheet, container, btn, canSim, curvedBox: curve.box, deleteSel: (...a) => deleteSel(...a), enterSim: (...a) => enterSim(...a),
     fit: (...a) => fit(...a), hopsBox, keepBox,
     leaveSim: (...a) => leaveSim(...a), live: () => live, mirrorSel: (...a) => mirrorSel(...a), mirrorVSel: (...a) => mirrorVSel(...a), namesBox,
     readOnly, redo: (...a) => redo(...a), rotateSel: (...a) => rotateSel(...a),
@@ -215,7 +217,7 @@ export function mountSchEditor(container, opts = {}) {
   function refreshNetlist() { try { nl = netlist(doc, { modules }); } catch (e) { console.error(e); nl = null; } }
   const { renderSheet, render, renderOverlay, updateToolbar, updateStatus } = mountRender({
     state: () => ({ doc, nl, sel, tool, placing, drag, wireDraw, cursor, hoverPin, lastDiags, live, modules, view, destroyed, showHops: showHops(), showNames: showNames() }),
-    curve, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, undoStack, redoStack,
+    curve, segSel, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, undoStack, redoStack,
     routeTo: (...a) => routeTo(...a), snapPoint: (...a) => snapPoint(...a), bandRect });
 
   // ---------------- properties panel (sch-props.js); an I/O marker given a net's name (sch-join.js, #2170)
@@ -258,7 +260,7 @@ export function mountSchEditor(container, opts = {}) {
   // ---------------- selection operations (sch-select.js)
   const { copySel, deleteSel, duplicateSel, mirrorSel, mirrorVSel, paste, rotateSel, selectAll, selected } = mountSchSelect({
     container, changed, destroyed: () => destroyed, doc: () => doc, edit, live: () => live, modules: () => modules,
-    placing: () => placing, readOnly, refusedShort, render, renderOverlay, renderProps, sel: () => sel, setTool,
+    placing: () => placing, readOnly, refusedShort, render, renderOverlay, renderProps, segSel, sel: () => sel, setTool,
     snapshot, svg, toSheet, tool: () => tool, undoStack, setSel: (v) => { sel = v; }
   });
 
@@ -286,7 +288,7 @@ export function mountSchEditor(container, opts = {}) {
   const { contextMenu } = mountSchContext({ readOnly, doc: () => doc, live: () => live, sel: () => sel, tool: () => tool, render, renderProps,
     rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; } });
   const { finishMove, onMove, onUp } = mountSchMouse({
-    container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
+    segSel, wholeBranch, container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
     cursor: () => cursor, destroyed: () => destroyed, doc: () => doc, drag: () => drag, finishSegMove, finishWire,
     flash: (...a) => flash(...a), hoverPin: () => hoverPin, ioClick, itemAt, keepConn, live: () => live,
     modules: () => modules, netClick, pinNear, placeAt, propBody, pushUndo, readOnly, refusedShort, render,
