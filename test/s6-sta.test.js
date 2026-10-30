@@ -1,13 +1,13 @@
-// research/s6 stage S6-G (#731), without ISE: the static timing of a routed Spartan-6 design (sta6.mjs). A slice's
+// packages/silinx-fpga/research/s6 stage S6-G (#731), without ISE: the static timing of a routed Spartan-6 design (sta6.mjs). A slice's
 // arcs from its settings (the LUTs' equations, the output multiplexers, the carry chain stage by stage, the
 // flip-flops and the second ones, a flip-flop set as a gate), a block RAM's and a DSP48A1's, the arcs' delays by site
 // class, the PERIOD and OFFSET IN / OUT analyses on a small design against a hand count, trce's OFFSET sections read; reportgen's loads by logical pin
 // (timing-fit6.mjs loadDelay) and the wire model by wire type (fitWires).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sliceArcs6, hardArcs6, lutInputs, periodSlack, offsetIn, offsetOut, siteClass, classArcs, ARC_DEFAULTS } from '../research/s6/sta6.mjs';
-import { parseOffsets } from '../research/s6/twr6.mjs';
-import { loadDelay, fitWires, wireType } from '../research/s6/timing-fit6.mjs';
+import { sliceArcs6, hardArcs6, lutInputs, periodSlack, offsetIn, offsetOut, siteClass, classArcs, ARC_DEFAULTS } from '../packages/silinx-fpga/research/s6/sta6.mjs';
+import { parseOffsets } from '../packages/silinx-fpga/research/s6/twr6.mjs';
+import { loadDelay, fitWires, wireType } from '../packages/silinx-fpga/research/s6/timing-fit6.mjs';
 
 const slice = (cfg, site = 'SLICE_X2Y2', type = 'SLICEL') => ({ name: 's', type, site, tile: 'CLEXL_X1Y2', cfg: Object.entries(cfg).map(([attr, value]) => ({ attr, name: '', value })) });
 const pins = arcs => arcs.map(a => a.slice(0, -1).join('>')).sort();

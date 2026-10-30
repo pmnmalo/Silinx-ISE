@@ -46,7 +46,7 @@ in (`npm run check:open-flow` on a Nexys3 or Atlys project, and the nightly ISE 
 #731). The Atlys has no seven-segment display or VGA of its own: Silinx puts them on its VHDCI connector, as a
 Digilent VmodBB wires them. What it does not cover yet: a DCM's or PLL's configurations beyond the ones measured
 (#2025), and the browser edition ([#1](https://github.com/pmnmalo/Silinx-ISE/issues/1); the plan and the results:
-[research/s6/README.md](../research/s6/README.md)).
+[packages/silinx-fpga/research/s6/README.md](../packages/silinx-fpga/research/s6/README.md)).
 
 ## Method: observation of a tool's behaviour (black-box)
 

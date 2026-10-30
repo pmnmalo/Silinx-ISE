@@ -1,14 +1,14 @@
-// research/s6 stage S6-C (#725), without ISE: the primitive definitions read from an XDLRC, gen-slice6.mjs's
+// packages/silinx-fpga/research/s6 stage S6-C (#725), without ISE: the primitive definitions read from an XDLRC, gen-slice6.mjs's
 // designs (a base slice and one variant per slice) and ana-slice6.mjs's analysis on frame data built here.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { primitiveDefs } from '../research/s6/prim-defs6.mjs';
-import { baseSettings, sliceVariants, sliceXdl, oneSlicePerTile, sliceDesign, harnessNets, designName, tileFilter } from '../research/s6/gen-slice6.mjs';
-import { columnOf, sliceBits, sliceSettings } from '../research/s6/ana-slice6.mjs';
+import { primitiveDefs } from '../packages/silinx-fpga/research/s6/prim-defs6.mjs';
+import { baseSettings, sliceVariants, sliceXdl, oneSlicePerTile, sliceDesign, harnessNets, designName, tileFilter } from '../packages/silinx-fpga/research/s6/gen-slice6.mjs';
+import { columnOf, sliceBits, sliceSettings } from '../packages/silinx-fpga/research/s6/ana-slice6.mjs';
 import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
-const DEFS = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/prim-defs.json', import.meta.url), 'utf8'));
+const DEFS = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/prim-defs.json', import.meta.url), 'utf8'));
 
 test('prim-defs6: the elements with options or a BEL, the pins and route-throughs left out', () => {
   const text = `(primitive_defs 2

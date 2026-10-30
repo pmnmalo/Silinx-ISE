@@ -1,10 +1,10 @@
-// research/s6 stage S6-E (#727), without ISE: gen-iob6.mjs's designs (every bonded pad an IOB of the same settings,
+// packages/silinx-fpga/research/s6 stage S6-E (#727), without ISE: gen-iob6.mjs's designs (every bonded pad an IOB of the same settings,
 // as Silinx writes them) and ana-iob6.mjs's attribution of the bits to the pads; the measured pads checked.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bondedPads, iobSettings, iobVariants, iobDesign } from '../research/s6/gen-iob6.mjs';
-import { bitsOf, padOfBits, nearestPad } from '../research/s6/ana-iob6.mjs';
+import { bondedPads, iobSettings, iobVariants, iobDesign } from '../packages/silinx-fpga/research/s6/gen-iob6.mjs';
+import { bitsOf, padOfBits, nearestPad } from '../packages/silinx-fpga/research/s6/ana-iob6.mjs';
 import { s6Device } from './s6-lib.mjs';
 
 const { device } = s6Device('xc6slx16csg324-3');
@@ -49,7 +49,7 @@ test('the XC6SLX16\'s pads, measured: 6 bits an output, 9 an input, each variant
 });
 
 test('the pads in the residual: a pad\'s bits from its IOB\'s settings, an output\'s path bit; the XC6SLX45\'s pads', async () => {
-  const { predictIob, padBit } = await import('../research/s6/residual6.mjs');
+  const { predictIob, padBit } = await import('../packages/silinx-fpga/research/s6/residual6.mjs');
   const read = d => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/${d}-iob.json`, import.meta.url), 'utf8'));
   const db = read('xc6slx16'), pad = db.pads.U16;
   const cfg = s => s.split(' ').map(x => { const [attr, name, value] = x.split(':'); return { attr, name, value }; });

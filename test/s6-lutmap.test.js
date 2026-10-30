@@ -1,9 +1,9 @@
-// research/s6 stage S6-B (#725), without ISE: gen-lutmap6.mjs's designs (every slice's four LUTs numbered) and
+// packages/silinx-fpga/research/s6 stage S6-B (#725), without ISE: gen-lutmap6.mjs's designs (every slice's four LUTs numbered) and
 // ana-lutmap6.mjs's analysis on frame data built here from a known layout.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lutSlices, lutDesign, lutMapDesigns, idBits, sampleSlices, LUTS } from '../research/s6/gen-lutmap6.mjs';
-import { setBits, lutBits, lutMap, extendBases } from '../research/s6/ana-lutmap6.mjs';
+import { lutSlices, lutDesign, lutMapDesigns, idBits, sampleSlices, LUTS } from '../packages/silinx-fpga/research/s6/gen-lutmap6.mjs';
+import { setBits, lutBits, lutMap, extendBases } from '../packages/silinx-fpga/research/s6/ana-lutmap6.mjs';
 import fs from 'node:fs';
 import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 

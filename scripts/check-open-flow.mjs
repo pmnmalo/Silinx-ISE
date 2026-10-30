@@ -5,7 +5,7 @@
 // two .bit files must be byte-identical (CRC on and off), and ISE's xdl -xdl2ncd and DRC must give
 // no error and no warning. The open flow's own warnings are listed. A Spartan-6 project (its silinx.json's device, the
 // Nexys3's or the Atlys's part, #732) runs the application's own open flow (server/open-flow.js) on a copy of it, and
-// its .bit is compared with research/s6/check-bitgen6.mjs.
+// its .bit is compared with packages/silinx-fpga/research/s6/check-bitgen6.mjs.
 //
 //   SILINX_ISE_HOST=user@host node scripts/check-open-flow.mjs [project folder [open-flow options] …]   (default: examples/blinky)
 //   SILINX_ISE_HOST=local …: the ISE Docker image on this machine (the self-hosted runner of
@@ -106,7 +106,7 @@ process.stdout.write(out.split('\n').map(l => (l ? `  ISE ${l}` : l)).join('\n')
 // the Spartan-6's (#732): bitstreamS6 of the routed.xdl with ISE's header and options, against each of ISE's .bit, as
 // check-writer.mjs reports it ({ stdout }: BYTE-IDENTICAL, or how they differ)
 async function checkS6(d) {
-  const { compareBit } = await import('../research/s6/check-bitgen6.mjs');
+  const { compareBit } = await import('../packages/silinx-fpga/research/s6/check-bitgen6.mjs');
   const { loadDeviceCache, loadBitDbS6 } = await import('../packages/silinx-fpga/src/node.js');
   const text = fs.readFileSync(path.join(d, 'routed.xdl'), 'utf8');
   const part = text.match(/^design "[^"]*" (\S+)/m)[1].replace(/^(xc6slx\d+)-?(csg\d+)(-\d)?$/, '$1$2-3');

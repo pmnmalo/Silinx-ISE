@@ -1,11 +1,11 @@
-// research/s6 stage S6-E (#727), without ISE: the clock path's designs (gen-clock6.mjs), the DCM_SP's and PLL_BASE's
+// packages/silinx-fpga/research/s6 stage S6-E (#727), without ISE: the clock path's designs (gen-clock6.mjs), the DCM_SP's and PLL_BASE's
 // (gen-dcm6.mjs) and their analysis (ana-dcm6.mjs); the measured DCM and PLL settings checked.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { clockDesign, manyClocks, padsForBufgs, sliceAt } from '../research/s6/gen-clock6.mjs';
-import { dcmVariants, fieldVariants, dcmDesign, DCM_BASE } from '../research/s6/gen-dcm6.mjs';
-import { variantBits } from '../research/s6/ana-dcm6.mjs';
+import { clockDesign, manyClocks, padsForBufgs, sliceAt } from '../packages/silinx-fpga/research/s6/gen-clock6.mjs';
+import { dcmVariants, fieldVariants, dcmDesign, DCM_BASE } from '../packages/silinx-fpga/research/s6/gen-dcm6.mjs';
+import { variantBits } from '../packages/silinx-fpga/research/s6/ana-dcm6.mjs';
 import { S6_DEVICES } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
@@ -64,9 +64,9 @@ test('the XC6SLX16\'s DCM and PLL settings, measured: the counters\' bits, one o
 });
 
 test('the clock pads: a BUFG per BUFGMUX from two pads; each pad\'s REGC and I/O bits, predicted on both parts', async () => {
-  const { bufgDesign, bufgSelections } = await import('../research/s6/gen-clock6.mjs');
-  const { clockPadBits, REGC_FRAME } = await import('../research/s6/ana-clock6.mjs');
-  const { predictDesign, padBit } = await import('../research/s6/residual6.mjs');
+  const { bufgDesign, bufgSelections } = await import('../packages/silinx-fpga/research/s6/gen-clock6.mjs');
+  const { clockPadBits, REGC_FRAME } = await import('../packages/silinx-fpga/research/s6/ana-clock6.mjs');
+  const { predictDesign, padBit } = await import('../packages/silinx-fpga/research/s6/residual6.mjs');
   const { parseXdl } = await import('../packages/silinx-fpga/src/xdl.js');
   const b = bufgDesign('V10', 'BUFGMUX_X3Y13', 'SLICE_X16Y9');
   assert.match(b.v, /BUFG b\(\.I\(clk\), \.O\(c\)\);/);
@@ -106,10 +106,10 @@ test('the CMT sites: a DCM\'s or PLL\'s bits at minor 30 of the CMT column in it
 });
 
 test('a SLICEM as a shift register on a clock: minors 16 to 19 of its column\'s clock row word', async () => {
-  const { predictDesign } = await import('../research/s6/residual6.mjs');
-  const { loadDb } = await import('../research/s6/check-slice6.mjs');
+  const { predictDesign } = await import('../packages/silinx-fpga/research/s6/residual6.mjs');
+  const { loadDb } = await import('../packages/silinx-fpga/research/s6/check-slice6.mjs');
   const { parseXdl } = await import('../packages/silinx-fpga/src/xdl.js');
-  const { columnOf } = await import('../research/s6/ana-slice6.mjs');
+  const { columnOf } = await import('../packages/silinx-fpga/research/s6/ana-slice6.mjs');
   const dev = S6_DEVICES.xc6slx16, { device } = s6Device('xc6slx16csg324-3');
   const db = { part: 'xc6slx16csg324-3', slices: loadDb('xc6slx16'), int: { pips: {}, cover: {} }, other: { pips: {} } };
   const srl = cfg => parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";\ninst "s" "SLICEM",placed CLEXM_X12Y42 SLICE_X18Y42 , cfg " ${cfg} " ;\n`);
@@ -125,7 +125,7 @@ test('a SLICEM as a shift register on a clock: minors 16 to 19 of its column\'s 
 });
 
 test('cmt6: a DCM\'s clock pad and BUFGs from its nets; its bits, the base\'s with the pad\'s and the BUFG\'s changes', async () => {
-  const { cmtPath, cmtCfg, predictCmt } = await import('../research/s6/cmt6.mjs');
+  const { cmtPath, cmtCfg, predictCmt } = await import('../packages/silinx-fpga/research/s6/cmt6.mjs');
   const { parseXdl } = await import('../packages/silinx-fpga/src/xdl.js');
   const design = parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";
 inst "clk" "IOB",placed BIOB_X12Y0 U10 , cfg " PAD:clk: " ;

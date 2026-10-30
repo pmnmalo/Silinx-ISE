@@ -1,8 +1,8 @@
-// research/s6 check-slice6.mjs (#725), without ISE: the slices of a design predicted from the LUT and slice
+// packages/silinx-fpga/research/s6 check-slice6.mjs (#725), without ISE: the slices of a design predicted from the LUT and slice
 // databases (packages/silinx-fpga/bitdb/s6), checked tile by tile against a bitstream; here one written from the prediction itself.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lutEntries, routeThroughs, loadDb, kindModel, predictSlice, checkDesign, CIN_BIT } from '../research/s6/check-slice6.mjs';
+import { lutEntries, routeThroughs, loadDb, kindModel, predictSlice, checkDesign, CIN_BIT } from '../packages/silinx-fpga/research/s6/check-slice6.mjs';
 import { S6_DEVICES, emptyFdri, writeBit6, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
 const cfg = s => s.split(' ').map(x => { const [attr, name, ...v] = x.split(':'); return { attr, name, value: v.join(':') }; });

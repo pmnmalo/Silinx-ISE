@@ -1,10 +1,10 @@
-// research/s6 stage S6-D (#726), without ISE: gen-pipprobe6.mjs's designs (one PIP per INT tile, on a net of the
+// packages/silinx-fpga/research/s6 stage S6-D (#726), without ISE: gen-pipprobe6.mjs's designs (one PIP per INT tile, on a net of the
 // tile's TIEOFF) and ana-pipprobe6.mjs's analysis (a tile's bits, a PIP's bits the same in every tile).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { intTiles, probePips, probeXdl, probePins } from '../research/s6/gen-pipprobe6.mjs';
-import { intRegion, regionBits, pipBits } from '../research/s6/ana-pipprobe6.mjs';
+import { intTiles, probePips, probeXdl, probePins } from '../packages/silinx-fpga/research/s6/gen-pipprobe6.mjs';
+import { intRegion, regionBits, pipBits } from '../packages/silinx-fpga/research/s6/ana-pipprobe6.mjs';
 import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
@@ -42,8 +42,8 @@ test('ana-pipprobe6: an INT tile\'s region, its bits; a PIP\'s bits checked betw
 });
 
 test('gen-pipcover6: a target PIP either way, a path to it from a driver; ana: its tile\'s bits less the paths\'', async () => {
-  const { findTarget, findPath, coverDesign } = await import('../research/s6/gen-pipcover6.mjs');
-  const { coverBits } = await import('../research/s6/ana-pipprobe6.mjs');
+  const { findTarget, findPath, coverDesign } = await import('../packages/silinx-fpga/research/s6/gen-pipcover6.mjs');
+  const { coverBits } = await import('../packages/silinx-fpga/research/s6/ana-pipprobe6.mjs');
   const k = device.tile('INT_X12Y34');
   assert.deepEqual(findTarget(device, k, 'SR1E1', 'SR1B2'), { i: device.findPip(k, 'SR1E1', 'SR1B2'), from: 'SR1E1', to: 'SR1B2', text: 'SR1E1 -> SR1B2' });
   // a bidirectional PIP the other way
@@ -65,7 +65,7 @@ test('gen-pipcover6: a target PIP either way, a path to it from a driver; ana: i
 });
 
 test('check-pips6: a bidirectional PIP\'s direction from its net; the bits by direction', async () => {
-  const { pipDirections, pipLookup } = await import('../research/s6/check-pips6.mjs');
+  const { pipDirections, pipLookup } = await import('../packages/silinx-fpga/research/s6/check-pips6.mjs');
   const design = { insts: [{ name: 't', site: 'TIEOFF_X31Y30' }] };
   const net = { outpins: [{ inst: 't', pin: 'HARD1' }], pips: [
     { tile: 'INT_X17Y15', from: 'GFAN1', dir: '=-', to: 'LOGICIN_B51' }, { tile: 'INT_X17Y15', from: 'VCC_WIRE', dir: '->', to: 'LOGICIN_B51' }] };
@@ -85,9 +85,9 @@ test('check-pips6: a bidirectional PIP\'s direction from its net; the bits by di
 });
 
 test('the other INT-like tiles: their regions by the columns\' rule, their own PIPs, an I/O tile\'s renamed wires', async () => {
-  const { otherIntTiles, tilePips, tieoffs } = await import('../research/s6/gen-pipprobe6.mjs');
-  const { tileRegion, intRegion: region } = await import('../research/s6/ana-pipprobe6.mjs');
-  const { pipLookup } = await import('../research/s6/check-pips6.mjs');
+  const { otherIntTiles, tilePips, tieoffs } = await import('../packages/silinx-fpga/research/s6/gen-pipprobe6.mjs');
+  const { tileRegion, intRegion: region } = await import('../packages/silinx-fpga/research/s6/ana-pipprobe6.mjs');
+  const { pipLookup } = await import('../packages/silinx-fpga/research/s6/check-pips6.mjs');
   const dev = S6_DEVICES.xc6slx16, bases = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-lut.json', import.meta.url), 'utf8')).slices;
   // the rule gives the INT tiles' regions found from their CLBs' slices
   for (const k of intTiles(device).filter((_, i) => i % 50 === 0)) assert.deepEqual(tileRegion(dev, device.tileNames[k]), region(sites, bases, dev, device.tileNames[k]));
@@ -110,8 +110,8 @@ test('the other INT-like tiles: their regions by the columns\' rule, their own P
 });
 
 test('gen-pipdrop6 / ana-pipdrop6: the other tiles\' PIPs dropped (all or a quarter), the changed bits by tile, peeled', async () => {
-  const { dropPips, KEPT } = await import('../research/s6/gen-pipdrop6.mjs');
-  const { diffBits, bitsByTile, peel, gridRegion } = await import('../research/s6/ana-pipdrop6.mjs');
+  const { dropPips, KEPT } = await import('../packages/silinx-fpga/research/s6/gen-pipdrop6.mjs');
+  const { diffBits, bitsByTile, peel, gridRegion } = await import('../packages/silinx-fpga/research/s6/ana-pipdrop6.mjs');
   const xdl = 'net "n" , \n  outpin "a" A ,\n  pip INT_X1Y2 A -> B ,\n  pip RIOI_X24Y3 C -> D ,\n  pip RIOI_X24Y3 E -> F ,\n  pip CLKC_X15Y31 G =- H ,\n  ;\n';
   assert.ok(KEPT.test('CLEXM_X2Y3') && !KEPT.test('RIOI_X24Y3'));
   const all = dropPips(xdl);
@@ -140,8 +140,8 @@ test('gen-pipdrop6 / ana-pipdrop6: the other tiles\' PIPs dropped (all or a quar
 });
 
 test('residual6: a design\'s bits predicted from every database (slices, INT-like PIPs, the other tiles\' PIPs)', async () => {
-  const { predictDesign, typesAt } = await import('../research/s6/residual6.mjs');
-  const { loadDb } = await import('../research/s6/check-slice6.mjs');
+  const { predictDesign, typesAt } = await import('../packages/silinx-fpga/research/s6/residual6.mjs');
+  const { loadDb } = await import('../packages/silinx-fpga/research/s6/check-slice6.mjs');
   const { parseXdl } = await import('../packages/silinx-fpga/src/xdl.js');
   const read = n => JSON.parse(fs.readFileSync(new URL(`../packages/silinx-fpga/bitdb/s6/${n}.json`, import.meta.url), 'utf8'));
   const db = { part: 'xc6slx16csg324-3', slices: loadDb('xc6slx16'), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips }, other: read('s6-pips-other') };

@@ -1,7 +1,7 @@
 // The Spartan-6 placer (#729): packages/silinx-fpga/src/fpga/s6/phys.js (the physical design of a packed netlist), sites.js (the
 // device's sites), place.js (the annealing), place-check.js (the rules), on small designs and on every example on
 // the Nexys3's XC6SLX16 and the Atlys's XC6SLX45: legal, deterministic for a seed, the warnings expected, the
-// wirelength per connection near ISE's own placement of the same netlists (research/s6/measured/place-compare.json).
+// wirelength per connection near ISE's own placement of the same netlists (packages/silinx-fpga/research/s6/measured/place-compare.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -189,10 +189,10 @@ test('every example placed legally on the XC6SLX16 and the XC6SLX45: the rules, 
   }
 });
 
-// ISE's placement of the same netlists (night 1, research/s6/compare-place.mjs): the wirelength per connection of
+// ISE's placement of the same netlists (night 1, packages/silinx-fpga/research/s6/compare-place.mjs): the wirelength per connection of
 // the placer's cost, the Silinx placer's no more than 25 % above ISE's (night 1: 0.63 … 1.15 of it)
 test('the wirelength per connection against ISE\'s placement of the same netlists (night 1)', { timeout: 600000 }, async () => {
-  const cmp = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/place-compare.json', import.meta.url), 'utf8'));
+  const cmp = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/place-compare.json', import.meta.url), 'utf8'));
   for (const { board, part } of S6_BOARDS) {
     for (const name of EXAMPLES) {
       const ise = cmp.boards[board][name].ise;
@@ -206,12 +206,12 @@ test('the wirelength per connection against ISE\'s placement of the same netlist
   }
 });
 
-// ISE's check of the placements (2026-10-24, research/s6/ise-place-check.sh, measured/ise-check.json): ISE reads every
+// ISE's check of the placements (2026-10-24, packages/silinx-fpga/research/s6/ise-place-check.sh, measured/ise-check.json): ISE reads every
 // example's placed XDL on both boards, par -k routes it completely keeping the placement, and its DRC finds no error;
 // the warnings: xdl2ncd's of the nets not routed yet (PhysDesignRules:10), the DRC's only stopwatch's 9K block RAM
 // note (PhysDesignRules:2410, ISE's own implementation of stopwatch has it too)
 test('ISE accepts every example\'s placement on both boards: xdl -xdl2ncd, par -k complete, the DRC\'s warnings', () => {
-  const rec = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/ise-check.json', import.meta.url), 'utf8'));
+  const rec = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/ise-check.json', import.meta.url), 'utf8'));
   const names = S6_BOARDS.flatMap(({ board }) => EXAMPLES.map(n => `${n}-${board}`)).sort();
   assert.deepEqual(Object.keys(rec.designs), names);
   for (const [d, { placed }] of Object.entries(rec.designs)) {

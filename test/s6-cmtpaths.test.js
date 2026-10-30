@@ -1,19 +1,19 @@
-// research/s6 stage S6-E3 (#1951), without ISE: a CMT's clock paths. The BUFGMUX designs (gen-cmtsites6.mjs --muxes),
+// packages/silinx-fpga/research/s6 stage S6-E3 (#1951), without ISE: a CMT's clock paths. The BUFGMUX designs (gen-cmtsites6.mjs --muxes),
 // the paths' PIPs dropped one at a time (gen-cmtdrop6.mjs, ana-cmtdrop6.mjs), a BUFGMUX's REGC bit, what a CMT uses and
 // its bits outside its settings and PIPs (cmt6.mjs, ana-cmtinput6.mjs), the residual's databases and bits (residual6.mjs),
 // and the databases measured (db/s6-pips-cmt.json, db/xc6slx16-cmt-input.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { cmtMuxDesigns, cmtSiteDesign } from '../research/s6/gen-cmtsites6.mjs';
-import { xdlPips, oneDrops } from '../research/s6/gen-cmtdrop6.mjs';
-import { unknownPips } from '../research/s6/gen-flowdrop6.mjs';
+import { cmtMuxDesigns, cmtSiteDesign } from '../packages/silinx-fpga/research/s6/gen-cmtsites6.mjs';
+import { xdlPips, oneDrops } from '../packages/silinx-fpga/research/s6/gen-cmtdrop6.mjs';
+import { unknownPips } from '../packages/silinx-fpga/research/s6/gen-flowdrop6.mjs';
 import { loadBitDbS6 } from '../packages/silinx-fpga/src/fpga/s6/bitdb-node.js';
-import { dropBits } from '../research/s6/ana-cmtdrop6.mjs';
-import { cmtInputTable } from '../research/s6/ana-cmtinput6.mjs';
-import { gridRegion } from '../research/s6/ana-pipdrop6.mjs';
-import { CMT_REGC, CMT_FRAME, cmtRegcBits, cmtUses, cmtInputBits } from '../research/s6/cmt6.mjs';
-import { setBits } from '../research/s6/residual6.mjs';
+import { dropBits } from '../packages/silinx-fpga/research/s6/ana-cmtdrop6.mjs';
+import { cmtInputTable } from '../packages/silinx-fpga/research/s6/ana-cmtinput6.mjs';
+import { gridRegion } from '../packages/silinx-fpga/research/s6/ana-pipdrop6.mjs';
+import { CMT_REGC, CMT_FRAME, cmtRegcBits, cmtUses, cmtInputBits } from '../packages/silinx-fpga/research/s6/cmt6.mjs';
+import { setBits } from '../packages/silinx-fpga/research/s6/residual6.mjs';
 import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 

@@ -2,7 +2,7 @@
 // (the nets, the general interconnect, the route-throughs, the TIEOFFs), route-output.js (the routed design as
 // XDL), route-check.js (its rules): small designs and every example on the Nexys3's XC6SLX16 and the Atlys's
 // XC6SLX45 routed completely, no node of two nets, the clocks on the global network, the routes legal by the graph,
-// the switches per connection near ISE's routing of the same netlists (research/s6/measured/route-compare.json).
+// the switches per connection near ISE's routing of the same netlists (packages/silinx-fpga/research/s6/measured/route-compare.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -130,10 +130,10 @@ test('every example routed on the XC6SLX16 and the XC6SLX45: complete, no node o
   }
 });
 
-// ISE's routing of the same netlists (night 1, research/s6/compare-route.mjs): the routing switches of the signal
+// ISE's routing of the same netlists (night 1, packages/silinx-fpga/research/s6/compare-route.mjs): the routing switches of the signal
 // nets per connection, the Silinx router's no more than 30 % above ISE's (night 1: 1.03 … 1.22 of it)
 test('the switches per connection against ISE\'s routing of the same netlists (night 1)', { timeout: 900000 }, async () => {
-  const cmp = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/route-compare.json', import.meta.url), 'utf8'));
+  const cmp = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/route-compare.json', import.meta.url), 'utf8'));
   for (const { board, part } of S6_BOARDS) {
     for (const name of EXAMPLES) {
       const { out } = routed(await s6Example(name, board), part);
@@ -150,11 +150,11 @@ test('the switches per connection against ISE\'s routing of the same netlists (n
   }
 });
 
-// ISE's check of the routings (2026-10-24, research/s6/ise-place-check.sh, measured/ise-check.json): ISE reads every
+// ISE's check of the routings (2026-10-24, packages/silinx-fpga/research/s6/ise-place-check.sh, measured/ise-check.json): ISE reads every
 // example's routed XDL on both boards and its DRC finds no error; the one warning, of xdl2ncd and of the DRC, is
 // stopwatch's 9K block RAM note (PhysDesignRules:2410, ISE's own implementation of stopwatch has it too)
 test('ISE\'s DRC of every example\'s routing on both boards: no error, the warnings', () => {
-  const rec = JSON.parse(fs.readFileSync(new URL('../research/s6/measured/ise-check.json', import.meta.url), 'utf8'));
+  const rec = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/ise-check.json', import.meta.url), 'utf8'));
   assert.deepEqual(Object.keys(rec.designs), S6_BOARDS.flatMap(({ board }) => EXAMPLES.map(n => `${n}-${board}`)).sort());
   for (const [d, { routed }] of Object.entries(rec.designs)) {
     const sw = d.startsWith('stopwatch-');
