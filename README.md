@@ -203,7 +203,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   a deeper one, the high address bits choosing the row), their INIT_xx from the file, or the inferable HDL (an
   array that synthesis maps to the same block RAMs). Like the Clocking Wizard's, the module shows as
   *[Block Memory] [VHDL]* and reopens the wizard (which reads the file again). Generator: `core/blockram.js`.
-- **Schematic Wizard** (*New Source ▸ Schematic ▸ Wizard >*): the same port table (no quick-add buttons) and
+- **Schematic Wizard** (*New Source ▸ Schematic ▸ Wizard >*): a template first (Empty, or a register, a shift
+  register, a counter, a multiplexer, a demultiplexer, an adder, a subtractor, a comparator, a decoder, a priority
+  encoder, a full adder of gates: their symbols placed and wired), the same port table (no quick-add buttons) and
   a description; it creates the
   `.sch.json` with the I/O markers placed tidily (inputs on the left edge, outputs on the right,
   bidirectional markers on the right below the outputs, bus markers with their width), the

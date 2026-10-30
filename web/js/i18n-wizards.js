@@ -32,6 +32,24 @@ export const WIZARDS_PT = {
   'Start/done controller': 'Controlador start/done', 'Request/acknowledge handshake': 'Handshake pedido/confirmação',
   'Cycle of N places': 'Ciclo de N lugares', 'Producer/consumer': 'Produtor/consumidor', 'Mutual exclusion': 'Exclusão mútua', 'Fork/join': 'Fork/join',
   'Semaphore': 'Semáforo',
+  // the Schematic Wizard's (#2180, core/chart-templates.js SCH_TEMPLATES, core/sch-templates.js)
+  'Register': 'Registo', 'Shift register': 'Registo de deslocamento', 'Multiplexer': 'Multiplexador', 'Demultiplexer': 'Desmultiplexador', 'Adder': 'Somador', 'Subtractor': 'Subtrator',
+  'Comparator': 'Comparador', 'Decoder': 'Descodificador', 'Priority encoder': 'Codificador de prioridade', 'Full adder (gates)': 'Somador completo (portas)',
+  'Width (bits):': 'Largura (bits):', 'Clock enable:': 'Enable do relógio:', 'Reset:': 'Reset:', 'Select bits:': 'Bits de seleção:', 'Direction:': 'Sentido:', 'Numbers:': 'Números:',
+  'Address bits (N):': 'Bits de endereço (N):', 'Output bits (N):': 'Bits de saída (N):', 'yes': 'sim', 'no': 'não', 'up': 'crescente', 'down': 'decrescente',
+  'unsigned': 'sem sinal', "signed (two's complement)": 'com sinal (complemento para dois)',
+  'No symbols: only the I/O markers of the inputs and outputs you type in.': 'Sem símbolos: só os marcadores de E/S das entradas e saídas que escrever.',
+  'N flip-flops side by side: q takes d at the rising edge of clk, while ce = 1; rst sets it to 0.': 'N flip-flops lado a lado: q toma o valor de d no flanco ascendente de clk, enquanto ce = 1; rst põe-no a 0.',
+  'N flip-flops in a chain: at the rising edge of clk, q moves one place to the left and its bit 0 takes the serial input si.': 'N flip-flops em cadeia: no flanco ascendente de clk, q desloca-se uma posição para a esquerda e o seu bit 0 toma o valor da entrada série si.',
+  'A binary counter of N bits: q counts at the rising edge of clk, while ce = 1; rst sets it to 0.': 'Um contador binário de N bits: q conta no flanco ascendente de clk, enquanto ce = 1; rst põe-no a 0.',
+  'y takes the data input that the select s chooses: d0 when s = 0, d1 when s = 1…': 'y toma o valor da entrada de dados que a seleção s escolhe: d0 quando s = 0, d1 quando s = 1…',
+  'The output that the select s chooses takes the data input d; the other outputs are 0.': 'A saída que a seleção s escolhe toma o valor da entrada de dados d; as outras saídas ficam a 0.',
+  'A binary adder of N bits: s = a + b + ci, the carry out in co.': 'Um somador binário de N bits: s = a + b + ci, o transporte de saída em co.',
+  'A binary subtractor of N bits: d = a - b - bi, the borrow out in bo.': 'Um subtrator binário de N bits: d = a - b - bi, o empréstimo de saída em bo.',
+  'Compares a and b: eq when a = b, lt when a < b, gt when a > b.': 'Compara a e b: eq quando a = b, lt quando a < b, gt quando a > b.',
+  'A binary decoder: the bit of y numbered by a is 1 while en = 1; all of them 0 while en = 0.': 'Um descodificador binário: o bit de y com o número a é 1 enquanto en = 1; todos a 0 enquanto en = 0.',
+  'a is the number of the highest bit of i that is 1; v says that some bit is.': 'a é o número do bit mais alto de i que está a 1; v indica que há algum.',
+  'One bit added with XOR, AND and OR gates: s = a xor b xor ci, co = a and b, or (a xor b) and ci.': 'Um bit somado com portas XOR, AND e OR: s = a xor b xor ci, co = a and b, ou (a xor b) and ci.',
   'Number of states (N):': 'Número de estados (N):', 'Number of states (N, even):': 'Número de estados (N, par):', 'Number of places (N):': 'Número de lugares (N):',
   'Buffer size (N):': 'Tamanho do buffer (N):', 'Resources (N):': 'Recursos (N):', 'Users (M):': 'Utilizadores (M):', 'Pattern (bits):': 'Padrão (bits):',
   'Overlapping matches:': 'Ocorrências sobrepostas:', 'yes (1011011: two)': 'sim (1011011: duas)', 'no (1011011: one)': 'não (1011011: uma)',
@@ -69,6 +87,8 @@ export const WIZARDS_PT = {
 const label = what => (WIZARDS_PT[`${what}:`] || `${what}:`).replace(/:$/, '');
 
 export const WIZARDS_PT_PATTERNS = [
+  [/^The template's port '(.*)' was removed: put it back, or choose another template or parameters on the Template page\.$/, "O porto '$1' do modelo foi removido: reponha-o, ou escolha outro modelo ou outros parâmetros na página Modelo."],
+  [/^The port '(.*)' is wired by the template, with its direction and width: change them on the Template page, or in the schematic editor after creating it\.$/, "O porto '$1' é ligado pelo modelo, com a sua direção e largura: altere-as na página Modelo, ou no editor de esquemáticos depois de o criar."],
   [/^(.*): a whole number from (-?\d+) to (-?\d+)\.$/, (m, what, lo, hi) => `${label(what)}: um número inteiro de ${lo} a ${hi}.`],
   [/^(.*): choose one\.$/, (m, what) => `${label(what)}: escolha um.`],
   [/^The names of the inputs \(1 to (\d+)\) and of the outputs, separated by commas; or an expression, whose variables are the inputs and whose name \(else f\) the output, its column filled in\.$/,

@@ -5,14 +5,17 @@
 //                    tri-state) ports (a friendly table, only the user's own ports, #2145) -> kind of logic
 //                    (combinational / sequential with clock,
 //                    reset and enable; generics) -> summary with a preview of the code.
-//   schematicWizard: name, language and description -> inputs and outputs (the same table, empty,
-//                    #950) -> summary; it creates a
-//                    .sch.json with the I/O markers placed.
+//   schematicWizard: name, language and description -> a template (#2180, core/sch-templates.js) -> inputs and
+//                    outputs (the same table, empty or the template's, #950) -> summary; it creates a
+//                    .sch.json with the I/O markers placed, and the template's symbols wired to them.
 // Generators: core/modgen.js.
 import { api } from './api.js';
 import { icons } from './icons.js';
 import { h, alertDlg, toast } from './ui.js';
 import { generateModule, schematicFromPorts, checkPorts, identError, guessClockReset, MAX_WIDTH } from '/core/modgen.js';
+import { SCH_TEMPLATES } from '/core/chart-templates.js';
+import { schematicTemplatePorts, schematicFromTemplate, templatePortsError } from '/core/sch-templates.js';
+import { templatePage } from './template-page.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere, drawnHdlTaken } from './wizards.js';
 import { S, app } from './app.js';
 import { cleanLoc, portText, namedPages } from './wizard-util.js';
@@ -286,13 +289,22 @@ export async function schematicWizard({ name = '', location = 'src', lang = null
   // the table starts empty, no suggested ports (#950); no ports at all is a schematic with no markers yet
   const ports = [];
   const pe = portEditor(ports, { lang: p1.lang });
-  const doc = () => schematicFromPorts({ name: p1.name(), lang: p1.lang(), description: p1.desc.value, ports: ports.map(p => ({ ...p, width: +p.width })) });
+  const tpl = templatePage('sch', SCH_TEMPLATES, (id, params) => {
+    ports.splice(0, ports.length, ...schematicTemplatePorts(id, params).map(p => ({ ...p, desc: '' })));
+    pe.render();
+  });
+  const doc = () => {
+    const spec = { name: p1.name(), lang: p1.lang(), description: p1.desc.value, ports: ports.map(p => ({ ...p, width: +p.width })) };
+    return tpl.id() === 'empty' ? schematicFromPorts(spec) : schematicFromTemplate({ ...spec, id: tpl.id(), params: tpl.params() });
+  };
   const p2 = {
     title: 'Inputs and Outputs',
     render: () => pe.node,
     validate: () => {
       const err = pe.check(p1.name());
       if (err) return err;
+      const changed = templatePortsError(tpl.id(), tpl.params(), ports);
+      if (changed) return changed;
       try { doc(); } catch (e) { return e.message; }
       return null;
     },
@@ -308,16 +320,17 @@ export async function schematicWizard({ name = '', location = 'src', lang = null
         `The wizard will create the schematic ${p1.path()} and open it in the schematic editor.`,
         '',
         `Module: ${d.name} (its HDL: ${d.lang === 'vhdl' ? 'VHDL' : 'Verilog'})`,
+        ...(tpl.id() === 'empty' ? [] : [`Template: ${tpl.label()} (${d.symbols.length} symbol(s), ${d.wires.length} wire(s))`]),
         `Input markers (left edge): ${ins.map(portText).join(', ') || 'none'}`,
         `Output markers (right edge): ${outs.map(portText).join(', ') || 'none'}`,
         ...(ios.length ? [`Bidirectional markers (right edge, below the outputs): ${ios.map(portText).join(', ')}`] : []),
         '',
-        'Then place the symbols in the middle of the sheet and wire them to the markers.',
+        tpl.id() === 'empty' ? 'Then place the symbols in the middle of the sheet and wire them to the markers.' : 'Then change it in the schematic editor as you wish.',
       ].join('\n');
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('Schematic Wizard', namedPages(p1.page, [p1.page, p2, pSum], named, p1.tail), { width: 820, back });
+  const ok = await wizard('Schematic Wizard', namedPages(p1.page, [p1.page, tpl.page, p2, pSum], named, p1.tail), { width: 820, back });
   if (!ok) return;
   let d;
   try { d = doc(); } catch (e) { return alertDlg('Schematic Wizard', e.message, 'error'); }

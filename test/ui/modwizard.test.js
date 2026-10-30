@@ -91,8 +91,9 @@ uiTest('Schematic ▸ Wizard >: the port table starts empty (no suggested ports)
   await makeProject(env, { name: 'SwPj' });
   await page.openProject('SwPj');
   await openWizard(page, 'Schematic', 'board_io', 'Schematic Wizard', 'verilog');
-  assert.deepEqual(await steps(page), ['Inputs and Outputs', 'Summary']);
+  assert.deepEqual(await steps(page), ['Template', 'Inputs and Outputs', 'Summary']);
   await page.fill('.dlg-overlay .mw-desc', 'Switches to LEDs.');
+  await next(page, 'Inputs and Outputs');
   // only the table: no rows, no quick-add buttons, no clock checkbox
   assert.deepEqual(await portRows(page), []);
   assert.deepEqual(await page.eval(() => ['.mw-qa', '.mw-quick', '.mw-clkchk', '.mw-clkname'].filter((s) => document.querySelector(`.dlg-overlay ${s}`))), []);
@@ -144,6 +145,7 @@ uiTest('Schematic ▸ Wizard >: finishing with no ports makes a schematic with n
   await makeProject(env, { name: 'SwNone' });
   await page.openProject('SwNone');
   await openWizard(page, 'Schematic', 'empty_sch', 'Schematic Wizard', 'vhdl');
+  await next(page, 'Inputs and Outputs');   // (the template Empty, #2180)
   // a port added and removed again: back to the empty table
   await page.click('.dlg-overlay .mw-add');
   await page.click('.dlg-overlay .mw-pdel');
@@ -201,7 +203,7 @@ uiTest('Portuguese: the New Source list and every page of the Module and Schemat
     for (let k = 0; k < pages; k++) {
       if (k === 0) {
         await compare(`${title} page 1 (empty)`);
-        if (title === 'Schematic Wizard') { await page.click('.dlg-overlay .mw-add'); await page.fill('.dlg-overlay .mw-pdir', 'out'); } else for (const [n, d, w] of [['clk', 'in', 1], ['reset', 'in', 1], ['enable', 'in', 1], ['q', 'out', 8], ['y', 'out', 1]]) await addPort(page, n, d, w);
+        if (title === 'Schematic Wizard') { await next(page, 'Inputs and Outputs'); await compare(`${title} ports (empty)`); await page.click('.dlg-overlay .mw-add'); await page.fill('.dlg-overlay .mw-pdir', 'out'); } else for (const [n, d, w] of [['clk', 'in', 1], ['reset', 'in', 1], ['enable', 'in', 1], ['q', 'out', 8], ['y', 'out', 1]]) await addPort(page, n, d, w);
       }
       if (k === 1 && title === 'Module Wizard') {
         await page.click('.dlg-overlay details.mw-gen summary');

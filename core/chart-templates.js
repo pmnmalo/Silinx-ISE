@@ -1,4 +1,4 @@
-// The templates of the FSM, ASM and Petri net wizards of New Source (#2149): a template and its parameters give the
+// The templates of the FSM, ASM and Petri net wizards of New Source (#2149), and the list of the Schematic Wizard's (#2180): a template and its parameters give the
 // chart's ports and its states (an FSM's transitions too), or the whole of an ASM chart or a Petri net, laid out for
 // the editor; the wizard's next pages edit them before the chart is made (core/chart-wizard.js).
 
@@ -37,9 +37,32 @@ export const PETRI_TEMPLATES = [
     params: [N('Resources (N):', 2, 1, 255), { key: 'm', label: 'Users (M):', def: 3, min: 1, max: 255 }] },
 ];
 
-const LISTS = { fsm: FSM_TEMPLATES, asm: ASM_TEMPLATES, petri: PETRI_TEMPLATES };
+// the Schematic Wizard's (#2180; drawn by core/sch-templates.js): each one the editor's symbols, placed and wired
+const WIDTH = (def = 8, min = 1) => N('Width (bits):', def, min, 32);
+const YES_NO = [['yes', 'yes'], ['no', 'no']];
+const ENABLE = { key: 'en', label: 'Clock enable:', def: 'yes', options: YES_NO };
+const RESET = { key: 'reset', label: 'Reset:', def: 'async', options: [['async', 'Asynchronous (at once)'], ['sync', 'Synchronous (at the clock edge)'], ['none', 'No reset']] };
+const SELECT = { key: 'k', label: 'Select bits:', def: 2, min: 1, max: 4 };
+export const SCH_TEMPLATES = [
+  { id: 'empty', label: 'Empty', text: 'No symbols: only the I/O markers of the inputs and outputs you type in.' },
+  { id: 'register', label: 'Register', text: 'N flip-flops side by side: q takes d at the rising edge of clk, while ce = 1; rst sets it to 0.', params: [WIDTH(), ENABLE, RESET] },
+  { id: 'shift', label: 'Shift register', text: 'N flip-flops in a chain: at the rising edge of clk, q moves one place to the left and its bit 0 takes the serial input si.', params: [WIDTH(8, 2), ENABLE, RESET] },
+  { id: 'counter', label: 'Counter', text: 'A binary counter of N bits: q counts at the rising edge of clk, while ce = 1; rst sets it to 0.',
+    params: [WIDTH(), ENABLE, RESET, { key: 'dir', label: 'Direction:', def: 'up', options: [['up', 'up'], ['down', 'down']] }] },
+  { id: 'mux', label: 'Multiplexer', text: 'y takes the data input that the select s chooses: d0 when s = 0, d1 when s = 1…', params: [WIDTH(), SELECT] },
+  { id: 'demux', label: 'Demultiplexer', text: 'The output that the select s chooses takes the data input d; the other outputs are 0.', params: [WIDTH(), SELECT] },
+  { id: 'adder', label: 'Adder', text: 'A binary adder of N bits: s = a + b + ci, the carry out in co.', params: [WIDTH()] },
+  { id: 'subtractor', label: 'Subtractor', text: 'A binary subtractor of N bits: d = a - b - bi, the borrow out in bo.', params: [WIDTH()] },
+  { id: 'comparator', label: 'Comparator', text: 'Compares a and b: eq when a = b, lt when a < b, gt when a > b.',
+    params: [WIDTH(), { key: 'signed', label: 'Numbers:', def: 'no', options: [['no', 'unsigned'], ['yes', 'signed (two\'s complement)']] }] },
+  { id: 'decoder', label: 'Decoder', text: 'A binary decoder: the bit of y numbered by a is 1 while en = 1; all of them 0 while en = 0.', params: [N('Address bits (N):', 3, 1, 5)] },
+  { id: 'encoder', label: 'Priority encoder', text: 'a is the number of the highest bit of i that is 1; v says that some bit is.', params: [N('Output bits (N):', 3, 2, 5)] },
+  { id: 'fulladder', label: 'Full adder (gates)', text: 'One bit added with XOR, AND and OR gates: s = a xor b xor ci, co = a and b, or (a xor b) and ci.' },
+];
 
-/** The template `id` of a kind (fsm, asm, petri), the first one (empty) if unknown. */
+const LISTS = { fsm: FSM_TEMPLATES, asm: ASM_TEMPLATES, petri: PETRI_TEMPLATES, sch: SCH_TEMPLATES };
+
+/** The template `id` of a kind (fsm, asm, petri, sch), the first one (empty) if unknown. */
 export const templateOf = (kind, id) => LISTS[kind].find(t => t.id === id) || LISTS[kind][0];
 /** A template's parameters at their defaults: { key: value }. */
 export const templateDefaults = (kind, id) => Object.fromEntries((templateOf(kind, id).params || []).map(p => [p.key, p.def]));
