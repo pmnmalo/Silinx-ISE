@@ -112,15 +112,15 @@ test('runOpenImplementation under the flag: the gates example on the Nexys3, syn
 });
 
 // an example with the board's pins and clock (its UCF for the board, test/examples-lib.mjs): the blinky example on
-// the Nexys3 through Map, Place & Route, the timing and the bitstream (its frame data every bit the bit databases give
-// the routed design), no warning, its PERIOD constraint met (the Atlys has no
-// seven-segment display: the board's check refuses blinky there; its placement and routing: s6-place, s6-route)
-test('runOpenImplementation under the flag: the blinky example on the Nexys3, placed, routed, timed against its PERIOD and written as a bitstream', { timeout: 600000 }, async () => {
+// the Nexys3 and the Atlys through Map, Place & Route, the timing and the bitstream (its frame data every bit the bit
+// databases give the routed design), no warning, its PERIOD constraint met (the Atlys's seven-segment display on its
+// VHDCI connector, #732)
+test('runOpenImplementation under the flag: the blinky example on the Nexys3 and the Atlys, placed, routed, timed against its PERIOD and written as a bitstream', { timeout: 600000 }, async () => {
   const { exampleUcf } = await import('./examples-lib.mjs');
   const before = process.env.SILINX_SPARTAN6_OPEN;
   process.env.SILINX_SPARTAN6_OPEN = '1';
   try {
-    for (const board of ['nexys3']) {
+    for (const [board, part] of [['nexys3', 'xc6slx16csg324-3'], ['atlys', 'xc6slx45csg324-3']]) {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-s6-'));
       try {
         const project = JSON.parse(fs.readFileSync(path.join(ROOT, 'examples/blinky/silinx.json'), 'utf8'));
@@ -140,11 +140,11 @@ test('runOpenImplementation under the flag: the blinky example on the Nexys3, pl
         for (const f of ['placed.xdl', 'routed.xdl', 'timing.txt']) assert.ok(fs.existsSync(path.join(dir, 'build/open', f)), `${board} ${f}`);
         // the bitstream: the part's, CRC on, JTAG start-up (the project's), its frame data every bit the routed design has
         const bit = readBit6(fs.readFileSync(path.join(dir, 'build/top.bit')));
-        assert.deepEqual([bit.header.a, bit.header.b, bit.crc, bit.startupClk, bit.rewrites.length], ['top.ncd;UserID=0xFFFFFFFF', '6slx16csg324', true, 'JtagClk', 0], board);
+        assert.deepEqual([bit.header.a, bit.header.b, bit.crc, bit.startupClk, bit.rewrites.length], ['top.ncd;UserID=0xFFFFFFFF', part.replace(/^xc/, '').replace(/-\d$/, ''), true, 'JtagClk', 0], board);
         assert.ok(bit.crcChecks.length && bit.crcChecks.every(c => c.expected === c.computed), board);
         assert.equal(readBit6(fs.readFileSync(path.join(dir, 'build/top_prom.bit'))).startupClk, 'Cclk', board);
-        const routed = parseXdl(fs.readFileSync(path.join(dir, 'build/open/routed.xdl'), 'utf8')), dev = bitFormat6('6slx16csg324');
-        const { bits, unknown } = predictDesign(routed, loadDeviceCache('xc6slx16csg324-3'), dev, loadBitDbS6('xc6slx16csg324-3'));
+        const routed = parseXdl(fs.readFileSync(path.join(dir, 'build/open/routed.xdl'), 'utf8')), dev = bitFormat6(part.replace(/^xc/, '').replace(/-\d$/, ''));
+        const { bits, unknown } = predictDesign(routed, loadDeviceCache(part), dev, loadBitDbS6(part));
         assert.deepEqual([...unknown], [], board);
         const empty = emptyFdri(dev), set = [];
         for (let w = 0; w < bit.fdri.length; w++) { const x = bit.fdri[w] ^ empty[w]; for (let i = 0; i < 16; i++) if ((x >> (15 - i)) & 1) set.push(`${Math.floor(w / FRAME_WORDS)},${(w % FRAME_WORDS) * 16 + i}`); }

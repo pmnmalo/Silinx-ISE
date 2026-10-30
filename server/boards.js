@@ -253,8 +253,18 @@ export const BOARDS = [
       { name: 'ac97_sync', label: 'AC97 codec SYNC', pins: ['U17'], dir: 'out', iostandard: 'LVCMOS33', group: 'Audio (AC97)' },
       { name: 'ac97_reset', label: 'AC97 codec RESET', pins: ['T17'], dir: 'out', iostandard: 'LVCMOS33', group: 'Audio (AC97)' },
       { name: 'ja', label: 'Pmod JA (JA1-4, JA7-10; "JB" in the Digilent UCF; bank 2)', pins: ['T3', 'R3', 'P6', 'N5', 'V9', 'T9', 'V4', 'T4'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod', iostandardVerified: false },
-      { name: 'vhdci_io1', label: 'VHDCI channel 1 (EXP-IO1_P..EXP-IO20_P; bank 2)', pins: ['U16', 'U15', 'U13', 'M11', 'R11', 'T12', 'N10', 'M10', 'U11', 'R10', 'U10', 'R8', 'M8', 'U8', 'U7', 'N7', 'T6', 'R7', 'N6', 'U5'], dir: 'inout', iostandard: 'LVCMOS33', group: 'VHDCI', iostandardVerified: false },
-      { name: 'vhdci_io2', label: 'VHDCI channel 2 (EXP-IO1_N..EXP-IO20_N; bank 2)', pins: ['V16', 'V15', 'V13', 'N11', 'T11', 'V12', 'P11', 'N9', 'V11', 'T10', 'V10', 'T8', 'N8', 'V8', 'V7', 'P8', 'V6', 'T7', 'P7', 'V5'], dir: 'inout', iostandard: 'LVCMOS33', group: 'VHDCI', iostandardVerified: false },
+      // (the Atlys has no seven-segment display and no VGA port: the examples' are on its VHDCI connector, e.g. a
+      // Digilent VmodBB with a display and a VGA resistor network on its breadboard, #732; the rest of the connector below)
+      { name: 'seg', label: '7-segment cathodes CA..CG on the VHDCI connector (EXP-IO1_P..EXP-IO7_P, e.g. VmodBB; active low)', pins: ['U16', 'U15', 'U13', 'M11', 'R11', 'T12', 'N10'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment (VHDCI)', iostandardVerified: false, extra: { activeLow: true } },
+      { name: 'dp', label: '7-segment decimal point on the VHDCI connector (EXP-IO8_P; active low)', pins: ['M10'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment (VHDCI)', iostandardVerified: false, extra: { activeLow: true } },
+      { name: 'an', label: '7-segment anodes AN0..AN3 on the VHDCI connector (EXP-IO9_P..EXP-IO12_P; active low)', pins: ['U11', 'R10', 'U10', 'R8'], dir: 'out', iostandard: 'LVCMOS33', group: '7-segment (VHDCI)', iostandardVerified: false, extra: { activeLow: true } },
+      { name: 'vga_red', label: 'VGA red RED0..RED2 on the VHDCI connector (EXP-IO1_N..EXP-IO3_N, through a resistor network)', pins: ['V16', 'V15', 'V13'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA (VHDCI)', iostandardVerified: false },
+      { name: 'vga_green', label: 'VGA green GRN0..GRN2 on the VHDCI connector (EXP-IO4_N..EXP-IO6_N)', pins: ['N11', 'T11', 'V12'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA (VHDCI)', iostandardVerified: false },
+      { name: 'vga_blue', label: 'VGA blue BLU1..BLU2 on the VHDCI connector (EXP-IO7_N..EXP-IO8_N; 2 bits)', pins: ['P11', 'N9'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA (VHDCI)', iostandardVerified: false },
+      { name: 'vga_hsync', label: 'VGA HSYNC on the VHDCI connector (EXP-IO9_N)', pins: ['V11'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA (VHDCI)', iostandardVerified: false },
+      { name: 'vga_vsync', label: 'VGA VSYNC on the VHDCI connector (EXP-IO10_N)', pins: ['T10'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA (VHDCI)', iostandardVerified: false },
+      { name: 'vhdci_io1', label: 'VHDCI channel 1 (EXP-IO13_P..EXP-IO20_P; bank 2)', pins: ['M8', 'U8', 'U7', 'N7', 'T6', 'R7', 'N6', 'U5'], dir: 'inout', iostandard: 'LVCMOS33', group: 'VHDCI', iostandardVerified: false },
+      { name: 'vhdci_io2', label: 'VHDCI channel 2 (EXP-IO11_N..EXP-IO20_N; bank 2)', pins: ['V10', 'T8', 'N8', 'V8', 'V7', 'P8', 'V6', 'T7', 'P7', 'V5'], dir: 'inout', iostandard: 'LVCMOS33', group: 'VHDCI', iostandardVerified: false },
     ],
   },
   {
