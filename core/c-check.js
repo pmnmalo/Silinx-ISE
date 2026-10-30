@@ -119,7 +119,12 @@ export function checkC(source, file = 'input.c', opts = {}) {
     if (t.kind === 'ptr') typeOk(t.to, loc);
   };
   for (const it of ast.items) {
-    if (it.kind === 'var') typeOk(it.type, it.loc);
+    if (it.kind === 'var') {
+      typeOk(it.type, it.loc);
+      // (a global's value: its casts' widths too, an ap_uint<W>'s, #1963)
+      const casts = (n) => { if (!n || typeof n !== 'object') return; if (Array.isArray(n)) { n.forEach(casts); return; } if (n.kind === 'cast') typeOk(n.type, n.loc); for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type') casts(v); };
+      casts(it.init);
+    }
     if (it.kind === 'func') { typeOk(it.ret, it.loc); for (const pa of it.params) typeOk(pa.type, pa.loc); }
   }
 

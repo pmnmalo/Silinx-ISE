@@ -160,14 +160,22 @@ structs is an array per member; a member array of an array of structs is one arr
   HLS does.
 - **Bit-fields** (#1896): a member `T m : W;` is a member of `W` bits (`ap_uint<W>`, `ap_int<W>` of a signed `T`),
   wrapped as C wraps it; an unnamed one (`T : W;`) is padding.
-- **Unions** (#1896): a union is one word, an unsigned integer of its size (up to 64 bits), its members views of its
+- **Unions** (#1896, #1963): a union is one word, an unsigned integer of its size (over 64 bits, an `ap_uint` of its
+  size: a port of 96 bits for `uint32_t v[3]`), its members views of its
   bits laid out as GCC lays them out on x86: from the least significant bit; an integer at an offset of its own size;
   a bit-field after the one before it when it fits in a unit of its type, else at the next. `u.m` reads the member's
   bits (a `float` or a `double` member's as one, the same bits), `u.m = e` writes them, the others kept; a struct
   member's members, anonymous (`union { float f; uint32_t raw; struct { uint32_t mant : 23, bexp : 8, sign : 1; }; }`:
   `u.bexp`) or named (`u.s.m`); an array member's elements (`u.b[i]`). A union variable, parameter, pointer
-  (`p->m`), array (`a[i].m`) or port is its word; `{ e }` is its first member's value. Not yet: a union of more than
-  64 bits, a union inside a struct, `++` and `--` on a member, designated initializers.
+  (`p->m`), array (`a[i].m`) or port is its word; `{ e }` is its first member's value, `{ .m = e }` the member's. `++`
+  and `--` on a member write it, wrapped as C wraps it (`u.m++`, `--p->m`, `y = u.m++`; a `bool` member's as a statement).
+  A union in a struct, named or anonymous, of its own or of a type's name, is a member of the word's type (part of
+  the struct's port), its members reached through the struct (`s.u.m`, `p->u.m`, `a[i].u.m`, `s.m`);
+  a struct holding it is copied, passed and returned as any other, and its methods read it.
+- **Designated initializers** (#1963): in a declaration of a struct, a union or an array, as C takes them
+  (`S s = { .y = 2, .x = 1 };`, `int a[4] = { [2] = 5 };`, `S t[2] = { [1].x = 3 };`, `{ .a.b[1] = 4, 5 }`, an index an
+  enum's constant or a `const int`); in C++ a member not given keeps its default value. Not yet: in an expression
+  (`(S){ .x = 1 }`).
 - Not possible: pointers in a struct or a union, a pointer to a struct as a variable. Not yet: base classes; a static
   object or an array of objects whose constructor is not of constants.
 
