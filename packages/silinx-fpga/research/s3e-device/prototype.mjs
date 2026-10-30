@@ -85,7 +85,7 @@ const [cmd, ...args] = process.argv.slice(2);
 if (cmd === 'observe') {
   const [out, ...files] = args;
   const all = { pips: [], sites: [], joins: [], pins: [], pinJoins: [], ambiguous: [], unexplained: [] };
-  for (const f of files) { const o = observeDesign(parseXdl(fs.readFileSync(f, 'utf8'))); for (const k in all) all[k].push(...o[k]); }
+  for (const f of files) { const o = observeDesign(parseXdl(fs.readFileSync(f, 'utf8'))); for (const k in all) for (const x of o[k]) all[k].push(x); }
   const amb = [...new Map(all.ambiguous.map(x => [`${x.from}<${x.candidates.join(',')}${x.src ? '<src' : ''}`, x])).values()];
   // (INTERSECT=1: first the intersection of each wire's candidates over the nets, intersectAmbiguous)
   const ix = process.env.INTERSECT === '1' ? intersectAmbiguous(amb) : { joins: [], ambiguous: amb };

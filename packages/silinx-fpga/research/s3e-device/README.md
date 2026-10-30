@@ -1225,3 +1225,39 @@ the measured one:
 | vga | 8.918 -> 8.672 |
 
 The shipped graph stays. The `test/fixtures/open-flow` designs are not run on the XC3S500E's measured graph yet.
+
+### The recipe for the other dies, part 8: the XC3S500E's open-flow designs (2026-10-30)
+
+Part 6 on the XC3S500E: the `test/fixtures/open-flow` designs retargeted to the XC3S500E-FG320 (Nexys2-500), each
+Basys2 pad moved to the Nexys2 pad of the same board resource (`mclk` to `clk`, `uclk` to `clk1`). `feat_dcm_pads` and
+`feat_ll_splitters` are left out, as they are made for the XC3S1200E, so 43 designs remain. Before this part,
+`feat_clocks12` could not be placed on the measured graph ("no room for a group of 8 slices"). The placer's clock reach
+(`clockReach`) lacked the paths from most global buffers to the clock rows.
+
+- **ISE implemented** 42 of the 43 (`feat_iob_ddr_v` is refused by XST, as on the XC3S100E). Observed with the 55
+  earlier designs, they give 97 designs and 1745 more joins.
+- **Clock-tree rounds** (`clocktests.mjs` on the fixtures' clock nets, `varyjoins.mjs` spine and rows, the I/O columns'
+  undriven clock lines against their column's GCLKH UP / DN): 9449 verdicts, 632 of them joins, all agreeing with the
+  shipped graph. The rounds measured three parts of the clock tree:
+  - the clock column: `GCLKVMLR_GCLK_DNk` / `UPk` drive `GCLKC_GCLKk` of the GCLKVC tiles at Y7;
+  - the clock rows: `GCLKC_GCLK_OUT_L/Rk` join `GCLKH_GCLKk`, and `BRAMSITE2_GCLKH_GCLKk` in the block-RAM columns;
+  - the side buffers: `CLKL_GCLKH_MAINk` / `CLKR_GCLKH_MAINk` join `GCLKVML_GCLKLRk` / `GCLKVMR_GCLKLRk`.
+  The GCLKVC tests that their own route made invalid (part 7) were marked again and left out.
+- **The clock reach** is now complete from every BUFGMUX to every slice and block RAM. Only a few paths from a global
+  buffer to a DCM's CLKIN / CLKFB are missing, at most 6 per buffer. ISE did not use these paths in any design.
+- One observed join is not explained: `CLKT_X17Y47/CLKT_CKI4`, from `feat_bufgmux` and `feat_bufgmux_1`, whose clock
+  pad has `CLOCK_DEDICATED_ROUTE = FALSE`. The XC3S100E's observation has similar joins, and the build does not use them.
+
+| | Part 7 | Now |
+|---|---|---|
+| Nodes split / merged | 3558 / 0 | 3280 / 0 |
+| ... with two pieces a net can reach (a short) | 0 | 0 |
+| ... with a route lost | 932 | 655 |
+| PIPs extra / missing | 74 / 81 838 | 74 / 81 793 |
+| Pins missing | 33 417 | 33 417 |
+
+**ISE's verdict on the 43** routed by the open flow on the measured graph: every one is clean. DRC gives 0 errors and
+0 warnings, xdl2ncd gives no warning, and Silinx's `.bit` is byte-identical to ISE's bitgen with CRC on and off.
+
+`prototype.mjs observe` now adds a design's observations one at a time. The XC3S1200E's designs overflowed the call
+stack of `push(...)`.
