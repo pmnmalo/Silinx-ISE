@@ -145,3 +145,55 @@ test('#2192 the IOB registers\' design (Silinx\'s synthesis) built with --engine
   assert.deepEqual(ffs, ['led<0> OFF1', 'led<1> OFF1', 'led<1> TFF1', 'led<2> OFF1', 'led<2> OFF2', 'sw<0> IFF1', 'sw<1> IFF1', 'sw<1> IFF2']);
   assert.equal(design.insts.find(i => i.type === 'BUFGMUX').site, 'BUFGMUX_X2Y11');
 });
+
+test('#2195 nextpnrNetlist: a pad\'s constraints on its buffer, a NET name with wildcards on each bit, a one-bit bus\'s name<0>; a PERIOD per clock after its global buffer; an input nothing reads left out', () => {
+  const ucf = fs.readFileSync(fixture('ucf_all.ucf'), 'utf8');
+  const { json, problems, sdc } = nextpnrNetlist(fs.readFileSync(fixture('ucf_all.json'), 'utf8'), 'ucf_all', ucf);
+  assert.deepEqual(problems, []);
+  assert.equal(sdc, 'create_clock -period 10 [get_nets {ck2}]\ncreate_clock -period 20 [get_nets {ck}]\n');
+  const cells = Object.values(cellsOf(json));
+  const by = pad => cells.find(c => c.attributes?.LOC === pad).attributes;
+  assert.deepEqual([by('M5').IOSTANDARD, by('M5').DRIVE, by('M5').SLEW, by('M5').PULL], ['LVCMOS33', '8', 'fast', undefined]);
+  assert.equal(by('P11').PULL, 'up');
+  assert.equal(by('K3').PULL, 'keeper');
+  assert.equal(by('G1').PULL, 'down');
+  // the unused input: no buffer, no pad, no LOC asked of it
+  assert.ok(!cells.some(c => c.attributes?.LOC === 'A7'));
+  assert.deepEqual(Object.values(json.modules)[0].ports.unused.bits, ['x']);
+  const noLoc = ucf.split('\n').filter(l => !/"unused"/.test(l)).join('\n');
+  assert.deepEqual(nextpnrNetlist(fs.readFileSync(fixture('ucf_all.json'), 'utf8'), 'ucf_all', noLoc).problems, []);
+  // wildcards
+  const wild = `${ucf}\nNET "led<*>" SLEW = FAST ;\nNET "sw<*>" IOSTANDARD = LVTTL ;\n`;
+  const w = Object.values(cellsOf(nextpnrNetlist(fs.readFileSync(fixture('ucf_all.json'), 'utf8'), 'ucf_all', wild).json));
+  assert.equal(w.find(c => c.attributes?.LOC === 'P7').attributes.SLEW, 'fast');
+  assert.equal(w.find(c => c.attributes?.LOC === 'P11').attributes.IOSTANDARD, 'LVTTL');
+  // a one-bit port written name<0> (#2199: Silinx's packer drops it)
+  const one = JSON.parse(gates());
+  const m = Object.values(one.modules)[0], [p] = Object.entries(m.ports).find(([, d]) => d.direction === 'input');
+  m.ports[p].bits = [m.ports[p].bits[0]];
+  const r = nextpnrNetlist(JSON.stringify(one), 'gates', `NET "${p}<0>" LOC = "G12" | IOSTANDARD = LVTTL ;\n`);
+  assert.equal(Object.values(cellsOf(r.json)).find(c => c.attributes?.LOC === 'G12')?.attributes.IOSTANDARD, 'LVTTL');
+  // a PERIOD on no port of the design: no target (the timing step says it is missing)
+  assert.equal(nextpnrNetlist(gates(), 'gates', 'NET "nothing" PERIOD = 5 ns ;\n').sdc, '');
+});
+
+test('#2195 --engine nextpnr with the whole UCF: no warnings (TIG and CLOCK_DEDICATED_ROUTE change nothing, as in Silinx\'s flow); each PERIOD and OFFSET checked by the timing step, as with Silinx\'s engine', { timeout: 300000 }, async () => {
+  const build = async engine => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+    const out = [], err = [];
+    const code = await main(['build', fixture('ucf_all.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('ucf_all.ucf').pathname, '--out-dir', dir, '--engine', engine],
+      { out: l => out.push(l), err: l => err.push(l) });
+    assert.equal(code, 0, err.join('\n'));
+    assert.deepEqual(err, []);   // no warnings
+    const checks = out.filter(l => /^constraint /.test(l)).map(l => l.replace(/ \(.*$/, '')).sort();
+    return { checks, out };
+  };
+  const n = await build('nextpnr'), s = await build('silinx');
+  assert.deepEqual(n.checks, s.checks);
+  assert.ok(n.checks.includes('constraint PERIOD 10 ns on clk2: met'), n.checks.join('\n'));
+  assert.ok(n.checks.includes('constraint PERIOD 20 ns on clk: met'));
+  assert.ok(n.checks.includes('constraint OFFSET = IN 15 ns BEFORE "clk": met on sw<0>'));
+  assert.ok(n.checks.includes('constraint OFFSET = OUT 15 ns AFTER "clk": met on led<0>'));
+  assert.ok(n.out.includes('All constraints were met.'));
+  assert.ok(n.out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), n.out.join('\n'));
+});

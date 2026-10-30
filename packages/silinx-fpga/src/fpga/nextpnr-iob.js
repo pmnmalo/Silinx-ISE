@@ -9,6 +9,9 @@ const bitParam = (c, p) => parseInt(bitsOf(c.parameters?.[p] ?? '0'), 2) & 1;
 const initOf = c => (bitParam(c, 'INIT') ? 'INIT1' : 'INIT0');
 const srAttr = c => (/_SET$/.test(strParam(c, 'SRMODE') ?? '') ? 'SRHIGH' : 'SRLOW');
 const syncOf = c => (/ASYNC/.test(strParam(c, 'SRMODE') ?? '') ? 'ASYNC' : 'SYNC');
+// a pad's constraints, from the UCF (nextpnrNetlist): attributes of the IOB cell; nextpnr writes a string with a trailing space
+const attr = (c, a) => (typeof c.attributes?.[a] === 'string' ? c.attributes[a].replace(/ $/, '') : undefined);
+const PULL = { up: 'PULLUP', down: 'PULLDOWN', keeper: 'KEEPER' };
 const clkInv = (c, pin) => (bitParam(c, 'CLKINV') ? `${pin}_B` : pin);
 
 /** The settings of a register alone (Silinx's iobRegCfg): its clock's only with `clk`; the parts not used left out. */
@@ -61,13 +64,14 @@ function readByFabric(mod, bit) {
 export function iobSettings(c, name, mod, part) {
   const i = portNet(c.IOB, 'I'), read = readByFabric(mod, i);
   const out = portNet(c.IOB, 'O') !== undefined;
-  const buf = name;
+  const buf = name, std = attr(c.IOB, 'IOSTANDARD') || 'LVCMOS25', pull = PULL[attr(c.IOB, 'PULL')];
+  const pullCfg = pull ? [['PULL', '', pull]] : [];
   if (!out) {
-    return { type: 'IBUF', cfg: [...(read || !c.IFF1 ? [['IDELMUX', '', '1'], ['IMUX', '', '1']] : []), ['IOATTRBOX', '', 'LVCMOS25'],
-      ...inputRegs(c, buf, part), ['INBUF', `${buf}_IBUF`, ''], ['PAD', name, '']] };
+    return { type: 'IBUF', cfg: [...(read || !c.IFF1 ? [['IDELMUX', '', '1'], ['IMUX', '', '1']] : []), ['IOATTRBOX', '', std],
+      ...inputRegs(c, buf, part), ['INBUF', `${buf}_IBUF`, ''], ['PAD', name, ''], ...pullCfg] };
   }
   const tri = c.TFF1 || portNet(c.IOB, 'T') !== undefined;
-  return { type: 'IOB', cfg: [['DRIVEATTRBOX', '', '12'], ['IOATTRBOX', '', 'LVCMOS25'], ['O1INV', '', 'O1'], ['OMUX', '', c.OFF2 ? 'OFFDDR' : c.OFF1 ? 'OFF1' : 'O1'], ['SLEW', '', 'SLOW'],
+  return { type: 'IOB', cfg: [['DRIVEATTRBOX', '', attr(c.IOB, 'DRIVE') || '12'], ['IOATTRBOX', '', std], ['O1INV', '', 'O1'], ['OMUX', '', c.OFF2 ? 'OFFDDR' : c.OFF1 ? 'OFF1' : 'O1'], ['SLEW', '', (attr(c.IOB, 'SLEW') || 'slow').toUpperCase()],
     ...(tri ? [['T1INV', '', 'T1'], ['TMUX', '', c.TFF1 ? 'TFF1' : 'T1']] : []), ...outputRegs(c),
-    ...(read ? [['IDELMUX', '', '1'], ['IMUX', '', '1'], ['INBUF', `${buf}_IBUF`, '']] : []), ['OUTBUF', `${buf}_OBUF`, ''], ['PAD', name, '']] };
+    ...(read ? [['IDELMUX', '', '1'], ['IMUX', '', '1'], ['INBUF', `${buf}_IBUF`, '']] : []), ['OUTBUF', `${buf}_OBUF`, ''], ['PAD', name, ''], ...pullCfg] };
 }

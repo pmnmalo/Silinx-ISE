@@ -6,7 +6,7 @@
 //   read Silinx's own.
 // - For now the micro-architecture knows LUTs, flip-flops, carry chains, wide multiplexers, constants, IOBs with their
 //   registers, global clock buffers, block RAMs and multipliers (#2135): a netlist with other cells fails at Map, naming them.
-import { parseUcf, ucfPattern } from './ucf.js';
+import { parseUcf, portAssignments, ucfPattern } from './ucf.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { checkRouting } from './fpga/route.js';
 import { deviceSites } from './fpga/place.js';
@@ -25,7 +25,8 @@ export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GN
  * synthesis put there (nextpnr gives a port's own attributes to none of its cells; the micro-architecture places an
  * I/O buffer at its LOC). The UCF's IOB = TRUE / FALSE as the attribute IOB, the micro-architecture's question: NET on the
  * port bit's buffer, INST on the cell. Returns { json, problems }: the cells the micro-architecture does not have, ports without
- * a pad. (The constants: the micro-architecture's, #2135.)
+ * a pad; and sdc, the PERIODs as nextpnr's clock constraints. An input nothing reads is left out, as Silinx's packer does.
+ * (The constants: the micro-architecture's, #2135.)
  */
 export function nextpnrNetlist(text, top, ucfText) {
   const json = JSON.parse(text);
@@ -36,8 +37,9 @@ export function nextpnrNetlist(text, top, ucfText) {
   for (const [t, n] of types) problems.push(`${n} cell(s) ${t}: not in the spartan3e micro-architecture yet`);
   hardInputs(mod);
   // each port bit's pad on its I/O buffer
-  let locs = {}, other = [];
-  try { if (ucfText) ({ assignments: locs = {}, other = [] } = parseUcf(ucfText)); } catch { /* checked by translate */ }
+  let parsed = { assignments: {}, clocks: [], other: [] };
+  try { if (ucfText) parsed = parseUcf(ucfText); } catch { /* checked by translate */ }
+  const { other = [] } = parsed;
   const iobAsked = [];   // [NET / INST, name pattern, TRUE / FALSE]: the last that matches
   for (const st of other) {
     const m = /^(NET|INST)\s+"?([^"\s]+)"?\s+IOB\s*=\s*"?(TRUE|FALSE|FORCE)"?\s*$/i.exec(String(st).trim());
@@ -45,7 +47,13 @@ export function nextpnrNetlist(text, top, ucfText) {
   }
   const asked = (kind, name) => { let v; for (const [k, re, x] of iobAsked) if (k === kind && re.test(name)) v = x; return v; };
   for (const [n, c] of Object.entries(mod.cells)) { const a = asked('INST', n); if (a) c.attributes = { ...c.attributes, IOB: a }; }
-  const loc = n => Object.entries(locs).find(([k, a]) => a.loc && k.toLowerCase() === n.toLowerCase())?.[1].loc;
+  // the constraints of each port bit, a NET name with wildcards on every bit it matches, as Silinx's packer reads them
+  const bitName = (p, d, i) => (d.bits.length > 1 ? `${p}<${i}>` : p);
+  const names = Object.entries(mod.ports).flatMap(([p, d]) => d.bits.map((_, i) => bitName(p, d, i)));
+  const cons = portAssignments(parsed, names).assignments;
+  const consOf = n => cons[n] || Object.entries(cons).find(([k]) => k.toLowerCase() === n.toLowerCase())?.[1];
+  const read = new Set();   // the nets some cell reads
+  for (const c of Object.values(mod.cells)) for (const [p, b] of Object.entries(c.connections || {})) if (c.port_directions?.[p] === 'input') read.add(b[0]);
   const buffers = new Map();   // port bit -> its IBUF / OBUF
   for (const c of Object.values(mod.cells)) {
     if (c.type === 'IBUF' || c.type === 'IBUFG') buffers.set(c.connections.I?.[0], c);
@@ -54,19 +62,42 @@ export function nextpnrNetlist(text, top, ucfText) {
   }
   for (const [p, d] of Object.entries(mod.ports)) {
     d.bits.forEach((b, i) => {
-      const bit = d.bits.length > 1 ? `${p}<${i}>` : p;
-      const pad = loc(bit) || (d.bits.length === 1 ? loc(`${p}<0>`) : null);
+      const bit = bitName(p, d, i);
       const buffer = buffers.get(b);
-      if (!pad) problems.push(`port ${bit}: no LOC in the constraints (the nextpnr engine places only the ports given a pad)`);
+      // an input nothing reads gets no pad, as ISE's map trims it (ISE's DRC calls its buffer's output a dangling pin)
+      if (/^IBUFG?$/.test(buffer?.type) && !read.has(buffer.connections.O?.[0])) {
+        delete mod.cells[Object.keys(mod.cells).find(k => mod.cells[k] === buffer)];
+        d.bits[i] = 'x';
+        return;
+      }
+      const a = { ...(d.bits.length === 1 ? consOf(`${p}<0>`) : null), ...consOf(bit) };
+      if (!a.loc) problems.push(`port ${bit}: no LOC in the constraints (the nextpnr engine places only the ports given a pad)`);
       else if (!buffer) problems.push(`port ${bit}: no I/O buffer (IBUF / OBUF) on it`);
       else {
-        const a = asked('NET', bit);
-        buffer.attributes = { ...buffer.attributes, LOC: pad, ...(a ? { IOB: a } : {}) };
+        const iob = asked('NET', bit);
+        // (the converter to XDL writes the IOB's settings from them: they stay on the cell in the routed design)
+        buffer.attributes = { ...buffer.attributes, LOC: a.loc, ...(iob ? { IOB: iob } : {}), ...(a.iostandard ? { IOSTANDARD: a.iostandard } : {}),
+          ...(a.drive ? { DRIVE: String(a.drive) } : {}), ...(a.slew ? { SLEW: a.slew } : {}), ...(a.pull ? { PULL: a.pull } : {}) };
       }
     });
   }
+  // a PERIOD per clock as nextpnr's targets: on the port's clock net as the flip-flops see it, after its global buffer
+  const netNameOf = b => Object.entries(mod.netnames).find(([, n]) => n.bits[0] === b && n.bits.length === 1)?.[0]
+    ?? Object.entries(mod.netnames).find(([, n]) => n.bits.includes(b))?.[0];
+  const clockNets = [];
+  for (const k of parsed.clocks || []) {
+    for (const [p, d] of Object.entries(mod.ports)) {
+      d.bits.forEach((b, i) => {
+        if (bitName(p, d, i).toLowerCase() !== String(k.net).toLowerCase() || !/^IBUFG?$/.test(buffers.get(b)?.type)) return;
+        const pad = buffers.get(b).connections.O[0];
+        const bufgs = Object.values(mod.cells).filter(c => c.type === 'BUFG' && c.connections.I?.[0] === pad).map(c => c.connections.O[0]);
+        for (const net of bufgs.length ? bufgs : [pad]) clockNets.push([netNameOf(net), k.period]);
+      });
+    }
+  }
+  const sdc = clockNets.filter(([n]) => n).map(([n, period]) => `create_clock -period ${period} [get_nets {${n}}]\n`).join('');
   json.modules = { [name]: mod };
-  return { json, problems };
+  return { json, problems, sdc };
 }
 
 /**
@@ -133,7 +164,7 @@ export function hardInputs(mod) {
  */
 export function mountNextpnrSteps(ctx) {
   const { io, spec, log, report, util, now, ms, netlistText, top, ucfText, StepError, setRouted } = ctx;
-  let input = null;
+  let input = null, sdc = '';
   const part = `${spec.device}${spec.pkg}`;
 
   function runMap() {
@@ -145,6 +176,7 @@ export function mountNextpnrSteps(ctx) {
         'Choose the Silinx engine (Toolchain Settings): nextpnr\'s Spartan-3E is growing (#2135).');
     }
     input = JSON.stringify(r.json);
+    sdc = r.sdc;
     log('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).');
   }
 
@@ -152,15 +184,15 @@ export function mountNextpnrSteps(ctx) {
     if (!input) runMap();
     const t = now();
     const db = await io.nextpnr.chipdb(part);
-    // the tightest PERIOD constraint as nextpnr's target (each clock's met or not: the timing step's)
+    // each clock's PERIOD as its target (the SDC), the tightest for the clocks with none (each met or not: the timing step's)
     let mhz = null;
     try { const c = ucfText ? parseUcf(ucfText).clocks || [] : []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
     const args = ['--device', part, '--chipdb', 'chipdb.bin', '--json', 'design.json', '--write', 'routed.json', '--seed', String(spec.seed || 1),
-      ...(mhz ? ['--freq', mhz.toFixed(3)] : []), '--timing-allow-fail'];
+      ...(mhz ? ['--freq', mhz.toFixed(3)] : []), ...(sdc ? ['--sdc', 'design.sdc'] : []), '--timing-allow-fail'];
     const lines = [];
     let files;
     try {
-      files = await io.nextpnr.run(args, { 'design.json': input, 'chipdb.bin': db }, l => {
+      files = await io.nextpnr.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => {
         lines.push(l);
         if (/^ERROR:/.test(l)) log(`ERROR:nextpnr - ${l.replace(/^ERROR:\s*/, '')}`);
         else if (/^Warning:/.test(l)) log(`WARNING:nextpnr - ${l.replace(/^Warning:\s*/, '')}`);

@@ -1,0 +1,19 @@
+# Basys2-250 (#2195): research/nextpnr-s3e/ucf_all.v; the 3.3 V standards, each attribute Silinx reads, and what it only checks or leaves
+NET "clk"    LOC = "B8"  | IOSTANDARD = LVCMOS33 ;
+NET "clk2"   LOC = "M6"  | IOSTANDARD = LVCMOS33 ;
+NET "unused" LOC = "A7"  | IOSTANDARD = LVCMOS33 ;
+NET "sw<0>"  LOC = "P11" | IOSTANDARD = LVCMOS33 | PULLUP ;
+NET "sw<1>"  LOC = "L3"  | IOSTANDARD = LVCMOS33 | PULLDOWN ;
+NET "sw<2>"  LOC = "K3"  | IOSTANDARD = LVTTL | KEEPER ;
+NET "led<0>" LOC = "M5"  | IOSTANDARD = LVCMOS33 | DRIVE = 8 | SLEW = FAST ;
+NET "led<1>" LOC = "M11" | IOSTANDARD = LVTTL | DRIVE = 4 ;
+NET "led<2>" LOC = "P7"  | IOSTANDARD = LVTTL | DRIVE = 16 | SLEW = SLOW ;
+NET "led<3>" LOC = "P6"  | IOSTANDARD = LVCMOS33 | DRIVE = 2 ;
+NET "led2"   LOC = "G1"  | IOSTANDARD = LVCMOS33 | DRIVE = 6 | PULLDOWN ;
+NET "clk" TNM_NET = "clk" ;
+TIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50% ;
+NET "clk2" PERIOD = 10 ns ;
+OFFSET = IN 15 ns BEFORE "clk" ;
+OFFSET = OUT 15 ns AFTER "clk" ;
+NET "sw<0>" TIG ;
+NET "clk" CLOCK_DEDICATED_ROUTE = FALSE ;

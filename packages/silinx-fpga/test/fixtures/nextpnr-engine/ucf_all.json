@@ -1,0 +1,586 @@
+{
+  "creator": "Yosys 0.70 (git sha1 28ba3cb92, Release, Clang /workspace/YoWASP/yosys/wasi-sdk-33.0-x86_64-linux/share/cmake/../..//bin/clang++ 22.1.0)",
+  "modules": {
+    "ucf_all": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "ucf_all_syn.v:2.1-35.10"
+      },
+      "ports": {
+        "clk": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "clk2": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "sw": {
+          "direction": "input",
+          "bits": [ 4, 5, 6 ]
+        },
+        "unused": {
+          "direction": "input",
+          "bits": [ 7 ]
+        },
+        "led": {
+          "direction": "output",
+          "bits": [ 8, 9, 10, 11 ]
+        },
+        "led2": {
+          "direction": "output",
+          "bits": [ 12 ]
+        }
+      },
+      "cells": {
+        "$abc$1348$blif$1348$0": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 13 ],
+            "I1": [ 14 ],
+            "O": [ 15 ]
+          }
+        },
+        "$abc$1348$blif$1348$1": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 16 ],
+            "I1": [ 17 ],
+            "O": [ 18 ]
+          }
+        },
+        "$abc$1348$blif$1348$2": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 17 ],
+            "O": [ 19 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1260": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:18.3-20.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 20 ],
+            "CE": [ "1" ],
+            "D": [ 15 ],
+            "Q": [ 14 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1261": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 21 ],
+            "CE": [ "1" ],
+            "D": [ 18 ],
+            "Q": [ 22 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1262": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 21 ],
+            "CE": [ "1" ],
+            "D": [ 22 ],
+            "Q": [ 23 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1263": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 21 ],
+            "CE": [ "1" ],
+            "D": [ 23 ],
+            "Q": [ 24 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1264": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 21 ],
+            "CE": [ "1" ],
+            "D": [ 24 ],
+            "Q": [ 25 ],
+            "R": [ "0" ]
+          }
+        },
+        "$iopadmap$ucf_all.clk": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 2 ],
+            "O": [ 26 ]
+          }
+        },
+        "$iopadmap$ucf_all.clk2": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 3 ],
+            "O": [ 27 ]
+          }
+        },
+        "$iopadmap$ucf_all.led": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 22 ],
+            "O": [ 8 ]
+          }
+        },
+        "$iopadmap$ucf_all.led2[0]": {
+          "hide_name": 1,
+          "type": "OBUFT",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output",
+            "T": "input"
+          },
+          "connections": {
+            "I": [ 14 ],
+            "O": [ 12 ],
+            "T": [ 19 ]
+          }
+        },
+        "$iopadmap$ucf_all.led_1": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 23 ],
+            "O": [ 9 ]
+          }
+        },
+        "$iopadmap$ucf_all.led_2": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 24 ],
+            "O": [ 10 ]
+          }
+        },
+        "$iopadmap$ucf_all.led_3": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 25 ],
+            "O": [ 11 ]
+          }
+        },
+        "$iopadmap$ucf_all.sw": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 4 ],
+            "O": [ 16 ]
+          }
+        },
+        "$iopadmap$ucf_all.sw_1": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 5 ],
+            "O": [ 17 ]
+          }
+        },
+        "$iopadmap$ucf_all.sw_2": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 6 ],
+            "O": [ 13 ]
+          }
+        },
+        "$iopadmap$ucf_all.unused": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 7 ],
+            "O": [ 28 ]
+          }
+        },
+        "u1": {
+          "hide_name": 0,
+          "type": "BUFG",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:26.8-29.4"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 26 ],
+            "O": [ 21 ]
+          }
+        },
+        "u2": {
+          "hide_name": 0,
+          "type": "BUFG",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:31.8-34.4"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 27 ],
+            "O": [ 20 ]
+          }
+        }
+      },
+      "netnames": {
+        "$0\\led[3:0]": {
+          "hide_name": 1,
+          "bits": [ 18, 22, 23, 24 ],
+          "attributes": {
+            "src": "ucf_all_syn.v:14.3-16.6"
+          }
+        },
+        "$0\\r2[0:0]": {
+          "hide_name": 1,
+          "bits": [ 15 ],
+          "attributes": {
+            "src": "ucf_all_syn.v:18.3-20.6"
+          }
+        },
+        "$abc$1348$auto$rtlil.cc:3483:NotGate$1266": {
+          "hide_name": 1,
+          "bits": [ 19 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$clk": {
+          "hide_name": 1,
+          "bits": [ 26 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$clk2": {
+          "hide_name": 1,
+          "bits": [ 27 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$led": {
+          "hide_name": 1,
+          "bits": [ 22, 23, 24, 25 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$unused": {
+          "hide_name": 1,
+          "bits": [ 28 ],
+          "attributes": {
+          }
+        },
+        "$techmap1352$abc$1348$blif$1348$0.A": {
+          "hide_name": 1,
+          "bits": [ 13, 14 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "$techmap1353$abc$1348$blif$1348$1.A": {
+          "hide_name": 1,
+          "bits": [ 16, 17 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "$techmap1354$abc$1348$blif$1348$2.A": {
+          "hide_name": 1,
+          "bits": [ 17 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "ck": {
+          "hide_name": 0,
+          "bits": [ 21 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:10.15-10.17"
+          }
+        },
+        "ck2": {
+          "hide_name": 0,
+          "bits": [ 20 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:11.15-11.18"
+          }
+        },
+        "clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "ucf_all_syn.v:3.14-3.17"
+          }
+        },
+        "clk2": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "ucf_all_syn.v:4.14-4.18"
+          }
+        },
+        "led": {
+          "hide_name": 0,
+          "bits": [ 8, 9, 10, 11 ],
+          "attributes": {
+            "src": "ucf_all_syn.v:7.22-7.25"
+          }
+        },
+        "led2": {
+          "hide_name": 0,
+          "bits": [ 12 ],
+          "attributes": {
+            "src": "ucf_all_syn.v:8.16-8.20"
+          }
+        },
+        "r2": {
+          "hide_name": 0,
+          "bits": [ 14 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "ucf_all_syn.v:12.15-12.17"
+          }
+        },
+        "sw": {
+          "hide_name": 0,
+          "bits": [ 4, 5, 6 ],
+          "attributes": {
+            "src": "ucf_all_syn.v:5.20-5.22"
+          }
+        },
+        "unused": {
+          "hide_name": 0,
+          "bits": [ 7 ],
+          "attributes": {
+            "src": "ucf_all_syn.v:6.14-6.20"
+          }
+        }
+      }
+    }
+  }
+}
