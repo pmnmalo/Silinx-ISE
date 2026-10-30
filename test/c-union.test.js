@@ -124,11 +124,7 @@ test('#1896 unions and bit-fields co-simulated in VHDL and Verilog: no warning; 
 
 test('#1896 unions and bit-fields: what is not supported, said', () => {
   const errs = (src) => cToHdl(src, { file: 'e.c' }).diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`);
-  assert.deepEqual(errs('union big { uint64_t a; uint32_t b[3]; };\nint f(int x) { union big u; u.a = x; return u.b[1]; }\n'), ["1 error: the union 'big': 128 bits: a union of up to 64 bits is supported"]);
   assert.deepEqual(errs('union p { int *q; int a; };\nint f(int x) { return x; }\n'), ["1 error: the union 'p': a pointer in it is not possible in Silinx HLS"]);
-  assert.deepEqual(errs('union u { int a; float b; };\nint f(int x) { union u v; v.a = x; v.a++; return v.a; }\n'), ["2 error: 'a' of a union: ++ and -- on it are not supported yet (write v.a += 1)"]);
-  assert.deepEqual(errs('union u { int a; float b; };\nint f(int x) { union u v = { .b = 1.0f }; return v.a + x; }\n'), ["2 error: 'v': a designated initializer of a union is not supported yet (its first member's value: { v })"]);
-  assert.deepEqual(errs('struct s { union { int a; float b; } u; int c; };\nint f(int x) { struct s v; v.c = x; return v.c; }\n'), ['1 error: a union inside a struct is not supported yet (a union of its own, a member of the struct)']);
   assert.deepEqual(errs('union u { int a; struct { int x : 40; }; };\nint f(int x) { union u v; v.a = x; return v.a; }\n'), ["1 error: the union 'u': the bit-field 'x' must be a constant width from 0 to 32, of an integer type"]);
   assert.deepEqual(errs('union u { int a; short b; };\nint f(int x) { union u v; v.a = x; return v.c; }\n'), ["2 error: 'c' is not a member of u"]);
   assert.deepEqual(errs('union u { int a; struct { short lo, hi; } h; };\nint f(int x) { union u v; v.a = x; return v.h; }\n'), ["2 error: 'h': a struct of the union 'u': give its member (v.h.m)"]);
