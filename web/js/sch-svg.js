@@ -183,16 +183,20 @@ function typeUnder(sym, def, box, center, name) {
 // the symbol's type inside its body (AND2, INV, M2_1…), as ISE's symbols have it (#2041): at the body's centre, upright;
 // 8 px bold, about 5.5 px a character, squeezed to the body's width when a little longer. A triangle (INV, BUF, BUFE /
 // BUFT's first) has room for it only near its base, its first 55 %, and only upright, 7 px there (4.8 px a character). Null when it does
-// not fit (the caller draws it under)
+// not fit (the caller draws it under). With Pins per bit, in each row's shape, as the one-bit symbol's (#2122)
 function typeInside(sym, def, name) {
   const turned = sym.rot === 90 || sym.rot === 270, tri = def.shape === 'inv' || def.shape === 'buf' || def.shape === 'tbuf';
-  if (tri && (turned || def.rows > 1)) return null;   // (INV4, BUFE4…: under their triangles, #2067)
-  if (def.shape === 'gate' && def.rows > 1) return null;   // (gates a bit each: under them, #2079)
-  const room = tri ? def.body.w * 0.55 - 1 : (turned ? def.body.h : def.body.w) - 6, need = name.length * (tri ? 4.8 : 5.5);
+  if (tri && turned) return null;
+  // (a row's height: a gate's gh, a multiplexer's rh, a triangle's 20)
+  const n = def.rows || 1, pitch = def.gh || def.rh || def.body.h / n;
+  const room = tri ? def.body.w * 0.55 - 1 : (turned ? pitch : def.body.w) - 6, need = name.length * (tri ? 4.8 : 5.5);
   if (need > room * 1.3) return null;
-  const cy = def.shape === 'tbuf' ? def.body.y + 10 : def.body.y + def.body.h / 2;
-  const c = xform(sym, def, def.body.x + (tri ? room / 2 + 1 : def.body.w / 2), cy);
-  return `<text class="stype inside${tri ? ' tri' : ''}" x="${r1(c.x)}" y="${r1(c.y + 3)}" text-anchor="middle"${need > room ? ` textLength="${r1(room)}" lengthAdjust="spacingAndGlyphs"` : ''}>${esc(name)}</text>`;
+  let s = '';
+  for (let r = 0; r < n; r++) {
+    const c = xform(sym, def, def.body.x + (tri ? room / 2 + 1 : def.body.w / 2), def.body.y + r * pitch + pitch / 2);
+    s += `<text class="stype inside${tri ? ' tri' : ''}" x="${r1(c.x)}" y="${r1(c.y + 3)}" text-anchor="middle"${need > room ? ` textLength="${r1(room)}" lengthAdjust="spacingAndGlyphs"` : ''}>${esc(name)}</text>`;
+  }
+  return s;
 }
 const AUTO_NAME = /^(XLXI_\d+|inst_\d+|U\d+)$/;
 // a pin's name inside the body, past its lead and clock triangle (L px from the pin's end); on the top or the bottom
@@ -219,7 +223,7 @@ function textsSvg(sym, def, ctx = {}) {
   // (a multiplexer / demultiplexer: its type inside it, upright (#2041); turned, or a DEMUX, above it, the instance
   // name above that, #313)
   const muxType = def.shape === 'mux' || def.shape === 'demux';
-  const muxIn = muxType && def.title && def.shape === 'mux' && sym.rot !== 90 && sym.rot !== 270 && !(def.rows > 1) ? typeInside(sym, def, def.title) : null;
+  const muxIn = muxType && def.title && def.shape === 'mux' && sym.rot !== 90 && sym.rot !== 270 ? typeInside(sym, def, def.title) : null;
   const muxAbove = muxType && !muxIn;
   if (showName) {
     // above the symbol; when pins stick out of the top (turned symbols), beside the top right corner instead
@@ -291,8 +295,8 @@ function textsSvg(sym, def, ctx = {}) {
     // the type (AND2, OR3B1, INV…) inside the symbol (#2041), else under it, as ISE draws it (#172)
     s += typeInside(sym, def, symbolTypeName(sym)) ?? typeUnder(sym, def, box, center, symbolTypeName(sym));
   } else if (def.shape === 'tbuf') {
-    // (its type, BUFE / BUFT8…, inside its triangle, #2068; BUFE4…'s under them, #2041)
-    s += typeInside(sym, def, def.title) ?? typeUnder(sym, def, box, center, def.title);
+    // (its type, BUFE / BUFT8…, inside its triangle, #2068; BUFE4…'s one-bit BUFE inside each, #2122)
+    s += typeInside(sym, def, def.rows > 1 ? def.title.replace(/\d+$/, '') : def.title) ?? typeUnder(sym, def, box, center, def.title);
   }
   if (def.shape === 'gate' || def.shape === 'inv' || def.shape === 'buf' || def.shape === 'tbuf') {
     // a gate wider than a bit: the width on each bus pin's lead, as the other symbols, nothing in its shape (#1486)
