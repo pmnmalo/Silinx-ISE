@@ -234,7 +234,8 @@ uiTest('New Source: page 1 is only the type; the file name and the location on t
   assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]').length), 0, 'no file name, no location on page 1');
   await page.dialogButton('Next >');
   await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'File Name and Location');
-  assert.deepEqual(await labels(), ['Source type:', 'File name:', 'Location:']);
+  // (the same page for every type, #2140: the language too)
+  assert.deepEqual(await labels(), ['Source type:', 'File name:', 'Location:', 'Language:']);
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].map((i) => i.value)), ['', 'src']);
   // an invalid name: refused here, with its message
   await page.dialogButton('Next >');
@@ -274,7 +275,7 @@ uiTest('New Source: page 1 is only the type; the file name and the location on t
   await page.eval(() => [...document.querySelectorAll('.dlg-overlay .src-types .st')][0].click());
   await page.click('.dlg-overlay .dlg-buttons .btn.primary');
   await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Nome do Ficheiro e Localização', [], { what: 'page 2 in Portuguese' });
-  // (the first type, a truth table: its optional expression too, #1056)
-  assert.deepEqual(await labels(), ['Tipo de fonte:', 'Nome do ficheiro:', 'Localização:', 'Expressão:', 'Linguagem:']);
+  // (the first type, a truth table: no expression here, #2140: its wizard's)
+  assert.deepEqual(await labels(), ['Tipo de fonte:', 'Nome do ficheiro:', 'Localização:', 'Linguagem:']);
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
 });

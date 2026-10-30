@@ -258,7 +258,7 @@ for (const theme of ['dark', 'light']) {
     await closeDialogs(page);
     // every type, then the Module, Schematic, FSM, ASM, Petri Net, Test Bench and UCF wizards through the Wizard >
     // button (#958, #2082)
-    const runs = [...types.map((t) => [t, false]), ...['Module (HDL)', 'Schematic', 'Finite State Machine (FSM)', 'Algorithmic State Machine (ASM)', 'Petri Net', 'Test Bench',
+    const runs = [...types.map((t) => [t, false]), ...['Boolean Algebra', 'Module (HDL)', 'Schematic', 'Finite State Machine (FSM)', 'Algorithmic State Machine (ASM)', 'Petri Net', 'Test Bench',
       'Implementation Constraints File'].map((t) => [types.find((x) => x.endsWith(t)), true])];
     for (const [k, [type, wiz]] of runs.entries()) {
       await page.menu('Project', 'New Source…');
@@ -278,7 +278,8 @@ for (const theme of ['dark', 'light']) {
         for (let p = 1; ; p++) {
           const title = await page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent || '');
           // the Module Wizard: a port from the quick buttons; the Schematic Wizard (no quick buttons, #950): Add Port
-          if (title === 'Inputs and Outputs') await page.click(await page.eval(() => !!document.querySelector('.dlg-overlay .mw-qa')) ? '.dlg-overlay .mw-qa' : '.dlg-overlay .mw-add');
+          // (the Boolean Algebra Wizard's page of that name: names typed, no port table)
+          if (title === 'Inputs and Outputs' && await page.eval(() => !!document.querySelector('.dlg-overlay .mw-add'))) await page.click(await page.eval(() => !!document.querySelector('.dlg-overlay .mw-qa')) ? '.dlg-overlay .mw-qa' : '.dlg-overlay .mw-add');
           if (/Expected Outputs/.test(title)) {
             assert.ok(await page.eval(() => !!document.querySelector('.dlg-overlay th.th-drive')), 'the drive column of the bidirectional port');
             await page.click('.dlg-overlay .btn', { text: 'Fill Expected from Current Design' });

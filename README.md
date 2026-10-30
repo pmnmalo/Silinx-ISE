@@ -141,11 +141,16 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **New Source types**: *Boolean Algebra*, *Module (HDL)* (the ISE Define Module page: language, entity/module and
   architecture names, a port table), *Schematic* (a blank sheet), *Finite State Machine (FSM)*, *Algorithmic State
   Machine (ASM)*, *Petri Net*, *Clock Manager (DCM / PLL)*, *Block Memory*, *Test Bench*, *Implementation
-  Constraints File*, *Memory Initialization File (.mem)*. Page 2 asks the file name, the location and (an HDL file, a
-  drawing's HDL) the language, with the buttons *Wizard > | < Back | Next > | Cancel*: *Next >* makes the plain
-  source, *Wizard >* opens the type's wizard (Module, Schematic, FSM, ASM, Petri Net, Test Bench, Clocking Wizard,
-  Block Memory, UCF) at its own pages, with that name, location and language; it is disabled for a type that has
-  none, and *Next >* for a type that has only the wizard (Clock Manager, Block Memory).
+  Constraints File*, *Memory Initialization File (.mem)*. Page 2 is the same for every type: the file name, the
+  location and the language (VHDL / Verilog, the project's preferred language by default), with the buttons
+  *Wizard > | < Back | Next > | Cancel*: *Next >* makes the plain source, *Wizard >* opens the type's wizard (Boolean
+  Algebra, Module, Schematic, FSM, ASM, Petri Net, Test Bench, Clocking Wizard, Block Memory, UCF) at its own pages,
+  with that name, location and language, and its *< Back* on the first page goes back to New Source to change them;
+  *Wizard >* is disabled for a type that has none, and *Next >* for a type that has only the wizard (Clock Manager,
+  Block Memory).
+- **Boolean Algebra Wizard** (*New Source ▸ Boolean Algebra ▸ Wizard >*): the names of the inputs (1–6) and of the
+  outputs, or an expression (`F = A·B' + C`) whose variables are the inputs and whose name the output, its column
+  filled in.
 - **FSM Wizard** and **ASM Wizard** (*New Source ▸ Finite State Machine (FSM) / Algorithmic State Machine (ASM) ▸
   Wizard >*): the inputs and outputs (the port table, no quick-add buttons), the clock and the reset (an FSM: Moore
   or Mealy), then the states (an FSM's transitions too: from, to and a condition over the inputs, in priority

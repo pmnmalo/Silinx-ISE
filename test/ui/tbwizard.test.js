@@ -114,9 +114,11 @@ uiTest('New Source ▸ Test Bench in VHDL and in Verilog, Module (HDL) in Verilo
     await page.eval((t) => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim().endsWith(t)); r.scrollIntoView(); r.click(); }, type);
     await page.dialogButton('Next >');
     await page.fill('.dlg-overlay .wiz-main input[type=text]', name);
+    // the language on the File Name and Location page (#2140: the same page for every type)
+    await page.fill('.dlg-overlay .wiz-main select', lang);
     await page.dialogButton('Next >');
-    await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main select'));
-    await page.eval((l) => { const sel = [...document.querySelectorAll('.dlg-overlay .wiz-main select')].find((x) => [...x.options].some((o) => o.value === 'verilog')); sel.value = l; sel.dispatchEvent(new Event('change', { bubbles: true })); }, lang);
+    await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent !== 'File Name and Location');
+    assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main select')].filter((x) => [...x.options].some((o) => o.value === 'verilog')).length), 0, 'no language on the next page');
     if (type === 'Module (HDL)') assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main input[type=text]')].find((i) => i.value === 'Behavioral').style.display), lang === 'vhdl' ? '' : 'none');
     await page.dialogButton('Next >');
     assert.match(await page.eval(() => document.querySelector('.dlg-overlay pre').textContent), new RegExp(`Source Name: ${name}\\.${lang === 'vhdl' ? 'vhd' : 'v'}`));

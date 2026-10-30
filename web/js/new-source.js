@@ -14,10 +14,9 @@ import { cTemplate, cppTemplate } from './c-templates.js';
 export { cTemplate, cppTemplate } from './c-templates.js';
 
 const SOURCE_TYPES = [
-  // hdl / tb: VHDL or Verilog, chosen in the wizard (the extension follows the language)
-  // wiz: the wizard the Wizard > button opens (#958); only: no plain source, Next > disabled; drawn: a drawing, its
-  // HDL in the language of the File Name and Location page (#2082)
-  { id: 'tt', label: 'Boolean Algebra', ico: 'algebra', ext: '.bool.json', dir: 'src', drawn: true },
+  // ext null: VHDL or Verilog, the language of the File Name and Location page (the extension follows it)
+  // wiz: the wizard the Wizard > button opens (#958); only: no plain source, Next > disabled
+  { id: 'tt', label: 'Boolean Algebra', ico: 'algebra', ext: '.bool.json', dir: 'src', wiz: 'boolean' },
   { id: 'hdl', label: 'Module (HDL)', ico: 'vhdl', ext: null, dir: 'src', wiz: 'module' },
   { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src', wiz: 'schematic', drawn: true },
   { id: 'fsm', label: 'Finite State Machine (FSM)', ico: 'fsm', ext: '.fsm.json', dir: 'src', wiz: 'fsm', drawn: true },
@@ -75,20 +74,11 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     return null;
   };
   const typeShown = h('span');   // (the page is drawn once: the type set on show)
-  // a truth table: an optional expression (#1056) gives its inputs, its output and its column
-  const ttExpr = h('input', { type: 'text', class: 'ns-tt-expr', spellcheck: 'false', placeholder: "optional, e.g. F = A·B' + C" });
-  const [ttLbl, ttRow] = field('Expression:', h('div', { class: 'ns-tt-row' }, ttExpr));
-  // the language of a module, a test bench, a clock manager or a block memory (the extension follows it) or of a
-  // drawing's HDL, here for their wizards too (#2082); the module's and the test bench's next pages show it again
-  const langHere = h('span');
-  const [langLbl, langRow] = field('Language:', langHere);
-  const fileGrid = h('div', { class: 'form-grid' }, ...field('Source type:', typeShown), ...field('File name:', fname), ...field('Location:', loc));
-  // (the expression's row on the page of a truth table only, the language's on the pages of the HDL types)
-  const typeShownAt = () => {
-    typeShown.textContent = st.label;
-    if (st.id === 'tt') fileGrid.append(ttLbl, ttRow); else { ttLbl.remove(); ttRow.remove(); }
-    if (!st.ext || st.drawn) { langHere.replaceChildren(langSel); fileGrid.append(langLbl, langRow); } else { langLbl.remove(); langRow.remove(); }
-  };
+  // the same page for every type (#2140): its type, the file name, the location and the language (an HDL file's, the
+  // extension follows it, or a drawing's HDL; the project's preferred language by default); the rest on the next
+  // pages or in the type's wizard
+  const fileGrid = h('div', { class: 'form-grid' }, ...field('Source type:', typeShown), ...field('File name:', fname), ...field('Location:', loc), ...field('Language:', langSel));
+  const typeShownAt = () => { typeShown.textContent = st.label; };
   const pFile = {
     title: 'File Name and Location',
     render: () => h('div', {},
@@ -106,10 +96,6 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
       if (!['hdl', 'ucf', 'mem'].includes(st.id)) {
         const r = reservedError(n.split('/').pop().replace(/[^A-Za-z0-9_]/g, '_'));
         if (r) return `${r}: choose another name.`;
-      }
-      if (st.id === 'tt' && ttExpr.value.trim()) {
-        const e = await ttFromExpression(ttExpr.value);
-        if (typeof e === 'string') return e;
       }
       // a drawing: its module (named as the file) and its HDL file must be free (#230)
       if (isView(p)) {
@@ -165,16 +151,15 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
   const archLbl = h('label', {}, 'Architecture name:');
   const syncArch = () => { const v = langSel.value === 'vhdl'; archLbl.style.display = archName.style.display = v ? '' : 'none'; };
   langSel.addEventListener('change', syncArch);
-  const p2LangSlot = h('span');   // langSel lives here or on the test bench page (moved on show)
   const p2 = {
     title: 'Define Module',
     render: () => {
       renderPorts();
       return h('div', {},
-        h('div', { class: 'form-grid' }, ...field('Language:', p2LangSlot), ...field('Entity / Module name:', entName), archLbl, archName),
+        h('div', { class: 'form-grid' }, ...field('Entity / Module name:', entName), archLbl, archName),   // (its language: the previous page's, #2140)
         h('div', { style: { marginTop: '10px', maxHeight: '250px', overflow: 'auto', border: '1px solid var(--frame)' } }, portTbl));
     },
-    onShow: () => { p2LangSlot.replaceChildren(langSel); if (!entName.value) entName.value = fname.value.trim().replace(/\..*$/, ''); syncArch(); },
+    onShow: () => { if (!entName.value) entName.value = fname.value.trim().replace(/\..*$/, ''); syncArch(); },
     validate: () => {
       if (!NAME_RE.test(entName.value.trim())) return 'Invalid module name.';
       const r = reservedError(entName.value.trim()) || ports.map(p => reservedError(p.name)).find(Boolean);
@@ -199,11 +184,9 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     }
     if (!uutList.childElementCount) uutList.append(h('div', { class: 'st' }, 'No design modules in the project.'));
   };
-  const tbLangHost = h('div', { class: 'form-grid', style: { marginBottom: '8px' } });
   const p2tb = {
     title: 'Associate Source',
-    render: () => { renderUut(); return h('div', {}, tbLangHost, h('div', { class: 'hint' }, 'Select the source (Unit Under Test) to associate with the new test bench.'), uutList); },
-    onShow: () => { tbLangHost.replaceChildren(...field('Language:', langSel)); },
+    render: () => { renderUut(); return h('div', {}, h('div', { class: 'hint' }, 'Select the source (Unit Under Test) to associate with the new test bench.'), uutList); },
     validate: () => (S.modules.some(m => m.name === uutName) ? null : 'Select a module.'),
   };
   const summary = h('pre', { class: 'code-box' });
@@ -215,8 +198,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
       const lg = langSel.value === 'verilog' ? 'Verilog' : 'VHDL';
       summary.textContent = `Project Navigator will create a new skeleton source with the following specifications.\n\nAdd to Project: Yes\nSource Directory: ${loc.value}\nSource Type: ${st.label}${st.ext ? '' : ` (${lg})`}\nSource Name: ${n}${extOf(st)}\n` +
         (st.id === 'hdl' ? `\nEntity name: ${entName.value}\n${langSel.value === 'vhdl' ? `Architecture name: ${archName.value}\n` : ''}\nPort Definitions:\n${ports.map(p => `    ${p.name.padEnd(12)} ${p.bus ? `Bus[${p.msb}:${p.lsb}]` : 'Pin'.padEnd(8)}  ${p.dir}`).join('\n')}` : '') +
-        (st.id === 'tb' ? `\nAssociated Source: ${uutName}` : '') +
-        (st.id === 'tt' && ttExpr.value.trim() ? `\nExpression: ${ttExpr.value.trim()}` : '');
+        (st.id === 'tb' ? `\nAssociated Source: ${uutName}` : '');
     },
   };
   const pages = () => {
@@ -275,10 +257,7 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
     }
     case 'tt': {
       const { newTable } = await import('/core/logic.js');
-      const e = ttExpr.value.trim() ? await ttFromExpression(ttExpr.value) : null;
-      const table = e ? { ...newTable(n.replace(/[^A-Za-z0-9_]/g, '_'), e.inputs, [e.output]), table: { [e.output]: e.column }, exprs: { [e.output]: e.expr } }
-        : newTable(n.replace(/[^A-Za-z0-9_]/g, '_'), ['a', 'b', 'c'], ['f']);
-      text = JSON.stringify({ ...table, lang: langSel.value }, null, 2);
+      text = JSON.stringify({ ...newTable(n.replace(/[^A-Za-z0-9_]/g, '_'), ['a', 'b', 'c'], ['f']), lang: langSel.value }, null, 2);
       break;
     }
   }
@@ -293,23 +272,6 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
   if (st.id === 'fsm') { app.openFsm(path); return; }
   if (st.id === 'petri') { app.openPetri(path); return; }
   if (st.id === 'asm') app.openAsm(path); else if (st.id === 'tt') app.openTt(path); else if (st.id === 'sch') app.openSch(path); else app.openFile(path);
-}
-
-// a truth table from "name = expression" (#1056): its inputs (the expression's, 1 to 6), its output (the name, else f)
-// and the output's column; or the error to show
-async function ttFromExpression(text) {
-  const { splitEquation, expressionInputs } = await import('/core/ink/expression.js');
-  const { parseExpr, exprColumn, MAX_EDIT_INPUTS } = await import('/core/logic.js');
-  const { name, expr } = splitEquation(text);
-  let inputs;
-  try { inputs = expressionInputs(expr); } catch (e) { return `Expression: ${e.message}`; }
-  if (inputs.length < 1 || inputs.length > MAX_EDIT_INPUTS) return `Expression: 1 to ${MAX_EDIT_INPUTS} inputs (it has ${inputs.length}).`;
-  const output = name || 'f';
-  if (!NAME_RE.test(output)) return `Expression: '${output}' is not a valid output name.`;
-  const r = reservedError(output) || inputs.map(reservedError).find(Boolean);
-  if (r) return `${r}: choose another name.`;
-  if (inputs.some(i => i.toLowerCase() === output.toLowerCase())) return `Expression: the output '${output}' is also an input.`;
-  return { inputs, output, expr, column: exprColumn(parseExpr(expr, { vars: inputs }), inputs) };
 }
 
 // a file name that is not an identifier (e.g. with -) as the module's name
@@ -327,6 +289,7 @@ async function openWizard(wiz, { name, location, lang, ext, back }) {
     case 'fsm': return (await import('./chart-wizards.js')).fsmWizard(o);
     case 'asm': return (await import('./chart-wizards.js')).asmWizard(o);
     case 'ucf': return (await import('./ucf-wizard.js')).ucfWizard({ path: `${location}/${name}${ext}`, back });
+    case 'boolean': return (await import('./tt-wizard.js')).booleanWizard({ path: `${location}/${name}${ext}`, name: o.name, lang, back });
     case 'testbench': return (await import('./tbwizard.js')).testBenchWizard({ module: S.sel?.module, name: name || null, location, lang, back });
     case 'clock': return (await import('./clock-wizard.js')).clockWizard(o);
     case 'memory': return (await import('./bram-wizard.js')).blockMemoryWizard(o);

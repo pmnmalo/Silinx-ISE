@@ -21,22 +21,21 @@ const TYPES = ['Boolean Algebra', 'Module (HDL)', 'Schematic', 'Finite State Mac
   'Clock Manager (DCM / PLL)', 'Block Memory', 'Test Bench', 'Implementation Constraints File', 'Memory Initialization File (.mem)', 'C Function (HLS)', 'C++ Function (HLS)'];
 // each type: its wizard's dialog (null: none), only a wizard (Next > disabled)
 const WIZARD = {
-  'Module (HDL)': 'Module Wizard', 'Schematic': 'Schematic Wizard', 'Finite State Machine (FSM)': 'FSM Wizard',
+  'Boolean Algebra': 'Boolean Algebra Wizard', 'Module (HDL)': 'Module Wizard', 'Schematic': 'Schematic Wizard', 'Finite State Machine (FSM)': 'FSM Wizard',
   'Algorithmic State Machine (ASM)': 'ASM Wizard', 'Petri Net': 'Petri Net Wizard',
   'Clock Manager (DCM / PLL)': 'Clocking Wizard', 'Block Memory': 'Block Memory', 'Test Bench': 'Test Bench Wizard',
   'Implementation Constraints File': 'UCF Wizard',
 };
 // each wizard's pages opened from New Source: its own, no "Name and Language" (#2082)
 const STEPS = {
+  'Boolean Algebra Wizard': ['Inputs and Outputs', 'Summary'],
   'Module Wizard': ['Inputs and Outputs', 'Kind of Logic', 'Summary'], 'Schematic Wizard': ['Inputs and Outputs', 'Summary'],
   'FSM Wizard': ['Inputs and Outputs', 'States and Transitions', 'Summary'], 'ASM Wizard': ['Inputs and Outputs', 'States', 'Summary'],
   'Petri Net Wizard': ['Inputs and Outputs', 'Summary'], 'Clocking Wizard': ['Input Clock', 'Output Clocks', 'Summary'], 'Block Memory': ['Memory', 'Summary'],
   'Test Bench Wizard': ['Unit Under Test', 'Clock and Reset', 'Input Vectors', 'Vectors and Expected Outputs', 'Summary'], 'UCF Wizard': ['Ports and Pins', 'Summary'],
 };
-// the types whose File Name and Location page asks the language (an HDL file's, the extension follows it, or a
-// drawing's HDL, #2082)
-const LANGUAGE = new Set(['Boolean Algebra', 'Module (HDL)', 'Schematic', 'Finite State Machine (FSM)', 'Algorithmic State Machine (ASM)', 'Petri Net',
-  'Clock Manager (DCM / PLL)', 'Block Memory', 'Test Bench']);
+// the File Name and Location page: the same for every type (#2140)
+const FILE_LABELS = ['Source type:', 'File name:', 'Location:', 'Language:'];
 const ONLY = new Set(['Clock Manager (DCM / PLL)', 'Block Memory']);
 const ADDER = 'library ieee;\nuse ieee.std_logic_1164.all;\nentity adder is\n  port (a, b : in std_logic; s : out std_logic);\nend adder;\narchitecture rtl of adder is\nbegin\n  s <= a xor b;\nend rtl;\n';
 
@@ -64,8 +63,9 @@ uiTest('New Source (#958, #2082): no "(Wizard)" types; Wizard > | < Back | Next 
     await waitNewSourcePage(page, 'File Name and Location');
     const last = ONLY.has(type) ? 'Finish' : 'Next >';
     assert.deepEqual(await buttons(page), [`Wizard >${WIZARD[type] ? '' : ' (disabled)'}`, '< Back', `${last}${ONLY.has(type) ? ' (disabled)' : ''}`, 'Cancel'], type);
-    // the language asked on this page by the HDL types only
-    assert.equal(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main label')].some((l) => l.textContent === 'Language:')), LANGUAGE.has(type), type);
+    // the same fields for every type (#2140), the language the project's preferred one
+    assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-main .form-grid > label')].map((l) => l.textContent)), FILE_LABELS, type);
+    assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main select').value), 'vhdl', type);
     // an invalid name: Wizard > refuses it on this page too
     if (WIZARD[type]) {
       await page.fill('.dlg-overlay .wiz-main input[type=text]', '9x');
