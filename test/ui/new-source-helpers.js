@@ -28,3 +28,12 @@ export async function newSourceWizardOf(page, type, name, title, {
   await page.dialogButton(wizard);
   await page.waitDialog(title);
 }
+
+// a port added to a wizard's port table: Add Port, then its name, direction and width (no quick-add buttons, #2145)
+export async function addPort(page, name, dir = 'in', width = 1) {
+  const k = await page.eval(() => document.querySelectorAll('.dlg-overlay .mw-pname').length);
+  await page.click('.dlg-overlay .mw-add');
+  await page.fill('.dlg-overlay .mw-pname', name, { index: k });
+  await page.fill('.dlg-overlay .mw-pdir', dir, { index: k });
+  await page.fill('.dlg-overlay .mw-pwidth', String(width), { index: k });
+}

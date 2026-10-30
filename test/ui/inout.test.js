@@ -1,12 +1,12 @@
 // UI: bidirectional (inout, tri-state) ports in the beginner wizards. Module Wizard: a module with
-// inout ports (quick-add and a typed row), tri-state template written and compiling; Schematic
+// inout ports (added with Add Port, one typed as inout), tri-state template written and compiling; Schematic
 // Wizard: inout markers on the right edge, then the live simulation drives / releases them; Test
 // Bench Wizard: a bidirectional register tested exhaustively (expected values from the design) and
 // with typed drive / release rows, TEST PASSED in ISim.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
-import { newSourceWizardOf } from './new-source-helpers.js';
+import { newSourceWizardOf, addPort } from './new-source-helpers.js';
 import { compile, elaborate } from '../../core/compile.js';
 
 let env;
@@ -20,7 +20,6 @@ const next = async (page, title) => {
   await page.dialogButton(title === null ? 'Finish' : 'Next >');
   if (title) await page.waitFor((t) => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === t, [title], { what: `wizard page ${title}` });
 };
-const quick = (page, port) => page.click(`.dlg-overlay .mw-qa[data-port=${port}]`);
 const setLang = (page, l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
 const noErrors = (text, lang, top) => {
   const lib = compile([{ path: `src/${top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text }]);
@@ -29,13 +28,13 @@ const noErrors = (text, lang, top) => {
   return d;
 };
 
-uiTest('Module Wizard: bidirectional ports (quick-add data[7:0], a typed inout row), tri-state template, opened and compiling', E, async (page) => {
+uiTest('Module Wizard: bidirectional ports (data[7:0] and a typed inout row), tri-state template, opened and compiling', E, async (page) => {
   await makeProject(env, { name: 'IoMw' });
   await page.openProject('IoMw');
   for (const lang of ['vhdl', 'verilog']) {
     const name = `busctl_${lang}`;
     await openWizard(page, 'Module (HDL)', name, 'Module Wizard', lang);
-    for (const p of ['a', 'data', 'y']) await quick(page, p);
+    for (const [n, d, w] of [['a', 'in', 8], ['data', 'inout', 8], ['y', 'out', 1]]) await addPort(page, n, d, w);
     await page.click('.dlg-overlay .mw-add');
     await page.fill('.dlg-overlay .mw-pname', 'ack', { index: 3 });
     // the direction list offers 'bidirectional' (inout), translated in Portuguese
@@ -43,7 +42,6 @@ uiTest('Module Wizard: bidirectional ports (quick-add data[7:0], a typed inout r
     if (lang === 'vhdl') {
       await setLang(page, 'pt');
       await page.waitFor(() => document.querySelectorAll('.dlg-overlay .mw-pdir')[3].options[2].textContent === 'bidirecional', [], { what: 'Portuguese direction' });
-      assert.match(await page.eval(() => document.querySelector('.dlg-overlay .mw-quick').textContent), /Adicionar \(bidirecionais\):/);
       await setLang(page, 'en');
     }
     await page.fill('.dlg-overlay .mw-pdir', 'inout', { index: 3 });

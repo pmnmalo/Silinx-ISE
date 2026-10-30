@@ -9,7 +9,7 @@
 //     PASS with the right expected values (typed in or from a trace run), FAIL with a wrong one.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateModule, schematicFromPorts, checkPorts, QUICK_PORTS } from '../core/modgen.js';
+import { generateModule, schematicFromPorts } from '../core/modgen.js';
 import { netlist, generateHdl, normalizeDoc, portBox, newDoc, symbolPins, modulesFromLibrary } from '../core/schdoc.js';
 import { compile, elaborate, simulate } from '../core/compile.js';
 import { buildLiveSim } from '../core/schlive.js';
@@ -84,9 +84,7 @@ test('module generator, inout ports: every option combination compiles, elaborat
     }
   }
   assert.ok(n > 50, `${n} modules`);
-  // quick-add has bidirectional ports; names clashing with the internal ones get a fresh name
-  assert.ok(QUICK_PORTS.some((p) => p.dir === 'inout' && p.width === 8));
-  for (const lang of LANGS) assert.equal(checkPorts(QUICK_PORTS, { lang, name: 'top' }), null);
+  // names clashing with the internal ones get a fresh name
   const clash = generateModule({ name: 'clash', lang: 'vhdl', ports: [{ name: 'd', dir: 'inout', width: 4 }, { name: 'd_oe', dir: 'in', width: 1 }], kind: 'comb' });
   assert.match(clash, /signal d_oe_1 : std_logic;/);
   check(clash, 'vhdl', 'clash');

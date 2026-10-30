@@ -2,7 +2,6 @@
 // the Test Bench Wizard and the live schematic simulation (merged into the dictionary of i18n.js).
 export const IO_PT = {
   // Module Wizard / Schematic Wizard (web/js/modwizard.js)
-  'Quick add (bidirectional):': 'Adicionar (bidirecionais):',
   'bidirectional': 'bidirecional',
   'bidirectional = inout: a tri-state port the module can drive or release (Z), and read':
     'bidirecional = inout: um porto tri-state que o módulo pode atuar ou libertar (Z), e ler',

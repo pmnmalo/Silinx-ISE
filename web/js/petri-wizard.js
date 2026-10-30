@@ -33,7 +33,7 @@ export async function petriWizard({ name = '', location = 'src', lang = null, na
     hint: 'The wizard creates a Petri net with its inputs and outputs declared, ready for you to draw its places, transitions and arcs; its HDL is generated from it.',
   });
   const ports = [];
-  const pe = portEditor(ports, { lang: p1.lang, dirs: ['in', 'out'], quickAdd: false });   // only the user's own ports (#2082); the clock and the reset: fields of their own
+  const pe = portEditor(ports, { lang: p1.lang, dirs: ['in', 'out'] });   // only the user's own ports (#2082); the clock and the reset: fields of their own
   const clkIn = h('input', { type: 'text', class: 'pw-clock', value: 'clk', style: { width: '100px' } });
   const rstIn = h('input', { type: 'text', class: 'pw-reset', value: 'rst', style: { width: '100px' } });
   const net = () => petriFromPorts({ name: p1.name(), lang: p1.lang(), description: p1.desc.value, ports, clock: clkIn.value.trim(), reset: rstIn.value.trim() });

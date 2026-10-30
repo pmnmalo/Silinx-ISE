@@ -61,26 +61,6 @@ export function checkPorts(ports, { lang = 'vhdl', name = null, generics = [] } 
   return null;
 }
 
-/** Ports offered by the quick-add buttons of the wizards (the usual names of the board labs). */
-export const QUICK_PORTS = [
-  { name: 'clk', dir: 'in', width: 1, desc: 'clock' },
-  { name: 'reset', dir: 'in', width: 1, desc: 'reset' },
-  { name: 'enable', dir: 'in', width: 1, desc: 'enable' },
-  { name: 'a', dir: 'in', width: 8, desc: 'operand a' },
-  { name: 'b', dir: 'in', width: 8, desc: 'operand b' },
-  { name: 'sel', dir: 'in', width: 1, desc: 'select' },
-  { name: 'sw', dir: 'in', width: 4, desc: 'switches' },
-  { name: 'btn', dir: 'in', width: 4, desc: 'push buttons' },
-  { name: 'y', dir: 'out', width: 1, desc: 'output' },
-  { name: 'sum', dir: 'out', width: 8, desc: 'sum' },
-  { name: 'q', dir: 'out', width: 8, desc: 'register value' },
-  { name: 'led', dir: 'out', width: 8, desc: 'LEDs' },
-  { name: 'seg', dir: 'out', width: 7, desc: '7-segment display segments (a..g)' },
-  { name: 'an', dir: 'out', width: 4, desc: '7-segment display anodes' },
-  { name: 'data', dir: 'inout', width: 8, desc: 'bidirectional data bus' },
-  { name: 'sda', dir: 'inout', width: 1, desc: 'bidirectional line' },
-];
-
 /** Likely clock / reset among the 1-bit inputs (by name), and the reset's active level. */
 export function guessClockReset(ports) {
   const bits = ports.filter(p => p.dir === 'in' && +p.width === 1).map(p => p.name);

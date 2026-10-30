@@ -18,7 +18,7 @@ import { portText, namedPages } from './wizard-util.js';
 // the page of the inputs and outputs, the clock and the reset (the Petri Net Wizard's)
 function ioPage(p1, extra = []) {
   const ports = [];
-  const pe = portEditor(ports, { lang: p1.lang, dirs: ['in', 'out'], quickAdd: false });
+  const pe = portEditor(ports, { lang: p1.lang, dirs: ['in', 'out'] });
   const clkIn = h('input', { type: 'text', class: 'cw-clock', value: 'clk', style: { width: '100px' } });
   const rstIn = h('input', { type: 'text', class: 'cw-reset', value: 'rst', style: { width: '100px' } });
   const page = {

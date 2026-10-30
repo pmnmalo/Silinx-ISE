@@ -4,7 +4,7 @@
 // netlist() / generateHdl() with only "not connected" warnings, and its HDL compiles and simulates.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateModule, schematicFromPorts, checkPorts, identError, guessClockReset, QUICK_PORTS } from '../core/modgen.js';
+import { generateModule, schematicFromPorts, checkPorts, identError, guessClockReset } from '../core/modgen.js';
 import { netlist, generateHdl, normalizeDoc, portBox } from '../core/schdoc.js';
 import { compile, elaborate, simulate } from '../core/compile.js';
 
@@ -157,8 +157,6 @@ test('port table checks: identifiers, reserved words, duplicates, widths, generi
   assert.throws(() => generateModule({ name: 'm', lang: 'vhdl', ports: [P('a'), P('a')], kind: 'comb' }), /Two ports/);
   assert.throws(() => generateModule({ name: 'm', lang: 'vhdl', ports: [P('d', 'in', 4)], kind: 'seq', clock: 'd' }), /needs a clock/);
   assert.throws(() => generateModule({ name: 'm', lang: 'vhdl', ports: [P('c'), P('r')], kind: 'seq', clock: 'c', reset: { port: 'c', mode: 'sync' } }), /reset must be/);
-  // the quick-add ports are valid in both languages and distinct
-  for (const lang of ['vhdl', 'verilog']) assert.equal(checkPorts(QUICK_PORTS, { lang, name: 'top' }), null);
   assert.deepEqual(guessClockReset([P('clk'), P('rst_n'), P('d', 'in', 4)]), { clock: 'clk', reset: 'rst_n', active: '0' });
   assert.deepEqual(guessClockReset([P('clock'), P('reset')]), { clock: 'clock', reset: 'reset', active: '1' });
   assert.deepEqual(guessClockReset([P('d', 'in', 4)]), { clock: '', reset: '', active: '1' });
