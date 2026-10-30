@@ -63,7 +63,7 @@ them and this table is corrected then.
 | S6-D | the routing switches, by PIP drop in batches (the INT tile and the other tile types) | 1 500–3 000 | several nights | from `gen-pipdrop.mjs`, `gen-pipcover.mjs`, `pips-to-db.mjs` | #726 |
 | S6-E | I/O and clocking: every pad's settings at random, the BUFIO2 / BUFG / BUFH paths, DCM and PLL settings | about 500 | 1–2 nights | from `gen-iob.mjs`, `gen-iorand.mjs`, `gen-sitevar.mjs`, `gen-dcmhdl.mjs` | #727 |
 | S6-F | block RAM content and settings, DSP48A1 settings | about 300 | 1 night | from `gen-bram.mjs`, `gen-sitevar.mjs` | #728 |
-| S6-G | timing: trce on the examples and on generated paths (each cell and wire kind) | about 200 | 1 night | from `research/s3e-route` (`ise-timing-check.sh`, `timing-fit.mjs`) | #731 |
+| S6-G | timing: trce on the examples and on generated paths (each cell and wire kind) | about 200 | 1 night | from `packages/silinx-fpga/research/s3e-route` (`ise-timing-check.sh`, `timing-fit.mjs`) | #731 |
 | S6-G | the XC6SLX45 from the XC6SLX16's tile types (stage F of the Spartan-3E: the larger part's layout and residuals) | about 100 | 1 night | from `impl-remote.sh`, `ana-residual.mjs` | #725–#728 |
 
 ISE's raw outputs (`.bit`, `.ncd`, `.xdl`, `.xdlrc`, the logs) never enter the repository: the scripts keep
@@ -144,7 +144,7 @@ FLR is not the frame length of 65 words: its meaning, and the frames' order, are
 
 ### The device descriptions (#723, 2026-10-21)
 
-Built from the two reports by Silinx's generic builder (`research/s3e-route/build-device.mjs`, the Spartan-3E
+Built from the two reports by Silinx's generic builder (`packages/silinx-fpga/research/s3e-route/build-device.mjs`, the Spartan-3E
 one, unchanged: it reads any `xdl -report`): the XC6SLX16 in 5 s, 1.4 MB gzipped (307 tile templates, 509 302
 nodes), the XC6SLX45 in 14 s, 2.9 MB (369 templates, 1 397 026 nodes, loaded in 136 ms); their tiles, sites by type
 and PIPs exactly the reports'. Shipped in `packages/silinx-fpga/devices/` as the Spartan-3E boards' are. A slice's carry goes

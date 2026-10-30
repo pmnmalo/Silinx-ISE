@@ -1,5 +1,5 @@
 // Stage S6-D (#726): the PIPs of the tiles other than the INT-like and CLB ones (the I/O, block RAM and DSP sites',
-// the clock tiles'), by PIP drop on designs ISE routed (research/s3e-bitstream's gen-pipdrop.mjs): for each design,
+// the clock tiles'), by PIP drop on designs ISE routed (packages/silinx-fpga/research/s3e-bitstream's gen-pipdrop.mjs): for each design,
 // <name>.base.xdl (ISE's XDL as it is) and <name>.drop.xdl (without those PIPs; the nets keep their pins, so bitgen
 // programs the rest); ana-pipdrop6.mjs takes the bits the drop clears, tile by tile.
 //   node research/s6/gen-pipdrop6.mjs [--split L] <out dir> <name>=<top.xdl> …
