@@ -4,8 +4,8 @@
 //   through io.nextpnr) packs, places and routes Yosys's netlist.
 // - Its routed design becomes XDL (fpga/nextpnr-xdl.js), which the timing, the pins and the bitstream read as they
 //   read Silinx's own.
-// - For now the micro-architecture knows LUTs, flip-flops, IOBs and global clock buffers (#2135): a netlist with
-//   other cells fails at Map, naming them.
+// - For now the micro-architecture knows LUTs, flip-flops, carry chains, constants, IOBs and global clock buffers
+//   (#2135): a netlist with other cells fails at Map, naming them.
 import { parseUcf } from './ucf.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { checkRouting } from './fpga/route.js';
@@ -13,37 +13,23 @@ import { deviceSites } from './fpga/place.js';
 import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
 
 /** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops of
- *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the I/O buffers and BUFG. */
-export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|IBUF|OBUF|BUFG)$/;
-
-/** A flip-flop's ports a constant may drive (the micro-architecture drops them: an enable always 1, a reset always 0). */
-const CONSTANT_PORTS = { CE: 'VCC', R: 'GND', S: 'GND', CLR: 'GND', PRE: 'GND' };
+ *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the carry chains (MUXCY, XORCY), the
+ *  constants (GND, VCC), the I/O buffers and BUFG. */
+export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|GND|VCC|IBUF|OBUF|BUFG)$/;
 
 /**
  * The netlist for nextpnr: each port bit's pad (its LOC in the UCF) on the I/O buffer at that bit, the IBUF or OBUF the
  * synthesis put there (nextpnr gives a port's own attributes to none of its cells; the micro-architecture places an
- * I/O buffer at its LOC). Returns { json, problems }: the cells the micro-architecture does not have, constants it
- * cannot drive, ports without a pad.
+ * I/O buffer at its LOC). Returns { json, problems }: the cells the micro-architecture does not have, ports without
+ * a pad. (The constants: the micro-architecture's, #2135.)
  */
 export function nextpnrNetlist(text, top, ucfText) {
   const json = JSON.parse(text);
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
   const problems = [];
   const types = new Map();
-  for (const c of Object.values(mod.cells)) if (!NEXTPNR_CELL.test(c.type) && !/^(GND|VCC)$/.test(c.type)) types.set(c.type, (types.get(c.type) || 0) + 1);
+  for (const c of Object.values(mod.cells)) if (!NEXTPNR_CELL.test(c.type)) types.set(c.type, (types.get(c.type) || 0) + 1);
   for (const [t, n] of types) problems.push(`${n} cell(s) ${t}: not in the spartan3e micro-architecture yet`);
-  // the constants: only a flip-flop's enable at 1 and its set / reset at 0
-  const constant = new Map();
-  for (const c of Object.values(mod.cells)) if (/^(GND|VCC)$/.test(c.type)) for (const b of Object.values(c.connections).flat()) constant.set(b, c.type);
-  for (const [n, c] of Object.entries(mod.cells)) {
-    for (const [port, bits] of Object.entries(c.connections)) {
-      if (c.port_directions?.[port] === 'output') continue;
-      for (const b of bits) {
-        const k = b === '1' ? 'VCC' : b === '0' ? 'GND' : constant.get(b);
-        if (k && !(/^FD/.test(c.type) && CONSTANT_PORTS[port] === k)) problems.push(`${c.type} ${n}: ${port} tied to ${k === 'VCC' ? '1' : '0'} (constants: #2135)`);
-      }
-    }
-  }
   // each port bit's pad on its I/O buffer
   let locs = {};
   try { if (ucfText) locs = parseUcf(ucfText).assignments || {}; } catch { /* checked by translate */ }
