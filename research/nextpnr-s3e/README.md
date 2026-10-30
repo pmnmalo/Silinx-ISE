@@ -14,6 +14,7 @@ XC3S250E (Basys2-250).
 | `nextpnr-to-xdl.mjs` | nextpnr's routed design (`--write`) to XDL: one instance per used site with its settings, each net's site pins and PIPs |
 | `xdl-to-bit.mjs` | Silinx's bitgen on that XDL |
 | `export-timing.mjs` | Silinx's delay model (`SPEED_4`, fitted to trce) for the chip database: the class of the node each PIP drives, per template, and the model's delays |
+| `xdl-sim-check.mjs` | Does the converted XDL implement nextpnr's netlist? Both simulated cycle by cycle, every flip-flop compared (also from random states, for a counter's top bits); ISE's DRC cannot tell a wrong LUT equation |
 | `xdl-report.mjs` | The size (slices, LUTs, flip-flops) and speed (each clock's minimum period, Silinx's static timing analysis fitted to trce) of a routed XDL: nextpnr's result and Silinx's measured the same way |
 
 The site model, per slice: two LUT4s (F, G, inputs on F1…F4 / G1…G4), their outputs to X / Y
@@ -40,7 +41,8 @@ node research/nextpnr-s3e/xdl-to-bit.mjs routed.xdl blink.bit
 ```
 
 `blink.v` (in this folder): a 24-bit counter on the 50 MHz clock, its top byte on the LEDs, the ports'
-pads as `LOC` attributes.
+pads as `LOC` attributes. `blink27.v`: the same with 27 bits, bits 26…19 on the LEDs (LD7 a cycle every
+2.68 s), to time on the board.
 
 ## Results (2026-10-29)
 
@@ -82,7 +84,11 @@ The slices packed (`pack_slices`): a LUT with the flip-flop it feeds, or either 
 units with the same control set go into one slice, chosen by the nets they share (each net weighing
 1 / its fanout), the rest paired by control set; each slice a cluster (F, G, FFX, FFY at z 0…3).
 
-On a Basys2-250 (2026-10-30), the LUT pins permuted result (seed 3) loaded by adepttool: LD7 blinks at about 3 Hz (q[23], 50 MHz / 2^24), each LED below it twice as fast, SW0 holds them off.
+On a Basys2-250 (2026-10-30), loaded by adepttool: `blink.v` (LUT pins permuted, seed 3) counts, each LED
+twice as fast as the one above, SW0 holds them off; `blink27.v` (seed 3: 22 slices, ISE's DRC clean, trce
+6.982 ns, `.bit` byte-identical to ISE's) takes about 27 s for 10 cycles of LD7 (26.8 s at 50 MHz), as
+Silinx's build of the same netlist does. Both converted XDLs pass `xdl-sim-check.mjs` (5000 random starts).
+At 3 to 12 Hz the rates of two builds could not be told apart by eye: the slower counter settled it.
 
 What ISE taught the converter: an input alone is an `IBUF` instance, also on an IOB site; logic on a
 SLICEM site is a `SLICEL` instance (as a `SLICEM`, ISE's DRC finds the SR pin "partially connected");
