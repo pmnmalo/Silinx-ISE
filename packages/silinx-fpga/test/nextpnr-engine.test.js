@@ -106,6 +106,24 @@ test('#2135 a counter with a carry chain and constants (Silinx\'s synthesis) bui
   assert.equal(cfg('CYINIT', 'CIN'), 11);
 });
 
+test('#2196 the VGA example built with --engine nextpnr: at most 157 slices as the packing fills them, no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const netlist = path.join(dir, 'top.json');
+  fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('vga.json.gz'))));
+  const out = [], err = [];
+  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('vga.ucf').pathname, '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of occupied Slices: 157 out of 2448 6%'), out.join('\n'));
+  assert.ok(out.includes('  Number of 4 input LUTs: 296 out of 4896 6%'), out.join('\n'));
+  assert.ok(out.includes('  Number of Slice Flip Flops: 56 out of 4896 1%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  const clock = design.nets.find(n => n.inpins.some(p => p.pin === 'CLK'));
+  assert.deepEqual(clock.pips.filter(p => /^CLK\d$/.test(p.to) && !/^GCLK/.test(p.from)), []);
+});
+
 test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry chains) built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const netlist = path.join(dir, 'top.json');
@@ -116,7 +134,7 @@ test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry 
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
   assert.ok(out.includes('  Number of Slice Flip Flops: 58 out of 4896 1%'), out.join('\n'));
-  assert.ok(out.includes('  Number of occupied Slices: 71 out of 2448 3%'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 69 out of 2448 3%'), out.join('\n'));
   assert.ok(out.includes('All constraints were met.'), out.join('\n'));
   assert.ok(out.includes('Bitstream: build/top.bit (169286 bytes, every feature in the bit database)'), out.join('\n'));
   // the wide multiplexers on the slices' own: twelve F5s, two F6s each reading two of them

@@ -226,6 +226,43 @@ test('#2135 the wide multiplexers\' XDL implements its netlist; an F5 or F6 outp
   }
 });
 
+// nextpnr's routed VGA example (Silinx's synthesis, seed 1): carry chains on copies of shared LUTs, carry outs read by
+// logic leaving by XB / YB, as Silinx's packer (#2196). ISE's DRC passed it (0 errors, 0 warnings), its bitgen's .bit
+// byte-identical to Silinx's from the sync word on.
+const vgaRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/vga-routed.json.gz', import.meta.url))));
+const vga = nextpnrToXdl(vgaRouted(), device, PART);
+
+test('#2196 nextpnrToXdl: the carry out on XB / YB (XBUSED, YBUSED), COUT only where the chain goes on', () => {
+  assert.deepEqual(xdlSize(vga), { slices: 157, luts: 296, ffs: 56 });
+  assert.equal(count(vga, /^XBUSED::0$/), 14);
+  assert.equal(count(vga, /^YBUSED::0$/), 5);
+  for (const i of vga.insts.filter(x => cfg(x, 'YBUSED'))) {
+    const net = vga.nets.find(n => n.outpins.some(p => p.inst === i.name && p.pin === 'YB'));
+    assert.deepEqual(net.outpins, [{ inst: i.name, pin: 'YB' }], net.name);   // (one driver, COUT not among them)
+    assert.equal(cfg(i, 'COUTUSED'), undefined, i.name);
+  }
+  assert.deepEqual(checkRouting(vga, device).problems, []);
+  assert.deepEqual(bitgen(vga, loadDb(PART), { name: 'vga.ncd', crc: true, startupClk: 'JtagClk', part: PART }).unknown, []);
+});
+
+test('#2196 the carry out\'s XDL implements its netlist; one taken away is caught', () => {
+  const json = vgaRouted();
+  const r = simCheck(json, vga, { cycles: 2000, starts: 100 });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.flipFlops, 56);
+  const text = writeXdl(vga);
+  for (const attr of ['XBUSED', 'YBUSED'])
+    assert.equal(simCheck(json, parseXdl(text.replaceAll(`${attr}::0`, '')), { cycles: 2000, starts: 100 }).ok, false, attr);
+});
+
+test('#2196 a global buffer\'s clock pins are on its global lines, none on general routing', () => {
+  const clocks = vga.nets.filter(n => n.inpins.some(p => p.pin === 'CLK'));
+  assert.equal(clocks.length, 1);
+  const intoClock = clocks[0].pips.filter(p => /^CLK\d$/.test(p.to));
+  assert.ok(intoClock.length > 0);
+  assert.deepEqual(intoClock.filter(p => !/^GCLK/.test(p.from)), []);
+});
+
 // nextpnr's routed design of research/nextpnr-s3e/iob_regs.v as Silinx's synthesis maps it, its constraints
 // test/fixtures/nextpnr-engine/iob_regs.ucf: registers in the IOBs (input, output, output-enable: the UCF's IOB = TRUE), an
 // IDDR2 and an ODDR2 on the clock and its inverse, the clock on a GCLK pin (#2135). ISE's DRC passed it (0 errors, 0
