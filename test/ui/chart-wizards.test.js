@@ -188,7 +188,7 @@ uiTest('#2082 UCF Wizard with no board: the pins typed; the module chosen', E, a
   assert.equal(await page.eval(() => window.Silinx.project.constraints), 'constraints/top.ucf');
 });
 
-uiTest('#2082 New Source ▸ Next > of a drawing: its HDL in the language chosen on the page (FSM in Verilog)', E, async (page) => {
+uiTest('#2082 New Source ▸ Next > of a drawing: its HDL in the language chosen on the page (an FSM and a Petri net in Verilog; the net, empty, has its HDL at once, #2176)', E, async (page) => {
   await makeProject(env, { name: 'NlPj', top: '' });
   await page.openProject('NlPj');
   await page.menu('Project', 'New Source…');
@@ -203,7 +203,20 @@ uiTest('#2082 New Source ▸ Next > of a drawing: its HDL in the language chosen
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.active?.id === 'fsm:src/plain_fsm.fsm.json', [], { what: 'the diagram opened' });
   assert.equal(JSON.parse(await readWs(env, 'NlPj', 'src/plain_fsm.fsm.json')).lang, 'verilog');
-  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/plain_fsm.v'), [], { what: 'its Verilog', timeout: 15000 });
+  // (an empty diagram has no HDL until its first state, #2176: an empty net has its HDL)
+  await page.menu('Project', 'New Source…');
+  await page.waitDialog('New Source');
+  await pickSourceType(page, 'Petri Net');
+  await page.dialogButton('Next >');
+  await waitNewSourcePage(page, 'File Name and Location');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'plain_net');
+  await page.fill('.dlg-overlay .wiz-main select', 'verilog');
+  await next(page, 'Summary');
+  await next(page, null);
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.active?.id === 'pn:src/plain_net.pn.json', [], { what: 'the net opened' });
+  assert.equal(JSON.parse(await readWs(env, 'NlPj', 'src/plain_net.pn.json')).lang, 'verilog');
+  await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/plain_net.v'), [], { what: 'its Verilog', timeout: 15000 });
 });
 
 uiTest('#2082 Portuguese: every page of the FSM, ASM and UCF wizards translated', E, async (page) => {

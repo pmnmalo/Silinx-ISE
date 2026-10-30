@@ -5,6 +5,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { newPetri } from '../../core/petri.js';
 import { setupUi, uiTest, makeProject, readWs, waitDownload } from './harness.js';
 import { newSourceWizardOf } from './new-source-helpers.js';
 
@@ -15,15 +16,9 @@ const E = () => env;
 const ED = '.doc:not([hidden]) .petri-editor';
 
 uiTest('Petri net editor: new net, a place added and undone, the token game and the clock step, the HDL, the net as the top module', E, async (page) => {
-  await makeProject(env, { name: 'PnPj', top: '' });
+  await makeProject(env, { name: 'PnPj', top: '', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
   await page.openProject('PnPj');
-  await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source');
-  await page.dialogButton('Next >');
-  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Finish');
-  await page.waitNoDialog();
+  await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
   await page.waitFor((ed) => window.Silinx.active?.id === 'pn:src/ctl.pn.json' && document.querySelector(ed), [ED], { what: 'the Petri net editor' });
   const count = () => page.eval((ed) => document.querySelector(`${ed} .asm-status`).textContent, ED);
   await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED]);
@@ -68,15 +63,9 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
 
 // a new net in a project, opened in the editor
 async function newNet(page, pj) {
-  await makeProject(env, { name: pj, top: '' });
+  await makeProject(env, { name: pj, top: '', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
   await page.openProject(pj);
-  await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source');
-  await page.dialogButton('Next >');
-  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Finish');
-  await page.waitNoDialog();
+  await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
   await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-status`)?.textContent || ''), [ED], { what: 'the Petri net editor' });
 }
 const node = (page, id) => page.eval((ed, i) => { const r = document.querySelector(`${ed} [data-id=${i}] ${i[0] === 'p' ? 'circle' : 'rect'}`).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, ED, id);
@@ -207,7 +196,7 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
   // PNML export: the net as PNML, read back by core/petri.js
   await page.click(`${ED} button`, { text: 'PNML ⇩' });
   const f = await waitDownload(page, 'ctl.pnml');
-  const { fromPnml, newPetri, normalizePetri } = await import('../../core/petri.js');
+  const { fromPnml, normalizePetri } = await import('../../core/petri.js');
   assert.deepEqual(fromPnml(await fs.readFile(f, 'utf8')), normalizePetri(newPetri('ctl')));
   // PNML import: a net of another tool replaces this one; Undo brings it back
   const pnml = path.join(page.downloadDir, 'other.pnml');

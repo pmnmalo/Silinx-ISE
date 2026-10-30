@@ -6,6 +6,8 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, chromeOnly } from './harness.js';
+import { newPetri } from '../../core/petri.js';
+import { newFsm } from '../../core/fsm.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -112,17 +114,11 @@ uiTest('touch (#264): a finger moves the waveform viewer\'s cursor; the mouse st
 }, { skip: chromeOnly });
 
 uiTest('touch (#265): a finger drags a state of the FSM editor and a place of the Petri net editor (their canvases touch-action: none)', E, async (page) => {
-  await makeProject(env, { name: 'TouchDiag', top: '', files: {} });
+  await makeProject(env, { name: 'TouchDiag', top: '', files: {
+    'src/det.fsm.json': JSON.stringify(newFsm('det'), null, 2), 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
   await page.openProject('TouchDiag');
   // a state diagram
-  await page.menu('Project', 'New Source…');
-  await page.waitDialog('New Source');
-  await page.eval(() => { const r = [...document.querySelectorAll('.dlg-overlay .src-types .st')].find((e) => e.textContent.trim() === 'Finite State Machine (FSM)'); r.scrollIntoView(); r.click(); });
-  await page.dialogButton('Next >');
-  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'det');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Finish');
-  await page.waitNoDialog();
+  await page.eval(() => window.SilinxApp.openFsm('src/det.fsm.json'));
   const FSM = '.doc:not([hidden]) .fsm-editor';
   await page.waitFor((ed) => document.querySelector(`${ed} [data-state=s1] .fsm-circle`)?.getBoundingClientRect().width > 10, [FSM], { what: 'the state diagram editor' });
   assert.equal(await touchAction(page, `${FSM} .fsm-canvas`), 'none');
@@ -134,13 +130,7 @@ uiTest('touch (#265): a finger drags a state of the FSM editor and a place of th
   near(a1.y - a0.y, 40, 15, 'the state dragged by a finger (y)');
 
   // a Petri net
-  await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source');
-  await page.dialogButton('Next >');
-  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Finish');
-  await page.waitNoDialog();
+  await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
   const PN = '.doc:not([hidden]) .petri-editor';
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-place .pn-circle`)?.getBoundingClientRect().width > 10, [PN], { what: 'the Petri net editor' });
   assert.equal(await touchAction(page, `${PN} .pn-canvas`), 'none');

@@ -240,19 +240,18 @@ export async function newSourceWizard({ type, name = '', location = null, lang =
       break;
     }
     case 'asm': {
-      const { newModel } = await import('/core/asm.js');
-      const m = newModel(n.replace(/[^A-Za-z0-9_]/g, '_'), langSel.value);
-      text = JSON.stringify(m, null, 2);
+      const { normalizeModel } = await import('/core/asm.js');
+      text = JSON.stringify(normalizeModel({ name: n.replace(/[^A-Za-z0-9_]/g, '_'), lang: langSel.value }), null, 2);   // empty (#2176)
       break;
     }
     case 'fsm': {
-      const { newFsm } = await import('/core/fsm.js');
-      text = JSON.stringify(newFsm(n.replace(/[^A-Za-z0-9_]/g, '_'), langSel.value), null, 2);
+      const { normalizeFsm } = await import('/core/fsm.js');
+      text = JSON.stringify(normalizeFsm({ name: n.replace(/[^A-Za-z0-9_]/g, '_'), lang: langSel.value }), null, 2);   // empty (#2176)
       break;
     }
     case 'petri': {
-      const { newPetri } = await import('/core/petri.js');
-      text = JSON.stringify(newPetri(n.replace(/[^A-Za-z0-9_]/g, '_'), langSel.value), null, 2);
+      const { normalizePetri } = await import('/core/petri.js');
+      text = JSON.stringify(normalizePetri({ name: n.replace(/[^A-Za-z0-9_]/g, '_'), lang: langSel.value }), null, 2);   // empty (#2176)
       break;
     }
     case 'tt': {

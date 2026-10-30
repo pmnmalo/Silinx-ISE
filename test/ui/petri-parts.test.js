@@ -5,6 +5,7 @@
 // The editor's whole use: test/ui/petri.test.js.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { newPetri } from '../../core/petri.js';
 import { setupUi, uiTest, makeProject } from './harness.js';
 
 let env;
@@ -14,15 +15,9 @@ const E = () => env;
 const ED = '.doc:not([hidden]) .petri-editor';
 
 uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation, the HDL and the analysis', E, async (page) => {
-  await makeProject(env, { name: 'PnParts', top: '' });
+  await makeProject(env, { name: 'PnParts', top: '', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
   await page.openProject('PnParts');
-  await page.menu('Tools', 'Petri Net Editor…');
-  await page.waitDialog('New Source');
-  await page.dialogButton('Next >');
-  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctl');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Finish');
-  await page.waitNoDialog();
+  await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
   await page.waitFor((ed) => window.Silinx.active?.id === 'pn:src/ctl.pn.json' && document.querySelector(`${ed} .pn-place`), [ED], { what: 'the Petri net editor' });
   const ev = (fn, ...a) => page.eval(fn, ED, ...a);
   // ---- the drawing: two places (idle with its token), two transitions, four arcs; the status line

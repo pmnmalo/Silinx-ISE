@@ -7,7 +7,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs, waitDownload, chromeOnly } from './harness.js';
 import { compile, elaborate } from '../../core/compile.js';
-import { normalizeModel, generate } from '../../core/asm.js';
+import { newModel, normalizeModel, generate } from '../../core/asm.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -594,17 +594,15 @@ uiTest('#322 schematic SUB: Borrow in, Borrow out and Pins per bit in its proper
 });
 
 uiTest('ASM chart editor: add a state, a decision and a case box, connect them, its VHDL generated from it', E, async (page) => {
-  await makeProject(env, { name: 'AsmPj' });
+  await makeProject(env, { name: 'AsmPj', files: { 'src/ctrl.asm.json': JSON.stringify(newModel('ctrl', 'vhdl'), null, 2) } });
   await page.openProject('AsmPj');
   // Tools ▸ ASM State Machine Editor… opens the New Source wizard on the ASM type
   await page.menu('Tools', 'ASM State Machine Editor…');
   await page.waitDialog('New Source');
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .src-types .st.sel').textContent), 'Algorithmic State Machine (ASM)');
-  await page.dialogButton('Next >');
-  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'ctrl');
-  await page.dialogButton('Next >');
-  await page.dialogButton('Finish');
+  await page.dialogButton('Cancel');
   await page.waitNoDialog();
+  await page.eval(() => window.SilinxApp.openAsm('src/ctrl.asm.json'));
   await page.waitFor(() => window.Silinx.active?.id === 'asm:src/ctrl.asm.json' && document.querySelector('.doc:not([hidden]) [data-node]'));
   const model = () => page.eval(() => window.Silinx.active.asmEditor.getModel());
   const ids0 = new Set((await model()).nodes.map((n) => n.id));
