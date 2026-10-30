@@ -3,7 +3,9 @@
 // (packages/silinx-fpga/research/s3e-route/open-flow.mjs: no Xilinx tool) writes routed.xdl and its .bit; ISE converts
 // the same routed.xdl, runs its design rule check and writes its own .bit (ise-open-check.sh); the
 // two .bit files must be byte-identical (CRC on and off), and ISE's xdl -xdl2ncd and DRC must give
-// no error and no warning. The open flow's own warnings are listed.
+// no error and no warning. The open flow's own warnings are listed. A Spartan-6 project (its silinx.json's device, the
+// Nexys3's or the Atlys's part, #732) runs the application's own open flow (server/open-flow.js) on a copy of it, and
+// its .bit is compared with research/s6/check-bitgen6.mjs.
 //
 //   SILINX_ISE_HOST=user@host node scripts/check-open-flow.mjs [project folder [open-flow options] …]   (default: examples/blinky)
 //   SILINX_ISE_HOST=local …: the ISE Docker image on this machine (the self-hosted runner of
@@ -43,15 +45,42 @@ const ssh = cmd => run('ssh', ['-o', 'BatchMode=yes', '--', HOST, `export PATH="
 const names = [];
 let failed = 0;
 
+// the Spartan-6's open flow as the application runs it (#732), on a copy of the project: { ok, lines } and
+// <out>/routed.xdl
+async function openFlowS6(dir, out) {
+  const src = path.join(out, 'project');
+  fs.cpSync(dir, src, { recursive: true, filter: f => !/[\\/]build$/.test(f) });
+  const project = JSON.parse(fs.readFileSync(path.join(src, 'silinx.json'), 'utf8'));
+  const { createJob } = await import('../server/jobs.js');
+  const { runOpenImplementation } = await import('../server/open-flow.js');
+  const job = createJob('check', j => runOpenImplementation(j, { project, projectDir: src, steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] }));
+  while (job.status === 'running') await new Promise(r => setTimeout(r, 200));
+  const routed = path.join(src, 'build', 'open', 'routed.xdl');
+  if (job.status === 'ok') fs.copyFileSync(routed, path.join(out, 'routed.xdl'));
+  return { ok: job.status === 'ok', lines: job.lines };
+}
+const family = dir => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8')).device?.family; } catch { return null; } };
+const s6 = new Set();
+
 // 1. the open flow, here
 for (const { dir, opts } of projects) {
   let name = [path.basename(path.resolve(dir)), ...opts.map(o => o.replace(/^--/, ''))].join('-').replace(/[^\w.-]/g, '_');
   while (names.includes(name)) name += '_';
   names.push(name);
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), dir, path.join(work, name), ...opts], { encoding: 'utf8' });
-  const warns = `${r.stdout}\n${r.stderr}`.split('\n').filter(l => /warning/i.test(l)).map(l => l.trim());
-  console.log(`${name}: open flow ${r.status === 0 ? 'ok' : 'FAILED'}; ${warns.length} warning(s)${warns.length ? `: ${warns.join(' | ')}` : ''}`);
-  if (r.status !== 0) { console.log(r.stderr.trim().split('\n').slice(-10).join('\n')); failed++; names.pop(); }
+  let ok, lines;
+  if (family(dir) === 'spartan6') {
+    if (opts.length) { console.log(`${name}: open-flow options are for the Spartan-3E's open-flow.mjs only`); failed++; names.pop(); continue; }
+    fs.mkdirSync(path.join(work, name));
+    ({ ok, lines } = await openFlowS6(dir, path.join(work, name)));
+    s6.add(name);
+  } else {
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), dir, path.join(work, name), ...opts], { encoding: 'utf8' });
+    ok = r.status === 0;
+    lines = `${r.stdout}\n${r.stderr}`.split('\n');
+  }
+  const warns = lines.filter(l => /warning/i.test(l)).map(l => l.trim());
+  console.log(`${name}: open flow ${ok ? 'ok' : 'FAILED'}; ${warns.length} warning(s)${warns.length ? `: ${warns.join(' | ')}` : ''}`);
+  if (!ok) { console.log(lines.filter(l => l.trim()).slice(-10).join('\n')); failed++; names.pop(); }
 }
 if (!names.length) process.exit(1);
 
@@ -74,6 +103,24 @@ else {
 }
 process.stdout.write(out.split('\n').map(l => (l ? `  ISE ${l}` : l)).join('\n'));
 
+// the Spartan-6's (#732): bitstreamS6 of the routed.xdl with ISE's header and options, against each of ISE's .bit, as
+// check-writer.mjs reports it ({ stdout }: BYTE-IDENTICAL, or how they differ)
+async function checkS6(d) {
+  const { compareBit } = await import('../research/s6/check-bitgen6.mjs');
+  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
+  const { loadBitDbS6 } = await import('../packages/silinx-fpga/src/fpga/s6/bitdb-node.js');
+  const text = fs.readFileSync(path.join(d, 'routed.xdl'), 'utf8');
+  const part = text.match(/^design "[^"]*" (\S+)/m)[1].replace(/^(xc6slx\d+)-?(csg\d+)(-\d)?$/, '$1$2-3');
+  const device = loadDeviceCache(part), db = loadBitDbS6(part);
+  const out = [];
+  for (const b of ['ise.bit', 'ise-nocrc.bit']) {
+    if (!fs.existsSync(path.join(d, b))) { out.push(`${b}: not written by ISE`); continue; }
+    const r = compareBit(text, fs.readFileSync(path.join(d, b)), device, db);
+    out.push(r.same ? `${b}: BYTE-IDENTICAL` : `${b}: ${r.diff} bytes differ from ${r.first} (sizes ${r.sizes.join(' / ')})${r.unknown.size ? `; not in the bit databases: ${[...r.unknown.keys()].slice(0, 10).join(', ')}` : ''}`);
+  }
+  return { stdout: out.join('\n') };
+}
+
 // 3. Silinx's .bit against ISE's, from the same routed.xdl (the header's name, date and time are ISE's)
 for (const name of names) {
   const d = path.join(work, name);
@@ -82,7 +129,7 @@ for (const name of names) {
   const drcWarn = +(/<(\d+)> warnings/.exec(drc)?.[1] ?? NaN);
   const x2n = fs.existsSync(path.join(d, 'xdl2ncd.log')) ? fs.readFileSync(path.join(d, 'xdl2ncd.log'), 'utf8') : '';
   const x2nWarn = (x2n.match(/^WARNING/gm) || []).length;
-  const check = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-bitstream/check-writer.mjs'),
+  const check = s6.has(name) ? await checkS6(d) : spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-bitstream/check-writer.mjs'),
     path.join(d, 'routed.xdl'), path.join(d, 'ise.bit'), path.join(d, 'routed.xdl'), path.join(d, 'ise-nocrc.bit')], { encoding: 'utf8' });
   const same = (check.stdout.match(/BYTE-IDENTICAL/g) || []).length === 2;
   console.log(`${name}: DRC ${drcOk ? '0 errors' : 'ERRORS'}, ${Number.isNaN(drcWarn) ? '?' : drcWarn} warnings; xdl2ncd ${x2nWarn} warnings; .bit vs ISE's bitgen: ${same ? 'byte-identical (CRC on and off)' : 'DIFFERENT'}`);
