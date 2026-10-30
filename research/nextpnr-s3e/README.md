@@ -8,10 +8,11 @@ XC3S250E (Basys2-250).
 
 | Where | What |
 |---|---|
-| nextpnr fork, branch `silinx-s3e`: `himbaechel/uarch/spartan3e/gen/s3e_gen.py` | The chip database from Silinx's device graph (`packages/silinx-fpga/devices/<part>.json.gz`): one tile type per template, the graph's wires, PIPs and nodes, and the BELs inside the sites written by hand (the graph has no site internals) |
+| [pmnmalo/nextpnr](https://github.com/pmnmalo/nextpnr/tree/silinx-s3e), branch `silinx-s3e`: `himbaechel/uarch/spartan3e/gen/s3e_gen.py` | The chip database from Silinx's device graph (`packages/silinx-fpga/devices/<part>.json.gz`): one tile type per template, the graph's wires, PIPs and nodes, and the BELs inside the sites written by hand (the graph has no site internals) |
 | the same, `spartan3e.cc` | The micro-architecture: Yosys's `synth_xilinx -family xc3se -nocarry -nowidelut` cells (LUT1…4, INV, FD*, IBUF, OBUF, BUFG) to LUT4 / FF / IOB / BUFGMUX, the pads from the ports' `LOC` attributes, the slice's shared CLK / CE / SR checked |
+| `lib.mjs` | The functions of the scripts below (`unknownPips`, `timingExport`, `nextpnrToXdl`, `simCheck`, `xdlSize`); tested by `test/nextpnr-s3e.test.js` on nextpnr's routed counter (`test/fixtures/nextpnr-s3e/`) |
 | `export-unknown-pips.mjs` | The PIPs whose bits Silinx's bit database does not know (Silinx's own router is kept off them: `knownRouting`), per tile, for the generator to leave out |
-| `nextpnr-to-xdl.mjs` | nextpnr's routed design (`--write`) to XDL: one instance per used site with its settings, each net's site pins and PIPs |
+| `nextpnr-to-xdl.mjs` | nextpnr's routed design (`--write`) to XDL: one instance per used site with its settings (the sites named from the device graph), each net's site pins and PIPs |
 | `xdl-to-bit.mjs` | Silinx's bitgen on that XDL |
 | `export-timing.mjs` | Silinx's delay model (`SPEED_4`, fitted to trce) for the chip database: the class of the node each PIP drives, per template, and the model's delays |
 | `xdl-sim-check.mjs` | Does the converted XDL implement nextpnr's netlist? Both simulated cycle by cycle, every flip-flop compared (also from random states, for a counter's top bits); ISE's DRC cannot tell a wrong LUT equation |
@@ -35,8 +36,10 @@ node research/nextpnr-s3e/export-unknown-pips.mjs xc3s250ecp132-4 <dir>/unknown-
 node research/nextpnr-s3e/export-timing.mjs xc3s250ecp132-4 <dir>/timing-xc3s250e.json
 yosys -p "read_verilog blink.v; synth_xilinx -family xc3se -nocarry -nowidelut -top blink; write_json blink.json"
 nextpnr-himbaechel --device xc3s250ecp132-4 --json blink.json --write routed.json
-node research/nextpnr-s3e/nextpnr-to-xdl.mjs routed.json <build-s3e>/himbaechel/uarch/spartan3e/sites-xc3s250e.json routed.xdl
+node research/nextpnr-s3e/nextpnr-to-xdl.mjs routed.json routed.xdl
 node research/s3e-route/check.mjs routed.xdl
+node research/nextpnr-s3e/xdl-sim-check.mjs routed.json routed.xdl 1000 --starts 2000
+node research/nextpnr-s3e/xdl-report.mjs routed.xdl
 node research/nextpnr-s3e/xdl-to-bit.mjs routed.xdl blink.bit
 ```
 
