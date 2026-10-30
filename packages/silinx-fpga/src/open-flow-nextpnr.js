@@ -12,24 +12,25 @@ import { checkRouting } from './fpga/route.js';
 import { deviceSites } from './fpga/place.js';
 import { analyzeTiming } from './fpga/timing.js';
 import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
+import { dcmPeriodFactor, dcmSettings } from './fpga/nextpnr-dcm.js';
 import { parityToData } from './fpga/pack-bram.js';
 import { BRAM_TYPE, MULT_TYPE } from './fpga/pack.js';
 
 /** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops of
  *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the carry chains (MUXCY, XORCY), the wide
- *  multiplexers, the constants (GND, VCC), the I/O buffers, the IOBs' DDR registers (IDDR2, ODDR2), BUFG, the block RAMs,
+ *  multiplexers, the constants (GND, VCC), the I/O buffers, the IOBs' DDR registers (IDDR2, ODDR2), BUFG, the DCMs, the block RAMs,
  *  the multipliers (not chained), the distributed RAMs and the shift registers. */
-export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
+export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|DCM|DCM_SP|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
 
 /**
  * The netlist for nextpnr: each port bit's pad (its LOC in the UCF) on the I/O buffer at that bit, the IBUF or OBUF the
  * synthesis put there (nextpnr gives a port's own attributes to none of its cells; the micro-architecture places an
  * I/O buffer at its LOC). The UCF's IOB = TRUE / FALSE as the attribute IOB, the micro-architecture's question: NET on the
- * port bit's buffer, INST on the cell. Returns { json, problems }: the cells the micro-architecture does not have, ports without
+ * port bit's buffer, INST on the cell; INST LOC on a DCM as its BEL (device: the device's graph, for the site's place). Returns { json, problems }: the cells the micro-architecture does not have, ports without
  * a pad; and sdc, the PERIODs as nextpnr's clock constraints. An input nothing reads is left out, as Silinx's packer does.
  * (The constants: the micro-architecture's, #2135.)
  */
-export function nextpnrNetlist(text, top, ucfText) {
+export function nextpnrNetlist(text, top, ucfText, device = null) {
   const json = JSON.parse(text);
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
   const problems = [];
@@ -41,6 +42,15 @@ export function nextpnrNetlist(text, top, ucfText) {
   let parsed = { assignments: {}, clocks: [], other: [] };
   try { if (ucfText) parsed = parseUcf(ucfText); } catch { /* checked by translate */ }
   const { other = [] } = parsed;
+  // INST "name" LOC = "DCM_X0Y1": a DCM's site, its BEL in the chip database (X<col>Y<row>/S<site index>_DCM)
+  for (const st of other) {
+    const m = /^INST\s+"?([^"\s]+)"?\s+LOC\s*=\s*"?([^"\s;]+)"?\s*$/i.exec(String(st).trim());
+    const c = m && mod.cells[m[1]];
+    if (!c || !/^DCM(_SP)?$/.test(c.type) || !device) continue;
+    const s = device.site(m[2].toUpperCase());
+    if (s?.type !== 'DCM') { problems.push(`INST ${m[1]}: LOC ${m[2]} is not a DCM site of this device`); continue; }
+    c.attributes = { ...c.attributes, BEL: `X${device.tileCol[s.tile]}Y${device.tileRow[s.tile]}/S${s.index}_DCM` };
+  }
   const iobAsked = [];   // [NET / INST, name pattern, TRUE / FALSE]: the last that matches
   for (const st of other) {
     const m = /^(NET|INST)\s+"?([^"\s]+)"?\s+IOB\s*=\s*"?(TRUE|FALSE|FORCE)"?\s*$/i.exec(String(st).trim());
@@ -86,13 +96,25 @@ export function nextpnrNetlist(text, top, ucfText) {
   const netNameOf = b => Object.entries(mod.netnames).find(([, n]) => n.bits[0] === b && n.bits.length === 1)?.[0]
     ?? Object.entries(mod.netnames).find(([, n]) => n.bits.includes(b))?.[0];
   const clockNets = [];
+  // a clock net as the flip-flops see it: after its global buffers, through a DCM's outputs with their periods
+  const follow = (net, period, depth = 0) => {
+    const users = port => Object.values(mod.cells).filter(c => c.connections?.[port]?.[0] === net);
+    const bufgs = users('I').filter(c => c.type === 'BUFG');
+    for (const c of bufgs) follow(c.connections.O[0], period, depth + 1);
+    if (!bufgs.length || users('I').some(c => c.type !== 'BUFG')) clockNets.push([netNameOf(net), period]);
+    if (depth > 8) return;
+    for (const c of users('CLKIN').filter(x => /^DCM(_SP)?$/.test(x.type))) {
+      const d = dcmSettings(c.parameters);
+      for (const [pin, bits] of Object.entries(c.connections)) {
+        const f = dcmPeriodFactor(d, pin);
+        if (f !== null && bits[0] !== undefined && Object.values(mod.cells).some(u => u.type === 'BUFG' && u.connections.I?.[0] === bits[0])) follow(bits[0], +(period * f).toFixed(6), depth + 1);
+      }
+    }
+  };
   for (const k of parsed.clocks || []) {
     for (const [p, d] of Object.entries(mod.ports)) {
       d.bits.forEach((b, i) => {
-        if (bitName(p, d, i).toLowerCase() !== String(k.net).toLowerCase() || !/^IBUFG?$/.test(buffers.get(b)?.type)) return;
-        const pad = buffers.get(b).connections.O[0];
-        const bufgs = Object.values(mod.cells).filter(c => c.type === 'BUFG' && c.connections.I?.[0] === pad).map(c => c.connections.O[0]);
-        for (const net of bufgs.length ? bufgs : [pad]) clockNets.push([netNameOf(net), k.period]);
+        if (bitName(p, d, i).toLowerCase() === String(k.net).toLowerCase() && /^IBUFG?$/.test(buffers.get(b)?.type)) follow(buffers.get(b).connections.O[0], k.period);
       });
     }
   }
@@ -177,7 +199,7 @@ export function mountNextpnrSteps(ctx) {
   function runMap() {
     if (spec.family !== 'spartan3e') throw new StepError(`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`, [], 'Choose the Silinx engine (Toolchain Settings).');
     if (!io.nextpnr) throw new StepError('the nextpnr engine is not available here (io.nextpnr)', [], 'Choose the Silinx engine (Toolchain Settings).');
-    const r = nextpnrNetlist(netlistText(), top, ucfText);
+    const r = nextpnrNetlist(netlistText(), top, ucfText, io.device());
     if (r.problems.length) {
       throw new StepError(`the nextpnr engine cannot implement this design yet: ${r.problems.length} problem(s)`, r.problems.slice(0, 50),
         'Choose the Silinx engine (Toolchain Settings): nextpnr\'s Spartan-3E is growing (#2135).');
