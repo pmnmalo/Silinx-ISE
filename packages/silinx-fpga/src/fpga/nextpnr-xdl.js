@@ -100,7 +100,8 @@ export function lutPins(chosen) {
 function carryCfg(inst, add) {
   const c = inst.cells;
   if (!c.CYMUXF && !c.XORF && !c.CYMUXG && !c.XORG) return;
-  if (c.CYMUXF || c.XORF) add('CYINIT', '', inst.mux.CYINIT || 'BX');
+  // (a chain's carry-in stage takes none: its MUXCY passes DI, its LUT giving 0)
+  if ((c.CYMUXF || c.XORF) && inst.mux.CYINIT) add('CYINIT', '', inst.mux.CYINIT);
   for (const [side, vdd] of [['F', 'C1VDD'], ['G', 'C2VDD']]) {
     const mux = c[`CYMUX${side}`], xr = c[`XOR${side}`];
     if (mux) {
