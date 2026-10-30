@@ -69,6 +69,7 @@ uiTest('Schematic Wizard: bidirectional markers on the right edge; live simulati
   await makeProject(env, { name: 'IoSw' });
   await page.openProject('IoSw');
   await openWizard(page, 'Schematic', 'bus_io', 'Schematic Wizard');
+  await next(page, 'Inputs and Outputs');   // (the template Empty, #2180)
   // the user's own rows (the Schematic Wizard suggests no ports, #950)
   for (const [k, [name, dir, width]] of [['sw', 'in', 4], ['led', 'out', 8], ['data', 'inout', 8], ['sda', 'inout', 1]].entries()) {
     await page.click('.dlg-overlay .mw-add');

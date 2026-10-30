@@ -1,4 +1,4 @@
-// The Template page of the FSM, ASM and Petri net wizards (#2149): a template of core/chart-templates.js and its
+// The Template page of the FSM, ASM, Petri net (#2149) and schematic (#2180) wizards: a template of core/chart-templates.js and its
 // parameters; leaving the page with another template or other parameters than the last ones applies it (onApply), which
 // fills in the wizard's next pages (they can still be edited there).
 import { h } from './ui.js';

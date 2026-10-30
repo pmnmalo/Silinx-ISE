@@ -29,7 +29,7 @@ const WIZARD = {
 // each wizard's pages opened from New Source: its own, no "Name and Language" (#2082)
 const STEPS = {
   'Boolean Algebra Wizard': ['Inputs and Outputs', 'Summary'],
-  'Module Wizard': ['Inputs and Outputs', 'Kind of Logic', 'Summary'], 'Schematic Wizard': ['Inputs and Outputs', 'Summary'],
+  'Module Wizard': ['Inputs and Outputs', 'Kind of Logic', 'Summary'], 'Schematic Wizard': ['Template', 'Inputs and Outputs', 'Summary'],
   'FSM Wizard': ['Template', 'Inputs and Outputs', 'States and Transitions', 'Summary'], 'ASM Wizard': ['Template', 'Inputs and Outputs', 'States', 'Summary'],
   'Petri Net Wizard': ['Template', 'Inputs and Outputs', 'Summary'], 'Clocking Wizard': ['Input Clock', 'Output Clocks', 'Summary'], 'Block Memory': ['Memory', 'Summary'],
   'Test Bench Wizard': ['Unit Under Test', 'Clock and Reset', 'Input Vectors', 'Vectors and Expected Outputs', 'Summary'], 'UCF Wizard': ['Ports and Pins', 'Summary'],
