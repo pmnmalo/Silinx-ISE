@@ -11,6 +11,8 @@
 //                                    // release it (null = Z, the default) so that the circuit drives it
 //   live.netValue(net) / live.pinValue(symId, pin) / live.portValue(portId) / live.stored(symId)
 //   live.reset();                    // power cycle: back to time 0, registers to their INIT values
+//   live.reset({ inputs: true });    // … and the inputs to theirs (0, released)
+//   live.restoreInputs(live.inputValues());   // the inputs' values kept from one Try it to the next
 //
 // Values are core/values.js 4-state values ({ w, v, x, s }); level(v) classifies one for drawing.
 import { netlist, generateHdl, normalizeDoc, normModules, symbolDef, SYMBOLS } from './schdoc.js';
@@ -244,12 +246,36 @@ export class LiveSim {
     const M = V.mask(b.width);
     this.sim.write({ sig: b.sig, whole: true }, b.value == null ? V.mk(b.width, M, M) : V.mk(b.width, b.value), null);
   }
-  /** Power cycle: time 0, every signal back to its initial value, the inputs keep their values (clocks 0). */
-  reset() {
+  /** Power cycle: time 0, every signal back to its initial value, the inputs keep their values (clocks 0); with
+   *  { inputs: true }, the inputs back to theirs too (0, the bidirectional markers released, #2106). */
+  reset({ inputs = false } = {}) {
     this.sim.reset();
     this.error = null;
-    for (const i of this.inputs) if (i.clock) i.value = 0n;
+    for (const i of this.inputs) if (i.clock || inputs) i.value = 0n;
+    if (inputs) for (const b of this.bidirs) b.value = null;
     this.start();
+  }
+  /** The values the user gave the inputs and bidirectional markers (not the clocks'): { portId: { width, value } }
+   *  for restoreInputs in the next Try it (#2106). */
+  inputValues() {
+    const out = {};
+    for (const i of this.inputs) if (!i.clock) out[i.id] = { width: i.width, value: i.value };
+    for (const b of this.bidirs) out[b.id] = { width: b.width, value: b.value };
+    return out;
+  }
+  /** Give the inputs the values of inputValues() (a marker that is no more, now a clock, or of another width:
+   *  left as it is), then power cycle at time 0. True when any value was taken. */
+  restoreInputs(saved) {
+    let any = false;
+    for (const [id, sv] of Object.entries(saved || {})) {
+      const i = this.input(id), x = i || this.bidir(id);
+      if (!x || x.clock || x.width !== sv?.width) continue;
+      if (typeof sv.value !== 'bigint' && (i || sv.value !== null)) continue;   // (an input has a value; a bidir may be released)
+      x.value = sv.value;
+      any = true;
+    }
+    if (any) this.reset();
+    return any;
   }
   settle() {
     if (this.sim.finished) return;
