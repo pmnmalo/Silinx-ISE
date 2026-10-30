@@ -79,9 +79,22 @@ export function reexportsOnly(text) {
 }
 
 /** files: { 'test/a.test.js': text, … } (paths relative to the root, with '/'); changed: the paths changed. */
+/** A page script's absolute imports (static): '/core/schdoc.js', '/js/ui.js'. */
+export function pageImports(text) {
+  return [...new Set([...String(text).matchAll(/(?:^|[;\s])(?:import|export)\s[^'";]*?from\s*['"](\/(?:core|js|packages)\/[^'"]+)['"]/g)].map(m => m[1]))];
+}
+
+/** The modules a module's text re-exports names of (export { … } from '…', export * from '…'), as written. */
+export function reexported(text) {
+  return [...String(text).matchAll(/^\s*export\s+(?:\*(?:\s+as\s+\w+)?|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]);
+}
+
 export function relatedTests(files, changed) {
-  const resolve = (from, spec) => path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
-  const deps = Object.fromEntries(Object.entries(files).map(([f, t]) => [f, imports(t).map(s => resolve(f, s))]));
+  // (a page script's absolute import, as the server serves it: /core/… the repository's core/, /js/… web/js/, #2093)
+  const resolve = (from, spec) => (spec.startsWith('/') ? (spec.startsWith('/js/') ? `web${spec}` : spec.slice(1))
+    : path.posix.normalize(path.posix.join(path.posix.dirname(from), spec)));
+  // (a page script's absolute imports too, /core/… and /js/…, as the browser loads them, #2093)
+  const deps = Object.fromEntries(Object.entries(files).map(([f, t]) => [f, [...imports(t), ...(f.startsWith('web/js/') ? pageImports(t) : [])].map(s => resolve(f, s))]));
   const isUnit = f => UNIT_TESTS.test(f);
   const isUi = f => /^test\/ui\/[^/]+\.test\.js$/.test(f);
   // (a helper at any depth of the tests' folders but the UI tests': test/schematic-corpus/lib.mjs, #2058)
@@ -97,10 +110,13 @@ export function relatedTests(files, changed) {
     for (const f of Object.keys(files)) if (!inTests(f) && !readers.has(f) && deps[f].some(d => readers.has(d))) { readers.add(f); grew = true; }
   }
   const ch = new Set([...changed, ...readers]);
-  // a module that only re-exports a changed one (the toolchain package's entries, #1677, #1678) counts as changed
+  // a module that only re-exports a changed one (the toolchain package's entries, #1677, #1678), or that re-exports
+  // names of it (a module split, its old module exporting what moved: core/schdoc.js of core/schdoc-symbols.js, #2093)
+  // counts as changed
+  const again = Object.fromEntries(Object.entries(files).map(([f, t]) => [f, reexported(t).map(s => resolve(f, s))]));
   for (let grew = true; grew;) {
     grew = false;
-    for (const f of Object.keys(files)) if (!ch.has(f) && reexportsOnly(files[f]) && deps[f].some(d => ch.has(d))) { ch.add(f); grew = true; }
+    for (const f of Object.keys(files)) if (!ch.has(f) && ((reexportsOnly(files[f]) && deps[f].some(d => ch.has(d))) || again[f].some(d => ch.has(d)))) { ch.add(f); grew = true; }
   }
   // a helper of the tests that imports a changed file (or changed itself) counts as changed for its tests
   const touched = new Set(ch);
@@ -108,7 +124,8 @@ export function relatedTests(files, changed) {
   const unit = new Set(), ui = new Set();
   for (const f of Object.keys(files)) {
     if (isUnit(f) && (ch.has(f) || deps[f].some(d => touched.has(d)))) unit.add(f);
-    if (isUi(f) && ch.has(f)) ui.add(f);
+    // (a UI test that imports a changed module, as its sheet's newDoc of core/schdoc.js, #2093)
+    if (isUi(f) && (ch.has(f) || deps[f].some(d => ch.has(d) && !inTests(d)))) ui.add(f);
   }
   // a test that names a changed file it reads ('CLAUDE.md', '.github/workflows/ci.yml', 'ci.yml')
   const quoted = n => new RegExp(`['"\`/]${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`);
@@ -124,6 +141,13 @@ export function relatedTests(files, changed) {
     const name = path.posix.basename(f).replace(/\.m?js$/, '');
     for (const dir of UNIT_DIRS) if (files[`${dir}/${name}.test.js`] != null) unit.add(`${dir}/${name}.test.js`);
     if (f.startsWith('web/js/') && files[`test/ui/${name}.test.js`] != null) ui.add(`test/ui/${name}.test.js`);
+  }
+  // the UI test of a page script that imports a changed module (web/js/sch-props.js of core/schdoc.js: a symbol's new
+  // parameter in its properties, #2093)
+  for (const f of Object.keys(files)) {
+    if (!/^web\/js\/[^/]+\.m?js$/.test(f) || !deps[f].some(d => ch.has(d))) continue;
+    const t = `test/ui/${path.posix.basename(f).replace(/\.m?js$/, '')}.test.js`;
+    if (files[t] != null) ui.add(t);
   }
   return { unit: [...unit].sort(), ui: [...ui].sort() };
 }
