@@ -260,8 +260,11 @@ export function generateHdl(docIn, opts = {}) {
     if (!net.endpoints.length) continue;
     if (isolated(net) && net.auto && net.endpoints[0].kind === 'pin' && net.endpoints[0].dir !== 'out'
       && !['module', 'hdlblock'].includes(doc.symbols.find(x => x.id === net.endpoints[0].sym)?.type)) continue;
-    // (a device primitive's output left unconnected: open)
-    if (isolated(net) && net.auto && net.endpoints[0].kind === 'pin' && SYMBOLS[doc.symbols.find(x => x.id === net.endpoints[0].sym)?.type]?.prim) continue;
+    // (a device primitive's output left unconnected: open; a block's too, left out of its port map, #2162)
+    if (isolated(net) && net.auto && net.endpoints[0].kind === 'pin') {
+      const s = doc.symbols.find(x => x.id === net.endpoints[0].sym);
+      if (SYMBOLS[s?.type]?.prim || (s && isBlock(s))) continue;
+    }
     const iv = init.get(net);
     if (ci) sigDecls.push(`  signal ${nm} : ${netType(net)}${iv ? ` := ${vhdlClass(netType(net)) === 'sl' ? vhdlBits(iv, true) : vhdlBits(iv, false)}` : ''};`);
     else {
