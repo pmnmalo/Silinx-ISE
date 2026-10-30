@@ -97,6 +97,21 @@ test('openedState: a project opened shows every task\'s side panel and messages,
   assert.deepEqual(T.readState(JSON.stringify({ ...opened, v: T.STATE_V })), opened);
 });
 
+test('closedState: the project closed shows Design\'s side panel, no document maximized; the other tasks as kept (#2169)', () => {
+  const kept = T.readState(JSON.stringify({ v: T.STATE_V, task: 'impl', tasks: {
+    edit: { side: false, console: false, max: true, doc: 'file:src/top.vhd' }, sim: { side: false }, emu: { side: false, narrowSide: true }, impl: { max: true } } }));
+  const closed = T.closedState(kept);
+  assert.deepEqual(closed, { task: 'impl', tasks: {
+    edit: { side: true, console: false, max: false, doc: 'file:src/top.vhd' }, sim: { side: false }, emu: { side: false, narrowSide: true }, impl: { max: true } } });
+  assert.equal(T.arrangement('edit', closed.tasks.edit).side, true);
+  assert.equal(T.arrangement('edit', closed.tasks.edit, true).side, true);   // (on a narrow screen too)
+  // (nothing kept before: the same; the kept state not changed in place)
+  assert.deepEqual(T.closedState(T.readState(null)).tasks.edit, { side: true, max: false });
+  assert.deepEqual(kept.tasks.edit, { side: false, console: false, max: true, doc: 'file:src/top.vhd' });
+  // (read back as kept)
+  assert.deepEqual(T.readState(JSON.stringify({ ...closed, v: T.STATE_V })), closed);
+});
+
 test('#854 docDetail: the module and the model a single document\'s title says; the tasks whose document is single', () => {
   assert.deepEqual(T.SINGLE, []);   // (Simulate: its tabs, several simulations, #1161; Emulate its tab, #1426)
   assert.deepEqual(T.docDetail('SSim (top)'), { module: 'top', model: null });

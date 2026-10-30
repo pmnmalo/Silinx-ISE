@@ -133,6 +133,11 @@ export function openedState(st) {
   }
   return { ...st, tasks };
 }
+/** The kept state once the project is closed (#2169): Design's side panel shown (the Start page in it), no document
+ *  maximized, whatever the viewer left; the other tasks as they were. */
+export function closedState(st) {
+  return { ...st, tasks: { ...st.tasks, edit: { ...(st.tasks.edit || {}), side: true, max: false } } };
+}
 
 // the tasks whose document is single by nature: a new emulation replaces the old one
 export const SINGLE = [];   // (none: Simulate its tabs, several simulations open, #1161; Emulate its tab, its title not in the header, #1426)
@@ -499,6 +504,12 @@ export function initTasks(a) {
     state = openedState(state);
     setTask('edit');
     app.showLeftPage('design');
+  });
+  // a project closed: in Design, its side panel shown with the Start page, whatever was left folded or maximized (#2169)
+  addEventListener('silinx:project-closed', () => {
+    if (!on()) return;
+    state = closedState(state);
+    setTask('edit');
   });
   // the documents: opened, closed, brought to the front
   new MutationObserver(followActive).observe($('doc-tabs'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
