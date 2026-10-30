@@ -123,6 +123,17 @@ net "n" , outpin "a" X , inpin "b" F1 ,
   assert.equal(o.pins.length, 2);
 });
 
+test('prototype observe: a design of 300 000 PIPs (the XC3S1200E\'s size) does not overflow the stack (#3)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'observe-'));
+  let xdl = 'design "d" xc3s250ecp132-4 v3.2 ;\n';
+  for (let i = 0; i < 300000; i++) xdl += `net "n${i}" , pip CLB_X${1 + i % 20}Y${1 + (i / 20 | 0) % 20} E2BEG1 -> E2BEG2 , ;\n`;
+  fs.writeFileSync(path.join(dir, 'top.xdl'), xdl);
+  execFileSync(process.execPath, ['packages/silinx-fpga/research/s3e-device/prototype.mjs', 'observe', path.join(dir, 'obs.json'), path.join(dir, 'top.xdl')], { stdio: 'pipe' });
+  const o = JSON.parse(fs.readFileSync(path.join(dir, 'obs.json'), 'utf8'));
+  assert.equal(o.pips.length, 400); // one PIP in each of 400 tiles, seen 750 times
+  fs.rmSync(dir, { recursive: true });
+});
+
 test('switch-box grid: offsets counted in switch boxes of the row, then of the column', () => {
   // a row with a block-RAM column (one switch box at X3, none at X4-X6), a row of CLBs above it,
   // and a column interrupted (no switch box at X7Y2)
