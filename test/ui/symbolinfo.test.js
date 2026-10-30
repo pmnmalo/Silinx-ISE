@@ -17,7 +17,7 @@ const DLG = `${ED} .se-symdoc`;
 const waitTable = (page, kind) => page.waitFor((d, k) => { const b = document.querySelector(d); return b && (!k || b.dataset.table === k) && b.querySelector('.sd-truth'); }, [DLG, kind || null], { what: `truth table ${kind || ''}` });
 const rows = (page, sel = `${DLG} .sd-truth tbody tr`) => page.eval((s) => [...document.querySelectorAll(s)].map((r) => [...r.cells].map((c) => c.textContent).join(' ')), sel);
 
-uiTest('Symbol Info: palette menu and More… link, placed symbol (F1, toolbar, Properties), parameters, Portuguese', E, async (page) => {
+uiTest('Symbol Info: palette menu and More… link, placed symbol (F1, Properties), parameters, Portuguese', E, async (page) => {
   const doc = newDoc('info', 'vhdl');
   doc.symbols.push({ id: 'S1', type: 'fdce', x: 300, y: 200, rot: 0, mirror: false, name: 'U1', params: { init: '0' } });
   doc.symbols.push({ id: 'S2', type: 'mux4', x: 300, y: 420, rot: 0, mirror: false, name: 'U2', params: { width: 1, en: false, selBus: false } });
@@ -25,8 +25,6 @@ uiTest('Symbol Info: palette menu and More… link, placed symbol (F1, toolbar, 
   await page.openProject('InfoPj');
   await page.eval(() => window.SilinxApp.openSch('src/info.sch.json'));
   await page.waitFor((sel) => window.Silinx.active?.id === 'sch:src/info.sch.json' && document.querySelector(`${sel} .se-symrow`), [ED]);
-  // nothing chosen yet: the toolbar button is disabled
-  assert.equal(await page.eval((sel) => document.querySelector(`${sel} .se-btn[data-act=info]`).disabled, ED), true);
 
   // ---- palette: right-click MUX ▸ Symbol Info… (the M2_1, #334)
   await page.rightClick(`${ED} .se-symrow`, { text: 'MUX' });
@@ -96,7 +94,6 @@ uiTest('Symbol Info: palette menu and More… link, placed symbol (F1, toolbar, 
   await page.click(`${ED} g.sym[data-id="S1"] .hitbox`);
   await page.waitFor((sel) => document.querySelector(`${sel} .se-props .se-infobtn`), [ED], { what: 'properties of the FDCE' });
   assert.match(await page.eval((sel) => document.querySelector(`${sel} .se-props .se-sum`).textContent, ED), /^FDCE is a D flip-flop with clock enable and asynchronous clear/);
-  assert.equal(await page.eval((sel) => document.querySelector(`${sel} .se-btn[data-act=info]`).disabled, ED), false);
   await page.key('F1');
   await page.waitFor((d) => document.querySelector(d)?.dataset.type === 'fdce', [DLG], { what: 'FDCE datasheet from F1' });
   assert.deepEqual(await rows(page, `${DLG} .sd-mode tbody tr`), ['1 X X X 0', '0 0 X X No change', '0 1 0 ↑ 0', '0 1 1 ↑ 1']);
@@ -115,8 +112,8 @@ uiTest('Symbol Info: palette menu and More… link, placed symbol (F1, toolbar, 
   assert.equal(await page.eval((d) => document.querySelector(`${d} [data-param=init]`).value, DLG), '1', 'the parameters are kept');
   await page.key('Escape');
   await page.waitFor((d) => !document.querySelector(d), [DLG]);
-  // toolbar button, in Portuguese, with a palette symbol from the info box
-  assert.equal(await page.eval((sel) => document.querySelector(`${sel} .se-btn[data-act=info]`).title, ED), 'Informação do Símbolo (F1)');
+  // the Properties panel's button, in Portuguese, then a palette symbol from the info box (no toolbar button, #2208)
+  assert.equal(await page.eval((sel) => document.querySelector(`${sel} .se-props .se-infobtn`).title, ED), 'Informação do Símbolo (F1)');
   await page.click(`${ED} .se-props .se-infobtn`);
   await page.waitFor((d) => document.querySelector(d)?.dataset.lang === 'pt' && document.querySelector(d)?.dataset.type === 'fdce', [DLG], { what: 'datasheet from the Properties panel' });
   await page.key('Escape');
@@ -127,7 +124,7 @@ uiTest('Symbol Info: palette menu and More… link, placed symbol (F1, toolbar, 
   await page.key('Escape');
   await page.waitFor((sel) => /^ADD: ADD é um somador binário de 8 bits/.test(document.querySelector(`${sel} .se-syminfo`).textContent), [ED], { what: 'PT info box' });
   assert.match(await page.eval((sel) => document.querySelector(`${sel} .se-syminfo`).textContent, ED), /Mais…$/);
-  await page.click(`${ED} .se-btn[data-act=info]`);
+  await page.key('F1');
   await page.waitFor((d) => document.querySelector(d)?.dataset.type === 'add', [DLG], { what: 'ADD datasheet' });
   await waitTable(page, 'samples');
   assert.match(await page.eval((d) => document.querySelector(`${d} .sd-ttbox`).textContent, DLG), /Linhas representativas|linhas representativas/);
