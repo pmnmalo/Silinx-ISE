@@ -42,7 +42,7 @@ Atlys) are in the Silinx toolchain of the local server (not yet in the browser e
 bitstream of a design for the XC6SLX16 and the XC6SLX45 (#732). Its bit database (`packages/silinx-fpga/bitdb/s6`)
 was measured the same way against ISE 14.7's bitgen; the seven examples on both boards, routed by the Silinx
 toolchain, give byte for byte the bitstream ISE's bitgen writes for the same routing, which ISE's DRC finds no error
-in, and its static timing is fitted to ISE's trce (each constraint within 5 % of its slack or 2.5 % of the period,
+in (`npm run check:open-flow` on a Nexys3 or Atlys project, and the nightly ISE tests), and its static timing is fitted to ISE's trce (each constraint within 5 % of its slack or 2.5 % of the period,
 #731). The Atlys has no seven-segment display or VGA of its own: Silinx puts them on its VHDCI connector, as a
 Digilent VmodBB wires them. What it does not cover yet: a DCM's or PLL's configurations beyond the ones measured
 (#2025), and the browser edition ([#1](https://github.com/pmnmalo/Silinx-ISE/issues/1); the plan and the results:

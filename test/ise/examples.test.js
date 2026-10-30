@@ -4,7 +4,8 @@
 //     the warnings of XST, map and par are the expected ones (below);
 //   - the Silinx toolchain's routed design of each example passes ISE's design rule check with no
 //     error and no warning, and Silinx's bitstream is byte-identical to ISE's bitgen of it
-//     (scripts/check-open-flow.mjs).
+//     (scripts/check-open-flow.mjs); on the Spartan-6 boards (Nexys3, Atlys, #732) this check only, ISE's own build of
+//     them not yet recorded here.
 //
 //   SILINX_ISE_TESTS=1 SILINX_ISE_HOST=user@host node --test test/ise/examples.test.js
 //   SILINX_ISE_HOST=local: the image on this machine (the self-hosted runner, .github/workflows/ise.yml)
@@ -14,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { EXAMPLES, S3E_TARGETS as TARGETS, ROOT, exampleProject } from '../examples-lib.mjs';
+import { EXAMPLES, S3E_TARGETS as TARGETS, S6_TARGETS, ROOT, targetName, exampleProject } from '../examples-lib.mjs';
 import { iseExamplesConfig } from '../ise-examples-config.mjs';
 
 const IMAGE = process.env.SILINX_ISE_IMAGE || 'xilinx/ise:14.7';
@@ -51,7 +52,19 @@ before(() => {
 const iseWarnings = lines => [...new Set(lines.filter(l => /^WARNING:(Xst|Pack|Map|Par|Place|Route|Timing|PhysDesignRules|LIT|NgdBuild|ConstraintSystem)/.test(l))
   .map(l => l.replace(/\s+/g, ' ').trim()))].sort();
 
+// the routed design's check against ISE, on every board (the Spartan-6's, #732, too)
+const checkOpenFlow = (name, t) => {
+  const { dir } = exampleProject(name, t, path.join(tmp, 'open'));
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/check-open-flow.mjs'), dir], { encoding: 'utf8', env: process.env });
+  assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+  assert.match(r.stdout, /DRC 0 errors, 0 warnings; xdl2ncd 0 warnings; \.bit vs ISE's bitgen: byte-identical \(CRC on and off\)/);
+  assert.match(r.stdout, /open flow ok; 0 warning\(s\)/);
+};
+
 for (const name of EXAMPLES) {
+  for (const t of S6_TARGETS) {
+    test(`example ${name} for the ${targetName(t)}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000 }, () => checkOpenFlow(name, t));
+  }
   for (const t of TARGETS) {
     test(`ISE builds example ${name} for the ${t.board}-${t.variant}, with the expected warnings`, { skip, timeout: 30 * 60000 }, async () => {
       const { createJob } = await import('../../server/jobs.js');
@@ -64,12 +77,6 @@ for (const name of EXAMPLES) {
       assert.deepEqual(iseWarnings(job.lines), ISE_WARNINGS[name]);
     });
 
-    test(`example ${name} for the ${t.board}-${t.variant}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000, todo: KNOWN[name] }, () => {
-      const { dir } = exampleProject(name, t, path.join(tmp, 'open'));
-      const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts/check-open-flow.mjs'), dir], { encoding: 'utf8', env: process.env });
-      assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
-      assert.match(r.stdout, /DRC 0 errors, 0 warnings; xdl2ncd 0 warnings; \.bit vs ISE's bitgen: byte-identical \(CRC on and off\)/);
-      assert.match(r.stdout, /open flow ok; 0 warning\(s\)/);
-    });
+    test(`example ${name} for the ${t.board}-${t.variant}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000, todo: KNOWN[name] }, () => checkOpenFlow(name, t));
   }
 }
