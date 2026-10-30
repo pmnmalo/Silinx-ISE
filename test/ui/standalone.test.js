@@ -1258,6 +1258,7 @@ uiTest('#483 browser edition: a hostile zip (paths leaving the project, a broken
 const directives = (csp) => Object.fromEntries(csp.split(/;\s*/).map((d) => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
 uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\' hashes, versioned assets; an injected script does not run', E, async (page) => {
   const yosysVersion = JSON.parse(await fs.readFile(path.join(ROOT, 'node_modules/@yowasp/yosys/package.json'), 'utf8')).version;
+  const nextpnrVersion = JSON.parse(await fs.readFile(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/package.json'), 'utf8')).version;
   const dir = `dev-${build.commit}/`;
   const origin = new URL(siteUrl).origin;
   let layout;
@@ -1278,7 +1279,7 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
     assert.deepEqual(d['base-uri'], ["'none'"]);
     assert.equal(d['frame-ancestors'], undefined, 'not in a <meta> (the browser reports it as an error)');
     layout = JSON.parse(text.match(/window\.SILINX_ASSET_LAYOUT = (\{.*?\});\n/)[1]);
-    assert.deepEqual({ ...layout, integrity: undefined }, { dir, yosys: `../vendor/yowasp-yosys/${yosysVersion}/gen/bundle.js`, site: siteUrl, integrity: undefined });
+    assert.deepEqual({ ...layout, integrity: undefined }, { dir, yosys: `../vendor/yowasp-yosys/${yosysVersion}/gen/bundle.js`, nextpnr: `../vendor/nextpnr-spartan/${nextpnrVersion}/gen/bundle.js`, site: siteUrl, integrity: undefined });
   }
   // the site's assets, versioned; none at the unversioned paths of before
   const ls = async (p) => (await fs.readdir(path.join(site, p))).sort();
@@ -1290,10 +1291,15 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
   assert.deepEqual(await ls('assets/vendor/yowasp-yosys'), [yosysVersion]);
   assert.ok((await ls(`assets/vendor/yowasp-yosys/${yosysVersion}/gen`)).includes('bundle.js'));
   assert.ok((await ls(`assets/vendor/yowasp-yosys/${yosysVersion}`)).includes('package.json'), 'its licence and package.json with it');
+  // (nextpnr in WebAssembly, #2136: its bundle, each device's chip database, its package.json with its licence's terms)
+  assert.deepEqual(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}`), ['chipdb', 'gen', 'package.json']);
+  assert.deepEqual(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}/chipdb`), ['chipdb-xc3s100e.bin.gz', 'chipdb-xc3s1200e.bin.gz', 'chipdb-xc3s250e.bin.gz', 'chipdb-xc3s500e.bin.gz']);
   // #1237: each published asset's SHA-256 in the page (the cache checks it), and no other
   const { createHash } = await import('node:crypto');
   const published = [...(await ls(`assets/${dir}devices`)).map((f) => `${dir}devices/${f}`), ...(await ls(`assets/${dir}bitdb`)).map((f) => `${dir}bitdb/${f}`),
-    ...(await ls(`assets/vendor/yowasp-yosys/${yosysVersion}/gen`)).map((f) => `vendor/yowasp-yosys/${yosysVersion}/gen/${f}`)];
+    ...(await ls(`assets/vendor/yowasp-yosys/${yosysVersion}/gen`)).map((f) => `vendor/yowasp-yosys/${yosysVersion}/gen/${f}`),
+    ...(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}/gen`)).map((f) => `vendor/nextpnr-spartan/${nextpnrVersion}/gen/${f}`),
+    ...(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}/chipdb`)).map((f) => `vendor/nextpnr-spartan/${nextpnrVersion}/chipdb/${f}`)];
   assert.deepEqual(Object.keys(layout.integrity).sort(), published.sort());
   for (const f of published) assert.equal(layout.integrity[f], `sha256-${createHash('sha256').update(await fs.readFile(path.join(site, 'assets', f))).digest('base64')}`, f);
   // #1445: Yosys's bundle.js, the one script the page imports from the site, is among them (the Yosys workers check it
@@ -1322,3 +1328,33 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
     assert.ok(page.errors.slice(before).some((e) => /Content-Security-Policy violation: script-src/.test(e)), `${url}: the violation reported (${page.errors.slice(before).join(' | ')})`);
   }
 }, { url: () => 'about:blank' });
+
+// #2136: the browser edition's nextpnr engine: nextpnr in WebAssembly in the flow's worker, its chip database fetched from
+// the site's assets (vendor/nextpnr-spartan/<version>/), the project's engine nextpnr (Silinx when it cannot)
+uiTest('#2136 browser edition: the nextpnr engine places and routes in the browser', E, async (page) => {
+  await page.goto(siteUrl);
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
+  await page.menu('File', 'New Project…');
+  await page.waitDialog('New Project Wizard');
+  await page.fill('.dlg-overlay .wiz-main input[type=text]', 'WebNextpnr');
+  await page.fill('.dlg-overlay .wiz-main select', 'blinky', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.fill('.dlg-overlay .wiz-main select', 'basys2', { index: 0 });
+  await page.dialogButton('Next >');
+  await page.dialogButton('Finish');
+  await page.waitNoDialog();
+  await page.waitFor(() => window.Silinx.project?.name === 'WebNextpnr' && window.Silinx.project.top);
+  await page.eval(async () => { window.Silinx.project.impl = { ...window.Silinx.project.impl, engine: 'auto' }; await window.SilinxApp.saveProjectJson(); });
+  await page.setView('impl');
+  const before = (await page.consoleText()).length;
+  await page.treeRow('#procs', 'Implement Design', { dbl: true, exact: true });
+  await page.waitConsole(/=== SILINX (DONE|FAILED)/, { timeout: 180000 });
+  await page.waitFor(() => !window.Silinx.busy, [], { what: 'flow finished', timeout: 30000 });
+  const log = (await page.consoleText()).slice(before);
+  assert.doesNotMatch(log, /SILINX FAILED|Process failed/, log.slice(-3000));
+  for (const re of [/Loading nextpnr and the chip database of xc3s250ecp132 \(WebAssembly, about 7 MB: once, then kept by this browser\)…/,
+    /Map: nextpnr packs the design itself, at Place & Route \(the nextpnr engine\)\./, /Placed and routed by nextpnr in \d/, /All signals are completely routed\./]) assert.match(log, re);
+  // its chip database and bundle from this version's assets
+  assert.ok(served.some((r) => /^assets\/vendor\/nextpnr-spartan\/[\d.]+\/chipdb\/chipdb-xc3s250e\.bin\.gz$/.test(r)), served.filter((r) => /nextpnr/.test(r)).join('\n'));
+}, { url: () => 'about:blank', timeout: 300000 });
+

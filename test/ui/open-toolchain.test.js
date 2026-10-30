@@ -1006,3 +1006,49 @@ uiTest('#282 open mode: Optimization Effort Normal (the default) synthesizes onc
   log = await run('Implement Design');
   assert.ok(!/is up to date/.test(log) && log.includes(NORMAL), log.slice(0, 2000));
 }, { timeout: 300000, ui: 'classic' });
+
+// #2136: Process Properties chooses the place and route engine of the Silinx toolchain; nextpnr (Silinx when it cannot)
+// implements blinky with nextpnr, a design it cannot (a port without its pin) with the Silinx engine, said; Portuguese
+uiTest('#2136 open mode: Process Properties chooses the place and route engine; nextpnr implements, else Silinx, said; Portuguese', E, async (page) => {
+  await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
+  await makeProject(env, { name: 'OpenEngine', template: 'blinky' });
+  await page.openProject('OpenEngine');
+  await reloadToolchain(page);
+  // (the modern interface: Implement's task, its Processes panel there)
+  if (await page.eval(() => !!document.querySelector('#task-switch .task-btn[data-task="impl"]'))) await page.click('#task-switch .task-btn[data-task="impl"]');
+  else await page.setView('impl');
+  const props = async (proc = 'Implement Design', item = 'Process Properties…') => {
+    await page.treeRow('#procs', proc, { right: true, exact: true });
+    await page.click('body > .menu-popup .mi', { text: item });
+    await page.waitForSelector('.dlg-overlay select');
+    return page.eval(() => [...document.querySelectorAll('.dlg-overlay .form-grid > *')].map((e) => e.tagName === 'SELECT' ? [...e.options].map((o) => o.text).join('|') : e.textContent.trim()).filter(Boolean));
+  };
+  const fields = await props();
+  assert.ok(fields.includes('Place & Route Engine:'), fields.join('\n'));
+  assert.ok(fields.includes('Silinx|nextpnr (Silinx when it cannot)|nextpnr only'), fields.join('\n'));
+  await page.dialogButton('Cancel');
+  await page.waitNoDialog();
+  const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
+  await setLang('pt');
+  try {
+    const pt = await props('Implementar Projeto', 'Propriedades do Processo…');
+    assert.ok(pt.includes('Motor de Place & Route:') && pt.includes('Silinx|nextpnr (Silinx quando não consegue)|Só nextpnr'), pt.join('\n'));
+    await page.dialogButton('Cancelar');
+    await page.waitNoDialog();
+  } finally { await setLang('en'); }
+  // nextpnr (Silinx when it cannot): saved with the project
+  await props();
+  await page.eval(() => { const s = [...document.querySelectorAll('.dlg-overlay select')].find((x) => [...x.options].some((o) => o.value === 'auto')); s.value = 'auto'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+  await page.dialogButton('OK');
+  await page.waitNoDialog();
+  await page.waitFor(async () => (await (await fetch('/api/projects/OpenEngine')).json()).impl.engine === 'auto', [], { what: 'the engine saved' });
+  const before = (await page.consoleText()).length;
+  await page.treeRow('#procs', 'Implement Design', { dbl: true, exact: true });
+  await page.waitFor((b) => /Process "Implement Design" (completed successfully|failed)/.test(window.__console().slice(b)), [before], { what: 'Implement Design', timeout: 240000 });
+  const log = (await page.consoleText()).slice(before);
+  assert.match(log, /Process "Implement Design" completed successfully/, log.slice(-3000));
+  assert.ok(log.includes('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).'), log.slice(0, 3000));
+  assert.match(log, /Placed and routed by nextpnr in \d/);
+  assert.doesNotMatch(log, /WARNING:nextpnr|ERROR:nextpnr/);
+}, { timeout: 300000 });
+

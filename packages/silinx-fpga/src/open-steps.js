@@ -39,3 +39,7 @@ export function orderOpenSteps(steps, { synthUpToDate = false } = {}) {
   if (set.has('fpgaview')) out.push('fpgaview');
   return out;
 }
+
+/** A project's place and route engine (its impl.engine, Process Properties, #2136): 'silinx', 'nextpnr' or 'auto' (nextpnr
+ *  when it can implement the design, else Silinx's); 'silinx' when not set. */
+export const engineOf = impl => (['silinx', 'nextpnr', 'auto'].includes(impl?.engine) ? impl.engine : 'silinx');

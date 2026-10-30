@@ -636,18 +636,21 @@ export async function implProperties() {
   const opt = select(['Speed', 'Area'], pj.impl.optMode || 'Speed');
   const lvl = select([['1', 'Normal'], ['2', 'High']], String(pj.impl.optLevel || 1));
   const clk = select([['JtagClk', 'JTAG Clock'], ['CCLK', 'CCLK'], ['UserClk', 'User Clock']], pj.impl.startupClk || 'JtagClk');
+  // the Silinx toolchain's place and route (#2136): its own, nextpnr, or nextpnr when it can implement the design
+  const eng = select([['silinx', 'Silinx'], ['auto', 'nextpnr (Silinx when it cannot)'], ['nextpnr', 'nextpnr only']], pj.impl.engine || 'silinx');
   const r = await dialog({
     title: 'Process Properties - Synthesis / Implementation / Bitstream', width: 520,
     body: h('div', { class: 'form-grid' },
       ...field('Optimization Goal:', opt), ...field('Optimization Effort:', lvl),
       ...field('FPGA Start-Up Clock:', clk),
+      ...(app.openMode() ? field('Place & Route Engine:', eng) : []),
       // the Silinx toolchain's synthesis: what its effort does (#282)
       app.openMode() ? h('div', { class: 'effort-hint', style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } },
         'Silinx toolchain: Optimization Effort Normal synthesizes once, fast, and tries the mappings for speed only on a small design (250 LUTs at most), a design limited by its logic depth or one with wide multiplexers; High tries them on every design (a slower synthesis, a circuit about 5-10 % faster).') : null,
       h('div', { style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } }, 'Use JTAG Clock when programming over JTAG (iMPACT, xc3sprog, djtgcfg); CCLK when booting from the PROM/flash.')),
   });
   if (!r) return;
-  pj.impl = { ...pj.impl, optMode: opt.value, optLevel: +lvl.value, startupClk: clk.value };
+  pj.impl = { ...pj.impl, optMode: opt.value, optLevel: +lvl.value, startupClk: clk.value, ...(app.openMode() ? { engine: eng.value } : {}) };
   await app.saveProjectJson();
 }
 

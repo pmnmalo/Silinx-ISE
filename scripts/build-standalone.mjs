@@ -32,10 +32,13 @@ const arg = name => { const i = process.argv.indexOf(name); return i > 0 ? proce
 const BUILD = buildInfo(ROOT, VERSION);
 // ---- the assets' layout (web/js/open-flow-browser.js LAYOUT)
 const YOSYS_VERSION = JSON.parse(rd('node_modules/@yowasp/yosys/package.json')).version;
+// nextpnr in WebAssembly (the nextpnr engine, #2136): its bundle and, beside it in ../chipdb, each device's chip database
+const NEXTPNR_VERSION = JSON.parse(rd('node_modules/@silinx/nextpnr-himbaechel-spartan3e/package.json')).version;
 const PUBLISHED = 'https://pmnmalo.github.io/Silinx-ISE/';
 const LAYOUT = {
   dir: BUILD ? `dev-${BUILD.commit}/` : `${VERSION}/`,
   yosys: `../vendor/yowasp-yosys/${YOSYS_VERSION}/gen/bundle.js`,
+  nextpnr: `../vendor/nextpnr-spartan/${NEXTPNR_VERSION}/gen/bundle.js`,
   site: new URL(arg('--assets-url') || (BUILD ? `${PUBLISHED}dev/` : PUBLISHED)).href,
 };
 // the assets this version publishes (writeAssets): their folder under assets/, where they come from, which files
@@ -43,6 +46,8 @@ const ASSET_DIRS = [
   [`${LAYOUT.dir}devices`, 'packages/silinx-fpga/devices', f => f.endsWith('.json.gz')],
   [`${LAYOUT.dir}bitdb`, 'packages/silinx-fpga/bitdb', f => f.endsWith('.json')],
   [`vendor/yowasp-yosys/${YOSYS_VERSION}/gen`, 'node_modules/@yowasp/yosys/gen', () => true],
+  [`vendor/nextpnr-spartan/${NEXTPNR_VERSION}/gen`, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/gen', () => true],
+  [`vendor/nextpnr-spartan/${NEXTPNR_VERSION}/chipdb`, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/chipdb', f => f.endsWith('.bin.gz')],
 ];
 // each one's SHA-256 by its path under assets/, checked by the browser's cache before it keeps or uses a copy (#1237)
 LAYOUT.integrity = {};
@@ -72,6 +77,8 @@ function writeAssets(assets) {
     const src = path.join(ROOT, 'node_modules/@yowasp/yosys', f);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(yosys, f));
   }
+  // (nextpnr's: its package.json, with its licence's terms)
+  fs.copyFileSync(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/package.json'), path.join(assets, 'vendor/nextpnr-spartan', NEXTPNR_VERSION, 'package.json'));
   for (const [k, { n, bytes }] of parts) console.log(`  assets/${k}: ${n} file(s), ${(bytes / 1024 / 1024).toFixed(1)} MB`);
 }
 if (arg('--assets-only')) {

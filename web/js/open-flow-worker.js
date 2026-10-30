@@ -8,7 +8,7 @@
 //        Cache Storage (web/js/asset-cache.js, #967), this edition's other versions deleted from it
 //   out: { done: { fetched, bytes, pruned } }
 import { runOpenFlow } from '/core/flow-ide.js';
-import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
+import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, nextpnrIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
 import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES } from './asset-cache.js';
@@ -49,8 +49,25 @@ async function prepare({ prepare: d, assets, yosys, root }) {
 // device uses them again (the flow does not change them) instead of fetching and parsing them anew
 let lastDevice = null;   // { key, device, db }
 
+// nextpnr in this worker's thread (#2136), from its bundle; the log says what the wait is the first time
+const nextpnrs = new Map();
+function nextpnrBrowser(url, post) {
+  if (!nextpnrs.has(url)) nextpnrs.set(url, nextpnrIo(() => import(url)));
+  const io = nextpnrs.get(url);
+  return {
+    run: io.run,
+    chipdb: async part => {
+      if (!loaded.has(`${url} ${part}`)) {
+        loaded.add(`${url} ${part}`);
+        post({ line: `Loading nextpnr and the chip database of ${part} (WebAssembly, about 7 MB: once, then kept by this browser)…` });
+      }
+      return io.chipdb(part);
+    },
+  };
+}
+
 self.onmessage = async ({ data }) => {
-  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl } = data;
+  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl } = data;
   // every message carries the run's id (web/js/open-flow-browser.js: each run hears only its own)
   const post = m => self.postMessage({ ...m, id: data.id });
   if (data.integrity) self.SILINX_ASSET_INTEGRITY = data.integrity;   // (the assets' SHA-256, #1237: this worker's fetches and its Yosys workers')
@@ -120,6 +137,8 @@ self.onmessage = async ({ data }) => {
       device: () => device,
       bitDb: () => db,
       yosys,
+      // (the nextpnr engine's, #2136: its bundle and the device's chip database fetched on its first use, then kept by the cache)
+      nextpnr: spec.engine && spec.engine !== 'silinx' ? nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post) : null,
       write: (name, d) => {
         const path = `build/${name}`;
         store[name] = d;
