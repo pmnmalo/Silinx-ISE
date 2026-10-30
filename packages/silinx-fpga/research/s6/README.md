@@ -557,7 +557,27 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   #727's 32 bottom-half CMT designs, which the rules were not derived from, nothing is predicted that ISE does not
   set; what is left is their output flip-flop's clock in the IOB (an OLOGIC2, 7 bits) and the BUFIO2s of the pads
   not measured. The examples stay exact on both boards. The top half's CMTs (their CMT_PLL_TOP paths are not in the
-  drop) and the XC6SLX45's: #2025.
+  drop) and the XC6SLX45's: #2025 (the top half's: below).
+
+### The top half's CMTs (#2025, S6-E4, 2026-10-30)
+
+- **The top half's paths' PIPs one at a time** (`gen-cmtdrop6.mjs` on the BUFGMUX and one-output designs of
+  PLL_ADV_X0Y1, DCM_X0Y2 and DCM_X0Y3, 43 designs, 398 drops; `ana-cmtdrop6.mjs`, merged into `db/s6-pips-cmt.json`:
+  550 PIPs): 219 PIPs new (CMT_DCM_TOP 113, CMT_PLL_TOP 40, REG_T 19, TIOI_INNER 18, CLKC 16 …), 125 of the 398 with
+  bits; the 179 the bottom half's drop had measured the same.
+- **The settings without the CLKIN path** (`ana-cmtsites6.mjs` with the CMT paths' PIPs predicted): a CMT's input path
+  sets bits of its CMT frame through its tile's PIPs (`CMT_CLKMUX_*`, `*_CLK_INDIRECT_*`: an odd DCM's 271 to 293, an
+  even DCM's 596 to 627, a PLL's 600 to 619), which differ by the BUFIO2 that drives CLKIN. The settings' patterns,
+  each measured from one BUFIO2, held the bits of that path: a PLL's 604 and an even DCM's 596 and 599, which the top
+  half's CMTs from the clock pad C10 (BUFIO2_X4Y26) do not set. A PLL's CLKOUT0 enable (bit 416 of its CMT frame, set
+  when CLKOUT0 drives a net) was in them too (every settings design used CLKOUT0): now the PLL's output in
+  `db/xc6slx16-cmt-input.json`, which also fixes the bottom PLL's #1951 bit 1101,416.
+- **The input table** (`ana-cmtinput6.mjs` on the 92 BUFGMUX and one-output designs of the six sites): the top half's
+  three sites added, the DCMs' outputs the bottom's bits in their row's CMT frame.
+- **The residual** (`residual6.mjs --no-cmt-paths` on #727's and #1951's CMT designs and night 1's examples, 203):
+  119 exact (65 before), 767 bits left over (2042), none predicted that ISE does not set (21); the 32 BUFGMUX and
+  one-output designs of the top half's DCMs and the 14 of its PLL exact. Night 1's 14 examples stay exact. What is
+  left: the IOB's output flip-flop's clock (OLOGIC2) and the BUFIO2s of pads not measured.
 
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
