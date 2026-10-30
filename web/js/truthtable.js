@@ -129,7 +129,7 @@ export function mountTtEditor(container, opts = {}) {
   const toolbar = h('div', { class: 'tt-toolbar' },
     undoButton('undo', () => undo(), { class: 'tb-btn tt-undo' }), undoButton('redo', () => redo(), { class: 'tb-btn tt-redo' }),
     h('span', { class: 'tt-sep' }),
-    h('label', {}, 'Inputs:'), inIn, h('label', {}, 'Outputs:'), outIn, btn('Apply', 'Apply the input and output names', applyShape), shapeErr,
+    h('label', {}, 'Inputs:'), inIn, h('label', {}, 'Outputs:'), outIn, shapeErr,
     h('span', { class: 'tt-sep' }),
     h('label', { title: FORM_TIP }, 'HDL logic:'), formSel, h('label', { title: 'HDL language' }, 'Language:'), langSel,
     h('span', { class: 'tt-sep' }),
