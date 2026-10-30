@@ -1,6 +1,6 @@
 // Does the XDL written by nextpnr-to-xdl.mjs implement nextpnr's netlist? (#1954) lib.mjs simCheck: both simulated,
 // every flip-flop compared after each rising edge (ISE's DRC cannot tell a wrong LUT equation).
-//   node research/nextpnr-s3e/xdl-sim-check.mjs routed.json design.xdl [cycles] [input=value ...] [--starts N]
+//   node packages/silinx-fpga/research/nextpnr-s3e/xdl-sim-check.mjs routed.json design.xdl [cycles] [input=value ...] [--starts N]
 // Inputs (top ports) are 0 unless given (e.g. rst=1). --starts N: then N runs of 64 cycles from random states (a
 // counter's top bits without 2^n cycles). Exits 1 at the first difference, naming the flip-flop.
 import fs from 'node:fs';

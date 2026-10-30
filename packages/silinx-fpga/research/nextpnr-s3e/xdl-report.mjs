@@ -1,7 +1,7 @@
 // The size and speed of a routed XDL design, as the Silinx toolchain reports its own (#1954: nextpnr's result and
 // Silinx's measured the same way): the slices, LUTs and flip-flops used (lib.mjs xdlSize), and each clock's minimum
 // period by Silinx's static timing analysis (fpga/timing.js, fitted to ISE's trce).
-//   node research/nextpnr-s3e/xdl-report.mjs routed.xdl [part]
+//   node packages/silinx-fpga/research/nextpnr-s3e/xdl-report.mjs routed.xdl [part]
 import fs from 'node:fs';
 import { parseXdl } from '../../src/xdl.js';
 import { analyzeTiming, timingReport } from '../../src/fpga/timing.js';
