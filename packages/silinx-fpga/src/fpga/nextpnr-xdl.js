@@ -6,6 +6,7 @@ import { writeXdl } from '../xdl.js';
 import { initToEquation } from './lut.js';
 import { paramBits } from './netlist.js';
 import { BRAM_WIDTH } from './pack.js';
+import { iobSettings } from './nextpnr-iob.js';
 
 const topModule = json => Object.entries(json.modules).find(([, m]) => m.attributes?.top) || Object.entries(json.modules)[0];
 const esc = x => String(x).replace(/:/g, '_');
@@ -82,6 +83,7 @@ function siteRoutes(mod, insts, v) {
       const m = /^S(\d+)_(\w+)$/.exec(src) || /^S(\d+)_(\w+)$/.exec(dst);
       if (!m) continue;
       const inst = insts.get(v.siteName(tile, +m[1]));
+      if (!inst || !/^SLICE/.test(inst.siteType)) continue;       // (an IOB's: its settings come from its cells)
       const pinOf = w => v.pinOfWire(v.tileAt.get(tile)).get(w)?.pin;   // a site pin's name (F1, BX, CIN…)
       let x;
       if ((x = /^S\d+_([FG])I(\d)$/.exec(dst))) (inst.lutPins[x[1]] ||= [])[+x[2]] = +pinOf(src)[1];   // F1..F4 / G1..G4
@@ -186,7 +188,7 @@ function multCfg(inst, add) {
 }
 
 /** An instance's XDL type, name and settings (cfg items), as ISE's map writes them. */
-function instanceCfg(inst, mod) {
+function instanceCfg(inst, mod, part) {
   const cfg = [], c = inst.cells;
   const add = (attr, name, value) => cfg.push({ attr, name, value });
   if (c.GND || c.VCC) {
@@ -239,16 +241,9 @@ function instanceCfg(inst, mod) {
     const pad = portNet(c.IOB, 'PAD');
     const [port, d] = Object.entries(mod.ports).find(([, p]) => p.bits.includes(pad)) || [c.IOB.name, null];
     inst.name = d && d.bits.length > 1 ? `${port}<${d.bits.indexOf(pad)}>` : port.replace(/\[(\d+)\]$/, '<$1>');
-    const out = portNet(c.IOB, 'O') !== undefined;
-    inst.type = out ? 'IOB' : 'IBUF';                    // (an input alone: IBUF, as ISE's map writes it)
-    if (out) {
-      add('DRIVEATTRBOX', '', '12'); add('IOATTRBOX', '', 'LVCMOS25'); add('O1INV', '', 'O1'); add('OMUX', '', 'O1'); add('SLEW', '', 'SLOW');
-      add('OUTBUF', `${esc(inst.name)}_OBUF`, '');
-    } else {
-      add('IDELMUX', '', '1'); add('IMUX', '', '1'); add('IOATTRBOX', '', 'LVCMOS25');
-      add('INBUF', `${esc(inst.name)}_IBUF`, '');
-    }
-    add('PAD', esc(inst.name), '');
+    const io = iobSettings(c, esc(inst.name), mod, part);
+    inst.type = io.type;
+    for (const [attr, n, value] of io.cfg) add(attr, n, value);
   } else if (c.BUFGMUX) {
     inst.type = 'BUFGMUX';
     inst.name = esc(c.BUFGMUX.name);
@@ -341,14 +336,15 @@ function tieSelects(xdlInsts, nets, device) {
 /**
  * nextpnr-himbaechel's routed design (spartan3e micro-architecture, its --write JSON) as an XDL design (parseXdl's
  * structure: writeXdl writes it): one instance per used site with its settings, each net's site pins and PIPs.
- * Its cells: LUT4, FF, MUXCY, XORCY, MUXF5, MUXF6, IOB, BUFGMUX. Throws when a LUT input is not on the pin its equation reads.
+ * Its cells: LUT4, FF, MUXCY, XORCY, MUXF5, MUXF6, IOB (with its registers IFF, OFF, TFF), BUFGMUX. Throws when a LUT input
+ * is not on the pin its equation reads.
  */
 export function nextpnrToXdl(json, device, part = device.part) {
   const [top, mod] = topModule(json);
   const v = deviceViews(device);
   const insts = sitesOfCells(mod, device, v);
   siteRoutes(mod, insts, v);
-  const xdlInsts = [...insts.values()].map(inst => instanceCfg(inst, mod));
+  const xdlInsts = [...insts.values()].map(inst => instanceCfg(inst, mod, part));
   const nets = netsOf(mod, insts, device, v);
   checkLutPins(mod, insts, nets);
   tieSelects(xdlInsts, nets, device);

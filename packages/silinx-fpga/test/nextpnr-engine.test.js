@@ -39,9 +39,9 @@ test('nextpnrNetlist: what the micro-architecture cannot implement yet is named'
   assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) RAM16X1S: not in the spartan3e micro-architecture yet']);
 });
 
-test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants, the buffers, the block RAMs and multipliers; not a falling edge, a latch, a distributed RAM', () => {
-  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'OBUF', 'BUFG', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
-  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'SRL16E', 'RAM16X1S', 'RAMB16_S3', 'MULT18X18SX', 'DCM_SP', 'IOBUF', 'OBUFT']) assert.ok(!NEXTPNR_CELL.test(t), t);
+test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants, the buffers, the IOBs\' DDR registers, the block RAMs and multipliers; not a falling edge, a latch, a distributed RAM', () => {
+  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'IDDR2', 'ODDR2', 'BUFG', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
+  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'SRL16E', 'RAM16X1S', 'RAMB16_S3', 'MULT18X18SX', 'DCM_SP', 'OBUFDS', 'BUFGMUX']) assert.ok(!NEXTPNR_CELL.test(t), t);
 });
 
 test('#2136 the gates example built with --engine nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
@@ -125,4 +125,23 @@ test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry 
   assert.equal(has('F5MUX'), 12);
   assert.equal(has('F6MUX'), 2);
   assert.equal(has('F5USED'), 4);
+});
+
+test('#2192 the IOB registers\' design (Silinx\'s synthesis) built with --engine nextpnr: no warnings, its PERIOD met, the registers in their IOBs, a complete bitstream', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fixture('iob_regs.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('iob_regs.ucf').pathname, '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of bonded IOBs: 11 out of 92 12%'), out.join('\n'));
+  assert.ok(out.includes('  Number of Slice Flip Flops: 0 out of 4896 0%'), out.join('\n'));
+  assert.ok(out.some(l => /^constraint PERIOD 20 ns on clk: met \(period [0-9.]+ ns, slack [0-9.]+ ns\)$/.test(l)), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'));
+  assert.ok(out.includes('Bitstream: build/iob_regs.bit (169291 bytes, every feature in the bit database)'), out.join('\n'));
+  // the eight flip-flops in their IOBs, the clock pad's buffer on its dedicated path
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  const ffs = design.insts.flatMap(i => i.cfg.filter(c => c.value === '#FF').map(c => `${i.name} ${c.attr}`)).sort();
+  assert.deepEqual(ffs, ['led<0> OFF1', 'led<1> OFF1', 'led<1> TFF1', 'led<2> OFF1', 'led<2> OFF2', 'sw<0> IFF1', 'sw<1> IFF1', 'sw<1> IFF2']);
+  assert.equal(design.insts.find(i => i.type === 'BUFGMUX').site, 'BUFGMUX_X2Y11');
 });
