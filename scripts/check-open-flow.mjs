@@ -107,8 +107,7 @@ process.stdout.write(out.split('\n').map(l => (l ? `  ISE ${l}` : l)).join('\n')
 // check-writer.mjs reports it ({ stdout }: BYTE-IDENTICAL, or how they differ)
 async function checkS6(d) {
   const { compareBit } = await import('../research/s6/check-bitgen6.mjs');
-  const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
-  const { loadBitDbS6 } = await import('../packages/silinx-fpga/src/fpga/s6/bitdb-node.js');
+  const { loadDeviceCache, loadBitDbS6 } = await import('../packages/silinx-fpga/src/node.js');
   const text = fs.readFileSync(path.join(d, 'routed.xdl'), 'utf8');
   const part = text.match(/^design "[^"]*" (\S+)/m)[1].replace(/^(xc6slx\d+)-?(csg\d+)(-\d)?$/, '$1$2-3');
   const device = loadDeviceCache(part), db = loadBitDbS6(part);
