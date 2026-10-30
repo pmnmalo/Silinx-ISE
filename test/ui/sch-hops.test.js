@@ -11,6 +11,8 @@ before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
 const E = () => env;
 const ED = '.doc:not([hidden]) .sch-editor';
+// the toolbar's menu opened (#2208), if it is not
+const openMenu = (page) => page.eval((ed) => { const b = document.querySelector(`${ed} .se-btn[data-act=more]`); if (b.getAttribute('aria-expanded') !== 'true') b.click(); }, ED);
 const P = (x, y) => ({ x, y });
 
 uiTest('#692 #756 schematic: Hop-overs (on by default) draws an arc where two wires cross, a T keeps its dot; printed; off remembered; in Portuguese; the document the same', E, async (page) => {
@@ -63,6 +65,7 @@ uiTest('#692 #756 schematic: Hop-overs (on by default) draws an arc where two wi
   assert.deepEqual(await label(), ['Saltos', 'Desenhar um pequeno arco onde dois fios se cruzam sem se ligarem']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // off: plain lines, remembered (the schematic opened again: still off)
+  await openMenu(page);
   await page.click(`${ED} .se-hops input`);
   await page.waitFor((ed) => !document.querySelector(`${ed} svg .wire path.wline`), [ED], { what: 'no hops' });
   assert.equal(await page.eval(() => localStorage.getItem('xl.sch.hops')), '0');
@@ -70,6 +73,7 @@ uiTest('#692 #756 schematic: Hop-overs (on by default) draws an arc where two wi
   await reopen();
   assert.deepEqual(await view(), PLAIN, 'off remembered');
   // on again
+  await openMenu(page);
   await page.click(`${ED} .se-hops input`);
   await page.waitFor((ed) => document.querySelector(`${ed} svg .wire path.wline`), [ED], { what: 'the hop drawn' });
   assert.deepEqual(await view(), HOP);

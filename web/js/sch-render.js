@@ -10,9 +10,7 @@ import { snap } from './sch-editor.js';
 /** { renderSheet, render, renderOverlay, updateToolbar, updateStatus } of a schematic editor (state(): its current
  *  document, netlist, selection, tool, … at the time of the call; refreshNetlist() computes the netlist again). */
 export function mountRender(ctx) {
-  const { state, curve, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, undoStack, redoStack, routeTo, snapPoint, bandRect,
-    infoTarget } = ctx;
-
+  const { state, curve, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, undoStack, redoStack, routeTo, snapPoint, bandRect } = ctx;
   function renderSheet() {
     const { doc } = state();
     const W = doc.sheet.w, H = doc.sheet.h;
@@ -163,7 +161,7 @@ export function mountRender(ctx) {
     const symSel = [...sel].some(k => k.startsWith('sym:') || k.startsWith('port:')) || (tool === 'place');
     tb.querySelector('[data-act="rotate"]').disabled = !symSel;
     tb.querySelector('[data-act="mirror"]').disabled = !symSel;
-    tb.querySelector('[data-act="info"]').disabled = !infoTarget();
+    tb.querySelector('[data-act="mirrorv"]').disabled = !symSel;
   }
   const TOOL_HINT = {
     select: 'Click to select, drag to move (connected wires follow), drag on empty space to select a region. Double-click a module to open it.',

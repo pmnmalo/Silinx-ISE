@@ -39,7 +39,7 @@ uiTest('#1730 schematic: Rearrange Wires draws the wires again (the selected one
   const wires = async () => (await getDoc()).wires.map((w) => w.points);
   const hint = (t) => page.waitFor((ed, x) => { const e = document.querySelector(`${ed} .se-hint`); return !!e && !e.hidden && e.textContent === x; }, [ED, t], { what: `the note: ${t}` });
   const button = (act) => page.eval((ed, a) => { const b = document.querySelector(`${ed} .se-toolbar [data-act=${a}]`); return b && [b.textContent.trim(), b.title, getComputedStyle(b).display !== 'none']; }, ED, act);
-  const WIRES = `${ED} .se-toolbar [data-act=rewire]`, SHEET = `${ED} .se-toolbar [data-act=relayout]`;
+  const WIRES = `${ED} .se-toolbar [data-act=rewire]`, SHEET = `${ED} .se-toolbar [data-act=relayout]`, MORE = `${ED} .se-btn[data-act=more]`;
   assert.deepEqual(await button('rewire'), ['Rearrange Wires', TITLE_W, true]);
   assert.deepEqual(await button('relayout'), ['Rearrange Schematic', TITLE_S, true]);
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} .se-toolbar [data-act=beautify]`), ED), null, 'no Beautify button any more');
@@ -59,6 +59,7 @@ uiTest('#1730 schematic: Rearrange Wires draws the wires again (the selected one
     await page.waitFor((ed) => !document.querySelector(`${ed} svg .sel`), [ED], { what: 'nothing selected' });
   };
   await select();
+  await page.click(MORE);
   await page.click(WIRES);
   await hint('Rearrange Wires: 1 wire drawn again');
   const sel1 = await wires();
@@ -70,6 +71,7 @@ uiTest('#1730 schematic: Rearrange Wires draws the wires again (the selected one
 
   // no selection: every wire drawn again (the other one now), the markers where they were
   await deselect();
+  await page.click(MORE);
   await page.click(WIRES);
   await hint('Rearrange Wires: 1 wire drawn again');
   const all = await wires();
@@ -77,10 +79,12 @@ uiTest('#1730 schematic: Rearrange Wires draws the wires again (the selected one
   assert.deepEqual([all[0][0], all[0].at(-1)], [P(100, 100), P(400, 100)]);
   assert.ok(length(all[0]) < length(DETOUR1), 'shorter');
   assert.deepEqual((await getDoc()).ports, doc0.ports, 'the markers where they were');
+  await page.click(MORE);
   await page.click(WIRES);
   await hint('Rearrange Wires: the wires are already as clear as they can be');
 
   // Rearrange Schematic: the whole sheet laid out, the markers moved (the inputs on the left), every wire straight
+  await page.click(MORE);
   await page.click(SHEET);
   await hint('Rearrange Schematic: the schematic laid out again');
   const laid = await getDoc();
@@ -90,6 +94,7 @@ uiTest('#1730 schematic: Rearrange Wires draws the wires again (the selected one
   assert.deepEqual(laid.wires.map((w) => w.points.length), [2, 2], 'straight');
   const ends = laid.wires.map((w) => [w.points[0], w.points[1]].map((q) => laid.ports.find((p) => p.x === q.x && p.y === q.y)?.name).sort().join('-')).sort();
   assert.deepEqual(ends, ['a-y', 'c-x'], 'the same connections');
+  await page.click(MORE);
   await page.click(SHEET);
   await hint('Rearrange Schematic: the schematic is already laid out this way');
   // one undo step each
@@ -109,13 +114,17 @@ uiTest('#1730 schematic: Rearrange Wires draws the wires again (the selected one
     assert.deepEqual(await button('rewire'), ['Reorganizar fios', TITLE_W_PT, true]);
     assert.deepEqual(await button('relayout'), ['Reorganizar esquemático', TITLE_S_PT, true]);
     await select();
+    await page.click(MORE);
     await page.click(WIRES);
     await hint('Reorganizar fios: 1 fio desenhado de novo');
+    await page.click(MORE);
     await page.click(WIRES);
     await hint('Reorganizar fios: os fios já estão tão claros quanto possível');
     await deselect();
+    await page.click(MORE);
     await page.click(SHEET);
     await hint('Reorganizar esquemático: esquemático disposto de novo');
+    await page.click(MORE);
     await page.click(SHEET);
     await hint('Reorganizar esquemático: o esquemático já está disposto assim');
   } finally {

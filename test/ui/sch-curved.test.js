@@ -17,6 +17,8 @@ before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
 const E = () => env;
 const ED = '.doc:not([hidden]) .sch-editor';
+// the toolbar's menu opened (#2208), if it is not
+const openMenu = (page) => page.eval((ed) => { const b = document.querySelector(`${ed} .se-btn[data-act=more]`); if (b.getAttribute('aria-expanded') !== 'true') b.click(); }, ED);
 const DEV = { commit: 'abc1234', date: '2026-10-24 12:00' };   // (the Tasks interface: a development build's only, #838)
 
 const inv = (id, name, x, y) => ({ id, type: 'inv', x, y, rot: 0, mirror: false, name, params: { width: 1 } });
@@ -89,6 +91,7 @@ const wave = (a, b, n = 16, amp = 40) => Array.from({ length: n + 1 }, (_, i) =>
 
 // Curved wires ticked (by a click or a tap): the schematic's style, every wire a curve as core/schcurve.js draws it
 async function tick(page, how = 'click') {
+  await openMenu(page);
   await page[how](`${ED} .se-curved input`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wireStyle === 'curved', [], { what: 'curved' });
   const d = await getDoc(page);
@@ -219,10 +222,12 @@ uiTest('#1144 schematic: Curved wires by the mouse: ticked, handles dragged, a c
   await page.waitNoDialog();
 
   // unticked: the technical drawing, the curves kept in the document; saved: opened again as it was left
+  await openMenu(page);
   await page.click(`${ED} .se-curved input`);
   await page.waitFor(() => !window.Silinx.active.schEditor.getDoc().wireStyle, [], { what: 'rectilinear' });
   assert.deepEqual((await drawn(page)).map(x => x[1]), dNow.wires.map(() => 'poly'));
   assert.deepEqual((await getDoc(page)).wires.map(x => x.curve), dNow.wires.map(x => x.curve), 'the curves kept');
+  await openMenu(page);
   await page.click(`${ED} .se-curved input`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wireStyle === 'curved', [], { what: 'curved' });
   await page.eval(() => new Promise((r) => setTimeout(r, 800)));   // (saved: the editor's change, a moment later)
@@ -340,9 +345,11 @@ uiTest('#1163 schematic: Curved wires hop where they cross (Hop-overs ticked); o
   await page.key('Escape');
   await page.waitNoDialog();
   // Hop-overs off: plain curves; on again: the hop
+  await openMenu(page);
   await page.click(`${ED} .se-hops input`);
   await page.waitFor((ed) => !/ A5,5/.test(document.querySelector(`${ed} g.wire[data-id="W1"] .wline`).getAttribute('d')), [ED], { what: 'no hop' });
   assert.deepEqual(await drawn(page), d0.wires.map(w => [w.id, curveD(w)]));
+  await openMenu(page);
   await page.click(`${ED} .se-hops input`);
   await page.waitFor((ed) => / A5,5/.test(document.querySelector(`${ed} g.wire[data-id="W1"] .wline`).getAttribute('d')), [ED], { what: 'the hop' });
   assert.deepEqual(await drawn(page), HOP);
@@ -356,22 +363,22 @@ uiTest('#1163 schematic: Curved wires hop where they cross (Hop-overs ticked); o
 // (a symbol that is not an input selected by a click) stay enabled, the circuit still running
 uiTest('#1175 Curved wires before Hop-overs; in Try it, Curved wires and Symbol Info enabled', E, async (page) => {
   await open(page, 'CurvedTry');
-  const order = await page.eval((ed) => [...document.querySelector(`${ed} .se-toolbar`).children].map((e) => e.className.match(/se-(curved|hops|names)/)?.[1] || e.dataset.act).filter(Boolean), ED);
-  assert.deepEqual(order.slice(order.indexOf('info')), ['info', 'rewire', 'relayout', 'curved', 'hops', 'names', 'check', 'sim']);
+  const order = await page.eval((ed) => [...document.querySelector(`${ed} .se-more-menu`).children].map((e) => e.className.match(/se-(curved|hops)/)?.[1] || e.dataset.act).filter(Boolean), ED);
+  assert.deepEqual(order, ['rewire', 'relayout', 'curved', 'hops']);
   await page.click(`${ED} .se-btn[data-act=sim]`);
   await page.waitFor((ed) => document.querySelector(ed).classList.contains('sim-mode') && window.Silinx.active.schEditor.isLive?.() !== false, [ED], { what: 'Try it' });
-  // (not greyed out by Try it: it takes clicks; Symbol Info still disabled with nothing selected)
+  // (not greyed out by Try it: it takes clicks)
   const usable = (sel) => page.eval((ed, s) => getComputedStyle(document.querySelector(`${ed} ${s}`)).pointerEvents !== 'none', ED, sel);
-  assert.deepEqual([await usable('.se-curved'), await usable('.se-btn[data-act=info]'), await usable('.se-btn[data-act=rotate]')], [true, true, false]);
+  assert.deepEqual([await usable('.se-curved'), await usable('.se-btn[data-act=more]'), await usable('.se-btn[data-act=rotate]')], [true, true, false]);
   // Curved wires ticked in Try it: the wires drawn as curves, the schematic says so, Try it still on
+  await openMenu(page);
   await page.click(`${ED} .se-curved input`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wireStyle === 'curved', [], { what: 'curved' });
   assert.ok((await drawn(page)).some(([, d]) => d !== 'poly'), 'a curve drawn');
   assert.ok(await page.eval((ed) => document.querySelector(ed).classList.contains('sim-mode'), ED));
   // a gate clicked: selected, Symbol Info shows it
   await page.click(`${ED} svg .sym[data-id="S2"] .hitbox`);
-  await page.waitFor((ed) => !document.querySelector(`${ed} .se-btn[data-act=info]`).disabled, [ED], { what: 'Symbol Info enabled' });
-  await page.click(`${ED} .se-btn[data-act=info]`);
+  await page.key('F1');
   await page.waitFor(() => !!window.Silinx.active.schEditor.symbolInfoDialog, [], { what: 'Symbol Info open' });
   await page.eval(() => window.Silinx.active.schEditor.symbolInfoDialog.close());
   assert.ok(await page.eval((ed) => document.querySelector(ed).classList.contains('sim-mode'), ED), 'still trying it');

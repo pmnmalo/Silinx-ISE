@@ -318,7 +318,7 @@ const PT = {
   'Symbol Info (F1)': 'Informação do Símbolo (F1)', 'Symbol Info…': 'Informação do Símbolo…', 'Symbol Info': 'Informação do Símbolo',
   // schematic editor labels that were still in English
   'Select (Esc)': 'Selecionar (Esc)', 'Add Wire (W)': 'Adicionar Fio (W)', 'Add Net Name (N)': 'Adicionar Nome de Rede (N)', 'Add I/O Marker (O)': 'Adicionar Marcador de E/S (O)',
-  'Rotate (Ctrl+R)': 'Rodar (Ctrl+R)', 'Mirror (Ctrl+M)': 'Espelhar (Ctrl+M)', 'Delete (Del)': 'Apagar (Del)', 'Keep connections': 'Manter ligações',
+  'Rotate (Ctrl+R)': 'Rodar (Ctrl+R)', 'Mirror Horizontal (Ctrl+M)': 'Espelhar na horizontal (Ctrl+M)', 'Mirror Vertical': 'Espelhar na vertical', 'Delete (Del)': 'Apagar (Del)', 'Keep connections': 'Manter ligações',
   'Check': 'Verificar', 'Schematic sheet': 'Folha do esquemático',
   'Context clause': 'Cláusula de contexto', 'Compiler directives': 'Diretivas do compilador', 'one per line: NAME : type := default': 'uma por linha: NOME : tipo := valor por omissão',
   'signals, types, constants, functions emitted verbatim': 'sinais, tipos, constantes, funções copiados tal e qual',

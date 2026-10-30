@@ -7,7 +7,7 @@ import { readClip, writeClip } from './clipboard.js';
 import { untangleNew } from '/core/schpath.js';
 import { KEYS, snap } from './sch-editor.js';
 
-/** { copySel, deleteSel, duplicateSel, mirrorSel, paste, rotateSel, selectAll, selected } of mountSchEditor (destroyed(), doc(), live(), modules(), placing(), sel(), tool(): its current values). */
+/** { copySel, deleteSel, duplicateSel, mirrorSel, mirrorVSel, paste, rotateSel, selectAll, selected } of mountSchEditor (destroyed(), doc(), live(), modules(), placing(), sel(), tool(): its current values). */
 export function mountSchSelect(ctx) {
   const {
     container, changed, destroyed, doc, edit, live, modules, placing, readOnly, refusedShort, render, renderOverlay,
@@ -36,10 +36,19 @@ export function mountSchSelect(ctx) {
     });
   }
   function mirrorSel() {
-    if (tool() === 'place' && placing()) { placing().mirror = !placing().mirror; renderOverlay(); return; }
+    flipSel(0, oppositeSide);
+  }
+  // Mirror Vertical (#2209): the markers above and below change sides, the others keep theirs
+  function mirrorVSel() {
+    flipSel(180, side => (side === 'N' ? 'S' : side === 'S' ? 'N' : side));
+  }
+  // flipped as seen on the sheet, whatever the turn (#2209): a symbol is drawn flipped along its own x, then turned
+  function flipSel(turn, portFlip) {
+    const flip = s => { s.mirror = !s.mirror; s.rot = (turn + 360 - s.rot) % 360; };
+    if (tool() === 'place' && placing()) { flip(placing()); renderOverlay(); return; }
     const ids = selected('sym'), pids = selected('port');
     if (!ids.length && !pids.length) return;
-    edit(() => { turnPorts(pids, oppositeSide); for (const id of ids) { const s = doc().symbols.find(x => x.id === id); s.mirror = !s.mirror; } });
+    edit(() => { turnPorts(pids, portFlip); for (const id of ids) flip(doc().symbols.find(x => x.id === id)); });
   }
   function deleteSel() {
     if (!sel().size) return;
@@ -100,5 +109,5 @@ export function mountSchSelect(ctx) {
   }
   function selectAll() { setSel(new Set([...doc().symbols.map(s => `sym:${s.id}`), ...doc().wires.map(w => `wire:${w.id}`), ...doc().ports.map(p => `port:${p.id}`), ...doc().labels.map(l => `label:${l.id}`)])); render(); renderProps(); }
 
-  return { copySel, deleteSel, duplicateSel, mirrorSel, paste, rotateSel, selectAll, selected };
+  return { copySel, deleteSel, duplicateSel, mirrorSel, mirrorVSel, paste, rotateSel, selectAll, selected };
 }
