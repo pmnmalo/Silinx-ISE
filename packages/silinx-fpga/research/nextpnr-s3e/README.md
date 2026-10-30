@@ -15,7 +15,7 @@ XC3S250E (Basys2-250).
 | `nextpnr-to-xdl.mjs` | nextpnr's routed design (`--write`) to XDL: one instance per used site with its settings (the sites named from the device graph), each net's site pins and PIPs |
 | `xdl-to-bit.mjs` | Silinx's bitgen on that XDL |
 | `export-timing.mjs` | Silinx's delay model (`SPEED_4`, fitted to trce) for the chip database: the class of the node each PIP drives, per template, and the model's delays |
-| `xdl-sim-check.mjs` | Does the converted XDL implement nextpnr's netlist? Both simulated cycle by cycle, every flip-flop compared (also from random states, for a counter's top bits); ISE's DRC cannot tell a wrong LUT equation |
+| `xdl-sim-check.mjs` | Does the converted XDL implement nextpnr's netlist? Both simulated cycle by cycle, every flip-flop compared after each clock edge (the IOBs' too, a DDR register's on both edges); also from random states, for a counter's top bits, and with random inputs (`--random-inputs`), for an input register's edge or a reset; ISE's DRC cannot tell a wrong LUT equation |
 | `xdl-report.mjs` | The size (slices, LUTs, flip-flops) and speed (each clock's minimum period, Silinx's static timing analysis fitted to trce) of a routed XDL: nextpnr's result and Silinx's measured the same way |
 
 The site model, per slice: two LUT4s (F, G, inputs on F1…F4 / G1…G4), their outputs to X / Y
@@ -97,14 +97,26 @@ What ISE taught the converter: an input alone is an `IBUF` instance, also on an 
 SLICEM site is a `SLICEL` instance (as a `SLICEM`, ISE's DRC finds the SR pin "partially connected");
 a BUFGMUX's select S is tied to VCC through its tile's VCC site (`XDL_DUMMY_<tile>_<site>`).
 
+## The IOBs' registers and the clock pads (#2192)
+
+`iob_regs.v` (in this folder): an input register, an output register, an output-enable one (the UCF's `IOB = TRUE`, which
+the flow's `nextpnrNetlist` gives the micro-architecture as the attribute `IOB`), an IDDR2 and an ODDR2 on the clock and
+its inverse, the clock on B8 (a GCLK pin); its constraints `test/fixtures/nextpnr-engine/iob_regs.ucf`. With
+nextpnr-spartan v0.4.0 (2026-10-30), from Silinx's synthesis:
+- the registers in their IOBs (IFF1 / IFF2, OFF1 / OFF2, TFF1: BELs of the IOB site), each IOB's settings those of
+  Silinx's packer for the same netlist, in the same order (`nextpnr-iob.js`);
+- the clock pad's BUFGMUX placed where its dedicated path reaches (BUFGMUX_X2Y11), the net routed on that path
+  (`I0_PINWIRE -> IOIS_IBUF0`, `CLKT_CKI4 -> CLKT_GCLK0 -> CLKT_GCLKIN00`), as Silinx routes it;
+- the routing check and `xdl-sim-check.mjs --random-inputs` passed (the 8 flip-flops, on both edges);
+- ISE: `xdl -xdl2ncd` clean, `drc` 0 errors and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical to
+  Silinx's; so too blink and blink_carry on the new chip database.
+
 ## What is left for a decision
 
 - **Speed.** With Silinx's delays nextpnr got 8.4 ns where Silinx gets 6.7 ns on the same netlist:
   Silinx's placer and router are the better ones here (its timing-driven placement, the loads in its
   router's costs). With the LUT pins permuted, 7.15 ns against 6.72 ns.
-- **Constants**, the carry chain, MUXF5…F8, SLICEM's RAMs and shift registers, the IOB's registers,
+- **Constants**, the carry chain, MUXF5…F8, SLICEM's RAMs and shift registers,
   BRAM, MULT18X18, DCM: each a cell type, its BELs and its settings in the converter.
-- **The clock pads.** nextpnr routes a pad to its BUFGMUX on general routing where a dedicated path
-  exists, for want of delays.
 - **WebAssembly**: the build of nextpnr-himbaechel with Emscripten (as YoWASP does), and the chip
   database (24 MB per device) loaded in the browser.

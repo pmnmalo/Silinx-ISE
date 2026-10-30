@@ -4,9 +4,10 @@
 //   through io.nextpnr) packs, places and routes Yosys's netlist.
 // - Its routed design becomes XDL (fpga/nextpnr-xdl.js), which the timing, the pins and the bitstream read as they
 //   read Silinx's own.
-// - For now the micro-architecture knows LUTs, flip-flops, carry chains, constants, IOBs and global clock buffers
+// - For now the micro-architecture knows LUTs, flip-flops, carry chains, constants, IOBs with their registers and
+//   global clock buffers
 //   (#2135): a netlist with other cells fails at Map, naming them.
-import { parseUcf } from './ucf.js';
+import { parseUcf, ucfPattern } from './ucf.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { checkRouting } from './fpga/route.js';
 import { deviceSites } from './fpga/place.js';
@@ -14,13 +15,14 @@ import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
 
 /** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops of
  *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the carry chains (MUXCY, XORCY), the
- *  constants (GND, VCC), the I/O buffers and BUFG. */
-export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|OBUF|BUFG)$/;
+ *  constants (GND, VCC), the I/O buffers, the IOBs' DDR registers (IDDR2, ODDR2) and BUFG. */
+export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG)$/;
 
 /**
  * The netlist for nextpnr: each port bit's pad (its LOC in the UCF) on the I/O buffer at that bit, the IBUF or OBUF the
  * synthesis put there (nextpnr gives a port's own attributes to none of its cells; the micro-architecture places an
- * I/O buffer at its LOC). Returns { json, problems }: the cells the micro-architecture does not have, ports without
+ * I/O buffer at its LOC). The UCF's IOB = TRUE / FALSE as the attribute IOB, the micro-architecture's question: NET on the
+ * port bit's buffer, INST on the cell. Returns { json, problems }: the cells the micro-architecture does not have, ports without
  * a pad. (The constants: the micro-architecture's, #2135.)
  */
 export function nextpnrNetlist(text, top, ucfText) {
@@ -31,13 +33,21 @@ export function nextpnrNetlist(text, top, ucfText) {
   for (const c of Object.values(mod.cells)) if (!NEXTPNR_CELL.test(c.type)) types.set(c.type, (types.get(c.type) || 0) + 1);
   for (const [t, n] of types) problems.push(`${n} cell(s) ${t}: not in the spartan3e micro-architecture yet`);
   // each port bit's pad on its I/O buffer
-  let locs = {};
-  try { if (ucfText) locs = parseUcf(ucfText).assignments || {}; } catch { /* checked by translate */ }
+  let locs = {}, other = [];
+  try { if (ucfText) ({ assignments: locs = {}, other = [] } = parseUcf(ucfText)); } catch { /* checked by translate */ }
+  const iobAsked = [];   // [NET / INST, name pattern, TRUE / FALSE]: the last that matches
+  for (const st of other) {
+    const m = /^(NET|INST)\s+"?([^"\s]+)"?\s+IOB\s*=\s*"?(TRUE|FALSE|FORCE)"?\s*$/i.exec(String(st).trim());
+    if (m) iobAsked.push([m[1].toUpperCase(), ucfPattern(m[2]), /^FALSE$/i.test(m[3]) ? 'FALSE' : 'TRUE']);
+  }
+  const asked = (kind, name) => { let v; for (const [k, re, x] of iobAsked) if (k === kind && re.test(name)) v = x; return v; };
+  for (const [n, c] of Object.entries(mod.cells)) { const a = asked('INST', n); if (a) c.attributes = { ...c.attributes, IOB: a }; }
   const loc = n => Object.entries(locs).find(([k, a]) => a.loc && k.toLowerCase() === n.toLowerCase())?.[1].loc;
   const buffers = new Map();   // port bit -> its IBUF / OBUF
   for (const c of Object.values(mod.cells)) {
-    if (c.type === 'IBUF') buffers.set(c.connections.I?.[0], c);
-    if (c.type === 'OBUF') buffers.set(c.connections.O?.[0], c);
+    if (c.type === 'IBUF' || c.type === 'IBUFG') buffers.set(c.connections.I?.[0], c);
+    if (c.type === 'OBUF' || c.type === 'OBUFT') buffers.set(c.connections.O?.[0], c);
+    if (c.type === 'IOBUF') buffers.set(c.connections.IO?.[0], c);
   }
   for (const [p, d] of Object.entries(mod.ports)) {
     d.bits.forEach((b, i) => {
@@ -46,7 +56,10 @@ export function nextpnrNetlist(text, top, ucfText) {
       const buffer = buffers.get(b);
       if (!pad) problems.push(`port ${bit}: no LOC in the constraints (the nextpnr engine places only the ports given a pad)`);
       else if (!buffer) problems.push(`port ${bit}: no I/O buffer (IBUF / OBUF) on it`);
-      else buffer.attributes = { ...buffer.attributes, LOC: pad };
+      else {
+        const a = asked('NET', bit);
+        buffer.attributes = { ...buffer.attributes, LOC: pad, ...(a ? { IOB: a } : {}) };
+      }
     });
   }
   json.modules = { [name]: mod };

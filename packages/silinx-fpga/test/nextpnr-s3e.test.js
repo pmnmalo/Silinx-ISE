@@ -12,6 +12,8 @@ import { loadDb } from '../src/fpga/bitdb-node.js';
 import { bitgen } from '../src/fpga/bitgen.js';
 import { checkRouting } from '../src/fpga/route.js';
 import { WIRE } from '../src/fpga/timing.js';
+import { readYosysJson } from '../src/fpga/netlist.js';
+import { pack } from '../src/fpga/pack.js';
 import { lutPins, nextpnrToXdl, simCheck, timingExport, unknownPips, xdlSize } from '../research/nextpnr-s3e/lib.mjs';
 
 const PART = 'xc3s250ecp132-4';
@@ -219,4 +221,77 @@ test('#2135 the wide multiplexers\' XDL implements its netlist; an F5 or F6 outp
     const wrong = parseXdl(text.replaceAll(from, to));   // (in every slice)
     assert.equal(simCheck(json, wrong, { cycles: 2000, starts: 300 }).ok, false, `${from} -> ${to}`);
   }
+});
+
+// nextpnr's routed design of research/nextpnr-s3e/iob_regs.v as Silinx's synthesis maps it, its constraints
+// test/fixtures/nextpnr-engine/iob_regs.ucf: registers in the IOBs (input, output, output-enable: the UCF's IOB = TRUE), an
+// IDDR2 and an ODDR2 on the clock and its inverse, the clock on a GCLK pin (#2135). ISE's DRC passed it (0 errors, 0
+// warnings), its bitgen's .bit byte-identical to Silinx's.
+const iobRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/iob-routed.json.gz', import.meta.url))));
+const iobs = nextpnrToXdl(iobRouted(), device, PART);
+const cfgText = i => i.cfg.map(c => `${c.attr}:${c.name}:${c.value}`).join(' ');
+
+test('#2192 nextpnrToXdl: the IOBs\' registers and DDR registers, each setting as Silinx\'s packer writes it, in its order', () => {
+  // the reference: Silinx's own packer on the same netlist and constraints
+  const engine = new URL('./fixtures/nextpnr-engine/', import.meta.url);
+  const nl = readYosysJson(JSON.parse(fs.readFileSync(new URL('iob_regs.json', engine), 'utf8')));
+  const p = pack(nl, { ucf: fs.readFileSync(new URL('iob_regs.ucf', engine), 'utf8'), part: PART });
+  const ours = iobs.insts.filter(i => /^(IOB|IBUF)$/.test(i.type));
+  assert.equal(ours.length, 11);
+  for (const i of ours) {
+    const s = p.insts.find(x => x.kind === 'iob' && x.name === i.name);
+    assert.equal(i.type, s.type, i.name);
+    assert.equal(cfgText(i), cfgText(s), i.name);
+  }
+  // each kind there: the input register alone (no IMUX), the output and output-enable registers sharing OTCLK1, the DDRs
+  const at = name => cfgText(ours.find(i => i.name === name));
+  assert.match(at('sw<0>'), /^IOATTRBOX::LVCMOS25 IFF1:\S+:#FF IFF1_INIT_ATTR::INIT0 IFF1_SR_ATTR::SRLOW IFFATTRBOX::SYNC .* IFD_DELAY_VALUE::DLY3 /);
+  assert.match(at('led<1>'), /TMUX::TFF1 OFF1:\S+:#FF .* TFF1_SR_ATTR::SRHIGH TFFATTRBOX::SYNC TSR_USED::0 TCEINV::TCE OUTBUF/);
+  assert.match(at('sw<1>'), /IFF1:u_i\/FF0:#FF .* IFF2:u_i\/FF1:#FF IFF2_INIT_ATTR::INIT1 .* ICLK1INV::ICLK1 ICLK2INV::ICLK2_B /);
+  assert.match(at('led<2>'), /OMUX::OFFDDR .* OTCLK1INV::OTCLK1 OTCLK2INV::OTCLK2_B OFFDDRBLACKBOX:u_o: /);
+  // the registers' pins: the clock on ICLK1 / ICLK2 / OTCLK1 / OTCLK2, the DDR's unconnected S tied to 0 on REV
+  const ck = iobs.nets.find(n => n.outpins.some(p => p.inst === 'u_b' && p.pin === 'O'));
+  assert.deepEqual(ck.inpins.map(p => `${p.inst} ${p.pin}`).sort(),
+    ['led<0> OTCLK1', 'led<1> OTCLK1', 'led<2> OTCLK1', 'led<2> OTCLK2', 'sw<0> ICLK1', 'sw<1> ICLK1', 'sw<1> ICLK2']);
+  assert.ok(iobs.nets.some(n => n.inpins.some(p => p.inst === 'sw<1>' && p.pin === 'REV')));
+  assert.deepEqual(xdlSize(iobs), { slices: 2, luts: 4, ffs: 0 });
+});
+
+test('#2192 nextpnrToXdl: the clock pad to its global buffer by the dedicated path, as Silinx routes it', () => {
+  const bufg = iobs.insts.find(i => i.type === 'BUFGMUX');
+  assert.equal(bufg.site, 'BUFGMUX_X2Y11');
+  const pad = iobs.nets.find(n => n.outpins.some(p => p.inst === 'clk' && p.pin === 'I'));
+  assert.deepEqual(pad.inpins, [{ inst: 'u_b', pin: 'I0' }]);
+  assert.deepEqual(pad.pips.map(p => `${p.tile} ${p.from} -> ${p.to}`),
+    ['TIBUFS_X13Y35 I0_PINWIRE -> IOIS_IBUF0', 'CLKT_X13Y35 CLKT_CKI4 -> CLKT_GCLK0', 'CLKT_X13Y35 CLKT_GCLK0 -> CLKT_GCLKIN00']);
+  const r = checkRouting(iobs, device);
+  assert.deepEqual(r.problems, []);
+  const { bytes, unknown } = bitgen(parseXdl(writeXdl(iobs)), loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' });
+  assert.deepEqual(unknown, []);
+  assert.equal(bytes.length, 169286);
+});
+
+test('#2192 simCheck: the IOBs\' registers follow the netlist on both edges; a wrong setting is caught', () => {
+  const json = iobRouted();
+  const r = simCheck(json, iobs, { cycles: 1000, starts: 300 });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.flipFlops, 8);
+  // with the inputs held (the reset btn<0> high, sw<1> high), and with new random inputs before each edge: still equal
+  assert.equal(simCheck(json, iobs, { cycles: 50, inputs: { 'btn[0]': 1, 'sw[1]': 1 } }).ok, true);
+  assert.equal(simCheck(json, iobs, { cycles: 2000, randomInputs: true }).ok, true);
+  // a clock edge, an initial value, a set / reset kind, an enable turned over: the flip-flops' values differ (an input
+  // register's edge and a reset only with the inputs changing)
+  const text = writeXdl(iobs);
+  for (const [from, to] of [['ICLK2INV::ICLK2_B', 'ICLK2INV::ICLK2'], ['IFF2_INIT_ATTR::INIT1', 'IFF2_INIT_ATTR::INIT0'],
+    ['TFF1_SR_ATTR::SRHIGH', 'TFF1_SR_ATTR::SRLOW'], ['OTCLK2INV::OTCLK2_B', 'OTCLK2INV::OTCLK2'], ['TFFATTRBOX::SYNC', 'TFFATTRBOX::ASYNC'],
+    ['OFF1_SR_ATTR::SRLOW', 'OFF1_SR_ATTR::SRHIGH'], ['TCEINV::TCE ', '']]) {
+    assert.ok(text.includes(from), from);
+    const w = simCheck(json, parseXdl(text.replace(from, to)), { cycles: 200, randomInputs: true });
+    assert.equal(w.ok, false, `${from} -> ${to}`);
+    assert.match(w.message, /^(start \d+, )?cycle \d+: \S+ is [01] in the netlist, [01] in the XDL$/);
+  }
+});
+
+test('#2192 timingExport: the IOB registers\' delays (SPEED_4.pad)', () => {
+  assert.deepEqual(timingExport(device).timing.pad, { Tiopi: 1.253, Tioop: 3.257, Tiockiq: 0.6, Tioock: 0.5, Tiotck: 0.5 });
 });

@@ -62,7 +62,7 @@ export function timingExport(device) {
   let disagree = 0;
   for (const [t, v] of votes) pipClass[t] = v.map(m => { if (m.size > 1) disagree++; return mostFrequent(m); });
   const slice = Object.fromEntries(Object.entries(SPEED_4.slice).map(([k, [l]]) => [k, l]));
-  const timing = { wireNames: WIRE_NAMES, wire: SPEED_4.wire, lutPin: SPEED_4.lutPin, base: SPEED_4.base, dist: SPEED_4.dist, slice, pipClass };
+  const timing = { wireNames: WIRE_NAMES, wire: SPEED_4.wire, lutPin: SPEED_4.lutPin, base: SPEED_4.base, dist: SPEED_4.dist, slice, pad: SPEED_4.pad, pipClass };
   return { timing, disagree };
 }
 
@@ -70,12 +70,16 @@ export function timingExport(device) {
 /** The netlist's simulation: its LUT4s by INIT, its flip-flops. */
 function netlistSim(mod, inputs) {
   const S = { val: new Map(), luts: [], ffs: [] };
-  for (const [name, p] of Object.entries(mod.ports)) if (p.direction === 'input') S.val.set(p.bits[0], inputs[name] || 0);
+  // (a bus's bits by name[i], as the XDL's pads are named)
+  S.pads = new Map();   // input name -> the values it sets
+  for (const [name, p] of Object.entries(mod.ports)) if (p.direction === 'input') p.bits.forEach((b, i) => S.pads.set(p.bits.length > 1 ? `${name}[${i}]` : name, [b]));
   for (const [name, c] of Object.entries(mod.cells)) {
     const con = p => portNet(c, p);
     if (c.type === 'LUT4') S.luts.push({ init: bitsOf(c.parameters.INIT).padStart(16, '0'), ins: [0, 1, 2, 3].map(i => con(`I${i}`)), out: con('O') });
     else if (c.type === 'FF') S.ffs.push({ name: esc(name), d: con('D'), q: con('Q'), ce: con('CE'), sr: con('SR'), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
-    else if (c.type === 'IOB' && con('I') !== undefined) S.val.set(con('I'), S.val.get(con('PAD')) || 0);
+    // the IOB's registers (an unconnected Q: an ODDR2's second flip-flop); REV sets; CLKINV: the falling edge
+    else if (/^[IOT]FF$/.test(c.type)) S.ffs.push({ name: esc(name), d: con('D'), q: con('Q') ?? `${name}/Q`, ce: con('CE'), sr: con('SR'), rev: con('REV'), set: /_SET *$/.test(c.parameters.SRMODE), hasSr: !/^NONE *$/.test(c.parameters.SRMODE), async: /ASYNC/.test(c.parameters.SRMODE), falling: parseInt(bitsOf(c.parameters.CLKINV ?? '0'), 2) === 1, init: parseInt(bitsOf(c.parameters.INIT ?? '0'), 2) & 1 });
+    else if (c.type === 'IOB' && con('I') !== undefined) { for (const v of S.pads.values()) if (v[0] === con('PAD')) v.push(con('I')); }
     // the carry: a MUXCY passes CI when S, else DI (or its constant, CY0); an XORCY gives CI xor LI
     else if (c.type === 'MUXCY') S.luts.push({ out: con('O'), fn: () => (S.get(con('S')) ? S.get(con('CI')) : con('DI') !== undefined ? S.get(con('DI')) : +String(c.parameters.CY0 ?? 0).trim()) });
     else if (c.type === 'XORCY') S.luts.push({ out: con('O'), fn: () => S.get(con('CI')) ^ S.get(con('LI')) });
@@ -83,15 +87,16 @@ function netlistSim(mod, inputs) {
     else if (c.type === 'MUXF5' || c.type === 'MUXF6') S.luts.push({ out: con('O'), fn: () => S.get(con(S.get(con('S')) ? 'I1' : 'I0')) });
   }
   S.get = b => (b === undefined || b === '0' ? 0 : b === '1' ? 1 : S.val.get(b) || 0);
+  setInputs(S, inputs);
   S.lut = l => (l.fn ? l.fn() : +l.init[15 - l.ins.reduce((a, b, i) => a | (S.get(b) << i), 0)]);
   return S;
 }
 
 /** The XDL's simulation: its slices' LUT equations on their site pins, the carry (CYINIT, CY0F / CY0G, CYMUXF / CYMUXG,
  *  XORF / XORG, COUT), the F5 / F6 multiplexers (F5: BX ? F : G; F6: BY ? FXINA : FXINB), FXMUX / DXMUX, the flip-flops'
- *  set / reset. */
+ *  set / reset; the IOBs' registers. */
 function xdlSim(design, inputs) {
-  const S = { val: new Map(), luts: [], ffs: [] };
+  const S = { val: new Map(), luts: [], ffs: [], pads: new Map() };
   const netOfPin = new Map();
   for (const n of design.nets) for (const p of [...n.outpins, ...n.inpins]) netOfPin.set(`${p.inst} ${p.pin}`, n.name);
   for (const inst of design.insts) {
@@ -125,60 +130,92 @@ function xdlSim(design, inputs) {
           S.ffs.at(-1).hasSr = S.ffs.at(-1).sr !== undefined;
         }
       }
-    } else if ((inst.type === 'IOB' || inst.type === 'IBUF') && pin('I')) {
-      S.val.set(pin('I'), inputs[(inst.cfg.find(c => c.attr === 'PAD')?.name || '').replace(/<(\d+)>$/, '[$1]')] || 0);
+    } else if (inst.type === 'IOB' || inst.type === 'IBUF') {
+      // the pad's input to the fabric (I) and to the input registers; the registers' clocks, enables, set / reset
+      S.pads.set((inst.cfg.find(c => c.attr === 'PAD')?.name || '').replace(/<(\d+)>$/, '[$1]'), [`${inst.name}/PAD`, ...(pin('I') ? [pin('I')] : [])]);
+      for (const [ff, g, d, clk, q] of [['IFF1', 'I', `${inst.name}/PAD`, 'ICLK1', pin('IQ1')], ['IFF2', 'I', `${inst.name}/PAD`, 'ICLK2', pin('IQ2')],
+        ['OFF1', 'O', pin('O1'), 'OTCLK1', `${inst.name}/OFF1Q`], ['OFF2', 'O', pin('O2'), 'OTCLK2', `${inst.name}/OFF2Q`], ['TFF1', 'T', pin('T1'), 'OTCLK1', `${inst.name}/TFF1Q`]]) {
+        if (!cfg[ff]) continue;
+        const usesSr = cfg[`${ff}_SR_ATTR`] !== undefined;
+        S.ffs.push({ name: cfg[ff].name, d, q: q ?? `${inst.name}/${ff}Q`, ce: cfg[`${g}CEINV`] ? pin(`${g}CE`) : undefined, sr: usesSr ? pin('SR') : undefined, hasSr: usesSr,
+          rev: cfg.IREV_USED && g === 'I' ? pin('REV') : undefined, set: cfg[`${ff}_SR_ATTR`]?.value === 'SRHIGH', async: cfg[`${g}FFATTRBOX`]?.value === 'ASYNC',
+          falling: /_B$/.test(cfg[`${clk}INV`]?.value || ''), init: cfg[`${ff}_INIT_ATTR`]?.value === 'INIT1' ? 1 : 0 });
+      }
     }
   }
   S.get = n => (n === undefined ? 0 : S.val.get(n) || 0);
+  setInputs(S, inputs);
   S.lut = l => +(l.fn ? l.fn() : l.copy ? S.get(l.copy) : evalLut(l.eq, Object.fromEntries(l.ins.map((n, k) => [`A${k + 1}`, S.get(n)]))));
   return S;
+}
+
+/** The top's inputs (by name, a bus's bits name[i]; 0 unless given) on the values they set. */
+function setInputs(S, inputs) {
+  for (const [name, vals] of S.pads) for (const v of vals) S.val.set(v, inputs[name] || 0);
 }
 
 /** The combinational logic settled (its LUTs evaluated until nothing changes). */
 function settle(S, what) {
   for (let pass = 0; pass < 64; pass++) {
     let changed = false;
+    // (an asynchronous set / reset at once)
+    for (const f of S.ffs) {
+      if (!f.async) continue;
+      const v = f.hasSr && S.get(f.sr) ? (f.set ? 1 : 0) : f.rev !== undefined && S.get(f.rev) ? 1 : null;
+      if (v !== null && S.get(f.q) !== v) { S.val.set(f.q, v); changed = true; }
+    }
     for (const l of S.luts) { const v = S.lut(l); if (S.val.get(l.out) !== v) { S.val.set(l.out, v); changed = true; } }
     if (!changed) return;
   }
   throw new Error(`${what}: no stable state`);
 }
 
-/** A rising clock edge on every flip-flop (set / reset synchronous, the spike's). */
-function clock(S) {
-  const next = S.ffs.map(f => {
+/** A clock edge on the flip-flops of that edge: set / reset before REV, the enable last. */
+function clock(S, falling = false) {
+  const ffs = S.ffs.filter(f => !!f.falling === falling);
+  const next = ffs.map(f => {
     if (f.hasSr && S.get(f.sr)) return f.set ? 1 : 0;
+    if (f.rev !== undefined && S.get(f.rev)) return 1;
     return f.ce === undefined || S.get(f.ce) ? S.get(f.d) : S.get(f.q);
   });
-  S.ffs.forEach((f, i) => S.val.set(f.q, next[i]));
+  ffs.forEach((f, i) => S.val.set(f.q, next[i]));
 }
 
 /**
  * Does an XDL design (parseXdl's) implement nextpnr's netlist? Both simulated cycle by cycle from the flip-flops'
  * initial values (`cycles`), then `starts` runs of 64 cycles from random states (the same in both, each flip-flop
  * 1 with probability 0.9, so that long carries come at once: a counter's top bits are reached without 2^n cycles),
- * every flip-flop compared after each rising edge. inputs: top ports' values (0 unless given).
+ * every flip-flop compared after each clock edge. inputs: top ports' values (0 unless given); randomInputs: new random
+ * values on every input before each edge instead (the same in both: an input register's edge, a reset taken, are seen).
  * Returns { ok, flipFlops, message } (message: the first difference).
  */
-export function simCheck(json, design, { cycles = 1000, starts = 0, inputs = {} } = {}) {
+export function simCheck(json, design, { cycles = 1000, starts = 0, inputs = {}, randomInputs = false } = {}) {
   const A = netlistSim(topModule(json)[1], inputs), B = xdlSim(design, inputs);
   const byName = new Map(B.ffs.map(f => [f.name, f]));
   for (const f of A.ffs) if (!byName.has(f.name)) return { ok: false, flipFlops: A.ffs.length, message: `flip-flop ${f.name} not in the XDL` };
+  let seed = 1;
+  const rand = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+  const edges = A.ffs.some(f => f.falling) ? [false, true] : [false];
   const run = (n, from) => {
     for (let t = 0; t < n; t++) {
-      settle(A, 'netlist'); settle(B, 'XDL');
-      clock(A); clock(B);
-      for (const f of A.ffs) {
-        const a = A.get(f.q), b = B.get(byName.get(f.name).q);
-        if (a !== b) return `${from}cycle ${t + 1}: ${f.name} is ${a} in the netlist, ${b} in the XDL`;
+      // (each edge in turn: a DDR register's second flip-flop on the falling one)
+      for (const falling of edges) {
+        if (randomInputs) {
+          const v = Object.fromEntries([...A.pads.keys()].map(k => [k, rand() < 0.5 ? 1 : 0]));
+          setInputs(A, v); setInputs(B, v);
+        }
+        settle(A, 'netlist'); settle(B, 'XDL');
+        clock(A, falling); clock(B, falling);
+        for (const f of A.ffs) {
+          const a = A.get(f.q), b = B.get(byName.get(f.name).q);
+          if (a !== b) return `${from}cycle ${t + 1}: ${f.name} is ${a} in the netlist, ${b} in the XDL`;
+        }
       }
     }
     return null;
   };
   for (const f of A.ffs) { A.val.set(f.q, f.init); B.val.set(byName.get(f.name).q, byName.get(f.name).init); }
   let message = run(cycles, '');
-  let seed = 1;
-  const rand = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
   for (let k = 0; k < starts && !message; k++) {
     for (const f of A.ffs) { const v = rand() < 0.9 ? 1 : 0; A.val.set(f.q, v); B.val.set(byName.get(f.name).q, v); }
     message = run(64, `start ${k + 1}, `);
