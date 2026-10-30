@@ -2,6 +2,7 @@
 // C simulation's functions (JS_MATH) against JavaScript's Math (their accuracy) and C99's special cases; the library's
 // C (MATHLIB), run by Silinx's C interpreter, giving JS_MATH's bits on random arguments, for every function; in
 // hardware: expf and logf co-simulated in VHDL and Verilog (their bits the C simulation's), sinf and powf synthesized.
+// #2119's others: the same, in test/c-mathlib2.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JS_MATH, MATHLIB } from '../core/c-mathlib.js';
@@ -101,7 +102,7 @@ test('#1761 sin, cos, pow (float and double) synthesized, no longer refused; ano
   }
   const p = cToHdl('#include <math.h>\nfloat f(float x, float y) { return powf(x, y); }\n', { file: 'f.c' });
   assert.deepEqual([p.ok, p.diagnostics], [true, []]);
-  const t = cToHdl('#include <math.h>\ndouble f(double x) { return tan(x); }\n', { file: 'f.c' });
+  const t = cToHdl('#include <math.h>\ndouble f(double x) { return lround(x); }\n', { file: 'f.c' });
   assert.equal(t.ok, false);
-  assert.match(t.diagnostics.map((d) => d.message).join('\n'), /math\.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos and pow/);
+  assert.match(t.diagnostics.map((d) => d.message).join('\n'), /math\.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos, pow, tan, log2, log10, exp2, hypot, fmod, atan, asin, acos, atan2, sinh, cosh, tanh and cbrt/);
 });

@@ -85,16 +85,17 @@ const R = (f) => ({ n: 1, f });
 const CMIN = (a, b) => (Number.isNaN(a) ? b : Number.isNaN(b) ? a : Math.min(a, b));
 const CMAX = (a, b) => (Number.isNaN(a) ? b : Number.isNaN(b) ? a : Math.max(a, b));
 const CSIGN = (a, b) => (b < 0 || Object.is(b, -0) ? -Math.abs(a) : Math.abs(a));
-// (exp, log, sin, cos, pow and their float ones: Silinx's own (core/c-mathlib.js), the hardware's algorithm, #1761)
+// (exp, log, sin, cos, pow, tan, … and their float ones: Silinx's own (core/c-mathlib.js), the hardware's algorithm, #1761, #2119)
+const MATH_ONE = ['exp', 'log', 'sin', 'cos', 'tan', 'log2', 'log10', 'exp2', 'atan', 'asin', 'acos', 'sinh', 'cosh', 'tanh', 'cbrt'];
+const MATH_TWO = ['hypot', 'fmod', 'atan2'];
 export const MATH = {
-  sqrt: R(Math.sqrt), sqrtf: R(Math.sqrt), fabs: R(Math.abs), fabsf: R(Math.abs), exp: R(JS_MATH.exp), log: R(JS_MATH.log), log2: R(Math.log2),
-  log10: R(Math.log10), sin: R(JS_MATH.sin), cos: R(JS_MATH.cos), tan: R(Math.tan), asin: R(Math.asin), acos: R(Math.acos),
-  atan: R(Math.atan), sinh: R(Math.sinh), cosh: R(Math.cosh), tanh: R(Math.tanh), floor: R(Math.floor), ceil: R(Math.ceil),
-  trunc: R(Math.trunc), cbrt: R(Math.cbrt), expf: R(JS_MATH.expf), logf: R(JS_MATH.logf), sinf: R(JS_MATH.sinf), cosf: R(JS_MATH.cosf),
+  sqrt: R(Math.sqrt), sqrtf: R(Math.sqrt), fabs: R(Math.abs), fabsf: R(Math.abs), floor: R(Math.floor), ceil: R(Math.ceil),
+  trunc: R(Math.trunc),
+  ...Object.fromEntries(MATH_ONE.flatMap((n) => [[n, R(JS_MATH[n])], [`${n}f`, R(JS_MATH[`${n}f`])]])),
+  ...Object.fromEntries(MATH_TWO.flatMap((n) => [[n, { n: 2, f: JS_MATH[n] }], [`${n}f`, { n: 2, f: JS_MATH[`${n}f`] }]])),
   // (round: half away from zero, as C's)
   round: R((x) => Math.sign(x) * Math.round(Math.abs(x))), roundf: R((x) => Math.sign(x) * Math.round(Math.abs(x))),
-  pow: { n: 2, f: JS_MATH.pow }, powf: { n: 2, f: JS_MATH.powf }, atan2: { n: 2, f: Math.atan2 }, hypot: { n: 2, f: Math.hypot },
-  fmod: { n: 2, f: (a, b) => a % b },
+  pow: { n: 2, f: JS_MATH.pow }, powf: { n: 2, f: JS_MATH.powf },
   // (fmin, fmax: a NaN and a number the number, as C's; copysign: a NaN's sign not known, +, #1843)
   fmin: { n: 2, f: CMIN }, fmax: { n: 2, f: CMAX }, fminf: { n: 2, f: CMIN }, fmaxf: { n: 2, f: CMAX },
   floorf: R(Math.floor), ceilf: R(Math.ceil), truncf: R(Math.trunc),

@@ -137,7 +137,7 @@ int main(void) {
 
 test('#1783 math.h in hardware: sqrt and fabs of any value, the others of constants only (said)', () => {
   const errs = (src) => cToHdl(src, { file: 'e.c' }).diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`);
-  assert.deepEqual(errs('#include <math.h>\ndouble f(double x) { return tan(x); }\n'), ['2 tan: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos and pow, the others only of constants, a table computed at synthesis, #1761)']);
+  assert.deepEqual(errs('#include <math.h>\ndouble f(double x) { return lround(x); }\n'), ['2 lround: floating point is not supported in Silinx HLS yet (math.h in hardware: sqrt, fabs, floor, ceil, trunc, round, fmin, fmax, copysign, exp, log, sin, cos, pow, tan, log2, log10, exp2, hypot, fmod, atan, asin, acos, atan2, sinh, cosh, tanh and cbrt, the others only of constants, a table computed at synthesis, #1761)']);
   assert.deepEqual(errs('#include <math.h>\nfloat f(float x, int k) { return sqrtf(x) / k + exp(1.0); }\n'), []);
 });
 
