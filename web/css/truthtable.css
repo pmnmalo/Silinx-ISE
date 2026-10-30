@@ -66,7 +66,7 @@
 .tt-note { display: block; color: #8a5a00; }
 
 /* the maps of 5 or 6 inputs in 3D (#1407, web/js/tt-kmap3d.js): stacked in depth, turned by dragging */
-.tt-k3d { position: relative; perspective: 1100px; display: flex; justify-content: center; align-items: center; padding: 30px 40px; cursor: grab; touch-action: none; user-select: none; outline: none; }
+.tt-k3d { position: relative; flex: none; display: flex; justify-content: center; align-items: center; cursor: grab; touch-action: none; user-select: none; outline: none; }
 .tt-k3d:active { cursor: grabbing; }
 .tt-k3d-stack { position: relative; transform-style: preserve-3d; }
 .tt-k3d-layer { position: absolute; left: 0; top: 0; transform-style: preserve-3d; background: rgba(255, 255, 255, .78); outline: 1px solid #888; }

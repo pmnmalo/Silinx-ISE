@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { kmapLayout, kmapRects, cubeMinterms } from '../core/logic.js';
-import { kmapSolid } from '../core/kmap3d.js';
+import { kmapSolid, kmapSceneSide } from '../core/kmap3d.js';
 
 // a cube from its literals: { a: 0, c: 1 } over the inputs `names`
 const cube = (names, lits) => names.reduce((c, v, j) => {
@@ -114,4 +114,26 @@ test('#1491 kmapSolid: the shapes one by one, in 5 and 6 variables', () => {
   const cells = s => s.layers.flatMap(l => l.pieces.flatMap(p => p.cells));
   assert.ok(cells(g1).includes(5) && cells(g2).includes(5));
   assert.deepEqual([joins(g1), joins(g2)], [['0-1'], []]);
+});
+
+// #2206: the scene holds the stack at any rotation: every corner of the stack, turned and projected as the browser does
+// (the reference, by the matrices), stays inside the side; and the side is not much more than the stack needs.
+test('kmapSceneSide: the stack fits at every rotation, without much to spare', () => {
+  const P = 1100;
+  for (const [w, h, depth] of [[160, 204, 90], [160, 204, 270], [1, 1, 0], [400, 100, 900]]) {
+    const side = kmapSceneSide(w, h, depth, P);
+    let most = 0;
+    for (let rx = -180; rx <= 180; rx += 5) for (let ry = -180; ry <= 180; ry += 5) {
+      const [a, b] = [rx * Math.PI / 180, ry * Math.PI / 180];
+      for (const x of [-w / 2, w / 2]) for (const y of [-h / 2, h / 2]) for (const z of [-depth / 2, depth / 2]) {
+        // rotateX(a) rotateY(b), then depth / 2 behind the screen
+        const x1 = x * Math.cos(b) + z * Math.sin(b), z1 = -x * Math.sin(b) + z * Math.cos(b);
+        const y2 = y * Math.cos(a) - z1 * Math.sin(a), z2 = y * Math.sin(a) + z1 * Math.cos(a) - depth / 2;
+        const s = P / (P - z2);
+        most = Math.max(most, Math.abs(x1 * s), Math.abs(y2 * s));
+      }
+    }
+    assert.ok(most <= side / 2, `${w}×${h}×${depth}: ${most} over ${side / 2}`);
+    assert.ok(side / 2 <= most * 1.2 + 1, `${w}×${h}×${depth}: ${side / 2} is too much for ${most}`);
+  }
 });

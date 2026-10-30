@@ -6,10 +6,12 @@
 // kmapLayout; a group's solid: core/kmap3d.js kmapSolid. Styles: web/css/truthtable.css (.tt-k3d).
 
 import { h } from './ui.js';
-import { kmapSolid } from '/core/kmap3d.js';
+import { kmapSolid, kmapSceneSide } from '/core/kmap3d.js';
 
 const C = 40;      // a cell's side (px)
 const GAP = 90;    // between layers (px)
+const TITLE = 22;  // a layer's title, over it (px)
+const PERSPECTIVE = 1100;
 let view = { rx: -28, ry: 32 };   // (kept between redraws, as the viewer left it)
 let on = false;                   // (the 3D box ticked: every table's map of 5 or 6 inputs in 3D)
 
@@ -77,7 +79,9 @@ export function mountKmap3d(host, { layout: L, col, terms, groups, colors, onCel
     }
   });
   apply();
-  const scene = h('div', { class: 'tt-k3d', tabindex: '0', title: 'Drag (or the arrow keys) to turn the maps', style: { height: `${H + depth * 0.7 + 90}px` } }, stack);
+  // (the title counted on both sides of the map: the stack is centred on the map alone)
+  const side = kmapSceneSide(W, H + 2 * TITLE, depth, PERSPECTIVE);
+  const scene = h('div', { class: 'tt-k3d', tabindex: '0', title: 'Drag (or the arrow keys) to turn the maps', style: { width: `${side}px`, height: `${side}px`, perspective: `${PERSPECTIVE}px` } }, stack);
   // turned by dragging, or by the arrow keys
   let drag = null;
   scene.addEventListener('pointerdown', e => { if (e.target.closest('.tt-k3d-cell')) return; drag = { x: e.clientX, y: e.clientY, ...view }; scene.setPointerCapture?.(e.pointerId); });
