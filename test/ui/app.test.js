@@ -906,6 +906,30 @@ uiTest('#1128 the document tabs: one width, every close button shown (not only o
   assert.deepEqual((await tabs()).map((t) => t.label), [t0[3].label, ...t0.slice(4).map((t) => t.label)]);
 });
 
+// the tab of the document in front is in sight when the strip is full, in one strip and on a side of a split; the strip scrolls
+uiTest('document tabs: a document opened in a full strip has its tab in sight, also in a split', E, async (page) => {
+  await makeProject(env, { name: 'TabsFull', template: 'blinky' });
+  await page.openProject('TabsFull');
+  await page.eval(() => document.getElementById('doc-tabs').style.setProperty('--doc-tab-w', '500px'));
+  const files = ['src/top.vhd', 'src/knight.vhd', 'src/speed_ctrl.vhd', 'src/counter.v'];
+  const inSight = (f) => page.waitFor((name) => {
+    const t = document.querySelector('#doc-tabs .tab.active');
+    if (!t?.querySelector('.tlabel').textContent.includes(name)) return false;
+    const r = t.getBoundingClientRect(), b = t.parentElement.getBoundingClientRect();
+    return r.width > 0 && r.left >= b.left - 1 && r.right <= b.right + 1;
+  }, [f.split('/').pop()], { what: `the tab of ${f} in sight` });
+  for (const f of files) { await page.eval((p) => window.SilinxApp.openFile(p), f); await inSight(f); }
+  assert.equal(await page.eval(() => getComputedStyle(document.getElementById('doc-tabs')).overflowX), 'auto');
+  // (brought back to the front: the first one, now out at the left)
+  await page.eval((p) => window.SilinxApp.openFile(p), files[0]);
+  await inSight(files[0]);
+  // (a split: the side's own strip)
+  await page.click('#split-btn');
+  await page.waitFor(() => document.getElementById('doc-tabs').classList.contains('split'), [], { what: 'the split' });
+  for (const f of files.slice(1)) { await page.eval((p) => window.SilinxApp.openFile(p), f); await inSight(f); }
+  await page.click('#split-btn');
+});
+
 // #2027: the toolbar's Close Project (as File ▸ Close Project): off with no project, on with one, closing it
 uiTest('#2027 toolbar: Close Project, between Open Project and Print, closes the project; off with none; Portuguese', E, async (page) => {
   const btn = '#toolbar .tb-btn[data-cmd=closeProject]';

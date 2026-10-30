@@ -93,6 +93,7 @@ body.dragging-tab, body.dragging-tab * { cursor: grabbing !important; }
 .bottom-tabs .tab.dirty .tlabel::after { content: '*'; }
 /* the document tabs: one width, their close button at the same place on each (closing several in a row with no move),
    always shown (a tablet has no hover), #1128 */
+#doc-tabs:not(.split) { overflow-x: auto; scrollbar-width: none; }   /* (more tabs than fit: the strip scrolls, the active tab brought into sight) */
 #doc-tabs .tab { flex: none; width: var(--doc-tab-w, 170px); max-width: none; justify-content: space-between; }
 #doc-tabs .tab .tlabel { flex: 1 1 auto; min-width: 0; }
 #doc-tabs .tab .tclose { flex: none; }

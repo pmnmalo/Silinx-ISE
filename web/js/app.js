@@ -355,6 +355,8 @@ export function activateDoc(doc, { background = false } = {}) {
   S.active = doc;
   for (const d of S.docs) { d.el.hidden = d !== doc; d.tab.classList.toggle('active', d === doc); }
   placeSplit(doc);   // (on its side, the other side's document shown beside it, #1619, #1652)
+  // (its tab in sight in a full strip, once the Tasks layout and the split have placed it)
+  requestAnimationFrame(() => doc.tab.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
   doc.onActivate?.();
   $('status-pos').textContent = '';
   if (!keepView && !background) drawerGiveWay();   // a narrow screen: the drawer gives way to the document (#266)
