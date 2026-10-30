@@ -269,6 +269,11 @@ test('join tests: one net per hypothesis, from a slice output through the tile t
   // a second hypothesis on the same source pin waits for the next design
   const r2 = joinTestDesigns({ part: 'xc3s250ecp132-4', joins: [joins[0], ['CLB_X10Y10/E2BEG1', 'CLB_X12Y10/E2MID1']], slicesOf, pinWire, pipsOf: () => [...pipsOf(), ['E2MID1', 'F2_B0']] });
   assert.equal(r2.designs.length, 2);
+  // maxTests: the tests of one design, the rest in the next ones (#2178: ISE's DRC errs in designs of thousands)
+  const r3 = joinTestDesigns({ part: 'xc3s250ecp132-4', joins, slicesOf, pinWire, pipsOf, maxTests: 1 });
+  assert.deepEqual(r3.designs.map(x => x.tests), [[{ net: 'h0', join: joins[0] }], [{ net: 'h0', join: joins[1] }]]);
+  assert.deepEqual(r3.untestable, [joins[2]]);
+  assert.deepEqual(joinTestDesigns({ part: 'xc3s250ecp132-4', joins, slicesOf, pinWire, pipsOf, maxTests: 2 }).designs.map(x => x.tests.length), [2]);
 });
 
 test('join tests: a wire only an I/O or block-RAM site drives, tested from that site (an IOB\'s input, a block RAM\'s output) (#3)', () => {

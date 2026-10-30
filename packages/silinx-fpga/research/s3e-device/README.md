@@ -314,7 +314,9 @@ or confirmed by an earlier round of tests), up to `maxJoins` of them, to a slice
 e.g. slice -> OMUX -> W2BEG of a CLB, joined to W2MID of the I/O tile -> the tested wire. The path
 never crosses the tested join's other end (it would join the two ends by itself), and the known
 nodes are reserved whole (two tests never share one). Each round's confirmations make the next
-round's paths: `prototype.mjs tests pred.json obs.json dir tested-dir...` (MAXJOINS, default 2).
+round's paths: `prototype.mjs tests pred.json obs.json dir tested-dir...` (MAXJOINS, default 2; MAXTESTS, the
+tests of one design, default 1000: in a design of thousands ISE's DRC gives a few wrong verdicts, on the XC3S1200E
+2721 per million over 10 000 tests and none up to 500, #2178).
 
 Done again from scratch on the XC3S250E (the prototype's working folders were gone), ISE 14.7 in
 Docker on the Intel Mac mini, one container at a time:
