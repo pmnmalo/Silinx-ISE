@@ -377,6 +377,10 @@ html[data-ui="modern"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar
 html[data-ui="modern"] .asm-editor .asm-toolbar .asm-btn { height: var(--m-tool-h); min-width: 0; padding: 0 10px; font-size: var(--fs); }
 html[data-ui="modern"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar, .sch-editor .se-toolbar, .asm-editor .asm-toolbar, .emu-bar, .pin-planner .pp-bar) .tb-btn, html[data-ui="modern"] .sch-editor .se-toolbar .se-btn:not(.wide) { width: var(--m-tool-h); min-width: var(--m-tool-h); height: var(--m-tool-h); }
 html[data-ui="modern"] .sch-editor .se-toolbar .se-btn.wide, html[data-ui="modern"] .isim-toolbar .tb-btn:has(.tb-label) { width: auto; height: var(--m-tool-h); }
+/* the toolbar's menu (#2208): at the right of the first line, its place kept free */
+html[data-ui="modern"] .sch-editor .se-toolbar { padding-right: calc(var(--m-tool-h) + 12px); }
+html[data-ui="modern"] .sch-editor .se-more { top: 6px; right: 8px; }
+html[data-ui="modern"] .sch-editor .se-more-menu { padding: 6px; border-radius: 8px; }
 html[data-ui="modern"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar, .sch-editor .se-toolbar, .asm-editor .asm-toolbar, .emu-bar, .pin-planner .pp-bar)
   :is(select, input:is(:not([type]), [type=text], [type=number])) { height: var(--m-tool-h); padding: 0 6px; border-radius: var(--m-radius-sm); }
 /* (in the Tasks interface SSim's toolbar is its wave window's line: its own padding none, the line's) */

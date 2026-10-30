@@ -22,6 +22,8 @@ export function mountSchKeys(ctx) {
       const k0 = e.key.toLowerCase();
       if (k0 === 'escape') { e.preventDefault(); if (live().editing) live().closeEditor(); else leaveSim(); return; }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // (a symbol clicked in Try it: its Symbol Info, #1175)
+      if (e.key === 'F1') { e.preventDefault(); const t1 = infoTarget(); if (t1) openInfo(t1); return; }
       if (k0 === ' ' && !spaceDown()) { setSpaceDown(true); canvas.classList.add('pan-ready'); e.preventDefault(); }
       else if (k0 === 'f') fit();
       else if (k0 === '+' || k0 === '=') zoomAt(1.25);

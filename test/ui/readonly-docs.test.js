@@ -48,7 +48,7 @@ uiTest('#1193 a truth table\'s schematic: "Read-only, generated from …" at the
   const bar = await page.eval(() => {
     const tb = document.querySelector('.doc:not([hidden]) .se-toolbar'), b = tb.querySelector('.se-banner');
     return { text: b.textContent, last: [...tb.children].filter((e) => e.getClientRects().length).at(-1) === b, above: !!document.querySelector('.doc:not([hidden]) .tt-sch-bar'),
-      curved: !!tb.querySelector('.se-curved')?.getClientRects().length };
+      curved: !!tb.querySelector('.se-curved') };
   });
   assert.deepEqual(bar, { text: 'Read-only, generated from maj.tt.json', last: true, above: false, curved: true });
   // the editing tools hidden (Undo / Redo among them, after Add I/O Marker since #1696): no separator first, doubled or last
@@ -60,6 +60,7 @@ uiTest('#1193 a truth table\'s schematic: "Read-only, generated from …" at the
   // (the curves: paths with Bézier segments; the hop-overs' paths are arcs)
   const curves = () => page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) svg .wire .wline')].filter((l) => /[CQ]/.test(l.getAttribute('d') || '')).length);
   assert.equal(await curves(page), 0);
+  await page.click('.doc:not([hidden]) .se-btn[data-act=more]');
   await page.click('.doc:not([hidden]) .se-curved input');
   await page.waitFor(() => [...document.querySelectorAll('.doc:not([hidden]) svg .wire .wline')].some((l) => /[CQ]/.test(l.getAttribute('d') || '')), [], { what: 'curves' });
   assert.equal(await page.eval(() => window.Silinx.active.viewer.getDoc().wireStyle), undefined);

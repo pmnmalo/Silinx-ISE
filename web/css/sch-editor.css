@@ -36,9 +36,19 @@
 
 /* ------------------------------------------------------------------ toolbar */
 .sch-editor .se-toolbar {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 1px; padding: 2px 4px; min-height: 28px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 1px; padding: 2px 32px 2px 4px; min-height: 28px; position: relative;
   background: var(--se-toolbar); border-bottom: 1px solid var(--se-border);
 }
+/* the toolbar's menu (#2208): always at the right of its first line, whatever wraps */
+.sch-editor .se-more { position: absolute; top: 2px; right: 4px; }
+.sch-editor .se-more-menu {
+  position: absolute; top: 100%; right: 0; margin-top: 2px; z-index: 30; display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px;
+  background: var(--se-panel); border: 1px solid var(--se-border); box-shadow: 2px 2px 6px rgba(0, 0, 0, .3);
+}
+.sch-editor .se-more-menu[hidden] { display: none; }
+.sch-editor .se-more-menu .se-btn { justify-content: flex-start; }
+.sch-editor .se-more-menu .se-sep { width: auto; height: 1px; margin: 2px 0; box-shadow: none; }
+.sch-editor .se-more-menu label { min-height: 22px; }
 .sch-editor .se-btn {
   height: 22px; min-width: 24px; padding: 0 3px; border: 1px solid transparent; border-radius: 2px; background: none;
   display: inline-flex; align-items: center; justify-content: center; gap: 3px; cursor: default; white-space: nowrap;
@@ -339,9 +349,9 @@
 /* read-only view (RTL schematic): no palette, no editing tools */
 .sch-editor.read-only .se-left,
 .sch-editor.read-only .se-toolbar [data-act="wire"], .sch-editor.read-only .se-toolbar [data-act="net"], .sch-editor.read-only .se-toolbar [data-act="io"],
-.sch-editor.read-only .se-toolbar [data-act="rotate"], .sch-editor.read-only .se-toolbar [data-act="mirror"], .sch-editor.read-only .se-toolbar [data-act="delete"],
+.sch-editor.read-only .se-toolbar [data-act="rotate"], .sch-editor.read-only .se-toolbar [data-act="mirror"], .sch-editor.read-only .se-toolbar [data-act="mirrorv"], .sch-editor.read-only .se-toolbar [data-act="delete"],
 .sch-editor.read-only .se-toolbar [data-act="undo"], .sch-editor.read-only .se-toolbar [data-act="redo"],
-.sch-editor.read-only .se-toolbar [data-act="rewire"], .sch-editor.read-only .se-toolbar [data-act="relayout"] { display: none; }
+.sch-editor.read-only .se-toolbar [data-act="rewire"], .sch-editor.read-only .se-toolbar [data-act="relayout"], .sch-editor.read-only .se-more-menu .se-sep { display: none; }
 
 .sch-editor .se-keep, .sch-editor .se-names, .sch-editor .se-hops, .sch-editor .se-curved { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; padding: 0 4px; cursor: pointer; }
 .sch-editor.read-only .se-keep { display: none; }
@@ -371,8 +381,8 @@
 .sch-editor .lv-err { color: var(--se-danger); font-weight: bold; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sch-editor .lv-err[hidden] { display: none; }
 .sch-editor.sim-mode .se-left { opacity: .45; pointer-events: none; }
-/* (Try it: the drawing's options and Symbol Info stay, #1175) */
-.sch-editor.sim-mode .se-toolbar .se-btn:not([data-act="sim"]):not([data-act="zin"]):not([data-act="zout"]):not([data-act="fit"]):not([data-act="view"]):not([data-act="check"]):not([data-act="info"]),
+/* (Try it: the drawing's options stay, #1175, in the menu, #2208) */
+.sch-editor.sim-mode .se-toolbar .se-btn:not([data-act="sim"]):not([data-act="zin"]):not([data-act="zout"]):not([data-act="fit"]):not([data-act="view"]):not([data-act="check"]):not([data-act="more"]),
 .sch-editor.sim-mode .se-toolbar .tb-btn, .sch-editor.sim-mode .se-toolbar .se-keep { opacity: .35; pointer-events: none; }
 .sch-editor.sim-mode .se-canvas { cursor: default; }
 /* wires by value: 1 bright green, 0 dark green, X/U red, Z blue, no value grey; a single-bit wire keeps its width,

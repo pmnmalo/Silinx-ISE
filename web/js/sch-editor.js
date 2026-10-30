@@ -65,6 +65,8 @@ export const ICON = {
   net: I('<path d="M1 12.5h14" stroke="#0000a0" stroke-width="1.4"/><text x="1.5" y="9.5" font-size="8" font-family="Arial" font-weight="bold" fill="#800000">abc</text>'),
   io: I('<path d="M1.5 4.5h8l4 3.5-4 3.5h-8z" fill="#fffff0" stroke="#000080" stroke-width="1.2"/>'),
   rotate: I('<path d="M12.5 8a4.5 4.5 0 1 1-1.3-3.2" fill="none" stroke="#24476f" stroke-width="1.5"/><path d="M13.6 1.8v3.8H9.8z" fill="#24476f"/>'),
+  mirrorv: I('<path d="M1 8h14" stroke="#888" stroke-dasharray="2 1.5"/><path d="M3.5 6.5h9L12.5 1.5z" fill="#9cc3ea" stroke="#24476f"/><path d="M3.5 9.5h9l0 5z" fill="#fff" stroke="#24476f"/>'),
+  more: I('<circle cx="8" cy="3" r="1.5" fill="#24476f"/><circle cx="8" cy="8" r="1.5" fill="#24476f"/><circle cx="8" cy="13" r="1.5" fill="#24476f"/>'),
   mirror: I('<path d="M8 1v14" stroke="#888" stroke-dasharray="2 1.5"/><path d="M6.5 3.5v9L1.5 12.5z" fill="#9cc3ea" stroke="#24476f"/><path d="M9.5 3.5v9l5 0z" fill="#fff" stroke="#24476f"/>'),
   del: I('<path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="#c00000" stroke-width="2.2" stroke-linecap="round"/>'),
   zin: I('<circle cx="6.5" cy="6.5" r="4.5" fill="#e8f2fc" stroke="#24476f" stroke-width="1.4"/><path d="M10 10l4.5 4.5" stroke="#24476f" stroke-width="2"/><path d="M4 6.5h5M6.5 4v5" stroke="#24476f" stroke-width="1.4"/>'),
@@ -159,9 +161,9 @@ export function mountSchEditor(container, opts = {}) {
   const { rearrangeWires, rearrangeSheet } = mountSchBeautify({ doc: () => doc, edit: (...a) => edit(...a), fit: (...a) => fit(...a), flash: (...a) => flash(...a), modules: () => modules, sel: () => sel, snapshot: (...a) => snapshot(...a) });
   const { optBox } = mountSchToolbar({
     rearrangeWires, rearrangeSheet, container, btn, canSim, curvedBox: curve.box, deleteSel: (...a) => deleteSel(...a), enterSim: (...a) => enterSim(...a),
-    fit: (...a) => fit(...a), hopsBox, infoTarget: (...a) => infoTarget(...a), keepBox,
-    leaveSim: (...a) => leaveSim(...a), live: () => live, mirrorSel: (...a) => mirrorSel(...a), namesBox,
-    openInfo: (...a) => openInfo(...a), readOnly, redo: (...a) => redo(...a), rotateSel: (...a) => rotateSel(...a),
+    fit: (...a) => fit(...a), hopsBox, keepBox,
+    leaveSim: (...a) => leaveSim(...a), live: () => live, mirrorSel: (...a) => mirrorSel(...a), mirrorVSel: (...a) => mirrorVSel(...a), namesBox,
+    readOnly, redo: (...a) => redo(...a), rotateSel: (...a) => rotateSel(...a),
     runCheck: (...a) => runCheck(...a), sep, setTool: (...a) => setTool(...a), tb, undo: (...a) => undo(...a),
     zoomAt: (...a) => zoomAt(...a)
   });
@@ -214,8 +216,7 @@ export function mountSchEditor(container, opts = {}) {
   const { renderSheet, render, renderOverlay, updateToolbar, updateStatus } = mountRender({
     state: () => ({ doc, nl, sel, tool, placing, drag, wireDraw, cursor, hoverPin, lastDiags, live, modules, view, destroyed, showHops: showHops(), showNames: showNames() }),
     curve, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, undoStack, redoStack,
-    routeTo: (...a) => routeTo(...a), snapPoint: (...a) => snapPoint(...a), bandRect,
-    infoTarget: (...a) => infoTarget(...a) });
+    routeTo: (...a) => routeTo(...a), snapPoint: (...a) => snapPoint(...a), bandRect });
 
   // ---------------- properties panel (sch-props.js); an I/O marker given a net's name (sch-join.js, #2170)
   const { joinMarker } = mountSchJoin({ doc: () => doc, nl: () => nl, container });
@@ -255,7 +256,7 @@ export function mountSchEditor(container, opts = {}) {
   }
 
   // ---------------- selection operations (sch-select.js)
-  const { copySel, deleteSel, duplicateSel, mirrorSel, paste, rotateSel, selectAll, selected } = mountSchSelect({
+  const { copySel, deleteSel, duplicateSel, mirrorSel, mirrorVSel, paste, rotateSel, selectAll, selected } = mountSchSelect({
     container, changed, destroyed: () => destroyed, doc: () => doc, edit, live: () => live, modules: () => modules,
     placing: () => placing, readOnly, refusedShort, render, renderOverlay, renderProps, sel: () => sel, setTool,
     snapshot, svg, toSheet, tool: () => tool, undoStack, setSel: (v) => { sel = v; }
