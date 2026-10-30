@@ -290,3 +290,22 @@ uiTest('#1924 View C Synthesis Report: the target clock the board\'s (20 ns), th
     assert.doesNotMatch(log, /WARNING|ERROR/);
   }
 });
+
+// #2080: a pipelined loop that does not fit the board's clock: its II kept, said in the report, not in a compilation's messages
+uiTest('#2080 View C Synthesis Report: a pipelined loop too slow for the board\'s clock said, with its path; one that fits, not', E, async (page) => {
+  const loop = (name, prag) => `int ${name}(int x) {\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n#pragma HLS PIPELINE ${prag}\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n`;
+  await makeProject(env, { name: 'CSlow', top: 'slow', files: { 'src/slow.c': loop('slow', 'II=1'), 'src/calm.c': loop('calm', 'off') } });
+  await page.openProject('CSlow');
+  await page.showMessages();
+  await page.treeRow('#hier', 'calm');
+  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+  await page.waitConsole(/C Synthesis Report of 'calm'[\s\S]*Process "View C Synthesis Report" completed successfully/);
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+  await page.treeRow('#hier', 'slow');
+  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+  await page.waitConsole(/C Synthesis Report of 'slow'[\s\S]*Process "View C Synthesis Report" completed successfully/);
+  const log = await page.consoleText();
+  assert.match(log, /line 3 +100 iterations; II=1, 101 cycles; pipelined, II=1 asked/);
+  assert.match(log, /WARNING:SilinxC - "src\/slow\.c" line 3: this pipelined loop's iteration does not fit the 20 ns clock: a path of about \d+\.\d ns in one cycle \(Silinx adds no pipeline stages\); a slower clock, or #pragma HLS PIPELINE off, makes it fit/);
+  assert.doesNotMatch(log, /ERROR/);
+});

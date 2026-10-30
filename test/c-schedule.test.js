@@ -141,3 +141,56 @@ test('#2080 the ASM chart: a state split its chain, the register transfers in it
   assert.deepEqual(first.actions, []);
   assert.equal(acting.length, 1);
 });
+
+// a stream's value computed by a long path, written; a stream read, its value used after
+const STREAM = `#include "hls_stream.h"
+void f(hls::stream<int> &xs, hls::stream<int> &ys, int k) {
+  for (int i = 0; i < 4; i++) {
+#pragma HLS PIPELINE off
+    int v = xs.read();
+    ys.write(v * k + k * k + v + k + v + k + v);
+  }
+}
+int main() {
+  hls::stream<int> xs, ys;
+  for (int i = 0; i < 4; i++) xs.write(i * 3 - 2);
+  f(xs, ys, 7);
+  int r = 0;
+  for (int i = 0; i < 4; i++) r += ys.read();
+  return r == 0;
+}
+`;
+
+test('#2080 a state that writes a stream split: the handshake in the chain\'s last state, the value computed by then, waiting there and not computing again', () => {
+  for (const [clock, cycles] of [[5, 62], [10, 41], [20, 33]]) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const c = cosimulate(STREAM, { file: 't.cpp', top: 'f', lang, clock });
+      assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, cycles, []], `${clock} ns, ${lang}`);
+    }
+  }
+  const m = scheduled(checkC(STREAM, 't.cpp', { top: 'f', synthesis: true }), {}, { clock: 10 });
+  const g = m.graph;
+  const writers = m.states.filter((st) => st.fifo.size);
+  assert.ok(m.subStates.size > 0);
+  for (const [first, rest] of m.subStates) {
+    const chain = [first, ...rest].map((id) => m.states.find((st) => st.id === id));
+    assert.ok(chain.slice(0, -1).every((st) => !st.fifo.size), `chain ${first}`);
+    const end = chain.at(-1);
+    // (while it waits: this state again, the chain's last, not its first)
+    if (end.fifo.size) {
+      assert.equal(g.get(end.next).op, 'mux');
+      assert.equal(g.k(g.get(end.next).args[1]), BigInt(end.id));
+    }
+  }
+  assert.ok(writers.length >= 2);
+});
+
+test('#2080 a pipelined loop that does not fit the clock: its II kept, its path in the report, no warning; one that fits, none', () => {
+  const src = (prag) => `int f(int x) {\n  int s = 0;\n  for (int i = 0; i < 100; i++) {\n${prag}\n    s += x * i + x + i + 1;\n  }\n  return s;\n}\n`;
+  const slow = cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 10 });
+  assert.deepEqual(slow.diagnostics, []);
+  assert.deepEqual(slow.report.loops.map((l) => [l.pipeline, l.ii]), [[1, 1]]);
+  assert.deepEqual(slow.report.slowLoops.map((l) => [l.line, Math.round(l.ns * 10) / 10]), [[3, 15.6]]);
+  assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 40 }).report.slowLoops, []);
+  assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE off'), { file: 't.c', clock: 10 }).report.slowLoops, []);
+});

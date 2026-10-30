@@ -176,6 +176,8 @@ export async function runCReport(path) {
     }
   }
   for (const l of L) log(l);
+  // (a pipelined loop too slow for the clock: its II kept, no pipeline stages, #2080)
+  for (const l of rep.slowLoops || []) log(`WARNING:SilinxC - "${path}" line ${l.line}: this pipelined loop's iteration does not fit the ${clock} ns clock: a path of about ${l.ns.toFixed(1)} ns in one cycle (Silinx adds no pipeline stages); a slower clock, or #pragma HLS PIPELINE off, makes it fit`, 'warn');
   log('\nProcess "View C Synthesis Report" completed successfully', 'ok');
   return true;
 }

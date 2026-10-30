@@ -517,10 +517,25 @@ class SeqFlow extends Flow {
       const piped = new Set((this.loopReport || []).filter((l) => l.pipeline).flatMap((l) => l.blocks.filter((b) => b.num).map((b) => b.num)));
       const r = this.split({ graph: this.g, states: this.states, stateT: this.stateT, done: this.doneNum, piped });
       if (r.overflow) this.overflow = r.overflow;
-      else { this.states = r.states; for (const x of r.regs) this.regs.set(x.name, x); this.subStates = r.subStates; }
+      else {
+        this.states = r.states;
+        for (const x of r.regs) this.regs.set(x.name, x);
+        this.subStates = r.subStates;
+        this.slowLoops = this.slowPipes(r.slow);
+      }
     }
     this.mems = this.memPorts(this.states);
     this.fifos = this.fifoPorts(this.states);
+  }
+  /** The pipelined loops whose iteration does not fit the clock (their II kept, no pipeline stages, #2080): for the
+   *  report, once each. */
+  slowPipes(slow) {
+    const seen = new Map();
+    for (const l of this.loopReport || []) {
+      const ns = l.pipeline ? Math.max(0, ...l.blocks.map((b) => slow.get(b.num) ?? 0)) : 0;
+      if (ns > (seen.get(l.line)?.ns ?? 0)) seen.set(l.line, { line: l.line, ...(l.name ? { name: l.name } : {}), ns });
+    }
+    return [...seen.values()];
   }
   // the outputs read before they are written: a pointer read and written takes its input at the start of a call
   readOut(o) {
@@ -583,7 +598,7 @@ class SeqFlow extends Flow {
     return {
       graph: this.g, regs: [...(this.regs?.values() || [])], states: this.states || [], entry: this.entry?.num ?? 1, idle: 0, done: this.doneNum ?? 1,
       stateT: this.stateT, ports, outputs, ctrl: this.ctrl ?? 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
-      ...(this.overflow ? { overflow: this.overflow } : {}), ...(this.subStates ? { subStates: this.subStates } : {}),
+      ...(this.overflow ? { overflow: this.overflow } : {}), ...(this.subStates ? { subStates: this.subStates } : {}), slowLoops: this.slowLoops || [],
       loops: this.loops || [], blocks: this.reached || [], loopStates: (this.loopReport || []).map((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.port ?? x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}), ...(x.fields ? { fields: x.fields } : {}) })),
       extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.port ?? x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written, ...(x.fields ? { fields: x.fields } : {}), ...(x.bram ? { bram: x.bram } : {}) })),
     };
