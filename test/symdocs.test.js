@@ -404,3 +404,38 @@ test('mode tables: Xilinx layout and priorities', () => {
   assert.equal(modeTable('and2'), null);
   assert.match(modeTable('fdcpe', {}, 'pt').notes.join(' '), /Prioridade, da mais alta para a mais baixa: CLR > PRE > CE > dados/);
 });
+
+// #2141: a symbol with Pins per bit: Symbol Info opens (M4_1's threw) and each row's pin is described as the one-bit
+// symbol's pin, with its bit; the shared selects and enable as the one-bit symbol's
+test('#2141 pins per bit: each row\'s pin described as the one-bit symbol\'s, with its bit; M4_1 / M8_1 / M16_1 open', () => {
+  // (the one-bit pin of a row's pin: I0_1 -> I0, O1 -> O, a demultiplexer's D1 -> D, INV's I1 -> I)
+  const one = (type, name) => {
+    let m = /^([A-Z]+\d+)_(\d+)$/.exec(name);
+    if (m) return [m[1], +m[2]];
+    m = /^([A-Z])(\d+)$/.exec(name);
+    const letters = type === 'inv' || type === 'buf' ? 'IO' : type === 'demux' ? 'D' : 'O';
+    return m && letters.includes(m[1]) ? [m[1], +m[2]] : [name, null];
+  };
+  const CASES = [['and2', {}], ['nand2b1', {}], ['or3b2', {}], ['xor2', {}], ['inv', {}], ['buf', {}], ['mux2', {}], ['mux2', { en: true }],
+    ['mux4', {}], ['mux4', { en: true }], ['mux8', { selBus: true }], ['mux16', { en: true }], ['demux', {}], ['demux', { en: true, sel: 2 }]];
+  for (const lang of ['en', 'pt']) {
+    for (const [type, extra] of CASES) {
+      const params = { ...defaultParams(type), ...extra };
+      const bits = symbolDoc(type, { ...params, width: 3, bits: true }, { lang });
+      const base = symbolDoc(type, { ...params, width: 1 }, { lang });
+      const baseFunc = Object.fromEntries(base.pins.map((p) => [p.name, p.func]));
+      const what = `${type} ${JSON.stringify(extra)} ${lang}`;
+      assert.equal(bits.pins.length, symbolPins({ type, x: 0, y: 0, rot: 0, mirror: false, params: { ...params, width: 3, bits: true } }).length, `${what}: every pin`);
+      for (const p of bits.pins) {
+        assert.doesNotMatch(p.func, /null|undefined|NaN/, `${what} ${p.name}: ${p.func}`);
+        const [name, bit] = one(type, p.name);
+        assert.equal(p.func, bit == null ? baseFunc[name] : `${baseFunc[name]} (bit ${bit})`, `${what} ${p.name}`);
+      }
+      // the bits 0..2 each
+      assert.deepEqual([...new Set(bits.pins.map((p) => one(type, p.name)[1]).filter((b) => b != null))].sort(), [0, 1, 2], what);
+    }
+  }
+  // the pins of a symbol without Pins per bit unchanged (a 3-bit AND2: I0, I1, O; BUFE4's own (bit k))
+  assert.deepEqual(symbolDoc('and2', { ...defaultParams('and2'), width: 3 }, { lang: 'en' }).pins.map((p) => p.func), ['Input 0', 'Input 1', 'Output: O = I0·I1']);
+  assert.equal(symbolDoc('tbuf', { ...defaultParams('tbuf'), width: 2, bits: true }, { lang: 'en' }).pins.find((p) => p.name === 'I1').func, 'Data input (bit 1)');
+});
