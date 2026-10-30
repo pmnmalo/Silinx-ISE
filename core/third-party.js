@@ -93,6 +93,13 @@ export const THIRD_PARTY = [
     "standalone": true
   },
   {
+    "name": "@silinx/nextpnr-himbaechel-spartan3e",
+    "version": "0.1.0",
+    "license": "ISC",
+    "url": "https://github.com/pmnmalo/nextpnr-spartan",
+    "standalone": false
+  },
+  {
     "name": "@yowasp/yosys",
     "version": "0.70.1258",
     "license": "ISC",

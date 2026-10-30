@@ -20,6 +20,9 @@
 //   io.placeRoute(netlist, packed, device, knownPips, options)
 //                                      the place and route (#1678), optional: fpga/place-route.js placeRouteBest by default;
 //                                      another engine (nextpnr, #1953) returns its result's shape
+//   io.nextpnr                         { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }: nextpnr-himbaechel
+//                                      with the spartan3e micro-architecture, for spec.engine 'nextpnr' (#2136,
+//                                      open-flow-nextpnr.js: its Map and Place & Route), optional
 // core/flow-ide.js runOpenFlow is runFlow with the IDE's front end and simulation models (#1675).
 // spec.resources: the part's resources (resources.js resourcesOf(part, pkg)), for the synthesis's used of
 // available and its check (#795); without them the synthesis gives the used ones only.
@@ -38,6 +41,7 @@ import { checkRouting } from './fpga/route.js';
 import { bitgen, knownRouting } from './fpga/bitgen.js';
 import { mountFlowReports } from './open-flow-reports.js';
 import { mountS6Steps } from './open-flow-s6.js';
+import { mountNextpnrSteps } from './open-flow-nextpnr.js';
 
 // without the HDL front end (io.frontEnd): the sources are the flat Verilog given to Yosys, its top module `top` (#1675)
 function flatVerilog(srcs, top) {
@@ -59,7 +63,8 @@ export class StepError extends Error {
 
 /**
  * Run the steps of spec ({ top, family, device, pkg, part, steps, seed, effort, replicate,
- * startupClk, synthUpToDate, synthEffort, deepRule }) with io (above). synthEffort: 'normal' | 'high' (the default), the
+ * startupClk, synthUpToDate, synthEffort, deepRule, engine }) with io (above). engine: 'nextpnr' for nextpnr's Map and Place & Route
+ * (#2136, io.nextpnr), else Silinx's own. synthEffort: 'normal' | 'high' (the default), the
  * synthesis's Optimization Effort (#282; 'high' given, Place & Route makes HIGH_TRIES placements too, the fastest kept, and HIGH_EXTRA more routed when the placer's estimate is promising, #651; Normal NORMAL_TRIES for a small design); deepRule: Normal's rule of the deep designs (synth-open.js DEEP_RULE, for tests). synthUpToDate ({ report }: the synthesis part of the
  * report of the run that made it, or null), when the steps start after the synthesis: the netlist of that
  * run is the design's (#280); it is used as it is, or, when it is not there, the synthesis runs.
@@ -82,7 +87,7 @@ export async function runFlow(spec, io) {
   // and the placements more at High, each routed only when its estimate is promising (#651)
   const parExtra = () => effortExtra(spec.synthEffort);
   const ucfText = io.ucf || null;
-  let synth = null, netlist = null, packed = null, routedText = null;
+  let synth = null, netlist = null, netlistText = null, packed = null, routedText = null;
 
   async function runSynth() {
     const t = now();
@@ -153,6 +158,7 @@ export async function runFlow(spec, io) {
     const text = synth ? synth.files[`${synth.top}.json`] : io.read(`open/${top}.json`);
     if (text == null) throw new StepError('no netlist: run Synthesize first', [], '');
     netlist = readYosysJson(text);
+    netlistText = text;
     let ucf = { assignments: {}, clocks: [] };
     try { if (ucfText) ucf = parseUcf(ucfText); } catch (e) { throw new StepError(`the constraints cannot be read: ${e.message}`, [], 'Fix the constraints (Check Constraints).'); }
     const locs = Object.values(ucf.assignments || {}).filter(a => a.loc).length;
@@ -255,6 +261,8 @@ export async function runFlow(spec, io) {
 
   // the Spartan-6's Map and Place & Route (#732: open-flow-s6.js)
   const s6 = spec.family === 'spartan6' ? mountS6Steps({ io, spec, log, report, util, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
+  // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine
+  const np = spec.engine === 'nextpnr' ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
 
   const { bitfile, runPins, runPower, runTiming } = mountFlowReports({
     io, spec, log, report, routedOrEarlier: (...a) => routedOrEarlier(...a), routedText: () => routedText, top, ucfText
@@ -281,9 +289,9 @@ export async function runFlow(spec, io) {
     if (steps.includes('postsynth')) { step('postsynth'); await runPostSynth(); save(); }
     if (steps.includes('translate')) { step('translate'); runTranslate(); save(); }
     if (steps.includes('posttrans')) { step('posttrans'); await runPostTranslate(); save(); }
-    if (steps.includes('map')) { step('map'); (s6 ? s6.runMap : runMap)(); save(); }
+    if (steps.includes('map')) { step('map'); (np ? np.runMap : s6 ? s6.runMap : runMap)(); save(); }
     if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
-    if (steps.includes('par')) { step('par'); (s6 ? s6.runPar : runPar)(); save(); }
+    if (steps.includes('par')) { step('par'); await (np ? np.runPar : s6 ? s6.runPar : runPar)(); save(); }
     if (steps.includes('trce')) { step('trce'); routedOrEarlier(); runTiming(); save(); }
     if (steps.includes('postpar')) { step('postpar'); await runPostPar(); save(); }
     if (steps.includes('pin2ucf')) { step('pin2ucf'); runPins(); save(); }

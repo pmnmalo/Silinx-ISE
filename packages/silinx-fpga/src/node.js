@@ -10,3 +10,5 @@ export { loadDb, hasBitDb, dbPackages, DB_DIR } from './fpga/bitdb-node.js';
 export { loadBitDbS6, S6_DB_DIR } from './fpga/s6/bitdb-node.js';
 // Yosys: one run (yosysNode), or a pool of workers for the synthesis's mappings in parallel (yosysWorkers)
 export { yosysNode, yosysWorkers } from './synth-open-node.js';
+// nextpnr (the nextpnr engine's io.nextpnr, #2136)
+export { nextpnrNode } from './nextpnr-node.js';

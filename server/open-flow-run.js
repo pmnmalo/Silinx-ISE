@@ -2,14 +2,15 @@
 // synchronous parts, placing and routing, never hold the server; Stop kills it):
 //   node server/open-flow-run.js build/open/flow.json
 // flow.json: { top, part, device, family, pkg, graph, bitDbDir, sources: [{ path, lang, file }], ucf,
-//   buildDir, outDir, steps, seed, effort, startupClk, simTop, simSources: [{ path, lang, file }] }.
+//   buildDir, outDir, steps, seed, effort, startupClk, simTop, simSources: [{ path, lang, file }], engine }
+//   (engine: 'nextpnr' for nextpnr's Map and Place & Route, #2136).
 // The flow itself is packages/silinx-fpga/src/open-flow-core.js (the browser edition runs the same, web/js/open-flow-worker.js);
 // this file gives it the files on disk: the log on stdout ("=== SILINX STEP <step> ===", "=== SILINX
 // FAILED <step> (exit 1) ===", "=== SILINX DONE ===": the protocol of ISE's run.sh) and
 // build/open/report.json after every step (what the Design Summary shows).
 import fs from 'node:fs';
 import path from 'node:path';
-import { yosysWorkers, loadDeviceCache, loadDb, loadBitDbS6 } from '../packages/silinx-fpga/src/node.js';
+import { yosysWorkers, nextpnrNode, loadDeviceCache, loadDb, loadBitDbS6 } from '../packages/silinx-fpga/src/node.js';
 import { runOpenFlow } from '../core/flow-ide.js';
 
 const spec = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -29,6 +30,7 @@ const io = {
   // (the Spartan-6's bit databases, packages/silinx-fpga/bitdb/s6, #732)
   bitDb: () => (db ||= spec.family === 'spartan6' ? loadBitDbS6(spec.part) : loadDb(`${spec.device}${spec.pkg}`, { graph: io.device(), dir: spec.bitDbDir })),
   yosys: yosysWorkers(),   // (the synthesis's mappings from the same netlist in parallel, #86)
+  nextpnr: nextpnrNode(),   // (the nextpnr engine's, spec.engine 'nextpnr', #2136)
   write: (name, data) => {
     const f = fileOf(name);
     fs.mkdirSync(path.dirname(f), { recursive: true });   // (netgen/synthesis/…)

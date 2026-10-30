@@ -27,9 +27,9 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-fpga-cli-'));
 
 test('#1679 parseArgs: the defaults, each option', () => {
   assert.deepEqual(parseArgs(['build', 'a.v', '--part', 'xc3s250e-cp132-4']),
-    { command: 'build', files: ['a.v'], part: 'xc3s250e-cp132-4', replicate: true, quiet: false, outDir: 'build', effort: 'normal', seed: 1 });
-  const o = parseArgs(['build', 'a.v', 'b.v', '--part', 'p', '--top', 't', '--ucf', 'u.ucf', '-o', 'x.bit', '--out-dir', 'o', '--effort', 'high', '--seed', '3', '--no-replicate', '--quiet']);
-  assert.deepEqual(o, { command: 'build', files: ['a.v', 'b.v'], part: 'p', top: 't', ucf: 'u.ucf', out: 'x.bit', outDir: 'o', effort: 'high', seed: 3, replicate: false, quiet: true });
+    { command: 'build', files: ['a.v'], part: 'xc3s250e-cp132-4', replicate: true, quiet: false, outDir: 'build', effort: 'normal', seed: 1, engine: 'silinx' });
+  const o = parseArgs(['build', 'a.v', 'b.v', '--part', 'p', '--top', 't', '--ucf', 'u.ucf', '-o', 'x.bit', '--out-dir', 'o', '--effort', 'high', '--seed', '3', '--no-replicate', '--engine', 'nextpnr', '--quiet']);
+  assert.deepEqual(o, { command: 'build', files: ['a.v', 'b.v'], part: 'p', top: 't', ucf: 'u.ucf', out: 'x.bit', outDir: 'o', effort: 'high', seed: 3, replicate: false, engine: 'nextpnr', quiet: true });
 });
 
 test('#1679 parseArgs: what is wrong in a command line', () => {
@@ -42,6 +42,7 @@ test('#1679 parseArgs: what is wrong in a command line', () => {
   assert.equal(error(['build', 'a.v', '--part', 'p', '--effort', 'max']), '--effort max: normal or high');
   assert.equal(error(['build', 'a.v', '--part', 'p', '--seed', '0']), '--seed: a whole number from 1');
   assert.equal(error(['build', 'a.v', '--part', 'p', '--seed', '1.5']), '--seed: a whole number from 1');
+  assert.equal(error(['build', 'a.v', '--part', 'p', '--engine', 'vpr']), '--engine vpr: silinx or nextpnr');   // (#2136)
 });
 
 test('#1679 partOf: a part as ISE and the boards write it', () => {

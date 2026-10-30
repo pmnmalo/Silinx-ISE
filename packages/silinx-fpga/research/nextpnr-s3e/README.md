@@ -8,9 +8,9 @@ XC3S250E (Basys2-250).
 
 | Where | What |
 |---|---|
-| [pmnmalo/nextpnr](https://github.com/pmnmalo/nextpnr/tree/silinx-s3e), branch `silinx-s3e`: `himbaechel/uarch/spartan3e/gen/s3e_gen.py` | The chip database from Silinx's device graph (`packages/silinx-fpga/devices/<part>.json.gz`): one tile type per template, the graph's wires, PIPs and nodes, and the BELs inside the sites written by hand (the graph has no site internals) |
+| [pmnmalo/nextpnr-spartan](https://github.com/pmnmalo/nextpnr-spartan/tree/silinx), branch `silinx`: `himbaechel/uarch/spartan3e/gen/s3e_gen.py` | The chip database from Silinx's device graph (`packages/silinx-fpga/devices/<part>.json.gz`): one tile type per template, the graph's wires, PIPs and nodes, and the BELs inside the sites written by hand (the graph has no site internals) |
 | the same, `spartan3e.cc` | The micro-architecture: Yosys's `synth_xilinx -family xc3se -nocarry -nowidelut` cells (LUT1…4, INV, FD*, IBUF, OBUF, BUFG) to LUT4 / FF / IOB / BUFGMUX, the pads from the ports' `LOC` attributes, the slice's shared CLK / CE / SR checked |
-| `lib.mjs` | The functions of the scripts below (`unknownPips`, `timingExport`, `nextpnrToXdl`, `simCheck`, `xdlSize`); tested by `test/nextpnr-s3e.test.js` on nextpnr's routed counter (`test/fixtures/nextpnr-s3e/`) |
+| `lib.mjs` | The functions of the scripts below (the converter to XDL and `xdlSize` re-exported from the toolchain's `src/fpga/nextpnr-xdl.js`, where they moved for the flow's nextpnr engine, #2136) (`unknownPips`, `timingExport`, `nextpnrToXdl`, `simCheck`, `xdlSize`); tested by `test/nextpnr-s3e.test.js` on nextpnr's routed counter (`test/fixtures/nextpnr-s3e/`) |
 | `export-unknown-pips.mjs` | The PIPs whose bits Silinx's bit database does not know (Silinx's own router is kept off them: `knownRouting`), per tile, for the generator to leave out |
 | `nextpnr-to-xdl.mjs` | nextpnr's routed design (`--write`) to XDL: one instance per used site with its settings (the sites named from the device graph), each net's site pins and PIPs |
 | `xdl-to-bit.mjs` | Silinx's bitgen on that XDL |

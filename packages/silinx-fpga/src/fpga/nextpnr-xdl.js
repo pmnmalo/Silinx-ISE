@@ -117,9 +117,10 @@ function instanceCfg(inst, mod) {
     if (inst.mux.Y) add('YUSED', '', '0');
     inst.name = esc((c.FFX || c.FFY || c.FLUT || c.GLUT).name);
   } else if (c.IOB) {
-    // the IOB's name: its port
-    const port = Object.entries(mod.ports).find(([, p]) => p.bits.includes(portNet(c.IOB, 'PAD')))?.[0] || c.IOB.name;
-    inst.name = port.replace(/\[(\d+)\]$/, '<$1>');
+    // the IOB's name: its port bit, as the UCF names it (led<3>: nextpnr writes a bus's bits as one port again)
+    const pad = portNet(c.IOB, 'PAD');
+    const [port, d] = Object.entries(mod.ports).find(([, p]) => p.bits.includes(pad)) || [c.IOB.name, null];
+    inst.name = d && d.bits.length > 1 ? `${port}<${d.bits.indexOf(pad)}>` : port.replace(/\[(\d+)\]$/, '<$1>');
     const out = portNet(c.IOB, 'O') !== undefined;
     inst.type = out ? 'IOB' : 'IBUF';                    // (an input alone: IBUF, as ISE's map writes it)
     if (out) {
