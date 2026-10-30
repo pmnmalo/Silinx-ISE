@@ -23,7 +23,8 @@ the code and the lessons learnt.
   simulation, synthesis, implementation, ISE), or an explicit "no warnings", never only "no errors".
 - **The examples are the test designs**: gates, traffic, blinky, pong, stopwatch, clock,
   vga (`examples/`, in that order). Each must run on every device of the Silinx toolchain
-  (Basys2-100/250, Nexys2-500/1200) and build with ISE with no warnings. A new source style or
+  (Basys2-100/250, Nexys2-500/1200, Nexys3, Atlys: `TARGETS` in `test/examples-lib.mjs`) and build with ISE with no
+  warnings. A new source style or
   feature should be exercised by an example where it fits.
 - **ISE is the oracle** for the open toolchain: byte-identical `.bit` and a clean DRC
   (`npm run check:open-flow`). For language questions XST's Spartan-3E behaviour is the reference.

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TARGETS, example, exampleUcf, runTestbench } from './examples-lib.mjs';
+import { TARGETS, targetName, example, exampleUcf, runTestbench } from './examples-lib.mjs';
 
 const ex = example('blinky');
 const read = (f) => fs.readFileSync(path.join(ex.dir, f), 'utf8');
@@ -35,10 +35,15 @@ test('blinky: the display\'s pins in the UCF it ships (Basys2) and in the board 
   const loc = (text, net) => text.match(new RegExp(`^NET "${net}" +LOC = "(\\w+)"`, 'm'))?.[1];
   for (const t of TARGETS) {
     const u = exampleUcf('blinky', t);
-    assert.deepEqual(u.unmatched, [], `${t.board}-${t.variant}`);
-    // the Nexys2's display: other pins (its anodes F17 H17 C18 F15, its segments L18 F18 D17 D16 G14 J17 H14, dp C17)
-    const want = t.board === 'nexys2' ? { 'an<0>': 'F17', 'an<3>': 'F15', 'seg<0>': 'L18', 'seg<6>': 'H14', dp: 'C17' } : { 'an<0>': 'F12', 'an<3>': 'K14', 'seg<0>': 'L14', 'seg<6>': 'M12', dp: 'N13' };
-    for (const [net, pin] of Object.entries(want)) assert.equal(loc(u.text, net), pin, `${t.board}-${t.variant} ${net}`);
+    assert.deepEqual(u.unmatched, [], `${targetName(t)}`);
+    // the other boards' displays: other pins (the Nexys2's anodes F17 H17 C18 F15, its segments L18 F18 D17 D16 G14
+    // J17 H14, dp C17; the Nexys3's from its master UCF; the Atlys's on its VHDCI connector, #732)
+    const want = {
+      nexys2: { 'an<0>': 'F17', 'an<3>': 'F15', 'seg<0>': 'L18', 'seg<6>': 'H14', dp: 'C17' },
+      nexys3: { 'an<0>': 'N16', 'an<3>': 'P17', 'seg<0>': 'T17', 'seg<6>': 'L14', dp: 'M13' },
+      atlys: { 'an<0>': 'U11', 'an<3>': 'R8', 'seg<0>': 'U16', 'seg<6>': 'N10', dp: 'M10' },
+    }[t.board] || { 'an<0>': 'F12', 'an<3>': 'K14', 'seg<0>': 'L14', 'seg<6>': 'M12', dp: 'N13' };
+    for (const [net, pin] of Object.entries(want)) assert.equal(loc(u.text, net), pin, `${targetName(t)} ${net}`);
   }
 });
 

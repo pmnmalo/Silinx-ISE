@@ -178,7 +178,7 @@ async function measure() {
   fs.writeFileSync(path.join(process.env.SILINX_CONFIG_DIR, 'config.json'), JSON.stringify(host
     ? { mode: 'ssh', ssh: { host: host[2], user: host[1] || '', remoteDir: 'silinx-measure-power', image, settings } }
     : { mode: 'docker', docker: { image, platform: 'linux/amd64', settings } }));
-  const { EXAMPLES, TARGETS, exampleProject } = await import('../test/examples-lib.mjs');
+  const { EXAMPLES, S3E_TARGETS: TARGETS, exampleProject } = await import('../test/examples-lib.mjs');
   const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
   const unknown = (only || []).filter(e => !EXAMPLES.includes(e));
   if (unknown.length) { console.error(`not an example: ${unknown.join(', ')}`); process.exit(2); }
