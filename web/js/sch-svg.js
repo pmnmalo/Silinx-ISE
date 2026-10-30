@@ -37,13 +37,14 @@ export function bodySvg(sym, def) {
       // (a gate a row with Pins per bit, #2079: each drawn in its own band of gh)
       const gh = def.gh || h;
       for (let r = 0; r < (def.rows || 1); r++) {
-        const y0 = r * gh, Y = v => r1(y0 + v);
-        if (!isOr) s += `<path class="gate" d="M20,${Y(0)} H40 A20,${gh / 2} 0 0 1 40,${Y(gh)} H20 Z"/>`;
+        // (each row's top, middle and bottom: numbers, #1443)
+        const yt = r1(r * gh), ym = r1(r * gh + gh / 2), yb = r1(r * gh + gh);
+        if (!isOr) s += `<path class="gate" d="M20,${+yt} H40 A20,${gh / 2} 0 0 1 40,${+yb} H20 Z"/>`;
         else {
-          s += `<path class="gate" d="M20,${Y(0)} Q48,${Y(0)} 60,${Y(gh / 2)} Q48,${Y(gh)} 20,${Y(gh)} Q32,${Y(gh / 2)} 20,${Y(0)} Z"/>`;
-          if (base === 'xor') s += `<path class="gate nofill" d="M14,${Y(gh)} Q26,${Y(gh / 2)} 14,${Y(0)}"/>`;
+          s += `<path class="gate" d="M20,${+yt} Q48,${+yt} 60,${+ym} Q48,${+yb} 20,${+yb} Q32,${+ym} 20,${+yt} Z"/>`;
+          if (base === 'xor') s += `<path class="gate nofill" d="M14,${+yb} Q26,${+ym} 14,${+yt}"/>`;
         }
-        if (def.bubble) s += `<circle class="gate" cx="63" cy="${Y(gh / 2)}" r="3"/>`;
+        if (def.bubble) s += `<circle class="gate" cx="63" cy="${+ym}" r="3"/>`;
       }
       for (const p of pins) {
         if (p.dir === 'out') {
@@ -191,8 +192,7 @@ function typeInside(sym, def, name) {
   if (need > room * 1.3) return null;
   const cy = def.shape === 'tbuf' ? def.body.y + 10 : def.body.y + def.body.h / 2;
   const c = xform(sym, def, def.body.x + (tri ? room / 2 + 1 : def.body.w / 2), cy);
-  const fit = need > room ? ` textLength="${r1(room)}" lengthAdjust="spacingAndGlyphs"` : '';
-  return `<text class="stype inside${tri ? ' tri' : ''}" x="${r1(c.x)}" y="${r1(c.y + 3)}" text-anchor="middle"${fit}>${esc(name)}</text>`;
+  return `<text class="stype inside${tri ? ' tri' : ''}" x="${r1(c.x)}" y="${r1(c.y + 3)}" text-anchor="middle"${need > room ? ` textLength="${r1(room)}" lengthAdjust="spacingAndGlyphs"` : ''}>${esc(name)}</text>`;
 }
 const AUTO_NAME = /^(XLXI_\d+|inst_\d+|U\d+)$/;
 // a pin's name inside the body, past its lead and clock triangle (L px from the pin's end); on the top or the bottom
@@ -282,8 +282,8 @@ function textsSvg(sym, def, ctx = {}) {
     // turned 90° / 270°, not over it, #2042)
     const end = def.shape === 'vcc' ? 10 : 28, tip = cx(10, end), far = cx(10, def.shape === 'vcc' ? end - 10 : end + 10);
     const dx = Math.sign(far.x - tip.x), dy = Math.sign(far.y - tip.y);
-    const [x, y, anchor] = dx ? [tip.x + 4 * dx, tip.y + 3, dx > 0 ? 'start' : 'end'] : [tip.x, tip.y + (dy < 0 ? -6 : 12), 'middle'];
-    s += `<text class="stype" x="${x}" y="${y}" text-anchor="${anchor}">${esc(def.shape.toUpperCase())}</text>`;
+    const [x, y] = dx ? [tip.x + 4 * dx, tip.y + 3] : [tip.x, tip.y + (dy < 0 ? -6 : 12)];
+    s += `<text class="stype" x="${x}" y="${y}" text-anchor="${!dx ? 'middle' : dx > 0 ? 'start' : 'end'}">${esc(def.shape.toUpperCase())}</text>`;
     // (a VCC / GND wider than a bit: its width by its output, #953)
     const o = symbolPins(sym, null, def)[0];
     if ((o.width || 1) > 1) s += pinWidth(o);
