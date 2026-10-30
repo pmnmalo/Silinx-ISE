@@ -32,11 +32,14 @@ export const SOURCES = [['X', 'F1'], ['Y', 'G1']];
  *   maxDepth (PIPs from the slice output to the tested wire, default 3),
  *   maxJoins (known joins a path may cross, default 0: the source in the tested wire's own tile),
  *   sourcesOf(tile) -> [{ site, type: 'IOB' | 'RAMB16', siteType, tile, o: output pin, wire: its tile wire }] (other sites
- *     that can drive a test: an IOB's input I, a block RAM's output; none by default).
+ *     that can drive a test: an IOB's input I, a block RAM's output; none by default),
+ *   maxTests (the tests of one design, default no limit: the rest wait for the next design; #2178: in a design of
+ *     thousands of nets ISE's DRC gives a few wrong verdicts where the nets meet on nodes the prediction has not yet
+ *     joined, on the XC3S1200E 2721 per million over 10 000 tests, none up to 500).
  * Returns { designs: [{ xdl, tests: [{ net, join }] }], untestable: [join] }.
  */
 export function joinTestDesigns(opts) {
-  const { part, joins, slicesOf, pinWire, pipsOf, nodeOf = k => [k], joined = () => [], maxDepth = 3, maxJoins = 0, sourcesOf = () => [] } = opts;
+  const { part, joins, slicesOf, pinWire, pipsOf, nodeOf = k => [k], joined = () => [], maxDepth = 3, maxJoins = 0, sourcesOf = () => [], maxTests = Infinity } = opts;
   const cache = new Map();   // tile -> { out: Map from -> [to], into: Map to -> [from], src: Map wire -> [source] }
   const tileOf = tile => {
     if (!cache.has(tile)) {
@@ -106,6 +109,7 @@ export function joinTestDesigns(opts) {
       return null;
     };
     for (const join of left) {
+      if (tests.length >= maxTests) { next.push(join); continue; }
       let plan = null, possible = false;
       for (const [d, l] of [[join[0], join[1]], [join[1], join[0]]]) {
         const [tL, wL] = splitKey(l);

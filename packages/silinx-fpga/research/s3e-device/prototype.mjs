@@ -163,6 +163,7 @@ if (cmd === 'observe') {
     pipsOf: t => [...pipsOf(dbType(t)), ...(probed.get(t) || [])].filter(([a, b, f]) => !(f & PIP_BIDI)),
     joined: k => joinedTo.get(k) || [], nodeOf: k => (root.has(k) ? members.get(root.get(k)) : [k]),
     maxJoins, maxDepth: +(process.env.MAXDEPTH ?? 3), sourcesOf: t => extra.get(t) || [],
+    maxTests: +(process.env.MAXTESTS ?? 1000),   // (#2178: ISE's DRC errs in designs of thousands of tests)
   });
   fs.mkdirSync(dir, { recursive: true });
   r.designs.forEach((d, i) => fs.writeFileSync(path.join(dir, `j${i}.xdl`), d.xdl));
