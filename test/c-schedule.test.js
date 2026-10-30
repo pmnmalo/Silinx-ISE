@@ -48,11 +48,21 @@ test('#2080 the C\'s registers written in the chain\'s last state only; the stat
   for (const st of m.states.filter((x) => x !== c[0])) assert.ok([...st.updates.keys()].every((r) => /^s\d+_c\d+_\d+$/.test(r)), [...st.updates.keys()].join());
 });
 
-test('#2080 an operation longer than the period: alone in its cycle (not yet split, PR of the multiplier), the machine still ends', () => {
+test('#2080 a 64 x 64 multiplication longer than the period: 18 x 18 ones over cycles, each state within the period', () => {
   const src = 'long long f(long long a, long long b) {\n  return a * b + a;\n}\nint main() { return f(3, 4) == 15 ? 0 : 1; }\n';
   for (const lang of ['vhdl', 'verilog']) {
     const c = cosimulate(src, { file: 't.c', top: 'f', lang });
-    assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, 2, []], lang);
+    assert.deepEqual([c.pass, c.latency.max, c.gen.diagnostics], [true, 6, []], lang);
+  }
+  const m = machine(src, 10), g = m.graph, budget = 10 * (1 - UNCERTAINTY);
+  const muls = m.states.flatMap((st) => g.needed([st.next, ...st.updates.values()]).filter((n) => n.op === 'mul'));
+  assert.ok(muls.length >= 10 && muls.every((n) => n.w === 36), muls.map((n) => n.w).join());
+  for (const st of m.states) {
+    const at = new Map();
+    for (const n of g.needed([st.next, ...st.updates.values()])) {
+      at.set(n.id, n.args.reduce((t, a) => Math.max(t, at.get(a) ?? 0), 0) + nodeDelay(g, n));
+      assert.ok(at.get(n.id) <= budget, `state ${st.id}: ${at.get(n.id)} ns`);
+    }
   }
 });
 
