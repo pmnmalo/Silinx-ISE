@@ -1,0 +1,2354 @@
+{
+  "creator": "Yosys 0.70 (git sha1 28ba3cb92, Release, Clang /workspace/YoWASP/yosys/wasi-sdk-33.0-x86_64-linux/share/cmake/../..//bin/clang++ 22.1.0)",
+  "modules": {
+    "slicemem": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "slicemem_syn.v:2.1-651.10"
+      },
+      "ports": {
+        "clk": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "sw": {
+          "direction": "input",
+          "bits": [ 3, 4, 5, 6, 7, 8, 9, 10 ]
+        },
+        "led": {
+          "direction": "output",
+          "bits": [ 11, 12, 13, 14, 15, 16, 17, 18 ]
+        }
+      },
+      "cells": {
+        "$abc$1628$blif$1628$0": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 19 ],
+            "I1": [ 20 ],
+            "O": [ 21 ]
+          }
+        },
+        "$abc$1628$blif$1628$1": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 22 ],
+            "I1": [ 23 ],
+            "O": [ 24 ]
+          }
+        },
+        "$abc$1628$blif$1628$2": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 25 ],
+            "I1": [ 26 ],
+            "O": [ 27 ]
+          }
+        },
+        "$abc$1628$blif$1628$3": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 28 ],
+            "I1": [ 29 ],
+            "O": [ 30 ]
+          }
+        },
+        "$abc$1628$blif$1628$4": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 31 ],
+            "I1": [ 32 ],
+            "O": [ 33 ]
+          }
+        },
+        "$abc$1628$blif$1628$5": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 34 ],
+            "I1": [ 35 ],
+            "O": [ 36 ]
+          }
+        },
+        "$abc$1628$blif$1628$6.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut0": {
+          "hide_name": 1,
+          "type": "LUT4",
+          "parameters": {
+            "INIT": "1000000000000000"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:67.44-67.69|/share/xilinx/lut_map.v:51.26-53.19"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "I2": "input",
+            "I3": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 37 ],
+            "I1": [ 34 ],
+            "I2": [ 35 ],
+            "I3": [ 38 ],
+            "O": [ 39 ]
+          }
+        },
+        "$abc$1628$blif$1628$6.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.lut1": {
+          "hide_name": 1,
+          "type": "LUT4",
+          "parameters": {
+            "INIT": "0111111111111111"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:68.44-68.69|/share/xilinx/lut_map.v:51.26-53.19"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "I2": "input",
+            "I3": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 37 ],
+            "I1": [ 34 ],
+            "I2": [ 35 ],
+            "I3": [ 38 ],
+            "O": [ 40 ]
+          }
+        },
+        "$abc$1628$blif$1628$6.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.mux5": {
+          "hide_name": 1,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:69.13-69.52"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 39 ],
+            "I1": [ 40 ],
+            "O": [ 41 ],
+            "S": [ 42 ]
+          }
+        },
+        "$abc$1628$blif$1628$7": {
+          "hide_name": 1,
+          "type": "LUT3",
+          "parameters": {
+            "INIT": "01111000"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:47.26-48.41"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "I2": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 34 ],
+            "I1": [ 35 ],
+            "I2": [ 38 ],
+            "O": [ 43 ]
+          }
+        },
+        "$abc$1628$blif$1628$8": {
+          "hide_name": 1,
+          "type": "LUT4",
+          "parameters": {
+            "INIT": "0111111110000000"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:51.26-53.19"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "I2": "input",
+            "I3": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 34 ],
+            "I1": [ 35 ],
+            "I2": [ 38 ],
+            "I3": [ 37 ],
+            "O": [ 44 ]
+          }
+        },
+        "$abc$1628$blif$1628$9": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 34 ],
+            "O": [ 45 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1481": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 45 ],
+            "Q": [ 34 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1482": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 36 ],
+            "Q": [ 35 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1483": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 43 ],
+            "Q": [ 38 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1484": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 44 ],
+            "Q": [ 37 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1485": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 41 ],
+            "Q": [ 42 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1514": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:465.3-467.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 33 ],
+            "Q": [ 47 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1515": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:465.3-467.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 30 ],
+            "Q": [ 48 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1516": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:465.3-467.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 27 ],
+            "Q": [ 49 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1517": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:465.3-467.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 24 ],
+            "Q": [ 50 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1518": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:465.3-467.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 51 ],
+            "Q": [ 52 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1519": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:465.3-467.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 53 ],
+            "Q": [ 54 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1520": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:465.3-467.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 55 ],
+            "Q": [ 56 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1521": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:465.3-467.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 21 ],
+            "Q": [ 57 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1522": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:309.3-311.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 58 ],
+            "Q": [ 23 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1528": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:144.3-147.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 59 ],
+            "Q": [ 60 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1529": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:144.3-147.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 61 ],
+            "Q": [ 62 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1530": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:144.3-147.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 63 ],
+            "Q": [ 64 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1531": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:144.3-147.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 65 ],
+            "Q": [ 66 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1532": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:144.3-147.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 46 ],
+            "CE": [ "1" ],
+            "D": [ 67 ],
+            "Q": [ 68 ],
+            "R": [ "0" ]
+          }
+        },
+        "$iopadmap$slicemem.clk": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 2 ],
+            "O": [ 69 ]
+          }
+        },
+        "$iopadmap$slicemem.led": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 47 ],
+            "O": [ 11 ]
+          }
+        },
+        "$iopadmap$slicemem.led_1": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 48 ],
+            "O": [ 12 ]
+          }
+        },
+        "$iopadmap$slicemem.led_2": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 49 ],
+            "O": [ 13 ]
+          }
+        },
+        "$iopadmap$slicemem.led_3": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 50 ],
+            "O": [ 14 ]
+          }
+        },
+        "$iopadmap$slicemem.led_4": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 52 ],
+            "O": [ 15 ]
+          }
+        },
+        "$iopadmap$slicemem.led_5": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 54 ],
+            "O": [ 16 ]
+          }
+        },
+        "$iopadmap$slicemem.led_6": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 56 ],
+            "O": [ 17 ]
+          }
+        },
+        "$iopadmap$slicemem.led_7": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 57 ],
+            "O": [ 18 ]
+          }
+        },
+        "$iopadmap$slicemem.sw": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 3 ],
+            "O": [ 59 ]
+          }
+        },
+        "$iopadmap$slicemem.sw_1": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 4 ],
+            "O": [ 70 ]
+          }
+        },
+        "$iopadmap$slicemem.sw_2": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 5 ],
+            "O": [ 71 ]
+          }
+        },
+        "$iopadmap$slicemem.sw_3": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 6 ],
+            "O": [ 72 ]
+          }
+        },
+        "$iopadmap$slicemem.sw_4": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 7 ],
+            "O": [ 61 ]
+          }
+        },
+        "$iopadmap$slicemem.sw_5": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 8 ],
+            "O": [ 63 ]
+          }
+        },
+        "$iopadmap$slicemem.sw_6": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 9 ],
+            "O": [ 65 ]
+          }
+        },
+        "$iopadmap$slicemem.sw_7": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 10 ],
+            "O": [ 67 ]
+          }
+        },
+        "u_32": {
+          "hide_name": 0,
+          "type": "RAM32X1S",
+          "parameters": {
+            "INIT": "11011110101011011011111011101111"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:520.5-530.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "A4": "input",
+            "D": "input",
+            "O": "output",
+            "WCLK": "input",
+            "WE": "input"
+          },
+          "connections": {
+            "A0": [ 34 ],
+            "A1": [ 35 ],
+            "A2": [ 38 ],
+            "A3": [ 37 ],
+            "A4": [ 42 ],
+            "D": [ 61 ],
+            "O": [ 51 ],
+            "WCLK": [ 46 ],
+            "WE": [ 70 ]
+          }
+        },
+        "u_a": {
+          "hide_name": 0,
+          "type": "SRL16",
+          "parameters": {
+            "INIT": "0000000011111111"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:547.5-555.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "A0": [ 62 ],
+            "A1": [ 64 ],
+            "A2": [ 66 ],
+            "A3": [ 68 ],
+            "CLK": [ 46 ],
+            "D": [ 67 ],
+            "Q": [ 58 ]
+          }
+        },
+        "u_b": {
+          "hide_name": 0,
+          "type": "BUFG",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:469.8-472.4"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 69 ],
+            "O": [ 46 ]
+          }
+        },
+        "u_c0": {
+          "hide_name": 0,
+          "type": "SRL16E",
+          "parameters": {
+            "INIT": "0000000000000011"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:559.5-568.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CE": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "A0": [ "1" ],
+            "A1": [ "1" ],
+            "A2": [ "1" ],
+            "A3": [ "1" ],
+            "CE": [ 71 ],
+            "CLK": [ 46 ],
+            "D": [ 72 ],
+            "Q": [ 73 ]
+          }
+        },
+        "u_c1": {
+          "hide_name": 0,
+          "type": "SRL16E",
+          "parameters": {
+            "INIT": "0000001100000000"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:572.5-581.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CE": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "A0": [ 60 ],
+            "A1": [ 64 ],
+            "A2": [ 62 ],
+            "A3": [ 66 ],
+            "CE": [ 71 ],
+            "CLK": [ 46 ],
+            "D": [ 73 ],
+            "Q": [ 25 ]
+          }
+        },
+        "u_d": {
+          "hide_name": 0,
+          "type": "RAM16X1D",
+          "parameters": {
+            "INIT": "0000111111110000"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:502.5-516.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "D": "input",
+            "DPO": "output",
+            "DPRA0": "input",
+            "DPRA1": "input",
+            "DPRA2": "input",
+            "DPRA3": "input",
+            "SPO": "output",
+            "WCLK": "input",
+            "WE": "input"
+          },
+          "connections": {
+            "A0": [ 34 ],
+            "A1": [ 35 ],
+            "A2": [ 38 ],
+            "A3": [ 37 ],
+            "D": [ 72 ],
+            "DPO": [ 53 ],
+            "DPRA0": [ 60 ],
+            "DPRA1": [ 62 ],
+            "DPRA2": [ 64 ],
+            "DPRA3": [ 66 ],
+            "SPO": [ 55 ],
+            "WCLK": [ 46 ],
+            "WE": [ 70 ]
+          }
+        },
+        "u_e": {
+          "hide_name": 0,
+          "type": "SRL16E",
+          "parameters": {
+            "INIT": "1000000000000001"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:534.5-543.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CE": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "A0": [ 60 ],
+            "A1": [ 62 ],
+            "A2": [ 64 ],
+            "A3": [ 66 ],
+            "CE": [ 63 ],
+            "CLK": [ 46 ],
+            "D": [ 65 ],
+            "Q": [ 22 ]
+          }
+        },
+        "u_k0": {
+          "hide_name": 0,
+          "type": "SRLC16E",
+          "parameters": {
+            "INIT": "0001000100010001"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:585.5-595.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CE": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output",
+            "Q15": "output"
+          },
+          "connections": {
+            "A0": [ 60 ],
+            "A1": [ 62 ],
+            "A2": [ 64 ],
+            "A3": [ 66 ],
+            "CE": [ 61 ],
+            "CLK": [ 46 ],
+            "D": [ 63 ],
+            "Q": [ 28 ],
+            "Q15": [ 74 ]
+          }
+        },
+        "u_k1": {
+          "hide_name": 0,
+          "type": "SRLC16E",
+          "parameters": {
+            "INIT": "0010001000100010"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:599.5-609.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CE": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output",
+            "Q15": "output"
+          },
+          "connections": {
+            "A0": [ 62 ],
+            "A1": [ 64 ],
+            "A2": [ 66 ],
+            "A3": [ 60 ],
+            "CE": [ 61 ],
+            "CLK": [ 46 ],
+            "D": [ 74 ],
+            "Q": [ 29 ],
+            "Q15": [ 75 ]
+          }
+        },
+        "u_k2": {
+          "hide_name": 0,
+          "type": "SRLC16E",
+          "parameters": {
+            "INIT": "0100010001000100"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:613.5-623.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CE": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output",
+            "Q15": "output"
+          },
+          "connections": {
+            "A0": [ 64 ],
+            "A1": [ 66 ],
+            "A2": [ 60 ],
+            "A3": [ 62 ],
+            "CE": [ 61 ],
+            "CLK": [ 46 ],
+            "D": [ 75 ],
+            "Q": [ 31 ],
+            "Q15": [ 76 ]
+          }
+        },
+        "u_k3": {
+          "hide_name": 0,
+          "type": "SRLC16E",
+          "parameters": {
+            "INIT": "1000100010001000"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:627.5-637.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CE": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output",
+            "Q15": "output"
+          },
+          "connections": {
+            "A0": [ 66 ],
+            "A1": [ 60 ],
+            "A2": [ 62 ],
+            "A3": [ 64 ],
+            "CE": [ 61 ],
+            "CLK": [ 46 ],
+            "D": [ 76 ],
+            "Q": [ 32 ],
+            "Q15": [ 77 ]
+          }
+        },
+        "u_n": {
+          "hide_name": 0,
+          "type": "SRL16E_1",
+          "parameters": {
+            "INIT": "0000111100001111"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:641.5-650.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "CE": "input",
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "A0": [ 35 ],
+            "A1": [ 38 ],
+            "A2": [ 37 ],
+            "A3": [ 42 ],
+            "CE": [ 65 ],
+            "CLK": [ 46 ],
+            "D": [ 59 ],
+            "Q": [ 26 ]
+          }
+        },
+        "u_s0": {
+          "hide_name": 0,
+          "type": "RAM16X1S",
+          "parameters": {
+            "INIT": "0001001000110100"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:476.5-485.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "D": "input",
+            "O": "output",
+            "WCLK": "input",
+            "WE": "input"
+          },
+          "connections": {
+            "A0": [ 34 ],
+            "A1": [ 35 ],
+            "A2": [ 38 ],
+            "A3": [ 37 ],
+            "D": [ 59 ],
+            "O": [ 19 ],
+            "WCLK": [ 46 ],
+            "WE": [ 70 ]
+          }
+        },
+        "u_s1": {
+          "hide_name": 0,
+          "type": "RAM16X1S",
+          "parameters": {
+            "INIT": "1010010110100101"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:489.5-498.4"
+          },
+          "port_directions": {
+            "A0": "input",
+            "A1": "input",
+            "A2": "input",
+            "A3": "input",
+            "D": "input",
+            "O": "output",
+            "WCLK": "input",
+            "WE": "input"
+          },
+          "connections": {
+            "A0": [ 34 ],
+            "A1": [ 35 ],
+            "A2": [ 38 ],
+            "A3": [ 37 ],
+            "D": [ 71 ],
+            "O": [ 20 ],
+            "WCLK": [ 46 ],
+            "WE": [ 70 ]
+          }
+        }
+      },
+      "netnames": {
+        "$$auto$proc_rom.cc:155:do_switch$1192$rdreg[0]$d": {
+          "hide_name": 1,
+          "bits": [ 45, 36, 43, 44, 41, 78 ],
+          "attributes": {
+          }
+        },
+        "$0\\led[7:0]": {
+          "hide_name": 1,
+          "bits": [ 33, 30, 27, 24, 51, 53, 55, 21 ],
+          "attributes": {
+            "src": "slicemem_syn.v:465.3-467.6"
+          }
+        },
+        "$abc$1628$blif$1628$6.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f0": {
+          "hide_name": 1,
+          "bits": [ 39 ],
+          "attributes": {
+            "src": "/share/xilinx/lut_map.v:66.12-66.14"
+          }
+        },
+        "$abc$1628$blif$1628$6.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.genblk1.f1": {
+          "hide_name": 1,
+          "bits": [ 40 ],
+          "attributes": {
+            "src": "/share/xilinx/lut_map.v:66.16-66.18"
+          }
+        },
+        "$iopadmap$clk": {
+          "hide_name": 1,
+          "bits": [ 69 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$led": {
+          "hide_name": 1,
+          "bits": [ 47, 48, 49, 50, 52, 54, 56, 57 ],
+          "attributes": {
+          }
+        },
+        "a": {
+          "hide_name": 0,
+          "bits": [ 34, 35, 38, 37, 42 ],
+          "attributes": {
+            "src": "slicemem_syn.v:8.15-8.16"
+          }
+        },
+        "c0": {
+          "hide_name": 0,
+          "bits": [ 28 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:19.15-19.17"
+          }
+        },
+        "c1": {
+          "hide_name": 0,
+          "bits": [ 29 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:20.15-20.17"
+          }
+        },
+        "c2": {
+          "hide_name": 0,
+          "bits": [ 31 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:21.15-21.17"
+          }
+        },
+        "c3": {
+          "hide_name": 0,
+          "bits": [ 32 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:22.15-22.17"
+          }
+        },
+        "ck": {
+          "hide_name": 0,
+          "bits": [ 46 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:7.15-7.17"
+          }
+        },
+        "clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "slicemem_syn.v:3.14-3.17"
+          }
+        },
+        "dpo": {
+          "hide_name": 0,
+          "bits": [ 53 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:13.15-13.18"
+          }
+        },
+        "k0": {
+          "hide_name": 0,
+          "bits": [ 74 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:23.15-23.17"
+          }
+        },
+        "k1": {
+          "hide_name": 0,
+          "bits": [ 75 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:24.15-24.17"
+          }
+        },
+        "k2": {
+          "hide_name": 0,
+          "bits": [ 76 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:25.15-25.17"
+          }
+        },
+        "led": {
+          "hide_name": 0,
+          "bits": [ 11, 12, 13, 14, 15, 16, 17, 18 ],
+          "attributes": {
+            "src": "slicemem_syn.v:5.22-5.25"
+          }
+        },
+        "q1": {
+          "hide_name": 0,
+          "bits": [ 22 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:15.15-15.17"
+          }
+        },
+        "q2": {
+          "hide_name": 0,
+          "bits": [ 58 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:16.15-16.17"
+          }
+        },
+        "q2f": {
+          "hide_name": 0,
+          "bits": [ 23 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:26.15-26.18"
+          }
+        },
+        "q3": {
+          "hide_name": 0,
+          "bits": [ 73 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:17.15-17.17"
+          }
+        },
+        "q3b": {
+          "hide_name": 0,
+          "bits": [ 25 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:18.15-18.18"
+          }
+        },
+        "qn": {
+          "hide_name": 0,
+          "bits": [ 26 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:27.15-27.17"
+          }
+        },
+        "r": {
+          "hide_name": 0,
+          "bits": [ 60, 62, 64, 66, 68 ],
+          "attributes": {
+            "src": "slicemem_syn.v:9.15-9.16"
+          }
+        },
+        "r32": {
+          "hide_name": 0,
+          "bits": [ 51 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:14.15-14.18"
+          }
+        },
+        "s0": {
+          "hide_name": 0,
+          "bits": [ 19 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:10.15-10.17"
+          }
+        },
+        "s1": {
+          "hide_name": 0,
+          "bits": [ 20 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:11.15-11.17"
+          }
+        },
+        "spo": {
+          "hide_name": 0,
+          "bits": [ 55 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:12.15-12.18"
+          }
+        },
+        "sw": {
+          "hide_name": 0,
+          "bits": [ 3, 4, 5, 6, 7, 8, 9, 10 ],
+          "attributes": {
+            "src": "slicemem_syn.v:4.20-4.22"
+          }
+        },
+        "u_32.a0": {
+          "hide_name": 0,
+          "bits": [ 34 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:50.15-50.23"
+          }
+        },
+        "u_32.a1": {
+          "hide_name": 0,
+          "bits": [ 35 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:51.15-51.23"
+          }
+        },
+        "u_32.a2": {
+          "hide_name": 0,
+          "bits": [ 38 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:52.15-52.23"
+          }
+        },
+        "u_32.a3": {
+          "hide_name": 0,
+          "bits": [ 37 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:53.15-53.23"
+          }
+        },
+        "u_32.a4": {
+          "hide_name": 0,
+          "bits": [ 42 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:54.15-54.23"
+          }
+        },
+        "u_32.d": {
+          "hide_name": 0,
+          "bits": [ 61 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:55.15-55.22"
+          }
+        },
+        "u_32.we": {
+          "hide_name": 0,
+          "bits": [ 70 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:56.15-56.23"
+          }
+        },
+        "u_a.a0": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:63.15-63.22"
+          }
+        },
+        "u_a.a1": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:64.15-64.22"
+          }
+        },
+        "u_a.a2": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:65.15-65.22"
+          }
+        },
+        "u_a.a3": {
+          "hide_name": 0,
+          "bits": [ 68 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:66.15-66.22"
+          }
+        },
+        "u_a.d": {
+          "hide_name": 0,
+          "bits": [ 67 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:67.15-67.21"
+          }
+        },
+        "u_c0.a0": {
+          "hide_name": 0,
+          "bits": [ "1" ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:68.15-68.23"
+          }
+        },
+        "u_c0.a1": {
+          "hide_name": 0,
+          "bits": [ "1" ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:69.15-69.23"
+          }
+        },
+        "u_c0.a2": {
+          "hide_name": 0,
+          "bits": [ "1" ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:70.15-70.23"
+          }
+        },
+        "u_c0.a3": {
+          "hide_name": 0,
+          "bits": [ "1" ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:71.15-71.23"
+          }
+        },
+        "u_c0.ce": {
+          "hide_name": 0,
+          "bits": [ 71 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:72.15-72.23"
+          }
+        },
+        "u_c0.d": {
+          "hide_name": 0,
+          "bits": [ 72 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:73.15-73.22"
+          }
+        },
+        "u_c1.a0": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:74.15-74.23"
+          }
+        },
+        "u_c1.a1": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:75.15-75.23"
+          }
+        },
+        "u_c1.a2": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:76.15-76.23"
+          }
+        },
+        "u_c1.a3": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:77.15-77.23"
+          }
+        },
+        "u_c1.ce": {
+          "hide_name": 0,
+          "bits": [ 71 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:78.15-78.23"
+          }
+        },
+        "u_d.a0": {
+          "hide_name": 0,
+          "bits": [ 34 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:40.15-40.22"
+          }
+        },
+        "u_d.a1": {
+          "hide_name": 0,
+          "bits": [ 35 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:41.15-41.22"
+          }
+        },
+        "u_d.a2": {
+          "hide_name": 0,
+          "bits": [ 38 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:42.15-42.22"
+          }
+        },
+        "u_d.a3": {
+          "hide_name": 0,
+          "bits": [ 37 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:43.15-43.22"
+          }
+        },
+        "u_d.d": {
+          "hide_name": 0,
+          "bits": [ 72 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:48.15-48.21"
+          }
+        },
+        "u_d.dpra0": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:44.15-44.25"
+          }
+        },
+        "u_d.dpra1": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:45.15-45.25"
+          }
+        },
+        "u_d.dpra2": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:46.15-46.25"
+          }
+        },
+        "u_d.dpra3": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:47.15-47.25"
+          }
+        },
+        "u_d.we": {
+          "hide_name": 0,
+          "bits": [ 70 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:49.15-49.22"
+          }
+        },
+        "u_e.a0": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:57.15-57.22"
+          }
+        },
+        "u_e.a1": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:58.15-58.22"
+          }
+        },
+        "u_e.a2": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:59.15-59.22"
+          }
+        },
+        "u_e.a3": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:60.15-60.22"
+          }
+        },
+        "u_e.ce": {
+          "hide_name": 0,
+          "bits": [ 63 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:61.15-61.22"
+          }
+        },
+        "u_e.d": {
+          "hide_name": 0,
+          "bits": [ 65 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:62.15-62.21"
+          }
+        },
+        "u_k0.a0": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:79.15-79.23"
+          }
+        },
+        "u_k0.a1": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:80.15-80.23"
+          }
+        },
+        "u_k0.a2": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:81.15-81.23"
+          }
+        },
+        "u_k0.a3": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:82.15-82.23"
+          }
+        },
+        "u_k0.ce": {
+          "hide_name": 0,
+          "bits": [ 61 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:83.15-83.23"
+          }
+        },
+        "u_k0.d": {
+          "hide_name": 0,
+          "bits": [ 63 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:84.15-84.22"
+          }
+        },
+        "u_k1.a0": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:85.15-85.23"
+          }
+        },
+        "u_k1.a1": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:86.15-86.23"
+          }
+        },
+        "u_k1.a2": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:87.15-87.23"
+          }
+        },
+        "u_k1.a3": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:88.15-88.23"
+          }
+        },
+        "u_k1.ce": {
+          "hide_name": 0,
+          "bits": [ 61 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:89.15-89.23"
+          }
+        },
+        "u_k2.a0": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:90.15-90.23"
+          }
+        },
+        "u_k2.a1": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:91.15-91.23"
+          }
+        },
+        "u_k2.a2": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:92.15-92.23"
+          }
+        },
+        "u_k2.a3": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:93.15-93.23"
+          }
+        },
+        "u_k2.ce": {
+          "hide_name": 0,
+          "bits": [ 61 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:94.15-94.23"
+          }
+        },
+        "u_k3.a0": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:95.15-95.23"
+          }
+        },
+        "u_k3.a1": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:96.15-96.23"
+          }
+        },
+        "u_k3.a2": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:97.15-97.23"
+          }
+        },
+        "u_k3.a3": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:98.15-98.23"
+          }
+        },
+        "u_k3.ce": {
+          "hide_name": 0,
+          "bits": [ 61 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:99.15-99.23"
+          }
+        },
+        "u_k3.q15": {
+          "hide_name": 0,
+          "bits": [ 77 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:100.15-100.24"
+          }
+        },
+        "u_n.a0": {
+          "hide_name": 0,
+          "bits": [ 35 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:101.15-101.22"
+          }
+        },
+        "u_n.a1": {
+          "hide_name": 0,
+          "bits": [ 38 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:102.15-102.22"
+          }
+        },
+        "u_n.a2": {
+          "hide_name": 0,
+          "bits": [ 37 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:103.15-103.22"
+          }
+        },
+        "u_n.a3": {
+          "hide_name": 0,
+          "bits": [ 42 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:104.15-104.22"
+          }
+        },
+        "u_n.ce": {
+          "hide_name": 0,
+          "bits": [ 65 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:105.15-105.22"
+          }
+        },
+        "u_n.d": {
+          "hide_name": 0,
+          "bits": [ 59 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:106.15-106.21"
+          }
+        },
+        "u_s0.a0": {
+          "hide_name": 0,
+          "bits": [ 34 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:28.15-28.23"
+          }
+        },
+        "u_s0.a1": {
+          "hide_name": 0,
+          "bits": [ 35 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:29.15-29.23"
+          }
+        },
+        "u_s0.a2": {
+          "hide_name": 0,
+          "bits": [ 38 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:30.15-30.23"
+          }
+        },
+        "u_s0.a3": {
+          "hide_name": 0,
+          "bits": [ 37 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:31.15-31.23"
+          }
+        },
+        "u_s0.d": {
+          "hide_name": 0,
+          "bits": [ 59 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:32.15-32.22"
+          }
+        },
+        "u_s0.we": {
+          "hide_name": 0,
+          "bits": [ 70 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:33.15-33.23"
+          }
+        },
+        "u_s1.a0": {
+          "hide_name": 0,
+          "bits": [ 34 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:34.15-34.23"
+          }
+        },
+        "u_s1.a1": {
+          "hide_name": 0,
+          "bits": [ 35 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:35.15-35.23"
+          }
+        },
+        "u_s1.a2": {
+          "hide_name": 0,
+          "bits": [ 38 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:36.15-36.23"
+          }
+        },
+        "u_s1.a3": {
+          "hide_name": 0,
+          "bits": [ 37 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:37.15-37.23"
+          }
+        },
+        "u_s1.d": {
+          "hide_name": 0,
+          "bits": [ 71 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:38.15-38.22"
+          }
+        },
+        "u_s1.we": {
+          "hide_name": 0,
+          "bits": [ 70 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "slicemem_syn.v:39.15-39.23"
+          }
+        }
+      }
+    }
+  }
+}
