@@ -126,3 +126,12 @@ test('timingExport: each PIP the class of the node it drives, Silinx\'s delays',
   assert.equal(timing.slice.Tilo, 0.704);
   assert.deepEqual(timing.lutPin, [0.06, 0, -0.06, -0.05]);
 });
+
+test('the scripts the README and the usage lines name exist, from the repository\'s root (#2120)', () => {
+  const dir = new URL('../research/nextpnr-s3e/', import.meta.url), root = new URL('../../../', import.meta.url);
+  const texts = fs.readdirSync(dir).filter(f => /\.(md|mjs)$/.test(f)).map(f => [f, fs.readFileSync(new URL(f, dir), 'utf8')]);
+  const named = [];
+  for (const [f, text] of texts) for (const m of text.matchAll(/^(?:\/\/\s+)?node (\S+\.mjs)\b/gm)) named.push([f, m[1]]);
+  assert.ok(named.length >= 13);
+  for (const [f, script] of named) assert.ok(fs.existsSync(new URL(script, root)), `${f} names ${script}, which does not exist`);
+});

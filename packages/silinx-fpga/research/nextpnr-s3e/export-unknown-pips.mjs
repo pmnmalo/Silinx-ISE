@@ -1,6 +1,6 @@
 // The PIPs nextpnr must not use (#1954): those whose bits Silinx's bit database does not know (lib.mjs
 // unknownPips), per tile, for the chip database's generator (s3e_gen.py --unknown-pips).
-//   node research/nextpnr-s3e/export-unknown-pips.mjs <part> out.json
+//   node packages/silinx-fpga/research/nextpnr-s3e/export-unknown-pips.mjs <part> out.json
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';
 import { loadDb } from '../../src/fpga/bitdb-node.js';

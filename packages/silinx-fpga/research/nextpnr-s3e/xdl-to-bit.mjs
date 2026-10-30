@@ -1,5 +1,5 @@
 // A routed XDL design to its .bit with Silinx's bitgen (#1954: nextpnr's result, converted by nextpnr-to-xdl.mjs).
-//   node research/nextpnr-s3e/xdl-to-bit.mjs routed.xdl out.bit
+//   node packages/silinx-fpga/research/nextpnr-s3e/xdl-to-bit.mjs routed.xdl out.bit
 import fs from 'node:fs';
 import { parseXdl } from '../../src/xdl.js';
 import { bitgen } from '../../src/fpga/bitgen.js';

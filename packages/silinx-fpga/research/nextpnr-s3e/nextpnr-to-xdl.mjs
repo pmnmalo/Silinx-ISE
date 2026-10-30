@@ -1,6 +1,6 @@
 // nextpnr-himbaechel's routed design (spartan3e micro-architecture, #1954) to XDL, so that Silinx's bitgen writes
 // its .bit and ISE checks it (xdl -xdl2ncd, drc): lib.mjs nextpnrToXdl.
-//   node research/nextpnr-s3e/nextpnr-to-xdl.mjs routed.json out.xdl [part]
+//   node packages/silinx-fpga/research/nextpnr-s3e/nextpnr-to-xdl.mjs routed.json out.xdl [part]
 // routed.json: nextpnr's --write. The spike's cells only: LUT4, FF, IOB, BUFGMUX.
 import fs from 'node:fs';
 import { loadDeviceCache } from '../../src/fpga/device-node.js';

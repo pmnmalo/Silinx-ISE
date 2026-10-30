@@ -32,15 +32,15 @@ cmake -S . -B build-s3e -DARCH=himbaechel -DHIMBAECHEL_UARCH=spartan3e -DBUILD_P
 cmake --build build-s3e -j6
 
 # in Silinx
-node research/nextpnr-s3e/export-unknown-pips.mjs xc3s250ecp132-4 <dir>/unknown-pips-xc3s250e.json
-node research/nextpnr-s3e/export-timing.mjs xc3s250ecp132-4 <dir>/timing-xc3s250e.json
+node packages/silinx-fpga/research/nextpnr-s3e/export-unknown-pips.mjs xc3s250ecp132-4 <dir>/unknown-pips-xc3s250e.json
+node packages/silinx-fpga/research/nextpnr-s3e/export-timing.mjs xc3s250ecp132-4 <dir>/timing-xc3s250e.json
 yosys -p "read_verilog blink.v; synth_xilinx -family xc3se -nocarry -nowidelut -top blink; write_json blink.json"
 nextpnr-himbaechel --device xc3s250ecp132-4 --json blink.json --write routed.json
-node research/nextpnr-s3e/nextpnr-to-xdl.mjs routed.json routed.xdl
-node research/s3e-route/check.mjs routed.xdl
-node research/nextpnr-s3e/xdl-sim-check.mjs routed.json routed.xdl 1000 --starts 2000
-node research/nextpnr-s3e/xdl-report.mjs routed.xdl
-node research/nextpnr-s3e/xdl-to-bit.mjs routed.xdl blink.bit
+node packages/silinx-fpga/research/nextpnr-s3e/nextpnr-to-xdl.mjs routed.json routed.xdl
+node packages/silinx-fpga/research/s3e-route/check.mjs routed.xdl
+node packages/silinx-fpga/research/nextpnr-s3e/xdl-sim-check.mjs routed.json routed.xdl 1000 --starts 2000
+node packages/silinx-fpga/research/nextpnr-s3e/xdl-report.mjs routed.xdl
+node packages/silinx-fpga/research/nextpnr-s3e/xdl-to-bit.mjs routed.xdl blink.bit
 ```
 
 `blink.v` (in this folder): a 24-bit counter on the 50 MHz clock, its top byte on the LEDs, the ports'
