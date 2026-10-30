@@ -500,6 +500,12 @@ export function initTasks(a) {
     setTask('edit');
     app.showLeftPage('design');
   });
+  // a project closed: Design's side panel shown, the Start page in it, even when it was left folded (#2169)
+  addEventListener('silinx:project-closed', () => {
+    if (!on()) return;
+    setTask('edit');
+    arrange({ [sideKey()]: true });
+  });
   // the documents: opened, closed, brought to the front
   new MutationObserver(followActive).observe($('doc-tabs'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
   new MutationObserver(refreshDots).observe($('procs'), { childList: true, subtree: true });

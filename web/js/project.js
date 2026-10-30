@@ -136,6 +136,7 @@ async function closeProjectNow() {
   try { localStorage.removeItem(prefKey('silinx.lastProject')); } catch { /* ignore */ }
   updateTitle(); renderHierarchy(); renderProcesses(); renderFilesPage(); renderLibsPage();
   showLeftPage('start');
+  dispatchEvent(new CustomEvent('silinx:project-closed'));
 }
 
 export function updateTitle() {

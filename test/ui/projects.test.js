@@ -837,3 +837,19 @@ uiTest('#1162 the Processes panel after opening another project: not the last pr
   const procs = await page.eval(() => ({ caption: document.getElementById('proc-caption').textContent, rows: [...document.querySelectorAll('#procs .lbl')].map((e) => e.textContent), states: document.querySelectorAll('#procs .status svg').length }));
   assert.deepEqual(procs, { caption: 'Processes: ', rows: ['Design Summary/Reports'], states: 0 });
 });
+
+// #2169: Close Project shows the side panel with the Start page, also when it was left folded (the modern interface's)
+uiTest('#2169 Close Project: the side panel shown again, its Start page', E, async (page) => {
+  await makeProject(E(), { name: 'CloseSide', template: 'gates' });
+  await page.openProject('CloseSide');
+  const startShown = () => page.eval(() => { const e = document.querySelector('.left-page[data-page="start"]'); return !!e && !e.hidden && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0; });
+  const modern = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
+  if (modern) {
+    await page.click('#task-view [data-act="side"]');
+    assert.equal(await page.eval(() => document.documentElement.dataset.side), 'folded');
+  }
+  await page.menu('File', 'Close Project');
+  await page.waitFor(() => !window.Silinx.project, [], { what: 'the project closed' });
+  assert.equal(await startShown(), true);
+  if (modern) assert.deepEqual(await page.eval(() => [document.documentElement.dataset.task, document.documentElement.dataset.side]), ['edit', 'open']);
+});
