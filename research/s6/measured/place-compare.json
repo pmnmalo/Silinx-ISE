@@ -92,16 +92,16 @@
      "slices": 113
     },
     "silinx": {
-     "wirelength": 2541.5,
+     "wirelength": 2551.6,
      "wirelengths": [
-      2547.1,
-      2891.5,
-      2541.5
+      2943.5,
+      2895,
+      2551.6
      ],
-     "connections": 732,
-     "perConnection": 3.47,
+     "connections": 721,
+     "perConnection": 3.54,
      "slices": 84,
-     "delay": 9.08
+     "delay": 8.66
     }
    },
    "clock": {
@@ -174,16 +174,16 @@
      "slices": 49
     },
     "silinx": {
-     "wirelength": 1346.9,
+     "wirelength": 1558,
      "wirelengths": [
-      1457.6,
-      1346.9,
-      1458.2
+      1558,
+      1783.9,
+      1985.1
      ],
      "connections": 249,
-     "perConnection": 5.41,
+     "perConnection": 6.26,
      "slices": 34,
-     "delay": 6.57
+     "delay": 6.59
     }
    },
    "blinky": {
@@ -194,16 +194,16 @@
      "slices": 51
     },
     "silinx": {
-     "wirelength": 2392.4,
+     "wirelength": 2218.7,
      "wirelengths": [
-      2515.1,
-      2392.4,
-      2439.9
+      2288.9,
+      2218.7,
+      2320.6
      ],
      "connections": 372,
-     "perConnection": 6.43,
+     "perConnection": 5.96,
      "slices": 54,
-     "delay": 4.8
+     "delay": 4.54
     }
    },
    "pong": {
@@ -214,16 +214,16 @@
      "slices": 141
     },
     "silinx": {
-     "wirelength": 3517.7,
+     "wirelength": 3532.6,
      "wirelengths": [
-      3517.7,
-      3819.8,
-      3976.4
+      3532.6,
+      3690.6,
+      4210.7
      ],
      "connections": 831,
-     "perConnection": 4.23,
+     "perConnection": 4.25,
      "slices": 117,
-     "delay": 10.79
+     "delay": 10.27
     }
    },
    "stopwatch": {
@@ -234,16 +234,16 @@
      "slices": 113
     },
     "silinx": {
-     "wirelength": 3352.7,
+     "wirelength": 3280,
      "wirelengths": [
-      3680,
-      3352.7,
-      3788.9
+      3280,
+      3331,
+      3629.8
      ],
-     "connections": 732,
-     "perConnection": 4.58,
+     "connections": 721,
+     "perConnection": 4.55,
      "slices": 84,
-     "delay": 10.16
+     "delay": 9.08
     }
    },
    "clock": {
@@ -254,14 +254,14 @@
      "slices": 116
     },
     "silinx": {
-     "wirelength": 3101.7,
+     "wirelength": 2713,
      "wirelengths": [
-      3369.7,
-      3363.1,
-      3101.7
+      2713,
+      2935.9,
+      3023.7
      ],
      "connections": 596,
-     "perConnection": 5.2,
+     "perConnection": 4.55,
      "slices": 87,
      "delay": 6.16
     }
@@ -274,16 +274,16 @@
      "slices": 60
     },
     "silinx": {
-     "wirelength": 1475.7,
+     "wirelength": 1465,
      "wirelengths": [
-      1475.7,
-      1516.7,
-      1565.7
+      1584.6,
+      1465,
+      1612.4
      ],
      "connections": 439,
-     "perConnection": 3.36,
+     "perConnection": 3.34,
      "slices": 52,
-     "delay": 5.38
+     "delay": 5.31
     }
    }
   }

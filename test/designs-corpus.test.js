@@ -204,6 +204,8 @@ test('flaggedSynth: synth_xilinx options on every step, all the files the script
   const { yosysNode } = await import('../packages/silinx-fpga/src/synth-open-node.js');
   const { toVerilog } = await import('../core/synth-verilog.js');
   const { cellCounts, SRL_MAP_FILE, SRL_CELLS_FILE } = await import('../packages/silinx-fpga/src/synth-open.js');
+  // (the Spartan-6's block-RAM rule given to every run, read by the Spartan-6's alone, #2130)
+  const { BRAMS_S6_FILE } = await import('../packages/silinx-fpga/src/synth-brams-s6.js');
   // an 8-bit shift register and a 16x4 memory
   const V = `module shmem(input clk, input d, input we, input [3:0] a, input [3:0] wd, output q, output [3:0] rd);
   reg [7:0] sh; reg [3:0] mem [0:15];
@@ -218,12 +220,12 @@ endmodule
   assert.deepEqual(no.args.slice(0, 2), ['-q', '-p']);
   assert.equal(script.match(/synth_xilinx /g).length, script.match(/synth_xilinx -nobram -nolutram -nosrl -family xc3se /g).length);
   assert.doesNotMatch(script, /xilinx_srl|silinx_srl/);
-  assert.deepEqual(Object.keys(no.files).sort(), [SRL_CELLS_FILE, SRL_MAP_FILE, 'shmem_syn.v'].sort());
+  assert.deepEqual(Object.keys(no.files).sort(), [SRL_CELLS_FILE, SRL_MAP_FILE, BRAMS_S6_FILE, 'shmem_syn.v'].sort());
   // without -nosrl: the script reads the SRL cells, which Yosys did not find before (#62)
   const keep = flaggedSynth(top, text, '-nobram');
   assert.match(keep.args[2], new RegExp(`read_verilog -lib ${SRL_CELLS_FILE}`));
   assert.equal(keep.args[2].match(/synth_xilinx /g).length, keep.args[2].match(/synth_xilinx -nobram -family xc3se /g).length);
-  assert.deepEqual(Object.keys(keep.files).sort(), [SRL_CELLS_FILE, SRL_MAP_FILE, 'shmem_syn.v'].sort());
+  assert.deepEqual(Object.keys(keep.files).sort(), [SRL_CELLS_FILE, SRL_MAP_FILE, BRAMS_S6_FILE, 'shmem_syn.v'].sort());
   // both run in Yosys; the only warning is the one Yosys prints on every Spartan-3E run
   const run = async ({ args, files }) => {
     const lines = [];

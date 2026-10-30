@@ -42,8 +42,9 @@ test('the Spartan-6 models: no variable or signal has the name of one of the ent
 });
 
 // designs Yosys maps onto each primitive: { name, v (Verilog of module m), cells: { type: count } of the netlist, warnings:
-// the synthesis's (none by default) }. Yosys's mapping onto RAMB8BWER (brams_xc3sda_map.v) connects its ports with the
-// widths of RAMB16BWER's and Yosys resizes them: no warning of the design (synth-open.js QUIET, #2045).
+// the synthesis's (none by default) }. Yosys's mapping onto the block RAM (brams_xc3sda_map.v) connects its ports with
+// 64 data bits and Yosys resizes them: no warning of the design (synth-open.js QUIET, #2045). A memory that fits half a
+// block RAM takes a whole RAMB16BWER too, not a RAMB8BWER, whose initial contents ISE says may be wrong (#2130).
 const DESIGNS = [
   { name: 'counter', cells: { CARRY4: 6 }, v: 'module m(input clk, input rst, input [15:0] d, output reg [15:0] q, output lt); always @(posedge clk) if (rst) q <= 0; else q <= q + d; assign lt = q < d; endmodule' },
   { name: 'shift register', cells: { SRLC32E: 3, SRL16E: 1 }, v: 'module m(input clk, input ce, input d, output q, output q2); reg [99:0] s; always @(posedge clk) if (ce) s <= {s[98:0], d}; assign q = s[99]; assign q2 = s[20]; endmodule' },
@@ -60,10 +61,10 @@ const DESIGNS = [
   { name: 'block RAM 512 x 32, byte write enables', cells: { RAMB16BWER: 1 }, v: 'module m(input clk, input [3:0] we, input [8:0] a, input [31:0] d, output reg [31:0] q); reg [31:0] mem [0:511]; always @(posedge clk) begin if (we[0]) mem[a][7:0] <= d[7:0]; if (we[1]) mem[a][15:8] <= d[15:8]; if (we[2]) mem[a][23:16] <= d[23:16]; if (we[3]) mem[a][31:24] <= d[31:24]; q <= mem[a]; end endmodule' },
   { name: 'block RAM 2048 x 9, two write ports', cells: { RAMB16BWER: 1 }, sim: { distinct: [{ a: 'a', b: 'b', mask: 2047 }] },
     v: 'module m(input clk, input wea, input web, input [10:0] a, input [10:0] b, input [8:0] da, input [8:0] db, output reg [8:0] qa, output reg [8:0] qb); reg [8:0] mem [0:2047]; always @(posedge clk) begin if (wea) mem[a] <= da; qa <= mem[a]; end always @(posedge clk) begin if (web) mem[b] <= db; qb <= mem[b]; end endmodule' },
-  { name: 'block RAM 512 x 16, two ports', cells: { RAMB8BWER: 1 }, v: 'module m(input clk, input we, input [8:0] a, input [8:0] b, input [15:0] d, output reg [15:0] q); reg [15:0] mem [0:511]; always @(posedge clk) begin if (we) mem[a] <= d; q <= mem[b]; end endmodule' },
-  { name: 'block RAM 256 x 36 (SDP)', cells: { RAMB8BWER: 1 }, v: 'module m(input clk, input we, input [7:0] a, input [7:0] b, input [35:0] d, output reg [35:0] q); reg [35:0] mem [0:255]; always @(posedge clk) begin if (we) mem[a] <= d; q <= mem[b]; end endmodule' },
-  { name: 'block RAM 512 x 16, its output reset', cells: { RAMB8BWER: 1 }, v: "module m(input clk, input rst, input we, input [8:0] a, input [15:0] d, output reg [15:0] q); reg [15:0] mem [0:511]; always @(posedge clk) begin if (we) mem[a] <= d; if (rst) q <= 16'h1234; else q <= mem[a]; end endmodule" },
-  { name: 'block ROM 1024 x 8', cells: { RAMB8BWER: 1 }, v: 'module m(input clk, input [9:0] a, output reg [7:0] q); reg [7:0] mem [0:1023]; integer i; initial for (i = 0; i < 1024; i = i + 1) mem[i] = i * 7; always @(posedge clk) q <= mem[a]; endmodule' },
+  { name: 'block RAM 512 x 16, two ports', cells: { RAMB16BWER: 1 }, v: 'module m(input clk, input we, input [8:0] a, input [8:0] b, input [15:0] d, output reg [15:0] q); reg [15:0] mem [0:511]; always @(posedge clk) begin if (we) mem[a] <= d; q <= mem[b]; end endmodule' },
+  { name: 'block RAM 256 x 36 (SDP)', cells: { RAMB16BWER: 1 }, v: 'module m(input clk, input we, input [7:0] a, input [7:0] b, input [35:0] d, output reg [35:0] q); reg [35:0] mem [0:255]; always @(posedge clk) begin if (we) mem[a] <= d; q <= mem[b]; end endmodule' },
+  { name: 'block RAM 512 x 16, its output reset', cells: { RAMB16BWER: 1 }, v: "module m(input clk, input rst, input we, input [8:0] a, input [15:0] d, output reg [15:0] q); reg [15:0] mem [0:511]; always @(posedge clk) begin if (we) mem[a] <= d; if (rst) q <= 16'h1234; else q <= mem[a]; end endmodule" },
+  { name: 'block ROM 2048 x 8', cells: { RAMB16BWER: 1 }, v: 'module m(input clk, input [10:0] a, output reg [7:0] q); reg [7:0] mem [0:2047]; integer i; initial for (i = 0; i < 2048; i = i + 1) mem[i] = i * 7; always @(posedge clk) q <= mem[a]; endmodule' },
   { name: 'multiplier 18 x 18', cells: { DSP48A1: 1 }, v: 'module m(input clk, input signed [17:0] a, input signed [17:0] b, output signed [35:0] p); assign p = a * b; endmodule' },
   { name: 'multiplier, its inputs and product registered', cells: { DSP48A1: 1 }, v: 'module m(input clk, input signed [17:0] a, input signed [17:0] b, output reg signed [35:0] p); reg signed [17:0] ra, rb; always @(posedge clk) begin ra <= a; rb <= b; p <= ra * rb; end endmodule' },
   { name: 'multiply-accumulate', cells: { DSP48A1: 1 }, v: 'module m(input clk, input rst, input signed [17:0] a, input signed [17:0] b, output reg signed [47:0] acc); always @(posedge clk) if (rst) acc <= 0; else acc <= acc + a * b; endmodule' },
