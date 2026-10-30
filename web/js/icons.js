@@ -31,7 +31,8 @@ export const icons = {
   asm: S('<rect x="4" y="1" width="8" height="4" fill="#fff8d0" stroke="#806000"/><path d="M8 5v2" stroke="#806000"/><path d="M8 7l4 2.5-4 2.5-4-2.5z" fill="#e0f0ff" stroke="#004080"/><path d="M8 12v3" stroke="#806000"/>'),
   petri: S('<circle cx="3.5" cy="8" r="2.6" fill="#e8f0ff" stroke="#004080"/><circle cx="3.5" cy="8" r=".9" fill="#004080"/><rect x="7.4" y="3" width="1.6" height="10" fill="#004080"/><circle cx="12.5" cy="8" r="2.6" fill="#e8f0ff" stroke="#004080"/><path d="M6.2 8h1.1M9.1 8h.9" stroke="#806000"/>'),
   fsm: S('<circle cx="4" cy="11" r="3" fill="#e8f0ff" stroke="#004080"/><circle cx="12" cy="5" r="3" fill="#e8f0ff" stroke="#004080"/><circle cx="12" cy="5" r="1.7" fill="none" stroke="#004080" stroke-width=".7"/><path d="M5.5 8.6Q6.5 5.5 9 5" fill="none" stroke="#806000"/><path d="M8.2 4.2l1 .8-1.1.7" fill="none" stroke="#806000"/>'),
-  truthtable: S('<rect x="1.5" y="1.5" width="13" height="13" fill="#fff" stroke="#556"/><path d="M1.5 5h13M6 1.5v13M10.5 1.5v13M1.5 8.5h13M1.5 12h13" stroke="#8aa0c8" stroke-width=".8"/><rect x="6" y="5" width="8.5" height="3.5" rx="1.5" fill="none" stroke="#d62728" stroke-width="1.2"/>'),
+  // the Boolean Algebra source (#2105): an expression with a bar, Ā·B, on paper (drawn, not <text>: a row's textContent stays its label)
+  algebra: S('<rect x="1.5" y="1.5" width="13" height="13" fill="#fff" stroke="#556"/><path d="M3.2 4.3h3.6" stroke="#d62728" stroke-width="1.2"/><path d="M3 12.2L5 5.8l2 6.4M3.7 10h2.6M9.6 5.8v6.4h2.1a1.6 1.6 0 000-3.2H9.6h1.8a1.6 1.6 0 000-3.2z" fill="none" stroke="#000080" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8.3" cy="9.2" r=".7" fill="#000080"/>'),
   file: S('<path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#556"/><path d="M10 1.5v3h3" fill="none" stroke="#556"/>'),
   folder: S('<path d="M1.5 3.5h5l1 1.5h7v9h-13z" fill="#f4d27a" stroke="#b48a2c"/>'),
   ok: S('<circle cx="8" cy="8" r="6.5" fill="#2da12d" stroke="#176b17"/><path d="M4.8 8.2l2.2 2.2 4.3-4.6" fill="none" stroke="#fff" stroke-width="1.8"/>'),
@@ -79,6 +80,7 @@ export const icons = {
   mStop: L('<rect x="6" y="6" width="12" height="12" rx="1.5"/>'),
   mPanel: L('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>'),
 };
+icons.truthtable = icons.algebra;   // the old id (#2105)
 
 export function icon(name) {
   const span = document.createElement('span');

@@ -81,7 +81,7 @@ const EXAMPLES = {
       '    moduleTop top [VHDL*] (top.vhd)',
       '      fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
       '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
-      '      truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
+      '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
       '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
     ],
     sim: [
@@ -91,7 +91,7 @@ const EXAMPLES = {
       '      vhdl uut - top [VHDL*] (top.vhd)',
       '        fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
       '        vhdl u_timer - timer [VHDL*] (timer.vhd)',
-      '        truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
+      '        algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
       '        verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
     ],
     tips: [
@@ -283,7 +283,7 @@ const KINDS = [
   { type: 'sch', name: 'g1', file: 'src/g1.sch.json', ico: 'schematic', badge: 'Schematic', id: 'sch:src/g1.sch.json' },
   { type: 'asm', name: 'c1', file: 'src/c1.asm.json', ico: 'asm', badge: 'ASM', id: 'asm:src/c1.asm.json' },
   { type: 'fsm', name: 'f1', file: 'src/f1.fsm.json', ico: 'fsm', badge: 'FSM', id: 'fsm:src/f1.fsm.json' },
-  { type: 'tt', name: 't1', file: 'src/t1.bool.json', ico: 'truthtable', badge: 'Algebra', views: ' [Schematic]', id: 'tt:src/t1.bool.json' },
+  { type: 'tt', name: 't1', file: 'src/t1.bool.json', ico: 'algebra', badge: 'Algebra', views: ' [Schematic]', id: 'tt:src/t1.bool.json' },
   { type: 'petri', name: 'p1', file: 'src/p1.pn.json', ico: 'petri', badge: 'Petri', id: 'pn:src/p1.pn.json' },
 ];
 for (const [lang, L, ext] of [['vhdl', 'VHDL', 'vhd'], ['verilog', 'Verilog', 'v']]) {
@@ -486,7 +486,7 @@ end architecture rtl;
     '    moduleTop top [VHDL*] (top.vhd)',
     '      vhdl u_fsm - traffic [VHDL*] (traffic.vhd)',
     '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
-    '      truthtable u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
+    '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
     '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
   ]);
 }, { ui: 'classic' });

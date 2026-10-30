@@ -73,8 +73,8 @@ uiTest('Design Properties, Preferred Language Verilog: the state diagram and the
   assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) select[title="HDL language"]').value), 'verilog', 'the open editor in Verilog');
   // the Design pane: the drawings' HDL badge [Verilog], last; the HDL modules as they were
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => r.querySelector('.lbl').textContent.endsWith('traffic') && [...r.querySelectorAll('.badge')].some((b) => b.textContent === 'Verilog')), [], { what: 'the row of traffic with [Verilog]' });
-  assert.deepEqual(await rows(page), before.map((r) => (/^(fsm|truthtable) /.test(r) ? r.replace('[VHDL]', '[Verilog]') : r)));
-  assert.ok(before.some((r) => /^fsm .*\[FSM\*\] \[VHDL\]/.test(r)) && before.some((r) => /^truthtable .*\[VHDL\]/.test(r)), before.join('\n'));
+  assert.deepEqual(await rows(page), before.map((r) => (/^(fsm|algebra) /.test(r) ? r.replace('[VHDL]', '[Verilog]') : r)));
+  assert.ok(before.some((r) => /^fsm .*\[FSM\*\] \[VHDL\]/.test(r)) && before.some((r) => /^algebra .*\[VHDL\]/.test(r)), before.join('\n'));
   // the editor's model in Verilog, linked to the Verilog file (its next edit keeps them)
   assert.deepEqual(await page.eval(() => { const m = window.Silinx.docs.find((d) => d.fsmEditor).fsmEditor.getModel(); return [m.lang, m.generatedFile]; }), ['verilog', 'src/traffic.v']);
 
@@ -85,7 +85,7 @@ uiTest('Design Properties, Preferred Language Verilog: the state diagram and the
   assert.deepEqual(await state(page), was);
   assert.deepEqual(['src/traffic.v', 'src/lamps.v'].map((f) => exists('PrefLang', f)), [false, false], 'the Verilog files removed');
   for (const f of ['src/traffic.vhd', 'src/lamps.vhd']) assert.equal(await readWs(env, 'PrefLang', f), shipped(f), f);
-  await page.waitFor((n) => document.querySelectorAll('#hier .row').length === n && ![...document.querySelectorAll('#hier .badge')].some((b) => b.textContent === 'Verilog' && /fsm|truthtable/.test(b.closest('.row').querySelector('.ico')?.dataset.ico)), [before.length], { what: 'the Design pane in VHDL' });
+  await page.waitFor((n) => document.querySelectorAll('#hier .row').length === n && ![...document.querySelectorAll('#hier .badge')].some((b) => b.textContent === 'Verilog' && /fsm|algebra/.test(b.closest('.row').querySelector('.ico')?.dataset.ico)), [before.length], { what: 'the Design pane in VHDL' });
   assert.deepEqual(await rows(page), before);
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });

@@ -73,7 +73,7 @@ function selectionProcesses(sel, view) {
   if (sel.type === 'asm') return [{ id: 'asm-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.file) }];
   if (sel.type === 'pn') return [{ id: 'pn-open', label: 'View/Edit Petri Net', ico: 'petri', run: () => openPetri(sel.file) }];
   if (sel.type === 'fsm') return [{ id: 'fsm-open', label: 'View/Edit State Diagram (FSM)', ico: 'fsm', run: () => openFsm(sel.file) }];
-  if (sel.type === 'tt') return [{ id: 'tt-open', label: 'View/Edit Boolean Algebra', ico: 'truthtable', run: () => openTt(sel.file) }];
+  if (sel.type === 'tt') return [{ id: 'tt-open', label: 'View/Edit Boolean Algebra', ico: 'algebra', run: () => openTt(sel.file) }];
   if (sel.type === 'sch') return [{ id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.file) }];
   if (sel.type === 'ucf') return [
     { id: 'ucf-edit', label: 'Edit Constraints (Text)', ico: 'ucf', run: () => openFile(sel.file) },
@@ -102,7 +102,7 @@ function selectionProcesses(sel, view) {
     ...cp,
     ...(sel.sch ? [
       isAsm(sel.sch) ? { id: 'sch-open', label: 'View/Edit State Diagram (ASM)', ico: 'asm', run: () => openAsm(sel.sch) }
-        : isTt(sel.sch) ? { id: 'sch-open', label: 'View/Edit Boolean Algebra', ico: 'truthtable', run: () => openTt(sel.sch) }
+        : isTt(sel.sch) ? { id: 'sch-open', label: 'View/Edit Boolean Algebra', ico: 'algebra', run: () => openTt(sel.sch) }
         : isFsm(sel.sch) ? { id: 'sch-open', label: 'View/Edit State Diagram (FSM)', ico: 'fsm', run: () => openFsm(sel.sch) }
         : isPn(sel.sch) ? { id: 'sch-open', label: 'View/Edit Petri Net', ico: 'petri', run: () => openPetri(sel.sch) }
                      : { id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.sch) },
