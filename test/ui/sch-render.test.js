@@ -21,7 +21,7 @@ const MOUNT = async () => {
   const svg = document.createElementNS(NS, 'svg');
   svg.innerHTML = '<g class="se-sheet"></g><g class="se-content"></g><g class="se-overlay"></g>';
   const tb = document.createElement('div'), status = document.createElement('div');
-  tb.innerHTML = ['select', 'wire', 'net', 'io', 'place', 'sim', 'undo', 'redo', 'delete', 'rotate', 'mirror', 'info'].map((a) => `<button data-act="${a}"></button>`).join('');
+  tb.innerHTML = ['select', 'wire', 'net', 'io', 'place', 'sim', 'undo', 'redo', 'delete', 'rotate', 'mirror', 'mirrorv'].map((a) => `<button data-act="${a}"></button>`).join('');
   document.body.append(svg, tb, status);
   const inv = { id: 'S1', type: 'inv', name: 'U1', x: 200, y: 100 };
   const [I, O] = symbolPins(normalizeDoc({ symbols: [inv] }).symbols[0]);
@@ -36,10 +36,10 @@ const MOUNT = async () => {
   const undoStack = [], redoStack = ['x'];
   // (curved wires, #1144: the editor's, on this state)
   const curve = mountSchCurve({ doc: () => st.doc, sel: () => st.sel, view: () => st.view, readOnly: false, edit: (fn) => fn(), render: () => {}, renderProps: () => {}, snapshot: () => '', pushUndo: () => {}, changed: () => {} });
-  const r = mountRender({ curve, state: () => st, refreshNetlist: () => { st.nl = netlist(st.doc); }, uidE: 7, readOnly: false,
+  const r = mountRender({ curve, segSel: { current: () => null }, state: () => st, refreshNetlist: () => { st.nl = netlist(st.doc); }, uidE: 7, readOnly: false,
     sheetG: svg.querySelector('.se-sheet'), contentG: svg.querySelector('.se-content'), overlayG: svg.querySelector('.se-overlay'), tb, status,
     undoStack, redoStack, routeTo: (a, b) => [{ x: b.x, y: a.y }, b], snapPoint: (p) => ({ x: Math.round(p.x / 10) * 10, y: Math.round(p.y / 10) * 10 }),
-    bandRect: () => ({ x: 10, y: 20, w: 30, h: 40 }), infoTarget: () => (st.sel.size ? 'x' : null) });
+    bandRect: () => ({ x: 10, y: 20, w: 30, h: 40 }) });
   const q = (s) => [...svg.querySelectorAll(s)];
   const off = (a) => tb.querySelector(`[data-act="${a}"]`).disabled;
   const on = () => [...tb.querySelectorAll('.on')].map((b) => b.dataset.act);
@@ -59,12 +59,12 @@ uiTest('#405 schematic drawing: the sheet, the wires, symbols, markers and names
     o.ports = q('.se-content g[data-kind=port] .ioname').map((t) => t.textContent);
     o.labels = q('.se-content g[data-kind=label] text').map((t) => t.textContent);
     o.nc = q('.se-content .nc').length;
-    o.toolbar = [on(), off('undo'), off('redo'), off('delete'), off('rotate'), off('info')];
+    o.toolbar = [on(), off('undo'), off('redo'), off('delete'), off('rotate'), off('mirrorv')];
     o.status = status.textContent;
     // nothing selected, the check's counts, read-only is not in the hint (the editor's flag), a live simulation's
     st.sel = new Set(); st.lastDiags = [{ severity: 'error' }, { severity: 'warning' }, { severity: 'warning' }];
     r.render();
-    o.toolbar2 = [off('delete'), off('rotate'), off('info')];
+    o.toolbar2 = [off('delete'), off('rotate'), off('mirrorv')];
     o.status2 = status.textContent;
     let updated = 0;
     st.live = { update: (full) => { updated += full ? 1 : 0; } };

@@ -115,7 +115,7 @@ uiTest('tri-state buffers: palette (BUFE / BUFT only, a BUFE made BUFE4), live s
   await page.click(`${ED} .se-symrow`, { text: 'BUFT' });
   await page.key('Escape');
   await page.waitFor((sel) => /^BUFT: O buffer de três estados com habilitação ativa a 0/.test(document.querySelector(`${sel} .se-syminfo`)?.textContent || ''), [ED], { what: 'PT info box' });
-  await page.click(`${ED} .se-btn[data-act=info]`);
+  await page.key('F1');
   await page.waitFor((d) => document.querySelector(d)?.dataset.type === 'tbuf' && document.querySelector(`${d} .sd-truth`), [DLG], { what: 'BUFT datasheet' });
   assert.match(await page.eval((d) => document.querySelector(`${d} .se-dhead b`).textContent, DLG), /^Informação do Símbolo: BUFT \(TBUF\)$/);
   assert.match(await page.eval((d) => document.querySelector(`${d} .sd-main p`).textContent, DLG), /alta impedância/);
