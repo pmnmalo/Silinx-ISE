@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeFsm, validateFsm, generateFsm, fsmEncoding, fsmFromHdl, sameFsm } from '../core/fsm.js';
 import { normalizeTable, validateTable, generateTableHdl, truthTableFromModule, dontCaresInHdl } from '../core/logic.js';
-import { EXAMPLES, TARGETS, example, exampleUcf, runTestbench } from './examples-lib.mjs';
+import { EXAMPLES, TARGETS, targetName, example, exampleUcf, runTestbench } from './examples-lib.mjs';
 
 const ex = example('traffic');
 const read = (f) => fs.readFileSync(path.join(ex.dir, f), 'utf8');
@@ -107,9 +107,11 @@ test('traffic: the board pins, on every board (BTN0, SW0 / SW1, LD7..LD0, the di
   const ports = ['clk', 'sw<0>', 'sw<1>', 'btn<0>', 'dp', ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => `led<${i}>`), ...[0, 1, 2, 3, 4, 5, 6].map((i) => `seg<${i}>`), ...[0, 1, 2, 3].map((i) => `an<${i}>`)];
   for (const t of TARGETS) {
     const u = exampleUcf('traffic', t);
-    assert.deepEqual(u.unmatched, [], `${t.board}-${t.variant}`);
-    for (const p of ports) assert.match(u.text, new RegExp(`NET "${p}" +LOC = "\\w+" ;`), `${t.board}-${t.variant} ${p}`);
-    assert.match(u.text, /TIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50% ;/);
+    assert.deepEqual(u.unmatched, [], `${targetName(t)}`);
+    for (const p of ports) assert.match(u.text, new RegExp(`NET "${p}" +LOC = "\\w+" ;`), `${targetName(t)} ${p}`);
+    // the board's clock: 50 MHz, the Spartan-6 boards' 100 MHz
+    const period = ['nexys3', 'atlys'].includes(t.board) ? 10 : 20;
+    assert.match(u.text, new RegExp(`TIMESPEC "TS_clk" = PERIOD "clk" ${period} ns HIGH 50% ;`), targetName(t));
   }
   const b = read('constraints/traffic.ucf');
   assert.equal(b, exampleUcf('traffic', { board: 'basys2', variant: '250' }).text);

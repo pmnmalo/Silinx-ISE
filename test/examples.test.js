@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { compile, elaborate } from '../core/compile.js';
 import { designChecks } from '../core/lint.js';
-import { EXAMPLES, TARGETS, example, exampleUcf, exampleProject, runTestbench, silinxFlow } from './examples-lib.mjs';
+import { EXAMPLES, TARGETS, targetName, example, exampleUcf, exampleProject, runTestbench, silinxFlow } from './examples-lib.mjs';
 
 // known failures, with their issue: the test still runs, as a todo
 const KNOWN = {};
@@ -34,7 +34,7 @@ for (const name of EXAMPLES) {
   test(`example ${name}: the UCF it ships is Silinx's board pin assignment for the Basys2-250, every port assigned`, () => {
     const ex = example(name);
     assert.equal(ex.project.board, 'basys2');
-    for (const t of TARGETS) assert.deepEqual(exampleUcf(name, t).unmatched, [], `${name} on ${t.board}-${t.variant}`);
+    for (const t of TARGETS) assert.deepEqual(exampleUcf(name, t).unmatched, [], `${name} on ${targetName(t)}`);
     // blinky's UCF was written before the board assignment left the I/O standard at its default
     if (name !== 'blinky') assert.equal(fs.readFileSync(path.join(ex.dir, ex.project.constraints), 'utf8'), exampleUcf(name, { board: 'basys2', variant: '250' }).text);
   });
@@ -48,12 +48,14 @@ process.env.SILINX_CONFIG_DIR = path.join(tmp, 'config');
 describe('the examples on every board', { concurrency: 2 }, () => {
   for (const name of EXAMPLES) {
     for (const t of TARGETS) {
-      test(`example ${name} on the ${t.board}-${t.variant}: the Silinx toolchain builds the bitstream, no warning`, { timeout: 600000, todo: KNOWN[name] }, async () => {
+      test(`example ${name} on the ${targetName(t)}: the Silinx toolchain builds the bitstream, no warning`, { timeout: 600000, todo: KNOWN[name] }, async () => {
         const { dir, project } = exampleProject(name, t, tmp);
         const job = await silinxFlow(dir, project);
         const log = job.lines.join('\n');
         assert.equal(job.status, 'ok', log.slice(-3000));
-        assert.match(log, new RegExp(`Device: ${project.device.part}${project.device.package}-4: device description \\(shipped with Silinx\\) and bit database\\.`));
+        // (the Spartan-6's parts, #732: the steps the toolchain has for them, every one the test runs)
+        assert.match(log, project.device.family === 'spartan6' ? new RegExp(`Device: ${project.device.part}${project.device.package}-3: the Spartan-6: synthesis, `)
+          : new RegExp(`Device: ${project.device.part}${project.device.package}-4: device description \\(shipped with Silinx\\) and bit database\\.`));
         assert.match(log, /All signals are completely routed\./);
         assert.match(log, new RegExp(`Bitstream: build/${project.top}\\.bit \\(\\d+ bytes, every feature in the bit database\\)`));
         // a combinational example (gates) has no clock, so no PERIOD constraint to meet

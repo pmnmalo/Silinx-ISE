@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { EXAMPLES, TARGETS, ROOT, exampleProject } from '../examples-lib.mjs';
+import { EXAMPLES, S3E_TARGETS as TARGETS, ROOT, exampleProject } from '../examples-lib.mjs';
 import { iseExamplesConfig } from '../ise-examples-config.mjs';
 
 const IMAGE = process.env.SILINX_ISE_IMAGE || 'xilinx/ise:14.7';

@@ -11,11 +11,17 @@ import { EXAMPLE_ORDER } from '../core/examples.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const EXAMPLES = EXAMPLE_ORDER;   // gates, traffic, blinky, pong, stopwatch, clock, vga
-// the boards (and variants) of the devices of the Silinx toolchain: the examples run on all of them
-export const TARGETS = [
+// the boards (and variants) of the devices of the Silinx toolchain: the examples run on all of them; the Spartan-3E's
+// also through ISE (test/ise/examples.test.js, the power estimates), the Spartan-6's (#732, no variants; the Atlys's
+// seven-segment display and VGA on its VHDCI connector) checked against ISE in research/s6 so far
+export const S3E_TARGETS = [
   { board: 'basys2', variant: '100' }, { board: 'basys2', variant: '250' },
   { board: 'nexys2', variant: '500' }, { board: 'nexys2', variant: '1200' },
 ];
+export const S6_TARGETS = [{ board: 'nexys3' }, { board: 'atlys' }];
+export const TARGETS = [...S3E_TARGETS, ...S6_TARGETS];
+/** A target's name: 'basys2-250', 'nexys3'. */
+export const targetName = t => t.variant ? `${t.board}-${t.variant}` : t.board;
 
 export function example(name) {
   const dir = path.join(ROOT, 'examples', name);
@@ -72,7 +78,7 @@ export async function runTestbench(name, { until = SIM_TIME[name] || 5e9, edit =
 /** An example as a project folder for a target (its board's device and UCF), in `into`. */
 export function exampleProject(name, target, into) {
   const ex = example(name);
-  const dir = path.join(into, `${name}-${target.board}-${target.variant}`);
+  const dir = path.join(into, `${name}-${targetName(target)}`);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.cpSync(ex.dir, dir, { recursive: true, filter: f => !/[\\/]build$/.test(f) });
   const { text, device } = exampleUcf(name, target);

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { netlist, generateHdl, normalizeDoc } from '../core/schdoc.js';
-import { EXAMPLES, TARGETS, example, exampleUcf, runTestbench } from './examples-lib.mjs';
+import { EXAMPLES, TARGETS, targetName, example, exampleUcf, runTestbench } from './examples-lib.mjs';
 import { EXAMPLE_ORDER, orderExamples } from '../core/examples.js';
 
 const ex = example('gates');
@@ -91,8 +91,8 @@ test('gates: 16 gates, NOT / AND / OR for prime_sop (LD0) and NAND only for prim
 test('gates: the board pins, sw(3:0) on the switches and led(1:0) on LD0 / LD1, on every board', () => {
   for (const t of TARGETS) {
     const u = exampleUcf('gates', t);
-    assert.deepEqual(u.unmatched, [], `${t.board}-${t.variant}`);
-    for (const p of ['sw<0>', 'sw<1>', 'sw<2>', 'sw<3>', 'led<0>', 'led<1>']) assert.match(u.text, new RegExp(`NET "${p}" +LOC = "\\w+" ;`), `${t.board}-${t.variant} ${p}`);
+    assert.deepEqual(u.unmatched, [], `${targetName(t)}`);
+    for (const p of ['sw<0>', 'sw<1>', 'sw<2>', 'sw<3>', 'led<0>', 'led<1>']) assert.match(u.text, new RegExp(`NET "${p}" +LOC = "\\w+" ;`), `${targetName(t)} ${p}`);
     assert.doesNotMatch(u.text, /clk|PERIOD|unassigned/);
   }
   // the Basys2: SW0 = P11 ... SW3 = B4, LD0 = M5, LD1 = M11
