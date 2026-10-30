@@ -21,6 +21,8 @@ export const WIZARDS_PT = {
     'Uma caixa de estado por estado, de cima para baixo: a primeira é o estado inicial (depois do reset); cada uma vai para a seguinte, a última volta à primeira. Acrescente as caixas de decisão e as saídas no editor.',
   'Add at least one state.': 'Acrescente pelo menos um estado.',
   'A transition starts or ends at a state that is not in the list.': 'Uma transição começa ou acaba num estado que não está na lista.',
+  // the Boolean Algebra Wizard (#2140, web/js/tt-wizard.js)
+  'Boolean Algebra Wizard': 'Assistente de Álgebra Booleana', 'Outputs: at least one.': 'Saídas: pelo menos uma.',
   // the UCF Wizard
   'UCF Wizard': 'Assistente de UCF', 'Ports and Pins': 'Portos e Pinos', 'Signal': 'Sinal', 'Pin': 'Pino', 'Module:': 'Módulo:',
   'Assign from Board': 'Atribuir pela Placa', 'e.g. P4': 'p. ex. P4', 'The project has no design module.': 'O projeto não tem módulos de desenho.',
@@ -29,6 +31,10 @@ export const WIZARDS_PT = {
 };
 
 export const WIZARDS_PT_PATTERNS = [
+  [/^The names of the inputs \(1 to (\d+)\) and of the outputs, separated by commas; or an expression, whose variables are the inputs and whose name \(else f\) the output, its column filled in\.$/,
+    'Os nomes das entradas (1 a $1) e das saídas, separados por vírgulas; ou uma expressão, cujas variáveis são as entradas e cujo nome (senão f) é a saída, com a coluna preenchida.'],
+  [/^Inputs: 1 to (\d+) \(there are (\d+)\)\.$/, 'Entradas: 1 a $1 (há $2).'], [/^'(.*)' is not a valid name\.$/, "'$1' não é um nome válido."],
+  [/^'(.*)' is used twice\.$/, "'$1' é usado duas vezes."],
   [/^State '(.*)': (.*)\.$/, "Estado '$1': $2."], [/^Two states are named '(.*)'\.$/, "Há dois estados com o nome '$1'."],
   [/^Each bit of the module's ports on a pin of the (.*): assigned from the board by their names \(clk, led, sw, btn…\) and directions; change them at will\.$/,
     'Cada bit dos portos do módulo num pino da $1: atribuído pela placa pelos nomes (clk, led, sw, btn…) e pelas direções; mude-os à vontade.'],
