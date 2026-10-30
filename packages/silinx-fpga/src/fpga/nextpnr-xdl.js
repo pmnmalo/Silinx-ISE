@@ -66,6 +66,7 @@ function sitesOfCells(mod, device, v) {
  *  - the LUT's output (S<i>_FOUT / GOUT) or the carry's sum (S<i>_XORF / XORG) to X / Y (FXMUX / GYMUX) and to the
  *    flip-flop's D (S<i>_DX / DY: DXMUX / DYMUX), or BX / BY to the flip-flop;
  *  - the carry in (S<i>_CI: CYINIT) from CIN or BX; a MUXCY's DI (S<i>_DIF / DIG: CY0F / CY0G) from pin 1 or BX / BY;
+ *  - a stage's carry out (S<i>_CYF, COUT) to XB / YB (XBUSED / YBUSED), COUT up the column (COUTUSED);
  *  - the F5 / FX multiplexer's output (the F5 / FX pin) to X / Y and to the flip-flop (FXMUX = F5, GYMUX = FX), or out
  *    of the site to a FXINA / FXINB (F5USED / FXUSED). */
 function siteRoutes(mod, insts, v) {
@@ -80,6 +81,12 @@ function siteRoutes(mod, insts, v) {
         else inst[`${wide.what}out`] = true;
         continue;
       }
+      const carry = v.pinOfWire(v.tileAt.get(tile)).get(src);
+      if (carry?.pin === 'COUT') {
+        const yb = v.pinOfWire(v.tileAt.get(tile)).get(dst)?.pin === 'YB', inst = insts.get(v.siteName(tile, carry.site));
+        if (yb) inst.yb = true; else inst.coutUp = true;
+        continue;
+      }
       const m = /^S(\d+)_(\w+)$/.exec(src) || /^S(\d+)_(\w+)$/.exec(dst);
       if (!m) continue;
       const inst = insts.get(v.siteName(tile, +m[1]));
@@ -87,6 +94,7 @@ function siteRoutes(mod, insts, v) {
       const pinOf = w => v.pinOfWire(v.tileAt.get(tile)).get(w)?.pin;   // a site pin's name (F1, BX, CIN…)
       let x;
       if ((x = /^S\d+_([FG])I(\d)$/.exec(dst))) (inst.lutPins[x[1]] ||= [])[+x[2]] = +pinOf(src)[1];   // F1..F4 / G1..G4
+      else if (/^S\d+_CYF$/.test(src) && pinOf(dst) === 'XB') inst.xb = true;
       else if (/^S\d+_CI$/.test(dst)) inst.mux.CYINIT = pinOf(src);                                     // CIN / BX
       else if ((x = /^S\d+_DI([FG])$/.exec(dst))) inst.mux[`CY0${x[1]}`] = pinOf(src);                 // F1 / G1 / BX / BY
       else {
@@ -137,7 +145,10 @@ function carryCfg(inst, add) {
     }
     if (xr) add(`XOR${side}`, esc(xr.name), '');
   }
-  if (c.CYMUXG && portNet(c.CYMUXG, 'O') !== undefined) add('COUTUSED', '', '0');
+  if (inst.xb) add('XBUSED', '', '0');
+  if (inst.yb) add('YBUSED', '', '0');
+  // (a carry out that only leaves by YB does not go on up the column)
+  if (c.CYMUXG && portNet(c.CYMUXG, 'O') !== undefined && (!inst.yb || inst.coutUp)) add('COUTUSED', '', '0');
 }
 
 // a parameter as hexadecimal of `bits` bits (nextpnr writes a bit string, x read as 0, or a number)
@@ -278,7 +289,8 @@ function netsOf(mod, insts, device, v) {
         // (an F5 / FX pin only when the net leaves the site there: to X / Y it stays inside)
         // (a block RAM's or multiplier's pins: its cell's ports only, the pair's sites share nodes)
         const hard = inst && (inst.cells.RAMB16 || inst.cells.MULT18X18SIO);
-        if (inst && !(p.pin === 'F5' && !inst.f5out) && !(p.pin === 'FX' && !inst.fxout) && (!hard || portNet(hard, p.pin) !== undefined))
+        // (COUT only when the carry goes on up the column: out by YB, that is the net's pin)
+        if (inst && !(p.pin === 'F5' && !inst.f5out) && !(p.pin === 'FX' && !inst.fxout) && !(p.pin === 'COUT' && inst.yb && !inst.coutUp) && (!hard || portNet(hard, p.pin) !== undefined))
           (p.dir === 'o' ? net.outpins : net.inpins).push({ inst: inst.name, pin: p.pin });
       }
     }
@@ -286,6 +298,8 @@ function netsOf(mod, insts, device, v) {
       if (!pip) continue;
       const [tile, dst, src] = pip.split('/');
       if (/^S\d+_/.test(src) || /^S\d+_/.test(dst) || siteMuxPip(v, tile, src, dst)?.to) continue;
+      const pinsAt = v.pinOfWire(v.tileAt.get(tile));
+      if (pinsAt.get(src)?.pin === 'COUT' && pinsAt.get(dst)?.pin === 'YB') continue;   // (inside the site)
       const k = v.tileAt.get(tile), pi = device.findPip(k, src, dst);
       if (pi < 0) throw new Error(`${name}: no PIP ${tile} ${src} -> ${dst}`);
       const x = device.pip(k, pi);

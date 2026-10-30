@@ -93,7 +93,7 @@ function netlistSim(mod, inputs) {
 }
 
 /** The XDL's simulation: its slices' LUT equations on their site pins, the carry (CYINIT, CY0F / CY0G, CYMUXF / CYMUXG,
- *  XORF / XORG, COUT), the F5 / F6 multiplexers (F5: BX ? F : G; F6: BY ? FXINA : FXINB), FXMUX / DXMUX, the flip-flops'
+ *  XORF / XORG, COUT, XB, YB), the F5 / F6 multiplexers (F5: BX ? F : G; F6: BY ? FXINA : FXINB), FXMUX / DXMUX, the flip-flops'
  *  set / reset; the IOBs' registers. */
 function xdlSim(design, inputs) {
   const S = { val: new Map(), luts: [], ffs: [], pads: new Map() };
@@ -111,6 +111,9 @@ function xdlSim(design, inputs) {
         if (cfg[`CYMUX${side}`]) S.luts.push({ out: co, fn: () => (S.get(at(side)) ? S.get(ci) : typeof d === 'number' ? d : S.get(d)) });
         if (cfg[`XOR${side}`]) S.luts.push({ out: at(`XOR${side}`), fn: () => S.get(ci) ^ S.get(at(side)) });
       }
+      // the carry out read by logic (XB: the F stage's, YB: the G stage's)
+      if (cfg.XBUSED) S.luts.push({ copy: at('CYF'), out: pin('XB') });
+      if (cfg.YBUSED) S.luts.push({ copy: cfg.COUTUSED ? pin('COUT') : at('CYG'), out: pin('YB') });
       if (cfg.F5MUX) S.luts.push({ out: cfg.F5USED ? pin('F5') : at('F5'), fn: () => S.get(at(S.get(pin('BX')) ? 'F' : 'G')) });
       if (cfg.F6MUX) S.luts.push({ out: cfg.FXUSED ? pin('FX') : at('FX'), fn: () => S.get(pin(S.get(pin('BY')) ? 'FXINA' : 'FXINB')) });
       for (const [side, X] of [['F', 'X'], ['G', 'Y']]) {
