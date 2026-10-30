@@ -379,7 +379,19 @@ function describe(type, p, tx, preset) {
 }
 
 // ------------------------------------------------------------------ pins
+// a row's pin of a symbol with Pins per bit (#2067, #2079, #2081) as the one-bit symbol's, and its bit: a gate's or a
+// multiplexer's I0_1 / D0_1 (its O1: O), INV's and BUF's I1 / O1, a demultiplexer's O0_1 (its D1: D); null otherwise
+// (the shared selects and enable, BUFE4's pins, #2141)
+function bitPin(type, p, n) {
+  if (!p.bits || !(+p.width > 1) || type === 'tbuf') return null;
+  const m = /^([A-Z]+\d+)_(\d+)$/.exec(n);
+  if (m) return { name: m[1], bit: +m[2] };
+  const one = type === 'inv' || type === 'buf' ? 'IO' : type === 'demux' ? 'D' : 'O', s = /^([A-Z])(\d+)$/.exec(n);
+  return s && one.includes(s[1]) ? { name: s[1], bit: +s[2] } : null;
+}
 function pinFunc(type, p, pin, tx) {
+  const row = bitPin(type, p, pin.name);
+  if (row) return `${pinFunc(type, { ...p, bits: false, width: 1 }, { ...pin, name: row.name }, tx)} ${tx(`(bit ${row.bit})`, `(bit ${row.bit})`)}`;
   const S = SYMBOLS[type];
   const n = pin.name;
   const idx = /^[A-Z]+(\d+)$/.exec(n)?.[1];
