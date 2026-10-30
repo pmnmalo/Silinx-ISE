@@ -324,3 +324,51 @@ test('#2195 nextpnrToXdl: the pads\' IOSTANDARD, DRIVE, SLEW and pulls, each IOB
   assert.deepEqual(bitgen(parseXdl(writeXdl(ucfDesign)), loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' }).unknown, []);
   assert.equal(simCheck(ucfRouted(), ucfDesign, { cycles: 1000, randomInputs: true }).ok, true);
 });
+
+// nextpnr's routed design of research/nextpnr-s3e/widemux.v (#2190): a 16:1 tree with its MUXF8, an 8:1 with a MUXF7 on top, a
+// MUXF7 that became a LUT. ISE's DRC passed it (0 errors, 0 warnings), its bitgen's .bit byte-identical to Silinx's.
+const wideRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/widemux-routed.json.gz', import.meta.url))));
+const wide = nextpnrToXdl(wideRouted(), device, PART);
+
+test('#2190 nextpnrToXdl: the MUXF7 and MUXF8 on their slices, on the CLB\'s dedicated wires, as WIDE_MUX places them', () => {
+  const cells = Object.values(Object.values(wideRouted().modules)[0].cells);
+  const count = t => cells.filter(c => c.type === t).length;
+  assert.deepEqual([count('MUXF5'), count('MUXF6'), count('MUXF7'), count('MUXF8')], [12, 6, 3, 1]);   // (the fourth MUXF7: a LUT)
+  const nameOf = c => c.replace(/:/g, '_');
+  const at = name => wide.insts.find(i => i.cfg.some(c => c.attr === 'F6MUX' && c.name === nameOf(name)));
+  const xy = i => /^SLICE_X(\d+)Y(\d+)$/.exec(i.site).slice(1).map(Number);
+  // the F8 at (1, 1) of its CLB; its F7s at (0, 1) of the CLB and of the one above
+  const [x8, y8] = xy(at('u_f8'));
+  assert.deepEqual([x8 % 2, y8 % 2], [1, 1]);
+  const f7s = ['m7[0]_u', 'm7[1]_u'].map(n => xy(at(n)));
+  assert.deepEqual(f7s.map(p => p.join()).sort(), [[x8 - 1, y8], [x8 - 1, y8 + 2]].map(p => p.join()).sort());
+  // the F7 feeding the F8's FXINA is the one of its own CLB, by the net on the pins
+  const fxina = wide.nets.find(n => n.inpins.some(p => p.inst === at('u_f8').name && p.pin === 'FXINA'));
+  assert.equal(fxina.outpins[0].pin, 'FX');
+  const s = wide.insts.find(i => i.name === fxina.outpins[0].inst);
+  assert.deepEqual(xy(s), [x8 - 1, y8]);
+  // from the CLB above: its FX -> FX_S2 PIP, the node into this tile
+  const fxinb = wide.nets.find(n => n.inpins.some(p => p.inst === at('u_f8').name && p.pin === 'FXINB'));
+  assert.ok(fxinb.pips.some(p => p.from === 'FX2' && p.to === 'FX_S2'), JSON.stringify(fxinb.pips));
+  assert.deepEqual(checkRouting(wide, device).problems, []);
+  assert.deepEqual(bitgen(parseXdl(writeXdl(wide)), loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' }).unknown, []);
+  // as many of each setting as Silinx's packer writes for the same netlist
+  const p = pack(readYosysJson(JSON.parse(fs.readFileSync(new URL('./fixtures/nextpnr-engine/widemux.json', import.meta.url), 'utf8'))), { ucf: fs.readFileSync(new URL('./fixtures/nextpnr-engine/widemux.ucf', import.meta.url), 'utf8'), part: PART });
+  const settings = insts => ['F5MUX', 'F6MUX', 'F5USED', 'FXUSED'].map(a => insts.reduce((n, i) => n + (i.cfg || []).filter(c => c.attr === a).length, 0));
+  assert.deepEqual(settings(wide.insts), settings(p.insts));
+});
+
+test('#2190 simCheck: the XDL implements the wide multiplexers; a select or an input swapped is caught', () => {
+  const json = wideRouted();
+  const r = simCheck(json, wide, { cycles: 1000, starts: 100 });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.flipFlops, 32);
+  assert.equal(simCheck(json, wide, { cycles: 2000, randomInputs: true }).ok, true);
+  // the F8's two inputs swapped on its pins: another multiplexer
+  const swapped = parseXdl(writeXdl(wide));
+  const f8 = swapped.insts.find(i => i.cfg.some(c => c.attr === 'F6MUX' && c.name === 'u_f8'));
+  for (const n of swapped.nets) for (const p of n.inpins) if (p.inst === f8.name && /^FXIN[AB]$/.test(p.pin)) p.pin = p.pin === 'FXINA' ? 'FXINB' : 'FXINA';
+  const w = simCheck(json, swapped, { cycles: 200, randomInputs: true });
+  assert.equal(w.ok, false);
+  assert.match(w.message, /^cycle \d+: \S+ is [01] in the netlist, [01] in the XDL$/);
+});
