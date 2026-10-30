@@ -27,7 +27,7 @@
      "other": 38,
      "perConnection": 9.67,
      "passes": 1,
-     "seconds": 0.1
+     "seconds": 0.101
     }
    },
    "traffic": {
@@ -53,7 +53,7 @@
      "other": 649,
      "perConnection": 3.87,
      "passes": 3,
-     "seconds": 0.35
+     "seconds": 0.348
     }
    },
    "blinky": {
@@ -79,7 +79,7 @@
      "other": 993,
      "perConnection": 4.21,
      "passes": 4,
-     "seconds": 0.42
+     "seconds": 0.428
     }
    },
    "pong": {
@@ -105,7 +105,7 @@
      "other": 2089,
      "perConnection": 4.16,
      "passes": 4,
-     "seconds": 0.959
+     "seconds": 0.984
     }
    },
    "stopwatch": {
@@ -121,17 +121,17 @@
      "perConnection": 3.6
     },
     "silinx": {
-     "nets": 424,
-     "connections": 1062,
-     "pips": 4533,
-     "single": 807,
-     "double": 455,
-     "quad": 144,
-     "logicin": 1406,
-     "other": 1721,
-     "perConnection": 4.27,
+     "nets": 423,
+     "connections": 1067,
+     "pips": 4548,
+     "single": 776,
+     "double": 425,
+     "quad": 205,
+     "logicin": 1411,
+     "other": 1731,
+     "perConnection": 4.26,
      "passes": 4,
-     "seconds": 0.817
+     "seconds": 0.823
     }
    },
    "clock": {
@@ -157,7 +157,7 @@
      "other": 1476,
      "perConnection": 4.17,
      "passes": 4,
-     "seconds": 0.683
+     "seconds": 0.679
     }
    },
    "vga": {
@@ -183,7 +183,7 @@
      "other": 852,
      "perConnection": 4.11,
      "passes": 4,
-     "seconds": 0.483
+     "seconds": 0.48
     }
    }
   },
@@ -211,7 +211,7 @@
      "other": 38,
      "perConnection": 20,
      "passes": 1,
-     "seconds": 0.23
+     "seconds": 0.227
     }
    },
    "traffic": {
@@ -237,7 +237,7 @@
      "other": 645,
      "perConnection": 4.19,
      "passes": 4,
-     "seconds": 0.372
+     "seconds": 0.374
     }
    },
    "blinky": {
@@ -263,7 +263,7 @@
      "other": 994,
      "perConnection": 4.55,
      "passes": 3,
-     "seconds": 0.414
+     "seconds": 0.411
     }
    },
    "pong": {
@@ -289,7 +289,7 @@
      "other": 2091,
      "perConnection": 4.31,
      "passes": 4,
-     "seconds": 1.037
+     "seconds": 1.022
     }
    },
    "stopwatch": {
@@ -305,17 +305,17 @@
      "perConnection": 3.69
     },
     "silinx": {
-     "nets": 424,
-     "connections": 1062,
-     "pips": 4644,
-     "single": 841,
-     "double": 420,
-     "quad": 271,
-     "logicin": 1395,
-     "other": 1717,
-     "perConnection": 4.37,
+     "nets": 423,
+     "connections": 1067,
+     "pips": 4698,
+     "single": 819,
+     "double": 429,
+     "quad": 304,
+     "logicin": 1414,
+     "other": 1732,
+     "perConnection": 4.4,
      "passes": 4,
-     "seconds": 0.871
+     "seconds": 0.878
     }
    },
    "clock": {
@@ -341,7 +341,7 @@
      "other": 1490,
      "perConnection": 4.33,
      "passes": 4,
-     "seconds": 0.722
+     "seconds": 0.718
     }
    },
    "vga": {
@@ -367,7 +367,7 @@
      "other": 844,
      "perConnection": 4.25,
      "passes": 4,
-     "seconds": 0.496
+     "seconds": 0.491
     }
    }
   }

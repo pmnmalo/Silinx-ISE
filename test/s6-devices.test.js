@@ -141,8 +141,8 @@ test('runOpenImplementation: the blinky example on the Nexys3 and the Atlys, pla
 });
 
 // stopwatch on the Nexys3 (a block RAM, three DSP48A1s): routed on the switches whose bits the databases have, through
-// the bitstream, with no warning (#2045)
-test('runOpenImplementation: the stopwatch example on the Nexys3 through the bitstream, its block RAM\'s frame written again', { timeout: 600000 }, async () => {
+// the bitstream, with no warning (#2045); its lap memory a whole RAMB16BWER, whose bitstream writes no frame again (#2130)
+test('runOpenImplementation: the stopwatch example on the Nexys3 through the bitstream, its block RAM a RAMB16BWER', { timeout: 600000 }, async () => {
   const { exampleUcf } = await import('./examples-lib.mjs');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-s6-'));
   try {
@@ -156,9 +156,10 @@ test('runOpenImplementation: the stopwatch example on the Nexys3 through the bit
     // no warning (the synthesis's block-RAM port resizing is Yosys's mapping, not the design's: QUIET, #2045)
     assert.deepEqual(j.lines.filter(l => /^(WARNING|ERROR)/.test(l)), [], j.lines.join('\n'));
     assert.ok(j.lines.includes('All constraints were met.'));
+    assert.match(j.lines.join('\n'), /Number of RAMB16BWERs: +1 out of +32 /);
+    assert.doesNotMatch(j.lines.join('\n'), /Number of RAMB8BWERs: +[1-9]/);
     const bit = readBit6(fs.readFileSync(path.join(dir, `build/${project.top}.bit`)));
-    assert.equal(bit.rewrites.length, 1);
-    assert.equal(bit.rewrites[0].far[1], 23);
+    assert.equal(bit.rewrites.length, 0);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

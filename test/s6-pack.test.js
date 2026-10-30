@@ -219,7 +219,7 @@ const EXAMPLE_PACK = {
   traffic: { slices: 34, X: 14, L: 20, M: 0, luts: 96, ffs: 58, warnings: 0 },
   blinky: { slices: 54, X: 25, L: 29, M: 0, luts: 104, ffs: 131, warnings: 0 },
   pong: { slices: 117, X: 60, L: 57, M: 0, luts: 275, ffs: 226, warnings: 0 },
-  stopwatch: { slices: 84, X: 42, L: 42, M: 0, luts: 179, ffs: 200, warnings: 0 },
+  stopwatch: { slices: 84, X: 42, L: 42, M: 0, luts: 178, ffs: 200, warnings: 0 },
   clock: { slices: 87, X: 36, L: 51, M: 0, luts: 161, ffs: 174, warnings: 0 },
   vga: { slices: 52, X: 22, L: 30, M: 0, luts: 129, ffs: 56, warnings: 0 },
 };
