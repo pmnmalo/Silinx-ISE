@@ -27,7 +27,8 @@
    "name": "XLXI_2",
    "params": {
     "init": "0",
-    "width": 1
+    "width": 1,
+    "qn": false
    }
   },
   {
@@ -40,7 +41,8 @@
    "name": "XLXI_3",
    "params": {
     "init": "0",
-    "width": 1
+    "width": 1,
+    "qn": false
    }
   },
   {
@@ -53,7 +55,8 @@
    "name": "XLXI_4",
    "params": {
     "init": "0",
-    "width": 1
+    "width": 1,
+    "qn": false
    }
   },
   {
@@ -66,7 +69,8 @@
    "name": "XLXI_5",
    "params": {
     "init": "0",
-    "width": 1
+    "width": 1,
+    "qn": false
    }
   },
   {
@@ -79,7 +83,8 @@
    "name": "XLXI_6",
    "params": {
     "init": "1",
-    "width": 1
+    "width": 1,
+    "qn": false
    }
   },
   {
@@ -92,7 +97,8 @@
    "name": "XLXI_7",
    "params": {
     "init": "0",
-    "width": 1
+    "width": 1,
+    "qn": false
    }
   },
   {

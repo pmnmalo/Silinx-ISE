@@ -154,6 +154,8 @@ SYMBOLS.gnd = { category: 'General', title: 'GND', description: 'Logic 0 (all bi
 // ff: { k: 'd'|'t'|'jk', ce, clr, pre (asynchronous; CLR wins over PRE), r, s (synchronous; R wins over S unless sp) }.
 // Priorities as in the Xilinx Libraries Guide: CLR > PRE > clock; R > S > CE (FDSE/FTSRE/FJKSRE: S > R > CE).
 const FF_KIND = { d: ['D', 'D'], t: ['T', 'toggle (T)'], jk: ['JK', 'J-K'] };
+// (the inverted output QN = not Q when asked, drawn /Q at the bottom right, #2161)
+const P_FF_QN = { name: 'qn', label: 'Inverted output QN (/Q)', kind: 'bool', default: false };
 function ffSym(name, k, f, title) {
   const parts = [];
   if (f.ce) parts.push('clock enable');
@@ -166,7 +168,7 @@ function ffSym(name, k, f, title) {
   // Xilinx INIT default: 1 for the preset / set types (FDP, FDS, FTP, FJKP, FDSE...), 0 otherwise
   const init = (f.pre && !f.clr) || (f.s && (!f.r || f.sp)) ? '1' : '0';
   // (INIT first: the Xilinx default; Width: the data inputs and Q, one flip-flop per bit, the controls shared)
-  return { category: 'Flip-Flops', title: title || name.toUpperCase(), ff: { k, ...f }, description: `${desc[0].toUpperCase() + desc.slice(1)} (bitwise when Width > 1)`, params: [{ ...P_INIT, default: init }, P_WIDTH] };
+  return { category: 'Flip-Flops', title: title || name.toUpperCase(), ff: { k, ...f }, description: `${desc[0].toUpperCase() + desc.slice(1)} (bitwise when Width > 1)`, params: [{ ...P_INIT, default: init }, P_WIDTH, P_FF_QN] };
 }
 for (const [k, pfx, list] of [
   ['d', 'fd', ['', 'c', 'ce', 'cp', 'cpe', 'e', 'p', 'pe', 'r', 're', 'rs', 'rse', 's', 'se']],
@@ -467,6 +469,8 @@ export function symbolDef(sym, modules = {}) {
       return { w: 90, h: hb, shape: 'ff', body: { x: 20, y: 0, w: 50, h: hb }, pins };
     }
     pins.push({ name: 'Q', dir: 'out', x: 90, y: 10 + 20 * (t === 'counter' ? 0 : q0), side: 'E', width: bw });
+    // (QN, #2161: level with the last input, below Q)
+    if (f && p.qn) pins.push({ name: 'QN', dir: 'out', x: 90, y: 10 + 20 * (west.length - 1), side: 'E', width: bw, neg: true });
     return { w: 90, h, shape: 'ff', body: { x: 20, y: 0, w: 50, h }, pins };
   }
   if (t === 'slice') {

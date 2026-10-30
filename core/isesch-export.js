@@ -57,7 +57,7 @@ function iseSymbolFor(s, def, netW, modules) {
     const d0 = S.params[0].default, iv = String(p.init ?? d0) === '1' ? '1' : '0';
     const lp = libPins(t);
     if (W === 1 && iv === d0 && lp && def.pins.every(q => lp[q.name] && lp[q.name][1] != null)) return { lib: true, name: t, pins: Object.fromEntries(def.pins.map(q => [q.name, q.name])) };
-    return { lib: false, name: `xl_${t}_i${iv}${W > 1 ? `_w${W}` : ''}` };
+    return { lib: false, name: `xl_${t}_i${iv}${W > 1 ? `_w${W}` : ''}${p.qn ? '_qn' : ''}` };   // (QN: no library flip-flop has it, #2161)
   }
   switch (t) {
     // (with an enable E: the Xilinx M2_1E / M4_1E; the select bits on pins of their own, #301: 's' in the
@@ -156,7 +156,7 @@ export function decodeXlSymbol(name) {
   const s = lc(name);
   let m;
   if ((m = /^xl_(and|or|nand|nor|xor|xnor)(\d(?:b\d)?)_w(\d+)(_bits)?$/.exec(s)) && SYMBOLS[m[1] + m[2]]) return { type: m[1] + m[2], params: { width: +m[3], ...(m[4] ? { bits: true } : {}) } };
-  if ((m = /^xl_(f(?:d|t|jk)[a-z]*)_i([01])(?:_w(\d+))?$/.exec(s)) && SYMBOLS[m[1]]?.ff) return { type: m[1], params: { init: m[2], ...(m[3] ? { width: +m[3] } : {}) } };
+  if ((m = /^xl_(f(?:d|t|jk)[a-z]*)_i([01])(?:_w(\d+))?(_qn)?$/.exec(s)) && SYMBOLS[m[1]]?.ff) return { type: m[1], params: { init: m[2], ...(m[3] ? { width: +m[3] } : {}), ...(m[4] ? { qn: true } : {}) } };
   if ((m = /^xl_tbuf([et])_w(\d+)(_bits)?$/.exec(s))) return { type: 'tbuf', params: { width: +m[2], enable: m[1].toUpperCase(), bits: !!m[3] } };
   // (_bits: a pin per bit, #2081)
   if ((m = /^xl_demux([1-4])(e?)(s?)_w(\d+)(_bits)?$/.exec(s))) return { type: 'demux', params: { sel: +m[1], width: +m[4], en: !!m[2], selBus: +m[1] > 1 && !m[3], ...(m[5] ? { bits: true } : {}) } };
