@@ -6,7 +6,6 @@
 // part): enough to tell a function of a few additions (it fits) from a chain of them, a wide multiplication, a table
 // read or a floating-point operation (it does not).
 // Isomorphic ES module: no DOM and no Node APIs.
-import { mulWidth } from './c-mul-split.js';
 
 export const DEFAULT_CLOCK = 10;
 export const UNCERTAINTY = 0.27;
@@ -49,8 +48,6 @@ export function nodeDelay(graph, n, family = 'artix7') {
   // (a multiplication by a power of 2: a shift by a constant, wiring)
   const pow2 = (a) => { const x = graph.nodes[a]; return x.op === 'const' && x.k > 0n && (x.k & (x.k - 1n)) === 0n; };
   if (n.op === 'mul' && args.some(pow2)) return 0;
-  // (a multiplication by its operands' own widths: a value extended to the product's width the value it extends)
-  if (n.op === 'mul') return d(mulWidth(graph, n));
   return d ? d(n.w, args.length ? graph.nodes[args[0]].w : n.w, constAmount) : 0;
 }
 

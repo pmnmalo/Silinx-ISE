@@ -110,11 +110,3 @@ test('#2080 every operation of the graph has a delay in each family: <= counts a
     for (const op of ['add', 'sub', 'neg', 'lt', 'le', 'gt', 'ge', 'eq', 'ne', 'mul', 'mux', 'and', 'or', 'xor', 'not', 'shl', 'shr']) assert.equal(typeof FAMILIES[f][op], 'function', `${f} ${op}`);
   }
 });
-
-test('#2080 a multiplication by its operands\' own widths: two 16-bit values extended to 64 bits one block, not a cascade', () => {
-  const g = new Graph(), t = { w: 64, s: true }, h = { w: 16, s: true };
-  const a = g.add('in', [], h, { port: { key: 'a' } }), b = g.add('in', [], h, { port: { key: 'b' } });
-  g.add('mul', [g.add('ext', [a], t), g.add('ext', [b], t)], { w: 128, s: true });
-  assert.equal(pathDelay(g), 3.4);
-  assert.equal(pathDelay(g, 'spartan3e'), 7);
-});
