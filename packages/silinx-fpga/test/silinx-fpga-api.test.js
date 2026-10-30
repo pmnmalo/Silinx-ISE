@@ -30,7 +30,7 @@ const API = ['FAMILY_INFO', 'ISE_HINT', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STE
   'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6OpenStatus', 'splitBitPart', 'splitPart', 'synthEffort',
   'synthesizeVerilog', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'writeBit', 'writeXdl', 'yosysWorkerSource'];
 const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'loadBitDbS6', 'loadDb',
-  'loadDeviceCache', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];
+  'loadDeviceCache', 'nextpnrNode', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];   // (nextpnrNode: the nextpnr engine's io.nextpnr, #2136)
 
 const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'checkUcf',
   'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'familyFromXise', 'familyName', 'familyOfPart', 'fpgaModel', 'generateUcf',

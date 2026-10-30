@@ -5,6 +5,8 @@
 #     base's), and which is never merged on green alone (CLAUDE.md, Integration)
 #   - GitHub Actions: every action of the workflows and of the setup action in one pull request; the actions are
 #     pinned by commit, their version in a comment (#414), which Dependabot updates with the commit
+# @silinx/nextpnr-himbaechel-spartan3e (nextpnr, #2136) is pinned by its release's URL (pmnmalo/nextpnr-spartan), which
+# Dependabot does not update: a new release is pinned by hand (its group entry only keeps every dependency named).
 # Sources pinned outside npm (Yosys's test designs, the design corpus, the MCC models): the monthly
 # .github/workflows/pins.yml (scripts/check-pins.mjs).
 # elkjs is no longer ignored (0.9 to 0.12 in #351): a 0.x minor update may change the schematic layout;
@@ -25,7 +27,7 @@ updates:
     labels: [dependencies]
     groups:
       npm-minor-patch:
-        patterns: ['@codemirror/*', '@lezer/*', express, elkjs, esbuild, playwright]
+        patterns: ['@codemirror/*', '@lezer/*', '@silinx/nextpnr-himbaechel-spartan3e', express, elkjs, esbuild, playwright]
         update-types: [minor, patch]
     # (no update ignored)
     # CodeMirror: on 6 since #349, its major updates no longer ignored
