@@ -15,8 +15,8 @@ export function mountSchMouse(ctx) {
   const {
     container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
     cursor, destroyed, doc, drag, finishSegMove, finishWire, flash, hoverPin, ioClick, itemAt, keepConn, live, modules,
-    netClick, pinNear, placeAt, propBody, pushUndo, readOnly, refusedShort, render, renderOverlay, renderProps, sel,
-    setTool, spaceDown, startPlace, svg, toSheet, tool, updateStatus, view, wireClick, wireDraw, zoomAt, setCursor, setDoc, setDrag,
+    netClick, pinNear, placeAt, propBody, pushUndo, readOnly, refusedShort, render, renderOverlay, renderProps, segSel, sel,
+    setTool, spaceDown, startPlace, svg, toSheet, tool, updateStatus, view, wireClick, wholeBranch, wireDraw, zoomAt, setCursor, setDoc, setDrag,
     setHoverPin, setSel, setWireDraw
   } = ctx;
   // a wire drawn as a freehand stroke (#1052)
@@ -63,7 +63,12 @@ export function mountSchMouse(ctx) {
       const k = `${it.kind}:${it.id}`;
       if (e.shiftKey || e.ctrlKey || e.metaKey) { if (sel().has(k)) sel().delete(k); else sel().add(k); render(); renderProps(); return; }
       const sel0 = sel();
-      if (!sel().has(k)) { setSel(new Set([k])); render(); renderProps(); }
+      const fresh = !sel().has(k);
+      if (fresh) setSel(new Set([k]));
+      // (Select whole branch off, #2211: the segment clicked; the wire's properties the same)
+      const segChanged = it.kind === 'wire' && !readOnly && !wholeBranch() && !curve.curved() && sel().size === 1 ? segSel.pick(it.id, pt) : segSel.clear();
+      if (fresh || segChanged) render();
+      if (fresh) renderProps();
       if (e.detail >= 2) return;            // handled by the dblclick listener
       // one wire, Keep connections: the segment under the pointer is dragged, the rest stays (#688)
       // (curved, #1144: one wire, its curve grabbed where pressed)
@@ -143,7 +148,7 @@ export function mountSchMouse(ctx) {
     if (!drag()) return;
     const d = drag(); setDrag(null);
     if (d.kind === 'pan') { canvas.classList.remove('panning'); return; }
-    if (d.kind === 'seg') { if (d.d) finishSegMove(d); return; }
+    if (d.kind === 'seg') { if (d.d) { finishSegMove(d); if (!wholeBranch()) { segSel.pick(d.id, toSheet(e.clientX, e.clientY)); render(); } } return; }
     if (d.kind === 'stroke') { strokeEnd(d, toSheet(e.clientX, e.clientY)); return; }
     if (d.kind === 'knot') { curve.endKnot(d); return; }
     if (d.kind === 'move') {

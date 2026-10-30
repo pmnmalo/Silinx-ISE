@@ -5,13 +5,14 @@ import { clipEmpty, copySchematic, pasteOffset, pasteSchematic } from '/core/sch
 import { GRID, oppositeSide, portBox, portSide, rotSize, symbolBox, symbolDef, turnSide } from '/core/schdoc.js';
 import { readClip, writeClip } from './clipboard.js';
 import { untangleNew } from '/core/schpath.js';
+import { deleteWireSegment } from '/core/schwire-seg.js';
 import { KEYS, snap } from './sch-editor.js';
 
 /** { copySel, deleteSel, duplicateSel, mirrorSel, mirrorVSel, paste, rotateSel, selectAll, selected } of mountSchEditor (destroyed(), doc(), live(), modules(), placing(), sel(), tool(): its current values). */
 export function mountSchSelect(ctx) {
   const {
     container, changed, destroyed, doc, edit, live, modules, placing, readOnly, refusedShort, render, renderOverlay,
-    renderProps, sel, setTool, snapshot, svg, toSheet, tool, undoStack, setSel
+    renderProps, segSel, sel, setTool, snapshot, svg, toSheet, tool, undoStack, setSel
   } = ctx;
 
   // ---------------- selection operations
@@ -52,6 +53,8 @@ export function mountSchSelect(ctx) {
   }
   function deleteSel() {
     if (!sel().size) return;
+    const seg = segSel.current();
+    if (seg) { edit(() => { deleteWireSegment(doc(), seg.id, seg.a, seg.b); sel().clear(); }); return; }
     edit(() => {
       for (const [kind, arr] of Object.entries(KEYS)) { const ids = new Set(selected(kind)); doc()[arr] = doc()[arr].filter(o => !ids.has(o.id)); }
       sel().clear();
