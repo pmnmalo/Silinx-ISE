@@ -104,7 +104,7 @@ uiTest('#230 regression, a truth table whose HDL file name holds another module:
   assert.deepEqual(await rows(page), [
     'project C_tt',
     '  chip xc3s250e-4-cp132',
-    '    truthtable maj [Algebra*] [Schematic] [No HDL!] (maj.tt.json)',
+    '    algebra maj [Algebra*] [Schematic] [No HDL!] (maj.tt.json)',
     '    vhdl parity [VHDL*] (maj.vhd)',
   ]);
   assert.equal(await warnTip(page), TIP_TT);
@@ -122,7 +122,7 @@ uiTest('#230 regression, a truth table whose HDL file name holds another module:
   assert.deepEqual(await rows(page), [
     'project C_tt',
     '  chip xc3s250e-4-cp132',
-    '    truthtable maj [Algebra*] [Schematic] [VHDL] (maj.tt.json)',
+    '    algebra maj [Algebra*] [Schematic] [VHDL] (maj.tt.json)',
     '    vhdl parity [VHDL*] (maj.vhd)',
   ]);
   assert.deepEqual(await warnings(page), [W_TT]);
@@ -139,7 +139,7 @@ uiTest('#230 two drawings of the same module: the second has no HDL file, warned
     'project C_two',
     '  chip xc3s250e-4-cp132',
     '    moduleTop ctl [Petri*] [VHDL] (ctl.pn.json)',
-    '    truthtable other.tt.json [No HDL!]',
+    '    algebra other.tt.json [No HDL!]',
   ]);
   assert.equal(await warnTip(page), 'No HDL file: its module ctl is the module of src/ctl.pn.json. Rename one of them.');
   await page.treeRow('#hier', 'other.tt.json', { right: true, exact: true });
@@ -282,7 +282,7 @@ uiTest('#231 a truth table whose HDL file is gone when the project is opened: ma
   await page.waitConsole(/src\/maj\.vhd generated from src\/maj\.tt\.json \(its HDL file src\/maj\.vhd is no longer in the project folder\)/);
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj.vhd'] === 'src/maj.tt.json', [], { what: 'linked' });
   assert.equal(await readWs(env, 'L_open', 'src/maj.vhd'), viewHdl('src/maj.tt.json', TT).text);
-  assert.deepEqual(await rows(page), ['project L_open', '  chip xc3s250e-4-cp132', '    truthtable maj [Algebra*] [Schematic] [VHDL] (maj.tt.json)']);
+  assert.deepEqual(await rows(page), ['project L_open', '  chip xc3s250e-4-cp132', '    algebra maj [Algebra*] [Schematic] [VHDL] (maj.tt.json)']);
   assert.deepEqual(await warnings(page), []);
   // gone (it was src/maj_tt.vhd), src/maj.vhd holding another module: as #230
   await makeProject(env, { name: 'L_taken', top: '', files: { 'src/maj.tt.json': linked('src/maj_tt.vhd'), 'src/maj.vhd': OTHER } });
@@ -292,7 +292,7 @@ uiTest('#231 a truth table whose HDL file is gone when the project is opened: ma
   assert.deepEqual(await rows(page), [
     'project L_taken',
     '  chip xc3s250e-4-cp132',
-    '    truthtable maj [Algebra*] [Schematic] [No HDL!] (maj.tt.json)',
+    '    algebra maj [Algebra*] [Schematic] [No HDL!] (maj.tt.json)',
     '    vhdl parity [VHDL*] (maj.vhd)',
   ]);
   assert.equal(await warnTip(page), TIP_TT);

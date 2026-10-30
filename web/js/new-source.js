@@ -17,7 +17,7 @@ const SOURCE_TYPES = [
   // hdl / tb: VHDL or Verilog, chosen in the wizard (the extension follows the language)
   // wiz: the wizard the Wizard > button opens (#958); only: no plain source, Next > disabled; drawn: a drawing, its
   // HDL in the language of the File Name and Location page (#2082)
-  { id: 'tt', label: 'Boolean Algebra', ico: 'truthtable', ext: '.bool.json', dir: 'src', drawn: true },
+  { id: 'tt', label: 'Boolean Algebra', ico: 'algebra', ext: '.bool.json', dir: 'src', drawn: true },
   { id: 'hdl', label: 'Module (HDL)', ico: 'vhdl', ext: null, dir: 'src', wiz: 'module' },
   { id: 'sch', label: 'Schematic', ico: 'schematic', ext: '.sch.json', dir: 'src', wiz: 'schematic', drawn: true },
   { id: 'fsm', label: 'Finite State Machine (FSM)', ico: 'fsm', ext: '.fsm.json', dir: 'src', wiz: 'fsm', drawn: true },

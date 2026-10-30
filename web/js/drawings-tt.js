@@ -27,7 +27,7 @@ export async function openTt(path) {
   const { mountTtEditor } = await import('./truthtable.js');
   if (S.project?.name !== pj) return;   // another project opened meanwhile: not its drawing (#1231)
   openDoc({
-    id, path, title: path.split('/').pop(), icon: 'truthtable',
+    id, path, title: path.split('/').pop(), icon: 'algebra',
     create(el, d) {
       const host = h('div', { class: 'doc-body' });
       el.append(host);
