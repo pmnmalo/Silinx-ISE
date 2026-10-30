@@ -26,3 +26,13 @@ export function kmapSolid(layout, cube) {
   const joins = layers.filter(l => byMap.has(l.map + 1)).map(l => ({ from: l.map, to: l.map + 1, pieces: l.pieces }));
   return { layers, joins };
 }
+
+/**
+ * The side of the square scene that holds a stack of layers (w × h, `depth` from the first to the last, turned about
+ * its centre, `depth / 2` behind the screen) at any rotation, seen with `perspective`: the projection of the sphere
+ * around the stack, so that turning it never moves what is beside the scene (#2206).
+ */
+export function kmapSceneSide(w, h, depth, perspective) {
+  const r = Math.hypot(w, h, depth) / 2, eye = perspective + depth / 2;
+  return 2 * Math.ceil(perspective * r / Math.sqrt(eye * eye - r * r));
+}

@@ -710,6 +710,35 @@ uiTest('#1407 Truth Table: the Karnaugh map of 5 or 6 inputs in 3D, its groups a
   await page.waitFor((t) => !document.querySelector(`${t} .tt-k3d`) && !!document.querySelector(`${t} svg.tt-kmap`), [T], { what: 'flat again' });
 });
 
+// #2206: the 3D map stays in its scene at any rotation, inside the page, and the list of groups is never under it
+uiTest('#2206 Truth Table: the 3D Karnaugh map stays inside the page and off the list of groups at any rotation', E, async (page) => {
+  const col6 = Array.from({ length: 64 }, (_, m) => (m % 3 ? '1' : '0')).join('');
+  const k6 = { version: 1, name: 'k6', inputs: ['a', 'b', 'c', 'd', 'e', 'g'], outputs: ['f'], table: { f: col6 }, exprs: {}, notes: '', form: 'sop', lang: 'vhdl' };
+  await makeProject(env, { name: 'Tt3dFit', files: { 'src/k6.bool.json': JSON.stringify(k6) } });
+  await page.openProject('Tt3dFit');
+  const T = '.doc:not([hidden]) .tt-editor';
+  await page.eval((p) => window.SilinxApp.openTt(p), 'src/k6.bool.json');
+  await page.waitFor((t) => document.querySelector(`${t} .tt-kmap-host`), [T], { what: 'K-map' });
+  if (!await page.eval((t) => document.querySelector(`${t} .tt-k3d-on`).checked, T)) await page.click(`${T} .tt-k3d-on`);
+  await page.waitFor((t) => !!document.querySelector(`${t} .tt-k3d`), [T], { what: '3D' });
+  const fit = () => page.eval((t) => {
+    const scene = document.querySelector(`${t} .tt-k3d`), leg = document.querySelector(`${t} .tt-legend`).getBoundingClientRect(), host = document.querySelector(`${t} .tt-kmap-host`).getBoundingClientRect();
+    const s = scene.getBoundingClientRect(), parts = [...scene.querySelectorAll('.tt-k3d-cell, .tt-k3d-title, .tt-k3d-side')].map((e) => e.getBoundingClientRect());
+    const out = parts.filter((r) => r.left < s.left - 1 || r.right > s.right + 1 || r.top < s.top - 1 || r.bottom > s.bottom + 1).length;
+    return { out, inHost: s.left >= host.left - 1, clear: leg.left >= s.right - 1 || leg.top >= s.bottom - 1, size: [Math.round(s.width), Math.round(s.height)], legend: [Math.round(leg.left), Math.round(leg.top)] };
+  }, T);
+  const f0 = await fit();
+  assert.deepEqual([f0.out, f0.inHost, f0.clear], [0, true, true], 'as first shown');
+  await page.eval((t) => document.querySelector(`${t} .tt-k3d`).focus(), T);
+  for (const key of ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp']) {
+    for (let i = 0; i < 8; i++) await page.eval((t, k) => document.querySelector(`${t} .tt-k3d`).dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })), T, key);
+    assert.deepEqual(await fit(), f0, `turned with ${key}: nothing moved, nothing out of the scene`);
+  }
+  await page.click(`${T} .tt-k3d-reset`);
+  // the box left as it was found: the 3D box is shared by every table
+  await page.click(`${T} .tt-k3d-on`);
+});
+
 // #1491: in 3D, a group is the extrusion of its exact shape on the layers: the flat map's pieces on each layer it
 // covers (a group across the edges split as there, open on the edge), the walls of their closed sides between the
 // neighbouring layers it covers only (none through the layers between the first and last of four)
