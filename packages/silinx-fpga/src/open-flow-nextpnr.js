@@ -7,6 +7,7 @@
 // - For now the micro-architecture knows LUTs, flip-flops, carry chains, wide multiplexers, constants, IOBs with their
 //   registers, global clock buffers, block RAMs and multipliers (#2135): a netlist with other cells fails at Map, naming them.
 import { parseUcf, portAssignments, ucfPattern } from './ucf.js';
+export { engineOf } from './open-steps.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { checkRouting } from './fpga/route.js';
 import { deviceSites } from './fpga/place.js';
@@ -189,7 +190,7 @@ export const NEXTPNR_TRIES = { normal: 4, high: 8, maxSlices: 500 };
 export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRIES.high : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.normal : 1);
 
 /**
- * { runMap, runPar } of runFlow for the nextpnr engine. ctx: { io, spec, log, report, util, now, ms, netlistText (a
+ * { problems, runMap, runPar } of runFlow for the nextpnr engine (problems(): what keeps it from the design, [] if nothing). ctx: { io, spec, log, report, util, now, ms, netlistText (a
  * getter: the synthesis's JSON), top, ucfText, StepError, setRouted (the routed design's text, for the reports and
  * the bitstream) }. io.nextpnr: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }.
  */
@@ -197,6 +198,15 @@ export function mountNextpnrSteps(ctx) {
   const { io, spec, log, report, util, now, ms, netlistText, top, ucfText, StepError, setRouted } = ctx;
   let input = null, sdc = '';
   const part = `${spec.device}${spec.pkg}`;
+
+  // what keeps the nextpnr engine from implementing the design, [] when nothing (the engine 'auto' then takes it)
+  let found = null;
+  function problems() {
+    if (found) return found;
+    if (spec.family !== 'spartan3e') return (found = [`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`]);
+    if (!io.nextpnr) return (found = ['the nextpnr engine is not available here (io.nextpnr)']);
+    return (found = nextpnrNetlist(netlistText(), top, ucfText, io.device()).problems);
+  }
 
   function runMap() {
     if (spec.family !== 'spartan3e') throw new StepError(`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`, [], 'Choose the Silinx engine (Toolchain Settings).');
@@ -280,5 +290,5 @@ export function mountNextpnrSteps(ctx) {
     for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
   }
 
-  return { runMap, runPar };
+  return { problems, runMap, runPar };
 }

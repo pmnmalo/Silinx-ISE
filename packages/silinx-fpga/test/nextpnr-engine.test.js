@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
-import { nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
+import { engineOf, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
 import { parseXdl } from '../src/xdl.js';
 import { loadDeviceCache } from '../src/fpga/device-node.js';
 
@@ -332,4 +332,33 @@ test('#2194 a DCM_SP (Silinx\'s synthesis) built with --engine nextpnr: no warni
   const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
   assert.equal(design.insts.find(i => i.type === 'DCM').site, 'DCM_X0Y1');
   assert.deepEqual(design.insts.filter(i => i.type === 'BUFGMUX').map(i => i.site).sort(), ['BUFGMUX_X1Y10', 'BUFGMUX_X1Y11', 'BUFGMUX_X2Y10', 'BUFGMUX_X2Y11']);
+});
+
+test('#2136 --engine auto: nextpnr when it can implement the design; else the Silinx engine, which Map says (no warning)', { timeout: 300000 }, async () => {
+  const build = async ucfText => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+    fs.writeFileSync(path.join(dir, 'gates.ucf'), ucfText);
+    const out = [], err = [];
+    const code = await main(['build', fixture('gates.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir, 'gates.ucf'), '--out-dir', dir, '--engine', 'auto'],
+      { out: l => out.push(l), err: l => err.push(l) });
+    assert.equal(code, 0, err.join('\n'));
+    assert.deepEqual(err, []);   // no warnings
+    assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+    return out;
+  };
+  // the gates example with its pads: nextpnr
+  const n = await build(ucf());
+  assert.ok(n.includes('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).'), n.join('\n'));
+  // a port without a pad: the Silinx engine, said once, its placer choosing the pin
+  const s = await build(ucf().split('\n').filter(l => !/led<1>/.test(l)).join('\n'));
+  assert.deepEqual(s.filter(l => /^Map: /.test(l)), ['Map: the nextpnr engine cannot implement this design yet (port led<1>: no LOC in the constraints (the nextpnr engine places only the ports given a pad)): the Silinx engine places and routes it.']);
+  assert.ok(!s.some(l => /nextpnr packs|Placed and routed by nextpnr/.test(l)), s.join('\n'));
+});
+
+test('#2136 engineOf: a project\'s engine, Silinx\'s when not set or not known', () => {
+  assert.equal(engineOf(undefined), 'silinx');
+  assert.equal(engineOf({}), 'silinx');
+  assert.equal(engineOf({ engine: 'auto' }), 'auto');
+  assert.equal(engineOf({ engine: 'nextpnr' }), 'nextpnr');
+  assert.equal(engineOf({ engine: 'vpr' }), 'silinx');
 });

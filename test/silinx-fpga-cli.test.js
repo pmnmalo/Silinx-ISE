@@ -42,7 +42,7 @@ test('#1679 parseArgs: what is wrong in a command line', () => {
   assert.equal(error(['build', 'a.v', '--part', 'p', '--effort', 'max']), '--effort max: normal or high');
   assert.equal(error(['build', 'a.v', '--part', 'p', '--seed', '0']), '--seed: a whole number from 1');
   assert.equal(error(['build', 'a.v', '--part', 'p', '--seed', '1.5']), '--seed: a whole number from 1');
-  assert.equal(error(['build', 'a.v', '--part', 'p', '--engine', 'vpr']), '--engine vpr: silinx or nextpnr');   // (#2136)
+  assert.equal(error(['build', 'a.v', '--part', 'p', '--engine', 'vpr']), '--engine vpr: silinx, nextpnr or auto');   // (#2136)
 });
 
 test('#1679 partOf: a part as ISE and the boards write it', () => {

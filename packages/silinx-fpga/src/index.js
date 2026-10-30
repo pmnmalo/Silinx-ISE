@@ -16,6 +16,8 @@ export { runFlow, StepError, ISE_HINT } from './open-flow-core.js';
 // synthesis: Verilog in (synthesisInput's { text, top }), a Yosys JSON netlist out
 export { synthesizeVerilog, synthEffort, cellCounts } from './synth-open.js';
 export { runYosysOnce, yosysWorkerSource, readableBlobs, asText } from './synth-open-yosys.js';
+// nextpnr's WebAssembly package as the flow's io.nextpnr (the nextpnr engine, #2136; in Node: node.js nextpnrNode)
+export { nextpnrIo } from './nextpnr-io.js';
 export { gateAssignments, rewriteCarryChains } from './carry-chain.js';
 
 // the netlist in (the constraints: ./parts.js)

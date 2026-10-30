@@ -3,7 +3,7 @@
 // runs it (server/open-flow-run.js) without its front end: the Verilog is synthesized as it is, VHDL needs Silinx
 // ISE. bin/silinx-fpga.js runs main(); the tests call it with their own output.
 //   silinx-fpga build <file.v ...|netlist.json> --part xc3s250e-cp132-4 [--top name] [--ucf pins.ucf] [-o top.bit]
-//     [--out-dir build] [--effort normal|high] [--seed N] [--no-replicate] [--engine silinx|nextpnr] [--quiet]
+//     [--out-dir build] [--effort normal|high] [--seed N] [--no-replicate] [--engine silinx|nextpnr|auto] [--quiet]
 // Writes into the out folder the synthesis's netlist (<top>.json), the placed and routed design (placed.xdl,
 // routed.xdl), the timing report (timing.txt) and the .bit; prints the flow's log (its warnings, the timing summary).
 // Exit codes: 0 built, 1 the flow failed (the design, the constraints, the routing), 2 the command line is wrong.
@@ -26,8 +26,8 @@ export const USAGE = `usage:
   --effort normal|high   the optimization effort: more placements tried at high (default: normal)
   --seed <N>       the placer's first seed (default: 1)
   --no-replicate   no register replication on the critical path
-  --engine silinx|nextpnr   the place and route: Silinx's own (default), or nextpnr's Spartan-3E (#2136: LUTs,
-                   flip-flops, carry chains, MUXF5 / MUXF6, IOBs and global clocks so far; every port needs a LOC)
+  --engine silinx|nextpnr|auto   the place and route: Silinx's own (default), nextpnr's Spartan-3E (#2136: every
+                   port needs a LOC), or auto: nextpnr when it can implement the design, else Silinx's
   --quiet          only the warnings, the errors and the result`;
 
 const VALUED = new Set(['--part', '--top', '--ucf', '-o', '--out-dir', '--effort', '--seed', '--engine']);
@@ -61,7 +61,7 @@ export function parseArgs(argv) {
   if (!o.part) return { command, error: '--part is needed (xc3s250e-cp132-4: the Basys2\'s)' };
   if (!['normal', 'high'].includes(o.effort)) return { command, error: `--effort ${o.effort}: normal or high` };
   if (!Number.isInteger(o.seed) || o.seed < 1) return { command, error: '--seed: a whole number from 1' };
-  if (!['silinx', 'nextpnr'].includes(o.engine)) return { command, error: `--engine ${o.engine}: silinx or nextpnr` };
+  if (!['silinx', 'nextpnr', 'auto'].includes(o.engine)) return { command, error: `--engine ${o.engine}: silinx, nextpnr or auto` };
   return o;
 }
 

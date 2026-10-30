@@ -63,7 +63,7 @@ export class StepError extends Error {
 
 /**
  * Run the steps of spec ({ top, family, device, pkg, part, steps, seed, effort, replicate,
- * startupClk, synthUpToDate, synthEffort, deepRule, engine }) with io (above). engine: 'nextpnr' for nextpnr's Map and Place & Route
+ * startupClk, synthUpToDate, synthEffort, deepRule, engine }) with io (above). engine: 'nextpnr' for nextpnr's Map and Place & Route, 'auto' for it when it can implement the design (else the Silinx engine's)
  * (#2136, io.nextpnr), else Silinx's own. synthEffort: 'normal' | 'high' (the default), the
  * synthesis's Optimization Effort (#282; 'high' given, Place & Route makes HIGH_TRIES placements too, the fastest kept, and HIGH_EXTRA more routed when the placer's estimate is promising, #651; Normal NORMAL_TRIES for a small design); deepRule: Normal's rule of the deep designs (synth-open.js DEEP_RULE, for tests). synthUpToDate ({ report }: the synthesis part of the
  * report of the run that made it, or null), when the steps start after the synthesis: the netlist of that
@@ -261,8 +261,20 @@ export async function runFlow(spec, io) {
 
   // the Spartan-6's Map and Place & Route (#732: open-flow-s6.js)
   const s6 = spec.family === 'spartan6' ? mountS6Steps({ io, spec, log, report, util, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
-  // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine
-  const np = spec.engine === 'nextpnr' ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
+  // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine: 'nextpnr' always; 'auto' when it can
+  // implement the design (its cells, every port's pad), else the Silinx engine, which Map says (not the Spartan-6's)
+  const np = (spec.engine === 'nextpnr' || (spec.engine === 'auto' && spec.family !== 'spartan6')) ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
+
+  let viaNextpnr = null;
+  const useNextpnr = () => {
+    if (viaNextpnr !== null) return viaNextpnr;
+    viaNextpnr = !!np && (spec.engine === 'nextpnr' || !np.problems().length);
+    if (np && !viaNextpnr) {
+      const p = np.problems();
+      log(`Map: the nextpnr engine cannot implement this design yet (${p[0]}${p.length > 1 ? `, and ${p.length - 1} more` : ''}): the Silinx engine places and routes it.`);
+    }
+    return viaNextpnr;
+  };
 
   const { bitfile, runPins, runPower, runTiming } = mountFlowReports({
     io, spec, log, report, routedOrEarlier: (...a) => routedOrEarlier(...a), routedText: () => routedText, top, ucfText
@@ -289,9 +301,9 @@ export async function runFlow(spec, io) {
     if (steps.includes('postsynth')) { step('postsynth'); await runPostSynth(); save(); }
     if (steps.includes('translate')) { step('translate'); runTranslate(); save(); }
     if (steps.includes('posttrans')) { step('posttrans'); await runPostTranslate(); save(); }
-    if (steps.includes('map')) { step('map'); (np ? np.runMap : s6 ? s6.runMap : runMap)(); save(); }
+    if (steps.includes('map')) { step('map'); (useNextpnr() ? np.runMap : s6 ? s6.runMap : runMap)(); save(); }
     if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
-    if (steps.includes('par')) { step('par'); await (np ? np.runPar : s6 ? s6.runPar : runPar)(); save(); }
+    if (steps.includes('par')) { step('par'); await (useNextpnr() ? np.runPar : s6 ? s6.runPar : runPar)(); save(); }
     if (steps.includes('trce')) { step('trce'); routedOrEarlier(); runTiming(); save(); }
     if (steps.includes('postpar')) { step('postpar'); await runPostPar(); save(); }
     if (steps.includes('pin2ucf')) { step('pin2ucf'); runPins(); save(); }

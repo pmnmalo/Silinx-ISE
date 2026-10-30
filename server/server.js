@@ -92,6 +92,8 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   }
   // Yosys compiled to WebAssembly (YoWASP): the open synthesis runs in the browser (web/js/yosys-worker.js)
   app.use('/vendor/yowasp-yosys', express.static(path.join(ROOT, 'node_modules/@yowasp/yosys')));
+  // nextpnr in WebAssembly, its chip databases beside its bundle (the browser edition's nextpnr engine, #2136)
+  app.use('/vendor/nextpnr-spartan', express.static(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e')));
 
   const api = express.Router();
   api.get('/projects', wrap(() => P.listProjects()));
