@@ -298,3 +298,29 @@ test('#2192 simCheck: the IOBs\' registers follow the netlist on both edges; a w
 test('#2192 timingExport: the IOB registers\' delays (SPEED_4.pad)', () => {
   assert.deepEqual(timingExport(device).timing.pad, { Tiopi: 1.253, Tioop: 3.257, Tiockiq: 0.6, Tioock: 0.5, Tiotck: 0.5 });
 });
+
+// nextpnr's routed design of research/nextpnr-s3e/ucf_all.v with test/fixtures/nextpnr-engine/ucf_all.ucf (#2195): ISE's DRC
+// passed it (0 errors, 0 warnings), its bitgen's .bit byte-identical to Silinx's.
+const ucfRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/ucf-routed.json.gz', import.meta.url))));
+const ucfDesign = nextpnrToXdl(ucfRouted(), device, PART);
+
+test('#2195 nextpnrToXdl: the pads\' IOSTANDARD, DRIVE, SLEW and pulls, each IOB\'s settings as Silinx\'s packer writes them for the same UCF', () => {
+  const engine = new URL('./fixtures/nextpnr-engine/', import.meta.url);
+  const nl = readYosysJson(JSON.parse(fs.readFileSync(new URL('ucf_all.json', engine), 'utf8')));
+  const p = pack(nl, { ucf: fs.readFileSync(new URL('ucf_all.ucf', engine), 'utf8'), part: PART });
+  const ours = ucfDesign.insts.filter(i => /^(IOB|IBUF)$/.test(i.type));
+  // (the input nothing reads has no pad, in both)
+  assert.deepEqual(ours.map(i => i.name).sort(), p.insts.filter(x => x.kind === 'iob').map(x => x.name).sort());
+  assert.ok(!ours.some(i => i.name === 'unused'));
+  for (const i of ours) assert.equal(cfgText(i), cfgText(p.insts.find(x => x.kind === 'iob' && x.name === i.name)), i.name);
+  const at = name => cfgText(ours.find(i => i.name === name));
+  assert.match(at('led<0>'), /^DRIVEATTRBOX::8 IOATTRBOX::LVCMOS33 .* SLEW::FAST /);
+  assert.match(at('led<2>'), /^DRIVEATTRBOX::16 IOATTRBOX::LVTTL .* SLEW::SLOW /);
+  assert.match(at('sw<0>'), / PULL::PULLUP$/);
+  assert.match(at('sw<1>'), / PULL::PULLDOWN$/);
+  assert.match(at('sw<2>'), /IOATTRBOX::LVTTL .* PULL::KEEPER$/);
+  assert.match(at('led2'), /^DRIVEATTRBOX::6 .* TMUX::T1 .* PULL::PULLDOWN$/);
+  assert.deepEqual(checkRouting(ucfDesign, device).problems, []);
+  assert.deepEqual(bitgen(parseXdl(writeXdl(ucfDesign)), loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' }).unknown, []);
+  assert.equal(simCheck(ucfRouted(), ucfDesign, { cycles: 1000, randomInputs: true }).ok, true);
+});
