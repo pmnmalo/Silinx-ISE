@@ -67,8 +67,9 @@ test('a width set for several I/O markers: as the single marker\'s (clamped, rou
 test('symbols: the parameters they all have (the width of gates of different kinds; the INIT of flip-flops), not their names nor inputs', () => {
   const doc = extra();
   // two inverters and an AND2: the width (the same parameter, its value mixed)
-  assert.deepEqual(brief(commonProps(doc, ['sym:S1', 'sym:S2'])), ['param:width=1']);
-  assert.deepEqual(brief(commonProps(doc, ['sym:S1', 'sym:S2', 'sym:S3'])), ['param:width=(mixed)']);
+  assert.deepEqual(brief(commonProps(doc, ['sym:S1', 'sym:S2'])), ['param:width=1', 'param:bits=false']);
+  // (and Pins per bit, all the gates', #2079)
+  assert.deepEqual(brief(commonProps(doc, ['sym:S1', 'sym:S2', 'sym:S3'])), ['param:width=(mixed)', 'param:bits=false']);
   const w = commonProps(doc, ['sym:S1', 'sym:S3'])[0];
   assert.deepEqual([w.label, w.kind, w.min, w.max], ['Width', 'int', 1, 1024]);
   // a flip-flop with a gate: the width only; one alone (an independent reference: its own parameters)
