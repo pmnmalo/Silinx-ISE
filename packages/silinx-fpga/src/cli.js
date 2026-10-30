@@ -27,7 +27,7 @@ export const USAGE = `usage:
   --seed <N>       the placer's first seed (default: 1)
   --no-replicate   no register replication on the critical path
   --engine silinx|nextpnr   the place and route: Silinx's own (default), or nextpnr's Spartan-3E (#2136: LUTs,
-                   flip-flops, IOBs and global clocks so far; every port needs a LOC)
+                   flip-flops, carry chains, MUXF5 / MUXF6, IOBs and global clocks so far; every port needs a LOC)
   --quiet          only the warnings, the errors and the result`;
 
 const VALUED = new Set(['--part', '--top', '--ucf', '-o', '--out-dir', '--effort', '--seed', '--engine']);

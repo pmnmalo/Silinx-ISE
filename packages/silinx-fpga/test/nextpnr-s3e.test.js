@@ -178,3 +178,45 @@ test('#2135 the carry chain\'s XDL implements its netlist; a wrong DI constant o
     assert.equal(simCheck(json, wrong, { cycles: 0, starts: 300 }).ok, false, `${from} -> ${to}`);
   }
 });
+
+// nextpnr's routed traffic example (Silinx's synthesis, seed 1): eight MUXF5s alone, two MUXF6s on two F5s each (#2135)
+const trafficRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/traffic-routed.json.gz', import.meta.url))));
+const traffic = nextpnrToXdl(trafficRouted(), device, PART);
+
+test('#2135 nextpnrToXdl: the F5 and F6 multiplexers, as Silinx\'s packer writes them', () => {
+  assert.deepEqual(xdlSize(traffic), { slices: 70, luts: 138, ffs: 58 });
+  assert.equal(count(traffic, /^F5MUX::$/), 12);
+  assert.equal(count(traffic, /^F6MUX::$/), 2);
+  // the F5s out to the F6s through the F5 pin (F5USED), the others' and the F6s' to X / Y and the flip-flops
+  assert.equal(count(traffic, /^F5USED::0$/), 4);
+  assert.equal(count(traffic, /^FXUSED::0$/), 0);
+  assert.equal(count(traffic, /^FXMUX::F5$/), 8);
+  assert.equal(count(traffic, /^GYMUX::FX$/), 2);
+  // an F6's slice: its own F5 on FXINA, the F5 of the slice above on FXINB (the CLB's dedicated wires)
+  for (const i of traffic.insts.filter(x => cfg(x, 'F6MUX'))) {
+    const [, x, y] = /^SLICE_X(\d+)Y(\d+)$/.exec(i.site).map(Number);
+    assert.equal(y % 2, 0, i.site);
+    const into = pin => traffic.nets.find(n => n.inpins.some(p => p.inst === i.name && p.pin === pin));
+    const from = pin => traffic.insts.find(k => k.name === into(pin).outpins[0].inst).site;
+    assert.equal(from('FXINA'), i.site);
+    assert.equal(from('FXINB'), `SLICE_X${x}Y${y + 1}`);
+    assert.deepEqual(into('FXINA').outpins.map(p => p.pin), ['F5']);
+    assert.ok(cfg(i, 'BYINV'));
+  }
+  const r = checkRouting(traffic, device);
+  assert.deepEqual(r.problems, []);
+  const { unknown } = bitgen(traffic, loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' });
+  assert.deepEqual(unknown, []);
+});
+
+test('#2135 the wide multiplexers\' XDL implements its netlist; an F5 or F6 output taken from its LUT instead is caught', () => {
+  const json = trafficRouted();
+  const r = simCheck(json, traffic, { cycles: 2000, starts: 300 });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.flipFlops, 58);
+  const text = writeXdl(traffic);
+  for (const [from, to] of [['GYMUX::FX', 'GYMUX::G'], ['FXMUX::F5', 'FXMUX::F']]) {
+    const wrong = parseXdl(text.replaceAll(from, to));   // (in every slice)
+    assert.equal(simCheck(json, wrong, { cycles: 2000, starts: 300 }).ok, false, `${from} -> ${to}`);
+  }
+});

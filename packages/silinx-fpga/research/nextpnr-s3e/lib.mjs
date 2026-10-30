@@ -79,6 +79,8 @@ function netlistSim(mod, inputs) {
     // the carry: a MUXCY passes CI when S, else DI (or its constant, CY0); an XORCY gives CI xor LI
     else if (c.type === 'MUXCY') S.luts.push({ out: con('O'), fn: () => (S.get(con('S')) ? S.get(con('CI')) : con('DI') !== undefined ? S.get(con('DI')) : +String(c.parameters.CY0 ?? 0).trim()) });
     else if (c.type === 'XORCY') S.luts.push({ out: con('O'), fn: () => S.get(con('CI')) ^ S.get(con('LI')) });
+    // the wide multiplexers: S ? I1 : I0
+    else if (c.type === 'MUXF5' || c.type === 'MUXF6') S.luts.push({ out: con('O'), fn: () => S.get(con(S.get(con('S')) ? 'I1' : 'I0')) });
   }
   S.get = b => (b === undefined || b === '0' ? 0 : b === '1' ? 1 : S.val.get(b) || 0);
   S.lut = l => (l.fn ? l.fn() : +l.init[15 - l.ins.reduce((a, b, i) => a | (S.get(b) << i), 0)]);
@@ -86,7 +88,8 @@ function netlistSim(mod, inputs) {
 }
 
 /** The XDL's simulation: its slices' LUT equations on their site pins, the carry (CYINIT, CY0F / CY0G, CYMUXF / CYMUXG,
- *  XORF / XORG, COUT), FXMUX / DXMUX, the flip-flops' set / reset. */
+ *  XORF / XORG, COUT), the F5 / F6 multiplexers (F5: BX ? F : G; F6: BY ? FXINA : FXINB), FXMUX / DXMUX, the flip-flops'
+ *  set / reset. */
 function xdlSim(design, inputs) {
   const S = { val: new Map(), luts: [], ffs: [] };
   const netOfPin = new Map();
@@ -103,10 +106,14 @@ function xdlSim(design, inputs) {
         if (cfg[`CYMUX${side}`]) S.luts.push({ out: co, fn: () => (S.get(at(side)) ? S.get(ci) : typeof d === 'number' ? d : S.get(d)) });
         if (cfg[`XOR${side}`]) S.luts.push({ out: at(`XOR${side}`), fn: () => S.get(ci) ^ S.get(at(side)) });
       }
+      if (cfg.F5MUX) S.luts.push({ out: cfg.F5USED ? pin('F5') : at('F5'), fn: () => S.get(at(S.get(pin('BX')) ? 'F' : 'G')) });
+      if (cfg.F6MUX) S.luts.push({ out: cfg.FXUSED ? pin('FX') : at('FX'), fn: () => S.get(pin(S.get(pin('BY')) ? 'FXINA' : 'FXINB')) });
       for (const [side, X] of [['F', 'X'], ['G', 'Y']]) {
         const out = `${inst.name}/${side}`, ff = `FF${X}`;   // the LUT's output, inside the slice
         const mux = cfg[`${side === 'F' ? 'FX' : 'GY'}MUX`];
-        const fx = mux && /XOR$/.test(mux.value) ? at(`XOR${side}`) : out;   // FXMUX / GYMUX: the LUT or the sum
+        // FXMUX / GYMUX: the LUT, the sum or the wide multiplexer
+        const wide = cfg[side === 'F' ? 'F5USED' : 'FXUSED'] ? pin(side === 'F' ? 'F5' : 'FX') : at(side === 'F' ? 'F5' : 'FX');
+        const fx = mux && /XOR$/.test(mux.value) ? at(`XOR${side}`) : mux && /^F[5X]$/.test(mux.value) ? wide : out;
         if (cfg[side]) S.luts.push({ eq: cfg[side].value.replace(/^#LUT:/, ''), ins: [1, 2, 3, 4].map(k => pin(`${side}${k}`)), out });
         if (mux && pin(X)) S.luts.push({ copy: fx, out: pin(X) });
         if (cfg[ff]) {
