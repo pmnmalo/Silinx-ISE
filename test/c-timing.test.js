@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Graph } from '../core/c-graph.js';
-import { pathDelay, fitsClock, DEFAULT_CLOCK, UNCERTAINTY } from '../core/c-timing.js';
+import { pathDelay, fitsClock, DEFAULT_CLOCK, UNCERTAINTY, FAMILIES } from '../core/c-timing.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { cosimulate } from '../core/c-cosim.js';
 
@@ -65,4 +65,48 @@ test('#1924 a function too slow for the clock: a sequential module (ap_clk, ap_r
   // a single addition fits 10 ns: combinational, as Vitis HLS makes it (latency 0)
   const one = cToHdl('int add(int a, int b) { return a + b; }', { file: 'add.c' });
   assert.deepEqual([one.sequential, one.ports.slice(0, 2).map((p) => p.name)], [false, ['ap_rst', 'ap_start']]);
+});
+
+// (#2080) one operation or a chain between two registers: its period, in ns, through the open flow (XC3S250E -4), its
+// inputs shifted in serially so that no pad is on the path
+const MEASURED = [
+  ['add8', 3.97, 'add', 8], ['add16', 4.89, 'add', 16], ['add32', 5.42, 'add', 32], ['xor32', 2.67, 'xor', 32], ['mux32', 2.59, 'mux', 32],
+  ['mul16', 8.20, 'mul', 32], ['mul32', 16.76, 'mul', 64],
+];
+const REGISTERS = 1.2;
+const chainOf = (op, w, n) => {
+  const t = { w, s: false }, g = new Graph();
+  const a = g.add('in', [], t, { port: { key: 'a' } }), b = g.add('in', [], t, { port: { key: 'b' } }), c = g.add('in', [], { w: 1, s: false }, { port: { key: 'c' } });
+  let x = a;
+  for (let k = 0; k < n; k++) x = g.add(op, op === 'mux' ? [c, x, b] : [x, b], t);
+  return g;
+};
+
+test('#2080 the Spartan-3E\'s delays: an operation within 15 % of its measured period', () => {
+  for (const [name, period, op, w] of MEASURED) {
+    const est = pathDelay(chainOf(op, w, 1), 'spartan3e') + REGISTERS;
+    assert.ok(Math.abs(est - period) / period < 0.15, `${name}: ${est} against ${period}`);
+  }
+});
+
+test('#2080 the Spartan-3E\'s delays: a chain of additions high, never low (its carries overlap); under twice the measured period', () => {
+  for (const [n, period] of [[2, 7.13], [4, 9.08]]) {
+    const est = pathDelay(chainOf('add', 32, n), 'spartan3e') + REGISTERS;
+    assert.ok(est >= period && est < 2 * period, `${n} additions: ${est} against ${period}`);
+  }
+});
+
+test('#2080 a family\'s clock: the same graph fits the Artix-7 and not the Spartan-3E; Artix-7 is the default, as before', () => {
+  const g = chainOf('add', 32, 3);
+  assert.equal(pathDelay(g), pathDelay(g, 'artix7'));
+  assert.deepEqual([fitsClock(g), fitsClock(g, 10, 'artix7'), fitsClock(g, 10, 'spartan3e'), fitsClock(g, 20, 'spartan3e')], [true, true, false, true]);
+});
+
+test('#2080 every operation of the graph has a delay in each family: <= counts as a carry chain, as < does', () => {
+  for (const f of Object.keys(FAMILIES)) {
+    const lt = pathDelay(chainOf('lt', 32, 1), f), le = pathDelay(chainOf('le', 32, 1), f);
+    assert.ok(lt > 0);
+    assert.equal(le, lt, f);
+    for (const op of ['add', 'sub', 'neg', 'lt', 'le', 'gt', 'ge', 'eq', 'ne', 'mul', 'mux', 'and', 'or', 'xor', 'not', 'shl', 'shr']) assert.equal(typeof FAMILIES[f][op], 'function', `${f} ${op}`);
+  }
 });
