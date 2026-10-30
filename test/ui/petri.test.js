@@ -293,11 +293,15 @@ uiTest('Petri Net Wizard (#208): New Source ▸ Petri Net ▸ Wizard > (#958), t
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   await newSourceWizardOf(page, 'Petri Net', 'ctl', 'Petri Net Wizard', { location: 'nets' });
-  // its first page: the inputs and outputs (#2082), no quick-add buttons (#2082: only the user's own ports)
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-side .step')].map((e) => e.textContent)), ['Inputs and Outputs', 'Summary']);
-  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3').textContent), 'Inputs and Outputs');
+  // its first page: the template (#2149; the empty one), then the inputs and outputs (#2082), no quick-add buttons
+  // (#2082: only the user's own ports)
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.dlg-overlay .wiz-side .step')].map((e) => e.textContent)), ['Template', 'Inputs and Outputs', 'Summary']);
+  assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .tp-template').value), 'empty');
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main').innerText), /Description \(optional\):/);
+  await page.dialogButton('Next >');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Inputs and Outputs', [], { what: 'Inputs and Outputs' });
   assert.deepEqual(await page.eval(() => [document.querySelectorAll('.dlg-overlay .mw-quick, .dlg-overlay .mw-qa').length, /Quick add/.test(document.querySelector('.dlg-overlay').innerText)]), [0, false]);
-  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main').innerText), /No ports yet: use Add Port\.[\s\S]*Description \(optional\):/);
+  assert.match(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main').innerText), /No ports yet: use Add Port\./);
   for (let k = 0; k < 4; k++) await page.click('.dlg-overlay .mw-add');
   for (const [k, [n, d, w]] of [['go', 'in', 1], ['sel', 'in', 3], ['busy', 'out', 1], ['st', 'out', 2]].entries()) {
     await page.fill('.dlg-overlay .mw-pname', n, { index: k });

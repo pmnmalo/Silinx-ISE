@@ -145,7 +145,9 @@ uiTest('New Source: Cancel and New Source again start afresh (the default type, 
   assert.equal(await page.eval(() => document.querySelector('.dlg-overlay .wiz-main input[type=text]').value), 'w1');
   await page.dialogButton('Wizard >');
   await page.waitDialog('Petri Net Wizard');
-  // its own first page (#2082), the name typed: in its summary
+  // its own first page (#2082, the template's, #2149), the name typed: in its summary
+  await page.dialogButton('Next >');
+  await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Inputs and Outputs', [], { what: 'Inputs and Outputs' });
   await page.dialogButton('Next >');
   await page.waitFor(() => /src\/w1\.pn\.json/.test(document.querySelector('.dlg-overlay .mw-summary')?.textContent || ''), [], { what: 'the summary with w1' });
   await close(page);
