@@ -34,7 +34,8 @@ const SOURCE_TYPES = [
   { id: 'vhdl-pkg', label: 'VHDL Package', ico: 'vhdl', ext: '.vhd', dir: 'src', hidden: true },
 ];
 
-export async function newSourceWizard({ type } = {}) {
+// name, location, lang, atFile: a wizard's < Back (#2082): New Source again at the File Name and Location page, as left
+export async function newSourceWizard({ type, name = '', location = null, lang = null, atFile = false } = {}) {
   if (!S.project) return;
   // old type ids (vhdl, verilog, vhdl-tb, verilog-tb) still accepted: they preset the language; the old wizard types
   // (modwiz, schwiz, pnwiz, tbwiz) select the type whose Wizard button opens that wizard (#958)
@@ -43,11 +44,11 @@ export async function newSourceWizard({ type } = {}) {
   let st = SOURCE_TYPES.find(t => t.id === (LEGACY[type]?.[0] || type)) || SOURCE_TYPES.find(t => t.id === 'hdl');   // default: Module (HDL)
   const shown = () => SOURCE_TYPES.filter(t => !t.hidden || t === st);
   // language of HDL modules and test benches (Define Module / Associate Source pages)
-  const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
+  const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], lang || LEGACY[type]?.[1] || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl'));
   const extOf = t => t.ext ?? (langSel.value === 'verilog' ? '.v' : '.vhd');
   const guard = replaceGuard('New Source');
-  const fname = h('input', { type: 'text', placeholder: 'file name' });
-  const loc = h('input', { type: 'text', value: st.dir });
+  const fname = h('input', { type: 'text', placeholder: 'file name', value: name });
+  const loc = h('input', { type: 'text', value: location ?? st.dir });
   const list = h('div', { class: 'src-types' });
   let refresh = () => {};   // the wizard's steps and buttons for the type now (bound by the wizard)
   const renderList = () => {
@@ -228,11 +229,12 @@ export async function newSourceWizard({ type } = {}) {
   // checked there as src/x.fsm.json and written as src/x.fsm.json.fsm.json)
   pSum.validate = () => guard(`${loc.value.trim().replace(/\/+$/, '')}/${nameOf()}${extOf(st)}`);
   const ok = await wizard('New Source', pages, {
-    width: 760, bind: r => { refresh = r; },
+    width: 760, bind: r => { refresh = r; }, start: atFile ? 1 : 0,
     extra: { label: 'Wizard >', value: 'wizard', shown: p => p === pFile, disabled: () => !st.wiz, validate: wizardError },
   });
   if (!ok) return;
-  if (ok === 'wizard') return openWizard(st.wiz, { name: nameOf(), location: loc.value.trim().replace(/\/+$/, ''), lang: langSel.value, ext: st.ext });
+  if (ok === 'wizard') return openWizard(st.wiz, { name: nameOf(), location: loc.value.trim().replace(/\/+$/, ''), lang: langSel.value, ext: st.ext,
+    back: () => newSourceWizard({ type: st.id, name: fname.value.trim(), location: loc.value.trim(), lang: langSel.value, atFile: true }) });
   const n = nameOf();
   const path = `${loc.value.trim().replace(/\/+$/, '')}/${n}${extOf(st)}`;
   let text;
@@ -315,16 +317,17 @@ const identOf = name => name.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').
 
 // the wizard of a source type (New Source ▸ Wizard >, #958) with the file name, the location and the language typed:
 // it opens at its own pages, without its page of the name (named, #2082)
-async function openWizard(wiz, { name, location, lang, ext }) {
-  const o = { name: identOf(name), location, lang, named: true };
+// (< Back on its first page: New Source again, `back`)
+async function openWizard(wiz, { name, location, lang, ext, back }) {
+  const o = { name: identOf(name), location, lang, named: true, back };
   switch (wiz) {
     case 'module': return (await import('./modwizard.js')).moduleWizard(o);
     case 'schematic': return (await import('./modwizard.js')).schematicWizard(o);
     case 'petri': return (await import('./petri-wizard.js')).petriWizard(o);
     case 'fsm': return (await import('./chart-wizards.js')).fsmWizard(o);
     case 'asm': return (await import('./chart-wizards.js')).asmWizard(o);
-    case 'ucf': return (await import('./ucf-wizard.js')).ucfWizard({ path: `${location}/${name}${ext}` });
-    case 'testbench': return (await import('./tbwizard.js')).testBenchWizard({ module: S.sel?.module, name: name || null, location, lang });
+    case 'ucf': return (await import('./ucf-wizard.js')).ucfWizard({ path: `${location}/${name}${ext}`, back });
+    case 'testbench': return (await import('./tbwizard.js')).testBenchWizard({ module: S.sel?.module, name: name || null, location, lang, back });
     case 'clock': return (await import('./clock-wizard.js')).clockWizard(o);
     case 'memory': return (await import('./bram-wizard.js')).blockMemoryWizard(o);
   }

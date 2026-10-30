@@ -24,7 +24,7 @@ export function petriFromPorts({ name, lang, description = '', ports, clock = 'c
   });
 }
 
-export async function petriWizard({ name = '', location = 'src', lang = null, named = false } = {}) {
+export async function petriWizard({ name = '', location = 'src', lang = null, named = false, back = null } = {}) {
   const guard = replaceGuard('Petri Net Wizard');
   if (!S.project) return;
   const L = lang || (S.project.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
@@ -70,7 +70,7 @@ export async function petriWizard({ name = '', location = 'src', lang = null, na
     },
     validate: () => guard(p1.path()),
   };
-  const ok = await wizard('Petri Net Wizard', namedPages(p1.page, [p1.page, p2, pSum], named, p1.tail), { width: 820 });
+  const ok = await wizard('Petri Net Wizard', namedPages(p1.page, [p1.page, p2, pSum], named, p1.tail), { width: 820, back });
   if (!ok) return;
   let m;
   try { m = net(); } catch (e) { return alertDlg('Petri Net Wizard', e.message, 'error'); }

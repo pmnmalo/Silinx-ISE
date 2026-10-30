@@ -18,7 +18,7 @@ const NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 export const designSources = () => S.sources.filter(s => s.role === 'design' && (s.lang === 'vhdl' || s.lang === 'verilog'));
 
-export async function testBenchWizard({ module, name = null, location = null, lang: langPick = null, task = null } = {}) {
+export async function testBenchWizard({ module, name = null, location = null, lang: langPick = null, task = null, back = null } = {}) {
   if (!S.project) return;
   await app.saveAll?.();
   const guard = replaceGuard('Test Bench Wizard');
@@ -235,7 +235,7 @@ export async function testBenchWizard({ module, name = null, location = null, la
   const all = [p1, p2, p3, p4, pSum];
   const list = () => (p4skip ? [p1, p2, p3, pSum] : all);
   const proxy = new Proxy(all, { get: (t, k) => (k === 'length' ? list().length : (typeof k === 'string' && /^\d+$/.test(k) ? list()[+k] : t[k])) });
-  const ok = await wizard('Test Bench Wizard', proxy, { width: 820 });
+  const ok = await wizard('Test Bench Wizard', proxy, { width: 820, back });
   if (!ok) return;
   let text;
   try { text = st.mode === 'none' ? generateSkeleton(tbOpts([])) : generateTestbench(tbOpts(vectorsBits())); } catch (e) { return alertDlg('Test Bench Wizard', e.message, 'error'); }
