@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { imports, dataPaths, relatedTests, reexportsOnly, shardOf, sources } from '../scripts/related-tests.mjs';
+import { imports, dataPaths, relatedTests, reexportsOnly, reexported, pageImports, shardOf, sources } from '../scripts/related-tests.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -271,4 +271,27 @@ test('PR tests: every pull request, three parts, the related-tests verdict main 
   assert.match(yml, /fetch-depth: 0\n\s+- uses: \.\/\.github\/actions\/setup\n\s+- run: >-\n\s+node scripts\/related-tests\.mjs "origin\/\$BASE" HEAD --shard "\$SHARD\/3"\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+env:\n\s+BASE: \$\{\{ github\.base_ref \}\}/);
   assert.match(yml, /\n {2}related-tests:\n {4}if: always\(\)\n {4}needs: \[tests\]\n[\s\S]*- if: contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\)\n\s+run: exit 1\n/);
   for (const f of ['CLAUDE.md', 'ONBOARDING.md']) assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /related-tests/, f);
+});
+
+test('#2093 related tests: through a module re-exporting names of a changed one; a UI test importing a changed module; a page script\'s absolute imports', () => {
+  assert.deepEqual(reexported("export { a, b } from './x.js';\nexport * from '../y.js';\nexport * as z from './z.js';\nimport { c } from './c.js';\nexport const d = 1;\n"), ['./x.js', '../y.js', './z.js']);
+  assert.deepEqual(pageImports("import { S } from '/core/schdoc.js';\nimport { h } from './dom.js';\nconst m = await import('/js/i18n.js');\n"), ['/core/schdoc.js']);
+  const files = {
+    'core/sym.js': 'export const SYMBOLS = {};',
+    'core/doc.js': "export { SYMBOLS } from './sym.js';\nexport const newDoc = () => ({});",
+    'test/multi.test.js': "import { SYMBOLS } from '../core/doc.js';",
+    'test/ui/sch-bits.test.js': "import { newDoc } from '../../core/doc.js';",
+    'test/ui/harness.js': '',
+    'web/js/props.js': "import { SYMBOLS } from '/core/doc.js';\nimport { h } from './dom.js';",
+    'web/js/dom.js': '',
+    'test/ui/props.test.js': "import { uiTest } from './harness.js';",
+    'test/ui/dom-free.test.js': "import { uiTest } from './harness.js';",
+  };
+  // core/sym.js changed: core/doc.js re-exports it (a split module's old one): its importers' unit and UI tests, and the
+  // UI test of the page script importing it by its absolute path
+  assert.deepEqual(relatedTests(files, ['core/sym.js']), { unit: ['test/multi.test.js'], ui: ['test/ui/props.test.js', 'test/ui/sch-bits.test.js'] });
+  // the repository: the symbols' module selects the tests that list the symbols' parameters (#2079's, #2081's breaks)
+  const real = relatedTests(sources(), ['core/schdoc-symbols.js']);
+  for (const t of ['test/schmulti.test.js', 'test/schsymbols.test.js', 'test/symdocs.test.js', 'test/inv-bits.test.js']) assert.ok(real.unit.includes(t), t);
+  for (const t of ['test/ui/sch-props.test.js', 'test/ui/sch-inv-bits.test.js']) assert.ok(real.ui.includes(t), t);
 });
