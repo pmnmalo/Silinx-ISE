@@ -33,15 +33,15 @@ test('nextpnrNetlist: what the micro-architecture cannot implement yet is named'
   // a cell it does not have; constants, carry chains and wide multiplexers are the micro-architecture's own (#2135)
   const json = JSON.parse(gates());
   const cells = cellsOf(json);
-  cells.ram = { type: 'RAM16X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
+  cells.ram = { type: 'RAM64X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
   cells.carry = { type: 'MUXCY', connections: { S: [12], DI: ['0'], CI: ['1'], O: [14] }, port_directions: { S: 'input', DI: 'input', CI: 'input', O: 'output' } };
   cells['$abc$20424$lut$aiger$o0'].connections.I3 = ['1'];
-  assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) RAM16X1S: not in the spartan3e micro-architecture yet']);
+  assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) RAM64X1S: not in the spartan3e micro-architecture yet']);
 });
 
 test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants, the buffers, the IOBs\' DDR registers, the block RAMs and multipliers; not a falling edge, a latch, a distributed RAM', () => {
-  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'IDDR2', 'ODDR2', 'BUFG', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
-  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'SRL16E', 'RAM16X1S', 'RAMB16_S3', 'MULT18X18SX', 'DCM_SP', 'OBUFDS', 'BUFGMUX']) assert.ok(!NEXTPNR_CELL.test(t), t);
+  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'IDDR2', 'ODDR2', 'BUFG', 'RAM16X1S', 'RAM16X1D', 'RAM32X1S', 'SRL16', 'SRL16E', 'SRLC16E', 'SRL16E_1', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
+  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'RAMB16_S3', 'MULT18X18SX', 'DCM_SP', 'OBUFDS', 'BUFGMUX']) assert.ok(!NEXTPNR_CELL.test(t), t);
 });
 
 test('#2136 the gates example built with --engine nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
@@ -66,10 +66,10 @@ test('#2136 the gates example built with --engine nextpnr: no warnings, its pads
   assert.equal(fs.statSync(path.join(dir, 'gates.bit')).size, 169288);
 });
 
-test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM16X1S): Map fails, naming them (exit 1)', { timeout: 300000 }, async () => {
+test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM64X1S): Map fails, naming them (exit 1)', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const json = JSON.parse(gates());
-  cellsOf(json).ram = { type: 'RAM16X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
+  cellsOf(json).ram = { type: 'RAM64X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
   fs.writeFileSync(path.join(dir, 'gates.json'), JSON.stringify(json));
   fs.writeFileSync(path.join(dir, 'gates.ucf'), ucf());
   const out = [], err = [];
@@ -81,7 +81,7 @@ test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM
     'silinx-fpga: the nextpnr engine cannot implement this design yet: 1 problem(s)',
   ]);
   // (the problems and the hint: the log's, after the error)
-  const at = out.indexOf('  1 cell(s) RAM16X1S: not in the spartan3e micro-architecture yet');
+  const at = out.indexOf('  1 cell(s) RAM64X1S: not in the spartan3e micro-architecture yet');
   assert.ok(at > 0, out.join('\n'));
   assert.equal(out[at + 1], 'Choose the Silinx engine (Toolchain Settings): nextpnr\'s Spartan-3E is growing (#2135).');
   assert.ok(!fs.existsSync(path.join(dir, 'gates.bit')));
@@ -211,4 +211,17 @@ test('#2190 MUXF7 and MUXF8 built with --engine nextpnr: no warnings, its PERIOD
   // one F6MUX per MUXF6, MUXF7 and MUXF8 of the trees; the fourth MUXF7 a LUT
   const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
   assert.equal(design.insts.reduce((n, i) => n + i.cfg.filter(c => c.attr === 'F6MUX').length, 0), 10);
+});
+
+test('#2191 the SLICEM\'s memories built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fixture('slicemem.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('slicemem.ucf').pathname, '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  assert.equal(design.insts.filter(i => i.type === 'SLICEM').length, 9);
 });

@@ -62,7 +62,7 @@ export function timingExport(device) {
   let disagree = 0;
   for (const [t, v] of votes) pipClass[t] = v.map(m => { if (m.size > 1) disagree++; return mostFrequent(m); });
   const slice = Object.fromEntries(Object.entries(SPEED_4.slice).map(([k, [l]]) => [k, l]));
-  const timing = { wireNames: WIRE_NAMES, wire: SPEED_4.wire, lutPin: SPEED_4.lutPin, base: SPEED_4.base, dist: SPEED_4.dist, slice, bram: SPEED_4.bram, mult: SPEED_4.mult, pad: SPEED_4.pad, pipClass };
+  const timing = { wireNames: WIRE_NAMES, wire: SPEED_4.wire, lutPin: SPEED_4.lutPin, base: SPEED_4.base, dist: SPEED_4.dist, slice, bram: SPEED_4.bram, mult: SPEED_4.mult, pad: SPEED_4.pad, mem: SPEED_4.mem, pipClass };
   return { timing, disagree };
 }
 
@@ -72,6 +72,7 @@ function netlistSim(mod, inputs) {
   const S = { val: new Map(), luts: [], ffs: [] };
   // (a bus's bits by name[i], as the XDL's pads are named)
   S.pads = new Map();   // input name -> the values it sets
+  const wmates = [], memByName = new Map();
   for (const [name, p] of Object.entries(mod.ports)) if (p.direction === 'input') p.bits.forEach((b, i) => S.pads.set(p.bits.length > 1 ? `${name}[${i}]` : name, [b]));
   for (const [name, c] of Object.entries(mod.cells)) {
     const con = p => portNet(c, p);
@@ -84,12 +85,47 @@ function netlistSim(mod, inputs) {
     else if (c.type === 'MUXCY') S.luts.push({ out: con('O'), fn: () => (S.get(con('S')) ? S.get(con('CI')) : con('DI') !== undefined ? S.get(con('DI')) : +String(c.parameters.CY0 ?? 0).trim()) });
     else if (c.type === 'XORCY') S.luts.push({ out: con('O'), fn: () => S.get(con('CI')) ^ S.get(con('LI')) });
     // the wide multiplexers: S ? I1 : I0
+    // a memory: its contents (written or shifted at a clock edge, clock()), read at its address
+    else if (/^MEM16[FG]$/.test(c.type)) {
+      const m = memState(S, bitsOf(c.parameters.INIT).padStart(16, '0').split('').reverse().map(Number), { mode: String(c.parameters.MODE).trim(), read: [0, 1, 2, 3].map(i => con(`A${i}`)), write: null, d: con('D'), en: con('SR'), a4: con('A4'), falling: parseInt(bitsOf(c.parameters.CLKINV ?? '0'), 2) === 1, o: con('O'), q15: con('Q15') });
+      if (c.parameters.WMATE) wmates.push([m, String(c.parameters.WMATE).trim()]);
+      memByName.set(name, m);
+    }
     else if (/^MUXF[5-8]$/.test(c.type)) S.luts.push({ out: con('O'), fn: () => S.get(con(S.get(con('S')) ? 'I1' : 'I0')) });
   }
   S.get = b => (b === undefined || b === '0' ? 0 : b === '1' ? 1 : S.val.get(b) || 0);
+  // (a dual port's F or a RAM32X1S's: its data G's; a dual port's written at G's address)
+  for (const [m, g] of wmates) { m.d = memByName.get(g).d; if (m.mode === 'DUAL') m.write = memByName.get(g).read; }
   setInputs(S, inputs);
   S.lut = l => (l.fn ? l.fn() : +l.init[15 - l.ins.reduce((a, b, i) => a | (S.get(b) << i), 0)]);
   return S;
+}
+
+/** A memory in a simulation: its bits, an output at its read address, Q15 its last stage. */
+function memState(S, bits, m) {
+  const mem = { bits, write: null, ...m };
+  (S.mems ||= []).push(mem);
+  const addr = ns => ns.reduce((a, n, k) => a | (S.get(n) << k), 0);
+  mem.addr = addr;
+  if (m.o !== undefined) S.luts.push({ out: m.o, fn: () => mem.bits[addr(mem.read)] });
+  if (m.q15 !== undefined) S.luts.push({ out: m.q15, fn: () => mem.bits[15] });
+  return mem;
+}
+
+/** The memories' next contents at a clock edge (their inputs as they were before it). */
+function memEdges(S, falling) {
+  const out = [];
+  for (const m of S.mems || []) {
+    if (!!m.falling !== falling || !S.get(m.en)) continue;
+    const d = S.get(m.d);
+    if (m.mode === 'SHIFT') { out.push([m, [d, ...m.bits.slice(0, 15)]]); continue; }
+    if (m.mode === 'RAM32G' && S.get(m.a4)) continue;
+    if (m.mode === 'RAM32F' && !S.get(m.a4)) continue;
+    const next = [...m.bits];
+    next[m.addr(m.write || m.read)] = d;
+    out.push([m, next]);
+  }
+  return out;
 }
 
 /** The XDL's simulation: its slices' LUT equations on their site pins, the carry (CYINIT, CY0F / CY0G, CYMUXF / CYMUXG,
@@ -97,6 +133,7 @@ function netlistSim(mod, inputs) {
  *  set / reset; the IOBs' registers. */
 function xdlSim(design, inputs) {
   const S = { val: new Map(), luts: [], ffs: [], pads: new Map() };
+  S.get = n => (n === undefined ? 0 : S.val.get(n) || 0);
   const netOfPin = new Map();
   for (const n of design.nets) for (const p of [...n.outpins, ...n.inpins]) netOfPin.set(`${p.inst} ${p.pin}`, n.name);
   for (const inst of design.insts) {
@@ -119,12 +156,22 @@ function xdlSim(design, inputs) {
         // FXMUX / GYMUX: the LUT, the sum or the wide multiplexer
         const wide = cfg[side === 'F' ? 'F5USED' : 'FXUSED'] ? pin(side === 'F' ? 'F5' : 'FX') : at(side === 'F' ? 'F5' : 'FX');
         const fx = mux && /XOR$/.test(mux.value) ? at(`XOR${side}`) : mux && /^F[5X]$/.test(mux.value) ? wide : out;
-        if (cfg[side]) S.luts.push({ eq: cfg[side].value.replace(/^#LUT:/, ''), ins: [1, 2, 3, 4].map(k => pin(`${side}${k}`)), out });
+        if (/^#RAM/.test(cfg[side]?.value || '')) {
+          const v = parseInt(cfg[side].value.replace(/^#RAM:D=0x/, ''), 16), read = [1, 2, 3, 4].map(k => pin(`${side}${k}`));
+          const dmux = cfg[side === 'F' ? 'DIF_MUX' : 'DIG_MUX']?.value;
+          const d = dmux === 'SHIFTIN' ? (side === 'F' ? at('GQ15') : pin('SHIFTIN')) : dmux === 'BX' ? pin('BX') : pin('BY');
+          const shift = cfg[`${side}_ATTR`]?.value === 'SHIFT_REG', ram32 = !!cfg.SLICEWE0USED;
+          memState(S, Array.from({ length: 16 }, (_, a) => (v >> a) & 1), { mode: shift ? 'SHIFT' : ram32 ? `RAM32${side}` : 'RAM', read, d, en: pin('SR'), a4: pin('BX'),
+            falling: cfg.CLKINV?.value === 'CLK_B', o: out, q15: side === 'G' ? at('GQ15') : cfg.SHIFTOUTUSED ? pin('SHIFTOUT') : undefined,
+            write: side === 'F' && cfg.F_ATTR?.value === 'DUAL_PORT' ? [1, 2, 3, 4].map(k => pin(`G${k}`)) : null });
+          S.mems.at(-1).write = side === 'F' && cfg.F_ATTR?.value === 'DUAL_PORT' ? [1, 2, 3, 4].map(k => pin(`G${k}`)) : null;
+        } else if (cfg[side]) S.luts.push({ eq: cfg[side].value.replace(/^#LUT:/, ''), ins: [1, 2, 3, 4].map(k => pin(`${side}${k}`)), out });
         if (mux && pin(X)) S.luts.push({ copy: fx, out: pin(X) });
         if (cfg[ff]) {
           S.ffs.push({
             name: cfg[ff].name, d: cfg[`D${X}MUX`]?.value === '1' ? fx : pin(`B${X}`), q: pin(`${X}Q`),
-            ce: cfg.CEINV ? pin('CE') : undefined, sr: cfg.SRINV ? pin('SR') : undefined,
+            ce: cfg.CEINV ? pin('CE') : undefined, sr: cfg.SRINV && !cfg.WSGEN ? pin('SR') : undefined,   // (beside a memory, SR is its enable)
+           
             set: cfg[`${ff}_SR_ATTR`]?.value === 'SRHIGH', init: cfg[`${ff}_INIT_ATTR`]?.value === 'INIT1' ? 1 : 0,
           });
           S.ffs.at(-1).hasSr = S.ffs.at(-1).sr !== undefined;
@@ -172,6 +219,7 @@ function settle(S, what) {
 
 /** A clock edge on the flip-flops of that edge: set / reset before REV, the enable last. */
 function clock(S, falling = false) {
+  const mems = memEdges(S, falling);
   const ffs = S.ffs.filter(f => !!f.falling === falling);
   const next = ffs.map(f => {
     if (f.hasSr && S.get(f.sr)) return f.set ? 1 : 0;
@@ -179,6 +227,7 @@ function clock(S, falling = false) {
     return f.ce === undefined || S.get(f.ce) ? S.get(f.d) : S.get(f.q);
   });
   ffs.forEach((f, i) => S.val.set(f.q, next[i]));
+  for (const [m, bits] of mems) m.bits = bits;
 }
 
 /**
@@ -195,7 +244,7 @@ export function simCheck(json, design, { cycles = 1000, starts = 0, inputs = {},
   for (const f of A.ffs) if (!byName.has(f.name)) return { ok: false, flipFlops: A.ffs.length, message: `flip-flop ${f.name} not in the XDL` };
   let seed = 1;
   const rand = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
-  const edges = A.ffs.some(f => f.falling) ? [false, true] : [false];
+  const edges = A.ffs.some(f => f.falling) || A.mems?.some(m => m.falling) ? [false, true] : [false];
   const run = (n, from) => {
     for (let t = 0; t < n; t++) {
       // (each edge in turn: a DDR register's second flip-flop on the falling one)

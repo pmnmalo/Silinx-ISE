@@ -7,6 +7,7 @@ import { initToEquation } from './lut.js';
 import { paramBits } from './netlist.js';
 import { BRAM_WIDTH } from './pack.js';
 import { iobSettings } from './nextpnr-iob.js';
+import { memCfg, memSiteRoute } from './nextpnr-mem.js';
 
 const topModule = json => Object.entries(json.modules).find(([, m]) => m.attributes?.top) || Object.entries(json.modules)[0];
 const esc = x => String(x).replace(/:/g, '_');
@@ -84,6 +85,8 @@ function siteRoutes(mod, insts, v) {
       if (!m) continue;
       const inst = insts.get(v.siteName(tile, +m[1]));
       if (!inst || !/^SLICE/.test(inst.siteType)) continue;       // (an IOB's: its settings come from its cells)
+      const pinOfMem = w => v.pinOfWire(v.tileAt.get(tile)).get(w)?.pin;
+      if (memSiteRoute(inst, src, dst, pinOfMem)) continue;
       const pinOf = w => v.pinOfWire(v.tileAt.get(tile)).get(w)?.pin;   // a site pin's name (F1, BX, CIN…)
       let x;
       if ((x = /^S\d+_([FG])I(\d)$/.exec(dst))) (inst.lutPins[x[1]] ||= [])[+x[2]] = +pinOf(src)[1];   // F1..F4 / G1..G4
@@ -198,8 +201,10 @@ function instanceCfg(inst, mod, part) {
     add('_NO_USER_LOGIC', '', '');
     if (c.GND) add('_GND_SOURCE', '', 'Y'); else add('_VCC_SOURCE', '', 'VCCOUT');
   } else if (inst.siteType === 'SLICEL' || inst.siteType === 'SLICEM') {
-    inst.type = 'SLICEL';                // (logic on a SLICEM site too: ISE's DRC wants a SLICEL comp there)
-    inst.name = esc((c.FFX || c.FFY || c.FLUT || c.GLUT || c.CYMUXF || c.XORF || c.F5MUX || c.FXMUX).name);
+    const mem = !!(c.FMEM || c.GMEM);
+    inst.type = mem ? 'SLICEM' : 'SLICEL';   // (logic on a SLICEM site too: ISE's DRC wants a SLICEL comp there)
+    inst.name = esc((c.FFX || c.FFY || c.FLUT || c.GLUT || c.CYMUXF || c.XORF || c.F5MUX || c.FXMUX || c.FMEM || c.GMEM).name);
+    if (mem) memCfg(inst, add, 'luts');
     for (const [side, lut] of [['F', c.FLUT], ['G', c.GLUT]]) if (lut) add(side, esc(lut.name), `#LUT:${initToEquation(bitsOf(lut.parameters.INIT), 4, lutPins(inst.lutPins[side]))}`);
     let ctrl = null;
     for (const [X, ff] of [['X', c.FFX], ['Y', c.FFY]]) {
@@ -207,22 +212,24 @@ function instanceCfg(inst, mod, part) {
       const init = parseInt(bitsOf(ff.parameters.INIT ?? '0'), 2) & 1, mode = strParam(ff, 'SRMODE') ?? 'NONE';
       add(`FF${X}`, esc(ff.name), '#FF');
       add(`FF${X}_INIT_ATTR`, '', init ? 'INIT1' : 'INIT0');
-      add(`FF${X}_SR_ATTR`, '', /_SET$/.test(mode) || (mode === 'NONE' && init) ? 'SRHIGH' : 'SRLOW');
+      add(`FF${X}_SR_ATTR`, '', /_SET$/.test(mode) || (mode === 'NONE' && init && !mem) ? 'SRHIGH' : 'SRLOW');
       add(`D${X}MUX`, '', inst.mux[`D${X}`] === 'bypass' ? '0' : '1');
       ctrl = { ce: portNet(ff, 'CE') !== undefined, sr: portNet(ff, 'SR') !== undefined, sync: !/ASYNC/.test(mode) };
     }
+    if (mem) memCfg(inst, add, 'controls');
     if (ctrl) {
-      add('CLKINV', '', 'CLK');
+      if (!mem) add('CLKINV', '', 'CLK');
       if (ctrl.ce) add('CEINV', '', 'CE');
       if (ctrl.sr) add('SRINV', '', 'SR');
-      add('SYNC_ATTR', '', ctrl.sync ? 'SYNC' : 'ASYNC');
+      // (beside a memory, whose enable has SR: a flip-flop with no set / reset, as Silinx's packer writes it)
+      add('SYNC_ATTR', '', ctrl.sync && !(mem && !ctrl.sr) ? 'SYNC' : 'ASYNC');
     }
     carryCfg(inst, add);
     // the wide multiplexers: F5MUX (select BX), F6MUX (the FXMUX BEL, select BY), their outputs out of the site
     if (c.F5MUX) { add('F5MUX', esc(c.F5MUX.name), ''); if (inst.f5out) add('F5USED', '', '0'); }
     if (c.FXMUX) { add('F6MUX', esc(c.FXMUX.name), ''); if (inst.fxout) add('FXUSED', '', '0'); }
-    const bx = inst.mux.DX === 'bypass' || inst.mux.CYINIT === 'BX' || inst.mux.CY0F === 'BX' || !!c.F5MUX;
-    const by = inst.mux.DY === 'bypass' || inst.mux.CY0G === 'BY' || !!c.FXMUX;
+    const bx = inst.mux.DX === 'bypass' || inst.mux.CYINIT === 'BX' || inst.mux.CY0F === 'BX' || !!c.F5MUX || inst.mux.DIF === 'BX';
+    const by = inst.mux.DY === 'bypass' || inst.mux.CY0G === 'BY' || !!c.FXMUX || inst.mux.DIF === 'ALTDIF' || inst.mux.DIG === 'BY';
     if (bx) add('BXINV', '', 'BX');
     if (by) add('BYINV', '', 'BY');
     // FXMUX / GYMUX: the LUT, the carry's sum or the wide multiplexer, to X / Y or to the flip-flop
@@ -336,7 +343,7 @@ function tieSelects(xdlInsts, nets, device) {
 /**
  * nextpnr-himbaechel's routed design (spartan3e micro-architecture, its --write JSON) as an XDL design (parseXdl's
  * structure: writeXdl writes it): one instance per used site with its settings, each net's site pins and PIPs.
- * Its cells: LUT4, FF, MUXCY, XORCY, MUXF5, MUXF6, IOB (with its registers IFF, OFF, TFF), BUFGMUX. Throws when a LUT input
+ * Its cells: LUT4, MEM16, FF, MUXCY, XORCY, MUXF5 .. MUXF8, IOB (with its registers IFF, OFF, TFF), BUFGMUX. Throws when a LUT input
  * is not on the pin its equation reads.
  */
 export function nextpnrToXdl(json, device, part = device.part) {
