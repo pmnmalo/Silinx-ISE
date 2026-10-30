@@ -271,7 +271,7 @@ export function generateHdl(docIn, opts = {}) {
   }
   for (const x of extra) {
     if (ci) sigDecls.push(`  signal ${hdlName(x.name, lang)} : ${x.type || vtype(x.width || 1)}${x.init ? ` := ${(x.type || '').startsWith('std_logic') && !(x.type || '').includes('vector') ? vhdlBits(x.init, true) : vhdlBits(x.init, false)}` : ''};`);
-    else sigDecls.push(`  ${x.reg ? 'reg ' : 'wire'}${(x.width || 1) > 1 ? ` [${x.width - 1}:0]` : ''} ${hdlName(x.name, lang)};`);
+    else sigDecls.push(`  ${x.reg ? 'reg ' : 'wire'}${(x.width || 1) > 1 ? ` [${x.width - 1}:0]` : ''} ${hdlName(x.name, lang)}${x.reg && x.init ? ` = ${vlogBits(x.init)}` : ''};`);
   }
   const vdecls = verbatimOK && (hdl.decls || '').trim() ? indent(dedentBlock(hdl.decls), '  ') : '';
   // one-line statements one after the other; a blank line around a statement of several lines (an

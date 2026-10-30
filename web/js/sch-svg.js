@@ -204,13 +204,15 @@ function typeInside(sym, def, name) {
 }
 const AUTO_NAME = /^(XLXI_\d+|inst_\d+|U\d+)$/;
 // a pin's name inside the body, past its lead and clock triangle (L px from the pin's end); on the top or the bottom
-// side, upright, or turned to read upwards (vertical: names that would not fit 20 px apart, as ISE turns them, #1134)
-function pinName(p, L, label, vertical) {
+// side, upright, or turned to read upwards (vertical: names that would not fit 20 px apart, as ISE turns them, #1134);
+// over: the name barred (a flip-flop's QN, /Q, #2161)
+function pinName(p, L, label, vertical, over = false) {
   const v = { W: [1, 0], E: [-1, 0], N: [0, 1], S: [0, -1] }[p.side];
-  if (v[0]) return `<text class="pname" x="${p.x + v[0] * (L + 3)}" y="${p.y + 3}" text-anchor="${v[0] > 0 ? 'start' : 'end'}">${esc(label)}</text>`;
-  if (!vertical) return `<text class="pname" x="${p.x}" y="${p.y + (v[1] > 0 ? L + 10 : -(L + 4))}" text-anchor="middle">${esc(label)}</text>`;
+  const cls = `class="pname"${over ? ' text-decoration="overline"' : ''}`;
+  if (v[0]) return `<text ${cls} x="${p.x + v[0] * (L + 3)}" y="${p.y + 3}" text-anchor="${v[0] > 0 ? 'start' : 'end'}">${esc(label)}</text>`;
+  if (!vertical) return `<text ${cls} x="${p.x}" y="${p.y + (v[1] > 0 ? L + 10 : -(L + 4))}" text-anchor="middle">${esc(label)}</text>`;
   const x = p.x + 3, y = p.y + v[1] * (L + 3);
-  return `<text class="pname" x="${x}" y="${y}" transform="rotate(-90 ${x} ${y})" text-anchor="${v[1] > 0 ? 'end' : 'start'}">${esc(label)}</text>`;
+  return `<text ${cls} x="${x}" y="${y}" transform="rotate(-90 ${x} ${y})" text-anchor="${v[1] > 0 ? 'end' : 'start'}">${esc(label)}</text>`;
 }
 // the names on the top and the bottom turned when one of them is longer than 2 letters
 const verticalNames = (pins, label = p => p.name) => pins.some(p => (p.side === 'N' || p.side === 'S') && label(p).length > 2);
@@ -320,8 +322,8 @@ function textsSvg(sym, def, ctx = {}) {
       // demux select: the lead ends on the sloped edge; clock pins: room for the clock triangle
       const L = 20 + (def.shape === 'demux' && p.ly === def.h ? 6 : 0) + (p.clock ? 8 : 0);
       // (a demultiplexer a bit, #2081: each row's names as the one-bit one's, D and O0, O1…; the selects' on each, #2127)
-      const name = def.rows > 1 ? p.name.replace(/_\d+$/, '').replace(/^D\d+$/, 'D') : p.name;
-      for (const q of [p, ...rowSelects(sym, def, p, def.pins[i])]) s += pinName(q, L, name, vertical);
+      const neg = !!def.pins[i].neg, name = neg ? 'Q' : def.rows > 1 ? p.name.replace(/_\d+$/, '').replace(/^D\d+$/, 'D') : p.name;
+      for (const q of [p, ...rowSelects(sym, def, p, def.pins[i])]) s += pinName(q, L, name, vertical, neg);
       if ((p.width || 1) > 1) s += pinWidth(p);
     }
   } else if (pinLabels) {

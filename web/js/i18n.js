@@ -310,7 +310,7 @@ const PT = {
   'Output bits': 'Bits de saída', 'Bus pins (I, A)': 'Pinos em barramento (I, A)', 'Select bits': 'Bits de seleção', 'Type': 'Tipo',
   'priority': 'prioridade',
   // tri-state buffers (BUFE / BUFT)
-  'Buffers': 'Buffers', 'Enable input': 'Entrada de habilitação', 'Pins per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)',
+  'Buffers': 'Buffers', 'Enable input': 'Entrada de habilitação', 'Pins per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)', 'Inverted output QN (/Q)': 'Saída invertida QN (/Q)',
   'Tri-state buffer: O = I while enabled, Z (high impedance, released) otherwise; E active high (BUFE) or T active low (BUFT)': 'Buffer de três estados: O = I enquanto habilitado, Z (alta impedância, libertado) caso contrário; E ativo a 1 (BUFE) ou T ativo a 0 (BUFT)',
   'Tri-state buffer, active-high enable: O = I when E = 1, Z when E = 0': 'Buffer de três estados, habilitação ativa a 1: O = I quando E = 1, Z quando E = 0',
   'Tri-state buffer, active-low enable T: O = I when T = 0, Z when T = 1': 'Buffer de três estados, habilitação T ativa a 0: O = I quando T = 0, Z quando T = 1',

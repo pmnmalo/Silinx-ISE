@@ -91,7 +91,7 @@ test('the same parameter name with other choices: not common (a flip-flop\'s INI
   const doc = extra();
   doc.symbols.push({ id: 'S5', type: 'fdc', name: 'U5', x: 600, y: 400 }, { id: 'S6', type: 'register', name: 'R1', x: 800, y: 400 });
   const d = normalizeDoc(doc);
-  assert.deepEqual(brief(commonProps(d, ['sym:S4', 'sym:S5'])), ['param:init="0"', 'param:width=1']);
+  assert.deepEqual(brief(commonProps(d, ['sym:S4', 'sym:S5'])), ['param:init="0"', 'param:width=1', 'param:qn=false']);   // (QN, #2161)
   assert.deepEqual(['sym:S4', 'sym:S6'].map(k => symbolParams(d.symbols.find(s => s.id === k.slice(4))).find(p => p.name === 'init').kind), ['select', 'text']);
   assert.deepEqual(brief(commonProps(d, ['sym:S4', 'sym:S6'])), ['param:width=(mixed)']);
 });

@@ -79,7 +79,7 @@ const PARAM_PT = {
   'Type': 'Tipo', 'Bus pins (I, A)': 'Pinos em barramento (I, A)', 'Carry in': 'Transporte de entrada (carry in)',
   'Carry out': 'Transporte de saída (carry out)', 'Pins per bit (A0.., B0.., S0..)': 'Um pino por bit (A0.., B0.., S0..)', 'Pins per bit (A0.., B0..)': 'Um pino por bit (A0.., B0..)', 'Pins per bit (Q0..)': 'Um pino por bit (Q0..)', 'Pins per bit (A0.., B0.., D0..)': 'Um pino por bit (A0.., B0.., D0..)', 'Borrow in (BI)': 'Empréstimo de entrada (BI)', 'Borrow out (BO)': 'Empréstimo de saída (BO)', 'Operation': 'Operação', 'Comparisons': 'Comparações', 'Signed': 'Com sinal', 'Value': 'Valor',
   'Clock enable': 'Habilitação do relógio', 'Reset': 'Reset', 'Reset/INIT value': 'Valor de reset/INIT', 'Direction': 'Sentido',
-  'Enable input': 'Entrada de habilitação', 'Pins per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)',
+  'Enable input': 'Entrada de habilitação', 'Pins per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)', 'Inverted output QN (/Q)': 'Saída invertida QN (/Q)',
   // (a gate, a MUX, a DEMUX a bit, #2079, #2081)
   'Pins per bit (I0_0.., O0..)': 'Um pino por bit (I0_0.., O0..)', 'Pins per bit (D0_0.., O0..)': 'Um pino por bit (D0_0.., O0..)',
   'Pins per bit (D0.., O0_0..)': 'Um pino por bit (D0.., O0_0..)',
@@ -502,6 +502,7 @@ function pinFunc(type, p, pin, tx) {
       R: what ? tx(`Synchronous reset: 1 = Q takes ${type === 'counter' ? '0' : what} at the next rising edge`, `Reset síncrono: 1 = Q toma ${type === 'counter' ? '0' : what} no flanco ascendente seguinte`) : tx('Synchronous reset: 1 = Q = 0 at the next rising edge of C', 'Reset síncrono: 1 = Q = 0 no flanco ascendente seguinte de C'),
       S: tx('Synchronous set: 1 = Q = 1 at the next rising edge of C', 'Set síncrono: 1 = Q = 1 no flanco ascendente seguinte de C'),
       Q: type === 'counter' ? tx('Count value', 'Valor da contagem') : reg ? tx('Output: the stored word', 'Saída: a palavra guardada') : tx('Output: the stored bit', 'Saída: o bit guardado'),
+      QN: tx('Inverted output: not Q (/Q)', 'Saída invertida: o complemento de Q (/Q)'),
     }[n];
   }
   return '';
@@ -532,6 +533,7 @@ function paramMeaning(type, d, p, tx) {
       : tx('Adds the clock enable input CE (without it every rising edge acts)', 'Acrescenta a entrada de habilitação do relógio CE (sem ela todos os flancos ascendentes atuam)');
     case 'selBus': return tx('Draws the select bits as one bus pin S instead of one pin per bit (S1, S0…; same function), as a symbol drawn before the pins per bit', 'Desenha os bits de seleção como um único pino em barramento S em vez de um pino por bit (S1, S0…; mesma função), como um símbolo desenhado antes dos pinos por bit')
     case 'bus': return tx('Draws the multi-bit pins as one bus pin instead of one pin per bit (same function)', 'Desenha os pinos de vários bits como um único pino em barramento em vez de um pino por bit (mesma função)');
+    case 'qn': return tx('Adds the inverted output QN = not Q (/Q), below Q (no Xilinx library flip-flop has one)', 'Acrescenta a saída invertida QN = complemento de Q (/Q), por baixo de Q (nenhuma báscula da biblioteca Xilinx a tem)');
     case 'enable': return tx('E: enable active high (BUFE, O = I when E = 1); T: three-state control active low (BUFT, O = I when T = 0)', 'E: habilitação ativa a 1 (BUFE, O = I quando E = 1); T: controlo de três estados ativo a 0 (BUFT, O = I quando T = 0)');
     case 'bits': if (type === 'sub') return tx('With Width > 1: one pin per bit (A0.., B0.., D0..) instead of the bus pins A, B and D (same function)', 'Com Largura > 1: um pino por bit (A0.., B0.., D0..) em vez dos pinos em barramento A, B e D (mesma função)');
       if (type === 'compare') return tx('With Width > 1: one pin per bit (A0.., B0..) instead of the bus pins A and B (same function)', 'Com Largura > 1: um pino por bit (A0.., B0..) em vez dos pinos em barramento A e B (mesma função)');
