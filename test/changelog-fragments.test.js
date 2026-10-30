@@ -26,6 +26,19 @@ test('fragments of the repository: well formed, README.md apart', () => {
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'changes')).filter(f => !f.endsWith('.md')), []);
 });
 
+// silinx-fpga's own changelog (#1681): its fragments in packages/silinx-fpga/changes, the same format
+test('silinx-fpga\'s fragments: well formed, README.md apart; its CHANGELOG.md', () => {
+  const dir = path.join(ROOT, 'packages/silinx-fpga/changes');
+  assert.ok(fs.existsSync(path.join(dir, 'README.md')));
+  assert.deepEqual(checkFragments(readFragments(dir)), []);
+  assert.deepEqual(fs.readdirSync(dir).filter(f => !f.endsWith('.md')), []);
+  const md = fs.readFileSync(path.join(ROOT, 'packages/silinx-fpga/CHANGELOG.md'), 'utf8');
+  assert.match(md, /^# Changelog\n\nWhat changed in each version of silinx-fpga/);
+  // its versions are its own: none of Silinx ISE's
+  const ide = new Set(parseChangelog(fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8')).map(s => s.version));
+  assert.ok(parseChangelog(md).every(s => !ide.has(s.version) && /^0\./.test(s.version)));
+});
+
 test('parseFragment: the lists, In short optional, continuation lines kept', () => {
   assert.deepEqual(parseFragment(A.text), { short: ['- **Generate and Simulate:** short a\n  more a'], detail: ['- **Model (#490):** detail a\n  more'] });
   assert.deepEqual(parseFragment(B.text), { short: [], detail: ['- **Muxes (#511):** detail b', '- **Muxes, the test (#511):** detail b2'] });
@@ -174,7 +187,7 @@ test('scripts/changelog-release.mjs: refuses a malformed fragment, a bad version
   assert.equal(s.changes().length, 3, 'nothing deleted');
   r = s.run('2.1');
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /^usage: node scripts\/changelog-release\.mjs <version> \[--dry-run\]\n$/);
+  assert.match(r.stderr, /^usage: node scripts\/changelog-release\.mjs <version> \[--dry-run\] \[--package <name>\]\n$/);
   const e = sandbox(t, []);
   r = e.run('2.1.0');
   assert.equal(r.status, 1);
@@ -205,4 +218,62 @@ test('scripts/sync-version.mjs (npm version): refuses a version while fragments 
   assert.equal(r.stderr, '', 'no warnings');
   assert.equal(r.stdout, 'core/version.js: 2.1.0\n');
   assert.equal(version(), '2.1.0');
+});
+
+// a workspace's changelog (#1681): --package silinx-fpga, its packages/silinx-fpga/changes into its CHANGELOG.md
+const PKG_MD = '# Changelog\n\nWhat changed in each version of silinx-fpga.\n';
+function packageSandbox(t, fragments, version = '0.1.0') {
+  const s = sandbox(t, [A]);
+  fs.copyFileSync(path.join(ROOT, 'scripts/sync-version.mjs'), path.join(s.dir, 'scripts/sync-version.mjs'));
+  const pkg = path.join(s.dir, 'packages/silinx-fpga');
+  fs.mkdirSync(path.join(pkg, 'changes'), { recursive: true });
+  fs.writeFileSync(path.join(pkg, 'CHANGELOG.md'), PKG_MD);
+  fs.writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({ name: 'silinx-fpga', version }));
+  fs.writeFileSync(path.join(pkg, 'changes/README.md'), '# Fragments\n');
+  for (const f of fragments) fs.writeFileSync(path.join(pkg, 'changes', f.name), f.text);
+  const sync = (...a) => spawnSync(process.execPath, [path.join(s.dir, 'scripts/sync-version.mjs'), ...a], { cwd: s.dir, encoding: 'utf8' });
+  return { ...s, sync, pkgMd: () => fs.readFileSync(path.join(pkg, 'CHANGELOG.md'), 'utf8'), pkgChanges: () => fs.readdirSync(path.join(pkg, 'changes')).sort(),
+    versionJs: () => fs.readFileSync(path.join(s.dir, 'core/version.js'), 'utf8') };
+}
+
+test('scripts/changelog-release.mjs --package silinx-fpga: its fragments into its CHANGELOG.md; the IDE\'s untouched', (t) => {
+  const s = packageSandbox(t, [B, C]);
+  const dry = s.run('0.1.0', '--package', 'silinx-fpga', '--dry-run');
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.equal(dry.stdout, `## 0.1.0\n\n${changesOf(assembleRelease(PKG_MD, '0.1.0', [C, B]), '0.1.0').body}\n`);
+  assert.equal(s.pkgMd(), PKG_MD);
+  const r = s.run('0.1.0', '--package', 'silinx-fpga');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stderr, '', 'no warnings');
+  assert.equal(r.stdout, 'packages/silinx-fpga/CHANGELOG.md: 2 fragment(s) assembled into "## 0.1.0" and deleted from packages/silinx-fpga/changes/.\n');
+  assert.equal(s.pkgMd(), assembleRelease(PKG_MD, '0.1.0', [B, C]));
+  assert.deepEqual(s.pkgChanges(), ['README.md']);
+  assert.equal(s.md(), MD, 'the IDE\'s CHANGELOG.md unchanged');
+  assert.deepEqual(s.changes(), ['490-generate-and-simulate.md', 'README.md'], 'the IDE\'s fragments kept');
+  // errors: nothing to release, a package with no changelog, a bad name
+  let e = s.run('0.1.1', '--package', 'silinx-fpga');
+  assert.equal(e.status, 1);
+  assert.equal(e.stderr, 'no changelog fragments and no "## 0.1.1" section in packages/silinx-fpga/CHANGELOG.md: nothing to release\n');
+  e = s.run('0.1.0', '--package', 'silinx-hdl');
+  assert.equal(e.status, 1);
+  assert.equal(e.stderr, 'packages/silinx-hdl/CHANGELOG.md: no such file\n');
+  for (const bad of [['--package'], ['--package', '../x']]) assert.equal(s.run('0.1.0', ...bad).status, 2, bad.join(' '));
+});
+
+test('scripts/sync-version.mjs --package silinx-fpga: refuses its version with no section or fragments left, then passes; writes nothing', (t) => {
+  const s = packageSandbox(t, [B]);
+  const before = s.versionJs();
+  let r = s.sync('--package', 'silinx-fpga');
+  assert.equal(r.status, 1);
+  assert.equal(r.stderr, 'packages/silinx-fpga/CHANGELOG.md has no "## 0.1.0" section: write what changed in 0.1.0 before releasing it.\n');
+  fs.writeFileSync(path.join(s.dir, 'packages/silinx-fpga/CHANGELOG.md'), assembleRelease(PKG_MD, '0.1.0', [A]));
+  r = s.sync('--package', 'silinx-fpga');
+  assert.equal(r.status, 1);
+  assert.equal(r.stderr, 'packages/silinx-fpga/changes/ has fragments not in packages/silinx-fpga/CHANGELOG.md (511-wide-muxes.md): run node scripts/changelog-release.mjs 0.1.0 --package silinx-fpga first.\n');
+  assert.equal(s.run('0.1.0', '--package', 'silinx-fpga').status, 0);
+  r = s.sync('--package', 'silinx-fpga');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stderr, '', 'no warnings');
+  assert.equal(r.stdout, 'silinx-fpga 0.1.0: packages/silinx-fpga/CHANGELOG.md has its section, no fragment left\n');
+  assert.equal(s.versionJs(), before, 'core/version.js unchanged');
 });

@@ -51,7 +51,8 @@ npm start          # http://127.0.0.1:8642
    `changes/<issue>-<slug>.md` (`changes/490-generate-and-simulate.md`), with an optional "In short:" list
    (what users notice) and the "In detail:" list (the change, naming its issue), as in a section of
    CHANGELOG.md; [changes/README.md](changes/README.md) has the format and an example. The release
-   assembles the fragments into CHANGELOG.md (`node scripts/changelog-release.mjs X`).
+   assembles the fragments into CHANGELOG.md (`node scripts/changelog-release.mjs X`). The toolchain's package
+   has its own: `packages/silinx-fpga/changes/` (and `changes/` too when the IDE's users notice the change).
 6. **Releases happen only when Pedro asks.** The session that releases asks the others to hold their
    merges until the tag is pushed.
 7. **Small modules and functions** (#405): a source file under 1000 lines, a function under 300, one
