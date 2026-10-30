@@ -15,7 +15,7 @@ import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
 /** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops of
  *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the carry chains (MUXCY, XORCY), the
  *  constants (GND, VCC), the I/O buffers and BUFG. */
-export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|GND|VCC|IBUF|OBUF|BUFG)$/;
+export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|OBUF|BUFG)$/;
 
 /**
  * The netlist for nextpnr: each port bit's pad (its LOC in the UCF) on the I/O buffer at that bit, the IBUF or OBUF the

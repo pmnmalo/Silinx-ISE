@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
 import { nextpnrNetlist, NEXTPNR_CELL } from '../src/open-flow-nextpnr.js';
 import { parseXdl } from '../src/xdl.js';
@@ -29,18 +30,18 @@ test('nextpnrNetlist: what the micro-architecture cannot implement yet is named'
   const ucfNoLed1 = ucf().split('\n').filter(l => !/led<1>/.test(l)).join('\n');
   assert.deepEqual(nextpnrNetlist(gates(), 'gates', ucfNoLed1).problems,
     ['port led<1>: no LOC in the constraints (the nextpnr engine places only the ports given a pad)']);
-  // a cell it does not have; constants and carry chains are the micro-architecture's own (#2135)
+  // a cell it does not have; constants, carry chains and wide multiplexers are the micro-architecture's own (#2135)
   const json = JSON.parse(gates());
   const cells = cellsOf(json);
-  cells.mux = { type: 'MUXF5', connections: { I0: [12], I1: [8], S: [9], O: [13] }, port_directions: { I0: 'input', I1: 'input', S: 'input', O: 'output' } };
+  cells.ram = { type: 'RAM16X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
   cells.carry = { type: 'MUXCY', connections: { S: [12], DI: ['0'], CI: ['1'], O: [14] }, port_directions: { S: 'input', DI: 'input', CI: 'input', O: 'output' } };
   cells['$abc$20424$lut$aiger$o0'].connections.I3 = ['1'];
-  assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) MUXF5: not in the spartan3e micro-architecture yet']);
+  assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) RAM16X1S: not in the spartan3e micro-architecture yet']);
 });
 
-test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the constants and the buffers; not a falling edge, a latch, a wide multiplexer, a RAM', () => {
-  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'GND', 'VCC', 'IBUF', 'OBUF', 'BUFG']) assert.ok(NEXTPNR_CELL.test(t), t);
-  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF5', 'MUXF6', 'SRL16E', 'RAM16X1S', 'RAMB16_S9', 'MULT18X18SIO', 'DCM_SP', 'IOBUF', 'OBUFT']) assert.ok(!NEXTPNR_CELL.test(t), t);
+test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants and the buffers; not a falling edge, a latch, a RAM', () => {
+  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'OBUF', 'BUFG']) assert.ok(NEXTPNR_CELL.test(t), t);
+  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'SRL16E', 'RAM16X1S', 'RAMB16_S9', 'MULT18X18SIO', 'DCM_SP', 'IOBUF', 'OBUFT']) assert.ok(!NEXTPNR_CELL.test(t), t);
 });
 
 test('#2136 the gates example built with --engine nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
@@ -65,10 +66,10 @@ test('#2136 the gates example built with --engine nextpnr: no warnings, its pads
   assert.equal(fs.statSync(path.join(dir, 'gates.bit')).size, 169288);
 });
 
-test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a MUXF5): Map fails, naming them (exit 1)', { timeout: 300000 }, async () => {
+test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM16X1S): Map fails, naming them (exit 1)', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const json = JSON.parse(gates());
-  cellsOf(json).mux = { type: 'MUXF5', connections: { I0: [12], I1: [8], S: [9], O: [13] }, port_directions: { I0: 'input', I1: 'input', S: 'input', O: 'output' } };
+  cellsOf(json).ram = { type: 'RAM16X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
   fs.writeFileSync(path.join(dir, 'gates.json'), JSON.stringify(json));
   fs.writeFileSync(path.join(dir, 'gates.ucf'), ucf());
   const out = [], err = [];
@@ -80,7 +81,7 @@ test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a MUX
     'silinx-fpga: the nextpnr engine cannot implement this design yet: 1 problem(s)',
   ]);
   // (the problems and the hint: the log's, after the error)
-  const at = out.indexOf('  1 cell(s) MUXF5: not in the spartan3e micro-architecture yet');
+  const at = out.indexOf('  1 cell(s) RAM16X1S: not in the spartan3e micro-architecture yet');
   assert.ok(at > 0, out.join('\n'));
   assert.equal(out[at + 1], 'Choose the Silinx engine (Toolchain Settings): nextpnr\'s Spartan-3E is growing (#2135).');
   assert.ok(!fs.existsSync(path.join(dir, 'gates.bit')));
@@ -103,4 +104,25 @@ test('#2135 a counter with a carry chain and constants (Silinx\'s synthesis) bui
   const cfg = (attr, value) => design.insts.filter(i => i.cfg.some(c => c.attr === attr && c.value === value)).length;
   assert.equal(cfg('CYINIT', 'BX'), 1);
   assert.equal(cfg('CYINIT', 'CIN'), 11);
+});
+
+test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry chains) built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const netlist = path.join(dir, 'top.json');
+  fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('traffic.json.gz'))));
+  const out = [], err = [];
+  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('traffic.ucf').pathname, '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of Slice Flip Flops: 58 out of 4896 1%'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 70 out of 2448 3%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.includes('Bitstream: build/top.bit (169286 bytes, every feature in the bit database)'), out.join('\n'));
+  // the wide multiplexers on the slices' own: twelve F5s, two F6s each reading two of them
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  const has = attr => design.insts.filter(i => i.cfg.some(c => c.attr === attr)).length;
+  assert.equal(has('F5MUX'), 12);
+  assert.equal(has('F6MUX'), 2);
+  assert.equal(has('F5USED'), 4);
 });

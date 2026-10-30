@@ -13,8 +13,7 @@ const portNet = (c, p) => c.connections?.[p]?.[0];
 const strParam = (c, p) => (typeof c.parameters?.[p] === 'string' ? c.parameters[p].replace(/ $/, '') : c.parameters?.[p]);
 
 // ---------------------------------------------------------------- nextpnr's result to XDL
-// BELs of a site: z = site index * Z_STRIDE + offset, BEL names S<site index>_<BEL> (s3e_gen.py)
-const Z_STRIDE = 8;
+// BELs of a site: names S<site index>_<BEL> (s3e_gen.py)
 
 /** The device's views the converter needs: tile by "X<col>Y<row>" (nextpnr's tile names), site names, pin wires. */
 function deviceViews(device) {
@@ -40,7 +39,7 @@ const routing = n => {
   return out;
 };
 
-/** One instance per used site, its cells by BEL (FLUT, GLUT, FFX, FFY, IOB, BUFGMUX). */
+/** One instance per used site, its cells by BEL (FLUT, GLUT, FFX, FFY, CYMUXF…, F5MUX, FXMUX, IOB, BUFGMUX). */
 function sitesOfCells(mod, device, v) {
   const insts = new Map();
   for (const [name, c] of Object.entries(mod.cells)) {
@@ -63,12 +62,21 @@ function sitesOfCells(mod, device, v) {
  *  each LUT input was routed to (its inputs are permutable: S<i>_FI<j> is reached from any of F1..F4):
  *  - the LUT's output (S<i>_FOUT / GOUT) or the carry's sum (S<i>_XORF / XORG) to X / Y (FXMUX / GYMUX) and to the
  *    flip-flop's D (S<i>_DX / DY: DXMUX / DYMUX), or BX / BY to the flip-flop;
- *  - the carry in (S<i>_CI: CYINIT) from CIN or BX; a MUXCY's DI (S<i>_DIF / DIG: CY0F / CY0G) from pin 1 or BX / BY. */
+ *  - the carry in (S<i>_CI: CYINIT) from CIN or BX; a MUXCY's DI (S<i>_DIF / DIG: CY0F / CY0G) from pin 1 or BX / BY;
+ *  - the F5 / FX multiplexer's output (the F5 / FX pin) to X / Y and to the flip-flop (FXMUX = F5, GYMUX = FX), or out
+ *    of the site to a FXINA / FXINB (F5USED / FXUSED). */
 function siteRoutes(mod, insts, v) {
   for (const n of Object.values(mod.netnames)) {
     for (const [, pip] of routing(n)) {
       if (!pip) continue;
       const [tile, dst, src] = pip.split('/');
+      const wide = siteMuxPip(v, tile, src, dst);
+      if (wide) {
+        const inst = insts.get(v.siteName(tile, wide.site));
+        if (wide.to) inst.mux[wide.to] = wide.what;
+        else inst[`${wide.what}out`] = true;
+        continue;
+      }
       const m = /^S(\d+)_(\w+)$/.exec(src) || /^S(\d+)_(\w+)$/.exec(dst);
       if (!m) continue;
       const inst = insts.get(v.siteName(tile, +m[1]));
@@ -85,6 +93,16 @@ function siteRoutes(mod, insts, v) {
       }
     }
   }
+}
+
+/** A PIP from a slice's F5 / FX pin: { site, what: 'f5' / 'fx', to: X / Y / DX / DY inside the site, or none: out to
+ *  another site's FXINA / FXINB }, or null. */
+function siteMuxPip(v, tile, src, dst) {
+  const pins = v.pinOfWire(v.tileAt.get(tile)), p = pins.get(src);
+  if (!p || (p.pin !== 'F5' && p.pin !== 'FX')) return null;
+  const what = p.pin.toLowerCase(), d = pins.get(dst), x = /^S(\d+)_(D[XY])$/.exec(dst);
+  if (x) return { site: +x[1], what, to: x[2] };
+  return { site: p.site, what, to: d && d.site === p.site && /^[XY]$/.test(d.pin) ? d.pin : null };
 }
 
 /** A LUT's site pins by input (I0..I3), the unconnected inputs on the pins left (their values do not matter: the
@@ -124,7 +142,7 @@ function instanceCfg(inst, mod) {
   const add = (attr, name, value) => cfg.push({ attr, name, value });
   if (inst.siteType === 'SLICEL' || inst.siteType === 'SLICEM') {
     inst.type = 'SLICEL';                // (logic on a SLICEM site too: ISE's DRC wants a SLICEL comp there)
-    inst.name = esc((c.FFX || c.FFY || c.FLUT || c.GLUT || c.CYMUXF || c.XORF).name);
+    inst.name = esc((c.FFX || c.FFY || c.FLUT || c.GLUT || c.CYMUXF || c.XORF || c.F5MUX || c.FXMUX).name);
     for (const [side, lut] of [['F', c.FLUT], ['G', c.GLUT]]) if (lut) add(side, esc(lut.name), `#LUT:${initToEquation(bitsOf(lut.parameters.INIT), 4, lutPins(inst.lutPins[side]))}`);
     let ctrl = null;
     for (const [X, ff] of [['X', c.FFX], ['Y', c.FFY]]) {
@@ -143,14 +161,17 @@ function instanceCfg(inst, mod) {
       add('SYNC_ATTR', '', ctrl.sync ? 'SYNC' : 'ASYNC');
     }
     carryCfg(inst, add);
-    const bx = inst.mux.DX === 'bypass' || inst.mux.CYINIT === 'BX' || inst.mux.CY0F === 'BX';
-    const by = inst.mux.DY === 'bypass' || inst.mux.CY0G === 'BY';
+    // the wide multiplexers: F5MUX (select BX), F6MUX (the FXMUX BEL, select BY), their outputs out of the site
+    if (c.F5MUX) { add('F5MUX', esc(c.F5MUX.name), ''); if (inst.f5out) add('F5USED', '', '0'); }
+    if (c.FXMUX) { add('F6MUX', esc(c.FXMUX.name), ''); if (inst.fxout) add('FXUSED', '', '0'); }
+    const bx = inst.mux.DX === 'bypass' || inst.mux.CYINIT === 'BX' || inst.mux.CY0F === 'BX' || !!c.F5MUX;
+    const by = inst.mux.DY === 'bypass' || inst.mux.CY0G === 'BY' || !!c.FXMUX;
     if (bx) add('BXINV', '', 'BX');
     if (by) add('BYINV', '', 'BY');
-    // FXMUX / GYMUX: the LUT or the carry's sum, to X / Y or to the flip-flop
-    for (const [X, mux, l, sum] of [['X', 'FXMUX', 'F', 'FXOR'], ['Y', 'GYMUX', 'G', 'GXOR']]) {
-      const from = [inst.mux[X], inst.mux[`D${X}`]].find(w => w === 'lut' || w === 'xor');
-      if (from) add(mux, '', from === 'xor' ? sum : l);
+    // FXMUX / GYMUX: the LUT, the carry's sum or the wide multiplexer, to X / Y or to the flip-flop
+    for (const [X, mux, l, sum, wide] of [['X', 'FXMUX', 'F', 'FXOR', 'F5'], ['Y', 'GYMUX', 'G', 'GXOR', 'FX']]) {
+      const from = [inst.mux[X], inst.mux[`D${X}`]].find(w => w && w !== 'bypass');
+      if (from) add(mux, '', { lut: l, xor: sum, f5: wide, fx: wide }[from]);
     }
     if (inst.mux.X) add('XUSED', '', '0');
     if (inst.mux.Y) add('YUSED', '', '0');
@@ -197,13 +218,15 @@ function netsOf(mod, insts, device, v) {
       for (const w of device.nodeWireIds(node)) {
         const k = device.wireTile[w], p = v.pinOfWire(k).get(device.wireInfo(w).name);
         const inst = p && insts.get(device.tileSites[k][p.site][0]);
-        if (inst) (p.dir === 'o' ? net.outpins : net.inpins).push({ inst: inst.name, pin: p.pin });
+        // (an F5 / FX pin only when the net leaves the site there: to X / Y it stays inside)
+        if (inst && !(p.pin === 'F5' && !inst.f5out) && !(p.pin === 'FX' && !inst.fxout))
+          (p.dir === 'o' ? net.outpins : net.inpins).push({ inst: inst.name, pin: p.pin });
       }
     }
     for (const [, pip] of route) {
       if (!pip) continue;
       const [tile, dst, src] = pip.split('/');
-      if (/^S\d+_/.test(src) || /^S\d+_/.test(dst)) continue;
+      if (/^S\d+_/.test(src) || /^S\d+_/.test(dst) || siteMuxPip(v, tile, src, dst)?.to) continue;
       const k = v.tileAt.get(tile), pi = device.findPip(k, src, dst);
       if (pi < 0) throw new Error(`${name}: no PIP ${tile} ${src} -> ${dst}`);
       const x = device.pip(k, pi);
@@ -254,7 +277,7 @@ function tieSelects(xdlInsts, nets, device) {
 /**
  * nextpnr-himbaechel's routed design (spartan3e micro-architecture, its --write JSON) as an XDL design (parseXdl's
  * structure: writeXdl writes it): one instance per used site with its settings, each net's site pins and PIPs.
- * The spike's cells only: LUT4, FF, IOB, BUFGMUX. Throws when a LUT input is not on the pin its equation reads.
+ * Its cells: LUT4, FF, MUXCY, XORCY, MUXF5, MUXF6, IOB, BUFGMUX. Throws when a LUT input is not on the pin its equation reads.
  */
 export function nextpnrToXdl(json, device, part = device.part) {
   const [top, mod] = topModule(json);
