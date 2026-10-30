@@ -102,7 +102,7 @@ pin, so nothing is optimised away — the back end is tested on the real logic, 
 checked before on the design's own ports (`diff`). Cells the packer does not support yet (block
 and distributed RAM, shift registers, multipliers) are recorded as a warning and the design is
 synthesized again with `-nobram -nolutram -nosrl -nodsp` so the rest of the flow is still tested.
-The place and route is the one of the app's flow and of `research/s3e-route/open-flow.mjs`
+The place and route is the one of the app's flow and of `packages/silinx-fpga/research/s3e-route/open-flow.mjs`
 (`packages/silinx-fpga/src/fpga/place-route.js`, #79, #88): the corpus measures what users get, register replication
 (the flip-flops of many loads on the critical path copied, kept when faster) included.
 
@@ -320,7 +320,7 @@ as ISE's map does, and bitgen writes such a pad, when an XDL has one, as ISE's b
 
 Our own top around a fetched design (`boards/*.v`), the Basys2's pins (`server/devices.js`), the
 board design's own testbench in Silinx's simulator when it has one, and the fully open flow
-(`research/s3e-route/open-flow.mjs`) to `<bit dir>/<name>.bit`.
+(`packages/silinx-fpga/research/s3e-route/open-flow.mjs`) to `<bit dir>/<name>.bit`.
 
 | bitstream | design | on the board |
 | --- | --- | --- |

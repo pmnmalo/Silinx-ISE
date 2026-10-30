@@ -2,7 +2,7 @@
 // Board versions of designs of the corpus (test/designs-corpus/manifest.json) for the Digilent
 // Basys2-250: a top of our own (test/designs-corpus/boards/*.v) around the fetched design, the
 // board's pins (server/devices.js basys2), its testbench in Silinx's simulator when it has one, and
-// the fully open flow (research/s3e-route/open-flow.mjs: no Xilinx tool) to a bitstream.
+// the fully open flow (packages/silinx-fpga/research/s3e-route/open-flow.mjs: no Xilinx tool) to a bitstream.
 //
 //   node test/designs-corpus/boards.mjs <projects dir> [<bit dir>] [--filter name]
 //
@@ -126,7 +126,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     check.push([pdir, ...flowOpts].join(' '));
     if (!bits) continue;
     const out = path.join(path.resolve(projects), `${bd.name}.out`);
-    const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), pdir, out, ...flowOpts], { encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), pdir, out, ...flowOpts], { encoding: 'utf8' });
     process.stdout.write(r.stdout.split('\n').filter(l => /^(synthesis|pack|place|route|timing|bitgen)/.test(l)).map(l => `  ${l}\n`).join(''));
     if (r.status !== 0) { console.log(`  FAILED\n${r.stderr.trim().split('\n').slice(-10).map(l => `  ${l}`).join('\n')}`); failed++; continue; }
     fs.mkdirSync(bits, { recursive: true });

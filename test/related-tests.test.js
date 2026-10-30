@@ -136,19 +136,19 @@ test('related tests: a changed data file, the tests of the sources that read it 
 
 test('related tests: the repository — the bit database, a device description, an example select the tests that read them (#772)', () => {
   const files = sources();
-  assert.ok(Object.keys(files).includes('research/s3e-bitstream/db.mjs'), 'the research tools, which read the database too');
+  assert.ok(Object.keys(files).includes('packages/silinx-fpga/research/s3e-bitstream/db.mjs'), 'the research tools, which read the database too');
   // #748: the database alone changed, its tests not run; a file of the database that is not there yet, the same
   for (const f of ['packages/silinx-fpga/bitdb/xc3s1200e-tiles.json', 'packages/silinx-fpga/bitdb/xc3s9999e-lut.json']) {
     const { unit } = relatedTests(files, [f]);
-    for (const t of ['packages/silinx-fpga/test/fpga-hard.test.js', 'test/open-flow.test.js', 'test/s3e-devices.test.js', 'test/fpga-bitgen.test.js', 'test/open-flow-core.test.js']) assert.ok(unit.includes(t), `${f}: ${t}`);
+    for (const t of ['packages/silinx-fpga/test/fpga-hard.test.js', 'test/open-flow.test.js', 'packages/silinx-fpga/test/s3e-devices.test.js', 'packages/silinx-fpga/test/fpga-bitgen.test.js', 'test/open-flow-core.test.js']) assert.ok(unit.includes(t), `${f}: ${t}`);
     assert.ok(!unit.includes('test/schdoc.test.js') && !unit.includes('test/code-size.test.js'), f);
   }
   const dev = relatedTests(files, ['packages/silinx-fpga/devices/xc3s500efg320-4.json.gz']).unit;
-  for (const t of ['packages/silinx-fpga/test/fpga-device.test.js', 'test/open-flow.test.js', 'test/s3e-devices.test.js']) assert.ok(dev.includes(t), t);
+  for (const t of ['packages/silinx-fpga/test/fpga-device.test.js', 'test/open-flow.test.js', 'packages/silinx-fpga/test/s3e-devices.test.js']) assert.ok(dev.includes(t), t);
   const ex = relatedTests(files, ['examples/gates/silinx.json']).unit;
   for (const t of ['test/examples.test.js', 'test/gates-example.test.js']) assert.ok(ex.includes(t), t);
   // the measurements a research tool reads; a test's fixture
-  assert.ok(relatedTests(files, ['research/s3e-bitstream/measured/fix-28-pad-delays.json']).unit.includes('test/iob-reg.test.js'));
+  assert.ok(relatedTests(files, ['packages/silinx-fpga/research/s3e-bitstream/measured/fix-28-pad-delays.json']).unit.includes('packages/silinx-fpga/test/iob-reg.test.js'));
   assert.ok(relatedTests(files, ['packages/silinx-fpga/test/fixtures/fpga/new.xdl']).unit.includes('packages/silinx-fpga/test/fpga-pack.test.js'));
   // a style sheet: no server test (a server serves web/ as a whole), documentation: none of the flow's
   assert.ok(!relatedTests(files, ['web/css/app.css']).unit.includes('test/server.test.js'));

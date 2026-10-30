@@ -13,9 +13,9 @@ import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
 import { WIRE, SPEED_4, classOfWires, nodeClasses, nodeDelays, lutPinIndex, netTree, treePath, pathDelay, distanceDelay, instArcs, timingGraph, analyzeTiming, timingReport, clockPort, checkPeriods, delayTable, clockArrivals, parseOffsets, checkOffsets, DELAY_KIND, delayKind, clockSources, clockRequirement, checkCross } from '../packages/silinx-fpga/src/fpga/timing.js';
 import { checkSwitching, switchingLine } from '../packages/silinx-fpga/src/fpga/timing.js';
 import zlib from 'node:zlib';
-import { parseDly, twrArcs, memArcs, hardArcs } from '../research/s3e-route/timing-fit.mjs';
-import { parseTwrClocks } from '../research/s3e-route/dcm-timing-compare.mjs';
-import { silinxPcf } from '../research/s3e-route/dcm-timing.mjs';
+import { parseDly, twrArcs, memArcs, hardArcs } from '../packages/silinx-fpga/research/s3e-route/timing-fit.mjs';
+import { parseTwrClocks } from '../packages/silinx-fpga/research/s3e-route/dcm-timing-compare.mjs';
+import { silinxPcf } from '../packages/silinx-fpga/research/s3e-route/dcm-timing.mjs';
 import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'packages', 'silinx-fpga', 'test', 'fixtures', 'fpga');
@@ -258,7 +258,7 @@ test('SLICEM memory arcs, as trce times them (#443): a shift register\'s and a R
   const M = SPEED_4.mem;
   const sl = cfg => instArcs({ type: 'SLICEM', site: 'SLICE_X2Y0', cfg: cfg.map(([attr, value]) => ({ attr, name: '', value })) });
   const setupOf = (a, p) => a.setup.filter(x => x[0] === p).map(x => x[1]);
-  // trce's values (research/s3e-route/timing-fit.mjs --arcs on the srl and dram fixtures, feat_srl, feat_srl_var,
+  // trce's values (packages/silinx-fpga/research/s3e-route/timing-fit.mjs --arcs on the srl and dram fixtures, feat_srl, feat_srl_var,
   // hard_prim), on either clock edge
   assert.deepEqual([M.Treg, M.Tshcko, M.Tshckof5, M.TdsX, M.TdsY, M.TdsAlt, M.Tbxs, M.Tas, M.Tws], [3.762, 1.956, 2.349, 0.414, 0.442, 0.461, 0.619, 0.522, 0.392]);
   // two shift registers, data through BX and BY: Treg on X and Y, Tds of each pin, the shift enable on SR
@@ -279,7 +279,7 @@ test('SLICEM memory arcs, as trce times them (#443): a shift register\'s and a R
 
 test('block RAM and multiplier arcs, as trce times them (#457): clock to out, setups, A / B -> P by the product bit', () => {
   const B = SPEED_4.bram, M = SPEED_4.mult;
-  // trce's values (research/s3e-route/timing-fit.mjs --arcs on hard_prim, feat_bram, feat_const_bram, feat_mult,
+  // trce's values (packages/silinx-fpga/research/s3e-route/timing-fit.mjs --arcs on hard_prim, feat_bram, feat_const_bram, feat_mult,
   // feat_const_mult, feat_constmult, stopwatch and the multipliers with input registers): the same at every width
   assert.deepEqual([B.Tbcko, B.Tback, B.Tbdck, B.Tbeck, B.Tbwck, B.Tbrck], [2.812, 0.377, 0.227, 0.770, 1.253, 0.705]);
   assert.deepEqual([M.TmsckpP, M.TmsdckP, M.TmsdckA, M.TmsdckB, M.Tmscck, M.Tmsrck], [1.100, 3.980, 0.223, 0.384, 0.735, 0.736]);
@@ -623,7 +623,7 @@ test('#601 clock arrivals through a DCM: from its CLKIN\'s, deskewed by its taps
 });
 
 // Silinx's routing of six DCM designs (test/fixtures/open-flow, the OFFSET ones' UCF in dcm-trce.json), timed by trce with the same
-// constraints (research/s3e-route/dcm-timing.mjs): its paths between two clocks and its data sheet (setup, hold, clock to pad)
+// constraints (packages/silinx-fpga/research/s3e-route/dcm-timing.mjs): its paths between two clocks and its data sheet (setup, hold, clock to pad)
 test('#601 static timing of a DCM\'s clocks against trce on routed designs: the paths between two clocks, the pads\' setup, hold and clock to pad', async () => {
   const { loadDeviceCache } = await import('../packages/silinx-fpga/src/fpga/device-node.js');
   const ref = JSON.parse(fs.readFileSync(path.join(FIX, 'trce', 'dcm-trce.json'), 'utf8'));
@@ -898,7 +898,7 @@ test('timing-driven routing: branch loads (XC3S250E graph): a net of 17 timed lo
 
 // #661: trce's Component Switching Limit checks on a DCM. One DCM_SP on the pad clk (PERIOD 20 ns unless said), its
 // outputs on global buffers; the expected periods, limits and slacks are trce 14.7's (Basys2-250, -4) on the same
-// settings, built by ISE's own flow (research/s3e-route/README.md)
+// settings, built by ISE's own flow (packages/silinx-fpga/research/s3e-route/README.md)
 const oneDcm = (cfg, outs) => parseXdl(`design "t" xc3s250ecp132-4 v3.2 , cfg "";
 inst "clk" "IOB",placed BIOIS_X1Y0 P11 , cfg " " ;
 inst "u_dcm" "DCM",placed DCM_BL_CENTER_X9Y0 DCM_X0Y0 , cfg " ${cfg} " ;

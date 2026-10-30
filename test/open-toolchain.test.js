@@ -223,7 +223,7 @@ test('open mode: Implement + Generate Programming File of blinky, for real: step
   assert.equal((await app.call('GET', '/projects/Blinky/fpga-view')).body.available, false);
 });
 
-// the other boards (research/s3e-bitstream, stage F): blinky for the Nexys2-1200 (its LEDs LD4-LD7)
+// the other boards (packages/silinx-fpga/research/s3e-bitstream, stage F): blinky for the Nexys2-1200 (its LEDs LD4-LD7)
 // (and its display), and the Basys2-100, Implement + Generate Programming File through the API, no warning
 const NEXYS2_UCF = [['clk', 'B8'], ['sw<0>', 'G18'], ['sw<1>', 'H18'], ['sw<2>', 'K18'], ['sw<3>', 'K17'], ['btn<0>', 'B18'], ['btn<1>', 'D18'],
   ...['J14', 'J15', 'K15', 'K14', 'E16', 'P16', 'E4', 'P4'].map((p, i) => [`led<${i}>`, p]),

@@ -3,7 +3,7 @@
 //   - ISE's flow (XST + map + par + trce, as test/designs-corpus/compare-ise.mjs runs it: map -c 1, the board
 //     clock's PERIOD tightened to --period ns so that par works for speed): LUTs, flip-flops, slices, period,
 //     and the state machines XST found in its report (.syr): each one's states and the encoding XST chose;
-//   - ISE's trce on Silinx's routed designs of each way (fsm.mjs --routed <dir>): research/s3e-route/ise-open-check.sh.
+//   - ISE's trce on Silinx's routed designs of each way (fsm.mjs --routed <dir>): packages/silinx-fpga/research/s3e-route/ise-open-check.sh.
 //
 //   node research/synth-quality/fsm-ise.mjs [--projects dir] [--routed dir] [--filter a,b] [--trce a,b] [--period 5] [--no-flow] [--synth-only]
 // --synth-only: XST alone (its state machines; the corpus's sizes and periods are those of test/designs-corpus/ise-comparison.json,
@@ -94,7 +94,7 @@ async function main(argv) {
       && timed.some(n => d.startsWith(`${n.replace(/[^\w.-]/g, '_')}__`)));
     const tdir = path.join(work, 'trce');
     for (const d of dirs) { fs.mkdirSync(path.join(tdir, d), { recursive: true }); fs.copyFileSync(path.join(routed, d, 'routed.xdl'), path.join(tdir, d, 'routed.xdl')); }
-    fs.copyFileSync(path.join(ROOT, 'research/s3e-route/ise-open-check.sh'), path.join(tdir, 'ise-open-check.sh'));
+    fs.copyFileSync(path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/ise-open-check.sh'), path.join(tdir, 'ise-open-check.sh'));
     const host = `${userCfg.ssh.user ? `${userCfg.ssh.user}@` : ''}${userCfg.ssh.host}`;
     const sshArgs = ['-o', 'BatchMode=yes', ...(userCfg.ssh.port && userCfg.ssh.port !== 22 ? ['-p', String(userCfg.ssh.port)] : [])];
     const ssh = cmd => execFileSync('ssh', [...sshArgs, '--', host, `export PATH="$PATH:/usr/local/bin"; ${cmd}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
