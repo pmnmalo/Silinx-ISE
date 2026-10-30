@@ -9,7 +9,7 @@ export const TT_PT = {
     'Módulo combinatório (no máximo 8 bits de entrada): a tabela de verdade é calculada simulando todas as combinações das entradas.',
   'The project has no design modules.': 'O projeto não tem módulos de projeto.',
   // editor toolbar
-  'Inputs:': 'Entradas:', 'Outputs:': 'Saídas:', 'Apply': 'Aplicar', 'Apply the input and output names': 'Aplicar os nomes das entradas e das saídas',
+  'Inputs:': 'Entradas:', 'Outputs:': 'Saídas:',
   'Input names (1 to 6), separated by commas or spaces; the first is the most significant bit of a row': 'Nomes das entradas (1 a 6), separados por vírgulas ou espaços; a primeira é o bit mais significativo de cada linha',
   'Output names (1 or more), separated by commas or spaces': 'Nomes das saídas (1 ou mais), separados por vírgulas ou espaços',
   'HDL logic:': 'Lógica do HDL:', 'Form of the logic in the generated HDL module and schematic': 'Forma da lógica no módulo HDL e no esquemático gerados',
