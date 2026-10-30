@@ -1,0 +1,12 @@
+NET "clk"  LOC = "B8" ;
+NET "rst"  LOC = "P11" ;
+NET "led7" LOC = "G1" ;
+NET "led6" LOC = "P4" ;
+NET "led5" LOC = "N4" ;
+NET "led4" LOC = "N5" ;
+NET "led3" LOC = "P6" ;
+NET "led2" LOC = "P7" ;
+NET "led1" LOC = "M11" ;
+NET "led0" LOC = "M5" ;
+NET "clk" TNM_NET = "clk" ;
+TIMESPEC "TS_clk" = PERIOD "clk" 20 ns HIGH 50% ;
