@@ -48,9 +48,13 @@ test('the Yosys script and the device families', () => {
   assert.equal(synthCommands('m', 'spartan3'), synthCommands('m', 'spartan3e').replaceAll('xc3se', 'xc3s'));
   assert.match(synthCommands('m', 'spartan3e', { srl: false }), /^synth_xilinx -family xc3se -ise -flatten -top m -run :map_luts; /);
   assert.doesNotMatch(yosysScript('m', 'spartan3e', { srl: false }), /xilinx_srl|silinx_srl/);
-  // 6-input-LUT families: synth_xilinx as it is
-  assert.equal(synthCommands('m', 'spartan6'), 'synth_xilinx -family xc6s -ise -flatten -top m');
+  // 6-input-LUT families: synth_xilinx as it is, the Spartan-6's memory step on its block-RAM rule without the 9K halves (#2130)
+  assert.equal(synthCommands('m', 'virtex5'), 'synth_xilinx -family xc5v -ise -flatten -top m');
+  assert.equal(synthCommands('m', 'spartan6'), 'synth_xilinx -family xc6s -ise -flatten -top m -run :map_memory; '
+    + 'memory_libmap -lib +/xilinx/lutrams_xc5v.txt -lib silinx_brams_xc6s.txt -D IS_SPARTAN6 -logic-cost-rom 0.015625; '
+    + 'techmap -map +/xilinx/lutrams_xc5v_map.v; techmap -map +/xilinx/brams_xc3sda_map.v; synth_xilinx -family xc6s -ise -flatten -top m -run map_ffram:');
   assert.match(yosysScript('m', 'spartan6'), /-family xc6s /);
+  assert.ok(yosysFiles('m', '')['silinx_brams_xc6s.txt'].includes('option "MODE" "FULL"'));
   assert.throws(() => yosysScript('m', 'cyclone'), /no Yosys mapping for the device family 'cyclone'/);
   for (const f of ['spartan3', 'spartan3e', 'spartan3a', 'spartan3adsp', 'spartan6', 'virtex4', 'virtex5', 'virtex6', 'artix7', 'kintex7', 'zynq']) assert.ok(YOSYS_FAMILY[f], f);
 });
@@ -394,8 +398,9 @@ test('logic depth: the scripts (the design before the LUT mapping written, mappe
   assert.equal(remapCommands('top', 'spartan3e', { luts: '1,1,1,1' }), 'read_rtlil silinx_premap.il; abc -luts 1,1,1,1 -script silinx_depth.abc; clean; techmap -map +/xilinx/ff_map.v; '
     + 'techmap -map +/xilinx/lut_map.v -map +/xilinx/cells_map.v -D LUT_WIDTH=4; xilinx_dffopt -lut4; opt_lut_ins -tech xilinx; synth_xilinx -family xc3se -ise -flatten -top top -run finalize:');
   assert.match(DEPTH_ABC, /if -g; .*if; mfs2$/);
-  // 6-input-LUT families: synth_xilinx as it is, nothing written
-  assert.equal(synthCommands('m', 'spartan6', { premap: PREMAP_FILE }), 'synth_xilinx -family xc6s -ise -flatten -top m');
+  // 6-input-LUT families: synth_xilinx as it is (the Spartan-6's memory step its own, #2130), nothing written
+  assert.equal(synthCommands('m', 'spartan6', { premap: PREMAP_FILE }), synthCommands('m', 'spartan6'));
+  assert.ok(!synthCommands('m', 'spartan6').includes(PREMAP_FILE));
 });
 
 test('logic depth: the estimated critical path of a netlist (flip-flop to flip-flop; none inside a slice; the outputs when no flip-flop)', () => {

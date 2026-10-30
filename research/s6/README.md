@@ -649,8 +649,9 @@ Recorded here because the work was planned without the author's answers (2026-10
   frame bitgen writes again, `bitstream.js`'s writer. **The frame written again** (a design with a block RAM): minor
   23 of its column in its row, as in the frame data but for two bits bitgen clears, bit 1 of word w and bit 14 of
   word w + 15 (w the first word of the four switch boxes' rows the block RAM's tile spans, its tile's band less 12
-  words), then a pad frame; measured with one RAMB8BWER (stopwatch, both boards); two block RAMs or a RAMB16BWER are
-  named as not measured.
+  words), then a pad frame; measured with one RAMB8BWER (stopwatch, both boards). A RAMB16BWER (#2130: the open
+  synthesis's inferred memories since, stopwatch on both boards): no frame written again, bit 0 of word w and bit 15 of
+  word w + 15 cleared in the frame data itself. Two block RAMs are named as not measured.
 - **Against ISE's bitgen** (`check-bitgen6.mjs`: each routed XDL written with the header and options of ISE's own
   .bit): night 1's 14 examples on both boards, CRC on and off, **28 of 28 byte-identical**. Of the 86 CMT designs, 30
   identical; the others are the clock managers' gaps (#2025), and a DCM or PLL is now always named as not measured,
@@ -684,7 +685,8 @@ traffic, blinky and pong on the Atlys):
   the databases dropped alone from the first open-flow design that has it; `ana-cmtdrop6.mjs <dir> <part>
   s6-pips-flow`: `bitdb/s6/s6-pips-flow.json`): 21 PIPs, 5 with bits (a right I/O tile's input route-through, a left
   one's output path, a top tile's IBUF0, an Atlys clock feed-through), the others none (the BIOB_SINGLE and LIOB pads,
-  the block RAM's clock and reset pins). **With them, the eleven open-flow designs left are byte-identical with ISE's
+  the block RAM's clock and reset pins); 5 more for the RAMB16BWER (#2130: its clock and reset pins, no bits, and a
+  block RAM tile's clock feed-through on the XC6SLX16, one bit). **With them, the eleven open-flow designs left are byte-identical with ISE's
   bitgen** (the Atlys's stopwatch, clock, vga, blinky and traffic, the Nexys3's, and gates on the Nexys3 with no UCF,
   its pads on the right side), every one with no DRC error: **all seven examples on both boards** come out of the
   open flow with ISE's own bitstream for their routing.

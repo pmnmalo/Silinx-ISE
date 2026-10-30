@@ -83,7 +83,7 @@ test('bitgen: a pad\'s bits by its settings, a design\'s the union of its instan
   assert.deepEqual([u.bits.size, [...u.unknown]], [0, [['NOSUCH A -> B', 1]]]);
 });
 
-test('bitgen: the block RAM\'s frame written again (minor 23 of its column, two bits cleared, a pad frame), the unmeasured named', () => {
+test('bitgen: the block RAM\'s frame written again (minor 23 of its column, two bits cleared, a pad frame), a RAMB16BWER\'s bits cleared in the frame data, the unmeasured named', () => {
   const site = s6Sites(device).brams[0], ramb8 = { name: 'r', type: 'RAMB8BWER', site: site.r8[0], tile: site.tile, placed: true, cfg: [] };
   const fdri = emptyFdri(dev).slice().fill(0xffff), [f0, b0] = gridRegion(device, dev, site.tile), w = (b0 >> 4) - 12;
   const r = bramRewrites({ insts: [ramb8], nets: [] }, device, dev, fdri);
@@ -95,10 +95,14 @@ test('bitgen: the block RAM\'s frame written again (minor 23 of its column, two 
   assert.equal(x.words.length, 2 * FRAME_WORDS);
   assert.deepEqual([x.words[w], x.words[w + 15]], [0xfffd, 0xbfff]);
   assert.equal(x.words.filter(v => v === 0xffff).length, 2 * FRAME_WORDS - 2);
-  // two block RAMs, or a RAMB16BWER: not measured
+  assert.deepEqual(r.clears, []);
+  // a RAMB16BWER (#2130): no frame written again, bit 0 of word w and bit 15 of word w + 15 cleared in the frame data
+  const r16 = bramRewrites({ insts: [{ ...ramb8, type: 'RAMB16BWER', site: site.r16 }], nets: [] }, device, dev, fdri);
+  const [c0] = columnOf(dev, f0), main = (c0 + 23) * FRAME_WORDS;
+  assert.deepEqual(r16, { rewrites: [], clears: [[main + w, 0x0001], [main + w + 15, 0x8000]], unknown: [] });
+  // two block RAMs: not measured
   assert.match(bramRewrites({ insts: [ramb8, { ...ramb8, name: 's', site: site.r8[1] }], nets: [] }, device, dev, fdri).unknown[0], /^2 block RAMs/);
-  assert.match(bramRewrites({ insts: [{ ...ramb8, type: 'RAMB16BWER', site: site.r16 }], nets: [] }, device, dev, fdri).unknown[0], /^a RAMB16BWER/);
-  assert.deepEqual(bramRewrites({ insts: [], nets: [] }, device, dev, fdri), { rewrites: [], unknown: [] });
+  assert.deepEqual(bramRewrites({ insts: [], nets: [] }, device, dev, fdri), { rewrites: [], clears: [], unknown: [] });
 });
 
 test('bitgen: a design\'s .bit, its frame data the empty device\'s with the design\'s bits; a DCM named as not measured', () => {
