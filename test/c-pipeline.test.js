@@ -47,12 +47,13 @@ test('#1919 a loop with no pragma pipelined automatically (II=1, no warning); PI
   assert.equal(auto.cycles, 19);
   assert.deepEqual(auto.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 17 }]);
   assert.deepEqual(auto.messages, []);
+  // (not pipelined: x * i and the sum do not fit 10 ns together, the body two states, #2080)
   const off = run(ACC('#pragma HLS PIPELINE off'));
-  assert.equal(off.cycles, 51);
-  assert.deepEqual(off.loops, [{ line: 4, unroll: null, pipeline: null, ii: 3, cycles: 49 }]);
+  assert.equal(off.cycles, 67);
+  assert.deepEqual(off.loops, [{ line: 4, unroll: null, pipeline: null, ii: 4, cycles: 65 }]);
   assert.deepEqual(off.messages, []);
   const none = run(ACC(''), { pipelineLoops: 0 });
-  assert.equal(none.cycles, 51);
+  assert.equal(none.cycles, 67);
   assert.deepEqual(none.loops, off.loops);
   assert.deepEqual(none.messages, []);
 });

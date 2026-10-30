@@ -24,10 +24,12 @@ import { inlineCalls } from './c-inline.js';
 import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from './c-pipeline.js';
 
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
-export function fsmd(checked, { groups = [], pipelineLoops = PIPELINE_LOOPS } = {}) {
+// (spare: states core/c-schedule.js adds, room for them in the state's register, #2080)
+export function fsmd(checked, { groups = [], pipelineLoops = PIPELINE_LOOPS, spare = 0 } = {}) {
   const f = new SeqFlow(checked);
   f.groups = groups;
   f.pipelineLoops = pipelineLoops;
+  f.spare = spare;
   return f.runSeq();
 }
 
@@ -371,7 +373,7 @@ class SeqFlow extends Flow {
     reached.forEach((b, k) => { b.num = k + 1; });
     this.reached = reached;
     this.doneNum = reached.length + 1;
-    this.stateT = { w: Math.max(1, (this.doneNum).toString(2).length), s: false };
+    this.stateT = { w: Math.max(1, (this.doneNum + (this.spare || 0)).toString(2).length), s: false };
   }
   // ------------------------------------------------------------------ each block, symbolically
   declare(v, g) {
@@ -506,7 +508,7 @@ class SeqFlow extends Flow {
           updates.set(k, r.t === BOOL && k.endsWith('_vld_reg') ? this.and(this.not(stall), v) : this.mux(stall, this.regNode(r), v, r.t));
         }
       }
-      this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc, stall });
+      this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc, stall, ...(b.gate ? { gate: true } : {}) });
     }
     this.mems = this.memPorts(this.states);
     this.fifos = this.fifoPorts(this.states);
@@ -572,7 +574,7 @@ class SeqFlow extends Flow {
     return {
       graph: this.g, regs: [...(this.regs?.values() || [])], states: this.states || [], entry: this.entry?.num ?? 1, idle: 0, done: this.doneNum ?? 1,
       stateT: this.stateT, ports, outputs, ctrl: this.ctrl ?? 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
-      loops: this.loops || [], blocks: this.reached || [], fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.port ?? x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}), ...(x.fields ? { fields: x.fields } : {}) })),
+      loops: this.loops || [], blocks: this.reached || [], loopStates: (this.loopReport || []).map((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.port ?? x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}), ...(x.fields ? { fields: x.fields } : {}) })),
       extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.port ?? x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written, ...(x.fields ? { fields: x.fields } : {}), ...(x.bram ? { bram: x.bram } : {}) })),
     };
   }

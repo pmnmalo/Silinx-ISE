@@ -40,25 +40,26 @@ test('#1529 a loop\'s PIPELINE and UNROLL: the cycles of a call (co-simulated: t
   // (each pragma on its own: no loop pipelined automatically, #1919, core/c-pipeline.js's tests)
   const alone = (src) => run(src, 'acc.c', { pipelineLoops: 0 });
   const none = alone(ACC(''));
-  assert.equal(none.cycles, 51);
-  assert.deepEqual(none.loops, [{ line: 4, unroll: null, pipeline: null, ii: 3, cycles: 49 }]);
+  // (x * i and the sum do not fit 10 ns together: the body two states, #2080)
+  assert.equal(none.cycles, 67);
+  assert.deepEqual(none.loops, [{ line: 4, unroll: null, pipeline: null, ii: 4, cycles: 65 }]);
   assert.deepEqual(none.messages, []);
   const pipe = alone(ACC('#pragma HLS PIPELINE II=1'));
   assert.equal(pipe.cycles, 19);
   assert.deepEqual(pipe.loops, [{ line: 4, unroll: null, pipeline: 1, ii: 1, cycles: 17 }]);
   assert.deepEqual(pipe.messages, []);
   const whole = alone(ACC('#pragma HLS UNROLL'));
-  assert.equal(whole.cycles, 1);
+  assert.equal(whole.cycles, 7);   // (its 16 multiplications' sum: over several cycles, #2080)
   assert.deepEqual(whole.loops, [{ line: 4, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
   const by4 = alone(ACC('#pragma HLS UNROLL factor=4'));
-  assert.equal(by4.cycles, 11);
-  assert.deepEqual(by4.loops, [{ line: 4, unroll: 4, pipeline: null, ii: 2, cycles: 9 }]);
+  assert.equal(by4.cycles, 23);
+  assert.deepEqual(by4.loops, [{ line: 4, unroll: 4, pipeline: null, ii: 5, cycles: 21 }]);
   const both = alone(ACC('#pragma HLS UNROLL factor=4\n#pragma HLS PIPELINE'));
   assert.equal(both.cycles, 7);
   assert.deepEqual(both.loops, [{ line: 4, unroll: 4, pipeline: 1, ii: 1, cycles: 5 }]);
   // a factor that does not divide the count: the last iteration's copies skipped
   const by5 = alone(ACC('#pragma HLS UNROLL factor=5'));
-  assert.deepEqual(by5.loops, [{ line: 4, unroll: 5, pipeline: null, ii: 2, cycles: 9 }]);
+  assert.deepEqual(by5.loops, [{ line: 4, unroll: 5, pipeline: null, ii: 5, cycles: 21 }]);
   assert.deepEqual(by5.messages, []);
 });
 
@@ -120,7 +121,7 @@ int main(void) { for (int k = 0; k < 90; k += 7) printf("%d ", shift(k)); return
 `;
   const parted = run(src('#pragma HLS ARRAY_PARTITION variable=d type=complete'), 'shift.c');
   assert.deepEqual(parted.messages, []);
-  assert.equal(parted.cycles, 1);
+  assert.equal(parted.cycles, 2);   // (its four additions do not fit 10 ns, #2080)
   assert.doesNotMatch(parted.r.gen.hdl, /ap_m_d/);
   assert.deepEqual(parted.r.gen.report.memories, []);
   const block = run(src('#pragma HLS ARRAY_PARTITION variable=d type=block factor=4'), 'shift.c');
