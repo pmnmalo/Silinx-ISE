@@ -28,3 +28,18 @@ test('#405 boards: each found by its id, its FPGA a known part, its resources\' 
     assert.ok(b.resources.every(r => r.verified === true || r.verified === false), b.id);
   }
 });
+
+// (#732) the Atlys has no seven-segment display and no VGA port: the examples' are on its VHDCI connector (channel 1's
+// EXP-IO1..12_P, channel 2's EXP-IO1..10_N), the rest of the connector its two VHDCI resources; every example's ports
+// then on the Atlys's pins
+test('#732 the Atlys: the seven-segment display and VGA on its VHDCI connector, every example\'s ports on its pins', async () => {
+  const atlys = BOARDS.find(b => b.id === 'atlys'), r = Object.fromEntries(atlys.resources.map(x => [x.name, x]));
+  const ch1 = ['U16', 'U15', 'U13', 'M11', 'R11', 'T12', 'N10', 'M10', 'U11', 'R10', 'U10', 'R8', 'M8', 'U8', 'U7', 'N7', 'T6', 'R7', 'N6', 'U5'];
+  const ch2 = ['V16', 'V15', 'V13', 'N11', 'T11', 'V12', 'P11', 'N9', 'V11', 'T10', 'V10', 'T8', 'N8', 'V8', 'V7', 'P8', 'V6', 'T7', 'P7', 'V5'];
+  assert.deepEqual([...r.seg.pins, ...r.dp.pins, ...r.an.pins, ...r.vhdci_io1.pins], ch1);
+  assert.deepEqual([...r.vga_red.pins, ...r.vga_green.pins, ...r.vga_blue.pins, ...r.vga_hsync.pins, ...r.vga_vsync.pins, ...r.vhdci_io2.pins], ch2);
+  for (const n of ['seg', 'dp', 'an']) assert.equal(r[n].extra?.activeLow, true, n);
+  for (const n of ['seg', 'dp', 'an', 'vga_red', 'vga_green', 'vga_blue', 'vga_hsync', 'vga_vsync']) assert.match(r[n].label, /on the VHDCI connector/, n);
+  const { EXAMPLES, exampleUcf } = await import('./examples-lib.mjs');
+  for (const name of EXAMPLES) assert.deepEqual(exampleUcf(name, { board: 'atlys' }).unmatched, [], name);
+});

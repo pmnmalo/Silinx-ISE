@@ -27,7 +27,7 @@
      "other": 38,
      "perConnection": 9.67,
      "passes": 1,
-     "seconds": 0.131
+     "seconds": 0.1
     }
    },
    "traffic": {
@@ -53,7 +53,7 @@
      "other": 649,
      "perConnection": 3.87,
      "passes": 3,
-     "seconds": 0.413
+     "seconds": 0.35
     }
    },
    "blinky": {
@@ -79,7 +79,7 @@
      "other": 993,
      "perConnection": 4.21,
      "passes": 4,
-     "seconds": 0.53
+     "seconds": 0.42
     }
    },
    "pong": {
@@ -105,7 +105,7 @@
      "other": 2089,
      "perConnection": 4.16,
      "passes": 4,
-     "seconds": 1.033
+     "seconds": 0.959
     }
    },
    "stopwatch": {
@@ -131,7 +131,7 @@
      "other": 1721,
      "perConnection": 4.27,
      "passes": 4,
-     "seconds": 1.013
+     "seconds": 0.817
     }
    },
    "clock": {
@@ -157,7 +157,7 @@
      "other": 1476,
      "perConnection": 4.17,
      "passes": 4,
-     "seconds": 0.731
+     "seconds": 0.683
     }
    },
    "vga": {
@@ -183,7 +183,7 @@
      "other": 852,
      "perConnection": 4.11,
      "passes": 4,
-     "seconds": 0.538
+     "seconds": 0.483
     }
    }
   },
@@ -211,7 +211,7 @@
      "other": 38,
      "perConnection": 20,
      "passes": 1,
-     "seconds": 0.223
+     "seconds": 0.23
     }
    },
    "traffic": {
@@ -229,15 +229,15 @@
     "silinx": {
      "nets": 115,
      "connections": 416,
-     "pips": 1738,
-     "single": 241,
-     "double": 121,
-     "quad": 169,
-     "logicin": 557,
-     "other": 650,
-     "perConnection": 4.18,
+     "pips": 1742,
+     "single": 242,
+     "double": 95,
+     "quad": 209,
+     "logicin": 551,
+     "other": 645,
+     "perConnection": 4.19,
      "passes": 4,
-     "seconds": 0.375
+     "seconds": 0.372
     }
    },
    "blinky": {
@@ -255,15 +255,15 @@
     "silinx": {
      "nets": 229,
      "connections": 585,
-     "pips": 2646,
-     "single": 431,
-     "double": 180,
-     "quad": 239,
-     "logicin": 797,
-     "other": 999,
-     "perConnection": 4.52,
-     "passes": 4,
-     "seconds": 0.527
+     "pips": 2663,
+     "single": 427,
+     "double": 174,
+     "quad": 257,
+     "logicin": 811,
+     "other": 994,
+     "perConnection": 4.55,
+     "passes": 3,
+     "seconds": 0.414
     }
    },
    "pong": {
@@ -281,15 +281,15 @@
     "silinx": {
      "nets": 523,
      "connections": 1311,
-     "pips": 5549,
-     "single": 972,
-     "double": 464,
-     "quad": 260,
-     "logicin": 1770,
-     "other": 2083,
-     "perConnection": 4.23,
+     "pips": 5655,
+     "single": 986,
+     "double": 466,
+     "quad": 356,
+     "logicin": 1756,
+     "other": 2091,
+     "perConnection": 4.31,
      "passes": 4,
-     "seconds": 1.004
+     "seconds": 1.037
     }
    },
    "stopwatch": {
@@ -307,15 +307,15 @@
     "silinx": {
      "nets": 424,
      "connections": 1062,
-     "pips": 4675,
-     "single": 796,
-     "double": 423,
-     "quad": 309,
-     "logicin": 1427,
-     "other": 1720,
-     "perConnection": 4.4,
+     "pips": 4644,
+     "single": 841,
+     "double": 420,
+     "quad": 271,
+     "logicin": 1395,
+     "other": 1717,
+     "perConnection": 4.37,
      "passes": 4,
-     "seconds": 0.861
+     "seconds": 0.871
     }
    },
    "clock": {
@@ -333,15 +333,15 @@
     "silinx": {
      "nets": 366,
      "connections": 886,
-     "pips": 3866,
-     "single": 608,
-     "double": 283,
-     "quad": 306,
-     "logicin": 1183,
-     "other": 1486,
-     "perConnection": 4.36,
+     "pips": 3833,
+     "single": 653,
+     "double": 291,
+     "quad": 225,
+     "logicin": 1174,
+     "other": 1490,
+     "perConnection": 4.33,
      "passes": 4,
-     "seconds": 0.6
+     "seconds": 0.722
     }
    },
    "vga": {
@@ -359,15 +359,15 @@
     "silinx": {
      "nets": 183,
      "connections": 565,
-     "pips": 2396,
-     "single": 425,
-     "double": 235,
-     "quad": 109,
-     "logicin": 781,
-     "other": 846,
-     "perConnection": 4.24,
+     "pips": 2403,
+     "single": 435,
+     "double": 215,
+     "quad": 139,
+     "logicin": 770,
+     "other": 844,
+     "perConnection": 4.25,
      "passes": 4,
-     "seconds": 0.472
+     "seconds": 0.496
     }
    }
   }
