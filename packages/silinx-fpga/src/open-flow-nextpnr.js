@@ -10,6 +10,7 @@ import { parseUcf, portAssignments, ucfPattern } from './ucf.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { checkRouting } from './fpga/route.js';
 import { deviceSites } from './fpga/place.js';
+import { analyzeTiming } from './fpga/timing.js';
 import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
 import { parityToData } from './fpga/pack-bram.js';
 import { BRAM_TYPE, MULT_TYPE } from './fpga/pack.js';
@@ -157,6 +158,12 @@ export function hardInputs(mod) {
   });
 }
 
+// The placements the nextpnr engine makes, each routed, the fastest kept. Measured on the examples (#2196): the best of
+// four is 2 to 8 % shorter than one seed; a design of a few hundred slices takes seconds per placement.
+export const NEXTPNR_TRIES = { normal: 4, high: 8, maxSlices: 500 };
+/** The placements at an Optimization Effort ('high', else Normal) for a design of `slices` slices: one for a large one at Normal. */
+export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRIES.high : slices <= NEXTPNR_TRIES.maxSlices ? NEXTPNR_TRIES.normal : 1);
+
 /**
  * { runMap, runPar } of runFlow for the nextpnr engine. ctx: { io, spec, log, report, util, now, ms, netlistText (a
  * getter: the synthesis's JSON), top, ucfText, StepError, setRouted (the routed design's text, for the reports and
@@ -187,27 +194,43 @@ export function mountNextpnrSteps(ctx) {
     // each clock's PERIOD as its target (the SDC), the tightest for the clocks with none (each met or not: the timing step's)
     let mhz = null;
     try { const c = ucfText ? parseUcf(ucfText).clocks || [] : []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
-    const args = ['--device', part, '--chipdb', 'chipdb.bin', '--json', 'design.json', '--write', 'routed.json', '--seed', String(spec.seed || 1),
-      ...(mhz ? ['--freq', mhz.toFixed(3)] : []), ...(sdc ? ['--sdc', 'design.sdc'] : []), '--timing-allow-fail'];
-    const lines = [];
-    let files;
-    try {
-      files = await io.nextpnr.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => {
-        lines.push(l);
-        if (/^ERROR:/.test(l)) log(`ERROR:nextpnr - ${l.replace(/^ERROR:\s*/, '')}`);
-        else if (/^Warning:/.test(l)) log(`WARNING:nextpnr - ${l.replace(/^Warning:\s*/, '')}`);
-      });
-    } catch (e) {
-      throw new StepError(`nextpnr failed: ${e.message}`, lines.filter(l => /^ERROR:/.test(l)).slice(0, 20));
+    // one placement and routing, as nextpnr's seed makes it: { seed, lines, ms, design, text, size, period } (its problems: StepError)
+    const placeRoute = async seed => {
+      const t1 = now(), lines = [];
+      const args = ['--device', part, '--chipdb', 'chipdb.bin', '--json', 'design.json', '--write', 'routed.json', '--seed', String(seed),
+        ...(mhz ? ['--freq', mhz.toFixed(3)] : []), ...(sdc ? ['--sdc', 'design.sdc'] : []), '--timing-allow-fail'];
+      const errors = () => lines.filter(l => /^ERROR:/.test(l)).slice(0, 20);
+      let files;
+      try {
+        files = await io.nextpnr.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => lines.push(l));
+      } catch (e) {
+        throw new StepError(`nextpnr failed: ${e.message}`, errors());
+      }
+      const routedJson = files?.['routed.json'];
+      if (!routedJson) throw new StepError('nextpnr wrote no routed design', errors());
+      const json = typeof routedJson === 'string' ? routedJson : new TextDecoder().decode(routedJson);
+      let design;
+      try { design = nextpnrToXdl(JSON.parse(json), io.device(), io.device().part); } catch (e) { throw new StepError(`nextpnr's routed design cannot be read: ${e.message}`); }
+      const text = writeXdl(design);
+      return { seed, lines, took: ms(t1), design, text, size: xdlSize(design), period: analyzeTiming(parseXdl(text), io.device(), { clocks: [] }).period };
+    };
+    // N placements from the seed on, the fastest kept (as fpga/place-route.js's tries); a design without a clock: one
+    const first = spec.seed || 1;
+    let best = null, failed = null, tried = 0;
+    for (let k = 0, n = 1; k < n; k++) {
+      let r;
+      try { r = await placeRoute(first + k); } catch (e) { failed ||= { e }; continue; } finally { tried++; }
+      if (!best) n = r.period > 0 ? nextpnrTries(spec.synthEffort, r.size.slices) : 1;
+      if (n > 1) log(`Placement ${k + 1} of ${n} (seed ${r.seed}): ${r.period.toFixed(3)} ns, ${r.size.slices} slices, in ${r.took}.`);
+      if (!best || r.period < best.period) best = r;
     }
-    const routedJson = files?.['routed.json'];
-    if (!routedJson) throw new StepError('nextpnr wrote no routed design', lines.filter(l => /^ERROR:/.test(l)).slice(0, 20));
-    const fmax = lines.map(l => /Max frequency for clock '(.*)': ([0-9.]+) MHz/.exec(l)).filter(Boolean).at(-1);
+    if (!best) throw failed.e;
+    for (const l of best.lines) if (/^Warning:/.test(l)) log(`WARNING:nextpnr - ${l.replace(/^Warning:\s*/, '')}`);
+    if (tried > 1) log(`Kept the fastest of ${tried} placements: seed ${best.seed}, ${best.period.toFixed(3)} ns.`);
+    const fmax = best.lines.map(l => /Max frequency for clock '(.*)': ([0-9.]+) MHz/.exec(l)).filter(Boolean).at(-1);
     log(`Placed and routed by nextpnr in ${ms(t)}${fmax ? ` (its estimate: ${fmax[2]} MHz)` : ''}.`);
-    const json = typeof routedJson === 'string' ? routedJson : new TextDecoder().decode(routedJson);
-    let design;
-    try { design = nextpnrToXdl(JSON.parse(json), io.device(), io.device().part); } catch (e) { throw new StepError(`nextpnr's routed design cannot be read: ${e.message}`); }
-    const text = writeXdl(design);
+    const { design } = best;
+    const text = best.text;
     report.files.routed = io.write('open/routed.xdl', text);
     const check = checkRouting(parseXdl(text), io.device());
     if (!check.ok) throw new StepError('the routing check failed', check.problems.slice(0, 50));
