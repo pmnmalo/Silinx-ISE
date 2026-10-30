@@ -194,3 +194,13 @@ test('#2080 a pipelined loop that does not fit the clock: its II kept, its path 
   assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE II=1'), { file: 't.c', clock: 40 }).report.slowLoops, []);
   assert.deepEqual(cToHdl(src('#pragma HLS PIPELINE off'), { file: 't.c', clock: 10 }).report.slowLoops, []);
 });
+
+test('#2183 the state register as wide as the states need: the machine\'s overflow only the states the clock\'s split adds (not the method of that name)', () => {
+  const width = (src, clock) => /ap_CS_fsm : unsigned\((\d+) downto 0\)/.exec(cToHdl(src, { file: 't.c', clock, top: 'f' }).hdl)?.[1] * 1 + 1;
+  const loop = 'unsigned f(unsigned n) {\n  unsigned l = n, o = 1, r = 0;\n  while (l >= o) {\n    l = l - o;\n    o = o + 2;\n    r = r + 1;\n  }\n  return r;\n}\n';
+  assert.equal(machine(loop, 10).overflow, undefined);
+  assert.ok(width(loop, 10) <= 4, `${width(loop, 10)} bits`);
+  // (a long chain split into its 40 states: the register grown for them, by the states added)
+  const m = machine(chain(40), 5);
+  assert.ok(m.stateT.w >= 6 && m.stateT.w < 8, `${m.stateT.w} bits`);
+});
