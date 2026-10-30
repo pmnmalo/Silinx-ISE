@@ -409,3 +409,61 @@ test('#2190 simCheck: the XDL implements the wide multiplexers; a select or an i
   assert.equal(w.ok, false);
   assert.match(w.message, /^cycle \d+: \S+ is [01] in the netlist, [01] in the XDL$/);
 });
+
+// nextpnr's routed design of research/nextpnr-s3e/slicemem.v (#2191): each of the SLICEM's memories. ISE's DRC passed it (0 errors, 0
+// warnings), its bitgen's .bit byte-identical to Silinx's.
+const memRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/slicemem-routed.json.gz', import.meta.url))));
+const mems = nextpnrToXdl(memRouted(), device, PART);
+const memInst = name => mems.insts.find(i => i.cfg.some(c => /^[FG]$/.test(c.attr) && c.name === name));
+
+test('#2191 nextpnrToXdl: the SLICEM\'s memories, each slice\'s settings as Silinx\'s packer writes them', () => {
+  const engine = new URL('./fixtures/nextpnr-engine/', import.meta.url);
+  const p = pack(readYosysJson(JSON.parse(fs.readFileSync(new URL('slicemem.json', engine), 'utf8'))), { ucf: fs.readFileSync(new URL('slicemem.ucf', engine), 'utf8'), part: PART });
+  // the slice as a set of settings, each memory by its own name (which RAM of a pair takes G is either's), no flip-flop's name
+  const settings = i => i.cfg.filter(c => !/^(F|G|F_ATTR|G_ATTR|WSGEN|FF[XY]|FXMUX|GYMUX|XUSED|YUSED|[DW][FG]?\d?USED|D[XY]MUX|DIF_MUX|DIG_MUX|BXINV|BYINV)$/.test(c.attr) && !/^W[FG]\dUSED$/.test(c.attr)).map(c => `${c.attr}:${c.name}:${c.value}`).sort().join(' ');
+  const contents = i => i.cfg.filter(c => /^[FG]$/.test(c.attr)).map(c => `${c.name}:${c.value}`).sort().join(' ');
+  const memsOf = insts => insts.filter(i => i.cfg?.some(c => /^#RAM/.test(c.value)));
+  const key = i => i.cfg.filter(c => /^[FG]$/.test(c.attr)).map(c => c.name).sort().join('+');
+  const theirs = new Map(memsOf(p.insts).map(i => [key(i), i]));
+  assert.equal(memsOf(mems.insts).length, 9);
+  for (const i of memsOf(mems.insts)) {
+    const s = theirs.get(key(i));
+    assert.ok(s, key(i));
+    assert.equal(i.type, 'SLICEM', key(i));
+    assert.equal(contents(i), contents(s), key(i));
+    assert.equal(settings(i), settings(s), key(i));
+  }
+  const val = (i, a) => i.cfg.find(c => c.attr === a)?.value;
+  // the data's multiplexers, as ISE's map writes them
+  assert.equal(val(memInst('u_d.SLICEM_F'), 'DIF_MUX'), 'ALTDIF');
+  assert.equal(val(memInst('u_d.SLICEM_F'), 'F_ATTR'), 'DUAL_PORT');
+  assert.equal(val(memInst('u_32.SLICEM_F'), 'DIF_MUX'), 'ALTDIF');
+  assert.equal(val(memInst('u_32.SLICEM_F'), 'FXMUX'), 'F5');
+  assert.equal(val(memInst('u_32.SLICEM_F'), 'SLICEWE0USED'), '0');
+  assert.equal(val(memInst('u_c1'), 'DIF_MUX'), 'SHIFTIN');   // the cascade inside the slice
+  assert.equal(val(memInst('u_n'), 'CLKINV'), 'CLK_B');
+  // the chain through Q15: k0, k1 on X0Y1 of a CLB (SHIFTOUT), k2, k3 on X0Y0, the same CLB
+  const [up, lo] = [memInst('u_k0'), memInst('u_k2')];
+  assert.equal(up, memInst('u_k1'));
+  assert.equal(lo, memInst('u_k3'));
+  assert.equal(val(up, 'SHIFTOUTUSED'), '0');
+  assert.equal(val(lo, 'DIG_MUX'), 'SHIFTIN');
+  assert.equal(up.tile, lo.tile);
+  const chain = mems.nets.find(n => n.outpins.some(o => o.inst === up.name && o.pin === 'SHIFTOUT'));
+  assert.deepEqual(chain.inpins, [{ inst: lo.name, pin: 'SHIFTIN' }]);
+  assert.deepEqual(checkRouting(mems, device).problems, []);
+  assert.deepEqual(bitgen(parseXdl(writeXdl(mems)), loadDb(PART), { name: 'top.ncd', crc: true, startupClk: 'JtagClk', part: '3s250ecp132' }).unknown, []);
+});
+
+test('#2191 simCheck: the XDL\'s memories behave as the netlist\'s; wrong contents, data or clock edge is caught', () => {
+  const json = memRouted();
+  const r = simCheck(json, mems, { cycles: 3000, randomInputs: true });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(r.flipFlops, 19);
+  assert.equal(simCheck(json, mems, { cycles: 300, starts: 100 }).ok, true);
+  const text = writeXdl(mems);
+  for (const [from, to] of [['D=0x1234', 'D=0x1235'], ['DIF_MUX::SHIFTIN', 'DIF_MUX::BX'], ['CLKINV::CLK_B', 'CLKINV::CLK'], ['SLICEWE0USED::0 ', ''], ['F_ATTR::DUAL_PORT ', '']]) {
+    assert.ok(text.includes(from), from);
+    assert.equal(simCheck(json, parseXdl(text.replace(from, to)), { cycles: 500, randomInputs: true }).ok, false, `${from} -> ${to}`);
+  }
+});

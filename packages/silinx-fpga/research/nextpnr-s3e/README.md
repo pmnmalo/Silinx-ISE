@@ -119,12 +119,20 @@ own trees only when they beat its other mappings. With nextpnr-spartan v0.6.0 (2
 FXUSED settings as Silinx's packer; the routing check and `xdl-sim-check.mjs --random-inputs` passed (32 flip-flops); ISE's
 `drc` 0 errors and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical to Silinx's.
 
+## The SLICEM's memories (#2191)
+
+`slicemem.v` (in this folder): two RAM16X1S on one address, a RAM16X1D, a RAM32X1S, SRL16s with and without an enable, one into a flip-flop, a
+cascade, four SRLC16E through Q15, an SRL16E_1; its constraints `test/fixtures/nextpnr-engine/slicemem.ucf`. With nextpnr-spartan v0.9.1
+(2026-10-30): the settings of each memory slice those of Silinx's packer (which of a pair takes G apart); the routing check and
+`xdl-sim-check.mjs --random-inputs` passed; ISE's `drc` 0 errors and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical. A
+RAM64X1S is refused at Map (Silinx's packer makes it two RAM32X1S).
+
 ## What is left for a decision
 
 - **Speed.** With Silinx's delays nextpnr got 8.4 ns where Silinx gets 6.7 ns on the same netlist:
   Silinx's placer and router are the better ones here (its timing-driven placement, the loads in its
   router's costs). With the LUT pins permuted, 7.15 ns against 6.72 ns.
-- **Constants**, the carry chain, SLICEM's RAMs and shift registers,
+- **Constants**, the carry chain,
   BRAM, MULT18X18, DCM: each a cell type, its BELs and its settings in the converter.
 - **WebAssembly**: the build of nextpnr-himbaechel with Emscripten (as YoWASP does), and the chip
   database (24 MB per device) loaded in the browser.
