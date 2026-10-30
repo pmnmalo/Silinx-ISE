@@ -32,6 +32,11 @@ test('wait for CI: the verdict from the runs of the commit', () => {
   assert.equal(verdict([run(8, 'completed', 'failure'), run(9, 'completed', 'success')]).state, 'success');
   assert.equal(verdict([run(8, 'completed', 'failure'), run(10, 'in_progress')]).state, 'pending');
   assert.equal(verdict([{ id: 11, status: 'completed', conclusion: 'success', event: 'push', head_branch: 'v1.2.3' }]).reason, 'CI passed (v1.2.3): run 11');
+  // the toolchain package's tag (#1681) counts as the IDE's; a tag named like it but not a version does not
+  assert.equal(verdict([run(16, 'completed', 'success', 'push', 'silinx-fpga-v0.1.0')]).reason, 'CI passed (silinx-fpga-v0.1.0): https://github.com/o/r/actions/runs/16');
+  assert.equal(verdict([run(17, 'in_progress', null, 'push', 'silinx-fpga-v0.1.0')]).state, 'pending');
+  assert.equal(verdict([run(18, 'completed', 'success', 'push', 'silinx-fpga-next')]).state, 'none');
+  assert.equal(verdict([run(19, 'completed', 'success', 'push', 'other-v1.0.0')]).state, 'none');
 });
 
 test('wait for CI: the command line without its arguments', () => {
@@ -50,7 +55,7 @@ test('release: CI on the tagged commit instead of npm test, the commit on main; 
   assert.match(yml, /uses: actions\/checkout@.+\n\s+with:\n\s+fetch-depth: 0\n/);
   assert.match(yml, /- name: The commit is on main\n\s+run: git merge-base --is-ancestor "\$GITHUB_SHA" origin\/main\n/);
   // CI starts on the tag, with the release (ci.yml)
-  assert.match(fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8'), /^on:\n {2}push:\n {4}tags: \['v\*'\]\n {2}workflow_dispatch:\n/m);
+  assert.match(fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8'), /^on:\n {2}push:\n {4}tags: \['v\*', 'silinx-fpga-v\*'\]\n {2}workflow_dispatch:\n/m);
   // the job's limit above the wait's, with time to package and check
   const wait = +/--timeout (\d+)/.exec(yml)[1], job = +/\n {4}timeout-minutes: (\d+)\n/.exec(yml)[1];
   assert.ok(job >= wait + 15, `${job} >= ${wait} + 15`);

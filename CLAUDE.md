@@ -131,4 +131,9 @@ the code and the lessons learnt.
   4. tag `vX` and push; the tag starts CI, and the Release workflow publishes the release once that run has
      passed (it does not run the tests itself; the commit must be on `main`).
 
+  The toolchain's package, `silinx-fpga`, has releases of its own (#1681): `node scripts/changelog-release.mjs X
+  --package silinx-fpga`, `npm version X -w silinx-fpga --no-git-tag-version`, `node scripts/sync-version.mjs --package
+  silinx-fpga`, a commit, then the tag `silinx-fpga-vX`: it starts CI, and `silinx-fpga-release.yml` publishes it on
+  npm once that run has passed.
+
   The Pages site serves the latest release at the root and `main` under `dev/`.

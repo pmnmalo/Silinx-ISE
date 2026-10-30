@@ -1,5 +1,5 @@
 // The toolchain's package, silinx-fpga (#1677, step 6 of the toolchain's separation, #1651): an npm workspace of this
-// repository, packages/silinx-fpga/, private until it is published (#1681), Apache-2.0 for its code and its data.
+// repository, packages/silinx-fpga/, published on npm from its own tag (#1681), Apache-2.0 for its code and its data.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,10 +13,12 @@ const pkg = JSON.parse(read(path.join(DIR, 'package.json')));
 const root = JSON.parse(read(path.join(ROOT, 'package.json')));
 const lock = JSON.parse(read(path.join(ROOT, 'package-lock.json')));
 
-test('#1677 silinx-fpga: a private workspace package of this repository, Apache-2.0, its own version', () => {
+test('#1677 silinx-fpga: a workspace package of this repository, public on npm, Apache-2.0, its own version', () => {
   assert.deepEqual(root.workspaces, ['packages/*']);
   assert.equal(pkg.name, 'silinx-fpga');
-  assert.equal(pkg.private, true, 'private until it is published (#1681)');
+  // published by .github/workflows/silinx-fpga-release.yml (#1681): public, with npm's provenance
+  assert.equal(pkg.private, undefined);
+  assert.deepEqual(pkg.publishConfig, { access: 'public', provenance: true });
   assert.equal(pkg.license, 'Apache-2.0');
   assert.equal(pkg.type, 'module');
   assert.match(pkg.version, /^0\.\d+\.\d+$/, 'its own semver, 0.x');

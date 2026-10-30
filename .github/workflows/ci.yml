@@ -1,12 +1,13 @@
 name: CI
 # The tests, all of them, at a release only (#607): when a version tag v* is pushed (the Release workflow
-# waits for this run of the tagged commit, scripts/wait-for-ci.mjs), and by hand (Actions ▸ CI ▸ Run
+# waits for this run of the tagged commit, scripts/wait-for-ci.mjs), or the toolchain package's silinx-fpga-v*
+# (its npm publishing waits for it the same way, silinx-fpga-release.yml, #1681), and by hand (Actions ▸ CI ▸ Run
 # workflow, on main or a branch). Not on pull requests nor on pushes to main: a change is merged after
 # the tests related to it, run locally (CLAUDE.md); the scheduled workflows (nightly, ISE, Quality) keep
 # watching between releases.
 on:
   push:
-    tags: ['v*']
+    tags: ['v*', 'silinx-fpga-v*']
   workflow_dispatch:
 permissions:
   contents: read

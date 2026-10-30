@@ -2,7 +2,8 @@
 // A release only of a commit that CI passed (#416): the Release workflow does not run the tests itself, it
 // waits for the CI run of the tagged commit and fails when that run failed, or when the commit has no CI
 // run. CI runs at a release only (#607): the push of the tag v* starts it (a run of the tag), alongside the
-// Release workflow, so it is usually still running and the script waits for it; a run of main started by
+// Release workflow, so it is usually still running and the script waits for it (and the toolchain package's tag
+// silinx-fpga-v*, alongside its npm publishing, #1681); a run of main started by
 // hand (Actions ▸ CI ▸ Run workflow) on that commit counts too. A pull request's or a branch's does not.
 //
 //   node scripts/wait-for-ci.mjs <sha> [--timeout <minutes, 60>] [--appear <minutes, 10>]
@@ -11,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 /** { state: 'success' | 'failure' | 'pending' | 'none', reason } from the CI runs of a commit (the API's workflow_runs). */
 export function verdict(runs) {
-  const ours = runs.filter(r => (r.event === 'push' && /^v\d/.test(r.head_branch)) || (['push', 'workflow_dispatch'].includes(r.event) && r.head_branch === 'main'));
+  const ours = runs.filter(r => (r.event === 'push' && /^(silinx-fpga-)?v\d/.test(r.head_branch)) || (['push', 'workflow_dispatch'].includes(r.event) && r.head_branch === 'main'));
   const url = r => r.html_url || `run ${r.id}`;
   const passed = ours.find(r => r.status === 'completed' && r.conclusion === 'success');
   if (passed) return { state: 'success', reason: `CI passed (${passed.head_branch}): ${url(passed)}` };

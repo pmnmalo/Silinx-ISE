@@ -1,0 +1,45 @@
+# Publishes the toolchain's package, silinx-fpga (packages/silinx-fpga), on npm when its own version tag
+# (silinx-fpga-v0.1.0) is pushed (#1681), with npm's provenance: a signed statement that the package was built here,
+# by this workflow, from this tag (npm audit signatures, or the package's page on npmjs.com). As the IDE's Release:
+# the tests are not run here; CI, started by the same tag, runs them all (the package's among them) and the job
+# waits for that run (scripts/wait-for-ci.mjs). The tagged commit must be on main, its package's version the tag's,
+# with its changelog section and no fragment left (scripts/sync-version.mjs --package). The token is the secret
+# NPM_TOKEN (an npm granular token that may publish silinx-fpga); npm reads it from the environment, it is written
+# nowhere. No GitHub Release: the Pages site serves the IDE's latest one.
+name: silinx-fpga release
+on:
+  push:
+    tags: ['silinx-fpga-v*']
+permissions:
+  actions: read               # the tagged commit's CI run
+  contents: read
+  id-token: write             # npm's provenance (its signing certificate, from GitHub's OIDC token)
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 170
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The commit is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - uses: ./.github/actions/setup
+      - name: The tag's version, with its changelog
+        run: |
+          V="${GITHUB_REF_NAME#silinx-fpga-v}"
+          test "$(node -p "require('./packages/silinx-fpga/package.json').version")" = "$V" || { echo "packages/silinx-fpga/package.json is not $V"; exit 1; }
+          node scripts/sync-version.mjs --package silinx-fpga
+      # CI on this commit, started by the same tag and waited for; a failed run, or none: no release
+      - name: CI passed
+        run: node scripts/wait-for-ci.mjs "$GITHUB_SHA" --timeout 150 --appear 10
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Publish
+        run: |
+          echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > "$RUNNER_TEMP/.npmrc"
+          npm publish -w silinx-fpga --provenance --access public --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/.npmrc
