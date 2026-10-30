@@ -1,0 +1,204 @@
+{
+  "creator": "Yosys 0.70 (git sha1 28ba3cb92, Release, Clang /workspace/YoWASP/yosys/wasi-sdk-33.0-x86_64-linux/share/cmake/../..//bin/clang++ 22.1.0)",
+  "modules": {
+    "gates": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "gates_syn.v:2.1-110.10"
+      },
+      "ports": {
+        "sw": {
+          "direction": "input",
+          "bits": [ 2, 3, 4, 5 ]
+        },
+        "led": {
+          "direction": "output",
+          "bits": [ 6, 7 ]
+        }
+      },
+      "cells": {
+        "$abc$20424$lut$aiger$o0": {
+          "hide_name": 1,
+          "type": "LUT4",
+          "parameters": {
+            "INIT": "0111110000010000"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:51.26-53.19"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "I2": "input",
+            "I3": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 8 ],
+            "I1": [ 9 ],
+            "I2": [ 10 ],
+            "I3": [ 11 ],
+            "O": [ 12 ]
+          }
+        },
+        "$iopadmap$gates.led": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 12 ],
+            "O": [ 6 ]
+          }
+        },
+        "$iopadmap$gates.led_1": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 12 ],
+            "O": [ 7 ]
+          }
+        },
+        "$iopadmap$gates.sw": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 2 ],
+            "O": [ 11 ]
+          }
+        },
+        "$iopadmap$gates.sw_1": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 3 ],
+            "O": [ 10 ]
+          }
+        },
+        "$iopadmap$gates.sw_2": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 4 ],
+            "O": [ 9 ]
+          }
+        },
+        "$iopadmap$gates.sw_3": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 5 ],
+            "O": [ 8 ]
+          }
+        }
+      },
+      "netnames": {
+        "$abc$20424$aiger$o0": {
+          "hide_name": 1,
+          "bits": [ 12 ],
+          "attributes": {
+          }
+        },
+        "a": {
+          "hide_name": 0,
+          "bits": [ 8 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "gates_syn.v:9.15-9.16"
+          }
+        },
+        "b": {
+          "hide_name": 0,
+          "bits": [ 9 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "gates_syn.v:8.15-8.16"
+          }
+        },
+        "c": {
+          "hide_name": 0,
+          "bits": [ 10 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "gates_syn.v:7.15-7.16"
+          }
+        },
+        "d": {
+          "hide_name": 0,
+          "bits": [ 11 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "gates_syn.v:6.15-6.16"
+          }
+        },
+        "led": {
+          "hide_name": 0,
+          "bits": [ 6, 7 ],
+          "attributes": {
+            "src": "gates_syn.v:4.22-4.25"
+          }
+        },
+        "sw": {
+          "hide_name": 0,
+          "bits": [ 2, 3, 4, 5 ],
+          "attributes": {
+            "src": "gates_syn.v:3.20-3.22"
+          }
+        }
+      }
+    }
+  }
+}
