@@ -1160,7 +1160,7 @@ test('research scripts: the command line recognised on Windows too (#1877: not `
   // never matched, so measure.mjs's generators wrote nothing)
   // (the scripts git tracks: not a sync tool's copies)
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const files = execFileSync('git', ['ls-files', 'research'], { cwd: root, encoding: 'utf8' }).split('\n').filter(f => /\.mjs$/.test(f));
+  const files = execFileSync('git', ['ls-files', 'research', 'packages/silinx-fpga/research'], { cwd: root, encoding: 'utf8' }).split('\n').filter(f => /\.mjs$/.test(f));
   assert.ok(files.length > 50);
   const old = files.filter(f => fs.readFileSync(path.join(root, f), 'utf8').includes('import.meta.url === `file://${process.argv[1]}`'));
   assert.deepEqual(old, []);
