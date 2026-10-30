@@ -25,6 +25,8 @@ test('personal data: e-mail addresses, home folders with a user name, logins', (
   assert.deepEqual(kinds('a.md', `write to jane.doe${at}${dot('mail', 'pt')}`), [`e-mail address: jane.doe${at}mail.pt`]);
   assert.deepEqual(kinds('a.md', `jane${at}${dot('example', 'com')} and bot${at}${dot('lab', 'test')}`), []);   // example domains
   assert.deepEqual(kinds('THIRD-PARTY-NOTICES.md', `Copyright (c) Some Author <a${at}${dot('b', 'org')}>`), []);   // licence texts
+  assert.deepEqual(kinds('packages/silinx-fpga/THIRD-PARTY-NOTICES.md', `Copyright (c) Some Author <a${at}${dot('b', 'org')}>`), []);   // silinx-fpga's (#1681)
+  assert.equal(kinds('packages/silinx-fpga/README.md', `Copyright (c) Some Author <a${at}${dot('b', 'org')}>`).length, 1);
   assert.deepEqual(kinds('a.js', `const p = '${['', 'Users', 'alice', 'x.v'].join('/')}';`), [`home folder with a user name: /Users/alice`]);
   assert.deepEqual(kinds('a.js', `cd ${['', 'home', 'bob', 'proj'].join('/')}`), [`home folder with a user name: /home/bob`]);
   assert.deepEqual(kinds('a.md', `C:${'\\'}Users${'\\'}carol${'\\'}Desktop`), [`home folder with a user name: C:${'\\'}Users${'\\'}carol`]);

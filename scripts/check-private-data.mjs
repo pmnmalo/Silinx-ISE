@@ -20,7 +20,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // Known, harmless matches: [file (or a RegExp of files), the matched text (or a RegExp), why]
 const ALLOW = [
-  [/^(THIRD-PARTY-NOTICES\.md|scripts\/licences\/[^/]+\.txt)$/, /@/, 'the licence texts of the third-party packages name their authors'],
+  [/^((packages\/silinx-fpga\/)?THIRD-PARTY-NOTICES\.md|scripts\/licences\/[^/]+\.txt)$/, /@/, 'the licence texts of the third-party packages name their authors'],
   [/./, /^(127\.\d+\.\d+\.\d+|0\.0\.0\.0|255\.255\.255\.255)$/, 'loopback / any address / broadcast'],
   [/./, /^(192\.0\.2|198\.51\.100|203\.0\.113)\.\d+$/, 'documentation addresses (RFC 5737)'],
   [/./, /^(::1|::|::[fF]{4}:(127|0)|2001:0?[dD][bB]8:.*)$/, 'IPv6 loopback / any address (also mapped), the documentation prefix (RFC 3849)'],
