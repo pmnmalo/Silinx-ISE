@@ -10,7 +10,7 @@ import { cmtProbes, intTieoffs } from '../packages/silinx-fpga/research/s6/gen-c
 import { probeBits, CONTEXT } from '../packages/silinx-fpga/research/s6/ana-cmtprobe6.mjs';
 import { gridRegion } from '../packages/silinx-fpga/research/s6/ana-pipdrop6.mjs';
 import { cmtKind, predictCmtSettings, CMT_FRAME } from '../packages/silinx-fpga/research/s6/cmt6.mjs';
-import { cmtWindow } from '../packages/silinx-fpga/research/s6/ana-cmtsites6.mjs';
+import { cmtWindow, PLL_USE_BITS } from '../packages/silinx-fpga/research/s6/ana-cmtsites6.mjs';
 import { columnOf } from '../packages/silinx-fpga/research/s6/ana-slice6.mjs';
 import { S6_DEVICES, emptyFdri } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
@@ -79,6 +79,21 @@ test('db: the settings the same at every site of a kind, the two DCMs of a tile 
   const mo = cmt.dcm.variants.dcmM3, me = cmt.dcmEven.variants.dcmM3;
   assert.ok(mo.set.length && me.set.length);
   assert.notDeepEqual(mo.set, me.set);
+});
+
+// Regression (#2025): the settings' patterns held bits of what the measured designs used: a PLL's CLKOUT0 enable (bit 416
+// of its CMT frame) and the CLKIN path's PIPs' bits in the CMT frame (a PLL's 604, an even DCM's 596 and 599), which a
+// CMT fed from another BUFIO2 (the top half's from the clock pad C10) does not set
+test('db: the settings\' patterns without a PLL\'s CLKOUT0 enable nor the CLKIN paths\' PIP bits (#2025)', () => {
+  const s = db('xc6slx16-cmt-settings').patterns, pips = db('s6-pips-cmt').pips;
+  assert.deepEqual(PLL_USE_BITS, [416]);
+  const pll = Object.entries(s).filter(([k]) => k.startsWith('PLL_ADV'));
+  assert.ok(pll.length >= 20);
+  for (const [, p] of pll) for (const b of ['357,416', '357,604']) assert.ok(!p.bits.includes(b), b);
+  for (const [k, p] of Object.entries(s).filter(([k]) => k.startsWith('DCM0'))) for (const b of ['357,596', '357,599']) assert.ok(!p.bits.includes(b), `${k.slice(0, 30)} ${b}`);
+  // those bits are the paths' PIPs': a CMT tile's PIP sets them (their offsets from its region)
+  const cmtTile = Object.entries(pips).filter(([k, b]) => /^CMT_(PLL|DCM)_/.test(k) && b.length);
+  assert.ok(cmtTile.length > 50);
 });
 
 test('gen-cmtsites6 --outputs: each output of a CMT alone, the pad and the BUFGMUX fixed per site', () => {

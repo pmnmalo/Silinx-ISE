@@ -102,9 +102,9 @@ test('cmt6 / ana-cmtinput6: what a CMT uses; its site\'s, outputs\' and BUFIO2\'
     bufio2: { BUFIO2_X1Y6: ['357,271', '3554,441'], BUFIO2_X3Y7: ['3554,201'] } } } });
 });
 
-test('db: the XC6SLX16\'s bottom CMTs\' input table (the bits outside their settings and PIPs)', () => {
+test('db: the XC6SLX16\'s CMTs\' input table (the bits outside their settings and PIPs), the top half\'s too (#2025)', () => {
   const t = db('xc6slx16-cmt-input');
-  assert.deepEqual(Object.keys(t.sites), ['DCM_X0Y0', 'DCM_X0Y1', 'PLL_ADV_X0Y0']);
+  assert.deepEqual(Object.keys(t.sites), ['DCM_X0Y0', 'DCM_X0Y1', 'DCM_X0Y2', 'DCM_X0Y3', 'PLL_ADV_X0Y0', 'PLL_ADV_X0Y1']);
   const frame = `${CMT_FRAME.xc6slx16},`;
   for (const site of ['DCM_X0Y0', 'DCM_X0Y1']) {
     const s = t.sites[site];
@@ -116,6 +116,17 @@ test('db: the XC6SLX16\'s bottom CMTs\' input table (the bits outside their sett
   }
   // the two DCMs of a tile apart
   assert.notDeepEqual(t.sites.DCM_X0Y0.outputs.CLK2X, t.sites.DCM_X0Y1.outputs.CLK2X);
+  // the top half's DCMs (row 2): the bottom's outputs bits in their own row's CMT frame; the board's clock pad C10's
+  // BUFIO2_X4Y26 one I/O word bit; the clock spine's bits of the top half
+  const row2 = `${CMT_FRAME.xc6slx16 + 2 * S6_DEVICES.xc6slx16.rowFrames},`;
+  for (const [top, bot] of [['DCM_X0Y2', 'DCM_X0Y0'], ['DCM_X0Y3', 'DCM_X0Y1']]) {
+    const s = t.sites[top];
+    assert.deepEqual(s.outputs, Object.fromEntries(Object.entries(t.sites[bot].outputs).map(([o, b]) => [o, b.map(x => x.replace(frame, row2))])));
+    assert.deepEqual(s.bufio2.BUFIO2_X4Y26, ['3562,569']);
+    assert.deepEqual(s.common, ['3,74', '1491,64', '1491,66', '1491,69', '1491,74']);
+  }
+  // a PLL's CLKOUT0 enable: bit 416 of its row's CMT frame (rows 1 and 3), not one of its settings
+  for (const [site, row] of [['PLL_ADV_X0Y0', 1], ['PLL_ADV_X0Y1', 3]]) assert.deepEqual(t.sites[site].outputs, { CLKOUT0: [`${CMT_FRAME.xc6slx16 + row * S6_DEVICES.xc6slx16.rowFrames},416`] });
 });
 
 test('residual6: a bitstream\'s bits set against the empty one, the block RAM\'s frames only when asked', () => {
