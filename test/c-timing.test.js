@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Graph } from '../core/c-graph.js';
-import { pathDelay, fitsClock, DEFAULT_CLOCK, UNCERTAINTY, FAMILIES } from '../core/c-timing.js';
+import { pathDelay, fitsClock, familyOf, DEFAULT_CLOCK, UNCERTAINTY, FAMILIES } from '../core/c-timing.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { cosimulate } from '../core/c-cosim.js';
 
@@ -109,4 +109,8 @@ test('#2080 every operation of the graph has a delay in each family: <= counts a
     assert.equal(le, lt, f);
     for (const op of ['add', 'sub', 'neg', 'lt', 'le', 'gt', 'ge', 'eq', 'ne', 'mul', 'mux', 'and', 'or', 'xor', 'not', 'shl', 'shr']) assert.equal(typeof FAMILIES[f][op], 'function', `${f} ${op}`);
   }
+});
+
+test('#2080 a device family\'s delays: the Spartan-3E its own; another family, or none, the Artix-7\'s', () => {
+  assert.deepEqual(['spartan3e', 'spartan6', 'virtex4', undefined, null, 'constructor'].map(familyOf), ['spartan3e', 'artix7', 'artix7', 'artix7', 'artix7', 'artix7']);
 });

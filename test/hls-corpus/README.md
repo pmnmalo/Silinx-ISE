@@ -70,7 +70,7 @@ Not part of `npm test` (it needs the network once).
 | modeling-pointers-stream-good | C | pass | pass | pass | 5 |  |
 | modeling-pointers-using-double | C | pass | pass | pass | - |  |
 | modeling-conditional-control-of-pragmas-using-defines | C++ | pass | pass | pass | 35 |  |
-| modeling-conditional-control-of-pragmas-using-template-function | C++ | pass | pass | pass | 58 |  |
+| modeling-conditional-control-of-pragmas-using-template-function | C++ | pass | pass | pass | 68 |  |
 | modeling-cpp-templates-for-multiple-instances | C++ | pass | pass | pass | 2 |  |
 | modeling-fixed-point-sqrt | C++ | pass | pass | pass | - |  |
 | modeling-free-running-kernel-remerge-ii4to1 | C++ | pass | pass | pass | 80 |  |
@@ -85,7 +85,7 @@ Not part of `npm test` (it needs the network once).
 | modeling-variable-bound-loops | C++ | pass | pass | pass | 3-34 |  |
 | pipelining-functions-function-instantiate | C++ | pass | pass | pass | - |  |
 | pipelining-functions-hier-func | C++ | pass | pass | pass | - |  |
-| pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 523 |  |
+| pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 543 |  |
 | pipelining-loops-perfect-loop | C++ | pass | pass | pass | 1723 |  |
 | pipelining-loops-using-free-running-pipeline | C++ | pass | fail | skip | - | C synthesis: 66: 'strm_out' is not an integer |
 | task-level-parallelism-control-driven-channels-autorestart | C++ | fail | fail | skip | - | C simulation: diamond_test.cpp:23: the header 'ap_float.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |

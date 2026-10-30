@@ -5,7 +5,8 @@ import { S, findDoc, closeDoc, openDoc, openFile } from './app.js';
 import { createEditor } from './editor.js';
 import { icons } from './icons.js';
 import { log, showConsolePage } from './console.js';
-import { periodNs } from '/packages/silinx-fpga/src/parts.js';
+import { periodNs, deviceFamily } from '/packages/silinx-fpga/src/parts.js';
+import { familyOf } from '/core/c-timing.js';
 
 export const isC = (p) => /\.(c|cpp|cc|cxx)$/i.test(p || '');
 // (its badge: C or C++, #1590)
@@ -44,7 +45,7 @@ export async function openCAsm(path) {
   const old = findDoc(id);
   if (old) await closeDoc(old);
   const { cAsm } = await import('/core/c-asm.js');
-  const r = cAsm(await text(path), { file: path, lang: hdlLang(), clock: hlsClock() });
+  const r = cAsm(await text(path), { file: path, lang: hdlLang(), clock: hlsClock(), family: hlsFamily() });
   if (!r.ok) { log(`ERROR:SilinxC - "${path}" ${r.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`).join('; ')}`, 'err'); return null; }
   const { mountAsmEditor } = await import('./asm-editor.js');
   const name = `${r.model.name}.asm`;
@@ -111,7 +112,7 @@ export async function runCosimulation(path) {
   log(`\nStarted : "C/RTL Co-simulation" of ${path} (${lang === 'vhdl' ? 'VHDL' : 'Verilog'}).\n`, 'hdr');
   showConsolePage('console');
   const src = await text(path);
-  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src), clock: hlsClock() });
+  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src), clock: hlsClock(), family: hlsFamily() });
   for (const e of r.errors) log(`ERROR:SilinxC - "${path}" ${e}`, 'err');
   if (!r.ok || r.errors.length) { log('\nProcess "C/RTL Co-simulation" failed', 'err', { diag: false }); return false; }
   log(`C simulation: ${r.calls} call(s) of '${r.gen.top}' replayed on its ${lang === 'vhdl' ? 'VHDL' : 'Verilog'}.`);
@@ -132,6 +133,12 @@ export function hlsClock() {
   return (r && periodNs(r.extra.period)) || 20;
 }
 
+/** The delays Silinx HLS schedules with (#2080): those of the project's device family (core/c-timing.js), else the
+ *  Artix-7's. */
+export function hlsFamily() {
+  return familyOf(S.project?.device ? deviceFamily(S.project.device) : null);
+}
+
 /** View C Synthesis Report (#1531): what the C was made into (core/c-hdl.js's report): the module, its ports, its
  *  states and registers, its memories, each loop's pragmas, II and cycles. */
 export async function runCReport(path) {
@@ -140,7 +147,7 @@ export async function runCReport(path) {
   log(`\nStarted : "View C Synthesis Report" of ${path}.\n`, 'hdr');
   showConsolePage('console');
   const clock = hlsClock();
-  const r = cToHdl(await text(path), { file: path, lang, clock });
+  const r = cToHdl(await text(path), { file: path, lang, clock, family: hlsFamily() });
   for (const d of r.diagnostics) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:SilinxC - "${path}" line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn');
   if (!r.ok) { log('\nProcess "View C Synthesis Report" failed', 'err', { diag: false }); return false; }
   const rep = r.report;

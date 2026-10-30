@@ -274,16 +274,19 @@ uiTest('#1897 C Simulation of a test bench with files: the project\'s data files
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });
 
-// #1924: a function's HDL scheduled for the board's clock (Basys2: 50 MHz, 20 ns): four additions in a row fit it,
-// a combinational module (at Vitis HLS's 10 ns they would not); the report says the clock
-uiTest('#1924 View C Synthesis Report: the target clock the board\'s (20 ns), a chain of four additions combinational there', E, async (page) => {
-  await makeProject(env, { name: 'CClock', top: 'sum4', files: { 'src/sum4.c': 'int sum4(int a, int b, int c, int d, int e) {\n  return a + b + c + d + e;\n}\n' } });
+// #1924: a function's HDL scheduled for the board's clock (Basys2: 50 MHz, 20 ns) with its family's delays (a Spartan-3E,
+// #2080: an addition 4.06 ns): three additions in a row fit it, a combinational module; four do not, a sequential one
+// (at Vitis HLS's 10 ns on an Artix-7, three fit); the report says the clock
+uiTest('#1924 View C Synthesis Report: the target clock the board\'s (20 ns), the Spartan-3E\'s delays: three additions combinational there, four sequential', E, async (page) => {
+  await makeProject(env, { name: 'CClock', top: 'sum4', files: { 'src/sum4.c': 'int sum4(int a, int b, int c, int d, int e) {\n  return a + b + c + d + e;\n}\n', 'src/sum3.c': 'int sum3(int a, int b, int c, int d) {\n  return a + b + c + d;\n}\n' } });
   await page.openProject('CClock');
   await page.showMessages();
-  await page.treeRow('#hier', 'sum4');
-  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
-  await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
-  const log = await page.consoleText();
-  assert.match(log, /C Synthesis Report of 'sum4' \(src\/sum4\.c, VHDL\)\n\nModule: combinational\nTarget clock: 20 ns \(the board's oscillator\)\n/);
-  assert.doesNotMatch(log, /WARNING|ERROR/);
+  for (const [top, module] of [['sum3', 'combinational'], ['sum4', 'sequential, ap_ctrl_hs \\(ap_clk, ap_rst, ap_start \\/ ap_done \\/ ap_idle \\/ ap_ready\\), 4 states, \\d+ register bits']]) {
+    await page.treeRow('#hier', top);
+    await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+    await page.waitConsole(new RegExp(`C Synthesis Report of '${top}'[\\s\\S]*Process "View C Synthesis Report" completed successfully`));
+    const log = await page.consoleText();
+    assert.match(log, new RegExp(`C Synthesis Report of '${top}' \\(src\\/${top}\\.c, VHDL\\)\\n\\nModule: ${module}\\nTarget clock: 20 ns \\(the board's oscillator\\)\\n`));
+    assert.doesNotMatch(log, /WARNING|ERROR/);
+  }
 });

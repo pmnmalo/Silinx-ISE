@@ -65,6 +65,11 @@ export function pathDelay(graph, family = 'artix7') {
 
 /** Whether a combinational function's graph fits the clock (ns): its estimate within the period less its
  *  uncertainty. */
+/** The delays of a device family (a project's, spartan3e…): its own, else the Artix-7's (#2080). */
+export function familyOf(deviceFamily) {
+  return Object.hasOwn(FAMILIES, deviceFamily) ? deviceFamily : 'artix7';
+}
+
 export function fitsClock(graph, clock = DEFAULT_CLOCK, family = 'artix7') {
   return pathDelay(graph, family) <= clock * (1 - UNCERTAINTY);
 }
