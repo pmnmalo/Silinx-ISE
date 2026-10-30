@@ -631,7 +631,7 @@ Object.assign(PT, {
   'Trying it out: click the inputs (switches, bus values, clocks), hover a wire or pin to see its value, drag to pan. Esc stops.':
     'A experimentar: clique nas entradas (interruptores, valores de barramentos, relógios), passe o rato sobre um fio ou pino para ver o valor, arraste para deslocar. Esc para.',
   'Building the circuit\'s model…': 'A construir o modelo do circuito…', 'Trying it out': 'A experimentar',
-  'Power cycle: back to time 0, registers to their initial values': 'Religar: volta ao tempo 0, registos com os valores iniciais',
+  'Power cycle: back to time 0, registers and inputs to their initial values': 'Religar: volta ao tempo 0, registos e entradas com os valores iniciais',
   'Step': 'Passo', 'One clock cycle (rising and falling edge)': 'Um ciclo de relógio (flanco ascendente e descendente)', 'Pause': 'Pausa',
   'Run / pause the clock': 'Executar / pausar o relógio', 'Clock rate': 'Frequência do relógio', 'Buses:': 'Barramentos:',
   'Number format of the bus values': 'Formato dos valores dos barramentos',

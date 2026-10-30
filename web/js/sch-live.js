@@ -27,12 +27,13 @@ const isReg = s => !!(SYMBOLS[s.type]?.ff || s.type === 'register' || s.type ===
  * Start the live simulation of a schematic.
  * ctx: { doc, modules, sources, lang, generics? ({ NAME: integer }: an instance's, #1064), h, layer (svg <g> above the content), content (svg <g> of the drawing),
  *        bar (HTML strip above the canvas), canvas (positioned HTML box of the svg), toCanvas(pt) -> {x,y} px,
- *        onExit(), onRepaint?() }
+ *        onExit(), onRepaint?(), inputs? (the inputs' values of the last Try it, ctl.inputValues(): taken where they still fit, #2106) }
  * Returns { ok: false, errors, warnings } or { ok: true, warnings, ctl }.
  */
 export function startLiveSim(ctx) {
   const r = buildLiveSim(ctx.doc, { modules: ctx.modules, sources: ctx.sources, lang: ctx.lang, generics: ctx.generics });
   if (!r.ok) return { ok: false, errors: r.errors, warnings: r.warnings, diagnostics: r.diagnostics };
+  if (ctx.inputs) r.live.restoreInputs(ctx.inputs);
   return { ok: true, warnings: r.warnings, ctl: liveController(ctx, r.live) };
 }
 
@@ -101,7 +102,7 @@ function liveController(ctx, live) {
   });
   bar.append(
     h('span', { class: 'lv-badge', text: 'Trying it out' }),
-    h('button', { type: 'button', class: 'btn lv-reset', title: 'Power cycle: back to time 0, registers to their initial values', text: 'Reset', onclick: () => { stopAll(); act(() => live.reset()); } }),
+    h('button', { type: 'button', class: 'btn lv-reset', title: 'Power cycle: back to time 0, registers and inputs to their initial values', text: 'Reset', onclick: () => { stopAll(); closeEditor(); act(() => live.reset({ inputs: true })); } }),
     ...(clocks.length ? [h('span', { class: 'lv-sep' }), h('span', { class: 'lv-lbl', text: 'Clock:' }), ...clockBoxes.map(b => b.box)] : []),
     h('span', { class: 'lv-sep' }), h('label', { class: 'lv-lbl', text: 'Buses:' }), radixSel,
     h('span', { class: 'lv-sp' }), errEl, tEl,
@@ -328,6 +329,6 @@ function liveController(ctx, live) {
   return {
     live, update, renderProps, pointerDown, hover, hideTip: () => { tip.hidden = true; }, destroy,
     closeEditor, get editing() { return !!editor; }, get radix() { return radix; },
-    stopAll, clocks: clocks.map(c => c.id),
+    stopAll, clocks: clocks.map(c => c.id), inputValues: () => live.inputValues(),
   };
 }

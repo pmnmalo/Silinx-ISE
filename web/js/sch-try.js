@@ -15,6 +15,8 @@ export function mountSchTry(ctx) {
   } = ctx;
 
   // ---------------- live simulation (Logisim style): web/js/sch-live.js on core/schlive.js
+  // the inputs' values of the last Try it of this schematic, for the next one (#2106): in memory, while it is open
+  let lastInputs = null;
   const toCanvas = pt => ({ x: pt.x * view().s + view().tx, y: pt.y * view().s + view().ty });
   async function enterSim() {
     if (live() || liveStarting() || !canSim || destroyed()) return;
@@ -27,7 +29,7 @@ export function mountSchTry(ctx) {
       if (destroyed() || live()) return;
       const res = startLiveSim({
         doc: clone(doc()), modules: modules(), sources: sources || [], lang: opts.simLang || genLang(), generics: opts.simGenerics?.(), h,
-        layer: simG, content: contentG, bar: simBar, canvas, toCanvas, onExit: leaveSim,
+        layer: simG, content: contentG, bar: simBar, canvas, toCanvas, onExit: leaveSim, inputs: lastInputs,
       });
       if (!res.ok) {
         setLastDiags(res.diagnostics?.length ? res.diagnostics : res.errors.map(message => ({ severity: 'error', message })));
@@ -50,6 +52,7 @@ export function mountSchTry(ctx) {
   }
   function leaveSim() {
     if (!live()) return;
+    lastInputs = live().inputValues();
     live().destroy();
     setLive(null);
     container.classList.remove('sim-mode');

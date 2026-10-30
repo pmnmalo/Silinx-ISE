@@ -159,6 +159,54 @@ for (const lang of ['vhdl', 'verilog']) {
     assert.equal(live.input(d).value, 1n);
   });
 
+  test(`${lang}: #2106 the inputs' values kept for the next Try it; Reset with the inputs back to 0`, () => {
+    const mk = (pw = 4) => {
+      wid = 0;
+      const doc = newDoc('keep', lang);
+      const g = sym(doc, 'and2', 200, 100), ff = sym(doc, 'fd', 200, 250), ad = sym(doc, 'add', 200, 400, { width: pw });
+      io(doc, g, 'I0', 'a', 'in'); io(doc, g, 'I1', 'b', 'in'); io(doc, g, 'O', 'y', 'out');
+      io(doc, ff, 'D', 'd', 'in'); io(doc, ff, 'C', 'clk', 'in'); io(doc, ff, 'Q', 'q', 'out');
+      io(doc, ad, 'A', 'p', 'in', pw); io(doc, ad, 'B', 'n', 'in', pw); io(doc, ad, 'S', 'r', 'out', pw);
+      return doc;
+    };
+    const doc = mk(), live = build(doc), id = n => byName(doc, n);
+    live.set(id('a'), 1n); live.set(id('b'), 1n); live.set(id('p'), 5n); live.set(id('d'), 1n); live.cycle(id('clk'));
+    assert.equal(val(live, id('y')), '1');
+    const saved = live.inputValues();
+    // the clocks are not kept (they end every step at 0)
+    assert.deepEqual(Object.keys(saved).map(k => doc.ports.find(p => p.id === k).name).sort(), ['a', 'b', 'd', 'n', 'p']);
+    assert.deepEqual(saved[id('p')], { width: 4, value: 5n });
+    // the next Try it: the same inputs, the circuit settled on them, registers at INIT, time 0
+    const next = build(doc), t0 = next.now;
+    assert.equal(next.restoreInputs(saved), true);
+    assert.equal(next.now, t0, 'at time 0 (and one settle)');
+    assert.equal(val(next, id('y')), '1');
+    assert.equal(val(next, id('r')), '0101');
+    assert.equal(val(next, id('q')), '0', 'the registers start from their INIT value');
+    assert.deepEqual(next.inputValues(), saved);
+    // Reset: time 0, registers and inputs to their initial values
+    next.cycle(id('clk'));
+    assert.equal(val(next, id('q')), '1');
+    next.reset({ inputs: true });
+    assert.equal(next.now, t0);
+    assert.deepEqual([id('a'), id('b'), id('d'), id('p'), id('n')].map(k => next.input(k).value), [0n, 0n, 0n, 0n, 0n]);
+    assert.equal(val(next, id('y')), '0');
+    assert.equal(val(next, id('r')), '0000');
+    assert.equal(val(next, id('q')), '0');
+    // a marker removed, one of another width, one now a clock, junk: left at 0, no error
+    const changed = mk(8);
+    changed.ports = changed.ports.filter(p => p.name !== 'b');
+    const other = build(changed);
+    const taken = other.restoreInputs({ ...saved, [byName(changed, 'clk')]: { width: 1, value: 1n }, nope: { width: 1, value: 1n }, [byName(changed, 'd')]: { width: 1, value: 'x' } });
+    assert.equal(taken, true);
+    assert.equal(other.input(byName(changed, 'a')).value, 1n);
+    assert.equal(other.input(byName(changed, 'p')).value, 0n, 'p is 8 bits now');
+    assert.equal(other.input(byName(changed, 'd')).value, 0n);
+    assert.equal(other.input(byName(changed, 'clk')).value, 0n);
+    assert.equal(other.restoreInputs(null), false);
+    assert.equal(other.restoreInputs({}), false);
+  });
+
   test(`${lang}: counter with asynchronous clear`, () => {
     const doc = newDoc('cnt', lang);
     const c = sym(doc, 'counter', 200, 100, { width: 4, en: true, reset: 'async' });

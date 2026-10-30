@@ -258,6 +258,27 @@ test('schematic with a bidirectional marker wired to a module inout port (and re
     live.reset();
     assert.equal(bits('data'), '00000000');
     assert.equal(live.drive('nope', 1n), false);
+    // the next Try it (#2106): the bus driven from outside again, the inputs as they were; Reset: released, inputs 0
+    live.set(id('we'), 1n); live.drive(id('data'), 0x3cn);
+    const saved = live.inputValues();
+    assert.deepEqual(saved, { [id('we')]: { width: 1, value: 1n }, [id('rd')]: { width: 0 + 1, value: 1n }, [id('data')]: { width: 8, value: 0x3cn } });
+    const next = buildLiveSim(nd, { modules, sources }).live;
+    assert.equal(next.restoreInputs(saved), true);
+    assert.equal(next.bidir(id('data')).value, 0x3cn);
+    assert.equal(next.input(id('rd')).value, 1n);
+    assert.equal(V.toBin(next.portValue(id('q'))), '00000000', 'the register restarts at 0');
+    assert.equal(V.toBin(next.portValue(id('data'))), '00xxxx00', 'the register (rd = 1) and the outside both drive the bus');
+    next.set(id('rd'), 0n);
+    assert.equal(V.toBin(next.portValue(id('nbus'))), '11000011', 'the gate reads the restored bus');
+    next.reset({ inputs: true });
+    assert.equal(next.bidir(id('data')).value, null);
+    assert.equal(next.input(id('we')).value, 0n);
+    assert.equal(V.toBin(next.portValue(id('data'))), 'zzzzzzzz');
+    // released: restored released
+    const rel = buildLiveSim(nd, { modules, sources }).live;
+    rel.drive(id('data'), 1n);
+    assert.equal(rel.restoreInputs(next.inputValues()), true);
+    assert.equal(rel.bidir(id('data')).value, null);
   }
 });
 

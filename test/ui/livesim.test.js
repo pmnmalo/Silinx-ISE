@@ -117,9 +117,10 @@ uiTest('live schematic simulation: toggle inputs, wire colours, outputs, clock s
   const t1 = await now();
   await new Promise((r) => setTimeout(r, 150));
   assert.equal(await now(), t1, 'paused');
-  // Reset (power cycle): q back to its INIT value 0, the switches keep their positions
+  // Reset (power cycle): q back to its INIT value 0, the switches back to 0 too (#2106)
   await page.click(`${ED} .se-simbar .lv-reset`);
-  await page.waitFor((s) => document.querySelector(s).classList.contains('lv-0'), [ledQ], { what: 'q = 0 after reset' });  assert.ok(await page.eval((s) => document.querySelector(s).classList.contains('lv-1'), ledY));
+  await page.waitFor((s) => document.querySelector(s).classList.contains('lv-0'), [ledQ], { what: 'q = 0 after reset' });
+  assert.ok(await page.eval((s) => document.querySelector(s).classList.contains('lv-0'), ledY));
   // in Portuguese: no untranslated label in the simulation strip and panels
   await page.eval(TEXTS);
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
