@@ -17,6 +17,9 @@ additional permission to convey the resulting work. Corresponding Source for a n
 of such a combination shall include the source code for the parts of elkjs used as well as that
 of the covered work.
 
+Its toolchain, silinx-fpga (packages/silinx-fpga: synthesis, pack, place, route, timing, bitstream and the
+device data), is Copyright 2026 Pedro Maló too, under the Apache License 2.0 (its LICENSE and NOTICE).
+
 It includes open-source components from other projects, each under its own licence:
 CodeMirror (MIT), Express and its dependencies (MIT, ISC, BSD-3-Clause), Yosys (YoWASP, ISC),
 nextpnr with the Spartan-3E (nextpnr-spartan, ISC; with Boost, BSL-1.0, and Eigen, MPL-2.0: source code at

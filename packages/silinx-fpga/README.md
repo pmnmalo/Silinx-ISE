@@ -96,4 +96,6 @@ const { ok, report } = await runFlow({ top: 'blinky', part, device: 'xc3s250e', 
 The sources are flat Verilog; VHDL needs an HDL front end (`io.frontEnd`, Silinx ISE's). The place and route is
 Silinx's own unless `io.placeRoute` gives another engine (`placeRouteBest`'s arguments and result).
 
-Licence: Apache-2.0 ([LICENSE](LICENSE)), its code and its data.
+Licence: Apache-2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)), its code and its data; its dependencies' licences are in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The npm package holds `src/`, `bin/`, `bitdb/` and `devices/`; the research
+and the tests stay in the repository.

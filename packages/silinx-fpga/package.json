@@ -11,6 +11,14 @@
   "bin": {
     "silinx-fpga": "bin/silinx-fpga.js"
   },
+  "files": [
+    "src",
+    "bin",
+    "bitdb",
+    "devices",
+    "NOTICE",
+    "THIRD-PARTY-NOTICES.md"
+  ],
   "scripts": {
     "test": "node --test test/*.test.js"
   },
