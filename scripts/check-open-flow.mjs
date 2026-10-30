@@ -41,7 +41,7 @@ if (!projects.length) projects.push({ dir: path.join(ROOT, 'examples', 'blinky')
 
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-open-check-'));
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 << 20, ...opts });
-const ssh = cmd => run('ssh', ['-o', 'BatchMode=yes', '--', HOST, `export PATH="$PATH:/usr/local/bin"; ${cmd}`]);
+const ssh = cmd => run('ssh', ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=4', '-o', 'ConnectTimeout=30', '--', HOST, `export PATH="$PATH:/usr/local/bin"; ${cmd}`]);
 const names = [];
 let failed = 0;
 
@@ -96,9 +96,9 @@ let out;
 if (LOCAL) out = run('docker', ['run', '--rm', ...DOCKER_ISOLATION, '--platform', 'linux/amd64', '-v', `${work}:/w`, IMAGE, 'bash', '/w/ise-open-check.sh', '/w', ...names]);
 else {
   ssh(`rm -rf ${remote} && mkdir -p ${remote}`);
-  run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes', `${work}/`, `${HOST}:${remote}/`]);
+  run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30', `${work}/`, `${HOST}:${remote}/`]);
   out = ssh(`docker run --rm ${DOCKER_ISOLATION.join(' ')} -v "${mount}":/w ${IMAGE} bash /w/ise-open-check.sh /w ${names.join(' ')}`);
-  run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes', '--include=*/', '--include=ise*.bit', '--include=drc.log', '--include=xdl2ncd.log', '--include=routed.twr', '--include=routed.dly', '--exclude=*', `${HOST}:${remote}/`, `${work}/`]);
+  run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30', '--include=*/', '--include=ise*.bit', '--include=drc.log', '--include=xdl2ncd.log', '--include=routed.twr', '--include=routed.dly', '--exclude=*', `${HOST}:${remote}/`, `${work}/`]);
   ssh(`rm -rf ${remote}`);
 }
 process.stdout.write(out.split('\n').map(l => (l ? `  ISE ${l}` : l)).join('\n'));

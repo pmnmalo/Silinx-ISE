@@ -193,7 +193,7 @@ async function main() {
   if (collect && !/^silinx-vitis-[\w]+$/.test(collect)) { console.error(`--collect: not a run's name: ${collect}`); process.exit(2); }
   const filesOf = (d) => [...d.files, ...d.tb, ...d.headers];
   const run = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 64 << 20 });
-  const ssh = (cmd) => run('ssh', ['-o', 'BatchMode=yes', '--', HOST, `export PATH="$PATH:/usr/local/bin"; ${cmd}`]);
+  const ssh = (cmd) => run('ssh', ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=4', '-o', 'ConnectTimeout=30', '--', HOST, `export PATH="$PATH:/usr/local/bin"; ${cmd}`]);
   const remoteOf = (name) => `${iseWorkBase('silinx-vitis')}/${name}`;
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-vitis-'));
   let designs;
@@ -207,7 +207,7 @@ async function main() {
         process.exitCode = 3;
         return;
       }
-      run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes', `${HOST}:${remote}/designs.txt`, `${HOST}:${remote}/results`, `${work}/`]);
+      run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30', `${HOST}:${remote}/designs.txt`, `${HOST}:${remote}/results`, `${work}/`]);
       const names = new Set(fs.readFileSync(path.join(work, 'designs.txt'), 'utf8').split('\n').map((l) => l.split(' ')[0]).filter(Boolean));
       designs = manifest.designs.filter((d) => names.has(d.name));
     } else {
@@ -236,7 +236,7 @@ async function main() {
         const name = path.basename(work), remote = remoteOf(name);
         const mount = remote.startsWith('/') ? remote : `$HOME/${remote}`;
         ssh(`rm -rf ${remote} && mkdir -p ${remote}`);
-        run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes', `${work}/`, `${HOST}:${remote}/`]);
+        run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30', `${work}/`, `${HOST}:${remote}/`]);
         if (a.includes('--detach')) {
           ssh(`docker run -d --name ${name} ${docker.slice(1).join(' ')} -v "${mount}":/w ${IMAGE} bash /w/hls-vitis-run.sh /w`);
           console.log(`${name}: ${designs.length} designs started on the host; collect with: node scripts/hls-vitis.mjs --collect ${name} --update`);
@@ -244,7 +244,7 @@ async function main() {
         }
         try {
           process.stdout.write(ssh(`docker run ${docker.slice(1).join(' ')} -v "${mount}":/w ${IMAGE} bash /w/hls-vitis-run.sh /w`));
-          run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes', `${HOST}:${remote}/results/`, `${work}/results/`]);
+          run('rsync', ['-a', '-e', 'ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30', `${HOST}:${remote}/results/`, `${work}/results/`]);
         } finally { ssh(`rm -rf ${remote}`); }
       }
     }

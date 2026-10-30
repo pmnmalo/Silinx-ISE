@@ -6,7 +6,7 @@
 # routed.xdl: xdl -xdl2ncd and drc (the routing of the Silinx toolchain, every net complete and legal for ISE).
 # Remote run (the host only on the command line, never in a file):
 #   rsync -a <scratch>/{gates,blinky} "$SILINX_ISE_HOST:<remote dir>/"
-#   ssh -o BatchMode=yes "$SILINX_ISE_HOST" 'export PATH="$PATH:/usr/local/bin"; docker run --rm \
+#   ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30 "$SILINX_ISE_HOST" 'export PATH="$PATH:/usr/local/bin"; docker run --rm \
 #     -v <remote dir>:/w xilinx/ise:14.7 bash /w/ise-place-check.sh /w gates blinky'
 source /opt/Xilinx/14.7/ISE_DS/settings64.sh >/dev/null 2>&1
 cd "$1" || exit 1

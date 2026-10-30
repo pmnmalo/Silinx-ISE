@@ -11,7 +11,7 @@ set -e
 W=$(cd "$1" && pwd); shift
 RW=${RW:-silinx-s6}; P=${P:-3}
 PARTS=("$@"); [ ${#PARTS[@]} -eq 0 ] && PARTS=(report empty impl edif)
-SSHO="ssh -o BatchMode=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=10"
+SSHO="ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30"
 SSH=($SSHO "$SILINX_ISE_HOST")
 DOCKER="export PATH=\"\$PATH:/usr/local/bin\"; docker run --rm --network none -v \"\$HOME/$RW\":/w xilinx/ise:14.7 bash /w/ise-s6.sh"
 "${SSH[@]}" "mkdir -p $RW"
