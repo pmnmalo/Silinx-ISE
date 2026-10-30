@@ -376,6 +376,61 @@ test('#2068 BUF, BUFE, BUFT: a 40 px triangle, their type inside it; INV its 34 
     // (within the triangle's first 55 %, around its middle line y = 30)
     assert.deepEqual([t[3], +t[1] > 20 && +t[1] < 42, Math.abs(+t[2] - 33) < 1], [name, true, true], name);
   }
-  assert.match(draw('tbuf', { enable: 'E', width: 4, bits: true }), /<text class="stype" [^>]*>BUFE4</, 'BUFE4: under');
-  assert.doesNotMatch(draw('tbuf', { enable: 'E', width: 4, bits: true }), /stype inside/);
+  // (BUFE4: BUFE inside each of its triangles, #2122)
+  assert.deepEqual([...draw('tbuf', { enable: 'E', width: 4, bits: true }).matchAll(/<text class="(stype[^"]*)"[^>]*>([^<]*)</g)].map((m) => `${m[1]}:${m[2]}`),
+    Array(4).fill('stype inside tri:BUFE'), 'BUFE4: inside each triangle');
+});
+
+// #2122: a symbol with Pins per bit has its type inside each row's shape, as the one-bit symbol (#2041): in the
+// orientations the one-bit symbol has it inside (a gate's and a multiplexer's every one or upright, a triangle's 0° / 180°),
+// under the stack in the others, as the one-bit one; the one-bit symbols unchanged
+test('#2122 pins per bit: the type inside each row\'s shape, in every orientation the one-bit symbol has it inside', () => {
+  const svgOf = (type, params, rot) => {
+    const sym = { id: 'S1', type, x: 200, y: 100, rot, mirror: false, name: 'U1', params: { ...defaultParams(type), ...params } };
+    const def = symbolDef(sym);
+    return { sym, def, labels: [...symbolSvg(sym, def).matchAll(/<text class="(stype[^"]*)"([^>]*)>([^<]*)</g)].map((m) => ({ cls: m[1], ...attrs(`<t${m[2]}>`), name: m[3] })) };
+  };
+  // [type, params, the name in each row, the rows' count, the row's local box (r: its index) where the label's anchor is,
+  // its orientations inside]
+  const CASES = [
+    ['and2', { width: 3, bits: true }, 'AND2', 3, (d, r) => [20, r * d.gh, 60, (r + 1) * d.gh], [0, 90, 180, 270]],
+    ['or3b1', { width: 3, bits: true }, 'OR3B1', 3, (d, r) => [20, r * d.gh, 60, (r + 1) * d.gh], [0, 90, 180, 270]],
+    ['nand2', { width: 2, bits: true }, 'NAND2', 2, (d, r) => [20, r * d.gh, 60, (r + 1) * d.gh], [0, 90, 180, 270]],
+    ['inv', { width: 4, bits: true }, 'INV', 4, (d, r) => [20, 20 * r, 40, 20 * r + 20], [0, 180]],
+    ['buf', { width: 3, bits: true }, 'BUF', 3, (d, r) => [20, 20 * r, 40, 20 * r + 20], [0, 180]],
+    ['tbuf', { enable: 'E', width: 5, bits: true }, 'BUFE', 5, (d, r) => [20, 20 + 20 * r, 40, 40 + 20 * r], [0, 180]],
+    ['tbuf', { enable: 'T', width: 3, bits: true }, 'BUFT', 3, (d, r) => [20, 20 + 20 * r, 40, 40 + 20 * r], [0, 180]],
+    ['mux2', { width: 3, bits: true }, 'M2_1', 3, (d, r) => [20, r * d.rh, 20 + d.body.w, (r + 1) * d.rh], [0, 180]],
+  ];
+  for (const [type, params, name, n, rowBox, inside] of CASES) {
+    for (const rot of [0, 90, 180, 270]) {
+      const { sym, def, labels } = svgOf(type, params, rot), what = `${type} ${JSON.stringify(params)} rot ${rot}`;
+      if (!inside.includes(rot)) {
+        // (as the one-bit symbol: once, outside it)
+        assert.equal(labels.length, 1, `${what}: once`);
+        assert.ok(!labels[0].cls.includes('inside'), `${what}: outside`);
+        continue;
+      }
+      assert.deepEqual(labels.map((l) => l.name), Array(n).fill(name), `${what}: one a row`);
+      // each in its own row: its anchor (the baseline 3 px under the centre) in the row's turned box
+      const rows = labels.map((l) => {
+        const c = { x: +l.x, y: +l.y - 3 };
+        return [...Array(n).keys()].find((r) => {
+          const [x0, y0, x1, y1] = rowBox(def, r), a = xform(sym, def, x0, y0), b = xform(sym, def, x1, y1);
+          return c.x > Math.min(a.x, b.x) && c.x < Math.max(a.x, b.x) && c.y > Math.min(a.y, b.y) && c.y < Math.max(a.y, b.y);
+        });
+      });
+      assert.deepEqual([...rows].sort(), [...Array(n).keys()], `${what}: a label in each row ${JSON.stringify(labels)}`);
+      assert.ok(labels.every((l) => l.cls === `stype inside${def.shape === 'gate' || def.shape === 'mux' ? '' : ' tri'}`), what);
+    }
+  }
+  // the one-bit symbols unchanged: one label, where it was
+  for (const [type, params, label] of [['and2', {}, '<text class="stype inside" x="240" y="123" text-anchor="middle">AND2</text>'],
+    ['inv', {}, '<text class="stype inside tri" x="229.9" y="113" text-anchor="middle">INV</text>'],
+    ['tbuf', { enable: 'E' }, '<text class="stype inside tri" x="231.5" y="133" text-anchor="middle">BUFE</text>'],
+    ['and2', { width: 3 }, '<text class="stype inside" x="240" y="123" text-anchor="middle">AND2</text>'],
+    ['tbuf', { enable: 'E', width: 4 }, '<text class="stype inside tri" x="231.5" y="133" text-anchor="middle" textLength="21" lengthAdjust="spacingAndGlyphs">BUFE4</text>']]) {
+    const sym = { id: 'S1', type, x: 200, y: 100, rot: 0, mirror: false, name: 'U1', params: { ...defaultParams(type), ...params } };
+    assert.deepEqual(symbolSvg(sym, symbolDef(sym)).match(/<text class="stype[^>]*>[^<]*<\/text>/g), [label], type);
+  }
 });

@@ -27,7 +27,7 @@ uiTest('#2079 schematic: AND2 and NOR2, Width 3 and Pins per bit in their proper
     await page.waitFor((d) => document.querySelector(`${d} [data-param=bits]`), [D], { what: 'Pins per bit again' });
     await page.click(`${D} [data-param=bits]`);
     await page.waitFor(async (i) => JSON.parse(await (await fetch('/api/projects/GateBits/file?path=src%2Fgb.sch.json')).text()).symbols.find((s) => s.id === i).params.bits === true, [id], { what: `${id}: bits saved` });
-    // three gate shapes (NOR: a bubble each), the type under them
+    // three gate shapes (NOR: a bubble each), the type inside each (#2122)
     assert.equal(await page.eval((d, i) => document.querySelectorAll(`${d} .se-svg g.sym[data-id="${i}"] path.gate:not(.nofill)`).length, D, id), 3, id);
     assert.equal(await page.eval((d, i) => document.querySelectorAll(`${d} .se-svg g.sym[data-id="${i}"] circle.gate`).length, D, id), id === 'S2' ? 3 : 0, id);
   }
