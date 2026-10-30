@@ -111,12 +111,20 @@ nextpnr-spartan v0.4.0 (2026-10-30), from Silinx's synthesis:
 - ISE: `xdl -xdl2ncd` clean, `drc` 0 errors and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical to
   Silinx's; so too blink and blink_carry on the new chip database. Again with v0.5.0: iob_regs and all seven examples (Basys2-250).
 
+## The wide multiplexers (#2190)
+
+`widemux.v` (in this folder): a 16:1 tree (MUXF5, F6, F7, an F8), an 8:1 with an F7 on top, a MUXF7 whose inputs are no F6s (a
+LUT); its constraints `test/fixtures/nextpnr-engine/widemux.ucf`. The primitives are instantiated: the synthesis keeps its
+own trees only when they beat its other mappings. With nextpnr-spartan v0.6.0 (2026-10-30), the same F5MUX, F6MUX, F5USED and
+FXUSED settings as Silinx's packer; the routing check and `xdl-sim-check.mjs --random-inputs` passed (32 flip-flops); ISE's
+`drc` 0 errors and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical to Silinx's.
+
 ## What is left for a decision
 
 - **Speed.** With Silinx's delays nextpnr got 8.4 ns where Silinx gets 6.7 ns on the same netlist:
   Silinx's placer and router are the better ones here (its timing-driven placement, the loads in its
   router's costs). With the LUT pins permuted, 7.15 ns against 6.72 ns.
-- **Constants**, the carry chain, MUXF5…F8, SLICEM's RAMs and shift registers,
+- **Constants**, the carry chain, SLICEM's RAMs and shift registers,
   BRAM, MULT18X18, DCM: each a cell type, its BELs and its settings in the converter.
 - **WebAssembly**: the build of nextpnr-himbaechel with Emscripten (as YoWASP does), and the chip
   database (24 MB per device) loaded in the browser.

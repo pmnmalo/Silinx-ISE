@@ -197,3 +197,18 @@ test('#2195 --engine nextpnr with the whole UCF: no warnings (TIG and CLOCK_DEDI
   assert.ok(n.out.includes('All constraints were met.'));
   assert.ok(n.out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), n.out.join('\n'));
 });
+
+test('#2190 MUXF7 and MUXF8 built with --engine nextpnr: no warnings, its PERIOD met, the multiplexers on the dedicated wires, a complete bitstream', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fixture('widemux.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('widemux.ucf').pathname, '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of Slice Flip Flops: 32 out of 4896 1%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  // one F6MUX per MUXF6, MUXF7 and MUXF8 of the trees; the fourth MUXF7 a LUT
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  assert.equal(design.insts.reduce((n, i) => n + i.cfg.filter(c => c.attr === 'F6MUX').length, 0), 10);
+});
