@@ -45,15 +45,15 @@
     "silinx": {
      "nets": 115,
      "connections": 416,
-     "pips": 1611,
-     "single": 253,
-     "double": 128,
-     "quad": 46,
-     "logicin": 535,
-     "other": 649,
-     "perConnection": 3.87,
-     "passes": 3,
-     "seconds": 0.348
+     "pips": 1614,
+     "single": 265,
+     "double": 120,
+     "quad": 43,
+     "logicin": 554,
+     "other": 632,
+     "perConnection": 3.88,
+     "passes": 4,
+     "seconds": 0.522
     }
    },
    "blinky": {
@@ -123,15 +123,15 @@
     "silinx": {
      "nets": 423,
      "connections": 1067,
-     "pips": 4548,
-     "single": 776,
-     "double": 425,
-     "quad": 205,
-     "logicin": 1411,
-     "other": 1731,
-     "perConnection": 4.26,
+     "pips": 4521,
+     "single": 820,
+     "double": 424,
+     "quad": 154,
+     "logicin": 1405,
+     "other": 1718,
+     "perConnection": 4.24,
      "passes": 4,
-     "seconds": 0.823
+     "seconds": 0.777
     }
    },
    "clock": {
@@ -175,15 +175,15 @@
     "silinx": {
      "nets": 183,
      "connections": 565,
-     "pips": 2320,
-     "single": 424,
-     "double": 184,
-     "quad": 91,
-     "logicin": 769,
-     "other": 852,
+     "pips": 2322,
+     "single": 418,
+     "double": 197,
+     "quad": 96,
+     "logicin": 772,
+     "other": 839,
      "perConnection": 4.11,
      "passes": 4,
-     "seconds": 0.48
+     "seconds": 0.477
     }
    }
   },
@@ -229,15 +229,15 @@
     "silinx": {
      "nets": 115,
      "connections": 416,
-     "pips": 1742,
-     "single": 242,
-     "double": 95,
-     "quad": 209,
-     "logicin": 551,
-     "other": 645,
-     "perConnection": 4.19,
+     "pips": 1718,
+     "single": 262,
+     "double": 99,
+     "quad": 175,
+     "logicin": 540,
+     "other": 642,
+     "perConnection": 4.13,
      "passes": 4,
-     "seconds": 0.374
+     "seconds": 0.348
     }
    },
    "blinky": {
@@ -307,15 +307,15 @@
     "silinx": {
      "nets": 423,
      "connections": 1067,
-     "pips": 4698,
-     "single": 819,
-     "double": 429,
-     "quad": 304,
-     "logicin": 1414,
-     "other": 1732,
+     "pips": 4691,
+     "single": 804,
+     "double": 423,
+     "quad": 305,
+     "logicin": 1437,
+     "other": 1722,
      "perConnection": 4.4,
      "passes": 4,
-     "seconds": 0.878
+     "seconds": 0.845
     }
    },
    "clock": {
@@ -359,15 +359,15 @@
     "silinx": {
      "nets": 183,
      "connections": 565,
-     "pips": 2403,
-     "single": 435,
-     "double": 215,
-     "quad": 139,
-     "logicin": 770,
+     "pips": 2373,
+     "single": 426,
+     "double": 205,
+     "quad": 124,
+     "logicin": 774,
      "other": 844,
-     "perConnection": 4.25,
-     "passes": 4,
-     "seconds": 0.491
+     "perConnection": 4.2,
+     "passes": 5,
+     "seconds": 0.496
     }
    }
   }

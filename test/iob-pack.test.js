@@ -192,3 +192,12 @@ test('IOB registers in the post-map simulation model: X_FF / X_SFF fed by the pa
   const insts = [...m.vhdl.matchAll(/^ {2}(\S+) : (X_\w+)$/gm)].map(x => `${x[1]} ${x[2]}`);
   for (const x of ['ra X_FF', 'rq X_SFF', 'rt X_FF', 'y_OBUFT X_OBUFT', 'a_IBUF X_BUF', 'q_o_OBUF X_OBUF']) assert.ok(insts.includes(x), `${x}: ${insts.join(', ')}`);
 });
+
+// #2199: a one-bit bus port (btn : in std_logic_vector(0 downto 0)) is btn in the netlist; its UCF line, written btn<0> as
+// XST names it (or btn(0)), gives its pad and I/O standard (they were dropped: the placer chose the pad)
+test('a one-bit bus port: its LOC and IOSTANDARD written x<0> or x(0) on its pad (#2199)', () => {
+  const nl = design({ x: lut2('a', 'b', 'y') }, { ins: ['a', 'b'], outs: ['y'] });
+  const p = pack(nl, { ucf: 'NET "a<0>" LOC = "G12" | IOSTANDARD = LVCMOS33;\nNET "b(0)" LOC = "P11";\nNET "y_o<0>" LOC = "M5";\nNET "c<0>" LOC = "B8";', part: 'xc3s250e-cp132-4' });
+  assert.deepEqual(['a', 'b', 'y_o'].map(n => [n, iob(p, n).loc, cfgOf(iob(p, n)).IOATTRBOX.value]), [['a', 'G12', 'LVCMOS33'], ['b', 'P11', 'LVCMOS25'], ['y_o', 'M5', 'LVCMOS25']]);
+  assert.deepEqual(p.warnings, []);
+});
