@@ -1,7 +1,8 @@
 // The schematic editor's tools (#405: out of mountSchEditor): the tool in use and its options (a net name, an I/O
 // marker's name and direction), a symbol placed, a wire drawn (routed square, nudged clear of other wires, pins and
 // bodies, #948, its ends connecting, a short between two named nets refused, #754; curved, #1144: through the points
-// clicked, its rectilinear path routed between its ends), a net name attached to a wire, an I/O marker added; the points a wire can connect to.
+// clicked, its rectilinear path routed between its ends), a net name attached to a wire, an I/O marker added (joining a
+// net of its name, #2170); the points a wire can connect to.
 // mountTools(ctx) is called by mountSchEditor where this code was.
 import { SYMBOLS, defaultParams, symbolDef, symbolPins, rotSize, freePortName, normalizeDoc, parseNetName, splitWiresAt, renameNet, netShort,
 } from '/core/schdoc.js';
@@ -9,13 +10,14 @@ import { h } from './dom.js';
 import { reservedError } from '/core/reserved.js';
 import { nudgeWire, routePath, wireGrid, cleanPath } from '/core/schpath.js';
 import { setCurve } from '/core/schcurve.js';
+import { newMarkerDir } from '/core/schmarker.js';
 import { clone, snap, onSeg, segDist, cleanPts } from './sch-editor.js';
 
 /** { setTool, renderOpts, startPlace, placeAt, connPoints, pinNear, snapPoint, routeTo, finishWire, wireClick, netClick, ioClick } of a
  *  schematic editor (doc(), nl(), sel(), tool(), placing(), wireDraw(), …: its current ones; set({ tool, placing, wireDraw }) changes them). */
 export function mountTools(ctx) {
   const { doc, nl, sel, modules, view, hoverPin, destroyed, tool, placing, wireDraw, curve, set, readOnly, canvas, optBox, container, edit, flash, shortNote,
-    nextId, nextInstName, promptBox, renderPalette, render, renderOverlay, renderProps, updateToolbar, updateStatus, joinByName, renamed } = ctx;
+    nextId, nextInstName, promptBox, renderPalette, render, renderOverlay, renderProps, updateToolbar, updateStatus, joinByName, joinMarker, renamed } = ctx;
 
   function setTool(t) {
     if (readOnly && t !== 'select') return;
@@ -167,20 +169,28 @@ export function mountTools(ctx) {
     const cw = !near && curve.curved() ? curve.wireAt(pt) : null;
     const p = near ? { x: near.x, y: near.y } : cw ? cw.at : { x: snap(pt.x), y: snap(pt.y) };
     if (near?.port) { flash('There is already an I/O marker here'); return; }
-    let dir = 'auto', width = 1, suggest = '';
+    let width = 1, suggest = '';
     const net = near?.pin ? nl()?.pinNet.get(`${near.sym.id}/${near.pin.name}`) : nl()?.wireNet.get(cw ? cw.w.id : wireNear(p, 0.5)?.w.id);
-    if (near?.pin) { width = near.pin.width || net?.width || 1; if (dir === 'auto') dir = near.pin.dir === 'out' ? 'out' : near.pin.dir === 'inout' ? 'inout' : 'in'; }
-    else if (net) { width = net.width; if (dir === 'auto') dir = net.drivers.length ? 'out' : 'in'; }
-    // (on empty space: a marker of 1 bit, an input (its properties change it), with the next free name, wired later, #680)
-    if (dir === 'auto') dir = 'in';
+    if (near?.pin) width = near.pin.width || net?.width || 1;
+    else if (net) width = net.width;
+    // its direction what it is on (a pin's, a net's: #1109); on empty space that of the marker added last (#2170); a
+    // marker of 1 bit there, with the next free name, wired later (#680)
+    let dir = newMarkerDir(doc(), { pin: near?.pin, net });
     const taken = new Set(doc().ports.map(q => q.name.toLowerCase()));
     if (net && !net.auto && !net.ports.length && !taken.has(net.name.toLowerCase())) suggest = net.name;
     if (!near?.pin && !net) suggest = freePortName(doc(), dir);
-    const name = await promptBox(pt, `${dir === 'in' ? 'Input' : dir === 'out' ? 'Output' : 'Bidirectional'} port name`, suggest);
-    if (!name) return;
-    if (taken.has(name.toLowerCase())) { flash(`An I/O marker named '${name}' already exists`); return; }
-    if (reservedError(name)) { flash(`${reservedError(name)}: choose another name.`); return; }   // (#679)
-    edit(() => { if (!near) splitWiresAt(doc(), [p]); doc().ports.push({ id: nextId('P', doc().ports), name, dir, width, x: p.x, y: p.y }); }, { keepProps: true });
+    for (;;) {
+      const name = await promptBox(pt, `${dir === 'in' ? 'Input' : dir === 'out' ? 'Output' : 'Bidirectional'} port name`, suggest);
+      if (!name) return;
+      if (taken.has(name.toLowerCase())) { flash(`An I/O marker named '${name}' already exists`); return; }
+      if (reservedError(name)) { flash(`${reservedError(name)}: choose another name.`); return; }   // (#679)
+      // the name of another net (#2170): joined (its width; unconnected, its direction too), or another name asked
+      const j = await joinMarker(name, net);
+      if (j === false) continue;
+      if (j) { width = j.width; if (!near?.pin && !net) dir = newMarkerDir(doc(), { net: j.net }); }
+      edit(() => { if (!near) splitWiresAt(doc(), [p]); doc().ports.push({ id: nextId('P', doc().ports), name, dir, width, x: p.x, y: p.y }); }, { keepProps: true });
+      return;
+    }
   }
 
   return { setTool, renderOpts, startPlace, placeAt, connPoints, pinNear, snapPoint, routeTo, finishWire, wireClick, netClick, ioClick };
