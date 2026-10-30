@@ -28,7 +28,8 @@ test('#2067 INV / BUF: Pins per bit a parameter; Width 4 with it: I0..I3, O0..O3
   for (const type of ['inv', 'buf']) {
     assert.deepEqual(SYMBOLS[type].params.map((p) => p.name), ['width', 'bits'], type);
     const d = symbolDef({ type, params: { width: 4, bits: true } });
-    assert.deepEqual([d.w, d.h, d.rows, d.body], [80, 80, 4, { x: 20, y: 0, w: 34, h: 80 }], type);
+    // (BUF's triangle 40 long, INV's 34 and its bubble, #2068)
+    assert.deepEqual([d.w, d.h, d.rows, d.body], [80, 80, 4, { x: 20, y: 0, w: type === 'buf' ? 40 : 34, h: 80 }], type);
     assert.deepEqual(d.pins.map((p) => `${p.name}:${p.dir}@${p.x},${p.y}/${p.width}`),
       ['I0:in@0,10/1', 'I1:in@0,30/1', 'I2:in@0,50/1', 'I3:in@0,70/1', 'O0:out@80,10/1', 'O1:out@80,30/1', 'O2:out@80,50/1', 'O3:out@80,70/1'], type);
     for (const params of [{ width: 4 }, { width: 1, bits: true }]) {

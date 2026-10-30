@@ -80,6 +80,9 @@ const PARAM_PT = {
   'Carry out': 'Transporte de saída (carry out)', 'Pins per bit (A0.., B0.., S0..)': 'Um pino por bit (A0.., B0.., S0..)', 'Pins per bit (A0.., B0..)': 'Um pino por bit (A0.., B0..)', 'Pins per bit (Q0..)': 'Um pino por bit (Q0..)', 'Pins per bit (A0.., B0.., D0..)': 'Um pino por bit (A0.., B0.., D0..)', 'Borrow in (BI)': 'Empréstimo de entrada (BI)', 'Borrow out (BO)': 'Empréstimo de saída (BO)', 'Operation': 'Operação', 'Comparisons': 'Comparações', 'Signed': 'Com sinal', 'Value': 'Valor',
   'Clock enable': 'Habilitação do relógio', 'Reset': 'Reset', 'Reset/INIT value': 'Valor de reset/INIT', 'Direction': 'Sentido',
   'Enable input': 'Entrada de habilitação', 'Pins per bit (I0.., O0..)': 'Um pino por bit (I0.., O0..)',
+  // (a gate, a MUX, a DEMUX a bit, #2079, #2081)
+  'Pins per bit (I0_0.., O0..)': 'Um pino por bit (I0_0.., O0..)', 'Pins per bit (D0_0.., O0..)': 'Um pino por bit (D0_0.., O0..)',
+  'Pins per bit (D0.., O0_0..)': 'Um pino por bit (D0.., O0_0..)',
   'MSB index': 'Índice do MSB', 'LSB index': 'Índice do LSB', 'Input widths (MSB first)': 'Larguras das entradas (MSB primeiro)',
 };
 // (the device primitives' (#791): their attributes by their UNISIM names, the same in Portuguese)
