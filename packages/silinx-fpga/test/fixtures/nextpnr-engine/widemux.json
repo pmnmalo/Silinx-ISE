@@ -1,0 +1,2513 @@
+{
+  "creator": "Yosys 0.70 (git sha1 28ba3cb92, Release, Clang /workspace/YoWASP/yosys/wasi-sdk-33.0-x86_64-linux/share/cmake/../..//bin/clang++ 22.1.0)",
+  "modules": {
+    "widemux": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "widemux_syn.v:2.1-637.10"
+      },
+      "ports": {
+        "clk": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "sw": {
+          "direction": "input",
+          "bits": [ 3, 4, 5, 6, 7, 8, 9, 10 ]
+        },
+        "led": {
+          "direction": "output",
+          "bits": [ 11, 12, 13, 14 ]
+        }
+      },
+      "cells": {
+        "$abc$1493$blif$1493$0": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 15 ],
+            "I1": [ 16 ],
+            "O": [ 17 ]
+          }
+        },
+        "$abc$1493$blif$1493$1": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 18 ],
+            "I1": [ 19 ],
+            "O": [ 20 ]
+          }
+        },
+        "$abc$1493$blif$1493$2": {
+          "hide_name": 1,
+          "type": "LUT2",
+          "parameters": {
+            "INIT": "0110"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:43.26-44.30"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I0": [ 21 ],
+            "I1": [ 22 ],
+            "O": [ 23 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1353": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 25 ],
+            "Q": [ 26 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1354": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 15 ],
+            "Q": [ 27 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1355": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 17 ],
+            "Q": [ 28 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1356": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "x"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 29 ],
+            "Q": [ 30 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1357": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 23 ],
+            "Q": [ 31 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1358": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 31 ],
+            "Q": [ 32 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1359": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 32 ],
+            "Q": [ 33 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1360": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 33 ],
+            "Q": [ 34 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1361": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 34 ],
+            "Q": [ 35 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1362": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 35 ],
+            "Q": [ 36 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1363": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 36 ],
+            "Q": [ 37 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1364": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 37 ],
+            "Q": [ 38 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1365": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 38 ],
+            "Q": [ 39 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1366": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 39 ],
+            "Q": [ 40 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1367": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 40 ],
+            "Q": [ 41 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1368": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 41 ],
+            "Q": [ 42 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1369": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 42 ],
+            "Q": [ 43 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1370": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 43 ],
+            "Q": [ 44 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1371": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 44 ],
+            "Q": [ 45 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1372": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 45 ],
+            "Q": [ 22 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1373": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 20 ],
+            "Q": [ 46 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1374": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 46 ],
+            "Q": [ 47 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1375": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 47 ],
+            "Q": [ 48 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1376": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 48 ],
+            "Q": [ 49 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1377": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 49 ],
+            "Q": [ 50 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1378": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 50 ],
+            "Q": [ 51 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1379": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "1"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 51 ],
+            "Q": [ 52 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1380": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 52 ],
+            "Q": [ 19 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1381": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 53 ],
+            "Q": [ 54 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1382": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 55 ],
+            "Q": [ 56 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1383": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 57 ],
+            "Q": [ 58 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1384": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:465.3-470.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 24 ],
+            "CE": [ "1" ],
+            "D": [ 59 ],
+            "Q": [ 60 ],
+            "R": [ "0" ]
+          }
+        },
+        "$iopadmap$widemux.clk": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 2 ],
+            "O": [ 61 ]
+          }
+        },
+        "$iopadmap$widemux.led": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 26 ],
+            "O": [ 11 ]
+          }
+        },
+        "$iopadmap$widemux.led_1": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 27 ],
+            "O": [ 12 ]
+          }
+        },
+        "$iopadmap$widemux.led_2": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 28 ],
+            "O": [ 13 ]
+          }
+        },
+        "$iopadmap$widemux.led_3": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 30 ],
+            "O": [ 14 ]
+          }
+        },
+        "$iopadmap$widemux.sw": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 3 ],
+            "O": [ 21 ]
+          }
+        },
+        "$iopadmap$widemux.sw_1": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 4 ],
+            "O": [ 18 ]
+          }
+        },
+        "$iopadmap$widemux.sw_2": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 5 ],
+            "O": [ 16 ]
+          }
+        },
+        "$iopadmap$widemux.sw_3": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 6 ],
+            "O": [ 62 ]
+          }
+        },
+        "$iopadmap$widemux.sw_4": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 7 ],
+            "O": [ 53 ]
+          }
+        },
+        "$iopadmap$widemux.sw_5": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 8 ],
+            "O": [ 55 ]
+          }
+        },
+        "$iopadmap$widemux.sw_6": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 9 ],
+            "O": [ 57 ]
+          }
+        },
+        "$iopadmap$widemux.sw_7": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 10 ],
+            "O": [ 59 ]
+          }
+        },
+        "m5[0]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:477.9-482.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 31 ],
+            "I1": [ 32 ],
+            "O": [ 63 ],
+            "S": [ 54 ]
+          }
+        },
+        "m5[1]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:484.9-489.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 33 ],
+            "I1": [ 34 ],
+            "O": [ 64 ],
+            "S": [ 54 ]
+          }
+        },
+        "m5[2]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:491.9-496.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 35 ],
+            "I1": [ 36 ],
+            "O": [ 65 ],
+            "S": [ 54 ]
+          }
+        },
+        "m5[3]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:498.9-503.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 37 ],
+            "I1": [ 38 ],
+            "O": [ 66 ],
+            "S": [ 54 ]
+          }
+        },
+        "m5[4]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:505.9-510.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 39 ],
+            "I1": [ 40 ],
+            "O": [ 67 ],
+            "S": [ 54 ]
+          }
+        },
+        "m5[5]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:512.9-517.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 41 ],
+            "I1": [ 42 ],
+            "O": [ 68 ],
+            "S": [ 54 ]
+          }
+        },
+        "m5[6]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:519.9-524.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 43 ],
+            "I1": [ 44 ],
+            "O": [ 69 ],
+            "S": [ 54 ]
+          }
+        },
+        "m5[7]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:526.9-531.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 45 ],
+            "I1": [ 22 ],
+            "O": [ 70 ],
+            "S": [ 54 ]
+          }
+        },
+        "m6[0]_u": {
+          "hide_name": 0,
+          "type": "MUXF6",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:533.9-538.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 63 ],
+            "I1": [ 64 ],
+            "O": [ 71 ],
+            "S": [ 56 ]
+          }
+        },
+        "m6[1]_u": {
+          "hide_name": 0,
+          "type": "MUXF6",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:540.9-545.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 65 ],
+            "I1": [ 66 ],
+            "O": [ 72 ],
+            "S": [ 56 ]
+          }
+        },
+        "m6[2]_u": {
+          "hide_name": 0,
+          "type": "MUXF6",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:547.9-552.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 67 ],
+            "I1": [ 68 ],
+            "O": [ 73 ],
+            "S": [ 56 ]
+          }
+        },
+        "m6[3]_u": {
+          "hide_name": 0,
+          "type": "MUXF6",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:554.9-559.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 69 ],
+            "I1": [ 70 ],
+            "O": [ 74 ],
+            "S": [ 56 ]
+          }
+        },
+        "m7[0]_u": {
+          "hide_name": 0,
+          "type": "MUXF7",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:561.9-566.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 71 ],
+            "I1": [ 72 ],
+            "O": [ 75 ],
+            "S": [ 58 ]
+          }
+        },
+        "m7[1]_u": {
+          "hide_name": 0,
+          "type": "MUXF7",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:568.9-573.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 73 ],
+            "I1": [ 74 ],
+            "O": [ 76 ],
+            "S": [ 58 ]
+          }
+        },
+        "n5[0]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:575.9-580.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 46 ],
+            "I1": [ 47 ],
+            "O": [ 77 ],
+            "S": [ 54 ]
+          }
+        },
+        "n5[1]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:582.9-587.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 48 ],
+            "I1": [ 49 ],
+            "O": [ 78 ],
+            "S": [ 54 ]
+          }
+        },
+        "n5[2]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:589.9-594.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 50 ],
+            "I1": [ 51 ],
+            "O": [ 79 ],
+            "S": [ 54 ]
+          }
+        },
+        "n5[3]_u": {
+          "hide_name": 0,
+          "type": "MUXF5",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:596.9-601.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 52 ],
+            "I1": [ 19 ],
+            "O": [ 80 ],
+            "S": [ 54 ]
+          }
+        },
+        "n6[0]_u": {
+          "hide_name": 0,
+          "type": "MUXF6",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:603.9-608.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 77 ],
+            "I1": [ 78 ],
+            "O": [ 81 ],
+            "S": [ 56 ]
+          }
+        },
+        "n6[1]_u": {
+          "hide_name": 0,
+          "type": "MUXF6",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:610.9-615.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 79 ],
+            "I1": [ 80 ],
+            "O": [ 82 ],
+            "S": [ 56 ]
+          }
+        },
+        "u_b": {
+          "hide_name": 0,
+          "type": "BUFG",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:472.8-475.4"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 61 ],
+            "O": [ 24 ]
+          }
+        },
+        "u_f8": {
+          "hide_name": 0,
+          "type": "MUXF8",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:617.9-622.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 75 ],
+            "I1": [ 76 ],
+            "O": [ 25 ],
+            "S": [ 60 ]
+          }
+        },
+        "u_g7": {
+          "hide_name": 0,
+          "type": "MUXF7",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:624.9-629.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 81 ],
+            "I1": [ 82 ],
+            "O": [ 15 ],
+            "S": [ 58 ]
+          }
+        },
+        "u_h7": {
+          "hide_name": 0,
+          "type": "MUXF7",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:631.9-636.4"
+          },
+          "port_directions": {
+            "I0": "input",
+            "I1": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "I0": [ 16 ],
+            "I1": [ 62 ],
+            "O": [ 29 ],
+            "S": [ 60 ]
+          }
+        }
+      },
+      "netnames": {
+        "$0\\d[15:0]": {
+          "hide_name": 1,
+          "bits": [ 23, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45 ],
+          "attributes": {
+            "src": "widemux_syn.v:465.3-470.6"
+          }
+        },
+        "$0\\e[7:0]": {
+          "hide_name": 1,
+          "bits": [ 20, 46, 47, 48, 49, 50, 51, 52 ],
+          "attributes": {
+            "src": "widemux_syn.v:465.3-470.6"
+          }
+        },
+        "$0\\led[3:0]": {
+          "hide_name": 1,
+          "bits": [ 25, 15, 17, 29 ],
+          "attributes": {
+            "src": "widemux_syn.v:465.3-470.6"
+          }
+        },
+        "$iopadmap$clk": {
+          "hide_name": 1,
+          "bits": [ 61 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$led": {
+          "hide_name": 1,
+          "bits": [ 26, 27, 28, 30 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$sw": {
+          "hide_name": 1,
+          "bits": [ 21, 18, 16, 62, 53, 55, 57, 59 ],
+          "attributes": {
+          }
+        },
+        "$techmap1497$abc$1493$blif$1493$2.A": {
+          "hide_name": 1,
+          "bits": [ 21, 22 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "$techmap1498$abc$1493$blif$1493$1.A": {
+          "hide_name": 1,
+          "bits": [ 18, 19 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:30.21-30.22"
+          }
+        },
+        "ck": {
+          "hide_name": 0,
+          "bits": [ 24 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:10.15-10.17"
+          }
+        },
+        "clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "widemux_syn.v:3.14-3.17"
+          }
+        },
+        "d": {
+          "hide_name": 0,
+          "bits": [ 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 22 ],
+          "attributes": {
+            "src": "widemux_syn.v:7.16-7.17"
+          }
+        },
+        "e": {
+          "hide_name": 0,
+          "bits": [ 46, 47, 48, 49, 50, 51, 52, 19 ],
+          "attributes": {
+            "src": "widemux_syn.v:8.15-8.16"
+          }
+        },
+        "f5": {
+          "hide_name": 0,
+          "bits": [ 63, 64, 65, 66, 67, 68, 69, 70 ],
+          "attributes": {
+            "src": "widemux_syn.v:11.15-11.17"
+          }
+        },
+        "f6": {
+          "hide_name": 0,
+          "bits": [ 71, 72, 73, 74 ],
+          "attributes": {
+            "src": "widemux_syn.v:12.15-12.17"
+          }
+        },
+        "f7": {
+          "hide_name": 0,
+          "bits": [ 75, 76 ],
+          "attributes": {
+            "src": "widemux_syn.v:13.15-13.17"
+          }
+        },
+        "f8": {
+          "hide_name": 0,
+          "bits": [ 25 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:14.15-14.17"
+          }
+        },
+        "g5": {
+          "hide_name": 0,
+          "bits": [ 77, 78, 79, 80 ],
+          "attributes": {
+            "src": "widemux_syn.v:17.15-17.17"
+          }
+        },
+        "g6": {
+          "hide_name": 0,
+          "bits": [ 81, 82 ],
+          "attributes": {
+            "src": "widemux_syn.v:18.15-18.17"
+          }
+        },
+        "g7": {
+          "hide_name": 0,
+          "bits": [ 15 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:15.15-15.17"
+          }
+        },
+        "h7": {
+          "hide_name": 0,
+          "bits": [ 29 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:16.15-16.17"
+          }
+        },
+        "led": {
+          "hide_name": 0,
+          "bits": [ 11, 12, 13, 14 ],
+          "attributes": {
+            "src": "widemux_syn.v:5.22-5.25"
+          }
+        },
+        "m5[0].u.i0": {
+          "hide_name": 0,
+          "bits": [ 31 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:19.15-19.26"
+          }
+        },
+        "m5[0].u.i1": {
+          "hide_name": 0,
+          "bits": [ 32 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:20.15-20.26"
+          }
+        },
+        "m5[0].u.o": {
+          "hide_name": 0,
+          "bits": [ 63 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:22.15-22.25"
+          }
+        },
+        "m5[0].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:21.15-21.25"
+          }
+        },
+        "m5[1].u.i0": {
+          "hide_name": 0,
+          "bits": [ 33 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:23.15-23.26"
+          }
+        },
+        "m5[1].u.i1": {
+          "hide_name": 0,
+          "bits": [ 34 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:24.15-24.26"
+          }
+        },
+        "m5[1].u.o": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:26.15-26.25"
+          }
+        },
+        "m5[1].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:25.15-25.25"
+          }
+        },
+        "m5[2].u.i0": {
+          "hide_name": 0,
+          "bits": [ 35 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:27.15-27.26"
+          }
+        },
+        "m5[2].u.i1": {
+          "hide_name": 0,
+          "bits": [ 36 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:28.15-28.26"
+          }
+        },
+        "m5[2].u.o": {
+          "hide_name": 0,
+          "bits": [ 65 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:30.15-30.25"
+          }
+        },
+        "m5[2].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:29.15-29.25"
+          }
+        },
+        "m5[3].u.i0": {
+          "hide_name": 0,
+          "bits": [ 37 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:31.15-31.26"
+          }
+        },
+        "m5[3].u.i1": {
+          "hide_name": 0,
+          "bits": [ 38 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:32.15-32.26"
+          }
+        },
+        "m5[3].u.o": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:34.15-34.25"
+          }
+        },
+        "m5[3].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:33.15-33.25"
+          }
+        },
+        "m5[4].u.i0": {
+          "hide_name": 0,
+          "bits": [ 39 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:35.15-35.26"
+          }
+        },
+        "m5[4].u.i1": {
+          "hide_name": 0,
+          "bits": [ 40 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:36.15-36.26"
+          }
+        },
+        "m5[4].u.o": {
+          "hide_name": 0,
+          "bits": [ 67 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:38.15-38.25"
+          }
+        },
+        "m5[4].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:37.15-37.25"
+          }
+        },
+        "m5[5].u.i0": {
+          "hide_name": 0,
+          "bits": [ 41 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:39.15-39.26"
+          }
+        },
+        "m5[5].u.i1": {
+          "hide_name": 0,
+          "bits": [ 42 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:40.15-40.26"
+          }
+        },
+        "m5[5].u.o": {
+          "hide_name": 0,
+          "bits": [ 68 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:42.15-42.25"
+          }
+        },
+        "m5[5].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:41.15-41.25"
+          }
+        },
+        "m5[6].u.i0": {
+          "hide_name": 0,
+          "bits": [ 43 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:43.15-43.26"
+          }
+        },
+        "m5[6].u.i1": {
+          "hide_name": 0,
+          "bits": [ 44 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:44.15-44.26"
+          }
+        },
+        "m5[6].u.o": {
+          "hide_name": 0,
+          "bits": [ 69 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:46.15-46.25"
+          }
+        },
+        "m5[6].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:45.15-45.25"
+          }
+        },
+        "m5[7].u.i0": {
+          "hide_name": 0,
+          "bits": [ 45 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:47.15-47.26"
+          }
+        },
+        "m5[7].u.i1": {
+          "hide_name": 0,
+          "bits": [ 22 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:48.15-48.26"
+          }
+        },
+        "m5[7].u.o": {
+          "hide_name": 0,
+          "bits": [ 70 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:50.15-50.25"
+          }
+        },
+        "m5[7].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:49.15-49.25"
+          }
+        },
+        "m6[0].u.i0": {
+          "hide_name": 0,
+          "bits": [ 63 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:51.15-51.26"
+          }
+        },
+        "m6[0].u.i1": {
+          "hide_name": 0,
+          "bits": [ 64 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:52.15-52.26"
+          }
+        },
+        "m6[0].u.o": {
+          "hide_name": 0,
+          "bits": [ 71 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:54.15-54.25"
+          }
+        },
+        "m6[0].u.s": {
+          "hide_name": 0,
+          "bits": [ 56 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:53.15-53.25"
+          }
+        },
+        "m6[1].u.i0": {
+          "hide_name": 0,
+          "bits": [ 65 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:55.15-55.26"
+          }
+        },
+        "m6[1].u.i1": {
+          "hide_name": 0,
+          "bits": [ 66 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:56.15-56.26"
+          }
+        },
+        "m6[1].u.o": {
+          "hide_name": 0,
+          "bits": [ 72 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:58.15-58.25"
+          }
+        },
+        "m6[1].u.s": {
+          "hide_name": 0,
+          "bits": [ 56 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:57.15-57.25"
+          }
+        },
+        "m6[2].u.i0": {
+          "hide_name": 0,
+          "bits": [ 67 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:59.15-59.26"
+          }
+        },
+        "m6[2].u.i1": {
+          "hide_name": 0,
+          "bits": [ 68 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:60.15-60.26"
+          }
+        },
+        "m6[2].u.o": {
+          "hide_name": 0,
+          "bits": [ 73 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:62.15-62.25"
+          }
+        },
+        "m6[2].u.s": {
+          "hide_name": 0,
+          "bits": [ 56 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:61.15-61.25"
+          }
+        },
+        "m6[3].u.i0": {
+          "hide_name": 0,
+          "bits": [ 69 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:63.15-63.26"
+          }
+        },
+        "m6[3].u.i1": {
+          "hide_name": 0,
+          "bits": [ 70 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:64.15-64.26"
+          }
+        },
+        "m6[3].u.o": {
+          "hide_name": 0,
+          "bits": [ 74 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:66.15-66.25"
+          }
+        },
+        "m6[3].u.s": {
+          "hide_name": 0,
+          "bits": [ 56 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:65.15-65.25"
+          }
+        },
+        "m7[0].u.i0": {
+          "hide_name": 0,
+          "bits": [ 71 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:67.15-67.26"
+          }
+        },
+        "m7[0].u.i1": {
+          "hide_name": 0,
+          "bits": [ 72 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:68.15-68.26"
+          }
+        },
+        "m7[0].u.o": {
+          "hide_name": 0,
+          "bits": [ 75 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:70.15-70.25"
+          }
+        },
+        "m7[0].u.s": {
+          "hide_name": 0,
+          "bits": [ 58 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:69.15-69.25"
+          }
+        },
+        "m7[1].u.i0": {
+          "hide_name": 0,
+          "bits": [ 73 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:71.15-71.26"
+          }
+        },
+        "m7[1].u.i1": {
+          "hide_name": 0,
+          "bits": [ 74 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:72.15-72.26"
+          }
+        },
+        "m7[1].u.o": {
+          "hide_name": 0,
+          "bits": [ 76 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:74.15-74.25"
+          }
+        },
+        "m7[1].u.s": {
+          "hide_name": 0,
+          "bits": [ 58 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:73.15-73.25"
+          }
+        },
+        "n5[0].u.i0": {
+          "hide_name": 0,
+          "bits": [ 46 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:75.15-75.26"
+          }
+        },
+        "n5[0].u.i1": {
+          "hide_name": 0,
+          "bits": [ 47 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:76.15-76.26"
+          }
+        },
+        "n5[0].u.o": {
+          "hide_name": 0,
+          "bits": [ 77 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:78.15-78.25"
+          }
+        },
+        "n5[0].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:77.15-77.25"
+          }
+        },
+        "n5[1].u.i0": {
+          "hide_name": 0,
+          "bits": [ 48 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:79.15-79.26"
+          }
+        },
+        "n5[1].u.i1": {
+          "hide_name": 0,
+          "bits": [ 49 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:80.15-80.26"
+          }
+        },
+        "n5[1].u.o": {
+          "hide_name": 0,
+          "bits": [ 78 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:82.15-82.25"
+          }
+        },
+        "n5[1].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:81.15-81.25"
+          }
+        },
+        "n5[2].u.i0": {
+          "hide_name": 0,
+          "bits": [ 50 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:83.15-83.26"
+          }
+        },
+        "n5[2].u.i1": {
+          "hide_name": 0,
+          "bits": [ 51 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:84.15-84.26"
+          }
+        },
+        "n5[2].u.o": {
+          "hide_name": 0,
+          "bits": [ 79 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:86.15-86.25"
+          }
+        },
+        "n5[2].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:85.15-85.25"
+          }
+        },
+        "n5[3].u.i0": {
+          "hide_name": 0,
+          "bits": [ 52 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:87.15-87.26"
+          }
+        },
+        "n5[3].u.i1": {
+          "hide_name": 0,
+          "bits": [ 19 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:88.15-88.26"
+          }
+        },
+        "n5[3].u.o": {
+          "hide_name": 0,
+          "bits": [ 80 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:90.15-90.25"
+          }
+        },
+        "n5[3].u.s": {
+          "hide_name": 0,
+          "bits": [ 54 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:89.15-89.25"
+          }
+        },
+        "n6[0].u.i0": {
+          "hide_name": 0,
+          "bits": [ 77 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:91.15-91.26"
+          }
+        },
+        "n6[0].u.i1": {
+          "hide_name": 0,
+          "bits": [ 78 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:92.15-92.26"
+          }
+        },
+        "n6[0].u.o": {
+          "hide_name": 0,
+          "bits": [ 81 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:94.15-94.25"
+          }
+        },
+        "n6[0].u.s": {
+          "hide_name": 0,
+          "bits": [ 56 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:93.15-93.25"
+          }
+        },
+        "n6[1].u.i0": {
+          "hide_name": 0,
+          "bits": [ 79 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:95.15-95.26"
+          }
+        },
+        "n6[1].u.i1": {
+          "hide_name": 0,
+          "bits": [ 80 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:96.15-96.26"
+          }
+        },
+        "n6[1].u.o": {
+          "hide_name": 0,
+          "bits": [ 82 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:98.15-98.25"
+          }
+        },
+        "n6[1].u.s": {
+          "hide_name": 0,
+          "bits": [ 56 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:97.15-97.25"
+          }
+        },
+        "s": {
+          "hide_name": 0,
+          "bits": [ 54, 56, 58, 60 ],
+          "attributes": {
+            "src": "widemux_syn.v:9.15-9.16"
+          }
+        },
+        "sw": {
+          "hide_name": 0,
+          "bits": [ 3, 4, 5, 6, 7, 8, 9, 10 ],
+          "attributes": {
+            "src": "widemux_syn.v:4.20-4.22"
+          }
+        },
+        "u_f8.i0": {
+          "hide_name": 0,
+          "bits": [ 75 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:99.15-99.23"
+          }
+        },
+        "u_f8.i1": {
+          "hide_name": 0,
+          "bits": [ 76 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:100.15-100.23"
+          }
+        },
+        "u_f8.s": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:101.15-101.22"
+          }
+        },
+        "u_g7.i0": {
+          "hide_name": 0,
+          "bits": [ 81 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:102.15-102.23"
+          }
+        },
+        "u_g7.i1": {
+          "hide_name": 0,
+          "bits": [ 82 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:103.15-103.23"
+          }
+        },
+        "u_g7.s": {
+          "hide_name": 0,
+          "bits": [ 58 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:104.15-104.22"
+          }
+        },
+        "u_h7.i0": {
+          "hide_name": 0,
+          "bits": [ 16 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:105.15-105.23"
+          }
+        },
+        "u_h7.i1": {
+          "hide_name": 0,
+          "bits": [ 62 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:106.15-106.23"
+          }
+        },
+        "u_h7.s": {
+          "hide_name": 0,
+          "bits": [ 60 ],
+          "attributes": {
+            "single_bit_vector": "00000000000000000000000000000001",
+            "src": "widemux_syn.v:107.15-107.22"
+          }
+        }
+      }
+    }
+  }
+}
