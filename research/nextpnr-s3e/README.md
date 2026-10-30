@@ -82,7 +82,7 @@ The slices packed (`pack_slices`): a LUT with the flip-flop it feeds, or either 
 units with the same control set go into one slice, chosen by the nets they share (each net weighing
 1 / its fanout), the rest paired by control set; each slice a cluster (F, G, FFX, FFY at z 0…3).
 
-Not yet run on a Basys2.
+On a Basys2-250 (2026-10-30), the LUT pins permuted result (seed 3) loaded by adepttool: LD7 blinks at about 3 Hz (q[23], 50 MHz / 2^24), each LED below it twice as fast, SW0 holds them off.
 
 What ISE taught the converter: an input alone is an `IBUF` instance, also on an IOB site; logic on a
 SLICEM site is a `SLICEL` instance (as a `SLICEM`, ISE's DRC finds the SR pin "partially connected");
