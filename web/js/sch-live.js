@@ -40,9 +40,10 @@ export function startLiveSim(ctx) {
 function liveController(ctx, live) {
   const { doc, modules, h, layer, content, bar, canvas } = ctx;
   const nl = live.nl;
-  let radix = 'hex';
-  try { radix = localStorage.getItem(prefKey('xl.sch.liveRadix')) || 'hex'; } catch { /* default */ }
-  if (!['hex', 'bin', 'dec', 'sdec', 'c1dec'].includes(radix)) radix = 'hex';
+  // Binary (Unsigned) by default; the plain Binary saved before #2160 read so
+  let radix = 'dec';
+  try { radix = localStorage.getItem(prefKey('xl.sch.liveRadix')) || 'dec'; } catch { /* default */ }
+  if (!['hex', 'dec', 'sdec', 'c1dec'].includes(radix)) radix = 'dec';
   let last = new Map();           // net id -> painted signature
   let wireEls = new Map();        // wire id -> <g class="wire">
   let junctionNet = [];           // [{ el, net }]
@@ -83,8 +84,8 @@ function liveController(ctx, live) {
   const tEl = h('span', { class: 'lv-time', 'data-no-i18n': '' });
   const errEl = h('span', { class: 'lv-err', hidden: true });
   const radixSel = h('select', { class: 'lv-radix', title: 'Number format of the bus values' },
-    h('option', { value: 'hex', text: 'Hex' }), h('option', { value: 'bin', text: 'Binary' }),
-    // (a bus's bits and their value read unsigned, in two's or in one's complement: 1110 = -2, #2015, #2064)
+    h('option', { value: 'hex', text: 'Hex' }),
+    // (a bus's bits and their value read unsigned, in two's or in one's complement: 1110 = -2, #2015, #2064; no plain Binary, #2160)
     h('option', { value: 'dec', text: 'Binary (Unsigned)' }), h('option', { value: 'sdec', text: "Binary (Two's Complement)" }), h('option', { value: 'c1dec', text: "Binary (One's Complement)" }));
   radixSel.value = radix;
   radixSel.addEventListener('change', () => { radix = radixSel.value; try { localStorage.setItem(prefKey('xl.sch.liveRadix'), radix); } catch { /* ignore */ } update(true); });
