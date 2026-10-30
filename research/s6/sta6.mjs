@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseXdl } from '../../packages/silinx-fpga/src/xdl.js';
 import { netTree, treePath } from '../../packages/silinx-fpga/src/fpga/timing.js';
-import { nnls, parseDly } from '../s3e-route/timing-fit.mjs';
+import { nnls, parseDly } from '../../packages/silinx-fpga/research/s3e-route/timing-fit.mjs';
 import { parseTwr, parseOffsets } from './twr6.mjs';
 import { arcTable, arcKey } from './timing6.mjs';
 import { dlySamples, fitWires, pathCounts, loadDelay } from './timing-fit6.mjs';

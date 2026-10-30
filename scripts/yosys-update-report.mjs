@@ -11,7 +11,7 @@
 //   node scripts/yosys-update-report.mjs subset
 //        the design corpus's designs measured (run.mjs --filter)
 //   node scripts/yosys-update-report.mjs report --base dir --head dir --corpus dir --base-version v --head-version v [--out file]
-//        dir: examples/<name>.json (research/s3e-route/open-flow.mjs --quality) and designs.json
+//        dir: examples/<name>.json (packages/silinx-fpga/research/s3e-route/open-flow.mjs --quality) and designs.json
 //        (test/designs-corpus/run.mjs --json); corpus: shard-<k>.json (test/corpus/run-corpus.mjs --json)
 //   node scripts/yosys-update-report.mjs comment <file>
 //        the table as the pull request's comment (one, updated by later runs): GITHUB_TOKEN with

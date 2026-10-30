@@ -522,10 +522,10 @@ database, a net it cannot route) fails with the list of what is missing: impleme
 mode. The supported devices' descriptions and bit databases ship with Silinx: the Silinx toolchain
 needs no ISE at all (the Spartan-3E Starter Kit's XC3S500E-FG320 is the Nexys2-500's chip and
 package). Developers can build another package's description from an ISE
-(`research/s3e-route/build-device.mjs`, into `~/.silinx/devices/`) once its pads are in the bit
+(`packages/silinx-fpga/research/s3e-route/build-device.mjs`, into `~/.silinx/devices/`) once its pads are in the bit
 database. The open
 toolchain also takes **the Spartan-6 boards (Nexys3, Atlys)** in the local server, to a bitstream ISE's bitgen
-writes byte for byte for the same routing (not yet in the browser edition: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node research/s3e-route/open-flow.mjs <project
+writes byte for byte for the same routing (not yet in the browser edition: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node packages/silinx-fpga/research/s3e-route/open-flow.mjs <project
 folder> <out folder>`.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);

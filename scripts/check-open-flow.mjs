@@ -1,6 +1,6 @@
 // The fully open flow checked against Xilinx ISE (the oracle), on another machine with the ISE
 // Docker image (e.g. an Intel Mac, where ISE runs natively): for each project, the open flow
-// (research/s3e-route/open-flow.mjs: no Xilinx tool) writes routed.xdl and its .bit; ISE converts
+// (packages/silinx-fpga/research/s3e-route/open-flow.mjs: no Xilinx tool) writes routed.xdl and its .bit; ISE converts
 // the same routed.xdl, runs its design rule check and writes its own .bit (ise-open-check.sh); the
 // two .bit files must be byte-identical (CRC on and off), and ISE's xdl -xdl2ncd and DRC must give
 // no error and no warning. The open flow's own warnings are listed.
@@ -14,7 +14,7 @@
 // Options after a project folder go to its open flow (e.g. `examples/pong --seed 2 --timing-route 0`); the
 // same project may be given several times with different options. With SILINX_KEEP=1 the work
 // folder is kept, with ISE's timing report (routed.twr, trce -a) and every connection's delay
-// (routed.dly, reportgen -delay) next to each routed.xdl: research/s3e-route/timing-fit.mjs.
+// (routed.dly, reportgen -delay) next to each routed.xdl: packages/silinx-fpga/research/s3e-route/timing-fit.mjs.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -48,7 +48,7 @@ for (const { dir, opts } of projects) {
   let name = [path.basename(path.resolve(dir)), ...opts.map(o => o.replace(/^--/, ''))].join('-').replace(/[^\w.-]/g, '_');
   while (names.includes(name)) name += '_';
   names.push(name);
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), dir, path.join(work, name), ...opts], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), dir, path.join(work, name), ...opts], { encoding: 'utf8' });
   const warns = `${r.stdout}\n${r.stderr}`.split('\n').filter(l => /warning/i.test(l)).map(l => l.trim());
   console.log(`${name}: open flow ${r.status === 0 ? 'ok' : 'FAILED'}; ${warns.length} warning(s)${warns.length ? `: ${warns.join(' | ')}` : ''}`);
   if (r.status !== 0) { console.log(r.stderr.trim().split('\n').slice(-10).join('\n')); failed++; names.pop(); }
@@ -62,7 +62,7 @@ if (!names.length) process.exit(1);
 const remoteBase = iseWorkBase('silinx-open-check');
 const remote = `${remoteBase}/${path.basename(work)}`;
 const mount = remote.startsWith('/') ? remote : `$HOME/${remote}`;
-fs.copyFileSync(path.join(ROOT, 'research/s3e-route/ise-open-check.sh'), path.join(work, 'ise-open-check.sh'));
+fs.copyFileSync(path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/ise-open-check.sh'), path.join(work, 'ise-open-check.sh'));
 let out;
 if (LOCAL) out = run('docker', ['run', '--rm', ...DOCKER_ISOLATION, '--platform', 'linux/amd64', '-v', `${work}:/w`, IMAGE, 'bash', '/w/ise-open-check.sh', '/w', ...names]);
 else {
@@ -82,7 +82,7 @@ for (const name of names) {
   const drcWarn = +(/<(\d+)> warnings/.exec(drc)?.[1] ?? NaN);
   const x2n = fs.existsSync(path.join(d, 'xdl2ncd.log')) ? fs.readFileSync(path.join(d, 'xdl2ncd.log'), 'utf8') : '';
   const x2nWarn = (x2n.match(/^WARNING/gm) || []).length;
-  const check = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-bitstream/check-writer.mjs'),
+  const check = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-bitstream/check-writer.mjs'),
     path.join(d, 'routed.xdl'), path.join(d, 'ise.bit'), path.join(d, 'routed.xdl'), path.join(d, 'ise-nocrc.bit')], { encoding: 'utf8' });
   const same = (check.stdout.match(/BYTE-IDENTICAL/g) || []).length === 2;
   console.log(`${name}: DRC ${drcOk ? '0 errors' : 'ERRORS'}, ${Number.isNaN(drcWarn) ? '?' : drcWarn} warnings; xdl2ncd ${x2nWarn} warnings; .bit vs ISE's bitgen: ${same ? 'byte-identical (CRC on and off)' : 'DIFFERENT'}`);

@@ -3,7 +3,7 @@
 The open synthesis is Silinx's front end (`core/synth-verilog.js`: the elaborated design as one flat
 SystemVerilog module) + Yosys (`packages/silinx-fpga/src/synth-open.js`, YoWASP 0.70 since 15.10.23, 0.68 before) + Silinx's packer
 (`packages/silinx-fpga/src/fpga/pack.js`). Until 15.10.1 its netlists were about 2.5 times larger than XST's
-(research/s3e-bitstream/README.md, "To do later"). This page says where the size came from, what
+(packages/silinx-fpga/research/s3e-bitstream/README.md, "To do later"). This page says where the size came from, what
 changed in 15.10.2 and what is left. `measure.mjs` reproduces the tables:
 
     node research/synth-quality/measure.mjs [--place] [project folder…]
@@ -156,7 +156,7 @@ post-synthesis netlists, test/fixtures/netgen; the designs with block RAMs, DCM,
 distributed RAM or tri-state buffers are left out: the packer did not take those cells then. The
 srl row: before SRL16; with them, below.)
 
-The full open flow (`research/s3e-route/open-flow.mjs`: pack, place, route, static timing, a
+The full open flow (`packages/silinx-fpga/research/s3e-route/open-flow.mjs`: pack, place, route, static timing, a
 complete bitstream) against ISE's place and route:
 
 | design | 15.10.1 | 15.10.2 | ISE (XST + map + par) |
@@ -494,7 +494,7 @@ EPFL dec and vtr-ch-intrinsics, where its period is 1 to 19 % shorter. On EPFL p
 (52 ns against 11: without the depth-oriented mapping).
 
 **ISE's trce** on the routed designs of the four designs where abc9-4 gains or loses most, with EPFL max added
-(`abc9.mjs --routed dir`, then `research/s3e-route/ise-open-check.sh` on the ISE host; seed 1). The period is ISE's,
+(`abc9.mjs --routed dir`, then `packages/silinx-fpga/research/s3e-route/ise-open-check.sh` on the ISE host; seed 1). The period is ISE's,
 with Silinx's STA in parentheses:
 
 | design | now | lut4 | abc9-4 | abc9-4 / now |
@@ -771,10 +771,10 @@ the remaps need them).
   -> ALU carry chain -> result multiplexer -> register, about 8 ns of logic), but had about 6 ns of
   routing against XST's 4: Silinx's placer and router, not the synthesis. Since closed to 4.3 ns
   (timing-driven placement with the device's delay table, LUT input swapping, branch loads in the
-  router: lab11 11.6 ns by ISE's trce, blinky 7.4 ns; research/s3e-route/README.md, "Closing the
+  router: lab11 11.6 ns by ISE's trce, blinky 7.4 ns; packages/silinx-fpga/research/s3e-route/README.md, "Closing the
   routing gap"). Left: XST replicates the state register's flip-flops to cut their fanout (54 on
   lab11's critical path, about 0.5 ns of branch load); the open flow does since 15.10.3
-  (research/s3e-route/README.md, "The design corpus against ISE").
+  (packages/silinx-fpga/research/s3e-route/README.md, "The design corpus against ISE").
 - **Shift registers in SRL16**: done in 15.10.2 for fixed-length chains (above), in 15.10.15 for
   variable taps (#5, above), the cascade within a SLICEM in 15.10.23 (#24, above). What the prototype
   (before it) found:
@@ -796,7 +796,7 @@ the remaps need them).
     packages/silinx-fpga/test/fpga-sim.js (netlistSim and packedSim), and a check of the bitstream against ISE's
     (the bit database has the SLICEM shift-register features, measured with ISE's designs).
 - **Tri-state buffers in the packer** (distributed RAM, block RAM, multipliers and the DCM are in
-  the open flow since 15.10.2: research/s3e-bitstream/README.md, stage E).
+  the open flow since 15.10.2: packages/silinx-fpga/research/s3e-bitstream/README.md, stage E).
 - **State machines** (#438): Yosys's `fsm` pass finds no state machine in lab11's control unit (its
   `state_id` output reads the state register); XST kept its binary encoding too. Nor in any other design:
   `fsm_detect` refuses every register with an initial value, and the front end gives every register its

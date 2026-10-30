@@ -62,7 +62,7 @@ for (const fixture of ['feat_clkwiz', 'feat_clkwiz_v']) {
       Object.assign(pj.device, { part, package: pkg });
       fs.writeFileSync(path.join(dir, 'silinx.json'), JSON.stringify(pj, null, 2));
       fs.writeFileSync(path.join(dir, 'top.ucf'), ucf(pinsOf(part, pkg, fixture === 'feat_clkwiz')));
-      const r = spawnSync(process.execPath, [path.join(ROOT, 'research/s3e-route/open-flow.mjs'), dir, path.join(dir, 'out')],
+      const r = spawnSync(process.execPath, [path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/open-flow.mjs'), dir, path.join(dir, 'out')],
         { encoding: 'utf8', env: { ...process.env, SILINX_CONFIG_DIR: path.join(tmp, 'cfg') } });
       assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
       assert.match(r.stdout, /top\.bit: complete \(every feature in the bit database\)/);

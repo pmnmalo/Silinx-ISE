@@ -1,12 +1,12 @@
 // research/s6 stage S6-G (#731), without ISE: a trce report's paths read (twr6.mjs), the Spartan-6's wire classes and
 // a connection's features and load pin (timing-fit6.mjs), every connection of reportgen's report on a routed design
-// (dlySamples), the non-negative least squares the fit uses (research/s3e-route), the arcs' table and a path
+// (dlySamples), the non-negative least squares the fit uses (packages/silinx-fpga/research/s3e-route), the arcs' table and a path
 // re-evaluated by the model (timing6.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseTwr } from '../research/s6/twr6.mjs';
 import { wireClass6, CLASSES6, nodeWire, features, pinKind, PIN_KINDS, dlySamples } from '../research/s6/timing-fit6.mjs';
-import { nnls } from '../research/s3e-route/timing-fit.mjs';
+import { nnls } from '../packages/silinx-fpga/research/s3e-route/timing-fit.mjs';
 import { arcKey, arcTable, modelPath } from '../research/s6/timing6.mjs';
 import { placeS6 } from '../packages/silinx-fpga/src/fpga/s6/place.js';
 import { placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xdl.js';

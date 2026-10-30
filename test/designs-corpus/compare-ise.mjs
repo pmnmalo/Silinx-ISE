@@ -180,7 +180,7 @@ for (const t of timedNames) {
   const n = t.replace(HIGH, ''), r = (t.endsWith(HIGH) ? silHigh : sil)[names.indexOf(n)];
   fs.mkdirSync(path.join(tdir, t), { recursive: true }); fs.copyFileSync(r.routed, path.join(tdir, t, 'routed.xdl'));
 }
-fs.copyFileSync(path.join(ROOT, 'research/s3e-route/ise-open-check.sh'), path.join(tdir, 'ise-open-check.sh'));
+fs.copyFileSync(path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/ise-open-check.sh'), path.join(tdir, 'ise-open-check.sh'));
 const sshArgs = LOCAL ? [] : ['-o', 'BatchMode=yes', ...(userCfg.ssh.port && userCfg.ssh.port !== 22 ? ['-p', String(userCfg.ssh.port)] : [])];
 const ssh = cmd => execFileSync('ssh', [...sshArgs, '--', host, `export PATH="$PATH:/usr/local/bin"; ${cmd}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
 // (the host's folder for ISE work, #1774: the ssh config's remoteDir, which Docker Desktop shares, else ~/silinx-compare)
