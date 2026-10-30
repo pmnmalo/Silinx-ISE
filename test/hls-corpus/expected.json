@@ -15,9 +15,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 83784,
-      "max": 83784,
-      "avg": 83784
+      "min": 83785,
+      "max": 83785,
+      "avg": 83785
     },
     "reason": null
   },
@@ -94,9 +94,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 93,
-      "max": 93,
-      "avg": 93
+      "min": 103,
+      "max": 103,
+      "avg": 103
     },
     "reason": null
   },
@@ -385,9 +385,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 1,
-      "max": 1,
-      "avg": 1
+      "min": 2,
+      "max": 2,
+      "avg": 2
     },
     "reason": null
   },
@@ -446,7 +446,11 @@
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 2,
+      "max": 2,
+      "avg": 2
+    },
     "reason": null
   },
   "modeling-pointers-stream-good": {
@@ -471,7 +475,11 @@
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 18,
+      "max": 18,
+      "avg": 18
+    },
     "reason": null
   },
   "modeling-using-arbitrary-precision-casting": {
@@ -503,7 +511,11 @@
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 2,
+      "max": 2,
+      "avg": 2
+    },
     "reason": null
   },
   "modeling-using-fixed-point": {
@@ -521,7 +533,11 @@
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 2,
+      "max": 2,
+      "avg": 2
+    },
     "reason": null
   },
   "modeling-using-vectors": {

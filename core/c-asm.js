@@ -5,18 +5,19 @@
 // the C writes them), its ifs decision boxes and the statements under them conditional output boxes, a return, break
 // or continue its exit to the state it goes to; the block's own end its next state (a decision when it is a loop's
 // condition); a stream's read or write its C, the wait on the FIFO's flag a decision and its handshake under it
-// (#1941). Isomorphic ES module.
+// (#1941); a state the clock splits (core/c-schedule.js, #2080) its chain of states, its register transfers in the last.
+// Isomorphic ES module.
 //
-//   cAsm(source, { file, lang }) -> { ok, model, diagnostics }   (no model for a combinational function)
+//   cAsm(source, { file, lang, clock, family }) -> { ok, model, diagnostics }   (no model for a combinational function)
 import { checkC } from './c-check.js';
 import { dataflow } from './c-dataflow.js';
-import { fsmd } from './c-fsmd.js';
+import { scheduled } from './c-schedule.js';
 import { exprText, stmtText } from './c-print.js';
 import { asmLayout } from './asm-layout.js';
 import { cToHdl } from './c-hdl.js';
 import { portOf } from './c-names.js';
 
-export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null } = {}) {
+export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, clock, family } = {}) {
   const checked = checkC(source, file, { headers, top, synthesis: true });
   if (!checked.ok || !checked.top) return { ok: false, model: null, diagnostics: checked.diagnostics };
   const df = dataflow(checked);
@@ -25,10 +26,10 @@ export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, 
     const errs = df.diagnostics.filter((d) => d.severity === 'error');
     return { ok: false, model: null, diagnostics: errs.length ? errs : [{ file, line: 1, col: 1, message: `'${checked.top}' is combinational: it has no state machine`, severity: 'error' }] };
   }
-  const m = fsmd(checked);
+  const m = scheduled(checked, {}, { clock, family });
   if (m.diagnostics.some((d) => d.severity === 'error')) return { ok: false, model: null, diagnostics: m.diagnostics };
   // (the ports the module is made with: ap_ctrl_none's none of the block protocol, an argument renamed, #1927)
-  const gen = cToHdl(source, { file, lang, headers, top });
+  const gen = cToHdl(source, { file, lang, headers, top, clock, family });
   if (!gen.ok) return { ok: false, model: null, diagnostics: gen.diagnostics };
   return { ok: true, model: asmLayout(chart(checked.top, m, lang, gen.ports)), diagnostics: m.diagnostics };
 }
@@ -44,7 +45,13 @@ function chart(top, m, lang, ports) {
   const states = new Map();
   const idle = node({ type: 'state', name: 'IDLE', actions: hs ? ['ap_idle = 1'] : [] });
   const done = node({ type: 'state', name: 'DONE', actions: hs ? ['ap_done = 1', 'ap_ready = 1'] : [] });
-  for (const b of m.blocks) states.set(b.num, node({ type: 'state', name: `S${b.num}`, actions: [] }));
+  // (a state split by the clock: its chain, entered by its first state, its register transfers in its last, #2080)
+  const chains = new Map();
+  for (const b of m.blocks) {
+    const chain = [b.num, ...(m.subStates?.get(b.num) || [])].map((k) => node({ type: 'state', name: `S${k}`, actions: [] }));
+    states.set(b.num, chain[0]);
+    chains.set(b.num, chain);
+  }
   const st = (b) => (b ? states.get(b.num) : done);
   // IDLE: on ap_start the arguments read, the first state (ap_ctrl_none: at once, ap_start 1 inside the module)
   const start = hs ? node({ type: 'decision', cond: 'ap_start' }) : idle;
@@ -59,7 +66,8 @@ function chart(top, m, lang, ports) {
   edge(done, idle);
 
   for (const b of m.blocks) {
-    const s = states.get(b.num);
+    const chain = chains.get(b.num), s = chain.at(-1);
+    chain.slice(1).forEach((x, k) => edge(chain[k], x));
     // the statements: the actions of the box the path is in; an if: a decision, its branches' paths
     let cur = s, pending = [{ from: s, port: 'next' }];
     const act = (text) => {

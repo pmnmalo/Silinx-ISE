@@ -27,7 +27,7 @@ Not part of `npm test` (it needs the network once).
 | Design | Language | C simulation | C synthesis | Co-simulation | Latency | Why not |
 |---|---|---|---|---|---|---|
 | array-array-partition-block-cyclic | C++ | pass | pass | pass | 5705 |  |
-| array-array-partition-complete | C++ | pass | pass | pass | 83784 |  |
+| array-array-partition-complete | C++ | pass | pass | pass | 83785 |  |
 | dsp-fft-interface-array | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-array-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-stream | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
@@ -36,7 +36,7 @@ Not part of `npm test` (it needs the network once).
 | dsp-fir-decimator | C++ | pass | pass | pass | 132 |  |
 | interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 13 |  |
 | interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 19 |  |
-| interface-aggregation-disaggregation-aggregation-of-struct | C++ | pass | pass | pass | 93 |  |
+| interface-aggregation-disaggregation-aggregation-of-struct | C++ | pass | pass | pass | 103 |  |
 | interface-aggregation-disaggregation-auto-disaggregation-of-struct | C++ | pass | pass | pass | 35 |  |
 | interface-aggregation-disaggregation-disaggregation-of-axis-port | C++ | pass | pass | pass | 23 |  |
 | interface-aggregation-disaggregation-struct-ii-issue | C++ | pass | pass | pass | 1815 |  |
@@ -66,21 +66,21 @@ Not part of `npm test` (it needs the network once).
 | modeling-pointers-basic-arithmetic | C | pass | pass | pass | 10 |  |
 | modeling-pointers-multiple-pointers | C | pass | pass | pass | 1 |  |
 | modeling-pointers-native-casts | C | pass | pass | pass | 411 |  |
-| modeling-pointers-stream-better | C | pass | pass | pass | - |  |
+| modeling-pointers-stream-better | C | pass | pass | pass | 2 |  |
 | modeling-pointers-stream-good | C | pass | pass | pass | 5 |  |
 | modeling-pointers-using-double | C | pass | pass | pass | - |  |
 | modeling-conditional-control-of-pragmas-using-defines | C++ | pass | pass | pass | 35 |  |
 | modeling-conditional-control-of-pragmas-using-template-function | C++ | pass | pass | pass | 58 |  |
-| modeling-cpp-templates-for-multiple-instances | C++ | pass | pass | pass | 1 |  |
+| modeling-cpp-templates-for-multiple-instances | C++ | pass | pass | pass | 2 |  |
 | modeling-fixed-point-sqrt | C++ | pass | pass | pass | - |  |
 | modeling-free-running-kernel-remerge-ii4to1 | C++ | pass | pass | pass | 80 |  |
-| modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | - |  |
+| modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | 18 |  |
 | modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | - |  |
 | modeling-using-array-stencil-1d | C++ | pass | pass | pass | 29803 |  |
 | modeling-using-array-stencil-2d | C++ | fail | fail | skip | - | C simulation: test.cpp:19: the header 'malloc.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| modeling-using-cpp-templates | C++ | pass | pass | pass | - |  |
+| modeling-using-cpp-templates | C++ | pass | pass | pass | 2 |  |
 | modeling-using-fixed-point | C++ | pass | pass | pass | 1 |  |
-| modeling-using-float-and-double | C | pass | pass | pass | - |  |
+| modeling-using-float-and-double | C | pass | pass | pass | 2 |  |
 | modeling-using-vectors | C++ | fail | fail | skip | - | C simulation: example.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | modeling-variable-bound-loops | C++ | pass | pass | pass | 3-34 |  |
 | pipelining-functions-function-instantiate | C++ | pass | pass | pass | - |  |

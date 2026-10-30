@@ -39,19 +39,25 @@ export const FAMILIES = {
   }),
 };
 
+/** The estimated delay, in ns, of one node's operation (core/c-schedule.js's, #2080). */
+export function nodeDelay(graph, n, family = 'artix7') {
+  const d = FAMILIES[family][n.op];
+  const args = n.args || [];
+  // (a shift by a constant is wiring; the operands' width of a comparison its own)
+  const constAmount = (n.op === 'shl' || n.op === 'shr') && args.length > 1 && graph.nodes[args[1]].op === 'const';
+  // (a multiplication by a power of 2: a shift by a constant, wiring)
+  const pow2 = (a) => { const x = graph.nodes[a]; return x.op === 'const' && x.k > 0n && (x.k & (x.k - 1n)) === 0n; };
+  if (n.op === 'mul' && args.some(pow2)) return 0;
+  return d ? d(n.w, args.length ? graph.nodes[args[0]].w : n.w, constAmount) : 0;
+}
+
 /** The estimated delay, in ns, of the graph's longest path from an input or a constant to any node. */
 export function pathDelay(graph, family = 'artix7') {
-  const DELAY = FAMILIES[family];
   const at = new Array(graph.nodes.length).fill(0);
   let worst = 0;
   for (const n of graph.nodes) {
-    const args = n.args || [];
-    const start = args.reduce((m, a) => Math.max(m, at[a] ?? 0), 0);
-    const d = DELAY[n.op];
-    // (a shift by a constant is wiring; the operands' width of a comparison its own)
-    const constAmount = (n.op === 'shl' || n.op === 'shr') && args.length > 1 && graph.nodes[args[1]].op === 'const';
-    const own = d ? d(n.w, args.length ? graph.nodes[args[0]].w : n.w, constAmount) : 0;
-    at[n.id] = start + own;
+    const start = (n.args || []).reduce((m, a) => Math.max(m, at[a] ?? 0), 0);
+    at[n.id] = start + nodeDelay(graph, n, family);
     if (at[n.id] > worst) worst = at[n.id];
   }
   return worst;

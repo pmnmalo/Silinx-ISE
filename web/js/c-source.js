@@ -44,7 +44,7 @@ export async function openCAsm(path) {
   const old = findDoc(id);
   if (old) await closeDoc(old);
   const { cAsm } = await import('/core/c-asm.js');
-  const r = cAsm(await text(path), { file: path, lang: hdlLang() });
+  const r = cAsm(await text(path), { file: path, lang: hdlLang(), clock: hlsClock() });
   if (!r.ok) { log(`ERROR:SilinxC - "${path}" ${r.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`).join('; ')}`, 'err'); return null; }
   const { mountAsmEditor } = await import('./asm-editor.js');
   const name = `${r.model.name}.asm`;
