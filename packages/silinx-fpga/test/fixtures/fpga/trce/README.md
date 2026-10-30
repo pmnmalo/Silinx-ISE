@@ -21,3 +21,10 @@ setup / hold of each input and clock to pad of each output, by clock.
 (XC3S1200E-FG320, seed 1), and `vtr-ch-intrinsics-delay.json`: ISE 14.7's delay of each of its 531 connections to a LUT
 input, as `reportgen -delay` gives it for that routing ([net, load pin, ns]); the timing model's delay by LUT input is
 checked against it.
+
+`blinky-clock-detour.xdl.gz` (#2224): examples/blinky placed and routed by nextpnr-spartan v0.6.0 (the flow's nextpnr
+engine, XC3S250E-CP132, seed 1), before its router kept a global buffer's loads on the global lines: 28 of its 77 clock
+pins are reached through general routing. `blinky-clock-detour-trce.json`: trce's minimum period for it (8.015 ns) and
+its critical path's clock skew (-1.774 ns), and ISE's delay of each connection of the clock net as `reportgen -delay`
+gives it (the clock delay trce counts at each flip-flop); the analysis's clock skew is checked against them in
+test/fpga-clock-skew.test.js.

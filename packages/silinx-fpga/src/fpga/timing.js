@@ -112,6 +112,11 @@ export const SPEED_4 = {
     // DCM's clock); tap, each tap of DESKEW_ADJUST below 7 later (0: SOURCE_SYNCHRONOUS), from trce's Tdcmino. Between
     // two outputs trce counts no skew (within ±0.02 ns) and no uncertainty (0 on the Spartan-3E).
     dcm: { pad: [-1.097, -2.150, -0.735], global: [0.02, 0.015, 0.02], tap: [0.176, 0.26, 0.176] },
+    // a global clock's load reached through general routing (#2224): later than on the global lines by a + b x the model's
+    // delay of the general wires from where it leaves them (clockDetour), fitted to ISE's delay of the clock net's
+    // connections (reportgen -delay, as trce's clock paths: 0.07-0.12 ns on the global lines) on 129 such loads of nine
+    // routings of blinky and stopwatch (research/s3e-route/clock-detour.mjs): rms error 0.100 ns, 0.220 at most
+    detour: [-0.708, 1.188],
   },
   // the SLICEM's RAMs and shift registers: trce's values (research/s3e-route/timing-fit.mjs --arcs, #443: the srl
   // and dram fixtures, feat_srl, feat_srl_var, hard_prim; the same on either clock edge)
@@ -618,14 +623,16 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
       run(starts.filter(([p, , c]) => c === clk && known(p)).map(([p, d]) => [p, clockArr.get(pinName[p].inst) + d]));
       for (const [o, d2] of padOuts) if (Number.isFinite(arr[o])) out.outputs.push({ pad: pinName[o].inst, clock: clk, delay: arr[o] + d2, path: trace(o, 'pad', d2, 'clock-to-out') });
       // hold: the shortest path, per launching edge, into the flip-flops of that edge
+      // (#2224: a clock's detour through general routing, clockArr.skew, later at the launch and at the capture)
+      const sk = p => clockArr.skew?.get(pinName[p].inst) ?? 0;
       let w = null;
       for (const launch of [0, 1]) {
         const seeds = starts.filter(([, , c, ed]) => c === clk && ed === launch);
         if (!seeds.length) continue;
-        run(seeds.map(([p, d]) => [p, d]), true);
+        run(seeds.map(([p, d]) => [p, d + sk(p)]), true);
         for (const [e, , c, ed] of dataEnds) {
           if (c !== clk || ed !== launch || !Number.isFinite(arr[e])) continue;
-          const slack = sc * arr[e] - Th;
+          const slack = sc * arr[e] - Th - sk(e);
           if (!w || slack < w.slack) w = { clock: clk, slack, path: trace(e, 'hold', -model.clock.hold, 'clock-to-out') };
         }
       }
@@ -681,9 +688,17 @@ export function clockArrivals(design, device, model = SPEED_4, clocks = []) {
         if (T) half = s.f * T / 2;
       } else if (inNet && loadsOf(inNet, depth + 1)?.get(`${di.name}\u0000${pin}`)) g = [Tgclk, sc * Tgclk, Tgclk];
       if (!g) return null;
+      // (#2224: a load the global lines do not reach, routed off them through general routing, later by its detour)
+      const s0 = pinNode(drv), tree = n.pips.length && s0 >= 0 ? netTree(n.pips, [s0], device) : null;
       const m = new Map(n.inpins.map(p => {
         const h = half && inst.has(p.inst) && edgeAt(inst.get(p.inst), p.pin) ? half : 0;
-        return [`${p.inst}\u0000${p.pin}`, h ? g.map(x => x + h) : g];
+        const sink = tree && CLOCK_PIN.test(p.pin) ? pinNode(p) : -1, path = sink >= 0 ? treePath(tree, sink) : null;
+        const off = path ? clockDetour(path, tree, device, model) : null;
+        if (off === null) return [`${p.inst}\u0000${p.pin}`, h ? g.map(x => x + h) : g];
+        const a = [g[0] + h + off, g[1] + h + sc * off, g[2] + h + off];
+        a.skew = off;
+        a.detour = true;
+        return [`${p.inst}\u0000${p.pin}`, a];
       }));
       at.set(n.name, m);
       return m;
@@ -704,12 +719,41 @@ export function clockArrivals(design, device, model = SPEED_4, clocks = []) {
   const out = new Map();
   out.early = new Map();
   out.hold = new Map();
-  for (const n of design.nets) for (const p of n.inpins) {
-    if (!CLOCK_PIN.test(p.pin)) continue;
-    const a = loadsOf(n)?.get(`${p.inst}\u0000${p.pin}`);
-    if (a && !out.has(p.inst)) { out.set(p.inst, a[0]); out.early.set(p.inst, a[1]); out.hold.set(p.inst, a[2]); }
+  out.skew = new Map();
+  out.detours = [];
+  for (const n of design.nets) {
+    let pins = 0, worst = 0;
+    for (const p of n.inpins) {
+      if (!CLOCK_PIN.test(p.pin)) continue;
+      const a = loadsOf(n)?.get(`${p.inst}\u0000${p.pin}`);
+      if (a?.detour) { pins++; worst = Math.max(worst, a.skew); }
+      if (!a || out.has(p.inst)) continue;
+      out.set(p.inst, a[0]); out.early.set(p.inst, a[1]); out.hold.set(p.inst, a[2]);
+      if (a.skew) out.skew.set(p.inst, a.skew);
+    }
+    if (pins) out.detours.push({ clock: n.name, pins, of: n.inpins.filter(p => CLOCK_PIN.test(p.pin)).length, skew: worst });
   }
   return out;
+}
+
+// the wires of general routing (a block RAM's BRAM_CLK, an I/O tile's IOIS_CLK: the global lines' own way into a pin)
+const GENERAL = new Set([WIRE.OMUX, WIRE.DOUBLE, WIRE.HEX, WIRE.LONG]);
+
+/**
+ * The detour of a global clock's load through general routing (#2224): null when the path from the global buffer to the
+ * clock pin stays on the global lines (trce: no clock skew between their loads); else how much later than on them the
+ * clock arrives there, ISE's delay of that connection less a global line's (model.clock.detour, fitted to trce's clock
+ * paths).
+ */
+export function clockDetour(path, tree, device, model = SPEED_4) {
+  const cls = nodeClasses(device);
+  const k = path.findIndex(n => GENERAL.has(cls[n]));
+  if (k < 0) return null;
+  // the general wires from where it leaves the global lines, as a data connection's
+  let d = 0;
+  for (let j = k; j < path.length; j++) d += model.wire[cls[path[j]]] + model.branch[cls[path[j]]] * Math.max(0, (tree.children.get(path[j]) || 0) - 1);
+  const [a, b] = model.clock.detour;
+  return Math.max(0, a + b * d);
 }
 
 /** The delay of every connection of a timing graph from the routing of the design (Float64Array);
@@ -745,10 +789,13 @@ export function analyzeTiming(design, device, opts = {}) {
   const model = opts.model || SPEED_4;
   const tg = timingGraph(design, model);
   const connDelay = routedDelays(design, device, tg, model);
-  const r = tg.analyze(connDelay);
-  r.conns = tg.conns.map((c, i) => ({ net: c.net, from: `${c.fromPin.inst}.${c.fromPin.pin}`, to: `${c.toPin.inst}.${c.toPin.pin}`, delay: connDelay[i], slack: r.slack[i], crit: r.crit[i] }));
-  // the pads' paths and the hold check (#26), apart from the period
   // (opts.clocks: the UCF's PERIOD constraints, parseUcf().clocks: a DCM output's phase in its clock's arrival, #601)
-  r.pads = tg.pads(connDelay, clockArrivals(design, device, model, opts.clocks || []));
+  const arr = clockArrivals(design, device, model, opts.clocks || []);
+  // the skew of a global clock's loads reached through general routing (#2224; none on the global lines)
+  const r = tg.analyze(connDelay, arr.skew);
+  r.conns = tg.conns.map((c, i) => ({ net: c.net, from: `${c.fromPin.inst}.${c.fromPin.pin}`, to: `${c.toPin.inst}.${c.toPin.pin}`, delay: connDelay[i], slack: r.slack[i], crit: r.crit[i] }));
+  r.detours = arr.detours;
+  // the pads' paths and the hold check (#26), apart from the period
+  r.pads = tg.pads(connDelay, arr);
   return r;
 }

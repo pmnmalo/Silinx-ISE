@@ -598,6 +598,17 @@ pad-to-pad figures.
   between flip-flops on the global lines. The model's routed clock nets spread 0.4 ns over their loads (the GCLK
   class was never fitted), so `clockArrivals` gives every load of a global buffer `Tgclk` = 3.045 ns after the pad,
   and `minScale` x that at the earliest.
+- **A global clock's load reached through general routing is not at once** (#2224): trce's clock delay at such a
+  flip-flop is ISE's delay of that connection of the clock net (`reportgen -delay`: 0.07-0.12 ns to a load on the
+  global lines, 0.86-2.57 ns off them), so a path between the two kinds has that skew. `clockArrivals` gives such a load
+  `model.clock.detour` later: a + b x the model's delay of the general wires from where its path leaves the global
+  lines (an OMUX, double, hex or long line: a block RAM's `BRAM_CLK` and an I/O tile's `IOIS_CLK` are the global lines'
+  own way into the pin), fitted with `clock-detour.mjs` on 129 such loads of nine routings of blinky and stopwatch
+  (Silinx's with 3 or 12 pins moved off the global lines by `--reroute`, nextpnr-spartan v0.6.0's): -0.708 + 1.188 x,
+  rms error 0.100 ns, 0.220 at most. The periods then follow trce's (blinky with 12 pins moved: +1.10 ns in trce,
+  +1.08 in the analysis; nextpnr v0.6.0's blinky 7.918 ns against trce's 8.015, 7.647 before). The hold check of two
+  flip-flops counts the skew too; it stays 0.57-0.75 ns above trce's slack on the same pairs, as on the global
+  lines.
 - **trce's minimum delays** are 0.751 (`minScale`) of the model's: the slope of the inputs' hold against the model's
   shortest data paths.
 - **Setup uses the clock's earliest arrival, clock-to-pad its latest.** With one arrival for both, pad to pad did not

@@ -316,6 +316,12 @@ export function timingReport(r, checks = []) {
     lines.push(`clock ${c.clock}: minimum period ${c.period.toFixed(3)} ns (${(1000 / c.period).toFixed(1)} MHz)`);
     for (const s of c.path) lines.push(step(s));
   }
+  // (#2224: a global clock's loads reached off its global lines, their skew in the periods and the hold check)
+  const skewed = new Set();
+  for (const d of r.detours || []) {
+    skewed.add(d.clock);
+    lines.push(`clock ${d.clock}: ${d.pins} of its ${d.of} clock pins reached through general routing, not the global lines (clock skew up to ${d.skew.toFixed(3)} ns)`);
+  }
   // (#601: as trce, against the time between the clocks' edges; unrelated clocks not timed)
   for (const x of checks.filter(k => k.kind === 'cross')) {
     const what = `paths from clock ${x.from} (${edgeName(x.launch)}) to clock ${x.to} (${edgeName(x.capture)})`;
@@ -334,7 +340,7 @@ export function timingReport(r, checks = []) {
   }
   table('pad to pad:', p.padToPad, x => `  ${x.from.padEnd(w)} -> ${x.to.padEnd(w)} ${x.delay.toFixed(3).padStart(7)} ns`);
   for (const h of p.hold) {
-    lines.push('', `hold, clock ${h.clock}: ${h.slack >= 0 ? 'met' : 'NOT MET'}, worst slack ${h.slack.toFixed(3)} ns (the shortest path at its earliest; the global clock reaches both flip-flops at once)`);
+    lines.push('', `hold, clock ${h.clock}: ${h.slack >= 0 ? 'met' : 'NOT MET'}, worst slack ${h.slack.toFixed(3)} ns (the shortest path at its earliest; ${skewed.has(h.clock) ? 'with the clock\'s skew' : 'the global clock reaches both flip-flops at once'})`);
     for (const s of h.path) lines.push(step(s));
   }
   return lines;
