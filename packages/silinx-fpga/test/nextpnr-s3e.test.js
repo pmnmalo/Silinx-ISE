@@ -12,6 +12,7 @@ import { loadDb } from '../src/fpga/bitdb-node.js';
 import { bitgen } from '../src/fpga/bitgen.js';
 import { checkRouting } from '../src/fpga/route.js';
 import { WIRE } from '../src/fpga/timing.js';
+import { SPEED_4 } from '../src/fpga/timing.js';
 import { lutPins, nextpnrToXdl, simCheck, timingExport, unknownPips, xdlSize } from '../research/nextpnr-s3e/lib.mjs';
 
 const PART = 'xc3s250ecp132-4';
@@ -115,6 +116,8 @@ test('unknownPips: the PIPs Silinx\'s router is kept off, by tile', () => {
 
 test('timingExport: each PIP the class of the node it drives, Silinx\'s delays', () => {
   const { timing, disagree } = timingExport(device);
+  // (#2193: a block RAM's and a multiplier's delays, trce's: the same numbers as the model's)
+  assert.deepEqual([timing.bram, timing.mult], [SPEED_4.bram, SPEED_4.mult]);
   assert.equal(disagree, 407);
   for (const [t, cls] of Object.entries(timing.pipClass)) assert.equal(cls.length, device.templates[t].from.length);
   const k = device.tile('CLB_X11Y6'), t = device.tileTemplate[k];
