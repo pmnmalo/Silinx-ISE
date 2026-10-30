@@ -4,18 +4,20 @@
 //   through io.nextpnr) packs, places and routes Yosys's netlist.
 // - Its routed design becomes XDL (fpga/nextpnr-xdl.js), which the timing, the pins and the bitstream read as they
 //   read Silinx's own.
-// - For now the micro-architecture knows LUTs, flip-flops, carry chains, constants, IOBs and global clock buffers
-//   (#2135): a netlist with other cells fails at Map, naming them.
+// - For now the micro-architecture knows LUTs, flip-flops, carry chains, wide multiplexers, constants, IOBs, global
+//   clock buffers, block RAMs and multipliers (#2135): a netlist with other cells fails at Map, naming them.
 import { parseUcf } from './ucf.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { checkRouting } from './fpga/route.js';
 import { deviceSites } from './fpga/place.js';
 import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
+import { parityToData } from './fpga/pack-bram.js';
+import { BRAM_TYPE, MULT_TYPE } from './fpga/pack.js';
 
 /** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops of
- *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the carry chains (MUXCY, XORCY), the
- *  constants (GND, VCC), the I/O buffers and BUFG. */
-export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|OBUF|BUFG)$/;
+ *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the carry chains (MUXCY, XORCY), the wide
+ *  multiplexers, the constants (GND, VCC), the I/O buffers, BUFG, the block RAMs and the multipliers (not chained). */
+export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|OBUF|BUFG|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?)$/;
 
 /**
  * The netlist for nextpnr: each port bit's pad (its LOC in the UCF) on the I/O buffer at that bit, the IBUF or OBUF the
@@ -30,6 +32,7 @@ export function nextpnrNetlist(text, top, ucfText) {
   const types = new Map();
   for (const c of Object.values(mod.cells)) if (!NEXTPNR_CELL.test(c.type)) types.set(c.type, (types.get(c.type) || 0) + 1);
   for (const [t, n] of types) problems.push(`${n} cell(s) ${t}: not in the spartan3e micro-architecture yet`);
+  hardInputs(mod);
   // each port bit's pad on its I/O buffer
   let locs = {};
   try { if (ucfText) locs = parseUcf(ucfText).assignments || {}; } catch { /* checked by translate */ }
@@ -51,6 +54,63 @@ export function nextpnrNetlist(text, top, ucfText) {
   }
   json.modules = { [name]: mod };
   return { json, problems };
+}
+
+/**
+ * The block RAMs' and multipliers' inputs as Silinx's packer leaves them (#2135), which ISE's DRC wants: a block RAM's
+ * parity bit written and not read moved to a free data bit (pack-bram.js parityToData); the data inputs of a port never
+ * written (WE at 0, its data constant or undriven) left unconnected; the other undriven inputs (x) at 0. In place.
+ */
+export function hardInputs(mod) {
+  // Silinx's netlist view of the module (fpga/netlist.js): nets 0 and 1 the constants, a net per bit
+  const nets = [{ const: 0, loads: [] }, { const: 1, loads: [] }], netOf = new Map();
+  const net = b => { if (!netOf.has(b)) { netOf.set(b, nets.length); nets.push({ loads: [], driver: null }); } return netOf.get(b); };
+  for (const p of Object.values(mod.ports)) for (const b of p.bits) if (typeof b === 'number') nets[net(b)].port = true;
+  const pinName = (port, i, n) => (n > 1 ? `${port}<${i}>` : port);
+  const cells = Object.values(mod.cells);
+  cells.forEach((c, k) => {
+    for (const [port, bits] of Object.entries(c.connections)) {
+      bits.forEach((b, i) => {
+        if (typeof b !== 'number') return;
+        const e = { cell: k, pin: pinName(port, i, bits.length) };
+        if (c.port_directions[port] === 'output') nets[net(b)].driver = e; else nets[net(b)].loads.push(e);
+      });
+    }
+  });
+  cells.forEach((c, k) => {
+    const m = BRAM_TYPE.exec(c.type);
+    if (!m && !MULT_TYPE.test(c.type)) return;
+    const pins = {}, undriven = [];
+    for (const [port, bits] of Object.entries(c.connections)) {
+      bits.forEach((b, i) => {
+        const pin = pinName(port, i, bits.length);
+        if (b === 'x' || b === 'z') { undriven.push(pin); pins[pin] = 0; } else pins[pin] = b === '0' ? 0 : b === '1' ? 1 : net(b);
+      });
+    }
+    const cell = { type: c.type, pins, params: c.parameters, undriven };
+    let unwritten = new Set();
+    if (m) {
+      const single = !m[3], ports = single ? { A: +m[1] } : { A: +m[1], B: +m[3] };
+      parityToData(cell, ports, single, { ci: x => (x === cell ? k : -1), nets });
+      const inputsOf = P => Object.keys(cell.pins).filter(p => new RegExp(`^DIP?${single ? '' : P}(<\\d+>)?$`).test(p));
+      unwritten = new Set(Object.keys(ports).filter(P => cell.pins[single ? 'WE' : `WE${P}`] === 0
+        && inputsOf(P).every(p => nets[cell.pins[p]].const !== undefined)));
+      c.type = cell.type;
+      c.parameters = cell.params;
+    }
+    // the connections again from the pins (parityToData may move or widen them)
+    const bitOf = new Map([...netOf].map(([b, n]) => [n, b]));
+    const conn = {}, dirs = {};
+    for (const [pin, n] of Object.entries(cell.pins)) {
+      const q = /^(\w+?)(?:<(\d+)>)?$/.exec(pin), port = q[1], i = q[2] === undefined ? 0 : +q[2];
+      const free = /^DIP?[AB]?$/.test(port) && unwritten.has(m && !m[3] ? 'A' : port.slice(-1));
+      (conn[port] ||= [])[i] = free ? 'x' : nets[n].const !== undefined ? String(nets[n].const) : bitOf.get(n);
+      dirs[port] = /^(DO|DOP|P|BCOUT)$/.test(port.replace(/[AB]$/, '')) || /^(P|BCOUT)$/.test(port) ? 'output' : 'input';
+    }
+    for (const port of Object.keys(conn)) conn[port] = Array.from(conn[port], b => b ?? 'x');
+    c.connections = conn;
+    c.port_directions = dirs;
+  });
 }
 
 /**

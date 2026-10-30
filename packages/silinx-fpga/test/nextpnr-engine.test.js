@@ -39,9 +39,9 @@ test('nextpnrNetlist: what the micro-architecture cannot implement yet is named'
   assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) RAM16X1S: not in the spartan3e micro-architecture yet']);
 });
 
-test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants and the buffers; not a falling edge, a latch, a RAM', () => {
-  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'OBUF', 'BUFG']) assert.ok(NEXTPNR_CELL.test(t), t);
-  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'SRL16E', 'RAM16X1S', 'RAMB16_S9', 'MULT18X18SIO', 'DCM_SP', 'IOBUF', 'OBUFT']) assert.ok(!NEXTPNR_CELL.test(t), t);
+test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants, the buffers, the block RAMs and multipliers; not a falling edge, a latch, a distributed RAM', () => {
+  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'OBUF', 'BUFG', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
+  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'SRL16E', 'RAM16X1S', 'RAMB16_S3', 'MULT18X18SX', 'DCM_SP', 'IOBUF', 'OBUFT']) assert.ok(!NEXTPNR_CELL.test(t), t);
 });
 
 test('#2136 the gates example built with --engine nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
@@ -116,7 +116,7 @@ test('#2135 the traffic example (Silinx\'s synthesis: MUXF5s, two MUXF6s, carry 
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
   assert.ok(out.includes('  Number of Slice Flip Flops: 58 out of 4896 1%'), out.join('\n'));
-  assert.ok(out.includes('  Number of occupied Slices: 70 out of 2448 3%'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 71 out of 2448 3%'), out.join('\n'));
   assert.ok(out.includes('All constraints were met.'), out.join('\n'));
   assert.ok(out.includes('Bitstream: build/top.bit (169286 bytes, every feature in the bit database)'), out.join('\n'));
   // the wide multiplexers on the slices' own: twelve F5s, two F6s each reading two of them

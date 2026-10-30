@@ -4,6 +4,8 @@
 // packages/silinx-fpga/research/nextpnr-s3e/lib.mjs, which re-exports it.
 import { writeXdl } from '../xdl.js';
 import { initToEquation } from './lut.js';
+import { paramBits } from './netlist.js';
+import { BRAM_WIDTH } from './pack.js';
 
 const topModule = json => Object.entries(json.modules).find(([, m]) => m.attributes?.top) || Object.entries(json.modules)[0];
 const esc = x => String(x).replace(/:/g, '_');
@@ -136,11 +138,64 @@ function carryCfg(inst, add) {
   if (c.CYMUXG && portNet(c.CYMUXG, 'O') !== undefined) add('COUTUSED', '', '0');
 }
 
+// a parameter as hexadecimal of `bits` bits (nextpnr writes a bit string, x read as 0, or a number)
+const paramHex = (v, bits) => {
+  const b = paramBits(typeof v === 'number' ? (v >>> 0).toString(2) : v) || [];
+  let n = 0n;
+  for (let i = Math.min(b.length, bits) - 1; i >= 0; i--) n = (n << 1n) | BigInt(b[i]);
+  return n.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0');
+};
+
+/** A block RAM's settings (the packer's RAMB16 of RAMB16_S<w>[_S<w>]), as Silinx's packer writes them (pack-cfg.js). */
+function bramCfg(inst, add) {
+  const c = inst.cells.RAMB16, p = c.parameters, single = !/_S\d+_S\d+$/.test(strParam(c, 'SILINX_TYPE'));
+  inst.type = 'RAMB16';
+  inst.name = esc(c.name);
+  const ports = single ? ['A'] : ['A', 'B'];
+  const width = P => parseInt(bitsOf(p[`PORT${P}_WIDTH`]), 2);
+  const prm = (name, P) => (single ? p[name] : p[`${name}_${P}`]);
+  for (const P of ports) {
+    for (const pin of ['CLK', 'EN', 'SSR', 'WE']) add(`${pin}${P}INV`, '', `${pin}${P}`);
+    add(`PORT${P}_ATTR`, '', BRAM_WIDTH[width(P)].attr);
+    add(`WRITEMODE${P}`, '', String(strParam(c, single ? 'WRITE_MODE' : `WRITE_MODE_${P}`) || 'WRITE_FIRST').trim());
+  }
+  add('RAMB16', `${inst.name}.RAMB16`, '');
+  for (const P of ports) add(`RAMB16${P}`, `${inst.name}.${P}`, '');
+  for (let i = 0; i < 8; i++) add(`INITP_0${i}`, '', paramHex(p[`INITP_0${i}`], 256));
+  for (let i = 0; i < 64; i++) { const h = i.toString(16).padStart(2, '0'); add(`INIT_${h}`, '', paramHex(p[`INIT_${h.toUpperCase()}`], 256)); }
+  for (const P of ports) {
+    const w = BRAM_WIDTH[width(P)], bits = w.data + w.par;
+    add(`INIT_${P}`, '', paramHex(prm('INIT', P), bits));
+    add(`SRVAL_${P}`, '', paramHex(prm('SRVAL', P), bits));
+  }
+}
+
+/** A multiplier's settings (the packer's MULT18X18SIO of MULT18X18 / MULT18X18S / MULT18X18SIO, its registers in AREG,
+ *  BREG, PREG), as Silinx's packer writes them (pack-cfg.js): the inverters of the connected pins. */
+function multCfg(inst, add) {
+  const c = inst.cells.MULT18X18SIO, p = c.parameters;
+  inst.type = 'MULT18X18SIO';
+  inst.name = esc(c.name);
+  const reg = k => String(parseInt(bitsOf(p[k] ?? 0), 2));
+  const inv = pin => { if (portNet(c, pin) !== undefined) add(`${pin}INV`, '', pin); };
+  add('AREG', '', reg('AREG')); add('BREG', '', reg('BREG')); add('B_INPUT', '', 'DIRECT');
+  for (const pin of ['CEA', 'CEB', 'CEP', 'CLK']) inv(pin);
+  add('PREG', '', reg('PREG')); add('PREG_CLKINVERSION', '', '0');
+  for (const pin of ['RSTA', 'RSTB', 'RSTP']) inv(pin);
+  add('MULT18X18SIO', inst.name, '');
+}
+
 /** An instance's XDL type, name and settings (cfg items), as ISE's map writes them. */
 function instanceCfg(inst, mod) {
   const cfg = [], c = inst.cells;
   const add = (attr, name, value) => cfg.push({ attr, name, value });
-  if (inst.siteType === 'SLICEL' || inst.siteType === 'SLICEM') {
+  if (c.GND || c.VCC) {
+    // a constant's source, as ISE's map and Silinx write it: a slice giving 0 on Y, or a VCC site
+    inst.type = c.GND ? 'SLICEL' : 'VCC';
+    inst.name = `XDL_DUMMY_${inst.tile}_${inst.site}`;
+    add('_NO_USER_LOGIC', '', '');
+    if (c.GND) add('_GND_SOURCE', '', 'Y'); else add('_VCC_SOURCE', '', 'VCCOUT');
+  } else if (inst.siteType === 'SLICEL' || inst.siteType === 'SLICEM') {
     inst.type = 'SLICEL';                // (logic on a SLICEM site too: ISE's DRC wants a SLICEL comp there)
     inst.name = esc((c.FFX || c.FFY || c.FLUT || c.GLUT || c.CYMUXF || c.XORF || c.F5MUX || c.FXMUX).name);
     for (const [side, lut] of [['F', c.FLUT], ['G', c.GLUT]]) if (lut) add(side, esc(lut.name), `#LUT:${initToEquation(bitsOf(lut.parameters.INIT), 4, lutPins(inst.lutPins[side]))}`);
@@ -175,6 +230,10 @@ function instanceCfg(inst, mod) {
     }
     if (inst.mux.X) add('XUSED', '', '0');
     if (inst.mux.Y) add('YUSED', '', '0');
+  } else if (c.RAMB16) {
+    bramCfg(inst, add);
+  } else if (c.MULT18X18SIO) {
+    multCfg(inst, add);
   } else if (c.IOB) {
     // the IOB's name: its port bit, as the UCF names it (led<3>: nextpnr writes a bus's bits as one port again)
     const pad = portNet(c.IOB, 'PAD');
@@ -205,10 +264,13 @@ function netsOf(mod, insts, device, v) {
   const netName = new Map();
   for (const [name, n] of Object.entries(mod.netnames)) for (const b of n.bits) if (!netName.has(b) || !n.hide_name) netName.set(b, name);
   const nets = [];
+  // the constants' nets (driven by a GND / VCC source: XDL's gnd / vcc nets)
+  const constant = new Map();
+  for (const c of Object.values(mod.cells)) if (/^(GND|VCC)SRC$/.test(c.type)) constant.set(portNet(c, 'O'), c.type === 'GNDSRC' ? 'gnd' : 'vcc');
   for (const [name, n] of Object.entries(mod.netnames)) {
     const route = routing(n);
     if (!route.length || n.hide_name && netName.get(n.bits[0]) !== name) continue;
-    const net = { name, type: 'wire', outpins: [], inpins: [], pips: [] };
+    const net = { name, type: constant.get(n.bits[0]) || 'wire', outpins: [], inpins: [], pips: [] };
     const seen = new Set();
     for (const [wire] of route) {
       const [tile, w0] = wire.split('/');
@@ -219,7 +281,9 @@ function netsOf(mod, insts, device, v) {
         const k = device.wireTile[w], p = v.pinOfWire(k).get(device.wireInfo(w).name);
         const inst = p && insts.get(device.tileSites[k][p.site][0]);
         // (an F5 / FX pin only when the net leaves the site there: to X / Y it stays inside)
-        if (inst && !(p.pin === 'F5' && !inst.f5out) && !(p.pin === 'FX' && !inst.fxout))
+        // (a block RAM's or multiplier's pins: its cell's ports only, the pair's sites share nodes)
+        const hard = inst && (inst.cells.RAMB16 || inst.cells.MULT18X18SIO);
+        if (inst && !(p.pin === 'F5' && !inst.f5out) && !(p.pin === 'FX' && !inst.fxout) && (!hard || portNet(hard, p.pin) !== undefined))
           (p.dir === 'o' ? net.outpins : net.inpins).push({ inst: inst.name, pin: p.pin });
       }
     }
