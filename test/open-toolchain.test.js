@@ -53,7 +53,7 @@ async function implement(name, body = {}) {
   return r.body.job;
 }
 
-test('openStatus: available for the Basys2 and Nexys2 parts; why not for the other devices', () => {
+test('openStatus: available for the Basys2, Nexys2, Nexys3 and Atlys parts; why not for the other devices', () => {
   const ok = OF.openStatus(DEV('xc3s250e', 'cp132'));
   assert.equal(ok.available, true, ok.reason);
   assert.equal(ok.part, 'xc3s250ecp132-4');
@@ -85,9 +85,12 @@ test('openStatus: available for the Basys2 and Nexys2 parts; why not for the oth
   assert.equal(tq2.available, false);
   assert.equal(tq2.canBuild, true);
   assert.equal(tq2.reason, 'no device description of xc3s250etq144-4 ships with Silinx (the Silinx toolchain supports the XC3S250E (TQ144)): use an ISE mode for this device');
+  // the Spartan-6 boards' parts too (#732: no developer flag); another family refused
   const s6 = OF.openStatus(DEV('xc6slx16', 'csg324', 'spartan6'));
-  assert.equal(s6.available, false);
-  assert.match(s6.reason, /does not support the spartan6 family yet \(only the Spartan-3E XC3S100E \(CP132\), XC3S250E/);
+  assert.deepEqual([s6.available, s6.shipped], [true, true], s6.reason);
+  const s3a = OF.openStatus(DEV('xc3s200a', 'vq100', 'spartan3a'));
+  assert.equal(s3a.available, false);
+  assert.match(s3a.reason, /does not support the spartan3a family yet \(only the Spartan-3E XC3S100E \(CP132\), XC3S250E/);
   assert.equal(OF.hasBitDatabase('xc3s250e'), true);
   assert.equal(OF.hasBitDatabase('xc3s250e', 'tq144'), false);
   assert.equal(OF.hasBitDatabase('xc3s1600e'), false);

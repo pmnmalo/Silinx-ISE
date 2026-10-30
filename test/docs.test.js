@@ -173,7 +173,9 @@ test('docs: the boards the Silinx toolchain supports are the ones the code suppo
   const section = /^\*\*Without ISE \(Silinx toolchain[\s\S]*?(?=^\*\*Recommended)/m.exec(readme)?.[0];
   assert.ok(section, 'README: the section on the Silinx toolchain');
   for (const b of SUPPORTED) {
-    const ok = b.board === 's3e-starter' ? /Spartan-3E Starter Kit/.test(section) : named(section).includes(b.name);
+    // (a board with no variants by its name: the Nexys3, the Atlys)
+    const ok = b.board === 's3e-starter' ? /Spartan-3E Starter Kit/.test(section)
+      : b.name.includes('-') ? named(section).includes(b.name) : new RegExp(`\\b${b.name}\\b`).test(section);
     assert.ok(ok, `README's Silinx toolchain section does not name the ${b.name}`);
   }
   // "Basys2 and Nexys2 boards" (Getting Started, both languages): every variant of them
@@ -183,10 +185,9 @@ test('docs: the boards the Silinx toolchain supports are the ones the code suppo
   }
   assert.match(read('docs/GETTING-STARTED.md'), /For the Basys2 and Nexys2 boards, nothing/);
   assert.match(read('docs/COMECAR.md'), /Para as placas Basys2 e Nexys2, nada/);
-  // what it does not support yet is said so: the Spartan-6 boards
-  const unsupported6 = boardsOf(a => !a).filter(b => ['nexys3', 'atlys'].includes(b.board));
-  assert.equal(unsupported6.length, 2);
-  assert.match(section, /does \*\*not yet support the Spartan-6 boards \(Nexys3, Atlys\)\*\*/);
+  // the Spartan-6 boards (#732: no developer flag), not in the browser edition yet, which is said so
+  assert.deepEqual(SUPPORTED.filter(b => ['nexys3', 'atlys'].includes(b.board)).map(b => b.name), ['Nexys3', 'Atlys']);
+  assert.match(section, /the \*\*Nexys3 and the Atlys\*\* [^.]*not yet in the browser edition/);
 });
 
 test('docs test: the interface\'s labels are read past comments with quotes in them (#127)', () => {

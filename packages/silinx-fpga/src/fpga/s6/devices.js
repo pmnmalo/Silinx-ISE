@@ -1,8 +1,7 @@
 // Silinx - the Spartan-6 devices of the Silinx toolchain (#722; the plan: research/s6/README.md, #1): the parts of
 // the Nexys3 and the Atlys, their configuration facts as UG380 (Spartan-6 FPGA Configuration User Guide) documents
-// them, until the measurements on ISE's bitgen (#724) replace them, and the developer flag under which the open
-// flow takes these parts with the steps it has for them. Without the flag nothing changes: the Spartan-6 boards are
-// built with ISE.
+// them, until the measurements on ISE's bitgen (#724) replace them, and whether the open flow takes a part (the
+// boards' parts, since #732 with no developer flag).
 //
 // Isomorphic ES module (browser + Node), no DOM.
 
@@ -21,19 +20,15 @@ export const S6_DEVICES = {
 export const S6_OPEN_STEPS = ['synth', 'postsynth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit'];
 const STEP_NAMES = { synth: 'synthesis', postsynth: 'its post-synthesis simulation model', translate: null, map: 'Map', par: 'Place & Route', trce: 'the static timing', bitgen: 'the bitstream', prombit: null };
 
-/** The developer flag: SILINX_SPARTAN6_OPEN=1 in the environment of the server (none in the browser). */
-const SPARTAN6_FLAG = 'SILINX_SPARTAN6_OPEN';
-export const spartan6Open = (env = globalThis.process?.env) => env?.[SPARTAN6_FLAG] === '1';
-
 /**
- * Can the Silinx toolchain take this Spartan-6 part (dev 'xc6slx16', pkg 'csg324'), under the flag?
+ * Can the Silinx toolchain take this Spartan-6 part (dev 'xc6slx16', pkg 'csg324')?
  * { available, steps (S6_OPEN_STEPS), reason }.
  */
 export function s6OpenStatus(dev, pkg, part) {
   const d = S6_DEVICES[dev];
   const list = Object.values(S6_DEVICES).map(x => `${x.device.toUpperCase()} (${x.pkg.toUpperCase()}, ${x.board})`).join(', ');
-  if (!d) return { available: false, reason: `the Silinx toolchain for the Spartan-6 is for the ${list} only (${SPARTAN6_FLAG}): use an ISE mode for the ${dev}` };
-  if (pkg !== d.pkg) return { available: false, reason: `the Silinx toolchain for the Spartan-6 has the ${dev} in the ${d.pkg} package only (${SPARTAN6_FLAG}): use an ISE mode for the ${pkg}` };
+  if (!d) return { available: false, reason: `the Silinx toolchain for the Spartan-6 is for the ${list} only: use an ISE mode for the ${dev}` };
+  if (pkg !== d.pkg) return { available: false, reason: `the Silinx toolchain for the Spartan-6 has the ${dev} in the ${d.pkg} package only: use an ISE mode for the ${pkg}` };
   return { available: true, steps: S6_OPEN_STEPS,
-    reason: `${part}: the Spartan-6 under development (${SPARTAN6_FLAG}): ${S6_OPEN_STEPS.map(x => STEP_NAMES[x]).filter(Boolean).join(', ')} only (#732)` };
+    reason: `${part}: the Spartan-6: ${S6_OPEN_STEPS.map(x => STEP_NAMES[x]).filter(Boolean).join(', ')}` };
 }
