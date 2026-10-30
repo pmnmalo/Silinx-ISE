@@ -8,7 +8,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
-import { newSourceWizardOf, pickSourceType, waitNewSourcePage } from './new-source-helpers.js';
+import { newSourceWizardOf, pickSourceType, waitNewSourcePage, addPort } from './new-source-helpers.js';
 import { compile, elaborate } from '../../core/compile.js';
 const IMPORT = process.env.SILINX_UI_INTERFACE === 'classic' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
@@ -237,7 +237,7 @@ uiTest('#2082 < Back on a wizard\'s first page: New Source again, the name and t
   await page.dialogButton('Wizard >');
   await page.waitDialog('Module Wizard');
   assert.equal(await h3(page), 'Inputs and Outputs');
-  await page.click('.dlg-overlay .mw-qa[data-port=clk]');
+  await addPort(page, 'clk');
   for (const t of ['Kind of Logic', 'Summary']) {
     await page.dialogButton('Next >');
     await page.waitFor((x) => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === x, [t], { what: t });

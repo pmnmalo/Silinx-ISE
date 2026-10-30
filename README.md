@@ -164,8 +164,7 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **Module Wizard** (*New Source ▸ Module (HDL) ▸ Wizard >*), for beginners: the name, the location and the
   language typed on New Source; the inputs, outputs and bidirectional ports
   in a friendly table (name, input/output/bidirectional, width — 1 is a single bit, N a bus N-1
-  downto 0 — and a description per port), with quick-add buttons for the usual ports (clk, reset,
-  enable, a/b [7:0], sw, btn, y, sum, q, led, seg, an, data [7:0] / sda bidirectional…) and checks (valid identifiers, no reserved word of the chosen language, no
+  downto 0 — and a description per port; only the user's own ports, added with *Add Port*) and checks (valid identifiers, no reserved word of the chosen language, no
   duplicates); the kind of logic: **combinational** (one assignment per output, or one process /
   `always @(*)` that reads every input with every output given a default — no latches) or
   **sequential** (clock, reset none / synchronous / asynchronous, active high or low, optional

@@ -277,9 +277,9 @@ for (const theme of ['dark', 'light']) {
         await page.waitFor(() => document.querySelector('.dlg-overlay .dlg-title span')?.textContent.endsWith('Wizard') && !/New Source/.test(document.querySelector('.dlg-overlay .dlg-title span').textContent));
         for (let p = 1; ; p++) {
           const title = await page.eval(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent || '');
-          // the Module Wizard: a port from the quick buttons; the Schematic Wizard (no quick buttons, #950): Add Port
-          // (the Boolean Algebra Wizard's page of that name: names typed, no port table)
-          if (title === 'Inputs and Outputs' && await page.eval(() => !!document.querySelector('.dlg-overlay .mw-add'))) await page.click(await page.eval(() => !!document.querySelector('.dlg-overlay .mw-qa')) ? '.dlg-overlay .mw-qa' : '.dlg-overlay .mw-add');
+          // a port: Add Port (no quick-add buttons, #950, #2145; the Boolean Algebra Wizard's page of that name: names
+          // typed, no port table)
+          if (title === 'Inputs and Outputs' && await page.eval(() => !!document.querySelector('.dlg-overlay .mw-add'))) await page.click('.dlg-overlay .mw-add');
           if (/Expected Outputs/.test(title)) {
             assert.ok(await page.eval(() => !!document.querySelector('.dlg-overlay th.th-drive')), 'the drive column of the bidirectional port');
             await page.click('.dlg-overlay .btn', { text: 'Fill Expected from Current Design' });
