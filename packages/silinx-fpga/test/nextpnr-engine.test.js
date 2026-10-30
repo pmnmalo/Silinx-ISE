@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
-import { nextpnrNetlist, NEXTPNR_CELL } from '../src/open-flow-nextpnr.js';
+import { nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
 import { parseXdl } from '../src/xdl.js';
 
 const fixture = name => new URL(`./fixtures/nextpnr-engine/${name}`, import.meta.url);
@@ -104,6 +104,32 @@ test('#2135 a counter with a carry chain and constants (Silinx\'s synthesis) bui
   const cfg = (attr, value) => design.insts.filter(i => i.cfg.some(c => c.attr === attr && c.value === value)).length;
   assert.equal(cfg('CYINIT', 'BX'), 1);
   assert.equal(cfg('CYINIT', 'CIN'), 11);
+});
+
+test('#2196 nextpnrTries: four placements at Normal up to 500 slices, one above; eight at High', () => {
+  assert.deepEqual(NEXTPNR_TRIES, { normal: 4, high: 8, maxSlices: 500 });
+  for (const [effort, slices, n] of [['normal', 1, 4], ['normal', 500, 4], ['normal', 501, 1], ['high', 1, 8], ['high', 4000, 8], [undefined, 100, 4]]) assert.equal(nextpnrTries(effort, slices), n);
+});
+
+test('#2196 --seed 5: placements from that seed on, each reported, the fastest kept; the design with no clock takes one', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fixture('counter.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('counter.ucf').pathname, '--out-dir', dir, '--engine', 'nextpnr', '--seed', '5'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  const tries = out.map(l => /^Placement (\d) of 4 \(seed (\d)\): ([0-9.]+) ns, 13 slices, in [0-9.]+ s\.$/.exec(l)).filter(Boolean);
+  assert.deepEqual(tries.map(m => [+m[1], +m[2]]), [[1, 5], [2, 6], [3, 7], [4, 8]]);
+  const fastest = Math.min(...tries.map(m => +m[3]));
+  const kept = out.map(l => /^Kept the fastest of 4 placements: seed (\d), ([0-9.]+) ns\.$/.exec(l)).find(Boolean);
+  assert.equal(+kept[2], fastest);
+  assert.equal(tries.find(m => +m[3] === fastest)[2], kept[1]);
+  // and the gates example, combinational: one placement, nothing to compare
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  fs.writeFileSync(path.join(dir2, 'gates.ucf'), ucf());
+  const out2 = [];
+  assert.equal(await main(['build', fixture('gates.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir2, 'gates.ucf'), '--out-dir', dir2, '--engine', 'nextpnr'], { out: l => out2.push(l), err: () => {} }), 0);
+  assert.deepEqual(out2.filter(l => /^(Placement|Kept)/.test(l)), []);
 });
 
 test('#2196 the VGA example built with --engine nextpnr: at most 157 slices as the packing fills them, no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
