@@ -194,7 +194,9 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
       continue;
     }
     const t = typeOf(pa.type.kind === 'ptr' ? pa.type.to : pa.type);
-    if (t && pa.type.kind !== 'array' && procs.some((p) => p.wires.some((x) => x.top === pa.name))) ports.push({ name: rn(pa.name), dir: 'in', w: t.w, role: 'arg', param: pa.name, s: t.s });
+    // (a scalar no process reads keeps its port, as Vitis HLS's and a top without DATAFLOW's, #1940; a pointer no process
+    // uses has none, as there)
+    if (t && pa.type.kind !== 'array' && (pa.type.kind !== 'ptr' || procs.some((p) => p.wires.some((x) => x.top === pa.name)))) ports.push({ name: rn(pa.name), dir: 'in', w: t.w, role: 'arg', param: pa.name, s: t.s });
   }
   const name = rn(checked.top);
   const src = file.split('/').pop();

@@ -33,7 +33,7 @@ const OUT = '51 61 71 81 \n';
 const PROCS = ['ap_split_s_U0 (task s)', 'ap_merge_m_U1 (task m)', 'pr_U2', 'id_U3 (task t0)', 'id_U4 (task t1)', 'ga_U5'];
 
 const PORTS = ['in_r_dout', 'in_r_empty_n', 'in_r_read', 'out_r_din', 'out_r_full_n', 'out_r_write', 'n'];
-// (an argument the region does not use: no port, as a region's in the top, #1707)
+// (an argument the region does not use keeps its port, as Vitis HLS's, #1940)
 const both = (top, what, procs = PROCS, ports = PORTS) => {
   const src = top + MAIN;
   assert.equal(simulateC(src, { file: 'd.cpp' }).output, OUT, what);
@@ -51,7 +51,7 @@ test('#1931 a DATAFLOW region in a function the top calls alone: made as the top
   both(H + REGION('inner') + TOP('  inner(in, out, n);'), 'one call');
   both(H + REGION('inner') + 'void mid(hls::stream<int>& x, hls::stream<int>& y, int k) { inner(x, y, k); return; }\n' + TOP('  mid(in, out, n);\n  return;'), 'two calls');
   // (its parameter given a constant: the constant, the top's n a port not used)
-  both(H + REGION('inner') + TOP('  inner(in, out, 5);'), 'a constant given', PROCS, PORTS.slice(0, -1));
+  both(H + REGION('inner') + TOP('  inner(in, out, 5);'), 'a constant given');
 });
 
 test('#1931 a function template\'s instance holding the region (N its parameter, #1898): made as the top\'s processes; co-simulated in VHDL and Verilog', () => {
@@ -72,7 +72,7 @@ ${TOP('  inner<2>(in, out, n);')}`;
 });
 
 test('#1931 a variable of the region never changed: its value, as Vitis HLS folds it; changed, or another shape: said, as an error (a region of streams cannot be made sequential)', () => {
-  both(H + REGION('inner', '  int K = 5;\n', 'K') + TOP('  inner(in, out, n);'), 'a variable never changed', PROCS, PORTS.slice(0, -1));
+  both(H + REGION('inner', '  int K = 5;\n', 'K') + TOP('  inner(in, out, n);'), 'a variable never changed');
   const errors = (src) => say(cToHdl(src, { file: 'd.cpp' }).diagnostics.filter((d) => d.severity === 'error'));
   assert.deepEqual(errors(H + REGION('dut', '  int K = 5;\n  K++;\n', 'K') + MAIN),
     ["10 error: #pragma HLS DATAFLOW: the region has 'K': only streams and arrays are declared in a DATAFLOW region: its streams are FIFOs between processes, so it cannot be made sequential"]);
@@ -102,4 +102,55 @@ int main() { int a[4] = {1, 2, 3, 4}, c[4]; dut(a, c); for (int i = 0; i < 4; i+
     assert.deepEqual([r.errors, r.pass, r.output], [[], true, '2 5 10 17 \n'], JSON.stringify(r.mismatches, big));
     assert.equal(r.gen.report.processes, undefined);
   }
+});
+
+// #1940: an argument of the top that no process reads keeps its port (a scalar, ap_none), directly or when the top calls the region with a constant
+for (const [what, top] of [
+  ['the region in the top', `void dut(hls::stream<int>& a, hls::stream<int>& b, int n) {
+  hls::stream<int> s;
+#pragma HLS dataflow
+  ga(a, s);
+  ga(s, b);
+}
+`],
+  ['the region called with a constant', `void inner(hls::stream<int>& a, hls::stream<int>& b, int n) {
+  hls::stream<int> s;
+#pragma HLS dataflow
+  ga(a, s);
+  ga(s, b);
+}
+void dut(hls::stream<int>& a, hls::stream<int>& b, int n) { inner(a, b, 3); }
+`],
+]) {
+  const src = `${H}${top}int main() {
+  hls::stream<int> a, b;
+  for (int i = 0; i < 4; i++) a.write(i);
+  dut(a, b, 7);
+  for (int i = 0; i < 4; i++) printf("%d\\n", b.read());
+  return 0;
+}
+`;
+  for (const lang of ['vhdl', 'verilog']) {
+    test(`DATAFLOW, ${what}: a scalar argument no process reads keeps its port (${lang}, #1940)`, () => {
+      const g = cToHdl(src, { file: 'd.cpp', lang, top: 'dut' });
+      assert.equal(g.ok, true);
+      assert.deepEqual(say(g.diagnostics), []);
+      const n = g.ports.filter((p) => p.name === 'n');
+      assert.deepEqual(n.map((p) => [p.dir, p.w]), [['in', 32]]);
+      const r = cosimulate(src, { file: 'd.cpp', lang });
+      assert.deepEqual([r.errors, r.pass, r.output, say(r.gen.diagnostics)], [[], true, simulateC(src, { file: 'd.cpp' }).output, []], JSON.stringify(r.mismatches, big));
+    });
+  }
+}
+
+test('DATAFLOW: a pointer no process uses has no port, as a top without DATAFLOW (#1940)', () => {
+  const g = cToHdl(`${H}void dut(hls::stream<int>& a, hls::stream<int>& b, int *n) {
+  hls::stream<int> s;
+#pragma HLS dataflow
+  ga(a, s);
+  ga(s, b);
+}
+`, { file: 'd.cpp', top: 'dut' });
+  assert.equal(g.ok, true);
+  assert.deepEqual(g.ports.filter((p) => p.name === 'n'), []);
 });
