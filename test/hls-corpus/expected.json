@@ -486,7 +486,11 @@
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 4,
+      "max": 4,
+      "avg": 4
+    },
     "reason": null
   },
   "modeling-using-array-stencil-1d": {

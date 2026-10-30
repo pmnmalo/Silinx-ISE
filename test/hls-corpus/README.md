@@ -75,7 +75,7 @@ Not part of `npm test` (it needs the network once).
 | modeling-fixed-point-sqrt | C++ | pass | pass | pass | - |  |
 | modeling-free-running-kernel-remerge-ii4to1 | C++ | pass | pass | pass | 80 |  |
 | modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | 18 |  |
-| modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | - |  |
+| modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | 4 |  |
 | modeling-using-array-stencil-1d | C++ | pass | pass | pass | 29803 |  |
 | modeling-using-array-stencil-2d | C++ | fail | fail | skip | - | C simulation: test.cpp:19: the header 'malloc.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | modeling-using-cpp-templates | C++ | pass | pass | pass | 2 |  |
