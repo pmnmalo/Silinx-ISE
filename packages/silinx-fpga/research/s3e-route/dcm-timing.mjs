@@ -68,7 +68,7 @@ const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.silinx', 'confi
 if (!cfg.host) throw new Error('~/.silinx/config.json: no ssh host (the ISE machine)');
 // (SILINX_ISE_HOST=user@host: another address of the same machine, e.g. away from its network)
 const host = process.env.SILINX_ISE_HOST || `${cfg.user ? `${cfg.user}@` : ''}${cfg.host}`;
-const sshArgs = ['-o', 'BatchMode=yes', ...(cfg.port && cfg.port !== 22 ? ['-p', String(cfg.port)] : [])];
+const sshArgs = ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=4', '-o', 'ConnectTimeout=30', ...(cfg.port && cfg.port !== 22 ? ['-p', String(cfg.port)] : [])];
 const ssh = cmd => execFileSync('ssh', [...sshArgs, '--', host, `export PATH="$PATH:/usr/local/bin"; ${cmd}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
 const send = path.join(outDir, 'send');
 fs.rmSync(send, { recursive: true, force: true });

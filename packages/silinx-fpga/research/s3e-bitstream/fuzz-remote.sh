@@ -10,9 +10,9 @@ W=${W:-/tmp/claude-501/bg}; RW=${RW:-silinx-fuzz}
 # (an absolute RW, e.g. under /Users/Shared/silinx-ise/build where Docker Desktop shares folders, #482; else in the home)
 case "$RW" in /*) MNT=$RW ;; *) MNT='$HOME/'$RW ;; esac
 OPTS=(); while [[ "$1" == -* ]]; do OPTS+=("$1"); [[ "$1" == -P || "$1" == -g ]] && { OPTS+=("$2"); shift; }; shift; done
-SSH=(ssh -o BatchMode=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=10 "$SILINX_FUZZ_HOST")
+SSH=(ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30 "$SILINX_FUZZ_HOST")
 "${SSH[@]}" "mkdir -p $RW"
-rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=10" "$(dirname "$0")/run-many.sh" "$SILINX_FUZZ_HOST:$RW/"
+rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30" "$(dirname "$0")/run-many.sh" "$SILINX_FUZZ_HOST:$RW/"
 # The results an earlier run left in RW (run-many.sh skips a design whose .bit is there) are reused,
 # and copied back below, only for the same input: a design whose .xdl there differs from the local
 # one, or has none here, loses its .xdl, .bit and logs there first (a run resumed after the local
@@ -25,13 +25,13 @@ for d in "$@"; do
   stale=$(LC_ALL=C comm -13 <(echo "$here") <(echo "$there") | awk 'NF { sub(/\.xdl$/, "", $3); print $3 }')
   [ -z "$stale" ] || "${SSH[@]}" "cd $RW/$d && for b in $(echo $stale); do rm -f \"\$b\".xdl \"\$b\".bit \"\$b\".crc.bit \"\$b\".*log \"\$b\".ncd \"\$b\".crc.ncd; done"
   n=$("${SSH[@]}" "ls $RW/$d" | grep '\.bit$' | grep -vc '\.crc\.bit$' || true); reused=$((reused + n))
-  rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=10" --include='*.xdl' --exclude='*' "$W/$d/" "$SILINX_FUZZ_HOST:$RW/$d/"
+  rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30" --include='*.xdl' --exclude='*' "$W/$d/" "$SILINX_FUZZ_HOST:$RW/$d/"
 done
 [ "$reused" = 0 ] || echo "$reused results of an earlier run reused (same .xdl)"
 start=$(date +%s)
 "${SSH[@]}" "export PATH=\"\$PATH:/usr/local/bin\"; docker run --rm --network none -v \"$MNT\":/w xilinx/ise:14.7 bash /w/run-many.sh ${OPTS[*]} $(printf '/w/%s ' "$@")" | grep -v '^DONE' || true
 for d in "$@"; do
-  rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=10" --include='*.bit' --include='*log' --exclude='*' "$SILINX_FUZZ_HOST:$RW/$d/" "$W/$d/"
+  rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30" --include='*.bit' --include='*log' --exclude='*' "$SILINX_FUZZ_HOST:$RW/$d/" "$W/$d/"
   "${SSH[@]}" "rm -f $RW/$d/*.ncd"
 done
 echo "$(ls $(printf "$W/%s/*.xdl " "$@") | wc -l | tr -d ' ') designs, $(( $(date +%s) - start )) s"

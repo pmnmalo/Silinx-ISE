@@ -6,7 +6,7 @@
 # longest paths; each clock's period on a line of its own), reportgen -delay (routed.dly: the delay of every connection). Compare ISE's .bit with Silinx's: research/s3e-bitstream/check-writer.mjs.
 # Remote run (the host only on the command line, never in a file):
 #   rsync -a <scratch>/{blinky,pong} "$SILINX_ISE_HOST:silinx-route/open/"
-#   ssh -o BatchMode=yes "$SILINX_ISE_HOST" 'export PATH="$PATH:/usr/local/bin"; docker run --rm \
+#   ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30 "$SILINX_ISE_HOST" 'export PATH="$PATH:/usr/local/bin"; docker run --rm \
 #     -v "$HOME/silinx-route":/w xilinx/ise:14.7 bash /w/ise-open-check.sh /w/open blinky pong'
 source /opt/Xilinx/14.7/ISE_DS/settings64.sh >/dev/null 2>&1
 cd "$1" || exit 1

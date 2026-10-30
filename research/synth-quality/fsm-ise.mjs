@@ -96,7 +96,7 @@ async function main(argv) {
     for (const d of dirs) { fs.mkdirSync(path.join(tdir, d), { recursive: true }); fs.copyFileSync(path.join(routed, d, 'routed.xdl'), path.join(tdir, d, 'routed.xdl')); }
     fs.copyFileSync(path.join(ROOT, 'packages/silinx-fpga/research/s3e-route/ise-open-check.sh'), path.join(tdir, 'ise-open-check.sh'));
     const host = `${userCfg.ssh.user ? `${userCfg.ssh.user}@` : ''}${userCfg.ssh.host}`;
-    const sshArgs = ['-o', 'BatchMode=yes', ...(userCfg.ssh.port && userCfg.ssh.port !== 22 ? ['-p', String(userCfg.ssh.port)] : [])];
+    const sshArgs = ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=4', '-o', 'ConnectTimeout=30', ...(userCfg.ssh.port && userCfg.ssh.port !== 22 ? ['-p', String(userCfg.ssh.port)] : [])];
     const ssh = cmd => execFileSync('ssh', [...sshArgs, '--', host, `export PATH="$PATH:/usr/local/bin"; ${cmd}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
     const remote = `silinx-compare/${path.basename(work)}`;
     ssh(`rm -rf ${remote} && mkdir -p ${remote}`);

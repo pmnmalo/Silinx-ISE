@@ -45,7 +45,7 @@ end rtl;
 const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.silinx', 'config.json'), 'utf8')).ssh || {};
 if (!process.env.SILINX_ISE_HOST && !cfg.host) throw new Error('~/.silinx/config.json: no ssh host (the ISE machine)');
 const host = process.env.SILINX_ISE_HOST || `${cfg.user ? `${cfg.user}@` : ''}${cfg.host}`;
-const ssh = cmd => execFileSync('ssh', ['-o', 'BatchMode=yes', '--', host, `export PATH="$PATH:/usr/local/bin"; ${cmd}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
+const ssh = cmd => execFileSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=4', '-o', 'ConnectTimeout=30', '--', host, `export PATH="$PATH:/usr/local/bin"; ${cmd}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
 const send = path.join(outDir, 'send'); fs.rmSync(send, { recursive: true, force: true }); fs.mkdirSync(send, { recursive: true });
 for (const v of variants) {
   const d = DEV[v.dev || 'basys2'];
