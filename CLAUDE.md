@@ -119,7 +119,9 @@ the code and the lessons learnt.
 - **The changelog**: every change adds its own fragment, `changes/<issue>-<slug>.md`, and never edits
   CHANGELOG.md (whose edits made every pull request conflict): an optional "In short:" list (what users
   notice) and the "In detail:" list (the change, with its issue number). The format is in
-  [changes/README.md](changes/README.md); `test/changelog-fragments.test.js` checks it.
+  [changes/README.md](changes/README.md); `test/changelog-fragments.test.js` checks it. A change to the
+  toolchain's package adds its fragment to `packages/silinx-fpga/changes/` (its own changelog and versions, #1681:
+  [its README](packages/silinx-fpga/changes/README.md)), and one to `changes/` too when the IDE's users notice it.
 - **Releases**, only when asked:
   1. `node scripts/changelog-release.mjs X`: the fragments assembled into CHANGELOG.md's `## X` section and
      deleted; edit the section if needed (an introduction, a shorter "In short:");
