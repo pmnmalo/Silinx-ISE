@@ -7,6 +7,7 @@
 //   cToHdl(source, { file, lang: 'vhdl' | 'verilog' }) -> { ok, hdl, top, ports, diagnostics, sequential, report }
 //     ports: [{ name, dir, w }] in the module's order (the block protocol's first, as Vitis HLS)
 import { checkC } from './c-check.js';
+import { axisArgs, axisTop } from './c-axis.js';
 import { dataflow } from './c-dataflow.js';
 import { portOf, renamedWhy } from './c-names.js';
 import { scheduled } from './c-schedule.js';
@@ -28,10 +29,19 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
 // name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
 // threshold of the loops pipelined automatically, 0 none, #1919)
-export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7' } = {}) {
+export function cToHdl(source, opts = {}) {
+  const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true } = opts;
   const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+  if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...checked.diagnostics] };
+  // (AXI4-Stream ports around the module, #1894: none for a DATAFLOW process's, nor for the ASM chart's, core/c-asm.js)
+  const names = axis && !module && !flat ? axisArgs(checked, file) : new Map();
+  if (!names.size) return fromChecked(source, checked, opts);
+  const gen = fromChecked(source, checked, { ...opts, module: `${portOf(checked.top)}_core` });
+  return gen.ok ? axisTop(gen, names, lang, new Set((checked.ast.structArgs?.get(checked.top) || []).filter((a) => a.axis).map((a) => a.name))) : gen;
+}
+
+function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7' } = {}) {
   const diagnostics = [...checked.diagnostics];
-  if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
   foldTables(checked);
   const flatErrs = [];
