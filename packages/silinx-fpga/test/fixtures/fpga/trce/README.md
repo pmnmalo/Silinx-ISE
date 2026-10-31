@@ -34,3 +34,7 @@ onto general routing (research/s3e-route/clock-detour.mjs --reroute, seed 1), an
 trce's minimum period for it and its worst hold path (the two flip-flops, slack -0.659 ns: a hold violation);
 `blinky-clock-detour-trce.json` has its worst hold path too (0.032 ns). test/fpga-ff-hold.test.js checks the hold check
 of two flip-flops against them.
+
+`blinky-carry.xdl.gz` (#2286): Silinx's routing of examples/blinky (seed 1, before #2286's delays), and
+`blinky-carry-trce.json`: trce's minimum period for it (7.075 ns), its critical path through a carry chain's CIN -> XB;
+test/fpga-slice-delays.test.js checks the period and the slice's delays through the carry against trce's.

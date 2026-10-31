@@ -139,9 +139,9 @@ endmodule
 
 // #651: the polish's two more moves, the whole net of a critical connection routed again (polishNet) and
 // the lookahead when no change gains; on CE64's placements (by the analysis, with the LUT inputs' delays by
-// pin, #1359): seed 19, the router as before 5.344 ns, the whole-net move 5.114; the lookahead on the first of
-// seeds 2, 14, 7 where it gains (on macOS 5.914 -> 5.499 on seed 2; Linux's placement of seed 2 differs, and the
-// lookahead gains nothing there); never longer, the routing legal and complete
+// pin, #1359; the carry's XOR and XB delays trce's, #2286): seed 25, the router as before 5.434 ns, the whole-net move
+// 5.149; the lookahead on the first of seeds 6, 28, 8 where it gains (on macOS 5.742 -> 5.496 on seed 6; a placement
+// may differ on Linux, as seed 2's did before); never longer, the routing legal and complete
 test('routeDesign: the polish routes a critical connection\'s whole net again, and looks ahead when stuck (#651)', { timeout: 300000 }, async () => {
   const r = await synthesizeOpen(elaborate(compile([{ path: 'ce64.v', lang: 'verilog', text: CE64 }]), 'ce64'), { run: yosysNode });
   assert.deepEqual(r.warnings, []);
@@ -163,12 +163,12 @@ test('routeDesign: the polish routes a critical connection\'s whole net again, a
     return { before: route({ polishNet: false, lookahead: 0 }), net: route({ lookahead: 0 }), look: route({ polishNet: false }), both: route({}) };
   };
   const never = p => { for (const k of ['net', 'look', 'both']) assert.ok(p[k] <= p.before + 1e-9, `${k} ${p[k].toFixed(3)} ns, before ${p.before.toFixed(3)} ns`); };
-  const s19 = periods(19);
-  never(s19);
-  assert.ok(s19.net <= s19.before - 0.15, `seed 19: the whole net again ${s19.net.toFixed(3)} ns, before ${s19.before.toFixed(3)} ns`);
-  assert.ok(s19.both <= s19.before - 0.15);
+  const s25 = periods(25);
+  never(s25);
+  assert.ok(s25.net <= s25.before - 0.15, `seed 25: the whole net again ${s25.net.toFixed(3)} ns, before ${s25.before.toFixed(3)} ns`);
+  assert.ok(s25.both <= s25.before - 0.15);
   const tried = [];
-  for (const seed of [2, 14, 7]) {
+  for (const seed of [6, 28, 8]) {
     const p = periods(seed);
     never(p);
     tried.push(`seed ${seed} ${p.before.toFixed(3)} -> ${p.look.toFixed(3)} ns`);
@@ -339,10 +339,11 @@ test('the XC3S1200E\'s long-line splitters (#23, #709): the router takes one whe
   const { example, exampleUcf } = await import('./examples-lib.mjs');
   const { bitgen, pipFeatures } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
   const part = 'xc3s1200efg320-4';
-  // the traffic example (blinky's routing took none once the LUT inputs' delays were by pin, #1359)
-  const ex = example('traffic');
+  // the stopwatch example (blinky's routing took none once the LUT inputs' delays were by pin, #1359; traffic's none
+  // once the carry's delays were trce's, #2286)
+  const ex = example('stopwatch');
   const r = await synthesizeOpen(elaborate(compile(ex.design), ex.project.top), { run: yosysNode });
-  const ucf = exampleUcf('traffic', { board: 'nexys2', variant: '1200' }).text;
+  const ucf = exampleUcf('stopwatch', { board: 'nexys2', variant: '1200' }).text;
   const netlist = readYosysJson(r.files[`${ex.project.top}.json`]);
   const packed = pack(netlist, { ucf, part });
   const device = loadDeviceCache(part);

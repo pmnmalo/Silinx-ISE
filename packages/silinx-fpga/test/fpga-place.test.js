@@ -277,9 +277,10 @@ test('the random generator is deterministic and uniform enough', () => {
 test('the placer\'s results are pinned: the same placements as before its speed-up (#55)', async () => {
   const crypto = await import('node:crypto');
   const table = { at: (dc, dr) => 0.2 + 0.3 * Math.abs(dc) + 0.4 * Math.abs(dr) };
+  // (#2286: counter's and srmux's again, with trce's delays of the carry chain's XORs and XB)
   const pinned = [
-    ['counter', 'timing', '378845fe4f6266db'], ['counter', 'table', '453f1001a64db383'], ['counter', 'wirelength', '378845fe4f6266db'],
-    ['srmux', 'timing', '589ba1b25aae701d'], ['srmux', 'table', '6715a464492ffd22'], ['srmux', 'wirelength', '1e4c8bf9e4448ee0'],
+    ['counter', 'timing', '6d0d553d3d13b6f9'], ['counter', 'table', '2c2cc36b7d5dcee3'], ['counter', 'wirelength', '6d0d553d3d13b6f9'],
+    ['srmux', 'timing', '00a194bf6960659c'], ['srmux', 'table', 'e320894e96b1b229'], ['srmux', 'wirelength', '1e4c8bf9e4448ee0'],
     ['mux64', 'timing', '44dc651659491f3c'], ['widemux', 'timing', 'b68a6883bd9ee4f0'], ['sw', 'timing', 'da05e2411ddab670'],
   ];
   const opts = { timing: {}, table: { delays: table }, wirelength: { timing: 0 } };

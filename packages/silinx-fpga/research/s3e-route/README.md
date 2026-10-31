@@ -610,6 +610,13 @@ pad-to-pad figures.
   flip-flops counts the skew too (fitted to trce's hold paths in #2226, below).
 - **trce's minimum delays** are 0.751 (`minScale`) of the model's: the slope of the inputs' hold against the model's
   shortest data paths.
+- **A slice's ways through the carry chain's XORs and onto XB** (#2286) are trce's own maximum delays, read from the
+  setup paths of the nine routings of #2224 (their "Maximum Data Path"): Topx 1.060 / 1.118, Togy (trce's Topgy) 1.231
+  / 1.288, Topy 1.641 / 1.732, Topcyf 1.162, Topcyg 1.001 / 1.131 (from a LUT pin; the model had 0.953 / 0.888 there),
+  Tdick 0.308 / 0.360, Tbxy 1.676 (SLICEM); XB (#591): Tcinxb 0.495 (the model had half of CIN -> COUT, 0.065), Topxb
+  1.344, from the carry's data input 1.135 (a LUT pin) / 1.288 (BX), on the SLICEM, the SLICEL's taken the same. The
+  periods of designs with carry chains follow trce's: blinky routed by Silinx 6.607 -> 7.037 ns (trce 7.075), by
+  nextpnr 6.659 -> 7.089 (7.051); stopwatch's unchanged.
 - **The hold check of two flip-flops** (#2226) is trce's hold path: the data's earliest arrival at the end's pin plus
   the end's hold margin, less the clock's skew from the launching flip-flop to it (#2224). trce's earliest delays are
   0.80 of the model's in every logic arc of its hold paths (clock-to-out, LUT, carry, a block RAM's clock to out:

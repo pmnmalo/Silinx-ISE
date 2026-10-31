@@ -1,0 +1,4 @@
+{
+ "source": "examples/blinky placed and routed by Silinx (seed 1, XC3S250E-CP132), trce of ISE 14.7 on it (#2286): its minimum period, the critical path through the carry chain's XORs",
+ "period": 7.075
+}
