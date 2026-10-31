@@ -25,7 +25,11 @@ async function choose(page, file, lang) {
   await page.dialogButton('OK');
   await page.waitNoDialog();
 }
-const linked = (page, hdl) => page.waitFor((h) => window.Silinx.hdlToSch?.[h], [hdl], { what: `${hdl} linked` });
+// (linked, and the project read again to the end: a dialog opened while it is read works on the project before it)
+const linked = async (page, hdl) => {
+  await page.waitFor((h) => window.Silinx.hdlToSch?.[h], [hdl], { what: `${hdl} linked`, timeout: 15000 });
+  await page.eval(async () => { let c; do { c = window.Silinx.reloadChain; await c; } while (c !== window.Silinx.reloadChain); });
+};
 const errors = (page) => page.eval(() => (window.Silinx.lib?.errors || []).filter((e) => e.severity === 'error' || e.severity === 'warning').map((e) => e.message));
 
 uiTest('#2254 #2255 Source Properties: a drawn source\'s language: its own kept when the project\'s changes, back to the project\'s; the HDL by hand as it is; no View Association; kept on reopening', E, async (page) => {
@@ -72,6 +76,8 @@ uiTest('#2254 #2255 Source Properties: a drawn source\'s language: its own kept 
   });
   await page.dialogButton('OK');
   await page.waitNoDialog();
+  // (the project read again: its last message)
+  await page.waitConsole(/Preferred Language: Verilog \(1 drawing\(s\) now in it, their HDL made again in it\)\.\n.*Device set to/);
   await linked(page, 'src/lamps.v');
   assert.deepEqual([exists('src/traffic.vhd'), exists('src/lamps.v')], [true, true]);
   // back to the project's: its language, and no own one left
