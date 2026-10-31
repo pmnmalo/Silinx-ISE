@@ -3,7 +3,7 @@
 // (pin2ucf) and the power estimate (#123).
 import { ESTIMATE_ERROR_PERCENT, estimatePower, powerReport } from './power.js';
 import { checkCross, checkOffsets, checkPeriods, clockPort, parseOffsets, switchingLine, timingReport } from './fpga/timing.js';
-import { parseUcf, pinsUcf } from './ucf.js';
+import { pinsUcf } from './ucf.js';
 import { parseXdl, placedPins } from './xdl.js';
 import { StepError } from './open-flow-core.js';
 
@@ -12,13 +12,13 @@ import { StepError } from './open-flow-core.js';
  *  (open-flow-backends.js, #2360). */
 export function mountFlowReports(ctx) {
   const {
-    io, spec, log, report, reports, routedOrEarlier, routedText, top, ucfText
+    io, spec, log, report, reports, routedOrEarlier, routedText, top, constraints: model
   } = ctx;
 
   function runTiming() {
     routedOrEarlier();
     const design = parseXdl(routedText());
-    const pu = ucfText ? parseUcf(ucfText) : { clocks: [], other: [] };
+    const pu = model() || { clocks: [], other: [] };
     const constraints = pu.clocks || [];
     // (the PERIOD constraints: a DCM's clocks' phases at the pads, #601)
     const sta = reports.analyze(design, io.device(), { clocks: constraints });
@@ -81,7 +81,7 @@ export function mountFlowReports(ctx) {
     if (text == null) throw new StepError('no placed design: run Place & Route first', [], '');
     const pins = placedPins(parseXdl(text));
     let locs = {};
-    try { if (ucfText) locs = parseUcf(ucfText).assignments; } catch { /* checked by translate */ }
+    try { locs = model()?.assignments ?? locs; } catch { /* checked by translate */ }
     const given = new Set(Object.keys(locs).filter(k => locs[k].loc).map(k => k.toLowerCase()));
     const chosen = pins.filter(p => !given.has(p.net.toLowerCase())).length;
     io.write(`${top}_pins.ucf`, pinsUcf(pins, { header: `Pin locations of '${top}' on ${spec.part}: the pads of the placed design (Silinx toolchain), as Xilinx pin2ucf writes them` }));
@@ -93,7 +93,7 @@ export function mountFlowReports(ctx) {
   function runPower() {
     routedOrEarlier();
     let periods = [];
-    try { if (ucfText) periods = parseUcf(ucfText).clocks || []; } catch { /* checked by translate */ }
+    try { periods = model()?.clocks || periods; } catch { /* checked by translate */ }
     const est = estimatePower(parseXdl(routedText()), { device: spec.device, periods });
     io.write(`${top}.pwr`, powerReport(est, { top, part: spec.part, errorPercent: ESTIMATE_ERROR_PERCENT }));
     report.power = { totalMw: est.totalMw, dynamicMw: est.dynamicMw, staticMw: est.staticMw, junctionC: est.junctionC, estimate: true };

@@ -118,11 +118,11 @@ The plan is in #1953 and #2315. For the open toolchains:
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
 | Xilinx 7-series | to be defined | nextpnr in the fork | to be written in JavaScript | to be defined | A spike first (#2305) |
 
-Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. Still
+Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. The
+constraints are one model (`constraints.js`, #2385): the back end says its format, a reader and a writer, UCF by default; the
+other formats are #2296. Still
 missing before iCE40 (#2360):
 
-- **A neutral constraints model (#2385).** `ucfText` and `parseUcf` are in the flow today; UCF, PCF, LPF and CST should be
-  readers and writers of one model.
 - **The synthesis by family (#2386).** `synth` is a hook today; the commands are `synth_xilinx`'s, and a family's `FAMILY_INFO`
   entry has fields only Xilinx families have (`xise`, `pm`).
 - **The steps by family (#2387).** They have ISE's names (`translate`, `trce`), and the back end does not yet say which it has.

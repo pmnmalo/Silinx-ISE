@@ -5,7 +5,7 @@
 //   io.log(line)                       a line of the log (the console)
 //   io.sources()                       [{ path, lang, text }] of the design
 //   io.simSources()                    those of the simulation (the test benches), for the simulation models (optional)
-//   io.ucf                             the constraints' text, or null
+//   io.ucf                             the constraints' text, in the back end's format (UCF for the Xilinx families), or null
 //   io.ucfName                         the constraints file's name (for the log)
 //   io.device()                        the device description (fpga/device.js Device), loaded once
 //   io.bitDb()                         the bit database (fpga/bitdb.js makeBitDb), loaded once
@@ -31,7 +31,7 @@
 // Returns { ok, report }.
 import { synthesizeVerilog, cellCounts, DEEP_RULE } from './synth-open.js';
 import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
-import { parseUcf } from './ucf.js';
+import { UCF, readConstraints } from './constraints.js';
 import { readYosysJson } from './fpga/netlist.js';
 import { effortTries, effortExtra } from './fpga/place-route.js';
 import { knownRouting } from './fpga/bitgen.js';
@@ -80,9 +80,12 @@ export async function runFlow(spec, io) {
   const parTries = slices => effortTries(spec.synthEffort, slices);
   // and the placements more at High, each routed only when its estimate is promising (#651)
   const parExtra = () => effortExtra(spec.synthEffort);
-  const ucfText = io.ucf || null;
   let synth = null, netlist = null, netlistText = null;
   const backend = backendOf(spec.family);
+  // the constraints, read when a step asks, in the back end's format (constraints.js, #2385)
+  const format = backend.constraints || UCF;
+  let model;
+  const constraints = () => (model === undefined ? (model = readConstraints(format, io.ucf, io.ucfName)) : model);
 
   async function runSynth() {
     const t = now();
@@ -145,7 +148,7 @@ export async function runFlow(spec, io) {
   const { runPostMap, runPostPar, runPostSynth, runPostTranslate } = (io.simModels || noSimModels)({
     io, spec, knownPips, log, netlist: () => netlist, packed: () => impl.packed?.() ?? null, parTries, parExtra, report,
     routedOrEarlier: (...a) => impl.routedOrEarlier(...a), routedText: () => impl.routedText(), step, synth: () => synth, top,
-    ucfText
+    constraints
   });
 
   function runTranslate() {
@@ -154,15 +157,15 @@ export async function runFlow(spec, io) {
     if (text == null) throw new StepError('no netlist: run Synthesize first', [], '');
     netlist = readYosysJson(text);
     netlistText = text;
-    let ucf = { assignments: {}, clocks: [] };
-    try { if (ucfText) ucf = parseUcf(ucfText); } catch (e) { throw new StepError(`the constraints cannot be read: ${e.message}`, [], 'Fix the constraints (Check Constraints).'); }
-    const locs = Object.values(ucf.assignments || {}).filter(a => a.loc).length;
-    log(`Netlist of <${top}> read; constraints: ${ucfText ? `${io.ucfName || 'the UCF'}, ${locs} pin location(s), ${(ucf.clocks || []).length} PERIOD constraint(s)` : 'none'}.`);
+    let ucf = null;
+    try { ucf = constraints(); } catch (e) { throw new StepError(`the constraints cannot be read: ${e.message}`, [], 'Fix the constraints (Check Constraints).'); }
+    const locs = Object.values(ucf?.assignments || {}).filter(a => a.loc).length;
+    log(`Netlist of <${top}> read; constraints: ${ucf ? `${io.ucfName || `the ${format.id.toUpperCase()}`}, ${locs} pin location(s), ${(ucf.clocks || []).length} PERIOD constraint(s)` : 'none'}.`);
   }
 
   // the family's Map, Place & Route, timing and bitstream (open-flow-backends.js, #2360); the routed design is the back
   // end's, in its format: the steps after Place & Route read it, or an earlier run's (#2384)
-  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, top, knownPips, parTries, parExtra, ucfText, StepError });
+  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, top, knownPips, parTries, parExtra, constraints, StepError });
   const { bitfile, runPins, runPower, runTiming } = impl;
 
   let steps = spec.steps;

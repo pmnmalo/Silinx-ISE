@@ -10,16 +10,16 @@ import { overResources, overMessage } from './resource-check.js';
 
 /**
  * { runMap, runPar, packed } of runFlow for the Spartan-3E. ctx: { io, spec, log, report, util, now, ms, netlist (a getter),
- * knownPips, parTries, parExtra, ucfText, StepError, setRouted (the routed design's text, for the reports and the bitstream) }.
+ * knownPips, parTries, parExtra, constraints, StepError, setRouted (the routed design's text, for the reports and the bitstream) }.
  */
 export function mountS3eSteps(ctx) {
-  const { io, spec, log, report, util, now, ms, knownPips, parTries, parExtra, ucfText, StepError, setRouted } = ctx;
+  const { io, spec, log, report, util, now, ms, knownPips, parTries, parExtra, constraints, StepError, setRouted } = ctx;
   let packed = null;
 
   function runMap() {
     const t = now();
     try {
-      packed = pack(ctx.netlist(), { ucf: ucfText, part: spec.part });
+      packed = pack(ctx.netlist(), { ucf: constraints(), part: spec.part });
     } catch (e) { throw new StepError(`packing failed: ${e.message}`); }
     for (const w of packed.warnings || []) log(`WARNING:Pack - ${w}`);
     const items = mapReport();
@@ -64,7 +64,7 @@ export function mountS3eSteps(ctx) {
     const tried = [], placeWarned = new Set();
     try {
       pr = (io.placeRoute || placeRouteBest)(ctx.netlist(), packed, d, k, {
-        seed: spec.seed || 1, tries: parTries(packed.stats.slices), extra: parExtra(), effort: spec.effort || 1, replicate: spec.replicate !== false, routeIterations: spec.routeIterations || null, pack: { ucf: ucfText, part: spec.part },
+        seed: spec.seed || 1, tries: parTries(packed.stats.slices), extra: parExtra(), effort: spec.effort || 1, replicate: spec.replicate !== false, routeIterations: spec.routeIterations || null, pack: { ucf: constraints(), part: spec.part },
         onRouted: (p, info) => {
           if (info.replication) return;
           if (!info.retry) tried.push(p);
