@@ -81,7 +81,7 @@ int main(void) {
 }
 `;
 
-uiTest('#1531 a C module\'s processes (C Synthesis (HLS)): View C Synthesis Report (the module, its ports, its memories, each loop\'s II), C Simulation and C/RTL Co-simulation, in both views; Portuguese', E, async (page) => {
+uiTest('#1531 a C module\'s processes (C Synthesis (HLS)): View C Synthesis Report (the module, its ports, its memories, each loop\'s II, its multipliers), C Simulation and C/RTL Co-simulation, in both views; Portuguese', E, async (page) => {
   await makeProject(env, { name: 'CProc', top: 'sum', files: { 'src/sum.c': SUM } });
   await page.openProject('CProc');
   await page.showMessages();
@@ -94,6 +94,8 @@ uiTest('#1531 a C module\'s processes (C Synthesis (HLS)): View C Synthesis Repo
   assert.match(log, /Memories:\n {2}a {16}8 x 32 bits, ap_memory \(outside the module\)\n/);
   // (the second loop pipelined automatically, as Vitis HLS does, #1919)
   assert.match(log, /Loops:\n {2}line 4 {4}8 iterations; II=2, 17 cycles; pipelined, II=1 asked\n {2}line 8 {4}4 iterations; II=1, 5 cycles; pipelined automatically, as Vitis HLS does\n/);
+  // (its multiplication a unit, #2125: its widths, its blocks, its uses)
+  assert.match(log, /\nMultipliers: 1 unit, \d+ multiplier blocks?\n {2}mul_0 {11}\d+ x \d+ bits, \d+ blocks?; 1 use, 1 input multiplexed\n/);
   assert.match(log, /WARNING:SilinxC - "src\/sum\.c" line 4: #pragma HLS PIPELINE II=1: II=2 made \(it accesses a memory, an access a state\)/);
   await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
   await page.waitConsole(/Process "C Simulation" completed successfully/);
