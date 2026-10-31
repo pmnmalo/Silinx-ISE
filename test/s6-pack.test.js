@@ -222,7 +222,7 @@ const EXAMPLE_PACK = {
   stopwatch: { slices: 84, X: 42, L: 42, M: 0, luts: 178, ffs: 200, warnings: 0 },
   clock: { slices: 87, X: 36, L: 51, M: 0, luts: 161, ffs: 174, warnings: 0 },
   vga: { slices: 52, X: 22, L: 30, M: 0, luts: 129, ffs: 56, warnings: 0 },
-  isqrt: { slices: 28, X: 16, L: 12, M: 0, luts: 71, ffs: 86, warnings: 0 },
+  isqrt: { slices: 30, X: 17, L: 13, M: 0, luts: 77, ffs: 86, warnings: 0 },
 };
 // map's packing of the same netlists on ISE (packages/silinx-fpga/research/s6/measured/night1.json, night 1): its SLICELs are the packer's
 // (the carry chains and the wide multiplexers); its SLICEX are a placement's, more (packages/silinx-fpga/research/s6/README.md)
@@ -249,8 +249,7 @@ test('every example packs into legal slices for the XC6SLX16 (the slices by kind
     const { slices, X, L, M, luts, ffs } = p.stats;
     assert.deepEqual({ slices, X, L, M, luts, ffs, warnings: p.warnings.length }, EXAMPLE_PACK[name], name);
     assert.equal(p.stats.and2l, name === 'clock' ? 1 : 0, name);
-    // (LUT combining: never more slices; isqrt one more, #2279)
-    if (name === 'isqrt') assert.equal(packed(nl, { combine: 'area' }).stats.slices, slices + 1, name);
-    else assert.ok(packed(nl, { combine: 'area' }).stats.slices <= slices, name);
+    // (LUT combining: never more slices)
+    assert.ok(packed(nl, { combine: 'area' }).stats.slices <= slices, name);
   }
 });

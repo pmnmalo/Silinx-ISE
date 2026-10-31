@@ -23,7 +23,8 @@ entity isqrt_top is
 end isqrt_top;
 
 architecture Behavioral of isqrt_top is
-    signal rst       : STD_LOGIC_VECTOR (1 downto 0) := "11";    -- the reset, at power-up only
+    signal boot      : UNSIGNED (1 downto 0) := "00";            -- the reset, for 3 cycles at power-up
+    signal rst       : STD_LOGIC;
     signal sw_meta   : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
     signal n         : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
     signal done      : STD_LOGIC;
@@ -34,18 +35,23 @@ architecture Behavioral of isqrt_top is
     signal remainder : UNSIGNED (4 downto 0) := (others => '0');
     signal digits    : STD_LOGIC_VECTOR (15 downto 0);
 
-    -- two decimal digits of a number under 100 (tens, units)
+    -- two decimal digits of a number under 40 (tens, units): its tens found by comparisons, a constant taken away
+    -- (XST divides by a power of 2 only)
     function decimal (v : UNSIGNED) return STD_LOGIC_VECTOR is
-        variable tens : integer;
+        variable x : UNSIGNED (5 downto 0);
     begin
-        tens := to_integer(v) / 10;
-        return STD_LOGIC_VECTOR(to_unsigned(tens, 4)) & STD_LOGIC_VECTOR(to_unsigned(to_integer(v) - 10 * tens, 4));
+        x := resize(v, 6);
+        if x >= 30 then return "0011" & STD_LOGIC_VECTOR(resize(x - 30, 4));
+        elsif x >= 20 then return "0010" & STD_LOGIC_VECTOR(resize(x - 20, 4));
+        elsif x >= 10 then return "0001" & STD_LOGIC_VECTOR(resize(x - 10, 4));
+        else return "0000" & STD_LOGIC_VECTOR(resize(x, 4));
+        end if;
     end function;
 begin
     process (clk)
     begin
         if rising_edge(clk) then
-            rst     <= rst(0) & '0';
+            if boot /= "11" then boot <= boot + 1; end if;
             sw_meta <= sw;                            -- the switches synchronised to the clock
             n       <= sw_meta;
             if rem_vld = '1' then remainder <= unsigned(rem_now); end if;
@@ -53,8 +59,10 @@ begin
         end if;
     end process;
 
+    rst <= '1' when boot /= "11" else '0';
+
     sqrt: entity work.isqrt
-        port map ( ap_clk => clk, ap_rst => rst(1), ap_start => '1', ap_done => done, ap_idle => led(0), ap_ready => led(1),
+        port map ( ap_clk => clk, ap_rst => rst, ap_start => '1', ap_done => done, ap_idle => led(0), ap_ready => led(1),
                    n => n, remainder => rem_now, remainder_ap_vld => rem_vld, ap_return => root_now );
 
     digits <= decimal(root) & decimal(remainder);
