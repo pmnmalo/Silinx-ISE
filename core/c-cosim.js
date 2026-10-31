@@ -32,7 +32,18 @@ export const packWord = (fields, value) => fields.reduce((acc, f) => {
 }, 0n);
 
 /** The calls with the values of each stream and memory of structs, its words, from its members' (#1668). */
-export function wordCalls(gen, calls) {
+export function wordCalls(gen, calls0) {
+  // (a pointer or an array with ap_fifo or ap_hs, #1901: its values the C's, what it reads and what it leaves)
+  const ptrs = (gen.fifos || []).filter((f) => f.ptr);
+  const calls = !ptrs.length ? calls0 : calls0.map((c) => {
+    const r = { ...c, streamIn: { ...c.streamIn }, streamOut: { ...c.streamOut }, streamWas: {} };
+    for (const f of ptrs) {
+      const was = f.ptr === 'scalar' ? [c.ptrIn[f.name]] : c.memIn[f.name] ?? [];
+      if (f.dir === 'in') r.streamIn[f.name] = was;
+      else { r.streamOut[f.name] = f.ptr === 'scalar' ? [c.ptrOut[f.name]] : c.memOut[f.name] ?? []; r.streamWas[f.name] = was; }
+    }
+    return r;
+  });
   const gs = [...(gen.memories || []), ...(gen.fifos || [])].filter((x) => x.fields);
   if (!gs.length) return calls;
   const words = (src, fields) => {
@@ -67,16 +78,18 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
   for (const o of outs) L.push(`  reg [${o.w - 1}:0] cap_${o.name}; reg got_${o.name};`);
   const mems = gen.memories || [];
   const P = (x) => x.port ?? x.name;
-  // (a memory's port: ap_memory's, or a BRAM's, its address in bytes, a write enable a byte, #1668)
-  const M = (x) => (x.bram ? { a: `(${P(x)}_Addr_A >> ${x.bram.shift})`, ce: `${P(x)}_EN_A`, we: `(|${P(x)}_WEN_A)`, d: `${P(x)}_Din_A`, q: `${P(x)}_Dout_A` }
-    : { a: `${P(x)}_address0`, ce: `${P(x)}_ce0`, we: `${P(x)}_we0`, d: `${P(x)}_d0`, q: `${P(x)}_q0` });
+  // (a memory's ports: ap_memory's, one or two, #1901, or a BRAM's, its address in bytes, a write enable a byte, #1668)
+  const M = (x) => (x.bram ? [{ k: '', a: `(${P(x)}_Addr_A >> ${x.bram.shift})`, ce: `${P(x)}_EN_A`, we: `(|${P(x)}_WEN_A)`, d: `${P(x)}_Din_A`, q: `${P(x)}_Dout_A`, rd: true, wr: x.written }]
+    : [0, 1].filter((k) => port(`${P(x)}_ce${k}`)).map((k) => ({ k: k || '', a: `${P(x)}_address${k}`, ce: `${P(x)}_ce${k}`, we: `${P(x)}_we${k}`, d: `${P(x)}_d${k}`, q: `${P(x)}_q${k}`, rd: !!port(`${P(x)}_q${k}`), wr: !!port(`${P(x)}_we${k}`) })));
   for (const x of mems) {
     L.push(`  reg [${x.w - 1}:0] mem_${x.name} [0:${x.n - 1}];`);
-    if (x.read || x.bram) L.push(`  reg [${x.w - 1}:0] q_${x.name};`, `  assign ${M(x).q} = q_${x.name};`);
+    for (const m of M(x)) if (m.rd) L.push(`  reg [${x.w - 1}:0] q_${x.name}${m.k};`, `  assign ${m.q} = q_${x.name}${m.k};`);
   }
   // (a stream: a FIFO in the test bench, its values the C's before each call; empty and full now and then, the
   // module's waits exercised, #1590; one the design polls, s.empty() / s.full(), only when it is, #1823)
   const fifos = gen.fifos || [];
+  // (ap_hs: the same handshake, named as Vitis HLS names it, #1901)
+  const FP = (f, port0) => `${P(f)}${f.hs ? { dout: '', empty_n: '_ap_vld', read: '_ap_ack', din: '', full_n: '_ap_ack', write: '_ap_vld' }[port0] : `_${port0}`}`;
   // (hls::task's run by themselves, #1719, and a module with ap_ctrl_none, #1900: an input stream's values kept across
   // calls, each call adding the test bench's new ones; the values read counted from the start, at least the C's: a task
   // may read ahead)
@@ -93,9 +106,9 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
     if (f.dir === 'in') {
       const N = depth(f, 'streamIn');
       L.push(`  reg [${f.w - 1}:0] fin_${f.name} [0:${N - 1}]; integer fi_${f.name} = 0, fn_${f.name} = 0;`,
-        `  assign ${P(f)}_dout = fin_${f.name}[fi_${f.name} < ${N} ? fi_${f.name} : 0];`, `  assign ${P(f)}_empty_n = fi_${f.name} < fn_${f.name}${f.polled ? '' : ' && ap_tick % 3 != 1'};`);
+        `  assign ${FP(f, 'dout')} = fin_${f.name}[fi_${f.name} < ${N} ? fi_${f.name} : 0];`, `  assign ${FP(f, 'empty_n')} = ${f.ptr ? '1' : `fi_${f.name} < fn_${f.name}`}${f.polled ? '' : ' && ap_tick % 3 != 1'};`);
     } else {
-      L.push(`  reg [${f.w - 1}:0] fout_${f.name} [0:${depth(f, 'streamOut') - 1}]; integer fo_${f.name} = 0;`, `  assign ${P(f)}_full_n = ${f.polled ? "1'b1" : 'ap_tick % 4 != 2'};`);
+      L.push(`  reg [${f.w - 1}:0] fout_${f.name} [0:${depth(f, 'streamOut') - 1}]; integer fo_${f.name} = 0;`, `  assign ${FP(f, 'full_n')} = ${f.polled ? "1'b1" : 'ap_tick % 4 != 2'};`);
     }
   }
   L.push(`  ${gen.top} dut(${gen.ports.map((p) => `.${p.name}(${p.name})`).join(', ')});`);
@@ -103,11 +116,13 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
     L.push('  always #5 ap_clk = ~ap_clk;', '  always @(posedge ap_clk) begin');
     for (const o of outs) if (port(`${o.name}_ap_vld`)) L.push(`    if (${o.name}_ap_vld) begin cap_${o.name} <= ${o.name}; got_${o.name} <= 1; end`);
     // (a memory: one port, the value read on _q0 the cycle after its address; an address outside it: x)
-    for (const x of mems) { const m = M(x); L.push(`    if (${m.ce}) begin${x.written ? ` if (${m.we} && ${m.a} < ${x.n}) mem_${x.name}[${m.a}] <= ${m.d};` : ''}${x.read ? ` q_${x.name} <= ${m.a} < ${x.n} ? mem_${x.name}[${m.a}] : ${x.w}'bx;` : ''} end`); }
+    for (const x of mems) for (const m of M(x)) L.push(`    if (${m.ce}) begin${x.written && m.wr ? ` if (${m.we} && ${m.a} < ${x.n}) mem_${x.name}[${m.a}] <= ${m.d};` : ''}${(x.read || x.bram) && m.rd ? ` q_${x.name}${m.k} <= ${m.a} < ${x.n} ? mem_${x.name}[${m.a}] : ${x.w}'bx;` : ''} end`);
     if (fifos.length) L.push('    ap_tick <= ap_tick + 1;');
     for (const f of fifos) {
-      if (f.dir === 'in') L.push(`    if (${P(f)}_read && ${P(f)}_empty_n) fi_${f.name} <= fi_${f.name} + 1;`);
-      else L.push(`    if (${P(f)}_write && ${P(f)}_full_n) begin if (fo_${f.name} < ${depth(f, 'streamOut')}) fout_${f.name}[fo_${f.name}] <= ${P(f)}_din; fo_${f.name} <= fo_${f.name} + 1; end`);
+      if (f.dir === 'in') L.push(`    if (${FP(f, 'read')} && ${FP(f, 'empty_n')}) fi_${f.name} <= fi_${f.name} + 1;`);
+      // (a pointer's: the last value written, #1901)
+      else if (f.ptr === 'scalar') L.push(`    if (${FP(f, 'write')} && ${FP(f, 'full_n')}) begin fout_${f.name}[0] <= ${FP(f, 'din')}; fo_${f.name} <= fo_${f.name} + 1; end`);
+      else L.push(`    if (${FP(f, 'write')} && ${FP(f, 'full_n')}) begin if (fo_${f.name} < ${depth(f, 'streamOut')}) fout_${f.name}[fo_${f.name}] <= ${FP(f, 'din')}; fo_${f.name} <= fo_${f.name} + 1; end`);
     }
     L.push('  end');
   }
@@ -146,9 +161,9 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
 }
 
 // (files: the test bench's, core/c-interp.js's, #1897)
-export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family } = {}) {
-  const sim = simulateC(source, { file, headers, top, files });
-  const gen = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family });
+export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family, directives = null } = {}) {
+  const sim = simulateC(source, { file, headers, top, files, directives });
+  const gen = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family, directives });
   if (alter && gen.ok) gen.hdl = alter(gen.hdl);   // (the tests: an HDL that differs, its mismatches reported)
   const base = { ok: false, pass: false, calls: 0, mismatches: [], latency: null, output: sim.output, sim, gen, errors: [] };
   if (!sim.ok) return { ...base, errors: [sim.error ? `the C simulation failed: line ${sim.error.line}: ${sim.error.message}` : 'the C simulation cannot run: the source has errors'] };
@@ -188,6 +203,8 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
     }
     for (const f of gen.fifos || []) {
       if (f.dir === 'in') {
+        // (a pointer's: a volatile read as often as the code says, the C's value each time, #1901)
+        if (f.ptr) { q++; continue; }
         // (tasks: the values read from the start, at least the C's; a task may read ahead, #1719)
         const got = row[q++], e = BigInt(tb.reads ? tb.reads.get(f.name)[k] : c.streamRead[f.name] ?? 0);
         if (tb.reads ? got === null || got < e : got !== e) say(`${f.name} (values read)`, e, got);
@@ -195,6 +212,13 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
       }
       const exp = c.streamOut[f.name] || [];
       const n = row[q++];
+      // (a pointer's, #1901: the values written, as far as written; none only if the C changed nothing)
+      if (f.ptr) {
+        const was = c.streamWas[f.name] || [];
+        if (n === 0n && exp.some((v, i) => B(v, f.w) !== B(was[i] ?? 0n, f.w))) say(`${f.name} (values written)`, BigInt(exp.length), n);
+        exp.forEach((v, i) => { const got = row[q++], e = B(v, f.w); if (BigInt(i) < n && got !== e) say(`${f.name}[${i}]`, e, got); });
+        continue;
+      }
       if (n !== BigInt(exp.length)) say(`${f.name} (values written)`, BigInt(exp.length), n);
       exp.forEach((v, k) => { const got = row[q++], e = B(v, f.w); if (got !== e) say(`${f.name}[${k}]`, e, got); });
     }
