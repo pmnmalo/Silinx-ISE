@@ -98,7 +98,7 @@ jobs:
       - name: The examples
         run: |
           mkdir -p "out/examples"
-          for ex in gates traffic blinky pong stopwatch clock vga; do
+          for ex in gates traffic blinky pong stopwatch clock vga isqrt; do
             node packages/silinx-fpga/research/s3e-route/open-flow.mjs "examples/$ex" "$RUNNER_TEMP/flow/$ex" --quality "out/examples/$ex.json" > "out/examples/$ex.log" 2>&1 \
               || echo "::warning::$ex: the open flow failed (out/examples/$ex.log)"
             tail -3 "out/examples/$ex.log"

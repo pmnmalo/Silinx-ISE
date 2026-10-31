@@ -8,9 +8,10 @@ import { compile, elaborate } from '../core/compile.js';
 import { boardAutoAssign, generateUcf } from '../packages/silinx-fpga/src/ucf.js';
 import { resolveBoard } from '../server/devices.js';
 import { EXAMPLE_ORDER } from '../core/examples.js';
+import { isCSource, viewHdl } from '../core/view-hdl.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const EXAMPLES = EXAMPLE_ORDER;   // gates, traffic, blinky, pong, stopwatch, clock, vga
+export const EXAMPLES = EXAMPLE_ORDER;   // gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt
 // the boards (and variants) of the devices of the Silinx toolchain: the examples run on all of them; the Spartan-3E's
 // also through ISE (test/ise/examples.test.js, the power estimates), the Spartan-6's (#732, no variants; the Atlys's
 // seven-segment display and VGA on its VHDCI connector) checked against ISE in packages/silinx-fpga/research/s6 so far
@@ -27,6 +28,13 @@ export function example(name) {
   const dir = path.join(ROOT, 'examples', name);
   const project = JSON.parse(fs.readFileSync(path.join(dir, 'silinx.json'), 'utf8'));
   const sources = project.files.map(f => ({ ...f, text: fs.readFileSync(path.join(dir, f.path), 'utf8') }));
+  // a C function's module (isqrt): its HDL made from the C, as the application makes it (core/view-hdl.js), no file of its own
+  const src = path.join(dir, 'src');
+  for (const f of fs.readdirSync(src).filter(isCSource)) {
+    const r = viewHdl(`src/${f}`, fs.readFileSync(path.join(src, f), 'utf8'), { lang: project.preferredLanguage });
+    if (r.errors.length) throw new Error(r.errors.join('; '));
+    sources.unshift({ path: `src/${f}.${r.lang === 'vhdl' ? 'vhd' : 'v'}`, lang: r.lang, role: 'design', text: r.text });
+  }
   return { dir, project, sources, design: sources.filter(s => s.role === 'design'), sim: sources.filter(s => s.role === 'sim') };
 }
 

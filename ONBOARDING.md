@@ -102,7 +102,7 @@ web/js/        the Project Navigator: app.js (the shell, Design pane, processes,
                dialogs, long press), narrow.js (tablet portrait)
 server/        the local server: projects, the ISE flow, the Silinx flow, programmers
 test/ui/       UI tests on headless Chrome over CDP (harness.js); Firefox / WebKit via Playwright
-examples/      gates, traffic, blinky, pong, stopwatch, clock, vga: the test designs
+examples/      gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt: the test designs
 research/      the open toolchain's research (bit database, route, place, synthesis quality)
 docs/          user guides (EN, PT), the project model and API, QUALITY.md (against ISE)
 ```
