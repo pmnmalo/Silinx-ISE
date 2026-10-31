@@ -16,6 +16,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sha256sums, SUMS_FILE } from './checksums.mjs';
+import { leaveOutChipdbs } from '../packages/silinx-fpga/src/nextpnr-chipdb-node.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -27,8 +28,10 @@ const out = path.resolve(opt('out', path.join(root, 'out')));
 const appOnly = argv.includes('--app-only');
 const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: ['ignore', 'inherit', 'inherit'], shell: process.platform === 'win32' && cmd === 'npm' });
 
-/** The tracked files the app never reads, left out of the zip: the device measurements (#3, #1541). */
-const NOT_RELEASED = /^packages\/silinx-fpga\/research\/s3e-device\/data\//;
+/** The tracked files the app never reads, left out of the zip: the device measurements (#3, #1541), the tests (#2329). */
+const NOT_RELEASED = /^(packages\/silinx-fpga\/research\/s3e-device\/data|test|packages\/silinx-fpga\/test)\//;
+
+const NEXTPNR_PACKAGES = ['@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6'];
 
 /**
  * The tracked files (as `git archive HEAD` gives them in a clean checkout, the release's case) with
@@ -73,6 +76,8 @@ function packageApp() {
     copyTracked(app);
     run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], app);
     unlinkWorkspaces(app);
+    // nextpnr's chip databases: downloaded on their first use (#2329)
+    for (const pkg of NEXTPNR_PACKAGES) leaveOutChipdbs(path.join(app, 'node_modules', pkg));
     fs.rmSync(path.join(app, '.github'), { recursive: true, force: true });
     const zip = path.join(out, `silinx-ise-${version}.zip`);
     fs.rmSync(zip, { force: true });

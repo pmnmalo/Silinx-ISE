@@ -43,7 +43,7 @@ export function mountNextpnrS6(ctx) {
     const device = io.device(), { packed, phys } = state(), sites = state().sites || s6Sites(device), nl = netlist();
     if (!io.nextpnrS6) throw new StepError('the nextpnr engine is not available here (io.nextpnrS6)', [], 'Choose the Silinx engine (Toolchain Settings).');
     const t = now();
-    const db = await io.nextpnrS6.chipdb(part);
+    const db = await io.nextpnrS6.chipdb(part, log);
     // the pads and the global buffers, by Silinx's rules (the banks' VCCO, a clock pad's dedicated path); the block RAMs
     // and DSP48A1s from its timing-driven placement (nextpnr's analytical placer left them columns apart: the stopwatch
     // on the Atlys missed its 10 ns on every seed), a DSP48A1 cascade with them
