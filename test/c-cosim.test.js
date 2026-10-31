@@ -4,8 +4,9 @@
 // not call the top, or a C simulation that fails, said.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cosimulate } from '../core/c-cosim.js';
+import { cosimBench, cosimulate } from '../core/c-cosim.js';
 import { simulateC } from '../core/c-interp.js';
+import { cToHdl } from '../core/c-hdl.js';
 
 const ADDER = `#include "ap_int.h"
 #include <stdio.h>
@@ -213,4 +214,26 @@ test('#1899 co-simulation: a call that never ends (ap_done never 1) stops at its
       assert.deepEqual([r.ok, r.pass, r.errors], [true, false, [`a call did not end in ${bound} cycles`]], `${lang} ${maxCycles}`);
     }
   }
+});
+
+test('#2368 the Verilog bench declares its reset once: a sequential top, ap_ctrl_chain, a combinational top, axis', () => {
+  const resets = (src) => {
+    const o = { file: 'u.cpp', top: 'f', headers: {} };
+    const gen = cToHdl(src, { ...o, lang: 'verilog' });
+    assert.deepEqual(gen.diagnostics.filter((d) => d.severity === 'error'), []);
+    return cosimBench(gen, simulateC(src, o).calls).text.split('\n').flatMap((l) => (/^\s*reg\b/.test(l) ? l.match(/\bap_rst(_n)? = \d/g) || [] : []));
+  };
+  const main = 'int main() { return f(3) == 0; }\n';
+  const loop = 'int s = 0; for (int i = 0; i < n; i++) s += i + 1; return s;';
+  assert.deepEqual(resets(`int f(int n) { ${loop} }\n${main}`), ['ap_rst = 1']);
+  assert.deepEqual(resets(`int f(int n) {\n#pragma HLS INTERFACE ap_ctrl_chain port=return\n${loop} }\n${main}`), ['ap_rst = 1']);
+  assert.deepEqual(resets(`int f(int n) { return n + 1; }\n${main}`), ['ap_rst = 0']);
+  assert.deepEqual(resets(`#include "hls_stream.h"
+void f(hls::stream<int> &a, hls::stream<int> &b) {
+#pragma HLS INTERFACE axis port=a
+#pragma HLS INTERFACE axis port=b
+  b.write(a.read() + 1);
+}
+int main() { hls::stream<int> a, b; a.write(1); f(a, b); return b.read() != 2; }
+`), ['ap_rst_n = 0']);
 });

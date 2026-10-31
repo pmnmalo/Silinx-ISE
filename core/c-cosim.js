@@ -90,10 +90,10 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
   const L = ['module silinx_cosim_tb;', '  integer cyc, bad = 0;'];
   // (ap_ctrl_none: no ap_start, the module running by itself, #1900)
   if (seq) L.push(`  reg ap_clk = 0, ${low ? 'ap_rst_n = 0' : 'ap_rst = 1'}${hs ? ', ap_start = 0' : ''};`);
-  // (ap_ctrl_chain, #1965: its ap_ready's counted in each call, ap_done and the outputs held while ap_continue is 0)
-  if (chain) L.push('  integer readys = 0, held;');
   // (a combinational module's reset: an input it does not use, held low, #1924)
   else if (port('ap_rst')) L.push('  reg ap_rst = 0;');
+  // (ap_ctrl_chain, #1965: its ap_ready's counted in each call, ap_done and the outputs held while ap_continue is 0)
+  if (chain) L.push('  integer readys = 0, held;');
   for (const p of gen.ports) if (!['ap_clk', 'ap_rst', 'ap_rst_n', 'ap_start', 'ap_continue'].includes(p.name)) L.push((p.role === 'mem' || p.role === 'fifo') && p.dir === 'in' ? `  wire [${p.w - 1}:0] ${p.name};` : `  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
   const outs = gen.ports.filter((p) => p.dir === 'out' && p.role === 'arg');
   if (chain) L.push('  reg ap_continue = 0;');
