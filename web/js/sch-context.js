@@ -7,12 +7,12 @@ import { TITLES } from './sch-rename.js';
 
 /** { contextMenu } of mountSchEditor (doc(), live(), sel(), tool(): its current values). */
 export function mountSchContext(ctx) {
-  const { readOnly, doc, live, sel, tool, setSel, render, renderProps, rename, duplicateSel, rotateSel, mirrorSel, deleteSel } = ctx;
+  const { readOnly, doc, live, segSel, sel, tool, setSel, render, renderProps, rename, duplicateSel, rotateSel, mirrorSel, deleteSel } = ctx;
 
   function contextMenu(e, it) {
     if (readOnly || live() || tool() !== 'select' || !it || !TITLES[it.kind] || !doc()[KEYS[it.kind]]?.some(o => o.id === it.id)) return;
     const key = `${it.kind}:${it.id}`;
-    if (!sel().has(key)) setSel(new Set([key]));
+    if (!sel().has(key)) setSel(it.kind === 'wire' ? segSel.branch(it.id) : new Set([key]));
     render(); renderProps();
     // (what applies to the selection: Duplicate, Rotate and Mirror to its symbols and I/O markers)
     const parts = [...sel()].some(k => k.startsWith('sym:') || k.startsWith('port:'));

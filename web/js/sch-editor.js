@@ -153,11 +153,11 @@ export function mountSchEditor(container, opts = {}) {
   // ---------------- toolbar
   // Keep connections, Names, Hop-overs (sch-options.js)
   const { branchBox, hopsBox, keepBox, keepConn, namesBox, showHops, showNames, wholeBranch } = mountSchOptions({ render: (...a) => render(...a) });
-  const segSel = mountSchSegSel({ doc: () => doc, sel: () => sel });   // (the wire segment selected, #2211)
+  const segSel = mountSchSegSel({ doc: () => doc, nl: () => nl, sel: () => sel, wholeBranch });   // (the wire segment selected, #2211; the network of wires, #2228)
   const btn = (act, icon, title) => h('button', { type: 'button', class: 'se-btn', 'data-act': act, title, html: ICON[icon] });
   const sep = () => h('span', { class: 'se-sep' });
   // Curved wires (#1144, sch-curve.js): the schematic drawn with curves (saved with it), or the technical drawing
-  const curve = mountSchCurve({ doc: () => doc, sel: () => sel, view: () => view, live: () => live, readOnly, edit: (...a) => edit(...a), render: (...a) => render(...a), renderProps: (...a) => renderProps(...a), snapshot: (...a) => snapshot(...a), pushUndo: (...a) => pushUndo(...a), changed: (...a) => changed(...a), contentG: () => contentG });
+  const curve = mountSchCurve({ doc: () => doc, sel: () => sel, oneWire: segSel.oneWire, view: () => view, live: () => live, readOnly, edit: (...a) => edit(...a), render: (...a) => render(...a), renderProps: (...a) => renderProps(...a), snapshot: (...a) => snapshot(...a), pushUndo: (...a) => pushUndo(...a), changed: (...a) => changed(...a), contentG: () => contentG });
   // (the toolbar's buttons and their clicks: sch-toolbar.js)
   // Rearrange Wires / Rearrange Schematic (#1481, #1730, sch-beautify.js)
   const { rearrangeWires, rearrangeSheet } = mountSchBeautify({ doc: () => doc, edit: (...a) => edit(...a), fit: (...a) => fit(...a), flash: (...a) => flash(...a), modules: () => modules, sel: () => sel, snapshot: (...a) => snapshot(...a) });
@@ -222,7 +222,7 @@ export function mountSchEditor(container, opts = {}) {
 
   // ---------------- properties panel (sch-props.js); an I/O marker given a net's name (sch-join.js, #2170)
   const { joinMarker } = mountSchJoin({ doc: () => doc, nl: () => nl, container });
-  const { renderProps, openSelected, renamed, joinByName, renameLabel } = mountProps({ joinMarker, opts, container, propBody, readOnly, doc: () => doc, sel: () => sel, nl: () => nl,
+  const { renderProps, openSelected, renamed, joinByName, renameLabel } = mountProps({ joinMarker, segSel, opts, container, propBody, readOnly, doc: () => doc, sel: () => sel, nl: () => nl,
     live: () => live, modules: () => modules, setGenLang: (v) => { genLang = v; }, edit: (...a) => edit(...a),
     flash: (...a) => flash(...a), rotateSel: (...a) => rotateSel(...a), mirrorSel: (...a) => mirrorSel(...a),
     deleteSel: (...a) => deleteSel(...a), nextId: (...a) => nextId(...a), openInfo: (...a) => openInfo(...a),
@@ -285,7 +285,7 @@ export function mountSchEditor(container, opts = {}) {
   let spaceDown = false;
   // the right-click menu (sch-context.js): Rename… (sch-rename.js, #1546), the selection's commands (#1556)
   const { rename } = mountSchRename({ doc: () => doc, nl: () => nl, edit, joinByName, joinMarker, renameLabel });
-  const { contextMenu } = mountSchContext({ readOnly, doc: () => doc, live: () => live, sel: () => sel, tool: () => tool, render, renderProps,
+  const { contextMenu } = mountSchContext({ readOnly, doc: () => doc, live: () => live, segSel, sel: () => sel, tool: () => tool, render, renderProps,
     rename, duplicateSel, rotateSel, mirrorSel, deleteSel, setSel: (v) => { sel = v; } });
   const { finishMove, onMove, onUp } = mountSchMouse({
     segSel, wholeBranch, container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,

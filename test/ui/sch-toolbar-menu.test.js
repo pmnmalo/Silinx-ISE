@@ -127,6 +127,49 @@ uiTest('#2208 #2209 a read-only schematic: Curved wires and Hop-overs in the men
   assert.deepEqual(shown, [true, true, true, false, false, false]);
 });
 
+uiTest('#2228 schematic: Select whole branch selects the whole network of wires of the signal; its properties, Delete and a segment drag', E, async (page) => {
+  const doc = newDoc('network', 'vhdl');
+  doc.wires.push({ id: 'W1', points: [{ x: 100, y: 100 }, { x: 300, y: 100 }] }, { id: 'W2', points: [{ x: 300, y: 100 }, { x: 500, y: 100 }] },
+    { id: 'W3', points: [{ x: 300, y: 100 }, { x: 300, y: 300 }, { x: 500, y: 300 }] }, { id: 'W4', points: [{ x: 100, y: 500 }, { x: 300, y: 500 }] });
+  await makeProject(env, { name: 'NetworkPj', files: { 'src/n.sch.json': JSON.stringify(doc) } });
+  await page.openProject('NetworkPj');
+  await page.eval(() => window.SilinxApp.openSch('src/n.sch.json'));
+  await page.waitFor((ed) => document.querySelector(`${ed} svg g.wire[data-id="W1"]`), [ED], { what: 'drawn' });
+  await page.eval(() => localStorage.removeItem('xl.sch.branch'));
+  await page.click(`${ED} .se-btn[data-act=fit]`);
+  const selected = () => page.eval((ed) => [...document.querySelectorAll(`${ed} svg g.wire.sel`)].map((g) => g.dataset.id).sort(), ED);
+  const at = (x, y) => page.eval((ed, px, py) => { const l = document.querySelector(`${ed} svg g.wire`); const q = l.ownerSVGElement.createSVGPoint(); q.x = px; q.y = py; const r = q.matrixTransform(l.getScreenCTM()); return { x: r.x, y: r.y }; }, ED, x, y);
+  const clickAt = async (x, y) => { const p = await at(x, y); await page.mouse('mouseMoved', p.x, p.y); await page.mouse('mousePressed', p.x, p.y); await page.mouse('mouseReleased', p.x, p.y); };
+  // a click: the three wires of the junction, the other signal not; the properties, the wire's
+  await clickAt(200, 100);
+  assert.deepEqual(await selected(), ['W1', 'W2', 'W3']);
+  assert.match(await page.eval((ed) => document.querySelector(`${ed} .se-ptitle`).textContent, ED), /^Wire · net /);
+  await clickAt(200, 500);
+  assert.deepEqual(await selected(), ['W4']);
+  // a drag: the segment under the pointer, the network still selected
+  await clickAt(400, 200 + 100);
+  assert.deepEqual(await selected(), ['W1', 'W2', 'W3']);
+  const a = await at(400, 300), b = await at(400, 340);
+  await page.mouse('mouseMoved', a.x, a.y); await page.mouse('mousePressed', a.x, a.y); await page.mouse('mouseMoved', b.x, b.y); await page.mouse('mouseReleased', b.x, b.y);
+  const after = await getDoc(page);
+  assert.deepEqual(after.wires.find((w) => w.id === 'W1').points, [{ x: 100, y: 100 }, { x: 300, y: 100 }]);
+  assert.ok(after.wires.find((w) => w.id === 'W3').points.some((p) => p.x === 500 && p.y === 340), 'the segment moved');
+  assert.deepEqual(await selected(), ['W1', 'W2', 'W3']);
+  await page.click(`${ED} [data-act=undo]`);
+  // Delete: the network; the other signal stays
+  await clickAt(200, 100);
+  await page.key('Delete');
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 1, [], { what: 'deleted' });
+  assert.equal((await getDoc(page)).wires[0].id, 'W4');
+  await page.click(`${ED} [data-act=undo]`);
+  await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 4, [], { what: 'undone' });
+  // not ticked: the one wire
+  await page.click(`${ED} .se-branch input`);
+  await clickAt(200, 100);
+  assert.equal((await page.eval((ed) => document.querySelectorAll(`${ed} svg g.wire .segsel`).length, ED)), 1);
+  await page.click(`${ED} .se-branch input`);
+});
+
 uiTest('#2211 schematic: Select whole branch beside Keep connections: ticked, the whole wire; not ticked, the segment clicked, moved and deleted alone; remembered; in Portuguese', E, async (page) => {
   const doc = newDoc('branch', 'vhdl');
   doc.wires.push({ id: 'W1', points: [{ x: 100, y: 100 }, { x: 300, y: 100 }, { x: 300, y: 300 }, { x: 500, y: 300 }] });

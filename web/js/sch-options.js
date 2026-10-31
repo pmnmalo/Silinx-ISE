@@ -12,7 +12,7 @@ export function mountSchOptions(ctx) {
   try { keepConn = localStorage.getItem(prefKey('xl.sch.keepConn')) !== '0'; } catch { /* default */ }
   const keepBox = h('input', { type: 'checkbox', checked: keepConn });
   keepBox.addEventListener('change', () => { keepConn = keepBox.checked; try { localStorage.setItem(prefKey('xl.sch.keepConn'), keepConn ? '1' : '0'); } catch { /* ignore */ } });
-  // Select whole branch (#2211): a click on a wire selects it from junction to junction (on by default, as it has
+  // Select whole branch (#2211): a click on a wire selects the whole network of wires of its signal (#2228) (on by default, as it has
   // always been), or only the straight segment clicked
   let wholeBranch = true;
   try { wholeBranch = localStorage.getItem(prefKey('xl.sch.branch')) !== '0'; } catch { /* default */ }

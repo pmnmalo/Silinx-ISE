@@ -17,7 +17,7 @@ import { clone, onSeg } from './sch-editor.js';
 /** { box, curved, setCurved, wireD, hops, hopD, previewD, wireAt, labelAt, wireText, handlesSvg, inBand, beginKnot, moveKnot, endKnot,
  *  cancelKnot, removeKnot } of a schematic editor (doc(), sel(), view(): its current ones). */
 export function mountSchCurve(ctx) {
-  const { doc, sel, view, live, readOnly, edit, render, renderProps, snapshot, pushUndo, changed, contentG } = ctx;
+  const { doc, sel, oneWire, view, live, readOnly, edit, render, renderProps, snapshot, pushUndo, changed, contentG } = ctx;
   // (a read-only view, #1193: drawn with curves or not by the viewer's choice, the schematic untouched)
   let viewCurved = null;
   const curved = () => (readOnly && viewCurved !== null ? viewCurved : isCurved(doc()));
@@ -74,9 +74,9 @@ export function mountSchCurve(ctx) {
     const p = curvePointAt(w, 0.25);
     return { x: Math.round(p.x) + 4, y: Math.round(p.y) - 5 };
   }
-  // the selected wire's handles (one wire selected, editable): a dot on each of its knots between its ends
+  // the selected wire's handles (one wire or its network selected, the wire clicked; editable): a dot on each of its knots between its ends
   function handlesSvg() {
-    if (!curved() || readOnly || sel().size !== 1) return '';
+    if (!curved() || readOnly || !oneWire()) return '';
     const k = [...sel()][0];
     if (!k.startsWith('wire:')) return '';
     const w = doc().wires.find(x => x.id === k.slice(5));

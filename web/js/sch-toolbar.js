@@ -45,7 +45,7 @@ export function mountSchToolbar(ctx) {
     // (Keep connections after the view's buttons, #1733)
     sep(), h('label', { class: 'se-keep', title: 'Moving components: keep the wires connected (re-routed around other parts) or detach them' },
       keepBox, h('span', { text: 'Keep connections' })),
-    h('label', { class: 'se-branch', title: 'A click on a wire selects its whole branch, from junction to junction; not ticked, only the straight segment clicked' },
+    h('label', { class: 'se-branch', title: 'A click on a wire selects the whole network of wires of its signal; not ticked, only the straight segment clicked' },
       branchBox, h('span', { text: 'Select whole branch' })),
     sep(),
     h('label', { class: 'se-names', title: 'Show the name of every instance and every net (the automatic ones too)' }, namesBox, h('span', { text: 'Names' })),

@@ -20,7 +20,7 @@ import { setMarkerWidth } from '/core/schmarker.js';
 /** { renderProps, openSelected, renamed, joinByName, renameLabel } of a schematic editor (doc(), sel(), nl(), live(), modules(): its current ones). */
 export function mountProps(ctx) {
   const { opts, container, propBody, readOnly, doc, sel, nl, live, modules, setGenLang, edit, flash, rotateSel, mirrorSel, deleteSel, nextId,
-    openInfo, infoTarget, joinMarker } = ctx;
+    openInfo, infoTarget, joinMarker, segSel } = ctx;
 
   const multiProps = mountMultiProps({ propBody, doc, edit, field: (...a) => field(...a), keepFocus: (...a) => keepFocus(...a) });   // (#1471)
   const compareTicks = mountCompareTicks({ container, doc, nl, modules, edit, flash });   // (#1555)
@@ -47,7 +47,7 @@ export function mountProps(ctx) {
     propBody.innerHTML = '';
     const items = [...sel()];
     if (items.length === 0) return sheetProps();
-    if (items.length > 1) {
+    if (items.length > 1 && !segSel.oneWire()) {
       propBody.append(h('div', { class: 'se-ptitle', text: `${items.length} objects selected` }));
       multiProps(items);   // (sch-multi.js)
       propBody.append(h('div', { class: 'se-pbtns' }, h('button', { class: 'btn', type: 'button', text: 'Rotate', onclick: rotateSel }), h('button', { class: 'btn', type: 'button', text: 'Mirror', onclick: mirrorSel }), h('button', { class: 'btn', type: 'button', text: 'Delete', onclick: deleteSel })));
