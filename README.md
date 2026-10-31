@@ -236,9 +236,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   reason in the editor banners).
   Its schematic is always drawn from it, in that logic (AND / OR / NOT gates, XOR / XNOR gates,
   NAND or NOR gates only): the *Schematic* badge of the table's row in the Design pane opens it
-  (read-only, redrawn whenever the table changes). *Boolean Algebra from Module…* fills the table with the table of any combinational module
+  (read-only, redrawn whenever the table changes). *Algebra from Module…*, in the toolbar's menu (⋮), fills the table with the table of any combinational module
   of up to 8 input bits.
-- **Handwritten expressions** (the Boolean Algebra editor's *Handwritten…*): write one or more equations on a pad, one a
+- **Handwritten expressions** (*Handwritten Algebra…*, in the Boolean Algebra editor's menu ⋮): write one or more equations on a pad, one a
   line, with any names (`F = A·B' + C`, `G = A ⊕ D`), with a pen, a finger or the mouse — on an interactive
   whiteboard or a tablet too. Silinx's own recognizer reads them, offline (a point-cloud recognizer with built-in
   templates; nothing is sent anywhere): letters, digits, `_`, `+ · * ' ¬ ~ ( ) = ⊕ ^ & |`, and a bar over letters as

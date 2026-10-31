@@ -1,5 +1,5 @@
 // UI: schematic editor (place symbols, wire them, I/O markers, save, its HDL), ASM chart
-// editor (states, decision, case box, connections, its HDL; # Snap, </> Code and Copy, Reset
+// editor (states, decision, case box, connections, its HDL; # Snap, Reset
 // route / Delete connection, Swap 1 / 0 exits, a case exit's ✕, Delete box, Zoom / Fit, ↶ ↷ and
 // Edit ▸ Undo / Redo: #195), print preview of a diagram; the schematic editor's Rotate (Ctrl+R,
 // toolbar, properties; an I/O marker's properties without them, #949), zoom buttons, palette Place Symbol.
@@ -607,7 +607,8 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
   const model = () => page.eval(() => window.Silinx.active.asmEditor.getModel());
   const ids0 = new Set((await model()).nodes.map((n) => n.id));
   // (Undo / Redo: the main toolbar's buttons, #220)
-  const tool = (label) => (/^[↶↷]$/.test(label) ? page.click(`.doc:not([hidden]) .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click('.doc:not([hidden]) .asm-toolbar .asm-btn', { text: label }));
+  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`.doc:not([hidden]) .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click('.doc:not([hidden]) .asm-toolbar .asm-btn', { text: label }));
+  const tool = async (label) => { if (/^(Arrange|# Snap)$/.test(label)) await page.click('.doc:not([hidden]) .tb-more-btn'); return tool0(label); };   // (in the menu, #2261)
   // a point inside a node / port that is really on top (boxes may touch)
   const at = (sel) => page.eval((s) => {
     const e = document.querySelector(`.doc:not([hidden]) ${s}`);
@@ -696,7 +697,7 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
   await page.waitFor(() => [...document.querySelectorAll('#hier .row .meta')].some((e) => e.textContent === '(ctrl.asm.json)'));
 });
 
-uiTest('ASM chart editor: Zoom / Fit, </> Code and Copy, Reset route / Delete connection, Swap 1 / 0 exits, a case exit\'s ✕, Delete box, # Snap, ↶ ↷ and Edit ▸ Undo / Redo (#195)', E, async (page) => {
+uiTest('ASM chart editor: Zoom / Fit, Reset route / Delete connection, Swap 1 / 0 exits, a case exit\'s ✕, Delete box, # Snap, ↶ ↷ and Edit ▸ Undo / Redo (#195)', E, async (page) => {
   const chart = normalizeModel({
     name: 'ctl', lang: 'vhdl', clock: 'clk', reset: { name: 'rst', active: 'high', sync: false }, encoding: 'binary',
     inputs: [{ name: 'start', width: 1 }, { name: 'op', width: 2 }], outputs: [{ name: 'busy', width: 1, default: '0' }],
@@ -724,7 +725,8 @@ uiTest('ASM chart editor: Zoom / Fit, </> Code and Copy, Reset route / Delete co
   const model = () => page.eval(() => window.Silinx.active.asmEditor.getModel());
   const problems = () => page.eval(() => window.Silinx.active.asmEditor.validate().map((d) => `${d.severity}: ${d.message}`));
   // (Undo / Redo: the main toolbar's buttons, #220)
-  const tool = (label) => (/^[↶↷]$/.test(label) ? page.click(`${D} .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click(`${D} .asm-toolbar .asm-btn`, { text: label }));
+  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`${D} .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click(`${D} .asm-toolbar .asm-btn`, { text: label }));
+  const tool = async (label) => { if (/^(Arrange|# Snap)$/.test(label)) await page.click('.doc:not([hidden]) .tb-more-btn'); return tool0(label); };   // (in the menu, #2261)
   const side = (label) => page.click(`${D} .asm-selection .asm-btn`, { text: label });
   const edges = async () => (await model()).edges.map((e) => `${e.id}:${e.from}>${e.to}:${e.port}`).join(' ');
   const E0 = 'e1:s1>d1:next e2:d1>s2:true e3:d1>s1:false e4:s2>c1:next e5:c1>s3:01 e6:c1>s1:others e7:s3>s1:next';
@@ -775,19 +777,13 @@ uiTest('ASM chart editor: Zoom / Fit, </> Code and Copy, Reset route / Delete co
   await tool('Fit');
   assert.equal(await zoom(), fitted);
 
-  // ---- </> Code: the HDL of the chart; Copy puts it on the clipboard; ✕ hides it
-  await page.eval(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copied = t; } } }); });
-  await tool('</> Code');
-  await page.waitForSelector(`${D} .asm-codepanel .asm-code`);
-  const code = generate(chart).code;
-  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-code-title`).textContent, D), 'ctl.vhd');
-  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-code`).textContent, D), code);
-  await page.click(`${D} .asm-codebar .asm-btn`, { text: 'Copy' });
-  await page.waitFor(() => window.__copied != null, [], { what: 'code copied' });
-  assert.equal(await page.eval(() => window.__copied), code);
-  assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-status-msg`).textContent, D), 'Code copied to clipboard');
-  await page.click(`${D} .asm-codebar .asm-btn`, { text: '✕' });
-  assert.ok(await page.eval((d) => document.querySelector(`${d} .asm-codepanel`).hidden, D));
+  // ---- (#2261) no Language, no </> Code; Arrange and # Snap in the menu at the right of the first line
+  const barMenu = () => page.eval((d) => { const m = document.querySelector(`${d} .tb-more-menu`), b = document.querySelector(`${d} .tb-more-btn`).getBoundingClientRect(), t = document.querySelector(`${d} .asm-toolbar`).getBoundingClientRect(); return { open: !m.hidden, buttons: [...m.querySelectorAll('button')].map((x) => x.textContent), right: t.right - b.right < 20, firstLine: b.top - t.top < 20, tools: [...document.querySelectorAll(`${d} .asm-toolbar .asm-btn`)].map((x) => x.textContent).filter((x) => x === '</> Code').length, selects: document.querySelectorAll(`${d} .asm-toolbar select`).length, panel: !!document.querySelector(`${d} .asm-code`) }; }, D);
+  assert.deepEqual(await barMenu(), { open: false, buttons: ['Arrange', '# Snap'], right: true, firstLine: true, tools: 0, selects: 1, panel: false });
+  await page.click(`${D} .tb-more-btn`);
+  assert.equal((await barMenu()).open, true);
+  await page.key('Escape');
+  assert.equal((await barMenu()).open, false);
 
   // ---- a connection with a route: Reset route, ↶ ↷; Delete connection, Edit ▸ Undo / Redo
   await pick('edge', 'e7');

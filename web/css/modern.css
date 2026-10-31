@@ -378,7 +378,9 @@ html[data-ui="modern"] .asm-editor .asm-toolbar .asm-btn { height: var(--m-tool-
 html[data-ui="modern"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar, .sch-editor .se-toolbar, .asm-editor .asm-toolbar, .emu-bar, .pin-planner .pp-bar) .tb-btn, html[data-ui="modern"] .sch-editor .se-toolbar .se-btn:not(.wide) { width: var(--m-tool-h); min-width: var(--m-tool-h); height: var(--m-tool-h); }
 html[data-ui="modern"] .sch-editor .se-toolbar .se-btn.wide, html[data-ui="modern"] .isim-toolbar .tb-btn:has(.tb-label) { width: auto; height: var(--m-tool-h); }
 /* the toolbar's menu (#2208): at the right of the first line, its place kept free */
-html[data-ui="modern"] .sch-editor .se-toolbar { padding-right: calc(var(--m-tool-h) + 12px); }
+html[data-ui="modern"] :is(.sch-editor .se-toolbar, .tt-toolbar, .asm-toolbar.pn-toolbar, .asm-toolbar.fsm-toolbar, .asm-toolbar.asm-chart-toolbar) { padding-right: calc(var(--m-tool-h) + 12px); }
+html[data-ui="modern"] .tb-more { top: 6px; right: 8px; }
+html[data-ui="modern"] .tb-more-menu { padding: 6px; border-radius: 8px; background: var(--m-surface, #fff); }
 html[data-ui="modern"] .sch-editor .se-more { top: 6px; right: 8px; }
 html[data-ui="modern"] .sch-editor .se-more-menu { padding: 6px; border-radius: 8px; }
 html[data-ui="modern"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar, .sch-editor .se-toolbar, .asm-editor .asm-toolbar, .emu-bar, .pin-planner .pp-bar)

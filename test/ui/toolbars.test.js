@@ -73,7 +73,7 @@ for (const theme of ['light', 'dark']) {
     for (const [name, b] of Object.entries(bars)) {
       assert.ok(b.n > 0, `${name}: its controls`);
       // (SSim's toolbar is its wave window's line in the Tasks interface: the line's height and padding)
-      const want = name === 'ssim' ? { min: '0px', pad: '6px 0px', controls: [28] } : { min: '40px', pad: '6px 8px', controls: [28] };
+      const want = name === 'ssim' ? { min: '0px', pad: '6px 0px', controls: [28] } : { min: '40px', pad: ['asm', 'schematic', 'truth table', 'fsm'].includes(name) ? '6px 40px 6px 8px' : '6px 8px', controls: [28] };   // (room for the menu at the right, #2208, #2257, #2260, #2261)
       assert.deepEqual({ min: b.min, pad: b.pad, controls: b.controls }, want, `${name}: ${JSON.stringify(b)}`);
     }
     // a page's fields as high as its buttons: Find in Project

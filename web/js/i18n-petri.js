@@ -5,7 +5,7 @@ export const PETRI_PT = {
   '— generated from the net': '— gerado a partir da rede', 'Open Petri Net': 'Abrir Rede de Petri',
   // toolbar
   '➚ Select': '➚ Selecionar', 'Place': 'Lugar', 'Transition': 'Transição', '→ Arc': '→ Arco', '⊸ Inhibitor': '⊸ Inibidor',
-  'Fit': 'Ajustar', '▶ Simulate': '▶ Simular', '</> HDL': '</> HDL', 'PNML ⇩': 'PNML ⇩', 'PNML ⇧': 'PNML ⇧',
+  'Analysis and PNML': 'Análise e PNML', 'Fit': 'Ajustar', '▶ Simulate': '▶ Simular', '</> HDL': '</> HDL', 'PNML ⇩': 'PNML ⇩', 'PNML ⇧': 'PNML ⇧',
   'Select and move (drag the background to pan, wheel to zoom)': 'Selecionar e mover (arraste o fundo para deslocar, roda para zoom)',
   'Click the drawing to add a place': 'Clique no desenho para acrescentar um lugar',
   'Click the drawing to add a transition': 'Clique no desenho para acrescentar uma transição',
