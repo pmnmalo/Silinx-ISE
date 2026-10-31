@@ -343,6 +343,65 @@ function compareMembers(p, q, cmp, dst, t, leafRef) {
   return q.end;
 }
 
+/** The chain of a struct variable's uses from k: v, v[i], v.m, p->m, …: { S (the struct reached, or null at a
+ *  leaf), leaf, prefix, sub (the members' suffix), idx (the indices given), dims, kind, end }. */
+function structPath(ts, k, { look, rewrite, report }) {
+  const b = look(ts[k].v);
+  let S = b.S, sub = '', dims = b.dims.slice(), idx = [], j = k + 1, leaf = null, ldims = [];
+  for (;;) {
+    if (op(ts[j], '[')) {
+      // (a pointer to structs indexed, #1684: its members' pointers indexed, core/c-pointer.js's arrays)
+      if (b.kind === 'ptr' && !idx.length && !sub && !dims.length) dims = [[]];
+      const e = closing(ts, j);
+      const inner = [];
+      rewrite(ts.slice(j + 1, e), inner, false);
+      // (an hls::vector indexed, v[i] (core/cpp-hls-lib.js, #1891): its array's element)
+      if (!leaf && S?.members[0]?.name === 'ap_d' && idx.length >= dims.length) { sub += '_ap_d'; leaf = S.members[0]; ldims = leaf.dims; S = null; }
+      if (leaf ? idx.length >= dims.length + ldims.length : idx.length >= dims.length) break;
+      idx.push(inner);
+      j = e + 1;
+      continue;
+    }
+    if (!leaf && (op(ts[j], '.') || op(ts[j], '->')) && isId(ts[j + 1])) {
+      if (op(ts[j], '->') !== (b.kind === 'ptr' && !sub && !idx.length)) { if (op(ts[j], '->')) report(ts[j], `'->' on '${ts[k].v}', which is not a pointer to a struct: write '.'`); }
+      if (idx.length < dims.length) { report(ts[j], `'${ts[k].v}' is an array of structs: index it before its member`); return bad(ts, k); }
+      const m = S.members.find((x) => x.name === ts[j + 1].v);
+      if (!m && S.methods?.has(ts[j + 1].v) && op(ts[j + 2], '(')) return { S, leaf: false, prefix: b.prefix, sub, idx, dims, kind: b.kind, end: j, method: S.methods.get(ts[j + 1].v) };
+      if (!m) { report(ts[j + 1], `'${ts[j + 1].v}' is not a member of ${S.name}`); return bad(ts, k); }
+      sub += `_${m.name}`;
+      if (m.struct) { S = m.struct; dims = [...dims, ...m.dims]; }
+      else { leaf = m; ldims = m.dims; S = null; }
+      j += 2;
+      // (a nested struct's member arrays: their sizes the outer's)
+      continue;
+    }
+    break;
+  }
+  if (!leaf && S && sub && dims.length > b.dims.length && idx.length < dims.length) { /* (a nested struct array, its element still to come) */ }
+  return { S, leaf: !!leaf, prefix: b.prefix, sub, idx, dims: leaf ? [...dims, ...ldims] : dims, kind: b.kind, end: j };
+}
+/** A leaf's tokens: its variable, indexed (the indices of the struct's arrays, then its own, i an index of the
+ *  member array's elements in order). */
+function structLeaf(report, p, l, t, i = null) {
+  const name = `${p.prefix}${p.sub}${l ? l.suffix : ''}`;
+  const dims = l ? [...p.dims, ...l.dims] : p.dims;
+  const own = l ? l.dims : [];
+  const idx = p.idx.slice();
+  let index = null;
+  if (dims.length) {
+    if (i) {
+      // (the struct's indices, then i over the member array's product)
+      const outer = lin(idx, dims.slice(0, dims.length - own.length), t);
+      index = outer ? [L(t, '('), ...outer, L(t, ')'), L(t, '*'), L(t, '('), ...product(own), L(t, ')'), L(t, '+'), { ...i }] : [{ ...i }];
+    } else if (idx.length === dims.length) index = lin(idx, dims, t);
+    else if (idx.length) report(t, `'${name}': an element of an array of structs, its member array indexed too (${name}[…])`);
+  }
+  const v = L(t, name, 'id');
+  if (index) return [v, L(t, '['), ...index, L(t, ']')];
+  if (p.kind === 'ptr' && !dims.length) return [L(t, '('), L(t, '*'), v, L(t, ')')];
+  return [v];
+}
+
 // ------------------------------------------------------------------ the uses
 function uses(toks, cx) {
   const { structs, sigs, report, cpp } = cx;
@@ -350,6 +409,8 @@ function uses(toks, cx) {
   const scopes = [new Map()];
   const bind = (name, b) => scopes.at(-1).set(name, b);
   const look = (name) => { for (let i = scopes.length - 1; i >= 0; i--) if (scopes[i].has(name)) return scopes[i].get(name); return null; };
+  const path = (ts, k) => structPath(ts, k, { look, rewrite, report });
+  const leafRef = (p, l, t, i) => structLeaf(report, p, l, t, i);
   let pendingScope = null, retOf = null, fnDepth = 0;
   const out = [];
   rewrite(toks, out, true);
@@ -590,64 +651,6 @@ function uses(toks, cx) {
     return [L(t, '&'), ...r];
   }
 
-  /** The chain of a struct variable's uses from k: v, v[i], v.m, p->m, …: { S (the struct reached, or null at a
-   *  leaf), leaf, prefix, sub (the members' suffix), idx (the indices given), dims, kind, end }. */
-  function path(ts, k) {
-    const b = look(ts[k].v);
-    let S = b.S, sub = '', dims = b.dims.slice(), idx = [], j = k + 1, leaf = null, ldims = [];
-    for (;;) {
-      if (op(ts[j], '[')) {
-        // (a pointer to structs indexed, #1684: its members' pointers indexed, core/c-pointer.js's arrays)
-        if (b.kind === 'ptr' && !idx.length && !sub && !dims.length) dims = [[]];
-        const e = closing(ts, j);
-        const inner = [];
-        rewrite(ts.slice(j + 1, e), inner, false);
-        // (an hls::vector indexed, v[i] (core/cpp-hls-lib.js, #1891): its array's element)
-        if (!leaf && S?.members[0]?.name === 'ap_d' && idx.length >= dims.length) { sub += '_ap_d'; leaf = S.members[0]; ldims = leaf.dims; S = null; }
-        if (leaf ? idx.length >= dims.length + ldims.length : idx.length >= dims.length) break;
-        idx.push(inner);
-        j = e + 1;
-        continue;
-      }
-      if (!leaf && (op(ts[j], '.') || op(ts[j], '->')) && isId(ts[j + 1])) {
-        if (op(ts[j], '->') !== (b.kind === 'ptr' && !sub && !idx.length)) { if (op(ts[j], '->')) report(ts[j], `'->' on '${ts[k].v}', which is not a pointer to a struct: write '.'`); }
-        if (idx.length < dims.length) { report(ts[j], `'${ts[k].v}' is an array of structs: index it before its member`); return bad(ts, k); }
-        const m = S.members.find((x) => x.name === ts[j + 1].v);
-        if (!m && S.methods?.has(ts[j + 1].v) && op(ts[j + 2], '(')) return { S, leaf: false, prefix: b.prefix, sub, idx, dims, kind: b.kind, end: j, method: S.methods.get(ts[j + 1].v) };
-        if (!m) { report(ts[j + 1], `'${ts[j + 1].v}' is not a member of ${S.name}`); return bad(ts, k); }
-        sub += `_${m.name}`;
-        if (m.struct) { S = m.struct; dims = [...dims, ...m.dims]; }
-        else { leaf = m; ldims = m.dims; S = null; }
-        j += 2;
-        // (a nested struct's member arrays: their sizes the outer's)
-        continue;
-      }
-      break;
-    }
-    if (!leaf && S && sub && dims.length > b.dims.length && idx.length < dims.length) { /* (a nested struct array, its element still to come) */ }
-    return { S, leaf: !!leaf, prefix: b.prefix, sub, idx, dims: leaf ? [...dims, ...ldims] : dims, kind: b.kind, end: j };
-  }
-  /** A leaf's tokens: its variable, indexed (the indices of the struct's arrays, then its own, i an index of the
-   *  member array's elements in order). */
-  function leafRef(p, l, t, i = null) {
-    const name = `${p.prefix}${p.sub}${l ? l.suffix : ''}`;
-    const dims = l ? [...p.dims, ...l.dims] : p.dims;
-    const own = l ? l.dims : [];
-    const idx = p.idx.slice();
-    let index = null;
-    if (dims.length) {
-      if (i) {
-        // (the struct's indices, then i over the member array's product)
-        const outer = lin(idx, dims.slice(0, dims.length - own.length), t);
-        index = outer ? [L(t, '('), ...outer, L(t, ')'), L(t, '*'), L(t, '('), ...product(own), L(t, ')'), L(t, '+'), { ...i }] : [{ ...i }];
-      } else if (idx.length === dims.length) index = lin(idx, dims, t);
-      else if (idx.length) report(t, `'${name}': an element of an array of structs, its member array indexed too (${name}[…])`);
-    }
-    const v = L(t, name, 'id');
-    if (index) return [v, L(t, '['), ...index, L(t, ']')];
-    if (p.kind === 'ptr' && !dims.length) return [L(t, '('), L(t, '*'), v, L(t, ')')];
-    return [v];
-  }
 }
 
 /** A pragma naming a struct (port=, variable=; look: its binding) pushed once per member, its name the member's (said
