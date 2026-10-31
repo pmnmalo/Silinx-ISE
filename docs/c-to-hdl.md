@@ -220,8 +220,12 @@ are read and the next call may start; `ap_done` (one cycle) says the outputs and
 valid; `ap_idle` is 1 while no call runs.
 
 An argument named as a reserved word of VHDL or Verilog (`in`, `out`, `signal`…), or as one of the names Vitis HLS
-reserves (`pos`, `neg`, #1902), has its ports named `<name>_r` (`in_r_dout`, `pos_r`), with a warning, as Vitis HLS
-names them.
+reserves (`pos`, `read`, `write`, `value`, `length`, `rst`, the block protocol's `ap_start`, `ap_return`…; #1902,
+#1926), in any letter case, has its ports named `<name>_r` (`in_r_dout`, `pos_r`), with a warning, as Vitis HLS 2025.2
+names them (`test/hls-corpus/vitis-names.json`, from `scripts/hls-vitis-names.mjs`). `neg` and SystemC's other names
+(`sensitive`, `sc_module`, `clk`) are kept. Vitis keeps a few words of the languages: VHDL-2008's PSL words (`vunit`…)
+and SystemVerilog-2009's (`soft`, `nettype`…) are kept too; `units`, `uwire`, `include`, `incdir` and `rtranif1`, which
+Silinx's VHDL or Verilog would not compile with, are renamed, and their warning says Vitis does not.
 
 A function with no `static` variable whose loops all have constant bounds (fully unrolled) is
 **combinational**: with `ap_ctrl_hs`, `ap_done` and `ap_ready` follow `ap_start` and `ap_idle` is 1;
