@@ -41,7 +41,7 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
     return gen.ok ? axiWrap(gen, axi, { name, src: file.split('/').pop(), lang, file }) : gen;
   }
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
-  foldTables(checked);
+  foldTables(checked, diagnostics);
   const flatErrs = [];
   flattenArrays(checked, (loc, message) => flatErrs.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'error' }));
   if (flatErrs.length) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, ...flatErrs] };

@@ -57,7 +57,8 @@ is: the hardware gives the C simulation's bits. C's usual conversions: a double 
 too, makes an operation a double's; write `0.5f` to keep it a float's. **A table computed at synthesis** (#1779): a call
 of a function that only writes its arrays from constants (no argument read, no global but a constant, no call but
 `math.h`'s), as `for (i…) t[i] = sin(…)`, is run by the C simulation at synthesis, its values the arrays' (a ROM), as
-Vitis HLS computes one; `math.h` and a division of constants are folded the same way. Of other
+Vitis HLS computes one; so is such a loop in the function's own body, its writes depending only on constants and its own
+index, the array used only by reading its elements after it (#2151: the loop is not made); `math.h` and a division of constants are folded the same way. Of other
 values: a division (`/`), `sqrt` / `sqrtf` and `fabs` / `fabsf` are made (#1783), and `floor`, `ceil`, `trunc`,
 `round`, `fmin`, `fmax`, `copysign` (and their `…f`) on the value's bits (#1843); the others not yet (#1761).
 
