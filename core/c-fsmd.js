@@ -20,8 +20,9 @@ import { memMethods, MEM_MIN } from './c-mem.js';
 import { partitionMethods } from './c-partition.js';
 import { fifoMethods } from './c-fifo.js';
 import { wordMethods } from './c-agg-mem.js';
-import { loopPragma, unrollBy } from './c-pragma.js';
+import { loopPragma, tripcountArgs, unrollBy } from './c-pragma.js';
 import { inlineCalls } from './c-inline.js';
+import { withSeqMath } from './c-dataflow-float.js';
 import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from './c-pipeline.js';
 
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
@@ -239,7 +240,7 @@ class SeqFlow extends Flow {
     this.blocks = [];
     try {
       // (the calls of a function with a loop, or given an array: inlined, its loops the top's, #1632)
-      const inl = { ...fn, body: inlineCalls(fn, funcs, (loc, m) => this.error(loc, m)) };
+      const inl = { ...fn, body: inlineCalls(fn, withSeqMath(funcs), (loc, m) => this.error(loc, m)) };
       this.fn = inl;
       const { body, decls } = this.renameLocals(inl);
       this.makeRegisters(inl, decls);
@@ -433,7 +434,11 @@ class SeqFlow extends Flow {
     return y;
   }
   tripOf(s) { return this.loopCount(s).trip; }
-  loopCount(s) { return this.c.loops.find((l) => l.loc.line === s.loc.line && l.loc.col === s.loc.col) || { trip: null, max: null }; }
+  loopCount(s) {
+    // (the library's loop, inlined: its bound its LOOP_TRIPCOUNT's, core/c-mathlib.js's fmod, #2144)
+    if (s.library) { const pg = (s.body?.items || []).find((x) => x?.kind === 'pragma' && x.pragma.name === 'LOOP_TRIPCOUNT'); return { trip: null, max: pg ? Number(tripcountArgs(pg.pragma.text).max) : null }; }
+    return this.c.loops.find((l) => l.loc.line === s.loc.line && l.loc.col === s.loc.col) || { trip: null, max: null };
+  }
   /** The record of a loop for the report: its line, its count (checkC's), what its pragmas made. */
   loopInfo(s) {
     const c = this.loopCount(s);
