@@ -101,5 +101,5 @@ export function mountS6Steps(ctx) {
     log('All signals are completely routed.');
   }
 
-  return { runMap, runPar };
+  return { runMap, runPar, state: () => ({ packed, phys, sites }) };
 }

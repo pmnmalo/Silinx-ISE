@@ -42,6 +42,7 @@ import { bitgen, knownRouting } from './fpga/bitgen.js';
 import { mountFlowReports } from './open-flow-reports.js';
 import { mountS6Steps } from './open-flow-s6.js';
 import { mountNextpnrSteps } from './open-flow-nextpnr.js';
+import { mountNextpnrS6 } from './open-flow-nextpnr-s6.js';
 
 // without the HDL front end (io.frontEnd): the sources are the flat Verilog given to Yosys, its top module `top` (#1675)
 function flatVerilog(srcs, top) {
@@ -262,7 +263,9 @@ export async function runFlow(spec, io) {
   // the Spartan-6's Map and Place & Route (#732: open-flow-s6.js)
   const s6 = spec.family === 'spartan6' ? mountS6Steps({ io, spec, log, report, util, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
   // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine
-  const np = spec.engine === 'nextpnr' ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
+  // (the Spartan-6: Silinx's Map, nextpnr's Place & Route, #2138)
+  const npS6 = spec.engine === 'nextpnr' && s6 ? mountNextpnrS6({ io, spec, log, report, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; }, state: s6.state }) : null;
+  const np = spec.engine === 'nextpnr' && !s6 ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
 
   const { bitfile, runPins, runPower, runTiming } = mountFlowReports({
     io, spec, log, report, routedOrEarlier: (...a) => routedOrEarlier(...a), routedText: () => routedText, top, ucfText
@@ -291,7 +294,7 @@ export async function runFlow(spec, io) {
     if (steps.includes('posttrans')) { step('posttrans'); await runPostTranslate(); save(); }
     if (steps.includes('map')) { step('map'); (np ? np.runMap : s6 ? s6.runMap : runMap)(); save(); }
     if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
-    if (steps.includes('par')) { step('par'); await (np ? np.runPar : s6 ? s6.runPar : runPar)(); save(); }
+    if (steps.includes('par')) { step('par'); await (np ? np.runPar : npS6 ? npS6.runPar : s6 ? s6.runPar : runPar)(); save(); }
     if (steps.includes('trce')) { step('trce'); routedOrEarlier(); runTiming(); save(); }
     if (steps.includes('postpar')) { step('postpar'); await runPostPar(); save(); }
     if (steps.includes('pin2ucf')) { step('pin2ucf'); runPins(); save(); }
