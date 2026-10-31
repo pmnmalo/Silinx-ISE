@@ -27,11 +27,11 @@
   "migration-vitis-unified-cli": [],
   "modeling-cpp-templates-for-multiple-instances": [
     "20 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
-    "27 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function",
-    "27 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function",
-    "27 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function",
-    "27 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function",
-    "27 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function"
+    "27 warning: #pragma HLS INLINE off: 'func_with_static_1' is inlined: its caller waits for an AXI master (ap_ce), it would not (not yet)",
+    "27 warning: #pragma HLS INLINE off: 'func_with_static_2' is inlined: its caller waits for an AXI master (ap_ce), it would not (not yet)",
+    "27 warning: #pragma HLS INLINE off: 'func_with_static_3' is inlined: its caller waits for an AXI master (ap_ce), it would not (not yet)",
+    "27 warning: #pragma HLS INLINE off: 'func_with_static_4' is inlined: its caller waits for an AXI master (ap_ce), it would not (not yet)",
+    "27 warning: #pragma HLS INLINE off: 'func_with_static_5' is inlined: its caller waits for an AXI master (ap_ce), it would not (not yet)"
   ],
   "modeling-pointers-basic-arithmetic": [
     "23 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'd' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off"

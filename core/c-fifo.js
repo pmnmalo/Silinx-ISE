@@ -141,7 +141,8 @@ export const fifoMethods = {
         const a = st.fifo?.get(f.name);
         if (!a) continue;
         // (a state with another access that waits: none taken while it waits, #1919)
-        const ok = st.stall !== this.F ? this.and(a.ok, this.not(st.stall)) : a.ok;
+        // (a sub-module's call: its accesses are its own while the state waits for it, #1960)
+        const ok = st.stall !== this.F && !a.free ? this.and(a.ok, this.not(st.stall)) : a.ok;
         // (ap_hs: a write's _ap_vld does not wait for its _ap_ack; it may answer it, #1901)
         const here = this.and(this.g.add('eq', [cs, this.g.const(st.id, this.stateT)], BOOL), f.hs && a.d !== undefined && !st.gate ? a.g : this.and(a.g, ok));
         go = this.or(go, here);
