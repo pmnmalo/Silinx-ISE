@@ -409,6 +409,8 @@ export function saveProjectJson() {
   };
   return (projectSaves = projectSaves.then(run, run));
 }
+/** The saves asked so far done (a reload reads the project after them, #2281). */
+export const projectSaved = () => projectSaves;
 
 // Remove from Project: the file stays in the project folder (as in ISE); Undo / Add to Project
 // bring it back. HDL files leave the file list; other files (diagrams, tables, UCF) are listed in
