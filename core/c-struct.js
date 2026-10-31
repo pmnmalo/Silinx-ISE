@@ -239,6 +239,8 @@ function signatures(toks, cx) {
 const leaves = (S) => S.members.flatMap((m) => (m.struct ? leaves(m.struct).map((l) => ({ suffix: `_${m.name}${l.suffix}`, type: l.type, dims: [...m.dims, ...l.dims] })) : [{ suffix: `_${m.name}`, type: m.type, dims: m.dims }]));
 const product = (dims) => (dims.length ? dims.flatMap((d, i) => [...(i ? [L(d[0], '*')] : []), L(d[0], '('), ...d, L(d[0], ')')]) : null);
 
+const COPY_STATEMENTS = 64;   // (the iterations of an inner loop its parent's pipelining unrolls, core/c-pipeline.js's threshold)
+
 /** A parameter's tokens for a leaf of its struct. */
 function paramTokens(pa, l, name, t, cpp) {
   const ty = [...(pa.constQ ? [L(t, 'const', 'id')] : []), ...l.type.map((x) => ({ ...x }))];
@@ -511,6 +513,12 @@ function uses(toks, cx) {
     const s1 = once(s);
     for (const l of leaves(dstP.S)) {
       if (!l.dims.length) { dst.push(...leafRef(dstP, l, t), L(t, '='), ...leafRef(s1, l, t), L(t, ';')); continue; }
+      // (a member array of few elements: a statement each, no loop, so that the loop around it can be pipelined, #2126)
+      const n = l.dims.reduce((a, d) => (d.length === 1 && d[0].t === 'num' ? a * Number(d[0].v) : NaN), 1);
+      if (n <= COPY_STATEMENTS) {
+        for (let k = 0; k < n; k++) { const e = L(t, String(k), 'num'); dst.push(...leafRef(dstP, l, t, e), L(t, '='), ...leafRef(s1, l, t, e), L(t, ';')); }
+        continue;
+      }
       // (a member array: element by element)
       const i = L(t, `ap_c${fresh++}`, 'id');
       dst.push(L(t, 'for', 'id'), L(t, '('), L(t, 'int', 'id'), i, L(t, '='), L(t, '0', 'num'), L(t, ';'), { ...i }, L(t, '<'), L(t, '('), ...product(l.dims), L(t, ')'), L(t, ';'), { ...i }, L(t, '++'), L(t, ')'),
