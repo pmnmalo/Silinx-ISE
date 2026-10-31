@@ -599,6 +599,20 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   are the XC6SLX16's (`CMT_REGC`), in frame 5104.
 - **The residual** (`residual6.mjs --no-cmt-paths` on the 184 designs): all 184 exact. The XC6SLX16's 203 unchanged.
 
+### The I/O logic's clock and the CMTs' HCLK outputs (#2025, S6-E6, 2026-10-31)
+
+- **The PIPs no database had** (`gen-flowdrop6.mjs` on the XC6SLX16's 190 CMT and example designs: 63 PIPs, one drop
+  each from 28 designs, 91 XDL, 25 minutes; `ana-cmtdrop6.mjs`): a global clock to an OLOGIC2's or ILOGIC2's CLK0 in a
+  BIOI tile (`IOI_GFAN0` / `IOI_CLK0 -> IOI_CLK1INTER_M -> IOI_CLKDIST_CLK0_*LOGIC_M -> CLK0_*LOGIC_SITE`), a DCM's or
+  PLL's outputs onto the HCLK lines (`DCM1_CLKOUT* -> DCM_HCLK*`, `CMT_PLL_CLKOUT* -> CMT_PLL_HCLK3`), some REG_B BUFIO2
+  inputs and a DCM's CLKIN and CLKFB paths from the other DCM's side; 42 with bits. Those whose bits are near their
+  tile (56) joined `db/s6-pips-flow.json`, the same on every device; those with bits far from it (7: the I/O words, the
+  CMT column) `db/xc6slx16-pips-cmt.json`.
+- **The residual** (`residual6.mjs --no-cmt-paths`, the 203 designs): 122 exact (103 before), 264 bits left over (767),
+  none predicted that ISE does not set; the XC6SLX45's 184 stay exact. What is left: an OLOGIC2's output flip-flop's
+  settings (`OMUX::OUTFF`; 2 bits of its BIOI tile and 1 of the HCLK row's, in 81 designs) and the BUFIO2s of the
+  clock pads the input table was not measured from (U10, T9, R8: the I/O words and a PLL's CLKIN path).
+
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
 XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the part holding an instance (`gen-hard6.mjs`;
