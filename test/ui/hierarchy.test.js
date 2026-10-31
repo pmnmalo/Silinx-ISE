@@ -15,6 +15,8 @@ import fs from 'node:fs';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
 import { newDoc, normalizeDoc, symbolPins } from '../../core/schdoc.js';
 import { viewHdl } from '../../core/view-hdl.js';
+import { newModel } from '../../core/asm.js';
+import { newFsm } from '../../core/fsm.js';
 const IMPORT = process.env.SILINX_UI_INTERFACE === 'classic' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
 // a module's Create Test Bench (Wizard): the classic interface's only (the Tasks interface's test benches on its Test page, #1330)
@@ -286,20 +288,30 @@ const KINDS = [
   { type: 'tt', name: 't1', file: 'src/t1.bool.json', ico: 'algebra', badge: 'Algebra', views: ' [Schematic]', id: 'tt:src/t1.bool.json' },
   { type: 'petri', name: 'p1', file: 'src/p1.pn.json', ico: 'petri', badge: 'Petri', id: 'pn:src/p1.pn.json' },
 ];
+// a chart starts empty (#2176), with no HDL until it can have one: one with its states, already in the project
+const CHART = { asm: [newModel, 'openAsm'], fsm: [newFsm, 'openFsm'] };
+const charts = (lang) => Object.fromEntries(KINDS.filter((k) => CHART[k.type]).map((k) => [k.file, JSON.stringify(CHART[k.type][0](k.name, lang), null, 2)]));
+// a schematic, a truth table or a Petri net (empty, it has no problems) by New Source; a chart opened
+async function newOrOpen(page, k) {
+  if (CHART[k.type]) await page.eval((fn, file) => window.SilinxApp[fn](file), CHART[k.type][1], k.file);
+  else {
+    await page.eval(async (t) => { (await import('/js/wizards.js')).newSourceWizard({ type: t }); }, k.type);
+    await page.waitDialog('New Source');
+    await page.dialogButton('Next >');
+    await page.fill('.dlg-overlay .wiz-main input[type=text]', k.name);
+    await page.dialogButton('Next >');
+    await page.dialogButton('Finish');
+    await page.waitNoDialog();
+  }
+  await page.waitFor((id) => window.Silinx.active?.id === id, [k.id], { what: `the editor of ${k.file}` });
+}
 for (const [lang, L, ext] of [['vhdl', 'VHDL', 'vhd'], ['verilog', 'Verilog', 'v']]) {
-  uiTest(`every source has its HDL (#207): New Source of a schematic, ASM chart, state diagram, truth table and Petri net creates its HDL file at once; its row: [drawing*] [${L}] (preferred language ${L}, #220)`, E, async (page) => {
+  uiTest(`every source has its HDL (#207): New Source of a schematic, truth table and Petri net creates its HDL file at once, an ASM chart and state diagram with states have it; its row: [drawing*] [${L}] (preferred language ${L}, #220)`, E, async (page) => {
     const pj = `H_new_${lang}`;
-    await makeProject(env, { name: pj, top: '', preferredLanguage: lang });
+    await makeProject(env, { name: pj, top: '', preferredLanguage: lang, files: charts(lang) });
     await page.openProject(pj);
     for (const k of KINDS) {
-      await page.eval(async (t) => { (await import('/js/wizards.js')).newSourceWizard({ type: t }); }, k.type);
-      await page.waitDialog('New Source');
-      await page.dialogButton('Next >');
-      await page.fill('.dlg-overlay .wiz-main input[type=text]', k.name);
-      await page.dialogButton('Next >');
-      await page.dialogButton('Finish');
-      await page.waitNoDialog();
-      await page.waitFor((id) => window.Silinx.active?.id === id, [k.id], { what: `the editor of ${k.file}` });
+      await newOrOpen(page, k);
       const hdl = `src/${k.name}.${ext}`;
       await page.waitConsole(new RegExp(`${hdl.replace('.', '\\.')} generated from ${k.file.replace(/\./g, '\\.')} \\(every source has its HDL\\)`));
       await page.waitFor((f, h) => window.Silinx.hdlToSch?.[h] === f, [k.file, hdl], { what: `${k.file} linked to ${hdl}` });
@@ -313,6 +325,24 @@ for (const [lang, L, ext] of [['vhdl', 'VHDL', 'vhd'], ['verilog', 'Verilog', 'v
     assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
   });
 }
+
+uiTest('#2176 #207 New Source of an empty ASM chart or state diagram: no HDL file until it can have one, no warnings', E, async (page) => {
+  await makeProject(env, { name: 'H_empty', top: '' });
+  await page.openProject('H_empty');
+  for (const k of KINDS.filter((x) => CHART[x.type])) {
+    await page.eval(async (t) => { (await import('/js/wizards.js')).newSourceWizard({ type: t }); }, k.type);
+    await page.waitDialog('New Source');
+    await page.dialogButton('Next >');
+    await page.fill('.dlg-overlay .wiz-main input[type=text]', k.name);
+    await page.dialogButton('Next >');
+    await page.dialogButton('Finish');
+    await page.waitNoDialog();
+    await page.waitFor((id) => window.Silinx.active?.id === id, [k.id], { what: `the editor of ${k.file}` });
+    assert.equal(JSON.parse(await readWs(env, 'H_empty', k.file)).generatedFile, undefined, k.file);
+    assert.equal(await page.eval((f) => window.Silinx.fileTree.includes(f), `src/${k.name}.vhd`), false, k.file);
+  }
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+});
 
 uiTest('Design pane (#207) from the keyboard: ↑ / ↓ select, ← / → collapse / expand, Enter opens the base, Tab reaches the selected row\'s badges, Enter on a badge opens that view', E, async (page) => {
   await makeProject(env, { name: 'H_keys', template: 'traffic' });
@@ -494,17 +524,10 @@ end architecture rtl;
 // a drawing's HDL language (its editor's HDL language, a schematic's Language): its HDL file made again in it, the other one
 // removed (no Generate HDL any more, #220); a truth table's too (#696)
 uiTest('a drawing\'s HDL language changed in its editor (ASM chart, state diagram, truth table, Petri net; a schematic\'s Language): its HDL file made again in that language, the other one removed (#220, #696)', E, async (page) => {
-  await makeProject(env, { name: 'H_lang', top: '' });
+  await makeProject(env, { name: 'H_lang', top: '', files: charts('vhdl') });
   await page.openProject('H_lang');
   for (const k of KINDS) {
-    await page.eval(async (t) => { (await import('/js/wizards.js')).newSourceWizard({ type: t }); }, k.type);
-    await page.waitDialog('New Source');
-    await page.dialogButton('Next >');
-    await page.fill('.dlg-overlay .wiz-main input[type=text]', k.name);
-    await page.dialogButton('Next >');
-    await page.dialogButton('Finish');
-    await page.waitNoDialog();
-    await page.waitFor((id) => window.Silinx.active?.id === id, [k.id], { what: `the editor of ${k.file}` });
+    await newOrOpen(page, k);
     await page.waitFor((f, h) => window.Silinx.hdlToSch?.[h] === f, [k.file, `src/${k.name}.vhd`], { what: `${k.file} linked to its VHDL` });
     for (const [lang, ext, other, L] of [['verilog', 'v', 'vhd', 'Verilog'], ['vhdl', 'vhd', 'v', 'VHDL']]) {
       await page.eval((l) => { const s = document.querySelector('.doc:not([hidden]) select[title="HDL language"]') || [...document.querySelectorAll('.doc:not([hidden]) .se-field')].find((f) => f.querySelector('label').textContent === 'Language').querySelector('select'); s.value = l; s.dispatchEvent(new Event('change')); }, lang);

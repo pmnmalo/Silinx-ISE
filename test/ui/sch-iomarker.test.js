@@ -78,8 +78,9 @@ uiTest('#680 schematic: I/O markers placed on empty space (the next free name), 
     assert.equal(await hint(page), 'Adicionar Marcador de E/S: clique na ponta de um fio, num pino ou num espaço vazio para adicionar um marcador de porto (um fio até à sua ponta liga-o depois).');
     await page.click(await at(page, (A.x + Y.x) / 2, A.y + 40));
     await page.waitFor(() => document.activeElement?.matches('.se-prompt input'), [], { what: 'port name prompt focused' });
-    await page.waitFor(() => document.querySelector('.se-prompt label')?.textContent === 'Nome do porto de entrada', [], { what: 'the prompt in Portuguese' });
-    assert.deepEqual(await prompt(page), { label: 'Nome do porto de entrada', value: 'in2' });
+    await page.waitFor(() => document.querySelector('.se-prompt label')?.textContent === 'Nome do porto de saída', [], { what: 'the prompt in Portuguese' });
+    // (the direction of the marker added last, out1: #2170)
+    assert.deepEqual(await prompt(page), { label: 'Nome do porto de saída', value: 'out2' });
     await page.key('Escape');
     await page.waitFor(() => !document.querySelector('.se-prompt'), [], { what: 'prompt closed' });
     d = await getDoc(page);

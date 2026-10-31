@@ -143,14 +143,16 @@ uiTest('New Source on an existing drawing: Replace / Cancel (in Portuguese too);
   await page.dialogButton('Finish');
   await page.waitNoDialog();
   let fsm = JSON.parse(OLD_FSM);
-  // (its HDL file, generated from the old FSM, made again from the new one and linked)
-  for (let i = 0; i < 200 && (fsm.comment || fsm.generatedFile !== 'src/ctl.vhd'); i++) { fsm = JSON.parse(await readWs(env, 'Repl3', 'src/ctl.fsm.json')); await new Promise((r) => setTimeout(r, 50)); }
+  // the new FSM, empty (#2176): the old one's HDL file gone with it, none until it can have one
+  for (let i = 0; i < 200 && fsm.comment; i++) { fsm = JSON.parse(await readWs(env, 'Repl3', 'src/ctl.fsm.json')); await new Promise((r) => setTimeout(r, 50)); }
   assert.equal(fsm.comment, undefined, 'replaced');
   assert.equal(fsm.name, 'ctl');
+  assert.deepEqual(fsm.states, []);
+  assert.equal(fsm.generatedFile, undefined);
   await assert.rejects(readWs(env, 'Repl3', 'src/ctl.fsm.json.fsm.json'));
-  // one entry: the drawing's HDL in the project once, its module once
-  assert.deepEqual(await page.eval(() => window.Silinx.project.files.map((f) => f.path)), ['src/inv.vhd', 'src/ctl.vhd']);
-  assert.equal(await page.eval(() => window.Silinx.modules.filter((m) => m.name === 'ctl').length), 1);
+  // the drawing's HDL not in the project, its module neither
+  await page.waitFor(() => window.Silinx.project.files.map((f) => f.path).join() === 'src/inv.vhd' && !window.Silinx.modules.some((m) => m.name === 'ctl'), [], { what: 'no HDL of the empty FSM' });
+  await assert.rejects(readWs(env, 'Repl3', 'src/ctl.vhd'));
   assert.deepEqual(await logWarnings(page), []);
   assert.deepEqual(warnings(page), []);
 });
