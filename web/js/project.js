@@ -119,7 +119,10 @@ async function reloadProjectNow(render = true, depth = 0) {
       if (d.generatedFile && S.fileTree.includes(d.generatedFile) && !hdlToSch[d.generatedFile]) { schOwners[f] = d.generatedFile; hdlToSch[d.generatedFile] = f; viewModule[f] = d.name; }
     } catch { /* unreadable */ }
   }
-  Object.assign(S, { schOwners, hdlToSch, viewModule, viewTexts });
+  // (the RTL blackboxes of its C functions, as it opens, #1903)
+  const { blackboxesIn } = await import('/core/c-blackbox.js');
+  const hls = await blackboxesIn(S.diskTree, f => api.readFile(pj.name, f)).catch(() => null);
+  Object.assign(S, { schOwners, hdlToSch, viewModule, viewTexts, hls });
   compileProject();
   // a drawing whose base was its HDL (before #220) is made the base; a drawn source without its HDL
   // file gets it (#207): read the project again with them

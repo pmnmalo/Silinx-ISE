@@ -46,7 +46,7 @@ export async function openCAsm(path) {
   const old = findDoc(id);
   if (old) await closeDoc(old);
   const { cAsm } = await import('/core/c-asm.js');
-  const r = cAsm(await text(path), { file: path, lang: hdlLang(), clock: hlsClock(), family: hlsFamily() });
+  const r = cAsm(await text(path), { file: path, lang: hdlLang(), clock: hlsClock(), family: hlsFamily(), ...(S.hls || {}) });
   if (!r.ok) { log(`ERROR:SilinxC - "${path}" ${r.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`).join('; ')}`, 'err'); return null; }
   const { mountAsmEditor } = await import('./asm-editor.js');
   const name = `${r.model.name}.asm`;
@@ -91,7 +91,7 @@ export async function runCSimulation(path) {
   showConsolePage('console');
   showCommandLines('sim');   // (in the Edit task too, #2262)
   const src = await text(path);
-  const r = simulateC(src, { file: path, files: await tbFiles(src) });
+  const r = simulateC(src, { file: path, files: await tbFiles(src), ...(S.hls || {}) });
   if (r.output) for (const l of r.output.replace(/\n$/, '').split('\n')) log(l);
   // (the files it wrote: in memory, the project's left as they are)
   const wrote = Object.keys(r.files || {});
@@ -115,7 +115,7 @@ export async function runCosimulation(path) {
   showConsolePage('console');
   showCommandLines('sim');
   const src = await text(path);
-  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src), clock: hlsClock(), family: hlsFamily() });
+  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src), clock: hlsClock(), family: hlsFamily(), ...(S.hls || {}) });
   for (const e of r.errors) log(`ERROR:SilinxC - "${path}" ${e}`, 'err');
   if (!r.ok || r.errors.length) { log('\nProcess "C/RTL Co-simulation" failed', 'err', { diag: false }); return false; }
   log(`C simulation: ${r.calls} call(s) of '${r.gen.top}' replayed on its ${lang === 'vhdl' ? 'VHDL' : 'Verilog'}.`);
@@ -151,7 +151,7 @@ export async function runCReport(path) {
   showConsolePage('console');
   showCommandLines('impl');
   const clock = hlsClock();
-  const r = cToHdl(await text(path), { file: path, lang, clock, family: hlsFamily() });
+  const r = cToHdl(await text(path), { file: path, lang, clock, family: hlsFamily(), ...(S.hls || {}) });
   for (const d of r.diagnostics) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:SilinxC - "${path}" line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn');
   if (!r.ok) { log('\nProcess "View C Synthesis Report" failed', 'err', { diag: false }); return false; }
   const rep = r.report;
@@ -162,6 +162,7 @@ export async function runCReport(path) {
   else L.push(rep.sequential ? `Module: sequential, ${ctrl}, ${rep.states} states, ${rep.registerBits} register bits` : 'Module: combinational');
   // (the clock it was scheduled for: the board's, #1924)
   L.push(`Target clock: ${clock} ns (the board's oscillator)`);
+  for (const b of r.blackboxes || []) L.push(`RTL blackbox: ${b.name} is the module ${b.module} (${b.rtl.map((f) => f.path.split('/').pop()).join(', ')})`);
   L.push('', 'Ports:');
   for (const p of r.ports) L.push(`  ${p.name.padEnd(16)} ${p.dir === 'in' ? 'in ' : 'out'} ${String(p.w).padStart(3)} bit${p.w > 1 ? 's' : ''}`);
   // (DATAFLOW, #1707: each process a module, the FIFOs between them)

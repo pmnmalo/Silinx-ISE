@@ -37,7 +37,7 @@ export function inlineCalls(fn, funcs, report) {
     if (seen.has(f.name)) return false;
     seen.add(f.name);
     const r = !!f.body && (has(f.body, isLoop) || f.params.some((p) => p.type.kind === 'array')
-      || has(f.body, (n) => n.kind === 'call' && n.callee.kind === 'id' && funcs.get(n.callee.name) && needs(funcs.get(n.callee.name), seen)));
+      || has(f.body, (n) => n.kind === 'call' && n.callee.kind === 'id' && funcs.get(n.callee.name) && (funcs.get(n.callee.name).blackbox || needs(funcs.get(n.callee.name), seen))));
     memo.set(f.name, r);
     return r;
   };

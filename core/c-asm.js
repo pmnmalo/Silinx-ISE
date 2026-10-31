@@ -16,10 +16,13 @@ import { exprText, stmtText } from './c-print.js';
 import { asmLayout } from './asm-layout.js';
 import { cToHdl } from './c-hdl.js';
 import { portOf } from './c-names.js';
+import { loadBlackboxes, applyBlackboxes } from './c-blackbox.js';
 
-export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, clock, family } = {}) {
+export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, clock, family, blackboxes = null } = {}) {
   const checked = checkC(source, file, { headers, top, synthesis: true });
   if (!checked.ok || !checked.top) return { ok: false, model: null, diagnostics: checked.diagnostics };
+  // (the RTL blackboxes, #1903: cToHdl below says what is wrong with them)
+  applyBlackboxes(checked, loadBlackboxes(blackboxes, headers).list, () => {});
   const df = dataflow(checked);
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
   if (!seqOnly) {
@@ -29,7 +32,7 @@ export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, 
   const m = scheduled(checked, {}, { clock, family });
   if (m.diagnostics.some((d) => d.severity === 'error')) return { ok: false, model: null, diagnostics: m.diagnostics };
   // (the ports the module is made with: ap_ctrl_none's none of the block protocol, an argument renamed, #1927)
-  const gen = cToHdl(source, { file, lang, headers, top, clock, family });
+  const gen = cToHdl(source, { file, lang, headers, top, clock, family, blackboxes });
   if (!gen.ok) return { ok: false, model: null, diagnostics: gen.diagnostics };
   return { ok: true, model: asmLayout(chart(checked.top, m, lang, gen.ports)), diagnostics: m.diagnostics };
 }
@@ -111,6 +114,18 @@ function chart(top, m, lang, ports) {
           edge(d, s, 'false');
           cur = null; pending = [{ from: d, port: 'true' }];
           act(rd ? `${f}_read = 1; ${x.tmp} = ${f}_dout` : `${f}_din = ${exprText(x.v)}; ${f}_write = 1`);
+          return;
+        }
+        // an RTL blackbox's call (#1903): its module started, the state waiting for its end, its outputs then read
+        case 'bbcall': {
+          if (!cur && !pending.length) return;
+          const P = `ap_bb${x.inst.i}`;
+          act(`${P} (${x.inst.d.module}): ap_start = 1`);
+          const d = node({ type: 'decision', cond: `${P}_done` });
+          for (const p of pending) edge(p.from, d, p.port);
+          edge(d, s, 'false');
+          cur = null; pending = [{ from: d, port: 'true' }];
+          act(x.inst.outs.map((o) => `${o.q} = ${P}_${o.name}_v`).join('; ') || `${P} done`);
           return;
         }
         case 'for': case 'while': case 'do': act(`${x.kind} (…) unrolled: ${loopText(x)}`); return;

@@ -24,9 +24,17 @@ test('#1597 the manifest: AMD\'s examples at a pinned commit (Apache-2.0); every
 
 test('#1597 a config as Vitis HLS writes it; a design from it (files of another folder, a test bench folder, the headers beside its sources)', () => {
   const cfg = readConfig('part=xc7z020\n[hls]\nflow_target=vivado\nclock=4\nsyn.file=../top.c\nsyn.top=top\ntb.file=top_test.c\ntb.file=data # golden\nsyn.directive.interface=top mode=m_axi port=d\n');
-  assert.deepEqual(cfg, { top: 'top', files: ['../top.c'], tb: ['top_test.c', 'data'], flow: 'vivado', clock: '4', directives: ['interface top mode=m_axi port=d'] });
+  assert.deepEqual(cfg, { top: 'top', files: ['../top.c'], tb: ['top_test.c', 'data'], blackbox: [], flow: 'vivado', clock: '4', directives: ['interface top mode=m_axi port=d'] });
   const d = designOf('A/b', cfg, ['A/top.c', 'A/top.h', 'A/b/top_test.c', 'A/b/data/in.dat', 'A/b/data/out.dat', 'A/b/other.hpp', 'B/x.h']);
   assert.deepEqual(d, { name: 'a-b', source: 'vitis-hls-examples', dir: 'A/b', top: 'top', language: 'c', files: ['A/top.c'], tb: ['A/b/top_test.c', 'A/b/data/in.dat', 'A/b/data/out.dat'], headers: ['A/top.h', 'A/b/other.hpp'], directives: ['interface top mode=m_axi port=d'] });
+});
+
+test('#1903 a config with syn.blackbox.file: its description, and the C models and RTL beside it', () => {
+  const cfg = readConfig('[hls]\nsyn.blackbox.file=m.json\nsyn.file=e.cpp\nsyn.top=e\ntb.file=t.cpp\n');
+  assert.deepEqual(cfg.blackbox, ['m.json']);
+  const d = designOf('M', cfg, ['M/e.cpp', 'M/e.h', 'M/t.cpp', 'M/m.json', 'M/m.cpp', 'M/m.v', 'M/run.py', 'N/x.v']);
+  assert.deepEqual(d.blackbox, { descriptions: ['M/m.json'], files: ['M/m.cpp', 'M/m.v'] });
+  assert.deepEqual(JSON.parse(fs.readFileSync(HLS_MANIFEST, 'utf8')).designs.find((x) => x.name === 'misc-rtl-as-blackbox').blackbox, { descriptions: ['Misc/rtl_as_blackbox/rtl_model.json'], files: ['Misc/rtl_as_blackbox/rtl_model.cpp', 'Misc/rtl_as_blackbox/rtl_model.v'] });
 });
 
 test('#1597 a design through the stages; the differences from the expectations; the table', () => {

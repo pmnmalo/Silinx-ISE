@@ -40,7 +40,7 @@ export const memMethods = {
     const w = (n) => {
       if (!n || typeof n !== 'object' || hit) return;
       if (Array.isArray(n)) { n.forEach(w); return; }
-      if (this.isMem(n) || (n.kind === 'id' && this.slots.get(n.name)?.kind === 'mem') || this.fifoOp?.(n) != null) { hit = true; return; }
+      if (this.isMem(n) || (n.kind === 'id' && this.slots.get(n.name)?.kind === 'mem') || this.fifoOp?.(n) != null || this.isBlackbox?.(n)) { hit = true; return; }
       for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type') w(v);
     };
     w(x);
@@ -52,7 +52,7 @@ export const memMethods = {
       if (!n || typeof n !== 'object' || hit) return;
       if (Array.isArray(n)) { n.forEach(w); return; }
       // (a stream's access is the access itself, not a side effect beside it)
-      if ((SIDE.has(n.kind) && this.fifoOp?.(n) == null) || (n.kind === 'unary' && (n.op === '++' || n.op === '--'))) { hit = true; return; }
+      if ((SIDE.has(n.kind) && this.fifoOp?.(n) == null && !this.isBlackbox?.(n)) || (n.kind === 'unary' && (n.op === '++' || n.op === '--'))) { hit = true; return; }
       for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type') w(v);
     };
     w(x);
@@ -68,6 +68,7 @@ export const memMethods = {
     const fop = this.fifoOp?.(e);
     if (fop === 'read') return this.hoistFifoRead(e, at);
     if (fop === 'empty' || fop === 'full') return e;
+    if (this.isBlackbox?.(e)) return this.hoistBlackbox(e, at);   // (its registers and its state, #1903)
     if (this.isMem(e)) {
       const mem = this.slots.get(e.e.name);
       if (mem.banks) { const one = this.bankPlain(e, mem); return one ? this.hoist(one, at) : this.hoistBanks(e, mem, at); }   // (partitioned, #1920)

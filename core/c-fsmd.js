@@ -23,6 +23,7 @@ import { wordMethods } from './c-agg-mem.js';
 import { loopPragma, tripcountArgs, unrollBy } from './c-pragma.js';
 import { inlineCalls } from './c-inline.js';
 import { withSeqMath } from './c-dataflow-float.js';
+import { blackboxMethods } from './c-blackbox.js';
 import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from './c-pipeline.js';
 
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
@@ -420,6 +421,7 @@ class SeqFlow extends Flow {
   /** Why a loop cannot be pipelined, an iteration a state (its inner loops unrolled whole), or null. */
   pipeWhy(s) {
     const unrollable = (x) => innerLoops(x).every((l) => l.kind === 'for' && this.tripOf(l) !== null && unrollable(l.body));
+    if (this.hasBlackbox(s)) return 'it calls an RTL blackbox, a state that waits for the module';
     return !unrollable(s.body) ? 'a loop is in it whose count is not a constant: it cannot be unrolled' : this.hasMem(s) ? this.pipeMemWhy(s)
       : hasContinue(s.body) ? "a 'continue' is in it" : s.kind === 'do' ? 'a do-while' : null;
   }
@@ -466,6 +468,7 @@ class SeqFlow extends Flow {
   }
   stmt(s, base) {
     if (s && /^word(get|set|load|write)$/.test(s.kind)) return this.wordStmt(s, base);
+    if (s?.kind === 'bbcall') return this.bbStmt(s, base);
     return s && /^mem(read|write|latch)$/.test(s.kind) ? this.memStmt(s, base) : s && /^fifo(read|write)$/.test(s.kind) ? this.fifoStmt(s, base) : super.stmt(s, base);
   }
   runBlocks() {
@@ -607,7 +610,9 @@ class SeqFlow extends Flow {
       }
     }
     if (this.retReg) { ports.push({ name: 'ap_return', dir: 'out', w: this.retType.w, s: this.retType.s, role: 'return' }); outputs.set('ap_return', { reg: this.retReg.name }); }
+    this.bbOutputs(outputs);
     return {
+      blackboxes: this.bbInsts || [],
       graph: this.g, regs: [...(this.regs?.values() || [])], states: this.states || [], entry: this.entry?.num ?? 1, idle: 0, done: this.doneNum ?? 1,
       stateT: this.stateT, ports, outputs, ctrl: this.ctrl ?? 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
       ...(this.statesAdded ? { overflow: this.statesAdded } : {}), ...(this.subStates ? { subStates: this.subStates } : {}), slowLoops: this.slowLoops || [],
@@ -616,4 +621,4 @@ class SeqFlow extends Flow {
     };
   }
 }
-Object.assign(SeqFlow.prototype, memMethods, partitionMethods, fifoMethods, wordMethods, pipelineMethods);
+Object.assign(SeqFlow.prototype, memMethods, partitionMethods, fifoMethods, wordMethods, pipelineMethods, blackboxMethods);

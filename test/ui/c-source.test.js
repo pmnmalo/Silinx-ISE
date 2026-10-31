@@ -78,3 +78,27 @@ uiTest('#1531 Silinx HLS: a .c file a module of the project (its Design row, its
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });
+
+// (#1903) an RTL blackbox: the project's JSON description, its Verilog module and its C model: the C function's module
+// instantiates the Verilog module in place of the call, the module's ports those of the top
+const BB_TOP = `#include "ap_int.h"
+typedef ap_int<10> data_t;
+void adder(data_t a, data_t b, data_t &z);
+void top(data_t a, data_t b, data_t &s) { data_t t; adder(a, b, t); s = t; }
+`;
+const BB_RTL = `module adder_rtl(input clk, input [9:0] a, b, output reg [9:0] z);
+  always @(posedge clk) z <= a + b;
+endmodule
+`;
+const BB_JSON = JSON.stringify({ c_function_name: 'adder', rtl_top_module_name: 'adder_rtl', c_files: [{ c_file: 'adder_model.cpp', cflag: '' }], rtl_files: ['adder_rtl.v'],
+  c_parameters: [{ c_name: 'a', c_port_direction: 'in', rtl_ports: { data_read_in: 'a' } }, { c_name: 'b', c_port_direction: 'in', rtl_ports: { data_read_in: 'b' } }, { c_name: 'z', c_port_direction: 'out', rtl_ports: { data_write_out: 'z' } }],
+  rtl_common_signal: { module_clock: 'clk' }, rtl_performance: { latency: '1' } });
+uiTest('#1903 Silinx HLS: an RTL blackbox of the project (syn.blackbox): its Verilog module instantiated in the C function\'s, no warnings', E, async (page) => {
+  await makeProject(env, { name: 'CBlackbox', top: '', files: { 'src/top.cpp': BB_TOP, 'src/adder.json': BB_JSON, 'src/adder_rtl.v': BB_RTL, 'src/adder_model.cpp': '#include "ap_int.h"\nvoid adder(ap_int<10> a, ap_int<10> b, ap_int<10> &z) { z = a + b; }\n' } });
+  await page.openProject('CBlackbox');
+  await page.leftTab('design');
+  await page.waitFor(() => window.SilinxApp.S.modules.some((m) => m.name === 'top'), [], { what: 'the module top' });
+  assert.deepEqual(await page.eval(() => window.SilinxApp.S.lib.modules.get('top').ports.map((p) => p.name)), ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'a', 'b', 's', 's_ap_vld']);
+  assert.match(await page.eval(() => window.SilinxApp.S.viewSources.find((s) => s.path === 'src/top.cpp').text), /ap_bb0 : adder_rtl port map \(clk => ap_clk, a => ap_bb0_a_i_w, b => ap_bb0_b_i_w, z => ap_bb0_z_o\)/);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});

@@ -356,11 +356,15 @@
     "reason": null
   },
   "misc-rtl-as-blackbox": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: 29: 'rtl_model' is declared but not defined"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 5,
+      "max": 5,
+      "avg": 5
+    },
+    "reason": null
   },
   "modeling-conditional-control-of-pragmas-using-defines": {
     "csim": "pass",
