@@ -162,7 +162,7 @@ export async function main(argv, { out = l => console.log(l), err = l => console
     device: () => (device ||= loadDeviceCache(graph)),
     bitDb: () => (bitDb ||= loadDb(`${p.device}${p.pkg}`, { graph: io.device() })),
     yosys: yosysWorkers(),
-    nextpnr: nextpnrNode(),
+    nextpnr: { spartan3e: nextpnrNode() },
     write: (name, data) => { const f = fileOf(name); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, data); written[name] = f; return f; },
     read: (name) => (name === `open/${top}.json` && netlist != null ? netlist : (fs.existsSync(fileOf(name)) ? fs.readFileSync(fileOf(name), 'utf8') : null)),
     save: () => {},

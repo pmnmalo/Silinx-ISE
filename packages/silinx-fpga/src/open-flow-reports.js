@@ -2,18 +2,16 @@
 // open-flow-core.js): the static timing and its report, the bitstream written, the pins back-annotated
 // (pin2ucf) and the power estimate (#123).
 import { ESTIMATE_ERROR_PERCENT, estimatePower, powerReport } from './power.js';
-import { analyzeTiming, checkCross, checkOffsets, checkPeriods, checkSwitching, clockPort, parseOffsets, switchingLine, timingReport } from './fpga/timing.js';
-import { bitgen } from './fpga/bitgen.js';
-import { analyzeTimingS6 } from './fpga/s6/timing.js';
-import { bitstreamS6 } from './fpga/s6/bitgen.js';
+import { checkCross, checkOffsets, checkPeriods, clockPort, parseOffsets, switchingLine, timingReport } from './fpga/timing.js';
 import { parseUcf, pinsUcf } from './ucf.js';
 import { parseXdl, placedPins } from './xdl.js';
 import { StepError } from './open-flow-core.js';
 
-/** { bitfile, runPins, runPower, runTiming } of runOpenFlow (routedText(): its current values). */
+/** { bitfile, runPins, runPower, runTiming } of runOpenFlow (routedText(): its current values). reports: the family's
+ *  { analyze, switching, model, bitstream } (open-flow-backends.js, #2360). */
 export function mountFlowReports(ctx) {
   const {
-    io, spec, log, report, routedOrEarlier, routedText, top, ucfText
+    io, spec, log, report, reports, routedOrEarlier, routedText, top, ucfText
   } = ctx;
 
   function runTiming() {
@@ -21,17 +19,16 @@ export function mountFlowReports(ctx) {
     const pu = ucfText ? parseUcf(ucfText) : { clocks: [], other: [] };
     const constraints = pu.clocks || [];
     // (the PERIOD constraints: a DCM's clocks' phases at the pads, #601)
-    // (the Spartan-6's: its arcs and delays fitted to ISE's trce, fpga/s6/timing.js, #732)
-    const s6 = spec.family === 'spartan6', sta = (s6 ? analyzeTimingS6 : analyzeTiming)(design, io.device(), { clocks: constraints });
+    const sta = reports.analyze(design, io.device(), { clocks: constraints });
     // the PERIOD constraints, then the OFFSET ones (#26)
     const offsets = checkOffsets(sta, design, parseOffsets(pu.other || []), constraints);
     // (#601: a DCM's clocks with their derived PERIOD; the paths between two related clocks)
     const periods = checkPeriods(sta, design, constraints), cross = checkCross(sta, design, constraints);
     // (#661: the DCMs' pins against their switching limits, as trce's Component Switching Limit checks)
-    const switching = s6 ? [] : checkSwitching(design, constraints);
+    const switching = reports.switching(design, constraints);
     const checks = [...periods, ...switching, ...cross, ...offsets];
     const lines = timingReport(sta, checks);
-    report.files.timing = io.write('open/timing.txt', `Static timing analysis of ${top} (Silinx toolchain, delay model of ${s6 ? 'fpga/s6/timing.js, fitted to ISE\'s trce' : 'core/fpga/timing.js'})\n\n${lines.join('\n')}\n`);
+    report.files.timing = io.write('open/timing.txt', `Static timing analysis of ${top} (Silinx toolchain, delay model of ${reports.model})\n\n${lines.join('\n')}\n`);
     const failed = periods.filter(c => !c.missing && !c.met), offFailed = offsets.filter(c => !c.missing && !c.unsupported && !c.met);
     const crossFailed = cross.filter(c => c.related && !c.met);
     const swFailed = switching.filter(c => !c.met);
@@ -71,16 +68,7 @@ export function mountFlowReports(ctx) {
 
   function bitfile(name, startupClk) {
     const sc = /^cclk$/i.test(startupClk) ? 'Cclk' : /^userclk$/i.test(startupClk) ? 'UserClk' : 'JtagClk';
-    // (the Spartan-6's: fpga/s6/bitgen.js, byte for byte as ISE's bitgen writes the routed design, #732)
-    if (spec.family === 'spartan6') {
-      const r = bitstreamS6(parseXdl(routedText()), io.device(), io.bitDb(), { name: `${top}.ncd;UserID=0xFFFFFFFF`, crc: true, startupClk: sc });
-      if (r.unknown.size) throw new StepError(`${r.unknown.size} feature(s) of the design are not in the bit database: no bitstream`, [...r.unknown.keys()].slice(0, 50));
-      return { path: io.write(name, r.bytes), size: r.bytes.length };
-    }
-    const { bytes, unknown } = bitgen(routedText(), io.bitDb(), { name: `${top}.ncd`, crc: true, startupClk: sc, part: `${spec.device.replace(/^xc/, '')}${spec.pkg}` });
-    if (unknown.length) {
-      throw new StepError(`${unknown.length} feature(s) of the design are not in the bit database: no bitstream`, unknown.slice(0, 50).map(u => `${u.tile} ${u.feature}`));
-    }
+    const { bytes } = reports.bitstream(ctx, sc);
     return { path: io.write(name, bytes), size: bytes.length };
   }
   // Back-annotate Pin Locations: the pads of the ports in the placed design, as Xilinx pin2ucf

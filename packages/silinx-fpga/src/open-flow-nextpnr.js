@@ -192,7 +192,7 @@ export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRI
 /**
  * { problems, runMap, runPar } of runFlow for the nextpnr engine (problems(): what keeps it from the design, [] if nothing). ctx: { io, spec, log, report, util, now, ms, netlistText (a
  * getter: the synthesis's JSON), top, ucfText, StepError, setRouted (the routed design's text, for the reports and
- * the bitstream) }. io.nextpnr: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }.
+ * the bitstream) }. io.nextpnr.spartan3e: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }.
  */
 export function mountNextpnrSteps(ctx) {
   const { io, spec, log, report, util, now, ms, netlistText, top, ucfText, StepError, setRouted } = ctx;
@@ -204,13 +204,13 @@ export function mountNextpnrSteps(ctx) {
   function problems() {
     if (found) return found;
     if (spec.family !== 'spartan3e') return (found = [`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`]);
-    if (!io.nextpnr) return (found = ['the nextpnr engine is not available here (io.nextpnr)']);
+    if (!io.nextpnr?.spartan3e) return (found = ['the nextpnr engine is not available here (io.nextpnr)']);
     return (found = nextpnrNetlist(netlistText(), top, ucfText, io.device()).problems);
   }
 
   function runMap() {
     if (spec.family !== 'spartan3e') throw new StepError(`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`, [], 'Choose the Silinx engine (Toolchain Settings).');
-    if (!io.nextpnr) throw new StepError('the nextpnr engine is not available here (io.nextpnr)', [], 'Choose the Silinx engine (Toolchain Settings).');
+    if (!io.nextpnr?.spartan3e) throw new StepError('the nextpnr engine is not available here (io.nextpnr)', [], 'Choose the Silinx engine (Toolchain Settings).');
     const r = nextpnrNetlist(netlistText(), top, ucfText, io.device());
     if (r.problems.length) {
       throw new StepError(`the nextpnr engine cannot implement this design yet: ${r.problems.length} problem(s)`, r.problems.slice(0, 50),
@@ -224,7 +224,7 @@ export function mountNextpnrSteps(ctx) {
   async function runPar() {
     if (!input) runMap();
     const t = now();
-    const db = await io.nextpnr.chipdb(part, log);
+    const db = await io.nextpnr.spartan3e.chipdb(part, log);
     // each clock's PERIOD as its target (the SDC), the tightest for the clocks with none (each met or not: the timing step's)
     let mhz = null;
     try { const c = ucfText ? parseUcf(ucfText).clocks || [] : []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
@@ -236,7 +236,7 @@ export function mountNextpnrSteps(ctx) {
       const errors = () => lines.filter(l => /^ERROR:/.test(l)).slice(0, 20);
       let files;
       try {
-        files = await io.nextpnr.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => lines.push(l));
+        files = await io.nextpnr.spartan3e.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => lines.push(l));
       } catch (e) {
         throw new StepError(`nextpnr failed: ${e.message}`, errors());
       }

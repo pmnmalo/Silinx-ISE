@@ -1,0 +1,143 @@
+# The toolchain's architecture
+
+What takes a design to a `.bit` in Silinx: the process, the tools, what is the toolchain and what is not, how a family
+fits in, and how a result is checked. Other documents go deeper: [OPEN-TOOLCHAIN.md](OPEN-TOOLCHAIN.md) (how the bit
+database is measured, the legal basis), [TOOLCHAIN-SEPARATION.md](TOOLCHAIN-SEPARATION.md) (the package's separation),
+[QUALITY.md](QUALITY.md) (size and speed against ISE).
+
+## What is the toolchain
+
+**The toolchain is the package `silinx-fpga`** (`packages/silinx-fpga`): from HDL as flat Verilog, or a Yosys netlist, to
+the `.bit`. It works without the IDE, as a library (`runFlow(spec, io)`) and a command line (`silinx-fpga build`). Not
+everything on the way from a design to a programmed board is in it:
+
+| Part | Where | Is it the toolchain? |
+|---|---|---|
+| The drawings (schematic, ASM, FSM, truth table, Petri net), the C of Silinx HLS: the HDL they generate | `core/`, `web/js/` | No, the IDE: the toolchain receives their HDL |
+| The HDL front end: VHDL and Verilog elaborated into one flat Verilog module | `core/synth-front.js`, `core/synth-verilog.js` | No, the IDE, given through `io.frontEnd`; alone, the package reads Verilog only |
+| The synthesis's scripts and what Silinx adds around Yosys (state machines, carry chains, LUT resynthesis) | `src/synth-open.js`, `synth-fsm.js`, `carry-chain.js`, `lut-resynth.js` | **Yes** |
+| Yosys, nextpnr | npm: `@yowasp/yosys`, `@silinx/nextpnr-himbaechel-*` | Dependencies of the toolchain, in WebAssembly |
+| Pack, place, route, timing, power, bitstream | `src/fpga/` | **Yes** |
+| The device descriptions and the bit databases | `devices/`, `bitdb/` | **Yes**, its data |
+| The steps' order, the families' back ends | `src/open-steps.js`, `open-flow-core.js`, `open-flow-backends.js` | **Yes** |
+| The simulation models (post-synthesis to post-route) | `core/flow-models.js`, given through `io.simModels` | No, the IDE |
+| Running the flow: a process on disk, a Web Worker in memory | `server/open-flow*.js`, `web/js/open-flow-*.js` | No, the IDE's hosts of `runFlow` |
+| Programming the board | `core/adept.js`, `core/xcf.js`, `server/programmer*.js` | No, the IDE |
+| Xilinx ISE 14.7 | `server/ise.js` runs it; the user installs it | No: another tool, and the open flow's oracle |
+
+## The process
+
+```text
+ drawings, C ──> HDL ──> front end ──> flat Verilog
+                                          │
+                 ┌────────────────────────▼─────────────────────────┐
+                 │ runFlow (silinx-fpga)                            │
+                 │                                                  │
+                 │ synth      Yosys synth_xilinx        netlist.json│
+                 │ translate  the netlist and the UCF read          │
+                 │ map        pack into slices and I/O sites        │
+                 │ par        place, route, check       routed.xdl  │
+                 │ trce       static timing             timing.txt  │
+                 │ bitgen     from the bit database     <top>.bit   │
+                 │ prombit    the same, for the PROM    _prom.bit   │
+                 └────────────────────────┬─────────────────────────┘
+                                          ▼
+                              Configure Target Device
+```
+
+ISE's flow has the same stages: XST, NGDBuild, MAP, PAR, TRCE, BitGen.
+
+The chain is `OPEN_CHAIN` in `src/open-steps.js`. Optional steps go into it: the simulation models, the pins
+(`pin2ucf`), the power estimate (`xpwr`), the FPGA view. The synthesis does not run again while it is up to date.
+
+## The engines
+
+Map and Place & Route have two engines, chosen by the project (`impl.engine`, Process Properties):
+
+| Engine | Spartan-3E | Spartan-6 |
+|---|---|---|
+| `silinx`, the default | Silinx's packer, placer and router | The same, its own modules (`fpga/s6/`) |
+| `nextpnr` | nextpnr packs, places and routes | Silinx's packer; nextpnr places and routes; local server only (#2288) |
+| `auto` | nextpnr when it can implement the design, else `silinx`, which Map says | `silinx` |
+
+**nextpnr replaces Silinx's packer, placer and router** (decided in #2131): they stay until nextpnr reaches parity (the
+examples on all four Spartan-3E devices, clean in ISE, at least Silinx's size and speed), then #2137 removes them.
+The micro-architectures live in the fork `pmnmalo/nextpnr-spartan`. What stays Silinx's in any case: the timing, the bitstream
+and their data. nextpnr's routed design is converted to XDL (`fpga/nextpnr-xdl.js`), which those steps read.
+
+## The layers
+
+```text
+ The IDE          editors, processes, front end, simulation models, programmer
+                     │ spec, io
+ The orchestrator runFlow: the steps, the log, the report; names no family, no engine
+                     │ backendOf(spec.family).mount(ctx)
+ The back ends    spartan3e │ spartan6 │ (a new family)
+                     │
+ The tools        Yosys │ nextpnr │ Silinx's pack, place, route │ timing │ bitgen
+                     │
+ The data         device descriptions │ bit databases
+```
+
+### `io`: the outside world
+
+Everything outside the flow comes through `io`, so the same flow runs in Node (files on disk) and in the browser (files
+in memory): the sources, the constraints, the device, the bit database, Yosys, nextpnr, the files written, the report.
+The list is at the top of `src/open-flow-core.js`. nextpnr is one hook by micro-architecture:
+`io.nextpnr.spartan3e`, `io.nextpnr.spartan6`.
+
+### The back ends
+
+A family is an object (`src/open-flow-backends.js`, #2360):
+
+```js
+{
+  id: 'spartan3e',
+  mount(ctx),   // { runMap, runPar, runTiming, runPins, runPower, bitfile, packed? }: the family's steps, with its engines
+  synth,        // optional: the synthesis, synthesizeVerilog's signature and result; that function when not given
+  xstNames,     // optional: the synthesis's report names its lines as XST does, not as the MAP report
+}
+```
+
+`registerBackend(backend)` adds a family. A family with no back end is implemented as the Spartan-3E is: the families only ISE
+implements never get there, because the server's `openStatus` stops them first.
+`test/open-flow-backends.test.js` runs a fake family through the flow and keeps family and engine names out of the orchestrator.
+
+## Adding a family
+
+The plan is in #1953 and #2315. For the open toolchains:
+
+| Family | Synthesis | Place and route | Bitstream | Constraints | Status |
+|---|---|---|---|---|---|
+| Spartan-3E | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser and local |
+| Spartan-6 | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, local; not yet in the browser (#2103) |
+| iCE40 | `synth_ice40` | nextpnr | `icepack` | PCF | Planned first (#2295) |
+| ECP5, MachXO2 | `synth_ecp5`, to be defined | nextpnr | `ecppack`, Project Trellis | LPF | Planned (#2302) |
+| Gowin | `synth_gowin` | nextpnr-himbaechel | `gowin_pack` (Python: the browser's path is to be decided) | CST | Planned (#2303) |
+| Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
+| Xilinx 7-series | to be defined | nextpnr in the fork | to be written in JavaScript | to be defined | A spike first (#2305) |
+
+Still missing before iCE40 (#2360):
+
+- **The routed design opaque to the orchestrator.** It reads and writes `open/routed.xdl` by name today, and XDL exists only for
+  Xilinx.
+- **A neutral constraints model.** `ucfText` and `parseUcf` are in the flow today; UCF, PCF, LPF and CST should be
+  readers and writers of one model.
+- **The synthesis by family.** `synth` is a hook today; the commands are `synth_xilinx`'s, and a family's `FAMILY_INFO` entry has
+  fields only Xilinx families have (`xise`, `pm`).
+- **The steps by family.** They have ISE's names (`translate`, `trce`), and the back end does not yet say which it has.
+
+And around the flow, one issue each: the boards and examples (#2297), programming (#2298), the primitives' simulation models
+(#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).
+
+Vendor tools (ISE, Vivado, Quartus) are another kind of back end: they run a whole flow externally and give reports and a
+`.bit`. They share the tool descriptor with the open flows, not an implementation.
+
+## How a result is checked
+
+- **ISE is the oracle of the Xilinx families** (`npm run check:open-flow`). ISE converts the same `routed.xdl` and runs its DRC:
+  no error, no warning, and its `.bit` is byte-identical to Silinx's. This proves the bitstream and that the routing is legal; it does
+  not compare our placement with PAR's. Size and speed against XST are the weekly quality comparison.
+- **The examples are the test designs** on every device of `TARGETS`.
+- **The other families have no such oracle.** What proves a build there is to be decided (#2301): post-route simulation against the
+  design, the families' timing tools, the vendors' tools where available, runs on real boards.

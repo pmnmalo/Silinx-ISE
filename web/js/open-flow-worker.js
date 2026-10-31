@@ -138,7 +138,7 @@ self.onmessage = async ({ data }) => {
       bitDb: () => db,
       yosys,
       // (the nextpnr engine's, #2136: its bundle and the device's chip database fetched on its first use, then kept by the cache)
-      nextpnr: spec.engine && spec.engine !== 'silinx' ? nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post) : null,
+      nextpnr: spec.engine && spec.engine !== 'silinx' ? { spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post) } : null,
       write: (name, d) => {
         const path = `build/${name}`;
         store[name] = d;
