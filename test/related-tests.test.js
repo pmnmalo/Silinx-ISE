@@ -65,6 +65,12 @@ test('related tests: the unit tests that import a changed module, directly or th
   assert.deepEqual(relatedTests(sized, ['core/b.js']), { unit: ['test/b.test.js', 'test/code-size.test.js'], ui: [] });
   assert.deepEqual(relatedTests(sized, ['web/js/menus.js']), { unit: ['test/code-size.test.js'], ui: ['test/ui/menus.test.js'] });
   assert.deepEqual(relatedTests(sized, ['README.md', 'test/other.test.js', 'web/css/app.css']), { unit: ['test/other.test.js'], ui: [] });
+  // the imports of the sources (#2356): the API boundary and the layering for a source of the IDE or the package
+  const scanned = { ...files, 'test/toolchain-boundary.test.js': '', 'test/layering.test.js': '', 'scripts/package-release.mjs': '', 'packages/silinx-fpga/src/node.js': '' };
+  const both = ['test/layering.test.js', 'test/toolchain-boundary.test.js'];
+  assert.deepEqual(relatedTests(scanned, ['scripts/package-release.mjs']).unit.filter(t => both.includes(t)), both, 'a script');
+  assert.deepEqual(relatedTests(scanned, ['packages/silinx-fpga/src/node.js']).unit.filter(t => both.includes(t)), both, 'the package');
+  assert.deepEqual(relatedTests(scanned, ['README.md', 'web/css/app.css', 'test/other.test.js']).unit.filter(t => both.includes(t)), [], 'no source');
 });
 
 test('related tests: the data a source reads, named from its own place (#772)', () => {

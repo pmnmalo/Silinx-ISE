@@ -16,7 +16,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sha256sums, SUMS_FILE } from './checksums.mjs';
-import { leaveOutChipdbs } from '../packages/silinx-fpga/src/nextpnr-chipdb-node.js';
+import { leaveOutChipdbs } from '../packages/silinx-fpga/src/node.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
