@@ -149,7 +149,7 @@ test('#2196 --seed 5: placements from that seed on, each reported, the fastest k
   assert.deepEqual(out2.filter(l => /^(Placement|Kept)/.test(l)), []);
 });
 
-test('#2196 the VGA example built with --engine nextpnr: at most 157 slices as the packing fills them, no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
+test('#2196 the VGA example built with --engine nextpnr: at most 148 slices as the packing fills them (#2223), no warnings, its PERIOD met, its clock on the global lines', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const netlist = path.join(dir, 'top.json');
   fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(fixture('vga.json.gz'))));
@@ -158,8 +158,8 @@ test('#2196 the VGA example built with --engine nextpnr: at most 157 slices as t
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
-  assert.ok(out.includes('  Number of occupied Slices: 157 out of 2448 6%'), out.join('\n'));
-  assert.ok(out.includes('  Number of 4 input LUTs: 296 out of 4896 6%'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 148 out of 2448 6%'), out.join('\n'));
+  assert.ok(out.includes('  Number of 4 input LUTs: 278 out of 4896 6%'), out.join('\n'));
   assert.ok(out.includes('  Number of Slice Flip Flops: 56 out of 4896 1%'), out.join('\n'));
   assert.ok(out.includes('All constraints were met.'), out.join('\n'));
   const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
@@ -315,7 +315,6 @@ test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its 
   assert.deepEqual(nextpnrNetlist(json(), 'top', `${ucf}\nINST "u_dcm" LOC = "SLICE_X0Y0" ;\n`, device).problems, ['INST u_dcm: LOC SLICE_X0Y0 is not a DCM site of this device']);
 });
 
-
 test('#2194 a DCM_SP (Silinx\'s synthesis) built with --engine nextpnr: no warnings, each clock\'s PERIOD derived and met, on its buffers, a complete bitstream', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const out = [], err = [];
@@ -361,4 +360,28 @@ test('#2136 engineOf: a project\'s engine, Silinx\'s when not set or not known',
   assert.equal(engineOf({ engine: 'auto' }), 'auto');
   assert.equal(engineOf({ engine: 'nextpnr' }), 'nextpnr');
   assert.equal(engineOf({ engine: 'vpr' }), 'silinx');
+});
+
+test('#2223 flip-flops alone in the slices of carry chains built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fixture('ffcarry.json').pathname, '--part', 'xc3s250e-cp132-4', '--ucf', fixture('ffcarry.ucf').pathname, '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of occupied Slices: 22 out of 2448 1%'), out.join('\n'));
+  assert.ok(out.includes('  Number of Slice Flip Flops: 35 out of 4896 1%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  const value = (i, attr) => i.cfg.find(c => c.attr === attr)?.value;
+  // flip-flops from BX / BY (DXMUX / DYMUX 0) in the slices of the chains, beside their stages
+  const chain = design.insts.filter(i => i.cfg.some(c => /^CYMUX[FG]$/.test(c.attr)));
+  const alone = chain.flatMap(i => ['X', 'Y'].filter(X => value(i, `FF${X}`) === '#FF' && value(i, `D${X}MUX`) === '0'));
+  assert.ok(alone.length >= 6, `${alone.length} flip-flop(s) alone in the chains' slices`);
+  // the difference's carry in, a 1: from the CLB's VCC site to BX, CYINIT = BX
+  const vcc = design.nets.filter(n => n.type === 'vcc' && n.inpins.some(p => p.pin === 'BX'));
+  assert.equal(vcc.length, 1);
+  assert.match(vcc[0].outpins[0].inst, /^XDL_DUMMY_CLB_X\d+Y\d+_VCC_X\d+Y\d+$/);
+  assert.equal(value(design.insts.find(i => i.name === vcc[0].inpins[0].inst), 'CYINIT'), 'BX');
 });
