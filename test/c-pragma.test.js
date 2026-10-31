@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cToHdl } from '../core/c-hdl.js';
 import { cosimulate } from '../core/c-cosim.js';
+import { dependenceOf, readPragma } from '../core/c-pragma.js';
 import { COMB } from './c-helpers.js';
 
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
@@ -155,4 +156,22 @@ test('#1529 the pragmas accepted and ignored, unknown, misplaced or wrong: their
   const comb = cToHdl('int f(int a) {\n  int s = 0;\n  for (int i = 0; i < 4; i++) {\n#pragma HLS PIPELINE II=1\n    s += a;\n  }\n  return s;\n}', { clock: COMB });
   assert.deepEqual(comb.diagnostics, []);
   assert.deepEqual(comb.report, { sequential: false });
+});
+
+test('#1961 dependenceOf: what a DEPENDENCE says false', () => {
+  const d = (t) => dependenceOf(readPragma(`HLS DEPENDENCE ${t}`));
+  assert.deepEqual(d('variable = buffer inter WAR false'), { variable: 'buffer', inter: true, raw: false, war: true });
+  assert.deepEqual(d('variable=a intra RAW dependent=false'), { variable: 'a', inter: false, raw: true, war: false });
+  assert.deepEqual(d('class=array false'), { variable: null, inter: true, raw: true, war: true });
+  assert.equal(d('variable=a inter true'), null);
+  assert.equal(d('variable=a inter'), null);
+  assert.equal(dependenceOf(readPragma('HLS PIPELINE false')), null);
+});
+
+test('#1961 DEPENDENCE: inter with intra, and another class, warned', () => {
+  const msgs = (src) => cToHdl(src).diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`);
+  assert.deepEqual(msgs('int f(int a) {\n#pragma HLS DEPENDENCE inter intra false\n#pragma HLS DEPENDENCE class=pointer false\n  return a;\n}'), [
+    '2 warning: #pragma HLS DEPENDENCE: inter or intra, not both: taken as intra',
+    "3 warning: #pragma HLS DEPENDENCE class=pointer: a variable's dependence is kept (the next iteration needs its value): ignored",
+  ]);
 });

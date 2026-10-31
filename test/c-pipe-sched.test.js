@@ -220,3 +220,70 @@ test('#1962 moduloSchedule: a port used once modulo the II; a dependence refused
   assert.deepEqual(moduloSchedule({ g, ops, updates: [[x, q0]], exit: q1 }, 2).fail, { kind: 'exit' });
   assert.equal(moduloSchedule({ g, ops, updates: [[x, q0]], exit: q1 }, 3).squash, false);
 });
+
+// #1961: #pragma HLS DEPENDENCE
+const DEP = (prag) => M('int a[8], int b[8]', `#pragma HLS BIND_STORAGE variable=a type=ram_2p
+  for (int i = 0; i < 4; i++) {
+${P}
+${prag}
+    a[i + 4] = a[i] + b[i];
+  }`, 'f(t, w);');
+const DEP_II = "5 warning: #pragma HLS PIPELINE II=1: II=2 made (a dependence: another iteration's read of the memory 'a' must come after this one's write)";
+
+test('#1961 DEPENDENCE inter false: the II no longer bound by a read after another iteration\'s write, the C\'s results', () => {
+  // (the regression: with no pragma, or one saying it true, II=2)
+  for (const prag of ['', '#pragma HLS DEPENDENCE variable=a inter true', '#pragma HLS DEPENDENCE variable=a inter WAR false', '#pragma HLS DEPENDENCE variable=a intra false']) {
+    const r = run(DEP(prag));
+    assert.deepEqual([r.loops[0].ii, r.loops[0].cycles, r.messages], [2, 8, [DEP_II]], prag);
+  }
+  for (const prag of ['#pragma HLS DEPENDENCE variable=a inter false', '#pragma HLS DEPENDENCE variable=a inter RAW false', '#pragma HLS DEPENDENCE variable=a dependent=false', '#pragma HLS DEPENDENCE class=array inter false']) {
+    const r = run(DEP(prag));
+    assert.deepEqual([r.loops[0].ii, r.loops[0].cycles, r.messages], [1, 5, []], prag);
+  }
+});
+
+test('#1961 DEPENDENCE in the loop around, or the function: it holds in the loops inside; in a loop beside: not', () => {
+  const nest = (outer, beside) => M('int a[8], int b[8]', `#pragma HLS BIND_STORAGE variable=a type=ram_2p
+  for (int k = 0; k < 2; k++) {
+${outer}
+    for (int i = 0; i < 4; i++) {
+${P}
+      a[i + 4] = a[i] + b[i];
+    }
+  }
+  for (int i = 0; i < 2; i++) {
+${beside}
+    s += i;
+  }`, 'f(t, w);');
+  const ii = (src) => run(src).loops.find((l) => l.line === 7).ii;
+  assert.equal(ii(nest('#pragma HLS DEPENDENCE variable=a inter false', '')), 1);
+  assert.equal(ii(nest('', '#pragma HLS DEPENDENCE variable=a inter false')), 2);
+});
+
+test('#1961 DEPENDENCE intra false: a read after a write of its own iteration in one stage', () => {
+  const src = (prag) => M('int a[8], int b[8]', `#pragma HLS BIND_STORAGE variable=a type=ram_2p
+  for (int i = 0; i < 4; i++) {
+${P}
+#pragma HLS DEPENDENCE variable=a inter false
+${prag}
+    a[i] = b[i];
+    s += a[i + 4];
+  }`, 'f(t, w);');
+  const depth = (prag) => run(src(prag)).loops[0].depth;
+  // (the read after the write with no pragma, at once with one)
+  assert.deepEqual([depth(''), depth('#pragma HLS DEPENDENCE variable=a intra RAW false')], [4, 2]);
+  assert.deepEqual(run(src('#pragma HLS DEPENDENCE variable=a intra RAW false')).messages, []);
+});
+
+test('#1961 DEPENDENCE of what is no memory: its warning, the II kept', () => {
+  const r = run(M('int a[8]', `  for (int i = 0; i < 8; i++) {
+${P}
+#pragma HLS DEPENDENCE variable=s inter false
+#pragma HLS DEPENDENCE variable=q inter false
+    s = s * a[i] + 1;
+  }`, 'f(t);'));
+  assert.deepEqual(r.messages, [
+    '6 warning: #pragma HLS DEPENDENCE variable=s: not a memory: its dependence is kept (the next iteration needs its value): ignored',
+    '7 warning: #pragma HLS DEPENDENCE variable=q: no such array here: ignored',
+  ]);
+});

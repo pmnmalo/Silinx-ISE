@@ -281,6 +281,7 @@ class SeqFlow extends Flow {
       this.insts = new Map();
       this.memArgs = this.subArrays(body);
       this.makeRegisters(inl, decls);
+      this.fnDeps = this.markDependences(body);
       markAutoPipeline(body.items, { threshold: this.pipelineLoops, trip: (l) => this.tripOf(l), why: (l) => this.pipeWhy(l), autoWhy: (l) => this.pipeWhy(l) || (innerLoops(l.body).some((x) => this.hasMem(x)) ? 'a loop that accesses a memory is in it' : null), never: (l) => hasSub(l.body) });
       // (the function's own PIPELINE, #1962: its machine one pipeline, a new call every II cycles)
       const fp = body.items.find((x) => x.kind === 'pragma' && x.pragma.name === 'PIPELINE')?.pragma.args;
