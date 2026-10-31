@@ -10,6 +10,7 @@ import { FAMILY_INFO, deviceFamily, familyFromXise, familyOfPart, familyName } f
 import { convertIseSchematics, exportIseSch, iseTimestamp } from '../core/isesch.js';
 import { compile, langOfPath } from '../core/compile.js';
 import { modulesFromLibrary } from '../core/schdoc.js';
+import { isCSource, viewHdl } from '../core/view-hdl.js';
 
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
 
@@ -97,10 +98,12 @@ export function exportXise(project, { sources, schematics = [], extraFiles = [] 
   }
   lines.push('  </files>', '');
 
-  const top = project.top ? topValue(project, project.top, sources) : null;
+  // (a module whose file only the export writes, a C source's HDL, can be the top: #2320)
+  const units = { files: [...(project.files || []), ...extraFiles] };
+  const top = project.top ? topValue(units, project.top, sources) : null;
   const schOf = p => schematics.find(x => x.hdl === p)?.path;
   if (top?.file && schOf(top.file)) top.file = schOf(top.file);
-  const sim = project.simTop ? topValue(project, project.simTop, sources) : null;
+  const sim = project.simTop ? topValue(units, project.simTop, sources) : null;
   const vhdlCount = files.filter(f => f.lang === 'vhdl').length;
   const prefLang = vhdlCount > files.length / 2 ? 'VHDL' : 'Verilog';
   const fam = deviceFamily(dev) || 'spartan3e';
@@ -283,6 +286,30 @@ export function exportIseSchematics(project, docs, sources) {
       if (f.kind === 'hdl') res.extraFiles.push({ path: p, lang: langOfPath(p), role: 'design' });
     }
     res.warnings.push(...r.warnings.map(w => `${sch}: ${w}`));
+  }
+  return res;
+}
+
+/**
+ * The C sources of a project export (#2320): ISE reads no C, so each goes out as its HDL, as a build makes it (no file
+ * of its own in the project), and the C stays behind: imported back, that HDL would hide later edits of the C.
+ * cSources: { 'src/x.c': text }, sources: { path: text } (the project's HDL: a module defined there is that file).
+ * Returns { extraFiles: [{ path, lang, role }], files: [{ path, text }], warnings }.
+ */
+export function exportCSources(project, cSources, sources = {}) {
+  const res = { extraFiles: [], files: [], warnings: [] };
+  const entries = Object.entries(cSources).filter(([p]) => isCSource(p));
+  if (!entries.length) return res;
+  const hdl = Object.entries(sources).filter(([p]) => /\.(vhdl?|v|sv)$/i.test(p)).map(([path, text]) => ({ path, text }));
+  let defined = new Set();
+  try { defined = new Set(Object.keys(modulesFromLibrary(compile(hdl), { sources: Object.fromEntries(hdl.map(s => [s.path, s.text])) })).map(n => n.toLowerCase())); } catch { /* none */ }
+  for (const [p, text] of entries) {
+    const r = viewHdl(p, text, { lang: project.preferredLanguage });
+    if (!r.text) { res.warnings.push(`${p}: not exported, its HDL could not be made (${r.errors.join('; ')})`); continue; }
+    if (defined.has(String(r.module).toLowerCase())) continue;
+    const out = `${p}.${r.lang === 'vhdl' ? 'vhd' : 'v'}`;
+    res.files.push({ path: out, text: r.text });
+    res.extraFiles.push({ path: out, lang: r.lang, role: 'design' });
   }
   return res;
 }

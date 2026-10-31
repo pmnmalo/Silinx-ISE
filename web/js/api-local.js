@@ -12,8 +12,9 @@
 // and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
 import { getDeviceDb, findPart } from '../../server/devices.js';
 import { resourcesOf, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
-import { exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
+import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
 import EXAMPLES from 'silinx-examples';
+import { isCSource } from '../../core/view-hdl.js';
 import { orderExamples } from '../../core/examples.js';
 import TEST_DESIGNS from 'silinx-test-designs';
 import { orderTestDesigns } from '../../core/test-designs.js';
@@ -421,13 +422,17 @@ export const api = {
     const docs = {};
     for (const [k, v] of Object.entries(p.files)) if (/\.sch\.json$/i.test(k)) { try { docs[k] = JSON.parse(v); } catch { /* skip */ } }
     const sch = exportIseSchematics(p.json, docs, p.files);
-    const xml = exportXise(p.json, { sources: p.files, schematics: sch.schematics, extraFiles: sch.extraFiles });
-    const added = new Set(sch.files.map(f => f.path));
+    // C sources go out as their HDL (#2320)
+    const c = exportCSources(p.json, Object.fromEntries(Object.entries(p.files).filter(([k]) => isCSource(k))), p.files);
+    const sources = { ...p.files, ...Object.fromEntries(c.files.map(f => [f.path, f.text])) };
+    const xml = exportXise(p.json, { sources, schematics: sch.schematics, extraFiles: [...sch.extraFiles, ...c.extraFiles] });
+    const generated = [...sch.files, ...c.files];
+    const added = new Set(generated.map(f => f.path));
     // Xilinx ISE project: no Silinx-only files (silinx.json, ASM charts, Silinx schematics)
     const entries = [{ path: `${name}.xise`, data: xml },
-      ...sch.files.map(f => ({ path: f.path, data: f.text })),
-      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k) && !/(^|\/)[^/]+\.(asm|sch|tt|bool|fsm)\.json$/i.test(k)).map(([path, data]) => ({ path, data }))];
-    return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip`, warnings: sch.warnings };
+      ...generated.map(f => ({ path: f.path, data: f.text })),
+      ...Object.entries(p.files).filter(([k]) => k !== `${name}.xise` && !added.has(k) && !isCSource(k) && !/(^|\/)[^/]+\.(asm|sch|tt|bool|fsm)\.json$/i.test(k)).map(([path, data]) => ({ path, data }))];
+    return { blob: new Blob([await createZip(entries, browserCodec())], { type: 'application/zip' }), filename: `${name}.zip`, warnings: [...sch.warnings, ...c.warnings] };
   },
   // the zip's entries as a project (project-store.js projectFromZip: every path inside the project,
   // silinx.json normalised, what was dropped in the warnings), then stored

@@ -5,7 +5,8 @@ import express from 'express';
 import { createZip, readZip, ZIP_LIMITS } from '../core/zip.js';
 import fss from 'node:fs';
 import path from 'node:path';
-import { exportIseSchematics, exportXise, importXise } from './xise.js';
+import { exportCSources, exportIseSchematics, exportXise, importXise } from './xise.js';
+import { isCSource } from '../core/view-hdl.js';
 import { ISE_OUTPUT, NODE_CODEC, SILINX_ONLY, importXiseProject } from './impl-routes.js';
 
 /** The ISE project and zip routes of registerImplRoutes, registered on api (nothing returned). */
@@ -62,15 +63,21 @@ export function mountXiseRoutes(ctx) {
       try { docs[rel] = JSON.parse(await fs.readFile(P.safeJoin(P.projectDir(name), rel), 'utf8')); } catch { /* skip */ }
     }
     const sch = exportIseSchematics(project, docs, sources);
-    const xml = exportXise(project, { sources, schematics: sch.schematics, extraFiles: sch.extraFiles });
+    // C sources go out as their HDL (#2320)
+    const cSources = {};
+    for (const rel of tree.filter(isCSource)) cSources[rel] = await fs.readFile(P.safeJoin(P.projectDir(name), rel), 'utf8');
+    const c = exportCSources(project, cSources, sources);
+    for (const f of c.files) sources[f.path] = f.text;
+    const xml = exportXise(project, { sources, schematics: sch.schematics, extraFiles: [...sch.extraFiles, ...c.extraFiles] });
     const entries = [];
-    const added = new Set(sch.files.map(f => f.path));
+    const generated = [...sch.files, ...c.files], warnings = [...sch.warnings, ...c.warnings];
+    const added = new Set(generated.map(f => f.path));
     for (const rel of tree) {
-      if (rel === xiseName(project) || added.has(rel) || SILINX_ONLY.test(rel)) continue;
+      if (rel === xiseName(project) || added.has(rel) || SILINX_ONLY.test(rel) || isCSource(rel)) continue;
       entries.push({ path: rel, data: await fs.readFile(P.safeJoin(P.projectDir(name), rel)) });
     }
-    entries.unshift({ path: xiseName(project), data: xml }, ...sch.files.map(f => ({ path: f.path, data: f.text })));
-    if (sch.warnings.length) res.set('X-Silinx-Warnings', encodeURIComponent(JSON.stringify(sch.warnings.slice(0, 50))));
+    entries.unshift({ path: xiseName(project), data: xml }, ...generated.map(f => ({ path: f.path, data: f.text })));
+    if (warnings.length) res.set('X-Silinx-Warnings', encodeURIComponent(JSON.stringify(warnings.slice(0, 50))));
     const zip = await createZip(entries, NODE_CODEC);
     res.type('application/zip').attachment(`${name}.zip`).send(Buffer.from(zip));
   }));
