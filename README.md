@@ -204,8 +204,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   array that synthesis maps to the same block RAMs). Like the Clocking Wizard's, the module shows as
   *[Block Memory] [VHDL]* and reopens the wizard (which reads the file again). Generator: `core/blockram.js`.
 - **Schematic Wizard** (*New Source ▸ Schematic ▸ Wizard >*): a template first (Empty, or a register, a shift
-  register, a counter, a multiplexer, a demultiplexer, an adder, a subtractor, a comparator, a decoder, a priority
-  encoder, a full adder of gates: their symbols placed and wired), the same port table (no quick-add buttons) and
+  register, a counter, a modulo-N counter, a clock divider, a PWM, an edge detector, a synchroniser and debouncer, an
+  adder-subtractor, an accumulator, a multiplexed 7-segment display, a full adder of gates: their symbols placed and
+  wired), the same port table (no quick-add buttons) and
   a description; it creates the
   `.sch.json` with the I/O markers placed tidily (inputs on the left edge, outputs on the right,
   bidirectional markers on the right below the outputs, bus markers with their width), the

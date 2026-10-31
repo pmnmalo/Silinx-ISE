@@ -42,21 +42,25 @@ const WIDTH = (def = 8, min = 1) => N('Width (bits):', def, min, 32);
 const YES_NO = [['yes', 'yes'], ['no', 'no']];
 const ENABLE = { key: 'en', label: 'Clock enable:', def: 'yes', options: YES_NO };
 const RESET = { key: 'reset', label: 'Reset:', def: 'async', options: [['async', 'Asynchronous (at once)'], ['sync', 'Synchronous (at the clock edge)'], ['none', 'No reset']] };
-const SELECT = { key: 'k', label: 'Select bits:', def: 2, min: 1, max: 4 };
 export const SCH_TEMPLATES = [
   { id: 'empty', label: 'Empty', text: 'No symbols: only the I/O markers of the inputs and outputs you type in.' },
   { id: 'register', label: 'Register', text: 'N flip-flops side by side: q takes d at the rising edge of clk, while ce = 1; rst sets it to 0.', params: [WIDTH(), ENABLE, RESET] },
   { id: 'shift', label: 'Shift register', text: 'N flip-flops in a chain: at the rising edge of clk, q moves one place to the left and its bit 0 takes the serial input si.', params: [WIDTH(8, 2), ENABLE, RESET] },
   { id: 'counter', label: 'Counter', text: 'A binary counter of N bits: q counts at the rising edge of clk, while ce = 1; rst sets it to 0.',
     params: [WIDTH(), ENABLE, RESET, { key: 'dir', label: 'Direction:', def: 'up', options: [['up', 'up'], ['down', 'down']] }] },
-  { id: 'mux', label: 'Multiplexer', text: 'y takes the data input that the select s chooses: d0 when s = 0, d1 when s = 1…', params: [WIDTH(), SELECT] },
-  { id: 'demux', label: 'Demultiplexer', text: 'The output that the select s chooses takes the data input d; the other outputs are 0.', params: [WIDTH(), SELECT] },
-  { id: 'adder', label: 'Adder', text: 'A binary adder of N bits: s = a + b + ci, the carry out in co.', params: [WIDTH()] },
-  { id: 'subtractor', label: 'Subtractor', text: 'A binary subtractor of N bits: d = a - b - bi, the borrow out in bo.', params: [WIDTH()] },
-  { id: 'comparator', label: 'Comparator', text: 'Compares a and b: eq when a = b, lt when a < b, gt when a > b.',
-    params: [WIDTH(), { key: 'signed', label: 'Numbers:', def: 'no', options: [['no', 'unsigned'], ['yes', 'signed (two\'s complement)']] }] },
-  { id: 'decoder', label: 'Decoder', text: 'A binary decoder: the bit of y numbered by a is 1 while en = 1; all of them 0 while en = 0.', params: [N('Address bits (N):', 3, 1, 5)] },
-  { id: 'encoder', label: 'Priority encoder', text: 'a is the number of the highest bit of i that is 1; v says that some bit is.', params: [N('Output bits (N):', 3, 2, 5)] },
+  { id: 'modcounter', label: 'Modulo-N counter', text: 'A counter and a comparator: when q reaches N-1, the comparator clears the counter at the next count, so q goes 0 to N-1; tc marks the last count, to chain another counter.',
+    params: [N('Modulus (N):', 10, 2, 65536)] },
+  { id: 'clockdiv', label: 'Clock divider (tick)', text: 'A counter and a comparator give tick, 1 for one clock period in every N: connect it to a clock enable, rather than making another clock.',
+    params: [N('Divide by (N):', 50000, 2, 16777216)] },
+  { id: 'pwm', label: 'PWM', text: 'A free counter compared with the duty kept in a register (load = 1 takes it): pwm is 1 for duty clocks in every 2^N, to dim an LED.', params: [WIDTH(8)] },
+  { id: 'edge', label: 'Edge detector', text: 'A flip-flop keeps the input of one clock ago and a gate compares it with the present one: pulse is 1 for one clock period at each edge of d.',
+    params: [{ key: 'kind', label: 'Edge:', def: 'rise', options: [['rise', 'rising'], ['fall', 'falling'], ['both', 'both']] }] },
+  { id: 'debounce', label: 'Synchroniser and debouncer', text: 'For a button: two flip-flops bring d into the clock\'s domain, and a third one samples it once every N clocks, longer than the bouncing lasts; q is the clean input.',
+    params: [N('Clocks between samples (N):', 500000, 2, 16777216)] },
+  { id: 'addsub', label: 'Adder-subtractor', text: 'One adder for both: sub = 1 chooses the complement of b and adds 1 through the carry in, so s = a - b; ov says that the signed result does not fit.', params: [WIDTH()] },
+  { id: 'accumulator', label: 'Accumulator', text: 'An adder and a register in a loop: at each rising edge of clk, while ce = 1, q takes q + d; rst sets it to 0.', params: [WIDTH()] },
+  { id: 'display', label: 'Multiplexed 7-segment display', text: 'The digits of d shown one at a time, too fast to see: a tick every N clocks moves a counter, which chooses the digit and lights its anode; a multiplexer of constants gives its segments. seg (gfedcba) and an are active low.',
+    params: [{ key: 'k', label: 'Digits:', def: '4', options: [['2', '2'], ['4', '4']] }, N('Clocks per digit (N):', 50000, 2, 16777216)] },
   { id: 'fulladder', label: 'Full adder (gates)', text: 'One bit added with XOR, AND and OR gates: s = a xor b xor ci, co = a and b, or (a xor b) and ci.' },
 ];
 

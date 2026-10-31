@@ -6,6 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SCH_TEMPLATES, templateDefaults, templateError, templateOf } from '../core/chart-templates.js';
 import { schematicFromTemplate, schematicTemplatePorts, templatePortsError } from '../core/sch-templates.js';
+import { HEX_SEGMENTS } from '../core/sch-circuits.js';
+import { readFileSync } from 'node:fs';
 import { netlist, generateHdl, portBox, symbolBox } from '../core/schdoc.js';
 import { wireStats } from '../core/schbeautify.js';
 import { compile, elaborate, simulate } from '../core/compile.js';
@@ -35,6 +37,9 @@ const variants = () => SCH_TEMPLATES.slice(1).flatMap((t) => {
   return out.map((params) => [t.id, params]);
 });
 
+// the wires that have to cross (a circuit's fan-outs), at most
+const CROSSINGS = { fulladder: 9, modcounter: 1, pwm: 1, edge: 1, debounce: 1, addsub: 2, display: 2 };
+
 test('#2180 every template, at the defaults and the limits: no warnings, nothing overlapping, its wires clean, on the sheet (VHDL, Verilog)', () => {
   for (const [id, params] of variants()) {
     const what = `${id} ${JSON.stringify(params)}`;
@@ -45,7 +50,7 @@ test('#2180 every template, at the defaults and the limits: no warnings, nothing
       assert.deepEqual(checkDiags(hdlOf(doc, lang), lang, 'm'), [], `${what} ${lang}`);
       const st = wireStats(doc);
       assert.deepEqual([st.clashes, st.diagonals], [{}, 0], what);
-      if (id !== 'fulladder') assert.equal(st.crossings, 0, what);
+      assert.ok(st.crossings <= (CROSSINGS[id] ?? 0), `${what}: ${st.crossings} crossings`);
       assert.deepEqual(doc.ports.map((p) => `${p.name}:${p.dir}:${p.width}`).sort(), schematicTemplatePorts(id, params).map((p) => `${p.name}:${p.dir}:${p.width}`).sort(), what);
       const boxes = [...doc.ports.map(portBox), ...doc.symbols.map((s) => symbolBox(s))];
       for (const b of boxes) assert.ok(b.x >= 10 && b.y >= 10 && b.x + b.w <= doc.sheet.w - 10 && b.y + b.h <= doc.sheet.h - 10, `${what}: on the sheet`);
@@ -129,50 +134,116 @@ test('#2180 the asynchronous reset clears at once, the synchronous one waits for
   }
 });
 
-test('#2180 the multiplexer and the demultiplexer: every select, against a model', () => {
-  for (const k of [1, 2, 3, 4]) for (const n of [1, 4]) {
-    const r = rng(k * 5 + n), m = 1 << k;
-    const vectors = Array.from({ length: 2 * m }, (_, i) => {
-      const v = { s: BigInt(i % m), d: r(n) };
-      for (let j = 0; j < m; j++) v[`d${j}`] = r(n);
-      return v;
-    });
-    expectSame('mux', { n, k }, vectors.map(({ d, ...v }) => v), () => (v) => bin(v[`d${v.s}`], n));
-    expectSame('demux', { n, k }, vectors.map((v) => ({ s: v.s, d: v.d })), () => (v) => Array.from({ length: m }, (_, j) => bin(BigInt(j) === v.s ? v.d : 0n, n)).join(' '));
-  }
-});
-
-test('#2180 the adder, the subtractor, the comparator (unsigned, signed), the full adder of gates: against the arithmetic', () => {
-  for (const n of [1, 8, 32]) {
-    const r = rng(n + 9);
-    const vectors = Array.from({ length: 50 }, () => ({ a: r(n), b: r(n) }));
-    const signedOf = (x) => BigInt.asIntN(n, x);
-    expectSame('adder', { n }, vectors.map((v) => ({ ...v, ci: r(1) })), () => (v) => { const t = v.a + v.b + v.ci; return `${bin(t, n)} ${bin(t >> BigInt(n), 1)}`; });
-    expectSame('subtractor', { n }, vectors.map((v) => ({ ...v, bi: r(1) })), () => (v) => { const t = v.a - v.b - v.bi; return `${bin(t, n)} ${t < 0n ? 1 : 0}`; });
-    const cmp = (a, b) => [a === b, a < b, a > b].map((x) => (x ? '1' : '0')).join(' ');
-    // (an equal pair too: rarely drawn at random)
-    const pairs = [...vectors, { a: vectors[0].a, b: vectors[0].a }];
-    expectSame('comparator', { n, signed: 'no' }, pairs, () => (v) => cmp(v.a, v.b));
-    expectSame('comparator', { n, signed: 'yes' }, pairs, () => (v) => cmp(signedOf(v.a), signedOf(v.b)));
-  }
+test('#2180 the full adder of gates: against the arithmetic', () => {
   const all = Array.from({ length: 8 }, (_, i) => ({ a: BigInt(i >> 2 & 1), b: BigInt(i >> 1 & 1), ci: BigInt(i & 1) }));
   expectSame('fulladder', {}, all, () => (v) => { const t = v.a + v.b + v.ci; return `${bin(t, 1)} ${bin(t >> 1n, 1)}`; });
 });
 
-test('#2180 the decoder and the priority encoder: every value, against a model', () => {
-  for (const n of [1, 3, 5]) {
-    const vectors = Array.from({ length: 2 << n }, (_, i) => ({ a: BigInt(i % (1 << n)), en: BigInt(i >> n & 1) }));
-    expectSame('decoder', { n }, vectors, () => (v) => bin(v.en ? 1n << v.a : 0n, 1 << n));
+test('#2231 the modulo-N counter: 0 to N-1 and back, tc at the last count, held while ce = 0, the reset, against a model', () => {
+  for (const N of [2, 3, 10, 16]) {
+    const r = rng(N), w = Math.max(1, Math.ceil(Math.log2(N)));
+    const vectors = Array.from({ length: 3 * N + 20 }, (_, i) => ({ ce: r(2) === 0n ? 0n : 1n, rst: i === 0 || i === 2 * N + 5 ? 1n : 0n }));
+    expectSame('modcounter', { n: N }, vectors, () => { let q = 0; return (v) => {
+      // (tc read after the edge, with this vector's ce)
+      if (v.rst) q = 0; else if (v.ce) q = (q + 1) % N;
+      return `${bin(q, w)} ${v.ce && q === N - 1 ? 1 : 0}`;
+    }; });
   }
-  for (const n of [2, 3, 5]) {
-    const m = 1 << n, r = rng(n);
-    const vectors = [{ i: 0n }, ...Array.from({ length: m }, (_, j) => ({ i: 1n << BigInt(j) })), ...Array.from({ length: 30 }, () => ({ i: r(m) }))];
-    expectSame('encoder', { n }, vectors, () => (v) => {
-      let top = -1;
-      for (let j = 0; j < m; j++) if ((v.i >> BigInt(j)) & 1n) top = j;
-      return `${bin(Math.max(top, 0), n)} ${top < 0 ? 0 : 1}`;
+});
+
+test('#2231 the clock divider: tick one clock in every N, the reset restarts it, against a model', () => {
+  for (const N of [2, 5, 16]) {
+    const vectors = Array.from({ length: 4 * N }, (_, i) => ({ rst: i === 0 || i === 2 * N + 1 ? 1n : 0n }));
+    expectSame('clockdiv', { n: N }, vectors, () => { let q = 0; return (v) => { q = v.rst ? 0 : (q + 1) % N; return bin(q === N - 1 ? 1 : 0, 1); }; });
+  }
+});
+
+test('#2231 the PWM: out high for duty clocks in every 2^N, the duty taken at load, against a model', () => {
+  for (const n of [1, 3]) for (const duty of [0n, 1n, BigInt((1 << n) - 1)]) {
+    const vectors = Array.from({ length: 3 << n }, (_, i) => ({ duty: i < 2 ? duty : 0n, load: i === 1 ? 1n : 0n, rst: i === 0 ? 1n : 0n }));
+    expectSame('pwm', { n }, vectors, () => { let q = 0n, h = 0n; return (v) => {
+      if (v.rst) { q = 0n; h = 0n; } else { q = BigInt.asUintN(n, q + 1n); if (v.load) h = v.duty; }
+      return bin(h > q ? 1 : 0, 1);
+    }; });
+  }
+  // over a whole period, after the duty is taken: exactly duty clocks
+  for (const lang of LANGS) {
+    const vectors = [{ duty: 5n, load: 0n, rst: 1n }, { duty: 5n, load: 1n, rst: 0n }, ...Array.from({ length: 8 }, () => ({ duty: 0n, load: 0n, rst: 0n }))];
+    assert.equal(sim('pwm', { n: 3 }, vectors, lang).slice(2).filter((x) => x === '1').length, 5, lang);
+  }
+});
+
+test('#2231 the edge detector: a pulse of one clock at the rising, the falling or both edges, against the input', () => {
+  const r = rng(5);
+  // (d changes between edges: pulse read just before the next change is 0, so the pulse is read with d still applied)
+  const vectors = Array.from({ length: 40 }, (_, i) => ({ d: i < 2 ? 0n : r(1), rst: i === 0 ? 1n : 0n }));
+  for (const kind of ['rise', 'fall', 'both']) for (const lang of LANGS) {
+    // two vectors per value of d: the first sees it change (before the clock), read before the edge by hand-clocking
+    const clocked = vectors.flatMap((v) => [{ ...v, clk: 0n }, { ...v, clk: 1n }, { ...v, clk: 0n }]);
+    const got = sim('edge', { kind }, clocked, lang, true);
+    let prev = 0n;
+    const want = clocked.map((v, i) => {
+      if (v.rst) prev = 0n; else if (i % 3 === 1) prev = v.d;
+      return bin(kind === 'rise' ? v.d & (prev ^ 1n) : kind === 'fall' ? (v.d ^ 1n) & prev : v.d ^ prev, 1);
+    });
+    assert.deepEqual(got.slice(3), want.slice(3), `${kind} ${lang}`);
+  }
+});
+
+test('#2231 the debouncer: bouncing shorter than the sampling never reaches q, the new level does, against a model', () => {
+  const N = 4;
+  const levels = [0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const vectors = levels.map((d, i) => ({ d: BigInt(d), rst: i === 0 ? 1n : 0n }));
+  expectSame('debounce', { n: N }, vectors, () => { let a = 0n, b = 0n, q = 0n, c = 0; return (v) => {
+    const tick = !v.rst && c === N - 1;
+    if (v.rst) q = 0n; else if (tick) q = b;
+    b = a; a = v.d;
+    c = v.rst || tick ? 0 : c + 1;
+    return bin(q, 1);
+  }; });
+});
+
+test('#2231 the adder-subtractor: s, co and ov against the arithmetic (corners and random, adding and subtracting)', () => {
+  for (const n of [1, 4, 8, 32]) {
+    const r = rng(n + 9), top = 1n << BigInt(n - 1), mask = (1n << BigInt(n)) - 1n;
+    const corners = [0n, 1n, top, top - 1n, mask];
+    const pairs = corners.flatMap((a) => corners.map((b) => ({ a: a & mask, b: b & mask })));
+    const vectors = [...pairs, ...Array.from({ length: 30 }, () => ({ a: r(n), b: r(n) }))].flatMap((v) => [{ ...v, sub: 0n }, { ...v, sub: 1n }]);
+    const signed = (x) => BigInt.asIntN(n, x);
+    expectSame('addsub', { n }, vectors, () => (v) => {
+      const raw = v.sub ? v.a + (v.b ^ mask) + 1n : v.a + v.b;
+      const exact = v.sub ? signed(v.a) - signed(v.b) : signed(v.a) + signed(v.b);
+      return `${bin(raw, n)} ${bin(raw >> BigInt(n), 1)} ${exact === signed(BigInt.asUintN(n, raw)) ? 0 : 1}`;
     });
   }
+});
+
+test('#2231 the accumulator: q takes q + d while ce = 1, wraps around, cleared by rst, against a model', () => {
+  for (const n of [1, 4, 32]) {
+    const r = rng(n + 2);
+    const vectors = Array.from({ length: 50 }, (_, i) => ({ d: r(n), ce: r(2) === 0n ? 0n : 1n, rst: i === 0 || i === 30 ? 1n : 0n }));
+    expectSame('accumulator', { n }, vectors, () => { let q = 0n; return (v) => { if (v.rst) q = 0n; else if (v.ce) q = BigInt.asUintN(n, q + v.d); return bin(q, n); }; });
+  }
+});
+
+test('#2231 the multiplexed display: each digit in turn, its anode low, the segments of every value (the same table as the stopwatch example\'s)', () => {
+  for (const k of [2, 4]) {
+    const N = 3, sel = k === 2 ? 1 : 2;
+    const value = (i) => (k === 2 ? 0x5an : 0x1e7cn) + BigInt(i >> 4);
+    const vectors = Array.from({ length: 16 * k * N + 10 }, (_, i) => ({ d: BigInt.asUintN(4 * k, value(i)), rst: i === 0 ? 1n : 0n }));
+    expectSame('display', { k: String(k), n: N }, vectors, () => { let c = 0, s = 0; return (v) => {
+      if (v.rst) { c = 0; s = 0; } else {
+        if (c === N - 1) s = (s + 1) % (1 << sel);
+        c = c === N - 1 ? 0 : c + 1;
+      }
+      const digit = Number((v.d >> BigInt(4 * s)) & 15n);
+      return `${HEX_SEGMENTS[digit]} ${bin(~(1n << BigInt(s)), k)}`;
+    }; });
+  }
+  // every value of a digit, from the example's own table where it has it
+  const text = readFileSync(new URL('../examples/stopwatch/src/sevenseg.vhd', import.meta.url), 'utf8');
+  for (const [, bits, v] of text.matchAll(/"([01]{7})" when "([01]{4})"/g)) assert.equal(HEX_SEGMENTS[parseInt(v, 2)], bits, v);
+  assert.equal(new Set(HEX_SEGMENTS).size, 16);
 });
 
 test('#2180 the wizard\'s table: ports renamed (the wires follow), others added (their markers unwired, its warning), a template\'s port removed or changed refused', () => {
@@ -208,9 +279,9 @@ test('#2180 the wizard\'s table: ports renamed (the wires follow), others added 
 test('#2180 the templates\' parameters refused with their messages; an unknown template is the empty one', () => {
   assert.equal(templateError('sch', 'register', { n: 0, en: 'yes', reset: 'async' }), 'Width (bits): a whole number from 1 to 32.');
   assert.equal(templateError('sch', 'shift', { n: 1, en: 'yes', reset: 'async' }), 'Width (bits): a whole number from 2 to 32.');
-  assert.equal(templateError('sch', 'mux', { n: 8, k: 5 }), 'Select bits: a whole number from 1 to 4.');
+  assert.equal(templateError('sch', 'modcounter', { n: 1 }), 'Modulus (N): a whole number from 2 to 65536.');
+  assert.equal(templateError('sch', 'display', { k: '3', n: 10 }), 'Digits: choose one.');
   assert.equal(templateError('sch', 'counter', { n: 8, en: 'yes', reset: 'async', dir: 'sideways' }), 'Direction: choose one.');
-  assert.equal(templateError('sch', 'decoder', { n: 6 }), 'Address bits (N): a whole number from 1 to 5.');
   assert.equal(templateOf('sch', 'nope').id, 'empty');
 });
 
