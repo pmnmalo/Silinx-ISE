@@ -52,18 +52,25 @@ export function wordCalls(gen, calls) {
   });
 }
 
+// (ap_ctrl_chain: the cycles ap_continue stays 0 after a call's ap_done, longer than a short module's call)
+const CHAIN_HOLD = 8;
+
 /** The Verilog test bench replaying the calls: one line of hex values per call (and the protocol's faults last). */
 export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
   const calls = wordCalls(gen, calls0);
   const port = (n) => gen.ports.find((p) => p.name === n);
-  const seq = !!port('ap_clk'), hs = !!port('ap_start');
+  const seq = !!port('ap_clk'), hs = !!port('ap_start'), chain = !!port('ap_continue');
   const L = ['module silinx_cosim_tb;', '  integer cyc, bad = 0;'];
   // (ap_ctrl_none: no ap_start, the module running by itself, #1900)
   if (seq) L.push(`  reg ap_clk = 0, ap_rst = 1${hs ? ', ap_start = 0' : ''};`);
+  // (ap_ctrl_chain, #1965: its ap_ready's counted in each call, ap_done and the outputs held while ap_continue is 0)
+  if (chain) L.push('  integer readys = 0, held;');
   // (a combinational module's reset: an input it does not use, held low, #1924)
   else if (port('ap_rst')) L.push('  reg ap_rst = 0;');
-  for (const p of gen.ports) if (!['ap_clk', 'ap_rst', 'ap_start'].includes(p.name)) L.push((p.role === 'mem' || p.role === 'fifo') && p.dir === 'in' ? `  wire [${p.w - 1}:0] ${p.name};` : `  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
+  for (const p of gen.ports) if (!['ap_clk', 'ap_rst', 'ap_start', 'ap_continue'].includes(p.name)) L.push((p.role === 'mem' || p.role === 'fifo') && p.dir === 'in' ? `  wire [${p.w - 1}:0] ${p.name};` : `  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
   const outs = gen.ports.filter((p) => p.dir === 'out' && p.role === 'arg');
+  if (chain) L.push('  reg ap_continue = 0;');
+  if (chain && port('ap_return')) L.push(`  reg [${port('ap_return').w - 1}:0] ret_held;`);
   for (const o of outs) L.push(`  reg [${o.w - 1}:0] cap_${o.name}; reg got_${o.name};`);
   const mems = gen.memories || [];
   const P = (x) => x.port ?? x.name;
@@ -101,6 +108,7 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
   L.push(`  ${gen.top} dut(${gen.ports.map((p) => `.${p.name}(${p.name})`).join(', ')});`);
   if (seq) {
     L.push('  always #5 ap_clk = ~ap_clk;', '  always @(posedge ap_clk) begin');
+    if (chain) L.push('    if (ap_ready) readys = readys + 1;');
     for (const o of outs) if (port(`${o.name}_ap_vld`)) L.push(`    if (${o.name}_ap_vld) begin cap_${o.name} <= ${o.name}; got_${o.name} <= 1; end`);
     // (a memory: one port, the value read on _q0 the cycle after its address; an address outside it: x)
     for (const x of mems) { const m = M(x); L.push(`    if (${m.ce}) begin${x.written ? ` if (${m.we} && ${m.a} < ${x.n}) mem_${x.name}[${m.a}] <= ${m.d};` : ''}${x.read ? ` q_${x.name} <= ${m.a} < ${x.n} ? mem_${x.name}[${m.a}] : ${x.w}'bx;` : ''} end`); }
@@ -130,7 +138,14 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
     // (per call: the values each stream gives back, as many as the C's)
     const each = [...shown, ...fifos.flatMap((f) => (f.dir === 'in' ? [`fi_${f.name}`] : [`fo_${f.name}`, ...(c.streamOut[f.name] || []).map((_, k) => `fout_${f.name}[${k}]`)])), ...(seq ? ['cyc'] : [])];
     if (seq && !hs) L.push(`    ${asg} ${outs.map((o) => `got_${o.name} = 0;`).join(' ')} cyc = 0;`);
-    else if (seq) {
+    else if (chain) {
+      // (the next stage not ready: ap_continue 0 and ap_start 1 a while: ap_done and ap_return held, no new call; then
+      // ap_continue takes it, ap_done falls)
+      L.push('    if (!ap_idle) bad = bad + 1;', `    ${asg} ${outs.map((o) => `got_${o.name} = 0;`).join(' ')} ap_start = 1; cyc = 0; readys = 0;`, '    @(posedge ap_clk); #1 ap_start = 0;');
+      L.push(`    while (!ap_done && cyc < ${callCycles(c, maxCycles)}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`, '    @(posedge ap_clk); #1;', ...(port('ap_return') ? ['    ret_held = ap_return;'] : []), '    ap_start = 1;');
+      L.push(`    for (held = 0; held < ${CHAIN_HOLD}; held = held + 1) begin @(posedge ap_clk); #1 if (ap_ready || !ap_done || ap_idle${port('ap_return') ? ' || ap_return !== ret_held' : ''}) bad = bad + 1; end`);
+      L.push('    if (readys != 1) bad = bad + 1;', '    ap_start = 0; ap_continue = 1;', '    @(posedge ap_clk); #1 ap_continue = 0;', '    if (ap_done || !ap_idle) bad = bad + 1;');
+    } else if (seq) {
       L.push('    if (!ap_idle) bad = bad + 1;', `    ${asg} ${outs.map((o) => `got_${o.name} = 0;`).join(' ')} ap_start = 1; cyc = 0;`, '    @(posedge ap_clk); #1 ap_start = 0;');
       L.push(`    while (!ap_done && cyc < ${callCycles(c, maxCycles)}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`, '    if (!ap_ready) bad = bad + 1;', '    @(posedge ap_clk); #1;');
     }
@@ -207,7 +222,8 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
     const why = w.length ? `: DATAFLOW's processes may wait for each other: ${[...new Set(w.map((x) => `${x.to}|${x.from}`))].map((k) => { const [to, from] = k.split('|'); return `'${to}' starts once '${from}' is done, and ${w.filter((x) => x.to === to && x.from === from).map((x) => `the stream '${x.stream}' from '${from}' to it holds ${x.depth} values`).join('; ')} (a call may write more)`; }).join('; ')}` : '';
     return { ...base, ok: true, errors: [`a call did not end in ${callCycles(sim.calls[over], maxCycles)} cycles${why}`], calls: sim.calls.length, mismatches };
   }
-  if (bad) mismatches.push({ call: null, port: 'ap_ctrl_hs', expected: 'ap_idle between calls, ap_done with ap_ready', got: `${bad} fault(s)` });
+  if (bad) mismatches.push(port('ap_continue') ? { call: null, port: 'ap_ctrl_chain', expected: 'ap_idle between calls, one ap_ready a call, ap_done and ap_return held until ap_continue', got: `${bad} fault(s)` }
+    : { call: null, port: 'ap_ctrl_hs', expected: 'ap_idle between calls, ap_done with ap_ready', got: `${bad} fault(s)` });
   const latency = tb.seq ? { min: Math.min(...cycles), max: Math.max(...cycles), avg: cycles.reduce((a, b) => a + b, 0) / cycles.length } : null;
   return { ...base, ok: true, pass: !mismatches.length, calls: sim.calls.length, mismatches, latency };
 }

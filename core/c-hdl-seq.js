@@ -1,7 +1,8 @@
 // Silinx HLS (#1526): the VHDL and the Verilog of a sequential C function's machine (core/c-fsmd.js): its registers and
 // its state (ap_CS_fsm, as Vitis HLS names it) in one clocked process, the operations of its states one signal each
 // (core/c-hdl.js), Vitis HLS's ports (ap_clk, ap_rst, ap_start, ap_done, ap_idle, ap_ready, the arguments, ap_return;
-// with ap_ctrl_none ap_start, ap_done, ap_idle and ap_ready signals inside it, #1900).
+// with ap_ctrl_none ap_start, ap_done, ap_idle and ap_ready signals inside it, #1900; with ap_ctrl_chain, #1965, as
+// Vitis HLS's, ap_continue: ap_done held until it is 1, no new call meanwhile).
 // Isomorphic ES module: no DOM and no Node APIs.
 import { bin, sig, vhdlNodes, verilogNodes, innerSignals } from './c-hdl.js';
 import { hdlName } from './c-graph.js';
@@ -42,6 +43,8 @@ export function vhdlSeq(name, src, ports, m, agg) {
   innerSignals(agg, 'vhdl', L);
   // (ap_ctrl_none, #1900: the block protocol's signals inside the module, ap_start 1: a call after the other)
   if (!ports.some((p) => p.name === 'ap_start')) L.push("  signal ap_start : std_logic := '1';", '  signal ap_done, ap_idle, ap_ready : std_logic;');
+  const chain = ports.some((p) => p.name === 'ap_continue');
+  if (chain) L.push("  signal ap_done_reg : std_logic := '0';");
   L.push('begin');
   vhdlNodes(nodes, g, L);
   L.push(...(agg?.vhdl || []));
@@ -56,7 +59,7 @@ export function vhdlSeq(name, src, ports, m, agg) {
   for (const r of regs) L.push(`        ${r.sig} <= "${bin(r.reset, r.w)}";`);
   L.push('      else');
   for (const r of regs) if (/_vld_reg$/.test(r.name)) L.push(`        ${r.sig} <= "0";`);
-  L.push(`        if ap_CS_fsm = ${S(m.idle)} then`, "          if ap_start = '1' then");
+  L.push(`        if ap_CS_fsm = ${S(m.idle)} then`, `          if ap_start = '1'${chain ? " and ap_done_reg = '0'" : ''} then`);
   for (const r of regs) if (r.latch != null) L.push(`            ${r.sig} <= ${sig(g.get(r.latch))};`);
   L.push(`            ap_CS_fsm <= ${S(m.entry)};`, '          end if;');
   for (const st of m.states) {
@@ -65,7 +68,8 @@ export function vhdlSeq(name, src, ports, m, agg) {
     L.push(`          ap_CS_fsm <= ${sig(g.get(st.next))};`);
   }
   L.push('        else', `          ap_CS_fsm <= ${S(m.idle)};`, '        end if;', '      end if;', '    end if;', '  end process;');
-  L.push(`  ap_done <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_ready <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_idle <= '1' when ap_CS_fsm = ${S(m.idle)} else '0';`);
+  L.push(`  ap_done <= '1' when ap_CS_fsm = ${S(m.done)}${chain ? " or ap_done_reg = '1'" : ''} else '0';`, `  ap_ready <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_idle <= '1' when ap_CS_fsm = ${S(m.idle)}${chain ? " and ap_start = '0'" : ''} else '0';`);
+  if (chain) L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' or ap_continue = '1' then", "        ap_done_reg <= '0';", `      elsif ap_CS_fsm = ${S(m.done)} then`, "        ap_done_reg <= '1';", '      end if;', '    end if;', '  end process;');
   for (const [p, o] of m.outputs) {
     if (o.wire) { L.push(`  ${p} <= ${o.wire};`); continue; }   // (a BRAM's clock and reset, core/c-mem.js)
     const v = o.node != null ? sig(g.get(o.node)) : byName.get(o.reg).sig, port = [...ports, ...(agg?.inner || [])].find((x) => x.name === p);
@@ -87,6 +91,8 @@ export function verilogSeq(name, src, ports, m, agg) {
   for (const n of nodes) L.push(`  wire ${n.s ? 'signed ' : ''}[${n.w - 1}:0] ${sig(n)};`);
   innerSignals(agg, 'verilog', L);
   if (!ports.some((p) => p.name === 'ap_start')) L.push("  wire ap_start = 1'b1;", '  wire ap_done, ap_idle, ap_ready;');
+  const chain = ports.some((p) => p.name === 'ap_continue');
+  if (chain) L.push("  reg ap_done_reg = 1'b0;");
   for (const x of m.mems || []) {
     L.push(`  reg [${x.t.w - 1}:0] ap_m_${hdlName(x.name)} [0:${depth(x) - 1}];`, `  reg ${x.t.s ? 'signed ' : ''}[${x.t.w - 1}:0] ap_m_${hdlName(x.name)}_q0;`);
     if (x.init) L.push('  initial begin', ...words(x).map((v, k) => `    ap_m_${hdlName(x.name)}[${k}] = ${x.t.w}'b${bin(v, x.t.w)};`), '  end');
@@ -103,7 +109,7 @@ export function verilogSeq(name, src, ports, m, agg) {
   for (const r of regs) L.push(`      ${r.sig} <= ${r.w}'b${bin(r.reset, r.w)};`);
   L.push('    end else begin');
   for (const r of regs) if (/_vld_reg$/.test(r.name)) L.push(`      ${r.sig} <= 1'b0;`);
-  L.push('      case (ap_CS_fsm)', `        ${S(m.idle)}: if (ap_start) begin`);
+  L.push('      case (ap_CS_fsm)', `        ${S(m.idle)}: if (ap_start${chain ? ' && !ap_done_reg' : ''}) begin`);
   for (const r of regs) if (r.latch != null) L.push(`          ${r.sig} <= ${sig(g.get(r.latch))};`);
   L.push(`          ap_CS_fsm <= ${S(m.entry)};`, '        end');
   for (const st of m.states) {
@@ -112,7 +118,8 @@ export function verilogSeq(name, src, ports, m, agg) {
     L.push(`          ap_CS_fsm <= ${sig(g.get(st.next))};`, '        end');
   }
   L.push(`        default: ap_CS_fsm <= ${S(m.idle)};`, '      endcase', '    end', '  end');
-  L.push(`  assign ap_done = ap_CS_fsm == ${S(m.done)};`, `  assign ap_ready = ap_CS_fsm == ${S(m.done)};`, `  assign ap_idle = ap_CS_fsm == ${S(m.idle)};`);
+  L.push(`  assign ap_done = ap_CS_fsm == ${S(m.done)}${chain ? ' || ap_done_reg' : ''};`, `  assign ap_ready = ap_CS_fsm == ${S(m.done)};`, `  assign ap_idle = ap_CS_fsm == ${S(m.idle)}${chain ? ' && !ap_start' : ''};`);
+  if (chain) L.push('  always @(posedge ap_clk) begin', "    if (ap_rst || ap_continue) ap_done_reg <= 1'b0;", `    else if (ap_CS_fsm == ${S(m.done)}) ap_done_reg <= 1'b1;`, '  end');
   for (const [p, o] of m.outputs) L.push(`  assign ${p} = ${o.wire ?? (o.node != null ? sig(g.get(o.node)) : byName.get(o.reg).sig)};`);
   L.push('endmodule', '');
   return L.join('\n');

@@ -153,9 +153,9 @@ export async function runCReport(path) {
   const rep = r.report;
   const L = [`C Synthesis Report of '${r.top}' (${path}, ${lang === 'vhdl' ? 'VHDL' : 'Verilog'})`, ''];
   // (ap_ctrl_none: no ap_start / ap_done / ap_idle / ap_ready, #1900)
-  const ctrl = r.ports.some((p) => p.name === 'ap_start') ? 'ap_ctrl_hs (ap_clk, ap_rst, ap_start / ap_done / ap_idle / ap_ready)' : 'ap_ctrl_none (ap_clk, ap_rst: running by itself)';
+  const ctrl = r.ports.some((p) => p.name === 'ap_continue') ? 'ap_ctrl_chain (ap_clk, ap_rst, ap_start / ap_done / ap_continue / ap_idle / ap_ready)' : r.ports.some((p) => p.name === 'ap_start') ? 'ap_ctrl_hs (ap_clk, ap_rst, ap_start / ap_done / ap_idle / ap_ready)' : 'ap_ctrl_none (ap_clk, ap_rst: running by itself)';
   if (rep.dataflow) L.push(`Module: DATAFLOW, ${ctrl}, ${rep.processes.length} processes running at once`);
-  else L.push(rep.sequential ? `Module: sequential, ${ctrl}, ${rep.states} states, ${rep.registerBits} register bits` : 'Module: combinational');
+  else L.push(rep.sequential ? `Module: sequential, ${ctrl}, ${rep.states} states, ${rep.registerBits} register bits` : r.ports.some((p) => p.name === 'ap_continue') ? `Module: combinational, ${ctrl}` : 'Module: combinational');
   // (the clock it was scheduled for: the board's, #1924)
   L.push(`Target clock: ${clock} ns (the board's oscillator)`);
   L.push('', 'Ports:');
