@@ -25,6 +25,8 @@ const walk = (x, f) => {
 };
 const isLoop = (s) => s && (s.kind === 'for' || s.kind === 'while' || s.kind === 'do');
 const extraOf = ({ id, op, args, w, s, ...extra }) => extra;
+// (an access's memory, from its key: `a`, or `a#1` on its second port, each port an access a cycle of its own, #1901)
+const memOf = (key) => key.replace(/#1$/, '');
 
 /**
  * The stages of a body, modulo ii; { fail: why } when the ii does not work.
@@ -52,16 +54,21 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
       at.set(n.id, t + d);
     }
   };
-  const ports = new Map(), last = new Map(), opStage = [];
+  const ports = new Map(), last = new Map(), lastRead = new Map(), lastWrite = new Map(), opStage = [];
   for (const op of ops) {
     ensure(op.roots);
     let s = op.roots.reduce((m, r) => Math.max(m, stage.get(r)), 0);
     if (last.has(op.mem)) s = Math.max(s, last.get(op.mem) + 1);
+    // (the other port's, in the C's order: a read after a write sees it, a write is not before a read, #1901)
+    const m = memOf(op.mem);
+    if (op.write && lastRead.has(m)) s = Math.max(s, lastRead.get(m));
+    if (!op.write && lastWrite.has(m)) s = Math.max(s, lastWrite.get(m) + 1);
     const used = ports.get(op.mem) || new Set();
     while (used.has(s % ii)) s++;
     used.add(s % ii);
     ports.set(op.mem, used);
     last.set(op.mem, s);
+    (op.write ? lastWrite : lastRead).set(m, s);
     opStage.push(s);
     for (const q of [op.q, ...(op.alias || [])]) if (q != null) { stage.set(q, s + 1); at.set(q, 0); }
   }
@@ -104,8 +111,8 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
   for (let w = 0; w < ops.length; w++) {
     if (!ops[w].write) continue;
     for (let r = 0; r < ops.length; r++) {
-      if (ops[r].write || ops[r].mem !== ops[w].mem || sameIndex(ops[r], ops[w])) continue;
-      if (opStage[w] >= opStage[r] + ii) return { fail: { kind: 'mem', mem: ops[w].mem } };
+      if (ops[r].write || memOf(ops[r].mem) !== memOf(ops[w].mem) || sameIndex(ops[r], ops[w])) continue;
+      if (opStage[w] >= opStage[r] + ii) return { fail: { kind: 'mem', mem: memOf(ops[w].mem) } };
     }
   }
   let depth = 1;
@@ -211,7 +218,7 @@ export const pipelineSchedMethods = {
       this.piping.qs = new Map();
       for (const [mem, a] of this.access) {
         // (a read of the element read before, no write of the memory between: that read, its value the same)
-        const same = a.d === null && [...ops].reverse().find((o) => o.mem === mem && (o.write || o.a.addr === a.addr));
+        const same = a.d === null && [...ops].reverse().find((o) => (o.write && memOf(o.mem) === memOf(mem)) || (o.mem === mem && o.a.addr === a.addr));
         if (same && !same.write) { same.a = { ...same.a, ce: this.or(same.a.ce, a.ce) }; same.roots = [same.a.addr, same.a.ce]; same.more = [...(same.more || []), true]; continue; }
         ops.push({ mem, a, write: a.d !== null, roots: [a.addr, a.ce, ...(a.d !== null ? [a.we, a.d] : [])], q: null });
       }
@@ -260,7 +267,7 @@ export const pipelineSchedMethods = {
     if (!timed.fail) plan = timed;
     const crowded = [...perMem].filter(([, n]) => n > asked).sort((x, y) => y[1] - x[1])[0];
     if (ii > asked) {
-      p.info.memII = crowded && crowded[1] >= ii ? `the memory '${crowded[0]}' has one port, accessed ${crowded[1]} times an iteration`
+      p.info.memII = crowded && crowded[1] >= ii ? `the memory '${memOf(crowded[0])}' has one port, accessed ${crowded[1]} times an iteration`
         : why?.kind === 'var' ? `a dependence: the next iteration reads '${vals.get(why.reg).name}' before this one has written it`
           : why?.kind === 'mem' ? `a dependence: another iteration's read of the memory '${why.mem}' must come after this one's write`
             : why?.kind === 'exit' ? 'a dependence: the next iteration must wait for this one to say the loop goes on' : null;
@@ -295,7 +302,7 @@ export const pipelineSchedMethods = {
       let out = v;
       if (s < 0) out = v;
       else if (s < c) out = cut(v, c);
-      else if (qMem.has(v)) out = this.memQ(this.slots.get(qMem.get(v)));
+      else if (qMem.has(v)) out = this.memQ(this.slots.get(memOf(qMem.get(v))), qMem.get(v) === memOf(qMem.get(v)) ? 0 : 1);
       else if (inOf.has(v)) out = inOf.get(v);
       else if (node.args.length) {
         const args = node.args.map((a) => at(c, a));
@@ -326,7 +333,7 @@ export const pipelineSchedMethods = {
       const addr = at(c, op.a.addr), ce = this.and(v, at(c, op.a.ce));
       const prev = access.get(op.mem);
       const w = op.write ? this.and(v, at(c, op.a.we)) : null, d = op.write ? at(c, op.a.d) : null;
-      const memT = this.slots.get(op.mem).t, aT = { w: this.slots.get(op.mem).aw, s: false };
+      const slot = this.slots.get(memOf(op.mem)), memT = slot.t, aT = { w: slot.aw, s: false };
       if (!prev) access.set(op.mem, { addr, ce, we: w ?? this.F, d });
       else access.set(op.mem, { addr: this.mux(v, addr, prev.addr, aT), ce: this.or(prev.ce, ce), we: w ? this.or(prev.we, w) : prev.we, d: d === null ? prev.d : prev.d === null ? d : this.mux(v, d, prev.d, memT) });
     });

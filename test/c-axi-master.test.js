@@ -93,8 +93,9 @@ int main() { int d = 4; f(&d); f(&d); return d == 40 ? 0 : 1; }
 
 test("#1893 the config's interface directive (syn.directive.interface): a pragma of the top; another function's or mode not", () => {
   const fn = { name: 'f', loc: { line: 3 }, body: { items: [] } };
-  addDirectives(fn, ['interface f mode=m_axi depth=5 d', 'interface g mode=m_axi depth=1 x', 'interface f d_i depth=4 mode=ap_fifo']);
-  assert.deepEqual(fn.body.items.map((s) => s.pragma.args), [{ mode: 'm_axi', depth: '5', port: 'd' }]);
+  addDirectives(fn, ['interface f mode=m_axi depth=5 d', 'interface g mode=m_axi depth=1 x', 'interface f d_i depth=4 mode=ap_fifo', 'interface f mode=ap_ctrl_hs return']);
+  // (ap_fifo too, #1901)
+  assert.deepEqual(fn.body.items.map((s) => s.pragma.args), [{ mode: 'ap_fifo', depth: '4', port: 'd_i' }, { mode: 'm_axi', depth: '5', port: 'd' }]);
   cosim(`void f(int *d) {
   for (int i = 0; i < 2; i++) d[i] += 1;
 }

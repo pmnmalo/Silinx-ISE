@@ -184,7 +184,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const free = (none && streamed) || procs.every((p) => p.task);
   const ports = CTRL.slice(0, free ? 2 : CTRL.length).map((name) => ({ name, dir: ['ap_clk', 'ap_rst', 'ap_start'].includes(name) ? 'in' : 'out', w: 1 }));
   if (!free && ctrlChain(fn)) ports.splice(4, 0, { name: 'ap_continue', dir: 'in', w: 1 });
-  const memories = [], fifos = [];
+  const memories = [], fifos = [], ties = [];
   for (const pa of fn.params) {
     const u = use.get(pa.name);
     if (u) {
@@ -192,7 +192,18 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
       const pm = u.ports[0].p.mod.gen;
       const callee = u.ports[0].port.param;
       const m = pm.memories.find((x) => x.name === callee), f = pm.fifos.find((x) => x.name === callee);
-      if (m) memories.push({ ...m, name: pa.name, n: Number(pa.type.length), aw: clog2(Number(pa.type.length)), port: rn(pa.name) });
+      if (m) {
+        memories.push({ ...m, name: pa.name, n: Number(pa.type.length), aw: clog2(Number(pa.type.length)), port: rn(pa.name) });
+        // (a memory of the top: both ports, as Vitis HLS makes it; what no process uses driven 0, #1901; not one a pragma
+        // makes another interface, nor a module inside an AXI one, core/c-axi.js, which took its pragmas)
+        const other = fn.body.items.some((st) => st.kind === 'pragma' && st.pragma.name === 'INTERFACE' && st.pragma.args.port === pa.name && !/^(ap_memory)?$/i.test(String(st.pragma.args.mode ?? Object.keys(st.pragma.args).find((k) => /^(ap_|m_axi|s_axi|axis|bram)/i.test(k)) ?? '')));
+        const aw = clog2(Number(pa.type.length)), R = rn(pa.name);
+        if (!other && !module) for (const [sfx, dir, w] of [['_address0', 'out', aw], ['_ce0', 'out', 1], ['_d0', 'out', m.w], ['_q0', 'in', m.w], ['_we0', 'out', 1], ['_address1', 'out', aw], ['_ce1', 'out', 1], ['_d1', 'out', m.w], ['_q1', 'in', m.w], ['_we1', 'out', 1]]) {
+          if (ports.some((x) => x.name === R + sfx)) continue;
+          ports.push({ name: R + sfx, dir, w, role: 'mem', param: pa.name });
+          if (dir === 'out') ties.push({ name: R + sfx, w });
+        }
+      }
       if (f) fifos.push({ ...f, name: pa.name, port: rn(pa.name) });
       continue;
     }
@@ -204,7 +215,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const name = module || rn(checked.top);
   const src = file.split('/').pop();
   if (stall) ports.splice(2, 0, { name: 'ap_ce', dir: 'in', w: 1 });
-  const net = { stall, name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free };
+  const net = { stall, name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free, ties };
   const top = lang === 'vhdl' ? vhdlTop(net) : verilogTop(net);
   const hdl = [...[...mods.values()].map((m) => m.gen.hdl), ...top].join('\n');
   const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
@@ -294,6 +305,7 @@ function vhdlTop(net) {
     if (sw === 1) return `(0 => ${src0}, others => '0')`;
     return dw < sw ? `${src0}(${dw - 1} downto 0)` : `std_logic_vector(resize(${s ? 'signed' : 'unsigned'}(${src0}), ${dw}))`;
   };
+  for (const t of net.ties) L.push(`  ${t.name} <= ${t.w === 1 ? "'0'" : "(others => '0')"};`);
   for (const l of links) L.push(`  ${l.dst} <= ${l.k !== undefined ? (l.dw === 1 ? `'${l.k & 1n}'` : `std_logic_vector(to_${l.k < 0n ? 'signed' : 'unsigned'}(${l.k}, ${l.dw}))`) : conv(l.src, l.sw, l.dw, l.s)};`);
   fifos.forEach((f, i) => L.push(`  ${f.name} : entity work.${name}_ap_fifo${i} port map (ap_clk => ap_clk, ap_rst => ap_rst, ${net.stall ? 'ap_ce => ap_ce, ' : ''}din => ${f.din}, wr => ${f.wr}, full_n => ${f.full}, dout => ${f.dout}, rd => ${f.rd}, empty_n => ${f.empty});`));
   for (const b of bufs) {
@@ -361,6 +373,7 @@ function verilogTop(net) {
   for (const b of bufs) L.push(`  reg [${b.w - 1}:0] ${b.name} [0:${b.n - 1}];`, `  reg [${b.w - 1}:0] ${b.name}_q;`, `  wire [${b.aw - 1}:0] ${b.name}_addr;`, `  wire ${b.name}_ce, ${b.name}_we;`, `  wire [${b.w - 1}:0] ${b.name}_d;`);
   for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${port.name === 'ap_continue' ? "1'b1" : SHARED.includes(port.name) ? port.name : sig(p, port)})`).join(', ')});`);
   const conv = (s0, sw, dw, sg = false) => (dw > sw && sg && sw > 1 ? `{{${dw - sw}{${s0}[${sw - 1}]}}, ${s0}}` : dw < sw ? (dw === 1 ? `${s0}[0]` : `${s0}[${dw - 1}:0]`) : s0);
+  for (const t of net.ties) L.push(`  assign ${t.name} = ${t.w}'d0;`);
   for (const l of links) L.push(`  assign ${l.dst} = ${l.k !== undefined ? `${l.dw}'d${BigInt.asUintN(l.dw, l.k)}` : conv(l.src, l.sw, l.dw, l.s)};`);
   fifos.forEach((f, i) => L.push(`  ${name}_ap_fifo${i} ${f.name} (.ap_clk(ap_clk), .ap_rst(ap_rst), ${net.stall ? '.ap_ce(ap_ce), ' : ''}.din(${f.din}), .wr(${f.wr}), .full_n(${f.full}), .dout(${f.dout}), .rd(${f.rd}), .empty_n(${f.empty}));`));
   for (const b of bufs) {
