@@ -34,6 +34,17 @@ function sum(ts, loc) {
   return e;
 }
 
+/** Whether every use of the pointer name in body is *name or name[i] (a master's pointer to one value, #1893: else it
+ *  stays a pointer, its value a register). */
+function onlyDeref(body, name) {
+  let all = 0, deref = 0;
+  walk(body, (n) => {
+    if (n.kind === 'id' && n.name === name) all++;
+    if ((n.kind === 'unary' && n.op === '*' && n.e.kind === 'id' && n.e.name === name) || (n.kind === 'index' && n.e.kind === 'id' && n.e.name === name)) deref++;
+  });
+  return all === deref;
+}
+
 export function pointerArithmetic(funcs, globals, synth, report, structArgs = new Map(), top = null, depths = null) {
   for (const f of funcs.values()) {
     if (!f.body) continue;
@@ -64,6 +75,8 @@ export function pointerArithmetic(funcs, globals, synth, report, structArgs = ne
         if (!isArg(pa) || arrays.has(pa)) continue;
         let indexed = false;
         walk(f.body, (n) => {
+          // (a master's pointer is always a memory, #1893)
+          if (f.name === top && n.kind === 'pragma' && n.pragma.name === 'INTERFACE' && n.pragma.args.port === pa.name && (n.pragma.args.m_axi || String(n.pragma.args.mode).toLowerCase() === 'm_axi') && onlyDeref(f.body, pa.name)) indexed = true;
           if (n.kind === 'index' && n.e.kind === 'id' && n.e.name === pa.name && !(n.i.kind === 'num' && n.i.value === 0n && !n.fromDeref)) indexed = true;
           if (n.kind === 'call' && n.callee.kind === 'id') {
             const g = funcs.get(n.callee.name);
