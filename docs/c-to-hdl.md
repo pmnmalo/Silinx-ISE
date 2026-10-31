@@ -171,7 +171,7 @@ structs is an array per member; a member array of an array of structs is one arr
   a struct holding it is copied, passed and returned as any other, and its methods read it.
 - **Designated initializers** (#1963): in a declaration of a struct, a union or an array, as C takes them
   (`S s = { .y = 2, .x = 1 };`, `int a[4] = { [2] = 5 };`, `S t[2] = { [1].x = 3 };`, `{ .a.b[1] = 4, 5 }`, an index an
-  enum's constant or a `const int`); in C++ a member not given keeps its default value. Not yet: in an expression
+  enum's constant or a macro); in C++ a member not given keeps its default value. Not yet: in an expression
   (`(S){ .x = 1 }`).
 - Not possible: pointers in a struct or a union, a pointer to a struct as a variable. Not yet: base classes; a static
   object or an array of objects whose constructor is not of constants.
