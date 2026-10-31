@@ -8,6 +8,7 @@ import { S6_DEVICES, FRAME_WORDS, bitFormat6, emptyFdri, writeBit6 } from './bit
 import { tileRegion, gridRegion, columnOf } from './bitgen-regions.js';
 import { kindModel, predictSlice } from './bitgen-slice.js';
 import { pipDirections, pipLookup } from './bitgen-pips.js';
+import { predictOlogic } from './bitgen-ologic.js';
 import { cmtCfg, cmtPath, predictCmt, predictCmtSettings, cmtRegcBits, cmtInputBits } from './bitgen-cmt.js';
 import { HARD_TYPES, predictHard } from './bitgen-hard.js';
 
@@ -114,6 +115,12 @@ export function predictDesign(design, device, dev, db) {
       if (c) for (const x of c) bits.add(x);
       if (!s) note(`${inst.type} ${inst.site} (its settings not measured)`);
     }
+  }
+  // an OLOGIC2's output flip-flop: its tile's bits and its clock's HCLK tile's (db/s6-ologic.json, #2025)
+  if (db.ologic) {
+    const p = predictOlogic(design, device, dev, db.ologic);
+    for (const x of p.bits) bits.add(x);
+    for (const u of p.unknown) note(u);
   }
   // a block RAM's or a DSP48A1's settings and contents
   if (db.hard) {
