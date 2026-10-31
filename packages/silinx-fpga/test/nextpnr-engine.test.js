@@ -27,6 +27,22 @@ test('nextpnrNetlist: each port bit\'s pad (UCF) on its I/O buffer; no problem f
   assert.deepEqual(Object.keys(Object.values(json.modules)[0].ports), ['sw', 'led']);
 });
 
+// #2232: a one-bit bus port (b : std_logic_vector(0 downto 0), Yosys's single_bit_vector) takes the LOC written b<0>, as
+// XST names it (#2199); a scalar's a<0> is not its name (ngdbuild does not find it, #84, #2229): no pad
+test('nextpnrNetlist: a one-bit bus port\'s pad written x<0>, not a scalar port\'s (#2232)', () => {
+  const io = (type, I, O) => ({ type, port_directions: { I: 'input', O: 'output' }, connections: { I: [I], O: [O] } });
+  const one = { single_bit_vector: '00000000000000000000000000000001' };
+  const json = JSON.stringify({ modules: { t: { attributes: { top: '1' },
+    ports: { a: { direction: 'input', bits: [2] }, b: { direction: 'input', bits: [3] }, y: { direction: 'output', bits: [4] } },
+    cells: { ia: io('IBUF', 2, 5), ib: io('IBUF', 3, 6), oy: io('OBUF', 7, 4),
+      l: { type: 'LUT2', parameters: { INIT: '0110' }, port_directions: { I0: 'input', I1: 'input', O: 'output' }, connections: { I0: [5], I1: [6], O: [7] } } },
+    netnames: { a: { bits: [2], attributes: {} }, b: { bits: [3], attributes: one }, y: { bits: [4], attributes: {} } } } } });
+  const { json: out, problems } = nextpnrNetlist(json, 't', 'NET "a<0>" LOC = "G12";\nNET "B<0>" LOC = "P11" | IOSTANDARD = LVCMOS33;\nNET "y" LOC = "M5";');
+  assert.deepEqual(problems, ['port a: no LOC in the constraints (the nextpnr engine places only the ports given a pad)']);
+  const c = cellsOf(out);
+  assert.deepEqual([c.ia.attributes?.LOC, c.ib.attributes.LOC, c.ib.attributes.IOSTANDARD, c.oy.attributes.LOC], [undefined, 'P11', 'LVCMOS33', 'M5']);
+});
+
 test('nextpnrNetlist: what the micro-architecture cannot implement yet is named', () => {
   const ucfNoLed1 = ucf().split('\n').filter(l => !/led<1>/.test(l)).join('\n');
   assert.deepEqual(nextpnrNetlist(gates(), 'gates', ucfNoLed1).problems,
@@ -212,10 +228,12 @@ test('#2195 nextpnrNetlist: a pad\'s constraints on its buffer, a NET name with 
   const w = Object.values(cellsOf(nextpnrNetlist(fs.readFileSync(fixture('ucf_all.json'), 'utf8'), 'ucf_all', wild).json));
   assert.equal(w.find(c => c.attributes?.LOC === 'P7').attributes.SLEW, 'fast');
   assert.equal(w.find(c => c.attributes?.LOC === 'P11').attributes.IOSTANDARD, 'LVTTL');
-  // a one-bit port written name<0> (#2199: Silinx's packer drops it)
+  // a one-bit bus port written name<0> (#2199: Silinx's packer dropped it); Yosys marks a [0:0] port single_bit_vector
+  // (a scalar's name<0> is not its name: #2232)
   const one = JSON.parse(gates());
   const m = Object.values(one.modules)[0], [p] = Object.entries(m.ports).find(([, d]) => d.direction === 'input');
   m.ports[p].bits = [m.ports[p].bits[0]];
+  m.netnames[p] = { ...m.netnames[p], bits: m.ports[p].bits, attributes: { ...m.netnames[p]?.attributes, single_bit_vector: '00000000000000000000000000000001' } };
   const r = nextpnrNetlist(JSON.stringify(one), 'gates', `NET "${p}<0>" LOC = "G12" | IOSTANDARD = LVTTL ;\n`);
   assert.equal(Object.values(cellsOf(r.json)).find(c => c.attributes?.LOC === 'G12')?.attributes.IOSTANDARD, 'LVTTL');
   // a PERIOD on no port of the design: no target (the timing step says it is missing)
