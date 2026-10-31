@@ -100,7 +100,7 @@ int main(void) { printf("%d %d\\n", count(0), count(1000)); return 0; }
   assert.deepEqual(v.messages, ["4 warning: #pragma HLS UNROLL: this loop's count is not a constant: it is not unrolled (give a factor=)"]);
 });
 
-test('#1529 ARRAY_PARTITION complete: a large array\'s elements registers (no memory), its accesses in one state; the other types said', () => {
+test('#1529 ARRAY_PARTITION complete: a large array\'s elements registers (no memory), its accesses in one state; block several memories', () => {
   const src = (prag) => `#include <stdio.h>
 int shift(int x) {
   static int d[80];
@@ -125,12 +125,12 @@ int main(void) { for (int k = 0; k < 90; k += 7) printf("%d ", shift(k)); return
   assert.doesNotMatch(parted.r.gen.hdl, /ap_m_d/);
   assert.deepEqual(parted.r.gen.report.memories, []);
   const block = run(src('#pragma HLS ARRAY_PARTITION variable=d type=block factor=4'), 'shift.c');
+  // (block: four memories, #1920)
   assert.deepEqual(block.messages, [
-    '4 warning: #pragma HLS ARRAY_PARTITION type=block is not made yet: ignored (type=complete is: the array\'s elements registers)',
     '6 warning: #pragma HLS UNROLL: this loop is not unrolled: it accesses a memory: an access a state',
     '11 warning: #pragma HLS UNROLL: this loop is not unrolled: it accesses a memory: an access a state',
   ]);
-  assert.deepEqual(block.r.gen.report.memories, [{ name: 'd', words: 80, bits: 32, kind: 'RAM' }]);
+  assert.deepEqual(block.r.gen.report.memories, [0, 1, 2, 3].map((k) => ({ name: `d_${k}`, words: 20, bits: 32, kind: 'RAM' })));
 });
 
 test('#1529 the pragmas accepted and ignored, unknown, misplaced or wrong: their warnings and errors; a combinational module\'s report', () => {
