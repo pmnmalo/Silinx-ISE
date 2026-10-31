@@ -5,6 +5,7 @@
 // and widths are the parameters' (a wire of another width would be an error of the schematic). Isomorphic (no DOM).
 import { newDoc, normalizeDoc, portBox, symbolDef, symbolPins, joinOnWires, ffVariant, r10, snap } from './schdoc.js';
 import { checkPorts } from './modgen.js';
+import { CIRCUITS } from './sch-circuits.js';
 
 const IN = 'in', OUT = 'out';
 const port = (role, dir, width = 1) => ({ role, name: role, dir, width });
@@ -17,9 +18,9 @@ const controls = ({ en, reset }, clear = 'CLR') => [
 ];
 const ffType = ({ en, reset }) => ffVariant('fd', { ce: yes(en), clr: reset === 'async', r: reset === 'sync' });
 
-// a template of one symbol: { sym: { type, params }, west, south, east: [[role, pin]], ports }
+// a template of one symbol: { sym: { type, params }, west, east: [[role, pin]], ports }
 function oneSymbol(id, p) {
-  const n = Number(p.n), k = Number(p.k), inputs = 1 << k;
+  const n = Number(p.n);
   switch (id) {
     case 'register': {
       const c = controls(p);
@@ -31,28 +32,6 @@ function oneSymbol(id, p) {
       return { sym: { type: 'counter', params: { width: n, en: yes(p.en), reset: p.reset, dir: p.dir, bits: false } }, west: c, east: [['q', 'Q']],
         ports: [...c.map(([r]) => port(r, IN)), port('q', OUT, n)] };
     }
-    case 'mux': {
-      const d = Array.from({ length: inputs }, (_, i) => `d${i}`);
-      return { sym: { type: `mux${inputs}`, params: { width: n, en: false, ...(k > 1 ? { selBus: true } : {}) } },
-        west: d.map((r, i) => [r, `D${i}`]), south: [['s', k > 1 ? 'S' : 'S0']], east: [['y', 'O']],
-        ports: [...d.map(r => port(r, IN, n)), port('s', IN, k), port('y', OUT, n)] };
-    }
-    case 'demux': {
-      const y = Array.from({ length: inputs }, (_, i) => `y${i}`);
-      return { sym: { type: 'demux', params: { width: n, sel: k, en: false, ...(k > 1 ? { selBus: true } : {}) } },
-        west: [['d', 'D']], south: [['s', k > 1 ? 'S' : 'S0']], east: y.map((r, i) => [r, `O${i}`]),
-        ports: [port('d', IN, n), port('s', IN, k), ...y.map(r => port(r, OUT, n))] };
-    }
-    case 'adder': return { sym: { type: 'add', params: { width: n, cin: true, cout: true } }, west: [['a', 'A'], ['b', 'B'], ['ci', 'CI']], east: [['s', 'S'], ['co', 'CO']],
-      ports: [port('a', IN, n), port('b', IN, n), port('ci', IN), port('s', OUT, n), port('co', OUT)] };
-    case 'subtractor': return { sym: { type: 'sub', params: { width: n, bin: true, bout: true } }, west: [['a', 'A'], ['b', 'B'], ['bi', 'BI']], east: [['d', 'D'], ['bo', 'BO']],
-      ports: [port('a', IN, n), port('b', IN, n), port('bi', IN), port('d', OUT, n), port('bo', OUT)] };
-    case 'comparator': return { sym: { type: 'compare', params: { width: n, op: 'eq,lt,gt', signed: yes(p.signed) } }, west: [['a', 'A'], ['b', 'B']], east: [['eq', 'EQ'], ['lt', 'LT'], ['gt', 'GT']],
-      ports: [port('a', IN, n), port('b', IN, n), port('eq', OUT), port('lt', OUT), port('gt', OUT)] };
-    case 'decoder': return { sym: { type: 'decoder', params: { n, en: true, bus: true } }, west: [['a', 'A'], ['en', 'E']], east: [['y', 'D']],
-      ports: [port('a', IN, n), port('en', IN), port('y', OUT, 1 << n)] };
-    case 'encoder': return { sym: { type: 'encoder', params: { n, mode: 'priority', bus: true } }, west: [['i', 'I']], east: [['a', 'A'], ['v', 'V']],
-      ports: [port('i', IN, 1 << n), port('a', OUT, n), port('v', OUT)] };
     default: return null;
   }
 }
@@ -60,6 +39,7 @@ function oneSymbol(id, p) {
 /** The ports of a template, as the wizard's table shows them: [{ role, name, dir, width }] (none: the empty one). */
 export function schematicTemplatePorts(id, params = {}) {
   if (id === 'shift') { const c = controls(params); return [port('si', IN), ...c.map(([r]) => port(r, IN)), port('q', OUT, Number(params.n))]; }
+  if (CIRCUITS[id]) return CIRCUITS[id].ports(params);
   if (id === 'fulladder') return [port('a', IN), port('b', IN), port('ci', IN), port('s', OUT), port('co', OUT)];
   return oneSymbol(id, params)?.ports || [];
 }
@@ -127,13 +107,6 @@ function drawOne(d, spec, top) {
   const xEnd = x + def.w;
   const xOut = xEnd + channels(east.length) + MARGIN;
   low = Math.max(low, fan(d, items(east), OUT, xEnd, xOut, 1, widths));
-  // the select at the bottom: its marker under the data inputs
-  for (const [role, pn] of spec.south || []) {
-    const q = S.pin(pn), ym = r10(Math.max(low, q.y) + STEP);
-    d.marker(role, IN, widths[role], d.xIn, ym);
-    d.wire({ x: d.xIn, y: ym }, { x: q.x, y: ym }, q);
-    low = ym;
-  }
   return low;
 }
 
@@ -208,7 +181,7 @@ export function schematicFromTemplate({ name, lang = 'vhdl', description = '', i
   const d = sheet(doc, role => rows.find(p => p.role === role), rows.filter(p => p.dir === IN));
   const top = desc ? 160 : 120;
   const one = oneSymbol(id, params);
-  let low = one ? drawOne(d, one, top) : id === 'shift' ? drawShift(d, params, top) : drawFullAdder(d, top);
+  let low = one ? drawOne(d, one, top) : CIRCUITS[id] ? CIRCUITS[id].draw(d, params, top) : id === 'shift' ? drawShift(d, params, top) : drawFullAdder(d, top);
   // the ports added to the table: under the others, their markers only
   const xIn = d.xIn, xOut = Math.max(...doc.ports.filter(p => p.dir !== IN).map(p => p.x));
   const extraIn = rows.filter(p => !p.role && p.dir === IN), extraOut = rows.filter(p => !p.role && p.dir !== IN);
