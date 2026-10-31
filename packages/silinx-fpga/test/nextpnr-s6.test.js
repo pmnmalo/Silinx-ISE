@@ -8,11 +8,23 @@ import { parseXdl } from '../src/xdl.js';
 import { checkRoutingS6 } from '../src/fpga/s6/route-check.js';
 import { placementOf, siteBel, siteNetlist, timingParam } from '../src/fpga/s6/nextpnr.js';
 import { unknownPipsS6, timingExportS6 } from '../src/fpga/s6/nextpnr-export.js';
+import { nextpnrIo } from '../src/nextpnr-io.js';
 
 const PART = 'xc6slx16csg324-3';
 const device = loadDeviceCache(PART);
 const slice = (name, cfg = []) => ({ name, type: 'SLICEX', placed: true, cfg });
 const pin = (inst, p) => ({ inst, pin: p });
+
+test('nextpnrIo: the package\'s runner by its name (the Spartan-6\'s), its lines, the last without its newline', async () => {
+  const seen = [];
+  const pkg = { Exit: class {}, runNextpnrHimbaechelSpartan6: async (args, files, { stdout }) => {
+    stdout(new TextEncoder().encode('Info: one\nInfo: tw')); stdout(new TextEncoder().encode('o\nlast')); return { out: args.join(' ') }; } };
+  const io = nextpnrIo(async () => pkg, 'runNextpnrHimbaechelSpartan6');
+  assert.deepEqual(await io.run(['--a'], {}, l => seen.push(l)), { out: '--a' });
+  assert.deepEqual(seen, ['Info: one', 'Info: two', 'last']);
+  // (the Spartan-3E's by default)
+  await assert.rejects(nextpnrIo(async () => pkg).run([], {}), /not a function/);
+});
 
 test('siteBel: a site\'s BEL is its tile\'s position, its index in the tile and its type (an IOBM / IOBS: IOB)', () => {
   const [k, sites] = [...device.tileSites.entries()].find(([, s]) => s.some(([n]) => /^SLICE_X/.test(n)));
