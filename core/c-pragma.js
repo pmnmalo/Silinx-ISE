@@ -68,7 +68,9 @@ export function checkPragmas(ast, funcs, report, top = null) {
     }
     if (name === 'INTERFACE' && args.port && args.port !== 'return') {
       const mode = String(args.mode || Object.keys(args).find((k) => /^(ap_|s_axi|m_axi|axis|bram)/.test(k)) || '').toLowerCase();
-      if (mode && !ARG_MODES.has(mode)) report(loc, `#pragma HLS INTERFACE ${mode} port=${p.of ?? args.port} is not made yet: ignored (its default interface made)`, 'warning');
+      // (axis on the top's stream or array: core/c-axis.js makes it, or says why not, #1894)
+      const axisArg = mode === 'axis' && fname === top && ['stream', 'array'].includes(funcs.get(fname)?.params.find((x) => x.name === args.port)?.type.kind);
+      if (mode && !ARG_MODES.has(mode) && !axisArg) report(loc, `#pragma HLS INTERFACE ${mode} port=${p.of ?? args.port} is not made yet: ignored (its default interface made)`, 'warning');
     }
   };
   for (const p of ast.pragmas) one(p, p.loc, 'file', null);

@@ -117,13 +117,12 @@ test('#1662 a stream of ap_axiu co-simulated in VHDL and Verilog: one ap_fifo of
     const r = cosimulate(TOP, { file: 'add.cpp', lang });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
-    // (the stream named in and out: in_r and out_r, as Vitis HLS names them; axis's TDATA, TKEEP… ports are #1894's)
+    // (the stream named in and out: in_r and out_r, as Vitis HLS names them; axis's TDATA, TKEEP… ports, #1894)
     assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), [
       "4 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
-      "4 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
-      '5 #pragma HLS INTERFACE axis port=in is not made yet: ignored (its default interface made)']);
+      "4 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"]);
     assert.deepEqual(r.gen.ports.filter((p) => /^(in|out)_/.test(p.name)).map((p) => `${p.name}:${p.w}`), [
-      'in_r_dout:17', 'in_r_empty_n:1', 'in_r_read:1', 'out_r_din:17', 'out_r_full_n:1', 'out_r_write:1']);
+      'in_r_TDATA:12', 'in_r_TKEEP:2', 'in_r_TSTRB:2', 'in_r_TLAST:1', 'in_r_TVALID:1', 'in_r_TREADY:1', 'out_r_TDATA:12', 'out_r_TKEEP:2', 'out_r_TSTRB:2', 'out_r_TLAST:1', 'out_r_TREADY:1', 'out_r_TVALID:1']);
   }
   const sim = simulateC(TOP, { file: 'add.cpp' });
   assert.deepEqual([sim.error, sim.exitCode], [null, 0]);
@@ -169,7 +168,7 @@ int main() {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(src, { file: 'u.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true], JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.ports.filter((p) => /_(dout|din)$/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['A_dout:14', 'B_din:14']);   // (user, then last: one word, #1668)
+    assert.deepEqual(r.gen.ports.filter((p) => /_T(USER|LAST)$/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['A_TUSER:13', 'A_TLAST:1', 'B_TUSER:13', 'B_TLAST:1']);   // (axis, #1894)
   }
   const errs = (s) => cToHdl(s, { file: 'e.cpp' }).diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`);
   assert.deepEqual(errs('#include "ap_axi_sdata.h"\nint f(int x) { hls::axis_user<8> p; p.user = x; return p.last; }\n'), ["2 'last' is not a member of axis_user_8_64_0_0"]);

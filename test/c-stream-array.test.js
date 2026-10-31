@@ -73,14 +73,14 @@ test('#1739 arrays of streams in the C simulation (variable and constant indices
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('#1739 arrays of streams co-simulated in VHDL and Verilog: an ap_fifo per element; the array\'s pragma said once', () => {
+test('#1739 arrays of streams co-simulated in VHDL and Verilog: a stream per element (axis, #1894)', () => {
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(SRC, { file: 'dut.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true], JSON.stringify(r.mismatches, big));
     // (the inner loop pipelined automatically, #1919: s_out[j] written in both branches of its if, each element twice)
-    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ['5 #pragma HLS INTERFACE axis port=s_in is not made yet: ignored (its default interface made)',
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), [
       '8 this loop is pipelined automatically, as Vitis HLS does (II=1): II=23 made (it accesses a stream in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off']);
-    assert.deepEqual(r.gen.ports.filter((p) => /_dout$|_din$/.test(p.name)).map((p) => p.name), ['s_in_0_dout', 's_in_1_dout', 's_in_2_dout', 's_out_0_din', 's_out_1_din', 's_out_2_din']);
+    assert.deepEqual(r.gen.ports.filter((p) => /_TDATA$|_din$/.test(p.name)).map((p) => p.name), ['s_in_0_TDATA', 's_in_1_TDATA', 's_in_2_TDATA', 's_out_0_din', 's_out_1_din', 's_out_2_din']);
   }
 });
 

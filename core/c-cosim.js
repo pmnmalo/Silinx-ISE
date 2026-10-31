@@ -11,6 +11,7 @@
 //       output, sim: the C simulation's result, gen: cToHdl's result, errors: [message] }
 import { simulateC } from './c-interp.js';
 import { cToHdl } from './c-hdl.js';
+import { fifoPort } from './c-axis.js';
 import { simulate } from './compile.js';
 import { f32Bits, f64Bits } from './c-dataflow-float.js';
 
@@ -32,7 +33,17 @@ export const packWord = (fields, value) => fields.reduce((acc, f) => {
 }, 0n);
 
 /** The calls with the values of each stream and memory of structs, its words, from its members' (#1668). */
-export function wordCalls(gen, calls) {
+export function wordCalls(gen, calls0) {
+  // (an array made a stream, #1894: its elements the stream's values, read or written once each)
+  const arrays = (gen.fifos || []).filter((f) => f.array);
+  const calls = !arrays.length ? calls0 : calls0.map((c) => {
+    const r = { ...c, streamIn: { ...c.streamIn }, streamOut: { ...c.streamOut }, streamRead: { ...c.streamRead } };
+    for (const f of arrays) {
+      if (f.dir === 'in') { r.streamIn[f.name] = (c.memIn[f.name] || []).slice(0, f.array); r.streamRead[f.name] = r.streamIn[f.name].length; }
+      else r.streamOut[f.name] = (c.memOut[f.name] || []).slice(0, f.array);
+    }
+    return r;
+  });
   const gs = [...(gen.memories || []), ...(gen.fifos || [])].filter((x) => x.fields);
   if (!gs.length) return calls;
   const words = (src, fields) => {
@@ -56,13 +67,13 @@ export function wordCalls(gen, calls) {
 export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
   const calls = wordCalls(gen, calls0);
   const port = (n) => gen.ports.find((p) => p.name === n);
-  const seq = !!port('ap_clk'), hs = !!port('ap_start');
+  const seq = !!port('ap_clk'), hs = !!port('ap_start'), low = !!port('ap_rst_n');   // (axis's reset: active low, #1894)
   const L = ['module silinx_cosim_tb;', '  integer cyc, bad = 0;'];
   // (ap_ctrl_none: no ap_start, the module running by itself, #1900)
-  if (seq) L.push(`  reg ap_clk = 0, ap_rst = 1${hs ? ', ap_start = 0' : ''};`);
+  if (seq) L.push(`  reg ap_clk = 0, ${low ? 'ap_rst_n = 0' : 'ap_rst = 1'}${hs ? ', ap_start = 0' : ''};`);
   // (a combinational module's reset: an input it does not use, held low, #1924)
   else if (port('ap_rst')) L.push('  reg ap_rst = 0;');
-  for (const p of gen.ports) if (!['ap_clk', 'ap_rst', 'ap_start'].includes(p.name)) L.push((p.role === 'mem' || p.role === 'fifo') && p.dir === 'in' ? `  wire [${p.w - 1}:0] ${p.name};` : `  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
+  for (const p of gen.ports) if (!['ap_clk', 'ap_rst', 'ap_rst_n', 'ap_start'].includes(p.name)) L.push((p.role === 'mem' || p.role === 'fifo') && p.dir === 'in' ? `  wire [${p.w - 1}:0] ${p.name};` : `  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
   const outs = gen.ports.filter((p) => p.dir === 'out' && p.role === 'arg');
   for (const o of outs) L.push(`  reg [${o.w - 1}:0] cap_${o.name}; reg got_${o.name};`);
   const mems = gen.memories || [];
@@ -93,9 +104,9 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
     if (f.dir === 'in') {
       const N = depth(f, 'streamIn');
       L.push(`  reg [${f.w - 1}:0] fin_${f.name} [0:${N - 1}]; integer fi_${f.name} = 0, fn_${f.name} = 0;`,
-        `  assign ${P(f)}_dout = fin_${f.name}[fi_${f.name} < ${N} ? fi_${f.name} : 0];`, `  assign ${P(f)}_empty_n = fi_${f.name} < fn_${f.name}${f.polled ? '' : ' && ap_tick % 3 != 1'};`);
+        `  assign ${fifoPort(f, 'dout')} = fin_${f.name}[fi_${f.name} < ${N} ? fi_${f.name} : 0];`, `  assign ${fifoPort(f, 'empty_n')} = fi_${f.name} < fn_${f.name}${f.polled ? '' : ' && ap_tick % 3 != 1'};`);
     } else {
-      L.push(`  reg [${f.w - 1}:0] fout_${f.name} [0:${depth(f, 'streamOut') - 1}]; integer fo_${f.name} = 0;`, `  assign ${P(f)}_full_n = ${f.polled ? "1'b1" : 'ap_tick % 4 != 2'};`);
+      L.push(`  reg [${f.w - 1}:0] fout_${f.name} [0:${depth(f, 'streamOut') - 1}]; integer fo_${f.name} = 0;`, `  assign ${fifoPort(f, 'full_n')} = ${f.polled ? "1'b1" : 'ap_tick % 4 != 2'};`);
     }
   }
   L.push(`  ${gen.top} dut(${gen.ports.map((p) => `.${p.name}(${p.name})`).join(', ')});`);
@@ -106,13 +117,13 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
     for (const x of mems) { const m = M(x); L.push(`    if (${m.ce}) begin${x.written ? ` if (${m.we} && ${m.a} < ${x.n}) mem_${x.name}[${m.a}] <= ${m.d};` : ''}${x.read ? ` q_${x.name} <= ${m.a} < ${x.n} ? mem_${x.name}[${m.a}] : ${x.w}'bx;` : ''} end`); }
     if (fifos.length) L.push('    ap_tick <= ap_tick + 1;');
     for (const f of fifos) {
-      if (f.dir === 'in') L.push(`    if (${P(f)}_read && ${P(f)}_empty_n) fi_${f.name} <= fi_${f.name} + 1;`);
-      else L.push(`    if (${P(f)}_write && ${P(f)}_full_n) begin if (fo_${f.name} < ${depth(f, 'streamOut')}) fout_${f.name}[fo_${f.name}] <= ${P(f)}_din; fo_${f.name} <= fo_${f.name} + 1; end`);
+      if (f.dir === 'in') L.push(`    if (${fifoPort(f, 'read')} && ${fifoPort(f, 'empty_n')}) fi_${f.name} <= fi_${f.name} + 1;`);
+      else L.push(`    if (${fifoPort(f, 'write')} && ${fifoPort(f, 'full_n')}) begin if (fo_${f.name} < ${depth(f, 'streamOut')}) fout_${f.name}[fo_${f.name}] <= ${fifoPort(f, 'din')}; fo_${f.name} <= fo_${f.name} + 1; end`);
     }
     L.push('  end');
   }
   L.push('  initial begin');
-  if (seq) L.push('    #12 ap_rst = 0;');
+  if (seq) L.push(`    #12 ${low ? 'ap_rst_n = 1' : 'ap_rst = 0'};`);
   else if (port('ap_start')) L.push('    ap_start = 1;');
   const shown = [port('ap_return') ? 'ap_return' : null, ...outs.flatMap((o) => (seq || port(`${o.name}_ap_vld`) ? [seq ? `cap_${o.name}` : o.name, seq ? `got_${o.name}` : `${o.name}_ap_vld`] : [o.name, "1'b1"])),
     ...mems.filter((x) => x.written).flatMap((x) => Array.from({ length: x.n }, (_, k) => `mem_${x.name}[${k}]`))].filter(Boolean);

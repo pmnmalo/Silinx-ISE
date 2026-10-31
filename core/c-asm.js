@@ -29,7 +29,7 @@ export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, 
   const m = scheduled(checked, {}, { clock, family });
   if (m.diagnostics.some((d) => d.severity === 'error')) return { ok: false, model: null, diagnostics: m.diagnostics };
   // (the ports the module is made with: ap_ctrl_none's none of the block protocol, an argument renamed, #1927)
-  const gen = cToHdl(source, { file, lang, headers, top, clock, family });
+  const gen = cToHdl(source, { file, lang, headers, top, clock, family, axis: false });
   if (!gen.ok) return { ok: false, model: null, diagnostics: gen.diagnostics };
   return { ok: true, model: asmLayout(chart(checked.top, m, lang, gen.ports)), diagnostics: m.diagnostics };
 }
