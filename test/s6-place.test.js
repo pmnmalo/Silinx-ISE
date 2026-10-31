@@ -9,7 +9,7 @@ import { placeS6, PlaceError, chainSites } from '../packages/silinx-fpga/src/fpg
 import { checkPlacementS6 } from '../packages/silinx-fpga/src/fpga/s6/place-check.js';
 import { PhysError } from '../packages/silinx-fpga/src/fpga/s6/phys.js';
 import { S6_ESTIMATE, timingGraphS6, analyzeS6 } from '../packages/silinx-fpga/src/fpga/s6/place-timing.js';
-import { EXAMPLES } from './examples-lib.mjs';
+import { EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 
 const LX16 = 'xc6slx16csg324-3', LX45 = 'xc6slx45csg324-3';
@@ -194,7 +194,7 @@ test('every example placed legally on the XC6SLX16 and the XC6SLX45: the rules, 
 test('the wirelength per connection against ISE\'s placement of the same netlists (night 1)', { timeout: 600000 }, async () => {
   const cmp = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/place-compare.json', import.meta.url), 'utf8'));
   for (const { board, part } of S6_BOARDS) {
-    for (const name of EXAMPLES) {
+    for (const name of ISE_RECORDED) {
       const ise = cmp.boards[board][name].ise;
       const d = await s6Example(name, board);
       const { r } = placed(d, part, { seed: 1 });
@@ -212,7 +212,7 @@ test('the wirelength per connection against ISE\'s placement of the same netlist
 // note (PhysDesignRules:2410, ISE's own implementation of stopwatch has it too)
 test('ISE accepts every example\'s placement on both boards: xdl -xdl2ncd, par -k complete, the DRC\'s warnings', () => {
   const rec = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/ise-check.json', import.meta.url), 'utf8'));
-  const names = S6_BOARDS.flatMap(({ board }) => EXAMPLES.map(n => `${n}-${board}`)).sort();
+  const names = S6_BOARDS.flatMap(({ board }) => ISE_RECORDED.map(n => `${n}-${board}`)).sort();
   assert.deepEqual(Object.keys(rec.designs), names);
   for (const [d, { placed }] of Object.entries(rec.designs)) {
     assert.equal(placed.xdl2ncd, 'ok', d);

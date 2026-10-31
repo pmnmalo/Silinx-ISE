@@ -11,6 +11,7 @@ import { parseXdl } from '../packages/silinx-fpga/src/xdl.js';
 import { parsePwr } from '../server/ise.js';
 import { FIXTURE, fit, mergeRuns, silinxEstimate } from '../scripts/measure-power.mjs';
 import { EXAMPLE_ORDER } from '../core/examples.js';
+import { ISE_RECORDED } from './examples-lib.mjs';
 
 // a seeded random generator (the simulation is the same at every run)
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; }; }
@@ -135,7 +136,7 @@ test('the model\'s coefficients are the fit of XPower\'s reports of the examples
   const { tool, runs } = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
   assert.match(tool, /^XPower 14\.7/);
   assert.equal(runs.length, 28);   // the seven examples on the four devices
-  assert.deepEqual([...new Set(runs.map(r => r.example))], EXAMPLE_ORDER);
+  assert.deepEqual([...new Set(runs.map(r => r.example))], ISE_RECORDED);
   const f = fit(runs);
   const near = (a, b, what) => assert.ok(Math.abs(a - b) <= 0.002 * Math.abs(b) + 1e-9, `${what}: ${a} vs the fit's ${b}`);
   for (const [k, v] of Object.entries(f.coefficients)) near(COEFFICIENTS[k], v, k);

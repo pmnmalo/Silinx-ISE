@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { example } from './examples-lib.mjs';
 import * as T from '../web/js/templates.js';
 import { compile, elaborate } from '../core/compile.js';
 import { Simulator } from '../core/simulator.js';
@@ -142,7 +143,8 @@ test('example projects (New Project ▸ Start from): sources compile, top and te
   assert.ok(examples.length >= 1);
   for (const ex of examples) {
     const pj = JSON.parse(fs.readFileSync(path.join(dir, ex, 'silinx.json'), 'utf8'));
-    const sources = pj.files.filter((f) => f.lang === 'vhdl' || f.lang === 'verilog').map((f) => ({ ...f, text: fs.readFileSync(path.join(dir, ex, f.path), 'utf8') }));
+    // (a C source's module too: its HDL made from the C, as the application makes it, #1966)
+    const sources = example(ex).sources.filter((f) => f.lang === 'vhdl' || f.lang === 'verilog');
     assert.ok(sources.length, `${ex} has sources`);
     if (pj.top) check(sources.filter((s) => s.role !== 'sim'), pj.top);
     if (pj.simTop) simulate(check(sources, pj.simTop), 2_000_000);

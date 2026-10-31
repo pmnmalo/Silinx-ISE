@@ -12,7 +12,7 @@ import { synthesizeOpen } from '../core/synth-front.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
 import { packS6, checkSlice, ctrlKey, lutInputs, PackError, AND2L } from '../packages/silinx-fpga/src/fpga/s6/pack.js';
-import { example, EXAMPLES } from './examples-lib.mjs';
+import { example, EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
 
 // a design synthesized for the Spartan-6 and read as the packer reads it
 async function netlistOf(sources, top) {
@@ -229,8 +229,7 @@ const EXAMPLE_PACK = {
 test('the packer\'s SLICELs are those of ISE\'s map on the same netlists, every example on the Nexys3 and the Atlys (night 1)', () => {
   const night1 = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/night1.json', import.meta.url), 'utf8'));
   for (const board of ['nexys3', 'atlys']) {
-    // (the examples of that night; isqrt came later, its bitstream checked against ISE in test/ise/examples.test.js)
-    for (const name of EXAMPLES.filter(n => n !== 'isqrt')) {
+    for (const name of ISE_RECORDED) {
       const open = night1.boards[board].examples[name].open;
       assert.equal(open.routed, true, `${board} ${name}`);
       assert.equal(open.sites.SLICEL || 0, EXAMPLE_PACK[name].L, `${board} ${name}`);

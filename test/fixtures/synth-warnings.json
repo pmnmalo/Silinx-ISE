@@ -22,6 +22,7 @@
   "examples/blinky": [],
   "examples/clock": [],
   "examples/gates": [],
+  "examples/isqrt": [],
   "examples/pong": [],
   "examples/stopwatch": [],
   "examples/traffic": [],
