@@ -83,8 +83,7 @@ int main(void) { int t[8] = {1, 2, 3, 4, 5, 6, 7, 8}; printf("%d\\n", sum(t)); r
   const u = run(MEM('#pragma HLS UNROLL'), 'sum.c');
   assert.deepEqual(u.messages, ['4 warning: #pragma HLS UNROLL: this loop is not unrolled: it accesses a memory: an access a state']);
   const c = run(ACC('#pragma HLS UNROLL factor=2\n    if (i == 3) continue;'));
-  assert.deepEqual(c.messages, ["4 warning: #pragma HLS UNROLL factor=2: this loop is not unrolled: a 'continue' is in it",
-    "4 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (a 'continue' is in it); #pragma HLS PIPELINE off in it turns that off"]);
+  assert.deepEqual(c.messages, ["4 warning: #pragma HLS UNROLL factor=2: this loop is not unrolled: a 'continue' is in it"]);
   const v = run(`#include <stdio.h>
 int count(unsigned n) {
   int k = 0;
@@ -141,7 +140,6 @@ test('#1529 the pragmas accepted and ignored, unknown, misplaced or wrong: their
     '4 warning: #pragma HLS FOO is not a pragma Silinx knows: ignored',
   ]);
   assert.deepEqual(msgs('int f(int a) {\n#pragma HLS PIPELINE II=1\n  if (a) {\n#pragma HLS UNROLL\n    a++;\n  }\n  return a;\n}'), [
-    "2 warning: a function's #pragma HLS PIPELINE is not made yet: ignored (a loop's is: put it in the loop's body)",
     '4 warning: #pragma HLS UNROLL applies to the loop it is in (first in its body): ignored here',
   ]);
   assert.deepEqual(msgs('int g(int x) {\n#pragma HLS INLINE off\n  return x + 1;\n}\nint f(int a, int *p) {\n#pragma HLS INTERFACE m_axi port=p\n  return g(a) + *p;\n}'), [

@@ -191,7 +191,7 @@ test('#1668 #pragma HLS AGGREGATE compact=none, byte, bit (an array, a stream, a
 });
 
 // (its loops pipelined automatically, #1919: d read and written, one port; q's elements read and one written)
-const BRAM_LOOPS = [AUTO(6, 2, 'it accesses a memory, an access a state'), AUTO(7, 3, 'it accesses a memory, an access a state')];
+const BRAM_LOOPS = [AUTO(6, 2, "the memory 'd' has one port, accessed 2 times an iteration"), AUTO(7, 3, 'it accesses a memory, an access a state')];
 const BRAM = `struct Q { short a; char b; };
 int acc(int d[5], Q q[3]) {
 #pragma HLS INTERFACE bram port=d

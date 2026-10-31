@@ -248,6 +248,7 @@ export const exprMethods = {
       const k = Number(this.g.k(i.id));
       if (k < 0 || k >= n) this.error(l.loc, `the index ${k} is outside '${arr.name}' (0 to ${n - 1})`);
       arr.elems[k] = this.mux(g, nv.id, arr.elems[k], arr.t);
+      arr.lastWrite = null;
       return;
     }
     const it = promote(i.t);
@@ -256,6 +257,8 @@ export const exprMethods = {
       const hit = this.and(g, this.g.add('eq', [iv.id, this.g.const(k, it)], BOOL));
       arr.elems[k] = this.mux(hit, nv.id, arr.elems[k], arr.t);
     }
+    // (what it just wrote, read at the same index: that value, no mux of its elements, #1962)
+    arr.lastWrite = this.g.isConst(g) && this.g.k(g) ? { i: iv.id, v: nv.id, elems: arr.elems } : null;
   },
   index(e, g) {
     const base = e.e.kind === 'id' ? this.lookup(e.e.name, e.loc) : null;
@@ -268,6 +271,7 @@ export const exprMethods = {
         return this.v(base.elems[k], base.t);
       }
       const it = promote(i.t), iv = this.conv(i, it);
+      if (base.lastWrite?.i === iv.id && base.lastWrite.elems === base.elems) return this.v(base.lastWrite.v, base.t);
       let r = base.elems[n - 1];
       for (let k = n - 2; k >= 0; k--) r = this.mux(this.g.add('eq', [iv.id, this.g.const(k, it)], BOOL), base.elems[k], r, base.t);
       return this.v(r, base.t);

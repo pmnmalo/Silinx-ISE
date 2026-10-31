@@ -65,7 +65,7 @@ test('#1527 co-simulation of array arguments (read; read and written, one access
   // add (made whatever i < n, its value then unused), the loop's head and step in it
   assert.deepEqual(sum.latency, { min: 11, max: 11, avg: 11 });
   // (v[i] and v[5 - i] read, v[i] written: one port, a state each, #1919)
-  passes(ARGS.replace('TOPNAME', 'scale'), 'scale.c', { calls: 2, warnings: ['9 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off'] });
+  passes(ARGS.replace('TOPNAME', 'scale'), 'scale.c', { calls: 2, warnings: ['9 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (the memory \'v\' has one port, accessed 3 times an iteration); #pragma HLS PIPELINE off in it turns that off'] });
   const r = cosimulate(ARGS.replace('TOPNAME', 'scale'), { file: 'scale.c', lang: 'verilog', alter: (h) => h.replace(/assign v_d0 = (\w+);/, 'assign v_d0 = $1 ^ 16\'h0100;') });
   assert.equal(r.pass, false);
   const where = r.mismatches.map((m) => `${m.call} ${m.port}`);

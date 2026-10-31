@@ -50,7 +50,7 @@ test('#1786 arrays of more dimensions co-simulated in VHDL and Verilog: each arg
     const r = cosimulate(SRC, { file: 'st.c', lang });
     // (the inner loop pipelined automatically, #1919: a, b one port each)
     assert.deepEqual([r.errors, r.pass, r.calls, r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`)], [[], true, 3,
-      ['9 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=5 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off']], JSON.stringify(r.mismatches, big));
+      ['9 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (the memory \'a\' has one port, accessed 3 times an iteration); #pragma HLS PIPELINE off in it turns that off']], JSON.stringify(r.mismatches, big));
     assert.deepEqual(r.gen.memories.map((m) => `${m.name} ${m.n}x${m.w}`), ['a 15x32', 'b 9x16']);
     assert.deepEqual(r.gen.ports.filter((p) => /_address0$/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['a_address0:4', 'b_address0:4']);
   }
