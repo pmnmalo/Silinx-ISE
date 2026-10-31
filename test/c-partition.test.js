@@ -55,6 +55,31 @@ test('#1920 an argument cyclic or block: its memories\' ports d_0_…, d_1_…, 
   }
 });
 
+test('#2348 a memory named as another argument: d_01, then d_02, …, as Vitis HLS 2025.2 names it', () => {
+  for (const [kind, args, banks] of [
+    ['d_0 taken', ['d_0'], ['d_01', 'd_1']],
+    ['d_0 and d_01 taken', ['d_0', 'd_01'], ['d_02', 'd_1']],
+    ['d_1 taken', ['d_1'], ['d_0', 'd_11']],
+    ['d_01 taken, not d_0', ['d_01'], ['d_0', 'd_1']],
+  ]) {
+    const src = `int f(int d[12]${args.map((a) => `, int ${a}`).join('')}, int n) {
+#pragma HLS ARRAY_PARTITION variable=d type=cyclic factor=2
+  int s = ${args.join(' + ')};
+  for (int i = 0; i < n; i++) { s += d[i]; d[i] = s; }
+  return s;
+}
+int main(void) {
+  int a[12];
+  for (int i = 0; i < 12; i++) a[i] = i;
+  return f(a, ${args.map(() => '1').join(', ')}, 12) != ${args.length} + 66;
+}
+`;
+    const g = both(src, [UNKNOWN, AUTO2], kind);
+    assert.deepEqual(memPorts(g), banks.flatMap((b) => SFX.map((s) => `${b}_${s}`)), kind);
+    assert.deepEqual(g.ports.filter((p) => args.includes(p.name)).map((p) => p.name), args, kind);
+  }
+});
+
 const TWO = (pragma) => `int f(int d[3][4], int n) {
 ${pragma}
   int s = 0;
@@ -99,9 +124,9 @@ int main(void) { return f(10) != (10 + 7 + 1 + 21 + 5 + 90 - 14 - 16) ; }
 
 test('#1920 a local array: inner memories A_0, … (no port), run-time and constant accesses, a read-modify-write, a variable of a memory\'s name; non-power-of-2 factors', () => {
   for (const [kind, pragma, list] of [
-    ['cyclic 3', '#pragma HLS ARRAY_PARTITION variable=A type=cyclic factor=3', [['A_0_s', 34], ['A_1', 34], ['A_2', 34]]],
-    ['block 3', '#pragma HLS ARRAY_PARTITION variable=A type=block factor=3', [['A_0_s', 34], ['A_1', 34], ['A_2', 34]]],
-    ['cyclic 4', '#pragma HLS ARRAY_PARTITION variable=A type=cyclic factor=4', [['A_0_s', 25], ['A_1', 25], ['A_2', 25], ['A_3', 25]]],
+    ['cyclic 3', '#pragma HLS ARRAY_PARTITION variable=A type=cyclic factor=3', [['A_01', 34], ['A_1', 34], ['A_2', 34]]],
+    ['block 3', '#pragma HLS ARRAY_PARTITION variable=A type=block factor=3', [['A_01', 34], ['A_1', 34], ['A_2', 34]]],
+    ['cyclic 4', '#pragma HLS ARRAY_PARTITION variable=A type=cyclic factor=4', [['A_01', 25], ['A_1', 25], ['A_2', 25], ['A_3', 25]]],
   ]) {
     const g = both(LOCAL(pragma), [UNKNOWN], kind);
     assert.deepEqual(memPorts(g), [], kind);
