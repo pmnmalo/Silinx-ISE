@@ -8,15 +8,17 @@ import { hdlName } from './c-graph.js';
 
 const rname = (r) => `ap_r_${hdlName(r.name)}`;
 
-/** The nodes the machine needs: its updates, its next states, its latches. */
-function nodesOf(m) {
+/** The nodes the machine reads: its updates, its next states, its latches, its outputs, its memories' ports. */
+export function seqRoots(m) {
   const roots = [];
   for (const st of m.states) { roots.push(st.next, ...st.updates.values()); }
   for (const r of m.regs) if (r.latch != null) roots.push(r.latch);
   for (const o of m.outputs.values()) if (o.node != null) roots.push(o.node);
   for (const x of m.mems || []) roots.push(...[x.addr, x.ce, x.we, x.d].filter((id) => id != null));
-  return m.graph.needed(roots);
+  return roots;
 }
+/** The nodes the machine needs. */
+const nodesOf = (m) => m.graph.written(seqRoots(m));
 // (a memory inside the module: 2^aw words, its initial values, the rest 0)
 const depth = (x) => 2 ** x.aw;
 const words = (x) => Array.from({ length: depth(x) }, (_, k) => x.init?.[k] ?? 0n);
