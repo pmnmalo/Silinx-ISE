@@ -1,4 +1,4 @@
-// The Tasks interface (#782, #804): a third interface beside the modern and the classic ones, organised
+// The Tasks interface (#782, #804), which became the modern one (#1149): the modern interface's layout, organised
 // around the five tasks of a lab session: Edit, Simulate, Emulate, Implement, Program. It has the modern
 // look (<html data-ui="modern">) and a layout of its own (data-layout="tasks", web/css/tasks.css):
 // - a task switcher in the header (a tab bar at the bottom of a narrow screen, NARROW_QUERY), each task
