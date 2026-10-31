@@ -111,7 +111,7 @@ int main(void) {
 const DESIGNATED = `#include <stdio.h>
 #include <stdint.h>
 enum { RED, GREEN, BLUE, N };
-const int SZ = 5;
+#define SZ 5
 struct pt { int x, y; };
 struct line { struct pt a, b; int w[3]; };
 typedef struct { uint8_t r, g, b; } rgb_t;
