@@ -71,7 +71,8 @@ export function cmtUses(design, inst) {
 
 /**
  * A CMT's bits outside its settings and its paths' PIPs (db/<device>-cmt-input.json, ana-cmtinput6.mjs): its site's,
- * each output's that drives a net, and its CLKIN's BUFIO2's; null for a site not measured.
+ * each output's that drives a net, and its CLKIN's BUFIO2's (the BUFIO2's own, input.bufio2, #2025, and its route's to
+ * this site); null for a site not measured.
  */
 export function cmtInputBits(design, inst, input) {
   const s = input.sites[inst.site];
@@ -79,5 +80,6 @@ export function cmtInputBits(design, inst, input) {
   const { outputs, bufio2 } = cmtUses(design, inst), bits = new Set(s.common);
   for (const o of outputs) for (const x of s.outputs[o] ?? []) bits.add(x);
   for (const x of (bufio2 && s.bufio2[bufio2]) ?? []) bits.add(x);
+  for (const x of (bufio2 && input.bufio2?.[bufio2]) ?? []) bits.add(x);
   return bits;
 }

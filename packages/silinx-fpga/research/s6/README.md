@@ -636,6 +636,24 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   whole paths, 199 exact (138), the same 44 bits predicted and not set as before (the DCM_X0Y1 mux designs). What is
   left: the BUFIO2s of the clock pads U10, T9 and R8 (the I/O words and a PLL's CLKIN path).
 
+### The clock pads' BUFIO2s (#2025, S6-E8, 2026-10-31)
+
+- **Their routes' PIPs** (`gen-cmtdrop6.mjs` on #727's 7 designs from U10, T9 and R8, the PIPs neither
+  `db/xc6slx16-pips-cmt.json` nor `db/s6-pips-flow.json` had: 30 drops, 35 XDL, 15 minutes; `ana-cmtdrop6.mjs`): 6
+  with bits, all far: a pad's CLKPIN or DFB into a BUFIO2 and a BUFIO2FB's input (the I/O words), a DCM's or PLL's
+  CLKIN and CLKFB from them (the CMT column); into `db/xc6slx16-pips-cmt.json`. The 24 without bits (the pads' input
+  buffers, the BTERM and REG_B route-throughs) `db/s6-pips-flow.json`.
+- **A BUFIO2's own bit:** every design with a BUFIO2 placed has one I/O word bit of it, whatever the CMT it drives;
+  the input table had it in its (CMT site, BUFIO2) entries, so a pair not measured left it over. `ana-cmtinput6.mjs`
+  now takes it apart (`bufio2` of `db/<device>-cmt-input.json`, the I/O word bits of every design with the BUFIO2) and
+  `cmtInputBits` adds it. On the XC6SLX16 it is the bit before the clock input bit of the BUFIO2's own pad
+  (`db/s6-clocks.json`): BUFIO2_X1Y6 T9's, X3Y6 U10's, X1Y0 R8's, X3Y0 R10's; the master pad's of even Y, the slave's
+  of odd Y; X1 / X2 the pads of the IOB tile X11, X3 / X4 those of X12. The XC6SLX16's table is now from #1951's 92
+  designs and #727's 14 from other pads (106); both parts: each BUFIO2 one bit of its own, and none left in a (CMT
+  site, BUFIO2) entry but the two from another BUFIO2's side (DCM_X0Y0 from X1Y7, DCM_X0Y1 from X1Y6).
+- **The residual** (`residual6.mjs --no-cmt-paths`): the XC6SLX16's 203 designs all exact (196), the XC6SLX45's 184 and
+  the 10 OLOGIC2 designs too. With #727's whole paths: 199 exact, 44 bits predicted that ISE does not set.
+
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
 XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the part holding an instance (`gen-hard6.mjs`;
