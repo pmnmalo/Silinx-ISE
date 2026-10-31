@@ -19,8 +19,9 @@ const inToolchain = (f) => TOOLCHAIN.some((r) => r.test(f));
 const ALLOWED = new Set([
 ]);
 // the npm packages it imports (its dependencies once it is a package of its own)
-// (@silinx/nextpnr-himbaechel-spartan3e: nextpnr in WebAssembly, the flow's nextpnr engine, #2136)
-const PACKAGES = new Set(['@yowasp/yosys', '@silinx/nextpnr-himbaechel-spartan3e']);
+// (@silinx/nextpnr-himbaechel-spartan3e: nextpnr in WebAssembly, the flow's nextpnr engine, #2136; -spartan6: its
+// Spartan-6, #2138)
+const PACKAGES = new Set(['@yowasp/yosys', '@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6']);
 
 function sources(dir) {
   return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
