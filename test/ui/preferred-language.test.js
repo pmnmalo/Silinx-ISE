@@ -47,7 +47,8 @@ uiTest('Design Properties, Preferred Language Verilog: the state diagram and the
   await page.openProject('PrefLang');
   // the state diagram open in its editor: it follows
   await page.eval(async () => (await import('/js/drawings.js')).openFsm('src/traffic.fsm.json'));
-  await page.waitFor(() => document.querySelector('.doc:not([hidden]) select[title="HDL language"]'), [], { what: 'the state diagram editor' });
+  // (its editor mounted: the toolbar has no Language select since #2257, #2395)
+  await page.waitFor(() => window.Silinx.docs.some((d) => d.fsmEditor), [], { what: 'the state diagram editor' });
   const before = await rows(page);
   const was = await state(page);
   assert.deepEqual(was.links, { 'src/traffic.vhd': 'src/traffic.fsm.json', 'src/lamps.vhd': 'src/lamps.bool.json' });
@@ -70,12 +71,11 @@ uiTest('Design Properties, Preferred Language Verilog: the state diagram and the
     assert.match(await readWs(env, 'PrefLang', hdl), /^\s*module \w+/m);
   }
   for (const [f, t] of Object.entries(hand)) assert.equal(await readWs(env, 'PrefLang', f), t, `${f} written by hand: as it is`);
-  assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) select[title="HDL language"]').value), 'verilog', 'the open editor in Verilog');
   // the Design pane: the drawings' HDL badge [Verilog], last; the HDL modules as they were
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => r.querySelector('.lbl').textContent.endsWith('traffic') && [...r.querySelectorAll('.badge')].some((b) => b.textContent === 'Verilog')), [], { what: 'the row of traffic with [Verilog]' });
   assert.deepEqual(await rows(page), before.map((r) => (/^(fsm|algebra) /.test(r) ? r.replace('[VHDL]', '[Verilog]') : r)));
   assert.ok(before.some((r) => /^fsm .*\[FSM\*\] \[VHDL\]/.test(r)) && before.some((r) => /^algebra .*\[VHDL\]/.test(r)), before.join('\n'));
-  // the editor's model in Verilog, linked to the Verilog file (its next edit keeps them)
+  // the open editor follows: its model in Verilog, linked to the Verilog file (its next edit keeps them)
   assert.deepEqual(await page.eval(() => { const m = window.Silinx.docs.find((d) => d.fsmEditor).fsmEditor.getModel(); return [m.lang, m.generatedFile]; }), ['verilog', 'src/traffic.v']);
 
   // back to VHDL: the files shipped with the example
