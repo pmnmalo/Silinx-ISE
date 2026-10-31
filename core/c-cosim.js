@@ -132,7 +132,7 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
     if (seq && !hs) L.push(`    ${asg} ${outs.map((o) => `got_${o.name} = 0;`).join(' ')} cyc = 0;`);
     else if (seq) {
       L.push('    if (!ap_idle) bad = bad + 1;', `    ${asg} ${outs.map((o) => `got_${o.name} = 0;`).join(' ')} ap_start = 1; cyc = 0;`, '    @(posedge ap_clk); #1 ap_start = 0;');
-      L.push(`    while (!ap_done && cyc < ${callCycles(c, maxCycles)}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`, '    if (!ap_ready) bad = bad + 1;', '    @(posedge ap_clk); #1;');
+      L.push(`    while (!ap_done && cyc < ${callCycles(c, maxCycles)}) begin @(posedge ap_clk); #1 cyc = cyc + 1; end`, ...(gen.freeRun ? [] : ['    if (!ap_ready) bad = bad + 1;']), '    @(posedge ap_clk); #1;');
     }
     if (seq) {
       // (hls::task's run by themselves: the call's values, read and written, waited for, #1719)

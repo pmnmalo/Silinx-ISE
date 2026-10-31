@@ -156,6 +156,13 @@ export const memMethods = {
     const mem = this.slots.get(s.mem);
     const g = this.guard(base);
     const at = { w: mem.aw, s: false };
+    // (in a pipeline: the value of this read, found in its stage, core/c-pipe-sched.js)
+    if (s.kind === 'memlatch' && this.piping) {
+      const q = this.g.add('reg', [], mem.t, { port: { key: `pipeq:${s.tmp}`, name: `ap_q_${s.tmp}` } });
+      this.piping.qs.set(mem.name, q);
+      this.slots.get(s.tmp).val = q;
+      return;
+    }
     if (s.kind === 'memlatch') { this.slots.get(s.tmp).val = this.memQ(mem); return; }
     const addr = this.conv(this.expr(s.i, g), at).id;
     const acc = { addr, ce: g, we: this.F, d: null };

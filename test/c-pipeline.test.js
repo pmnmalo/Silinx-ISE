@@ -127,25 +127,25 @@ test('#1919 a pipelined loop that reads a memory: its head and step in its state
 test('#1919 the II of 1 not met (a memory\'s one port, what the condition reads, two memories read): the II made, said with why; a break and a return in the loop', () => {
   // (a[i] read and written: its one port, so the next read waits for the write)
   const port = run(MEM(LOOP('for (int i = 0; i < n; i++)', 'a[i] = a[i] + i;'), 'int a[8], int n', 'f(t, 0); f(t, 8); f(t, 5);'));
-  assert.deepEqual(port.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 17 }]);
-  assert.deepEqual(port.messages, [`4 warning: ${AUTO}: II=2 made (it accesses a memory, an access a state); ${OFF}`]);
+  assert.deepEqual(port.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 16 }]);
+  assert.deepEqual(port.messages, [`4 warning: ${AUTO}: II=2 made (the memory 'a' has one port, accessed 2 times an iteration); ${OFF}`]);
   // (the first state writes what the condition reads: the condition tested after it, the next read not moved)
   const cond = run(MEM(`  int i = 0;\n${LOOP('while (i < n)', 'i += 2;', 's += a[i - 2];')}`, 'int a[8], int n', 'printf("%d %d %d\\n", f(t, 0), f(t, 3), f(t, 8));'));
-  assert.deepEqual(cond.loops, [{ line: 5, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 17 }]);
-  assert.deepEqual(cond.messages, [`5 warning: ${AUTO}: II=2 made (it accesses a memory, an access a state); ${OFF}`]);
+  assert.deepEqual(cond.loops, [{ line: 5, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 9 }]);
+  assert.deepEqual(cond.messages, []);
   // (two memories read: a state each, the first's read in the last state)
   const two = run(MEM('  for (int i = 0; i < 8; i++) s += a[i] * b[i];', 'int a[8], int b[8]', 'printf("%d %d\\n", f(t, u), f(u, u));'));
-  assert.deepEqual(two.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 17 }]);
-  assert.deepEqual(two.messages, [`4 warning: ${AUTO}: II=2 made (it accesses a memory, an access a state); ${OFF}`]);
-  assert.equal(two.cycles, 19);
+  assert.deepEqual(two.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 10 }]);
+  assert.deepEqual(two.messages, []);
+  assert.equal(two.cycles, 12);
   // (a break, a return: out of the loop, the next iteration's read not done; an if reading a memory in its state)
   const brk = run(MEM(LOOP('for (int i = 0; i < n; i++)', 'if (a[i] < 0) break;', 's += a[i];'), 'int a[8], int n', 'printf("%d %d %d\\n", f(t, 0), f(t, 1), f(t, 8));'));
-  assert.deepEqual(brk.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 17 }]);
-  assert.deepEqual(brk.messages, [`4 warning: ${AUTO}: II=2 made (it accesses a memory, an access a state); ${OFF}`]);
+  assert.deepEqual(brk.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 9 }]);
+  assert.deepEqual(brk.messages, []);
   // (an if: its reads before it, whatever its condition; its write made only if it runs it)
   const branch = run(MEM(LOOP('for (int i = 0; i < n; i++)', 'if (a[i] > 0) a[i] = s; else if (i & 1) s -= i;'), 'int a[8], int n', 'f(t, 0); f(t, 8); f(t, 5);'));
-  assert.deepEqual(branch.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 17 }]);
-  assert.deepEqual(branch.messages, [`4 warning: ${AUTO}: II=2 made (it accesses a memory, an access a state); ${OFF}`]);
+  assert.deepEqual(branch.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 16 }]);
+  assert.deepEqual(branch.messages, [`4 warning: ${AUTO}: II=2 made (the memory 'a' has one port, accessed 2 times an iteration); ${OFF}`]);
   const ret = run(MEM(LOOP('for (int i = 0; i < n; i++)', 'if (a[i] == 9) return i;'), 'int a[8], int n', 'printf("%d %d %d\\n", f(t, 0), f(t, 5), f(t, 8));'));
   assert.deepEqual(ret.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 9 }]);
   assert.deepEqual(ret.messages, []);
@@ -156,9 +156,9 @@ test('#1919 what a pipelined loop cannot be made as yet: said, the loop made as 
   const branch = run(MEM(LOOP('for (int i = 0; i < n; i++)', 'int k = i;', 'if (i & 1) { k = 7 - i; s += a[k]; }'), 'int a[8], int n', 'printf("%d %d\\n", f(t, 0), f(t, 8));'));
   assert.deepEqual(branch.messages, [`4 warning: ${AUTO}: II=5 made (it accesses a memory in a branch, an access a state); ${OFF}`]);
   const cont = run(MEM(LOOP('for (int i = 0; i < n; i++)', 'if (i == 2) continue;', 's += a[i];'), 'int a[8], int n', 'printf("%d %d\\n", f(t, 0), f(t, 8));'));
-  assert.deepEqual(cont.messages, [`4 warning: ${AUTO}: II=4 made (a 'continue' or a 'goto' is in it); ${OFF}`]);
+  assert.deepEqual(cont.messages, []);   // (#1962: made)
   const pragma = run(MEM(`  int i = 0;\n${LOOP('do', '#pragma HLS PIPELINE II=1', 's += a[i];', 'i++;')} while (i < n);`, 'int a[8], int n', 'printf("%d %d\\n", f(t, 1), f(t, 8));'));
-  assert.deepEqual(pragma.messages, ['5 warning: #pragma HLS PIPELINE II=1: II=3 made (a do-while)']);
+  assert.deepEqual(pragma.messages, []);   // (#1962: made)
   // (an inner loop whose count is not a constant: the outer loop not pipelined, the inner one pipelined)
   const inner = run(MEM(`  for (int i = 0; i < 4; i++) {\n#pragma HLS PIPELINE\n${LOOP('for (int j = 0; j < n; j++)', 's += i ^ j;')}\n  }`, 'int n', 'printf("%d %d\\n", f(0), f(5));'));
   assert.deepEqual(inner.messages, ['4 warning: #pragma HLS PIPELINE II=1: II=4 made (a loop is in it whose count is not a constant: it cannot be unrolled)']);
@@ -194,13 +194,13 @@ test('#1919 which loop is pipelined: an inner loop\'s PIPELINE off keeps its par
   const nest = (inner, outer = '') => `  for (int i = 0; i < n; i++) {\n#pragma HLS LOOP_TRIPCOUNT max=8\n${outer}    for (int j = 0; j < 4; j++) {\n${inner}      s += i ^ j;\n    }\n  }`;
   assert.deepEqual(loops(nest('#pragma HLS PIPELINE off\n')), [[3, null, null, false, 6], [5, null, null, false, 3]]);
   assert.deepEqual(loops(nest('#pragma HLS UNROLL\n')), [[3, null, 1, true, 1], [5, 'whole', null, false, 0]]);
-  assert.deepEqual(loops(nest('      s += a[j];\n')), [[3, null, null, false, 5], [5, null, 1, true, 1]]);
+  assert.deepEqual(loops(nest('      s += a[j];\n')), [[3, null, null, false, 4], [5, null, 1, true, 1]]);
 });
 
 test('#1919 a pipelined loop that accesses a memory with an inner loop (no access in it): the inner loop unrolled in its states', () => {
   const r = run(MEM(LOOP('for (int i = 0; i < n; i++)', 'int q = a[i];', 'for (int k = 0; k < 4; k++) q += (q >> k) ^ i;', 'a[i] = q;'), 'int a[8], int n', 'f(t, 0); f(t, 8); f(t, 3);'));
-  assert.deepEqual(r.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 17 }, { line: 7, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
-  assert.deepEqual(r.messages, [`4 warning: ${AUTO}: II=2 made (it accesses a memory, an access a state); ${OFF}`]);
+  assert.deepEqual(r.loops, [{ line: 4, unroll: null, pipeline: 1, auto: true, ii: 2, cycles: 18 }, { line: 7, unroll: 'whole', pipeline: null, ii: 0, cycles: 0 }]);
+  assert.deepEqual(r.messages, [`4 warning: ${AUTO}: II=2 made (the memory 'a' has one port, accessed 2 times an iteration); ${OFF}`]);
 });
 
 const STREAM = (body, args = '') => `#include <stdio.h>

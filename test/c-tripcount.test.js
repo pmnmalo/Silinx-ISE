@@ -72,8 +72,8 @@ test('#1921 the bound in the report, the design co-simulated in VHDL and Verilog
   const ref = run('max=16');
   const got = run('min = c_dim max = c_dim * c_dim');
   assert.deepEqual(got, ref);
-  // (the loop pipelined automatically, #1919: an iteration a cycle)
-  for (const g of got) assert.deepEqual(g, { latency: { min: 3, max: 19, avg: 10 }, loops: [{ line: 5, trip: null, max: 16, ii: 1, cycles: 17 }], messages: [] });
+  // (the loop pipelined automatically, #1919: an iteration a cycle; none: the loop's state left at once, #1962)
+  for (const g of got) assert.deepEqual(g, { latency: { min: 2, max: 19, avg: 29 / 3 }, loops: [{ line: 5, trip: null, max: 16, ii: 1, cycles: 17 }], messages: [] });
   // (a variable: the loop made as before, its cycles unknown, both warnings)
   for (const g of run('max=n')) {
     assert.deepEqual(g.loops, [{ line: 5, trip: null, max: null, ii: 1, cycles: null }]);

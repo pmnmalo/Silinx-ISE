@@ -14,6 +14,7 @@ function nodesOf(m) {
   for (const st of m.states) { roots.push(st.next, ...st.updates.values()); }
   for (const r of m.regs) if (r.latch != null) roots.push(r.latch);
   for (const o of m.outputs.values()) if (o.node != null) roots.push(o.node);
+  if (m.freeRun) roots.push(m.freeRun.ready, m.freeRun.done, m.freeRun.idle);
   for (const x of m.mems || []) roots.push(...[x.addr, x.ce, x.we, x.d].filter((id) => id != null));
   return m.graph.needed(roots);
 }
@@ -52,7 +53,7 @@ export function vhdlSeq(name, src, ports, m, agg) {
     if (x.we != null) L.push(`        if ${sig(g.get(x.we))} = "1" then`, `          ap_m_${hdlName(x.name)}(${a}) <= std_logic_vector(${sig(g.get(x.d))});`, '        end if;');
     L.push(`        ap_m_${hdlName(x.name)}_q0 <= ${x.t.s ? 'signed' : 'unsigned'}(ap_m_${hdlName(x.name)}(${a}));`, '      end if;', '    end if;', '  end process;');
   }
-  L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' then", `        ap_CS_fsm <= ${S(m.idle)};`);
+  L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' then", `        ap_CS_fsm <= ${S(m.freeRun?.state ?? m.idle)};`);
   for (const r of regs) L.push(`        ${r.sig} <= "${bin(r.reset, r.w)}";`);
   L.push('      else');
   for (const r of regs) if (/_vld_reg$/.test(r.name)) L.push(`        ${r.sig} <= "0";`);
@@ -65,7 +66,9 @@ export function vhdlSeq(name, src, ports, m, agg) {
     L.push(`          ap_CS_fsm <= ${sig(g.get(st.next))};`);
   }
   L.push('        else', `          ap_CS_fsm <= ${S(m.idle)};`, '        end if;', '      end if;', '    end if;', '  end process;');
-  L.push(`  ap_done <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_ready <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_idle <= '1' when ap_CS_fsm = ${S(m.idle)} else '0';`);
+  // (a function pipelined, #1962: its calls overlap, its block protocol its valid bits')
+  if (m.freeRun) L.push(`  ap_done <= ${sig(g.get(m.freeRun.done))}(0);`, `  ap_ready <= ${sig(g.get(m.freeRun.ready))}(0);`, `  ap_idle <= ${sig(g.get(m.freeRun.idle))}(0);`);
+  else L.push(`  ap_done <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_ready <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_idle <= '1' when ap_CS_fsm = ${S(m.idle)} else '0';`);
   for (const [p, o] of m.outputs) {
     if (o.wire) { L.push(`  ${p} <= ${o.wire};`); continue; }   // (a BRAM's clock and reset, core/c-mem.js)
     const v = o.node != null ? sig(g.get(o.node)) : byName.get(o.reg).sig, port = [...ports, ...(agg?.inner || [])].find((x) => x.name === p);
@@ -99,7 +102,7 @@ export function verilogSeq(name, src, ports, m, agg) {
     if (x.we != null) L.push(`    if (${sig(g.get(x.we))}) ap_m_${hdlName(x.name)}[${a}] <= ${sig(g.get(x.d))};`);
     L.push(`    ap_m_${hdlName(x.name)}_q0 <= ap_m_${hdlName(x.name)}[${a}];`, '  end');
   }
-  L.push('  always @(posedge ap_clk) begin', '    if (ap_rst) begin', `      ap_CS_fsm <= ${S(m.idle)};`);
+  L.push('  always @(posedge ap_clk) begin', '    if (ap_rst) begin', `      ap_CS_fsm <= ${S(m.freeRun?.state ?? m.idle)};`);
   for (const r of regs) L.push(`      ${r.sig} <= ${r.w}'b${bin(r.reset, r.w)};`);
   L.push('    end else begin');
   for (const r of regs) if (/_vld_reg$/.test(r.name)) L.push(`      ${r.sig} <= 1'b0;`);
@@ -112,7 +115,8 @@ export function verilogSeq(name, src, ports, m, agg) {
     L.push(`          ap_CS_fsm <= ${sig(g.get(st.next))};`, '        end');
   }
   L.push(`        default: ap_CS_fsm <= ${S(m.idle)};`, '      endcase', '    end', '  end');
-  L.push(`  assign ap_done = ap_CS_fsm == ${S(m.done)};`, `  assign ap_ready = ap_CS_fsm == ${S(m.done)};`, `  assign ap_idle = ap_CS_fsm == ${S(m.idle)};`);
+  if (m.freeRun) L.push(`  assign ap_done = ${sig(g.get(m.freeRun.done))};`, `  assign ap_ready = ${sig(g.get(m.freeRun.ready))};`, `  assign ap_idle = ${sig(g.get(m.freeRun.idle))};`);
+  else L.push(`  assign ap_done = ap_CS_fsm == ${S(m.done)};`, `  assign ap_ready = ap_CS_fsm == ${S(m.done)};`, `  assign ap_idle = ap_CS_fsm == ${S(m.idle)};`);
   for (const [p, o] of m.outputs) L.push(`  assign ${p} = ${o.wire ?? (o.node != null ? sig(g.get(o.node)) : byName.get(o.reg).sig)};`);
   L.push('endmodule', '');
   return L.join('\n');
