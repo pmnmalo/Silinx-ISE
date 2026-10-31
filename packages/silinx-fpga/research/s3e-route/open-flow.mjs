@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { compile, elaborate } from '../../../../core/compile.js';
 import { primitiveSources } from '../../../../core/unisim.js';
+import { isCSource, viewHdl } from '../../../../core/view-hdl.js';
 import { synthesizeOpen } from '../../../../core/synth-front.js';
 import { yosysWorkers } from '../../src/synth-open-node.js';
 import { parseXdl, writeXdl } from '../../src/xdl.js';
@@ -52,6 +53,14 @@ let netFile = json;
 if (!netFile) {
   const srcs = proj.files.filter(f => (f.role || 'design') === 'design' && (f.lang === 'vhdl' || f.lang === 'verilog'))
     .map(f => ({ path: f.path, lang: f.lang, text: fs.readFileSync(path.resolve(projDir, f.path), 'utf8') }));
+  // (a C source's module, Silinx HLS: its HDL made from the C, as the application makes it; it has no file, #1966)
+  const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (e.name === 'build' ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)]);
+  for (const f of walk(projDir).filter(isCSource)) {
+    const rel = path.relative(projDir, f).split(path.sep).join('/');
+    const v = viewHdl(rel, fs.readFileSync(f, 'utf8'), { lang: proj.preferredLanguage });
+    if (v.errors.length) fail('a C source has errors', v.errors);
+    srcs.push({ path: `${rel}.${v.lang === 'vhdl' ? 'vhd' : 'v'}`, lang: v.lang, text: v.text });
+  }
   const lib = compile([...primitiveSources(srcs), ...srcs]);
   const design = elaborate(lib, top);
   const errs = [...lib.errors, ...design.diags].filter(d => d.severity === 'error');
