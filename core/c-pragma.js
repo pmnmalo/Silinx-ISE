@@ -4,6 +4,8 @@
 // (core/c-fsmd.js): UNROLL factor=N, N copies of the body an iteration. Isomorphic ES module: no DOM and no Node APIs.
 //
 //   checkPragmas(ast, funcs, report, top)   report(loc, message, severity)
+//   applyDirectives(funcs, directives)   a Vitis HLS config's syn.directive.interface lines as the top functions' pragmas (#1901)
+//   storageOf(pragma) -> '1p' | '2p' | 't2p' | null: the ports of the memory a BIND_STORAGE or an INTERFACE's storage_type= asks for (#1901)
 //   loopPragma(loop, name) -> its pragma's args, or null
 //   readPragma(text after #pragma) -> { name, args, text } | null
 //   tripcountArgs(a LOOP_TRIPCOUNT's text) -> { min?, max?, avg? }: its values' texts
@@ -11,13 +13,31 @@
 
 // what Silinx makes of the pragmas it knows
 // (TASK: an hls::task's, core/cpp-lex.js, #1721; AGGREGATE and DISAGGREGATE: of the top's struct arguments, core/c-aggregate.js, #1668)
-export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE']);
+export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE']);
 // Vitis HLS's others: accepted, ignored with a warning
-export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'LATENCY', 'BIND_OP', 'BIND_STORAGE', 'RESOURCE', 'ALLOCATION', 'DEPENDENCE',
+export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'LATENCY', 'BIND_OP', 'RESOURCE', 'ALLOCATION', 'DEPENDENCE',
   'LOOP_FLATTEN', 'LOOP_MERGE', 'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
   'ARRAY_RESHAPE', 'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
-export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite']);
+export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite', 'ap_fifo', 'ap_hs']);
+// (a memory's type, its ports: ram_2p reads on port 0 and writes on port 1, ram_t2p reads and writes on both; #1901)
+const STORAGE = { ram_1p: '1p', rom_1p: '1p', ram_2p: '2p', ram_s2p: '2p', ram_t2p: 't2p', rom_2p: 't2p' };
+export function storageOf({ name, args }) {
+  const type = String((name === 'BIND_STORAGE' ? args.type : args.storage_type) ?? '').toLowerCase();
+  return STORAGE[type] ?? null;
+}
+/** A config's `interface <function> [<port>] mode=… depth=…` (Vitis HLS's syn.directive.interface): the function's
+ *  INTERFACE pragma, first in its body. Others of a config (pipeline, unroll) are not read here. */
+export function applyDirectives(funcs, directives = []) {
+  for (const d of directives) {
+    const [kind, fname, ...rest] = d.trim().split(/\s+/);
+    const f = funcs.get(fname);
+    if (kind.toLowerCase() !== 'interface' || !f?.body) continue;
+    const port = rest.find((x) => !x.includes('='));
+    const pragma = readPragma(`HLS INTERFACE ${rest.filter((x) => x !== port).join(' ')}${port ? ` port=${port}` : ''}`);
+    f.body.items.unshift({ kind: 'pragma', pragma, loc: f.loc });
+  }
+}
 /** `#pragma HLS NAME key=value key` -> { name, args, text }; null if not an HLS pragma (core/c-lex.js's). */
 export function readPragma(rest) {
   const m = /^\s*HLS\s+(\w+)\s*(.*)$/i.exec(rest);
@@ -68,11 +88,21 @@ export function checkPragmas(ast, funcs, report, top = null) {
       else if (type !== 'complete' && String(args.dim) === '0') report(loc, `#pragma HLS ARRAY_PARTITION type=${type} dim=0 is not made yet: ignored (name its dimension, dim=1 and up)`, 'warning');
       if (args.dim !== undefined && !/^\d+$/.test(String(args.dim))) report(loc, `#pragma HLS ARRAY_PARTITION dim=${args.dim}: the dimension must be a whole number: ignored`, 'warning');
     }
+    if (name === 'BIND_STORAGE') {
+      if (!args.variable) { report(loc, '#pragma HLS BIND_STORAGE needs variable=<the array>'); return; }
+      if (!storageOf(p)) report(loc, `#pragma HLS BIND_STORAGE type=${args.type ?? ''} is not one Silinx makes (ram_1p, ram_2p, ram_s2p, ram_t2p, rom_1p, rom_2p): ignored`, 'warning');
+    }
     if (name === 'INTERFACE' && args.port && args.port !== 'return') {
       const mode = String(args.mode || Object.keys(args).find((k) => /^(ap_|s_axi|m_axi|axis|bram)/.test(k)) || '').toLowerCase();
       // (axis on the top's stream or array: core/c-axis.js makes it, or says why not, #1894)
-      const axisArg = mode === 'axis' && fname === top && ['stream', 'array'].includes(funcs.get(fname)?.params.find((x) => x.name === args.port)?.type.kind);
-      if (mode && !ARG_MODES.has(mode) && !axisArg) report(loc, `#pragma HLS INTERFACE ${mode} port=${p.of ?? args.port} is not made yet: ignored (its default interface made)`, 'warning');
+      // (ap_fifo: of a pointer, an array or a stream; ap_hs: of a pointer, #1901; struct members: their own rules)
+      const pa = funcs.get(fname)?.params.find((x) => x.name === args.port), k = pa?.type.kind;
+      const axisArg = mode === 'axis' && fname === top && ['stream', 'array'].includes(k);
+      // (a struct's members, a pragma of the struct's: #1668's, not made)
+      const fits = p.of && /^ap_(fifo|hs)$/.test(mode) ? false : mode === 'ap_fifo' ? ['ptr', 'array', 'stream'].includes(k) : mode === 'ap_hs' ? k === 'ptr' || !!pa?.type.fromPtr : true;
+      if (p.of && !fits) report(loc, `#pragma HLS INTERFACE ${mode} port=${p.of} is not made yet: ignored (its default interface made)`, 'warning');
+      else if (pa && !fits) report(loc, `#pragma HLS INTERFACE ${mode} port=${p.of ?? args.port} is not made of this argument (a pointer${mode === 'ap_fifo' ? ', an array or a stream' : ''}): ignored (its default interface made)`, 'warning');
+      else if (mode && !ARG_MODES.has(mode) && !axisArg) report(loc, `#pragma HLS INTERFACE ${mode} port=${p.of ?? args.port} is not made yet: ignored (its default interface made)`, 'warning');
     }
   };
   for (const p of ast.pragmas) one(p, p.loc, 'file', null);

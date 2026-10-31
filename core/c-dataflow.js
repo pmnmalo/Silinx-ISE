@@ -76,7 +76,7 @@ export class Flow {
       const a = st.pragma.args;
       const mode = String(a.mode || Object.keys(a).find((k) => /^ap_/.test(k)) || '').toLowerCase();
       if (a.port === 'return') { if (mode === 'ap_ctrl_none' || mode === 'ap_ctrl_hs' || mode === 'ap_ctrl_chain') this.ctrl = mode; else this.warn(st.loc, `#pragma HLS INTERFACE ${mode} port=return is not supported yet: ap_ctrl_hs is made`); }
-      else if (a.port) this.modes.set(a.port, mode);
+      else if (a.port && !(st.pragma.of && /^ap_(fifo|hs)$/.test(mode))) this.modes.set(a.port, mode);
     }
     for (const it of ast.items) {
       if (it.kind === 'var' && !it.const) {
@@ -100,6 +100,7 @@ export class Flow {
   }
   topParam(pa) {
     const t = pa.type;
+    if (t.kind === 'ptr' && /^ap_(fifo|hs)$/.test(this.modes.get(pa.name) ?? '')) this.error(pa.loc, `the argument '${pa.name}' is a handshake outside the module (${this.modes.get(pa.name)}): its accesses take clock cycles (#1526)`);
     if (t.kind === 'stream') this.error(pa.loc, `the stream '${pa.name}' is a FIFO outside the module (ap_fifo): its accesses take clock cycles (#1526)`);
     if (t.kind === 'array' || (t.kind === 'ptr' && t.to.kind === 'array')) this.error(pa.loc, `the array argument '${pa.name}' is a memory outside the module (ap_memory): its accesses take clock cycles (#1526)`);
     if (t.kind === 'ptr') {

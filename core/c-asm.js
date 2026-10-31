@@ -100,8 +100,8 @@ function chart(top, m, lang, ports) {
         case 'return': if (x.e) act(`ap_return = ${exprText(x.e)}`); jump(done); return;
         case 'break': jump(st(b.loop?.exit)); return;
         case 'continue': jump(st(b.loop?.cont)); return;
-        case 'memread': act(`${x.mem}_address0 = ${exprText(x.i)}; ${x.mem}_ce0 = 1`); return;
-        case 'memlatch': act(`${x.tmp} = ${x.mem}_q0`); return;
+        case 'memread': act(`${x.mem}_address${x.port ?? 0} = ${exprText(x.i)}; ${x.mem}_ce${x.port ?? 0} = 1`); return;
+        case 'memlatch': act(`${x.tmp} = ${x.mem}_q${x.port ?? 0}`); return;
         case 'memwrite': act(`${x.mem}_address0 = ${exprText(x.i)}; ${x.mem}_we0 = 1; ${x.mem}_d0 = ${exprText(x.v)}`); return;
         // a stream's read or write (#1941): the C's, then the state waits while the FIFO is empty (full), the
         // handshake under it (by the module's ports: a stream named in, in_r_empty_n, core/c-hdl.js)
