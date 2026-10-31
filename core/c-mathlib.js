@@ -17,8 +17,9 @@
 //   log2, log10: log's m and e, e times the constant and log m times its inverse, each constant in two parts (a power of
 //     two's log2 exact); exp2: exp's polynomial on (x - n) ln 2, n = round(x), so that an integer's is exact;
 //   hypot: scaled by big's power of two in two steps, so that no square overflows or underflows, sqrt, scaled back;
-//   fmod: the exact remainder, by long division of the significands, one bit a step, for x / y up to 2^FMOD_STEPS; a
-//     quotient beyond it gives NaN (a loop over every exponent would be a circuit of 277 steps in float, 2098 in double);
+//   fmod: the exact remainder for every quotient, by long division of the significands, one bit a step, a step for each
+//     bit of the exponents' difference (up to 277 in float, 2098 in double): in hardware a loop of the state machine, its
+//     size that of one step (#2144);
 //   atan: fdlibm's: |x| reduced to under 7/16 by one of four points, a polynomial in x^2, the point's atan in two parts;
 //   atan2, asin, acos: from atan: atan(|y / x|) in its quadrant, atan(x / sqrt((1 - x)(1 + x))),
 //     2 atan(sqrt((1 - x) / (1 + x)));
@@ -57,7 +58,6 @@ const K = {
     hypBig: 22, hypTerms: 10, cbrtSub: 54, cbrtHalley: 2,
   },
 };
-const FMOD_STEPS = 64;
 
 // ---- the algorithms, on ops: f(x) a value of the format, b a boolean, i an int
 function exp(o, x) {
@@ -172,22 +172,24 @@ function hypot(o, x, y) {
 // C99: the sign of x; x infinite or y zero NaN; y infinite x
 function fmod(o, x, y) {
   const k = K[o.p], M = FMT[o.p].M;
-  const ax = o.abs(x), ay = o.abs(y);
-  // (a subnormal y scaled, x with it, so that y's significand has its top bit; an x overflowing is one too far anyway)
-  const tiny = o.lt(ay, o.c(k.minNormal)), scale = o.pow2(o.ic(k.sub));
-  const sx = o.sel(tiny, o.mul(ax, scale), ax), sy = o.sel(tiny, o.mul(ay, scale), ay);
-  const ey = o.expo(sy), d = o.isub(o.expo(sx), ey), m = o.sig(sy);
-  let rem = o.sig(sx);
-  rem = o.usel(o.uge(rem, m), o.usub(rem, m), rem);
-  for (let i = 0; i < FMOD_STEPS; i++) {
-    const r2 = o.ushl1(rem);
-    rem = o.usel(o.ineg(o.isub(o.ic(i), d)), o.usel(o.uge(r2, m), o.usub(r2, m), r2), rem);
-  }
-  // (the remainder a multiple of y's last bit: exact, in the format and scaled)
-  const e = o.isub(o.isub(ey, o.ic(M)), o.seli(tiny, o.ic(k.sub), o.ic(0))), h = o.ishr1(e);
-  const z = o.sign(o.mul(o.mul(o.ufrom(rem), o.pow2(h)), o.pow2(o.isub(e, h))), x);
+  const ax = o.abs(x), ay = o.abs(y), scale = o.pow2(o.ic(k.sub));
+  // (a subnormal scaled by itself, so that its significand has its top bit: [its exponent, its significand])
+  const normal = (v) => {
+    const tiny = o.lt(v, o.c(k.minNormal));
+    const s = o.sel(tiny, o.mul(v, scale), v);
+    return [o.isub(o.expo(s), o.seli(tiny, o.ic(k.sub), o.ic(0))), o.sig(s)];
+  };
+  const [ex, sx] = normal(ax), [ey, m] = normal(ay);
   const bad = o.or(o.or(o.isnan(x), o.isnan(y)), o.or(o.isinf(x), o.eq(y, o.c(0))));
-  return o.sel(bad, o.nan(), o.sel(o.lt(ax, ay), x, o.sel(o.ineg(o.isub(o.ic(FMOD_STEPS), d)), o.nan(), z)));
+  const n = o.seli(o.or(bad, o.lt(ax, ay)), o.ic(0), o.isub(ex, ey));
+  const rem = o.steps(n, o.usel(o.uge(sx, m), o.usub(sx, m), sx), (r) => {
+    const r2 = o.ushl1(r);
+    return o.usel(o.uge(r2, m), o.usub(r2, m), r2);
+  });
+  // (the remainder a multiple of y's last bit: exact, in the format and scaled)
+  const e = o.isub(ey, o.ic(M)), h = o.ishr1(e);
+  const z = o.sign(o.mul(o.mul(o.ufrom(rem), o.pow2(h)), o.pow2(o.isub(e, h))), x);
+  return o.sel(bad, o.nan(), o.sel(o.lt(ax, ay), x, z));
 }
 
 function atan(o, x) {
@@ -328,6 +330,7 @@ function jsOps(p) {
       ? (v) => { dv.setFloat32(0, v); return BigInt((dv.getUint32(0) & 0x7fffff) | 0x800000); }
       : (v) => { dv.setFloat64(0, v); return (dv.getBigUint64(0) & 0xfffffffffffffn) | (1n << 52n); },
     ushl1: (a) => a << 1n, usub: (a, b) => a - b, uge: (a, b) => a >= b, usel: (c, a, b) => (c ? a : b), ufrom: (a) => r(Number(a)),
+    steps: (n, v, step) => { for (let i = 0; i < n; i++) v = step(v); return v; },
     call: (name, ...a) => JS_MATH[p === 'f32' ? `${name}f` : name](...a),
   };
 }
@@ -366,6 +369,14 @@ function cOps(p, lines) {
     uge: (x, y) => b(`${x} >= ${y}`), usel: (cnd, x, y) => t(T, `${cnd} ? ${x} : ${y}`),
     ufrom: (x) => (p === 'f32' ? f('from_u32', x)
       : f('add', f('mul', f('from_u32', `(unsigned)(${x} >> 32)`), bits(2 ** 32)), f('from_u32', `(unsigned)${x}`))),
+    // (n steps of a value, n not negative: a loop)
+    steps: (n, v, step) => {
+      const x = t(T, v), i = b(n);
+      lines.push(`  while (${i} != 0) {`, `#pragma HLS LOOP_TRIPCOUNT max=${2 * bias + M - 1}`);
+      const y = step(x);
+      lines.push(`  ${x} = ${y};`, `  ${i} = ${i} - 1;`, '  }');
+      return x;
+    },
     call: (name, ...a) => f(name, ...a),
   };
 }
