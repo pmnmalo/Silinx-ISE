@@ -613,6 +613,29 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   settings (`OMUX::OUTFF`; 2 bits of its BIOI tile and 1 of the HCLK row's, in 81 designs) and the BUFIO2s of the
   clock pads the input table was not measured from (U10, T9, R8: the I/O words and a PLL's CLKIN path).
 
+### An output register in the pad (#2025, S6-E7, 2026-10-31)
+
+- **The designs** (`gen-ologic6.mjs`, `ise-s6.sh impl`, 10 designs, 25 minutes): every pad an output from a flip-flop
+  forced into its OLOGIC2 (`IOB = "TRUE"`; ISE writes `OMUX::OUTFF OUTFFTYPE::FF SRINIT_OQ::0 CLK0INV::CLK0`), one global
+  clock; each IOB tile's k-th pad in design k (the IOI tile's two sites apart), and every third tile's first pad (the
+  clock rows apart). On each part: 88 + 89 + 25 + 25 + 30 sites (the XC6SLX45: 85 + 86 + 21 + 21 + 29).
+- **Their clock paths' PIPs first** (`gen-flowdrop6.mjs` on the 10 designs, 136 drops, 145 XDL, about an hour;
+  `ana-cmtdrop6.mjs`): the `IOI_CLK0/1 -> IOI_CLK1INTER_* -> IOI_CLKDIST_CLK0_OLOGIC_* -> CLK0_OLOGIC_SITE*` chains of
+  the TIOI, BIOI_OUTER, LIOI and RIOI tiles and the BIOI_INNER's slave, the HCLK tiles' `HCLK_GCLK15` on the IOI and
+  FOLD columns: 83 PIPs, the same on both parts, every bit near its tile (`db/s6-pips-flow.json`).
+- **The register** (`ana-ologic6.mjs` -> `db/s6-ologic.json`, read by `src/fpga/s6/bitgen-ologic.js`): two bits of its
+  tile, the same in every site of a layout: the top and bottom tiles' master (odd Y) 26,32 and 27,29, slave 26,35 and
+  27,48; the left and right tiles' 27,29 and 29,32, and 27,48 and 29,35. These are two of the three bits of the D1 -> OQ
+  route-through (its third, 28,49 / 28,14, is the bypass). And one bit of the HCLK tile its clock passes in its column
+  and clock region, whatever the clock's GCLK: minor 18 (17 in an XM column), bit 14 of the HCLK word. A flip-flop of a
+  slice on the same clock sets none.
+- **A wrong entry** (#2372): `TIOB TIOB_O0 -> TIOB_O0_PINW` in `db/s6-pips-io.json` had the route-through's three bits
+  (the pair #727 could not take apart), so a register in a top-outer tile predicted 28,49; the pin PIP now has none.
+- **The residual** (`residual6.mjs --no-cmt-paths`): the 10 designs exact; the XC6SLX16's 203 designs 196 exact (122
+  before), 21 bits left over (264), none predicted that ISE does not set; the XC6SLX45's 184 stay exact. With #727's
+  whole paths, 199 exact (138), the same 44 bits predicted and not set as before (the DCM_X0Y1 mux designs). What is
+  left: the BUFIO2s of the clock pads U10, T9 and R8 (the I/O words and a PLL's CLKIN path).
+
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
 XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the part holding an instance (`gen-hard6.mjs`;

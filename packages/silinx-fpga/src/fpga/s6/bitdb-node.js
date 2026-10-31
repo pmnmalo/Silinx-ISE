@@ -10,6 +10,7 @@
 //   <device>-iob.json, s6-clocks.json         the pads' settings, a clock pad's selection
 //   <device>-hard.json, s6-hard-base.json     the block RAMs' and DSP48A1s' settings and contents
 //   <device>-cmt-{settings,input}.json, xc6slx16-cmt-paths.json  the DCMs' and PLLs'
+//   s6-ologic.json                   an OLOGIC2's output flip-flop (#2025)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +20,7 @@ export const S6_DB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)),
 
 /**
  * A part's databases ('xc6slx16csg324-3'): { part, slices: { lut, rounds, sliceX }, int, other: { pips }, iob,
- * clocks, cmt, hard, hardBase, cmtSettings, cmtInput } (null for a file the part has not); cmtPaths: false leaves the
+ * clocks, cmt, hard, hardBase, cmtSettings, cmtInput, ologic } (null for a file the part has not); cmtPaths: false leaves the
  * DCMs' and PLLs' whole measured paths out (research/s6/residual6.mjs --no-cmt-paths).
  */
 export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtPaths = true, cmtInput = true } = {}) {
@@ -38,6 +39,6 @@ export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtPaths = true, cmtInput =
     // flow's (#732) one at a time
     other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...(dev('pips-cmt')?.pips ?? {}), ...pips('s6-pips-flow') } },
     iob: dev('iob'), clocks: read('s6-clocks'), cmt: cmtPaths ? dev('cmt-paths') : null, hard: dev('hard'), hardBase: read('s6-hard-base'),
-    cmtSettings: dev('cmt-settings'), cmtInput: cmtInput ? dev('cmt-input') : null,
+    cmtSettings: dev('cmt-settings'), cmtInput: cmtInput ? dev('cmt-input') : null, ologic: read('s6-ologic'),
   };
 }
