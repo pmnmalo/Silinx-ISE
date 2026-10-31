@@ -6,7 +6,7 @@ import { createEditor } from './editor.js';
 import { icons } from './icons.js';
 import { log, showConsolePage } from './console.js';
 import { showCommandLines } from './messages.js';
-import { periodNs, deviceFamily } from '/packages/silinx-fpga/src/parts.js';
+import { periodNs, deviceFamily, resourceCount } from '/packages/silinx-fpga/src/parts.js';
 import { familyOf } from '/core/c-timing.js';
 
 export const isC = (p) => /\.(c|cpp|cc|cxx)$/i.test(p || '');
@@ -46,7 +46,7 @@ export async function openCAsm(path) {
   const old = findDoc(id);
   if (old) await closeDoc(old);
   const { cAsm } = await import('/core/c-asm.js');
-  const r = cAsm(await text(path), { file: path, lang: hdlLang(), clock: hlsClock(), family: hlsFamily(), ...(S.hls || {}) });
+  const r = cAsm(await text(path), { file: path, lang: hdlLang(), clock: hlsClock(), family: hlsFamily(), mults: hlsMults(), ...(S.hls || {}) });
   if (!r.ok) { log(`ERROR:SilinxC - "${path}" ${r.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`).join('; ')}`, 'err'); return null; }
   const { mountAsmEditor } = await import('./asm-editor.js');
   const name = `${r.model.name}.asm`;
@@ -115,7 +115,7 @@ export async function runCosimulation(path) {
   showConsolePage('console');
   showCommandLines('sim');
   const src = await text(path);
-  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src), clock: hlsClock(), family: hlsFamily(), ...(S.hls || {}) });
+  const r = cosimulate(src, { file: path, lang, files: await tbFiles(src), clock: hlsClock(), family: hlsFamily(), mults: hlsMults(), ...(S.hls || {}) });
   for (const e of r.errors) log(`ERROR:SilinxC - "${path}" ${e}`, 'err');
   if (!r.ok || r.errors.length) { log('\nProcess "C/RTL Co-simulation" failed', 'err', { diag: false }); return false; }
   log(`C simulation: ${r.calls} call(s) of '${r.gen.top}' replayed on its ${lang === 'vhdl' ? 'VHDL' : 'Verilog'}.`);
@@ -142,6 +142,13 @@ export function hlsFamily() {
   return familyOf(S.project?.device ? deviceFamily(S.project.device) : null);
 }
 
+/** The multiplier blocks a cycle may take (#2125): the project's device's, else no limit. */
+export function hlsMults() {
+  const part = S.project?.device?.part;
+  if (!part) return null;
+  try { return resourceCount(part, deviceFamily(S.project.device) === 'spartan6' ? 'dsp48a1' : 'mult18x18') || null; } catch { return null; }
+}
+
 /** View C Synthesis Report (#1531): what the C was made into (core/c-hdl.js's report): the module, its ports, its
  *  states and registers, its memories, each loop's pragmas, II and cycles. */
 export async function runCReport(path) {
@@ -151,7 +158,7 @@ export async function runCReport(path) {
   showConsolePage('console');
   showCommandLines('impl');
   const clock = hlsClock();
-  const r = cToHdl(await text(path), { file: path, lang, clock, family: hlsFamily(), ...(S.hls || {}) });
+  const r = cToHdl(await text(path), { file: path, lang, clock, family: hlsFamily(), mults: hlsMults(), ...(S.hls || {}) });
   for (const d of r.diagnostics) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:SilinxC - "${path}" line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn');
   if (!r.ok) { log('\nProcess "View C Synthesis Report" failed', 'err', { diag: false }); return false; }
   const rep = r.report;
@@ -180,7 +187,13 @@ export async function runCReport(path) {
       L.push(`  ${l.name ? `${l.name} (line ${l.line})` : `line ${String(l.line).padEnd(4)}`} ${count}; ${l.unroll === 'whole' ? 'in the state it is in' : `II=${l.ii}`}${l.cycles !== null ? `, ${l.cycles} cycles` : ''}${made ? `; ${made}` : ''}`);
     }
   }
+  if (rep.units?.length) {
+    // (the multiplications of different states bound to one unit, #2125)
+    L.push('', `Multipliers: ${rep.units.length} unit${rep.units.length > 1 ? 's' : ''}, ${rep.blocks} multiplier block${rep.blocks > 1 ? 's' : ''}`);
+    for (const [k, u] of rep.units.entries()) L.push(`  mul_${k}`.padEnd(18) + `${u.a} x ${u.b} bits, ${u.blocks} block${u.blocks > 1 ? 's' : ''}; ${u.uses} use${u.uses > 1 ? 's' : ''}, ${u.inputs} input${u.inputs > 1 ? 's' : ''} multiplexed`);
+  }
   for (const l of L) log(l);
+  if (rep.unitsNs > clock) log(`WARNING:SilinxC - "${path}": the multipliers' multiplexers make a path of about ${rep.unitsNs.toFixed(1)} ns, over the ${clock} ns clock (Silinx adds no registers on them): a slower clock makes it fit`, 'warn');
   // (a pipelined loop too slow for the clock: its II kept, no pipeline stages, #2080)
   for (const l of rep.slowLoops || []) log(`WARNING:SilinxC - "${path}" line ${l.line}: this pipelined loop's iteration does not fit the ${clock} ns clock: a path of about ${l.ns.toFixed(1)} ns in one cycle (Silinx adds no pipeline stages); a slower clock, or #pragma HLS PIPELINE off, makes it fit`, 'warn');
   log('\nProcess "View C Synthesis Report" completed successfully', 'ok');

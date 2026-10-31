@@ -28,8 +28,8 @@ export const isGeneratedSource = path => isView(path) || isCSource(path);
  * (generatedFile) is there, in the project (default: always); when it is not (#231), the HDL is made
  * here as for a source without one, and `lost` names that file.
  */
-export function viewHdl(path, text, { modules = {}, linked = null, lang = 'vhdl', clock, family, hls = null } = {}) {
-  if (isCSource(path)) return cHdl(path, text, lang, clock, family, hls);
+export function viewHdl(path, text, { modules = {}, linked = null, lang = 'vhdl', clock, family, hls = null, mults } = {}) {
+  if (isCSource(path)) return cHdl(path, text, lang, clock, family, hls, mults);
   if (!isView(path)) return null;
   let m;
   try { m = JSON.parse(text); } catch (e) { return { path, lang: 'vhdl', text: '', module: null, errors: [`${path}: ${e.message}`] }; }
@@ -41,10 +41,10 @@ export function viewHdl(path, text, { modules = {}, linked = null, lang = 'vhdl'
 }
 
 // a C source's HDL: its top function's module, in the project's language, scheduled for the clock (ns, #1924) with the
-// device family's delays (#2080); its errors as a drawing's
+// device family's delays (#2080) and its multiplier blocks (#2125); its errors as a drawing's
 // (hls: the project's RTL blackboxes, core/c-blackbox.js, #1903)
-function cHdl(path, text, lang, clock, family, hls) {
-  const r = cToHdl(String(text ?? ''), { file: path, lang: lang === 'verilog' ? 'verilog' : 'vhdl', clock, family, ...(hls || {}) });
+function cHdl(path, text, lang, clock, family, hls, mults) {
+  const r = cToHdl(String(text ?? ''), { file: path, lang: lang === 'verilog' ? 'verilog' : 'vhdl', clock, family, mults, ...(hls || {}) });
   const errors = r.diagnostics.filter((d) => d.severity === 'error').map((d) => `${path}: line ${d.line}: ${d.message}`);
   return { path, lang: lang === 'verilog' ? 'verilog' : 'vhdl', text: r.ok ? r.hdl : '', module: r.top, errors, sequential: !!r.sequential };
 }

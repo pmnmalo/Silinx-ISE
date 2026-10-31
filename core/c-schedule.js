@@ -6,11 +6,14 @@
 // chain held on its q0, no other access to it in between), and a stream too (the machine waits for its FIFO in that last
 // state, not computing again): every state of the chain reads the same values, so the machine does what it did, in more
 // cycles. Not split: a pipelined loop's state, its II kept, and reported when its path does not fit (`slow`). The split is made
-// inside core/c-fsmd.js (its `split`), before the ports the states drive.
+// inside core/c-fsmd.js (its `split`), before the ports the states drive. The multiplications of different states are then
+// bound to one unit (core/c-bind.js, #2125), and with `mults` (the device's multiplier blocks) a cycle takes no more than
+// that many: the others wait for a later cycle, every multiplication split to 18 x 18.
 // Isomorphic ES module: no DOM and no Node APIs.
 //
-//   scheduled(checked, opts, { clock, family }) -> fsmd's result, its states split; subStates: Map state id -> [ids
-//     of the states after it in its chain]
+//   scheduled(checked, opts, { clock, family, mults }) -> fsmd's result, its states split; subStates: Map state id -> [ids
+//     of the states after it in its chain]; units: core/c-bind.js's
+import { bindable, bindMuls } from './c-bind.js';
 import { fsmd } from './c-fsmd.js';
 import { hdlName } from './c-graph.js';
 import { splitMuls } from './c-mul-split.js';
@@ -18,9 +21,9 @@ import { BOOL } from './c-types.js';
 import { DEFAULT_CLOCK, UNCERTAINTY, nodeDelay } from './c-timing.js';
 
 /** A sequential function's machine (core/c-fsmd.js) with its states split by the clock (ns). */
-export function scheduled(checked, opts = {}, { clock = DEFAULT_CLOCK, family = 'artix7' } = {}) {
+export function scheduled(checked, opts = {}, { clock = DEFAULT_CLOCK, family = 'artix7', mults = null } = {}) {
   const budget = clock * (1 - UNCERTAINTY);
-  const split = (ctx) => schedule(ctx, budget, family);
+  const split = (ctx) => schedule(ctx, budget, family, mults);
   const timing = { budget, family };
   let m = fsmd(checked, { ...opts, split, timing });
   // (the state's register wide enough for the states added: the machine made again with room for them)
@@ -58,10 +61,13 @@ function rebuilt(g, st, f, stateT, self) {
   return { ...st, next, updates: new Map([...st.updates].map(([r, v]) => [r, f(v)])), access, fifo };
 }
 /** The longest path of a state, in ns. */
-function longest(g, st, family) {
+const longest = (g, st, family) => longestOf(g, [st], family);
+
+/** The longest path of all the states, in ns. */
+function longestOf(g, states, family) {
   const at = new Map();
   let worst = 0;
-  for (const n of g.needed([st.next, ...st.updates.values(), ...[...st.access.values()].flatMap((a) => ACC.map((k) => a[k]).filter((x) => x != null)), ...[...st.fifo.values()].map((a) => a.d).filter((x) => x !== undefined)])) {
+  for (const n of g.needed(states.flatMap((st) => [st.next, ...st.updates.values(), ...[...st.access.values()].flatMap((a) => ACC.map((k) => a[k]).filter((x) => x != null)), ...[...st.fifo.values()].map((a) => a.d).filter((x) => x !== undefined)]))) {
     at.set(n.id, n.args.reduce((t, a) => Math.max(t, at.get(a) ?? 0), 0) + nodeDelay(g, n, family));
     worst = Math.max(worst, at.get(n.id));
   }
@@ -71,27 +77,30 @@ function longest(g, st, family) {
 /** The states of the machine core/c-fsmd.js makes, split by the clock: { states, regs, subStates, slow: Map pipelined
  *  loop's state -> its path, when over the budget }, or { overflow: the states added } when the state's register is too
  *  narrow for them. */
-function schedule({ graph: g, states, stateT, done, piped }, budget, family) {
+function schedule({ graph: g, states, stateT, done, piped }, budget, family, mults) {
   // (a wide multiplication of a state split: 18 x 18 ones, chained as the other operations, core/c-mul-split.js)
   const sts = states.map((st) => {
     if (piped.has(st.id) || !splittable(g, st)) return st;
-    const roots = rootsOf(g, st), out = splitMuls(g, roots);
+    const roots = rootsOf(g, st), out = splitMuls(g, roots, mults != null);
     const m = new Map(roots.map((r, i) => [r, out[i]]));
     return rebuilt(g, st, (x) => m.get(x), stateT, st.id);
   });
   const slow = new Map();
   for (const st of sts) if (piped.has(st.id)) { const d = longest(g, st, family); if (d > budget) slow.set(st.id, d); }
-  const plans = sts.map((st) => (piped.has(st.id) || !splittable(g, st) ? null : stagesOf(g, st, budget, family)));
+  const plans = sts.map((st) => (piped.has(st.id) || !splittable(g, st) ? null : stagesOf(g, st, budget, family, mults)));
   const extra = plans.reduce((a, p) => a + (p ? p.n - 1 : 0), 0);
-  if (!extra) return { states: sts, regs: [], subStates: new Map(), slow };
   if ((done + extra).toString(2).length > stateT.w) return { overflow: extra };
-  return { ...split(g, sts, plans, stateT, done), slow };
+  const r = extra ? split(g, sts, plans, stateT, done) : { states: sts, regs: [], subStates: new Map() };
+  const bound = bindMuls(g, r.states, stateT, { family, budget, always: mults != null });
+  // (the longest path once bound, the units' multiplexers in it: what a state does not choose counts for the tools too)
+  const unitsNs = bound.units.some((u) => u.inputs > 1) ? longestOf(g, bound.states, family) : 0;
+  return { ...r, ...bound, unitsNs, slow };
 }
 
 /** A state's operations by the cycle they run in: { n: cycles, stage: Map node -> cycle }, or null when it fits one
  *  cycle. */
-function stagesOf(g, st, budget, family) {
-  const stage = new Map(), at = new Map();
+function stagesOf(g, st, budget, family, mults) {
+  const stage = new Map(), at = new Map(), taken = [];
   let n = 1;
   for (const node of g.needed(rootsOf(g, st))) {
     let s = 0, t = 0;
@@ -102,6 +111,11 @@ function stagesOf(g, st, budget, family) {
     const d = nodeDelay(g, node, family);
     // (a new cycle when it does not fit what is left of this one; an operation longer than the period alone in its own)
     if (d > 0 && t > 0 && t + d > budget) { s++; t = 0; }
+    // (the multiplier blocks of this cycle all taken: a later one's)
+    if (mults != null && bindable(g, node)) {
+      while ((taken[s] || 0) >= mults) { s++; t = 0; }
+      taken[s] = (taken[s] || 0) + 1;
+    }
     stage.set(node.id, s);
     at.set(node.id, t + d);
     n = Math.max(n, s + 1);
