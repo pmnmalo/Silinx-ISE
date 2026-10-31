@@ -521,6 +521,8 @@ class SeqFlow extends Flow {
         this.states = r.states;
         for (const x of r.regs) this.regs.set(x.name, x);
         this.subStates = r.subStates;
+        this.units = r.units;
+        this.unitsNs = r.unitsNs;
         this.slowLoops = this.slowPipes(r.slow);
       }
     }
@@ -598,7 +600,7 @@ class SeqFlow extends Flow {
     return {
       graph: this.g, regs: [...(this.regs?.values() || [])], states: this.states || [], entry: this.entry?.num ?? 1, idle: 0, done: this.doneNum ?? 1,
       stateT: this.stateT, ports, outputs, ctrl: this.ctrl ?? 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
-      ...(this.overflow ? { overflow: this.overflow } : {}), ...(this.subStates ? { subStates: this.subStates } : {}), slowLoops: this.slowLoops || [],
+      ...(this.overflow ? { overflow: this.overflow } : {}), ...(this.subStates ? { subStates: this.subStates, units: this.units, unitsNs: this.unitsNs } : {}), slowLoops: this.slowLoops || [],
       loops: this.loops || [], blocks: this.reached || [], loopStates: (this.loopReport || []).map((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.port ?? x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}), ...(x.fields ? { fields: x.fields } : {}) })),
       extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.port ?? x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written, ...(x.fields ? { fields: x.fields } : {}), ...(x.bram ? { bram: x.bram } : {}) })),
     };

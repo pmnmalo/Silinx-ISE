@@ -372,6 +372,17 @@ writes nothing while it waits. Where the II of 1 is not met, a warning gives the
 a state each, or a loop that cannot be made so (a branch or a `break` around an access, a `do`-while, an inner loop
 that cannot be unrolled), then made as before. The generation's report (`cToHdl(…).report`) gives a sequential module's states, register bits, memories
 and, for each loop, what its pragmas made: its II (states an iteration) and its cycles.
+Only one state runs in a cycle, so the multiplications of different states share their units (#2125), as Vitis HLS
+binds its operations: a state's multiplications take the first free units of their kind (one multiplier block, 18 x 18
+at the operands' own widths, or the same widths), the units' operands multiplexed by the state; a multiplication by a
+power of 2, or with an operand under 6 bits, keeps its own; so does one after another multiplication in its state, and
+the uses of a kind whose unit's path (the latest operands of its uses, the multiplexers, the longest path after any of
+them) has no room in the period: the latency is the schedule's, never longer. The soft-float's operations share their multiplications so.
+With the device's multiplier blocks known (the IDE gives them: a Spartan-3E's MULT18X18s, a Spartan-6's DSP48A1s;
+`cToHdl(…, { mults: N })`), a cycle takes no more than that many, every multiplication made of 18 x 18 ones: the
+others wait for a later cycle (`pow` in double on a Basys2-100's 4). The report's `units` give each unit's widths, its
+blocks, its uses and its inputs, `blocks` their sum and `unitsNs` the longest path with their multiplexers; the View
+C Synthesis Report lists them, and warns when that path is over the clock (no registers are added on them yet).
 
 ## HDL to C (the other way)
 
