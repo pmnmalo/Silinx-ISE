@@ -148,6 +148,22 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   await page.waitNoDialog();
   await page.waitFor((t) => document.querySelector(`${t} .tt-expr-in`).value === 'A./B + C', [T], { what: 'the expression written' });
   assert.equal(await cells(page, 'F'), '01011101');
+  // a correction typed while the pad's reading is still pending (Undo and Redo read the pad again, 250 ms later), then
+  // Insert at once: the correction inserted, not the pad's reading written over it (#2389)
+  await page.click(`${T} .tb-more-btn`);
+  await page.click(`${T} .tt-ink`);
+  await page.waitDialog('Handwritten Expression');
+  await write(page, 'F=AB', { seed: 3 });
+  await waitText(page, 'F = A.B');
+  assert.equal(await page.eval((d) => {
+    const q = (s) => document.querySelector(`${d} ${s}`);
+    q('.ink-undo').click(); q('.ink-redo').click();
+    q('.ink-text').value = 'F = A + B'; q('.ink-text').dispatchEvent(new Event('input'));
+    [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].find((b) => b.textContent.trim() === 'Insert').click();
+    return q('.ink-text').value;
+  }, D), 'F = A + B');
+  await page.waitNoDialog();
+  await page.waitFor((t) => document.querySelector(`${t} .tt-expr-in`).value === 'A + B', [T], { what: 'the correction inserted' });
 
   // the editor: F = A | C, its | drawn by a finger with page.touchDrag; its inputs the expression's, A and C (#2010)
   await page.click(`${T} .tb-more-btn`);

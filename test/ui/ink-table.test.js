@@ -71,10 +71,16 @@ uiTest('Handwritten Table…: a table drawn with the mouse, a finger and a pen f
   await draw(page, XOR);
   await waitText(page, 'A B | F\n0 0 | 0\n0 1 | 1\n1 0 | 1\n1 1 | 0');
   assert.equal(await message(page), '');
-  // corrected in the text: an XNOR, an output more
-  await page.fill(`${D} .ink-table-text`, 'A B | F G\n0 0 | 1 0\n0 1 | 0 1\n1 0 | 0 1\n1 1 | 1 X');
-  assert.equal(await message(page), '');
-  await page.dialogButton('Fill Table');
+  // corrected in the text: an XNOR, an output more; typed while the pad's reading is still pending (Undo and Redo read
+  // the pad again, a moment later), then Fill Table at once: the correction kept, not the reading written over it (#2389)
+  assert.deepEqual(await page.eval((d) => {
+    const q = (s) => document.querySelector(`${d} ${s}`);
+    q('.ink-undo').click(); q('.ink-redo').click();
+    q('.ink-table-text').value = 'A B | F G\n0 0 | 1 0\n0 1 | 0 1\n1 0 | 0 1\n1 1 | 1 X'; q('.ink-table-text').dispatchEvent(new Event('input'));
+    const msg = q('.ink-msg').innerText.trim();
+    [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].find((b) => b.textContent.trim() === 'Fill Table').click();
+    return [msg, q('.ink-table-text').value];
+  }, D), ['', 'A B | F G\n0 0 | 1 0\n0 1 | 0 1\n1 0 | 0 1\n1 1 | 1 X']);
   await page.waitNoDialog();
   await page.waitFor((t) => document.querySelector(`${t} .tt-inputs`).value === 'A, B' && document.querySelector(`${t} .tt-outputs`).value === 'F, G', [T], { what: 'the names' });
   assert.equal(await cells(page, 'F'), '1001');

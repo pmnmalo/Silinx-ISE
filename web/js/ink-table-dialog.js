@@ -22,6 +22,8 @@ export function handwrittenTable({ check = () => null, title = 'Handwritten Bool
   const padHost = h('div', { class: 'ink-pad ink-pad-table' });
   const pad = mountInkPad(padHost, { onStroke: () => { clearTimeout(timer); timer = setTimeout(recognize, 350); } });
   const flush = () => { if (timer) { clearTimeout(timer); recognize(); } };
+  // (a correction typed by hand: the reading still pending would write over it, #2389; the next stroke reads again)
+  const edited = () => { clearTimeout(timer); timer = null; };
   // the errors and warnings of the text (and of the reading, after a stroke); ok: the table can fill the editor's
   const verdict = (readErrors = [], readWarnings = []) => {
     const r = tableFromText(text.value);
@@ -44,7 +46,7 @@ export function handwrittenTable({ check = () => null, title = 'Handwritten Bool
       showMsg([e.message]);
     }
   }
-  text.addEventListener('input', () => verdict());
+  text.addEventListener('input', () => { edited(); verdict(); });
   // Undo, Redo, Clear; Copy Drawing and Paste Drawing (#1749)
   const padRow = padButtons(pad);
   padRow.append(...drawingButtons(pad, { kind: 'table', read: () => text.value }));
