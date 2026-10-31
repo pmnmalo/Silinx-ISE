@@ -32,14 +32,14 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
 // threshold of the loops pipelined automatically, 0 none, #1919)
 export function cToHdl(source, opts = {}) {
-  const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true } = opts;
-  const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+  const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true, directives = null } = opts;
+  const checked = checkC(source, file, { headers, top, depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...checked.diagnostics] };
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
-  const axi = axiPlan(checked.funcs.get(checked.top));
+  const axi = axiPlan(checked.funcs.get(checked.top), checked.consts);
   if (axi && !module) {
     const name = portOf(checked.top);
-    const gen = fromChecked(source, checked, { ...opts, module: `${name}_core` });
+    const gen = fromChecked(source, checked, { ...opts, module: `${name}_core`, stall: axi.masters.size > 0 });
     return gen.ok ? axiWrap(gen, axi, { name, src: file.split('/').pop(), lang, file }) : gen;
   }
   // (AXI4-Stream ports around the module, #1894: none for a DATAFLOW process's, nor for the ASM chart's, core/c-asm.js)
@@ -49,7 +49,7 @@ export function cToHdl(source, opts = {}) {
   return gen.ok ? axisTop(gen, names, lang, new Set((checked.ast.structArgs?.get(checked.top) || []).filter((a) => a.axis).map((a) => a.name))) : gen;
 }
 
-function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null } = {}) {
+function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, stall = false } = {}) {
   const diagnostics = [...checked.diagnostics];
   // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903)
   const bbs = loadBlackboxes(blackboxes, headers);
@@ -70,13 +70,13 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   // the filter's C model inlined, #1942)
   const firTop = !checked.dataflow && checked.ast.firs?.size && checked.funcs.get(checked.top).body.items.some((st) => st.kind === 'expr' && st.e.kind === 'call' && checked.ast.firs.has(st.e.callee.name));
   if (firTop) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, module });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, module, stall });
     if (!r.fallback) return r;
   }
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module, stall });
     if (!r.fallback) return r;
     if (hasStreams(checked.funcs.get(checked.top))) {
       const why = { ...r.fallback, severity: 'error', message: r.fallback.message.replace(/: made sequential \(not as processes\)$/, ': its streams are FIFOs between processes, so it cannot be made sequential') };
@@ -133,8 +133,9 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   // ap_ctrl_hs's and ap_continue, with a clock even when combinational, as Vitis HLS 2025.2 makes it (#1965)
   const hs = [{ name: 'ap_start', dir: 'in', w: 1 }, { name: 'ap_done', dir: 'out', w: 1 }, { name: 'ap_idle', dir: 'out', w: 1 }, { name: 'ap_ready', dir: 'out', w: 1 }];
   const clk = { name: 'ap_clk', dir: 'in', w: 1 }, rst = { name: 'ap_rst', dir: 'in', w: 1 };
+  const ce = stall && df.seq ? [{ name: 'ap_ce', dir: 'in', w: 1 }] : [];   // (an AXI master's wait, core/c-axi-master.js, #1893)
   const chain = [hs[0], hs[1], { name: 'ap_continue', dir: 'in', w: 1 }, hs[2], hs[3]];
-  const ctrl = df.ctrl === 'ap_ctrl_chain' ? [clk, rst, ...chain] : df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst] : [clk, rst, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? [rst, ...hs] : [];
+  const ctrl = df.ctrl === 'ap_ctrl_chain' ? [clk, rst, ...ce, ...chain] : df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst, ...ce] : [clk, rst, ...ce, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? [rst, ...hs] : [];
   const portName = (p) => (p.param ? rn(p.param) + p.name.slice(p.param.length) : p.name);
   const flatPorts = [...ctrl, ...df.ports.map((p) => ({ name: portName(p), dir: p.dir, w: p.w, role: p.role, ...(p.param ? { param: p.param } : {}) }))];
   // (each output by its port's name: an argument named as a reserved word, in, its ports in_r_…: a memory's, a stream's too, #1590)

@@ -142,9 +142,9 @@ test('#1529 the pragmas accepted and ignored, unknown, misplaced or wrong: their
   assert.deepEqual(msgs('int f(int a) {\n#pragma HLS PIPELINE II=1\n  if (a) {\n#pragma HLS UNROLL\n    a++;\n  }\n  return a;\n}'), [
     '4 warning: #pragma HLS UNROLL applies to the loop it is in (first in its body): ignored here',
   ]);
-  assert.deepEqual(msgs('int g(int x) {\n#pragma HLS INLINE off\n  return x + 1;\n}\nint f(int a, int *p) {\n#pragma HLS INTERFACE m_axi port=p\n  return g(a) + *p;\n}'), [
+  // (m_axi made, #1893: no warning)
+  assert.deepEqual(msgs('int g(int x) {\n#pragma HLS INLINE off\n  return x + 1;\n}\nint f(int a, int *p) {\n#pragma HLS INTERFACE m_axi port=p depth=1\n  int v = *p;\n  return g(a) + v;\n}'), [
     '2 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function',
-    '6 warning: #pragma HLS INTERFACE m_axi port=p is not made yet: ignored (its default interface made)',
   ]);
   assert.deepEqual(msgs('int f(int a) {\n  int s = 0;\n  for (int i = 0; i < 4; i++) {\n#pragma HLS UNROLL factor=0\n#pragma HLS PIPELINE II=x\n    s += a;\n  }\n#pragma HLS ARRAY_PARTITION type=complete\n  return s;\n}'), [
     '4 error: #pragma HLS UNROLL factor=0: the factor must be a whole number, 1 or more',

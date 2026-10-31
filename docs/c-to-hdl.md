@@ -440,6 +440,7 @@ uses its C model in the C simulation and its module in the synthesis, one instan
 | `INTERFACE ap_ctrl_none / ap_ctrl_hs / ap_ctrl_chain port=return` | the block protocol |
 | `INTERFACE ap_none / ap_vld / ap_ovld / ap_memory / bram port=` | the argument's interface |
 | `INTERFACE s_axilite port= [bundle=] [offset=]` (#1893) | an AXI4-Lite slave `s_axi_<bundle>_*` (`control` by default): a scalar or a pointer to one a register, `port=return` the block protocol's (`interrupt`, the control register at 0x00; the interrupts' at 0x04, 0x08, 0x0c; the arguments from 0x10); the module's reset `ap_rst_n` |
+| `INTERFACE m_axi port= [bundle=] [depth=] [offset=] [max_widen_bitwidth=]` (#1893) | an AXI4 master `m_axi_<bundle>_*` (`gmem` by default): an array, or a pointer indexed or read and written as `*p`, a memory read and written over the bus, a word on its byte lanes, one access at a time (the module waits, `ap_ce`); its address a register of 64 bits of the slave (`offset=slave`, the default: `control` if no `s_axilite` names it), a port (`offset=direct`) or 0 (`offset=off`); the bus 32 bits at least, or a word's, or `max_widen_bitwidth=`. A config's `syn.directive.interface=<top> mode=m_axi …` is the same pragma |
 | `AGGREGATE variable= compact=` / `DISAGGREGATE variable=` (the top's, #1668) | a struct argument, a stream or an array of structs one port, stream or memory of its words, packed `compact=bit` (an array's or a stream's default), `byte`, `none` (a scalar struct's default) / a port, a stream or a memory per member |
 | `INLINE` / `INLINE off` | every function is inlined (`off` is ignored, with a warning) |
 | `LOOP_TRIPCOUNT min= max=` | the report's bound of a loop whose count depends on the inputs (its latency, else unknown) |
@@ -449,7 +450,7 @@ uses its C model in the C simulation and its module in the synthesis, one instan
 | `ARRAY_PARTITION variable= type=block\|cyclic factor=N [dim=D]` (#1920) | several memories, as Vitis HLS's: `cyclic` element k in memory k % N, `block` consecutive blocks of ceil(L / N); an argument's each with its own port (`d_0_address0`, `d_1_address0`, …), a local's `A_0`, `A_1`, … A local array of 64 elements or fewer stays registers. Accesses of different memories share a state only when the memory is known at synthesis (`A[i * N + 3]` cyclic factor=N) |
 | `DATAFLOW` (the top function's, #1707) | its calls processes running at once (below); a region of other statements: a warning, made sequential |
 | `STREAM variable= depth=` | a DATAFLOW region's stream: its FIFO's depth (else `hls::stream<T, D>`'s D, else 2) |
-| `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `BIND_STORAGE`, `DEPENDENCE`, `LOOP_FLATTEN`, … and AXI interfaces (`s_axilite`, `m_axi`; `axis` on what is not a stream or an array) | accepted and ignored, with a warning; an unknown pragma: a warning |
+| `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `BIND_STORAGE`, `DEPENDENCE`, `LOOP_FLATTEN`, … and AXI4-Stream (`axis`) on what is not a stream or an array | accepted and ignored, with a warning; an unknown pragma: a warning |
 
 A loop's pragma is its body's first statements; one elsewhere is ignored with a warning.
 
