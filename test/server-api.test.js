@@ -805,6 +805,26 @@ test('zip: Silinx export keeps silinx.json and every file; import restores board
   assert.equal((await call('GET', '/projects/Nope/export.zip')).status, 404);
 });
 
+test('zip: Xilinx export of a C source: its HDL in the zip and the .xise, not the C; re-imported as that HDL (#2320)', async () => {
+  await call('POST', '/projects', { name: 'Zc', board: 'basys2' });
+  await call('PUT', '/projects/Zc/file?path=src/twice.c', 'int twice(int a) {\n  return a + a;\n}\n');
+  await call('PUT', '/projects/Zc/file?path=constraints/top.ucf', '# none\n');
+  await P.updateProject('Zc', pj => { pj.top = 'twice'; pj.preferredLanguage = 'vhdl'; });
+  const r = await call('GET', '/projects/Zc/export.zip');
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-silinx-warnings'), null);
+  const files = await unzip(r.body);
+  assert.ok(!('src/twice.c' in files));
+  assert.match(files['src/twice.c.vhd'], /entity twice is/i);
+  assert.match(files['Zc.xise'], /xil_pn:name="src\/twice\.c\.vhd" xil_pn:type="FILE_VHDL"/);
+  assert.match(files['Zc.xise'], /xil_pn:name="Implementation Top" xil_pn:value="Architecture\|twice\|/);
+  const back = await call('POST', '/projects/import-zip?name=Zc2', new Uint8Array(r.body));
+  assert.equal(back.status, 200, JSON.stringify(back.body));
+  assert.deepEqual(back.body.warnings, []);
+  assert.deepEqual(back.body.missing, []);
+  assert.deepEqual(back.body.project.files, [{ path: 'src/twice.c.vhd', lang: 'vhdl', role: 'design' }]);
+});
+
 test('zip import: nested root folder, ISE outputs and traversal entries skipped, silinx.json merged into an ISE import', async () => {
   const pjSaved = { name: 'Orig', board: 'basys2', stimuli: { clk: 'clock' }, preferredLanguage: 'vhdl', impl: { optLevel: 2 }, top: 'ignored' };
   const z = await zip([

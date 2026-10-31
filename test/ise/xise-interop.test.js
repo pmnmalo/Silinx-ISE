@@ -22,8 +22,6 @@ const HOST = LOCAL ? null : /^(?:([\w.-]+)@)?([\w.:-]+)$/.exec(process.env.SILIN
 const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST && !LOCAL ? 'set SILINX_ISE_HOST=user@host (the machine with the ISE Docker image), or local (the image here)' : false;
 // a device of each family the .xise names: its properties differ, the sources do not
 const TARGETS = [{ board: 'basys2', variant: '250' }, { board: 'nexys3' }];
-// known failures of the export, with their issue
-const KNOWN = { isqrt: '#2320: the HDL of a C function is not exported' };
 // the warnings of ISE's project flow: none, but on the Nexys3 those of XST and map, the same with no .xise (#2321)
 const constant = (block, cause, ...ffs) => ffs.map(ff => `WARNING:Xst:${cause ? `1896 - Due to other FF/Latch trimming, FF/Latch` : '1293 - FF/Latch'} <${ff}> has a constant value of 0 in block <${block}>. This FF/Latch will be trimmed during the optimization process.`);
 const counts = (...names) => names.flatMap(n => [20, 21, 22, 23].map(b => `${n}/count_${b}`));
@@ -107,7 +105,7 @@ const fileList = p => (p.files || []).map(f => `${f.path} ${f.lang} ${f.role}`).
 
 for (const example of EXAMPLES) {
   for (const t of TARGETS) {
-    test(`example ${example} for the ${targetName(t)}: its exported project built in ISE's project flow, what ISE leaves imported back`, { skip, timeout: 30 * 60000, todo: KNOWN[example] }, async () => {
+    test(`example ${example} for the ${targetName(t)}: its exported project built in ISE's project flow, what ISE leaves imported back`, { skip, timeout: 30 * 60000 }, async () => {
       const name = `${example}-${targetName(t)}`;
       const { project } = exampleProject(example, t, process.env.SILINX_WORKSPACE);
       fs.writeFileSync(path.join(process.env.SILINX_WORKSPACE, name, 'silinx.json'), JSON.stringify({ ...project, name }, null, 2));
@@ -135,7 +133,9 @@ for (const example of EXAMPLES) {
       assert.equal(back.simTop, project.simTop);
       assert.equal(back.constraints, project.constraints);
       assert.deepEqual([back.device.part, back.device.package, back.device.speed], [project.device.part, project.device.package, project.device.speed].map(String));
-      assert.deepEqual(fileList(back), fileList(project));
+      // (a C function's module comes back as the HDL file it was exported as: #2320)
+      const generated = example === 'isqrt' ? [{ path: 'src/isqrt.c.vhd', lang: 'vhdl', role: 'design' }] : [];
+      assert.deepEqual(fileList(back), fileList({ files: [...project.files, ...generated] }));
     });
   }
 }
