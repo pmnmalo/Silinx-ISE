@@ -29,16 +29,16 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // (headers, top: a source of several files, its top function named, #1597)
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
 // name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
-// threshold of the loops pipelined automatically, 0 none, #1919)
-export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null } = {}) {
-  const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+// threshold of the loops pipelined automatically, 0 none, #1919; directives: a config's syn.directive.interface lines, #1901)
+export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, directives = null } = {}) {
+  const checked = checkC(source, file, { headers, top, depths, synthesis: true, ...(directives ? { directives } : {}) });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   const diagnostics = [...checked.diagnostics];
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
   const axi = axiPlan(checked.funcs.get(checked.top));
   if (axi && !module) {
     const name = portOf(checked.top);
-    const gen = cToHdl(source, { file, lang, headers, top, depths, module: `${name}_core`, flat, pipelineLoops, clock, family, blackboxes });
+    const gen = cToHdl(source, { file, lang, headers, top, depths, module: `${name}_core`, flat, pipelineLoops, clock, family, blackboxes, directives });
     return gen.ok ? axiWrap(gen, axi, { name, src: file.split('/').pop(), lang, file }) : gen;
   }
   // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903)
