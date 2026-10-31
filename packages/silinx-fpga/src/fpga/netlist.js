@@ -7,7 +7,8 @@
 //
 //   const nl = readYosysJson(json, { top })
 //   nl = { name,
-//          ports: [{ name, dir: 'in' | 'out' | 'inout', bits: [{ net, name }] }]   bit names as in UCF: led<3>
+//          ports: [{ name, dir: 'in' | 'out' | 'inout', bits: [{ net, name }], oneBitBus: true (a [0:0] / (0 downto 0) port, #2229) }]
+//                   bit names as in UCF: led<3>
 //          cells: [{ name, type, params: { INIT: '0110…' (msb first) … }, attrs, pins: { I0: net … }, dirs: { I0: 'input' … },
 //                   undriven: [pins Yosys left undriven (x / z), tied to 0] (when there are any) }]
 //          nets:  [{ id, name, const: 0 | 1 | undefined, driver: { cell, pin } | null, port: 'name<3>' | null,
@@ -82,7 +83,9 @@ export function readYosysJson(json, { top } = {}) {
       const idx = p.upto ? off + (w - 1 - i) : off + i;
       return { net: netOf(b), name: bus ? bitName(pname, idx) : bitName(pname) };
     });
-    ports.push({ name: pname, dir, bits });
+    // a one-bit bus with no offset ([0:0], std_logic_vector(0 downto 0)) is x, as a scalar, but its UCF name x<0>: Yosys marks it
+    const oneBit = !bus && mod.netnames?.[yname]?.attributes?.single_bit_vector !== undefined;
+    ports.push({ name: pname, dir, bits, ...(oneBit ? { oneBitBus: true } : {}) });
     for (const b of bits) if (nets[b.net].const === undefined) nets[b.net].port = b.name;
   }
 

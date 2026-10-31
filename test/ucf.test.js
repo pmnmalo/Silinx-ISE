@@ -465,10 +465,13 @@ test('portAssignments: x<0> on a one-bit bus port x, its LOC and other attribute
   const { portAssignments } = await import('../packages/silinx-fpga/src/ucf.js');
   const ports = [{ name: 'btn', dir: 'in', width: 1, msb: 0, lsb: 0 }, { name: 'sw', dir: 'in', width: 1, msb: 0, lsb: 0 }, { name: 'led', dir: 'out', width: 2, msb: 1, lsb: 0 }];
   const text = 'NET "btn<0>" LOC = "G12" | IOSTANDARD = LVCMOS33;\nNET "sw(0)" LOC = "P11";\nNET "led[1]" LOC = "M11";\nNET "q<0>" LOC = "M5";\nNET "btn<1>" LOC = "C11";\nNET "led<0>" LOC = "P6";';
-  const r = portAssignments(parseUcf(text, { ports: [{ name: 'btn' }, { name: 'sw' }, { name: 'led', msb: 1, lsb: 0 }] }), ['btn', 'sw', 'led<0>', 'led<1>']);
+  const r = portAssignments(parseUcf(text, { ports: [{ name: 'btn' }, { name: 'sw' }, { name: 'led', msb: 1, lsb: 0 }] }), ['btn', 'sw', 'led<0>', 'led<1>'], { oneBitBuses: ['btn', 'sw'] });
   assert.deepEqual(r, { assignments: { btn: { loc: 'G12', iostandard: 'LVCMOS33' }, sw: { loc: 'P11' }, 'led<1>': { loc: 'M11' }, 'q<0>': { loc: 'M5' }, 'btn<1>': { loc: 'C11' }, 'led<0>': { loc: 'P6' } }, unmatched: [] });
   // a port bit named as written wins (a bus x of one bit x<0>, as Silinx's netlists of the wider buses name them)
-  assert.deepEqual(portAssignments(parseUcf('NET "x<0>" LOC = "G12";'), ['x', 'x<0>']).assignments, { 'x<0>': { loc: 'G12' } });
+  assert.deepEqual(portAssignments(parseUcf('NET "x<0>" LOC = "G12";'), ['x', 'x<0>'], { oneBitBuses: ['x'] }).assignments, { 'x<0>': { loc: 'G12' } });
+  // a scalar port x (std_logic): x<0> is not its name, kept as written (#2229, as ngdbuild: #84)
+  assert.deepEqual(portAssignments(parseUcf('NET "x<0>" LOC = "G12";\nNET "y(0)" LOC = "P11";'), ['x', 'y'], { oneBitBuses: [] }).assignments, { 'x<0>': { loc: 'G12' }, 'y<0>': { loc: 'P11' } });
+  assert.deepEqual(portAssignments(parseUcf('NET "x<0>" LOC = "G12";'), ['x']).assignments, { 'x<0>': { loc: 'G12' } });
   // Check Constraints: btn<0> on the one-bit bus is right, the bit it does not have and a name no port has are errors
   assert.deepEqual(checkUcf(text, { top: 'top', ports, package: 'cp132' }).map(d => [d.line, d.severity, d.message]), [
     [2, 'warning', 'use sw<0> for a bus bit in UCF (the default bus delimiter is <>)'],

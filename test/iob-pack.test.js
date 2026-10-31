@@ -13,8 +13,8 @@ import { compareSims, packedSim, netlistSim } from '../packages/silinx-fpga/test
 
 // a Yosys netlist: clk -> IBUFG -> BUFG (bit 4); inputs (an IBUF each, its output named by the input), outputs
 // (an OBUF each from the named bit), tristate outputs ({ name: [I bit, T bit] }: an OBUFT each), and cells
-// { name: [type, { pin: bit }, params, attrs] } (outputs O and Q)
-function design(cells, { ins = [], outs = [], tris = {} } = {}) {
+// { name: [type, { pin: bit }, params, attrs] } (outputs O and Q); oneBit: the ports declared [0:0] (Yosys's single_bit_vector)
+function design(cells, { ins = [], outs = [], tris = {}, oneBit = [] } = {}) {
   const ports = { clk: { direction: 'input', bits: [2] } };
   const io = (I, O) => ({ port_directions: { I: 'input', O: 'output' }, connections: { I: [I], O: [O] } });
   const cs = { clkbuf: { type: 'IBUFG', ...io(2, 3) }, clkg: { type: 'BUFG', ...io(3, 4) } };
@@ -33,7 +33,8 @@ function design(cells, { ins = [], outs = [], tris = {} } = {}) {
   const num = new Map();
   const id = b => (typeof b === 'number' || b === '0' || b === '1' ? b : (num.has(b) || num.set(b, 2000 + num.size), num.get(b)));
   for (const c of Object.values(cs)) for (const p of Object.keys(c.connections)) c.connections[p] = c.connections[p].map(id);
-  return readYosysJson({ modules: { t: { attributes: { top: 1 }, ports, cells: cs, netnames: {} } } });
+  const netnames = Object.fromEntries(oneBit.map(n => [n, { bits: ports[n].bits, attributes: { single_bit_vector: '00000000000000000000000000000001' } }]));
+  return readYosysJson({ modules: { t: { attributes: { top: 1 }, ports, cells: cs, netnames } } });
 }
 const fdre = (d, q, ce = '1', r = '0') => ['FDRE', { C: 4, CE: ce, R: r, D: d, Q: q }];
 const fdce = (d, q, ce, clr) => ['FDCE', { C: 4, CE: ce, CLR: clr, D: d, Q: q }];
@@ -194,10 +195,13 @@ test('IOB registers in the post-map simulation model: X_FF / X_SFF fed by the pa
 });
 
 // #2199: a one-bit bus port (btn : in std_logic_vector(0 downto 0)) is btn in the netlist; its UCF line, written btn<0> as
-// XST names it (or btn(0)), gives its pad and I/O standard (they were dropped: the placer chose the pad)
-test('a one-bit bus port: its LOC and IOSTANDARD written x<0> or x(0) on its pad (#2199)', () => {
-  const nl = design({ x: lut2('a', 'b', 'y') }, { ins: ['a', 'b'], outs: ['y'] });
-  const p = pack(nl, { ucf: 'NET "a<0>" LOC = "G12" | IOSTANDARD = LVCMOS33;\nNET "b(0)" LOC = "P11";\nNET "y_o<0>" LOC = "M5";\nNET "c<0>" LOC = "B8";', part: 'xc3s250e-cp132-4' });
-  assert.deepEqual(['a', 'b', 'y_o'].map(n => [n, iob(p, n).loc, cfgOf(iob(p, n)).IOATTRBOX.value]), [['a', 'G12', 'LVCMOS33'], ['b', 'P11', 'LVCMOS25'], ['y_o', 'M5', 'LVCMOS25']]);
+// XST names it (or btn(0)), gives its pad and I/O standard (they were dropped: the placer chose the pad); a scalar port's
+// s<0> is not it (ngdbuild does not find it, #84), and stays unmatched (#2229)
+test('a one-bit bus port: its LOC and IOSTANDARD written x<0> or x(0) on its pad, not a scalar\'s (#2199, #2229)', () => {
+  const nl = design({ x: lut2('a', 'b', 'y'), w: lut2('s', 'a', 'z') }, { ins: ['a', 'b', 's'], outs: ['y', 'z'], oneBit: ['a', 'b', 'y_o'] });
+  assert.deepEqual(nl.ports.filter(p => p.oneBitBus).map(p => p.name), ['a', 'b', 'y_o']);
+  const p = pack(nl, { ucf: 'NET "a<0>" LOC = "G12" | IOSTANDARD = LVCMOS33;\nNET "b(0)" LOC = "P11";\nNET "y_o<0>" LOC = "M5";\nNET "c<0>" LOC = "B8";\nNET "s<0>" LOC = "C11";\nNET "z_o[0]" LOC = "M11";', part: 'xc3s250e-cp132-4' });
+  assert.deepEqual(['a', 'b', 'y_o', 's', 'z_o'].map(n => [n, iob(p, n).loc, cfgOf(iob(p, n)).IOATTRBOX.value]),
+    [['a', 'G12', 'LVCMOS33'], ['b', 'P11', 'LVCMOS25'], ['y_o', 'M5', 'LVCMOS25'], ['s', null, 'LVCMOS25'], ['z_o', null, 'LVCMOS25']]);
   assert.deepEqual(p.warnings, []);
 });
