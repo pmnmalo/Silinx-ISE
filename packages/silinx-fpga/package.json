@@ -29,7 +29,7 @@
   "license": "Apache-2.0",
   "author": "Pedro Maló",
   "dependencies": {
-    "@silinx/nextpnr-himbaechel-spartan3e": "https://github.com/pmnmalo/nextpnr-spartan/releases/download/v0.11.0/silinx-nextpnr-himbaechel-spartan3e-0.11.0.tgz",
+    "@silinx/nextpnr-himbaechel-spartan3e": "0.11.2",
     "@silinx/nextpnr-himbaechel-spartan6": "https://github.com/pmnmalo/nextpnr-spartan/releases/download/spartan6-v0.1.0/silinx-nextpnr-himbaechel-spartan6-0.1.0.tgz",
     "@yowasp/yosys": "0.70.1258"
   }
