@@ -7,7 +7,8 @@
 //   header are its process's.
 // - Filters by source follow the task in front in the Tasks interface (Implement: Implementation)
 //   until the viewer picks one; All shows every line (the modern and classic interfaces' default: no task). A
-//   process started whose source the viewer's filter hides turns that filter to its source (#1852, #1867).
+//   process started whose source the viewer's filter hides turns that filter to its source (#1852, #1867); a C
+//   module's commands, run where it is edited, turn the task's filter too (#2262).
 // - Folded (tasks.js), the panel shows its last line of the current filter.
 // - SSim's console and the emulator's Messages box are hidden; their lines come here (Simulation, Emulation).
 // - One command line: SSim's commands while simulating (SSim> run 1 us; Simulate in front, or an SSim window in the
@@ -53,6 +54,13 @@ export function filterForProcess(src, filter, task) {
   if (!SOURCES.includes(filter)) return filter;
   const set = filterSources(filter, task);
   return set.includes(src) ? filter : src;
+}
+
+/** The filter once the viewer runs a command of `src` (#2262): its source when the filter hides it, the task's too (the
+ *  C commands run in the Edit task, whose filter shows Design's lines only), else the filter as it is. */
+export function filterForCommand(src, filter, task) {
+  const set = filterSources(filter, task);
+  return !set || set.includes(src) ? filter : src;
 }
 
 // ------------------------------------------------------------------ the page
@@ -181,6 +189,13 @@ export function messagesTask(t) {
   if (!built) return;
   refilter();
   prompt();
+}
+
+/** A command the viewer ran, of source `src` (#2262): its lines shown, whatever the filter (filterForCommand). */
+export function showCommandLines(src) {
+  if (!built) return;
+  const f = filterForCommand(src, picked, task);
+  if (f !== picked) { picked = f; refilter(); }
 }
 
 /** Builds the message centre and follows the Console's new lines, the documents opened (SSim, the emulator) and the

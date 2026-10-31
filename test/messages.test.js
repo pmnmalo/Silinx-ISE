@@ -101,3 +101,14 @@ test('#1852 filterForProcess: a process started whose source the viewer\'s filte
   assert.equal(M.filterForProcess('sim', null, null), null);       // (no task, nothing picked: every source)
   assert.equal(M.filterForProcess('check', 'check', 'sim'), 'check');
 });
+
+test('#2262 filterForCommand: a command the viewer runs turns the filter that hides its source, the task\'s too; one shown, or every source, left', () => {
+  assert.equal(M.filterForCommand('sim', null, 'edit'), 'sim');    // (the Edit task's filter: a C Simulation shown)
+  assert.equal(M.filterForCommand('impl', null, 'edit'), 'impl');  // (View C Synthesis Report)
+  assert.equal(M.filterForCommand('sim', 'check', 'edit'), 'sim');
+  assert.equal(M.filterForCommand('sim', 'impl', null), 'sim');
+  assert.equal(M.filterForCommand('sim', null, 'sim'), null);      // (the task's filter shows it: it stays the task's)
+  assert.equal(M.filterForCommand('sim', 'sim', 'edit'), 'sim');
+  assert.equal(M.filterForCommand('sim', 'all', 'edit'), 'all');
+  assert.equal(M.filterForCommand('sim', null, null), null);       // (no task, nothing picked: every source)
+});

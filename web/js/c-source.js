@@ -5,6 +5,7 @@ import { S, findDoc, closeDoc, openDoc, openFile } from './app.js';
 import { createEditor } from './editor.js';
 import { icons } from './icons.js';
 import { log, showConsolePage } from './console.js';
+import { showCommandLines } from './messages.js';
 import { periodNs, deviceFamily } from '/packages/silinx-fpga/src/parts.js';
 import { familyOf } from '/core/c-timing.js';
 
@@ -88,6 +89,7 @@ export async function runCSimulation(path) {
   const { simulateC } = await import('/core/c-interp.js');
   log(`\nStarted : "C Simulation" of ${path}.\n`, 'hdr');
   showConsolePage('console');
+  showCommandLines('sim');   // (in the Edit task too, #2262)
   const src = await text(path);
   const r = simulateC(src, { file: path, files: await tbFiles(src) });
   if (r.output) for (const l of r.output.replace(/\n$/, '').split('\n')) log(l);
@@ -111,6 +113,7 @@ export async function runCosimulation(path) {
   const lang = hdlLang();
   log(`\nStarted : "C/RTL Co-simulation" of ${path} (${lang === 'vhdl' ? 'VHDL' : 'Verilog'}).\n`, 'hdr');
   showConsolePage('console');
+  showCommandLines('sim');
   const src = await text(path);
   const r = cosimulate(src, { file: path, lang, files: await tbFiles(src), clock: hlsClock(), family: hlsFamily() });
   for (const e of r.errors) log(`ERROR:SilinxC - "${path}" ${e}`, 'err');
@@ -146,6 +149,7 @@ export async function runCReport(path) {
   const lang = hdlLang();
   log(`\nStarted : "View C Synthesis Report" of ${path}.\n`, 'hdr');
   showConsolePage('console');
+  showCommandLines('impl');
   const clock = hlsClock();
   const r = cToHdl(await text(path), { file: path, lang, clock, family: hlsFamily() });
   for (const d of r.diagnostics) log(`${d.severity === 'error' ? 'ERROR' : 'WARNING'}:SilinxC - "${path}" line ${d.line}: ${d.message}`, d.severity === 'error' ? 'err' : 'warn');
