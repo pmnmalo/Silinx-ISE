@@ -382,6 +382,9 @@ npm install
 npm start          # http://127.0.0.1:8642  (node bin/silinx-ise.js serve --open also opens the browser)
 ```
 
+How Silinx is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the application as a whole, and
+[docs/TOOLCHAIN.md](docs/TOOLCHAIN.md), the toolchain from the design to the `.bit`.
+
 To contribute, read [CONTRIBUTING.md](CONTRIBUTING.md): the project's development principles (issues,
 tests, integration) are in [CLAUDE.md](CLAUDE.md), for people and AI agents alike.
 Security: report a vulnerability privately, as [SECURITY.md](SECURITY.md) says (it also lists what is
