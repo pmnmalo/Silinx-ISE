@@ -12,7 +12,7 @@ import { routeS6, routedXdlS6, RouteError } from '../packages/silinx-fpga/src/fp
 import { routingResources } from '../packages/silinx-fpga/src/fpga/s6/route-nets.js';
 import { checkRoutingS6 } from '../packages/silinx-fpga/src/fpga/s6/route-check.js';
 import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
-import { EXAMPLES } from './examples-lib.mjs';
+import { EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 
 const LX16 = 'xc6slx16csg324-3';
@@ -135,7 +135,7 @@ test('every example routed on the XC6SLX16 and the XC6SLX45: complete, no node o
 test('the switches per connection against ISE\'s routing of the same netlists (night 1)', { timeout: 900000 }, async () => {
   const cmp = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/route-compare.json', import.meta.url), 'utf8'));
   for (const { board, part } of S6_BOARDS) {
-    for (const name of EXAMPLES) {
+    for (const name of ISE_RECORDED) {
       const { out } = routed(await s6Example(name, board), part);
       const type = new Map(out.insts.map(i => [i.name, i.type]));
       let pips = 0, conns = 0;
@@ -155,7 +155,7 @@ test('the switches per connection against ISE\'s routing of the same netlists (n
 // stopwatch's 9K block RAM note (PhysDesignRules:2410, ISE's own implementation of stopwatch has it too)
 test('ISE\'s DRC of every example\'s routing on both boards: no error, the warnings', () => {
   const rec = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/ise-check.json', import.meta.url), 'utf8'));
-  assert.deepEqual(Object.keys(rec.designs), S6_BOARDS.flatMap(({ board }) => EXAMPLES.map(n => `${n}-${board}`)).sort());
+  assert.deepEqual(Object.keys(rec.designs), S6_BOARDS.flatMap(({ board }) => ISE_RECORDED.map(n => `${n}-${board}`)).sort());
   for (const [d, { routed }] of Object.entries(rec.designs)) {
     const sw = d.startsWith('stopwatch-');
     assert.equal(routed.xdl2ncd, 'ok', d);

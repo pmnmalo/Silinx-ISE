@@ -55,10 +55,12 @@ begin
             root := 0;
             while (root + 1) * (root + 1) <= n loop root := root + 1; end loop;
             remainder := n - root * root;
-            -- the four digits, left to right
+            -- the four digits, left to right: each read a clock cycle after its anode is on (the segments settled, on
+            -- the post-place & route model with its delays too)
             shown := 0;
             for k in 3 downto 0 loop
-                wait until falling_edge(clk) and an(k) = '0';
+                wait until rising_edge(clk) and an = not STD_LOGIC_VECTOR(to_unsigned(2 ** k, 4));
+                wait for 1 ns;
                 shown := shown * 10 + digit_of(seg);
                 if (dp = '0') /= (k = 2) then
                     report "ERROR: decimal point on digit " & integer'image(k) & " at n = " & integer'image(n) severity error;

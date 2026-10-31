@@ -12,6 +12,9 @@ import { isCSource, viewHdl } from '../core/view-hdl.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const EXAMPLES = EXAMPLE_ORDER;   // gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt
+// the examples of the ISE records made before isqrt (#1966): the Spartan-6's night 1 (packages/silinx-fpga/research/s6/
+// measured), XPower's fit (test/fixtures/power); isqrt is checked against ISE in test/ise/examples.test.js
+export const ISE_RECORDED = EXAMPLES.filter(n => n !== 'isqrt');
 // the boards (and variants) of the devices of the Silinx toolchain: the examples run on all of them; the Spartan-3E's
 // also through ISE (test/ise/examples.test.js, the power estimates), the Spartan-6's (#732, no variants; the Atlys's
 // seven-segment display and VGA on its VHDCI connector) checked against ISE in packages/silinx-fpga/research/s6 so far
