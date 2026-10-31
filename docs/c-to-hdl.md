@@ -124,7 +124,7 @@ so its hardware is the C's:
 - Macros are expanded in pragmas (`#define F 4` … `#pragma HLS UNROLL factor=F`), as Vitis HLS does.
 
 Not synthesizable, as in Vitis HLS: `new` / `delete`, exceptions, RTTI, virtual functions, recursion, the STL
-(but the headers above). Not yet: operators other than `()`, base classes, `ap_fixed`, floating point.
+(but the headers above). Not yet: operators other than `()`, `ap_fixed`, floating point.
 
 ## Structs and enums (C and C++)
 
@@ -165,8 +165,22 @@ structs is an array per member; a member array of an array of structs is one arr
   `u.bexp`) or named (`u.s.m`); an array member's elements (`u.b[i]`). A union variable, parameter, pointer
   (`p->m`), array (`a[i].m`) or port is its word; `{ e }` is its first member's value. Not yet: a union of more than
   64 bits, a union inside a struct, `++` and `--` on a member, designated initializers.
-- Not possible: pointers in a struct or a union, a pointer to a struct as a variable. Not yet: base classes; a static
-  object or an array of objects whose constructor is not of constants.
+- **Base classes** (#1964, non-virtual, C++): `struct D : public A, B { … }`. A base is a member of its own, first
+  (`d_A_x`), so a derived class has its members and methods, hides those of the same name (`A::f()`, `A::x`, `d.A::f()`
+  reach them; a name in two bases is ambiguous, said), is passed to a parameter of its base and copied to one
+  (`A a = d;`). A constructor calls the bases', then initializes the members, in their order whatever its list's
+  (`D(int v) : A(v), y(1) {}`); a base's or a member's default constructor is called when the list does not name it.
+  A class template may derive from one (`template <class T> struct D : B<T>`). A virtual function or a virtual base is
+  refused, as Vitis HLS. Not yet: a base with static members only, `using A::A;`.
+- **Objects with a constructor** (#1964): `S a(1), b{2}, c = S(3);`, arrays of them (`S v[4];`, `S v[2] = { S(1), 2 };`,
+  a method of an element: `v[i].f()`, in a sequential module). A **static or global object** has its constructor run
+  at synthesis: its arguments constants, its body (loops too) reading only constants and calling only functions of
+  the source or math.h's, else said; what it computes is the object's initial values, in the C simulation too, so its
+  state is a register (a member array: a memory) set at the reset, with no logic for the construction.
+  A local object's constructor is code that runs where it is declared.
+- Not possible: pointers in a struct or a union, a pointer to a struct as a variable. Not yet: a method of an element
+  of an array of objects with a member array, an array of objects as a member when its constructor is not of constants,
+  an array of more dimensions initialized with `{ … }`, a float in a static object (as any static float).
 
 ## What can be synthesized (UG1399's rules)
 

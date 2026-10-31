@@ -443,12 +443,15 @@ export function cppTemplates(input, report) {
       const toks = subst(decl.toks, spec ? new Map() : env);
       const open = toks.findIndex((x) => op(x, '{'));
       const inner = toks.slice(open + 1, closing(toks, open));
-      if (!onlyStatic(inner)) {
+      // (`: B<T>`: its bases, kept, #1964)
+      const colon = toks.findIndex((x, i) => i < open && op(x, ':'));
+      const bases = colon < 0 ? [] : toks.slice(colon, open);
+      if (!onlyStatic(inner) || bases.length) {
         // (a class of data members and methods: a struct named by the instance, core/c-struct.js's; its own name, in
         // its constructors, the instance's)
         const own = inner.map((x, i) => (isId(x, tpl.name) && !op(inner[i + 1], '<') ? { ...x, v: name } : x));
         const t0 = toks[open];
-        tpl.at.place.push(...expand([{ ...t0, t: 'id', v: 'struct' }, { ...t0, t: 'id', v: name }, { ...t0 }, ...own, { ...t0, v: '}' }, { ...t0, v: ';' }], spec ? new Map() : env, tpl.scope));
+        tpl.at.place.push(...expand([{ ...t0, t: 'id', v: 'struct' }, { ...t0, t: 'id', v: name }, ...bases, { ...t0 }, ...own, { ...t0, v: '}' }, { ...t0, v: ';' }], spec ? new Map() : env, tpl.scope));
         return;
       }
       classBody(name, inner, spec ? new Map() : env, at, tpl.at.place, tpl.name);

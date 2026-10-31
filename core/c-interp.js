@@ -60,6 +60,27 @@ export function runAtSynthesis(checked, fn, decls, maxSteps = 5_000_000) {
   }
 }
 
+/** Calls run at synthesis on the variables they name (#1964, core/c-const-init.js), each job { call, vars: [their
+ *  declarations] } in order: Map(declaration -> its cell, kept from job to job), job.error if it could not run. */
+export function runAtReset(checked, jobs, maxSteps = 5_000_000) {
+  const m = new Machine(checked, maxSteps);
+  m.files = {};
+  const cells = new Map();
+  for (const it of checked.ast.items) if (it.kind === 'var') m.globals.set(it.name, m.cell(it));
+  for (const job of jobs) {
+    const scope = new Map();
+    m.frames.push({ fn: { name: 'ap_reset' }, scopes: [scope] });
+    try {
+      for (const d of job.vars) { if (!cells.has(d)) cells.set(d, m.cell(d)); scope.set(d.name, cells.get(d)); }
+      m.call(job.call);
+    } catch (e) {
+      if (!(e instanceof Halt || e instanceof Exit)) throw e;
+      job.error = e.message ?? 'it ended the program';
+    } finally { m.frames.pop(); }
+  }
+  return cells;
+}
+
 class Machine {
   constructor(checked, maxSteps) {
     this.c = checked;
