@@ -133,7 +133,9 @@ function chart(top, m, lang, ports) {
         default: act(stmtText(x));
       }
     };
-    b.stmts.forEach(walk);
+    // (a pipelined loop or function, #1962: its stages one state, its statements in it)
+    if (b.pipe) act(`${b.pipe.src.kind === 'function' ? '' : `${b.pipe.src.kind} (…) `}pipelined, II=${b.pipe.info.pipeII}: ${loopText(b.pipe.src)}`);
+    else b.stmts.forEach(walk);
     if (!pending.length) continue;
     if (b.term.done) jump(done);
     else if (b.term.goto) jump(st(b.term.goto));

@@ -115,7 +115,8 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
     if (!sargs.some((a) => a.name === p.name && a.name !== 'return')) diagnostics.push({ file, line: p.loc.line, col: p.loc.col, message: `#pragma HLS ${p.pragma} variable=${p.name}: not a struct argument of the top function: ignored`, severity: 'warning' });
   }
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
-  for (const node of df.graph.nodes) if (node.op === 'in') node.port.name = node.port.param ? rn(node.port.param) + node.port.suffix : rn(node.port.name);
+  // (the block protocol's own inputs, a pipelined function's ap_start, #1962: not renamed)
+  for (const node of df.graph.nodes) if (node.op === 'in' && !node.port.protocol) node.port.name = node.port.param ? rn(node.port.param) + node.port.suffix : rn(node.port.name);
   // the block protocol's ports, as Vitis HLS's (#1900): ap_ctrl_hs's, a sequential module's clock and reset first (a
   // combinational one its reset, unused, but no clock, as Vitis HLS 2025.2 makes a top of latency 0, #1924); ap_ctrl_none,
   // none of ap_start, ap_done, ap_idle, ap_ready (a sequential module running by itself, core/c-fsmd.js); ap_ctrl_chain,
@@ -149,9 +150,9 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   const report = df.seq
     ? { sequential: true, states: df.states.length + 2, registerBits: df.regs.reduce((a, r) => a + r.w, 0) + df.stateT.w,
       memories: [...df.mems.map((x) => ({ name: x.name, words: x.n, bits: x.t.w, kind: x.rom || (!x.written && x.init) ? 'ROM' : 'RAM' })), ...df.extMems.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' }))],
-      loops: df.loops, slowLoops: df.slowLoops || [] }
+      loops: df.loops, ...(df.fnPipe ? { pipeline: df.fnPipe } : {}), slowLoops: df.slowLoops || [] }
     : { sequential: false };
-  return { ok: true, ...(df.blackboxes?.length ? { blackboxes: bbs.list } : {}), hdl, top: name, ports, diagnostics, sequential: !!df.seq, states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };
+  return { ok: true, ...(df.blackboxes?.length ? { blackboxes: bbs.list } : {}), hdl, top: name, ports, diagnostics, sequential: !!df.seq, ...(df.freeRun ? { freeRun: true } : {}), states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };
 }
 
 /** The nodes to write: those the outputs need. */

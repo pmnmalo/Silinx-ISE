@@ -293,6 +293,7 @@ test('#1941 every statement the HLS compiler makes and every literal written bac
   assert.equal(r.ok, true);
   assert.deepEqual(r.diagnostics, []);
   const acts = r.model.nodes.filter((n) => n.type === 'state').flatMap((n) => n.actions);
-  assert.ok(acts.includes('float s = 0.5f') && acts.includes('s += ap_mem_a_0 * 1.5'), acts.join(' | '));
+  // (the loop pipelined, #1962: its statements in its one state)
+  assert.ok(acts.includes('float s = 0.5f') && acts.includes('for (…) pipelined, II=1: s += a[i] * 1.5'), acts.join(' | '));
   assert.ok(!acts.some((a) => /<[a-z]+>/.test(a)), acts.join(' | '));
 });

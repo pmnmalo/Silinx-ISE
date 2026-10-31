@@ -3,8 +3,8 @@
 // of the threshold or fewer has its parent pipelined instead (its inner loops then unrolled whole), and an innermost
 // loop with no parent is pipelined whatever its count. A loop with its own #pragma HLS PIPELINE is the pragma's (off:
 // not pipelined); the threshold 0 pipelines none. The parent is taken only if Silinx can make it an iteration a state
-// (core/c-fsmd.js), else its inner loops are taken as innermost ones. A pipelined loop that accesses a memory (its
-// accesses a state each) is made as pipelineMethods.pipeMem makes it. Isomorphic ES module: no DOM and no Node APIs.
+// (core/c-fsmd.js), else its inner loops are taken as innermost ones. A pipelined loop that accesses a stream (its
+// accesses a state each) is made as pipelineMethods.pipeMem makes it; one that accesses a memory, core/c-pipe-sched.js. Isomorphic ES module: no DOM and no Node APIs.
 //
 //   markAutoPipeline(items, { threshold, trip, why })   sets autoPipe on the loops pipelined automatically
 //     trip(loop) -> its count (a constant) or null; why(loop) -> why it cannot be pipelined, or null
@@ -28,7 +28,8 @@ export function innerLoops(x) {
   return out;
 }
 
-export function markAutoPipeline(items, { threshold = PIPELINE_LOOPS, trip, why }) {
+// (autoWhy: why a parent is not pipelined automatically, beyond why; a pragma's loop is why's alone)
+export function markAutoPipeline(items, { threshold = PIPELINE_LOOPS, trip, why, autoWhy = why }) {
   if (!threshold) return;
   const visit = (s) => {
     const pp = loopPragma(s, 'PIPELINE');
@@ -39,7 +40,7 @@ export function markAutoPipeline(items, { threshold = PIPELINE_LOOPS, trip, why 
     const whole = (l) => { const u = loopPragma(l, 'UNROLL'); return !!u && u.factor === undefined; };
     if (!inner.length) { if (!pp && !whole(s)) s.autoPipe = true; return; }
     const small = (l) => !innerLoops(l.body).length && !loopPragma(l, 'PIPELINE') && (whole(l) || (trip(l) !== null && trip(l) <= threshold));
-    if (!pp && !whole(s) && inner.every(small) && !why(s)) { s.autoPipe = true; return; }
+    if (!pp && !whole(s) && inner.every(small) && !autoWhy(s)) { s.autoPipe = true; return; }
     inner.forEach(visit);
   };
   innerLoops(items).forEach(visit);
@@ -53,7 +54,7 @@ const walk = (x, f) => {
   for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') walk(v, f);
 };
 const named = (x) => { const out = new Set(); walk(x, (n) => { if (n.kind === 'id') out.add(n.name); }); return out; };
-const base = (e) => { while (e && (e.kind === 'index' || e.kind === 'member' || e.kind === 'paren')) e = e.e; return e?.kind === 'id' ? e.name : null; };
+const base = (e) => { while (e && (e.kind === 'index' || e.kind === 'member' || e.kind === 'paren' || (e.kind === 'unary' && e.op === '*'))) e = e.e; return e?.kind === 'id' ? e.name : null; };
 const written = (x, fifoOp) => {
   const out = new Set();
   walk(x, (n) => {

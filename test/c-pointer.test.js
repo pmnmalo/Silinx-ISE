@@ -62,7 +62,7 @@ test('#1599 co-simulated in VHDL and Verilog: the indexed pointer arguments memo
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
     assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), [
       "5 warning: the pointer argument 's' is indexed: a memory (ap_memory) of 1024 elements, its depth not given (#pragma HLS INTERFACE port=s depth=N)",
-      '8 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off']);
+      '8 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory \'d\' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off']);
     assert.deepEqual(r.gen.ports.filter((p) => /^[ds]_/.test(p.name)).map((p) => `${p.name}:${p.w}`), [
       'd_address0:3', 'd_ce0:1', 'd_we0:1', 'd_d0:32', 'd_q0:32', 's_address0:10', 's_ce0:1', 's_q0:32']);
   }

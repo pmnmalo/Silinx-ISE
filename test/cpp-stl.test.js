@@ -63,7 +63,7 @@ test('#1734 a vector\'s data passed to the top: co-simulated in VHDL and Verilog
     assert.deepEqual([r.errors, r.pass, r.calls], [[], true, 1], JSON.stringify(r.mismatches, big));
     // (the loop pipelined automatically, #1919: a and b read one after the other)
     assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), [
-      '8 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off']);
+      '8 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory \'a\' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off']);
   }
 });
 
