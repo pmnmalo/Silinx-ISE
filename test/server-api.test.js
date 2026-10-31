@@ -50,7 +50,7 @@ test('projects: create (empty + template), list, read with file tree, write, del
   for (const d of ['src', 'sim', 'constraints']) assert.ok(fss.statSync(path.join(P.projectDir('Alpha'), d)).isDirectory());
 
   const tpl = await call('GET', '/templates');
-  assert.deepEqual(tpl.body, ['gates', 'traffic', 'blinky', 'pong', 'stopwatch', 'clock', 'vga']);   // the order the interface lists them
+  assert.deepEqual(tpl.body, ['gates', 'traffic', 'blinky', 'pong', 'stopwatch', 'clock', 'vga', 'isqrt']);   // the order the interface lists them
   // the test designs, apart (#1746): a new project from one, a C design's top its function
   const { TEST_DESIGN_ORDER } = await import('../core/test-designs.js');
   assert.deepEqual((await call('GET', '/test-designs')).body, TEST_DESIGN_ORDER);

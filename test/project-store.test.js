@@ -68,7 +68,7 @@ test('folder: a project from each example is the server\'s, file for file', asyn
     await P.createProject({ name, template: t });
     assert.deepEqual(under(await dump(root), name), sorted(diskTree(P.projectDir(name))), t);
   }
-  assert.deepEqual(Object.keys(EXAMPLES).sort(), ['blinky', 'clock', 'gates', 'pong', 'stopwatch', 'traffic', 'vga']);
+  assert.deepEqual(Object.keys(EXAMPLES).sort(), ['blinky', 'clock', 'gates', 'isqrt', 'pong', 'stopwatch', 'traffic', 'vga']);
 });
 
 test('folder: writing, renaming (files and folders), deleting and saving keep silinx.json as the server does', async () => {

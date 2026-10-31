@@ -1,4 +1,4 @@
-// The example projects (examples/gates, traffic, blinky, pong, stopwatch, clock, vga), which also test Silinx's workflows end to
+// The example projects (examples/gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt), which also test Silinx's workflows end to
 // end on every device of the Silinx toolchain (Basys2-100 / 250, Nexys2-500 / 1200): each example's
 // sources read with no error or warning and no design-check message, its self-checking testbench
 // passes in Silinx's simulator with no warning, the UCF it ships is the one Silinx's board pin

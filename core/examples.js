@@ -2,7 +2,7 @@
 // steps (gates: combinational logic drawn as a schematic; traffic: a state diagram and a truth table)
 // to the larger designs. Isomorphic.
 
-export const EXAMPLE_ORDER = ['gates', 'traffic', 'blinky', 'pong', 'stopwatch', 'clock', 'vga'];
+export const EXAMPLE_ORDER = ['gates', 'traffic', 'blinky', 'pong', 'stopwatch', 'clock', 'vga', 'isqrt'];
 
 /** Example names in the listing order: the known ones first (EXAMPLE_ORDER), then any other, by name. */
 export function orderExamples(names) {

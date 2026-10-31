@@ -1,0 +1,38 @@
+{
+  "name": "isqrt",
+  "version": 1,
+  "device": {
+    "family": "spartan3e",
+    "part": "xc3s250e",
+    "package": "cp132",
+    "speed": "-4"
+  },
+  "board": "basys2",
+  "top": "isqrt_top",
+  "simTop": "tb_isqrt",
+  "files": [
+    {
+      "path": "src/sevenseg.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/isqrt_top.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "sim/tb_isqrt.vhd",
+      "lang": "vhdl",
+      "role": "sim"
+    }
+  ],
+  "constraints": "constraints/top.ucf",
+  "stimuli": {},
+  "impl": {
+    "optMode": "Speed",
+    "optLevel": 1,
+    "startupClk": "JtagClk"
+  },
+  "preferredLanguage": "vhdl"
+}

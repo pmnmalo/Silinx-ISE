@@ -470,7 +470,7 @@ npm run build:standalone    # writes dist/Silinx-ISE.html (~5 MB)
 
 One file, no server: open it in a browser or share it. It includes the editor, schematics, ASM
 editor, simulation/SSim, pin planner and ISE project import/export; the examples (*gates*, *traffic*,
-*blinky*, *pong*, *stopwatch*, *clock*, *vga*) are embedded. Projects are stored in the browser (*File ▸ Download / Open Project Bundle* to move
+*blinky*, *pong*, *stopwatch*, *clock*, *vga*, *isqrt*) are embedded. Projects are stored in the browser (*File ▸ Download / Open Project Bundle* to move
 them), or, in Chrome / Edge, in a folder on the disk (*File ▸ Open Workspace Folder…*: the File
 System Access API; each project a folder as the full application writes it, so the same folder opens
 there; web/js/project-store.js). `--site <dir>` also writes the GitHub Pages site: the page and its `assets/` (the device
@@ -613,7 +613,8 @@ examples/   example projects for the Basys2 / Nexys2 (the Silinx toolchain's dev
             traffic (a pedestrian crossing: a state diagram, a Boolean algebra, VHDL and a Verilog display),
             blinky (VHDL + Verilog, an ASM chart, its steps counted on the display),
             pong (a game for two, Verilog), stopwatch (VHDL, block RAM and multipliers), clock (Verilog, set
-            with the buttons), vga (VHDL, a picture on a VGA monitor); each with a self-checking testbench
+            with the buttons), vga (VHDL, a picture on a VGA monitor),
+            isqrt (a C function made into hardware by Silinx HLS, on the display); each with a self-checking testbench
 docs/       GETTING-STARTED.md / COMECAR.md (step-by-step guides), IR.md (parser intermediate
             representation), PROJECT.md (project model and API), OPEN-TOOLCHAIN.md (how the open
             Spartan-3E toolchain is developed), QUALITY.md (the Silinx toolchain against ISE)
