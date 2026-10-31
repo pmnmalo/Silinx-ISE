@@ -30,8 +30,7 @@ const io = {
   // (the Spartan-6's bit databases, packages/silinx-fpga/bitdb/s6, #732)
   bitDb: () => (db ||= spec.family === 'spartan6' ? loadBitDbS6(spec.part) : loadDb(`${spec.device}${spec.pkg}`, { graph: io.device(), dir: spec.bitDbDir })),
   yosys: yosysWorkers(),   // (the synthesis's mappings from the same netlist in parallel, #86)
-  nextpnr: nextpnrNode(),   // (the nextpnr engine's, spec.engine 'nextpnr', #2136)
-  nextpnrS6: nextpnrS6Node(),   // (the Spartan-6's, #2138)
+  nextpnr: { spartan3e: nextpnrNode(), spartan6: nextpnrS6Node() },   // (the nextpnr engine's, spec.engine 'nextpnr', #2136, #2138)
   write: (name, data) => {
     const f = fileOf(name);
     fs.mkdirSync(path.dirname(f), { recursive: true });   // (netgen/synthesis/…)

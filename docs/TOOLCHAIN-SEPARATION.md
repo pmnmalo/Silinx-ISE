@@ -296,3 +296,11 @@ simulator that `compile` uses), so its steps are the toolchain's, shorter:
 3. **Its API and publishing** ([#1711](https://github.com/pmnmalo/Silinx-ISE/issues/1711)): `compile`,
    `elaborate`, the flat Verilog with its hints, the UNISIM sources; the IDE's importers switch to it; its
    publishing from its own tag; VHDL in `silinx-fpga`'s command line through it.
+
+## The flow's back ends (#2360)
+
+`runFlow` (`open-flow-core.js`) runs the steps and names no family and no engine. What a family does is its back end
+(`open-flow-backends.js`), `{ id, mount(ctx), synth?, xstNames? }`: `mount` gives the family's `runMap`, `runPar`, `runTiming`,
+`runPins`, `runPower` and `bitfile`, with its engines. `registerBackend` adds one; a family not registered is implemented as
+the Spartan-3E is. nextpnr comes through one hook, `io.nextpnr`, by micro-architecture. Still to come: the routed design
+opaque to the orchestrator (it is XDL today) and a neutral constraints model (UCF today), then iCE40 (#2295).

@@ -234,10 +234,10 @@ test('placeRouteBest: a replicated design that cannot be placed is not kept (the
 
 test('the three flows (the app\'s, open-flow.mjs, the design corpus\'s) place and route through placeRouteBest only (#79, #88)', () => {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-  for (const f of ['packages/silinx-fpga/src/open-flow-core.js', 'packages/silinx-fpga/research/s3e-route/open-flow.mjs', 'test/designs-corpus/run.mjs']) {
+  for (const f of ['packages/silinx-fpga/src/open-flow-s3e.js', 'packages/silinx-fpga/research/s3e-route/open-flow.mjs', 'test/designs-corpus/run.mjs']) {
     const src = fs.readFileSync(path.join(root, f), 'utf8');
     // (the app's: placeRouteBest unless its io gives another place and route, #1678)
-    assert.match(src, /placeRouteBest\)?\(netlist, packed, /, f);
+    assert.match(src, /placeRouteBest\)?\((ctx\.netlist\(\)|netlist), packed, /, f);
     // no placement, routing or replication of their own
     for (const call of ['place(', 'routeDesign(', 'replicationPlan(', 'replicateCells(', 'placedXdl(']) assert.ok(!new RegExp(`[^\\w.]${call.replace('(', '\\(')}`).test(src), `${f}: ${call}`);
   }

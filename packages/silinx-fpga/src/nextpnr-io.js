@@ -1,9 +1,9 @@
-// Silinx toolchain - io.nextpnr of the flow's nextpnr engine (#2136) from the WebAssembly package of nextpnr-himbaechel with
+// Silinx toolchain - io.nextpnr.spartan3e of the flow's nextpnr engine (#2136) from the WebAssembly package of nextpnr-himbaechel with
 // the spartan3e micro-architecture (@silinx/nextpnr-himbaechel-spartan3e): in Node (nextpnr-node.js) and in the browser's
-// flow worker (web/js/open-flow-worker.js), each loading the package its own way; io.nextpnrS6 the same from the spartan6
+// flow worker (web/js/open-flow-worker.js), each loading the package its own way; io.nextpnr.spartan6 the same from the spartan6
 // one's (@silinx/nextpnr-himbaechel-spartan6, #2138: nextpnr-s6-node.js).
 
-/** io.nextpnr: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }; load() resolves the package's module,
+/** A micro-architecture's of io.nextpnr: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }; load() resolves the package's module,
  *  whose function `runner` runs nextpnr. */
 export function nextpnrIo(load, runner = 'runNextpnrHimbaechelSpartan3e') {
   let pkg = null;

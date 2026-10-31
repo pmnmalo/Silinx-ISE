@@ -12,6 +12,8 @@ export * from './parts.js';
 
 // the flow
 export { runFlow, StepError, ISE_HINT } from './open-flow-core.js';
+// a family's back end (open-flow-backends.js says what it is, #2360)
+export { backendOf, registerBackend } from './open-flow-backends.js';
 
 // synthesis: Verilog in (synthesisInput's { text, top }), a Yosys JSON netlist out
 export { synthesizeVerilog, synthEffort, cellCounts } from './synth-open.js';

@@ -99,7 +99,7 @@ for (const [dev, pkg] of [['xc6slx16', 'csg324'], ['xc6slx45', 'csg324']]) {
     const files = {}, lines = [];
     const io = {
       log: l => lines.push(String(l)), sources: () => [{ path: 'top.v', lang: 'verilog', text: COUNTER }], ucf: UCF[`${dev}${pkg}`], ucfName: 't.ucf',
-      device: () => dv, bitDb: () => db, yosys: yosysNode, nextpnrS6: nextpnrS6Node(),
+      device: () => dv, bitDb: () => db, yosys: yosysNode, nextpnr: { spartan6: nextpnrS6Node() },
       write: (n, d) => { files[n] = d; return n; }, read: n => files[n] ?? null, save: () => {},
     };
     const r = await runFlow({ top: 'top', part, device: dev, pkg, family: 'spartan6', steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'], seed: 1, effort: 1,

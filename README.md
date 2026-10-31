@@ -617,7 +617,8 @@ examples/   example projects for the Basys2 / Nexys2 (the Silinx toolchain's dev
             isqrt (a C function made into hardware by Silinx HLS, on the display); each with a self-checking testbench
 docs/       GETTING-STARTED.md / COMECAR.md (step-by-step guides), IR.md (parser intermediate
             representation), PROJECT.md (project model and API), OPEN-TOOLCHAIN.md (how the open
-            Spartan-3E toolchain is developed), QUALITY.md (the Silinx toolchain against ISE)
+            Spartan-3E toolchain is developed), TOOLCHAIN.md (the toolchain's architecture, from the design to the
+            .bit), QUALITY.md (the Silinx toolchain against ISE)
 research/   the Silinx toolchain's research: s3e-bitstream (the bit database it ships), s3e-route
             (the command-line flow, device descriptions), s3e-place, s3e-device, synth-quality
 test/       node:test suites

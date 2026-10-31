@@ -20,11 +20,9 @@
 //   io.placeRoute(netlist, packed, device, knownPips, options)
 //                                      the place and route (#1678), optional: fpga/place-route.js placeRouteBest by default;
 //                                      another engine (nextpnr, #1953) returns its result's shape
-//   io.nextpnr                         { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }: nextpnr-himbaechel
-//                                      with the spartan3e micro-architecture, for spec.engine 'nextpnr' (#2136,
-//                                      open-flow-nextpnr.js: its Map and Place & Route), optional
-//   io.nextpnrS6                       the same with the spartan6 micro-architecture, for the Spartan-6 (#2138,
-//                                      open-flow-nextpnr-s6.js: its Place & Route), optional
+//   io.nextpnr                         { <micro-architecture>: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array } }:
+//                                      nextpnr-himbaechel for spec.engine 'nextpnr' (#2136, #2360): spartan3e (open-flow-nextpnr.js: its
+//                                      Map and Place & Route), spartan6 (#2138, open-flow-nextpnr-s6.js: its Place & Route), optional
 // core/flow-ide.js runOpenFlow is runFlow with the IDE's front end and simulation models (#1675).
 // spec.resources: the part's resources (resources.js resourcesOf(part, pkg)), for the synthesis's used of
 // available and its check (#795); without them the synthesis gives the used ones only.
@@ -33,18 +31,11 @@
 // Returns { ok, report }.
 import { synthesizeVerilog, cellCounts, DEEP_RULE } from './synth-open.js';
 import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
-import { parseXdl, writeXdl } from './xdl.js';
 import { parseUcf } from './ucf.js';
 import { readYosysJson } from './fpga/netlist.js';
-import { pack } from './fpga/pack.js';
-import { placeRouteBest, effortTries, effortExtra } from './fpga/place-route.js';
-import { deviceSites } from './fpga/place.js';
-import { checkRouting } from './fpga/route.js';
-import { bitgen, knownRouting } from './fpga/bitgen.js';
-import { mountFlowReports } from './open-flow-reports.js';
-import { mountS6Steps } from './open-flow-s6.js';
-import { mountNextpnrSteps } from './open-flow-nextpnr.js';
-import { mountNextpnrS6 } from './open-flow-nextpnr-s6.js';
+import { effortTries, effortExtra } from './fpga/place-route.js';
+import { knownRouting } from './fpga/bitgen.js';
+import { backendOf } from './open-flow-backends.js';
 
 // without the HDL front end (io.frontEnd): the sources are the flat Verilog given to Yosys, its top module `top` (#1675)
 function flatVerilog(srcs, top) {
@@ -90,7 +81,8 @@ export async function runFlow(spec, io) {
   // and the placements more at High, each routed only when its estimate is promising (#651)
   const parExtra = () => effortExtra(spec.synthEffort);
   const ucfText = io.ucf || null;
-  let synth = null, netlist = null, netlistText = null, packed = null, routedText = null;
+  let synth = null, netlist = null, netlistText = null, routedText = null;
+  const backend = backendOf(spec.family);
 
   async function runSynth() {
     const t = now();
@@ -104,7 +96,7 @@ export async function runFlow(spec, io) {
       : 'Optimization Effort High: the mappings for speed tried too, the fastest kept.');
     let r;
     try {
-      r = await synthesizeVerilog(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
+      r = await (backend.synth || synthesizeVerilog)(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
     } catch (e) {
       for (const l of e.lines || []) if (/ERROR/.test(l)) log(l);
       throw new StepError(`synthesis failed: ${e.message}`);
@@ -126,7 +118,7 @@ export async function runFlow(spec, io) {
     const row = (id, name) => ({ id, name, used: used[id] || 0, total: of(id)?.count ?? null, percent: of(id)?.count ? pct(used[id] || 0, of(id).count) : null });
     // (the Spartan-3E's lines as XST names them; another family's, its MAP report's)
     const s3e = { luts: 'Number of 4 input LUTs', ffs: 'Number of Slice Flip Flops', ramb16: 'Number of RAMB16s', mult18x18: 'Number of MULT18X18SIOs', bufgmux: 'Number of GCLKs', dcm: 'Number of DCMs', iob: 'Number of IOs' };
-    const name = id => (spec.family === 'spartan3e' ? s3e[id] : of(id)?.report) || s3e[id] || id;
+    const name = id => (backend.xstNames ? s3e[id] : of(id)?.report) || s3e[id] || id;
     const other = (k, n) => ({ name: n, used: u[k], total: null, percent: null });
     const items = [row('luts', name('luts')), row('ffs', name('ffs')), other('latches', 'Number of latches'), other('muxes', 'Number of F5-F8 multiplexers'),
       other('carry', 'Number of carry cells'), other('shiftRegisters', 'Number of shift registers'), other('distributedRam', 'Number of distributed RAMs'),
@@ -151,7 +143,7 @@ export async function runFlow(spec, io) {
 
   // The design the simulation models are made of (#120, #121): synthesized with the generics the test bench (open-flow-models.js)
   const { runPostMap, runPostPar, runPostSynth, runPostTranslate } = (io.simModels || noSimModels)({
-    io, spec, knownPips, log, netlist: () => netlist, packed: () => packed, parTries, parExtra, report,
+    io, spec, knownPips, log, netlist: () => netlist, packed: () => impl.packed?.() ?? null, parTries, parExtra, report,
     routedOrEarlier: (...a) => routedOrEarlier(...a), routedText: () => routedText, step, synth: () => synth, top,
     ucfText
   });
@@ -168,122 +160,10 @@ export async function runFlow(spec, io) {
     log(`Netlist of <${top}> read; constraints: ${ucfText ? `${io.ucfName || 'the UCF'}, ${locs} pin location(s), ${(ucf.clocks || []).length} PERIOD constraint(s)` : 'none'}.`);
   }
 
-  function runMap() {
-    const t = now();
-    try {
-      packed = pack(netlist, { ucf: ucfText, part: spec.part });
-    } catch (e) { throw new StepError(`packing failed: ${e.message}`); }
-    for (const w of packed.warnings || []) log(`WARNING:Pack - ${w}`);
-    const items = mapReport();
-    log('Design summary (pack):');
-    for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
-    log(`Packed in ${ms(t)}.`);
-  }
-
-  // the Design Summary's map section, from the packed design (again after a register replication): every
-  // resource used of the device's sites, in the MAP report's order (resources.js); more than the device
-  // has, the step fails with the resources named, the report kept (the summary shows them over 100 %, #795)
-  function mapReport() {
-    const s = packed.stats;
-    const sites = deviceSites(io.device());
-    const nSlices = sites.slices.size;
-    const rows = [['ffs', 'Number of Slice Flip Flops', s.ffs, 2 * nSlices], ['luts', 'Number of 4 input LUTs', s.luts, 2 * nSlices], ['slices', 'Number of occupied Slices', s.slices, nSlices],
-      ['iob', 'Number of bonded IOBs', s.iobs, sites.pads.size], ['ramb16', 'Number of RAMB16s', s.brams || 0, sites.brams.length], ['mult18x18', 'Number of MULT18X18SIOs', s.mults || 0, sites.mults.length],
-      ['bufgmux', 'Number of BUFGMUXs', s.bufgs, sites.bufgmux.length], ['dcm', 'Number of DCMs', s.dcms || 0, sites.dcms.length]];
-    const items = rows.map(([id, name, used, total]) => ({ id, ...util(name, used, total) }));
-    const byId = Object.fromEntries(items.map(i => [i.id, i]));
-    report.map = { utilization: items, summary: { slices: byId.slices, ffs: byId.ffs, luts: byId.luts, iobs: byId.iob, bufg: byId.bufgmux }, carry: s.carry, muxes: s.muxes, warnings: (packed.warnings || []).length, errors: 0 };
-    const over = overResources(items.map(i => ({ id: i.id, report: i.name, count: i.total })), Object.fromEntries(items.map(i => [i.id, i.used])));
-    if (over.length) {
-      report.map.errors = over.length;
-      log('Design summary (pack):');
-      for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
-      throw new StepError(over.map(o => overMessage(o, spec.device)).join('; '), [], 'Choose a larger device (Design Properties).');
-    }
-    return items;
-  }
-
-  function runPar() {
-    const d = io.device();
-    const k = knownPips();
-    // place, route and their timing (fpga/place-route.js, the flows' one place and route): each
-    // clock's flip-flops on the slices its global line reaches through switches of known bits; then
-    // register replication (#4): the flip-flops and LUTs of many loads on the critical path copied
-    // (#522), the design placed again from the first placement (#87) and routed; the faster kept. At Optimization Effort
-    // High (and Normal, a small design), two placements first (seeds seed, seed + 1 …), the fastest kept; at High a third,
-    // routed only when the placer's estimate is shorter than one of the first two's (#651)
-    let pr;
-    const tried = [], placeWarned = new Set();
-    try {
-      pr = (io.placeRoute || placeRouteBest)(netlist, packed, d, k, {
-        seed: spec.seed || 1, tries: parTries(packed.stats.slices), extra: parExtra(), effort: spec.effort || 1, replicate: spec.replicate !== false, routeIterations: spec.routeIterations || null, pack: { ucf: ucfText, part: spec.part },
-        onRouted: (p, info) => {
-          if (info.replication) return;
-          if (!info.retry) tried.push(p);
-          // (each warning once, whichever placements give it)
-          for (const w of p.placement.warnings || []) if (!placeWarned.has(w)) { placeWarned.add(w); log(`WARNING:Place - ${w}`); }
-        },
-        onReplication: x => log(`Register replication: ${x.flipFlops} flip-flop(s)${x.luts ? ` and ${x.luts} LUT(s)` : ''} on the critical path copied (${x.copies} copies): ${x.kept ? `kept, ${x.result.sta.period.toFixed(3)} ns instead of ${x.before.toFixed(3)} ns` : 'not kept, no faster'}.`),
-      });
-    } catch (e) { throw new StepError(`placement failed: ${e.message}`, [], e.hint); }   // (e.hint: the placer's, #128)
-    if (tried.length + pr.unrouted.length > 1) {
-      const ns = p => (p.sta ? `${p.period.toFixed(3)} ns` : 'not routed');
-      const kept = tried.reduce((a, p) => (p.period < a.period ? p : a));
-      // (an extra placement whose estimate was no shorter than the first ones': not routed, #651)
-      const all = [...tried.map(p => [p.seed, ns(p)]), ...pr.unrouted.map(s => [s, 'not routed (estimated slower)'])].sort((a, b) => a[0] - b[0]);
-      log(`Optimization Effort ${spec.synthEffort === 'high' ? 'High' : 'Normal'}: ${all.length} placements (seeds ${all.map(a => a[0]).join(', ')}): ${all.map(a => a[1]).join(', ')}; seed ${kept.seed} kept.`);
-    }
-    if (pr.replication?.kept) {
-      packed = pr.packed;
-      const items = mapReport();
-      log(`Design summary (pack, after the replication): ${items[0].name} ${items[0].used}, ${items[2].name} ${items[2].used}.`);
-    }
-    const { placement: r, placedText, routed } = pr;
-    report.files.placed = io.write('open/placed.xdl', placedText);
-    log(`Placed ${r.sites.length} sites in ${(pr.placeMs / 1000).toFixed(1)} s (estimated critical path ${r.delay.toFixed(1)} ns): ${report.files.placed}`);
-    report.par = { routed: false, unroutedSignals: routed.failed.length, nets: routed.routed, pips: routed.pips, iterations: routed.iterations };
-    if (routed.errors.length) throw new StepError('routing errors', routed.errors.slice(0, 50));
-    if (routed.failed.length) {
-      throw new StepError(`${routed.failed.length} net(s) cannot be routed on the routing switches whose bits are known (the bit database does not know every switch of the device yet)`,
-        routed.unreached.slice(0, 50).map(u => `${u.net} -> ${u.inst}.${u.pin}`));
-    }
-    // (the router stopped with nodes still shared, on every placement tried, #249)
-    if (routed.overused) {
-      throw new StepError(`the routing did not converge: ${routed.overused} routing node(s) still used by more than one net after ${routed.iterations} passes, on ${1 + pr.retried} placement(s) (seeds ${spec.seed || 1} to ${(spec.seed || 1) + pr.retried})`,
-        [], 'The design is too dense for the router on this device: a larger device, or an ISE mode (Toolchain Settings), may implement it.');
-    }
-    if (pr.retried) log(`Placed and routed again with the seed ${pr.seed}: the routing of ${pr.retried} placement(s) before did not converge.`);
-    routedText = writeXdl(routed.design);
-    report.files.routed = io.write('open/routed.xdl', routedText);
-    const check = checkRouting(parseXdl(routedText), d);
-    if (!check.ok) throw new StepError('the routing check failed', check.problems.slice(0, 50));
-    report.par = { ...report.par, routed: true, unroutedSignals: 0, done: true };
-    log(`Routed ${routed.routed} nets (${routed.pips} PIPs, ${routed.iterations} passes) in ${(pr.routeMs / 1000).toFixed(1)} s: ${report.files.routed}`);
-    log('All signals are completely routed.');
-  }
-
-  // the Spartan-6's Map and Place & Route (#732: open-flow-s6.js)
-  const s6 = spec.family === 'spartan6' ? mountS6Steps({ io, spec, log, report, util, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
-  // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine: 'nextpnr' always; 'auto' when it can
-  // implement the design (its cells, every port's pad), else the Silinx engine, which Map says (not the Spartan-6's). The
-  // Spartan-6 by nextpnr ('nextpnr' only, #2138): Silinx's Map, nextpnr's Place & Route (open-flow-nextpnr-s6.js)
-  const np = s6 ? (spec.engine === 'nextpnr' ? { runMap: s6.runMap, problems: () => [], ...mountNextpnrS6({ io, spec, log, report, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; }, state: s6.state }) } : null)
-    : (spec.engine === 'nextpnr' || spec.engine === 'auto') ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
-
-  let viaNextpnr = null;
-  const useNextpnr = () => {
-    if (viaNextpnr !== null) return viaNextpnr;
-    viaNextpnr = !!np && (spec.engine === 'nextpnr' || !np.problems().length);
-    if (np && !viaNextpnr) {
-      const p = np.problems();
-      log(`Map: the nextpnr engine cannot implement this design yet (${p[0]}${p.length > 1 ? `, and ${p.length - 1} more` : ''}): the Silinx engine places and routes it.`);
-    }
-    return viaNextpnr;
-  };
-
-  const { bitfile, runPins, runPower, runTiming } = mountFlowReports({
-    io, spec, log, report, routedOrEarlier: (...a) => routedOrEarlier(...a), routedText: () => routedText, top, ucfText
-  });
+  // the family's Map, Place & Route, timing and bitstream (open-flow-backends.js, #2360)
+  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, top, knownPips, parTries, parExtra, ucfText, StepError,
+    setRouted: t => { routedText = t; }, routedText: () => routedText, routedOrEarlier: (...a) => routedOrEarlier(...a) });
+  const { bitfile, runPins, runPower, runTiming } = impl;
 
   // (Place & Route of an earlier run: the routed design it wrote)
   const routedOrEarlier = () => { if (routedText == null) routedText = io.read('open/routed.xdl'); if (routedText == null) throw new StepError('no routed design: run Place & Route first', [], ''); };
@@ -306,9 +186,9 @@ export async function runFlow(spec, io) {
     if (steps.includes('postsynth')) { step('postsynth'); await runPostSynth(); save(); }
     if (steps.includes('translate')) { step('translate'); runTranslate(); save(); }
     if (steps.includes('posttrans')) { step('posttrans'); await runPostTranslate(); save(); }
-    if (steps.includes('map')) { step('map'); (useNextpnr() ? np.runMap : s6 ? s6.runMap : runMap)(); save(); }
+    if (steps.includes('map')) { step('map'); impl.runMap(); save(); }
     if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
-    if (steps.includes('par')) { step('par'); await (useNextpnr() ? np.runPar : s6 ? s6.runPar : runPar)(); save(); }
+    if (steps.includes('par')) { step('par'); await impl.runPar(); save(); }
     if (steps.includes('trce')) { step('trce'); routedOrEarlier(); runTiming(); save(); }
     if (steps.includes('postpar')) { step('postpar'); await runPostPar(); save(); }
     if (steps.includes('pin2ucf')) { step('pin2ucf'); runPins(); save(); }

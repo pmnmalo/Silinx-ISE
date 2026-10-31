@@ -1,6 +1,6 @@
 // Silinx toolchain - the Spartan-6's Place & Route by nextpnr (#2138; the plan: #2131), chosen by spec.engine ===
 // 'nextpnr'. Silinx's Map stays (open-flow-s6.js: the netlist packed into sites); nextpnr-himbaechel with the spartan6
-// micro-architecture (the fork pmnmalo/nextpnr-spartan, its WebAssembly package through io.nextpnrS6) places those sites,
+// micro-architecture (the fork pmnmalo/nextpnr-spartan, its WebAssembly package through io.nextpnr.spartan6) places those sites,
 // and, the placed design written with its constants' sources (fpga/s6/xdl.js), routes it.
 import { parseUcf } from './ucf.js';
 import { parseXdl, writeXdl } from './xdl.js';
@@ -24,7 +24,7 @@ export function mountNextpnrS6(ctx) {
     const lines = [];
     let files;
     try {
-      files = await io.nextpnrS6.run(['--device', part, '--chipdb', 'chipdb.bin', '--json', 'design.json', '--write', 'out.json', ...args],
+      files = await io.nextpnr.spartan6.run(['--device', part, '--chipdb', 'chipdb.bin', '--json', 'design.json', '--write', 'out.json', ...args],
         { 'design.json': JSON.stringify(input), 'chipdb.bin': db }, l => {
           lines.push(l);
           if (/^ERROR:/.test(l)) log(`ERROR:nextpnr - ${l.replace(/^ERROR:\s*/, '')}`);
@@ -41,9 +41,9 @@ export function mountNextpnrS6(ctx) {
 
   async function runPar() {
     const device = io.device(), { packed, phys } = state(), sites = state().sites || s6Sites(device), nl = netlist();
-    if (!io.nextpnrS6) throw new StepError('the nextpnr engine is not available here (io.nextpnrS6)', [], 'Choose the Silinx engine (Toolchain Settings).');
+    if (!io.nextpnr?.spartan6) throw new StepError('the nextpnr engine is not available here (io.nextpnr)', [], 'Choose the Silinx engine (Toolchain Settings).');
     const t = now();
-    const db = await io.nextpnrS6.chipdb(part, log);
+    const db = await io.nextpnr.spartan6.chipdb(part, log);
     // the pads and the global buffers, by Silinx's rules (the banks' VCCO, a clock pad's dedicated path); the block RAMs
     // and DSP48A1s from its timing-driven placement (nextpnr's analytical placer left them columns apart: the stopwatch
     // on the Atlys missed its 10 ns on every seed), a DSP48A1 cascade with them
