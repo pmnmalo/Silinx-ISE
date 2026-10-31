@@ -127,6 +127,19 @@ int main(void) {
 }
 `;
 
+uiTest('#1965 View C Synthesis Report of a module with ap_ctrl_chain: its block protocol and ap_continue among its ports', E, async (page) => {
+  await makeProject(env, { name: 'CChain', top: 'inc', files: { 'src/inc.c': 'int inc(int a) {\n#pragma HLS INTERFACE ap_ctrl_chain port=return\n  return a + 1;\n}\nint main(void) { return inc(1) == 2 ? 0 : 1; }\n' } });
+  await page.openProject('CChain');
+  await page.showMessages();
+  await page.treeRow('#hier', 'inc');
+  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+  await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
+  const log = await page.consoleText();
+  assert.match(log, /ap_ctrl_chain \(ap_clk, ap_rst, ap_start \/ ap_done \/ ap_continue \/ ap_idle \/ ap_ready\)/);
+  assert.match(log, /Ports:\n {2}ap_clk {11}in {4}1 bit\n[\s\S]* {2}ap_continue {6}in {4}1 bit\n/);
+  assert.doesNotMatch(log, /WARNING:SilinxC/);
+});
+
 uiTest('#1707 View C Synthesis Report of a DATAFLOW module: its processes (each a module, when each starts), its buffer between them; C/RTL Co-simulation PASS', E, async (page) => {
   await makeProject(env, { name: 'CDiamond', top: 'diamond', files: { 'src/diamond.c': DIAMOND } });
   await page.openProject('CDiamond');
