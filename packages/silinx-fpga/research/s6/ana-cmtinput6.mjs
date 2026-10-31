@@ -3,7 +3,8 @@
 // REGC bits predicted (not #727's whole paths), by what the CMT uses (cmtUses): its CLKIN's BUFIO2 (the bits left in the
 // I/O words: the BUFIO2's route to the CMT), each output that drives a net (the bits left in the CMT's frame, CMT_FRAME
 // of its row: kept where every design using the output has them), and its site (the other bits every design of the
-// site has: the clock spine's and the CMT column's, set by any CMT of the half).
+// site has: the clock spine's and the CMT column's, set by any CMT of the half). A BUFIO2's own bits (#2025: the I/O
+// words' bits of every design with it, whatever its CMT) are its site's, apart from those of its route to each CMT.
 //   node research/s6/ana-cmtinput6.mjs <dir> …   (each with top.xdl and top.bit)  -> packages/silinx-fpga/bitdb/s6/<device>-cmt-input.json
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,10 +20,12 @@ const inter = (a, b) => (a ? a.filter(x => b.includes(x)) : [...b]);
 
 /**
  * The table from designs' leftovers: [{ site, outputs, bufio2, left: ['frame,bit'], cmtFrame, iobFrame }] (cmtFrame: the
- * CMT's frame; iobFrame: the I/O words' first) -> { sites: { site: { common, outputs: { pin: bits }, bufio2: { site: bits } } } }.
+ * CMT's frame; iobFrame: the I/O words' first) -> { sites: { site: { common, outputs: { pin: bits }, bufio2: { site: bits } } },
+ * bufio2: { site: bits } } (bufio2: a BUFIO2's own bits, those of every design with it; a site's bufio2 the rest).
  */
 export function cmtInputTable(samples) {
-  const sites = {}, f = b => +b.split(',')[0];
+  const sites = {}, bufio2 = {}, f = b => +b.split(',')[0];
+  for (const x of samples) if (x.bufio2) bufio2[x.bufio2] = inter(bufio2[x.bufio2], x.left.filter(b => f(b) >= x.iobFrame));
   for (const x of samples) {
     const s = (sites[x.site] ??= { common: null, outputs: {}, bufio2: {}, samples: [] });
     s.samples.push(x);
@@ -36,7 +39,7 @@ export function cmtInputTable(samples) {
     for (const x of s.samples) {
       if (!x.bufio2) continue;
       const outs = new Set(x.outputs.flatMap(o => s.outputs[o]));
-      s.bufio2[x.bufio2] = inter(s.bufio2[x.bufio2], x.left.filter(b => f(b) >= x.iobFrame || (f(b) === x.cmtFrame && !outs.has(b))));
+      s.bufio2[x.bufio2] = inter(s.bufio2[x.bufio2], x.left.filter(b => (f(b) >= x.iobFrame && !bufio2[x.bufio2].includes(b)) || (f(b) === x.cmtFrame && !outs.has(b))));
     }
     delete s.samples;
   }
@@ -46,7 +49,7 @@ export function cmtInputTable(samples) {
     s.outputs = Object.fromEntries(Object.entries(s.outputs).filter(([, b]) => b.length).map(([o, b]) => [o, sort(b)]).sort());
     s.bufio2 = Object.fromEntries(Object.entries(s.bufio2).map(([k, b]) => [k, sort(b)]).sort());
   }
-  return { sites: Object.fromEntries(Object.entries(sites).sort()) };
+  return { sites: Object.fromEntries(Object.entries(sites).sort()), bufio2: Object.fromEntries(Object.entries(bufio2).map(([k, b]) => [k, sort(b)]).sort()) };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -65,6 +68,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     device0 = r6.device.device;
   }
   const table = cmtInputTable(samples);
-  console.log(`${samples.length} designs (${skipped} without exactly one CMT): ${Object.entries(table.sites).map(([s, x]) => `${s} ${x.common.length} common, outputs ${Object.keys(x.outputs).join('/') || '-'}, BUFIO2 ${Object.keys(x.bufio2).join('/') || '-'}`).join('; ')}`);
-  fs.writeFileSync(new URL(`../../bitdb/s6/${device0}-cmt-input.json`, import.meta.url), `${JSON.stringify({ note: 'A CMT\'s bits outside its settings and its paths\' PIPs, by its site, its outputs used and its CLKIN\'s BUFIO2 (#1951, ana-cmtinput6.mjs); absolute frame,bit.', ...table })}\n`);
+  console.log(`${samples.length} designs (${skipped} without exactly one CMT): ${Object.entries(table.sites).map(([s, x]) => `${s} ${x.common.length} common, outputs ${Object.keys(x.outputs).join('/') || '-'}, BUFIO2 ${Object.keys(x.bufio2).join('/') || '-'}`).join('; ')}; the BUFIO2s' own: ${Object.entries(table.bufio2).map(([s, b]) => `${s} ${b.join(' ')}`).join(', ')}`);
+  fs.writeFileSync(new URL(`../../bitdb/s6/${device0}-cmt-input.json`, import.meta.url), `${JSON.stringify({ note: 'A CMT\'s bits outside its settings and its paths\' PIPs, by its site, its outputs used and its CLKIN\'s BUFIO2 (#1951, ana-cmtinput6.mjs); bufio2, a BUFIO2\'s own (#2025); absolute frame,bit.', ...table })}\n`);
 }

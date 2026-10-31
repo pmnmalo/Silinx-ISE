@@ -13,7 +13,7 @@ import { dropBits } from '../packages/silinx-fpga/research/s6/ana-cmtdrop6.mjs';
 import { cmtInputTable } from '../packages/silinx-fpga/research/s6/ana-cmtinput6.mjs';
 import { gridRegion } from '../packages/silinx-fpga/research/s6/ana-pipdrop6.mjs';
 import { CMT_REGC, CMT_FRAME, cmtRegcBits, cmtUses, cmtInputBits } from '../packages/silinx-fpga/research/s6/cmt6.mjs';
-import { setBits } from '../packages/silinx-fpga/research/s6/residual6.mjs';
+import { setBits, padBit } from '../packages/silinx-fpga/research/s6/residual6.mjs';
 import { S6_DEVICES, emptyFdri, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 import { s6Device } from './s6-lib.mjs';
 
@@ -90,20 +90,27 @@ test('cmt6 / ana-cmtinput6: what a CMT uses; its site\'s, outputs\' and BUFIO2\'
   // an output with no load is not used; CLKFX180 in CLKFX's group
   assert.deepEqual(cmtUses(design, design.insts[0]), { outputs: ['CLK2X', 'CLKFX'], bufio2: 'BUFIO2_X3Y7' });
   assert.deepEqual(cmtUses({ insts: [design.insts[0]], nets: [] }, design.insts[0]), { outputs: [], bufio2: null });
-  const input = { sites: { DCM_X0Y1: { common: ['3,64'], outputs: { CLK2X: ['357,347'], CLKFX: ['357,383'], CLK90: ['357,351'] }, bufio2: { BUFIO2_X3Y7: ['3554,201'], BUFIO2_X1Y6: ['3554,441'] } } } };
-  assert.deepEqual([...cmtInputBits(design, design.insts[0], input)].sort(), ['3,64', '3554,201', '357,347', '357,383']);
+  const input = { sites: { DCM_X0Y1: { common: ['3,64'], outputs: { CLK2X: ['357,347'], CLKFX: ['357,383'], CLK90: ['357,351'] }, bufio2: { BUFIO2_X3Y7: ['357,600'], BUFIO2_X1Y6: ['357,271'] } } },
+    bufio2: { BUFIO2_X3Y7: ['3554,201'], BUFIO2_X1Y6: ['3554,441'] } };
+  // the BUFIO2's own bit (#2025) and its route's to this site
+  assert.deepEqual([...cmtInputBits(design, design.insts[0], input)].sort(), ['3,64', '3554,201', '357,347', '357,383', '357,600']);
+  assert.deepEqual([...cmtInputBits(design, design.insts[0], { sites: input.sites })].sort(), ['3,64', '357,347', '357,383', '357,600']);
   assert.equal(cmtInputBits(design, inst('p', 'PLL_ADV', 'PLL_ADV_X0Y0'), input), null);
   // the table: the site's bits every design has; an output's those of every design using it and of none not using it;
-  // the BUFIO2's its I/O words' and the CMT frame's not an output's
-  const s = (outputs, bufio2, left) => ({ site: 'DCM_X0Y1', outputs, bufio2, left, cmtFrame: 357, iobFrame: 3552 });
+  // a BUFIO2's own, its I/O words' bits of every design with it whatever the CMT; its route's to a site, the rest of
+  // its I/O words' and the CMT frame's not an output's
+  const s = (outputs, bufio2, left, site = 'DCM_X0Y1', cmtFrame = 357) => ({ site, outputs, bufio2, left, cmtFrame, iobFrame: 3552 });
   const t = cmtInputTable([
     s(['CLK2X'], 'BUFIO2_X1Y6', ['3,64', '3,99', '357,347', '357,271', '3554,441']),
     s(['CLK90'], 'BUFIO2_X1Y6', ['3,64', '357,351', '357,271', '3554,441']),
     s(['CLK2X', 'CLKFX'], 'BUFIO2_X3Y7', ['3,64', '357,347', '357,383', '3554,201']),
     s(['CLKFX'], 'BUFIO2_X3Y7', ['3,64', '357,383', '3554,201', '3554,999']),
+    s([], 'BUFIO2_X1Y6', ['1101,603', '3554,441', '3554,460'], 'PLL_ADV_X0Y0', 1101),
   ]);
-  assert.deepEqual(t, { sites: { DCM_X0Y1: { common: ['3,64'], outputs: { CLK2X: ['357,347'], CLK90: ['357,351'], CLKFX: ['357,383'] },
-    bufio2: { BUFIO2_X1Y6: ['357,271', '3554,441'], BUFIO2_X3Y7: ['3554,201'] } } } });
+  assert.deepEqual(t, { sites: {
+    DCM_X0Y1: { common: ['3,64'], outputs: { CLK2X: ['357,347'], CLK90: ['357,351'], CLKFX: ['357,383'] }, bufio2: { BUFIO2_X1Y6: ['357,271'], BUFIO2_X3Y7: [] } },
+    PLL_ADV_X0Y0: { common: [], outputs: {}, bufio2: { BUFIO2_X1Y6: ['1101,603', '3554,460'] } },
+  }, bufio2: { BUFIO2_X1Y6: ['3554,441'], BUFIO2_X3Y7: ['3554,201'] } });
 });
 
 test('db: the XC6SLX16\'s CMTs\' input table (the bits outside their settings and PIPs), the top half\'s too (#2025)', () => {
@@ -115,7 +122,7 @@ test('db: the XC6SLX16\'s CMTs\' input table (the bits outside their settings an
     // a DCM's six outputs one bit each in its frame, its frequency synthesizer's three; the clock pad's BUFIO2 one I/O word bit
     assert.deepEqual(Object.keys(s.outputs), ['CLK180', 'CLK270', 'CLK2X', 'CLK2X180', 'CLK90', 'CLKDV', 'CLKFX']);
     for (const [o, b] of Object.entries(s.outputs)) { assert.equal(b.length, o === 'CLKFX' ? 3 : 1); assert.ok(b.every(x => x.startsWith(frame))); }
-    assert.deepEqual(s.bufio2.BUFIO2_X3Y7, ['3554,201']);
+    assert.deepEqual(s.bufio2.BUFIO2_X3Y7, []);
     assert.deepEqual(s.common, ['3,64', '3,66', '3,69', '3,74', '1491,74']);
   }
   // the two DCMs of a tile apart
@@ -126,7 +133,7 @@ test('db: the XC6SLX16\'s CMTs\' input table (the bits outside their settings an
   for (const [top, bot] of [['DCM_X0Y2', 'DCM_X0Y0'], ['DCM_X0Y3', 'DCM_X0Y1']]) {
     const s = t.sites[top];
     assert.deepEqual(s.outputs, Object.fromEntries(Object.entries(t.sites[bot].outputs).map(([o, b]) => [o, b.map(x => x.replace(frame, row2))])));
-    assert.deepEqual(s.bufio2.BUFIO2_X4Y26, ['3562,569']);
+    assert.deepEqual(s.bufio2.BUFIO2_X4Y26, []);
     assert.deepEqual(s.common, ['3,74', '1491,64', '1491,66', '1491,69', '1491,74']);
   }
   // a PLL's CLKOUT0 enable: bit 416 of its row's CMT frame (rows 1 and 3), not one of its settings
@@ -166,10 +173,11 @@ test('db: the XC6SLX45\'s CMTs\' input table, its eight DCMs and four PLLs (#202
     // a DCM's outputs in its row's CMT frame, CLKFX three bits; no CLK0 (a path's PIP): the paths' bits are the PIPs'
     assert.deepEqual(Object.keys(s.outputs), ['CLK180', 'CLK270', 'CLK2X', 'CLK2X180', 'CLK90', 'CLKDV', 'CLKFX']);
     for (const [o, b] of Object.entries(s.outputs)) { assert.equal(b.length, o === 'CLKFX' ? 3 : 1); assert.ok(b.every(x => x.startsWith(frame(row))), `${site} ${o}`); }
-    // each BUFIO2 one I/O word bit
-    for (const b of Object.values(s.bufio2)) assert.equal(b.length, 1);
+    // a BUFIO2's bits its own (one I/O word bit), none of its route's
+    for (const b of Object.values(s.bufio2)) assert.deepEqual(b, []);
   }
-  assert.deepEqual(t.sites.DCM_X0Y0.bufio2, { BUFIO2_X1Y7: ['11395,377'], BUFIO2_X3Y7: ['11395,185'] });
+  assert.deepEqual(t.bufio2, { BUFIO2_X1Y0: ['11395,329'], BUFIO2_X1Y1: ['11395,281'], BUFIO2_X1Y6: ['11395,425'], BUFIO2_X1Y7: ['11395,377'], BUFIO2_X3Y7: ['11395,185'],
+    BUFIO2_X4Y26: ['11407,617'], BUFIO2_X4Y27: ['11407,569'], BUFIO2_X4Y28: ['11407,521'], BUFIO2_X4Y29: ['11407,473'] });
   // a PLL's CLKOUT0 enable: bit 416 of its row's CMT frame
   for (const [site, row] of [['PLL_ADV_X0Y0', 1], ['PLL_ADV_X0Y3', 7]]) assert.deepEqual(t.sites[site].outputs.CLKOUT0, [`${frame(row)}416`]);
 });
@@ -206,4 +214,25 @@ test('db: the I/O logic\'s clock PIPs, the CMTs\' HCLK outputs and BUFIO2 inputs
   const { device } = s6Device('xc6slx16csg324-3'), dev = S6_DEVICES.xc6slx16, all = loadBitDbS6('xc6slx16csg324-3');
   const xdl = `design "d" xc6slx16csg324-3 v3.2 ,\n  cfg "";\nnet "n" ,\n  pip BIOI_INNER_X23Y1 IOI_CLKDIST_CLK0_OLOGIC_M -> CLK0_OLOGIC_SITE ,\n  pip REG_B_X28Y0 REGB_CLKPIN3 -> I_BUFIO2_BOT_SITE3 ,\n  ;\n`;
   assert.deepEqual([...unknownPips([['a', xdl]], device, dev, all)], []);
+});
+
+// Regression (#2025): a BUFIO2's own bit was in the input table's (CMT site, BUFIO2) entries only, so a CMT fed by a
+// BUFIO2 never measured with it (the bottom PLL from U10's or T9's BUFIO2_X1Y6, from R8's BUFIO2_X3Y0) left it over
+test('db: each BUFIO2\'s own bit, its pad\'s clock bit\'s neighbour, whatever its CMT; the clock pads\' routes to them (#2025)', () => {
+  const t = db('xc6slx16-cmt-input'), all = loadBitDbS6('xc6slx16csg324-3');
+  // the bit 1 before the pad's clock input bit (s6-clocks.json, a pad on a BUFG): the master pad's BUFIO2 of even Y, the slave's of odd Y
+  const pads = { BUFIO2_X1Y0: 'R8', BUFIO2_X3Y0: 'R10', BUFIO2_X1Y6: 'T9', BUFIO2_X1Y7: 'V9', BUFIO2_X3Y6: 'U10', BUFIO2_X3Y7: 'V10',
+    BUFIO2_X2Y26: 'B9', BUFIO2_X2Y27: 'A9', BUFIO2_X2Y29: 'C9', BUFIO2_X4Y26: 'C10' };
+  assert.deepEqual(Object.keys(t.bufio2), Object.keys(pads).sort());
+  for (const [b, p] of Object.entries(pads)) assert.deepEqual(t.bufio2[b], [padBit(all.iob.pads[p], all.clocks.pads[p].iob - 1)], b);
+  // the bottom PLL from BUFIO2_X1Y6: its own bit (T9's), as the bottom DCM's
+  const design = { insts: [inst('p', 'PLL_ADV', 'PLL_ADV_X0Y0'), inst('io', 'BUFIO2', 'BUFIO2_X1Y6')], nets: [net(['io', 'DIVCLK'], [['p', 'CLKIN2']])] };
+  assert.ok(cmtInputBits(design, design.insts[0], t).has('3554,441'));
+  // the clock pads' routes measured one PIP at a time with their far bits: the I/O words', a CMT's input in its column
+  const cmt = db('xc6slx16-pips-cmt').pips;
+  assert.deepEqual(cmt['REG_B REGB_CLKPIN2 -> I_BUFIO2_BOT_SITE6'], ['3554,-499', '3554,-516']);
+  assert.deepEqual(cmt['REG_B REGB_DFB4 -> I_BUFIO2_BOT_SITE4'], ['3554,-594', '3554,-612']);
+  assert.deepEqual(cmt['CMT_PLL_BOT CMT_PLL_CLK_INDIRECT_LRBOT6 -> CMT_CLKMUX_CLKIN2'], [`${CMT_FRAME.xc6slx16},155`, `${CMT_FRAME.xc6slx16},171`]);
+  assert.deepEqual(cmt['CMT_DCM_BOT DCM_CLK_INDIRECT_TB_BOT4 -> DCM1_CLKIN'], [`${CMT_FRAME.xc6slx16},-177`]);
+  assert.deepEqual(db('s6-pips-flow').pips['IOI_BTERM_REGB BTERM_IOIUP_IBUF0 -> BTERM_CLB_CLKPIN6'], []);
 });
