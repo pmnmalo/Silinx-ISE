@@ -6,11 +6,16 @@
 // table, its values exactly the C simulation's. A loop in the function's own body likewise (#2151, foldLoops): its writes
 // to arrays depending only on constants and its own index. Before core/c-dataflow.js and core/c-fsmd.js. Isomorphic ES
 // module.
+// A static object's constructor (#1964, core/c-struct.js's calls) likewise: run when the source is checked, its
+// arguments constants, its body reading only constants; the object's variables get its results as initial values, in
+// the C simulation as in synthesis, so its state is a register set at the reset.
 //
 //   foldTables(checked, diagnostics) -> the names of the tables folded ('function:array'); the warnings of the loops no
 //   longer made taken out of diagnostics
-import { runAtSynthesis } from './c-interp.js';
+//   foldResetCtors({ ast, funcs, globals, consts }, typeOk, report)
+import { runAtSynthesis, runAtReset } from './c-interp.js';
 import { MATH } from './c-float.js';
+import { fixedToDouble } from './c-fixed.js';
 
 const walk = (n, f) => {
   if (!n || typeof n !== 'object') return;
@@ -191,4 +196,88 @@ export function foldTables(checked, diagnostics = []) {
     foldLoops(checked, g, globals, done, diagnostics);
   }
   return done;
+}
+
+const argName = (a) => (a.kind === 'id' ? a.name : a.kind === 'index' || (a.kind === 'unary' && a.op === '&') ? argName(a.e) : null);
+
+/** What a constructor's run cannot depend on, in it and in the functions it calls: the first thing found, or null. */
+function impureCtor(fn, funcs, globals, seen = new Set()) {
+  if (seen.has(fn.name)) return null;
+  seen.add(fn.name);
+  const locals = new Set(fn.params.map((p) => p.name));
+  walk(fn.body, (n) => { if (n.kind === 'decl') n.vars.forEach((v) => locals.add(v.name)); });
+  let found = null;
+  walk(fn.body, (n) => {
+    if (found) return;
+    if (n.kind === 'call' && n.callee.kind === 'id') {
+      const g = funcs.get(n.callee.name);
+      if (g?.body) found = impureCtor(g, funcs, globals, seen);
+      else if (!MATH[n.callee.name]) found = `call '${n.callee.name}'`;
+    } else if (n.kind === 'id' && !locals.has(n.name) && !funcs.has(n.name) && !MATH[n.name] && globals.has(n.name) && !globals.get(n.name).const) found = `read the variable '${n.name}'`;
+  });
+  return found;
+}
+
+export function foldResetCtors(checked, typeOk, report) {
+  const { ast, funcs, globals } = checked;
+  if (!ast.resetCtors?.size) return;
+  const jobs = [];
+  const sized = new Set();
+  // (the types they use, ahead of the functions' checks)
+  const sizes = (n) => {
+    if (!n || typeof n !== 'object' || sized.has(n)) return;
+    sized.add(n);
+    if (['int', 'array', 'ptr', 'stream'].includes(n.kind) && (n.of !== undefined || n.to !== undefined || n.ap)) typeOk(n, n.loc);
+    for (const [k, v] of Object.entries(n)) if (k !== 'loc') sizes(v);
+  };
+  for (const f of funcs.values()) {
+    if (!f.body) continue;
+    const seen = new Map(f.params.map((p) => [p.name, p]));
+    const visit = (n) => {
+      if (Array.isArray(n)) {
+        n.forEach((x, k) => {
+          const c = x?.kind === 'expr' && x.e.kind === 'call' && x.e.callee.kind === 'id' && ast.resetCtors.has(x.e.callee.name) ? x.e : null;
+          const fn = c && funcs.get(c.callee.name);
+          const own = fn ? c.args.filter((_, i) => /^ap_this_/.test(fn.params[i]?.name)) : [];
+          const obj = own.length ? argName(own[0]) : null;
+          const d = obj !== null ? seen.get(obj) ?? globals.get(obj) : null;
+          if (!d?.static && !(d && globals.get(obj) === d)) { visit(x); return; }
+          n[k] = { kind: 'empty', loc: x.loc };
+          const name = obj.slice(0, obj.length - fn.params[c.args.indexOf(own[0])].name.length + 'ap_this'.length);
+          const given = c.args.filter((a) => !own.includes(a));
+          const vars = new Map();
+          let wrong = null;
+          walk(given, (a) => {
+            if (a.kind !== 'id' || funcs.has(a.name) || MATH[a.name]) return;
+            const v = seen.get(a.name);
+            if (v?.kind === 'var' && v.const && v.init) vars.set(a.name, v);
+            else if (v || !globals.get(a.name)?.const) wrong ??= a.name;
+          });
+          if (wrong) { report(x.loc, `'${name}': a static object's constructor runs at synthesis, its state set at the reset: its argument '${wrong}' must be a constant`); return; }
+          const impure = impureCtor(fn, funcs, globals);
+          if (impure) { report(x.loc, `'${name}': a static object's constructor runs at synthesis, its state set at the reset: it cannot ${impure}`); return; }
+          for (const a of own) { const v = seen.get(argName(a)) ?? globals.get(argName(a)); if (v) vars.set(argName(a), v); }
+          sizes([fn, [...vars.values()]]);
+          jobs.push({ call: c, vars: [...vars.values()], loc: x.loc, name });
+        });
+        return;
+      }
+      if (!n || typeof n !== 'object') return;
+      if (n.kind === 'decl') for (const v of n.vars) seen.set(v.name, v);
+      for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type' && v && typeof v === 'object') visit(v);
+    };
+    visit(f.body);
+  }
+  sizes(jobs.flatMap((j) => j.vars));
+  for (const f of funcs.values()) if (f.body && jobs.length) sizes(f.body);
+  const cells = runAtReset(checked, jobs);
+  for (const j of jobs) if (j.error) report(j.loc, `'${j.name}': a static object's constructor runs at synthesis, its state set at the reset: ${j.error}`);
+  for (const [d, c] of cells) {
+    // (an ap_fixed's: its value, not its bits)
+    const value = (x) => literal(c.t?.fx ? fixedToDouble({ v: x.v, t: c.t }) : x.v, d.type, d.loc);
+    d.init = c.arr ? { kind: 'init', items: c.arr.map(value), loc: d.loc } : value(c);
+  }
+  // (a global's: its function gone)
+  for (const [name] of funcs) if (/^ap_global_ctor\d+$/.test(name)) funcs.delete(name);
+  ast.items = ast.items.filter((it) => !(it.kind === 'func' && /^ap_global_ctor\d+$/.test(it.name)));
 }
