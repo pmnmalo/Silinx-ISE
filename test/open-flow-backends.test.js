@@ -13,26 +13,54 @@ function memoryIo(over = {}) {
 }
 const STEPS = ['synth', 'translate', 'map', 'par', 'trce', 'xpwr', 'pin2ucf', 'bitgen'];
 
+// a fake family whose routed design is its own format and file (#2384), read again from an earlier run
+function fakeBackend(calls) {
+  return {
+    id: 'fake', synth: async () => { calls.push('synth'); return SYNTH; },
+    mount: ctx => {
+      let routed = null;
+      const need = () => { routed ??= ctx.io.read('open/top.asc'); if (routed == null) throw new ctx.StepError('nothing routed', [], ''); return routed; };
+      return {
+        runMap: () => calls.push('map'), runPar: async () => { calls.push('par'); routed = '.asc 1'; ctx.report.files.routed = ctx.io.write('open/top.asc', routed); },
+        runTiming: () => calls.push(`timing ${need()}`), runPins: () => calls.push('pins'), runPower: () => calls.push(`power ${need()}`),
+        bitfile: (name, clk) => { calls.push(`bit ${clk} ${need()}`); return { path: ctx.io.write(name, 'bits'), size: 4 }; },
+        runFpgaView: () => calls.push(`view ${need()}`),
+      };
+    },
+  };
+}
+
 test('#2360 a family added by its back end goes through the whole flow with its own steps, and no warnings', async () => {
   const calls = [];
-  const remove = registerBackend({
-    id: 'fake', synth: async () => { calls.push('synth'); return SYNTH; },
-    mount: ctx => ({
-      runMap: () => calls.push('map'), runPar: async () => { calls.push('par'); ctx.setRouted('routed'); },
-      runTiming: () => calls.push(`timing ${ctx.routedText()}`), runPins: () => calls.push('pins'), runPower: () => calls.push('power'),
-      bitfile: (name, clk) => { calls.push(`bit ${clk}`); return { path: ctx.io.write(name, 'bits'), size: 4 }; },
-    }),
-  });
+  const remove = registerBackend(fakeBackend(calls));
   try {
     const { io, log, files } = memoryIo();
-    const r = await runFlow({ top: 'top', family: 'fake', part: 'fake1', device: 'fake1', steps: STEPS, startupClk: 'JtagClk' }, io);
+    const r = await runFlow({ top: 'top', family: 'fake', part: 'fake1', device: 'fake1', steps: [...STEPS, 'fpgaview'], startupClk: 'JtagClk' }, io);
     assert.equal(r.ok, true, r.error);
-    assert.deepEqual(calls, ['synth', 'map', 'par', 'timing routed', 'pins', 'power', 'bit JtagClk']);
+    assert.deepEqual(calls, ['synth', 'map', 'par', 'timing .asc 1', 'pins', 'power .asc 1', 'bit JtagClk .asc 1', 'view .asc 1']);
     assert.equal(files['top.bit'], 'bits');
+    assert.equal(r.report.files.routed, 'build/open/top.asc');
+    assert.ok(!Object.keys(files).some(n => /xdl/.test(n)), Object.keys(files).join());
     assert.deepEqual(log.filter(l => /^(WARNING|ERROR)/.test(l)), []);
     assert.equal(log.at(-1), '=== SILINX DONE ===');
   } finally { remove(); }
   assert.notEqual(backendOf('fake').id, 'fake');
+});
+
+test('#2384 the routed design is the back end\'s: an earlier run\'s read in its format, or the back end\'s error when there is none', async () => {
+  const calls = [];
+  const remove = registerBackend(fakeBackend(calls));
+  try {
+    const { io, files } = memoryIo();
+    files['open/top.asc'] = '.asc 0';
+    const r = await runFlow({ top: 'top', family: 'fake', steps: ['trce', 'bitgen', 'prombit'], startupClk: 'JtagClk' }, io);
+    assert.equal(r.ok, true, r.error);
+    assert.deepEqual(calls, ['timing .asc 0', 'bit JtagClk .asc 0', 'bit Cclk .asc 0']);
+    const none = memoryIo();
+    const r2 = await runFlow({ top: 'top', family: 'fake', steps: ['trce'] }, none.io);
+    assert.equal(r2.ok, false);
+    assert.deepEqual(none.log.slice(-2), ['ERROR:Silinx - nothing routed', '=== SILINX FAILED trce (exit 1) ===']);
+  } finally { remove(); }
 });
 
 test('#2360 a back end\'s step that fails: the flow reports it as any step, with its hint', async () => {
@@ -56,7 +84,7 @@ test('#2360 the registry: the two families, the others implemented as the Sparta
   assert.throws(() => registerBackend({ id: 'spartan6', mount() {} }), /has its back end/);
 });
 
-test('#2360 the orchestrator names no family and no engine', () => {
+test('#2360 #2384 the orchestrator names no family, no engine and no routed design\'s format', () => {
   const code = fs.readFileSync(new URL('../packages/silinx-fpga/src/open-flow-core.js', import.meta.url), 'utf8').split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).map(l => l.replace(/\s\/\/ .*$/, '')).join('\n');
-  assert.deepEqual(code.match(/spartan\w*|nextpnr|mountS6|\bs6\b|spec\.engine|spec\.family\s*[!=]=/gi) || [], []);
+  assert.deepEqual(code.match(/spartan\w*|nextpnr|mountS6|\bs6\b|spec\.engine|spec\.family\s*[!=]=|xdl|routed\.\w+/gi) || [], []);
 });

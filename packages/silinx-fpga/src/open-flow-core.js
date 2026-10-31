@@ -81,7 +81,7 @@ export async function runFlow(spec, io) {
   // and the placements more at High, each routed only when its estimate is promising (#651)
   const parExtra = () => effortExtra(spec.synthEffort);
   const ucfText = io.ucf || null;
-  let synth = null, netlist = null, netlistText = null, routedText = null;
+  let synth = null, netlist = null, netlistText = null;
   const backend = backendOf(spec.family);
 
   async function runSynth() {
@@ -144,7 +144,7 @@ export async function runFlow(spec, io) {
   // The design the simulation models are made of (#120, #121): synthesized with the generics the test bench (open-flow-models.js)
   const { runPostMap, runPostPar, runPostSynth, runPostTranslate } = (io.simModels || noSimModels)({
     io, spec, knownPips, log, netlist: () => netlist, packed: () => impl.packed?.() ?? null, parTries, parExtra, report,
-    routedOrEarlier: (...a) => routedOrEarlier(...a), routedText: () => routedText, step, synth: () => synth, top,
+    routedOrEarlier: (...a) => impl.routedOrEarlier(...a), routedText: () => impl.routedText(), step, synth: () => synth, top,
     ucfText
   });
 
@@ -160,13 +160,10 @@ export async function runFlow(spec, io) {
     log(`Netlist of <${top}> read; constraints: ${ucfText ? `${io.ucfName || 'the UCF'}, ${locs} pin location(s), ${(ucf.clocks || []).length} PERIOD constraint(s)` : 'none'}.`);
   }
 
-  // the family's Map, Place & Route, timing and bitstream (open-flow-backends.js, #2360)
-  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, top, knownPips, parTries, parExtra, ucfText, StepError,
-    setRouted: t => { routedText = t; }, routedText: () => routedText, routedOrEarlier: (...a) => routedOrEarlier(...a) });
+  // the family's Map, Place & Route, timing and bitstream (open-flow-backends.js, #2360); the routed design is the back
+  // end's, in its format: the steps after Place & Route read it, or an earlier run's (#2384)
+  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, top, knownPips, parTries, parExtra, ucfText, StepError });
   const { bitfile, runPins, runPower, runTiming } = impl;
-
-  // (Place & Route of an earlier run: the routed design it wrote)
-  const routedOrEarlier = () => { if (routedText == null) routedText = io.read('open/routed.xdl'); if (routedText == null) throw new StepError('no routed design: run Place & Route first', [], ''); };
 
   let steps = spec.steps;
   try {
@@ -189,29 +186,23 @@ export async function runFlow(spec, io) {
     if (steps.includes('map')) { step('map'); impl.runMap(); save(); }
     if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
     if (steps.includes('par')) { step('par'); await impl.runPar(); save(); }
-    if (steps.includes('trce')) { step('trce'); routedOrEarlier(); runTiming(); save(); }
+    if (steps.includes('trce')) { step('trce'); runTiming(); save(); }
     if (steps.includes('postpar')) { step('postpar'); await runPostPar(); save(); }
     if (steps.includes('pin2ucf')) { step('pin2ucf'); runPins(); save(); }
     if (steps.includes('xpwr')) { step('xpwr'); runPower(); save(); }
     if (steps.includes('bitgen')) {
       step('bitgen');
-      routedOrEarlier();
       report.bit = bitfile(`${top}.bit`, spec.startupClk);
       save();
       log(`Bitstream: build/${top}.bit (${report.bit.size} bytes, every feature in the bit database)`);
     }
     if (steps.includes('prombit')) {
       step('prombit');
-      routedOrEarlier();
       report.prom = bitfile(`${top}_prom.bit`, 'Cclk');
       save();
       log(`PROM bitstream (StartUpClk Cclk): build/${top}_prom.bit`);
     }
-    if (steps.includes('fpgaview')) {
-      step('fpgaview');
-      if (io.read('open/routed.xdl') == null) throw new StepError('no routed design: run Place & Route first', [], '');
-      log(`The FPGA view reads ${report.files.routed || 'build/open/routed.xdl'}.`);
-    }
+    if (steps.includes('fpgaview')) { step('fpgaview'); impl.runFpgaView(); }
     log('=== SILINX DONE ===');
     return { ok: true, report };
   } catch (e) {

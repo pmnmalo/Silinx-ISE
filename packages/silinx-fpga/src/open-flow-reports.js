@@ -7,14 +7,16 @@ import { parseUcf, pinsUcf } from './ucf.js';
 import { parseXdl, placedPins } from './xdl.js';
 import { StepError } from './open-flow-core.js';
 
-/** { bitfile, runPins, runPower, runTiming } of runOpenFlow (routedText(): its current values). reports: the family's
- *  { analyze, switching, model, bitstream } (open-flow-backends.js, #2360). */
+/** { bitfile, runFpgaView, runPins, runPower, runTiming } of runOpenFlow (routedText(): the routed design's XDL, read
+ *  again from an earlier run by routedOrEarlier, #2384). reports: the family's { analyze, switching, model, bitstream }
+ *  (open-flow-backends.js, #2360). */
 export function mountFlowReports(ctx) {
   const {
     io, spec, log, report, reports, routedOrEarlier, routedText, top, ucfText
   } = ctx;
 
   function runTiming() {
+    routedOrEarlier();
     const design = parseXdl(routedText());
     const pu = ucfText ? parseUcf(ucfText) : { clocks: [], other: [] };
     const constraints = pu.clocks || [];
@@ -67,6 +69,7 @@ export function mountFlowReports(ctx) {
   }
 
   function bitfile(name, startupClk) {
+    routedOrEarlier();
     const sc = /^cclk$/i.test(startupClk) ? 'Cclk' : /^userclk$/i.test(startupClk) ? 'UserClk' : 'JtagClk';
     const { bytes } = reports.bitstream(ctx, sc);
     return { path: io.write(name, bytes), size: bytes.length };
@@ -98,5 +101,11 @@ export function mountFlowReports(ctx) {
     log(`Estimated power: ${est.totalMw.toFixed(2)} mW (dynamic ${est.dynamicMw.toFixed(2)} mW, static ${est.staticMw.toFixed(2)} mW), junction ${est.junctionC.toFixed(1)} C: build/${top}.pwr (an estimate, not Xilinx XPower)`);
   }
 
-  return { bitfile, runPins, runPower, runTiming };
+  // the FPGA view (the IDE's) reads the routed design's file
+  function runFpgaView() {
+    if (io.read('open/routed.xdl') == null) throw new StepError('no routed design: run Place & Route first', [], '');
+    log(`The FPGA view reads ${report.files.routed || 'build/open/routed.xdl'}.`);
+  }
+
+  return { bitfile, runFpgaView, runPins, runPower, runTiming };
 }
