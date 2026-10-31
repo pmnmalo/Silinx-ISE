@@ -18,7 +18,7 @@ import { hdlName } from './c-graph.js';
 import { BOOL, typeOf } from './c-types.js';
 import { memMethods, MEM_MIN } from './c-mem.js';
 import { partitionMethods } from './c-partition.js';
-import { fifoMethods } from './c-fifo.js';
+import { fifoMethods, fifoSuffix } from './c-fifo.js';
 import { wordMethods } from './c-agg-mem.js';
 import { loopPragma, tripcountArgs, unrollBy } from './c-pragma.js';
 import { inlineCalls } from './c-inline.js';
@@ -241,7 +241,7 @@ class SeqFlow extends Flow {
       }
       // (ap_ctrl_chain: ap_ctrl_hs's and ap_continue, the module holding ap_done until it is taken, #1965)
       else if (a.port === 'return' && mode === 'ap_ctrl_chain') this.ctrl = mode;
-      else if (a.port && a.port !== 'return') this.modes.set(a.port, mode);
+      else if (a.port && a.port !== 'return' && !(st.pragma.of && /^ap_(fifo|hs)$/.test(mode))) this.modes.set(a.port, mode);   // (a struct's ap_fifo: #1668's)
     }
     this.retType = fn.ret.kind === 'void' ? null : typeOf(fn.ret);
     this.regs = new Map();
@@ -250,6 +250,7 @@ class SeqFlow extends Flow {
       // (the calls of a function with a loop, or given an array: inlined, its loops the top's, #1632)
       const inl = { ...fn, body: inlineCalls(fn, withSeqMath(funcs), (loc, m) => this.error(loc, m)) };
       this.fn = inl;
+      this.ptrFifoAccesses(inl);   // (a pointer with ap_fifo or ap_hs: a stream's accesses, #1901)
       const { body, decls } = this.renameLocals(inl);
       this.makeRegisters(inl, decls);
       markAutoPipeline(body.items, { threshold: this.pipelineLoops, trip: (l) => this.tripOf(l), why: (l) => this.pipeWhy(l), autoWhy: (l) => this.pipeWhy(l) || (innerLoops(l.body).some((x) => this.hasMem(x)) ? 'a loop that accesses a memory is in it' : null) });
@@ -288,6 +289,7 @@ class SeqFlow extends Flow {
     // ARRAY_PARTITION (#1529): complete, the array's elements registers, whatever its size; block, cyclic and a dimension
     // of an array of more, several memories (core/c-partition.js, #1920)
     this.partPragmas(fn.body);
+    this.storage = this.memStorage(fn);
     const names = new Set([...fn.params.map((p) => p.name), ...decls.map((v) => v.name), ...this.globals.keys()]);
     const used = (n) => names.has(n) || this.slots.has(n);
     for (const pa of fn.params) if (pa.type.kind === 'array' && this.partWhole(pa)) this.warn(pa.loc, `#pragma HLS ARRAY_PARTITION of the argument '${pa.name}' is not made yet: it is ap_memory`);
@@ -297,6 +299,7 @@ class SeqFlow extends Flow {
     for (const pa of fn.params) {
       const t = pa.type;
       if (this.wordOf.has(pa.name)) { this.slots.set(pa.name, this.fieldSlot(pa)); continue; }
+      if (this.ptrFifoMode(pa)) { this.slots.set(pa.name, this.fifoSlot(pa)); continue; }   // (#1901)
       if (t.kind === 'ptr' && t.to.kind === 'array') this.error(pa.loc, `the argument '${pa.name}': a pointer to an array is not supported: write it as an array, ${pa.name}[N]`);
       if (t.kind === 'array' && this.partOf(pa, true)) { this.slots.set(pa.name, this.bankSlot(pa, this.partOf(pa, true), { ext: true, used })); continue; }
       if (t.kind === 'array') { this.slots.set(pa.name, this.bramOf(this.memSlot({ ...pa, const: !!t.of.const }, { ext: true }), pa.name)); continue; }
@@ -361,7 +364,7 @@ class SeqFlow extends Flow {
     const parted = t.kind === 'array' && (this.partWhole(v));
     const init = (e, et) => (e ? this.constOf(e, et) : 0n);
     if (t.kind === 'array') {
-      if (this.arrayLength(v) > MEM_MIN && !parted) return this.memSlot(v);
+      if ((this.arrayLength(v) > MEM_MIN || this.storage?.has(v.orig ?? v.name)) && !parted) return this.memSlot(v);
       const et = typeOf(t.of);
       if (!et) this.error(v.loc, `'${v.name}': only arrays of integers (one dimension) are supported yet`);
       const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : null);
@@ -626,9 +629,9 @@ class SeqFlow extends Flow {
       if (fifo) {
         // ap_fifo: read, _dout _empty_n _read; written, _din _full_n _write
         if (!fifo.used) continue;
-        const p = (sfx, dir, w, node) => { ports.push({ name: `${pa.name}${sfx}`, dir, w, s: false, role: 'fifo', param: pa.name }); if (node != null) outputs.set(`${pa.name}${sfx}`, { node }); };
-        if (fifo.dir === 'in') { p('_dout', 'in', fifo.t.w, null); p('_empty_n', 'in', 1, null); p('_read', 'out', 1, fifo.go); }
-        else { p('_din', 'out', fifo.t.w, fifo.d); p('_full_n', 'in', 1, null); p('_write', 'out', 1, fifo.go); }
+        const p = (port, dir, w, node) => { const sfx = fifoSuffix(fifo, port); ports.push({ name: `${pa.name}${sfx}`, dir, w, s: false, role: 'fifo', param: pa.name }); if (node != null) outputs.set(`${pa.name}${sfx}`, { node }); };
+        if (fifo.dir === 'in') { p('dout', 'in', fifo.t.w, null); p('empty_n', 'in', 1, null); p('read', 'out', 1, fifo.go); }
+        else { p('din', 'out', fifo.t.w, fifo.d); p('full_n', 'in', 1, null); p('write', 'out', 1, fifo.go); }
         continue;
       }
       const banks = this.slots?.get(pa.name)?.banks;
@@ -661,8 +664,8 @@ class SeqFlow extends Flow {
       stateT: this.stateT, ports, outputs, ctrl: this.ctrl ?? 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
       ...(this.freeRun ? { freeRun: this.freeRun, fnPipe: { ii: this.fnPipe.pipeII, depth: this.fnPipe.depth, ...(this.fnPipe.memII ? { why: this.fnPipe.memII } : {}) } } : {}),
       ...(this.statesAdded ? { overflow: this.statesAdded } : {}), ...(this.subStates ? { subStates: this.subStates } : {}), slowLoops: this.slowLoops || [],
-      loops: this.loops || [], blocks: this.reached || [], loopStates: (this.loopReport || []).map((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.port ?? x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}), ...(x.fields ? { fields: x.fields } : {}) })),
-      extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.port ?? x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written, ...(x.fields ? { fields: x.fields } : {}), ...(x.bram ? { bram: x.bram } : {}), ...(x.part ? { part: x.part } : {}) })),
+      loops: this.loops || [], blocks: this.reached || [], loopStates: (this.loopReport || []).map((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.port ?? x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}), ...(x.ptr ? { ptr: x.ptr } : {}), ...(x.hs ? { hs: true } : {}), ...(x.fields ? { fields: x.fields } : {}) })),
+      extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.port ?? x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written, ...(x.fields ? { fields: x.fields } : {}), ...(x.bram ? { bram: x.bram } : {}), ...(x.part ? { part: x.part } : {}), ...(x.storage ? { storage: x.storage } : {}) })),
     };
   }
 }
