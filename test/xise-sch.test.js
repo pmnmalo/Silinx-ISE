@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { importXise, exportXise, importIseSchematics, exportIseSchematics } from '../server/xise.js';
+import { importXise, exportXise, importIseSchematics, exportIseSchematics, exportCSources } from '../server/xise.js';
 import { compile, elaborate } from '../core/compile.js';
 
 const F = new URL('./fixtures/ise-sch/', import.meta.url);
@@ -37,4 +37,33 @@ test('xise schematics are imported as synchronized schematics and exported back 
   const again = importIseSchematics({ 'Mux4to1b4.sch': sch.files.find(f => f.path === 'Mux4to1b4.sch').text },
     { existing: p => ({ 'Mux4to1b4.sch.json': JSON.stringify(docs['Mux4to1b4.sch.json']), 'Mux4to1b4.vhd': sources['Mux4to1b4.vhd'] })[p] });
   assert.deepEqual(JSON.parse(again[0].jsonText), docs['Mux4to1b4.sch.json']);
+});
+
+// a C source goes out as its HDL (#2320)
+const C_SRC = 'int twice(int a) {\n  return a + a;\n}\n';
+test('C sources: exported as their HDL in the project\'s language, listed in the .xise', () => {
+  const vhdl = exportCSources({ preferredLanguage: 'vhdl' }, { 'src/twice.c': C_SRC, 'src/x.vhd': 'not C' });
+  assert.deepEqual(vhdl.extraFiles, [{ path: 'src/twice.c.vhd', lang: 'vhdl', role: 'design' }]);
+  assert.deepEqual(vhdl.warnings, []);
+  assert.deepEqual(vhdl.files.map(f => f.path), ['src/twice.c.vhd']);
+  const lib = compile([{ path: 'src/twice.c.vhd', lang: 'vhdl', text: vhdl.files[0].text }]);
+  assert.deepEqual(lib.errors.filter(e => e.severity === 'error'), []);
+  assert.deepEqual(elaborate(lib, 'twice').diags, []);
+  const verilog = exportCSources({ preferredLanguage: 'verilog' }, { 'src/twice.c': C_SRC });
+  assert.deepEqual(verilog.extraFiles, [{ path: 'src/twice.c.v', lang: 'verilog', role: 'design' }]);
+  const vlib = compile([{ path: 'src/twice.c.v', lang: 'verilog', text: verilog.files[0].text }]);
+  assert.deepEqual(vlib.errors.filter(e => e.severity === 'error'), []);
+  assert.deepEqual(elaborate(vlib, 'twice').diags, []);
+  const parsed = importXise(exportXise({ name: 'c', top: 'twice', files: [], device: {} }, { extraFiles: vhdl.extraFiles, sources: { 'src/twice.c.vhd': vhdl.files[0].text } }));
+  assert.deepEqual(parsed.files, [{ path: 'src/twice.c.vhd', lang: 'vhdl', role: 'design' }]);
+});
+
+test('C sources: none, a module an HDL file defines (that file), a C source with errors (a warning)', () => {
+  assert.deepEqual(exportCSources({}, {}), { extraFiles: [], files: [], warnings: [] });
+  const hdl = 'entity twice is end;\narchitecture a of twice is begin end;\n';
+  assert.deepEqual(exportCSources({}, { 'src/twice.c': C_SRC }, { 'src/twice.vhd': hdl }), { extraFiles: [], files: [], warnings: [] });
+  const bad = exportCSources({}, { 'src/bad.c': 'int f( {' });
+  assert.deepEqual([bad.extraFiles, bad.files], [[], []]);
+  assert.equal(bad.warnings.length, 1);
+  assert.match(bad.warnings[0], /^src\/bad\.c: not exported, its HDL could not be made \(src\/bad\.c: line 1: /);
 });

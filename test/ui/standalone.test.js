@@ -22,7 +22,7 @@ const devEnv = () => { const e = { ...process.env }; delete e.GITHUB_REF; return
 import { VERSION, versionLabel } from '../../core/version.js';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import { createZip } from '../../core/zip.js';
+import { createZip, readZip } from '../../core/zip.js';
 import { EXAMPLE_ORDER } from '../../core/examples.js';
 import { TEST_DESIGN_ORDER } from '../../core/test-designs.js';
 
@@ -1248,6 +1248,28 @@ uiTest('#483 browser edition: a hostile zip (paths leaving the project, a broken
   });
   assert.equal(await page.eval(() => [...document.querySelectorAll('#hier .lbl')].some((e) => /^top\b/.test(e.textContent))), true, 'the top module in the hierarchy');
   assert.equal(await page.eval(() => document.getElementById('err-count').textContent), '', 'no error');
+}, { url: () => 'about:blank' });
+
+uiTest('#2320 browser edition: Export Xilinx ISE Project writes a C source as its HDL, in the zip and the .xise, not the C', E, async (page) => {
+  const codec = { deflate: (d) => zlib.deflateRawSync(d), inflate: (d) => zlib.inflateRawSync(d) };
+  const pj = { name: 'CMod', top: 'twice', preferredLanguage: 'vhdl', files: [] };
+  const zipFile = path.join(env.tmp, 'c-module-silinx.zip');
+  await fs.writeFile(zipFile, await createZip([{ path: 'silinx.json', data: JSON.stringify(pj) }, { path: 'src/twice.c', data: 'int twice(int a) {\n  return a + a;\n}\n' }], codec));
+  await page.goto(siteUrl);
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx.devices, [], { what: 'site boot' });
+  await page.menu('File', 'Import Silinx ISE Project (.zip)…');
+  await page.waitDialog('Import Silinx ISE Project');
+  await page.setFiles('.dlg-overlay input[type=file]', [zipFile]);
+  await page.fill('.dlg-overlay input[type=text]', 'CMod');
+  await page.dialogButton('Import');
+  await page.waitFor(() => window.Silinx.project?.name === 'CMod' && document.querySelector('#hier .row'), [], { what: 'the imported project open' });
+  await page.menu('File', 'Export Xilinx ISE Project (.zip)…');
+  const entries = await readZip(new Uint8Array(await fs.readFile(await waitDownload(page, 'CMod.zip'))), codec);
+  const text = (p) => Buffer.from(entries.find((e) => e.path === p).data).toString('utf8');
+  assert.deepEqual(entries.map((e) => e.path).sort(), ['CMod.xise', 'src/twice.c.vhd']);
+  assert.match(text('src/twice.c.vhd'), /entity twice is/i);
+  assert.match(text('CMod.xise'), /xil_pn:name="src\/twice\.c\.vhd" xil_pn:type="FILE_VHDL"/);
+  assert.equal((await page.consoleText()).split('\n').filter((l) => /^WARNING/.test(l)).length, 0);
 }, { url: () => 'about:blank' });
 
 // #487: the static editions carry a Content-Security-Policy (a <meta>: the page's inline scripts by their
