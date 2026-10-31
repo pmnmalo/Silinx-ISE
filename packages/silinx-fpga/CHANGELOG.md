@@ -3,9 +3,18 @@
 What changed in each version of silinx-fpga, the Silinx toolchain. The newest version is first. Its versions
 are its own (semver, 0.x until its API is stable), apart from Silinx ISE's.
 
+## 0.1.4
+
+The first version on npm: 0.1.3 was tagged, but its CI failed on a UI test of Silinx ISE, fixed since (#2395).
+
+In detail:
+
+- **0.1.3 published (#1681):** the package is 0.1.3's, unchanged; 0.1.3 was not published, its tag's CI having failed on
+  Silinx ISE's Preferred Language UI test (#2395).
+
 ## 0.1.3
 
-The first version on npm: 0.1.2 was tagged and tested, but npm refused it with no repository in its package.json
+0.1.2 was tagged and tested, but npm refused it with no repository in its package.json
 (#2382). 0.1.1's and 0.1.2's changes are in it.
 
 In short:
