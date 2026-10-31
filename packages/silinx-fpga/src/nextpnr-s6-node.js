@@ -3,6 +3,7 @@
 // fork pmnmalo/nextpnr-spartan's release, @silinx/nextpnr-himbaechel-spartan6), loaded on its first use (the runner:
 // nextpnr-io.js).
 import { nextpnrIo } from './nextpnr-io.js';
+import { withChipdbFetch } from './nextpnr-chipdb-node.js';
 
-/** io.nextpnrS6 in this process: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }. */
-export const nextpnrS6Node = () => nextpnrIo(() => import('@silinx/nextpnr-himbaechel-spartan6'), 'runNextpnrHimbaechelSpartan6');
+/** io.nextpnrS6 in this process: { run(args, files, onLine) -> files, chipdb(part, log) -> Uint8Array } (a database the release zip left out: downloaded, #2329). */
+export const nextpnrS6Node = () => withChipdbFetch(nextpnrIo(() => import('@silinx/nextpnr-himbaechel-spartan6'), 'runNextpnrHimbaechelSpartan6'));

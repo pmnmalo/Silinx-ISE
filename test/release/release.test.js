@@ -104,6 +104,18 @@ test('release zip: the device measurements left out, the bit database the app re
   for (const f of ['packages/silinx-fpga/bitdb/s3e-tiles.json', 'packages/silinx-fpga/research/s3e-device/build-measured.mjs']) assert.ok(exists(f), f);
 });
 
+test('release zip: nextpnr\'s chip databases and the tests left out, a manifest in their place (#2329)', { skip: SKIP }, () => {
+  for (const f of ['test', 'packages/silinx-fpga/test']) assert.equal(exists(f), false, `${f} not packaged`);
+  for (const [pkg, device] of [['spartan3e', 'xc3s250e'], ['spartan6', 'xc6slx16']]) {
+    const dir = `node_modules/@silinx/nextpnr-himbaechel-${pkg}`;
+    assert.equal(exists(`${dir}/chipdb/chipdb-${device}.bin.gz`), false, `${device}'s database not packaged`);
+    assert.ok(exists(`${dir}/gen/bundle.js`), `${dir}/gen/bundle.js in the zip`);
+    const { url, version, files } = JSON.parse(fs.readFileSync(path.join(APP, dir, 'chipdb/fetch.json'), 'utf8'));
+    assert.ok(url.startsWith('https://github.com/pmnmalo/nextpnr-spartan/releases/download/') && url.includes(`v${version}/`), url);
+    assert.match(files[`chipdb-${device}.bin.gz`].sha256, /^[0-9a-f]{64}$/);
+  }
+});
+
 test('release zip: within its size budget', { skip: SKIP }, () => {
   const zipMB = fs.statSync(zip).size / 1048576, appMB = sizeOf(APP) / 1048576;
   const biggest = fs.readdirSync(path.join(APP, 'node_modules')).flatMap((f) => (f.startsWith('@') ? fs.readdirSync(path.join(APP, 'node_modules', f)).map((g) => `${f}/${g}`) : [f]))

@@ -224,7 +224,7 @@ export function mountNextpnrSteps(ctx) {
   async function runPar() {
     if (!input) runMap();
     const t = now();
-    const db = await io.nextpnr.chipdb(part);
+    const db = await io.nextpnr.chipdb(part, log);
     // each clock's PERIOD as its target (the SDC), the tightest for the clocks with none (each met or not: the timing step's)
     let mhz = null;
     try { const c = ucfText ? parseUcf(ucfText).clocks || [] : []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
