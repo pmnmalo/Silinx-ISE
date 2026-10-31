@@ -169,7 +169,7 @@ export async function openTtSchematic(ttPath) {
 }
 // the table changed (edited, or read back from its HDL): its schematic, when open, follows
 let ttSchT = null;
-function refreshTtSchematic(ttPath, model) {
+export function refreshTtSchematic(ttPath, model) {
   if (!findDoc(`ttsch:${ttPath}`)) return;
   clearTimeout(ttSchT);
   ttSchT = setTimeout(async () => { const d = findDoc(`ttsch:${ttPath}`); if (d?.showTt) d.showTt(await ttSchematicDoc(model)); }, 150);

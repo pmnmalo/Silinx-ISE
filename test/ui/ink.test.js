@@ -82,6 +82,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   ]);
 
   // the editor's Handwritten… (#2010): the same expression written with the mouse, a finger and a pen
+  await page.click(`${T} .tb-more-btn`);
   await page.click(`${T} .tt-ink`);
   await page.waitDialog('Handwritten Expression');
   // the pad: a finger writes on it, the page does not pan
@@ -149,6 +150,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   assert.equal(await cells(page, 'F'), '01011101');
 
   // the editor: F = A | C, its | drawn by a finger with page.touchDrag; its inputs the expression's, A and C (#2010)
+  await page.click(`${T} .tb-more-btn`);
   await page.click(`${T} .tt-ink`);
   await page.waitDialog('Handwritten Expression');
   const boxes = await write(page, 'F=A C', { kind: () => 'mouse', seed: 5 });
@@ -163,6 +165,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   assert.equal(await cells(page, 'F'), '0111');
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-expr-err`).textContent, T), '');
   // two equations, a line each, with names the table does not have: the editor's inputs, outputs and expressions
+  await page.click(`${T} .tb-more-btn`);
   await page.click(`${T} .tt-ink`);
   await page.waitDialog('Handwritten Expression');
   await write(page, 'S=A⊕B', { seed: 2 });

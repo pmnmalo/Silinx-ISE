@@ -38,7 +38,8 @@ uiTest('#405 ASM editor parts: the view, Arrange, a box added and deleted, a box
   const model = () => page.eval(() => window.Silinx.active.asmEditor.getModel());
   const problems = () => page.eval(() => window.Silinx.active.asmEditor.validate().map((d) => `${d.severity}: ${d.message}`));
   // (Undo / Redo: the main toolbar's buttons, #220)
-  const tool = (label) => (/^[↶↷]$/.test(label) ? page.click(`${D} .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click(`${D} .asm-toolbar .asm-btn`, { text: label }));
+  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`${D} .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click(`${D} .asm-toolbar .asm-btn`, { text: label }));
+  const tool = async (label) => { if (/^(Arrange|# Snap)$/.test(label)) await page.click('.doc:not([hidden]) .tb-more-btn'); return tool0(label); };   // (in the menu, #2261)
   const side = (label) => page.click(`${D} .asm-selection .asm-btn`, { text: label });
   const edges = async () => (await model()).edges.map((e) => `${e.id}:${e.from}>${e.to}:${e.port}`).join(' ');
   const E0 = 'e1:s1>d1:next e2:d1>s2:true e3:d1>s1:false e4:s2>c1:next e5:c1>s3:01 e6:c1>s1:others e7:s3>s1:next';

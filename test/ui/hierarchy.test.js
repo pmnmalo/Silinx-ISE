@@ -523,7 +523,7 @@ end architecture rtl;
 
 // a drawing's HDL language (its editor's HDL language, a schematic's Language, a Petri net's Source Properties): its HDL file made again in it, the other one
 // removed (no Generate HDL any more, #220); a truth table's too (#696)
-uiTest('a drawing\'s HDL language changed in its editor (ASM chart, state diagram, truth table; a schematic\'s Language; a Petri net\'s in Source Properties, #2254): its HDL file made again in that language, the other one removed (#220, #696)', E, async (page) => {
+uiTest('a drawing\'s HDL language changed (a schematic\'s Language; a Petri net\'s in Source Properties, #2254; by the project\'s Preferred Language: ASM chart, state diagram, truth table, #2257, #2260, #2261): its HDL file made again in that language, the other one removed (#220, #696)', E, async (page) => {
   await makeProject(env, { name: 'H_lang', top: '', files: charts('vhdl') });
   await page.openProject('H_lang');
   for (const k of KINDS) {
@@ -537,7 +537,12 @@ uiTest('a drawing\'s HDL language changed in its editor (ASM chart, state diagra
         await page.eval((l) => { const s = document.querySelector('.dlg-overlay .form-grid select'); s.value = l; s.dispatchEvent(new Event('change')); }, lang);
         await page.dialogButton('OK');
         await page.waitNoDialog();
-      } else await page.eval((l) => { const s = document.querySelector('.doc:not([hidden]) select[title="HDL language"]') || [...document.querySelectorAll('.doc:not([hidden]) .se-field')].find((f) => f.querySelector('label').textContent === 'Language').querySelector('select'); s.value = l; s.dispatchEvent(new Event('change')); }, lang);
+      } else await page.eval(async (l) => {
+        // (the ASM chart, the state diagram and the truth table: no Language in their toolbars, the project's Preferred Language)
+        const s = [...document.querySelectorAll('.doc:not([hidden]) .se-field')].find((f) => f.querySelector('label').textContent === 'Language')?.querySelector('select');
+        if (!s) { await (await import('/js/drawings-lang.js')).drawingsInLanguage(l); return; }
+        s.value = l; s.dispatchEvent(new Event('change'));
+      }, lang);
       await page.waitFor((f, h, o) => window.Silinx.hdlToSch?.[h] === f && !window.Silinx.fileTree.includes(o), [k.file, `src/${k.name}.${ext}`, `src/${k.name}.${other}`], { what: `${k.file} in ${L}`, timeout: 15000 });
       await page.waitConsole(new RegExp(`${k.file.replace(/\./g, '\\.')}: its HDL is now in ${L}, src/${k.name}\\.${ext} \\(src/${k.name}\\.${other} removed\\)`));
       const d = JSON.parse(await readWs(env, 'H_lang', k.file));

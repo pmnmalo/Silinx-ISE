@@ -3,7 +3,7 @@ export const FSM_PT = {
   // New Source, menus, processes, hierarchy
   'FSM State Diagram Editor…': 'Editor de Diagramas de Estados FSM…',
   'View/Edit State Diagram (FSM)': 'Ver/Editar Diagrama de Estados (FSM)', 'Convert to State Diagram (FSM)…': 'Converter para Diagrama de Estados (FSM)…',
-  'Open State Diagram': 'Abrir Diagrama de Estados', 'Convert to ASM chart': 'Converter para fluxograma ASM',
+  'Open State Diagram': 'Abrir Diagrama de Estados', 'Convert to ASM chart': 'Converter para fluxograma ASM', 'Convert the diagram': 'Converter o diagrama',
   'Convert to State Diagram': 'Converter para Diagrama de Estados', 'Create Boolean Algebra': 'Criar Álgebra Booleana',
   
   '— generated from the diagram': '— gerado a partir do diagrama',
