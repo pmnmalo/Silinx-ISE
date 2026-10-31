@@ -3,6 +3,44 @@
 What changed in each version of silinx-fpga, the Silinx toolchain. The newest version is first. Its versions
 are its own (semver, 0.x until its API is stable), apart from Silinx ISE's.
 
+## 0.1.1
+
+The first version on npm: 0.1.0 was tagged but not published, its CI having failed on two breaks fixed since
+(#2329, #2335).
+
+In short:
+
+- **`--engine nextpnr` takes fewer slices:** flip-flops alone share the carry chains' slices, and a chain's carry in at 1 costs no LUT.
+- **`--engine nextpnr` gives faster designs:** about 2 % shorter periods, for a longer Place & Route.
+
+In detail:
+
+- **nextpnr's chip databases on first use (#2329):** `nextpnrNode()` and `nextpnrS6Node()` download a database their package
+  does not have, when its `chipdb/fetch.json` says where (Silinx ISE's release zip leaves them out), check its size and
+  SHA-256 and keep it in `~/.silinx/nextpnr/`. An installation from npm has them all, and nothing changes. The module:
+  `src/nextpnr-chipdb-node.js`, tested by test/nextpnr-chipdb.test.js.
+- **nextpnr from npm (#2307):** the dependency `@silinx/nextpnr-himbaechel-spartan3e` is pinned by its version on npm,
+  0.11.2 (published by nextpnr-spartan's CI through npm's trusted publishing, with its provenance), no longer by the URL
+  of its GitHub release. Its engine is v0.11.0's.
+- **The nextpnr engine's packing, flip-flops in carry slices (#2223):** the dependency `@silinx/nextpnr-himbaechel-spartan3e` is now
+  nextpnr-spartan v0.10.0. A flip-flop alone takes a free place of a chain's slices when BX / BY is free or carries the same net and the
+  control set suits (fpga/pack-luts.js's way); a chain's carry in at 1 comes from the CLB's VCC site (XDL's `vcc` net to BX); a stage's
+  constant select reads a LUT giving it. src/fpga/nextpnr-xdl.js needs no change: its settings for those slices are checked.
+  - **Research:** research/nextpnr-s3e/ffcarry.v.
+  - **Tests:** test/nextpnr-engine.test.js (test/fixtures/nextpnr-engine/ffcarry.*: the mixed slices' settings, the `vcc` net; the VGA example's size).
+- **The nextpnr engine's placer (#2222):** the dependency `@silinx/nextpnr-himbaechel-spartan3e` is now nextpnr-spartan
+  v0.11.0. HeAP's refinement is a timing-driven annealing (placer1 from a temperature of 1e-2 in a window of 30 tiles, 30
+  passes a temperature, the criticalities to the 4th) that moves the carry chains and slices whole; the placer's delays
+  are fitted to Silinx's delays of the examples' routes (from a flip-flop's Q through an OMUX, from a LUT by its CLB's
+  fast connects, by the distance) plus a net's load, about 60 ps a doubling of its fanout. Settings tried and dropped
+  are reported in the issue.
+- **Spartan-6: the I/O logic's clock and the CMTs' HCLK outputs (#2025):** 63 PIPs of the XC6SLX16's CMT designs that
+  no database had (a global clock to an OLOGIC2's or ILOGIC2's CLK0, a DCM's or PLL's outputs onto the HCLK lines,
+  some BUFIO2 inputs) measured one at a time against ISE's bitgen: those with bits near their tile in
+  `bitdb/s6/s6-pips-flow.json`, the others in `bitdb/s6/xc6slx16-pips-cmt.json`. On the XC6SLX16's 203 CMT and example
+  designs the rules predict 122 bit for bit (103 before), with no bit ISE does not set.
+  - **Tests:** test/s6-cmtpaths.test.js.
+
 ## 0.1.0
 
 The first version of silinx-fpga, the Silinx toolchain as a package of its own, separated from Silinx ISE
