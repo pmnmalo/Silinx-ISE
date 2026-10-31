@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REMOTE = path.join(ROOT, 'packages/silinx-fpga/research/s3e-device/ise-remote.sh');
-const SCRIPTS = ['scripts/hls-vitis.mjs', 'scripts/check-open-flow.mjs', 'research/synth-quality/fsm-ise.mjs',
+const SCRIPTS = ['scripts/hls-vitis.mjs', 'scripts/hls-vitis-names.mjs', 'scripts/check-open-flow.mjs', 'research/synth-quality/fsm-ise.mjs',
   'test/designs-corpus/compare-ise.mjs',
   ...['s3e-route/ise-open-check.sh', 's3e-route/switching-limits.mjs', 's3e-route/dcm-timing.mjs', 's3e-device/ise-remote.sh',
     's6/ise-place-check.sh', 's6/night1-remote.sh', 's3e-bitstream/fuzz-remote.sh', 's3e-bitstream/impl-remote.sh']

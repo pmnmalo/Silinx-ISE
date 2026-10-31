@@ -36,8 +36,8 @@ function cosim(src, file, ports, warnings) {
   return hdl;
 }
 
-test('#1902 the names Vitis HLS reserves: a reserved word of VHDL or Verilog, pos and neg (any case); the others kept', () => {
-  assert.deepEqual(['pos', 'neg', 'POS', 'in', 'out', 'signal', 'config', 'size', 'index', 'position', 'p'].map(renamed), [true, true, true, true, true, true, true, false, false, false, false]);
+test('#1902 the names Vitis HLS reserves: a reserved word of VHDL or Verilog, pos (any case; #1926 neg is not); the others kept', () => {
+  assert.deepEqual(['pos', 'neg', 'POS', 'in', 'out', 'signal', 'config', 'size', 'index', 'position', 'p'].map(renamed), [true, false, true, true, true, true, true, false, false, false, false]);
   assert.deepEqual(['pos', 'in', 'size'].map(portOf), ['pos_r', 'in_r', 'size']);
   assert.equal(renamedWhy('pos'), "'pos' is a name Vitis HLS reserves: it is named pos_r in the module");
   assert.equal(renamedWhy('out'), "'out' is a reserved word of VHDL or Verilog: it is named out_r in the module");
@@ -68,13 +68,12 @@ int main() {
 
 const POS_WARNINGS = [
   "1 warning: 'pos' is a name Vitis HLS reserves: it is named pos_r in the module",
-  "1 warning: 'neg' is a name Vitis HLS reserves: it is named neg_r in the module",
   "1 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"];
 const FREE_WARNINGS = ["2 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module", "2 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"];
 
-test('#1902 an argument named pos: its port pos_r (neg neg_r), a warning each, as Vitis HLS; #1900 a combinational top: no ap_clk, its ap_rst unused (#1924), its test bench holding it low; co-simulated in VHDL and Verilog', () => {
+test('#1902 an argument named pos: its port pos_r, a warning, as Vitis HLS (#1926: neg kept); #1900 a combinational top: no ap_clk, its ap_rst unused (#1924), its test bench holding it low; co-simulated in VHDL and Verilog', () => {
   assert.equal(cToHdl(POS, { file: 'pick.c' }).ok, true);
-  cosim(POS, 'pick.c', ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return'], POS_WARNINGS);
+  cosim(POS, 'pick.c', ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg', 'out_r', 'out_r_ap_vld', 'ap_return'], POS_WARNINGS);
   // #1900 combinational: no clock, in the HDL and in the co-simulation's test bench; ap_ctrl_hs: its reset (unused, as
   // Vitis HLS's of latency 0, #1924, held low by the test bench), ap_start / ap_done / ap_idle / ap_ready; ap_ctrl_none,
   // only the data ports
@@ -115,7 +114,7 @@ int main() {
   const seq = POS.replace('  return pos * 2;', '  int s = 0;\n  for (int i = 0; i < sel + 3; i++) {\n#pragma HLS LOOP_TRIPCOUNT max=4\n    s += pos;\n  }\n  return s;');
   const g = cToHdl(seq, { file: 'pick.c' });
   assert.deepEqual(msgs(g), POS_WARNINGS);
-  assert.deepEqual([g.sequential, g.ports.map((p) => p.name)], [true, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg_r', 'out_r', 'out_r_ap_vld', 'ap_return']]);
+  assert.deepEqual([g.sequential, g.ports.map((p) => p.name)], [true, ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'sel', 'pos_r', 'neg', 'out_r', 'out_r_ap_vld', 'ap_return']]);
   for (const lang of LANGS) {
     const r = cosimulate(seq, { file: 'pick.c', lang });
     assert.deepEqual([r.errors, r.pass, msgs(r.gen)], [[], true, POS_WARNINGS], lang);
