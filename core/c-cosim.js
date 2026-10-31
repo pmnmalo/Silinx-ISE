@@ -162,9 +162,9 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
 }
 
 // (files: the test bench's, core/c-interp.js's, #1897)
-export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family } = {}) {
-  const sim = simulateC(source, { file, headers, top, files });
-  const made = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family });
+export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family, blackboxes = null } = {}) {
+  const sim = simulateC(source, { file, headers, top, files, blackboxes });
+  const made = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family, blackboxes });
   if (alter && made.ok) made.hdl = alter(made.hdl);   // (the tests: an HDL that differs, its mismatches reported)
   const base = { ok: false, pass: false, calls: 0, mismatches: [], latency: null, output: sim.output, sim, gen: made, errors: [] };
   // (AXI interfaces, #1893: the calls replayed on the function's ports of a model of the buses, around the module)
@@ -175,7 +175,7 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
   const tb = cosimBench(gen, sim.calls, { maxCycles });
   // (a deep combinational path, math.h's pow in soft-float, #1761, settles in more delta cycles than the simulator's
   // default allows: up to a million)
-  const r = simulate([{ path: `${made.top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: made.hdl }, ...(made.axi ? [{ path: 'silinx_axi_bfm.v', text: axiBfm(made) }] : []), { path: 'silinx_cosim_tb.v', text: tb.text }], 'silinx_cosim_tb', { until: 1e15, maxDeltas: 1e6 });
+  const r = simulate([{ path: `${made.top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: made.hdl }, ...(made.axi ? [{ path: 'silinx_axi_bfm.v', text: axiBfm(made) }] : []), { path: 'silinx_cosim_tb.v', text: tb.text }, ...(made.blackboxes || []).flatMap((d) => d.rtl)], 'silinx_cosim_tb', { until: 1e15, maxDeltas: 1e6 });
   if (r.errors.length) return { ...base, errors: r.errors.map((d) => `${d.file || ''}: ${d.message}`) };
   // (the test bench's lines only: the simulator's own, as its waveform recording's limit, left out, #1734)
   const lines = r.sim.log.map((e) => String(e.text).trim()).filter((s) => /^(bad \d+|[0-9a-fxz]+( [0-9a-fxz]+)*)$/i.test(s));

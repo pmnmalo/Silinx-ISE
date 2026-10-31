@@ -11,6 +11,7 @@
 //              steps it took (#1899)
 //     error: { line, col, message } when the run stopped (a division by zero, an index outside an array, an endless loop)
 import { checkC, constValue } from './c-check.js';
+import { loadBlackboxes, withModels } from './c-blackbox.js';
 import { typeOf } from './c-types.js';
 import { exprMethods, convert } from './c-interp-expr.js';
 import { libMethods, Exit } from './c-interp-lib.js';
@@ -23,7 +24,11 @@ class Return { constructor(value) { this.value = value; } }
 const BREAK = Symbol('break'), CONTINUE = Symbol('continue');
 
 // (files: the test bench's data files, { path: text }, read by fopen; its run's written files in the result's files, #1598)
-export function simulateC(source, { file = 'input.c', maxSteps = MAX_STEPS, entry = 'main', headers = null, top = null, files = null } = {}) {
+export function simulateC(source, { file = 'input.c', maxSteps = MAX_STEPS, entry = 'main', headers = null, top = null, files = null, blackboxes = null } = {}) {
+  // (syn.blackbox: its C model, the C simulation's, #1903)
+  const bbs = loadBlackboxes(blackboxes, headers);
+  if (bbs.diagnostics.some((d) => d.severity === 'error')) return { ok: false, output: '', exitCode: null, calls: [], error: null, steps: 0, top: null, diagnostics: bbs.diagnostics };
+  source = withModels(source, headers, bbs.list).source;
   const checked = checkC(source, file, { headers, top });
   // (a test bench with no function to synthesize still runs)
   const errors = checked.diagnostics.filter((d) => d.severity === 'error' && !/^no function to synthesize/.test(d.message));

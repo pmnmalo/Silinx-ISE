@@ -743,7 +743,16 @@
       ],
       "headers": [
         "Misc/rtl_as_blackbox/example.h"
-      ]
+      ],
+      "blackbox": {
+        "descriptions": [
+          "Misc/rtl_as_blackbox/rtl_model.json"
+        ],
+        "files": [
+          "Misc/rtl_as_blackbox/rtl_model.cpp",
+          "Misc/rtl_as_blackbox/rtl_model.v"
+        ]
+      }
     },
     {
       "name": "modeling-pointers-basic-arithmetic",

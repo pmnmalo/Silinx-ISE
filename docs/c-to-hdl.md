@@ -375,6 +375,34 @@ void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
   top that runs it (its calls only, DATAFLOW or not) makes it a process of its own; in a top of other statements its C
   model is inlined. dsp-fir-decimator: 4 MACs, 31 cycles a call (Vitis HLS's FIR Compiler 32).
 
+### An RTL blackbox: `syn.blackbox` (#1903)
+
+A function written in VHDL or Verilog, as Vitis HLS's RTL blackbox (UG1399): a JSON file describes it, and Silinx HLS
+uses its C model in the C simulation and its module in the synthesis, one instance for each call.
+
+- **The description** (Vitis HLS's keys): `c_function_name`, `rtl_top_module_name`, `c_files` (the C model, each
+  `{ "c_file": … }`; its `cflag` is ignored, with a warning), `rtl_files`, `c_parameters` (each argument's `c_name`,
+  `c_port_direction` `in`, `out` or `inout`, its `rtl_ports`: `data_read_in`, `data_write_out`, `data_write_valid`),
+  `c_return` (its `data_write_out`), `rtl_common_signal` (`module_clock`, `module_reset`, `module_clock_enable`, and
+  `ap_ctrl_chain_protocol_start`, `_done`, `_idle`, `_ready`, `_continue`), `rtl_performance` (`latency`);
+  `rtl_resource_usage` is read and not used. A file is found beside the description, else by its name in the project.
+- **The C function**: declared in the sources (`void rtl_model(data_t a, data_t &z);`); its body, if it has one, is
+  not synthesized. Each argument is described, a scalar by value `in`, a reference or a pointer to a scalar `in`,
+  `out` or `inout`; the module's ports are checked against the description and the C types (direction, width).
+- **A call**: a state of the machine. The inputs are held in registers for the whole call; `ap_start` is 1 for its
+  first cycle; the call ends with `ap_done`, or, with no `ap_done`, after the description's `latency` (0: a
+  combinational module, the same cycle). An output with a `data_write_valid` is taken in the cycle its valid is 1
+  (a valid that is never 1 leaves the variable as it was), one without as the call ends. `module_clock_enable` and
+  `ap_ctrl_chain_protocol_continue` are held at 1, `module_reset` is `ap_rst`. A loop with a call is not pipelined.
+- **In the app**: the project's JSON files that are descriptions are read as it opens, with the files they name and
+  the project's headers; the RTL module is a source of the project, synthesized with the HDL made from the C.
+- **The co-simulation** replays the test bench's calls on the HDL with the module itself, not its C model.
+- **Refused, each said**: a description that is not valid JSON or misses a key, names a file the project does not
+  have, a port kind of a memory or a stream (`RAM_type`, `FIFO_…`: not yet), an argument not described, a port the
+  module does not have or of another width; a blackbox in a DATAFLOW region (not yet). Every message starts with
+  `syn.blackbox:` and names the description's file. An input of the module the description does not name is left
+  unconnected, with a warning.
+
 ## Pragmas (`#pragma HLS …`)
 
 | Pragma | In Silinx |

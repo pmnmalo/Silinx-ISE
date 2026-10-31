@@ -352,6 +352,7 @@ const DEFAULT_SETTINGS_SH = '/opt/Xilinx/14.7/ISE_DS/settings64.sh';
 export { unconstrainedPorts } from '../core/auto-pins.js';
 import { unconstrainedPorts } from '../core/auto-pins.js';
 import { isGeneratedSource, viewHdl } from '../core/view-hdl.js';
+import { blackboxesIn } from '../core/c-blackbox.js';
 import { modulesFromLibrary } from '../core/schdoc.js';
 
 /**
@@ -370,8 +371,9 @@ export async function viewSources(project, projectDir, hdl = []) {
   try { modules = modulesFromLibrary(compile(hdl), { sources: Object.fromEntries(hdl.map(s => [s.path, s.text])) }); } catch { /* none */ }
   const res = [];
   const hdlMods = new Set(Object.keys(modules).map(n => n.toLowerCase()));   // (a module an HDL file defines: that file)
+  const hls = await blackboxesIn(disk, f => fs.readFile(path.join(projectDir, f), 'utf8'));   // (#1903)
   for (const f of views) {
-    const r = viewHdl(f, await fs.readFile(path.join(projectDir, f), 'utf8'), { modules, linked: p => inProject.has(p), lang: project.preferredLanguage });
+    const r = viewHdl(f, await fs.readFile(path.join(projectDir, f), 'utf8'), { modules, linked: p => inProject.has(p), lang: project.preferredLanguage, hls });
     if (r && r.text && !hdlMods.has(String(r.module).toLowerCase())) res.push(r);
     else if (r && !r.text && r.errors.length) res.push(r);
   }
