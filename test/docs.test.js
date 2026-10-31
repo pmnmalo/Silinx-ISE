@@ -34,6 +34,11 @@ function anchors(file) {
   }));
 }
 
+test('docs: the README links the architecture and the toolchain, outside its code blocks (#2401)', () => {
+  const links = [...noCode(read('README.md')).matchAll(/\]\(([^)]+)\)/g)].map(m => m[1]);
+  for (const doc of ['docs/ARCHITECTURE.md', 'docs/TOOLCHAIN.md']) assert.ok(links.includes(doc), doc);
+});
+
 test('docs: every relative link and anchor of the Markdown files resolves', () => {
   const bad = [];
   let n = 0;
