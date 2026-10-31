@@ -11,6 +11,7 @@ import { SOFTFLOAT32, SOFTFLOAT64 } from './c-softfloat.js';
 import { MATHLIB } from './c-mathlib.js';
 
 const U32 = { w: 32, s: false, ap: false };
+const SEQ_LIB = new Set(['ap_f32_fmod', 'ap_f64_fmod']);
 let LIB = null;
 /** The library's functions (parsed once, their loops unrolled). */
 function lib() {
@@ -19,6 +20,7 @@ function lib() {
   const walk = (n) => {
     if (!n || typeof n !== 'object') return;
     if (Array.isArray(n)) { n.forEach(walk); return; }
+    if (n.kind === 'func' && SEQ_LIB.has(n.name)) return;   // (its loop the state machine's)
     if (n.kind === 'for' || n.kind === 'while' || n.kind === 'do') n.unroll = true;
     for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type') walk(v);
   };
@@ -28,6 +30,19 @@ function lib() {
 }
 /** A function of the library (its names ap_f32_…, ap_f64_…), else null. */
 export const softfloatFn = (name) => (/^ap_f(32|64)_/.test(name) ? lib().get(name) ?? null : null);
+let SEQ_MATH = null;
+/** funcs with math.h's functions that are loops in hardware (fmod, fmodf, #2144), to be inlined into a sequential top as a
+ *  function of its own with a loop is; a function of the program named so stays. A call of constants is folded (noInline). */
+export function withSeqMath(funcs) {
+  if (!SEQ_MATH) {
+    const ast = parse(`float fmodf(float a, float b) { return ap_bits_float(ap_f32_fmod(ap_float_bits(a), ap_float_bits(b))); }
+double fmod(double a, double b) { return ap_bits_double(ap_f64_fmod(ap_double_bits(a), ap_double_bits(b))); }`, 'silinx-softfloat.c');
+    SEQ_MATH = [...ast.items.map((f) => [f.name, { ...f, library: true }]), ...[...SEQ_LIB].map((n) => [n, { ...lib().get(n), library: true }])];
+  }
+  const all = new Map(SEQ_MATH);
+  for (const [k, v] of funcs) all.set(k, v);
+  return all;
+}
 const f32 = new Float32Array(1), u32 = new Uint32Array(f32.buffer);
 const f64 = new Float64Array(1), u64 = new BigUint64Array(f64.buffer);
 /** A number's binary32 bits (a NaN the quiet NaN). */
@@ -41,6 +56,8 @@ const HW_MATH = { sqrt: [64, 'sqrt'], sqrtf: [32, 'sqrt'], fabs: [64, 'abs'], fa
 for (const op of ['floor', 'ceil', 'trunc', 'round', 'fmin', 'fmax', 'copysign']) { HW_MATH[op] = [64, op]; HW_MATH[`${op}f`] = [32, op]; }
 // (exp, log, sin, cos, pow, tan, …: Silinx's own library, core/c-mathlib.js, #1761, #2119)
 for (const op of ['exp', 'log', 'sin', 'cos', 'pow', 'tan', 'log2', 'log10', 'exp2', 'hypot', 'fmod', 'atan', 'asin', 'acos', 'atan2', 'sinh', 'cosh', 'tanh', 'cbrt']) { HW_MATH[op] = [64, op]; HW_MATH[`${op}f`] = [32, op]; }
+
+const SEQ_MATH_NAMES = new Set(['fmod', 'fmodf']);
 
 export const floatMethods = {
   /** The library's function `name` called on the values args, where the operation is: its result of type rt. */
@@ -109,6 +126,8 @@ export const floatMethods = {
     const vals = e.args.map((a) => this.expr(a, g));
     const xs = vals.map((x) => this.flNumber(x));
     if (xs.length !== m.n) this.error(e.loc, `${name}() takes ${m.n} argument(s)`);
+    // (fmod's reduction: a step a cycle, in a state machine, #2144)
+    if (xs.some((x) => x === null) && SEQ_MATH_NAMES.has(name)) this.error(e.loc, `${name}: a step a cycle (a sequential module: not supported yet here, #1526)`);
     // (sqrt, fabs, floor, … of values that are not constants: the library's, #1783, #1843)
     if (xs.some((x) => x === null) && HW_MATH[name]) {
       const [fl, op] = HW_MATH[name];

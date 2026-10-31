@@ -89,7 +89,7 @@ test('#2119 hypot neither overflows nor underflows where the result does not', (
   assert.equal(J.hypot(1.7e308, 1.7e308), Infinity);
 });
 
-test('#2119 fmod is exact: JavaScript\'s % on random arguments (a quotient up to 2^64), subnormals too', () => {
+test('#2119 fmod is exact: JavaScript\'s % on random arguments, subnormals too', () => {
   const arg = signed(log(-18, 18));
   for (let i = 0; i < 4000; i++) {
     const x = arg(), y = arg();
@@ -107,10 +107,71 @@ test('#2119 fmod is exact: JavaScript\'s % on random arguments (a quotient up to
   }
 });
 
-test('#2119 fmod: a quotient beyond 2^64 gives NaN, said so in the library, not a wrong number', () => {
-  assert.ok(Number.isNaN(J.fmod(1e300, 3)));
-  assert.ok(Number.isNaN(J.fmodf(1e30, 1e-10)));
-  assert.equal(J.fmod(2 ** 64, 3), 2 ** 64 % 3);
+// quotients just below and above 2^64, the largest and smallest exponents, subnormals (an x / y of every size, #2144)
+const FMOD_DOUBLE = [[2 ** 64, 3], [2 ** 64 - 2048, 3], [2 ** 65, 3], [2 ** 65 + 8192, 7], [1e300, 3], [Number.MAX_VALUE, 5e-324], [Number.MAX_VALUE, 3e-320], [Number.MAX_VALUE, 3], [-Number.MAX_VALUE, 1e-310],
+  [2.2250738585072014e-308, 5e-324], [1e-310, 3e-320], [5e-324, 5e-324], [1e-320, 5e-324], [1e308, 1e-308], [-1e300, -7]];
+const FMOD_FLOAT = [[2 ** 64, 3], [2 ** 64 - 2 ** 40, 3], [2 ** 65, 3], [2 ** 65 + 2 ** 42, 7], [1e30, 1e-10], [3.4028234663852886e38, 1e-45], [3.4028234663852886e38, 3], [-3.4028234663852886e38, 1e-40],
+  [1.1754943508222875e-38, 1e-45], [1e-40, 3e-44], [1e-45, 1e-45], [1e-44, 1e-45], [1e38, 1e-38], [-1e30, -7]].map(([x, y]) => [Math.fround(x), Math.fround(y)]);
+
+test('#2144 fmod is exact for every quotient: JavaScript\'s %, just below and above 2^64, the largest and smallest exponents, subnormals', () => {
+  for (const [x, y] of FMOD_DOUBLE) assert.ok(Object.is(J.fmod(x, y), x % y), `fmod(${x}, ${y}): ${J.fmod(x, y)}`);
+  for (const [x, y] of FMOD_FLOAT) assert.ok(Object.is(J.fmodf(x, y), x % y), `fmodf(${x}, ${y}): ${J.fmodf(x, y)}`);
+  // (the exponents over their whole range, each exact in the format, so % needs no rounding in a float's)
+  const arg = signed(log(-740, 709)), argf = signed(log(-103, 88));
+  for (let i = 0; i < 400; i++) {
+    const x = arg(), y = arg();
+    assert.ok(Object.is(J.fmod(x, y), x % y), `fmod(${x}, ${y})`);
+    const xf = Math.fround(argf()), yf = Math.fround(argf());
+    assert.ok(Object.is(J.fmodf(xf, yf), xf % yf), `fmodf(${xf}, ${yf})`);
+  }
+});
+
+const FMOD_C = (ty, fn, v) => `#include <math.h>\n${ty} f(${ty} x, ${ty} y) { return ${fn}(x, y); }\nint main() {\n  ${ty} a[${v.length}] = {${v.map(([x]) => lit(x, ty)).join(', ')}};\n  ${ty} b[${v.length}] = {${v.map(([, y]) => lit(y, ty)).join(', ')}};\n  ${ty} s = 0;\n  for (int i = 0; i < ${v.length}; i++) s += f(a[i], b[i]);\n  return s == 12345 ? 1 : 0;\n}\n`;
+const lit = (x, ty) => { const t = x.toExponential(17); return ty === 'float' ? `${t}f` : t; };
+
+test('#2144 fmod and fmodf co-simulated in VHDL and Verilog on those quotients, the C simulation\'s bits, no warning, a step a cycle', () => {
+  for (const [ty, fn, v, most] of [['float', 'fmodf', FMOD_FLOAT, 276], ['double', 'fmod', FMOD_DOUBLE, 2097]]) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const r = cosimulate(FMOD_C(ty, fn, v), { file: 'f.c', top: 'f', lang });
+      assert.deepEqual([r.errors, r.pass, r.calls, r.gen.diagnostics, r.gen.sequential], [[], true, v.length, [], true], `${fn} ${lang}`);
+      // (the largest quotient: its steps, and the machine's states around them)
+      assert.ok(r.latency.max >= most && r.latency.max < most + r.gen.states, `${fn} ${lang}: ${r.latency.max} cycles`);
+    }
+  }
+});
+
+test('#2144 fmod\'s size is one step\'s: a loop of one state, its bound in the report, not a state per exponent', () => {
+  const g = cToHdl('#include <math.h>\nfloat f(float x, float y) { return fmodf(x, y); }\n', { file: 'f.c' });
+  assert.deepEqual([g.ok, g.diagnostics, g.sequential], [true, [], true]);
+  assert.deepEqual(g.report.loops.map((l) => [l.line, l.trip, l.max, l.ii]), [[2, null, 276, 1]]);
+  assert.ok(g.states < 277, `${g.states} states`);
+});
+
+test('#2144 fmod in a program: of constants folded, a function of the program named so its own, inside a function, in a loop, in an expression', () => {
+  const syn = (src) => cToHdl(`#include <math.h>\n${src}`, { file: 'f.c' });
+  // (constants: at synthesis, combinational)
+  let g = syn('float f(float x) { return x + fmodf(7.5f, 2.0f); }\n');
+  assert.deepEqual([g.ok, g.diagnostics, g.hdl.includes('ap_f32_fmod')], [true, [], false]);
+  // (the program's own: its own function, no library's loop)
+  g = cToHdl('int fmodf(int a, int b) { return a - b; }\nint f(int x) { return fmodf(x, 2); }\n', { file: 'f.c' });
+  assert.deepEqual([g.ok, g.diagnostics, g.sequential], [true, [], false]);
+  // (the call inside a function with none of its own loops, in an expression, in a loop)
+  for (const src of ['float g(float x) { return fmodf(x, 3.0f); }\nfloat f(float x) { return g(x) + 1.0f; }\nint main() { float s = f(1e30f); return s == 1 ? 1 : 0; }\n',
+    'float f(float x, float y) { float s = 0; for (int i = 0; i < 3; i++) { s = s + fmodf(x, y); x = x * 2.0f; } return s; }\nint main() { float s = f(1e30f, 3.0f); return s == 1 ? 1 : 0; }\n']) {
+    for (const lang of ['vhdl', 'verilog']) {
+      const r = cosimulate(`#include <math.h>\n${src}`, { file: 'f.c', top: 'f', lang });
+      assert.deepEqual([r.errors, r.pass, r.calls, r.gen.diagnostics], [[], true, 1, []], lang);
+    }
+  }
+});
+
+test('#2144 fmod where it may not run, or in a loop\'s condition: said, a statement of its own; a pipelined loop around it said not to be', () => {
+  const msgs = (src) => cToHdl(`#include <math.h>\n${src}`, { file: 'f.c' }).diagnostics.map((d) => `${d.severity}: ${d.message}`);
+  assert.deepEqual(msgs('float f(float x, float y, int c) { return c ? fmodf(x, y) : x; }\n'), ["error: 'fmodf' is called where it may not run (after && / || / ?:): call it as a statement of its own"]);
+  assert.deepEqual(msgs('float f(float x, float y) { while (fmodf(x, y) > 1.0f) x = x / 2.0f; return x; }\n').filter((m) => m.startsWith('error')), ["error: 'fmodf' is called in a loop's condition: call it in the loop's body"]);
+  const w = msgs('float f(float x, float y) { float s = 0; for (int i = 0; i < 4; i++) {\n#pragma HLS PIPELINE\n s = s + fmodf(x, y); } return s; }\n');
+  assert.equal(w.length, 1, w.join('\n'));
+  assert.match(w[0], /^warning: .*PIPELINE.*count is not a constant/);
 });
 
 // [function, arguments, result]
@@ -187,7 +248,7 @@ test('#2119 the library\'s C, run by Silinx\'s C interpreter, gives the C simula
   }
   for (const [n, arg] of Object.entries(fn2)) {
     const v = Array.from({ length: N }, () => [arg(), arg()]);
-    v.push([0, 1], [-0, -1], [Infinity, 1], [1, Infinity], [NaN, 1], [Infinity, -Infinity], [0, 0], [1e-320, 3e-321], [1e-44, 3e-45], [1e300, 3]);
+    v.push([0, 1], [-0, -1], [Infinity, 1], [1, Infinity], [NaN, 1], [Infinity, -Infinity], [0, 0], [1e-320, 3e-321], [1e-44, 3e-45], [1e300, 3], [1e30, 1e-10], [2 ** 65, 3]);
     const L = v.length;
     lines.push(`  { unsigned a[${L}] = {${v.map(([x]) => lit32(x)).join(', ')}}, b[${L}] = {${v.map(([, y]) => lit32(y)).join(', ')}}; for (int i = 0; i < ${L}; i++) printf("%08x\\n", ap_f32_${n}(a[i], b[i])); }`);
     want.push(...v.map(([x, y]) => hex32(J[`${n}f`](Math.fround(x), Math.fround(y)))));

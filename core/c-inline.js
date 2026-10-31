@@ -41,7 +41,9 @@ export function inlineCalls(fn, funcs, report) {
     memo.set(f.name, r);
     return r;
   };
-  const inlined = (e) => e?.kind === 'call' && e.callee.kind === 'id' && funcs.get(e.callee.name)?.body && funcs.get(e.callee.name) !== fn && needs(funcs.get(e.callee.name));
+  // (math.h's fmod of constants: folded, core/c-dataflow-float.js, #2144)
+  const folded = (e, f) => f?.library && e.args.every((a) => !has(a, (n) => n.kind === 'id' || n.kind === 'call'));
+  const inlined = (e) => e?.kind === 'call' && e.callee.kind === 'id' && funcs.get(e.callee.name)?.body && funcs.get(e.callee.name) !== fn && !folded(e, funcs.get(e.callee.name)) && needs(funcs.get(e.callee.name));
   let fresh = 0;
   const statics = new Map();   // function -> Map(name -> its variable's name)
   const hoisted = [];          // the statics' declarations, first in the top's body
@@ -156,6 +158,8 @@ export function inlineCalls(fn, funcs, report) {
     const locals = new Map();
     walk(f.body, (n) => { if (n.kind === 'decl') for (const v of n.vars) if (!v.static) locals.set(v.name, `${v.name}_l${k}`); return undefined; });
     const body = bind(cloneBig(f.body), alias, own, locals);
+    // (the library's: its place the call's, its loop in the report at that line)
+    if (f.library) walk(body, (n) => { if (n.loc) n.loc = call.loc; if (isLoop(n)) n.library = true; return undefined; });
     const ret = f.ret.kind === 'void' ? null : into;
     const lowered = returns(body.items, ret, k, f);
     if (lowered.flag) items.push({ kind: 'decl', vars: [{ kind: 'var', name: lowered.flag, type: { kind: 'int', name: 'bool', bits: 1, signed: false }, init: { kind: 'num', value: 0n, text: '0', loc: call.loc }, loc: call.loc }], loc: call.loc });
