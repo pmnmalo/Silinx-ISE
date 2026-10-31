@@ -15,7 +15,7 @@ export function seqRoots(m) {
   for (const st of m.states) { roots.push(st.next, ...st.updates.values()); }
   for (const r of m.regs) if (r.latch != null) roots.push(r.latch);
   for (const o of m.outputs.values()) if (o.node != null) roots.push(o.node);
-  for (const x of m.mems || []) roots.push(...[x.addr, x.ce, x.we, x.d].filter((id) => id != null));
+  for (const x of m.mems || []) roots.push(...[x.addr, x.ce, x.we, x.d, x.addr1, x.ce1, x.we1, x.d1].filter((id) => id != null));
   return roots;
 }
 /** The nodes the machine needs. */
@@ -41,6 +41,7 @@ export function vhdlSeq(name, src, ports, m, agg) {
     L.push(`  type ap_m_${hdlName(x.name)}_t is array (0 to ${depth(x) - 1}) of std_logic_vector(${x.t.w - 1} downto 0);`);
     const init = x.init ? ` := (${words(x).map((v, k) => `${k} => "${bin(v, x.t.w)}"`).join(', ')})` : '';
     L.push(`  signal ap_m_${hdlName(x.name)} : ap_m_${hdlName(x.name)}_t${init};`, `  signal ap_m_${hdlName(x.name)}_q0 : ${ty(x.t)};`);
+    if (x.storage === 't2p') L.push(`  signal ap_m_${hdlName(x.name)}_q1 : ${ty(x.t)};`);
   }
   innerSignals(agg, 'vhdl', L);
   // (ap_ctrl_none, #1900: the block protocol's signals inside the module, ap_start 1: a call after the other)
@@ -55,7 +56,16 @@ export function vhdlSeq(name, src, ports, m, agg) {
     const a = `to_integer(${sig(g.get(x.addr))})`;
     L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', `      if ${sig(g.get(x.ce))} = "1" then`);
     if (x.we != null) L.push(`        if ${sig(g.get(x.we))} = "1" then`, `          ap_m_${hdlName(x.name)}(${a}) <= std_logic_vector(${sig(g.get(x.d))});`, '        end if;');
-    L.push(`        ap_m_${hdlName(x.name)}_q0 <= ${x.t.s ? 'signed' : 'unsigned'}(ap_m_${hdlName(x.name)}(${a}));`, '      end if;', '    end if;', '  end process;');
+    L.push(`        ap_m_${hdlName(x.name)}_q0 <= ${x.t.s ? 'signed' : 'unsigned'}(ap_m_${hdlName(x.name)}(${a}));`, '      end if;');
+    // (its second port, #1901: in the same process, one driver of the memory)
+    if (x.storage) {
+      const a1 = `to_integer(${sig(g.get(x.addr1))})`;
+      L.push(`      if ${sig(g.get(x.ce1))} = "1" then`);
+      if (x.we1 != null) L.push(`        if ${sig(g.get(x.we1))} = "1" then`, `          ap_m_${hdlName(x.name)}(${a1}) <= std_logic_vector(${sig(g.get(x.d1))});`, '        end if;');
+      if (x.storage === 't2p') L.push(`        ap_m_${hdlName(x.name)}_q1 <= ${x.t.s ? 'signed' : 'unsigned'}(ap_m_${hdlName(x.name)}(${a1}));`);
+      L.push('      end if;');
+    }
+    L.push('    end if;', '  end process;');
   }
   L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' then", `        ap_CS_fsm <= ${S(m.idle)};`);
   for (const r of regs) L.push(`        ${r.sig} <= "${bin(r.reset, r.w)}";`);
@@ -97,6 +107,7 @@ export function verilogSeq(name, src, ports, m, agg) {
   if (chain) L.push("  reg ap_done_reg = 1'b0;");
   for (const x of m.mems || []) {
     L.push(`  reg [${x.t.w - 1}:0] ap_m_${hdlName(x.name)} [0:${depth(x) - 1}];`, `  reg ${x.t.s ? 'signed ' : ''}[${x.t.w - 1}:0] ap_m_${hdlName(x.name)}_q0;`);
+    if (x.storage === 't2p') L.push(`  reg ${x.t.s ? 'signed ' : ''}[${x.t.w - 1}:0] ap_m_${hdlName(x.name)}_q1;`);
     if (x.init) L.push('  initial begin', ...words(x).map((v, k) => `    ap_m_${hdlName(x.name)}[${k}] = ${x.t.w}'b${bin(v, x.t.w)};`), '  end');
   }
   verilogNodes(nodes, g, L);
@@ -106,6 +117,14 @@ export function verilogSeq(name, src, ports, m, agg) {
     L.push(`  always @(posedge ap_clk) if (${sig(g.get(x.ce))}) begin`);
     if (x.we != null) L.push(`    if (${sig(g.get(x.we))}) ap_m_${hdlName(x.name)}[${a}] <= ${sig(g.get(x.d))};`);
     L.push(`    ap_m_${hdlName(x.name)}_q0 <= ap_m_${hdlName(x.name)}[${a}];`, '  end');
+    // (its second port, #1901)
+    if (x.storage) {
+      const a1 = sig(g.get(x.addr1));
+      L.push(`  always @(posedge ap_clk) if (${sig(g.get(x.ce1))}) begin`);
+      if (x.we1 != null) L.push(`    if (${sig(g.get(x.we1))}) ap_m_${hdlName(x.name)}[${a1}] <= ${sig(g.get(x.d1))};`);
+      if (x.storage === 't2p') L.push(`    ap_m_${hdlName(x.name)}_q1 <= ap_m_${hdlName(x.name)}[${a1}];`);
+      L.push('  end');
+    }
   }
   L.push('  always @(posedge ap_clk) begin', '    if (ap_rst) begin', `      ap_CS_fsm <= ${S(m.idle)};`);
   for (const r of regs) L.push(`      ${r.sig} <= ${r.w}'b${bin(r.reset, r.w)};`);
