@@ -21,7 +21,7 @@ export function runDesign(design, texts, { maxCycles = 100000 } = {}) {
   const r = { csim: 'skip', synth: 'skip', cosim: 'skip', latency: null, reason: null };
   const { unit, headers } = unitOf(design, texts);
   // (a C++ design's unit is C++, #1590)
-  const opts = { file: design.language === 'c' ? 'unit.c' : 'unit.cpp', headers, top: design.top };
+  const opts = { file: design.language === 'c' ? 'unit.c' : 'unit.cpp', headers, top: design.top, ...(design.directives ? { directives: design.directives } : {}) };
   const sim = simulateC(unit, { ...opts, files: texts });
   r.csim = sim.ok && sim.exitCode === 0 ? 'pass' : 'fail';
   if (r.csim === 'fail') r.reason ||= `C simulation: ${sim.error ? `${sim.error.line}: ${sim.error.message}` : sim.ok ? `main() returned ${sim.exitCode}` : why(first(sim.diagnostics))}`;

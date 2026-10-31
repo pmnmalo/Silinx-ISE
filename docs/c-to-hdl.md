@@ -209,6 +209,9 @@ Names and behaviour as Vitis HLS makes them (UG1399, "Interface synthesis"):
 | an array argument | `ap_memory`: `a_address0`, `a_ce0`, `a_we0`, `a_d0`, `a_q0`; one of two or more dimensions (`a[N][M]`, #1786) one memory of N*M words, `a[i][j]` at `i*M + j`; an array of structs one memory of its words (#1668) |
 | an array argument with `#pragma HLS INTERFACE bram` (#1668) | a BRAM's port: `a_Addr_A` (32 bits, an address in bytes), `a_EN_A`, `a_WEN_A` (a write enable a byte), `a_Din_A`, `a_Dout_A` (its words a power of 2 of bytes), `a_Clk_A`, `a_Rst_A` |
 | a pointer argument indexed (`p[i]`, `*(p + i)`, #1599), or passed to a function that indexes it (#1684) | `ap_memory`, its depth the INTERFACE pragma's `depth=` (else 1024, a warning); a pointer to structs one memory of their words (#1668), a pragma naming the struct applying to it |
+| a pointer or an array argument with `#pragma HLS INTERFACE ap_fifo` (#1901) | `ap_fifo`, as a stream's: each `*p`, `p[i]` a read, each `*p = v`, `p[i] = v` a write, in the order of the code (constant positions out of order, or read and written: an error) |
+| a pointer argument with `#pragma HLS INTERFACE ap_hs` (#1901) | the two-way handshake: read, `p`, `p_ap_vld`, `p_ap_ack`; written, `p`, `p_ap_vld`, `p_ap_ack`; each access a state that waits for it |
+| an array argument with `BIND_STORAGE` or `storage_type=` `ram_2p` / `ram_t2p`, in a loop with `UNROLL`, or of a `DATAFLOW` top (#1901) | two ports: `ram_2p` reads on `a_address0`, `a_ce0`, `a_q0` and writes on `a_address1`, `a_ce1`, `a_we1`, `a_d1`; `ram_t2p` (`UNROLL`'s) has both ports, as far as it is read and written; a `DATAFLOW` top's has all their signals, those no process uses driven 0. Two reads of a statement share a state, two writes too when their addresses cannot be the same; unrolled copies do not share one yet, port 1 then idle |
 | a stream argument, `hls::stream<T>` | `ap_fifo`: `s_dout`, `s_empty_n`, `s_read`; `s_din`, `s_full_n`, `s_write`; a stream of structs one of their words (#1668) |
 
 Ports are `std_logic_vector(W-1 downto 0)` (VHDL) or `[W-1:0]` (Verilog), a 1-bit type a
@@ -354,7 +357,8 @@ void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
 | `ARRAY_PARTITION variable= type=complete` | the array's elements registers, whatever its size (not a memory); `block` / `cyclic` ignored with a warning |
 | `DATAFLOW` (the top function's, #1707) | its calls processes running at once (below); a region of other statements: a warning, made sequential |
 | `STREAM variable= depth=` | a DATAFLOW region's stream: its FIFO's depth (else `hls::stream<T, D>`'s D, else 2) |
-| `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `BIND_STORAGE`, `DEPENDENCE`, `LOOP_FLATTEN`, … and AXI interfaces (`s_axilite`, `m_axi`, `axis`) | accepted and ignored, with a warning; an unknown pragma: a warning |
+| `BIND_STORAGE variable= type=` (#1901) | a local array a memory (a small one too) of `ram_1p`, `ram_2p`, `ram_s2p`, `ram_t2p`, `rom_1p` or `rom_2p`'s ports; another type: a warning |
+| `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `DEPENDENCE`, `LOOP_FLATTEN`, … and AXI interfaces (`s_axilite`, `m_axi`, `axis`) | accepted and ignored, with a warning; an unknown pragma: a warning |
 
 A loop's pragma is its body's first statements; one elsewhere is ignored with a warning (a function's `PIPELINE`
 too).

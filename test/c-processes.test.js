@@ -83,7 +83,8 @@ test('#1707 DATAFLOW co-simulated in VHDL and Verilog: a module per callee (add 
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
     assert.deepEqual(r.gen.diagnostics, []);
     assert.deepEqual(r.gen.ports.map((p) => `${p.name}:${p.w}`), ['ap_clk:1', 'ap_rst:1', 'ap_start:1', 'ap_done:1', 'ap_idle:1', 'ap_ready:1',
-      'vecIn_address0:3', 'vecIn_ce0:1', 'vecIn_q0:8', 'vecOut_address0:3', 'vecOut_ce0:1', 'vecOut_we0:1', 'vecOut_d0:8', 'k:32']);
+      'vecIn_address0:3', 'vecIn_ce0:1', 'vecIn_q0:8', 'vecIn_d0:8', 'vecIn_we0:1', 'vecIn_address1:3', 'vecIn_ce1:1', 'vecIn_d1:8', 'vecIn_q1:8', 'vecIn_we1:1',
+      'vecOut_address0:3', 'vecOut_ce0:1', 'vecOut_we0:1', 'vecOut_d0:8', 'vecOut_q0:8', 'vecOut_address1:3', 'vecOut_ce1:1', 'vecOut_d1:8', 'vecOut_q1:8', 'vecOut_we1:1', 'k:32']);
     const rep = r.gen.report;
     assert.deepEqual(rep.processes.map((p) => `${p.instance} ${p.name} after ${p.after.join(',')}`), ['load_U0 load after ', 'twice_U1 twice after ', 'add_U2 add after twice', 'add_U3 add after add', 'join_r_U4 join after add']);
     assert.deepEqual(rep.fifos, [{ name: 's1', depth: 2 }, { name: 's2_a', depth: 8 }, { name: 's2_last', depth: 8 }]);
