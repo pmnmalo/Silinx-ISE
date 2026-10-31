@@ -7,17 +7,13 @@
     "73 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=6 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off"
   ],
   "interface-aggregation-disaggregation-aggregation-of-m-axi-ports": [],
-  "interface-aggregation-disaggregation-struct-ii-issue": [
-    "22 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=6 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off",
-    "29 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=6 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off",
-    "41 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=6 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off"
-  ],
+  "interface-aggregation-disaggregation-struct-ii-issue": [],
   "interface-memory-burst-rw": [
     "54 warning: #pragma HLS LOOP_FLATTEN is accepted and ignored: Silinx does not make it",
-    "62 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off"
+    "62 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (the memory 'burstbuffer' has one port, accessed 3 times an iteration); #pragma HLS PIPELINE off in it turns that off"
   ],
   "interface-memory-lmem-2rw": [
-    "85 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=4 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off",
+    "85 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'v1_buffer' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off",
     "87 warning: #pragma HLS LOOP_FLATTEN is accepted and ignored: Silinx does not make it"
   ],
   "interface-memory-manual-burst-manual-burst-example-auto-burst-inference-failure": [
@@ -38,13 +34,29 @@
     "27 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function"
   ],
   "modeling-pointers-basic-arithmetic": [
-    "23 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off"
+    "23 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'd' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off"
   ],
   "modeling-using-arbitrary-precision-arith": [],
   "modeling-using-array-stencil-1d": [
     "23 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
     "23 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
-    "33 warning: #pragma HLS PIPELINE II=1: II=3 made (it accesses a memory, an access a state)",
+    "33 warning: #pragma HLS PIPELINE II=1: II=3 made (the memory 'in' has one port, accessed 3 times an iteration)",
     "35 warning: #pragma HLS ARRAY_STENCIL is not a pragma Silinx knows: ignored"
+  ],
+  "interface-memory-using-axi-master": [],
+  "interface-memory-manual-burst-manual-burst-example-manual-burst-inference-success": [
+    "20 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
+    "20 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
+    "29 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)",
+    "37 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)"
+  ],
+  "interface-memory-manual-burst-manual-burst-with-conditionals": [
+    "29 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)",
+    "29 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=7 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off",
+    "54 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)",
+    "54 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=7 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off",
+    "77 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=9 made (it accesses a memory in a branch, an access a state); #pragma HLS PIPELINE off in it turns that off",
+    "89 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'x_aux' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off",
+    "94 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'x_aux' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off"
   ]
 }

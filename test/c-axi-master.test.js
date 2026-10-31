@@ -17,7 +17,7 @@ import { unitOf } from './hls-corpus/lib.mjs';
 const LANGS = ['vhdl', 'verilog'];
 const big = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
 const msgs = (gen) => gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`);
-const AUTO = (line, ii) => `${line} warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=${ii} made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off`;
+const AUTO = (line, ii, mem, n) => `${line} warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=${ii} made (the memory '${mem}' has one port, accessed ${n} times an iteration); #pragma HLS PIPELINE off in it turns that off`;
 
 function cosim(src, warnings, top, opts = {}) {
   for (const lang of LANGS) {
@@ -51,7 +51,7 @@ int main() {
 `;
 
 test('#1893 two masters on one bundle, a byte on its lane: read and written, their addresses registers of 64 bits', () => {
-  const g = cosim(TWO, ['5 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)', AUTO(5, 3)], 'f');
+  const g = cosim(TWO, ['5 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)', AUTO(5, 2, 'a', 2)], 'f');
   assert.deepEqual(g.axi.lite[0].regs.map((r) => [r.port, r.off, r.words]), [['a_base', 0x10, 2], ['b_base', 0x1c, 2]]);
   assert.equal(g.axi.lite[0].aw, 6);
   assert.deepEqual(g.axi.buses.map((b) => [b.bundle, b.w, b.clients.map((c) => `${c.name} ${c.bytes}`)]), [['gmem', 32, ['a 1', 'b 4']]]);
@@ -75,7 +75,7 @@ test('#1893 offset=direct a port of 64 bits, offset=off none; no s_axilite: cont
   return s;
 }
 int main() { int p[4] = { 1, 2, 3, 4 }, q[4] = { 5, 6, 7, 8 }, r[4] = { 0, 0, 0, 0 }; return f(p, q, r) == 70 ? 0 : 1; }
-`, [AUTO(6, 3)], 'f');
+`, [], 'f');
   const names = g.ports.map((p) => p.name).filter((n) => !/^[ms]_axi_/.test(n));
   assert.deepEqual(names, ['ap_clk', 'ap_rst_n', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'ap_return', 'p']);
   assert.equal(g.ports.find((x) => x.name === 'p').w, 64);
@@ -99,7 +99,7 @@ test("#1893 the config's interface directive (syn.directive.interface): a pragma
   for (int i = 0; i < 2; i++) d[i] += 1;
 }
 int main() { int d[2] = { 1, 2 }; f(d); return d[1] == 3 ? 0 : 1; }
-`, [AUTO(2, 2)], 'f', { directives: ['interface f mode=m_axi depth=2 d'] });
+`, [AUTO(2, 2, 'd', 2)], 'f', { directives: ['interface f mode=m_axi depth=2 d'] });
 });
 
 test('#1893 DATAFLOW: the processes wait together for the bus', () => {
