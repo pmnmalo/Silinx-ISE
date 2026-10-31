@@ -80,6 +80,6 @@ test('#1590 C++ methods: what is not supported said', () => {
   assert.deepEqual(errs('struct S { int a; static int f() { return 1; } };\nint g() { return 0; }\n'), ["1 the struct 'S': a static member function is supported in a class of static members only"]);
   assert.deepEqual(errs('struct S { int a; int f(); };\nint g() { S s; s.a = 1; return s.f(); }\n'), ["1 'f' of 'S' is declared but not defined"]);
   assert.deepEqual(errs('struct S { int a; S(int v) : a(v) {} };\nint g() { S s(1, 2); return s.a; }\n'), ["2 's': S has no constructor of 2 argument(s)"]);
-  assert.deepEqual(errs('struct S { int a; S(int v) : a(v) {} };\nint g(int x) { static S s(x); return s.a; }\n'), ["2 's': a static or global of a struct with a constructor is not supported yet (give its members their values in the struct)"]);
+  assert.deepEqual(errs('struct S { int a; S(int v) : a(v) {} };\nint g(int x) { static S s(x); return s.a; }\n'), ["2 's': a static object's constructor runs at synthesis, its state set at the reset: its argument 'x' must be a constant"]);
   assert.deepEqual(errs('struct S { int a; int f() { return a; } };\nint g(void) { return 0; }\n', 'e.c'), ["1 the struct 'S': a member function is C++ (a .cpp source)"]);
 });
