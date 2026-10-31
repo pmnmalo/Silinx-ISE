@@ -1,7 +1,7 @@
 // packages/silinx-fpga/research/s6 stage S6-E3 (#1951), without ISE: a CMT's clock paths. The BUFGMUX designs (gen-cmtsites6.mjs --muxes),
 // the paths' PIPs dropped one at a time (gen-cmtdrop6.mjs, ana-cmtdrop6.mjs), a BUFGMUX's REGC bit, what a CMT uses and
 // its bits outside its settings and PIPs (cmt6.mjs, ana-cmtinput6.mjs), the residual's databases and bits (residual6.mjs),
-// and the databases measured (db/s6-pips-cmt.json, db/xc6slx16-cmt-input.json).
+// and the databases measured (db/xc6slx16-pips-cmt.json, db/xc6slx16-cmt-input.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -60,7 +60,7 @@ test('ana-cmtdrop6: a drop\'s changed bits as offsets from its tile\'s region (f
   flip(drop, c0 - 5, b0 + 2);
   assert.deepEqual(dropBits(device, dev, base, drop, 'CLKC_X11Y31'), ['-5,2', '3,7']);
   assert.deepEqual(dropBits(device, dev, base, base, 'CLKC_X11Y31'), []);
-  const pips = db('s6-pips-cmt').pips;
+  const pips = db('xc6slx16-pips-cmt').pips;
   assert.ok(Object.keys(pips).length > 300);
   // the CLKC tile's selection of a CMT's line onto a global clock: its own bit
   assert.ok(pips['CLKC CLKC_PLL_L0 -> CLKC_GCLK0'].length > 0);
@@ -75,9 +75,13 @@ test('cmt6: a CMT-fed BUFGMUX\'s REGC bit, from the bottom or the top by the CMT
   const bot = design('CMT_DCM_BOT_X11Y8'), top = design('CMT_DCM_TOP_X11Y40');
   assert.deepEqual(cmtRegcBits(bot, bot.insts[0], 'xc6slx16', 1840), ['1840,1008', '1840,1023']);
   assert.deepEqual(cmtRegcBits(top, top.insts[0], 'xc6slx16', 1840), ['1840,1024', '1840,1039']);
+  // the XC6SLX45's the same (#2025: its 184 CMT designs, every one's REGC bits exact), in its REGC frame
+  const atlys = design('CMT_DCM_BOT_X18Y8');
+  assert.equal(CMT_REGC.xc6slx45, r);
+  assert.deepEqual(cmtRegcBits(atlys, atlys.insts[0], 'xc6slx45', 5104), ['5104,1008', '5104,1023']);
   // a BUFG not driven by the CMT, or a part not measured
   assert.deepEqual(cmtRegcBits(bot, bot.insts[3], 'xc6slx16', 1840), []);
-  assert.equal(cmtRegcBits(bot, bot.insts[0], 'xc6slx45', 1840), null);
+  assert.equal(cmtRegcBits(bot, bot.insts[0], 'xc6slx9', 1840), null);
 });
 
 test('cmt6 / ana-cmtinput6: what a CMT uses; its site\'s, outputs\' and BUFIO2\'s bits; the table from leftovers', () => {
@@ -127,6 +131,47 @@ test('db: the XC6SLX16\'s CMTs\' input table (the bits outside their settings an
   }
   // a PLL's CLKOUT0 enable: bit 416 of its row's CMT frame (rows 1 and 3), not one of its settings
   for (const [site, row] of [['PLL_ADV_X0Y0', 1], ['PLL_ADV_X0Y1', 3]]) assert.deepEqual(t.sites[site].outputs, { CLKOUT0: [`${CMT_FRAME.xc6slx16 + row * S6_DEVICES.xc6slx16.rowFrames},416`] });
+});
+
+// Regression (#2025): the CMT paths' PIPs were one database for every device, the XC6SLX16's; a PIP's bits far from its
+// tile (in the CMT's column, the REGC frame, the I/O words) are offsets from gridRegion's column 0, so on the XC6SLX45
+// they landed in other tiles (an INT_BRAM's, a CLEXL's) and its own were left over
+test('db: the CMT paths\' PIPs per device, the XC6SLX45\'s far bits in its own CMT column and I/O words (#2025)', () => {
+  const p16 = db('xc6slx16-pips-cmt').pips, p45 = db('xc6slx45-pips-cmt').pips;
+  assert.ok(Object.values(p45).filter(b => b.length).length > 500);
+  // the CMT column's frame (CMT_FRAME) and its REGC frame (5 minors before) moved with the column; the near bits the same
+  const col = { [CMT_FRAME.xc6slx16]: CMT_FRAME.xc6slx45, [CMT_FRAME.xc6slx16 - 5]: CMT_FRAME.xc6slx45 - 5 };
+  let moved = 0;
+  for (const [k, b] of Object.entries(p45)) {
+    if (!p16[k]?.length || !b.length || /^REG_[BT] /.test(k)) continue;
+    assert.deepEqual([...b].sort(), p16[k].map(x => { const [f, i] = x.split(','); return `${col[f] ?? f},${i}`; }).sort(), k);
+    if (p16[k].some(x => col[x.split(',')[0]])) moved++;
+  }
+  assert.ok(moved > 30);
+  // the REG_B / REG_T tiles' BUFIO2 inputs: bits in the I/O words, at the device's own offsets
+  assert.deepEqual(p16['REG_T REGT_CLKPIN6 -> I_BUFIO2_TOP_SITE6'], ['1330,588']);
+  assert.deepEqual(p45['REG_T REGT_CLKPIN6 -> I_BUFIO2_TOP_SITE6'], ['3455,636']);
+  // the loader reads the part's own: the XC6SLX45's CLKC selection in its REGC frame's column, not the XC6SLX16's
+  const clkc = 'CLKC CLKC_PLL_L0 -> CLKC_GCLK0';
+  assert.deepEqual(loadBitDbS6('xc6slx45csg324-3').other.pips[clkc], p45[clkc]);
+  assert.deepEqual(loadBitDbS6('xc6slx16csg324-3').other.pips[clkc], p16[clkc]);
+  assert.notDeepEqual(p45[clkc], p16[clkc]);
+});
+
+test('db: the XC6SLX45\'s CMTs\' input table, its eight DCMs and four PLLs (#2025)', () => {
+  const t = db('xc6slx45-cmt-input'), dev = S6_DEVICES.xc6slx45, frame = row => `${CMT_FRAME.xc6slx45 + row * dev.rowFrames},`;
+  assert.deepEqual(Object.keys(t.sites), [...[0, 1, 2, 3, 4, 5, 6, 7].map(y => `DCM_X0Y${y}`), ...[0, 1, 2, 3].map(y => `PLL_ADV_X0Y${y}`)]);
+  for (const [site, row] of [['DCM_X0Y0', 0], ['DCM_X0Y5', 4]]) {
+    const s = t.sites[site];
+    // a DCM's outputs in its row's CMT frame, CLKFX three bits; no CLK0 (a path's PIP): the paths' bits are the PIPs'
+    assert.deepEqual(Object.keys(s.outputs), ['CLK180', 'CLK270', 'CLK2X', 'CLK2X180', 'CLK90', 'CLKDV', 'CLKFX']);
+    for (const [o, b] of Object.entries(s.outputs)) { assert.equal(b.length, o === 'CLKFX' ? 3 : 1); assert.ok(b.every(x => x.startsWith(frame(row))), `${site} ${o}`); }
+    // each BUFIO2 one I/O word bit
+    for (const b of Object.values(s.bufio2)) assert.equal(b.length, 1);
+  }
+  assert.deepEqual(t.sites.DCM_X0Y0.bufio2, { BUFIO2_X1Y7: ['11395,377'], BUFIO2_X3Y7: ['11395,185'] });
+  // a PLL's CLKOUT0 enable: bit 416 of its row's CMT frame
+  for (const [site, row] of [['PLL_ADV_X0Y0', 1], ['PLL_ADV_X0Y3', 7]]) assert.deepEqual(t.sites[site].outputs.CLKOUT0, [`${frame(row)}416`]);
 });
 
 test('residual6: a bitstream\'s bits set against the empty one, the block RAM\'s frames only when asked', () => {

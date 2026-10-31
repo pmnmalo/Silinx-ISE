@@ -85,7 +85,7 @@ test('db: the settings the same at every site of a kind, the two DCMs of a tile 
 // of its CMT frame) and the CLKIN path's PIPs' bits in the CMT frame (a PLL's 604, an even DCM's 596 and 599), which a
 // CMT fed from another BUFIO2 (the top half's from the clock pad C10) does not set
 test('db: the settings\' patterns without a PLL\'s CLKOUT0 enable nor the CLKIN paths\' PIP bits (#2025)', () => {
-  const s = db('xc6slx16-cmt-settings').patterns, pips = db('s6-pips-cmt').pips;
+  const s = db('xc6slx16-cmt-settings').patterns, pips = db('xc6slx16-pips-cmt').pips;
   assert.deepEqual(PLL_USE_BITS, [416]);
   const pll = Object.entries(s).filter(([k]) => k.startsWith('PLL_ADV'));
   assert.ok(pll.length >= 20);
@@ -94,6 +94,16 @@ test('db: the settings\' patterns without a PLL\'s CLKOUT0 enable nor the CLKIN 
   // those bits are the paths' PIPs': a CMT tile's PIP sets them (their offsets from its region)
   const cmtTile = Object.entries(pips).filter(([k, b]) => /^CMT_(PLL|DCM)_/.test(k) && b.length);
   assert.ok(cmtTile.length > 50);
+});
+
+test('db: the XC6SLX45\'s settings in its CMT column, each kind the same at all its sites, no PLL CLKOUT0 enable (#2025)', () => {
+  const s = db('xc6slx45-cmt-settings');
+  assert.equal(s.column, 535);
+  const many = Object.values(s.patterns).filter(p => p.sites.length > 1);
+  assert.deepEqual([...new Set(many.map(p => p.sites.join(' ')))].sort(), ['DCM_X0Y0 DCM_X0Y2 DCM_X0Y4 DCM_X0Y6', 'DCM_X0Y1 DCM_X0Y3 DCM_X0Y5 DCM_X0Y7', 'PLL_ADV_X0Y0 PLL_ADV_X0Y1 PLL_ADV_X0Y2 PLL_ADV_X0Y3']);
+  const all = Object.values(s.patterns).flatMap(p => p.bits);
+  assert.ok(all.length && all.every(x => /^5(3[5-9]|[45]\d|6[0-5]),\d+$/.test(x)));
+  for (const [, p] of Object.entries(s.patterns).filter(([k]) => k.startsWith('PLL_ADV'))) for (const b of [`${CMT_FRAME.xc6slx45},416`, `${CMT_FRAME.xc6slx45},604`]) assert.ok(!p.bits.includes(b), b);
 });
 
 test('gen-cmtsites6 --outputs: each output of a CMT alone, the pad and the BUFGMUX fixed per site', () => {
