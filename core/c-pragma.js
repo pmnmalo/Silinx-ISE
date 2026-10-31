@@ -17,7 +17,7 @@ export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'LATENCY', 'BIND_OP', 'BIN
   'LOOP_FLATTEN', 'LOOP_MERGE', 'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
   'ARRAY_RESHAPE', 'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
-export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram']);
+export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite']);
 /** `#pragma HLS NAME key=value key` -> { name, args, text }; null if not an HLS pragma (core/c-lex.js's). */
 export function readPragma(rest) {
   const m = /^\s*HLS\s+(\w+)\s*(.*)$/i.exec(rest);
