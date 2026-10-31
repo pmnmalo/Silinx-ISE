@@ -16,6 +16,7 @@
 //     double a number; coeff_vec an array of numbers)
 //   firPhases(p) -> [BigInt]: the coefficients by set, phase and tap ((set * L + phase) * nt + tap, nt the taps of a
 //     phase), 0 past the end
+//   firStructure(p) -> { cps, half, wanted, macs, groups, depth, rom }: the hardware the rate asks for (#1947)
 //   firCModel(fn, p, args) -> the C++ text of the function fn(in, out[, config])
 
 import { CPP_OWN_HEADERS } from './cpp-headers.js';
@@ -43,8 +44,8 @@ export function firParams(name, fields) {
   const f = (k) => (fields.has(k) ? fields.get(k) : FIR_DEFAULTS[k]);
   const n = (k) => Number(f(k));
   const refuse = (k, why) => errors.push(`hls::FIR<${name}>: ${k} = ${nameOf(k, f(k))}: ${why}`);
-  // what Silinx does not make, each named (the fields that set the hardware's speed and structure only, not what it
-  // computes, taken: filter_arch, optimization_goal, sample_period…; Silinx's MAC its own)
+  // what Silinx does not make, each named (the fields of the hardware's structure only, not of what it computes, taken:
+  // filter_arch, optimization_goal…; the rate's choose the number of MACs, firStructure)
   if (n('reloadable')) refuse('reloadable', 'coefficients reloaded at run time are not made by Silinx HLS yet');
   if (![C.single_rate, C.interpolation, C.decimation].includes(n('filter_type'))) refuse('filter_type', 'Silinx HLS makes single_rate, decimation and interpolation filters');
   if (n('rate_change') !== C.integer) refuse('rate_change', 'Silinx HLS makes integer rates only (rate_change = integer)');
@@ -91,7 +92,17 @@ export function firParams(name, fields) {
   }
   if (errors.length) return { p: null, errors };
   const p = { name, inW, inF, cW, cF, taps, sets, L, D, inLen, outLen, coeffs: raw, nt: Math.ceil(taps / L),
-    type: type === C.interpolation ? 'interpolation' : type === C.decimation ? 'decimation' : 'single_rate' };
+    type: type === C.interpolation ? 'interpolation' : type === C.decimation ? 'decimation' : 'single_rate',
+    // (the clocks an input may take, PG149's: the period, or the hardware's oversampling rate)
+    rate: n('rate_specification') === C.frequency ? n('hardware_oversampling_rate') : n('rate_specification') === C.output_period ? (n('sample_period') * L) / D : n('sample_period') };
+  const mirror = mirrored(p);
+  const said = n('coeff_structure');
+  if (L === 1 && ((said === C.symmetric && mirror !== 'symmetric') || (said === C.negative_symmetric && mirror !== 'negative'))) {
+    refuse('coeff_structure', 'the coefficients of a set are not mirrored so');
+    return { p: null, errors };
+  }
+  // (the pre-adder only where its sum stays an 18x18 multiplier's operand)
+  p.symmetry = L === 1 && said !== C.non_symmetric && inW < 18 ? mirror : null;
   p.accW = fullPrecision(p);
   p.accF = inF + cF;
   // (truncate_lsbs: the LSBs past output_width dropped, the MSB the full precision's)
@@ -128,6 +139,36 @@ function fullPrecision(p) {
   let w = 1;
   while (hi > (1n << BigInt(w - 1)) - 1n || lo < -(1n << BigInt(w - 1))) w++;
   return w;
+}
+
+/** How every set's coefficients mirror: 'symmetric' (h[k] = h[n-1-k]), 'negative' (= -h[n-1-k]), or null. */
+function mirrored(p) {
+  const all = (sign) => p.coeffs.every((c, j) => c === sign * p.coeffs[j - j % p.taps + p.taps - 1 - j % p.taps]);
+  return all(1n) ? 'symmetric' : all(-1n) ? 'negative' : null;
+}
+
+/** The most MACs a filter gets: the MULT18X18s of the largest Spartan-3E of the boards (XC3S1200E, Nexys2-1200). */
+export const FIR_MAX_MACS = 28;
+
+/** The hardware the rate asks for, as the FIR Compiler chooses it (PG149): an output's taps (half of a mirrored filter's,
+ *  its pre-adder) over the clocks an output has (clocks per input x decim_rate / interp_rate), a read one a clock at
+ *  most. Each group of taps (a clock's, one tap a MAC) reads the oldest samples first, so that inputs may arrive
+ *  meanwhile. rom[m]: MAC m's coefficients by (set * L + phase) * groups + group: the tap oldest first of the group, 0
+ *  past its end. depth: the words of a MAC's bank of the delay line (all the taps' samples, a word more, so that a
+ *  write never meets a read). */
+export function firStructure(p) {
+  const cps = Math.max(1, Math.floor(p.rate));
+  const half = p.symmetry ? Math.ceil(p.nt / 2) : p.nt;
+  const wanted = Math.min(half, Math.ceil((p.L * half) / (cps * p.D)));
+  const macs = Math.min(wanted, FIR_MAX_MACS);
+  const groups = Math.ceil(half / macs);
+  const ph = firPhases(p);
+  const words = p.sets * p.L * groups;
+  const rom = Array.from({ length: macs }, (_, m) => Array.from({ length: words }, (_, w) => {
+    const row = Math.floor(w / groups), at = (w % groups) * macs + m;
+    return at < half ? ph[row * p.nt + p.nt - 1 - at] : 0n;
+  }));
+  return { cps, half, wanted, macs, groups, depth: Math.ceil(p.nt / macs) + 1, rom };
 }
 
 const fixed = (w, f) => `ap_fixed<${w}, ${w - f}>`;

@@ -2,7 +2,7 @@
 // ports Vitis HLS's, its calls replayed on it in VHDL and in Verilog, its outputs the FIR's from its definition,
 // test/hls-fir-ref.js); in a design, co-simulated against the C simulation (single rate, decimation with coefficient sets,
 // interpolation; arrays and streams, a config stream), its warnings asserted; the open synthesis (Yosys, Spartan-3E)
-// making it an 18x18 multiplier and block RAMs, with no warning.
+// making it an 18x18 multiplier and block RAMs, with no warning. (The structures: test/hls-fir-structure.test.js.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { firParams, FIR_CONSTANTS as C } from '../core/hls-fir.js';
@@ -43,13 +43,13 @@ test('#1942 the module alone: the decimator\'s ports Vitis HLS\'s (two ap_memory
   for (const lang of LANGS) {
     const { gen, out, cycles } = alone(cfg, { lang, types, args: { ...ARR, config: { type: 'config_t', ptr: true } }, calls });
     assert.deepEqual(out, want, lang);
-    // (each output 13 cycles: its two inputs read (3), its 7 taps (7, then 2 through the multiplier), written (1))
-    assert.deepEqual(cycles, [130, 130, 130, 130], lang);
+    // (4 MACs at the default rate, #1947: an input a clock (20), then the last output through the pipeline)
+    assert.deepEqual(cycles, [29, 29, 29, 29], lang);
     assert.deepEqual(gen.ports.map((x) => `${x.name} ${x.dir} ${x.w}`), ['ap_clk in 1', 'ap_rst in 1', 'ap_start in 1', 'ap_done out 1', 'ap_idle out 1', 'ap_ready out 1',
       'in_r_address0 out 5', 'in_r_ce0 out 1', 'in_r_d0 out 16', 'in_r_q0 in 16', 'in_r_we0 out 1', 'in_r_address1 out 5', 'in_r_ce1 out 1', 'in_r_d1 out 16', 'in_r_q1 in 16', 'in_r_we1 out 1',
       'out_r_address0 out 4', 'out_r_ce0 out 1', 'out_r_d0 out 24', 'out_r_q0 in 24', 'out_r_we0 out 1', 'out_r_address1 out 4', 'out_r_ce1 out 1', 'out_r_d1 out 24', 'out_r_q1 in 24', 'out_r_we1 out 1',
       'config_r in 8'], lang);
-    assert.deepEqual([gen.diagnostics, gen.report.memories], [[], [{ name: 'coefficients', words: 21, bits: 16, kind: 'ROM' }, { name: 'delay line', words: 7, bits: 16, kind: 'RAM' }]], lang);
+    assert.deepEqual([gen.diagnostics, gen.report.memories], [[], [{ name: 'coefficients', words: 24, bits: 16, kind: 'ROM' }, { name: 'delay line', words: 12, bits: 16, kind: 'RAM' }]], lang);
   }
 });
 
@@ -93,7 +93,7 @@ const M = (o) => Object.entries(o).map(([k, v]) => (k === 'coeff_vec' ? `static 
 
 test('#1942 co-simulated: single rate, decimation with its coefficient sets, interpolation; a top with no DATAFLOW running the filter its process too', () => {
   const single = cosim(firSource(M({ num_coeffs: 5, input_length: 8, output_length: 8, coeff_vec: [1, -2, 3, -2, 1] }), { inLen: 8, outLen: 8 }));
-  assert.deepEqual([single.latency, single.report.processes.map((x) => x.instance)], [{ min: 82, max: 82, avg: 82 }, ['ap_fir_f_U0']]);
+  assert.deepEqual([single.latency, single.report.processes.map((x) => x.instance)], [{ min: 19, max: 19, avg: 19 }, ['ap_fir_f_U0']]);
   const decim = cosim(firSource(M({ num_coeffs: 4, coeff_sets: 2, input_length: 12, output_length: 4, filter_type: 'decimation', decim_rate: 3, coeff_vec: [1, 2, 3, 4, -4, -3, -2, -1] }),
     { inLen: 12, outLen: 4, sets: 2, calls: 4 }));
   assert.deepEqual(decim.ports.slice(-1), ['config_r']);
@@ -115,14 +115,15 @@ test('#1942 co-simulated: streams (ap_fifo, waiting while empty or full), a conf
 test('#1942 the open synthesis (Yosys, Spartan-3E): one 18x18 multiplier, the coefficients and the delay line block RAMs, from the VHDL and from the Verilog, with no warning', async () => {
   // (256 taps of 16 bits: a block RAM each, the coefficients and the delay line)
   const vec = Array.from({ length: 256 }, (_, k) => ((k * 37) % 201) - 100);
-  const cfg = { num_coeffs: 256, input_length: 64, output_length: 64, coeff_vec: vec };
+  const cfg = { num_coeffs: 256, input_length: 64, output_length: 64, sample_period: 256, coeff_vec: vec };
   const types = { in: { w: 16, s: true }, out: { w: 24, s: true } };
   for (const lang of LANGS) {
     const { p } = firParams('cfg', fields(cfg));
     const gen = firHdl({ p, args: ARR }, { lang, module: 'fir_big', types });
     const design = elaborate(compile([{ path: `fir_big.${lang === 'vhdl' ? 'vhd' : 'v'}`, lang, text: gen.hdl }]), 'fir_big');
     const r = await synthesizeOpen(design, { family: 'spartan3e', run: yosysNode });
-    assert.deepEqual([r.cells.MULT18X18, r.cells.RAMB16_S18], [1, 2], `${lang} ${JSON.stringify(r.cells)}`);
+    // (its rate one MAC's, #1947; the delay line read and written at once, both of its ports)
+    assert.deepEqual([r.cells.MULT18X18, r.cells.RAMB16_S18, r.cells.RAMB16_S18_S18], [1, 1, 1], `${lang} ${JSON.stringify(r.cells)}`);
     assert.deepEqual(r.warnings, [], lang);
   }
 });

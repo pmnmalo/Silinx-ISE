@@ -33,7 +33,7 @@ Not part of `npm test` (it needs the network once).
 | dsp-fft-interface-stream | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-stream-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-logicore-fft-float-ssr | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| dsp-fir-decimator | C++ | pass | pass | pass | 132 |  |
+| dsp-fir-decimator | C++ | pass | pass | pass | 31 |  |
 | interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 13 |  |
 | interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 19 |  |
 | interface-aggregation-disaggregation-aggregation-of-struct | C++ | pass | pass | pass | 103 |  |

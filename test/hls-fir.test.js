@@ -20,7 +20,7 @@ test('#1942 the parameters: the config\'s fields, UG1399\'s defaults for the oth
   const { p, errors } = firParams('config1', fields(DECIM));
   assert.deepEqual(errors, []);
   const { coeffs, ...rest } = p;
-  assert.deepEqual(rest, { name: 'config1', inW: 16, inF: 0, cW: 16, cF: 0, taps: 7, sets: 3, L: 1, D: 2, inLen: 20, outLen: 10, nt: 7, type: 'decimation', accW: 24, accF: 0, outW: 24, outF: 0 });
+  assert.deepEqual(rest, { name: 'config1', inW: 16, inF: 0, cW: 16, cF: 0, taps: 7, sets: 3, L: 1, D: 2, inLen: 20, outLen: 10, nt: 7, type: 'decimation', accW: 24, accF: 0, outW: 24, outF: 0, rate: 0.5, symmetry: null });
   assert.deepEqual(coeffs.map(Number), DECIM.coeff_vec);
   assert.equal(FIR_DEFAULTS.output_width, 24n);
   assert.equal(FIR_DEFAULTS.num_coeffs, 21n);
@@ -75,7 +75,7 @@ test('#1942 what Silinx does not make: refused, each parameter named with why', 
   assert.deepEqual(why({ coeff_vec: [6, 40000] }), ['hls::FIR<cfg>: coeff_vec[1] = 40000 does not fit in coeff_width (16) bits']);
   assert.deepEqual(why({ coeff_vec: undefined }), ['hls::FIR<cfg>: coeff_vec is not given (static constexpr double coeff_vec[total_num_coeff] = { … };)']);
   // (the structure and speed of the hardware only: taken, Silinx's MAC its own)
-  assert.deepEqual(why({ filter_arch: C.transpose_multiply_accumulate, optimization_goal: C.speed, coeff_structure: C.symmetric, sample_frequency: 100, config_sync_mode: C.on_packet }), []);
+  assert.deepEqual(why({ filter_arch: C.transpose_multiply_accumulate, optimization_goal: C.speed, sample_frequency: 100, config_sync_mode: C.on_packet }), []);
 });
 
 /** The C simulation of a design running the filter: each call's outputs (raw) and the reference's. */

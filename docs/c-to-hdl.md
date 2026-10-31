@@ -322,8 +322,9 @@ void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
   rate, decimation and interpolation filters of an integer rate, one channel, coefficient sets chosen by the config
   argument (its value the set), `integer_coefficients` and `quantize_only`, `full_precision` and `truncate_lsbs`; the
   others (`reloadable`, `hilbert_filter`, `interpolated`, `fixed_fractional`, `num_channels` > 1, the rounding modes,
-  unsigned data or coefficients, `half_band`, …) are refused, each named with why. The fields of the hardware's speed and
-  structure (`filter_arch`, `optimization_goal`, `sample_period`, …) are taken: Silinx's structure is its own.
+  unsigned data or coefficients, `half_band`, …) are refused, each named with why, as `coeff_structure` `symmetric` or
+  `negative_symmetric` of coefficients not so mirrored. `filter_arch` and `optimization_goal` are taken: Silinx's
+  structure is its own, chosen from the rate (below).
 - **What it computes** (the C model, the C simulation's): each input taken in the parameters' format
   (`ap_fixed<input_width, input_width - input_fractional_bits>`), the sums in full precision (the fewest bits holding
   every sum of a phase's coefficients times inputs of the input's range: PG149's `input_width + ceil(log2(sum |h|))`),
@@ -331,13 +332,24 @@ void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
   conversion). Decimation by D gives an output once each D inputs (at the D-th: the single rate's y[mD + D - 1]);
   interpolation by L gives L outputs an input (y[nL + p] = Σ h[p + kL] x[n − k]). A call reads `input_length` inputs
   and writes `output_length` outputs (`input_length` × L / D).
-- **The hardware** (its own HDL, core/hls-fir-hdl.js): one multiply-accumulate (an 18×18 multiplier, its operands and
-  product registered), the coefficients a ROM and the delay line a RAM (block RAMs when large enough), a state machine:
-  each input read and written into the delay line, then a tap a cycle, the sum written out. Its ports are Vitis HLS's:
-  an array's `ap_memory` with its two ports (`in_r_address0` … `in_r_we1`; the second unused), a stream's `ap_fifo`, the
-  config an `ap_none` input (`config_r`). The top that runs it (its calls only, DATAFLOW or not) makes it a process of
-  its own; in a top of other statements its C model is inlined. Its latency is Silinx's: (D + 1) + taps + 3 cycles an
-  output for a decimator (dsp-fir-decimator: 132 cycles a call, Vitis HLS's FIR Compiler 32).
+- **The structure** (#1947, `firStructure`): as the FIR Compiler (PG149), from the clocks an input may take: `sample_period`
+  (`rate_specification` `period` or `input_period`; `output_period`: its value × `interp_rate` / `decim_rate`), or
+  `hardware_oversampling_rate` (`frequency`); at least one, a port reading one input a clock, so the corpus's 0.5 is 1.
+  MACs = ⌈taps × L / (clocks × D)⌉, no more than a phase's taps: a decimator computes only the outputs it keeps. A mirrored
+  filter (`coeff_structure` `symmetric`, `negative_symmetric`, or `inferred` when it is, every set; single rate or
+  decimation; inputs under 18 bits, so that the sum stays a multiplier's operand) adds its pair of samples before the
+  multiplier (the pre-adder): half the taps, half the MACs, a second delay line. More than 28 MACs (the XC3S1200E's
+  multipliers, the largest Spartan-3E of the boards) are not made: a warning says so, and that a larger `sample_period`
+  states the rate the filter must sustain.
+- **The hardware** (its own HDL, core/hls-fir-hdl.js): the MACs (18×18 multipliers, their operands and products registered),
+  a coefficient ROM each and a delay-line RAM each (block RAMs when large enough; the delay line cyclically partitioned among
+  the MACs, so each has its tap in the same clock); the inputs read and written apace while the MACs work, the oldest taps
+  first, so a write never needs what is still to be read; the products summed in a pipelined tree and accumulated; the sum
+  written out. The input waits only when its sample would start an output before the last has read its taps; everything
+  waits while an output stream is full. Its ports are Vitis HLS's: an array's `ap_memory` with its two ports
+  (`in_r_address0` … `in_r_we1`; the second unused), a stream's `ap_fifo`, the config an `ap_none` input (`config_r`). The
+  top that runs it (its calls only, DATAFLOW or not) makes it a process of its own; in a top of other statements its C
+  model is inlined. dsp-fir-decimator: 4 MACs, 31 cycles a call (Vitis HLS's FIR Compiler 32).
 
 ## Pragmas (`#pragma HLS …`)
 

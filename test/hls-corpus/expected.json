@@ -61,9 +61,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 132,
-      "max": 132,
-      "avg": 132
+      "min": 31,
+      "max": 31,
+      "avg": 31
     },
     "reason": null
   },
