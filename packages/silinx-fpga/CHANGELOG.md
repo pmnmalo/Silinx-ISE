@@ -3,10 +3,20 @@
 What changed in each version of silinx-fpga, the Silinx toolchain. The newest version is first. Its versions
 are its own (semver, 0.x until its API is stable), apart from Silinx ISE's.
 
+## 0.1.2
+
+The first version on npm: 0.1.1 was tagged but not published either, its CI having failed on a break fixed since
+(#2356). 0.1.1's changes are in it.
+
+In detail:
+
+- **`leaveOutChipdbs` in the Node API (#2356):** `silinx-fpga/node` exports it (a nextpnr package without its chip
+  databases, fetched on first use), which Silinx ISE's release script imported from the module itself, across the
+  package's API.
+
 ## 0.1.1
 
-The first version on npm: 0.1.0 was tagged but not published, its CI having failed on two breaks fixed since
-(#2329, #2335).
+0.1.0 was tagged but not published, its CI having failed on two breaks fixed since (#2329, #2335).
 
 In short:
 
