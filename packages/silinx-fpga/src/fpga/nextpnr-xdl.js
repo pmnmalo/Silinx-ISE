@@ -38,7 +38,7 @@ function deviceViews(device) {
 }
 
 /** The routed design's ROUTING attribute: [wire, pip] pairs (each "tile/name", pip "tile/dst/src" or ''). */
-const routing = n => {
+export const routing = n => {
   const parts = (n.attributes?.ROUTING || '').split(';'), out = [];
   for (let i = 0; i + 2 < parts.length; i += 3) out.push([parts[i], parts[i + 1]]);
   return out;

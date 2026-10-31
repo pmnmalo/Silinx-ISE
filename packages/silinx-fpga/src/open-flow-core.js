@@ -42,6 +42,7 @@ import { bitgen, knownRouting } from './fpga/bitgen.js';
 import { mountFlowReports } from './open-flow-reports.js';
 import { mountS6Steps } from './open-flow-s6.js';
 import { mountNextpnrSteps } from './open-flow-nextpnr.js';
+import { mountNextpnrS6 } from './open-flow-nextpnr-s6.js';
 
 // without the HDL front end (io.frontEnd): the sources are the flat Verilog given to Yosys, its top module `top` (#1675)
 function flatVerilog(srcs, top) {
@@ -262,8 +263,10 @@ export async function runFlow(spec, io) {
   // the Spartan-6's Map and Place & Route (#732: open-flow-s6.js)
   const s6 = spec.family === 'spartan6' ? mountS6Steps({ io, spec, log, report, util, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
   // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine: 'nextpnr' always; 'auto' when it can
-  // implement the design (its cells, every port's pad), else the Silinx engine, which Map says (not the Spartan-6's)
-  const np = (spec.engine === 'nextpnr' || (spec.engine === 'auto' && spec.family !== 'spartan6')) ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
+  // implement the design (its cells, every port's pad), else the Silinx engine, which Map says (not the Spartan-6's). The
+  // Spartan-6 by nextpnr ('nextpnr' only, #2138): Silinx's Map, nextpnr's Place & Route (open-flow-nextpnr-s6.js)
+  const np = s6 ? (spec.engine === 'nextpnr' ? { runMap: s6.runMap, problems: () => [], ...mountNextpnrS6({ io, spec, log, report, now, ms, netlist: () => netlist, ucfText, StepError, setRouted: t => { routedText = t; }, state: s6.state }) } : null)
+    : (spec.engine === 'nextpnr' || spec.engine === 'auto') ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
 
   let viaNextpnr = null;
   const useNextpnr = () => {
