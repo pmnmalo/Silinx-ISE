@@ -102,7 +102,7 @@ int main() {
 }
 `;
   const hdl = cosim(src, 'example.cpp', ['ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready', 'inval1', 'inval2', 'inval3', 'outval1', 'outval1_ap_vld', 'outval2', 'outval2_ap_vld', 'outval3', 'outval3_ap_vld'],
-    ['2 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function']);
+    ["2 warning: #pragma HLS INLINE off: 'foo' and its caller are combinational (latency 0): its logic is in its caller's, no module of its own"]);
   // (latency 0: ap_rst, no ap_clk, as Vitis HLS 2025.2 makes function-instantiate, #1924)
   for (const lang of LANGS) assert.doesNotMatch(hdl[lang].hdl, /ap_clk/, lang);
   assert.equal(hdl.vhdl.latency, null);
@@ -345,7 +345,7 @@ const CORPUS_WARNINGS = {
   'modeling-fixed-point-sqrt': ['77 warning: assert is ignored by synthesis (the C simulation checks it)'],
   'modeling-using-arbitrary-precision-casting': [],
   'modeling-using-cpp-templates': [],
-  'pipelining-functions-function-instantiate': ['19 warning: #pragma HLS INLINE off is ignored: Silinx inlines every function',
+  'pipelining-functions-function-instantiate': ["19 warning: #pragma HLS INLINE off: 'foo' and its caller are combinational (latency 0): its logic is in its caller's, no module of its own",
     '20 warning: #pragma HLS FUNCTION_INSTANTIATE is accepted and ignored: Silinx does not make it'],
 };
 

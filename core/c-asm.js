@@ -14,7 +14,7 @@ import { dataflow } from './c-dataflow.js';
 import { scheduled } from './c-schedule.js';
 import { exprText, stmtText } from './c-print.js';
 import { asmLayout } from './asm-layout.js';
-import { cToHdl } from './c-hdl.js';
+import { cToHdl, subsOf } from './c-hdl.js';
 import { portOf } from './c-names.js';
 
 export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, clock, family } = {}) {
@@ -26,7 +26,9 @@ export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, 
     const errs = df.diagnostics.filter((d) => d.severity === 'error');
     return { ok: false, model: null, diagnostics: errs.length ? errs : [{ file, line: 1, col: 1, message: `'${checked.top}' is combinational: it has no state machine`, severity: 'error' }] };
   }
-  const m = scheduled(checked, {}, { clock, family });
+  // (a function not inlined: a state that starts it and waits, #1960)
+  const { subs, sub } = subsOf(source, checked, { file, lang, headers, clock, family });
+  const m = scheduled(checked, { subs, sub }, { clock, family });
   if (m.diagnostics.some((d) => d.severity === 'error')) return { ok: false, model: null, diagnostics: m.diagnostics };
   // (the ports the module is made with: ap_ctrl_none's none of the block protocol, an argument renamed, #1927)
   const gen = cToHdl(source, { file, lang, headers, top, clock, family });
@@ -111,6 +113,17 @@ function chart(top, m, lang, ports) {
           edge(d, s, 'false');
           cur = null; pending = [{ from: d, port: 'true' }];
           act(rd ? `${f}_read = 1; ${x.tmp} = ${f}_dout` : `${f}_din = ${exprText(x.v)}; ${f}_write = 1`);
+          return;
+        }
+        // (a sub-module's call, #1960: started, the state again until it is done)
+        case 'subcall': {
+          if (!cur && !pending.length) return;
+          act(`${x.callee}: ap_start = 1`);
+          const d = node({ type: 'decision', cond: `${x.callee}_ap_done` });
+          for (const p of pending) edge(p.from, d, p.port);
+          edge(d, s, 'false');
+          cur = null; pending = [{ from: d, port: 'true' }];
+          act(stmtText(x));
           return;
         }
         case 'for': case 'while': case 'do': act(`${x.kind} (…) unrolled: ${loopText(x)}`); return;

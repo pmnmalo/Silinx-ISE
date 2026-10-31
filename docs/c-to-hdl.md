@@ -243,6 +243,19 @@ divider (one compare-and-subtract per bit, combinational: in one cycle); all wri
 XST takes them. A division by zero gives every quotient bit 1 and the dividend as the remainder (the C simulation
 stops on it). The machine shown as an ASM chart: #1575.
 
+A function with `#pragma HLS INLINE off` is a **sub-module** (#1960): a module of its own with its block protocol
+(`ap_start`, `ap_done`, `ap_idle`, `ap_ready`), instantiated once by its caller (`<function>_U0`), its calls sharing the
+instance. Each call is a state of the caller's machine holding `ap_start` at 1 and the arguments until `ap_done`; a
+loop calling it is not pipelined (said, if asked). Its value and a pointer's are taken when they come (`ap_return` at
+`ap_done`, a pointer's at its `_ap_vld`, so one it does not write keeps the caller's); an array or a stream argument's
+port is the callee's during the call (the array a memory, whatever its size); its `static` variables are the module's.
+The report lists each function's calls, latency (from `ap_start` to `ap_done`; at most, when its branches differ) and
+resources (states, register bits, memories), a sub-module's own below it. The same modules serve DATAFLOW's processes.
+Two cases stay inlined, with a warning: a function of latency 0 called by a top of latency 0 (no clock to start it
+with: its ports are Vitis HLS's), and one sharing a global variable with its caller (Vitis HLS makes it a port of the
+sub-module). `ALLOCATION` and `FUNCTION_INSTANTIATE` are not made: a function is one instance per caller and size of
+its arrays. With no pragma a function is inlined, where Vitis HLS keeps a large one (#2244).
+
 **Arrays and memories** (#1527). A local array of up to 64 elements is registers (one per element; an index that
 is not a constant a multiplexer). An array argument is a memory outside the module, `ap_memory`: one port, its
 address (`_address0`, enough bits for its size) and enable (`_ce0`), its write enable and data (`_we0`, `_d0`,
@@ -347,7 +360,7 @@ void top(data_t in[20], out_t out[10], ap_uint<8> *config) {
 | `INTERFACE ap_ctrl_none / ap_ctrl_hs port=return` | the block protocol |
 | `INTERFACE ap_none / ap_vld / ap_ovld / ap_memory / bram port=` | the argument's interface |
 | `AGGREGATE variable= compact=` / `DISAGGREGATE variable=` (the top's, #1668) | a struct argument, a stream or an array of structs one port, stream or memory of its words, packed `compact=bit` (an array's or a stream's default), `byte`, `none` (a scalar struct's default) / a port, a stream or a memory per member |
-| `INLINE` / `INLINE off` | every function is inlined (`off` is ignored, with a warning) |
+| `INLINE` / `INLINE recursive` / `INLINE off` | the function dissolved in its callers / the functions it calls too / a sub-module of its own, its calls sharing one instance, whatever its caller's `recursive` (#1960, below) |
 | `LOOP_TRIPCOUNT min= max=` | the report's bound of a loop whose count depends on the inputs (its latency, else unknown) |
 | `PIPELINE [II=]` / `PIPELINE off` (in a loop's body) | a sequential module's loop: an iteration a state (II=1: its condition, body and step in one clock cycle), its inner loops of constant count unrolled in it; one that accesses a memory or a stream: an iteration its accesses' states (below); a warning saying the II made when it is more than asked. `off`: not pipelined, not even automatically |
 | `UNROLL` / `UNROLL factor=N` (in a loop's body) | whole: a loop of constant count run in the state it is in (no state of its own); `factor=N`: N iterations a state. A combinational module's loops are all unrolled |
