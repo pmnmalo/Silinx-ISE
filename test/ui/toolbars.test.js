@@ -2,7 +2,8 @@
 // the truth table's, the ASM and FSM editors', SSim's, the board emulator's, the pin planner's, one height, the same
 // padding, every button, icon button and field in them as high (--m-tool-h), light and dark; a page's fields as high as
 // its buttons (Find in Project); on a touch screen every button 40 px, a tree's rows 32 px, the tools 36 px; the classic
-// interface's toolbars as before. No warnings.
+// interface's toolbars as before; a toolbar with a menu at the right of its first line keeps the menu's place free (#2331).
+// No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -33,7 +34,10 @@ const toolbar = (page) => page.eval((bars, controls) => {
   const bar = [...doc.querySelectorAll(bars)].find(vis);
   const c = getComputedStyle(bar);
   const ctl = [...bar.querySelectorAll(controls)].filter(vis);
-  return { min: c.minHeight, pad: c.padding, bg: c.backgroundColor,
+  const more = bar.querySelector('.se-more, .tb-more');
+  // (its menu's button right of every other control: the place kept free, #2331)
+  const clear = more && ctl.filter((e) => !more.contains(e)).every((e) => e.getBoundingClientRect().right <= more.getBoundingClientRect().left);
+  return { min: c.minHeight, pad: c.padding, bg: c.backgroundColor, menu: !!more, clear,
     controls: [...new Set(ctl.map((e) => Math.round(e.getBoundingClientRect().height)))], n: ctl.length };
 }, BARS, CONTROLS);
 
@@ -73,9 +77,12 @@ for (const theme of ['light', 'dark']) {
     for (const [name, b] of Object.entries(bars)) {
       assert.ok(b.n > 0, `${name}: its controls`);
       // (SSim's toolbar is its wave window's line in the Tasks interface: the line's height and padding)
-      const want = name === 'ssim' ? { min: '0px', pad: '6px 0px', controls: [28] } : { min: '40px', pad: '6px 8px', controls: [28] };
+      // (a toolbar with a menu, #2208: the menu's place kept free at the right, the same padding otherwise, #2331)
+      const want = name === 'ssim' ? { min: '0px', pad: '6px 0px', controls: [28] } : { min: '40px', pad: b.menu ? '6px 40px 6px 8px' : '6px 8px', controls: [28] };
       assert.deepEqual({ min: b.min, pad: b.pad, controls: b.controls }, want, `${name}: ${JSON.stringify(b)}`);
+      if (b.menu) assert.ok(b.clear, `${name}: its menu clear of the other controls`);
     }
+    assert.ok(bars.schematic.menu, 'the schematic toolbar\'s menu (#2208)');
     // a page's fields as high as its buttons: Find in Project
     await go(page, 'edit');
     await page.eval(() => window.SilinxApp.S.menus.find((m) => m.label === 'Edit').items().find((i) => i?.label === 'Find in Project…').action());
