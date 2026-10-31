@@ -48,12 +48,11 @@ export function mountRender(ctx) {
       const pts = w.points.map(p => `${p.x},${p.y}`).join(' ');
       const bus = (busW.get(w.id) || 1) > 1;   // (by its net's width only, not a wire's own bus flag, #1705)
       const seg = segSel.current()?.id === w.id ? segSel.current() : null;   // (only that segment highlighted, #2211)
-      const segLine = seg ? `<polyline class="wline segsel" points="${seg.a.x},${seg.a.y} ${seg.b.x},${seg.b.y}"/>` : '';
       const cls = `wire${bus ? ' bus' : ''}${sel.has(`wire:${w.id}`) && !seg ? ' sel' : ''}`;
       const d = cv.wireD(w);
       if (d) { parts.push(`<g class="${cls}" data-kind="wire" data-id="${esc(w.id)}"><path class="whit" d="${d}"/><path class="wline curved" d="${curveHops?.has(w.id) ? cv.hopD(w, curveHops.get(w.id)) : d}"/></g>`); continue; }
       const line = hops?.has(w.id) ? `<path class="wline" d="${hopPath(w, hops.get(w.id))}"/>` : `<polyline class="wline" points="${pts}"/>`;
-      parts.push(`<g class="${cls}" data-kind="wire" data-id="${esc(w.id)}"><polyline class="whit" points="${pts}"/>${line}${segLine}</g>`);
+      parts.push(`<g class="${cls}" data-kind="wire" data-id="${esc(w.id)}"><polyline class="whit" points="${pts}"/>${line}${seg ? `<polyline class="wline segsel" points="${seg.a.x},${seg.a.y} ${seg.b.x},${seg.b.y}"/>` : ''}</g>`);
     }
     if (nl) for (const j of nl.junctions) parts.push(`<circle class="junction" cx="${j.x}" cy="${j.y}" r="3.2"/>`);
     // a named bus (connected to an input / output marker or labelled) carries its name on every wire
