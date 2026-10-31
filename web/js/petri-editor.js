@@ -63,8 +63,6 @@ export function mountPetriEditor(container, opts = {}) {
   const delBtn = btn('✕', 'Delete the selection (Del)', () => deleteSelection(), 'asm-danger');
   const undoBtn = undoButton('undo', () => undo());
   const redoBtn = undoButton('redo', () => redo());
-  const langSel = h('select', { class: 'asm-select', title: 'HDL language', onchange: () => { M.lang = langSel.value; commit(); } },
-    h('option', { value: 'vhdl' }, 'VHDL'), h('option', { value: 'verilog' }, 'Verilog'));
   const tabBtns = {
     sim: btn('▶ Simulate', 'Play the net: fire transitions, clock steps, run', () => togglePanel('sim'), 'pn-tab-btn'),
     analysis: btn('∑ Analysis', 'Reachable markings, bounds, deadlocks, liveness, invariants', () => togglePanel('analysis'), 'pn-tab-btn'),
@@ -80,7 +78,7 @@ export function mountPetriEditor(container, opts = {}) {
   const toolbar = h('div', { class: 'asm-toolbar' },
     h('div', { class: 'asm-group' }, ...Object.values(tools), delBtn), sep(),
     h('div', { class: 'asm-group' }, undoBtn, redoBtn), sep(),
-    h('div', { class: 'asm-group' }, btn('Fit', 'Fit the net in the window', () => fit()), langSel),
+    h('div', { class: 'asm-group' }, btn('Fit', 'Fit the net in the window', () => fit())),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.sim, tabBtns.analysis,
       btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
@@ -183,7 +181,7 @@ export function mountPetriEditor(container, opts = {}) {
   // ---------------------------------------------------------------- drawing (petri-draw.js)
   const { applyView, render, toWorld } = mountPetriDraw({
     M: () => M, arcFrom: () => arcFrom, delBtn, destroyed: () => destroyed, drag: () => drag,
-    envOf: (...a) => envOf(...a), hi: () => hi, hist, langSel, nodeOf, placeOf, redoBtn,
+    envOf: (...a) => envOf(...a), hi: () => hi, hist, nodeOf, placeOf, redoBtn,
     refreshLink: (...a) => refreshLink(...a), renderPanel: (...a) => renderPanel(...a),
     renderSide: (...a) => renderSide(...a), sel: () => sel, sim: () => sim, statusInfo, svg, uid, undoBtn,
     view: () => view, world

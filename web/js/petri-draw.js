@@ -9,7 +9,7 @@ import { sv } from './petri-editor.js';
 /** { applyView, render, toWorld } of mountPetriEditor (M(), arcFrom(), destroyed(), drag(), hi(), sel(), sim(), view(): its current values). */
 export function mountPetriDraw(ctx) {
   const {
-    M, arcFrom, delBtn, destroyed, drag, envOf, hi, hist, langSel, nodeOf, placeOf, redoBtn, refreshLink, renderPanel,
+    M, arcFrom, delBtn, destroyed, drag, envOf, hi, hist, nodeOf, placeOf, redoBtn, refreshLink, renderPanel,
     renderSide, sel, sim, statusInfo, svg, uid, undoBtn, view, world
   } = ctx;
 
@@ -81,7 +81,6 @@ export function mountPetriDraw(ctx) {
     renderSide();
     renderPanel();
     undoBtn.disabled = hi() <= 0; redoBtn.disabled = hi() >= hist.length - 1; delBtn.disabled = !sel();
-    langSel.value = M().lang;
     statusInfo.textContent = `${M().places.length} places · ${M().transitions.length} transitions · ${M().arcs.length} arcs`;
     refreshLink();
   }

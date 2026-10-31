@@ -150,6 +150,11 @@ export function drawnHdlClash({ path, module, lang, exists, read, definedIn = nu
   return { kind: 'other', path, module, target, file: target, free: freeHdlPath(path, module, lang, exists) };
 }
 
+/** A drawing's language ('vhdl' | 'verilog'; model: its parsed document): its own, else that of its linked HDL file. */
+export function modelLanguage(m) {
+  return m.lang ? (m.lang === 'verilog' ? 'verilog' : 'vhdl') : m.generatedFile && /\.s?v$/i.test(m.generatedFile) ? 'verilog' : 'vhdl';
+}
+
 /**
  * A drawing (`path`, its JSON `text`) in the language `lang` (#220: its editor's HDL language; #1477: the
  * project's Preferred Language): { model, text: the drawing in that language, its link (generatedFile) renamed
@@ -162,7 +167,7 @@ export function drawingInLanguage(path, text, lang, { modules = {} } = {}) {
   const m = JSON.parse(text);
   const L = lang === 'verilog' ? 'verilog' : 'vhdl';
   const from = m.generatedFile || null;
-  const was = m.lang ? (m.lang === 'verilog' ? 'verilog' : 'vhdl') : from && /\.s?v$/i.test(from) ? 'verilog' : 'vhdl';
+  const was = modelLanguage(m);
   if (was === L && (!from || /\.s?v$/i.test(from) === (L === 'verilog'))) return null;
   const model = { ...m, lang: L };
   const r = drawnHdl(path, { ...model, generatedFile: undefined }, modules);

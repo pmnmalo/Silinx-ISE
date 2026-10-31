@@ -326,6 +326,7 @@ export async function renameFile(name, from, to) {
     if (pj.constraints) pj.constraints = remap(pj.constraints) ?? pj.constraints;
     // the files removed from the project stay removed at their new paths (#1228)
     if (pj.excluded) pj.excluded = pj.excluded.map(p => remap(p) ?? p);
+    if (pj.sourceLanguage) pj.sourceLanguage = Object.fromEntries(Object.entries(pj.sourceLanguage).map(([p, l]) => [remap(p) ?? p, l]));
     return writeProjectUnlocked(name, pj);
   });
 }
