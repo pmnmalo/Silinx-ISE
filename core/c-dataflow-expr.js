@@ -300,6 +300,7 @@ export const exprMethods = {
       return bits ? this.v(this.g.add('ext', [this.conv(x, F).id], U), U) : this.v(this.g.add('ext', [this.conv(x, U).id], F), F);
     }
     if (!fn) { if (['printf', 'fprintf', 'puts', 'putchar', 'assert'].includes(name)) return this.v(this.g.const(0, INT), INT); this.error(e.loc, `the function '${name}' cannot be called here`); }
+    if (fn.blackbox) this.error(e.loc, `the RTL blackbox '${name}' is a call of a module: a state that waits for it (#1526)`);
     if (!fn.body) this.error(e.loc, `'${name}' is declared but not defined`);   // (#1605)
     const scope = new Map();
     fn.params.forEach((pa, k) => {

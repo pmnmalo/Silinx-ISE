@@ -21,12 +21,13 @@ const filter = a.includes('--filter') ? a[a.indexOf('--filter') + 1] : '';
 const designs = manifest.designs.filter((d) => !filter || d.name.includes(filter));
 
 // the files to fetch: a design's sources, its test bench's files and the headers beside them
-const fetchable = { ...manifest, designs: designs.map((d) => ({ ...d, files: [...d.files, ...d.tb, ...d.headers] })) };
+const filesOf = (d) => [...d.files, ...d.tb, ...d.headers, ...(d.blackbox ? [...d.blackbox.descriptions, ...d.blackbox.files] : [])];
+const fetchable = { ...manifest, designs: designs.map((d) => ({ ...d, files: filesOf(d) })) };
 await fetchDesignCorpus({ manifest: fetchable, log: () => {} });
 const results = {};
 for (const d of designs) {
   const dir = sourceDir(manifest.sources[d.source]);
-  const texts = Object.fromEntries([...d.files, ...d.tb, ...d.headers].map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]));
+  const texts = Object.fromEntries(filesOf(d).map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]));
   const t0 = Date.now();
   // (an exception: the design's failure, its message the reason)
   try { results[d.name] = runDesign(d, texts); } catch (e) { results[d.name] = { csim: 'fail', synth: 'fail', cosim: 'skip', latency: null, reason: `exception: ${e.message}` }; }

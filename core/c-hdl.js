@@ -18,6 +18,7 @@ import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
 import { axiPlan, axiWrap } from './c-axi.js';
+import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
 
 export const bits = (k, w) => {
   const m = (1n << BigInt(w)) - 1n;
@@ -29,7 +30,7 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
 // name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
 // threshold of the loops pipelined automatically, 0 none, #1919)
-export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7' } = {}) {
+export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null } = {}) {
   const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   const diagnostics = [...checked.diagnostics];
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
@@ -37,9 +38,15 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   const axi = axiPlan(checked.funcs.get(checked.top));
   if (axi && !module) {
     const name = portOf(checked.top);
-    const gen = cToHdl(source, { file, lang, headers, top, depths, module: `${name}_core`, flat, pipelineLoops, clock, family });
+    const gen = cToHdl(source, { file, lang, headers, top, depths, module: `${name}_core`, flat, pipelineLoops, clock, family, blackboxes });
     return gen.ok ? axiWrap(gen, axi, { name, src: file.split('/').pop(), lang, file }) : gen;
   }
+  // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903)
+  const bbs = loadBlackboxes(blackboxes, headers);
+  diagnostics.push(...bbs.diagnostics);
+  applyBlackboxes(checked, bbs.list, (d) => diagnostics.push(d));
+  if (checked.dataflow && bbs.list.length) diagnostics.push({ file, line: 1, col: 1, message: 'syn.blackbox: an RTL blackbox in a DATAFLOW region is not supported yet', severity: 'error' });
+  if (diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
   foldTables(checked, diagnostics);
   const flatErrs = [];
@@ -123,6 +130,11 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // a struct's members' ports signals inside the module, its port theirs (#1628)
   const agg = aggregate(flat ? [] : sargs, fn.params, flatPorts, { seq: !!df.seq, rn, how: prag.how });
   const ports = agg.ports;
+  if (df.blackboxes?.length) {
+    const bb = blackboxHdl(df.blackboxes);
+    agg.inner.push(...bb.inner); agg.vhdl.push(...bb.vhdl); agg.verilog.push(...bb.verilog);
+    agg.decls = bb.decls;
+  }
   const inner = new Map(agg.groups.flatMap((x) => [...x.renamed])), drop = new Set(agg.groups.flatMap((x) => x.drop));
   for (const node of df.graph.nodes) if (node.op === 'in' && inner.has(node.port.name)) node.port.name = inner.get(node.port.name);
   df.outputs = new Map([...df.outputs].filter(([k]) => !drop.has(k)).map(([k, v]) => [inner.get(k) ?? k, v]));
@@ -137,7 +149,7 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
       memories: [...df.mems.map((x) => ({ name: x.name, words: x.n, bits: x.t.w, kind: x.rom || (!x.written && x.init) ? 'ROM' : 'RAM' })), ...df.extMems.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' }))],
       loops: df.loops, slowLoops: df.slowLoops || [] }
     : { sequential: false };
-  return { ok: true, hdl, top: name, ports, diagnostics, sequential: !!df.seq, states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };
+  return { ok: true, ...(df.blackboxes?.length ? { blackboxes: bbs.list } : {}), hdl, top: name, ports, diagnostics, sequential: !!df.seq, states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };
 }
 
 /** The nodes to write: those the outputs need. */
@@ -173,6 +185,7 @@ function vhdl(name, src, ports, df, agg) {
 
 /** The signals of a struct's members' ports (#1628). */
 export function innerSignals(agg, lang, L) {
+  L.push(...(agg?.decls?.[lang] || []));   // (the RTL blackboxes', #1903)
   for (const p of agg?.inner || []) {
     L.push(lang === 'vhdl' ? `  signal ${p.name} : ${p.w === 1 ? 'std_logic' : `std_logic_vector(${p.w - 1} downto 0)`};` : `  wire ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
   }

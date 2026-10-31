@@ -191,7 +191,7 @@ async function main() {
   const manifest = JSON.parse(fs.readFileSync(path.join(HLS, 'manifest.json'), 'utf8'));
   const collect = a.includes('--collect') ? a[a.indexOf('--collect') + 1] : null;
   if (collect && !/^silinx-vitis-[\w]+$/.test(collect)) { console.error(`--collect: not a run's name: ${collect}`); process.exit(2); }
-  const filesOf = (d) => [...d.files, ...d.tb, ...d.headers];
+  const filesOf = (d) => [...d.files, ...d.tb, ...d.headers, ...(d.blackbox ? [...d.blackbox.descriptions, ...d.blackbox.files] : [])];
   const run = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 64 << 20 });
   const ssh = (cmd) => run('ssh', ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=4', '-o', 'ConnectTimeout=30', '--', HOST, `export PATH="$PATH:/usr/local/bin"; ${cmd}`]);
   const remoteOf = (name) => `${iseWorkBase('silinx-vitis')}/${name}`;
