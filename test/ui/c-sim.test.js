@@ -3,6 +3,7 @@
 // the buttons in Portuguese; both interfaces. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { setupUi, uiTest, makeProject } from './harness.js';
 
 let env;
@@ -309,3 +310,46 @@ uiTest('#2080 View C Synthesis Report: a pipelined loop too slow for the board\'
   assert.match(log, /WARNING:SilinxC - "src\/slow\.c" line 3: this pipelined loop's iteration does not fit the 20 ns clock: a path of about \d+\.\d ns in one cycle \(Silinx adds no pipeline stages\); a slower clock, or #pragma HLS PIPELINE off, makes it fit/);
   assert.doesNotMatch(log, /ERROR/);
 });
+
+// The lines a viewer sees, not those hidden by the Console's filter: the test designs of each language.
+const shownLines = (page) => page.eval(() => [...document.querySelectorAll('#console-log .ln')].filter((l) => l.getClientRects().length > 0).map((l) => l.textContent));
+const pressedFilter = (page) => page.eval(() => [...document.querySelectorAll('#mc-filters .filt[aria-pressed="true"]')].map((b) => b.dataset.src));
+const NO_WARNINGS = (lines) => assert.deepEqual(lines.filter((l) => /WARNING|ERROR/.test(l)), []);
+
+for (const [mod, file, output, latency] of [['gcd', 'src/gcd.c', 'gcd(48, 18) = 6', /^Latency: 2 to 12 cycles \(average 6\.8\)\.$/], ['stream_sum', 'src/stream_sum.cpp', 'sum[7] = 321', /^Latency: 17 to 17 cycles \(average 17\.0\)\.$/]]) {
+  uiTest(`#2262 ${file} in its editor, nothing shown first: C Simulation, C/RTL Co-simulation and View C Synthesis Report show their lines; no warnings`, E, async (page) => {
+    const name = `CShown${mod}`;
+    await makeProject(env, { name, top: mod, files: { [file]: readFileSync(new URL(`../../test-designs/${mod}/${file}`, import.meta.url), 'utf8') } });
+    await page.openProject(name);
+    await page.eval((f) => window.SilinxApp.openFile(f), file);
+    await page.waitFor((f) => window.Silinx.active?.id === `file:${f}` && window.Silinx.active.editor, [file]);
+    const tasks = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
+    const btn = (t) => page.click('.doc:not([hidden]) .editor-bar .btn', { text: t });
+    await btn('C Simulation');
+    await page.waitConsole(/Process "C Simulation" completed successfully/);
+    await page.waitFor(() => [...document.querySelectorAll('#console-log .ln')].some((l) => /Process "C Simulation" completed/.test(l.textContent) && l.dataset.src), [], { what: 'the lines tagged' });
+    let shown = await shownLines(page);
+    assert.ok(shown.includes(output), 'the program\'s output shown');
+    assert.ok(shown.includes('Process "C Simulation" completed successfully'));
+    assert.deepEqual(await pressedFilter(page), [tasks ? 'sim' : 'all']);
+    NO_WARNINGS(shown);
+    await btn('C/RTL Co-simulation');
+    await page.waitConsole(/Process "C\/RTL Co-simulation" completed successfully/, { timeout: 60000 });
+    await page.waitFor(() => [...document.querySelectorAll('#console-log .ln')].some((l) => /Process "C\/RTL Co-simulation" completed/.test(l.textContent) && l.dataset.src), [], { what: 'the lines tagged' });
+    shown = await shownLines(page);
+    assert.ok(shown.some((l) => latency.test(l)), 'the latency shown');
+    assert.ok(shown.some((l) => /^C\/RTL co-simulation PASS: \d+ call\(s\), the same results$/.test(l)), 'PASS shown');
+    NO_WARNINGS(shown);
+    // (Implementation's lines, as a synthesis's)
+    await page.leftTab('design');
+    await page.treeRow('#hier', mod);
+    await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+    await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
+    await page.waitFor(() => [...document.querySelectorAll('#console-log .ln')].some((l) => /Process "View C Synthesis Report" completed/.test(l.textContent) && l.dataset.src), [], { what: 'the lines tagged' });
+    shown = await shownLines(page);
+    assert.ok(shown.includes('Process "View C Synthesis Report" completed successfully'));
+    assert.deepEqual(await pressedFilter(page), [tasks ? 'impl' : 'all']);
+    NO_WARNINGS(shown);
+    assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+  });
+}
