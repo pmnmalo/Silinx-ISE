@@ -5,7 +5,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-const here = path.dirname(new URL(import.meta.url).pathname);
+import { fileURLToPath } from 'node:url';
+const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(here, '../../test/fixtures/fpga');
 for (const f of fs.readdirSync(path.join(here, 'designs')).filter(f => f.endsWith('.v'))) {
   const top = f.replace(/\.v$/, '');

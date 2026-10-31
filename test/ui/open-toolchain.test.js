@@ -12,6 +12,7 @@ import path from 'node:path';
 import { setupUi, uiTest, makeProject, readWs, writeWs } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
 import { DB_DIR } from '../../packages/silinx-fpga/src/fpga/bitdb-node.js';
+import { fileURLToPath } from 'node:url';
 
 let env;
 // the server's bit database: the shipped one, plus the (empty) pads of the XC3S250E in the TQ144
@@ -197,7 +198,7 @@ uiTest('open mode: Generate Text Power Report of blinky without ISE: the estimat
 // LOCs of four LEDs and a switch; the pads the placer chose are added to the UCF (after the preview);
 // built again, nothing more to add (the pads of the two placements at Normal, #651; #938). The pads are the ones the
 // placer chose in this run, read from its build/top_pins.ucf: a change of the placer moves them (#1771)
-const BA_UCF = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '../../examples/blinky/constraints/top.ucf'), 'utf8')
+const BA_UCF = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../examples/blinky/constraints/top.ucf'), 'utf8')
   .split('\n').map((l) => (/"(led<[4-7]>|sw<3>)"/.test(l) ? l.replace(/LOC = "\w+" \| /, '') : l)).join('\n');
 const BA_NETS = ['led<4>', 'led<5>', 'led<6>', 'led<7>', 'sw<3>'];
 const BA_TAKEN = new Set([...BA_UCF.matchAll(/LOC = "(\w+)"/g)].map((m) => m[1]));
