@@ -165,6 +165,14 @@ test('docs: the Silinx toolchain\'s name and default mode are the code\'s', () =
     assert.equal(says.test(read(f)), isDefault, `${f}: the Silinx toolchain is ${isDefault ? '' : 'not '}the default`);
 });
 
+test('docs: the architecture counts the interfaces the code has (#2403)', () => {
+  const [, list] = read('web/js/modern.js').match(/INTERFACES = \[([^\]]*)\]/);
+  const names = [...list.matchAll(/'(\w+)'/g)].map(m => m[1]);
+  assert.deepEqual(names, ['modern', 'classic']);
+  assert.match(read('docs/ARCHITECTURE.md'), /two interfaces \(modern, classic\)/);
+  assert.doesNotMatch(read('docs/ARCHITECTURE.md'), /three interfaces|Tasks interface/i);
+});
+
 test('docs: the boards the Silinx toolchain supports are the ones the code supports', () => {
   assert.ok(SUPPORTED.length >= 4, SUPPORTED.map(b => b.name).join(', '));
   const readme = read('README.md');
