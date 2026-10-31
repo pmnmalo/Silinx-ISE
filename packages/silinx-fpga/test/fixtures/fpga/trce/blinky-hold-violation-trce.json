@@ -1,0 +1,9 @@
+{
+ "source": "examples/blinky routed by Silinx (seed 1), 12 of its 82 clock pins moved onto general routing (research/s3e-route/clock-detour.mjs --reroute, seed 1); trce of ISE 14.7 on it (#2226): its worst hold path",
+ "period": 8.176,
+ "hold": {
+  "slack": -0.659,
+  "from": "$auto$ff.cc_337_slice$2271",
+  "to": "$auto$ff.cc_337_slice$2263"
+ }
+}

@@ -7,8 +7,8 @@ const F_PINS = ['F1', 'F2', 'F3', 'F4'], G_PINS = ['G1', 'G2', 'G3', 'G4'];
 
 /**
  * The timing arcs of a placed instance (parseXdl's inst) from its type and configuration:
- * { comb: [[input pin, output pin, ns]], setup: [[input pin, ns]] (into a flip-flop or latch, before
- * the clock edge), clkToOut: [[output pin, ns]], clock: true if it has a flip-flop }. Pads: an input
+ * { comb: [[input pin, output pin, ns]], setup: [[input pin, ns, hold]] (into a flip-flop or latch, before
+ * the clock edge; hold: what a hold check adds to the data's earliest arrival there, #2226, 0 when not given), clkToOut: [[output pin, ns]], clock: true if it has a flip-flop }. Pads: an input
  * pad's I pin starts paths (`input`), an output pad's O1 pin ends them (`output`, its delay to the pad).
  */
 export function instArcs(inst, model = SPEED_4) {
@@ -84,8 +84,10 @@ export function instArcs(inst, model = SPEED_4) {
   const ff = (name, D, toD, byp, q, tco) => {
     if (!m.has(name)) return;
     out.clock = true;
-    if (m.get(D) === '0') setup.push([byp, T(byp === 'BY' ? 'Tdyck' : 'Tdick')]);
-    else for (const [p, d] of toD) setup.push([p, d + T('Tdxck')]);
+    // (#2226: the third element, the margin a hold check adds to the data's earliest arrival at the pin: trce's (-Th),
+    // the way through the slice at its earliest, model.clock.minLogic x it, less the flip-flop's hold time)
+    if (m.get(D) === '0') setup.push([byp, T(byp === 'BY' ? 'Tdyck' : 'Tdick'), T(byp === 'BY' ? 'Tckdy' : 'Tckdi')]);
+    else for (const [p, d] of toD) setup.push([p, d + T('Tdxck'), model.clock.minLogic * d - T('Tckdx')]);
     clkToOut.push([q, T(tco)]);
   };
   ff('FFX', 'DXMUX', toX, 'BX', 'XQ', 'TckoX');
@@ -112,8 +114,8 @@ export function instArcs(inst, model = SPEED_4) {
       }
     }
   }
-  if (out.clock && !memSides.length) setup.push(['CE', T('Tceck')], ['SR', T('Tsrck')]);
-  else if (m.has('FFX') || m.has('FFY')) setup.push(['CE', T('Tceck')]);
+  if (out.clock && !memSides.length) setup.push(['CE', T('Tceck'), T('Tckce')], ['SR', T('Tsrck'), T('Tcksr')]);
+  else if (m.has('FFX') || m.has('FFY')) setup.push(['CE', T('Tceck'), T('Tckce')]);
   return out;
 }
 

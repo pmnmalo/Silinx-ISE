@@ -19,7 +19,8 @@ test('#405 timing parts: timing.js exports the modules\' functions', () => {
 test('#405 timing parts, the logic: a slice\'s LUT into its flip-flop, a pad\'s input and output', () => {
   const a = instArcs({ type: 'SLICEL', site: 'SLICE_X1Y0', cfg: [['FXMUX', 'F'], ['FFX', '#FF'], ['DXMUX', '1']].map(([attr, value]) => ({ attr, name: '', value })) });
   assert.deepEqual(a.comb.filter(x => x[0] === 'F1' && x[1] === 'X').map(x => x[2]), [S.Tilo[0]]);
-  assert.deepEqual(a.setup.find(x => x[0] === 'F1'), ['F1', S.Tilo[0] + S.Tdxck[0]]);
+  // (#2226: the hold margin, the LUT at its earliest less the flip-flop's hold time)
+  assert.deepEqual(a.setup.find(x => x[0] === 'F1'), ['F1', S.Tilo[0] + S.Tdxck[0], timing.SPEED_4.clock.minLogic * S.Tilo[0] - S.Tckdx[0]]);
   assert.deepEqual(a.clkToOut, [['XQ', S.TckoX[0]]]);
   const p = instArcs({ type: 'IOB', site: 'P1', cfg: [] });
   assert.deepEqual([p.input, p.output], [[['I', timing.SPEED_4.pad.Tiopi]], [['O1', timing.SPEED_4.pad.Tioop]]]);

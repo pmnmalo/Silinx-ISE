@@ -100,7 +100,8 @@ test('slice arcs: LUT, F5 / FX multiplexers, carry chain (its data input), flip-
   // FXMUX = F, FFX from X: F1 -> X is a LUT; the setup through it adds Tdxck; XQ is Tcko
   const l = sl('SLICE_X1Y0', [['FXMUX', 'F'], ['GYMUX', 'G'], ['FFX', '#FF'], ['DXMUX', '1']]);
   assert.deepEqual(find(l, 'F3', 'X'), [S.Tilo[0]]);
-  assert.deepEqual(l.setup.find(x => x[0] === 'F3'), ['F3', S.Tilo[0] + S.Tdxck[0]]);
+  // (#2226: its hold margin, the LUT at its earliest less the flip-flop's hold time)
+  assert.deepEqual(l.setup.find(x => x[0] === 'F3'), ['F3', S.Tilo[0] + S.Tdxck[0], SPEED_4.clock.minLogic * S.Tilo[0] - S.Tckdx[0]]);
   assert.deepEqual(l.clkToOut, [['XQ', S.TckoX[0]]]);
   assert.ok(l.clock);
   assert.ok(l.setup.some(x => x[0] === 'CE') && l.setup.some(x => x[0] === 'SR'));
@@ -110,11 +111,11 @@ test('slice arcs: LUT, F5 / FX multiplexers, carry chain (its data input), flip-
   // DXMUX = 0: the flip-flop from BX (Tdick), the LUT not on its way
   const b = sl('SLICE_X1Y0', [['FXMUX', 'F'], ['FFX', '#FF'], ['DXMUX', '0']]);
   assert.deepEqual(b.setup.filter(x => /^F/.test(x[0])), []);
-  assert.deepEqual(b.setup.find(x => x[0] === 'BX'), ['BX', S.Tdick[0]]);
+  assert.deepEqual(b.setup.find(x => x[0] === 'BX'), ['BX', S.Tdick[0], S.Tckdi[0]]);
   // DYMUX = 0: BY into the Y flip-flop (Tdyck, slower than BX's; SLICEM slower still)
   const by = sl('SLICE_X1Y0', [['GYMUX', 'G'], ['FFY', '#FF'], ['DYMUX', '0']]);
-  assert.deepEqual(by.setup.find(x => x[0] === 'BY'), ['BY', S.Tdyck[0]]);
-  assert.deepEqual(sl('SLICE_X2Y0', [['GYMUX', 'G'], ['FFY', '#FF'], ['DYMUX', '0']]).setup.find(x => x[0] === 'BY'), ['BY', S.Tdyck[1]]);
+  assert.deepEqual(by.setup.find(x => x[0] === 'BY'), ['BY', S.Tdyck[0], S.Tckdy[0]]);
+  assert.deepEqual(sl('SLICE_X2Y0', [['GYMUX', 'G'], ['FFY', '#FF'], ['DYMUX', '0']]).setup.find(x => x[0] === 'BY'), ['BY', S.Tdyck[1], S.Tckdy[1]]);
   // F5 into X, FX into Y; F5 / FX outputs
   const w = sl('SLICE_X1Y0', [['FXMUX', 'F5'], ['GYMUX', 'FX']]);
   assert.deepEqual(find(w, 'G2', 'X'), [S.Tif5x[0]]);
@@ -775,9 +776,12 @@ test('pads and hold (#26): pad to setup, clock to pad, pad to pad, the shortest 
   // pad to pad: through c's LUT only
   assert.deepEqual(r.padToPad.map(x => [x.from, x.to]), [['i', 'p']]);
   close(r.padToPad[0].delay, Tiopi + 2 + S.Tilo[0] + 4 + Tioop);
-  // hold: a's clock to out and the 0.5 ns net into b's BY at their earliest, less the hold time; one clock time
+  // hold: a's clock to out and the 0.5 ns net into b's BY at their earliest (#2226: the logic's minLogic x, the wire's
+  // minNet x), plus b's hold margin at BY (its flip-flop's hold time, trce's Tckdi); one clock time
   assert.deepEqual(r.hold.map(h => h.clock), ['clk']);
-  close(r.hold[0].slack, sc * (S.TckoX[0] + 0.5) - Th);
+  const { minLogic, minNet } = SPEED_4.clock, hb = instArcs(PADS.insts.find(i => i.name === 'b')).setup.find(x => x[0] === 'BY')[2];
+  assert.ok([S.Tckdy[0], S.Tckdy[1]].includes(hb));
+  close(r.hold[0].slack, minLogic * S.TckoX[0] + minNet * 0.5 + hb);
   assert.deepEqual(r.hold[0].path.map(s => `${s.kind} ${s.inst}.${s.pin}`), ['clock-to-out a.XQ', 'net b.BY', 'hold b.BY']);
   // a flip-flop with no clock arrival (a clock through a DCM, or made by logic) is left out of the pads' paths
   const none = tg.pads(Float64Array.from([1, 2, 3, 0.5, 4]), new Map());
