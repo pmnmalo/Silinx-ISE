@@ -380,6 +380,7 @@ html[data-ui="modern"] .sch-editor .se-toolbar .se-btn.wide, html[data-ui="moder
 /* the toolbar's menu (#2208): at the right of the first line, its place kept free */
 html[data-ui="modern"] :is(.sch-editor .se-toolbar, .tt-toolbar, .asm-toolbar.pn-toolbar, .asm-toolbar.fsm-toolbar, .asm-toolbar.asm-chart-toolbar) { padding-right: calc(var(--m-tool-h) + 12px); }
 html[data-ui="modern"] .tb-more { top: 6px; right: 8px; }
+html[data-ui="modern"] .tb-more .tb-more-btn { width: var(--m-tool-h); padding-left: 0; padding-right: 0; }
 html[data-ui="modern"] .tb-more-menu { padding: 6px; border-radius: 8px; background: var(--m-surface, #fff); }
 html[data-ui="modern"] .sch-editor .se-more { top: 6px; right: 8px; }
 html[data-ui="modern"] .sch-editor .se-more-menu { padding: 6px; border-radius: 8px; }
