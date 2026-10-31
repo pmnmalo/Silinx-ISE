@@ -7,7 +7,7 @@
 // accesses a state each) is made as pipelineMethods.pipeMem makes it. Isomorphic ES module: no DOM and no Node APIs.
 //
 //   markAutoPipeline(items, { threshold, trip, why })   sets autoPipe on the loops pipelined automatically
-//     trip(loop) -> its count (a constant) or null; why(loop) -> why it cannot be pipelined, or null
+//     trip(loop) -> its count (a constant) or null; why(loop) -> why it cannot be pipelined, or null; never(loop): not tried
 //   pipelineMethods: SeqFlow's (core/c-fsmd.js) pipeMemWhy(loop), pipeMem(loop, cur, mk, lp, info)
 import { loopPragma } from './c-pragma.js';
 
@@ -28,11 +28,13 @@ export function innerLoops(x) {
   return out;
 }
 
-export function markAutoPipeline(items, { threshold = PIPELINE_LOOPS, trip, why }) {
+export function markAutoPipeline(items, { threshold = PIPELINE_LOOPS, trip, why, never = () => false }) {
   if (!threshold) return;
   const visit = (s) => {
     const pp = loopPragma(s, 'PIPELINE');
     const inner = innerLoops(s.body);
+    // (a call of a sub-module in it: it waits for it, its loop not one to pipeline, #1960)
+    if (!pp && never(s)) { inner.forEach(visit); return; }
     // (the pragma's: its inner loops unrolled; if it cannot be made, they are loops of their own)
     if (pp && !pp.off) { if (why(s)) inner.forEach(visit); return; }
     // (an UNROLL with no factor: its iterations in the state it is in, not a loop to pipeline)

@@ -19,6 +19,7 @@ import { flattenArrays } from './c-flatten.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
 import { axiPlan, axiWrap } from './c-axi.js';
 import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
+import { hierarchy, inlineMode, latencyOf, moduleRegistry } from './c-submodule.js';
 
 export const bits = (k, w) => {
   const m = (1n << BigInt(w)) - 1n;
@@ -29,8 +30,9 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // (headers, top: a source of several files, its top function named, #1597)
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
 // name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
-// threshold of the loops pipelined automatically, 0 none, #1919)
-export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null } = {}) {
+// threshold of the loops pipelined automatically, 0 none, #1919; modules: the design's modules, when it is one of them,
+// its hdl then only its own, core/c-submodule.js, #1960)
+export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, modules = null } = {}) {
   const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   const diagnostics = [...checked.diagnostics];
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
@@ -77,6 +79,10 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   }
   let df = dataflow(checked);
   const fn = checked.funcs.get(checked.top);
+  // (the functions not inlined, sub-modules, #1960)
+  const { subs, sub, kept } = subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes, modules });
+  const pragmaOf = (f) => f.body.items.find((s) => s.kind === 'pragma' && s.pragma.name === 'INLINE').loc;
+  for (const k of kept) diagnostics.push({ file, line: pragmaOf(k.f).line, col: pragmaOf(k.f).col, message: `#pragma HLS INLINE off: '${k.f.name}' is inlined: ${k.why}`, severity: 'warning' });
   const sargs = checked.ast.structArgs?.get(checked.top) || [];
   // (a stream or an array of structs one of its words, #1668; AGGREGATE / DISAGGREGATE: how, or not)
   const prag = flat ? { how: new Map(), named: [] } : structPragmas(fn);
@@ -84,14 +90,22 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // not combinational (a loop whose count depends on the inputs, a static or global variable): a sequential module,
   // a state machine (core/c-fsmd.js, #1526)
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
-  if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops }, { clock, family }), seq: true };
+  if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family }), seq: true };
   // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
   // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
   else if (!flat && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && !fitsClock(df.graph, clock, family)) {
-    const sq = scheduled(checked, { groups, pipelineLoops }, { clock, family });
+    const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family });
     if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
   }
   diagnostics.push(...df.diagnostics);
+  // (each sub-module's own, once; a name of its own as a reserved word: inside it)
+  const said = new Set(diagnostics.map((d) => `${d.line}:${d.col}:${d.message}`));
+  for (const d of subs.modules().flatMap((m) => m.gen.diagnostics)) {
+    const k = `${d.line}:${d.col}:${d.message}`;
+    if (!said.has(k) && !/is a reserved word of VHDL or Verilog|is a name Vitis HLS reserves/.test(d.message)) { said.add(k); diagnostics.push(d); }
+  }
+  // (a function of latency 0 called by a top of latency 0: no clock to start it with, in the top's logic, its ports as Vitis HLS's)
+  if (!df.seq) for (const f of checked.funcs.values()) if (f !== fn && f.body && inlineMode(f) === 'off' && !kept.some((k) => k.f === f) && calledFrom(fn, f, checked.funcs)) diagnostics.push({ file, line: pragmaOf(f).line, col: pragmaOf(f).col, message: `#pragma HLS INLINE off: '${f.name}' and its caller are combinational (latency 0): its logic is in its caller's, no module of its own`, severity: 'warning' });
   diagnostics.sort((a, b) => a.line - b.line || a.col - b.col);
   if (df.diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // a name that is a reserved word of VHDL or Verilog, or one of Vitis HLS's: its port named <name>_r (a warning, #1902)
@@ -144,14 +158,61 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   const src = file.split('/').pop();
   // (each operation only as wide as its users read it, #2290)
   df.graph.narrow(df.seq ? seqRoots(df) : [...df.outputs.values()]);
-  const hdl = df.seq ? (lang === 'vhdl' ? vhdlSeq : verilogSeq)(name, src, ports, df, agg) : (lang === 'vhdl' ? vhdl : verilog)(name, src, ports, df, agg);
+  const text = df.seq ? (lang === 'vhdl' ? vhdlSeq : verilogSeq)(name, src, ports, df, agg) : (lang === 'vhdl' ? vhdl : verilog)(name, src, ports, df, agg);
+  // (a design: its sub-modules first)
+  const hdl = modules ? text : [...subs.modules().map((m) => m.gen.hdl), text].join('\n');
   // the report (#1529): a sequential module's states, registers, memories and loops (each one's II and cycles)
   const report = df.seq
     ? { sequential: true, states: df.states.length + 2, registerBits: df.regs.reduce((a, r) => a + r.w, 0) + df.stateT.w,
       memories: [...df.mems.map((x) => ({ name: x.name, words: x.n, bits: x.t.w, kind: x.rom || (!x.written && x.init) ? 'ROM' : 'RAM' })), ...df.extMems.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' }))],
-      loops: df.loops, slowLoops: df.slowLoops || [] }
+      loops: df.loops, slowLoops: df.slowLoops || [], ...hierarchyReport(df) }
     : { sequential: false };
   return { ok: true, ...(df.blackboxes?.length ? { blackboxes: bbs.list } : {}), hdl, top: name, ports, diagnostics, sequential: !!df.seq, states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };
+}
+
+/** The sub-modules of a top (core/c-submodule.js, #1960): the registry and what is a sub-module; the functions off kept inlined. */
+export function subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes = null, modules = null }) {
+  const fn = checked.funcs.get(checked.top);
+  const globals = new Map(checked.ast.items.filter((it) => it.kind === 'var').map((it) => [it.name, it]));
+  const { sub, kept } = hierarchy(fn, checked.funcs, globals, checked.ast.structArgs);
+  const subs = modules || moduleRegistry({ make: (callee, depths, module) => cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, clock, family, blackboxes, modules: subs }) });
+  return { subs, sub, kept };
+}
+
+/** Whether fn calls f, directly or through others. */
+function calledFrom(fn, f, funcs, seen = new Set()) {
+  let hit = false;
+  const walk = (x) => {
+    if (hit || !x || typeof x !== 'object') return;
+    if (Array.isArray(x)) { x.forEach(walk); return; }
+    if (x.kind === 'call' && x.callee?.kind === 'id') {
+      const g = funcs.get(x.callee.name);
+      if (g === f) { hit = true; return; }
+      if (g?.body && !seen.has(g)) { seen.add(g); if (calledFrom(g, f, funcs, seen)) { hit = true; return; } }
+    }
+    for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') walk(v);
+  };
+  walk(fn.body);
+  return hit;
+}
+
+/** The report's latency of a machine and its functions (#1960): each sub-module's latency and resources, its own below it. */
+function hierarchyReport(m) {
+  const instOf = (b) => m.states.find((s) => s.id === b.num)?.call?.inst;
+  // (a call waits for the callee's latency and the cycle it starts in; a combinational one is done in the state)
+  const lat = latencyOf(m, (b) => {
+    const i = instOf(b);
+    if (!i) return null;
+    const r = i.m.gen.report.latency;
+    return r ? { min: r.min + 1, max: r.max === null ? null : r.max + 1 } : { min: 0, max: 0 };
+  });
+  const functions = (m.instances || []).flatMap((i) => {
+    const r = i.gen.report;
+    return [{ name: i.callee, module: i.module, instance: i.name, calls: i.calls, sequential: r.sequential, latency: r.latency ?? { min: 0, max: 0 }, states: r.states ?? 0, registerBits: r.registerBits ?? 0, memories: r.memories?.length ?? 0, of: null },
+      ...(r.functions || []).map((x) => ({ ...x, of: x.of ?? i.callee }))];
+  });
+  const called = (k) => (m.loopStates?.[k] || []).some((s) => m.states.find((x) => x.id === s)?.call);
+  return { latency: { min: lat.min, max: lat.max }, functions, ...(functions.length ? { loops: m.loops.map((l, k) => (called(k) ? { ...l, cycles: lat.loops[k] } : l)) } : {}) };
 }
 
 /** The nodes to write: those the outputs need. */

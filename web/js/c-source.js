@@ -171,6 +171,12 @@ export async function runCReport(path) {
     for (const p of rep.processes) L.push(`  ${p.instance.padEnd(16)} ${p.name}: ${p.states} states, ${p.registerBits} register bits${p.after.length ? `; starts once ${p.after.join(', ')} ${p.after.length > 1 ? 'are' : 'is'} done` : ''}`);
     if (rep.fifos.length) { L.push('', 'FIFOs:'); for (const f of rep.fifos) L.push(`  ${f.name.padEnd(16)} ${f.depth} words`); }
   }
+  // (a function not inlined, a sub-module: its calls, its latency and resources, #1960)
+  if (rep.functions?.length) {
+    const cycles = (x) => (x.max === null ? `at least ${x.min} cycles` : x.min === x.max ? `${x.max} cycles` : `${x.min}-${x.max} cycles`);
+    L.push('', `Functions (the module's latency: ${cycles(rep.latency)}):`);
+    for (const f of rep.functions) L.push(`  ${f.instance.padEnd(16)} ${f.name}${f.of ? `, in ${f.of}` : ''}: ${f.calls} call${f.calls > 1 ? 's' : ''}; ${f.sequential ? `latency ${cycles(f.latency)}, ${f.states} states, ${f.registerBits} register bits${f.memories ? `, ${f.memories} memor${f.memories > 1 ? 'ies' : 'y'}` : ''}` : 'combinational'}`);
+  }
   if (rep.memories?.length) { L.push('', 'Memories:'); for (const m of rep.memories) L.push(`  ${m.name.padEnd(16)} ${m.words} x ${m.bits} bits, ${m.kind === 'ap_memory' ? 'ap_memory (outside the module)' : m.kind === 'ROM' ? 'a ROM (block RAM)' : m.kind === 'RAM (PIPO)' ? 'a buffer between processes (block RAM)' : 'a RAM (block RAM)'}`); }
   if (rep.loops?.length) {
     L.push('', 'Loops:');

@@ -141,6 +141,19 @@ uiTest('#1965 View C Synthesis Report of a module with ap_ctrl_chain: its block 
   assert.doesNotMatch(log, /WARNING:SilinxC/);
 });
 
+uiTest('#1960 View C Synthesis Report of a function not inlined: its calls, latency and resources; the warnings none', E, async (page) => {
+  const src = 'int sum(int n) {\n#pragma HLS INLINE off\n  static int calls = 0;\n  calls = calls + 1;\n  int s = 0;\n  for (int i = 0; i < 8; i++) {\n#pragma HLS PIPELINE off\n    s += n + i;\n  }\n  return s;\n}\nint top(int a) { return sum(a) + sum(a + 1); }\nint main() { return top(1) == 80 ? 0 : 1; }\n';
+  await makeProject(env, { name: 'CSub', top: 'top', files: { 'src/top.c': src } });
+  await page.openProject('CSub');
+  await page.showMessages();
+  await page.treeRow('#hier', 'top');
+  await page.treeRow('#procs', 'View C Synthesis Report', { dbl: true, exact: true });
+  await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
+  const log = await page.consoleText();
+  assert.match(log, /Functions \(the module's latency: \d+ cycles\):\n {2}sum_U0 {11}sum: 2 calls; latency \d+ cycles, \d+ states, \d+ register bits\n/);
+  assert.doesNotMatch(log, /WARNING:SilinxC/);
+});
+
 uiTest('#1707 View C Synthesis Report of a DATAFLOW module: its processes (each a module, when each starts), its buffer between them; C/RTL Co-simulation PASS', E, async (page) => {
   await makeProject(env, { name: 'CDiamond', top: 'diamond', files: { 'src/diamond.c': DIAMOND } });
   await page.openProject('CDiamond');
