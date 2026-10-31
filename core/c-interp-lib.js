@@ -5,6 +5,7 @@
 // HLS examples' test benches use: they write their results to a file and compare it with a golden one. Isomorphic.
 import { convert } from './c-interp-expr.js';
 import { MATH, F64, F32, BITCASTS } from './c-float.js';
+import { fftFixed, fftFloat } from './hls-fft.js';
 
 const INT = { w: 32, s: true };
 const num = (v) => ({ v: BigInt(v), t: INT });
@@ -98,6 +99,41 @@ export const libMethods = {
       case 'fclose': { const [f] = A(); if (f.fh?.w) this.fs.set(f.fh.name, f.fh.text); if (f.fh) f.fh.closed = true; return num(0); }
       case 'feof': { const [f] = A(); return num(f.fh && f.fh.pos >= f.fh.text.length ? 1 : 0); }
       case 'fscanf': return this.scan(e);
+      // (hls::fft's transform, its C model's (core/hls-fft.js, #1943): ap_fft_core(re, im, nfft, input_width, fwd, sch,
+      // natural, float), in place, its overflow returned)
+      case 'ap_fft_core': {
+        const [re, im, ...ks] = A();
+        const [nfft, inW, fwd, sch, natural, float] = ks.map((x) => Number(this.intOf(x, e)));
+        const p = { N: 2 ** nfft, nfft, inW, natural: !!natural, inverse: !fwd };
+        const xs = [re, im].map((x) => x.arr.map((c) => (float ? Number(c.v) : Number(c.v))));
+        const over = float ? (fftFloat(xs[0], xs[1], p), 0) : fftFixed(xs[0], xs[1], p, fwd, BigInt.asUintN(32, BigInt(sch)));
+        [re, im].forEach((x, i) => x.arr.forEach((c, j) => { c.v = float ? xs[i][j] : BigInt(xs[i][j]); }));
+        return num(over);
+      }
+      // (fgetc, getc: a char of the file, EOF at its end; strcat: a string appended; memcpy of one value into another,
+      // a test bench's float from its bits: the bits kept, #1943)
+      case 'fgetc': case 'getc': { const [f] = A(); if (!f.fh) this.fail(e, `${name}: its file is not open (NULL)`); return num(f.fh.pos < f.fh.text.length ? f.fh.text.charCodeAt(f.fh.pos++) : -1); }
+      case 'strcat': {
+        const [d, a] = A();
+        const arr = d.arr || d.ptr?.arr, k0 = d.arr ? 0 : d.ptr?.index, add = this.cString(a), was = this.cString(d);
+        if (!arr || add === undefined) this.fail(e, 'strcat: a char array and a string');
+        const s2 = was + add;
+        if (k0 + s2.length >= arr.length) this.fail(e, `strcat: ${s2.length + 1} chars in an array of ${arr.length - k0} (outside the array)`);
+        [...s2, '\0'].forEach((ch, j) => { arr[k0 + j].v = BigInt(ch.charCodeAt(0)); });
+        return d;
+      }
+      case 'memcpy': {
+        const [d, a, n] = A();
+        if (!d.ptr || !a.ptr || d.arr || a.arr) this.fail(e, 'memcpy: of one value into another (&x, &y) in the C simulation');
+        const to = d.ptr.get().t, from = a.ptr.get(), bytes = Number(this.intOf(n, e));
+        const bits = (t) => (t.fl || t.w);
+        if (bits(to) !== bits(from.t) || bytes * 8 !== bits(to)) this.fail(e, `memcpy: ${bytes} bytes between values of ${bits(from.t)} and ${bits(to)} bits`);
+        const dv = new DataView(new ArrayBuffer(8)), w = bits(to);
+        if (from.t.fl) { if (w === 32) dv.setFloat32(0, from.v); else dv.setFloat64(0, from.v); } else if (w === 32) dv.setUint32(0, Number(BigInt.asUintN(32, BigInt(from.v)))); else dv.setBigUint64(0, BigInt.asUintN(64, BigInt(from.v)));
+        const v = to.fl ? (w === 32 ? dv.getFloat32(0) : dv.getFloat64(0)) : to.s ? (w === 32 ? BigInt(dv.getInt32(0)) : dv.getBigInt64(0)) : w === 32 ? BigInt(dv.getUint32(0)) : dv.getBigUint64(0);
+        d.ptr.set({ v, t: to });
+        return d;
+      }
       case 'fgets': {
         const [buf, n, f] = A();
         if (!buf.arr || !f.fh) this.fail(e, 'fgets: a char array and an open file');
@@ -191,7 +227,7 @@ export const libMethods = {
       const ch = fmt[i];
       if (/\s/.test(ch)) { skip(); continue; }
       if (ch !== '%') { if (fh.text[fh.pos] !== ch) break; fh.pos++; continue; }
-      const m = /^(hh|h|ll|l)?([diuxoc s%])/.exec(fmt.slice(i + 1).replace(/^ /, 's'));
+      const m = /^(hh|h|ll|l|L)?([diuxXoc s%feEgGaA])/.exec(fmt.slice(i + 1).replace(/^ /, 's'));
       if (!m) this.fail(e, `fscanf: the conversion '${fmt.slice(i, i + 3)}' is not supported`);
       i += m[0].length;
       const conv = m[2];
@@ -207,12 +243,23 @@ export const libMethods = {
         got++;
         continue;
       }
-      const re = conv === 'x' ? /^[-+]?(0[xX])?[0-9a-fA-F]+/ : conv === 'o' ? /^[-+]?[0-7]+/ : conv === 'i' ? /^[-+]?(0[xX][0-9a-fA-F]+|0[0-7]*|[1-9]\d*)/ : /^[-+]?\d+/;
+      // (%f, %e, %g: a float or, with l, a double, #1943)
+      if (/[feEgGaA]/.test(conv)) {
+        const t = /^[-+]?(inf(inity)?|nan|(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?)/i.exec(fh.text.slice(fh.pos));
+        if (!t) break;
+        fh.pos += t[0].length;
+        if (!p?.ptr) this.fail(e, 'fscanf: its values are read through pointers (&x)');
+        const x = Number(t[0].replace(/^([-+]?)inf(inity)?$/i, '$1Infinity'));
+        p.ptr.set(m[1] === 'l' || m[1] === 'L' ? { v: x, t: F64 } : { v: Math.fround(x), t: F32 });
+        got++;
+        continue;
+      }
+      const re = /[xX]/.test(conv) ? /^[-+]?(0[xX])?[0-9a-fA-F]+/ : conv === 'o' ? /^[-+]?[0-7]+/ : conv === 'i' ? /^[-+]?(0[xX][0-9a-fA-F]+|0[0-7]*|[1-9]\d*)/ : /^[-+]?\d+/;
       const t = re.exec(fh.text.slice(fh.pos));
       if (!t) break;
       fh.pos += t[0].length;
       const neg = t[0].startsWith('-'), digits = t[0].replace(/^[-+]/, '');
-      let v = conv === 'x' ? BigInt(`0x${digits.replace(/^0[xX]/, '')}`) : conv === 'o' ? BigInt(`0o${digits}`) : conv === 'i' ? BigInt(/^0[xX]/.test(digits) ? digits : /^0\d/.test(digits) ? `0o${digits.slice(1)}` : digits) : BigInt(digits);
+      let v = /[xX]/.test(conv) ? BigInt(`0x${digits.replace(/^0[xX]/, '')}`) : conv === 'o' ? BigInt(`0o${digits}`) : conv === 'i' ? BigInt(/^0[xX]/.test(digits) ? digits : /^0\d/.test(digits) ? `0o${digits.slice(1)}` : digits) : BigInt(digits);
       if (neg) v = -v;
       if (!p?.ptr) this.fail(e, 'fscanf: its values are read through pointers (&x)');
       p.ptr.set({ v, t: INT });
