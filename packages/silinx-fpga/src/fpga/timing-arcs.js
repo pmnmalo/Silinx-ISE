@@ -75,11 +75,12 @@ export function instArcs(inst, model = SPEED_4) {
   const cyG = G_PINS.filter(p => gIn.includes(p) || m.get('CY0G') === p).map(p => [p, m.get('CY0G') === p ? T('TopcygDI') : T('Topcyg')]);
   if (m.get('CY0G') === 'BY') cyG.push(['BY', T('Tbycy')]);
   for (const [p, d] of [...cyF, ...cyG]) comb.push([p, 'COUT', d], [p, 'YB', d]);
-  // XB: the F stage's carry, half of CIN -> COUT short of COUT (as the post-place & route model splits the chain,
-  // core/sim-model.js sliceModel; #591: the open flows' carry out, trce's value of it still to be read)
-  const half = T('Tbyp') / 2;
-  for (const [p, d] of cyF) comb.push([p, 'XB', d - half]);
-  comb.push([cin, 'COUT', cy], [cin, 'XB', cy - half], [cin, 'YB', cy]);
+  // XB: the F stage's carry (#591; trce's delays, #2286: Topxb from a LUT pin, TopxbDI / Tbxxb from the carry's data
+  // input, Tcinxb from CIN; BX as CYINIT, not seen in trce's reports: half of BX -> COUT short of it, as the post-place &
+  // route model splits the chain, core/sim-model.js sliceModel)
+  for (const p of F_PINS) if (fIn.includes(p) || m.get('CY0F') === p) comb.push([p, 'XB', m.get('CY0F') === p ? T('TopxbDI') : T('Topxb')]);
+  if (m.get('CY0F') === 'BX') comb.push(['BX', 'XB', T('Tbxxb')]);
+  comb.push([cin, 'COUT', cy], [cin, 'XB', cin === 'BX' ? cy - T('Tbyp') / 2 : T('Tcinxb')], [cin, 'YB', cy]);
   // the flip-flops (or latches): D from X / Y (DXMUX / DYMUX = 1) or from BX / BY
   const ff = (name, D, toD, byp, q, tco) => {
     if (!m.has(name)) return;

@@ -138,7 +138,7 @@ test('#1679 the README\'s blinky built from the command line: no warnings, its f
   const r = await run(['build', path.join(dir, 'blinky.v'), '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir, 'basys2.ucf'), '-o', bit, '--out-dir', build]);
   assert.equal(r.code, 0, r.err.join('\n'));
   assert.deepEqual(r.err, [], 'no warnings');
-  assert.ok(r.out.includes('constraint PERIOD 20 ns on clk: met (period 4.648 ns, slack 15.352 ns)'), r.out.join('\n'));
+  assert.ok(r.out.includes('constraint PERIOD 20 ns on clk: met (period 4.857 ns, slack 15.143 ns)'), r.out.join('\n'));
   assert.ok(r.out.includes('All constraints were met.'));
   assert.equal(r.out.at(-1), `${bit}: the bitstream of blinky on xc3s250ecp132-4`);
   for (const f of ['blinky.json', 'placed.xdl', 'routed.xdl', 'timing.txt', 'blinky.bit']) assert.ok(fs.existsSync(path.join(build, f)), f);

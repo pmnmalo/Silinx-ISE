@@ -691,10 +691,14 @@ function sliceModel(M, i, name, c, val, pin, inv, out, T = null, mem = null) {
   // the F stage's carry into the G XOR: BX (CY0F) Tbxy, a LUT pin Topy, CIN Tciny (BX: Tbxxor)
   const CYF2 = T ? once(() => M.mux(cy0(val('CY0F'), 'F'), cin, selF(), `${name}_CYMUXF2`,
     { IA: val('CY0F') === 'BX' ? t('Tbxy') : /^F[12]$/.test(val('CY0F')) ? t('Topy') : 0, IB: cinBX ? t('Tbxxor') : t('Tciny'), SEL: pos(t('Topy') - t('Tilo')) })) : CYF;
+  // XB, the F stage's carry out of the slice: its own copy with trce's delays (#2286: Topxb from the LUT, TopxbDI / Tbxxb
+  // from the carry's data input, Tcinxb from CIN; BX as CYINIT half of BX -> COUT short of it, as the timing's arcs)
+  const XBpin = T ? once(() => M.mux(cy0(val('CY0F'), 'F'), cin, selF(), `${name}_CYMUXFXB`,
+    { IA: val('CY0F') === 'BX' ? t('Tbxxb') : /^F[12]$/.test(val('CY0F')) ? t('TopxbDI') : 0, IB: cinBX ? pos(t('Tbxcy') - half) : t('Tcinxb'), SEL: pos(t('Topxb') - t('Tilo')) })) : CYF;
   const Xo = once(() => ({ F: () => F, F5: F5x, FXOR: () => M.xor(cin, F, c.get('XORF')?.name || `${name}_XORF`, { I0: cinBX ? t('Tbxxor') : t('Tcinx'), I1: pos(t('Topx') - t('Tilo')) }) }[val('FXMUX')]?.() ?? { c: 0 }));
   const Yo = once(() => ({ G: () => G, FX: FXy, GXOR: () => M.xor(CYF2(), G, c.get('XORG')?.name || `${name}_XORG`, { I0: 0, I1: pos(t('Togy') - t('Tilo')) }) }[val('GYMUX')]?.() ?? { c: 0 }));
   // (built when a net uses them)
-  for (const [p, f] of Object.entries({ X: Xo, Y: Yo, XB: CYF, YB: CYG, COUT: CYG, F5: F5pin, FX: FXpin })) out(p, f);
+  for (const [p, f] of Object.entries({ X: Xo, Y: Yo, XB: XBpin, YB: CYG, COUT: CYG, F5: F5pin, FX: FXpin })) out(p, f);
   // the flip-flops (or latches)
   const ce = c.has('CEINV') ? inv('CE') : { c: 1 };
   const sr = c.has('SRINV') && !c.has('WSGEN') ? inv('SR') : { c: 0 };

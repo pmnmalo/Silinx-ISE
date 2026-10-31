@@ -73,8 +73,8 @@ export const SPEED_4 = {
     Tif6y: [0.521, 0.409],     // FXINA / FXINB -> Y
     Tbyfx: [0.589, 0.687],     // BY (select) -> FX (est.)
     Tbyy: [0.850, 0.850],      // BY (select) -> Y
-    Topcyf: [0.953, 0.953],    // F1-4 -> COUT
-    Topcyg: [0.888, 0.888],    // G1-4 -> COUT
+    Topcyf: [1.162, 1.162],    // F1-4 -> COUT (trce's, #2286)
+    Topcyg: [1.001, 1.131],    // G1-4 -> COUT (trce's, #2286)
     TopcyfDI: [1.162, 1.162],  // F1 / F2 -> COUT when it is also the carry's data input (CY0F) (trce: 1.162 the worst)
     TopcygDI: [1.131, 1.131],  // G1 / G2 -> COUT when it is also the carry's data input (CY0G)
     Tbycy: [0.945, 0.945],     // BY (CY0G) -> COUT
@@ -82,15 +82,20 @@ export const SPEED_4 = {
     Tbyp: [0.118, 0.130],      // CIN -> COUT
     Tcinx: [0.462, 0.497],     // CIN -> X (XOR)
     Tciny: [0.869, 0.883],     // CIN -> Y (through the F stage and the G XOR)
-    Topx: [0.85, 0.9],         // F1-4 -> X (XOR) (est.)
-    Topy: [1.641, 1.641],      // F1-4 -> Y (carry of the F stage, G XOR)
-    Togy: [0.9, 0.95],         // G1-4 -> Y (XOR) (est.)
+    Topx: [1.060, 1.118],      // F1-4 -> X (XOR) (trce's, #2286)
+    Topy: [1.641, 1.732],      // F1-4 -> Y (carry of the F stage, G XOR)
+    Togy: [1.231, 1.288],      // G1-4 -> Y (XOR) (trce's Topgy, #2286)
     Tbxxor: [1.0, 1.0],        // BX (CYINIT) -> X / Y through the XOR (est.)
-    Tbxy: [1.574, 1.574],      // BX (CY0F, the F stage's carry data input) -> Y (the G XOR)
+    Tbxy: [1.574, 1.676],      // BX (CY0F, the F stage's carry data input) -> Y (the G XOR)
     TckoX: [0.591, 0.592],     // CLK -> XQ
     TckoY: [0.587, 0.652],     // CLK -> YQ
+    // the F stage's carry out on XB (#591, #2286: trce's on the SLICEM; the SLICEL's taken the same, est.)
+    Tcinxb: [0.495, 0.495],    // CIN -> XB
+    Topxb: [1.344, 1.344],     // F1-4 -> XB
+    TopxbDI: [1.135, 1.135],   // F1 / F2 -> XB when it is also the carry's data input (CY0F)
+    Tbxxb: [1.288, 1.288],     // BX (CY0F) -> XB
     Tdxck: [0.133, 0.133],     // setup of the flip-flop from the X / Y path (added to the path to X / Y)
-    Tdick: [0.308, 0.308],     // BX -> flip-flop X (DXMUX = 0)
+    Tdick: [0.308, 0.360],     // BX -> flip-flop X (DXMUX = 0)
     Tdyck: [0.361, 0.382],     // BY -> flip-flop Y (DYMUX = 0)
     Tceck: [0.555, 0.555],     // CE (est.)
     Tsrck: [0.910, 0.910],     // SR

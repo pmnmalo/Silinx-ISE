@@ -138,11 +138,12 @@ test('slice arcs: LUT, F5 / FX multiplexers, carry chain (its data input), flip-
   // critical path went through it, unseen by the analysis before 15.10.3)
   assert.deepEqual(find(c, 'BX', 'Y'), [S.Tbxy[0]]);
   assert.deepEqual(find(c, 'BX', 'X'), []);
-  // F1 as CY0F: slower to COUT than another F pin (trce: 1.162 against 0.953)
+  // F1 as CY0F: its own arc to COUT (TopcyfDI), another F pin Topcyf's
   const cf = sl('SLICE_X1Y0', [['FXMUX', 'FXOR'], ['GYMUX', 'GXOR'], ['CYINIT', 'CIN'], ['CY0F', 'F1'], ['CY0G', 'G1']]);
   assert.deepEqual(find(cf, 'F1', 'COUT'), [S.TopcyfDI[0]]);
   assert.deepEqual(find(cf, 'F2', 'COUT'), [S.Topcyf[0]]);
-  assert.ok(S.TopcyfDI[0] > S.Topcyf[0]);
+  // (#2286: trce's from a LUT pin is as slow as the model's from the data input, 1.162 ns)
+  assert.ok(S.TopcyfDI[0] >= S.Topcyf[0]);
   assert.deepEqual(find(cf, 'BX', 'Y'), []);
   // CYINIT = BX: the chain starts from BX
   const c0 = sl('SLICE_X1Y0', [['GYMUX', 'GXOR'], ['CYINIT', 'BX']]);
@@ -424,7 +425,8 @@ test('#1359 timing-driven routing: the critical loads of the LUTs on their fast 
   };
   const flat = routed({ ...SPEED_4, lutPin: [0, 0, 0, 0] }), pins = routed(SPEED_4);
   assert.deepEqual(pins.byPin, [0, 1, 5, 8]);
-  assert.deepEqual(flat.byPin, [3, 3, 3, 5]);
+  // (without the pins' delays: spread over the four, #2286's carry delays moving the critical paths)
+  assert.deepEqual(flat.byPin, [2, 3, 4, 5]);
   assert.ok(pins.period < flat.period, `${pins.period} against ${flat.period}`);
 });
 
