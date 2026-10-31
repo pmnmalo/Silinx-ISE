@@ -49,7 +49,8 @@ if [ "${1:-}" = --docker-acl ]; then
     exit 0
   fi
   # it waits for the socket (Docker Desktop's restart removes it, then makes it anew), and runs every 5 minutes too:
-  # a run while it was gone and an event launchd dropped left the runner without Docker (#1799)
+  # a run while it was gone and an event launchd dropped left the runner without Docker (#1799). It adds the ACL
+  # only when it is missing: removing it to add it again left the runner without Docker for an instant (#2268)
   mkdir -p "$HOME/Library/LaunchAgents"
   cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -58,7 +59,7 @@ if [ "${1:-}" = --docker-acl ]; then
 <dict>
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
-  <array><string>/bin/sh</string><string>-c</string><string>i=0; until [ -S '$SOCK' ] || [ \$i -ge 60 ]; do sleep 1; i=\$((i+1)); done; chmod -a '$ACE' '$SOCK' 2&gt;/dev/null; chmod +a '$ACE' '$SOCK'</string></array>
+  <array><string>/bin/sh</string><string>-c</string><string>i=0; until [ -S '$SOCK' ] || [ \$i -ge 60 ]; do sleep 1; i=\$((i+1)); done; ls -le '$SOCK' | grep -qF '$ACE' || chmod +a '$ACE' '$SOCK'</string></array>
   <key>WatchPaths</key><array><string>$(dirname "$SOCK")</string></array>
   <key>StartInterval</key><integer>300</integer>
   <key>RunAtLoad</key><true/>

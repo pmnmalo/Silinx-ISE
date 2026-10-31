@@ -201,7 +201,7 @@ test('install.sh --docker-acl: the runner\'s user on Docker Desktop\'s socket, a
   assert.equal(r.code, 0, r.err);
   const plist = r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx-ise.docker-acl.plist'));
   const sock = path.join(r.home, '.docker/run/docker.sock');
-  assert.match(plist, new RegExp(`<string>i=0; until \\[ -S '${sock}' \\] \\|\\| \\[ \\$i -ge 60 \\]; do sleep 1; i=\\$\\(\\(i\\+1\\)\\); done; chmod -a 'user:iserunner allow read,write' '${sock}' 2&gt;/dev/null; chmod \\+a 'user:iserunner allow read,write' '${sock}'</string>`));
+  assert.match(plist, new RegExp(`<string>i=0; until \\[ -S '${sock}' \\] \\|\\| \\[ \\$i -ge 60 \\]; do sleep 1; i=\\$\\(\\(i\\+1\\)\\); done; ls -le '${sock}' \\| grep -qF 'user:iserunner allow read,write' \\|\\| chmod \\+a 'user:iserunner allow read,write' '${sock}'</string>`));
   assert.match(plist, new RegExp(`<key>WatchPaths</key><array><string>${path.dirname(sock)}</string></array>`));
   assert.match(plist, /<key>StartInterval<\/key><integer>300<\/integer>/);
   assert.match(plist, /<key>RunAtLoad<\/key><true\/>/);
@@ -217,9 +217,10 @@ test('install.sh --docker-acl: the agent waits for the socket Docker Desktop mak
   const cmd = /<string>-c<\/string><string>(.*?)<\/string>/.exec(plist)[1].replace(/&gt;/g, '>');
   const sock = path.join(r.home, '.docker/run/docker.sock');
   fs.mkdirSync(path.dirname(sock), { recursive: true });
-  // chmod stubbed: each call logged with whether the socket was there
+  // chmod and ls stubbed: each chmod logged with whether the socket was there; no ACL yet
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'acl-bin-')), log = path.join(bin, 'log');
   fs.writeFileSync(path.join(bin, 'chmod'), `#!/bin/sh\n[ -S '${sock}' ] && s=socket || s=none\necho "$s chmod $*" >> '${log}'\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'ls'), `#!/bin/sh\necho 'srwxr-xr-x  1 admin  staff  0 Oct 27 23:01 ${sock}'\n`, { mode: 0o755 });
   const child = spawn('/bin/sh', ['-c', cmd], { env: { PATH: `${bin}:${process.env.PATH}` } });
   const exited = new Promise(res => child.on('exit', res));
   await new Promise(res => setTimeout(res, 1500));
@@ -229,9 +230,30 @@ test('install.sh --docker-acl: the agent waits for the socket Docker Desktop mak
   assert.equal(await exited, 0);
   server.close();
   assert.deepEqual(fs.readFileSync(log, 'utf8').trim().split('\n'), [
-    `socket chmod -a user:iserunner allow read,write ${sock}`,
     `socket chmod +a user:iserunner allow read,write ${sock}`,
   ]);
+});
+
+test('install.sh --docker-acl: the agent leaves an ACL that is there alone, never taking it away (#2268)', { skip: !posix }, async () => {
+  const r = installIn(['--docker-acl', 'iserunner']);
+  assert.equal(r.code, 0, r.err);
+  const plist = r.read(path.join(r.home, 'Library/LaunchAgents/com.github.pmnmalo.silinx-ise.docker-acl.plist'));
+  const cmd = /<string>-c<\/string><string>(.*?)<\/string>/.exec(plist)[1].replace(/&gt;/g, '>');
+  const sock = path.join(r.home, '.docker/run/docker.sock');
+  fs.mkdirSync(path.dirname(sock), { recursive: true });
+  // chmod and ls stubbed: the socket has the runner user's ACL already
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'acl-bin-')), log = path.join(bin, 'log');
+  fs.writeFileSync(path.join(bin, 'chmod'), `#!/bin/sh\necho "chmod $*" >> '${log}'\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'ls'), `#!/bin/sh\necho 'srwxr-xr-x+ 1 admin  staff  0 Oct 27 23:01 ${sock}'\necho ' 0: user:iserunner allow read,write'\n`, { mode: 0o755 });
+  const server = net.createServer().listen(sock);
+  await new Promise(res => server.on('listening', res));
+  // launchd ran it every 10 seconds or so (#2268): each run leaves the ACL as it is
+  for (let i = 0; i < 3; i++) {
+    const p = spawnSync('/bin/sh', ['-c', cmd], { env: { PATH: `${bin}:${process.env.PATH}` } });
+    assert.equal(p.status, 0, String(p.stderr));
+  }
+  server.close();
+  assert.equal(fs.existsSync(log), false, 'no chmod while the ACL is there');
 });
 
 test('window: the runner\'s service started and stopped through svc.sh, or as root\'s daemon', () => {
