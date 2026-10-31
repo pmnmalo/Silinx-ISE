@@ -22,6 +22,7 @@ import { wordMethods } from './c-agg-mem.js';
 import { loopPragma, unrollBy } from './c-pragma.js';
 import { inlineCalls } from './c-inline.js';
 import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from './c-pipeline.js';
+import { outFirstMethods } from './c-out-first.js';
 
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
 // (split: core/c-schedule.js's, the states split by the clock; spare: the states it adds, room for them in the state's
@@ -456,7 +457,12 @@ class SeqFlow extends Flow {
   }
   stmt(s, base) {
     if (s && /^word(get|set|load|write)$/.test(s.kind)) return this.wordStmt(s, base);
-    return s && /^mem(read|write|latch)$/.test(s.kind) ? this.memStmt(s, base) : s && /^fifo(read|write)$/.test(s.kind) ? this.fifoStmt(s, base) : super.stmt(s, base);
+    // (the condition a statement runs under: a pointer's read under it, #2241)
+    const prev = this.outBase;
+    this.outBase = base;
+    try {
+      return s && /^mem(read|write|latch)$/.test(s.kind) ? this.memStmt(s, base) : s && /^fifo(read|write)$/.test(s.kind) ? this.fifoStmt(s, base) : super.stmt(s, base);
+    } finally { this.outBase = prev; }
   }
   runBlocks() {
     const st = (n) => this.g.const(n, this.stateT);
@@ -474,7 +480,9 @@ class SeqFlow extends Flow {
       this.access = new Map();
       this.fifoAcc = new Map();
       this.stall = this.F;
+      this.outFirstBlock(b);
       for (const s of b.stmts) this.stmt(s, this.T);
+      this.outFirstEnd(b);
       // the next state: after a return, done; a break, its loop's exit; a continue, its loop's next iteration; else
       // the block's own end
       let next;
@@ -512,6 +520,8 @@ class SeqFlow extends Flow {
       }
       this.states.push({ id: b.num, updates, next, line: firstLine(b.stmts), access: this.access, fifo: this.fifoAcc, stall, ...(b.gate ? { gate: true } : {}) });
     }
+    // (a pointer written before it is read, on every path: no input, #2241)
+    this.outFirstDone();
     // (the states split by the clock, #2080: before the memories' ports, which the states drive)
     if (this.split) {
       const piped = new Set((this.loopReport || []).filter((l) => l.pipeline).flatMap((l) => l.blocks.filter((b) => b.num).map((b) => b.num)));
@@ -539,6 +549,7 @@ class SeqFlow extends Flow {
   }
   // the outputs read before they are written: a pointer read and written takes its input at the start of a call
   readOut(o) {
+    this.noteOutRead(o);
     o.read = true;
     if (!o.latched) {
       o.latched = true;
@@ -552,6 +563,7 @@ class SeqFlow extends Flow {
   }
   storeDeref(slot, val, g, l) {
     const r = super.storeDeref(slot, val, g, l);
+    if (slot.kind === 'out') this.noteOutWrite(slot.out, g);
     return r;
   }
   result() {
@@ -604,4 +616,4 @@ class SeqFlow extends Flow {
     };
   }
 }
-Object.assign(SeqFlow.prototype, memMethods, fifoMethods, wordMethods, pipelineMethods);
+Object.assign(SeqFlow.prototype, memMethods, fifoMethods, wordMethods, pipelineMethods, outFirstMethods);
