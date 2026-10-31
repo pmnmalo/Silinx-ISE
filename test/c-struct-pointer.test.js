@@ -81,8 +81,10 @@ test('#1684 C++: auto x = p[i] of a pointer to structs (AMD\'s aggregation_of_m_
   for (const lang of ['vhdl', 'verilog']) {
     const r = cosimulate(src, { file: 'm.cpp', lang });
     assert.deepEqual([r.errors, r.pass], [[], true], JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), ['3 #pragma HLS INTERFACE m_axi port=arr is not made yet: ignored (its default interface made)']);
-    assert.deepEqual(r.gen.ports.filter((p) => /^arr_/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['arr_address0:4', 'arr_ce0:1', 'arr_q0:24']);
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.message}`), []);
+    // (its memory of 24-bit words an AXI4 master's, #1893: a word of 4 bytes on a bus of 32 bits)
+    assert.deepEqual(r.gen.ports.filter((p) => /^arr_|^m_axi_gmem_RDATA$/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['m_axi_gmem_RDATA:32']);
+    assert.deepEqual(r.gen.axi.buses[0].clients.map((c) => `${c.name} ${c.bytes}`), ['arr 4']);
   }
 });
 

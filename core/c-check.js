@@ -16,7 +16,7 @@
 import { pointerArithmetic, pointerVariables } from './c-pointer.js';
 import { pointerToPointer, pointerArgsMoved } from './c-pointer-args.js';
 import { parse, parseExpression } from './c-parse.js';
-import { checkPragmas, tripcountArgs } from './c-pragma.js';
+import { checkPragmas, tripcountArgs, addDirectives } from './c-pragma.js';
 import { MATH, BITCASTS } from './c-float.js';
 import { Q_MODES, O_MODES } from './c-fixed.js';
 import { foldResetCtors } from './c-const-init.js';
@@ -176,6 +176,8 @@ export function checkC(source, file = 'input.c', opts = {}) {
   // ---------------------------------------------------------------- each function: names, calls, constructs
   const loops = [];
   // (opts.depths: a DATAFLOW process's pointer arguments, its caller's arrays' sizes, core/c-processes.js, #1707)
+  // (the config file's interface directives, as pragmas of the top: core/c-axi.js, #1893)
+  addDirectives(funcs.get(top), opts.directives);
   pointerToPointer(funcs, synth, top, report);   // (int **pp of a function the top calls: resolved at compile time, #1895)
   pointerArgsMoved(funcs, synth, report);   // (a pointer argument moved, p += n: an offset of its own, #1895)
   pointerArithmetic(funcs, globals, synth, report, ast.structArgs, top, opts.depths);   // (*(p + e) is p[e]; a pointer argument indexed an array, #1599)

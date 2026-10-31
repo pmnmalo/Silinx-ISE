@@ -29,6 +29,7 @@ export function liteMap(args, corePorts, { ret = false, extra = [] } = {}) {
       at += 4 * words(p.w) + (p.dir === 'out' ? 4 : 0) + 4;
     }
     for (const e of extra.filter((x) => x.param === param)) {
+      if (cfg.offset !== undefined) at = cfg.offset;
       regs.push({ ...e, off: at, words: words(e.w) });
       at += 4 * words(e.w) + 4;
     }
