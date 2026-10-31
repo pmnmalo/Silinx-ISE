@@ -17,7 +17,7 @@ export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'LATENCY', 'BIND_OP', 'BIN
   'LOOP_FLATTEN', 'LOOP_MERGE', 'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
   'ARRAY_RESHAPE', 'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
-export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite']);
+export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite', 'm_axi']);
 /** `#pragma HLS NAME key=value key` -> { name, args, text }; null if not an HLS pragma (core/c-lex.js's). */
 export function readPragma(rest) {
   const m = /^\s*HLS\s+(\w+)\s*(.*)$/i.exec(rest);
@@ -33,6 +33,19 @@ export function tripcountArgs(text) {
   const body = text.replace(/^\s*HLS\s+LOOP_TRIPCOUNT\b/i, '');
   const keys = [...body.matchAll(/\b(min|max|avg)\s*=(?!=)/gi)];
   return Object.fromEntries(keys.map((k, i) => [k[1].toLowerCase(), body.slice(k.index + k[0].length, keys[i + 1]?.index).trim()]));
+}
+
+/** The config's `syn.directive.interface=<top> [port] mode=m_axi [key=value]` (the manifest's directives, #1893): pragmas of the
+ *  function, first in its body. */
+export function addDirectives(fn, directives) {
+  for (const d of directives || []) {
+    const [kind, name, ...rest] = String(d).trim().split(/\s+/);
+    if (kind !== 'interface' || name !== fn?.name) continue;
+    const args = {};
+    for (const t of rest) { const [k, v] = t.split('='); if (v !== undefined) args[k.toLowerCase()] = v; else args.port = k; }
+    if (String(args.mode).toLowerCase() !== 'm_axi') continue;
+    fn.body.items.unshift({ kind: 'pragma', pragma: { name: 'INTERFACE', args, text: `HLS INTERFACE ${rest.join(' ')}` }, loc: fn.loc });
+  }
 }
 
 const LOOP_ONLY = new Set(['PIPELINE', 'UNROLL', 'LOOP_TRIPCOUNT']);
