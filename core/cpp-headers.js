@@ -10,7 +10,22 @@
 // options), hls::ip_fir::params_t's fields and their defaults (a config struct derives from it and sets those it
 // changes), hls::FIR<CONFIG_T> and its run(). Its constants and defaults are read from it (core/hls-fir.js); a source's
 // filters made by core/cpp-fir.js, which takes its tokens out (its names stay hls::ip_fir's, never the source's).
+//
+// hls_vector.h, hls_streamofblocks.h, ap_float.h, complex (#1891): the types core/cpp-hls-lib.js makes their names into.
 export const CPP_OWN_HEADERS = {
+  'hls_vector.h': `#pragma once
+#include <stdint.h>
+#include <assert.h>
+template <typename T, int N> struct ap_vector { T ap_d[N]; };
+`,
+  'hls_streamofblocks.h': `#pragma once
+#include "hls_vector.h"
+`,
+  'ap_float.h': `#pragma once
+`,
+  complex: `#pragma once
+template <typename T> struct complex { T ap_re = 0; T ap_im = 0; };
+`,
   'hls_fir.h': `#pragma once
 #include "ap_fixed.h"
 namespace hls {
@@ -78,6 +93,7 @@ public:
 `,
   'ap_axi_sdata.h': `#pragma once
 #include "ap_int.h"
+#include <complex>
 template <int D, int U, int TI, int TD> struct ap_axis {
   ap_int<D> data;
   ap_uint<(D + 7) / 8> keep;
@@ -91,6 +107,16 @@ template <int D, int U, int TI, int TD> struct ap_axiu {
   ap_uint<D> data;
   ap_uint<(D + 7) / 8> keep;
   ap_uint<(D + 7) / 8> strb;
+  ap_uint<U> user;
+  ap_uint<1> last;
+  ap_uint<TI> id;
+  ap_uint<TD> dest;
+};
+/* hls::axis<T, U, TI, TD>'s (core/cpp-hls-lib.js: B, the bytes of T) */
+template <typename T, int B, int U, int TI, int TD> struct ap_axis_t {
+  T data;
+  ap_uint<B> keep;
+  ap_uint<B> strb;
   ap_uint<U> user;
   ap_uint<1> last;
   ap_uint<TI> id;

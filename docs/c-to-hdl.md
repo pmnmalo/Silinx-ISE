@@ -17,7 +17,8 @@ Spartan-3E, so it is not Silinx's oracle: the C itself is (see *Checking it* bel
   `stddef.h`, `limits.h` (the library for test benches, ignored by synthesis); in C++ their `<c…>` names,
   `<iostream>`, `<fstream>`, `<iomanip>`, `hls_stream.h`, `ap_axi_sdata.h` (Silinx HLS's own: `ap_axis<D, U, TI,
   TD>` and `ap_axiu<…>`, a beat's data, keep, strb, user, last, id and dest; a side channel of width 0 left out, #1662)
-  and `hls_fir.h` (`hls::FIR`, below, #1942).
+  `hls_fir.h` (`hls::FIR`, below, #1942), `hls_vector.h`, `hls_streamofblocks.h`, `<complex>`, `ap_float.h` and
+  `malloc.h` (*The library's types*, below, #1891).
   The project's own headers (`#include "x.h"`)
   are read in place.
 - The **top function**: the one named by `#pragma HLS TOP name=…`, else the file's last function
@@ -256,6 +257,21 @@ Each access takes a state: a statement reading a memory has a state per read (it
 other side effect in it; the index of a memory has no side effect; a memory is accessed in the top function only
 (not passed to a function, not in a `switch`). A combinational function's constant arrays are LUT ROMs.
 
+### The library's types (#1891)
+
+- **`hls::vector<T, N>`** (`hls_vector.h`): a struct of an array of `N` elements: `v[i]`, `{ … }`, copied, in arrays, behind
+  pointers and in streams (a stream per element). `+ - * /` and `+= -= *= /=` element by element, of two vectors or of a
+  vector and a scalar, in a statement `x = e;`, `V x = e;`, `s.write(e);` or `return e;`. Not yet: a vector's operators as a
+  function's argument or in a larger expression; comparisons; a function's result in `e`.
+- **`std::complex<T>`** (`<complex>`): `c.real()`, `c.real(x)`, `c.imag()`, `c.imag(x)`, `c = {a, b}`, `==`, `!=`, its default
+  value 0; `hls::axis<T, U, TI, TD>` (`ap_axi_sdata.h`) of a builtin type, an `ap_int`, an `ap_uint` or a complex of one. Not
+  yet: its arithmetic.
+- **`ap_float<W, E>`** (`ap_float.h`): in a test bench only, a `double` with a warning: its rounding is not modelled. In the
+  synthesized code an error.
+- **`hls::autorestart r(n, f, a…);`**: in a test bench only, `n` calls of `f(a…)` with the same arguments.
+- **`malloc`, `free`** (`malloc.h`, `stdlib.h`): in a test bench only: `n` bytes for a pointer of its type.
+- `extern "C"`, with or without braces, is dropped; a parameter `T (&a)[N]` is `T a[N]`, its `T` and `N` deduced in a template.
+
 ### DATAFLOW (#1707)
 
 `#pragma HLS DATAFLOW` in the top function, whose body is calls of functions and declarations of streams and
@@ -278,6 +294,12 @@ calls in order; the co-simulation drives the top's ports as for any module, and 
 the streams that may be too shallow (a stream to a process that waits for its writer to be done, through a buffer,
 must hold all a call writes). Not yet: a process giving back a value (a pointer output or a result), an argument of
 the top shared by two processes, a channel with two writers or readers.
+
+**`hls::stream_of_blocks`** (`hls_streamofblocks.h`, #1891): `hls::stream_of_blocks<B> s;` with `typedef T B[N];`,
+`hls::write_lock<B> l(s);` and `hls::read_lock<B> l(s);`, `l[j]`. A block is a word of a FIFO (a stream per element,
+its depth the blocks', `hls::stream_of_blocks<B, D>`), not Vitis HLS's ping-pong memory: the same values, more
+registers. A write lock's block is written at the end of its scope; a `return`, `break` or `continue` within that scope
+is refused.
 
 **`hls::split` and `hls::merge`** (`hls_np_channel.h`, #1743): `hls::split::round_robin<T, N, D> s;` (its processes
 writing `s.in`, reading `s.out[i]`) and `hls::merge::round_robin<T, N, D> m;` (writing `m.in[i]`, reading `m.out`) are

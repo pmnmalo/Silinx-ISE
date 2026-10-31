@@ -57,7 +57,7 @@ Not part of `npm test` (it needs the network once).
 | interface-streaming-axis-array-stream-no-side-channel-data | C++ | pass | pass | pass | 53 |  |
 | interface-streaming-using-array-of-streams | C++ | pass | pass | pass | 71 |  |
 | interface-streaming-using-axi-stream-with-side-channel-data | C++ | pass | pass | pass | 6-7 |  |
-| interface-streaming-using-axi-stream-with-struct | C++ | fail | fail | skip | - | C simulation: example.h:3: the header 'complex' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
+| interface-streaming-using-axi-stream-with-struct | C++ | pass | pass | pass | 32 |  |
 | migration-python-scripts | C | pass | pass | pass | 1 |  |
 | migration-vitis-unified-cli | C | pass | pass | pass | 1 |  |
 | misc-initialization-and-reset-static-array-rom | C++ | pass | pass | pass | 1 |  |
@@ -77,30 +77,30 @@ Not part of `npm test` (it needs the network once).
 | modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | 18 |  |
 | modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | 4 |  |
 | modeling-using-array-stencil-1d | C++ | pass | pass | pass | 29803 |  |
-| modeling-using-array-stencil-2d | C++ | fail | fail | skip | - | C simulation: test.cpp:19: the header 'malloc.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
+| modeling-using-array-stencil-2d | C++ | fail | fail | skip | - | C simulation: cmdlineparser.h:21: the header 'map' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | modeling-using-cpp-templates | C++ | pass | pass | pass | 2 |  |
 | modeling-using-fixed-point | C++ | pass | pass | pass | 1 |  |
 | modeling-using-float-and-double | C | pass | pass | pass | 2 |  |
-| modeling-using-vectors | C++ | fail | fail | skip | - | C simulation: example.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
+| modeling-using-vectors | C++ | pass | pass | pass | 7513 |  |
 | modeling-variable-bound-loops | C++ | pass | pass | pass | 3-34 |  |
 | pipelining-functions-function-instantiate | C++ | pass | pass | pass | - |  |
 | pipelining-functions-hier-func | C++ | pass | pass | pass | - |  |
 | pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 543 |  |
 | pipelining-loops-perfect-loop | C++ | pass | pass | pass | 1723 |  |
 | pipelining-loops-using-free-running-pipeline | C++ | pass | fail | skip | - | C synthesis: 66: 'strm_out' is not an integer |
-| task-level-parallelism-control-driven-channels-autorestart | C++ | fail | fail | skip | - | C simulation: diamond_test.cpp:23: the header 'ap_float.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
+| task-level-parallelism-control-driven-channels-autorestart | C++ | pass | pass | pass | 415 |  |
 | task-level-parallelism-control-driven-channels-merge-split-merge-load-balance | C++ | pass | pass | pass | 594 |  |
 | task-level-parallelism-control-driven-channels-merge-split-merge-round-robin | C++ | pass | pass | pass | 594 |  |
 | task-level-parallelism-control-driven-channels-merge-split-split-load-balance | C++ | pass | pass | pass | 152 |  |
 | task-level-parallelism-control-driven-channels-merge-split-split-round-robin | C++ | pass | pass | pass | 152 |  |
 | task-level-parallelism-control-driven-channels-simple-fifos | C++ | pass | pass | pass | 415 |  |
-| task-level-parallelism-control-driven-channels-using-fifos | C++ | fail | fail | skip | - | C simulation: diamond.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| task-level-parallelism-control-driven-channels-using-stream-of-blocks | C++ | fail | fail | skip | - | C simulation: diamond.h:19: the header 'hls_streamofblocks.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
+| task-level-parallelism-control-driven-channels-using-fifos | C++ | pass | pass | pass | 1206 |  |
+| task-level-parallelism-control-driven-channels-using-stream-of-blocks | C++ | pass | pass | pass | 674-675 |  |
 | task-level-parallelism-data-driven-mixed-control-and-data-driven | C++ | pass | pass | pass | 157 |  |
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 
-73 designs: 56 through co-simulation.
+73 designs: 61 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

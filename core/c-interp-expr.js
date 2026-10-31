@@ -65,6 +65,7 @@ export const exprMethods = {
       case 'cast': {
         const t = typeOf(e.type);
         const x = this.eval(e.e);
+        if (x.heap !== undefined && e.type.kind === 'ptr') return this.heapPtr(x, e.type.to, e);
         if (!t) return x;
         return { v: this.as(x, t, e), t };
       }
@@ -85,6 +86,14 @@ export const exprMethods = {
       default: this.fail(e, `this expression cannot be simulated`);
     }
     return null;
+  },
+  /** malloc's bytes as an array of to's, a pointer to its first (#1891). */
+  heapPtr(x, to, e) {
+    const t = typeOf(to);
+    if (!t) this.fail(e, 'malloc: its memory is given to a pointer to numbers');
+    const arr = Array.from({ length: Math.floor(x.heap / Math.ceil((t.w || 32) / 8)) }, () => ({ v: t.fl ? 0 : 0n }));
+    if (!arr.length) this.fail(e, `malloc: ${x.heap} bytes hold no element`);
+    return { ptr: this.elemRef(arr, 0, t), t };
   },
   /** The type of an expression without running it (for ?:'s common type), or null. */
   typeOfExpr(e) {

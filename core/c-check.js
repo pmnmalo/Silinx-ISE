@@ -176,6 +176,13 @@ export function checkC(source, file = 'input.c', opts = {}) {
     const hw = synth.has(f.name);
     checkFunction(f, { hw, funcs, globals, consts, report, loops, typeOk, dataflow: hasDataflow(f) });   // (a region's streams: any function's, its C simulation; the hardware the top's, core/c-processes.js)
   }
+  // (ap_float, hls::autorestart: the test bench's, core/cpp-hls-lib.js, #1891)
+  const simulated = new Set();
+  for (const a of ast.apFloats || []) {
+    const at = { file: a.file, line: a.line, col: a.col };
+    if (a.fn && synth.has(a.fn)) report(at, `${a.text}: only in a test bench in Silinx HLS (the C simulation), not in the synthesized code`);
+    else if (a.text !== 'hls::autorestart' && !simulated.has(a.text)) { simulated.add(a.text); report(at, `${a.text} is simulated as a double (its rounding not modelled)`, 'warning'); }
+  }
   // the HLS pragmas of the synthesized functions (#1529)
   checkPragmas(ast, new Map([...funcs].filter(([n]) => synth.has(n))), report, top);
   diags.sort((a, b) => a.line - b.line || a.col - b.col);

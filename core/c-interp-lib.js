@@ -113,6 +113,9 @@ export const libMethods = {
         const [c] = A();
         return num(this.system(this.cString(c) ?? '', e));
       }
+      // (malloc.h's, the test bench's data: its bytes made an array by the pointer it is given to, core/c-interp.js, #1891)
+      case 'malloc': { const [n] = A(); return { heap: Number(this.intOf(n, e)), t: INT }; }
+      case 'free': { A(); return num(0); }
       case 'exit': { const [c] = A(); throw new Exit(Number(this.as(c, INT, e))); }
       case 'ap_uniform_int': {
         // (<random>'s uniform_int_distribution<T> d(a, b); d(e), with e a default_random_engine (core/cpp-lex.js): as

@@ -477,7 +477,7 @@ export function parse(source, file = 'input.c', opts = {}) {
       if (S.p === before) S.p++;
     }
   }
-  const ast = { file, items, pragmas: filePragmas, includes: lx.includes, errors, structArgs: lx.structArgs || new Map(), firs: lx.firs || new Map() };
+  const ast = { file, items, pragmas: filePragmas, includes: lx.includes, errors, structArgs: lx.structArgs || new Map(), firs: lx.firs || new Map(), apFloats: lx.apFloats || [] };
   if (cpp) cppTree(ast, (n, message) => errors.push({ file, line: n?.loc?.line || 1, col: n?.loc?.col || 1, message, severity: 'error' }), lx.streams);
   return ast;
 }

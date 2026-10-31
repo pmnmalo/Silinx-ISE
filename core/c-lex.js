@@ -21,6 +21,8 @@ import { cppStl } from './cpp-stl.js';
 import { streamArrays } from './c-stream-array.js';
 import { npChannels } from './cpp-np-channel.js';
 import { cppFir } from './cpp-fir.js';
+import { cppHlsLibs } from './cpp-hls-lib.js';
+import { cppVector } from './cpp-vector.js';
 import { taskArrays } from './cpp-task-array.js';
 import { cppSugar } from './cpp-sugar.js';
 import { cStructs } from './c-struct.js';
@@ -261,9 +263,12 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     // core/c-union.js, #1896)
     // (hls_fir.h's filters first: their config structs read, their run() a C model's call, core/cpp-fir.js, #1942)
     const channels = (t, later) => streamArrays(taskArrays(npChannels(t, report, later), report, later), report, later);
-    const fir = cppFir(tokens, report);
-    const st = cStructs(cUnions(cppSugar(channels(cppTemplates(channels(cppStl(fir.tokens, report), true), report), false), report), report, true), report, true);
-    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, firs: fir.firs };
+    // (hls::vector and the other library types their own first, core/cpp-hls-lib.js, #1891; its operators once the
+    // templates are made, core/cpp-vector.js)
+    const lib = cppHlsLibs(tokens, includes, report);
+    const fir = cppFir(lib.tokens, report);
+    const st = cStructs(cUnions(cppVector(cppSugar(channels(cppTemplates(channels(cppStl(fir.tokens, report), true), report), false), report)), report, true), report, true);
+    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, firs: fir.firs, apFloats: lib.apFloats };
   }
   const st = cStructs(cUnions(tokens, report), report, false);
   return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs };
@@ -307,7 +312,8 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
       if (dir === 'include') {
         const m0 = /^[<"]([^>"]+)[>"]/.exec(rest.trim());
         // (C++'s headers of C's: <cstdint> is <stdint.h>)
-        const m = m0 && cpp && CPP_HEADERS[m0[1]] ? [m0[0], CPP_HEADERS[m0[1]]] : m0;
+        // (malloc.h: stdlib.h's malloc and free, the test bench's, #1891)
+        const m = m0 && m0[1] === 'malloc.h' ? [m0[0], 'stdlib.h'] : m0 && cpp && CPP_HEADERS[m0[1]] ? [m0[0], CPP_HEADERS[m0[1]]] : m0;
         if (!m) { e('#include names a header: #include "ap_int.h" or #include <stdint.h>'); continue; }
         includes.push({ name: m[1], system: rest.trim()[0] === '<', line });
         const key = headers && !KNOWN_HEADERS.has(m[1]) ? headerKey(headers, fname, m[1]) : null;
