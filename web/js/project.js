@@ -10,7 +10,7 @@ import { S, closeAllDocs, compileProject, renderFilesPage, renderLibsPage, showL
 import { log, renderDiagnostics } from './console.js';
 import { drawingsAsBase, adoptDrawnHdl, drawnHdlClashes } from './drawings.js';
 import { renderProcesses, restoreImplStatus, reservedNameDiags } from './processes.js';
-import { renderHierarchy } from './design.js';
+import { projectSaved, renderHierarchy } from './design.js';
 import { prefKey } from './prefs.js';
 
 const $ = id => document.getElementById(id);
@@ -87,8 +87,18 @@ export function reloadProject(render = true) {
   return S.reloadChain;
 }
 
+// The project once the reloads asked so far are done: a dialog applies its choices to it, not to the project it read
+// on opening, which a reload may have replaced meanwhile (#2281).
+export async function currentProject() {
+  let c;
+  do { c = S.reloadChain; await c; } while (c !== S.reloadChain);
+  return S.project;
+}
+
 async function reloadProjectNow(render = true, depth = 0) {
   if (!S.project) return null;
+  // (the saves asked before it on the server first: read before, an older project would replace S.project, #2281)
+  await projectSaved();
   const pj = await api.project(S.project.name);
   // the files on disk; the project ignores the ones removed from it (project.excluded, unregistered HDL)
   S.diskTree = pj.fileTree || [];

@@ -11,7 +11,7 @@ import { reservedNameDiags } from './processes.js';
 import { countEvent, siteCounts } from './analytics.js';
 import { confirmDeviceChange } from './device-change.js';
 import { byLastUsed } from './project-store.js';
-import { opened } from './project.js';
+import { currentProject, opened } from './project.js';
 import { prefKey } from './prefs.js';
 import { safeReleaseUrl } from './release-url.js';
 
@@ -580,7 +580,8 @@ export async function sourceProperties(path) {
 export async function projectProperties() {
   const db = S.devices || (S.devices = await api.devices().catch(() => null));
   if (!db) return alertDlg("Design Properties", "The device database could not be loaded (is the Silinx server running?).", "error");
-  const pj = S.project;
+  const pj0 = S.project;
+  let pj = pj0;
   const boardSel = select([['', 'None Specified'], ...db.boards.map(b => [b.id, b.name])], pj.board || '');
   const dp = devicePicker(db, pj.device);
   dp.disable(!!pj.board);
@@ -605,6 +606,9 @@ export async function projectProperties() {
       ...field('Preferred Language:', lang)),
   });
   if (!r) return;
+  // (the choices applied to the project as it is now: a reload while the dialog was open replaced it, #2281)
+  pj = await currentProject();
+  if (pj?.name !== pj0.name) return;
   // a new device: the design checked against it first, the user told (#796)
   const next = dp.value();
   if ((next.part !== pj.device.part || next.package !== pj.device.package) && !await confirmDeviceChange(pj, next, db)) return;
@@ -632,7 +636,8 @@ export async function projectProperties() {
 }
 
 export async function implProperties() {
-  const pj = S.project;
+  const pj0 = S.project;
+  let pj = pj0;
   pj.impl ||= {};
   const opt = select(['Speed', 'Area'], pj.impl.optMode || 'Speed');
   const lvl = select([['1', 'Normal'], ['2', 'High']], String(pj.impl.optLevel || 1));
@@ -651,6 +656,8 @@ export async function implProperties() {
       h('div', { style: { gridColumn: '1 / 3', color: 'var(--grey-3)' } }, 'Use JTAG Clock when programming over JTAG (iMPACT, xc3sprog, djtgcfg); CCLK when booting from the PROM/flash.')),
   });
   if (!r) return;
+  pj = await currentProject();   // (#2281)
+  if (pj?.name !== pj0.name) return;
   pj.impl = { ...pj.impl, optMode: opt.value, optLevel: +lvl.value, startupClk: clk.value, ...(app.openMode() ? { engine: eng.value } : {}) };
   await app.saveProjectJson();
 }
