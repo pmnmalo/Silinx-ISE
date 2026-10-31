@@ -64,6 +64,7 @@ export function stmtText(s) {
     case 'decl': return s.vars.map((v) => `${v.static ? 'static ' : ''}${typeText(v.type)} ${v.name}${v.type?.kind === 'array' ? `[${v.type.length ?? ''}]` : ''}${v.init && v.init.kind !== 'init' ? ` = ${exprText(v.init, PREC['='])}` : v.init ? ' = { … }' : ''}`).join('; ');
     case 'return': return s.e ? `return ${exprText(s.e)}` : 'return';
     case 'break': case 'continue': return s.kind;
+    case 'subcall': return `${s.into ? `${s.into.name} = ` : ''}${s.callee}(${s.args.map((a) => exprText(a)).join(', ')})`;
     // (a stream's read and write, core/c-fifo.js: the value read in its register, #1941)
     case 'fiforead': return `${s.tmp} = ${s.fifo}.read()`;
     case 'fifowrite': return `${s.fifo}.write(${exprText(s.v)})`;

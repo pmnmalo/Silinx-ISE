@@ -16,10 +16,11 @@ import { typeOf } from './c-types.js';
 import { hdlName } from './c-graph.js';
 import { portOf, ctrlNone } from './c-names.js';
 import { firHdl } from './hls-fir-hdl.js';
+import { moduleRegistry } from './c-submodule.js';
 
 const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
-const SAID = /^#pragma HLS (DATAFLOW|STREAM) is accepted and ignored|^#pragma HLS INLINE off is ignored/;
+const SAID = /^#pragma HLS (DATAFLOW|STREAM) is accepted and ignored/;
 
 /** Whether name is assigned in body (=, op=, ++, --) or its address taken. */
 function changed(body, name) {
@@ -84,7 +85,15 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const fail = (l, m) => errors.push(diag(l, `DATAFLOW: ${m}`));
   if (fn.ret.kind !== 'void') fail(fn.loc, `the top function '${fn.name}' returns a value: not supported in a DATAFLOW region yet (give it back through a stream or an array)`);
   // each call a process: its module (one per callee and its arrays' sizes)
-  const mods = new Map(), procs = [];
+  const procs = [];
+  // (the modules of the design: a process's and a sub-module's alike, core/c-submodule.js, #1960; an hls::FIR's run():
+  // the filter's own hardware, core/hls-fir-hdl.js, #1942)
+  const elem = (t) => typeOf(t.kind === 'ptr' ? t.to : t.kind === 'array' || t.kind === 'stream' ? t.of : t);
+  const reg = moduleRegistry({ make: (callee, depths, module) => {
+    const fir = checked.ast.firs?.get(callee), f = checked.funcs.get(callee);
+    return fir ? firHdl(fir, { lang, module, src: file.split('/').pop(), types: Object.fromEntries(f.params.map((pa) => [pa.name, elem(pa.type)])) })
+      : cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, modules: reg });
+  } });
   const sizeOf = (a) => {
     if (a?.kind !== 'id') return null;
     const t = locals(a.name)?.type ?? params.get(a.name)?.type;
@@ -96,17 +105,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
     if (!f?.body) { fail(c.loc, `'${c.callee}' is not defined`); return; }
     const depths = {};
     f.params.forEach((pa, i) => { const n = sizeOf(c.args[i]); if (n && pa.name) depths[pa.name] = n; });
-    const key = `${c.callee} ${JSON.stringify(depths)}`;
-    if (!mods.has(key)) {
-      const same = [...mods.values()].filter((m) => m.callee === c.callee).length;
-      const module = `${rn(hdlName(c.callee))}${same ? `_${same}` : ''}`;
-      // (an hls::FIR's run(): the filter's own hardware, core/hls-fir-hdl.js, #1942)
-      const fir = checked.ast.firs?.get(c.callee);
-      const elem = (t) => typeOf(t.kind === 'ptr' ? t.to : t.kind === 'array' || t.kind === 'stream' ? t.of : t);
-      mods.set(key, { callee: c.callee, module, gen: fir ? firHdl(fir, { lang, module, src: file.split('/').pop(), types: Object.fromEntries(f.params.map((pa) => [pa.name, elem(pa.type)])) })
-        : cToHdl(source, { file, lang, headers, top: c.callee, depths, module, flat: true, pipelineLoops }) });
-    }
-    const m = mods.get(key);
+    const m = reg.of(c.callee, depths);
     procs.push({ k, call: c, f, mod: m, inst: `${m.module}_U${k}`, deps: new Set(), task: !!c.task });
   });
   const diagnostics = [];
@@ -114,8 +113,8 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const add = (d) => { const s = `${d.line}:${d.col}:${d.severity}:${d.message}`; if (!seen.has(s) && !SAID.test(d.message)) { seen.add(s); diagnostics.push(d); } };
   checked.diagnostics.forEach(add);
   // (a process's own names as VHDL or Verilog's reserved words: inside the module, the top's ports their own)
-  for (const m of mods.values()) m.gen.diagnostics.filter((d) => !/is a reserved word of VHDL or Verilog|is a name Vitis HLS reserves/.test(d.message)).forEach(add);
-  if ([...mods.values()].some((m) => !m.gen.ok)) return { ok: false, hdl: '', top: rn(checked.top), ports: [], diagnostics: diagnostics.sort(byLine) };
+  for (const m of reg.modules()) m.gen.diagnostics.filter((d) => !/is a reserved word of VHDL or Verilog|is a name Vitis HLS reserves/.test(d.message)).forEach(add);
+  if (reg.modules().some((m) => !m.gen.ok)) return { ok: false, hdl: '', top: rn(checked.top), ports: [], diagnostics: diagnostics.sort(byLine) };
   // the channels and the top's arguments: who writes and who reads each
   const use = new Map();   // name -> { writers: [{ p, port }], readers, scalar: [{ p, port }] }
   const of = (n) => { if (!use.has(n)) use.set(n, { writers: [], readers: [], ports: [] }); return use.get(n); };
@@ -202,7 +201,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const src = file.split('/').pop();
   const net = { name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free };
   const top = lang === 'vhdl' ? vhdlTop(net) : verilogTop(net);
-  const hdl = [...[...mods.values()].map((m) => m.gen.hdl), ...top].join('\n');
+  const hdl = [...reg.modules().map((m) => m.gen.hdl), ...top].join('\n');
   const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
     memories: [...memories.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' })), ...[...rg.locals].filter(([, l]) => l.kind === 'array').map(([n, l]) => ({ name: n, words: Number(l.type.length), bits: typeOf(l.type.of)?.w ?? 0, kind: 'RAM (PIPO)' }))],
     fifos: [...rg.locals].filter(([, l]) => l.kind === 'stream').map(([n, l]) => ({ name: n, depth: l.depth })), waits, loops: [] };
