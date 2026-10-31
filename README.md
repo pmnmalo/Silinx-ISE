@@ -615,7 +615,8 @@ examples/   example projects for the Basys2 / Nexys2 (the Silinx toolchain's dev
             pong (a game for two, Verilog), stopwatch (VHDL, block RAM and multipliers), clock (Verilog, set
             with the buttons), vga (VHDL, a picture on a VGA monitor),
             isqrt (a C function made into hardware by Silinx HLS, on the display); each with a self-checking testbench
-docs/       GETTING-STARTED.md / COMECAR.md (step-by-step guides), IR.md (parser intermediate
+docs/       ARCHITECTURE.md (Silinx's architecture as a whole: the editions, the layers, each part and its
+            files), GETTING-STARTED.md / COMECAR.md (step-by-step guides), IR.md (parser intermediate
             representation), PROJECT.md (project model and API), OPEN-TOOLCHAIN.md (how the open
             Spartan-3E toolchain is developed), TOOLCHAIN.md (the toolchain's architecture, from the design to the
             .bit), QUALITY.md (the Silinx toolchain against ISE)

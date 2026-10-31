@@ -91,11 +91,14 @@ Several sessions work on the repository at the same time, each in its own clone 
 
 ## 4. Where things are
 
+The architecture as a whole, part by part: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ```
 core/          parsers (vhdl/, verilog/), elaborator, simulator, lint, quick fixes, rename;
                drawings: schdoc.js (schematics), asm.js, fsm.js, petri.js, truth tables (logic.js);
-               hdl-to-sch.js (Convert to Schematic); synth-open*.js (Yosys); fpga/ (pack, place, route,
-               timing, bitstream); adept.js + xcf.js (WebUSB JTAG, FPGA and Platform Flash)
+               hdl-to-sch.js (Convert to Schematic); synth-front.js (the toolchain's input); c-*.js (Silinx
+               HLS); adept.js + xcf.js (WebUSB JTAG, FPGA and Platform Flash)
+packages/silinx-fpga/  the Silinx toolchain: Yosys, pack, place, route, timing, bitstream (docs/TOOLCHAIN.md)
 web/js/        the Project Navigator: app.js (the shell, Design pane, processes, documents), editor.js
                (CodeMirror), sch-editor.js, asm-editor.js, fsm-editor.js, petri-editor.js, truthtable.js,
                isim.js (simulator UI), impact.js, pinplanner.js, i18n*.js (Portuguese), ui.js (menus,
