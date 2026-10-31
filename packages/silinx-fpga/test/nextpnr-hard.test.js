@@ -16,6 +16,7 @@ import { checkRouting } from '../src/fpga/route.js';
 import { bitgen } from '../src/fpga/bitgen.js';
 import { loadDb } from '../research/s3e-bitstream/db.mjs';
 import { nextpnrToXdl, simCheck, xdlSize } from '../research/nextpnr-s3e/lib.mjs';
+import { fileURLToPath } from 'node:url';
 
 const PART = 'xc3s250ecp132-4';
 const gz = url => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL(url, import.meta.url))));
@@ -137,7 +138,7 @@ test('#2193 the stopwatch example (Silinx\'s synthesis) built with --engine next
   const netlist = path.join(dir, 'stopwatch.json');
   fs.writeFileSync(netlist, zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-engine/stopwatch.json.gz', import.meta.url))));
   const out = [], err = [];
-  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', new URL('./fixtures/nextpnr-engine/stopwatch.ucf', import.meta.url).pathname, '--out-dir', dir, '--engine', 'nextpnr'],
+  const code = await main(['build', netlist, '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(new URL('./fixtures/nextpnr-engine/stopwatch.ucf', import.meta.url)), '--out-dir', dir, '--engine', 'nextpnr'],
     { out: l => out.push(l), err: l => err.push(l) });
   assert.equal(code, 0, err.join('\n'));
   assert.deepEqual(err, []);   // no warnings
