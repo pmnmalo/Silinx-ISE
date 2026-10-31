@@ -12,3 +12,4 @@ export { loadBitDbS6, S6_DB_DIR } from './fpga/s6/bitdb-node.js';
 export { yosysNode, yosysWorkers } from './synth-open-node.js';
 // nextpnr (the nextpnr engine's io.nextpnr, #2136)
 export { nextpnrNode } from './nextpnr-node.js';
+export { nextpnrS6Node } from './nextpnr-s6-node.js';

@@ -23,6 +23,8 @@
 //   io.nextpnr                         { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }: nextpnr-himbaechel
 //                                      with the spartan3e micro-architecture, for spec.engine 'nextpnr' (#2136,
 //                                      open-flow-nextpnr.js: its Map and Place & Route), optional
+//   io.nextpnrS6                       the same with the spartan6 micro-architecture, for the Spartan-6 (#2138,
+//                                      open-flow-nextpnr-s6.js: its Place & Route), optional
 // core/flow-ide.js runOpenFlow is runFlow with the IDE's front end and simulation models (#1675).
 // spec.resources: the part's resources (resources.js resourcesOf(part, pkg)), for the synthesis's used of
 // available and its check (#795); without them the synthesis gives the used ones only.
