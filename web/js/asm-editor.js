@@ -12,6 +12,7 @@
 // data path: generics, internal registers and the 2-flip-flop synchroniser of each input.
 
 import { undoButton, linkModel, linkSnapshot } from './ui.js';
+import { toolbarMenu } from './toolbar-menu.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
   normalizeModel, newModel, validate, generate, ENCODINGS,
@@ -148,7 +149,6 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   // fit coming late (the canvas sized on a slow machine) moved the drawing under the pointer while it dragged (#339)
   let fitted = false;
   let snap = true;
-  let showCode = false;
   let diags = [];
   let hist = [JSON.stringify(M)], hi = 0, lastKey = null, lastT = 0;
   let spaceDown = false;
@@ -164,8 +164,6 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   const btn = (label, title, onclick, cls = '') => h('button', { type: 'button', class: `asm-btn ${cls}`, title, onclick }, label);
   const sep = () => h('span', { class: 'asm-sep' });
 
-  const langSel = h('select', { class: 'asm-select', title: 'HDL language', onchange: () => { M.lang = langSel.value; commit('lang'); } },
-    h('option', { value: 'vhdl' }, 'VHDL'), h('option', { value: 'verilog' }, 'Verilog'));
   const encSel = h('select', { class: 'asm-select', title: 'State encoding', onchange: () => { M.encoding = encSel.value; commit('enc'); } },
     ...ENCODINGS.map((e) => h('option', { value: e }, { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enum / auto' }[e])));
   const undoBtn = undoButton('undo', () => undo());
@@ -173,10 +171,13 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   const snapBtn = btn('# Snap', 'Toggle snapping to the grid', () => { snap = !snap; snapBtn.classList.toggle('on', snap); });
   snapBtn.classList.add('on');
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
-  const codeBtn = btn('</> Code', 'Show / hide the generated HDL preview', () => toggleCode());
   const delBtn = btn('✕', 'Delete selection (Del)', () => deleteSelection(), 'asm-danger');
 
-  const toolbar = h('div', { class: 'asm-toolbar' },
+  const more = toolbarMenu([
+    btn('Arrange', 'Automatic layout (states top-down, every-cycle blocks on the right)', () => autoArrange()),
+    snapBtn,
+  ], { title: 'Layout', btnClass: 'asm-btn' });
+  const toolbar = h('div', { class: 'asm-toolbar asm-chart-toolbar' },
     h('div', { class: 'asm-group' },
       btn([h('span', { class: 'asm-ico ico-state' }), 'State'], 'Add state box (rectangle)', () => addNode('state'), 'asm-add'),
       btn([h('span', { class: 'asm-ico ico-decision' }), 'Decision'], 'Add decision box (diamond)', () => addNode('decision'), 'asm-add'),
@@ -188,18 +189,16 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
     h('div', { class: 'asm-group' }, undoBtn, redoBtn),
     sep(),
     h('div', { class: 'asm-group' },
-      btn('Arrange', 'Automatic layout (states top-down, every-cycle blocks on the right)', () => autoArrange()),
-      snapBtn,
       btn('−', 'Zoom out', () => zoomBy(1 / 1.2)), zoomLbl, btn('+', 'Zoom in', () => zoomBy(1.2)),
       btn('Fit', 'Fit the chart in the window', () => fit()),
       btn('🖨', 'Print the chart / save it as PDF or SVG (Ctrl+P)', () => print())),
     sep(),
-    h('div', { class: 'asm-group' }, langSel, encSel),
+    h('div', { class: 'asm-group' }, encSel),
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' },
       panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }),
-      btn('✓ Validate', 'Check the chart for errors', () => { runValidate(); showProblems(true); }),
-      codeBtn));
+      btn('✓ Validate', 'Check the chart for errors', () => { runValidate(); showProblems(true); })),
+    more.el);
 
   // canvas
   const svg = document.createElementNS(SVGNS, 'svg');
@@ -233,16 +232,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
     'Drag from a port ● to a box to connect · drag background to pan · wheel to zoom · Shift+drag to select · double-click to add a state');
   const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg, hint);
 
-  const codePre = h('pre', { class: 'asm-code' });
-  const codeTitle = h('span', { class: 'asm-code-title' }, '');
-  const codePanel = h('div', { class: 'asm-codepanel', hidden: true },
-    h('div', { class: 'asm-codebar' }, codeTitle, h('div', { class: 'asm-spacer' }),
-      btn('Copy', 'Copy the code to the clipboard', () => {
-        navigator.clipboard?.writeText(codePre.textContent).then(() => flash('Code copied to clipboard'), () => {});
-      }),
-      btn('✕', 'Hide code preview', () => toggleCode(false))),
-    codePre);
-  const mainCol = h('div', { class: 'asm-main' }, canvasWrap, codePanel);
+  const mainCol = h('div', { class: 'asm-main' }, canvasWrap);
 
   // side panel
   const selSection = h('section', { class: 'asm-section asm-selection' });
@@ -259,7 +249,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   status.append(statusInfo, statusMsg);
 
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), status);
-  if (readOnly) readOnlyChrome({ root, toolbar, hide: [undoBtn, redoBtn, snapBtn, langSel, encSel, codeBtn, probSection], hint });
+  if (readOnly) readOnlyChrome({ root, toolbar, hide: [undoBtn, redoBtn, more.el, encSel, probSection], hint });
 
   // ---------------------------------------------------------------------------- model ops (asm-ops.js)
   const {
@@ -318,7 +308,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
 
   // ---------------------------------------------------------------------------- rendering (asm-render.js)
   const { render, updateToolbar } = mountRender({ state: () => ({ M, sel, diags, hist, hi }), uid, gBlocks, gEdges, gNodes, statusInfo, undoBtn,
-    redoBtn, delBtn, langSel, encSel, nodeById, caseExits, exitsOf, drawTarget });
+    redoBtn, delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget });
 
   let flashTimer = null;
   function flash(msg, kind = '') {
@@ -345,7 +335,6 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
       probList.append(li);
     }
     render();
-    if (showCode) renderCode();
   }
   function showProblems(announce) {
     probSection.open = true;
@@ -359,25 +348,6 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
     centerOn(n);
     render(); renderInspector(); updateToolbar();
   }
-  function renderCode() {
-    const fname = `${M.name}.${M.lang === 'verilog' ? 'v' : 'vhd'}`;
-    codeTitle.textContent = fname;
-    try {
-      const g = generate(M);
-      codePre.innerHTML = highlightHdl(g.code, M.lang);
-      codePre.classList.remove('has-err');
-    } catch (e) {
-      codePre.textContent = `-- Cannot generate ${fname}:\n\n${e.message}`;
-      codePre.classList.add('has-err');
-    }
-  }
-  function toggleCode(force) {
-    showCode = force ?? !showCode;
-    codePanel.hidden = !showCode;
-    codeBtn.classList.toggle('on', showCode);
-    if (showCode) renderCode();
-  }
-
   // ---------------------------------------------------------------------------- inspector (asm-inspector.js)
   const insp = mountInspector({ M: () => M, sel: () => sel, selSection, machineBody, btn, nodeById, caseExits,
     caseWidth, commit, deleteSelection });

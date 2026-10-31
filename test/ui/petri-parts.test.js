@@ -51,6 +51,7 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
   assert.equal(await ev((ed) => document.querySelector(`${ed} .pn-log`).textContent), 'clock: start');
   // ---- the analysis (no </> HDL button, #2250)
   assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['▶ Simulate', '∑ Analysis']);
+  await page.click(`${ED} .tb-more-btn`);   // (Analysis in the toolbar's menu, #2259)
   await page.click(`${ED} .pn-tab-btn`, { text: '∑ Analysis' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-an-props`), [ED], { what: 'the analysis' });
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-an-props th`)].map((t) => t.textContent)), ['Bounded', 'Deadlocks', 'Live', 'Reversible', 'Conservative']);

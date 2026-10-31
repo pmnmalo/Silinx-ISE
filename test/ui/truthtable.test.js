@@ -88,7 +88,19 @@ uiTest('Truth Table: new table, cells, K-map and SOP, linked VHDL module followi
   // it (no Generate VHDL / Verilog module any more, #220)
   // (no Generate Schematic, no NAND gates only check box: the schematic is always generated, #694; expressions
   // written by hand: Handwritten Algebra…, #2010, #2047)
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Algebra from Module…', 'Handwritten Algebra…']);
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Undo', 'Redo', 'Fill the table', 'Algebra from Module…', 'Handwritten Algebra…']);
+  // (#2257) no Language; the two commands in the menu at the right of the first line: shown by its button, hidden by Esc, by a click elsewhere and by a command
+  const menu = () => page.eval((t) => { const b = document.querySelector(`${t} .tb-more-btn`); const r = b.getBoundingClientRect(), f = [...document.querySelector(`${t} .tt-toolbar`).children].find((e) => e.tagName === 'SELECT' || e.tagName === 'INPUT').getBoundingClientRect(), bar = document.querySelector(`${t} .tt-toolbar`).getBoundingClientRect(), m = document.querySelector(`${t} .tb-more-menu`); return { open: !m.hidden, expanded: b.getAttribute('aria-expanded'), buttons: [...m.querySelectorAll('button')].map((x) => x.textContent), right: bar.right - r.right < 20, firstLine: r.top < f.bottom }; }, T);
+  assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-lang`), T), null);
+  assert.deepEqual(await menu(), { open: false, expanded: 'false', buttons: ['Algebra from Module…', 'Handwritten Algebra…'], right: true, firstLine: true });
+  await page.click(`${T} .tb-more-btn`);
+  assert.equal((await menu()).open, true);
+  assert.equal((await menu()).expanded, 'true');
+  await page.key('Escape');
+  assert.equal((await menu()).open, false);
+  await page.click(`${T} .tb-more-btn`);
+  await page.click(`${T} .tt-notes`);
+  assert.equal((await menu()).open, false);
   assert.equal(await page.eval((t) => document.querySelectorAll(`${t} .tt-toolbar input[type=checkbox]`).length, T), 0);
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/maj3.vhd'] === 'src/maj3.bool.json', [], { what: 'linked HDL' });
   assert.equal((await ttFile('TtPj', 'src/maj3.bool.json')).generatedFile, 'src/maj3.vhd');
@@ -315,7 +327,9 @@ uiTest('Algebra from Module: a vector adder read into a table (exhaustive simula
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.active?.id === 'tt:src/blank.bool.json');
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/blank.vhd'] === 'src/blank.bool.json', [], { what: 'the table linked to its HDL' });
+  await page.click(`${T} .tb-more-btn`);
   await page.click(`${T} .tt-btn`, { text: 'Algebra from Module…' });
+  assert.equal(await page.eval((t) => document.querySelector(`${t} .tb-more-menu`).hidden, T), true);
   await page.waitDialog('Algebra from Module');
   await page.dialogButton('OK');
   await page.waitDialog('Algebra from Module');
@@ -509,15 +523,13 @@ end rtl;
   assert.deepEqual(netlist(sch).diagnostics, []);
   assert.deepEqual(simTable(generateHdl(sch).code, 'fa.vhd', 'fa'), fa.table);
 
-  // ---- its HDL language (#696): Verilog, then VHDL again; the file made again in it, the other removed, the
+  // ---- its HDL language (#696; the project's Preferred Language, no choice in its toolbar, #2257): Verilog, then VHDL again; the file made again in it, the other removed, the
   // badge follows, the instance in top and the schematic keep working
   const row = (n) => page.eval((m) => { const r = [...document.querySelectorAll('#hier .row')].find((e) => e.querySelector('.lbl').textContent === m); return r && [...r.querySelectorAll('.badge')].map((b) => b.textContent); }, n);
-  assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-lang`).value, T), 'vhdl');
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-lang option`)].map((o) => `${o.value}:${o.textContent}`), T), ['vhdl:VHDL', 'verilog:Verilog']);
   for (const [lang, L, ext, other] of [['verilog', 'Verilog', 'v', 'vhd'], ['vhdl', 'VHDL', 'vhd', 'v']]) {
     await page.eval(() => window.SilinxApp.openTt('src/fa.bool.json'));
     await page.waitFor(() => window.Silinx.active?.id === 'tt:src/fa.bool.json');
-    await page.fill(`${T} .tt-lang`, lang);
+    await page.eval(async (l) => { await (await import('/js/drawings-lang.js')).drawingsInLanguage(l); }, lang);
     await page.waitFor((h, o) => window.Silinx.hdlToSch?.[h] === 'src/fa.bool.json' && !window.Silinx.fileTree.includes(o), [`src/fa.${ext}`, `src/fa.${other}`], { what: `fa in ${L}`, timeout: 15000 });
     await page.waitConsole(new RegExp(`src/fa\\.bool\\.json: its HDL is now in ${L}, src/fa\\.${ext} \\(src/fa\\.${other} removed\\)`));
     const d = await ttFile('TtXor', 'src/fa.bool.json');
@@ -554,8 +566,8 @@ end rtl;
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-xor .tt-cost`).textContent, T), '3 literal(is), 2 operador(es) de duas entradas: 2 XOR / XNOR, 0 AND, 0 OR');
   assert.equal(await page.eval((t) => document.querySelector(`${t} .tt-form option[value=xor]`).textContent, T), 'Forma XOR (quando mais simples)');
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-form option`)].slice(3).map((o) => o.textContent), T), ['Só portas NAND', 'Só portas NOR', 'Menor número de portas', 'Menor atraso']);
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar label`)].map((l) => l.textContent), T), ['Entradas:', 'Saídas:', 'Lógica do HDL:', 'Linguagem:']);
-  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Anular', 'Refazer', 'Álgebra de um Módulo…', 'Álgebra Manuscrita…']);
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar label`)].map((l) => l.textContent), T), ['Entradas:', 'Saídas:', 'Lógica do HDL:']);
+  assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-toolbar button`)].map((b) => b.textContent || b.title), T), ['Anular', 'Refazer', 'Preencher a tabela', 'Álgebra de um Módulo…', 'Álgebra Manuscrita…']);
   assert.deepEqual(await page.eval((t) => [...document.querySelectorAll(`${t} .tt-nand b, ${t} .tt-nor b, ${t} .tt-nand .tt-cost`)].map((b) => b.textContent), T), ['Forma NAND', '8 porta(s), 3 delas inversora(s)', 'Forma NOR']);
   // the Design pane's badges and the schematic's bar
   assert.deepEqual(await page.eval(() => [...[...document.querySelectorAll('#hier .row')].find((r) => r.querySelector('.lbl').textContent === 'u_fa - fa').querySelectorAll('.badge')].map((b) => b.textContent)), ['Álgebra', 'Esquemático', 'VHDL']);

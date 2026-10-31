@@ -21,7 +21,7 @@ export const TT_PT = {
   'The maps stacked in depth: a group across maps seen as one box': 'Os mapas empilhados em profundidade: um grupo que atravessa mapas visto como uma só caixa',
   'The form with the fewest gates, each symbol one gate whatever its number of inputs': 'A forma com menos portas, cada símbolo uma porta qualquer que seja o seu número de entradas',
   'The form with the fewest gates on its longest path, every gate the same delay': 'A forma com menos portas no caminho mais longo, todas as portas com o mesmo atraso',
-  'Algebra from Module…': 'Álgebra de um Módulo…',
+  'Algebra from Module…': 'Álgebra de um Módulo…', 'Fill the table': 'Preencher a tabela',
   'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)': 'Preencher a tabela com a tabela de verdade de um módulo combinatório do projeto (simulação exaustiva)',
   'Not in sync with': 'Não sincronizado com',
   // editor body
