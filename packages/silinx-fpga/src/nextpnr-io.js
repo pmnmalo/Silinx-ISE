@@ -1,14 +1,16 @@
 // Silinx toolchain - io.nextpnr of the flow's nextpnr engine (#2136) from the WebAssembly package of nextpnr-himbaechel with
 // the spartan3e micro-architecture (@silinx/nextpnr-himbaechel-spartan3e): in Node (nextpnr-node.js) and in the browser's
-// flow worker (web/js/open-flow-worker.js), each loading the package its own way.
+// flow worker (web/js/open-flow-worker.js), each loading the package its own way; io.nextpnrS6 the same from the spartan6
+// one's (@silinx/nextpnr-himbaechel-spartan6, #2138: nextpnr-s6-node.js).
 
-/** io.nextpnr: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }; load() resolves the package's module. */
-export function nextpnrIo(load) {
+/** io.nextpnr: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }; load() resolves the package's module,
+ *  whose function `runner` runs nextpnr. */
+export function nextpnrIo(load, runner = 'runNextpnrHimbaechelSpartan3e') {
   let pkg = null;
   const mod = async () => (pkg ||= await load());
   return {
     async run(args, files, onLine = () => {}) {
-      const { runNextpnrHimbaechelSpartan3e, Exit } = await mod();
+      const { [runner]: runNextpnr, Exit } = await mod();
       let rest = '';
       const out = bytes => {
         if (bytes === null) { if (rest) onLine(rest); rest = ''; return; }
@@ -17,7 +19,7 @@ export function nextpnrIo(load) {
         for (const l of lines) onLine(l);
       };
       try {
-        return await runNextpnrHimbaechelSpartan3e(args, files, { stdout: out, stderr: out, decodeASCII: false, fetchProgress: () => {} });
+        return await runNextpnr(args, files, { stdout: out, stderr: out, decodeASCII: false, fetchProgress: () => {} });
       } catch (e) {
         throw e instanceof Exit ? new Error(`nextpnr exited with code ${e.code}`) : e;
       } finally {
