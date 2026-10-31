@@ -189,3 +189,21 @@ test('gen-flowdrop6: the PIPs of the open flow\'s designs the databases do not h
   const u = unknownPips([['a', xdl([`RIOI_X28Y5 ${known.split(' ').slice(1).join(' ')}`, `RIOI_X28Y5 ${unknown.split(' ').slice(1).join(' ')}`])]], device, dev, db);
   assert.deepEqual([...u], [unknown]);
 });
+
+// Regression (#2025): the CMT designs' I/O logic clock (a global clock to an OLOGIC2's or ILOGIC2's CLK0), their DCMs'
+// and PLL's outputs onto the HCLK lines and some BUFIO2 inputs were in no database: their bits left over on the XC6SLX16
+test('db: the I/O logic\'s clock PIPs, the CMTs\' HCLK outputs and BUFIO2 inputs, dropped one at a time (#2025)', () => {
+  const flow = db('s6-pips-flow').pips, cmt = db('xc6slx16-pips-cmt').pips;
+  // the clock to an OLOGIC2's CLK0 in a BIOI tile: near bits of its region, the same on every device (s6-pips-flow)
+  assert.deepEqual(flow['BIOI_INNER IOI_CLKDIST_CLK0_OLOGIC_M -> CLK0_OLOGIC_SITE'], ['22,47', '23,45', '26,24']);
+  assert.deepEqual(flow['BIOI_INNER IOI_GFAN0 -> IOI_CLK1INTER_M'], ['22,47', '23,35']);
+  assert.deepEqual(flow['CMT_DCM_BOT DCM1_CLKOUT6 -> DCM_HCLK11'], ['3,-26', '3,-28']);
+  // the BUFIO2 inputs' bits in the I/O words and a DCM's CLKIN path in the CMT column: far, the XC6SLX16's own
+  assert.deepEqual(cmt['REG_B REGB_CLKPIN3 -> I_BUFIO2_BOT_SITE3'], ['3554,-756']);
+  assert.deepEqual(cmt['CMT_DCM_BOT DCM_CLK_INDIRECT_TB_BOT2 -> DCM1_CLKIN'], [`${CMT_FRAME.xc6slx16},-175`, `${CMT_FRAME.xc6slx16},-176`]);
+  for (const b of Object.values(flow).flat()) assert.ok(Math.abs(+b.split(',')[0]) < 40, b);
+  // the loader has them: predictDesign names none of them as not in the databases
+  const { device } = s6Device('xc6slx16csg324-3'), dev = S6_DEVICES.xc6slx16, all = loadBitDbS6('xc6slx16csg324-3');
+  const xdl = `design "d" xc6slx16csg324-3 v3.2 ,\n  cfg "";\nnet "n" ,\n  pip BIOI_INNER_X23Y1 IOI_CLKDIST_CLK0_OLOGIC_M -> CLK0_OLOGIC_SITE ,\n  pip REG_B_X28Y0 REGB_CLKPIN3 -> I_BUFIO2_BOT_SITE3 ,\n  ;\n`;
+  assert.deepEqual([...unknownPips([['a', xdl]], device, dev, all)], []);
+});
