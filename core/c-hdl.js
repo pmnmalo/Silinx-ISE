@@ -30,7 +30,7 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // (headers, top: a source of several files, its top function named, #1597)
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
 // name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
-// threshold of the loops pipelined automatically, 0 none, #1919)
+// threshold of the loops pipelined automatically, 0 none, #1919; directives: a config's syn.directive.interface lines, #1901)
 export function cToHdl(source, opts = {}) {
   const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true, directives = null } = opts;
   const checked = checkC(source, file, { headers, top, depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)

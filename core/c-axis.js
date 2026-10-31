@@ -9,6 +9,7 @@
 //   axisTop(gen, names, lang, side) -> gen with the module and the ports of Vitis HLS (side: the structs of ap_axi_sdata.h)
 //   fifoPort(f, 'dout' | 'empty_n' | 'read' | 'din' | 'full_n' | 'write') -> a stream's signal, for the test bench
 import { structPragmas } from './c-aggregate.js';
+import { fifoSuffix } from './c-fifo.js';
 
 const SIDE = { data: 'TDATA', keep: 'TKEEP', strb: 'TSTRB', user: 'TUSER', last: 'TLAST', id: 'TID', dest: 'TDEST' };
 const modeOf = (a) => String(a.mode || Object.keys(a).find((k) => /^(ap_|s_axi|m_axi|axis|bram)/.test(k)) || '').toLowerCase();
@@ -112,7 +113,7 @@ function parts(f, side) {
 
 /** The signal of a stream in the test bench: a word of side channels a concatenation, also as a target. */
 export function fifoPort(f, sig) {
-  if (!f.axis) return `${f.port ?? f.name}_${sig}`;
+  if (!f.axis) return `${f.port ?? f.name}${fifoSuffix(f, sig)}`;
   if (sig === 'dout' || sig === 'din') return f.axis.parts.length === 1 ? f.axis.parts[0].name : `{${[...f.axis.parts].reverse().map((p) => p.name).join(', ')}}`;
   return sig === 'empty_n' || sig === 'write' ? f.axis.valid : f.axis.ready;
 }

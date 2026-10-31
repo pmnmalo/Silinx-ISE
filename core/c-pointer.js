@@ -95,6 +95,10 @@ export function pointerArithmetic(funcs, globals, synth, report, structArgs = ne
       walk(f.body, (n) => { if (n.kind === 'pragma' && n.pragma.name === 'INTERFACE' && n.pragma.args.port === pa.name && n.pragma.args.depth !== undefined) depth = Number(n.pragma.args.depth); });
       // (a DATAFLOW process's: its caller's array's size, #1707)
       if (!(depth >= 1) && f.name === top && depths?.[pa.name] >= 1) depth = depths[pa.name];
+      // (ap_fifo, ap_hs: no memory, no depth to say, #1901)
+      let stream = false;
+      walk(f.body, (n) => { if (n.kind === 'pragma' && n.pragma.name === 'INTERFACE' && !n.pragma.of && n.pragma.args.port === pa.name && /^ap_(fifo|hs)$/i.test(String(n.pragma.args.mode ?? Object.keys(n.pragma.args).find((k) => /^ap_/i.test(k))))) stream = true; });
+      if (!(depth >= 1) && stream) depth = DEFAULT_DEPTH;
       if (!(depth >= 1)) {
         depth = DEFAULT_DEPTH;
         // (said of the top function's: the others are inlined, their arrays the caller's)
