@@ -11,15 +11,17 @@ supported boards in `devices/`, their bit databases in `bitdb/`. It is published
 
 ```
 silinx-fpga build <file.v ...|netlist.json> --part <part> [--top name] [--ucf pins.ucf] [-o top.bit]
-  [--out-dir build] [--effort normal|high] [--seed N] [--no-replicate] [--quiet]
+  [--out-dir build] [--effort normal|high] [--seed N] [--no-replicate] [--engine auto|nextpnr|silinx] [--quiet]
 ```
 
-It synthesizes the Verilog with Yosys, or reads a Yosys JSON netlist, then packs, places, routes, checks the
-timing and writes the bitstream. The parts are those of the Basys2 (`xc3s250e-cp132-4`, `xc3s100e-cp132-4`) and of
-the Nexys2 (`xc3s500e-fg320-4`, `xc3s1200e-fg320-4`). The out folder (`build`) gets the netlist, the placed and
-routed design (`placed.xdl`, `routed.xdl`) and the timing report (`timing.txt`); the warnings and errors go to
-stderr. It exits with 0 when the `.bit` is written, 1 when the flow fails (the design, the constraints, the
-routing) and 2 when the command line is wrong. VHDL needs Silinx ISE, whose front end turns it into Verilog.
+It synthesizes the Verilog with Yosys, or reads a Yosys JSON netlist, then packs, places, routes, checks the timing
+and writes the bitstream; it places and routes with nextpnr when nextpnr can implement the design, else with
+Silinx's own engine (`--engine auto`, the default; `nextpnr` or `silinx` for one of them). The parts are those of
+the Basys2 (`xc3s250e-cp132-4`, `xc3s100e-cp132-4`) and of the Nexys2 (`xc3s500e-fg320-4`, `xc3s1200e-fg320-4`). The
+out folder (`build`) gets the netlist, the routed design (`routed.xdl`; `placed.xdl` too by Silinx's engine) and the
+timing report (`timing.txt`); the warnings and errors go to stderr. It exits with 0 when the `.bit` is written, 1
+when the flow fails (the design, the constraints, the routing) and 2 when the command line is wrong. VHDL needs
+Silinx ISE, whose front end turns it into Verilog.
 
 A blinky for the Basys2: `blinky.v`,
 

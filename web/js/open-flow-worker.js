@@ -4,14 +4,15 @@
 // assets/ folder; web/js/open-flow-browser.js chooses it).
 //   in:  { spec, sources: [{ path, lang, text }], simSources (the test benches), ucf, ucfName, files: { name: text }, assets, yosys (its bundle's URL) }
 //   out: { line } … { write: name, data } … { report } … then { done: { ok, report, error, view } }
-//   in:  { prepare: { graph, device, pkg }, assets, yosys, root }: what a run of that device fetches, fetched into
-//        Cache Storage (web/js/asset-cache.js, #967), this edition's other versions deleted from it
+//   in:  { prepare: { graph, device, pkg, nextpnr }, assets, yosys, nextpnr, root }: what a run of that device fetches
+//        (nextpnr and the device's chip database too when prepare.nextpnr: the project's engine is not Silinx's, #2136),
+//        fetched into Cache Storage (web/js/asset-cache.js, #967), this edition's other versions deleted from it
 //   out: { done: { fetched, bytes, pruned } }
 import { runOpenFlow } from '/core/flow-ide.js';
 import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, nextpnrIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
-import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES } from './asset-cache.js';
+import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES, NEXTPNR_FILES, nextpnrChipdb } from './asset-cache.js';
 
 // (Yosys in this worker's own thread, where it cannot start workers of its own: its Blobs readable, #556)
 readableBlobs();
@@ -38,11 +39,13 @@ const loaded = new Set();   // (the URLs of Yosys a run of this worker has loade
 const yosysSource = bundle => assetFetchSource() + yosysWorkerSource(bundle);
 
 /** What a run of the device fetches, fetched into the cache: { fetched, bytes, pruned }. */
-async function prepare({ prepare: d, assets, yosys, root }) {
+async function prepare({ prepare: d, assets, yosys, nextpnr, root }) {
   const base = new URL(assets);
-  const pruned = await pruneAssetCache(root, [base.href, new URL('.', yosys).href]);
+  // (this version's nextpnr kept, its gen/ and chipdb/, whatever this project's engine)
+  const pruned = await pruneAssetCache(root, [base.href, new URL('.', yosys).href, ...(nextpnr ? [new URL('..', nextpnr).href] : [])]);
   const urls = [new URL(`devices/${d.graph}`, base), ...Object.values(dbFileNames(d.device, d.pkg)).map(f => new URL(`bitdb/${f}`, base)),
-    ...YOSYS_FILES.map(f => new URL(f, yosys))];
+    ...YOSYS_FILES.map(f => new URL(f, yosys)),
+    ...(nextpnr && d.nextpnr ? [...NEXTPNR_FILES, nextpnrChipdb(d.device)].map(f => new URL(f, nextpnr)) : [])];
   return { ...await prefetchAssets(urls, { fetchFn: netFetch }), pruned };
 }
 // the last device description and bit database loaded (1.6-2.5 MB gzipped): the next run of the same

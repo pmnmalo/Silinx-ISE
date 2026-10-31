@@ -614,8 +614,11 @@ uiTest('#967 browser edition: what Implement needs is downloaded when a project 
   await page.dialogButton('Finish');
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.project?.name === 'Kept' && window.Silinx.project.top);
-  // in the background, a moment after the project opened: Yosys, the XC3S250E's device description and its bit database
+  // in the background, a moment after the project opened: Yosys, the XC3S250E's device description and its bit database,
+  // nextpnr and the XC3S250E's chip database (the default engine's, #2136)
   const want = [...['bundle.js', 'yosys.core.wasm', 'yosys.core2.wasm', 'yosys.core3.wasm', 'yosys.core4.wasm', 'yosys-resources.0.tar'].map((f) => `vendor/yowasp-yosys/[^/]+/gen/${f}`),
+    ...['bundle.js', ...['', '2', '3', '4'].map((n) => `nextpnr-himbaechel-spartan3e.core${n}.wasm`), 'nextpnr-himbaechel-spartan3e-resources.0.tar'].map((f) => `vendor/nextpnr-spartan/[^/]+/gen/${f}`),
+    'vendor/nextpnr-spartan/[^/]+/chipdb/chipdb-xc3s250e.bin.gz',
     'dev-[0-9a-f]+/devices/xc3s250ecp132-4.json.gz', ...['s3e-tiles', 'xc3s250e-tiles', 'xc3s250e-layout', 'xc3s250e-lut', 'xc3s250e-bram', 'xc3s250e-cp132-pads'].map((f) => `dev-[0-9a-f]+/bitdb/${f}.json`)];
   await page.waitFor((a, w) => caches.open('silinx-assets').then((c) => c.keys()).then((ks) => w.every((p) => ks.some((k) => new RegExp(`^${a}${p}$`).test(k.url)))), [assets.replace(/[.]/g, '\\.'), want], { what: 'the assets prefetched', timeout: 60000 });
   const keys = await cached();
@@ -629,6 +632,7 @@ uiTest('#967 browser edition: what Implement needs is downloaded when a project 
   served.length = 0;
   let log = await run();
   assert.match(log, /Loading Yosys \(WebAssembly, kept by this browser\)…/);
+  assert.match(log, /Placed and routed by nextpnr in \d/);
   assert.match(log, /=== SILINX STEP synth ===[\s\S]*=== SILINX DONE ===/);
   assert.match(log, /Process "Generate Programming File" completed successfully/);
   assert.doesNotMatch(log, /WARNING|ERROR|Downloading/);
@@ -708,7 +712,8 @@ uiTest('#1051 the site installable as an app: its manifest, icons and service wo
   await page.dialogButton('Finish');
   await page.waitNoDialog();
   await page.waitFor(() => window.Silinx.project?.name === 'Away' && window.Silinx.project.top);
-  await page.waitFor(() => caches.open('silinx-assets').then((c) => c.keys()).then((ks) => ks.length >= 13), [], { what: 'the assets prefetched', timeout: 60000 });
+  // (nextpnr's bundle and the device's chip database too, the default engine's, #2136)
+  await page.waitFor(() => caches.open('silinx-assets').then((c) => c.keys()).then((ks) => ks.length >= 20 && ks.some((k) => k.url.endsWith('/chipdb/chipdb-xc3s250e.bin.gz'))), [], { what: 'the assets prefetched', timeout: 90000 });
   // the site out of reach: the page opens from the worker's copy, the project with it, and the flow runs to the bitstream
   unreachable = true;
   try {
@@ -723,6 +728,7 @@ uiTest('#1051 the site installable as an app: its manifest, icons and service wo
     const log = await page.consoleText();
     assert.match(log, /Loading Yosys \(WebAssembly, kept by this browser\)…/);
     assert.match(log, /Process "Generate Programming File" completed successfully/);
+    assert.match(log, /Placed and routed by nextpnr in \d/);   // (the default engine, from the cache too, #2136)
     assert.doesNotMatch(log, /WARNING|ERROR|Downloading/);
     // asked, unanswered: the page (the network first) and the browser's check for a newer worker; nothing of the flow's
     assert.deepEqual([...new Set(served)].sort(), ['unreachable /', 'unreachable /sw.js'], 'what was asked of the site');

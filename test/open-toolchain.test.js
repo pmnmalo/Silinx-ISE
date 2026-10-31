@@ -183,7 +183,10 @@ test('open mode: Implement + Generate Programming File of blinky, for real: step
   assert.deepEqual(j.lines.filter(l => /warning/i.test(l)), []);
   assert.deepEqual(j.result.warnings, []);
   const dir = P.projectDir('Blinky');
-  for (const f of ['open/top.json', 'open/placed.xdl', 'open/routed.xdl', 'open/timing.txt', 'top.bit', 'top_prom.bit', 'reports.json']) assert.ok(fss.existsSync(path.join(dir, 'build', f)), f);
+  for (const f of ['open/top.json', 'open/routed.xdl', 'open/timing.txt', 'top.bit', 'top_prom.bit', 'reports.json']) assert.ok(fss.existsSync(path.join(dir, 'build', f)), f);
+  // (by nextpnr, the default engine, #2136: placed and routed in one step, no placed.xdl)
+  assert.match(log, /Placed and routed by nextpnr in \d/);
+  assert.ok(!fss.existsSync(path.join(dir, 'build', 'open', 'placed.xdl')));
   // the Design Summary's reports
   const rep = (await app.call('GET', '/projects/Blinky/reports')).body;
   assert.equal(rep.source, 'open');

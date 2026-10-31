@@ -41,5 +41,5 @@ export function orderOpenSteps(steps, { synthUpToDate = false } = {}) {
 }
 
 /** A project's place and route engine (its impl.engine, Process Properties, #2136): 'silinx', 'nextpnr' or 'auto' (nextpnr
- *  when it can implement the design, else Silinx's); 'silinx' when not set. */
-export const engineOf = impl => (['silinx', 'nextpnr', 'auto'].includes(impl?.engine) ? impl.engine : 'silinx');
+ *  when it can implement the design, else Silinx's); 'auto' when not set: nextpnr by default (#2136). */
+export const engineOf = impl => (['silinx', 'nextpnr', 'auto'].includes(impl?.engine) ? impl.engine : 'auto');
