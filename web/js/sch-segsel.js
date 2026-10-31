@@ -1,13 +1,25 @@
 // The schematic editor's selected wire segment (#2211, Select whole branch off): the wire stays the selection (its
 // properties, its copy), the segment clicked is what is highlighted and what Delete removes. It holds while that
 // selection does and the segment is still on the wire; otherwise the selection is the whole wire again.
+// Select whole branch on (#2228): a click selects the whole network of wires of the signal, the wire clicked first.
+import { netWireIds } from '/core/schwire-seg.js';
 import { segDist } from './sch-editor.js';
 
-/** { pick, clear, current } (doc(), sel(): the editor's current ones). */
+/** { branch, oneWire, pick, clear, current } (doc(), nl(), sel(), wholeBranch(): the editor's current ones). */
 export function mountSchSegSel(ctx) {
-  const { doc, sel } = ctx;
+  const { doc, nl, sel, wholeBranch } = ctx;
   let picked = null;   // { set (the selection it belongs to), id, a, b }
   const same = (p, q) => p.x === q.x && p.y === q.y;
+  /** The selection keys a click on wire `id` selects, that wire's first. */
+  function branch(id) { return new Set((wholeBranch() ? netWireIds(nl(), id) : [id]).map(w => `wire:${w}`)); }
+  /** The selection is one wire or the whole network of one: the first is the wire it is about. */
+  function oneWire() {
+    const [k] = sel();
+    if (!k?.startsWith('wire:')) return false;
+    if (sel().size === 1) return true;
+    const net = netWireIds(nl(), k.slice(5));
+    return net.length === sel().size && net.every(w => sel().has(`wire:${w}`));
+  }
   /** The segment of wire `id` nearest pt becomes the selected one; true when that changes it. */
   function pick(id, pt) {
     const w = doc().wires.find(x => x.id === id);
@@ -25,5 +37,5 @@ export function mountSchSegSel(ctx) {
     const P = doc().wires.find(x => x.id === picked.id)?.points;
     return P?.some((p, k) => k + 1 < P.length && same(p, picked.a) && same(P[k + 1], picked.b)) ? picked : null;
   }
-  return { pick, clear, current };
+  return { branch, oneWire, pick, clear, current };
 }

@@ -1,5 +1,11 @@
 // A straight segment of a schematic wire (#2211): Delete with Select whole branch off removes that segment alone, what
-// is left on each side staying as a wire.
+// is left on each side staying as a wire. The whole network of wires of a signal (#2228): what Select whole branch selects.
+
+/** The ids of the wires on the net of wire `id`, across junctions and net names, `id` first; nl: its netlist (null: `id` alone). */
+export function netWireIds(nl, id) {
+  const net = nl?.wireNet.get(id);
+  return [id, ...(net ? [...nl.wireNet].filter(([w, n]) => n === net && w !== id).map(([w]) => w) : [])];
+}
 
 /** The wire `id` without its segment a-b ({x,y} points): the two sides kept, each with a segment at least; false when there is no such segment. */
 export function deleteWireSegment(doc, id, a, b) {

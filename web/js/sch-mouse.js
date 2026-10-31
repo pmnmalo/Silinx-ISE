@@ -61,19 +61,21 @@ export function mountSchMouse(ctx) {
       // nothing after a click on a symbol (the focus stays on the editor, given above)
       e.preventDefault();
       const k = `${it.kind}:${it.id}`;
-      if (e.shiftKey || e.ctrlKey || e.metaKey) { if (sel().has(k)) sel().delete(k); else sel().add(k); render(); renderProps(); return; }
+      // (a wire: with its whole network, Select whole branch, #2228)
+      const next = it.kind === 'wire' ? segSel.branch(it.id) : new Set([k]);
+      if (e.shiftKey || e.ctrlKey || e.metaKey) { const on = !sel().has(k); for (const x of next) { if (on) sel().add(x); else sel().delete(x); } render(); renderProps(); return; }
       const sel0 = sel();
-      const fresh = !sel().has(k);
-      if (fresh) setSel(new Set([k]));
+      const fresh = !sel().has(k) || (it.kind === 'wire' && segSel.oneWire() && [...sel()].join() !== [...next].join());
+      if (fresh) setSel(next);
       // (Select whole branch off, #2211: the segment clicked; the wire's properties the same)
       const segChanged = it.kind === 'wire' && !readOnly && !wholeBranch() && !curve.curved() && sel().size === 1 ? segSel.pick(it.id, pt) : segSel.clear();
       if (fresh || segChanged) render();
       if (fresh) renderProps();
       if (e.detail >= 2) return;            // handled by the dblclick listener
-      // one wire, Keep connections: the segment under the pointer is dragged, the rest stays (#688)
+      // one wire or its network, Keep connections: the segment under the pointer is dragged, the rest stays (#688)
       // (curved, #1144: one wire, its curve grabbed where pressed)
-      if (!readOnly && it.kind === 'wire' && curve.curved() && sel().size === 1) { setDrag({ ...curve.beginKnot(it.id, null, pt), sel0 }); return; }
-      if (!readOnly && it.kind === 'wire' && keepConn() && sel().size === 1) { const sd = beginSegMove(it.id, pt); if (sd) { setDrag({ ...sd, sel0 }); return; } }
+      if (!readOnly && it.kind === 'wire' && curve.curved() && segSel.oneWire()) { setDrag({ ...curve.beginKnot(it.id, null, pt), sel0 }); return; }
+      if (!readOnly && it.kind === 'wire' && keepConn() && segSel.oneWire()) { const sd = beginSegMove(it.id, pt); if (sd) { setDrag({ ...sd, sel0 }); return; } }
       if (!readOnly) setDrag({ ...beginMove({ x: snap(pt.x), y: snap(pt.y) }), sel0 });
       return;
     }

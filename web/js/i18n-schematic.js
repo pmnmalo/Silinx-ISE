@@ -43,7 +43,7 @@ export const SCH_PT = {
   'Hop-overs': 'Saltos', 'Draw a small arc where two wires cross without connecting': 'Desenhar um pequeno arco onde dois fios se cruzam sem se ligarem',
   'Wires and layout': 'Fios e disposição',
   'Select whole branch': 'Selecionar todo o ramo',
-  'A click on a wire selects its whole branch, from junction to junction; not ticked, only the straight segment clicked': 'Um clique num fio seleciona todo o ramo, de junção a junção; desativado, só o segmento reto clicado',
+  'A click on a wire selects the whole network of wires of its signal; not ticked, only the straight segment clicked': 'Um clique num fio seleciona toda a rede de fios do seu sinal; sem visto, apenas o segmento reto clicado',
   // Rearrange Wires / Rearrange Schematic (#1481's Beautify, #1506, #1730)
   'Rearrange Wires': 'Reorganizar fios', 'Rearrange Schematic': 'Reorganizar esquemático',
   'Rearrange Wires: draw the wires again with few bends and crossings, the symbols, I/O markers and net names where they are; with a selection, only its wires. The connections stay the same':

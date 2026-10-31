@@ -35,7 +35,7 @@ const MOUNT = async () => {
     hoverPin: null, lastDiags: null, live: null, modules: {}, view: { s: 1.5 }, destroyed: false, showHops: true, showNames: false };
   const undoStack = [], redoStack = ['x'];
   // (curved wires, #1144: the editor's, on this state)
-  const curve = mountSchCurve({ doc: () => st.doc, sel: () => st.sel, view: () => st.view, readOnly: false, edit: (fn) => fn(), render: () => {}, renderProps: () => {}, snapshot: () => '', pushUndo: () => {}, changed: () => {} });
+  const curve = mountSchCurve({ doc: () => st.doc, sel: () => st.sel, oneWire: () => st.sel.size === 1, view: () => st.view, readOnly: false, edit: (fn) => fn(), render: () => {}, renderProps: () => {}, snapshot: () => '', pushUndo: () => {}, changed: () => {} });
   const r = mountRender({ curve, segSel: { current: () => null }, state: () => st, refreshNetlist: () => { st.nl = netlist(st.doc); }, uidE: 7, readOnly: false,
     sheetG: svg.querySelector('.se-sheet'), contentG: svg.querySelector('.se-content'), overlayG: svg.querySelector('.se-overlay'), tb, status,
     undoStack, redoStack, routeTo: (a, b) => [{ x: b.x, y: a.y }, b], snapPoint: (p) => ({ x: Math.round(p.x / 10) * 10, y: Math.round(p.y / 10) * 10 }),

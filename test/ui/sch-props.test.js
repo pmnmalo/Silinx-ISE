@@ -29,7 +29,7 @@ const MOUNT = async (readOnly = false) => {
   const calls = [];
   const rec = (name) => (...a) => { calls.push([name, ...a]); };
   const opts = { onSelect: (s) => calls.push(['onSelect', s?.name ?? null]), onOpenModule: (m, o) => calls.push(['onOpenModule', m, o.instance]) };
-  const props = mountProps({ opts, container: document.body, propBody, readOnly, doc: () => doc, sel: () => sel, nl: () => null, live: () => live,
+  const props = mountProps({ segSel: { oneWire: () => false }, opts, container: document.body, propBody, readOnly, doc: () => doc, sel: () => sel, nl: () => null, live: () => live,
     modules: () => modules, setGenLang: (v) => { genLang = v; }, edit: (fn) => { fn(); doc = normalizeDoc(doc, { modules }); calls.push(['edit']); props.renderProps(); },
     flash: rec('flash'), rotateSel: rec('rotateSel'), mirrorSel: rec('mirrorSel'), deleteSel: rec('deleteSel'), nextId: () => 'L1',
     openInfo: rec('openInfo'), infoTarget: () => 'target' });

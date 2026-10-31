@@ -30,7 +30,7 @@ const MOUNT = async () => {
   const rec = (name) => (...a) => { calls.push([name, ...a.filter((x) => typeof x !== 'object')]); };
   let prompt = '', joins = [];
   // (curved wires, #1144: the editor's, on this document)
-  const curve = mountSchCurve({ doc: () => doc, sel: () => sel, view: () => ({ s: 1 }), readOnly: false, edit: (fn) => fn(), render: () => {}, renderProps: () => {}, snapshot: () => '', pushUndo: () => {}, changed: () => {} });
+  const curve = mountSchCurve({ doc: () => doc, sel: () => sel, oneWire: () => sel.size === 1, view: () => ({ s: 1 }), readOnly: false, edit: (fn) => fn(), render: () => {}, renderProps: () => {}, snapshot: () => '', pushUndo: () => {}, changed: () => {} });
   const t = mountTools({ curve, doc: () => doc, nl: () => nl, sel: () => sel, modules: () => modules, view: () => ({ s: 1 }), hoverPin: () => null,
     destroyed: () => false, tool: () => tool, placing: () => placing, wireDraw: () => wireDraw,
     set: (o) => { if ('tool' in o) tool = o.tool; if ('placing' in o) placing = o.placing; if ('wireDraw' in o) wireDraw = o.wireDraw; },
