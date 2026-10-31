@@ -6,7 +6,12 @@
 // function, shared by every call (a register of the top, initialized at the reset). A call inside an expression is
 // made before it, its value in a variable. Isomorphic ES module.
 //
-//   inlineCalls(fn, funcs, report) -> fn's body, inlined
+// A call of a sub-module (#1960, core/c-submodule.js) is not inlined: a statement of its own, 'subcall' (its value in a
+// variable, its by-value arguments names or constants).
+//
+//   inlineCalls(fn, funcs, report, sub) -> fn's body, inlined (sub(f, recursive): whether a call of f is a sub-module's)
+
+import { inlineMode } from './c-submodule.js';
 
 const walk = (x, f) => {
   if (!x || typeof x !== 'object') return;
@@ -29,16 +34,21 @@ const map = (x, f) => {
   return out;
 };
 
-export function inlineCalls(fn, funcs, report) {
-  // which functions are inlined: a loop in them (or in one they call), or an array among their parameters
+export function inlineCalls(fn, funcs, report, sub = () => false) {
+  // (#pragma HLS INLINE recursive of the function being inlined, or the top's: the functions it calls too, #1960)
+  let recursive = inlineMode(fn) === 'recursive';
+  const isSub = (f) => sub(f, recursive);
+  // which functions are inlined: a loop in them (or in one they call), or an array among their parameters, or a sub-module
+  // called in them
   const memo = new Map();
   const needs = (f, seen = new Set()) => {
-    if (memo.has(f.name)) return memo.get(f.name);
+    const key = `${f.name} ${recursive}`;
+    if (memo.has(key)) return memo.get(key);
     if (seen.has(f.name)) return false;
     seen.add(f.name);
-    const r = !!f.body && (has(f.body, isLoop) || f.params.some((p) => p.type.kind === 'array')
+    const r = !!f.body && (isSub(f) || has(f.body, isLoop) || f.params.some((p) => p.type.kind === 'array')
       || has(f.body, (n) => n.kind === 'call' && n.callee.kind === 'id' && funcs.get(n.callee.name) && (funcs.get(n.callee.name).blackbox || needs(funcs.get(n.callee.name), seen))));
-    memo.set(f.name, r);
+    memo.set(key, r);
     return r;
   };
   // (math.h's fmod of constants: folded, core/c-dataflow-float.js, #2144)
@@ -118,6 +128,7 @@ export function inlineCalls(fn, funcs, report) {
     const f = funcs.get(call.callee.name);
     if (depth > 32) { report(call.loc, `'${f.name}': calls inlined too deep`); return []; }
     if (call.args.length !== f.params.length) { report(call.loc, `'${f.name}' takes ${f.params.length} argument(s), not ${call.args.length}`); return []; }
+    if (isSub(f)) return subCall(call, f, into);
     const k = fresh++;
     const items = [];
     const alias = new Map();   // a parameter -> the expression it stands for (a pointer's: what it points to)
@@ -176,8 +187,25 @@ export function inlineCalls(fn, funcs, report) {
     const ret = f.ret.kind === 'void' ? null : into;
     const lowered = returns(body.items, ret, k, f);
     if (lowered.flag) items.push({ kind: 'decl', vars: [{ kind: 'var', name: lowered.flag, type: { kind: 'int', name: 'bool', bits: 1, signed: false }, init: { kind: 'num', value: 0n, text: '0', loc: call.loc }, loc: call.loc }], loc: call.loc });
+    const outer = recursive;
+    if (inlineMode(f) === 'recursive') recursive = true;
     items.push(...stmts(lowered.items).flatMap((x) => (x.kind === 'expr' && inlined(x.e) ? expand(x.e, null, s, depth + 1) : [x])));
+    recursive = outer;
     return [{ kind: 'block', items, loc: call.loc }];
+  }
+
+  /** A call of a sub-module: its by-value arguments in variables first (their reads of memories their own states), then
+   *  its statement, the state that starts it and waits. */
+  function subCall(call, f, into) {
+    const items = [];
+    const args = call.args.map((a, i) => {
+      const t = f.params[i].type;
+      if (t.kind === 'array' || t.kind === 'ptr' || t.kind === 'stream' || a.kind === 'id' || a.kind === 'num') return a;
+      const name = `ap_arg_${fresh++}`;
+      items.push({ kind: 'decl', vars: [{ kind: 'var', name, type: t, init: a, loc: a.loc }], loc: a.loc });
+      return id(name, a.loc);
+    });
+    return [...items, { kind: 'subcall', callee: f.name, args, into: into && f.ret.kind !== 'void' ? id(into, call.loc) : null, loc: call.loc }];
   }
 
   /** The callee's body with its parameters bound and its statics renamed. */

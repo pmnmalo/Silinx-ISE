@@ -82,7 +82,7 @@ export function checkPragmas(ast, funcs, report, top = null) {
     if (name === 'UNROLL' && args.factor !== undefined && !posInt(args.factor)) report(loc, `#pragma HLS UNROLL factor=${args.factor}: the factor must be a whole number, 1 or more`);
     if (name === 'PIPELINE' && args.ii !== undefined && !posInt(args.ii)) report(loc, `#pragma HLS PIPELINE II=${args.ii}: II must be a whole number, 1 or more`);
     if (name === 'AGGREGATE' && args.compact !== undefined && !['bit', 'byte', 'none', 'auto'].includes(String(args.compact).toLowerCase())) report(loc, `#pragma HLS AGGREGATE compact=${args.compact} is not one of bit, byte, none and auto: ignored (its default made)`, 'warning');
-    if (name === 'INLINE' && args.off) report(loc, '#pragma HLS INLINE off is ignored: Silinx inlines every function', 'warning');
+    if (name === 'INLINE') { const other = Object.keys(args).find((k) => k !== 'off' && k !== 'recursive'); if (other) report(loc, `#pragma HLS INLINE ${other}: not one of off and recursive: ignored`, 'warning'); }
     if (name === 'ARRAY_PARTITION') {
       if (!args.variable) { report(loc, '#pragma HLS ARRAY_PARTITION needs variable=<the array>'); return; }
       const type = String(args.type || (args.block ? 'block' : args.cyclic ? 'cyclic' : 'complete')).toLowerCase();

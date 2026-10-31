@@ -17,6 +17,7 @@ export function seqRoots(m) {
   for (const o of m.outputs.values()) if (o.node != null) roots.push(o.node);
   if (m.freeRun) roots.push(m.freeRun.ready, m.freeRun.done, m.freeRun.idle);
   for (const x of m.mems || []) roots.push(...[x.addr, x.ce, x.we, x.d, x.addr1, x.ce1, x.we1, x.d1].filter((id) => id != null));
+  for (const inst of m.instances || []) for (const p of inst.ports) if (p.node != null) roots.push(p.node);
   return roots;
 }
 /** The nodes the machine needs. */
@@ -24,6 +25,11 @@ const nodesOf = (m) => m.graph.written(seqRoots(m));
 // (a memory inside the module: 2^aw words, its initial values, the rest 0)
 const depth = (x) => 2 ** x.aw;
 const words = (x) => Array.from({ length: depth(x) }, (_, k) => x.init?.[k] ?? 0n);
+
+// (a sub-module's instance, core/c-submodule.js, #1960: its ports signals of <instance>_<port>, its inputs driven by the
+// states that call it)
+const wire = (inst, p) => `${inst.name}_${p.name}`;
+const linked = (p) => (p.name === 'ap_clk' || p.name === 'ap_rst');
 
 export function vhdlSeq(name, src, ports, m, agg) {
   const g = m.graph, nodes = nodesOf(m), SW = m.stateT.w;
@@ -46,6 +52,7 @@ export function vhdlSeq(name, src, ports, m, agg) {
     if (x.storage === 't2p') L.push(`  signal ap_m_${hdlName(x.name)}_q1 : ${ty(x.t)};`);
   }
   innerSignals(agg, 'vhdl', L);
+  for (const inst of m.instances || []) for (const p of inst.ports) if (!linked(p)) L.push(`  signal ${wire(inst, p)} : ${p.w === 1 ? 'std_logic' : `std_logic_vector(${p.w - 1} downto 0)`};`);
   // (ap_ctrl_none, #1900: the block protocol's signals inside the module, ap_start 1: a call after the other)
   if (!ports.some((p) => p.name === 'ap_start')) L.push("  signal ap_start : std_logic := '1';", '  signal ap_done, ap_idle, ap_ready : std_logic;');
   const chain = ports.some((p) => p.name === 'ap_continue');
@@ -53,6 +60,10 @@ export function vhdlSeq(name, src, ports, m, agg) {
   L.push('begin');
   vhdlNodes(nodes, g, L);
   L.push(...(agg?.vhdl || []));
+  for (const inst of m.instances || []) {
+    L.push(`  ${inst.name} : entity work.${inst.module} port map (${inst.ports.map((p) => `${p.name} => ${linked(p) ? p.name : wire(inst, p)}`).join(', ')});`);
+    for (const p of inst.ports) if (!linked(p) && p.node != null) { const v = sig(g.get(p.node)); L.push(`  ${wire(inst, p)} <= ${p.w === 1 ? `${v}(0)` : `std_logic_vector(${v})`};`); }
+  }
   for (const x of m.mems || []) {
     // (a block RAM's port: written when we, read the cycle after the address)
     const a = `to_integer(${sig(g.get(x.addr))})`;
@@ -107,6 +118,7 @@ export function verilogSeq(name, src, ports, m, agg) {
   for (const r of regs) L.push(`  reg ${r.s ? 'signed ' : ''}[${r.w - 1}:0] ${r.sig};`);
   for (const n of nodes) L.push(`  wire ${n.s ? 'signed ' : ''}[${n.w - 1}:0] ${sig(n)};`);
   innerSignals(agg, 'verilog', L);
+  for (const inst of m.instances || []) for (const p of inst.ports) if (!linked(p)) L.push(`  wire ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${wire(inst, p)};`);
   if (!ports.some((p) => p.name === 'ap_start')) L.push("  wire ap_start = 1'b1;", '  wire ap_done, ap_idle, ap_ready;');
   const chain = ports.some((p) => p.name === 'ap_continue');
   if (chain) L.push("  reg ap_done_reg = 1'b0;");
@@ -117,6 +129,10 @@ export function verilogSeq(name, src, ports, m, agg) {
   }
   verilogNodes(nodes, g, L);
   L.push(...(agg?.verilog || []));
+  for (const inst of m.instances || []) {
+    L.push(`  ${inst.module} ${inst.name} (${inst.ports.map((p) => `.${p.name}(${linked(p) ? p.name : wire(inst, p)})`).join(', ')});`);
+    for (const p of inst.ports) if (!linked(p) && p.node != null) L.push(`  assign ${wire(inst, p)} = ${sig(g.get(p.node))};`);
+  }
   for (const x of m.mems || []) {
     const a = sig(g.get(x.addr));
     L.push(`  always @(posedge ap_clk) if (${sig(g.get(x.ce))}${ce ? ' && ap_ce' : ''}) begin`);
