@@ -8,13 +8,14 @@
 //   loopPragma(loop, name) -> its pragma's args, or null
 //   readPragma(text after #pragma) -> { name, args, text } | null
 //   tripcountArgs(a LOOP_TRIPCOUNT's text) -> { min?, max?, avg? }: its values' texts
+//   dependenceOf(pragma) -> { variable, inter, raw, war } of a DEPENDENCE saying a dependence is false, else null (#1961)
 //   unrollBy(loop, n) -> the loop with n copies of its body (a 'for'), each after the first if its condition holds
 
 // what Silinx makes of the pragmas it knows
 // (TASK: an hls::task's, core/cpp-lex.js, #1721; AGGREGATE and DISAGGREGATE: of the top's struct arguments, core/c-aggregate.js, #1668)
-export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE']);
+export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE']);
 // Vitis HLS's others: accepted, ignored with a warning
-export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'LATENCY', 'BIND_OP', 'RESOURCE', 'ALLOCATION', 'DEPENDENCE',
+export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'LATENCY', 'BIND_OP', 'RESOURCE', 'ALLOCATION',
   'LOOP_FLATTEN', 'LOOP_MERGE', 'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
   'ARRAY_RESHAPE', 'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
@@ -24,6 +25,13 @@ const STORAGE = { ram_1p: '1p', rom_1p: '1p', ram_2p: '2p', ram_s2p: '2p', ram_t
 export function storageOf({ name, args }) {
   const type = String((name === 'BIND_STORAGE' ? args.type : args.storage_type) ?? '').toLowerCase();
   return STORAGE[type] ?? null;
+}
+/** A DEPENDENCE that says a dependence is false (`false` or `dependent=false`): its memory (null: every one, `class=array`), which
+ *  way (inter unless `intra`), and the directions it frees (none named: all); else null (`true` or nothing: no effect, as Vitis HLS's). */
+export function dependenceOf({ name, args }) {
+  if (name !== 'DEPENDENCE' || !(args.false === true || String(args.dependent).toLowerCase() === 'false')) return null;
+  const any = !args.raw && !args.war && !args.waw;
+  return { variable: args.variable === undefined ? null : String(args.variable), inter: !args.intra, raw: any || !!args.raw, war: any || !!args.war };
 }
 /** `#pragma HLS NAME key=value key` -> { name, args, text }; null if not an HLS pragma (core/c-lex.js's). */
 export function readPragma(rest) {
@@ -94,6 +102,10 @@ export function checkPragmas(ast, funcs, report, top = null) {
     if (name === 'BIND_STORAGE') {
       if (!args.variable) { report(loc, '#pragma HLS BIND_STORAGE needs variable=<the array>'); return; }
       if (!storageOf(p)) report(loc, `#pragma HLS BIND_STORAGE type=${args.type ?? ''} is not one Silinx makes (ram_1p, ram_2p, ram_s2p, ram_t2p, rom_1p, rom_2p): ignored`, 'warning');
+    }
+    if (name === 'DEPENDENCE') {
+      if (args.inter && args.intra) report(loc, '#pragma HLS DEPENDENCE: inter or intra, not both: taken as intra', 'warning');
+      if (args.class !== undefined && String(args.class).toLowerCase() !== 'array') report(loc, `#pragma HLS DEPENDENCE class=${args.class}: a variable's dependence is kept (the next iteration needs its value): ignored`, 'warning');
     }
     if (name === 'INTERFACE' && args.port && args.port !== 'return') {
       const mode = String(args.mode || Object.keys(args).find((k) => /^(ap_|s_axi|m_axi|axis|bram)/.test(k)) || '').toLowerCase();

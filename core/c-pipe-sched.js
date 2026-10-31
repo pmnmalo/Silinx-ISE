@@ -13,9 +13,11 @@
 //     pipeFullWhy(s)                     why this loop or function body cannot be made so, or null
 //     pipeFull(s, cur, mk, lp, info)     the loop's state after `cur`, its exit returned
 //     pipeFunction(body, ii, loc)        the function's state; pipeState(b): a pipeline's state, run
+//     markDependences(body)              DEPENDENCE's (#1961) on the loops they are in, and on those in those
 //   moduloSchedule(body, ii)             the stages
 import { BOOL } from './c-types.js';
 import { nodeDelay } from './c-timing.js';
+import { dependenceOf } from './c-pragma.js';
 
 const walk = (x, f) => {
   if (!x || typeof x !== 'object') return;
@@ -33,10 +35,11 @@ const memOf = (key) => key.replace(/#1$/, '');
  *   g: the graph; ops: its memories' accesses in the C's order, { mem, roots: [node], write, q: the node of its value };
  *   updates: [[register's node, value]] (a variable's next value); exit: the node saying the loop ends, or null;
  *   sameIndex(r, w): a read and a write that cannot meet across iterations; together: [[register's node, register's node]]
- *   written in one stage (a pointer output and its _ap_vld); budget, family: the clock's.
+ *   written in one stage (a pointer output and its _ap_vld); budget, family: the clock's; dep(mem, 'inter' | 'intra', 'raw' | 'war'):
+ *   whether a #pragma HLS DEPENDENCE says that dependence of the memory false (#1961).
  * -> { stage: Map node -> stage, opStage: [stage], read: Map register's node -> its stage, written: Map -> its stage, depth }
  */
-export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new Set(), sameIndex = () => false, together = [], budget = Infinity, family = 'artix7' }, ii) {
+export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new Set(), sameIndex = () => false, together = [], budget = Infinity, family = 'artix7', dep = () => false }, ii) {
   const stage = new Map(), at = new Map();
   const ensure = (roots) => {
     for (const n of g.needed(roots)) {
@@ -61,8 +64,8 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
     if (last.has(op.mem)) s = Math.max(s, last.get(op.mem) + 1);
     // (the other port's, in the C's order: a read after a write sees it, a write is not before a read, #1901)
     const m = memOf(op.mem);
-    if (op.write && lastRead.has(m)) s = Math.max(s, lastRead.get(m));
-    if (!op.write && lastWrite.has(m)) s = Math.max(s, lastWrite.get(m) + 1);
+    if (op.write && lastRead.has(m) && !dep(m, 'intra', 'war')) s = Math.max(s, lastRead.get(m));
+    if (!op.write && lastWrite.has(m) && !dep(m, 'intra', 'raw')) s = Math.max(s, lastWrite.get(m) + 1);
     const used = ports.get(op.mem) || new Set();
     while (used.has(s % ii)) s++;
     used.add(s % ii);
@@ -111,7 +114,7 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
   for (let w = 0; w < ops.length; w++) {
     if (!ops[w].write) continue;
     for (let r = 0; r < ops.length; r++) {
-      if (ops[r].write || memOf(ops[r].mem) !== memOf(ops[w].mem) || sameIndex(ops[r], ops[w])) continue;
+      if (ops[r].write || memOf(ops[r].mem) !== memOf(ops[w].mem) || sameIndex(ops[r], ops[w]) || dep(memOf(ops[w].mem), 'inter', 'raw')) continue;
       if (opStage[w] >= opStage[r] + ii) return { fail: { kind: 'mem', mem: memOf(ops[w].mem) } };
     }
   }
@@ -122,6 +125,26 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
 }
 
 export const pipelineSchedMethods = {
+  /** Each DEPENDENCE of a body said (on what is no memory, a warning: nothing to free) and set on the loops it is in and on
+   *  those in them, `deps`; the function's own returned. */
+  markDependences(body) {
+    const own = (items) => (items || []).filter((x) => x?.kind === 'pragma' && x.pragma.name === 'DEPENDENCE').flatMap((x) => {
+      const d = dependenceOf(x.pragma), v = d?.variable, slot = v == null ? null : this.slots.get(v);
+      if (v != null && slot?.kind !== 'mem') this.warn(x.loc, `#pragma HLS DEPENDENCE variable=${v}: ${slot ? 'not a memory: its dependence is kept (the next iteration needs its value)' : 'no such array here'}: ignored`);
+      return d && (v == null || slot?.kind === 'mem') ? [d] : [];
+    });
+    const fnDeps = own(body.items);
+    const go = (x, deps) => walk(x, (n) => {
+      if (n.kind === 'block' && n !== x) { go(n, [...deps, ...own(n.items)]); return false; }
+      if (!isLoop(n)) return true;
+      n.deps = [...deps, ...own(n.body?.kind === 'block' ? n.body.items : [])];
+      go(n.body, n.deps);
+      go([n.init, n.cond, n.step], deps);
+      return false;
+    });
+    go(body, fnDeps);
+    return fnDeps;
+  },
   /** Why a loop's or a function's body cannot be made as a pipeline here, or null. */
   pipeFullWhy(x) {
     let why = null;
@@ -177,7 +200,7 @@ export const pipelineSchedMethods = {
     const own = new Set(s.kind === 'for' && s.init?.kind === 'decl' ? s.init.vars.map((v) => v.name) : []);
     let free = s.kind === 'for' && !!s.step;
     walk(s.kind === 'for' ? s.step : null, (n) => { const t = n.kind === 'assign' ? n.l : n.kind === 'postfix' || n.kind === 'unary' ? n.e : null; if (t && !(t.kind === 'id' && own.has(t.name))) free = false; if (n.kind === 'call') free = false; });
-    P.pipe = { src: s, sts: this.pipeBlocks(body, L, mk), step: s.kind === 'for' ? s.step : null, stepFree: free, own: free ? own : null, cond: s.cond, loc: s.loc, ii: info.pipeline, info, locals };
+    P.pipe = { src: s, sts: this.pipeBlocks(body, L, mk), step: s.kind === 'for' ? s.step : null, stepFree: free, own: free ? own : null, cond: s.cond, loc: s.loc, ii: info.pipeline, info, locals, deps: s.deps };
     P.stmts.push({ kind: 'empty', loc: s.loc });
     P.term = { goto: exit };
     cur.term = s.kind === 'do' || !s.cond ? { goto: P } : { cond: s.cond, t: P, f: exit };
@@ -191,7 +214,7 @@ export const pipelineSchedMethods = {
     const locals = new Set();
     walk(body, (n) => { if (n.kind === 'decl') for (const v of n.vars) if (!v.static) locals.add(v.name); });
     const info = { line: loc.line, pipeline: ii };
-    P.pipe = { src: { kind: 'function', body }, sts: this.pipeBlocks(this.flatBody(body), null, mk), step: null, cond: null, loc, ii, info, locals, fn: true };
+    P.pipe = { src: { kind: 'function', body }, sts: this.pipeBlocks(this.flatBody(body), null, mk), step: null, cond: null, loc, ii, info, locals, fn: true, deps: this.fnDeps };
     P.stmts.push({ kind: 'empty', loc });
     P.term = { done: true };
     this.fnPipe = info;
@@ -255,7 +278,8 @@ export const pipelineSchedMethods = {
     // (a memory's port: an access a cycle, so at least its accesses an iteration)
     const perMem = new Map();
     for (const op of ops) perMem.set(op.mem, (perMem.get(op.mem) || 0) + 1);
-    const sched = (n, budget) => moduloSchedule({ g, ops, updates, exit: exitNode, pinned: latched.map((r) => this.regNode(r)), own, sameIndex, together, budget, family: this.pipeTiming?.family }, n);
+    const dep = (mem, way, dir) => (p.deps || []).some((d) => (d.variable == null || d.variable === mem) && d.inter === (way === 'inter') && d[dir]);
+    const sched = (n, budget) => moduloSchedule({ g, ops, updates, exit: exitNode, pinned: latched.map((r) => this.regNode(r)), own, sameIndex, together, budget, family: this.pipeTiming?.family, dep }, n);
     let ii = Math.max(asked, ...perMem.values()), plan = null, why = null;
     for (; ; ii++) {
       plan = sched(ii, Infinity);
