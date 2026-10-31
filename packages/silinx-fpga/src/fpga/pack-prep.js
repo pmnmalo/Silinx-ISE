@@ -4,7 +4,7 @@
 // constant selects (#846); the cells it cannot pack refused.
 import { paramBits, paramInt } from './netlist.js';
 import { parseUcf, portAssignments } from '../ucf.js';
-import { BRAM_TYPE, DCM_TYPE, LUT_K, MULT_TYPE, MUXF, PackError, SLICEM_MEM, ffKind, ucfPortsOf } from './pack.js';
+import { BRAM_TYPE, DCM_TYPE, LUT_K, MULT_TYPE, MUXF, PackError, SLICEM_MEM, ffKind, oneBitBusesOf, ucfPortsOf } from './pack.js';
 
 /** { carryPass, cells, ci, cons, driverCell, instLocs, isLut, liveCells, loadsOf, nets, parsedUcf, relabel } of packWith. */
 export function mountPrep(ctx) {
@@ -15,7 +15,7 @@ export function mountPrep(ctx) {
   // (given the top's ports, a name such as x[1] is a bus bit only when x is a bus: #63, #84)
   const parsedUcf = typeof ucf === 'string' ? parseUcf(ucf, { ports: ucfPortsOf(nl) }) : ucf;
   // the constraints of each port bit, a NET name with wildcards on every bit it matches (#773)
-  const cons = portAssignments(parsedUcf?.assignments ? parsedUcf : { assignments: ucf || {} }, nl.ports.flatMap(p => p.bits.map(b => b.name))).assignments;
+  const cons = portAssignments(parsedUcf?.assignments ? parsedUcf : { assignments: ucf || {} }, nl.ports.flatMap(p => p.bits.map(b => b.name)), { oneBitBuses: oneBitBusesOf(nl) }).assignments;
   // INST "name" LOC = "DCM_X1Y0": the site of a DCM (#47; the placer chooses one otherwise)
   const instLocs = new Map();
   for (const st of parsedUcf?.other || []) {

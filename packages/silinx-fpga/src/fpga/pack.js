@@ -100,6 +100,10 @@ export function ucfPortsOf(nl) {
     return idx.length ? { name: p.name, msb: Math.max(...idx), lsb: Math.min(...idx) } : { name: p.name };
   });
 }
+/** The bit names of the top's one-bit bus ports (x for std_logic_vector(0 downto 0), UCF x<0>: #2199, #2229). */
+export function oneBitBusesOf(nl) {
+  return (nl.ports || []).filter(p => p.oneBitBus).map(p => p.bits[0].name);
+}
 
 // ------------------------------------------------------------------ criticality before placement
 // The criticality (0..1) of every connection of the netlist, from its cells only, by the model of

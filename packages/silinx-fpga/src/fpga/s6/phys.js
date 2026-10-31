@@ -32,7 +32,7 @@
 //   cellInst: [cell] -> inst (-1: a constant, a pull)
 //   warnings: [] }
 import { parseUcf, portAssignments } from '../../ucf.js';
-import { ucfPortsOf } from '../pack.js';
+import { oneBitBusesOf, ucfPortsOf } from '../pack.js';
 import { AND2L, ffKind } from './pack.js';
 
 export class PhysError extends Error {}
@@ -55,7 +55,7 @@ const sitePinOf = pin => pin.replace(/<(\d+)>$/, '$1');
 function portConstraints(nl, ucf) {
   if (!ucf) return {};
   const parsed = typeof ucf === 'string' ? parseUcf(ucf, { ports: ucfPortsOf(nl) }) : ucf;
-  return portAssignments(parsed?.assignments ? parsed : { assignments: ucf }, nl.ports.flatMap(p => p.bits.map(b => b.name))).assignments;
+  return portAssignments(parsed?.assignments ? parsed : { assignments: ucf }, nl.ports.flatMap(p => p.bits.map(b => b.name)), { oneBitBuses: oneBitBusesOf(nl) }).assignments;
 }
 
 /** The physical design of a packed Spartan-6 netlist (see above). ucf: its text or parseUcf()'s result. */
