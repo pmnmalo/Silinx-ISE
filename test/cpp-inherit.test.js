@@ -59,7 +59,9 @@ int top(int x) {
   Mid m(x, 1);
   Base b = m;
   int r = st.all() + c.step(x) + arr[x & 1].s[x & 3]++ + pts[x & 1].m(x) + pd.mm() + lb[1].m(x) + pts[2].p + gcnt.step(2);
-  r += td.both() + la[1].m(2) + m.sum() + b.twice() + base_of(m) + m.twice();
+  r += td.both() + la[1].m(2) + b.twice();
+  r += m.sum();
+  r += base_of(m) + m.twice();
   td.y += 1;
   return r;
 }
