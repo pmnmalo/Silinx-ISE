@@ -22,39 +22,47 @@
     "reason": null
   },
   "dsp-fft-interface-array": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 26626,
+      "max": 26626,
+      "avg": 26626
+    },
+    "reason": null
   },
   "dsp-fft-interface-array-float-ssr2": {
     "csim": "fail",
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "C simulation: 66: a shift by 32 of a 32-bit value is undefined in C"
   },
   "dsp-fft-interface-stream": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 26626,
+      "max": 26626,
+      "avg": 26626
+    },
+    "reason": null
   },
   "dsp-fft-interface-stream-float-ssr2": {
     "csim": "fail",
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "C simulation: 19: a type expected, not '2'"
   },
   "dsp-fft-logicore-fft-float-ssr": {
     "csim": "fail",
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "C simulation: 22: a type expected, not '2'"
   },
   "dsp-fir-decimator": {
     "csim": "pass",

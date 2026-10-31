@@ -12,6 +12,11 @@
 // filters made by core/cpp-fir.js, which takes its tokens out (its names stay hls::ip_fir's, never the source's).
 //
 // hls_vector.h, hls_streamofblocks.h, ap_float.h, complex (#1891): the types core/cpp-hls-lib.js makes their names into.
+//
+// hls_fft.h (#1943): Silinx's own, of the API UG1399 describes, with the field names AMD's examples use (max_nfft,
+// output_ordering, super_sample_rate, use_native_float): hls::ip_fft's constants, params_t's and ssr_params_t's fields
+// and defaults, config_t and status_t, hls::fft<CONFIG_T>. Its constants and defaults are read from it (core/hls-fft.js);
+// a source's transforms made by core/cpp-fft.js, which takes its tokens out.
 export const CPP_OWN_HEADERS = {
   'hls_vector.h': `#pragma once
 #include <stdint.h>
@@ -89,6 +94,62 @@ public:
   template <typename IN_T, typename OUT_T> void run(IN_T *in, OUT_T *out);
   template <typename IN_T, typename OUT_T, typename CONFIG> void run(IN_T *in, OUT_T *out, CONFIG *config);
 };
+}
+`,
+  'hls_fft.h': `#pragma once
+#include "ap_fixed.h"
+#include "hls_stream.h"
+#include <complex>
+namespace hls {
+namespace ip_fft {
+enum arch { automatically_select = 0, radix_4_burst_io = 1, radix_2_burst_io = 2, pipelined_streaming_io = 3, radix_2_lite_burst_io = 4 };
+enum ordering { bit_reversed_order = 0, natural_order = 1 };
+enum scaling { scaled = 0, unscaled = 1, block_floating_point = 2 };
+enum rounding { truncation = 0, convergent_rounding = 1 };
+enum mem { block_ram = 0, distributed_ram = 1 };
+enum opt { use_luts = 0, use_mults_resources = 1, use_mults_performance = 2, use_xtremedsp_slices = 3 };
+/* the FFT's static parameters: a config struct derives from it and sets those it changes */
+struct params_t {
+  static const unsigned input_width = 16;
+  static const unsigned output_width = 16;
+  static const unsigned status_width = 8;
+  static const unsigned config_width = 16;
+  static const unsigned max_nfft = 10;
+  static const bool has_nfft = false;
+  static const unsigned channels = 1;
+  static const unsigned arch_opt = pipelined_streaming_io;
+  static const unsigned phase_factor_width = 16;
+  static const unsigned output_ordering = bit_reversed_order;
+  static const bool ovflo = true;
+  static const bool xk_index = false;
+  static const bool cyclic_prefix_insertion = false;
+  static const unsigned scaling_opt = scaled;
+  static const unsigned rounding_opt = truncation;
+  static const unsigned mem_data = block_ram;
+  static const unsigned mem_phase_factors = block_ram;
+  static const unsigned mem_reorder = block_ram;
+  static const unsigned stages_block_ram = 1;
+  static const bool mem_hybrid = false;
+  static const unsigned complex_mult_type = use_mults_resources;
+  static const unsigned butterfly_type = use_luts;
+  static const unsigned super_sample_rate = 1;
+  static const bool use_native_float = false;
+  static const bool systolicfft_inv = false;
+};
+/* SSR's defaults (super_sample_rate > 1): natural order, no overflow */
+struct ssr_params_t : params_t {
+  static const unsigned super_sample_rate = 2;
+  static const unsigned phase_factor_width = 32;
+  static const unsigned output_ordering = natural_order;
+  static const bool ovflo = false;
+  static const unsigned butterfly_type = use_xtremedsp_slices;
+};
+template <typename CONFIG_T> struct config_t { unsigned data; };
+template <typename CONFIG_T> struct status_t { unsigned data; };
+}
+/* the transform: hls::fft<config>(xn, xk[, fwd_inv[, scale_sch[, cp_len[, ovflo]]]]), xn and xk arrays of
+   1 << max_nfft std::complex values or hls::streams of them; fwd_inv 1 forward, 0 inverse (fixed point) */
+template <typename CONFIG_T, typename IN_T, typename OUT_T> void fft(IN_T *xn, OUT_T *xk, bool fwd_inv, unsigned scale_sch, int cp_len, bool *ovflo);
 }
 `,
   'ap_axi_sdata.h': `#pragma once

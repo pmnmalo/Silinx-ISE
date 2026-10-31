@@ -22,9 +22,11 @@ import { Q_MODES, O_MODES } from './c-fixed.js';
 
 // the library calls Silinx HLS refuses in synthesized code (UG1399: no system calls), and the ones it ignores there
 const REFUSED = new Set(['malloc', 'calloc', 'realloc', 'free', 'exit', 'abort', 'rand', 'srand', 'time', 'clock', 'fopen', 'fclose',
-  'fread', 'fwrite', 'fgets', 'fscanf', 'scanf', 'getchar', 'system', 'memcpy', 'memset', 'strlen', 'strcpy']);
+  'fread', 'fwrite', 'fgets', 'fscanf', 'scanf', 'getchar', 'system', 'memcpy', 'memset', 'strlen', 'strcpy', 'strcat', 'fgetc', 'getc']);
 const IGNORED = new Set(['printf', 'fprintf', 'puts', 'putchar']);
 const STREAMS = new Set(['stdout', 'stderr', 'stdin']);
+// (ap_fft_core: hls::fft's C model's transform, core/cpp-fft.js; in synthesis the transform's own hardware, #1943)
+const MODEL_LIB = new Set(['ap_fft_core']);
 const TB_LIB = new Set(['abs', 'labs', 'llabs', 'feof', 'fputs', 'fputc', 'putc', 'fflush', 'ap_uniform_int', 'sprintf', 'snprintf']);   // (ap_uniform_int: <random>'s, core/cpp-lex.js, #1734; sprintf: a file's name, #1897)
 // the member functions of ap_int / ap_uint Silinx HLS knows
 // the member functions of hls::stream Silinx HLS knows (#1590)
@@ -64,6 +66,14 @@ export function constValue(e, consts = new Map()) {
 }
 
 // (opts: headers, the project's own (#1597); top, the top function when no pragma names it)
+/** The warnings an hls::fft's function does not have: of its pragmas and arguments, from its first line to its call. */
+function fftMade(ast, funcs) {
+  const said = /#pragma HLS (INTERFACE ap_fifo|STREAM|DATAFLOW)|^the (stream of a struct|struct argument) '/;
+  const spans = [...funcs.values()].filter((f) => f.body?.items.some((st) => st.kind === 'expr' && st.e.kind === 'call' && ast.ffts.has(st.e.callee.name)))
+    .map((f) => { const c = f.body.items.find((st) => st.kind === 'expr' && st.e.kind === 'call' && ast.ffts.has(st.e.callee.name)); return [f.loc.file, f.loc.line, c.e.loc?.line ?? c.loc?.line ?? Infinity]; });
+  return (d) => d.severity === 'warning' && said.test(d.message) && spans.some(([file, a, b]) => (!d.file || !file || d.file === file) && d.line >= a && d.line <= b);
+}
+
 export function checkC(source, file = 'input.c', opts = {}) {
   const ast = parse(source, file, opts);
   const diags = [...ast.errors];
@@ -186,7 +196,10 @@ export function checkC(source, file = 'input.c', opts = {}) {
   // the HLS pragmas of the synthesized functions (#1529)
   checkPragmas(ast, new Map([...funcs].filter(([n]) => synth.has(n))), report, top);
   diags.sort((a, b) => a.line - b.line || a.col - b.col);
-  return { ast, top, funcs, loops, consts, diagnostics: diags, ok: !diags.some((d) => d.severity === 'error'), dataflow: !!top && hasDataflow(funcs.get(top)) };
+  // (an hls::fft's function: its FIFOs, its pragmas, are the transform's module's, core/hls-fft-hdl.js, #1943)
+  const made = ast.ffts?.size ? fftMade(ast, funcs) : () => false;
+  const shown = diags.filter((d) => !made(d));
+  return { ast, top, funcs, loops, consts, diagnostics: shown, ok: !shown.some((d) => d.severity === 'error'), dataflow: !!top && hasDataflow(funcs.get(top)) };
 }
 
 /** The checks of one function's body (hw: it is synthesized). */
@@ -324,6 +337,7 @@ function checkFunction(f, ctx) {
       return;
     }
     // (the rest of the test bench's C library, core/c-interp-lib.js, #1598)
+    if (MODEL_LIB.has(name) && !lookup(name)) { for (const a of e.args) expr(a, { printf: true }); return; }
     if (TB_LIB.has(name) && !lookup(name)) {
       if (hw) report(e.loc, `${name}() runs in the C simulation only (the test bench), not in the synthesized code`);
       for (const a of e.args) expr(a, { printf: true });

@@ -6,7 +6,7 @@
 //   cppTokens(tokens, report) -> tokens
 
 export const CPP_HEADERS = { cstdint: 'stdint.h', cstdio: 'stdio.h', cstdlib: 'stdlib.h', cstring: 'string.h', cmath: 'math.h',
-  climits: 'limits.h', cstddef: 'stddef.h', iostream: 'stdio.h', ostream: 'stdio.h', fstream: 'stdio.h', iomanip: 'stdio.h', 'assert.h': 'assert.h', cassert: 'assert.h' };
+  climits: 'limits.h', cstddef: 'stddef.h', iostream: 'stdio.h', ostream: 'stdio.h', fstream: 'stdio.h', iomanip: 'stdio.h', sstream: 'stdio.h', string: 'string.h', 'assert.h': 'assert.h', cassert: 'assert.h' };
 export const isCpp = (file) => /\.(cpp|cc|cxx|hpp|hh)$/i.test(String(file || ''));
 
 const FUNC_CASTS = new Set(['char', 'short', 'int', 'long', 'unsigned', 'signed', 'bool', 'float', 'double']);
