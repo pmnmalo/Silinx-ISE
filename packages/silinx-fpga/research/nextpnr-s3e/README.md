@@ -127,6 +127,19 @@ cascade, four SRLC16E through Q15, an SRL16E_1; its constraints `test/fixtures/n
 `xdl-sim-check.mjs --random-inputs` passed; ISE's `drc` 0 errors and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical. A
 RAM64X1S is refused at Map (Silinx's packer makes it two RAM32X1S).
 
+## Flip-flops alone in the carry chains' slices (#2223)
+
+As Silinx's packer (`fpga/pack-luts.js`), a flip-flop alone (its D through BX / BY: a shift register, a register loaded from
+another) first takes a free flip-flop place of a carry chain's slices, one holding logic of its nets if it can, when the
+slice's BX / BY is free or carries the same net (a chain's carry in, a DI its LUT cannot bring on pin 1) and its control
+set suits; it joins the chain's cluster, and its D comes only through BX / BY. A chain's carry in at 1 comes from the CLB's
+VCC site (XDL's `vcc` net to BX), not from a LUT giving 1; a stage whose select is a constant reads a LUT giving it.
+`ffcarry.v` (in this folder): a counter, two comparators and a difference on shift registers, one loaded with an enable;
+its constraints `test/fixtures/nextpnr-engine/ffcarry.ucf`. With nextpnr-spartan v0.10.0 (2026-10-30): 22 slices (Silinx 23),
+ten flip-flops in the chains' slices, the routing check and `xdl-sim-check.mjs --random-inputs` passed, ISE's `drc` 0 errors
+and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical. The VGA example: 148 slices and 278 LUTs where v0.9.1
+took 157 and 296 (Silinx: 150 to 153, its GND sources' slices included).
+
 ## What is left for a decision
 
 - **Speed.** With Silinx's delays nextpnr got 8.4 ns where Silinx gets 6.7 ns on the same netlist:

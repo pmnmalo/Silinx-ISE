@@ -503,3 +503,38 @@ test('#2194 simCheck: the DCM\'s LOCKED as an input of both simulations (in feat
   assert.equal(r.flipFlops, 108);
   assert.equal(simCheck(json, dcmDesign, { cycles: 100, inputs: { 'u_dcm.LOCKED': 1 } }).ok, true);
 });
+
+// nextpnr-spartan's routed ffcarry.v (seed 1, #2223): flip-flops alone in the carry chains' slices, a carry in at 1 from the VCC site
+const ffcarryRouted = () => JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('./fixtures/nextpnr-s3e/ffcarry-routed.json.gz', import.meta.url))));
+
+test('#2223 a chain\'s slice with flip-flops alone: D from BX / BY (DXMUX / DYMUX 0), the sum still on X / Y; simulation equal', () => {
+  const json = ffcarryRouted(), design = nextpnrToXdl(json, device, PART);
+  assert.deepEqual(xdlSize(design), { slices: 22, luts: 35, ffs: 35 });
+  const value = (i, attr) => i.cfg.find(c => c.attr === attr)?.value;
+  const has = (i, attr) => i.cfg.some(c => c.attr === attr);
+  const chain = design.insts.filter(i => i.cfg.some(c => /^(CYMUX|XOR)[FG]$/.test(c.attr)));
+  const alone = chain.flatMap(i => ['X', 'Y'].filter(X => has(i, `FF${X}`) && value(i, `D${X}MUX`) === '0').map(X => [i, X]));
+  assert.equal(alone.length, 10);
+  // each with its BX / BY used as a pin: BXINV / BYINV set, its D on the site pin
+  for (const [i, X] of alone) {
+    assert.equal(value(i, `B${X}INV`), `B${X}`);
+    assert.ok(design.nets.some(n => n.inpins.some(p => p.inst === i.name && p.pin === `B${X}`)), `${i.name}: no net on B${X}`);
+  }
+  // a flip-flop from BX beside a sum's flip-flop on the other side: GYMUX still gives the sum (DYMUX 1)
+  assert.ok(chain.some(i => value(i, 'DXMUX') === '0' && value(i, 'DYMUX') === '1' && value(i, 'GYMUX') === 'GXOR'));
+  // the 1 of the difference's carry in: a vcc net from the CLB's VCC site to BX, CYINIT = BX
+  const vcc = design.nets.filter(n => n.type === 'vcc' && n.inpins.some(p => p.pin === 'BX'));
+  assert.equal(vcc.length, 1);
+  assert.match(vcc[0].outpins[0].inst, /^XDL_DUMMY_CLB_X\d+Y\d+_VCC_X\d+Y\d+$/);
+  assert.equal(value(design.insts.find(i => i.name === vcc[0].inpins[0].inst), 'CYINIT'), 'BX');
+  assert.equal(checkRouting(design, device).ok, true);
+  assert.deepEqual(simCheck(json, design, { cycles: 500, starts: 20, randomInputs: true }), { ok: true, flipFlops: 35, message: null });
+});
+
+test('#2223 simCheck catches a mixed slice\'s wrong setting: a flip-flop from BX written as from the LUT', () => {
+  const json = ffcarryRouted(), design = nextpnrToXdl(json, device, PART);
+  const inst = design.insts.find(i => i.cfg.some(c => /^CYMUX[FG]$/.test(c.attr)) && i.cfg.some(c => c.attr === 'DXMUX' && c.value === '0'));
+  inst.cfg.find(c => c.attr === 'DXMUX').value = '1';
+  const r = simCheck(json, design, { cycles: 500, starts: 20, randomInputs: true });
+  assert.equal(r.ok, false);
+});
