@@ -39,8 +39,8 @@ test('#1677 silinx-fpga: its LICENSE is the Apache License 2.0, unchanged', () =
 });
 
 test('#1677 silinx-fpga: its dependencies are the toolchain\'s npm packages, at the versions the IDE pins', () => {
-  // (test/toolchain-boundary.test.js: the toolchain imports @yowasp/yosys and nextpnr's package, #2136)
-  assert.deepEqual(Object.keys(pkg.dependencies), ['@silinx/nextpnr-himbaechel-spartan3e', '@yowasp/yosys']);
+  // (test/toolchain-boundary.test.js: the toolchain imports @yowasp/yosys and nextpnr's packages, #2136, #2138)
+  assert.deepEqual(Object.keys(pkg.dependencies), ['@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6', '@yowasp/yosys']);
   for (const [name, version] of Object.entries(pkg.dependencies)) assert.equal(version, root.dependencies[name], name);
 });
 
