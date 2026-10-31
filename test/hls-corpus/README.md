@@ -28,11 +28,11 @@ Not part of `npm test` (it needs the network once).
 |---|---|---|---|---|---|---|
 | array-array-partition-block-cyclic | C++ | pass | pass | pass | 157280 |  |
 | array-array-partition-complete | C++ | pass | pass | pass | 353890 |  |
-| dsp-fft-interface-array | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| dsp-fft-interface-array-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| dsp-fft-interface-stream | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| dsp-fft-interface-stream-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
-| dsp-fft-logicore-fft-float-ssr | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
+| dsp-fft-interface-array | C++ | pass | pass | pass | 26626 |  |
+| dsp-fft-interface-array-float-ssr2 | C++ | fail | fail | skip | - | C simulation: 66: a shift by 32 of a 32-bit value is undefined in C |
+| dsp-fft-interface-stream | C++ | pass | pass | pass | 26626 |  |
+| dsp-fft-interface-stream-float-ssr2 | C++ | fail | fail | skip | - | C simulation: 19: a type expected, not '2' |
+| dsp-fft-logicore-fft-float-ssr | C++ | fail | fail | skip | - | C simulation: 22: a type expected, not '2' |
 | dsp-fir-decimator | C++ | pass | pass | pass | 31 |  |
 | interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 70 |  |
 | interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 19 |  |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 
-73 designs: 65 through co-simulation.
+73 designs: 67 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

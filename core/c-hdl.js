@@ -20,6 +20,7 @@ import { flattenArrays } from './c-flatten.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
 import { axiPlan, axiWrap } from './c-axi.js';
 import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
+import { fftTop } from './hls-fft-hdl.js';
 
 export const bits = (k, w) => {
   const m = (1n << BigInt(w)) - 1n;
@@ -73,6 +74,9 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
     const r = cProcesses(source, checked, { file, lang, headers, cToHdl, module, stall });
     if (!r.fallback) return r;
   }
+  // (a top that runs an hls::fft: the transform's own hardware, core/hls-fft-hdl.js, #1943)
+  const fftCall = checked.ast.ffts?.size ? checked.funcs.get(checked.top).body.items.find((st) => st.kind === 'expr' && st.e.kind === 'call' && checked.ast.ffts.has(st.e.callee.name)) : null;
+  if (fftCall) return fftTop(checked, fftCall, { file, lang, module, diagnostics });
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {

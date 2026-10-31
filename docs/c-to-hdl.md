@@ -17,7 +17,7 @@ Spartan-3E, so it is not Silinx's oracle: the C itself is (see *Checking it* bel
   `stddef.h`, `limits.h` (the library for test benches, ignored by synthesis); in C++ their `<c…>` names,
   `<iostream>`, `<fstream>`, `<iomanip>`, `hls_stream.h`, `ap_axi_sdata.h` (Silinx HLS's own: `ap_axis<D, U, TI,
   TD>` and `ap_axiu<…>`, a beat's data, keep, strb, user, last, id and dest; a side channel of width 0 left out, #1662)
-  `hls_fir.h` (`hls::FIR`, below, #1942), `hls_vector.h`, `hls_streamofblocks.h`, `<complex>`, `ap_float.h` and
+  `hls_fir.h` (`hls::FIR`, below, #1942), `hls_fft.h` (`hls::fft`, below, #1943), `hls_vector.h`, `hls_streamofblocks.h`, `<complex>`, `ap_float.h` and
   `malloc.h` (*The library's types*, below, #1891).
   The project's own headers (`#include "x.h"`)
   are read in place.
@@ -434,6 +434,45 @@ uses its C model in the C simulation and its module in the synthesis, one instan
   module does not have or of another width; a blackbox in a DATAFLOW region (not yet). Every message starts with
   `syn.blackbox:` and names the description's file. An input of the module the description does not name is left
   unconnected, with a warning.
+
+### The FFT: `hls::fft` (`hls_fft.h`, #1943)
+
+Vitis HLS's FFT (the FFT LogiCORE, PG109), with Silinx's own C model and hardware:
+
+```cpp
+typedef std::complex<ap_fixed<16, 1> > cx;
+struct config1 : hls::ip_fft::params_t {
+  static const unsigned max_nfft = 10;
+  static const unsigned output_ordering = hls::ip_fft::natural_order;
+};
+void top(ap_uint<1> dir, ap_uint<15> scaling, cx xn[1024], cx xk[1024], bool *status) {
+#pragma HLS interface ap_fifo depth=1 port=status
+#pragma HLS interface ap_fifo depth=1024 port=xn,xk
+#pragma HLS stream variable=xn
+#pragma HLS stream variable=xk
+#pragma HLS dataflow
+  hls::fft<config1>(xn, xk, dir, scaling, -1, status);   // (xn, xk arrays or hls::streams)
+}
+```
+
+- **The header**: Silinx's own `hls_fft.h` (core/cpp-headers.js, none of AMD's): `hls::ip_fft`'s constants and enum types,
+  `params_t`, `ssr_params_t`, `config_t`, `status_t`, `hls::fft<CONFIG_T>`, with the field names of AMD's examples
+  (`max_nfft`, `output_ordering`, `super_sample_rate`, `use_native_float`); UG1399's names of the same fields
+  (`log2_transform_length`, `implementation_options`, …) are taken too.
+- **The fixed point**: `pipelined_streaming_io`, scaled, `truncation`, 16-bit phase factors, one channel, `input_width` 8 to 16
+  and `output_width` the same, an even `max_nfft` (radix-4 stages); each other value is refused, named. `fwd_inv` 1 is forward;
+  `scale_sch` holds 2 bits a stage, the first stage's the LSBs. Not given: UG1399's defaults, inverse and every bit 1. The
+  transform is bit-exact with AMD's C model on the corpus's 20 frames of stimulus and golden files (core/hls-fft.js gives
+  the arithmetic); `status` is 1 when a value did not fit `input_width` bits (it wraps).
+- **The hardware** (core/hls-fft-hdl.js): the top is the transform's own module, in VHDL or Verilog, so the top holds the call
+  alone and its `xn`, `xk`, and `status` are its arguments (`fwd_inv` and `scale_sch` its arguments or constants). Its ports
+  are Vitis HLS's: `dir`, `scaling`, `xn_dout` / `xn_empty_n` / `xn_read` and `xk_din` / `xk_full_n` / `xk_write` of the complex
+  values packed `{im, re}`, `status_din` / `status_full_n` / `status_write`; an array is an `ap_fifo` port whatever its pragmas.
+  It works in place: a block RAM of the values, a ROM of the twiddles, four 18x18 multipliers, one output every 3 cycles, not
+  the LogiCORE's streaming pipeline: 26,626 cycles for 1024 points where Vitis HLS's takes 3,198.
+- **The floating point** (`use_native_float`): a C model only, unscaled, natural order, radix-2 in `float`, the direction its
+  `systolicfft_inv`. It is close to AMD's (about 1e-5 on the corpus) but not bit-exact: AMD's order of operations is not
+  public. Its synthesis is refused (#2309), and streams of `hls::vector` (`super_sample_rate` > 1) are not made yet.
 
 ## Pragmas (`#pragma HLS …`)
 
