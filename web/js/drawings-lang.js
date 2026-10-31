@@ -24,6 +24,8 @@ export async function drawingsInLanguage(lang) {
     await api.writeFile(S.project.name, f, text);
     S.viewTexts[f] = text;
     if (ed?.setDoc) ed.setDoc(m); else ed?.setModel?.(m);
+    // (a table's schematic, when open, follows: #2257, this is now the only way to change the table's language)
+    if (viewKind(f) === 'tt') (await import('./drawings-tt.js')).refreshTtSchematic(f, m);
     if (r.from && S.schOwners?.[f] === r.from) await drawnHdlLanguage(f, m);
     changed.push(f);
   }

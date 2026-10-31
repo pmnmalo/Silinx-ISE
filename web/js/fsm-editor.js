@@ -15,6 +15,7 @@
 // Model, validation, tables and HDL: core/fsm.js. Styles: asm-editor.css (shared look) + fsm-editor.css.
 
 import { h, undoButton, linkModel, linkSnapshot } from './ui.js';
+import { toolbarMenu } from './toolbar-menu.js';
 import { sv } from './dom.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
@@ -78,7 +79,6 @@ export function mountFsmEditor(container, opts = {}) {
   const encSel = select('fsm-enc', 'State encoding', FSM_ENCODINGS.map((e) => [e, { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enumerated' }[e]]),
     (v) => { M.encoding = v; commit('enc'); });
   const styleSel = select('fsm-style', 'Style of the generated HDL', [['3process', '3 processes'], ['2process', '2 processes']], (v) => { M.style = v; commit('style'); });
-  const langSel = select('fsm-lang', 'HDL language', [['vhdl', 'VHDL'], ['verilog', 'Verilog']], (v) => { M.lang = v; commit('lang'); });
   const undoBtn = undoButton('undo', () => undo());
   const redoBtn = undoButton('redo', () => redo());
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
@@ -89,7 +89,7 @@ export function mountFsmEditor(container, opts = {}) {
     sim: btn('▶ Simulate', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs', () => togglePanel('sim'), 'fsm-tab-btn'),
   };
   const linkHost = h('span', { class: 'fsm-link' });
-  const toolbar = h('div', { class: 'asm-toolbar' },
+  const toolbar = h('div', { class: 'asm-toolbar fsm-toolbar' },
     h('div', { class: 'asm-group' },
       btn([h('span', { class: 'fsm-ico-state' }), 'State'], 'Add a state (or double-click the drawing)', () => addState()),
       delBtn),
@@ -102,10 +102,10 @@ export function mountFsmEditor(container, opts = {}) {
       btn('Fit', 'Fit the diagram in the window', () => fit()),
       btn('🖨', 'Print the diagram / save it as PDF or SVG (Ctrl+P)', () => print())),
     sep(),
-    h('div', { class: 'asm-group' }, typeSel, encSel, styleSel, langSel),
+    h('div', { class: 'asm-group' }, typeSel, encSel, styleSel),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.tables, tabBtns.code, tabBtns.sim,
-      btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.())),
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.tables, tabBtns.code, tabBtns.sim),
+    toolbarMenu([btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.())], { title: 'Convert the diagram', btnClass: 'asm-btn' }).el,
     linkHost);
 
   // ---------------------------------------------------------------------------- canvas
@@ -214,7 +214,7 @@ export function mountFsmEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------------------- history (fsm-history.js)
   const { commit, redo, undo, updateToolbar } = mountFsmHistory({
-    opts, M: () => M, delBtn, destroyed: () => destroyed, encSel, hi: () => hi, hist: () => hist, langSel,
+    opts, M: () => M, delBtn, destroyed: () => destroyed, encSel, hi: () => hi, hist: () => hist,
     lastKey: () => lastKey, lastT: () => lastT, panel: () => panel, redoBtn, render: (...a) => render(...a),
     renderPanel: (...a) => renderPanel(...a), renderSide: (...a) => renderSide(...a), sel: () => sel, stateById,
     statusInfo, styleSel, tabBtns, timers, transById, typeSel, undoBtn, validateSoon: (...a) => validateSoon(...a),

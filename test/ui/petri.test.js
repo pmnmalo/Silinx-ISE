@@ -194,7 +194,16 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
   assert.equal(await marking(), m1, 'no clock step once stopped');
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .pn-log`).textContent, ED), /clock: start/);
   // PNML export: the net as PNML, read back by core/petri.js
+  // (#2259) Analysis and PNML in the menu at the right of the first line, not in the toolbar; shown by its button, hidden by Esc and by a command
+  const menu = () => page.eval((ed) => { const m = document.querySelector(`${ed} .tb-more-menu`), b = document.querySelector(`${ed} .tb-more-btn`).getBoundingClientRect(), t = document.querySelector(`${ed} .asm-toolbar`).getBoundingClientRect(); return { open: !m.hidden, buttons: [...m.querySelectorAll('button')].map((x) => x.textContent), right: t.right - b.right < 20, firstLine: b.top - t.top < 20 }; }, ED);
+  assert.deepEqual(await menu(), { open: false, buttons: ['∑ Analysis', 'PNML ⇩', 'PNML ⇧'], right: true, firstLine: true });
+  await page.click(`${ED} .tb-more-btn`);
+  assert.equal((await menu()).open, true);
+  await page.key('Escape');
+  assert.equal((await menu()).open, false);
+  await page.click(`${ED} .tb-more-btn`);
   await page.click(`${ED} button`, { text: 'PNML ⇩' });
+  assert.equal((await menu()).open, false);
   const f = await waitDownload(page, 'ctl.pnml');
   const { fromPnml, normalizePetri } = await import('../../core/petri.js');
   assert.deepEqual(fromPnml(await fs.readFile(f, 'utf8')), normalizePetri(newPetri('ctl')));
@@ -234,6 +243,7 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
 uiTest('Petri net editor: the analysis (#188): properties, places, transitions, invariants, a deadlock shown in the simulation; in Portuguese', E, async (page) => {
   await newNet(page, 'PnAn');
   const txt = (sel) => page.eval((ed, s) => [...document.querySelectorAll(`${ed} ${s}`)].map((e) => e.textContent), ED, sel);
+  await page.click(`${ED} .tb-more-btn`);
   await page.click(`${ED} .pn-tab-btn`, { text: '∑ Analysis' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-an-props`), [ED], { what: 'the analysis' });
   assert.deepEqual(await txt('.pn-an-props tr'), ['Boundedsafe (at most 1 token in each place)', 'Deadlocksnone', 'Liveyes: every transition can always fire again',
@@ -264,6 +274,7 @@ uiTest('Petri net editor: the analysis (#188): properties, places, transitions, 
   await page.click(`${ED} .pn-an-dead .asm-small`, { text: 'Show' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=0  work=0' && document.querySelector(`${ed} .pn-dead`), [ED], { what: 'the deadlock simulated' });
   // in Portuguese
+  await page.click(`${ED} .tb-more-btn`);
   await page.click(`${ED} .pn-tab-btn`, { text: '∑ Analysis' });
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
   await page.waitFor((ed) => /O jogo das marcas, sejam quais forem as entradas/.test(document.querySelector(`${ed} .asm-bottom, ${ed}`).textContent), [ED], { what: 'the analysis in Portuguese' });

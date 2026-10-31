@@ -52,6 +52,7 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
   // ---- the HDL, the analysis
   await page.click(`${ED} .pn-tab-btn`, { text: '</> HDL' });
   await page.waitFor((ed) => /entity ctl is/.test(document.querySelector(`${ed} .pn-code`)?.textContent || ''), [ED], { what: 'the VHDL' });
+  await page.click(`${ED} .tb-more-btn`);
   await page.click(`${ED} .pn-tab-btn`, { text: '∑ Analysis' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-an-props`), [ED], { what: 'the analysis' });
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-an-props th`)].map((t) => t.textContent)), ['Bounded', 'Deadlocks', 'Live', 'Reversible', 'Conservative']);

@@ -14,6 +14,7 @@
 // the HDL generated from the net. Model, simulation, HDL and PNML: core/petri.js.
 
 import { h, downloadText, undoButton, linkModel, linkSnapshot, twoFingerView } from './ui.js';
+import { toolbarMenu } from './toolbar-menu.js';
 import { sv } from './dom.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import { normalizePetri, newPetri, fire, toPnml, fromPnml } from '/core/petri.js';
@@ -78,15 +79,17 @@ export function mountPetriEditor(container, opts = {}) {
     catch (e) { status(`PNML: ${e.message}`, true); }
   });
   const linkHost = h('span', { class: 'pn-link' });
-  const toolbar = h('div', { class: 'asm-toolbar' },
+  const more = toolbarMenu([tabBtns.analysis,
+    btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
+    btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()),
+  ], { title: 'Analysis and PNML', btnClass: 'asm-btn' });
+  const toolbar = h('div', { class: 'asm-toolbar pn-toolbar' },
     h('div', { class: 'asm-group' }, ...Object.values(tools), delBtn), sep(),
     h('div', { class: 'asm-group' }, undoBtn, redoBtn), sep(),
     h('div', { class: 'asm-group' }, btn('Fit', 'Fit the net in the window', () => fit()), langSel),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.sim, tabBtns.code, tabBtns.analysis,
-      btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
-      btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()), pnmlIn),
-    linkHost);
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.sim, tabBtns.code, pnmlIn),
+    more.el, linkHost);
 
   // ---------------------------------------------------------------- canvas, panels
   const defs = sv('defs', {},

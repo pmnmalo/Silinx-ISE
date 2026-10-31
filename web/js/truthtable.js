@@ -16,6 +16,7 @@
 //   ed.getModel(), ed.setModel(m), ed.setLink(file), ed.destroy()
 // Styles: web/css/truthtable.css.
 import { h, undoButton, linkModel, linkSnapshot } from './ui.js';
+import { toolbarMenu } from './toolbar-menu.js';
 import {
   normalizeTable, validateTable, reshapeTable, analyzeOutput, parseExpr, exprColumn, formatExpr,
   kmapLayout, kmapRects, MAX_EDIT_INPUTS, circuitCost, outputForm,
@@ -121,19 +122,19 @@ export function mountTtEditor(container, opts = {}) {
   const formSel = h('select', { class: 'tt-form', title: FORM_TIP, onchange: () => { M.form = formSel.value; changed(); } },
     h('option', { value: 'sop' }, 'Minimal SOP'), h('option', { value: 'pos' }, 'Minimal POS'), h('option', { value: 'xor' }, 'XOR form (when simpler)'),
     h('option', { value: 'nand' }, 'NAND gates only'), h('option', { value: 'nor' }, 'NOR gates only'), ...leastOptions());
-  // its HDL module's language (#696): the host makes the module again in it (drawings.js drawnHdlLanguage)
-  const langSel = h('select', { class: 'tt-lang', title: 'HDL language', onchange: () => { M.lang = langSel.value; changed(); } },
-    h('option', { value: 'vhdl' }, 'VHDL'), h('option', { value: 'verilog' }, 'Verilog'));
   const btn = (label, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, title, onclick }, label);
   const link = h('span', { class: 'tt-link' });
+  const more = toolbarMenu([
+    btn('Algebra from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()),
+    btn('Handwritten Algebra…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
+  ], { title: 'Fill the table' });
   const toolbar = h('div', { class: 'tt-toolbar' },
     undoButton('undo', () => undo(), { class: 'tb-btn tt-undo' }), undoButton('redo', () => redo(), { class: 'tb-btn tt-redo' }),
     h('span', { class: 'tt-sep' }),
     h('label', {}, 'Inputs:'), inIn, h('label', {}, 'Outputs:'), outIn, shapeErr,
     h('span', { class: 'tt-sep' }),
-    h('label', { title: FORM_TIP }, 'HDL logic:'), formSel, h('label', { title: 'HDL language' }, 'Language:'), langSel,
-    h('span', { class: 'tt-sep' }),
-    btn('Algebra from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()), btn('Handwritten Algebra…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
+    h('label', { title: FORM_TIP }, 'HDL logic:'), formSel,
+    more.el,
     link);
 
   // ------------------------------------------------------------------ body
@@ -339,7 +340,7 @@ export function mountTtEditor(container, opts = {}) {
     if (!M.outputs.includes(out)) out = M.outputs[0];
     if (document.activeElement !== inIn) inIn.value = M.inputs.join(', ');
     if (document.activeElement !== outIn) outIn.value = M.outputs.join(', ');
-    formSel.value = M.form; langSel.value = M.lang;
+    formSel.value = M.form;
     if (document.activeElement !== notes) notes.value = M.notes;
     A = analyzeOutput(M, out, M.inputs.length > MAX_EDIT_INPUTS ? { maxNodes: 50000 } : {});   // module tables of 7–8 inputs: keep it quick
     exprLbl.textContent = `${out} =`;
@@ -361,6 +362,6 @@ export function mountTtEditor(container, opts = {}) {
     refreshLink: () => renderLink(),
     select(o) { if (M.outputs.includes(o)) { out = o; render(); } },
     handwritten, handwrittenTable, printView: () => ttPrintView(root, notes, M.name),   // (#1510)
-    destroy() { destroyed = true; container.innerHTML = ''; },
+    destroy() { destroyed = true; more.close(); container.innerHTML = ''; },
   };
 }
