@@ -138,7 +138,7 @@ int main(void) { int a[64]; for (int i = 0; i < 64; i++) a[i] = i; return f(a, 1
   const whole = cosimulate(src(''), { file: 't.c', top: 'f', lang });
   assert.deepEqual([parted.pass, whole.pass], [true, true], lang);
   assert.ok(parted.latency.min < whole.latency.min, `${parted.latency.min} ${whole.latency.min}`);
-  assert.deepEqual(whole.gen.diagnostics.map((d) => `${d.severity}: ${d.message}`), [UNKNOWN, AUTO2]);
+  assert.deepEqual(whole.gen.diagnostics.map((d) => `${d.severity}: ${d.message}`), [UNKNOWN, AUTO2.replace('it accesses a memory, an access a state', "the memory 'd' has one port, accessed 2 times an iteration")]);
   assert.deepEqual(parted.gen.diagnostics.map((d) => `${d.severity}: ${d.message}`), [UNKNOWN]);   // (II=1 made: no warning)
   assert.deepEqual([parted.latency.min, whole.latency.min], [19, 35]);
   // (the two memories it reads have ports read, the two others are never accessed)

@@ -26,16 +26,18 @@ import { withSeqMath } from './c-dataflow-float.js';
 import { blackboxMethods } from './c-blackbox.js';
 import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from './c-pipeline.js';
 import { outFirstMethods } from './c-out-first.js';
+import { pipelineSchedMethods } from './c-pipe-sched.js';
 
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
 // (split: core/c-schedule.js's, the states split by the clock; spare: the states it adds, room for them in the state's
 // register, #2080)
-export function fsmd(checked, { groups = [], pipelineLoops = PIPELINE_LOOPS, spare = 0, split = null } = {}) {
+export function fsmd(checked, { groups = [], pipelineLoops = PIPELINE_LOOPS, spare = 0, split = null, timing = null } = {}) {
   const f = new SeqFlow(checked);
   f.groups = groups;
   f.pipelineLoops = pipelineLoops;
   f.spare = spare;
   f.split = split;
+  f.pipeTiming = timing;
   return f.runSeq();
 }
 
@@ -166,6 +168,8 @@ class SeqFlow extends Flow {
             if (pp.auto) info.auto = true;
             const bad = this.pipeWhy(s);
             // (its memory accesses: a state each, the loop's head and step in them, #1919)
+            // (as a true pipeline where it can be, #1962; a stream's accesses, as pipeMem makes them)
+            if (!bad && (this.hasMem(s) || hasContinue(s.body)) && !this.pipeFullWhy(s)) { cur = this.pipeFull(s, cur, mk, lp, info); continue; }
             if (!bad && this.hasMem(s)) { cur = this.pipeMem(s, cur, mk, lp, info); continue; }
             if (!bad) {
               // one state an iteration: if its condition holds, the body and the step; else out
@@ -246,11 +250,21 @@ class SeqFlow extends Flow {
       this.fn = inl;
       const { body, decls } = this.renameLocals(inl);
       this.makeRegisters(inl, decls);
-      markAutoPipeline(body.items, { threshold: this.pipelineLoops, trip: (l) => this.tripOf(l), why: (l) => this.pipeWhy(l) });
-      this.entry = this.cfg(body.items, null, null);
+      markAutoPipeline(body.items, { threshold: this.pipelineLoops, trip: (l) => this.tripOf(l), why: (l) => this.pipeWhy(l), autoWhy: (l) => this.pipeWhy(l) || (innerLoops(l.body).some((x) => this.hasMem(x)) ? 'a loop that accesses a memory is in it' : null) });
+      // (the function's own PIPELINE, #1962: its machine one pipeline, a new call every II cycles)
+      const fp = body.items.find((x) => x.kind === 'pragma' && x.pragma.name === 'PIPELINE')?.pragma.args;
+      if (fp && !fp.off) {
+        this.fnPiping = true;
+        const bad = this.pipeFnWhy(body);
+        if (bad) { this.warn(fn.loc, `#pragma HLS PIPELINE of this function: not made (${bad}): its calls one after the other`); this.fnPiping = false; }
+        else this.entry = this.pipeFunction(body, fp.ii ?? 1, fn.loc);
+      }
+      if (!this.entry) this.entry = this.cfg(body.items, null, null);
       this.thread();
       this.runBlocks();
       this.loops = this.loopsDone();
+      const fi = this.fnPipe;
+      if (fi && fi.pipeII > fi.pipeline) this.warn(fn.loc, `#pragma HLS PIPELINE II=${fi.pipeline}: II=${fi.pipeII} made${fi.memII ? ` (${fi.memII})` : ''}`);
     } catch (e) { if (!(e instanceof Stop)) throw e; }
     return this.result();
   }
@@ -423,8 +437,9 @@ class SeqFlow extends Flow {
   pipeWhy(s) {
     const unrollable = (x) => innerLoops(x).every((l) => l.kind === 'for' && this.tripOf(l) !== null && unrollable(l.body));
     if (this.hasBlackbox(s)) return 'it calls an RTL blackbox, a state that waits for the module';
-    return !unrollable(s.body) ? 'a loop is in it whose count is not a constant: it cannot be unrolled' : this.hasMem(s) ? this.pipeMemWhy(s)
-      : hasContinue(s.body) ? "a 'continue' is in it" : s.kind === 'do' ? 'a do-while' : null;
+    if (!unrollable(s.body)) return 'a loop is in it whose count is not a constant: it cannot be unrolled';
+    if ((this.hasMem(s) || hasContinue(s.body)) && !this.pipeFullWhy(s)) return this.pipeBodyWhy(s);
+    return this.hasMem(s) ? this.pipeMemWhy(s) : hasContinue(s.body) ? "a 'continue' is in it" : s.kind === 'do' ? 'a do-while' : null;
   }
   /** A pipelined loop's body with its inner loops unrolled whole (each in the report). */
   unrollInner(x) {
@@ -435,6 +450,18 @@ class SeqFlow extends Flow {
     const y = loop ? { ...x, unroll: true } : { ...x };
     for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') y[k] = this.unrollInner(v);
     return y;
+  }
+  /** Why a loop's body, with no stream in it, cannot be a pipeline's: a branch around an access it cannot make in one stage. */
+  pipeBodyWhy(s) {
+    const ok = (x) => !this.hasMem(x) || ['expr', 'decl'].includes(x.kind) || (x.kind === 'block' && x.items.every(ok)) || (x.kind === 'if' && this.flatOk(x)) || (x.kind === 'for' && this.tripOf(x) !== null && ok(x.body));
+    return !ok(s.body) ? 'it accesses a memory in a branch, an access a state' : this.accesses(s.cond) || this.accesses(s.step) ? 'its condition or step accesses a memory' : null;
+  }
+  /** Why a function cannot be made a pipeline. */
+  pipeFnWhy(body) {
+    const unrollable = (x) => innerLoops(x).every((l) => l.kind === 'for' && this.tripOf(l) !== null && unrollable(l.body));
+    const ok = (x) => !this.hasMem(x) || ['expr', 'decl', 'return'].includes(x.kind) || (x.kind === 'block' && x.items.every(ok)) || (x.kind === 'if' && this.flatOk(x)) || (x.kind === 'for' && ok(x.body));
+    if (this.hasBlackbox(body)) return 'it calls an RTL blackbox, a state that waits for the module';
+    return this.pipeFullWhy(body) || (!unrollable(body) ? 'a loop is in it whose count is not a constant: it cannot be unrolled' : !ok(body) ? 'it accesses a memory in a branch, an access a state' : null);
   }
   tripOf(s) { return this.loopCount(s).trip; }
   loopCount(s) {
@@ -453,7 +480,7 @@ class SeqFlow extends Flow {
   loopsDone() {
     const said = new Set();
     return (this.loopReport || []).map((l) => {
-      const ii = l.unroll === 'whole' ? 0 : l.blocks.filter((b) => b.num).length;
+      const ii = l.unroll === 'whole' ? 0 : l.pipeII ?? l.blocks.filter((b) => b.num).length;
       // (the II asked, or Vitis HLS's 1 for a loop pipelined automatically, not met: said, and why, #1919)
       if (l.pipeline && (l.notPipelined || ii > l.pipeline)) {
         const why = l.notPipelined || l.memII || null;
@@ -464,7 +491,7 @@ class SeqFlow extends Flow {
         if (!said.has(key)) { said.add(key); this.warn(l.loc, m); }
       }
       const n = l.trip ?? l.max;
-      return { line: l.line, ...(l.name ? { name: l.name } : {}), trip: l.trip, max: l.max, unroll: l.unroll, pipeline: l.pipeline, ...(l.auto ? { auto: true } : {}), ii, cycles: n === null ? null : l.unroll === 'whole' ? 0 : Math.ceil(n / (typeof l.unroll === 'number' ? l.unroll : 1)) * ii + 1 };
+      return { line: l.line, ...(l.name ? { name: l.name } : {}), trip: l.trip, max: l.max, unroll: l.unroll, pipeline: l.pipeline, ...(l.auto ? { auto: true } : {}), ii, ...(l.depth ? { depth: l.depth } : {}), cycles: n === null ? null : l.unroll === 'whole' ? 0 : l.depth ? (n - 1) * ii + l.depth : Math.ceil(n / (typeof l.unroll === 'number' ? l.unroll : 1)) * ii + 1 };
     });
   }
   stmt(s, base) {
@@ -487,6 +514,8 @@ class SeqFlow extends Flow {
         if (slot.kind === 'array') slot.elems = slot.regs.map((r) => this.regNode(r));
         if (slot.kind === 'out') { slot.out.val = this.regNode(slot.out.reg); slot.out.vld = this.F; }
       }
+      // (a pipeline: its stages, #1962)
+      if (b.pipe) { this.states.push(this.pipeState(b)); continue; }
       const loopRec = b.loop ? { brk: this.F, cont: this.F } : null;
       this.frame = { fn: this.fn, returned: this.F, ret: this.retReg ? this.regNode(this.retReg) : null, rt: this.retType, loops: loopRec ? [loopRec] : [] };
       this.scopes = [this.slots];
@@ -537,7 +566,7 @@ class SeqFlow extends Flow {
     this.outFirstDone();
     // (the states split by the clock, #2080: before the memories' ports, which the states drive)
     if (this.split) {
-      const piped = new Set((this.loopReport || []).filter((l) => l.pipeline).flatMap((l) => l.blocks.filter((b) => b.num).map((b) => b.num)));
+      const piped = new Set([...(this.loopReport || []).filter((l) => l.pipeline).flatMap((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), ...this.reached.filter((b) => b.pipe).map((b) => b.num)]);
       const r = this.split({ graph: this.g, states: this.states, stateT: this.stateT, done: this.doneNum, piped });
       if (r.overflow) this.statesAdded = r.overflow;
       else {
@@ -627,10 +656,11 @@ class SeqFlow extends Flow {
       blackboxes: this.bbInsts || [],
       graph: this.g, regs: [...(this.regs?.values() || [])], states: this.states || [], entry: this.entry?.num ?? 1, idle: 0, done: this.doneNum ?? 1,
       stateT: this.stateT, ports, outputs, ctrl: this.ctrl ?? 'ap_ctrl_hs', diagnostics: this.diags, mems: (this.mems || []).filter((x) => !x.ext),
+      ...(this.freeRun ? { freeRun: this.freeRun, fnPipe: { ii: this.fnPipe.pipeII, depth: this.fnPipe.depth, ...(this.fnPipe.memII ? { why: this.fnPipe.memII } : {}) } } : {}),
       ...(this.statesAdded ? { overflow: this.statesAdded } : {}), ...(this.subStates ? { subStates: this.subStates } : {}), slowLoops: this.slowLoops || [],
       loops: this.loops || [], blocks: this.reached || [], loopStates: (this.loopReport || []).map((l) => l.blocks.filter((b) => b.num).map((b) => b.num)), fifos: (this.fifos || []).filter((x) => x.used).map((x) => ({ name: x.port ?? x.name, dir: x.dir, w: x.t.w, s: x.t.s, ...(x.polled ? { polled: true } : {}), ...(x.fields ? { fields: x.fields } : {}) })),
       extMems: (this.mems || []).filter((x) => x.ext).map((x) => ({ name: x.port ?? x.name, n: x.n, w: x.t.w, s: x.t.s, aw: x.aw, read: x.read, written: x.written, ...(x.fields ? { fields: x.fields } : {}), ...(x.bram ? { bram: x.bram } : {}), ...(x.part ? { part: x.part } : {}) })),
     };
   }
 }
-Object.assign(SeqFlow.prototype, memMethods, partitionMethods, fifoMethods, wordMethods, pipelineMethods, blackboxMethods, outFirstMethods);
+Object.assign(SeqFlow.prototype, memMethods, partitionMethods, fifoMethods, wordMethods, pipelineMethods, pipelineSchedMethods, blackboxMethods, outFirstMethods);

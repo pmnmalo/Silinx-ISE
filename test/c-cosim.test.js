@@ -178,11 +178,10 @@ int main(void) {
 }
 `;
 // (the copy loop pipelined automatically, #1919: in1 and in2 read one after the other)
-const COPY = 'warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off';
 const PARTITIONS = [
-  ['block', '#pragma HLS ARRAY_PARTITION variable=B dim=1 block factor=4', [COPY]],
-  ['cyclic', '#pragma HLS ARRAY_PARTITION variable=A dim=1 cyclic factor=4', [COPY]],
-  ['complete', '#pragma HLS ARRAY_PARTITION variable=B dim=1 complete', [COPY]],
+  ['block', '#pragma HLS ARRAY_PARTITION variable=B dim=1 block factor=4', []],
+  ['cyclic', '#pragma HLS ARRAY_PARTITION variable=A dim=1 cyclic factor=4', []],
+  ['complete', '#pragma HLS ARRAY_PARTITION variable=B dim=1 complete', []],
 ];
 
 test('#1899 co-simulation: a call that does more cycles than maxCycles, as many as its C steps at most, ends: partitioned matrix products (block, cyclic, complete) in VHDL and Verilog, their results the C\'s', () => {
