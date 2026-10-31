@@ -83,10 +83,11 @@ export const partitionMethods = {
       words[bank][idx.reduce((acc, y, k) => acc * inner[k] + (k === d ? at : y), 0)] = f;
     }
     const banks = [];
+    let clash = 0;
     for (let k = 0; k < N; k++) {
-      // (a name taken: d_01, d_02, …, as Vitis HLS 2025.2 names it, #2348)
+      // (a name taken: the next of one count, d_01, then d_02 or d_12, as Vitis HLS 2025.2 names it, #2348)
       let name = `${v.name}_${k}`;
-      for (let c = 1; used(name); c++) name = `${v.name}_${k}${c}`;
+      while (used(name)) name = `${v.name}_${k}${++clash}`;
       const init = v.init?.kind === 'init' ? { ...v.init, items: words[k].map((f) => (f !== null && v.init.items[f]) || num(0, v.loc)) } : v.init;
       const mem = this.memSlot({ ...v, name, type: { kind: 'array', of: v.type.of, length: n }, init }, { ext });
       mem.part = { of: v.name, words: words[k] };

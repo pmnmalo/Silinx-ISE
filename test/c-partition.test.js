@@ -55,11 +55,12 @@ test('#1920 an argument cyclic or block: its memories\' ports d_0_…, d_1_…, 
   }
 });
 
-test('#2348 a memory named as another argument: d_01, then d_02, …, as Vitis HLS 2025.2 names it', () => {
+test('#2348 a memory named as another argument: d_01, then d_02 or d_12 (one count), as Vitis HLS 2025.2 names it', () => {
   for (const [kind, args, banks] of [
     ['d_0 taken', ['d_0'], ['d_01', 'd_1']],
     ['d_0 and d_01 taken', ['d_0', 'd_01'], ['d_02', 'd_1']],
     ['d_1 taken', ['d_1'], ['d_0', 'd_11']],
+    ['d_0 and d_1 taken: one count', ['d_0', 'd_1'], ['d_01', 'd_12']],
     ['d_01 taken, not d_0', ['d_01'], ['d_0', 'd_1']],
   ]) {
     const src = `int f(int d[12]${args.map((a) => `, int ${a}`).join('')}, int n) {
