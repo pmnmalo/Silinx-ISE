@@ -94,6 +94,9 @@ export const SPEED_4 = {
     Tdyck: [0.361, 0.382],     // BY -> flip-flop Y (DYMUX = 0)
     Tceck: [0.555, 0.555],     // CE (est.)
     Tsrck: [0.910, 0.910],     // SR
+    // the hold of the flip-flops, trce's (-Th) of its hold paths (#2226, research/s3e-route/ff-hold.mjs): from the X / Y
+    // path (after the way through the slice at its earliest), BX, BY, CE, SR
+    Tckdx: [0.047, 0.047], Tckdi: [0.093, 0.134], Tckdy: [0.135, 0.152], Tckce: [0.069, 0.069], Tcksr: [0.491, 0.491],
   },
   // Tiopi pad -> I, Tioop O1 -> pad: fitted with the clock below (#26); the IOB registers' (#96): estimates until
   // trce's reports of designs with them are measured
@@ -101,7 +104,8 @@ export const SPEED_4 = {
   // the pads and the global clocks (#26): fitted to trce's data sheet (setup / hold of the inputs, clock to pad, pad
   // to pad) of lab11 placed and routed by Silinx and by ISE (research/s3e-route/README.md, "Pad paths"): a global
   // clock reaches every flip-flop at once (trce's clock skew 0.000 ns), Tgclk after its pad, minScale x that at
-  // the earliest; trce's shortest paths are minScale x the model's; hold: a flip-flop's data hold time
+  // the earliest; trce's shortest paths are minScale x the model's; hold: an input's data hold time at its flip-flop (the
+  // hold check of two flip-flops: minLogic, minNet below and the slices' hold times, #2226)
   clock: {
     Tgclk: 3.045, minScale: 0.751, hold: -1.018,
     // a DCM's clocks (#601), each on a global buffer: from the arrival at its CLKIN to the flip-flops' (trce's clock path:
@@ -117,6 +121,10 @@ export const SPEED_4 = {
     // connections (reportgen -delay, as trce's clock paths: 0.07-0.12 ns on the global lines) on 129 such loads of nine
     // routings of blinky and stopwatch (research/s3e-route/clock-detour.mjs): rms error 0.100 ns, 0.220 at most
     detour: [-0.708, 1.188],
+    // the hold check of two flip-flops (#2226): trce's earliest delays, minLogic x the model's through the logic (its
+    // clock-to-out, a slice's ways, a block RAM's: 0.80 in every arc trce shows) and minNet x the model's on the wires
+    // (4 410 connections of trce's hold paths of nine routings of blinky and stopwatch: rms error 0.053 ns)
+    minLogic: 0.8, minNet: 0.784,
   },
   // the SLICEM's RAMs and shift registers: trce's values (research/s3e-route/timing-fit.mjs --arcs, #443: the srl
   // and dram fixtures, feat_srl, feat_srl_var, hard_prim; the same on either clock edge)
@@ -460,7 +468,7 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
       eFrom.push(pid(src.inst, src.pin)); eTo.push(pid(p.inst, p.pin)); eDelay.push(0); eConn.push(c);
     }
   }
-  const starts = [], ends = [];   // [pin, ns, clock, edge (0 rising, 1 falling)]
+  const starts = [], ends = [];   // [pin, ns, clock, edge (0 rising, 1 falling)]; an end's fifth: its hold margin (#2226)
   const padIns = [], padOuts = [];   // [pin, ns]: an input pad's I (its delay from the pad), an output pad's O1 (to the pad)
   for (const inst of design.insts) {
     const a = arcs(inst, model);
@@ -473,7 +481,7 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
     // (an IOB's register pins: their own clock pin's net and edge)
     const at = p => { const cp = ioClockPin(p); return cp ? [clockAt.get(`${inst.name}\u0000${cp}`) || clk, edgeAt(inst, cp)] : [clk, edge]; };
     for (const [o, d] of a.clkToOut) starts.push([pid(inst.name, o), d, ...at(o)]);
-    for (const [i, d] of a.setup) ends.push([pid(inst.name, i), d, ...at(i)]);
+    for (const [i, d, h] of a.setup) ends.push([pid(inst.name, i), d, ...at(i), h ?? 0]);
   }
   const P = pinName.length, E = eFrom.length;
   // edges by from-pin, and a topological order (Kahn; pins on a combinational loop are left out)
@@ -569,20 +577,27 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
   //   (trce's "clock to pad", OFFSET OUT AFTER);
   // - padToPad: [{ from, to, delay, path }]: an input pad through logic only to an output pad;
   // - hold: [{ clock, slack, path }]: the shortest path from a flip-flop to a flip-flop of the same clock and edge,
-  //   at its earliest (minScale x it), less the hold time (model.clock.hold); a global clock reaches both at once.
+  //   at its earliest, plus the end's hold margin, less the clock's skew between the two (#2224), as trce's hold paths
+  //   (#2226: trce's earliest delays, model.clock.minLogic x the logic's and minNet x the wires'; a model without them,
+  //   minScale x the path less model.clock.hold, the inputs' hold time).
   // A flip-flop with no clock arrival (a clock made by logic) is left out of inputs and outputs.
   function pads(connDelay, clockArr = new Map()) {
     const delay = Float64Array.from(eDelay);
     for (let e = 0; e < E; e++) if (eConn[e] >= 0) delay[e] = connDelay[eConn[e]];
+    // (the hold check's earliest delays, #2226: the logic's and the wires' scaled apart)
+    const { minLogic, minNet } = model.clock, byKind = minNet !== undefined;
+    const early = byKind ? delay.map((d, e) => d * (eConn[e] >= 0 ? minNet : minLogic)) : delay;
     const arr = new Float64Array(P), prevE = new Int32Array(P);
-    const run = (seeds, min = false) => {
+    let cur = delay;
+    const run = (seeds, min = false, dl = delay) => {
+      cur = dl;
       arr.fill(min ? Infinity : -Infinity);
       prevE.fill(-1);
       for (const [p, t] of seeds) if (min ? t < arr[p] : t > arr[p]) arr[p] = t;
       for (const p of order) {
         if (!Number.isFinite(arr[p])) continue;
         for (let x = outStart[p]; x < outStart[p + 1]; x++) {
-          const e = outEdge[x], q = eTo[e], t = arr[p] + delay[e];
+          const e = outEdge[x], q = eTo[e], t = arr[p] + dl[e];
           if (min ? t < arr[q] : t > arr[q]) { arr[q] = t; prevE[q] = e; }
         }
       }
@@ -591,7 +606,7 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
       const path = [{ ...pinName[end], kind, delay: d, arrival: arr[end] + d }];
       for (let p = end; ;) {
         const e = prevE[p];
-        path.unshift({ ...pinName[p], kind: e < 0 ? start : eConn[e] >= 0 ? 'net' : 'logic', delay: e < 0 ? arr[p] : delay[e], arrival: arr[p] });
+        path.unshift({ ...pinName[p], kind: e < 0 ? start : eConn[e] >= 0 ? 'net' : 'logic', delay: e < 0 ? arr[p] : cur[e], arrival: arr[p] });
         if (e < 0) break;
         p = eFrom[e];
       }
@@ -629,11 +644,11 @@ export function timingGraph(design, model = SPEED_4, { arcs = instArcs, clockPin
       for (const launch of [0, 1]) {
         const seeds = starts.filter(([, , c, ed]) => c === clk && ed === launch);
         if (!seeds.length) continue;
-        run(seeds.map(([p, d]) => [p, d + sk(p)]), true);
-        for (const [e, , c, ed] of dataEnds) {
+        run(seeds.map(([p, d]) => [p, (byKind ? minLogic * d : d) + sk(p)]), true, early);
+        for (const [e, , c, ed, h] of dataEnds) {
           if (c !== clk || ed !== launch || !Number.isFinite(arr[e])) continue;
-          const slack = sc * arr[e] - Th - sk(e);
-          if (!w || slack < w.slack) w = { clock: clk, slack, path: trace(e, 'hold', -model.clock.hold, 'clock-to-out') };
+          const slack = byKind ? arr[e] + h - sk(e) : sc * arr[e] - Th - sk(e);
+          if (!w || slack < w.slack) w = { clock: clk, slack, path: trace(e, 'hold', byKind ? h : -Th, 'clock-to-out') };
         }
       }
       if (w) out.hold.push(w);

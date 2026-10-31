@@ -80,5 +80,10 @@
   "$auto$ff.cc_337_slice$2211": 1.549,
   "$auto$ff.cc_337_slice$2257": 0.088,
   "$auto$ff.cc_337_slice$2223": 1.842
+ },
+ "hold": {
+  "slack": 0.032,
+  "from": "$auto$ff.cc_337_slice$2270",
+  "to": "$auto$ff.cc_337_slice$2239"
  }
 }

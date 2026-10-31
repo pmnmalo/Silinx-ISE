@@ -63,7 +63,7 @@ test('#2224 a global clock on general routing: the period with the skew, near tr
   assert.deepEqual(lines.filter(l => /general routing/.test(l)),
     ['clock $iopadmap$clk: 28 of its 77 clock pins reached through general routing, not the global lines (clock skew up to 2.094 ns)']);
   assert.deepEqual(lines.filter(l => /^hold/.test(l)),
-    ['hold, clock $iopadmap$clk: met, worst slack 0.732 ns (the shortest path at its earliest; with the clock\'s skew)']);
+    ['hold, clock $iopadmap$clk: NOT MET, worst slack -0.014 ns (the shortest path at its earliest; with the clock\'s skew)']);
 });
 
 test('#2224 a global clock wholly on the global lines: no skew, the period and the report exactly as before (Silinx\'s routing of stopwatch)', () => {

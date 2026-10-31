@@ -607,10 +607,19 @@ pad-to-pad figures.
   (Silinx's with 3 or 12 pins moved off the global lines by `--reroute`, nextpnr-spartan v0.6.0's): -0.708 + 1.188 x,
   rms error 0.100 ns, 0.220 at most. The periods then follow trce's (blinky with 12 pins moved: +1.10 ns in trce,
   +1.08 in the analysis; nextpnr v0.6.0's blinky 7.918 ns against trce's 8.015, 7.647 before). The hold check of two
-  flip-flops counts the skew too; it stays 0.57-0.75 ns above trce's slack on the same pairs, as on the global
-  lines.
+  flip-flops counts the skew too (fitted to trce's hold paths in #2226, below).
 - **trce's minimum delays** are 0.751 (`minScale`) of the model's: the slope of the inputs' hold against the model's
   shortest data paths.
+- **The hold check of two flip-flops** (#2226) is trce's hold path: the data's earliest arrival at the end's pin plus
+  the end's hold margin, less the clock's skew from the launching flip-flop to it (#2224). trce's earliest delays are
+  0.80 of the model's in every logic arc of its hold paths (clock-to-out, LUT, carry, a block RAM's clock to out:
+  `minLogic`) and 0.784 on the wires (`minNet`: 4 410 connections, rms error 0.053 ns), not `minScale` (the inputs'
+  hold, through a pad); the margin is trce's (-Th): through the slice, `minLogic` x the way to X / Y less 0.047 ns
+  (`Tckdx`); BX 0.093 / 0.134, BY 0.135 / 0.152 (SLICEL / SLICEM: `Tckdi`, `Tckdy`), CE 0.069, SR 0.491 ns
+  (`ff-hold.mjs` on the nine routings of #2224). Before, the inputs' hold time (-1.018 ns) stood for it, 0.57-0.79 ns
+  over trce's slack; now the worst hold path of each routing is trce's pair of flip-flops, its slack within -0.09 /
+  +0.13 ns (blinky with 12 clock pins off the global lines: -0.547 ns, NOT MET, against trce's -0.659). An end trce's
+  reports did not show (an IOB's, a block RAM's, a multiplier's, a SLICEM memory's pins) has no margin (0).
 - **Setup uses the clock's earliest arrival, clock-to-pad its latest.** With one arrival for both, pad to pad did not
   close: it predicted 5.27 ns over the model's paths, and trce measures 4.51.
 - `Tiopi` = 1.253 ns and `Tioop` = 3.257 ns solve the three together: setup (Tiopi - minScale x Tgclk = -1.034),

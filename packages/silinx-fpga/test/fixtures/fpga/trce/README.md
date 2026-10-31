@@ -28,3 +28,9 @@ pins are reached through general routing. `blinky-clock-detour-trce.json`: trce'
 its critical path's clock skew (-1.774 ns), and ISE's delay of each connection of the clock net as `reportgen -delay`
 gives it (the clock delay trce counts at each flip-flop); the analysis's clock skew is checked against them in
 test/fpga-clock-skew.test.js.
+
+`blinky-hold-violation.xdl.gz` (#2226): Silinx's routing of examples/blinky (seed 1) with 12 of its 82 clock pins moved
+onto general routing (research/s3e-route/clock-detour.mjs --reroute, seed 1), and `blinky-hold-violation-trce.json`:
+trce's minimum period for it and its worst hold path (the two flip-flops, slack -0.659 ns: a hold violation);
+`blinky-clock-detour-trce.json` has its worst hold path too (0.032 ns). test/fpga-ff-hold.test.js checks the hold check
+of two flip-flops against them.
