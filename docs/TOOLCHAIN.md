@@ -93,7 +93,8 @@ A family is an object (`src/open-flow-backends.js`, #2360):
 ```js
 {
   id: 'spartan3e',
-  mount(ctx),   // { runMap, runPar, runTiming, runPins, runPower, bitfile, packed? }: the family's steps, with its engines
+  mount(ctx),   // { runMap, runPar, runTiming, runPins, runPower, bitfile, runFpgaView?, packed? }: the family's steps,
+                //   with its engines; the routed design is the back end's, in its format and file (#2384)
   synth,        // optional: the synthesis, synthesizeVerilog's signature and result; that function when not given
   xstNames,     // optional: the synthesis's report names its lines as XST does, not as the MAP report
 }
@@ -117,15 +118,15 @@ The plan is in #1953 and #2315. For the open toolchains:
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
 | Xilinx 7-series | to be defined | nextpnr in the fork | to be written in JavaScript | to be defined | A spike first (#2305) |
 
-Still missing before iCE40 (#2360):
+Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. Still
+missing before iCE40 (#2360):
 
-- **The routed design opaque to the orchestrator.** It reads and writes `open/routed.xdl` by name today, and XDL exists only for
-  Xilinx.
-- **A neutral constraints model.** `ucfText` and `parseUcf` are in the flow today; UCF, PCF, LPF and CST should be
+- **A neutral constraints model (#2385).** `ucfText` and `parseUcf` are in the flow today; UCF, PCF, LPF and CST should be
   readers and writers of one model.
-- **The synthesis by family.** `synth` is a hook today; the commands are `synth_xilinx`'s, and a family's `FAMILY_INFO` entry has
-  fields only Xilinx families have (`xise`, `pm`).
-- **The steps by family.** They have ISE's names (`translate`, `trce`), and the back end does not yet say which it has.
+- **The synthesis by family (#2386).** `synth` is a hook today; the commands are `synth_xilinx`'s, and a family's `FAMILY_INFO`
+  entry has fields only Xilinx families have (`xise`, `pm`).
+- **The steps by family (#2387).** They have ISE's names (`translate`, `trce`), and the back end does not yet say which it has.
+- **The fake family in the browser's worker (#2388).** Its test runs in Node only.
 
 And around the flow, one issue each: the boards and examples (#2297), programming (#2298), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).

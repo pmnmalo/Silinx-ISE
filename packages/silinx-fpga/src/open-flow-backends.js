@@ -1,7 +1,9 @@
 // Silinx toolchain - the flow's back ends, one per family (#2360): what runFlow (open-flow-core.js) asks of a family, so
 // that it names none. A back end is { id, mount(ctx), synth?, xstNames? }:
-//   mount(ctx)   -> { runMap, runPar, runTiming, runPins, runPower, bitfile(name, startupClk), packed? }: the family's steps,
-//                   with its engines; ctx: runFlow's (its getters: netlist, netlistText, routedText)
+//   mount(ctx)   -> { runMap, runPar, runTiming, runPins, runPower, bitfile(name, startupClk), runFpgaView?, packed?,
+//                   routedOrEarlier?, routedText? }: the family's steps, with its engines; ctx: runFlow's (its getters:
+//                   netlist, netlistText). The routed design is the back end's (#2384): its format, its file, an earlier
+//                   run's read again by the steps that need it; routedOrEarlier and routedText give it to the simulation models
 //   synth        the synthesis, as synth-open.js synthesizeVerilog (its signature and result), which it is when not given
 //   xstNames     the synthesis's report names its lines as XST does, not as the MAP report
 // A family not registered is implemented as the Spartan-3E is, with the names of its MAP report: the families only ISE
@@ -44,9 +46,21 @@ const S6_REPORTS = {
   },
 };
 
+// the Xilinx families' routed design: XDL, open/routed.xdl (#2384); Place & Route sets it, the later steps read it
+// again from an earlier run
+function xdlRouted({ io, StepError }) {
+  let text = null;
+  return {
+    setRouted: t => { text = t; },
+    routedText: () => text,
+    routedOrEarlier: () => { if (text == null) text = io.read('open/routed.xdl'); if (text == null) throw new StepError('no routed design: run Place & Route first', [], ''); },
+  };
+}
+
 // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine: 'nextpnr' always; 'auto' when it can
 // implement the design (its cells, every port's pad), else the Silinx engine, which Map says
-function mountS3e(ctx) {
+function mountS3e(base) {
+  const routed = xdlRouted(base), ctx = { ...base, ...routed };
   const { spec, log } = ctx;
   const own = mountS3eSteps(ctx);
   const np = (spec.engine === 'nextpnr' || spec.engine === 'auto') ? mountNextpnrSteps(ctx) : null;
@@ -64,16 +78,19 @@ function mountS3e(ctx) {
     runMap: () => (useNextpnr() ? np.runMap : own.runMap)(),
     runPar: () => (useNextpnr() ? np.runPar : own.runPar)(),
     packed: own.packed,
+    routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
     ...mountFlowReports({ ...ctx, reports: S3E_REPORTS }),
   };
 }
 
 // the Spartan-6's Map and Place & Route (#732: open-flow-s6.js); by nextpnr ('nextpnr' only, #2138): Silinx's Map,
 // nextpnr's Place & Route (open-flow-nextpnr-s6.js)
-function mountS6(ctx) {
+function mountS6(base) {
+  const routed = xdlRouted(base), ctx = { ...base, ...routed };
   const own = mountS6Steps(ctx);
   const np = ctx.spec.engine === 'nextpnr' ? mountNextpnrS6({ ...ctx, state: own.state }) : null;
-  return { runMap: own.runMap, runPar: () => (np || own).runPar(), ...mountFlowReports({ ...ctx, reports: S6_REPORTS }) };
+  return { runMap: own.runMap, runPar: () => (np || own).runPar(), routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
+    ...mountFlowReports({ ...ctx, reports: S6_REPORTS }) };
 }
 
 const SPARTAN3E = { id: 'spartan3e', mount: mountS3e, xstNames: true };
