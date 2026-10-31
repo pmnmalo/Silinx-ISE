@@ -301,11 +301,15 @@
     "reason": null
   },
   "interface-streaming-using-axi-stream-with-struct": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: example.h:3: the header 'complex' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 32,
+      "max": 32,
+      "avg": 32
+    },
+    "reason": null
   },
   "migration-python-scripts": {
     "csim": "pass",
@@ -509,7 +513,7 @@
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: test.cpp:19: the header 'malloc.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "C simulation: cmdlineparser.h:21: the header 'map' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
   },
   "modeling-using-cpp-templates": {
     "csim": "pass",
@@ -545,11 +549,15 @@
     "reason": null
   },
   "modeling-using-vectors": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: example.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 7513,
+      "max": 7513,
+      "avg": 7513
+    },
+    "reason": null
   },
   "modeling-variable-bound-loops": {
     "csim": "pass",
@@ -606,11 +614,15 @@
     "reason": "C synthesis: 66: 'strm_out' is not an integer"
   },
   "task-level-parallelism-control-driven-channels-autorestart": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: diamond_test.cpp:23: the header 'ap_float.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 415,
+      "max": 415,
+      "avg": 415
+    },
+    "reason": null
   },
   "task-level-parallelism-control-driven-channels-merge-split-merge-load-balance": {
     "csim": "pass",
@@ -668,18 +680,26 @@
     "reason": null
   },
   "task-level-parallelism-control-driven-channels-using-fifos": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: diamond.h:20: the header 'hls_vector.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 1206,
+      "max": 1206,
+      "avg": 1206
+    },
+    "reason": null
   },
   "task-level-parallelism-control-driven-channels-using-stream-of-blocks": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: diamond.h:19: the header 'hls_streamofblocks.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 674,
+      "max": 675,
+      "avg": 674.3333333333334
+    },
+    "reason": null
   },
   "task-level-parallelism-data-driven-mixed-control-and-data-driven": {
     "csim": "pass",

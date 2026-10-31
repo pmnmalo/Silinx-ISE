@@ -43,12 +43,22 @@ function foldApWidths(toks) {
   return out;
 }
 
+/** A parameter T (&a)[N], a reference to an array, is T a[N] (an array is passed by reference, #1891). */
+function refArrays(toks) {
+  const out = [];
+  for (let k = 0; k < toks.length; k++) {
+    if (op(toks[k], '(') && op(toks[k + 1], '&') && isId(toks[k + 2]) && op(toks[k + 3], ')') && op(toks[k + 4], '[') && isId(toks[k - 1])) { out.push(toks[k + 2]); k += 3; continue; }
+    out.push(toks[k]);
+  }
+  return out;
+}
+
 export function cStructs(input, report, cpp) {
   // (structs: name -> { name, members: [{ name, type: tokens, dims: [tokens], struct, init }] }; sigs: the functions
   // with struct parameters or results, name -> { params: [{ name, S, kind: 'val' | 'ref' | 'ptr' | 'arr', dims }],
   // ret }; structArgs: their members, the top's ports, core/c-hdl.js)
   const cx = { structs: new Map(), enums: new Set(), enumVals: new Map(), sigs: new Map(), structArgs: new Map(), report, cpp };
-  const defs = definitions(foldApWidths(input), cx);
+  const defs = definitions(foldApWidths(cpp ? refArrays(input) : input), cx);
   const streamArgs = new Map();
   const toks = cpp ? structStreams(defs, cx.structs, report, streamArgs) : defs;
   signatures(toks, cx);
@@ -313,6 +323,24 @@ function lin(idx, dims, t) {
   return r;
 }
 
+/** x = { a, b };: each member its value (#1891). */
+function assignList(dstP, src, dst, t, { report, rewrite, leafRef }) {
+  const vals = initValues(dstP.S, [], src, src[0], report);
+  for (const l of leaves(dstP.S)) {
+    if (l.dims.length) { report(src[0], `a ${dstP.S.name} with an array member is copied from another, not from a list`); return; }
+    const v = [];
+    rewrite(vals.get(l.suffix)[0], v, false);
+    dst.push(...leafRef(dstP, l, t), L(t, '='), ...v, L(t, ';'));
+  }
+}
+/** p == q, p != q (cmp) member by member; the end of q. */
+function compareMembers(p, q, cmp, dst, t, leafRef) {
+  dst.push(L(t, '('));
+  leaves(p.S).forEach((l, i) => { if (i) dst.push(L(t, op(cmp, '!=') ? '||' : '&&')); dst.push(...leafRef(p, l, t), cmp, ...leafRef(q, l, t)); });
+  dst.push(L(t, ')'));
+  return q.end;
+}
+
 // ------------------------------------------------------------------ the uses
 function uses(toks, cx) {
   const { structs, sigs, report, cpp } = cx;
@@ -435,6 +463,8 @@ function uses(toks, cx) {
           k = e;
           continue;
         }
+        // a == b, a != b of std::complex (#1891): member by member
+        if (!p.leaf && p.S?.members[0]?.name === 'ap_re' && (op(ts[p.end], '==') || op(ts[p.end], '!=')) && isId(ts[p.end + 1]) && look(ts[p.end + 1].v)) { k = compareMembers(p, path(ts, p.end + 1), ts[p.end], dst, t, leafRef) - 1; continue; }
         if (!p.leaf) { report(t, `the struct '${t.v}' used as a value here: copy it (x = ${t.v};), pass it to a function or read its members`); dst.push(L(t, '0', 'num')); k = p.end - 1; continue; }
         dst.push(...leafRef(p, null, t));
         k = p.end - 1;
@@ -489,6 +519,7 @@ function uses(toks, cx) {
   /** A struct value's members assigned from src: another struct (a variable, an element, a member) or a call of a
    *  function returning one. */
   function assignFrom(dstP, src, dst, t) {
+    if (op(src[0], '{') && closing(src, 0) === src.length - 1) { assignList(dstP, src, dst, t, { report, rewrite, leafRef }); return; }
     const call = isId(src[0]) && sigs.get(src[0].v)?.ret && op(src[1], '(') && closing(src, 1) === src.length - 1 ? src[0] : null;
     if (call) {
       const sg = sigs.get(call.v);
@@ -563,6 +594,8 @@ function uses(toks, cx) {
         const e = closing(ts, j);
         const inner = [];
         rewrite(ts.slice(j + 1, e), inner, false);
+        // (an hls::vector indexed, v[i] (core/cpp-hls-lib.js, #1891): its array's element)
+        if (!leaf && S?.members[0]?.name === 'ap_d' && idx.length >= dims.length) { sub += '_ap_d'; leaf = S.members[0]; ldims = leaf.dims; S = null; }
         if (leaf ? idx.length >= dims.length + ldims.length : idx.length >= dims.length) break;
         idx.push(inner);
         j = e + 1;

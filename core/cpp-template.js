@@ -152,7 +152,20 @@ function deduce(tpl, pname, callArgs, before) {
   for (let i = 0; i < params.length && i < callArgs.length; i++) {
     const ty = params[i].slice(0, -1).filter((t) => !(t.t === 'id' && QUALS.has(t.v)) && !op(t, '&'));
     if (ty.length === 1 && isId(ty[0], pname)) return argType(callArgs[i], before);
+    // (T (&a)[N], a reference to an array, #1891)
+    const r = refArray(params[i]);
+    if (r && isId(r.type, pname)) return argType(callArgs[i], before);
   }
+  return null;
+}
+/** A parameter T (&a)[N]: { type: T's token, size: N's tokens }, or null. */
+function refArray(p) {
+  const q = p.filter((t) => !(t.t === 'id' && QUALS.has(t.v)));
+  return q.length >= 7 && op(q[1], '(') && op(q[2], '&') && op(q[4], ')') && op(q[5], '[') && closing(q, 5) === q.length - 1 ? { type: q[0], size: q.slice(6, -1) } : null;
+}
+/** The first size an array is declared with (a variable's name), or null. */
+function arraySize(name, before) {
+  for (let i = before.length - 1; i > 0; i--) if (isId(before[i], name) && op(before[i + 1], '[') && (isId(before[i - 1]) || op(before[i - 1], ',') || op(before[i - 1], '>'))) return before.slice(i + 2, closing(before, i + 1));
   return null;
 }
 /** An integer parameter from the call: the argument's type's (ap_ufixed<W2, IW2> &r given an ap_ufixed<16, 8>: W2
@@ -161,6 +174,8 @@ function deduceValue(tpl, pname, callArgs, before) {
   const d = tpl.primary;
   const params = splitTop(d.toks.slice(d.paren + 1, closing(d.toks, d.paren)));
   for (let i = 0; i < params.length && i < callArgs.length; i++) {
+    const r = refArray(params[i]);
+    if (r && r.size.length === 1 && isId(r.size[0], pname) && callArgs[i].length === 1) { const n = arraySize(callArgs[i][0].v, before); if (n) return n; }
     const ty = params[i].filter((t) => !(t.t === 'id' && QUALS.has(t.v)) && !op(t, '&'));
     const lt = ty.findIndex((t) => op(t, '<'));
     if (lt < 1) continue;

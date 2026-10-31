@@ -115,7 +115,7 @@ class Machine {
     if (t.kind === 'ptr' && t.to.kind === 'struct' && t.to.name === 'FILE') return { isFile: true, fh: v.init ? this.eval(v.init).fh ?? null : null, t: { w: 32, s: true } };
     if (t.kind === 'ptr') {
       const c = { t: typeOf(t.to), ref: null };
-      if (v.init) { const p = this.eval(v.init); c.ref = p.ptr || (p.arr ? this.elemRef(p.arr, 0, p.t) : null); }
+      if (v.init) { let p = this.eval(v.init); if (p.heap !== undefined) p = this.heapPtr(p, t.to, v); c.ref = p.ptr || (p.arr ? this.elemRef(p.arr, 0, p.t) : null); }
       return c;
     }
     const et = typeOf(t);

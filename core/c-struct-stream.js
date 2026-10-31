@@ -5,7 +5,7 @@
 // Isomorphic ES module.
 //
 //   structStreams(toks, structs, report, streamArgs) -> toks (streamArgs: function -> [{ name, members, loc, stream }])
-import { closing } from './cpp-template.js';
+import { closing, constTokens } from './cpp-template.js';
 
 const op = (t, v) => t && t.t === 'op' && t.v === v;
 const isId = (t, v) => t && t.t === 'id' && (v === undefined || t.v === v);
@@ -16,7 +16,13 @@ const L = (t, v, tt = 'op') => ({ ...t, t: tt, v });
 function leafPaths(S, report, at) {
   const out = [];
   for (const m of S.members) {
-    if (m.dims.length) { report(at, `the stream of '${S.name}': its member '${m.name}' is an array (not possible in a stream yet)`); continue; }
+    // (a member array, an hls::vector's (#1891): a stream per element)
+    if (m.dims.length) {
+      const n = m.dims.length === 1 ? constTokens(m.dims[0]) : null;
+      if (n === null || m.struct) { report(at, `the stream of '${S.name}': its member '${m.name}' is an array of more than one dimension, of structs or of a size not constant (not possible in a stream yet)`); continue; }
+      for (let i = 0; i < Number(n); i++) out.push({ suffix: `_${m.name}_${i}`, path: [m.name], index: i, type: m.type });
+      continue;
+    }
     if (m.struct) for (const l of leafPaths(m.struct, report, at)) out.push({ suffix: `_${m.name}${l.suffix}`, path: [m.name, ...l.path], type: l.type });
     else out.push({ suffix: `_${m.name}`, path: [m.name], type: m.type });
   }
@@ -117,7 +123,7 @@ function declarations(toks, structs, found, report, streamArgs) {
 function uses(toks, report) {
   let n = 0;
   const out = [];
-  const member = (base, l, t) => [...base.map((x) => ({ ...x })), ...l.path.flatMap((p) => [L(t, '.'), L(t, p, 'id')])];
+  const member = (base, l, t) => [...base.map((x) => ({ ...x })), ...l.path.flatMap((p) => [L(t, '.'), L(t, p, 'id')]), ...(l.index !== undefined ? [L(t, '['), L(t, String(l.index), 'num'), L(t, ']')] : [])];
   const call = (name, l, fn, args, t) => [L(name, `${name.v}${l.suffix}`, 'id'), L(t, '.'), L(t, fn, 'id'), L(t, '('), ...args, L(t, ')')];
   const reads = (name, v, leaves, t) => leaves.flatMap((l) => [...member(v, l, t), L(t, '='), ...call(name, l, 'read', [], t), L(t, ';')]);
   const writes = (name, e, leaves, t) => leaves.flatMap((l) => [...call(name, l, 'write', member(e, l, t), t), L(t, ';')]);
