@@ -21,9 +21,10 @@ import { DEFAULT_CLOCK, UNCERTAINTY, nodeDelay } from './c-timing.js';
 export function scheduled(checked, opts = {}, { clock = DEFAULT_CLOCK, family = 'artix7' } = {}) {
   const budget = clock * (1 - UNCERTAINTY);
   const split = (ctx) => schedule(ctx, budget, family);
-  let m = fsmd(checked, { ...opts, split });
+  const timing = { budget, family };
+  let m = fsmd(checked, { ...opts, split, timing });
   // (the state's register wide enough for the states added: the machine made again with room for them)
-  if (m.overflow) m = fsmd(checked, { ...opts, split, spare: m.overflow });
+  if (m.overflow) m = fsmd(checked, { ...opts, split, timing, spare: m.overflow });
   if (m.diagnostics.some((d) => d.severity === 'error')) return m;
   const subStates = m.subStates || new Map();
   // (a loop's states an iteration: its states' chains in them)

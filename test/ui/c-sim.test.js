@@ -93,8 +93,8 @@ uiTest('#1531 a C module\'s processes (C Synthesis (HLS)): View C Synthesis Repo
   assert.match(log, /Ports:\n {2}ap_clk {11}in {4}1 bit\n[\s\S]* {2}a_address0 {7}out {3}3 bits\n {2}a_ce0 {12}out {3}1 bit\n {2}a_q0 {13}in {3}32 bits\n/);
   assert.match(log, /Memories:\n {2}a {16}8 x 32 bits, ap_memory \(outside the module\)\n/);
   // (the second loop pipelined automatically, as Vitis HLS does, #1919)
-  assert.match(log, /Loops:\n {2}line 4 {4}8 iterations; II=2, 17 cycles; pipelined, II=1 asked\n {2}line 8 {4}4 iterations; II=1, 5 cycles; pipelined automatically, as Vitis HLS does\n/);
-  assert.match(log, /WARNING:SilinxC - "src\/sum\.c" line 4: #pragma HLS PIPELINE II=1: II=2 made \(it accesses a memory, an access a state\)/);
+  assert.match(log, /Loops:\n {2}line 4 {4}8 iterations; II=2, 18 cycles; pipelined, II=1 asked\n {2}line 8 {4}4 iterations; II=1, 5 cycles; pipelined automatically, as Vitis HLS does\n/);
+  assert.match(log, /WARNING:SilinxC - "src\/sum\.c" line 4: #pragma HLS PIPELINE II=1: II=2 made \(the memory 'a' has one port, accessed 2 times an iteration\)/);
   await page.treeRow('#procs', 'C Simulation', { dbl: true, exact: true });
   await page.waitConsole(/Process "C Simulation" completed successfully/);
   assert.match(await page.consoleText(), /\n58 100\nmain\(\) returned 0; 2 call\(s\) of 'sum'\./);

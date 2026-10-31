@@ -81,7 +81,7 @@ test('#1893 an array with s_axilite keeps its memory, said', () => {
   for (int i = 0; i < 4; i++) a[i] += 1;
 }
 int main() { int a[4] = { 1, 2, 3, 4 }; f(a); return a[3] == 5 ? 0 : 1; }
-`, ['2 warning: #pragma HLS INTERFACE s_axilite port=a: only a scalar or a pointer to one is made a register: its interface kept', '4 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off'], 'f');
+`, ['2 warning: #pragma HLS INTERFACE s_axilite port=a: only a scalar or a pointer to one is made a register: its interface kept', '4 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory \'a\' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off'], 'f');
 });
 
 test('#1893 a DATAFLOW function: its processes inside the module with the bus', () => {

@@ -443,7 +443,7 @@ uses its C model in the C simulation and its module in the synthesis, one instan
 | `AGGREGATE variable= compact=` / `DISAGGREGATE variable=` (the top's, #1668) | a struct argument, a stream or an array of structs one port, stream or memory of its words, packed `compact=bit` (an array's or a stream's default), `byte`, `none` (a scalar struct's default) / a port, a stream or a memory per member |
 | `INLINE` / `INLINE off` | every function is inlined (`off` is ignored, with a warning) |
 | `LOOP_TRIPCOUNT min= max=` | the report's bound of a loop whose count depends on the inputs (its latency, else unknown) |
-| `PIPELINE [II=]` / `PIPELINE off` (in a loop's body) | a sequential module's loop: an iteration a state (II=1: its condition, body and step in one clock cycle), its inner loops of constant count unrolled in it; one that accesses a memory or a stream: an iteration its accesses' states (below); a warning saying the II made when it is more than asked. `off`: not pipelined, not even automatically |
+| `PIPELINE [II=]` / `PIPELINE off` (in a loop's or the top function's body) | a sequential module's loop: its iterations overlapping, a new one every II cycles, its inner loops of constant count unrolled in it (below); the top function's: its calls overlapping; a warning saying the II made, and why, when it is more than asked. `off`: not pipelined, not even automatically |
 | `UNROLL` / `UNROLL factor=N` (in a loop's body) | whole: a loop of constant count run in the state it is in (no state of its own); `factor=N`: N iterations a state. A combinational module's loops are all unrolled |
 | `ARRAY_PARTITION variable= type=complete` | the array's elements registers, whatever its size (not a memory); `dim=N` of an array of more dimensions: a memory per value of that index |
 | `ARRAY_PARTITION variable= type=block\|cyclic factor=N [dim=D]` (#1920) | several memories, as Vitis HLS's: `cyclic` element k in memory k % N, `block` consecutive blocks of ceil(L / N); an argument's each with its own port (`d_0_address0`, `d_1_address0`, …), a local's `A_0`, `A_1`, … A local array of 64 elements or fewer stays registers. Accesses of different memories share a state only when the memory is known at synthesis (`A[i * N + 3]` cyclic factor=N) |
@@ -451,15 +451,31 @@ uses its C model in the C simulation and its module in the synthesis, one instan
 | `STREAM variable= depth=` | a DATAFLOW region's stream: its FIFO's depth (else `hls::stream<T, D>`'s D, else 2) |
 | `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `BIND_STORAGE`, `DEPENDENCE`, `LOOP_FLATTEN`, … and AXI interfaces (`s_axilite`, `m_axi`; `axis` on what is not a stream or an array) | accepted and ignored, with a warning; an unknown pragma: a warning |
 
-A loop's pragma is its body's first statements; one elsewhere is ignored with a warning (a function's `PIPELINE`
-too).
+A loop's pragma is its body's first statements; one elsewhere is ignored with a warning.
+
+**`PIPELINE`, as Vitis HLS makes it** (#1962, `core/c-pipe-sched.js`): the iterations of a loop that accesses a memory
+or holds a `continue` or a `break` overlap, a new one every II cycles, and its cycles are Vitis's count, (N - 1) x II + the
+stages of an iteration (the report's `depth`). Each memory's port takes one access a cycle (a read's value the cycle
+after), the operations are chained while they fit the clock, its inner loops of constant count are unrolled, those
+with accesses too, and an element read twice is one read. The II is the one the ports and the dependences allow; when
+the clock's stages would need a larger one (a recurrence through a long operation, as a `float` sum), the II is kept
+and the iteration's path is longer than the clock, said in the report as for any pipelined loop (#2080). An exit known only after the next iteration has started squashes
+that iteration, if none has written anything by then but the loop's own variables. A warning says the II made only
+when the II asked cannot be met, and why: a memory's one port, or a dependence (a variable or a memory another iteration
+reads, the exit). A loop with a stream, with a memory of structs, a `return` or a `goto` is still made as below, its
+accesses a state each. The top function's `PIPELINE` makes the whole function so, its machine one pipeline: a new call
+whenever `ap_start` finds the first stage free (`ap_ready`, ahead of `ap_done`), its loops unrolled, the report's
+`pipeline` its II and depth; one with a stream, or that cannot be made so, runs its calls one after the other, with a
+warning saying why. A function the top calls is inlined: its pragma has no effect (a warning). A top that fits the clock
+with no state is combinational, whatever its pragma. `BIND_STORAGE` is not made, so a memory has one port even where
+Vitis's `ram_2p` has two.
 
 **Loops pipelined automatically** (#1919), as Vitis HLS's default (UG1399): with no `PIPELINE` pragma, an innermost
 loop of more than 64 iterations is pipelined (II=1 aimed at); one of 64 or fewer has its parent pipelined instead,
 the inner loop unrolled in it, when Silinx can make the parent so (else the inner loop is pipelined); an innermost
 loop with no parent is pipelined whatever its count. The threshold is Vitis HLS's `syn.compile.pipeline_loops`:
 `cToHdl(…, { pipelineLoops: N })` (and `cosimulate`'s), 0 for none; `#pragma HLS PIPELINE off` in a loop leaves it
-as it is. A pipelined loop that accesses a memory or a stream keeps a state per access (a memory's read is in its
+as it is. A pipelined loop that accesses a stream (or that the pipeline above cannot make) keeps a state per access (a memory's read is in its
 register a cycle later), its condition and step in its last state, consecutive states merged when they use no port
 of the same memory or stream; its first state's work is done in its last for the next iteration when they share no
 port: `s += a[i]` takes a cycle an iteration, `a[i] = a[i] + 1` two (one port). A state that waits for a stream

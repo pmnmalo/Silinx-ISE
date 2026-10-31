@@ -52,7 +52,10 @@ export function checkPragmas(ast, funcs, report, top = null) {
     if (IGNORED.has(name) || ((name === 'AGGREGATE' || name === 'DISAGGREGATE') && fname !== top)) { report(loc, `#pragma HLS ${name} is accepted and ignored: Silinx does not make it`, 'warning'); return; }
     if (!MADE.has(name)) { report(loc, `#pragma HLS ${name} is not a pragma Silinx knows: ignored`, 'warning'); return; }
     if (LOOP_ONLY.has(name) && where !== 'loop') {
-      if (name === 'PIPELINE' && where === 'function') report(loc, "a function's #pragma HLS PIPELINE is not made yet: ignored (a loop's is: put it in the loop's body)", 'warning');
+      if (name === 'PIPELINE' && where === 'function') {
+        // (the top's made, core/c-pipe-sched.js, #1962; a function the top calls is inlined in it)
+        if (fname !== top && !args.off) report(loc, `#pragma HLS PIPELINE of '${fname}', a function the top calls: inlined in the top, its pragma has no effect`, 'warning');
+      }
       else report(loc, `#pragma HLS ${name} applies to the loop it is in (first in its body): ignored here`, 'warning');
       return;
     }
