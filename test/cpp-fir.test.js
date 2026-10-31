@@ -80,9 +80,9 @@ test('#1942 the corpus\'s dsp-fir-decimator in its form: its C simulation passes
     assert.deepEqual([r.errors, r.pass], [[], true], `${lang} ${JSON.stringify(r.mismatches, big)}`);
     assert.deepEqual(comparePorts(ours(r.gen), VITIS.ports), { same: true, missing: [], extra: [], differ: [] }, lang);
     assert.deepEqual(msgs(r.gen.diagnostics), [], lang);
-    // (Vitis HLS's 32 cycles; Silinx's one multiply-accumulate 13 an output, and the region's start and end)
-    assert.deepEqual(r.latency, { min: 132, max: 132, avg: 132 }, lang);
-    assert.deepEqual(r.gen.report.processes.map((p) => `${p.instance} ${p.states}`), ['ap_fir_fir1_U0 6'], lang);
+    // (Vitis HLS's 32 cycles; Silinx's 4 MACs, an input a clock, and the region's start and end, #1947)
+    assert.deepEqual(r.latency, { min: 31, max: 31, avg: 31 }, lang);
+    assert.deepEqual(r.gen.report.processes.map((p) => `${p.instance} ${p.states}`), ['ap_fir_fir1_U0 3'], lang);
   }
 });
 
@@ -182,7 +182,7 @@ const fetched = fs.existsSync(path.join(corpusDir, design.files[0])) ? false : '
 test('#1942 the corpus\'s dsp-fir-decimator itself (AMD\'s sources, when fetched): its C simulation, synthesis and co-simulation pass; Vitis HLS\'s ports; its warnings', { skip: fetched }, () => {
   const texts = Object.fromEntries([...design.files, ...design.tb, ...design.headers].map((f) => [f, fs.readFileSync(path.join(corpusDir, f), 'utf8')]));
   const r = runDesign(design, texts);
-  assert.deepEqual(r, { csim: 'pass', synth: 'pass', cosim: 'pass', latency: { min: 132, max: 132, avg: 132 }, reason: null });
+  assert.deepEqual(r, { csim: 'pass', synth: 'pass', cosim: 'pass', latency: { min: 31, max: 31, avg: 31 }, reason: null });
   const { unit, headers } = unitOf(design, texts);
   for (const lang of LANGS) {
     const g = cToHdl(unit, { file: 'unit.cpp', headers, top: design.top, lang });

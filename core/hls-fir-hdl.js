@@ -1,12 +1,17 @@
-// Silinx HLS (#1942): the hardware of hls_fir.h's hls::FIR (core/hls-fir.js), its own HDL, VHDL or Verilog, suited to
-// the Spartan-3E: one multiply-accumulate (the multiplier's operands and product registered, an 18x18 multiplier's,
-// MULT18X18SIO, for widths up to 18), the coefficients a ROM and the delay line a RAM (written so that ISE and Yosys
-// make them block RAMs), a state machine around them:
-//   each input read (an array's: its address, its value the cycle after; a stream's: when it has one) and written
-//   into the delay line (a circular buffer, the input converted to the parameters' format);
-//   once each decim_rate inputs (decimation), or each input interp_rate times (interpolation, a phase each), the
-//   taps multiplied and accumulated one a cycle, in full precision;
-//   the sum written out (converted to the output's type, as the C model's ap_fixed conversion).
+// Silinx HLS (#1942, #1947): the hardware of hls_fir.h's hls::FIR (core/hls-fir.js), its own HDL, VHDL or Verilog, suited
+// to the Spartan-3E: the MACs the rate asks for (firStructure: the multipliers' operands and products registered, an
+// 18x18 multiplier's, MULT18X18SIO, for widths up to 18), the coefficients a ROM each and the delay line a RAM each
+// (written so that ISE and Yosys make them block RAMs), around them:
+//   the inputs read one a clock at most (an array's: its address, its value the cycle after; a stream's: when it has
+//   one) and written into the delay line, a circular buffer cyclically partitioned among the MACs, one write a clock
+//   in a bank of its own and each bank its own read, so that every MAC has its tap in the same clock;
+//   once each decim_rate inputs (a decimator computes only the outputs it keeps), or each input interp_rate times
+//   (interpolation, a phase each), the job: the taps a group a clock, oldest first (the samples arriving meanwhile
+//   overwrite only what has been read); a mirrored filter's second delay line read the other way, its samples added
+//   (the pre-adder) before the multiplier; the products summed in a pipelined tree, then accumulated in full precision;
+//   the sum written out (converted to the output's type, as the C model's ap_fixed conversion);
+//   the input held back only when its sample would start a job before the last has read its taps, all of it while a
+//   stream's output is full.
 // The module's ports Vitis HLS's for the filter's run(): ap_clk, ap_rst, ap_ctrl_hs, an array's ap_memory with its two
 // ports (the second unused, as the filter's), a stream's ap_fifo, the config an ap_none input (or a stream).
 // Isomorphic ES module.
@@ -18,7 +23,7 @@ import { Flow } from './c-dataflow.js';
 import { sig, vhdlNodes, verilogNodes, bin } from './c-hdl.js';
 import { portOf } from './c-names.js';
 import { fixedType } from './c-fixed.js';
-import { firPhases } from './hls-fir.js';
+import { firStructure, FIR_MAX_MACS } from './hls-fir.js';
 
 const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 
@@ -55,42 +60,69 @@ export function firHdl(fir, { lang = 'vhdl', module, src = 'input.cpp', types })
   const { p } = fir;
   const aw = { in: clog2(p.inLen), out: clog2(p.outLen) };
   const ports = portsOf(fir, types, aw);
-  const rom = firPhases(p);
-  const raw = clog2(rom.length + 1);
+  const st = firStructure(p);
+  const M = st.macs, C = st.groups;
+  const words = st.rom[0].length;
+  const raw = clog2(words + 1);
   const n = { in: portOf('in'), out: portOf('out'), config: portOf('config') };
   const sIn = fir.args.in.stream, sOut = fir.args.out.stream, cfg = fir.args.config;
   const cv = conversions(p, types, sIn ? `${n.in}_dout` : `${n.in}_q0`);
-  const k = { ...p, aw, raw, rn: 2 ** raw, rom, n, sIn, sOut, cfg, cv, types, lnt: p.L * p.nt, pw: p.inW + p.cW };
+  const sym = p.symmetry;
+  const opW = p.inW + (sym ? 1 : 0);
+  // (the tree of the products: the counts of its levels; the pipeline: the read, the operands, the product, each level)
+  const tree = [M];
+  while (tree.at(-1) > 1) tree.push(Math.ceil(tree.at(-1) / 2));
+  const pd = 3 + tree.length - 1;
+  // (where the samples are at the start: the next write at 0, the oldest tap nt - 1 before it, around the ring)
+  const ring = M * st.depth, off = (ring - ((p.nt - 1) % ring)) % ring;
+  // (a mirrored filter of an odd length: its centre tap counted once)
+  const centre = sym && p.nt % 2 ? { t: Math.floor((st.half - 1) / M), m: (st.half - 1) % M } : null;
+  const k = { ...p, ...st, M, C, aw, raw, rn: 2 ** raw, n, sIn, sOut, cfg, cv, types, lnt: p.L * C, cl: p.L * C, opW, pw: opW + p.cW, tree, pd, oa0: Math.floor(off / M), ob0: off % M, centre, sym };
   const hdl = (lang === 'vhdl' ? vhdl : verilog)(module, src, ports, k);
   const memories = ['in', 'out'].filter((a) => !fir.args[a].stream).map((a) => ({ name: a, n: a === 'in' ? p.inLen : p.outLen, w: types[a].w, s: types[a].s, aw: aw[a], read: a === 'in', written: a === 'out' }));
   const fifos = ['in', 'out', 'config'].filter((a) => fir.args[a]?.stream).map((a) => ({ name: a, dir: a === 'out' ? 'out' : 'in', w: types[a].w, s: types[a].s }));
-  // (the registers: the state, the counters, the bases, the operands, the product, the sum, the pipeline's valid bits)
-  const regs = 3 + clog2(p.inLen + 1) + clog2(p.outLen + 1) + 2 + 3 * clog2(p.nt + 1) + clog2(p.D) + clog2(p.L) + 2 * raw + p.inW + p.cW + k.pw + p.accW + 2;
-  const report = { sequential: true, states: cfg?.stream ? 7 : 6, registerBits: regs, memories: [{ name: 'coefficients', words: rom.length, bits: p.cW, kind: 'ROM' }, { name: 'delay line', words: p.nt, bits: p.inW, kind: 'RAM' }], loops: [], fir: { taps: p.taps, sets: p.sets, accW: p.accW, outW: p.outW } };
-  return { ok: true, hdl, top: module, ports, diagnostics: [], sequential: true, states: report.states, memories, fifos, report };
+  // (the registers: the state, the counters, the pointers, the operands, the products, the tree, the sum, the pipeline's bits)
+  const dbits = clog2(st.depth), mbits = clog2(M), treeRegs = tree.slice(1).reduce((a, b) => a + b, 0);
+  const regs = 2 + clog2(p.inLen + 1) + clog2(p.outLen + 1) + clog2(p.D) + 2 + clog2(k.cl + 1) + 2 * clog2(C) + 2 * raw + (sym ? 4 : 3) * dbits + (sym ? 6 : 4) * mbits + M * (opW + p.cW + k.pw) + treeRegs * p.accW + p.accW + 3 * pd + 1;
+  const report = { sequential: true, states: cfg?.stream ? 4 : 3, registerBits: regs,
+    memories: [{ name: 'coefficients', words: M * words, bits: p.cW, kind: 'ROM' }, { name: 'delay line', words: (sym ? 2 : 1) * ring, bits: p.inW, kind: 'RAM' }], loops: [],
+    fir: { taps: p.taps, sets: p.sets, accW: p.accW, outW: p.outW, clocksPerInput: st.cps, macs: M, tapsPerMac: C, preAdder: sym } };
+  // (the rate asks for more multipliers than any board has: said, the filter slower)
+  const diagnostics = st.wanted > M ? [{ line: fir.loc?.line ?? 0, col: fir.loc?.col ?? 0, severity: 'warning',
+    message: `hls::FIR<${p.name}>: ${st.half} taps at ${st.cps} clock${st.cps > 1 ? 's' : ''} an input ask for ${st.wanted} multipliers: Silinx HLS makes ${FIR_MAX_MACS}, an output taking ${C} clocks (a larger sample_period says the rate the filter must sustain)` }] : [];
+  return { ok: true, hdl, top: module, ports, diagnostics, sequential: true, states: report.states, memories, fifos, report };
 }
+
+const range = (n) => Array.from({ length: n }, (_, j) => j);
 
 // ------------------------------------------------------------------------------------------- VHDL
 function vhdl(name, src, ports, k) {
-  const { n, cv } = k;
+  const { n, cv, M, C, D, pd, sym } = k;
   const T = (w) => (w === 1 ? 'std_logic' : `std_logic_vector(${w - 1} downto 0)`);
-  const iw = clog2(k.inLen + 1) + 1, ow = clog2(k.outLen + 1) + 1;
-  const L = [`-- Generated by Silinx from ${src} (Silinx HLS, compatible with Vitis HLS): hls::FIR, ${k.type}, ${k.taps} taps${k.sets > 1 ? ` x ${k.sets} sets` : ''}: edit the C source`,
+  const iw = clog2(k.inLen + 1) + 1, ow = clog2(k.outLen + 1) + 1, dd = k.depth;
+  const L = [`-- Generated by Silinx from ${src} (Silinx HLS, compatible with Vitis HLS): hls::FIR, ${k.type}, ${k.taps} taps${k.sets > 1 ? ` x ${k.sets} sets` : ''}, ${M} MAC${M > 1 ? 's' : ''}${sym ? ', pre-adder' : ''}: edit the C source`,
     'library ieee;', 'use ieee.std_logic_1164.all;', 'use ieee.numeric_std.all;', '', `entity ${name} is`, '  port ('];
   ports.forEach((q, i) => L.push(`    ${q.name} : ${q.dir} ${T(q.w)}${i < ports.length - 1 ? ';' : ''}`));
+  const banks = range(M), bankNames = sym ? ['dl', 'dm'] : ['dl'];
+  const sg = (w) => `signed(${w - 1} downto 0)`;
   L.push('  );', `end ${name};`, '', `architecture behav of ${name} is`,
-    '  type ap_st_t is (S_IDLE, S_CFG, S_RD, S_WR, S_MAC, S_OUT, S_DONE);', '  signal ap_st : ap_st_t := S_IDLE;',
-    `  signal ap_i : unsigned(${iw - 1} downto 0);`, `  signal ap_o : unsigned(${ow - 1} downto 0);`,
-    `  signal ap_k : integer range 0 to ${k.nt};`, `  signal ap_wp, ap_nw : integer range 0 to ${k.nt - 1} := 0;`,
-    `  signal ap_dc : integer range 0 to ${k.D - 1};`, `  signal ap_ph : integer range 0 to ${k.L - 1};`,
-    `  signal ap_base, ap_sbase, ap_rom_addr : unsigned(${k.raw - 1} downto 0);`,
-    // (the coefficients: a block ROM; the delay line: a block RAM, zeros at the start as the C model's statics)
-    `  type ap_rom_t is array (0 to ${k.rn - 1}) of signed(${k.cW - 1} downto 0);`,
-    `  constant ap_rom : ap_rom_t := (${Array.from({ length: k.rn }, (_, j) => `${j} => "${bin(k.rom[j] ?? 0n, k.cW)}"`).join(', ')});`,
-    `  type ap_dl_t is array (0 to ${k.nt - 1}) of signed(${k.inW - 1} downto 0);`, '  signal ap_dl : ap_dl_t := (others => (others => \'0\'));',
-    `  signal ap_dl_addr : integer range 0 to ${k.nt - 1};`, '  signal ap_dl_we, ap_take, ap_give, ap_v1, ap_v2 : std_logic;',
-    `  signal ap_dl_q : signed(${k.inW - 1} downto 0);`, `  signal ap_rom_q : signed(${k.cW - 1} downto 0);`,
-    `  signal ap_prod : signed(${k.pw - 1} downto 0);`, `  signal ap_acc : signed(${k.accW - 1} downto 0);`, `  signal ap_acc_v : std_logic_vector(${k.accW - 1} downto 0);`,
+    '  type ap_st_t is (S_IDLE, S_CFG, S_RUN, S_DONE);', '  signal ap_st : ap_st_t := S_IDLE;',
+    `  signal ap_r : unsigned(${iw - 1} downto 0);`, `  signal ap_o : unsigned(${ow - 1} downto 0);`,
+    `  signal ap_dc : integer range 0 to ${D - 1};`,
+    `  signal ap_wb : integer range 0 to ${M - 1} := 0;`, `  signal ap_wa : integer range 0 to ${dd - 1} := 0;`,
+    `  signal ap_ob : integer range 0 to ${M - 1} := ${k.ob0};`, `  signal ap_oa : integer range 0 to ${dd - 1} := ${k.oa0};`,
+    `  signal ap_qb, ap_qbd, ap_pb, ap_pbd : integer range 0 to ${M - 1} := 0;`, `  signal ap_qa, ap_qa0, ap_qa1, ap_pa, ap_pa1 : integer range 0 to ${dd - 1} := 0;`,
+    `  signal ap_t, ap_td : integer range 0 to ${C - 1} := 0;`, `  signal ap_n, ap_nn : integer range 0 to ${k.cl} := 0;`,
+    `  signal ap_base, ap_sbase : unsigned(${k.raw - 1} downto 0);`,
+    "  signal ap_ce, ap_issue, ap_take, ap_give, ap_launch, ap_rd_v, ap_rd_l, ap_free, ap_v0, ap_f0, ap_l0, ap_out_v : std_logic := '0';",
+    `  signal ap_vv, ap_vf, ap_vl : std_logic_vector(${pd - 1} downto 0) := (others => '0');`,
+    // (the coefficients: a block ROM each; the delay line: a block RAM each, zeros at the start as the C model's statics)
+    `  type ap_rom_t is array (0 to ${k.rn - 1}) of ${sg(k.cW)};`, `  type ap_dl_t is array (0 to ${dd - 1}) of ${sg(k.inW)};`);
+  for (const m of banks) L.push(`  constant ap_rom_${m} : ap_rom_t := (${range(k.rn).map((j) => `${j} => "${bin(k.rom[m][j] ?? 0n, k.cW)}"`).join(', ')});`);
+  for (const b of bankNames) for (const m of banks) L.push(`  signal ap_${b}_${m} : ap_dl_t := (others => (others => '0'));`, `  signal ap_${b}_q_${m}, ap_${b}_x_${m} : ${sg(k.inW)};`, `  signal ap_${b}_a_${m} : integer range 0 to ${dd - 1};`);
+  for (const m of banks) L.push(`  signal ap_rom_q_${m}, ap_c_${m} : ${sg(k.cW)};`, `  signal ap_x_${m} : ${sg(k.opW)};`, `  signal ap_prod_${m} : ${sg(k.pw)};`);
+  k.tree.forEach((c, l) => { for (let j = 0; j < c; j++) L.push(`  signal ap_s_${l}_${j} : ${sg(k.accW)};`); });
+  L.push(`  signal ap_acc : ${sg(k.accW)};`, `  signal ap_acc_v : std_logic_vector(${k.accW - 1} downto 0);`,
     // (the addresses and the config as unsigned, a port of one bit too)
     `  signal ap_in_addr : unsigned(${k.aw.in - 1} downto 0);`, `  signal ap_out_addr : unsigned(${k.aw.out - 1} downto 0);`, `  signal ap_cfg : unsigned(${k.cfg ? k.types.config.w - 1 : 0} downto 0);`);
   for (const x of cv.nodes) L.push(`  signal ${sig(x)} : ${x.s ? 'signed' : 'unsigned'}(${x.w - 1} downto 0);`);
@@ -99,15 +131,18 @@ function vhdl(name, src, ports, k) {
   const zero = (w) => (w === 1 ? "'0'" : "(others => '0')");
   const vec = (x, w) => (w === 1 ? `${x}(0)` : `std_logic_vector(${x})`);
   const slv = (x, w) => (w === 1 ? `${sig(x)}(0)` : `std_logic_vector(${sig(x)})`);
-  // (an input taken: an array's value the cycle after its address, a stream's when it has one; an output given)
-  L.push(k.sIn ? `  ap_take <= '1' when ap_st = S_RD and ${n.in}_empty_n = '1' else '0';` : "  ap_take <= '1' when ap_st = S_WR else '0';",
-    k.sOut ? `  ap_give <= '1' when ap_st = S_OUT and ${n.out}_full_n = '1' else '0';` : "  ap_give <= '1' when ap_st = S_OUT else '0';",
-    '  ap_dl_we <= ap_take;', `  ap_dl_addr <= ap_wp when ap_take = '1' else ap_nw - ap_k when ap_nw >= ap_k else ap_nw + ${k.nt} - ap_k;`,
-    `  ap_rom_addr <= ap_base + to_unsigned(ap_k, ${k.raw});`, '  ap_acc_v <= std_logic_vector(ap_acc);');
+  // (the input: one read a clock, held back when its sample would start a job while the last still reads its taps)
+  L.push(k.sOut ? `  ap_ce <= '0' when ap_out_v = '1' and ${n.out}_full_n = '0' else '1';` : "  ap_ce <= '1';",
+    `  ap_nn <= ${k.cl} when ap_launch = '1' else ap_n - 1 when ap_n > 0 else 0;`,
+    `  ap_free <= '1' when ${k.sIn ? 'ap_n' : 'ap_nn'} <= 1 else '0';`,
+    `  ap_issue <= '1' when ap_ce = '1' and ap_st = S_RUN and ap_r < ${k.inLen} and (ap_dc /= ${D - 1} or ap_free = '1')${k.sIn ? ` and ${n.in}_empty_n = '1'` : ''} else '0';`,
+    k.sIn ? '  ap_take <= ap_issue;' : '  ap_take <= ap_rd_v;',
+    k.sIn ? `  ap_launch <= '1' when ap_issue = '1' and ap_dc = ${D - 1} else '0';` : '  ap_launch <= ap_rd_l;',
+    "  ap_give <= ap_out_v and ap_ce;", "  ap_v0 <= '1' when ap_n > 0 else '0';", "  ap_f0 <= '1' when ap_t = 0 else '0';", `  ap_l0 <= '1' when ap_t = ${C - 1} else '0';`,
+    `  ap_qa1 <= 0 when ap_qa = ${dd - 1} else ap_qa + 1;`, `  ap_pa1 <= ${dd - 1} when ap_pa = 0 else ap_pa - 1;`, '  ap_acc_v <= std_logic_vector(ap_acc);');
   if (k.sIn) L.push(`  ${n.in}_read <= ap_take;`);
   else {
-    L.push(`  ap_in_addr <= ap_i(${k.aw.in - 1} downto 0) + 1 when ap_st = S_WR else ap_i(${k.aw.in - 1} downto 0);`, `  ${n.in}_address0 <= ${vec('ap_in_addr', k.aw.in)};`,
-      `  ${n.in}_ce0 <= '1' when ap_st = S_RD or (ap_st = S_WR and ap_dc /= ${k.D - 1}) else '0';`,
+    L.push(`  ap_in_addr <= ap_r(${k.aw.in - 1} downto 0);`, `  ${n.in}_address0 <= ${vec('ap_in_addr', k.aw.in)};`, `  ${n.in}_ce0 <= ap_issue;`,
       `  ${n.in}_d0 <= ${zero(k.types.in.w)};`, `  ${n.in}_we0 <= '0';`, `  ${n.in}_address1 <= ${zero(k.aw.in)};`, `  ${n.in}_ce1 <= '0';`,
       `  ${n.in}_d1 <= ${zero(k.types.in.w)};`, `  ${n.in}_we1 <= '0';`);
   }
@@ -120,53 +155,94 @@ function vhdl(name, src, ports, k) {
   const cfgIn = k.cfg?.stream ? `${n.config}_dout` : n.config;
   L.push(k.cfg ? (k.types.config.w === 1 ? `  ap_cfg(0) <= ${cfgIn};` : `  ap_cfg <= unsigned(${cfgIn});`) : "  ap_cfg <= \"0\";");
   L.push("  ap_idle <= '1' when ap_st = S_IDLE else '0';", "  ap_done <= '1' when ap_st = S_DONE else '0';", "  ap_ready <= '1' when ap_st = S_DONE else '0';");
-  L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', '      ap_rom_q <= ap_rom(to_integer(ap_rom_addr));',
-    "      if ap_dl_we = '1' then", `        ap_dl(ap_dl_addr) <= ${sig(cv.x)};`, '      end if;', '      ap_dl_q <= ap_dl(ap_dl_addr);', '    end if;', '  end process;');
-  // (the set's first coefficient: the config's set times its phases' taps; one set, the first)
+  // (each bank its read: the oldest group's samples around the ring; each MAC its bank's sample, rotated; the pre-adder)
+  const pick = (list, sel) => list.reduce((e, [v, i], j) => (j === list.length - 1 ? `${e}${v}` : `${e}${v} when ${sel} = ${i} else `), '');
+  for (const m of banks) {
+    L.push(`  ap_dl_a_${m} <= ap_qa1 when ap_qb > ${m} else ap_qa;`);
+    if (sym) L.push(`  ap_dm_a_${m} <= ap_pa1 when ap_pb < ${m} else ap_pa;`);
+    L.push(`  ap_dl_x_${m} <= ${pick(banks.map((b) => [`ap_dl_q_${(b + m) % M}`, b]), 'ap_qbd')};`);
+    if (sym) {
+      const a = pick(banks.map((b) => [`ap_dm_q_${(b - m + M) % M}`, b]), 'ap_pbd');
+      L.push(`  ap_dm_x_${m} <= ${k.centre?.m === m ? `(others => '0') when ap_td = ${k.centre.t} else ` : ''}${a};`);
+    }
+    L.push(`  ap_s_0_${m} <= resize(ap_prod_${m}, ${k.accW});`);
+  }
+  const preadd = (m) => (sym === 'negative' ? `resize(ap_dl_x_${m}, ${k.opW}) - resize(ap_dm_x_${m}, ${k.opW})` : sym ? `resize(ap_dl_x_${m}, ${k.opW}) + resize(ap_dm_x_${m}, ${k.opW})` : `ap_dl_x_${m}`);
+  L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_ce = '1' then");
+  for (const m of banks) {
+    L.push(`        ap_rom_q_${m} <= ap_rom_${m}(to_integer(ap_base));`);
+    for (const b of bankNames) L.push(`        ap_${b}_q_${m} <= ap_${b}_${m}(ap_${b}_a_${m});`);
+  }
+  L.push('      end if;', "      if ap_take = '1' and ap_ce = '1' then");
+  for (const m of banks) { L.push(`        if ap_wb = ${m} then`); for (const b of bankNames) L.push(`          ap_${b}_${m}(ap_wa) <= ${sig(cv.x)};`); L.push('        end if;'); }
+  L.push('      end if;', '    end if;', '  end process;');
+  // (the set's first coefficient: the config's set times its groups; one set, the first)
   const sbase = k.sets > 1 ? `resize(ap_cfg * to_unsigned(${k.lnt}, ${k.raw}), ${k.raw})` : `to_unsigned(0, ${k.raw})`;
-  const sample = ['            ap_nw <= ap_wp;', `            if ap_wp = ${k.nt - 1} then ap_wp <= 0; else ap_wp <= ap_wp + 1; end if;`, '            ap_i <= ap_i + 1;',
-    `            if ap_dc = ${k.D - 1} then`, "              ap_dc <= 0; ap_ph <= 0; ap_base <= ap_sbase; ap_k <= 0; ap_acc <= (others => '0'); ap_st <= S_MAC;", '            else', '              ap_dc <= ap_dc + 1;', '            end if;'];
-  L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' then", '        ap_st <= S_IDLE; ap_wp <= 0; ap_nw <= 0;', "        ap_v1 <= '0'; ap_v2 <= '0';", '      else',
-    "        ap_v1 <= '0';", '        ap_v2 <= ap_v1;', "        if ap_v1 = '1' then ap_prod <= ap_dl_q * ap_rom_q; end if;", `        if ap_v2 = '1' then ap_acc <= ap_acc + resize(ap_prod, ${k.accW}); end if;`,
-    '        case ap_st is', '          when S_IDLE =>', "            if ap_start = '1' then", "              ap_i <= (others => '0'); ap_o <= (others => '0'); ap_dc <= 0;",
+  const tail = (v, x) => `${v} <= ${v}(${pd - 2} downto 0) & ${x};`;
+  L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' then",
+    `        ap_st <= S_IDLE; ap_wb <= 0; ap_wa <= 0; ap_ob <= ${k.ob0}; ap_oa <= ${k.oa0}; ap_n <= 0;`, "        ap_rd_v <= '0'; ap_rd_l <= '0'; ap_out_v <= '0'; ap_vv <= (others => '0');",
+    "      elsif ap_ce = '1' then", `        ${tail('ap_vv', 'ap_v0')}`, `        ${tail('ap_vf', 'ap_f0')}`, `        ${tail('ap_vl', 'ap_l0')}`, '        ap_qbd <= ap_qb; ap_pbd <= ap_pb; ap_td <= ap_t;');
+  for (const m of banks) L.push(`        ap_c_${m} <= ap_rom_q_${m}; ap_x_${m} <= ${preadd(m)}; ap_prod_${m} <= ap_x_${m} * ap_c_${m};`);
+  k.tree.slice(1).forEach((c, l) => { for (let j = 0; j < c; j++) L.push(`        ap_s_${l + 1}_${j} <= ${2 * j + 1 < k.tree[l] ? `ap_s_${l}_${2 * j} + ap_s_${l}_${2 * j + 1}` : `ap_s_${l}_${2 * j}`};`); });
+  const sum = `ap_s_${k.tree.length - 1}_0`;
+  L.push(`        if ap_vv(${pd - 1}) = '1' then`, `          if ap_vf(${pd - 1}) = '1' then ap_acc <= ${sum}; else ap_acc <= ap_acc + ${sum}; end if;`, '        end if;',
+    `        ap_out_v <= ap_vv(${pd - 1}) and ap_vl(${pd - 1});`,
+    ...(k.sIn ? [] : ['        ap_rd_v <= ap_issue;', `        if ap_issue = '1' and ap_dc = ${D - 1} then ap_rd_l <= '1'; else ap_rd_l <= '0'; end if;`]),
+    "        if ap_issue = '1' then", '          ap_r <= ap_r + 1;', `          if ap_dc = ${D - 1} then ap_dc <= 0; else ap_dc <= ap_dc + 1; end if;`, '        end if;',
+    "        if ap_take = '1' then",
+    `          if ap_wb = ${M - 1} then ap_wb <= 0; if ap_wa = ${dd - 1} then ap_wa <= 0; else ap_wa <= ap_wa + 1; end if; else ap_wb <= ap_wb + 1; end if;`,
+    `          if ap_ob = ${M - 1} then ap_ob <= 0; if ap_oa = ${dd - 1} then ap_oa <= 0; else ap_oa <= ap_oa + 1; end if; else ap_ob <= ap_ob + 1; end if;`, '        end if;',
+    '        ap_n <= ap_nn;',
+    "        if ap_launch = '1' then", '          ap_qb <= ap_ob; ap_qa <= ap_oa; ap_qa0 <= ap_oa; ap_pb <= ap_wb; ap_pa <= ap_wa; ap_t <= 0; ap_base <= ap_sbase;',
+    '        elsif ap_n > 0 then', '          ap_base <= ap_base + 1; ap_pa <= ap_pa1;', `          if ap_t = ${C - 1} then ap_t <= 0; ap_qa <= ap_qa0; else ap_t <= ap_t + 1; ap_qa <= ap_qa1; end if;`, '        end if;',
+    "        if ap_give = '1' then ap_o <= ap_o + 1; end if;",
+    '        case ap_st is', '          when S_IDLE =>', "            if ap_start = '1' then", "              ap_r <= (others => '0'); ap_o <= (others => '0'); ap_dc <= 0;",
     ...(k.cfg?.stream ? [] : [`              ap_sbase <= ${sbase};`]),
-    `              ap_st <= ${k.cfg?.stream ? 'S_CFG' : 'S_RD'};`, '            end if;',
-    '          when S_CFG =>', ...(k.cfg?.stream ? [`            if ${n.config}_empty_n = '1' then`, `              ap_sbase <= ${sbase};`, '              ap_st <= S_RD;', '            end if;'] : ['            ap_st <= S_RD;']),
-    '          when S_RD =>', ...(k.sIn ? ["            if ap_take = '1' then", ...sample.map((s) => `  ${s}`), '            end if;'] : ['            ap_st <= S_WR;']),
-    '          when S_WR =>', ...sample,
-    '          when S_MAC =>', `            if ap_k < ${k.nt} then`, "              ap_v1 <= '1'; ap_k <= ap_k + 1;", "            elsif ap_v1 = '0' then", '              ap_st <= S_OUT;', '            end if;',
-    '          when S_OUT =>', "            if ap_give = '1' then", '              ap_o <= ap_o + 1;', `              if ap_ph < ${k.L - 1} then`,
-    `                ap_ph <= ap_ph + 1; ap_base <= ap_base + ${k.nt}; ap_k <= 0; ap_acc <= (others => '0'); ap_st <= S_MAC;`,
-    `              elsif ap_i = ${k.inLen} then`, '                ap_st <= S_DONE;', '              else', '                ap_st <= S_RD;', '              end if;', '            end if;',
+    `              ap_st <= ${k.cfg?.stream ? 'S_CFG' : 'S_RUN'};`, '            end if;',
+    '          when S_CFG =>', ...(k.cfg?.stream ? [`            if ${n.config}_empty_n = '1' then`, `              ap_sbase <= ${sbase};`, '              ap_st <= S_RUN;', '            end if;'] : ['            ap_st <= S_RUN;']),
+    '          when S_RUN =>', `            if ap_give = '1' and ap_o = ${k.outLen - 1} then ap_st <= S_DONE; end if;`,
     '          when S_DONE =>', '            ap_st <= S_IDLE;', '        end case;', '      end if;', '    end if;', '  end process;', 'end behav;', '');
   return L.join('\n');
 }
 
 // ------------------------------------------------------------------------------------------- Verilog
 function verilog(name, src, ports, k) {
-  const { n, cv } = k;
+  const { n, cv, M, C, D, pd, sym } = k;
   const W = (w) => (w > 1 ? `[${w - 1}:0] ` : '');
-  const iw = clog2(k.inLen + 1) + 1, ow = clog2(k.outLen + 1) + 1, cw = clog2(k.nt + 1);
-  const S = { S_IDLE: 0, S_CFG: 1, S_RD: 2, S_WR: 3, S_MAC: 4, S_OUT: 5, S_DONE: 6 };
-  const L = [`// Generated by Silinx from ${src} (Silinx HLS, compatible with Vitis HLS): hls::FIR, ${k.type}, ${k.taps} taps${k.sets > 1 ? ` x ${k.sets} sets` : ''}: edit the C source`, `module ${name} (`];
+  const iw = clog2(k.inLen + 1) + 1, ow = clog2(k.outLen + 1) + 1, dd = k.depth;
+  const S = { S_IDLE: 0, S_CFG: 1, S_RUN: 2, S_DONE: 3 };
+  const mw = clog2(M), dw = clog2(dd), tw = clog2(C), nw = clog2(k.cl + 1);
+  const banks = range(M), bankNames = sym ? ['dl', 'dm'] : ['dl'];
+  const L = [`// Generated by Silinx from ${src} (Silinx HLS, compatible with Vitis HLS): hls::FIR, ${k.type}, ${k.taps} taps${k.sets > 1 ? ` x ${k.sets} sets` : ''}, ${M} MAC${M > 1 ? 's' : ''}${sym ? ', pre-adder' : ''}: edit the C source`, `module ${name} (`];
   ports.forEach((q, i) => L.push(`  ${q.dir === 'in' ? 'input ' : 'output'} wire ${W(q.w)}${q.name}${i < ports.length - 1 ? ',' : ''}`));
-  L.push(');', ...Object.entries(S).map(([s, v]) => `  localparam ${s} = 3'd${v};`), '  reg [2:0] ap_st = S_IDLE;',
-    `  reg [${iw - 1}:0] ap_i;`, `  reg [${ow - 1}:0] ap_o;`, `  reg [${cw - 1}:0] ap_k, ap_wp = 0, ap_nw = 0;`,
-    `  reg [${clog2(k.D) - 1}:0] ap_dc;`, `  reg [${clog2(k.L) - 1}:0] ap_ph;`, `  reg [${k.raw - 1}:0] ap_base, ap_sbase;`,
-    `  reg signed [${k.cW - 1}:0] ap_rom [0:${k.rn - 1}];`, `  reg signed [${k.inW - 1}:0] ap_dl [0:${k.nt - 1}];`,
-    `  reg signed [${k.cW - 1}:0] ap_rom_q;`, `  reg signed [${k.inW - 1}:0] ap_dl_q;`, `  reg signed [${k.pw - 1}:0] ap_prod;`, `  reg signed [${k.accW - 1}:0] ap_acc;`,
-    '  reg ap_v1, ap_v2;', `  wire [${k.accW - 1}:0] ap_acc_v = ap_acc;`,
-    // (the coefficients: a block ROM; the delay line: a block RAM, zeros at the start as the C model's statics)
-    '  initial begin', ...Array.from({ length: k.rn }, (_, j) => `    ap_rom[${j}] = ${k.cW}'b${bin(k.rom[j] ?? 0n, k.cW)};`),
-    ...Array.from({ length: k.nt }, (_, j) => `    ap_dl[${j}] = ${k.inW}'d0;`), '  end');
+  L.push(');', ...Object.entries(S).map(([s, v]) => `  localparam ${s} = 2'd${v};`), '  reg [1:0] ap_st = S_IDLE;',
+    `  reg [${iw - 1}:0] ap_r;`, `  reg [${ow - 1}:0] ap_o;`, `  reg [${clog2(D) - 1}:0] ap_dc;`,
+    `  reg [${mw - 1}:0] ap_wb = 0, ap_ob = ${k.ob0}, ap_qb = 0, ap_qbd = 0, ap_pb = 0, ap_pbd = 0;`, `  reg [${dw - 1}:0] ap_wa = 0, ap_oa = ${k.oa0}, ap_qa = 0, ap_qa0 = 0, ap_pa = 0;`,
+    `  reg [${tw - 1}:0] ap_t = 0, ap_td = 0;`, `  reg [${nw - 1}:0] ap_n = 0;`, `  reg [${k.raw - 1}:0] ap_base, ap_sbase;`,
+    "  reg ap_rd_v = 1'b0, ap_rd_l = 1'b0, ap_out_v = 1'b0;", `  reg [${pd - 1}:0] ap_vv = 0, ap_vf = 0, ap_vl = 0;`,
+    `  reg signed [${k.accW - 1}:0] ap_acc;`, `  wire [${k.accW - 1}:0] ap_acc_v = ap_acc;`);
+  for (const m of banks) L.push(`  reg signed [${k.cW - 1}:0] ap_rom_${m} [0:${k.rn - 1}];`, `  reg signed [${k.cW - 1}:0] ap_rom_q_${m}, ap_c_${m};`, `  reg signed [${k.opW - 1}:0] ap_x_${m};`, `  reg signed [${k.pw - 1}:0] ap_prod_${m};`);
+  for (const b of bankNames) for (const m of banks) L.push(`  reg signed [${k.inW - 1}:0] ap_${b}_${m} [0:${dd - 1}];`, `  reg signed [${k.inW - 1}:0] ap_${b}_q_${m};`);
+  // (the coefficients: a block ROM each; the delay line: a block RAM each, zeros at the start as the C model's statics)
+  L.push('  initial begin');
+  for (const m of banks) for (const j of range(k.rn)) L.push(`    ap_rom_${m}[${j}] = ${k.cW}'b${bin(k.rom[m][j] ?? 0n, k.cW)};`);
+  for (const b of bankNames) for (const m of banks) for (const j of range(dd)) L.push(`    ap_${b}_${m}[${j}] = ${k.inW}'d0;`);
+  L.push('  end');
   for (const x of cv.nodes) L.push(`  wire ${x.s ? 'signed ' : ''}[${x.w - 1}:0] ${sig(x)};`);
   verilogNodes(cv.nodes, cv.g, L);
-  L.push(`  wire ap_take = ${k.sIn ? `ap_st == S_RD && ${n.in}_empty_n` : 'ap_st == S_WR'};`, `  wire ap_give = ap_st == S_OUT${k.sOut ? ` && ${n.out}_full_n` : ''};`,
-    `  wire [${cw - 1}:0] ap_dl_addr = ap_take ? ap_wp : ap_nw >= ap_k ? ap_nw - ap_k : ap_nw + ${k.nt} - ap_k;`,
-    `  wire [${k.raw - 1}:0] ap_rom_addr = ap_base + ap_k;`);
+  // (the input: one read a clock, held back when its sample would start a job while the last still reads its taps)
+  L.push(`  wire ap_ce = ${k.sOut ? `!(ap_out_v && !${n.out}_full_n)` : "1'b1"};`,
+    `  wire ap_issue, ap_launch;`,
+    `  wire [${nw - 1}:0] ap_nn = ap_launch ? ${k.cl} : ap_n > 0 ? ap_n - 1'b1 : 0;`,
+    `  wire ap_free = ${k.sIn ? 'ap_n' : 'ap_nn'} <= 1;`,
+    `  assign ap_issue = ap_ce && ap_st == S_RUN && ap_r < ${k.inLen} && (ap_dc != ${D - 1} || ap_free)${k.sIn ? ` && ${n.in}_empty_n` : ''};`,
+    `  wire ap_take = ${k.sIn ? 'ap_issue' : 'ap_rd_v'};`,
+    `  assign ap_launch = ${k.sIn ? `ap_issue && ap_dc == ${D - 1}` : 'ap_rd_l'};`,
+    '  wire ap_give = ap_out_v && ap_ce;', '  wire ap_v0 = ap_n > 0;', '  wire ap_f0 = ap_t == 0;', `  wire ap_l0 = ap_t == ${C - 1};`,
+    `  wire [${dw - 1}:0] ap_qa1 = ap_qa == ${dd - 1} ? 0 : ap_qa + 1'b1;`, `  wire [${dw - 1}:0] ap_pa1 = ap_pa == 0 ? ${dd - 1} : ap_pa - 1'b1;`);
   if (k.sIn) L.push(`  assign ${n.in}_read = ap_take;`);
   else {
-    L.push(`  assign ${n.in}_address0 = ap_st == S_WR ? ap_i[${k.aw.in - 1}:0] + 1'b1 : ap_i[${k.aw.in - 1}:0];`, `  assign ${n.in}_ce0 = ap_st == S_RD || (ap_st == S_WR && ap_dc != ${k.D - 1});`,
+    L.push(`  assign ${n.in}_address0 = ap_r[${k.aw.in - 1}:0];`, `  assign ${n.in}_ce0 = ap_issue;`,
       `  assign ${n.in}_d0 = 0;`, `  assign ${n.in}_we0 = 1'b0;`, `  assign ${n.in}_address1 = 0;`, `  assign ${n.in}_ce1 = 1'b0;`, `  assign ${n.in}_d1 = 0;`, `  assign ${n.in}_we1 = 1'b0;`);
   }
   if (k.sOut) L.push(`  assign ${n.out}_din = ${sig(cv.y)};`, `  assign ${n.out}_write = ap_give;`);
@@ -176,21 +252,47 @@ function verilog(name, src, ports, k) {
   }
   if (k.cfg?.stream) L.push(`  assign ${n.config}_read = ap_st == S_CFG && ${n.config}_empty_n;`);
   L.push('  assign ap_idle = ap_st == S_IDLE;', '  assign ap_done = ap_st == S_DONE;', '  assign ap_ready = ap_st == S_DONE;');
-  L.push('  always @(posedge ap_clk) begin', '    ap_rom_q <= ap_rom[ap_rom_addr];', `    if (ap_take) ap_dl[ap_dl_addr] <= ${sig(cv.x)};`, '    ap_dl_q <= ap_dl[ap_dl_addr];', '  end');
+  // (each bank its read: the oldest group's samples around the ring; each MAC its bank's sample, rotated; the pre-adder)
+  const pick = (list, sel) => list.reduce((e, [v, i], j) => (j === list.length - 1 ? `${e}${v}` : `${e}${sel} == ${i} ? ${v} : `), '');
+  for (const m of banks) {
+    L.push(`  wire signed [${k.inW - 1}:0] ap_dl_x_${m} = ${pick(banks.map((b) => [`ap_dl_q_${(b + m) % M}`, b]), 'ap_qbd')};`);
+    if (sym) {
+      const a = pick(banks.map((b) => [`ap_dm_q_${(b - m + M) % M}`, b]), 'ap_pbd');
+      L.push(`  wire signed [${k.inW - 1}:0] ap_dm_x_${m} = ${k.centre?.m === m ? `ap_td == ${k.centre.t} ? 0 : ` : ''}${a};`);
+    }
+  }
+  k.tree.forEach((c, l) => { for (let j = 0; j < c; j++) L.push(l ? `  reg signed [${k.accW - 1}:0] ap_s_${l}_${j};` : `  wire signed [${k.accW - 1}:0] ap_s_0_${j} = ap_prod_${j};`); });
+  L.push('  always @(posedge ap_clk) begin', '    if (ap_ce) begin');
+  for (const m of banks) {
+    L.push(`      ap_rom_q_${m} <= ap_rom_${m}[ap_base];`, `      ap_dl_q_${m} <= ap_dl_${m}[ap_qb > ${m} ? ap_qa1 : ap_qa];`);
+    if (sym) L.push(`      ap_dm_q_${m} <= ap_dm_${m}[ap_pb < ${m} ? ap_pa1 : ap_pa];`);
+  }
+  L.push('    end', '    if (ap_take && ap_ce) begin');
+  for (const m of banks) for (const b of bankNames) L.push(`      if (ap_wb == ${m}) ap_${b}_${m}[ap_wa] <= ${sig(cv.x)};`);
+  L.push('    end', '  end');
   const sbase = k.sets > 1 ? `${k.cfg.stream ? `${n.config}_dout` : n.config} * ${k.raw}'d${k.lnt}` : `${k.raw}'d0`;
-  const sample = ['ap_nw <= ap_wp;', `ap_wp <= ap_wp == ${k.nt - 1} ? 0 : ap_wp + 1'b1;`, "ap_i <= ap_i + 1'b1;",
-    `if (ap_dc == ${k.D - 1}) begin ap_dc <= 0; ap_ph <= 0; ap_base <= ap_sbase; ap_k <= 0; ap_acc <= 0; ap_st <= S_MAC; end`, "else ap_dc <= ap_dc + 1'b1;"];
-  L.push('  always @(posedge ap_clk) begin', '    if (ap_rst) begin', '      ap_st <= S_IDLE; ap_wp <= 0; ap_nw <= 0;', "      ap_v1 <= 1'b0; ap_v2 <= 1'b0;", '    end else begin',
-    "      ap_v1 <= 1'b0;", '      ap_v2 <= ap_v1;', '      if (ap_v1) ap_prod <= ap_dl_q * ap_rom_q;', '      if (ap_v2) ap_acc <= ap_acc + ap_prod;',
-    '      case (ap_st)', '        S_IDLE: if (ap_start) begin', '          ap_i <= 0; ap_o <= 0; ap_dc <= 0;',
+  const tail = (v, x) => `${v} <= {${v}[${pd - 2}:0], ${x}};`;
+  const preadd = (m) => (sym === 'negative' ? `ap_dl_x_${m} - ap_dm_x_${m}` : sym ? `ap_dl_x_${m} + ap_dm_x_${m}` : `ap_dl_x_${m}`);
+  const sum = `ap_s_${k.tree.length - 1}_0`;
+  L.push('  always @(posedge ap_clk) begin', '    if (ap_rst) begin', `      ap_st <= S_IDLE; ap_wb <= 0; ap_wa <= 0; ap_ob <= ${k.ob0}; ap_oa <= ${k.oa0}; ap_n <= 0;`, "      ap_rd_v <= 1'b0; ap_rd_l <= 1'b0; ap_out_v <= 1'b0; ap_vv <= 0;", '    end else if (ap_ce) begin',
+    `      ${tail('ap_vv', 'ap_v0')}`, `      ${tail('ap_vf', 'ap_f0')}`, `      ${tail('ap_vl', 'ap_l0')}`, '      ap_qbd <= ap_qb; ap_pbd <= ap_pb; ap_td <= ap_t;');
+  for (const m of banks) L.push(`      ap_c_${m} <= ap_rom_q_${m}; ap_x_${m} <= ${preadd(m)}; ap_prod_${m} <= ap_x_${m} * ap_c_${m};`);
+  k.tree.slice(1).forEach((c, l) => { for (let j = 0; j < c; j++) L.push(`      ap_s_${l + 1}_${j} <= ${2 * j + 1 < k.tree[l] ? `ap_s_${l}_${2 * j} + ap_s_${l}_${2 * j + 1}` : `ap_s_${l}_${2 * j}`};`); });
+  L.push(`      if (ap_vv[${pd - 1}]) ap_acc <= ap_vf[${pd - 1}] ? ${sum} : ap_acc + ${sum};`, `      ap_out_v <= ap_vv[${pd - 1}] && ap_vl[${pd - 1}];`,
+    ...(k.sIn ? [] : ['      ap_rd_v <= ap_issue;', `      ap_rd_l <= ap_issue && ap_dc == ${D - 1};`]),
+    `      if (ap_issue) begin ap_r <= ap_r + 1'b1; ap_dc <= ap_dc == ${D - 1} ? 0 : ap_dc + 1'b1; end`,
+    '      if (ap_take) begin',
+    `        if (ap_wb == ${M - 1}) begin ap_wb <= 0; ap_wa <= ap_wa == ${dd - 1} ? 0 : ap_wa + 1'b1; end else ap_wb <= ap_wb + 1'b1;`,
+    `        if (ap_ob == ${M - 1}) begin ap_ob <= 0; ap_oa <= ap_oa == ${dd - 1} ? 0 : ap_oa + 1'b1; end else ap_ob <= ap_ob + 1'b1;`, '      end',
+    '      ap_n <= ap_nn;',
+    '      if (ap_launch) begin ap_qb <= ap_ob; ap_qa <= ap_oa; ap_qa0 <= ap_oa; ap_pb <= ap_wb; ap_pa <= ap_wa; ap_t <= 0; ap_base <= ap_sbase; end',
+    `      else if (ap_n > 0) begin ap_base <= ap_base + 1'b1; ap_pa <= ap_pa1; if (ap_t == ${C - 1}) begin ap_t <= 0; ap_qa <= ap_qa0; end else begin ap_t <= ap_t + 1'b1; ap_qa <= ap_qa1; end end`,
+    "      if (ap_give) ap_o <= ap_o + 1'b1;",
+    '      case (ap_st)', '        S_IDLE: if (ap_start) begin', '          ap_r <= 0; ap_o <= 0; ap_dc <= 0;',
     ...(k.cfg?.stream ? [] : [`          ap_sbase <= ${sbase};`]),
-    `          ap_st <= ${k.cfg?.stream ? 'S_CFG' : 'S_RD'};`, '        end',
-    `        S_CFG: ${k.cfg?.stream ? `if (${n.config}_empty_n) begin ap_sbase <= ${sbase}; ap_st <= S_RD; end` : 'ap_st <= S_RD;'}`,
-    ...(k.sIn ? ['        S_RD: if (ap_take) begin', ...sample.map((s) => `          ${s}`), '        end'] : ['        S_RD: ap_st <= S_WR;']),
-    '        S_WR: begin', ...sample.map((s) => `          ${s}`), '        end',
-    `        S_MAC: if (ap_k < ${k.nt}) begin ap_v1 <= 1'b1; ap_k <= ap_k + 1'b1; end else if (!ap_v1) ap_st <= S_OUT;`,
-    "        S_OUT: if (ap_give) begin", "          ap_o <= ap_o + 1'b1;", `          if (ap_ph < ${k.L - 1}) begin ap_ph <= ap_ph + 1'b1; ap_base <= ap_base + ${k.nt}; ap_k <= 0; ap_acc <= 0; ap_st <= S_MAC; end`,
-    `          else if (ap_i == ${k.inLen}) ap_st <= S_DONE;`, '          else ap_st <= S_RD;', '        end',
+    `          ap_st <= ${k.cfg?.stream ? 'S_CFG' : 'S_RUN'};`, '        end',
+    `        S_CFG: ${k.cfg?.stream ? `if (${n.config}_empty_n) begin ap_sbase <= ${sbase}; ap_st <= S_RUN; end` : 'ap_st <= S_RUN;'}`,
+    `        S_RUN: if (ap_give && ap_o == ${k.outLen - 1}) ap_st <= S_DONE;`,
     '        S_DONE: ap_st <= S_IDLE;', '        default: ap_st <= S_IDLE;', '      endcase', '    end', '  end', 'endmodule', '');
   return L.join('\n');
 }
