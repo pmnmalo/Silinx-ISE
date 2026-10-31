@@ -542,7 +542,7 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   **A BUFGMUX a CMT drives** sets one bit of the REGC frame (`cmt6.mjs`'s `CMT_REGC`, `cmtRegcBits`): 1008 + i for
   a CMT of the bottom half, 1024 + i for the top, the BUFGMUXes in one order (X3Y16, X3Y15 … X2Y1); exact on the 48.
 - **The paths' PIPs one at a time** (`gen-cmtdrop6.mjs`: each PIP of the designs' other tiles the databases have no
-  bits for, dropped alone from the first design that has it, 354 XDL; `ana-cmtdrop6.mjs`: `db/s6-pips-cmt.json`,
+  bits for, dropped alone from the first design that has it, 354 XDL; `ana-cmtdrop6.mjs`: `db/s6-pips-cmt.json` (now `db/xc6slx16-pips-cmt.json`),
   331 PIPs, 94 with bits). The drop of many PIPs at once had given the CLKC tile's selections no bits (theirs are
   far from its region and went to other tiles); alone, each is its own (`CLKC_PLL_Ln -> CLKC_GCLKn`).
 - **A CMT's input and outputs** (`ana-cmtinput6.mjs`: `db/xc6slx16-cmt-input.json`, from the BUFGMUX and one-output
@@ -562,7 +562,7 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
 ### The top half's CMTs (#2025, S6-E4, 2026-10-30)
 
 - **The top half's paths' PIPs one at a time** (`gen-cmtdrop6.mjs` on the BUFGMUX and one-output designs of
-  PLL_ADV_X0Y1, DCM_X0Y2 and DCM_X0Y3, 43 designs, 398 drops; `ana-cmtdrop6.mjs`, merged into `db/s6-pips-cmt.json`:
+  PLL_ADV_X0Y1, DCM_X0Y2 and DCM_X0Y3, 43 designs, 398 drops; `ana-cmtdrop6.mjs`, merged into `db/xc6slx16-pips-cmt.json`:
   550 PIPs): 219 PIPs new (CMT_DCM_TOP 113, CMT_PLL_TOP 40, REG_T 19, TIOI_INNER 18, CLKC 16 …), 125 of the 398 with
   bits; the 179 the bottom half's drop had measured the same.
 - **The settings without the CLKIN path** (`ana-cmtsites6.mjs` with the CMT paths' PIPs predicted): a CMT's input path
@@ -578,6 +578,26 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   119 exact (65 before), 767 bits left over (2042), none predicted that ISE does not set (21); the 32 BUFGMUX and
   one-output designs of the top half's DCMs and the 14 of its PLL exact. Night 1's 14 examples stay exact. What is
   left: the IOB's output flip-flop's clock (OLOGIC2) and the BUFIO2s of pads not measured.
+
+### The XC6SLX45's CMTs (#2025, S6-E5, 2026-10-31)
+
+- **The designs** (`gen-cmtsites6.mjs --muxes` and `--outputs` on the XC6SLX45's eight DCMs and four PLLs, 96 and 88
+  designs, ISE's routes): its CMT column is 535 (the XC6SLX16's 327), its CMT frame 565 and its REGC frame 5104.
+- **The paths' PIPs per device**: a PIP's bits are offsets from its tile's region (`gridRegion`), and the centre
+  column's tiles (CMT_*, CLKC, REG_B, REG_T) map to column 0, so their bits far from it (the CMT column's frame, the
+  REGC frame, the I/O words) are offsets that depend on the device. With the XC6SLX16's database the XC6SLX45's paths
+  set bits in other tiles (an INT_BRAM's at 357, a CLEXL's) and left their own over: the database is now
+  `db/<device>-pips-cmt.json`, and the loader reads the part's own (a device without one has no CMT paths' PIPs).
+- **The XC6SLX45's paths' PIPs one at a time** (`gen-cmtdrop6.mjs` on the 184 designs: 1147 drops from 169 of them,
+  4 rounds, 6 hours; `ana-cmtdrop6.mjs <dir> xc6slx45csg324-3`: `db/xc6slx45-pips-cmt.json`, 520 with bits). Its new
+  tile types: CMT_DCM2_BOT / TOP, CMT_PLL1_BOT, CMT_PLL2_BOT / TOP. Of the PIPs both parts have, the near bits are the
+  same; the far ones moved with the CMT column (357 to 565, the REGC frame's 352 to 560) and the REG_B / REG_T
+  tiles' to the XC6SLX45's I/O words.
+- **The settings and the input table** (`ana-cmtsites6.mjs`, `ana-cmtinput6.mjs`: `db/xc6slx45-cmt-settings.json`,
+  `db/xc6slx45-cmt-input.json`): each kind the same at all its sites (the even DCMs, the odd DCMs, the PLLs); the DCMs'
+  outputs in their row's CMT frame, a PLL's CLKOUT0 enable bit 416 of it, each BUFIO2 one I/O word bit. The REGC bits
+  are the XC6SLX16's (`CMT_REGC`), in frame 5104.
+- **The residual** (`residual6.mjs --no-cmt-paths` on the 184 designs): all 184 exact. The XC6SLX16's 203 unchanged.
 
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
@@ -763,7 +783,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `gen-cmtsites6.mjs` | Every CMT site's designs: pads of its half and the sides, outputs on the BUFGMUXes in turn; `--outputs` each alone, `--muxes` every BUFGMUX from the clock pad (#1951) |
 | `ana-cmtsites6.mjs` | A CMT's settings at any site: `db/<device>-cmt-settings.json` (#1951) |
 | `gen-cmtprobe6.mjs`, `ana-cmtprobe6.mjs` | The PIPs the drop could not take apart, probed one by one: `db/s6-pips-probe.json` (#1951) |
-| `gen-cmtdrop6.mjs`, `ana-cmtdrop6.mjs` | The CMT paths' PIPs dropped one at a time in context: `db/s6-pips-cmt.json` (#1951) |
+| `gen-cmtdrop6.mjs`, `ana-cmtdrop6.mjs` | The CMT paths' PIPs dropped one at a time in context: `db/<device>-pips-cmt.json` (#1951, per device since #2025) |
 | `ana-cmtinput6.mjs` | A CMT's bits beyond its settings and PIPs, by its site, outputs and BUFIO2: `db/<device>-cmt-input.json` (#1951) |
 | `twr6.mjs` | trce's report read: each constraint's paths, their figures and elements, the OFFSET sections (#731) |
 | `timing-fit6.mjs` | The wire delay model fitted to trce's nets, or every connection of reportgen's `.dly`, on ISE's routing (#731) |

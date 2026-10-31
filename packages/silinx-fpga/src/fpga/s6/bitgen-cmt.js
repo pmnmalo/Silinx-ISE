@@ -42,10 +42,12 @@ export function predictCmtSettings(inst, settings, rowFirst) {
 }
 
 /**
- * A BUFGMUX's REGC bit when a CMT drives it (#1951, measured on the XC6SLX16): one bit per BUFGMUX of the REGC frame,
- * from `bottom` for a CMT of the bottom half, from `top` for one of the top, the BUFGMUXes in `order`.
+ * A BUFGMUX's REGC bit when a CMT drives it (#1951, measured on the XC6SLX16; the XC6SLX45's the same, #2025): one bit
+ * per BUFGMUX of the REGC frame, from `bottom` for a CMT of the bottom half, from `top` for one of the top, the BUFGMUXes
+ * in `order`.
  */
-export const CMT_REGC = { xc6slx16: { bottom: 1008, top: 1024, order: ['X3Y16', 'X3Y15', 'X3Y14', 'X2Y12', 'X3Y13', 'X2Y11', 'X2Y10', 'X2Y9', 'X3Y8', 'X3Y7', 'X3Y6', 'X2Y4', 'X3Y5', 'X2Y3', 'X2Y2', 'X2Y1'] } };
+const REGC_S6 = { bottom: 1008, top: 1024, order: ['X3Y16', 'X3Y15', 'X3Y14', 'X2Y12', 'X3Y13', 'X2Y11', 'X2Y10', 'X2Y9', 'X3Y8', 'X3Y7', 'X3Y6', 'X2Y4', 'X3Y5', 'X2Y3', 'X2Y2', 'X2Y1'] };
+export const CMT_REGC = { xc6slx16: REGC_S6, xc6slx45: REGC_S6 };
 
 /** The REGC bits of the BUFGMUXes a CMT instance drives: ['frame,bit'] (null: the part not measured). */
 export function cmtRegcBits(design, inst, part, regcFrame) {

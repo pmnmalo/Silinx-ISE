@@ -2,7 +2,7 @@
 // DCM_X0Y1, DCM_X0Y0 and PLL_ADV_X0Y0, gen-cmtsites6.mjs's at every site). A CMT's settings are bits of the 31-frame
 // column its tile is in (the XC6SLX16's frames 327 to 357 of each row), in its tile's row: the same at every site of
 // a kind (a DCM's by its Y's parity: the two DCMs of a CMT tile have different bits) and setting. What residual6.mjs
-// leaves there (with the CMT paths' PIPs, db/s6-pips-cmt.json, predicted: their bits in the CMT's frame follow its CLKIN's
+// leaves there (with the CMT paths' PIPs, db/<device>-pips-cmt.json, predicted: their bits in the CMT's frame follow its CLKIN's
 // path, not its settings, #2025) in every design of a kind and setting (cmtCfg) is its pattern. A PLL's CLKOUT0 enable
 // (bit 416 of its CMT frame, set when CLKOUT0 drives a net: every design measured had it) stays out too:
 // ana-cmtinput6.mjs puts it with the PLL's outputs.
@@ -36,7 +36,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!dirs.length) { console.error('usage: node research/s6/ana-cmtsites6.mjs <part> <dir> …'); process.exit(1); }
   const read = n => JSON.parse(fs.readFileSync(new URL(`../../bitdb/s6/${n}.json`, import.meta.url), 'utf8')), dv = part.replace(/csg.*/, ''), { device } = s6Device(part);
   const db = { part, slices: loadDb(dv), int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
-    other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...read('s6-pips-clock').pips, ...(fs.existsSync(new URL('../../bitdb/s6/s6-pips-probe.json', import.meta.url)) ? read('s6-pips-probe').pips : {}), ...read('s6-pips-cmt').pips } }, iob: read(`${dv}-iob`), clocks: read('s6-clocks') };
+    other: { pips: { ...read('s6-pips-other').pips, ...read('s6-pips-io').pips, ...read('s6-pips-clock').pips, ...(fs.existsSync(new URL('../../bitdb/s6/s6-pips-probe.json', import.meta.url)) ? read('s6-pips-probe').pips : {}), ...read(`${dv}-pips-cmt`).pips } }, iob: read(`${dv}-iob`), clocks: read('s6-clocks') };
   const seen = new Map();
   let dev = null, column = null;
   for (const dir of dirs) for (const n of fs.readdirSync(dir)) {
