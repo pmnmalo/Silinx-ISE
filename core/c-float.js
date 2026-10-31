@@ -96,6 +96,8 @@ export const MATH = {
   // (round: half away from zero, as C's)
   round: R((x) => Math.sign(x) * Math.round(Math.abs(x))), roundf: R((x) => Math.sign(x) * Math.round(Math.abs(x))),
   pow: { n: 2, f: JS_MATH.pow }, powf: { n: 2, f: JS_MATH.powf },
+  // (ldexp: x * 2^e, exact, #1943)
+  ldexp: { n: 2, f: (x, n) => x * 2 ** n }, ldexpf: { n: 2, f: (x, n) => x * 2 ** n },
   // (fmin, fmax: a NaN and a number the number, as C's; copysign: a NaN's sign not known, +, #1843)
   fmin: { n: 2, f: CMIN }, fmax: { n: 2, f: CMAX }, fminf: { n: 2, f: CMIN }, fmaxf: { n: 2, f: CMAX },
   floorf: R(Math.floor), ceilf: R(Math.ceil), truncf: R(Math.trunc),

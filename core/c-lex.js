@@ -21,6 +21,7 @@ import { cppStl } from './cpp-stl.js';
 import { streamArrays } from './c-stream-array.js';
 import { npChannels } from './cpp-np-channel.js';
 import { cppFir } from './cpp-fir.js';
+import { cppFft } from './cpp-fft.js';
 import { cppHlsLibs } from './cpp-hls-lib.js';
 import { cppVector } from './cpp-vector.js';
 import { taskArrays } from './cpp-task-array.js';
@@ -269,8 +270,10 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     // templates are made, core/cpp-vector.js)
     const lib = cppHlsLibs(cppBurst(tokens, report), includes, report);
     const fir = cppFir(lib.tokens, report);
-    const st = cStructs(cUnions(cDesignated(cppVector(cppSugar(channels(cppTemplates(channels(cppStl(fir.tokens, report), true), report), false), report)), report), report, true), report, true);
-    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, resetCtors: st.resetCtors, firs: fir.firs, apFloats: lib.apFloats };
+    // (hls_fft.h's transforms: their config structs read, their call a C model's, core/cpp-fft.js, #1943)
+    const fft = cppFft(fir.tokens, report);
+    const st = cStructs(cUnions(cDesignated(cppVector(cppSugar(channels(cppTemplates(channels(cppStl(fft.tokens, report), true), report), false), report)), report), report, true), report, true);
+    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, resetCtors: st.resetCtors, firs: fir.firs, ffts: fft.ffts, apFloats: lib.apFloats };
   }
   const st = cStructs(cUnions(cDesignated(memcpyLoops(tokens), report), report), report, false);
   return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs, resetCtors: st.resetCtors };
@@ -331,7 +334,7 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
         if (cpp && TB_HEADERS.has(m[1])) { for (const [k, v] of Object.entries(HEADER_MACROS['stdlib.h'])) if (!macros.has(k)) macros.set(k, { params: null, body: scan(v, line, bad).map((t) => ({ ...t, line })) }); continue; }
         // (a header Silinx HLS writes itself: core/cpp-headers.js, #1662; hls_fir.h's, #1942)
         if (cpp && CPP_OWN_HEADERS[m[1]]) { if (!once.has(`<${m[1]}>`)) run(CPP_OWN_HEADERS[m[1]], `<${m[1]}>`, depth + 1); continue; }
-        if (!KNOWN_HEADERS.has(m[1])) e(m[1] === 'hls_stream.h' || m[1] === 'hls_fir.h' ? `${m[1]}: ${m[1] === 'hls_fir.h' ? 'hls::FIR' : 'hls::stream'} is C++: write the source as a .cpp file`
+        if (!KNOWN_HEADERS.has(m[1])) e(['hls_stream.h', 'hls_fir.h', 'hls_fft.h'].includes(m[1]) ? `${m[1]}: ${({ 'hls_fir.h': 'hls::FIR', 'hls_fft.h': 'hls::fft' })[m[1]] || 'hls::stream'} is C++: write the source as a .cpp file`
           : `the header '${m[1]}' is not one of Silinx HLS's (${[...KNOWN_HEADERS].join(', ')})`);
         for (const [k, v] of Object.entries(HEADER_MACROS[m[1]] || {})) if (!macros.has(k)) macros.set(k, { params: null, body: scan(v, line, bad).map((t) => ({ ...t, line })) });
         continue;

@@ -38,7 +38,9 @@ export function memcpyLoops(toks) {
     if (!(isId(t, 'memcpy') && op(toks[i + 1], '(') && !isId(toks[i - 1]) && !op(toks[i - 1], '.'))) { out.push(t); continue; }
     const end = closing(toks, i + 1);
     const args = splitTop(toks.slice(i + 2, end), ',');
-    if (args.length !== 3 || !op(toks[end + 1], ';')) { out.push(t); continue; }
+    // (memcpy(&x, &y, n) of two values: a copy of their bits, core/c-interp-lib.js's, #1943)
+    const addr = (a) => a.length === 2 && op(a[0], '&') && isId(a[1]);
+    if (args.length !== 3 || !op(toks[end + 1], ';') || (addr(args[0]) && addr(args[1]))) { out.push(t); continue; }
     // (a pointer cast dropped: (T *) x, (const T *) x)
     const bare = (a) => (op(a[0], '(') && closing(a, 0) < a.length - 1 && op(a[closing(a, 0) - 1], '*') ? a.slice(closing(a, 0) + 1) : a);
     const [dst, src, n] = [bare(args[0]), bare(args[1]), args[2]];
