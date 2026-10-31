@@ -140,6 +140,27 @@ ten flip-flops in the chains' slices, the routing check and `xdl-sim-check.mjs -
 and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical. The VGA example: 148 slices and 278 LUTs where v0.9.1
 took 157 and 296 (Silinx: 150 to 153, its GND sources' slices included).
 
+## The placer (#2222)
+
+Most of the speed gap to Silinx's engine is placement (#2196): the same logic depth on the critical paths, longer nets
+(clock on the Nexys2-500: 4.08 ns of nets against 3.07 ns). Two causes, measured on the examples' routes:
+- **HeAP's refinement was a greedy pass** (placer1 at a temperature of 1e-7, a window of 3). The full annealer
+  (`--placer sa`) cannot legalise the carry chains (their offsets are estimates), but the refinement moves a cluster
+  whole through `getClusterPlacement`: from a warm temperature it is the annealing Silinx's placer does.
+- **The placer's delays were the router's** (0.55 ns plus 0.1 ns a tile). Routed, a connection from a LUT takes 0.29 ns
+  in its own CLB, 0.43 ns to the next and about 65 ps a tile beyond; from a flip-flop (through an OMUX) 0.49, 0.47 ns,
+  then about 95 ps a tile. A net's loads (Silinx's delay per branch) add about 60 ps per doubling of its fanout.
+
+nextpnr-spartan v0.11.0 (2026-10-31): the refinement from 1e-2 in a window of 30 tiles, 30 passes a temperature, the
+criticalities to the 4th; `predictDelay` by the driver as above, and `predictNetLoadDelay` (a new arch hook, 0 by
+default) for the loads. The examples on the four devices, 8 placements each, Silinx's analysis, against v0.10.0: periods
+1.4 % shorter at best and 2.1 % on average (every example shorter on average), the slices unchanged; each placement takes
+three to five times as long (1 to 7 s more natively). Best of 4 against Silinx's own engine: 7.4 % slower with v0.10.0,
+5.4 % with v0.11.0. Their best of 4 routed: the routing check and `xdl-sim-check.mjs --random-inputs` passed, ISE's
+`xdl2ncd`, `drc` and `bitgen` with no warnings, the `.bit` byte-identical (CRC on and off). Tried and dropped (within
+noise, about ±0.7 %): the loads alone, the fitted delays alone, `lambda` 0.3 and 0.8, Silinx's exponent ramp from 1 to 8,
+extra moves for the critical clusters, warmer starts (up to an annealing from 1.0), 15 passes (−0.9 / −1.6 %).
+
 ## What is left for a decision
 
 - **Speed.** With Silinx's delays nextpnr got 8.4 ns where Silinx gets 6.7 ns on the same netlist:
