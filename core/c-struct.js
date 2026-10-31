@@ -7,9 +7,14 @@
 // parameters added for it (its call a statement: x = f(…); or S x = f(…);). Initializer lists ({ … }, nested or
 // not) give each member its values. An enum's constants are constants, its type an int.
 //
-//   cStructs(tokens, report, cpp) -> { tokens, structArgs: Map(function -> [{ name, members: [names], kind, ks }]) }
+// A static object (a global's too) with a constructor (#1964): the constructor's call kept, the statement of a function
+// of its own at file scope, for core/c-const-init.js's foldResetCtors, which runs it at synthesis: its state the
+// variables' initial values, a register set at the reset.
+//
+//   cStructs(tokens, report, cpp) -> { tokens, structArgs: Map(function -> [{ name, members: [names], kind, ks }]),
+//     resetCtors: Set(the constructors called so) }
 import { closing, splitTop, constTokens } from './cpp-template.js';
-import { parseMethod, methodFunctions, foldDefaultCtor } from './cpp-method.js';
+import { parseMethod, methodFunctions, foldDefaultCtor, implicitCtor, lookupMember, upcast } from './cpp-method.js';
 import { structStreams } from './c-struct-stream.js';
 
 const op = (t, v) => t && t.t === 'op' && t.v === v;
@@ -57,13 +62,13 @@ export function cStructs(input, report, cpp) {
   // (structs: name -> { name, members: [{ name, type: tokens, dims: [tokens], struct, init }] }; sigs: the functions
   // with struct parameters or results, name -> { params: [{ name, S, kind: 'val' | 'ref' | 'ptr' | 'arr', dims }],
   // ret }; structArgs: their members, the top's ports, core/c-hdl.js)
-  const cx = { structs: new Map(), enums: new Set(), enumVals: new Map(), sigs: new Map(), structArgs: new Map(), report, cpp };
+  const cx = { structs: new Map(), enums: new Set(), enumVals: new Map(), sigs: new Map(), structArgs: new Map(), resetCtors: new Set(), report, cpp };
   const defs = definitions(foldApWidths(cpp ? refArrays(input) : input), cx);
   const streamArgs = new Map();
   const toks = cpp ? structStreams(defs, cx.structs, report, streamArgs) : defs;
   signatures(toks, cx);
   for (const [f, a] of streamArgs) cx.structArgs.set(f, [...a, ...(cx.structArgs.get(f) || [])]);
-  return { tokens: uses(toks, cx), structArgs: cx.structArgs };
+  return { tokens: uses(toks, cx), structArgs: cx.structArgs, resetCtors: cx.resetCtors };
 }
 
 // ------------------------------------------------------------------ the definitions
@@ -111,13 +116,14 @@ function definitions(input, cx) {
       let j = s0 + 1;
       const tag = isId(input[j]) ? input[j++].v : null;
       if (isId(input[j], 'final')) j++;
-      if (op(input[j], ':')) { report(input[j], `the struct '${tag}': a base class is not supported yet`); while (input[j] && !op(input[j], '{')) j++; }
+      const bases = op(input[j], ':') ? baseClasses(input, j, tag) : [];
+      if (op(input[j], ':')) while (input[j] && !op(input[j], '{')) j++;
       if (op(input[j], '{')) {
         const end = closing(input, j);
         let e = end + 1;
         const alias = td && isId(input[e]) ? input[e++].v : null;
         const name = tag || alias;
-        const def = { name, members: [], methods: new Map(), ctors: [] };
+        const def = { name, members: bases.slice(), methods: new Map(), ctors: [] };
         members(input.slice(j + 1, end), def);
         def.at = toks.length;
         structs.set(name, def);
@@ -167,6 +173,20 @@ function definitions(input, cx) {
     if (t.t === 'id' && enums.has(t.v)) { toks.push(L(t, 'int', 'id')); continue; }
     toks.push(t);
   }
+  /** A struct's bases, `: public A, B`: its first members, named by their classes (#1964). */
+  function baseClasses(ts, colon, sname) {
+    const end = ts.findIndex((x, i) => i > colon && (op(x, '{') || op(x, ';')));
+    const out = [];
+    if (!cx.cpp) { report(ts[colon], `the struct '${sname}': a base class is C++ (a .cpp source)`); return out; }
+    for (const part of splitTop(ts.slice(colon + 1, end))) {
+      const names = part.filter((x) => !['public', 'protected', 'private'].includes(x.v));
+      if (names.some((x) => isId(x, 'virtual'))) { report(names[0], `the struct '${sname}': a virtual base class is not possible in hardware (Vitis HLS: no virtual functions)`); continue; }
+      const b = names.length === 1 && isId(names[0]) ? structs.get(names[0].v) : null;
+      if (!b) { report(names[0] ?? ts[colon], `the struct '${sname}': its base '${names.map((x) => x.v).join(' ')}' is not a struct defined before it with data members or methods`); continue; }
+      out.push({ name: b.name, type: [], dims: [], struct: b, init: null, base: true, loc: names[0] });
+    }
+    return out;
+  }
   /** A struct's body: its data members [{ name, type, dims, struct, init }], its methods and constructors
    *  (core/cpp-method.js). */
   function members(body, def) {
@@ -182,6 +202,11 @@ function definitions(input, cx) {
         continue;
       }
       if (decl.some((x) => isId(x, 'static'))) { report(decl[0], `the struct '${sname}': a static member is supported in a class of static members only`); continue; }
+      if (isId(decl[0], 'using') && op(decl[2], '::')) {
+        // (using B::f;: a base's name, found anyway; using B::B;: its constructors, not yet)
+        if (decl[1].v === decl[3]?.v) report(decl[0], `the struct '${sname}': inheriting the constructors (using ${decl[1].v}::${decl[1].v};) is not supported yet`);
+        continue;
+      }
       if (isId(decl[0], 'typedef')) { report(decl[0], `the struct '${sname}': a typedef inside it is not supported (write it before the struct)`); continue; }
       const parts = splitTop(decl.filter((x) => !op(x, ';')));
       const first = parts[0];
@@ -197,13 +222,16 @@ function definitions(input, cx) {
         const { name, dims, init } = declarator(d);
         if (!name) continue;
         const st = type.find((x) => x.t === 'id' && structs.has(x.v));
+        if (out.some((x) => x.base && x.name === name.v)) { report(name, `the member '${name.v}' of '${sname}': the name of its base class`); continue; }
         out.push({ name: name.v, type: type.filter((x) => !(x.t === 'id' && (x.v === 'struct' || x.v === 'class'))), dims, struct: st ? structs.get(st.v) : null, init, loc: name });
       }
     }
   }
   // the methods' and constructors' functions where their struct is (the top function stays the file's last)
-  for (const def of [...new Set(structs.values())].sort((a, b) => b.at - a.at)) {
-    foldDefaultCtor(def);
+  // (two at one place: the first's functions first; a base's before its derived's)
+  const all = [...new Set(structs.values())];
+  for (const def of all) { foldDefaultCtor(def); implicitCtor(def, input[0]); }
+  for (const def of all.reverse().sort((a, b) => b.at - a.at)) {
     toks.splice(def.at, 0, ...methodFunctions(def, report));
   }
   return toks;
@@ -224,6 +252,8 @@ function signatures(toks, cx) {
     const rs = head.find((x) => x.t === 'id' && structs.has(x.v));
     const params = splitTop(toks.slice(k + 2, close)).map(param);
     if (!rs && !params.some((p) => p?.S)) continue;
+    // (Cnt g(N + 1);, Cnt g(3);: an object and its constructor's arguments, not a function's declaration, #1964)
+    if (rs && op(toks[close + 1], ';') && structs.get(rs.v).ctors?.length && splitTop(toks.slice(k + 2, close)).some(valueNotParam)) continue;
     if (rs && head.some((x) => op(x, '*') || op(x, '&'))) report(rs, `'${t.v}' returns a pointer or a reference to a struct: not possible in Silinx HLS`);
     sigs.set(t.v, { params, ret: rs ? structs.get(rs.v) : null });
     // (kind: an array of structs, 'arr', or a pointer, 'ptr', one memory of its words, #1668; ks: each member's elements
@@ -231,6 +261,9 @@ function signatures(toks, cx) {
     structArgs.set(t.v, [...params.filter((p) => p?.S && p.name).map((p) => ({ name: p.name, members: leaves(p.S).map((l) => `${p.name}${l.suffix}`), loc: p.loc,
       kind: p.kind, ks: leaves(p.S).map((l) => (l.dims.length ? Number(constTokens(product(l.dims)) ?? 0n) : 1)) })),
       ...(rs ? [{ name: 'return', members: leaves(structs.get(rs.v)).map((l) => `ap_ret${l.suffix}`), loc: t }] : [])]);
+  }
+  function valueNotParam(p) {
+    return p.length > 0 && (p[0].t !== 'id' || p.some((x) => x.t === 'op' && /^[-+/%|^!~]$/.test(x.v)) || (p.length === 1 && !structs.has(p[0].v) && !/^(void|bool|char|short|int|long|float|double|unsigned|signed)$/.test(p[0].v)));
   }
   function atTop(k) { let d = 0; for (let i = 0; i < k; i++) { if (op(toks[i], '{')) d++; if (op(toks[i], '}')) d--; } return d === 0; }
   function param(p) {
@@ -362,11 +395,15 @@ function structPath(ts, k, { look, rewrite, report }) {
       j = e + 1;
       continue;
     }
-    if (!leaf && (op(ts[j], '.') || op(ts[j], '->')) && isId(ts[j + 1])) {
+    if (!leaf && (op(ts[j], '.') || op(ts[j], '->') || op(ts[j], '::')) && isId(ts[j + 1])) {
       if (op(ts[j], '->') !== (b.kind === 'ptr' && !sub && !idx.length)) { if (op(ts[j], '->')) report(ts[j], `'->' on '${ts[k].v}', which is not a pointer to a struct: write '.'`); }
       if (idx.length < dims.length) { report(ts[j], `'${ts[k].v}' is an array of structs: index it before its member`); return bad(ts, k); }
-      const m = S.members.find((x) => x.name === ts[j + 1].v);
-      if (!m && S.methods?.has(ts[j + 1].v) && op(ts[j + 2], '(')) return { S, leaf: false, prefix: b.prefix, sub, idx, dims, kind: b.kind, end: j, method: S.methods.get(ts[j + 1].v) };
+      const found = lookupMember(S, ts[j + 1].v);
+      if (found?.ambiguous) { report(ts[j + 1], `'${ts[j + 1].v}' is ambiguous: a member of two bases of ${S.name}`); return bad(ts, k); }
+      if (found?.method && op(ts[j + 2], '(')) return { S, leaf: false, prefix: b.prefix, sub, idx, dims, kind: b.kind, end: j, method: found.method };
+      // (a member of a base: through it)
+      for (const v of found?.via ?? []) { sub += `_${v.name}`; S = v.struct; }
+      const m = found?.member;
       if (!m) { report(ts[j + 1], `'${ts[j + 1].v}' is not a member of ${S.name}`); return bad(ts, k); }
       sub += `_${m.name}`;
       if (m.struct) { S = m.struct; dims = [...dims, ...m.dims]; }
@@ -518,7 +555,7 @@ function uses(toks, cx) {
         const p = path(ts, k);
         if (p.bad) { dst.push(L(t, '0', 'num')); k = p.end - 1; continue; }
         // v.m(…), v(…) (operator()): the method's function, v its last argument
-        const call = p.method ? { m: p.method, open: p.end + 2 } : !p.leaf && op(ts[p.end], '(') && p.S.methods?.has('operator()') ? { m: p.S.methods.get('operator()'), open: p.end } : null;
+        const call = p.method ? { m: p.method, open: p.end + 2 } : !p.leaf && op(ts[p.end], '(') && lookupMember(p.S, 'operator()')?.method ? { m: lookupMember(p.S, 'operator()').method, open: p.end } : null;
         if (call) {
           const e = closing(ts, call.open);
           const args = ts.slice(call.open + 1, e);
@@ -546,13 +583,12 @@ function uses(toks, cx) {
       if (!name) continue;
       // (a constructor: called after the members are declared)
       const open = d.indexOf(name) + 1;
-      const args = ctor ? splitTop(d.slice(open + 1, closing(d, open))) : [];
-      const c = ctor || !init ? S.ctors?.find((x) => splitTop(x.params).length === args.length) : null;
-      if (ctor && !c) report(name, `'${name.v}': ${S.name} has no constructor of ${args.length} argument(s)`);
+      const each = objectArgs(S, d, open, dims, init, ctor, name, report);
+      const objects = constructed(S, each, name, report);
       const b = { S, prefix: name.v, dims, kind: 'val' };
       const isStatic = quals.some((x) => isId(x, 'static')) || scopes.length === 1;
       // the initial values: a list, or a struct copied
-      const list = init && op(init[0], '{') ? initValues(S, dims, init, name, report) : null;
+      const list = init && op(init[0], '{') && !each.length ? initValues(S, dims, init, name, report) : null;
       for (const l of leaves(S)) {
         const all = [...dims, ...l.dims];
         dst.push(...quals.map((x) => ({ ...x })), ...l.type.map((x) => ({ ...x })), L(name, `${name.v}${l.suffix}`, 'id'));
@@ -567,11 +603,14 @@ function uses(toks, cx) {
         dst.push(L(name, ';'));
       }
       bind(name.v, b);
-      if (c) {
-        if (dims.length || isStatic) report(name, `'${name.v}': ${dims.length ? 'an array' : 'a static or global'} of a struct with a constructor is not supported yet (give its members their values in the struct)`);
-        else rewrite([L(name, c.fn, 'id'), L(name, '('), ...args.flatMap((a, i) => [...(i ? [L(name, ',')] : []), ...a]), ...(args.length ? [L(name, ',')] : []), { ...name }, L(name, ')'), L(name, ';')], dst, false);
+      const calls = objects.filter((o) => o.c);
+      if (isStatic && calls.length) {
+        const body = resetCalls(calls, S, name, dims, cx, (c, args) => callArgs(sigs.get(c.fn), args, name, null));
+        if (scopes.length === 1) dst.push(L(name, 'void', 'id'), L(name, `ap_global_ctor${fresh++}`, 'id'), L(name, '('), L(name, ')'), L(name, '{'), ...body, L(name, '}'));
+        else dst.push(...body);
       }
-      if (init && !list) {
+      else calls.forEach((o, i) => rewrite(ctorCall(o, name, dims, i), dst, false));
+      if (init && !list && !each.length) {
         if (dims.length) report(name, `the array of structs '${name.v}': initialize it with { … }`);
         else assignFrom({ ...b, sub: '', idx: [] }, init, dst, t);
       }
@@ -593,7 +632,10 @@ function uses(toks, cx) {
     const s = isId(src[0]) && look(src[0].v) ? path(src, 0) : null;
     if (s?.bad) return;
     if (!s || s.leaf || s.end !== src.length) { report(src[0] || t, `a ${dstP.S.name} is copied from another (a variable, an element of an array, a member) or from a call`); return; }
-    if (s.S !== dstP.S) { report(src[0], `a ${s.S.name} copied to a ${dstP.S.name}`); return; }
+    // (a derived class copied to its base: the base's part)
+    const part = s.idx.length === s.dims.length ? upcast(s.S, dstP.S) : null;
+    if (s.S !== dstP.S && part === null) { report(src[0], `a ${s.S.name} copied to a ${dstP.S.name}`); return; }
+    if (part) { s.sub += part; s.S = dstP.S; }
     // (an index with a side effect, b[i++] = a[3]: computed once, before the members', #1685)
     const once = (p) => ({ ...p, idx: p.idx.map((x) => {
       if (!x.some((y) => op(y, '++') || op(y, '--') || (y.t === 'op' && /^([-+*/%&|^]|<<|>>)?=$/.test(y.v)))) return x;
@@ -630,6 +672,9 @@ function uses(toks, cx) {
       const src = addr ? a.slice(1) : a;
       const p = isId(src[0]) && look(src[0].v) ? path(src, 0) : null;
       if (p?.bad) { push([L(t, '0', 'num')]); return; }
+      // (a derived class passed to its base, a base's method called on it: the base's part)
+      const part = p && !p.leaf && p.end === src.length && p.idx.length === p.dims.length && p.S !== pa.S ? upcast(p.S, pa.S) : null;
+      if (part) { p.sub += part; p.S = pa.S; }
       if (!p || p.leaf || p.end !== src.length || (p.S !== pa.S)) { report(a[0] || t, `the argument of '${pa.name ?? i + 1}': a ${pa.S.name} (a variable, an element of an array, a member)${pa.kind === 'ptr' ? ' by its address, &x' : ''}`); push([L(t, '0', 'num')]); return; }
       // (an array of structs passed to a pointer to structs: its members' arrays, #1684)
       if (pa.kind === 'ptr' && p.dims.length && !p.idx.length && !p.sub) { for (const l of leaves(pa.S)) push([L(t, `${p.prefix}${l.suffix}`, 'id')]); return; }
@@ -664,6 +709,48 @@ function pragmaPerMember(t, look, dst) {
     dst.push({ ...t, v: { ...t.v, args: { ...t.v.args, [key]: `${b.prefix}${l.suffix}` }, text, of: nm, ...(i ? { dup: true } : {}) } });
   });
   return true;
+}
+
+/** The constructor's arguments of each object a declaration makes (#1964): a(1), a{1}, a = S(1), a[2] = { S(1), 2 }, a[2];
+ *  none when S has no constructor or is initialized otherwise. */
+function objectArgs(S, d, open, dims, init, ctor, name, report) {
+  const given = ctor ? splitTop(d.slice(open + 1, closing(d, open))) : null;
+  if (!S.ctors?.length) { if (ctor) report(name, `'${name.v}': ${S.name} has no constructor of ${given.length} argument(s)`); return []; }
+  if (ctor) return [given];
+  const argsOf = (e) => (op(e[0], '{') ? splitTop(e.slice(1, closing(e, 0))).filter((x) => x.length) : isId(e[0], S.name) && op(e[1], '(') && closing(e, 1) === e.length - 1 ? splitTop(e.slice(2, -1)) : null);
+  if (!dims.length) return !init ? [[]] : argsOf(init) ? [argsOf(init)] : [];
+  if (init && !op(init[0], '{')) return [];
+  if (init && dims.length > 1) { report(name, `'${name.v}': an array of more dimensions of objects initialized with { … } is not supported yet`); return []; }
+  const items = init ? splitTop(init.slice(1, closing(init, 0))).filter((x) => x.length) : [];
+  return Array.from({ length: Number(constTokens(product(dims)) ?? 0n) }, (_, i) => (items[i] ? argsOf(items[i]) ?? [items[i]] : []));
+}
+/** Each object's constructor, by its arguments' number (none: said once). */
+function constructed(S, each, name, report) {
+  const objects = each.map((args) => ({ args, c: S.ctors.find((x) => splitTop(x.params).length === args.length) }));
+  for (const n of new Set(objects.filter((o) => !o.c).map((o) => o.args.length))) report(name, `'${name.v}': ${S.name} has no constructor of ${n} argument(s)`);
+  return objects;
+}
+/** The call of an object's constructor; an element's i-th of the array, the last dimension's fastest. */
+function ctorCall({ args, c }, name, dims, i) {
+  const sizes = dims.map((x) => Number(constTokens(x) ?? 1n));
+  const idx = [];
+  sizes.reduceRight((rest, n, at) => { idx[at] = Math.floor(i / rest) % n; return rest * n; }, 1);
+  return [L(name, c.fn, 'id'), L(name, '('), ...args.flatMap((a, j) => [...(j ? [L(name, ',')] : []), ...a]), ...(args.length ? [L(name, ',')] : []), { ...name }, ...idx.flatMap((x) => [L(name, '['), L(name, String(x), 'num'), L(name, ']')]), L(name, ')'), L(name, ';')];
+}
+/** A static object's constructors, one call per object on its own variables (an element's; a member array: its
+ *  address), the statements core/c-const-init.js runs at synthesis. */
+function resetCalls(calls, S, name, dims, cx, argsOf) {
+  return calls.flatMap(({ args, c }, i) => {
+    cx.resetCtors.add(c.fn);
+    const a = argsOf(c, args);
+    const own = leaves(S).map((l) => {
+      const v = L(name, `${name.v}${l.suffix}`, 'id');
+      if (!dims.length) return [v];
+      const size = l.dims.length ? Number(constTokens(product(l.dims)) ?? 1n) : 1;
+      return [...(l.dims.length ? [L(name, '&')] : []), v, L(name, '['), L(name, String(i * size), 'num'), L(name, ']')];
+    });
+    return [L(name, c.fn, 'id'), L(name, '('), ...a, ...(a.length && own.length ? [L(name, ',')] : []), ...own.flatMap((x, j) => [...(j ? [L(name, ',')] : []), ...x]), L(name, ')'), L(name, ';')];
+  });
 }
 
 /** Whether the tokens end with a control's header (if (…), for (…), while (…), else, do): a statement starts next (#1685). */

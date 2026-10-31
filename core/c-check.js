@@ -19,6 +19,7 @@ import { parse, parseExpression } from './c-parse.js';
 import { checkPragmas, tripcountArgs } from './c-pragma.js';
 import { MATH, BITCASTS } from './c-float.js';
 import { Q_MODES, O_MODES } from './c-fixed.js';
+import { foldResetCtors } from './c-const-init.js';
 
 // the library calls Silinx HLS refuses in synthesized code (UG1399: no system calls), and the ones it ignores there
 const REFUSED = new Set(['malloc', 'calloc', 'realloc', 'free', 'exit', 'abort', 'rand', 'srand', 'time', 'clock', 'fopen', 'fclose',
@@ -122,6 +123,9 @@ export function checkC(source, file = 'input.c', opts = {}) {
     if (it.kind === 'var') typeOk(it.type, it.loc);
     if (it.kind === 'func') { typeOk(it.ret, it.loc); for (const pa of it.params) typeOk(pa.type, pa.loc); }
   }
+
+  // (a static object's constructor: run now, its results the object's initial values, #1964)
+  foldResetCtors({ ast, funcs, globals, consts }, (t, loc) => { const n = diags.length; typeOk(t, loc, true); diags.length = n; }, report);
 
   // ---------------------------------------------------------------- the top function
   let top = null;
