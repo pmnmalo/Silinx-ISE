@@ -71,7 +71,7 @@ export function wordCalls(gen, calls0) {
     }
     return r;
   });
-  const gs = [...(gen.memories || []), ...(gen.fifos || [])].filter((x) => x.fields);
+  const gs = [...(gen.memories || []), ...(gen.fifos || [])].filter((x) => x.fields || x.from === 'ptr');
   if (!gs.length) return calls;
   const words = (src, fields) => {
     const f0 = fields[0];
@@ -82,6 +82,13 @@ export function wordCalls(gen, calls0) {
     const r = { ...c };
     for (const key of ['memIn', 'memOut', 'streamIn', 'streamOut', 'streamRead']) r[key] = { ...(c[key] || {}) };
     for (const x of gs) {
+      // (hls::fft's FIFOs, #1943: an array's words from its memory, all read, each written; a pointer's value, one word)
+      if (x.from === 'ptr') { r.streamOut[x.name] = [c.ptrOut[x.param] ?? 0n]; continue; }
+      if (x.from === 'mem') {
+        const v = words((x.dir === 'in' ? c.memIn : c.memOut) || {}, x.fields);
+        if (x.dir === 'in') { r.streamIn[x.name] = v; r.streamRead[x.name] = v?.length ?? 0; } else r.streamOut[x.name] = v;
+        continue;
+      }
       const keys = gen.memories?.includes(x) ? ['memIn', 'memOut'] : ['streamIn', 'streamOut'];
       for (const key of keys) { const v = words(c[key] || {}, x.fields); if (v !== undefined) r[key][x.name] = v; }
       if (!keys.includes('memIn') && c.streamRead?.[x.fields[0].param] !== undefined) r.streamRead[x.name] = c.streamRead[x.fields[0].param];

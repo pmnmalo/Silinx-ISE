@@ -15,6 +15,7 @@ import { closing, splitTop } from './cpp-template.js';
 const op = (t, v) => t && t.t === 'op' && t.v === v;
 const isId = (t, v) => t && t.t === 'id' && (v === undefined || t.v === v);
 const L = (t, v, tt = 'op') => ({ ...t, t: tt, v });
+const BUILTIN = new Set(['char', 'short', 'int', 'long', 'float', 'double', 'bool', 'unsigned', 'signed']);
 const SIZES = { char: 1, short: 2, int: 4, long: 8, float: 4, double: 8, bool: 1, int8_t: 1, uint8_t: 1, int16_t: 2, uint16_t: 2, int32_t: 4, uint32_t: 4, int64_t: 8, uint64_t: 8 };
 
 /** The bytes of a type's tokens (a builtin, ap_int, ap_uint, complex of one), or null. */
@@ -151,19 +152,69 @@ export function cppHlsLibs(input, includes, report) {
   return { tokens: has('complex') ? complexMembers(out) : out, apFloats };
 }
 
-/** c.real(), c.real(x) (and imag): its member, x's own too. */
+/** c.real(), c.real(x) (and imag): its member, x's own too; std::complex<T> complex<T>; complex<T>(re, im), and a
+ *  typedef's C(re, im) (#1943): a call of ap_complex_<n>(re, im), a function written before the declaration it is in
+ *  (a value from its parts, each converted to T, as C++'s constructor). */
 function complexMembers(toks) {
-  const out = [];
-  for (let k = 0; k < toks.length; k++) {
-    const t = toks[k];
-    if ((op(t, '.') || op(t, '->')) && (isId(toks[k + 1], 'real') || isId(toks[k + 1], 'imag')) && op(toks[k + 2], '(')) {
-      const c = closing(toks, k + 2);
-      out.push(t, L(t, toks[k + 1].v === 'real' ? 'ap_re' : 'ap_im', 'id'));
-      if (c > k + 3) out.push(L(t, '='), L(t, '('), ...complexMembers(toks.slice(k + 3, c)), L(t, ')'));
-      k = c;
-      continue;
+  const names = new Map(), made = new Map(), builtins = new Map(), out = [];
+  let start = 0, depth = 0;
+  const ctorOf = (t, type) => {
+    const key = type.map((x) => x.v).join(' ');
+    if (!made.has(key)) {
+      const fn = `ap_complex_${made.size}`, ty = () => type.map((x) => ({ ...x, line: t.line, col: t.col, file: t.file }));
+      made.set(key, fn);
+      const def = [L(t, 'complex', 'id'), L(t, '<'), ...ty(), L(t, '>'), L(t, fn, 'id'), L(t, '('), ...ty(), L(t, 'ap_re', 'id'), L(t, ','), ...ty(), L(t, 'ap_im', 'id'), L(t, ')'), L(t, '{'),
+        L(t, 'complex', 'id'), L(t, '<'), ...ty(), L(t, '>'), L(t, 'ap_c', 'id'), L(t, ';'), ...['ap_re', 'ap_im'].flatMap((m) => [L(t, 'ap_c', 'id'), L(t, '.'), L(t, m, 'id'), L(t, '='), L(t, m, 'id'), L(t, ';')]),
+        L(t, 'return', 'id'), L(t, 'ap_c', 'id'), L(t, ';'), L(t, '}')];
+      out.splice(start, 0, ...def);
+      start += def.length;
     }
-    out.push(t);
-  }
+    return made.get(key);
+  };
+  const walk = (list, dst, top) => {
+    for (let k = 0; k < list.length; k++) {
+      const t = list[k];
+      if (isId(t, 'std') && op(list[k + 1], '::') && isId(list[k + 2], 'complex')) { k++; continue; }
+      // (typedef float T;: complex<T> complex<float>, the same type as C++'s, #1943)
+      if (top && isId(t, 'typedef') && depth === 0) {
+        let e = k + 1;
+        while (isId(list[e]) && BUILTIN.has(list[e].v)) e++;
+        if (e > k + 1 && isId(list[e]) && op(list[e + 1], ';')) builtins.set(list[e].v, list.slice(k + 1, e));
+      }
+      if (isId(t, 'complex') && op(list[k + 1], '<') && isId(list[k + 2]) && builtins.has(list[k + 2].v) && op(list[k + 3], '>')) {
+        list = [...list.slice(0, k + 2), ...builtins.get(list[k + 2].v).map((x) => ({ ...x, line: t.line, col: t.col, file: t.file })), ...list.slice(k + 3)];
+      }
+      const prev = dst.at(-1);
+      // typedef [std::]complex<T> C; using C = complex<T>;
+      if (isId(t, 'complex') && op(list[k + 1], '<') && (isId(prev, 'typedef') || op(prev, '='))) {
+        const e = closing(list, k + 1);
+        const name = isId(prev, 'typedef') ? list[e + 1] : dst.at(-2);
+        if (isId(name) && (op(list[e + 2], ';') || op(list[e + 1], ';'))) names.set(name.v, list.slice(k + 2, e));
+      }
+      const ctor = isId(t, 'complex') && op(list[k + 1], '<') ? closing(list, k + 1) : isId(t) && names.has(t.v) ? k : -1;
+      if (ctor >= 0 && op(list[ctor + 1], '(') && !isId(prev) && !op(prev, '::') && !op(prev, '>') && !op(prev, '*') && !op(prev, '&')) {
+        const type = ctor === k ? names.get(t.v) : list.slice(k + 2, ctor);
+        const c = closing(list, ctor + 1), args = splitTop(list.slice(ctor + 2, c));
+        // (complex<T>() and complex<T>(re): the missing parts 0)
+        const parts = [0, 1].map((i) => { const d = []; if (args[i]?.length) walk(args[i], d, false); else d.push(L(t, '0', 'num')); return d; });
+        dst.push(L(t, ctorOf(t, type), 'id'), L(t, '('), ...parts[0], L(t, ','), ...parts[1], L(t, ')'));
+        k = c;
+        continue;
+      }
+      if ((op(t, '.') || op(t, '->')) && (isId(list[k + 1], 'real') || isId(list[k + 1], 'imag')) && op(list[k + 2], '(')) {
+        const c = closing(list, k + 2);
+        dst.push(t, L(t, list[k + 1].v === 'real' ? 'ap_re' : 'ap_im', 'id'));
+        if (c > k + 3) { dst.push(L(t, '='), L(t, '(')); walk(list.slice(k + 3, c), dst, false); dst.push(L(t, ')')); }
+        k = c;
+        continue;
+      }
+      dst.push(t);
+      if (!top) continue;
+      if (op(t, '{')) depth++;
+      if (op(t, '}')) depth--;
+      if (depth === 0 && (op(t, ';') || op(t, '}'))) start = dst.length;
+    }
+  };
+  walk(toks, out, true);
   return out;
 }
