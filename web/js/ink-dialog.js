@@ -47,6 +47,8 @@ export function handwrittenExpression({ name = 'F', check = () => null, title = 
   // read after each stroke, a moment later (the next stroke may follow at once); at once before Insert
   const pad = mountInkPad(padHost, { onStroke: () => { clearTimeout(timer); timer = setTimeout(recognize, 250); } });
   const flush = () => { if (timer) { clearTimeout(timer); recognize(); } };
+  // (a correction typed by hand: the reading still pending would write over it, #2389; the next stroke reads again)
+  const edited = () => { clearTimeout(timer); timer = null; };
   const showMsg = (lines, kind = 'warn') => { msg.className = `ink-msg ink-${kind}`; msg.replaceChildren(...lines.map(l => h('div', {}, l))); };
   function recognize() {
     timer = null;
@@ -63,7 +65,7 @@ export function handwrittenExpression({ name = 'F', check = () => null, title = 
       showMsg([e.message]);
     }
   }
-  text.addEventListener('input', () => { const e = error(); showMsg(e ? [e] : [], e ? 'warn' : 'ok'); });
+  text.addEventListener('input', () => { edited(); const e = error(); showMsg(e ? [e] : [], e ? 'warn' : 'ok'); });
 
   // ---- teach Silinx my handwriting
   const sym = h('input', { type: 'text', class: 'ink-sym', maxlength: 1, spellcheck: 'false', title: 'The symbol written on the pad' });

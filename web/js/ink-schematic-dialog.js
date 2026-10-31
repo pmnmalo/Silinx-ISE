@@ -31,6 +31,8 @@ export function handwrittenSchematic({ name = 'schematic', lang = 'vhdl', replac
   const padHost = h('div', { class: 'ink-pad ink-pad-full' });
   const pad = mountInkPad(padHost, { onStroke: () => { clearTimeout(timer); timer = setTimeout(recognize, 400); } });
   const flush = () => { if (timer) { clearTimeout(timer); recognize(); } };
+  // (a correction typed by hand: the reading still pending would write over it, #2389; the next stroke reads again)
+  const edited = () => { clearTimeout(timer); timer = null; };
   // the circuit read: a row a gate (its type to choose), a row a name (to correct)
   function renderList() {
     list.replaceChildren();
@@ -44,13 +46,13 @@ export function handwrittenSchematic({ name = 'schematic', lang = 'vhdl', replac
         list.append(h('div', { class: 'ink-row ink-gate ink-ff' }, h('b', {}, g.id), h('span', { class: 'ink-ff-type', 'data-no-i18n': '' }, gateName(g)), h('code', { 'data-no-i18n': '' }, `(${pins}) → ${outs || '?'}`)));
         continue;
       }
-      const sel = h('select', { class: 'ink-gate-type', onchange: () => { g.type = sel.value; } },
+      const sel = h('select', { class: 'ink-gate-type', onchange: () => { edited(); g.type = sel.value; } },
         ...typesFor(g.inputs.length).map(([t, l]) => h('option', { value: t, selected: t === g.type }, `${l}${g.inputs.length > 1 ? ` (${g.inputs.length})` : ''}`)));
       list.append(h('div', { class: 'ink-row ink-gate' }, h('b', {}, g.id), sel, h('code', { 'data-no-i18n': '' }, `(${g.inputs.map(netLabel).join(', ')}) → ${netLabel(g.output)}`)));
     }
     for (const n of circuit.nets.filter(x => x.name)) {
       const inp = h('input', { type: 'text', class: 'ink-net-name', value: n.name, spellcheck: 'false' });
-      inp.addEventListener('input', () => { n.name = inp.value.trim(); check(); });
+      inp.addEventListener('input', () => { edited(); n.name = inp.value.trim(); check(); });
       list.append(h('div', { class: 'ink-row ink-net' }, h('span', {}, n.dir === 'in' ? 'Input:' : 'Output:'), inp));
     }
   }

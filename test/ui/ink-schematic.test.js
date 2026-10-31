@@ -81,11 +81,18 @@ uiTest('Handwritten… (schematic): a half adder drawn with the mouse, a finger 
   await page.waitFor((d) => [...document.querySelectorAll(`${d} .ink-gate code`)].map((c) => c.textContent).join() === '(A, B) → S,(A, B) → C', [D], { what: 'the circuit read', timeout: 15000 });
   assert.deepEqual(await listed(page), { gates: ['U1 xor2 (A, B) → S', 'U2 and2 (A, B) → C'], names: ['A', 'B', 'S', 'C'] });
   assert.equal(await message(page), '');
-  // corrected: the AND an OR, the carry named Cout
-  await page.fill(`${D} .ink-gate:nth-of-type(2) select`, 'or2');
-  await page.fill(`${D} .ink-net-name`, 'Cout', { index: 3 });
-  assert.equal(await message(page), '');
-  await page.dialogButton('Create Schematic');
+  // corrected: the AND an OR, the carry named Cout; while the pad's reading is still pending (Undo and Redo read the pad
+  // again, a moment later), then Create Schematic at once: the corrections kept, not the reading made over them (#2389)
+  assert.equal(await page.eval((d) => {
+    const q = (s) => document.querySelector(`${d} ${s}`);
+    q('.ink-undo').click(); q('.ink-redo').click();
+    const sel = q('.ink-gate:nth-of-type(2) select'), name = document.querySelectorAll(`${d} .ink-net-name`)[3];
+    sel.value = 'or2'; sel.dispatchEvent(new Event('change'));
+    name.value = 'Cout'; name.dispatchEvent(new Event('input'));
+    const msg = q('.ink-msg').innerText.trim();
+    [...document.querySelectorAll('.dlg-overlay .dlg-buttons .btn')].find((b) => b.textContent.trim() === 'Create Schematic').click();
+    return msg;
+  }, D), '');
   await page.waitNoDialog();
   const doc = await page.waitFor(() => { const d = window.Silinx.active.schEditor.getDoc(); return d.symbols.length === 2 && d; }, [], { what: 'the drawing made' });
   assert.deepEqual(doc.symbols.map((s) => [s.name, s.type]), [['U1', 'xor2'], ['U2', 'or2']]);
