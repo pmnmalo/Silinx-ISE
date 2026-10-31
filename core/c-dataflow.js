@@ -8,7 +8,7 @@
 //     ports:   [{ name, dir: 'in' | 'out', w, s, role: 'arg' | 'arg_vld' | 'return', param? }] in the order of
 //              Vitis HLS (the arguments in order, then ap_return); the graph's 'in' nodes name their port
 //     outputs: Map port name -> node id (the outputs' values, ap_return and the _ap_vld flags included)
-//     ctrl:    'ap_ctrl_hs' | 'ap_ctrl_none' (#pragma HLS INTERFACE … port=return)
+//     ctrl:    'ap_ctrl_hs' | 'ap_ctrl_chain' | 'ap_ctrl_none' (#pragma HLS INTERFACE … port=return)
 // What is not combinational (a loop whose count depends on the inputs, a static or global variable written,
 // division by a value other than a constant power of 2) is reported: the sequential modules are #1526's.
 import { Graph } from './c-graph.js';
@@ -75,7 +75,7 @@ export class Flow {
       if (st.kind !== 'pragma' || st.pragma.name !== 'INTERFACE') continue;
       const a = st.pragma.args;
       const mode = String(a.mode || Object.keys(a).find((k) => /^ap_/.test(k)) || '').toLowerCase();
-      if (a.port === 'return') { if (mode === 'ap_ctrl_none' || mode === 'ap_ctrl_hs') this.ctrl = mode; else this.warn(st.loc, `#pragma HLS INTERFACE ${mode} port=return is not supported yet: ap_ctrl_hs is made`); }
+      if (a.port === 'return') { if (mode === 'ap_ctrl_none' || mode === 'ap_ctrl_hs' || mode === 'ap_ctrl_chain') this.ctrl = mode; else this.warn(st.loc, `#pragma HLS INTERFACE ${mode} port=return is not supported yet: ap_ctrl_hs is made`); }
       else if (a.port) this.modes.set(a.port, mode);
     }
     for (const it of ast.items) {
