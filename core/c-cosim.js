@@ -13,6 +13,7 @@ import { simulateC } from './c-interp.js';
 import { cToHdl } from './c-hdl.js';
 import { simulate } from './compile.js';
 import { f32Bits, f64Bits } from './c-dataflow-float.js';
+import { axiBfm } from './c-axi-bfm.js';
 
 export const MAX_CYCLES = 100000;
 /** A call's limit of cycles (#1899): maxCycles, or more, as many as the steps of its C simulation: a design that does
@@ -148,19 +149,22 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
 // (files: the test bench's, core/c-interp.js's, #1897)
 export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family } = {}) {
   const sim = simulateC(source, { file, headers, top, files });
-  const gen = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family });
-  if (alter && gen.ok) gen.hdl = alter(gen.hdl);   // (the tests: an HDL that differs, its mismatches reported)
-  const base = { ok: false, pass: false, calls: 0, mismatches: [], latency: null, output: sim.output, sim, gen, errors: [] };
+  const made = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family });
+  if (alter && made.ok) made.hdl = alter(made.hdl);   // (the tests: an HDL that differs, its mismatches reported)
+  const base = { ok: false, pass: false, calls: 0, mismatches: [], latency: null, output: sim.output, sim, gen: made, errors: [] };
+  // (AXI interfaces, #1893: the calls replayed on the function's ports of a model of the buses, around the module)
+  const gen = made.axi ? made.axi.view : made;
   if (!sim.ok) return { ...base, errors: [sim.error ? `the C simulation failed: line ${sim.error.line}: ${sim.error.message}` : 'the C simulation cannot run: the source has errors'] };
-  if (!gen.ok) return { ...base, errors: gen.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`) };
+  if (!made.ok) return { ...base, errors: made.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`) };
   if (!sim.calls.length) return { ...base, ok: true, pass: false, errors: [`the test bench (main) does not call the top function '${gen.top}': nothing to compare`] };
   const tb = cosimBench(gen, sim.calls, { maxCycles });
   // (a deep combinational path, math.h's pow in soft-float, #1761, settles in more delta cycles than the simulator's
   // default allows: up to a million)
-  const r = simulate([{ path: `${gen.top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: gen.hdl }, { path: 'silinx_cosim_tb.v', text: tb.text }], 'silinx_cosim_tb', { until: 1e15, maxDeltas: 1e6 });
+  const r = simulate([{ path: `${made.top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: made.hdl }, ...(made.axi ? [{ path: 'silinx_axi_bfm.v', text: axiBfm(made) }] : []), { path: 'silinx_cosim_tb.v', text: tb.text }], 'silinx_cosim_tb', { until: 1e15, maxDeltas: 1e6 });
   if (r.errors.length) return { ...base, errors: r.errors.map((d) => `${d.file || ''}: ${d.message}`) };
   // (the test bench's lines only: the simulator's own, as its waveform recording's limit, left out, #1734)
   const lines = r.sim.log.map((e) => String(e.text).trim()).filter((s) => /^(bad \d+|[0-9a-fxz]+( [0-9a-fxz]+)*)$/i.test(s));
+  const faults = r.sim.log.map((e) => String(e.text).trim()).filter((s) => s.startsWith('AXI fault'));
   const bad = Number(/^bad (\d+)/.exec(lines.at(-1) || '')?.[1] ?? 0);
   const rows = lines.filter((s) => !/^bad /.test(s)).map((s) => s.split(/\s+/).map((x) => (/[xz]/i.test(x) ? null : BigInt(`0x${x}`))));
   const port = (n) => gen.ports.find((p) => p.name === n);
@@ -208,6 +212,7 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
     return { ...base, ok: true, errors: [`a call did not end in ${callCycles(sim.calls[over], maxCycles)} cycles${why}`], calls: sim.calls.length, mismatches };
   }
   if (bad) mismatches.push({ call: null, port: 'ap_ctrl_hs', expected: 'ap_idle between calls, ap_done with ap_ready', got: `${bad} fault(s)` });
+  for (const f of faults) mismatches.push({ call: null, port: 'AXI', expected: 'OKAY', got: f });
   const latency = tb.seq ? { min: Math.min(...cycles), max: Math.max(...cycles), avg: cycles.reduce((a, b) => a + b, 0) / cycles.length } : null;
   return { ...base, ok: true, pass: !mismatches.length, calls: sim.calls.length, mismatches, latency };
 }

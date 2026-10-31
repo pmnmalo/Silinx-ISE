@@ -17,6 +17,7 @@ import { dataflowCall, hasStreams } from './c-dataflow-call.js';
 import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
+import { axiPlan, axiWrap } from './c-axi.js';
 
 export const bits = (k, w) => {
   const m = (1n << BigInt(w)) - 1n;
@@ -32,6 +33,13 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   const diagnostics = [...checked.diagnostics];
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
+  // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
+  const axi = axiPlan(checked.funcs.get(checked.top));
+  if (axi && !module) {
+    const name = portOf(checked.top);
+    const gen = cToHdl(source, { file, lang, headers, top, depths, module: `${name}_core`, flat, pipelineLoops, clock, family });
+    return gen.ok ? axiWrap(gen, axi, { name, src: file.split('/').pop(), lang, file }) : gen;
+  }
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
   foldTables(checked);
   const flatErrs = [];
@@ -45,13 +53,13 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // the filter's C model inlined, #1942)
   const firTop = !checked.dataflow && checked.ast.firs?.size && checked.funcs.get(checked.top).body.items.some((st) => st.kind === 'expr' && st.e.kind === 'call' && checked.ast.firs.has(st.e.callee.name));
   if (firTop) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, module });
     if (!r.fallback) return r;
   }
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module });
     if (!r.fallback) return r;
     if (hasStreams(checked.funcs.get(checked.top))) {
       const why = { ...r.fallback, severity: 'error', message: r.fallback.message.replace(/: made sequential \(not as processes\)$/, ': its streams are FIFOs between processes, so it cannot be made sequential') };
