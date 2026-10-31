@@ -4,9 +4,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 153417,
-      "max": 153417,
-      "avg": 153417
+      "min": 157280,
+      "max": 157280,
+      "avg": 157280
     },
     "reason": null
   },
@@ -15,9 +15,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 350025,
-      "max": 350025,
-      "avg": 350025
+      "min": 353890,
+      "max": 353890,
+      "avg": 353890
     },
     "reason": null
   },
@@ -72,9 +72,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 13,
-      "max": 13,
-      "avg": 13
+      "min": 70,
+      "max": 70,
+      "avg": 70
     },
     "reason": null
   },
@@ -127,9 +127,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 1815,
-      "max": 1815,
-      "avg": 1815
+      "min": 6642,
+      "max": 6642,
+      "avg": 6642
     },
     "reason": null
   },
@@ -138,9 +138,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 8243,
-      "max": 8243,
-      "avg": 8243
+      "min": 29702,
+      "max": 29702,
+      "avg": 29702
     },
     "reason": null
   },
@@ -149,9 +149,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 515,
-      "max": 515,
-      "avg": 515
+      "min": 259,
+      "max": 259,
+      "avg": 259
     },
     "reason": null
   },
@@ -160,9 +160,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 47,
-      "max": 47,
-      "avg": 47
+      "min": 55,
+      "max": 55,
+      "avg": 55
     },
     "reason": null
   },
@@ -171,9 +171,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 20523,
-      "max": 20523,
-      "avg": 20523
+      "min": 77965,
+      "max": 77965,
+      "avg": 77965
     },
     "reason": null
   },
@@ -182,34 +182,42 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 5677,
-      "max": 5677,
-      "avg": 5677
+      "min": 38812,
+      "max": 38812,
+      "avg": 38812
     },
     "reason": null
   },
   "interface-memory-manual-burst-manual-burst-example-manual-burst-inference-success": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: example.h:19: the header 'hls_burst_maxi.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 38812,
+      "max": 38812,
+      "avg": 38812
+    },
+    "reason": null
   },
   "interface-memory-manual-burst-manual-burst-with-conditionals": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: example.h:18: the header 'hls_burst_maxi.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 13283,
+      "max": 13283,
+      "avg": 13283
+    },
+    "reason": null
   },
   "interface-memory-max-widen-port-width": {
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 67,
-      "max": 67,
-      "avg": 67
+      "min": 772,
+      "max": 772,
+      "avg": 772
     },
     "reason": null
   },
@@ -218,9 +226,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 4,
-      "max": 5,
-      "avg": 4.5
+      "min": 10,
+      "max": 20,
+      "avg": 14.55
     },
     "reason": null
   },
@@ -228,21 +236,33 @@
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 2,
+      "max": 2,
+      "avg": 2
+    },
     "reason": null
   },
   "interface-memory-using-axi-master": {
-    "csim": "fail",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C simulation: 37: memcpy is a system call: not possible in the synthesized code (Silinx HLS, as Vitis HLS)"
+    "csim": "pass",
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 706,
+      "max": 706,
+      "avg": 706
+    },
+    "reason": null
   },
   "interface-register-using-axi-lite-with-user-defined-offset": {
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 24,
+      "max": 24,
+      "avg": 24
+    },
     "reason": null
   },
   "interface-streaming-axi-stream-custom-side-channel-data-2": {
@@ -261,9 +281,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 18549,
-      "max": 18549,
-      "avg": 18549
+      "min": 24619,
+      "max": 24619,
+      "avg": 24619
     },
     "reason": null
   },
@@ -316,9 +336,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 1,
-      "max": 1,
-      "avg": 1
+      "min": 22,
+      "max": 23,
+      "avg": 22.75
     },
     "reason": null
   },
@@ -327,9 +347,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 1,
-      "max": 1,
-      "avg": 1
+      "min": 22,
+      "max": 23,
+      "avg": 22.75
     },
     "reason": null
   },
@@ -349,9 +369,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 98,
-      "max": 98,
-      "avg": 98
+      "min": 67,
+      "max": 67,
+      "avg": 67
     },
     "reason": null
   },
@@ -371,9 +391,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 35,
-      "max": 35,
-      "avg": 35
+      "min": 31,
+      "max": 31,
+      "avg": 31
     },
     "reason": null
   },
@@ -382,9 +402,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 68,
-      "max": 68,
-      "avg": 68
+      "min": 60,
+      "max": 60,
+      "avg": 60
     },
     "reason": null
   },
@@ -393,9 +413,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 2,
-      "max": 2,
-      "avg": 2
+      "min": 23,
+      "max": 28,
+      "avg": 24.7
     },
     "reason": null
   },
@@ -403,7 +423,11 @@
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 35,
+      "max": 35,
+      "avg": 35
+    },
     "reason": null
   },
   "modeling-free-running-kernel-remerge-ii4to1": {
@@ -422,9 +446,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 10,
-      "max": 10,
-      "avg": 10
+      "min": 60,
+      "max": 60,
+      "avg": 60
     },
     "reason": null
   },
@@ -476,7 +500,11 @@
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
-    "latency": null,
+    "latency": {
+      "min": 21,
+      "max": 23,
+      "avg": 21.8
+    },
     "reason": null
   },
   "modeling-using-arbitrary-precision-arith": {
@@ -484,9 +512,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 18,
-      "max": 18,
-      "avg": 18
+      "min": 73,
+      "max": 78,
+      "avg": 75.66666666666667
     },
     "reason": null
   },
@@ -506,9 +534,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 29803,
-      "max": 29803,
-      "avg": 29803
+      "min": 225576,
+      "max": 225576,
+      "avg": 225576
     },
     "reason": null
   },
@@ -557,9 +585,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 7513,
-      "max": 7513,
-      "avg": 7513
+      "min": 19586,
+      "max": 19586,
+      "avg": 19586
     },
     "reason": null
   },
@@ -568,9 +596,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 3,
+      "min": 2,
       "max": 34,
-      "avg": 18.5
+      "avg": 18.46875
     },
     "reason": null
   },
@@ -615,16 +643,16 @@
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C synthesis: 66: 'strm_out' is not an integer"
+    "reason": "C synthesis: 58: #pragma HLS DATAFLOW: the region has its statements other than calls of functions and declarations of streams and arrays: its streams are FIFOs between processes, so it cannot be made sequential"
   },
   "task-level-parallelism-control-driven-channels-autorestart": {
     "csim": "pass",
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 415,
-      "max": 415,
-      "avg": 415
+      "min": 322,
+      "max": 325,
+      "avg": 323.6666666666667
     },
     "reason": null
   },
@@ -677,9 +705,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 415,
-      "max": 415,
-      "avg": 415
+      "min": 315,
+      "max": 315,
+      "avg": 315
     },
     "reason": null
   },
@@ -688,9 +716,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 1206,
-      "max": 1206,
-      "avg": 1206
+      "min": 5922,
+      "max": 5938,
+      "avg": 5930.666666666667
     },
     "reason": null
   },
@@ -699,9 +727,9 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 674,
-      "max": 675,
-      "avg": 674.3333333333334
+      "min": 602,
+      "max": 603,
+      "avg": 602.6666666666666
     },
     "reason": null
   },

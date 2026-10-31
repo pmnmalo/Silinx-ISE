@@ -25,6 +25,7 @@ import { cppHlsLibs } from './cpp-hls-lib.js';
 import { cppVector } from './cpp-vector.js';
 import { taskArrays } from './cpp-task-array.js';
 import { cppSugar } from './cpp-sugar.js';
+import { cppBurst, memcpyLoops } from './cpp-burst.js';
 import { cStructs } from './c-struct.js';
 import { cUnions } from './c-union.js';
 import { cDesignated } from './c-designated.js';
@@ -266,12 +267,12 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     const channels = (t, later) => streamArrays(taskArrays(npChannels(t, report, later), report, later), report, later);
     // (hls::vector and the other library types their own first, core/cpp-hls-lib.js, #1891; its operators once the
     // templates are made, core/cpp-vector.js)
-    const lib = cppHlsLibs(tokens, includes, report);
+    const lib = cppHlsLibs(cppBurst(tokens, report), includes, report);
     const fir = cppFir(lib.tokens, report);
     const st = cStructs(cUnions(cDesignated(cppVector(cppSugar(channels(cppTemplates(channels(cppStl(fir.tokens, report), true), report), false), report)), report), report, true), report, true);
     return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, resetCtors: st.resetCtors, firs: fir.firs, apFloats: lib.apFloats };
   }
-  const st = cStructs(cUnions(cDesignated(tokens, report), report), report, false);
+  const st = cStructs(cUnions(cDesignated(memcpyLoops(tokens), report), report), report, false);
   return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs, resetCtors: st.resetCtors };
 
   function run(src, fname, depth, simOuter = false) {
@@ -323,7 +324,7 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
           else if (!once.has(key)) run(headers[key], key, depth + 1, !liveSyn());
           continue;
         }
-        if (cpp && (m[1] === 'hls_stream.h' || m[1] === 'hls_task.h')) continue;   // (hls::stream, hls::task: C++'s, #1590, #1721)
+        if (cpp && (m[1] === 'hls_stream.h' || m[1] === 'hls_task.h' || m[1] === 'hls_burst_maxi.h')) continue;   // (hls::stream, hls::task, hls::burst_maxi: C++'s, #1590, #1721, core/cpp-burst.js #1893)
         // (a test bench's std::vector, <algorithm>, <random>: core/cpp-stl.js, #1734; their stdlib.h's macros, as libstdc++'s
         // headers bring them, EXIT_FAILURE)
         if (cpp && m[1] === 'hls_np_channel.h') continue;   // (hls::split, hls::merge: core/cpp-np-channel.js, #1743)
