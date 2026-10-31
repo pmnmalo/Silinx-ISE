@@ -93,6 +93,47 @@ export class Graph {
       default: return undefined;
     }
   }
+  /** The operations made only as wide as their users read them (#2290): an addition truncated to 6 bits is a 6-bit
+   *  addition, its operands' high bits not read (the low bits of +, -, &, |, ^, ~, unary -, << and a mux depend only on
+   *  their operands' low bits). The C's int arithmetic otherwise leaves bits computed and never used (XST's Xst:646).
+   *  roots: the nodes read outside the graph (outputs, registers, states), kept whole. In place, before writing. */
+  narrow(roots) {
+    const order = this.needed(roots), whole = new Set(roots), need = new Map();
+    const LOW = new Set(['add', 'sub', 'and', 'or', 'xor', 'not', 'neg', 'shl', 'mux', 'ext', 'const']);
+    // (what a node needs of its operand k: its own width for the low-bit operations, else all of it)
+    const reads = (n, k, a) => {
+      if (n.op === 'slice') return n.hi + 1;
+      if (n.op === 'ext') return Math.min(n.w, a.w);
+      if ((n.op === 'shl' && k === 1) || (n.op === 'mux' && k === 0)) return a.w;
+      return ['add', 'sub', 'and', 'or', 'xor', 'not', 'neg', 'shl', 'mux'].includes(n.op) ? n.w : a.w;
+    };
+    for (const n of [...order].reverse()) {
+      if (LOW.has(n.op) && !whole.has(n.id) && need.has(n.id) && need.get(n.id) < n.w) {
+        n.w = need.get(n.id);
+        if (n.op === 'const') n.k = wrap(n.k, n);
+      }
+      n.args.forEach((id, k) => { const a = this.nodes[id]; need.set(id, Math.max(need.get(id) ?? 0, reads(n, k, a))); });
+    }
+    // (an operand left wider than its narrowed user: its low bits taken)
+    for (const n of order) {
+      if (!['add', 'sub', 'and', 'or', 'xor', 'not', 'neg', 'shl', 'mux'].includes(n.op)) continue;
+      n.args = n.args.map((id, k) => {
+        const a = this.nodes[id];
+        if ((n.op === 'shl' && k === 1) || (n.op === 'mux' && k === 0) || a.w === n.w) return id;
+        // (new nodes, not hash-consed: the keys of the nodes narrowed are their old widths')
+        const id2 = this.nodes.length;
+        this.nodes.push(a.op === 'const' ? { id: id2, op: 'const', args: [], w: n.w, s: a.s, k: wrap(a.k, { w: n.w, s: a.s }) } : { id: id2, op: 'ext', args: [id], w: n.w, s: a.s });
+        return id2;
+      });
+    }
+  }
+  /** The nodes to write as signals: those the roots need, but a constant read only as a shift's amount (written as a
+   *  number there: its signal would never be read, XST's Xst:646, #2290). */
+  written(roots) {
+    const nodes = this.needed(roots), read = new Set(roots);
+    for (const n of nodes) n.args.forEach((id, k) => { if (!((n.op === 'shl' || n.op === 'shr') && k === 1)) read.add(id); });
+    return nodes.filter((n) => n.op !== 'const' || read.has(n.id));
+  }
   /** The nodes the outputs need, in an order where each comes after its operands. */
   needed(roots) {
     const seen = new Set(), out = [];

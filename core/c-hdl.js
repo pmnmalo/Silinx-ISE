@@ -10,7 +10,7 @@ import { checkC } from './c-check.js';
 import { dataflow } from './c-dataflow.js';
 import { portOf, renamedWhy } from './c-names.js';
 import { scheduled } from './c-schedule.js';
-import { vhdlSeq, verilogSeq } from './c-hdl-seq.js';
+import { vhdlSeq, verilogSeq, seqRoots } from './c-hdl-seq.js';
 import { aggregate, aggregable, structPragmas, wordGroups } from './c-aggregate.js';
 import { cProcesses } from './c-processes.js';
 import { dataflowCall, hasStreams } from './c-dataflow-call.js';
@@ -120,6 +120,8 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   df.outputs = new Map([...df.outputs].filter(([k]) => !drop.has(k)).map(([k, v]) => [inner.get(k) ?? k, v]));
   const name = module || rn(checked.top);
   const src = file.split('/').pop();
+  // (each operation only as wide as its users read it, #2290)
+  df.graph.narrow(df.seq ? seqRoots(df) : [...df.outputs.values()]);
   const hdl = df.seq ? (lang === 'vhdl' ? vhdlSeq : verilogSeq)(name, src, ports, df, agg) : (lang === 'vhdl' ? vhdl : verilog)(name, src, ports, df, agg);
   // the report (#1529): a sequential module's states, registers, memories and loops (each one's II and cycles)
   const report = df.seq
@@ -131,7 +133,7 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
 }
 
 /** The nodes to write: those the outputs need. */
-export function nodesOf(df) { return df.graph.needed([...df.outputs.values()]); }
+export function nodesOf(df) { return df.graph.written([...df.outputs.values()]); }
 // (the internal names start with ap_, reserved by Vitis HLS for its own: no argument's port meets them)
 export const sig = (n) => `ap_t${n.id}`;
 
@@ -243,8 +245,9 @@ export function verilogNodes(nodes, g, L) {
       case 'xor': e = `${sig(a)} ^ ${sig(b)}`; break;
       case 'not': e = `~${sig(a)}`; break;
       case 'neg': e = `-${sig(a)}`; break;
-      case 'shl': e = `${sig(a)} << ${sig(b)}`; break;
-      case 'shr': e = `${sig(a)} ${n.s ? '>>>' : '>>'} ${sig(b)}`; break;
+      // (a constant amount a number, its node not written: #2290)
+      case 'shl': e = `${sig(a)} << ${b.op === 'const' ? b.k : sig(b)}`; break;
+      case 'shr': e = `${sig(a)} ${n.s ? '>>>' : '>>'} ${b.op === 'const' ? b.k : sig(b)}`; break;
       case 'eq': case 'ne': case 'lt': case 'le': case 'gt': case 'ge':
         e = `${sig(a)} ${{ eq: '==', ne: '!=', lt: '<', le: '<=', gt: '>', ge: '>=' }[n.op]} ${sig(b)}`; break;
       case 'mux': e = `${sig(a)} ? ${sig(b)} : ${sig(c)}`; break;
