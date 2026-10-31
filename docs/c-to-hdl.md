@@ -137,7 +137,8 @@ structs is an array per member; a member array of an array of structs is one arr
 
 - Definitions: `struct S { … };`, `typedef struct { … } S;`, `typedef S T;`, `class` (its data members); nested structs, member
   arrays, members' default values (`int n = 0;`).
-- Uses: members (`.`, `->`), whole structs copied (`a = b;`, `S c = d;`), initializer lists (`{ … }`, nested or
+- Uses: members (`.`, `->`), whole structs copied (`a = b;`, `S c = d;`; a member array of 64 elements or fewer
+  a statement each, so that a loop around the copy is pipelined as a loop with no inner loop, #2126), initializer lists (`{ … }`, nested or
   not, the missing members zero), passed to functions by value, by reference (`S &`, `const S &`) or by address
   (`S *`; indexed, `p[i].x`, `auto t = p[i];`, an array of structs, #1684), arrays of structs passed whole, returned by a function (its call a statement: `x = f(…);` or
   `S x = f(…);`).

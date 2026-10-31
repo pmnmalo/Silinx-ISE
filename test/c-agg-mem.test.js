@@ -94,7 +94,8 @@ int main() {
 // b one port each; the while's condition reads a)
 const AUTO = (line, ii, why) => `${line} warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=${ii} made (${why}); #pragma HLS PIPELINE off in it turns that off`;
 const LOOPS = ['4 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
-  AUTO(8, 2, 'it accesses a memory, an access a state'),
+  // (the outer loop pipelined: the struct's copy statements, no inner loop, #2126)
+  AUTO(4, 18, 'it accesses a memory in a branch, an access a state'),
   '16 warning: the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
   AUTO(16, 3, 'its condition or step accesses a memory')];
 

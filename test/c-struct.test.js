@@ -130,7 +130,8 @@ test('#1590 structs in C++: co-simulated in VHDL and Verilog; an array of struct
     const r = cosimulate(CPP, { file: 'acc.cpp', lang });
     assert.deepEqual(r.errors, []);
     assert.equal(r.pass, true, JSON.stringify(r.mismatches, big));
-    assert.deepEqual(r.gen.diagnostics, []);
+    // (the loop around the copy of tmp pipelined, its member array copied a statement each, #2126)
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), ['18 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (it accesses a memory, an access a state); #pragma HLS PIPELINE off in it turns that off']);
     assert.deepEqual(r.gen.ports.filter((p) => /^arr_/.test(p.name)).map((p) => `${p.name}:${p.w}`), ['arr_address0:3', 'arr_ce0:1', 'arr_we0:1', 'arr_d0:119', 'arr_q0:119']);
   }
 });

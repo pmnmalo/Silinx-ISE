@@ -242,3 +242,38 @@ test('#1919 a pipelined loop that reads and writes streams: its accesses in one 
     `5 warning: ${AUTO}: II=2 made (it reads or writes a stream, an access a state); ${OFF}`,
   ]);
 });
+
+// (a struct copied: its member arrays of few elements a statement each, #2126)
+const COPY = (body, n = 3, args = '') => `#include <stdio.h>
+struct A { int foo[${n}]; short bar; };
+int dut(A arr[10]${args}) {
+  int sum = 0;
+  for (unsigned i = 0; i < 10; i++) {
+${body}
+  }
+  return sum;
+}
+int main() {
+  A arr[10];${args ? '\n  A dst[10];' : ''}
+  for (int i = 0; i < 10; i++) { for (int j = 0; j < ${n}; j++) arr[i].foo[j] = i * 7 - j * 3; arr[i].bar = 100 - i; }
+  printf("%d\\n", dut(arr${args ? ', dst' : ''}));${args ? '\n  for (int i = 0; i < 10; i++) printf("%d %d\\n", dst[i].foo[2], dst[i].bar);' : ''}
+  return 0;
+}
+`;
+
+test('#2126 a loop copying a struct whose member array has few elements: pipelined around the copy (II=1), not an inner loop of the copy (II=8)', () => {
+  // (the corpus's aggregation-of-struct: Vitis HLS 2025.2 an II of 2, its latency 24, vitis.json)
+  const sum = run(COPY('    A tmp = arr[i];\n    sum += tmp.foo[0] + tmp.foo[1] + tmp.foo[2] + tmp.bar;'), { file: 't.cpp' });
+  assert.deepEqual(sum.loops, [{ line: 5, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 11 }]);
+  assert.equal(sum.cycles, 13);
+  assert.deepEqual(sum.messages, []);
+  // (a copy under an if with no braces, and a copy from one memory into another)
+  const cond = run(COPY('    A tmp = arr[0];\n    if (i & 1) tmp = arr[i];\n    dst[i] = tmp;\n    sum += tmp.foo[1];', 3, ', A dst[10]'), { file: 't.cpp' });
+  assert.equal(cond.loops.length, 1);
+  assert.deepEqual(cond.loops, [{ line: 5, unroll: null, pipeline: 1, auto: true, ii: 8, cycles: 81 }]);
+  assert.deepEqual(cond.messages, [`5 warning: ${AUTO}: II=8 made (it accesses a memory in a branch, an access a state); ${OFF}`]);
+  // (a member array of more than 64 elements: copied in a loop, as before)
+  const big = run(COPY('    A tmp = arr[i];\n    sum += tmp.foo[0] + tmp.foo[69] + tmp.bar;', 70), { file: 't.cpp' });
+  assert.deepEqual(big.loops, [{ line: 5, unroll: null, pipeline: null, ii: 9, cycles: 91 }, { line: 6, unroll: null, pipeline: 1, auto: true, ii: 1, cycles: 71 }]);
+  assert.deepEqual(big.messages, []);
+});
