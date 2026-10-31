@@ -1,8 +1,8 @@
 // The Petri net editor's bottom panel (#405: out of mountPetriEditor in petri-editor.js): the simulation (the token
-// game, clock steps, run, the inputs, the outputs and the marking, the log), the HDL generated from the net, and the
+// game, clock steps, run, the inputs, the outputs and the marking, the log) and the
 // analysis (#188: boundedness, deadlocks, liveness, reversibility, the invariants, the reachability graph).
 import { analyzePetri } from '/core/petri-analysis.js';
-import { clockStep, enabledTransitions, fire, generatePetri, initialMarking, isDeadlock, outputsOf } from '/core/petri.js';
+import { clockStep, enabledTransitions, fire, initialMarking, isDeadlock, outputsOf } from '/core/petri.js';
 import { h } from './ui.js';
 
 /** { analysis, envOf, fireOne, renderPanel, resetSim, togglePanel } of mountPetriEditor (M(), destroyed(), panel(), sim(): its current values). */
@@ -12,7 +12,7 @@ export function mountPetriSim(ctx) {
     setPanel
   } = ctx;
 
-  // ---------------------------------------------------------------- simulation and HDL panel
+  // ---------------------------------------------------------------- simulation panel
   const envOf = () => Object.fromEntries(M().inputs.map(i => [i.name, BigInt(sim()?.inputs[i.name] ?? 0)]));
   function resetSim(rerender = true) {
     if (sim()?.timer) clearInterval(sim().timer);
@@ -83,13 +83,6 @@ export function mountPetriSim(ctx) {
   function renderPanel() {
     if (!panel()) return;
     if (panel() !== 'sim') { panelTools.replaceChildren(); panelBody.replaceChildren(); }
-    if (panel() === 'code') {
-      panelTitle.textContent = `${M().lang === 'vhdl' ? 'VHDL' : 'Verilog'} generated from the net`;
-      let code;
-      try { code = generatePetri(M(), M().lang, { source: `${M().name}.pn.json` }).code; } catch (e) { code = e.message; }
-      panelBody.append(h('pre', { class: 'asm-code pn-code' }, code));
-      return;
-    }
     if (panel() === 'analysis') { renderAnalysis(); return; }
     panelTitle.textContent = 'Simulation';
     const runLabel = sim().timer ? '■ Stop' : '▶▶ Run';

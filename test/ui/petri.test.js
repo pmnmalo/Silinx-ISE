@@ -45,9 +45,8 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
   await page.click(`${ED} .asm-codebar .asm-btn`, { text: '⏭ Clock step' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=1  work=0', [ED], { what: 'done fired at the clock step' });
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .pn-log`).textContent, ED), /clock: done/);
-  // the HDL
-  await page.click(`${ED} .pn-tab-btn`, { text: '</> HDL' });
-  await page.waitFor((ed) => /entity ctl is/.test(document.querySelector(`${ed} .pn-code`)?.textContent || ''), [ED], { what: 'the VHDL' });
+  // no </> HDL button (#2250): the HDL is the linked file
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['▶ Simulate', '∑ Analysis']);
   // the net is a module of the project with its HDL file, made with it (every source has its HDL, #207): Set as Top Module
   assert.match(await page.consoleText(), /src\/ctl\.vhd generated from src\/ctl\.pn\.json \(every source has its HDL\)/);
   await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'ctl'), [], { what: 'ctl in the hierarchy' });
