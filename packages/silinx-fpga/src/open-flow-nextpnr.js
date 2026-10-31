@@ -221,10 +221,14 @@ export function mountNextpnrSteps(ctx) {
     log('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).');
   }
 
+  // nextpnr and the device's chip database, loaded once (offline, a database not downloaded yet fails: #2329)
+  let db = null;
+  const load = async () => (db ||= await io.nextpnr.chipdb(part, log));
+
   async function runPar() {
     if (!input) runMap();
     const t = now();
-    const db = await io.nextpnr.chipdb(part, log);
+    await load();
     // each clock's PERIOD as its target (the SDC), the tightest for the clocks with none (each met or not: the timing step's)
     let mhz = null;
     try { const c = ucfText ? parseUcf(ucfText).clocks || [] : []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
@@ -276,13 +280,15 @@ export function mountNextpnrSteps(ctx) {
     log('All signals are completely routed.');
   }
 
-  // the Design Summary's map section, from the routed design (nextpnr packs at Place & Route)
+  // the Design Summary's map section, from the routed design (nextpnr packs at Place & Route): every resource, as
+  // the Silinx engine's (#795), in the MAP report's order
   function mapReport(design) {
     const s = xdlSize(design), sites = deviceSites(io.device());
     const count = t => design.insts.filter(i => t.test(i.type)).length;
     const rows = [['ffs', 'Number of Slice Flip Flops', s.ffs, 2 * sites.slices.size], ['luts', 'Number of 4 input LUTs', s.luts, 2 * sites.slices.size],
       ['slices', 'Number of occupied Slices', s.slices, sites.slices.size], ['iob', 'Number of bonded IOBs', count(/^(IOB|IBUF)$/), sites.pads.size],
-      ['bufgmux', 'Number of BUFGMUXs', count(/^BUFGMUX$/), sites.bufgmux.length]];
+      ['ramb16', 'Number of RAMB16s', count(/^RAMB16$/), sites.brams.length], ['mult18x18', 'Number of MULT18X18SIOs', count(/^MULT18X18SIO$/), sites.mults.length],
+      ['bufgmux', 'Number of BUFGMUXs', count(/^BUFGMUX$/), sites.bufgmux.length], ['dcm', 'Number of DCMs', count(/^DCM$/), sites.dcms.length]];
     const items = rows.map(([id, name, used, total]) => ({ id, ...util(name, used, total) }));
     const byId = Object.fromEntries(items.map(i => [i.id, i]));
     report.map = { utilization: items, summary: { slices: byId.slices, ffs: byId.ffs, luts: byId.luts, iobs: byId.iob, bufg: byId.bufgmux }, warnings: 0, errors: 0, engine: 'nextpnr' };
@@ -290,5 +296,5 @@ export function mountNextpnrSteps(ctx) {
     for (const i of items) log(`  ${i.name}: ${i.used} out of ${i.total} ${i.percent}%`);
   }
 
-  return { problems, runMap, runPar };
+  return { problems, load, runMap, runPar };
 }

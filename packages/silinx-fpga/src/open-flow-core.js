@@ -271,12 +271,18 @@ export async function runFlow(spec, io) {
     : (spec.engine === 'nextpnr' || spec.engine === 'auto') ? mountNextpnrSteps({ io, spec, log, report, util, now, ms, netlistText: () => netlistText, top, ucfText, StepError, setRouted: t => { routedText = t; } }) : null;
 
   let viaNextpnr = null;
-  const useNextpnr = () => {
+  const useNextpnr = async () => {
     if (viaNextpnr !== null) return viaNextpnr;
     viaNextpnr = !!np && (spec.engine === 'nextpnr' || !np.problems().length);
     if (np && !viaNextpnr) {
       const p = np.problems();
       log(`Map: the nextpnr engine cannot implement this design yet (${p[0]}${p.length > 1 ? `, and ${p.length - 1} more` : ''}): the Silinx engine places and routes it.`);
+    } else if (viaNextpnr && spec.engine === 'auto' && np.load) {
+      // 'auto' with nextpnr not starting (offline, its chip database not downloaded yet, #2329): the Silinx engine, warned
+      try { await np.load(); } catch (e) {
+        viaNextpnr = false;
+        log(`WARNING:Map - the nextpnr engine could not start (${e.message}): the Silinx engine places and routes this design.`);
+      }
     }
     return viaNextpnr;
   };
@@ -306,9 +312,9 @@ export async function runFlow(spec, io) {
     if (steps.includes('postsynth')) { step('postsynth'); await runPostSynth(); save(); }
     if (steps.includes('translate')) { step('translate'); runTranslate(); save(); }
     if (steps.includes('posttrans')) { step('posttrans'); await runPostTranslate(); save(); }
-    if (steps.includes('map')) { step('map'); (useNextpnr() ? np.runMap : s6 ? s6.runMap : runMap)(); save(); }
+    if (steps.includes('map')) { step('map'); (await useNextpnr() ? np.runMap : s6 ? s6.runMap : runMap)(); save(); }
     if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
-    if (steps.includes('par')) { step('par'); await (useNextpnr() ? np.runPar : s6 ? s6.runPar : runPar)(); save(); }
+    if (steps.includes('par')) { step('par'); await (await useNextpnr() ? np.runPar : s6 ? s6.runPar : runPar)(); save(); }
     if (steps.includes('trce')) { step('trce'); routedOrEarlier(); runTiming(); save(); }
     if (steps.includes('postpar')) { step('postpar'); await runPostPar(); save(); }
     if (steps.includes('pin2ucf')) { step('pin2ucf'); runPins(); save(); }

@@ -159,7 +159,8 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
 }
 
 /**
- * What Implement of the project's device fetches (Yosys, the device description, its bit database), fetched into the
+ * What Implement of the project's device fetches (Yosys, the device description, its bit database; nextpnr and the device's
+ * chip database unless the project's engine (impl, engineOf) is Silinx's, #2136), fetched into the
  * browser's Cache Storage by the flow's worker, in the background, when a project opens (#967): its first run does not
  * wait for 17 MB to download. Nothing in a page opened from a file (the single file: WebKit and Firefox give it a
  * Cache Storage, and a navigation that cancelled the download was a console error in WebKit, #1450), where there is
@@ -167,14 +168,14 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
  * Resolves { fetched, bytes, pruned } or null.
  */
 const prepared = new Set();
-export function prepareBrowserFlow(device = {}) {
+export function prepareBrowserFlow(device = {}, impl = undefined) {
   const st = browserOpenStatus(device);
   if (!st.available || prepared.has(st.graph) || globalThis.location?.protocol === 'file:' || !globalThis.isSecureContext || !globalThis.caches) return Promise.resolve(null);
   prepared.add(st.graph);
   const w = getWorker(), id = ++runSeq;
   return new Promise(resolve => {
     runs.set(id, { onData: data => { if (data.done) { runs.delete(id); resolve(data.done); } }, fail: () => { runs.delete(id); prepared.delete(st.graph); resolve(null); } });
-    w.postMessage({ id, prepare: { graph: st.graph, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase() }, assets: assetsBase(), yosys: yosysBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, prepare: { graph: st.graph, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: engineOf(impl) !== 'silinx' }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
   });
 }
 

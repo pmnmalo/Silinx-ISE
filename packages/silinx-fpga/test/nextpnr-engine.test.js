@@ -11,7 +11,9 @@ import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
 import { engineOf, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
 import { parseXdl } from '../src/xdl.js';
-import { loadDeviceCache } from '../src/fpga/device-node.js';
+import { loadDeviceCache, findDeviceGraph } from '../src/fpga/device-node.js';
+import { loadDb } from '../src/fpga/bitdb-node.js';
+import { runFlow } from '../src/open-flow-core.js';
 import { fileURLToPath } from 'node:url';
 
 const fixture = name => new URL(`./fixtures/nextpnr-engine/${name}`, import.meta.url);
@@ -355,12 +357,37 @@ test('#2136 --engine auto: nextpnr when it can implement the design; else the Si
   assert.ok(!s.some(l => /nextpnr packs|Placed and routed by nextpnr/.test(l)), s.join('\n'));
 });
 
-test('#2136 engineOf: a project\'s engine, Silinx\'s when not set or not known', () => {
-  assert.equal(engineOf(undefined), 'silinx');
-  assert.equal(engineOf({}), 'silinx');
+// #2136: the engine 'auto' (the default) with nextpnr not starting (offline: its chip database not downloaded yet, #2329):
+// the Silinx engine builds the bitstream, with one warning saying so; nextpnr not run
+test('#2136 --engine auto with nextpnr not starting (its chip database unreachable): the Silinx engine, one warning', { timeout: 300000 }, async () => {
+  const lines = [], store = { 'open/gates.json': gates() };
+  let device, db, ran = 0;
+  const io = { log: l => lines.push(l), sources: () => [], ucf: ucf(), ucfName: 'gates.ucf',
+    device: () => (device ||= loadDeviceCache(findDeviceGraph('xc3s250ecp132-4'))), bitDb: () => (db ||= loadDb('xc3s250ecp132', { graph: io.device() })),
+    nextpnr: { chipdb: async () => { throw new Error('fetch failed'); }, run: async () => { ran++; return {}; } },
+    write: (name, data) => { store[name] = data; return name; }, read: name => store[name] ?? null, save: () => {} };
+  const r = await runFlow({ top: 'gates', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1,
+    startupClk: 'JtagClk', engine: 'auto', steps: ['translate', 'map', 'par', 'trce', 'bitgen'] }, io);
+  assert.ok(r.ok, r.error);
+  assert.deepEqual(lines.filter(l => /warning/i.test(l)), ['WARNING:Map - the nextpnr engine could not start (fetch failed): the Silinx engine places and routes this design.']);
+  assert.equal(ran, 0);
+  assert.ok(!lines.some(l => /nextpnr packs|Placed and routed by nextpnr/.test(l)), lines.join('\n'));
+  assert.ok(lines.includes('All signals are completely routed.'), lines.join('\n'));
+  assert.ok(store['gates.bit'] instanceof Uint8Array || Buffer.isBuffer(store['gates.bit']), Object.keys(store).join(' '));
+  // --engine nextpnr: no fallback, the step fails
+  const n = await runFlow({ top: 'gates', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1,
+    startupClk: 'JtagClk', engine: 'nextpnr', steps: ['translate', 'map', 'par'] }, io);
+  assert.equal(n.ok, false);
+  assert.match(n.error, /fetch failed/);
+});
+
+test('#2136 engineOf: a project\'s engine, nextpnr (Silinx\'s when it cannot) when not set or not known', () => {
+  assert.equal(engineOf(undefined), 'auto');
+  assert.equal(engineOf({}), 'auto');
+  assert.equal(engineOf({ engine: 'silinx' }), 'silinx');
   assert.equal(engineOf({ engine: 'auto' }), 'auto');
   assert.equal(engineOf({ engine: 'nextpnr' }), 'nextpnr');
-  assert.equal(engineOf({ engine: 'vpr' }), 'silinx');
+  assert.equal(engineOf({ engine: 'vpr' }), 'auto');
 });
 
 test('#2223 flip-flops alone in the slices of carry chains built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream', { timeout: 300000 }, async () => {

@@ -8,7 +8,7 @@ In detail:
 
 - **The nextpnr engine in the IDE and the browser (#2136):**
   - **The project's engine:** `impl.engine` (`silinx`, `nextpnr` or `auto`), set in Process Properties (the Silinx toolchain
-    only), read by the local server's flow and the browser's; not set, the Silinx engine, as before.
+    only), read by the local server's flow and the browser's; not set, `auto` (#2136: nextpnr by default).
   - **`auto`:** nextpnr when it can implement the design; otherwise (a cell it does not have yet, a port without its pin) the
     Silinx engine, which Map says in one line (not a warning). The Spartan-6 stays on the Silinx engine.
   - **The browser edition:** the flow's worker runs nextpnr's bundle from the site's assets

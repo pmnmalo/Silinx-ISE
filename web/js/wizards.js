@@ -643,7 +643,7 @@ export async function implProperties() {
   const lvl = select([['1', 'Normal'], ['2', 'High']], String(pj.impl.optLevel || 1));
   const clk = select([['JtagClk', 'JTAG Clock'], ['CCLK', 'CCLK'], ['UserClk', 'User Clock']], pj.impl.startupClk || 'JtagClk');
   // the Silinx toolchain's place and route (#2136): its own, nextpnr, or nextpnr when it can implement the design
-  const eng = select([['silinx', 'Silinx'], ['auto', 'nextpnr (Silinx when it cannot)'], ['nextpnr', 'nextpnr only']], pj.impl.engine || 'silinx');
+  const eng = select([['silinx', 'Silinx'], ['auto', 'nextpnr (Silinx when it cannot)'], ['nextpnr', 'nextpnr only']], pj.impl.engine || 'auto');
   const r = await dialog({
     title: 'Process Properties - Synthesis / Implementation / Bitstream', width: 520,
     body: h('div', { class: 'form-grid' },

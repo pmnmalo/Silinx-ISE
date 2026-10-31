@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { main, parseArgs, partOf, topOf, USAGE } from '../packages/silinx-fpga/src/cli.js';
 import { runOpenFlow } from '../core/flow-ide.js';
-import { findDeviceGraph, loadDeviceCache, loadDb, yosysNode } from '../packages/silinx-fpga/src/node.js';
+import { findDeviceGraph, loadDeviceCache, loadDb, yosysNode, nextpnrNode } from '../packages/silinx-fpga/src/node.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BIN = path.join(ROOT, 'packages/silinx-fpga/bin/silinx-fpga.js');
@@ -27,7 +27,7 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-fpga-cli-'));
 
 test('#1679 parseArgs: the defaults, each option', () => {
   assert.deepEqual(parseArgs(['build', 'a.v', '--part', 'xc3s250e-cp132-4']),
-    { command: 'build', files: ['a.v'], part: 'xc3s250e-cp132-4', replicate: true, quiet: false, outDir: 'build', effort: 'normal', seed: 1, engine: 'silinx' });
+    { command: 'build', files: ['a.v'], part: 'xc3s250e-cp132-4', replicate: true, quiet: false, outDir: 'build', effort: 'normal', seed: 1, engine: 'auto' });
   const o = parseArgs(['build', 'a.v', 'b.v', '--part', 'p', '--top', 't', '--ucf', 'u.ucf', '-o', 'x.bit', '--out-dir', 'o', '--effort', 'high', '--seed', '3', '--no-replicate', '--engine', 'nextpnr', '--quiet']);
   assert.deepEqual(o, { command: 'build', files: ['a.v', 'b.v'], part: 'p', top: 't', ucf: 'u.ucf', out: 'x.bit', outDir: 'o', effort: 'high', seed: 3, replicate: false, engine: 'nextpnr', quiet: true });
 });
@@ -123,9 +123,9 @@ async function ideBit() {
   let device, db;
   const io = { log: () => {}, sources: () => [{ path: 'blinky.v', lang: 'verilog', text: BLINKY }], ucf: UCF, ucfName: 'basys2.ucf',
     device: () => (device ||= loadDeviceCache(findDeviceGraph('xc3s250ecp132-4'))), bitDb: () => (db ||= loadDb('xc3s250ecp132', { graph: io.device() })),
-    yosys: yosysNode, write: (name, data) => { store[name] = data; return name; }, read: name => store[name] ?? null, save: () => {} };
+    yosys: yosysNode, nextpnr: nextpnrNode(), write: (name, data) => { store[name] = data; return name; }, read: name => store[name] ?? null, save: () => {} };
   const r = await runOpenFlow({ top: 'blinky', part: 'xc3s250ecp132-4', device: 'xc3s250e', pkg: 'cp132', family: 'spartan3e', seed: 1, effort: 1,
-    synthEffort: 'normal', startupClk: 'JtagClk', steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] }, io);
+    synthEffort: 'normal', startupClk: 'JtagClk', engine: 'auto', steps: ['synth', 'translate', 'map', 'par', 'trce', 'bitgen'] }, io);   // (the IDE's default engine, #2136)
   assert.ok(r.ok, r.error);
   return Buffer.from(store['blinky.bit']);
 }
@@ -138,10 +138,12 @@ test('#1679 the README\'s blinky built from the command line: no warnings, its f
   const r = await run(['build', path.join(dir, 'blinky.v'), '--part', 'xc3s250e-cp132-4', '--ucf', path.join(dir, 'basys2.ucf'), '-o', bit, '--out-dir', build]);
   assert.equal(r.code, 0, r.err.join('\n'));
   assert.deepEqual(r.err, [], 'no warnings');
-  assert.ok(r.out.includes('constraint PERIOD 20 ns on clk: met (period 4.857 ns, slack 15.143 ns)'), r.out.join('\n'));
+  // (nextpnr, the default engine, #2136: the fastest of its 4 placements)
+  assert.ok(r.out.some(l => l.startsWith('Placed and routed by nextpnr in ')) && r.out.includes('Kept the fastest of 4 placements: seed 2, 5.040 ns.'), r.out.join('\n'));
+  assert.ok(r.out.includes('constraint PERIOD 20 ns on clk: met (period 5.040 ns, slack 14.960 ns)'), r.out.join('\n'));
   assert.ok(r.out.includes('All constraints were met.'));
   assert.equal(r.out.at(-1), `${bit}: the bitstream of blinky on xc3s250ecp132-4`);
-  for (const f of ['blinky.json', 'placed.xdl', 'routed.xdl', 'timing.txt', 'blinky.bit']) assert.ok(fs.existsSync(path.join(build, f)), f);
+  for (const f of ['blinky.json', 'routed.xdl', 'timing.txt', 'blinky.bit']) assert.ok(fs.existsSync(path.join(build, f)), f);
   const cli = fs.readFileSync(bit);
   assert.deepEqual(cli, fs.readFileSync(path.join(build, 'blinky.bit')));
   assert.ok(cli.equals(await ideBit()), 'the IDE\'s .bit');
