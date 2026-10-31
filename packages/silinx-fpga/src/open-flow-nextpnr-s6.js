@@ -2,7 +2,6 @@
 // 'nextpnr'. Silinx's Map stays (open-flow-s6.js: the netlist packed into sites); nextpnr-himbaechel with the spartan6
 // micro-architecture (the fork pmnmalo/nextpnr-spartan, its WebAssembly package through io.nextpnr.spartan6) places those sites,
 // and, the placed design written with its constants' sources (fpga/s6/xdl.js), routes it.
-import { parseUcf } from './ucf.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { s6Sites } from './fpga/s6/sites.js';
 import { placeS6 } from './fpga/s6/place.js';
@@ -17,7 +16,7 @@ const periodOf = (routed, device) => analyzeTimingS6(parseXdl(writeXdl(routed)),
 
 /** runPar of the Spartan-6 by nextpnr. ctx: mountS6Steps's, and its state() ({ packed, phys, sites }) after Map. */
 export function mountNextpnrS6(ctx) {
-  const { io, spec, log, report, now, ms, netlist, ucfText, StepError, setRouted, state } = ctx;
+  const { io, spec, log, report, now, ms, netlist, constraints, StepError, setRouted, state } = ctx;
   const part = `${spec.device}${spec.pkg}`;
 
   async function run(what, args, input, db) {
@@ -59,7 +58,7 @@ export function mountNextpnrS6(ctx) {
     });
     const chains = phys.chains.filter(c => c.length > 1).map(c => c.map(i => phys.insts[i].name));
     let mhz = null;
-    try { const c = ucfText ? parseUcf(ucfText).clocks || [] : []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
+    try { const c = constraints()?.clocks || []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
     const freq = [...(mhz ? ['--freq', mhz.toFixed(3)] : []), '--timing-allow-fail'];
     const unplaced = placedXdlS6(nl, packed, phys, { site: [], tile: [], pos: [] }, { part: spec.part, name: spec.top });
     // 1. the placements and their routings, of the placed design with its constants' sources. The seeds differ by up

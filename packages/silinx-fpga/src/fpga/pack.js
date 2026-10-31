@@ -225,7 +225,7 @@ export function connectionCriticality(cells, nets) {
   return { dmax, crit };
 }
 
-/** Pack a netlist. ucf: UCF text or parseUcf() result (LOC, IOSTANDARD, DRIVE, SLEW, PULL).
+/** Pack a netlist. ucf: UCF text, parseUcf() result or a constraints model (constraints.js) (LOC, IOSTANDARD, DRIVE, SLEW, PULL).
  *  carryOut: how the carry out of a chain's last stage leaves the slice when logic reads it:
  *  'pin' (default, as ISE does: the XB / YB pin of the carry multiplexer; every XB / YB -> OMUX switch
  *  is in the bit database of the four devices, and CIN -> XB is 0.13 ns where an XOR stage's CIN -> Y

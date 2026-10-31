@@ -6,7 +6,8 @@
 //   read Silinx's own.
 // - For now the micro-architecture knows LUTs, flip-flops, carry chains, wide multiplexers, constants, IOBs with their
 //   registers, global clock buffers, block RAMs and multipliers (#2135): a netlist with other cells fails at Map, naming them.
-import { parseUcf, portAssignments, ucfPattern } from './ucf.js';
+import { UCF, readConstraints } from './constraints.js';
+import { portAssignments, ucfPattern } from './ucf.js';
 export { engineOf } from './open-steps.js';
 import { parseXdl, writeXdl } from './xdl.js';
 import { checkRouting } from './fpga/route.js';
@@ -31,7 +32,7 @@ export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GN
  * a pad; and sdc, the PERIODs as nextpnr's clock constraints. An input nothing reads is left out, as Silinx's packer does.
  * (The constants: the micro-architecture's, #2135.)
  */
-export function nextpnrNetlist(text, top, ucfText, device = null) {
+export function nextpnrNetlist(text, top, ucf, device = null) {
   const json = JSON.parse(text);
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
   const problems = [];
@@ -41,7 +42,7 @@ export function nextpnrNetlist(text, top, ucfText, device = null) {
   hardInputs(mod);
   // each port bit's pad on its I/O buffer
   let parsed = { assignments: {}, clocks: [], other: [] };
-  try { if (ucfText) parsed = parseUcf(ucfText); } catch { /* checked by translate */ }
+  parsed = (typeof ucf === 'string' ? readConstraints(UCF, ucf) : ucf) || parsed;
   const { other = [] } = parsed;
   // INST "name" LOC = "DCM_X0Y1": a DCM's site, its BEL in the chip database (X<col>Y<row>/S<site index>_DCM)
   for (const st of other) {
@@ -191,11 +192,12 @@ export const nextpnrTries = (effort, slices) => (effort === 'high' ? NEXTPNR_TRI
 
 /**
  * { problems, runMap, runPar } of runFlow for the nextpnr engine (problems(): what keeps it from the design, [] if nothing). ctx: { io, spec, log, report, util, now, ms, netlistText (a
- * getter: the synthesis's JSON), top, ucfText, StepError, setRouted (the routed design's text, for the reports and
+ * getter: the synthesis's JSON), top, constraints, StepError, setRouted (the routed design's text, for the reports and
  * the bitstream) }. io.nextpnr.spartan3e: { run(args, files, onLine) -> files, chipdb(part) -> Uint8Array }.
  */
 export function mountNextpnrSteps(ctx) {
-  const { io, spec, log, report, util, now, ms, netlistText, top, ucfText, StepError, setRouted } = ctx;
+  const { io, spec, log, report, util, now, ms, netlistText, top, constraints, StepError, setRouted } = ctx;
+  const model = () => { try { return constraints(); } catch { return null; } };   // (checked by translate)
   let input = null, sdc = '';
   const part = `${spec.device}${spec.pkg}`;
 
@@ -205,13 +207,13 @@ export function mountNextpnrSteps(ctx) {
     if (found) return found;
     if (spec.family !== 'spartan3e') return (found = [`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`]);
     if (!io.nextpnr?.spartan3e) return (found = ['the nextpnr engine is not available here (io.nextpnr)']);
-    return (found = nextpnrNetlist(netlistText(), top, ucfText, io.device()).problems);
+    return (found = nextpnrNetlist(netlistText(), top, model(), io.device()).problems);
   }
 
   function runMap() {
     if (spec.family !== 'spartan3e') throw new StepError(`the nextpnr engine places the Spartan-3E only (#2131), not the ${spec.family}`, [], 'Choose the Silinx engine (Toolchain Settings).');
     if (!io.nextpnr?.spartan3e) throw new StepError('the nextpnr engine is not available here (io.nextpnr)', [], 'Choose the Silinx engine (Toolchain Settings).');
-    const r = nextpnrNetlist(netlistText(), top, ucfText, io.device());
+    const r = nextpnrNetlist(netlistText(), top, model(), io.device());
     if (r.problems.length) {
       throw new StepError(`the nextpnr engine cannot implement this design yet: ${r.problems.length} problem(s)`, r.problems.slice(0, 50),
         'Choose the Silinx engine (Toolchain Settings): nextpnr\'s Spartan-3E is growing (#2135).');
@@ -231,7 +233,7 @@ export function mountNextpnrSteps(ctx) {
     await load();
     // each clock's PERIOD as its target (the SDC), the tightest for the clocks with none (each met or not: the timing step's)
     let mhz = null;
-    try { const c = ucfText ? parseUcf(ucfText).clocks || [] : []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
+    try { const c = constraints()?.clocks || []; if (c.length) mhz = 1000 / Math.min(...c.map(x => x.period)); } catch { /* translate's */ }
     // one placement and routing, as nextpnr's seed makes it: { seed, lines, ms, design, text, size, period } (its problems: StepError)
     const placeRoute = async seed => {
       const t1 = now(), lines = [];

@@ -31,7 +31,8 @@
 //            the netlist but the clocks', for the timing estimate (place-timing.js)
 //   cellInst: [cell] -> inst (-1: a constant, a pull)
 //   warnings: [] }
-import { parseUcf, portAssignments } from '../../ucf.js';
+import { constraintsFor } from '../../constraints.js';
+import { portAssignments } from '../../ucf.js';
 import { oneBitBusesOf, ucfPortsOf } from '../pack.js';
 import { AND2L, ffKind } from './pack.js';
 
@@ -54,11 +55,11 @@ const sitePinOf = pin => pin.replace(/<(\d+)>$/, '$1');
 /** The constraints of the port bits (LOC, IOSTANDARD, DRIVE, SLEW, PULL): { 'led<3>': { loc, iostandard … } }. */
 function portConstraints(nl, ucf) {
   if (!ucf) return {};
-  const parsed = typeof ucf === 'string' ? parseUcf(ucf, { ports: ucfPortsOf(nl) }) : ucf;
+  const parsed = constraintsFor(ucf, ucfPortsOf(nl));
   return portAssignments(parsed?.assignments ? parsed : { assignments: ucf }, nl.ports.flatMap(p => p.bits.map(b => b.name)), { oneBitBuses: oneBitBusesOf(nl) }).assignments;
 }
 
-/** The physical design of a packed Spartan-6 netlist (see above). ucf: its text or parseUcf()'s result. */
+/** The physical design of a packed Spartan-6 netlist (see above). ucf: its text, parseUcf()'s result or a constraints model (constraints.js). */
 export function physS6(nl, packed, { ucf = null } = {}) {
   const cells = nl.cells, nets = nl.nets;
   const cons = portConstraints(nl, ucf);

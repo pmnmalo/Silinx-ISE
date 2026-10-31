@@ -15,10 +15,10 @@ import { parseXdl, writeXdl } from './xdl.js';
 
 /**
  * { runMap, runPar } of runOpenFlow for the Spartan-6. ctx: { io, spec, log, report, util, now, ms, netlist (a
- * getter), ucfText, StepError, setRouted (the routed design's text, for the reports and the bitstream) }.
+ * getter), constraints, StepError, setRouted (the routed design's text, for the reports and the bitstream) }.
  */
 export function mountS6Steps(ctx) {
-  const { io, spec, log, report, util, now, ms, netlist, ucfText, StepError, setRouted } = ctx;
+  const { io, spec, log, report, util, now, ms, netlist, constraints, StepError, setRouted } = ctx;
   let packed = null, phys = null, sites = null;
   const siteCounts = () => {
     sites ||= s6Sites(io.device());
@@ -52,7 +52,7 @@ export function mountS6Steps(ctx) {
     const t = now();
     try {
       packed = packS6(netlist());
-      phys = physS6(netlist(), packed, { ucf: ucfText });
+      phys = physS6(netlist(), packed, { ucf: constraints() });
     } catch (e) { throw new StepError(`packing failed: ${e.message}`); }
     for (const w of [...(packed.warnings || []), ...(phys.warnings || [])]) log(`WARNING:Pack - ${w}`);
     const items = mapReport();

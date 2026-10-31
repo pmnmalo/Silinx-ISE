@@ -304,5 +304,6 @@ simulator that `compile` uses), so its steps are the toolchain's, shorter:
 `runPins`, `runPower`, `bitfile` and `runFpgaView`, with its engines. `registerBackend` adds one; a family not registered is
 implemented as the Spartan-3E is. nextpnr comes through one hook, `io.nextpnr`, by micro-architecture. The routed design is
 the back end's (#2384): its format and its file (XDL, `open/routed.xdl`, for the Xilinx families), read again from an earlier
-run by the steps that need it. Still to come: a neutral constraints model (#2385, UCF today), the synthesis and the steps by
+run by the steps that need it. The constraints reach the back ends as one model, in the back end's format (#2385,
+`constraints.js`). Still to come: the synthesis and the steps by
 family (#2386, #2387), then iCE40 (#2295).

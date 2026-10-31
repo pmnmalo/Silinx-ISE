@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 // The flow's back ends (#2360): runFlow names no family and no engine; a family is added by registering its back end,
 // which runs through the orchestrator with its own steps; the families' back ends are the ones they were.
 import test from 'node:test';
@@ -61,6 +62,63 @@ test('#2384 the routed design is the back end\'s: an earlier run\'s read in its 
     assert.equal(r2.ok, false);
     assert.deepEqual(none.log.slice(-2), ['ERROR:Silinx - nothing routed', '=== SILINX FAILED trce (exit 1) ===']);
   } finally { remove(); }
+});
+
+// a format of a fake family's own: `pin name site` and `clock name ns`, the rest its own text
+const PINS = {
+  id: 'pins',
+  read(text) {
+    const m = { assignments: {}, netStatements: [], clocks: [], other: [] };
+    for (const l of text.split('\n').filter(Boolean)) {
+      const [k, a, b] = l.split(' ');
+      if (k === 'pin') { m.assignments[a] = { loc: b }; m.netStatements.push({ net: a, attrs: { loc: b } }); }
+      else if (k === 'clock') m.clocks.push({ net: a, period: +b, duty: 50 });
+      else if (k === 'bad') throw new Error(`bad line: ${l}`);
+      else m.other.push(l);
+    }
+    return m;
+  },
+  write: () => '',
+};
+
+test('#2385 the constraints reach a back end as the model of its own format, and the log says it', async () => {
+  let seen = null;
+  const remove = registerBackend({ id: 'fake', constraints: PINS, synth: async () => SYNTH, mount: ctx => ({ runMap: () => { seen = ctx.constraints(); } }) });
+  try {
+    const { io, log } = memoryIo();
+    io.ucf = 'pin led B2\nclock clk 20\nkeep this';
+    const r = await runFlow({ top: 'top', family: 'fake', steps: ['synth', 'translate', 'map'] }, io);
+    assert.equal(r.ok, true, r.error);
+    assert.deepEqual(seen.assignments, { led: { loc: 'B2' } });
+    assert.deepEqual(seen.clocks, [{ net: 'clk', period: 20, duty: 50 }]);
+    assert.deepEqual(seen.other, ['keep this']);
+    assert.equal(seen.format, 'pins');
+    assert.ok(log.includes('Netlist of <top> read; constraints: the PINS, 1 pin location(s), 1 PERIOD constraint(s).'), log.join('\n'));
+    assert.deepEqual(log.filter(l => /^(WARNING|ERROR)/.test(l)), []);
+  } finally { remove(); }
+});
+
+test('#2385 constraints its format cannot read fail at translate, with the format\'s message; none: the model is null', async () => {
+  let seen;
+  const remove = registerBackend({ id: 'fake', constraints: PINS, synth: async () => SYNTH, mount: ctx => ({ runMap: () => { seen = ctx.constraints(); } }) });
+  try {
+    const { io, log } = memoryIo();
+    io.ucf = 'bad line';
+    const r = await runFlow({ top: 'top', family: 'fake', steps: ['synth', 'translate', 'map'] }, io);
+    assert.equal(r.ok, false);
+    assert.ok(log.includes('ERROR:Silinx - the constraints cannot be read: bad line: bad line'), log.join('\n'));
+    assert.equal(log.at(-1), '=== SILINX FAILED translate (exit 1) ===');
+    const none = memoryIo();
+    assert.equal((await runFlow({ top: 'top', family: 'fake', steps: ['synth', 'translate', 'map'] }, none.io)).ok, true);
+    assert.equal(seen, null);
+    assert.ok(none.log.includes('Netlist of <top> read; constraints: none.'), none.log.join('\n'));
+  } finally { remove(); }
+});
+
+test('#2385 the orchestrator and the reports do not parse UCF', () => {
+  for (const f of ['open-flow-core.js', 'open-flow-reports.js', 'open-flow-nextpnr.js', 'open-flow-nextpnr-s6.js', 'open-flow-s3e.js', 'open-flow-s6.js']) {
+    assert.doesNotMatch(readFileSync(new URL(`../packages/silinx-fpga/src/${f}`, import.meta.url), 'utf8'), /parseUcf|ucfText/, f);
+  }
 });
 
 test('#2360 a back end\'s step that fails: the flow reports it as any step, with its hint', async () => {
