@@ -87,7 +87,7 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops }, { clock, family }), seq: true };
   // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
   // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
-  else if (!flat && df.ctrl === 'ap_ctrl_hs' && !df.diagnostics.some((d) => d.severity === 'error') && !fitsClock(df.graph, clock, family)) {
+  else if (!flat && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && !fitsClock(df.graph, clock, family)) {
     const sq = scheduled(checked, { groups, pipelineLoops }, { clock, family });
     if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
   }
@@ -118,10 +118,12 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   for (const node of df.graph.nodes) if (node.op === 'in') node.port.name = node.port.param ? rn(node.port.param) + node.port.suffix : rn(node.port.name);
   // the block protocol's ports, as Vitis HLS's (#1900): ap_ctrl_hs's, a sequential module's clock and reset first (a
   // combinational one its reset, unused, but no clock, as Vitis HLS 2025.2 makes a top of latency 0, #1924); ap_ctrl_none,
-  // none of ap_start, ap_done, ap_idle, ap_ready (a sequential module running by itself, core/c-fsmd.js)
+  // none of ap_start, ap_done, ap_idle, ap_ready (a sequential module running by itself, core/c-fsmd.js); ap_ctrl_chain,
+  // ap_ctrl_hs's and ap_continue, with a clock even when combinational, as Vitis HLS 2025.2 makes it (#1965)
   const hs = [{ name: 'ap_start', dir: 'in', w: 1 }, { name: 'ap_done', dir: 'out', w: 1 }, { name: 'ap_idle', dir: 'out', w: 1 }, { name: 'ap_ready', dir: 'out', w: 1 }];
   const clk = { name: 'ap_clk', dir: 'in', w: 1 }, rst = { name: 'ap_rst', dir: 'in', w: 1 };
-  const ctrl = df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst] : [clk, rst, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? [rst, ...hs] : [];
+  const chain = [hs[0], hs[1], { name: 'ap_continue', dir: 'in', w: 1 }, hs[2], hs[3]];
+  const ctrl = df.ctrl === 'ap_ctrl_chain' ? [clk, rst, ...chain] : df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst] : [clk, rst, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? [rst, ...hs] : [];
   const portName = (p) => (p.param ? rn(p.param) + p.name.slice(p.param.length) : p.name);
   const flatPorts = [...ctrl, ...df.ports.map((p) => ({ name: portName(p), dir: p.dir, w: p.w, role: p.role, ...(p.param ? { param: p.param } : {}) }))];
   // (each output by its port's name: an argument named as a reserved word, in, its ports in_r_…: a memory's, a stream's too, #1590)
@@ -169,15 +171,27 @@ function vhdl(name, src, ports, df, agg) {
   const ty = (n) => `${n.s ? 'signed' : 'unsigned'}(${n.w - 1} downto 0)`;
   for (const n of nodes) L.push(`  signal ${sig(n)} : ${ty(n)};`);
   innerSignals(agg, 'vhdl', L);
+  // (ap_ctrl_chain, #1965, as Vitis HLS's: a call when ap_start and no ap_done held; ap_done held, and ap_return, until
+  // ap_continue)
+  const chain = ports.some((p) => p.name === 'ap_continue'), ret = chain ? ports.find((p) => p.name === 'ap_return') : null;
+  if (chain) L.push("  signal ap_done_reg : std_logic := '0';", '  signal ap_fire : std_logic;');
+  if (ret) L.push(`  signal ap_return_preg, ap_return_v : std_logic_vector(${ret.w - 1} downto 0);`);
   L.push('begin');
   vhdlNodes(nodes, g, L);
   L.push(...agg.vhdl);
-  const hs = ports.some((p) => p.name === 'ap_start');
-  if (hs) L.push('  ap_done <= ap_start;', '  ap_ready <= ap_start;', "  ap_idle <= '1';");
+  const hs = ports.some((p) => p.name === 'ap_start'), fire = chain ? 'ap_fire' : 'ap_start';
+  if (chain) {
+    L.push("  ap_fire <= ap_start and not ap_done_reg;", '  ap_done <= ap_fire or ap_done_reg;', '  ap_ready <= ap_fire;', '  ap_idle <= not ap_start;',
+      '  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' then", "        ap_done_reg <= '0';",
+      ...(ret ? ["        ap_return_preg <= (others => '0');"] : []), '      else', "        if ap_continue = '1' then", "          ap_done_reg <= '0';",
+      "        elsif ap_fire = '1' then", "          ap_done_reg <= '1';", '        end if;', ...(ret ? ["        if ap_fire = '1' then", '          ap_return_preg <= ap_return_v;', '        end if;'] : []),
+      '      end if;', '    end if;', '  end process;');
+    if (ret) L.push("  ap_return <= ap_return_v when ap_fire = '1' else ap_return_preg;");
+  } else if (hs) L.push('  ap_done <= ap_start;', '  ap_ready <= ap_start;', "  ap_idle <= '1';");
   for (const [p, id] of df.outputs) {
     const n = g.get(id), port = [...ports, ...agg.inner].find((x) => x.name === p);
     const v = port.w === 1 ? `${sig(n)}(0)` : `std_logic_vector(${sig(n)})`;
-    L.push(`  ${p} <= ${v}${hs && port.role === 'arg_vld' ? ' and ap_start' : ''};`);
+    L.push(`  ${ret && p === 'ap_return' ? 'ap_return_v' : p} <= ${v}${hs && port.role === 'arg_vld' ? ` and ${fire}` : ''};`);
   }
   L.push('end behav;', '');
   return L.join('\n');
@@ -233,13 +247,21 @@ function verilog(name, src, ports, df, agg) {
   L.push(');');
   for (const n of nodes) L.push(`  wire ${n.s ? 'signed ' : ''}[${n.w - 1}:0] ${sig(n)};`);
   innerSignals(agg, 'verilog', L);
+  const chain = ports.some((p) => p.name === 'ap_continue'), ret = chain ? ports.find((p) => p.name === 'ap_return') : null;
+  if (chain) L.push("  reg ap_done_reg = 1'b0;", '  wire ap_fire = ap_start & ~ap_done_reg;');
+  if (ret) L.push(`  reg [${ret.w - 1}:0] ap_return_preg;`, `  wire [${ret.w - 1}:0] ap_return_v;`);
   verilogNodes(nodes, g, L);
   L.push(...agg.verilog);
-  const hs = ports.some((p) => p.name === 'ap_start');
-  if (hs) L.push('  assign ap_done = ap_start;', '  assign ap_ready = ap_start;', "  assign ap_idle = 1'b1;");
+  const hs = ports.some((p) => p.name === 'ap_start'), fire = chain ? 'ap_fire' : 'ap_start';
+  if (chain) {
+    L.push('  assign ap_done = ap_fire | ap_done_reg;', '  assign ap_ready = ap_fire;', '  assign ap_idle = ~ap_start;',
+      '  always @(posedge ap_clk) begin', '    if (ap_rst) begin', "      ap_done_reg <= 1'b0;", ...(ret ? [`      ap_return_preg <= ${ret.w}'d0;`] : []), '    end else begin',
+      "      if (ap_continue) ap_done_reg <= 1'b0;", "      else if (ap_fire) ap_done_reg <= 1'b1;", ...(ret ? ['      if (ap_fire) ap_return_preg <= ap_return_v;'] : []), '    end', '  end');
+    if (ret) L.push('  assign ap_return = ap_fire ? ap_return_v : ap_return_preg;');
+  } else if (hs) L.push('  assign ap_done = ap_start;', '  assign ap_ready = ap_start;', "  assign ap_idle = 1'b1;");
   for (const [p, id] of df.outputs) {
     const port = [...ports, ...agg.inner].find((x) => x.name === p);
-    L.push(`  assign ${p} = ${sig(g.get(id))}${hs && port.role === 'arg_vld' ? ' & ap_start' : ''};`);
+    L.push(`  assign ${ret && p === 'ap_return' ? 'ap_return_v' : p} = ${sig(g.get(id))}${hs && port.role === 'arg_vld' ? ` & ${fire}` : ''};`);
   }
   L.push('endmodule', '');
   return L.join('\n');

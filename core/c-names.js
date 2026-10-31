@@ -33,11 +33,13 @@ export function renamedWhy(n) {
   return `'${n}' is a name Vitis HLS reserves: it is named ${n}_r in the module`;
 }
 
-/** Whether a function's body has #pragma HLS INTERFACE ap_ctrl_none port=return (or mode=ap_ctrl_none). */
-export function ctrlNone(fn) {
+/** Whether a function's body has #pragma HLS INTERFACE <mode> port=return (or mode=<mode>). */
+function ctrlIs(fn, mode) {
   return (fn.body?.items || []).some((st) => {
     if (st.kind !== 'pragma' || st.pragma.name !== 'INTERFACE' || st.pragma.args.port !== 'return') return false;
     const a = st.pragma.args;
-    return String(a.mode || Object.keys(a).find((k) => /^ap_/.test(k)) || '').toLowerCase() === 'ap_ctrl_none';
+    return String(a.mode || Object.keys(a).find((k) => /^ap_/.test(k)) || '').toLowerCase() === mode;
   });
 }
+export const ctrlNone = (fn) => ctrlIs(fn, 'ap_ctrl_none');
+export const ctrlChain = (fn) => ctrlIs(fn, 'ap_ctrl_chain');

@@ -235,6 +235,8 @@ class SeqFlow extends Flow {
         if (fn.params.some((pa) => pa.type.kind === 'stream')) this.ctrl = 'ap_ctrl_none';
         else this.warn(st.loc, 'ap_ctrl_none: this function is sequential, it needs its block protocol: ap_ctrl_hs is made');
       }
+      // (ap_ctrl_chain: ap_ctrl_hs's and ap_continue, the module holding ap_done until it is taken, #1965)
+      else if (a.port === 'return' && mode === 'ap_ctrl_chain') this.ctrl = mode;
       else if (a.port && a.port !== 'return') this.modes.set(a.port, mode);
     }
     this.retType = fn.ret.kind === 'void' ? null : typeOf(fn.ret);

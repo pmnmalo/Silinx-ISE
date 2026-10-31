@@ -6,7 +6,7 @@
 //   a local array a buffer (PIPO within a call): its readers started once its writer is done;
 //   the top's arguments passed to the processes (a stream or an array to one process, scalars to any).
 // The top's ap_ctrl_hs starts every process once a call (each when the buffers it reads are written) and is done when
-// every one is; with ap_ctrl_none, or every process an hls::task, the top has no ap_start, ap_done, ap_idle, ap_ready
+// every one is (with ap_ctrl_chain, #1965: ap_done held until ap_continue, no new call meanwhile); with ap_ctrl_none, or every process an hls::task, the top has no ap_start, ap_done, ap_idle, ap_ready
 // (as Vitis HLS's), its processes started again once all are done (#1900). A region of other statements than declarations and calls: a warning, made sequential (as Vitis HLS).
 // Isomorphic ES module: no DOM and no Node APIs.
 //
@@ -14,7 +14,7 @@
 import { constValue } from './c-check.js';
 import { typeOf } from './c-types.js';
 import { hdlName } from './c-graph.js';
-import { portOf, ctrlNone } from './c-names.js';
+import { portOf, ctrlNone, ctrlChain } from './c-names.js';
 import { firHdl } from './hls-fir-hdl.js';
 
 const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
@@ -122,7 +122,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   for (const p of procs) {
     p.wires = [];
     for (const port of p.mod.gen.ports) {
-      if (CTRL.includes(port.name)) continue;
+      if (CTRL.includes(port.name) || port.name === 'ap_continue') continue;
       const i = p.f.params.findIndex((pa) => pa.name === port.param);
       // (*s: a reference to a stream, an argument of a function declared before its definition)
       const a0 = p.call.args[i], a = a0?.kind === 'unary' && a0.op === '*' && a0.e.kind === 'id' ? a0.e : a0;
@@ -181,6 +181,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   if (none && !streamed) add(diag(fn.body.items.find((st) => st.kind === 'pragma' && st.pragma.name === 'INTERFACE' && st.pragma.args.port === 'return').loc, 'ap_ctrl_none: this function is sequential, it needs its block protocol: ap_ctrl_hs is made', 'warning'));
   const free = (none && streamed) || procs.every((p) => p.task);
   const ports = CTRL.slice(0, free ? 2 : CTRL.length).map((name) => ({ name, dir: ['ap_clk', 'ap_rst', 'ap_start'].includes(name) ? 'in' : 'out', w: 1 }));
+  if (!free && ctrlChain(fn)) ports.splice(4, 0, { name: 'ap_continue', dir: 'in', w: 1 });
   const memories = [], fifos = [];
   for (const pa of fn.params) {
     const u = use.get(pa.name);
@@ -270,7 +271,9 @@ function vhdlTop(net) {
   L.push('  );', `end ${name};`, '', `architecture behav of ${name} is`, "  signal ap_busy : std_logic := '0';");
   for (const s of sigs) L.push(`  signal ${s.name} : ${T(s.w)};`);
   for (const p of procs) if (!p.task) L.push(`  signal ${p.inst}_pend, ${p.inst}_fin : std_logic := '0';`);
+  const chain = net.ports.some((p) => p.name === 'ap_continue');
   L.push('  signal ap_all_done : std_logic;');
+  if (chain) L.push("  signal ap_done_reg : std_logic := '0';");
   // (ap_ctrl_none: the block protocol's signals inside the module, ap_start 1: the processes started again once all are
   // done, #1900)
   if (net.free) L.push("  signal ap_start : std_logic := '1';", '  signal ap_done, ap_idle, ap_ready : std_logic;');
@@ -278,7 +281,8 @@ function vhdlTop(net) {
     `  signal ${b.name}_addr : unsigned(${b.aw - 1} downto 0);`, `  signal ${b.name}_ce, ${b.name}_we : std_logic;`, `  signal ${b.name}_d, ${b.name}_q : std_logic_vector(${b.w - 1} downto 0);`);
   L.push('begin');
   for (const p of procs) {
-    const m = p.mod.gen.ports.map((port) => `${port.name} => ${['ap_clk', 'ap_rst'].includes(port.name) ? port.name : sig(p, port)}`);
+    // (a process's own ap_ctrl_chain: the top's machine takes its ap_done at once)
+    const m = p.mod.gen.ports.map((port) => `${port.name} => ${port.name === 'ap_continue' ? "'1'" : ['ap_clk', 'ap_rst'].includes(port.name) ? port.name : sig(p, port)}`);
     L.push(`  ${p.inst} : entity work.${p.mod.module} port map (${m.join(', ')});`);
   }
   const conv = (src0, sw, dw, s = false) => {
@@ -308,10 +312,13 @@ function vhdlTop(net) {
   const ctl = control(procs);
   for (const c of ctl) L.push(`  ${c.inst}_ap_start <= ${[`${c.inst}_pend`, ...c.deps.map((d) => `${d}_fin`)].join(' and ')};`);
   for (const p of procs) if (p.task) L.push(`  ${p.inst}_ap_start <= '1';`);
-  L.push(`  ap_all_done <= ${ctl.map((c) => `${c.inst}_fin`).join(' and ') || "'1'"};`, '  ap_done <= ap_busy and ap_all_done;', '  ap_ready <= ap_busy and ap_all_done;', '  ap_idle <= not ap_busy;');
+  L.push(`  ap_all_done <= ${ctl.map((c) => `${c.inst}_fin`).join(' and ') || "'1'"};`, `  ap_done <= (ap_busy and ap_all_done)${chain ? ' or ap_done_reg' : ''};`, '  ap_ready <= ap_busy and ap_all_done;', `  ap_idle <= not ap_busy${chain ? ' and not ap_start' : ''};`);
+  if (chain) L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' or ap_continue = '1' then", "        ap_done_reg <= '0';", "      elsif ap_busy = '1' and ap_all_done = '1' then", "        ap_done_reg <= '1';", '      end if;', '    end if;', '  end process;');
   L.push('  process (ap_clk)', '  begin', '    if rising_edge(ap_clk) then', "      if ap_rst = '1' then", "        ap_busy <= '0';", ...ctl.flatMap((c) => [`        ${c.inst}_pend <= '0';`, `        ${c.inst}_fin <= '0';`]),
-    "      elsif ap_busy = '0' then", "        if ap_start = '1' then", "          ap_busy <= '1';", ...ctl.flatMap((c) => [`          ${c.inst}_pend <= '1';`, `          ${c.inst}_fin <= '0';`]), '        end if;', '      else');
-  for (const c of ctl) L.push(`        if ${c.inst}_ap_start = '1' and ${c.inst}_ap_idle = '1' then`, `          ${c.inst}_pend <= '0';`, '        end if;', `        if ${c.inst}_ap_done = '1' then`, `          ${c.inst}_fin <= '1';`, '        end if;');
+    "      elsif ap_busy = '0' then", `        if ap_start = '1'${chain ? " and ap_done_reg = '0'" : ''} then`, "          ap_busy <= '1';", ...ctl.flatMap((c) => [`          ${c.inst}_pend <= '1';`, `          ${c.inst}_fin <= '0';`]), '        end if;', '      else');
+  // (a process's own ap_ctrl_chain: its ap_idle 0 while ap_start is 1, a call a run taken at once, ap_continue tied to 1)
+  const taken = (c, on) => (procs.find((p) => p.inst === c.inst).mod.gen.ports.some((port) => port.name === 'ap_continue') ? '' : on);
+  for (const c of ctl) L.push(`        if ${c.inst}_ap_start = '1'${taken(c, ` and ${c.inst}_ap_idle = '1'`)} then`, `          ${c.inst}_pend <= '0';`, '        end if;', `        if ${c.inst}_ap_done = '1' then`, `          ${c.inst}_fin <= '1';`, '        end if;');
   L.push("        if ap_all_done = '1' then", "          ap_busy <= '0';", '        end if;', '      end if;', '    end if;', '  end process;', 'end behav;', '');
   return [...out, ...L];
 }
@@ -344,10 +351,12 @@ function verilogTop(net) {
   L.push(');', '  reg ap_busy;');
   for (const s of sigs) L.push(`  wire ${W(s.w)}${s.name};`);
   for (const p of procs) if (!p.task) L.push(`  reg ${p.inst}_pend, ${p.inst}_fin;`);
+  const chain = net.ports.some((p) => p.name === 'ap_continue');
   L.push('  wire ap_all_done;');
+  if (chain) L.push("  reg ap_done_reg = 1'b0;");
   if (net.free) L.push("  wire ap_start = 1'b1;", '  wire ap_done, ap_idle, ap_ready;');
   for (const b of bufs) L.push(`  reg [${b.w - 1}:0] ${b.name} [0:${b.n - 1}];`, `  reg [${b.w - 1}:0] ${b.name}_q;`, `  wire [${b.aw - 1}:0] ${b.name}_addr;`, `  wire ${b.name}_ce, ${b.name}_we;`, `  wire [${b.w - 1}:0] ${b.name}_d;`);
-  for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${['ap_clk', 'ap_rst'].includes(port.name) ? port.name : sig(p, port)})`).join(', ')});`);
+  for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${port.name === 'ap_continue' ? "1'b1" : ['ap_clk', 'ap_rst'].includes(port.name) ? port.name : sig(p, port)})`).join(', ')});`);
   const conv = (s0, sw, dw, sg = false) => (dw > sw && sg && sw > 1 ? `{{${dw - sw}{${s0}[${sw - 1}]}}, ${s0}}` : dw < sw ? (dw === 1 ? `${s0}[0]` : `${s0}[${dw - 1}:0]`) : s0);
   for (const l of links) L.push(`  assign ${l.dst} = ${l.k !== undefined ? `${l.dw}'d${BigInt.asUintN(l.dw, l.k)}` : conv(l.src, l.sw, l.dw, l.s)};`);
   fifos.forEach((f, i) => L.push(`  ${name}_ap_fifo${i} ${f.name} (.ap_clk(ap_clk), .ap_rst(ap_rst), .din(${f.din}), .wr(${f.wr}), .full_n(${f.full}), .dout(${f.dout}), .rd(${f.rd}), .empty_n(${f.empty}));`));
@@ -366,10 +375,12 @@ function verilogTop(net) {
   const ctl = control(procs);
   for (const c of ctl) L.push(`  assign ${c.inst}_ap_start = ${[`${c.inst}_pend`, ...c.deps.map((d) => `${d}_fin`)].join(' & ')};`);
   for (const p of procs) if (p.task) L.push(`  assign ${p.inst}_ap_start = 1'b1;`);
-  L.push(`  assign ap_all_done = ${ctl.map((c) => `${c.inst}_fin`).join(' & ') || "1'b1"};`, '  assign ap_done = ap_busy & ap_all_done;', '  assign ap_ready = ap_busy & ap_all_done;', '  assign ap_idle = ~ap_busy;');
+  L.push(`  assign ap_all_done = ${ctl.map((c) => `${c.inst}_fin`).join(' & ') || "1'b1"};`, `  assign ap_done = (ap_busy & ap_all_done)${chain ? ' | ap_done_reg' : ''};`, '  assign ap_ready = ap_busy & ap_all_done;', `  assign ap_idle = ~ap_busy${chain ? ' & ~ap_start' : ''};`);
+  if (chain) L.push('  always @(posedge ap_clk) begin', "    if (ap_rst || ap_continue) ap_done_reg <= 1'b0;", "    else if (ap_busy && ap_all_done) ap_done_reg <= 1'b1;", '  end');
   L.push('  always @(posedge ap_clk) begin', '    if (ap_rst) begin', "      ap_busy <= 1'b0;", ...ctl.flatMap((c) => [`      ${c.inst}_pend <= 1'b0;`, `      ${c.inst}_fin <= 1'b0;`]),
-    '    end else if (!ap_busy) begin', '      if (ap_start) begin', "        ap_busy <= 1'b1;", ...ctl.flatMap((c) => [`        ${c.inst}_pend <= 1'b1;`, `        ${c.inst}_fin <= 1'b0;`]), '      end', '    end else begin');
-  for (const c of ctl) L.push(`      if (${c.inst}_ap_start && ${c.inst}_ap_idle) ${c.inst}_pend <= 1'b0;`, `      if (${c.inst}_ap_done) ${c.inst}_fin <= 1'b1;`);
+    '    end else if (!ap_busy) begin', `      if (ap_start${chain ? ' && !ap_done_reg' : ''}) begin`, "        ap_busy <= 1'b1;", ...ctl.flatMap((c) => [`        ${c.inst}_pend <= 1'b1;`, `        ${c.inst}_fin <= 1'b0;`]), '      end', '    end else begin');
+  const taken = (c, on) => (procs.find((p) => p.inst === c.inst).mod.gen.ports.some((port) => port.name === 'ap_continue') ? '' : on);
+  for (const c of ctl) L.push(`      if (${c.inst}_ap_start${taken(c, ` && ${c.inst}_ap_idle`)}) ${c.inst}_pend <= 1'b0;`, `      if (${c.inst}_ap_done) ${c.inst}_fin <= 1'b1;`);
   L.push("      if (ap_all_done) ap_busy <= 1'b0;", '    end', '  end', 'endmodule', '');
   return [...out, ...L];
 }

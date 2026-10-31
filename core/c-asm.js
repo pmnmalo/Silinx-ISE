@@ -37,17 +37,17 @@ export function cAsm(source, { file = 'input.c', lang = 'vhdl', headers = null, 
   return { ok: true, model: asmLayout(chart(checked.top, m, lang, gen.ports)), diagnostics: m.diagnostics };
 }
 
-const HS = ['ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
+const HS = ['ap_start', 'ap_continue', 'ap_done', 'ap_idle', 'ap_ready'];
 
 function chart(top, m, lang, ports) {
-  const hs = ports.some((p) => p.name === 'ap_start');
+  const hs = ports.some((p) => p.name === 'ap_start'), chain = ports.some((p) => p.name === 'ap_continue');
   const nodes = [], edges = [];
   let nid = 0, eid = 0;
   const node = (n) => { const x = { id: `n${++nid}`, x: 0, y: 0, ...n }; nodes.push(x); return x; };
   const edge = (from, to, port = 'next') => edges.push({ id: `e${++eid}`, from: from.id, to: to.id, port });
   const states = new Map();
   const idle = node({ type: 'state', name: 'IDLE', actions: hs ? ['ap_idle = 1'] : [] });
-  const done = node({ type: 'state', name: 'DONE', actions: hs ? ['ap_done = 1', 'ap_ready = 1'] : [] });
+  const done = node({ type: 'state', name: 'DONE', actions: hs ? ['ap_done = 1', 'ap_ready = 1', ...(chain ? ['ap_done_reg = !ap_continue'] : [])] : [] });
   // (a state split by the clock: its chain, entered by its first state, its register transfers in its last, #2080)
   const chains = new Map();
   for (const b of m.blocks) {
@@ -57,7 +57,7 @@ function chart(top, m, lang, ports) {
   }
   const st = (b) => (b ? states.get(b.num) : done);
   // IDLE: on ap_start the arguments read, the first state (ap_ctrl_none: at once, ap_start 1 inside the module)
-  const start = hs ? node({ type: 'decision', cond: 'ap_start' }) : idle;
+  const start = hs ? node({ type: 'decision', cond: chain ? 'ap_start && !ap_done_reg' : 'ap_start' }) : idle;
   if (hs) edge(idle, start);
   const port = hs ? 'true' : 'next';
   // (the registers by the C's names: an argument's x_reg is x)

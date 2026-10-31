@@ -210,6 +210,7 @@ Names and behaviour as Vitis HLS makes them (UG1399, "Interface synthesis"):
 |---|---|
 | (clock and reset) | `ap_clk`, `ap_rst` (active high, synchronous) — none for a combinational module (#1900) |
 | the block protocol `ap_ctrl_hs` (default) | `ap_start` in; `ap_done`, `ap_idle`, `ap_ready` out |
+| `#pragma HLS INTERFACE ap_ctrl_chain port=return` | `ap_ctrl_hs`'s and `ap_continue` in (#1965): `ap_done` and `ap_return` held after a call until `ap_continue` is 1, no new call meanwhile; `ap_ready` one cycle; `ap_idle` also 0 while `ap_start` is 1; `ap_clk` and `ap_rst` even when combinational (its latency 0), as Vitis HLS 2025.2 |
 | `#pragma HLS INTERFACE ap_ctrl_none port=return` | no block protocol ports (a sequential module: `ap_clk` and `ap_rst` only, running by itself, #1900) |
 | the returned value | `ap_return` (its type's width) |
 | a scalar argument `int a` | input `a` (`ap_none`) |
@@ -420,7 +421,7 @@ uses its C model in the C simulation and its module in the synthesis, one instan
 | Pragma | In Silinx |
 |---|---|
 | `TOP name=` | the top function |
-| `INTERFACE ap_ctrl_none / ap_ctrl_hs port=return` | the block protocol |
+| `INTERFACE ap_ctrl_none / ap_ctrl_hs / ap_ctrl_chain port=return` | the block protocol |
 | `INTERFACE ap_none / ap_vld / ap_ovld / ap_memory / bram port=` | the argument's interface |
 | `INTERFACE s_axilite port= [bundle=] [offset=]` (#1893) | an AXI4-Lite slave `s_axi_<bundle>_*` (`control` by default): a scalar or a pointer to one a register, `port=return` the block protocol's (`interrupt`, the control register at 0x00; the interrupts' at 0x04, 0x08, 0x0c; the arguments from 0x10); the module's reset `ap_rst_n` |
 | `AGGREGATE variable= compact=` / `DISAGGREGATE variable=` (the top's, #1668) | a struct argument, a stream or an array of structs one port, stream or memory of its words, packed `compact=bit` (an array's or a stream's default), `byte`, `none` (a scalar struct's default) / a port, a stream or a memory per member |
