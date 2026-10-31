@@ -63,8 +63,10 @@ export function checkPragmas(ast, funcs, report, top = null) {
     if (name === 'ARRAY_PARTITION') {
       if (!args.variable) { report(loc, '#pragma HLS ARRAY_PARTITION needs variable=<the array>'); return; }
       const type = String(args.type || (args.block ? 'block' : args.cyclic ? 'cyclic' : 'complete')).toLowerCase();
-      if (type !== 'complete') report(loc, `#pragma HLS ARRAY_PARTITION type=${type} is not made yet: ignored (type=complete is: the array's elements registers)`, 'warning');
-      if (args.dim !== undefined && String(args.dim) !== '1' && String(args.dim) !== '0') report(loc, `#pragma HLS ARRAY_PARTITION dim=${args.dim}: only one dimension (dim=1)`, 'warning');
+      if (!['complete', 'block', 'cyclic'].includes(type)) report(loc, `#pragma HLS ARRAY_PARTITION type=${type} is not one of complete, block and cyclic: ignored`, 'warning');
+      else if (type !== 'complete' && !posInt(args.factor)) report(loc, `#pragma HLS ARRAY_PARTITION type=${type} needs factor=N, a whole number, 1 or more: ignored`, 'warning');
+      else if (type !== 'complete' && String(args.dim) === '0') report(loc, `#pragma HLS ARRAY_PARTITION type=${type} dim=0 is not made yet: ignored (name its dimension, dim=1 and up)`, 'warning');
+      if (args.dim !== undefined && !/^\d+$/.test(String(args.dim))) report(loc, `#pragma HLS ARRAY_PARTITION dim=${args.dim}: the dimension must be a whole number: ignored`, 'warning');
     }
     if (name === 'INTERFACE' && args.port && args.port !== 'return') {
       const mode = String(args.mode || Object.keys(args).find((k) => /^(ap_|s_axi|m_axi|axis|bram)/.test(k)) || '').toLowerCase();

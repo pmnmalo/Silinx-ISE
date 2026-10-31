@@ -61,6 +61,7 @@ const written = (x, fifoOp) => {
     if (n.kind === 'postfix' || (n.kind === 'unary' && (n.op === '++' || n.op === '--'))) out.add(base(n.e));
     if (n.kind === 'decl') for (const v of n.vars) out.add(v.name);
     if (n.kind === 'memlatch' || n.kind === 'fiforead' || n.kind === 'wordget') out.add(n.tmp);
+    if (n.kind === 'memread' && n.selTmp) out.add(n.selTmp);   // (the memory selected, core/c-partition.js)
     if (n.kind === 'wordload' || n.kind === 'wordset') out.add(n.reg);   // (a struct's word, #1668)
     // (a call may write what it reaches; a stream's read(x), x)
     const op = n.kind === 'call' ? fifoOp(n) : undefined;
@@ -102,7 +103,7 @@ export const pipelineMethods = {
       const op = this.fifoOp(n);
       if (isLoop(n) || (n.kind === 'call' && op == null)) ok = false;
       // (a member of a stream or a memory of structs: its word's, core/c-agg-mem.js, not made here)
-      if ((this.isMem(n) && this.slots.get(n.e.name).group) || (op != null && this.slots.get(n.callee.e.name).group)) ok = false;
+      if ((this.isMem(n) && (this.slots.get(n.e.name).group || this.slots.get(n.e.name).banks)) || (op != null && this.slots.get(n.callee.e.name).group)) ok = false;
       if (op === 'read' || op === 'write') { ops++; if (streams.has(n.callee.e.name)) ok = false; streams.add(n.callee.e.name); }
       const t = target(n);
       if (t && this.isMem(t)) { if (wrote.has(t.e.name)) ok = false; wrote.add(t.e.name); targets.add(t); }
@@ -196,6 +197,20 @@ export const pipelineMethods = {
       return p;
     };
     const apart = (a, b) => { const p = ports(a); return ![...ports(b)].some((x) => p.has(x)); };
+    // (reads of different memories of a partitioned array, in the state of the first: their values a state later, #1920)
+    for (let k = 0; k + 2 < sts.length;) {
+      const [x, y, z] = [sts[k], sts[k + 1], sts[k + 2]];
+      const r = y.stmts.at(-1), l = z.stmts[0];
+      const made = new Set(y.stmts.flatMap((n) => [...written(n, (c) => this.fifoOp(c))]));
+      if (!(r?.kind === 'memread' && !r.sel && this.slots.get(r.mem).part && l?.kind === 'memlatch' && l.mem === r.mem && !x.acc?.has(r.mem) && ![...named(r.i)].some((v) => made.has(v)))) { k++; continue; }
+      x.stmts.push(y.stmts.pop());
+      (x.acc ||= new Set()).add(r.mem);
+      y.acc?.delete(r.mem);
+      y.stmts.push(z.stmts.shift());
+      if (!z.stmts.length) { z.acc = null; sts.splice(k + 2, 1); continue; }
+      if (!z.stmts.some((n) => n.kind === 'memlatch') && apart(y, z)) { y.stmts.push(...z.stmts); y.acc = new Set([...(y.acc || []), ...(z.acc || [])]); sts.splice(k + 2, 1); continue; }
+      k++;
+    }
     for (let k = 0; k + 1 < sts.length;) {
       const [a, b] = [sts[k], sts[k + 1]];
       if (b.stmts.some((x) => x.kind === 'memlatch' || x.kind === 'wordload') || !apart(a, b)) { k++; continue; }

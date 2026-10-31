@@ -70,6 +70,7 @@ export const memMethods = {
     if (fop === 'empty' || fop === 'full') return e;
     if (this.isMem(e)) {
       const mem = this.slots.get(e.e.name);
+      if (mem.banks) { const one = this.bankPlain(e, mem); return one ? this.hoist(one, at) : this.hoistBanks(e, mem, at); }   // (partitioned, #1920)
       if (mem.group) return this.hoistField(e, mem, at);   // (a member of an array of structs: its word's field, #1668)
       const i = this.hoist(e.i, at);
       if (this.hasSide(i)) this.error(e.loc, `the index of the memory '${mem.name}' must have no side effect (no ++, --, assignment or call)`);
@@ -107,13 +108,19 @@ export const memMethods = {
       if (this.fifoOp?.(e) === 'read' && e.args.length === 1) e = { kind: 'assign', op: '=', l: e.args[0], r: { ...e, args: [] }, loc: e.loc };
       const target = e.kind === 'assign' ? e.l : (e.kind === 'postfix' || (e.kind === 'unary' && (e.op === '++' || e.op === '--'))) ? e.e : null;
       if (target && this.isMem(target)) {
-        const mem = this.slots.get(target.e.name);
+        const whole = target;
+        const parted = this.slots.get(target.e.name);
+        // (partitioned, #1920: the memory it is in, if known)
+        const plain = parted.banks ? this.bankPlain(target, parted) : null;
+        const mem = plain ? this.slots.get(plain.e.name) : parted;
         if (mem.rom) this.error(target.loc, `'${mem.name}' is constant: it cannot be written`);
         const one = { kind: 'num', value: 1n, text: '1', loc: e.loc };
-        const rhs = e.kind === 'assign' ? (e.op === '=' ? e.r : { kind: 'binary', op: e.op.slice(0, -1), l: target, r: e.r, loc: e.loc }) : { kind: 'binary', op: e.op === '++' ? '+' : '-', l: target, r: one, loc: e.loc };
-        if (this.hasSide(target.i) || this.hasSide(rhs)) this.error(e.loc, `a write of the memory '${mem.name}' with another side effect in it (++, --, an assignment, a call): write them as statements of their own`);
+        const rhs = e.kind === 'assign' ? (e.op === '=' ? e.r : { kind: 'binary', op: e.op.slice(0, -1), l: whole, r: e.r, loc: e.loc }) : { kind: 'binary', op: e.op === '++' ? '+' : '-', l: whole, r: one, loc: e.loc };
+        if (mem.banks) { if (this.hasSide(rhs)) this.error(e.loc, `a write of the memory '${mem.name}' with another side effect in it (++, --, an assignment, a call): write them as statements of their own`); return this.lowerBankWrite(whole, mem, rhs, e, at); }
+        const tgt = plain ?? whole;
+        if (this.hasSide(tgt.i) || this.hasSide(rhs)) this.error(e.loc, `a write of the memory '${mem.name}' with another side effect in it (++, --, an assignment, a call): write them as statements of their own`);
         if (mem.group) return this.lowerFieldWrite(target, rhs, e, at);
-        const i = this.hoist(target.i, at), v = this.hoist(rhs, at);
+        const i = this.hoist(tgt.i, at), v = this.hoist(rhs, at);
         if (at.cur.acc?.has(mem.name)) at.next();
         at.cur.stmts.push({ kind: 'memwrite', mem: mem.name, i, v, loc: e.loc });
         (at.cur.acc ||= new Set()).add(mem.name);
@@ -154,6 +161,7 @@ export const memMethods = {
   // ------------------------------------------------------------------ run in a state
   memStmt(s, base) {
     const mem = this.slots.get(s.mem);
+    if (mem.banks) { this.bankStmt(s, mem, base); return; }
     const g = this.guard(base);
     const at = { w: mem.aw, s: false };
     if (s.kind === 'memlatch') { this.slots.get(s.tmp).val = this.memQ(mem); return; }
@@ -206,7 +214,7 @@ export const memMethods = {
     const cs = this.g.add('reg', [], this.stateT, { port: { key: 'reg:ap_CS_fsm', name: 'ap_CS_fsm' } });
     const mems = [];
     for (const mem of this.slots.values()) {
-      if (mem.kind !== 'mem' || mem.group) continue;   // (a member of a memory of structs: its group's, #1668)
+      if (mem.kind !== 'mem' || mem.group || mem.banks) continue;   // (a member of a memory of structs: its group's, #1668)
       if (!mem.ext && !mem.static && !mem.rom && mem.init && mem.written) this.error(mem.loc, `'${mem.name}': a memory initialized with { … } and written: make it static (its values kept between calls) or const, or initialize it with a loop`);
       const at = { w: mem.aw, s: false };
       let addr = this.g.const(0, at), ce = this.F, we = this.F, d = this.g.const(0, mem.t);

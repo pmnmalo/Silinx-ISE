@@ -26,8 +26,8 @@ Not part of `npm test` (it needs the network once).
 <!-- results -->
 | Design | Language | C simulation | C synthesis | Co-simulation | Latency | Why not |
 |---|---|---|---|---|---|---|
-| array-array-partition-block-cyclic | C++ | pass | pass | pass | 5705 |  |
-| array-array-partition-complete | C++ | pass | pass | pass | 83785 |  |
+| array-array-partition-block-cyclic | C++ | pass | pass | pass | 153417 |  |
+| array-array-partition-complete | C++ | pass | pass | pass | 350025 |  |
 | dsp-fft-interface-array | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-array-float-ssr2 | C++ | fail | fail | skip | - | C simulation: fft_top.h:17: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
 | dsp-fft-interface-stream | C++ | fail | fail | skip | - | C simulation: fft_top.h:18: the header 'hls_fft.h' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |

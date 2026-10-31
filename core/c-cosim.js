@@ -32,8 +32,23 @@ export const packWord = (fields, value) => fields.reduce((acc, f) => {
   return acc;
 }, 0n);
 
+/** The calls with the values of each memory of a partitioned argument, from the array's (#1920). */
+function bankCalls(gen, calls) {
+  const bs = (gen.memories || []).filter((x) => x.part);
+  if (!bs.length) return calls;
+  return calls.map((c) => {
+    const r = { ...c, memIn: { ...c.memIn }, memOut: { ...c.memOut } };
+    for (const x of bs) for (const key of ['memIn', 'memOut']) {
+      const a = c[key]?.[x.part.of];
+      if (a) r[key][x.name] = x.part.words.map((f) => (f === null ? 0n : a[f] ?? 0n));
+    }
+    return r;
+  });
+}
+
 /** The calls with the values of each stream and memory of structs, its words, from its members' (#1668). */
-export function wordCalls(gen, calls) {
+export function wordCalls(gen, calls0) {
+  const calls = bankCalls(gen, calls0);
   const gs = [...(gen.memories || []), ...(gen.fifos || [])].filter((x) => x.fields);
   if (!gs.length) return calls;
   const words = (src, fields) => {

@@ -76,7 +76,7 @@ export function flattenArrays(checked, report) {
       if (idx.length !== ds.length) { report(e.loc, `'${b.name}': an array of ${ds.length} dimensions indexed by ${idx.length} (a row of it alone is not supported yet)`); return null; }
       let lin = idx[0];
       for (let k = 1; k < ds.length; k++) lin = { kind: 'binary', op: '+', l: { kind: 'binary', op: '*', l: lin, r: num(ds[k], e.loc), loc: e.loc }, r: idx[k], loc: e.loc };
-      return { kind: 'index', e: b, i: lin, loc: e.loc };
+      return { kind: 'index', e: b, i: lin, idx, loc: e.loc };   // (idx: each dimension's, for ARRAY_PARTITION, core/c-partition.js)
     };
     const visit = (n) => {
       if (!n || typeof n !== 'object') return n;
@@ -97,7 +97,7 @@ export function flattenArrays(checked, report) {
       }
       if (n.kind === 'index') {
         const r = index(n);
-        if (r) { r.i = visit(r.i); return r; }
+        if (r) { r.i = visit(r.i); r.idx = r.idx.map(visit); return r; }
       }
       for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type' && v && typeof v === 'object') n[k] = visit(v);
       return n;
