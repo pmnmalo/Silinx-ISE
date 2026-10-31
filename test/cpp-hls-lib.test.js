@@ -168,11 +168,14 @@ int main() {
   return 0;
 }
 `;
-  flows(src, 'f', ['7 #pragma HLS INTERFACE axis port=a is not made yet: ignored (its default interface made)', '8 #pragma HLS INTERFACE axis port=b is not made yet: ignored (its default interface made)',
-    '10 the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
+  flows(src, 'f', ['10 the number of iterations of this loop is not known: its latency is unknown (#pragma HLS LOOP_TRIPCOUNT max=N in it gives the report a bound)',
     '10 this loop is pipelined automatically, as Vitis HLS does (II=1): II=6 made (a do-while); #pragma HLS PIPELINE off in it turns that off']);
   const g = cToHdl(src, { ...opts('f'), lang: 'vhdl' });
   assert.ok(g.ok);
+  // (the AXI4-Stream ports, #1894: TDATA both halves, the real part low)
+  assert.deepEqual(g.ports.filter((p) => /^[ab]_T/.test(p.name)).map((p) => p.name).sort(), ['a_TDATA', 'a_TKEEP', 'a_TLAST', 'a_TREADY', 'a_TSTRB', 'a_TVALID', 'b_TDATA', 'b_TKEEP', 'b_TLAST', 'b_TREADY', 'b_TSTRB', 'b_TVALID']);
+  assert.match(g.hdl, /a_TDATA : in std_logic_vector\(31 downto 0\)/);
+  assert.match(g.hdl, /a_TKEEP : in std_logic_vector\(3 downto 0\)/);
   assert.deepEqual(errors(`#include "ap_axi_sdata.h"\ntypedef hls::axis<bad_t, 0, 0, 0> d;\nvoid f(int a) { }\n`).slice(0, 1), ["2 hls::axis: its data type 'bad_t' (a builtin type, ap_int, ap_uint or std::complex of one here)"]);
 });
 

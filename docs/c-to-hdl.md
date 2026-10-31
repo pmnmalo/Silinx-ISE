@@ -115,8 +115,8 @@ so its hardware is the C's:
   `_write`), each access a state of its own that waits while the FIFO is empty or full. A **stream of a struct**
   (`hls::stream<S>`, #1662): `write`, `<<`, `read()` in a declaration, an assignment or a `return`, `read(v)`, `>>`,
   `empty`, `full`, passed to a function, named by a pragma. The top's is one `ap_fifo` of the struct's words (#1668,
-  below), a word a struct read or written; an `ap_axis`'s side channels are members of its words (`axis`'s ports of
-  their own, `TDATA`, `TKEEP`…, are #1894's).
+  below), a word a struct read or written; an `ap_axis`'s side channels are members of its words, on `axis`'s ports of
+  their own (below, #1894).
 - **Arrays of streams** (#1739): `hls::stream<T> s[N]`, a parameter `s[N]` or `(&s)[N]`: each element a stream of its
   own (its ap_fifo ports `s_0_dout`…, a FIFO in a DATAFLOW region); `s[k]` by a constant that stream, `s[i]` by a
   variable the statement made for each element (an `if` on the index); the array passed whole, its elements; its
@@ -208,7 +208,7 @@ Names and behaviour as Vitis HLS makes them (UG1399, "Interface synthesis"):
 
 | Source | Ports |
 |---|---|
-| (clock and reset) | `ap_clk`, `ap_rst` (active high, synchronous) — none for a combinational module (#1900) |
+| (clock and reset) | `ap_clk`, `ap_rst` (active high, synchronous) — none for a combinational module (#1900); `ap_rst_n` (active low) when the top has an `axis` port (#1894) |
 | the block protocol `ap_ctrl_hs` (default) | `ap_start` in; `ap_done`, `ap_idle`, `ap_ready` out |
 | `#pragma HLS INTERFACE ap_ctrl_chain port=return` | `ap_ctrl_hs`'s and `ap_continue` in (#1965): `ap_done` and `ap_return` held after a call until `ap_continue` is 1, no new call meanwhile; `ap_ready` one cycle; `ap_idle` also 0 while `ap_start` is 1; `ap_clk` and `ap_rst` even when combinational (its latency 0), as Vitis HLS 2025.2 |
 | `#pragma HLS INTERFACE ap_ctrl_none port=return` | no block protocol ports (a sequential module: `ap_clk` and `ap_rst` only, running by itself, #1900) |
@@ -222,6 +222,8 @@ Names and behaviour as Vitis HLS makes them (UG1399, "Interface synthesis"):
 | an array argument with `#pragma HLS INTERFACE bram` (#1668) | a BRAM's port: `a_Addr_A` (32 bits, an address in bytes), `a_EN_A`, `a_WEN_A` (a write enable a byte), `a_Din_A`, `a_Dout_A` (its words a power of 2 of bytes), `a_Clk_A`, `a_Rst_A` |
 | a pointer argument indexed (`p[i]`, `*(p + i)`, #1599), or passed to a function that indexes it (#1684) | `ap_memory`, its depth the INTERFACE pragma's `depth=` (else 1024, a warning); a pointer to structs one memory of their words (#1668), a pragma naming the struct applying to it |
 | a stream argument, `hls::stream<T>` | `ap_fifo`: `s_dout`, `s_empty_n`, `s_read`; `s_din`, `s_full_n`, `s_write`; a stream of structs one of their words (#1668) |
+| a stream with `#pragma HLS INTERFACE axis`, or of `ap_axis` / `ap_axiu` / `hls::axis_user` with no pragma (#1894) | AXI4-Stream: `s_TVALID`, `s_TREADY`, `s_TDATA` (a struct's word, or an element of an array of streams `s_0_TDATA`…); those of `ap_axi_sdata.h` their side channels, `s_TKEEP`, `s_TSTRB`, `s_TUSER`, `s_TLAST`, `s_TID`, `s_TDEST`, those of width 0 none. Not with DATAFLOW or an `hls::FIR` (a warning, its `ap_fifo` kept) |
+| an array argument with `#pragma HLS INTERFACE axis` (#1894) | AXI4-Stream as above, when the array is read or written once in one loop `for (i = 0; i < N; i++)` of its size; else a warning, its `ap_memory` kept |
 
 Ports are `std_logic_vector(W-1 downto 0)` (VHDL) or `[W-1:0]` (Verilog), a 1-bit type a
 `std_logic` / plain wire. The block protocol: `ap_start` starts a call; `ap_ready` says the inputs
@@ -433,7 +435,7 @@ uses its C model in the C simulation and its module in the synthesis, one instan
 | `ARRAY_PARTITION variable= type=block\|cyclic factor=N [dim=D]` (#1920) | several memories, as Vitis HLS's: `cyclic` element k in memory k % N, `block` consecutive blocks of ceil(L / N); an argument's each with its own port (`d_0_address0`, `d_1_address0`, …), a local's `A_0`, `A_1`, … A local array of 64 elements or fewer stays registers. Accesses of different memories share a state only when the memory is known at synthesis (`A[i * N + 3]` cyclic factor=N) |
 | `DATAFLOW` (the top function's, #1707) | its calls processes running at once (below); a region of other statements: a warning, made sequential |
 | `STREAM variable= depth=` | a DATAFLOW region's stream: its FIFO's depth (else `hls::stream<T, D>`'s D, else 2) |
-| `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `BIND_STORAGE`, `DEPENDENCE`, `LOOP_FLATTEN`, … and AXI interfaces (`m_axi`, `axis`) | accepted and ignored, with a warning; an unknown pragma: a warning |
+| `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `BIND_STORAGE`, `DEPENDENCE`, `LOOP_FLATTEN`, … and AXI interfaces (`s_axilite`, `m_axi`; `axis` on what is not a stream or an array) | accepted and ignored, with a warning; an unknown pragma: a warning |
 
 A loop's pragma is its body's first statements; one elsewhere is ignored with a warning (a function's `PIPELINE`
 too).
