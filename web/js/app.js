@@ -3,7 +3,7 @@ import { api, followJob } from './api.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, alertDlg, confirmDlg, promptDlg, popupMenu, splitter, toast } from './ui.js';
 import { createEditor, instTemplate, snippetsFor, typeText } from './editor.js';
-import { cRunButtons, hlsClock, hlsFamily, isC, openCHdl } from './c-source.js';
+import { cRunButtons, hlsClock, hlsFamily, hlsMults, isC, openCHdl } from './c-source.js';
 import { compile, topCandidates } from '/core/compile.js';
 import { primitiveSources } from '/core/unisim.js';
 import * as wiz from './wizards.js';
@@ -87,7 +87,7 @@ export function compileProject() {
     const hdlMods = new Set(Object.keys(mods).map(n => n.toLowerCase()));
     // (a drawing whose HDL file is gone, deleted or removed from the project, is one without it: #231)
     for (const [f, t] of views) {
-      const r = viewHdl(f, t, { modules: mods, linked: hdlInProject, lang: S.project.preferredLanguage, clock: hlsClock(), family: hlsFamily(), hls: S.hls });
+      const r = viewHdl(f, t, { modules: mods, linked: hdlInProject, lang: S.project.preferredLanguage, clock: hlsClock(), family: hlsFamily(), hls: S.hls, mults: hlsMults() });
       if (!r?.text) continue;
       if (!hdlMods.has(String(r.module).toLowerCase())) { S.viewSources.push({ path: f, lang: r.lang, text: r.text, role: 'design', view: true, module: r.module, errors: r.errors.length, lost: r.lost || null, ...(r.sequential ? { sequential: true } : {}) }); continue; }
       const m = !r.errors.length && [...(lib0?.modules.values() || [])].find(x => x.name.toLowerCase() === String(r.module).toLowerCase());

@@ -51,7 +51,7 @@ export function cToHdl(source, opts = {}) {
   return gen.ok ? axisTop(gen, names, lang, new Set((checked.ast.structArgs?.get(checked.top) || []).filter((a) => a.axis).map((a) => a.name))) : gen;
 }
 
-function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, stall = false, modules = null } = {}) {
+function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null } = {}) {
   const diagnostics = [...checked.diagnostics];
   // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903)
   const bbs = loadBlackboxes(blackboxes, headers);
@@ -90,7 +90,7 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   let df = dataflow(checked);
   const fn = checked.funcs.get(checked.top);
   // (the functions not inlined, sub-modules, #1960)
-  const { subs, sub, kept } = subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes, stall, modules });
+  const { subs, sub, kept } = subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes, mults, stall, modules });
   const pragmaOf = (f) => f.body.items.find((s) => s.kind === 'pragma' && s.pragma.name === 'INLINE').loc;
   for (const k of kept) diagnostics.push({ file, line: pragmaOf(k.f).line, col: pragmaOf(k.f).col, message: `#pragma HLS INLINE off: '${k.f.name}' is inlined: ${k.why}`, severity: 'warning' });
   const sargs = checked.ast.structArgs?.get(checked.top) || [];
@@ -100,11 +100,11 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   // not combinational (a loop whose count depends on the inputs, a static or global variable): a sequential module,
   // a state machine (core/c-fsmd.js, #1526)
   const seqOnly = df.diagnostics.some((d) => d.severity === 'error') && df.diagnostics.every((d) => d.severity !== 'error' || d.message.includes('#1526'));
-  if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family }), seq: true };
+  if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults }), seq: true };
   // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
   // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
   else if (!flat && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && !fitsClock(df.graph, clock, family)) {
-    const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family });
+    const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults });
     if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
   }
   diagnostics.push(...df.diagnostics);
@@ -177,17 +177,17 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const report = df.seq
     ? { sequential: true, states: df.states.length + 2, registerBits: df.regs.reduce((a, r) => a + r.w, 0) + df.stateT.w,
       memories: [...df.mems.map((x) => ({ name: x.name, words: x.n, bits: x.t.w, kind: x.rom || (!x.written && x.init) ? 'ROM' : 'RAM' })), ...df.extMems.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' }))],
-      loops: df.loops, ...(df.fnPipe ? { pipeline: df.fnPipe } : {}), slowLoops: df.slowLoops || [], ...hierarchyReport(df) }
+      loops: df.loops, ...(df.fnPipe ? { pipeline: df.fnPipe } : {}), slowLoops: df.slowLoops || [], units: df.units || [], blocks: blocksOf(df), unitsNs: df.unitsNs || 0, ...hierarchyReport(df) }
     : { sequential: false };
   return { ok: true, ...(df.blackboxes?.length ? { blackboxes: bbs.list } : {}), hdl, top: name, ports, diagnostics, sequential: !!df.seq, ...(df.freeRun ? { freeRun: true } : {}), states: df.seq ? df.states.length + 2 : 0, memories: df.seq ? df.extMems.map((x) => ({ ...x, port: rn(x.name) })) : [], fifos: df.seq ? df.fifos.map((x) => ({ ...x, port: rn(x.name) })) : [], report };
 }
 
 /** The sub-modules of a top (core/c-submodule.js, #1960): the registry and what is a sub-module; the functions off kept inlined. */
-export function subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes = null, stall = false, modules = null }) {
+export function subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes = null, mults = null, stall = false, modules = null }) {
   const fn = checked.funcs.get(checked.top);
   const globals = new Map(checked.ast.items.filter((it) => it.kind === 'var').map((it) => [it.name, it]));
   const { sub, kept } = hierarchy(fn, checked.funcs, globals, checked.ast.structArgs, stall ? 'its caller waits for an AXI master (ap_ce), it would not (not yet)' : null);
-  const subs = modules || moduleRegistry({ make: (callee, depths, module) => cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, clock, family, blackboxes, modules: subs }) });
+  const subs = modules || moduleRegistry({ make: (callee, depths, module) => cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, clock, family, blackboxes, mults, modules: subs }) });
   return { subs, sub, kept };
 }
 
@@ -226,6 +226,9 @@ function hierarchyReport(m) {
   const called = (k) => (m.loopStates?.[k] || []).some((s) => m.states.find((x) => x.id === s)?.call);
   return { latency: { min: lat.min, max: lat.max }, functions, ...(functions.length ? { loops: m.loops.map((l, k) => (called(k) ? { ...l, cycles: lat.loops[k] } : l)) } : {}) };
 }
+
+// (the multiplier blocks of a machine's units, #2125)
+const blocksOf = (df) => (df.units || []).reduce((a, u) => a + u.blocks, 0);
 
 /** The nodes to write: those the outputs need. */
 export function nodesOf(df) { return df.graph.written([...df.outputs.values()]); }

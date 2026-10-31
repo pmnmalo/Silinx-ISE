@@ -33,9 +33,10 @@ export function mulWidth(g, n) {
   return Math.min(n.w, ea + eb);
 }
 
-/** The multiplication node n as 18 x 18 multiplications and their sum, or n itself when one block makes it. */
-export function splitMul(g, n) {
-  if (mulWidth(g, n) <= 36) return n.id;
+/** The multiplication node n as 18 x 18 multiplications and their sum, or n itself when one block makes it (without
+ *  `every`, when its product fits 36 bits: one path in the blocks it takes, #2125). */
+export function splitMul(g, n, every = false) {
+  if (every ? n.args.every((x) => operandOf(g, x, n.s)[1] <= 18) : mulWidth(g, n) <= 36) return n.id;
   // (the sum in the product's own width, which holds it: signed, its operands' widths together; then the node's)
   const t = { w: mulWidth(g, n), s: true };
   const limbs = (x) => {
@@ -65,7 +66,7 @@ export function splitMul(g, n) {
 }
 
 /** The roots with every wide multiplication of their graph split (the nodes above one made again). */
-export function splitMuls(g, roots) {
+export function splitMuls(g, roots, every = false) {
   const memo = new Map();
   const f = (id) => {
     if (memo.has(id)) return memo.get(id);
@@ -76,7 +77,7 @@ export function splitMuls(g, roots) {
       const changed = args.some((a, k) => a !== n.args[k]);
       const { id: _i, op, args: _a, w, s, ...extra } = n;
       const m = changed ? g.get(g.add(op, args, { w, s }, extra)) : n;
-      r = m.op === 'mul' ? splitMul(g, m) : m.id;
+      r = m.op === 'mul' ? splitMul(g, m, every) : m.id;
     }
     memo.set(id, r);
     return r;
