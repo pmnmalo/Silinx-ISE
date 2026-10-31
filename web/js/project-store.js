@@ -91,6 +91,7 @@ export function normalizeProjectJson(saved, name) {
   json.stimuli = plain(saved.stimuli) ? saved.stimuli : {};
   json.impl = { ...base.impl, ...(plain(saved.impl) ? saved.impl : {}) };
   if (saved.preferredLanguage === 'vhdl' || saved.preferredLanguage === 'verilog') json.preferredLanguage = saved.preferredLanguage;
+  if (plain(saved.sourceLanguage)) json.sourceLanguage = saved.sourceLanguage;
   if (typeof saved.synthTool === 'string') json.synthTool = saved.synthTool;
   return { json: clone(json), warnings };
 }
@@ -447,6 +448,7 @@ export function projectOps(getStore, examples = {}) {
         if (json.constraints) json.constraints = remap(json.constraints);
         // the files removed from the project stay removed at their new paths (#1228)
         if (json.excluded) json.excluded = json.excluded.map(remap);
+        if (json.sourceLanguage) json.sourceLanguage = Object.fromEntries(Object.entries(json.sourceLanguage).map(([f, l]) => [remap(f), l]));
         await S().saveJson(name, json);
         return clone(json);
       }
@@ -457,6 +459,7 @@ export function projectOps(getStore, examples = {}) {
       json.files = json.files.map(f => (f.path === from ? { ...f, path: to, lang: lang || f.lang } : f));
       if (json.constraints === from) json.constraints = to;
       if (json.excluded) json.excluded = json.excluded.map(f => (f === from ? to : f));
+      if (json.sourceLanguage?.[from]) { json.sourceLanguage[to] = json.sourceLanguage[from]; delete json.sourceLanguage[from]; }
       await S().saveJson(name, json);
       return clone(json);
     },

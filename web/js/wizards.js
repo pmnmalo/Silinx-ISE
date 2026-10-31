@@ -564,15 +564,16 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
 
 export async function sourceProperties(path) {
   const f = S.project.files.find(x => x.path === path);
-  if (!f) return;
-  const role = select([['design', 'All'], ['impl', 'Implementation'], ['sim', 'Simulation']], f.role || 'design');
+  const { setSourceLanguage, sourceLanguageChoice } = await import('./drawings-lang.js');
+  const own = await sourceLanguageChoice(path);
+  if (!f && !own) return;
+  const lang = own && select([['', 'Project Preferred Language'], ['vhdl', 'VHDL'], ['verilog', 'Verilog']], own.choice);
   const r = await dialog({
     title: `Source Properties - ${path}`, width: 440,
-    body: h('div', { class: 'form-grid' }, ...field('File:', h('span', {}, path)), ...field('Language:', h('span', {}, f.lang)), ...field('View Association:', role)),
+    body: h('div', { class: 'form-grid' }, ...field('File:', h('span', {}, path)), ...field('Language:', lang || h('span', {}, f.lang))),
   });
-  if (!r) return;
-  f.role = role.value;
-  await app.saveProjectJson();
+  if (!r || !own || lang.value === own.choice) return;
+  await setSourceLanguage(own.drawing, lang.value);
   await app.reloadProject();
 }
 

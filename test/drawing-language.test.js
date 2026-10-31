@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { drawingInLanguage, viewHdl } from '../core/view-hdl.js';
+import { drawingInLanguage, modelLanguage, viewHdl } from '../core/view-hdl.js';
 import { compile, elaborate } from '../core/compile.js';
 import { newPetri } from '../core/petri.js';
 import { example } from './examples-lib.mjs';
@@ -104,4 +104,13 @@ test('a drawing with no HDL file, with errors, or whose language the drawing doe
   const half = drawingInLanguage('src/gates.sch.json', JSON.stringify({ ...gates, lang: 'verilog' }), 'verilog');
   assert.deepEqual([half.from, half.target, half.errors], ['src/gates.vhd', 'src/gates.v', []]);
   assert.throws(() => drawingInLanguage('src/x.sch.json', '{', 'verilog'), SyntaxError);
+});
+
+test('modelLanguage (#2254): the drawing\'s own, else its linked file\'s, else VHDL', () => {
+  assert.equal(modelLanguage({ lang: 'verilog', generatedFile: 'a.vhd' }), 'verilog');
+  assert.equal(modelLanguage({ lang: 'vhdl', generatedFile: 'a.v' }), 'vhdl');
+  assert.equal(modelLanguage({ generatedFile: 'a.v' }), 'verilog');
+  assert.equal(modelLanguage({ generatedFile: 'a.sv' }), 'verilog');
+  assert.equal(modelLanguage({ generatedFile: 'a.vhd' }), 'vhdl');
+  assert.equal(modelLanguage({}), 'vhdl');
 });

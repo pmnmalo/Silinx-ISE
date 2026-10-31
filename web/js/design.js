@@ -333,7 +333,7 @@ export function fileContextMenu(e, file) {
     /\.ucf$/i.test(file) ? { label: 'Check Syntax', action: () => checkUcfFile(file) } : null,
     { label: 'Remove from Project', action: () => removeFile(file) },
     { label: 'Delete File…', action: () => deleteFile(file) },
-    { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) },
+    { label: 'Source Properties…', action: () => wiz.sourceProperties(file), disabled: !S.project.files.some(f => f.path === file) && S.viewTexts?.[file] === undefined },
   ].filter(Boolean), e.clientX, e.clientY);
 }
 // Delete File…: out of the project if it was in it, and deleted from the disk, which no Undo brings back (#1215;
