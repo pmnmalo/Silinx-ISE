@@ -269,10 +269,10 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     const lib = cppHlsLibs(tokens, includes, report);
     const fir = cppFir(lib.tokens, report);
     const st = cStructs(cUnions(cDesignated(cppVector(cppSugar(channels(cppTemplates(channels(cppStl(fir.tokens, report), true), report), false), report)), report), report, true), report, true);
-    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, firs: fir.firs, apFloats: lib.apFloats };
+    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, resetCtors: st.resetCtors, firs: fir.firs, apFloats: lib.apFloats };
   }
   const st = cStructs(cUnions(cDesignated(tokens, report), report), report, false);
-  return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs };
+  return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs, resetCtors: st.resetCtors };
 
   function run(src, fname, depth, simOuter = false) {
   const bad = [];

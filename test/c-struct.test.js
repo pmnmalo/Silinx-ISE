@@ -150,7 +150,7 @@ test('#1590 structs: what is not supported said', () => {
   assert.deepEqual(errs('union u { int a; short b; };\nint f(void) { return 0; }\n'), []);   // (#1896: test/c-union.test.js)
   assert.deepEqual(errs('struct s { int *p; int a; };\nint f(void) { struct s v; v.a = 1; return v.a; }\n'), ["1 the member 'p': a pointer in a struct is not possible in Silinx HLS"]);
   assert.deepEqual(errs('struct s { int a : 3; };\nint f(void) { return 0; }\n'), []);   // (#1896)
-  assert.deepEqual(errs('struct b { int x; };\nstruct s : b { int a; };\nint f() { return 0; }\n', 'e.cpp'), ["2 the struct 's': a base class is not supported yet"]);
+  assert.deepEqual(errs('struct b { int x; };\nstruct s : b { int a; };\nint f() { return 0; }\n', 'e.cpp'), []);   // (#1964: test/cpp-inherit.test.js)
   assert.deepEqual(errs('struct s { int a; };\nint f(void) { struct s v, *p; v.a = 1; return v.a; }\n'), ['2 a pointer or a reference to a struct (s) as a variable is not possible in Silinx HLS: use the struct or an index']);
   assert.deepEqual(errs('struct s { int a; };\nint g(int x) { return x; }\nint f(void) { struct s v; v.a = 1; return g(v); }\n'), ["3 the struct 'v' used as a value here: copy it (x = v;), pass it to a function or read its members"]);
   assert.deepEqual(errs('struct s { int a; };\nint f(struct s *p, int i) { return p[i].a; }\n'), []);   // (#1684: an array of structs)

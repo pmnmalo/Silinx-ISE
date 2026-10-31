@@ -307,6 +307,8 @@ export const exprMethods = {
       const a = e.args[k];
       if (pa.type.kind === 'ptr' || pa.type.kind === 'array') {
         const target = a.kind === 'unary' && a.op === '&' && a.e.kind === 'id' ? this.lookup(a.e.name, a.loc) : a.kind === 'id' ? this.lookup(a.name, a.loc) : null;
+        // (an element by reference, a method of an array of objects: inlined in a sequential module, #1964)
+        if (!target && a.kind === 'unary' && a.e.kind === 'index' && pa.type.ref) this.error(a.loc, `an element of an array by reference needs a sequential module (#1526)`);
         if (!target) this.error(a.loc, `the argument of '${pa.name}': a variable (&x), an array or a pointer argument`);
         scope.set(pa.name, target.kind === 'var' ? { kind: 'alias', slot: target } : target);
         return;

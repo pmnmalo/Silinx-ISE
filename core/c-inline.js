@@ -43,7 +43,9 @@ export function inlineCalls(fn, funcs, report) {
   };
   // (math.h's fmod of constants: folded, core/c-dataflow-float.js, #2144)
   const folded = (e, f) => f?.library && e.args.every((a) => !has(a, (n) => n.kind === 'id' || n.kind === 'call'));
-  const inlined = (e) => e?.kind === 'call' && e.callee.kind === 'id' && funcs.get(e.callee.name)?.body && funcs.get(e.callee.name) !== fn && !folded(e, funcs.get(e.callee.name)) && needs(funcs.get(e.callee.name));
+  // (an element of an array by reference: inlined too, a method of an array of objects, #1964)
+  const byElement = (e, f) => e.args.some((a, i) => a.kind === 'unary' && a.op === '&' && a.e.kind === 'index' && f.params[i]?.type.ref);
+  const inlined = (e) => e?.kind === 'call' && e.callee.kind === 'id' && funcs.get(e.callee.name)?.body && funcs.get(e.callee.name) !== fn && !folded(e, funcs.get(e.callee.name)) && (needs(funcs.get(e.callee.name)) || byElement(e, funcs.get(e.callee.name)));
   let fresh = 0;
   const statics = new Map();   // function -> Map(name -> its variable's name)
   const hoisted = [];          // the statics' declarations, first in the top's body
@@ -125,6 +127,17 @@ export function inlineCalls(fn, funcs, report) {
       if (t.kind === 'array') {
         if (a.kind !== 'id') report(a.loc, `the argument of '${pa.name}' in the call of '${f.name}': an array (its name)`);
         alias.set(pa.name, { arr: a });
+        return;
+      }
+      if (t.kind === 'ptr' && t.ref && a.kind === 'unary' && a.op === '&' && a.e.kind === 'index') {
+        // (its index computed once, when the reference is made)
+        let elem = a.e;
+        if (elem.i.kind !== 'num') {
+          const name = `${pa.name}_x${k}`;
+          items.push({ kind: 'decl', vars: [{ kind: 'var', name, type: { kind: 'int', name: 'int', bits: 32, signed: true }, init: elem.i, loc: a.loc }], loc: a.loc });
+          elem = { ...elem, i: id(name, a.loc) };
+        }
+        alias.set(pa.name, { ptr: elem, arg: { ...a, e: elem } });
         return;
       }
       if (t.kind === 'ptr' || t.kind === 'stream') {
