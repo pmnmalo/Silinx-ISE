@@ -5,6 +5,7 @@
 // with the page: .github/workflows/pages.yml).
 import { unconstrainedPorts } from '/core/auto-pins.js';
 import { isGeneratedSource, viewHdl } from '/core/view-hdl.js';
+import { blackboxesIn } from '/core/c-blackbox.js';
 import { compile } from '/core/compile.js';
 import { synthEffort } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
@@ -114,9 +115,10 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
     let modules = {};
     try { modules = modulesFromLibrary(compile(sources), { sources: Object.fromEntries(sources.map(s => [s.path, s.text])) }); } catch { /* none */ }
     const hdlMods = new Set(Object.keys(modules).map(n => n.toLowerCase()));   // (a module an HDL file defines: that file)
+    const hls = await blackboxesIn(Object.keys(files).filter(p => typeof files[p] === 'string'), p => files[p]);   // (#1903)
     for (const p of viewPaths) {
       // (a drawing whose HDL file is gone, deleted or removed from the project, is one without it: #231)
-      const r = viewHdl(p, files[p], { lang: project.preferredLanguage, modules, linked: f => typeof files[f] === 'string' && (project.files || []).some(x => x.path === f) });
+      const r = viewHdl(p, files[p], { lang: project.preferredLanguage, modules, linked: f => typeof files[f] === 'string' && (project.files || []).some(x => x.path === f), hls });
       if (!r || (r.text && hdlMods.has(String(r.module).toLowerCase()))) continue;
       for (const e of r.errors) onLine(`WARNING:Silinx - ${e}`);
       if (r.text) sources.push({ path: `${p}.${r.lang === 'vhdl' ? 'vhd' : 'v'}`, lang: r.lang, text: r.text });

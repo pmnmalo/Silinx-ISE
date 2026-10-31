@@ -62,7 +62,7 @@ Not part of `npm test` (it needs the network once).
 | migration-vitis-unified-cli | C | pass | pass | pass | 1 |  |
 | misc-initialization-and-reset-static-array-rom | C++ | pass | pass | pass | 1 |  |
 | misc-malloc-removed | C | pass | pass | pass | 98 |  |
-| misc-rtl-as-blackbox | C++ | fail | fail | skip | - | C simulation: 29: 'rtl_model' is declared but not defined |
+| misc-rtl-as-blackbox | C++ | pass | pass | pass | 5 |  |
 | modeling-pointers-basic-arithmetic | C | pass | pass | pass | 10 |  |
 | modeling-pointers-multiple-pointers | C | pass | pass | pass | 1 |  |
 | modeling-pointers-native-casts | C | pass | pass | pass | 411 |  |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 
-73 designs: 61 through co-simulation.
+73 designs: 62 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

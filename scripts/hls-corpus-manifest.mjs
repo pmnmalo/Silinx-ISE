@@ -17,7 +17,7 @@ const REPO = 'Xilinx/Vitis-HLS-Introductory-Examples';
 
 /** An hls_config.cfg's keys: { top, files: [syn.file], tb: [tb.file], flow, clock, directives: [syn.directive.*] }. */
 export function readConfig(text) {
-  const r = { top: null, files: [], tb: [], flow: null, clock: null, directives: [] };
+  const r = { top: null, files: [], tb: [], blackbox: [], flow: null, clock: null, directives: [] };
   for (const raw of String(text).split('\n')) {
     const l = raw.replace(/#.*$/, '').trim();
     const m = /^([\w.]+)\s*=\s*(.*)$/.exec(l);
@@ -26,6 +26,7 @@ export function readConfig(text) {
     if (k === 'syn.top') r.top = v;
     else if (k === 'syn.file') r.files.push(v);
     else if (k === 'tb.file') r.tb.push(v);
+    else if (k === 'syn.blackbox.file') r.blackbox.push(v);
     else if (k === 'flow_target') r.flow = v;
     else if (k === 'clock') r.clock = v;
     else if (k.startsWith('syn.directive.')) r.directives.push(`${k.slice(14)} ${v}`);
@@ -47,7 +48,10 @@ export function designOf(dir, cfg, paths) {
     name: dir.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase(),
     source: 'vitis-hls-examples', dir, top: cfg.top,
     language: sources.length && sources.every((f) => f.endsWith('.c')) ? 'c' : 'c++',
-    files, tb, headers, ...(cfg.directives.length ? { directives: cfg.directives } : {}),
+    files, tb, headers,
+    // (syn.blackbox: its descriptions, and the C models and RTL beside them, #1903)
+    ...(cfg.blackbox?.length ? { blackbox: { descriptions: cfg.blackbox.map(rel), files: paths.filter((p) => path.posix.dirname(p) === dir && /\.(c|cc|cpp|v|vhd|vhdl)$/.test(p) && !files.includes(p) && !tb.includes(p)) } } : {}),
+    ...(cfg.directives.length ? { directives: cfg.directives } : {}),
   };
 }
 
