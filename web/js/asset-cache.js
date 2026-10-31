@@ -1,5 +1,6 @@
 // The browser edition's versioned assets kept in Cache Storage (#967): Yosys in WebAssembly
-// (assets/vendor/yowasp-yosys/<its version>/gen/*, 16.7 MB gzipped) and the device descriptions and the
+// (assets/vendor/yowasp-yosys/<its version>/gen/*, 16.7 MB gzipped), nextpnr in WebAssembly and its chip databases
+// (assets/vendor/nextpnr-spartan/<its version>/gen|chipdb/*, #2136) and the device descriptions and the
 // bit database (assets/<version>/devices|bitdb/*). Their URLs name their version, so that what one holds
 // never changes: they are read from the cache with no request at all. The browser's HTTP cache kept them
 // 10 minutes only (GitHub Pages' max-age=600), and its revalidation downloaded Yosys again whenever the
@@ -17,7 +18,7 @@
 
 export const ASSET_CACHE = 'silinx-assets';
 /** Is url one of the versioned assets (its content never changes)? */
-export const isVersionedAsset = url => /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb)\/[^/?#]+$/.test(String(url));
+export const isVersionedAsset = url => /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/vendor\/nextpnr-spartan\/\d[^/]*\/(gen|chipdb)\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb)\/[^/?#]+$/.test(String(url));
 
 /** The scope's fetch reads the versioned assets from Cache Storage, and puts there those it fetches. Returns
  *  whether it replaced it. Self-contained: assetFetchSource writes its text into the Yosys Blob workers. */
@@ -92,6 +93,11 @@ export async function assetCached(url, scope = globalThis) {
 
 /** The files of Yosys's bundle (YoWASP's gen/): what its first run fetches. */
 export const YOSYS_FILES = ['bundle.js', 'yosys.core.wasm', 'yosys.core2.wasm', 'yosys.core3.wasm', 'yosys.core4.wasm', 'yosys-resources.0.tar'];
+
+/** The files of nextpnr's bundle (its gen/, #2136) and a device's chip database beside it: what its first run fetches. */
+export const NEXTPNR_FILES = ['bundle.js', 'nextpnr-himbaechel-spartan3e.core.wasm', 'nextpnr-himbaechel-spartan3e.core2.wasm',
+  'nextpnr-himbaechel-spartan3e.core3.wasm', 'nextpnr-himbaechel-spartan3e.core4.wasm', 'nextpnr-himbaechel-spartan3e-resources.0.tar'];
+export const nextpnrChipdb = device => `../chipdb/chipdb-${device}.bin.gz`;
 
 /**
  * Fetch urls into the cache, one at a time, those it holds skipped: { fetched, bytes } (bytes: as their Content-Length says, compressed).

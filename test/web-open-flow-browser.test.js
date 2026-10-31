@@ -100,10 +100,11 @@ test('#967 prepareBrowserFlow: the device\'s assets asked of the flow\'s worker 
   try {
     const p = prepareBrowserFlow(dev);
     const w = live(), m = w.posted.at(-1);
-    assert.deepEqual(m.prepare, { graph: 'xc3s500efg320-4.json.gz', device: 'xc3s500e', pkg: 'fg320' });
+    assert.deepEqual(m.prepare, { graph: 'xc3s500efg320-4.json.gz', device: 'xc3s500e', pkg: 'fg320', nextpnr: true });   // (nextpnr by default, #2136)
     assert.equal(m.assets, 'https://example.test/assets/');
     assert.equal(m.root, 'https://example.test/assets/', 'unbuilt: the assets folder itself');
     assert.equal(m.yosys, 'https://example.test/assets/vendor/yowasp-yosys/gen/bundle.js');
+    assert.equal(m.nextpnr, 'https://example.test/assets/vendor/nextpnr-spartan/gen/bundle.js');
     w.send({ id: m.id, line: 'ignored' });
     w.send({ id: m.id, done: { fetched: 9, bytes: 17e6, pruned: 0 } });
     assert.deepEqual(await p, { fetched: 9, bytes: 17e6, pruned: 0 });
@@ -113,9 +114,11 @@ test('#967 prepareBrowserFlow: the device\'s assets asked of the flow\'s worker 
     const q = prepareBrowserFlow(dev2);
     live().onerror({ message: 'boom' });
     assert.equal(await q, null);
-    const q2 = prepareBrowserFlow(dev2);
+    // (a project on the Silinx engine: no nextpnr fetched, #2136)
+    const q2 = prepareBrowserFlow(dev2, { engine: 'silinx' });
     const w2 = live(), m2 = w2.posted.at(-1);
     assert.equal(m2.prepare.graph, 'xc3s1200efg320-4.json.gz');
+    assert.equal(m2.prepare.nextpnr, false);
     w2.send({ id: m2.id, done: { fetched: 0, bytes: 0, pruned: 1 } });
     assert.deepEqual(await q2, { fetched: 0, bytes: 0, pruned: 1 });
   } finally { delete globalThis.caches; delete globalThis.isSecureContext; }
@@ -138,7 +141,7 @@ test('#1450 prepareBrowserFlow: nothing in a page opened from a file, though it 
     globalThis.location = new URL('https://example.test/');
     const p = prepareBrowserFlow(dev);
     const w = live(), m = w.posted.at(-1);
-    assert.deepEqual(m.prepare, { graph: 'xc3s100ecp132-4.json.gz', device: 'xc3s100e', pkg: 'cp132' });
+    assert.deepEqual(m.prepare, { graph: 'xc3s100ecp132-4.json.gz', device: 'xc3s100e', pkg: 'cp132', nextpnr: true });
     w.send({ id: m.id, done: { fetched: 9, bytes: 17e6, pruned: 0 } });
     assert.deepEqual(await p, { fetched: 9, bytes: 17e6, pruned: 0 });
   } finally { delete globalThis.caches; delete globalThis.isSecureContext; delete globalThis.location; }

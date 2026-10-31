@@ -186,7 +186,7 @@ export async function runFlow(spec, io) {
     if (steps.includes('postsynth')) { step('postsynth'); await runPostSynth(); save(); }
     if (steps.includes('translate')) { step('translate'); runTranslate(); save(); }
     if (steps.includes('posttrans')) { step('posttrans'); await runPostTranslate(); save(); }
-    if (steps.includes('map')) { step('map'); impl.runMap(); save(); }
+    if (steps.includes('map')) { step('map'); await impl.runMap(); save(); }
     if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
     if (steps.includes('par')) { step('par'); await impl.runPar(); save(); }
     if (steps.includes('trce')) { step('trce'); routedOrEarlier(); runTiming(); save(); }

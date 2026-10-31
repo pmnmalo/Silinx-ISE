@@ -61,7 +61,7 @@ async function openProjectNow(name, { startup = false } = {}) {
   // then did not start, or synthesized again (#346)
   await restoreImplStatus();
   // the browser edition: what Implement needs, downloaded now in the background, kept by the browser (#967)
-  if (api.standalone) setTimeout(() => S.project?.name === name && import('./open-flow-browser.js').then(m => m.prepareBrowserFlow(S.project.device)).catch(() => {}), prepareDelay());
+  if (api.standalone) setTimeout(() => S.project?.name === name && import('./open-flow-browser.js').then(m => m.prepareBrowserFlow(S.project.device, S.project.impl)).catch(() => {}), prepareDelay());
   // where the user was in this project; the Design Summary the first time (its documents reopened out of sight: the
   // work area shown once they are in place, at start-up once its task is back too, web/js/app.js, #1339)
   document.documentElement.dataset.restoring = '';

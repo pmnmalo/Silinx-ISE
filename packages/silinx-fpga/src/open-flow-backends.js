@@ -51,18 +51,24 @@ function mountS3e(ctx) {
   const own = mountS3eSteps(ctx);
   const np = (spec.engine === 'nextpnr' || spec.engine === 'auto') ? mountNextpnrSteps(ctx) : null;
   let viaNextpnr = null;
-  const useNextpnr = () => {
+  const useNextpnr = async () => {
     if (viaNextpnr !== null) return viaNextpnr;
     viaNextpnr = !!np && (spec.engine === 'nextpnr' || !np.problems().length);
     if (np && !viaNextpnr) {
       const p = np.problems();
       log(`Map: the nextpnr engine cannot implement this design yet (${p[0]}${p.length > 1 ? `, and ${p.length - 1} more` : ''}): the Silinx engine places and routes it.`);
+    } else if (viaNextpnr && spec.engine === 'auto') {
+      // 'auto' with nextpnr not starting (offline, its chip database not downloaded yet, #2329): the Silinx engine, warned
+      try { await np.load(); } catch (e) {
+        viaNextpnr = false;
+        log(`WARNING:Map - the nextpnr engine could not start (${e.message}): the Silinx engine places and routes this design.`);
+      }
     }
     return viaNextpnr;
   };
   return {
-    runMap: () => (useNextpnr() ? np.runMap : own.runMap)(),
-    runPar: () => (useNextpnr() ? np.runPar : own.runPar)(),
+    runMap: async () => (await useNextpnr() ? np.runMap : own.runMap)(),
+    runPar: async () => (await useNextpnr() ? np.runPar : own.runPar)(),
     packed: own.packed,
     ...mountFlowReports({ ...ctx, reports: S3E_REPORTS }),
   };

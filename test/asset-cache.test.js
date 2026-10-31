@@ -36,12 +36,15 @@ function scope({ caches = true, status = 200 } = {}) {
 }
 const settle = () => new Promise(r => setTimeout(r, 10));
 
-test('#967 the versioned assets: Yosys of a version, a version\'s (or a development build\'s) device descriptions and bit database', () => {
+test('#967 the versioned assets: Yosys and nextpnr (#2136) of a version, a version\'s (or a development build\'s) device descriptions and bit database', () => {
   for (const u of [WASM, `${SITE}assets/vendor/yowasp-yosys/0.70.1258/gen/bundle.js`, GRAPH, `${SITE}assets/15.12.0/bitdb/s3e-tiles.json`,
-    `${SITE}dev/assets/dev-770bf18/devices/xc3s500efg320-4.json.gz`, `${SITE}dev/assets/vendor/yowasp-yosys/0.71.3/gen/yosys-resources.0.tar`])
+    `${SITE}dev/assets/dev-770bf18/devices/xc3s500efg320-4.json.gz`, `${SITE}dev/assets/vendor/yowasp-yosys/0.71.3/gen/yosys-resources.0.tar`,
+    // nextpnr's bundle and its chip databases (#2136)
+    `${SITE}assets/vendor/nextpnr-spartan/0.11.2/gen/bundle.js`, `${SITE}assets/vendor/nextpnr-spartan/0.11.2/gen/nextpnr-himbaechel-spartan3e.core.wasm`,
+    `${SITE}dev/assets/vendor/nextpnr-spartan/0.11.2/chipdb/chipdb-xc3s250e.bin.gz`])
     assert.equal(isVersionedAsset(u), true, u);
   // unversioned: the local server's Yosys and the tests' assets, the page, version.json; a folder; a query
-  for (const u of ['http://127.0.0.1:8/vendor/yowasp-yosys/gen/yosys.core.wasm', 'http://127.0.0.1:8/assets/devices/xc3s250ecp132-4.json.gz', SITE, `${SITE}version.json`,
+  for (const u of ['http://127.0.0.1:8/vendor/yowasp-yosys/gen/yosys.core.wasm', 'http://127.0.0.1:8/vendor/nextpnr-spartan/gen/bundle.js', `${SITE}assets/vendor/nextpnr-spartan/0.11.2/package.json`, 'http://127.0.0.1:8/assets/devices/xc3s250ecp132-4.json.gz', SITE, `${SITE}version.json`,
     `${SITE}assets/15.12.0/devices/`, `${GRAPH}?x=1`, `${SITE}assets/latest/devices/a.json.gz`])
     assert.equal(isVersionedAsset(u), false, u);
 });
