@@ -15,7 +15,6 @@
 //   foldResetCtors({ ast, funcs, globals, consts }, typeOk, report)
 import { runAtSynthesis, runAtReset } from './c-interp.js';
 import { MATH } from './c-float.js';
-import { fixedToDouble } from './c-fixed.js';
 
 const walk = (n, f) => {
   if (!n || typeof n !== 'object') return;
@@ -273,8 +272,8 @@ export function foldResetCtors(checked, typeOk, report) {
   const cells = runAtReset(checked, jobs);
   for (const j of jobs) if (j.error) report(j.loc, `'${j.name}': a static object's constructor runs at synthesis, its state set at the reset: ${j.error}`);
   for (const [d, c] of cells) {
-    // (an ap_fixed's: its value, not its bits)
-    const value = (x) => literal(c.t?.fx ? fixedToDouble({ v: x.v, t: c.t }) : x.v, d.type, d.loc);
+    // (an ap_fixed's: its bits, literal's value of them)
+    const value = (x) => literal(x.v, d.type, d.loc);
     d.init = c.arr ? { kind: 'init', items: c.arr.map(value), loc: d.loc } : value(c);
   }
   // (a global's: its function gone)
