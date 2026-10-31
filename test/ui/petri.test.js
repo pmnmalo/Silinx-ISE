@@ -194,8 +194,8 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .pn-log`).textContent, ED), /clock: start/);
   // PNML export: the net as PNML, read back by core/petri.js
   // (#2259) Analysis and PNML in the menu at the right of the first line, not in the toolbar; shown by its button, hidden by Esc and by a command
-  const menu = () => page.eval((ed) => { const m = document.querySelector(`${ed} .tb-more-menu`), b = document.querySelector(`${ed} .tb-more-btn`).getBoundingClientRect(), t = document.querySelector(`${ed} .asm-toolbar`).getBoundingClientRect(); return { open: !m.hidden, buttons: [...m.querySelectorAll('button')].map((x) => x.textContent), right: t.right - b.right < 20, firstLine: b.top - t.top < 20 }; }, ED);
-  assert.deepEqual(await menu(), { open: false, buttons: ['∑ Analysis', 'PNML ⇩', 'PNML ⇧'], right: true, firstLine: true });
+  const menu = () => page.eval((ed) => { const m = document.querySelector(`${ed} .tb-more-menu`), b = document.querySelector(`${ed} .tb-more-btn`).getBoundingClientRect(), t = document.querySelector(`${ed} .asm-toolbar`).getBoundingClientRect(); return { open: !m.hidden, buttons: [...m.querySelectorAll('button')].map((x) => x.textContent), right: t.right - b.right < 20, firstLine: b.top - t.top < 20, clear: [...document.querySelectorAll(`${ed} .asm-toolbar .asm-btn`)].filter((x) => x.getClientRects().length && !x.closest('.tb-more')).every((x) => x.getBoundingClientRect().right <= b.left) }; }, ED);
+  assert.deepEqual(await menu(), { open: false, buttons: ['∑ Analysis', 'PNML ⇩', 'PNML ⇧'], right: true, firstLine: true, clear: true });
   await page.click(`${ED} .tb-more-btn`);
   assert.equal((await menu()).open, true);
   await page.key('Escape');
