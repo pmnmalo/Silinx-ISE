@@ -10,8 +10,8 @@
 // fewer tokens than its weight. Tools: select / move, place, transition, arc, inhibitor arc. The side
 // panel edits the selection and the net (its inputs, outputs, clock, reset); the bottom panel
 // simulates it: click an enabled transition to fire it (the token game), or a clock step (every
-// enabled transition whose guard is true fires, as the generated hardware does), run, reset; and shows
-// the HDL generated from the net. Model, simulation, HDL and PNML: core/petri.js.
+// enabled transition whose guard is true fires, as the generated hardware does), run, reset; and analyses it.
+// The HDL generated from the net is its linked file. Model, simulation, HDL and PNML: core/petri.js.
 
 import { h, downloadText, undoButton, linkModel, linkSnapshot, twoFingerView } from './ui.js';
 import { sv } from './dom.js';
@@ -41,7 +41,7 @@ export function mountPetriEditor(container, opts = {}) {
   let drag = null;
   let fitted = false;                   // the view fitted once, or set by the user
   let destroyed = false;
-  let panel = null;                     // 'sim' | 'code' | null
+  let panel = null;                     // 'sim' | 'analysis' | null
   let sim = null;                       // { marking, fired: [], inputs: {}, log: [], timer }
   const hist = [JSON.stringify(M)];
   let hi = 0;
@@ -67,7 +67,6 @@ export function mountPetriEditor(container, opts = {}) {
     h('option', { value: 'vhdl' }, 'VHDL'), h('option', { value: 'verilog' }, 'Verilog'));
   const tabBtns = {
     sim: btn('▶ Simulate', 'Play the net: fire transitions, clock steps, run', () => togglePanel('sim'), 'pn-tab-btn'),
-    code: btn('</> HDL', 'The hardware generated from the net', () => togglePanel('code'), 'pn-tab-btn'),
     analysis: btn('∑ Analysis', 'Reachable markings, bounds, deadlocks, liveness, invariants', () => togglePanel('analysis'), 'pn-tab-btn'),
   };
   const pnmlIn = h('input', { type: 'file', accept: '.pnml,.xml', hidden: true });
@@ -83,7 +82,7 @@ export function mountPetriEditor(container, opts = {}) {
     h('div', { class: 'asm-group' }, undoBtn, redoBtn), sep(),
     h('div', { class: 'asm-group' }, btn('Fit', 'Fit the net in the window', () => fit()), langSel),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.sim, tabBtns.code, tabBtns.analysis,
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.sim, tabBtns.analysis,
       btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
       btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()), pnmlIn),
     linkHost);
@@ -196,7 +195,7 @@ export function mountPetriEditor(container, opts = {}) {
     selSection, status, transOf, setSel: (v) => { sel = v; }
   });
 
-  // ---------------------------------------------------------------- simulation and HDL panel (petri-sim.js)
+  // ---------------------------------------------------------------- simulation and analysis panel (petri-sim.js)
   const { analysis, envOf, fireOne, renderPanel, resetSim, togglePanel } = mountPetriSim({
     M: () => M, bottom, btn, destroyed: () => destroyed, panel: () => panel, panelBody, panelTitle, panelTools, render,
     sim: () => sim, status, tabBtns, transOf, setSim: (v) => { sim = v; }, setPanel: (v) => { panel = v; }

@@ -1,7 +1,7 @@
 // UI: the parts of the Petri net editor (#405: out of mountPetriEditor in web/js/petri-editor.js): the drawing
 // (petri-draw.js: the places with their tokens, the transitions, the arcs), the side panel (petri-side.js: a place
 // selected and its fields, its tokens changed and drawn, the net's fields, the problems) and the bottom panel
-// (petri-sim.js: the simulation's marking and outputs after a clock step, the HDL, the analysis) on a new net.
+// (petri-sim.js: the simulation's marking and outputs after a clock step, the analysis) on a new net.
 // The editor's whole use: test/ui/petri.test.js.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,7 @@ after(async () => { await env?.teardown?.(); });
 const E = () => env;
 const ED = '.doc:not([hidden]) .petri-editor';
 
-uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation, the HDL and the analysis', E, async (page) => {
+uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation and the analysis', E, async (page) => {
   await makeProject(env, { name: 'PnParts', top: '', files: { 'src/ctl.pn.json': JSON.stringify(newPetri('ctl', 'vhdl'), null, 2) } });
   await page.openProject('PnParts');
   await page.eval(() => window.SilinxApp.openPetri('src/ctl.pn.json'));
@@ -49,9 +49,8 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
   await page.click(`${ED} .asm-codebar .asm-btn`, { text: '⏭ Clock step' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=2  work=1', [ED], { what: 'start fired' });
   assert.equal(await ev((ed) => document.querySelector(`${ed} .pn-log`).textContent), 'clock: start');
-  // ---- the HDL, the analysis
-  await page.click(`${ED} .pn-tab-btn`, { text: '</> HDL' });
-  await page.waitFor((ed) => /entity ctl is/.test(document.querySelector(`${ed} .pn-code`)?.textContent || ''), [ED], { what: 'the VHDL' });
+  // ---- the analysis (no </> HDL button, #2250)
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['▶ Simulate', '∑ Analysis']);
   await page.click(`${ED} .pn-tab-btn`, { text: '∑ Analysis' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-an-props`), [ED], { what: 'the analysis' });
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-an-props th`)].map((t) => t.textContent)), ['Bounded', 'Deadlocks', 'Live', 'Reversible', 'Conservative']);

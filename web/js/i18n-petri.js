@@ -5,7 +5,7 @@ export const PETRI_PT = {
   '— generated from the net': '— gerado a partir da rede', 'Open Petri Net': 'Abrir Rede de Petri',
   // toolbar
   '➚ Select': '➚ Selecionar', 'Place': 'Lugar', 'Transition': 'Transição', '→ Arc': '→ Arco', '⊸ Inhibitor': '⊸ Inibidor',
-  'Fit': 'Ajustar', '▶ Simulate': '▶ Simular', '</> HDL': '</> HDL', 'PNML ⇩': 'PNML ⇩', 'PNML ⇧': 'PNML ⇧',
+  'Fit': 'Ajustar', '▶ Simulate': '▶ Simular', 'PNML ⇩': 'PNML ⇩', 'PNML ⇧': 'PNML ⇧',
   'Select and move (drag the background to pan, wheel to zoom)': 'Selecionar e mover (arraste o fundo para deslocar, roda para zoom)',
   'Click the drawing to add a place': 'Clique no desenho para acrescentar um lugar',
   'Click the drawing to add a transition': 'Clique no desenho para acrescentar uma transição',
@@ -14,7 +14,6 @@ export const PETRI_PT = {
   'Delete the selection (Del)': 'Apagar a seleção (Del)',
   'Fit the net in the window': 'Ajustar a rede à janela', 'HDL language': 'Linguagem HDL',
   'Play the net: fire transitions, clock steps, run': 'Jogar a rede: disparar transições, passos de relógio, correr',
-  'The hardware generated from the net': 'O hardware gerado a partir da rede',
   'Export the net as PNML (for PIPE, WoPeD, TINA…)': 'Exportar a rede em PNML (para o PIPE, WoPeD, TINA…)',
   'Import a PNML net (replaces this one: Undo brings it back)': 'Importar uma rede PNML (substitui esta: Anular repõe-na)',
   'Place / Transition: click to add · Arc: click its two ends · drag to move · Del to delete · wheel to zoom': 'Lugar / Transição: clique para acrescentar · Arco: clique nas duas pontas · arraste para mover · Del para apagar · roda para zoom',
@@ -75,7 +74,6 @@ export const PETRI_PT_PATTERNS = [
   [/^(\d+) places · (\d+) transitions · (\d+) arcs$/, '$1 lugares · $2 transições · $3 arcos'],
   [/^Place ([A-Za-z]\w*)$/, 'Lugar $1'], [/^Transition ([A-Za-z]\w*)$/, 'Transição $1'], [/^Arc ([A-Za-z]\w*|\?) → ([A-Za-z]\w*|\?)$/, 'Arco $1 → $2'],
   [/^Priority (\d+) of (\d+) \(in a conflict, the first takes the tokens\)$/, 'Prioridade $1 de $2 (num conflito, a primeira tira as marcas)'],
-  [/^(VHDL|Verilog) generated from the net$/, '$1 gerado a partir da rede'],
   [/^fire ([A-Za-z]\w*)$/, 'disparo $1'], [/^clock: nothing fires$/, 'relógio: nada dispara'], [/^clock: ([A-Za-z]\w*(?:, [A-Za-z]\w*)*)$/, 'relógio: $1'],
   [/^([A-Za-z]\w*): not enabled \(its guard is false\)$/, '$1: não habilitada (a guarda é falsa)'], [/^([A-Za-z]\w*): not enabled$/, '$1: não habilitada'],
 ];

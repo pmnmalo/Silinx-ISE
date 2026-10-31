@@ -37,7 +37,6 @@
 .petri-editor .pn-num { width: 70px; }
 .petri-editor .pn-dead { color: var(--asm-danger); font-weight: 700; }
 .petri-editor .pn-log { margin: 4px 0 0 18px; padding: 0; font: 11px var(--asm-mono); color: var(--asm-muted); }
-.petri-editor .pn-code { margin: 0; }
 
 /* the analysis panel (#188) */
 .petri-editor .pn-an-props th, .petri-editor .pn-an-table th { text-align: left; font-weight: 600; padding: 1px 12px 1px 0; color: var(--asm-muted); }
