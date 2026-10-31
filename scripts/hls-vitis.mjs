@@ -262,7 +262,7 @@ async function main() {
       try {
         const r = runDesign(d, texts);
         const { unit, headers } = unitOf(d, texts);
-        const g = cToHdl(unit, { file: d.language === 'c' ? 'unit.c' : 'unit.cpp', headers, top: d.top, lang: 'vhdl' });
+        const g = cToHdl(unit, { file: d.language === 'c' ? 'unit.c' : 'unit.cpp', headers, top: d.top, lang: 'vhdl', directives: d.directives });
         silinx = { csim: r.csim, synth: r.synth, cosim: r.cosim, latency: r.latency && { min: r.latency.min, max: r.latency.max }, loops: g.ok ? (g.report.loops || []).map((l) => ({ name: l.name || null, line: l.line, ii: l.ii, cycles: l.cycles })) : [], ports: g.ok ? g.ports.map(({ name, dir, w }) => ({ name, dir, w })) : [] };
       } catch (e) { silinx = { csim: 'fail', synth: 'fail', cosim: 'skip', latency: null, loops: [], ports: [], reason: `exception: ${e.message}` }; }
       results[d.name] = compareDesign(vitis, silinx);

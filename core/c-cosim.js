@@ -53,6 +53,17 @@ export function wordCalls(gen, calls) {
   });
 }
 
+/** A pointer to one value made a memory (m_axi, #1893): its value the memory's one element, as the C passed it. */
+function oneValue(gen, calls) {
+  const ms = (gen.memories || []).filter((x) => calls.some((c) => c.memIn?.[x.name] === undefined && c.ptrIn?.[x.name] !== undefined));
+  if (!ms.length) return calls;
+  return calls.map((c) => {
+    const r = { ...c, memIn: { ...(c.memIn || {}) }, memOut: { ...(c.memOut || {}) } };
+    for (const x of ms) if (c.ptrIn?.[x.name] !== undefined) { r.memIn[x.name] = [c.ptrIn[x.name]]; r.memOut[x.name] = [c.ptrOut?.[x.name] ?? c.ptrIn[x.name]]; }
+    return r;
+  });
+}
+
 /** The Verilog test bench replaying the calls: one line of hex values per call (and the protocol's faults last). */
 export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
   const calls = wordCalls(gen, calls0);
@@ -147,9 +158,9 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
 }
 
 // (files: the test bench's, core/c-interp.js's, #1897)
-export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family } = {}) {
+export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family, directives } = {}) {
   const sim = simulateC(source, { file, headers, top, files });
-  const made = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family });
+  const made = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family, directives });
   if (alter && made.ok) made.hdl = alter(made.hdl);   // (the tests: an HDL that differs, its mismatches reported)
   const base = { ok: false, pass: false, calls: 0, mismatches: [], latency: null, output: sim.output, sim, gen: made, errors: [] };
   // (AXI interfaces, #1893: the calls replayed on the function's ports of a model of the buses, around the module)
@@ -157,7 +168,8 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
   if (!sim.ok) return { ...base, errors: [sim.error ? `the C simulation failed: line ${sim.error.line}: ${sim.error.message}` : 'the C simulation cannot run: the source has errors'] };
   if (!made.ok) return { ...base, errors: made.diagnostics.filter((d) => d.severity === 'error').map((d) => `line ${d.line}: ${d.message}`) };
   if (!sim.calls.length) return { ...base, ok: true, pass: false, errors: [`the test bench (main) does not call the top function '${gen.top}': nothing to compare`] };
-  const tb = cosimBench(gen, sim.calls, { maxCycles });
+  const calls = oneValue(gen, sim.calls);
+  const tb = cosimBench(gen, calls, { maxCycles });
   // (a deep combinational path, math.h's pow in soft-float, #1761, settles in more delta cycles than the simulator's
   // default allows: up to a million)
   const r = simulate([{ path: `${made.top}.${lang === 'vhdl' ? 'vhd' : 'v'}`, text: made.hdl }, ...(made.axi ? [{ path: 'silinx_axi_bfm.v', text: axiBfm(made) }] : []), { path: 'silinx_cosim_tb.v', text: tb.text }], 'silinx_cosim_tb', { until: 1e15, maxDeltas: 1e6 });
@@ -170,7 +182,7 @@ export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles 
   const port = (n) => gen.ports.find((p) => p.name === n);
   const mismatches = [];
   const cycles = [];
-  wordCalls(gen, sim.calls).forEach((c, k) => {
+  wordCalls(gen, calls).forEach((c, k) => {
     const row = rows[k] || [];
     let q = 0;
     const say = (p, expected, got) => mismatches.push({ call: k + 1, port: p, expected, got });

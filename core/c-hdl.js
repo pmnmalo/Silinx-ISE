@@ -29,15 +29,15 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // (depths, module, flat: a DATAFLOW process's, core/c-processes.js, #1707: its pointer arguments' depths, its module's
 // name, its struct arguments' members ports of their own; pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the
 // threshold of the loops pipelined automatically, 0 none, #1919)
-export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7' } = {}) {
-  const checked = checkC(source, file, { headers, top, depths, synthesis: true });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', directives = null, stall = false } = {}) {
+  const checked = checkC(source, file, { headers, top, depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   const diagnostics = [...checked.diagnostics];
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
-  const axi = axiPlan(checked.funcs.get(checked.top));
+  const axi = axiPlan(checked.funcs.get(checked.top), checked.consts);
   if (axi && !module) {
     const name = portOf(checked.top);
-    const gen = cToHdl(source, { file, lang, headers, top, depths, module: `${name}_core`, flat, pipelineLoops, clock, family });
+    const gen = cToHdl(source, { file, lang, headers, top, depths, module: `${name}_core`, flat, pipelineLoops, clock, family, directives, stall: axi.masters.size > 0 });
     return gen.ok ? axiWrap(gen, axi, { name, src: file.split('/').pop(), lang, file }) : gen;
   }
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
@@ -53,13 +53,13 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // the filter's C model inlined, #1942)
   const firTop = !checked.dataflow && checked.ast.firs?.size && checked.funcs.get(checked.top).body.items.some((st) => st.kind === 'expr' && st.e.kind === 'call' && checked.ast.firs.has(st.e.callee.name));
   if (firTop) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, module });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, module, stall });
     if (!r.fallback) return r;
   }
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module, stall });
     if (!r.fallback) return r;
     if (hasStreams(checked.funcs.get(checked.top))) {
       const why = { ...r.fallback, severity: 'error', message: r.fallback.message.replace(/: made sequential \(not as processes\)$/, ': its streams are FIFOs between processes, so it cannot be made sequential') };
@@ -114,7 +114,8 @@ export function cToHdl(source, { file = 'input.c', lang = 'vhdl', headers = null
   // none of ap_start, ap_done, ap_idle, ap_ready (a sequential module running by itself, core/c-fsmd.js)
   const hs = [{ name: 'ap_start', dir: 'in', w: 1 }, { name: 'ap_done', dir: 'out', w: 1 }, { name: 'ap_idle', dir: 'out', w: 1 }, { name: 'ap_ready', dir: 'out', w: 1 }];
   const clk = { name: 'ap_clk', dir: 'in', w: 1 }, rst = { name: 'ap_rst', dir: 'in', w: 1 };
-  const ctrl = df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst] : [clk, rst, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? [rst, ...hs] : [];
+  const ce = stall && df.seq ? [{ name: 'ap_ce', dir: 'in', w: 1 }] : [];   // (an AXI master's wait, core/c-axi-master.js, #1893)
+  const ctrl = df.seq ? (df.ctrl === 'ap_ctrl_none' ? [clk, rst, ...ce] : [clk, rst, ...ce, ...hs]) : df.ctrl === 'ap_ctrl_hs' ? [rst, ...hs] : [];
   const portName = (p) => (p.param ? rn(p.param) + p.name.slice(p.param.length) : p.name);
   const flatPorts = [...ctrl, ...df.ports.map((p) => ({ name: portName(p), dir: p.dir, w: p.w, role: p.role, ...(p.param ? { param: p.param } : {}) }))];
   // (each output by its port's name: an argument named as a reserved word, in, its ports in_r_…: a memory's, a stream's too, #1590)
