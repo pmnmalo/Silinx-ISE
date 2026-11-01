@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { loadBitDbS6, S6_DB_DIR } from '../packages/silinx-fpga/src/node.js';
 import { fetchBitDbS6, s6DbNames, bitDbS6 } from '../packages/silinx-fpga/src/index.js';
@@ -51,7 +52,7 @@ test('#2103 every file of bitdb/s6 is one a part reads: the browser fetches them
 });
 
 test('#2103 a file the site has not: null in the object, as a file missing on the disk', async () => {
-  const tmp = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 's6db-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 's6db-'));
   try {
     for (const f of fs.readdirSync(S6_DB_DIR)) if (f.endsWith('.json') && !/^s6-ologic|hard\.json$/.test(f)) fs.copyFileSync(path.join(S6_DB_DIR, f), path.join(tmp, f));
     const db = await fetchBitDbS6('xc6slx16csg324-3', site(tmp).fetchJson);
