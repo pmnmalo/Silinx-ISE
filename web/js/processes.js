@@ -12,7 +12,7 @@ import { designDiags, sevWord } from './diaghelp.js';
 import { S, flushDoc, openFile, openFpgaView, openImpact, openPinPlanner, openSummary, openUcf,
   status, viewRoots, withPrimitives } from './app.js';
 import { log, showConsolePage, setDiagnostics } from './console.js';
-import { SYNTH_OPEN, backAnnotatePins, checkUcfFile, generateSimModel, postParTiming, runImpl, stopProcesses,
+import { backAnnotatePins, checkUcfFile, generateSimModel, postParTiming, runImpl, stopProcesses,
   synthOpen, textPowerReport, worst } from './implement.js';
 import { isAsm, isFsm, isPn, isTt, openAsm, openFsm, openPetri, openSch, openTt } from './drawings.js';
 import { inView, setTop, testBench } from './design.js';
@@ -20,6 +20,9 @@ import { openWizardModule, wizardProcessOf } from './wizard-modules.js';
 import { openEmulator, openSchematic, openTechSchematic, runSimulation } from './viewers.js';
 import { cProcesses, isC } from './c-source.js';
 import { openCModel } from './c-model.js';
+import { EXTRA_STEPS, FLOW_PROCS, IMPL_IDS, buildProcesses, toolOf } from './tool-descriptors.js';
+
+export { EXTRA_STEPS, IMPL_IDS } from './tool-descriptors.js';
 
 const $ = id => document.getElementById(id);
 
@@ -28,34 +31,13 @@ const STATUS_ICON = { ok: 'ok', warn: 'warn', err: 'err', running: 'running', st
 // The Design Summary can always be (re)opened from the Processes panel: whatever is selected, in both views
 const SUMMARY_PROC = { id: 'summary', label: 'Design Summary/Reports', ico: 'summary', run: () => openSummary() };
 // The Silinx toolchain (Toolchain Settings: "Silinx toolchain (no ISE)"): Synthesize,
-// Implement Design and Generate Programming File run Silinx's own flow on the server; the processes
-// that need Xilinx ISE are disabled (their tooltip says why).
+// Implement Design and Generate Programming File run Silinx's own flow on the server.
 // the project's synthesis tool (Design Properties: Silinx or XST), else Toolchain Settings' mode; never
 // in the single-file edition (no server: the Silinx toolchain runs on it)
 // (the browser edition: the Silinx toolchain, unless the project chose XST)
 export const openMode = () => openOnlyDevice(S.project?.device) || (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx');
-export const OPEN_SYNTH = 'Synthesize - Yosys';
-// (Back-annotate Pin Locations, View Technology Schematic and the simulation models are the Silinx toolchain's
-// own: the pads its placer chose, the netlist of its synthesis, its packed and its routed design, #120-#122;
-// none needs ISE any more, the mechanism stays for the processes to come)
-export const ISE_ONLY = new Set([]);
-const ISE_ONLY_TIP = 'Needs Xilinx ISE: not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings)';
-// what a family only the open toolchain implements does not have (the iCE40, #2295): nextpnr maps in its Place & Route,
-// its report gives the timing, and the simulation models, the views and the wizards of the UCF read Xilinx's cells
-const OPEN_ONLY_ABSENT = new Set(['map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech']);
-function forOpenMode(defs) {
-  const conv = p => {
-    if (p.id === 'synth-open') return null;   // Synthesize is the open synthesis already
-    if (OPEN_ONLY_ABSENT.has(p.id) && openOnlyDevice(S.project?.device)) return null;
-    const q = { ...p };
-    if (ISE_ONLY.has(p.id)) Object.assign(q, { disabled: true, title: ISE_ONLY_TIP });
-    if (p.id === 'synth') q.label = OPEN_SYNTH;
-    if (['synth', 'impl', 'bitgen'].includes(p.id)) q.title = 'Silinx toolchain (no ISE)';
-    if (p.children) q.children = p.children.map(conv).filter(Boolean);
-    return q;
-  };
-  return defs.map(conv).filter(Boolean);
-}
+/** The project's tool (its descriptor, web/js/tool-descriptors.js): what the process tree and the tasks are built from. */
+export const projectTool = () => toolOf(S.project?.device, openMode());
 // Tasks ▸ Implement: the top module's processes, whatever the Design pane has selected since (#1208)
 const implTop = () => { const d = document.documentElement.dataset; return d.layout === 'tasks' && d.task === 'impl'; };
 /** The item whose processes are shown and the view: the selection's, or in Implement the top module's. */
@@ -65,10 +47,6 @@ function procsShown() {
   return { sel: top ? { type: 'module', module: top, file: S.modules.find(m => m.name === top)?.file } : {}, view: 'impl' };
 }
 function processDefs(sel, view) {
-  const defs = processDefsAll(sel, view);
-  return openMode() ? forOpenMode(defs) : defs;
-}
-function processDefsAll(sel, view) {
   if (!S.project) return [];
   const defs = selectionProcesses(sel, view);
   return defs.some(p => p.id === 'summary') ? defs : [SUMMARY_PROC, ...defs.filter(p => p.id !== 'none')];
@@ -113,42 +91,23 @@ function selectionProcesses(sel, view) {
                      : { id: 'sch-open', label: 'View/Edit Schematic', ico: 'schematic', run: () => openSch(sel.sch) },
     ] : []),
     ...(sel.wizard ? [{ id: 'wiz-open', label: wizardProcessOf(sel.file), ico: 'template', run: () => openWizardModule(sel.file) }] : []),
-    SUMMARY_PROC,
-    constraintsProcs(mod),
-    { id: 'synth', label: 'Synthesize - XST', ico: 'process', onTop: 'synthesizes', run: () => runImpl(top, ['synth']), children: [
-      { id: 'rtl', label: 'View RTL Schematic', ico: 'schematic', run: () => openSchematic(mod) },
-      { id: 'tech', label: 'View Technology Schematic', ico: 'schematic', onTop: 'synthesizes', run: () => openTechSchematic(top) },
-      { id: 'check', label: 'Check Syntax', ico: 'process', run: () => checkSyntax(mod) },
-      ...(cp.length ? [] : [{ id: 'cmodel', label: 'View C Model', ico: 'process', run: () => openCModel(mod) }]),   // (#1530)
-      ...simModelProc({ id: 'postsynth', label: EXTRA_STEPS.postsynth, ico: 'process', onTop: 'synthesizes', run: () => generateSimModel(top, 'postsynth') }),
-    ] },
-    { id: 'synth-open', label: SYNTH_OPEN, ico: 'process', onTop: 'synthesizes', run: () => synthOpen(top) },
-    { id: 'impl', label: 'Implement Design', ico: 'process', onTop: 'implements', run: () => runImpl(top, ['synth', 'translate', 'map', 'par']), children: [
-      { id: 'translate', label: 'Translate', ico: 'process', onTop: 'implements', run: () => runImpl(top, ['synth', 'translate']), children: [
-        ...simModelProc({ id: 'posttrans', label: EXTRA_STEPS.posttrans, ico: 'process', onTop: 'implements', run: () => generateSimModel(top, 'posttrans') }),
-      ] },
-      { id: 'map', label: 'Map', ico: 'process', onTop: 'implements', run: () => runImpl(top, ['synth', 'translate', 'map']), children: [
-        ...simModelProc({ id: 'postmap', label: EXTRA_STEPS.postmap, ico: 'process', onTop: 'implements', run: () => generateSimModel(top, 'postmap') }),
-      ] },
-      { id: 'par', label: 'Place & Route', ico: 'process', onTop: 'implements', run: () => runImpl(top, ['synth', 'translate', 'map', 'par']), children: [
-        { id: 'trce', label: EXTRA_STEPS.trce, ico: 'process', onTop: 'implements', run: () => postParTiming(top) },
-        { id: 'xpwr', label: EXTRA_STEPS.xpwr, ico: 'process', onTop: 'implements', run: () => textPowerReport(top) },
-        ...simModelProc({ id: 'postpar', label: EXTRA_STEPS.postpar, ico: 'process', onTop: 'implements', run: () => generateSimModel(top, 'postpar') }),
-        { id: 'pin2ucf', label: EXTRA_STEPS.pin2ucf, ico: 'process', onTop: 'implements', run: () => backAnnotatePins(top) },
-        { id: 'fpgaview', label: EXTRA_STEPS.fpgaview, ico: 'chip', onTop: 'implements', run: () => openFpgaView(top) },
-      ] },
-    ] },
-    { id: 'bitgen', label: 'Generate Programming File', ico: 'process', onTop: 'implements', run: () => runImpl(top, ['synth', 'translate', 'map', 'par', 'bitgen']) },
-    emulateProcs(top, 'emulates'),
-    { id: 'config', label: 'Configure Target Device', ico: 'impact', run: () => openImpact(), children: [
-      { id: 'impact', label: 'Manage Configuration Project (iMPACT)', ico: 'impact', run: () => openImpact() },
-    ] },
+    ...buildProcesses(projectTool(), {
+      parts: { summary: SUMMARY_PROC, constraints: constraintsProcs(mod), emulate: emulateProcs(top, 'emulates') },
+      runFlow: steps => runImpl(top, steps),
+      actions: {
+        rtl: () => openSchematic(mod), tech: () => openTechSchematic(top), check: () => checkSyntax(mod),
+        ...(cp.length ? {} : { cmodel: () => openCModel(mod) }),   // (#1530)
+        ...simModelActions(top),
+        'synth-open': () => synthOpen(top), trce: () => postParTiming(top), xpwr: () => textPowerReport(top),
+        pin2ucf: () => backAnnotatePins(top), fpgaview: () => openFpgaView(top), config: () => openImpact(), impact: () => openImpact(),
+      },
+    }),
   ];
 }
 
 // a Generate Post-… Simulation Model process: the ISE style interface's only; the Tasks interface's Implement has none,
 // Simulate's model choice generates the one it needs (#1265, #490)
-const simModelProc = p => (globalThis.document?.documentElement.dataset.layout === 'tasks' ? [] : [p]);
+const simModelActions = top => (globalThis.document?.documentElement.dataset.layout === 'tasks' ? {} : Object.fromEntries(Object.keys(SIM_MODEL_NAMES).map(step => [step, () => generateSimModel(top, step)])));
 // the User Constraints group (Implement's, and Emulate's, #1204), of module `mod`
 const constraintsProcs = mod => ({ id: 'constraints', label: 'User Constraints', ico: 'procGroup', children: [
   { id: 'pins', label: 'I/O Pin Planning', ico: 'pins', run: () => openPinPlanner(mod) },
@@ -255,7 +214,7 @@ export function renderProcessTree(host, defs) {
 
 // Only the ISE implementation runs are exclusive (one build directory); simulation, check syntax,
 // schematics, editors and programming run in the browser or independently and stay available.
-const ISE_PROCS = ['synth', 'impl', 'translate', 'map', 'par', 'bitgen'];
+const ISE_PROCS = FLOW_PROCS;
 export async function runProcess(p) {
   if (S.busy && ISE_PROCS.includes(p.id)) { toast('An implementation is already running (use Stop to cancel it)', 'error'); return; }
   if (p.onTop && !await topConfirmed(p.label, p.onTop)) return;
@@ -386,14 +345,6 @@ async function cDiagnostics(path, info) {
 // build/silinx-status.json with a fingerprint of the sources + constraints, and restored when the
 // project is opened (marked out of date if the sources changed since). Older builds without that
 // file get their marks from ISE's reports and output files.
-export const IMPL_IDS = ['synth', 'translate', 'map', 'par', 'impl', 'bitgen', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'xpwr', 'trce', 'fpgaview'];
-// optional steps of the ISE flow: process label (ISE names) and what they produce
-export const EXTRA_STEPS = {
-  postsynth: 'Generate Post-Synthesis Simulation Model', posttrans: 'Generate Post-Translate Simulation Model',
-  postmap: 'Generate Post-Map Simulation Model', postpar: 'Generate Post-Place & Route Simulation Model',
-  pin2ucf: 'Back-annotate Pin Locations', xpwr: 'Generate Text Power Report', trce: 'Generate Post-Place & Route Static Timing',
-  fpgaview: 'View Implemented Design (FPGA)',
-};
 export const SIM_MODEL_NAMES = { postsynth: 'Post-Synthesis', posttrans: 'Post-Translate', postmap: 'Post-Map', postpar: 'Post-Place & Route' };
 const STATUS_FILE = 'build/silinx-status.json';
 
