@@ -36,6 +36,8 @@ import { pinCensus, renamePads } from './pins.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DB = path.join(HERE, '../../bitdb');
 const PART = process.env.PART || 'xc3s250ecp132-4';
+/** The XC3S1200E's long-line splitter tiles (#2483). */
+const SPLITTER = /^CLK[A-Z_]*_LL$/, SPLIT_WIRE = /_LL[A-Z]?_L[HV]\d+$/;
 const readJson = f => JSON.parse(/\.gz$/.test(f) ? zlib.gunzipSync(fs.readFileSync(f)).toString() : fs.readFileSync(f, 'utf8'));
 const lines = f => fs.readFileSync(f, 'utf8').split('\n').map(s => s.trim()).filter(Boolean);
 const tiles = readJson(path.join(DB, 's3e-tiles.json'));
@@ -160,7 +162,10 @@ if (cmd === 'observe') {
   }) : new Map();
   const r = joinTestDesigns({
     part: PART, joins, slicesOf, pinWire: (pos, pin) => pins.get(`${pos}.${pin}`)?.[0],
-    pipsOf: t => [...pipsOf(dbType(t)), ...(probed.get(t) || [])].filter(([a, b, f]) => !(f & PIP_BIDI)),
+    // (SPLITTERS=1, #2483: a long-line splitter's PIPs between its long-line wires too, every one taken as bidirectional (the database lists the two
+    // directions as two PIPs), so out of the tested wire only; the verdicts then come from ISE's bitgen, splitters.mjs)
+    pipsOf: t => process.env.SPLITTERS === '1' && SPLITTER.test(dbType(t)) ? [...pipsOf(dbType(t)), ...(probed.get(t) || [])].map(([a, b, f]) => [a, b, SPLIT_WIRE.test(a) && SPLIT_WIRE.test(b) ? f | PIP_BIDI : f & ~PIP_BIDI]).filter(([a, b, f]) => (f & PIP_BIDI) || !(SPLIT_WIRE.test(a) || SPLIT_WIRE.test(b)))
+      : [...pipsOf(dbType(t)), ...(probed.get(t) || [])].filter(([a, b, f]) => !(f & PIP_BIDI)),
     joined: k => joinedTo.get(k) || [], nodeOf: k => (root.has(k) ? members.get(root.get(k)) : [k]),
     maxJoins, maxDepth: +(process.env.MAXDEPTH ?? 3), sourcesOf: t => extra.get(t) || [],
     maxTests: +(process.env.MAXTESTS ?? 1000),   // (#2178: ISE's DRC errs in designs of thousands of tests)

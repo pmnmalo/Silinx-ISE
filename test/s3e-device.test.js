@@ -1242,3 +1242,105 @@ test('measure random, round, verdicts: the random designs of a part\'s CLBs; eac
   assert.deepEqual(roundSummary([['c', 'd', 'no-join'], ['e', 'f', 'not-run']]), { join: 0, island: 1, other: 1, again: false });
   assert.deepEqual(roundSummary([]), { join: 0, island: 0, other: 0, again: false });
 });
+
+test('join tests: a bidirectional PIP only out of the tested wire, written `=-`, never on a path (#2483: the splitters)', () => {
+  // the CLB drives LV0; the splitter's only PIP joins its two ends both ways. A path to CLKH_LLT_LV0 through the
+  // splitter would begin at the other end, so it is untestable; the test of LV0 ~ CLKH_LLB_LV0 ends on the splitter
+  const pips = {
+    CLB_X10Y31: [['X0', 'OMUX3'], ['OMUX3', 'LV0']],
+    CLKH_LL_X10Y30: [['CLKH_LLB_LV0', 'CLKH_LLT_LV0', PIP_BIDI], ['CLKH_LLT_LV0', 'CLKH_LLB_LV0', PIP_BIDI]],
+  };
+  const slicesOf = t => t === 'CLB_X10Y31' ? [{ site: 'SLICE_X18Y62', pos: 0 }] : [];
+  const joins = [['CLB_X10Y31/LV0', 'CLKH_LL_X10Y30/CLKH_LLB_LV0'], ['CLKH_LL_X10Y30/CLKH_LLB_LV0', 'CLKH_LL_X10Y30/CLKH_LLT_LV0']];
+  const r = joinTestDesigns({ part: 'xc3s1200efg320-4', joins, slicesOf, pinWire: (pos, pin) => `${pin}${pos}`, pipsOf: t => pips[t] || [] });
+  assert.deepEqual(r.untestable, [joins[1]]);
+  assert.deepEqual(r.designs[0].tests, [{ net: 'h0', join: joins[0], bidi: ['CLKH_LL_X10Y30', 'CLKH_LLB_LV0', 'CLKH_LLT_LV0'] }]);
+  assert.match(r.designs[0].xdl, /pip CLB_X10Y31 OMUX3 -> LV0 ,\n {2}pip CLKH_LL_X10Y30 CLKH_LLB_LV0 =- CLKH_LLT_LV0 ,/);
+  // without the flag the same PIPs are one-way PIPs, and a test of the second join goes through the first
+  const plain = joinTestDesigns({ part: 'xc3s1200efg320-4', joins, slicesOf, pinWire: (pos, pin) => `${pin}${pos}`, pipsOf: t => (pips[t] || []).map(([a, b]) => [a, b]) });
+  assert.deepEqual(plain.designs[0].tests.map(t => t.bidi), [undefined]);
+  assert.doesNotMatch(plain.designs.map(d => d.xdl).join(''), /=-/);
+});
+
+test('splitters: the hypotheses, the direction bits ISE\'s bitgen set, and the verdicts read from them (#2483)', async () => {
+  const { splitterHypotheses, directionBit, splitterVerdicts, SPLITTER, SPLIT_WIRE, DRIVEN } = await import('../packages/silinx-fpga/research/s3e-device/splitters.mjs');
+  assert.ok(['CLKH_LL', 'CLKV_LL', 'CLKT_LL', 'CLKB_LL', 'CLKLH_DCM_LL', 'CLKRH_DCM_LL', 'CLKL_IOIS_LL', 'CLKR_IOIS_LL'].every(t => SPLITTER.test(t)));
+  assert.ok(!SPLITTER.test('LL') && !SPLITTER.test('CLKH'));
+  assert.ok(SPLIT_WIRE.test('CLKH_LLB_LV3') && SPLIT_WIRE.test('CLKV_LLR_LH12') && SPLIT_WIRE.test('CLKLH_LLT_LV0') && !SPLIT_WIRE.test('CLKV_E2BEG0'));
+  assert.ok(DRIVEN.test('LV0') && DRIVEN.test('LH18') && !DRIVEN.test('LV3') && !DRIVEN.test('LV180'));
+
+  // hypotheses: each splitter wire with the nearest wires of its node a switch box drives (a CLB's before an I/O tile's)
+  const wires = [['CLKH_LL_X10Y30', 'CLKH_LLT_LV0'], ['CLB_X10Y31', 'LV0'], ['CLB_X10Y40', 'LV0'], ['CLB_X10Y33', 'LV3'], ['TIOIS_X10Y61', 'LV0'],
+    ['CLKH_LL_X10Y30', 'CLKH_LLB_LV0'], ['CLB_X10Y29', 'LV0'], ['CLKH_LL_X10Y30', 'CLKV_E2BEG0']];
+  const node = new Map([['CLKH_LL_X10Y30/CLKH_LLT_LV0', 0], ['CLB_X10Y31/LV0', 0], ['CLB_X10Y40/LV0', 0], ['CLB_X10Y33/LV3', 0], ['TIOIS_X10Y61/LV0', 0],
+    ['CLKH_LL_X10Y30/CLKH_LLB_LV0', 1], ['CLB_X10Y29/LV0', 1]]);
+  const names = ['CLKH_LLB_LV0', 'CLKH_LLT_LV0', 'CLKV_E2BEG0'];
+  const dev = {
+    tileCount: 2, tileNames: ['CLKH_LL_X10Y30', 'CLB_X10Y31'], tileTemplate: [0, 1], names,
+    templates: [{ from: [0, 1, 2], to: [1, 0, 2], wires: [0, 1, 2] }, { from: [], to: [], wires: [] }],
+    node: (t, w) => node.get(`${t}/${w}`) ?? -1,
+    nodeWireIds: n => wires.map((w, i) => (node.get(w.join('/')) === n ? i : -1)).filter(i => i >= 0),
+    wireInfo: i => ({ tile: wires[i][0], name: wires[i][1] }),
+  };
+  assert.deepEqual(splitterHypotheses(dev), [
+    ['CLB_X10Y29/LV0', 'CLKH_LL_X10Y30/CLKH_LLB_LV0'],
+    ['CLB_X10Y31/LV0', 'CLKH_LL_X10Y30/CLKH_LLT_LV0'], ['CLB_X10Y40/LV0', 'CLKH_LL_X10Y30/CLKH_LLT_LV0'],
+  ]);
+  assert.deepEqual(splitterHypotheses(dev, 1).length, 2);
+
+  // the direction bit: each direction of a CLKH_LL splitter has its own bit in the XC3S1200E's database
+  const { loadDb } = await import('../packages/silinx-fpga/src/fpga/bitdb-node.js');
+  const { setBit } = await import('../packages/silinx-fpga/src/fpga/bitstream.js');
+  const { tileOf, tileBase, featureBits, parseBit } = await import('../packages/silinx-fpga/src/fpga/bitgen.js');
+  const db = loadDb('xc3s1200efg320-4'), fw = 125;
+  const bit = { frames: new Uint32Array(959 * fw), frameWords: fw };
+  const tile = 'CLKH_LL_X10Y30', t = tileOf(tile, db), base = tileBase(t, db);
+  for (const s of featureBits(db.types[t.type], 'CLKH_LLB_LV0->CLKH_LLT_LV0')) { const [df, b] = parseBit(s); setBit(bit.frames, fw, base.frame + df, base.bit + b, 1); }
+  assert.equal(directionBit(bit, db, tile, 'CLKH_LLB_LV0', 'CLKH_LLT_LV0'), 1);
+  assert.equal(directionBit(bit, db, tile, 'CLKH_LLT_LV0', 'CLKH_LLB_LV0'), 0);
+  assert.equal(directionBit(bit, db, tile, 'CLKH_LLB_LV0', 'NO_SUCH_WIRE'), null);
+  assert.equal(directionBit(bit, db, 'NO_TILE_X1Y1', 'CLKH_LLB_LV0', 'CLKH_LLT_LV0'), null);
+
+  // the verdicts: an island says neither end; the bit names the end the net drives
+  const join = ['CLB_X10Y31/LV0', `${tile}/CLKH_LLB_LV0`], bidi = [tile, 'CLKH_LLB_LV0', 'CLKH_LLT_LV0'];
+  assert.deepEqual(splitterVerdicts(join, bidi, 'join', 1, 0), [[join[0], `${tile}/CLKH_LLB_LV0`, 'join'], [join[0], `${tile}/CLKH_LLT_LV0`, 'no-join']]);
+  assert.deepEqual(splitterVerdicts(join, bidi, 'join', 0, 1), [[join[0], `${tile}/CLKH_LLB_LV0`, 'no-join'], [join[0], `${tile}/CLKH_LLT_LV0`, 'join']]);
+  assert.deepEqual(splitterVerdicts(join, bidi, 'no-join', 0, 0), [[join[0], `${tile}/CLKH_LLB_LV0`, 'no-join'], [join[0], `${tile}/CLKH_LLT_LV0`, 'no-join']]);
+  // both bits or neither (the net drove nothing through it), or a DRC message other than an island: unclear
+  assert.deepEqual(splitterVerdicts(join, bidi, 'join', 0, 0), [[...join, 'unclear']]);
+  assert.deepEqual(splitterVerdicts(join, bidi, 'join', 1, 1), [[...join, 'unclear']]);
+  assert.deepEqual(splitterVerdicts(join, bidi, 'join', null, null), [[...join, 'unclear']]);
+  assert.deepEqual(splitterVerdicts(join, bidi, 'unclear', 1, 0), [[...join, 'unclear']]);
+  assert.deepEqual(splitterVerdicts(join, bidi, 'not-run', 1, 0), [[...join, 'not-run']]);
+});
+
+test('oracle: bitgen for the splitters\' direction tests (-b), its .bit brought back and never kept elsewhere (#2483)', () => {
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../packages/silinx-fpga/research/s3e-device');
+  const oracle = fs.readFileSync(path.join(dir, 'oracle.sh'), 'utf8'), remote = fs.readFileSync(path.join(dir, 'ise-remote.sh'), 'utf8');
+  assert.match(oracle, /getopts "P:rfb"/);
+  assert.match(oracle, /\[ "\$BIT" = 1 \] && bitgen -w -d -g CRC:Disable "\$b\.ncd" "\$b\.bit"/);
+  assert.match(oracle, /export ROUTE FORCE BIT/);
+  // both fetches (the normal one and the one after a lost connection) bring the .bit back
+  assert.equal(remote.match(/--include='\*\.bit'/g).length, 2);
+});
+
+test('the XC3S1200E\'s measurements: the splitters from ISE\'s bitgen round alone, every joined end in a description with no such split (#2483)', async () => {
+  const { SPLITTER, SPLIT_WIRE } = await import('../packages/silinx-fpga/research/s3e-device/splitters.mjs');
+  const dir = dataDir('xc3s1200e'), gz = f => JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(dir, f))).toString());
+  const isSplit = k => { const [t, w] = k.split('/'); return SPLITTER.test(tileXY(t)?.prefix || '') && SPLIT_WIRE.test(w); };
+  // the observation holds no join of a splitter's wire: it could not tell the halves apart
+  const obs = gz('obs.json.gz');
+  assert.equal([...obs.joins, ...obs.decided].filter(([a, b]) => isSplit(a) || isSplit(b)).length, 0);
+  const v = gz('verdicts.json.gz');
+  const counts = {};
+  for (const [, , x] of v.sp) counts[x] = (counts[x] || 0) + 1;
+  assert.deepEqual(counts, { join: 9785, 'no-join': 9748 });   // none unclear, none not run
+  // the two ends of one PIP are never joined to one half, and the description joins each measured end to its half
+  const M = loadDevice(gz('measured.json.gz'));
+  const node = k => { const [t, w] = k.split('/'); return M.node(t, w); };
+  const joined = v.sp.filter(x => x[2] === 'join' && isSplit(x[1]));
+  assert.ok(joined.length > 9000);
+  for (const [a, b] of joined) assert.equal(node(a), node(b), `${a} ~ ${b}`);
+  const ends = v.sp.filter(x => isSplit(x[1]));
+  for (const [a, b, x] of ends) if (x === 'no-join') assert.notEqual(node(a), node(b), `${a} !~ ${b}`);
+});
