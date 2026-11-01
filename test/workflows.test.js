@@ -159,6 +159,8 @@ test('workflows: the weekly comparison\'s results pushed from GitHub\'s runner, 
   assert.match(compare, /- if: always\(\)\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: quality-results\n\s+path: \|\n\s+test\/designs-corpus\/ise-comparison\.json\n\s+docs\/QUALITY\.md/);
   for (const f of ['test/designs-corpus/ise-comparison.json', 'docs/QUALITY.md']) assert.match(publish, new RegExp(`git add .*${f.replace(/[./]/g, '\\$&')}`), f);
   assert.match(compare, /compare-ise\.mjs .* --guard/);
+  // #2498: the comparison passed 15 hours (14h13m on 2026-10-25)
+  assert.match(compare, /^ {4}timeout-minutes: 1200$/m);
 });
 
 /** The run: scripts of a workflow: [{ line, script }] (one line, or a block | / >). */

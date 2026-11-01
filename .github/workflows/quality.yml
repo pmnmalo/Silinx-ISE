@@ -32,7 +32,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'pmnmalo/Silinx-ISE' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, ise]
-    timeout-minutes: 900
+    # the comparison took 14h13m on 2026-10-25 and passed 15 hours on 2026-10-31 (#2498); the runner's window does
+    # not close while a job runs (scripts/ise-runner/window.mjs)
+    timeout-minutes: 1200
     permissions:
       contents: read
     env:
