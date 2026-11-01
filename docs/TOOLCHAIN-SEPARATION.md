@@ -306,5 +306,5 @@ implemented as the Spartan-3E is. nextpnr comes through one hook, `io.nextpnr`, 
 the back end's (#2384): its format and its file (XDL, `open/routed.xdl`, for the Xilinx families), read again from an earlier
 run by the steps that need it. The constraints reach the back ends as one model, in the back end's format (#2385,
 `constraints.js`). The synthesis is the back end's too (#2386): `synth_xilinx` and its mappings for the Xilinx families, a
-Yosys script of its own for another (`synth-script.js`); the steps are the back end's list (#2387). Still to come: the fake
-family in the browser's worker (#2388), then iCE40 (#2295).
+Yosys script of its own for another (`synth-script.js`); the steps are the back end's list (#2387). A fake family runs in Node
+and in the browser's worker (#2388). Next: iCE40 (#2295).

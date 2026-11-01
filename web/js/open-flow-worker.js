@@ -11,6 +11,7 @@
 import { runOpenFlow } from '/core/flow-ide.js';
 import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, nextpnrIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
+import { workerIo } from './open-flow-worker-io.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
 import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES, NEXTPNR_FILES, nextpnrChipdb } from './asset-cache.js';
 
@@ -131,30 +132,9 @@ self.onmessage = async ({ data }) => {
       }
       return inThread(args, yfiles, onLine);
     }, { parallel: pool ? pool.parallel : 1 });
-    const store = { ...(files || {}) };
-    const io = {
-      log: line => post({ line }),
-      sources: () => sources,
-      simSources: () => simSources,
-      ucf, ucfName,
-      device: () => device,
-      bitDb: () => db,
-      yosys,
+    const { io, store } = workerIo({ post, sources, simSources, ucf, ucfName, files, device: () => device, bitDb: () => db, yosys,
       // (the nextpnr engine's, #2136: its bundle and the device's chip database fetched on its first use, then kept by the cache)
-      nextpnr: spec.engine && spec.engine !== 'silinx' ? { spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post) } : null,
-      write: (name, d) => {
-        const path = `build/${name}`;
-        store[name] = d;
-        post({ write: path, data: d });
-        return path;
-      },
-      read: name => {
-        if (store[name] !== undefined) return typeof store[name] === 'string' ? store[name] : null;
-        const k = Object.keys(store).find(x => x.toLowerCase() === name.toLowerCase());   // (a VHDL top: lower case, #31)
-        return k && typeof store[k] === 'string' ? store[k] : null;
-      },
-      save: report => post({ report: JSON.parse(JSON.stringify(report)) }),
-    };
+      nextpnr: spec.engine && spec.engine !== 'silinx' ? { spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post) } : null });
     const res = await runOpenFlow(spec, io);
     // the FPGA view's model, from the routed design
     let view = null;
