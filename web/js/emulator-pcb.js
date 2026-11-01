@@ -40,3 +40,18 @@ export function boardFrame({ h, W, H, art, board, title, clockNote }) {
   noMenu(wrap);
   return { pcb, put, wrap };
 }
+
+// text on the board (its silkscreen, a chip's marking), upright or turned a quarter left
+export const svgText = (x, y, t, { size = 9, anchor = 'middle', weight = 'bold', fill = '#eef3ec', rotate = false, family = 'Arial' } = {}) =>
+  `<text x="${x}" y="${y}" fill="${fill}" font-size="${size}" text-anchor="${anchor}" font-family="${family}" font-weight="${weight}"${rotate ? ` transform="rotate(-90 ${x} ${y})"` : ''}>${esc(t)}</text>`;
+// a chip seen from above, its marking in lines
+export const ic = (x, y, w, hgt, lines = [], size = 8) => `<rect x="${x}" y="${y}" width="${w}" height="${hgt}" rx="2" fill="#141414" stroke="#2c2c2c"/>`
+  + lines.map((t, i) => svgText(x + w / 2, y + hgt / 2 + (i - (lines.length - 1) / 2) * (size + 3) + 3, t, { size, fill: i ? '#a9a9a9' : '#d6d6d6', weight: i ? 'normal' : 'bold' })).join('');
+// the upright power switch (ON up), for the boards that have one; its LED placed by the board's own style
+export const POWER_V_CSS = `
+.emu-power-v { flex-direction: column; gap: 0; position: relative; }
+.emu-power-v .emu-power-sw { width: 16px; height: 36px; }
+.emu-power-v .emu-power-sw::after { left: 1px; right: 1px; width: auto; top: auto; bottom: 2px; height: 15px; transition: bottom .08s; }
+.emu-power-v.on .emu-power-sw::after { left: 1px; bottom: 17px; }
+.emu-power-v .emu-power-led { position: absolute; }
+`;
