@@ -1,11 +1,15 @@
 // Silinx toolchain - the flow's back ends, one per family (#2360): what runFlow (open-flow-core.js) asks of a family, so
-// that it names none. A back end is { id, mount(ctx), synth?, xstNames? }:
+// that it names none. A back end is { id, mount(ctx), synth?, synthName?, constraints? }:
 //   mount(ctx)   -> { runMap, runPar, runTiming, runPins, runPower, bitfile(name, startupClk), runFpgaView?, packed?,
 //                   routedOrEarlier?, routedText? }: the family's steps, with its engines; ctx: runFlow's (its getters:
 //                   netlist, netlistText). The routed design is the back end's (#2384): its format, its file, an earlier
 //                   run's read again by the steps that need it; routedOrEarlier and routedText give it to the simulation models
-//   synth        the synthesis, as synth-open.js synthesizeVerilog (its signature and result), which it is when not given
-//   xstNames     the synthesis's report names its lines as XST does, not as the MAP report
+//   synth        the synthesis, as synth-open.js synthesizeVerilog (its signature and result): the Xilinx families' that,
+//                another family's its own Yosys script (synth-script.js scriptSynthesis, #2386); when not given, Yosys's
+//                generic synth into its generic cells
+//   synthName(id, resource)  the name of a resource's line in the synthesis's report (resource: resources.js's entry of the
+//                part, or undefined): the Spartan-3E's as XST names them; when not given, the resource's report name
+//   constraints  the constraints' format (constraints.js, #2385): UCF when not given
 // A family not registered is implemented as the Spartan-3E is, with the names of its MAP report: the families only ISE
 // implements fail there, as they did, at the device they have no description of.
 import { analyzeTiming, checkSwitching } from './fpga/timing.js';
@@ -18,6 +22,8 @@ import { mountS3eSteps } from './open-flow-s3e.js';
 import { mountS6Steps } from './open-flow-s6.js';
 import { mountNextpnrSteps } from './open-flow-nextpnr.js';
 import { mountNextpnrS6 } from './open-flow-nextpnr-s6.js';
+import { synthesizeVerilog } from './synth-open.js';
+import { scriptSynthesis } from './synth-script.js';
 
 const S3E_REPORTS = {
   analyze: analyzeTiming,
@@ -99,9 +105,17 @@ function mountS6(base) {
     ...mountFlowReports({ ...ctx, reports: S6_REPORTS }) };
 }
 
-const SPARTAN3E = { id: 'spartan3e', mount: mountS3e, xstNames: true };
-const OTHER = { id: 'other', mount: mountS3e };
-const backends = new Map([['spartan3e', SPARTAN3E], ['spartan6', { id: 'spartan6', mount: mountS6 }]]);
+// the synthesis's report: its lines as XST names them (the Spartan-3E's), else as the MAP report does (the part's resources)
+const XST_NAMES = { luts: 'Number of 4 input LUTs', ffs: 'Number of Slice Flip Flops', ramb16: 'Number of RAMB16s', mult18x18: 'Number of MULT18X18SIOs', bufgmux: 'Number of GCLKs', dcm: 'Number of DCMs', iob: 'Number of IOs' };
+const xstName = id => XST_NAMES[id] || id;
+const mapName = (id, resource) => resource?.report || XST_NAMES[id] || id;
+
+const SPARTAN3E = { id: 'spartan3e', mount: mountS3e, synth: synthesizeVerilog, synthName: xstName };
+const OTHER = { id: 'other', mount: mountS3e, synth: synthesizeVerilog, synthName: mapName };
+const backends = new Map([['spartan3e', SPARTAN3E], ['spartan6', { id: 'spartan6', mount: mountS6, synth: synthesizeVerilog, synthName: mapName }]]);
+// a registered back end's synthesis and report names when it gives none: Yosys's generic synth, its resources' names
+const GENERIC_SYNTH = scriptSynthesis({ script: top => `synth -flatten -top ${top}` });
+const ownName = (id, resource) => resource?.report || id;
 
 /** The back end of a family. */
 export const backendOf = family => backends.get(family) || OTHER;
@@ -110,6 +124,6 @@ export const backendOf = family => backends.get(family) || OTHER;
 export function registerBackend(backend) {
   if (typeof backend?.mount !== 'function' || !backend.id) throw new Error('a back end needs an id and mount(ctx)');
   if (backends.has(backend.id)) throw new Error(`the family ${backend.id} has its back end`);
-  backends.set(backend.id, backend);
+  backends.set(backend.id, { synth: GENERIC_SYNTH, synthName: ownName, ...backend });
   return () => backends.delete(backend.id);
 }

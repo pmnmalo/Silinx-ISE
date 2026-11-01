@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
 // The flow's back ends (#2360): runFlow names no family and no engine; a family is added by registering its back end,
 // which runs through the orchestrator with its own steps; the families' back ends are the ones they were.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { runFlow, backendOf, registerBackend } from '../packages/silinx-fpga/src/index.js';
+import { synthesizeVerilog } from '../packages/silinx-fpga/src/synth-open.js';
 
 const SYNTH = { top: 'top', files: { 'top.json': '{"modules":{"top":{"ports":{},"cells":{},"netnames":{}}}}', 'top_stat.txt': 'cells 0' }, util: { cells: 0 }, warnings: [] };
 function memoryIo(over = {}) {
@@ -117,7 +117,7 @@ test('#2385 constraints its format cannot read fail at translate, with the forma
 
 test('#2385 the orchestrator and the reports do not parse UCF', () => {
   for (const f of ['open-flow-core.js', 'open-flow-reports.js', 'open-flow-nextpnr.js', 'open-flow-nextpnr-s6.js', 'open-flow-s3e.js', 'open-flow-s6.js']) {
-    assert.doesNotMatch(readFileSync(new URL(`../packages/silinx-fpga/src/${f}`, import.meta.url), 'utf8'), /parseUcf|ucfText/, f);
+    assert.doesNotMatch(fs.readFileSync(new URL(`../packages/silinx-fpga/src/${f}`, import.meta.url), 'utf8'), /parseUcf|ucfText/, f);
   }
 });
 
@@ -133,16 +133,21 @@ test('#2360 a back end\'s step that fails: the flow reports it as any step, with
 });
 
 test('#2360 the registry: the two families, the others implemented as the Spartan-3E with their MAP report\'s names, bad back ends refused', () => {
-  assert.equal(backendOf('spartan3e').xstNames, true);
+  const lut = { id: 'luts', report: 'Number of Slice LUTs' };
+  assert.equal(backendOf('spartan3e').synthName('luts', lut), 'Number of 4 input LUTs');
   assert.equal(backendOf('spartan6').id, 'spartan6');
+  assert.equal(backendOf('spartan6').synthName('luts', lut), 'Number of Slice LUTs');
+  assert.equal(backendOf('spartan6').synthName('ramb16', undefined), 'Number of RAMB16s');
   assert.equal(backendOf('spartan3a').mount, backendOf('spartan3e').mount);
-  assert.ok(!backendOf('spartan3a').xstNames);
-  assert.ok(!backendOf(undefined).xstNames);
+  assert.equal(backendOf('spartan3a').synthName('luts', lut), 'Number of Slice LUTs');
+  assert.equal(backendOf(undefined).synthName('luts', lut), 'Number of Slice LUTs');
+  // (#2386: the Xilinx families' synthesis is synth-open.js's, synth_xilinx and its mappings)
+  for (const f of ['spartan3e', 'spartan6', 'spartan3a']) assert.equal(backendOf(f).synth, synthesizeVerilog, f);
   assert.throws(() => registerBackend({ id: 'x' }), /mount/);
   assert.throws(() => registerBackend({ id: 'spartan6', mount() {} }), /has its back end/);
 });
 
-test('#2360 #2384 the orchestrator names no family, no engine and no routed design\'s format', () => {
+test('#2360 #2384 #2386 the orchestrator names no family, no engine, no routed design\'s format and no family\'s synthesis', () => {
   const code = fs.readFileSync(new URL('../packages/silinx-fpga/src/open-flow-core.js', import.meta.url), 'utf8').split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).map(l => l.replace(/\s\/\/ .*$/, '')).join('\n');
-  assert.deepEqual(code.match(/spartan\w*|nextpnr|mountS6|\bs6\b|spec\.engine|spec\.family\s*[!=]=|xdl|routed\.\w+/gi) || [], []);
+  assert.deepEqual(code.match(/spartan\w*|nextpnr|mountS6|\bs6\b|spec\.engine|spec\.family\s*[!=]=|xdl|routed\.\w+|synthesizeVerilog|synth_xilinx|xstNames|Number of 4 input/gi) || [], []);
 });

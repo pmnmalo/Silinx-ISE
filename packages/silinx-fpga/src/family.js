@@ -43,7 +43,7 @@ export const familyName = f => FAMILY_INFO[f]?.name || f || 'unknown family';
 export const isSpartan3Like = f => /^spartan3/.test(f || '');
 export const familyFromXise = text => {
   const t = String(text || '').toLowerCase().replace(/[\s-]/g, '');
-  for (const [id, fi] of Object.entries(FAMILY_INFO)) if (fi.xise.toLowerCase().replace(/[\s-]/g, '') === t || fi.pm === t) return id;
+  for (const [id, fi] of Object.entries(FAMILY_INFO)) if (fi.xise?.toLowerCase().replace(/[\s-]/g, '') === t || (fi.pm && fi.pm === t)) return id;
   if (/spartan3a/.test(t)) return 'spartan3a';
   return null;
 };
