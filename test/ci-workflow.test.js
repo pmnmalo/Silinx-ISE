@@ -53,7 +53,8 @@ test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v
   assert.match(ui, /^ {10}PART: \$\{\{ matrix\.part \}\}\n {10}CHROME_PATH: \/usr\/bin\/google-chrome\n {10}SILINX_UI_INTERFACE: \$\{\{ matrix\.interface == 'ise' && 'ise' \|\| '' \}\}$/m);
   assert.match(ui, /- if: always\(\)\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: ui-times-\$\{\{ matrix\.interface \}\}-\$\{\{ matrix\.part \}\}\n\s+path: test-times\.json\n/);
   assert.doesNotMatch(ui, /npm run test:ui/, 'the parts, not every file');
-  assert.match(ui, /^ {8}timeout-minutes: 25$/m);
+  assert.match(ui, /^ {8}timeout-minutes: 40$/m, 'a part takes up to 25 minutes on a slow runner (#2462)');
+  assert.match(ui, /^    timeout-minutes: 45$/m, 'the job holds the step and its setup');
   // Firefox and WebKit, one after the other (#1126)
   const br = j.browsers.join('\n');
   assert.match(br, /^ {4}timeout-minutes: 60$/m);
