@@ -42,19 +42,22 @@ export function cToHdl(source, opts = {}) {
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...checked.diagnostics] };
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
   const axi = axiPlan(checked.funcs.get(checked.top), checked.consts);
+  // (AXI4-Stream ports around the module, #1894: none for a DATAFLOW process's, nor for the ASM chart's, core/c-asm.js;
+  // around the AXI interfaces' module too, #1706)
+  const names = axis && !module && !flat ? axisArgs(checked, file) : new Map();
+  const side = () => new Set((checked.ast.structArgs?.get(checked.top) || []).filter((a) => a.axis).map((a) => a.name));
   if (axi && !module) {
     const name = portOf(checked.top);
-    const gen = fromChecked(source, checked, { ...opts, module: `${name}_core`, stall: axi.masters.size > 0 });
-    return gen.ok ? axiWrap(gen, axi, { name, src: file.split('/').pop(), lang, file }) : gen;
+    const gen = fromChecked(source, checked, { ...opts, module: `${name}_core`, stall: axi.masters.size > 0, taken: new Set([...axi.masters].flatMap(([p, m]) => [p, m.of])) });
+    const wrapped = gen.ok ? axiWrap(gen, axi, { name: names.size ? `${name}_axi` : name, src: file.split('/').pop(), lang, file }) : gen;
+    return wrapped.ok && names.size ? axisTop(wrapped, names, lang, side()) : wrapped;
   }
-  // (AXI4-Stream ports around the module, #1894: none for a DATAFLOW process's, nor for the ASM chart's, core/c-asm.js)
-  const names = axis && !module && !flat ? axisArgs(checked, file) : new Map();
   if (!names.size) return fromChecked(source, checked, opts);
-  const gen = fromChecked(source, checked, { ...opts, module: `${portOf(checked.top)}_core` });
-  return gen.ok ? axisTop(gen, names, lang, new Set((checked.ast.structArgs?.get(checked.top) || []).filter((a) => a.axis).map((a) => a.name))) : gen;
+  const gen = fromChecked(source, checked, { ...opts, module: `${portOf(checked.top)}_core`, taken: new Set() });
+  return gen.ok ? axisTop(gen, names, lang, side()) : gen;
 }
 
-function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null } = {}) {
+function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null, taken = null } = {}) {
   const diagnostics = [...checked.diagnostics];
   // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903)
   const bbs = loadBlackboxes(blackboxes, headers);
@@ -84,7 +87,7 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   // #pragma HLS DATAFLOW: the top's calls processes of their own (#1707); a region not of calls, sequential (said); one
   // with streams of its own cannot be (said, #1931)
   if (checked.dataflow) {
-    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module, stall });
+    const r = cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module, stall, flat, taken });
     if (!r.fallback) return r;
     if (hasStreams(checked.funcs.get(checked.top))) {
       const why = { ...r.fallback, severity: 'error', message: r.fallback.message.replace(/: made sequential \(not as processes\)$/, ': its streams are FIFOs between processes, so it cannot be made sequential') };

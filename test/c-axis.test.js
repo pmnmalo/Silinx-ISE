@@ -227,7 +227,7 @@ int main() { int x[4] = {1, 2, 3, 4}, y[4]; f(x, y); return y[0] == 4 && y[3] ==
   assert.deepEqual(msgs(cToHdl('int f(int a) {\n#pragma HLS INTERFACE axis port=a\n  return a + 1;\n}\n', { file: 'u.cpp' })), ['2 warning: #pragma HLS INTERFACE axis port=a is not made yet: ignored (its default interface made)']);
 });
 
-test('#1894 DATAFLOW\'s processes keep their ap_fifo ports, said; a C check of a stream says nothing', () => {
+test('#1706 a DATAFLOW top\'s axis stream AXI4-Stream ports, its processes\' FIFOs under them (they were kept ap_fifo, #1894), nothing said', () => {
   const src = `#include "hls_stream.h"
 void p(hls::stream<int> &a, hls::stream<int> &c) { c.write(a.read() + 1); }
 void q(hls::stream<int> &c, hls::stream<int> &b) { b.write(c.read() * 2); }
@@ -241,8 +241,8 @@ void f(hls::stream<int> &a, hls::stream<int> &b) {
 `;
   const g = cToHdl(src, { file: 'u.cpp', top: 'f' });
   assert.equal(g.ok, true);
-  assert.ok(names(g).includes('a_dout:32') && names(g).includes('ap_rst:1'), String(names(g)));
-  assert.ok(msgs(g).some((m) => m === '5 warning: #pragma HLS INTERFACE axis port=a is not made yet: ignored (its default interface made)'), String(msgs(g)));
+  assert.ok(names(g).includes('a_TDATA:32') && names(g).includes('ap_rst_n:1') && !names(g).includes('a_dout:32'), String(names(g)));
+  assert.ok(!msgs(g).some((m) => /INTERFACE axis/.test(m)), String(msgs(g)));
 });
 
 test('#1894 the ASM chart of an axis design: the state machine\'s ap_fifo ports, active-high reset', () => {
