@@ -76,13 +76,13 @@ test('silinx-fpga: Apache-2.0 (LICENSE, package.json), its NOTICE, its dependenc
   const notice = fs.readFileSync(path.join(pkg, 'NOTICE'), 'utf8');
   assert.match(notice, /^silinx-fpga\nCopyright 2026 Pedro Maló\n/);
   assert.match(notice, /Apache License, Version 2\.0[\s\S]*bitdb\/[\s\S]*devices\//);
-  assert.match(notice, /Yosys \(YoWASP, ISC\)[\s\S]*nextpnr-spartan, ISC[\s\S]*THIRD-PARTY-NOTICES\.md/);
+  assert.match(notice, /Yosys \(YoWASP, ISC\)[\s\S]*nextpnr-spartan, ISC[\s\S]*nextpnr-ice40[\s\S]*THIRD-PARTY-NOTICES\.md/);
   assert.match(notice, /not affiliated with or endorsed by AMD\/Xilinx/);
   // the components are its dependencies', each with its licence text
   const md = fs.readFileSync(path.join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8');
   assert.match(md, /^# Third-party notices\n\nsilinx-fpga \(Copyright 2026 Pedro Maló, Apache-2\.0\)/);
   const listed = [...md.matchAll(/^## (\S+) (\S+) — (\S+)$/gm)].map(m => m[1]);
-  assert.deepEqual(listed, Object.keys(json.dependencies).sort());
+  assert.deepEqual(listed, Object.keys({ ...json.dependencies, ...json.peerDependencies }).sort());   // (an optional peer's: the iCE40's, #2295)
   for (const name of listed) {
     const sec = new RegExp(`## ${name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} [^\\n]*\\n\\n[^\\n]*\\n\\n\`\`\`text\\n([\\s\\S]*?)\\n\`\`\``).exec(md);
     assert.ok(sec && sec[1].length > 200 && !/no licence file/.test(sec[1]), `${name}: the licence text`);

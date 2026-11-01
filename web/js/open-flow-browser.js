@@ -9,7 +9,8 @@ import { blackboxesIn } from '/core/c-blackbox.js';
 import { compile } from '/core/compile.js';
 import { synthEffort } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
-import { OPEN_STEPS, engineOf, orderOpenSteps } from '/packages/silinx-fpga/src/parts.js';
+import { OPEN_STEPS, engineOf, orderOpenSteps, orderSteps, deviceFamily } from '/packages/silinx-fpga/src/parts.js';
+import { ICE40_PARTS, ICE40_STEPS } from '/packages/silinx-fpga/src/index.js';
 
 // the devices whose device description and bit database are published (packages/silinx-fpga/devices,
 // packages/silinx-fpga/bitdb): device/package -> the description's file
@@ -25,7 +26,7 @@ export const BROWSER_DEVICES = {
 // versions with the same Yosys: ../vendor/yowasp-yosys/<its version>/gen/bundle.js), and the site the
 // page opened from a file fetches them from (the site keeps the older releases' folders, so that a
 // downloaded Silinx-ISE.html keeps the assets it was tested with). Unbuilt (tests): the folder itself.
-const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx-ISE/' };
+const LAYOUT = globalThis.SILINX_ASSET_LAYOUT || { dir: '', yosys: 'vendor/yowasp-yosys/gen/bundle.js', nextpnr: 'vendor/nextpnr-spartan/gen/bundle.js', nextpnrIce40: 'vendor/nextpnr-ice40/gen/bundle.js', site: 'https://pmnmalo.github.io/Silinx-ISE/' };
 // (and each asset's SHA-256, checked by the cache, web/js/asset-cache.js #1237: here, in the flow worker's messages
 // and in the Yosys workers' code)
 if (LAYOUT.integrity) globalThis.SILINX_ASSET_INTEGRITY ||= LAYOUT.integrity;
@@ -51,6 +52,13 @@ export function browserOpenStatus(device = {}) {
   const speed = String(device.speed || '-4').replace(/^(?!-)/, '-');
   const part = `${dev}${pkg}${speed}`;
   const list = Object.keys(BROWSER_DEVICES).map(k => k.replace('/', ' ')).join(', ');
+  // (the iCE40, #2295: where nextpnr-ice40 is served, not in the published editions yet)
+  if (deviceFamily(device) === 'ice40') {
+    const name = `${dev}${pkg}`;
+    if (!ICE40_PARTS.includes(dev.replace(/^ice40/, ''))) return { available: false, part: name, reason: `${dev}: not an iCE40 part of nextpnr-ice40` };
+    return LAYOUT.nextpnrIce40 ? { available: true, part: name, family: 'ice40', reason: `${name}: nextpnr-ice40 and icepack (in the browser)` }
+      : { available: false, part: name, reason: 'nextpnr-ice40 is not in this edition: use the local server' };
+  }
   if (String(device.family || 'spartan3e').toLowerCase() !== 'spartan3e' || !/^xc3s\d+e$/.test(dev)) {
     return { available: false, part, reason: `the Silinx toolchain supports the Spartan-3E only (${list}); other devices need Xilinx ISE, in the full application` };
   }
@@ -60,7 +68,12 @@ export function browserOpenStatus(device = {}) {
 
 const ALIASES = { implement: 'par', impl: 'par', synthesize: 'synth', xst: 'synth', ngdbuild: 'translate', place: 'par', route: 'par', timing: 'trce', bit: 'bitgen' };
 /** The steps of a run: the chain from synthesis to the last step asked for (packages/silinx-fpga/src/open-steps.js, as the server's openSteps). */
-export function browserSteps(steps, { synthUpToDate = false } = {}) {
+export function browserSteps(steps, { synthUpToDate = false, family = null } = {}) {
+  if (family === 'ice40') {
+    const asked = (Array.isArray(steps) ? steps : [steps]).filter(Boolean).map(s => ALIASES[String(s).toLowerCase()] || String(s).toLowerCase());
+    const list = orderSteps(ICE40_STEPS, asked);
+    return synthUpToDate && !asked.includes('synth') ? list.filter(s => s !== 'synth') : list;
+  }
   const set = new Set((Array.isArray(steps) ? steps : [steps]).filter(Boolean).map(s => ALIASES[String(s).toLowerCase()] || String(s).toLowerCase()));
   const bad = [...set].filter(s => !OPEN_STEPS.includes(s));
   if (bad.length) throw new Error(`not available in the Silinx toolchain (they need Xilinx ISE, in the full application): ${bad.join(', ')}`);
@@ -127,11 +140,12 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   if (!sources.length) throw new Error('the project has no design HDL files');
   const ucf = project.constraints && typeof files[project.constraints] === 'string' ? files[project.constraints] : null;
   // the port bits without a pin: on a board they would go to arbitrary pins (refused, as the server does)
-  const unplaced = await unconstrainedPorts(sources, top, ucf || '');
+  // (the iCE40's constraints are PCF: its back end says the ports without a pin, #2295)
+  const unplaced = st.family ? [] : await unconstrainedPorts(sources, top, ucf || '');
   if (unplaced.length && project.board) throw new Error(`${unplaced.length} top-level port bit(s) have no pin location (LOC) for the ${project.board} board: ${unplaced.slice(0, 12).map(u => u.net).join(', ')}${unplaced.length > 12 ? ', …' : ''}. Assign them in I/O Pin Planning (or remove the board in Design Properties).`);
   if (unplaced.length) onLine(`WARNING:Silinx - ${unplaced.length} port bit(s) have no LOC constraint (${unplaced.slice(0, 8).map(u => u.net).join(', ')}${unplaced.length > 8 ? ', …' : ''}): the Silinx toolchain chooses their pins - do NOT program real hardware with this bitstream`);
   const dev = String(project.device.part).toLowerCase(), pkg = String(project.device.package).toLowerCase();
-  const spec = { top, part: st.part, device: dev, pkg, family: 'spartan3e', graph: st.graph, steps: browserSteps(steps, { synthUpToDate: !!synthUpToDate }), seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), ...(resources && { resources }) };
+  const spec = { top, part: st.part, device: dev, pkg, family: st.family || 'spartan3e', graph: st.graph, steps: browserSteps(steps, { synthUpToDate: !!synthUpToDate, family: st.family }), seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), ...(resources && { resources }) };
   if (synthUpToDate && !spec.steps.includes('synth')) spec.synthUpToDate = synthUpToDate;
   // the test benches, for the post-synthesis model's generics (#120)
   const simSources = (project.files || []).filter(f => f.role === 'sim' && (f.lang === 'verilog' || f.lang === 'vhdl') && typeof files[f.path] === 'string')
@@ -154,7 +168,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
       fail: e => { end(); reject(e); },
     });
     signal?.addEventListener('abort', abort, { once: true });
-    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrIce40: st.family === 'ice40' ? new URL(LAYOUT.nextpnrIce40, assetsBase()).href : null, integrity: LAYOUT.integrity || null });
   });
 }
 
@@ -170,7 +184,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
 const prepared = new Set();
 export function prepareBrowserFlow(device = {}, impl = undefined) {
   const st = browserOpenStatus(device);
-  if (!st.available || prepared.has(st.graph) || globalThis.location?.protocol === 'file:' || !globalThis.isSecureContext || !globalThis.caches) return Promise.resolve(null);
+  if (!st.available || !st.graph || prepared.has(st.graph) || globalThis.location?.protocol === 'file:' || !globalThis.isSecureContext || !globalThis.caches) return Promise.resolve(null);
   prepared.add(st.graph);
   const w = getWorker(), id = ++runSeq;
   return new Promise(resolve => {
