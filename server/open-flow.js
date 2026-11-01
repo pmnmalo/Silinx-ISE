@@ -24,7 +24,7 @@ import fss from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deviceFamily, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
+import { deviceFamily, isIseFamily, backendOf, orderSteps, ICE40_PARTS, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
 import { findPart } from './devices.js';
 import { runCommand } from './jobs.js';
 import { safeJoin } from './projects.js';
@@ -82,6 +82,7 @@ export function flowHeapMb(totalBytes = os.totalmem(), nodeOptions = process.env
  */
 export function openStatus(device, { dbDir = BIT_DB_DIR } = {}) {
   const out = { available: false, reason: '', part: null, device: null, graph: null, shipped: false, bitDb: false, canBuild: false };
+  if (deviceFamily(device) === 'ice40') return { ...out, ...ice40Status(device) };
   let part;
   try { part = reportPart(device || {}); } catch (e) { out.reason = e.message; return out; }
   const dev = String(device.part).toLowerCase();
@@ -118,8 +119,24 @@ export function openStatus(device, { dbDir = BIT_DB_DIR } = {}) {
   return out;
 }
 
-/** Normalise the steps of an open run: the chain from synthesis to the last requested step. */
-export function openSteps(steps, { synthUpToDate = false } = {}) {
+// the iCE40 (#2295): nextpnr-ice40's part, and YoWASP's package installed (the release zip leaves it out)
+function ice40Status(device) {
+  const dev = String(device.part).toLowerCase(), pkg = String(device.package || '').toLowerCase(), part = `${dev}${pkg}`;
+  if (!ICE40_PARTS.includes(dev.replace(/^ice40/, ''))) return { part, device: dev, reason: `${dev}: not an iCE40 part of nextpnr-ice40 (ice40${ICE40_PARTS.join(', ice40')})` };
+  try { import.meta.resolve('@yowasp/nextpnr-ice40'); } catch {
+    return { part, device: dev, reason: 'nextpnr-ice40 is not in this installation: npm install @yowasp/nextpnr-ice40' };
+  }
+  return { part, device: dev, available: true, reason: `${part}: nextpnr-ice40 and icepack`, steps: backendOf('ice40').steps.map(s => s.id) };
+}
+
+/** Normalise the steps of an open run: the chain from synthesis to the last requested step; a family ISE does not
+ *  implement: its back end's list (#2295). */
+export function openSteps(steps, { synthUpToDate = false, family = null } = {}) {
+  if (family && !isIseFamily(family) && backendOf(family).id === family) {
+    const asked = [].concat(steps || []).map(s => String(s).toLowerCase());
+    const list = orderSteps(backendOf(family).steps, asked);
+    return synthUpToDate && !asked.includes('synth') ? list.filter(s => s !== 'synth') : list;
+  }
   const st = normalizeSteps(steps);
   const bad = st.filter(s => !OPEN_STEPS.includes(s));
   if (bad.length) throw Object.assign(new Error(`not available in the Silinx toolchain (they need Xilinx ISE): ${bad.join(', ')}. Choose an ISE mode in Toolchain Settings.`), { status: 400 });
@@ -132,7 +149,7 @@ export function openSteps(steps, { synthUpToDate = false } = {}) {
  * @param {object} o { project, projectDir, steps?, seed?, effort? }
  */
 export async function runOpenImplementation(job, { project, projectDir, steps, seed = 1, effort = 1, synthUpToDate = false }) {
-  const st = openSteps(steps, { synthUpToDate });
+  const st = openSteps(steps, { synthUpToDate, family: deviceFamily(project.device) });
   const status = openStatus(project.device || {});
   job.log(`Silinx implementation with the Silinx toolchain (no ISE): ${project.name} top=${project.top} device=${status.part || '?'}`);
   const result = { buildDir: path.join(projectDir, 'build'), steps: st, warnings: [], mode: 'silinx', reports: null, completedSteps: [], failedStep: null };
@@ -156,18 +173,18 @@ export async function runOpenImplementation(job, { project, projectDir, steps, s
   await fs.mkdir(outDir, { recursive: true });
   // the outputs of the previous run: they no longer match the design (and a failure must not leave
   // a bitstream behind)
-  for (const f of [`${gen.top}.bit`, `${gen.top}_prom.bit`, `${gen.top}_pins.ucf`]) await fs.rm(path.join(gen.buildDir, f), { force: true });
+  for (const f of [`${gen.top}.bit`, `${gen.top}.bin`, `${gen.top}_prom.bit`, `${gen.top}_pins.ucf`]) await fs.rm(path.join(gen.buildDir, f), { force: true });
   // (the synthesis up to date, #280: what the report of the run that made it said about it, kept)
   let earlier = null;
   if (!st.includes('synth')) {
     try { const r = JSON.parse(await fs.readFile(path.join(outDir, 'report.json'), 'utf8')); earlier = { synthesis: r.synthesis || null, files: { netlist: r.files?.netlist, synthesis: r.files?.synthesis } }; } catch { /* none */ }
   }
-  for (const f of ['placed.xdl', 'routed.xdl', 'timing.txt', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
+  for (const f of ['placed.xdl', 'routed.xdl', 'routed.asc', 'timing.txt', 'report.json', 'fpga-view.json']) await fs.rm(path.join(outDir, f), { force: true });
   const spec = {
     top: gen.top, part: status.part, device: status.device, family: deviceFamily(project.device) || 'spartan3e',
     pkg: String(project.device.package).toLowerCase(), graph: status.graph, bitDbDir: BIT_DB_DIR,
     sources: gen.sources.map(s => ({ path: s.path, lang: s.lang, file: path.join(gen.buildDir, s.buildPath) })),
-    ucf: gen.hasUcf ? path.join(gen.buildDir, `${gen.top}.ucf`) : null,
+    ucf: gen.hasUcf ? path.join(gen.buildDir, gen.constraintsFile || `${gen.top}.ucf`) : null,
     buildDir: gen.buildDir, outDir, steps: st, seed, effort, startupClk: project.impl?.startupClk || 'JtagClk', synthEffort: synthEffort(project.impl), engine: engineOf(project.impl),
     ...(!st.includes('synth') && { synthUpToDate: { report: earlier } }),
     // the part's resources: the synthesis's used of available and its check (#795)
@@ -217,7 +234,7 @@ export async function openReports(buildDir, top, device) {
   try { r = JSON.parse(await fs.readFile(path.join(buildDir, 'open', 'report.json'), 'utf8')); } catch { /* the flow wrote nothing */ }
   const out = { generatedAt: base.generatedAt, top, device: device || null, source: 'open',
     synthesis: r.synthesis || undefined, map: r.map || undefined, par: r.par || undefined, timing: r.timing || undefined,
-    bit: r.bit && base.bit ? base.bit : undefined, prom: r.prom || undefined,
+    bit: r.bit && (base.bit || (fss.existsSync(r.bit.path) ? r.bit : null)) || undefined,   // (the iCE40's .bin: no .bit header, #2295) prom: r.prom || undefined,
     pinsUcf: r.pinsUcf && base.pinsUcf ? base.pinsUcf : undefined, simModels: {}, files: r.files || {} };
   // the simulation models (#120, #121, #122): this run's, or an earlier run's still in build/ (as the ISE flow's);
   // the post-place & route model's timing beside it (its SDF)

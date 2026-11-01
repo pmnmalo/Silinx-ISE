@@ -28,7 +28,7 @@ updates:
     labels: [dependencies]
     groups:
       npm-minor-patch:
-        patterns: ['@codemirror/*', '@lezer/*', '@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6', express, elkjs, esbuild, playwright]
+        patterns: ['@codemirror/*', '@lezer/*', '@silinx/nextpnr-himbaechel-spartan3e', '@silinx/nextpnr-himbaechel-spartan6', '@yowasp/nextpnr-ice40', express, elkjs, esbuild, playwright]
         update-types: [minor, patch]
     # (no update ignored)
     # CodeMirror: on 6 since #349, its major updates no longer ignored

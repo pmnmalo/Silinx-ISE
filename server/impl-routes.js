@@ -9,6 +9,7 @@ import { getDeviceDb, resolveBoard } from './devices.js';
 import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig, loadConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
+import { deviceFamily } from '../packages/silinx-fpga/src/parts.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
@@ -51,7 +52,7 @@ export async function startImplementation(name, body = {}) {
   const open = choice ? ['silinx', 'open'].includes(choice) : (await loadConfig()).mode === 'silinx';
   // (the synthesis up to date, #280: the run starts at Translate from its netlist)
   const synthUpToDate = !!body.synthUpToDate;
-  if (open) { try { steps = openSteps(body.steps, { synthUpToDate }); } catch (e) { throw bad(e.message); } }
+  if (open) { try { steps = openSteps(body.steps, { synthUpToDate, family: deviceFamily(project.device) }); } catch (e) { throw bad(e.message); } }
   const job = open
     ? createJob('implement', j => runOpenImplementation(j, { project, projectDir, steps, synthUpToDate }), { meta: { project: name, steps, toolchain: 'silinx' } })
     : createJob('implement', j => runImplementation(j, { project, projectDir, steps, generateOnly: !!body.generateOnly }), { meta: { project: name, steps } });

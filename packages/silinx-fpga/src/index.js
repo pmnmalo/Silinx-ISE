@@ -20,6 +20,10 @@ export { synthesizeVerilog, synthEffort, cellCounts } from './synth-open.js';
 export { runYosysOnce, yosysWorkerSource, readableBlobs, asText } from './synth-open-yosys.js';
 // nextpnr's WebAssembly package as the flow's io.nextpnr (the nextpnr engine, #2136; in Node: node.js nextpnrNode)
 export { nextpnrIo } from './nextpnr-io.js';
+// the iCE40's nextpnr and icepack, YoWASP's package as io.nextpnr.ice40 (#2295; in Node: node.js nextpnrIce40Node)
+export { ice40Io } from './nextpnr-ice40-io.js';
+export { ICE40_PARTS, ICE40_STEPS } from './open-flow-ice40.js';
+export { PCF } from './pcf.js';
 export { gateAssignments, rewriteCarryChains } from './carry-chain.js';
 
 // the netlist in (the constraints: ./parts.js)
