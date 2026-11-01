@@ -1,4 +1,5 @@
-// Xilinx device families known to ISE 14.7 (isomorphic: used by the server and the browser).
+// Xilinx device families known to ISE 14.7, and the open toolchains' others (the iCE40, #2295) (isomorphic: used by the
+// server and the browser).
 // Detection works from the part name alone, so it also covers parts missing from the device DB.
 
 export const FAMILY_INFO = {
@@ -14,9 +15,10 @@ export const FAMILY_INFO = {
   kintex7:      { name: 'Kintex-7',           xise: 'Kintex7',                  pm: 'kintex7' },
   virtex7:      { name: 'Virtex-7',           xise: 'Virtex7',                  pm: 'virtex7' },
   zynq:         { name: 'Zynq-7000',          xise: 'Zynq',                     pm: 'zynq' },
+  ice40:        { name: 'iCE40' },
 };
 
-/** Family id of a part name such as xc3s250e, xc6slx9, xc3s700an, xc7a100t. */
+/** Family id of a part name such as xc3s250e, xc6slx9, xc3s700an, xc7a100t, ice40up5k. */
 export function familyOfPart(part) {
   const p = String(part || '').toLowerCase().replace(/^x[aq](?=\d)/, 'xc'); // XA (automotive) / XQ (defense) parts
   if (/^xc3sd\d+a/.test(p)) return 'spartan3adsp';
@@ -31,6 +33,7 @@ export function familyOfPart(part) {
   if (/^xc7k/.test(p)) return 'kintex7';
   if (/^xc7v/.test(p)) return 'virtex7';
   if (/^xc7z/.test(p)) return 'zynq';
+  if (/^ice40/.test(p)) return 'ice40';
   return null;
 }
 
@@ -39,6 +42,8 @@ export function deviceFamily(device) {
   return familyOfPart(device?.part) || String(device?.family || '').toLowerCase() || null;
 }
 
+/** Does ISE implement this family? The others are the open toolchain's only (#2295). */
+export const isIseFamily = f => !!FAMILY_INFO[f]?.xise;
 export const familyName = f => FAMILY_INFO[f]?.name || f || 'unknown family';
 export const isSpartan3Like = f => /^spartan3/.test(f || '');
 export const familyFromXise = text => {
