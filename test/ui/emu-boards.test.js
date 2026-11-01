@@ -41,7 +41,7 @@ uiTest('#2478 the board layouts in a module of their own: emulator.js exports th
   }), [true, ['basys2', 'nexys2', 's3e-starter'], ['s3e-starter']]);
 });
 
-for (const [board, size, parts] of [['basys2', [780, 500], [8, 8, 4, 4]], ['nexys2', [800, 560], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]]]) {
+for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [800, 560], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]]]) {
   uiTest(`#2478 the ${board} drawn: its PCB, LEDs, switches, buttons and digits`, E, async (page) => {
     await emulatorOn(page, board, `Emu-${board}`);
     assert.deepEqual(await page.eval(() => {
@@ -108,5 +108,39 @@ uiTest('#2478 the Spartan-3E Starter Kit drawn as the real board: its parts wher
   // it still works: the power switch turns the board off
   await page.eval(() => document.querySelector('.emu-power').click());
   await page.waitFor(() => document.querySelector('.emu .stat').textContent === 'Power off', [], { what: 'Power off' });
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+uiTest('#2479 the Basys2 drawn as the real board: its parts where they are, as they are turned', E, async (page) => {
+  await emulatorOn(page, 'basys2', 'Emu-basys2-real');
+  const g = await geometry(page);
+  assert.deepEqual([g.W, g.H], [840, 556]);   // (the board's proportions)
+  // the power switch SW8: upright, in the bottom-left corner, left of SW7, its STATUS LED over it and to its right
+  const sw = await page.eval(() => { const s = document.querySelector('.emu-power-sw').getBoundingClientRect(), l = document.querySelector('.emu-power-led').getBoundingClientRect();
+    return { upright: s.height > 2 * s.width, ledRightAbove: l.left > s.right && l.bottom < s.top }; });
+  assert.deepEqual(sw, { upright: true, ledRightAbove: true });
+  assert.ok(g.power.x < g.W * 0.06 && g.power.y > g.H * 0.7 && g.power.x < g.sw7.x, JSON.stringify(g.power));
+  // SW7..SW0 left to right along the bottom edge (left part), upright, each under its LED
+  const sws = [7, 6, 5, 4, 3, 2, 1, 0].map((k) => `sw${k}`);
+  assert.ok(leftToRight(g, sws) && sws.every((n) => g[n].h > 1.5 * g[n].w && g[n].y > g.H * 0.75 && g[n].x < g.W * 0.6));
+  for (let k = 0; k < 8; k++) assert.ok(Math.abs(g[`led${k}`].x - g[`sw${k}`].x) < 1 && g[`led${k}`].y < g[`sw${k}`].y, `LD${k} over SW${k}`);
+  // BTN3..BTN0 left to right on the bottom edge, right of the switches, under AN3..AN0
+  const btns = [3, 2, 1, 0].map((k) => `btn${k}`), digits = [3, 2, 1, 0].map((k) => `an${k}`);
+  assert.ok(leftToRight(g, btns) && leftToRight(g, digits) && g.btn3.x > g.sw0.x && btns.every((n) => g[n].y > g.H * 0.8));
+  // (the display over the row of buttons, the buttons a little to the left of the digits, as on the board)
+  assert.ok(digits.every((d) => btns.every((b) => g[d].y < g[b].y)) && g.btn3.x < g.an3.x && g.an3.x < g.btn2.x && g.btn0.x < g.an0.x);
+  // the silkscreen: the parts' names with their FPGA pins, as on the board
+  const silk = await page.eval(() => [...document.querySelectorAll('.emu-pcb .b2-silk')].map((e) => e.textContent));
+  const art = await page.eval(() => [...document.querySelectorAll('.emu-pcb-art text')].map((t) => t.textContent));
+  for (const t of ['SW7-N3', 'SW0-P11', 'LD7', 'LD0', 'BTN3-A7', 'BTN0-G12', 'AN3(K14)', 'AN0(F12)']) assert.ok(silk.includes(t), t);
+  // the board's name, none of its makers' names or logos
+  assert.ok(art.includes('BASYS 2'));
+  assert.deepEqual(art.filter((t) => MAKERS.test(t)), []);
+  for (const t of ['(B2)', '(A3)', '(J3)', '(B5)', 'POWER', 'SW8', 'STATUS', 'BATTERY', 'JP3', 'JP4', 'IC6', 'DISP1', 'CA(L14)', 'DP(N13)']) assert.ok(silk.includes(t) || art.includes(t), t);
+  // the connectors on their edges: JA..JD along the top, the PS/2 (J1) over the mini-USB (J3) on the left, the VGA (J2) on the right
+  const xs = await page.eval(() => Object.fromEntries([...document.querySelectorAll('.emu-pcb-art text')].map((t) => [t.textContent, [+t.getAttribute('x'), +t.getAttribute('y')]])));
+  assert.ok(xs.JA[0] < xs.JB[0] && xs.JB[0] < xs.JC[0] && xs.JC[0] < xs.JD[0] && xs.JD[1] < g.H * 0.15);
+  assert.ok(xs.J1[0] < g.W * 0.05 && xs.J3[0] < g.W * 0.05 && xs.J1[1] < xs.J3[1] && xs.J3[1] < g.power.y, JSON.stringify([xs.J1, xs.J3]));
+  assert.ok(xs.VGA[0] > g.W * 0.8 && xs.VGA[1] > g.H * 0.2 && xs.VGA[1] < g.H * 0.6, JSON.stringify(xs.VGA));
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });

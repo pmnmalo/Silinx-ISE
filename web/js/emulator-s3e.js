@@ -1,12 +1,9 @@
 // Silinx - Board Emulator: the Xilinx Spartan-3E Starter Kit drawn as the real board (#2478; out of emulator.js, #405).
 // Our own drawing, after the board's photos and figures in its user guide (UG230): each part where it is, as it is
 // turned, in proportion (1 px = 0.16 mm, the board 860 x 736), with its silkscreen names.
-import { esc } from './dom.js';
-import { holes4, boardFrame } from './emulator-pcb.js';
+import { holes4, boardFrame, svgText as text, ic, POWER_V_CSS } from './emulator-pcb.js';
 
 const W = 860, H = 736, SILK = '#eef3ec';
-const text = (x, y, t, { size = 9, anchor = 'middle', weight = 'bold', fill = SILK, rotate = false, family = 'Arial' } = {}) =>
-  `<text x="${x}" y="${y}" fill="${fill}" font-size="${size}" text-anchor="${anchor}" font-family="${family}" font-weight="${weight}"${rotate ? ` transform="rotate(-90 ${x} ${y})"` : ''}>${esc(t)}</text>`;
 // a D-sub on the top edge, seen from above: the metal shell's front plate, the black body, the screw locks
 const dsub = (x, w, name, desig) => `<rect x="${x}" y="0" width="${w}" height="16" rx="2" fill="#b9bec6" stroke="#6b7079"/>`
   + `<path d="M${x + 22},3 L${x + w - 22},3 L${x + w - 28},13 L${x + 28},13 Z" fill="#8d939b"/>`
@@ -17,8 +14,6 @@ const dsub = (x, w, name, desig) => `<rect x="${x}" y="0" width="${w}" height="1
 const header6 = (x, y, name) => `<rect x="${x}" y="${y}" width="20" height="68" rx="2" fill="#141414"/>`
   + Array.from({ length: 6 }, (_, i) => `<rect x="${x + 7}" y="${y + 5 + i * 10.5}" width="6" height="6" fill="#c9a94a"/>`).join('')
   + text(x + 10, y + 80, name);
-const ic = (x, y, w, hgt, lines = [], size = 8) => `<rect x="${x}" y="${y}" width="${w}" height="${hgt}" rx="2" fill="#141414" stroke="#2c2c2c"/>`
-  + lines.map((t, i) => text(x + w / 2, y + hgt / 2 + (i - (lines.length - 1) / 2) * (size + 3) + 3, t, { size, fill: i ? '#a9a9a9' : '#d6d6d6', weight: i ? 'normal' : 'bold' })).join('');
 
 // where the parts are (their centres)
 const KNOB = [180, 645], N = [182, 588], S = [182, 708], WEST = [108, 645], EAST = [254, 645];
@@ -117,13 +112,8 @@ export function s3eLayout({ board, title, h, mkLed, mkSwitch, mkButton, portLabe
 s3eLayout.lcd = true;   // the layout shows the character LCD
 // its parts' look: the upright power switch (its LED moved to the corner by the jack), the tact buttons, the slide
 // switches, the SMD LEDs, the LCD's larger cells
-s3eLayout.css = `
-.emu-power-v { flex-direction: column; gap: 0; }
-.emu-power-v .emu-power-sw { width: 16px; height: 36px; }
-.emu-power-v .emu-power-sw::after { left: 1px; right: 1px; width: auto; top: auto; bottom: 2px; height: 15px; transition: bottom .08s; }
-.emu-power-v.on .emu-power-sw::after { left: 1px; bottom: 17px; }
-.s3e-power { position: relative; }
-.s3e-power .emu-power-led { position: absolute; left: -96px; top: -24px; }
+s3eLayout.css = `${POWER_V_CSS}
+.s3e-power .emu-power-led { left: -96px; top: -24px; }
 .s3e-btn { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(#f2f2f2, #b9b9b9); border: 1px solid #555; cursor: pointer; user-select: none; }
 .s3e-btn.on { background: radial-gradient(#ff6a5a, #b31d12); }
 .s3e-led { width: 7px; height: 10px; border-radius: 1px; border: 1px solid #0a0a0a; }

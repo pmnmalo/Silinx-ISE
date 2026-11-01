@@ -623,11 +623,12 @@ uiTest('#1021 #1999 Tasks ▸ Emulate: the board fits the window; the Watch and 
   let L = await at(1680, 1050);
   assert.ok(L.zoom >= 1, JSON.stringify(L));
   assert.deepEqual({ ...L, zoom: undefined }, { zoom: undefined, proper: true, watch: 'beside', vga: 'below', scrollsDown: true, scrollsAcross: false });
-  // (smaller than its proper size, down to 0.7, and the bar above the board, #1999)
-  const fits = (L, what) => assert.ok(L.zoom >= 0.7 && L.zoom < 1 && !L.proper && L.watch === 'below' && L.vga === 'below' && !L.scrollsAcross, `${what}: ${JSON.stringify(L)}`);
+  // (smaller than its proper size, down to 0.7, and the bar above the board, #1999; the Watch below it, or beside it
+  // when the board, fitting the height, leaves it the room: the Basys2 in its proportions, #2479)
+  const fits = (L, what, watch = ['below']) => assert.ok(L.zoom >= 0.7 && L.zoom < 1 && !L.proper && watch.includes(L.watch) && L.vga === 'below' && !L.scrollsAcross, `${what}: ${JSON.stringify(L)}`);
   const barAbove = () => page.eval(() => { const e = document.querySelector('.doc:not([hidden]) .emu'); return e.querySelector('.emu-bar').getBoundingClientRect().bottom <= e.querySelector('.emu-board-wrap').getBoundingClientRect().top; });
   L = await at(1280, 800);
-  fits(L, 'a smaller laptop');
+  fits(L, 'a smaller laptop', ['below', 'beside']);
   // a tablet in landscape: the side panel docked, not a drawer (#1418); the board smaller beside it, the Watch and the
   // VGA monitor below it, the area scrolling down only; the emulator's bar (two rows) above the board
   L = await at(1024, 768);
