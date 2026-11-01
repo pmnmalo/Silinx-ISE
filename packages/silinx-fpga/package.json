@@ -1,6 +1,6 @@
 {
   "name": "silinx-fpga",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "The Silinx toolchain for Spartan-3E FPGAs without Xilinx tools: synthesis with Yosys in WebAssembly, then pack, place, route, timing and bitstream, with the device data",
   "type": "module",
   "exports": {
