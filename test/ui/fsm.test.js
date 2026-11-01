@@ -91,10 +91,15 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   // the hierarchy lists the diagram
   await page.waitFor(() => [...document.querySelectorAll('#hier .row')].some((r) => /det\.fsm\.json/.test(r.textContent)), [], { what: 'det.fsm.json in the hierarchy' });
 
-  // ---- a new state: double-click the drawing, name and Moore output typed in place
-  await page.waitFor((ed) => document.querySelector(`${ed} [data-state=s3] .fsm-circle`)?.getBoundingClientRect().width > 10, [ED]);
-  const s3 = await statePos(page, 's3');
-  await page.dblclick({ x: s3.x, y: s3.y + 130 });
+  // ---- a new state: double-click the drawing, name and Moore output typed in place (once the view is fitted: the
+  // point read before the fit could be on a state after it, #2397; checked to be the empty background)
+  await page.waitFor(() => window.Silinx.active.fsmEditor?.fitted(), [], { what: 'the view fitted' });
+  const empty = await page.waitFor((ed) => {
+    const c = document.querySelector(`${ed} [data-state=s3] .fsm-circle`).getBoundingClientRect();
+    const p = { x: c.left + c.width / 2, y: c.top + c.height / 2 + 130 };
+    return document.elementFromPoint(p.x, p.y)?.matches(`${ed} .fsm-bg`) && p;
+  }, [ED], { what: 'the background under S2' });
+  await page.dblclick(empty);
   await page.waitForSelector(`${ED} .fsm-inline`);
   await page.fill(`${ED} .fsm-inline`, 'S3 / z=1');
   await page.key('Enter');
