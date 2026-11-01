@@ -3,10 +3,20 @@
 What changed in each version of silinx-fpga, the Silinx toolchain. The newest version is first. Its versions
 are its own (semver, 0.x until its API is stable), apart from Silinx ISE's.
 
+## 0.1.7
+
+The first version published by npm's trusted publishing (#2428): 0.1.5 and 0.1.6 were tagged but not published.
+
+In detail:
+
+- **The nextpnr packages pinned at spartan3e 0.11.3 and spartan6 0.1.1 (#2441):** both declare the Node versions they
+  run on, 22 and later (#2351); their engines are unchanged.
+  - **Tests:** test/silinx-fpga-package.test.js, test/toolchain-boundary.test.js and the third-party notices' check,
+    unchanged.
+
 ## 0.1.6
 
-The first version published by npm's trusted publishing (#2428): 0.1.5 was tagged but not published, a fragment merged
-after its section was assembled.
+Tagged but not published: its release CI failed (a UI part's time limit, #2462; a test on Windows, #2465).
 
 In short:
 
