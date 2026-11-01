@@ -578,6 +578,9 @@ class PageBase {
   }
 }
 
+// a page's load: 45 s (30 s before #2497: a slow CI machine), not more, so that a real stall still fails
+const LOAD_TIMEOUT = 45000;
+
 /** A page of Chrome, driven over the Chrome DevTools Protocol (the default backend). */
 export class Page extends PageBase {
   constructor(env, sessionId, targetId, contextId, downloadDir) {
@@ -612,15 +615,30 @@ export class Page extends PageBase {
   }
   /** Reload the page and wait for the new one to load and the app to start (not the old page). */
   async reload() {
-    const loaded = this.waitEvent('Page.loadEventFired', 30000);
-    await this.send('Page.reload', {});
-    await loaded;
+    await this.navigated(() => this.send('Page.reload', {}));
     await this.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx?.startupChecked, [], { what: 'app boot after reload', timeout: 30000 });   // (a slow CI machine; the page it replaced may still be busy, e.g. the emulator)
   }
-  async goto(url) {
-    const loaded = this.waitEvent('Page.loadEventFired', 30000);
-    await this.send('Page.navigate', { url });
-    await loaded;
+  async goto(url) { await this.navigated(() => this.send('Page.navigate', { url })); }
+  /** A navigation and its load event, waited for together (a failed navigation leaves no wait behind, #2497); when the
+   *  load event does not come, the error names the requests the page is still waiting for (also on stderr, for CI's log). */
+  async navigated(go, timeout = LOAD_TIMEOUT) {
+    const pending = new Map();
+    const offNet = this.cdp.on((msg) => {
+      if (msg.sessionId !== this.sessionId) return;
+      const p = msg.params;
+      if (msg.method === 'Network.requestWillBeSent') pending.set(p.requestId, { url: p.request.url, type: p.type || '?', at: Date.now() });
+      else if (msg.method === 'Network.loadingFinished' || msg.method === 'Network.loadingFailed') pending.delete(p.requestId);
+    });
+    await this.send('Network.enable').catch(() => {});
+    try {
+      await Promise.all([this.waitEvent('Page.loadEventFired', timeout), go()]);
+    } catch (e) {
+      if (!/timed out waiting for Page\.loadEventFired/.test(e.message)) throw e;
+      const now = Date.now(), list = [...pending.values()].map((r) => `${r.url.slice(0, 160)} (${r.type}, ${((now - r.at) / 1000).toFixed(1)} s)`);
+      const msg = `timed out waiting for Page.loadEventFired after ${timeout / 1000} s; requests still pending: ${list.length ? list.slice(0, 12).join('; ') : 'none'}`;
+      console.error(`[harness] ${msg}`);
+      throw new Error(msg);
+    } finally { offNet(); }
   }
   waitEvent(method, timeout = 10000) {
     return new Promise((resolve, reject) => {

@@ -580,6 +580,8 @@ uiTest('#280 browser edition: Generate Programming File again, the design unchan
   for (const id of ['synth', 'translate', 'map', 'par', 'impl', 'bitgen']) assert.ok(['ok', 'warn'].includes(st[id]), `${id}: ${st[id]}`);
 }, { url: () => 'about:blank', timeout: 240000 });
 
+// (#2497: on CI only, this test's and Open Workspace Folder's reload timed out waiting for the load event: the harness's
+// goto / reload now name the requests the page still waits for)
 uiTest('#967 browser edition: what Implement needs is downloaded when a project opens and kept in Cache Storage; Implement then fetches none of it, after a reload too', E, async (page) => {
   const assets = `${siteUrl}assets/`;
   const versioned = () => served.filter((p) => /^assets\/(vendor\/yowasp-yosys\/[^/]+\/gen\/(?!bundle\.js)|dev-[0-9a-f]+\/(devices|bitdb)\/)/.test(p));
