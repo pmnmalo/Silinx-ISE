@@ -296,9 +296,9 @@ for Xilinx FPGAs supported by ISE 14.7.
   toolchain's routing, or from ISE's `xdl`): sites coloured by module, LUT equations and flip-flops of each site, I/O pads, nets
   and their routing, the clock network; selecting a module in the Design hierarchy shows it on
   the chip and the other way round.
-- **Two interfaces**: a modern one (default: header with search, activity bar, tabs, labelled
-  design-flow buttons, light and dark themes that follow the system, command palette with
-  Ctrl+K / Cmd+K) and the classic Xilinx ISE Project Navigator look (*View ▸ Interface*).
+- **Two interfaces** (*View ▸ Interface*): the **Silinx** interface (the default: header with search, activity bar,
+  tabs, labelled design-flow buttons, light and dark themes that follow the system, command palette with
+  Ctrl+K / Cmd+K) and the **ISE style** interface, laid out as ISE's Project Navigator.
 - **Internationalised interface**: English and Portuguese (*View ▸ Language*; the browser language
   is used by default). Translations live in `web/js/i18n.js`: adding a language is adding a
   dictionary. Code, tool output and design names are never translated.
@@ -608,7 +608,7 @@ core/       VHDL/Verilog parsers, elaborator, simulator, schematics, ASM, UCF, z
             core/fpga: the Silinx toolchain (pack, place, route, timing, bitstream); adept.js / xcf.js:
             the board and its Platform Flash programmed over WebUSB
 server/     HTTP server, projects, ISE flow, programmers, boards/devices, .xise
-web/        Project Navigator UI (modern and ISE-like, web/css/modern.css): editor, SSim, schematics, ASM, pin planner, iMPACT
+web/        Project Navigator UI (the Silinx and ISE style interfaces, web/css/modern.css): editor, SSim, schematics, ASM, pin planner, iMPACT
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image
 scripts/    adepttool installer/patch, Platform Flash programmer, standalone build
 examples/   example projects for the Basys2 / Nexys2 (the Silinx toolchain's devices): gates (the first one: logic
