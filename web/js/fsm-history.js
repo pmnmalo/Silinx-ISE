@@ -7,8 +7,8 @@ import { clone } from './fsm-editor.js';
 /** { commit, redo, undo, updateToolbar } of mountFsmEditor (M(), destroyed(), hi(), hist(), lastKey(), lastT(), panel(), sel(): its current values). */
 export function mountFsmHistory(ctx) {
   const {
-    opts, M, delBtn, destroyed, encSel, hi, hist, lastKey, lastT, panel, redoBtn, render, renderPanel,
-    renderSide, sel, stateById, statusInfo, styleSel, tabBtns, timers, transById, typeSel, undoBtn, validateSoon, setM,
+    opts, M, delBtn, destroyed, encSel, hi, hist, lastKey, lastT, panel, render, renderPanel,
+    renderSide, sel, stateById, statusInfo, styleSel, tabBtns, timers, transById, typeSel, validateSoon, setM,
     setHist, setHi, setLastKey, setLastT, setSel
   } = ctx;
 
@@ -41,7 +41,7 @@ export function mountFsmHistory(ctx) {
   const undo = () => { if (hi() > 0) restore(hi() - 1); };
   const redo = () => { if (hi() < hist().length - 1) restore(hi() + 1); };
   function updateToolbar() {
-    undoBtn.disabled = hi() <= 0; redoBtn.disabled = hi() >= hist().length - 1; delBtn.disabled = !sel();
+    delBtn.disabled = !sel();
     typeSel.value = M().type; encSel.value = M().encoding; styleSel.value = M().style;
     for (const [k, b] of Object.entries(tabBtns)) b.classList.toggle('on', panel() === k);
     statusInfo.textContent = `${M().states.length} state(s), ${M().transitions.length} transition(s) · ${M().type === 'mealy' ? 'Mealy' : 'Moore'}`;

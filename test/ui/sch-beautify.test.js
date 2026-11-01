@@ -99,10 +99,10 @@ uiTest('#1730 schematic: Rearrange Wires draws the wires again (the selected one
   await hint('Rearrange Schematic: the schematic is already laid out this way');
   // one undo step each
   for (const back of [all, sel1]) {
-    await page.click(`${ED} [data-act=undo]`);
+    await page.click(`#toolbar [data-cmd=undo]`);
     await page.waitFor((w) => JSON.stringify(window.Silinx.active.schEditor.getDoc().wires.map((x) => x.points)) === w, [JSON.stringify(back)], { what: 'undone' });
   }
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor((d) => JSON.stringify(window.Silinx.active.schEditor.getDoc()) === d, [JSON.stringify(doc0)], { what: 'undone' });
   assert.equal(await page.eval(() => window.Silinx.active.schEditor.canUndo()), false, 'nothing more to undo');
   await page.click(`${ED} [data-act=fit]`);   // (the view was fitted to the sheet laid out)

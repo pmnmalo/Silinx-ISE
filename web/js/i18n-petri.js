@@ -2,17 +2,16 @@
 export const PETRI_PT = {
   // New Source, menus, processes, hierarchy
   'Petri Net': 'Rede de Petri', 'Petri Net Editor…': 'Editor de Redes de Petri…', 'View/Edit Petri Net': 'Ver/Editar Rede de Petri',
-  '— generated from the net': '— gerado a partir da rede', 'Open Petri Net': 'Abrir Rede de Petri',
+  'Open Petri Net': 'Abrir Rede de Petri',
   // toolbar
-  '➚ Select': '➚ Selecionar', 'Place': 'Lugar', 'Transition': 'Transição', '→ Arc': '→ Arco', '⊸ Inhibitor': '⊸ Inibidor',
-  'Analysis and PNML': 'Análise e PNML', 'Fit': 'Ajustar', '▶ Simulate': '▶ Simular', 'PNML ⇩': 'PNML ⇩', 'PNML ⇧': 'PNML ⇧',
+  'Place': 'Lugar', 'Transition': 'Transição', 'Arc': 'Arco', 'Inhibitor': 'Inibidor',
+  'Analysis and PNML': 'Análise e PNML', 'Fit': 'Ajustar', 'PNML ⇩': 'PNML ⇩', 'PNML ⇧': 'PNML ⇧',
   'Select and move (drag the background to pan, wheel to zoom)': 'Selecionar e mover (arraste o fundo para deslocar, roda para zoom)',
   'Click the drawing to add a place': 'Clique no desenho para acrescentar um lugar',
   'Click the drawing to add a transition': 'Clique no desenho para acrescentar uma transição',
   'Click a place then a transition (or a transition then a place)': 'Clique num lugar e depois numa transição (ou numa transição e depois num lugar)',
   'Click a place then a transition: the transition fires only while the place holds fewer tokens than the weight': 'Clique num lugar e depois numa transição: a transição só dispara enquanto o lugar tiver menos marcas do que o peso',
   'Delete the selection (Del)': 'Apagar a seleção (Del)',
-  'Fit the net in the window': 'Ajustar a rede à janela',
   'Play the net: fire transitions, clock steps, run': 'Jogar a rede: disparar transições, passos de relógio, correr',
   'Export the net as PNML (for PIPE, WoPeD, TINA…)': 'Exportar a rede em PNML (para o PIPE, WoPeD, TINA…)',
   'Import a PNML net (replaces this one: Undo brings it back)': 'Importar uma rede PNML (substitui esta: Anular repõe-na)',

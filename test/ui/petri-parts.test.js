@@ -27,12 +27,12 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
     [['start', '[go]'], ['done', '[!go]']]);
   assert.equal(await ev((ed) => document.querySelector(`${ed} .pn-place[data-id=p2] .pn-outs`).textContent), 'busy=1');
   assert.equal(await ev((ed) => document.querySelectorAll(`${ed} .pn-arc`).length), 4);
-  assert.equal(await ev((ed) => document.querySelector(`${ed} .asm-status`).textContent), '2 places · 2 transitions · 4 arcs');
+  assert.equal(await ev((ed) => document.querySelector(`${ed} .asm-status > span`).textContent), '2 places · 2 transitions · 4 arcs');
   // ---- the side panel: nothing selected; the place idle selected: its fields; 3 initial tokens: three dots drawn
   assert.equal(await ev((ed) => document.querySelector(`${ed} .pn-selection`).textContent), 'Nothing selected: click a place, a transition or an arc');
   const at = await ev((ed) => { const r = document.querySelector(`${ed} .pn-place[data-id=p1] circle`).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 4 }; });
   await page.click(at);
-  await page.waitFor((ed) => document.querySelector(`${ed} .pn-selection .asm-section-title`)?.textContent === 'Place idle', [ED], { what: 'idle selected' });
+  await page.waitFor((ed) => document.querySelector(`${ed} .pn-selection h3`)?.textContent === 'Place idle', [ED], { what: 'idle selected' });
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .pn-selection .asm-label`)].map((l) => l.textContent)), ['Name', 'Initial tokens', 'Capacity', 'Outputs while marked']);
   await page.fill(`${ED} .pn-selection input[type=number]`, '3', { index: 0 });
   await page.key('Tab');
@@ -43,14 +43,14 @@ uiTest('#405 Petri net editor parts: the drawing, the side panel, the simulation
     ['Module name', 'Inputs', 'Outputs', 'Clock', 'Reset (synchronous, to the initial marking)', 'Description']);
   assert.equal(await ev((ed) => document.querySelectorAll(`${ed} .asm-problems li`).length), 0);
   // ---- the simulation: the marking, go on and a clock step: start fires (idle 3 -> 2, work 1), busy
-  await page.click(`${ED} .pn-tab-btn`, { text: '▶ Simulate' });
+  await page.click(`${ED} .pn-tab-btn`, { text: 'Simulate' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=3  work=0', [ED], { what: 'the initial marking' });
   await page.click(`${ED} .pn-sim-ins input[type=checkbox]`);
   await page.click(`${ED} .asm-codebar .asm-btn`, { text: '⏭ Clock step' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=2  work=1', [ED], { what: 'start fired' });
   assert.equal(await ev((ed) => document.querySelector(`${ed} .pn-log`).textContent), 'clock: start');
   // ---- the analysis (no </> HDL button, #2250)
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['▶ Simulate', '∑ Analysis']);
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['Simulate', '∑ Analysis']);
   await page.click(`${ED} .tb-more-btn`);   // (Analysis in the toolbar's menu, #2259)
   await page.click(`${ED} .pn-tab-btn`, { text: '∑ Analysis' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-an-props`), [ED], { what: 'the analysis' });

@@ -13,8 +13,9 @@
 // enabled transition whose guard is true fires, as the generated hardware does), run, reset; and analyses it.
 // The HDL generated from the net is its linked file. Model, simulation, HDL and PNML: core/petri.js.
 
-import { h, downloadText, undoButton, linkModel, linkSnapshot, twoFingerView } from './ui.js';
+import { h, downloadText, linkModel, linkSnapshot, twoFingerView } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
+import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { sv } from './dom.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import { normalizePetri, newPetri, fire, toPnml, fromPnml } from '/core/petri.js';
@@ -55,17 +56,15 @@ export function mountPetriEditor(container, opts = {}) {
 
   // ---------------------------------------------------------------- toolbar
   const tools = {
-    select: btn('➚ Select', 'Select and move (drag the background to pan, wheel to zoom)', () => setTool('select'), 'pn-tool'),
-    place: btn([h('span', { class: 'pn-ico-place' }), 'Place'], 'Click the drawing to add a place', () => setTool('place'), 'pn-tool'),
-    transition: btn([h('span', { class: 'pn-ico-trans' }), 'Transition'], 'Click the drawing to add a transition', () => setTool('transition'), 'pn-tool'),
-    arc: btn('→ Arc', 'Click a place then a transition (or a transition then a place)', () => setTool('arc'), 'pn-tool'),
-    inhibitor: btn('⊸ Inhibitor', 'Click a place then a transition: the transition fires only while the place holds fewer tokens than the weight', () => setTool('inhibitor'), 'pn-tool'),
+    select: toolIcon('select', 'select', 'Select and move (drag the background to pan, wheel to zoom)', () => setTool('select'), 'pn-tool'),
+    place: btn([h('span', { class: 'pn-ico-place' }), 'Place'], 'Click the drawing to add a place', () => setTool('place'), 'pn-tool asm-wide'),
+    transition: btn([h('span', { class: 'pn-ico-trans' }), 'Transition'], 'Click the drawing to add a transition', () => setTool('transition'), 'pn-tool asm-wide'),
+    arc: toolWide('arc', 'Arc', 'Click a place then a transition (or a transition then a place)', () => setTool('arc'), 'pn-tool'),
+    inhibitor: toolWide('inhibitor', 'Inhibitor', 'Click a place then a transition: the transition fires only while the place holds fewer tokens than the weight', () => setTool('inhibitor'), 'pn-tool'),
   };
-  const delBtn = btn('✕', 'Delete the selection (Del)', () => deleteSelection(), 'asm-danger');
-  const undoBtn = undoButton('undo', () => undo());
-  const redoBtn = undoButton('redo', () => redo());
+  const delBtn = toolIcon('delete', 'del', 'Delete the selection (Del)', () => deleteSelection(), 'asm-danger');
   const tabBtns = {
-    sim: btn('▶ Simulate', 'Play the net: fire transitions, clock steps, run', () => togglePanel('sim'), 'pn-tab-btn'),
+    sim: toolWide('sim', 'Simulate', 'Play the net: fire transitions, clock steps, run', () => togglePanel('sim'), 'pn-tab-btn'),
     analysis: btn('∑ Analysis', 'Reachable markings, bounds, deadlocks, liveness, invariants', () => togglePanel('analysis'), 'pn-tab-btn'),
   };
   const pnmlIn = h('input', { type: 'file', accept: '.pnml,.xml', hidden: true });
@@ -76,16 +75,18 @@ export function mountPetriEditor(container, opts = {}) {
     catch (e) { status(`PNML: ${e.message}`, true); }
   });
   const linkHost = h('span', { class: 'pn-link' });
+  const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
   const more = toolbarMenu([tabBtns.analysis,
     btn('PNML ⇩', 'Export the net as PNML (for PIPE, WoPeD, TINA…)', () => downloadText(`${M.name}.pnml`, toPnml(M), 'application/xml')),
     btn('PNML ⇧', 'Import a PNML net (replaces this one: Undo brings it back)', () => pnmlIn.click()),
   ], { title: 'Analysis and PNML', btnClass: 'asm-btn' });
   const toolbar = h('div', { class: 'asm-toolbar pn-toolbar' },
-    h('div', { class: 'asm-group' }, ...Object.values(tools), delBtn), sep(),
-    h('div', { class: 'asm-group' }, undoBtn, redoBtn), sep(),
-    h('div', { class: 'asm-group' }, btn('Fit', 'Fit the net in the window', () => fit())),
+    h('div', { class: 'asm-group' }, ...Object.values(tools)), sep(),
+    h('div', { class: 'asm-group' }, delBtn), sep(),
+    h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBtn(f), () => fit())), sep(),
+    h('div', { class: 'asm-group' }, tabBtns.sim, pnmlIn),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.sim, pnmlIn),
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
     more.el, linkHost);
 
   // ---------------------------------------------------------------- canvas, panels
@@ -107,9 +108,9 @@ export function mountPetriEditor(container, opts = {}) {
   const probList = h('ul', { class: 'asm-problems' });
   const probCount = h('span', { class: 'asm-prob-count' });
   const probSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Problems ', probCount), probList);
-  const side = h('aside', { class: 'asm-side' }, selSection, netSection, probSection);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection, probSection);
   const statusInfo = h('span', {}), statusMsg = h('span', { class: 'asm-status-msg' });
-  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg));
+  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));
   const status = (msg, err = false) => { statusMsg.textContent = msg || ''; statusMsg.classList.toggle('err', !!err); };
 
   // ---------------------------------------------------------------- model edits, history
@@ -184,10 +185,10 @@ export function mountPetriEditor(container, opts = {}) {
   // ---------------------------------------------------------------- drawing (petri-draw.js)
   const { applyView, render, toWorld } = mountPetriDraw({
     M: () => M, arcFrom: () => arcFrom, delBtn, destroyed: () => destroyed, drag: () => drag,
-    envOf: (...a) => envOf(...a), hi: () => hi, hist, nodeOf, placeOf, redoBtn,
+    envOf: (...a) => envOf(...a), nodeOf, placeOf,
     refreshLink: (...a) => refreshLink(...a), renderPanel: (...a) => renderPanel(...a),
-    renderSide: (...a) => renderSide(...a), sel: () => sel, sim: () => sim, statusInfo, svg, uid, undoBtn,
-    view: () => view, world
+    renderSide: (...a) => renderSide(...a), sel: () => sel, sim: () => sim, statusInfo, svg, uid,
+    view: () => view, world, zoomLbl
   });
 
   // ---------------------------------------------------------------- side panel (petri-side.js)
@@ -261,6 +262,8 @@ export function mountPetriEditor(container, opts = {}) {
     view.tx = mx - (mx - view.tx) * k / view.k; view.ty = my - (my - view.ty) * k / view.k; view.k = k;
     applyView();
   }
+  // (the toolbar's and the keys': about the middle of the canvas)
+  function zoomBtn(f) { const r = svg.getBoundingClientRect(); zoomAt(f, r.left + r.width / 2, r.top + r.height / 2); }
   svg.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY); }, { passive: false });
   root.addEventListener('keydown', e => {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
@@ -272,6 +275,9 @@ export function mountPetriEditor(container, opts = {}) {
     else if (mod && k === 'v') pasteFromKey('petri', paste);
     else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(); }
     else if (e.key === 'Escape') { setTool('select'); }
+    else if (!mod && (k === '+' || k === '=')) zoomBtn(1.25);
+    else if (!mod && k === '-') zoomBtn(0.8);
+    else if (!mod && k === 'f') fit();
   });
 
   // the whole net, its selection left out (#1509)

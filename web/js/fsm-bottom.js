@@ -1,9 +1,8 @@
 // The state diagram editor's bottom panel (#405: out of mountFsmEditor in fsm-editor.js): the tables (the state and
-// output tables, the encodings), the HDL generated from the diagram, and the simulation (the inputs, a clock step,
+// output tables, the encodings), and the simulation (the inputs, a clock step,
 // run, reset, the state and outputs, the trace).
 import { downloadText, h } from './ui.js';
-import { encodedTable, generateFsm, stateTable, stepFsm, toCsv, transitionTable } from '/core/fsm.js';
-import { highlightHdl } from './highlight.js';
+import { encodedTable, stateTable, stepFsm, toCsv, transitionTable } from '/core/fsm.js';
 import { clamp } from './fsm-editor.js';
 
 /** { renderPanel, resetSim, stopRun, togglePanel } of mountFsmEditor (M(), destroyed(), diags(), panel(), sim(): its current values). */
@@ -29,22 +28,8 @@ export function mountFsmBottom(ctx) {
   function renderPanel() {
     if (panel() !== 'sim') { panelBody.textContent = ''; panelTools.textContent = ''; }
     if (!panel()) return;
-    if (panel() === 'code') return renderCode();
     if (panel() === 'tables') return renderTables();
     return renderSim();
-  }
-  function renderCode() {
-    panelTitle.textContent = `${M().name}.${M().lang === 'verilog' ? 'v' : 'vhd'}`;
-    const pre = h('pre', { class: 'asm-code fsm-code' });
-    try {
-      const g = generateFsm(M(), M().lang);
-      pre.innerHTML = highlightHdl(g.code, M().lang);
-      panelTools.append(btn('Copy', 'Copy the code to the clipboard', () => navigator.clipboard?.writeText(g.code).then(() => flash('Code copied to the clipboard'), () => {}), 'asm-small'));
-    } catch (e) {
-      pre.classList.add('has-err');
-      pre.textContent = `${e.message}`;
-    }
-    panelBody.append(pre);
   }
   function csvButton(name, rows) {
     return btn('Export CSV', 'Download this table as a CSV file (opens in a spreadsheet)', () => downloadText(name, toCsv(rows), 'text/csv'), 'asm-small');

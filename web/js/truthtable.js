@@ -15,7 +15,8 @@
 //                                    onOpenFile(path) });
 //   ed.getModel(), ed.setModel(m), ed.setLink(file), ed.destroy()
 // Styles: web/css/truthtable.css.
-import { h, undoButton, linkModel, linkSnapshot } from './ui.js';
+import { h, linkModel, linkSnapshot } from './ui.js';
+import { ICON } from './editor-icons.js';
 import { toolbarMenu } from './toolbar-menu.js';
 import {
   normalizeTable, validateTable, reshapeTable, analyzeOutput, parseExpr, exprColumn, formatExpr,
@@ -64,6 +65,9 @@ function ttPrintView(root, notes, name) {
   if (!notes.value.trim()) drop.push('.tt-cap-notes', '.tt-notes');
   return { title: `${tr('Truth table')} ${name}`, app: true, body: domSnapshot(root, { drop }) };
 }
+
+// a menu item as the schematic editor's: an icon and a label (#2505)
+const menuItem = (icon, label, title, onclick, cls = '') => h('button', { type: 'button', class: `tt-menu-item ${cls}`, title, html: `${ICON[icon]}<span>${label}</span>`, onclick });
 
 export function mountTtEditor(container, opts = {}) {
   let M = normalizeTable(opts.model);
@@ -125,12 +129,10 @@ export function mountTtEditor(container, opts = {}) {
   const btn = (label, title, onclick, cls = '') => h('button', { type: 'button', class: `btn tt-btn ${cls}`, title, onclick }, label);
   const link = h('span', { class: 'tt-link' });
   const more = toolbarMenu([
-    btn('Algebra from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()),
-    btn('Handwritten Algebra…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
+    menuItem('module', 'Algebra from Module…', 'Fill the table with the truth table of a combinational module of the project (exhaustive simulation)', () => opts.onFromModule?.()),
+    menuItem('pen', 'Handwritten Algebra…', 'Write the expressions by hand, one a line, with any names: they become the table\'s inputs, outputs and expressions', () => handwritten(), 'tt-ink'),
   ], { title: 'Fill the table' });
   const toolbar = h('div', { class: 'tt-toolbar' },
-    undoButton('undo', () => undo(), { class: 'tb-btn tt-undo' }), undoButton('redo', () => redo(), { class: 'tb-btn tt-redo' }),
-    h('span', { class: 'tt-sep' }),
     h('label', {}, 'Inputs:'), inIn, h('label', {}, 'Outputs:'), outIn, shapeErr,
     h('span', { class: 'tt-sep' }),
     h('label', { title: FORM_TIP }, 'HDL logic:'), formSel,
@@ -161,7 +163,7 @@ export function mountTtEditor(container, opts = {}) {
   // written by hand in the toolbar (#2010), drawn by hand from the Development menu while a preview (#1098): web/js/tt-ink.js
   const ink = {
     model: () => M, output: () => out, alive: () => !destroyed,
-    replace: m => { M = m; if (!M.outputs.includes(out)) out = M.outputs[0]; changed(); },
+    replace: m => { M = m; if (!M.outputs.includes(out)) out = M.outputs[0]; changed(true); },
   };
   const handwritten = () => import('./tt-ink.js').then(m => m.handwrittenExpressions(ink));
   const handwrittenTable = () => import('./tt-ink.js').then(m => m.handwrittenWholeTable(ink));
@@ -187,7 +189,7 @@ export function mountTtEditor(container, opts = {}) {
 
   // ------------------------------------------------------------------ rendering
   let A = null;   // analysis of the selected output
-  const changed = () => { snap(); render(); opts.onChange?.(M); };
+  const changed = (user) => { snap(); render(); opts.onChange?.(M, user ? { user: true } : undefined); };   // (user: in a dialog, the main toolbar's Undo's, #2505)
   const cycle = (o, r) => {
     const c = M.table[o][r];
     M.table[o] = M.table[o].slice(0, r) + NEXT[c] + M.table[o].slice(r + 1);

@@ -374,7 +374,18 @@ html[data-ui="silinx"] .sch-editor .btn { height: var(--m-tool-h); padding: 0 10
 html[data-ui="silinx"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar, .sch-editor .se-toolbar, .asm-editor .asm-toolbar, .emu-bar, .pin-planner .pp-bar) {
   min-height: var(--m-toolbar-h); padding: 6px 8px; background: var(--m-surface); border-bottom: 1px solid var(--m-border); }   /* (each its own gap) */
 html[data-ui="silinx"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar, .sch-editor .se-toolbar, .emu-bar, .pin-planner .pp-bar) .btn,
-html[data-ui="silinx"] .asm-editor .asm-toolbar .asm-btn { height: var(--m-tool-h); min-width: 0; padding: 0 10px; font-size: var(--fs); }
+html[data-ui="silinx"] .asm-editor .asm-toolbar .asm-btn { height: var(--m-tool-h); min-width: var(--m-tool-h); padding: 0 10px; font-size: var(--fs); border: none; border-radius: 6px; cursor: pointer; }
+html[data-ui="silinx"] .asm-editor .asm-toolbar .asm-tool { width: var(--m-tool-h); padding: 0; }
+html[data-ui="silinx"] .asm-editor .asm-toolbar .asm-btn:hover:not(:disabled) { background: var(--m-hover); border: none; }
+html[data-ui="silinx"] .asm-editor .asm-toolbar .asm-btn:active:not(:disabled), html[data-ui="silinx"] .asm-editor .asm-toolbar .asm-btn:is(.on, .active) { background: var(--m-accent-soft); border: none; }
+html[data-ui="silinx"] .asm-editor .asm-sep, html[data-ui="silinx"] .tt-toolbar .tt-sep { background: var(--m-border); box-shadow: none; }
+html[data-ui="silinx"] .asm-editor .asm-cap { height: 32px; padding: 0 10px; background: var(--m-surface); color: var(--m-muted); border-color: var(--m-border); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+html[data-ui="silinx"] .asm-editor .asm-section { border-color: var(--m-border); }
+html[data-ui="silinx"] .asm-editor :is(.asm-section h3, details.asm-section > summary) { color: var(--m-fg); }
+html[data-ui="silinx"] .asm-editor .asm-input { border-radius: var(--m-radius-sm); }
+html[data-ui="silinx"] .tt-toolbar .tb-more-btn { height: var(--m-tool-h); border: none; border-radius: 6px; }
+html[data-ui="silinx"] .tt-menu-item, html[data-ui="silinx"] .asm-editor .asm-toolbar .tb-more-menu .asm-btn { height: var(--m-tool-h); width: auto; padding: 0 10px; border: none; border-radius: 6px; cursor: pointer; }
+html[data-ui="silinx"] :is(.tt-menu-item, .tt-toolbar .tb-more-btn):hover { background: var(--m-hover); border: none; }
 html[data-ui="silinx"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar, .sch-editor .se-toolbar, .asm-editor .asm-toolbar, .emu-bar, .pin-planner .pp-bar) .tb-btn, html[data-ui="silinx"] .sch-editor .se-toolbar .se-btn:not(.wide) { width: var(--m-tool-h); min-width: var(--m-tool-h); height: var(--m-tool-h); }
 html[data-ui="silinx"] .sch-editor .se-toolbar .se-btn.wide, html[data-ui="silinx"] .isim-toolbar .tb-btn:has(.tb-label) { width: auto; height: var(--m-tool-h); }
 /* the toolbar's menu (#2208): at the right of the first line, its place kept free */

@@ -262,10 +262,10 @@ const PT = {
   'Combinational logic': 'Lógica combinatória', 'Testbench process': 'Processo de testbench', 'Black box (module not found)': 'Caixa negra (módulo não encontrado)',
   'Instance': 'Instância', 'Constant': 'Constante', 'Net (driven elsewhere)': 'Ligação (excitada noutro sítio)',
   // ASM editor
-  'State': 'Estado', 'Decision': 'Decisão', 'Cond. output': 'Saída cond.', 'Arrange': 'Organizar', 'Fit': 'Ajustar', '✓ Validate': '✓ Validar',
+  'State': 'Estado', 'Decision': 'Decisão', 'Cond. output': 'Saída cond.', 'Arrange': 'Organizar', 'Fit': 'Ajustar', 'Validate': 'Validar',
   'Add state box (rectangle)': 'Adicionar caixa de estado (retângulo)', 'Add decision box (diamond)': 'Adicionar caixa de decisão (losango)',
   'Add conditional output box (oval)': 'Adicionar caixa de saída condicional (oval)', 'Delete selection': 'Apagar seleção',
-  'Toggle snapping to the grid': 'Ativar/desativar alinhamento à grelha', 'Fit the chart in the window': 'Ajustar o diagrama à janela',
+  'Toggle snapping to the grid': 'Ativar/desativar alinhamento à grelha',
   'Check the chart for errors': 'Verificar erros no diagrama',
   'Layout': 'Disposição', 'Selection': 'Seleção', 'Machine': 'Máquina',
   'Module / entity name': 'Nome do módulo / entidade', 'HDL language': 'Linguagem HDL', 'State encoding': 'Codificação de estados', 'Clock': 'Relógio',
@@ -278,7 +278,6 @@ const PT = {
   'State: name + Moore outputs': 'Estado: nome + saídas de Moore', 'Decision: condition, exits 1 / 0': 'Decisão: condição, saídas 1 / 0',
   'Conditional (Mealy) outputs': 'Saídas condicionais (Mealy)', 'Conditional output': 'Saída condicional', 'active high': 'ativo a alto', 'active low': 'ativo a baixo',
   'Gray': 'Gray', 'One-hot': 'One-hot', 'Enum / auto': 'Enum / automático',
-  'Copy the code to the clipboard': 'Copiar o código',
   'Default (combinational) or reset value (registered)': 'Valor por omissão (combinatória) ou de reset (registada)',
   'Drop the connection on a box (a state, decision or conditional output)': 'Largue a ligação numa caixa (estado, decisão ou saída condicional)',
   'Drag from a port ● to a box to connect · drag background to pan · wheel to zoom · Shift+drag to select · double-click to add a state': 'Arraste de um porto ● para uma caixa para ligar · arraste o fundo para deslocar · roda para zoom · Shift+arrastar para selecionar · duplo clique para adicionar um estado',
@@ -404,7 +403,6 @@ const PT_PATTERNS = [
   // the tip of a drawing's link banner, shortened on a narrow screen (#266)
   // the HDL editor's banner of a file generated from a drawing, out of sync (#1176)
   [/^— the (schematic|state machine|Petri net) has errors: ([\s\S]*)$/, (m, w, why) => `— ${{ schematic: 'o esquemático tem', 'state machine': 'a máquina de estados tem', 'Petri net': 'a rede de Petri tem' }[w]} erros: ${why}`],
-  [/^HDL: (\S+) — generated from the (diagram|net|table)$/, (m, f, w) => `HDL: ${f} — gerado a partir ${{ diagram: 'do diagrama', net: 'da rede', table: 'da tabela' }[w]}`],
   // a process run on the top module while another module is selected (#223)
   [/^(.+) (implements|synthesizes|emulates) the top module '(.+)', not the selected module '(.+)'\.$/,
     (m, p, v, top, sel) => `${t(p)} ${{ implements: 'implementa', synthesizes: 'sintetiza', emulates: 'emula' }[v]} o módulo de topo '${top}', não o módulo selecionado '${sel}'.`],

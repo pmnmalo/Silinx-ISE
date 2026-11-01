@@ -137,26 +137,21 @@ for (const [w, h] of [[820, 1180], [768, 1024]]) {
   });
 }
 
-uiTest('narrow screen 820×1180: the FSM and Petri net editors, their properties over the canvas, the link banner on one line', E, async (page) => {
+uiTest('narrow screen 820×1180: the FSM and Petri net editors, their properties over the canvas', E, async (page) => {
   await makeProject(env, { name: 'Narrow_fsm', template: 'traffic' });
   await page.setViewport(820, 1180);
   await page.openProject('Narrow_fsm');
   await page.eval(() => window.SilinxApp.openFsm('src/traffic.fsm.json'));
-  await page.waitFor((d) => document.querySelector(`${d} .fsm-editor .fsm-link .gen-banner`), [DOC], { what: 'the FSM editor' });
+  await page.waitFor((d) => document.querySelector(`${d} .fsm-editor .asm-side`), [DOC], { what: 'the FSM editor' });
   // (the Silinx interface: its side panel docked, #1463, folded for the canvas's width; the ISE style one: the drawer closed)
   if (await page.eval(() => document.documentElement.dataset.ui === 'silinx')) {
     await sideButton(page);
     await page.waitFor(() => document.documentElement.dataset.side === 'folded', [], { what: 'the side panel folded' });
   } else assert.equal((await drawer(page))[0], 'closed');
-  const check = async (ed, tip) => {
+  const check = async (ed) => {
     const canvas = await width(page, `${DOC} ${ed} .asm-canvas-wrap`);
     assert.ok(canvas >= 0.6 * 820, `${ed}: canvas ${canvas} px`);
     assert.ok(!(await shown(page, `${DOC} ${ed} .asm-side`)));
-    // the banner: one line, its whole text in its tip
-    const b = await page.eval((s) => { const e = document.querySelector(s); return { h: e.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(e).lineHeight) || 16, title: e.title, wrap: getComputedStyle(e).whiteSpace }; }, `${DOC} ${ed} .gen-banner`);
-    assert.equal(b.title, tip);
-    assert.equal(b.wrap, 'nowrap');
-    assert.ok(b.h < 2 * b.lh, JSON.stringify(b));
     // the toolbar: a few rows at most
     const tb = await rect(page, `${DOC} ${ed} .asm-toolbar`);
     assert.ok(tb.height <= 120, `${ed}: toolbar ${tb.height} px high`);
@@ -170,7 +165,7 @@ uiTest('narrow screen 820×1180: the FSM and Petri net editors, their properties
     assert.ok(!(await shown(page, `${DOC} ${ed} .asm-side`)));
     assert.deepEqual(await noSideScroll(page), { page: true, over: [] });
   };
-  await check('.fsm-editor', 'HDL: traffic.vhd — generated from the diagram');
+  await check('.fsm-editor');
   // a new Petri net (Tools ▸ Petri Net Editor…)
   await page.menu('Tools', 'Petri Net Editor…');
   await page.waitDialog('New Source');
@@ -179,12 +174,11 @@ uiTest('narrow screen 820×1180: the FSM and Petri net editors, their properties
   await page.dialogButton('Next >');
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor((d) => document.querySelector(`${d} .petri-editor .pn-link .gen-banner`), [DOC], { what: 'the Petri net editor' });
-  await check('.petri-editor', 'HDL: ctl.vhd — generated from the net');
-  // the tips in Portuguese
+  await page.waitFor((d) => document.querySelector(`${d} .petri-editor .pn-link`)?.dataset.hdl === 'ctl.vhd', [DOC], { what: 'the Petri net editor' });
+  await check('.petri-editor');
+  // the Properties button in Portuguese
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
-  assert.deepEqual(await page.eval((d) => [document.querySelector(`${d} .pn-link .gen-banner`).title, document.querySelector(`${d} .petri-editor .narrow-only`).textContent], DOC),
-    ['HDL: ctl.vhd — gerado a partir da rede', '☰ Propriedades']);
+  assert.equal(await page.eval((d) => document.querySelector(`${d} .petri-editor .narrow-only`).textContent, DOC), '☰ Propriedades');
   await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
   await noWarnings(page);
 });
@@ -220,7 +214,7 @@ for (const [w, h] of [[1180, 820], [1400, 900]]) {
     await page.waitFor((d) => document.querySelector(`${d} .fsm-editor .asm-side`)?.getClientRects().length, [DOC], { what: 'the FSM editor' });
     const fc = await rect(page, `${DOC} .fsm-editor .asm-canvas-wrap`), fs = await rect(page, `${DOC} .fsm-editor .asm-side`);
     assert.ok(fc.right <= fs.left, JSON.stringify({ fc, fs }));
-    assert.equal(await width(page, `${DOC} .fsm-editor .asm-side`), 320);
+    assert.equal(await width(page, `${DOC} .fsm-editor .asm-side`), 250);
     assert.ok(!(await shown(page, `${DOC} .fsm-editor .narrow-only`)));
     assert.ok(await shown(page, '#hier'));
     await noWarnings(page);

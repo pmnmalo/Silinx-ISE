@@ -198,7 +198,7 @@ export function mountAsmPointer(ctx) {
     }
     if (!mod && (k === '+' || k === '=')) { zoomBy(1.2); return; }
     if (!mod && k === '-') { zoomBy(1 / 1.2); return; }
-    if (!mod && k === '0') { fit(); return; }
+    if (!mod && (k === '0' || k === 'f')) { fit(); return; }
     const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (arrows[k] && sel().nodes.size) {
       const step = ev.shiftKey ? 1 : GRID;

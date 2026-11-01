@@ -33,7 +33,7 @@ export async function openTt(path) {
       el.append(host);
       const ed = mountTtEditor(host, {
         model,
-        onChange: m => { setDirty(d, true); refreshTtSchematic(path, m); },
+        onChange: (m, o) => { setDirty(d, true, o); refreshTtSchematic(path, m); },
         linkInfo: () => { const f = S.schOwners?.[path]; return f ? { file: f, why: S.outOfSync?.[f] } : null; },
         onOpenFile: f => openFile(f),
         onFromModule: () => loadTtFromModule(path),

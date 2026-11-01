@@ -203,7 +203,7 @@ uiTest('Handwritten expressions: a truth table from the New Source wizard, the e
   const saved = await page.waitFor(async () => { const d = JSON.parse(await (await fetch('/api/projects/Ink/file?path=src%2Fhand.bool.json')).text()); return d.outputs.join() === 'S,K' && d; }, [], { what: 'saved' });
   assert.deepEqual(saved.exprs, { S: 'A ⊕ B', K: 'A.D' });
   // one step of Undo: the table before
-  await page.click(`${T} .tt-undo`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor((t) => document.querySelector(`${t} .tt-outputs`).value === 'F', [T], { what: 'undone' });
   assert.deepEqual(await shape(), ['A, C', 'F']);
   assert.deepEqual(warnings(page), []);

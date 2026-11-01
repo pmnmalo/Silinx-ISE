@@ -87,7 +87,7 @@ uiTest('Handwritten Table…: a table drawn with the mouse, a finger and a pen f
   assert.equal(await cells(page, 'G'), '011X');
   await page.waitFor(async () => (await (await fetch('/api/projects/InkTable/file?path=src%2Fdrawn.bool.json')).json()).table.G === '011X', [], { what: 'saved', timeout: 15000 });
   // one step of Undo: the table before
-  await page.click(`${T} .tt-undo`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor((t) => document.querySelector(`${t} .tt-inputs`).value === 'a, b, c', [T], { what: 'undone' });
   assert.equal(await cells(page, 'f'), '00000000');
   assert.deepEqual(warnings(page), []);
