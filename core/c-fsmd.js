@@ -28,6 +28,7 @@ import { subMethods } from './c-submodule.js';
 import { markAutoPipeline, innerLoops, pipelineMethods, PIPELINE_LOOPS } from './c-pipeline.js';
 import { outFirstMethods } from './c-out-first.js';
 import { pipelineSchedMethods } from './c-pipe-sched.js';
+import { mergeLoops } from './c-loop-merge.js';
 
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
 // (split: core/c-schedule.js's, the states split by the clock; spare: the states it adds, room for them in the state's
@@ -276,6 +277,7 @@ class SeqFlow extends Flow {
       // (the calls of a function with a loop, or given an array: inlined, its loops the top's, #1632)
       const inl = { ...fn, body: inlineCalls(fn, withSeqMath(funcs), (loc, m) => this.error(loc, m), this.sub) };
       this.fn = inl;
+      inl.body = mergeLoops(inl.body, { trip: (l) => this.loopCount(l), warn: (loc, m) => this.warn(loc, m) });   // (LOOP_FLATTEN, LOOP_MERGE, #1961)
       this.ptrFifoAccesses(inl);   // (a pointer with ap_fifo or ap_hs: a stream's accesses, #1901)
       const { body, decls } = this.renameLocals(inl);
       this.insts = new Map();
@@ -501,6 +503,7 @@ class SeqFlow extends Flow {
   }
   tripOf(s) { return this.loopCount(s).trip; }
   loopCount(s) {
+    if (s.count) return s.count;   // (a loop made one with others, core/c-loop-merge.js, #1961)
     // (the library's loop, inlined: its bound its LOOP_TRIPCOUNT's, core/c-mathlib.js's fmod, #2144)
     if (s.library) { const pg = (s.body?.items || []).find((x) => x?.kind === 'pragma' && x.pragma.name === 'LOOP_TRIPCOUNT'); return { trip: null, max: pg ? Number(tripcountArgs(pg.pragma.text).max) : null }; }
     return this.c.loops.find((l) => l.loc.line === s.loc.line && l.loc.col === s.loc.col) || { trip: null, max: null };

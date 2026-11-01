@@ -9,12 +9,10 @@
   "interface-aggregation-disaggregation-aggregation-of-m-axi-ports": [],
   "interface-aggregation-disaggregation-struct-ii-issue": [],
   "interface-memory-burst-rw": [
-    "54 warning: #pragma HLS LOOP_FLATTEN is accepted and ignored: Silinx does not make it",
     "62 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=3 made (the memory 'burstbuffer' has one port, accessed 3 times an iteration); #pragma HLS PIPELINE off in it turns that off"
   ],
   "interface-memory-lmem-2rw": [
-    "85 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'v1_buffer' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off",
-    "87 warning: #pragma HLS LOOP_FLATTEN is accepted and ignored: Silinx does not make it"
+    "85 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'v1_buffer' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off"
   ],
   "interface-memory-manual-burst-manual-burst-example-auto-burst-inference-failure": [
     "20 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
