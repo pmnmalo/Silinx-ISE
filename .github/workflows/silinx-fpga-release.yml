@@ -3,9 +3,10 @@
 # by this workflow, from this tag (npm audit signatures, or the package's page on npmjs.com). As the IDE's Release:
 # the tests are not run here; CI, started by the same tag, runs them all (the package's among them) and the job
 # waits for that run (scripts/wait-for-ci.mjs). The tagged commit must be on main, its package's version the tag's,
-# with its changelog section and no fragment left (scripts/sync-version.mjs --package). The token is the secret
-# NPM_TOKEN (an npm granular token that may publish silinx-fpga); npm reads it from the environment, it is written
-# nowhere. No GitHub Release: the Pages site serves the IDE's latest one.
+# with its changelog section and no fragment left (scripts/sync-version.mjs --package). No token: npm's trusted
+# publishing (#2428) authenticates this workflow by GitHub's OIDC token, the package's trusted publisher on npmjs.com
+# being this repository and this workflow; it needs npm 11.5.1 or later (Node 22's is npm 10), pinned here. No
+# GitHub Release: the Pages site serves the IDE's latest one.
 name: silinx-fpga release
 on:
   push:
@@ -13,7 +14,7 @@ on:
 permissions:
   actions: read               # the tagged commit's CI run
   contents: read
-  id-token: write             # npm's provenance (its signing certificate, from GitHub's OIDC token)
+  id-token: write             # npm's trusted publishing and provenance (GitHub's OIDC token)
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -38,8 +39,5 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Publish
         run: |
-          echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > "$RUNNER_TEMP/.npmrc"
+          npm install --global npm@11.21.0 --ignore-scripts --no-audit --no-fund
           npm publish -w silinx-fpga --provenance --access public --ignore-scripts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/.npmrc
