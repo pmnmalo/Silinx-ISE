@@ -48,7 +48,11 @@ function resourcesUsed(body) {
   for (const b of rest.matchAll(/mkButton\(0, '[^']*', '([\w-]+)'\)/g)) use(b[1]);
   if (/mkLcd\(/.test(rest)) { use('lcd_e'); use('lcd_rs'); use('lcd_rw'); }
   if (/mkRotary\(/.test(rest)) { use('rot_a'); use('rot_b'); }
-  return { used, optional: new Set([...rest.matchAll(/\['(btn_\w+)', '[A-Z_]+'/g)].map((m) => m[1])) };
+  // drawn only when the board has them: the direction buttons (the Starter Kit's), what a layout asks has('…') of (the
+  // iCEBreaker's modules on its Pmods, #2297: a display's anodes, its segments with them)
+  const optional = new Set([...rest.matchAll(/\['(btn_\w+)', '[A-Z_]+'/g), ...body.matchAll(/has\('(\w+)'\)/g)].map((m) => m[1]));
+  if (optional.has('an')) optional.add('seg');
+  return { used, optional };
 }
 
 test('every board drawn by the emulator is in the device database', () => {
@@ -68,7 +72,7 @@ for (const [id, fn] of Object.entries(LAYOUTS)) {
       assert.ok(r.pins.length > maxIdx, `${id}: '${name}' has ${r.pins.length} pin(s), the drawing uses index ${maxIdx}`);
     }
     // direction buttons (drawn when the board has them): mkButton(0, …, res) for each
-    if (optional.size) assert.match(layoutBody(fn), /for \(const \[res, lbl, [^\]]*\] of dirs\)[^]*mkButton\(0, '[^']*', res\)/);
+    if ([...optional].some((n) => n.startsWith('btn_'))) assert.match(layoutBody(fn), /for \(const \[res, lbl, [^\]]*\] of dirs\)[^]*mkButton\(0, '[^']*', res\)/);
     // and conversely the board's LEDs / switches / buttons / digits all have a widget
     for (const name of ['led', 'sw', 'btn', 'an']) {
       const r = board.resources.find((x) => x.name === name);

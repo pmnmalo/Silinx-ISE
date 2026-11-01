@@ -1,0 +1,2 @@
+In detail:
+- The iCEBreaker's drawing shows the modules of the examples on its Pmods when the board data has them: the 4-digit display on a breadboard over PMOD1A (its segments there, its anodes on PMOD1B by wires), the 4 switches' module on PMOD1B, the board under them; without them it is drawn as before (`web/js/emulator-icebreaker.js`). `test/web-emulator.test.js` takes a layout's `has('…')` parts as optional (Refs #2297).
