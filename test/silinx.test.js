@@ -1,5 +1,5 @@
-// web/js/modern.js: the interface and theme preferences, and the matching of the command palette;
-// web/index.html + web/css/modern.css: the two interfaces share one page.
+// web/js/silinx.js: the interface and theme preferences, and the matching of the command palette;
+// web/index.html + web/css/silinx.css: the two interfaces share one page.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,7 +14,7 @@ globalThis.matchMedia = () => ({ get matches() { return systemDark; }, addEventL
 globalThis.addEventListener ??= () => {};
 globalThis.dispatchEvent ??= () => true;
 globalThis.Event ??= class { constructor(type) { this.type = type; } };
-const M = await import('../web/js/modern.js');
+const M = await import('../web/js/silinx.js');
 const fakeRoot = () => ({ dataset: {}, style: {} });
 
 test('preferences: the Silinx interface following the system theme by default; invalid values ignored', () => {
@@ -53,7 +53,7 @@ test('#2451 a preference saved with an old id (modern, classic) migrated once to
   assert.equal(M.migrateInterface('silinx.dev.ui'), 'ise');
   // on load: a page whose module is loaded fresh finds the old id rewritten
   mem.clear(); mem.set(M.UI_KEY, 'classic');
-  const fresh = await import(`../web/js/modern.js?migrate=${Date.now()}`);
+  const fresh = await import(`../web/js/silinx.js?migrate=${Date.now()}`);
   assert.equal(mem.get(M.UI_KEY), 'ise');
   assert.equal(fresh.getInterface(), 'ise');
   // no storage (a private window's, blocked): no error
@@ -207,7 +207,7 @@ test('index.html: one page for both interfaces (header, activity bar icons, empt
   const html = fs.readFileSync(path.join(ROOT, 'web/index.html'), 'utf8');
   for (const id of ['topbar', 'titlebar', 'menubar', 'toolbar', 'palette-btn', 'settings-btn', 'ws-empty', 'left-tabs', 'doc-tabs', 'console-wrap', 'statusbar'])
     assert.match(html, new RegExp(`id="${id}"`), id);
-  assert.match(html, /<link rel="stylesheet" href="\/css\/modern.css">/);
+  assert.match(html, /<link rel="stylesheet" href="\/css\/silinx.css">/);
   // the interface and theme are set before the first paint (no flash of the other look)
   const head = html.slice(0, html.indexOf('</head>'));
   // (under the keys of this edition: the site's dev/ its own, web/js/prefs.js, #1243)
@@ -218,8 +218,8 @@ test('index.html: one page for both interfaces (header, activity bar icons, empt
   assert.equal((html.match(/class="ico-inline tab-ico" data-icon="m\w+"/g) || []).length, 4);
 });
 
-test('modern.css: the Silinx look applies only under data-ui="silinx"; the ISE style look hides its parts', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'web/css/modern.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+test('silinx.css: the Silinx look applies only under data-ui="silinx"; the ISE style look hides its parts', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'web/css/silinx.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   // shared parts (both interfaces): the palette, the empty state, the header wrapper, the m-* controls, kbd keys
   const shared = /^(\.pal\b|\.pal-|#ws-empty|#topbar$|\.m-|\.ws-|#app kbd$|html:not\(\[data-ui="silinx"\]\)|html\[data-theme="dark"\] \.m-sun$|html:not\(\[data-theme="dark"\]\) \.m-moon$)/;
   // the selectors of a rule, split at the commas outside parentheses (:is(a, b))
@@ -240,7 +240,7 @@ test('modern.css: the Silinx look applies only under data-ui="silinx"; the ISE s
 // #159: the colours of the pages and dialogs are theme.css's variables, each with a dark value
 test('theme.css: the pages\' own colours have a dark value; no colour written in the code of the pages (dark theme, #159)', () => {
   const theme = fs.readFileSync(path.join(ROOT, 'web/css/theme.css'), 'utf8');
-  const css = fs.readFileSync(path.join(ROOT, 'web/css/modern.css'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'web/css/silinx.css'), 'utf8');
   const own = theme.slice(theme.indexOf('--note-bg:'), theme.indexOf('}', theme.indexOf('--note-bg:')));
   const vars = [...own.matchAll(/(--[\w-]+):/g)].map((m) => m[1]);
   assert.deepEqual(vars, ['--note-bg', '--note-border', '--code-bg', '--frame', '--frame-light', '--frame-lighter', '--field-bg', '--field-fg', '--field-border',

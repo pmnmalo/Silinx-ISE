@@ -58,7 +58,7 @@ uiTest('#1224 Tasks ▸ Implement with no top module: said so, Set Top Module…
   assert.match((await note(page)).text, /^Não está definido nenhum módulo de topo/);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the ISE style interface: none
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
+  await page.eval(async () => (await import('/js/silinx.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   await page.eval(() => window.SilinxApp.renderProcesses());
   assert.equal(await note(page), null, 'ise');

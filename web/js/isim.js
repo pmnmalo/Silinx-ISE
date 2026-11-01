@@ -15,7 +15,7 @@
 // Time is in picoseconds everywhere.
 
 import * as V from '/core/values.js';
-import { onPrefsChange } from './modern.js';
+import { onPrefsChange } from './silinx.js';
 import { normalizeStimuli } from '/core/stimuli.js';
 import { h } from './dom.js';
 import { mountConsole } from './isim-console.js';

@@ -161,7 +161,7 @@ test('no matchMedia: a wide screen', () => {
 
 test('the breakpoint (under 1024 px: 1024 px wide, an iPad in landscape, docked, #1418) is the same in the stylesheets and the scripts, and the first-paint script keeps the drawer under the same key', () => {
   assert.equal(N.NARROW_QUERY, '(max-width: 1023px)');
-  for (const f of ['app.css', 'modern.css', 'asm-editor.css', 'sch-editor.css', 'tasks.css']) {
+  for (const f of ['app.css', 'silinx.css', 'asm-editor.css', 'sch-editor.css', 'tasks.css']) {
     const css = fs.readFileSync(path.join(ROOT, 'web/css', f), 'utf8');
     assert.ok(css.includes('@media (max-width: 1023px)'), f);
     assert.doesNotMatch(css, /max-width: 1024px|min-width: 1025px/, `${f}: no other breakpoint`);

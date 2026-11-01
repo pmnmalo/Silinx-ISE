@@ -1,7 +1,7 @@
 /* The Silinx interface: applied under <html data-ui="silinx">, light or dark (data-theme).
    The ISE style look (theme.css + app.css) is <html data-ui="ise">; both share the same
    page (web/index.html) and the same element ids, so the application code does not depend on the look.
-   Preferences and command palette: web/js/modern.js, web/js/palette.js. */
+   Preferences and command palette: web/js/silinx.js, web/js/palette.js. */
 
 /* ------------------------------------------------------------------ parts of the Silinx interface only */
 html:not([data-ui="silinx"]) #top-actions, html:not([data-ui="silinx"]) .m-steps,

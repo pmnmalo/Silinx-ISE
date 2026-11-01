@@ -615,7 +615,7 @@ core/       VHDL/Verilog parsers, elaborator, simulator, schematics, ASM, UCF, z
             core/fpga: the Silinx toolchain (pack, place, route, timing, bitstream); adept.js / xcf.js:
             the board and its Platform Flash programmed over WebUSB
 server/     HTTP server, projects, ISE flow, programmers, boards/devices, .xise
-web/        Project Navigator UI (the Silinx and ISE style interfaces, web/css/modern.css): editor, SSim, schematics, ASM, pin planner, iMPACT
+web/        Project Navigator UI (the Silinx and ISE style interfaces, web/css/silinx.css): editor, SSim, schematics, ASM, pin planner, iMPACT
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image
 scripts/    adepttool installer/patch, Platform Flash programmer, standalone build
 examples/   example projects for the Basys2 / Nexys2 (the Silinx toolchain's devices): gates (the first one: logic

@@ -49,7 +49,7 @@
   --wave-marker: #00c0ff;
   --wave-names-bg: #ffffff;
 
-  /* the pages' and dialogs' own colours, light (the dark theme's in modern.css): never a colour
+  /* the pages' and dialogs' own colours, light (the dark theme's in silinx.css): never a colour
      written in the code, so that no light patch or dark text is left in the dark theme (#159) */
   --note-bg: #fffbe6;       /* a tip, e.g. iMPACT's notes */
   --note-border: #e6d690;

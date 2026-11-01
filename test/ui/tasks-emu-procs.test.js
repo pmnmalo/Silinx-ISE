@@ -93,7 +93,7 @@ uiTest('#1204 Tasks ▸ Emulate: its Processes, the top\'s User Constraints and 
   await page.click('#task-view [data-act="side"]');
   assert.equal((await procs(page)).shown, true);
   // the ISE style interface: none
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
+  await page.eval(async () => (await import('/js/silinx.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal((await procs(page))?.shown ?? false, false, 'ISE style: none');
   await noWarnings(page);

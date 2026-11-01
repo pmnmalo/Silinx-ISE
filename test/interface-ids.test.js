@@ -34,11 +34,10 @@ export const OLD_NAMES = [
 // the lines allowed to name an old id, by file: how many matches each has, and why
 const ALLOW = {
   'web/index.html': [2, 'the early script migrates a saved old id (#2451)'],
-  'test/modern.test.js': [2, 'the migration, of the development edition\'s preference and on load'],
+  'test/silinx.test.js': [2, 'the migration, of the development edition\'s preference and on load'],
   'test/tasks.test.js': [2, 'the early script\'s migration'],
   'test/ui/tasks.test.js': [2, 'the migration in the browser'],
   'test/ui-interface.test.js': [5, 'SILINX_UI_INTERFACE=modern|classic mapped, with a warning'],
-  'scripts/test-browsers.mjs': [1, 'the file test/ui/modern.test.js, not an interface'],
 };
 
 const matches = (patterns) => (text) => {

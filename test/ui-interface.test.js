@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { uiInterface, UI_INTERFACES, LEGACY_UI_INTERFACES } from './ui/interface.js';
-import { INTERFACES, LEGACY_INTERFACES } from '../web/js/modern.js';
+import { INTERFACES, LEGACY_INTERFACES } from '../web/js/silinx.js';
 
 test('#2451 SILINX_UI_INTERFACE: silinx or ise as they are, unset the default, no warning', () => {
   const warnings = [];

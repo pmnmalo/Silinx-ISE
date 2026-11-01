@@ -127,7 +127,7 @@ uiTest('#1214 Tasks ▸ Files: Add to Project… (the folder\'s files not in the
   assert.deepEqual((await bar(page)).labels, ['Acrescentar ao Projeto…', 'Acrescentar Cópia ao Projeto…']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the ISE style interface: none
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
+  await page.eval(async () => (await import('/js/silinx.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-files-bar')), null);
   assert.deepEqual(warnings(page), []);

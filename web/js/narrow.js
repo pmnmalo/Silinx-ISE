@@ -6,7 +6,7 @@
 // - the diagram editors' side panels (properties; the schematic's symbols) go over the canvas, shown
 //   and hidden by a button of the editor's toolbar (panelToggle);
 // - the link banner of a drawing is one short line, its whole text in its tip.
-// Whether each is open is remembered per viewer (localStorage). The look: app.css and modern.css (the
+// Whether each is open is remembered per viewer (localStorage). The look: app.css and silinx.css (the
 // drawer), asm-editor.css and sch-editor.css (the side panels); the same width there.
 
 import { prefKey } from './prefs.js';

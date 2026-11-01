@@ -9,7 +9,7 @@ import { primitiveSources } from '/core/unisim.js';
 import * as wiz from './wizards.js';
 import { PRODUCT, VERSION_LABEL } from '/core/version.js';
 import { startI18n, t } from './i18n.js';
-import { applyPrefs } from './modern.js';
+import { applyPrefs } from './silinx.js';
 import { initDrawer, drawerGiveWay, leftTabClicked } from './narrow.js';
 import { initTasks, restoreStartTask } from './tasks.js';
 import { registerServiceWorker } from './pwa.js';

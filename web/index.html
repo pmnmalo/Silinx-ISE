@@ -16,14 +16,14 @@
 <link rel="stylesheet" href="/css/fsm-editor.css">
 <link rel="stylesheet" href="/css/petri-editor.css">
 <link rel="stylesheet" href="/css/fpgaview.css">
-<link rel="stylesheet" href="/css/modern.css">
+<link rel="stylesheet" href="/css/silinx.css">
 <link rel="stylesheet" href="/css/tasks.css">
 <link rel="stylesheet" href="/css/messages.css">
-<script>/* the interface (silinx | ise) and theme before the first paint: web/js/modern.js */
+<script>/* the interface (silinx | ise) and theme before the first paint: web/js/silinx.js */
 (function () { var d = document.documentElement, ui = 'silinx', th = 'system';
   /* the site's development edition (dev/) keeps its own settings: web/js/prefs.js prefKey (#1243) */
   var k = /\/dev\//.test(location.pathname) ? 'silinx.dev.' : 'silinx.';
-  /* a preference saved with the ids of before (#2451) migrated once: web/js/modern.js LEGACY_INTERFACES */
+  /* a preference saved with the ids of before (#2451) migrated once: web/js/silinx.js LEGACY_INTERFACES */
   try { var v = localStorage.getItem(k + 'ui'), was = v; v = v === 'modern' ? 'silinx' : v === 'classic' ? 'ise' : v;
     if (v !== was) localStorage.setItem(k + 'ui', v);
     ui = v === 'ise' ? 'ise' : 'silinx'; th = localStorage.getItem(k + 'theme') || 'system'; } catch (e) {}

@@ -75,7 +75,7 @@ uiTest('#1314 the header\'s Settings: About, Interface, Language, Theme, Check f
   await settingsMenu(page, 'Interface', 'ISE style');
   await page.waitFor(() => document.documentElement.dataset.ui === 'ise');
   assert.equal(await page.eval(() => document.getElementById('settings-btn').getClientRects().length), 0);
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('silinx'));
+  await page.eval(async () => (await import('/js/silinx.js')).setInterface('silinx'));
 }, { ui: 'silinx' });
 
 uiTest('Silinx interface by default: the Tasks layout, header with search and the tasks, Design\'s tabs on top, tabs on top, empty state', E, async (page) => {
