@@ -20,6 +20,8 @@ import { flattenArrays } from './c-flatten.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
 import { axiPlan, axiWrap } from './c-axi.js';
 import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
+import { latencyPragma, markFabric, mulLimit } from './c-op-pragmas.js';
+import { bindable } from './c-bind.js';
 import { hierarchy, inlineMode, latencyOf, moduleRegistry } from './c-submodule.js';
 import { fftTop } from './hls-fft-hdl.js';
 
@@ -91,8 +93,13 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
     // (said once: why it is made sequential)
     diagnostics.splice(0, diagnostics.length, ...diagnostics.filter((d) => !/^#pragma HLS DATAFLOW is accepted and ignored/.test(d.message)), r.fallback);
   }
+  // (the pragmas of operations and cycles, #1961)
+  for (const w of markFabric(checked)) diagnostics.push({ file, line: w.loc.line, col: w.loc.col, message: w.message, severity: 'warning' });
+  const limit = mulLimit(checked);
+  if (limit !== null) mults = Math.min(mults ?? limit, limit);
   let df = dataflow(checked);
   const fn = checked.funcs.get(checked.top);
+  const lat = latencyPragma(fn);
   // (the functions not inlined, sub-modules, #1960)
   const { subs, sub, kept } = subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes, mults, stall, modules });
   const pragmaOf = (f) => f.body.items.find((s) => s.kind === 'pragma' && s.pragma.name === 'INLINE').loc;
@@ -107,10 +114,19 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   if (seqOnly) df = { ...scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults }), seq: true };
   // a combinational top whose longest path does not fit the clock (the project's, syn.clock, else 10 ns): scheduled
   // over cycles, as Vitis HLS does, a sequential module (#1924); kept combinational when it cannot be made so
-  else if (!flat && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && !fitsClock(df.graph, clock, family)) {
+  else if (!flat && df.ctrl !== 'ap_ctrl_none' && !df.diagnostics.some((d) => d.severity === 'error') && (!fitsClock(df.graph, clock, family) || lat?.min > 0 || (limit !== null && mulsIn(df.graph) > limit))) {
     const sq = scheduled(checked, { groups, pipelineLoops, subs, sub }, { clock, family, mults });
     if (!sq.diagnostics.some((d) => d.severity === 'error')) df = { ...sq, seq: true };
   }
+  // (LATENCY min=: the machine made again with the wait states it lacks; max=: said if a path takes more)
+  if (lat && df.seq && !df.diagnostics.some((d) => d.severity === 'error')) {
+    const { min } = hierarchyReport(df).latency;
+    if (df.fnPipe) diagnostics.push({ file, line: lat.loc.line, col: lat.loc.col, message: '#pragma HLS LATENCY of a pipelined function: not made: its stages are its pipeline\'s', severity: 'warning' });
+    else if (lat.min > min) df = { ...scheduled(checked, { groups, pipelineLoops, subs, sub, wait: lat.min - min }, { clock, family, mults }), seq: true };
+    const { max } = hierarchyReport(df).latency;
+    if (lat.max !== null && max !== null && max > lat.max) diagnostics.push({ file, line: lat.loc.line, col: lat.loc.col, message: `#pragma HLS LATENCY max=${lat.max}: ${max} cycles made at this clock`, severity: 'warning' });
+  }
+  if (limit !== null && df.seq && blocksOf(df) > limit) diagnostics.push({ file, line: fn.loc.line, col: fn.loc.col, message: `#pragma HLS ALLOCATION limit=${limit} of mul: ${blocksOf(df)} multiplier blocks made (a pipeline's II is kept)`, severity: 'warning' });
   diagnostics.push(...df.diagnostics);
   // (each sub-module's own, once; a name of its own as a reserved word: inside it)
   const said = new Set(diagnostics.map((d) => `${d.line}:${d.col}:${d.message}`));
@@ -231,6 +247,8 @@ function hierarchyReport(m) {
   return { latency: { min: lat.min, max: lat.max }, functions, ...(functions.length ? { loops: m.loops.map((l, k) => (called(k) ? { ...l, cycles: lat.loops[k] } : l)) } : {}) };
 }
 
+// (the multiplications a combinational module holds, #1961)
+const mulsIn = (g) => g.nodes.filter((n) => n.op === 'mul' && bindable(g, n)).length;
 // (the multiplier blocks of a machine's units, #2125)
 const blocksOf = (df) => (df.units || []).reduce((a, u) => a + u.blocks, 0);
 

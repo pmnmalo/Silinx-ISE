@@ -147,6 +147,8 @@ function split(g, sts, plans, stateT, done) {
         const node = g.get(v);
         if (!node.args.length || !p.stage.has(v)) return v;
         const s = p.stage.get(v);
+        // (a value widened: its register as narrow as the value, a multiplication then knowing its operand's width, #1961)
+        if (s < c && node.op === 'ext' && g.get(node.args[0]).w < node.w) return g.add('ext', [f(node.args[0])], { w: node.w, s: node.s });
         if (s < c) return cutReg(v);
         if (memo.has(v)) return memo.get(v);
         const r = s === 0 && c === 0 ? v : g.add(node.op, node.args.map(f), { w: node.w, s: node.s }, extraOf(node));

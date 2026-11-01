@@ -5,6 +5,7 @@ import { softfloatFn } from './c-dataflow-float.js';
 import { MATH, BITCASTS, F32, F64 } from './c-float.js';
 import { BOOL, INT, typeOf, promote, binaryType, compareType, shiftType, unaryType, literalType } from './c-types.js';
 import { constValue } from './c-check.js';
+import { operandOf } from './c-mul-split.js';
 
 const NOT_COMB = '(a sequential module: not supported yet, #1526)';
 const OPS = { '+': 'add', '-': 'sub', '*': 'mul', '&': 'and', '|': 'or', '^': 'xor' };
@@ -141,6 +142,7 @@ export const exprMethods = {
     const { res, opnd } = binaryType(op, l.t, r.t);
     const a = this.conv(l, opnd), b = this.conv(r, opnd);
     if (op === '/' || op === '%') return this.divide(op, a, b, res, e);
+    if (op === '*' && e.fabric) return this.conv(this.fabricMul(a, b, res, opnd), res);   // (BIND_OP impl=fabric, #1961)
     if (op === '*') {
       const full = this.g.add('mul', [a.id, b.id], { w: opnd.w * 2, s: opnd.s });
       return this.conv(this.v(full, { w: opnd.w * 2, s: opnd.s }), res);
@@ -150,6 +152,22 @@ export const exprMethods = {
   },
   /** a / b and a % b (C: truncated toward zero): by constants folded; by a constant power of 2 with shifts; by
    *  another constant or a variable, core/c-dataflow-div.js. */
+  /** A multiplication made of LUTs (BIND_OP impl=fabric, #1961): a shift and an addition a bit of the right operand, its
+   *  sign's a subtraction. */
+  fabricMul(a, b, res, opnd) {
+    const g = this.g, t = { w: Math.max(res.w, opnd.w), s: opnd.s };
+    const x = g.add('ext', [a.id], t), y = g.add('ext', [b.id], t);
+    const [, bits] = operandOf(g, y, t.s);
+    const k = (n) => g.const(n, t);
+    let sum = k(0);
+    for (let i = 0; i < Math.min(bits, t.w); i++) {
+      const shifted = g.add('shl', [x, k(i)], t);
+      const set = g.add('eq', [g.add('and', [g.add('shr', [y, k(i)], t), k(1)], t), k(1)], BOOL);
+      const sign = t.s && i === Math.min(bits, t.w) - 1;
+      sum = g.add('mux', [set, g.add(sign ? 'sub' : 'add', [sum, shifted], t), sum], t);
+    }
+    return this.v(sum, t);
+  },
   divide(op, a, b, res, e) {
     if (!this.g.isConst(b.id)) return this.divVar(op, a, b, res);
     const d = this.g.k(b.id);

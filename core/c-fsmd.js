@@ -33,7 +33,7 @@ import { mergeLoops } from './c-loop-merge.js';
 // (pipelineLoops: Vitis HLS's syn.compile.pipeline_loops, the threshold of the loops pipelined automatically; 0 none, #1919)
 // (split: core/c-schedule.js's, the states split by the clock; spare: the states it adds, room for them in the state's
 // register, #2080; subs, sub: the design's modules, whether a call of a function is a sub-module's, core/c-submodule.js, #1960)
-export function fsmd(checked, { groups = [], pipelineLoops = PIPELINE_LOOPS, spare = 0, split = null, timing = null, subs = null, sub = () => false } = {}) {
+export function fsmd(checked, { groups = [], pipelineLoops = PIPELINE_LOOPS, spare = 0, split = null, timing = null, subs = null, sub = () => false, wait = 0 } = {}) {
   const f = new SeqFlow(checked);
   f.groups = groups;
   f.pipelineLoops = pipelineLoops;
@@ -42,6 +42,7 @@ export function fsmd(checked, { groups = [], pipelineLoops = PIPELINE_LOOPS, spa
   f.pipeTiming = timing;
   f.subs = subs;
   f.sub = sub;
+  f.waitStates = wait;
   return f.runSeq();
 }
 
@@ -294,6 +295,12 @@ class SeqFlow extends Flow {
         else this.entry = this.pipeFunction(body, fp.ii ?? 1, fn.loc);
       }
       if (!this.entry) this.entry = this.cfg(body.items, null, null);
+      // (LATENCY min=: wait states at its start, every path through them, #1961)
+      for (let k = 0; k < this.waitStates; k++) {
+        const b = { id: this.blocks.length + 1, stmts: [{ kind: 'empty', loc: fn.loc }], term: { goto: this.entry }, loop: null };
+        this.blocks.push(b);
+        this.entry = b;
+      }
       this.thread();
       this.runBlocks();
       this.loops = this.loopsDone();
