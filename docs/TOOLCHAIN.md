@@ -118,7 +118,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 |---|---|---|---|---|---|
 | Spartan-3E | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser and local |
 | Spartan-6 | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser (the Silinx engine, #2103) and local |
-| iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works, flow only: local server, and the browser's worker where the server serves it; no board or device in the interface yet (#2297, #2310) |
+| iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works, flow only: local server and browser, nextpnr-ice40 downloaded on first use (#2444); no board or device in the interface yet (#2297, #2310) |
 | ECP5, MachXO2 | `synth_ecp5`, to be defined | nextpnr | `ecppack`, Project Trellis | LPF | Planned (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel | `gowin_pack` (Python: the browser's path is to be decided) | CST | Planned (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
@@ -131,7 +131,8 @@ another family's Yosys script (`scriptSynthesis`), and the report's names; `FAMI
 needs (`orderSteps`), ISE's names for the Xilinx families. A fake family runs in Node and in the browser's worker (#2388,
 `web/js/open-flow-worker-io.js`). The iCE40 is the first family on them (#2295, `src/open-flow-ice40.js`): YoWASP's
 `@yowasp/nextpnr-ice40` (about 80 MB, every iCE40's chip database) is an optional dependency of the package and a development
-one of the IDE, so the release zip and the published site do not have it yet.
+one of the IDE: the release zip and the published site download it from npm's registry on the first iCE40 run, at
+`package-lock.json`'s version and SHA-512, and keep it (`server/nextpnr-ice40-fetch.js`, `web/js/nextpnr-ice40-browser.js`, #2444).
 
 And around the flow, one issue each: the boards and examples (#2297), programming (#2298), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).

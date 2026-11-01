@@ -26,7 +26,7 @@ test('#487 contentSecurityPolicy: the server\'s header and a page\'s <meta> (no 
     'default-src': ["'self'"],
     'script-src': ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", "'sha256-x'"],
     'worker-src': ["'self'", 'blob:'],
-    'connect-src': ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com'],
+    'connect-src': ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org'],
     'img-src': ["'self'", 'data:', 'blob:'],
     'style-src': ["'self'", "'unsafe-inline'"],
     'font-src': ["'self'", 'data:'],
@@ -38,7 +38,7 @@ test('#487 contentSecurityPolicy: the server\'s header and a page\'s <meta> (no 
   const meta = directives(contentSecurityPolicy({ hashes: ["'sha256-y'"], scripts: ['https://a.test'], connect: ['https://a.test'], meta: true }));
   assert.equal(meta['frame-ancestors'], undefined);
   assert.deepEqual(meta['script-src'], ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'https://a.test', "'sha256-y'"]);
-  assert.deepEqual(meta['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://a.test']);
+  assert.deepEqual(meta['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', 'https://a.test']);
 });
 
 test('#487 withMetaCsp / metaCsp / addSources: the <meta> first in <head>, replaced in place, quotes escaped', () => {
@@ -66,7 +66,7 @@ test('#487 the usage counter added to a page with a policy: its loader\'s hash, 
   // every inline script of the page is allowed by its hash: the application's and the loader; the counter's script by
   // its one versioned URL (#1439), not its host
   assert.deepEqual(d['script-src'], ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", ...inlineScriptHashes(out), 'https://gc.zgo.at/count.v5.js']);
-  assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://silinx.goatcounter.com']);
+  assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', 'https://silinx.goatcounter.com']);
   assert.deepEqual(d['img-src'], ["'self'", 'data:', 'blob:', 'https://silinx.goatcounter.com']);
   assert.equal(addAnalytics(out, 'silinx'), out, 'once');
   // a page without a policy: none added

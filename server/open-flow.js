@@ -26,6 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deviceFamily, isIseFamily, backendOf, orderSteps, ICE40_PARTS, resourcesOf, OPEN_STEPS, orderOpenSteps, synthEffort, findDeviceGraph, shippedDevicePath, buildDeviceCache, devicesDir, SHIPPED_DEVICES_DIR, S3E_DEVICES, s6OpenStatus, DB_DIR, hasBitDb, dbPackages } from '../packages/silinx-fpga/src/node.js';
 import { findPart } from './devices.js';
+import { ice40Package, ice40Present } from './nextpnr-ice40-fetch.js';
 import { runCommand } from './jobs.js';
 import { safeJoin } from './projects.js';
 import { engineOf } from '../packages/silinx-fpga/src/parts.js';
@@ -119,14 +120,12 @@ export function openStatus(device, { dbDir = BIT_DB_DIR } = {}) {
   return out;
 }
 
-// the iCE40 (#2295): nextpnr-ice40's part, and YoWASP's package installed (the release zip leaves it out)
+// the iCE40 (#2295): nextpnr-ice40's part, and YoWASP's package installed or to download (the release zip leaves it out, #2444)
 function ice40Status(device) {
   const dev = String(device.part).toLowerCase(), pkg = String(device.package || '').toLowerCase(), part = `${dev}${pkg}`;
   if (!ICE40_PARTS.includes(dev.replace(/^ice40/, ''))) return { part, device: dev, reason: `${dev}: not an iCE40 part of nextpnr-ice40 (ice40${ICE40_PARTS.join(', ice40')})` };
-  try { import.meta.resolve('@yowasp/nextpnr-ice40'); } catch {
-    return { part, device: dev, reason: 'nextpnr-ice40 is not in this installation: npm install @yowasp/nextpnr-ice40' };
-  }
-  return { part, device: dev, available: true, reason: `${part}: nextpnr-ice40 and icepack`, steps: backendOf('ice40').steps.map(s => s.id) };
+  if (!ice40Present() && !ice40Package()) return { part, device: dev, reason: 'nextpnr-ice40 is not in this installation: npm install @yowasp/nextpnr-ice40' };
+  return { part, device: dev, available: true, reason: `${part}: nextpnr-ice40 and icepack${ice40Present() ? '' : ' (downloaded by the first run, #2444)'}`, steps: backendOf('ice40').steps.map(s => s.id) };
 }
 
 /** Normalise the steps of an open run: the chain from synthesis to the last requested step; a family ISE does not
