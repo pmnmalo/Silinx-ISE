@@ -141,7 +141,7 @@ function selectionProcesses(sel, view) {
   ];
 }
 
-// a Generate Post-… Simulation Model process: the classic interface's only; the Tasks interface's Implement has none,
+// a Generate Post-… Simulation Model process: the ISE style interface's only; the Tasks interface's Implement has none,
 // Simulate's model choice generates the one it needs (#1265, #490)
 const simModelProc = p => (globalThis.document?.documentElement.dataset.layout === 'tasks' ? [] : [p]);
 // the User Constraints group (Implement's, and Emulate's, #1204), of module `mod`

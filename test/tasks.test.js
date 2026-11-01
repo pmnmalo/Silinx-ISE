@@ -1,5 +1,5 @@
 // web/js/tasks.js: the Tasks interface (#804): the task of a document, the arrangements, the kept state, the
-// task's state dot; web/css/tasks.css: its rules apply in that interface only, with the modern look's colours.
+// task's state dot; web/css/tasks.css: its rules apply in that interface only, with the Silinx look's colours.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +16,7 @@ const IMPL = await import('../web/js/tasks-impl.js');
 const CHECK = await import('../web/js/tasks-check.js');
 
 // (#1172: no Program task, programming Implement's)
-test('the four tasks, in the order of a lab session, with the names of the modern toolbar\'s steps', () => {
+test('the four tasks, in the order of a lab session, with the names of the Silinx toolbar\'s steps', () => {
   assert.deepEqual(T.TASKS, ['edit', 'sim', 'emu', 'impl']);
   assert.deepEqual(T.TASKS.map((t) => T.TASK_LABEL[t]), ['Design', 'Simulate', 'Emulate', 'Implement']);
 });
@@ -201,7 +201,7 @@ test('taskTitle: the task button\'s tooltip says what its dot means (#991)', () 
   for (const s of ['ok', 'warn', 'err', 'stale', 'running']) assert.ok(T.DOT_TEXT[s], s);
 });
 
-test('tasks.css: its rules apply in the Tasks interface only (or to its own elements), with the modern look\'s colours', () => {
+test('tasks.css: its rules apply in the Tasks interface only (or to its own elements), with the Silinx look\'s colours', () => {
   const css = fs.readFileSync(path.join(ROOT, 'web/css/tasks.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const parts = (sel) => { const out = []; let depth = 0, cur = ''; for (const c of sel) { if (c === ',' && !depth) { out.push(cur.trim()); cur = ''; continue; } depth += c === '(' ? 1 : c === ')' ? -1 : 0; cur += c; } out.push(cur.trim()); return out; };
   const selectors = [...css.matchAll(/(^|[{}])\s*([^{}@][^{}]*)\{/g)].map((m) => m[2].trim()).filter((x) => x && !x.startsWith('@'));
@@ -211,11 +211,11 @@ test('tasks.css: its rules apply in the Tasks interface only (or to its own elem
   // its own elements are hidden in the other interfaces
   assert.match(css, /#task-switch, #task-tabs, #task-bar, #task-view, #task-empty \{ display: none; \}/);
   assert.match(css, /^#mc-last \{ display: none; \}/m);   // (the message centre's other rules: every interface's, messages.css, #925)
-  // colours: the modern look's tokens only (light and dark), no colour written here
+  // colours: the Silinx look's tokens only (light and dark), no colour written here
   assert.deepEqual(css.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g), null);
 });
 
-test('index.html: the modern interface (the Tasks one, #1149) before the first paint (data-ui modern, data-layout tasks), its stylesheet', () => {
+test('index.html: the Silinx interface (the Tasks one, #1149) before the first paint (data-ui silinx, data-layout tasks), its stylesheet', () => {
   const html = fs.readFileSync(path.join(ROOT, 'web/index.html'), 'utf8');
   assert.match(html, /<link rel="stylesheet" href="\/css\/modern.css">\n<link rel="stylesheet" href="\/css\/tasks.css">/);
   const script = html.slice(html.indexOf('<script>'), html.indexOf('</script>'));
@@ -227,20 +227,20 @@ test('index.html: the modern interface (the Tasks one, #1149) before the first p
       { documentElement: d }, { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } }, {}, () => ({ matches: false }), { pathname });
     return attrs;
   };
-  // (the modern interface, the default, is the Tasks one, #1149: a stored tasks, or anything but classic)
-  const modern = { 'data-ui': 'silinx', 'data-layout': 'tasks', 'data-theme': 'dark', 'data-drawer': 'open' };
-  for (const ui of ['silinx', 'tasks', 'retro', null]) assert.deepEqual(run(ui), modern, String(ui));
+  // (the Silinx interface, the default, is the Tasks one, #1149: a stored tasks, or anything but ise)
+  const silinx = { 'data-ui': 'silinx', 'data-layout': 'tasks', 'data-theme': 'dark', 'data-drawer': 'open' };
+  for (const ui of ['silinx', 'tasks', 'retro', null]) assert.deepEqual(run(ui), silinx, String(ui));
   assert.deepEqual(run('ise'), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'open' });
   // the site's development edition (dev/) reads its own keys (#1243): not the stable edition's
   const both = { 'silinx.ui': 'ise', 'silinx.theme': 'light', 'silinx.drawer': 'closed', 'silinx.dev.ui': 'silinx', 'silinx.dev.theme': 'dark' };
-  assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: both }), modern);
+  assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: both }), silinx);
   assert.deepEqual(run(null, { pathname: '/Silinx-ISE/', store: both }), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'closed' });
   // #2451 a preference saved with an old id: shown with its new one and stored so, once (web/js/modern.js LEGACY_INTERFACES)
   const old = { 'silinx.ui': 'classic', 'silinx.dev.ui': 'modern', 'silinx.theme': 'dark', 'silinx.dev.theme': 'dark' };
   assert.deepEqual(run(null, { store: old }), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'open' });
-  assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: old }), modern);
+  assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: old }), silinx);
   assert.deepEqual([old['silinx.ui'], old['silinx.dev.ui']], ['ise', 'silinx']);
   const kept = { 'silinx.ui': 'tasks', 'silinx.theme': 'dark' };
-  assert.deepEqual(run(null, { store: kept }), modern);
+  assert.deepEqual(run(null, { store: kept }), silinx);
   assert.equal(kept['silinx.ui'], 'tasks', 'only the old ids rewritten');
 });

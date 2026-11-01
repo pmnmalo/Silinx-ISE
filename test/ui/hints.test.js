@@ -28,7 +28,7 @@ begin
 end rtl;
 `;
 
-// (the File and Edit menus: the classic interface's, the modern one has none, #1307)
+// (the File and Edit menus: the ISE style interface's, the Silinx one has none, #1307)
 uiTest('latch warning with its explanation in the Warnings tab and the editor tooltip (English, Portuguese); suppression; Edit ▸ Design Checks; output read', E, async (page) => {
   await makeProject(env, { name: 'HintPj', files: { 'src/top.vhd': TOP }, top: 'top' });
   await page.openProject('HintPj');

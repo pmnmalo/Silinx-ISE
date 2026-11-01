@@ -1,6 +1,9 @@
-// The interfaces' ids (#2451): silinx and ise, never the ids of before (modern, classic), anywhere in the code, the
-// tests, the scripts and the workflows: data-ui and its CSS selectors, the saved preference, SILINX_UI_INTERFACE, the
-// CI matrix. Only the migration of a preference saved with an old id, and its tests, name them (ALLOW).
+// The interfaces' ids and names (#2451). Their ids silinx and ise, never the ids of before (modern, classic), anywhere
+// in the code, the tests, the scripts and the workflows: data-ui and its CSS selectors, the saved preference,
+// SILINX_UI_INTERFACE, the CI matrix; only the migration of a preference saved with an old id, and its tests, name them
+// (ALLOW). Their names Silinx and ISE style (Silinx, Estilo ISE), never the names of before (Modern, Classic, the
+// modern / classic interface, Moderna, Clássica) nor AMD's trademark as one (the Xilinx ISE interface), in the labels,
+// the comments and the tests' names.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,6 +22,14 @@ export const OLD_IDS = [
   /interface: \[[^\]\n]*?\b(modern|classic)\b/g,
 ];
 
+// an old name: a label, a menu's path, the interface called so in prose (English or Portuguese), the trademark as its name
+export const OLD_NAMES = [
+  /(['"`])(Modern|Classic|Moderna|Clássica)\1/g,
+  /▸ (Modern|Classic)\b/g,
+  /\b(modern|classic|Xilinx ISE)(['’]s)? (interfaces?|look|ones?|toolbar|header)\b/gi,
+  /\binterfaces? (moderna|cl[aá]ssica)s?\b/gi,
+];
+
 // the lines allowed to name an old id, by file: how many matches each has, and why
 const ALLOW = {
   'web/index.html': [2, 'the early script migrates a saved old id (#2451)'],
@@ -29,14 +40,22 @@ const ALLOW = {
   'scripts/test-browsers.mjs': [1, 'the file test/ui/modern.test.js, not an interface'],
 };
 
-/** The matches of the old ids in a text: [{ line, text }]. */
-export function oldIds(text) {
+const matches = (patterns) => (text) => {
   const found = [];
   text.split('\n').forEach((l, i) => {
-    for (const re of OLD_IDS) for (const m of l.matchAll(re)) found.push({ line: i + 1, text: m[0] });
+    for (const re of patterns) for (const m of l.matchAll(re)) found.push({ line: i + 1, text: m[0] });
   });
   return found;
-}
+};
+/** The matches of the old ids in a text: [{ line, text }]. */
+export const oldIds = matches(OLD_IDS);
+/** The matches of the old names in a text: [{ line, text }]. */
+export const oldNames = matches(OLD_NAMES);
+
+// the files searched: the code, the tests, the scripts, the workflows (a new file not yet added too; a sync's copy,
+// "name 2.js", not)
+const sources = () => execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', 'web', 'test', 'scripts', '.github'], { cwd: ROOT, encoding: 'utf8' })
+  .split('\0').filter((f) => f && f !== SELF && !/ \d+\.\w+$/.test(f) && /\.(m?js|html|css|ya?ml|json)$/.test(f) && fs.existsSync(path.join(ROOT, f)));
 
 test('#2451 oldIds finds the ids of before as ids, not the words', () => {
   assert.deepEqual(oldIds("x = 'modern'\nhtml[data-ui=\"classic\"] a {}\nSILINX_UI_INTERFACE=classic node --test"),
@@ -45,10 +64,19 @@ test('#2451 oldIds finds the ids of before as ids, not the words', () => {
   assert.deepEqual(oldIds("a modern look, the classic one; 'silinx', data-ui=\"ise\", { modern: 'silinx' }; a classic worker"), []);
 });
 
+test('#2451 oldNames finds the names of before, not the words', () => {
+  assert.deepEqual(oldNames("{ label: 'Classic' }\n// the modern interface, the classic one; View ▸ Modern\n'Moderna', a interface clássica, the Xilinx ISE look").map((m) => m.text),
+    ["'Classic'", '▸ Modern', 'modern interface', 'classic one', "'Moderna'", 'Xilinx ISE look', 'interface clássica']);
+  assert.deepEqual(oldNames("a classic worker, Windows classic, 'Silinx', 'ISE style', the Silinx interface, the ISE style one, Xilinx ISE 14.7"), []);
+});
+
+test('#2451 no old interface name (Modern, Classic, the modern / classic interface) in web/, test/, scripts/, .github/', () => {
+  const found = sources().flatMap((f) => oldNames(fs.readFileSync(path.join(ROOT, f), 'utf8')).map((m) => `${f}:${m.line}: ${m.text}`));
+  assert.deepEqual(found, []);
+});
+
 test('#2451 no old interface id (modern, classic) in web/, test/, scripts/, .github/ but the migration\'s', () => {
-  const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', 'web', 'test', 'scripts', '.github'], { cwd: ROOT, encoding: 'utf8' })
-    // (a new file not yet added counts; a sync's copy, "name 2.js", does not)
-    .split('\0').filter((f) => f && f !== SELF && !/ \d+\.\w+$/.test(f) && /\.(m?js|html|css|ya?ml|json)$/.test(f) && fs.existsSync(path.join(ROOT, f)));
+  const files = sources();
   assert.ok(files.length > 100, 'the files found');
   const counts = {};
   for (const f of files) {

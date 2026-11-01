@@ -6,7 +6,7 @@
 //   headers ("Started : …", "=== SILINX STEP …", iMPACT's "Programming FPGA (SRAM)..."): the lines after a
 //   header are its process's.
 // - Filters by source follow the task in front in the Tasks interface (Implement: Implementation)
-//   until the viewer picks one; All shows every line (the modern and classic interfaces' default: no task). A
+//   until the viewer picks one; All shows every line (the Silinx and ISE style interfaces' default: no task). A
 //   process started whose source the viewer's filter hides turns that filter to its source (#1852, #1867); a C
 //   module's commands, run where it is edited, turn the task's filter too (#2262).
 // - Folded (tasks.js), the panel shows its last line of the current filter.
@@ -174,7 +174,7 @@ function build() {
       input.value = isim.value;
     }
   });
-  // (under the console's lines: modern's grid row 3, classic's before the tabs under them; web/css/messages.css)
+  // (under the console's lines: Silinx's grid row 3, ISE style's before the tabs under them; web/css/messages.css)
   $('console-body').after(h('div', { id: 'mc-cmd' }, h('span', { class: 'mc-prompt' }), input));
   retagAll();
   refilter();

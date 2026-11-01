@@ -143,17 +143,17 @@ export function restoreSplit(kept, find) {
 }
 
 // ---- on the page
-/** The Split button: in the Tasks interface's header between the messages' button and Maximize (#1657), in the modern one's at its right
- *  end, in the classic one's toolbar at its right end. */
+/** The Split button: in the Tasks interface's header between the messages' button and Maximize (#1657), in the Silinx one's at its right
+ *  end, in the ISE style one's toolbar at its right end. */
 function placeButton() {
   if (!button) {
     button = h('button', { id: 'split-btn', type: 'button', 'data-cmd': 'split', title: 'Split the editor: two documents side by side, each side with its tabs', html: ICON, onclick: () => toggleSplit() });
     button.setAttribute('aria-label', button.title);
   }
-  const view = $('task-view'), modern = document.documentElement.dataset.ui === 'silinx';
-  const where = view || (modern ? $('top-actions') : $('toolbar'));
+  const view = $('task-view'), silinx = document.documentElement.dataset.ui === 'silinx';
+  const where = view || (silinx ? $('top-actions') : $('toolbar'));
   if (!where) return;
-  button.className = view || !modern ? 'tb-btn' : 'm-icon-btn';
+  button.className = view || !silinx ? 'tb-btn' : 'm-icon-btn';
   const max = view?.querySelector('[data-act=max]');
   if (button.parentNode !== where || (max && button.nextElementSibling !== max)) { if (max) max.before(button); else where.append(button); }
   button.setAttribute('aria-pressed', String(on));

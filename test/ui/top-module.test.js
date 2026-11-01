@@ -1,6 +1,6 @@
 // UI: synthesis, implementation and emulation work on the project's top module (#223). With another
 // module selected in the Design pane, running one of them (Generate Programming File, Synthesize,
-// Implement Design, Emulate on Board; the modern header's Implement / Emulate) says so first: OK runs
+// Implement Design, Emulate on Board; the Silinx header's Implement / Emulate) says so first: OK runs
 // it on the top, Cancel nothing; with the top selected, no question. In Portuguese too.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,12 +55,12 @@ uiTest('the processes on the top module (#223): with another module selected, Ge
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });
 
-uiTest('the processes on the top module (#223): the modern header\'s Implement and Emulate say so too; in Portuguese', E, async (page) => {
+uiTest('the processes on the top module (#223): the Silinx header\'s Implement and Emulate say so too; in Portuguese', E, async (page) => {
   await makeProject(env, { name: 'TopSelPt', template: 'traffic' });
   await page.openProject('TopSelPt');
   await page.treeRow('#hier', 'u_timer - timer', { exact: true });
   await page.waitFor(() => window.Silinx.sel?.module === 'timer');
-  // the header's buttons (the modern interface's)
+  // the header's buttons (the Silinx interface's)
   if (await page.eval(() => document.querySelector('#toolbar .m-step')?.getClientRects().length > 0)) {
     for (const [title, verb] of [['Implement', 'implements'], ['Emulate', 'emulates']]) {
       await page.click('#toolbar .m-step', { text: title });

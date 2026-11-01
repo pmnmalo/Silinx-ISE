@@ -1,7 +1,7 @@
 // Narrow screens (#266): an iPad in portrait, a narrow window. Under 1024 px wide (NARROW_QUERY:
 // every iPad in portrait, 768 to 1023 px; at 1024 px, an iPad in landscape, the layout is the desktop's, #1418):
 // - the left side (Start / Design / Files / Libraries and the Processes) is a drawer over the
-//   workspace, shown and hidden by the header's button (#drawer-btn) and, in the modern interface,
+//   workspace, shown and hidden by the header's button (#drawer-btn) and, in the Silinx interface,
 //   by the activity bar; a tap beside it, or a document opened, closes it;
 // - the diagram editors' side panels (properties; the schematic's symbols) go over the canvas, shown
 //   and hidden by a button of the editor's toolbar (panelToggle);
@@ -46,7 +46,7 @@ export function drawerProjectOpened() { if (asDrawer() && !drawerOpen()) setDraw
 /** A document opened or brought to the front: on a narrow screen the open drawer gives way to it. */
 export function drawerGiveWay() { if (asDrawer() && drawerOpen()) setDrawer(false); }
 /** A button of the left side's tabs clicked (`page`; `shown`: the page shown before): on a narrow
- *  screen it opens the drawer; in the modern interface the shown page's button closes it again. */
+ *  screen it opens the drawer; in the Silinx interface the shown page's button closes it again. */
 export function leftTabClicked(page, shown) {
   if (!asDrawer()) return;
   if (!drawerOpen()) setDrawer(true);

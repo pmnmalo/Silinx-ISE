@@ -1,10 +1,10 @@
 // UI: narrow screens (#266, web/js/narrow.js): at 1024 px wide or less (an iPad in portrait, 820 × 1180
 // or 768 × 1024) the left side is a drawer over the workspace (the header's button, the activity bar
-// of the modern interface, the scrim beside it; it gives way to a document opened; remembered), the
+// of the Silinx interface, the scrim beside it; it gives way to a document opened; remembered), the
 // diagram editors' side panels go over the canvas (their toolbar's Symbols / Properties buttons), the
 // canvas keeps most of the width, the link banner is one line with its whole text in its tip, the
 // page never scrolls sideways; at 1180 × 820 (an iPad in landscape) and 1400 × 900 the layout is the
-// desktop's, whatever was left open or closed on a narrow screen. In both interfaces (SILINX_UI_INTERFACE); the modern
+// desktop's, whatever was left open or closed on a narrow screen. In both interfaces (SILINX_UI_INTERFACE); the Silinx
 // one (the Tasks layout) has no drawer: its side panel docked beside the document, folded by the task's side button (#1463).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +20,7 @@ const DOC = '.doc:not([hidden])';
 const shown = (page, sel) => page.eval((s) => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0; }, sel);
 const width = (page, sel) => page.eval((s) => Math.round(document.querySelector(s).getBoundingClientRect().width), sel);
 const rect = (page, sel) => page.eval((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), height: Math.round(r.height) }; }, sel);
-// (the modern interface, the Tasks layout: its side panel folded or opened by the task's side button, #1463)
+// (the Silinx interface, the Tasks layout: its side panel folded or opened by the task's side button, #1463)
 const sideButton = (page) => page.click('#task-view [data-act="side"]');
 const drawer = (page) => page.eval(() => [document.documentElement.dataset.drawer, localStorage.getItem('silinx.drawer'), document.getElementById('drawer-btn').getAttribute('aria-expanded')]);
 // the page does not scroll sideways, nor does any toolbar overflow
@@ -40,8 +40,8 @@ for (const [w, h] of [[820, 1180], [768, 1024]]) {
     await makeProject(env, { name: pj, template: 'gates' });
     await page.setViewport(w, h);
     await page.openProject(pj);
-    const modern = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
-    if (modern) {
+    const silinx = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
+    if (silinx) {
       // the Tasks layout: the side panel docked beside the document (at most 45 % of the width), no drawer (#1463)
       assert.ok(await shown(page, '#hier') && !(await shown(page, '#drawer-btn')));
       assert.ok(await width(page, '#left') <= 0.45 * w + 1);
@@ -68,7 +68,7 @@ for (const [w, h] of [[820, 1180], [768, 1024]]) {
     // the canvas has most of the width; the symbols and the properties are not beside it
     const canvas = await width(page, `${DOC} .se-canvas`);
     assert.ok(canvas >= 0.6 * w, `canvas ${canvas} px of ${w}`);
-    assert.ok(canvas >= w - (modern ? 70 : 12), `canvas ${canvas} px of ${w}`);   // the activity bar (modern), the borders
+    assert.ok(canvas >= w - (silinx ? 70 : 12), `canvas ${canvas} px of ${w}`);   // the activity bar (Silinx), the borders
     assert.ok(!(await shown(page, `${DOC} .se-left`)) && !(await shown(page, `${DOC} .se-right`)));
     assert.deepEqual(await noSideScroll(page), { page: true, over: [] });
     // Properties: the panel over the canvas (the canvas keeps its width), at its right; again: hidden
@@ -90,7 +90,7 @@ for (const [w, h] of [[820, 1180], [768, 1024]]) {
     await page.click(`${DOC} [data-panel=props]`);
     assert.ok(!(await shown(page, `${DOC} .se-left`)) && !(await shown(page, `${DOC} .se-right`)));
     assert.deepEqual(await page.eval(() => [localStorage.getItem('silinx.narrow.symbols'), localStorage.getItem('silinx.narrow.props')]), ['closed', 'closed']);
-    if (modern) {
+    if (silinx) {
       // the side panel opened again: the hierarchy beside the schematic; kept over a reload
       await sideButton(page);
       await page.waitFor(() => document.documentElement.dataset.side === 'open', [], { what: 'the side panel open' });
@@ -143,7 +143,7 @@ uiTest('narrow screen 820×1180: the FSM and Petri net editors, their properties
   await page.openProject('Narrow_fsm');
   await page.eval(() => window.SilinxApp.openFsm('src/traffic.fsm.json'));
   await page.waitFor((d) => document.querySelector(`${d} .fsm-editor .fsm-link .gen-banner`), [DOC], { what: 'the FSM editor' });
-  // (the modern interface: its side panel docked, #1463, folded for the canvas's width; the classic one: the drawer closed)
+  // (the Silinx interface: its side panel docked, #1463, folded for the canvas's width; the ISE style one: the drawer closed)
   if (await page.eval(() => document.documentElement.dataset.ui === 'silinx')) {
     await sideButton(page);
     await page.waitFor(() => document.documentElement.dataset.side === 'folded', [], { what: 'the side panel folded' });
@@ -198,11 +198,11 @@ for (const [w, h] of [[1180, 820], [1400, 900]]) {
     await page.reload();
     await page.setViewport(w, h);
     await page.openProject(pj);
-    const modern = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
+    const silinx = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
     assert.equal(await page.eval(() => document.documentElement.dataset.drawer), 'closed');
     assert.ok(!(await shown(page, '#drawer-btn')) && !(await shown(page, '#drawer-scrim')));
     assert.ok(await shown(page, '#hier') && await shown(page, '#v-split'));
-    assert.equal(await width(page, '#left'), modern ? 344 : 300);
+    assert.equal(await width(page, '#left'), silinx ? 344 : 300);
     await page.treeRow('#hier', 'gates', { dbl: true, exact: true });
     await page.waitFor((d) => document.querySelector(`${d} .sch-editor .se-canvas`), [DOC], { what: 'the schematic editor' });
     // the drawer is not involved: the Design pane stays
@@ -228,7 +228,7 @@ for (const [w, h] of [[1180, 820], [1400, 900]]) {
 }
 
 // a project opened (#1557): the side panel and the messages shown, whatever was left folded or maximized; on a narrow screen
-// in the classic interface the drawer open, in the modern one (the Tasks layout) every task's side panel and messages open,
+// in the ISE style interface the drawer open, in the Silinx one (the Tasks layout) every task's side panel and messages open,
 // no document maximized (Emulate's side panel there back to its default, folded: the board its room, #1463)
 for (const [w, h] of [[1400, 900], [820, 1180]]) {
   uiTest(`${w}×${h}: a project opened shows the side panel and the messages, whatever was left folded (#1557)`, E, async (page) => {
@@ -237,7 +237,7 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
     await makeProject(env, { name: `${pj}_b`, template: 'blinky' });
     await page.setViewport(w, h);
     await page.openProject(pj);
-    const modern = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
+    const silinx = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
     const narrow = w < 1024;
     const task = (t) => page.eval((t) => [...document.querySelectorAll(`.task-btn[data-task="${t}"]`)].find((b) => b.getClientRects().length).click(), t);
     const arranged = () => page.eval(() => {
@@ -245,7 +245,7 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
       return { task: d.task, side: d.side, console: d.console, max: d.max };
     });
     const TASKS = ['edit', 'sim', 'emu', 'impl'];
-    if (modern) {
+    if (silinx) {
       // every task: its side panel and messages folded, Design's and Implement's document maximized
       for (const t of TASKS) {
         await task(t);
@@ -263,7 +263,7 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
       assert.deepEqual(await drawer(page), ['closed', 'closed', 'false']);
     }
     await page.openProject(`${pj}_b`);
-    if (modern) {
+    if (silinx) {
       await page.waitFor(() => document.documentElement.dataset.task === 'edit', [], { what: 'Design in front' });
       for (const t of TASKS) {
         await task(t);
@@ -289,23 +289,23 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
   });
 }
 
-// #2169: the project closed shows the side panel again (the Start page in it), whatever was left folded: in the modern
+// #2169: the project closed shows the side panel again (the Start page in it), whatever was left folded: in the Silinx
 // interface (the Tasks layout) Design's side panel open, no document maximized, kept so that the saved choice does not
-// fold it again (a reload); on a narrow screen in the classic interface the drawer open, kept too
+// fold it again (a reload); on a narrow screen in the ISE style interface the drawer open, kept too
 for (const [w, h] of [[1400, 900], [820, 1180]]) {
   uiTest(`${w}×${h}: Close Project shows the side panel again, whatever was left folded (#2169)`, E, async (page) => {
     const pj = `Closed_${w}`;
     await makeProject(env, { name: pj, template: 'gates' });
     await page.setViewport(w, h);
     await page.openProject(pj);
-    const modern = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
+    const silinx = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
     const narrow = w < 1024;
     const arranged = () => page.eval(() => {
       const d = document.documentElement.dataset;
       return { task: d.task, side: d.side, max: d.max };
     });
     const startShown = () => page.eval(() => !document.querySelector('.left-page[data-page=start]').hidden);
-    if (modern) {
+    if (silinx) {
       // Design's side panel folded, its document maximized
       await page.waitFor(() => document.documentElement.dataset.task === 'edit', [], { what: 'Design in front' });
       if ((await arranged()).side === 'open') await sideButton(page);
@@ -324,19 +324,19 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
     const visible = async (what) => {
       assert.ok(await shown(page, '#left'), what);
       assert.ok(await startShown(), what);
-      if (modern) assert.deepEqual(await arranged(), { task: 'edit', side: 'open', max: 'off' }, what);
+      if (silinx) assert.deepEqual(await arranged(), { task: 'edit', side: 'open', max: 'off' }, what);
       else if (narrow) assert.deepEqual(await drawer(page), ['open', 'open', 'true'], what);
     };
     await visible('closed');
     // kept: the saved "folded" does not fold it again
-    if (modern) assert.deepEqual(JSON.parse(await page.eval(() => localStorage.getItem('silinx.tasks'))).tasks.edit.side, true);
+    if (silinx) assert.deepEqual(JSON.parse(await page.eval(() => localStorage.getItem('silinx.tasks'))).tasks.edit.side, true);
     await noWarnings(page);
     // (the reloaded page's Warnings tab has the start-up checks' lines of the machine: its console only, below)
     await page.reload();
     await page.setViewport(w, h);
     await visible('reloaded');
     // still folded by the viewer afterwards
-    if (modern) { await sideButton(page); assert.equal((await arranged()).side, 'folded'); await sideButton(page); }
+    if (silinx) { await sideButton(page); assert.equal((await arranged()).side, 'folded'); await sideButton(page); }
     else if (narrow) { await page.click('#drawer-btn'); assert.deepEqual(await drawer(page), ['closed', 'closed', 'false']); await page.click('#drawer-btn'); }
     assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
   });

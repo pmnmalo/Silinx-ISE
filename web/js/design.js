@@ -30,7 +30,7 @@ export function renderHierarchy() {
   const host = $('hier');
   const focused = host.contains(document.activeElement) ? (document.activeElement.closest('.badge') ? 'badge' : 'tree') : null;
   host.innerHTML = '';
-  // (no project: its two commands here, the modern interface has no File menu, #1585)
+  // (no project: its two commands here, the Silinx interface has no File menu, #1585)
   if (!S.project) {
     host.append(h('div', { class: 'tree empty' }, h('div', {}, 'No project open'),
       h('div', { class: 'empty-actions' }, h('a', { href: '#', 'data-act': 'new-project', onclick: e => { e.preventDefault(); wiz.newProjectWizard(); } }, 'New Project…'),

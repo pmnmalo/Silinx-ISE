@@ -55,7 +55,7 @@
 }
 .sch-view .sch-hint.empty { top: 50%; transform: translate(-50%, -50%); background: #fff; color: var(--muted, #6d6d6d); border-color: var(--border-light, #d4d0c8); box-shadow: none; }
 
-/* ---------- tooltip (Windows classic) */
+/* ---------- tooltip (Windows ISE style) */
 .sch-view .sch-tip {
   position: absolute; z-index: 4; pointer-events: none; max-width: 420px;
   background: #ffffe1; color: #000; border: 1px solid #767676; padding: 3px 6px;

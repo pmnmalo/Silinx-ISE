@@ -1,6 +1,6 @@
 // UI (#1224): Tasks ▸ Implement with no top module says so in its empty list (no Design Summary/Reports either, #1287) and offers
 // Set Top Module…: the top chosen among the design's modules (the hierarchy's roots first, no test bench), then its
-// processes; in Portuguese; none in the classic interface. No warnings.
+// processes; in Portuguese; none in the ISE style interface. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, chromeOnly } from './harness.js';
@@ -25,7 +25,7 @@ const note = (page) => page.eval(() => {
 });
 const rows = (page) => page.eval(() => [...document.querySelectorAll('#procs .row .lbl')].filter((e) => e.getClientRects().length).map((e) => e.textContent));
 
-uiTest('#1224 Tasks ▸ Implement with no top module: said so, Set Top Module… chooses one; Portuguese; classic none', E, async (page) => {
+uiTest('#1224 Tasks ▸ Implement with no top module: said so, Set Top Module… chooses one; Portuguese; ISE style none', E, async (page) => {
   await makeProject(env, { name: 'NoTop', top: '', files: { 'src/inv.vhd': INV, 'src/top.vhd': TOP, 'src/other.v': OTHER } });
   await page.setViewport(1366, 768);
   await tasksInterface(page);
@@ -57,7 +57,7 @@ uiTest('#1224 Tasks ▸ Implement with no top module: said so, Set Top Module…
   await page.waitFor(() => document.querySelector('#procs .task-no-top button')?.textContent === 'Definir Módulo de Topo…', [], { what: 'Portuguese' });
   assert.match((await note(page)).text, /^Não está definido nenhum módulo de topo/);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  // the classic interface: none
+  // the ISE style interface: none
   await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   await page.eval(() => window.SilinxApp.renderProcesses());

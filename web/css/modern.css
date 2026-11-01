@@ -1,9 +1,9 @@
-/* Silinx modern interface: applied under <html data-ui="silinx">, light or dark (data-theme).
-   The classic Xilinx ISE look (theme.css + app.css) is <html data-ui="ise">; both share the same
+/* The Silinx interface: applied under <html data-ui="silinx">, light or dark (data-theme).
+   The ISE style look (theme.css + app.css) is <html data-ui="ise">; both share the same
    page (web/index.html) and the same element ids, so the application code does not depend on the look.
    Preferences and command palette: web/js/modern.js, web/js/palette.js. */
 
-/* ------------------------------------------------------------------ parts of the modern interface only */
+/* ------------------------------------------------------------------ parts of the Silinx interface only */
 html:not([data-ui="silinx"]) #top-actions, html:not([data-ui="silinx"]) .m-steps,
 html:not([data-ui="silinx"]) .tab-ico, html:not([data-ui="silinx"]) #ws-empty { display: none !important; }
 #ws-empty { display: none; }
@@ -471,7 +471,7 @@ html[data-ui="silinx"] .tt-tab { border-color: var(--m-border); background: var(
 html[data-ui="silinx"] .tt-tab.active { background: var(--m-surface); color: var(--m-accent); border-bottom-color: var(--m-surface); }
 html[data-ui="silinx"] .tt-kmap { border-radius: 8px; }
 
-/* RTL / technology schematic viewer: light sheet, modern controls */
+/* RTL / technology schematic viewer: light sheet, Silinx controls */
 html[data-ui="silinx"] .sch-view .sch-btn { width: 28px; height: 28px; border: 1px solid var(--m-border); border-radius: 6px; background: var(--m-surface); box-shadow: var(--m-shadow); }
 html[data-ui="silinx"] .sch-view .sch-btn:hover { background: var(--m-surface-2); border-color: var(--m-border-strong); }
 html[data-ui="silinx"] .sch-view .sch-btn:disabled { background: var(--m-surface); border-color: var(--m-border); }
@@ -512,7 +512,7 @@ html[data-ui="silinx"][data-theme="dark"] .pin-planner .pp-res { background: var
 html[data-ui="silinx"][data-theme="dark"] .pin-planner .pp-res .grp { color: var(--m-fg); }
 html[data-ui="silinx"][data-theme="dark"] .pin-planner td.conflict input { background: rgba(240, 113, 107, .25) !important; }
 html[data-ui="silinx"][data-theme="dark"] .console-page .diag-hint b { color: var(--m-fg); }
-/* the classic colour icons of trees, menus and tabs: a little softer on the dark background */
+/* the ISE style colour icons of trees, menus and tabs: a little softer on the dark background */
 html[data-ui="silinx"][data-theme="dark"] .tree .ico, html[data-ui="silinx"][data-theme="dark"] .tab > .ico { filter: brightness(.92) saturate(.9); }
 
 html[data-ui="silinx"][data-theme="dark"] :is(.fsm-link, .tt-link) .gen-banner { background: rgba(227, 179, 65, .14); border-color: rgba(227, 179, 65, .4); color: #f2d58a; }

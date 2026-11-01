@@ -345,7 +345,7 @@ class PageBase {
   async openMenu(label) {
     debug(`menu ${label}`);
     await this.closeMenus();
-    // a menu the modern interface does not show (#1217; no menu bar at all, #1321): its items as its definition has them,
+    // a menu the Silinx interface does not show (#1217; no menu bar at all, #1321): its items as its definition has them,
     // and its popup shown at the window's top left as the menu's would be (its submenus hovered, its items clicked)
     const def = typeof label === 'string' && await this.eval(async (m) => {
       const e = [...document.querySelectorAll('#menubar .item')].find((x) => x.textContent.trim() === m);
@@ -417,7 +417,7 @@ class PageBase {
   }
   /** File ▸ Open Project… style: open the menu and click the item. */
   async menu(menuLabel, itemLabel) {
-    // a menu the modern interface does not show (Project, Process, Tools: #1217): its command run as a menu click runs
+    // a menu the Silinx interface does not show (Project, Process, Tools: #1217): its command run as a menu click runs
     // it (runAction), from the menus' definitions (by the menu's name, whatever the language; an item by its label or
     // its translation)
     const r = await this.eval(async (m, l) => {
@@ -473,21 +473,21 @@ class PageBase {
     // (and the app's start-up checks done: their lines, e.g. 'ISE not available', written before a test reads the console)
     await this.waitFor((n) => window.Silinx.project?.name === n && document.querySelector('#hier .row') && window.Silinx.startupChecked, [name], { what: `project ${name} open` });
   }
-  /** The task's side panel shown (ISim's instances, the emulator's Watch): the modern interface's task may have it folded (#1149). */
+  /** The task's side panel shown (ISim's instances, the emulator's Watch): the Silinx interface's task may have it folded (#1149). */
   async showSide() {
     if (await this.eval(() => document.documentElement.dataset.layout === 'tasks' && document.documentElement.dataset.side === 'folded')) {
       await this.click('#task-view [data-act=side]');
       await this.waitFor(() => document.documentElement.dataset.side !== 'folded', [], { what: 'the side panel shown' });
     }
   }
-  /** The messages (the bottom console) shown: the modern interface's task may have them folded (#1149). */
+  /** The messages (the bottom console) shown: the Silinx interface's task may have them folded (#1149). */
   async showMessages() {
     if (await this.eval(() => document.documentElement.dataset.layout === 'tasks' && document.documentElement.dataset.console === 'folded')) {
       await this.click('#task-view [data-act=console]');
       await this.waitFor(() => document.documentElement.dataset.console !== 'folded', [], { what: 'the messages shown' });
     }
   }
-  /** A page of the side panel (start, design, files, libraries) by its tab; the modern interface's are Design's (its
+  /** A page of the side panel (start, design, files, libraries) by its tab; the Silinx interface's are Design's (its
    *  layout by tasks, #1149): that task first. */
   async leftTab(name) {
     if (await this.eval(() => document.documentElement.dataset.layout === 'tasks' && document.documentElement.dataset.task !== 'edit')) {
@@ -501,19 +501,19 @@ class PageBase {
     }
     await this.click(`#left-tabs .tab[data-page=${name}]`);
   }
-  /** The Design pane's view, Implementation or Simulation: its radio button; the modern interface has no views (its
+  /** The Design pane's view, Implementation or Simulation: its radio button; the Silinx interface has no views (its
    *  layout by tasks, #1149): the app's view set as the radio would. */
   async setView(view) {
     this.view = view;   // (asked for: Implement in front sets the Implementation view, tasksTreeRow sets it back)
     if (await this.eval((v) => !!document.querySelector(`input[name=view][value=${v}]`)?.getClientRects().length, view)) return this.click(`input[name=view][value=${view}]`);
-    // (the modern interface: Implement's Processes are the top's whatever is selected, #1208, so the Simulation's
+    // (the Silinx interface: Implement's Processes are the top's whatever is selected, #1208, so the Simulation's
     // processes are read in Design)
     if (view === 'sim' && await this.eval(() => document.documentElement.dataset.layout === 'tasks' && document.documentElement.dataset.task === 'impl')) {
       await this.click('#task-switch .task-btn[data-task="edit"]');
     }
     await this.eval((v) => window.SilinxApp.setView(v), view);
   }
-  /** Click a row of the Design hierarchy / processes by its label. In the modern interface (its layout by tasks, #1149)
+  /** Click a row of the Design hierarchy / processes by its label. In the Silinx interface (its layout by tasks, #1149)
    *  a row its task does not show is acted on as its click would: a module of the hierarchy selected (opened on a
    *  double-click), a process's row clicked where the Processes list has it. */
   async treeRow(container, label, { dbl = false, exact = false, right = false } = {}) {
@@ -533,7 +533,7 @@ class PageBase {
     if (right) return this.rightClick(sel, { index: absolute });
     return this.click(sel, { index: absolute });
   }
-  // (the modern interface: a row shown is clicked as it is; one not shown acted on; false: none, waited for as before)
+  // (the Silinx interface: a row shown is clicked as it is; one not shown acted on; false: none, waited for as before)
   async tasksTreeRow(container, label, { dbl, exact, right }) {
     const isShown = () => this.eval((c, l, ex) => [...document.querySelectorAll(`${c} .row`)].some((r) => r.getClientRects().length && ((t) => (ex ? t === l : t === l || t.startsWith(l)))(r.querySelector('.lbl')?.textContent?.trim() || '')), container, label, exact);
     // (a Processes row: acted on where the list has it, shown or not, its task coming and going under the test)
@@ -574,7 +574,7 @@ class PageBase {
       const f = S.project?.files.find((x) => x.path.split('/').pop() === l);
       if (f) { A.select({ type: 'file', file: f.path }); if (d) A.openFile(f.path); return true; }
       return false;
-    }, [container, label, exact, dbl, this.view || null], { what: `tree row '${label}' in ${container} (the modern interface)` });
+    }, [container, label, exact, dbl, this.view || null], { what: `tree row '${label}' in ${container} (the Silinx interface)` });
   }
 }
 
@@ -856,7 +856,7 @@ function initScripts({ updateCheck, build, ui }) {
     // a development build's data (core/version.js BUILD, which the single file's build defines): its Development
     // menu (#707) on the local server
     ...(build ? [`window.__SILINX_BUILD__ = ${JSON.stringify(build)};`] : []),
-    // the Console's lines, every one: the modern interface's message centre hides those of the other tasks (#1149)
+    // the Console's lines, every one: the Silinx interface's message centre hides those of the other tasks (#1149)
     "window.__console = () => [...(document.getElementById('console-log')?.children || [])].map((l) => l.textContent).join('\\n');",
     // SILINX_UI_INTERFACE=ise: run the tests in the ISE style interface (the default is the Silinx one)
     // ui: 'ise': a test of that interface's own parts (its views, its Processes panel: the Silinx interface has none, #1149)

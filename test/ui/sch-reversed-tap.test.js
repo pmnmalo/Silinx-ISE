@@ -31,7 +31,7 @@ uiTest('#1702 a bus tap the wrong way round: the bus still drawn as a bus, Check
   const drawn = await page.eval((ed) => Object.fromEntries([...document.querySelectorAll(`${ed} [data-kind=wire]`)].map((g) => [g.dataset.id, g.classList.contains('bus')])), ED);
   assert.deepEqual(drawn, { W1: true, W3: true, W2: false });
   await page.click(`${ED} .se-btn[data-act=check]`);
-  // (in the editor's panel in the classic interface; in the console in the modern one, #993, #1149)
+  // (in the editor's panel in the ISE style interface; in the console in the Silinx one, #993, #1149)
   if (await page.eval(() => document.documentElement.dataset.layout === 'tasks')) await page.waitConsole(new RegExp(ERR.replace(/[()]/g, '\\$&')));
   else {
     // (the netlist's warnings, and the HDL's: C1's outputs not connected)

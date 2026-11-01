@@ -286,7 +286,7 @@ uiTest('#1297 the Start page of the application: Where Projects Are Kept, the wo
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
 });
 
-// (the File and Edit menus: the classic interface's, the modern one has none, #1307)
+// (the File and Edit menus: the ISE style interface's, the Silinx one has none, #1307)
 uiTest('open, switch and close projects (Open Project dialog, Recent Projects, Start page)', E, async (page) => {
   for (const n of ['Alpha', 'Beta']) {
     await makeProject(env, { name: n, files: { [`src/${n.toLowerCase()}.vhd`]: `library ieee; use ieee.std_logic_1164.all;\nentity ${n.toLowerCase()} is port (a : in std_logic; y : out std_logic); end;\narchitecture r of ${n.toLowerCase()} is begin y <= not a; end r;\n` }, top: n.toLowerCase() });
@@ -354,7 +354,7 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   await page.menu('File', 'Close Project');
   await page.waitFor(() => window.Silinx.project === null && !document.querySelector('[data-page=start]').hidden);
   assert.match(await page.eval(() => document.getElementById('hier').innerText), /No project open/);
-  // its two commands right there, no File menu named (the modern interface has none, #1585)
+  // its two commands right there, no File menu named (the Silinx interface has none, #1585)
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#hier .empty a')].map((a) => a.textContent)), ['New Project…', 'Open Project…']);
   assert.doesNotMatch(await page.eval(() => document.getElementById('hier').textContent), /File >/);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
@@ -441,7 +441,7 @@ uiTest('Close Project while the project is still opening: closed after the openi
   assert.doesNotMatch(await page.consoleText(), /ERROR/);
 });
 
-// (the classic interface's views and Processes panel: the modern one has none, #1149)
+// (the ISE style interface's views and Processes panel: the Silinx one has none, #1149)
 uiTest('Add Copy of Source: new files, association, overwrite confirmation (No keeps, Yes replaces)', E, async (page) => {
   const orig = 'library ieee; use ieee.std_logic_1164.all;\nentity inv is port (a : in std_logic; y : out std_logic); end inv;\narchitecture r of inv is begin y <= not a; end r;\n';
   await makeProject(env, { name: 'Copies', files: { 'src/inv.vhd': orig }, top: 'inv' });
@@ -454,15 +454,15 @@ uiTest('Add Copy of Source: new files, association, overwrite confirmation (No k
   await fs.writeFile(path.join(dir, 'tb_buf2.v'), 'module tb_buf2; reg a = 0; wire y; buf2 u(.a(a), .y(y)); initial begin #10 a = 1; #10 $finish; end endmodule\n');
   // (its name as the interface shown: Import Source in the Tasks layout, ISE's elsewhere, #1501)
   const IMPORT = await page.eval(() => (document.documentElement.dataset.layout === 'tasks' ? 'Import Source' : 'Add Copy of Source'));
-  // (the modern interface asks no association, #1501: Import Source is All, Import Test Bench Simulation only; the
+  // (the Silinx interface asks no association, #1501: Import Source is All, Import Test Bench Simulation only; the
   // association asked here is the one its command would give)
-  const modern = IMPORT === 'Import Source';
+  const silinx = IMPORT === 'Import Source';
   const add = async (files, role, answer) => {
-    if (modern && role !== 'design') await page.eval((r) => { import('/js/wizards.js').then((w) => w.addSourceDialog({ role: r })); }, role);
+    if (silinx && role !== 'design') await page.eval((r) => { import('/js/wizards.js').then((w) => w.addSourceDialog({ role: r })); }, role);
     else await page.menu('Project', `${IMPORT}…`);
     await page.waitDialog(IMPORT);
     await page.setFiles('.dlg-overlay input[type=file]', files.map((f) => path.join(dir, f)));
-    if (modern) assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay select').length), 0, 'no association asked');
+    if (silinx) assert.equal(await page.eval(() => document.querySelectorAll('.dlg-overlay select').length), 0, 'no association asked');
     else await page.fill('.dlg-overlay select', role);
     await page.dialogButton('OK');
     if (answer) {

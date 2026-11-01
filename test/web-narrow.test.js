@@ -95,7 +95,7 @@ test('the drawer gives way to a document on a narrow screen only', () => {
   assert.equal(page.html.dataset.drawer, 'closed');
 });
 
-test('the left side\'s tabs: open the drawer; in the modern interface the shown page\'s tab closes it', () => {
+test('the left side\'s tabs: open the drawer; in the Silinx interface the shown page\'s tab closes it', () => {
   N.setDrawer(false);
   N.leftTabClicked('files', 'design');
   assert.equal(page.html.dataset.drawer, 'open');
@@ -105,7 +105,7 @@ test('the left side\'s tabs: open the drawer; in the modern interface the shown 
   assert.equal(page.html.dataset.drawer, 'closed');
   N.leftTabClicked('design', 'design');              // closed: the shown page's tab opens it again
   assert.equal(page.html.dataset.drawer, 'open');
-  // the classic interface: its tabs are in the drawer, a click there never closes it
+  // the ISE style interface: its tabs are in the drawer, a click there never closes it
   page.html.dataset.ui = 'ise';
   N.leftTabClicked('design', 'design');
   assert.equal(page.html.dataset.drawer, 'open');

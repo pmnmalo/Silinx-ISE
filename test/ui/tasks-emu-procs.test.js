@@ -1,7 +1,7 @@
 // UI (#1204): Tasks ▸ Emulate has its Processes at the top of its side column, under a tab named Emulate (#1212): the top
 // module's User Constraints (I/O Pin Planning, Edit Constraints (Text), Check Constraints) and Emulate on Board with
 // its models, the same as Implement's (web/js/processes.js emulateProcesses), each run by a double-click, its state
-// the Processes panel's; in Portuguese; folded with the side panel; none in the classic interface. No warnings.
+// the Processes panel's; in Portuguese; folded with the side panel; none in the ISE style interface. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -41,7 +41,7 @@ const EN = ['User Constraints', '  I/O Pin Planning', '  Edit Constraints (Text)
   '  Emulate Behavioral Model (RTL)', '  Emulate Post-Synthesis Model', '  Emulate Post-Translate Model', '  Emulate Post-Map Model',
   '  Emulate Post-Place & Route Model'];
 
-uiTest('#1204 Tasks ▸ Emulate: its Processes, the top\'s User Constraints and Emulate on Board, run from there; in Portuguese; classic none', E, async (page) => {
+uiTest('#1204 Tasks ▸ Emulate: its Processes, the top\'s User Constraints and Emulate on Board, run from there; in Portuguese; ISE style none', E, async (page) => {
   await makeProject(env, { name: 'EmuProcs', template: 'blinky' });
   await page.setViewport(1680, 1050);   // (the side panel, the board and the Watch side by side, #1399)
   await tasksInterface(page);
@@ -92,9 +92,9 @@ uiTest('#1204 Tasks ▸ Emulate: its Processes, the top\'s User Constraints and 
   assert.ok(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-side')?.getClientRects().length > 0), 'the Watch kept');
   await page.click('#task-view [data-act="side"]');
   assert.equal((await procs(page)).shown, true);
-  // the classic interface: none
+  // the ISE style interface: none
   await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
-  assert.equal((await procs(page))?.shown ?? false, false, 'classic: none');
+  assert.equal((await procs(page))?.shown ?? false, false, 'ISE style: none');
   await noWarnings(page);
 }, { build: DEV });

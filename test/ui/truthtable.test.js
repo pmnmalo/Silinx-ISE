@@ -15,7 +15,7 @@ import { truthTableFromModule, schematicFromTable } from '../../core/logic.js';
 import { netlist, generateHdl } from '../../core/schdoc.js';
 const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
-// a module's Create Test Bench (Wizard): the classic interface's only (the Tasks interface's test benches on its Test page, #1330)
+// a module's Create Test Bench (Wizard): the ISE style interface's only (the Tasks interface's test benches on its Test page, #1330)
 const TB = process.env.SILINX_UI_INTERFACE === 'ise' ? ['Create Test Bench (Wizard)…'] : [];
 
 let env;

@@ -369,8 +369,8 @@ const PT = {
   'Emulator': 'Emulador', 'Emulation': 'Emulação', 'Synthesis': 'Síntese', 'Messages from': 'Mensagens de', 'Command line': 'Linha de comandos',
   'Show it in the drawing': 'Mostrar no desenho',   // a schematic's Check's line in the console below (#993)
   'Type an SSim command (help)': 'Escreva um comando do SSim (help)', 'Type a command or a file name': 'Escreva um comando ou o nome de um ficheiro',
-  // modern interface (web/js/modern.js, web/js/palette.js): View ▸ Interface / Theme, header, design flow, command palette
-  'Interface': 'Interface', 'Modern': 'Moderna', 'Classic': 'Clássica',
+  // the Silinx interface (web/js/modern.js, web/js/palette.js): View ▸ Interface / Theme, header, design flow, command palette
+  'Interface': 'Interface', 'ISE style': 'Estilo ISE',   // (Silinx: a proper name, the same, #2451)
   'Theme': 'Tema', 'System': 'Sistema', 'Light': 'Claro', 'Dark': 'Escuro', 'Command Palette…': 'Paleta de Comandos…',
   'Implement': 'Implementar', 'Emulate': 'Emular', 'Design flow': 'Fluxo de projeto',
   'Check Syntax of the selected module': 'Verificar a sintaxe do módulo selecionado',
@@ -644,7 +644,7 @@ Object.assign(PT, {
   'click for one clock cycle': 'clique para um ciclo de relógio', 'click to toggle': 'clique para comutar', 'click to change the value': 'clique para mudar o valor',
   'no value': 'sem valor', '(unconnected)': '(não ligado)',
 });
-// the classic title bar (web/js/project.js updateTitle, #987): "<project> - [Design Summary]", its name translated (#1007)
+// the ISE style title bar (web/js/project.js updateTitle, #987): "<project> - [Design Summary]", its name translated (#1007)
 PT_PATTERNS.push([/^(.+) - \[Design Summary\]$/, (m, pj) => `${pj} - [${PT['Design Summary']}]`]);
 // a task's button with its dot (web/js/tasks.js taskTitle, #991): "Implement — done with warnings"
 PT_PATTERNS.push([/^(Design|Simulate|Implement) — (done, no warnings|done with warnings|errors|out of date \(a source changed\)|running…)$/, (m, a, b) => `${a === 'Design' ? 'Design' : PT[a]} — ${PT[b]}`]);   // (the Design task: 'Design' in Portuguese too, #1046)

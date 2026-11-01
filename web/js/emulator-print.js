@@ -4,7 +4,7 @@
 import { esc } from './dom.js';
 import { domSnapshot } from './print-view.js';
 
-// (the time: above the copy; the modern interface shows it on the board, web/js/tasks-emu.js)
+// (the time: above the copy; the Silinx interface shows it on the board, web/js/tasks-emu.js)
 const DROP = ['select', '.emu-hint', '.emu-rot-btn', '.emu-box:has(.emu-log)', 'a[href="#"]', '.stat'];
 
 /** { body, app, fit } (one page) of the emulator whose board and side panel are in `main`, its time in `stat` (the toolbar's). */

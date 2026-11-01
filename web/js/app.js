@@ -870,7 +870,7 @@ export function renderLibsPage() {
 // the Simulation view with module `mod` selected (e.g. a test bench just created): Simulate runs it
 export function showInSim(mod) {
   setView('sim');
-  // (the modern interface, the Tasks layout: the test bench Simulate's, the one it runs, #1161)
+  // (the Silinx interface, the Tasks layout: the test bench Simulate's, the one it runs, #1161)
   if (document.documentElement.dataset.layout === 'tasks') {
     const m = S.modules.find(x => x.name === mod);
     if (m) select({ type: 'module', module: mod, file: m.file });   // (its processes: the Simulation view's)
@@ -909,7 +909,7 @@ async function boot() {
   // Clear: the console and the Warnings and Errors tabs, their counts too (#302; the editors' marks stay,
   // checked again at the next edit)
   $('console-clear').addEventListener('click', clearConsole);
-  // modern interface: header search / settings / project, keyboard access to the activity bar
+  // Silinx interface: header search / settings / project, keyboard access to the activity bar
   const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   for (const k of [$('palette-kbd'), ...document.querySelectorAll('.pal-key')]) k.textContent = mac ? '⌘ K' : 'Ctrl K';
   $('palette-btn').addEventListener('click', () => showPalette());

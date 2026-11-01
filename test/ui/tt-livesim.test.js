@@ -3,7 +3,7 @@
 // switches, the outputs those of the table for every input combination, every net 0 or 1; the drawing still
 // not editable (no editing tools, Delete and Ctrl+V do nothing, during the simulation and after it); a change
 // of the table stops the simulation; a read-only view without the option (the RTL schematic) has no Simulate.
-// In the modern and classic interfaces, the Tasks interface, and Portuguese.
+// In the Silinx and ISE style interfaces, the Tasks interface, and Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';

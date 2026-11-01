@@ -1,6 +1,6 @@
 // UI (#1220): Unset as Top Module. The top module's right-click menu (a module of HDL, a drawing) has Unset as Top
 // Module in place of Set as Top Module: the project has no top then (saved), Implement lists only the Design Summary,
-// and Set as Top Module makes one again; the classic interface's Project menu too; in Portuguese. No warnings.
+// and Set as Top Module makes one again; the ISE style interface's Project menu too; in Portuguese. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -43,13 +43,13 @@ uiTest('#1220 Unset as Top Module: on the top\'s menu, the project without a top
   await waitSaved('UnsetPj', '');
   assert.deepEqual(await rowMenu(page, 'a'), ['Set as Top Module']);
   await page.closeMenus();
-  // the modern interface's Implement: no processes, its note (no Design Summary either, #1287, #1305)
+  // the Silinx interface's Implement: no processes, its note (no Design Summary either, #1287, #1305)
   if (await page.eval(() => document.documentElement.dataset.layout === 'tasks')) {
     await page.click('#task-switch .task-btn[data-task="impl"]');
     await page.waitFor(() => !document.querySelector('#procs .lbl') && !!document.querySelector('#procs .task-no-top'), [], { what: 'no processes' });
     await page.click('#task-switch .task-btn[data-task="edit"]');
   } else {
-    // the classic interface's Project menu: Set as Top Module of the selected module; on the top, Unset
+    // the ISE style interface's Project menu: Set as Top Module of the selected module; on the top, Unset
     await page.treeRow('#hier', 'b', { exact: true });
     assert.ok((await page.openMenu('Project')).some((i) => i.label === 'Set as Top Module'));
     await page.closeMenus();

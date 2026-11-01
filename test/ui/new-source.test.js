@@ -206,7 +206,7 @@ uiTest('#1326 Add Copy of Source: the Files input inside the dialog, as wide as 
     await page.waitDialog(IMPORT);
     const g = await page.eval(() => {
       const r = (s) => document.querySelector(`.dlg-overlay ${s}`).getBoundingClientRect();
-      // (the modern interface asks no association, #1501: the Files input alone in its column)
+      // (the Silinx interface asks no association, #1501: the Files input alone in its column)
       const d = r('.dlg'), f = r('input[type=file]'), s = document.querySelector('.dlg-overlay select') ? r('select') : f;
       return { inside: f.left >= d.left && f.right <= d.right + 0.5 && d.right <= innerWidth + 0.5, column: Math.abs(f.right - s.right) < 1.5 && Math.abs(f.left - s.left) < 1.5 };
     });

@@ -1,7 +1,7 @@
-// UI (#1409): the dialogs alike in the modern interface (the Tasks layout), light and dark: the app's (Open Project,
+// UI (#1409): the dialogs alike in the Silinx interface (the Tasks layout), light and dark: the app's (Open Project,
 // Toolchain Settings, whose title bar no longer shrinks under a tall body), SSim's (Force Selected Signal) and the
 // schematic editor's Symbol Info, one title bar, the same corners, padding, fields and buttons (the primary one filled);
-// a list in a dialog with rows as a tree's; the Design Summary's cards with their tops in line; the classic interface's
+// a list in a dialog with rows as a tree's; the Design Summary's cards with their tops in line; the ISE style interface's
 // dialogs and summary as before. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -97,12 +97,12 @@ for (const theme of ['light', 'dark']) {
   }, { timeout: 180000 });
 }
 
-// the classic interface: a dialog's title bar ISE's, not shrunk under a tall body either; SSim's as before; the summary
+// the ISE style interface: a dialog's title bar ISE's, not shrunk under a tall body either; SSim's as before; the summary
 // without the cards' caption
-uiTest('#1409 classic: the dialogs\' title bars as before (not shrunk), the summary without the cards\' caption', E, async (page) => {
-  await makeProject(env, { name: 'DlgClassic', template: 'blinky' });
+uiTest('#1409 ISE style: the dialogs\' title bars as before (not shrunk), the summary without the cards\' caption', E, async (page) => {
+  await makeProject(env, { name: 'DlgIse', template: 'blinky' });
   await boot(page, { ui: 'ise' });
-  await page.openProject('DlgClassic');
+  await page.openProject('DlgIse');
   await page.eval(() => import('/js/wizards.js').then((w) => { w.toolchainDialog(); }));
   await page.waitDialog('Toolchain Settings');
   assert.equal(await page.eval(() => Math.round(document.querySelector('.dlg-title').getBoundingClientRect().height)), 28);

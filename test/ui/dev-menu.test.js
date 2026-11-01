@@ -76,7 +76,7 @@ const LONG = { ...BUILD, changes: [{ issue: 30, type: 'feature', title: `A chang
 uiTest('#767 a submenu stays inside the window: the Development menu at 1024 px, a long title cut, whole in its tooltip', E, async (page) => {
   await page.setViewport(1024, 700);
   try {
-    // (the modern interface lays itself out again after a resize, narrow mode #266: settled before the menu opens)
+    // (the Silinx interface lays itself out again after a resize, narrow mode #266: settled before the menu opens)
     await page.waitFor(() => innerWidth === 1024);
     await page.eval(() => new Promise((r) => setTimeout(r, 500)));
     await page.openMenu('Development');

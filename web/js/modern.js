@@ -1,10 +1,10 @@
-// Silinx interfaces: the modern interface (default) or the classic Xilinx ISE one, the colour theme of the modern
-// interface (follows the system, light or dark) and the command palette (Ctrl+K / Cmd+K): every menu command and
-// every project file, searched by name.
+// Silinx interfaces: the Silinx interface (default) or the ISE style one, the colour theme of the Silinx interface
+// (follows the system, light or dark) and the command palette (Ctrl+K / Cmd+K): every menu command and every project
+// file, searched by name.
 //
-// The two interfaces share the same page and element ids (web/index.html): the modern one is web/css/modern.css,
+// The two interfaces share the same page and element ids (web/index.html): the Silinx one is web/css/modern.css,
 // applied under <html data-ui="silinx">, with the theme in data-theme, and its layout by tasks (#804, web/js/tasks.js,
-// data-layout="tasks"): the Tasks interface became the modern one (#1149).
+// data-layout="tasks"): the Tasks interface became the Silinx one (#1149).
 // The palette's matching (fuzzyScore, rankEntries, menuCommands) has no DOM and is unit tested.
 
 
@@ -13,6 +13,12 @@ import { prefKey } from './prefs.js';
 export const UI_KEY = prefKey('silinx.ui');
 export const THEME_KEY = prefKey('silinx.theme');
 export const INTERFACES = ['silinx', 'ise'];
+// the interfaces' names, as the menus show them (translated by web/js/i18n.js; Silinx a proper name, the same in
+// Portuguese, #2451): another interface is one more id in INTERFACES and its name here
+export const INTERFACE_NAMES = Object.freeze({
+  silinx: { label: 'Silinx' },
+  ise: { label: 'ISE style' },
+});
 // the interfaces' ids before #2451, and theirs now: a preference saved with one is migrated once, on load
 // (migrateInterface; web/index.html's early script does the same before the first paint)
 export const LEGACY_INTERFACES = Object.freeze({ modern: 'silinx', classic: 'ise' });
@@ -36,7 +42,7 @@ export function migrateInterface(key = UI_KEY) {
 }
 migrateInterface();
 
-// the interface: silinx (the default) or ise; a stored 'tasks' (the Tasks interface of before, #1131) the modern one
+// the interface: silinx (the default) or ise; a stored 'tasks' (the Tasks interface of before, #1131) the Silinx one
 export const getInterface = () => readPref(UI_KEY, INTERFACES, 'silinx');
 export const getTheme = () => readPref(THEME_KEY, THEMES, 'system');
 /** 'light' or 'dark': the theme shown for a preference (`system` follows the OS). */
