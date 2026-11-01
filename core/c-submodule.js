@@ -54,6 +54,9 @@ export function hierarchy(fn, funcs, globals, structArgs = null, all = null) {
     if (all) return all;
     if (ctrlNone(f)) return 'it has no block protocol (ap_ctrl_none)';
     if (ctrlChain(f)) return 'its ap_continue has no caller yet (ap_ctrl_chain)';
+    // (A[]: a module's memory needs its depth, #1706)
+    const open = f.params.find((pa) => pa.type.kind === 'array' && !pa.type.length && !pa.type.size);
+    if (open) return `its array argument '${open.name}' has no size (${open.name}[N])`;
     if (structArgs?.get(f.name)?.length) return `its argument '${structArgs.get(f.name)[0].name}' is a struct (not yet as a sub-module's)`;
     const mine = tree(f, funcs);
     const others = new Set([...tree(fn, funcs)].filter((g) => !mine.has(g)));

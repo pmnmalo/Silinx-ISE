@@ -648,10 +648,14 @@
   },
   "pipelining-loops-using-free-running-pipeline": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C synthesis: 58: #pragma HLS DATAFLOW: the region has its statements other than calls of functions and declarations of streams and arrays: its streams are FIFOs between processes, so it cannot be made sequential"
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 107,
+      "max": 107,
+      "avg": 107
+    },
+    "reason": null
   },
   "task-level-parallelism-control-driven-channels-autorestart": {
     "csim": "pass",

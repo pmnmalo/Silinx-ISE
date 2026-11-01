@@ -116,7 +116,7 @@ test('#1707 DATAFLOW: what is not supported, said; a region of other statements 
   assert.deepEqual(msgs(`${H}void t(int a[2], int k) {\n  hls::stream<int> s, u;\n#pragma HLS DATAFLOW\n  p(s, k);\n  p(u, k + 1);\n  c(s, a);\n  c(u, a);\n}\n`).filter((m) => / error: /.test(m)),
     ["5 error: DATAFLOW: the argument 'a' is used by 2 processes: one process each (not yet shared)", "9 error: DATAFLOW: the argument of 'k' of 'p': an argument of 't' or a constant (not an expression, yet)"]);
   assert.deepEqual(msgs(`${H}void t(int *r, int k) {\n  hls::stream<int> s;\n#pragma HLS DATAFLOW\n  p(s, k);\n  q(s, r);\n}\n`),
-    ["9 error: DATAFLOW: 'q' gives back a value (r): not supported in a DATAFLOW region yet (a stream or an array)"]);
+    []);   // (a pointer output of the top given back by its process, #1706, test/c-dataflow-loops.test.js)
   assert.deepEqual(msgs(`${H}void t(int a[2], int k) {\n  int b[2];\n#pragma HLS DATAFLOW\n  for (int i = 0; i < 2; i++) b[i] = k;\n  a[0] = b[1];\n}\n`),
     ['7 warning: #pragma HLS DATAFLOW: the region has its statements other than calls of functions and declarations of streams and arrays: made sequential (not as processes)']);
   assert.deepEqual(msgs(`${H}void t(int a[2], int k) {\n  hls::stream<int> s;\n  p(s, k);\n  c(s, a);\n}\n`),

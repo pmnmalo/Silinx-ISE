@@ -87,7 +87,7 @@ Not part of `npm test` (it needs the network once).
 | pipelining-functions-hier-func | C++ | pass | pass | pass | - |  |
 | pipelining-loops-imperfect-loop | C++ | pass | pass | pass | 543 |  |
 | pipelining-loops-perfect-loop | C++ | pass | pass | pass | 1723 |  |
-| pipelining-loops-using-free-running-pipeline | C++ | pass | fail | skip | - | C synthesis: 58: #pragma HLS DATAFLOW: the region has its statements other than calls of functions and declarations of streams and arrays: its streams are FIFOs between processes, so it cannot be made sequential |
+| pipelining-loops-using-free-running-pipeline | C++ | pass | pass | pass | 107 |  |
 | task-level-parallelism-control-driven-channels-autorestart | C++ | pass | pass | pass | 322-325 |  |
 | task-level-parallelism-control-driven-channels-merge-split-merge-load-balance | C++ | pass | pass | pass | 594 |  |
 | task-level-parallelism-control-driven-channels-merge-split-merge-round-robin | C++ | pass | pass | pass | 594 |  |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
 
-73 designs: 67 through co-simulation.
+73 designs: 68 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS
