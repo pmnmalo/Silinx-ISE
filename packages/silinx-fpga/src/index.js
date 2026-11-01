@@ -46,3 +46,4 @@ export { makeBitDb, dbFileNames, dbFilesFrom, splitPart } from './fpga/bitdb.js'
 
 // the Spartan-6: how far its open flow goes
 export { s6OpenStatus } from './fpga/s6/devices.js';
+export { bitDbS6, fetchBitDbS6, s6DbNames } from './fpga/s6/bitdb.js';

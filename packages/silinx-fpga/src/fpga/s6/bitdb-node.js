@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bitDbS6 } from './bitdb.js';
 
 /** The folder of the Spartan-6's bit databases: packages/silinx-fpga/bitdb/s6. */
 export const S6_DB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'bitdb', 's6');
@@ -21,24 +22,9 @@ export const S6_DB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)),
 /**
  * A part's databases ('xc6slx16csg324-3'): { part, slices: { lut, rounds, sliceX }, int, other: { pips }, iob,
  * clocks, hard, hardBase, cmtSettings, cmtInput, ologic } (null for a file the part has not); cmtInput: false leaves the
- * CMTs' input bits out (research/s6/ana-cmtinput6.mjs measures them).
+ * CMTs' input bits out (research/s6/ana-cmtinput6.mjs measures them). The browser's: bitdb.js fetchBitDbS6.
  */
 export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtInput = true } = {}) {
   const read = n => { const f = path.join(dir, `${n}.json`); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; };
-  const device = part.match(/^xc6slx\d+/)[0], dev = n => read(`${device}-${n}`);
-  const pips = n => read(n)?.pips ?? {};
-  return {
-    part,
-    slices: {
-      lut: dev('lut'), rounds: { full: read('xc6slx16-slice-full'), nets: read('xc6slx16-slice-nets'), slice: read('xc6slx16-slice') },
-      // a SLICEX's settings in the frames before its tile's (minor 20 of the column) by its tile's type
-      sliceX: { CLEXL: read('xc6slx16-slice-full-clexl13'), CLEXM: read('xc6slx16-slice-full-clexm') },
-    },
-    int: { pips: read('xc6slx16-int').pips, cover: read('xc6slx16-int-cover').pips, own: read('xc6slx16-int-own').pips },
-    // the other tiles' PIPs (the PIP drop), the I/O path's, the clocks', the probed ones, the CMT paths' and the open
-    // flow's (#732) one at a time
-    other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...(dev('pips-cmt')?.pips ?? {}), ...pips('s6-pips-flow') } },
-    iob: dev('iob'), clocks: read('s6-clocks'), hard: dev('hard'), hardBase: read('s6-hard-base'),
-    cmtSettings: dev('cmt-settings'), cmtInput: cmtInput ? dev('cmt-input') : null, ologic: read('s6-ologic'),
-  };
+  return bitDbS6(read, part, { cmtInput });
 }

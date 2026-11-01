@@ -503,7 +503,7 @@ unchanged). For the **Basys2-100 and Basys2-250
 Silinx also places, routes and writes the bitstream itself: the device descriptions ship with
 Silinx, and the bitstreams it writes for the tested designs are byte-identical to ISE's. The same holds in the
 local server for the Spartan-6 boards, the **Nexys3 and the Atlys** (XC6SLX16 / XC6SLX45-CSG324; the Atlys's
-seven-segment display and VGA on its VHDCI connector), not yet in the browser edition (#2103). It is the
+seven-segment display and VGA on its VHDCI connector), and in the browser edition with the Silinx engine (#2103). It is the
 default execution mode of a new installation, so students need nothing else for these boards; for
 the other boards choose an ISE mode in *Tools ▸ Toolchain Settings ▸ Execution mode*. The
 usual processes then run Silinx's own flow on this machine: *Synthesize - Yosys* (Yosys),

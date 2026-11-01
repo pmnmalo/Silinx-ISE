@@ -7,9 +7,9 @@ import { unconstrainedPorts } from '/core/auto-pins.js';
 import { isGeneratedSource, viewHdl } from '/core/view-hdl.js';
 import { blackboxesIn } from '/core/c-blackbox.js';
 import { compile } from '/core/compile.js';
-import { synthEffort } from '/packages/silinx-fpga/src/index.js';
+import { synthEffort, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
-import { OPEN_STEPS, engineOf, orderOpenSteps } from '/packages/silinx-fpga/src/parts.js';
+import { OPEN_STEPS, engineOf, orderOpenSteps, deviceFamily } from '/packages/silinx-fpga/src/parts.js';
 
 // the devices whose device description and bit database are published (packages/silinx-fpga/devices,
 // packages/silinx-fpga/bitdb): device/package -> the description's file
@@ -18,6 +18,9 @@ export const BROWSER_DEVICES = {
   'xc3s250e/cp132': 'xc3s250ecp132-4.json.gz',
   'xc3s500e/fg320': 'xc3s500efg320-4.json.gz',
   'xc3s1200e/fg320': 'xc3s1200efg320-4.json.gz',
+  // the Spartan-6's (the Nexys3's, the Atlys's: their bit databases in bitdb/s6, #2103)
+  'xc6slx16/csg324': 'xc6slx16csg324-3.json.gz',
+  'xc6slx45/csg324': 'xc6slx45csg324-3.json.gz',
 };
 // The assets' layout, written into the page by its build (scripts/build-standalone.mjs, #487): the
 // folder of this version's device descriptions and bit database under the site's assets/ (a release:
@@ -45,17 +48,25 @@ export const yosysBundleUrl = (base = assetsBase()) => new URL(LAYOUT.yosys, bas
 /** The URL of nextpnr's bundle (its chip databases in ../chipdb beside it, #2136) for the assets at `base`. */
 export const nextpnrBundleUrl = (base = assetsBase()) => new URL(LAYOUT.nextpnr || 'vendor/nextpnr-spartan/gen/bundle.js', base).href;
 
-/** Can the browser edition implement a design for this device? { available, reason, part }. */
+/** Can the browser edition implement a design for this device? { available, reason, part, family, graph, steps (the
+ *  steps it has for the device, when not all of them: the Spartan-6's, as the server's openStatus) }. */
 export function browserOpenStatus(device = {}) {
   const dev = String(device.part || '').toLowerCase(), pkg = String(device.package || '').toLowerCase();
   const speed = String(device.speed || '-4').replace(/^(?!-)/, '-');
   const part = `${dev}${pkg}${speed}`;
+  const family = deviceFamily(device) || 'spartan3e';
   const list = Object.keys(BROWSER_DEVICES).map(k => k.replace('/', ' ')).join(', ');
-  if (String(device.family || 'spartan3e').toLowerCase() !== 'spartan3e' || !/^xc3s\d+e$/.test(dev)) {
-    return { available: false, part, reason: `the Silinx toolchain supports the Spartan-3E only (${list}); other devices need Xilinx ISE, in the full application` };
+  // (the Spartan-6, #2103: the parts of the Nexys3 and the Atlys)
+  if (family === 'spartan6' && /^xc6slx\d+$/.test(dev)) {
+    const s6 = s6OpenStatus(dev, pkg, part);
+    if (!s6.available || !BROWSER_DEVICES[`${dev}/${pkg}`]) return { available: false, part, family, reason: s6.reason };
+    return { available: true, part, family, graph: BROWSER_DEVICES[`${dev}/${pkg}`], steps: s6.steps, reason: `${s6.reason} (in the browser)` };
   }
-  if (!BROWSER_DEVICES[`${dev}/${pkg}`]) return { available: false, part, reason: `no device description of the ${dev} in the ${pkg} package yet (only ${list})` };
-  return { available: true, part, graph: BROWSER_DEVICES[`${dev}/${pkg}`], reason: `${part}: device description and bit database (in the browser)` };
+  if (family !== 'spartan3e' || !/^xc3s\d+e$/.test(dev)) {
+    return { available: false, part, family, reason: `the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 only (${list}); other devices need Xilinx ISE, in the full application` };
+  }
+  if (!BROWSER_DEVICES[`${dev}/${pkg}`]) return { available: false, part, family, reason: `no device description of the ${dev} in the ${pkg} package yet (only ${list})` };
+  return { available: true, part, family, graph: BROWSER_DEVICES[`${dev}/${pkg}`], reason: `${part}: device description and bit database (in the browser)` };
 }
 
 const ALIASES = { implement: 'par', impl: 'par', synthesize: 'synth', xst: 'synth', ngdbuild: 'translate', place: 'par', route: 'par', timing: 'trce', bit: 'bitgen' };
@@ -131,7 +142,11 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   if (unplaced.length && project.board) throw new Error(`${unplaced.length} top-level port bit(s) have no pin location (LOC) for the ${project.board} board: ${unplaced.slice(0, 12).map(u => u.net).join(', ')}${unplaced.length > 12 ? ', …' : ''}. Assign them in I/O Pin Planning (or remove the board in Design Properties).`);
   if (unplaced.length) onLine(`WARNING:Silinx - ${unplaced.length} port bit(s) have no LOC constraint (${unplaced.slice(0, 8).map(u => u.net).join(', ')}${unplaced.length > 8 ? ', …' : ''}): the Silinx toolchain chooses their pins - do NOT program real hardware with this bitstream`);
   const dev = String(project.device.part).toLowerCase(), pkg = String(project.device.package).toLowerCase();
-  const spec = { top, part: st.part, device: dev, pkg, family: 'spartan3e', graph: st.graph, steps: browserSteps(steps, { synthUpToDate: !!synthUpToDate }), seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), ...(resources && { resources }) };
+  const runSteps = browserSteps(steps, { synthUpToDate: !!synthUpToDate });
+  // (a device with some of the steps only, as the server refuses the others: the Spartan-6's, #722)
+  const missing = st.steps ? runSteps.filter(s => !st.steps.includes(s)) : [];
+  if (missing.length) throw new Error(`the Silinx toolchain has no ${missing.join(', ')} for ${st.part} yet (only ${st.steps.join(', ')})`);
+  const spec = { top, part: st.part, device: dev, pkg, family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), ...(resources && { resources }) };
   if (synthUpToDate && !spec.steps.includes('synth')) spec.synthUpToDate = synthUpToDate;
   // the test benches, for the post-synthesis model's generics (#120)
   const simSources = (project.files || []).filter(f => f.role === 'sim' && (f.lang === 'verilog' || f.lang === 'vhdl') && typeof files[f.path] === 'string')
@@ -175,7 +190,7 @@ export function prepareBrowserFlow(device = {}, impl = undefined) {
   const w = getWorker(), id = ++runSeq;
   return new Promise(resolve => {
     runs.set(id, { onData: data => { if (data.done) { runs.delete(id); resolve(data.done); } }, fail: () => { runs.delete(id); prepared.delete(st.graph); resolve(null); } });
-    w.postMessage({ id, prepare: { graph: st.graph, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: engineOf(impl) !== 'silinx' }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: st.family === 'spartan3e' && engineOf(impl) !== 'silinx' }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
   });
 }
 

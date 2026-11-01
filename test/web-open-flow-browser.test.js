@@ -15,7 +15,7 @@ class FakeWorker {
 }
 globalThis.Worker = FakeWorker;
 globalThis.SILINX_ASSETS = 'https://example.test/assets/';
-const { runBrowserFlow, prepareBrowserFlow } = await import('../web/js/open-flow-browser.js');
+const { runBrowserFlow, prepareBrowserFlow, browserOpenStatus } = await import('../web/js/open-flow-browser.js');
 
 const project = { name: 'p', top: 'top', device: { family: 'spartan3e', part: 'xc3s250e', package: 'cp132', speed: '-4' }, files: [{ path: 'top.v', lang: 'verilog', role: 'design' }] };
 const files = { 'top.v': 'module top(input a, output y); assign y = a; endmodule\n' };
@@ -95,12 +95,12 @@ test('#967 prepareBrowserFlow: the device\'s assets asked of the flow\'s worker 
   globalThis.caches = {};
   assert.equal(await prepareBrowserFlow(dev), null, 'not a secure context');
   globalThis.isSecureContext = true;
-  assert.equal(await prepareBrowserFlow({ family: 'spartan6', part: 'xc6slx16', package: 'csg324' }), null, 'a device the Silinx toolchain does not support');
+  assert.equal(await prepareBrowserFlow({ family: 'spartan6', part: 'xc6slx9', package: 'csg324' }), null, 'a device the Silinx toolchain does not support');
   assert.equal(FakeWorker.all.length, n);
   try {
     const p = prepareBrowserFlow(dev);
     const w = live(), m = w.posted.at(-1);
-    assert.deepEqual(m.prepare, { graph: 'xc3s500efg320-4.json.gz', device: 'xc3s500e', pkg: 'fg320', nextpnr: true });   // (nextpnr by default, #2136)
+    assert.deepEqual(m.prepare, { graph: 'xc3s500efg320-4.json.gz', part: 'xc3s500efg320-4', family: 'spartan3e', device: 'xc3s500e', pkg: 'fg320', nextpnr: true });   // (nextpnr by default, #2136)
     assert.equal(m.assets, 'https://example.test/assets/');
     assert.equal(m.root, 'https://example.test/assets/', 'unbuilt: the assets folder itself');
     assert.equal(m.yosys, 'https://example.test/assets/vendor/yowasp-yosys/gen/bundle.js');
@@ -141,8 +141,44 @@ test('#1450 prepareBrowserFlow: nothing in a page opened from a file, though it 
     globalThis.location = new URL('https://example.test/');
     const p = prepareBrowserFlow(dev);
     const w = live(), m = w.posted.at(-1);
-    assert.deepEqual(m.prepare, { graph: 'xc3s100ecp132-4.json.gz', device: 'xc3s100e', pkg: 'cp132', nextpnr: true });
+    assert.deepEqual(m.prepare, { graph: 'xc3s100ecp132-4.json.gz', part: 'xc3s100ecp132-4', family: 'spartan3e', device: 'xc3s100e', pkg: 'cp132', nextpnr: true });
     w.send({ id: m.id, done: { fetched: 9, bytes: 17e6, pruned: 0 } });
     assert.deepEqual(await p, { fetched: 9, bytes: 17e6, pruned: 0 });
   } finally { delete globalThis.caches; delete globalThis.isSecureContext; delete globalThis.location; }
+});
+
+test('#2103 the Spartan-6 in the browser: the Nexys3\'s and the Atlys\'s parts, with their steps; a run says its family and refuses a step the part has not; prepare asks for its databases', async () => {
+  const nexys3 = { family: 'spartan6', part: 'xc6slx16', package: 'csg324', speed: '-3' };
+  const steps = ['synth', 'postsynth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit'];
+  assert.deepEqual(browserOpenStatus(nexys3), { available: true, part: 'xc6slx16csg324-3', family: 'spartan6', graph: 'xc6slx16csg324-3.json.gz', steps,
+    reason: 'xc6slx16csg324-3: the Spartan-6: synthesis, its post-synthesis simulation model, Map, Place & Route, the static timing, the bitstream (in the browser)' });
+  assert.equal(browserOpenStatus({ part: 'xc6slx45', package: 'csg324', speed: '-3' }).graph, 'xc6slx45csg324-3.json.gz', 'the family from the part');
+  // another part, another package: no
+  assert.deepEqual(browserOpenStatus({ family: 'spartan6', part: 'xc6slx9', package: 'csg324', speed: '-2' }), { available: false, part: 'xc6slx9csg324-2', family: 'spartan6',
+    reason: 'the Silinx toolchain for the Spartan-6 is for the XC6SLX16 (CSG324, Nexys3), XC6SLX45 (CSG324, Atlys) only: use an ISE mode for the xc6slx9' });
+  assert.equal(browserOpenStatus({ ...nexys3, package: 'ftg256' }).available, false);
+  assert.match(browserOpenStatus({ family: 'artix7', part: 'xc7a35t', package: 'cpg236', speed: '-1' }).reason, /^the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 only \(xc3s100e cp132, .*xc6slx16 csg324, xc6slx45 csg324\)/);
+  const s6 = { ...project, device: nexys3 };
+  const before = live()?.posted.length || 0;
+  const r = runBrowserFlow({ project: s6, files, steps: ['bitgen'], onLine: () => {} });
+  const w = await posts(before + 1);
+  const m = w.posted.at(-1);
+  assert.equal(m.spec.family, 'spartan6');
+  assert.equal(m.spec.part, 'xc6slx16csg324-3');
+  assert.equal(m.spec.graph, 'xc6slx16csg324-3.json.gz');
+  assert.deepEqual(m.spec.steps, ['synth', 'translate', 'map', 'par', 'trce', 'bitgen', 'prombit']);
+  w.send({ id: m.id, done: { ok: true } });
+  assert.deepEqual(await r, { ok: true });
+  await assert.rejects(runBrowserFlow({ project: s6, files, steps: ['xpwr'], onLine: () => {} }),
+    /^Error: the Silinx toolchain has no xpwr for xc6slx16csg324-3 yet \(only synth, postsynth, translate, map, par, trce, bitgen, prombit\)$/);
+  globalThis.caches = {};
+  globalThis.isSecureContext = true;
+  try {
+    const p = prepareBrowserFlow(nexys3);
+    const pw = live(), pm = pw.posted.at(-1);
+    // (no nextpnr: the Spartan-6's engine is Silinx's unless the project asks for nextpnr, which the browser has not for it)
+    assert.deepEqual(pm.prepare, { graph: 'xc6slx16csg324-3.json.gz', part: 'xc6slx16csg324-3', family: 'spartan6', device: 'xc6slx16', pkg: 'csg324', nextpnr: false });
+    pw.send({ id: pm.id, done: { fetched: 30, bytes: 3e6, pruned: 0 } });
+    assert.deepEqual(await p, { fetched: 30, bytes: 3e6, pruned: 0 });
+  } finally { delete globalThis.caches; delete globalThis.isSecureContext; }
 });

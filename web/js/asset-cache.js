@@ -1,7 +1,7 @@
 // The browser edition's versioned assets kept in Cache Storage (#967): Yosys in WebAssembly
 // (assets/vendor/yowasp-yosys/<its version>/gen/*, 16.7 MB gzipped), nextpnr in WebAssembly and its chip databases
 // (assets/vendor/nextpnr-spartan/<its version>/gen|chipdb/*, #2136) and the device descriptions and the
-// bit database (assets/<version>/devices|bitdb/*). Their URLs name their version, so that what one holds
+// bit databases (assets/<version>/devices|bitdb|bitdb/s6/*). Their URLs name their version, so that what one holds
 // never changes: they are read from the cache with no request at all. The browser's HTTP cache kept them
 // 10 minutes only (GitHub Pages' max-age=600), and its revalidation downloaded Yosys again whenever the
 // site had been deployed since (its ETags are the files' times of deployment: every push to main).
@@ -18,14 +18,14 @@
 
 export const ASSET_CACHE = 'silinx-assets';
 /** Is url one of the versioned assets (its content never changes)? */
-export const isVersionedAsset = url => /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/vendor\/nextpnr-spartan\/\d[^/]*\/(gen|chipdb)\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb)\/[^/?#]+$/.test(String(url));
+export const isVersionedAsset = url => /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/vendor\/nextpnr-spartan\/\d[^/]*\/(gen|chipdb)\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb(\/s6)?)\/[^/?#]+$/.test(String(url));
 
 /** The scope's fetch reads the versioned assets from Cache Storage, and puts there those it fetches. Returns
  *  whether it replaced it. Self-contained: assetFetchSource writes its text into the Yosys Blob workers. */
 export function assetFetch(scope = globalThis, name = 'silinx-assets') {
   const net = scope.fetch;
   if (typeof net !== 'function' || net.assetCache) return false;
-  const versioned = url => /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb)\/[^/?#]+$/.test(url);
+  const versioned = url => /\/vendor\/yowasp-yosys\/\d[^/]*\/gen\/[^/?#]+$|\/assets\/(\d+\.\d+\.\d+[^/]*|dev-[0-9a-f]+)\/(devices|bitdb(\/s6)?)\/[^/?#]+$/.test(url);
   const open = () => { try { return scope.caches ? scope.caches.open(name) : null; } catch { return null; } };   // (an opaque origin throws)
   // the SHA-256 the build wrote for url (none: not checked), and a response's body checked against it (null: it differs)
   const expected = url => { const i = url.lastIndexOf('/assets/'); return i >= 0 ? scope.SILINX_ASSET_INTEGRITY?.[url.slice(i + 8)] : undefined; };

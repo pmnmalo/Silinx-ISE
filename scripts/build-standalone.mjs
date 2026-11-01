@@ -45,6 +45,8 @@ const LAYOUT = {
 const ASSET_DIRS = [
   [`${LAYOUT.dir}devices`, 'packages/silinx-fpga/devices', f => f.endsWith('.json.gz')],
   [`${LAYOUT.dir}bitdb`, 'packages/silinx-fpga/bitdb', f => f.endsWith('.json')],
+  // (the Spartan-6's, a folder of their own: fpga/s6/bitdb.js fetchBitDbS6, #2103)
+  [`${LAYOUT.dir}bitdb/s6`, 'packages/silinx-fpga/bitdb/s6', f => f.endsWith('.json')],
   [`vendor/yowasp-yosys/${YOSYS_VERSION}/gen`, 'node_modules/@yowasp/yosys/gen', () => true],
   [`vendor/nextpnr-spartan/${NEXTPNR_VERSION}/gen`, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/gen', () => true],
   [`vendor/nextpnr-spartan/${NEXTPNR_VERSION}/chipdb`, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e/chipdb', f => f.endsWith('.bin.gz')],
