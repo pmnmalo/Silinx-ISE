@@ -41,7 +41,7 @@ uiTest('#2478 the board layouts in a module of their own: emulator.js exports th
   }), [true, ['basys2', 'nexys2', 's3e-starter'], ['s3e-starter']]);
 });
 
-for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [800, 560], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]]]) {
+for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [860, 720], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]]]) {
   uiTest(`#2478 the ${board} drawn: its PCB, LEDs, switches, buttons and digits`, E, async (page) => {
     await emulatorOn(page, board, `Emu-${board}`);
     assert.deepEqual(await page.eval(() => {
@@ -142,5 +142,37 @@ uiTest('#2479 the Basys2 drawn as the real board: its parts where they are, as t
   assert.ok(xs.JA[0] < xs.JB[0] && xs.JB[0] < xs.JC[0] && xs.JC[0] < xs.JD[0] && xs.JD[1] < g.H * 0.15);
   assert.ok(xs.J1[0] < g.W * 0.05 && xs.J3[0] < g.W * 0.05 && xs.J1[1] < xs.J3[1] && xs.J3[1] < g.power.y, JSON.stringify([xs.J1, xs.J3]));
   assert.ok(xs.VGA[0] > g.W * 0.8 && xs.VGA[1] > g.H * 0.2 && xs.VGA[1] < g.H * 0.6, JSON.stringify(xs.VGA));
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+uiTest('#2480 the Nexys2 drawn as the real board: its parts where they are, as they are turned', E, async (page) => {
+  await emulatorOn(page, 'nexys2', 'Emu-nexys2-real');
+  const g = await geometry(page);
+  assert.deepEqual([g.W, g.H], [860, 720]);   // (the board's proportions)
+  // the power switch: upright, on the top edge beside the 5 V jack (top left), its LED beside it
+  const sw = await page.eval(() => { const s = document.querySelector('.emu-power-sw').getBoundingClientRect(), l = document.querySelector('.emu-power-led').getBoundingClientRect();
+    return { upright: s.height > 2 * s.width, ledRight: l.left > s.right && l.top > s.top && l.bottom < s.bottom + 10 }; });
+  assert.deepEqual(sw, { upright: true, ledRight: true });
+  assert.ok(g.power.x < g.W * 0.3 && g.power.y < g.H * 0.1, JSON.stringify(g.power));
+  // SW7..SW0 left to right along the bottom edge (left part), upright, each under its LED
+  const sws = [7, 6, 5, 4, 3, 2, 1, 0].map((k) => `sw${k}`);
+  assert.ok(leftToRight(g, sws) && sws.every((n) => g[n].h > 1.5 * g[n].w && g[n].y > g.H * 0.8 && g[n].x < g.W * 0.5));
+  for (let k = 0; k < 8; k++) assert.ok(Math.abs(g[`led${k}`].x - g[`sw${k}`].x) < 1 && g[`led${k}`].y < g[`sw${k}`].y, `LD${k} over SW${k}`);
+  // the display over BTN3..BTN0, right of the switches, left of the FX2 connector
+  const btns = [3, 2, 1, 0].map((k) => `btn${k}`), digits = [3, 2, 1, 0].map((k) => `an${k}`);
+  assert.ok(leftToRight(g, btns) && leftToRight(g, digits) && g.btn3.x > g.sw0.x && g.btn0.x < g.W * 0.85 && btns.every((n) => g[n].y > g.H * 0.85));
+  for (let k = 0; k < 4; k++) assert.ok(g[`an${k}`].y < g[`btn${k}`].y && Math.abs(g[`an${k}`].x - g[`btn${k}`].x) < 1, `AN${k} over BTN${k}`);
+  // the silkscreen: the parts' names, their FPGA pins in brackets
+  const silk = await page.eval(() => [...document.querySelectorAll('.emu-pcb .nx2-silk')].map((e) => e.textContent));
+  for (const t of ['LD7', '(R4)', 'SW7 (R17)', 'SW0 (G18)', 'BTN3', '(H13)', 'BTN0', '(B18)']) assert.ok(silk.includes(t), t);
+  const art = await page.eval(() => [...document.querySelectorAll('.emu-pcb-art text')].map((t) => t.textContent));
+  assert.ok(art.includes('NEXYS 2'));
+  assert.deepEqual(art.filter((t) => MAKERS.test(t)), []);
+  // the connectors on their edges: JA..JD along the top, RESET top right, VGA over RS-232 over USB over PS2 on the left, FX2 on the right
+  const xs = await page.eval(() => Object.fromEntries([...document.querySelectorAll('.emu-pcb-art text')].map((t) => [t.textContent, [+t.getAttribute('x'), +t.getAttribute('y')]])));
+  assert.ok(xs.JA[0] < xs.JB[0] && xs.JB[0] < xs.JC[0] && xs.JC[0] < xs.JD[0] && xs.JD[1] < g.H * 0.15 && xs.JA[0] > g.power.x);
+  assert.ok(xs.RESET[0] > g.W * 0.9 && xs.RESET[1] < g.H * 0.2);
+  assert.ok(['VGA', 'RS-232', 'USB', 'PS2'].every((t, i, a) => xs[t][0] < g.W * 0.12 && (!i || xs[a[i - 1]][1] < xs[t][1])), JSON.stringify(xs));
+  assert.ok(xs.FX2[0] > g.W * 0.85 && xs.J1[0] > g.W * 0.85);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });

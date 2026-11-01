@@ -93,8 +93,6 @@ function injectStyle() {
 .b2-btn::after { content: ''; position: absolute; left: 6px; top: 6px; width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(#5a5a5a, #222); }
 .b2-btn.on { box-shadow: none; transform: translateY(1px); }
 .b2-btn.on::after { background: radial-gradient(#d33, #700); }
-.nx2-btn { width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(#555, #151515); border: 2px solid #8a8a8a; cursor: pointer; user-select: none; }
-.nx2-btn.on { background: radial-gradient(#d33, #700); border-color: #fcc; }
 .s3e-knob { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(#666, #1c1c1c); border: 2px solid #777; cursor: pointer; user-select: none; }
 .s3e-knob.on { background: radial-gradient(#d33, #700); }
 .emu-lcd { position: relative; width: 248px; height: 44px; }
