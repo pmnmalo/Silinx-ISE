@@ -205,8 +205,8 @@ test('#1901 a DATAFLOW top\'s memories: both ports, all their signals, as Vitis 
   const all = (n) => ['address0', 'ce0', 'd0', 'q0', 'we0', 'address1', 'ce1', 'd1', 'q1', 'we1'].map((s) => `${n}_${s}`);
   both(DF(), [...all('a'), ...all('b')], [], { file: 'f.c' });
   const g = cToHdl(DF('#pragma HLS INTERFACE m_axi port=a'), { file: 'f.c' });
-  // (m_axi, #1893: its AXI master; the module inside the AXI one has none of the ports added)
-  assert.deepEqual(names(g).filter((n) => /^[ab]_/.test(n)).sort(), ['b_address0', 'b_ce0', 'b_d0', 'b_we0']);
+  // (m_axi, #1893: its AXI master, none of its ports; the other memory both ports, as Vitis HLS's with AXI too, #1706)
+  assert.deepEqual(names(g).filter((n) => /^[ab]_/.test(n)).sort(), all('b').sort());
 });
 
 test('#1901 ram_t2p in a pipelined loop: its two reads in one state, the II asked for made; one port, the II it can', () => {
