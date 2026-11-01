@@ -57,11 +57,11 @@ export function browserOpenStatus(device = {}) {
   const part = `${dev}${pkg}${speed}`;
   const family = deviceFamily(device) || 'spartan3e';
   const list = Object.keys(BROWSER_DEVICES).map(k => k.replace('/', ' ')).join(', ');
-  // (the iCE40, #2295: where nextpnr-ice40 is served, not in the published editions yet)
+  // (the iCE40, #2295: nextpnr-ice40 served by the local server, or the published editions' download from npm's registry, #2444)
   if (family === 'ice40') {
     const name = `${dev}${pkg}`;
     if (!ICE40_PARTS.includes(dev.replace(/^ice40/, ''))) return { available: false, part: name, reason: `${dev}: not an iCE40 part of nextpnr-ice40` };
-    return LAYOUT.nextpnrIce40 ? { available: true, part: name, family: 'ice40', reason: `${name}: nextpnr-ice40 and icepack (in the browser)` }
+    return LAYOUT.nextpnrIce40 || LAYOUT.nextpnrIce40Package ? { available: true, part: name, family: 'ice40', reason: `${name}: nextpnr-ice40 and icepack (in the browser)` }
       : { available: false, part: name, reason: 'nextpnr-ice40 is not in this edition: use the local server' };
   }
   // (the Spartan-6, #2103: the parts of the Nexys3 and the Atlys)
@@ -183,7 +183,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
       fail: e => { end(); reject(e); },
     });
     signal?.addEventListener('abort', abort, { once: true });
-    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrIce40: st.family === 'ice40' ? new URL(LAYOUT.nextpnrIce40, assetsBase()).href : null, integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrIce40: st.family === 'ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null });
   });
 }
 
