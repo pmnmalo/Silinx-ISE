@@ -3,6 +3,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
+import { resolveBoard } from '../../server/devices.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -26,7 +27,8 @@ end rtl;
 
 /** The emulator open on `board` with the counter. */
 async function emulatorOn(page, board, name) {
-  await makeProject(env, { name, board, files: { 'src/blink.vhd': BLINK }, top: 'blink' });
+  // (the Spartan-6 boards' device: the default device list has the Spartan-3E boards only)
+  await makeProject(env, { name, board, device: resolveBoard(board).device, files: { 'src/blink.vhd': BLINK }, top: 'blink' });
   await page.openProject(name);
   assert.equal(await page.eval(() => window.SilinxApp.regenerateUcf()), true);
   await page.eval(() => window.SilinxApp.openFile('src/blink.vhd'));
@@ -38,10 +40,11 @@ uiTest('#2478 the board layouts in a module of their own: emulator.js exports th
   assert.deepEqual(await page.eval(async () => {
     const [a, b] = await Promise.all([import('/js/emulator.js'), import('/js/emulator-layouts.js')]);
     return [a.BOARD_LAYOUTS === b.BOARD_LAYOUTS, Object.keys(b.BOARD_LAYOUTS), Object.entries(b.BOARD_LAYOUTS).filter(([, f]) => f.lcd).map(([id]) => id)];
-  }), [true, ['basys2', 'nexys2', 's3e-starter'], ['s3e-starter']]);
+  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys'], ['s3e-starter']]);
 });
 
-for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [860, 720], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]]]) {
+for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [860, 720], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]],
+  ['nexys3', [900, 930], [8, 8, 5, 4]], ['atlys', [1100, 780], [8, 8, 6, 4]]]) {
   uiTest(`#2478 the ${board} drawn: its PCB, LEDs, switches, buttons and digits`, E, async (page) => {
     await emulatorOn(page, board, `Emu-${board}`);
     assert.deepEqual(await page.eval(() => {
@@ -176,3 +179,79 @@ uiTest('#2480 the Nexys2 drawn as the real board: its parts where they are, as t
   assert.ok(xs.FX2[0] > g.W * 0.85 && xs.J1[0] > g.W * 0.85);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });
+
+uiTest('#2481 the Nexys3 drawn as the real board: its parts where they are, as they are turned', E, async (page) => {
+  await emulatorOn(page, 'nexys3', 'Emu-nexys3-real');
+  const g = await geometry(page);
+  assert.deepEqual([g.W, g.H], [900, 930]);   // (the board nearly square, as it is)
+  // the power switch: upright, on the left edge at the top, by the 5 V jack; its LED (POWER good) right of it
+  const sw = await page.eval(() => { const s = document.querySelector('.emu-power-sw').getBoundingClientRect(), l = document.querySelector('.emu-power-led').getBoundingClientRect();
+    return { upright: s.height > 2 * s.width, ledRight: l.left > s.right }; });
+  assert.deepEqual(sw, { upright: true, ledRight: true });
+  assert.ok(g.power.x < g.W * 0.06 && g.power.y < g.H * 0.15, JSON.stringify(g.power));
+  // SW7..SW0 left to right along the bottom edge, upright, each under its LED
+  const sws = [7, 6, 5, 4, 3, 2, 1, 0].map((k) => `sw${k}`);
+  assert.ok(leftToRight(g, sws) && sws.every((n) => g[n].h > 1.5 * g[n].w && g[n].y > g.H * 0.85));
+  for (let k = 0; k < 8; k++) assert.ok(Math.abs(g[`led${k}`].x - g[`sw${k}`].x) < 1 && g[`led${k}`].y < g[`sw${k}`].y, `LD${k} over SW${k}`);
+  // the display AN3..AN0 over the cross of buttons (btn[0] = BTNS in the middle, BTNU over it, BTNL / BTNR beside it, BTND under it), right of the switches
+  assert.ok(leftToRight(g, ['an3', 'an2', 'an1', 'an0']) && g.an3.y < g.btn1.y && g.an3.x > g.sw0.x);
+  assert.ok(g.btn1.y < g.btn0.y && g.btn3.y > g.btn0.y && g.btn2.x < g.btn0.x && g.btn4.x > g.btn0.x);
+  for (const b of ['btn1', 'btn3']) assert.ok(Math.abs(g[b].x - g.btn0.x) < 1, b);
+  for (const b of ['btn2', 'btn4']) assert.ok(Math.abs(g[b].y - g.btn0.y) < 1, b);
+  const silk = await page.eval(() => [...document.querySelectorAll('.emu-pcb .nx3-silk')].map((e) => e.textContent));
+  for (const t of ['LD7(T11)', 'LD0(U16)', 'SW7(T5)', 'SW0(T10)', 'BTNS(B8)', 'BTNU(A8)', 'BTNL(C4)', 'BTND(C9)', 'BTNR(D9)']) assert.ok(silk.includes(t), t);
+  const art = await page.eval(() => [...document.querySelectorAll('.emu-pcb-art text')].map((t) => t.textContent));
+  assert.ok(art.includes('NEXYS 3'));
+  assert.deepEqual(art.filter((t) => MAKERS.test(t)), []);
+  // the connectors on their edges: JA..JD along the top, USB PROG / ETHERNET / VGA / USB HOST down the left edge, VHDC and UART on the right
+  const xs = await page.eval(() => Object.fromEntries([...document.querySelectorAll('.emu-pcb-art text')].map((t) => [t.textContent, [+t.getAttribute('x'), +t.getAttribute('y')]])));
+  assert.ok(xs.JA[0] < xs.JB[0] && xs.JB[0] < xs.JC[0] && xs.JC[0] < xs.JD[0] && xs.JD[1] < g.H * 0.15);
+  assert.ok(['USB PROG', 'ETHERNET', 'VGA', 'USB HOST'].every((t, i, a) => xs[t][0] < g.W * 0.2 && (!i || xs[a[i - 1]][1] < xs[t][1])), JSON.stringify(xs));
+  assert.ok(xs.VHDC[0] > g.W * 0.85 && xs.UART[0] > g.W * 0.85 && xs.VHDC[1] < xs.UART[1]);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+uiTest('#2481 the Atlys drawn as the real board: its parts where they are, as they are turned, the display on the VHDCI', E, async (page) => {
+  await emulatorOn(page, 'atlys', 'Emu-atlys-real');
+  const g = await geometry(page), BW = 860;   // (the board 860 x 780, the 7-segment module on its right)
+  assert.deepEqual([g.W, g.H], [1100, 780]);
+  // the power switch: upright, on the top edge beside the 5 V jack (top left), its LED beside it
+  const sw = await page.eval(() => { const s = document.querySelector('.emu-power-sw').getBoundingClientRect(), l = document.querySelector('.emu-power-led').getBoundingClientRect();
+    return { upright: s.height > 2 * s.width, ledRight: l.left > s.right }; });
+  assert.deepEqual(sw, { upright: true, ledRight: true });
+  assert.ok(g.power.x < BW * 0.2 && g.power.y < g.H * 0.1, JSON.stringify(g.power));
+  // SW7..SW0 left to right along the bottom edge (right part), upright, each under its LED
+  const sws = [7, 6, 5, 4, 3, 2, 1, 0].map((k) => `sw${k}`);
+  assert.ok(leftToRight(g, sws) && sws.every((n) => g[n].h > 1.5 * g[n].w && g[n].y > g.H * 0.85 && g[n].x > BW * 0.5 && g[n].x < BW));
+  for (let k = 0; k < 8; k++) assert.ok(Math.abs(g[`led${k}`].x - g[`sw${k}`].x) < 1 && g[`led${k}`].y < g[`sw${k}`].y, `LD${k} over SW${k}`);
+  // the buttons in a cross (btn[4] = BTNC in the middle, BTNU over it, BTNL / BTNR beside it, BTND under it), RESET over BTNR, on the board's right
+  assert.ok(g.btn0.y < g.btn4.y && g.btn2.y > g.btn4.y && g.btn1.x < g.btn4.x && g.btn3.x > g.btn4.x && g.btn4.x > BW * 0.8 && g.btn4.x < BW);
+  assert.ok(g.btn_reset.y < g.btn3.y && Math.abs(g.btn_reset.x - g.btn3.x) < 10 && g.btn_reset.y > g.btn0.y - 20);
+  // the display on the module plugged into the VHDCI connector, right of the board
+  assert.ok(leftToRight(g, ['an3', 'an2', 'an1', 'an0']) && ['an3', 'an0'].every((n) => g[n].x > BW));
+  const art = await page.eval(() => [...document.querySelectorAll('.emu-pcb-art text')].map((t) => t.textContent));
+  for (const t of ['ATLYS', 'HDMI OUT', 'HDMI IN', 'HP OUT', 'LINE OUT', 'LINE IN', 'MIC', 'ETHERNET', 'VHDCI', 'JB', 'PROG', 'HOST', 'UART', 'CA(U16)', 'DP(M10)']) assert.ok(art.includes(t), t);
+  assert.deepEqual(art.filter((t) => MAKERS.test(t)), []);
+  // the top edge, left to right: HDMI OUT, the audio jacks, HDMI IN, Ethernet; the left edge, top to bottom: PROG, HOST, UART
+  const xs = await page.eval(() => Object.fromEntries([...document.querySelectorAll('.emu-pcb-art text')].map((t) => [t.textContent, [+t.getAttribute('x'), +t.getAttribute('y')]])));
+  const top = await page.eval((h) => [...document.querySelectorAll('.emu-pcb-art text')].filter((t) => +t.getAttribute('y') < h && +t.getAttribute('y') > 40).sort((p, q) => p.getAttribute('x') - q.getAttribute('x')).map((t) => t.textContent), g.H * 0.15);
+  assert.deepEqual(top.filter((t) => /HDMI|OUT|IN$|MIC|ETHERNET/.test(t)), ['HDMI OUT', 'HP OUT', 'LINE OUT', 'LINE IN', 'MIC', 'HDMI IN', 'ETHERNET']);
+  // (the other HDMI IN on the left edge, at the bottom)
+  assert.ok(['PROG', 'HOST', 'UART', 'HDMI IN'].every((t, i, a) => xs[t][0] < BW * 0.15 && (!i || xs[a[i - 1]][1] < xs[t][1])), JSON.stringify(xs));
+  const silk = await page.eval(() => [...document.querySelectorAll('.emu-pcb .at-silk')].map((e) => e.textContent));
+  for (const t of ['RESET', 'BTNU', 'BTNC', 'LD7', '(N12)', 'SW0', 'AN3']) assert.ok(silk.includes(t), t);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// on every board drawn: the pointer aims at each control, what is at its centre is that control (no label, no other
+// part over it)
+for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys']) {
+  uiTest(`#2481 the ${board}'s controls: each one is what is at its centre`, E, async (page) => {
+    await emulatorOn(page, board, `Emu-aim-${board}`);
+    assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-pcb .emu-btn, .emu-pcb .emu-sw, .emu-pcb .emu-rot-btn, .emu-pcb .emu-power')].filter((c) => {
+      c.scrollIntoView({ block: 'center', inline: 'center' });
+      const r = c.getBoundingClientRect(), at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !(at === c || c.contains(at));
+    }).map((c) => c.title)), []);
+  });
+}
