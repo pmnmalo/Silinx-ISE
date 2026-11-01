@@ -15,13 +15,17 @@ export function mountEmuSide(ctx) {
     const canvas = h('canvas', { width: 640, height: 480 });
     const nosig = h('div', { class: 'emu-vga-nosig' }, compiled() ? 'No signal' : 'The VGA monitor needs the compiled engine (the event-driven one is too slow for a frame)');
     const statEl = h('div', { class: 'emu-vga-stat' }), warnEl = h('div', { class: 'emu-vga-warn' });
-    main.append(h('div', { class: 'emu-box emu-vga' }, h('h4', {}, 'VGA monitor (640×480)'), h('div', { class: 'emu-vga-frame' }, canvas, nosig), statEl, warnEl));
+    const box = h('div', { class: 'emu-box emu-vga', 'data-module': 'vga' }, h('h4', {}, 'VGA monitor (640×480)'), h('div', { class: 'emu-vga-frame' }, canvas, nosig), statEl, warnEl);
+    main.append(box);
+    const shown = () => box.style.display !== 'none';   // (hidden, #2522: no picture fetched or drawn)
     const ctx = canvas.getContext('2d');
     const img = ctx?.createImageData(640, 480), px = img ? new Uint32Array(img.data.buffer) : null;
     let drawn = 0, warned = '';
     const dark = () => { ctx?.clearRect(0, 0, 640, 480); nosig.hidden = false; statEl.textContent = ''; if (warned) { warnEl.textContent = ''; warned = ''; } };
     setVgaView({
+      shown,
       draw() {
+        if (!shown()) return;
         if (!compiled() || !powered()) { dark(); return; }
         const v = sim.vga();
         if (!v?.status.signal || !v.fb) { dark(); return; }

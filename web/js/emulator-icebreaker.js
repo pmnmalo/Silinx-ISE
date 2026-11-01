@@ -65,7 +65,9 @@ export function icebreakerLayout({ board, title, h, mkDigit, mkLed, mkSwitch, mk
     <rect x="756" y="141" width="44" height="190" rx="3" fill="#141414"/>${Array.from({ length: 12 }, (_, i) => `<rect x="${764 + Math.floor(i / 6) * 20}" y="${152 + (i % 6) * 31}" width="8" height="8" fill="#c9a94a"/>`).join('')}
     ${text(820, 135, 'PMOD', { size: 9 })}
     ${[0, 1, 2].map((i) => tact(BTN_X, BTN_Y(i))).join('')}</g>`;
-  const { put: putAt, wrap } = boardFrame({ h, W, H, art, board, title, clockNote });
+  const { pcb, put: putAt, wrap } = boardFrame({ h, W, H, art, board, title, clockNote });
+  if (Y0) pcb.dataset.moduleRoom = Y0;   // (#2522)
+  const mod = (w, id) => { w.dataset.module = id; return w; };
   const put = (el, x, y, cls) => putAt(el, x, y + Y0, cls);   // (on the board, under the modules)
   const part = (w, name) => { w.dataset.part = name; return w; };
   const silkText = (t, x, y) => put(h('span', { class: 'emu-silk icb-silk' }, t), x, y);
@@ -96,16 +98,16 @@ export function icebreakerLayout({ board, title, h, mkDigit, mkLed, mkSwitch, mk
   for (let i = 0; i < 4; i++) {
     const k = 3 - i, x = DIG_X(i);
     if (!hasDisp) break;
-    part(putAt(mkDigit(k), x, DIG_Y - 27), `an${k}`);
-    putAt(h('span', { class: 'emu-silk icb-silk icb-dark' }, `AN${k}`), x, DIG_Y + 36);
-    port('an', k, x, DIG_Y + 48 - Y0);
+    mod(part(putAt(mkDigit(k), x, DIG_Y - 27), `an${k}`), 'display');
+    mod(putAt(h('span', { class: 'emu-silk icb-silk icb-dark' }, `AN${k}`), x, DIG_Y + 36), 'display');
+    mod(port('an', k, x, DIG_Y + 48 - Y0), 'display');
   }
   for (let i = 0; i < 4; i++) {
     const k = 3 - i, x = SW_X(i);
     if (!hasSw) break;
-    part(putAt(mkSwitch(k, 'emu-sw icb-sw'), x, SW_Y - 24), `sw${k}`);
-    putAt(h('span', { class: 'emu-silk icb-silk' }, `SW${k}`), x, SW_Y + 28);
-    port('sw', k, x, SW_Y + 40 - Y0);
+    mod(part(putAt(mkSwitch(k, 'emu-sw icb-sw'), x, SW_Y - 24), `sw${k}`), 'switches');
+    mod(putAt(h('span', { class: 'emu-silk icb-silk' }, `SW${k}`), x, SW_Y + 28), 'switches');
+    mod(port('sw', k, x, SW_Y + 40 - Y0), 'switches');
   }
   return wrap;
 }
@@ -119,17 +121,17 @@ function modules(board, hasDisp, hasSw) {
   // the wires: the segments to PMOD1A's pins, the anodes to PMOD1B's lower row
   const wire = (x0, x1, y1, colour) => `<path d="M${x0},176 C${x0},${y1 - 6} ${x1},${176} ${x1},${y1}" fill="none" stroke="${colour}" stroke-width="2.5"/>`;
   const colours = ['#c0392b', '#e67e22', '#f1c40f', '#27ae60', '#2980b9', '#8e44ad', '#7f8c8d', '#ecf0f1'];
-  const disp = !hasDisp ? '' : `
+  const disp = !hasDisp ? '' : `<g data-module="display">
     <rect x="40" y="8" width="340" height="168" rx="6" fill="#ebe6d6" stroke="#b7ae94" stroke-width="2"/>${holes(20)}${holes(150)}
     <rect x="${DIG_X(0) - 32}" y="${DIG_Y - 36}" width="${DIG_X(3) - DIG_X(0) + 64}" height="72" rx="3" fill="#0b0b0b" stroke="#2a2a2a"/>
     ${segs.map((t, i) => text(310, 50 + i * 10, t, { size: 6, anchor: 'start', weight: 'normal', fill: '#55503f' })).join('')}
     ${text(48, 44, 'BREADBOARD', { size: 7, anchor: 'start', fill: '#55503f' })}
     ${colours.map((c, i) => wire(96 + i * 22, 98 + i * 31, TOP + 4, c)).join('')}
-    ${[0, 1, 2, 3].map((i) => wire(300 + i * 18, 418 + i * 31, TOP + 28, '#7a4a2a')).join('')}`;
-  const sw = !hasSw ? '' : `
+    ${[0, 1, 2, 3].map((i) => wire(300 + i * 18, 418 + i * 31, TOP + 28, '#7a4a2a')).join('')}</g>`;
+  const sw = !hasSw ? '' : `<g data-module="switches">
     <rect x="404" y="40" width="182" height="${TOP - 40}" rx="6" fill="#20357a" stroke="#0e1f4d" stroke-width="2"/>
     <rect x="414" y="${TOP - 14}" width="120" height="18" rx="2" fill="#141414"/>
-    ${text(414, 56, 'SWITCHES (PMOD)', { size: 8, anchor: 'start' })}`;
+    ${text(414, 56, 'SWITCHES (PMOD)', { size: 8, anchor: 'start' })}</g>`;
   return disp + sw;
 }
 // its parts' look: the power switch by the USB (its LED the PWR LED), the round tact buttons, the small SMD LEDs
