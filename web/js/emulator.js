@@ -209,8 +209,10 @@ export function mountEmulator(container, { design, board, assignments, title = '
   }
   const sim = compiled || new Simulator(design, { files, maxWaveEvents: 1e9 });
   const inVal = new Map(inputPorts.map((p) => [p.sig, 0n]));   // value of each input port (unmapped bits 0)
-  // inputs with a pull-up on the board (e.g. the rotary encoder's A / B) rest at '1'
-  for (const b of wiring.bits) if (b.dir === 'in' && b.res.pull === 'up' && b.kind !== 'sw' && b.kind !== 'btn') inVal.set(b.sig, (inVal.get(b.sig) ?? 0n) | (1n << BigInt(b.pos)));
+  // inputs with a pull-up on the board (e.g. the rotary encoder's A / B) rest at '1', and an active-low button (the
+  // iCEBreaker's BTN_N, #2511) released
+  const restsHigh = (b) => (b.res.pull === 'up' && b.kind !== 'sw' && b.kind !== 'btn') || (b.res.extra?.activeLow && (b.kind === 'btn' || b.kind === 'sw'));
+  for (const b of wiring.bits) if (b.dir === 'in' && restsHigh(b)) inVal.set(b.sig, (inVal.get(b.sig) ?? 0n) | (1n << BigInt(b.pos)));
   let lcd = lcdState(), lcdView = null;
 
   let running = false, speed = compiled ? 'real' : 'max', prev = null, destroyed = false, knobEnd = 0;

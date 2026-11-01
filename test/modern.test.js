@@ -258,7 +258,7 @@ test('theme.css: the pages\' own colours have a dark value; no colour written in
   }
   assert.deepEqual(found, [
     "emulator-board.js: color: '#cfe8d4'",
-    'emulator-paint.js: background = `rgb(${Math.round(27 + 20 * v)}, ${Math.round(58 + 197 * v)}, ${Math.round(35 + 40 * v)})`',
+    'emulator-paint.js: background = `rgb(${ledColour(v, red).join()})`',
     "fpgaview.js: color = '#4e79a7'",
     "wizards.js: background: '#c4161c'",
     "wizards.js: color: '#fff'",

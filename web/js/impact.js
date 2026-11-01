@@ -140,7 +140,7 @@ export function mountImpact(el) {
     return true;
   };
   // (the project's own design with no pins set: said first, I/O Pin Planning one click away, #1508)
-  const pinsFirst = async () => bitData || !pj?.top || bitfile.value.trim() !== fpgaFile || pinsReady(await loadUcfText(), 'program', () => app.openPinPlanner());
+  const pinsFirst = async () => bitData || !pj?.top || bitfile.value.trim() !== fpgaFile || pinsReady(await loadUcfText(), 'program', () => app.openPinPlanner(), pj.device);
   const programFpga = async () => (await pinsFirst()) && (await fileReady()) && runJob('Programming FPGA (SRAM)', () => api.program({
     project: pj?.name, tool: toolSel.value || undefined, cable: cable.value.trim() || undefined, board: board?.id, position: selPos + 1, bitfile: bitfile.value.trim(),
     ...(bitData ? { bitData } : {}),

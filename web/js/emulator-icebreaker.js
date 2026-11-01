@@ -1,6 +1,7 @@
 // Silinx - Board Emulator: the iCEBreaker drawn as the real board (#2481). Our own drawing, after the board's annotated
 // top view in its repository: each part where it is, as it is turned, in proportion (the main board 712 x 493, its
 // snap-off Pmod part plugged into PMOD2 on its right), with its silkscreen names.
+import { ledNumbers } from '/core/emulate.js';
 import { holes4, boardFrame, svgText as text, ic, POWER_V_CSS } from './emulator-pcb.js';
 
 const W = 1010, H = 493, MW = 712;                       // the drawing: the main board (MW wide), the snap-off part
@@ -42,8 +43,7 @@ export function icebreakerLayout({ board, title, h, mkLed, mkButton, portLabel, 
     <rect x="94" y="108" width="22" height="16" rx="2" fill="#d8dbe0" stroke="#7b8088"/>${text(105, 102, '12MHz', { size: 7, weight: 'normal' })}
     ${ic(136, 189, 128, 128, ['FT2232HQ'], 9)}
     ${tact(UBUTTON[0], UBUTTON[1], 44)}${text(76, 365, 'UBUTTON', { size: 8, rotate: true })}
-    <rect x="98" y="342" width="16" height="12" rx="2" fill="#163a16" stroke="#0a0a0a"/>${text(122, 352, 'G', { size: 8, anchor: 'start' })}
-    <rect x="98" y="366" width="16" height="12" rx="2" fill="#3a1414" stroke="#0a0a0a"/>${text(122, 376, 'R', { size: 8, anchor: 'start' })}
+    ${text(122, 352, 'G', { size: 8, anchor: 'start' })}${text(122, 376, 'R', { size: 8, anchor: 'start' })}
     <rect x="146" y="424" width="34" height="34" rx="3" fill="#f2f2f2" stroke="#9a9a9a"/>${text(163, 476, 'RGBLED', { size: 8 })}
     <g transform="rotate(45 424 221)"><rect x="368" y="165" width="112" height="112" rx="4" fill="#121212" stroke="#333"/></g>
     ${text(424, 218, 'iCE40UP5k', { size: 9, fill: '#ddd' })}${text(424, 231, (board.device?.package || 'SG48').toUpperCase(), { size: 7, weight: 'normal', fill: '#bbb' })}
@@ -68,10 +68,14 @@ export function icebreakerLayout({ board, title, h, mkLed, mkButton, portLabel, 
   // the user button BTN_N
   part(put(mkButton(0, 'emu-btn icb-btn', 'btn_n'), UBUTTON[0], UBUTTON[1] - 15), 'btn_n');
   port('btn_n', 0, UBUTTON[0], UBUTTON[1] + 24);
-  // the snap-off part: LED1..LED5 in a cross, Button 1..3 in a column, each named with its FPGA pin
+  // the green and red LEDs (LEDG_N, LEDR_N: numbered after LED1..LED5, #2511) beside it
+  const n = ledNumbers(board), red = (l) => { l.dataset.colour = 'red'; return l; };
+  part(put(mkLed(n.ledg_n, 'emu-led icb-led'), 106, 342), 'ledg_n');
+  part(put(red(mkLed(n.ledr_n, 'emu-led icb-led')), 106, 366), 'ledr_n');
+  // the snap-off part: LED1 (red) and LED2..LED5 in a cross, Button 1..3 in a column, each named with its FPGA pin
   for (let i = 0; i < 5; i++) {
     const k = 4 - i, [x, y] = LED_AT[k];
-    part(put(mkLed(k, 'emu-led icb-led'), x, y - 6), `led${k}`);
+    part(put(k ? mkLed(k, 'emu-led icb-led') : red(mkLed(k, 'emu-led icb-led')), x, y - 6), `led${k}`);
   }
   silkText(`LED1 (${pin('led', 0)})`, 848, 302);
   for (let i = 0; i < 3; i++) {

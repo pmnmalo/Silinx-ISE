@@ -3,7 +3,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
-import { resolveBoard, BOARDS } from '../../server/devices.js';
+import { resolveBoard } from '../../server/devices.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -25,13 +25,27 @@ begin
 end rtl;
 `;
 
-/** The emulator open on `board` with the counter. */
-async function emulatorOn(page, board, name) {
-  // (the Spartan-6 boards' device: the default device list has the Spartan-3E boards only)
-  await makeProject(env, { name, board, device: resolveBoard(board).device, files: { 'src/blink.vhd': BLINK }, top: 'blink' });
+// the iCEBreaker's (#2511): BTN_N lights LED1 and the red LED (active low) while pressed, Button 1 the green LED and LED2
+const ICE = `library ieee; use ieee.std_logic_1164.all;
+entity ice is
+  port (clk, btn_n : in std_logic; btn : in std_logic_vector(2 downto 0);
+        led : out std_logic_vector(4 downto 0); ledr_n, ledg_n : out std_logic);
+end ice;
+architecture rtl of ice is
+begin
+  led <= "000" & btn(0) & not btn_n;
+  ledr_n <= btn_n;
+  ledg_n <= not btn(0);
+end rtl;
+`;
+
+/** The emulator open on `board` with the counter (or `files`, `top`). */
+async function emulatorOn(page, board, name, { files = { 'src/blink.vhd': BLINK }, top = 'blink' } = {}) {
+  // (the Spartan-6 and iCE40 boards' device: the default device list has the Spartan-3E boards only)
+  await makeProject(env, { name, board, device: resolveBoard(board).device, files, top });
   await page.openProject(name);
   assert.equal(await page.eval(() => window.SilinxApp.regenerateUcf()), true);
-  await page.eval(() => window.SilinxApp.openFile('src/blink.vhd'));
+  await page.eval((f) => window.SilinxApp.openFile(f), Object.keys(files)[0]);
   await page.menu('Tools', 'Board Emulator');
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { what: 'emulator running' });
 }
@@ -256,31 +270,14 @@ for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys']) {
   });
 }
 
-// a board the emulator cannot run a design on yet (the iCEBreaker: its pins in a PCF, #2511) drawn alone: its parts
-// (web/js/emulator-board.js mountBoardParts, the board's layout) mounted with no design, in #alone, the emulator's
-// style in place (a Basys2's emulator opened first)
-async function boardAlone(page, id) {
-  await emulatorOn(page, 'basys2', `Emu-style-${id}`);
-  await page.eval(async (board) => {
-    const [{ mountBoardParts }, { h }] = await Promise.all([import('/js/emulator-board.js'), import('/js/dom.js')]);
-    const main = h('div', { id: 'alone', style: { position: 'fixed', left: '0', top: '0', zIndex: '1000', background: '#fff' } });
-    document.body.append(main);
-    mountBoardParts({
-      board, title: '', after() {}, bitFor: () => undefined, compiled: () => false, hasLcd: false, inVal: new Map(), knobEnd: () => 0,
-      lcdView: () => null, main, manual: [], period: 83333, powered: () => true, refresh() {}, resLabel: {},
-      resOf: (n) => board.resources.find((r) => r.name === n), runCycles() {}, running: () => false, setInputBit() {}, setPower() {},
-      sim: {}, tip: (res, k = 0) => `${res}${k}`, wiring: { bits: [], clocks: [] }, setKnobEnd() {}, setLcdView() {},
-    });
-  }, BOARDS.find((b) => b.id === id));
-}
 
 uiTest('#2481 the iCEBreaker drawn as the real board: its parts where they are, the snap-off part on PMOD2', E, async (page) => {
-  await boardAlone(page, 'icebreaker');
-  const g = await geometry(page, '#alone'), MW = 712;   // (the main board 712 x 493, the snap-off part on its right)
+  await emulatorOn(page, 'icebreaker', 'Emu-icebreaker-real', { files: { 'src/ice.vhd': ICE }, top: 'ice' });
+  const g = await geometry(page), MW = 712;   // (the main board 712 x 493, the snap-off part on its right)
   assert.deepEqual([g.W, g.H], [1010, 493]);
-  assert.deepEqual(await page.eval(() => ['.emu-led', '.emu-btn', '.emu-power', '.emu-sw'].map((s) => document.querySelectorAll(`#alone ${s}`).length)), [5, 4, 1, 0]);
+  assert.deepEqual(await page.eval(() => ['.emu-led', '.emu-btn', '.emu-power', '.emu-sw'].map((s) => document.querySelectorAll(`.emu-pcb ${s}`).length)), [7, 4, 1, 0]);   // (LED1..LED5, G, R)
   // no power switch on the board (the USB powers it): the emulator's by the USB, upright, its LED the PWR LED under it
-  const sw = await page.eval(() => { const s = document.querySelector('#alone .emu-power-sw').getBoundingClientRect(), l = document.querySelector('#alone .emu-power-led').getBoundingClientRect();
+  const sw = await page.eval(() => { const s = document.querySelector('.emu-power-sw').getBoundingClientRect(), l = document.querySelector('.emu-power-led').getBoundingClientRect();
     return { upright: s.height > 2 * s.width, ledBelow: l.top > s.bottom }; });
   assert.deepEqual(sw, { upright: true, ledBelow: true });
   assert.ok(g.power.x < MW * 0.06 && g.power.y < g.H * 0.3, JSON.stringify(g.power));
@@ -293,16 +290,40 @@ uiTest('#2481 the iCEBreaker drawn as the real board: its parts where they are, 
   for (const k of [3, 4]) assert.ok(Math.abs(led[k].x - led[0].x) < 1, `LED${k + 1} over or under LED1`);
   assert.ok(g.btn0.y < g.btn1.y && g.btn1.y < g.btn2.y && [0, 1, 2].every((k) => g[`btn${k}`].x > led[2].x && Math.abs(g[`btn${k}`].x - g.btn0.x) < 1));
   // the silkscreen and the connectors: PMOD1A, +5V, PMOD1B along the top, PMOD2 on the right edge, USB on the left
-  const xs = await page.eval(() => Object.fromEntries([...document.querySelectorAll('#alone .emu-pcb-art text')].map((t) => [t.textContent, [+t.getAttribute('x'), +t.getAttribute('y')]])));
+  const xs = await page.eval(() => Object.fromEntries([...document.querySelectorAll('.emu-pcb-art text')].map((t) => [t.textContent, [+t.getAttribute('x'), +t.getAttribute('y')]])));
   assert.ok(xs.PMOD1A[0] < xs['+5V'][0] && xs['+5V'][0] < xs.PMOD1B[0] && xs.PMOD1B[1] < g.H * 0.2, JSON.stringify(xs));
   assert.ok(xs.PMOD2[0] > MW * 0.8 && xs.PMOD2[0] < MW && xs.USB[0] < MW * 0.15);
   for (const t of ['iCEBreaker', 'PWR', 'UBUTTON', 'RGBLED', 'CDONE', 'CRESET', 'FLASH', '12MHz']) assert.ok(t in xs, t);
   assert.deepEqual(Object.keys(xs).filter((t) => MAKERS.test(t)), []);
-  const silk = await page.eval(() => [...document.querySelectorAll('#alone .icb-silk')].map((e) => e.textContent));
+  const silk = await page.eval(() => [...document.querySelectorAll('.icb-silk')].map((e) => e.textContent));
   assert.deepEqual(silk, ['LED1 (27)', 'Button 3', 'Button 2', 'Button 1']);
   // each control is what is at its centre
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#alone .emu-btn, #alone .emu-power')].filter((c) => {
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-btn, .emu-power')].filter((c) => {
     const r = c.getBoundingClientRect(), at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return !(at === c || c.contains(at));
   }).map((c) => c.title)), []);
+});
+
+uiTest('#2511 the iCEBreaker emulated: its PCF\'s pins, BTN_N active low, the red and green LEDs lit when low', E, async (page) => {
+  await emulatorOn(page, 'icebreaker', 'Emu-icebreaker-run', { files: { 'src/ice.vhd': ICE }, top: 'ice' });
+  const leds = () => page.eval(() => window.Silinx.active.view.outputs.leds.map((v) => Math.round(v)));
+  const settled = (want) => page.waitFor((w) => JSON.stringify(window.Silinx.active.view.outputs.leds.map((v) => Math.round(v))) === w, [JSON.stringify(want)], { what: `LEDs ${want}` });
+  // at rest: BTN_N released (high), so LED1 and the red LED dark; Button 1 released, so the green LED dark
+  await settled([0, 0, 0, 0, 0, 0, 0]);
+  // BTN_N held (Shift+click keeps it): LED1 and the red LED (LEDR_N = BTN_N, low) lit
+  await page.click('[data-part="btn_n"] .emu-btn', { modifiers: 8 });
+  await settled([1, 0, 0, 0, 0, 1, 0]);
+  // Button 1 too: LED2 and the green LED
+  await page.click('[data-part="btn0"] .emu-btn', { modifiers: 8 });
+  await settled([1, 1, 0, 0, 0, 1, 1]);
+  // the LEDs drawn: LED1 and R red, the others green
+  const colours = await page.eval(() => Object.fromEntries(['led0', 'led1', 'ledr_n', 'ledg_n'].map((n) => {
+    const [r, g] = getComputedStyle(document.querySelector(`[data-part="${n}"] .emu-led`)).backgroundColor.match(/\d+/g).map(Number);
+    return [n, r > g ? 'red' : 'green'];
+  })));
+  assert.deepEqual(colours, { led0: 'red', led1: 'green', ledr_n: 'red', ledg_n: 'green' });
+  // nothing of the board is left 'not emulated' (the red and green LEDs are)
+  assert.doesNotMatch(await page.eval(() => document.querySelector('.emu-board-note').textContent), /not emulated/);
+  assert.deepEqual(await leds(), [1, 1, 0, 0, 0, 1, 1]);
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
 });

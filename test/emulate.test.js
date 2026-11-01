@@ -5,7 +5,9 @@ import { compile, elaborate } from '../core/compile.js';
 import { Simulator } from '../core/simulator.js';
 import * as V from '../core/values.js';
 import { parseUcf } from '../packages/silinx-fpga/src/ucf.js';
-import { boardWiring, boardOutputs, portBits, emulatorClocks, manualClocks } from '../core/emulate.js';
+import { boardWiring, boardOutputs, portBits, emulatorClocks, manualClocks, ledNumbers } from '../core/emulate.js';
+import { PCF } from '../packages/silinx-fpga/src/parts.js';
+import { BOARDS } from '../server/boards.js';
 
 const BOARD = { resources: [
   { name: 'mclk', group: 'Clock', pins: ['B8'], dir: 'in', extra: { period: '20 ns' } },
@@ -59,6 +61,37 @@ test('board emulation: wiring, LED brightness and multiplexed digits', () => {
   assert.ok(Math.abs(out.leds[1] - 0.5) < 0.01, `LED1 ${out.leds[1]}`);
   assert.deepEqual(out.digits[0].seg.map(Math.round), [0, 1, 1, 0, 0, 0, 0]);   // "1"
   assert.deepEqual(out.digits[1].seg.map(Math.round), [0, 0, 0, 0, 0, 0, 1]);   // "-"
+});
+
+// #2511: the iCEBreaker (iCE40): its pins from a PCF; its red and green LEDs (LEDR_N, LEDG_N, active low) LEDs of
+// their own, numbered after LED1..LED5
+test('the iCEBreaker: the PCF\'s pins, the red and green LEDs numbered after LED1..LED5, lit when low', () => {
+  const board = BOARDS.find((b) => b.id === 'icebreaker');
+  assert.deepEqual(ledNumbers(board), { led: 0, ledr_n: 5, ledg_n: 6 });
+  assert.deepEqual(ledNumbers(BOARD), { led: 0 });   // (a board with LED1..LEDn only: as before)
+  const src = `library ieee; use ieee.std_logic_1164.all;
+entity top is port(clk, btn_n : in std_logic; led : out std_logic_vector(4 downto 0); ledr_n, ledg_n : out std_logic); end top;
+architecture rtl of top is begin
+  led <= "0000" & btn_n;   -- LED1 lit while BTN_N is released (high)
+  ledr_n <= '0';           -- the red LED lit (active low)
+  ledg_n <= '1';           -- the green LED dark
+end rtl;`;
+  const pcf = `set_io clk 35\nset_io btn_n 10\nset_io ledr_n 11\nset_io ledg_n 37\n${board.resources.find((r) => r.name === 'led').pins.map((p, i) => `set_io led[${i}] ${p}`).join('\n')}\n`;
+  // (the interface's model of the PCF's nets: led[0] as led<0>, web/js/constraints-format.js readPins)
+  const assignments = Object.fromEntries(Object.entries(PCF.read(pcf).assignments).map(([k, v]) => [k.replace(/\[(\d+)\]$/, '<$1>'), v]));
+  const d = elaborate(compile([{ path: 'top.vhd', lang: 'vhdl', text: src }]), 'top');
+  const w = boardWiring({ ports: d.top.ports, assignments, board });
+  assert.deepEqual(w.unmapped, []);
+  assert.deepEqual(w.bits.filter((b) => b.kind === 'led').map((b) => [b.bit, b.led]).sort(), [['led<0>', 0], ['led<1>', 1], ['led<2>', 2], ['led<3>', 3], ['led<4>', 4], ['ledg_n', 6], ['ledr_n', 5]]);
+  assert.deepEqual(w.bits.filter((b) => b.kind === 'btn').map((b) => [b.bit, b.res.extra?.activeLow]), [['btn_n', true]]);
+  assert.equal(w.clocks[0].period, 83333);
+  const sim = new Simulator(d);
+  sim.force(d.top.ports.find((p) => p.name === 'btn_n').sig, V.fromInt(1, 1));   // (released: high, as the emulator rests it)
+  sim.run(1000);
+  for (const s2 of d.signals) s2.wave = { t: [sim.now], v: [s2.val] };
+  const t0 = sim.now;
+  sim.run(t0 + 1000);
+  assert.deepEqual(boardOutputs(w, t0, sim.now).leds, [1, 0, 0, 0, 0, 1, 0]);
 });
 
 test('timing scale: large integer generics of the top are divided for the emulator', async () => {
