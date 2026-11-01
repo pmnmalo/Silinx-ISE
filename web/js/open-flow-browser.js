@@ -9,7 +9,7 @@ import { blackboxesIn } from '/core/c-blackbox.js';
 import { compile } from '/core/compile.js';
 import { synthEffort, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
-import { OPEN_STEPS, engineOf, orderOpenSteps, orderSteps, deviceFamily } from '/packages/silinx-fpga/src/parts.js';
+import { OPEN_STEPS, engineOf, orderOpenSteps, orderSteps, deviceFamily, isIseFamily } from '/packages/silinx-fpga/src/parts.js';
 import { ICE40_PARTS, ICE40_STEPS } from '/packages/silinx-fpga/src/index.js';
 
 // the devices whose device description and bit database are published (packages/silinx-fpga/devices,
@@ -152,7 +152,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   const ucf = project.constraints && typeof files[project.constraints] === 'string' ? files[project.constraints] : null;
   // the port bits without a pin: on a board they would go to arbitrary pins (refused, as the server does)
   // (the iCE40's constraints are PCF: its back end says the ports without a pin, #2295)
-  const unplaced = st.family ? [] : await unconstrainedPorts(sources, top, ucf || '');
+  const unplaced = isIseFamily(st.family) ? await unconstrainedPorts(sources, top, ucf || '') : [];   // (a UCF's: the iCE40 warns in its own flow)
   if (unplaced.length && project.board) throw new Error(`${unplaced.length} top-level port bit(s) have no pin location (LOC) for the ${project.board} board: ${unplaced.slice(0, 12).map(u => u.net).join(', ')}${unplaced.length > 12 ? ', …' : ''}. Assign them in I/O Pin Planning (or remove the board in Design Properties).`);
   if (unplaced.length) onLine(`WARNING:Silinx - ${unplaced.length} port bit(s) have no LOC constraint (${unplaced.slice(0, 8).map(u => u.net).join(', ')}${unplaced.length > 8 ? ', …' : ''}): the Silinx toolchain chooses their pins - do NOT program real hardware with this bitstream`);
   const dev = String(project.device.part).toLowerCase(), pkg = String(project.device.package).toLowerCase();
