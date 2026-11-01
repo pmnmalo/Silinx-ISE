@@ -1,5 +1,5 @@
 // UI: the dark theme as a whole (#159): every screen of the application in the dark theme (the
-// modern interface) has its text readable — no text with a contrast ratio below 3 against what is
+// Silinx interface) has its text readable — no text with a contrast ratio below 3 against what is
 // behind it (a light background left in the code, a dark grey on the dark background), fields
 // included. The Start page, the menus, the command palette, the toasts, the dialogs of Help and
 // Tools, the New Project wizard; a project (gates): the Design / Files / Libraries panes, the HDL
@@ -60,14 +60,14 @@ begin
 end rtl;
 `;
 
-/** The page in the modern interface and the given theme (whatever SILINX_UI_INTERFACE says: the
- *  classic interface is light only), with the scan installed; returns the checker: check(where)
+/** The page in the Silinx interface and the given theme (whatever SILINX_UI_INTERFACE says: the
+ *  ISE style interface is light only), with the scan installed; returns the checker: check(where)
  *  adds what the scan finds on the whole page, `bad` the list. */
 async function themed(page, theme) {
   await page.eval((t) => { localStorage.setItem('silinx.ui', 'silinx'); localStorage.setItem('silinx.theme', t); }, theme);
   await page.reload();
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
-  // (the drawer of a narrow screen, #266; the modern interface's layout by tasks and its arrangement, #1149)
+  // (the drawer of a narrow screen, #266; the Silinx interface's layout by tasks and its arrangement, #1149)
   assert.deepEqual(await page.eval(() => ({ ...document.documentElement.dataset })), { ui: 'silinx', theme, drawer: 'open', layout: 'tasks', task: 'edit', side: 'open', console: 'open', max: 'off', nodocs: 'on' });   // (no document yet: no tab bar, #1289)
   await page.eval(CONTRAST);
   const bad = [];
@@ -100,7 +100,7 @@ for (const theme of ['dark', 'light']) {
   uiTest(`${theme} theme: the Start page, the menus, the command palette, the toasts, the Help and Tools dialogs, the New Project wizard`, E, async (page) => {
     const { check, bad } = await themed(page, theme);
     await check('Start page');
-    // (the menus shown: the modern interface has no Project, Process and Tools menus, #1217)
+    // (the menus shown: the Silinx interface has no Project, Process and Tools menus, #1217)
     for (const m of await page.eval(() => [...document.querySelectorAll('#menubar .item')].filter((e) => e.getClientRects().length).map((e) => e.textContent.trim()))) {
       await page.openMenu(m);
       await check(`menu ${m}`);
@@ -165,18 +165,18 @@ for (const theme of ['dark', 'light']) {
     await check('Errors');
     await tab(page, 'console');
     await page.waitForSelector('.doc:not([hidden]) .cm-lint-marker-warning', { timeout: 8000 });
-    await page.hover('.app-logo');   // (the pointer away; no menu bar in the modern interface, #1321)
+    await page.hover('.app-logo');   // (the pointer away; no menu bar in the Silinx interface, #1321)
     await page.hover('.doc:not([hidden]) .cm-lint-marker-warning');
     await page.waitFor(() => document.querySelector('.xl-lint-tip')?.textContent, [], { what: 'lint tooltip' });
     await check('lint tooltip');
-    await page.hover('.app-logo');   // (the pointer away; no menu bar in the modern interface, #1321)
+    await page.hover('.app-logo');   // (the pointer away; no menu bar in the Silinx interface, #1321)
     // an error with a quick fix (#179): its button in the tooltip, "Fix: …" in the Errors tab
     await page.eval(() => { const ed = window.Silinx.active.editor; ed.setValue(ed.getValue().replace('q <= d;', 'q <= d')); });
     await page.waitForSelector('.doc:not([hidden]) .cm-lint-marker-error', { timeout: 8000 });
     await page.hover('.doc:not([hidden]) .cm-lint-marker-error');
     await page.waitFor(() => !!document.querySelector('.xl-lint-tip .xl-fix'), [], { what: 'the quick fix in the tooltip' });
     await check('lint tooltip with a quick fix');
-    await page.hover('.app-logo');   // (the pointer away; no menu bar in the modern interface, #1321)
+    await page.hover('.app-logo');   // (the pointer away; no menu bar in the Silinx interface, #1321)
     await page.click('.doc:not([hidden]) .editor-bar .btn', { text: 'Check Syntax' });
     await page.waitConsole(/Process "Check Syntax" failed/);
     await tab(page, 'errors');

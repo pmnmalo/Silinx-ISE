@@ -101,10 +101,10 @@ const digit = (page, k) => page.eval((i) => window.Silinx.active.view.outputs?.d
 
 // #347: a manual clock (test/fixtures/open-flow/feat_manual_clock: a D flip-flop clocked by BTN0, CLOCK_DEDICATED_ROUTE
 // = FALSE): the emulator does not drive the clk port at 50 MHz, LD0 takes SW0 only at a press of BTN0
-// #925: the message centre in this interface too (modern, or classic with SILINX_UI_INTERFACE): ISim's console and the
+// #925: the message centre in this interface too (Silinx, or ISE style with SILINX_UI_INTERFACE): ISim's console and the
 // emulator's Messages box in the bottom console, its lines tagged by source, filtered; one command line, ISim's while an
 // ISim window is in front (its history on ↑), the command palette otherwise
-// (the message centre with no task to follow: the classic interface's; the modern one's follows its task: tasks.test.js, #1149)
+// (the message centre with no task to follow: the ISE style interface's; the Silinx one's follows its task: tasks.test.js, #1149)
 uiTest('#925 message centre: ISim\'s console and command line, the emulator\'s Messages, in the bottom console', E, async (page) => {
   await makeProject(env, { name: 'MsgCentre', template: 'blinky' });
   await page.openProject('MsgCentre');
@@ -436,7 +436,7 @@ uiTest('#918 board emulator: its status line whole at every window width (a row 
   await emulatorProject(page, 'EmuStat', 'basys2', { 'src/cnt.vhd': EMU_COUNT }, 'cnt');
   await page.waitFor(() => /^t = .* cycles .* kHz \(.*% of real time\)$/.test(document.querySelector('.doc:not([hidden]) .emu .stat')?.textContent || ''), [], { what: 'the status line' });
   const cut = [];
-  // (the modern interface: the Tasks one, its Emulate, #1149)
+  // (the Silinx interface: the Tasks one, its Emulate, #1149)
   for (const ui of ['ise', 'silinx']) {
     await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
     if (ui === 'silinx') { await page.waitFor(() => document.documentElement.dataset.layout === 'tasks'); await page.click('#task-switch .task-btn[data-task="emu"]'); }

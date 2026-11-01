@@ -1,6 +1,6 @@
 /* The message centre (web/js/messages.js; #798, in every interface since #925): the bottom console's lines filtered
    by source, SSim's console and the emulator's Messages box in it, one command line under it. Its folding is the
-   Tasks interface's (web/css/tasks.css). The modern look's colours, with the classic look's as their fallbacks. */
+   Tasks interface's (web/css/tasks.css). The Silinx look's colours, with the ISE style look's as their fallbacks. */
 
 #console-tabs { min-width: 0; overflow: hidden; }
 #mc-filters { display: flex; align-items: center; gap: 4px; margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--m-border, #c5c5c5);
@@ -11,7 +11,7 @@
 #mc-filters .filt[aria-pressed="true"] { background: var(--m-accent-soft, #dbe8fb); border-color: var(--m-accent, #316ac5); color: var(--m-accent, #15428b); font-weight: 600; }
 #console-log .ln.mc-off { display: none; }
 
-/* the one command line: under the console's lines (modern: the grid's last row; classic: before the tabs below) */
+/* the one command line: under the console's lines (Silinx: the grid's last row; ISE style: before the tabs below) */
 #mc-cmd { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; border-top: 1px solid var(--m-border, #c5c5c5);
   background: var(--m-surface, #fff); font: 12px var(--mono, monospace); flex: none; }
 html[data-ui="silinx"] #console-wrap { grid-template-rows: auto minmax(0, 1fr) auto; }

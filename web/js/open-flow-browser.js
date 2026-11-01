@@ -87,7 +87,7 @@ function getWorker() {
   if (worker) return worker;
   // the single-file edition: the worker's code, embedded, started from a Blob as a classic worker (its
   // bundle has no imports): a file:// page is an opaque origin, from which Chrome refuses a module Blob
-  // worker but starts a classic one (#512)
+  // worker but starts a ISE style one (#512)
   const src = globalThis.SILINX_FLOW_WORKER_SRC;
   const w = src ? new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))) : new Worker('/js/open-flow-worker.js', { type: 'module' });
   w.onmessage = ({ data }) => runs.get(data.id)?.onData(data);

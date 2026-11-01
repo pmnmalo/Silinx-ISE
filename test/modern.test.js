@@ -17,7 +17,7 @@ globalThis.Event ??= class { constructor(type) { this.type = type; } };
 const M = await import('../web/js/modern.js');
 const fakeRoot = () => ({ dataset: {}, style: {} });
 
-test('preferences: the modern interface following the system theme by default; invalid values ignored', () => {
+test('preferences: the Silinx interface following the system theme by default; invalid values ignored', () => {
   mem.clear();
   assert.equal(M.getInterface(), 'silinx');
   assert.equal(M.getTheme(), 'system');
@@ -63,6 +63,17 @@ test('#2451 a preference saved with an old id (modern, classic) migrated once to
   mem.clear();
 });
 
+test('#2451 the interfaces\' names: one per interface, Silinx and ISE style (Silinx, Estilo ISE in Portuguese)', async () => {
+  assert.deepEqual(Object.keys(M.INTERFACE_NAMES), M.INTERFACES, 'one name per interface, in their order');
+  assert.deepEqual(M.INTERFACES.map((id) => M.INTERFACE_NAMES[id].label), ['Silinx', 'ISE style']);
+  assert.ok(Object.isFrozen(M.INTERFACE_NAMES));
+  // in Portuguese (web/js/i18n.js): ISE style translated, Silinx a proper name, the same (not in the dictionary)
+  const { LOCALES } = await import('../web/js/i18n.js');
+  assert.deepEqual(M.INTERFACES.map((id) => LOCALES.pt.strings[M.INTERFACE_NAMES[id].label] ?? M.INTERFACE_NAMES[id].label), ['Silinx', 'Estilo ISE']);
+  // never AMD's trademark as an interface's name
+  for (const { label } of Object.values(M.INTERFACE_NAMES)) assert.doesNotMatch(label, /Xilinx/);
+});
+
 test('effectiveTheme: system follows the OS, light and dark are fixed', () => {
   assert.equal(M.effectiveTheme('system', true), 'dark');
   assert.equal(M.effectiveTheme('system', false), 'light');
@@ -70,7 +81,7 @@ test('effectiveTheme: system follows the OS, light and dark are fixed', () => {
   assert.equal(M.effectiveTheme('dark', false), 'dark');
 });
 
-test('applyPrefs puts data-ui and data-theme on the root; the classic look is always light', () => {
+test('applyPrefs puts data-ui and data-theme on the root; the ISE style look is always light', () => {
   mem.clear();
   const r = fakeRoot();
   systemDark = true;
@@ -89,9 +100,9 @@ test('applyPrefs puts data-ui and data-theme on the root; the classic look is al
   assert.equal(r.dataset.layout, undefined);
 });
 
-// #1149: the Tasks interface became the modern one (the default, in every build): its look and its layout by tasks;
-// a stored 'tasks' (the Tasks interface of before, #1131) the modern interface; no third one to choose
-test('#1149 the modern interface is the Tasks one: data-ui modern, data-layout tasks; a stored tasks read as modern', () => {
+// #1149: the Tasks interface became the Silinx one (the default, in every build): its look and its layout by tasks;
+// a stored 'tasks' (the Tasks interface of before, #1131) the Silinx interface; no third one to choose
+test('#1149 the Silinx interface is the Tasks one: data-ui silinx, data-layout tasks; a stored tasks read as silinx', () => {
   mem.clear();
   assert.deepEqual(M.INTERFACES, ['silinx', 'ise']);
   globalThis.document = { documentElement: fakeRoot() };
@@ -105,7 +116,7 @@ test('#1149 the modern interface is the Tasks one: data-ui modern, data-layout t
     assert.equal(M.getInterface(), 'silinx', stored);
     assert.deepEqual([M.applyPrefs(r).ui, r.dataset.ui, r.dataset.layout], ['silinx', 'silinx', 'tasks'], stored);
   }
-  // the classic interface: no layout of its own; back to the modern one
+  // the ISE style interface: no layout of its own; back to the Silinx one
   M.setInterface('ise');
   assert.deepEqual([mem.get(M.UI_KEY), document.documentElement.dataset.ui, document.documentElement.dataset.layout], ['ise', 'ise', undefined]);
   M.setInterface('tasks');
@@ -207,7 +218,7 @@ test('index.html: one page for both interfaces (header, activity bar icons, empt
   assert.equal((html.match(/class="ico-inline tab-ico" data-icon="m\w+"/g) || []).length, 4);
 });
 
-test('modern.css: the modern look applies only under data-ui="silinx"; the classic look hides its parts', () => {
+test('modern.css: the Silinx look applies only under data-ui="silinx"; the ISE style look hides its parts', () => {
   const css = fs.readFileSync(path.join(ROOT, 'web/css/modern.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   // shared parts (both interfaces): the palette, the empty state, the header wrapper, the m-* controls, kbd keys
   const shared = /^(\.pal\b|\.pal-|#ws-empty|#topbar$|\.m-|\.ws-|#app kbd$|html:not\(\[data-ui="silinx"\]\)|html\[data-theme="dark"\] \.m-sun$|html:not\(\[data-theme="dark"\]\) \.m-moon$)/;

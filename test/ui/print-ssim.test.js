@@ -43,7 +43,7 @@ uiTest('#1511 SSim\'s waveform prints its names, values and waves over the time 
   const rows = await page.eval(() => window.Silinx.active.view.state.rows.length);
   assert.equal(+imgs[0][4], 30 + rows * 20 + 6, 'every row: the ruler, then 20 px a row');
   assert.match(html, /<p class="pv-wave-info">Cursor: 1 us {2}· {2}Time shown: 0 ns – [\d.]+ us {2}· {2}Simulation time: 1 us {2}· {2}Marker 1: 250 ns<\/p>/);
-  // paper: the waves' background white (the screen's is black in the classic interface), the names' first row not selected
+  // paper: the waves' background white (the screen's is black in the ISE style interface), the names' first row not selected
   assert.deepEqual(await pixelOf(page, imgs[1][2], 3, +imgs[1][4] - 3), [255, 255, 255], "under the last row");
   assert.deepEqual(await pixelOf(page, imgs[0][2], +imgs[0][3] - 4, 45), [255, 255, 255]);
   // the window as it was

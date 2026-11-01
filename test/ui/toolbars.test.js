@@ -1,7 +1,7 @@
-// UI (#1409): the documents' toolbars alike in the modern interface (the Tasks layout): the HDL editor's, the schematic's,
+// UI (#1409): the documents' toolbars alike in the Silinx interface (the Tasks layout): the HDL editor's, the schematic's,
 // the truth table's, the ASM and FSM editors', SSim's, the board emulator's, the pin planner's, one height, the same
 // padding, every button, icon button and field in them as high (--m-tool-h), light and dark; a page's fields as high as
-// its buttons (Find in Project); on a touch screen every button 40 px, a tree's rows 32 px, the tools 36 px; the classic
+// its buttons (Find in Project); on a touch screen every button 40 px, a tree's rows 32 px, the tools 36 px; the ISE style
 // interface's toolbars as before; a toolbar with a menu at the right of its first line keeps the menu's place free (#2331).
 // No warnings.
 import { before, after } from 'node:test';
@@ -128,11 +128,11 @@ uiTest('#1409 a touch screen: every button 40 px, the rows 32 px, a document\'s 
   await noWarnings(page);
 }, { tablet: 'landscape' });
 
-// the classic interface: its toolbars as before (ISE's sizes)
-uiTest('#1409 classic: the toolbars as before', E, async (page) => {
-  await makeProject(env, { name: 'Classic', template: 'gates' });
+// the ISE style interface: its toolbars as before (ISE's sizes)
+uiTest('#1409 ISE style: the toolbars as before', E, async (page) => {
+  await makeProject(env, { name: 'IseStyle', template: 'gates' });
   await boot(page, { ui: 'ise' });
-  await page.openProject('Classic');
+  await page.openProject('IseStyle');
   await page.eval(() => window.SilinxApp.openFile('src/gates.sch.json'));
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .se-toolbar')?.getClientRects().length > 0, [], { what: 'the schematic' });
   await page.eval(() => window.SilinxApp.openFile('src/gates.vhd'));

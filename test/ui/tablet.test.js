@@ -1,5 +1,5 @@
 // UI on a tablet (#1130): the app as a tablet runs it, at its size in landscape and in portrait, with touch (a coarse
-// pointer, no hover) and acted on by taps, in the interface of the run (modern, or classic with SILINX_UI_INTERFACE)
+// pointer, no hover) and acted on by taps, in the interface of the run (Silinx, or ISE style with SILINX_UI_INTERFACE)
 // and in the Tasks interface: the page fits the screen, the menus and a dialog by taps, a file opened, Simulate, the
 // Board Emulator's switch and its LEDs, Implement with the Silinx toolchain, the programming panel. The harness makes
 // the page a tablet's (uiTest's `tablet`: harness.js TABLET), in Chrome an Android tablet's, in WebKit an iPad's.
@@ -24,7 +24,7 @@ async function tapMenu(page, menu, item) {
   await page.waitFor(() => document.querySelector('body > .menu-popup:not(.sub) .mi'), [], { what: `menu ${menu} open` });
   await page.tap('body > .menu-popup:not(.sub) > .mi', { text: item });
 }
-// a task by a tap (the modern interface, its layout by tasks: the header's switcher, the bottom tab bar on a narrow
+// a task by a tap (the Silinx interface, its layout by tasks: the header's switcher, the bottom tab bar on a narrow
 // screen), then its action: the empty page's button, or the task's bar's (#1149)
 async function tapTask(page, task) {
   const bar = await page.eval(() => (document.getElementById('task-tabs')?.getClientRects().length ? '#task-tabs' : '#task-switch'));
@@ -51,7 +51,7 @@ for (const orientation of ['landscape', 'portrait']) {
   uiTest(`#1130 tablet in ${orientation} (${width} x ${height}): the page fits the screen; a menu and a dialog by taps; a file opened`, E, async (page) => {
     assert.deepEqual(await page.eval(() => [matchMedia('(pointer: coarse)').matches, matchMedia('(hover: none)').matches, innerWidth, innerHeight]), [true, true, width, height]);
     assert.deepEqual(await fits(page), { page: true, over: [] }, 'the Start page');
-    // a menu by taps (the header's Settings, no menu bar in the modern interface, #1321; else File's), its dialog on the
+    // a menu by taps (the header's Settings, no menu bar in the Silinx interface, #1321; else File's), its dialog on the
     // screen (About; File ▸ New Project…), closed by a tap
     if (await page.eval(() => !!document.getElementById('settings-btn')?.getClientRects().length)) {
       await page.tap('#settings-btn');
@@ -113,7 +113,7 @@ for (const orientation of ['landscape', 'portrait']) {
     } finally {
       await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
     }
-  }, { tablet: orientation, timeout: 300000, ui: 'silinx' });   // (the tasks: the modern interface's, #1149)
+  }, { tablet: orientation, timeout: 300000, ui: 'silinx' });   // (the tasks: the Silinx interface's, #1149)
 
   uiTest(`#1130 tablet in ${orientation}: the Tasks interface fits, its tasks by taps`, E, async (page) => {
     await page.eval(() => localStorage.setItem('silinx.ui', 'tasks'));

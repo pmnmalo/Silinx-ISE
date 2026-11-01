@@ -1,6 +1,6 @@
 // UI (#1210): Tasks ▸ Design has New Source… and Import Source… (#1501) above the Design tree, half of the panel each:
 // they open the New Source dialog and the Import Source dialog; disabled with no project; in Portuguese; not in
-// Implement; none in the classic interface. No warnings.
+// Implement; none in the ISE style interface. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
@@ -35,7 +35,7 @@ const bar = (page) => page.eval(() => {
 });
 const dlgTitle = (page) => page.waitFor(() => document.querySelector('.dlg-overlay .dlg-title span')?.textContent, [], { what: 'a dialog' });
 
-uiTest('#1210 #1501 Tasks ▸ Design: New Source and Import Source above the tree, each opening its dialog; Portuguese; not in Implement; classic none', E, async (page) => {
+uiTest('#1210 #1501 Tasks ▸ Design: New Source and Import Source above the tree, each opening its dialog; Portuguese; not in Implement; ISE style none', E, async (page) => {
   await makeProject(env, { name: 'SrcBar', template: 'gates' });
   await page.setViewport(1366, 768);
   await tasksInterface(page);
@@ -68,7 +68,7 @@ uiTest('#1210 #1501 Tasks ▸ Design: New Source and Import Source above the tre
   assert.equal(await bar(page), null, 'Implement');
   await page.click('#task-switch .task-btn[data-task="edit"]');
   assert.ok(await bar(page));
-  // the classic interface: none
+  // the ISE style interface: none
   await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-src-bar')), null);

@@ -217,7 +217,7 @@ const errorMarker = (page, line) => page.waitFor((l) => window.Silinx.active.edi
 const noMarkers = (page) => page.waitFor(() => !document.querySelector('.doc:not([hidden]) .cm-lint-marker'), [], { what: 'no lint marker' });
 const lintTooltip = async (page) => {
   await page.eval(() => document.querySelectorAll('.xl-lint-tip').forEach((t) => t.remove()));
-  await page.hover('#console-tabs');   // (off the marker: the tooltip closes; the modern interface has no status bar, #1149)
+  await page.hover('#console-tabs');   // (off the marker: the tooltip closes; the Silinx interface has no status bar, #1149)
   await page.hover('.doc:not([hidden]) .cm-lint-marker-error');
   return page.waitFor(() => document.querySelector('.xl-lint-tip')?.textContent, [], { what: 'lint tooltip' });
 };
@@ -268,7 +268,7 @@ uiTest('quick fix with Ctrl+. (and the right-click menu): a procedural assignmen
   await errorMarker(page, 5);
   const tip = await lintTooltip(page);
   assert.match(tip, /^Procedural assignment to a non-register <led> is not permitted/);
-  await page.hover('#console-tabs');   // (off the marker: the tooltip closes; the modern interface has no status bar, #1149)
+  await page.hover('#console-tabs');   // (off the marker: the tooltip closes; the Silinx interface has no status bar, #1149)
   // ---- Ctrl+. on the line of the error: the menu of its fixes (in Portuguese)
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.closeMenus();

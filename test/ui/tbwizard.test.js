@@ -136,15 +136,15 @@ uiTest('New Source ▸ Test Bench in VHDL and in Verilog, Module (HDL) in Verilo
   await page.waitFor(() => window.Silinx.project.files.some((f) => f.path === 'src/blk.v' && f.role === 'design'), [], { what: 'src/blk.v registered' });
   assert.match(await readWs(env, 'TbwNs', 'src/blk.v'), /module blk/);
   // no simulation top: the new test bench is selected in the Simulation view (Simulate runs it), and
-  // neither the Project menu nor the right-click menu offers a "simulation top" (the modern interface: no views, the
+  // neither the Project menu nor the right-click menu offers a "simulation top" (the Silinx interface: no views, the
   // new test bench the one Simulate runs, #1161)
-  const modern = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
-  if (modern) assert.equal(await page.eval(() => window.Silinx.project.simTop), 'tb_skel_v');
+  const silinx = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
+  if (silinx) assert.equal(await page.eval(() => window.Silinx.project.simTop), 'tb_skel_v');
   else assert.equal(await page.eval(() => document.querySelector('#hier .row.sel .lbl')?.textContent), 'tb_skel_v');
   const simItems = await page.openMenu('Project');
   assert.ok(!simItems.some((i) => /Top/.test(i.label)), simItems.map((i) => i.label).join(' | '));
   await page.key('Escape');
-  if (!modern) {
+  if (!silinx) {
     await page.rightClick('#hier .row.sel');
     await page.waitForSelector('body > .menu-popup');
     assert.doesNotMatch(await page.eval(() => document.querySelector('body > .menu-popup').innerText), /Simulation Top|Top Module/);

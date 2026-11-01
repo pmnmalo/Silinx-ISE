@@ -1,5 +1,5 @@
-// The Tasks interface (#782, #804), which became the modern one (#1149): the modern interface's layout, organised
-// around the five tasks of a lab session: Edit, Simulate, Emulate, Implement, Program. It has the modern
+// The Tasks interface (#782, #804), which became the Silinx one (#1149): the Silinx interface's layout, organised
+// around the five tasks of a lab session: Edit, Simulate, Emulate, Implement, Program. It has the Silinx
 // look (<html data-ui="silinx">) and a layout of its own (data-layout="tasks", web/css/tasks.css):
 // - a task switcher in the header (a tab bar at the bottom of a narrow screen, NARROW_QUERY), each task
 //   with a state dot from its processes' status; its labels give way when the header is short of room
@@ -20,7 +20,7 @@
 //   web/js/viewers.js) shows no tab bar: what the tab said (the module, the model) and its close are in the task's
 //   bar (#854);
 // - the task's bar (the toolbar's right end): the fold and maximize buttons and the task's main action
-//   (the modern toolbar's design-flow buttons, [data-step]), also offered when the task has no document.
+//   (the Silinx toolbar's design-flow buttons, [data-step]), also offered when the task has no document.
 // A document is maximized by double-clicking its tab, Ctrl/Cmd+Shift+Enter or the bar's button.
 // The task of a document, the arrangements and the kept state (taskOfDoc, arrangement, readState,
 // taskDot) have no DOM and are unit tested (test/tasks.test.js).
@@ -43,7 +43,7 @@ export const TASKS = ['edit', 'sim', 'emu', 'impl'];
 // (the first task is Design, its id 'edit' kept: the kept state, the documents; 'Design' in Portuguese too, #1046)
 export const TASK_LABEL = { edit: 'Design', sim: 'Simulate', emu: 'Emulate', impl: 'Implement' };
 export const TASKS_KEY = prefKey('silinx.tasks');
-// the design-flow button of the modern toolbar (web/js/menus.js, data-step) each task runs
+// the design-flow button of the Silinx toolbar (web/js/menus.js, data-step) each task runs
 const STEP = { edit: 'check', sim: 'simulate', emu: 'emulate', impl: 'implement' };
 const ACTION = { edit: 'Check', sim: 'Simulate', emu: 'Emulate', impl: 'Implement' };
 const NO_BENCH = 'The project has no test bench yet: create one with the wizard, or choose a module to simulate with stimuli drawn in SSim.';
@@ -285,7 +285,7 @@ function tagDocs() {
 const stepButton = (t = current()) => document.querySelector(`#toolbar .m-step[data-step="${STEP[t]}"]`);
 // (Simulate runs the test bench, whatever is selected: #800)
 const mainEnabled = () => (current() === 'sim' ? !!app?.S.project && !!simTarget(app.S.project, app.S.modules) : !!stepButton()?._enabled?.());
-/** The current task's main action: the design-flow button of the modern toolbar; Edit's Check checks the selected
+/** The current task's main action: the design-flow button of the Silinx toolbar; Edit's Check checks the selected
  *  module, a test bench with the simulation's sources (one tree, no views: #799). */
 async function runMain() {
   if (!mainEnabled()) return;

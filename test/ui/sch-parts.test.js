@@ -85,7 +85,7 @@ uiTest('#405 schematic editor parts: the toolbar, the palette, Select All and De
   await page.eval(() => window.Silinx.active.schEditor.symbolInfoDialog.close());
   // ---- Check: no errors
   await page.click(`${ED} .se-btn[data-act=check]`);
-  // (in the editor's panel; the modern interface, the Tasks one, takes the problems into its console: tasks.test.js #993, #1149)
+  // (in the editor's panel; the Silinx interface, the Tasks one, takes the problems into its console: tasks.test.js #993, #1149)
   if (await page.eval(() => document.documentElement.dataset.layout === 'tasks')) await page.waitConsole(/Process "Check Schematic" completed/);
   else await page.waitFor((ed) => /^Check Schematic: 0 error\(s\), \d+ warning\(s\)/.test(document.querySelector(`${ed} .se-diags`)?.textContent || ''), [ED], { what: 'the check in the panel' });
   // ---- Try it: entered (its mode), the gate's output follows its inputs; Escape leaves it

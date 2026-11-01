@@ -99,7 +99,7 @@ uiTest('#1509 any other document prints a copy of what it shows (the Design Summ
   assert.match(html, /PrSum Project Status/);
   assert.match(html, /Device Utilization Summary/);
   assert.doesNotMatch(html, /<button/, 'no buttons');
-  // the dark theme (the modern interface): the page is light, the drawings' styles read in the light theme
+  // the dark theme (the Silinx interface): the page is light, the drawings' styles read in the light theme
   if (await page.eval(() => document.documentElement.dataset.ui === 'silinx')) {
     const snapshot = () => page.eval(async () => {
       const { svgSnapshot } = await import('/js/print.js');

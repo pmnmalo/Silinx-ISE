@@ -6,7 +6,7 @@ import { h, alertDlg, menuBar, toast, downloadText, runAction } from './ui.js';
 import * as wiz from './wizards.js';
 import { setLanguage, getLanguage, LOCALES } from './i18n.js';
 import { lintEnabled, setLintEnabled } from './diaghelp.js';
-import { getInterface, setInterface, getTheme, setTheme, menuCommands } from './modern.js';
+import { INTERFACES, INTERFACE_NAMES, getInterface, setInterface, getTheme, setTheme, menuCommands } from './modern.js';
 import { openPalette } from './palette.js';
 import { openFindInProject } from './find-project.js';
 import { developmentMenu } from './devmenu.js';
@@ -27,20 +27,18 @@ export { printActive, printable };
 
 const $ = id => document.getElementById(id);
 
-// the menus' entries the header's Settings shares (#1314): the language, the interface, the theme (the classic ISE look is
+// the menus' entries the header's Settings shares (#1314): the language, the interface, the theme (the ISE style interface is
 // light only), the update check at start-up (#488: off, the app asks GitHub nothing until Check for Updates… is used)
 const languageMenu = () => ({ label: 'Language', submenu: Object.entries(LOCALES).map(([id, l]) => ({ label: l.name, checked: getLanguage() === id, action: () => setLanguage(id) })) });
-const interfaceMenu = () => ({ label: 'Interface', submenu: [
-  { label: 'Modern', checked: getInterface() === 'silinx', action: () => setInterface('silinx') },
-  { label: 'Classic', checked: getInterface() === 'ise', action: () => setInterface('ise') },
-] });
+const interfaceMenu = () => ({ label: 'Interface', submenu: INTERFACES.map((id) =>
+  ({ label: INTERFACE_NAMES[id].label, checked: getInterface() === id, action: () => setInterface(id) })) });
 const themeMenu = () => (getInterface() !== 'ise' ? { label: 'Theme', submenu: [
   { label: 'System', checked: getTheme() === 'system', action: () => setTheme('system') },
   { label: 'Light', checked: getTheme() === 'light', action: () => setTheme('light') },
   { label: 'Dark', checked: getTheme() === 'dark', action: () => setTheme('dark') },
 ] } : null);
 const updateAtStartItem = () => ({ label: 'Check for Updates at Start-up', checked: wiz.updateCheckEnabled(), action: () => { wiz.setUpdateCheckEnabled(!wiz.updateCheckEnabled()); toast(wiz.updateCheckEnabled() ? 'Check for updates at start-up on: the latest release is asked of GitHub when the app starts' : 'Check for updates at start-up off: Help > Check for Updates… checks by hand'); } });
-/** The header's Settings menu (the modern interface, #1314). */
+/** The header's Settings menu (the Silinx interface, #1314). */
 export const settingsItems = () => [
   { label: 'About Silinx ISE', icon: icon('help'), action: () => wiz.aboutDialog() },
   '-',
@@ -122,7 +120,7 @@ export function setupMenus() {
     ].filter(Boolean) },
     { label: 'Project', items: () => [
       { label: 'New Source…', action: () => wiz.newSourceWizard(), disabled: hasPj },
-      { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog(), disabled: hasPj },   // (Import Source… in the modern interface, #1501)
+      { label: `${wiz.addSourceTitle()}…`, action: () => wiz.addSourceDialog(), disabled: hasPj },   // (Import Source… in the Silinx interface, #1501)
       '-',
       // the implementation top (the Simulation view has none: Simulate runs the selected module)
       // (the selected module the top: Unset as Top Module, #1220)
@@ -206,7 +204,7 @@ export function setupToolbar() {
     btn('gear', 'Toolchain Settings', () => wiz.toolchainDialog()),
     btn('help', 'About', () => wiz.aboutDialog()),
   );
-  // the modern interface: the main steps of the design flow as labelled buttons
+  // the Silinx interface: the main steps of the design flow as labelled buttons
   const step = (ico, label, title, fn, enabled) => {
     const b = h('button', { class: 'm-step', title, 'data-step': label.toLowerCase(), onclick: () => enabled() && fn() }, h('span', { class: 'ico-inline', html: icons[ico] }), h('span', {}, label));
     b._enabled = enabled;
@@ -225,7 +223,7 @@ export function setupToolbar() {
   refreshSteps();
 }
 
-// enable / disable the labelled buttons of the modern toolbar (cheap: run on clicks and changes)
+// enable / disable the labelled buttons of the Silinx toolbar (cheap: run on clicks and changes)
 export function refreshSteps() {
   for (const b of document.querySelectorAll('#toolbar .m-step')) b.disabled = !b._enabled();
   for (const b of document.querySelectorAll('#toolbar .tb-btn:is([data-cmd=cut], [data-cmd=copy], [data-cmd=paste], [data-cmd=undo], [data-cmd=redo], [data-cmd=print], [data-cmd=closeProject])')) b.disabled = !b._enabled();

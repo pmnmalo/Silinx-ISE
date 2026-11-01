@@ -19,7 +19,7 @@ import { newModel } from '../../core/asm.js';
 import { newFsm } from '../../core/fsm.js';
 const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
-// a module's Create Test Bench (Wizard): the classic interface's only (the Tasks interface's test benches on its Test page, #1330)
+// a module's Create Test Bench (Wizard): the ISE style interface's only (the Tasks interface's test benches on its Test page, #1330)
 const TB = process.env.SILINX_UI_INTERFACE === 'ise' ? ['Create Test Bench (Wizard)…'] : [];
 
 let env;
@@ -138,7 +138,7 @@ const EXAMPLES = {
 };
 
 for (const [ex, want] of Object.entries(EXAMPLES)) {
-  // (the classic interface's Design pane: its views, its tree without the modern one's groups, #1149)
+  // (the ISE style interface's Design pane: its views, its tree without the Silinx one's groups, #1149)
   uiTest(`Design pane (#207, #220), the example ${ex}: one row per module, its views as badges after its name (the drawing's first, its HDL's last), in the Implementation and Simulation views`, E, async (page) => {
     await makeProject(env, { name: `H_${ex}`, template: ex });
     await page.openProject(`H_${ex}`);
@@ -411,7 +411,7 @@ const example = (ex, file) => fs.readFileSync(new URL(`../../examples/${ex}/${fi
 const withBase = (ex, file) => ({ ...JSON.parse(example(ex, file)), base: 'hdl' });
 const NOTE = '-- my own note, written by hand\n';
 
-// (the classic interface's Design pane: its views, its tree without the modern one's groups, #1149)
+// (the ISE style interface's Design pane: its views, its tree without the Silinx one's groups, #1149)
 uiTest('a drawing whose base was its HDL (before #220), its HDL what the drawing makes: the drawing made the base, nothing else changed', E, async (page) => {
   const vhd = example('gates', 'src/gates.vhd');
   const sch = withBase('gates', 'src/gates.sch.json');
@@ -430,7 +430,7 @@ uiTest('a drawing whose base was its HDL (before #220), its HDL what the drawing
   assert.deepEqual(await consoleAfterOpen(page), []);
 }, { ui: 'ise' });
 
-// (the classic interface's Design pane: its views, its tree without the modern one's groups, #1149)
+// (the ISE style interface's Design pane: its views, its tree without the Silinx one's groups, #1149)
 uiTest('drawings whose base was their HDL (before #220), the HDL edited by hand: the state diagram, the truth table and the ASM chart made again from it and made the base, the HDL kept as it is (said)', E, async (page) => {
   const files = {};
   for (const [ex, f, hdl] of [['traffic', 'src/traffic.fsm.json', 'src/traffic.vhd'], ['traffic', 'src/lamps.bool.json', 'src/lamps.vhd'], ['blinky', 'src/speed_ctrl.asm.json', 'src/speed_ctrl.vhd']]) {
@@ -468,7 +468,7 @@ uiTest('drawings whose base was their HDL (before #220), the HDL edited by hand:
   assert.deepEqual(await rows(page), EXAMPLES.blinky.impl.map((r) => r.replace('H_blinky', 'H_mig_asm')));
 }, { ui: 'ise' });
 
-// (the classic interface's Design pane: its views, its tree without the modern one's groups, #1149)
+// (the ISE style interface's Design pane: its views, its tree without the Silinx one's groups, #1149)
 uiTest('drawings whose base was their HDL (before #220) that cannot be made again from it (a schematic, HDL the diagram cannot show): the HDL kept as a plain module, the drawing out of the project (its file kept)', E, async (page) => {
   // a schematic whose VHDL was edited by hand
   const vhd = NOTE + example('gates', 'src/gates.vhd');
@@ -558,7 +558,7 @@ uiTest('a drawing\'s HDL language changed (a schematic\'s Language; a Petri net\
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });
 
-// (the classic interface's Design pane: its views, its tree without the modern one's groups, #1149)
+// (the ISE style interface's Design pane: its views, its tree without the Silinx one's groups, #1149)
 uiTest('#1100 the Design pane: the design tree right under the View selector, no "Hierarchy" heading; in Portuguese too', E, async (page) => {
   await makeProject(env, { name: 'NoHierCaption', template: 'gates' });
   await page.openProject('NoHierCaption');

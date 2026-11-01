@@ -67,7 +67,7 @@ const menuAt = (page, sel = 'body > .menu-popup') => page.eval((s) => { const m 
 // the right-click's menu of the same element (the reference)
 const rightMenu = async (page, sel, opts) => { await page.rightClick(sel, opts); const items = await menuItems(page); await page.closeMenus(); return items; };
 
-// (a Processes row's long press: the classic interface's Processes panel, #1149)
+// (a Processes row's long press: the ISE style interface's Processes panel, #1149)
 uiTest('#263 a long press opens the right-click menu of a Design-pane row, its badge, a document tab, the HDL editor, a Processes row and a Files view row; a tap or a moving press does not', E, async (page) => {
   await makeProject(env, { name: 'TouchPj', top: 'cnt', files: { 'src/cnt.vhd': CNT } });
   await page.openProject('TouchPj');
@@ -191,7 +191,7 @@ uiTest('#263 a long press on the ISim wave window\'s canvas opens its menu (Add 
   await closeAll(page);
 
   // the objects of the instance tree: the row pressed selected, its menu
-  await page.showSide();   // (ISim's objects: the side panel, the modern interface's Simulate has it folded, #1149)
+  await page.showSide();   // (ISim's objects: the side panel, the Silinx interface's Simulate has it folded, #1149)
   const objs = '.doc:not([hidden]) .isim-objs tbody tr';
   await page.eval(() => window.Silinx.active.view.state.selObj?.clear());
   const objRef = await (async () => { await page.rightClick(objs); const it = await isimItems(page); await closeAll(page); return it; })();

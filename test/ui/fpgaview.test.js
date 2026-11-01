@@ -45,7 +45,7 @@ async function routedProject(name) {
 const V = '.doc:not([hidden]) .fv';
 const idxOf = (page, inst) => page.eval(async (n) => (await (await fetch(`/api/projects/${window.Silinx.project.name}/fpga-view`)).json()).insts.findIndex((i) => i.name === n), inst);
 
-// (the classic interface's Design pane beside the FPGA view: the modern one shows it in Implement, without the tree, #1149)
+// (the ISE style interface's Design pane beside the FPGA view: the Silinx one shows it in Implement, without the tree, #1149)
 uiTest('FPGA view: chip, modules, a site\'s logic and connections, nets, clock network, zoom; hierarchy and chip select each other', E, async (page) => {
   await routedProject('FpgaPj');
   await page.openProject('FpgaPj');

@@ -100,7 +100,7 @@ uiTest('another script\'s failed promise (an extension\'s, a host\'s) is not sai
   assert.ok(!diags.some((m) => /sseError|foreign-997/.test(m)), diags.join('\n'));
 });
 
-// (#1217: the modern interface has no Project, Process and Tools menus)
+// (#1217: the Silinx interface has no Project, Process and Tools menus)
 uiTest('every menu opens and every enabled item acts or opens its dialog', E, async (page) => {
   await makeProject(env, { name: 'MenuPj', template: 'blinky' });
   await page.eval(() => {
@@ -121,19 +121,19 @@ uiTest('every menu opens and every enabled item acts or opens its dialog', E, as
   // here it would open the browser's print of a new window, which held the test past its budget (#1861)
   // Unset as Top Module (#1220): tested by itself; here it would leave the processes below with no top
   const SKIP = new Set(['Close Project', 'Print…', 'Unset as Top Module']);
-  const modern = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
+  const silinx = await page.eval(() => document.documentElement.dataset.layout === 'tasks');
   const GONE = ['File', 'Edit', 'View', 'Project', 'Process', 'Tools', 'Window', 'Help'];   // (Window: #1253; File, Edit: #1307; View, Help: no menu bar, #1321)
   const shownMenus = await page.eval(() => [...document.querySelectorAll('#menubar .item')].filter((e) => e.getClientRects().length).map((e) => e.textContent.trim()));
-  assert.deepEqual(GONE.filter((m) => shownMenus.includes(m)), modern ? [] : GONE, `the menu bar: ${shownMenus}`);
+  assert.deepEqual(GONE.filter((m) => shownMenus.includes(m)), silinx ? [] : GONE, `the menu bar: ${shownMenus}`);
   // (in Portuguese too: the menus hidden by their name, not their label)
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   const pt = await page.eval(() => [...document.querySelectorAll('#menubar .item')].filter((e) => e.getClientRects().length).map((e) => e.textContent.trim()));
   const PT = ['Ficheiro', 'Editar', 'Ver', 'Projeto', 'Processo', 'Ferramentas', 'Janela', 'Ajuda'];
-  assert.deepEqual(PT.filter((m) => pt.includes(m)), modern ? [] : PT, `in Portuguese: ${pt}`);
+  assert.deepEqual(PT.filter((m) => pt.includes(m)), silinx ? [] : PT, `in Portuguese: ${pt}`);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  // (the modern interface: no menu bar, its commands the Start page's, the toolbar's, the header's Settings, #1321)
-  assert.equal(await page.eval(() => document.getElementById('menubar').getClientRects().length > 0), !modern, 'the menu bar');
-  const MENUS = modern ? [] : ['Edit', 'File', 'View', 'Project', 'Process', 'Tools', 'Help', 'Window'];
+  // (the Silinx interface: no menu bar, its commands the Start page's, the toolbar's, the header's Settings, #1321)
+  assert.equal(await page.eval(() => document.getElementById('menubar').getClientRects().length > 0), !silinx, 'the menu bar');
+  const MENUS = silinx ? [] : ['Edit', 'File', 'View', 'Project', 'Process', 'Tools', 'Help', 'Window'];
   const acted = [], idle = [], disabled = [], log = [];
   for (const m of MENUS) {
     const items = await page.openMenu(m);
@@ -191,25 +191,25 @@ uiTest('every menu opens and every enabled item acts or opens its dialog', E, as
   assert.deepEqual(idle, [], `menu items that did nothing: ${idle.join(', ')}`);
   // the processes ran on a valid design: the simulator and the emulator opened
   const windows = log.filter((l) => l.startsWith('Window ▸')).map((l) => l.slice(9, l.indexOf(':')));
-  // (SSim's module: the test bench, or in the modern interface the module its Simulate chose, #1149)
-  // (the modern interface: they open from the processes and the toolbar, not from a menu, #1217)
-  // (no Window menu in the modern interface: its documents in their tabs, #1253)
-  for (const w of modern ? [] : ['SSim (', 'Board Emulator (top)', 'I/O Pin Planning', 'iMPACT', 'Design Summary']) assert.ok(windows.some((x) => x === w || (w.endsWith('(') && x.startsWith(w))), `Window menu lists ${w}: ${windows}`);
+  // (SSim's module: the test bench, or in the Silinx interface the module its Simulate chose, #1149)
+  // (the Silinx interface: they open from the processes and the toolbar, not from a menu, #1217)
+  // (no Window menu in the Silinx interface: its documents in their tabs, #1253)
+  for (const w of silinx ? [] : ['SSim (', 'Board Emulator (top)', 'I/O Pin Planning', 'iMPACT', 'Design Summary']) assert.ok(windows.some((x) => x === w || (w.endsWith('(') && x.startsWith(w))), `Window menu lists ${w}: ${windows}`);
   for (const must of ['File ▸ New Project…', 'File ▸ Open Project…', 'File ▸ Import Silinx ISE Project (.zip)…', 'File ▸ Export Silinx ISE Project (.zip)…',
     'File ▸ Import Xilinx ISE Project (.zip)…', 'File ▸ Export Xilinx ISE Project (.zip)…', 'File ▸ Recent Projects', 'Edit ▸ Undo', 'Edit ▸ Redo', 'Edit ▸ Find…',
     'Edit ▸ Replace…', 'Edit ▸ Go to Line…', 'View ▸ Implementation', 'View ▸ Simulation', 'View ▸ Design Summary', 'View ▸ Language',
     'Project ▸ New Source…', `Project ▸ ${IMPORT}…`, 'Project ▸ Design Properties…',
     'Process ▸ Implement Top Module', 'Process ▸ Check Syntax', 'Process ▸ Simulate Behavioral Model',
     'Tools ▸ ASM State Machine Editor…', 'Tools ▸ I/O Pin Planning', 'Tools ▸ iMPACT (Configure Target Device)', 'Tools ▸ Board Emulator', 'Tools ▸ RTL Schematic',
-    'Tools ▸ Toolchain Settings (ISE / Programmers)…', 'Help ▸ About Silinx ISE', 'Help ▸ Keyboard Shortcuts', 'Help ▸ Check for Updates…', 'Window ▸ Close All Documents'].filter((m) => !modern || !GONE.some((g) => m.startsWith(`${g} ▸`)))) {
+    'Tools ▸ Toolchain Settings (ISE / Programmers)…', 'Help ▸ About Silinx ISE', 'Help ▸ Keyboard Shortcuts', 'Help ▸ Check for Updates…', 'Window ▸ Close All Documents'].filter((m) => !silinx || !GONE.some((g) => m.startsWith(`${g} ▸`)))) {
     assert.ok(acted.some((a) => a.startsWith(must)), `${must} acted (acted: ${acted.join(', ')}; disabled: ${disabled.join(', ')})`);
   }
   // no Project ▸ Sync with .xise (#1248): it only wrote the .xise, File ▸ Export Xilinx ISE Project gives ISE the project
   assert.ok(![...acted, ...disabled, ...idle].some((a) => a.includes('.xise')), `a .xise entry: ${[...acted, ...disabled].join(', ')}`);
-  // both exports were downloaded (the classic interface's File menu; the modern one's are the Start page's, #1307)
+  // both exports were downloaded (the ISE style interface's File menu; the Silinx one's are the Start page's, #1307)
   const fs = await import('node:fs/promises');
   const files = await fs.readdir(page.downloadDir);
-  if (!modern) assert.ok(files.includes('MenuPj-silinx.zip') && files.includes('MenuPj.zip'), `downloads: ${files.join(', ')}`);
+  if (!silinx) assert.ok(files.includes('MenuPj-silinx.zip') && files.includes('MenuPj.zip'), `downloads: ${files.join(', ')}`);
 });
 
 uiTest('dialogs close with Escape and only the topmost dialog handles Enter / Escape', E, async (page) => {
@@ -452,7 +452,7 @@ uiTest('Portuguese: View ▸ Language switches the UI; menus, dialogs and the ma
   const db = await env.server.api('GET', '/api/devices');
   const tc = await env.server.api('GET', '/api/toolchain');
   const projects = (await env.server.api('GET', '/api/projects')).flatMap((p) => [p.name, p.top, p.board]);
-  // (and the modern interface's first task, Design, its name in Portuguese too: #1046)
+  // (and the Silinx interface's first task, Design, its name in Portuguese too: #1046)
   const data = new Set([...projects, ...db.boards.map((b) => b.name), tc.ise.help, tc.ise.reason, 'LangPj', 'top', 'tb_top', 'basys2', 'in', 'out', 'inout',
     'impact', 'djtgcfg', 'adepttool', 'xc3sprog', 'openFPGALoader', 'Design', '@Design']);
   const same = [/^\(.*\)$/, /^LangPj\//, /^constraints\//, { test: (s) => data.has(s) }];
@@ -464,7 +464,7 @@ uiTest('Portuguese: View ▸ Language switches the UI; menus, dialogs and the ma
     for (const s of untranslated(en, pt, same)) missing.push(`${where}: ${s}`);
   };
   await compare('main window', () => page.eval(() => window.__uiTexts()));
-  // (the menus shown: the modern interface has no Project, Process and Tools menus, #1217; the classic run checks them)
+  // (the menus shown: the Silinx interface has no Project, Process and Tools menus, #1217; the ISE style run checks them)
   const shown = await page.eval(() => [...document.querySelectorAll('#menubar .item')].filter((e) => e.getClientRects().length).map((e) => e.dataset.menu));
   for (const m of ['File', 'Edit', 'View', 'Project', 'Process', 'Tools', 'Window', 'Help'].filter((x) => shown.includes(x))) {
     await setLang('en');
@@ -789,7 +789,7 @@ uiTest('toolbar: Print, enabled with a document in front, opens its print previe
 uiTest('a reload comes back to where the user was: the open documents, the one in front, the left pane, the Design view (#160)', E, async (page) => {
   await makeProject(env, { name: 'ViewPj', template: 'blinky' });
   await page.openProject('ViewPj');
-  // (the view: the classic interface's; the modern one has none, #1149)
+  // (the view: the ISE style interface's; the Silinx one has none, #1149)
   const where = () => page.eval(() => ({ docs: window.Silinx.docs.map((d) => d.id), active: window.Silinx.active?.id, view: document.documentElement.dataset.layout ? null : window.Silinx.view,
     page: document.querySelector('#left-tabs .tab.active')?.dataset.page }));
   const sim = await page.eval(() => (document.documentElement.dataset.layout ? null : 'sim'));
@@ -812,7 +812,7 @@ uiTest('a reload comes back to where the user was: the open documents, the one i
   await opened(before.docs);
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.vhd', [], { what: 'top.vhd in front again' });
   assert.deepEqual(await where(), before);
-  // (the view's radio button: the classic interface's; the modern one has no views, #1149)
+  // (the view's radio button: the ISE style interface's; the Silinx one has no views, #1149)
   if (!await page.eval(() => document.documentElement.dataset.layout)) assert.equal(await page.eval(() => document.querySelector('input[name=view][value=sim]').checked), true);
   // a document closed stays closed; one whose file is gone is not reopened (no message)
   await page.eval(async () => { await window.SilinxApp.closeDoc(window.Silinx.docs.find((d) => d.id === 'impact')); });
@@ -865,7 +865,7 @@ uiTest('#1101 #1225 the Start page: its buttons right under the pane\'s caption 
   await page.leftTab('start');
   await page.waitFor(() => document.querySelector('#start-page .start-box h3'), [], { what: 'the Start page' });
   const g = await page.eval(() => {
-    // (the page's top: right under its caption; the modern interface shows none, #1159)
+    // (the page's top: right under its caption; the Silinx interface shows none, #1159)
     const cap = { bottom: document.getElementById('start-page').getBoundingClientRect().top };
     const btns = document.querySelector('#start-page .start-btns').getBoundingClientRect();
     const h3s = [...document.querySelectorAll('#start-page .start-box h3')];

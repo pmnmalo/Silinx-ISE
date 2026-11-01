@@ -1,4 +1,4 @@
-/* The Tasks interface (#804, web/js/tasks.js): the modern look (modern.css, data-ui="silinx") with a
+/* The Tasks interface (#804, web/js/tasks.js): the Silinx look (modern.css, data-ui="silinx") with a
    layout of its own under <html data-layout="tasks">: the task switcher in the header (the tab bar at
    the bottom of a narrow screen), the current task's documents only (data-task), the side panel and the
    messages folded or open (data-side, data-console), a maximized document (data-max). */
@@ -235,7 +235,7 @@ html[data-layout="tasks"] .task-program button { font-weight: 600; }
 /* iMPACT arranged for the task: the chain and Program FPGA / PROM; the board, tool and cable folded away (a board
    chooses them); every operation of the PROM shown (#1025) */
 .task-prog-settings { display: none; }
-/* (the whole width available, as in the modern and classic interfaces: #1023) */
+/* (the whole width available, as in the Silinx and ISE style interfaces: #1023) */
 html[data-layout="tasks"] #workspace > .doc.task-impact > .page { display: flex; flex-direction: column; gap: 10px; }
 html[data-layout="tasks"] .doc.task-impact > .page > h2 { order: 1; margin: 0; }
 html[data-layout="tasks"] .doc.task-impact > .page > .imp-file { order: 2; margin: 0; }

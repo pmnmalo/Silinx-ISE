@@ -28,8 +28,8 @@ async function noWarnings(page) {
 }
 
 // #1023: the programming panel as wide as its document, the chain and Program FPGA too, at a desktop's and a
-// laptop's width; in the Tasks interface (it was 920 px at most) as in the modern and classic ones
-uiTest('#1023 Program: the panel uses the whole width available, in the Tasks, modern and classic interfaces', E, async (page) => {
+// laptop's width; in the Tasks interface (it was 920 px at most) as in the Silinx and ISE style ones
+uiTest('#1023 Program: the panel uses the whole width available, in the Tasks, Silinx and ISE style interfaces', E, async (page) => {
   await makeProject(env, { name: 'ProgWide', template: 'gates' });
   const W = () => page.eval(() => {
     const doc = document.querySelector('#workspace > .doc:not([hidden])'), p = doc.querySelector(':scope > .page');
@@ -38,7 +38,7 @@ uiTest('#1023 Program: the panel uses the whole width available, in the Tasks, m
     const inner = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), full = (s) => Math.abs(w(p.querySelector(s)) - inner) <= 1;
     return { doc: w(doc), page: w(p), chain: full('.impact-chain'), fpga: full('.imp-fpga') };
   });
-  // (the modern interface: iMPACT in Implement, arranged there, #1172)
+  // (the Silinx interface: iMPACT in Implement, arranged there, #1172)
   for (const ui of ['silinx', 'ise']) {
     await useInterface(page, ui);
     await page.openProject('ProgWide');
@@ -147,7 +147,7 @@ uiTest('#1024 Program FPGA with no programming file, or an old one: implement fi
 }, { build: DEV, timeout: 240000 });
 
 // #1025: the PROM selected in the chain: Program PROM and every other operation shown at once, no More…, in the Tasks,
-// modern and classic interfaces; in Portuguese
+// Silinx and ISE style interfaces; in Portuguese
 uiTest('#1025 Program PROM: every operation shown, no More…; in Portuguese', E, async (page) => {
   await makeProject(env, { name: 'ProgProm', template: 'gates' });
   const prom = () => page.eval(() => {

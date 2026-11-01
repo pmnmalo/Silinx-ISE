@@ -1,6 +1,6 @@
 // UI: the simulator's wave configuration as a file of the project (#1019, web/js/sim-wcfg.js, web/js/isim-wcfg.js):
 // Save Wave Configuration and Load Wave Configuration in the simulator's toolbar, no Save VCD; saved next to the test
-// bench's source (a .wcfg, ISim's), the window changed, loaded back the same; in the modern, classic and Tasks
+// bench's source (a .wcfg, ISim's), the window changed, loaded back the same; in the Silinx, ISE style and Tasks
 // interfaces, and in Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';

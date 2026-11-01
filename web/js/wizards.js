@@ -517,13 +517,13 @@ export function drawnHdlTaken(path, name, lang) {
 // ------------------------------------------------------------------ New Source (web/js/new-source.js, #405)
 export { newSourceWizard } from './new-source.js';
 
-/** Add Copy of Source's name: Import Source in the modern interface (the Tasks layout, #1501), ISE's in the classic one. */
+/** Add Copy of Source's name: Import Source in the Silinx interface (the Tasks layout, #1501), ISE's in the ISE style one. */
 export const addSourceTitle = () => (document.documentElement.dataset.layout === 'tasks' ? 'Import Source' : 'Add Copy of Source');
 /** Add Copy of Source… (`role`: the association first chosen; `title`: Import Test Bench, Simulation only, #1385, #1501). */
 export async function addSourceDialog({ role: first = 'design', title = addSourceTitle() } = {}) {
   const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.mem,.hex,.asm.json,.json' });
   const role = select([['design', 'All (Implementation + Simulation)'], ['impl', 'Implementation only'], ['sim', 'Simulation only']], typeof first === 'string' ? first : 'design');
-  // (the modern interface asks no association: Import Source's All, Import Test Bench's Simulation only, #1501)
+  // (the Silinx interface asks no association: Import Source's All, Import Test Bench's Simulation only, #1501)
   const ask = document.documentElement.dataset.layout !== 'tasks';
   const r = await dialog({
     title, width: 480,

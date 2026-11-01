@@ -1,4 +1,4 @@
-// UI: the modern interface (the default, its layout by tasks: #1149) and the classic Xilinx ISE one — layout,
+// UI: the Silinx interface (the default, its layout by tasks: #1149) and the ISE style one — layout,
 // View ▸ Interface, light / dark theme (following the system), command palette, Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,7 +46,7 @@ async function subMenu(page, menu, item, sub) {
   return subs;
 }
 
-// #1149: the modern interface is the Tasks one (its layout by tasks, data-layout="tasks"): the header with the search and
+// #1149: the Silinx interface is the Tasks one (its layout by tasks, data-layout="tasks"): the header with the search and
 // the task switcher, Design's pages as tabs above its panel, the document and console tabs on top, the task's empty state
 // #1314: the header's Settings, in place of the light / dark switch: About, Interface, Language, Theme, the update checks,
 // the keyboard shortcuts, Tell Us Who You Are; in Portuguese
@@ -71,14 +71,14 @@ uiTest('#1314 the header\'s Settings: About, Interface, Language, Theme, Check f
   await page.waitFor(() => document.getElementById('settings-btn').title === 'Definições', [], { what: 'Portuguese' });
   assert.deepEqual(await settingsMenu(page), ['Acerca do Silinx ISE', 'Interface', 'Idioma', 'Tema', 'Definições da Toolchain (ISE / Programadores)…', 'Procurar Atualizações…', 'Procurar Atualizações no Arranque', 'Atalhos de Teclado', 'Diga-nos Quem É…']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  // Interface ▸ Classic: the classic interface (no header buttons there), its menus
-  await settingsMenu(page, 'Interface', 'Classic');
+  // Interface ▸ ISE style: the ISE style interface (no header buttons there), its menus
+  await settingsMenu(page, 'Interface', 'ISE style');
   await page.waitFor(() => document.documentElement.dataset.ui === 'ise');
   assert.equal(await page.eval(() => document.getElementById('settings-btn').getClientRects().length), 0);
   await page.eval(async () => (await import('/js/modern.js')).setInterface('silinx'));
 }, { ui: 'silinx' });
 
-uiTest('modern interface by default: the Tasks layout, header with search and the tasks, Design\'s tabs on top, tabs on top, empty state', E, async (page) => {
+uiTest('Silinx interface by default: the Tasks layout, header with search and the tasks, Design\'s tabs on top, tabs on top, empty state', E, async (page) => {
   await page.waitForSelector('#start-page .start-box');
   assert.deepEqual(await ui(page), { ui: 'silinx', theme: 'light' });
   const L = await page.eval(() => {
@@ -96,7 +96,7 @@ uiTest('modern interface by default: the Tasks layout, header with search and th
       empty: [vis('#task-empty'), document.querySelector('#task-empty h2')?.textContent],
       project: document.getElementById('title-project'),
       titlebar: document.getElementById('titlebar').innerText,
-      classicTitle: vis('#title-text'),
+      iseTitle: vis('#title-text'),
     };
   });
   assert.deepEqual(L.layout, ['tasks', 'edit']);
@@ -108,10 +108,10 @@ uiTest('modern interface by default: the Tasks layout, header with search and th
   assert.deepEqual(L.empty, [true, 'Design'], 'the task\'s empty state when no document is open');
   assert.equal(L.project, null, 'no project chip in the header (#1042)');
   assert.doesNotMatch(L.titlebar, /Silinx|\d+\.\d+\.\d+/, 'no product and version in the header (#987)');
-  assert.equal(L.classicTitle, false);
+  assert.equal(L.iseTitle, false);
   // a project: Design's empty state goes away with its first document
-  await makeProject(env, { name: 'ModernPj', template: 'blinky' });
-  await page.openProject('ModernPj');
+  await makeProject(env, { name: 'SilinxPj', template: 'blinky' });
+  await page.openProject('SilinxPj');
   await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/top.vhd' && window.Silinx.active.editor, [], { what: 'the editor' });
   assert.equal(await page.eval(() => document.getElementById('task-empty').getClientRects().length), 0);
@@ -123,12 +123,12 @@ uiTest('modern interface by default: the Tasks layout, header with search and th
   assert.equal(await page.eval(() => document.querySelector('.left-page[data-page=design]').hidden), false);
 }, O);
 
-uiTest('View ▸ Interface: the Xilinx ISE look and back, live and remembered after a reload', E, async (page) => {
+uiTest('View ▸ Interface: the ISE style look and back, live and remembered after a reload', E, async (page) => {
   await page.waitForSelector('#start-page .start-box');
   let subs = await subMenu(page, 'View', 'Interface');
-  // (Modern, the Tasks layout, and Classic: #1149)
-  assert.deepEqual(subs, [{ label: 'Modern', checked: true }, { label: 'Classic', checked: false }]);
-  await subMenu(page, 'View', 'Interface', 'Classic');
+  // (Silinx, the Tasks layout, and ISE style: #1149)
+  assert.deepEqual(subs, [{ label: 'Silinx', checked: true }, { label: 'ISE style', checked: false }]);
+  await subMenu(page, 'View', 'Interface', 'ISE style');
   await page.waitFor(() => document.documentElement.dataset.ui === 'ise');
   const C = await page.eval(() => {
     const r = (id) => document.getElementById(id).getBoundingClientRect();
@@ -141,52 +141,52 @@ uiTest('View ▸ Interface: the Xilinx ISE look and back, live and remembered af
     };
   });
   assert.deepEqual(C, { title: true, search: false, tasks: 0, tabsBelow: true, leftTabsBelow: true, icons: 0, stored: 'ise' });
-  // no Theme menu in the classic look (light only)
+  // no Theme menu in the ISE style look (light only)
   assert.ok(!(await page.openMenu('View')).some((x) => x.label === 'Theme'));
   await page.closeMenus();
-  // remembered: the page loads in the classic look
+  // remembered: the page loads in the ISE style look
   await page.reload();
   assert.deepEqual(await ui(page), { ui: 'ise', theme: 'light' });
   subs = await subMenu(page, 'View', 'Interface');
   assert.deepEqual(subs.map((s) => s.checked), [false, true]);
-  await subMenu(page, 'View', 'Interface', 'Modern');
+  await subMenu(page, 'View', 'Interface', 'Silinx');
   await page.waitFor(() => document.documentElement.dataset.ui === 'silinx' && document.documentElement.dataset.layout === 'tasks' && document.getElementById('task-switch'));
   assert.ok((await page.openMenu('View')).some((x) => x.label === 'Theme'));
   await page.closeMenus();
 }, O);
 
-// #987: neither interface's header shows the product and version (Silinx ISE 15.12.0): the classic title bar the project
-// and its document, the modern header the logo and the project; the product and version the logo's tooltip and the
+// #987: neither interface's header shows the product and version (Silinx ISE 15.12.0): the ISE style title bar the project
+// and its document, the Silinx header the logo and the project; the product and version the logo's tooltip and the
 // window's title
-uiTest('#987 the header: the project and its document, not the product and version, in the modern and classic interfaces', E, async (page) => {
+uiTest('#987 the header: the project and its document, not the product and version, in the Silinx and ISE style interfaces', E, async (page) => {
   const head = () => page.eval(() => ({ text: document.getElementById('titlebar').innerText.replace(/\s+/g, ' ').trim(),
     logo: document.querySelector('#titlebar .app-logo').title, window: document.title }));
-  for (const look of ['Classic', 'Modern']) {
+  for (const look of ['ISE style', 'Silinx']) {
     await subMenu(page, 'View', 'Interface', look);
-    await page.waitFor((l) => document.documentElement.dataset.ui === l, [look === 'Classic' ? 'ise' : 'silinx']);
+    await page.waitFor((l) => document.documentElement.dataset.ui === l, [look === 'ISE style' ? 'ise' : 'silinx']);
     const none = await head();
     assert.doesNotMatch(none.text, /Silinx|\d+\.\d+\.\d+/, look);
     assert.match(none.logo, /^Silinx ISE \S/, look);
     assert.match(none.window, /^Silinx ISE \S.* Project Navigator$/, look);
-    if (look === 'Classic') assert.equal(none.text, 'S Project Navigator');
+    if (look === 'ISE style') assert.equal(none.text, 'S Project Navigator');
   }
   await makeProject(env, { name: 'HeadPj', template: 'gates' });
   await page.openProject('HeadPj');
-  for (const look of ['Classic', 'Modern']) {
+  for (const look of ['ISE style', 'Silinx']) {
     await subMenu(page, 'View', 'Interface', look);
-    await page.waitFor((l) => document.documentElement.dataset.ui === l, [look === 'Classic' ? 'ise' : 'silinx']);
+    await page.waitFor((l) => document.documentElement.dataset.ui === l, [look === 'ISE style' ? 'ise' : 'silinx']);
     const pj = await head();
     assert.doesNotMatch(pj.text, /Silinx|\d+\.\d+\.\d+/, look);
     assert.match(pj.window, /^HeadPj — Silinx ISE \S/, look);
-    assert.match(pj.text, look === 'Classic' ? /^S HeadPj - \[.+\]$/ : /^S$/, look);   // (modern: no project chip, #1042; the project in the window's title and in Design)
+    assert.match(pj.text, look === 'ISE style' ? /^S HeadPj - \[.+\]$/ : /^S$/, look);   // (Silinx: no project chip, #1042; the project in the window's title and in Design)
   }
-  // in Portuguese the classic title bar's Design Summary too (#1007)
-  await subMenu(page, 'View', 'Interface', 'Classic');
+  // in Portuguese the ISE style title bar's Design Summary too (#1007)
+  await subMenu(page, 'View', 'Interface', 'ISE style');
   await page.waitFor(() => document.documentElement.dataset.ui === 'ise');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor(() => document.getElementById('title-text').textContent === 'HeadPj - [Resumo do Projeto]', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  await subMenu(page, 'View', 'Interface', 'Modern');
+  await subMenu(page, 'View', 'Interface', 'Silinx');
 }, O);
 
 uiTest('theme: follows the system, View ▸ Theme ▸ Dark / Light / System, header button; remembered', E, async (page) => {
@@ -284,7 +284,7 @@ uiTest('command palette: Ctrl+K, search, arrow keys, Enter runs a command or ope
   await page.key('Escape');
 }, O);
 
-uiTest('Portuguese: the modern header, buttons, empty state and palette are translated', E, async (page) => {
+uiTest('Portuguese: the Silinx header, buttons, empty state and palette are translated', E, async (page) => {
   await page.waitForSelector('#start-page .start-box');
   await page.eval(TEXTS);
   const en = await page.eval(() => window.__uiTexts(document.getElementById('app')));
@@ -305,7 +305,7 @@ uiTest('Portuguese: the modern header, buttons, empty state and palette are tran
     empty: 'Abra uma fonte no painel Projeto.', settings: 'Definições',
   });
   const subs = await subMenu(page, 'Ver', 'Interface');
-  assert.deepEqual(subs.map((s) => s.label), ['Moderna', 'Clássica']);
+  assert.deepEqual(subs.map((s) => s.label), ['Silinx', 'Estilo ISE']);
   // the palette in Portuguese: found by the Portuguese and by the English name
   await page.key('k', { modifiers: CTRL });
   await page.waitForSelector('.pal-overlay');

@@ -3,7 +3,7 @@
 // simulation runs again at once), a bus value typed in, an expected output wrong (the mismatch in red, in the
 // bar and the console) then filled in from the simulation, saved in the project and run again when ISim opens,
 // Save as Test Bench (a simulation source that passes), and the texts in Portuguese; a bus expanded and its bits
-// clicked one at a time (#919), in the modern and classic interfaces and in the Tasks interface's Simulate; the view
+// clicked one at a time (#919), in the Silinx and ISE style interfaces and in the Tasks interface's Simulate; the view
 // kept where it was after an edit (#1616).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';

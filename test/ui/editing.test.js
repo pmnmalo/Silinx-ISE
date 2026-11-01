@@ -228,7 +228,7 @@ uiTest('#302 the console Clear button empties the Console, the Warnings and the 
   await page.waitFor(() => document.getElementById('err-count').textContent !== '', [], { what: 'the error again' });
 });
 
-// (the classic interface's views and Processes panel: the modern one has none, #1149)
+// (the ISE style interface's views and Processes panel: the Silinx one has none, #1149)
 uiTest('Design hierarchy: modules, instances, files, views; set top by right-click; collapsed nodes stay collapsed', E, async (page) => {
   await project('HierPj', { 'constraints/top.ucf': 'NET "clk" LOC = "B8" ;\n' });
   await page.openProject('HierPj');
@@ -261,7 +261,7 @@ uiTest('Design hierarchy: modules, instances, files, views; set top by right-cli
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#libs-page .lbl')].map((e) => e.textContent)), ['work', 'top', 'sub', 'tb_top']);
 }, { ui: 'ise' });
 
-// (the classic interface's views and Processes panel: the modern one has none, #1149)
+// (the ISE style interface's views and Processes panel: the Silinx one has none, #1149)
 uiTest('processes that need no ISE: RTL schematic, constraints, pin planning, summary, emulator, iMPACT, properties', E, async (page) => {
   await project('ProcPj', { 'constraints/top.ucf': 'NET "clk" LOC = "B8" | IOSTANDARD = LVCMOS33 ;\nNET "sw<0>" LOC = "P11" ;\n' });
   await page.openProject('ProcPj');

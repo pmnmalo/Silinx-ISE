@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // what users do most, and what depends most on the browser: the shell (menus, dialogs, keys), the
-// modern / classic interface, dark theme and command palette, the HDL editor (CodeMirror), schematic,
+// Silinx / ISE style interface, dark theme and command palette, the HDL editor (CodeMirror), schematic,
 // ASM and FSM editors, SSim and the board emulator, projects from the examples, and Yosys
 // (WebAssembly in a Web Worker), the static editions under their Content-Security-Policy (#487), and a tablet
 // by touch (#1130: WebKit as an iPad's Safari)

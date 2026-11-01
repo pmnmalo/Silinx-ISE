@@ -2,7 +2,7 @@
 // document maximized or restored: the Tasks bar's buttons, a tab's double click, Ctrl/Cmd+Shift+Enter) zooms the
 // schematic in front to Full View: the editor (web/js/sch-editor.js), and the RTL / Technology viewer
 // (web/js/schematic-view.js) mounted alone. The reference: the drawing's own Zoom to Full View at the new size (a fit
-// again changes nothing), the zoom by hand undone. The classic interface has no such buttons: the signal itself
+// again changes nothing), the zoom by hand undone. The ISE style interface has no such buttons: the signal itself
 // (web/js/layout-fit.js layoutToggled) does it there. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -75,7 +75,7 @@ uiTest('#1203 Schematic editor: Full View when the side panel, the messages or t
     await waitFitted(page, 'restored by the keys', t);
     assert.notEqual(await page.eval(() => document.documentElement.dataset.max), 'on');
   } else {
-    // the classic interface: no such buttons; the signal fits the drawing in front
+    // the ISE style interface: no such buttons; the signal fits the drawing in front
     assert.equal(await page.eval(() => document.querySelector('#task-bar')), null);
     await zoomIn(page);
     const t = await transform(page);

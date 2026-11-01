@@ -2,7 +2,7 @@
 // #1215: Delete File… in a file's menu, in the project or not: asked first (Cancel keeps it), its editor closed, out
 // of the project (the UCF: no constraints file), deleted from the disk; in Portuguese; both interfaces.
 // #1214: Tasks ▸ Design ▸ Files has Add to Project… (the folder's files not in the project, chosen and added) and
-// Add Copy to Project… (Import Source, #1501) above the list; none in the classic interface. No warnings.
+// Add Copy to Project… (Import Source, #1501) above the list; none in the ISE style interface. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -90,7 +90,7 @@ const bar = (page) => page.eval(() => {
     above: btns.every((x) => x.getBoundingClientRect().bottom <= document.getElementById('files-page').getBoundingClientRect().top + 1) };
 });
 
-uiTest('#1214 Tasks ▸ Files: Add to Project… (the folder\'s files not in the project) and Add Copy to Project… above the list; classic none', E, async (page) => {
+uiTest('#1214 Tasks ▸ Files: Add to Project… (the folder\'s files not in the project) and Add Copy to Project… above the list; ISE style none', E, async (page) => {
   await makeProject(env, { name: 'AddPj', top: 'a', files: { 'src/a.vhd': A, 'src/b.v': B } });
   await page.setViewport(1366, 768);
   await tasksInterface(page);
@@ -118,7 +118,7 @@ uiTest('#1214 Tasks ▸ Files: Add to Project… (the folder\'s files not in the
   await page.waitConsole(/src\/b\.v added to the project\./);
   // Add Copy to Project…: Import Source
   await page.click('#task-files-bar button:nth-child(2)');
-  assert.equal(await page.waitDialog('Import Source'), 'Import Source');   // (the modern interface's name, #1501)
+  assert.equal(await page.waitDialog('Import Source'), 'Import Source');   // (the Silinx interface's name, #1501)
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   // in Portuguese
@@ -126,7 +126,7 @@ uiTest('#1214 Tasks ▸ Files: Add to Project… (the folder\'s files not in the
   await page.waitFor(() => document.querySelector('#task-files-bar button')?.textContent === 'Acrescentar ao Projeto…', [], { what: 'Portuguese' });
   assert.deepEqual((await bar(page)).labels, ['Acrescentar ao Projeto…', 'Acrescentar Cópia ao Projeto…']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  // the classic interface: none
+  // the ISE style interface: none
   await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-files-bar')), null);
