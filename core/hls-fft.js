@@ -16,9 +16,12 @@
 //   by 5 + the stage's scaling (one rounding: (p + 2^9) >> (15 + s)); a quarter turn (j k = L / 4) an exact rotation,
 //   no twiddle (as the last stage's), the value truncated by the stage's scaling;
 //   each value kept in input_width bits (wrapped), an overflow said by ovflo.
-// The floating-point transform (use_native_float): unscaled, natural order, in float (radix-2 decimation in frequency,
-// twiddles of double rounded to float). Not AMD's systolic FFT's own order of operations (its C model is closed): close
-// to its results, not bit-exact. Isomorphic ES module.
+// The floating-point transform (use_native_float), found against AMD's golden files (#2309; its C model is closed): every
+// value of the corpus's 1024-point, SSR 2 forward frames. Unscaled, natural order, radix-2 decimation in frequency in
+// float, each operation rounded to nearest: a stage's pair a, b gives a + b and (a - b) W^k (W = e^(-2 pi i / L) forward,
+// e^(+2 pi i / L) inverse), the product (x wr - y wi, x wi + y wr) of four multiplies, not fused; W's cos and sin those of
+// double truncated toward zero to float (not rounded); k = 0 no twiddle, k = L / 4 an exact rotation. Other lengths, other
+// super sample rates and the inverse follow the same rules, with no golden file to check them against. Isomorphic ES module.
 //
 //   fftParams(name, fields, base) -> { p, errors: [message] }   fields: Map name -> BigInt (a bool 0n / 1n); base the
 //     struct the config derives from, 'params_t' or 'ssr_params_t'
@@ -140,6 +143,15 @@ function reorder(re, im, b) {
   }
 }
 
+// (a float's bits, to step one toward zero)
+const F32 = new Float32Array(1), U32 = new Uint32Array(F32.buffer);
+/** The double v as a float, truncated toward zero. */
+const floatTowardZero = (v) => {
+  F32[0] = v;
+  if (Math.abs(F32[0]) > Math.abs(v)) U32[0]--;
+  return F32[0];
+};
+
 /** The floating-point transform in place, natural order, unscaled (forward, or inverse: systolicfft_inv). */
 export function fftFloat(re, im, p) {
   const f = Math.fround, { N } = p, sg = p.inverse ? 1 : -1;
@@ -150,7 +162,8 @@ export function fftFloat(re, im, p) {
       const ar = f(re[i] + re[j]), ai = f(im[i] + im[j]), dr = f(re[i] - re[j]), di = f(im[i] - im[j]);
       re[i] = ar; im[i] = ai;
       if (!k) { re[j] = dr; im[j] = di; continue; }
-      const a = (sg * 2 * Math.PI * k) / L, wr = f(Math.cos(a)), wi = f(Math.sin(a));
+      if (4 * k === L) { re[j] = -sg * di; im[j] = sg * dr; continue; }
+      const a = (sg * 2 * Math.PI * k) / L, wr = floatTowardZero(Math.cos(a)), wi = floatTowardZero(Math.sin(a));
       re[j] = f(f(dr * wr) - f(di * wi));
       im[j] = f(f(dr * wi) + f(di * wr));
     }

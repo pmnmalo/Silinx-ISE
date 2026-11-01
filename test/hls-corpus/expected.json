@@ -33,11 +33,11 @@
     "reason": null
   },
   "dsp-fft-interface-array-float-ssr2": {
-    "csim": "fail",
+    "csim": "pass",
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: main() returned 1"
+    "reason": "C synthesis: fft_top.cpp:26: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too)"
   },
   "dsp-fft-interface-stream": {
     "csim": "pass",
@@ -51,11 +51,11 @@
     "reason": null
   },
   "dsp-fft-interface-stream-float-ssr2": {
-    "csim": "fail",
+    "csim": "pass",
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: main() returned 1"
+    "reason": "C synthesis: fft_top.cpp:26: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too)"
   },
   "dsp-fft-logicore-fft-float-ssr": {
     "csim": "pass",

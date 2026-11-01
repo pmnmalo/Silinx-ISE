@@ -491,8 +491,9 @@ void top(ap_uint<1> dir, ap_uint<15> scaling, cx xn[1024], cx xk[1024], bool *st
   It works in place: a block RAM of the values, a ROM of the twiddles, four 18x18 multipliers, one output every 3 cycles, not
   the LogiCORE's streaming pipeline: 26,626 cycles for 1024 points where Vitis HLS's takes 3,198.
 - **The floating point** (`use_native_float`): a C model only, unscaled, natural order, radix-2 in `float`, the direction its
-  `systolicfft_inv`. It is close to AMD's (about 1e-5 on the corpus) but not bit-exact: AMD's order of operations is not
-  public. Its input and output may be streams of `hls::vector<std::complex<float>, super_sample_rate>`, a word of that many
+  `systolicfft_inv`. It is bit-exact with AMD's C model on the corpus's 1024-point, SSR 2 forward golden files
+  (core/hls-fft.js gives the arithmetic); other lengths, other super sample rates and the inverse follow the same rules
+  with no golden file to check them. Its input and output may be streams of `hls::vector<std::complex<float>, super_sample_rate>`, a word of that many
   samples (#2309). Its synthesis is refused (a floating-point FFT's hardware waits on #1761).
 
 ## Pragmas (`#pragma HLS …`)
