@@ -18,6 +18,7 @@ import { CPP_OWN_HEADERS } from './cpp-headers.js';
 import { readPragma } from './c-pragma.js';
 import { cppTemplates } from './cpp-template.js';
 import { cppStl } from './cpp-stl.js';
+import { cppTestBench } from './cpp-tb.js';
 import { streamArrays } from './c-stream-array.js';
 import { npChannels } from './cpp-np-channel.js';
 import { cppFir } from './cpp-fir.js';
@@ -33,7 +34,7 @@ import { cUnions } from './c-union.js';
 import { cDesignated } from './c-designated.js';
 
 // (C++'s headers of a test bench whose names core/cpp-lex.js makes C: std::vector, generate / fill, the random engines, #1734)
-const TB_HEADERS = new Set(['vector', 'algorithm', 'random']);
+const TB_HEADERS = new Set(['vector', 'algorithm', 'random', 'map', 'chrono']);
 export const KNOWN_HEADERS = new Set(['ap_int.h', 'ap_fixed.h', 'stdint.h', 'stdbool.h', 'stdio.h', 'stdlib.h', 'string.h', 'math.h', 'stddef.h', 'limits.h', 'assert.h']);
 // the macros of the standard headers a test bench uses (#1598)
 const HEADER_MACROS = { 'stdio.h': { EOF: '(-1)', NULL: '0' }, 'stdbool.h': { true: '1', false: '0' }, 'stdlib.h': { NULL: '0', EXIT_SUCCESS: '0', EXIT_FAILURE: '1', RAND_MAX: '2147483647' }, 'stddef.h': { NULL: '0' },
@@ -269,12 +270,14 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     const channels = (t, later) => streamArrays(taskArrays(npChannels(t, report, later), report, later), report, later);
     // (hls::vector and the other library types their own first, core/cpp-hls-lib.js, #1891; its operators once the
     // templates are made, core/cpp-vector.js)
-    const lib = cppHlsLibs(cppBurst(tokens, report), includes, report);
+    // (a test bench's classes of strings and maps out first: the C simulation's, core/cpp-tb.js, #2234)
+    const tb = cppTestBench(tokens, report);
+    const lib = cppHlsLibs(cppBurst(tb.tokens, report), includes, report);
     const fir = cppFir(lib.tokens, report);
     // (hls_fft.h's transforms: their config structs read, their call a C model's, core/cpp-fft.js, #1943)
     const fft = cppFft(fir.tokens, report);
     const st = cStructs(cUnions(cDesignated(cppVector(cppSugar(cppDefaultArgs(channels(cppTemplates(channels(cppStl(fft.tokens, report), true), report), false)), report)), report), report, true), report, true);
-    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, resetCtors: st.resetCtors, firs: fir.firs, ffts: fft.ffts, apFloats: lib.apFloats };
+    return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, resetCtors: st.resetCtors, firs: fir.firs, ffts: fft.ffts, apFloats: lib.apFloats, tbProgram: tb.program };
   }
   const st = cStructs(cUnions(cDesignated(memcpyLoops(tokens), report), report), report, false);
   return { tokens: st.tokens, pragmas, includes, errors, structArgs: st.structArgs, resetCtors: st.resetCtors };

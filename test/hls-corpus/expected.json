@@ -549,11 +549,11 @@
     "reason": null
   },
   "modeling-using-array-stencil-2d": {
-    "csim": "fail",
-    "synth": "fail",
+    "csim": "pass",
+    "synth": "pass",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: cmdlineparser.h:21: the header 'map' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h)"
+    "reason": "co-simulation not run: II=225 without #pragma HLS ARRAY_STENCIL (#2503), about 6.75M cycles a call, not ended in 9.5 hours"
   },
   "modeling-using-cpp-templates": {
     "csim": "pass",

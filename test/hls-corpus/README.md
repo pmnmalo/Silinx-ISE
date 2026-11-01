@@ -77,7 +77,7 @@ Not part of `npm test` (it needs the network once).
 | modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | 73-78 |  |
 | modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | 4 |  |
 | modeling-using-array-stencil-1d | C++ | pass | pass | pass | 225576 |  |
-| modeling-using-array-stencil-2d | C++ | fail | fail | skip | - | C simulation: cmdlineparser.h:21: the header 'map' is not one of Silinx HLS's (ap_int.h, ap_fixed.h, stdint.h, stdbool.h, stdio.h, stdlib.h, string.h, math.h, stddef.h, limits.h, assert.h) |
+| modeling-using-array-stencil-2d | C++ | pass | pass | skip | - | co-simulation not run: II=225 without #pragma HLS ARRAY_STENCIL (#2503), about 6.75M cycles a call, not ended in 9.5 hours |
 | modeling-using-cpp-templates | C++ | pass | pass | pass | 2 |  |
 | modeling-using-fixed-point | C++ | pass | pass | pass | 1 |  |
 | modeling-using-float-and-double | C | pass | pass | pass | 2 |  |

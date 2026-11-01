@@ -6,6 +6,7 @@
 import { convert } from './c-interp-expr.js';
 import { MATH, F64, F32, BITCASTS } from './c-float.js';
 import { fftFixed, fftFloat } from './hls-fft.js';
+import { TbRun } from './cpp-tb-run.js';
 
 const INT = { w: 32, s: true };
 const num = (v) => ({ v: BigInt(v), t: INT });
@@ -45,6 +46,26 @@ export const libMethods = {
   warnOnce(e, message) {
     const k = `${e.loc?.line}:${e.loc?.col}`;
     if (!this.warned.has(k)) this.warned.set(k, { file: e.loc?.file, line: e.loc?.line || 1, col: e.loc?.col || 1, message, severity: 'warning' });
+  },
+  /** The runner of the unit's test-bench classes (core/cpp-tb-run.js). */
+  tb() {
+    return this.tbRun ||= new TbRun(this.c.ast.tbProgram, {
+      fail: (tok, message) => this.fail(tok?.line ? { loc: tok } : tok, message),
+      tick: (tok) => this.tick(tok?.line ? { loc: tok } : tok),
+      printf: (fmt, args, tok) => {
+        const s = this.format(fmt, args.map((x) => (typeof x === 'string' ? { str: x } : Number.isInteger(x) ? { v: BigInt(x), t: { w: 64, s: true, ap: false } } : { v: x, t: F64 })), { loc: tok });
+        this.out.push(s);
+        return s.length;
+      },
+      fileExists: (name) => this.fileText(name) !== null,
+    });
+  },
+  /** A value given to a test bench's class: a string, argv, a number. */
+  tbValue(x, e) {
+    if (x.argv) return x.argv;
+    const s = this.cString(x);
+    if (s !== undefined) return s;
+    return x.t?.fl ? Number(x.v) : Number(this.intOf(x, e));
   },
   /** A path a test bench names, refused when it leaves the project: absolute (/x, C:\x, \\host, ~/x) or through '..'
    *  (#1897). */
@@ -186,6 +207,21 @@ export const libMethods = {
         return { v: v < 0n ? -v : v, t: x.t };
       }
       case 'fflush': return num(0);
+      // (a test bench's class of strings and maps, core/cpp-tb.js, #2234)
+      case 'ap_tb_new': {
+        const [c, ...xs] = A();
+        (this.tbObjects ||= []).push(this.tb().create(c.str, xs.map((x) => this.tbValue(x, e)), e));
+        return num(this.tbObjects.length);
+      }
+      case 'ap_tb_call': {
+        const [h, m, ...xs] = A();
+        const args = xs.map((x) => this.tbValue(x, e));
+        const id = Number(this.intOf(h, e));
+        const r = id ? this.tb().callMethod(this.tbObjects[id - 1], m.str, args, e) : this.tb().callFree(m.str, args, e);
+        if (typeof r === 'string') return { str: r };
+        if (r !== undefined && typeof r !== 'number') this.fail(e, `'${m.str}' returns what the code outside its class cannot hold (an object): only numbers and strings`);
+        return Number.isInteger(r ?? 0) ? { v: BigInt(r ?? 0), t: { w: 64, s: true, ap: false } } : { v: r, t: F64 };
+      }
       case 'assert': { const [c] = A(); if (!this.truth(c)) this.fail(e, 'assertion failed'); return num(0); }
       // (rand: a linear congruential generator of 31 bits (RAND_MAX's), its seed srand's; its values are not the host
       // library's)
