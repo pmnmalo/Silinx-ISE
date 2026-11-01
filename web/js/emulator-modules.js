@@ -5,8 +5,8 @@ import { h } from './dom.js';
 import { prefKey } from './prefs.js';
 
 const LABELS = { vga: 'VGA monitor', display: 'Display', switches: 'Switches' };
-const key = (id) => prefKey(`silinx.emulator.module.${id}`);
-const pref = (id) => { try { return localStorage.getItem(key(id)) !== 'hidden'; } catch { return true; } };
+const MODULE_KEY = (id) => prefKey(`silinx.emulator.module.${id}`);
+const pref = (id) => { try { return localStorage.getItem(MODULE_KEY(id)) !== 'hidden'; } catch { return true; } };
 
 /** The checkboxes, before the toolbar's status (stat), for the modules in main; changed(): after one is shown or hidden. */
 export function mountEmuModules({ main, stat, changed }) {
@@ -28,7 +28,7 @@ export function mountEmuModules({ main, stat, changed }) {
     return h('label', { class: 'emu-module', title: 'Show or hide this module: the design goes on running' },
       h('input', { type: 'checkbox', checked: on, 'data-module-toggle': id, onchange: (e) => {
         show(id, e.target.checked);
-        try { localStorage.setItem(key(id), e.target.checked ? 'shown' : 'hidden'); } catch { /* ignore */ }
+        try { localStorage.setItem(MODULE_KEY(id), e.target.checked ? 'shown' : 'hidden'); } catch { /* ignore */ }
         changed();
       } }), LABELS[id] || id);
   };
