@@ -18,6 +18,17 @@ const S3_UCF = 'Xilinx UG130 Spartan-3 Starter Kit board pin tables';
 const PAPILIO_UCF = 'Gadget Factory BPC3003_2.03+.ucf (Papilio_One.ucf)';
 const ELBERTV2_UCF = 'Numato Lab Elbertv2.ucf (numato/samplecode)';
 const ICEBREAKER_PCF = 'icebreaker.pcf of IceStorm\'s iCEBreaker example (YosysHQ/icestorm)';
+// the iCEBreaker's own resources, its Pmods' apart: the board's (icebreaker) and with a PmodVGA (icebreaker-vga), #2517
+const ICEBREAKER_BOARD = [
+  { name: 'clk', label: '12 MHz oscillator (CLK)', pins: ['35'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Clock', extra: { period: '83.333 ns' } },
+  { name: 'led', label: 'Pmod LEDs LED1..LED5 (the snap-off part)', pins: ['27', '25', '21', '23', '26'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeHigh: true } },
+  { name: 'btn', label: 'Pmod buttons BTN1..BTN3 (the snap-off part)', pins: ['20', '19', '18'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Buttons' },
+  { name: 'ledr_n', label: 'Red LED LEDR_N (active low)', pins: ['11'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeLow: true } },
+  { name: 'ledg_n', label: 'Green LED LEDG_N (active low)', pins: ['37'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeLow: true } },
+  { name: 'btn_n', label: 'User button BTN_N (active low)', pins: ['10'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Buttons', extra: { activeLow: true } },
+  { name: 'rx', label: 'UART RX (from the FTDI)', pins: ['6'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'UART' },
+  { name: 'tx', label: 'UART TX (to the FTDI)', pins: ['9'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'UART' },
+];
 
 export const BOARDS = [
   {
@@ -532,17 +543,40 @@ export const BOARDS = [
     },
     source: ICEBREAKER_PCF,
     sourceUrl: 'https://github.com/YosysHQ/icestorm/blob/master/examples/icebreaker/icebreaker.pcf',
+    // (#2517) no switches, no seven-segment display: the examples' are on its Pmods 1A (P1A1..4, P1A7..10: 4 2 47 45 3 48
+    // 46 44) and 1B (P1B1..4, P1B7..10: 43 38 34 31 42 36 32 28), as the Atlys's on its VHDCI connector (#732)
     resources: [
-      { name: 'clk', label: '12 MHz oscillator (CLK)', pins: ['35'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Clock', extra: { period: '83.333 ns' } },
-      { name: 'led', label: 'Pmod LEDs LED1..LED5 (the snap-off part)', pins: ['27', '25', '21', '23', '26'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeHigh: true } },
-      { name: 'btn', label: 'Pmod buttons BTN1..BTN3 (the snap-off part)', pins: ['20', '19', '18'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Buttons' },
-      { name: 'ledr_n', label: 'Red LED LEDR_N (active low)', pins: ['11'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeLow: true } },
-      { name: 'ledg_n', label: 'Green LED LEDG_N (active low)', pins: ['37'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeLow: true } },
-      { name: 'btn_n', label: 'User button BTN_N (active low)', pins: ['10'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Buttons', extra: { activeLow: true } },
-      { name: 'rx', label: 'UART RX (from the FTDI)', pins: ['6'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'UART' },
-      { name: 'tx', label: 'UART TX (to the FTDI)', pins: ['9'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'UART' },
-      { name: 'pmod1a', label: 'Pmod 1A P1A1..4, P1A7..10', pins: ['4', '2', '47', '45', '3', '48', '46', '44'], dir: 'inout', iostandard: 'SB_LVCMOS', group: 'Headers' },
-      { name: 'pmod1b', label: 'Pmod 1B P1B1..4, P1B7..10', pins: ['43', '38', '34', '31', '42', '36', '32', '28'], dir: 'inout', iostandard: 'SB_LVCMOS', group: 'Headers' },
+      ...ICEBREAKER_BOARD,
+      { name: 'seg', label: '7-segment cathodes CA..CG on Pmod 1A (P1A1..4, P1A7..9; a 4-digit display on a breadboard; active low)', pins: ['4', '2', '47', '45', '3', '48', '46'], dir: 'out', iostandard: 'SB_LVCMOS', group: '7-segment', extra: { activeLow: true }, verified: false },
+      { name: 'dp', label: '7-segment decimal point on Pmod 1A (P1A10; active low)', pins: ['44'], dir: 'out', iostandard: 'SB_LVCMOS', group: '7-segment', extra: { activeLow: true }, verified: false },
+      { name: 'sw', label: 'Switches SW0..SW3 on Pmod 1B (P1B1..4; a Digilent PmodSWT)', pins: ['43', '38', '34', '31'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Switches', verified: false },
+      { name: 'an', label: '7-segment anodes AN0..AN3 on Pmod 1B (P1B7..10; active low)', pins: ['42', '36', '32', '28'], dir: 'out', iostandard: 'SB_LVCMOS', group: '7-segment', extra: { activeLow: true }, verified: false },
+    ],
+  },
+  {
+    // (#2517) the iCEBreaker with a Digilent PmodVGA in its Pmods 1A (R0..R3, B0..B3) and 1B (G0..G3, HS, VS): the pins of
+    // the display and the switches, so a board of its own. The examples' 3/3/2 bits of colour on the PmodVGA's most
+    // significant ones (R1..R3, G1..G3, B2..B3)
+    id: 'icebreaker-vga',
+    name: '1BitSquared iCEBreaker + PmodVGA',
+    vendor: '1BitSquared',
+    device: { family: 'ice40', part: 'ice40up5k', package: 'sg48', speed: '' },
+    flash: { type: 'spi', part: 'W25Q128JV', sizeMbit: 128, xcf: false, verified: false, note: 'Written over the on-board FTDI FT2232H (iceprog, openFPGALoader) with the .bin file.' },
+    programmer: {
+      preferred: 'openFPGALoader',
+      tools: {
+        openFPGALoader: { cable: 'ft2232', position: 0, onboard: true, verified: false, note: 'The on-board FT2232H; Silinx does not program an iCE40 yet (openFPGALoader -b ice40_generic design.bin).' },
+      },
+    },
+    source: ICEBREAKER_PCF,
+    sourceUrl: 'https://github.com/YosysHQ/icestorm/blob/master/examples/icebreaker/icebreaker.pcf',
+    resources: [
+      ...ICEBREAKER_BOARD,
+      { name: 'vga_red', label: 'VGA red R1..R3 on the PmodVGA (Pmod 1A P1A2..4)', pins: ['2', '47', '45'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'VGA', verified: false },
+      { name: 'vga_green', label: 'VGA green G1..G3 on the PmodVGA (Pmod 1B P1B2..4)', pins: ['38', '34', '31'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'VGA', verified: false },
+      { name: 'vga_blue', label: 'VGA blue B2..B3 on the PmodVGA (Pmod 1A P1A9..10)', pins: ['46', '44'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'VGA', verified: false },
+      { name: 'vga_hsync', label: 'VGA HSYNC on the PmodVGA (Pmod 1B P1B7)', pins: ['42'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'VGA', verified: false },
+      { name: 'vga_vsync', label: 'VGA VSYNC on the PmodVGA (Pmod 1B P1B8)', pins: ['36'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'VGA', verified: false },
     ],
   },
 ];

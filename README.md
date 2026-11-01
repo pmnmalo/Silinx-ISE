@@ -291,7 +291,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   Lattice iCE40 (LP, HX, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack.
 - **Boards and I/O Pin Planning**: Digilent Basys2, Nexys2, Nexys3, Atlys, Cmod S6; Xilinx
   Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One;
-  1BitSquared iCEBreaker (iCE40, its pins written as a PCF).
+  1BitSquared iCEBreaker (iCE40, its pins written as a PCF; a 1BitSquared iCEBreaker + PmodVGA for VGA).
   Ports are mapped to board resources by name, the UCF is generated, and pins are checked against
   the board before ISE runs.
 - **View Implemented Design (FPGA)**: the placed and routed design inside the chip (from the Silinx
@@ -548,6 +548,8 @@ writes byte for byte for the same routing (not yet in the browser edition: [docs
 folder> <out folder>`.
 Beyond Xilinx, it takes **the 1BitSquared iCEBreaker** (Lattice iCE40UP5K-SG48): Yosys's `synth_ice40`,
 nextpnr-ice40 and icepack, to `build/<top>.bin`, its pins written as a PCF (programming it from Silinx is still to come).
+The examples run on it with their seven-segment display and switches on its Pmods 1A and 1B; vga on the
+**1BitSquared iCEBreaker + PmodVGA**, a Digilent PmodVGA in those Pmods.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);
 what is planned: the [issues](https://github.com/pmnmalo/Silinx-ISE/issues).
