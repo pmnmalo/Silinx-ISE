@@ -1131,10 +1131,11 @@ test('gen-obspins2 dcmpads: every DCM on the clock pad ISE gives it (DCM_PAD), r
 });
 
 test('build-measured: every measured die rebuilt from its measurements alone is the committed description (#3)', () => {
-  assert.deepEqual(measuredDies(), ['xc3s100e', 'xc3s250e', 'xc3s500e']);
+  assert.deepEqual(measuredDies(), ['xc3s100e', 'xc3s250e', 'xc3s500e', 'xc3s1200e']);
   assert.equal(dataDir('xc3s250e'), DATA_DIR);
-  // (the tiles with a PIP or a site: the XC3S100E's 479 of the grid's 667, the XC3S250E's 1057 of 1419, the XC3S500E's 1760)
-  const tiles = { xc3s100e: 479, xc3s250e: 1057, xc3s500e: 1760 };
+  // (the tiles with a PIP or a site: the XC3S100E's 479 of the grid's 667, the XC3S250E's 1057 of 1419, the XC3S500E's 1760,
+  // the XC3S1200E's 3061)
+  const tiles = { xc3s100e: 479, xc3s250e: 1057, xc3s500e: 1760, xc3s1200e: 3061 };
   for (const die of measuredDies()) {
     const g = loadDeviceCache(PARTS[die]);
     const packed = buildMeasured(g);
@@ -1154,10 +1155,12 @@ test('build-measured: the die of a part; a part with no die or no measurements r
   assert.equal(dieOf('xc3s250evq100-4'), 'xc3s250e');
   for (const p of ['xc3s1600efg320-4', 'xc6slx16csg324-3', 'xc3s250e', '', undefined]) assert.equal(dieOf(p), null, String(p));
   assert.throws(() => buildMeasured({ part: 'xc6slx16csg324-3' }), /xc6slx16csg324-3 is not a Spartan-3E part of xc3s100ecp132-4, xc3s250ecp132-4, xc3s500efg320-4, xc3s1200efg320-4/);
-  // a die with no data folder yet: its missing file named
-  assert.throws(() => buildMeasured({ part: 'xc3s1200efg320-4' }), /build-measured: xc3s1200e has no obs\.json\.gz in .*data[\/\\]xc3s1200e$/);
+  // a folder with no measurements: its missing file named
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-measured-'));
-  try { assert.deepEqual(measuredDies(empty), []); } finally { fs.rmSync(empty, { recursive: true }); }
+  try {
+    assert.throws(() => buildMeasured({ part: 'xc3s1200efg320-4' }, empty), /build-measured: xc3s1200e has no obs\.json\.gz in .*silinx-measured-\w+$/);
+    assert.deepEqual(measuredDies(empty), []);
+  } finally { fs.rmSync(empty, { recursive: true }); }
 });
 
 test('research scripts: the command line recognised on Windows too (#1877: not `file://${process.argv[1]}`, a C:\\ path)', () => {
