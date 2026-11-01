@@ -40,7 +40,13 @@ function inOrder(fn) {
   return run;
 }
 /** Opens a project (startup: the last one reopened at start-up, where the user was, #1191). */
-export function openProject(name, { startup = false } = {}) { return inOrder(() => openProjectNow(name, { startup })); }
+export function openProject(name, { startup = false } = {}) {
+  if (!startup) requested = true;
+  return inOrder(() => openProjectNow(name, { startup }));
+}
+// a project asked for (not the start-up's): the start-up does not reopen the last one over it (#2492)
+let requested = false;
+export const projectRequested = () => requested;
 export function closeProject() { return inOrder(closeProjectNow); }
 
 async function openProjectNow(name, { startup = false } = {}) {

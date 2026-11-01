@@ -703,6 +703,33 @@ uiTest('#339 the start-up checks answering after the last project reopened: thei
   assert.deepEqual(await page.eval(() => [document.getElementById('warn-count').textContent, document.getElementById('err-count').textContent]), ['', '']);
 }, { skip: chromeOnly });   // (Page.addScriptToEvaluateOnNewDocument)
 
+// #2492 regression: the start-up reopened the last project once the project list came, also over a project opened
+// meanwhile (the start-up checks done, the list still on its way: a UI test's, or the user's from the Start page);
+// its documents (the Design Summary opened with it) were gone. The list held until that project is open.
+uiTest('#2492 a project opened while the start-up is still listing the projects stays open, the last one not reopened over it', E, async (page) => {
+  await makeProject(env, { name: 'StartLast', template: 'blinky' });
+  await makeProject(env, { name: 'StartAsked', template: 'blinky' });
+  await page.openProject('StartLast');   // (the last project: reopened at start-up)
+  const s = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const orig = window.fetch;
+    window.fetch = async (u, o) => {
+      if (!String(u).endsWith('/api/projects') || window.__listHeld) return orig(u, o);
+      window.__listHeld = true;
+      while (window.Silinx?.project?.name !== 'StartAsked') await new Promise((r) => setTimeout(r, 20));
+      return orig(u, o);
+    };
+  })();` });
+  await page.reload();
+  await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: s.identifier });
+  await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item') && window.Silinx?.startupChecked, [], { what: 'app boot' });
+  await page.openProject('StartAsked');
+  await page.waitFor(() => document.documentElement.dataset.starting === undefined, [], { what: 'the start-up done' });
+  assert.equal(await page.eval(() => window.__listHeld), true);
+  await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'summary'), [], { what: 'the Design Summary opened with the project' });
+  assert.deepEqual(await page.eval(() => [window.Silinx.project.name, window.Silinx.docs.map((d) => `${d.id}@${d.project}`), window.Silinx.leftPage]), ['StartAsked', ['summary@StartAsked'], 'design']);
+  assert.deepEqual(await page.eval(() => window.Silinx.diags.map((d) => d.message)), []);
+}, { skip: chromeOnly });   // (Page.addScriptToEvaluateOnNewDocument)
+
 uiTest("update dialog: What's new lists the changes of every version newer than the one running (text only)", E, async (page) => {
   const version = await page.eval(async () => (await import('/core/version.js')).VERSION);
   const cl = `# Changelog\n\n## 99.1.0\n\n- **Big** feature with \`code\` and *style*\n- <img src=x onerror="window.__pwned=1"> shown as text\n\n## 99.0.0\n\n- Another change\n  continued line\n\n## ${version}\n\n- already running\n`;

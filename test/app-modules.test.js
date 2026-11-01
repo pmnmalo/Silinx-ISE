@@ -95,7 +95,8 @@ test('#405 app.js split: the helpers fail on a part missing from a module', () =
 test('#405 project.js: open / close / reload keep their call order (the queues of #375)', () => {
   const code = read('project.js');
   assert.match(code, /^let lifecycle = Promise\.resolve\(\);\nfunction inOrder\(fn\) \{\n  const run = lifecycle\.then\(fn, fn\);\n  lifecycle = run\.catch\(\(\) => \{\}\);\n  return run;\n\}/m);
-  assert.match(code, /^export function openProject\(name, \{ startup = false \} = \{\}\) \{ return inOrder\(\(\) => openProjectNow\(name, \{ startup \}\)\); \}$/m);
+  // (a project asked for noted, for the start-up not to reopen the last one over it: #2492)
+  assert.match(code, /^export function openProject\(name, \{ startup = false \} = \{\}\) \{\n  if \(!startup\) requested = true;\n  return inOrder\(\(\) => openProjectNow\(name, \{ startup \}\)\);\n\}$/m);
   assert.match(code, /^export function closeProject\(\) \{ return inOrder\(closeProjectNow\); \}$/m);
   assert.match(code, /S\.reloadChain = \(S\.reloadChain \|\| Promise\.resolve\(\)\)\.then\(run, run\);/);
   // every document closed through app.js (its view state kept as it was), never by project.js itself

@@ -21,7 +21,7 @@ import { deviceFamily } from '/packages/silinx-fpga/src/parts.js';
 import { setActionRunner, longPressMenu } from './ui.js';
 import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';
-import { openProject, closeProject, reloadProject, updateTitle, renderStartPage, updateStorageStatus } from './project.js';
+import { openProject, closeProject, projectRequested, reloadProject, updateTitle, renderStartPage, updateStorageStatus } from './project.js';
 import { FLOW_UP_TO, boardUcf, checkUcfFile, regenerateUcf, runImpl, stepTracker, ucfDiagnostics } from './implement.js';
 import { adoptDrawnHdl, drawnHdlClashes, freshHdl, openAsm, openFsm, openPetri, openSch,
   openTt, openTtSchematic, openView, projectPart, refreshSyncBanner, schModules, staleHdl, syncBanner, viewTitle } from './drawings.js';
@@ -970,15 +970,17 @@ async function boot() {
   let last = null;
   try { last = localStorage.getItem(prefKey('silinx.lastProject')); } catch { /* ignore */ }
   const projects = await api.projects().catch(() => []);
+  // (a project opened meanwhile, e.g. from the Start page: kept, not replaced by the last one, #2492)
+  const asked = projectRequested();
   // (a workspace folder waiting for its permission: its last project is not the browser's one of that name)
-  if (last && projects.some(p => p.name === last) && !(api.standalone && api.storage().needsPermission)) {
+  if (!asked && last && projects.some(p => p.name === last) && !(api.standalone && api.storage().needsPermission)) {
     try {
       await openProject(last, { startup: true });   // (where the user was: its tasks too, #1191)
       await new Promise(r => setTimeout(r, 0));   // (the reopened documents' tasks followed first)
       restoreStartTask();   // (and the task that was in front, #1337)
     } finally { delete document.documentElement.dataset.restoring; delete document.documentElement.dataset.starting; }   // (the work area shown, where the user was: #1339; the whole app, #1403)
   }
-  else showLeftPage('start');
+  else if (!asked) showLeftPage('start');
   delete document.documentElement.dataset.starting;   // (no project reopened: the app shown at once, #1403)
   // check for updates at start-up (a newer release opens the update dialog) unless the setting is off; not awaited
   if (!window.SILINX_NO_UPDATE_CHECK) wiz.checkUpdatesOnStart().catch(() => {});
