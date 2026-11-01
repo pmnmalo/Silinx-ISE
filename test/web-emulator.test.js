@@ -1,4 +1,4 @@
-// web/js/emulator.js board drawings: every board resource a layout wires a widget to (LEDs,
+// The Board Emulator's board drawings (web/js/emulator-layouts.js and its boards' modules, #2478): every board resource a layout wires a widget to (LEDs,
 // switches, buttons, displays, LCD, rotary knob…) exists on that board in the device database,
 // with enough pins for the widgets drawn; and the core wiring finds them for a design using them.
 import { test } from 'node:test';
@@ -9,7 +9,10 @@ import { fileURLToPath } from 'node:url';
 import './ui/core-hooks.js';
 import { getDeviceDb } from '../server/devices.js';
 
-const SRC = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'web', 'js', 'emulator.js'), 'utf8');
+const JS = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'web', 'js');
+// the registry and the modules it imports, one after the other
+const REGISTRY = fs.readFileSync(path.join(JS, 'emulator-layouts.js'), 'utf8');
+const SRC = [REGISTRY, ...[...REGISTRY.matchAll(/from '\.\/([\w-]+\.js)'/g)].map((m) => fs.readFileSync(path.join(JS, m[1]), 'utf8'))].join('\n');
 const boards = getDeviceDb({ all: true }).boards;
 
 // the layout functions and the boards they draw
@@ -20,7 +23,8 @@ function layoutBody(fn) {
   assert.ok(start >= 0, `layout function ${fn}`);
   const next = SRC.indexOf('\nfunction ', start + 10);
   const nextConst = SRC.indexOf('\nconst ', start + 10);
-  return SRC.slice(start, Math.min(...[next, nextConst].filter((i) => i > 0)));
+  const nextExport = SRC.indexOf('\nexport ', start + 10);
+  return SRC.slice(start, Math.min(...[next, nextConst, nextExport].filter((i) => i > 0)));
 }
 
 /** Board resources a layout uses: { name -> highest pin index used (or 0) }. */
