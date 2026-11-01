@@ -104,7 +104,8 @@ test('boards: devices exist with that package and speed, pins are unique, progra
       const p = dev.findPart(d.part);
       assert.ok(p, `${b.id}: part ${d.part}`);
       assert.ok(p.packages[d.package], `${b.id}: ${d.part} has no package ${d.package}`);
-      assert.ok((p.packages[d.package].speeds || p.speeds).includes(d.speed), `${b.id}: speed ${d.speed}`);
+      const speeds = p.packages[d.package].speeds || p.speeds;
+      assert.ok(speeds.length ? speeds.includes(d.speed) : d.speed === '', `${b.id}: speed ${d.speed}`);   // (the iCE40 has none)
       assert.equal(d.family, p.family, `${b.id}: device family`);
       assert.deepEqual(dev.validateDevice(d), [], b.id);
     }
@@ -121,6 +122,7 @@ test('boards: devices exist with that package and speed, pins are unique, progra
     for (const t of Object.keys(b.programmer.tools)) assert.ok(['openFPGALoader', 'xc3sprog', 'djtgcfg', 'impact', 'adepttool'].includes(t), `${b.id}: unknown tool ${t}`);
     assert.ok(b.flash && ['xcf', 'spi', 'bpi'].includes(b.flash.type), `${b.id} flash`);
     assert.equal(b.flash.xcf, b.flash.type === 'xcf', `${b.id} flash.xcf`);
+    if (b.device.family === 'ice40') { assert.equal(b.jtagChain, undefined, `${b.id}: the iCE40 is configured over SPI, no JTAG chain`); continue; }
     assert.ok(b.jtagChain.some(c => c.role === 'fpga'), `${b.id} jtag chain`);
     assert.equal(b.jtagChain.some(c => c.role === 'prom'), b.flash.type === 'xcf', `${b.id}: PROM in chain iff Platform Flash`);
   }
