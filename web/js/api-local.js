@@ -21,6 +21,7 @@ import { orderTestDesigns } from '../../core/test-designs.js';
 import { createZip, readZip, browserCodec, textOf } from '../../core/zip.js';
 import { runBrowserFlow, browserOpenStatus } from './open-flow-browser.js';
 import { ADEPT_FILTERS, ADEPT_VENDOR, scanAdept, programAdept, bitHeader } from '../../core/adept.js';
+import { FTDI_FILTERS, FTDI_VENDOR, programIce40Flash } from '../../core/ftdi-ice40.js';
 import { promAdept, PROM_OPS } from '../../core/xcf.js';
 import { noWebUsb } from '../../core/webusb-support.js';
 import { browserStore, folderStore, projectOps, copyProjects, emptyProjectJson, normalizeProjectJson, projectFromZip, safePath, NAME_RE, saveBuildResults, readBuildResults, BUILD_VIEW, DEV_SITE } from './project-store.js';
@@ -104,13 +105,13 @@ function fakeJob(kind, lines, status = 'error', error) {
   return { job: id };
 }
 const FULL_APP = 'the full Silinx application (run `npm start` in the Silinx folder and open http://127.0.0.1:8642; File > Download Project Bundle moves a project there)';
-// the board's Digilent USB (the user chooses it once; the browser remembers the permission)
-async function adeptDevice() {
+// the board's Digilent USB, or an iCE40 board's FTDI (#2298): the user chooses it once; the browser remembers the permission
+async function adeptDevice(vendor = ADEPT_VENDOR, filters = ADEPT_FILTERS) {
   const usb = globalThis.navigator?.usb;
   if (!usb) fail(noWebUsb());
-  const known = (await usb.getDevices()).filter(d => d.vendorId === ADEPT_VENDOR);
+  const known = (await usb.getDevices()).filter(d => d.vendorId === vendor);
   if (known.length) return known[0];
-  try { return await usb.requestDevice({ filters: ADEPT_FILTERS }); } catch (e) {
+  try { return await usb.requestDevice({ filters }); } catch (e) {
     fail(e.name === 'NotFoundError' ? 'no board chosen: connect the board\'s USB cable, switch it on and choose it in the browser\'s list' : e.message);
   }
 }
@@ -120,7 +121,7 @@ function usbJob(kind, run) {
   const job = addJob({ id, kind, status: 'running', lines: [], next: 0, error: null, result: null });
   const push = l => { job.lines.push(l); job.next = job.lines.length; };
   run(push, job).then(result => { job.result = result; job.status = 'ok'; })
-    .catch(e => { const m = e.message.replace(/^Adept USB: /, ''); push(`ERROR: ${m}`); job.status = 'error'; job.error = m; });
+    .catch(e => { const m = e.message.replace(/^(Adept|FTDI) USB: /, ''); push(`ERROR: ${m}`); job.status = 'error'; job.error = m; });
   return { job: id };
 }
 // the bitstream: this session's build, else (a workspace folder) the one in the project's build/
@@ -312,7 +313,7 @@ export const api = {
     const b = buildOf(name);
     const push = l => { job.lines.push(l); job.next = job.lines.length; };
     // the outputs of a previous run no longer match the design (a failure must not leave a bitstream)
-    for (const k of Object.keys(b.files)) if (/^build\/[^/]+(\.bit|_pins\.ucf)$|^build\/open\/(placed|routed)\.xdl$|^build\/open\/timing\.txt$/.test(k)) delete b.files[k];
+    for (const k of Object.keys(b.files)) if (/^build\/[^/]+(\.bit|\.bin|_pins\.ucf)$|^build\/open\/(placed|routed)\.xdl$|^build\/open\/timing\.txt$/.test(k)) delete b.files[k];
     b.view = null;
     // a workspace folder: the build's files also go into the project's build/ folder
     const folder = store.kind === 'folder' ? store : null;
@@ -356,11 +357,20 @@ export const api = {
   bitinfo: async name => {
     let top = null;
     try { top = (await projectJson(name)).top; } catch { /* no project */ }
+    // (an iCE40's .bin: its size, #2298)
+    const bin = top && await bitOf(name, `build/${top}.bin`);
+    if (bin) return { available: true, size: bin.length, ice40: true };
     const bit = top && await bitOf(name, `build/${top}.bit`), hd = bit && bitHeader(bit);
     return hd ? { available: true, designName: hd.design, part: `${hd.part}${hd.package}`, date: hd.date, time: hd.time } : { available: false, reason: 'no bitstream in this browser' };
   },
   // { project, bitfile, bitData? (a .bit chosen from the disk) }
   program: async ({ project, bitfile, bitData } = {}) => usbJob('program', async log => {
+    // an iCE40's .bin: into its board's SPI flash, through its FT2232H (#2298)
+    if (/\.bin$/i.test(bitfile || '')) {
+      const bin = await bitOf(project, bitfile);
+      if (!bin) fail(`no ${bitfile} in this browser: run Generate Programming File first`);
+      return programIce40Flash(await adeptDevice(FTDI_VENDOR, FTDI_FILTERS), bin, { log });
+    }
     const bit = bitData || await bitOf(project, bitfile);
     if (!bit) fail(`no bitstream ${bitfile || ''} in this browser: run Generate Programming File first, or choose a .bit file`);
     let part = null;

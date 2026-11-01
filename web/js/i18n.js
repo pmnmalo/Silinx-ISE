@@ -214,7 +214,6 @@ const PT = {
   'No .bin yet — run "Generate Programming File" first.': 'Ainda não há .bin — execute primeiro "Generate Programming File".',
   'Writes the .bin into the board\'s SPI flash: the FPGA loads it, and again at every power-up.': 'Escreve o .bin na flash SPI da placa: a FPGA carrega-o, e de novo sempre que é ligada.',
   'Flash programmed: the FPGA loads the design.': 'Flash programada: a FPGA carrega o projeto.',
-  'The browser edition does not program an iCE40 yet: program it from the Silinx application (openFPGALoader).': 'A edição do browser ainda não programa um iCE40: programe-o a partir da aplicação Silinx (openFPGALoader).',
   'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).': 'O FT2232H da placa: o .bin escrito na flash SPI, que a FPGA depois carrega (e sempre que é ligada).',
   'Not yet tested on a real board.': 'Ainda não testado numa placa real.', 'No board selected: choose one in Design Properties.': 'Nenhuma placa selecionada: escolha uma nas Propriedades do Projeto.',
   // editor

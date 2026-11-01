@@ -1,5 +1,6 @@
 // Configure Target Device of an iCE40 project (#2298): no JTAG chain and no PROM, as iMPACT's; its .bin written into the
-// board's SPI flash, which the FPGA then loads (and at every power-up): by openFPGALoader in the local server.
+// board's SPI flash, which the FPGA then loads (and at every power-up): by openFPGALoader in the local server, through the
+// board's FT2232H over WebUSB in the browser edition (core/ftdi-ice40.js).
 import { api, followJob } from './api.js';
 import { h, toast, alertDlg, confirmDlg } from './ui.js';
 import { S, app } from './app.js';
@@ -23,7 +24,6 @@ export function mountIce40Program(page) {
 
   const program = async () => {
     if (busy) { toast('Another operation is running', 'error'); return null; }
-    if (api.standalone) { alertDlg('Program Flash', 'The browser edition does not program an iCE40 yet: program it from the Silinx application (openFPGALoader).', 'error'); return null; }
     // (no .bin: the design implemented first, as iMPACT's Program FPGA, #1024)
     if (!(await loadInfo())?.available) {
       if (!pj?.top || !await confirmDlg('Program Flash', `There is no ${file} yet. Implement the design and generate it now?`)) return null;
@@ -34,7 +34,7 @@ export function mountIce40Program(page) {
     busy = true;
     app.log('\nProgramming the SPI flash...', 'hdr');
     try {
-      const { job } = await api.program({ project: pj.name, board: board?.id });
+      const { job } = await api.program({ project: pj.name, board: board?.id, bitfile: file });
       const r = await followJob(job, app.logLine);
       if (r.status === 'ok') { app.log('Flash programmed: the FPGA loads the design.', 'ok'); toast('Flash programmed: the FPGA loads the design.', 'ok'); countEvent('program'); }
       else { app.log(`Programming the SPI flash failed: ${r.error || 'see log'}`, 'err'); toast('Failed — see console', 'error'); }
