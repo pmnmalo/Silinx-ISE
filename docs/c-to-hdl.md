@@ -507,7 +507,9 @@ void top(ap_uint<1> dir, ap_uint<15> scaling, cx xn[1024], cx xk[1024], bool *st
 | `STREAM variable= depth=` | a DATAFLOW region's stream: its FIFO's depth (else `hls::stream<T, D>`'s D, else 2) |
 | `BIND_STORAGE variable= type=` (#1901) | a local array a memory (a small one too) of `ram_1p`, `ram_2p`, `ram_s2p`, `ram_t2p`, `rom_1p` or `rom_2p`'s ports; another type: a warning |
 | `DEPENDENCE [variable=] [class=array] inter\|intra [RAW\|WAR\|WAW] false` (#1961) | a pipelined loop's or function's memory, in the loop the pragma is in and those in it: `inter` a read need not come after another iteration's write, so the II is no longer bound by it (the C's results then only if the dependence really is false, as in Vitis HLS); `intra` a read and a write of one iteration in the same stage. `true` or no `false`: no effect. A variable's dependence is kept: a warning |
-| `STREAM` elsewhere, `LATENCY`, `BIND_OP`, `LOOP_FLATTEN`, … and AXI4-Stream (`axis`) on what is not a stream or an array | accepted and ignored, with a warning; an unknown pragma: a warning |
+| `LOOP_FLATTEN [off]` (in a loop's body, #1961) | the loop made one with the loop around it (and on up, each with its own pragma), of the product of their counts, when the one around holds nothing else, both counts are constants and no `break`, `continue`, `return` or `goto` is in it; else a warning, its loops kept. `off`: left alone |
+| `LOOP_MERGE [force]` (in a body, #1961) | its consecutive `for` loops made one, of the largest count (each body while its own lasts), or of their common bound; not when a value crosses them in another order than the C's (only an array at each one's own variable is safe), a warning; `force` merges them all the same, on the designer's word |
+| `STREAM` elsewhere, `LATENCY`, `BIND_OP`, … and AXI4-Stream (`axis`) on what is not a stream or an array | accepted and ignored, with a warning; an unknown pragma: a warning |
 
 A loop's pragma is its body's first statements; one elsewhere is ignored with a warning.
 
