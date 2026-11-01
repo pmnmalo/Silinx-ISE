@@ -206,7 +206,7 @@ test('run_process and get_report: the power estimate of blinky with the Silinx t
   assert.equal(map.structuredContent.path, 'build/reports.json');
   assert.match(map.content[0].text, /^Design summary \(pack, Silinx toolchain\) of top:\n {2}Number of Slice Flip Flops: \d+ out of 4896 \d+%\n(?: {2}.*\n)+0 error\(s\), 0 warning\(s\)\.$/);
   const par = await srv.call('get_report', { project: 'Blinky', report: 'par' });
-  assert.match(par.content[0].text, /^Place and route \(Silinx toolchain\) of top: all signals are completely routed \(\d+ nets, \d+ PIPs, \d+ passes\)\.\nTiming constraints: all met; minimum period [\d.]+ ns \([\d.]+ MHz\)\.$/);
+  assert.match(par.content[0].text, /^Place and route \(Silinx toolchain\) of top: all signals are completely routed \(\d+ nets, \d+ PIPs(, \d+ passes)?\)\.\nTiming constraints: all met; minimum period [\d.]+ ns \([\d.]+ MHz\)\.$/);
   assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'timing' })).structuredContent.path, 'build/open/timing.txt');
   assert.equal((await srv.call('get_report', { project: 'Blinky', report: 'pins' })).content[0].text, 'No pins report for \'Blinky\' from its last run (Silinx toolchain: build/top_pins.ucf): run_process pins first.');
   assert.equal((await srv.call('get_report', { project: 'TrafficN', report: 'map' })).content[0].text, 'No map report for \'TrafficN\': no process has run yet (run_process implement).');
@@ -258,4 +258,14 @@ test('new_project and set_top: an empty project for a board, its source written,
   assert.deepEqual([impl.structuredContent.errors, impl.structuredContent.warnings], [[], []]);
   assert.match(impl.content[0].text, /Process "implement" of <counter> completed successfully \(Silinx toolchain\)\.$/);
   assert.match((await srv.call('get_report', { project: 'Counter4', report: 'map' })).content[0].text, /^Design summary \(pack, Silinx toolchain\) of counter:\n {2}Number of Slice Flip Flops: 4 out of 1920 0%\n/);
+});
+
+// Regression (#2420): the nextpnr engine counts no router passes (iterations null), and the summary said "null passes"
+test('the place and route summary: the router\'s passes only when the engine counts them', async () => {
+  const { OPEN_REPORTS } = await import('../server/mcp.js');
+  const r = iterations => ({ top: 'top', par: { routed: true, nets: 304, pips: 2161, iterations }, timing: { met: true, minPeriodNs: 7.117, maxFreqMHz: 140.509 } });
+  assert.equal(OPEN_REPORTS.par(r(null)), 'Place and route (Silinx toolchain) of top: all signals are completely routed (304 nets, 2161 PIPs).\nTiming constraints: all met; minimum period 7.117 ns (140.509 MHz).');
+  assert.equal(OPEN_REPORTS.par(r(undefined)).split('\n')[0], 'Place and route (Silinx toolchain) of top: all signals are completely routed (304 nets, 2161 PIPs).');
+  assert.equal(OPEN_REPORTS.par(r(3)).split('\n')[0], 'Place and route (Silinx toolchain) of top: all signals are completely routed (304 nets, 2161 PIPs, 3 passes).');
+  assert.equal(OPEN_REPORTS.par({ top: 'top', par: { routed: false, unroutedSignals: 2, nets: 10, pips: 50, iterations: 40 } }), 'Place and route (Silinx toolchain) of top: 2 signal(s) not routed (10 nets, 50 PIPs, 40 passes).');
 });
