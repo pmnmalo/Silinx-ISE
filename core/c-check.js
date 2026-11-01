@@ -289,7 +289,7 @@ function checkFunction(f, ctx) {
       case 'binary':
         if (hw && (e.op === '+' || e.op === '-') && (isPtr(e.l) || isPtr(e.r))) report(e.loc, 'pointer arithmetic is not possible in Silinx HLS: index the array instead');
         if (e.op === '/' || e.op === '%') { const d = constValue(e.r, consts); if (d === 0n) report(e.loc, 'division by zero'); }
-        if ((e.op === '<<' || e.op === '>>') && !ctx.dead) { const s = constValue(e.r, consts); if (s !== null && s < 0n) report(e.loc, `a shift by a negative amount (${s}) is undefined in C`); }
+        if ((e.op === '<<' || e.op === '>>') && !ctx.dead) { const s = constValue(e.r, consts); if (s !== null && s < 0n) report(e.loc, `a shift by a negative amount (${s}) is undefined in C`); e.constCount = s !== null; }
         expr(e.l); expr(e.r); return;
       case 'assign': expr(e.l); expr(e.r); return;
       case 'cond': expr(e.c); expr(e.a); expr(e.b); return;

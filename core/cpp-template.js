@@ -113,6 +113,7 @@ export function declType(toks, name) {
     for (; j >= 0; j--) {
       const t = toks[j];
       if (op(t, '>')) depth++;
+      else if (op(t, '>>')) depth += 2;
       else if (op(t, '<')) { if (!depth) break; depth--; }
       else if (!depth && (op(t, '(') || op(t, ',') || op(t, ';') || op(t, '{') || op(t, '}') || t.t === 'pragma')) break;
       else if (!depth && !(t.t === 'id' || op(t, '&') || op(t, '*') || op(t, '::'))) { ty.length = 0; break; }

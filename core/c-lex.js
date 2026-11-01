@@ -24,6 +24,7 @@ import { cppFir } from './cpp-fir.js';
 import { cppFft } from './cpp-fft.js';
 import { cppHlsLibs } from './cpp-hls-lib.js';
 import { cppVector } from './cpp-vector.js';
+import { cppDefaultArgs } from './cpp-default-args.js';
 import { taskArrays } from './cpp-task-array.js';
 import { cppSugar } from './cpp-sugar.js';
 import { cppBurst, memcpyLoops } from './cpp-burst.js';
@@ -272,7 +273,7 @@ export function lex(source, file = 'input.c', { headers = null, cpp = isCpp(file
     const fir = cppFir(lib.tokens, report);
     // (hls_fft.h's transforms: their config structs read, their call a C model's, core/cpp-fft.js, #1943)
     const fft = cppFft(fir.tokens, report);
-    const st = cStructs(cUnions(cDesignated(cppVector(cppSugar(channels(cppTemplates(channels(cppStl(fft.tokens, report), true), report), false), report)), report), report, true), report, true);
+    const st = cStructs(cUnions(cDesignated(cppVector(cppSugar(cppDefaultArgs(channels(cppTemplates(channels(cppStl(fft.tokens, report), true), report), false)), report)), report), report, true), report, true);
     return { tokens: cppTokens(st.tokens, report, streams), pragmas, includes, errors, streams, structArgs: st.structArgs, resetCtors: st.resetCtors, firs: fir.firs, ffts: fft.ffts, apFloats: lib.apFloats };
   }
   const st = cStructs(cUnions(cDesignated(memcpyLoops(tokens), report), report), report, false);

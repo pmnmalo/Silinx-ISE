@@ -16,6 +16,7 @@
 import { closing, splitTop, constTokens } from './cpp-template.js';
 import { parseMethod, methodFunctions, foldDefaultCtor, implicitCtor, lookupMember, upcast } from './cpp-method.js';
 import { structStreams } from './c-struct-stream.js';
+import { structBytes } from './c-struct-size.js';
 
 const op = (t, v) => t && t.t === 'op' && t.v === v;
 const isId = (t, v) => t && t.t === 'id' && (v === undefined || t.v === v);
@@ -215,7 +216,9 @@ function definitions(input, cx) {
       const type = first.slice(0, nameAt);
       // (ap_uint<0> x;: no bits, left out, as AMD's ap_axis's side channels of width 0)
       if (type.length === 4 && /^ap_u?int$/.test(type[0].v) && op(type[1], '<') && type[2].v === '0' && op(type[3], '>')) continue;
-      if (type.some((x) => op(x, '*') || op(x, '&'))) { report(first[nameAt], `the member '${first[nameAt].v}': a pointer in a struct is not possible in Silinx HLS`); continue; }
+      // (const char *: a test bench's text, #2309)
+      const text = type.length === 3 && isId(type[0], 'const') && isId(type[1], 'char') && op(type[2], '*');
+      if (!text && type.some((x) => op(x, '*') || op(x, '&'))) { report(first[nameAt], `the member '${first[nameAt].v}': a pointer in a struct is not possible in Silinx HLS`); continue; }
       for (const [i, p] of parts.entries()) {
         const d = i === 0 ? p.slice(nameAt) : p;
         if (d.some((x) => op(x, ':')) && !d.some((x) => op(x, '='))) { report(d[0], `the member '${d[0].v}': a bit field is not supported here (write ap_uint<W>)`); continue; }
@@ -389,7 +392,12 @@ function structPath(ts, k, { look, rewrite, report }) {
       const inner = [];
       rewrite(ts.slice(j + 1, e), inner, false);
       // (an hls::vector indexed, v[i] (core/cpp-hls-lib.js, #1891): its array's element)
-      if (!leaf && S?.members[0]?.name === 'ap_d' && idx.length >= dims.length) { sub += '_ap_d'; leaf = S.members[0]; ldims = leaf.dims; S = null; }
+      if (!leaf && S?.members[0]?.name === 'ap_d' && idx.length >= dims.length) {
+        sub += '_ap_d';
+        // (of structs, std::complex's, #2309: the element a struct still)
+        const m = S.members[0];
+        if (m.struct) { S = m.struct; dims = [...dims, ...m.dims]; } else { leaf = m; ldims = leaf.dims; S = null; }
+      }
       if (leaf ? idx.length >= dims.length + ldims.length : idx.length >= dims.length) break;
       idx.push(inner);
       j = e + 1;
@@ -479,6 +487,9 @@ function uses(toks, cx) {
           if (!pa) { flat.push(p); return; }
           if (!pa.name) { flat.push(...leaves(pa.S).map((l) => paramTokens(pa, l, `ap_${fresh++}`, t, cpp))); return; }
           if (pa.kind === 'arr' && pa.dims.some((d) => !d.length)) report(pa.loc, `the parameter '${pa.name}': an array of structs needs its size`);
+          // (a const char * member: a test bench's variables' only, #2309)
+          const text = leaves(pa.S).find((l) => l.type.some((x) => op(x, '*')));
+          if (text) report(pa.loc, `the parameter '${pa.name}': its struct's member '${text.suffix.slice(1)}' is a const char * (a test bench's variable of the struct only, not a parameter)`);
           for (const l of leaves(pa.S)) flat.push(paramTokens(pa, l, pa.name, t, cpp));
           sc.set(pa.name, { S: pa.S, prefix: pa.name, dims: pa.kind === 'arr' ? pa.dims : [], kind: pa.kind === 'ref' || pa.kind === 'ptr' ? (cpp && pa.kind === 'ref' ? 'ref' : 'ptr') : 'val' });
         });
@@ -550,6 +561,13 @@ function uses(toks, cx) {
         k = close;
         continue;
       }
+      // sizeof(S), sizeof(v) of a struct: its size in bytes (#2309)
+      if (isId(t, 'sizeof') && op(ts[k + 1], '(') && isId(ts[k + 2]) && op(ts[k + 3], ')')) {
+        const b = look(ts[k + 2].v), S = b ? (b.kind === 'val' ? b.S : null) : cx.structs.get(ts[k + 2].v);
+        const size = S ? structBytes(S)?.size : null;
+        const n = (b?.dims ?? []).reduce((a, d) => (a === null || constTokens(d) === null ? null : a * Number(constTokens(d))), 1);
+        if (size != null && n !== null) { dst.push(L(t, String(size * n), 'num')); k += 3; continue; }
+      }
       // a member: its variable
       if (isId(t) && look(t.v) && !op(ts[k - 1], '.') && !op(ts[k - 1], '->')) {
         const p = path(ts, k);
@@ -581,6 +599,11 @@ function uses(toks, cx) {
       if (op(d[0], '*') || op(d[0], '&')) { report(d[0], `a pointer or a reference to a struct (${S.name}) as a variable is not possible in Silinx HLS: use the struct or an index`); continue; }
       const { name, dims, init, ctor } = declarator(d);
       if (!name) continue;
+      // (S a[] = { … };: its size the list's, #2309)
+      if (dims[0] && !dims[0].length && init && op(init[0], '{')) {
+        const items = splitTop(init.slice(1, closing(init, 0))).filter((x) => x.length);
+        dims[0] = [L(name, String(items.length && op(items[0][0], '{') ? items.length : Math.ceil(items.length / Math.max(1, leaves(S).length))), 'num')];
+      }
       // (a constructor: called after the members are declared)
       const open = d.indexOf(name) + 1;
       const each = objectArgs(S, d, open, dims, init, ctor, name, report);

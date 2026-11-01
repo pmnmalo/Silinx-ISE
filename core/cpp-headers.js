@@ -21,6 +21,7 @@ export const CPP_OWN_HEADERS = {
   'hls_vector.h': `#pragma once
 #include <stdint.h>
 #include <assert.h>
+#include <complex>
 template <typename T, int N> struct ap_vector { T ap_d[N]; };
 `,
   'hls_streamofblocks.h': `#pragma once
@@ -99,6 +100,7 @@ public:
   'hls_fft.h': `#pragma once
 #include "ap_fixed.h"
 #include "hls_stream.h"
+#include "hls_vector.h"
 #include <complex>
 namespace hls {
 namespace ip_fft {

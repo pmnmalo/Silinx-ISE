@@ -184,6 +184,11 @@ function complexMembers(toks) {
       if (isId(t, 'complex') && op(list[k + 1], '<') && isId(list[k + 2]) && builtins.has(list[k + 2].v) && op(list[k + 3], '>')) {
         list = [...list.slice(0, k + 2), ...builtins.get(list[k + 2].v).map((x) => ({ ...x, line: t.line, col: t.col, file: t.file })), ...list.slice(k + 3)];
       }
+      // (hls::vector<C, N> of such a typedef: complex<T>'s, the instance written before C is declared, #2309)
+      if (isId(t) && names.has(t.v) && isId(list[k - 2], 'ap_vector') && op(list[k - 1], '<')) {
+        dst.push(L(t, 'complex', 'id'), L(t, '<'), ...names.get(t.v).map((x) => ({ ...x, line: t.line, col: t.col, file: t.file })), L(t, '>'));
+        continue;
+      }
       const prev = dst.at(-1);
       // typedef [std::]complex<T> C; using C = complex<T>;
       if (isId(t, 'complex') && op(list[k + 1], '<') && (isId(prev, 'typedef') || op(prev, '='))) {

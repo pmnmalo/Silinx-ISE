@@ -36,7 +36,7 @@ export function simulateC(source, { file = 'input.c', maxSteps = MAX_STEPS, entr
   const m = new Machine(checked, maxSteps);
   m.files = files || headers || {};
   const r = m.run(entry);
-  return { ...r, top: checked.top, diagnostics: checked.diagnostics, files: Object.fromEntries(m.fs) };
+  return { ...r, top: checked.top, diagnostics: [...checked.diagnostics, ...[...m.warned.values()].map((d) => ({ ...d, file: d.file || file }))], files: Object.fromEntries(m.fs) };
 }
 
 /** An array parameter's dimensions (two or more: int a[3][4], int a[][4]), its first from n, the elements given; else
@@ -88,6 +88,7 @@ export function runAtReset(checked, jobs, maxSteps = 5_000_000) {
 
 class Machine {
   constructor(checked, maxSteps) {
+    this.warned = new Map();
     this.c = checked;
     this.maxSteps = maxSteps;
     this.steps = 0;
@@ -120,6 +121,15 @@ class Machine {
       let at = t;
       // (a size known when it runs: a test bench's, #1734)
       for (; at.kind === 'array'; at = at.of) dims.push(at.length ?? (at.size ? Number(this.intOf(this.eval(at.size), v)) : at === t && v.init?.kind === 'init' ? v.init.items.length : 0));
+      // (const char *: a test bench's texts, each cell a pointer, #2309)
+      if (at.kind === 'ptr' && at.to.kind === 'int' && at.to.bits === 8) {
+        const n = dims.reduce((a, b) => a * b, 1), et = { w: 64, s: false, ap: false, text: true };
+        const arr = Array.from({ length: n }, () => ({ v: { v: 0n, t: et } })), flat = [];
+        const walk = (x) => { if (x?.kind === 'init') x.items.forEach(walk); else flat.push(x); };
+        walk(v.init);
+        flat.forEach((x, k) => { if (k < n && x) { const p = this.eval(x); arr[k].v = p.str !== undefined ? this.strPtr(p.str) : p; } });
+        return { t: et, arr, dims };
+      }
       const et = typeOf(at);
       if (!et) this.fail(v, `'${v.name}': only arrays of numbers can be simulated`);
       const n = dims.reduce((a, b) => a * b, 1);
@@ -141,7 +151,7 @@ class Machine {
     if (t.kind === 'ptr' && t.to.kind === 'struct' && t.to.name === 'FILE') return { isFile: true, fh: v.init ? this.eval(v.init).fh ?? null : null, t: { w: 32, s: true } };
     if (t.kind === 'ptr') {
       const c = { t: typeOf(t.to), ref: null };
-      if (v.init) { let p = this.eval(v.init); if (p.heap !== undefined) p = this.heapPtr(p, t.to, v); c.ref = p.ptr || (p.arr ? this.elemRef(p.arr, 0, p.t) : null); }
+      if (v.init) { let p = this.eval(v.init); if (p.heap !== undefined) p = this.heapPtr(p, t.to, v); if (p.str !== undefined) p = this.strPtr(p.str); c.ref = p.ptr || (p.arr ? this.elemRef(p.arr, 0, p.t) : null); }
       return c;
     }
     const et = typeOf(t);
@@ -213,6 +223,7 @@ class Machine {
       // (a stream, or a reference to one: a function declared before its definition, #1721)
       if (pt?.kind === 'stream' || (pt?.kind === 'ptr' && pt.to.kind === 'stream')) { if (!x.fifo) this.fail(a, `the argument of '${fn.params[k].name}' must be a stream`); return x; }
       if (pt?.kind === 'ptr' || pt?.kind === 'array') {
+        if (x.str !== undefined) return this.strPtr(x.str);
         if (x.arr) return { arr: x.arr, t: x.t };
         if (x.ptr) return { ptr: x.ptr, t: x.t };
         this.fail(a, `the argument of '${fn.params[k].name}' must be a pointer or an array`);
