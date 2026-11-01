@@ -18,7 +18,7 @@ const PART = 'xc6slx16csg324-3', device = loadDeviceCache(PART), dev = bitFormat
 const db = loadBitDbS6(PART);
 const cfg = o => Object.entries(o).map(([attr, value]) => ({ attr, name: '', value }));
 
-test('bitdb-node: both parts\' databases read, the XC6SLX16\'s DCM paths only (the XC6SLX45\'s CMTs not measured yet)', () => {
+test('bitdb-node: both parts\' databases read, both parts\' CMT settings and inputs (#727\'s whole paths retired, #2025)', () => {
   for (const part of [PART, 'xc6slx45csg324-3']) {
     const d = loadBitDbS6(part);
     assert.deepEqual(Object.keys(d.slices.lut.kinds).sort(), ['L', 'M', 'X'], part);
@@ -27,9 +27,8 @@ test('bitdb-node: both parts\' databases read, the XC6SLX16\'s DCM paths only (t
     assert.deepEqual(Object.keys(d.hardBase.bases), ['RAMB16BWER', 'RAMB8BWER', 'DSP48A1'], part);
     assert.ok(d.hard.RAMB8BWER && d.clocks.regcFrame, part);
   }
-  assert.ok(db.cmt && db.cmtSettings && db.cmtInput);
-  assert.equal(loadBitDbS6('xc6slx45csg324-3').cmt, null);
-  assert.equal(loadBitDbS6(PART, { cmtPaths: false, cmtInput: false }).cmt, null);
+  for (const part of [PART, 'xc6slx45csg324-3']) { const d = loadBitDbS6(part); assert.ok(d.cmtSettings && d.cmtInput && !('cmt' in d), part); }
+  assert.equal(loadBitDbS6(PART, { cmtInput: false }).cmtInput, null);
 });
 
 test('bitgen-regions: a switch box\'s region by its name, any tile\'s by the grid (the same for a switch box), a frame\'s column', () => {

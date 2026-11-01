@@ -430,7 +430,7 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   527), a flip-flop does not. With it the examples' residual (both boards) has no clock bit left: only the block RAM's
   and DSP's (stopwatch's, #728).
 - **A DCM's and a PLL's clock path** (`gen-dcm6.mjs --paths`: the base from the clock pads U10, T9, R8 and to BUFGs at
-  three other BUFGMUXes, 12 designs; `ana-cmt6.mjs`, `cmt6.mjs`: `db/xc6slx16-cmt-paths.json`): a design's bits beyond
+  three other BUFGMUXes, 12 designs; `ana-cmt6.mjs`, `cmt6.mjs`: `db/xc6slx16-cmt-paths.json`, retired by #2025): a design's bits beyond
   the other databases' are the base's (the CMT's settings, its input from V10, its outputs' BUFGs) with its pad's
   change (5 bits of the pad's I/O words, its I/O tile's path, the CMT's input selection) and its BUFGMUX's (2 bits of
   the REGC frame, the centre column's path). Two designs of combinations never measured (U10 to BUFGMUX_X2Y1, T9 to
@@ -654,6 +654,18 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
 - **The residual** (`residual6.mjs --no-cmt-paths`): the XC6SLX16's 203 designs all exact (196), the XC6SLX45's 184 and
   the 10 OLOGIC2 designs too. With #727's whole paths: 199 exact, 44 bits predicted that ISE does not set.
 
+### #727's whole paths retired (#2025, 2026-11-01)
+
+#727 measured a DCM's and a PLL's clock path whole, at one site each (DCM_X0Y1, PLL_ADV_X0Y0) with one setting: the
+base design's bits with a pad's and a BUFGMUX's changes (`db/xc6slx16-cmt-paths.json`, `ana-cmt6.mjs`). The rules
+measured since (the settings at every site, a BUFGMUX's REGC bit, the input table, the paths' PIPs one at a time) predict
+every design it did, and more: it gave its base design's bits whole, so a design from that site to other BUFGMUXes had its
+base's other BUFGMUX's REGC bit and its outputs' bits (#1951's DCM_X0Y1-m designs: 44 bits ISE does not set). Retired:
+the database, `ana-cmt6.mjs`, `cmtPath` / `predictCmt`, `loadBitDbS6`'s `cmt` and `--no-cmt-paths`.
+
+- **The residual** (`residual6.mjs`): the XC6SLX16's 203 designs all exact (199 with the whole paths), the XC6SLX45's
+  184 too.
+
 ### The block RAM and the DSP48A1 (#728, S6-F, 2026-10-29)
 
 XDL designs with no nets, every RAMB16BWER, RAMB8BWER or DSP48A1 site of the part holding an instance (`gen-hard6.mjs`;
@@ -832,7 +844,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `gen-iob6.mjs` | The pads' designs: every bonded pad an IOB of one setting, the id designs (#727) |
 | `gen-clock6.mjs` | The clock path's designs (ISE implements them): one or more clocks to fixed flip-flops, k16 (#727) |
 | `ana-clock6.mjs` | A clock pad's REGC and I/O bits, the spines' PIP groups: `db/s6-clocks.json`, `db/s6-pips-clock.json` (#727) |
-| `ana-cmt6.mjs`, `cmt6.mjs` | A DCM's and PLL's clock path: `db/xc6slx16-cmt-paths.json`; the shared helpers (#727) |
+| `cmt6.mjs` | A DCM's and PLL's settings, REGC and input bits: the shared helpers (#727; `ana-cmt6.mjs`'s whole paths retired, #2025) |
 | `gen-dcm6.mjs` | The DCM's and PLL's designs, one setting per design (`--fields`: the counters' bits) (#727) |
 | `ana-dcm6.mjs` | Their settings' bits: `db/<device>-cmt.json` (#727) |
 | `gen-cmtsites6.mjs` | Every CMT site's designs: pads of its half and the sides, outputs on the BUFGMUXes in turn; `--outputs` each alone, `--muxes` every BUFGMUX from the clock pad (#1951) |

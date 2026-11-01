@@ -5,8 +5,7 @@
 // over the rows' frames and the I/O words, and the block RAM's frames with db/<device>-hard.json (#728: the block RAMs'
 // and DSP48A1s' settings and contents, hard6.mjs). A bit left over goes to the tiles whose
 // region holds it, by type (the I/O words: 'IOB words').
-//   node research/s6/residual6.mjs [--no-cmt-paths] <dir> …   (each with top.xdl and top.bit, e.g. night 1's impl-nexys3/*;
-//     --no-cmt-paths: a CMT by its settings, PIPs and cmt-input only, not #727's whole paths)
+//   node research/s6/residual6.mjs <dir> …   (each with top.xdl and top.bit, e.g. night 1's impl-nexys3/*)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,10 +38,10 @@ export function typesAt(device, dev, cache = typesAt.cache ??= new WeakMap()) {
 }
 
 
-/** The databases predictDesign reads, for a bitstream's device (readBit6's); cmtPaths: false leaves #727's whole CMT paths out. */
-export function residualDb(r6, { cmtPaths = true, cmtInput = true } = {}) {
+/** The databases predictDesign reads, for a bitstream's device (readBit6's); cmtInput: false leaves the CMTs' input bits out. */
+export function residualDb(r6, { cmtInput = true } = {}) {
   const d = r6.device.device;
-  return loadBitDbS6(`${d}${r6.device.part.slice(d.length - 2)}-3`, { cmtPaths, cmtInput });
+  return loadBitDbS6(`${d}${r6.device.part.slice(d.length - 2)}-3`, { cmtInput });
 }
 
 /** A bitstream's bits set (against the empty one): 'frame,bit' (the block RAM's frames only with withBram). */
@@ -57,11 +56,11 @@ export function setBits(r6, dev, withBram) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2), dirs = args.filter(a => !a.startsWith('--')), cmtPaths = !args.includes('--no-cmt-paths');
-  if (!dirs.length) { console.error('usage: node research/s6/residual6.mjs [--no-cmt-paths] <dir> …'); process.exit(1); }
+  const args = process.argv.slice(2), dirs = args.filter(a => !a.startsWith('--'));
+  if (!dirs.length) { console.error('usage: node research/s6/residual6.mjs <dir> …'); process.exit(1); }
   const left = new Map(), extra = new Map(), unknown = new Map();
   for (const dir of dirs) {
-    const bit = fs.readFileSync(path.join(dir, 'top.bit')), r6 = readBit6(bit), dev = bitFormat6(r6.device.part), db = residualDb(r6, { cmtPaths });
+    const bit = fs.readFileSync(path.join(dir, 'top.bit')), r6 = readBit6(bit), dev = bitFormat6(r6.device.part), db = residualDb(r6);
     const { device } = s6Device(db.part), design = parseXdl(fs.readFileSync(path.join(dir, 'top.xdl'), 'utf8'));
     const { bits, unknown: u } = predictDesign(design, device, dev, db);
     for (const [w, n] of u) unknown.set(w, (unknown.get(w) || 0) + n);
