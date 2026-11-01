@@ -9,7 +9,7 @@ import { tileRegion, gridRegion, columnOf } from './bitgen-regions.js';
 import { kindModel, predictSlice } from './bitgen-slice.js';
 import { pipDirections, pipLookup } from './bitgen-pips.js';
 import { predictOlogic } from './bitgen-ologic.js';
-import { cmtCfg, cmtPath, predictCmt, predictCmtSettings, cmtRegcBits, cmtInputBits } from './bitgen-cmt.js';
+import { predictCmtSettings, cmtRegcBits, cmtInputBits } from './bitgen-cmt.js';
 import { HARD_TYPES, predictHard } from './bitgen-hard.js';
 
 const INT_LIKE = /^(INT|INT_BRK|INT_BRAM|INT_BRAM_BRK|IOI_INT|LIOI_INT|INT_GCLK)_X/;
@@ -97,14 +97,11 @@ export function predictDesign(design, device, dev, db) {
       for (let m = 16; m < 20; m++) bits.add(`${c0 + m},527`);
     }
   }
-  // a DCM or PLL at the site measured, with the base's settings: the base's bits with its pad's and BUFGs' changes;
-  // elsewhere its settings' (db/<device>-cmt-settings.json, #1951), its clock path not yet
-  if (db.cmt || db.cmtSettings) {
+  // a DCM or PLL: its settings' bits (db/<device>-cmt-settings.json, #1951); its paths' PIPs are the routing's (#2025:
+  // #727's whole measured paths retired)
+  if (db.cmtSettings) {
     for (const inst of design.insts) {
       if (!/^(DCM|PLL_ADV)$/.test(inst.type) || !inst.placed) continue;
-      const kind = db.cmt && { DCM: db.cmt.dcm, PLL_ADV: db.cmt.pll }[inst.type];
-      const p = kind && kind.site === inst.site && kind.cfg === cmtCfg(inst) ? predictCmt(kind, cmtPath(design, inst)) : null;
-      if (p) { for (const x of p) bits.add(x); continue; }
       const s = db.cmtSettings && predictCmtSettings(inst, db.cmtSettings, Math.floor(gridRegion(device, dev, inst.tile)[0] / dev.rowFrames) * dev.rowFrames);
       if (s) for (const x of s) bits.add(x);
       // the BUFGMUXes it drives: their REGC bits (its paths' PIPs are the routing's)

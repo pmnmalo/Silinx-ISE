@@ -19,7 +19,7 @@ export { isOutFF, ologicKey };
 
 /** A design's bits left over (ISE's not predicted), by OLOGIC2 site and HCLK tile: { sites: { key: [[site, offsets]] }, hclk: { type: [[tile, offsets]] }, rest }. */
 export function ologicLeft(dir, { ologic = false } = {}) {
-  const r6 = readBit6(fs.readFileSync(path.join(dir, 'top.bit'))), dev = bitFormat6(r6.device.part), db = residualDb(r6, { cmtPaths: false });
+  const r6 = readBit6(fs.readFileSync(path.join(dir, 'top.bit'))), dev = bitFormat6(r6.device.part), db = residualDb(r6);
   if (!ologic) db.ologic = null;
   const { device } = s6Device(db.part), design = parseXdl(fs.readFileSync(path.join(dir, 'top.xdl'), 'utf8'));
   const { bits } = predictDesign(design, device, dev, db), left = [...setBits(r6, dev, !!db.hard)].filter(x => !bits.has(x)).map(x => x.split(',').map(Number));

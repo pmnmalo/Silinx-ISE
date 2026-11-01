@@ -236,3 +236,34 @@ test('db: each BUFIO2\'s own bit, its pad\'s clock bit\'s neighbour, whatever it
   assert.deepEqual(cmt['CMT_DCM_BOT DCM_CLK_INDIRECT_TB_BOT4 -> DCM1_CLKIN'], [`${CMT_FRAME.xc6slx16},-177`]);
   assert.deepEqual(db('s6-pips-flow').pips['IOI_BTERM_REGB BTERM_IOIUP_IBUF0 -> BTERM_CLB_CLKPIN6'], []);
 });
+
+// Regression (#2025): #727's whole measured paths (db/xc6slx16-cmt-paths.json) gave a DCM or PLL at its one measured site,
+// with its base's settings, its base design's bits whole (its other BUFGMUX's REGC bit among them): 44 bits ISE does
+// not set on the 203 designs; the rules alone (settings, REGC, input table, the paths' PIPs) predict all of them exactly
+test('bitgen: a DCM at #727\'s measured site, from its pad, with its base\'s settings by the rules, the whole paths retired (#2025)', async () => {
+  const { parseXdl } = await import('../packages/silinx-fpga/src/xdl.js');
+  const { predictDesign } = await import('../packages/silinx-fpga/src/fpga/s6/bitgen.js');
+  const { predictCmtSettings } = await import('../packages/silinx-fpga/research/s6/cmt6.mjs');
+  const all = loadBitDbS6('xc6slx16csg324-3'), { device } = s6Device('xc6slx16csg324-3'), dev = S6_DEVICES.xc6slx16;
+  assert.equal(all.cmt, undefined);
+  assert.ok(!fs.existsSync(new URL('../packages/silinx-fpga/bitdb/s6/xc6slx16-cmt-paths.json', import.meta.url)));
+  const cfg = 'CLKDV_DIVIDE::2.0 CLKFX_DIVIDE::1 CLKFX_MULTIPLY::2 CLKIN_DIVIDE_BY_2::FALSE CLKIN_PERIOD::10.000000 CLKOUT_PHASE_SHIFT::NONE CLK_FEEDBACK::1X DCM:: DESKEW_ADJUST::5 DFS_FREQUENCY_MODE::LOW DLL_FREQUENCY_MODE::LOW DSS_MODE::NONE DUTY_CYCLE_CORRECTION::TRUE PHASE_SHIFT::0 PSCLKINV::PSCLK PSENINV::PSEN PSINCDECINV::PSINCDEC RSTINV::RST STARTUP_WAIT::FALSE VERY_HIGH_FREQUENCY::FALSE';
+  const design = parseXdl(`design "t" xc6slx16csg324-3 v3.2 , cfg "";
+inst "clk" "IOB",placed BIOB_X12Y0 V10 , cfg " PAD:clk: " ;
+inst "io" "BUFIO2",placed REG_B_X28Y0 BUFIO2_X3Y7 , cfg " " ;
+inst "cm" "DCM",placed CMT_DCM_BOT_X11Y8 DCM_X0Y1 , cfg " ${cfg} " ;
+inst "bo" "BUFG",placed CLKC_X11Y31 BUFGMUX_X2Y3 , cfg " BUFG:bo: " ;
+net "a" , outpin "clk" I , inpin "io" I , ;
+net "b" , outpin "io" DIVCLK , inpin "cm" CLKIN , ;
+net "c" , outpin "cm" CLKFX , inpin "bo" I0 , ;
+`);
+  const cm = design.insts.find(i => i.name === 'cm'), { bits } = predictDesign(design, device, dev, all);
+  // the DCM's bits: those it adds to the design without it, exactly its settings', its BUFGMUX's REGC and its inputs'
+  const without = predictDesign({ ...design, insts: design.insts.filter(i => i !== cm) }, device, dev, all).bits;
+  const rowFirst = Math.floor(gridRegion(device, dev, cm.tile)[0] / dev.rowFrames) * dev.rowFrames;
+  const want = new Set([...predictCmtSettings(cm, all.cmtSettings, rowFirst), ...cmtRegcBits(design, cm, 'xc6slx16', all.clocks.regcFrame.xc6slx16), ...cmtInputBits(design, cm, all.cmtInput)]);
+  assert.ok(want.size > 10);
+  assert.deepEqual([...bits].filter(x => !without.has(x)).sort(), [...want].filter(x => !without.has(x)).sort());
+  // the BUFGMUX's REGC bit among them (the whole path left it out)
+  assert.deepEqual(cmtRegcBits(design, cm, 'xc6slx16', 1840), [`1840,${1008 + CMT_REGC.xc6slx16.order.indexOf('X2Y3')}`]);
+});
