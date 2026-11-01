@@ -22,7 +22,7 @@ function el() {
   };
 }
 let page, store, narrow;
-function setup({ storage = true, ui = 'modern' } = {}) {
+function setup({ storage = true, ui = 'silinx' } = {}) {
   store = {};
   const ids = { 'drawer-btn': el(), 'drawer-scrim': el() };
   page = { ids, html: { dataset: { ui } } };
@@ -106,7 +106,7 @@ test('the left side\'s tabs: open the drawer; in the modern interface the shown 
   N.leftTabClicked('design', 'design');              // closed: the shown page's tab opens it again
   assert.equal(page.html.dataset.drawer, 'open');
   // the classic interface: its tabs are in the drawer, a click there never closes it
-  page.html.dataset.ui = 'classic';
+  page.html.dataset.ui = 'ise';
   N.leftTabClicked('design', 'design');
   assert.equal(page.html.dataset.drawer, 'open');
   // a wide screen: nothing changes

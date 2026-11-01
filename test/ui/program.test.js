@@ -39,11 +39,11 @@ uiTest('#1023 Program: the panel uses the whole width available, in the Tasks, m
     return { doc: w(doc), page: w(p), chain: full('.impact-chain'), fpga: full('.imp-fpga') };
   });
   // (the modern interface: iMPACT in Implement, arranged there, #1172)
-  for (const ui of ['modern', 'classic']) {
+  for (const ui of ['silinx', 'ise']) {
     await useInterface(page, ui);
     await page.openProject('ProgWide');
     await page.eval(() => window.SilinxApp.openImpact());
-    if (ui === 'modern') await page.waitFor(() => !!document.querySelector('.doc:not([hidden]) .task-prog-settings'), [], { what: 'iMPACT arranged' });
+    if (ui === 'silinx') await page.waitFor(() => !!document.querySelector('.doc:not([hidden]) .task-prog-settings'), [], { what: 'iMPACT arranged' });
     else await page.waitFor(() => document.querySelector('#workspace > .doc:not([hidden]) .impact-chain'), [], { what: 'iMPACT' });
     for (const [w, h] of [[1920, 1080], [1366, 768]]) {
       await page.setViewport(w, h);
@@ -82,7 +82,7 @@ uiTest('#1024 Program FPGA with no programming file, or an old one: implement fi
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'ProgImpl', template: 'gates' });
   const ask = ['Program FPGA', "There is no programming file of 'gates' yet.", 'Implement the design first? When it ends without errors, the FPGA is programmed.', 'Yes', 'No'];
-  for (const ui of ['modern', 'classic']) {
+  for (const ui of ['silinx', 'ise']) {
     await useInterface(page, ui);
     await page.openProject('ProgImpl');
     await page.eval(() => window.SilinxApp.openImpact());
@@ -155,7 +155,7 @@ uiTest('#1025 Program PROM: every operation shown, no More…; in Portuguese', E
     return { buttons: [...p.querySelectorAll('.prom-box .btn')].filter(vis).map((b) => b.textContent),
       more: [...p.querySelectorAll('.btn')].filter((b) => vis(b) && /^(More…|Mais…)$/.test(b.textContent)).length };
   });
-  for (const ui of ['modern', 'classic']) {
+  for (const ui of ['silinx', 'ise']) {
     await useInterface(page, ui);
     await page.openProject('ProgProm');
     await page.eval(() => window.SilinxApp.openImpact());

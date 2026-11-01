@@ -52,7 +52,7 @@ uiTest('#1017 Tasks ▸ Simulate: no "Ready … Sim Time" status line; the moder
   assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .isim-st-msg').textContent), 'Ready');
   await page.waitFor(() => [...document.querySelectorAll('#console-log .ln[data-src="sim"]')].some((l) => /circuit initialization/.test(l.textContent)), [], { what: 'ISim\'s lines in the message centre' });
   // the classic interface (#1149: the modern one is the Tasks one): the status line as it was
-  for (const ui of ['classic']) {
+  for (const ui of ['ise']) {
     await setInterface(page, ui);
     await page.waitFor(() => !document.documentElement.dataset.layout, [], { what: ui });
     assert.ok(await shown(page, '.doc:not([hidden]) .isim-status'), `${ui}: the status line`);
@@ -98,14 +98,14 @@ uiTest('#1026 Tasks ▸ Simulate: the simulator\'s icons in the wave window\'s l
     ['Reiniciar', 'Executar Tudo', 'Executar durante o tempo indicado', 'Passo (avançar para o próximo evento)']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the classic interface (#1149: the modern one is the Tasks one): the toolbar on its own line again, the name and the cursor's text shown
-  for (const ui of ['classic']) {
+  for (const ui of ['ise']) {
     await setInterface(page, ui);
     await page.waitFor(() => !document.documentElement.dataset.layout, [], { what: ui });
     assert.equal(await toolbarAt(page), 'top', ui);
     assert.ok(await shown(page, '.doc:not([hidden]) .isim-wcfg') && await shown(page, '.doc:not([hidden]) .isim-cursor-info'), `${ui}: the name and the cursor`);
   }
   // and back to Tasks: in the line again
-  await setInterface(page, 'modern');
+  await setInterface(page, 'silinx');
   await page.waitFor(() => document.documentElement.dataset.layout === 'tasks', [], { what: 'tasks' });
   assert.equal(await toolbarAt(page), 'caption');
   await noWarnings(page);
@@ -203,8 +203,8 @@ uiTest('#1161 Tasks ▸ Simulate: a tab per simulation; Simulation lists the tes
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-sim-tabs .tab')?.textContent === 'Simulação', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the classic interface: Instances and Processes as before, the simulated bench only
-  await setInterface(page, 'classic');
-  await page.waitFor(() => !document.documentElement.dataset.layout, [], { what: 'classic' });
+  await setInterface(page, 'ise');
+  await page.waitFor(() => !document.documentElement.dataset.layout, [], { what: 'ise' });
   assert.deepEqual(await panel(), { tab: null, caption: true, rows: ['tb_top'], open: ['tb_top'] });
 });
 
@@ -338,7 +338,7 @@ uiTest('#1353 #1391 Tasks ▸ Simulate: the model chosen in the wave window\'s t
   assert.equal((await g()).label, 'Modelo:');   // (its label, #1391)
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the classic interface: none
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.querySelectorAll('.isim-toolbar :is(.isim-model, .isim-model-field)').length), 0);
 }, { build: DEV, timeout: 300000 });
@@ -462,7 +462,7 @@ uiTest('#1259 Tasks ▸ Simulate: the side panel from the top, the simulations\'
   assert.equal(b.side, null);
   assert.deepEqual([b.waves.x, b.waves.y], [b.center.x, b.tabs.b], JSON.stringify(b));
   // the classic interface: the tabs under the waves' document as before (not moved)
-  await setInterface(page, 'classic');
+  await setInterface(page, 'ise');
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => getComputedStyle(document.getElementById('doc-tabs')).position), 'static');
   assert.doesNotMatch(await logText(page), /WARNING|ERROR/);
@@ -532,7 +532,7 @@ uiTest('#1385 Tasks ▸ Simulate: the Simulation hierarchy\'s buttons and right-
   // the classic interface: none
   await page.click('#task-sim-panel .task-sim-bench .row');
   await page.waitFor(() => window.Silinx.active?.id === 'isim:tb_top', [], { what: 'SSim', timeout: 60000 });
-  await setInterface(page, 'classic');
+  await setInterface(page, 'ise');
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.deepEqual(await bars('.doc:not([hidden]) .isim-inst-panel'), []);
   assert.doesNotMatch(await logText(page), /WARNING|ERROR/);
@@ -584,7 +584,7 @@ uiTest('#1395 Tasks ▸ Simulate: the Files page beside Simulation, the test ben
   assert.deepEqual(await state(doc), { tabs: ['Simulation*', 'Files'], files: [], tree: true });
   // the classic interface: none, its tree shown whatever page was in front
   await page.click(`${doc} .task-sim-tabs .tab[data-page=files]`);
-  await setInterface(page, 'classic');
+  await setInterface(page, 'ise');
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.deepEqual(await page.eval(() => [[...document.querySelectorAll('.task-sim-files, .task-sim-tabs')].some((e) => e.getClientRects().length), !!document.querySelector('.doc:not([hidden]) .isim-tree')?.getClientRects().length]), [false, true]);
   assert.doesNotMatch(await logText(page), /WARNING|ERROR/);

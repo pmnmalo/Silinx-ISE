@@ -19,15 +19,48 @@ const fakeRoot = () => ({ dataset: {}, style: {} });
 
 test('preferences: the modern interface following the system theme by default; invalid values ignored', () => {
   mem.clear();
-  assert.equal(M.getInterface(), 'modern');
+  assert.equal(M.getInterface(), 'silinx');
   assert.equal(M.getTheme(), 'system');
-  mem.set(M.UI_KEY, 'classic'); mem.set(M.THEME_KEY, 'dark');
-  assert.equal(M.getInterface(), 'classic');
+  mem.set(M.UI_KEY, 'ise'); mem.set(M.THEME_KEY, 'dark');
+  assert.equal(M.getInterface(), 'ise');
   assert.equal(M.getTheme(), 'dark');
   mem.set(M.UI_KEY, 'retro'); mem.set(M.THEME_KEY, 'purple');
-  assert.equal(M.getInterface(), 'modern');
+  assert.equal(M.getInterface(), 'silinx');
   assert.equal(M.getTheme(), 'system');
   assert.equal(M.readPref('x', ['a', 'b'], 'b'), 'b');
+});
+
+test('#2451 a preference saved with an old id (modern, classic) migrated once to its new one (silinx, ise)', async () => {
+  assert.deepEqual({ ...M.LEGACY_INTERFACES }, { modern: 'silinx', classic: 'ise' });
+  for (const [old, now] of Object.entries(M.LEGACY_INTERFACES)) {
+    mem.clear(); mem.set(M.UI_KEY, old);
+    assert.equal(M.migrateInterface(), now, old);
+    assert.equal(mem.get(M.UI_KEY), now, `${old}: stored with its new id`);
+    assert.equal(M.getInterface(), now, old);
+    assert.equal(M.migrateInterface(), now, `${old}: once (nothing left to migrate)`);
+  }
+  // the new ids, a Tasks of before (#1131), anything else and nothing: left as they are
+  for (const v of ['silinx', 'ise', 'tasks', 'retro', 'constructor']) {
+    mem.clear(); mem.set(M.UI_KEY, v);
+    assert.equal(M.migrateInterface(), v, v);
+    assert.equal(mem.get(M.UI_KEY), v, v);
+  }
+  mem.clear();
+  assert.equal(M.migrateInterface(), null);
+  assert.equal(mem.has(M.UI_KEY), false, 'nothing written');
+  // the development edition's key (dev/, #1243): its own preference migrated too
+  mem.set('silinx.dev.ui', 'classic');
+  assert.equal(M.migrateInterface('silinx.dev.ui'), 'ise');
+  // on load: a page whose module is loaded fresh finds the old id rewritten
+  mem.clear(); mem.set(M.UI_KEY, 'classic');
+  const fresh = await import(`../web/js/modern.js?migrate=${Date.now()}`);
+  assert.equal(mem.get(M.UI_KEY), 'ise');
+  assert.equal(fresh.getInterface(), 'ise');
+  // no storage (a private window's, blocked): no error
+  const saved = globalThis.localStorage;
+  Object.defineProperty(globalThis, 'localStorage', { get() { throw new Error('blocked'); }, configurable: true });
+  try { assert.equal(M.migrateInterface(), null); } finally { Object.defineProperty(globalThis, 'localStorage', { value: saved, configurable: true, writable: true }); }
+  mem.clear();
 });
 
 test('effectiveTheme: system follows the OS, light and dark are fixed', () => {
@@ -41,17 +74,17 @@ test('applyPrefs puts data-ui and data-theme on the root; the classic look is al
   mem.clear();
   const r = fakeRoot();
   systemDark = true;
-  assert.deepEqual(M.applyPrefs(r), { ui: 'modern', theme: 'system', shown: 'dark' });
-  assert.equal(r.dataset.ui, 'modern'); assert.equal(r.dataset.theme, 'dark'); assert.equal(r.style.colorScheme, 'dark');
+  assert.deepEqual(M.applyPrefs(r), { ui: 'silinx', theme: 'system', shown: 'dark' });
+  assert.equal(r.dataset.ui, 'silinx'); assert.equal(r.dataset.theme, 'dark'); assert.equal(r.style.colorScheme, 'dark');
   systemDark = false;
   M.applyPrefs(r);
   assert.equal(r.dataset.theme, 'light');
   mem.set(M.THEME_KEY, 'dark');
   M.applyPrefs(r);
   assert.equal(r.dataset.theme, 'dark');
-  mem.set(M.UI_KEY, 'classic');
+  mem.set(M.UI_KEY, 'ise');
   M.applyPrefs(r);
-  assert.equal(r.dataset.ui, 'classic');
+  assert.equal(r.dataset.ui, 'ise');
   assert.equal(r.dataset.theme, 'light', 'the ISE look has no dark theme');
   assert.equal(r.dataset.layout, undefined);
 });
@@ -60,25 +93,25 @@ test('applyPrefs puts data-ui and data-theme on the root; the classic look is al
 // a stored 'tasks' (the Tasks interface of before, #1131) the modern interface; no third one to choose
 test('#1149 the modern interface is the Tasks one: data-ui modern, data-layout tasks; a stored tasks read as modern', () => {
   mem.clear();
-  assert.deepEqual(M.INTERFACES, ['modern', 'classic']);
+  assert.deepEqual(M.INTERFACES, ['silinx', 'ise']);
   globalThis.document = { documentElement: fakeRoot() };
-  assert.equal(M.getInterface(), 'modern', 'the default');
+  assert.equal(M.getInterface(), 'silinx', 'the default');
   const r = fakeRoot();
   mem.set(M.THEME_KEY, 'dark');
-  assert.deepEqual(M.applyPrefs(r), { ui: 'modern', theme: 'dark', shown: 'dark' });
-  assert.deepEqual([r.dataset.ui, r.dataset.layout, r.dataset.theme], ['modern', 'tasks', 'dark']);
+  assert.deepEqual(M.applyPrefs(r), { ui: 'silinx', theme: 'dark', shown: 'dark' });
+  assert.deepEqual([r.dataset.ui, r.dataset.layout, r.dataset.theme], ['silinx', 'tasks', 'dark']);
   for (const stored of ['tasks', 'retro']) {
     mem.set(M.UI_KEY, stored);
-    assert.equal(M.getInterface(), 'modern', stored);
-    assert.deepEqual([M.applyPrefs(r).ui, r.dataset.ui, r.dataset.layout], ['modern', 'modern', 'tasks'], stored);
+    assert.equal(M.getInterface(), 'silinx', stored);
+    assert.deepEqual([M.applyPrefs(r).ui, r.dataset.ui, r.dataset.layout], ['silinx', 'silinx', 'tasks'], stored);
   }
   // the classic interface: no layout of its own; back to the modern one
-  M.setInterface('classic');
-  assert.deepEqual([mem.get(M.UI_KEY), document.documentElement.dataset.ui, document.documentElement.dataset.layout], ['classic', 'classic', undefined]);
+  M.setInterface('ise');
+  assert.deepEqual([mem.get(M.UI_KEY), document.documentElement.dataset.ui, document.documentElement.dataset.layout], ['ise', 'ise', undefined]);
   M.setInterface('tasks');
-  assert.equal(mem.get(M.UI_KEY), 'classic', 'no Tasks to choose');
-  M.setInterface('modern');
-  assert.deepEqual([mem.get(M.UI_KEY), document.documentElement.dataset.ui, document.documentElement.dataset.layout], ['modern', 'modern', 'tasks']);
+  assert.equal(mem.get(M.UI_KEY), 'ise', 'no Tasks to choose');
+  M.setInterface('silinx');
+  assert.deepEqual([mem.get(M.UI_KEY), document.documentElement.dataset.ui, document.documentElement.dataset.layout], ['silinx', 'silinx', 'tasks']);
 });
 
 test('setInterface / setTheme store valid values and notify the listeners', () => {
@@ -86,16 +119,16 @@ test('setInterface / setTheme store valid values and notify the listeners', () =
   globalThis.document = { documentElement: fakeRoot() };
   const seen = [];
   const off = M.onPrefsChange((p) => seen.push(p));
-  M.setInterface('classic');
+  M.setInterface('ise');
   M.setTheme('dark');
   M.setTheme('neon');            // ignored
   M.setInterface('retro');       // ignored
   off();
   M.setTheme('light');           // no longer heard
-  assert.equal(mem.get(M.UI_KEY), 'classic');
+  assert.equal(mem.get(M.UI_KEY), 'ise');
   assert.equal(mem.get(M.THEME_KEY), 'light');
-  assert.deepEqual(seen.map((p) => [p.ui, p.theme]), [['classic', 'system'], ['classic', 'dark']]);
-  M.setInterface('modern'); M.setTheme('dark');
+  assert.deepEqual(seen.map((p) => [p.ui, p.theme]), [['ise', 'system'], ['ise', 'dark']]);
+  M.setInterface('silinx'); M.setTheme('dark');
   M.toggleTheme();
   assert.equal(mem.get(M.THEME_KEY), 'light');
   M.toggleTheme();
@@ -174,23 +207,23 @@ test('index.html: one page for both interfaces (header, activity bar icons, empt
   assert.equal((html.match(/class="ico-inline tab-ico" data-icon="m\w+"/g) || []).length, 4);
 });
 
-test('modern.css: the modern look applies only under data-ui="modern"; the classic look hides its parts', () => {
+test('modern.css: the modern look applies only under data-ui="silinx"; the classic look hides its parts', () => {
   const css = fs.readFileSync(path.join(ROOT, 'web/css/modern.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   // shared parts (both interfaces): the palette, the empty state, the header wrapper, the m-* controls, kbd keys
-  const shared = /^(\.pal\b|\.pal-|#ws-empty|#topbar$|\.m-|\.ws-|#app kbd$|html:not\(\[data-ui="modern"\]\)|html\[data-theme="dark"\] \.m-sun$|html:not\(\[data-theme="dark"\]\) \.m-moon$)/;
+  const shared = /^(\.pal\b|\.pal-|#ws-empty|#topbar$|\.m-|\.ws-|#app kbd$|html:not\(\[data-ui="silinx"\]\)|html\[data-theme="dark"\] \.m-sun$|html:not\(\[data-theme="dark"\]\) \.m-moon$)/;
   // the selectors of a rule, split at the commas outside parentheses (:is(a, b))
   const parts = (sel) => { const out = []; let depth = 0, cur = ''; for (const c of sel) { if (c === ',' && !depth) { out.push(cur.trim()); cur = ''; continue; } depth += c === '(' ? 1 : c === ')' ? -1 : 0; cur += c; } out.push(cur.trim()); return out; };
   const selectors = [...css.matchAll(/(^|[{}])\s*([^{}@][^{}]*)\{/g)].map((m) => m[2].trim()).filter((x) => x && !x.startsWith('@'));
-  const loose = selectors.filter((sel) => !parts(sel).every((p) => p.startsWith('html[data-ui="modern"]') || shared.test(p)));
+  const loose = selectors.filter((sel) => !parts(sel).every((p) => p.startsWith('html[data-ui="silinx"]') || shared.test(p)));
   assert.deepEqual(loose, []);
   // every theme token has a dark value
-  const light = css.slice(css.indexOf('html[data-ui="modern"] {'), css.indexOf('}', css.indexOf('html[data-ui="modern"] {')));
-  const dark = css.slice(css.indexOf('html[data-ui="modern"][data-theme="dark"] {'));
+  const light = css.slice(css.indexOf('html[data-ui="silinx"] {'), css.indexOf('}', css.indexOf('html[data-ui="silinx"] {')));
+  const dark = css.slice(css.indexOf('html[data-ui="silinx"][data-theme="dark"] {'));
   // (the sizes, lengths only or another token, are the same in both themes: the radius, the rows', bars' and controls' sizes, #1409)
   const tokens = [...light.matchAll(/(--m-[\w-]+):\s*([^;]+);/g)].filter((m) => !/^([\d.]+px( [\d.]+px)*|var\(--m-[\w-]+\))$/.test(m[2].trim())).map((m) => m[1]);
   assert.ok(tokens.includes('--m-bg') && !tokens.includes('--m-radius') && !tokens.includes('--m-row-h'), tokens.join(' '));
   for (const t of tokens) assert.ok(dark.slice(0, dark.indexOf('}')).includes(`${t}:`), `${t} has a dark value`);
-  assert.match(css, /html:not\(\[data-ui="modern"\]\) #top-actions/);
+  assert.match(css, /html:not\(\[data-ui="silinx"\]\) #top-actions/);
 });
 
 // #159: the colours of the pages and dialogs are theme.css's variables, each with a dark value
@@ -202,7 +235,7 @@ test('theme.css: the pages\' own colours have a dark value; no colour written in
   assert.deepEqual(vars, ['--note-bg', '--note-border', '--code-bg', '--frame', '--frame-light', '--frame-lighter', '--field-bg', '--field-fg', '--field-border',
     '--field-bad-bg', '--pin-name', '--drive-bg', '--release-bg', '--expected-bg', '--grey-1', '--grey-2', '--grey-3', '--grey-4', '--grey-5', '--grey-6', '--grey-7',
     '--error-fg', '--error-fg-2', '--log-error', '--log-warning']);
-  const start = css.indexOf('html[data-ui="modern"][data-theme="dark"] {');
+  const start = css.indexOf('html[data-ui="silinx"][data-theme="dark"] {');
   const dark = css.slice(start, css.indexOf('}', start));
   assert.deepEqual(vars.filter((v) => !dark.includes(`  ${v}: `)), [], 'a dark value for each');
   // the colours written in the scripts: only these, on purpose (the board emulator's board and LEDs, the FPGA

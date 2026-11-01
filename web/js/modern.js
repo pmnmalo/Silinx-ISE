@@ -3,7 +3,7 @@
 // every project file, searched by name.
 //
 // The two interfaces share the same page and element ids (web/index.html): the modern one is web/css/modern.css,
-// applied under <html data-ui="modern">, with the theme in data-theme, and its layout by tasks (#804, web/js/tasks.js,
+// applied under <html data-ui="silinx">, with the theme in data-theme, and its layout by tasks (#804, web/js/tasks.js,
 // data-layout="tasks"): the Tasks interface became the modern one (#1149).
 // The palette's matching (fuzzyScore, rankEntries, menuCommands) has no DOM and is unit tested.
 
@@ -12,7 +12,10 @@ import { prefKey } from './prefs.js';
 
 export const UI_KEY = prefKey('silinx.ui');
 export const THEME_KEY = prefKey('silinx.theme');
-export const INTERFACES = ['modern', 'classic'];
+export const INTERFACES = ['silinx', 'ise'];
+// the interfaces' ids before #2451, and theirs now: a preference saved with one is migrated once, on load
+// (migrateInterface; web/index.html's early script does the same before the first paint)
+export const LEGACY_INTERFACES = Object.freeze({ modern: 'silinx', classic: 'ise' });
 export const THEMES = ['system', 'light', 'dark'];
 
 const store = () => { try { return globalThis.localStorage || null; } catch { return null; } };
@@ -24,8 +27,17 @@ export function readPref(key, allowed, def) {
 }
 function writePref(key, v) { try { store()?.setItem(key, v); } catch { /* ignore */ } }
 
-// the interface: modern (the default) or classic; a stored 'tasks' (the Tasks interface of before, #1131) the modern one
-export const getInterface = () => readPref(UI_KEY, INTERFACES, 'modern');
+/** A stored interface of an old id (LEGACY_INTERFACES) rewritten with its new one; returns the id now stored. */
+export function migrateInterface(key = UI_KEY) {
+  let v = null;
+  try { v = store()?.getItem(key); } catch { /* storage unavailable */ }
+  if (Object.hasOwn(LEGACY_INTERFACES, v)) writePref(key, v = LEGACY_INTERFACES[v]);
+  return v ?? null;
+}
+migrateInterface();
+
+// the interface: silinx (the default) or ise; a stored 'tasks' (the Tasks interface of before, #1131) the modern one
+export const getInterface = () => readPref(UI_KEY, INTERFACES, 'silinx');
 export const getTheme = () => readPref(THEME_KEY, THEMES, 'system');
 /** 'light' or 'dark': the theme shown for a preference (`system` follows the OS). */
 export const effectiveTheme = (theme, systemDark) => (theme === 'system' ? (systemDark ? 'dark' : 'light') : theme);
@@ -35,14 +47,14 @@ const listeners = new Set();
 /** Call fn({ ui, theme, shown }) after every change of interface or theme. */
 export function onPrefsChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
-/** Puts the preferences on <html>: data-ui (modern | classic: the look), data-layout (tasks, or none) and
+/** Puts the preferences on <html>: data-ui (silinx | ise: the look), data-layout (tasks, or none) and
  *  data-theme (light | dark). */
 export function applyPrefs(root = document.documentElement) {
   const ui = getInterface();
   const theme = getTheme();
-  const shown = ui !== 'classic' ? effectiveTheme(theme, !!darkQuery()?.matches) : 'light';   // the ISE look is light only
+  const shown = ui !== 'ise' ? effectiveTheme(theme, !!darkQuery()?.matches) : 'light';   // the ISE look is light only
   root.dataset.ui = ui;
-  if (ui === 'modern') root.dataset.layout = 'tasks'; else delete root.dataset.layout;
+  if (ui === 'silinx') root.dataset.layout = 'tasks'; else delete root.dataset.layout;
   root.dataset.theme = shown;
   root.style.colorScheme = shown;
   for (const fn of [...listeners]) { try { fn({ ui, theme, shown }); } catch (e) { console.error(e); } }

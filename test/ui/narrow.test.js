@@ -40,7 +40,7 @@ for (const [w, h] of [[820, 1180], [768, 1024]]) {
     await makeProject(env, { name: pj, template: 'gates' });
     await page.setViewport(w, h);
     await page.openProject(pj);
-    const modern = await page.eval(() => document.documentElement.dataset.ui === 'modern');
+    const modern = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
     if (modern) {
       // the Tasks layout: the side panel docked beside the document (at most 45 % of the width), no drawer (#1463)
       assert.ok(await shown(page, '#hier') && !(await shown(page, '#drawer-btn')));
@@ -144,7 +144,7 @@ uiTest('narrow screen 820×1180: the FSM and Petri net editors, their properties
   await page.eval(() => window.SilinxApp.openFsm('src/traffic.fsm.json'));
   await page.waitFor((d) => document.querySelector(`${d} .fsm-editor .fsm-link .gen-banner`), [DOC], { what: 'the FSM editor' });
   // (the modern interface: its side panel docked, #1463, folded for the canvas's width; the classic one: the drawer closed)
-  if (await page.eval(() => document.documentElement.dataset.ui === 'modern')) {
+  if (await page.eval(() => document.documentElement.dataset.ui === 'silinx')) {
     await sideButton(page);
     await page.waitFor(() => document.documentElement.dataset.side === 'folded', [], { what: 'the side panel folded' });
   } else assert.equal((await drawer(page))[0], 'closed');
@@ -198,7 +198,7 @@ for (const [w, h] of [[1180, 820], [1400, 900]]) {
     await page.reload();
     await page.setViewport(w, h);
     await page.openProject(pj);
-    const modern = await page.eval(() => document.documentElement.dataset.ui === 'modern');
+    const modern = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
     assert.equal(await page.eval(() => document.documentElement.dataset.drawer), 'closed');
     assert.ok(!(await shown(page, '#drawer-btn')) && !(await shown(page, '#drawer-scrim')));
     assert.ok(await shown(page, '#hier') && await shown(page, '#v-split'));
@@ -237,7 +237,7 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
     await makeProject(env, { name: `${pj}_b`, template: 'blinky' });
     await page.setViewport(w, h);
     await page.openProject(pj);
-    const modern = await page.eval(() => document.documentElement.dataset.ui === 'modern');
+    const modern = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
     const narrow = w < 1024;
     const task = (t) => page.eval((t) => [...document.querySelectorAll(`.task-btn[data-task="${t}"]`)].find((b) => b.getClientRects().length).click(), t);
     const arranged = () => page.eval(() => {
@@ -298,7 +298,7 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
     await makeProject(env, { name: pj, template: 'gates' });
     await page.setViewport(w, h);
     await page.openProject(pj);
-    const modern = await page.eval(() => document.documentElement.dataset.ui === 'modern');
+    const modern = await page.eval(() => document.documentElement.dataset.ui === 'silinx');
     const narrow = w < 1024;
     const arranged = () => page.eval(() => {
       const d = document.documentElement.dataset;

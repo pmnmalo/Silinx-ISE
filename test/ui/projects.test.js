@@ -405,7 +405,7 @@ uiTest('open, switch and close projects (Open Project dialog, Recent Projects, S
   await page.waitFor(() => [...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Alpha'));
   await page.click('#start-page a', { text: 'Clear Recent Projects' });
   await page.waitFor(() => ![...document.querySelectorAll('#start-page a')].some((a) => a.textContent === 'Alpha' || a.textContent === 'Clear Recent Projects'), [], { what: 'Start page list cleared' });
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 uiTest('Close Project while the project is still opening: closed after the opening, the Start page stays shown (#375)', E, async (page) => {
   await makeProject(env, { name: 'Gamma', files: { 'src/gamma.vhd': 'library ieee; use ieee.std_logic_1164.all;\nentity gamma is port (a : in std_logic; y : out std_logic); end;\narchitecture r of gamma is begin y <= not a; end r;\n' }, top: 'gamma' });
@@ -503,7 +503,7 @@ uiTest('Add Copy of Source: new files, association, overwrite confirmation (No k
   await page.leftTab('files');
   const rows = await page.eval(() => [...document.querySelectorAll('#files-page tr')].slice(1).map((r) => [...r.cells].map((c) => c.textContent).join('|')));
   assert.ok(rows.includes('src/inv.vhd|All|vhdl') && rows.includes('src/buf2.v|All|verilog') && rows.includes('sim/tb_buf2.v|Simulation|verilog'), rows.join('\n'));
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 uiTest('Files view: rename a file into another folder, remove a file (right-click)', E, async (page) => {
   await makeProject(env, {

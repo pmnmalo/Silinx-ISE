@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, readWs } from './harness.js';
 import { newSourceWizardOf, pickSourceType, waitNewSourcePage, addPort } from './new-source-helpers.js';
 import { compile, elaborate } from '../../core/compile.js';
-const IMPORT = process.env.SILINX_UI_INTERFACE === 'classic' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
+const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
 let env;
 before(async () => { env = await setupUi(); });

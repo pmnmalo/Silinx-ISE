@@ -30,7 +30,7 @@ function appCss() {
  * (data-ui) in the light theme.
  */
 export function printPageHtml({ title, meta = '', body, css = '', app = false }) {
-  const ui = globalThis.document?.documentElement.dataset.ui || 'classic';
+  const ui = globalThis.document?.documentElement.dataset.ui || 'ise';
   return `<!doctype html><html data-ui="${esc(ui)}" data-theme="light" style="color-scheme: light"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
 ${app ? appCss() : ''}
 @page { size: A4 portrait; margin: ${MARGIN}mm; }

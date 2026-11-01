@@ -64,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        interface: [modern, classic]
+        interface: [silinx, ise]
         part: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -84,7 +84,7 @@ jobs:
         env:
           PART: ${{ matrix.part }}
           CHROME_PATH: /usr/bin/google-chrome
-          SILINX_UI_INTERFACE: ${{ matrix.interface == 'classic' && 'classic' || '' }}
+          SILINX_UI_INTERFACE: ${{ matrix.interface == 'ise' && 'ise' || '' }}
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

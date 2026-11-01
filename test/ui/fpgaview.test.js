@@ -173,7 +173,7 @@ uiTest('FPGA view: chip, modules, a site\'s logic and connections, nets, clock n
   assert.match(io, /Direction\s+output/);
   assert.match(io, /I\/O standard\s+LVCMOS33/);
   assert.match(io, /Drive\s+12 mA/);
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 uiTest('FPGA view: not placed and routed yet asks to run Implement Design (No: nothing opens); Portuguese', E, async (page) => {
   await makeProject(env, { name: 'NoRoute', files: { 'src/top.vhd': TOP, 'src/sub.vhd': SUB }, top: 'top' });

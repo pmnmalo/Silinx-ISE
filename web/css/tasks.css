@@ -1,4 +1,4 @@
-/* The Tasks interface (#804, web/js/tasks.js): the modern look (modern.css, data-ui="modern") with a
+/* The Tasks interface (#804, web/js/tasks.js): the modern look (modern.css, data-ui="silinx") with a
    layout of its own under <html data-layout="tasks">: the task switcher in the header (the tab bar at
    the bottom of a narrow screen), the current task's documents only (data-task), the side panel and the
    messages folded or open (data-side, data-console), a maximized document (data-max). */

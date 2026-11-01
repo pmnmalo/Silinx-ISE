@@ -1,6 +1,6 @@
 // The Tasks interface (#782, #804), which became the modern one (#1149): the modern interface's layout, organised
 // around the five tasks of a lab session: Edit, Simulate, Emulate, Implement, Program. It has the modern
-// look (<html data-ui="modern">) and a layout of its own (data-layout="tasks", web/css/tasks.css):
+// look (<html data-ui="silinx">) and a layout of its own (data-layout="tasks", web/css/tasks.css):
 // - a task switcher in the header (a tab bar at the bottom of a narrow screen, NARROW_QUERY), each task
 //   with a state dot from its processes' status; its labels give way when the header is short of room
 //   (fitHeader: the other tasks' first, then all; #839);

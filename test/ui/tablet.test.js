@@ -113,7 +113,7 @@ for (const orientation of ['landscape', 'portrait']) {
     } finally {
       await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
     }
-  }, { tablet: orientation, timeout: 300000, ui: 'modern' });   // (the tasks: the modern interface's, #1149)
+  }, { tablet: orientation, timeout: 300000, ui: 'silinx' });   // (the tasks: the modern interface's, #1149)
 
   uiTest(`#1130 tablet in ${orientation}: the Tasks interface fits, its tasks by taps`, E, async (page) => {
     await page.eval(() => localStorage.setItem('silinx.ui', 'tasks'));

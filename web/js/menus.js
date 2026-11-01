@@ -31,10 +31,10 @@ const $ = id => document.getElementById(id);
 // light only), the update check at start-up (#488: off, the app asks GitHub nothing until Check for Updates… is used)
 const languageMenu = () => ({ label: 'Language', submenu: Object.entries(LOCALES).map(([id, l]) => ({ label: l.name, checked: getLanguage() === id, action: () => setLanguage(id) })) });
 const interfaceMenu = () => ({ label: 'Interface', submenu: [
-  { label: 'Modern', checked: getInterface() === 'modern', action: () => setInterface('modern') },
-  { label: 'Classic', checked: getInterface() === 'classic', action: () => setInterface('classic') },
+  { label: 'Modern', checked: getInterface() === 'silinx', action: () => setInterface('silinx') },
+  { label: 'Classic', checked: getInterface() === 'ise', action: () => setInterface('ise') },
 ] });
-const themeMenu = () => (getInterface() !== 'classic' ? { label: 'Theme', submenu: [
+const themeMenu = () => (getInterface() !== 'ise' ? { label: 'Theme', submenu: [
   { label: 'System', checked: getTheme() === 'system', action: () => setTheme('system') },
   { label: 'Light', checked: getTheme() === 'light', action: () => setTheme('light') },
   { label: 'Dark', checked: getTheme() === 'dark', action: () => setTheme('dark') },

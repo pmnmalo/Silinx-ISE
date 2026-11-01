@@ -127,9 +127,9 @@ body.dragging-tab, body.dragging-tab * { cursor: grabbing !important; }
   #drawer-btn .ico-inline { margin: 0; }
   #main { position: relative; }
   #v-split { display: none; }
-  html:not([data-ui="modern"]) #left { position: absolute; z-index: 40; top: 3px; bottom: 0; left: 3px; width: min(320px, calc(100vw - 56px)) !important;
+  html:not([data-ui="silinx"]) #left { position: absolute; z-index: 40; top: 3px; bottom: 0; left: 3px; width: min(320px, calc(100vw - 56px)) !important;
     background: var(--bg); box-shadow: 4px 0 18px rgba(0, 0, 0, .3); }
-  html:not([data-ui="modern"]):not([data-drawer="open"]) #left { display: none; }
+  html:not([data-ui="silinx"]):not([data-drawer="open"]) #left { display: none; }
   html[data-drawer="open"] #drawer-scrim { display: block; position: absolute; inset: 0; z-index: 39; background: rgba(0, 0, 0, .18); }
 }
 

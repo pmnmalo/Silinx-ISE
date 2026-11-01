@@ -39,7 +39,7 @@ npm start          # http://127.0.0.1:8642
    ([CONTRIBUTING.md](CONTRIBUTING.md#contributing-from-outside)). Run the
    same files locally first: `node scripts/related-tests.mjs origin/main HEAD`. The release's CI, the nightly and ISE runs and the CI watcher find what slipped through.
 3. **Tests with every change**: unit tests (`test/*.test.js`) and UI tests (`test/ui/*.test.js`), in
-   **both interfaces** (`SILINX_UI_INTERFACE=classic`) and in Portuguese when labels change. A bug fix
+   **both interfaces** (`SILINX_UI_INTERFACE=ise`) and in Portuguese when labels change. A bug fix
    gets a regression test that fails on the old code. **Tests assert the exact warnings**, not only "no
    errors".
 4. **Locally run only the tests related to your change, one process at a time.** Never the full

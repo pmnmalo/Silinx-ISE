@@ -150,7 +150,7 @@ function placeButton() {
     button = h('button', { id: 'split-btn', type: 'button', 'data-cmd': 'split', title: 'Split the editor: two documents side by side, each side with its tabs', html: ICON, onclick: () => toggleSplit() });
     button.setAttribute('aria-label', button.title);
   }
-  const view = $('task-view'), modern = document.documentElement.dataset.ui === 'modern';
+  const view = $('task-view'), modern = document.documentElement.dataset.ui === 'silinx';
   const where = view || (modern ? $('top-actions') : $('toolbar'));
   if (!where) return;
   button.className = view || !modern ? 'tb-btn' : 'm-icon-btn';
@@ -245,7 +245,7 @@ function watch(ws) {
   let wasV = null;
   new ResizeObserver(() => { const v = ws.clientWidth < NARROW; if (sides() && (v !== wasV || v)) { wasV = v; layout(); } }).observe(ws);
   // (the header rebuilt: the Tasks interface on or off, View ▸ Interface)
-  const replace = () => { if (button?.parentNode !== ($('task-view') || (document.documentElement.dataset.ui === 'modern' ? $('top-actions') : $('toolbar')))) placeButton(); };
+  const replace = () => { if (button?.parentNode !== ($('task-view') || (document.documentElement.dataset.ui === 'silinx' ? $('top-actions') : $('toolbar')))) placeButton(); };
   new MutationObserver(replace).observe(document.documentElement, { attributes: true, attributeFilter: ['data-ui', 'data-layout'] });
   new MutationObserver(replace).observe($('topbar'), { childList: true, subtree: true });
   // (the Tasks interface's task changed: its documents on each side)

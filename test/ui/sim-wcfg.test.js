@@ -27,7 +27,7 @@ const dialogText = (page) => page.eval(() => {
     options: [...d.querySelectorAll('option')].map((o) => o.textContent), buttons: [...d.querySelectorAll('.dlg-buttons .btn')].map((b) => b.textContent) };
 });
 
-for (const ui of ['modern', 'classic', 'tasks']) {
+for (const ui of ['silinx', 'ise', 'tasks']) {
   uiTest(`#1019 ${ui}: Save and Load Wave Configuration in the simulator's toolbar (no Save VCD), a file of the project, in Portuguese`, E, async (page) => {
     const name = `Wcfg${ui}`;
     await makeProject(env, { name, template: 'blinky' });

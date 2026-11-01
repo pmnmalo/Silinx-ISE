@@ -50,7 +50,7 @@ export function drawerGiveWay() { if (asDrawer() && drawerOpen()) setDrawer(fals
 export function leftTabClicked(page, shown) {
   if (!asDrawer()) return;
   if (!drawerOpen()) setDrawer(true);
-  else if (page === shown && document.documentElement.dataset.ui === 'modern') setDrawer(false);
+  else if (page === shown && document.documentElement.dataset.ui === 'silinx') setDrawer(false);
 }
 
 // ------------------------------------------------------------------ the editors' side panels
