@@ -15,6 +15,7 @@
 
 import { h, downloadText, linkModel, linkSnapshot, twoFingerView } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
+import { mountSideFold } from './side-fold.js';
 import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { sv } from './dom.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
@@ -109,6 +110,7 @@ export function mountPetriEditor(container, opts = {}) {
   const probCount = h('span', { class: 'asm-prob-count' });
   const probSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Problems ', probCount), probList);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, netSection, probSection);
+  mountSideFold({ root, side, key: 'silinx.petri.props.folded' });
   const statusInfo = h('span', {}), statusMsg = h('span', { class: 'asm-status-msg' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));
   const status = (msg, err = false) => { statusMsg.textContent = msg || ''; statusMsg.classList.toggle('err', !!err); };

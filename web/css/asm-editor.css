@@ -98,7 +98,21 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* the look of the schematic editor's Properties (sch-editor.css, #2505) */
+/* the look of the schematic editor's Properties (sch-editor.css, #2505), folded as it (side-fold.js) */
+.asm-editor .asm-cap .sp { flex: 1; }
+.asm-editor .asm-fold { border: 0; background: none; padding: 0 2px; margin-right: -2px; color: inherit; display: inline-flex; align-items: center; cursor: pointer; opacity: .75; }
+.asm-editor .asm-fold:hover { opacity: 1; }
+@media (min-width: 1024px) {
+  .asm-editor.props-folded .asm-side { width: 24px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+  .asm-editor.props-folded .asm-side > :not(.asm-cap) { display: none; }
+  .asm-editor.props-folded .asm-cap {
+    flex: 1; height: auto; writing-mode: vertical-rl; flex-direction: row-reverse; justify-content: flex-end; padding: 6px 0; gap: 8px;
+    border-bottom: 0; align-items: center; background: var(--asm-panel);
+  }
+  .asm-editor.props-folded .asm-cap .sp { display: none; }
+  .asm-editor.props-folded .asm-fold { writing-mode: horizontal-tb; margin: 0; }
+}
+@media (max-width: 1023px) { .asm-editor .asm-fold { display: none; } }
 .asm-editor .asm-side {
   width: 250px; flex: none; overflow-y: auto;
   background: var(--asm-panel); border-left: 1px solid var(--asm-border);

@@ -1,6 +1,7 @@
 // UI (#2505): the drawing editors' toolbars and side panels as the Schematic editor's, in both interfaces: flat buttons
 // of the same height, the same bar, no second Undo / Redo or Print, no note of the HDL in sync; the Petri net's zooms;
-// the Algebra editor's menu an icon and a label; the main toolbar's Undo still undoes an edit. No warnings.
+// the Algebra editor's menu an icon and a label; the main toolbar's Undo still undoes an edit; the side panels folded as
+// the schematic's, remembered per editor, in Portuguese. No warnings.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { newPetri } from '../../core/petri.js';
@@ -75,7 +76,8 @@ uiTest('#2505 the FSM: no HDL button; the Petri net: its zooms; the main toolbar
   const r = await page.eval(() => { const b = document.querySelector('.doc:not([hidden]) .pn-canvas').getBoundingClientRect(); return { x: b.left + 40, y: b.top + 40 }; });
   await page.click(r);
   assert.equal(await places(), n + 1);
-  await page.eval(() => document.querySelector('#toolbar [title^="Undo"]').click());
+  await page.waitFor(() => !document.querySelector('#toolbar [data-cmd=undo]').disabled, [], { what: 'the main toolbar\'s Undo enabled' });
+  await page.click('#toolbar [data-cmd=undo]');
   await page.waitFor((c) => window.Silinx.active.petriEditor.getModel().places.length === c, [n], { what: 'undone by the main toolbar' });
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });
@@ -93,3 +95,38 @@ uiTest('#2505 the Algebra editor: no Undo or Redo of its own, its menu an icon a
   await shot(page, 'algebra');
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 });
+
+uiTest('#2505 the Petri net, FSM and ASM side panels fold to a strip and expand, as the schematic\'s; remembered; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'BarsF', template: 'traffic', files: { 'src/net.pn.json': JSON.stringify(newPetri('net')) } });
+  await makeProject(env, { name: 'BarsFB', template: 'blinky' });
+  await page.setViewport(1440, 900);
+  const state = () => page.eval((d) => {
+    const e = document.querySelector(`${d} .asm-editor`), b = e.querySelector('.asm-fold');
+    return { folded: e.classList.contains('props-folded'), side: Math.round(e.querySelector('.asm-side').getBoundingClientRect().width), title: b.title,
+      expanded: b.getAttribute('aria-expanded'), shown: !!e.querySelector('.asm-side details').getClientRects().length, cap: e.querySelector('.asm-cap').textContent };
+  }, D);
+  for (const [pj, file, name, bar] of [['BarsF', 'src/traffic.fsm.json', 'fsm', '.fsm-toolbar'], ['BarsF', 'src/net.pn.json', 'petri', '.pn-toolbar'], ['BarsFB', 'src/speed_ctrl.asm.json', 'asm', '.asm-chart-toolbar']]) {
+    if (await page.eval(() => window.SilinxApp.S.project?.name) !== pj) await page.openProject(pj);
+    await open(page, file, name, bar);
+    const canvas = () => page.eval((d) => Math.round(document.querySelector(`${d} .asm-canvas-wrap`).getBoundingClientRect().width), D);
+    const c0 = await canvas();
+    assert.deepEqual(await state(), { folded: false, side: 250, title: 'Collapse the Properties panel', expanded: 'true', shown: true, cap: 'Properties' }, name);
+    await page.click(`${D} .asm-fold`);
+    assert.deepEqual(await state(), { folded: true, side: 24, title: 'Expand the Properties panel', expanded: 'false', shown: false, cap: 'Properties' }, name);
+    assert.ok(Math.abs(await canvas() - (c0 + 226)) <= 2, `${name}: the canvas wider`);
+    if (name === 'fsm') await shot(page, 'fsm-folded');
+    // remembered: closed and opened again, still folded; a click on the strip expands it
+    await page.eval(() => window.SilinxApp.closeDoc(window.Silinx.active));
+    await page.waitFor((f) => !window.Silinx.active?.id?.endsWith(f), [file], { what: `${name} closed` });
+    await open(page, file, name, bar);
+    assert.equal((await state()).folded, true, `${name}: remembered`);
+    if (name === 'asm') {
+      await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('pt'); });
+      assert.equal(await page.eval((d) => document.querySelector(`${d} .asm-fold`).title, D), 'Expandir o painel das propriedades');
+      await page.eval(async () => { (await import('/js/i18n.js')).setLanguage('en'); });
+    }
+    await page.click(`${D} .asm-side`);
+    assert.equal((await state()).folded, false, `${name}: expanded by a click on the strip`);
+  }
+  assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
+}, { timeout: 180000 });

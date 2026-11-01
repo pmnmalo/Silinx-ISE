@@ -97,7 +97,7 @@ uiTest('#2254 the Petri net editor has no language selector; its language set in
   await page.waitFor(() => window.Silinx.hdlToSch?.['src/ctl.vhd'], [], { what: 'its HDL file' });
   await choose(page, 'src/ctl.pn.json', 'verilog');
   await linked(page, 'src/ctl.v');
-  await page.waitFor(() => /^HDL: ctl\.v /.test(document.querySelector('.doc:not([hidden]) .petri-editor .gen-banner')?.textContent || ''), [], { what: 'the link follows' });
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .petri-editor .pn-link')?.dataset.hdl === 'ctl.v', [], { what: 'the link follows' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   try {
     await open(page, 'src/ctl.pn.json');

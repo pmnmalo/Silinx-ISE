@@ -1,7 +1,7 @@
 In short:
 
 - **The drawing editors alike:** the Petri net, FSM, ASM and Algebra editors' toolbars and the Petri net, FSM and ASM
-  side panels look as the Schematic editor's; Undo, Redo and Print are the main toolbar's only.
+  side panels look as the Schematic editor's, and fold as it; Undo, Redo and Print are the main toolbar's only.
 - **Petri net editor:** Zoom In and Zoom Out.
 
 In detail:
@@ -14,6 +14,7 @@ In detail:
 - **No note of the HDL in sync (#2505):** the FSM and the Petri net no longer say "HDL: x.vhd — generated from …", and
   the FSM has no `</> HDL` panel: its file is in the Design pane. "Not in sync with" stays.
 - **The side panels as the Schematic editor's Properties (#2505):** the Petri net, FSM and ASM editors': its caption,
-  width, titles and fields.
+  width, titles and fields; folded to a strip by the button in its caption, expanded by a click on the strip, remembered
+  per editor (web/js/side-fold.js).
 - **The Petri net's zooms (#2505):** Zoom In and Zoom Out in its toolbar and on + and −; F fits, in the FSM and ASM
   editors too.
