@@ -11,11 +11,13 @@
 //   dependenceOf(pragma) -> { variable, inter, raw, war } of a DEPENDENCE saying a dependence is false, else null (#1961)
 //   unrollBy(loop, n) -> the loop with n copies of its body (a 'for'), each after the first if its condition holds
 
+import { checkOpPragma } from './c-op-pragmas.js';
+
 // what Silinx makes of the pragmas it knows
 // (TASK: an hls::task's, core/cpp-lex.js, #1721; AGGREGATE and DISAGGREGATE: of the top's struct arguments, core/c-aggregate.js, #1668)
-export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE']);
+export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY']);
 // Vitis HLS's others: accepted, ignored with a warning
-export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'LATENCY', 'BIND_OP', 'RESOURCE', 'ALLOCATION',
+export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'RESOURCE',
   'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
   'ARRAY_RESHAPE', 'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
@@ -79,6 +81,7 @@ export function checkPragmas(ast, funcs, report, top = null) {
     if (p.dup) return;   // (a stream of a struct's pragma made for each of its members' streams but the first: said once, #1662)
     if (IGNORED.has(name) || ((name === 'AGGREGATE' || name === 'DISAGGREGATE') && fname !== top)) { report(loc, `#pragma HLS ${name} is accepted and ignored: Silinx does not make it`, 'warning'); return; }
     if (!MADE.has(name)) { report(loc, `#pragma HLS ${name} is not a pragma Silinx knows: ignored`, 'warning'); return; }
+    if (checkOpPragma(p, loc, report, where, fname, top, funcs)) return;   // (BIND_OP, ALLOCATION, LATENCY, #1961)
     if (LOOP_ONLY.has(name) && where !== 'loop') {
       if (name === 'PIPELINE' && where === 'function') {
         // (the top's made, core/c-pipe-sched.js, #1962; a function the top calls is inlined in it)

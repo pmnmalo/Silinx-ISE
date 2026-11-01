@@ -335,7 +335,7 @@ const CORPUS_WARNINGS = {
   'modeling-pointers-multiple-pointers': ["19 warning: 'pos' is a name Vitis HLS reserves: it is named pos_r in the module"],
   // (each loop's reads and writes in one state, #1919: the II asked met; mux's and demux's streams chosen by an index,
   // each access made only on its branch)
-  'modeling-free-running-kernel-remerge-ii4to1': ['30 warning: #pragma HLS LATENCY is accepted and ignored: Silinx does not make it'],
+  'modeling-free-running-kernel-remerge-ii4to1': ["30 warning: #pragma HLS LATENCY of a loop: not made: the clock schedules its operations; only a top function's is"],
   'task-level-parallelism-data-driven-simple-data-driven': [],
   // (its loop's II=3 met, #1919: an iteration two states)
   'interface-aggregation-disaggregation-aggregation-of-nested-structs': [],
