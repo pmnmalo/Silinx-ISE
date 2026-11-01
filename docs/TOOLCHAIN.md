@@ -93,8 +93,11 @@ A family is an object (`src/open-flow-backends.js`, #2360):
 ```js
 {
   id: 'spartan3e',
-  mount(ctx),   // { runMap, runPar, runTiming, runPins, runPower, bitfile, runFpgaView?, packed? }: the family's steps,
-                //   with its engines; the routed design is the back end's, in its format and file (#2384)
+  steps,        // optional: its steps, [{ id, label, needs }], run in this order (#2387); the Xilinx families' when not
+                //   given (open-steps.js XILINX_STEPS: ISE's names, the processes' labels)
+  mount(ctx),   // { steps: { id: run() }, packed? }: the functions of its steps, with its engines, but the synthesis's and
+                //   the simulation models' (runFlow's own); ctx.readNetlist for the step that reads the netlist; the
+                //   routed design is the back end's, in its format and file (#2384)
   synth,        // optional: the synthesis, synthesizeVerilog's signature and result: the Xilinx families' synthesizeVerilog
                 //   (synth_xilinx and its mappings), another family's scriptSynthesis({ script }) (synth-script.js, #2386);
                 //   Yosys's generic synth when not given
@@ -124,10 +127,10 @@ The plan is in #1953 and #2315. For the open toolchains:
 Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. The
 constraints are one model (`constraints.js`, #2385): the back end says its format, a reader and a writer, UCF by default; the
 other formats are #2296. The synthesis is the back end's (#2386): the Xilinx families' `synth_xilinx` with Silinx's mappings,
-another family's Yosys script (`scriptSynthesis`), and the report's names; `FAMILY_INFO` needs only a family's name. Still
+another family's Yosys script (`scriptSynthesis`), and the report's names; `FAMILY_INFO` needs only a family's name. The steps are the back end's (#2387): its list, each step's label and what it
+needs (`orderSteps`), ISE's names for the Xilinx families. Still
 missing before iCE40 (#2360):
 
-- **The steps by family (#2387).** They have ISE's names (`translate`, `trce`), and the back end does not yet say which it has.
 - **The fake family in the browser's worker (#2388).** Its test runs in Node only.
 
 And around the flow, one issue each: the boards and examples (#2297), programming (#2298), the primitives' simulation models

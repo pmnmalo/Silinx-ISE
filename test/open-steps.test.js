@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './ui/core-hooks.js';
-import { OPEN_STEPS, OPEN_CHAIN, orderOpenSteps } from '../packages/silinx-fpga/src/open-steps.js';
+import { OPEN_STEPS, OPEN_CHAIN, XILINX_STEPS, orderOpenSteps, orderSteps } from '../packages/silinx-fpga/src/open-steps.js';
 import { openSteps, OPEN_STEPS as SERVER_STEPS } from '../server/open-flow.js';
 
 const { browserSteps } = await import('../web/js/open-flow-browser.js');
@@ -68,4 +68,15 @@ test('each side names the steps its own way and says its own error', () => {
   assert.deepEqual(openSteps(['power']), browserSteps(['xpwr']));
   assert.throws(() => openSteps(['ngdanno']), /unknown step 'ngdanno'/);
   assert.throws(() => browserSteps(['ngdanno']), /^Error: not available in the Silinx toolchain \(they need Xilinx ISE, in the full application\): ngdanno$/);
+});
+
+test('#2387 orderSteps: the steps asked and what they need, in the list\'s order; none asked: the whole list; an unknown step refused', () => {
+  const list = [{ id: 'synth', needs: [] }, { id: 'pnr', needs: ['synth'] }, { id: 'timing', needs: ['pnr'] }, { id: 'bitstream', needs: ['pnr'] }];
+  assert.deepEqual(orderSteps(list, ['bitstream']), ['synth', 'pnr', 'bitstream']);
+  assert.deepEqual(orderSteps(list, ['bitstream', 'timing']), ['synth', 'pnr', 'timing', 'bitstream']);
+  assert.deepEqual(orderSteps(list, ['synth']), ['synth']);
+  assert.deepEqual(orderSteps(list), ['synth', 'pnr', 'timing', 'bitstream']);
+  assert.throws(() => orderSteps(list, ['map']), /no step map \(the steps: synth, pnr, timing, bitstream\)/);
+  // the Xilinx families' list: what each step needs is in the chain orderOpenSteps makes for it
+  for (const s of XILINX_STEPS) for (const n of orderSteps(XILINX_STEPS, [s.id])) assert.ok(orderOpenSteps([s.id]).includes(n), `${s.id}: ${n}`);
 });

@@ -1,9 +1,13 @@
 // Silinx toolchain - the flow's back ends, one per family (#2360): what runFlow (open-flow-core.js) asks of a family, so
-// that it names none. A back end is { id, mount(ctx), synth?, synthName?, constraints? }:
-//   mount(ctx)   -> { runMap, runPar, runTiming, runPins, runPower, bitfile(name, startupClk), runFpgaView?, packed?,
-//                   routedOrEarlier?, routedText? }: the family's steps, with its engines; ctx: runFlow's (its getters:
-//                   netlist, netlistText). The routed design is the back end's (#2384): its format, its file, an earlier
-//                   run's read again by the steps that need it; routedOrEarlier and routedText give it to the simulation models
+// that it names none. A back end is { id, mount(ctx), steps?, synth?, synthName?, constraints? }:
+//   steps        its steps, [{ id, label, needs }] (#2387): runFlow runs those asked in this order; the Xilinx families'
+//                (open-steps.js XILINX_STEPS, ISE's names) when not given
+//   mount(ctx)   -> { steps: { id: run() }, packed?, routedOrEarlier?, routedText? }: the functions of its steps, with its
+//                engines, but the synthesis's and the simulation models' (runFlow's own: synth, postsynth, posttrans, postmap,
+//                postpar); ctx: runFlow's (its getters: netlist, netlistText; readNetlist, the netlist read and the
+//                constraints checked, for the step that does it). The routed design is the back end's (#2384): its format,
+//                its file, an earlier run's read again by the steps that need it; routedOrEarlier and routedText give it to
+//                the simulation models
 //   synth        the synthesis, as synth-open.js synthesizeVerilog (its signature and result): the Xilinx families' that,
 //                another family's its own Yosys script (synth-script.js scriptSynthesis, #2386); when not given, Yosys's
 //                generic synth into its generic cells
@@ -24,6 +28,7 @@ import { mountNextpnrSteps } from './open-flow-nextpnr.js';
 import { mountNextpnrS6 } from './open-flow-nextpnr-s6.js';
 import { synthesizeVerilog } from './synth-open.js';
 import { scriptSynthesis } from './synth-script.js';
+import { XILINX_STEPS } from './open-steps.js';
 
 const S3E_REPORTS = {
   analyze: analyzeTiming,
@@ -63,6 +68,23 @@ function xdlRouted({ io, StepError }) {
   };
 }
 
+// the Xilinx families' steps after the synthesis (XILINX_STEPS, ISE's names): Translate reads the netlist, then Map and
+// Place & Route (the family's, with its engines), the timing, the pins, the power, the bitstreams and the FPGA view
+function xilinxSteps(ctx, runMap, runPar, r) {
+  const { top, spec, report, log } = ctx;
+  return {
+    translate: ctx.readNetlist, map: runMap, par: runPar, trce: r.runTiming, pin2ucf: r.runPins, xpwr: r.runPower, fpgaview: r.runFpgaView,
+    bitgen: () => {
+      report.bit = r.bitfile(`${top}.bit`, spec.startupClk);
+      log(`Bitstream: build/${top}.bit (${report.bit.size} bytes, every feature in the bit database)`);
+    },
+    prombit: () => {
+      report.prom = r.bitfile(`${top}_prom.bit`, 'Cclk');
+      log(`PROM bitstream (StartUpClk Cclk): build/${top}_prom.bit`);
+    },
+  };
+}
+
 // nextpnr's Map and Place & Route (#2136: open-flow-nextpnr.js), chosen by spec.engine: 'nextpnr' always; 'auto' when it can
 // implement the design (its cells, every port's pad), else the Silinx engine, which Map says
 function mountS3e(base) {
@@ -86,12 +108,11 @@ function mountS3e(base) {
     }
     return viaNextpnr;
   };
+  const runMap = async () => (await useNextpnr() ? np.runMap : own.runMap)();
+  const runPar = async () => (await useNextpnr() ? np.runPar : own.runPar)();
   return {
-    runMap: async () => (await useNextpnr() ? np.runMap : own.runMap)(),
-    runPar: async () => (await useNextpnr() ? np.runPar : own.runPar)(),
-    packed: own.packed,
-    routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
-    ...mountFlowReports({ ...ctx, reports: S3E_REPORTS }),
+    steps: xilinxSteps(ctx, runMap, runPar, mountFlowReports({ ...ctx, reports: S3E_REPORTS })),
+    packed: own.packed, routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
   };
 }
 
@@ -101,8 +122,8 @@ function mountS6(base) {
   const routed = xdlRouted(base), ctx = { ...base, ...routed };
   const own = mountS6Steps(ctx);
   const np = ctx.spec.engine === 'nextpnr' ? mountNextpnrS6({ ...ctx, state: own.state }) : null;
-  return { runMap: own.runMap, runPar: () => (np || own).runPar(), routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText,
-    ...mountFlowReports({ ...ctx, reports: S6_REPORTS }) };
+  return { steps: xilinxSteps(ctx, own.runMap, () => (np || own).runPar(), mountFlowReports({ ...ctx, reports: S6_REPORTS })),
+    routedOrEarlier: routed.routedOrEarlier, routedText: routed.routedText };
 }
 
 // the synthesis's report: its lines as XST names them (the Spartan-3E's), else as the MAP report does (the part's resources)
@@ -110,9 +131,9 @@ const XST_NAMES = { luts: 'Number of 4 input LUTs', ffs: 'Number of Slice Flip F
 const xstName = id => XST_NAMES[id] || id;
 const mapName = (id, resource) => resource?.report || XST_NAMES[id] || id;
 
-const SPARTAN3E = { id: 'spartan3e', mount: mountS3e, synth: synthesizeVerilog, synthName: xstName };
-const OTHER = { id: 'other', mount: mountS3e, synth: synthesizeVerilog, synthName: mapName };
-const backends = new Map([['spartan3e', SPARTAN3E], ['spartan6', { id: 'spartan6', mount: mountS6, synth: synthesizeVerilog, synthName: mapName }]]);
+const SPARTAN3E = { id: 'spartan3e', mount: mountS3e, steps: XILINX_STEPS, synth: synthesizeVerilog, synthName: xstName };
+const OTHER = { id: 'other', mount: mountS3e, steps: XILINX_STEPS, synth: synthesizeVerilog, synthName: mapName };
+const backends = new Map([['spartan3e', SPARTAN3E], ['spartan6', { id: 'spartan6', mount: mountS6, steps: XILINX_STEPS, synth: synthesizeVerilog, synthName: mapName }]]);
 // a registered back end's synthesis and report names when it gives none: Yosys's generic synth, its resources' names
 const GENERIC_SYNTH = scriptSynthesis({ script: top => `synth -flatten -top ${top}` });
 const ownName = (id, resource) => resource?.report || id;
@@ -124,6 +145,6 @@ export const backendOf = family => backends.get(family) || OTHER;
 export function registerBackend(backend) {
   if (typeof backend?.mount !== 'function' || !backend.id) throw new Error('a back end needs an id and mount(ctx)');
   if (backends.has(backend.id)) throw new Error(`the family ${backend.id} has its back end`);
-  backends.set(backend.id, { synth: GENERIC_SYNTH, synthName: ownName, ...backend });
+  backends.set(backend.id, { steps: XILINX_STEPS, synth: GENERIC_SYNTH, synthName: ownName, ...backend });
   return () => backends.delete(backend.id);
 }

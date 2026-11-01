@@ -162,10 +162,12 @@ export async function runFlow(spec, io) {
     log(`Netlist of <${top}> read; constraints: ${ucf ? `${io.ucfName || `the ${format.id.toUpperCase()}`}, ${locs} pin location(s), ${(ucf.clocks || []).length} PERIOD constraint(s)` : 'none'}.`);
   }
 
-  // the family's Map, Place & Route, timing and bitstream (open-flow-backends.js, #2360); the routed design is the back
-  // end's, in its format: the steps after Place & Route read it, or an earlier run's (#2384)
-  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, top, knownPips, parTries, parExtra, constraints, StepError });
-  const { bitfile, runPins, runPower, runTiming } = impl;
+  // the family's steps after the synthesis (open-flow-backends.js, #2360, #2387: its list, backend.steps, and their
+  // functions, impl.steps; readNetlist for the step that reads the netlist); the routed design is the back end's, in its
+  // format: the steps after Place & Route read it, or an earlier run's (#2384)
+  const impl = backend.mount({ io, spec, log, report, util, now, ms, netlist: () => netlist, netlistText: () => netlistText, readNetlist: runTranslate, top, knownPips, parTries, parExtra, constraints, StepError });
+  // the synthesis and the simulation models' steps are the flow's own (the models: the IDE's, io.simModels)
+  const own = { synth: runSynth, postsynth: runPostSynth, posttrans: runPostTranslate, postmap: runPostMap, postpar: runPostPar };
 
   let steps = spec.steps;
   try {
@@ -181,30 +183,14 @@ export async function runFlow(spec, io) {
         for (const k of ['netlist', 'synthesis']) if (r?.files?.[k]) report.files[k] = r.files[k];
       }
     }
-    if (steps.includes('synth')) { step('synth'); await runSynth(); save(); }
-    if (steps.includes('postsynth')) { step('postsynth'); await runPostSynth(); save(); }
-    if (steps.includes('translate')) { step('translate'); runTranslate(); save(); }
-    if (steps.includes('posttrans')) { step('posttrans'); await runPostTranslate(); save(); }
-    if (steps.includes('map')) { step('map'); await impl.runMap(); save(); }
-    if (steps.includes('postmap')) { step('postmap'); await runPostMap(); save(); }
-    if (steps.includes('par')) { step('par'); await impl.runPar(); save(); }
-    if (steps.includes('trce')) { step('trce'); runTiming(); save(); }
-    if (steps.includes('postpar')) { step('postpar'); await runPostPar(); save(); }
-    if (steps.includes('pin2ucf')) { step('pin2ucf'); runPins(); save(); }
-    if (steps.includes('xpwr')) { step('xpwr'); runPower(); save(); }
-    if (steps.includes('bitgen')) {
-      step('bitgen');
-      report.bit = bitfile(`${top}.bit`, spec.startupClk);
+    // the steps asked, in the order of the back end's list (#2387)
+    for (const { id } of backend.steps.filter(s => steps.includes(s.id))) {
+      step(id);
+      const run = own[id] || impl.steps?.[id];
+      if (!run) throw new StepError(`the back end of ${spec.family} has no step ${id}`, [], '');
+      await run();
       save();
-      log(`Bitstream: build/${top}.bit (${report.bit.size} bytes, every feature in the bit database)`);
     }
-    if (steps.includes('prombit')) {
-      step('prombit');
-      report.prom = bitfile(`${top}_prom.bit`, 'Cclk');
-      save();
-      log(`PROM bitstream (StartUpClk Cclk): build/${top}_prom.bit`);
-    }
-    if (steps.includes('fpgaview')) { step('fpgaview'); impl.runFpgaView(); }
     log('=== SILINX DONE ===');
     return { ok: true, report };
   } catch (e) {
