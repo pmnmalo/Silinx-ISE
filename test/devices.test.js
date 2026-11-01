@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 
 const dev = await import('../server/devices.js');
 
-const FAMILY_IDS = ['spartan3', 'spartan3e', 'spartan3a', 'spartan3adsp', 'spartan6', 'virtex4', 'virtex5', 'virtex6', 'artix7', 'kintex7', 'zynq'];
+const FAMILY_IDS = ['spartan3', 'spartan3e', 'spartan3a', 'spartan3adsp', 'spartan6', 'virtex4', 'virtex5', 'virtex6', 'artix7', 'kintex7', 'zynq', 'ice40'];
 
 test('families: the ISE 14.7 WebPACK families, with ISE names and I/O standards', () => {
   assert.deepEqual(dev.FAMILIES.map(f => f.id).sort(), [...FAMILY_IDS].sort());
-  for (const f of dev.FAMILIES) {
+  for (const f of dev.FAMILIES.filter(x => x.id !== 'ice40')) {
     assert.equal(f.webpack, true, f.id);
     assert.ok(f.name && f.xiseFamily && f.displayName, f.id);
     assert.ok(Array.isArray(f.ioStandards) && f.ioStandards.length > 5, f.id);
@@ -33,8 +33,8 @@ test('parts: every part has a known family, packages with user I/O and speed gra
       assert.ok(pk.userIo > 0 && pk.userIo <= p.maxUserIo, `${p.part}-${k} userIo ${pk.userIo} vs max ${p.maxUserIo}`);
       assert.ok(dev.PACKAGES[k], `no description for package ${k}`);
     }
-    assert.ok(p.speeds.length > 0 && p.speeds.every(s => /^-\d+[LN]?$/.test(s)), `${p.part} speeds ${p.speeds}`);
-    assert.ok(p.slices > 0 && p.luts > 0 && p.ffs > 0 && p.brams > 0, p.part);
+    assert.ok((p.family === 'ice40' ? p.speeds.length === 0 : p.speeds.length > 0) && p.speeds.every(s => /^-\d+[LN]?$/.test(s)), `${p.part} speeds ${p.speeds}`);
+    assert.ok(p.slices > 0 && p.luts > 0 && p.ffs > 0 && (p.brams > 0 || p.part === 'ice40lp384'), p.part);
   }
   // WebPACK limits (UG631 Table 2-1): parts outside WebPACK must not be offered.
   for (const missing of ['xc6slx100', 'xc6slx150t', 'xc3s2000', 'xc3sd3400a', 'xc4vlx40', 'xc5vsx35t', 'xc6vlx130t', 'xc7a35t', 'xc7k325t', 'xc7z015', 'xc7z045'])

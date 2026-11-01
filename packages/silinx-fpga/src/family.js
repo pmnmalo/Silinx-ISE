@@ -44,6 +44,8 @@ export function deviceFamily(device) {
 
 /** Does ISE implement this family? The others are the open toolchain's only (#2295). */
 export const isIseFamily = f => !!FAMILY_INFO[f]?.xise;
+/** Is this project device's family one only the open toolchain implements? (An unknown family is not: it stays with ISE's flow.) */
+export const openOnlyDevice = device => { const f = deviceFamily(device); return !!FAMILY_INFO[f] && !isIseFamily(f); };
 export const familyName = f => FAMILY_INFO[f]?.name || f || 'unknown family';
 export const isSpartan3Like = f => /^spartan3/.test(f || '');
 export const familyFromXise = text => {

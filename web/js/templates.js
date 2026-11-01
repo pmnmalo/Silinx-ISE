@@ -204,6 +204,17 @@ endmodule
 `;
 }
 
+export function pcfTemplate(project) {
+  return `# Physical constraints for ${project.name}
+# Target: ${project.device.part}-${project.device.package}
+#
+# Example:
+# set_io clk 35
+# set_io led[0] 11
+# set_frequency clk 12
+`;
+}
+
 export function ucfTemplate(project) {
   return `# User Constraints File for ${project.name}
 # Target: ${project.device.part}${project.device.speed}-${project.device.package}

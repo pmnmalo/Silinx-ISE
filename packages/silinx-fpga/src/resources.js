@@ -92,6 +92,10 @@ const FAMILY_RESOURCES = {
   spartan3a: [...LUT4_COMMON, globalBuffers(24)],
   spartan3adsp: [...LUT4_COMMON, globalBuffers(24)],
   virtex4: [...LUT4_COMMON, globalBuffers(32, 'Number of BUFG/BUFGCTRLs', [...BUFG_PRIMS, 'BUFGCTRL'])],
+  // (the iCE40's data sheets: 8 global nets, its 4 Kbit EBRs, its SB_MAC16s)
+  ice40: [...LUT4_COMMON, globalBuffers(8, 'Number of SB_GBs', ['SB_GB']),
+    { id: 'ebr', label: label('Block RAMs (4 Kbit)', 'RAMs de bloco (4 Kbit)'), report: null, count: p => p.brams, primitives: ['SB_RAM40_4K'] },
+    { id: 'mac', label: label('DSP blocks', 'Blocos DSP'), report: null, count: p => p.dsp, primitives: ['SB_MAC16'] }],
 };
 
 /** The families whose own resources are all described (the Spartan-3, 3A, 3A DSP and Virtex-4 have their
