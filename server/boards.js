@@ -17,6 +17,7 @@ const S3A_UCF = 'Xilinx UG334 Spartan-3A/3AN Starter Kit UCF listings';
 const S3_UCF = 'Xilinx UG130 Spartan-3 Starter Kit board pin tables';
 const PAPILIO_UCF = 'Gadget Factory BPC3003_2.03+.ucf (Papilio_One.ucf)';
 const ELBERTV2_UCF = 'Numato Lab Elbertv2.ucf (numato/samplecode)';
+const ICEBREAKER_PCF = 'icebreaker.pcf of IceStorm\'s iCEBreaker example (YosysHQ/icestorm)';
 
 export const BOARDS = [
   {
@@ -513,6 +514,35 @@ export const BOARDS = [
       { name: 'io_p4', label: 'Header P4 IO_P4[0..7]', pins: ['P141', 'P143', 'P138', 'P139', 'P134', 'P135', 'P130', 'P132'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Headers' },
       { name: 'io_p5', label: 'Header P5 IO_P5[0..7]', pins: ['P125', 'P123', 'P127', 'P126', 'P131', 'P91', 'P142', 'P140'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Headers' },
       { name: 'io_p6', label: 'Header P6 IO_P6[0..7]', pins: ['P19', 'P21', 'P18', 'P20', 'P15', 'P16', 'P12', 'P13'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Headers' },
+    ],
+  },
+  {
+    // (#2468) the iCE40's first board; the PCF names the pins by the package's balls/pins (SG48: 1..48). The RGB LED (39..41)
+    // is on the SB_RGBA_DRV's own pins and the SPI flash (12..17) configures the FPGA: neither is a resource here.
+    id: 'icebreaker',
+    name: '1BitSquared iCEBreaker',
+    vendor: '1BitSquared',
+    device: { family: 'ice40', part: 'ice40up5k', package: 'sg48', speed: '' },
+    flash: { type: 'spi', part: 'W25Q128JV', sizeMbit: 128, xcf: false, verified: false, note: 'Written over the on-board FTDI FT2232H (iceprog, openFPGALoader) with the .bin file.' },
+    programmer: {
+      preferred: 'openFPGALoader',
+      tools: {
+        openFPGALoader: { cable: 'ft2232', position: 0, onboard: true, verified: false, note: 'The on-board FT2232H; Silinx does not program an iCE40 yet (openFPGALoader -b ice40_generic design.bin).' },
+      },
+    },
+    source: ICEBREAKER_PCF,
+    sourceUrl: 'https://github.com/YosysHQ/icestorm/blob/master/examples/icebreaker/icebreaker.pcf',
+    resources: [
+      { name: 'clk', label: '12 MHz oscillator (CLK)', pins: ['35'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Clock', extra: { period: '83.333 ns' } },
+      { name: 'led', label: 'Pmod LEDs LED1..LED5 (the snap-off part)', pins: ['27', '25', '21', '23', '26'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeHigh: true } },
+      { name: 'btn', label: 'Pmod buttons BTN1..BTN3 (the snap-off part)', pins: ['20', '19', '18'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Buttons' },
+      { name: 'ledr_n', label: 'Red LED LEDR_N (active low)', pins: ['11'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeLow: true } },
+      { name: 'ledg_n', label: 'Green LED LEDG_N (active low)', pins: ['37'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'LEDs', extra: { activeLow: true } },
+      { name: 'btn_n', label: 'User button BTN_N (active low)', pins: ['10'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Buttons', extra: { activeLow: true } },
+      { name: 'rx', label: 'UART RX (from the FTDI)', pins: ['6'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'UART' },
+      { name: 'tx', label: 'UART TX (to the FTDI)', pins: ['9'], dir: 'out', iostandard: 'SB_LVCMOS', group: 'UART' },
+      { name: 'pmod1a', label: 'Pmod 1A P1A1..4, P1A7..10', pins: ['4', '2', '47', '45', '3', '48', '46', '44'], dir: 'inout', iostandard: 'SB_LVCMOS', group: 'Headers' },
+      { name: 'pmod1b', label: 'Pmod 1B P1B1..4, P1B7..10', pins: ['43', '38', '34', '31', '42', '36', '32', '28'], dir: 'inout', iostandard: 'SB_LVCMOS', group: 'Headers' },
     ],
   },
 ];
