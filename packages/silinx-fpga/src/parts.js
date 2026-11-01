@@ -9,6 +9,7 @@ export { resourcesOf, resourceCount, resourceOfPrimitive } from './resources.js'
 export { usedOfReport, primitiveInstances, deviceChangeIssues } from './resource-check.js';
 
 // the constraints
+export { boardConstraintsText } from './board-constraints.js';
 export { parseUcf, generateUcf, checkUcf, bitName, boardAutoAssign, periodNs, ucfPlacesPins, backAnnotateUcf, locsNotOnBoard } from './ucf.js';
 
 // the flow's steps

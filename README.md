@@ -287,9 +287,11 @@ for Xilinx FPGAs supported by ISE 14.7.
   no board is selected (with a warning; with a board they must be assigned).
 - **Devices**: every FPGA family ISE 14.7 WebPACK implements — Spartan-3, Spartan-3E,
   Spartan-3A/3AN, Spartan-3A DSP, Spartan-6, Virtex-4/5/6, Artix-7, Kintex-7 and Zynq-7000
-  (WebPACK parts). Full flows verified to a bitstream on Spartan-3E and Spartan-6.
+  (WebPACK parts). Full flows verified to a bitstream on Spartan-3E and Spartan-6. Beyond ISE, the
+  Lattice iCE40 (LP, HX, UltraPlus) builds with the Silinx toolchain's nextpnr-ice40 and icepack.
 - **Boards and I/O Pin Planning**: Digilent Basys2, Nexys2, Nexys3, Atlys, Cmod S6; Xilinx
-  Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One.
+  Spartan-3E / Spartan-3A / Spartan-3 starter kits; Numato Mimas V2 and Elbert V2; Papilio One;
+  1BitSquared iCEBreaker (iCE40, its pins written as a PCF).
   Ports are mapped to board resources by name, the UCF is generated, and pins are checked against
   the board before ISE runs.
 - **View Implemented Design (FPGA)**: the placed and routed design inside the chip (from the Silinx
@@ -543,6 +545,8 @@ database. The open
 toolchain also takes **the Spartan-6 boards (Nexys3, Atlys)** in the local server, to a bitstream ISE's bitgen
 writes byte for byte for the same routing (not yet in the browser edition: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node packages/silinx-fpga/research/s3e-route/open-flow.mjs <project
 folder> <out folder>`.
+Beyond Xilinx, it takes **the 1BitSquared iCEBreaker** (Lattice iCE40UP5K-SG48): Yosys's `synth_ice40`,
+nextpnr-ice40 and icepack, to `build/<top>.bin`, its pins written as a PCF (programming it from Silinx is still to come).
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
 [docs/QUALITY.md](docs/QUALITY.md). How it is developed, and what may be shipped: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md);
 what is planned: the [issues](https://github.com/pmnmalo/Silinx-ISE/issues).
