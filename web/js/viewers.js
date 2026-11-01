@@ -17,7 +17,7 @@ import { log, showConsolePage, setDiagnostics } from './console.js';
 import { reloadProject } from './project.js';
 import { generateSimModel, readBuildFile, runImpl } from './implement.js';
 import { ucfPort } from './drawings.js';
-import { EXTRA_STEPS, ISE_ONLY, SIM_MODEL_NAMES, checkSyntax, diagsFor, loadUcfText, openMode, saveAll, setStatus } from './processes.js';
+import { EXTRA_STEPS, SIM_MODEL_NAMES, checkSyntax, diagsFor, loadUcfText, openMode, saveAll, setStatus } from './processes.js';
 import { inView, moduleBadges, openModuleSource, saveProjectJson } from './design.js';
 import { wcfgFiles } from './sim-wcfg.js';
 import { prefKey } from './prefs.js';
@@ -78,9 +78,7 @@ const SIM_MODEL_THEN = { Simulate: 'the simulation starts', Emulate: 'the emulat
 async function offerSimModel(step, action, title) {
   const proc = EXTRA_STEPS[step];
   let why = null;
-  if (openMode()) {
-    if (ISE_ONLY.has(step)) why = `"${proc}" needs the Xilinx ISE toolchain: it is not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings).`;
-  } else {
+  if (!openMode()) {
     const tc = S.toolchain || await api.toolchain().catch(() => null);
     if (!tc?.ise?.available) why = `"${proc}" needs the Xilinx ISE toolchain, which is not available (configure it in Toolchain Settings (the gear in the toolbar)).`;
   }

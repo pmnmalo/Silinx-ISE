@@ -180,7 +180,7 @@ test('#2387 a family runs its own list of steps, in its order, with no warnings;
 test('#2387 the Xilinx families\' list: ISE\'s steps and names, the IDE\'s processes\' labels', () => {
   for (const f of ['spartan3e', 'spartan6', 'spartan3a']) assert.equal(backendOf(f).steps, XILINX_STEPS, f);
   assert.deepEqual(XILINX_STEPS.map(s => s.id), OPEN_STEPS);
-  const processes = fs.readFileSync(new URL('../web/js/processes.js', import.meta.url), 'utf8');
+  const processes = fs.readFileSync(new URL('../web/js/tool-descriptors.js', import.meta.url), 'utf8');   // (the tree's, #2311)
   for (const s of XILINX_STEPS.filter(s => !['synth', 'prombit'].includes(s.id))) assert.ok(processes.includes(`'${s.label}'`), s.label);
   // a registered back end with no list of its own: the Xilinx families'
   const remove = registerBackend({ id: 'fake', mount: () => ({}) });

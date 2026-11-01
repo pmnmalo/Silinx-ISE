@@ -12,6 +12,7 @@ html[data-layout="tasks"] #statusbar { display: none; }
 html[data-layout="tasks"] #task-switch { display: flex; gap: 2px; padding: 3px; margin: 0 auto; flex: none;
   background: var(--m-surface-2); border: 1px solid var(--m-border); border-radius: 10px; }
 .task-btn { position: relative; display: inline-flex; align-items: center; gap: 7px; height: var(--m-ctl-h, 32px); padding: 0 12px; border: none; border-radius: 7px;
+.task-btn[hidden] { display: none; }
   background: none; color: var(--m-muted); font: inherit; font-weight: 550; white-space: nowrap; cursor: pointer; }
 .task-btn:hover { background: var(--m-hover); color: var(--m-fg); }
 .task-btn:disabled { opacity: .4; cursor: default; }   /* (no project: #1260) */

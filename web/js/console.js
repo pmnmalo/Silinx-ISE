@@ -6,6 +6,7 @@ import { quickFixes } from '/core/quickfix.js';
 import { t, onLanguageChange } from './i18n.js';
 import { hintRow, sevWord } from './diaghelp.js';
 import { S, app } from './app.js';
+import { MESSAGE_LINE } from './tool-descriptors.js';
 
 const $ = id => document.getElementById(id);
 
@@ -36,7 +37,7 @@ function consoleMessage(line, cls) {
   }
   lastConsoleDiag = null;
   if (cls !== 'err' && cls !== 'warn') return;
-  const m = /^\s*(ERROR|WARNING|FATAL|CRITICAL WARNING)\s*:\s*(?:([A-Za-z][\w-]*(?::\d+)?)\s+-\s+)?(.*)$/i.exec(line);
+  const m = MESSAGE_LINE.exec(line);
   let severity = cls === 'err' ? 'error' : 'warning', tool = 'Silinx', message = line.trim();
   if (m) { severity = /error|fatal/i.test(m[1]) ? 'error' : 'warning'; tool = m[2] || 'Silinx'; message = m[3]; }
   else if (/=== SILINX FAILED/.test(line)) { tool = 'Silinx'; message = line.replace(/=+/g, '').trim(); }

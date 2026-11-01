@@ -28,7 +28,7 @@ const PARTS = {
     'renderStartPage', 'storageBox', 'storageMenuItems', 'storageLine', 'updateStorageStatus', 'switchStorage',
     'openWorkspaceFolder', 'reopenWorkspaceFolder', 'useBrowserStorage', 'copyBrowserProjects'],
   'implement.js': ['STEP_PROC', 'RANK', 'worst', 'applyReportWarnings', 'stepTracker', 'ucfDiagnostics', 'checkUcfFile',
-    'checkConstraints', 'regenerateUcf', 'runImpl', 'runImplInner', 'SYNTH_OPEN', 'synthOpenRunning', 'synthOpen', 'FLOW_UP_TO',
+    'checkConstraints', 'regenerateUcf', 'runImpl', 'runImplInner', 'synthOpenRunning', 'synthOpen', 'FLOW_UP_TO',
     'generateSimModel', 'postParTiming', 'textPowerReport', 'backAnnotatePins', 'readBuildFile', 'showTextDoc', 'stopProcesses'],
   'drawings.js': ['openAsm', 'staleHdl', 'freshHdl', 'syncHdlFromAsm', 'asmFromHdlFile',
     'convertToAsm', 'asmContextMenu', 'openTt', 'ttModel', 'refreshTtLink', 'syncHdlFromTt',
@@ -41,10 +41,10 @@ const PARTS = {
     'drawnHdlClashes', 'clashItem', 'resolveHdlClash', 'syncBanner', 'refreshSyncBanner',
     'topUcfPorts', 'ucfPort', 'refreshOpenEditor', 'syncHdlFromSchematic',
     'convertToSchematic', 'drawingsAsBase', 'setViewAsTop', 'viewSel', 'topOfView', 'exportSchAsIse', 'schContextMenu'],
-  'processes.js': ['STATUS_ICON', 'SUMMARY_PROC', 'openMode', 'OPEN_SYNTH', 'ISE_ONLY', 'ISE_ONLY_TIP', 'forOpenMode',
-    'processDefs', 'processDefsAll', 'selectionProcesses', 'renderProcesses', 'ISE_PROCS', 'runProcess',
+  'processes.js': ['STATUS_ICON', 'SUMMARY_PROC', 'openMode',
+    'processDefs', 'selectionProcesses', 'renderProcesses', 'ISE_PROCS', 'runProcess',
     'topConfirmed', 'setStatus', 'markStale', 'diagsFor', 'saveAll', 'checkSyntax', 'checkSyntaxInner',
-    'hdlDiagnostics', 'checkFileSyntax', 'IMPL_IDS', 'EXTRA_STEPS', 'SIM_MODEL_NAMES', 'STATUS_FILE',
+    'hdlDiagnostics', 'checkFileSyntax', 'SIM_MODEL_NAMES', 'STATUS_FILE',
     'sourcesFingerprint', 'synthFingerprint', 'loadUcfText', 'saveImplStatus', 'restoreImplStatus'],
   'design.js': ['renderHierarchy', 'clashBadge', 'viewOfModule', 'treeItem', 'selectRow', 'markSelRow', 'treeKeys',
     'select', 'testBench', 'inView', 'moduleContextMenu', 'fileContextMenu', 'projectContextMenu', 'setTop',
@@ -120,7 +120,7 @@ test('#405 app.js split: a module\'s top-level constants use nothing imported fr
 
 test('#405 implement.js: the implementation processes, Check Constraints and Stop left app.js', () => {
   const code = read('implement.js');
-  for (const s of ['=== SILINX STEP', "'Synthesize - Yosys (open)'", 'pin location(s) chosen by the tools', 'api.cancelJob(S.currentJob)'])
+  for (const s of ['=== SILINX STEP', 'pin location(s) chosen by the tools', 'api.cancelJob(S.currentJob)'])
     assert.ok(code.includes(s) && !app.includes(s), s);
   // the processes panel's runners (processes.js since the fifth part) still reach them
   for (const name of ['runImpl', 'synthOpen', 'checkUcfFile', 'stopProcesses']) assert.match(read('processes.js'), new RegExp(`\\b${name}\\(`), name);

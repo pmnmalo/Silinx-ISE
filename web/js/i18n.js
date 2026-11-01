@@ -521,7 +521,7 @@ Object.assign(PT, {
   'Device Utilization Summary (Silinx toolchain)': 'Resumo da Utilização do Dispositivo (toolchain Silinx)',
   'Device Utilization Summary (after synthesis)': 'Resumo da Utilização do Dispositivo (após a síntese)',
   'Timing (post Place & Route, Silinx toolchain estimate)': 'Temporização (após Posicionar e Encaminhar, estimativa da toolchain Silinx)',
-  'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)',
+  'Synthesis Report (Yosys)': 'Relatório de Síntese (Yosys)', 'Placed Design (XDL)': 'Projeto Posicionado (XDL)', 'Routed Design (XDL)': 'Projeto Encaminhado (XDL)', 'Routed Design (ASC)': 'Projeto Encaminhado (ASC)',
   'Static Timing Report': 'Relatório de Temporização Estática',
   'Tip: double-click a process in the Processes panel to run it. Simulation runs entirely inside Silinx; synthesis and implementation use the Silinx toolchain (no ISE): Toolchain Settings (the gear in the toolbar).':
     'Dica: faça duplo clique num processo no painel Processos para o executar. A simulação corre inteiramente no Silinx; a síntese e a implementação usam a toolchain Silinx (sem ISE): Definições da Toolchain (a roda dentada da barra de ferramentas).',

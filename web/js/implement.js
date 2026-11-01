@@ -11,9 +11,10 @@ import { S, closeDoc, findDoc, moduleInfo, openDoc, openSummary, projectBoard, r
 import { log, logLine, showConsolePage, setDiagnostics } from './console.js';
 import { reloadProject } from './project.js';
 import { refreshOpenEditor, topUcfPorts, ucfPort } from './drawings.js';
-import { EXTRA_STEPS, IMPL_IDS, OPEN_SYNTH, SIM_MODEL_NAMES, checkSyntax, loadUcfText, openMode, renderProcesses,
+import { EXTRA_STEPS, IMPL_IDS, SIM_MODEL_NAMES, checkSyntax, loadUcfText, openMode, renderProcesses,
   saveAll, saveImplStatus, setStatus, synthFingerprint } from './processes.js';
 import { inView, saveProjectJson, setTop } from './design.js';
+import { OPEN_SYNTH, SYNTH_OPEN } from './tool-descriptors.js';
 
 // Live per-step status from run.sh's "=== SILINX STEP <step> ===" markers and ISE WARNING/ERROR lines.
 const STEP_PROC = { synth: 'synth', translate: 'translate', map: 'map', par: 'par', trce: 'par', bitgen: 'bitgen', prombit: 'bitgen',
@@ -321,7 +322,7 @@ async function runImplInner(mod, steps, opts, pjName) {
 // Synthesize - Yosys (open): the open synthesis in the browser, without Xilinx ISE (packages/silinx-fpga/src/synth-open.js):
 // Silinx's front end writes the design as one flat module, Yosys compiled to WebAssembly maps it
 // onto the cells of the device family in a Web Worker; the netlist goes to build/open/
-export const SYNTH_OPEN = 'Synthesize - Yosys (open)';
+export { SYNTH_OPEN };
 let synthOpenRunning = false;
 export async function synthOpen(mod) {
   if (!S.project || !mod) return;
