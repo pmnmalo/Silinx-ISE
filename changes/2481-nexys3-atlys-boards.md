@@ -1,0 +1,5 @@
+In short:
+- The Board Emulator draws the Nexys3 and the Atlys as the real boards, no longer as rows of parts: each part where it is and as it is turned, with the boards' names and FPGA pins; the Atlys's 7-segment display on a module plugged into its VHDCI connector, as the examples use it.
+
+In detail:
+- Layouts of their own for the Nexys3 (`web/js/emulator-nexys3.js`: 900 x 930; the upright power switch on the left edge by the 5 V jack, JA..JD and JTAG along the top, USB PROG, Ethernet, VGA and USB HOST down the left edge, VHDC and UART on the right, LD7..LD0 over SW7..SW0, the display over the cross of BTNU / BTNL / BTNS / BTNR / BTND) and the Atlys (`web/js/emulator-atlys.js`: 860 x 780; the upright power switch by the 5 V jack, HDMI OUT, the audio jacks, HDMI IN and Ethernet along the top, JTAG, PROG, HOST, UART and HDMI IN down the left edge, the VHDCI connector with the 7-segment module on the right edge, RESET over the cross of five buttons, the Pmod JB, LD7..LD0 over SW7..SW0 along the bottom); the boards' names, not their makers' names or logos (#2481). The iCEBreaker's layout follows its board data (#2475).
