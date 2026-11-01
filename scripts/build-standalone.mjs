@@ -39,6 +39,8 @@ const LAYOUT = {
   dir: BUILD ? `dev-${BUILD.commit}/` : `${VERSION}/`,
   yosys: `../vendor/yowasp-yosys/${YOSYS_VERSION}/gen/bundle.js`,
   nextpnr: `../vendor/nextpnr-spartan/${NEXTPNR_VERSION}/gen/bundle.js`,
+  // (the iCE40's: not published, from npm's registry on its first run, at package-lock.json's version and SHA-512, #2444)
+  nextpnrIce40Package: (({ resolved: url, integrity }) => ({ url, integrity }))(JSON.parse(rd('package-lock.json')).packages['node_modules/@yowasp/nextpnr-ice40']),
   site: new URL(arg('--assets-url') || (BUILD ? `${PUBLISHED}dev/` : PUBLISHED)).href,
 };
 // the assets this version publishes (writeAssets): their folder under assets/, where they come from, which files

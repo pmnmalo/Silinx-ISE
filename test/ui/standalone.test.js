@@ -54,7 +54,7 @@ before(async () => {
   git('init', '-q'); git('-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'build');
   build = buildInfo(root, VERSION, devEnv());
   for (const d of ['web', 'core', 'packages', 'server', 'examples', 'test-designs', 'research', 'changes']) await fs.symlink(path.join(ROOT, d), path.join(root, d), 'dir');
-  for (const f of ['LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md']) await fs.copyFile(path.join(ROOT, f), path.join(root, f));   // the embedded notices
+  for (const f of ['LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md', 'package-lock.json']) await fs.copyFile(path.join(ROOT, f), path.join(root, f));   // the embedded notices; the iCE40's package (#2444)
   await fs.symlink(modules, path.join(root, 'node_modules'), 'dir');
   site = path.join(root, 'site');
   // the site over HTTP, as GitHub Pages serves it (no Content-Encoding: the .json.gz are fetched as bytes)
@@ -1301,13 +1301,16 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
     const hashes = [...text.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
     assert.ok(hashes.length >= 4, `${hashes.length} inline scripts`);
     assert.deepEqual(d['script-src'], ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", origin, ...hashes]);
-    assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', origin]);
+    assert.deepEqual(d['connect-src'], ["'self'", 'https://api.github.com', 'https://raw.githubusercontent.com', 'https://registry.npmjs.org', origin]);
+    // the iCE40's nextpnr from npm's registry at package-lock.json's SHA-512 (#2444)
+    const ice40 = JSON.parse(await fs.readFile(path.join(ROOT, 'package-lock.json'), 'utf8')).packages['node_modules/@yowasp/nextpnr-ice40'];
+    assert.ok(text.includes(JSON.stringify({ url: ice40.resolved, integrity: ice40.integrity })), 'the page has the package\'s URL and SHA-512');
     assert.deepEqual(d['worker-src'], ["'self'", 'blob:']);
     assert.deepEqual(d['object-src'], ["'none'"]);
     assert.deepEqual(d['base-uri'], ["'none'"]);
     assert.equal(d['frame-ancestors'], undefined, 'not in a <meta> (the browser reports it as an error)');
     layout = JSON.parse(text.match(/window\.SILINX_ASSET_LAYOUT = (\{.*?\});\n/)[1]);
-    assert.deepEqual({ ...layout, integrity: undefined }, { dir, yosys: `../vendor/yowasp-yosys/${yosysVersion}/gen/bundle.js`, nextpnr: `../vendor/nextpnr-spartan/${nextpnrVersion}/gen/bundle.js`, site: siteUrl, integrity: undefined });
+    assert.deepEqual({ ...layout, integrity: undefined }, { dir, yosys: `../vendor/yowasp-yosys/${yosysVersion}/gen/bundle.js`, nextpnr: `../vendor/nextpnr-spartan/${nextpnrVersion}/gen/bundle.js`, nextpnrIce40Package: { url: ice40.resolved, integrity: ice40.integrity }, site: siteUrl, integrity: undefined });
   }
   // the site's assets, versioned; none at the unversioned paths of before
   const ls = async (p) => (await fs.readdir(path.join(site, p))).sort();
