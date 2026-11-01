@@ -32,10 +32,19 @@ test('the iCEBreaker in the board data: the UP5K in SG48, IceStorm\'s pins', () 
   assert.deepEqual(b.device, { family: 'ice40', part: 'ice40up5k', package: 'sg48', speed: '' });
   assert.deepEqual(validateDevice(b.device), []);
   const pins = Object.fromEntries(b.resources.map(r => [r.name, r.pins]));
-  assert.deepEqual(pins, { clk: ['35'], led: ['27', '25', '21', '23', '26'], btn: ['20', '19', '18'], ledr_n: ['11'], ledg_n: ['37'], btn_n: ['10'], rx: ['6'], tx: ['9'],
-    pmod1a: ['4', '2', '47', '45', '3', '48', '46', '44'], pmod1b: ['43', '38', '34', '31', '42', '36', '32', '28'] });
+  const own = { clk: ['35'], led: ['27', '25', '21', '23', '26'], btn: ['20', '19', '18'], ledr_n: ['11'], ledg_n: ['37'], btn_n: ['10'], rx: ['6'], tx: ['9'] };
+  // (#2517) the examples' display and switches on Pmods 1A and 1B: every one of their 16 pins
+  assert.deepEqual(pins, { ...own, seg: ['4', '2', '47', '45', '3', '48', '46'], dp: ['44'], sw: ['43', '38', '34', '31'], an: ['42', '36', '32', '28'] });
+  for (const n of ['seg', 'dp', 'an']) assert.equal(b.resources.find(r => r.name === n).extra.activeLow, true, n);
   // (the snap-off's LEDs and buttons are Pmod 2's pins: not a resource of their own, a pin on one resource only)
   assert.equal(new Set(Object.values(pins).flat()).size, Object.values(pins).flat().length);
+  // the iCEBreaker with a PmodVGA: the same FPGA, its own pins; the colours' most significant bits (R1..R3, G1..G3, B2..B3)
+  const v = findBoard('icebreaker-vga');
+  assert.deepEqual(v.device, b.device);
+  const vpins = Object.fromEntries(v.resources.map(r => [r.name, r.pins]));
+  assert.deepEqual(vpins, { ...own, vga_red: ['2', '47', '45'], vga_green: ['38', '34', '31'], vga_blue: ['46', '44'], vga_hsync: ['42'], vga_vsync: ['36'] });
+  assert.equal(new Set(Object.values(vpins).flat()).size, Object.values(vpins).flat().length);
+  for (const r of [...b.resources, ...v.resources]) assert.equal(r.verified, !/^(seg|dp|sw|an|vga_)/.test(r.name), r.name);
 });
 
 test('a board\'s constraints in its family\'s format: a PCF on the iCEBreaker, the UCF as before on a Xilinx board', () => {

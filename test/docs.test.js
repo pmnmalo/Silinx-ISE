@@ -188,7 +188,7 @@ test('docs: the boards the Silinx toolchain supports are the ones the code suppo
   for (const b of SUPPORTED) {
     // (a board with no variants by its name: the Nexys3, the Atlys)
     const ok = b.board === 's3e-starter' ? /Spartan-3E Starter Kit/.test(section)
-      : b.name.includes('-') ? named(section).includes(b.name) : new RegExp(`\\b${b.name}\\b`).test(section);
+      : b.name.includes('-') ? named(section).includes(b.name) : new RegExp(`\\b${b.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(section);   // (a name with a +, #2517)
     assert.ok(ok, `README's Silinx toolchain section does not name the ${b.name}`);
   }
   // "Basys2 and Nexys2 boards" (Getting Started, both languages): every variant of them
