@@ -1,5 +1,6 @@
 // The Processes panel (#405: out of app.js): the processes of the selected source and what runs them, Check Syntax
 // and the elaboration's diagnostics, and the processes' status kept in the project's build folder.
+import { openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
 import { api } from './api.js';
 import { icons, icon } from './icons.js';
 import { h, dialog, popupMenu, toast, longPressMenu } from './ui.js';
@@ -32,16 +33,20 @@ const SUMMARY_PROC = { id: 'summary', label: 'Design Summary/Reports', ico: 'sum
 // the project's synthesis tool (Design Properties: Silinx or XST), else Toolchain Settings' mode; never
 // in the single-file edition (no server: the Silinx toolchain runs on it)
 // (the browser edition: the Silinx toolchain, unless the project chose XST)
-export const openMode = () => (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx');
+export const openMode = () => openOnlyDevice(S.project?.device) || (S.project?.synthTool ? S.project.synthTool === 'silinx' : api.standalone || S.toolchain?.config?.mode === 'silinx');
 export const OPEN_SYNTH = 'Synthesize - Yosys';
 // (Back-annotate Pin Locations, View Technology Schematic and the simulation models are the Silinx toolchain's
 // own: the pads its placer chose, the netlist of its synthesis, its packed and its routed design, #120-#122;
 // none needs ISE any more, the mechanism stays for the processes to come)
 export const ISE_ONLY = new Set([]);
 const ISE_ONLY_TIP = 'Needs Xilinx ISE: not available with the Silinx toolchain (choose an ISE mode in Toolchain Settings)';
+// what a family only the open toolchain implements does not have (the iCE40, #2295): nextpnr maps in its Place & Route,
+// its report gives the timing, and the simulation models, the views and the wizards of the UCF read Xilinx's cells
+const OPEN_ONLY_ABSENT = new Set(['map', 'trce', 'xpwr', 'postsynth', 'posttrans', 'postmap', 'postpar', 'pin2ucf', 'fpgaview', 'tech']);
 function forOpenMode(defs) {
   const conv = p => {
     if (p.id === 'synth-open') return null;   // Synthesize is the open synthesis already
+    if (OPEN_ONLY_ABSENT.has(p.id) && openOnlyDevice(S.project?.device)) return null;
     const q = { ...p };
     if (ISE_ONLY.has(p.id)) Object.assign(q, { disabled: true, title: ISE_ONLY_TIP });
     if (p.id === 'synth') q.label = OPEN_SYNTH;
@@ -406,7 +411,7 @@ function sourcesFingerprint() {
 // Translate while they are the same
 export function synthFingerprint(sources) {
   const ucf = S.project.constraints;
-  const parts = sources.filter(f => f.role !== 'sim' && f.path !== ucf && !/\.ucf$/i.test(f.path)).map(f => `${f.path}\n${f.text}`).sort();
+  const parts = sources.filter(f => f.role !== 'sim' && f.path !== ucf && !/\.(ucf|pcf)$/i.test(f.path)).map(f => `${f.path}\n${f.text}`).sort();
   parts.push(`top\n${S.project.top}`, `dev\n${JSON.stringify(S.project.device)}`, `tool\n${S.project.synthTool || ''}\n${openMode()}`, `effort\n${S.project.impl?.optLevel ?? ''}\n${S.project.impl?.optMode ?? ''}`);
   let h = 2166136261;
   for (const c of parts.join('\0')) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }

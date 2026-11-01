@@ -6,7 +6,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { compile, elaborate } from '../core/compile.js';
 import { primitiveSources } from '../core/unisim.js';
-import { boardAutoAssign, generateUcf } from '../packages/silinx-fpga/src/parts.js';
+import { boardAutoAssign, generateUcf, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
 import { resolveBoard } from './devices.js';
 import { within } from './paths.js';
 import { topNameError } from './ident.js';
@@ -55,7 +55,7 @@ export function langOf(p) {
   const ext = path.extname(p).toLowerCase();
   if (ext === '.v' || ext === '.vh' || ext === '.sv') return 'verilog';
   if (ext === '.vhd' || ext === '.vhdl') return 'vhdl';
-  if (ext === '.ucf') return 'ucf';
+  if (ext === '.ucf' || ext === '.pcf') return 'ucf';
   return 'text';
 }
 
@@ -208,7 +208,7 @@ export async function createProject({ name, template = 'empty', device, board })
   await fs.mkdir(path.join(dir, 'constraints'), { recursive: true });
   return writeProject(name, {
     name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null,
-    top: '', simTop: '', files: [], constraints: 'constraints/top.ucf',
+    top: '', simTop: '', files: [], constraints: `constraints/top${openOnlyDevice(device) ? '.pcf' : '.ucf'}`,
     stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
   });
 }

@@ -11,7 +11,7 @@
 // Target Device programs the FPGA of a Digilent board over WebUSB (core/adept.js; Chrome / Edge),
 // and its Platform Flash (core/xcf.js). XST (Xilinx ISE) needs the full application.
 import { getDeviceDb, findPart } from '../../server/devices.js';
-import { resourcesOf, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
+import { resourcesOf, openOnlyDevice, MODEL_VERSION } from '../../packages/silinx-fpga/src/parts.js';
 import { exportCSources, exportXise, importXise, importIseSchematics, exportIseSchematics } from '../../server/xise.js';
 import EXAMPLES from 'silinx-examples';
 import { isCSource } from '../../core/view-hdl.js';
@@ -300,7 +300,7 @@ export const api = {
   openStatus: async name => browserOpenStatus((await projectJson(name)).device || {}),
   implement: async (name, { steps, synthUpToDate = false } = {}) => {
     const p = await store.load(name);
-    if (p.json.synthTool === 'xst') return fakeJob('implement', NEED_ISE, 'error', 'XST needs Xilinx ISE 14.7 (choose Silinx as the synthesis tool in Design Properties)');
+    if (p.json.synthTool === 'xst' && !openOnlyDevice(p.json.device)) return fakeJob('implement', NEED_ISE, 'error', 'XST needs Xilinx ISE 14.7 (choose Silinx as the synthesis tool in Design Properties)');
     const id = `local-${++jobSeq}`;
     const job = addJob({ id, kind: 'implement', status: 'running', lines: [], next: 0, error: null });
     // Stop (cancelJob): the flow's worker is terminated, nothing of the run is written after it

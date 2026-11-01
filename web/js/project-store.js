@@ -10,6 +10,7 @@
 // FileSystemDirectoryHandle (test/fixtures/fs-access-fake.js).
 
 import { DEV_SITE } from './prefs.js';
+import { openOnlyDevice } from '../../packages/silinx-fpga/src/parts.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
 
 const PROJECT_FILE = 'silinx.json';
@@ -22,7 +23,7 @@ export { DEV_SITE };
 const BROWSER_KEY = DEV_SITE ? 'silinx.dev.standalone.fs' : 'silinx.standalone.fs';
 
 const fail = msg => { throw new Error(msg); };
-const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.ucf$/i.test(p) ? 'ucf' : 'text');
+const langOf = p => (/\.(v|vh|sv)$/i.test(p) ? 'verilog' : /\.(vhd|vhdl)$/i.test(p) ? 'vhdl' : /\.(ucf|pcf)$/i.test(p) ? 'ucf' : 'text');
 /**
  * A project-relative path normalised: forward slashes, no empty or '.' segments. null when it would
  * leave the project (#483): not a string, empty, absolute ('/x', '\\\\host\\x', 'C:\\x'), a '..' segment,
@@ -49,7 +50,7 @@ export function projectJsonText(name, pj) {
 /** A new empty project's silinx.json (server/projects.js createProject). */
 export const emptyProjectJson = (name, { device, board } = {}) => ({
   name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null, top: '', simTop: '', files: [],
-  constraints: 'constraints/top.ucf', stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
+  constraints: `constraints/top${openOnlyDevice(device) ? '.pcf' : '.ucf'}`, stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
 });
 const under = (k, dir) => k === dir || k.startsWith(`${dir}/`);
 const plain = o => !!o && typeof o === 'object' && !Array.isArray(o);
