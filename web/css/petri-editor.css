@@ -2,7 +2,6 @@
 .petri-editor { --pn-place-fill: color-mix(in srgb, var(--asm-panel) 82%, var(--asm-accent) 18%); --pn-hot: #e0752d; }
 .petri-editor .pn-ico-place { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 1.6px solid currentColor; background: var(--pn-place-fill); }
 .petri-editor .pn-ico-trans { display: inline-block; width: 4px; height: 14px; background: currentColor; }
-.petri-editor .pn-tool.active, .petri-editor .pn-tab-btn.active { outline: 2px solid var(--asm-accent); outline-offset: -2px; }
 .petri-editor .pn-canvas.pn-adding { cursor: crosshair; }
 .petri-editor .pn-place, .petri-editor .pn-trans { cursor: move; }
 .petri-editor .pn-circle { fill: var(--pn-place-fill); stroke: var(--asm-fg); stroke-width: 1.6; }
@@ -26,9 +25,6 @@
 .petri-editor .pn-arrowhead { fill: color-mix(in srgb, var(--asm-fg) 85%, transparent); }
 .petri-editor .pn-inhib { fill: var(--asm-bg); stroke: color-mix(in srgb, var(--asm-fg) 85%, transparent); stroke-width: 1.6; }
 .petri-editor .pn-weight { fill: var(--asm-fg); font: 700 11px var(--asm-mono); pointer-events: none; }
-.petri-editor .pn-link { display: inline-flex; align-items: center; font-size: 12px; }
-.petri-editor .pn-link .gen-banner { margin-left: 4px; padding: 2px 8px; border: 1px solid var(--asm-border); border-radius: 4px; }
-.petri-editor .pn-link .gen-banner a { color: var(--asm-accent); cursor: pointer; text-decoration: underline; }
 .petri-editor .pn-panel-tools { display: inline-flex; gap: 4px; margin-left: 8px; }
 .petri-editor .pn-panel-body { padding: 6px 10px; overflow: auto; color: var(--asm-fg); }
 .petri-editor .pn-sim-row { margin: 3px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

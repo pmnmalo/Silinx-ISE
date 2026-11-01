@@ -18,6 +18,7 @@
 //
 // Styles: web/css/sch-editor.css (scoped under .sch-editor, themed by the ISE variables of theme.css).
 
+import { ICON } from './editor-icons.js';
 import {
   SYMBOL_CATEGORIES, GRID, defaultParams, normalizeDoc, newDoc, symbolBox, portBox, netlist, netShort,
 } from '/core/schdoc.js';
@@ -58,29 +59,7 @@ export const snap = v => Math.round(v / GRID) * GRID;
 export const KEYS = { sym: 'symbols', wire: 'wires', port: 'ports', label: 'labels' };
 
 
-// ------------------------------------------------------------------ icons (16x16)
-const I = (body) => `<svg viewBox="0 0 16 16">${body}</svg>`;
-export const ICON = {
-  select: I('<path d="M3 1.5v12l3.2-3 2.3 5 1.8-.8-2.3-5H12z" fill="#fff" stroke="#24476f" stroke-width="1.1" stroke-linejoin="round"/>'),
-  wire: I('<path d="M1.5 12.5h5v-9h8" fill="none" stroke="#0000a0" stroke-width="1.6"/><circle cx="1.5" cy="12.5" r="1.4" fill="#0000a0"/><circle cx="14.5" cy="3.5" r="1.4" fill="#0000a0"/>'),
-  net: I('<path d="M1 12.5h14" stroke="#0000a0" stroke-width="1.4"/><text x="1.5" y="9.5" font-size="8" font-family="Arial" font-weight="bold" fill="#800000">abc</text>'),
-  io: I('<path d="M1.5 4.5h8l4 3.5-4 3.5h-8z" fill="#fffff0" stroke="#000080" stroke-width="1.2"/>'),
-  rotate: I('<path d="M12.5 8a4.5 4.5 0 1 1-1.3-3.2" fill="none" stroke="#24476f" stroke-width="1.5"/><path d="M13.6 1.8v3.8H9.8z" fill="#24476f"/>'),
-  mirrorv: I('<path d="M1 8h14" stroke="#888" stroke-dasharray="2 1.5"/><path d="M3.5 6.5h9L12.5 1.5z" fill="#9cc3ea" stroke="#24476f"/><path d="M3.5 9.5h9l0 5z" fill="#fff" stroke="#24476f"/>'),
-  more: I('<circle cx="8" cy="3" r="1.5" fill="#24476f"/><circle cx="8" cy="8" r="1.5" fill="#24476f"/><circle cx="8" cy="13" r="1.5" fill="#24476f"/>'),
-  mirror: I('<path d="M8 1v14" stroke="#888" stroke-dasharray="2 1.5"/><path d="M6.5 3.5v9L1.5 12.5z" fill="#9cc3ea" stroke="#24476f"/><path d="M9.5 3.5v9l5 0z" fill="#fff" stroke="#24476f"/>'),
-  del: I('<path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="#c00000" stroke-width="2.2" stroke-linecap="round"/>'),
-  zin: I('<circle cx="6.5" cy="6.5" r="4.5" fill="#e8f2fc" stroke="#24476f" stroke-width="1.4"/><path d="M10 10l4.5 4.5" stroke="#24476f" stroke-width="2"/><path d="M4 6.5h5M6.5 4v5" stroke="#24476f" stroke-width="1.4"/>'),
-  zout: I('<circle cx="6.5" cy="6.5" r="4.5" fill="#e8f2fc" stroke="#24476f" stroke-width="1.4"/><path d="M10 10l4.5 4.5" stroke="#24476f" stroke-width="2"/><path d="M4 6.5h5" stroke="#24476f" stroke-width="1.4"/>'),
-  fit: I('<path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="#24476f" stroke-width="1.5"/><rect x="5" y="5" width="6" height="6" fill="#9cc3ea" stroke="#24476f"/>'),
-  check: I('<rect x="1.5" y="1.5" width="13" height="13" rx="1" fill="#fff" stroke="#24476f"/><path d="M4 8.2l2.6 2.6L12 5" fill="none" stroke="#008000" stroke-width="2"/>'),
-  sim: I('<rect x="1" y="4" width="7" height="8" rx="1.5" fill="#1f6b1f" stroke="#0d3d0d"/><rect x="4.5" y="5.5" width="2.5" height="5" rx=".6" fill="#fff"/><path d="M9 8h2.5" stroke="#00b000" stroke-width="1.6"/><circle cx="13" cy="8" r="2.4" fill="#33e033" stroke="#0d6d0d"/>'),
-  info: I('<circle cx="8" cy="8" r="6.5" fill="#e8f2fc" stroke="#24476f" stroke-width="1.2"/><circle cx="8" cy="4.6" r="1.1" fill="#24476f"/><path d="M8 7v5" stroke="#24476f" stroke-width="2"/>'),
-  // (#1730: a wire with a square bend redrawn, Rearrange Wires)
-  rewire: I('<path d="M1.5 12.5h4v-8h5v4h4" fill="none" stroke="#24476f" stroke-width="1.6" stroke-linejoin="round"/><circle cx="1.5" cy="12.5" r="1.4" fill="#24476f"/><circle cx="14.5" cy="8.5" r="1.4" fill="#24476f"/><path d="M12 1l.6 1.4 1.4.6-1.4.6L12 5l-.6-1.4L10 3l1.4-.6z" fill="#e0a000"/>'),
-  beautify: I('<path d="M2 14.5l8.5-8.5" stroke="#24476f" stroke-width="2" stroke-linecap="round"/><path d="M11.5 1l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="#e0a000"/><path d="M4 3l.5 1 1 .5-1 .5L4 6l-.5-1-1-.5 1-.5zM13.5 9.5l.5 1 1 .5-1 .5-.5 1-.5-1-1-.5 1-.5z" fill="#e0a000"/>'),
-  view: I('<path d="M3 1.5h7l3 3v10H3z" fill="#fff" stroke="#24476f"/><path d="M10 1.5v3h3" fill="none" stroke="#24476f"/><text x="4.2" y="12" font-size="6.5" font-family="Consolas,monospace" font-weight="bold" fill="#000080">&lt;/&gt;</text>'),
-};
+export { ICON };   // (editor-icons.js's)
 
 export function onSeg(p, a, b, tol = 0) {
   if (a.x === b.x) return Math.abs(p.x - a.x) <= tol && p.y >= Math.min(a.y, b.y) - tol && p.y <= Math.max(a.y, b.y) + tol;
@@ -165,8 +144,8 @@ export function mountSchEditor(container, opts = {}) {
     branchBox, rearrangeWires, rearrangeSheet, container, btn, canSim, curvedBox: curve.box, deleteSel: (...a) => deleteSel(...a), enterSim: (...a) => enterSim(...a),
     fit: (...a) => fit(...a), hopsBox, keepBox,
     leaveSim: (...a) => leaveSim(...a), live: () => live, mirrorSel: (...a) => mirrorSel(...a), mirrorVSel: (...a) => mirrorVSel(...a), namesBox,
-    readOnly, redo: (...a) => redo(...a), rotateSel: (...a) => rotateSel(...a),
-    runCheck: (...a) => runCheck(...a), sep, setTool: (...a) => setTool(...a), tb, undo: (...a) => undo(...a),
+    readOnly, rotateSel: (...a) => rotateSel(...a),
+    runCheck: (...a) => runCheck(...a), sep, setTool: (...a) => setTool(...a), tb,
     zoomAt: (...a) => zoomAt(...a)
   });
 

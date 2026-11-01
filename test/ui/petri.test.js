@@ -31,8 +31,8 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
   await page.waitFor((ed) => /^2 places/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'undone' });
   assert.match(await count(), /2 places/);
   // the simulation: start is enabled but its guard (go) is false; go: it is ready, a click fires it
-  await page.click(`${ED} .pn-tool`, { text: '➚ Select' });
-  await page.click(`${ED} .pn-tab-btn`, { text: '▶ Simulate' });
+  await page.click(`${ED} [data-act=select]`);
+  await page.click(`${ED} .pn-tab-btn`, { text: 'Simulate' });
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-trans[data-id=t1]`)?.classList.contains('enabled'), [ED], { what: 'start enabled, guard false' });
   await page.click(`${ED} .pn-sim-ins input[type=checkbox]`);
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-trans[data-id=t1]`).classList.contains('ready'), [ED], { what: 'start ready' });
@@ -46,7 +46,7 @@ uiTest('Petri net editor: new net, a place added and undone, the token game and 
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=1  work=0', [ED], { what: 'done fired at the clock step' });
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .pn-log`).textContent, ED), /clock: done/);
   // no </> HDL button (#2250): the HDL is the linked file
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['▶ Simulate', '∑ Analysis']);
+  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .pn-tab-btn`)].map((b) => b.textContent), ED), ['Simulate', '∑ Analysis']);
   // the net is a module of the project with its HDL file, made with it (every source has its HDL, #207): Set as Top Module
   assert.match(await page.consoleText(), /src\/ctl\.vhd generated from src\/ctl\.pn\.json \(every source has its HDL\)/);
   await page.waitFor(() => [...document.querySelectorAll('#hier .lbl')].some((e) => e.textContent === 'ctl'), [], { what: 'ctl in the hierarchy' });
@@ -98,7 +98,7 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   const box = await page.eval((ed) => { const r = document.querySelector(`${ed} .pn-canvas`).getBoundingClientRect(); return { x: r.left + r.width - 70, y: r.top + r.height - 70 }; }, ED);
   await page.click(box);
   await page.waitFor((ed) => /3 transitions/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 't3 added' });
-  await page.click(`${ED} .pn-tool`, { text: '→ Arc' });
+  await page.click(`${ED} .pn-tool`, { text: 'Arc' });
   await page.click(await node(page, 'p2')); await page.click(await node(page, 't3'));
   await page.click(await node(page, 't3')); await page.click(await node(page, 'p1'));
   await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'two arcs drawn' });
@@ -106,7 +106,7 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   await page.click(await node(page, 'p1')); await page.click(await node(page, 'p2'));
   await page.waitFor((ed) => document.querySelector(`${ed} .asm-status-msg`).textContent === 'An arc joins a place and a transition', [ED]);
   // an inhibitor arc work ⊸ start; from a transition: refused
-  await page.click(`${ED} .pn-tool`, { text: '⊸ Inhibitor' });
+  await page.click(`${ED} .pn-tool`, { text: 'Inhibitor' });
   await page.click(await node(page, 't1')); await page.click(await node(page, 'p1'));
   await page.waitFor((ed) => document.querySelector(`${ed} .asm-status-msg`).textContent === 'An inhibitor arc goes from a place to a transition', [ED]);
   await page.click(await node(page, 'p2')); await page.click(await node(page, 't1'));
@@ -114,14 +114,14 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   let m = await untilSaved('PnEd', (x) => x.arcs.length === 7, 'the 7 arcs saved');
   assert.deepEqual(m.arcs.slice(4).map((a) => [a.from, a.to, !!a.inhibitor]), [['p2', 't3', false], ['t3', 'p1', false], ['p2', 't1', true]]);
   // the inhibitor arc is selected: ✕ deletes it, ↶ brings it back, ↷ deletes it again
-  await page.click(`${ED} .asm-danger`, { text: '✕' });
+  await page.click(`${ED} [data-act=delete]`);
   await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'deleted' });
-  await page.click(`${ED} .tb-btn[title=Undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor((ed) => /7 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'undone' });
-  await page.click(`${ED} .tb-btn[title=Redo]`);
+  await page.click(`#toolbar [data-cmd=redo]`);
   await page.waitFor((ed) => /6 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'redone' });
   // the properties: idle 2 tokens (its capacity follows), t3 a guard, a pulse, the first in priority
-  await page.click(`${ED} .pn-tool`, { text: '➚ Select' });
+  await page.click(`${ED} [data-act=select]`);
   await page.click(await node(page, 'p1'));
   await setField(page, 'Initial tokens', 2);
   await page.click(await node(page, 't3'));
@@ -138,7 +138,7 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   await page.click(`${ED} .pn-tool`, { text: 'Place' });
   await page.click({ x: box.x, y: box.y - 120 });
   await page.waitFor((ed) => /3 places/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED]);
-  await page.click(`${ED} .pn-tool`, { text: '➚ Select' });
+  await page.click(`${ED} [data-act=select]`);
   await page.click(await node(page, 't3'));
   await setField(page, 'Guard', 'go &');
   await page.click(await node(page, 'p2'));
@@ -151,12 +151,12 @@ uiTest('Petri net editor: arcs and inhibitor arcs drawn, delete / undo / redo, t
   ]);
   // a click on a problem selects what it is about
   await page.click(`${ED} .asm-prob`, { text: 'place p1 is not connected' });
-  await page.waitFor((ed) => /^Place p1/.test(document.querySelector(`${ed} .pn-selection .asm-section-title`)?.textContent || ''), [ED], { what: 'p1 selected' });
+  await page.waitFor((ed) => /^Place p1/.test(document.querySelector(`${ed} .pn-selection h3`)?.textContent || ''), [ED], { what: 'p1 selected' });
 });
 
 uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (undone); the HDL file generated and kept in sync', E, async (page) => {
   await newNet(page, 'PnSim');
-  await page.click(`${ED} .pn-tab-btn`, { text: '▶ Simulate' });
+  await page.click(`${ED} .pn-tab-btn`, { text: 'Simulate' });
   const marking = () => page.eval((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent, ED);
   await page.waitFor((ed) => document.querySelector(`${ed} .pn-marking`)?.textContent === 'idle=1  work=0', [ED]);
   // Random: go off, nothing can fire; go on: start fires
@@ -218,7 +218,7 @@ uiTest('Petri net editor: Random, Run / Stop, Reset; PNML export and import (und
   await page.waitFor((ed) => /2 places · 2 transitions · 4 arcs/.test(document.querySelector(`${ed} .asm-status`).textContent), [ED], { what: 'the import undone' });
   // the HDL file: made with the net (every source has its HDL, #207), generated from it
   await page.waitFor(() => window.Silinx.project.files.some((x) => x.path === 'src/ctl.vhd'), [], { what: 'src/ctl.vhd in the project' });
-  await page.waitFor(() => /^HDL: ctl\.vhd — generated from the net$/.test(document.querySelector('.doc:not([hidden]) .petri-editor .gen-banner')?.textContent || ''), [], { what: 'the link banner' });
+  await page.waitFor(() => document.querySelector('.doc:not([hidden]) .petri-editor .pn-link')?.dataset.hdl === 'ctl.vhd', [], { what: 'the link banner' });
   // (the import undone is saved, and its HDL written, a moment after the editor shows it)
   await untilWs('PnSim', 'src/ctl.vhd', (t) => /entity ctl is[\s\S]*busy : out std_logic/.test(t), 'the HDL of the net (the import undone)');
   await setField(page, 'Outputs', 'busy, ready');
@@ -253,7 +253,7 @@ uiTest('Petri net editor: the analysis (#188): properties, places, transitions, 
   assert.deepEqual(await txt('.pn-an-tinv li'), ['start + done']);
   assert.deepEqual(await txt('.pn-an-graph li'), ['idle=1  work=0  →  start: M1', 'idle=0  work=1  →  done: M0']);
   // done no longer puts the token back (its arc to idle deleted): a deadlock after start, done
-  await page.click(`${ED} .pn-tool`, { text: '➚ Select' });
+  await page.click(`${ED} [data-act=select]`);
   const arc = await page.eval((ed) => { const l = document.querySelector(`${ed} .pn-arc[data-id=a4] .pn-arc-hit`).getBoundingClientRect(); return { x: l.left + l.width / 2, y: l.top + l.height / 2 }; }, ED);
   // each step waited for, so that a failure names it (#233): the arc selected by the click (what was
   // under the pointer said), the keys going to the editor, the arc gone
@@ -321,7 +321,7 @@ uiTest('Petri Net Wizard (#208): New Source ▸ Petri Net ▸ Wizard > (#958), t
     'Then draw its places, transitions and arcs; the outputs are set by the places (while marked) and the transitions (when they fire).'].join('\n'));
   await page.dialogButton('Finish');
   await page.waitNoDialog();
-  await page.waitFor((ed) => window.Silinx.active?.id === 'pn:nets/ctl.pn.json' && /^0 places · 0 transitions · 0 arcs$/.test(document.querySelector(`${ed} .asm-status`)?.textContent || ''), [ED], { what: 'the empty net opened' });
+  await page.waitFor((ed) => window.Silinx.active?.id === 'pn:nets/ctl.pn.json' && /^0 places · 0 transitions · 0 arcs$/.test(document.querySelector(`${ed} .asm-status > span`)?.textContent || ''), [ED], { what: 'the empty net opened' });
   const m = JSON.parse(await readWs(env, 'PnWiz', 'nets/ctl.pn.json'));
   assert.deepEqual([m.name, m.lang, m.clock, m.reset, m.inputs, m.outputs, m.places, m.transitions, m.arcs],
     ['ctl', 'vhdl', 'clk', { name: 'rst', active: 'high', sync: true }, [{ name: 'go', width: 1 }, { name: 'sel', width: 3 }], [{ name: 'busy', width: 1 }, { name: 'st', width: 2 }], [], [], []]);

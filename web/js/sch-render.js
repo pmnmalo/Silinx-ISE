@@ -10,7 +10,7 @@ import { snap } from './sch-editor.js';
 /** { renderSheet, render, renderOverlay, updateToolbar, updateStatus } of a schematic editor (state(): its current
  *  document, netlist, selection, tool, … at the time of the call; refreshNetlist() computes the netlist again). */
 export function mountRender(ctx) {
-  const { state, curve, segSel, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, undoStack, redoStack, routeTo, snapPoint, bandRect } = ctx;
+  const { state, curve, segSel, refreshNetlist, uidE, readOnly, sheetG, contentG, overlayG, tb, status, routeTo, snapPoint, bandRect } = ctx;
   function renderSheet() {
     const { doc } = state();
     const W = doc.sheet.w, H = doc.sheet.h;
@@ -155,8 +155,6 @@ export function mountRender(ctx) {
     const { live, tool, sel, doc } = state();
     curve.box.checked = doc.wireStyle === 'curved';
     tb.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('on', live ? b.dataset.act === 'sim' : b.dataset.act === tool));
-    tb.querySelector('[data-act="undo"]').disabled = !undoStack.length;
-    tb.querySelector('[data-act="redo"]').disabled = !redoStack.length;
     const any = sel.size > 0;
     tb.querySelector('[data-act="delete"]').disabled = !any;
     const symSel = [...sel].some(k => k.startsWith('sym:') || k.startsWith('port:')) || (tool === 'place');

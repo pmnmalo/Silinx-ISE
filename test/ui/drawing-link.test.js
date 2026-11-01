@@ -14,6 +14,8 @@ import { newModel } from '../../core/asm.js';
 import { newFsm } from '../../core/fsm.js';
 import { newDoc, normalizeDoc, symbolPins } from '../../core/schdoc.js';
 
+// the editor's own Undo / Redo (Ctrl+Z, Ctrl+Y in it, #2505): the main toolbar's undoes Generate HDL File…, the newer
+const editorKey = async (page, k) => { await page.eval(() => document.querySelector('.doc:not([hidden]) :is(.sch-editor, .asm-editor)').focus()); await page.key(k, { modifiers: 2 }); };
 let env;
 before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
@@ -88,7 +90,7 @@ uiTest('#245 regression, a Petri net linked to its HDL file on the save that cle
   await page.waitFor(() => window.Silinx.active.petriEditor.getModel().generatedFile === 'src/ctl.vhd', [], { what: 'the editor has the link' });
   assert.equal((await untilSaved('Lk_pn', 'src/ctl.pn.json', (m) => m.generatedFile === 'src/ctl.vhd', 'linked')).places[0].capacity, 2);
   // the link shown in the editor; selection, view and history kept
-  await page.waitFor((s) => /HDL: ctl\.vhd/.test(document.querySelector(`${s} .gen-banner`)?.textContent || ''), [ED], { what: 'the link shown' });
+  await page.waitFor((s) => document.querySelector(`${s} :is(.fsm-link, .pn-link, .tt-link)`)?.dataset.hdl === 'ctl.vhd', [ED], { what: 'the link shown' });
   assert.deepEqual(await selected(page, '.pn-place.sel'), ['p1']);
   assert.equal(await view(page, '.pn-world'), zoomed);
   assert.equal(await page.eval(() => window.Silinx.active.petriEditor.canUndo()), true);
@@ -145,14 +147,14 @@ uiTest('#245 regression, a schematic linked by Generate HDL File… while open: 
   assert.equal(await view(page, '.se-vp'), zoomed);
   assert.equal(await page.eval(() => window.Silinx.active.schEditor.canUndo()), true);
   // Undo (the editor's: Edit ▸ Undo undoes Generate HDL File…, the newer): U1 back, the link kept, saved so
-  await page.click(`${D} button[title=Undo]`);
+  await editorKey(page, 'z');
   await page.waitFor((x) => window.Silinx.active.schEditor.getDoc().symbols[0].x === x, [x0], { what: 'undone' });
   assert.equal((await doc()).generatedFile, 'src/gate_sch.vhd');
   await untilSaved('Lk_sch', 'src/gate.sch.json', (m) => m.symbols[0].x === x0 && m.generatedFile === 'src/gate_sch.vhd', 'the undo saved with the link');
   assert.deepEqual(await selected(page, '.se-svg .sel'), ['S1']);
   assert.equal(await view(page, '.se-vp'), zoomed);
   // Redo
-  await page.click(`${D} button[title=Redo]`);
+  await editorKey(page, 'y');
   await page.waitFor((x) => window.Silinx.active.schEditor.getDoc().symbols[0].x === x, [x1], { what: 'redone' });
   await untilSaved('Lk_sch', 'src/gate.sch.json', (m) => m.symbols[0].x === x1 && m.generatedFile === 'src/gate_sch.vhd', 'the redo saved with the link');
   assert.equal(await readWs(env, 'Lk_sch', 'src/gate.vhd'), OTHER);
@@ -184,14 +186,14 @@ uiTest('#245 regression, an ASM chart linked by Generate HDL File… while open:
   assert.equal(await view(page, '.asm-vp'), zoomed);
   assert.equal(await page.eval(() => window.Silinx.active.asmEditor.canUndo()), true);
   // Undo (the editor's: Edit ▸ Undo undoes Generate HDL File…, the newer)
-  await page.click(`${D} button[title=Undo]`);
+  await editorKey(page, 'z');
   await page.waitFor((x) => window.Silinx.active.asmEditor.getModel().nodes.find((n) => n.id === 's2').x === x, [x0], { what: 'undone' });
   assert.equal((await model()).generatedFile, 'src/ctl_asm.vhd');
   await untilSaved('Lk_asm', 'src/ctl.asm.json', (m) => m.nodes.find((n) => n.id === 's2').x === x0 && m.generatedFile === 'src/ctl_asm.vhd', 'the undo saved with the link');
   assert.deepEqual(await selected(page, '.asm-node.sel'), ['s2']);
   assert.equal(await view(page, '.asm-vp'), zoomed);
   // Redo
-  await page.click(`${D} button[title=Redo]`);
+  await editorKey(page, 'y');
   await page.waitFor((x) => window.Silinx.active.asmEditor.getModel().nodes.find((n) => n.id === 's2').x === x, [x1], { what: 'redone' });
   await untilSaved('Lk_asm', 'src/ctl.asm.json', (m) => m.nodes.find((n) => n.id === 's2').x === x1 && m.generatedFile === 'src/ctl_asm.vhd', 'the redo saved with the link');
   assert.deepEqual(await warnings(page), [W_OTHER('src/ctl.asm.json', 'ctl', 'asm')]);
@@ -220,11 +222,11 @@ uiTest('#245 a state diagram linked by Generate HDL File… while open: the stat
   await generateHdlFile(page, 'blink', 'src/blink.fsm.json', 'src/blink_fsm.vhd');
   await page.waitConsole(/src\/blink_fsm\.vhd generated from src\/blink\.fsm\.json \(src\/blink\.vhd holds something else\)/);
   assert.equal((await model()).generatedFile, 'src/blink_fsm.vhd');
-  await page.waitFor((s) => /HDL: blink_fsm\.vhd/.test(document.querySelector(`${s} .gen-banner`)?.textContent || ''), [`${D} .fsm-editor`], { what: 'the link shown' });
+  await page.waitFor((s) => document.querySelector(`${s} .fsm-link`)?.dataset.hdl === 'blink_fsm.vhd', [`${D} .fsm-editor`], { what: 'the link shown' });
   assert.deepEqual(await selected(page, '.fsm-state.sel'), ['s1']);
   assert.equal(await view(page, '.fsm-vp'), zoomed);
   // Undo (the editor's: Edit ▸ Undo undoes Generate HDL File…, the newer): the state back, the link kept
-  await page.click(`${D} button[title=Undo]`);
+  await editorKey(page, 'z');
   await page.waitFor(() => window.Silinx.active.fsmEditor.getModel().states.length === 3, [], { what: 'undone' });
   assert.equal((await model()).generatedFile, 'src/blink_fsm.vhd');
   await untilSaved('Lk_fsm', 'src/blink.fsm.json', (m) => m.states.length === 3 && m.generatedFile === 'src/blink_fsm.vhd', 'the undo saved with the link');

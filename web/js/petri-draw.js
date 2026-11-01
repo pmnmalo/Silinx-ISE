@@ -9,13 +9,13 @@ import { sv } from './petri-editor.js';
 /** { applyView, render, toWorld } of mountPetriEditor (M(), arcFrom(), destroyed(), drag(), hi(), sel(), sim(), view(): its current values). */
 export function mountPetriDraw(ctx) {
   const {
-    M, arcFrom, delBtn, destroyed, drag, envOf, hi, hist, nodeOf, placeOf, redoBtn, refreshLink, renderPanel,
-    renderSide, sel, sim, statusInfo, svg, uid, undoBtn, view, world
+    M, arcFrom, delBtn, destroyed, drag, envOf, nodeOf, placeOf, refreshLink, renderPanel,
+    renderSide, sel, sim, statusInfo, svg, uid, view, world, zoomLbl
   } = ctx;
 
   // ---------------------------------------------------------------- drawing
   const toWorld = (cx, cy) => { const r = svg.getBoundingClientRect(); return { x: (cx - r.left - view().tx) / view().k, y: (cy - r.top - view().ty) / view().k }; };
-  const applyView = () => world.setAttribute('transform', `translate(${view().tx},${view().ty}) scale(${view().k})`);
+  const applyView = () => { world.setAttribute('transform', `translate(${view().tx},${view().ty}) scale(${view().k})`); zoomLbl.textContent = `${Math.round(view().k * 100)}%`; };
   /** Where an arc meets a node: the rim of a place, the edge of a transition's bar. */
   function rim(n, toward) {
     const dx = toward.x - n.x, dy = toward.y - n.y, d = Math.hypot(dx, dy) || 1;
@@ -80,7 +80,7 @@ export function mountPetriDraw(ctx) {
     }
     renderSide();
     renderPanel();
-    undoBtn.disabled = hi() <= 0; redoBtn.disabled = hi() >= hist.length - 1; delBtn.disabled = !sel();
+    delBtn.disabled = !sel();
     statusInfo.textContent = `${M().places.length} places · ${M().transitions.length} transitions · ${M().arcs.length} arcs`;
     refreshLink();
   }

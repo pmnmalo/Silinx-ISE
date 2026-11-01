@@ -155,13 +155,13 @@ uiTest('#2228 schematic: Select whole branch selects the whole network of wires 
   assert.deepEqual(after.wires.find((w) => w.id === 'W1').points, [{ x: 100, y: 100 }, { x: 300, y: 100 }]);
   assert.ok(after.wires.find((w) => w.id === 'W3').points.some((p) => p.x === 500 && p.y === 340), 'the segment moved');
   assert.deepEqual(await selected(), ['W1', 'W2', 'W3']);
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   // Delete: the network; the other signal stays
   await clickAt(200, 100);
   await page.key('Delete');
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 1, [], { what: 'deleted' });
   assert.equal((await getDoc(page)).wires[0].id, 'W4');
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 4, [], { what: 'undone' });
   // not ticked: the one wire
   await page.click(`${ED} .se-branch input`);
@@ -201,7 +201,7 @@ uiTest('#2211 schematic: Select whole branch beside Keep connections: ticked, th
   await page.key('Delete');
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 2, [], { what: 'split' });
   assert.deepEqual((await getDoc(page)).wires.map((w) => w.points), [[{ x: 100, y: 100 }, { x: 300, y: 100 }], [{ x: 300, y: 300 }, { x: 500, y: 300 }]]);
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 1, [], { what: 'undone' });
   // in Portuguese
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));

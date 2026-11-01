@@ -37,14 +37,14 @@ uiTest('#405 schematic editor parts: the toolbar, the palette, Select All and De
   await page.waitFor((ed) => window.Silinx.active?.id === 'sch:src/andg.sch.json' && document.querySelector(`${ed} .se-symrow`), [ED], { what: 'the schematic editor' });
   const ev = (fn, ...a) => page.eval(fn, ED, ...a);
   const doc = () => page.eval(() => window.Silinx.active.schEditor.getDoc());
-  // ---- the toolbar: its buttons in order, Undo / Redo right after the drawing tools between separators (#1696); the
+  // ---- the toolbar: its buttons in order, the edits right after the drawing tools (no Undo / Redo: the main toolbar's, #2505); the
   // zooms, then Keep connections between separators (#1733); the menu last (#2208)
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .se-toolbar [data-act]`)].map((b) => b.dataset.act)),
-    ['select', 'wire', 'net', 'io', 'undo', 'redo', 'rotate', 'mirror', 'mirrorv', 'delete', 'zin', 'zout', 'fit', 'check', 'sim', 'more', 'rewire', 'relayout']);
-  assert.deepEqual(await ev((ed) => [...document.querySelector(`${ed} .se-toolbar`).children].map((e) => e.dataset.act || (e.classList.contains('se-sep') ? '|' : e.className.match(/se-(keep|curved)/)?.[1])).filter(Boolean).slice(12, 19)),
+    ['select', 'wire', 'net', 'io', 'rotate', 'mirror', 'mirrorv', 'delete', 'zin', 'zout', 'fit', 'check', 'sim', 'more', 'rewire', 'relayout']);
+  assert.deepEqual(await ev((ed) => [...document.querySelector(`${ed} .se-toolbar`).children].map((e) => e.dataset.act || (e.classList.contains('se-sep') ? '|' : e.className.match(/se-(keep|curved)/)?.[1])).filter(Boolean).slice(9, 16)),
     ['|', 'zin', 'zout', 'fit', '|', 'keep', '|']);
   assert.deepEqual(await ev((ed) => [...document.querySelector(`${ed} .se-toolbar`).children].slice(3, 9).map((e) => e.dataset.act || (e.classList.contains('se-sep') ? '|' : e.className))),
-    ['io', '|', 'undo', 'redo', '|', 'rotate']);
+    ['io', '|', 'rotate', 'mirror', 'mirrorv', 'delete']);
   // the zooms (the view): Zoom In scales the drawing by 1.25, Fit back
   const scale = () => ev((ed) => parseFloat(/scale\(([\d.]+)\)/.exec(document.querySelector(`${ed} .se-vp`).getAttribute('transform'))[1]));
   await page.click(`${ED} .se-btn[data-act=fit]`);

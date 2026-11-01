@@ -153,7 +153,7 @@ export function mountFsmPointer(ctx) {
     if (k === 'F2' && sel()) { if (sel().type === 'state') editState(stateById(sel().id)); else editLabel(transById(sel().id)); ev.preventDefault(); return; }
     if (k === '+' || k === '=') zoomBy(1.2);
     else if (k === '-') zoomBy(1 / 1.2);
-    else if (k === '0') fit();
+    else if (k === '0' || k === 'f') fit();
     else if (k === 'Escape' && sel()) { setSel(null); render(); renderSide(); }
   }
   twoFingerView(svg, { cancel: cancelDrag, pan: (dx, dy) => { view().tx += dx; view().ty += dy; applyView(); }, zoom: zoomAt });

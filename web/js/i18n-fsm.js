@@ -3,10 +3,9 @@ export const FSM_PT = {
   // New Source, menus, processes, hierarchy
   'FSM State Diagram Editor…': 'Editor de Diagramas de Estados FSM…',
   'View/Edit State Diagram (FSM)': 'Ver/Editar Diagrama de Estados (FSM)', 'Convert to State Diagram (FSM)…': 'Converter para Diagrama de Estados (FSM)…',
-  'Open State Diagram': 'Abrir Diagrama de Estados', 'Convert to ASM chart': 'Converter para fluxograma ASM', 'Convert the diagram': 'Converter o diagrama',
+  'Open State Diagram': 'Abrir Diagrama de Estados', 'Convert to ASM chart': 'Converter para fluxograma ASM',
   'Convert to State Diagram': 'Converter para Diagrama de Estados', 'Create Boolean Algebra': 'Criar Álgebra Booleana',
   
-  '— generated from the diagram': '— gerado a partir do diagrama',
   // toolbar
   'Moore machine: outputs depend on the state only (written in the circles). Mealy machine: outputs also on the transitions (condition / outputs).':
     'Máquina de Moore: as saídas dependem só do estado (escritas nos círculos). Máquina de Mealy: saídas também nas transições (condição / saídas).',
@@ -15,15 +14,14 @@ export const FSM_PT = {
   'Zoom level': 'Nível de zoom',
   'Delete the selected state or transition (Del)': 'Apagar o estado ou a transição selecionada (Del)',
   'Tables': 'Tabelas', 'State table, transition table and encoded transition table': 'Tabela de estados, tabela de transições e tabela de transições codificada',
-  '</> HDL': '</> HDL', 'Show / hide the generated HDL': 'Mostrar / esconder o HDL gerado',
-  '▶ Simulate': '▶ Simular', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs': 'Percorrer o diagrama passo a passo: definir as entradas, aplicar flancos de relógio, ver o estado e as saídas',
+  'Layout and conversion': 'Disposição e conversão', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs': 'Percorrer o diagrama passo a passo: definir as entradas, aplicar flancos de relógio, ver o estado e as saídas',
   'State': 'Estado', 'Add a state (or double-click the drawing)': 'Acrescentar um estado (ou duplo clique no desenho)',
   'Arrange': 'Organizar', 'Automatic layout of the states': 'Disposição automática dos estados', 'Zoom out': 'Reduzir', 'Zoom in': 'Ampliar',
-  'Fit': 'Ajustar', 'Fit the diagram in the window': 'Ajustar o diagrama à janela', 'Print the diagram / save it as PDF or SVG (Ctrl+P)': 'Imprimir o diagrama / guardá-lo em PDF ou SVG (Ctrl+P)',
+  'Fit': 'Ajustar',
   'Make an ASM chart (.asm.json) of this state machine': 'Fazer um fluxograma ASM (.asm.json) desta máquina de estados',
   'Double-click to add a state · drag from the rim of a state to another state to add a transition · double-click to edit · drag a label to bend its arrow · wheel to zoom':
     'Duplo clique para acrescentar um estado · arraste da borda de um estado para outro estado para acrescentar uma transição · duplo clique para editar · arraste uma etiqueta para curvar a seta · roda para zoom',
-  'Close the panel': 'Fechar o painel', 'Machine': 'Máquina', 'Problems': 'Problemas', 'Code copied to the clipboard': 'Código copiado',
+  'Close the panel': 'Fechar o painel', 'Machine': 'Máquina', 'Problems': 'Problemas',
   // selection
   'Selection': 'Seleção', 'Nothing selected. Click a state or a transition to edit it.': 'Nada selecionado. Clique num estado ou numa transição para o editar.',
   'State (Moore outputs inside)': 'Estado (saídas de Moore lá dentro)', 'Initial (reset) state': 'Estado inicial (de reset)',
@@ -46,7 +44,7 @@ export const FSM_PT = {
   'Synchronous reset': 'Reset síncrono', 'Description': 'Descrição', 'What the machine does (written in the HDL header)': 'O que a máquina faz (escrito no cabeçalho do HDL)',
   'No problems: the diagram is complete.': 'Sem problemas: o diagrama está completo.',
   // tables, code
-  'Copy': 'Copiar', 'Copy the code to the clipboard': 'Copiar o código', 'Export CSV': 'Exportar CSV',
+  'Copy': 'Copiar','Export CSV': 'Exportar CSV',
   'Download this table as a CSV file (opens in a spreadsheet)': 'Descarregar esta tabela num ficheiro CSV (abre numa folha de cálculo)',
   'Transition table': 'Tabela de transições', 'State table': 'Tabela de estados', 'Encoded transition table': 'Tabela de transições codificada',
   'Present state': 'Estado presente', 'Code': 'Código', 'Input condition': 'Condição das entradas', 'Next state': 'Estado seguinte', 'Next code': 'Código seguinte',

@@ -181,7 +181,7 @@ uiTest('Edit ▸ Undo / Redo reach every editor: text, truth table, pin planner 
   await page.menu('Edit', 'Redo');
   await page.waitFor(async (t, b) => [...document.querySelectorAll(`${t} .tt-cell[data-out=f]`)].map((c) => c.textContent).join('') !== b, [T, before0], { what: 'table redo' });
   // the table's own buttons
-  await page.click(`${T} .tt-undo`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   assert.equal(await col(), before0);
   // pin planner: a LOC typed, Edit ▸ Undo
   await page.eval(() => window.SilinxApp.openPinPlanner('top'));

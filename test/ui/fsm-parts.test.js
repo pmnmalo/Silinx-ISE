@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 import { normalizeFsm } from '../../core/fsm.js';
 
+const ACT = { Fit: 'fit', '+': 'zin', '−': 'zout' };
 let env;
 before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
@@ -27,17 +28,17 @@ uiTest('#405 FSM editor parts: the view, the history, the inline editing, the po
   await page.waitFor((ed) => window.Silinx.active?.id === 'fsm:src/pri.fsm.json' && document.querySelector(`${ed} [data-trans=t1] .fsm-label`), [ED], { what: 'FSM editor' });
   await new Promise((r) => setTimeout(r, 300));   // (the fit when it opened)
   const model = () => page.eval(() => window.Silinx.active.fsmEditor.getModel());
-  const tool = (label) => (/^[↶↷]$/.test(label) ? page.click(`${ED} .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click(`${ED} .asm-toolbar .asm-btn`, { text: label }));
+  const tool = async (label) => (label === 'Arrange' && await page.click(`${ED} .tb-more-btn`), /^[↶↷]$/.test(label) ? page.click(`#toolbar [data-cmd=${label === '↶' ? 'undo' : 'redo'}]`) : (ACT[label] ? page.click(`${ED} [data-act=${ACT[label]}]`) : page.click(`${ED} .asm-toolbar .asm-btn`, { text: label })));
   const zoom = () => page.eval((ed) => document.querySelector(`${ed} .asm-zoom`).textContent, ED);
   const scale = () => page.eval((ed) => parseFloat(/scale\(([\d.]+)\)/.exec(document.querySelector(`${ed} .fsm-vp`).getAttribute('transform'))[1]), ED);
-  const undoState = () => page.eval((ed) => ['Undo', 'Redo'].map((t) => document.querySelector(`${ed} .asm-toolbar .tb-btn[title=${t}]`).disabled), ED);
+  const undoState = () => page.eval(() => { const e = window.Silinx.active.fsmEditor; return [!e.canUndo(), !e.canRedo()]; }, ED);
   const statePos = (id) => page.eval((ed, sid) => { const b = document.querySelector(`${ed} [data-state="${sid}"] .fsm-circle`).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, ED, id);
   // ---- the view: Fit, + and −, the label following the scale
   await tool('Fit');
   const k = await scale();
   assert.equal(await zoom(), `${Math.round(k * 100)}%`);
   await tool('+');
-  assert.equal(await zoom(), `${Math.round(k * 120)}%`);
+  assert.equal(await zoom(), `${Math.round(k * 125)}%`);
   await tool('Fit');
   // ---- the history: nothing to undo; Arrange moves the states (one change), undone and redone
   assert.deepEqual(await undoState(), [true, true]);
@@ -88,9 +89,7 @@ uiTest('#405 FSM editor parts: the view, the history, the inline editing, the po
   await page.click(`${ED} .fsm-tab-btn`, { text: 'Tables' });
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-stable`), [ED], { what: 'the tables' });
   assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .fsm-tables .fsm-table`)].map((t) => t.className), ED), ['fsm-table fsm-ttable', 'fsm-table fsm-stable', 'fsm-table fsm-etable']);
-  await page.click(`${ED} .fsm-tab-btn`, { text: '</> HDL' });
-  await page.waitFor((ed) => /entity pri is/.test(document.querySelector(`${ed} pre.fsm-code`)?.textContent || ''), [ED], { what: 'the VHDL' });
-  await page.click(`${ED} .fsm-tab-btn`, { text: '▶ Simulate' });
+  await page.click(`${ED} .fsm-tab-btn`, { text: 'Simulate' });
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-sim-state`), [ED], { what: 'the simulation' });
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-sim-state`).textContent, ED), /A/);
   await page.click(`${ED} .fsm-sim-inputs .fsm-bit`);

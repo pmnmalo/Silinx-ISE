@@ -14,6 +14,7 @@ import { TEXTS, untranslated } from './i18n-check.js';
 import { newFsm, normalizeFsm, simulateFsm, encodedTable, generateFsm } from '../../core/fsm.js';
 import { simulate } from '../../core/compile.js';
 
+const ACT = { Fit: 'fit', '+': 'zin', '−': 'zout' };
 let env;
 before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
@@ -171,7 +172,7 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
 
   // ---- diagram -> HDL: an edited condition rewrites the module
   await page.eval(() => window.SilinxApp.openFsm('src/det.fsm.json'));
-  await page.waitFor((ed) => window.Silinx.active?.id === 'fsm:src/det.fsm.json' && /^HDL: det\.vhd — generated from the diagram$/.test(document.querySelector(`${ed} .fsm-link`).textContent), [ED]);
+  await page.waitFor((ed) => window.Silinx.active?.id === 'fsm:src/det.fsm.json' && document.querySelector(`${ed} .fsm-link`).dataset.hdl === 'det.vhd' && !document.querySelector(`${ed} .gen-banner`), [ED]);
   await selectTrans(page, 't1');
   await page.fill(`${ED} .fsm-cond`, 'x and x');
   await page.waitFor(async () => /S0 +: x and x -> S1/.test(await (await fetch('/api/projects/FsmPj/file?path=src%2Fdet.vhd')).text()), [], { what: 'HDL regenerated', timeout: 15000 });
@@ -197,7 +198,7 @@ uiTest('State diagram (FSM): New Source, states and transitions drawn and edited
   });
   await selectTrans(page, 't1');
   await page.fill(`${ED} .fsm-cond`, 'x');
-  await page.waitFor((ed) => /^HDL: det\.vhd — generated from the diagram$/.test(document.querySelector(`${ed} .fsm-link`).textContent), [ED], { what: 'back in sync', timeout: 15000 });
+  await page.waitFor((ed) => document.querySelector(`${ed} .fsm-link`).dataset.hdl === 'det.vhd' && !document.querySelector(`${ed} .gen-banner`), [ED], { what: 'back in sync', timeout: 15000 });
   vhd = await readWs(env, 'FsmPj', 'src/det.vhd');
   await page.eval(() => window.__restoreFetch());
   assert.match(vhd, /S0 +: x -> S1/);
@@ -231,7 +232,7 @@ uiTest('State diagram (FSM): step-by-step simulation, Mealy labels, module -> di
   // Mealy label "condition / outputs"
   assert.equal(await page.eval((ed) => document.querySelector(`${ed} [data-trans=t2] .fsm-label`).textContent, ED), '!x / z=1');
   // ---- simulation: x = 1, clock -> B; x = 0: z = 1 (Mealy) and the transition back to A is shown
-  await page.click(`${ED} .fsm-tab-btn`, { text: '▶ Simulate' });
+  await page.click(`${ED} .fsm-tab-btn`, { text: 'Simulate' });
   await page.waitForSelector(`${ED} .fsm-sim`);
   assert.ok(await page.eval((ed) => document.querySelector(`${ed} [data-state=a]`).classList.contains('current'), ED));
   await page.click(`${ED} .fsm-bit[data-input=x]`);
@@ -277,7 +278,7 @@ uiTest('State diagram (FSM): step-by-step simulation, Mealy labels, module -> di
   // ---- diagram -> ASM chart
   // (#2260) no Language; Convert to ASM chart in the menu at the right of the first line, closed by the command
   const menu = () => page.eval((ed) => { const m = document.querySelector(`${ed} .tb-more-menu`), b = document.querySelector(`${ed} .tb-more-btn`).getBoundingClientRect(), t = document.querySelector(`${ed} .asm-toolbar`).getBoundingClientRect(); return { open: !m.hidden, buttons: [...m.querySelectorAll('button')].map((x) => x.textContent), right: t.right - b.right < 20, firstLine: b.top - t.top < 20, lang: !!document.querySelector(`${ed} .fsm-lang`) }; }, ED);
-  assert.deepEqual(await menu(), { open: false, buttons: ['Convert to ASM chart'], right: true, firstLine: true, lang: false });
+  assert.deepEqual(await menu(), { open: false, buttons: ['Arrange', 'Convert to ASM chart'], right: true, firstLine: true, lang: false });
   await page.click(`${ED} .tb-more-btn`);
   assert.equal((await menu()).open, true);
   await page.click(`${ED} .asm-btn`, { text: 'Convert to ASM chart' });
@@ -323,7 +324,7 @@ uiTest('State diagram (FSM) in Portuguese: every label of the editor, the panels
   await check('state');
   await page.click(`${ED} [data-trans=t3] .fsm-label`);
   await check('transition');
-  for (const tab of ['Tables', '</> HDL', '▶ Simulate']) {
+  for (const tab of ['Tables', 'Simulate']) {
     await setLang('en');
     await page.click(`${ED} .fsm-tab-btn`, { text: tab });
     await check(tab);
@@ -331,7 +332,6 @@ uiTest('State diagram (FSM) in Portuguese: every label of the editor, the panels
   assert.deepEqual(missing, [], `untranslated:\n${missing.join('\n')}`);
   await setLang('pt');
   // (Undo / Redo: the main toolbar's, #220)
-  assert.deepEqual(await page.eval((ed) => [...document.querySelectorAll(`${ed} .asm-toolbar .tb-btn`)].map((b) => b.title), ED), ['Anular', 'Refazer']);
   await setLang('en');
 });
 
@@ -392,7 +392,7 @@ uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simul
   const model = () => page.eval(() => window.Silinx.active.fsmEditor.getModel());
   const warnings = () => page.eval(() => window.Silinx.active.fsmEditor.validate().map((d) => `${d.severity}: ${d.message}`));
   // (Undo / Redo: the main toolbar's buttons, #220)
-  const tool = (label) => (/^[↶↷]$/.test(label) ? page.click(`${ED} .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click(`${ED} .asm-toolbar .asm-btn`, { text: label }));
+  const tool = (label) => (/^[↶↷]$/.test(label) ? page.click(`#toolbar [data-cmd=${label === '↶' ? 'undo' : 'redo'}]`) : (ACT[label] ? page.click(`${ED} [data-act=${ACT[label]}]`) : page.click(`${ED} .asm-toolbar .asm-btn`, { text: label })));
   const side = (label) => page.click(`${ED} .fsm-selection .asm-btn`, { text: label });
   const zoom = () => page.eval((ed) => document.querySelector(`${ed} .asm-zoom`).textContent, ED);
   const order = async () => (await model()).transitions.map((t) => t.id).join(',');
@@ -407,9 +407,9 @@ uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simul
   const k = parseFloat(await page.eval((ed) => /scale\(([\d.]+)\)/.exec(document.querySelector(`${ed} .fsm-vp`).getAttribute('transform'))[1], ED));
   assert.equal(fitted, `${Math.round(k * 100)}%`);
   await tool('+');
-  assert.equal(await zoom(), `${Math.round(k * 120)}%`);
+  assert.equal(await zoom(), `${Math.round(k * 125)}%`);
   await tool('−'); await tool('−');
-  assert.equal(await zoom(), `${Math.round(k * 100 / 1.2)}%`);
+  assert.equal(await zoom(), `${Math.round(k * 80)}%`);
   await tool('Fit');
   assert.equal(await zoom(), fitted);
 
@@ -438,7 +438,7 @@ uiTest('State diagram (FSM): priority (▼ Later), Straighten, Export CSV, simul
   await page.waitFor(async () => (await (await fetch('/api/projects/FsmEd/file?path=src%2Fpri.fsm.json')).json()).transitions.map((t) => t.id).join(',') === 't2,t1,t3,t4', [], { what: 'priority saved', timeout: 15000 });
 
   // ---- simulator: x = y = 1 in A: C (y, now first); Clock ↑ three times, ⟲ Reset back to A with no trace
-  await page.click(`${ED} .fsm-tab-btn`, { text: '▶ Simulate' });
+  await page.click(`${ED} .fsm-tab-btn`, { text: 'Simulate' });
   await page.waitForSelector(`${ED} .fsm-sim`);
   await page.click(`${ED} .fsm-bit[data-input=x]`);
   await page.click(`${ED} .fsm-bit[data-input=y]`);

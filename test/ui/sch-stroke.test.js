@@ -88,7 +88,7 @@ async function strokeBetweenPins(page, how) {
   assert.equal(await ink(page), false, `${how}: the ink trail gone`);
   assert.equal(await page.eval(() => !!document.querySelector('.doc:not([hidden]) .sch-editor svg .wire-preview')), false, `${how}: no wire left being drawn`);
   // one undo: the design as it was
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.length === 2, [], { what: `${how}: undone` });
 }
 

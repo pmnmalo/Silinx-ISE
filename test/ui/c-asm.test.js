@@ -57,7 +57,7 @@ uiTest('#1575 a sequential C module\'s ASM chart, read-only: its [ASM] badge and
   assert.deepEqual(view.states, ['IDLE', 'S1', 'S2', 'S3', 'DONE']);
   assert.deepEqual(view.decisions, ['ap_start', 'b != 0', 'b > a']);
   assert.equal(view.readOnly, true);
-  for (const t of ['State', 'Decision', '✕', 'Arrange', '✓ Validate']) assert.ok(!view.tools.some((x) => x.endsWith(t)), `${t}: ${view.tools.join(', ')}`);
+  for (const t of ['State', 'Decision', '✕', 'Arrange', 'Validate']) assert.ok(!view.tools.some((x) => x.endsWith(t)), `${t}: ${view.tools.join(', ')}`);
   // a box selected: its properties shown, disabled; Delete and a drag change nothing
   const before0 = await page.eval(() => JSON.stringify(window.Silinx.active.asmEditor.getModel()));
   const box = await page.eval(() => { const g = [...document.querySelectorAll('.doc:not([hidden]) .asm-nodes [data-node]')].find((x) => x.textContent.includes('S2')); const r = g.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });

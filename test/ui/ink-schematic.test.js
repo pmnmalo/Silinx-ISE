@@ -103,10 +103,10 @@ uiTest('Handwritten… (schematic): a half adder drawn with the mouse, a finger 
   assert.deepEqual([tt.inputs, tt.table], [['a', 'b'], { s: '0110', cout: '0111' }]);
   // saved, then one Undo: the empty schematic again
   await page.waitFor(async () => JSON.parse(await (await fetch('/api/projects/InkSch/file?path=src%2Fhand.sch.json')).text()).symbols.length === 2, [], { what: 'saved', timeout: 15000 });
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols.length === 0, [], { what: 'undone' });
   // drawn again over a drawing: the dialog says it replaces it
-  await page.click(`${ED} [data-act=redo]`);
+  await page.click(`#toolbar [data-cmd=redo]`);
   await page.menu('Development', 'Handwritten Schematic…');
   await page.waitDialog('Handwritten Schematic');
   assert.equal(await page.eval((d) => document.querySelector(`${d} .ink-replaces`).textContent, D), 'The schematic drawn replaces the one in the editor (Undo brings it back).');

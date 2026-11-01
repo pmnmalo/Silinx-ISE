@@ -135,11 +135,11 @@ uiTest('#1144 schematic: Curved wires by the mouse: ticked, handles dragged, a c
   // ticked: W3 a curve rounding its two bends; Undo: square again; Redo: curved
   await tick(page);
   assert.match((await drawn(page))[2][1], /^M160,100 C\S+ \S+ \S+ C\S+ \S+ \S+ C\S+ \S+ 280,200$/, 'W3: three Béziers, from U1.O to U2.I');
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor(() => !window.Silinx.active.schEditor.getDoc().wireStyle, [], { what: 'undone' });
   assert.deepEqual((await drawn(page)).map(x => x[1]), ['poly', 'poly', 'poly']);
   assert.equal(await box(page), false, 'the box follows Undo');
-  await page.click(`${ED} [data-act=redo]`);
+  await page.click(`#toolbar [data-cmd=redo]`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wireStyle === 'curved', [], { what: 'redone' });
   assert.equal(await box(page), true);
 
@@ -164,7 +164,7 @@ uiTest('#1144 schematic: Curved wires by the mouse: ticked, handles dragged, a c
   await page.dblclick(await at(page, curveAbs(w)[0]));
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.find(x => x.id === 'W3').curve.length === 2, [], { what: 'a knot removed' });
   // one Undo per change: the knot back
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().wires.find(x => x.id === 'W3').curve.length === 3, [], { what: 'undone' });
   assert.deepEqual(nets(netlist(await getDoc(page))), NETS0, 'the connections the same');
   // U2 moved down 40 (its wires kept connected): W3's curve follows its end, its knots where they were relative to it
@@ -176,7 +176,7 @@ uiTest('#1144 schematic: Curved wires by the mouse: ticked, handles dragged, a c
   assert.deepEqual(wMoved.curve, wBefore.curve, 'its curve relative to its ends the same');
   assert.equal((await drawn(page)).find(x => x[0] === 'W3')[1], curveD(wMoved));
   assert.deepEqual(nets(netlist(await getDoc(page))), NETS0);
-  await page.click(`${ED} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols.find(x => x.id === 'S2').y === 190, [], { what: 'the move undone' });
 
   // a wire by clicks: from b (60, 300) through (150, 360) and (250, 330) to U3.I (280, 400)
