@@ -274,6 +274,8 @@ test('PR tests: every pull request, three parts, the related-tests verdict main 
   assert.match(yml, /^on:\n {2}pull_request:\npermissions:\n {2}contents: read\n/m);
   assert.match(yml, /^concurrency:\n {2}group: pr-tests-\$\{\{ github\.ref \}\}\n {2}cancel-in-progress: true\n/m);
   assert.match(yml, /\n {8}shard: \[1, 2, 3\]\n {4}runs-on: ubuntu-latest\n/, "GitHub's runner, never the self-hosted one");
+  // #1982: a part with "the examples on every board" (41 minutes) and its UI tests passed 45 minutes
+  assert.match(yml, /\n {4}runs-on: ubuntu-latest\n {4}# [^\n]*#1982\)\n {4}timeout-minutes: 90\n {4}name: tests/);
   assert.match(yml, /fetch-depth: 0\n\s+- uses: \.\/\.github\/actions\/setup\n\s+- run: >-\n\s+node scripts\/related-tests\.mjs "origin\/\$BASE" HEAD --shard "\$SHARD\/3"\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+env:\n\s+BASE: \$\{\{ github\.base_ref \}\}/);
   assert.match(yml, /\n {2}related-tests:\n {4}if: always\(\)\n {4}needs: \[tests\]\n[\s\S]*- if: contains\(needs\.\*\.result, 'failure'\) \|\| contains\(needs\.\*\.result, 'cancelled'\)\n\s+run: exit 1\n/);
   for (const f of ['CLAUDE.md', 'ONBOARDING.md']) assert.match(fs.readFileSync(path.join(ROOT, f), 'utf8'), /related-tests/, f);
