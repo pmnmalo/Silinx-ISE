@@ -9,7 +9,7 @@ import { getDeviceDb, resolveBoard } from './devices.js';
 import { createJob, getJob, cancelJob, listJobs } from './jobs.js';
 import { detectToolchain, saveConfig, loadConfig } from './toolchain.js';
 import { runImplementation, collectReports, normalizeSteps } from './ise.js';
-import { deviceFamily } from '../packages/silinx-fpga/src/parts.js';
+import { deviceFamily, openOnlyDevice } from '../packages/silinx-fpga/src/parts.js';
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
@@ -49,7 +49,7 @@ export async function startImplementation(name, body = {}) {
   // request's toolchain, else the project's synthesis tool (synthTool: 'silinx' | 'xst'), else the
   // execution mode of Toolchain Settings
   const choice = body.toolchain || ({ silinx: 'silinx', xst: 'ise' })[project.synthTool];
-  const open = choice ? ['silinx', 'open'].includes(choice) : (await loadConfig()).mode === 'silinx';
+  const open = openOnlyDevice(project.device) || (choice ? ['silinx', 'open'].includes(choice) : (await loadConfig()).mode === 'silinx');
   // (the synthesis up to date, #280: the run starts at Translate from its netlist)
   const synthUpToDate = !!body.synthUpToDate;
   if (open) { try { steps = openSteps(body.steps, { synthUpToDate, family: deviceFamily(project.device) }); } catch (e) { throw bad(e.message); } }

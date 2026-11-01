@@ -1,6 +1,7 @@
 // The implementation processes (#405: out of app.js): ISE's flow run step by step with its live status
 // (synthesis to bitstream), Check Constraints and the UCF made from the board, the open synthesis (Yosys in
 // the browser), the optional processes (simulation models, timing, power, pin back-annotation) and Stop.
+import { pcfDiagnostics } from './constraints-format.js';
 import { api, followJob } from './api.js';
 import { h, alertDlg, confirmDlg, toast } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
@@ -99,6 +100,7 @@ export async function ucfDiagnostics(text, file) {
       lang = moduleInfo(pj.top)?.lang || 'vhdl';
     } catch { /* no port data */ }
   }
+  if (/\.pcf$/i.test(file)) return pcfDiagnostics(text, ports).map(d => ({ ...d, file, tool: 'ConstraintSystem' }));
   const db = S.devices;
   const famId = db?.parts?.find(x => x.part === pj.device?.part)?.family || pj.device?.family;
   const iostandards = db?.families?.find(f => f.id === famId)?.ioStandards || null;
@@ -253,12 +255,14 @@ async function runImplInner(mod, steps, opts, pjName) {
   for (const l of ucfWarnings) track.line(l, { diag: false });
   try {
     const tc = S.toolchain || await api.toolchain();
-    if (!tc.ise.available) {
+    // (the Silinx toolchain runs without ISE: a project whose synthesis is Silinx's, or a family ISE does not implement)
+    const ran = openMode() || tc.ise.available;
+    if (!ran) {
       log(`Xilinx ISE toolchain not available (${tc.ise.mode} mode): ${tc.ise.reason}`, 'warn');
       log('The build directory and run.sh are still generated so they can be run on a machine with ISE 14.7. Configure it in Toolchain Settings (the gear in the toolbar).', 'info');
     }
     if (synthUpToDate) { S.status.synth = S.synthDone.status; renderProcesses(); }
-    const { job } = await api.implement(S.project.name, { steps, generateOnly: !tc.ise.available, ...(synthUpToDate && { synthUpToDate }) });
+    const { job } = await api.implement(S.project.name, { steps, generateOnly: !ran, ...(synthUpToDate && { synthUpToDate }) });
     S.currentJob = job;
     S.stopRequested = false;
     renderProcesses();
@@ -278,8 +282,8 @@ async function runImplInner(mod, steps, opts, pjName) {
     // the synthesis this run made: kept as up to date when it ended ok (#280)
     if (synthFp && ['ok', 'warn'].includes(track.result.synth)) S.synthDone = { fingerprint: synthFp, status: track.result.synth };
     else if (track.result.synth === 'err') S.synthDone = null;
-    if (tc.ise.available) { await applyReportWarnings(track); await saveImplStatus(); }
-    if (res.status === 'ok' && tc.ise.available) {
+    if (ran) { await applyReportWarnings(track); await saveImplStatus(); }
+    if (res.status === 'ok' && ran) {
       log(`\nProcess "${procName}" completed successfully${track.warnings ? ` with ${track.warnings} warning(s)` : ''}`, 'ok');
       if (extra) setStatus(procId, track.warnings ? 'warn' : 'ok');
       ok = true;
