@@ -36,7 +36,7 @@ export const partitionMethods = {
     const walk = (x) => {
       if (!x || typeof x !== 'object') return;
       if (Array.isArray(x)) { x.forEach(walk); return; }
-      if (x.kind === 'pragma' && x.pragma.name === 'ARRAY_PARTITION' && x.pragma.args.variable) {
+      if (x.kind === 'pragma' && (x.pragma.name === 'ARRAY_PARTITION' || (x.pragma.name === 'ARRAY_RESHAPE' && !this.fn.params.some((pa) => pa.name === x.pragma.args.variable))) && x.pragma.args.variable) {   // (ARRAY_RESHAPE of a local: its accesses as a partition's, #1961)
         const a = x.pragma.args;
         if (this.partPragma.has(a.variable)) this.warn(x.loc, `#pragma HLS ARRAY_PARTITION of '${a.variable}' again: ignored (one partition an array is made)`);
         else this.partPragma.set(a.variable, { ...a, loc: x.loc });

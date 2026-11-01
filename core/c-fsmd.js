@@ -328,6 +328,7 @@ class SeqFlow extends Flow {
     // of an array of more, several memories (core/c-partition.js, #1920)
     this.partPragmas(fn.body);
     this.storage = this.memStorage(fn);
+    this.impls = this.memImpl(fn);
     const names = new Set([...fn.params.map((p) => p.name), ...decls.map((v) => v.name), ...this.globals.keys()]);
     const used = (n) => names.has(n) || this.slots.has(n);
     for (const pa of fn.params) if (pa.type.kind === 'array' && this.partWhole(pa)) this.warn(pa.loc, `#pragma HLS ARRAY_PARTITION of the argument '${pa.name}' is not made yet: it is ap_memory`);
@@ -402,7 +403,9 @@ class SeqFlow extends Flow {
     const parted = t.kind === 'array' && (this.partWhole(v));
     const init = (e, et) => (e ? this.constOf(e, et) : 0n);
     if (t.kind === 'array') {
-      if ((this.arrayLength(v) > MEM_MIN || this.storage?.has(v.orig ?? v.name) || this.memArgs?.has(v.name)) && !parted) return this.memSlot(v);
+      // (BIND_STORAGE impl=register: its elements registers, no memory, #1961)
+      const asRegs = this.impls?.get(v.orig ?? v.name) === 'register' && !this.memArgs?.has(v.name);
+      if ((this.arrayLength(v) > MEM_MIN || this.storage?.has(v.orig ?? v.name) || this.memArgs?.has(v.name)) && !parted && !asRegs) return this.memSlot(v);
       const et = typeOf(t.of);
       if (!et) this.error(v.loc, `'${v.name}': only arrays of integers (one dimension) are supported yet`);
       const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : null);

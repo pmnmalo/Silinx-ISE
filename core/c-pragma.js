@@ -15,11 +15,11 @@ import { checkOpPragma } from './c-op-pragmas.js';
 
 // what Silinx makes of the pragmas it knows
 // (TASK: an hls::task's, core/cpp-lex.js, #1721; AGGREGATE and DISAGGREGATE: of the top's struct arguments, core/c-aggregate.js, #1668)
-export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY']);
+export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY', 'ARRAY_RESHAPE', 'STREAM']);
 // Vitis HLS's others: accepted, ignored with a warning
-export const IGNORED = new Set(['DATAFLOW', 'STREAM', 'RESOURCE',
+export const IGNORED = new Set(['DATAFLOW', 'RESOURCE',
   'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
-  'ARRAY_RESHAPE', 'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
+  'STABLE', 'RESET', 'SHARED', 'ALIAS', 'CACHE', 'PERFORMANCE']);
 // the interfaces of an argument Silinx makes (the others: ignored with a warning, its default made)
 export const ARG_MODES = new Set(['ap_none', 'ap_vld', 'ap_ovld', 'ap_memory', 'bram', 's_axilite', 'm_axi', 'ap_fifo', 'ap_hs']);
 // (a memory's type, its ports: ram_2p reads on port 0 and writes on port 1, ram_t2p reads and writes on both; #1901)
@@ -65,6 +65,34 @@ export function addDirectives(fn, directives) {
   }
 }
 
+// (BIND_STORAGE impl=: what the Spartan-3E has, #1961)
+const IMPL_STYLE = { bram: 'block', lutram: 'distributed' };
+/** How a BIND_STORAGE's memory is made: 'block' | 'distributed' (the tools' ram_style), 'register' (no memory), or null. */
+export function implOf({ args }) {
+  const impl = String(args.impl ?? '').toLowerCase();
+  return impl === 'register' ? 'register' : IMPL_STYLE[impl] ?? null;
+}
+function checkImpl({ args }, loc, report, fn) {
+  const impl = String(args.impl ?? '').toLowerCase();
+  if (args.latency !== undefined && String(args.latency) !== '-1') report(loc, `#pragma HLS BIND_STORAGE latency=${args.latency}: not made: a read takes one cycle: ignored`, 'warning');
+  if (!impl || impl === 'auto') return;
+  if (fn?.params.some((x) => x.name === args.variable)) report(loc, `#pragma HLS BIND_STORAGE impl=${impl} of the argument '${args.variable}': its memory is outside the module: ignored`, 'warning');
+  else if (impl === 'srl') report(loc, '#pragma HLS BIND_STORAGE impl=srl: not made: a shift register has no random access: its default memory made', 'warning');
+  else if (implOf({ args }) === null) report(loc, `#pragma HLS BIND_STORAGE impl=${impl}: the Spartan-3E has none: a block RAM made`, 'warning');
+}
+/** A STREAM's warnings: what it does in a DATAFLOW region is a stream's depth (core/c-processes.js). */
+function checkStream({ args }, loc, report, fn) {
+  const v = args.variable, type = String(args.type ?? '').toLowerCase();
+  if (!v) { report(loc, '#pragma HLS STREAM needs variable=<the stream or the array>'); return; }
+  const inRegion = fn?.body?.items.some((s) => s.kind === 'pragma' && (s.pragma.name === 'DATAFLOW' || s.pragma.name === 'TASK'));
+  let kind = null;
+  const look = (x) => { if (!x || typeof x !== 'object') return; if (Array.isArray(x)) { x.forEach(look); return; } if (x.kind === 'var' && x.name === v) kind = x.type?.kind; for (const [k, y] of Object.entries(x)) if (k !== 'loc' && k !== 'type' && k !== 'pragma') look(y); };
+  look(fn?.body);
+  if (!inRegion) { report(loc, `#pragma HLS STREAM variable=${v}: outside a DATAFLOW region: no effect: nothing runs at once to fill a FIFO`, 'warning'); return; }
+  if (kind === 'array') { if (args.off === undefined && type !== 'pipo') report(loc, `#pragma HLS STREAM variable=${v}${type ? ` type=${type}` : ''}: not made: a local array stays a buffer (PIPO): its readers start once its writer is done`, 'warning'); return; }
+  if (type && type !== 'fifo') report(loc, `#pragma HLS STREAM variable=${v} type=${type}: not made: a stream is a FIFO`, 'warning');
+  if (args.depth !== undefined && !/^\d+$/.test(String(args.depth))) report(loc, `#pragma HLS STREAM depth=${args.depth}: not a whole number: its default depth made`, 'warning');
+}
 const LOOP_ONLY = new Set(['PIPELINE', 'UNROLL', 'LOOP_TRIPCOUNT', 'LOOP_FLATTEN']);
 
 const isLoop = (s) => s && (s.kind === 'for' || s.kind === 'while' || s.kind === 'do');
@@ -94,17 +122,26 @@ export function checkPragmas(ast, funcs, report, top = null) {
     if (name === 'PIPELINE' && args.ii !== undefined && !posInt(args.ii)) report(loc, `#pragma HLS PIPELINE II=${args.ii}: II must be a whole number, 1 or more`);
     if (name === 'AGGREGATE' && args.compact !== undefined && !['bit', 'byte', 'none', 'auto'].includes(String(args.compact).toLowerCase())) report(loc, `#pragma HLS AGGREGATE compact=${args.compact} is not one of bit, byte, none and auto: ignored (its default made)`, 'warning');
     if (name === 'INLINE') { const other = Object.keys(args).find((k) => k !== 'off' && k !== 'recursive'); if (other) report(loc, `#pragma HLS INLINE ${other}: not one of off and recursive: ignored`, 'warning'); }
-    if (name === 'ARRAY_PARTITION') {
-      if (!args.variable) { report(loc, '#pragma HLS ARRAY_PARTITION needs variable=<the array>'); return; }
+    if (name === 'STREAM') { checkStream(p, loc, report, funcs.get(fname)); return; }
+    if (name === 'ARRAY_RESHAPE') {
+      const pa = funcs.get(fname)?.params.some((x) => x.name === args.variable);
+      if (!args.variable) { report(loc, '#pragma HLS ARRAY_RESHAPE needs variable=<the array>'); return; }
+      report(loc, pa ? `#pragma HLS ARRAY_RESHAPE of the argument '${args.variable}': not made: its port's words kept, one element each`
+        : `#pragma HLS ARRAY_RESHAPE of '${args.variable}': made as ARRAY_PARTITION, its elements at once as in one wide word, in memories side by side`, 'warning');
+      if (pa) return;
+    }
+    if (name === 'ARRAY_PARTITION' || name === 'ARRAY_RESHAPE') {
+      if (!args.variable) { report(loc, `#pragma HLS ${name} needs variable=<the array>`); return; }
       const type = String(args.type || (args.block ? 'block' : args.cyclic ? 'cyclic' : 'complete')).toLowerCase();
-      if (!['complete', 'block', 'cyclic'].includes(type)) report(loc, `#pragma HLS ARRAY_PARTITION type=${type} is not one of complete, block and cyclic: ignored`, 'warning');
-      else if (type !== 'complete' && !posInt(args.factor)) report(loc, `#pragma HLS ARRAY_PARTITION type=${type} needs factor=N, a whole number, 1 or more: ignored`, 'warning');
-      else if (type !== 'complete' && String(args.dim) === '0') report(loc, `#pragma HLS ARRAY_PARTITION type=${type} dim=0 is not made yet: ignored (name its dimension, dim=1 and up)`, 'warning');
-      if (args.dim !== undefined && !/^\d+$/.test(String(args.dim))) report(loc, `#pragma HLS ARRAY_PARTITION dim=${args.dim}: the dimension must be a whole number: ignored`, 'warning');
+      if (!['complete', 'block', 'cyclic'].includes(type)) report(loc, `#pragma HLS ${name} type=${type} is not one of complete, block and cyclic: ignored`, 'warning');
+      else if (type !== 'complete' && !posInt(args.factor)) report(loc, `#pragma HLS ${name} type=${type} needs factor=N, a whole number, 1 or more: ignored`, 'warning');
+      else if (type !== 'complete' && String(args.dim) === '0') report(loc, `#pragma HLS ${name} type=${type} dim=0 is not made yet: ignored (name its dimension, dim=1 and up)`, 'warning');
+      if (args.dim !== undefined && !/^\d+$/.test(String(args.dim))) report(loc, `#pragma HLS ${name} dim=${args.dim}: the dimension must be a whole number: ignored`, 'warning');
     }
     if (name === 'BIND_STORAGE') {
       if (!args.variable) { report(loc, '#pragma HLS BIND_STORAGE needs variable=<the array>'); return; }
       if (!storageOf(p)) report(loc, `#pragma HLS BIND_STORAGE type=${args.type ?? ''} is not one Silinx makes (ram_1p, ram_2p, ram_s2p, ram_t2p, rom_1p, rom_2p): ignored`, 'warning');
+      checkImpl(p, loc, report, funcs.get(fname));
     }
     if (name === 'DEPENDENCE') {
       if (args.inter && args.intra) report(loc, '#pragma HLS DEPENDENCE: inter or intra, not both: taken as intra', 'warning');
