@@ -13,6 +13,10 @@ export function unitOf(design, texts) {
   return { unit: srcs.map((f) => `#include "${f}"`).join('\n') + '\n', headers: texts };
 }
 
+// (a test bench's run longer than the C simulation's limit of steps: 2 frames of 30000 pixels, 225 taps each, twice, #2234)
+const STEPS = { 'modeling-using-array-stencil-2d': 2_000_000_000 };
+// (a co-simulation not run, its reason: too long until #pragma HLS ARRAY_STENCIL makes its II 1, #2503)
+const NO_COSIM = { 'modeling-using-array-stencil-2d': 'co-simulation not run: II=225 without #pragma HLS ARRAY_STENCIL (#2503), about 6.75M cycles a call, not ended in 9.5 hours' };
 const first = (diags) => diags.find((d) => d.severity === 'error');
 const why = (d) => (d ? `${d.file && !/^unit\.c(pp)?$/.test(d.file) ? `${d.file.split('/').pop()}:` : ''}${d.line}: ${d.message}` : null);
 
@@ -22,13 +26,15 @@ export function runDesign(design, texts, { maxCycles = 100000 } = {}) {
   const { unit, headers } = unitOf(design, texts);
   // (a C++ design's unit is C++, #1590)
   const opts = { file: design.language === 'c' ? 'unit.c' : 'unit.cpp', headers, top: design.top, directives: design.directives, ...(design.blackbox ? { blackboxes: design.blackbox.descriptions.map((f) => ({ file: f, text: texts[f] })) } : {}) };
-  const sim = simulateC(unit, { ...opts, files: texts });
+  const maxSteps = STEPS[design.name];
+  const sim = simulateC(unit, { ...opts, files: texts, ...(maxSteps ? { maxSteps } : {}) });
   r.csim = sim.ok && sim.exitCode === 0 ? 'pass' : 'fail';
   if (r.csim === 'fail') r.reason ||= `C simulation: ${sim.error ? `${sim.error.line}: ${sim.error.message}` : sim.ok ? `main() returned ${sim.exitCode}` : why(first(sim.diagnostics))}`;
   const gens = ['vhdl', 'verilog'].map((lang) => cToHdl(unit, { ...opts, lang }));
   r.synth = gens.every((g) => g.ok) ? 'pass' : 'fail';
   if (r.synth === 'fail') r.reason ||= `C synthesis: ${why(first(gens.find((g) => !g.ok).diagnostics))}`;
-  if (r.csim === 'pass' && r.synth === 'pass') {
+  if (r.csim === 'pass' && r.synth === 'pass' && NO_COSIM[design.name]) r.reason = NO_COSIM[design.name];
+  else if (r.csim === 'pass' && r.synth === 'pass') {
     const c = cosimulate(unit, { ...opts, lang: 'vhdl', maxCycles });
     r.cosim = c.ok && c.pass ? 'pass' : 'fail';
     r.latency = c.latency;

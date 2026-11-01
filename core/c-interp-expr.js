@@ -32,6 +32,7 @@ export const exprMethods = {
       case 'id': {
         const c = this.lookup(e.name, e);
         if (c.isFile) return { fh: c.fh, v: c.fh ? 1n : 0n, t: c.t };   // (a FILE *: 0 when NULL, #1598)
+        if (c.argv) return { argv: c.argv, t: c.t };   // (main's argv: for a test bench's class, #2234)
         if (c.fifo) return { fifo: c.fifo, t: c.t };   // (an hls::stream, #1590)
         if (c.arr) return { arr: c.arr, t: c.t, dims: c.dims };
         if (c.ref) return { ptr: c.ref, t: c.t };
@@ -263,19 +264,32 @@ export const exprMethods = {
   },
   /** a[i]: an array's element, a pointer's (p[0], or an element of the array it points into), an ap_int's bit. */
   indexRef(e) {
+    // (a[i][j] of a two-dimensional array: its cell with no row made, a test bench's hot path, #2234)
+    if (e.e.kind === 'index' && e.e.e.kind === 'id') {
+      const outer = this.eval(e.e.e);
+      if (outer.arr && outer.dims?.length === 2) {
+        const [rows, cols] = outer.dims;
+        const i = Number(this.intOf(this.eval(e.e.i), e.e)), j = Number(this.intOf(this.eval(e.i), e));
+        if (i < 0 || i >= rows) this.fail(e.e, `the index ${i} is outside the array (0 to ${rows - 1})`);
+        if (j < 0 || j >= cols) this.fail(e, `the index ${j} is outside the array (0 to ${cols - 1})`);
+        const at = i * cols + j, cell = outer.arr[at], t = outer.t;
+        return { get: () => ({ v: cell.v, t }), set: (x) => { cell.v = this.as(x, t, e); }, t, cell, arr: outer.flat ?? outer.arr, index: (outer.off ?? 0) + at };
+      }
+    }
     const base = this.eval(e.e);
     const i = Number(this.intOf(this.eval(e.i), e));
     if (base.arr && base.dims?.length > 1) {
       const stride = base.dims.slice(1).reduce((a, b) => a * b, 1);
       if (i < 0 || i >= base.dims[0]) this.fail(e, `the index ${i} is outside the array (0 to ${base.dims[0] - 1})`);
-      const row = { arr: base.arr.slice(i * stride, (i + 1) * stride), t: base.t, dims: base.dims.slice(1) };
+      // (flat, off: the whole array and where the row starts: &a[0][0] points into all of it, #2234)
+      const row = { arr: base.arr.slice(i * stride, (i + 1) * stride), t: base.t, dims: base.dims.slice(1), flat: base.flat ?? base.arr, off: (base.off ?? 0) + i * stride };
       return { row, get: () => row, set: () => this.fail(e, 'a row of an array cannot be assigned'), t: base.t };
     }
     if (base.arr) {
       if (i < 0 || i >= base.arr.length) this.fail(e, `the index ${i} is outside the array (0 to ${base.arr.length - 1})`);
       const cell = base.arr[i];
-      if (base.t.text) return { get: () => cell.v, set: (x) => { cell.v = x.str !== undefined ? this.strPtr(x.str) : x; }, t: base.t, cell, arr: base.arr, index: i };
-      return { get: () => ({ v: cell.v, t: base.t }), set: (x) => { cell.v = this.as(x, base.t, e); }, t: base.t, cell, arr: base.arr, index: i };
+      if (base.t.text) return { get: () => cell.v, set: (x) => { cell.v = x.str !== undefined ? this.strPtr(x.str) : x; }, t: base.t, cell, arr: base.flat ?? base.arr, index: (base.off ?? 0) + i };
+      return { get: () => ({ v: cell.v, t: base.t }), set: (x) => { cell.v = this.as(x, base.t, e); }, t: base.t, cell, arr: base.flat ?? base.arr, index: (base.off ?? 0) + i };
     }
     if (base.ptr) {
       if (base.ptr.arr) {

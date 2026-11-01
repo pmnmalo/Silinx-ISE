@@ -28,7 +28,7 @@ const IGNORED = new Set(['printf', 'fprintf', 'puts', 'putchar']);
 const STREAMS = new Set(['stdout', 'stderr', 'stdin']);
 // (ap_fft_core: hls::fft's C model's transform, core/cpp-fft.js; in synthesis the transform's own hardware, #1943)
 const MODEL_LIB = new Set(['ap_fft_core']);
-const TB_LIB = new Set(['abs', 'labs', 'llabs', 'feof', 'fputs', 'fputc', 'putc', 'fflush', 'ap_uniform_int', 'sprintf', 'snprintf']);   // (ap_uniform_int: <random>'s, core/cpp-lex.js, #1734; sprintf: a file's name, #1897)
+const TB_LIB = new Set(['abs', 'labs', 'llabs', 'feof', 'fputs', 'fputc', 'putc', 'fflush', 'ap_uniform_int', 'sprintf', 'snprintf', 'ap_tb_new', 'ap_tb_call']);   // (ap_uniform_int: <random>'s, core/cpp-lex.js, #1734; sprintf: a file's name, #1897; ap_tb_*: core/cpp-tb.js, #2234)
 // the member functions of ap_int / ap_uint Silinx HLS knows
 // the member functions of hls::stream Silinx HLS knows (#1590)
 const STREAM_MEMBERS = new Set(['read', 'write', 'empty', 'full', 'read_nb', 'write_nb', 'size']);

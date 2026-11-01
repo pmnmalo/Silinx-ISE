@@ -169,7 +169,8 @@ class Machine {
       for (const it of ast.items) if (it.kind === 'var') this.globals.set(it.name, this.cell(it));
       const fn = funcs.get(entry);
       if (!fn?.body) return { ok: false, output: '', exitCode: null, calls: [], error: { line: 1, col: 1, message: `no ${entry}() to run: the C simulation runs the test bench, main()` }, steps: 0 };
-      const r = this.invoke(fn, []);
+      // (main(argc, argv): the program's name alone, no options, #2234)
+      const r = this.invoke(fn, fn.params.length === 2 && entry === 'main' ? [{ v: 1n, t: { w: 32, s: true } }, { argv: ['csim.exe'] }] : []);
       return { ok: true, output: this.out.join(''), exitCode: r ? Number(convert(r.v ?? 0n, { w: 32, s: true })) : 0, calls: this.calls, error: null, steps: this.steps };
     } catch (e) {
       if (e instanceof Exit) return { ok: true, output: this.out.join(''), exitCode: e.code, calls: this.calls, error: null, steps: this.steps };
@@ -248,6 +249,7 @@ class Machine {
       const a = args[k];
       if (!a) return;
       if (a.fifo) scope.set(pa.name, { t: a.t, fifo: a.fifo });
+      else if (a.argv) scope.set(pa.name, { t: { w: 32, s: true }, argv: a.argv });
       else if (a.arr) scope.set(pa.name, { t: a.t, arr: a.arr, ...(dimsOf(pa.type, a.arr.length) ? { dims: dimsOf(pa.type, a.arr.length) } : {}) });
       else if (a.ptr) scope.set(pa.name, { t: a.t, ref: a.ptr });
       else { const t = typeOf(pa.type); scope.set(pa.name, { t, v: this.as(a, t, at) }); }
