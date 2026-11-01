@@ -14,6 +14,11 @@
 // earlier tests), e.g. slice -> OMUX -> E2BEG of the CLB, joined to E2END of the I/O tile, -> the
 // tested wire. A wire only a site of the I/O or block-RAM tile drives (its OMUX, the hexes that begin
 // there) is driven from that site: an IOB's input I, a block RAM's data output (`sourcesOf`, #3).
+//
+// A bidirectional PIP (pipsOf's flag PIP_BIDI: the XC3S1200E's long-line splitters, #2483) is only ever the
+// PIP out of the tested wire, written `a =- b`: the DRC finds no island when the net holds either end, so
+// such a test is read with ISE's bitgen, whose bit for the direction names the end the net drives.
+import { PIP_BIDI } from '../../src/fpga/device.js';
 
 const splitKey = k => { const i = k.indexOf('/'); return [k.slice(0, i), k.slice(i + 1)]; };
 
@@ -25,7 +30,8 @@ export const SOURCES = [['X', 'F1'], ['Y', 'G1']];
  *   part, joins: [['TILE/WIRE', 'TILE/WIRE']],
  *   slicesOf(tile) -> [{ site, pos }] (the slices of a tile that can drive a test, pos 0-3),
  *   pinWire(pos, pin) -> the tile wire of a slice pin,
- *   pipsOf(tile) -> [[from, to]] (the PIPs known to exist in the tile, wire names),
+ *   pipsOf(tile) -> [[from, to, flags]] (the PIPs known to exist in the tile, wire names; PIP_BIDI: only out of a
+ *     tested wire, never on a path),
  *   nodeOf(key) -> [keys] (the wires predicted to be one node with 'TILE/WIRE': reserved with it),
  *   joined(key) -> [keys] (the wires of other tiles known to be joined to 'TILE/WIRE': observed or
  *     confirmed; a path may cross them, to reach a tile with no slice from a neighbouring one),
@@ -36,17 +42,19 @@ export const SOURCES = [['X', 'F1'], ['Y', 'G1']];
  *   maxTests (the tests of one design, default no limit: the rest wait for the next design; #2178: in a design of
  *     thousands of nets ISE's DRC gives a few wrong verdicts where the nets meet on nodes the prediction has not yet
  *     joined, on the XC3S1200E 2721 per million over 10 000 tests, none up to 500).
- * Returns { designs: [{ xdl, tests: [{ net, join }] }], untestable: [join] }.
+ * Returns { designs: [{ xdl, tests: [{ net, join, bidi }] }], untestable: [join] } (bidi: [tile, from, to] of a test
+ * whose PIP out of the tested wire is bidirectional).
  */
 export function joinTestDesigns(opts) {
   const { part, joins, slicesOf, pinWire, pipsOf, nodeOf = k => [k], joined = () => [], maxDepth = 3, maxJoins = 0, sourcesOf = () => [], maxTests = Infinity } = opts;
   const cache = new Map();   // tile -> { out: Map from -> [to], into: Map to -> [from], src: Map wire -> [source] }
   const tileOf = tile => {
     if (!cache.has(tile)) {
-      const out = new Map(), into = new Map(), src = new Map();
-      for (const [f, t] of pipsOf(tile)) {
+      const out = new Map(), into = new Map(), src = new Map(), bidi = new Set();
+      for (const [f, t, fl] of pipsOf(tile)) {
         if (!out.has(f)) out.set(f, []);
         out.get(f).push(t);
+        if (fl & PIP_BIDI) { bidi.add(`${f}->${t}`); continue; }
         if (!into.has(t)) into.set(t, []);
         into.get(t).push(f);
       }
@@ -60,7 +68,7 @@ export function joinTestDesigns(opts) {
         if (!src.has(x.wire)) src.set(x.wire, []);
         src.get(x.wire).push({ s: { site: x.site, type: x.type, siteType: x.siteType, tile: x.tile }, o: x.o, i: null });
       }
-      cache.set(tile, { out, into, src });
+      cache.set(tile, { out, into, src, bidi });
     }
     return cache.get(tile);
   };
@@ -124,7 +132,7 @@ export function joinTestDesigns(opts) {
         if (!wC) continue;
         const keys = [...path.keys, l, `${tL}/${wC}`];
         if (!keys.every(free)) continue;
-        plan = { src: path.src, pips: [...path.pips, [tL, wL, wC]], keys };
+        plan = { src: path.src, pips: [...path.pips, [tL, wL, wC, tileOf(tL).bidi.has(`${wL}->${wC}`)]], keys };
         break;
       }
       if (!plan) { (possible ? next : untestable).push(join); continue; }
@@ -133,7 +141,7 @@ export function joinTestDesigns(opts) {
       tests.push({ net: `h${tests.length}`, join, plan });
     }
     if (!tests.length) { untestable.push(...next); break; }
-    designs.push({ xdl: testXdl(part, tests), tests: tests.map(t => ({ net: t.net, join: t.join })) });
+    designs.push({ xdl: testXdl(part, tests), tests: tests.map(t => { const p = t.plan.pips.at(-1); return { net: t.net, join: t.join, ...(p[3] ? { bidi: p.slice(0, 3) } : {}) }; }) });
     left = next;
   }
   return { designs, untestable };
@@ -162,7 +170,7 @@ function testXdl(part, tests) {
   for (const t of tests) {
     const { src, pips } = t.plan, n = `s_${src.s.site}`;
     lines.push(`net "${t.net}" ,`, `  outpin "${n}" ${src.o} ,`, ...(src.i ? [`  inpin "${n}" ${src.i} ,`] : []));
-    for (const [tile, from, to] of pips) lines.push(`  pip ${tile} ${from} -> ${to} ,`);
+    for (const [tile, from, to, bidi] of pips) lines.push(`  pip ${tile} ${from} ${bidi ? '=-' : '->'} ${to} ,`);
     lines.push('  ;');
   }
   return lines.join('\n') + '\n';

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs oracle.sh on a folder of XDL designs on another machine with Docker and the ISE image, and
-# brings back the logs (and routed XDL with -r). The machine is given on the command line only:
-#   SILINX_ISE_HOST=user@host [SILINX_ISE_IMAGE=xilinx/ise:14.7] [RWBASE=/Users/Shared/silinx-ise/build] ise-remote.sh [-P 2] [-r] [-f] dir
+# brings back the logs (and routed XDL with -r, the .bit with -b). The machine is given on the command line only:
+#   SILINX_ISE_HOST=user@host [SILINX_ISE_IMAGE=xilinx/ise:14.7] [RWBASE=/Users/Shared/silinx-ise/build] ise-remote.sh [-P 2] [-r] [-f] [-b] dir
 # The remote folder (silinx-device-<pid>, in RWBASE: a folder Docker Desktop shares, #482; else in the home) is
 # removed afterwards. A connection lost during the run (ssh's 255, within about 2 minutes, #2019) fails the script
 # and keeps that folder: the container may still be working there, and what it holds is fetched when it can be.
@@ -22,9 +22,9 @@ set +e
 rc=${PIPESTATUS[0]}; set -e
 if [ "$rc" -eq 255 ]; then
   LOST=1
-  rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30" --include='*.log' --include='*.r.xdl' --exclude='*' "$SILINX_ISE_HOST:$RW/$N/" "$D/" || true
+  rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30" --include='*.log' --include='*.r.xdl' --include='*.bit' --exclude='*' "$SILINX_ISE_HOST:$RW/$N/" "$D/" || true
   echo "ise-remote: the connection was lost during the run; the remote folder $RW is kept, its results are not complete" >&2
   exit 1
 fi
-rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30" --include='*.log' --include='*.r.xdl' --exclude='*' "$SILINX_ISE_HOST:$RW/$N/" "$D/"
+rsync -a -e "ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o ConnectTimeout=30" --include='*.log' --include='*.r.xdl' --include='*.bit' --exclude='*' "$SILINX_ISE_HOST:$RW/$N/" "$D/"
 echo "$(ls "$D"/*.xdl | grep -vc '\.r\.xdl$') designs, $(( $(date +%s) - start )) s"

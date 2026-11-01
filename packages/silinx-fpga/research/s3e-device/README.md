@@ -1320,3 +1320,49 @@ alone made 5 of them route; sS, sS2 and cE the other 7.
 **ISE's verdict**, every design routed by the open flow on the measured graph: the 7 examples and the 45 fixtures are
 clean. DRC gives 0 errors and 0 warnings, xdl2ncd gives no warning, and Silinx's `.bit` is byte-identical to ISE's
 bitgen with CRC on and off. The shipped graph stays.
+
+### The recipe for the other dies, part 10: the XC3S1200E's long-line splitters measured by half (2026-11-01, #2483)
+
+Part 9 left the splitters deferring to the shipped graph. A splitter's only PIP is bidirectional (`CLKH_LLB_LVk =-
+CLKH_LLT_LVk`), and a join test out of one end cannot be read from the DRC: the net holds the PIP whichever end it drives,
+so there is no island either way. That is why part 9's verdicts at the splitters were wrong. ISE's bitgen can tell: the
+bit database gives each direction its own bit, and bitgen sets the one whose input is the half the net drives.
+
+`splitters.mjs` makes these tests. Each net drives a half from a long-line wire a switch box drives (`LH` / `LV` 0, 6, 12,
+18) and ends on the splitter's PIP, written `X =- Y`; the search never takes such a PIP on a path (`joinTestDesigns`,
+`SPLITTERS=1`). `oracle.sh -b` adds bitgen, and the verdict comes from the DRC and the bit:
+
+| The DRC | The bit | Verdict |
+|---|---|---|
+| island | | the half holds neither end |
+| no island | `X -> Y` | the half holds X, not Y |
+| no island | `Y -> X` | the half holds Y, not X |
+
+The hypotheses are the shipped graph's nodes; only ISE's verdicts put a join into the description, as in round cE. The
+splitter wires' joins were taken out of `obs.json.gz` (4389 joins, 1083 decided), so nothing there comes from the shipped
+graph now. All the verdicts are the round `sp` of `verdicts.json.gz`:
+
+- 9630 tests from the switch boxes (4832 of the 4992 splitter ends);
+- 136 more for the ends in the I/O and corner tiles, across known joins, from their own sources (28 ends);
+- 19 ordinary join tests for what was left: the long-line wires of the DCM tiles, which no test had reached, and the wires
+  into one of them.
+
+19 533 verdicts, 9785 joins, 9748 no-joins, none unclear, and every one agrees with the shipped graph (local scoring only).
+132 splitter ends have no test of their own. They are the far ends of their PIPs: no test of theirs could be routed, and
+no split node is left there.
+
+| | Part 9 | Now |
+|---|---|---|
+| Nodes split / merged | 5084 / 0 | 3616 / 0 |
+| ... with two pieces a net can reach (a short) | 1469 | **0** |
+| ... with a route lost | 897 | 898 |
+| PIPs extra / missing, pins missing | 110 / 138 290, 57 885 | the same |
+
+**ISE's verdict**, every design routed by the open flow on this description: the 7 examples and the 45 fixtures on the
+Nexys2-1200 give DRC 0 errors and 0 warnings, xdl2ncd no warning, and a `.bit` byte-identical to ISE's bitgen with CRC on
+and off. The shipped graph stays.
+
+```
+PART=xc3s1200efg320-4 node splitters.mjs pred pred.json
+SPLITTERS=1 MAXJOINS=2 node prototype.mjs tests pred.json obs.json sp && ise-remote.sh -f -b sp && node splitters.mjs verdicts sp
+```
