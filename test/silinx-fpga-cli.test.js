@@ -139,8 +139,8 @@ test('#1679 the README\'s blinky built from the command line: no warnings, its f
   assert.equal(r.code, 0, r.err.join('\n'));
   assert.deepEqual(r.err, [], 'no warnings');
   // (nextpnr, the default engine, #2136: the fastest of its 4 placements)
-  assert.ok(r.out.some(l => l.startsWith('Placed and routed by nextpnr in ')) && r.out.includes('Kept the fastest of 4 placements: seed 2, 5.040 ns.'), r.out.join('\n'));
-  assert.ok(r.out.includes('constraint PERIOD 20 ns on clk: met (period 5.040 ns, slack 14.960 ns)'), r.out.join('\n'));
+  assert.ok(r.out.some(l => l.startsWith('Placed and routed by nextpnr in ')) && r.out.includes('Kept the fastest of 4 placements: seed 1, 5.069 ns.'), r.out.join('\n'));
+  assert.ok(r.out.includes('constraint PERIOD 20 ns on clk: met (period 5.069 ns, slack 14.931 ns)'), r.out.join('\n'));
   assert.ok(r.out.includes('All constraints were met.'));
   assert.equal(r.out.at(-1), `${bit}: the bitstream of blinky on xc3s250ecp132-4`);
   for (const f of ['blinky.json', 'routed.xdl', 'timing.txt', 'blinky.bit']) assert.ok(fs.existsSync(path.join(build, f)), f);

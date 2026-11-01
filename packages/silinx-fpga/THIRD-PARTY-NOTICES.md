@@ -6,11 +6,11 @@ which npm installs with it. Each one keeps its own licence, reproduced in full h
 
 | Component | Version | Licence | Project |
 |---|---|---|---|
-| @silinx/nextpnr-himbaechel-spartan3e | 0.11.3 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
+| @silinx/nextpnr-himbaechel-spartan3e | 0.12.0 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @silinx/nextpnr-himbaechel-spartan6 | 0.1.1 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @yowasp/yosys | 0.70.1258 | ISC | https://yowasp.org/ |
 
-## @silinx/nextpnr-himbaechel-spartan3e 0.11.3 — ISC
+## @silinx/nextpnr-himbaechel-spartan3e 0.12.0 — ISC
 
 https://github.com/pmnmalo/nextpnr-spartan
 
