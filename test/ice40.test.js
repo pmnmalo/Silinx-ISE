@@ -111,6 +111,16 @@ test('the iCE40 without pins: each port warned, nextpnr places it; a bitstream f
   assert.equal(next.files['blinky.bin'].length, 104090);
 });
 
+test('#2518 a port that is a vector of one bit: its pin from the PCF\'s btn[0] (a board\'s constraints) or btn, no warning', async () => {
+  const ONE = 'module one(input clk, input [0:0] btn, output reg [1:0] led);\n  always @(posedge clk) led <= {btn[0], ~btn[0]};\nendmodule\n';
+  for (const name of ['btn[0]', 'btn']) {
+    const { log, io } = memoryIo(`set_io clk 35\nset_io ${name} 10\nset_io led[0] 11\nset_io led[1] 37\nset_frequency clk 12\n`, { sources: () => [{ path: 'one.v', lang: 'verilog', text: ONE }] });
+    const r = await runFlow({ ...SPEC, top: 'one', steps: ['synth', 'translate', 'par'] }, io);
+    assert.ok(r.ok, r.error);
+    assert.deepEqual(warnings(log), [], name);
+  }
+});
+
 test('the iCE40\'s errors: a part nextpnr-ice40 does not have, a pin it does not have, no nextpnr, no routed design, a PCF it cannot read', async () => {
   const fail = async (spec, io) => { const r = await runFlow({ ...SPEC, ...spec }, io); assert.equal(r.ok, false); return r.error; };
   assert.match(await fail({ device: 'ice40xx9k' }, memoryIo(PINS).io), /^ice40xx9k: not an iCE40 part of nextpnr-ice40 \(ice40lp384, .*ice40up5k/);
