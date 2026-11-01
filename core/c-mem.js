@@ -13,7 +13,7 @@
 // addresses cannot be the same (a[i], a[i + 1]). What the states do not share leaves port 1 idle.
 // Isomorphic ES module: no DOM and no Node APIs.
 import { BOOL, INT, typeOf } from './c-types.js';
-import { storageOf } from './c-pragma.js';
+import { implOf, storageOf } from './c-pragma.js';
 
 export const MEM_MIN = 64;   // a local array of more elements than this is a memory (fewer: registers)
 
@@ -60,6 +60,18 @@ export const memMethods = {
     for (const n of inferred) if (!out.has(n)) out.set(n, 't2p');
     return out;
   },
+  /** The memories BIND_STORAGE names an impl= of (#1961): Map name -> 'block' | 'distributed' | 'register'. */
+  memImpl(fn) {
+    const out = new Map();
+    const scan = (x) => {
+      if (!x || typeof x !== 'object') return;
+      if (Array.isArray(x)) { x.forEach(scan); return; }
+      if (x.kind === 'pragma') { if (x.pragma.name === 'BIND_STORAGE' && implOf(x.pragma)) out.set(String(x.pragma.args.variable), implOf(x.pragma)); return; }
+      for (const [k, y] of Object.entries(x)) if (k !== 'loc' && k !== 'type') scan(y);
+    };
+    scan(fn.body);
+    return out;
+  },
   /** A memory: { kind: 'mem', name, t, n, aw, ext, init: [BigInt] | null, rom, static, read, written, acc }. */
   memSlot(v, { ext = false } = {}) {
     const t = v.type;
@@ -76,7 +88,8 @@ export const memMethods = {
     // (a static or a global with no initial values: zeros, as C)
     if (!init && !ext && v.static) init = [];
     const st = this.storage?.get(v.orig ?? v.name);
-    return { kind: 'mem', name: v.name, t: et, n: Number(n), aw: clog2(Number(n)), ext, init, rom: !!v.const, static: !!v.static, read: false, written: false, loc: v.loc, reads: 0, ...(st === '2p' || st === 't2p' ? { storage: st } : {}) };
+    const style = this.impls?.get(v.orig ?? v.name);
+    return { ...(style && style !== 'register' ? { style } : {}), kind: 'mem', name: v.name, t: et, n: Number(n), aw: clog2(Number(n)), ext, init, rom: !!v.const, static: !!v.static, read: false, written: false, loc: v.loc, reads: 0, ...(st === '2p' || st === 't2p' ? { storage: st } : {}) };
   },
   isMem(e) { return e?.kind === 'index' && e.e.kind === 'id' && this.slots.get(e.e.name)?.kind === 'mem'; },
   hasMem(x) {

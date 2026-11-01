@@ -49,6 +49,7 @@ export function vhdlSeq(name, src, ports, m, agg) {
     L.push(`  type ap_m_${hdlName(x.name)}_t is array (0 to ${depth(x) - 1}) of std_logic_vector(${x.t.w - 1} downto 0);`);
     const init = x.init ? ` := (${words(x).map((v, k) => `${k} => "${bin(v, x.t.w)}"`).join(', ')})` : '';
     L.push(`  signal ap_m_${hdlName(x.name)} : ap_m_${hdlName(x.name)}_t${init};`, `  signal ap_m_${hdlName(x.name)}_q0 : ${ty(x.t)};`);
+    if (x.style) L.push(`  attribute ${x.rom ? 'rom' : 'ram'}_style : string;`, `  attribute ${x.rom ? 'rom' : 'ram'}_style of ap_m_${hdlName(x.name)} : signal is "${x.style}";`);   // (BIND_STORAGE impl=, #1961)
     if (x.storage === 't2p') L.push(`  signal ap_m_${hdlName(x.name)}_q1 : ${ty(x.t)};`);
   }
   innerSignals(agg, 'vhdl', L);
@@ -123,7 +124,7 @@ export function verilogSeq(name, src, ports, m, agg) {
   const chain = ports.some((p) => p.name === 'ap_continue');
   if (chain) L.push("  reg ap_done_reg = 1'b0;");
   for (const x of m.mems || []) {
-    L.push(`  reg [${x.t.w - 1}:0] ap_m_${hdlName(x.name)} [0:${depth(x) - 1}];`, `  reg ${x.t.s ? 'signed ' : ''}[${x.t.w - 1}:0] ap_m_${hdlName(x.name)}_q0;`);
+    L.push(`  ${x.style ? `(* ${x.rom ? 'rom' : 'ram'}_style = "${x.style}" *) ` : ''}reg [${x.t.w - 1}:0] ap_m_${hdlName(x.name)} [0:${depth(x) - 1}];`, `  reg ${x.t.s ? 'signed ' : ''}[${x.t.w - 1}:0] ap_m_${hdlName(x.name)}_q0;`);
     if (x.storage === 't2p') L.push(`  reg ${x.t.s ? 'signed ' : ''}[${x.t.w - 1}:0] ap_m_${hdlName(x.name)}_q1;`);
     if (x.init) L.push('  initial begin', ...words(x).map((v, k) => `    ap_m_${hdlName(x.name)}[${k}] = ${x.t.w}'b${bin(v, x.t.w)};`), '  end');
   }
