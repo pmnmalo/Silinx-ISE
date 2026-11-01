@@ -3,7 +3,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
-import { resolveBoard } from '../../server/devices.js';
+import { resolveBoard, BOARDS } from '../../server/devices.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -326,4 +326,54 @@ uiTest('#2511 the iCEBreaker emulated: its PCF\'s pins, BTN_N active low, the re
   assert.doesNotMatch(await page.eval(() => document.querySelector('.emu-board-note').textContent), /not emulated/);
   assert.deepEqual(await leds(), [1, 1, 0, 0, 0, 1, 1]);
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn' || c.type === 'error').map((c) => c.text), []);
+});
+
+// #2297: the iCEBreaker with its modules on PMOD1A / PMOD1B (the examples' 4-digit display on a breadboard, 4 switches),
+// as the board data will have them; drawn alone (web/js/emulator-board.js mountBoardParts, no design), the emulator's
+// style in place (a Basys2's emulator opened first)
+async function partsAlone(page, board) {
+  await emulatorOn(page, 'basys2', `Emu-style-${board.id}`);
+  await page.eval(async (b) => {
+    const [{ mountBoardParts }, { h }] = await Promise.all([import('/js/emulator-board.js'), import('/js/dom.js')]);
+    const main = h('div', { id: 'alone', style: { position: 'fixed', left: '0', top: '0', zIndex: '1000', background: '#fff' } });
+    document.body.append(main);
+    mountBoardParts({
+      board: b, title: '', after() {}, bitFor: () => undefined, compiled: () => false, hasLcd: false, inVal: new Map(), knobEnd: () => 0,
+      lcdView: () => null, main, manual: [], period: 83333, powered: () => true, refresh() {}, resLabel: {},
+      resOf: (n) => b.resources.find((r) => r.name === n), runCycles() {}, running: () => false, setInputBit() {}, setPower() {},
+      sim: {}, tip: (res, k = 0) => `${res}${k}`, wiring: { bits: [], clocks: [] }, setKnobEnd() {}, setLcdView() {},
+    });
+  }, board);
+}
+const ICE_PMODS = (() => {
+  const b = structuredClone(BOARDS.find((x) => x.id === 'icebreaker'));
+  const io = { dir: 'out', iostandard: 'SB_LVCMOS', extra: { activeLow: true } };
+  b.resources = b.resources.filter((r) => !/^pmod1[ab]$/.test(r.name)).concat(
+    { name: 'seg', label: '7-segment CA..CG', pins: ['4', '2', '47', '45', '3', '48', '46'], group: '7-segment', ...io },
+    { name: 'dp', label: '7-segment DP', pins: ['44'], group: '7-segment', ...io },
+    { name: 'sw', label: 'Switches SW0..SW3', pins: ['43', '38', '34', '31'], dir: 'in', iostandard: 'SB_LVCMOS', group: 'Switches' },
+    { name: 'an', label: '7-segment AN0..AN3', pins: ['42', '36', '32', '28'], group: '7-segment', ...io });
+  return b;
+})();
+
+uiTest('#2297 the iCEBreaker with the display on a breadboard and the 4 switches on its Pmods: over PMOD1A and PMOD1B, the board under them', E, async (page) => {
+  await partsAlone(page, ICE_PMODS);
+  const g = await geometry(page, '#alone'), TOP = 190;
+  assert.deepEqual([g.W, g.H], [1010, 493 + TOP]);   // (the board drawn TOP lower, the modules over it)
+  assert.deepEqual(await page.eval(() => ['.emu-led', '.emu-btn', '.emu-sw', '.emu-power', 'svg[viewBox="0 0 44 64"]'].map((s) => document.querySelectorAll(`#alone ${s}`).length)), [7, 4, 4, 1, 4]);
+  // the digits AN3..AN0 left to right over PMOD1A, the switches SW3..SW0 left to right over PMOD1B, upright, all over the board
+  const digits = ['an3', 'an2', 'an1', 'an0'], sws = ['sw3', 'sw2', 'sw1', 'sw0'];
+  assert.ok(leftToRight(g, digits) && leftToRight(g, sws));
+  assert.ok([...digits, ...sws].every((n) => g[n].y < TOP), JSON.stringify(g));
+  assert.ok(g.an0.x < g.sw3.x && sws.every((n) => g[n].h > 1.5 * g[n].w));
+  // the board's parts under them, as without the modules (TOP lower)
+  assert.ok(g.power.y > TOP && g.btn_n.y > TOP + 300 && g.led0.y > TOP);
+  const xs = await page.eval(() => Object.fromEntries([...document.querySelectorAll('#alone .emu-pcb-art text')].map((t) => [t.textContent, +t.getAttribute('y')])));
+  for (const t of ['BREADBOARD', 'SWITCHES (PMOD)', 'CA(4)', 'CG(46)', 'DP(44)']) assert.ok(t in xs, t);
+  assert.deepEqual(Object.keys(xs).filter((t) => MAKERS.test(t)), []);
+  // each control is what is at its centre
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#alone .emu-btn, #alone .emu-sw, #alone .emu-power')].filter((c) => {
+    const r = c.getBoundingClientRect(), at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !(at === c || c.contains(at));
+  }).map((c) => c.title)), []);
 });
