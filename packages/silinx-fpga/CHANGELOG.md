@@ -3,6 +3,65 @@
 What changed in each version of silinx-fpga, the Silinx toolchain. The newest version is first. Its versions
 are its own (semver, 0.x until its API is stable), apart from Silinx ISE's.
 
+## 0.1.5
+
+The first version published by npm's trusted publishing, with no token (#2428).
+
+In short:
+
+- **nextpnr by default:** `silinx-fpga build` places and routes with nextpnr when it can implement the design, else with
+  Silinx's own engine (`--engine auto`, now the default); `--engine silinx` keeps Silinx's engine.
+
+In detail:
+
+- **Published by npm's trusted publishing (#2428):** the release workflow authenticates by GitHub's OIDC token, with no
+  stored token (npm 11.21.0, pinned, publishes it); its provenance as before.
+- **The steps by family (#2387):** a back end lists its steps (`steps: [{ id, label, needs }]`) and its mount gives their
+  functions (`{ steps: { id: run() } }`, in place of `runMap`, `runPar`, `runTiming`, `runPins`, `runPower`, `bitfile` and
+  `runFpgaView`); `runFlow` runs the steps asked in the list's order, the synthesis and the simulation models its own, and
+  names no other step. The Xilinx families keep ISE's steps, names and labels (`XILINX_STEPS`), so the IDE's processes do not
+  change; `orderSteps(list, asked)` gives a run's steps from any list. A fake family runs `synth, pnr, timing, bitstream` in
+  the tests; the Spartan-3E and Spartan-6 give the same output.
+- **The synthesis by family (#2386):** the back end gives its synthesis and the names of its report's lines (`synth`,
+  `synthName(id, resource)`, replacing `xstNames`): the Xilinx families' `synthesizeVerilog` (`synth_xilinx` and Silinx's
+  mappings), another family's Yosys script through `scriptSynthesis({ script, files, utilization, quiet })` (`synth-script.js`),
+  and Yosys's generic `synth` for a registered family that gives none. `runFlow` names no synthesis. `FAMILY_INFO` needs only a
+  family's name (`xise`, `pm` optional). The Spartan-3E and Spartan-6 give the same netlists and reports; a fake family is
+  synthesized with its own script into Yosys's generic cells in the tests.
+- **One model of the constraints (#2385):** `constraints.js`: the pins, the clocks and what is not portable (as the format's
+  own text), read by the format a back end says (`constraints: { id, read, write }`, UCF when it says none). `runFlow` and the
+  steps no longer read UCF: a back end receives `ctx.constraints()`, the model or null, in place of `ctx.ucfText`. The
+  Spartan-3E and Spartan-6 give the same output; a fake family reads a format of its own in the tests.
+- **The routed design is the back end's (#2384):** `runFlow` no longer reads or names `open/routed.xdl`; a back end keeps its
+  routed design in its own format and file, and its timing, bitstream, power and FPGA view read it again from an earlier run
+  (`runFpgaView`, `routedOrEarlier` and `routedText` for the simulation models). The Spartan-3E and Spartan-6 give the same
+  output; a fake family routes to a format of its own in the tests. A registered back end no longer receives `setRouted`,
+  `routedText` or `routedOrEarlier` in its context.
+- **The nextpnr engine's Design Summary: every resource (#2361):** its map report lists the RAMB16s, the MULT18X18SIOs and
+  the DCMs too, used or not, in the MAP report's order, as the Silinx engine's (#795); it had the flip-flops, LUTs,
+  slices, IOBs and BUFGMUXs only.
+  - **Tests:** test/open-toolchain.test.js (blinky's report through the default engine, every resource).
+- **The engine `auto` by default (#2136):** the command line's `--engine` defaults to `auto`, and `engineOf(impl)` reads a
+  project with no engine as `auto` (it was `silinx`). The flow's `spec.engine` itself is unchanged: not set, the Silinx engine.
+  `auto` loads nextpnr's chip database at Map; when it cannot (offline, a database not downloaded yet, #2329), the Silinx
+  engine places and routes, with `WARNING:Map - the nextpnr engine could not start (…)`; `nextpnr` still fails there.
+  - **Tests:** test/nextpnr-engine.test.js (`engineOf`, nextpnr not starting) and test/silinx-fpga-cli.test.js.
+- **Spartan-6: the clock pads' BUFIO2s (#2025):** the routes from the clock pads U10, T9 and R8 into their BUFIO2s
+  and on to a DCM or PLL, measured one PIP at a time with their far bits (30 PIPs, 6 with bits: the I/O words and
+  the CMT column; `bitdb/s6/xc6slx16-pips-cmt.json`, `s6-pips-flow.json`). Each BUFIO2 also sets one I/O word bit of
+  its own, whatever the CMT it drives. The CMTs' input table had it only in its (CMT site, BUFIO2) entries;
+  `research/s6/ana-cmtinput6.mjs` now takes it apart (`bufio2` of `bitdb/s6/<device>-cmt-input.json`), and
+  `cmtInputBits` (`src/fpga/s6/bitgen-cmt.js`) adds it. On the XC6SLX16's 203 CMT and example designs, all are bit for
+  bit (196 before); the XC6SLX45's 184 stay exact.
+  - **Tests:** test/s6-cmtpaths.test.js.
+- **Spartan-6: #727's whole CMT paths retired (#2025):** a DCM at DCM_X0Y1 or a PLL at PLL_ADV_X0Y0 with #727's base
+  settings was predicted from its base design's bits whole (`bitdb/s6/xc6slx16-cmt-paths.json`), which set its base's
+  other BUFGMUX's REGC bit and outputs' bits in a design to other BUFGMUXes (44 bits ISE does not set). It is now
+  predicted by the rules every other site has: its settings, its BUFGMUXes' REGC bits, the input table and its paths'
+  PIPs. The database, `research/s6/ana-cmt6.mjs`, `cmtPath` and `predictCmt` (`src/fpga/s6/bitgen-cmt.js`) and
+  `loadBitDbS6`'s `cmt` are gone. On the XC6SLX16's 203 CMT and example designs, all are bit for bit (199 before).
+  - **Tests:** test/s6-cmtpaths.test.js, test/s6-clock.test.js, packages/silinx-fpga/test/s6-bitgen.test.js.
+
 ## 0.1.4
 
 The first version on npm: 0.1.3 was tagged, but its CI failed on a UI test of Silinx ISE, fixed since (#2395).
