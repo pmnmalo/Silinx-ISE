@@ -107,9 +107,49 @@ test('#1943 the floating-point transform: the DFT within a float\'s error, natur
   }
 });
 
+// (the pins: cos and sin of 2 pi / N truncated toward zero, computed apart with Python's doubles and struct; to nearest,
+// sin's last hex digit would be 6 at 64 points, 8 at 1024)
+test('#2309 the floating-point twiddles: double\'s cos and sin truncated toward zero to float; a quarter turn an exact rotation', () => {
+  const bits = (v) => new Uint32Array(new Float32Array([v]).buffer)[0].toString(16).toUpperCase();
+  const impulse = (nfft, inverse) => {
+    const N = 2 ** nfft, re = new Array(N).fill(0), im = new Array(N).fill(0);
+    re[1] = 1;
+    fftFloat(re, im, { ...params({ use_native_float: 1, max_nfft: nfft }, 'ssr_params_t').p, inverse });
+    return [re, im];
+  };
+  for (const [nfft, c, s] of [[6, '3F7EC46D', '3DC8BD35'], [10, '3F7FFEC4', '3BC90F87']]) {
+    const [re, im] = impulse(nfft, false);
+    assert.deepEqual([bits(re[1]), bits(-im[1])], [c, s]);
+    // (the inverse: the conjugate's twiddle, the same truncated values)
+    const [ri, ii] = impulse(nfft, true);
+    assert.deepEqual([bits(ri[1]), bits(ii[1])], [c, s]);
+  }
+  // (a sample at 1 of N: X[N / 4] is exactly -j forward, +j inverse)
+  const [re, im] = impulse(6, false), [ri, ii] = impulse(6, true);
+  assert.deepEqual([Math.abs(re[16]), im[16], Math.abs(ri[16]), ii[16]], [0, -1, 0, 1]);
+});
+
 // (AMD's golden files, the corpus's: bit-exact, every value)
 const manifest = JSON.parse(fs.readFileSync(new URL('./hls-corpus/manifest.json', import.meta.url), 'utf8'));
 const dir = path.join(sourceDir(manifest.sources['vitis-hls-examples']), 'DSP/fft/interface_array/data');
+for (const design of ['interface_array_float_ssr2', 'interface_stream_float_ssr2']) {
+  const floats = path.join(sourceDir(manifest.sources['vitis-hls-examples']), 'DSP/fft', design, 'data-ssr2');
+  test(`#2309 the floating point bit-exact with Vitis HLS's C model: ${design}'s 10 frames, every value`, { skip: !fs.existsSync(floats) && 'the corpus is not fetched (npm run test:hls)' }, () => {
+    const u = new Uint32Array(1), fl = new Float32Array(u.buffer);
+    const float = (h) => { u[0] = parseInt(h, 16); return fl[0]; };
+    // (a line of values: the re and im floats in hex, then in decimal)
+    const rows = (file) => fs.readFileSync(path.join(floats, file), 'utf8').split('\n').map((l) => l.trim().split(/\s+/))
+      .filter((a) => a.length >= 4 && /^[0-9A-F]{8}$/i.test(a[0])).map((a) => [float(a[0]), float(a[1])]);
+    const p = params({ use_native_float: 1, max_nfft: 10 }, 'ssr_params_t').p;
+    for (let f = 0; f < 10; f++) {
+      const n = String(f).padStart(2, '0'), x = rows(`stimulus_${n}.dat`), want = rows(`stimulus_${n}.res`);
+      assert.deepEqual([x.length, want.length], [1024, 1024], n);
+      const re = x.map((a) => a[0]), im = x.map((a) => a[1]);
+      fftFloat(re, im, p);
+      assert.deepEqual(re.map((v, i) => [v, im[i]]), want, n);
+    }
+  });
+}
 test('#1943 bit-exact with Vitis HLS\'s C model: the corpus\'s 20 frames, every value', { skip: !fs.existsSync(dir) && 'the corpus is not fetched (npm run test:hls)' }, () => {
   const sx = (s) => { const v = parseInt(s, 16); return v >= 32768 ? v - 65536 : v; };
   const rows = (lines) => lines.map((l) => l.trim().split(/\s+/).slice(0, 2).map(sx));

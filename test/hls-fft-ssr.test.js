@@ -4,13 +4,21 @@
 // array; a stream of hls::vector of std::complex through the hardware (VHDL and Verilog, co-simulated); the errors said.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { simulateC } from '../core/c-interp.js';
 import { cToHdl } from '../core/c-hdl.js';
 import { cosimulate } from '../core/c-cosim.js';
 import { fftParams, fftFloat } from '../core/hls-fft.js';
+import { sourceDir } from '../scripts/fetch-design-corpus.mjs';
+import { unitOf } from './hls-corpus/lib.mjs';
 
 const OPTS = { file: 'f.cpp', top: 'fft_top' };
 const said = (r) => r.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`);
+// (each's #pragma on `direction`, then its test bench's 1 << 32, line 66 or 70)
+const corpusWarnings = (line) => ['21 warning: #pragma HLS INTERFACE ap_hs port=direction is not made of this argument (a pointer): ignored (its default interface made)',
+  `${line} warning: a shift by 32 of a 32-bit value is undefined in C: the C simulation takes g++'s value, 0 (synthesis refuses it)`];
+const CORPUS_WARNINGS = { 'dsp-fft-interface-array-float-ssr2': corpusWarnings(66), 'dsp-fft-interface-stream-float-ssr2': corpusWarnings(70) };
 const N = 16;
 const INPUT = Array.from({ length: N }, (_, i) => [Math.fround(Math.sin(i) * 3), Math.fround(i % 5 - 2)]);
 
@@ -144,3 +152,18 @@ test('#2309 a stream of hls::vector of std::complex<int> in the hardware, VHDL a
       "5 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"], lang);
   }
 });
+
+// (AMD's two designs that compare each float with `==`, when the corpus is at hand: their C simulation's run and its warnings)
+const manifest = JSON.parse(fs.readFileSync(new URL('./hls-corpus/manifest.json', import.meta.url), 'utf8'));
+for (const [name, warnings] of Object.entries(CORPUS_WARNINGS)) {
+  const d = manifest.designs.find((x) => x.name === name), dir = sourceDir(manifest.sources[d.source]);
+  const all = [...d.files, ...d.tb, ...d.headers];
+  test(`#2309 ${name}: its C simulation passes, bit-exact with AMD's golden files`, { skip: !all.every((f) => fs.existsSync(path.join(dir, f))) && 'the corpus is not fetched (npm run test:hls)' }, () => {
+    const texts = Object.fromEntries(all.map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]));
+    const { unit, headers } = unitOf(d, texts);
+    const r = simulateC(unit, { file: 'unit.cpp', headers, top: d.top, directives: d.directives, files: texts });
+    assert.deepEqual(r.diagnostics.map((x) => `${x.line} ${x.severity}: ${x.message}`), warnings);
+    assert.equal(r.error, null);
+    assert.equal(r.exitCode, 0);
+  });
+}
