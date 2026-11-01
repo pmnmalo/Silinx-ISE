@@ -120,7 +120,7 @@ docs/          user guides (EN, PT), the project model and API, QUALITY.md (agai
   with no warnings. A new feature should be exercised by an example where it fits.
 - **ISE is the oracle:** Silinx's `.bit` must be byte-identical to ISE's bitgen for the same design,
   with ISE's DRC clean. For language questions, XST's Spartan-3E behaviour is the reference.
-- **Two interfaces** (modern and classic, ISE-like), **light and dark themes**, **Portuguese**, **touch
+- **Two interfaces** (Silinx and ISE style), **light and dark themes**, **Portuguese**, **touch
   screens** (long press opens the right-click menus) and **narrow screens** (a tablet in portrait: the
   Design pane is a drawer).
 - **Never commit Xilinx files:** not ISE, its Docker image, or ISE's raw outputs (`.bit`, `.ncd`,

@@ -16,7 +16,7 @@ the code and the lessons learnt.
   - core logic: unit tests in `test/*.test.js` (node:test), covering normal cases, edge cases and
     error paths; compare computed results against an independent reference where possible;
   - anything visible in the app: a UI test in `test/ui/*.test.js`, which must pass in both
-    interfaces (modern and classic), and in Portuguese when it adds labels;
+    interfaces (Silinx and ISE style: `SILINX_UI_INTERFACE=ise`), and in Portuguese when it adds labels;
   - generated HDL: compiled, elaborated and simulated, in VHDL and in Verilog;
   - a bug fix: a regression test that fails on the old code.
 - **Tests assert the warnings too**: the exact expected warnings of every flow (Check Syntax,

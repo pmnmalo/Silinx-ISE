@@ -3,7 +3,8 @@
 // SILINX_UI_INTERFACE, the CI matrix; only the migration of a preference saved with an old id, and its tests, name them
 // (ALLOW). Their names Silinx and ISE style (Silinx, Estilo ISE), never the names of before (Modern, Classic, the
 // modern / classic interface, Moderna, Clássica) nor AMD's trademark as one (the Xilinx ISE interface), in the labels,
-// the comments and the tests' names.
+// the comments and the tests' names, and in the documentation (every Markdown file but the history and the research
+// notes).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -51,6 +52,20 @@ const matches = (patterns) => (text) => {
 export const oldIds = matches(OLD_IDS);
 /** The matches of the old names in a text: [{ line, text }]. */
 export const oldNames = matches(OLD_NAMES);
+// the documentation: the old names, the two of them named together ("modern and classic", "(modern, classic)"), and
+// SILINX_UI_INTERFACE's old ids in its commands
+export const OLD_IN_DOCS = [
+  ...OLD_NAMES,
+  /\b(modern|classic)(,? (and|or)|,) (classic|modern)\b/gi,
+  /\b(modern|moderna|classic|cl[aá]ssica)\b[^.\n]{0,40}\b(ISE-like|ISE look|Project Navigator look)/gi,
+  /SILINX_UI_INTERFACE=["']?(modern|classic)\b/g,
+];
+/** The matches of the old names in a document: [{ line, text }]. */
+export const oldInDocs = matches(OLD_IN_DOCS);
+// the documents searched: every Markdown file but the history (CHANGELOG.md, the changelog's fragments) and the
+// research notes, as they were written
+const docs = () => execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '*.md'], { cwd: ROOT, encoding: 'utf8' })
+  .split('\0').filter((f) => f && !/ \d+\.\w+$/.test(f) && !/^(CHANGELOG\.md$|changes\/|research\/|node_modules\/)|\/CHANGELOG\.md$/.test(f) && fs.existsSync(path.join(ROOT, f)));
 
 // the files searched: the code, the tests, the scripts, the workflows (a new file not yet added too; a sync's copy,
 // "name 2.js", not)
@@ -68,6 +83,20 @@ test('#2451 oldNames finds the names of before, not the words', () => {
   assert.deepEqual(oldNames("{ label: 'Classic' }\n// the modern interface, the classic one; View ▸ Modern\n'Moderna', a interface clássica, the Xilinx ISE look").map((m) => m.text),
     ["'Classic'", '▸ Modern', 'modern interface', 'classic one', "'Moderna'", 'Xilinx ISE look', 'interface clássica']);
   assert.deepEqual(oldNames("a classic worker, Windows classic, 'Silinx', 'ISE style', the Silinx interface, the ISE style one, Xilinx ISE 14.7"), []);
+});
+
+test('#2451 oldInDocs finds the names of before in prose, not the words', () => {
+  assert.deepEqual(oldInDocs('- **Two interfaces** (modern and classic, ISE-like)\ntwo interfaces (modern, classic)\n`SILINX_UI_INTERFACE=classic`\nthe classic Xilinx ISE Project Navigator look').map((m) => m.text),
+    ['modern and classic', 'modern and classic, ISE-like', 'modern, classic', 'SILINX_UI_INTERFACE=classic', 'classic Xilinx ISE Project Navigator look']);
+  assert.deepEqual(oldInDocs('the Silinx and ISE style interfaces; a classic state table; `SILINX_UI_INTERFACE=ise`; modern tools'), []);
+});
+
+test('#2451 no old interface name in the documentation (README, docs/, ONBOARDING, CLAUDE.md, CONTRIBUTING…)', () => {
+  const files = docs();
+  for (const f of ['README.md', 'CLAUDE.md', 'ONBOARDING.md', 'CONTRIBUTING.md', 'docs/ARCHITECTURE.md']) assert.ok(files.includes(f), f);
+  assert.ok(!files.some((f) => /^(CHANGELOG\.md|changes\/|research\/)/.test(f)), 'the history and the research notes as written');
+  const found = files.flatMap((f) => oldInDocs(fs.readFileSync(path.join(ROOT, f), 'utf8')).map((m) => `${f}:${m.line}: ${m.text}`));
+  assert.deepEqual(found, []);
 });
 
 test('#2451 no old interface name (Modern, Classic, the modern / classic interface) in web/, test/, scripts/, .github/', () => {

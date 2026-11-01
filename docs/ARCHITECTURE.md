@@ -20,7 +20,7 @@ WebAssembly tools into the single file; `scripts/pwa.mjs` adds the site's servic
 ## The layers
 
 ```text
- The interface    web/js/   two interfaces (modern, classic); the Design pane, the editors, the processes,
+ The interface    web/js/   two interfaces (Silinx, ISE style); the Design pane, the editors, the processes,
                             SSim, the Board Emulator, the pin planner, iMPACT, the FPGA view; Portuguese
                      │ api.js (the server) │ api-local.js (the browser)
  The hosts        server/   projects on disk, jobs, ISE's flow, the Silinx flow in a process, programmers, MCP
@@ -114,8 +114,8 @@ and the board's Platform Flash: in the browser over WebUSB, with Silinx's own JT
 
 ### The interface
 
-- **Two interfaces** over the same page (`web/js/modern.js`): the modern one, the default, organised around a lab
-  session's tasks (`web/js/tasks.js`), and the classic one, as ISE's. The UI tests run in both.
+- **Two interfaces** over the same page (`web/js/modern.js`): the Silinx interface, the default, organised
+  around a lab session's tasks (`web/js/tasks.js`), and the ISE style interface, laid out as ISE's. The UI tests run in both.
 - **Portuguese**: every label has its translation (`web/js/i18n.js`), which a test checks.
 - **Narrow screens and tablets**: `web/js/narrow.js`; the pen and touch work in the editors and the handwriting pads.
 - **The messages** of every process in one console (`web/js/messages.js`).
