@@ -48,7 +48,7 @@ function resourcesUsed(body) {
   for (const b of rest.matchAll(/mkButton\(0, '[^']*', '([\w-]+)'\)/g)) use(b[1]);
   if (/mkLcd\(/.test(rest)) { use('lcd_e'); use('lcd_rs'); use('lcd_rw'); }
   if (/mkRotary\(/.test(rest)) { use('rot_a'); use('rot_b'); }
-  return { used, optional: new Set([...rest.matchAll(/\['(btn_\w+)', '[A-Z]+'/g)].map((m) => m[1])) };
+  return { used, optional: new Set([...rest.matchAll(/\['(btn_\w+)', '[A-Z_]+'/g)].map((m) => m[1])) };
 }
 
 test('every board drawn by the emulator is in the device database', () => {
@@ -68,7 +68,7 @@ for (const [id, fn] of Object.entries(LAYOUTS)) {
       assert.ok(r.pins.length > maxIdx, `${id}: '${name}' has ${r.pins.length} pin(s), the drawing uses index ${maxIdx}`);
     }
     // direction buttons (drawn when the board has them): mkButton(0, …, res) for each
-    if (optional.size) assert.match(layoutBody(fn), /for \(const \[res, lbl, x, y\] of dirs\)[^]*mkButton\(0, '[^']*', res\)/);
+    if (optional.size) assert.match(layoutBody(fn), /for \(const \[res, lbl, [^\]]*\] of dirs\)[^]*mkButton\(0, '[^']*', res\)/);
     // and conversely the board's LEDs / switches / buttons / digits all have a widget
     for (const name of ['led', 'sw', 'btn', 'an']) {
       const r = board.resources.find((x) => x.name === name);
