@@ -13,6 +13,7 @@ import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, nextpnrIo, ice40Io, ru
 import { yosysPool } from './yosys-client.js';
 import { workerIo } from './open-flow-worker-io.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
+import { ice40FromTarball } from './nextpnr-ice40-browser.js';
 import { assetFetch, assetFetchSource, assetCached, prefetchAssets, pruneAssetCache, YOSYS_FILES, NEXTPNR_FILES, nextpnrChipdb } from './asset-cache.js';
 
 // (Yosys in this worker's own thread, where it cannot start workers of its own: its Blobs readable, #556)
@@ -70,14 +71,13 @@ function nextpnrBrowser(url, post) {
   };
 }
 
-// the iCE40's nextpnr and icepack (#2295), from YoWASP's bundle; the first run fetches every iCE40's chip database
+// the iCE40's nextpnr and icepack (#2295): YoWASP's bundle served by the local server (its URL), or its package from npm's
+// registry, kept by this browser (the published editions: its { url, integrity }, #2444)
 const ice40s = new Map();
-function ice40Browser(url, post) {
-  if (!ice40s.has(url)) {
-    post({ line: 'Loading nextpnr-ice40 and icepack (WebAssembly, about 80 MB the first time)…' });
-    ice40s.set(url, ice40Io(() => import(url)));
-  }
-  return ice40s.get(url);
+function ice40Browser(where, post) {
+  const key = where.url || where;
+  if (!ice40s.has(key)) ice40s.set(key, ice40Io(() => (where.url ? ice40FromTarball(where, { log: line => post({ line }) }) : import(where))));
+  return ice40s.get(key);
 }
 
 self.onmessage = async ({ data }) => {
