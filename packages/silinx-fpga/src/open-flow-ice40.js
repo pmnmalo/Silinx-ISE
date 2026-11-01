@@ -27,11 +27,20 @@ const NAMES = { luts: 'Number of LUT4s', ffs: 'Number of flip-flops', ramb16: 'N
 
 const text = v => (typeof v === 'string' ? v : new TextDecoder().decode(v));
 
-// a port's bits as nextpnr names them: q[0], q[1]… (a bus), clk (a bit)
+// a port's bits as nextpnr names them: q[0], q[1]… (a bus), clk (a bit); a vector of one bit too: btn, not btn[0] (#2518)
 function portBits(netlistText, top) {
   const mods = JSON.parse(netlistText).modules || {};
   const mod = mods[top] || Object.values(mods).find(m => m.attributes?.top) || {};
-  return Object.entries(mod.ports || {}).flatMap(([name, p]) => (p.bits.length > 1 ? p.bits.map((_, i) => `${name}[${(p.offset || 0) + i}]`) : [name]));
+  return Object.entries(mod.ports || {}).flatMap(([name, p]) => (p.bits.length > 1 ? p.bits.map((_, i) => `${name}[${(p.offset || 0) + i}]`)
+    : [{ name, bit: `${name}[${p.offset || 0}]` }])).map(b => (typeof b === 'string' ? { name: b } : b));
+}
+
+// (#2518) the PCF's names as nextpnr's: a one-bit port's btn[0] (a board's constraints name every bus's bits so) as btn
+function nextpnrNames(pcf, bits) {
+  const rename = new Map(bits.filter(b => b.bit && !pcf.assignments?.[b.name] && pcf.assignments?.[b.bit]).map(b => [b.bit, b.name]));
+  if (!rename.size) return pcf;
+  const to = n => rename.get(n) || n;
+  return { ...pcf, assignments: Object.fromEntries(Object.entries(pcf.assignments).map(([n, a]) => [to(n), a])), clocks: (pcf.clocks || []).map(c => ({ ...c, net: to(c.net) })) };
 }
 
 function mountIce40(ctx) {
@@ -51,9 +60,10 @@ function mountIce40(ctx) {
   async function runPar() {
     if (!ICE40_PARTS.includes(part)) throw new StepError(`${spec.device}: not an iCE40 part of nextpnr-ice40 (ice40${ICE40_PARTS.join(', ice40')})`, [], '');
     const t = now();
-    const pcf = constraints();
+    const bits = portBits(netlistText(), top);
+    const read = constraints(), pcf = read && nextpnrNames(read, bits);
     const pins = pcf?.assignments || {};
-    const free = portBits(netlistText(), top).filter(p => !pins[p]?.loc);
+    const free = bits.map(b => b.name).filter(p => !pins[p]?.loc);
     for (const p of free) log(`WARNING:Place - the port ${p} has no pin (set_io in the PCF): nextpnr places it anywhere.`);
     const args = [`--${part}`, ...(spec.pkg ? ['--package', spec.pkg] : []), '--json', 'netlist.json', '--asc', 'routed.asc', '--report', 'report.json',
       '--seed', String(spec.seed || 1), ...(pcf ? ['--pcf', 'design.pcf'] : []), ...(free.length ? ['--pcf-allow-unconstrained'] : [])];
