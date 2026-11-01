@@ -2,7 +2,7 @@
 // io.simModels by core/flow-ide.js runOpenFlow; #405: out of runOpenFlow in packages/silinx-fpga/src/open-flow-core.js, #120,
 // #121, #122, #622): the design the models are made of (the test bench's generics), the post-synthesis,
 // post-translate, post-map and post-place & route models, the board's model beside them.
-import { analyzeTiming, pack, placeRouteBest, readYosysJson, synthesizeVerilog, StepError } from '../packages/silinx-fpga/src/index.js';
+import { analyzeTiming, pack, placeRouteBest, readYosysJson, synthesizeVerilog, synthesizeArea, FAST_SYNTH, StepError } from '../packages/silinx-fpga/src/index.js';
 import { compile, elaborate } from './compile.js';
 import { flowFrontEnd } from './synth-front.js';
 import { dutGenerics, postMapModels, postParModels, postSynthesisModels, postTranslateModels, scalarVerilog } from './sim-model.js';
@@ -46,7 +46,7 @@ export function mountSimModels(ctx) {
   async function synthesizeWith(generics) {
     const fe = flowFrontEnd(io.sources(), top, { generics });
     if (fe.errors.length) throw new StepError('the design has errors', fe.errors, 'Fix them (Check Syntax shows them in the Errors tab).');
-    try { return await synthesizeVerilog(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high' }); } catch (e) {
+    try { return await (spec.synthGoal === 'area' ? synthesizeArea : synthesizeVerilog)(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(spec.synthGoal === 'fast' && FAST_SYNTH) }); } catch (e) {
       for (const l of e.lines || []) if (/ERROR/.test(l)) log(l);
       throw new StepError(`synthesis failed: ${e.message}`);
     }

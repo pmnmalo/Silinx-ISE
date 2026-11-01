@@ -650,6 +650,13 @@ export const QUIET = [/^Warning: Shift register inference not yet supported for 
 /** The open synthesis's effort from a project's implementation properties (#282): its Optimization Effort,
  *  as XST's: High (optLevel 2) 'high', else (Normal, the default) 'normal'. */
 export const synthEffort = impl => (String(impl?.optLevel) === '2' ? 'high' : 'normal');
+/** The project's Optimization (#2470), of its two ISE properties: 'area' (Optimization Goal Area), 'speed' (Speed, Effort High),
+ *  'fast' (Speed, Normal: every project made before it). */
+export const synthGoal = impl => (/^area$/i.test(impl?.optMode || '') ? 'area' : String(impl?.optLevel) === '2' ? 'speed' : 'fast');
+/** The ISE properties of an Optimization (XST's opt_mode and opt_level). */
+export const GOAL_IMPL = { fast: { optMode: 'Speed', optLevel: 1 }, area: { optMode: 'Area', optLevel: 2 }, speed: { optMode: 'Speed', optLevel: 2 } };
+/** Yosys's usual mapping alone, none of the mappings for speed: Optimization Fast's synthesis, and one of Area's two netlists (synth-area.js, #2470). */
+export const FAST_SYNTH = { effort: 'normal', depth: false, speed: false, abc9: false, fsm: false, resynth: false, bdd: false, csel: false };
 
 /**
  * Synthesize a design's flat Verilog: { text, top, warnings, shiftArrays, gates } (core/synth-front.js synthesisInput, the

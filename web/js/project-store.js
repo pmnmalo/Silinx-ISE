@@ -49,7 +49,7 @@ export function projectJsonText(name, pj) {
 /** A new empty project's silinx.json (server/projects.js createProject). */
 export const emptyProjectJson = (name, { device, board } = {}) => ({
   name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null, top: '', simTop: '', files: [],
-  constraints: 'constraints/top.ucf', stimuli: {}, impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' },
+  constraints: 'constraints/top.ucf', stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
 });
 const under = (k, dir) => k === dir || k.startsWith(`${dir}/`);
 const plain = o => !!o && typeof o === 'object' && !Array.isArray(o);
@@ -89,7 +89,8 @@ export function normalizeProjectJson(saved, name) {
   const excluded = (Array.isArray(saved.excluded) ? saved.excluded : []).map(safePath).filter(Boolean);
   if (excluded.length) json.excluded = excluded;
   json.stimuli = plain(saved.stimuli) ? saved.stimuli : {};
-  json.impl = { ...base.impl, ...(plain(saved.impl) ? saved.impl : {}) };
+  // (a project read, made before the Optimization or saying none: Fast, Speed at Normal; a new one is Area, #2470)
+  json.impl = { ...base.impl, optMode: 'Speed', optLevel: 1, ...(plain(saved.impl) ? saved.impl : {}) };
   if (saved.preferredLanguage === 'vhdl' || saved.preferredLanguage === 'verilog') json.preferredLanguage = saved.preferredLanguage;
   if (plain(saved.sourceLanguage)) json.sourceLanguage = saved.sourceLanguage;
   if (typeof saved.synthTool === 'string') json.synthTool = saved.synthTool;

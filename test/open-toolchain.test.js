@@ -307,6 +307,9 @@ test('open mode: a design over the XC3S100E\'s block RAMs fails in Synthesize, t
 test('open mode: Place & Route replicates a flip-flop of many loads on the critical path, the faster routing kept, the Design Summary of the design kept (#4)', { timeout: 240000 }, async () => {
   await writeConfig({ mode: 'silinx' });
   await app.call('POST', '/projects', { name: 'Fan64', device: DEV('xc3s250e', 'cp132') });
+  // (Optimization Speed: a new project's Area replicates no register, #2470)
+  const pj = (await app.call('GET', '/projects/Fan64')).body;
+  await app.call('PUT', '/projects/Fan64', { ...pj, impl: { ...pj.impl, optMode: 'Speed', optLevel: 2 } });
   // s selects 64 registers spread over the chip: its net is the slowest of the critical path
   await app.call('PUT', '/projects/Fan64/file?path=src/fan.v', ['module fan(input clk, input sel, input din, output reg y);', '  reg s;', '  reg [63:0] a, q;', '  reg [15:0] r1;', '  reg [3:0] r2;', '  integer i;',
     '  always @(posedge clk) begin', '    s <= sel;', '    a <= {a[62:0], din};', '    for (i = 0; i < 64; i = i + 1) q[i] <= s ? a[i] : a[63 - i];', '    for (i = 0; i < 16; i = i + 1) r1[i] <= ^q[4*i +: 4];',

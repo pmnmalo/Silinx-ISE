@@ -296,10 +296,10 @@ uiTest('processes that need no ISE: RTL schematic, constraints, pin planning, su
   assert.deepEqual(items, ['Run', 'Rerun', 'Stop (disabled)', 'Process Properties…']);
   await page.click('body > .menu-popup .mi', { text: 'Process Properties…' });
   await page.waitDialog('Process Properties');
-  await page.fill('.dlg-overlay select', 'Area');
+  await page.fill('.dlg-overlay select', 'speed');
   await page.dialogButton('OK');
   await page.waitNoDialog();
-  await page.waitFor(async () => (await (await fetch('/api/projects/ProcPj')).json()).impl.optMode === 'Area');
+  await page.waitFor(async () => (await (await fetch('/api/projects/ProcPj')).json()).impl.optLevel === 2);
   // Simulation view processes
   await page.setView('sim');
   await page.treeRow('#hier', 'tb_top');

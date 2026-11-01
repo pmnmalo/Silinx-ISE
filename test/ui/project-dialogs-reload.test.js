@@ -56,7 +56,7 @@ uiTest('#2281 Design Properties: the Preferred Language kept when a reload ends 
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });
 
-uiTest('#2281 Process Properties: the Optimization Goal kept when a reload ends while it is open', E, async (page) => {
+uiTest('#2281 Process Properties: the Optimization kept when a reload ends while it is open', E, async (page) => {
   await makeProject(env, { name: 'DlgReloadImpl', template: 'empty' });
   await page.openProject('DlgReloadImpl');
   await slow(page, 'project', 1000);
@@ -64,13 +64,13 @@ uiTest('#2281 Process Properties: the Optimization Goal kept when a reload ends 
   await page.eval(() => { import('/js/wizards.js').then((w) => w.implProperties()); });
   await page.waitDialog('Process Properties - Synthesis / Implementation / Bitstream');
   await settled(page);
-  await pick(page, 'Optimization Goal:', 'Area');
+  await pick(page, 'Optimization:', 'speed');
   await page.dialogButton('OK');
   await page.waitNoDialog();
   await settled(page);
   await restore(page);
-  await page.waitFor(() => window.Silinx.project.impl?.optMode === 'Area', [], { what: 'in the project' });
-  assert.equal((await saved('DlgReloadImpl')).impl.optMode, 'Area');
+  await page.waitFor(() => window.Silinx.project.impl?.optLevel === 2 && window.Silinx.project.impl?.optMode === 'Speed', [], { what: 'in the project' });
+  assert.deepEqual([(await saved('DlgReloadImpl')).impl.optMode, (await saved('DlgReloadImpl')).impl.optLevel], ['Speed', 2]);
 });
 
 uiTest('#2281 a reload asked after a save reads the project the save wrote', E, async (page) => {

@@ -491,13 +491,14 @@ Implementation uses the Silinx toolchain by default (below), or the ISE 14.7 com
 
 **Without ISE (Silinx toolchain):** the synthesis (*Synthesize - Yosys*, with Silinx as
 the project's synthesis tool; *Synthesize - Yosys (open)* in a project that synthesizes with XST)
-synthesizes any design with Yosys compiled to WebAssembly, in parallel Web Workers. Its *Optimization
-Effort* (Process Properties) Normal, the default, maps the design once (fast; a design of 250 LUTs at most as High does too, the faster kept; a state machine of 8 states or more
-that Yosys leaves as written also one-hot, when that is better; Place & Route makes two placements of a design of
-500 slices at most and keeps the faster); High also tries the mappings for speed, and its state machines of 8 states
-or more one-hot, and keeps the best, and Place & Route makes two placements of any design and keeps the faster (a third
-when the placer estimates it faster than one of them). Implement Design and Generate Programming File do not
-synthesize again while the synthesis is up to date (the design's sources, top, device and effort
+synthesizes any design with Yosys compiled to WebAssembly, in parallel Web Workers. Its *Optimization* (Process Properties) is **Fast**, **Area** or
+**Speed**. Fast maps the design once and Place & Route makes one placement: the quickest build. Area, the default of a
+new project, also synthesizes as Speed does and keeps the smaller netlist (by slices, then LUTs), with one placement and no
+register replication. Speed tries the mappings for speed, its state machines of 8 states or more one-hot, and keeps the
+fastest; Place & Route makes several placements and keeps the fastest (two and a third when the placer estimates it faster
+with Silinx's engine, eight with nextpnr's). A project made before these three is Fast (its Speed and Normal). ISE gets
+them as its Optimization Goal and Effort: Speed / Normal, Area / High and Speed / High. Implement Design and Generate Programming File do not
+synthesize again while the synthesis is up to date (the design's sources, top, device and Optimization
 unchanged). For the **Basys2-100 and Basys2-250
 (XC3S100E / XC3S250E-CP132) and the Nexys2-500 and Nexys2-1200 (XC3S500E / XC3S1200E-FG320)**
 Silinx also places, routes and writes the bitstream itself: the device descriptions ship with

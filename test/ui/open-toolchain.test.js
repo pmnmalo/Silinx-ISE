@@ -371,7 +371,7 @@ uiTest('open mode: View Technology Schematic of blinky and pong without ISE: the
   await page.setView('impl');
   assert.deepEqual((await procLabels(page)).find((p) => p.label === 'View Technology Schematic'), { label: 'View Technology Schematic', disabled: false, title: '' });
   await checkTechSchematic(page, { top: 'top', blocks: ['u_pre', 'u_speed', 'u_knight', 'u_count', 'u_display'], inside: 'u_pre',
-    message: "Technology Schematic of 'top': the netlist of the Silinx toolchain's synthesis (build/open/top.json), 511 cells in 5 block(s): u_display (61), u_knight (52), u_speed (216), u_count (84), u_pre (67)." });
+    message: "Technology Schematic of 'top': the netlist of the Silinx toolchain's synthesis (build/open/top.json), 512 cells in 5 block(s): u_display (61), u_knight (52), u_speed (216), u_count (84), u_pre (68)." });
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
   // Portuguese: the view's bar, its tab and the LUT's function have no untranslated text (the netlist's names apart)
   await page.eval(TEXTS);
@@ -475,7 +475,7 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   const tech = await viewerTexts(page);
   assert.deepEqual(tech.kinds, ['wire', 'sym:module', 'sym:constant', 'sym:slice', 'sym:busjoin', 'port', 'label']);
   assert.deepEqual(tech.untranslated, []);
-  for (const s of ['Propriedades', 'Esquemático Tecnológico (só de leitura): a netlist pós-síntese', 'Módulo LUT3', 'Pinos (4)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
+  for (const s of ['Propriedades', 'Esquemático Tecnológico (só de leitura): a netlist pós-síntese', 'Módulo LUT2', 'Pinos (3)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
     assert.ok(tech.pt.has(s), `${s}: ${[...tech.pt].join(' | ')}`);
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
@@ -947,10 +947,10 @@ uiTest('#280 open mode: Generate Programming File after a change of the pins onl
   assert.match(log, /Process "Implement Design" completed successfully/);
 }, { timeout: 300000 });
 
-// #282: the synthesis's Optimization Effort with the Silinx toolchain: Normal (the default) synthesizes once,
-// High also tries the mappings for speed; Process Properties says so, in English and in Portuguese
+// #282, #2470: the Optimization with the Silinx toolchain: Fast (every project before it: Speed, Normal) synthesizes once,
+// Speed (Speed, High) tries the mappings for speed; Process Properties says so, in English and in Portuguese
 // (the Design Summary's tables and the Processes panel: the ISE style interface's; the Silinx one's cards, its Implement: tasks.test.js #802, #1149)
-uiTest('#282 open mode: Optimization Effort Normal (the default) synthesizes once (a small design as High, #652), High tries the mappings for speed; Process Properties says so; Portuguese', E, async (page) => {
+uiTest('#282 #2470 open mode: Optimization Fast (an example\'s) synthesizes once, Speed tries the mappings for speed; Process Properties says so; Portuguese', E, async (page) => {
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
   await makeProject(env, { name: 'OpenEffort', template: 'blinky' });
   await page.openProject('OpenEffort');
@@ -961,38 +961,38 @@ uiTest('#282 open mode: Optimization Effort Normal (the default) synthesizes onc
     await page.waitFor((b, re) => new RegExp(re).test(window.__console().slice(b)), [before, DONE(proc).source], { what: proc, timeout: 120000 });
     return (await page.consoleText()).slice(before);
   };
-  const NORMAL = 'Optimization Effort Normal: one mapping, and the mappings for speed for a small design or one limited by its logic depth (High tries them for every design, a slower synthesis).';
+  const FAST = 'Optimization Fast: one mapping, none of the mappings for speed; one placement, no register replication.';
   const HIGH = 'Optimization Effort High: the mappings for speed tried too, the fastest kept.';
   let log = await run('Synthesize - Yosys');
   assert.match(log, /Process "Synthesize - Yosys" completed successfully/, log.slice(-2000));
-  assert.ok(log.includes(NORMAL) && !log.includes(HIGH), log.slice(0, 2000));
-  // (blinky is small: High's mappings at Normal too, said, #652)
-  assert.match(log, /Optimization Effort Normal: a small design \(\d+ LUTs\): the mappings for speed tried too, the fastest kept\./);
-  // Process Properties: what the effort does
+  assert.ok(log.includes(FAST) && !log.includes(HIGH), log.slice(0, 2000));
+  // (Fast: not even a small design's mappings for speed, #652)
+  assert.doesNotMatch(log, /a small design \(\d+ LUTs\)/);
+  // Process Properties: what each Optimization does
   const props = async (proc = 'Synthesize - Yosys', item = 'Process Properties…') => {
     await page.treeRow('#procs', proc, { right: true, exact: true });
     await page.click('body > .menu-popup .mi', { text: item });
     await page.waitForSelector('.dlg-overlay .effort-hint');
     return page.eval(() => document.querySelector('.dlg-overlay .effort-hint').textContent);
   };
-  assert.equal(await props(), 'Silinx toolchain: Optimization Effort Normal synthesizes once, fast, and tries the mappings for speed only on a small design (250 LUTs at most), a design limited by its logic depth or one with wide multiplexers; High tries them on every design (a slower synthesis, a circuit about 5-10 % faster).');
+  assert.equal(await props(), 'Fast: one mapping and one placement, the quickest build. Area: the smallest circuit, the mappings for speed tried too. Speed: the fastest circuit, every mapping for speed and several placements tried. ISE gets Speed / Normal, Area / High and Speed / High.');
   await page.dialogButton('Cancel');
   await page.waitNoDialog();
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('pt');
   try {
-    assert.equal(await props('Sintetizar - Yosys', 'Propriedades do Processo…'), 'Toolchain Silinx: o Esforço de Otimização Normal sintetiza uma vez, depressa, e só experimenta os mapeamentos para velocidade num desenho pequeno (250 LUTs no máximo), num desenho limitado pela sua profundidade lógica ou num com multiplexadores largos; Alto experimenta-os em todos os desenhos (uma síntese mais lenta, um circuito cerca de 5-10 % mais rápido).');
+    assert.equal(await props('Sintetizar - Yosys', 'Propriedades do Processo…'), 'Rápido: um mapeamento e uma colocação, a compilação mais rápida. Área: o circuito mais pequeno, experimentando também os mapeamentos para velocidade. Velocidade: o circuito mais rápido, experimentando todos os mapeamentos para velocidade e várias colocações. O ISE recebe Speed / Normal, Area / High e Speed / High.');
     await page.dialogButton('Cancelar');
     await page.waitNoDialog();
   } finally { await setLang('en'); }
-  // High: the mappings for speed
+  // Speed: the mappings for speed
   await props();
-  await page.eval(() => { const s = document.querySelectorAll('.dlg-overlay select')[1]; s.value = '2'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+  await page.eval(() => { const s = document.querySelectorAll('.dlg-overlay select')[0]; s.value = 'speed'; s.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.dialogButton('OK');
   await page.waitNoDialog();
-  await page.waitFor(async () => (await (await fetch('/api/projects/OpenEffort')).json()).impl.optLevel === 2, [], { what: 'High saved' });
+  await page.waitFor(async () => { const i = (await (await fetch('/api/projects/OpenEffort')).json()).impl; return i.optLevel === 2 && i.optMode === 'Speed'; }, [], { what: 'Speed saved' });
   log = await run('Synthesize - Yosys');
-  assert.ok(log.includes(HIGH) && !log.includes(NORMAL), log.slice(0, 2000));
+  assert.ok(log.includes(HIGH) && !log.includes(FAST), log.slice(0, 2000));
   // the effort is an input of the synthesis (#280): Implement Design with it the same, up to date; back to
   // Normal, it synthesizes again
   log = await run('Implement Design');
@@ -1002,12 +1002,12 @@ uiTest('#282 open mode: Optimization Effort Normal (the default) synthesizes onc
   assert.match(log, /Placement 8 of 8 \(seed 8\): \d+\.\d{3} ns, \d+ slices/);
   assert.match(log, /Kept the fastest of 8 placements: seed [1-8], \d+\.\d{3} ns\./);
   await props();
-  await page.eval(() => { const s = document.querySelectorAll('.dlg-overlay select')[1]; s.value = '1'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+  await page.eval(() => { const s = document.querySelectorAll('.dlg-overlay select')[0]; s.value = 'fast'; s.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.dialogButton('OK');
   await page.waitNoDialog();
-  await page.waitFor(async () => (await (await fetch('/api/projects/OpenEffort')).json()).impl.optLevel === 1, [], { what: 'Normal saved' });
+  await page.waitFor(async () => (await (await fetch('/api/projects/OpenEffort')).json()).impl.optLevel === 1, [], { what: 'Fast saved' });
   log = await run('Implement Design');
-  assert.ok(!/is up to date/.test(log) && log.includes(NORMAL), log.slice(0, 2000));
+  assert.ok(!/is up to date/.test(log) && log.includes(FAST), log.slice(0, 2000));
 }, { timeout: 300000, ui: 'ise' });
 
 // #2136: Process Properties chooses the place and route engine of the Silinx toolchain; nextpnr (Silinx when it cannot)

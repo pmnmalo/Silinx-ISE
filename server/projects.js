@@ -209,7 +209,7 @@ export async function createProject({ name, template = 'empty', device, board })
   return writeProject(name, {
     name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null,
     top: '', simTop: '', files: [], constraints: 'constraints/top.ucf',
-    stimuli: {}, impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' },
+    stimuli: {}, impl: { optMode: 'Area', optLevel: 2, startupClk: 'JtagClk' },
   });
 }
 
