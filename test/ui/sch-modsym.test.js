@@ -62,7 +62,8 @@ uiTest('#1183 a module\'s ports changed: its instance drawn as placed, marked ou
   for (const n of ['b', 'y']) assert.equal(nl.pinNet.get(`U/${n}`), nl.portNet.get(`m_${n}`), n);
   assert.deepEqual(nl.diagnostics.filter((d) => d.severity === 'error'), []);
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .se-status`).textContent + document.querySelector(ed).textContent, ED), /Symbol updated; not connected any more: U1\.a/);
-  // one undo step back to the symbol of before
-  await page.click(`#toolbar [data-cmd=undo]`);
+  // one undo step back to the symbol of before (the editor's: Ctrl+Z in it, #2505)
+  await page.eval(() => document.querySelector('.doc:not([hidden]) .sch-editor').focus());
+  await page.key('z', { modifiers: 2 });
   await page.waitFor(() => window.Silinx.active.schEditor.getDoc().symbols[0].params.ports[0].name === 'a', [], { what: 'undone' });
 });

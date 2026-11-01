@@ -20,7 +20,7 @@ uiTest('#405 ASM drawing: blocks, connections, boxes (kinds, initial, selected, 
     svg.innerHTML = '<g class="b"></g><g class="e"></g><g class="n"></g>';
     const statusInfo = document.createElement('span');
     const mk = (tag) => document.createElement(tag);
-    const undoBtn = mk('button'), redoBtn = mk('button'), delBtn = mk('button');
+    const delBtn = mk('button');
     const encSel = mk('select');
     encSel.innerHTML = '<option>binary</option><option>gray</option><option>onehot</option><option>enum</option>';
     document.body.append(svg, statusInfo);
@@ -29,7 +29,7 @@ uiTest('#405 ASM drawing: blocks, connections, boxes (kinds, initial, selected, 
       { nodeId: 'o1', severity: 'warning' }, { severity: 'warning' }], hist: ['a', 'b'], hi: 1 };
     const nodeById = (id) => M.nodes.find((n) => n.id === id);
     const r = mountRender({ state: () => st, uid: 'asm9', gBlocks: svg.querySelector('.b'), gEdges: svg.querySelector('.e'), gNodes: svg.querySelector('.n'),
-      statusInfo, undoBtn, redoBtn, delBtn, encSel, nodeById, caseExits: (id) => M.edges.filter((e) => e.from === id),
+      statusInfo, delBtn, encSel, nodeById, caseExits: (id) => M.edges.filter((e) => e.from === id),
       exitsOf: (id) => M.edges.filter((e) => e.from === id), drawTarget: (e) => nodeById(e.to) });
     r.render(); r.updateToolbar();
     const q = (s) => [...svg.querySelectorAll(s)];
@@ -42,11 +42,11 @@ uiTest('#405 ASM drawing: blocks, connections, boxes (kinds, initial, selected, 
     o.codes = q('.asm-statecode').map((t) => t.textContent);
     o.texts = q('[data-node=s3] .asm-text').map((t) => t.textContent);
     o.status = statusInfo.textContent;
-    o.toolbar = [undoBtn.disabled, redoBtn.disabled, delBtn.disabled, encSel.value];
+    o.toolbar = [delBtn.disabled, encSel.value];
     // nothing selected, at the start of the history, one-hot: no Delete, no Undo, the codes one-hot
     st.sel = { nodes: new Set(), edge: null }; st.hi = 0; st.diags = []; M.encoding = 'onehot';
     r.render(); r.updateToolbar();
-    o.toolbar2 = [undoBtn.disabled, redoBtn.disabled, delBtn.disabled, encSel.value];
+    o.toolbar2 = [delBtn.disabled, encSel.value];
     o.codes2 = q('.asm-statecode').map((t) => t.textContent);
     o.status2 = statusInfo.textContent;
     o.sel2 = q('.sel').length;
@@ -63,8 +63,8 @@ uiTest('#405 ASM drawing: blocks, connections, boxes (kinds, initial, selected, 
   assert.deepEqual(out.codes, ['00', '01', '10']);
   assert.deepEqual(out.texts, ['busy = 1', 'ready = 1']);
   assert.equal(out.status, 'ctl · 3 states · 1 error · 3 warnings');
-  assert.deepEqual(out.toolbar, [false, true, false, 'binary']);
-  assert.deepEqual(out.toolbar2, [true, false, true, 'onehot']);
+  assert.deepEqual(out.toolbar, [false, 'binary']);
+  assert.deepEqual(out.toolbar2, [true, 'onehot']);
   assert.deepEqual(out.codes2, ['001', '010', '100']);
   assert.equal(out.status2, 'ctl · 3 states · 0 errors · 0 warnings');
   assert.equal(out.sel2, 0);

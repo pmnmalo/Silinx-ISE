@@ -13,6 +13,7 @@
 
 import { linkModel, linkSnapshot } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
+import { mountSideFold } from './side-fold.js';
 import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
@@ -140,7 +141,7 @@ function readOnlyChrome({ root, toolbar, hide, hint }) {
     ...[...toolbar.querySelectorAll('.asm-btn')].filter((b) => /^(Arrange|Validate)$/.test(b.textContent.trim()))]) g.hidden = true;
   hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a box to see it';
 }
-const lockSide = (readOnly, side) => { if (readOnly) for (const x of side.querySelectorAll('input, textarea, select, button')) x.disabled = true; };
+const lockSide = (readOnly, side) => { if (readOnly) for (const x of side.querySelectorAll('input, textarea, select, button:not(.asm-fold)')) x.disabled = true; };
 export function mountAsmEditor(container, { model, onChange, readOnly = false } = {}) {
   const uid = `asm${++instanceCounter}`;
   let M = normalizeModel(model || newModel('fsm', 'vhdl'));
@@ -238,6 +239,7 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   const probSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Problems ', probSummary), probList);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
 
+  mountSideFold({ root, side, key: 'silinx.asm.props.folded' });
   const status = h('div', { class: 'asm-status' });
   const statusMsg = h('span', { class: 'asm-status-msg' });
   const statusInfo = h('span', { class: 'asm-status-info' });

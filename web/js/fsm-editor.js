@@ -16,6 +16,7 @@
 
 import { h, linkModel, linkSnapshot } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
+import { mountSideFold } from './side-fold.js';
 import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { sv } from './dom.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
@@ -140,6 +141,7 @@ export function mountFsmEditor(container, opts = {}) {
   const probCount = h('span', { class: 'asm-prob-count' });
   const probSection = h('details', { class: 'asm-section fsm-problems', open: true }, h('summary', {}, 'Problems ', probCount), probList);
   const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
+  mountSideFold({ root, side, key: 'silinx.fsm.props.folded' });
   const statusMsg = h('span', { class: 'asm-status-msg' });
   const statusInfo = h('span', { class: 'asm-status-info' });
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));

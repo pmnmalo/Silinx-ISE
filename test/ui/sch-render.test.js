@@ -21,7 +21,7 @@ const MOUNT = async () => {
   const svg = document.createElementNS(NS, 'svg');
   svg.innerHTML = '<g class="se-sheet"></g><g class="se-content"></g><g class="se-overlay"></g>';
   const tb = document.createElement('div'), status = document.createElement('div');
-  tb.innerHTML = ['select', 'wire', 'net', 'io', 'place', 'sim', 'undo', 'redo', 'delete', 'rotate', 'mirror', 'mirrorv'].map((a) => `<button data-act="${a}"></button>`).join('');
+  tb.innerHTML = ['select', 'wire', 'net', 'io', 'place', 'sim', 'delete', 'rotate', 'mirror', 'mirrorv'].map((a) => `<button data-act="${a}"></button>`).join('');
   document.body.append(svg, tb, status);
   const inv = { id: 'S1', type: 'inv', name: 'U1', x: 200, y: 100 };
   const [I, O] = symbolPins(normalizeDoc({ symbols: [inv] }).symbols[0]);
@@ -33,12 +33,11 @@ const MOUNT = async () => {
     labels: [{ id: 'L1', x: 300, y: 500, net: 'D' }] });
   const st = { doc, nl: null, sel: new Set(['wire:W3', 'sym:S1']), tool: 'select', placing: null, drag: null, wireDraw: null, cursor: { x: 123, y: 456 },
     hoverPin: null, lastDiags: null, live: null, modules: {}, view: { s: 1.5 }, destroyed: false, showHops: true, showNames: false };
-  const undoStack = [], redoStack = ['x'];
   // (curved wires, #1144: the editor's, on this state)
   const curve = mountSchCurve({ doc: () => st.doc, sel: () => st.sel, oneWire: () => st.sel.size === 1, view: () => st.view, readOnly: false, edit: (fn) => fn(), render: () => {}, renderProps: () => {}, snapshot: () => '', pushUndo: () => {}, changed: () => {} });
   const r = mountRender({ curve, segSel: { current: () => null }, state: () => st, refreshNetlist: () => { st.nl = netlist(st.doc); }, uidE: 7, readOnly: false,
     sheetG: svg.querySelector('.se-sheet'), contentG: svg.querySelector('.se-content'), overlayG: svg.querySelector('.se-overlay'), tb, status,
-    undoStack, redoStack, routeTo: (a, b) => [{ x: b.x, y: a.y }, b], snapPoint: (p) => ({ x: Math.round(p.x / 10) * 10, y: Math.round(p.y / 10) * 10 }),
+    routeTo: (a, b) => [{ x: b.x, y: a.y }, b], snapPoint: (p) => ({ x: Math.round(p.x / 10) * 10, y: Math.round(p.y / 10) * 10 }),
     bandRect: () => ({ x: 10, y: 20, w: 30, h: 40 }) });
   const q = (s) => [...svg.querySelectorAll(s)];
   const off = (a) => tb.querySelector(`[data-act="${a}"]`).disabled;
@@ -59,7 +58,7 @@ uiTest('#405 schematic drawing: the sheet, the wires, symbols, markers and names
     o.ports = q('.se-content g[data-kind=port] .ioname').map((t) => t.textContent);
     o.labels = q('.se-content g[data-kind=label] text').map((t) => t.textContent);
     o.nc = q('.se-content .nc').length;
-    o.toolbar = [on(), off('undo'), off('redo'), off('delete'), off('rotate'), off('mirrorv')];
+    o.toolbar = [on(), off('delete'), off('rotate'), off('mirrorv')];
     o.status = status.textContent;
     // nothing selected, the check's counts, read-only is not in the hint (the editor's flag), a live simulation's
     st.sel = new Set(); st.lastDiags = [{ severity: 'error' }, { severity: 'warning' }, { severity: 'warning' }];
@@ -83,7 +82,7 @@ uiTest('#405 schematic drawing: the sheet, the wires, symbols, markers and names
   assert.deepEqual(out.ports, ['A', 'Y', 'D(3:0)']);
   assert.deepEqual(out.labels, ['D(3:0)']);   // (the net's width after a name given without it)
   assert.equal(out.nc, 3);
-  assert.deepEqual(out.toolbar, [['select'], true, false, false, false, false]);
+  assert.deepEqual(out.toolbar, [['select'], false, false, false]);
   // (6 nets: A, Y, D and the 3 pins of U2, each a net of its own)
   assert.match(out.status, /^Click to select, drag to move.*2 symbols, 6 nets\s*X 120 Y 460\s*150%$/);
   assert.deepEqual(out.toolbar2, [true, true, true]);

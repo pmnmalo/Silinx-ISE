@@ -7,7 +7,7 @@ import { h } from './dom.js';
 import { prefKey } from './prefs.js';
 
 const CHEVRON = { left: '<path d="M10 3.5L5.5 8l4.5 4.5"/>', right: '<path d="M6 3.5L10.5 8 6 12.5"/>' };
-const svg = (dir) => `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${dir === 'left' ? CHEVRON.left : CHEVRON.right}</svg>`;
+export const foldChevron = (dir) => `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${dir === 'left' ? CHEVRON.left : CHEVRON.right}</svg>`;
 const PANELS = {
   // (the side the panel folds towards: its chevron when open; the other way when folded)
   symbols: { cls: 'sym-folded', key: 'silinx.sch.symbols.folded', toward: 'left', open: 'Collapse the Symbols panel', folded: 'Expand the Symbols panel' },
@@ -23,7 +23,7 @@ export function mountSchPanels({ container, left, right }) {
     container.classList.toggle(p.cls, folded);
     const title = folded ? p.folded : p.open;
     b.title = title; b.setAttribute('aria-label', title); b.setAttribute('aria-expanded', String(!folded));
-    b.innerHTML = svg(folded ? away(p.toward) : p.toward);
+    b.innerHTML = foldChevron(folded ? away(p.toward) : p.toward);
     if (remember) try { localStorage.setItem(prefKey(p.key), folded ? '1' : '0'); } catch { /* storage unavailable */ }
     dispatchEvent(new Event('resize'));
   }

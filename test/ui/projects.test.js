@@ -242,7 +242,7 @@ uiTest('Example traffic (New Project…), the second example: the state diagram 
   assert.equal(await page.eval((ed) => document.querySelectorAll(`${ed} [data-trans]`).length, FSM), 8);
   // no error, no warning (only the notes that each state waits for its condition)
   assert.match(await page.eval((ed) => document.querySelector(`${ed} .fsm-problems`).textContent, FSM), /^Problems \(0 error\(s\), 0 warning\(s\)\)/);
-  await page.waitFor((ed) => /^HDL: traffic\.vhd — generated from the diagram$/.test(document.querySelector(`${ed} .fsm-link`)?.textContent || ''), [FSM], { what: 'the diagram synchronized with traffic.vhd' });
+  await page.waitFor((ed) => document.querySelector(`${ed} .fsm-link`)?.dataset.hdl === 'traffic.vhd' && !document.querySelector(`${ed} .fsm-link .gen-banner`), [FSM], { what: 'the diagram synchronized with traffic.vhd' });
   // the truth table: 4 inputs, its 5 lamp outputs, synchronized with lamps.vhd
   await page.eval(() => window.SilinxApp.openTt('src/lamps.bool.json'));
   const TT = '.doc:not([hidden]) .tt-editor';
