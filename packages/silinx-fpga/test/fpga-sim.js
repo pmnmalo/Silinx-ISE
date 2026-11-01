@@ -1,7 +1,7 @@
 // Test helper (not a test file): two small cycle simulators that check the packer without ISE.
 //
 //   netlistSim(nl)     the Yosys netlist (packages/silinx-fpga/src/fpga/netlist.js): LUT1..4, INV, MUXF5..8, MUXCY, XORCY,
-//                      FD*/LD* flip-flops and latches, IBUF / OBUF / OBUFT (z: high impedance) / BUFG, distributed RAMs
+//                      FD*/LD* flip-flops and latches, IBUF / OBUF / OBUFT (z: high impedance) / BUFG / BUFGMUX, distributed RAMs
 //                      (RAM16X1S / RAM32X1S / RAM64X1S / RAM16X1D), MULT18X18; and the combinational
 //                      gates of Yosys's internal cell library ($_AND_, $_MUX_… after a generic
 //                      `synth`) (CELLS_SIMULATED)
@@ -22,7 +22,7 @@ const RAM_A = { RAM16X1S: 4, RAM32X1S: 5, RAM64X1S: 6, RAM16X1D: 4 };
 const IOB_FFS = [['IFF1', 'I', 'ICLK1', 'PAD'], ['OFF1', 'O', 'OTCLK1', 'O1'], ['TFF1', 'T', 'OTCLK1', 'T1'],
   ['IFF2', 'I', 'ICLK2', 'PAD'], ['OFF2', 'O', 'OTCLK2', 'O2'], ['TFF2', 'T', 'OTCLK2', 'T2']];
 /** The cell types netlistSim models. */
-export const CELLS_SIMULATED = /^(LUT[1-4]|INV|MUXF[5-8]|MUXCY|XORCY|(FDRE|FDSE|FDCE|FDPE|LDCE|LDPE)(_1)?|IBUF|IBUFG|OBUF|OBUFT|IOBUF|BUFG|BUF|IDDR2|ODDR2|RAM16X1S|RAM32X1S|RAM64X1S|RAM16X1D|MULT18X18|MULT18X18S|MULT18X18SIO|SRLC?16E?(_1)?|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|\$_(BUF|NOT|AND|NAND|OR|NOR|XOR|XNOR|ANDNOT|ORNOT|MUX|NMUX|AOI3|OAI3|AOI4|OAI4)_)$/;
+export const CELLS_SIMULATED = /^(LUT[1-4]|INV|MUXF[5-8]|MUXCY|XORCY|(FDRE|FDSE|FDCE|FDPE|LDCE|LDPE)(_1)?|IBUF|IBUFG|OBUF|OBUFT|IOBUF|BUFG|BUFGMUX(_1)?|BUF|IDDR2|ODDR2|RAM16X1S|RAM32X1S|RAM64X1S|RAM16X1D|MULT18X18|MULT18X18S|MULT18X18SIO|SRLC?16E?(_1)?|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|\$_(BUF|NOT|AND|NAND|OR|NOR|XOR|XNOR|ANDNOT|ORNOT|MUX|NMUX|AOI3|OAI3|AOI4|OAI4)_)$/;
 
 // ------------------------------------------------------------------ block RAM and multiplier (both simulators)
 // a block-RAM port of each width: data bits, parity bits, address bits (as core/unisim.js)
@@ -141,6 +141,7 @@ export function netlistSim(nl) {
         else if (c.type === 'MUXCY') o = p('S') ? p('CI') : p('DI');
         else if (c.type === 'XORCY') o = p('CI') ^ p('LI');
         else if (/^(IBUF|IBUFG|OBUF|BUFG|BUF)$/.test(c.type)) o = p('I');
+        else if (/^BUFGMUX(_1)?$/.test(c.type)) o = p('S') ? p('I1') : p('I0');   // (a clock switch: at once, #2457)
         else if (c.type === 'OBUFT') o = p('T') ? 'z' : p('I');
         else if (c.type === 'IOBUF') o = p('T') ? ext.get(c.pins.IO) || 0 : p('I');
         else if (c.type === 'ODDR2') { const q = oddr.get(c); put(c.pins.Q, v[q[(p('C0') ^ paramInt(c.params.IS_C0_INVERTED)) ? 0 : 1]]); continue; }
@@ -329,7 +330,8 @@ export function packedSim(packed) {
       else if (c.has('INBUF')) o.I = c.has('TMUX') && pin(i, 'T1') ? padIn.get(c.get('PAD').name) || 0 : pin(i, 'O1');
       return o;
     }
-    if (inst.kind === 'bufg') { o.O = pin(i, 'I0'); return o; }
+    // (a clock switch, I1_USED: its select S, with SINV, #2457)
+    if (inst.kind === 'bufg') { o.O = c.has('I1_USED') && (pin(i, 'S') ^ (c.get('SINV')?.value === 'S_B' ? 1 : 0)) ? pin(i, 'I1') : pin(i, 'I0'); return o; }
     const val = a => c.get(a)?.value;
     if (inst.kind === 'bram') {
       for (const pt of st[i].ports) {

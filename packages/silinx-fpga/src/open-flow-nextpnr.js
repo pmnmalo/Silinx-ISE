@@ -19,11 +19,12 @@ import { parityToData } from './fpga/pack-bram.js';
 import { BRAM_TYPE, MULT_TYPE } from './fpga/pack.js';
 import { paramBits } from './fpga/netlist.js';
 
-/** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops of
- *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the carry chains (MUXCY, XORCY), the wide
- *  multiplexers, the constants (GND, VCC), the I/O buffers, the IOBs' DDR registers (IDDR2, ODDR2), BUFG, the DCMs, the block RAMs,
- *  the multipliers (not chained), the distributed RAMs and the shift registers. (A RAM64X1S: lowerRam64's.) */
-export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|DCM|DCM_SP|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
+/** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops
+ *  (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE) and the latches (LD, LDE, LDCE, LDPE), of the falling edge too
+ *  (_1, #2457), the carry chains (MUXCY, XORCY), the wide multiplexers, the constants (GND, VCC), the I/O buffers, the IOBs'
+ *  DDR registers (IDDR2, ODDR2), BUFG and the clock switches (BUFGMUX, BUFGMUX_1), the DCMs, the block RAMs, the multipliers
+ *  (not chained), the distributed RAMs and the shift registers. (A RAM64X1S: lowerRam64's; a BUF, a LUT1.) */
+export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?(_1)?|LD(CE|PE|E)?(_1)?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|BUFGMUX(_1)?|DCM|DCM_SP|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
 
 /**
  * The netlist for nextpnr: each port bit's pad (its LOC in the UCF) on the I/O buffer at that bit, the IBUF or OBUF the
@@ -38,6 +39,12 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
   const problems = [];
   lowerRam64(mod);
+  lowerClockSwitches(mod);
+  // a BUF is a 1-input LUT, as Silinx's packer makes it (pack-prep.js)
+  for (const c of Object.values(mod.cells)) {
+    if (c.type !== 'BUF') continue;
+    Object.assign(c, { type: 'LUT1', parameters: { INIT: '10' }, connections: { I0: c.connections.I || ['x'], O: c.connections.O }, port_directions: { I0: 'input', O: 'output' } });
+  }
   const types = new Map();
   for (const c of Object.values(mod.cells)) if (!NEXTPNR_CELL.test(c.type)) types.set(c.type, (types.get(c.type) || 0) + 1);
   for (const [t, n] of types) problems.push(`${n} cell(s) ${t}: not in the spartan3e micro-architecture yet`);
@@ -105,7 +112,8 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   // a clock net as the flip-flops see it: after its global buffers, through a DCM's outputs with their periods
   const follow = (net, period, depth = 0) => {
     const users = port => Object.values(mod.cells).filter(c => c.connections?.[port]?.[0] === net);
-    const bufgs = users('I').filter(c => c.type === 'BUFG');
+    // (and through a clock switch, #2457)
+    const bufgs = [...users('I').filter(c => c.type === 'BUFG'), ...users('I0').concat(users('I1')).filter(c => /^BUFGMUX(_1)?$/.test(c.type))];
     for (const c of bufgs) follow(c.connections.O[0], period, depth + 1);
     if (!bufgs.length || users('I').some(c => c.type !== 'BUFG')) clockNets.push([netNameOf(net), period]);
     if (depth > 8) return;
@@ -124,7 +132,10 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
       });
     }
   }
-  const sdc = clockNets.filter(([n]) => n).map(([n, period]) => `create_clock -period ${period} [get_nets {${n}}]\n`).join('');
+  // (a switch's output of two clocks: the tighter)
+  const periods = new Map();
+  for (const [n, period] of clockNets) if (n && !(periods.get(n) <= period)) periods.set(n, period);
+  const sdc = [...periods].map(([n, period]) => `create_clock -period ${period} [get_nets {${n}}]\n`).join('');
   json.modules = { [name]: mod };
   return { json, problems, sdc };
 }
@@ -158,6 +169,33 @@ export function lowerRam64(mod) {
         { A0: pin('A0'), A1: pin('A1'), A2: pin('A2'), A3: pin('A3'), A4: pin('A4'), D: pin('D'), WCLK: pin('WCLK'), WE: we, O: o });
     }
     addCell(`${name}_mux`, 'LUT3', { INIT: '11001010' }, { I0: oLo, I1: oHi, I2: pin('A5'), O: pin('O') });
+  }
+}
+
+/**
+ * The clock switches as Silinx's packer leaves them (pack-prep.js, #846, #2457): an input from a BUFG (Yosys's clkbufmap
+ * puts one on a clock that also clocks flip-flops) is the BUFG's input, the clock into the switch on its own line, the
+ * BUFG left out when nothing else reads it; a switch whose select is a constant, a BUFG of the input it selects. In place.
+ */
+export function lowerClockSwitches(mod) {
+  const cells = mod.cells, ports = new Set(Object.values(mod.ports).flatMap(p => p.bits));
+  const reads = b => Object.values(cells).some(c => Object.entries(c.connections || {}).some(([p, x]) => c.port_directions?.[p] === 'input' && x.includes(b)));
+  for (const c of Object.values(cells)) {
+    if (!/^BUFGMUX(_1)?$/.test(c.type)) continue;
+    for (const pin of ['I0', 'I1']) {
+      const b = c.connections[pin]?.[0];
+      const [name, buf] = Object.entries(cells).find(([, x]) => x.type === 'BUFG' && x.connections.O?.[0] === b) || [];
+      if (!buf || buf.connections.I?.[0] === undefined) continue;
+      c.connections[pin] = [buf.connections.I[0]];
+      if (!reads(b) && !ports.has(b)) delete cells[name];
+    }
+  }
+  for (const c of Object.values(cells)) {
+    const s = c.connections?.S?.[0];
+    if (!/^BUFGMUX(_1)?$/.test(c.type) || (s !== '0' && s !== '1')) continue;
+    c.type = 'BUFG';
+    c.connections = { I: c.connections[s === '1' ? 'I1' : 'I0'] || ['x'], O: c.connections.O };
+    c.port_directions = { I: 'input', O: 'output' };
   }
 }
 

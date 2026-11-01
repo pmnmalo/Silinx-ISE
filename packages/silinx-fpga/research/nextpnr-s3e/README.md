@@ -140,6 +140,23 @@ ten flip-flops in the chains' slices, the routing check and `xdl-sim-check.mjs -
 and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical. The VGA example: 148 slices and 278 LUTs where v0.9.1
 took 157 and 296 (Silinx: 150 to 153, its GND sources' slices included).
 
+## Falling edges, latches and clock switches (#2457)
+
+Every cell Silinx's packer takes, the nextpnr engine takes too. A falling-edge flip-flop (`FD*_1`) or a latch (`LD*`) is an
+FF with the slice's CLKINV as `pack-slices.js` writes it: a latch is transparent while CLKINV's output is low, so one with
+an active-high gate takes CLK_B. A slice's two flip-flops share CLKINV and the latch mode; a latch stays out of the IOBs
+(`pack-iobregs.js`); a latch's SYNC_ATTR is ASYNC. A clock switch (`BUFGMUX`, `BUFGMUX_1`) keeps I1 and S, and the flow's
+netlist leaves it as `pack-prep.js` does (`lowerClockSwitches`: an input from a BUFG that BUFG's input, a constant select a
+BUFG). The two buffers of a pair share their input lines: in the CLKT tile, `CLKT_GCLK1` drives both `GCLKIN01` (one buffer's
+I0) and `GCLKIN10` (its partner's I1). A switch next to a buffer of another clock made router 1 loop on that line, so the
+micro-architecture checks the pair as `place-bufgs.js` does (#846).
+`edges.v` (in this folder): two falling-edge flip-flops, one into the other; an active-high latch with its enable and clear;
+an active-low one with its preset; an output and an input register on the falling edge in their IOBs; a BUFGMUX_1 between
+clk and clk2 beside clk's BUFG; a BUFGMUX whose select is 0. Its constraints are `test/fixtures/nextpnr-engine/edges.ucf`.
+With the native build of nextpnr-spartan's branch (2026-11-01): 6 slices (as Silinx); ISE's xdl2ncd 0 warnings, its `drc`
+0 errors and 0 warnings; its `bitgen`'s `.bit` (CRC on and off) byte-identical; trce 1.916 ns (Silinx's analysis 1.923 ns);
+the XDL simulates equal to the netlist.
+
 ## The placer (#2222)
 
 Most of the speed gap to Silinx's engine is placement (#2196): the same logic depth on the critical paths, longer nets
