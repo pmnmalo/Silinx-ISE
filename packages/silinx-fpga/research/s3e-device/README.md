@@ -1263,3 +1263,60 @@ Basys2 pad moved to the Nexys2 pad of the same board resource (`mclk` to `clk`, 
 
 `prototype.mjs observe` now adds a design's observations one at a time. The XC3S1200E's designs overflowed the call
 stack of `push(...)`.
+
+### The recipe for the other dies, part 9: the XC3S1200E's measured description and its open-flow designs (2026-11-01)
+
+Parts 1-8 on the XC3S1200E-FG320 (Nexys2-1200), ISE 14.7 on the Mac mini. The measurements and the description are in
+`data/xc3s1200e/`. Every valid verdict and every probe answer was scored against the shipped graph (local scoring
+only), and every one agrees.
+
+- **Observation:** the 38 designs of `measure.mjs designs` and `iobddr-b`, the 12 sparser clock designs, the 4 random
+  designs, and 44 of the 45 `test/fixtures/open-flow` designs (below): 98 designs. The tile probe gives 2492
+  switch-box tiles.
+- **Join rounds** t1-t11 and the edge tiles' round te; **clock tests by removal** c2, c3, cS, cM (cS2's baselines
+  failed, as on the other dies); the **arc probe** of the I/O tiles and of the rest; the **whole-chip rounds** u1c-u6.
+  The designs are cut at 1000 tests each (#2178: ISE's DRC errs in designs of thousands).
+- **The fixtures' clock rounds:** cF (`clocktests.mjs` on their clock nets), cI (the left and right I/O columns' clock
+  lines), sS and sS2 (the clock spine and rows by name, `GCLKVMLR_GCLK_UP/DNk ~ GCLKC_GCLKk`, `GCLKC_GCLK_OUT_L/Rk ~
+  GCLKH_GCLKk`), cE (the top and bottom I/O rows' clock lines, `[TB]IOIS/GCLKk` with the GCLKH line it ends). sS
+  joined the left spine below Y22 to the bottom clock row Y6, whose own tests (sS2) could then be routed; cE's 265
+  hypotheses are the shipped graph's own joins, which only ISE's verdicts put into the measured description.
+- In all, 33 rounds and 1 417 915 verdicts, 354 895 of them joins.
+
+**The long-line splitters.** On the XC3S1200E a long line crosses the clock row and the clock column through a splitter
+tile (`CLKH_LL`, `CLKV_LL`, `CLKLH_DCM_LL`, the `CLK[TB]_LL` corners). ISE routes through its bidirectional `=-` PIPs, and
+an observed route cannot say which end of such a PIP belongs to which half. The observation took the two halves for one
+wire, and the first build merged 1834 nodes. #2410 read this as the shipped graph's halves swapped; the measurement was
+wrong, and the issue is closed with the evidence. Now:
+
+- the observation's joins and decided joins of a long line (`LVk` / `LHk`, `CLK*_LL*_L[HV]k`) that the shipped graph does
+  not have are left out of `obs.json.gz` (2386 joins, 992 decided);
+- the join verdicts of such pairs are marked `invalid` (673: t2 28, u1 434, u2 174, u3 9, vdis 28).
+
+So at the splitters the measured description defers to the shipped graph. This is a limit of the method on this die:
+the halves are not measured. The splitter's own wire (`CLKV_LLL_LH`, `CLKH_LLB_LV`, …) is kept apart from the long line
+of its side, which the shipped graph joins. A net can reach both, so these are the split nodes a short can come from:
+1469, all at the splitters (#2483: `CLB/LV ~ CLKH_LLB_LV` 465, `CLB/LH ~ CLKV_LLL_LH` 268, `CLKV_LLR_LH` 217, `CLKH_LLT_LV` 194,
+the rest at the I/O and block-RAM ends).
+
+| | First build | Before the fixtures | Now |
+|---|---|---|---|
+| Nodes split / merged | 23 744 / 1834 | 5341 / 0 | 5084 / 0 |
+| ... with two pieces a net can reach (a short) | 1934 | 1477 | 1469 (the splitters) |
+| ... with a route lost | 19 090 | 1144 | 897 |
+| PIPs extra / missing | 14 159 / 155 441 | | 110 / 138 290 |
+| Pins missing | 77 397 | | 57 885 |
+
+The global clock network's split pieces went from 402 to 104 with the fixtures' rounds.
+
+**The open-flow designs:** the 45 `test/fixtures/open-flow` designs on the Nexys2-1200 (`feat_dcm_pads` and
+`feat_ll_splitters` among them, made for this die), each Basys2 pad moved to the Nexys2 pad of the same board resource;
+the 1200 variant's LEDs are on other pads (`E17` → `E16`, `P15` → `P16`, `F4` → `E4`, `R4` → `P4`). ISE implemented
+44 (`feat_iob_ddr_v` is refused by XST, as on the other dies). Before their observation and clock rounds, 12 did not
+route on the measured graph: 3 found no global buffer from a DCM's CLKFX, 8 could not take a clock to an IOB's ICLK /
+OTCLK or a DCM's input (the bottom clock row Y6, the I/O rows' clock lines), 1 had routing errors. Their observation
+alone made 5 of them route; sS, sS2 and cE the other 7.
+
+**ISE's verdict**, every design routed by the open flow on the measured graph: the 7 examples and the 45 fixtures are
+clean. DRC gives 0 errors and 0 warnings, xdl2ncd gives no warning, and Silinx's `.bit` is byte-identical to ISE's
+bitgen with CRC on and off. The shipped graph stays.
