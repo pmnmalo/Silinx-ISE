@@ -343,7 +343,10 @@ calls in order; the co-simulation drives the top's ports as for any module, and 
 the streams that may be too shallow (a stream to a process that waits for its writer to be done, through a buffer,
 must hold all a call writes). A loop among the calls of a region of streams is a process of its own (`Loop_<k>_proc`,
 as Vitis HLS's `Loop_…_proc`), and a process may give a value back through an output of the top (`inner(b, s, &out)`,
-`out` and `out_ap_vld`) (#1706). Not yet: a process's result (`return`) or an output to another process, an argument
+`out` and `out_ap_vld`) (#1706). A region's process that is itself a region (a function template's instances, Vitis HLS's unique task regions) has its
+processes and channels in its caller's region; a region the top calls among other statements is a module of its own,
+called each time (its tasks' state kept). The report gives each process's latency, and the region's latency and interval
+(their streams' waits are the co-simulation's). Not yet: a process's result (`return`) or an output to another process, an argument
 of the top shared by two processes, a channel with two writers or readers.
 
 **`hls::stream_of_blocks`** (`hls_streamofblocks.h`, #1891): `hls::stream_of_blocks<B> s;` with `typedef T B[N];`,

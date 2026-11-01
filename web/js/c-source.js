@@ -172,15 +172,17 @@ export async function runCReport(path) {
   for (const b of r.blackboxes || []) L.push(`RTL blackbox: ${b.name} is the module ${b.module} (${b.rtl.map((f) => f.path.split('/').pop()).join(', ')})`);
   L.push('', 'Ports:');
   for (const p of r.ports) L.push(`  ${p.name.padEnd(16)} ${p.dir === 'in' ? 'in ' : 'out'} ${String(p.w).padStart(3)} bit${p.w > 1 ? 's' : ''}`);
+  const cycles = (x) => (x.max === null ? `at least ${x.min} cycles` : x.min === x.max ? `${x.max} cycles` : `${x.min}-${x.max} cycles`);
   // (DATAFLOW, #1707: each process a module, the FIFOs between them)
   if (rep.dataflow) {
     L.push('', 'Processes:');
-    for (const p of rep.processes) L.push(`  ${p.instance.padEnd(16)} ${p.name}: ${p.states} states, ${p.registerBits} register bits${p.after.length ? `; starts once ${p.after.join(', ')} ${p.after.length > 1 ? 'are' : 'is'} done` : ''}`);
+    // (the region's latency and interval, each process's, #1706)
+    L[L.length - 1] = `Processes (the region's latency: ${cycles(rep.latency)}; its interval: ${cycles(rep.interval)}):`;
+    for (const p of rep.processes) L.push(`  ${p.instance.padEnd(16)} ${p.name}: ${p.states} states, ${p.registerBits} register bits${p.latency ? `, latency ${cycles(p.latency)}` : ''}${p.after.length ? `; starts once ${p.after.join(', ')} ${p.after.length > 1 ? 'are' : 'is'} done` : ''}`);
     if (rep.fifos.length) { L.push('', 'FIFOs:'); for (const f of rep.fifos) L.push(`  ${f.name.padEnd(16)} ${f.depth} words`); }
   }
   // (a function not inlined, a sub-module: its calls, its latency and resources, #1960)
   if (rep.functions?.length) {
-    const cycles = (x) => (x.max === null ? `at least ${x.min} cycles` : x.min === x.max ? `${x.max} cycles` : `${x.min}-${x.max} cycles`);
     L.push('', `Functions (the module's latency: ${cycles(rep.latency)}):`);
     for (const f of rep.functions) L.push(`  ${f.instance.padEnd(16)} ${f.name}${f.of ? `, in ${f.of}` : ''}: ${f.calls} call${f.calls > 1 ? 's' : ''}; ${f.sequential ? `latency ${cycles(f.latency)}, ${f.states} states, ${f.registerBits} register bits${f.memories ? `, ${f.memories} memor${f.memories > 1 ? 'ies' : 'y'}` : ''}` : 'combinational'}`);
   }

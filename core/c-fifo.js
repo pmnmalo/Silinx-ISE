@@ -14,6 +14,36 @@ const HS = { dout: '', empty_n: '_ap_vld', read: '_ap_ack', din: '', full_n: '_a
 export const fifoSuffix = (f, port) => (f.hs ? HS[port] : `_${port}`);
 const replace = (n, m) => { for (const k of Object.keys(n)) if (k !== 'loc') delete n[k]; Object.assign(n, m); };
 
+/** s.write(e) with x++ or x-- in e, x named once there, on the checked tree: s.write(e with x); x++; (C's order, the value
+ *  before the change), as a machine's statements of their own (#1706). */
+export function splitWriteEffects(funcs) {
+  const walk = (n) => {
+    if (!n || typeof n !== 'object') return;
+    if (Array.isArray(n)) { n.forEach(walk); return; }
+    const e = n.kind === 'expr' ? n.e : null;
+    if (e?.kind === 'call' && e.callee.kind === 'member' && e.callee.name === 'write' && e.args.length === 1) {
+      const found = [], counts = new Map();
+      const see = (x, up) => {
+        if (!x || typeof x !== 'object') return;
+        if (x.kind === 'id') counts.set(x.name, (counts.get(x.name) || 0) + 1);
+        // (an operand evaluated only sometimes: left as it is, refused)
+        if (x.kind === 'cond' || (x.kind === 'binary' && ['&&', '||'].includes(x.op))) counts.set('?', 2);
+        if (x.kind === 'postfix' && ['++', '--'].includes(x.op) && x.e.kind === 'id') found.push({ x, up });
+        for (const [k, v] of Object.entries(x)) if (k !== 'loc' && k !== 'type') see(v, { x, k });
+      };
+      see(e.args[0], { x: e.args, k: 0 });
+      if (found.length && !counts.has('?') && found.every((f) => counts.get(f.x.e.name) === 1)) {
+        const after = found.map((f) => { const copy = { ...f.x }; f.up.x[f.up.k] = f.x.e; return { kind: 'expr', e: copy, loc: n.loc }; });
+        const write = { ...n };
+        replace(n, { kind: 'block', items: [write, ...after], loc: n.loc });
+        return;
+      }
+    }
+    for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type') walk(v);
+  };
+  for (const f of funcs.values()) if (f.body) walk(f.body);
+}
+
 export const fifoMethods = {
   /** Whether the argument is a FIFO by its INTERFACE pragma: its mode, else null. */
   ptrFifoMode(pa) {

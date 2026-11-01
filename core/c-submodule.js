@@ -17,6 +17,8 @@
 import { BOOL, typeOf } from './c-types.js';
 import { hdlName } from './c-graph.js';
 import { portOf, ctrlNone, ctrlChain } from './c-names.js';
+import { hasDataflow } from './c-check.js';
+import { hasStreams } from './c-dataflow-call.js';
 
 const walk = (x, f) => {
   if (!x || typeof x !== 'object') return;
@@ -66,9 +68,11 @@ export function hierarchy(fn, funcs, globals, structArgs = null, all = null) {
   };
   const memo = new Map();
   const able = (f) => { if (!memo.has(f.name)) memo.set(f.name, why(f)); return memo.get(f.name) === null; };
+  // (a DATAFLOW region of streams the top calls among other statements: a module of its own, called each time, #1706)
+  const region = (f) => f.body && hasDataflow(f) && hasStreams(f) && !all;
   for (const f of tree(fn, funcs)) if (f !== fn && inlineMode(f) === 'off' && !able(f)) kept.push({ f, why: memo.get(f.name) });
   // (off wins over a caller's recursive, as Vitis HLS's)
-  return { kept, sub: (f) => f !== fn && inlineMode(f) === 'off' && able(f) };
+  return { kept, sub: (f) => f !== fn && ((inlineMode(f) === 'off' && able(f)) || region(f)) };
 }
 
 /** The modules of a design: one per function and sizes of its arrays. make(callee, depths, module) -> cToHdl's result. */

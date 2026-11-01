@@ -249,10 +249,32 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const net = { stall, name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free, ties, inner, words };
   const top = lang === 'vhdl' ? vhdlTop(net) : verilogTop(net);
   const hdl = [...reg.modules().map((m) => m.gen.hdl), ...top].join('\n');
-  const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
+  const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), ...regionTiming(procs), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, latency: p.mod.gen.report.latency ?? null, after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
     memories: [...memories.map((x) => ({ name: x.name, words: x.n, bits: x.w, kind: 'ap_memory' })), ...[...rg.locals].filter(([, l]) => l.kind === 'array').map(([n, l]) => ({ name: n, words: Number(l.type.length), bits: typeOf(l.type.of)?.w ?? 0, kind: 'RAM (PIPO)' }))],
     fifos: [...rg.locals].filter(([, l]) => l.kind === 'stream').map(([n, l]) => ({ name: n, depth: l.depth })), waits, loops: [] };
   return { ok: true, hdl, top: name, ports, diagnostics: diagnostics.sort(byLine), sequential: true, states: 0, memories, fifos, report, dataflow: true };
+}
+
+/** The report's region (#1706): its latency, the longest chain of processes one waiting for another's buffers (streams
+ *  add their waits in the co-simulation), its interval, its longest process's; a task runs by itself, not counted;
+ *  a maximum not known, null. */
+function regionTiming(procs) {
+  const called = procs.filter((p) => !p.task);
+  const lat = (p, w) => p.mod.gen.report.latency?.[w] ?? (w === 'max' && p.mod.gen.report.latency ? null : 0);
+  const along = (w) => {
+    const memo = new Map();
+    const go = (p) => {
+      if (!memo.has(p)) {
+        const before = [...p.deps].filter((d) => !d.task).map(go);
+        memo.set(p, lat(p, w) === null || before.includes(null) ? null : lat(p, w) + Math.max(0, ...before));
+      }
+      return memo.get(p);
+    };
+    const all = called.map(go);
+    return all.includes(null) ? null : Math.max(0, ...all);
+  };
+  const longest = (w) => { const all = called.map((p) => lat(p, w)); return all.includes(null) ? null : Math.max(0, ...all); };
+  return { latency: { min: along('min'), max: along('max') }, interval: { min: longest('min'), max: longest('max') } };
 }
 
 const byLine = (a, b) => a.line - b.line || a.col - b.col;

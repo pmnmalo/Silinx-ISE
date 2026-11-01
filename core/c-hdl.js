@@ -6,7 +6,7 @@
 //
 //   cToHdl(source, { file, lang: 'vhdl' | 'verilog' }) -> { ok, hdl, top, ports, diagnostics, sequential, report }
 //     ports: [{ name, dir, w }] in the module's order (the block protocol's first, as Vitis HLS)
-import { checkC } from './c-check.js';
+import { checkC, hasDataflow } from './c-check.js';
 import { axisArgs, axisTop } from './c-axis.js';
 import { dataflow } from './c-dataflow.js';
 import { portOf, renamedWhy } from './c-names.js';
@@ -15,6 +15,8 @@ import { vhdlSeq, verilogSeq, seqRoots } from './c-hdl-seq.js';
 import { aggregate, aggregable, structPragmas, wordGroups } from './c-aggregate.js';
 import { cProcesses } from './c-processes.js';
 import { regionLoops } from './c-dataflow-loops.js';
+import { nestRegions } from './c-dataflow-nest.js';
+import { splitWriteEffects } from './c-fifo.js';
 import { dataflowCall, hasStreams } from './c-dataflow-call.js';
 import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
@@ -73,6 +75,8 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   flattenArrays(checked, (loc, message) => flatErrs.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'error' }));
   if (flatErrs.length) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, ...flatErrs] };
   // (a region in a function the top calls alone: the top's, #1931)
+  splitWriteEffects(checked.funcs);
+  nestRegions(checked);   // (a region of a region's: the caller's processes, #1706)
   const callErrs = [];
   dataflowCall(checked, (loc, message) => callErrs.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'error' }));
   if (callErrs.length) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, ...callErrs].sort((a, b) => a.line - b.line || a.col - b.col) };
@@ -110,6 +114,8 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const lat = latencyPragma(fn);
   // (the functions not inlined, sub-modules, #1960)
   const { subs, sub, kept } = subsOf(source, checked, { file, lang, headers, pipelineLoops, clock, family, blackboxes, mults, stall, modules });
+  // (a region a sub-module of its own: made, #1706)
+  if ([...checked.funcs.values()].some((f) => f.body && f !== fn && sub(f) && hasDataflow(f))) diagnostics.splice(0, diagnostics.length, ...diagnostics.filter((d) => !/^#pragma HLS DATAFLOW is accepted and ignored/.test(d.message)));
   const pragmaOf = (f) => f.body.items.find((s) => s.kind === 'pragma' && s.pragma.name === 'INLINE').loc;
   for (const k of kept) diagnostics.push({ file, line: pragmaOf(k.f).line, col: pragmaOf(k.f).col, message: `#pragma HLS INLINE off: '${k.f.name}' is inlined: ${k.why}`, severity: 'warning' });
   const sargs = checked.ast.structArgs?.get(checked.top) || [];

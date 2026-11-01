@@ -165,7 +165,7 @@ uiTest('#1707 View C Synthesis Report of a DATAFLOW module: its processes (each 
   await page.waitConsole(/Process "View C Synthesis Report" completed successfully/);
   const log = await page.consoleText();
   assert.match(log, /\nModule: DATAFLOW, ap_ctrl_hs \(ap_clk, ap_rst, ap_start \/ ap_done \/ ap_idle \/ ap_ready\), 2 processes running at once\n/);
-  assert.match(log, /Processes:\n {2}scale_U0 {9}scale: \d+ states, \d+ register bits\n {2}add_U1 {11}add: \d+ states, \d+ register bits; starts once scale is done\n/);
+  assert.match(log, /Processes \(the region's latency: [^;]*cycles; its interval: [^)]*cycles\):\n {2}scale_U0 {9}scale: \d+ states, \d+ register bits, latency [^\n]*cycles\n {2}add_U1 {11}add: \d+ states, \d+ register bits, latency [^\n]*cycles; starts once scale is done\n/);
   assert.match(log, /Memories:\n {2}vin {14}4 x 32 bits, ap_memory \(outside the module\)\n {2}vout {13}4 x 32 bits, ap_memory \(outside the module\)\n {2}t {16}4 x 32 bits, a buffer between processes \(block RAM\)\n/);
   assert.doesNotMatch(log, /WARNING:SilinxC/);
   await page.setView('sim');
