@@ -95,8 +95,11 @@ A family is an object (`src/open-flow-backends.js`, #2360):
   id: 'spartan3e',
   mount(ctx),   // { runMap, runPar, runTiming, runPins, runPower, bitfile, runFpgaView?, packed? }: the family's steps,
                 //   with its engines; the routed design is the back end's, in its format and file (#2384)
-  synth,        // optional: the synthesis, synthesizeVerilog's signature and result; that function when not given
-  xstNames,     // optional: the synthesis's report names its lines as XST does, not as the MAP report
+  synth,        // optional: the synthesis, synthesizeVerilog's signature and result: the Xilinx families' synthesizeVerilog
+                //   (synth_xilinx and its mappings), another family's scriptSynthesis({ script }) (synth-script.js, #2386);
+                //   Yosys's generic synth when not given
+  synthName,    // optional: (id, resource) -> the name of a line of the synthesis's report (the Spartan-3E's as XST's)
+  constraints,  // optional: the constraints' format { id, read, write } (constraints.js, #2385); UCF when not given
 }
 ```
 
@@ -120,11 +123,10 @@ The plan is in #1953 and #2315. For the open toolchains:
 
 Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/routed.xdl` are the Xilinx back ends'. The
 constraints are one model (`constraints.js`, #2385): the back end says its format, a reader and a writer, UCF by default; the
-other formats are #2296. Still
+other formats are #2296. The synthesis is the back end's (#2386): the Xilinx families' `synth_xilinx` with Silinx's mappings,
+another family's Yosys script (`scriptSynthesis`), and the report's names; `FAMILY_INFO` needs only a family's name. Still
 missing before iCE40 (#2360):
 
-- **The synthesis by family (#2386).** `synth` is a hook today; the commands are `synth_xilinx`'s, and a family's `FAMILY_INFO`
-  entry has fields only Xilinx families have (`xise`, `pm`).
 - **The steps by family (#2387).** They have ISE's names (`translate`, `trce`), and the back end does not yet say which it has.
 - **The fake family in the browser's worker (#2388).** Its test runs in Node only.
 

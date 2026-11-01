@@ -29,7 +29,7 @@
 // Prints "=== SILINX STEP <step> ===" before each step, "=== SILINX FAILED <step> (exit 1) ===" and the
 // ERROR lines when one fails, "=== SILINX DONE ===" at the end (the protocol of ISE's run.sh).
 // Returns { ok, report }.
-import { synthesizeVerilog, cellCounts, DEEP_RULE } from './synth-open.js';
+import { cellCounts, DEEP_RULE } from './synth-open.js';
 import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
 import { UCF, readConstraints } from './constraints.js';
 import { readYosysJson } from './fpga/netlist.js';
@@ -99,7 +99,7 @@ export async function runFlow(spec, io) {
       : 'Optimization Effort High: the mappings for speed tried too, the fastest kept.');
     let r;
     try {
-      r = await (backend.synth || synthesizeVerilog)(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
+      r = await backend.synth(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
     } catch (e) {
       for (const l of e.lines || []) if (/ERROR/.test(l)) log(l);
       throw new StepError(`synthesis failed: ${e.message}`);
@@ -119,13 +119,12 @@ export async function runFlow(spec, io) {
     const own = res.filter(x => !['luts', 'ffs', 'iob'].includes(x.id));
     const of = id => res.find(x => x.id === id);
     const row = (id, name) => ({ id, name, used: used[id] || 0, total: of(id)?.count ?? null, percent: of(id)?.count ? pct(used[id] || 0, of(id).count) : null });
-    // (the Spartan-3E's lines as XST names them; another family's, its MAP report's)
-    const s3e = { luts: 'Number of 4 input LUTs', ffs: 'Number of Slice Flip Flops', ramb16: 'Number of RAMB16s', mult18x18: 'Number of MULT18X18SIOs', bufgmux: 'Number of GCLKs', dcm: 'Number of DCMs', iob: 'Number of IOs' };
-    const name = id => (backend.xstNames ? s3e[id] : of(id)?.report) || s3e[id] || id;
+    // (each line's name the back end's: the Spartan-3E's as XST names them, another family's as its MAP report, #2386)
+    const name = id => backend.synthName(id, of(id));
     const other = (k, n) => ({ name: n, used: u[k], total: null, percent: null });
     const items = [row('luts', name('luts')), row('ffs', name('ffs')), other('latches', 'Number of latches'), other('muxes', 'Number of F5-F8 multiplexers'),
       other('carry', 'Number of carry cells'), other('shiftRegisters', 'Number of shift registers'), other('distributedRam', 'Number of distributed RAMs'),
-      ...(own.length ? own.map(x => row(x.id, name(x.id))) : [['ramb16', 'blockRam'], ['mult18x18', 'multipliers'], ['bufgmux', 'clockBuffers'], ['dcm', 'dcms']].map(([id, k]) => ({ ...row(id, s3e[id]), used: u[k] || 0 }))),
+      ...(own.length ? own.map(x => row(x.id, name(x.id))) : [['ramb16', 'blockRam'], ['mult18x18', 'multipliers'], ['bufgmux', 'clockBuffers'], ['dcm', 'dcms']].map(([id, k]) => ({ ...row(id, name(id)), used: u[k] || 0 }))),
       row('iob', name('iob'))].filter(i => i.used);
     log('Device utilization (open synthesis):');
     for (const i of items) log(`  ${i.name}: ${i.used}${i.total != null ? ` out of ${i.total} ${i.percent}%` : ''}`);
