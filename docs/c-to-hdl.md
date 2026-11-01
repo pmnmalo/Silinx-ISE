@@ -341,8 +341,10 @@ stream argument), or when every process is an `hls::task` (a data-driven top), t
 `ap_rst`, as Vitis HLS's (#1900): its processes start again once all are done. The C simulation runs the
 calls in order; the co-simulation drives the top's ports as for any module, and when a call does not end it names
 the streams that may be too shallow (a stream to a process that waits for its writer to be done, through a buffer,
-must hold all a call writes). Not yet: a process giving back a value (a pointer output or a result), an argument of
-the top shared by two processes, a channel with two writers or readers.
+must hold all a call writes). A loop among the calls of a region of streams is a process of its own (`Loop_<k>_proc`,
+as Vitis HLS's `Loop_…_proc`), and a process may give a value back through an output of the top (`inner(b, s, &out)`,
+`out` and `out_ap_vld`) (#1706). Not yet: a process's result (`return`) or an output to another process, an argument
+of the top shared by two processes, a channel with two writers or readers.
 
 **`hls::stream_of_blocks`** (`hls_streamofblocks.h`, #1891): `hls::stream_of_blocks<B> s;` with `typedef T B[N];`,
 `hls::write_lock<B> l(s);` and `hls::read_lock<B> l(s);`, `l[j]`. A block is a word of a FIFO (a stream per element,

@@ -108,7 +108,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const reg = moduleRegistry({ make: (callee, depths, module) => {
     const fir = checked.ast.firs?.get(callee), f = checked.funcs.get(callee);
     return fir ? firHdl(fir, { lang, module, src: file.split('/').pop(), types: Object.fromEntries(f.params.map((pa) => [pa.name, elem(pa.type)])) })
-      : cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, stall, modules: reg });
+      : cToHdl(source, { file, lang, headers, top: callee, depths, module, flat: true, pipelineLoops, stall, modules: reg, ...(/^Loop_\d+_proc$/.test(callee) ? { host: checked.top } : {}) });
   } });
   const sizeOf = (a) => {
     if (a?.kind !== 'id') return null;
@@ -126,7 +126,9 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   });
   const diagnostics = [];
   const seen = new Set();
-  const add = (d) => { const s = `${d.line}:${d.col}:${d.severity}:${d.message}`; if (!seen.has(s) && !SAID.test(d.message)) { seen.add(s); diagnostics.push(d); } };
+  // (a process's own PIPELINE is made in its module, not inlined in the top, #1706)
+  const inlined = (m) => /^#pragma HLS \w+ of '(\w+)', a function the top calls: inlined in the top/.exec(m)?.[1];
+  const add = (d) => { const s = `${d.line}:${d.col}:${d.severity}:${d.message}`; if (!seen.has(s) && !SAID.test(d.message) && !procs.some((p) => p.call.callee === inlined(d.message))) { seen.add(s); diagnostics.push(d); } };
   checked.diagnostics.forEach(add);
   // (a process's own names as VHDL or Verilog's reserved words: inside the module, the top's ports their own)
   for (const m of reg.modules()) m.gen.diagnostics.filter((d) => !/is a reserved word of VHDL or Verilog|is a name Vitis HLS reserves/.test(d.message)).forEach(add);
@@ -141,6 +143,9 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
       const i = p.f.params.findIndex((pa) => pa.name === port.param);
       // (*s: a reference to a stream, an argument of a function declared before its definition)
       const a0 = p.call.args[i], a = a0?.kind === 'unary' && a0.op === '*' && a0.e.kind === 'id' ? a0.e : a0;
+      // (a pointer output, given an output of the top: its port and its ap_vld the top's, #1706)
+      const gives = (port.role === 'arg_vld' || (port.role === 'arg' && port.dir === 'out')) && (a?.kind === 'id' ? a : a?.kind === 'unary' && a.op === '&' && a.e.kind === 'id' ? a.e : null);
+      if (gives && ['ptr', 'ref'].includes(params.get(gives.name)?.type.kind)) { const u = of(gives.name); u.ports.push({ p, port }); if (!u.writers.includes(p)) u.writers.push(p); continue; }
       if (port.role === 'arg_vld') continue;
       if (port.role === 'return' || (port.role === 'arg' && port.dir === 'out')) { fail(p.call.loc, `'${p.call.callee}' gives back a value (${port.name}): not supported in a DATAFLOW region yet (a stream or an array)`); continue; }
       if (port.role === 'arg') {

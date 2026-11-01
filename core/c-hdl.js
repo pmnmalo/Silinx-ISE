@@ -14,6 +14,7 @@ import { scheduled } from './c-schedule.js';
 import { vhdlSeq, verilogSeq, seqRoots } from './c-hdl-seq.js';
 import { aggregate, aggregable, structPragmas, wordGroups } from './c-aggregate.js';
 import { cProcesses } from './c-processes.js';
+import { regionLoops } from './c-dataflow-loops.js';
 import { dataflowCall, hasStreams } from './c-dataflow-call.js';
 import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
@@ -37,8 +38,9 @@ export const bin = (k, w) => bits(k, w).toString(2).padStart(w, '0');
 // threshold of the loops pipelined automatically, 0 none, #1919; directives: a config's syn.directive.interface lines, #1901;
 // modules: the design's modules, when it is one of them, its hdl then only its own, core/c-submodule.js, #1960)
 export function cToHdl(source, opts = {}) {
-  const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true, directives = null } = opts;
-  const checked = checkC(source, file, { headers, top, depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
+  const { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, axis = true, directives = null, host = null } = opts;
+  // (host: a loop of that top's DATAFLOW region made a process, core/c-dataflow-loops.js, #1706)
+  const checked = checkC(source, file, { headers, top: host ?? top, depths: host ? null : depths, synthesis: true, directives });   // (__SYNTHESIS__ defined, as Vitis HLS's, #1897)
   if (!checked.ok || !checked.top) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...checked.diagnostics] };
   // (#pragma HLS INTERFACE s_axilite: this function's module inside one with the bus, core/c-axi.js, #1893)
   const axi = axiPlan(checked.funcs.get(checked.top), checked.consts);
@@ -57,7 +59,7 @@ export function cToHdl(source, opts = {}) {
   return gen.ok ? axisTop(gen, names, lang, side()) : gen;
 }
 
-function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null, taken = null } = {}) {
+function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers = null, top = null, depths = null, module = null, flat = false, pipelineLoops, clock = DEFAULT_CLOCK, family = 'artix7', blackboxes = null, mults = null, stall = false, modules = null, taken = null, host = null } = {}) {
   const diagnostics = [...checked.diagnostics];
   // (syn.blackbox: the functions a project's RTL modules replace, core/c-blackbox.js, #1903)
   const bbs = loadBlackboxes(blackboxes, headers);
@@ -74,6 +76,9 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   const callErrs = [];
   dataflowCall(checked, (loc, message) => callErrs.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'error' }));
   if (callErrs.length) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, ...callErrs].sort((a, b) => a.line - b.line || a.col - b.col) };
+  // (a loop among a region's calls: a process of its own, in a region of streams, #1706)
+  if (host || (checked.dataflow && hasStreams(checked.funcs.get(checked.top)))) regionLoops(checked);
+  if (host) { checked.top = top; checked.dataflow = false; }
   // (a top that runs an hls::FIR, its calls only: its processes too, the filter's hardware its own; of other statements,
   // the filter's C model inlined, #1942)
   const firTop = !checked.dataflow && checked.ast.firs?.size && checked.funcs.get(checked.top).body.items.some((st) => st.kind === 'expr' && st.e.kind === 'call' && checked.ast.firs.has(st.e.callee.name));
