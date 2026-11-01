@@ -29,10 +29,10 @@ Not part of `npm test` (it needs the network once).
 | array-array-partition-block-cyclic | C++ | pass | pass | pass | 157280 |  |
 | array-array-partition-complete | C++ | pass | pass | pass | 353890 |  |
 | dsp-fft-interface-array | C++ | pass | pass | pass | 26626 |  |
-| dsp-fft-interface-array-float-ssr2 | C++ | fail | fail | skip | - | C simulation: 66: a shift by 32 of a 32-bit value is undefined in C |
+| dsp-fft-interface-array-float-ssr2 | C++ | fail | fail | skip | - | C simulation: main() returned 1 |
 | dsp-fft-interface-stream | C++ | pass | pass | pass | 26626 |  |
-| dsp-fft-interface-stream-float-ssr2 | C++ | fail | fail | skip | - | C simulation: 19: a type expected, not '2' |
-| dsp-fft-logicore-fft-float-ssr | C++ | fail | fail | skip | - | C simulation: 22: a type expected, not '2' |
+| dsp-fft-interface-stream-float-ssr2 | C++ | fail | fail | skip | - | C simulation: main() returned 1 |
+| dsp-fft-logicore-fft-float-ssr | C++ | pass | fail | skip | - | C synthesis: fft_top.cpp:31: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too) |
 | dsp-fir-decimator | C++ | pass | pass | pass | 31 |  |
 | interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 70 |  |
 | interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 19 |  |

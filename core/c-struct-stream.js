@@ -1,5 +1,6 @@
 // Silinx HLS C++ (#1662): a stream of a struct, hls::stream<S>, as one stream per member of S (the scalar replacement
 // core/c-struct.js makes of S's variables): its declarations (a parameter, a local stream), its writes (write, <<),
+// a member array one stream per element (of structs, hls::vector<std::complex<T>, N>'s, one per member of each, #2309);
 // its reads (read() in a declaration, an assignment or a return; read(v), >>), empty / full, the stream passed to a
 // function, the pragmas naming it. As tokens, after core/c-struct.js's definitions; its uses then rewritten by it.
 // Isomorphic ES module.
@@ -19,11 +20,15 @@ function leafPaths(S, report, at) {
     // (a member array, an hls::vector's (#1891): a stream per element)
     if (m.dims.length) {
       const n = m.dims.length === 1 ? constTokens(m.dims[0]) : null;
-      if (n === null || m.struct) { report(at, `the stream of '${S.name}': its member '${m.name}' is an array of more than one dimension, of structs or of a size not constant (not possible in a stream yet)`); continue; }
-      for (let i = 0; i < Number(n); i++) out.push({ suffix: `_${m.name}_${i}`, path: [m.name], index: i, type: m.type });
+      if (n === null) { report(at, `the stream of '${S.name}': its member '${m.name}' is an array of more than one dimension or of a size not constant (not possible in a stream yet)`); continue; }
+      // (of structs, an hls::vector of std::complex's, #2309: a stream per member of each element)
+      for (let i = 0; i < Number(n); i++) {
+        if (m.struct) for (const l of leafPaths(m.struct, report, at)) out.push({ ...l, suffix: `_${m.name}_${i}${l.suffix}`, path: [{ name: m.name, index: i }, ...l.path] });
+        else out.push({ suffix: `_${m.name}_${i}`, path: [m.name], index: i, type: m.type });
+      }
       continue;
     }
-    if (m.struct) for (const l of leafPaths(m.struct, report, at)) out.push({ suffix: `_${m.name}${l.suffix}`, path: [m.name, ...l.path], type: l.type });
+    if (m.struct) for (const l of leafPaths(m.struct, report, at)) out.push({ ...l, suffix: `_${m.name}${l.suffix}`, path: [m.name, ...l.path] });
     else out.push({ suffix: `_${m.name}`, path: [m.name], type: m.type });
   }
   return out;
@@ -123,7 +128,7 @@ function declarations(toks, structs, found, report, streamArgs) {
 function uses(toks, report) {
   let n = 0;
   const out = [];
-  const member = (base, l, t) => [...base.map((x) => ({ ...x })), ...l.path.flatMap((p) => [L(t, '.'), L(t, p, 'id')]), ...(l.index !== undefined ? [L(t, '['), L(t, String(l.index), 'num'), L(t, ']')] : [])];
+  const member = (base, l, t) => [...base.map((x) => ({ ...x })), ...l.path.flatMap((p) => (p.name ? [L(t, '.'), L(t, p.name, 'id'), L(t, '['), L(t, String(p.index), 'num'), L(t, ']')] : [L(t, '.'), L(t, p, 'id')])), ...(l.index !== undefined ? [L(t, '['), L(t, String(l.index), 'num'), L(t, ']')] : [])];
   const call = (name, l, fn, args, t) => [L(name, `${name.v}${l.suffix}`, 'id'), L(t, '.'), L(t, fn, 'id'), L(t, '('), ...args, L(t, ')')];
   const reads = (name, v, leaves, t) => leaves.flatMap((l) => [...member(v, l, t), L(t, '='), ...call(name, l, 'read', [], t), L(t, ';')]);
   const writes = (name, e, leaves, t) => leaves.flatMap((l) => [...call(name, l, 'write', member(e, l, t), t), L(t, ';')]);

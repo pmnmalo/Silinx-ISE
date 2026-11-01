@@ -182,6 +182,12 @@ export const exprMethods = {
     if (op === '<<' || op === '>>') {
       const t = shiftType(l.t);
       const a = convert(a0, t);
+      // (a constant count past the width: the value g++ folds it to, said; #2309)
+      if (b0 >= 0n && !t.ap && b0 >= BigInt(t.w) && (e.constCount || e.r.kind === 'num')) {
+        const v = op === '>>' && a < 0n ? -1n : 0n;
+        this.warnOnce(e, `a shift by ${b0} of a ${t.w}-bit value is undefined in C: the C simulation takes g++'s value, ${v} (synthesis refuses it)`);
+        return num(v, t);
+      }
       if (b0 < 0n || (!t.ap && b0 >= BigInt(t.w))) this.fail(e, `a shift by ${b0} of a ${t.w}-bit value is undefined in C`);
       return num(op === '<<' ? a << b0 : a >> b0, t);
     }
@@ -268,6 +274,7 @@ export const exprMethods = {
     if (base.arr) {
       if (i < 0 || i >= base.arr.length) this.fail(e, `the index ${i} is outside the array (0 to ${base.arr.length - 1})`);
       const cell = base.arr[i];
+      if (base.t.text) return { get: () => cell.v, set: (x) => { cell.v = x.str !== undefined ? this.strPtr(x.str) : x; }, t: base.t, cell, arr: base.arr, index: i };
       return { get: () => ({ v: cell.v, t: base.t }), set: (x) => { cell.v = this.as(x, base.t, e); }, t: base.t, cell, arr: base.arr, index: i };
     }
     if (base.ptr) {
@@ -362,6 +369,8 @@ export const exprMethods = {
    *  by default; f: fixed; e: scientific). */
   streamText(a, st, e) {
     if (a.str !== undefined) return a.str;
+    // (a const char *'s text, #2309)
+    if (a.ptr && a.t?.w === 8) return this.cString(a);
     if (a.t?.fl) return fmtFloat(st.float, a.v, st.prec, '');
     if (a.t?.fx) return fixedText(a, st.prec ?? 6);   // (AMD's: its precision only)
     const v = this.intOf(a, e);

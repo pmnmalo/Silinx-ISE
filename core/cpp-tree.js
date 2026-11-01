@@ -85,7 +85,7 @@ export function cppTree(ast, report, streams = new Map()) {
       if (e?.kind === 'binary' && e.op === '>>') {
         while (e?.kind === 'binary' && e.op === '>>') { parts.unshift(e.r); e = e.l; }
         if (!(e?.kind === 'id' && streams.has(e.name))) return undefined;
-        return { kind: 'expr', e: { kind: 'call', callee: { kind: 'id', name: 'fscanf', loc: x.loc }, args: [e, { kind: 'str', value: parts.map(() => '%d').join(' '), loc: x.loc }, ...parts.map((p) => ({ kind: 'unary', op: '&', e: p, loc: p.loc }))], loc: x.loc }, loc: x.loc };
+        return { kind: 'expr', e: { kind: 'call', callee: { kind: 'id', name: 'fscanf', loc: x.loc }, args: [e, { kind: 'str', value: parts.map(() => '%v').join(' '), loc: x.loc }, ...parts.map((p) => ({ kind: 'unary', op: '&', e: p, loc: p.loc }))], loc: x.loc }, loc: x.loc };
       }
       while (e?.kind === 'binary' && e.op === '<<') { parts.unshift(e.r); e = e.l; }
       const file = e?.kind === 'id' && streams.has(e.name) ? e : null;
@@ -117,6 +117,16 @@ export function cppTree(ast, report, streams = new Map()) {
       }
       const fmtArg = { kind: 'str', value: fmt, loc: x.loc };
       return { kind: 'expr', e: { kind: 'call', callee: { kind: 'id', name: file ? 'fprintf' : 'printf', loc: x.loc }, args: [...(file ? [file] : []), fmtArg, ...args], loc: x.loc }, loc: x.loc };
+    });
+    // if (!(f >> a >> b)): whether it read them all (#2309)
+    f.body = walkExpr(f.body, (x) => {
+      if (x.kind !== 'binary' || x.op !== '>>') return undefined;
+      const parts = [];
+      let e = x;
+      while (e?.kind === 'binary' && e.op === '>>') { parts.unshift(e.r); e = e.l; }
+      if (!(e?.kind === 'id' && streams.has(e.name))) return undefined;
+      const scan = { kind: 'call', callee: { kind: 'id', name: 'fscanf', loc: x.loc }, args: [e, { kind: 'str', value: parts.map(() => '%v').join(' '), loc: x.loc }, ...parts.map((p) => ({ kind: 'unary', op: '&', e: p, loc: x.loc }))], loc: x.loc };
+      return { kind: 'binary', op: '==', l: scan, r: { kind: 'num', value: BigInt(parts.length), text: String(parts.length), loc: x.loc }, loc: x.loc };
     });
   }
   // the reference parameters: pointers from here on

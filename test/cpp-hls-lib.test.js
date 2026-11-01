@@ -241,5 +241,5 @@ int main() {
 }
 `;
   flows(src, 'f', []);
-  assert.deepEqual(errors(`#include "hls_stream.h"\nstruct R { int c[2][2]; };\nvoid f(hls::stream<R> &s) { }\n`), ["3 the stream of 'R': its member 'c' is an array of more than one dimension, of structs or of a size not constant (not possible in a stream yet)"]);
+  assert.deepEqual(errors(`#include "hls_stream.h"\nstruct R { int c[2][2]; };\nvoid f(hls::stream<R> &s) { }\n`), ["3 the stream of 'R': its member 'c' is an array of more than one dimension or of a size not constant (not possible in a stream yet)"]);
 });

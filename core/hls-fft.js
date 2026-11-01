@@ -26,7 +26,8 @@
 //   fftFloat(re, im, p) -> the transform in place, of doubles held as floats
 //   fftTwiddles(p) -> { cos, sin }: the fixed point's tables, N entries
 //   fftCModel(fn, p, args) -> the C++ text of the function fn(xn, xk[, dir[, sch[, cp[, ovflo]]]]), its
-//     complex values' members ap_re and ap_im (core/cpp-hls-lib.js's)
+//     complex values' members ap_re and ap_im (core/cpp-hls-lib.js's); a stream of hls::vector (args.xn.lanes, an SSR
+//     design's super_sample_rate values a word, #2309) read and written a word at a time
 
 import { CPP_OWN_HEADERS } from './cpp-headers.js';
 
@@ -158,13 +159,14 @@ export function fftFloat(re, im, p) {
 }
 
 /** The C model: the C++ function fn the C simulation runs for the call; args: { xn, xk } each { type (its element's
- *  type, C++ text), stream }, given: how many of the call's arguments (fwd_inv, scale_sch, cp_len, ovflo) it has, with
+ *  type, C++ text), stream, lanes (a stream of hls::vector's: its size, else 0) }, given: how many of the call's arguments (fwd_inv, scale_sch, cp_len, ovflo) it has, with
  *  their types (C++ text). The values copied into arrays of integers (input_width bits, as the core takes them: an
  *  ap_fixed<input_width, 1>'s) or of floats, the transform run by the C simulation (ap_fft_core, core/c-interp-lib.js),
  *  the results copied out. */
 export function fftCModel(fn, p, args) {
   const { N } = p, sc = 2 ** (p.inW - 1);
-  const par = (x, nm) => (x.stream ? `hls::stream<${x.type}> &${nm}` : `${x.type} ${nm}[${N}]`);
+  const word = (x) => (x.lanes ? `ap_vector<${x.type}, ${x.lanes}>` : x.type);
+  const par = (x, nm) => (x.stream ? `hls::stream<${word(x)} > &${nm}` : `${x.type} ${nm}[${N}]`);
   const more = args.more.map((m, i) => `, ${m} ap_a${i}`).join('');
   const el = p.float ? 'double' : 'long long';
   const into = p.float ? (x) => `(double)(${x})` : (x) => `(long long)floor((double)(${x}) * ${sc}.0)`;
@@ -172,15 +174,25 @@ export function fftCModel(fn, p, args) {
   // (fwd_inv: the fixed point's direction, 1 forward; scale_sch: the schedule; a float's direction its config's)
   const fwd = p.float ? (p.inverse ? '0' : '1') : args.more.length > 0 ? '(ap_a0 ? 1 : 0)' : '0';
   const sch = !p.float && args.more.length > 1 ? '(long long)ap_a1' : '-1';
+  // (a stream of hls::vector, #2309: a word of lanes values, in the order of the samples)
+  const load = args.xn.lanes
+    ? [`  for (int ap_i = 0; ap_i < ${N}; ap_i += ${args.xn.lanes}) {`, `    ${word(args.xn)} ap_w = xn.read();`,
+      `    for (int ap_j = 0; ap_j < ${args.xn.lanes}; ap_j++) {`,
+      `      ap_re[ap_i + ap_j] = ${into('ap_w.ap_d[ap_j].ap_re')};`, `      ap_im[ap_i + ap_j] = ${into('ap_w.ap_d[ap_j].ap_im')};`, '    }', '  }']
+    : [`  for (int ap_i = 0; ap_i < ${N}; ap_i++) {`,
+      `    ${args.xn.type} ap_v = ${args.xn.stream ? 'xn.read()' : 'xn[ap_i]'};`,
+      `    ap_re[ap_i] = ${into('ap_v.ap_re')};`, `    ap_im[ap_i] = ${into('ap_v.ap_im')};`, '  }'];
+  const store = args.xk.lanes
+    ? [`  for (int ap_i = 0; ap_i < ${N}; ap_i += ${args.xk.lanes}) {`, `    ${word(args.xk)} ap_w;`,
+      `    for (int ap_j = 0; ap_j < ${args.xk.lanes}; ap_j++) {`,
+      `      ap_w.ap_d[ap_j].ap_re = ${back('ap_re[ap_i + ap_j]')};`, `      ap_w.ap_d[ap_j].ap_im = ${back('ap_im[ap_i + ap_j]')};`, '    }', '    xk.write(ap_w);', '  }']
+    : [`  for (int ap_i = 0; ap_i < ${N}; ap_i++) {`,
+      `    ${args.xk.type} ap_v;`, `    ap_v.ap_re = ${back('ap_re[ap_i]')};`, `    ap_v.ap_im = ${back('ap_im[ap_i]')};`,
+      args.xk.stream ? '    xk.write(ap_v);' : '    xk[ap_i] = ap_v;', '  }'];
   const L = [`static void ${fn}(${par(args.xn, 'xn')}, ${par(args.xk, 'xk')}${more}) {`,
-    `  static ${el} ap_re[${N}], ap_im[${N}];`,
-    `  for (int ap_i = 0; ap_i < ${N}; ap_i++) {`,
-    `    ${args.xn.type} ap_v = ${args.xn.stream ? 'xn.read()' : 'xn[ap_i]'};`,
-    `    ap_re[ap_i] = ${into('ap_v.ap_re')};`, `    ap_im[ap_i] = ${into('ap_v.ap_im')};`, '  }',
+    `  static ${el} ap_re[${N}], ap_im[${N}];`, ...load,
     `  int ap_o = ap_fft_core(ap_re, ap_im, ${p.nfft}, ${p.inW}, ${fwd}, ${sch}, ${p.natural ? 1 : 0}, ${p.float ? 1 : 0});`,
-    `  for (int ap_i = 0; ap_i < ${N}; ap_i++) {`,
-    `    ${args.xk.type} ap_v;`, `    ap_v.ap_re = ${back('ap_re[ap_i]')};`, `    ap_v.ap_im = ${back('ap_im[ap_i]')};`,
-    args.xk.stream ? '    xk.write(ap_v);' : '    xk[ap_i] = ap_v;', '  }',
+    ...store,
     ...(args.more.length > 3 ? [`  *ap_a3 = ${p.ovflo ? 'ap_o' : '0'};`] : []), '}'];
   return L.join('\n');
 }

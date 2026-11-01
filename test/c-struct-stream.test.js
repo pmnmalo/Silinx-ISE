@@ -137,7 +137,7 @@ test('#1662 typedef of a struct; the ap types\' widths as constant expressions; 
   const S = '#include "hls_stream.h"\nstruct P { int a; int b; };\n';
   assert.deepEqual(errs(`${S}int f(hls::stream<P> &s) { return s.read().a; }\n`), ["3 's.read()' (a stream of a struct): read it in a declaration (P v = s.read();), an assignment or a return"]);
   assert.deepEqual(errs(`${S}void f(hls::stream<P> &s, int x) { P r; r.a = x; r.b = x; if (x) s.write(r), x++; }\n`), ["3 's' (a stream of a struct): its write a statement of its own (s.write(…);)"]);
-  assert.deepEqual(errs(`${S}struct R { int c[2][2]; };\nvoid f(hls::stream<R> &s) { R r; r.c[0][0] = 1; s.write(r); }\n`), ["4 the stream of 'R': its member 'c' is an array of more than one dimension, of structs or of a size not constant (not possible in a stream yet)"]);
+  assert.deepEqual(errs(`${S}struct R { int c[2][2]; };\nvoid f(hls::stream<R> &s) { R r; r.c[0][0] = 1; s.write(r); }\n`), ["4 the stream of 'R': its member 'c' is an array of more than one dimension or of a size not constant (not possible in a stream yet)"]);
 });
 
 test('#1819 hls::axis_user (AMD\'s ap_axi_sdata.h: user, last when AXIS_ENABLE_LAST, id, dest; no data): get_user / set_user, a stream of them co-simulated in VHDL and Verilog (one stream of its words, #1668); a signal not enabled not a member', () => {

@@ -37,7 +37,7 @@
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: 66: a shift by 32 of a 32-bit value is undefined in C"
+    "reason": "C simulation: main() returned 1"
   },
   "dsp-fft-interface-stream": {
     "csim": "pass",
@@ -55,14 +55,14 @@
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: 19: a type expected, not '2'"
+    "reason": "C simulation: main() returned 1"
   },
   "dsp-fft-logicore-fft-float-ssr": {
-    "csim": "fail",
+    "csim": "pass",
     "synth": "fail",
     "cosim": "skip",
     "latency": null,
-    "reason": "C simulation: 22: a type expected, not '2'"
+    "reason": "C synthesis: fft_top.cpp:31: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too)"
   },
   "dsp-fir-decimator": {
     "csim": "pass",

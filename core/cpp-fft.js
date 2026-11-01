@@ -4,7 +4,8 @@
 // (config::max_nfft); hls::ip_fft's constants numbers, its enum types (hls::ip_fft::arch …) and config_t<…> / status_t<…>
 // unsigned; a call hls::fft<config>(xn, xk[, fwd_inv[, scale_sch[, cp_len[, ovflo]]]]); a call of the transform's C
 // model, ap_fft_<n>, written before the function it is in (its arguments' types the declared ones: arrays or streams of
-// complex values; the others' a name's, a number's int, &x's x's pointer). The top of such a call is the transform's
+// complex values, or streams of hls::vector<std::complex<T>, super_sample_rate> (#2309); the others' a name's, a number's
+// int, &x's x's pointer). The top of such a call is the transform's
 // own hardware (core/hls-fft-hdl.js). Isomorphic ES module.
 //
 //   cppFft(tokens, report) -> { tokens, ffts: Map ap_fft_<n> -> { config, p, args, loc } }
@@ -108,10 +109,16 @@ export function cppFft(toks, report) {
         const ty = a.length === 1 && isId(a[0]) ? declType(out, a[0].v) : null;
         const s = ty ? ty.findIndex((x) => isId(x, 'stream')) : -1;
         const stream = s >= 0 && op(ty[s + 1], '<');
-        const elem = !ty ? null : stream ? ty.slice(s + 2, closing(ty, s + 1)) : ty.filter((x) => !op(x, '*'));
+        // (hls::stream<hls::vector<C, N>>'s last '>>' closes both)
+        const end = stream ? closing(ty, s + 1) : -1;
+        const elem = !ty ? null : stream ? [...ty.slice(s + 2, end), ...(op(ty[end], '>>') ? [{ ...ty[end], v: '>' }] : [])] : ty.filter((x) => !op(x, '*'));
         if (!elem) { report(a[0] || t, `hls::fft<${cfgName}>: its ${['input', 'output'][i]} is an array or a stream declared in the function (its name)`); break; }
-        if (elem.some((x) => isId(x, 'vector'))) { report(a[0], `hls::fft<${cfgName}>: streams of hls::vector (super_sample_rate > 1) are not made by Silinx HLS yet: arrays of std::complex`); break; }
-        kinds.push({ type: text(elem), stream });
+        // (a stream of hls::vector<C, super_sample_rate>, #2309: that many values a word; core/cpp-hls-lib.js has made it ap_vector)
+        const vec = isId(elem[0], 'ap_vector');
+        if (vec && !stream) { report(a[0], `hls::fft<${cfgName}>: hls::vector in a stream only (hls::stream<hls::vector<std::complex<T>, ${cfg.p.ssr}>>), or an array of std::complex`); break; }
+        const lanes = vec ? splitTop(elem.slice(2, closing(elem, 1))) : null;
+        if (vec && consts.value(resolve(lanes[1] || [])) !== BigInt(cfg.p.ssr)) { report(a[0], `hls::fft<${cfgName}>: a stream of hls::vector of super_sample_rate (${cfg.p.ssr}) values`); break; }
+        kinds.push({ type: text(vec ? lanes[0] : elem), stream, lanes: vec ? cfg.p.ssr : 0 });
       }
       if (kinds.length !== 2) continue;
       // (fwd_inv, scale_sch, cp_len, ovflo: their types, a name's declared one, a number's int, &x's x's pointer)

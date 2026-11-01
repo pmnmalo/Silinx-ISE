@@ -36,6 +36,16 @@ export const libMethods = {
     for (let k = x.arr ? 0 : x.ptr.index; k < arr.length && arr[k].v; k++) s += String.fromCharCode(Number(BigInt.asUintN(8, BigInt(arr[k].v))));
     return s;
   },
+  /** A string as a const char *'s value: a pointer to its chars (#2309). */
+  strPtr(s) {
+    const t = { w: 8, s: true, ap: false }, arr = [...s, '\0'].map((ch) => ({ v: BigInt(ch.charCodeAt(0)) }));
+    return { ptr: this.elemRef(arr, 0, t), t };
+  },
+  /** A warning of the run, once per place of the source (#2309). */
+  warnOnce(e, message) {
+    const k = `${e.loc?.line}:${e.loc?.col}`;
+    if (!this.warned.has(k)) this.warned.set(k, { file: e.loc?.file, line: e.loc?.line || 1, col: e.loc?.col || 1, message, severity: 'warning' });
+  },
   /** A path a test bench names, refused when it leaves the project: absolute (/x, C:\x, \\host, ~/x) or through '..'
    *  (#1897). */
   inProject(name, e, what) {
@@ -227,14 +237,16 @@ export const libMethods = {
       const ch = fmt[i];
       if (/\s/.test(ch)) { skip(); continue; }
       if (ch !== '%') { if (fh.text[fh.pos] !== ch) break; fh.pos++; continue; }
-      const m = /^(hh|h|ll|l|L)?([diuxXoc s%feEgGaA])/.exec(fmt.slice(i + 1).replace(/^ /, 's'));
+      const m = /^(hh|h|ll|l|L)?([diuxXoc s%feEgGaAv])/.exec(fmt.slice(i + 1).replace(/^ /, 's'));
       if (!m) this.fail(e, `fscanf: the conversion '${fmt.slice(i, i + 3)}' is not supported`);
       i += m[0].length;
-      const conv = m[2];
+      let conv = m[2];
       if (conv === '%') { if (fh.text[fh.pos] !== '%') break; fh.pos++; continue; }
       if (conv !== 'c') skip();
       if (fh.pos >= fh.text.length) return num(got || -1);
       const p = ptrs[k++];
+      // (%v, C++'s f >> x: by x's type, #2309)
+      if (conv === 'v') conv = p?.ptr?.t?.fl ? 'g' : 'd';
       if (conv === 'c') { p.ptr?.set({ v: BigInt(fh.text.charCodeAt(fh.pos++)), t: INT }); got++; continue; }
       if (conv === 's') {
         let s = '';
@@ -250,7 +262,7 @@ export const libMethods = {
         fh.pos += t[0].length;
         if (!p?.ptr) this.fail(e, 'fscanf: its values are read through pointers (&x)');
         const x = Number(t[0].replace(/^([-+]?)inf(inity)?$/i, '$1Infinity'));
-        p.ptr.set(m[1] === 'l' || m[1] === 'L' ? { v: x, t: F64 } : { v: Math.fround(x), t: F32 });
+        p.ptr.set(m[1] === 'l' || m[1] === 'L' || (m[2] === 'v' && p.ptr.t.fl === 64) ? { v: x, t: F64 } : { v: Math.fround(x), t: F32 });
         got++;
         continue;
       }
