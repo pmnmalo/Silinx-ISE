@@ -16,6 +16,8 @@ const bitsOf = v => (typeof v === 'string' ? v : (v >>> 0).toString(2));
 const portNet = (c, p) => c.connections?.[p]?.[0];
 // a cell's string parameter (nextpnr writes a string with a trailing space, to tell it from a bit string)
 const strParam = (c, p) => (typeof c.parameters?.[p] === 'string' ? c.parameters[p].replace(/ $/, '') : c.parameters?.[p]);
+// a 1-bit parameter (CLKINV, LATCH), 0 when the cell has none
+const bitParam = (c, p) => parseInt(bitsOf(c.parameters?.[p] ?? '0'), 2) & 1;
 
 // ---------------------------------------------------------------- nextpnr's result to XDL
 // BELs of a site: names S<site index>_<BEL> (s3e_gen.py)
@@ -222,15 +224,16 @@ function instanceCfg(inst, mod, part) {
     for (const [X, ff] of [['X', c.FFX], ['Y', c.FFY]]) {
       if (!ff) continue;
       const init = parseInt(bitsOf(ff.parameters.INIT ?? '0'), 2) & 1, mode = strParam(ff, 'SRMODE') ?? 'NONE';
-      add(`FF${X}`, esc(ff.name), '#FF');
+      add(`FF${X}`, esc(ff.name), bitParam(ff, 'LATCH') ? '#LATCH' : '#FF');
       add(`FF${X}_INIT_ATTR`, '', init ? 'INIT1' : 'INIT0');
       add(`FF${X}_SR_ATTR`, '', /_SET$/.test(mode) || (mode === 'NONE' && init && !mem) ? 'SRHIGH' : 'SRLOW');
       add(`D${X}MUX`, '', inst.mux[`D${X}`] === 'bypass' ? '0' : '1');
-      ctrl = { ce: portNet(ff, 'CE') !== undefined, sr: portNet(ff, 'SR') !== undefined, sync: !/ASYNC/.test(mode) };
+      ctrl = { ce: portNet(ff, 'CE') !== undefined, sr: portNet(ff, 'SR') !== undefined, sync: !/ASYNC/.test(mode) && !bitParam(ff, 'LATCH'), clkInv: bitParam(ff, 'CLKINV') };   // (a latch: ASYNC)
     }
     if (mem) memCfg(inst, add, 'controls');
     if (ctrl) {
-      if (!mem) add('CLKINV', '', 'CLK');
+      // (the falling edge, or a latch with an active-high gate: CLK_B, #2457)
+      if (!mem) add('CLKINV', '', ctrl.clkInv ? 'CLK_B' : 'CLK');
       if (ctrl.ce) add('CEINV', '', 'CE');
       if (ctrl.sr) add('SRINV', '', 'SR');
       // (beside a memory, whose enable has SR: a flip-flop with no set / reset, as Silinx's packer writes it)
@@ -270,8 +273,14 @@ function instanceCfg(inst, mod, part) {
   } else if (c.BUFGMUX) {
     inst.type = 'BUFGMUX';
     inst.name = esc(c.BUFGMUX.name);
-    add('DISABLE_ATTR', '', 'LOW'); add('I0_USED', '', '0'); add('SINV', '', 'S_B');
-    add('GCLKMUX', `${inst.name}.GCLKMUX`, ''); add('GCLK_BUFFER', inst.name, '');
+    // a clock switch (#2457), as Silinx's packer writes it (pack-cfg.js): its select S, both inputs; else a buffer, S tied to VCC
+    if (portNet(c.BUFGMUX, 'S') !== undefined) {
+      add('DISABLE_ATTR', '', strParam(c.BUFGMUX, 'DISABLE_ATTR') ?? 'LOW'); add('I0_USED', '', '0'); add('I1_USED', '', '0'); add('SINV', '', 'S');
+      add('GCLKMUX', `${inst.name}.GCLKMUX`, '');
+    } else {
+      add('DISABLE_ATTR', '', 'LOW'); add('I0_USED', '', '0'); add('SINV', '', 'S_B');
+      add('GCLKMUX', `${inst.name}.GCLKMUX`, ''); add('GCLK_BUFFER', inst.name, '');
+    }
   } else throw new Error(`${inst.site}: no cell the converter knows`);
   return { name: inst.name, type: inst.type, placed: true, tile: inst.tile, site: inst.site, cfg };
 }
@@ -339,10 +348,10 @@ function checkLutPins(mod, insts, nets) {
   }
 }
 
-/** A BUFGMUX's select S tied to VCC, from its tile's VCC site, as ISE's map and Silinx write it. */
+/** A BUFGMUX's select S tied to VCC, from its tile's VCC site, as ISE's map and Silinx write it (not a clock switch's, its own net). */
 function tieSelects(xdlInsts, nets, device) {
   const bySite = new Map();   // the tile's VCC site -> its net (one net per site: the buffers of a tile share its VCC wire)
-  for (const inst of xdlInsts.filter(i => i.type === 'BUFGMUX')) {
+  for (const inst of xdlInsts.filter(i => i.type === 'BUFGMUX' && !i.cfg.some(x => x.attr === 'I1_USED'))) {
     const k = device.tile(inst.tile), s = device.sitePin(inst.site, 'S');
     const vcc = device.tileSites[k].find(([name]) => device.site(name).type === 'VCC');
     const tp = device.templates[device.tileTemplate[k]];

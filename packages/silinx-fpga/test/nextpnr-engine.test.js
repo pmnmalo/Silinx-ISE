@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
-import { engineOf, lowerRam64, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
+import { engineOf, lowerClockSwitches, lowerRam64, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
+import { BRAM_TYPE, LUT_K, MUXF, SLICEM_MEM, ffKind } from '../src/fpga/pack.js';
 import { parseXdl } from '../src/xdl.js';
 import { readYosysJson } from '../src/fpga/netlist.js';
 import { compareSims } from './fpga-sim.js';
@@ -61,9 +62,28 @@ test('nextpnrNetlist: what the micro-architecture cannot implement yet is named'
   assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) RAM128X1S: not in the spartan3e micro-architecture yet']);
 });
 
-test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants, the buffers, the IOBs\' DDR registers, the block RAMs and multipliers; not a falling edge, a latch, a distributed RAM', () => {
-  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'IDDR2', 'ODDR2', 'BUFG', 'DCM', 'DCM_SP', 'RAM16X1S', 'RAM16X1D', 'RAM32X1S', 'SRL16', 'SRL16E', 'SRLC16E', 'SRL16E_1', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
-  for (const t of ['RAM64X1S', 'LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'RAMB16_S3', 'MULT18X18SX', 'OBUFDS', 'BUFGMUX']) assert.ok(!NEXTPNR_CELL.test(t), t);
+test('NEXTPNR_CELL: the flip-flops and latches of both edges, the carry chains, the wide multiplexers, the constants, the buffers and clock switches, the IOBs\' DDR registers, the block RAMs and multipliers, the distributed RAMs; not what Silinx\'s packer refuses either', () => {
+  for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'IDDR2', 'ODDR2', 'BUFG', 'DCM', 'DCM_SP', 'RAM16X1S', 'RAM16X1D', 'RAM32X1S', 'SRL16', 'SRL16E', 'SRLC16E', 'SRL16E_1', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO',
+    'FD_1', 'FDRE_1', 'FDSE_1', 'FDCE_1', 'FDPE_1', 'LD', 'LDE', 'LDCE', 'LDPE', 'LD_1', 'LDCE_1', 'LDPE_1', 'BUFGMUX', 'BUFGMUX_1']) assert.ok(NEXTPNR_CELL.test(t), t);
+  for (const t of ['RAM64X1S', 'BUF', 'LUT5', 'LDC', 'LDRE', 'FDRE_2', 'MUXF9', 'RAMB16_S3', 'MULT18X18SX', 'OBUFDS', 'BUFGMUX_2', 'BUFGCE']) assert.ok(!NEXTPNR_CELL.test(t), t);
+});
+
+// #2457: every cell Silinx's packer takes (pack-prep.js's list) the nextpnr engine takes too, RAM64X1S and BUF lowered first
+test('#2457 the nextpnr engine takes every cell Silinx\'s packer takes', () => {
+  const ffs = ['FD', 'FDE', 'FDR', 'FDS', 'FDC', 'FDP', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'LD', 'LDE', 'LDCE', 'LDPE'].flatMap(t => [t, `${t}_1`]);
+  const widths = [1, 2, 4, 9, 18, 36];
+  const brams = widths.flatMap(a => [`RAMB16_S${a}`, ...widths.map(b => `RAMB16_S${a}_S${b}`)]);
+  const packer = [...Object.keys(LUT_K), ...ffs, ...Object.keys(MUXF), 'MUXCY', 'XORCY', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'BUFG', 'BUFGMUX', 'BUFGMUX_1',
+    'IDDR2', 'ODDR2', ...Object.keys(SLICEM_MEM), ...brams, 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO', 'DCM', 'DCM_SP', 'INV', 'GND', 'VCC'];
+  for (const t of ffs) assert.ok(ffKind(t), t);
+  for (const t of brams) assert.ok(BRAM_TYPE.test(t), t);
+  assert.deepEqual(packer.filter(t => !NEXTPNR_CELL.test(t)), []);
+  // the two it lowers: no problem left
+  for (const [type, connections, port_directions] of [['BUF', { I: [2], O: [3] }, { I: 'input', O: 'output' }],
+    ['RAM64X1S', { A0: [2], A1: [2], A2: [2], A3: [2], A4: [2], A5: [2], D: [2], WE: [2], WCLK: [2], O: [3] }, { A0: 'input', A1: 'input', A2: 'input', A3: 'input', A4: 'input', A5: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' }]]) {
+    const json = { modules: { top: { attributes: { top: 1 }, ports: {}, cells: { c: { type, parameters: {}, connections, port_directions } }, netnames: {} } } };
+    assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'top', '').problems, [], type);
+  }
 });
 
 test('#2136 the gates example built with --engine nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
@@ -370,6 +390,105 @@ test('#2218 a RAM64X1S built with --engine nextpnr: no warnings, its PERIOD met,
     assert.ok(text.includes(from), from);
     assert.notEqual(compareSims(netlist, asPacked(text.replace(from, to)), { cycles: 5000 }), null, from);
   }
+});
+
+test('#2457 lowerClockSwitches: an input from a BUFG its input, the BUFG left out when nothing else reads it; a constant select a BUFG of its input; a BUF a LUT1', () => {
+  const io = (ins, outs) => Object.fromEntries([...ins.map(p => [p, 'input']), ...outs.map(p => [p, 'output'])]);
+  const mod = () => ({
+    ports: { clk: { direction: 'input', bits: [2] }, q: { direction: 'output', bits: [9] } },
+    cells: {
+      b0: { type: 'BUFG', connections: { I: [2], O: [3] }, port_directions: io(['I'], ['O']) },
+      b1: { type: 'BUFG', connections: { I: [4], O: [5] }, port_directions: io(['I'], ['O']) },
+      m: { type: 'BUFGMUX_1', connections: { I0: [3], I1: [5], S: [6], O: [7] }, port_directions: io(['I0', 'I1', 'S'], ['O']) },
+      k: { type: 'BUFGMUX', connections: { I0: [2], I1: [4], S: ['1'], O: [8] }, port_directions: io(['I0', 'I1', 'S'], ['O']) },
+      f: { type: 'FDRE', connections: { C: [5], D: [7], Q: [9] }, port_directions: io(['C', 'D'], ['Q']) },
+    },
+  });
+  const m = mod();
+  lowerClockSwitches(m);
+  // b0 read only by the switch: gone; b1 also clocks f: kept
+  assert.deepEqual(Object.keys(m.cells).sort(), ['b1', 'f', 'k', 'm']);
+  assert.deepEqual(m.cells.m, { type: 'BUFGMUX_1', connections: { I0: [2], I1: [4], S: [6], O: [7] }, port_directions: io(['I0', 'I1', 'S'], ['O']) });
+  assert.deepEqual(m.cells.k, { type: 'BUFG', connections: { I: [4], O: [8] }, port_directions: io(['I'], ['O']) });
+  // S at 0: I0; a BUFG's output that is a port bit stays
+  const z = mod();
+  z.cells.k.connections.S = ['0'];
+  z.ports.c = { direction: 'output', bits: [3] };
+  lowerClockSwitches(z);
+  assert.deepEqual(z.cells.k.connections, { I: [2], O: [8] });
+  assert.ok(z.cells.b0);
+  // in nextpnrNetlist: a BUF a LUT1 (INIT 10); a switch's output timed at its inputs' tighter PERIOD
+  const json = { modules: { top: { attributes: { top: 1 }, ports: mod().ports, cells: { ...mod().cells, u: { type: 'BUF', connections: { I: [7], O: [10] }, port_directions: io(['I'], ['O']) } },
+    netnames: { clk: { bits: [2] }, c3: { bits: [3] }, c5: { bits: [5] }, mclk: { bits: [7] } } } } };
+  json.modules.top.cells.ib = { type: 'IBUFG', connections: { I: [1], O: [2] }, port_directions: io(['I'], ['O']) };
+  json.modules.top.ports.clk.bits = [1];
+  const r = nextpnrNetlist(JSON.stringify(json), 'top', 'NET "clk" PERIOD = 20 ns ;\n');
+  assert.deepEqual(cellsOf(r.json).u, { type: 'LUT1', parameters: { INIT: '10' }, connections: { I0: [7], O: [10] }, port_directions: io(['I0'], ['O']) });
+  // (clk reaches only the switch, b0 gone: its PERIOD on the switch's output)
+  assert.equal(r.sdc, 'create_clock -period 20 [get_nets {mclk}]\n');
+});
+
+// #2457: the design (research/nextpnr-s3e/edges.v): two flip-flops on the falling edge (one feeding the other), two
+// latches (an active-high gate with its enable and clear, an active-low one with its preset), an output and an input
+// register in their IOBs on the falling edge, a BUFGMUX_1 switching clk and clk2 beside the BUFG of clk, a BUFGMUX whose
+// select is 0 (a BUFG of clk2) clocking a falling-edge flip-flop
+test('#2457 falling-edge flip-flops, latches and clock switches built with --engine nextpnr: no warnings, its PERIOD met, the settings Silinx\'s packer writes, a complete bitstream; the XDL behaves as the netlist', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fileURLToPath(fixture('edges.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('edges.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 6 out of 2448 0%'), out.join('\n'));
+  assert.ok(out.includes('  Number of BUFGMUXs: 3 out of 24 13%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  const text = fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8');
+  const design = parseXdl(text);
+  const cfg = name => design.insts.find(i => i.cfg.some(c => c.name === name))?.cfg.map(c => `${c.attr}:${c.name}:${c.value}`) || [];
+  const has = (name, ...items) => { const c = cfg(name); for (const x of items) assert.ok(c.includes(x), `${name}: ${x} in ${c.join(' ')}`); };
+  for (const u of ['u0', 'u1', 'u6']) has(u, `FFX:${u}:#FF`, 'CLKINV::CLK_B');
+  has('u5', 'FFX:u5:#FF', 'CLKINV::CLK');
+  // the latches: an active-high gate CLK_B, an active-low one CLK; asynchronous
+  has('u2', 'FFX:u2:#LATCH', 'CLKINV::CLK_B', 'SYNC_ATTR::ASYNC');
+  has('u3', 'FFX:u3:#LATCH', 'CLKINV::CLK', 'SYNC_ATTR::ASYNC');
+  // the IOBs' registers on the falling edge
+  has('u4', 'OFF1:u4:#FF', 'OTCLK1INV::OTCLK1_B');
+  has('u7', 'IFF1:u7:#FF', 'ICLK1INV::ICLK1_B');
+  // the switch: both inputs, its select, high while it switches (BUFGMUX_1); m2 a buffer, its select tied to VCC
+  const bufs = design.insts.filter(i => i.type === 'BUFGMUX');
+  const m1 = bufs.find(i => i.name === 'm1').cfg.map(c => `${c.attr}:${c.value}`);
+  assert.deepEqual(m1, ['DISABLE_ATTR:HIGH', 'I0_USED:0', 'I1_USED:0', 'SINV:S', 'GCLKMUX:']);
+  assert.ok(bufs.filter(i => i.name !== 'm1').every(i => i.cfg.some(c => c.attr === 'GCLK_BUFFER')));
+  const sel = design.nets.find(n => n.inpins.some(p => p.inst === 'm1' && p.pin === 'S'));
+  assert.equal(sel.outpins[0].inst, 'sw<7>');
+  assert.equal(design.nets.filter(n => n.type === 'vcc' && n.inpins.some(p => p.pin === 'S')).flatMap(n => n.inpins).length, 2);
+  // (a switch and a buffer on its partner: the partner's I0 the switch's I1, #846)
+  const pair = name => name.replace(/Y(\d+)$/, (_, y) => `Y${+y ^ 1}`);
+  const at = new Map(bufs.map(i => [i.site, i]));
+  const inNet = (i, pin) => design.nets.find(n => n.inpins.some(p => p.inst === i.name && p.pin === pin))?.name;
+  const q = at.get(pair(bufs.find(i => i.name === 'm1').site));
+  if (q) assert.equal(inNet(q, 'I0'), inNet(bufs.find(i => i.name === 'm1'), 'I1'));
+  const asPacked = t => {
+    const d = parseXdl(t), at = new Map(d.insts.map((i, k) => [i.name, k]));
+    for (const i of d.insts) {
+      if (/^(IOB|IBUF)$/.test(i.type)) Object.assign(i, { kind: 'iob', dir: i.type === 'IBUF' ? 'in' : 'out' });
+      else if (/^SLICE/.test(i.type)) i.kind = 'slice';
+      else if (/BUFG/.test(i.type)) i.kind = 'bufg';
+    }
+    for (const n of d.nets) for (const p of [...n.inpins, ...n.outpins]) p.inst = at.get(p.inst);
+    return d;
+  };
+  const netlist = readYosysJson(fs.readFileSync(fixture('edges.json'), 'utf8'));
+  assert.equal(compareSims(netlist, asPacked(text), { cycles: 5000 }), null);
+  // a wrong setting of each kind: caught
+  for (const [from, to] of [['FFX:u2:#LATCH', 'FFX:u2:#FF'], ['OTCLK1INV::OTCLK1_B', 'OTCLK1INV::OTCLK1'], ['ICLK1INV::ICLK1_B', 'ICLK1INV::ICLK1'], ['SINV::S ', 'SINV::S_B ']]) {
+    assert.ok(text.includes(from), from);
+    assert.notEqual(compareSims(netlist, asPacked(text.replace(from, to)), { cycles: 5000 }), null, from);
+  }
+  const u0 = text.indexOf('FFX:u0:#FF');
+  assert.notEqual(compareSims(netlist, asPacked(text.slice(0, u0) + text.slice(u0).replace('CLKINV::CLK_B', 'CLKINV::CLK')), { cycles: 5000 }), null, 'u0 CLKINV');
 });
 
 test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its global buffer; an INST LOC as the DCM\'s BEL, a wrong site refused', () => {
