@@ -83,12 +83,12 @@ test('#489 highlightHdl on generated HDL: a state diagram\'s VHDL and Verilog sh
   }
 });
 
-// (each editor, and the module that shows its HDL since #405: the FSM editor's bottom panel, the schematic editor's
-// Symbol Info)
+// (each editor, and the module that shows its HDL since #405: the schematic editor's Symbol Info; the FSM editor shows
+// none since #2505)
 test('#489 no drawing editor keeps a highlighter of its own', () => {
   const read = (f) => fs.readFileSync(new URL(`../web/js/${f}`, import.meta.url), 'utf8');
-  for (const [f, hdl] of [['asm-editor.js', 'asm-editor.js'], ['fsm-editor.js', 'fsm-bottom.js'], ['sch-editor.js', 'sch-info.js']]) {
-    for (const g of new Set([f, hdl])) assert.doesNotMatch(read(g), /function highlight\(|^const KW = /m, g);
-    assert.match(read(hdl), /^import \{ highlightHdl \} from '\.\/highlight\.js';$/m, hdl);
+  for (const [f, hdl] of [['asm-editor.js', 'asm-editor.js'], ['fsm-editor.js', null], ['fsm-bottom.js', null], ['sch-editor.js', 'sch-info.js']]) {
+    for (const g of new Set([f, hdl].filter(Boolean))) assert.doesNotMatch(read(g), /function highlight\(|^const KW = /m, g);
+    if (hdl) assert.match(read(hdl), /^import \{ highlightHdl \} from '\.\/highlight\.js';$/m, hdl);
   }
 });
