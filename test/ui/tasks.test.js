@@ -1866,3 +1866,30 @@ uiTest('#1564 Tasks: the last document of a maximized task closed shows the side
   await restored('emu');
   await noWarnings(page);
 }, { build: DEV });
+
+uiTest('#2492 Tasks: a document closed brings the task\'s own last document forward, not another task\'s opened after it', E, async (page) => {
+  await makeProject(env, { name: 'TasksCloseOwn', template: 'blinky' });
+  await page.setViewport(1366, 768);
+  await tasksInterface(page);
+  await page.openProject('TasksCloseOwn');
+  // the documents in the order: top.vhd (Design), the Design Summary (Implement), knight.vhd (Design)
+  await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'summary'), [], { what: 'the Design Summary opened with the project' });
+  await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('summary')));
+  await page.waitFor(() => !window.Silinx.docs.some((d) => d.id === 'summary'), [], { what: 'the Design Summary closed' });
+  await page.eval(() => window.SilinxApp.openFile('src/top.vhd'));
+  await page.waitForSelector('.doc:not([hidden]) .cm-editor');
+  await page.click('#task-switch .task-btn[data-task="impl"]');
+  await page.waitFor(() => window.Silinx.active?.id === 'summary', [], { what: 'the Design Summary' });
+  await page.click('#task-switch .task-btn[data-task="edit"]');
+  await page.eval(() => window.SilinxApp.openFile('src/knight.vhd'));
+  await page.waitFor(() => (window.Silinx.active?.title || '').includes('knight.vhd'), [], { what: 'the second source' });
+  assert.deepEqual(await page.eval(() => window.Silinx.docs.map((d) => d.id)), ['file:src/top.vhd', 'summary', 'file:src/knight.vhd']);
+  // knight.vhd closed: top.vhd in front, its tab active, the task still Design (the summary stays behind)
+  await page.click('#doc-tabs > .tab.active .tclose');
+  await page.waitFor(() => !window.Silinx.docs.some((d) => d.id === 'file:src/knight.vhd'), [], { what: 'the second source closed' });
+  assert.equal(await page.eval(() => window.Silinx.active?.id), 'file:src/top.vhd');
+  const s = await state(page);
+  assert.deepEqual([s.task, s.tabs, s.empty], ['edit', ['top.vhd'], false]);
+  assert.ok(await shown(page, '#doc-tabs > .tab.active .tclose') && await shown(page, '.doc:not([hidden]) .cm-editor'));
+  await noWarnings(page);
+}, { build: DEV });

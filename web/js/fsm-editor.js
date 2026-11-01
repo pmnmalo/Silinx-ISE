@@ -3,7 +3,7 @@
 //   import { mountFsmEditor } from './fsm-editor.js';
 //   const ed = mountFsmEditor(container, { model, onChange(model), linkInfo() -> { file, why } | null,
 //                                          onOpenFile(path), onTruthTables(), onToAsm() });
-//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.fit(); ed.print(); ed.destroy();
+//   ed.getModel(); ed.setModel(m); ed.setLink(file); ed.refreshLink(); ed.fit(); ed.fitted(); ed.print(); ed.destroy();
 //
 // States are circles (the initial state has a double circle and an entry arrow); transitions are
 // curved arrows labelled "condition / outputs" (Mealy outputs) — Moore outputs are written inside
@@ -327,6 +327,8 @@ export function mountFsmEditor(container, opts = {}) {
     validate: () => { runValidate(); return diags.slice(); },
     showPanel: (p) => { if (panel !== p) togglePanel(p); },
     fit,
+    // (the view fitted when the canvas first had a size, or the user's own: the drawing stays where it is, #2397)
+    fitted: () => fitted,
     print,
     destroy() {
       destroyed = true;

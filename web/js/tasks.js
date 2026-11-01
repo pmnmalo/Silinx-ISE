@@ -307,6 +307,9 @@ function followActive() {
   // (the document in front was closed and another came forward in its place: the task stays, its page shown, #854)
   const closed = lastActive && !app.S.docs.includes(lastActive);
   lastActive = d;
+  // (and the task's own last document in its place, when it has one: not another task's, hidden, #2492)
+  const own = closed && taskOf(d) !== current() && app.S.docs.findLast(x => taskOf(x) === current());
+  if (own) { app.activateDoc(own); return; }
   if (closed && taskOf(d) !== current()) { tagDocs(); return; }
   // (a document opened behind, with the project (its Design Summary): the task stays the viewer's, until it is brought to the front)
   if (d.background && !d._taskSeen) { d._taskSeen = true; tagDocs(); return; }
