@@ -42,7 +42,7 @@ test('#2386 a fake family synthesized with its own script (4-input LUTs of Yosys
   let netlist = null;
   const remove = registerBackend({
     id: 'fake', synth: scriptSynthesis({ script: top => `synth -flatten -top ${top} -lut 4` }),
-    synthName: id => ({ luts: 'LUT4s', ffs: 'DFFs' }[id] || id), mount: ctx => ({ runMap: () => { netlist = ctx.netlist(); } }),
+    synthName: id => ({ luts: 'LUT4s', ffs: 'DFFs' }[id] || id), mount: ctx => ({ steps: { translate: ctx.readNetlist, map: () => { netlist = ctx.netlist(); } } }),
   });
   try {
     const { io, log, files } = memoryIo();

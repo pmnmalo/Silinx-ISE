@@ -300,10 +300,11 @@ simulator that `compile` uses), so its steps are the toolchain's, shorter:
 ## The flow's back ends (#2360)
 
 `runFlow` (`open-flow-core.js`) runs the steps and names no family and no engine. What a family does is its back end
-(`open-flow-backends.js`), `{ id, mount(ctx), synth?, synthName?, constraints? }`: `mount` gives the family's `runMap`, `runPar`, `runTiming`,
-`runPins`, `runPower`, `bitfile` and `runFpgaView`, with its engines. `registerBackend` adds one; a family not registered is
+(`open-flow-backends.js`), `{ id, mount(ctx), steps?, synth?, synthName?, constraints? }`: `steps` lists the family's steps (`{ id, label, needs }`, ISE's for
+the Xilinx families, #2387) and `mount` gives their functions, with its engines. `registerBackend` adds one; a family not registered is
 implemented as the Spartan-3E is. nextpnr comes through one hook, `io.nextpnr`, by micro-architecture. The routed design is
 the back end's (#2384): its format and its file (XDL, `open/routed.xdl`, for the Xilinx families), read again from an earlier
 run by the steps that need it. The constraints reach the back ends as one model, in the back end's format (#2385,
 `constraints.js`). The synthesis is the back end's too (#2386): `synth_xilinx` and its mappings for the Xilinx families, a
-Yosys script of its own for another (`synth-script.js`). Still to come: the steps by family (#2387), then iCE40 (#2295).
+Yosys script of its own for another (`synth-script.js`); the steps are the back end's list (#2387). Still to come: the fake
+family in the browser's worker (#2388), then iCE40 (#2295).
