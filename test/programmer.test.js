@@ -153,6 +153,40 @@ test('program: board default tool, bit header checks, explicit tools and positio
   assert.match(log, /^djtgcfg prog -d Basys2 -i 0 -f .*top\.bit$/m);
 });
 
+// #2298: the iCE40's .bin, written into the iCEBreaker's SPI flash by openFPGALoader (its board ice40_generic: the
+// on-board FT2232H), no JTAG chain; its file's size in bitinfo; the errors
+test('program: an iCE40 project\'s .bin into the iCEBreaker\'s flash with openFPGALoader -b ice40_generic', { skip: POSIX_ONLY }, async () => {
+  process.env.FAKE_PROG_LOG = path.join(tmp, 'prog-ice40.log');
+  await P.createProject({ name: 'Ice', board: 'icebreaker', device: { family: 'ice40', part: 'ice40up5k', package: 'sg48', speed: '' } });
+  await P.updateProject('Ice', pj => { pj.top = 'top'; });
+  const bin = path.join(P.projectDir('Ice'), 'build', 'top.bin');
+  await fs.mkdir(path.dirname(bin), { recursive: true });
+  assert.deepEqual((await app.call('GET', '/projects/Ice/bitinfo')).body, { available: false, path: bin, ice40: true });
+  await fs.writeFile(bin, Buffer.alloc(104090, 0xff));
+  assert.deepEqual((await app.call('GET', '/projects/Ice/bitinfo')).body, { available: true, path: bin, size: 104090, ice40: true });
+  let j = await run('/program', { project: 'Ice' });
+  assert.equal(j.status, 'ok', j.lines.join('\n'));
+  assert.equal(j.result.options.tool, 'openFPGALoader');
+  assert.deepEqual(j.result.commands, [{ cmd: 'openFPGALoader', args: ['-b', 'ice40_generic', bin], code: 0 }]);
+  assert.deepEqual(j.result.warnings, []);
+  assert.equal(j.result.size, 104090);
+  for (const l of [`Configuration file ${bin} (104090 bytes, an iCE40's .bin)`, 'Programming (SPI flash, non-volatile) with openFPGALoader board=ice40_generic',
+    'NOTE: the openFPGALoader defaults for this board are not verified on real hardware.', 'Programming finished.']) assert.ok(j.lines.includes(l), l);
+  assert.match(await fs.readFile(process.env.FAKE_PROG_LOG, 'utf8'), /^openFPGALoader -b ice40_generic .*top\.bin$/m);
+  // the .bin of a project of another family: warned; another tool, the tool failing, a .bin by an absolute path: errors
+  j = await run('/program', { project: 'Ice', expectDevice: { part: 'xc3s250e', package: 'cp132' } });
+  assert.deepEqual(j.result.warnings, ["a .bin is an iCE40's configuration, but the target device is 'xc3s250e'"]);
+  j = await run('/program', { project: 'Ice', tool: 'xc3sprog', cable: 'xpc' });
+  assert.equal(j.status, 'error');
+  assert.match(j.error, /an iCE40's \.bin is programmed with openFPGALoader, not xc3sprog/);
+  process.env.FAKE_PROG_FAIL = 'openFPGALoader';
+  j = await run('/program', { project: 'Ice' });
+  assert.equal(j.status, 'error');
+  assert.match(j.error, /openFPGALoader exited with code 1/);
+  const r = await app.call('POST', '/program', { project: 'Ice', bitfile: bin });
+  assert.equal(r.status, 400);
+});
+
 test('program: iMPACT success / silent failure / error message; adepttool DONE check; tool exit code', { skip: POSIX_ONLY }, async () => {
   let j = await run('/program', { project: 'Prog', tool: 'impact' });
   assert.equal(j.status, 'ok', j.lines.join('\n'));
@@ -208,7 +242,7 @@ test('program: request errors', async () => {
     [{}, 400, /give a project or a bitfile/],
     [{ bitfile: 'build/top.bit' }, 400, /must be an absolute path when no project is given/],
     [{ project: 'NoTop' }, 400, /project has no top module/],
-    [{ project: 'Prog', bitfile: 'build/top.ucf' }, 400, /only .bit files can be programmed/],
+    [{ project: 'Prog', bitfile: 'build/top.ucf' }, 400, /only \.bit files, or a project's \.bin \(the iCE40\), can be programmed/],
     [{ project: 'Prog', bitfile: 'build/none.bit' }, 404, /bitstream not found/],
     [{ project: 'Prog', bitfile: '../../escape.bit' }, 400, /path escapes project/],
     [{ project: 'Prog', board: 'nope' }, 400, /unknown board 'nope'/],

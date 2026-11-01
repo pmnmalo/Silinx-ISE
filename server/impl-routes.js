@@ -149,6 +149,12 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
   api.get('/projects/:p/bitinfo', wrap(async req => {
     const project = await P.readProject(req.params.p);
     if (!topOf(project)) return { available: false, reason: 'no top module' };
+    // (the iCE40's .bin: no header, its size, #2298)
+    if (openOnlyDevice(project.device)) {
+      const bin = path.join(P.projectDir(req.params.p), 'build', `${project.top}.bin`);
+      const st = await fs.stat(bin).catch(() => null);
+      return st ? { available: true, path: bin, size: st.size, ice40: true } : { available: false, path: bin, ice40: true };
+    }
     const bit = path.join(P.projectDir(req.params.p), 'build', `${project.top}.bit`);
     if (!fss.existsSync(bit)) return { available: false, path: bit };
     try {
@@ -167,13 +173,13 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
       if (b.bitfile) bitfile = path.isAbsolute(b.bitfile) ? b.bitfile : P.safeJoin(dir, b.bitfile);
       else {
         if (!topOf(project)) throw bad('project has no top module; cannot locate build/<top>.bit');
-        bitfile = path.join(dir, 'build', `${project.top}.bit`);
+        bitfile = path.join(dir, 'build', `${project.top}${openOnlyDevice(project.device) ? '.bin' : '.bit'}`);   // (the iCE40's, #2298)
       }
     } else if (b.bitfile) {
       if (!path.isAbsolute(b.bitfile)) throw bad('bitfile must be an absolute path when no project is given');
       bitfile = b.bitfile;
     } else throw bad('give a project or a bitfile');
-    if (!/\.bit$/i.test(bitfile)) throw bad('only .bit files can be programmed');
+    if (!/\.bit$/i.test(bitfile) && !(/\.bin$/i.test(bitfile) && !path.isAbsolute(b.bitfile || ''))) throw bad('only .bit files, or a project\'s .bin (the iCE40), can be programmed');
     if (!fss.existsSync(bitfile)) throw bad(`bitstream not found: ${bitfile} (run the implementation first)`, 404);
     // a file outside the project (iMPACT's file box takes any path): only a real Xilinx bitstream,
     // and the same answer for any other file as for a missing one (no file-existence check by the API)

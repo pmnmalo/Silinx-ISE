@@ -17,7 +17,7 @@ import { createHistory } from './history.js';
 import { viewHdl } from '/core/view-hdl.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
 import { primitiveTemplates } from '/core/prim-templates.js';
-import { deviceFamily } from '/packages/silinx-fpga/src/parts.js';
+import { deviceFamily, openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
 import { setActionRunner, longPressMenu } from './ui.js';
 import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';
@@ -747,7 +747,8 @@ export async function openPinPlanner(mod) {
 
 export async function openImpact() {
   const { mountImpact } = await import('./impact.js');
-  openDoc({ id: 'impact', title: 'iMPACT', icon: 'impact', create: (el, d) => mountImpact(el, d) });
+  // (an iCE40's: its flash, no iMPACT, #2298)
+  openDoc({ id: 'impact', title: openOnlyDevice(S.project?.device) ? 'Program Flash' : 'iMPACT', icon: 'impact', create: (el, d) => mountImpact(el, d) });
 }
 
 // ------------------------------------------------------------------ left pages

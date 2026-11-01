@@ -538,7 +538,7 @@ export const BOARDS = [
     programmer: {
       preferred: 'openFPGALoader',
       tools: {
-        openFPGALoader: { cable: 'ft2232', position: 0, onboard: true, verified: false, note: 'The on-board FT2232H; Silinx does not program an iCE40 yet (openFPGALoader -b ice40_generic design.bin).' },
+        openFPGALoader: { board: 'ice40_generic', onboard: true, verified: false, note: 'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).' },
       },
     },
     source: ICEBREAKER_PCF,
