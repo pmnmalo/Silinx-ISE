@@ -144,9 +144,11 @@ uiTest('editor: open from the hierarchy, edit, autosave, Ctrl+S, undo and live e
   await page.key('s', { modifiers: 2 });
   await page.waitFor(() => !window.Silinx.active.tab.classList.contains('dirty'), [], { timeout: 500, what: 'saved by Ctrl+S' });
   assert.match(await readWs(env, 'EdPj', 'src/top.vhd'), /^library ieee; -- autosaved now\n/);
-  // the Undo button of the editor bar, twice: back to the original text, saved again
-  await page.click('.doc:not([hidden]) .editor-bar .tb-btn[title=Undo]');
-  await page.click('.doc:not([hidden]) .editor-bar .tb-btn[title=Undo]');
+  // the main toolbar's Undo, twice (the editor bar has none of its own, #2514): back to the original text, saved again
+  for (let i = 0; i < 2; i++) {
+    await page.waitFor(() => !document.querySelector('#toolbar [data-cmd=undo]').disabled, [], { what: 'Undo enabled' });
+    await page.click('#toolbar [data-cmd=undo]');
+  }
   await page.waitFor((t) => window.Silinx.active.editor.getValue() === t, [TOP]);
   await page.waitFor(async (t) => (await (await fetch('/api/projects/EdPj/file?path=src/top.vhd')).text()) === t, [TOP], { what: 'undo saved' });
   // live check while typing: an unknown signal is marked in the gutter
