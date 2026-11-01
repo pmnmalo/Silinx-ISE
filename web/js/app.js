@@ -22,7 +22,7 @@ import { setActionRunner, longPressMenu } from './ui.js';
 import { log, logLine, showConsolePage, setDiagnostics, renderDiagnostics, clearConsole } from './console.js';
 import { isOwnFailure } from './own-error.js';
 import { openProject, closeProject, reloadProject, updateTitle, renderStartPage, updateStorageStatus } from './project.js';
-import { FLOW_UP_TO, checkUcfFile, regenerateUcf, runImpl, stepTracker, ucfDiagnostics } from './implement.js';
+import { FLOW_UP_TO, boardUcf, checkUcfFile, regenerateUcf, runImpl, stepTracker, ucfDiagnostics } from './implement.js';
 import { adoptDrawnHdl, drawnHdlClashes, freshHdl, openAsm, openFsm, openPetri, openSch,
   openTt, openTtSchematic, openView, projectPart, refreshSyncBanner, schModules, staleHdl, syncBanner, viewTitle } from './drawings.js';
 import { checkFileSyntax, hdlDiagnostics, markStale, openMode, renderProcesses, saveAll } from './processes.js';
@@ -944,7 +944,7 @@ async function boot() {
     const st = await api.initStorage().catch(() => api.storage());
     const where = st.kind === 'folder' ? `in the folder '${st.folder}' on the disk (File > Use Browser Storage to keep them in this browser)`
       : `in this browser (File > Download Project Bundle to keep a copy${st.supported ? '; File > Open Workspace Folder… keeps them in a folder on the disk' : ''})`;
-    log(`Browser edition: projects are stored ${where}. Implement Design and Generate Programming File run the Silinx toolchain here (Spartan-3E); Configure Target Device programs the FPGA of the board and its Platform Flash over USB (Chrome / Edge).`, 'info');
+    log(`Browser edition: projects are stored ${where}. Implement Design and Generate Programming File run the Silinx toolchain here (the Spartan-3E, and the Spartan-6 of the Nexys3 and the Atlys); Configure Target Device programs the FPGA of the board and its Platform Flash over USB (Chrome / Edge).`, 'info');
     if (st.needsPermission) log(`The workspace folder '${st.remembered}' needs the browser's permission again: Start page > Reopen ${st.remembered}.`, 'warn');
     if (api.devSite) log(`Development edition (built from main, not a release): its projects are kept apart from the stable edition's, ${new URL('../', location).href} (a workspace folder on the disk can be opened by both).`, 'warn');
     updateStorageStatus();
@@ -984,7 +984,7 @@ async function boot() {
   if (!window.SILINX_NO_UPDATE_CHECK) wiz.checkUpdatesOnStart().catch(() => {});
 }
 
-export const app = { showInSim, saveAll, openTt, openTtSchematic, openFsm, openPetri, openSch, stepTracker, projectBoard, regenerateUcf, openFile, openAsm, openProject, reloadProject, closeProject, renderStartPage, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, openMode, setView, select, S };
+export const app = { showInSim, saveAll, openTt, openTtSchematic, openFsm, openPetri, openSch, stepTracker, projectBoard, regenerateUcf, boardUcf, openFile, openAsm, openProject, reloadProject, closeProject, renderStartPage, openDoc, log, setDiagnostics, compileProject, renderHierarchy, renderProcesses, saveProjectJson, setTop, openSummary, showLeftPage, setDirty, findDoc, closeDoc, runSimulation, openPinPlanner, openImpact, followJob, logLine, openMode, setView, select, S };
 window.SilinxApp = app;
 // a promise nobody waits for that fails (a menu's action, the start-up's project): said in the
 // Console and the Errors tab, not lost (#408); the browser's console keeps its stack. Only Silinx's own:

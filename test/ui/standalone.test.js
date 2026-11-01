@@ -1324,7 +1324,7 @@ uiTest('#487 static editions: a Content-Security-Policy with the inline scripts\
   assert.deepEqual(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}/chipdb`), ['chipdb-xc3s100e.bin.gz', 'chipdb-xc3s1200e.bin.gz', 'chipdb-xc3s250e.bin.gz', 'chipdb-xc3s500e.bin.gz']);
   // #1237: each published asset's SHA-256 in the page (the cache checks it), and no other
   const { createHash } = await import('node:crypto');
-  const published = [...(await ls(`assets/${dir}devices`)).map((f) => `${dir}devices/${f}`), ...(await ls(`assets/${dir}bitdb`)).map((f) => `${dir}bitdb/${f}`),
+  const published = [...(await ls(`assets/${dir}devices`)).map((f) => `${dir}devices/${f}`), ...(await ls(`assets/${dir}bitdb`)).filter((f) => f !== 's6').map((f) => `${dir}bitdb/${f}`), ...(await ls(`assets/${dir}bitdb/s6`)).map((f) => `${dir}bitdb/s6/${f}`),   // (the Spartan-6's folder, #2103)
     ...(await ls(`assets/vendor/yowasp-yosys/${yosysVersion}/gen`)).map((f) => `vendor/yowasp-yosys/${yosysVersion}/gen/${f}`),
     ...(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}/gen`)).map((f) => `vendor/nextpnr-spartan/${nextpnrVersion}/gen/${f}`),
     ...(await ls(`assets/vendor/nextpnr-spartan/${nextpnrVersion}/chipdb`)).map((f) => `vendor/nextpnr-spartan/${nextpnrVersion}/chipdb/${f}`)];

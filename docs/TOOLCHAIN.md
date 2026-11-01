@@ -117,7 +117,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 | Family | Synthesis | Place and route | Bitstream | Constraints | Status |
 |---|---|---|---|---|---|
 | Spartan-3E | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser and local |
-| Spartan-6 | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, local; not yet in the browser (#2103) |
+| Spartan-6 | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser (the Silinx engine, #2103) and local |
 | iCE40 | `synth_ice40` | nextpnr | `icepack` | PCF | Planned first (#2295) |
 | ECP5, MachXO2 | `synth_ecp5`, to be defined | nextpnr | `ecppack`, Project Trellis | LPF | Planned (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel | `gowin_pack` (Python: the browser's path is to be decided) | CST | Planned (#2303) |

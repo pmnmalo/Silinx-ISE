@@ -154,7 +154,7 @@ localmente (Forma 2), precisam de até mais duas coisas. O seu professor pode j�
 
 1. **Para as placas Basys2 e Nexys2, nada:** a *toolchain Silinx*, o modo por omissão, sintetiza e
    gera o bitstream sem nenhuma ferramenta Xilinx. **As placas Spartan-6, a Nexys3 e a Atlys,
-   também**, com o Silinx a correr localmente (ainda não no browser); a Atlys não tem display de sete
+   também**, no browser e com o Silinx a correr localmente; a Atlys não tem display de sete
    segmentos nem VGA próprios, e o Silinx põe-nos no seu conector VHDCI (como os liga uma Digilent
    VmodBB). Para as outras placas (ou os processos que
    precisam do ISE), o **Xilinx ISE 14.7** (licença WebPACK gratuita); em qualquer computador corre

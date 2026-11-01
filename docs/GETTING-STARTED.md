@@ -149,7 +149,7 @@ In the browser (Way 1) nothing more is needed for the Basys2 and Nexys2. Running
 
 1. **For the Basys2 and Nexys2 boards, nothing:** the *Silinx toolchain*, the default mode,
    synthesizes and generates the bitstream with no Xilinx tool. **The Spartan-6 boards, the Nexys3 and the
-   Atlys, too**, with Silinx running locally (not yet in the browser); the Atlys has no seven-segment
+   Atlys, too**, in the browser and with Silinx running locally; the Atlys has no seven-segment
    display or VGA of its own, so Silinx puts them on its VHDCI connector (as a Digilent VmodBB wires
    them). For the other boards (or the
    processes that need ISE), **Xilinx ISE 14.7** (free WebPACK licence); on any computer it runs

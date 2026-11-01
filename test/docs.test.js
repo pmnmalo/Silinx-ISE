@@ -199,11 +199,11 @@ test('docs: the boards the Silinx toolchain supports are the ones the code suppo
   assert.match(read('docs/GETTING-STARTED.md'), /For the Basys2 and Nexys2 boards, nothing/);
   assert.match(read('docs/COMECAR.md'), /Para as placas Basys2 e Nexys2, nada/);
   // the Spartan-6 boards (#732), both languages
-  assert.match(read('docs/GETTING-STARTED.md'), /\*\*The Spartan-6 boards, the Nexys3 and the\s+Atlys, too\*\*, with Silinx running locally \(not yet in the browser\)/);
-  assert.match(read('docs/COMECAR.md'), /\*\*As placas Spartan-6, a Nexys3 e a Atlys,\s+também\*\*, com o Silinx a correr localmente \(ainda não no browser\)/);
-  // the Spartan-6 boards (#732: no developer flag), not in the browser edition yet, which is said so
+  assert.match(read('docs/GETTING-STARTED.md'), /\*\*The Spartan-6 boards, the Nexys3 and the\s+Atlys, too\*\*, in the browser and with Silinx running locally;/);
+  assert.match(read('docs/COMECAR.md'), /\*\*As placas Spartan-6, a Nexys3 e a Atlys,\s+também\*\*, no browser e com o Silinx a correr localmente;/);
+  // the Spartan-6 boards (#732: no developer flag), in the browser edition too (#2103), which is said so
   assert.deepEqual(SUPPORTED.filter(b => ['nexys3', 'atlys'].includes(b.board)).map(b => b.name), ['Nexys3', 'Atlys']);
-  assert.match(section, /the \*\*Nexys3 and the Atlys\*\* [^.]*not yet in the browser edition/);
+  assert.match(section, /the \*\*Nexys3 and the Atlys\*\* [^.]*and in the browser edition with the Silinx engine \(#2103\)/);
 });
 
 test('docs test: the interface\'s labels are read past comments with quotes in them (#127)', () => {

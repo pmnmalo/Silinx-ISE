@@ -292,6 +292,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
     // a diagram / table top: its document and its synchronized HDL module 'top'
     const top = topType.value !== 'hdl' && tplSel.value === 'empty' ? await createTopSource(pj.name, topType.value, langSel.value) : null;
     await app.openProject(pj.name);
+    if (api.standalone && tplSel.value !== 'empty') await app.boardUcf();   // (the chosen board's pins, as the server's, #2430)
     app.showLeftPage('design');
     if (top) {
       const fresh = await api.project(pj.name);

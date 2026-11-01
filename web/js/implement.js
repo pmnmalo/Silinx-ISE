@@ -179,6 +179,16 @@ export async function regenerateUcf(board = projectBoard()) {
   log(`${pj.constraints} regenerated for ${board.name}: ${matched.join(', ') || 'no ports matched'}${unmatched.length ? `; NOT assigned (use I/O Pin Planning): ${unmatched.join(', ')}` : ''}`, unmatched.length ? 'warn' : 'ok');
   return unmatched.length === 0;
 }
+/** The UCF of a new project from an example on another board (the browser edition; the server writes it, #36): made
+ *  from the board's pin table when its pins are not on the board (#2430). */
+export async function boardUcf() {
+  const pj = S.project, board = projectBoard(pj);
+  if (!board || !pj.top || !pj.constraints || !S.fileTree.includes(pj.constraints)) return false;
+  const { parseUcf, locsNotOnBoard } = await import('/packages/silinx-fpga/src/parts.js');
+  let bad = [];
+  try { bad = locsNotOnBoard(parseUcf(await api.readFile(pj.name, pj.constraints), { ports: topUcfPorts() }).assignments, board); } catch { return false; }
+  return bad.length ? regenerateUcf(board) : false;
+}
 export async function runImpl(mod, steps, opts = {}) {
   // one ISE run at a time (one build directory): checked and taken before any await
   if (S.busy) { toast('An implementation is already running (use Stop to cancel it)', 'error'); return false; }

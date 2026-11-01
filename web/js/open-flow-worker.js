@@ -4,12 +4,12 @@
 // assets/ folder; web/js/open-flow-browser.js chooses it).
 //   in:  { spec, sources: [{ path, lang, text }], simSources (the test benches), ucf, ucfName, files: { name: text }, assets, yosys (its bundle's URL) }
 //   out: { line } … { write: name, data } … { report } … then { done: { ok, report, error, view } }
-//   in:  { prepare: { graph, device, pkg, nextpnr }, assets, yosys, nextpnr, root }: what a run of that device fetches
+//   in:  { prepare: { graph, part, family, device, pkg, nextpnr }, assets, yosys, nextpnr, root }: what a run of that device fetches
 //        (nextpnr and the device's chip database too when prepare.nextpnr: the project's engine is not Silinx's, #2136),
 //        fetched into Cache Storage (web/js/asset-cache.js, #967), this edition's other versions deleted from it
 //   out: { done: { fetched, bytes, pruned } }
 import { runOpenFlow } from '/core/flow-ide.js';
-import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, nextpnrIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
+import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
 import { workerIo } from './open-flow-worker-io.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
@@ -44,11 +44,19 @@ async function prepare({ prepare: d, assets, yosys, nextpnr, root }) {
   const base = new URL(assets);
   // (this version's nextpnr kept, its gen/ and chipdb/, whatever this project's engine)
   const pruned = await pruneAssetCache(root, [base.href, new URL('.', yosys).href, ...(nextpnr ? [new URL('..', nextpnr).href] : [])]);
-  const urls = [new URL(`devices/${d.graph}`, base), ...Object.values(dbFileNames(d.device, d.pkg)).map(f => new URL(`bitdb/${f}`, base)),
+  const urls = [new URL(`devices/${d.graph}`, base), ...dbUrls(d, base),
     ...YOSYS_FILES.map(f => new URL(f, yosys)),
     ...(nextpnr && d.nextpnr ? [...NEXTPNR_FILES, nextpnrChipdb(d.device)].map(f => new URL(f, nextpnr)) : [])];
   return { ...await prefetchAssets(urls, { fetchFn: netFetch }), pruned };
 }
+// a device's bit database files: the Spartan-3E's in bitdb/, the Spartan-6's in bitdb/s6 (#2103)
+const dbUrls = (d, base) => (d.family === 'spartan6' ? s6DbNames(d.part).map(n => new URL(`bitdb/s6/${n}.json`, base))
+  : Object.values(dbFileNames(d.device, d.pkg)).map(f => new URL(`bitdb/${f}`, base)));
+// the Spartan-6's bit databases (fpga/s6/bitdb.js fetchBitDbS6: the same object as the server's loadBitDbS6)
+const fetchS6Db = (part, base) => fetchBitDbS6(part, async f => {
+  const r = await fetch(new URL(`bitdb/s6/${f}`, base));
+  return r.ok ? r.json() : null;
+});
 // the last device description and bit database loaded (1.6-2.5 MB gzipped): the next run of the same
 // device uses them again (the flow does not change them) instead of fetching and parsing them anew
 let lastDevice = null;   // { key, device, db }
@@ -79,20 +87,26 @@ self.onmessage = async ({ data }) => {
   try {
     const base = new URL(assets);
     // what the flow needs, fetched before it starts (it reads them synchronously)
-    const key = [base.href, spec.graph, spec.device, spec.pkg, spec.part].join('|');
+    const key = [base.href, spec.family, spec.graph, spec.device, spec.pkg, spec.part].join('|');
     if (lastDevice?.key !== key) {
       lastDevice = null;
       post({ line: `Loading the device description of ${spec.part} and its bit database…` });
       const graph = await gunzipJson(await fetchOk(new URL(`devices/${spec.graph}`, base), 'the device description'));
       const dev = loadDevice(graph);
-      const names = dbFileNames(spec.device, spec.pkg);
-      const json = {};
-      await Promise.all(Object.entries(names).map(async ([k, f]) => {
-        const r = await fetch(new URL(`bitdb/${f}`, base));
-        json[k] = r.ok ? await r.json() : null;
-      }));
-      if (!json.layout || !json.tiles) throw new Error(`no bit database for ${spec.device} on the site`);
-      lastDevice = { key, device: dev, db: makeBitDb(dbFilesFrom(json, spec.pkg), dev, spec.part) };
+      if (spec.family === 'spartan6') {
+        const db = await fetchS6Db(spec.part, base);
+        if (!db.slices.lut || !db.iob) throw new Error(`no bit database for ${spec.device} on the site`);
+        lastDevice = { key, device: dev, db };
+      } else {
+        const names = dbFileNames(spec.device, spec.pkg);
+        const json = {};
+        await Promise.all(Object.entries(names).map(async ([k, f]) => {
+          const r = await fetch(new URL(`bitdb/${f}`, base));
+          json[k] = r.ok ? await r.json() : null;
+        }));
+        if (!json.layout || !json.tiles) throw new Error(`no bit database for ${spec.device} on the site`);
+        lastDevice = { key, device: dev, db: makeBitDb(dbFilesFrom(json, spec.pkg), dev, spec.part) };
+      }
     }
     const { device, db } = lastDevice;
     // Yosys, compiled to WebAssembly (YoWASP): fetched once, then kept in Cache Storage (#967); in workers of
