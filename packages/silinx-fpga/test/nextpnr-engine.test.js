@@ -9,8 +9,10 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { main } from '../src/cli.js';
-import { engineOf, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
+import { engineOf, lowerRam64, nextpnrNetlist, nextpnrTries, NEXTPNR_CELL, NEXTPNR_TRIES } from '../src/open-flow-nextpnr.js';
 import { parseXdl } from '../src/xdl.js';
+import { readYosysJson } from '../src/fpga/netlist.js';
+import { compareSims } from './fpga-sim.js';
 import { loadDeviceCache, findDeviceGraph } from '../src/fpga/device-node.js';
 import { loadDb } from '../src/fpga/bitdb-node.js';
 import { runFlow } from '../src/open-flow-core.js';
@@ -53,15 +55,15 @@ test('nextpnrNetlist: what the micro-architecture cannot implement yet is named'
   // a cell it does not have; constants, carry chains and wide multiplexers are the micro-architecture's own (#2135)
   const json = JSON.parse(gates());
   const cells = cellsOf(json);
-  cells.ram = { type: 'RAM64X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
+  cells.ram = { type: 'RAM128X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
   cells.carry = { type: 'MUXCY', connections: { S: [12], DI: ['0'], CI: ['1'], O: [14] }, port_directions: { S: 'input', DI: 'input', CI: 'input', O: 'output' } };
   cells['$abc$20424$lut$aiger$o0'].connections.I3 = ['1'];
-  assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) RAM64X1S: not in the spartan3e micro-architecture yet']);
+  assert.deepEqual(nextpnrNetlist(JSON.stringify(json), 'gates', ucf()).problems, ['1 cell(s) RAM128X1S: not in the spartan3e micro-architecture yet']);
 });
 
 test('NEXTPNR_CELL: the rising-edge flip-flops, the carry chains, the wide multiplexers, the constants, the buffers, the IOBs\' DDR registers, the block RAMs and multipliers; not a falling edge, a latch, a distributed RAM', () => {
   for (const t of ['LUT1', 'LUT4', 'INV', 'FD', 'FDE', 'FDRE', 'FDSE', 'FDCE', 'FDPE', 'MUXCY', 'XORCY', 'MUXF5', 'MUXF6', 'MUXF7', 'MUXF8', 'GND', 'VCC', 'IBUF', 'IBUFG', 'OBUF', 'OBUFT', 'IOBUF', 'IDDR2', 'ODDR2', 'BUFG', 'DCM', 'DCM_SP', 'RAM16X1S', 'RAM16X1D', 'RAM32X1S', 'SRL16', 'SRL16E', 'SRLC16E', 'SRL16E_1', 'RAMB16_S1', 'RAMB16_S9', 'RAMB16_S18_S18', 'RAMB16_S36_S9', 'MULT18X18', 'MULT18X18S', 'MULT18X18SIO']) assert.ok(NEXTPNR_CELL.test(t), t);
-  for (const t of ['LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'RAMB16_S3', 'MULT18X18SX', 'OBUFDS', 'BUFGMUX']) assert.ok(!NEXTPNR_CELL.test(t), t);
+  for (const t of ['RAM64X1S', 'LUT5', 'FDRE_1', 'LDCE', 'MUXF9', 'RAMB16_S3', 'MULT18X18SX', 'OBUFDS', 'BUFGMUX']) assert.ok(!NEXTPNR_CELL.test(t), t);
 });
 
 test('#2136 the gates example built with --engine nextpnr: no warnings, its pads, the routing checked, a complete bitstream', { timeout: 300000 }, async () => {
@@ -86,10 +88,10 @@ test('#2136 the gates example built with --engine nextpnr: no warnings, its pads
   assert.equal(fs.statSync(path.join(dir, 'gates.bit')).size, 169288);
 });
 
-test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM64X1S): Map fails, naming them (exit 1)', { timeout: 300000 }, async () => {
+test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM128X1S): Map fails, naming them (exit 1)', { timeout: 300000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
   const json = JSON.parse(gates());
-  cellsOf(json).ram = { type: 'RAM64X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
+  cellsOf(json).ram = { type: 'RAM128X1S', connections: { A0: [12], A1: [8], A2: [9], A3: [9], D: [8], WE: [9], WCLK: [9], O: [13] }, port_directions: { A0: 'input', A1: 'input', A2: 'input', A3: 'input', D: 'input', WE: 'input', WCLK: 'input', O: 'output' } };
   fs.writeFileSync(path.join(dir, 'gates.json'), JSON.stringify(json));
   fs.writeFileSync(path.join(dir, 'gates.ucf'), ucf());
   const out = [], err = [];
@@ -101,7 +103,7 @@ test('#2136 --engine nextpnr on a netlist with cells it does not have yet (a RAM
     'silinx-fpga: the nextpnr engine cannot implement this design yet: 1 problem(s)',
   ]);
   // (the problems and the hint: the log's, after the error)
-  const at = out.indexOf('  1 cell(s) RAM64X1S: not in the spartan3e micro-architecture yet');
+  const at = out.indexOf('  1 cell(s) RAM128X1S: not in the spartan3e micro-architecture yet');
   assert.ok(at > 0, out.join('\n'));
   assert.equal(out[at + 1], 'Choose the Silinx engine (Toolchain Settings): nextpnr\'s Spartan-3E is growing (#2135).');
   assert.ok(!fs.existsSync(path.join(dir, 'gates.bit')));
@@ -302,6 +304,72 @@ test('#2191 a shift register read at its last stage into several others (only on
   assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
   const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
   assert.equal(design.insts.reduce((n, i) => n + i.cfg.filter(c => /^#RAM/.test(c.value)).length, 0), 9);
+});
+
+test('#2218 nextpnrNetlist: a RAM64X1S as two RAM32X1S and a LUT, as Silinx\'s packer lowers it; each address reads its INIT', () => {
+  const { json, problems } = nextpnrNetlist(fs.readFileSync(fixture('ram64.json'), 'utf8'), 'ram64', fs.readFileSync(fixture('ram64.ucf'), 'utf8'));
+  assert.deepEqual(problems, []);
+  const c = cellsOf(json);
+  assert.equal(c.u_ram, undefined);
+  assert.deepEqual([c.u_ram_lo.type, c.u_ram_hi.type, c.u_ram_we0.type, c.u_ram_we1.type, c.u_ram_mux.type], ['RAM32X1S', 'RAM32X1S', 'LUT2', 'LUT2', 'LUT3']);
+  // the contents against the INIT, 0x0123456789ABCDEF, each word its own half
+  assert.equal(BigInt(`0b${c.u_ram_hi.parameters.INIT}`), 0x01234567n);
+  assert.equal(BigInt(`0b${c.u_ram_lo.parameters.INIT}`), 0x89ABCDEFn);
+  // the write enables: WE and A5 low for the low word, WE and A5 high for the high one; the output chosen by A5
+  const lut = (cell, ...inputs) => cell.parameters.INIT[cell.parameters.INIT.length - 1 - inputs.reduce((n, b, i) => n + (b << i), 0)];
+  for (const [we, a5, lo, hi] of [[0, 0, '0', '0'], [0, 1, '0', '0'], [1, 0, '1', '0'], [1, 1, '0', '1']]) assert.deepEqual([lut(c.u_ram_we0, we, a5), lut(c.u_ram_we1, we, a5)], [lo, hi]);
+  for (const [o0, o1, a5] of [[0, 1, 0], [1, 0, 0], [0, 1, 1], [1, 0, 1]]) assert.equal(lut(c.u_ram_mux, o0, o1, a5), String(a5 ? o1 : o0));
+  // new nets, none shared with another bit of the design; the pins kept
+  assert.deepEqual(c.u_ram_mux.connections.O, JSON.parse(fs.readFileSync(fixture('ram64.json'), 'utf8')).modules.ram64.cells.u_ram.connections.O);
+  assert.deepEqual(c.u_ram_lo.connections.WE, c.u_ram_we0.connections.O);
+  assert.deepEqual(c.u_ram_hi.connections.WE, c.u_ram_we1.connections.O);
+  assert.notDeepEqual(c.u_ram_lo.connections.O, c.u_ram_hi.connections.O);
+});
+
+test('#2218 lowerRam64: a short INIT padded with zeros, an INIT missing all zeros, an unconnected pin undriven', () => {
+  const mod = { ports: {}, netnames: {}, cells: {
+    a: { type: 'RAM64X1S', parameters: { INIT: '101' }, connections: { A0: [1], A5: [2], D: [3], WE: [4], WCLK: [5], O: [6] } },
+    b: { type: 'RAM64X1S', connections: { A5: ['0'], O: [7] } } } };
+  lowerRam64(mod);
+  assert.equal(mod.cells.a_lo.parameters.INIT, '101'.padStart(32, '0'));
+  assert.equal(mod.cells.a_hi.parameters.INIT, '0'.repeat(32));
+  assert.equal(mod.cells.b_lo.parameters.INIT, '0'.repeat(32));
+  assert.deepEqual(mod.cells.a_lo.connections.A1, ['x']);
+  assert.deepEqual(mod.cells.b_we0.connections.I1, ['0']);
+  const made = Object.values(mod.cells).flatMap(c => c.connections.O), numbers = made.flat();
+  assert.equal(new Set(numbers).size, numbers.length);   // one driver per net
+});
+
+test('#2218 a RAM64X1S built with --engine nextpnr: no warnings, its PERIOD met, a complete bitstream; the XDL behaves as the RAM64X1S', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fileURLToPath(fixture('ram64.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('ram64.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of 4 input LUTs: 7 out of 4896 0%'), out.join('\n'));
+  assert.ok(out.includes('  Number of occupied Slices: 4 out of 2448 0%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  // against the netlist's RAM64X1S itself (fpga-sim.js, not the lowering): the routed XDL read as the packed design it simulates
+  const asPacked = text => {
+    const d = parseXdl(text), at = new Map(d.insts.map((i, k) => [i.name, k]));
+    for (const i of d.insts) {
+      if (/^(IOB|IBUF)$/.test(i.type)) Object.assign(i, { kind: 'iob', dir: i.type === 'IBUF' ? 'in' : 'out' });
+      else if (/^SLICE/.test(i.type)) i.kind = 'slice';
+      else if (/BUFG/.test(i.type)) i.kind = 'bufg';
+    }
+    for (const n of d.nets) for (const q of [...n.inpins, ...n.outpins]) q.inst = at.get(q.inst);
+    return d;
+  };
+  const netlist = readYosysJson(fs.readFileSync(fixture('ram64.json'), 'utf8'));
+  const text = fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8');
+  assert.equal(compareSims(netlist, asPacked(text), { cycles: 5000 }), null);
+  // each half's contents wrong: caught
+  for (const [from, to] of [['D=0x89AB', 'D=0x89AA'], ['D=0x4567', 'D=0x4566']]) {
+    assert.ok(text.includes(from), from);
+    assert.notEqual(compareSims(netlist, asPacked(text.replace(from, to)), { cycles: 5000 }), null, from);
+  }
 });
 
 test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its global buffer; an INST LOC as the DCM\'s BEL, a wrong site refused', () => {

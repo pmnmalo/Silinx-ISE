@@ -17,11 +17,12 @@ import { nextpnrToXdl, xdlSize } from './fpga/nextpnr-xdl.js';
 import { dcmPeriodFactor, dcmSettings } from './fpga/nextpnr-dcm.js';
 import { parityToData } from './fpga/pack-bram.js';
 import { BRAM_TYPE, MULT_TYPE } from './fpga/pack.js';
+import { paramBits } from './fpga/netlist.js';
 
 /** The netlist's cells the spartan3e micro-architecture packs (its spartan3e.cc pack()): LUTs, INV, the flip-flops of
  *  the rising edge (FD, FDE, FDR, FDRE, FDS, FDSE, FDC, FDCE, FDP, FDPE), the carry chains (MUXCY, XORCY), the wide
  *  multiplexers, the constants (GND, VCC), the I/O buffers, the IOBs' DDR registers (IDDR2, ODDR2), BUFG, the DCMs, the block RAMs,
- *  the multipliers (not chained), the distributed RAMs and the shift registers. */
+ *  the multipliers (not chained), the distributed RAMs and the shift registers. (A RAM64X1S: lowerRam64's.) */
 export const NEXTPNR_CELL = /^(LUT[1-4]|INV|FD[RSCP]?E?|MUXCY|XORCY|MUXF[5-8]|GND|VCC|IBUF|IBUFG|OBUF|OBUFT|IOBUF|IDDR2|ODDR2|BUFG|DCM|DCM_SP|RAMB16_S(1|2|4|9|18|36)(_S(1|2|4|9|18|36))?|MULT18X18(S|SIO)?|RAM16X1[SD]|RAM32X1S|SRLC?16E?(_1)?)$/;
 
 /**
@@ -36,6 +37,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   const json = JSON.parse(text);
   const [name, mod] = Object.entries(json.modules).find(([, m]) => m.attributes?.top) || [top, json.modules[top]];
   const problems = [];
+  lowerRam64(mod);
   const types = new Map();
   for (const c of Object.values(mod.cells)) if (!NEXTPNR_CELL.test(c.type)) types.set(c.type, (types.get(c.type) || 0) + 1);
   for (const [t, n] of types) problems.push(`${n} cell(s) ${t}: not in the spartan3e micro-architecture yet`);
@@ -125,6 +127,38 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   const sdc = clockNets.filter(([n]) => n).map(([n, period]) => `create_clock -period ${period} [get_nets {${n}}]\n`).join('');
   json.modules = { [name]: mod };
   return { json, problems, sdc };
+}
+
+/**
+ * Each RAM64X1S as Silinx's packer lowers it (pack-prep.js, #2218): two RAM32X1S (addresses 0-31 and 32-63, each written
+ * when WE and A5 select it) and a 3-input LUT choosing the read word by A5. In place.
+ */
+export function lowerRam64(mod) {
+  const bits = Object.values(mod.ports).flatMap(p => p.bits)
+    .concat(Object.values(mod.cells).flatMap(c => Object.values(c.connections || {}).flat()), Object.values(mod.netnames || {}).flatMap(n => n.bits));
+  let last = Math.max(0, ...bits.filter(b => typeof b === 'number'));
+  for (const [name, c] of Object.entries(mod.cells)) {
+    if (c.type !== 'RAM64X1S') continue;
+    delete mod.cells[name];
+    const pin = p => c.connections[p] || ['x'];
+    const addNet = n => { const b = ++last; if (mod.netnames) mod.netnames[n] = { hide_name: 1, bits: [b], attributes: {} }; return [b]; };
+    const addCell = (n, type, parameters, connections) => {
+      const port_directions = Object.fromEntries(Object.keys(connections).map(p => [p, p === 'O' ? 'output' : 'input']));
+      mod.cells[n] = { hide_name: 1, type, parameters, attributes: {}, port_directions, connections };
+    };
+    const init = paramBits(c.parameters?.INIT) || [];
+    const half = h => init.slice(32 * h, 32 * h + 32).concat(new Array(32).fill(0)).slice(0, 32).reverse().join('');
+    const weLo = addNet(`${name}_we0`), weHi = addNet(`${name}_we1`), oLo = addNet(`${name}_o0`), oHi = addNet(`${name}_o1`);
+    // LUT INIT strings, most significant bit first (I0 = bit 0 of the index)
+    addCell(`${name}_we0`, 'LUT2', { INIT: '0010' }, { I0: pin('WE'), I1: pin('A5'), O: weLo });
+    addCell(`${name}_we1`, 'LUT2', { INIT: '1000' }, { I0: pin('WE'), I1: pin('A5'), O: weHi });
+    for (const [h, we, o] of [[0, weLo, oLo], [1, weHi, oHi]]) {
+      const parameters = { INIT: half(h), ...(c.parameters?.IS_WCLK_INVERTED !== undefined ? { IS_WCLK_INVERTED: c.parameters.IS_WCLK_INVERTED } : {}) };
+      addCell(`${name}_${h ? 'hi' : 'lo'}`, 'RAM32X1S', parameters,
+        { A0: pin('A0'), A1: pin('A1'), A2: pin('A2'), A3: pin('A3'), A4: pin('A4'), D: pin('D'), WCLK: pin('WCLK'), WE: we, O: o });
+    }
+    addCell(`${name}_mux`, 'LUT3', { INIT: '11001010' }, { I0: oLo, I1: oHi, I2: pin('A5'), O: pin('O') });
+  }
 }
 
 /**

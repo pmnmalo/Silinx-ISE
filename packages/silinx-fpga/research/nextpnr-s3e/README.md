@@ -125,7 +125,7 @@ FXUSED settings as Silinx's packer; the routing check and `xdl-sim-check.mjs --r
 cascade, four SRLC16E through Q15, an SRL16E_1; its constraints `test/fixtures/nextpnr-engine/slicemem.ucf`. With nextpnr-spartan v0.9.1
 (2026-10-30): the settings of each memory slice those of Silinx's packer (which of a pair takes G apart); the routing check and
 `xdl-sim-check.mjs --random-inputs` passed; ISE's `drc` 0 errors and 0 warnings, its `bitgen`'s `.bit` (CRC on and off) byte-identical. A
-RAM64X1S is refused at Map (Silinx's packer makes it two RAM32X1S).
+RAM64X1S (`ram64.v`, #2218) is lowered in the flow's netlist to two RAM32X1S and a LUT, as Silinx's packer does (`lowerRam64`).
 
 ## Flip-flops alone in the carry chains' slices (#2223)
 

@@ -1,0 +1,477 @@
+{
+ "modules": {
+  "ram64": {
+   "attributes": {
+    "top": "00000000000000000000000000000001",
+    "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:2.1-19.10"
+   },
+   "ports": {
+    "clk": {
+     "direction": "input",
+     "bits": [
+      2
+     ]
+    },
+    "sw": {
+     "direction": "input",
+     "bits": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ]
+    },
+    "led": {
+     "direction": "output",
+     "bits": [
+      11,
+      12
+     ]
+    }
+   },
+   "cells": {
+    "u_a0": {
+     "hide_name": 0,
+     "type": "IBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:7.8-7.34"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       3
+      ],
+      "O": [
+       13
+      ]
+     }
+    },
+    "u_a1": {
+     "hide_name": 0,
+     "type": "IBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:8.8-8.34"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       4
+      ],
+      "O": [
+       14
+      ]
+     }
+    },
+    "u_a2": {
+     "hide_name": 0,
+     "type": "IBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:9.8-9.34"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       5
+      ],
+      "O": [
+       15
+      ]
+     }
+    },
+    "u_a3": {
+     "hide_name": 0,
+     "type": "IBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:10.8-10.34"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       6
+      ],
+      "O": [
+       16
+      ]
+     }
+    },
+    "u_a4": {
+     "hide_name": 0,
+     "type": "IBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:11.8-11.34"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       7
+      ],
+      "O": [
+       17
+      ]
+     }
+    },
+    "u_a5": {
+     "hide_name": 0,
+     "type": "IBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:12.8-12.34"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       8
+      ],
+      "O": [
+       18
+      ]
+     }
+    },
+    "u_b": {
+     "hide_name": 0,
+     "type": "BUFG",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:6.8-6.29"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       19
+      ],
+      "O": [
+       20
+      ]
+     }
+    },
+    "u_clk": {
+     "hide_name": 0,
+     "type": "IBUFG",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:5.9-5.33"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       2
+      ],
+      "O": [
+       19
+      ]
+     }
+    },
+    "u_d": {
+     "hide_name": 0,
+     "type": "IBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:13.8-13.30"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       9
+      ],
+      "O": [
+       21
+      ]
+     }
+    },
+    "u_l0": {
+     "hide_name": 0,
+     "type": "OBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:17.8-17.32"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       22
+      ],
+      "O": [
+       11
+      ]
+     }
+    },
+    "u_l1": {
+     "hide_name": 0,
+     "type": "OBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:18.8-18.32"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       23
+      ],
+      "O": [
+       12
+      ]
+     }
+    },
+    "u_q": {
+     "hide_name": 0,
+     "type": "FD",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:16.6-16.32"
+     },
+     "port_directions": {
+      "C": "input",
+      "D": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "C": [
+       20
+      ],
+      "D": [
+       22
+      ],
+      "Q": [
+       23
+      ]
+     }
+    },
+    "u_ram": {
+     "hide_name": 0,
+     "type": "RAM64X1S",
+     "parameters": {
+      "INIT": "0000000100100011010001010110011110001001101010111100110111101111"
+     },
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:15.43-15.149"
+     },
+     "port_directions": {
+      "A0": "input",
+      "A1": "input",
+      "A2": "input",
+      "A3": "input",
+      "A4": "input",
+      "A5": "input",
+      "D": "input",
+      "O": "output",
+      "WCLK": "input",
+      "WE": "input"
+     },
+     "connections": {
+      "A0": [
+       13
+      ],
+      "A1": [
+       14
+      ],
+      "A2": [
+       15
+      ],
+      "A3": [
+       16
+      ],
+      "A4": [
+       17
+      ],
+      "A5": [
+       18
+      ],
+      "D": [
+       21
+      ],
+      "O": [
+       22
+      ],
+      "WCLK": [
+       20
+      ],
+      "WE": [
+       24
+      ]
+     }
+    },
+    "u_we": {
+     "hide_name": 0,
+     "type": "IBUF",
+     "parameters": {},
+     "attributes": {
+      "module_not_derived": "00000000000000000000000000000001",
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:14.8-14.32"
+     },
+     "port_directions": {
+      "I": "input",
+      "O": "output"
+     },
+     "connections": {
+      "I": [
+       10
+      ],
+      "O": [
+       24
+      ]
+     }
+    }
+   },
+   "netnames": {
+    "a": {
+     "hide_name": 0,
+     "bits": [
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:4.14-4.15"
+     }
+    },
+    "ck": {
+     "hide_name": 0,
+     "bits": [
+      20
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:3.8-3.10"
+     }
+    },
+    "ckb": {
+     "hide_name": 0,
+     "bits": [
+      19
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:3.12-3.15"
+     }
+    },
+    "clk": {
+     "hide_name": 0,
+     "bits": [
+      2
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:2.21-2.24"
+     }
+    },
+    "d": {
+     "hide_name": 0,
+     "bits": [
+      21
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:3.21-3.22"
+     }
+    },
+    "led": {
+     "hide_name": 0,
+     "bits": [
+      11,
+      12
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:2.55-2.58"
+     }
+    },
+    "o": {
+     "hide_name": 0,
+     "bits": [
+      22
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:3.24-3.25"
+     }
+    },
+    "q": {
+     "hide_name": 0,
+     "bits": [
+      23
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:3.27-3.28"
+     }
+    },
+    "sw": {
+     "hide_name": 0,
+     "bits": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:2.38-2.40"
+     }
+    },
+    "we": {
+     "hide_name": 0,
+     "bits": [
+      24
+     ],
+     "attributes": {
+      "src": "packages/silinx-fpga/research/nextpnr-s3e/ram64.v:3.17-3.19"
+     }
+    }
+   }
+  }
+ }
+}
