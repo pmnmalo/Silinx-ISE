@@ -1,5 +1,5 @@
 // SSim's colours (#405: out of mountISim in isim.js): the wave window's and the names' colours and fonts read from
-// the theme's variables (web/css/modern.css and the ISE style theme), again when the theme changes.
+// the theme's variables (web/css/silinx.css and the ISE style theme), again when the theme changes.
 
 /** { readColors } of mountISim (setColors(v): the colours read, kept by the window). */
 export function mountColors(ctx) {
@@ -18,7 +18,7 @@ export function mountColors(ctx) {
       accent: g('--accent', '#316ac5'), accentFg: g('--accent-fg', '#fff'), border: g('--border', '#a0a0a0'),
       borderLight: g('--border-light', '#d4d0c8'), fgText: g('--fg', '#000'), muted: g('--muted', '#6d6d6d'),
       header: g('--bg', '#f0f0f0'),
-      // the header of the names and the time ruler (themes: web/css/modern.css)
+      // the header of the names and the time ruler (themes: web/css/silinx.css)
       head1: g('--wave-head-1', '#fbfbfb'), head2: g('--wave-head-2', '#e3e3e3'), rulerFg: g('--wave-ruler-fg', '#000'), rulerTick: g('--wave-ruler-tick', '#555'),
       font: g('--font', 'Tahoma, Arial, sans-serif'), mono: g('--mono', 'Consolas, monospace'),
     });

@@ -61,7 +61,7 @@ export const icons = {
   add: S('<path d="M8 2v12M2 8h12" stroke="#2a8a2a" stroke-width="2.4"/>'),
   remove: S('<path d="M2 8h12" stroke="#c22" stroke-width="2.4"/>'),
 
-  // the Silinx interface (web/css/modern.css): line icons in the text colour
+  // the Silinx interface (web/css/silinx.css): line icons in the text colour
   mHome: L('<path d="M3 10.5L12 3l9 7.5"/><path d="M5 9v11h5v-6h4v6h5V9"/>'),
   mDesign: L('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h4a2.5 2.5 0 012.5 2.5v5"/>'),
   mFiles: L('<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),

@@ -2,7 +2,7 @@
 // The ids of before (modern, classic) are still accepted for a transition, mapped to theirs with a warning, so a
 // command of before does not silently test the other interface. test/ui/harness.js normalises the variable on load.
 export const UI_INTERFACES = ['silinx', 'ise'];
-// the ids before #2451 (web/js/modern.js LEGACY_INTERFACES)
+// the ids before #2451 (web/js/silinx.js LEGACY_INTERFACES)
 export const LEGACY_UI_INTERFACES = Object.freeze({ modern: 'silinx', classic: 'ise' });
 
 /** The interface id SILINX_UI_INTERFACE asks for ('' when unset); an old id mapped with a warning, an unknown one

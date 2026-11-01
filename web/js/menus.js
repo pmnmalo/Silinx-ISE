@@ -6,7 +6,7 @@ import { h, alertDlg, menuBar, toast, downloadText, runAction } from './ui.js';
 import * as wiz from './wizards.js';
 import { setLanguage, getLanguage, LOCALES } from './i18n.js';
 import { lintEnabled, setLintEnabled } from './diaghelp.js';
-import { INTERFACES, INTERFACE_NAMES, getInterface, setInterface, getTheme, setTheme, menuCommands } from './modern.js';
+import { INTERFACES, INTERFACE_NAMES, getInterface, setInterface, getTheme, setTheme, menuCommands } from './silinx.js';
 import { openPalette } from './palette.js';
 import { openFindInProject } from './find-project.js';
 import { developmentMenu } from './devmenu.js';

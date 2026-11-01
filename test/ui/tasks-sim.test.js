@@ -24,7 +24,7 @@ async function tasksInterface(page) {
 // what is shown: displayed, with a size
 const shown = (page, sel) => page.eval((s) => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0; }, sel);
 // the interface switched (View ▸ Interface)
-const setInterface = (page, ui) => page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
+const setInterface = (page, ui) => page.eval(async (u) => (await import('/js/silinx.js')).setInterface(u), ui);
 // no warnings: the page's console, the Warnings tab
 async function noWarnings(page) {
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
@@ -338,7 +338,7 @@ uiTest('#1353 #1391 Tasks ▸ Simulate: the model chosen in the wave window\'s t
   assert.equal((await g()).label, 'Modelo:');   // (its label, #1391)
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the ISE style interface: none
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
+  await page.eval(async () => (await import('/js/silinx.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.querySelectorAll('.isim-toolbar :is(.isim-model, .isim-model-field)').length), 0);
 }, { build: DEV, timeout: 300000 });

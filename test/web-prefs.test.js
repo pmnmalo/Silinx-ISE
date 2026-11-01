@@ -59,7 +59,7 @@ test('every localStorage key of web/js goes through prefKey (the projects\' own 
 test('the constants that name the settings\' keys are made by prefKey', () => {
   const src = (f) => fs.readFileSync(path.join(ROOT, 'web/js', f), 'utf8');
   const defs = {
-    'modern.js': ['UI_KEY', 'THEME_KEY'], 'narrow.js': ['DRAWER_KEY', 'PROPS_KEY', 'SYMBOLS_KEY'], 'i18n.js': ['KEY'], 'diaghelp.js': ['KEY'],
+    'silinx.js': ['UI_KEY', 'THEME_KEY'], 'narrow.js': ['DRAWER_KEY', 'PROPS_KEY', 'SYMBOLS_KEY'], 'i18n.js': ['KEY'], 'diaghelp.js': ['KEY'],
     'ink-dialog.js': ['SAMPLES_KEY'], 'emulator.js': ['HIDDEN_KEY'], 'tasks.js': ['TASKS_KEY'], 'wizards.js': ['UPDATE_CACHE', 'UPDATE_ON_START'],
   };
   for (const [f, names] of Object.entries(defs)) {
@@ -80,6 +80,6 @@ test('the constants that name the settings\' keys are made by prefKey', () => {
 
 // the modules that read the keys at load time, in Node: the stable edition's keys (no page under dev/)
 test('the key constants in Node (no page): the stable keys, unchanged', async () => {
-  const { UI_KEY, THEME_KEY } = await import('../web/js/modern.js');
+  const { UI_KEY, THEME_KEY } = await import('../web/js/silinx.js');
   assert.deepEqual([UI_KEY, THEME_KEY], ['silinx.ui', 'silinx.theme']);
 });

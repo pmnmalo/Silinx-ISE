@@ -170,7 +170,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - name: UI smoke test (headless Chrome)
-        run: node --test --test-concurrency=1 test/ui/modern.test.js test/ui/focus.test.js test/ui/synth-open.test.js
+        run: node --test --test-concurrency=1 test/ui/silinx.test.js test/ui/focus.test.js test/ui/synth-open.test.js
         timeout-minutes: 10
       - name: Release zip
         if: runner.os == 'macOS'

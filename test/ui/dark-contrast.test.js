@@ -74,7 +74,7 @@ async function themed(page, theme) {
   const skip = EXCEPTIONS.filter((x) => !x.theme || x.theme === theme).map((x) => x.skip).join(', ');
   const check = async (where) => {
     await tick(100);   // the transitions of the theme's colours
-    // (and every colour transition ended: a button just enabled is .12 s on its way, modern.css; measured halfway, #1274)
+    // (and every colour transition ended: a button just enabled is .12 s on its way, silinx.css; measured halfway, #1274)
     await page.waitFor(() => !document.getAnimations().some((x) => x.playState === 'running' && typeof CSSTransition !== 'undefined' && x instanceof CSSTransition), [], { what: 'the transitions ended' });
     for (const x of await page.eval((m, s) => window.__lowContrast(document.body, m, s), MIN, skip)) bad.push(`${where}: ${x.ratio} '${x.text}' (${x.tag}.${x.cls}: ${x.fg} on ${x.bg})`);
   };

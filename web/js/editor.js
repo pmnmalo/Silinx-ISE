@@ -139,7 +139,7 @@ function symbolsOf(parsed, lang) {
 }
 
 // ------------------------------------------------------------------ languages
-// the legacy modes' token names as classes (tok-*), coloured by web/css/app.css and modern.css
+// the legacy modes' token names as classes (tok-*), coloured by web/css/app.css and silinx.css
 const highlighter = tagHighlighter([
   { tag: tags.keyword, class: 'tok-keyword' },
   { tag: tags.standard(tags.variableName), class: 'tok-builtin' },

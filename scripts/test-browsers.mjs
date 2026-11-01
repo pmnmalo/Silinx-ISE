@@ -17,7 +17,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // ASM and FSM editors, SSim and the board emulator, projects from the examples, and Yosys
 // (WebAssembly in a Web Worker), the static editions under their Content-Security-Policy (#487), and a tablet
 // by touch (#1130: WebKit as an iPad's Safari)
-const CROSS_BROWSER = ['app', 'modern', 'editing', 'diagrams', 'fsm', 'focus', 'sim-emu', 'projects', 'synth-open', 'standalone', 'tablet']
+const CROSS_BROWSER = ['app', 'silinx', 'editing', 'diagrams', 'fsm', 'focus', 'sim-emu', 'projects', 'synth-open', 'standalone', 'tablet']
   .map((n) => `test/ui/${n}.test.js`);
 
 const args = process.argv.slice(2);

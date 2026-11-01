@@ -114,7 +114,7 @@ and the board's Platform Flash: in the browser over WebUSB, with Silinx's own JT
 
 ### The interface
 
-- **Two interfaces** over the same page (`web/js/modern.js`): the Silinx interface, the default, organised
+- **Two interfaces** over the same page (`web/js/silinx.js`): the Silinx interface, the default, organised
   around a lab session's tasks (`web/js/tasks.js`), and the ISE style interface, laid out as ISE's. The UI tests run in both.
 - **Portuguese**: every label has its translation (`web/js/i18n.js`), which a test checks.
 - **Narrow screens and tablets**: `web/js/narrow.js`; the pen and touch work in the editors and the handwriting pads.

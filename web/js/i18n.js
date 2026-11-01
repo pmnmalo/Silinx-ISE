@@ -378,7 +378,7 @@ const PT = {
   'Emulator': 'Emulador', 'Emulation': 'Emulação', 'Synthesis': 'Síntese', 'Messages from': 'Mensagens de', 'Command line': 'Linha de comandos',
   'Show it in the drawing': 'Mostrar no desenho',   // a schematic's Check's line in the console below (#993)
   'Type an SSim command (help)': 'Escreva um comando do SSim (help)', 'Type a command or a file name': 'Escreva um comando ou o nome de um ficheiro',
-  // the Silinx interface (web/js/modern.js, web/js/palette.js): View ▸ Interface / Theme, header, design flow, command palette
+  // the Silinx interface (web/js/silinx.js, web/js/palette.js): View ▸ Interface / Theme, header, design flow, command palette
   'Interface': 'Interface', 'ISE style': 'Estilo ISE',   // (Silinx: a proper name, the same, #2451)
   'Theme': 'Tema', 'System': 'Sistema', 'Light': 'Claro', 'Dark': 'Escuro', 'Command Palette…': 'Paleta de Comandos…',
   'Implement': 'Implementar', 'Emulate': 'Emular', 'Design flow': 'Fluxo de projeto',

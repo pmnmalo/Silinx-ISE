@@ -1,4 +1,4 @@
-/* The Tasks interface (#804, web/js/tasks.js): the Silinx look (modern.css, data-ui="silinx") with a
+/* The Tasks interface (#804, web/js/tasks.js): the Silinx look (silinx.css, data-ui="silinx") with a
    layout of its own under <html data-layout="tasks">: the task switcher in the header (the tab bar at
    the bottom of a narrow screen), the current task's documents only (data-task), the side panel and the
    messages folded or open (data-side, data-console), a maximized document (data-max). */
@@ -113,7 +113,7 @@ html[data-layout="tasks"][data-max="on"] :is(#left, #v-split, #h-split, #console
   html[data-layout="tasks"] #task-tabs .task-dot { position: absolute; top: 6px; right: calc(50% - 18px); }
   html[data-layout="tasks"] #task-tabs .lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 }
-/* (touch: targets of 40 px, --m-ctl-h, as every button: web/css/modern.css, #1409) */
+/* (touch: targets of 40 px, --m-ctl-h, as every button: web/css/silinx.css, #1409) */
 
 /* ------------------------------------------------------------------ the message centre in the Tasks interface (#798) */
 /* (its look in every interface: web/css/messages.css, #925) folded: the last line of the filter instead of the filters */

@@ -69,7 +69,7 @@ uiTest('#1210 #1501 Tasks ▸ Design: New Source and Import Source above the tre
   await page.click('#task-switch .task-btn[data-task="edit"]');
   assert.ok(await bar(page));
   // the ISE style interface: none
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
+  await page.eval(async () => (await import('/js/silinx.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-src-bar')), null);
   await noWarnings(page);

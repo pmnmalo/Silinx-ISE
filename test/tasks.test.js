@@ -217,7 +217,7 @@ test('tasks.css: its rules apply in the Tasks interface only (or to its own elem
 
 test('index.html: the Silinx interface (the Tasks one, #1149) before the first paint (data-ui silinx, data-layout tasks), its stylesheet', () => {
   const html = fs.readFileSync(path.join(ROOT, 'web/index.html'), 'utf8');
-  assert.match(html, /<link rel="stylesheet" href="\/css\/modern.css">\n<link rel="stylesheet" href="\/css\/tasks.css">/);
+  assert.match(html, /<link rel="stylesheet" href="\/css\/silinx.css">\n<link rel="stylesheet" href="\/css\/tasks.css">/);
   const script = html.slice(html.indexOf('<script>'), html.indexOf('</script>'));
   // run the early script with each kept interface: the attributes it puts on <html>
   const run = (ui, { pathname = '/', store = { 'silinx.ui': ui, 'silinx.theme': 'dark' } } = {}) => {
@@ -235,7 +235,7 @@ test('index.html: the Silinx interface (the Tasks one, #1149) before the first p
   const both = { 'silinx.ui': 'ise', 'silinx.theme': 'light', 'silinx.drawer': 'closed', 'silinx.dev.ui': 'silinx', 'silinx.dev.theme': 'dark' };
   assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: both }), silinx);
   assert.deepEqual(run(null, { pathname: '/Silinx-ISE/', store: both }), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'closed' });
-  // #2451 a preference saved with an old id: shown with its new one and stored so, once (web/js/modern.js LEGACY_INTERFACES)
+  // #2451 a preference saved with an old id: shown with its new one and stored so, once (web/js/silinx.js LEGACY_INTERFACES)
   const old = { 'silinx.ui': 'classic', 'silinx.dev.ui': 'modern', 'silinx.theme': 'dark', 'silinx.dev.theme': 'dark' };
   assert.deepEqual(run(null, { store: old }), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'open' });
   assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: old }), silinx);

@@ -39,7 +39,7 @@ uiTest('#2451 the menus name the interfaces Silinx and ISE style (Silinx, Estilo
   const first = await page.eval(() => document.documentElement.dataset.ui);
   const order = first === 'ise' ? ['ise', 'silinx'] : ['silinx', 'ise'];
   for (const ui of [...order, order[0]]) {
-    await page.eval(async (x) => (await import('/js/modern.js')).setInterface(x), ui);
+    await page.eval(async (x) => (await import('/js/silinx.js')).setInterface(x), ui);
     await page.waitFor((x) => document.documentElement.dataset.ui === x, [ui], { what: ui });
     for (const lang of ['en', 'pt']) {
       await setLanguage(lang);

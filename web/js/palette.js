@@ -1,8 +1,8 @@
 // Command palette (Ctrl+K / Cmd+K, Ctrl+Shift+P): search the menu commands and the project files by
-// name and run / open the chosen one, all from the keyboard. Matching: web/js/modern.js.
+// name and run / open the chosen one, all from the keyboard. Matching: web/js/silinx.js.
 import { h, runAction } from './ui.js';
 import { t } from './i18n.js';
-import { rankEntries } from './modern.js';
+import { rankEntries } from './silinx.js';
 
 let current = null;
 

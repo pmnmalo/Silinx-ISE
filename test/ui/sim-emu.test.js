@@ -438,7 +438,7 @@ uiTest('#918 board emulator: its status line whole at every window width (a row 
   const cut = [];
   // (the Silinx interface: the Tasks one, its Emulate, #1149)
   for (const ui of ['ise', 'silinx']) {
-    await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
+    await page.eval(async (u) => (await import('/js/silinx.js')).setInterface(u), ui);
     if (ui === 'silinx') { await page.waitFor(() => document.documentElement.dataset.layout === 'tasks'); await page.click('#task-switch .task-btn[data-task="emu"]'); }
     for (let w = 600; w <= 1920; w += 20) {
       await page.setViewport(w, 900);
@@ -457,7 +457,7 @@ uiTest('#918 board emulator: its status line whole at every window width (a row 
     }
   }
   assert.deepEqual(cut, [], 'the whole status line, inside the window, not covered');
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('silinx'));
+  await page.eval(async () => (await import('/js/silinx.js')).setInterface('silinx'));
   await page.setViewport(1366, 768);
 }, { timeout: 300000, build: { commit: 'abc1234', date: '2026-10-21 12:00' } });
 

@@ -108,9 +108,9 @@ uiTest('#1509 any other document prints a copy of what it shows (the Design Summ
     });
     await page.eval(() => window.SilinxApp.openFile('src/gates.sch.json'));
     await page.waitFor(() => window.Silinx.active?.schEditor && document.querySelector('.doc:not([hidden]) .se-svg [data-kind=sym]'), [], { what: 'the schematic' });
-    await page.eval(async () => (await import('/js/modern.js')).setTheme('light'));
+    await page.eval(async () => (await import('/js/silinx.js')).setTheme('light'));
     const light = await snapshot();
-    await page.eval(async () => (await import('/js/modern.js')).setTheme('dark'));
+    await page.eval(async () => (await import('/js/silinx.js')).setTheme('dark'));
     assert.equal(await page.eval(() => document.documentElement.dataset.theme), 'dark');
     assert.equal(await snapshot(), light, 'the same drawing in the dark theme');
     assert.equal(await page.eval(() => document.documentElement.dataset.theme), 'dark', 'the theme put back');
@@ -120,7 +120,7 @@ uiTest('#1509 any other document prints a copy of what it shows (the Design Summ
     await confirmPrint(page);
     html = await printed(page, 2);
     assert.match(html, /^<html data-ui="silinx" data-theme="light"/);
-    await page.eval(async () => (await import('/js/modern.js')).setTheme('system'));
+    await page.eval(async () => (await import('/js/silinx.js')).setTheme('system'));
   }
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
 });

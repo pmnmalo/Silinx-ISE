@@ -2,7 +2,7 @@
 // (follows the system, light or dark) and the command palette (Ctrl+K / Cmd+K): every menu command and every project
 // file, searched by name.
 //
-// The two interfaces share the same page and element ids (web/index.html): the Silinx one is web/css/modern.css,
+// The two interfaces share the same page and element ids (web/index.html): the Silinx one is web/css/silinx.css,
 // applied under <html data-ui="silinx">, with the theme in data-theme, and its layout by tasks (#804, web/js/tasks.js,
 // data-layout="tasks"): the Tasks interface became the Silinx one (#1149).
 // The palette's matching (fuzzyScore, rankEntries, menuCommands) has no DOM and is unit tested.

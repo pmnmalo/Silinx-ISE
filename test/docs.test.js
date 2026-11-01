@@ -166,7 +166,7 @@ test('docs: the Silinx toolchain\'s name and default mode are the code\'s', () =
 });
 
 test('docs: the architecture counts the interfaces the code has (#2403)', () => {
-  const [, list] = read('web/js/modern.js').match(/INTERFACES = \[([^\]]*)\]/);
+  const [, list] = read('web/js/silinx.js').match(/INTERFACES = \[([^\]]*)\]/);
   const names = [...list.matchAll(/'(\w+)'/g)].map(m => m[1]);
   assert.deepEqual(names, ['silinx', 'ise']);
   assert.match(read('docs/ARCHITECTURE.md'), /two interfaces \(Silinx, ISE style\)/);
