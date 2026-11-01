@@ -65,9 +65,19 @@ export function axisArgs(checked, file) {
   const ignored = (st) => { if (!st.pragma.dup) say(st.loc, st.pragma.of ?? st.pragma.args.port, 'ignored (its default interface made)'); };
   const pragmas = (fn.body?.items || []).filter(isAxis);
   const param = (n) => fn.params.find((p) => p.name === n);
-  // (DATAFLOW's processes and an hls::FIR's own hardware: their FIFO ports as they are)
-  if (checked.dataflow || checked.ast.firs?.size) {
+  // (an hls::FIR's own hardware: its FIFO ports as they are; a DATAFLOW top's streams AXI4-Stream ports, its processes'
+  // FIFOs under them, #1706, its arrays not)
+  if (checked.ast.firs?.size) {
     for (const st of pragmas) if (['stream', 'array'].includes(param(st.pragma.args.port)?.type.kind)) ignored(st);
+    return names;
+  }
+  if (checked.dataflow) {
+    for (const a of checked.ast.structArgs?.get(checked.top) || []) if (a.stream && a.axis) names.set(a.name, 0);
+    for (const st of pragmas) {
+      const { port } = st.pragma.args, t = param(port)?.type;
+      if (t?.kind === 'stream') names.set(port, 0).set(st.pragma.of ?? port, 0);
+      else if (t?.kind === 'array') ignored(st);
+    }
     return names;
   }
   // (the structs of ap_axi_sdata.h: an axis port with no pragma too)
@@ -119,7 +129,7 @@ export function fifoPort(f, sig) {
 }
 
 export function axisTop(gen, names, lang, side) {
-  const core = gen.top, name = core.replace(/_core$/, '');
+  const core = gen.top, name = core.replace(/_(core|axi)$/, '');
   const fifos = gen.fifos.map((f) => {
     if (!names.has(f.name)) return f;
     const P = f.port ?? f.name;
@@ -145,7 +155,14 @@ export function axisTop(gen, names, lang, side) {
     }
   }
   const hdl = (lang === 'vhdl' ? vhdlTop : verilogTop)(name, core, ports, map, word);
-  return { ...gen, hdl: `${gen.hdl}\n${hdl}`, top: name, ports, fifos };
+  // (around an AXI interfaces' module, #1706: what the co-simulation's bus model has its streams on too, core/c-axi-bfm.js)
+  const axi = gen.axi && { ...gen.axi, view: { ...gen.axi.view, fifos, ports: gen.axi.view.ports.flatMap((p) => {
+    const at = by.get(p.name);
+    if (!at) return [p];
+    if (at.s === 'dout' || at.s === 'din') return at.f.axis.parts.map((x) => ({ ...p, name: x.name, w: x.w }));
+    return [{ ...p, name: at.s === 'empty_n' || at.s === 'write' ? at.f.axis.valid : at.f.axis.ready }];
+  }) } };
+  return { ...gen, hdl: `${gen.hdl}\n${hdl}`, top: name, ports, fifos, ...(axi ? { axi } : {}) };
 }
 
 function vhdlTop(name, core, ports, map, word) {

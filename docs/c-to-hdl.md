@@ -239,7 +239,7 @@ Names and behaviour as Vitis HLS makes them (UG1399, "Interface synthesis"):
 | a pointer argument with `#pragma HLS INTERFACE ap_hs` (#1901) | the two-way handshake: read, `p`, `p_ap_vld`, `p_ap_ack`; written, `p`, `p_ap_vld`, `p_ap_ack`; each access a state that waits for it |
 | an array argument with `BIND_STORAGE` or `storage_type=` `ram_2p` / `ram_t2p`, in a loop with `UNROLL`, or of a `DATAFLOW` top (#1901) | two ports: `ram_2p` reads on `a_address0`, `a_ce0`, `a_q0` and writes on `a_address1`, `a_ce1`, `a_we1`, `a_d1`; `ram_t2p` (`UNROLL`'s) has both ports, as far as it is read and written; a `DATAFLOW` top's has all their signals, those no process uses driven 0. Two reads of a statement share a state, two writes too when their addresses cannot be the same; unrolled copies do not share one yet, port 1 then idle |
 | a stream argument, `hls::stream<T>` | `ap_fifo`: `s_dout`, `s_empty_n`, `s_read`; `s_din`, `s_full_n`, `s_write`; a stream of structs one of their words (#1668) |
-| a stream with `#pragma HLS INTERFACE axis`, or of `ap_axis` / `ap_axiu` / `hls::axis_user` with no pragma (#1894) | AXI4-Stream: `s_TVALID`, `s_TREADY`, `s_TDATA` (a struct's word, or an element of an array of streams `s_0_TDATA`…); those of `ap_axi_sdata.h` their side channels, `s_TKEEP`, `s_TSTRB`, `s_TUSER`, `s_TLAST`, `s_TID`, `s_TDEST`, those of width 0 none. Not with DATAFLOW or an `hls::FIR` (a warning, its `ap_fifo` kept) |
+| a stream with `#pragma HLS INTERFACE axis`, or of `ap_axis` / `ap_axiu` / `hls::axis_user` with no pragma (#1894) | AXI4-Stream: `s_TVALID`, `s_TREADY`, `s_TDATA` (a struct's word, or an element of an array of streams `s_0_TDATA`…); those of `ap_axi_sdata.h` their side channels, `s_TKEEP`, `s_TSTRB`, `s_TUSER`, `s_TLAST`, `s_TID`, `s_TDEST`, those of width 0 none. Not with an `hls::FIR` (a warning, its `ap_fifo` kept) |
 | an array argument with `#pragma HLS INTERFACE axis` (#1894) | AXI4-Stream as above, when the array is read or written once in one loop `for (i = 0; i < N; i++)` of its size; else a warning, its `ap_memory` kept |
 
 Ports are `std_logic_vector(W-1 downto 0)` (VHDL) or `[W-1:0]` (Verilog), a 1-bit type a
@@ -332,7 +332,9 @@ channels between them:
 - a local array is a **buffer** (a block RAM) written by one process; the process reading it starts once its writer
   is done (ping-pong within a call);
 - the top's arguments are passed to the process that uses them: a stream or an array to one process, a scalar to
-  any (an argument of a call is an argument of the top, a constant, a local stream or array).
+  any (an argument of a call is an argument of the top, a constant, a local stream or array). A stream of structs is
+  one word on its port, and an `axis` stream AXI4-Stream ports, as for any top: the processes read and write its
+  members one by one, an adapter between them and the word (#1706).
 
 The top's `ap_ctrl_hs` starts every process once a call and is done when every one is. With `ap_ctrl_none` (and a
 stream argument), or when every process is an `hls::task` (a data-driven top), the top has only `ap_clk` and

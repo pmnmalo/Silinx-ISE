@@ -17,6 +17,8 @@ import { hdlName } from './c-graph.js';
 import { portOf, ctrlNone, ctrlChain } from './c-names.js';
 import { firHdl } from './hls-fir-hdl.js';
 import { moduleRegistry } from './c-submodule.js';
+import { structPragmas, wordGroups } from './c-aggregate.js';
+import { wordAdapter, wordPorts } from './c-processes-word.js';
 
 const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 const CTRL = ['ap_clk', 'ap_rst', 'ap_start', 'ap_done', 'ap_idle', 'ap_ready'];
@@ -74,7 +76,19 @@ export function region(fn, globals = new Map()) {
   return { calls, locals, consts };
 }
 
-export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module = null, stall = false }) {
+/** The top's streams of structs made one word (#1706): [{ name, dir, w, fields, members: [{ param, off, w }] }], the
+ *  members a process uses; none in a module made flat (a process's own). */
+function streamWords(checked, fn, use, rn, flat) {
+  if (flat) return [];
+  const sargs = checked.ast.structArgs?.get(checked.top) || [];
+  return wordGroups(sargs, fn, structPragmas(fn).how).filter((g) => g.kind === 'fifo' && g.fields.every((x) => x.k === 1)).flatMap((g) => {
+    const members = g.fields.filter((x) => use.has(x.param)).map((x) => ({ param: x.param, off: x.off, w: x.w }));
+    const dirs = new Set(members.map((m) => (use.get(m.param).ports.some((x) => /_dout$/.test(x.port.name)) ? 'in' : 'out')));
+    return members.length && dirs.size === 1 ? [{ name: g.name, dir: [...dirs][0], w: g.w, fields: g.fields, members }] : [];
+  });
+}
+
+export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipelineLoops, module = null, stall = false, flat = false, taken = null }) {
   const fn = checked.funcs.get(checked.top);
   const rg = region(fn, checked.consts);
   // (a top running an hls::FIR has none, #1942)
@@ -183,21 +197,33 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const free = (none && streamed) || procs.every((p) => p.task);
   const ports = CTRL.slice(0, free ? 2 : CTRL.length).map((name) => ({ name, dir: ['ap_clk', 'ap_rst', 'ap_start'].includes(name) ? 'in' : 'out', w: 1 }));
   if (!free && ctrlChain(fn)) ports.splice(4, 0, { name: 'ap_continue', dir: 'in', w: 1 });
-  const memories = [], fifos = [], ties = [];
+  const memories = [], fifos = [], ties = [], inner = [];
+  // (a stream of structs of the top: one word, its members' FIFOs behind an adapter, core/c-processes-word.js, #1706)
+  const words = streamWords(checked, fn, use, rn, flat);
+  const placed = new Set();
   for (const pa of fn.params) {
     const u = use.get(pa.name);
+    const g = words.find((x) => x.members.some((m) => m.param === pa.name));
+    if (g && !placed.has(g)) {
+      placed.add(g);
+      const R = rn(g.name);
+      for (const [sfx, dir, w] of g.dir === 'in' ? [['_dout', 'in', g.w], ['_empty_n', 'in', 1], ['_read', 'out', 1]] : [['_din', 'out', g.w], ['_full_n', 'in', 1], ['_write', 'out', 1]]) ports.push({ name: R + sfx, dir, w, role: 'fifo', param: g.name });
+      fifos.push({ name: g.name, dir: g.dir, w: g.w, s: false, fields: g.fields, port: R });
+    }
     if (u) {
-      for (const { port } of u.ports) ports.push({ name: rn(pa.name) + port.name.slice(rn(port.param).length), dir: port.dir, w: port.role === 'mem' && /_address0$/.test(port.name) ? clog2(Number(pa.type.length)) : port.w, role: port.role, param: pa.name });
+      for (const { port } of u.ports) (g ? inner : ports).push({ name: rn(pa.name) + port.name.slice(rn(port.param).length), dir: port.dir, w: port.role === 'mem' && /_address0$/.test(port.name) ? clog2(Number(pa.type.length)) : port.w, role: port.role, param: pa.name });
+      if (g) continue;
       const pm = u.ports[0].p.mod.gen;
       const callee = u.ports[0].port.param;
       const m = pm.memories.find((x) => x.name === callee), f = pm.fifos.find((x) => x.name === callee);
       if (m) {
         memories.push({ ...m, name: pa.name, n: Number(pa.type.length), aw: clog2(Number(pa.type.length)), port: rn(pa.name) });
         // (a memory of the top: both ports, as Vitis HLS makes it; what no process uses driven 0, #1901; not one a pragma
-        // makes another interface, nor a module inside an AXI one, core/c-axi.js, which took its pragmas)
+        // makes another interface, nor one an AXI master takes, core/c-axi.js (taken: the top's module inside the AXI or
+        // AXI4-Stream one, #1706), nor a sub-module's)
         const other = fn.body.items.some((st) => st.kind === 'pragma' && st.pragma.name === 'INTERFACE' && st.pragma.args.port === pa.name && !/^(ap_memory)?$/i.test(String(st.pragma.args.mode ?? Object.keys(st.pragma.args).find((k) => /^(ap_|m_axi|s_axi|axis|bram)/i.test(k)) ?? '')));
         const aw = clog2(Number(pa.type.length)), R = rn(pa.name);
-        if (!other && !module) for (const [sfx, dir, w] of [['_address0', 'out', aw], ['_ce0', 'out', 1], ['_d0', 'out', m.w], ['_q0', 'in', m.w], ['_we0', 'out', 1], ['_address1', 'out', aw], ['_ce1', 'out', 1], ['_d1', 'out', m.w], ['_q1', 'in', m.w], ['_we1', 'out', 1]]) {
+        if (!other && (taken ? !taken.has(pa.name) : !module)) for (const [sfx, dir, w] of [['_address0', 'out', aw], ['_ce0', 'out', 1], ['_d0', 'out', m.w], ['_q0', 'in', m.w], ['_we0', 'out', 1], ['_address1', 'out', aw], ['_ce1', 'out', 1], ['_d1', 'out', m.w], ['_q1', 'in', m.w], ['_we1', 'out', 1]]) {
           if (ports.some((x) => x.name === R + sfx)) continue;
           ports.push({ name: R + sfx, dir, w, role: 'mem', param: pa.name });
           if (dir === 'out') ties.push({ name: R + sfx, w });
@@ -206,6 +232,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
       if (f) fifos.push({ ...f, name: pa.name, port: rn(pa.name) });
       continue;
     }
+    if (g) continue;
     const t = typeOf(pa.type.kind === 'ptr' ? pa.type.to : pa.type);
     // (a scalar no process reads keeps its port, as Vitis HLS's and a top without DATAFLOW's, #1940; a pointer no process
     // uses has none, as there)
@@ -214,7 +241,7 @@ export function cProcesses(source, checked, { file, lang, headers, cToHdl, pipel
   const name = module || rn(checked.top);
   const src = file.split('/').pop();
   if (stall) ports.splice(2, 0, { name: 'ap_ce', dir: 'in', w: 1 });
-  const net = { stall, name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free, ties };
+  const net = { stall, name, src, procs, use, locals: rg.locals, params, ports, rn, fn, free, ties, inner, words };
   const top = lang === 'vhdl' ? vhdlTop(net) : verilogTop(net);
   const hdl = [...reg.modules().map((m) => m.gen.hdl), ...top].join('\n');
   const report = { sequential: true, dataflow: true, tasks: procs.some((p) => p.task), processes: procs.map((p) => ({ name: p.call.callee, module: p.mod.module, instance: p.inst, states: p.mod.gen.report.states, registerBits: p.mod.gen.report.registerBits, after: [...p.deps].map((d) => d.call.callee), ...(p.task ? { task: p.call.task } : {}) })),
@@ -243,7 +270,7 @@ function pieces(net) {
     if (!l) {
       // (an argument of the top: its process's ports are its)
       for (const { p, port } of u.ports) {
-        const tp = `${rn(n)}${port.name.slice(rn(port.param).length)}`, w = net.ports.find((q) => q.name === tp).w;
+        const tp = `${rn(n)}${port.name.slice(rn(port.param).length)}`, w = [...net.ports, ...net.inner].find((q) => q.name === tp).w;
         if (port.dir === 'in') links.push({ dst: sig(p, port), dw: port.w, src: tp, sw: w });
         else links.push({ dst: tp, dw: w, src: sig(p, port), sw: port.w });
       }
@@ -265,6 +292,15 @@ function pieces(net) {
   return { sigs, links, fifos, bufs, sig };
 }
 
+/** An adapter's connections (#1706): its ports to the top's word and to its members' signals. */
+function wordMap(net, g) {
+  const { rn } = net;
+  return wordPorts(g, net.stall).map(([n]) => {
+    const m = /^m(\d+)_(\w+)$/.exec(n), w = /^w_(\w+)$/.exec(n);
+    return [n, m ? `${rn(g.members[Number(m[1])].param)}_${m[2]}` : w ? `${rn(g.name)}_${w[1]}` : n];
+  });
+}
+
 /** The processes' start: each once a call, after the buffers it reads are written; the top done when all are. (An
  *  hls::task runs by itself: its ap_start 1, the top not waiting for it, #1719.) */
 function control(procs) {
@@ -278,11 +314,12 @@ function vhdlTop(net) {
   const T = (w) => (w === 1 ? 'std_logic' : `std_logic_vector(${w - 1} downto 0)`);
   const out = [];
   fifos.forEach((f, i) => out.push(...vhdlFifo(`${name}_ap_fifo${i}`, f.w, f.depth, net.stall)));
+  net.words.forEach((g, i) => out.push(...wordAdapter(`${name}_ap_word${i}`, g, 'vhdl', net.stall)));
   const L = [`-- Generated by Silinx from ${src} (Silinx HLS, compatible with Vitis HLS): edit the C source`, '-- (#pragma HLS DATAFLOW: each process a module, its channels FIFOs and buffers)',
     'library ieee;', 'use ieee.std_logic_1164.all;', 'use ieee.numeric_std.all;', '', `entity ${name} is`, '  port ('];
   net.ports.forEach((p, k) => L.push(`    ${p.name} : ${p.dir} ${T(p.w)}${k < net.ports.length - 1 ? ';' : ''}`));
   L.push('  );', `end ${name};`, '', `architecture behav of ${name} is`, "  signal ap_busy : std_logic := '0';");
-  for (const s of sigs) L.push(`  signal ${s.name} : ${T(s.w)};`);
+  for (const s of [...sigs, ...net.inner]) L.push(`  signal ${s.name} : ${T(s.w)};`);
   for (const p of procs) if (!p.task) L.push(`  signal ${p.inst}_pend, ${p.inst}_fin : std_logic := '0';`);
   const chain = net.ports.some((p) => p.name === 'ap_continue');
   L.push('  signal ap_all_done : std_logic;');
@@ -298,6 +335,7 @@ function vhdlTop(net) {
     const m = p.mod.gen.ports.map((port) => `${port.name} => ${port.name === 'ap_continue' ? "'1'" : SHARED.includes(port.name) ? port.name : sig(p, port)}`);
     L.push(`  ${p.inst} : entity work.${p.mod.module} port map (${m.join(', ')});`);
   }
+  net.words.forEach((g, i) => L.push(`  ap_word${i} : entity work.${name}_ap_word${i} port map (${wordMap(net, g).map(([a, b]) => `${a} => ${b}`).join(', ')});`));
   const conv = (src0, sw, dw, s = false) => {
     if (sw === dw) return src0;
     if (dw === 1) return `${src0}(0)`;
@@ -360,10 +398,11 @@ function verilogTop(net) {
   const W = (w) => (w > 1 ? `[${w - 1}:0] ` : '');
   const out = [];
   fifos.forEach((f, i) => out.push(...verilogFifo(`${name}_ap_fifo${i}`, f.w, f.depth, net.stall)));
+  net.words.forEach((g, i) => out.push(...wordAdapter(`${name}_ap_word${i}`, g, 'verilog', net.stall)));
   const L = [`// Generated by Silinx from ${src} (Silinx HLS, compatible with Vitis HLS): edit the C source`, '// (#pragma HLS DATAFLOW: each process a module, its channels FIFOs and buffers)', `module ${name} (`];
   net.ports.forEach((p, k) => L.push(`  ${p.dir === 'in' ? 'input ' : 'output'} wire ${W(p.w)}${p.name}${k < net.ports.length - 1 ? ',' : ''}`));
   L.push(');', '  reg ap_busy;');
-  for (const s of sigs) L.push(`  wire ${W(s.w)}${s.name};`);
+  for (const s of [...sigs, ...net.inner]) L.push(`  wire ${W(s.w)}${s.name};`);
   for (const p of procs) if (!p.task) L.push(`  reg ${p.inst}_pend, ${p.inst}_fin;`);
   const chain = net.ports.some((p) => p.name === 'ap_continue');
   L.push('  wire ap_all_done;');
@@ -371,6 +410,7 @@ function verilogTop(net) {
   if (net.free) L.push("  wire ap_start = 1'b1;", '  wire ap_done, ap_idle, ap_ready;');
   for (const b of bufs) L.push(`  reg [${b.w - 1}:0] ${b.name} [0:${b.n - 1}];`, `  reg [${b.w - 1}:0] ${b.name}_q;`, `  wire [${b.aw - 1}:0] ${b.name}_addr;`, `  wire ${b.name}_ce, ${b.name}_we;`, `  wire [${b.w - 1}:0] ${b.name}_d;`);
   for (const p of procs) L.push(`  ${p.mod.module} ${p.inst} (${p.mod.gen.ports.map((port) => `.${port.name}(${port.name === 'ap_continue' ? "1'b1" : SHARED.includes(port.name) ? port.name : sig(p, port)})`).join(', ')});`);
+  net.words.forEach((g, i) => L.push(`  ${name}_ap_word${i} ap_word${i} (${wordMap(net, g).map(([a, b]) => `.${a}(${b})`).join(', ')});`));
   const conv = (s0, sw, dw, sg = false) => (dw > sw && sg && sw > 1 ? `{{${dw - sw}{${s0}[${sw - 1}]}}, ${s0}}` : dw < sw ? (dw === 1 ? `${s0}[0]` : `${s0}[${dw - 1}:0]`) : s0);
   for (const t of net.ties) L.push(`  assign ${t.name} = ${t.w}'d0;`);
   for (const l of links) L.push(`  assign ${l.dst} = ${l.k !== undefined ? `${l.dw}'d${BigInt.asUintN(l.dw, l.k)}` : conv(l.src, l.sw, l.dw, l.s)};`);
