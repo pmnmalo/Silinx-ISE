@@ -6,7 +6,7 @@
 //   format, name   the format's id, the file's name (for the log)
 //   forPorts(ports) the same text read knowing the top's ports (a name may depend on them, #63)
 // A format is { id, read(text, { ports }) -> the fields above, write(model) -> text }; a back end says its own
-// (open-flow-backends.js), UCF when it says none. PCF, LPF and CST are formats to come (#2296).
+// (open-flow-backends.js), UCF when it says none. PCF is the iCE40's (pcf.js, #2295); LPF and CST are to come (#2296).
 import { generateUcf, parseUcf } from './ucf.js';
 
 export const UCF = {

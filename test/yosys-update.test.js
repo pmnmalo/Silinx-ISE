@@ -253,7 +253,7 @@ test('yosys update: Dependabot weekly, npm grouped but for Yosys, the majors wit
   for (const n of deps) assert.ok(patterns.some(p => matches(p, n)), `${n} in the group`);
   for (const p of patterns) assert.ok(deps.some(n => matches(p, n)), `the pattern ${p} names a dependency`);
   assert.ok(patterns.includes('@codemirror/*') && patterns.includes('@lezer/*'));
-  assert.ok(!npm.includes('yowasp'));
+  assert.ok(!patterns.some(p => matches(p, PACKAGE)), 'Yosys never grouped');
   assert.match(npm, /update-types: \[minor, patch\]/);
   assert.match(actions, /patterns: \['\*'\]/);
   // the ignored updates, each with its issue

@@ -8,6 +8,7 @@ which npm installs with it. Each one keeps its own licence, reproduced in full h
 |---|---|---|---|
 | @silinx/nextpnr-himbaechel-spartan3e | 0.12.0 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
 | @silinx/nextpnr-himbaechel-spartan6 | 0.1.1 | ISC | https://github.com/pmnmalo/nextpnr-spartan |
+| @yowasp/nextpnr-ice40 | 0.11.96-dev.805 | ISC | https://yowasp.org/ |
 | @yowasp/yosys | 0.70.1258 | ISC | https://yowasp.org/ |
 
 ## @silinx/nextpnr-himbaechel-spartan3e 0.12.0 — ISC
@@ -948,6 +949,71 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 The WASI SDK 34's runtime libraries (wasi-libc, libc++, libc++abi, libunwind; linked into the package): https://github.com/WebAssembly/wasi-sdk
 Licensed under the Apache License v2.0 with LLVM Exceptions (wasi-libc also MIT and CC0 parts): https://github.com/WebAssembly/wasi-libc/blob/main/LICENSE and https://llvm.org/LICENSE.txt
+```
+
+## @yowasp/nextpnr-ice40 0.11.96-dev.805 — ISC
+
+https://yowasp.org/
+
+```text
+YoWASP nextpnr-ice40 (the package: nextpnr-ice40 and the IceStorm tools, in WebAssembly): https://github.com/YoWASP/nextpnr
+
+ISC License
+
+Copyright (C) Catherine <whitequark@whitequark.org>
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+nextpnr (compiled to WebAssembly in the package): https://github.com/YosysHQ/nextpnr
+
+ISC License
+
+Copyright (C) 2018-2020 Claire Xenia Wolf <claire@yosyshq.com>
+Copyright (C) 2018-2020 gatecat <gatecat@ds0.me>
+Copyright (C) 2018-2020 Dan Gisselquist <dan@symbioticeda.com>
+Copyright (C) 2018-2020 Serge Bazanski <q3k@q3k.org>
+Copyright (C) 2018-2020 Miodrag Milanovic <micko@yosyshq.com>
+Copyright (C) 2018-2020 Eddie Hung <eddieh@ece.ubc.ca>
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+Project IceStorm (icepack, iceunpack and the iCE40 chip databases, compiled into the package): https://github.com/YosysHQ/icestorm
+
+ISC License
+
+Copyright (C) 2015 Claire Xenia Wolf <claire@yosyshq.com>
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ## @yowasp/yosys 0.70.1258 — ISC

@@ -94,6 +94,8 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   app.use('/vendor/yowasp-yosys', express.static(path.join(ROOT, 'node_modules/@yowasp/yosys')));
   // nextpnr in WebAssembly, its chip databases beside its bundle (the browser edition's nextpnr engine, #2136)
   app.use('/vendor/nextpnr-spartan', express.static(path.join(ROOT, 'node_modules/@silinx/nextpnr-himbaechel-spartan3e')));
+  // (the iCE40's nextpnr and icepack, when installed: not in the release zip, #2295)
+  app.use('/vendor/nextpnr-ice40', express.static(path.join(ROOT, 'node_modules/@yowasp/nextpnr-ice40')));
 
   const api = express.Router();
   api.get('/projects', wrap(() => P.listProjects()));

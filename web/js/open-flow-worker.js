@@ -9,7 +9,7 @@
 //        fetched into Cache Storage (web/js/asset-cache.js, #967), this edition's other versions deleted from it
 //   out: { done: { fetched, bytes, pruned } }
 import { runOpenFlow } from '/core/flow-ide.js';
-import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
+import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, ice40Io, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
 import { workerIo } from './open-flow-worker-io.js';
 import { parseXdl, fpgaModel, deviceGrid, MODEL_VERSION } from '/packages/silinx-fpga/src/parts.js';
@@ -78,8 +78,18 @@ function nextpnrBrowser(url, post) {
   };
 }
 
+// the iCE40's nextpnr and icepack (#2295), from YoWASP's bundle; the first run fetches every iCE40's chip database
+const ice40s = new Map();
+function ice40Browser(url, post) {
+  if (!ice40s.has(url)) {
+    post({ line: 'Loading nextpnr-ice40 and icepack (WebAssembly, about 80 MB the first time)…' });
+    ice40s.set(url, ice40Io(() => import(url)));
+  }
+  return ice40s.get(url);
+}
+
 self.onmessage = async ({ data }) => {
-  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl } = data;
+  const { spec, sources, simSources = [], ucf, ucfName, files, assets, yosys: yosysUrl, nextpnr: nextpnrUrl, nextpnrIce40: ice40Url } = data;
   // every message carries the run's id (web/js/open-flow-browser.js: each run hears only its own)
   const post = m => self.postMessage({ ...m, id: data.id });
   if (data.integrity) self.SILINX_ASSET_INTEGRITY = data.integrity;   // (the assets' SHA-256, #1237: this worker's fetches and its Yosys workers')
@@ -88,7 +98,8 @@ self.onmessage = async ({ data }) => {
     const base = new URL(assets);
     // what the flow needs, fetched before it starts (it reads them synchronously)
     const key = [base.href, spec.family, spec.graph, spec.device, spec.pkg, spec.part].join('|');
-    if (lastDevice?.key !== key) {
+    // (a family with its own tools has no device description here: the iCE40's, #2295)
+    if (spec.graph && lastDevice?.key !== key) {
       lastDevice = null;
       post({ line: `Loading the device description of ${spec.part} and its bit database…` });
       const graph = await gunzipJson(await fetchOk(new URL(`devices/${spec.graph}`, base), 'the device description'));
@@ -108,7 +119,7 @@ self.onmessage = async ({ data }) => {
         lastDevice = { key, device: dev, db: makeBitDb(dbFilesFrom(json, spec.pkg), dev, spec.part) };
       }
     }
-    const { device, db } = lastDevice;
+    const { device, db } = lastDevice || {};
     // Yosys, compiled to WebAssembly (YoWASP): fetched once, then kept in Cache Storage (#967); in workers of
     // this worker (#279), the synthesis's mappings from the same netlist in parallel (web/js/yosys-client.js),
     // or in this worker's own thread where it cannot start them
@@ -148,7 +159,8 @@ self.onmessage = async ({ data }) => {
     }, { parallel: pool ? pool.parallel : 1 });
     const { io, store } = workerIo({ post, sources, simSources, ucf, ucfName, files, device: () => device, bitDb: () => db, yosys,
       // (the nextpnr engine's, #2136: its bundle and the device's chip database fetched on its first use, then kept by the cache)
-      nextpnr: spec.engine && spec.engine !== 'silinx' ? { spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post) } : null });
+      nextpnr: ice40Url ? { ice40: ice40Browser(ice40Url, post) }
+        : spec.engine && spec.engine !== 'silinx' ? { spartan3e: nextpnrBrowser(nextpnrUrl || new URL('vendor/nextpnr-spartan/gen/bundle.js', base).href, post) } : null });
     const res = await runOpenFlow(spec, io);
     // the FPGA view's model, from the routed design
     let view = null;
