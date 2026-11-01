@@ -17,6 +17,7 @@ import { mountEmuSide } from './emulator-side.js';
 import { mountEmuPaint } from './emulator-paint.js';
 import { mountEmuToolbar } from './emulator-toolbar.js';
 import { emuPrintView } from './emulator-print.js';
+import { mountEmuModules } from './emulator-modules.js';
 import { prefKey } from './prefs.js';
 import { BOARD_LAYOUTS } from './emulator-layouts.js';
 
@@ -72,6 +73,10 @@ function injectStyle() {
 .emu-board-note { color: var(--grey-3); font-size: 11px; }
 .emu-pcb { position: relative; flex: none; }
 .emu-pcb-art { position: absolute; left: 0; top: 0; }
+/* the room for a board's modules given back, none being shown (#2522) */
+.emu-no-room > * { translate: 0 calc(-1 * var(--emu-room)); }
+.emu-no-room > .emu-pcb-art { pointer-events: none; }
+.emu-module { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
 .emu-at { position: absolute; transform: translateX(-50%); display: flex; justify-content: center; }
 .emu-silk { color: #e8edf7; font: bold 10px Arial, sans-serif; white-space: nowrap; }
 /* the power switch (a slide switch, ON to the right) and its LED */
@@ -272,6 +277,8 @@ export function mountEmulator(container, { design, board, assignments, title = '
     engineNote: () => engineNote, main, powered: () => powered, refresh: (...a) => refresh(...a),
     running: () => running, sim, vgaView: () => vgaView, vgaWired, wiring, setVgaView: (v) => { vgaView = v; }
   });
+  // (the modules outside the board shown or hidden, #2522: emulator-modules.js; shown when paused, the picture of now)
+  mountEmuModules({ main, stat, changed: () => { if (compiled && !running) after(advance(0)); } });
 
   // ------------------------------------------------------------------------------- simulation
   // (mask: the bits that changed, to the compiled engine: the rotary knob's may be the worker's to set)
@@ -327,7 +334,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   }
   // (what the board shows from what the compiled code counted in the run; the VGA picture 30 times a second)
   async function advance(n) {
-    const vga = !!vgaView && (!running || performance.now() - vgaFetched >= 30);
+    const vga = !!vgaView?.shown() && (!running || performance.now() - vgaFetched >= 30);
     const st = await sim.advance(n, { budget: FRAME_BUDGET_MS, vga });
     if (!st || destroyed) return null;
     if (vga) vgaFetched = performance.now();
