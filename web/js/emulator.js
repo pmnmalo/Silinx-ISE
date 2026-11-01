@@ -18,6 +18,7 @@ import { mountEmuPaint } from './emulator-paint.js';
 import { mountEmuToolbar } from './emulator-toolbar.js';
 import { emuPrintView } from './emulator-print.js';
 import { prefKey } from './prefs.js';
+import { BOARD_LAYOUTS } from './emulator-layouts.js';
 
 export const SPEEDS = [['real', 'Real time'], ['max', 'Max speed'], [1e5, '100 kHz'], [1e4, '10 kHz'], [1e3, '1 kHz'], [100, '100 Hz'], [10, '10 Hz'], [1, '1 Hz']];
 const FRAME_BUDGET_MS = 14;
@@ -109,7 +110,7 @@ function injectStyle() {
 .emu-vga-nosig[hidden] { display: none; }   /* (its display: flex would show it hidden too, #453) */
 .emu-vga-stat { margin-top: 4px; font-family: var(--mono, monospace); color: var(--grey-3); }
 .emu-vga-warn { color: var(--log-warning); }
-`));
+`), h('style', {}, Object.values(BOARD_LAYOUTS).map((l) => l.css || '').join('')));   // (each board's parts, after the common ones)
 }
 
 // 7-segment digit (a..g + dp), brightness per segment
@@ -137,7 +138,7 @@ export function makeDigit() {
   } };
 }
 
-export { BOARD_LAYOUTS } from './emulator-layouts.js';
+export { BOARD_LAYOUTS };
 
 // Yosys for the compiled engine (core/compiled-sim.js netlistOf): the page's workers (the local server), or,
 // in the browser edition, a worker of its own started from the site's assets (as the flow worker starts its)

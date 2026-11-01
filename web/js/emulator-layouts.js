@@ -5,4 +5,3 @@ import { nexys2Layout } from './emulator-nexys2.js';
 import { s3eLayout } from './emulator-s3e.js';
 
 export const BOARD_LAYOUTS = { basys2: basys2Layout, nexys2: nexys2Layout, 's3e-starter': s3eLayout };
-s3eLayout.lcd = true;   // the layout shows the character LCD
