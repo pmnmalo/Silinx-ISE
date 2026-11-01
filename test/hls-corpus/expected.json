@@ -769,9 +769,13 @@
   },
   "task-level-parallelism-data-driven-unique-task-regions": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C synthesis: 38: 'mid_class_c1_in1_t' is not an integer"
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 108,
+      "max": 110,
+      "avg": 109
+    },
+    "reason": null
   }
 }

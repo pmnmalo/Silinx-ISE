@@ -65,10 +65,8 @@ export function dataflowCall(checked, report) {
   for (let depth = 0; !hasDataflow(fn) && depth < 16; depth++) {
     const call = onlyCall(fn);
     const f = call && checked.funcs.get(call.callee.name);
-    if (!f?.body) {
-      report(hit.call.loc, `#pragma HLS DATAFLOW in '${hit.f.name}', a function '${fn.name}' calls: made only when '${fn.name}' calls it alone (its only statement), not yet with other statements`);
-      return false;
-    }
+    // (among other statements: a sub-module of its own, core/c-submodule.js, #1706)
+    if (!f?.body) return false;
     // (its parameters: the caller's arguments, or the constants given)
     const subst = new Map(), mine = new Set(fn.params.map((p) => p.name));
     for (const [i, p] of f.params.entries()) {

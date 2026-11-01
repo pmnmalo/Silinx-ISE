@@ -98,9 +98,9 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-control-driven-channels-using-stream-of-blocks | C++ | pass | pass | pass | 602-603 |  |
 | task-level-parallelism-data-driven-mixed-control-and-data-driven | C++ | pass | pass | pass | 157 |  |
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
-| task-level-parallelism-data-driven-unique-task-regions | C++ | pass | fail | skip | - | C synthesis: 38: 'mid_class_c1_in1_t' is not an integer |
+| task-level-parallelism-data-driven-unique-task-regions | C++ | pass | pass | pass | 108-110 |  |
 
-73 designs: 68 through co-simulation.
+73 designs: 69 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

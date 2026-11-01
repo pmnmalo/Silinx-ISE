@@ -76,8 +76,8 @@ test('#1931 a variable of the region never changed: its value, as Vitis HLS fold
   const errors = (src) => say(cToHdl(src, { file: 'd.cpp' }).diagnostics.filter((d) => d.severity === 'error'));
   assert.deepEqual(errors(H + REGION('dut', '  int K = 5;\n  K++;\n', 'K') + MAIN),
     ["10 error: #pragma HLS DATAFLOW: the region has 'K': only streams and arrays are declared in a DATAFLOW region: its streams are FIFOs between processes, so it cannot be made sequential"]);
-  assert.deepEqual(errors(H + REGION('inner') + TOP('  inner(in, out, n);\n  inner(in, out, n);') + MAIN),
-    ["17 error: #pragma HLS DATAFLOW in 'inner', a function 'dut' calls: made only when 'dut' calls it alone (its only statement), not yet with other statements"]);
+  // (among other statements: a sub-module, called each time, #1706, test/c-dataflow-nest.test.js)
+  assert.deepEqual(errors(H + REGION('inner') + TOP('  inner(in, out, n);\n  inner(in, out, n);') + MAIN), []);
   assert.deepEqual(errors(H + REGION('inner') + TOP('  inner(in, out, n + 1);') + MAIN),
     ["17 error: #pragma HLS DATAFLOW in 'inner': its argument 'n' an argument of 'dut' or a constant (not an expression, yet)"]);
   assert.deepEqual(errors(H + REGION('inner', '  int out = 0;\n') + TOP('  inner(in, out, n);') + MAIN),
