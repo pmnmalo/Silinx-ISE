@@ -517,17 +517,13 @@ export async function openFile(path, line, col, { task } = {}) {
         // the HDL generated from a drawing is read-only: the drawing is the base, edited instead (#1176)
         const generated = () => !!S.hdlToSch?.[path];
         const tplBtn = h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Language Templates' }, 'Templates ▾');
-        const editing = [
-          h('button', { class: 'tb-btn', title: 'Undo', html: icons.undo, onclick: () => d.editor.exec('undo') }),
-          h('button', { class: 'tb-btn', title: 'Redo', html: icons.redo, onclick: () => d.editor.exec('redo') }),
-          h('div', { class: 'tb-sep' })];
+        // (no Undo / Redo, the main toolbar's; no path, the tab's tip: #2514)
+        const editing = [];
         const bar = h('div', { class: 'editor-bar' },
-          ...editing,
           h('button', { class: 'tb-btn', title: 'Find (Ctrl+F)', html: icons.find, onclick: () => d.editor.exec('findToggle') }),   // (again: closed, #1328)
           snippetsFor(lang, path) && lang !== 'ucf' ? tplBtn : null,   // (C / C++ too, #1855)
           ...(lang === 'c' ? cRunButtons(path) : []),   // (C Simulation, C/RTL Co-simulation: #1528)
           (lang === 'vhdl' || lang === 'verilog' || lang === 'ucf' || lang === 'c') ? h('button', { class: 'btn', style: { minWidth: '0' }, title: 'Check Syntax of this file', onclick: () => (lang === 'ucf' ? checkUcfFile(path) : checkFileSyntax(path)) }, h('span', { class: 'ico-inline', html: icons.ok }), ' Check Syntax') : null,
-          h('span', { class: 'path' }, path),
           syncBanner(path));
         if (lang === 'vhdl' || lang === 'verilog' || lang === 'c') editing.push(tplBtn);
         tplBtn.addEventListener('click', e => {
