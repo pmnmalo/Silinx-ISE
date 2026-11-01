@@ -58,7 +58,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const samples = [];
   let device0, skipped = 0;
   for (const dir of dirs) {
-    const r6 = readBit6(fs.readFileSync(path.join(dir, 'top.bit'))), dev = bitFormat6(r6.device.part), db = residualDb(r6, { cmtPaths: false, cmtInput: false });
+    const r6 = readBit6(fs.readFileSync(path.join(dir, 'top.bit'))), dev = bitFormat6(r6.device.part), db = residualDb(r6, { cmtInput: false });
     const { device } = s6Device(db.part), design = parseXdl(fs.readFileSync(path.join(dir, 'top.xdl'), 'utf8'));
     const cmts = design.insts.filter(i => /^(DCM|PLL_ADV)$/.test(i.type) && i.placed);
     if (cmts.length !== 1) { skipped++; continue; }

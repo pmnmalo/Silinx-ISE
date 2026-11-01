@@ -9,7 +9,7 @@
 //                                    CMT's column or the I/O words, #2025)
 //   <device>-iob.json, s6-clocks.json         the pads' settings, a clock pad's selection
 //   <device>-hard.json, s6-hard-base.json     the block RAMs' and DSP48A1s' settings and contents
-//   <device>-cmt-{settings,input}.json, xc6slx16-cmt-paths.json  the DCMs' and PLLs'
+//   <device>-cmt-{settings,input}.json   the DCMs' and PLLs'
 //   s6-ologic.json                   an OLOGIC2's output flip-flop (#2025)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,10 +20,10 @@ export const S6_DB_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)),
 
 /**
  * A part's databases ('xc6slx16csg324-3'): { part, slices: { lut, rounds, sliceX }, int, other: { pips }, iob,
- * clocks, cmt, hard, hardBase, cmtSettings, cmtInput, ologic } (null for a file the part has not); cmtPaths: false leaves the
- * DCMs' and PLLs' whole measured paths out (research/s6/residual6.mjs --no-cmt-paths).
+ * clocks, hard, hardBase, cmtSettings, cmtInput, ologic } (null for a file the part has not); cmtInput: false leaves the
+ * CMTs' input bits out (research/s6/ana-cmtinput6.mjs measures them).
  */
-export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtPaths = true, cmtInput = true } = {}) {
+export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtInput = true } = {}) {
   const read = n => { const f = path.join(dir, `${n}.json`); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; };
   const device = part.match(/^xc6slx\d+/)[0], dev = n => read(`${device}-${n}`);
   const pips = n => read(n)?.pips ?? {};
@@ -38,7 +38,7 @@ export function loadBitDbS6(part, { dir = S6_DB_DIR, cmtPaths = true, cmtInput =
     // the other tiles' PIPs (the PIP drop), the I/O path's, the clocks', the probed ones, the CMT paths' and the open
     // flow's (#732) one at a time
     other: { pips: { ...pips('s6-pips-other'), ...pips('s6-pips-io'), ...pips('s6-pips-clock'), ...pips('s6-pips-probe'), ...(dev('pips-cmt')?.pips ?? {}), ...pips('s6-pips-flow') } },
-    iob: dev('iob'), clocks: read('s6-clocks'), cmt: cmtPaths ? dev('cmt-paths') : null, hard: dev('hard'), hardBase: read('s6-hard-base'),
+    iob: dev('iob'), clocks: read('s6-clocks'), hard: dev('hard'), hardBase: read('s6-hard-base'),
     cmtSettings: dev('cmt-settings'), cmtInput: cmtInput ? dev('cmt-input') : null, ologic: read('s6-ologic'),
   };
 }
