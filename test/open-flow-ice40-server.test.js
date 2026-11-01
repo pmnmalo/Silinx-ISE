@@ -26,7 +26,8 @@ test('openSteps: the iCE40\'s list; a Xilinx family\'s chain as it was', () => {
   assert.deepEqual(openSteps(undefined, { family }), ['synth', 'translate', 'par', 'bitgen']);
   assert.deepEqual(openSteps(['par'], { family }), ['synth', 'translate', 'par']);
   assert.deepEqual(openSteps(['bitgen'], { family, synthUpToDate: true }), ['translate', 'par', 'bitgen']);
-  assert.throws(() => openSteps(['map'], { family }), /no step map/);
+  assert.deepEqual(openSteps(['map'], { family }), ['synth', 'translate', 'par']);   // (Implement's chain: nextpnr maps in its Place & Route, #2463)
+  assert.throws(() => openSteps(['trce'], { family }), /no step trce/);
   assert.deepEqual(openSteps(['par'], { family: 'spartan3e' }), openSteps(['par']));
   assert.ok(openSteps(['par']).includes('map'));
 });

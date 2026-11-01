@@ -48,7 +48,7 @@ test('the iCE40 family: its parts, its back end\'s steps and constraints, its sy
   assert.equal(b.constraints, PCF);
   assert.deepEqual(b.steps.map(s => s.id), ['synth', 'translate', 'par', 'bitgen']);
   assert.deepEqual(orderSteps(b.steps, ['bitgen']), ['synth', 'translate', 'par', 'bitgen']);
-  assert.throws(() => orderSteps(b.steps, ['map']), /no step map/);
+  assert.throws(() => orderSteps(b.steps, ['trce']), /no step trce/);
   assert.deepEqual(ice40Utilization({ SB_LUT4: 24, SB_DFF: 2, SB_DFFE: 3, SB_CARRY: 22, SB_RAM40_4K: 1, SB_MAC16: 1, SB_GB: 1, SB_PLL40_CORE: 1, SB_IO: 2 }),
     { luts: 24, flipFlops: 5, latches: 0, ios: 2, carry: 22, blockRam: 1, multipliers: 1, clockBuffers: 1, dcms: 1, cells: 57 });
   assert.equal(b.synthName('ramb16'), 'Number of RAM4Ks');

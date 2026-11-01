@@ -1,5 +1,6 @@
 // Wizards and dialogs modelled on ISE (New Project Wizard, New Source, properties...).
 import { devicePicker } from './device-picker.js';
+import { constraintsForDevice } from './constraints-format.js';
 import { api } from './api.js';
 import { PRODUCT, PRODUCT_FULL, VERSION, VERSION_LABEL, BUILD, REPOSITORY, compareVersions, versionLabel } from '/core/version.js';
 import { icons } from './icons.js';
@@ -188,6 +189,7 @@ export async function newProjectWizard({ template = 'empty' } = {}) {
   });
   // the synthesis tool: Silinx (its own flow, no ISE) or XST (Xilinx ISE, as set in Toolchain Settings)
   const synthSel = select(SYNTH_TOOLS, 'silinx');
+  dp.lockSynth(synthSel);
   const langSel = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], 'vhdl');
   // the type of the top-level source: HDL, or a diagram / table whose HDL module is kept in sync
   const topType = select(TOP_TYPES.map(t => [t.id, t.label]), 'hdl');
@@ -344,7 +346,7 @@ export async function zipFolderSelection(fileList) { // exported for tests
 }
 
 export async function importXiseDialog() {
-  const fileInp = h('input', { type: 'file', multiple: true, accept: '.zip,.xise,.v,.vhd,.vhdl,.ucf' });
+  const fileInp = h('input', { type: 'file', multiple: true, accept: '.zip,.xise,.v,.vhd,.vhdl,.ucf,.pcf' });
   const dirInp = h('input', { type: 'file', webkitdirectory: true, multiple: true });
   const name = h('input', { type: 'text', placeholder: 'new project name' });
   const info = h('div', { class: 'hint', style: { minHeight: '16px' } });
@@ -481,7 +483,7 @@ export { newSourceWizard } from './new-source.js';
 export const addSourceTitle = () => (document.documentElement.dataset.layout === 'tasks' ? 'Import Source' : 'Add Copy of Source');
 /** Add Copy of Source… (`role`: the association first chosen; `title`: Import Test Bench, Simulation only, #1385, #1501). */
 export async function addSourceDialog({ role: first = 'design', title = addSourceTitle() } = {}) {
-  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.mem,.hex,.asm.json,.json' });
+  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.pcf,.mem,.hex,.asm.json,.json' });
   const role = select([['design', 'All (Implementation + Simulation)'], ['impl', 'Implementation only'], ['sim', 'Simulation only']], typeof first === 'string' ? first : 'design');
   // (the modern interface asks no association: Import Source's All, Import Test Bench's Simulation only, #1501)
   const ask = document.documentElement.dataset.layout !== 'tasks';
@@ -494,7 +496,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
   const written = [];
   for (const f of inp.files) {
     const ext = f.name.split('.').pop().toLowerCase();
-    const dir = ext === 'ucf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
+    const dir = ext === 'ucf' || ext === 'pcf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
     const text = await f.text();
     // a drawing named with a reserved word of VHDL or Verilog (its HDL is generated): refused (#679); an
@@ -507,7 +509,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
     if ((S.diskTree || S.fileTree).includes(path) && !await confirmDlg(title, `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, path, text);
     written.push(path);
-    if (ext === 'ucf' && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
+    if ((ext === 'ucf' || ext === 'pcf') && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
   }
   if (!written.length) return;
   // the association (role) of exactly the files written
@@ -554,6 +556,7 @@ export async function projectProperties() {
   const lang = select([['vhdl', 'VHDL'], ['verilog', 'Verilog']], pj.preferredLanguage || 'vhdl');
   // a project from before the setting follows Toolchain Settings
   const synth = select(SYNTH_TOOLS, pj.synthTool || (S.toolchain?.config?.mode === 'silinx' ? 'silinx' : 'xst'));
+  dp.lockSynth(synth);
   const r = await dialog({
     title: 'Design Properties', width: 520,
     body: h('div', { class: 'form-grid' },
@@ -578,6 +581,7 @@ export async function projectProperties() {
   pj.device = dp.value();
   pj.preferredLanguage = lang.value;
   pj.synthTool = synth.value;
+  constraintsForDevice(pj, S.fileTree, app.log);
   await app.saveProjectJson();
   // every drawing in the new language, its HDL file made again in it (#1477)
   if (lang.value !== oldLang) {

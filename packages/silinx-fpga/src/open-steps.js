@@ -26,7 +26,9 @@ export const XILINX_STEPS = [
 export function orderSteps(list, asked = []) {
   const byId = new Map(list.map(s => [s.id, s]));
   const set = new Set();
-  const add = id => {
+  const add = asked1 => {
+    // (the interface's chain asks for Map: a list without it maps in its Place & Route, nextpnr's)
+    const id = asked1 === 'map' && !byId.has('map') && byId.has('par') ? 'par' : asked1;
     if (set.has(id)) return;
     if (!byId.has(id)) throw new Error(`no step ${id} (the steps: ${list.map(s => s.id).join(', ')})`);
     set.add(id);

@@ -118,7 +118,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 |---|---|---|---|---|---|
 | Spartan-3E | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser and local |
 | Spartan-6 | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser (the Silinx engine, #2103) and local |
-| iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works, flow only: local server, and the browser's worker where the server serves it; no board or device in the interface yet (#2297, #2310) |
+| iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works, local server, and the browser's worker where the server serves it; its 12 parts in the interface (#2463), no board yet (#2297) |
 | ECP5, MachXO2 | `synth_ecp5`, to be defined | nextpnr | `ecppack`, Project Trellis | LPF | Planned (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel | `gowin_pack` (Python: the browser's path is to be decided) | CST | Planned (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |

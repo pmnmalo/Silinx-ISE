@@ -71,7 +71,7 @@ uiTest('New Project wizard: every device family (no board), the device list foll
     assert.equal(r.project.board, null);
     assert.equal(r.project.device.part, last.part);
     assert.ok(Object.keys(last.packages).includes(r.project.device.package));
-    assert.ok(last.speeds.includes(r.project.device.speed));
+    assert.ok(last.speeds.length ? last.speeds.includes(r.project.device.speed) : r.project.device.speed === '', f.id);   // (the iCE40's: none, #2463)
   }
   // from the blinky example: its sources, hierarchy and constraints
   const r = await newProject(page, { name: 'FromExample', template: 'blinky', board: 'basys2' });
