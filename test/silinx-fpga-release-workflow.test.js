@@ -43,10 +43,13 @@ test('#1681 silinx-fpga release: the commit on main, its version and changelog, 
   assert.deepEqual([checkout, main, setup, version, ci, publish], [0, 1, 2, 3, 4, 5]);
   assert.equal(publish, steps.length - 1);
   assert.match(publishStep, /npm publish -w silinx-fpga --provenance --access public --ignore-scripts\n/);
-  // the token from the secret, through the environment: the npmrc names the variable, never its value
-  assert.match(publishStep, /echo '\/\/registry\.npmjs\.org\/:_authToken=\$\{NODE_AUTH_TOKEN\}' > "\$RUNNER_TEMP\/\.npmrc"/);
-  assert.match(publishStep, /NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}\n/);
-  assert.equal(yml.match(/secrets\./g).length, 1);
+  // npm's trusted publishing (#2428): GitHub's OIDC token, no secret, no npmrc; npm 11.5.1 or later, pinned, before publishing
+  assert.match(yml, /\n {2}id-token: write/);
+  assert.doesNotMatch(yml, /secrets\.|NODE_AUTH_TOKEN|_authToken|npmrc/i);
+  const npm = /run: \|\n\s+npm install --global npm@(\d+)\.(\d+)\.(\d+) --ignore-scripts --no-audit --no-fund\n\s+npm publish /.exec(publishStep);
+  assert.ok(npm, 'npm installed, pinned, then the publish');
+  const [maj, min, pat] = npm.slice(1).map(Number);
+  assert.ok(maj > 11 || (maj === 11 && (min > 5 || (min === 5 && pat >= 1))), npm.slice(1).join('.'));
   // the tests are CI's, not run again here; no GitHub Release (the Pages site serves the IDE's latest)
   assert.doesNotMatch(yml, /npm test\b|gh release/);
 });
