@@ -101,7 +101,7 @@ for (const theme of ['light', 'dark']) {
 // without the cards' caption
 uiTest('#1409 classic: the dialogs\' title bars as before (not shrunk), the summary without the cards\' caption', E, async (page) => {
   await makeProject(env, { name: 'DlgClassic', template: 'blinky' });
-  await boot(page, { ui: 'classic' });
+  await boot(page, { ui: 'ise' });
   await page.openProject('DlgClassic');
   await page.eval(() => import('/js/wizards.js').then((w) => { w.toolchainDialog(); }));
   await page.waitDialog('Toolchain Settings');

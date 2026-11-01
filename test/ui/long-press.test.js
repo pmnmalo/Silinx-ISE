@@ -151,7 +151,7 @@ uiTest('#263 a long press opens the right-click menu of a Design-pane row, its b
   await page.leftTab('design');
 
   assert.deepEqual(await warnings(page), []);
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 uiTest('#263 a long press on the ISim wave window\'s canvas opens its menu (Add Marker Here …) at the press, its names and objects too; a tap or a moving press does not', E, async (page) => {
   await makeProject(env, { name: 'TouchWave', top: 'cnt', files: { 'src/cnt.vhd': CNT, 'sim/tb.vhd': TB }, roles: { 'sim/tb.vhd': 'sim' } });

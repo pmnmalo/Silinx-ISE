@@ -73,14 +73,14 @@ uiTest('#1314 the header\'s Settings: About, Interface, Language, Theme, Check f
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // Interface ▸ Classic: the classic interface (no header buttons there), its menus
   await settingsMenu(page, 'Interface', 'Classic');
-  await page.waitFor(() => document.documentElement.dataset.ui === 'classic');
+  await page.waitFor(() => document.documentElement.dataset.ui === 'ise');
   assert.equal(await page.eval(() => document.getElementById('settings-btn').getClientRects().length), 0);
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
-}, { ui: 'modern' });
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('silinx'));
+}, { ui: 'silinx' });
 
 uiTest('modern interface by default: the Tasks layout, header with search and the tasks, Design\'s tabs on top, tabs on top, empty state', E, async (page) => {
   await page.waitForSelector('#start-page .start-box');
-  assert.deepEqual(await ui(page), { ui: 'modern', theme: 'light' });
+  assert.deepEqual(await ui(page), { ui: 'silinx', theme: 'light' });
   const L = await page.eval(() => {
     const r = (id) => document.getElementById(id).getBoundingClientRect();
     const vis = (sel) => { const e = document.querySelector(sel); return !!e && e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none'; };
@@ -129,7 +129,7 @@ uiTest('View ▸ Interface: the Xilinx ISE look and back, live and remembered af
   // (Modern, the Tasks layout, and Classic: #1149)
   assert.deepEqual(subs, [{ label: 'Modern', checked: true }, { label: 'Classic', checked: false }]);
   await subMenu(page, 'View', 'Interface', 'Classic');
-  await page.waitFor(() => document.documentElement.dataset.ui === 'classic');
+  await page.waitFor(() => document.documentElement.dataset.ui === 'ise');
   const C = await page.eval(() => {
     const r = (id) => document.getElementById(id).getBoundingClientRect();
     const shown = (id) => document.getElementById(id).getClientRects().length > 0;
@@ -140,17 +140,17 @@ uiTest('View ▸ Interface: the Xilinx ISE look and back, live and remembered af
       stored: localStorage.getItem('silinx.ui'),
     };
   });
-  assert.deepEqual(C, { title: true, search: false, tasks: 0, tabsBelow: true, leftTabsBelow: true, icons: 0, stored: 'classic' });
+  assert.deepEqual(C, { title: true, search: false, tasks: 0, tabsBelow: true, leftTabsBelow: true, icons: 0, stored: 'ise' });
   // no Theme menu in the classic look (light only)
   assert.ok(!(await page.openMenu('View')).some((x) => x.label === 'Theme'));
   await page.closeMenus();
   // remembered: the page loads in the classic look
   await page.reload();
-  assert.deepEqual(await ui(page), { ui: 'classic', theme: 'light' });
+  assert.deepEqual(await ui(page), { ui: 'ise', theme: 'light' });
   subs = await subMenu(page, 'View', 'Interface');
   assert.deepEqual(subs.map((s) => s.checked), [false, true]);
   await subMenu(page, 'View', 'Interface', 'Modern');
-  await page.waitFor(() => document.documentElement.dataset.ui === 'modern' && document.documentElement.dataset.layout === 'tasks' && document.getElementById('task-switch'));
+  await page.waitFor(() => document.documentElement.dataset.ui === 'silinx' && document.documentElement.dataset.layout === 'tasks' && document.getElementById('task-switch'));
   assert.ok((await page.openMenu('View')).some((x) => x.label === 'Theme'));
   await page.closeMenus();
 }, O);
@@ -163,7 +163,7 @@ uiTest('#987 the header: the project and its document, not the product and versi
     logo: document.querySelector('#titlebar .app-logo').title, window: document.title }));
   for (const look of ['Classic', 'Modern']) {
     await subMenu(page, 'View', 'Interface', look);
-    await page.waitFor((l) => document.documentElement.dataset.ui === l, [look.toLowerCase()]);
+    await page.waitFor((l) => document.documentElement.dataset.ui === l, [look === 'Classic' ? 'ise' : 'silinx']);
     const none = await head();
     assert.doesNotMatch(none.text, /Silinx|\d+\.\d+\.\d+/, look);
     assert.match(none.logo, /^Silinx ISE \S/, look);
@@ -174,7 +174,7 @@ uiTest('#987 the header: the project and its document, not the product and versi
   await page.openProject('HeadPj');
   for (const look of ['Classic', 'Modern']) {
     await subMenu(page, 'View', 'Interface', look);
-    await page.waitFor((l) => document.documentElement.dataset.ui === l, [look.toLowerCase()]);
+    await page.waitFor((l) => document.documentElement.dataset.ui === l, [look === 'Classic' ? 'ise' : 'silinx']);
     const pj = await head();
     assert.doesNotMatch(pj.text, /Silinx|\d+\.\d+\.\d+/, look);
     assert.match(pj.window, /^HeadPj — Silinx ISE \S/, look);
@@ -182,7 +182,7 @@ uiTest('#987 the header: the project and its document, not the product and versi
   }
   // in Portuguese the classic title bar's Design Summary too (#1007)
   await subMenu(page, 'View', 'Interface', 'Classic');
-  await page.waitFor(() => document.documentElement.dataset.ui === 'classic');
+  await page.waitFor(() => document.documentElement.dataset.ui === 'ise');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor(() => document.getElementById('title-text').textContent === 'HeadPj - [Resumo do Projeto]', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));

@@ -100,7 +100,7 @@ uiTest('#1509 any other document prints a copy of what it shows (the Design Summ
   assert.match(html, /Device Utilization Summary/);
   assert.doesNotMatch(html, /<button/, 'no buttons');
   // the dark theme (the modern interface): the page is light, the drawings' styles read in the light theme
-  if (await page.eval(() => document.documentElement.dataset.ui === 'modern')) {
+  if (await page.eval(() => document.documentElement.dataset.ui === 'silinx')) {
     const snapshot = () => page.eval(async () => {
       const { svgSnapshot } = await import('/js/print.js');
       const svg = document.querySelector('.doc:not([hidden]) .se-svg');
@@ -119,7 +119,7 @@ uiTest('#1509 any other document prints a copy of what it shows (the Design Summ
     await page.click('#toolbar .tb-btn[data-cmd=print]');
     await confirmPrint(page);
     html = await printed(page, 2);
-    assert.match(html, /^<html data-ui="modern" data-theme="light"/);
+    assert.match(html, /^<html data-ui="silinx" data-theme="light"/);
     await page.eval(async () => (await import('/js/modern.js')).setTheme('system'));
   }
   assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);

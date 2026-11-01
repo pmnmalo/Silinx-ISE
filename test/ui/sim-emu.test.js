@@ -144,7 +144,7 @@ uiTest('#925 message centre: ISim\'s console and command line, the emulator\'s M
   await page.waitFor(() => window.Silinx.active?.id === 'emulator' && window.Silinx.active.view?.outputs, [], { what: 'the emulator', timeout: 60000 });
   assert.ok(!(await page.eval(() => !!document.querySelector('.doc:not([hidden]) .emu-log')?.getClientRects().length)), 'the Messages box not shown');
   assert.ok(await page.eval(() => [...document.querySelectorAll('#console-log .ln[data-src="emu"]')].some((l) => /^Board Emulator: 'top'/.test(l.textContent))));
-}, { timeout: 120000, ui: 'classic' });
+}, { timeout: 120000, ui: 'ise' });
 
 uiTest('board emulator: a manual clock on a button (BTN0) — the flip-flop takes the switch only at a press', E, async (page) => {
   const fx = (f) => fs.readFileSync(path.join(ROOT, 'test/fixtures/open-flow/feat_manual_clock', f), 'utf8');
@@ -437,9 +437,9 @@ uiTest('#918 board emulator: its status line whole at every window width (a row 
   await page.waitFor(() => /^t = .* cycles .* kHz \(.*% of real time\)$/.test(document.querySelector('.doc:not([hidden]) .emu .stat')?.textContent || ''), [], { what: 'the status line' });
   const cut = [];
   // (the modern interface: the Tasks one, its Emulate, #1149)
-  for (const ui of ['classic', 'modern']) {
+  for (const ui of ['ise', 'silinx']) {
     await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
-    if (ui === 'modern') { await page.waitFor(() => document.documentElement.dataset.layout === 'tasks'); await page.click('#task-switch .task-btn[data-task="emu"]'); }
+    if (ui === 'silinx') { await page.waitFor(() => document.documentElement.dataset.layout === 'tasks'); await page.click('#task-switch .task-btn[data-task="emu"]'); }
     for (let w = 600; w <= 1920; w += 20) {
       await page.setViewport(w, 900);
       // (a narrow screen's drawer, over the document, closed)
@@ -457,7 +457,7 @@ uiTest('#918 board emulator: its status line whole at every window width (a row 
     }
   }
   assert.deepEqual(cut, [], 'the whole status line, inside the window, not covered');
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('silinx'));
   await page.setViewport(1366, 768);
 }, { timeout: 300000, build: { commit: 'abc1234', date: '2026-10-21 12:00' } });
 

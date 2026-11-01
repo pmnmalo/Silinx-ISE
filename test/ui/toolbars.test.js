@@ -131,7 +131,7 @@ uiTest('#1409 a touch screen: every button 40 px, the rows 32 px, a document\'s 
 // the classic interface: its toolbars as before (ISE's sizes)
 uiTest('#1409 classic: the toolbars as before', E, async (page) => {
   await makeProject(env, { name: 'Classic', template: 'gates' });
-  await boot(page, { ui: 'classic' });
+  await boot(page, { ui: 'ise' });
   await page.openProject('Classic');
   await page.eval(() => window.SilinxApp.openFile('src/gates.sch.json'));
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .se-toolbar')?.getClientRects().length > 0, [], { what: 'the schematic' });

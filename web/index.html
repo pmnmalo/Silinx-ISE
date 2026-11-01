@@ -19,14 +19,17 @@
 <link rel="stylesheet" href="/css/modern.css">
 <link rel="stylesheet" href="/css/tasks.css">
 <link rel="stylesheet" href="/css/messages.css">
-<script>/* the interface (modern | classic) and theme before the first paint: web/js/modern.js */
-(function () { var d = document.documentElement, ui = 'modern', th = 'system';
+<script>/* the interface (silinx | ise) and theme before the first paint: web/js/modern.js */
+(function () { var d = document.documentElement, ui = 'silinx', th = 'system';
   /* the site's development edition (dev/) keeps its own settings: web/js/prefs.js prefKey (#1243) */
   var k = /\/dev\//.test(location.pathname) ? 'silinx.dev.' : 'silinx.';
-  try { ui = localStorage.getItem(k + 'ui') === 'classic' ? 'classic' : 'modern'; th = localStorage.getItem(k + 'theme') || 'system'; } catch (e) {}
+  /* a preference saved with the ids of before (#2451) migrated once: web/js/modern.js LEGACY_INTERFACES */
+  try { var v = localStorage.getItem(k + 'ui'), was = v; v = v === 'modern' ? 'silinx' : v === 'classic' ? 'ise' : v;
+    if (v !== was) localStorage.setItem(k + 'ui', v);
+    ui = v === 'ise' ? 'ise' : 'silinx'; th = localStorage.getItem(k + 'theme') || 'system'; } catch (e) {}
   var dark = th === 'dark' || (th !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-  d.setAttribute('data-ui', ui); if (ui === 'modern') d.setAttribute('data-layout', 'tasks');
-  d.setAttribute('data-theme', ui !== 'classic' && dark ? 'dark' : 'light');
+  d.setAttribute('data-ui', ui); if (ui === 'silinx') d.setAttribute('data-layout', 'tasks');
+  d.setAttribute('data-theme', ui !== 'ise' && dark ? 'dark' : 'light');
   /* narrow screens: the left side's drawer as the viewer left it (web/js/narrow.js, #266) */
   var dr = 'open'; try { dr = localStorage.getItem(k + 'drawer') === 'closed' ? 'closed' : 'open'; } catch (e) {}
   d.setAttribute('data-drawer', dr);

@@ -67,7 +67,7 @@ test('#1509 the print view of a source: every line numbered, HDL highlighted, es
   assert.equal(metaLine({ project: 'P', file: 'src/e.vhd' }), 'Project: P  ·  File: src/e.vhd');
   assert.equal(metaLine({ project: 'P' }), 'Project: P');
   const page = printPageHtml({ title: 'Source <e>', meta: 'Project: P', body, css: TEXT_CSS });
-  assert.match(page, /^<!doctype html><html data-ui="classic" data-theme="light"/);
+  assert.match(page, /^<!doctype html><html data-ui="ise" data-theme="light"/);
   assert.match(page, /<header class="pv-head"><b>Source &lt;e&gt;<\/b><span>Project: P<\/span><\/header>/);
   assert.match(page, /background: #fff !important/);
   assert.doesNotMatch(page, /<script/i);

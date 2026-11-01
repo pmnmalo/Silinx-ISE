@@ -25,7 +25,11 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { uiInterface } from './interface.js';
 
+// SILINX_UI_INTERFACE: silinx (the default) or ise; an id of before (modern, classic) mapped, with a warning (#2451),
+// before any test file reads it
+if (process.env.SILINX_UI_INTERFACE) process.env.SILINX_UI_INTERFACE = uiInterface(process.env.SILINX_UI_INTERFACE);
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const debug = (...a) => { if (process.env.SILINX_UI_DEBUG) console.error(`# [ui ${new Date().toISOString().slice(11, 23)}]`, ...a); };
@@ -854,8 +858,8 @@ function initScripts({ updateCheck, build, ui }) {
     ...(build ? [`window.__SILINX_BUILD__ = ${JSON.stringify(build)};`] : []),
     // the Console's lines, every one: the modern interface's message centre hides those of the other tasks (#1149)
     "window.__console = () => [...(document.getElementById('console-log')?.children || [])].map((l) => l.textContent).join('\\n');",
-    // SILINX_UI_INTERFACE=classic: run the tests in the Xilinx ISE interface (the default is the modern one)
-    // a test of the classic interface's own parts (its views, its Processes panel: the modern interface has none, #1149)
+    // SILINX_UI_INTERFACE=ise: run the tests in the ISE style interface (the default is the Silinx one)
+    // ui: 'ise': a test of that interface's own parts (its views, its Processes panel: the Silinx interface has none, #1149)
     // (the site's development edition, dev/: its own key, web/js/prefs.js, #1243)
     ...[ui, process.env.SILINX_UI_INTERFACE].filter(Boolean).map((v) => `try { var k = /\\/dev\\//.test(location.pathname) ? 'silinx.dev.ui' : 'silinx.ui'; if (!localStorage.getItem(k)) localStorage.setItem(k, ${JSON.stringify(v)}); } catch (e) {}`),
   ];

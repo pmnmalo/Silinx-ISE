@@ -922,7 +922,7 @@ uiTest('browser edition: File ▸ Open Workspace Folder… keeps the projects in
   const bar = !await page.eval(() => document.documentElement.dataset.layout);
   assert.ok(pt.includes('Reabrir Silinx-projects') && pt.includes('Onde Ficam os Projetos') && (!bar || pt.includes('Armazenamento: este navegador')), pt.join(' | '));
   assert.deepEqual(untranslated(en, pt, [/^(InBrowser|Disk|Silinx-projects)$/]), []);
-}, { url: () => 'about:blank', skip: chromeOnly, timeout: 120000, ui: 'classic' });
+}, { url: () => 'about:blank', skip: chromeOnly, timeout: 120000, ui: 'ise' });
 
 // (the File and Edit menus: the classic interface's, the modern one has none, #1307)
 uiTest('browser edition without the File System Access API (Firefox, Safari): Open Workspace Folder… disabled, and why', E, async (page) => {
@@ -940,7 +940,7 @@ uiTest('browser edition without the File System Access API (Firefox, Safari): Op
   // the browser's storage works as before
   await newProject(page, 'NoFolder', 'blinky');
   assert.ok(await page.eval(() => JSON.parse(localStorage.getItem('silinx.standalone.fs')).NoFolder.json.name === 'NoFolder'));
-}, { url: () => 'about:blank', skip: chromeOnly, ui: 'classic' });
+}, { url: () => 'about:blank', skip: chromeOnly, ui: 'ise' });
 
 // a new project from an example in the browser edition (the site): the New Project wizard
 async function newSiteProject(page, name, example) {
@@ -1089,10 +1089,10 @@ uiTest('the site\'s development edition (dev/) keeps its own settings (#1243): i
     await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what });
     return page.eval(() => ({ ui: document.documentElement.dataset.ui, menus: [...document.querySelectorAll('#menubar .item')].map((e) => e.textContent.trim()).join(' ') }));
   };
-  // (SILINX_UI_INTERFACE=classic: both editions start in the classic interface)
+  // (SILINX_UI_INTERFACE=ise: both editions start in the ISE style interface)
   const first = (await boot(siteUrl, 'stable boot')).ui;
-  const other = first === 'classic' ? 'modern' : 'classic';
-  await subMenu(page, 'View', 'Interface', other === 'classic' ? 'Classic' : 'Modern');
+  const other = first === 'ise' ? 'silinx' : 'ise';
+  await subMenu(page, 'View', 'Interface', other === 'ise' ? 'Classic' : 'Modern');
   await page.waitFor((ui) => document.documentElement.dataset.ui === ui, [other], { what: 'the stable edition\'s interface changed' });
   // the development edition: still its own interface; its language changed there
   let dev = await boot(`${siteUrl}dev/`, 'dev boot');
@@ -1190,7 +1190,7 @@ uiTest('browser edition: Generate Post-Synthesis Simulation Model in the browser
   const out = await page.waitFor(() => { const t = Array.from(document.querySelector('.doc:not([hidden]) .isim-console')?.children || [], (e) => e.textContent).join('\n'); return /Simulation finished OK|ERROR/.test(t) ? t : null; }, [], { timeout: 120000, what: 'the simulation of the model' });
   assert.match(out, /Simulation finished OK/);
   assert.doesNotMatch(out, /ERROR/);
-}, { url: () => 'about:blank', ui: 'classic', timeout: 300000 });   // (the classic Processes' Generate … Simulation Model: the modern Implement has none, #1265)
+}, { url: () => 'about:blank', ui: 'ise', timeout: 300000 });   // (the classic Processes' Generate … Simulation Model: the modern Implement has none, #1265)
 
 uiTest('browser edition: Simulate Post-Synthesis Model with no model: "Generate and Simulate" generates it in the browser and the simulation starts (#490)', E, async (page) => {
   await newSiteProject(page, 'WebGenSim', 'blinky');

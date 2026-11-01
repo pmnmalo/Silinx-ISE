@@ -224,15 +224,23 @@ test('index.html: the modern interface (the Tasks one, #1149) before the first p
     const attrs = {};
     const d = { setAttribute: (k, v) => { attrs[k] = v; }, hasAttribute: () => false };
     new Function('document', 'localStorage', 'window', 'matchMedia', 'location', script.replace('<script>', ''))(
-      { documentElement: d }, { getItem: (k) => store[k] ?? null }, {}, () => ({ matches: false }), { pathname });
+      { documentElement: d }, { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } }, {}, () => ({ matches: false }), { pathname });
     return attrs;
   };
   // (the modern interface, the default, is the Tasks one, #1149: a stored tasks, or anything but classic)
-  const modern = { 'data-ui': 'modern', 'data-layout': 'tasks', 'data-theme': 'dark', 'data-drawer': 'open' };
-  for (const ui of ['modern', 'tasks', 'retro', null]) assert.deepEqual(run(ui), modern, String(ui));
-  assert.deepEqual(run('classic'), { 'data-ui': 'classic', 'data-theme': 'light', 'data-drawer': 'open' });
+  const modern = { 'data-ui': 'silinx', 'data-layout': 'tasks', 'data-theme': 'dark', 'data-drawer': 'open' };
+  for (const ui of ['silinx', 'tasks', 'retro', null]) assert.deepEqual(run(ui), modern, String(ui));
+  assert.deepEqual(run('ise'), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'open' });
   // the site's development edition (dev/) reads its own keys (#1243): not the stable edition's
-  const both = { 'silinx.ui': 'classic', 'silinx.theme': 'light', 'silinx.drawer': 'closed', 'silinx.dev.ui': 'modern', 'silinx.dev.theme': 'dark' };
+  const both = { 'silinx.ui': 'ise', 'silinx.theme': 'light', 'silinx.drawer': 'closed', 'silinx.dev.ui': 'silinx', 'silinx.dev.theme': 'dark' };
   assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: both }), modern);
-  assert.deepEqual(run(null, { pathname: '/Silinx-ISE/', store: both }), { 'data-ui': 'classic', 'data-theme': 'light', 'data-drawer': 'closed' });
+  assert.deepEqual(run(null, { pathname: '/Silinx-ISE/', store: both }), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'closed' });
+  // #2451 a preference saved with an old id: shown with its new one and stored so, once (web/js/modern.js LEGACY_INTERFACES)
+  const old = { 'silinx.ui': 'classic', 'silinx.dev.ui': 'modern', 'silinx.theme': 'dark', 'silinx.dev.theme': 'dark' };
+  assert.deepEqual(run(null, { store: old }), { 'data-ui': 'ise', 'data-theme': 'light', 'data-drawer': 'open' });
+  assert.deepEqual(run(null, { pathname: '/Silinx-ISE/dev/', store: old }), modern);
+  assert.deepEqual([old['silinx.ui'], old['silinx.dev.ui']], ['ise', 'silinx']);
+  const kept = { 'silinx.ui': 'tasks', 'silinx.theme': 'dark' };
+  assert.deepEqual(run(null, { store: kept }), modern);
+  assert.equal(kept['silinx.ui'], 'tasks', 'only the old ids rewritten');
 });

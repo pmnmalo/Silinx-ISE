@@ -163,7 +163,7 @@ test('test timings: merged from the parts, the files that no longer exist left o
   // a UI file measured in each interface (#912): the longer time
   assert.deepEqual(merge([{ 'test/ui/u.test.js': 4 }, { 'test/ui/u.test.js': 6 }, { 'test/ui/u.test.js': 5 }], ['test/ui/u.test.js']), { 'test/ui/u.test.js': 6 });
   const dir = tmp(t);
-  for (const [k, v] of [['unit-times-1', { 'test/a.test.js': 1 }], ['ui-times-modern-2', { 'test/b.test.js': 2 }]]) {
+  for (const [k, v] of [['unit-times-1', { 'test/a.test.js': 1 }], ['ui-times-silinx-2', { 'test/b.test.js': 2 }]]) {
     fs.mkdirSync(path.join(dir, k));
     fs.writeFileSync(path.join(dir, k, 'test-times.json'), JSON.stringify(v));
   }

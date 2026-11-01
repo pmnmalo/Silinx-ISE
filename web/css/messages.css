@@ -14,8 +14,8 @@
 /* the one command line: under the console's lines (modern: the grid's last row; classic: before the tabs below) */
 #mc-cmd { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; border-top: 1px solid var(--m-border, #c5c5c5);
   background: var(--m-surface, #fff); font: 12px var(--mono, monospace); flex: none; }
-html[data-ui="modern"] #console-wrap { grid-template-rows: auto minmax(0, 1fr) auto; }
-html[data-ui="modern"] #mc-cmd { grid-row: 3; grid-column: 1 / 3; height: 32px; padding: 0 12px; }
+html[data-ui="silinx"] #console-wrap { grid-template-rows: auto minmax(0, 1fr) auto; }
+html[data-ui="silinx"] #mc-cmd { grid-row: 3; grid-column: 1 / 3; height: 32px; padding: 0 12px; }
 #mc-cmd .mc-prompt { color: var(--m-accent, #15428b); font-weight: 600; flex: none; }
 #mc-cmd input { flex: 1; min-width: 0; height: 24px; border: none; outline: none; background: transparent; color: var(--m-fg, #000); font: inherit; }
 

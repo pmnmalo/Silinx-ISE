@@ -17,10 +17,10 @@ import { newDoc, normalizeDoc, symbolPins } from '../../core/schdoc.js';
 import { viewHdl } from '../../core/view-hdl.js';
 import { newModel } from '../../core/asm.js';
 import { newFsm } from '../../core/fsm.js';
-const IMPORT = process.env.SILINX_UI_INTERFACE === 'classic' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
+const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
 // a module's Create Test Bench (Wizard): the classic interface's only (the Tasks interface's test benches on its Test page, #1330)
-const TB = process.env.SILINX_UI_INTERFACE === 'classic' ? ['Create Test Bench (Wizard)…'] : [];
+const TB = process.env.SILINX_UI_INTERFACE === 'ise' ? ['Create Test Bench (Wizard)…'] : [];
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -155,7 +155,7 @@ for (const [ex, want] of Object.entries(EXAMPLES)) {
     assert.deepEqual(await rows(page), want.sim);
     await view(page, 'impl');
     assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR|generated from|made again|base/);
-  }, { ui: 'classic' });
+  }, { ui: 'ise' });
 }
 
 // #1303: a module defined again in another file: the library uses the last one, the first file's row stays, marked
@@ -181,7 +181,7 @@ uiTest('Design pane (#1303): a module defined again in another file keeps the fi
   assert.ok(g.some((x) => /^\s*warn gates \(gates\.sch\.json, redefined in zz_other\.vhd\)$/.test(x)), g.join(' | '));
   await page.eval(() => { const row = [...document.querySelectorAll('#hier .row')].find((x) => x.querySelector('.ico')?.dataset.ico === 'warn'); row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
   await page.waitFor(() => window.Silinx.active?.id === 'sch:src/gates.sch.json', [], { what: 'the schematic' });
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 // the menus of every module's row and badge in the examples: none of the commands removed by #220
 uiTest('Design pane (#220): a badge opens its view, its right-click shows that view\'s commands; the module\'s menu; no Convert to HDL, HDL as base, Remove Synchronized, truth table of a module, Export as ISE Schematic on a module', E, async (page) => {
@@ -428,7 +428,7 @@ uiTest('a drawing whose base was its HDL (before #220), its HDL what the drawing
   // opened again: nothing more to do
   await page.openProject('H_mig_same');
   assert.deepEqual(await consoleAfterOpen(page), []);
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 // (the classic interface's Design pane: its views, its tree without the modern one's groups, #1149)
 uiTest('drawings whose base was their HDL (before #220), the HDL edited by hand: the state diagram, the truth table and the ASM chart made again from it and made the base, the HDL kept as it is (said)', E, async (page) => {
@@ -466,7 +466,7 @@ uiTest('drawings whose base was their HDL (before #220), the HDL edited by hand:
   assert.deepEqual([a.generatedFile, a.base], ['src/speed_ctrl.vhd', undefined]);
   assert.equal(await readWs(env, 'H_mig_asm', 'src/speed_ctrl.vhd'), files.blinky['src/speed_ctrl.vhd']);
   assert.deepEqual(await rows(page), EXAMPLES.blinky.impl.map((r) => r.replace('H_blinky', 'H_mig_asm')));
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 // (the classic interface's Design pane: its views, its tree without the modern one's groups, #1149)
 uiTest('drawings whose base was their HDL (before #220) that cannot be made again from it (a schematic, HDL the diagram cannot show): the HDL kept as a plain module, the drawing out of the project (its file kept)', E, async (page) => {
@@ -519,7 +519,7 @@ end architecture rtl;
     '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
     '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
   ]);
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 // a drawing's HDL language (its editor's HDL language, a schematic's Language, a Petri net's Source Properties): its HDL file made again in it, the other one
 // removed (no Generate HDL any more, #220); a truth table's too (#696)
@@ -574,4 +574,4 @@ uiTest('#1100 the Design pane: the design tree right under the View selector, no
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   assert.equal((await pane()).words, false);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-}, { ui: 'classic' });
+}, { ui: 'ise' });

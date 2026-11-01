@@ -139,7 +139,7 @@ uiTest('open mode: Generate Programming File of blinky without ISE; the Processe
   await page.treeRow('#procs', 'View Implemented Design (FPGA)', { dbl: true, exact: true });
   await page.waitFor(() => window.SilinxApp.findDoc('fpgaview'), [], { what: 'FPGA view', timeout: 60000 });
   assert.equal(await page.eval(() => window.SilinxApp.S.active.title), 'FPGA (top)');
-}, { ui: 'classic' });
+}, { ui: 'ise' });
 
 uiTest('open mode: a device without a bit database or without a shipped description fails clearly (no offer to build it, #8)', E, async (page) => {
   await env.server.api('PUT', '/api/toolchain', { mode: 'silinx' });
@@ -512,7 +512,7 @@ uiTest('open mode: Generate Post-Synthesis Simulation Model of blinky, then Simu
   assert.doesNotMatch(out, /ERROR/);
   assert.match(await page.consoleText(), /with the post-synthesis netlist of 'top'/);
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
-}, { ui: 'classic', timeout: 300000 });
+}, { ui: 'ise', timeout: 300000 });
 
 // #121: the Post-Translate and Post-Map Simulation Models in the Silinx toolchain: the processes enabled (in
 // Portuguese too), each generates its model (the console's lines, no warning), and the test bench passes on the
@@ -560,7 +560,7 @@ uiTest('#121 open mode: Generate Post-Translate / Post-Map Simulation Model of b
   assert.equal(await page.eval(() => window.Silinx.active.title), 'SSim (tb_top, Post-Map)');
   assert.match(await page.consoleText(), /with the post-map netlist of 'top'/);
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
-}, { ui: 'classic', timeout: 420000 });
+}, { ui: 'ise', timeout: 420000 });
 
 // #122: the Post-Place & Route Simulation Model in the Silinx toolchain: the process enabled (in Portuguese too);
 // it writes the model and its SDF; Simulate Post-Place & Route Model runs it with the SDF's delays (the console
@@ -602,7 +602,7 @@ uiTest('#122 open mode: Generate Post-Place & Route Simulation Model of blinky, 
   assert.doesNotMatch(out, /ERROR|Error|Timing violation/);
   assert.equal(await page.eval(() => window.Silinx.active.title), 'SSim (tb_top, Post-Place & Route)');
   await env.server.api('PUT', '/api/toolchain', { mode: 'local' });
-}, { ui: 'classic', timeout: 480000 });
+}, { ui: 'ise', timeout: 480000 });
 
 // #490: Simulate Post-Synthesis Model with no model yet: a dialog offers to generate it ("Generate and
 // Simulate"); Cancel (or Escape) runs nothing; in Portuguese; Enter generates it and the simulation starts
@@ -1008,7 +1008,7 @@ uiTest('#282 open mode: Optimization Effort Normal (the default) synthesizes onc
   await page.waitFor(async () => (await (await fetch('/api/projects/OpenEffort')).json()).impl.optLevel === 1, [], { what: 'Normal saved' });
   log = await run('Implement Design');
   assert.ok(!/is up to date/.test(log) && log.includes(NORMAL), log.slice(0, 2000));
-}, { timeout: 300000, ui: 'classic' });
+}, { timeout: 300000, ui: 'ise' });
 
 // #2136: Process Properties chooses the place and route engine of the Silinx toolchain; nextpnr (Silinx when it cannot)
 // by default: it implements blinky with nextpnr; the Silinx engine when chosen, saved with the project; Portuguese

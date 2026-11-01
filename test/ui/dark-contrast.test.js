@@ -64,11 +64,11 @@ end rtl;
  *  classic interface is light only), with the scan installed; returns the checker: check(where)
  *  adds what the scan finds on the whole page, `bad` the list. */
 async function themed(page, theme) {
-  await page.eval((t) => { localStorage.setItem('silinx.ui', 'modern'); localStorage.setItem('silinx.theme', t); }, theme);
+  await page.eval((t) => { localStorage.setItem('silinx.ui', 'silinx'); localStorage.setItem('silinx.theme', t); }, theme);
   await page.reload();
   await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot' });
   // (the drawer of a narrow screen, #266; the modern interface's layout by tasks and its arrangement, #1149)
-  assert.deepEqual(await page.eval(() => ({ ...document.documentElement.dataset })), { ui: 'modern', theme, drawer: 'open', layout: 'tasks', task: 'edit', side: 'open', console: 'open', max: 'off', nodocs: 'on' });   // (no document yet: no tab bar, #1289)
+  assert.deepEqual(await page.eval(() => ({ ...document.documentElement.dataset })), { ui: 'silinx', theme, drawer: 'open', layout: 'tasks', task: 'edit', side: 'open', console: 'open', max: 'off', nodocs: 'on' });   // (no document yet: no tab bar, #1289)
   await page.eval(CONTRAST);
   const bad = [];
   const skip = EXCEPTIONS.filter((x) => !x.theme || x.theme === theme).map((x) => x.skip).join(', ');

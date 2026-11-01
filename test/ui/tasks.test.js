@@ -56,7 +56,7 @@ async function noWarnings(page) {
 uiTest('View ▸ Interface ▸ Modern: the task switcher in the header, the task\'s bar; live, remembered, and back to Classic', E, async (page) => {
   await page.setViewport(1366, 768);
   // from the classic interface (whatever interface the suite runs in: SILINX_UI_INTERFACE)
-  await page.eval(() => localStorage.setItem('silinx.ui', 'classic'));
+  await page.eval(() => localStorage.setItem('silinx.ui', 'ise'));
   await page.reload();
   await page.waitFor(() => window.Silinx?.startupChecked && document.querySelector('#start-page .start-box'), [], { what: 'app boot' });
   // the classic interface has none of it
@@ -76,7 +76,7 @@ uiTest('View ▸ Interface ▸ Modern: the task switcher in the header, the task
     view: [...document.querySelectorAll('#task-view [title]')].map((b) => b.title),
   }));
   assert.deepEqual(L, {
-    ui: 'modern', stored: 'modern', tasks: ['Design', 'Simulate', 'Emulate', 'Implement'],   // (no Program: Implement's, #1172)
+    ui: 'silinx', stored: 'silinx', tasks: ['Design', 'Simulate', 'Emulate', 'Implement'],   // (no Program: Implement's, #1172)
     bar: ['Close'],   // (Close: a single document's, #854; Simulate's choices on its page, #1291; no action button, #1292)
     // (in the header, #1218; the Split button before Maximize, #1652, #1657)
     view: ['Show or hide the side panel', 'Show or hide the messages', 'Split the editor: two documents side by side, each side with its tabs', 'Maximize the document (double-click its tab)'],
@@ -93,10 +93,10 @@ uiTest('View ▸ Interface ▸ Modern: the task switcher in the header, the task
   // remembered: the page loads in the Tasks interface (set before the first paint)
   await page.reload();
   await page.waitFor(() => window.Silinx?.startupChecked, [], { what: 'app boot' });
-  assert.deepEqual(await page.eval(() => [document.documentElement.dataset.ui, document.documentElement.dataset.layout]), ['modern', 'tasks']);
+  assert.deepEqual(await page.eval(() => [document.documentElement.dataset.ui, document.documentElement.dataset.layout]), ['silinx', 'tasks']);
   assert.deepEqual(await noOverflow(page), { page: true, over: [] });
   // back to Classic: none of it, its status bar again
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.ok(!(await shown(page, '#task-switch')) && !(await shown(page, '#task-bar')));
   assert.ok(await shown(page, '#statusbar'), 'back in the classic interface, the status bar again');
@@ -354,7 +354,7 @@ uiTest('#854 #1161 #1426 Tasks: Emulate\'s document in its tab, no title in the 
   await page.click('#task-switch .task-btn[data-task="edit"]');
   assert.deepEqual(await docInfo(page), { tabs: true, info: null });
   // the classic interface: its tab bar as before
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.documentElement.dataset.single), undefined);
   assert.ok(await shown(page, '#doc-tabs'));
@@ -388,7 +388,7 @@ uiTest('#799 Tasks ▸ Edit: one design tree (the design, no constraints: #1250)
   await page.waitConsole(/Process "Check Syntax" completed successfully/);
   assert.equal(await page.eval(() => document.getElementById('err-count').textContent), '');
   // the classic interface: its views and Processes again, no constraints either
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.ok(await shown(page, '#design-panel .view-select') && await shown(page, '#proc-panel'));
   assert.ok(!(await hierRows(page)).some((r) => r === 'Test Benches' || r === 'Constraints' || /\.ucf\b/.test(r)));
@@ -455,7 +455,7 @@ uiTest('#993 Tasks ▸ Edit: Check Schematic\'s errors and warnings in the conso
   assert.equal(await page.eval(() => document.querySelector('#mc-filters .filt[data-src="check"]').textContent), 'Projeto');
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the modern interface: the editor's panel, as before
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   await page.click(`${ED} .se-btn[data-act=check]`);
   await page.waitFor((sel) => { const d = document.querySelector(`${sel} .se-diags`); return d && !d.hidden && /^Check Schematic: 1 error/.test(d.textContent); }, [ED], { what: 'the editor\'s panel' });
@@ -468,14 +468,14 @@ uiTest('#1042 no project chip in the header: modern (Tasks) and classic', E, asy
   await page.setViewport(1366, 768);
   await tasksInterface(page);
   await page.openProject('TasksChip');
-  for (const ui of ['modern', 'classic']) {
-    if (ui !== 'modern') await page.eval(async (x) => (await import('/js/modern.js')).setInterface(x), ui);
-    await page.waitFor((x) => (x === 'modern') === (document.documentElement.dataset.layout === 'tasks'), [ui], { what: ui });
+  for (const ui of ['silinx', 'ise']) {
+    if (ui !== 'silinx') await page.eval(async (x) => (await import('/js/modern.js')).setInterface(x), ui);
+    await page.waitFor((x) => (x === 'silinx') === (document.documentElement.dataset.layout === 'tasks'), [ui], { what: ui });
     assert.equal(await page.eval(() => document.getElementById('title-project')), null, ui);
     // (classic's title is ISE's, "TasksChip - [Design Summary]": the project there is the window's title, not a chip)
-    if (ui !== 'classic') assert.doesNotMatch(await page.eval(() => document.getElementById('titlebar').innerText), /TasksChip/, ui);
+    if (ui !== 'ise') assert.doesNotMatch(await page.eval(() => document.getElementById('titlebar').innerText), /TasksChip/, ui);
   }
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('silinx'));
   await noWarnings(page);
 }, { build: DEV });
 
@@ -534,7 +534,7 @@ uiTest('#800 Tasks ▸ Simulate: the waves get the screen; Simulate runs the tes
   assert.deepEqual(await noOverflow(page), { page: true, over: [] });
   await page.setViewport(1366, 768);
   // the modern interface: ISim as it was (its title bar, its Instances and Objects)
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.ok(await shown(page, '.doc:not([hidden]) .isim-title') && await shown(page, '.doc:not([hidden]) .isim-left'));
   await noWarnings(page);
@@ -586,7 +586,7 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
   assert.ok(f.inside && f.aim && f.side === 'beside', JSON.stringify(f));
   // the modern interface: the board at its own size again
   await page.setViewport(1366, 768);
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .emu-board-wrap').style.zoom), '');
   await noWarnings(page);
@@ -647,7 +647,7 @@ uiTest('#1021 #1999 Tasks ▸ Emulate: the board fits the window; the Watch and 
   // (the board fitting the height: a little smaller than its proper size, #1999)
   assert.ok(L.zoom >= 0.7 && L.watch === 'beside' && L.vga === 'below' && !L.scrollsAcross, JSON.stringify(L));
   // the modern and classic interfaces: the board at its own size, the side column and the VGA monitor in their order
-  for (const ui of ['classic']) {
+  for (const ui of ['ise']) {
     await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
     await page.waitFor(() => !document.documentElement.dataset.layout);
     assert.deepEqual(await page.eval(() => {
@@ -691,7 +691,7 @@ uiTest('#1022 Tasks ▸ Emulate: the emulation\'s time and rate right below the 
   assert.ok(s.where === 'board' && s.below && s.seen && !s.note, JSON.stringify(s));
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the modern and classic interfaces: at the end of the emulator's bar, the board's line below the board
-  for (const ui of ['classic']) {
+  for (const ui of ['ise']) {
     await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
     await page.waitFor(() => !document.documentElement.dataset.layout);
     await page.waitFor(() => /^t = .* cycles .* kHz \(.*% of real time\)$/.test(document.querySelector('.doc:not([hidden]) .emu .stat')?.textContent || ''), [], { what: `the status in ${ui}` });
@@ -701,7 +701,7 @@ uiTest('#1022 Tasks ▸ Emulate: the emulation\'s time and rate right below the 
     assert.match(s.noteText, /^Digilent Basys2 — top · Clock clk: 50 MHz on the board/, ui);
   }
   // and back to Tasks: below the board again
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('modern'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('silinx'));
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .emu-board-wrap > .stat'), [], { what: 'the status below the board again' });
   await noWarnings(page);
 }, { build: DEV });
@@ -729,7 +729,7 @@ uiTest('#1020 #1399 Tasks ▸ Emulate: the Watch shown at first; the side panel 
   await page.click('#task-switch .task-btn[data-task="emu"]');
   assert.deepEqual(await watch(), { side: 'folded', pressed: 'false', panel: false, shown: true, title: 'Watch', add: 'Add a signal to watch…' });
   // the modern and classic interfaces: the emulator's side column shown, as before
-  for (const ui of ['classic']) {
+  for (const ui of ['ise']) {
     await page.eval(async (u) => (await import('/js/modern.js')).setInterface(u), ui);
     await page.waitFor(() => !document.documentElement.dataset.layout);
     assert.deepEqual(await watch(), { side: null, pressed: null, panel: false, shown: true, title: 'Watch', add: 'Add a signal to watch…' }, ui);
@@ -830,7 +830,7 @@ uiTest('#802 Tasks ▸ Implement: the top\'s Processes, the Design Summary as ca
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-program button')?.textContent === 'Programar a placa…', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the classic interface: the summary's tables as before, no link; its tree and its views
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.ok(!(await shown(page, '.doc:not([hidden]) .task-program')));
   assert.ok(await shown(page, '#design-panel'));
@@ -882,7 +882,7 @@ uiTest('#803 #1172 Tasks ▸ Implement ▸ iMPACT: the chain and Program; settin
   await page.waitFor(() => document.querySelector('.doc:not([hidden]) .task-prog-settings')?.textContent === 'Placa, ferramenta de programação e cabo…', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the modern interface: iMPACT as it was (its fields and every PROM button, nothing added)
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.deepEqual(await page.eval(() => {
     const p = document.querySelector('.doc:not([hidden]) > .page');
@@ -924,7 +924,7 @@ uiTest('#876 Tasks: the activity bar in Edit only; Implement\'s Processes whatev
   await page.click('#task-switch .task-btn[data-task="edit"]');
   assert.deepEqual(await L(), { bar: true, left: true, side: true, procs: false, files: true });
   // the modern interface: the activity bar as before
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.ok(await shown(page, '#left-tabs'));
   await noWarnings(page);
@@ -978,7 +978,7 @@ uiTest('#984 Tasks ▸ Edit: its pages are tabs at the top of the side panel; fo
   assert.deepEqual((await T()).titles, ['Início', 'Projeto', 'Ficheiros', 'Bibliotecas', 'Implementação', 'Emular']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the modern interface: the activity bar as before, a column with every name, no tooltips
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.deepEqual(await page.eval(() => {
     const tabs = [...document.querySelectorAll('#left-tabs .tab')];
@@ -1115,7 +1115,7 @@ uiTest('#923 #1172 Tasks ▸ Implement: no Emulate processes, Configure Target D
   await sweep(5, 'after');
   // the modern interface: every process as before
   await page.setViewport(1366, 768);
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   procs = await procRows(page);
   assert.ok(procs.includes('Emulate on Board') && procs.includes('Configure Target Device'), procs.join(', '));
@@ -1191,7 +1191,7 @@ uiTest('Tasks: the message centre: every line\'s source, the filter following th
   await page.waitFor(() => document.querySelector('.pal-input')?.value === 'pin plan', [], { what: 'the palette with the command line\'s text' });
   await page.key('Escape');
   // the classic interface: its Console shows every source again (its filters at All, #925)
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => document.querySelector('#mc-filters .filt[aria-pressed="true"]')?.dataset.src === 'all');
   assert.equal(await page.eval(() => document.querySelectorAll('#console-log .ln.mc-off').length), 0);
   await noWarnings(page);
@@ -1208,16 +1208,32 @@ uiTest('#1149 without a development build: View ▸ Interface is Modern and Clas
   await page.waitForSelector('.menu-popup.sub .mi');
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.menu-popup.sub .mi .lbl')].map((l) => l.textContent)), ['Modern', 'Classic']);
   await page.closeMenus();
-  for (const stored of ['tasks', 'modern']) {
+  for (const stored of ['tasks', 'silinx']) {
     await page.eval((x) => localStorage.setItem('silinx.ui', x), stored);
     await page.reload();
     await page.waitFor(() => window.Silinx?.startupChecked && document.querySelector('#start-page .start-box'), [], { what: 'app boot' });
-    assert.deepEqual(await page.eval(() => [document.documentElement.dataset.ui, document.documentElement.dataset.layout ?? null]), ['modern', 'tasks'], stored);
+    assert.deepEqual(await page.eval(() => [document.documentElement.dataset.ui, document.documentElement.dataset.layout ?? null]), ['silinx', 'tasks'], stored);
     assert.ok((await shown(page, '#task-switch')) || (await shown(page, '#task-tabs')), stored);
   }
   // (a project opened: the start-up checks' warnings, which depend on the computer, are cleared)
   await makeProject(env, { name: 'TasksStored', template: 'gates' });
   await page.openProject('TasksStored');
+  await noWarnings(page);
+});
+
+// #2451 the interfaces' ids became silinx and ise: a preference saved with an old one (modern, classic) opens its
+// interface and is stored with the new id, before the first paint (web/index.html) as by the app (web/js/modern.js)
+uiTest('#2451 a stored modern or classic opens the Silinx or the ISE style interface, stored with its new id', E, async (page) => {
+  await page.waitFor(() => window.Silinx?.startupChecked && document.querySelector('#start-page .start-box'), [], { what: 'app boot' });
+  for (const [old, now, layout] of [['classic', 'ise', null], ['modern', 'silinx', 'tasks']]) {
+    await page.eval((x) => localStorage.setItem('silinx.ui', x), old);
+    await page.reload();
+    await page.waitFor(() => window.Silinx?.startupChecked && document.querySelector('#start-page .start-box'), [], { what: 'app boot' });
+    assert.deepEqual(await page.eval(() => [document.documentElement.dataset.ui, document.documentElement.dataset.layout ?? null, localStorage.getItem('silinx.ui')]), [now, layout, now], old);
+  }
+  // (a project opened: the start-up checks' warnings, which depend on the computer, are cleared)
+  await makeProject(env, { name: 'OldIds', template: 'gates' });
+  await page.openProject('OldIds');
   await noWarnings(page);
 });
 
@@ -1348,7 +1364,7 @@ uiTest('#1159 #1160 #1207 Tasks: no heading under the side panel\'s tabs; Implem
   assert.deepEqual((await impl()).tabs, [['procs', 'Implementação']]);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the classic interface: its headings, no Processes tab
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-procs-tab')), null);
   assert.ok((await heading()).length > 0);
@@ -1387,7 +1403,7 @@ uiTest('#1309 #1384 Tasks ▸ Design: Close Project under the Design tree, off w
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
   await page.waitFor(() => document.querySelector('#task-close-bar button:not([data-act])').textContent === 'Fechar Projeto', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-close-bar')), null);
   await noWarnings(page);
@@ -1422,7 +1438,7 @@ uiTest('#1329 #1330 Tasks ▸ Design: Check Design beside Close Project, the top
   await page.waitFor(() => document.querySelector('#task-close-bar [data-act="check-design"]').textContent === 'Verificar Projeto', [], { what: 'Portuguese' });
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the classic interface: no bar, the wizard in the module's menu
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-close-bar')), null);
   await page.treeRow('#hier', top, { right: true });
@@ -1445,7 +1461,7 @@ uiTest('#1321 Tasks: no menu bar, the toolbar in the header in its place, withou
   });
   assert.deepEqual(await L(), { menubar: false, inHeader: true, cmds: ['newProject', 'open', 'closeProject', 'print', 'undo', 'redo', 'cut', 'copy', 'paste', 'find'], oneLine: true });
   assert.ok(await page.eval(() => document.getElementById('toolbar').getBoundingClientRect().left < document.getElementById('task-switch').getBoundingClientRect().left), 'before the tasks');
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   const c = await L();
   assert.ok(c.menubar && !c.inHeader && ['stop', 'gear', 'help'].every((x) => c.cmds.includes(x)), JSON.stringify(c));
@@ -1577,7 +1593,7 @@ uiTest('#1265 Tasks ▸ Implement: no Generate Post-… Simulation Model process
   await page.click('#task-switch .task-btn[data-task="edit"]');
   assert.ok(!(await page.eval(() => [...document.querySelectorAll('#doc-tabs > .tab')].some((t) => t.getClientRects().length && /top\.ucf/.test(t.textContent)))));
   // the classic interface: its Processes keep the simulation models
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   await page.treeRow('#hier', 'top', {});
   await page.waitFor(() => [...document.querySelectorAll('#procs .lbl')].some((e) => e.textContent === 'Generate Post-Synthesis Simulation Model'), [], { what: 'classic: the models' });
@@ -1645,7 +1661,7 @@ uiTest('#1218 Tasks: the layout buttons at the top right, after the theme button
   assert.equal(await page.eval(() => document.querySelector('#task-view [data-act="max"]').getAttribute('aria-pressed')), 'true');
   await page.click('#task-view [data-act="max"]');
   // the classic interface: none
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-view')), null);
   // (the Split button: at the classic toolbar's right end, #1652)
@@ -1715,7 +1731,7 @@ uiTest('#1398 Tasks ▸ Implement: I/O Pin Planning and Program FPGA above the P
   await page.waitFor(() => document.querySelector('#task-impl-bar [data-act=program]').textContent === 'Programar FPGA', [], { what: 'Portuguese' });
   assert.deepEqual((await bar()).buttons, ['Planeamento de Pinos de E/S (off)', 'Programar FPGA']);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   assert.equal(await page.eval(() => document.getElementById('task-impl-bar')), null);
   await noWarnings(page);
@@ -1791,8 +1807,8 @@ for (const theme of ['light', 'dark']) uiTest(`#1409 Tasks (${theme}): the side 
 // folders' icon the app's (its rows as high as before, the files' and the folders')
 uiTest('#1409 classic: the Start page\'s commands with their icons, the Files page\'s folders with the app\'s icon', E, async (page) => {
   await makeProject(env, { name: 'ClassicAlike', template: 'blinky' });
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
-  await page.waitFor(() => document.documentElement.dataset.ui === 'classic' && !document.documentElement.dataset.layout, [], { what: 'classic' });
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
+  await page.waitFor(() => document.documentElement.dataset.ui === 'ise' && !document.documentElement.dataset.layout, [], { what: 'ise' });
   await page.openProject('ClassicAlike');
   await page.leftTab('start');
   await page.waitFor(() => document.querySelector('#start-page .start-box h3')?.getClientRects().length > 0, [], { what: 'the Start page' });

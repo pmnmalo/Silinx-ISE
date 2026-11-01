@@ -4,7 +4,7 @@ import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject, chromeOnly, BROWSER, PageGoneError } from './harness.js';
 import { TEXTS, untranslated } from './i18n-check.js';
-const IMPORT = process.env.SILINX_UI_INTERFACE === 'classic' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
+const IMPORT = process.env.SILINX_UI_INTERFACE === 'ise' ? 'Add Copy of Source' : 'Import Source';   // (#1501)
 
 let env;
 before(async () => { env = await setupUi(); });

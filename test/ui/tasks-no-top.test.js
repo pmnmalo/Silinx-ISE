@@ -58,10 +58,10 @@ uiTest('#1224 Tasks ▸ Implement with no top module: said so, Set Top Module…
   assert.match((await note(page)).text, /^Não está definido nenhum módulo de topo/);
   await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
   // the classic interface: none
-  await page.eval(async () => (await import('/js/modern.js')).setInterface('classic'));
+  await page.eval(async () => (await import('/js/modern.js')).setInterface('ise'));
   await page.waitFor(() => !document.documentElement.dataset.layout);
   await page.eval(() => window.SilinxApp.renderProcesses());
-  assert.equal(await note(page), null, 'classic');
+  assert.equal(await note(page), null, 'ise');
   assert.deepEqual(page.console.filter((c) => c.type === 'warning' || c.type === 'warn').map((c) => c.text), []);
 }, { build: DEV });
 
