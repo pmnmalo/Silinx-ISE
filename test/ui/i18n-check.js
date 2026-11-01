@@ -21,7 +21,7 @@ export const TEXTS = `window.__uiTexts = (root = document.body) => {
 const SAME = [
   /^[^A-Za-z]*$/,                                  // numbers, symbols
   /^@?[^a-z]*$/,                                   // ALL CAPS codes (VHDL, LVCMOS33, XC3S250E, CP132…)
-  /^@?(Silinx|ISE|ISim|iMPACT|XST|VHDL|Verilog|Spartan|Virtex|Artix|Kintex|Zynq|Digilent|Basys|Nexys|Xilinx|GitHub|Docker|SSH|Claude|Anthropic|Pedro|AMD|Pmod|JTAG|CCLK|OK|UCF|HDL|RTL|ASM|Ln|Col|xise|VCD|PNG|SVG|PDF|Petri)\b/,
+  /^@?(Silinx|ISE|ISim|iMPACT|XST|VHDL|Verilog|Spartan|Virtex|Artix|Kintex|Zynq|iCE40|Digilent|Basys|Nexys|Xilinx|GitHub|Docker|SSH|Claude|Anthropic|Pedro|AMD|Pmod|JTAG|CCLK|OK|UCF|HDL|RTL|ASM|Ln|Col|xise|VCD|PNG|SVG|PDF|Petri)\b/,
   /^@?[\w.-]+\.(vhdl?|v|ucf|json|zip|xise|sch|mem|asm\.json|sch\.json)$/i,   // file names
   /^@?(src|sim|constraints)\/?$/,
   /^@?xc\d|^@?xc[a-z0-9]+/i,                       // part names

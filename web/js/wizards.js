@@ -56,6 +56,7 @@ function devicePicker(db, device) {
     for (const k of pkgs) pkgSel.append(h('option', { value: k, selected: k === cur.package }, `${k.toUpperCase()}  (${part.packages[k].userIo ?? '?'} I/O)`));
     if (!part.speeds.includes(cur.speed)) cur.speed = part.speeds.find(x => !/L|N$/i.test(x)) || part.speeds[0]; // a standard grade, not low-power
     for (const sp of part.speeds) spdSel.append(h('option', { value: sp, selected: sp === cur.speed }, sp));
+    spdSel.disabled = !part.speeds.length;   // (the iCE40 has no speed grades)
   };
   famSel.addEventListener('change', () => fillParts());
   partSel.addEventListener('change', () => { cur.part = partSel.value; fillPkgs(); });
@@ -521,7 +522,7 @@ export { newSourceWizard } from './new-source.js';
 export const addSourceTitle = () => (document.documentElement.dataset.layout === 'tasks' ? 'Import Source' : 'Add Copy of Source');
 /** Add Copy of Source… (`role`: the association first chosen; `title`: Import Test Bench, Simulation only, #1385, #1501). */
 export async function addSourceDialog({ role: first = 'design', title = addSourceTitle() } = {}) {
-  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.mem,.hex,.asm.json,.json' });
+  const inp = h('input', { type: 'file', multiple: true, accept: '.v,.vhd,.vhdl,.ucf,.pcf,.mem,.hex,.asm.json,.json' });
   const role = select([['design', 'All (Implementation + Simulation)'], ['impl', 'Implementation only'], ['sim', 'Simulation only']], typeof first === 'string' ? first : 'design');
   // (the modern interface asks no association: Import Source's All, Import Test Bench's Simulation only, #1501)
   const ask = document.documentElement.dataset.layout !== 'tasks';
@@ -534,7 +535,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
   const written = [];
   for (const f of inp.files) {
     const ext = f.name.split('.').pop().toLowerCase();
-    const dir = ext === 'ucf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
+    const dir = ext === 'ucf' || ext === 'pcf' ? 'constraints' : role.value === 'sim' ? 'sim' : 'src';
     const path = `${dir}/${f.name}`;
     const text = await f.text();
     // a drawing named with a reserved word of VHDL or Verilog (its HDL is generated): refused (#679); an
@@ -547,7 +548,7 @@ export async function addSourceDialog({ role: first = 'design', title = addSourc
     if ((S.diskTree || S.fileTree).includes(path) && !await confirmDlg(title, `${path} already exists in the project. Replace it with the copy of ${f.name}?`)) continue;
     await api.writeFile(S.project.name, path, text);
     written.push(path);
-    if (ext === 'ucf' && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
+    if ((ext === 'ucf' || ext === 'pcf') && !S.fileTree.includes(S.project.constraints)) { S.project.constraints = path; await app.saveProjectJson(); }
   }
   if (!written.length) return;
   // the association (role) of exactly the files written

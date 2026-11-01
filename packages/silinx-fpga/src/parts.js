@@ -4,7 +4,7 @@
 // ./index.js gives all of it too.
 
 // the parts: their families and resources
-export { FAMILY_INFO, familyOfPart, deviceFamily, isIseFamily, familyName, familyFromXise, splitBitPart } from './family.js';
+export { FAMILY_INFO, familyOfPart, deviceFamily, constraintsFile, isIseFamily, familyName, familyFromXise, splitBitPart } from './family.js';
 export { resourcesOf, resourceCount, resourceOfPrimitive } from './resources.js';
 export { usedOfReport, primitiveInstances, deviceChangeIssues } from './resource-check.js';
 

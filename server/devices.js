@@ -20,6 +20,7 @@
 import { familyOfPart } from '../packages/silinx-fpga/src/parts.js';
 import { FAMILY } from './family.js';
 import { BOARDS } from './boards.js';
+import { ICE40_FAMILY, ICE40_DEVICES, ICE40_PACKAGES } from './devices-ice40.js';
 export { FAMILY } from './family.js';
 export { BOARDS } from './boards.js';
 
@@ -244,6 +245,7 @@ export const FAMILIES = [
     note: 'Zynq designs in ISE go through XPS/PlanAhead; the PS (ARM) side needs the processing-system IP. Z-7010/7020 have HR banks only; Z-7030 adds HP banks.',
     ioStandards: null, // Artix-7 (HR) + Kintex-7 (HP) SelectIO; filled below
   },
+  ICE40_FAMILY,
 ];
 
 const famById = Object.fromEntries(FAMILIES.map(f => [f.id, f]));
@@ -400,7 +402,7 @@ const NEW_PARTS = [
 ];
 
 /** Every part of every WebPACK family (Spartan-3E entries are the same objects as DEVICES.parts). */
-export const PARTS = [...DEVICES.parts, ...NEW_PARTS];
+export const PARTS = [...DEVICES.parts, ...NEW_PARTS, ...ICE40_DEVICES];
 for (const p of PARTS) {
   for (const k of Object.keys(p)) if (p[k] === undefined) delete p[k];
   if (p.verified === undefined) p.verified = true;
@@ -409,6 +411,7 @@ for (const p of PARTS) {
 /** Package descriptions for every package key used above. */
 export const PACKAGES = {
   ...DEVICES.packages,
+  ...ICE40_PACKAGES,
   cp132: '132-ball Chip-Scale Package (CSP)', fg456: '456-ball Fine-Pitch BGA (FBGA)', fg676: '676-ball Fine-Pitch BGA (FBGA)',
   tqg144: '144-pin Thin Quad Flat Pack, Pb-free (TQFP)', ftg256: '256-ball Fine-Pitch Thin BGA, Pb-free',
   fgg400: '400-ball Fine-Pitch BGA, Pb-free', fgg484: '484-ball Fine-Pitch BGA, Pb-free', fgg676: '676-ball Fine-Pitch BGA, Pb-free',
@@ -437,7 +440,7 @@ export function findPart(part) {
 /** Family record by id ('spartan6') or by ISE name ('Spartan6', 'Spartan3A and Spartan3AN'). */
 export function findFamily(id) {
   const s = String(id || '').trim().toLowerCase();
-  return famById[s] || FAMILIES.find(f => f.name.toLowerCase() === s || f.xiseFamily.toLowerCase() === s) || null;
+  return famById[s] || FAMILIES.find(f => f.name.toLowerCase() === s || f.xiseFamily?.toLowerCase() === s) || null;
 }
 
 /** Parts of a family (id or ISE name); empty list for unknown families. */
@@ -469,7 +472,7 @@ export function validateDevice(dev) {
   if (!pk) errs.push(`${p.part} is not available in package '${dev.package}' (valid: ${Object.keys(p.packages).join(', ')})`);
   const speeds = pk?.speeds || p.speeds;
   const sp = String(dev.speed ?? '');
-  if (!speeds.includes(sp.startsWith('-') ? sp : `-${sp}`)) errs.push(`speed grade '${dev.speed}' not available for ${p.part}-${dev.package} (valid: ${speeds.join(', ')})`);
+  if (speeds.length && !speeds.includes(sp.startsWith('-') ? sp : `-${sp}`)) errs.push(`speed grade '${dev.speed}' not available for ${p.part}-${dev.package} (valid: ${speeds.join(', ')})`);
   return errs;
 }
 

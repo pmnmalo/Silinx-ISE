@@ -57,6 +57,18 @@ const BUFH = { xc6slx4: 128, xc6slx9: 128, xc6slx16: 128, xc6slx25: 160, xc6slx4
 /** The resources of each family described here. A count is a function of the part record (and package);
  *  a fixed number is the family's own (the same on every part, the data sheet's or the user guide's). */
 const FAMILY_RESOURCES = {
+  // server/devices-ice40.js; the ids as the iCE40's synthesis reports them (open-flow-ice40.js)
+  ice40: [
+    { id: 'ffs', label: label('Flip-flops', 'Flip-flops'), report: 'Number of flip-flops', count: p => p.ffs,
+      primitives: ['SB_DFF', 'SB_DFFE', 'SB_DFFSR', 'SB_DFFR', 'SB_DFFSS', 'SB_DFFS', 'SB_DFFESR', 'SB_DFFER', 'SB_DFFESS', 'SB_DFFES', 'SB_DFFN', 'SB_DFFNE', 'SB_DFFNSR', 'SB_DFFNR', 'SB_DFFNSS', 'SB_DFFNS', 'SB_DFFNESR', 'SB_DFFNER', 'SB_DFFNESS', 'SB_DFFNES'] },
+    { id: 'luts', label: label('4-input LUTs', 'LUTs de 4 entradas'), report: 'Number of LUT4s', count: p => p.luts, primitives: ['SB_LUT4'] },
+    { id: 'iob', label: label('User I/O', 'E/S do utilizador'), report: 'Number of IOs',
+      count: (p, pkg) => (pkg ? p.packages?.[String(pkg).toLowerCase()]?.userIo ?? null : p.maxUserIo), primitives: ['SB_IO'] },
+    { id: 'ramb16', label: label('Block RAM (4 Kb)', 'RAM de bloco (4 Kb)'), report: 'Number of RAM4Ks', count: p => p.brams, primitives: ['SB_RAM40_4K', 'SB_RAM40_4KNR', 'SB_RAM40_4KNW', 'SB_RAM40_4KNRNW'] },
+    { id: 'mult18x18', label: label('DSPs', 'DSPs'), report: 'Number of DSPs', count: p => p.multipliers, primitives: ['SB_MAC16'] },
+    { id: 'bufgmux', label: label('Global buffers', 'Buffers globais'), report: 'Number of global buffers', count: () => 8, primitives: ['SB_GB', 'SB_GB_IO'] },
+    { id: 'dcm', label: label('PLLs', 'PLLs'), report: 'Number of PLLs', count: p => p.dcms, primitives: ['SB_PLL40_CORE', 'SB_PLL40_PAD', 'SB_PLL40_2_PAD', 'SB_PLL40_2F_CORE', 'SB_PLL40_2F_PAD'] },
+  ],
   // DS312 Table 1; the global clock buffers: 24 BUFGMUX on every part (DS312 "Clocking Infrastructure",
   // and the device reports of the shipped devices, packages/silinx-fpga/devices/)
   spartan3e: [
