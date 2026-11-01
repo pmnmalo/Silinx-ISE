@@ -8,12 +8,16 @@ import { runImpl } from './implement.js';
 import { programFileState, implementFirstText } from './impact-file.js';
 import { pinsReady } from './pins-check.js';
 import { loadUcfText } from './processes.js';
+import { mountIce40Program } from './program-ice40.js';
+import { openOnlyDevice } from '/packages/silinx-fpga/src/parts.js';
 
 const roleOf = name => (/^xcf/i.test(name) ? 'prom' : /^(xc)?(3s|6s|4v|5v|6v|7[akvz])/i.test(name) ? 'fpga' : /^(xc)?(2c|95)/i.test(name) ? 'cpld' : 'other');
 
 export function mountImpact(el) {
   const page = h('div', { class: 'page' });
   el.append(page);
+  // (an iCE40: no JTAG chain, its .bin into the board's SPI flash, #2298)
+  if (openOnlyDevice(S.project?.device)) return mountIce40Program(page);
   const pj = S.project;
   const db = S.devices;
   let board = db?.boards.find(b => b.id === pj?.board) || null;

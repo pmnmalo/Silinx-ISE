@@ -206,6 +206,17 @@ const PT = {
   'Loads the FPGA directly (volatile: lost at power-off). Select the PROM in the chain to store the design in flash.': 'Carrega a FPGA diretamente (volátil: perde-se ao desligar). Selecione a PROM na cadeia para guardar o projeto na flash.',
   'Program': 'Programar', 'Erase PROM': 'Apagar PROM', 'No board selected: choose the programming tool and cable explicitly.': 'Nenhuma placa selecionada: escolha a ferramenta e o cabo de programação.',
   'Another operation is running': 'Outra operação está em curso', 'Failed — see console': 'Falhou — ver consola', 'Scan finished.': 'Scan concluído.',
+  // (the iCE40's Configure Target Device, #2298)
+  'Program the iCE40 — SPI flash': 'Programar o iCE40 — flash SPI', 'Program Flash': 'Programar Flash', 'Configuration file (.bin):': 'Ficheiro de configuração (.bin):',
+  '(no board)': '(sem placa)', '(no top module)': '(sem módulo de topo)', 'No top module: set one in the Design pane first.': 'Sem módulo de topo: defina-o primeiro no painel Design.',
+  'the board\'s USB (FT2232H), from the browser (WebUSB)': 'a USB da placa (FT2232H), a partir do browser (WebUSB)',
+  'openFPGALoader, through the board\'s USB (FT2232H)': 'openFPGALoader, pela USB da placa (FT2232H)',
+  'No .bin yet — run "Generate Programming File" first.': 'Ainda não há .bin — execute primeiro "Generate Programming File".',
+  'Writes the .bin into the board\'s SPI flash: the FPGA loads it, and again at every power-up.': 'Escreve o .bin na flash SPI da placa: a FPGA carrega-o, e de novo sempre que é ligada.',
+  'Flash programmed: the FPGA loads the design.': 'Flash programada: a FPGA carrega o projeto.',
+  'The browser edition does not program an iCE40 yet: program it from the Silinx application (openFPGALoader).': 'A edição do browser ainda não programa um iCE40: programe-o a partir da aplicação Silinx (openFPGALoader).',
+  'The on-board FT2232H: the .bin written into the SPI flash, which the FPGA then loads (and at every power-up).': 'O FT2232H da placa: o .bin escrito na flash SPI, que a FPGA depois carrega (e sempre que é ligada).',
+  'Not yet tested on a real board.': 'Ainda não testado numa placa real.', 'No board selected: choose one in Design Properties.': 'Nenhuma placa selecionada: escolha uma nas Propriedades do Projeto.',
   // editor
   'Templates ▾': 'Modelos ▾', 'Find (Ctrl+F)': 'Procurar (Ctrl+F)', 'Auto-complete': 'Completar automaticamente',
   // (the C editor's Language Templates, #1855)
@@ -392,6 +403,10 @@ const PT_PATTERNS = [
   // Find in Project (#1430)
   [/^(\d+) result\(s\) in (\d+) file\(s\)$/, '$1 resultado(s) em $2 ficheiro(s)'], [/^(\d+) replacement\(s\) in (\d+) file\(s\)$/, '$1 substituição(ões) em $2 ficheiro(s)'],
   [/^Invalid regular expression: (.*)$/, 'Expressão regular inválida: $1'],
+  // (the iCE40's Configure Target Device, #2298)
+  [/^Configuration file: (\S+) \((\d+) bytes\)$/, 'Ficheiro de configuração: $1 ($2 bytes)'],
+  [/^There is no (\S+) yet\. Implement the design and generate it now\?$/, 'Ainda não há $1. Implementar o projeto e gerá-lo agora?'],
+  [/^Write (\S+) into the board's SPI flash\? The FPGA then loads it, and again at every power-up\.$/, 'Escrever $1 na flash SPI da placa? A FPGA depois carrega-o, e de novo sempre que é ligada.'],
   // Simulate's side panel: a test bench's row (#1378)
   [/^Simulate ([A-Za-z][A-Za-z0-9_]*)$/, 'Simular $1'],
   [/^Read-only, the C model of (.+)$/, 'Só de leitura, o modelo C de $1'],
