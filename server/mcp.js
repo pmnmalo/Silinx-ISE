@@ -129,11 +129,12 @@ const REPORT_FILES = {
     pins: top => `build/${top}_pins.ucf`,
   },
 };
-// the map and par reports of a Silinx toolchain run, from its Design Summary (build/reports.json)
-const OPEN_REPORTS = {
+// the map and par reports of a Silinx toolchain run, from its Design Summary (build/reports.json); the router's passes
+// only when the engine counts them (nextpnr's do not, #2420)
+export const OPEN_REPORTS = {
   map: r => r.map && [`Design summary (pack, Silinx toolchain) of ${r.top}:`, ...(r.map.utilization || []).map(u => `  ${u.name}: ${u.used}${u.total ? ` out of ${u.total} ${u.percent}%` : ''}`),
     `${r.map.errors ?? 0} error(s), ${r.map.warnings ?? 0} warning(s).`].join('\n'),
-  par: r => r.par && [`Place and route (Silinx toolchain) of ${r.top}: ${r.par.routed ? 'all signals are completely routed' : `${r.par.unroutedSignals} signal(s) not routed`} (${r.par.nets} nets, ${r.par.pips} PIPs, ${r.par.iterations} passes).`,
+  par: r => r.par && [`Place and route (Silinx toolchain) of ${r.top}: ${r.par.routed ? 'all signals are completely routed' : `${r.par.unroutedSignals} signal(s) not routed`} (${r.par.nets} nets, ${r.par.pips} PIPs${r.par.iterations != null ? `, ${r.par.iterations} passes` : ''}).`,
     ...(r.timing ? [`Timing constraints: ${r.timing.met === false ? `not met (${r.timing.timingErrors})` : 'all met'}${r.timing.minPeriodNs ? `; minimum period ${r.timing.minPeriodNs} ns (${r.timing.maxFreqMHz} MHz)` : ''}.`] : [])].join('\n'),
 };
 const deviceName = d => (d ? `${d.part}${d.package}${d.speed}` : 'no device');
