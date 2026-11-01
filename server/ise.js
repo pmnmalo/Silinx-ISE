@@ -14,7 +14,7 @@
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
-import { deviceFamily, parseUcf, bitName, resourceCount } from '../packages/silinx-fpga/src/parts.js';
+import { FAMILY_INFO, deviceFamily, isIseFamily, parseUcf, bitName, resourceCount } from '../packages/silinx-fpga/src/parts.js';
 import { compile, elaborate } from '../core/compile.js';
 import { clocksOf, latchGates } from '../core/schematic.js';
 import { primitiveSources } from '../core/unisim.js';
@@ -386,7 +386,9 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   if (!top) throw Object.assign(new Error('project has no top module set (project.top)'), { status: 400 });
   if (!IDENT.test(top)) throw Object.assign(new Error(`invalid top module name '${top}'`), { status: 400 });
   const device = project.device || {};
-  const devErr = validateDevice(device);
+  const fam = deviceFamily(device);
+  const ise = !FAMILY_INFO[fam] || isIseFamily(fam);   // (a family the open toolchain alone implements: its sources and constraints only, #2295)
+  const devErr = ise ? validateDevice(device) : [];
   if (devErr.length) throw Object.assign(new Error(devErr.join('; ')), { status: 400 });
 
   // synthesis: the files of every view and the implementation-only ones (not the simulation-only ones)
@@ -440,6 +442,12 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
     includeDirs.add(path.posix.dirname(`src/${rel}`));
   }
   for (const s of sources) if (s.lang === 'verilog') includeDirs.add(path.posix.dirname(s.buildPath));
+
+  if (!ise) {
+    const name = project.constraints && fss.existsSync(inside(project.constraints)) ? path.basename(project.constraints) : null;
+    if (name) await fs.copyFile(inside(project.constraints), path.join(buildDir, name));
+    return { buildDir, top, device, files: name ? [name] : [], sources, hasUcf: !!name, constraintsFile: name, warnings, steps: [] };
+  }
 
   // Constraints.
   let hasUcf = false;
