@@ -24,7 +24,7 @@
   min-height: 360px;
   background: var(--asm-bg);
   color: var(--asm-fg);
-  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: var(--fs, 12px)/1.4 var(--font, "Segoe UI", Tahoma, Verdana, Arial, sans-serif);
   outline: none;
   overflow: hidden;
   box-sizing: border-box;
@@ -32,16 +32,29 @@
 .asm-editor *, .asm-editor *::before, .asm-editor *::after { box-sizing: border-box; }
 
 /* ------------------------------------------------------------------ toolbar */
+/* the look of the schematic editor's toolbar (sch-editor.css, #2505): flat buttons, an icon or an icon and a label */
 .asm-editor .asm-toolbar {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  padding: 6px 8px;
-  background: var(--asm-panel);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 1px;
+  padding: 2px 32px 2px 4px; min-height: 28px;
+  background: var(--toolbar-grad, var(--asm-panel));
   border-bottom: 1px solid var(--asm-border);
 }
-.asm-editor .asm-group { display: flex; align-items: center; gap: 4px; }
-.asm-editor .asm-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--asm-border); }
+.asm-editor .asm-group { display: flex; align-items: center; gap: 1px; }
+.asm-editor .asm-sep { width: 1px; height: 18px; margin: 0 4px; background: #c0c0c0; box-shadow: 1px 0 #fff; }
+.asm-editor .asm-toolbar .asm-btn {
+  height: 22px; min-width: 24px; padding: 0 3px; gap: 3px; border: 1px solid transparent; border-radius: 2px; background: none;
+  font-size: inherit; cursor: default; transition: none;
+}
+.asm-editor .asm-toolbar .asm-btn svg { width: 16px; height: 16px; flex: none; }
+.asm-editor .asm-toolbar :is(.asm-wide, .asm-add) { padding: 0 6px 0 4px; }
+.asm-editor .asm-toolbar .asm-btn:hover:not(:disabled) { border-color: #a8c8eb; background: linear-gradient(#f3f8fd, #d5e6f8); }
+.asm-editor .asm-toolbar .asm-btn:active:not(:disabled), .asm-editor .asm-toolbar .asm-btn:is(.on, .active) { border-color: #3c7fb1; background: linear-gradient(#c4e5f6, #98d1ef); color: inherit; outline: none; }
+.asm-editor .asm-toolbar .asm-select { height: 22px; padding: 0 2px; border-radius: 2px; font-size: inherit; }
+.asm-editor .asm-toolbar .tb-more { top: 2px; right: 4px; }
+.asm-editor .asm-toolbar .tb-more-btn { width: 24px; }
+.asm-editor .asm-toolbar .tb-more-menu .asm-btn { justify-content: flex-start; padding: 0 6px; }
 .asm-editor .asm-spacer { flex: 1; }
-.asm-editor .asm-zoom { min-width: 42px; text-align: center; color: var(--asm-muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.asm-editor .asm-zoom { min-width: 42px; text-align: right; color: var(--asm-muted); font-variant-numeric: tabular-nums; font-size: 11.5px; }
 
 .asm-editor .asm-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -85,37 +98,42 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+/* the look of the schematic editor's Properties (sch-editor.css, #2505) */
 .asm-editor .asm-side {
-  width: 320px; flex: none; overflow-y: auto;
+  width: 250px; flex: none; overflow-y: auto;
   background: var(--asm-panel); border-left: 1px solid var(--asm-border);
 }
-.asm-editor .asm-section { border-bottom: 1px solid var(--asm-border); padding: 10px 12px; }
+.asm-editor .asm-cap {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; height: 20px; padding: 2px 6px;
+  background: var(--title-grad, linear-gradient(#e9eff8, #c9d7ed)); color: var(--title-fg, #15428b); font-weight: bold; border-bottom: 1px solid #99bbe8; white-space: nowrap;
+}
+.asm-editor .asm-section { border-bottom: 1px solid var(--border-light, #d4d0c8); padding: 6px 8px; }
 .asm-editor details.asm-section { padding: 0; }
 .asm-editor details.asm-section > summary {
-  padding: 9px 12px; cursor: pointer; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--asm-muted);
+  padding: 4px 8px; cursor: default; font-weight: bold; color: var(--title-fg, #15428b);
   list-style: none; user-select: none;
 }
 .asm-editor details.asm-section > summary::-webkit-details-marker { display: none; }
 .asm-editor details.asm-section > summary::before { content: "▸"; display: inline-block; width: 14px; transition: transform .12s; }
 .asm-editor details.asm-section[open] > summary::before { transform: rotate(90deg); }
-.asm-editor .asm-section-body { padding: 0 12px 12px; }
-.asm-editor .asm-section h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--asm-muted); }
-.asm-editor .asm-muted { color: var(--asm-muted); margin: 0 0 8px; font-size: 12.5px; }
+.asm-editor .asm-section-body { padding: 0 8px 8px; }
+.asm-editor .asm-section h3 { margin: 2px 0 4px; font-size: inherit; font-weight: bold; color: var(--title-fg, #15428b); }
+.asm-editor .asm-muted { color: var(--asm-muted); margin: 0 0 8px; font-size: 11px; line-height: 1.3; }
 .asm-editor .asm-legend { display: grid; gap: 6px; font-size: 12px; color: var(--asm-muted); }
 .asm-editor .asm-legend > div { display: flex; align-items: center; gap: 6px; }
 .asm-editor .asm-row { margin-top: 10px; display: flex; gap: 6px; }
 .asm-editor .asm-section .asm-btn { margin-top: 4px; }
 
-.asm-editor .asm-field { display: block; margin-bottom: 10px; }
-.asm-editor .asm-label { display: block; font-size: 11.5px; color: var(--asm-muted); margin-bottom: 3px; }
+.asm-editor .asm-field { display: block; margin: 6px 0; }
+.asm-editor .asm-label { display: block; font-size: 11px; color: var(--asm-muted); margin-bottom: 2px; }
 .asm-editor .asm-fhint { display: block; color: var(--asm-muted); font-size: 11px; margin-top: 3px; line-height: 1.35; }
 .asm-editor .asm-input {
-  width: 100%; padding: 5px 7px; border-radius: 5px; border: 1px solid var(--asm-border);
-  background: var(--asm-bg); color: var(--asm-fg); font: inherit; font-size: 12.5px;
+  width: 100%; min-height: 21px; padding: 1px 4px; border-radius: 0; border: 1px solid var(--field-border, var(--asm-border));
+  background: var(--field-bg, var(--asm-bg)); color: var(--asm-fg); font: inherit;
 }
-.asm-editor .asm-input.mono, .asm-editor textarea.asm-input { font-family: var(--asm-mono); font-size: 12px; }
+.asm-editor .asm-input.mono, .asm-editor textarea.asm-input { font-family: var(--asm-mono); font-size: 11px; }
 .asm-editor textarea.asm-input { resize: vertical; min-height: 56px; line-height: 1.45; }
-.asm-editor .asm-input:focus, .asm-editor .asm-select:focus { outline: none; border-color: var(--asm-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--asm-accent) 30%, transparent); }
+.asm-editor .asm-input:focus, .asm-editor .asm-select:focus { outline: 1px solid var(--asm-accent); outline-offset: -1px; }
 .asm-editor .asm-check { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 12.5px; cursor: pointer; }
 .asm-editor .asm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
@@ -227,11 +245,10 @@
   .asm-editor .asm-body { position: relative; }
   .asm-editor .asm-side { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(320px, 85%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
   .asm-editor:not(.side-open) .asm-side { display: none; }
-  .asm-editor .asm-toolbar { gap: 4px; }
-  .asm-editor .asm-toolbar .asm-sep { display: none; }
+    .asm-editor .asm-toolbar .asm-sep { display: none; }
   .asm-editor .asm-toolbar .asm-group { display: contents; }   /* one row of buttons, wrapped where it ends */
-  .asm-editor :is(.fsm-link, .pn-link) { min-width: 0; max-width: 100%; }
-  .asm-editor :is(.fsm-link, .pn-link) .gen-banner { display: block; max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .asm-editor .fsm-link { min-width: 0; max-width: 100%; }
+  .asm-editor .fsm-link .gen-banner { display: block; max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* ------------------------------------------------------------------ every-cycle blocks */

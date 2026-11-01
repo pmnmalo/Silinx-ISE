@@ -24,10 +24,10 @@ export function mountPetriSide(ctx) {
   const number = (value, min, max, onChange) => { const i = h('input', { type: 'number', class: 'asm-input', value: String(value), min: String(min), max: String(max) }); i.addEventListener('change', () => onChange(Math.max(min, Math.min(max, Math.round(+i.value || min))))); return i; };
   function renderSide() {
     selSection.replaceChildren();
-    if (!sel()) selSection.append(h('div', { class: 'asm-label' }, 'Nothing selected: click a place, a transition or an arc'));
+    if (!sel()) selSection.append(h('p', { class: 'asm-muted' }, 'Nothing selected: click a place, a transition or an arc'));
     else if (sel().kind === 'place') {
       const p = placeOf(sel().id);
-      if (p) selSection.append(h('div', { class: 'asm-section-title' }, `Place ${p.name}`),
+      if (p) selSection.append(h('h3', {}, `Place ${p.name}`),
         field('Name', text(p.name, v => { p.name = v.trim() || p.name; commit(); }, 'mono')),
         field('Initial tokens', number(p.tokens, 0, 255, v => { p.tokens = v; p.capacity = Math.max(p.capacity, v); commit(); })),
         field('Capacity', number(p.capacity, 1, 255, v => { p.capacity = v; p.tokens = Math.min(p.tokens, v); commit(); }), '1: a safe place (one flip-flop); more: a counter'),
@@ -36,7 +36,7 @@ export function mountPetriSide(ctx) {
       const t = transOf(sel().id);
       const pos = M().transitions.indexOf(t);
       const move = d => { const k = pos + d; if (k < 0 || k >= M().transitions.length) return; M().transitions.splice(pos, 1); M().transitions.splice(k, 0, t); commit(); };
-      if (t) selSection.append(h('div', { class: 'asm-section-title' }, `Transition ${t.name}`),
+      if (t) selSection.append(h('h3', {}, `Transition ${t.name}`),
         field('Name', text(t.name, v => { t.name = v.trim() || t.name; commit(); }, 'mono')),
         field('Guard', text(t.guard, v => { t.guard = v.trim(); commit(); }, 'mono'), 'a condition on the inputs, e.g. go & !stop (empty: always)'),
         field('Pulses when it fires', text(formatOutputs(t.outputs), v => { const o = parseOutputs(v); if (o.error) status(o.error, true); else { t.outputs = o.outputs; commit(); } }, 'mono'), '1 during the clock cycle after it fired'),
@@ -44,7 +44,7 @@ export function mountPetriSide(ctx) {
         h('div', { class: 'asm-row' }, btn('▲ Higher', 'Fire before the others', () => move(-1), 'asm-small'), btn('▼ Lower', 'Fire after the others', () => move(1), 'asm-small')));
     } else {
       const a = M().arcs.find(x => x.id === sel().id);
-      if (a) selSection.append(h('div', { class: 'asm-section-title' }, `Arc ${nodeOf(a.from)?.name ?? '?'} → ${nodeOf(a.to)?.name ?? '?'}`),
+      if (a) selSection.append(h('h3', {}, `Arc ${nodeOf(a.from)?.name ?? '?'} → ${nodeOf(a.to)?.name ?? '?'}`),
         field('Weight', number(a.weight, 1, 255, v => { a.weight = v; commit(); }), a.inhibitor ? 'the transition fires while the place holds fewer tokens than this' : placeOf(a.from) ? 'the tokens it takes' : 'the tokens it puts'),
         ...(placeOf(a.from) ? [h('label', { class: 'asm-check' }, (() => { const c = h('input', { type: 'checkbox', checked: !!a.inhibitor }); c.addEventListener('change', () => { if (c.checked) a.inhibitor = true; else delete a.inhibitor; commit(); }); return c; })(), ' Inhibitor arc')] : []));
     }
@@ -67,7 +67,8 @@ export function mountPetriSide(ctx) {
   }
   function refreshLink() {
     const li = opts.linkInfo?.();
-    linkHost.replaceChildren(...(li?.file ? [h('span', { class: 'gen-banner', title: `HDL: ${li.file.split('/').pop()} — generated from the net` }, 'HDL: ', (() => { const a = h('a', {}, li.file.split('/').pop()); a.addEventListener('click', () => opts.onOpenFile?.(li.file)); return a; })(), ' — generated from the net')] : []));
+    // (the file in sync unsaid, as the other drawings', its name in data-hdl, #2505)
+    linkHost.dataset.hdl = li?.file ? li.file.split('/').pop() : '';
   }
 
   return { refreshLink, renderSide };

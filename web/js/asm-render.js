@@ -8,7 +8,7 @@ import { CASE_BAR, nodeSize, box, pathD, portGeom, portsOf, routeEdge } from './
 
 /** { render, updateToolbar } of an ASM chart editor (state(): its current model, selection, problems, history). */
 export function mountRender(ctx) {
-  const { state, uid, gBlocks, gEdges, gNodes, statusInfo, undoBtn, redoBtn, delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget } = ctx;
+  const { state, uid, gBlocks, gEdges, gNodes, statusInfo, delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget } = ctx;
 
   function blockMembers(stateId) {
     const { M } = state();
@@ -179,8 +179,6 @@ export function mountRender(ctx) {
 
   function updateToolbar() {
     const { M, sel, hist, hi } = state();
-    undoBtn.disabled = hi <= 0;
-    redoBtn.disabled = hi >= hist.length - 1;
     delBtn.disabled = !sel.edge && !sel.nodes.size;
     encSel.value = M.encoding;
   }

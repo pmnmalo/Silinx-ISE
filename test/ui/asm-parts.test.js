@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
 import { normalizeModel } from '../../core/asm.js';
 
+const ACT = { Fit: 'fit', '+': 'zin', '−': 'zout' };
 let env;
 before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
@@ -38,7 +39,7 @@ uiTest('#405 ASM editor parts: the view, Arrange, a box added and deleted, a box
   const model = () => page.eval(() => window.Silinx.active.asmEditor.getModel());
   const problems = () => page.eval(() => window.Silinx.active.asmEditor.validate().map((d) => `${d.severity}: ${d.message}`));
   // (Undo / Redo: the main toolbar's buttons, #220)
-  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`${D} .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click(`${D} .asm-toolbar .asm-btn`, { text: label }));
+  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`#toolbar [data-cmd=${label === '↶' ? 'undo' : 'redo'}]`) : (ACT[label] ? page.click(`${D} [data-act=${ACT[label]}]`) : page.click(`${D} .asm-toolbar .asm-btn`, { text: label })));
   const tool = async (label) => { if (/^(Arrange|# Snap)$/.test(label)) await page.click('.doc:not([hidden]) .tb-more-btn'); return tool0(label); };   // (in the menu, #2261)
   const side = (label) => page.click(`${D} .asm-selection .asm-btn`, { text: label });
   const edges = async () => (await model()).edges.map((e) => `${e.id}:${e.from}>${e.to}:${e.port}`).join(' ');
@@ -84,7 +85,7 @@ uiTest('#405 ASM editor parts: the view, Arrange, a box added and deleted, a box
   const k = parseFloat(await page.eval((d) => /scale\(([\d.]+)\)/.exec(document.querySelector(`${d} .asm-vp`).getAttribute('transform'))[1], D));
   assert.equal(await zoom(), `${Math.round(k * 100)}%`);
   await tool('+');
-  assert.equal(await zoom(), `${Math.round(k * 120)}%`);
+  assert.equal(await zoom(), `${Math.round(k * 125)}%`);
   await tool('−');
   await tool('Fit');
   // ---- Arrange: the boxes moved, the connections the same; undone

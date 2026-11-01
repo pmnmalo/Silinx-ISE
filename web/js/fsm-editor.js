@@ -10,12 +10,13 @@
 // the circles. Double-click the background to add a state, drag from the rim of a state to another
 // state (or to itself) to add a transition, double-click a state or a label to edit it in place,
 // drag a label to bend its arrow. The bottom panel shows the tables (transition table, state
-// table, encoded table for the binary / gray encodings), the generated HDL and a step-by-step
+// table, encoded table for the binary / gray encodings) and a step-by-step
 // simulation of the diagram (current state highlighted, inputs set by hand, clock steps).
 // Model, validation, tables and HDL: core/fsm.js. Styles: asm-editor.css (shared look) + fsm-editor.css.
 
-import { h, undoButton, linkModel, linkSnapshot } from './ui.js';
+import { h, linkModel, linkSnapshot } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
+import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { sv } from './dom.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
@@ -59,7 +60,7 @@ export function mountFsmEditor(container, opts = {}) {
   let diags = [];
   let drag = null;
   let destroyed = false;
-  let panel = null;                    // 'tables' | 'code' | 'sim' | null
+  let panel = null;                    // 'tables' | 'sim' | null
   let sim = null;                      // { state, inputs: {}, trace: [], timer }
   const timers = {};
 
@@ -79,33 +80,30 @@ export function mountFsmEditor(container, opts = {}) {
   const encSel = select('fsm-enc', 'State encoding', FSM_ENCODINGS.map((e) => [e, { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enumerated' }[e]]),
     (v) => { M.encoding = v; commit('enc'); });
   const styleSel = select('fsm-style', 'Style of the generated HDL', [['3process', '3 processes'], ['2process', '2 processes']], (v) => { M.style = v; commit('style'); });
-  const undoBtn = undoButton('undo', () => undo());
-  const redoBtn = undoButton('redo', () => redo());
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
-  const delBtn = btn('✕', 'Delete the selected state or transition (Del)', () => deleteSelection(), 'asm-danger');
+  const delBtn = toolIcon('delete', 'del', 'Delete the selected state or transition (Del)', () => deleteSelection(), 'asm-danger');
   const tabBtns = {
     tables: btn('Tables', 'State table, transition table and encoded transition table', () => togglePanel('tables'), 'fsm-tab-btn'),
-    code: btn('</> HDL', 'Show / hide the generated HDL', () => togglePanel('code'), 'fsm-tab-btn'),
-    sim: btn('▶ Simulate', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs', () => togglePanel('sim'), 'fsm-tab-btn'),
+    sim: toolWide('sim', 'Simulate', 'Step through the diagram: set the inputs, apply clock edges, see the state and the outputs', () => togglePanel('sim'), 'fsm-tab-btn'),
   };
   const linkHost = h('span', { class: 'fsm-link' });
   const toolbar = h('div', { class: 'asm-toolbar fsm-toolbar' },
     h('div', { class: 'asm-group' },
-      btn([h('span', { class: 'fsm-ico-state' }), 'State'], 'Add a state (or double-click the drawing)', () => addState()),
-      delBtn),
+      btn([h('span', { class: 'fsm-ico-state' }), 'State'], 'Add a state (or double-click the drawing)', () => addState(), 'asm-wide')),
     sep(),
-    h('div', { class: 'asm-group' }, undoBtn, redoBtn),
+    h('div', { class: 'asm-group' }, delBtn),
     sep(),
-    h('div', { class: 'asm-group' },
-      btn('Arrange', 'Automatic layout of the states', () => arrange()),
-      btn('−', 'Zoom out', () => zoomBy(1 / 1.2)), zoomLbl, btn('+', 'Zoom in', () => zoomBy(1.2)),
-      btn('Fit', 'Fit the diagram in the window', () => fit()),
-      btn('🖨', 'Print the diagram / save it as PDF or SVG (Ctrl+P)', () => print())),
+    h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBy(f), () => fit())),
     sep(),
     h('div', { class: 'asm-group' }, typeSel, encSel, styleSel),
+    sep(),
+    h('div', { class: 'asm-group' }, tabBtns.tables, tabBtns.sim),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }), tabBtns.tables, tabBtns.code, tabBtns.sim),
-    toolbarMenu([btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.())], { title: 'Convert the diagram', btnClass: 'asm-btn' }).el,
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
+    toolbarMenu([
+      btn('Arrange', 'Automatic layout of the states', () => arrange()),
+      btn('Convert to ASM chart', 'Make an ASM chart (.asm.json) of this state machine', () => opts.onToAsm?.()),
+    ], { title: 'Layout and conversion', btnClass: 'asm-btn' }).el,
     linkHost);
 
   // ---------------------------------------------------------------------------- canvas
@@ -125,7 +123,7 @@ export function mountFsmEditor(container, opts = {}) {
   const hint = h('div', { class: 'asm-hint' }, 'Double-click to add a state · drag from the rim of a state to another state to add a transition · double-click to edit · drag a label to bend its arrow · wheel to zoom');
   const canvasWrap = h('div', { class: 'asm-canvas-wrap' }, svg, hint);
 
-  // bottom panel (tables / HDL / simulation)
+  // bottom panel (tables / simulation)
   const panelTitle = h('span', { class: 'asm-code-title' });
   const panelTools = h('span', { class: 'fsm-panel-tools' });
   const panelBody = h('div', { class: 'fsm-panel-body' });
@@ -141,10 +139,10 @@ export function mountFsmEditor(container, opts = {}) {
   const probList = h('ul', { class: 'asm-problems' });
   const probCount = h('span', { class: 'asm-prob-count' });
   const probSection = h('details', { class: 'asm-section fsm-problems', open: true }, h('summary', {}, 'Problems ', probCount), probList);
-  const side = h('aside', { class: 'asm-side' }, selSection, machineSection, probSection);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
   const statusMsg = h('span', { class: 'asm-status-msg' });
   const statusInfo = h('span', { class: 'asm-status-info' });
-  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg));
+  root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), h('div', { class: 'asm-status' }, statusInfo, statusMsg, zoomLbl));
 
   // ---------------------------------------------------------------------------- model helpers
   const stateById = (id) => M.states.find((s) => s.id === id);
@@ -215,9 +213,9 @@ export function mountFsmEditor(container, opts = {}) {
   // ---------------------------------------------------------------------------- history (fsm-history.js)
   const { commit, redo, undo, updateToolbar } = mountFsmHistory({
     opts, M: () => M, delBtn, destroyed: () => destroyed, encSel, hi: () => hi, hist: () => hist,
-    lastKey: () => lastKey, lastT: () => lastT, panel: () => panel, redoBtn, render: (...a) => render(...a),
+    lastKey: () => lastKey, lastT: () => lastT, panel: () => panel, render: (...a) => render(...a),
     renderPanel: (...a) => renderPanel(...a), renderSide: (...a) => renderSide(...a), sel: () => sel, stateById,
-    statusInfo, styleSel, tabBtns, timers, transById, typeSel, undoBtn, validateSoon: (...a) => validateSoon(...a),
+    statusInfo, styleSel, tabBtns, timers, transById, typeSel, validateSoon: (...a) => validateSoon(...a),
     setM: (v) => { M = v; }, setHist: (v) => { hist = v; }, setHi: (v) => { hi = v; },
     setLastKey: (v) => { lastKey = v; }, setLastT: (v) => { lastT = v; }, setSel: (v) => { sel = v; }
   });
@@ -275,7 +273,6 @@ export function mountFsmEditor(container, opts = {}) {
       probList.append(li);
     }
     render();
-    if (panel === 'code') renderPanel();
   }
 
   // ---------------------------------------------------------------------------- bottom panel (fsm-bottom.js)
@@ -289,10 +286,11 @@ export function mountFsmEditor(container, opts = {}) {
   function refreshLink() {
     linkHost.textContent = '';
     const L = opts.linkInfo?.();
-    if (!L) return;
+    // (only when its HDL is not in sync, as the Boolean algebra's: the file in sync unsaid, its name in data-hdl, #2505)
+    linkHost.dataset.hdl = L?.file && !L.why ? L.file.split('/').pop() : '';
+    if (!L?.why) return;
     const a = h('a', { onclick: () => opts.onOpenFile?.(L.file) }, L.file.split('/').pop());
-    linkHost.append(h('span', { class: `gen-banner${L.why ? ' out-of-sync' : ''}`, title: L.why || `HDL: ${L.file.split('/').pop()} — generated from the diagram` },
-      L.why ? 'Not in sync with ' : 'HDL: ', a, L.why ? ` — ${L.why}` : ' — generated from the diagram'));
+    linkHost.append(h('span', { class: 'gen-banner out-of-sync', title: L.why }, 'Not in sync with ', a, ` — ${L.why}`));
   }
 
   // ---------------------------------------------------------------------------- init

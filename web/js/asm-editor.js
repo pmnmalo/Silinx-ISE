@@ -11,8 +11,9 @@
 // parallel with the states; unconnected exits end the block), and the machine panel edits the
 // data path: generics, internal registers and the 2-flip-flop synchroniser of each input.
 
-import { undoButton, linkModel, linkSnapshot } from './ui.js';
+import { linkModel, linkSnapshot } from './ui.js';
 import { toolbarMenu } from './toolbar-menu.js';
+import { toolIcon, toolWide, zoomTools } from './editor-icons.js';
 import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
   normalizeModel, newModel, validate, generate, ENCODINGS,
@@ -136,7 +137,7 @@ function readOnlyChrome({ root, toolbar, hide, hint }) {
   root.classList.add('asm-readonly');
   // (the tools that change the chart, the language and encoding, Validate, Code and the problems: hidden)
   for (const g of [...toolbar.querySelectorAll('.asm-add, .asm-danger'), ...hide,
-    ...[...toolbar.querySelectorAll('.asm-btn')].filter((b) => /^(Arrange|✓ Validate)$/.test(b.textContent.trim()))]) g.hidden = true;
+    ...[...toolbar.querySelectorAll('.asm-btn')].filter((b) => /^(Arrange|Validate)$/.test(b.textContent.trim()))]) g.hidden = true;
   hint.textContent = 'Read-only · drag the background to pan · wheel to zoom · click a box to see it';
 }
 const lockSide = (readOnly, side) => { if (readOnly) for (const x of side.querySelectorAll('input, textarea, select, button')) x.disabled = true; };
@@ -166,12 +167,10 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
 
   const encSel = h('select', { class: 'asm-select', title: 'State encoding', onchange: () => { M.encoding = encSel.value; commit('enc'); } },
     ...ENCODINGS.map((e) => h('option', { value: e }, { binary: 'Binary', gray: 'Gray', onehot: 'One-hot', enum: 'Enum / auto' }[e])));
-  const undoBtn = undoButton('undo', () => undo());
-  const redoBtn = undoButton('redo', () => redo());
   const snapBtn = btn('# Snap', 'Toggle snapping to the grid', () => { snap = !snap; snapBtn.classList.toggle('on', snap); });
   snapBtn.classList.add('on');
   const zoomLbl = h('span', { class: 'asm-zoom', title: 'Zoom level' }, '100%');
-  const delBtn = btn('✕', 'Delete selection (Del)', () => deleteSelection(), 'asm-danger');
+  const delBtn = toolIcon('delete', 'del', 'Delete selection (Del)', () => deleteSelection(), 'asm-danger');
 
   const more = toolbarMenu([
     btn('Arrange', 'Automatic layout (states top-down, every-cycle blocks on the right)', () => autoArrange()),
@@ -183,21 +182,17 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
       btn([h('span', { class: 'asm-ico ico-decision' }), 'Decision'], 'Add decision box (diamond)', () => addNode('decision'), 'asm-add'),
       btn([h('span', { class: 'asm-ico ico-case' }), 'Case'], 'Add case box (multi-way decision on the value of a signal, e.g. opcode)', () => addNode('case'), 'asm-add'),
       btn([h('span', { class: 'asm-ico ico-output' }), 'Cond. output'], 'Add conditional output box (oval)', () => addNode('output'), 'asm-add'),
-      btn([h('span', { class: 'asm-ico ico-always' }), 'Every cycle'], 'Add an every-cycle block (logic evaluated on every clock cycle, in parallel with the states)', () => addNode('always'), 'asm-add'),
-      delBtn),
+      btn([h('span', { class: 'asm-ico ico-always' }), 'Every cycle'], 'Add an every-cycle block (logic evaluated on every clock cycle, in parallel with the states)', () => addNode('always'), 'asm-add')),
     sep(),
-    h('div', { class: 'asm-group' }, undoBtn, redoBtn),
+    h('div', { class: 'asm-group' }, delBtn),
     sep(),
-    h('div', { class: 'asm-group' },
-      btn('−', 'Zoom out', () => zoomBy(1 / 1.2)), zoomLbl, btn('+', 'Zoom in', () => zoomBy(1.2)),
-      btn('Fit', 'Fit the chart in the window', () => fit()),
-      btn('🖨', 'Print the chart / save it as PDF or SVG (Ctrl+P)', () => print())),
+    h('div', { class: 'asm-group' }, ...zoomTools((f) => zoomBy(f), () => fit())),
     sep(),
     h('div', { class: 'asm-group' }, encSel),
+    sep(),
+    h('div', { class: 'asm-group' }, toolWide('check', 'Validate', 'Check the chart for errors', () => { runValidate(); showProblems(true); })),
     h('div', { class: 'asm-spacer' }),
-    h('div', { class: 'asm-group' },
-      panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY }),
-      btn('✓ Validate', 'Check the chart for errors', () => { runValidate(); showProblems(true); })),
+    h('div', { class: 'asm-group' }, panelToggle(root, btn('☰ Properties', 'Show / hide the properties panel'), { key: PROPS_KEY })),
     more.el);
 
   // canvas
@@ -241,15 +236,15 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   const probList = h('ul', { class: 'asm-problems' });
   const probSummary = h('span', { class: 'asm-prob-count' });
   const probSection = h('details', { class: 'asm-section', open: true }, h('summary', {}, 'Problems ', probSummary), probList);
-  const side = h('aside', { class: 'asm-side' }, selSection, machineSection, probSection);
+  const side = h('aside', { class: 'asm-side' }, h('div', { class: 'asm-cap' }, 'Properties'), selSection, machineSection, probSection);
 
   const status = h('div', { class: 'asm-status' });
   const statusMsg = h('span', { class: 'asm-status-msg' });
   const statusInfo = h('span', { class: 'asm-status-info' });
-  status.append(statusInfo, statusMsg);
+  status.append(statusInfo, statusMsg, zoomLbl);
 
   root.append(toolbar, h('div', { class: 'asm-body' }, mainCol, side), status);
-  if (readOnly) readOnlyChrome({ root, toolbar, hide: [undoBtn, redoBtn, more.el, encSel, probSection], hint });
+  if (readOnly) readOnlyChrome({ root, toolbar, hide: [more.el, encSel, probSection], hint });
 
   // ---------------------------------------------------------------------------- model ops (asm-ops.js)
   const {
@@ -307,8 +302,8 @@ export function mountAsmEditor(container, { model, onChange, readOnly = false } 
   });
 
   // ---------------------------------------------------------------------------- rendering (asm-render.js)
-  const { render, updateToolbar } = mountRender({ state: () => ({ M, sel, diags, hist, hi }), uid, gBlocks, gEdges, gNodes, statusInfo, undoBtn,
-    redoBtn, delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget });
+  const { render, updateToolbar } = mountRender({ state: () => ({ M, sel, diags, hist, hi }), uid, gBlocks, gEdges, gNodes, statusInfo,
+    delBtn, encSel, nodeById, caseExits, exitsOf, drawTarget });
 
   let flashTimer = null;
   function flash(msg, kind = '') {

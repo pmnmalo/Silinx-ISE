@@ -9,6 +9,7 @@ import { setupUi, uiTest, makeProject, readWs, waitDownload, chromeOnly } from '
 import { compile, elaborate } from '../../core/compile.js';
 import { newModel, normalizeModel, generate } from '../../core/asm.js';
 
+const ACT = { Fit: 'fit', '+': 'zin', '−': 'zout' };
 let env;
 before(async () => { env = await setupUi(); });
 after(async () => { await env?.teardown?.(); });
@@ -254,7 +255,7 @@ uiTest('#296 #949 schematic editor: I/O markers rotated, mirrored and deleted (C
   await waitSides([null, null]);
   await page.click(`${D} .se-btn[data-act=rotate]`);
   await waitSides(['N', null]);
-  await page.click(`${D} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await waitSides([null, null]);
   // everything selected: the inverter and both markers turn (the output's default E -> S)
   await page.click(`${D} .se-svg`);
@@ -269,7 +270,7 @@ uiTest('#296 #949 schematic editor: I/O markers rotated, mirrored and deleted (C
   await page.waitFor((d) => document.querySelector(`${d} .se-ptitle`)?.textContent === 'I/O Marker' && !document.querySelector(`${d} .se-btn[data-act=delete]`).disabled, [D], { what: 'the output selected' });
   await page.click(`${D} .se-btn[data-act=delete]`);
   await waitSides(['N']);
-  await page.click(`${D} [data-act=undo]`);
+  await page.click(`#toolbar [data-cmd=undo]`);
   await waitSides(['N', 'S']);
   await page.click(`${D} g.port[data-id="P2"] .iomark`);
   await page.waitFor((d) => document.querySelector(`${d} .se-ptitle`)?.textContent === 'I/O Marker', [D], { what: 'the output selected' });
@@ -607,7 +608,7 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
   const model = () => page.eval(() => window.Silinx.active.asmEditor.getModel());
   const ids0 = new Set((await model()).nodes.map((n) => n.id));
   // (Undo / Redo: the main toolbar's buttons, #220)
-  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`.doc:not([hidden]) .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click('.doc:not([hidden]) .asm-toolbar .asm-btn', { text: label }));
+  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`#toolbar [data-cmd=${label === '↶' ? 'undo' : 'redo'}]`) : ACT[label] ? page.click(`.doc:not([hidden]) [data-act=${ACT[label]}]`) : page.click('.doc:not([hidden]) .asm-toolbar .asm-btn', { text: label }));
   const tool = async (label) => { if (/^(Arrange|# Snap)$/.test(label)) await page.click('.doc:not([hidden]) .tb-more-btn'); return tool0(label); };   // (in the menu, #2261)
   // a point inside a node / port that is really on top (boxes may touch)
   const at = (sel) => page.eval((s) => {
@@ -672,7 +673,7 @@ uiTest('ASM chart editor: add a state, a decision and a case box, connect them, 
     await page.waitFor((a, b) => window.Silinx.active.asmEditor.getModel().edges.some((e) => e.from === a && e.to === b), [s, idle], { what: `${s} -> IDLE` });
   }
   // the free state S0 is unreachable, and so are the states it leads to: warnings, not errors
-  await page.click('.doc:not([hidden]) .asm-btn', { text: '✓ Validate' });
+  await page.click('.doc:not([hidden]) .asm-btn', { text: 'Validate' });
   await page.waitFor(() => /· 7 states · 0 errors/.test(document.querySelector('.doc:not([hidden]) .asm-status')?.textContent || ''), [], { what: 'chart valid' });
   assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .asm-problems .asm-prob')].map((li) => [li.className, li.textContent])), [
     ['asm-prob warning link', "▲State 'S0' is unreachable from the initial state"],
@@ -725,7 +726,7 @@ uiTest('ASM chart editor: Zoom / Fit, Reset route / Delete connection, Swap 1 / 
   const model = () => page.eval(() => window.Silinx.active.asmEditor.getModel());
   const problems = () => page.eval(() => window.Silinx.active.asmEditor.validate().map((d) => `${d.severity}: ${d.message}`));
   // (Undo / Redo: the main toolbar's buttons, #220)
-  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`${D} .asm-toolbar .tb-btn[title=${label === '↶' ? 'Undo' : 'Redo'}]`) : page.click(`${D} .asm-toolbar .asm-btn`, { text: label }));
+  const tool0 = (label) => (/^[↶↷]$/.test(label) ? page.click(`#toolbar [data-cmd=${label === '↶' ? 'undo' : 'redo'}]`) : (ACT[label] ? page.click(`${D} [data-act=${ACT[label]}]`) : page.click(`${D} .asm-toolbar .asm-btn`, { text: label })));
   const tool = async (label) => { if (/^(Arrange|# Snap)$/.test(label)) await page.click('.doc:not([hidden]) .tb-more-btn'); return tool0(label); };   // (in the menu, #2261)
   const side = (label) => page.click(`${D} .asm-selection .asm-btn`, { text: label });
   const edges = async () => (await model()).edges.map((e) => `${e.id}:${e.from}>${e.to}:${e.port}`).join(' ');
@@ -771,9 +772,9 @@ uiTest('ASM chart editor: Zoom / Fit, Reset route / Delete connection, Swap 1 / 
   const k = parseFloat(await page.eval((d) => /scale\(([\d.]+)\)/.exec(document.querySelector(`${d} .asm-vp`).getAttribute('transform'))[1], D));
   assert.equal(fitted, `${Math.round(k * 100)}%`);
   await tool('+');
-  assert.equal(await zoom(), `${Math.round(k * 120)}%`);
+  assert.equal(await zoom(), `${Math.round(k * 125)}%`);
   await tool('−'); await tool('−');
-  assert.equal(await zoom(), `${Math.round(k * 100 / 1.2)}%`);
+  assert.equal(await zoom(), `${Math.round(k * 80)}%`);
   await tool('Fit');
   assert.equal(await zoom(), fitted);
 
