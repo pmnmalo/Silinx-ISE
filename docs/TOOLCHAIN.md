@@ -128,10 +128,8 @@ Done: the routed design is opaque to the orchestrator (#2384); XDL and `open/rou
 constraints are one model (`constraints.js`, #2385): the back end says its format, a reader and a writer, UCF by default; the
 other formats are #2296. The synthesis is the back end's (#2386): the Xilinx families' `synth_xilinx` with Silinx's mappings,
 another family's Yosys script (`scriptSynthesis`), and the report's names; `FAMILY_INFO` needs only a family's name. The steps are the back end's (#2387): its list, each step's label and what it
-needs (`orderSteps`), ISE's names for the Xilinx families. Still
-missing before iCE40 (#2360):
-
-- **The fake family in the browser's worker (#2388).** Its test runs in Node only.
+needs (`orderSteps`), ISE's names for the Xilinx families. A fake family runs in Node and in the browser's worker (#2388,
+`web/js/open-flow-worker-io.js`). The back ends are ready for iCE40 (#2295).
 
 And around the flow, one issue each: the boards and examples (#2297), programming (#2298), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).
