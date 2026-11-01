@@ -336,14 +336,15 @@ export async function synthOpen(mod) {
     const family = S.project.device?.family || 'spartan3e';
     const srcs = S.sources.filter(s => (s.lang === 'vhdl' || s.lang === 'verilog') && inView(s.role, false));
     const design = elaborate(compile([...primitiveSources(srcs), ...srcs]), mod);
-    const [{ synthesizeOpen }, { synthEffort }] = await Promise.all([import('/core/synth-front.js'), import('/packages/silinx-fpga/src/index.js')]);
+    const [{ synthesizeOpen, synthesisInput }, { synthEffort, synthGoal, synthesizeArea, FAST_SYNTH }] = await Promise.all([import('/core/synth-front.js'), import('/packages/silinx-fpga/src/index.js')]);
     const { yosysBrowser } = await import('./yosys-client.js');
     log(`Writing <${mod}> as one flat module for Yosys; Yosys (WebAssembly) maps it onto the ${family} cells.`);
     const t0 = performance.now();
     let shown = -1;
     const run = Object.assign((args, files, onLine) => yosysBrowser(args, files, onLine, p => { if (p - shown >= 0.1 || p === 1) { shown = p; status(`Loading Yosys… ${Math.round(p * 100)}%`); } }),
       { parallel: yosysBrowser.parallel });
-    const res = await synthesizeOpen(design, { family, run, onLine: logLine, effort: synthEffort(S.project.impl) });
+    const goal = synthGoal(S.project.impl), opts = { family, run, onLine: logLine, effort: synthEffort(S.project.impl), ...(goal === 'fast' && FAST_SYNTH) };
+    const res = goal === 'area' ? await synthesizeArea(synthesisInput(design), opts) : await synthesizeOpen(design, opts);
     status(`Saving the netlist of ${mod}…`);
     for (const [name, text] of Object.entries(res.files)) await api.writeFile(S.project.name, `build/open/${name}`, text);
     const u = res.util;

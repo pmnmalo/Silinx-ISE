@@ -358,7 +358,8 @@ test('#483 projectFromZip: entries leaving the project skipped with a warning, s
     'silinx.json: file path outside the project dropped (../../etc/passwd)']);
   assert.deepEqual(Object.keys(r.files).sort(), ['a/b.txt', 'src/top.vhd', 'sub/win.v']);
   assert.deepEqual(r.missing, ['src/gone.vhd', 'constraints/top.ucf']);
-  assert.deepEqual(r.json, { ...emptyProjectJson('Hostile'), top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/gone.vhd', lang: 'vhdl', role: 'design' }], constraints: 'constraints/top.ucf' });
+  // (a project read with no Optimization: Fast, #2470)
+  assert.deepEqual(r.json, { ...emptyProjectJson('Hostile'), impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' }, top: 'top', files: [{ path: 'src/top.vhd', lang: 'vhdl', role: 'design' }, { path: 'src/gone.vhd', lang: 'vhdl', role: 'design' }], constraints: 'constraints/top.ucf' });
   // the project in a folder of the zip, silinx.json not JSON: an empty project with the files
   const r2 = projectFromZip('Sub', [E('MyProj/silinx.json', '{ not json'), E('MyProj/src/a.v', 'a'), E('MyProj/../outside.v', 'o'), E('other/x.v', 'x')], { textOf, xiseProject: null });
   assert.deepEqual(r2.warnings, ['zip entry outside the project skipped (../outside.v)', 'silinx.json is not valid JSON: ignored']);

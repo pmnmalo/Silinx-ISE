@@ -29,7 +29,7 @@
 // Prints "=== SILINX STEP <step> ===" before each step, "=== SILINX FAILED <step> (exit 1) ===" and the
 // ERROR lines when one fails, "=== SILINX DONE ===" at the end (the protocol of ISE's run.sh).
 // Returns { ok, report }.
-import { cellCounts, DEEP_RULE } from './synth-open.js';
+import { cellCounts, DEEP_RULE, FAST_SYNTH } from './synth-open.js';
 import { usedOfPrimitives, overResources, overMessage } from './resource-check.js';
 import { UCF, readConstraints } from './constraints.js';
 import { readYosysJson } from './fpga/netlist.js';
@@ -57,13 +57,17 @@ export class StepError extends Error {
 
 /**
  * Run the steps of spec ({ top, family, device, pkg, part, steps, seed, effort, replicate,
- * startupClk, synthUpToDate, synthEffort, deepRule, engine }) with io (above). engine: 'nextpnr' for nextpnr's Map and Place & Route, 'auto' for it when it can implement the design (else the Silinx engine's)
+ * startupClk, synthUpToDate, synthEffort, synthGoal, deepRule, engine }) with io (above). engine: 'nextpnr' for nextpnr's Map and Place & Route, 'auto' for it when it can implement the design (else the Silinx engine's)
  * (#2136, io.nextpnr), else Silinx's own. synthEffort: 'normal' | 'high' (the default), the
  * synthesis's Optimization Effort (#282; 'high' given, Place & Route makes HIGH_TRIES placements too, the fastest kept, and HIGH_EXTRA more routed when the placer's estimate is promising, #651; Normal NORMAL_TRIES for a small design); deepRule: Normal's rule of the deep designs (synth-open.js DEEP_RULE, for tests). synthUpToDate ({ report }: the synthesis part of the
  * report of the run that made it, or null), when the steps start after the synthesis: the netlist of that
  * run is the design's (#280); it is used as it is, or, when it is not there, the synthesis runs.
  */
 export async function runFlow(spec, io) {
+  // (the Optimization, #2470: Fast, the usual mapping alone; Area, the smaller of its netlist and Speed's; both one placement,
+  // no register replication. Speed, or none given: by the Optimization Effort)
+  const goal = spec.synthGoal, area = goal === 'area', once = goal === 'fast' || area;
+  if (once) spec = { ...spec, replicate: false };
   const { top } = spec;
   const log = io.log;
   const report = { files: {} };
@@ -77,9 +81,9 @@ export async function runFlow(spec, io) {
   let known = null;
   const knownPips = () => (known ||= knownRouting(io.bitDb()));
   // the placements Place & Route makes for a design of `slices` slices: HIGH_TRIES at Optimization Effort High, NORMAL_TRIES at Normal (#651)
-  const parTries = slices => effortTries(spec.synthEffort, slices);
+  const parTries = slices => (once ? 1 : effortTries(spec.synthEffort, slices));
   // and the placements more at High, each routed only when its estimate is promising (#651)
-  const parExtra = () => effortExtra(spec.synthEffort);
+  const parExtra = () => (once ? 0 : effortExtra(spec.synthEffort));
   let synth = null, netlist = null, netlistText = null;
   const backend = backendOf(spec.family);
   // the constraints, read when a step asks, in the back end's format (constraints.js, #2385)
@@ -95,14 +99,23 @@ export async function runFlow(spec, io) {
     if (fe.errors.length) throw new StepError('the design has errors', fe.errors, 'Fix them (Check Syntax shows them in the Errors tab).');
     log(`Writing <${top}> as one flat module for Yosys; Yosys (WebAssembly) maps it onto the ${spec.family} cells.`);
     // (the synthesis's Optimization Effort, #282)
-    if (spec.synthEffort) log(spec.synthEffort === 'normal' ? 'Optimization Effort Normal: one mapping, and the mappings for speed for a small design or one limited by its logic depth (High tries them for every design, a slower synthesis).'
+    if (goal === 'fast') log('Optimization Fast: one mapping, none of the mappings for speed; one placement, no register replication.');
+    else if (area && backend.areaSynth) log('Optimization Area: the usual mapping and the mappings for speed, the smaller netlist kept; one placement, no register replication.');
+    else if (spec.synthEffort) log(spec.synthEffort === 'normal' ? 'Optimization Effort Normal: one mapping, and the mappings for speed for a small design or one limited by its logic depth (High tries them for every design, a slower synthesis).'
       : 'Optimization Effort High: the mappings for speed tried too, the fastest kept.');
     let r;
     try {
-      r = await backend.synth(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
+      // (a family of Yosys's own script has one mapping: Area as Speed)
+      const synth = (area && backend.areaSynth) || backend.synth;
+      r = await synth(fe.input(), { family: spec.family, run: io.yosys, effort: spec.synthEffort || 'high', ...(goal === 'fast' && FAST_SYNTH), ...(spec.deepRule && { deepRule: spec.deepRule }), ...(spec.smallRule && { smallRule: spec.smallRule }), onLine: l => { if (/^(Warning|ERROR)/.test(l)) log(l.replace(/^Warning:/, 'WARNING:Yosys -').replace(/^ERROR:/, 'ERROR:Yosys -')); } });
     } catch (e) {
       for (const l of e.lines || []) if (/ERROR/.test(l)) log(l);
       throw new StepError(`synthesis failed: ${e.message}`);
+    }
+    // (Area: the two netlists' sizes, #2470)
+    if (r.area) {
+      const n = x => (x.slices != null ? `${x.slices} slices, ${x.luts} LUTs` : `${x.luts} LUTs`);
+      log(`Optimization Area: the usual mapping ${n(r.area.usual)}, the mappings for speed ${n(r.area.speed)}: ${r.area.kept === 'usual' ? 'the usual mapping' : 'the mappings for speed\''} kept.`);
     }
     // (Normal: a small design synthesized as at High, #652)
     if (r.depth?.small) log(`Optimization Effort Normal: a small design (${r.depth.small.luts} LUTs): the mappings for speed tried too, ${r.depth.small.kept ? 'the fastest kept.' : `not faster (${r.depth.small.ns[1].toFixed(1)} ns estimated against ${r.depth.small.ns[0].toFixed(1)}): the one mapping kept.`}`);

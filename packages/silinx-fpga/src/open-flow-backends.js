@@ -27,6 +27,7 @@ import { mountS6Steps } from './open-flow-s6.js';
 import { mountNextpnrSteps } from './open-flow-nextpnr.js';
 import { mountNextpnrS6 } from './open-flow-nextpnr-s6.js';
 import { synthesizeVerilog } from './synth-open.js';
+import { synthesizeArea } from './synth-area.js';
 import { scriptSynthesis } from './synth-script.js';
 import { XILINX_STEPS } from './open-steps.js';
 import { ICE40 } from './open-flow-ice40.js';
@@ -132,9 +133,10 @@ const XST_NAMES = { luts: 'Number of 4 input LUTs', ffs: 'Number of Slice Flip F
 const xstName = id => XST_NAMES[id] || id;
 const mapName = (id, resource) => resource?.report || XST_NAMES[id] || id;
 
-const SPARTAN3E = { id: 'spartan3e', mount: mountS3e, steps: XILINX_STEPS, synth: synthesizeVerilog, synthName: xstName };
-const OTHER = { id: 'other', mount: mountS3e, steps: XILINX_STEPS, synth: synthesizeVerilog, synthName: mapName };
-const backends = new Map([['spartan3e', SPARTAN3E], ['spartan6', { id: 'spartan6', mount: mountS6, steps: XILINX_STEPS, synth: synthesizeVerilog, synthName: mapName }],
+// (areaSynth: the Optimization Area's synthesis, #2470; a back end with none synthesizes as at the other goals)
+const SPARTAN3E = { id: 'spartan3e', mount: mountS3e, steps: XILINX_STEPS, synth: synthesizeVerilog, areaSynth: synthesizeArea, synthName: xstName };
+const OTHER = { id: 'other', mount: mountS3e, steps: XILINX_STEPS, synth: synthesizeVerilog, areaSynth: synthesizeArea, synthName: mapName };
+const backends = new Map([['spartan3e', SPARTAN3E], ['spartan6', { id: 'spartan6', mount: mountS6, steps: XILINX_STEPS, synth: synthesizeVerilog, areaSynth: synthesizeArea, synthName: mapName }],
   ['ice40', ICE40]]);   // (#2295: open-flow-ice40.js)
 // a registered back end's synthesis and report names when it gives none: Yosys's generic synth, its resources' names
 const GENERIC_SYNTH = scriptSynthesis({ script: top => `synth -flatten -top ${top}` });

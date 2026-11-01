@@ -7,7 +7,7 @@ import { unconstrainedPorts } from '/core/auto-pins.js';
 import { isGeneratedSource, viewHdl } from '/core/view-hdl.js';
 import { blackboxesIn } from '/core/c-blackbox.js';
 import { compile } from '/core/compile.js';
-import { synthEffort, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
+import { synthEffort, synthGoal, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
 import { OPEN_STEPS, engineOf, orderOpenSteps, orderSteps, deviceFamily, isIseFamily } from '/packages/silinx-fpga/src/parts.js';
 import { ICE40_PARTS, ICE40_STEPS } from '/packages/silinx-fpga/src/index.js';
@@ -160,7 +160,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
   // (a device with some of the steps only, as the server refuses the others: the Spartan-6's, #722)
   const missing = st.steps ? runSteps.filter(s => !st.steps.includes(s)) : [];
   if (missing.length) throw new Error(`the Silinx toolchain has no ${missing.join(', ')} for ${st.part} yet (only ${st.steps.join(', ')})`);
-  const spec = { top, part: st.part, device: dev, pkg, family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), ...(resources && { resources }) };
+  const spec = { top, part: st.part, device: dev, pkg, family: st.family, graph: st.graph, steps: runSteps, seed: 1, effort: 1, startupClk: project.impl?.startupClk || 'JtagClk', engine: engineOf(project.impl), simTop: project.simTop || null, synthEffort: synthEffort(project.impl), synthGoal: synthGoal(project.impl), ...(resources && { resources }) };
   if (synthUpToDate && !spec.steps.includes('synth')) spec.synthUpToDate = synthUpToDate;
   // the test benches, for the post-synthesis model's generics (#120)
   const simSources = (project.files || []).filter(f => f.role === 'sim' && (f.lang === 'verilog' || f.lang === 'vhdl') && typeof files[f.path] === 'string')

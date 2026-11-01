@@ -25,13 +25,11 @@ A project is a directory under the workspace (default `~/Silinx-projects`, overr
 * `role: design` files go to synthesis; `role: sim` files are only used for simulation.
 * `synthTool`: `'silinx'` (the Silinx toolchain: Yosys, Silinx's place & route and bitstream) or
   `'xst'` (Xilinx ISE 14.7); without it, the mode of Toolchain Settings.
-* `impl.optLevel`: the synthesis's Optimization Effort, 1 Normal (the default; with the Silinx
-  toolchain one mapping, fast, and every mapping for a design of 250 LUTs at most (the faster kept) or limited by its logic depth; its wide multiplexers
-  on MUXF5 … MUXF7, the mapping with the wider functions and the state machines Yosys leaves as written (of 8
-  states or more) one-hot when that is better; Place & Route's two placements, the faster kept, for a design of 500
-  slices at most) or 2 High (every mapping tried, and the state machines of 8 states or more one-hot, the best kept;
-  Place & Route's two placements, the faster kept, and a third routed when the placer estimates it faster than one of
-  them).
+* `impl.optMode` and `impl.optLevel`: ISE's Optimization Goal and Effort, and the project's Optimization (#2470):
+  `Speed` and 1 **Fast** (one mapping, one placement: a project with none is Fast too), `Area` and 2 **Area** (the
+  default of a new project: the smaller of the usual mapping's netlist and Speed's, one placement, no register
+  replication), `Speed` and 2 **Speed** (every mapping for speed, the state machines of 8 states or more one-hot, the
+  fastest kept; several placements, the fastest kept). `Area` at 1, of a project made before, is Area.
 * Generated implementation output lives in `<project>/build/` (ISE work dir), bitstream `build/<top>.bit`.
 
 ## HTTP API (server/)

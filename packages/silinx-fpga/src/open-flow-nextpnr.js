@@ -294,7 +294,7 @@ export function mountNextpnrSteps(ctx) {
     for (let k = 0, n = 1; k < n; k++) {
       let r;
       try { r = await placeRoute(first + k); } catch (e) { failed ||= { e }; continue; } finally { tried++; }
-      if (!best) n = r.period > 0 ? nextpnrTries(spec.synthEffort, r.size.slices) : 1;
+      if (!best) n = r.period > 0 && !['fast', 'area'].includes(spec.synthGoal) ? nextpnrTries(spec.synthEffort, r.size.slices) : 1;   // (Fast, Area: one, #2470)
       if (n > 1) log(`Placement ${k + 1} of ${n} (seed ${r.seed}): ${r.period.toFixed(3)} ns, ${r.size.slices} slices, in ${r.took}.`);
       if (!best || r.period < best.period) best = r;
     }
