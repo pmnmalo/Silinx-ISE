@@ -11,6 +11,7 @@
 
 import { DEV_SITE } from './prefs.js';
 import { clone } from '../../core/util.js';   // (a relative path: Node imports this module too, as api-local.js)
+import { constraintsFile } from '../../packages/silinx-fpga/src/parts.js';
 
 const PROJECT_FILE = 'silinx.json';
 export const NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
@@ -49,7 +50,7 @@ export function projectJsonText(name, pj) {
 /** A new empty project's silinx.json (server/projects.js createProject). */
 export const emptyProjectJson = (name, { device, board } = {}) => ({
   name, version: 1, device: device || DEFAULT_DEVICE, board: board ?? null, top: '', simTop: '', files: [],
-  constraints: 'constraints/top.ucf', stimuli: {}, impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' },
+  constraints: constraintsFile(device || DEFAULT_DEVICE), stimuli: {}, impl: { optMode: 'Speed', optLevel: 1, startupClk: 'JtagClk' },
 });
 const under = (k, dir) => k === dir || k.startsWith(`${dir}/`);
 const plain = o => !!o && typeof o === 'object' && !Array.isArray(o);

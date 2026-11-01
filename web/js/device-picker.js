@@ -27,6 +27,7 @@ export function devicePicker(db, device) {
     for (const k of pkgs) pkgSel.append(h('option', { value: k, selected: k === cur.package }, `${k.toUpperCase()}  (${part.packages[k].userIo ?? '?'} I/O)`));
     if (!part.speeds.includes(cur.speed)) cur.speed = part.speeds.find(x => !/L|N$/i.test(x)) || part.speeds[0]; // a standard grade, not low-power
     for (const sp of part.speeds) spdSel.append(h('option', { value: sp, selected: sp === cur.speed }, sp));
+    spdSel.disabled = !part.speeds.length;   // (the iCE40 has no speed grades)
   };
   famSel.addEventListener('change', () => fillParts());
   partSel.addEventListener('change', () => { cur.part = partSel.value; fillPkgs(); });

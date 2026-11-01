@@ -15,7 +15,7 @@ export const FAMILY_INFO = {
   kintex7:      { name: 'Kintex-7',           xise: 'Kintex7',                  pm: 'kintex7' },
   virtex7:      { name: 'Virtex-7',           xise: 'Virtex7',                  pm: 'virtex7' },
   zynq:         { name: 'Zynq-7000',          xise: 'Zynq',                     pm: 'zynq' },
-  ice40:        { name: 'iCE40' },
+  ice40:        { name: 'iCE40', constraints: 'pcf' },
 };
 
 /** Family id of a part name such as xc3s250e, xc6slx9, xc3s700an, xc7a100t, ice40up5k. */
@@ -58,3 +58,6 @@ export function splitBitPart(p) {
   const m = /^(?:xc)?(\d[a-z]+\d+[a-z]*?)((?:cpg|cp|csg|cs|tqg|tq|vqg|vq|pqg|pq|ftg|ft|fgg|fg|ffg|ff|fbg|fb|sbg|sb|rfg|rf|rbg|rb|clg|cl|cg|sf)\d+)$/i.exec(String(p || ''));
   return m ? { part: `xc${m[1].toLowerCase()}`, package: m[2].toLowerCase() } : null;
 }
+
+/** A new project's constraints file on this device: 'constraints/top.ucf', 'constraints/top.pcf' on the iCE40 (#2461). */
+export const constraintsFile = device => `constraints/top.${FAMILY_INFO[deviceFamily(device)]?.constraints || 'ucf'}`;

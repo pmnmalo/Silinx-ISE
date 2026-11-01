@@ -22,7 +22,7 @@ test('#1678 silinx-fpga: its entries, the API, its light part and the API in Nod
 
 // the API's names: a change to them is a change of the API (its version, #1681), made on purpose
 const API = ['FAMILY_INFO', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'PCF', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PackError', 'S3E_DEVICES', 'SPEED_4', 'StepError',
-  'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'cellCounts', 'checkRouting', 'checkUcf',
+  'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'cellCounts', 'checkRouting', 'checkUcf', 'constraintsFile',
   'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'familyFromXise', 'familyName',
   'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
   'nextpnrIo', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'placeRouteBest', 'powerReport',
@@ -32,7 +32,7 @@ const API = ['FAMILY_INFO', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'PCF', 'MO
 const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'leaveOutChipdbs', 'loadBitDbS6', 'loadDb',
   'loadDeviceCache', 'nextpnrIce40Node', 'nextpnrNode', 'nextpnrS6Node', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];   // (nextpnrNode: the nextpnr engine's io.nextpnr, #2136; nextpnrS6Node: its io.nextpnrS6, #2138; leaveOutChipdbs: the release zip's, #2356)
 
-const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'checkUcf',
+const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'checkUcf', 'constraintsFile',
   'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'familyFromXise', 'familyName', 'familyOfPart', 'fpgaModel', 'generateUcf',
   'isIseFamily', 'locsNotOnBoard', 'lutTable', 'orderOpenSteps', 'orderSteps', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'primitiveInstances', 'resourceCount',
   'resourceOfPrimitive', 'resourcesOf', 'splitBitPart', 'ucfPlacesPins', 'usedOfReport', 'writeXdl'];
