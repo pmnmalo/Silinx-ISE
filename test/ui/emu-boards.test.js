@@ -3,7 +3,7 @@
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupUi, uiTest, makeProject } from './harness.js';
-import { resolveBoard } from '../../server/devices.js';
+import { resolveBoard, BOARDS } from '../../server/devices.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -40,7 +40,7 @@ uiTest('#2478 the board layouts in a module of their own: emulator.js exports th
   assert.deepEqual(await page.eval(async () => {
     const [a, b] = await Promise.all([import('/js/emulator.js'), import('/js/emulator-layouts.js')]);
     return [a.BOARD_LAYOUTS === b.BOARD_LAYOUTS, Object.keys(b.BOARD_LAYOUTS), Object.entries(b.BOARD_LAYOUTS).filter(([, f]) => f.lcd).map(([id]) => id)];
-  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys'], ['s3e-starter']]);
+  }), [true, ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys', 'icebreaker'], ['s3e-starter']]);
 });
 
 for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexys2', [860, 720], [8, 8, 4, 4]], ['s3e-starter', [860, 736], [8, 4, 5, 0]],
@@ -56,15 +56,15 @@ for (const [board, size, parts] of [['basys2', [840, 556], [8, 8, 4, 4]], ['nexy
 }
 
 /** The board's parts ([data-part]) in the board's own units (the view may scale it): { W, H, name: { x, y, w, h } } (x, y: the centre). */
-const geometry = (page) => page.eval(() => {
-  const pcb = document.querySelector('.emu-pcb'), r0 = pcb.getBoundingClientRect(), k = pcb.offsetWidth / r0.width;
+const geometry = (page, root = '') => page.eval((at) => {
+  const pcb = document.querySelector(`${at} .emu-pcb`), r0 = pcb.getBoundingClientRect(), k = pcb.offsetWidth / r0.width;
   const g = { W: pcb.offsetWidth, H: pcb.offsetHeight };
   for (const el of pcb.querySelectorAll('[data-part]')) {
     const r = el.firstElementChild.getBoundingClientRect();
     g[el.dataset.part] = { x: (r.x + r.width / 2 - r0.x) * k, y: (r.y + r.height / 2 - r0.y) * k, w: r.width * k, h: r.height * k };
   }
   return g;
-});
+}, root);
 // the makers' names, which the drawings do not show (nor their logos): the boards' and parts' names only
 const MAKERS = /xilinx|digilent|beyond theory|micron|intel|smsc|atmel|^st$|linear|texas/i;
 const leftToRight = (g, names) => names.every((n, i) => !i || g[names[i - 1]].x < g[n].x);
@@ -255,3 +255,54 @@ for (const board of ['basys2', 'nexys2', 's3e-starter', 'nexys3', 'atlys']) {
     }).map((c) => c.title)), []);
   });
 }
+
+// a board the emulator cannot run a design on yet (the iCEBreaker: its pins in a PCF, #2511) drawn alone: its parts
+// (web/js/emulator-board.js mountBoardParts, the board's layout) mounted with no design, in #alone, the emulator's
+// style in place (a Basys2's emulator opened first)
+async function boardAlone(page, id) {
+  await emulatorOn(page, 'basys2', `Emu-style-${id}`);
+  await page.eval(async (board) => {
+    const [{ mountBoardParts }, { h }] = await Promise.all([import('/js/emulator-board.js'), import('/js/dom.js')]);
+    const main = h('div', { id: 'alone', style: { position: 'fixed', left: '0', top: '0', zIndex: '1000', background: '#fff' } });
+    document.body.append(main);
+    mountBoardParts({
+      board, title: '', after() {}, bitFor: () => undefined, compiled: () => false, hasLcd: false, inVal: new Map(), knobEnd: () => 0,
+      lcdView: () => null, main, manual: [], period: 83333, powered: () => true, refresh() {}, resLabel: {},
+      resOf: (n) => board.resources.find((r) => r.name === n), runCycles() {}, running: () => false, setInputBit() {}, setPower() {},
+      sim: {}, tip: (res, k = 0) => `${res}${k}`, wiring: { bits: [], clocks: [] }, setKnobEnd() {}, setLcdView() {},
+    });
+  }, BOARDS.find((b) => b.id === id));
+}
+
+uiTest('#2481 the iCEBreaker drawn as the real board: its parts where they are, the snap-off part on PMOD2', E, async (page) => {
+  await boardAlone(page, 'icebreaker');
+  const g = await geometry(page, '#alone'), MW = 712;   // (the main board 712 x 493, the snap-off part on its right)
+  assert.deepEqual([g.W, g.H], [1010, 493]);
+  assert.deepEqual(await page.eval(() => ['.emu-led', '.emu-btn', '.emu-power', '.emu-sw'].map((s) => document.querySelectorAll(`#alone ${s}`).length)), [5, 4, 1, 0]);
+  // no power switch on the board (the USB powers it): the emulator's by the USB, upright, its LED the PWR LED under it
+  const sw = await page.eval(() => { const s = document.querySelector('#alone .emu-power-sw').getBoundingClientRect(), l = document.querySelector('#alone .emu-power-led').getBoundingClientRect();
+    return { upright: s.height > 2 * s.width, ledBelow: l.top > s.bottom }; });
+  assert.deepEqual(sw, { upright: true, ledBelow: true });
+  assert.ok(g.power.x < MW * 0.06 && g.power.y < g.H * 0.3, JSON.stringify(g.power));
+  // the user button BTN_N on the left edge, under the USB
+  assert.ok(g.btn_n.x < MW * 0.1 && g.btn_n.y > g.H * 0.65, JSON.stringify(g.btn_n));
+  // the snap-off part, right of the main board: LED1 in the middle of LED2..LED5 in a cross, Button 1..3 in a column right of them
+  const led = [0, 1, 2, 3, 4].map((k) => g[`led${k}`]);
+  assert.ok(led.every((l) => l.x > MW) && led[1].x < led[0].x && led[2].x > led[0].x && led[3].y < led[0].y && led[4].y > led[0].y);
+  for (const k of [1, 2]) assert.ok(Math.abs(led[k].y - led[0].y) < 1, `LED${k + 1} beside LED1`);
+  for (const k of [3, 4]) assert.ok(Math.abs(led[k].x - led[0].x) < 1, `LED${k + 1} over or under LED1`);
+  assert.ok(g.btn0.y < g.btn1.y && g.btn1.y < g.btn2.y && [0, 1, 2].every((k) => g[`btn${k}`].x > led[2].x && Math.abs(g[`btn${k}`].x - g.btn0.x) < 1));
+  // the silkscreen and the connectors: PMOD1A, +5V, PMOD1B along the top, PMOD2 on the right edge, USB on the left
+  const xs = await page.eval(() => Object.fromEntries([...document.querySelectorAll('#alone .emu-pcb-art text')].map((t) => [t.textContent, [+t.getAttribute('x'), +t.getAttribute('y')]])));
+  assert.ok(xs.PMOD1A[0] < xs['+5V'][0] && xs['+5V'][0] < xs.PMOD1B[0] && xs.PMOD1B[1] < g.H * 0.2, JSON.stringify(xs));
+  assert.ok(xs.PMOD2[0] > MW * 0.8 && xs.PMOD2[0] < MW && xs.USB[0] < MW * 0.15);
+  for (const t of ['iCEBreaker', 'PWR', 'UBUTTON', 'RGBLED', 'CDONE', 'CRESET', 'FLASH', '12MHz']) assert.ok(t in xs, t);
+  assert.deepEqual(Object.keys(xs).filter((t) => MAKERS.test(t)), []);
+  const silk = await page.eval(() => [...document.querySelectorAll('#alone .icb-silk')].map((e) => e.textContent));
+  assert.deepEqual(silk, ['LED1 (27)', 'Button 3', 'Button 2', 'Button 1']);
+  // each control is what is at its centre
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('#alone .emu-btn, #alone .emu-power')].filter((c) => {
+    const r = c.getBoundingClientRect(), at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !(at === c || c.contains(at));
+  }).map((c) => c.title)), []);
+});
