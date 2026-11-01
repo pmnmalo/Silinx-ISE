@@ -1,5 +1,6 @@
 // The viewers of the design (#405: out of app.js): the RTL and technology schematics, the simulation in SSim (the
 // behavioural model or a netlist model, with its test bench and data files) and the Board Emulator.
+import { readPins } from './constraints-format.js';
 import { api } from './api.js';
 import { h, dialog, alertDlg, confirmDlg, promptDlg, toast } from './ui.js';
 import { compile, elaborate } from '/core/compile.js';
@@ -398,8 +399,7 @@ export async function openEmulator(mod, { scale, model = null, engine = null, qu
     gens = model ? [] : timingGenerics(design.top?.params);   // a netlist has its constants built in
   } catch (e) { if (quiet) log(`ERROR: Board Emulator: cannot build the design: ${e.message}`, 'err'); else alertDlg('Board Emulator', `Cannot build the design: ${e.message}`, 'error'); return; }
   if (quiet ? diagsFor(lib, design).some(d => (d.severity || 'error') === 'error') : !await confirmElabErrors('Board Emulator', lib, design)) return;
-  const { parseUcf } = await import('/packages/silinx-fpga/src/parts.js');
-  const assignments = S.ucfText ? parseUcf(S.ucfText, { ports: design.top.ports.map(ucfPort) }).assignments : {};
+  const assignments = S.ucfText ? readPins(S.project.device, S.ucfText, { ports: design.top.ports.map(ucfPort) }).assignments : {};
   if (!S.ucfText) log('WARNING: the project has no UCF: the ports are not connected to the board (use I/O Pin Planning).', 'warn');
   const files = await readDataFiles();
   const { mountEmulator, emulatorYosys } = await import('./emulator.js');

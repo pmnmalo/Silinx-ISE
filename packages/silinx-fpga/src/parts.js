@@ -4,12 +4,14 @@
 // ./index.js gives all of it too.
 
 // the parts: their families and resources
-export { FAMILY_INFO, familyOfPart, deviceFamily, isIseFamily, familyName, familyFromXise, splitBitPart } from './family.js';
+export { FAMILY_INFO, familyOfPart, deviceFamily, isIseFamily, openOnlyDevice, familyName, familyFromXise, splitBitPart } from './family.js';
 export { resourcesOf, resourceCount, resourceOfPrimitive } from './resources.js';
 export { usedOfReport, primitiveInstances, deviceChangeIssues } from './resource-check.js';
 
 // the constraints
 export { parseUcf, generateUcf, checkUcf, bitName, boardAutoAssign, periodNs, ucfPlacesPins, backAnnotateUcf, locsNotOnBoard } from './ucf.js';
+
+export { PCF } from './pcf.js';
 
 // the flow's steps
 export { OPEN_STEPS, OPEN_CHAIN, orderOpenSteps, orderSteps, engineOf } from './open-steps.js';

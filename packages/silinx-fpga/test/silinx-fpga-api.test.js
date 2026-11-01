@@ -25,16 +25,16 @@ const API = ['FAMILY_INFO', 'ICE40_PARTS', 'ICE40_STEPS', 'ISE_HINT', 'PCF', 'MO
   'analyzeTiming', 'asText', 'backAnnotateUcf', 'backendOf', 'bitDbS6', 'bitName', 'bitgen', 'boardAutoAssign', 'cellCounts', 'checkRouting', 'checkUcf',
   'dbFileNames', 'dbFilesFrom', 'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'estimatePower', 'familyFromXise', 'familyName',
   'familyOfPart', 'fetchBitDbS6', 'fpgaModel', 'gateAssignments', 'generateUcf', 'ice40Io', 'instArcs', 'isIseFamily', 'knownRouting', 'loadDevice', 'locsNotOnBoard', 'lutTable', 'makeBitDb',
-  'nextpnrIo', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'placeRouteBest', 'powerReport',
+  'nextpnrIo', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'pack', 'paramBits', 'paramInt', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'placeRouteBest', 'powerReport',
   'primitiveInstances', 'readBit', 'readYosysJson', 'readableBlobs', 'registerBackend', 'resourceCount', 'resourceOfPrimitive', 'resourcesOf',
   'rewriteCarryChains', 'runFlow', 'runYosysOnce', 's6DbNames', 's6OpenStatus', 'splitBitPart', 'splitPart', 'synthEffort',
   'synthesizeVerilog', 'timingReport', 'ucfPlacesPins', 'usedOfReport', 'writeBit', 'writeXdl', 'yosysWorkerSource'];
 const NODE = ['DB_DIR', 'S6_DB_DIR', 'SHIPPED_DEVICES_DIR', 'buildDeviceCache', 'dbPackages', 'devicesDir', 'findDeviceGraph', 'hasBitDb', 'leaveOutChipdbs', 'loadBitDbS6', 'loadDb',
   'loadDeviceCache', 'nextpnrIce40Node', 'nextpnrNode', 'nextpnrS6Node', 'shippedDevicePath', 'yosysNode', 'yosysWorkers'];   // (nextpnrNode: the nextpnr engine's io.nextpnr, #2136; nextpnrS6Node: its io.nextpnrS6, #2138; leaveOutChipdbs: the release zip's, #2356)
 
-const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'checkUcf',
+const PARTS = ['FAMILY_INFO', 'MODEL_VERSION', 'OPEN_CHAIN', 'OPEN_STEPS', 'PCF', 'backAnnotateUcf', 'bitName', 'boardAutoAssign', 'checkUcf',
   'deviceChangeIssues', 'deviceFamily', 'deviceGrid', 'engineOf', 'familyFromXise', 'familyName', 'familyOfPart', 'fpgaModel', 'generateUcf',
-  'isIseFamily', 'locsNotOnBoard', 'lutTable', 'orderOpenSteps', 'orderSteps', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'primitiveInstances', 'resourceCount',
+  'isIseFamily', 'locsNotOnBoard', 'lutTable', 'openOnlyDevice', 'orderOpenSteps', 'orderSteps', 'parseUcf', 'parseXdl', 'parseXdlrc', 'periodNs', 'primitiveInstances', 'resourceCount',
   'resourceOfPrimitive', 'resourcesOf', 'splitBitPart', 'ucfPlacesPins', 'usedOfReport', 'writeXdl'];
 
 test('#1678 the API\'s names, each defined; ./parts: some of them; ./node: all and the loaders', () => {
@@ -73,7 +73,7 @@ test('#1678 ./parts: light, nothing of Node and none of the synthesis, pack, pla
   const { seen, nodeOnly } = modulesOf('parts.js');
   assert.deepEqual(nodeOnly, []);
   const rel = [...seen].map(f => path.relative(path.join(DIR, 'src'), f).split(path.sep).join('/')).sort();
-  assert.deepEqual(rel, ['family.js', 'open-steps.js', 'parts.js', 'resource-check.js', 'resources.js', 'ucf.js', 'xdl.js']);
+  assert.deepEqual(rel, ['family.js', 'open-steps.js', 'parts.js', 'pcf.js', 'resource-check.js', 'resources.js', 'ucf.js', 'xdl.js']);
 });
 
 const COUNTER = 'module cnt(input clk, input rst, output reg [3:0] q);\n  always @(posedge clk) if (rst) q <= 0; else q <= q + 1;\nendmodule\n';
