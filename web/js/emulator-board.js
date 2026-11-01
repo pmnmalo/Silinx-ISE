@@ -18,19 +18,21 @@ export function mountBoardParts(ctx) {
 
   // ---- interactive parts (placed by the board layout below)
   const digits = [], leds = [];
+  // (an active-low switch or button, the iCEBreaker's BTN_N: '0' when on or pressed, #2511)
+  const low = (b) => !!b?.res.extra?.activeLow;
   const mkDigit = (k) => { const d = makeDigit(); digits[k] = d; return d.el; };
   const mkLed = (k, cls = 'emu-led') => { const l = h('div', { class: cls }); leds[k] = l; return l; };
   const mkSwitch = (k, cls = 'emu-sw', res = 'sw') => {
     const b = bitFor(res, k);
     const el = h('div', { class: cls, title: `${tip(res, k)} — click to toggle` });
-    el.addEventListener('click', () => { const on = !el.classList.contains('on'); el.classList.toggle('on', on); setInputBit(b, on); if (!running()) refresh(); });
+    el.addEventListener('click', () => { const on = !el.classList.contains('on'); el.classList.toggle('on', on); setInputBit(b, on !== low(b)); if (!running()) refresh(); });
     return el;
   };
   const mkButton = (k, cls = 'emu-btn', res = 'btn') => {
     const b = bitFor(res, k);
     const el = h('div', { class: cls, title: `${tip(res, k)} — press and hold (Shift+click keeps it pressed)` });
     let latched = false;
-    const set = (on) => { el.classList.toggle('on', on); setInputBit(b, on); };
+    const set = (on) => { el.classList.toggle('on', on); setInputBit(b, on !== low(b)); };
     el.addEventListener('pointerdown', (e) => { e.preventDefault(); if (e.shiftKey) { latched = !latched; set(latched); } else { latched = false; set(true); el.setPointerCapture(e.pointerId); } });
     el.addEventListener('pointerup', () => { if (!latched) set(false); });
     el.addEventListener('pointercancel', () => { if (!latched) set(false); });

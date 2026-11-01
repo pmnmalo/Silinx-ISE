@@ -27,7 +27,20 @@ const KIND = { led: 'led', sw: 'sw', btn: 'btn', seg: 'seg', dp: 'dp', an: 'an',
 function kindOf(res) {
   if (res.group === 'Clock') return 'clk';
   if (/^btn_/.test(res.name)) return 'btn';       // e.g. btn_north on the Spartan-3E Starter Kit
+  if (res.group === 'LEDs' && res.dir === 'out') return 'led';   // e.g. the iCEBreaker's red and green LEDs (#2511)
   return KIND[res.name] || 'other';
+}
+/** The number of each LED resource's first LED among the board's LEDs: led's from 0, then the others (the iCEBreaker's
+ *  LEDR_N, LEDG_N) after it in the board's order (#2511): { led: 0, ledr_n: 5, ledg_n: 6 }. */
+export function ledNumbers(board) {
+  const out = {};
+  let n = 0;
+  for (const r of [...(board?.resources || [])].sort((a, b) => (b.name === 'led') - (a.name === 'led'))) {
+    if (kindOf(r) !== 'led') continue;
+    out[r.name] = n;
+    n += r.pins.length;
+  }
+  return out;
 }
 const periodPs = (p) => {
   const m = /([\d.]+)\s*(ps|ns|us)?/i.exec(String(p || ''));
@@ -42,12 +55,13 @@ const periodPs = (p) => {
  * @param assignments  parseUcf(...).assignments: { 'opcode<3>': { loc: 'B4' }, ... }
  * @param board        board definition with `resources` ({ name, group, pins, dir, extra })
  * @returns {{ bits: Array, clocks: Array, unmapped: Array, resources: Array }}
- *   bits: every port bit on a board resource { port, sig, pos, bit, res, kind, idx, loc }
+ *   bits: every port bit on a board resource { port, sig, pos, bit, res, kind, idx, loc } (an LED's: its number, led)
  */
 export function boardWiring({ ports, assignments = {}, board }) {
   const byPin = new Map();
   for (const r of board?.resources || []) r.pins.forEach((pin, idx) => byPin.set(String(pin).toUpperCase(), { res: r, idx }));
   const asg = new Map(Object.entries(assignments).map(([k, v]) => [k.toLowerCase(), v]));
+  const leds = ledNumbers(board);
   const bits = [], unmapped = [], clocks = [];
   for (const port of ports || []) {
     for (const b of portBits(port)) {
@@ -57,6 +71,7 @@ export function boardWiring({ ports, assignments = {}, board }) {
       const hit = loc ? byPin.get(loc) : null;
       if (!hit) { unmapped.push({ port: port.name, bit: b.name, dir: port.dir, loc }); continue; }
       const entry = { port: port.name, dir: port.dir, sig: port.sig, pos: b.pos, bit: b.name, res: hit.res, idx: hit.idx, kind: kindOf(hit.res), loc };
+      if (entry.kind === 'led') entry.led = leds[hit.res.name] + hit.idx;   // (its number among the board's LEDs)
       bits.push(entry);
       if (entry.kind === 'clk' && port.dir === 'in') clocks.push({ ...entry, period: periodPs(hit.res.extra?.period) });
     }
@@ -144,12 +159,13 @@ export function boardOutputs(wiring, t0, t1, prev = null) {
 }
 
 const onLevel = (b) => (b.res.extra?.activeLow ? 0 : 1);
-// the output bits of the board's LEDs and display: { leds: [b], segs, dps, ans } (by resource index)
+// the output bits of the board's LEDs and display: { leds: [b], segs, dps, ans } (by resource index; an LED by its
+// number among the board's LEDs, ledNumbers)
 function displayBits(wiring) {
   const leds = [], segs = [], dps = [], ans = [];
   for (const b of wiring.bits) {
     if (b.dir !== 'out' && b.dir !== 'inout') continue;
-    if (b.kind === 'led') leds[b.idx] = b;
+    if (b.kind === 'led') leds[b.led ?? b.idx] = b;
     else if (b.kind === 'seg') segs[b.idx] = b;
     else if (b.kind === 'dp') dps[b.idx] = b;
     else if (b.kind === 'an') ans[b.idx] = b;

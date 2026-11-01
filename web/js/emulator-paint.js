@@ -7,6 +7,8 @@ import { h } from './dom.js';
 import { lcdText } from '/core/emulate.js';
 
 /** { paint, setStat } of mountEmulator (compiled(), dirty(), lcd(), lcdDirty(), lcdView(), logN(), paints(), powered(), prev(), rateWin(), running(), vgaView(): its current values). */
+// an LED's colour at brightness v (0..1): green, or red (data-colour="red": the iCEBreaker's LED1 and LEDR_N, #2511)
+const ledColour = (v, red) => (red ? [58 + 197 * v, 27 + 20 * v, 27 + 20 * v] : [27 + 20 * v, 58 + 197 * v, 35 + 40 * v]).map(Math.round);
 // (the status line's rewrites while running: twice a second at most, #1106)
 const STAT_MS = 500;
 
@@ -27,11 +29,11 @@ export function mountEmuPaint(ctx) {
     setPaints(paints() + 1);
     // no window run yet (start-up, power cycle): LEDs and digits dark
     leds.forEach((l, k) => {
-      const v = prev()?.leds[k] ?? 0;
-      const background = `rgb(${Math.round(27 + 20 * v)}, ${Math.round(58 + 197 * v)}, ${Math.round(35 + 40 * v)})`;
+      const v = prev()?.leds[k] ?? 0, red = l.dataset.colour === 'red';
+      const background = `rgb(${ledColour(v, red).join()})`;
       if (ledShown[k] === background) return;
       ledShown[k] = background;
-      l.style.background = background; l.style.boxShadow = v > 0.05 ? `0 0 ${Math.round(8 * v)}px #4f4` : 'none';
+      l.style.background = background; l.style.boxShadow = v > 0.05 ? `0 0 ${Math.round(8 * v)}px ${red ? '#f44' : '#4f4'}` : 'none';
     });
     digits.forEach((d, k) => d && d.set(prev()?.digits[k] ?? null));
     if (lcdView() && lcdDirty()) { lcdView().set(powered() ? lcdText(lcd()) : null, lcd()); setLcdDirty(false); }
