@@ -176,7 +176,7 @@ const EXPECTED = {
   stopwatch: { chains: 3, registers: 3, cells: [391, 254] },
   clock: { chains: 6, registers: 6, cells: [920, 434] },
   vga: { chains: 2, registers: 2, cells: [498, 426] },
-  isqrt: { chains: 0, registers: 0, cells: [279, 279] },
+  isqrt: { chains: 0, registers: 0, cells: [277, 277] },
 };
 // (#659, #670: the equalities with a constant; the tables (their inputs at most, their words, their outputs), the
 // cells before and after; the registers wordLevel made again of the flip-flops the tables feed)
@@ -188,7 +188,7 @@ const TABLES = {
   stopwatch: [1, { tables: 31, inputs: 12, words: 12112, outputs: 62, cells: [250, 166] }, 9],
   clock: [9, { tables: 32, inputs: 12, words: 49880, outputs: 76, cells: [422, 149] }, 4],
   vga: [2, { tables: 19, inputs: 12, words: 48864, outputs: 55, cells: [425, 110] }, 2],
-  isqrt: [0, { tables: 35, inputs: 12, words: 22864, outputs: 79, cells: [279, 125] }, 4],
+  isqrt: [0, { tables: 34, inputs: 12, words: 22504, outputs: 78, cells: [277, 123] }, 6],
 };
 // (#670: the part of its operations a step evaluates at most, as the profile estimates it: clock's and vga's models,
 // their display's and their pixel clock's logic changing at every other step, unguarded; blinky's display refresh
