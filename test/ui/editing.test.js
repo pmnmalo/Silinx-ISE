@@ -276,8 +276,8 @@ uiTest('processes that need no ISE: RTL schematic, constraints, pin planning, su
   // no Design Utilities, no View HDL Instantiation Template (#1072)
   assert.ok(!(await page.eval(() => [...document.querySelectorAll('#procs .lbl')].some((l) => /Design Utilities|Instantiation Template/.test(l.textContent)))));
   await run('View RTL Schematic', () => window.Silinx.active?.id === 'rtl:top' && document.querySelectorAll('.doc:not([hidden]) .se-svg [data-kind=sym]').length >= 2);
-  // the RTL schematic pushes into an instance and comes back up
-  assert.match(await page.eval(() => document.querySelector('.doc:not([hidden]) .rtl-crumbs').innerText), /top : top/);
+  // the RTL schematic of top, its hierarchy's buttons in the schematic's toolbar (#2667)
+  assert.equal(await page.eval(() => window.Silinx.active.viewer.getDoc().name.toLowerCase()), 'top');
   await run('Edit Constraints (Text)', () => window.Silinx.active?.id === 'file:constraints/top.ucf');
   await run('Check Constraints', () => /Process "Check Constraints" completed successfully/.test(window.__console()));
   await run('I/O Pin Planning', () => window.Silinx.active?.id === 'pins' && document.querySelectorAll('.pin-planner tr').length > 5);
@@ -348,11 +348,14 @@ uiTest('View RTL Schematic of VHDL: the names as written in the design (instance
   await page.waitFor(() => window.Silinx.active?.id === 'rtl:top_level' && window.Silinx.active.viewer?.getDoc().symbols.length >= 3, [], { what: 'RTL schematic' });
   const view = () => page.eval(() => {
     const d = window.Silinx.active.viewer.getDoc();
-    return { crumbs: document.querySelector('.doc:not([hidden]) .rtl-crumbs').innerText.replace(/\s+/g, ' ').trim(), name: d.name, ports: d.ports.map((p) => p.name), nets: [...new Set(d.labels.map((l) => l.net))],
+    // (#2667: Up, Push into and the file first in the schematic's toolbar, no bar above it)
+    const nav = [...document.querySelector('.doc:not([hidden]) .se-toolbar').children].slice(0, 4)
+      .map((b) => (b.classList.contains('se-sep') ? '|' : `${b.textContent}${b.disabled ? ' (off)' : ''}`));
+    return { bar: !!document.querySelector('.doc:not([hidden]) .rtl-crumbs, .doc:not([hidden]) > .doc-toolbar'), nav, name: d.name, ports: d.ports.map((p) => p.name), nets: [...new Set(d.labels.map((l) => l.net))],
       syms: d.symbols.map((s) => [s.name, s.type, s.params.module || s.params.title || null]) };
   });
   assert.deepEqual(await view(), {
-    crumbs: '⬆ Up ⬇ Push into RTL Schematic (read-only) — Top_Level : Top_Level Open top.vhd', name: 'Top_Level', ports: ['CLK_50', 'nReset', 'LEDs'],
+    bar: false, nav: ['⬆ Up (off)', '⬇ Push into (off)', 'Open top.vhd', '|'], name: 'Top_Level', ports: ['CLK_50', 'nReset', 'LEDs'],
     nets: ['Blink_A'], syms: [['U_Blink', 'module', 'Blink_Ctrl'], ['inst_1', 'busjoin', null], ['inst_2', 'inv', null]],
   });
   // the instance's properties: its module, pins and generics as the entity writes them
@@ -364,14 +367,26 @@ uiTest('View RTL Schematic of VHDL: the names as written in the design (instance
     pins: document.querySelector('.doc:not([hidden]) .se-pins').textContent,
   })), { gens: ['Max_Count=5'], pins: 'Clk → CLK_50\nRst_N → nReset\nLED_Out → Blink_A' });
   // push into it (the instance is found by its name as written) and back up
+  assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .rtl-nav[data-nav="into"]').disabled), false, 'Push into on: an instance selected');
   await page.click('.doc:not([hidden]) .rtl-nav', { text: '⬇ Push into' });
   await page.waitFor(() => window.Silinx.active.viewer.getDoc().name === 'Blink_Ctrl', [], { what: 'inside U_Blink' });
   assert.deepEqual(await view(), {
-    crumbs: '⬆ Up ⬇ Push into RTL Schematic (read-only) — Top_Level : Top_Level › U_Blink : Blink_Ctrl Open top.vhd', name: 'Blink_Ctrl', ports: ['Clk', 'Rst_N', 'LED_Out'],
+    bar: false, nav: ['⬆ Up', '⬇ Push into (off)', 'Open top.vhd', '|'], name: 'Blink_Ctrl', ports: ['Clk', 'Rst_N', 'LED_Out'],
     nets: ['Toggle_Q'], syms: [['Flip', 'hdlblock', 'Flip'], ['LOGIC_1', 'hdlblock', 'assign']],
   });
   await page.click('.doc:not([hidden]) .rtl-nav', { text: '⬆ Up' });
   await page.waitFor(() => window.Silinx.active.viewer.getDoc().name === 'Top_Level', [], { what: 'back to the top' });
+  assert.equal(await page.eval(() => document.querySelector('.doc:not([hidden]) .rtl-nav[data-nav="up"]').disabled), true, 'Up off at the top');
+  // in Portuguese (#2667)
+  const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
+  await setLang('pt');
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.doc:not([hidden]) .se-toolbar .rtl-nav')].map((b) => [b.textContent, b.title])), [
+    ['⬆ Subir', 'Subir para o módulo pai (Backspace)'], ['⬇ Entrar', 'Entrar na instância selecionada (Enter, ou duplo clique)'],
+    ['Abrir top.vhd', 'Abrir o ficheiro HDL do módulo']]);
+  await setLang('en');
+  // the module's file opened from the toolbar
+  await page.click('.doc:not([hidden]) .rtl-nav[data-nav="open"]');
+  await page.waitFor(() => /^file:.*top\.vhd$/.test(window.Silinx.active?.id || ''), [], { what: 'top.vhd opened' });
   assert.deepEqual((await page.consoleText()).split('\n').filter((l) => /warning|error/i.test(l)), []);
 });
 

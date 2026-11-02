@@ -156,7 +156,6 @@ export async function openSchematic(mod, { netlist = null, task = netlist ? null
   const sources = Object.fromEntries(srcs.map(x => [x.path, x.text]));
   // the names as written in the sources (VHDL is lower-cased by the elaborator, #131), the primitives' too (LUT4, FDRE)
   const modules = modulesFromLibrary(lib, { sources: Object.fromEntries(all.map(x => [x.path, x.text])), asWritten: true });
-  const modName = name => Object.values(modules).find(m => m.name.toLowerCase() === String(name).toLowerCase())?.name || name;
   const elk = window.ELK ? new window.ELK() : null;
   const id = `${netlist ? 'tech' : 'rtl'}:${mod}`;
   const existing = findDoc(id);
@@ -164,30 +163,25 @@ export async function openSchematic(mod, { netlist = null, task = netlist ? null
   openDoc({
     id, title: `${mod} (${kindName})`, icon: 'schematic', task: task || undefined,
     create(el, docRef) {
-      const bar = h('div', { class: 'doc-toolbar rtl-crumbs' });
       const host = h('div', { class: 'doc-body' });
-      el.append(bar, host);
-      let ed = null, cur = null;
-      const crumbs = inst => { const out = []; for (let i = inst; i; i = i.parent) out.unshift(i); return out; };
+      el.append(host);
+      let ed = null, cur = null, file = null;
       // an instance or a module by its name in the schematic (as written: VHDL names match in any case)
       const sameName = (a, b, vhdl) => a === b || (vhdl && String(a).toLowerCase() === String(b).toLowerCase());
-      const shown = new Map();    // instance -> its name as the schematic writes it
-      const label = i => `${shown.get(i) || (i.parent ? i.name : modName(i.name))} : ${modName(i.module)}`;
-      // ISE-style hierarchy navigation: up to the parent, push into the selected instance
-      const upBtn = h('button', { class: 'btn rtl-nav', title: 'Up to the parent module (Backspace)', onclick: () => cur?.parent && show(cur.parent) }, '⬆ Up');
-      const intoBtn = h('button', { class: 'btn rtl-nav', title: 'Push into the selected instance (Enter, or double-click it)', onclick: () => ed?.openSelected() }, '⬇ Push into');
+      // ISE-style hierarchy navigation, in the schematic's toolbar (#2667): up to the parent, push into the selected
+      // instance; the module's file
+      const navBtn = (nav, title, text, onclick) => h('button', { type: 'button', class: 'se-btn wide rtl-nav', 'data-nav': nav, title, onclick }, text);
+      const upBtn = navBtn('up', 'Up to the parent module (Backspace)', '⬆ Up', () => cur?.parent && show(cur.parent));
+      const intoBtn = navBtn('into', 'Push into the selected instance (Enter, or double-click it)', '⬇ Push into', () => ed?.openSelected());
+      const openBtn = navBtn('open', 'Open the module\'s HDL file', '', () => file && openFile(file.file, file.line));
       const canEnter = s => !!(s && cur?.children.some(c => (sameName(c.name, s.name, cur.mod?.lang === 'vhdl') || sameName(c.module, s.params.module, c.mod?.lang === 'vhdl')) && !c.blackbox && !isPrimitive(c)));
-      // the bar (Up, the crumbs) says the instance drawn: it changes with the drawing, once that is laid
-      // out, not before (a click meanwhile went to the drawing left, its properties then replaced, #346)
+      // the buttons follow the instance drawn: they change with the drawing, once that is laid out, not before (a
+      // click meanwhile went to the drawing left, its properties then replaced, #346)
       const drawBar = (inst, info) => {
-        bar.innerHTML = '';
         upBtn.disabled = !inst.parent; intoBtn.disabled = true;
-        bar.append(upBtn, intoBtn, h('span', { class: 'rtl-ro' }, netlist ? 'Technology Schematic (read-only): the post-synthesis netlist' : 'RTL Schematic (read-only)'));
-        crumbs(inst).forEach((i, k, all) => {
-          bar.append(h('span', { class: 'sep' }, k ? ' › ' : ' — '));
-          bar.append(k === all.length - 1 ? h('b', {}, label(i)) : h('a', { onclick: () => show(i) }, label(i)));
-        });
-        if (info) bar.append(h('span', { class: 'spacer' }), h('a', { onclick: () => openFile(info.file, info.line) }, `Open ${info.file.split('/').pop()}`));
+        file = info || null;
+        openBtn.hidden = !info;
+        openBtn.textContent = info ? `Open ${info.file.split('/').pop()}` : '';
       };
       let want = null;   // the instance asked for last (its drawing being laid out)
       const show = async inst => {
@@ -208,10 +202,11 @@ export async function openSchematic(mod, { netlist = null, task = netlist ? null
               onUp: () => cur?.parent && show(cur.parent),
               onOpenModule: (name, { instance } = {}) => {
                 const child = cur.children.find(c => sameName(c.name, instance, cur.mod?.lang === 'vhdl')) || cur.children.find(c => sameName(c.module, name, c.mod?.lang === 'vhdl'));
-                if (child && !child.blackbox && !isPrimitive(child)) { if (instance) shown.set(child, instance); show(child); }
+                if (child && !child.blackbox && !isPrimitive(child)) show(child);
               },
             });
             docRef.viewer = ed;   // (the read-only editor of the view: tests)
+            host.querySelector('.se-toolbar')?.prepend(upBtn, intoBtn, openBtn, h('span', { class: 'se-sep' }));
           } else ed.setDoc(doc);
           drawBar(inst, info);
           setTimeout(() => ed.fit?.(), 50);
