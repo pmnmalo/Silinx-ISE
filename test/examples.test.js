@@ -14,7 +14,7 @@ import { designChecks } from '../core/lint.js';
 import { EXAMPLES, TARGETS, ICE40_TARGETS, exampleBoard, targetName, example, exampleUcf, exampleProject, runTestbench, silinxFlow } from './examples-lib.mjs';
 
 // known failures, with their issue: the test still runs, as a todo
-const KNOWN = { 'uart-atlys': '#2539: the Atlys\'s USB-UART pins use two features the bit database has not measured' };
+const KNOWN = {};
 
 for (const name of EXAMPLES) {
   test(`example ${name}: no error, no warning, no design-check message`, () => {
