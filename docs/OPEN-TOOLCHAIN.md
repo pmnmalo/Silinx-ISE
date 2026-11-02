@@ -141,10 +141,15 @@ or Digilent, or endorsed by them.
   Atlys) on 2026-10-21, for the Spartan-6 toolchain under development
   ([#723](https://github.com/pmnmalo/Silinx-ISE/issues/723)); for
   every other device each user builds it from their own ISE installation. Measuring it instead by
-  black-box observation, as the bit database is, would remove the question: the method and a first
-  prototype on the XC3S250E's CLB array are in
-  [packages/silinx-fpga/research/s3e-device/README.md](../packages/silinx-fpga/research/s3e-device/README.md)
-  ([#3](https://github.com/pmnmalo/Silinx-ISE/issues/3)).
+  black-box observation, as the bit database is, would remove the question. The four Spartan-3E dies are now
+  measured so ([#3](https://github.com/pmnmalo/Silinx-ISE/issues/3), the XC3S1200E's long-line splitters
+  [#2483](https://github.com/pmnmalo/Silinx-ISE/issues/2483)): their wires, routing switches, site pins and the
+  joins between tiles, each fact shown by an experiment on ISE, and the examples and the open-flow designs routed on
+  each measured description pass ISE's DRC with a `.bit` byte for byte ISE's bitgen's. What still comes from the
+  device report is the grid of tiles, the sites and the layout, and the candidates the bit database's PIPs were asked
+  of ([#2502](https://github.com/pmnmalo/Silinx-ISE/issues/2502)); the shipped descriptions are still the computed ones,
+  until they are replaced. The method and the results:
+  [packages/silinx-fpga/research/s3e-device/README.md](../packages/silinx-fpga/research/s3e-device/README.md).
 
 ## Author
 
