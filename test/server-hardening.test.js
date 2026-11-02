@@ -61,7 +61,8 @@ test('an include file that is a link is not copied into the build', { skip: !POS
   assert.equal(fs.existsSync(path.join(dir, 'build', 'src', 'src', 'loot.vh')), false);
 });
 
-test("a folder name that would end XST's quotes: refused", async () => {
+// (Windows refuses " and a line break in a file name: there the folder cannot exist, #2620)
+test("a folder name that would end XST's quotes: refused", { skip: !POSIX }, async () => {
   const dir = await project('XstName');
   const evil = 'src/dir" }\n-lso evil';
   fs.mkdirSync(path.join(dir, evil), { recursive: true });
