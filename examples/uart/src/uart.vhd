@@ -50,6 +50,7 @@ architecture Behavioral of uart is
     signal start    : STD_LOGIC := '0';
     signal tx_data  : STD_LOGIC_VECTOR (7 downto 0) := (others => '0');
     signal tx_busy  : STD_LOGIC;
+    signal digits   : STD_LOGIC_VECTOR (15 downto 0);
 begin
     receiver : entity work.uart_rx
         generic map ( BIT_T => BIT_T )
@@ -96,9 +97,10 @@ begin
     end process;
 
     led <= last;
+    digits <= std_logic_vector(count) & last;
 
     display : entity work.sevenseg
         generic map ( REFRESH => REFRESH )
-        port map ( clk => clk, digits => std_logic_vector(count) & last, points => "0100",
+        port map ( clk => clk, digits => digits, points => "0100",
                    seg => seg, dp => dp, an => an );
 end Behavioral;
