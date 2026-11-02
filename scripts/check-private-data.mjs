@@ -30,6 +30,7 @@ const ALLOW = [
   ['test/corpus/vloghammer-gen.mjs', 'claire@yosyshq.com', 'the copyright notice of VlogHammer (ISC licence), which a port must keep'],
   ['test/lang-vhdl-types.test.js', '6.4.2.3', 'a section of the VHDL standard'],
   [/^(core\/(elab-expr|elaborate)\.js|test\/vhdl-unconstrained-const\.test\.js)$/, '9.3.3.3', 'a section of the VHDL standard (#2559)'],
+  ['core/vhdl/actual.js', '4.3.2.2', 'a section of the VHDL standard, which the file named before #2579 (in the history only)'],
   ['test/server-api.test.js', /^(fpga-lab\.local|box\.lan)$/, 'made-up computer names: the Host header test, the ssh settings'],
   ['test/impl.test.js', /^(dev@)?10\.0\.0\.2$/, 'a made-up address of an example (in the history only)'],
   ['test/impl.test.js', '/Users/Me', "a made-up macOS home folder of the ssh settings script's test (#1244, #1336)"],
