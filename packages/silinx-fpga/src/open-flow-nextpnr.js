@@ -75,7 +75,7 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
   const cons = portAssignments(parsed, names).assignments;
   const consOf = n => cons[n] || Object.entries(cons).find(([k]) => k.toLowerCase() === n.toLowerCase())?.[1];
   const read = new Set();   // the nets some cell reads
-  for (const c of Object.values(mod.cells)) for (const [p, b] of Object.entries(c.connections || {})) if (c.port_directions?.[p] === 'input') read.add(b[0]);
+  for (const c of Object.values(mod.cells)) for (const [p, b] of Object.entries(c.connections || {})) if (c.port_directions?.[p] === 'input') for (const x of b) read.add(x);
   const buffers = new Map();   // port bit -> its IBUF / OBUF
   for (const c of Object.values(mod.cells)) {
     if (c.type === 'IBUF' || c.type === 'IBUFG') buffers.set(c.connections.I?.[0], c);
@@ -316,7 +316,8 @@ export function mountNextpnrSteps(ctx) {
       try {
         files = await io.nextpnr.spartan3e.run(args, { 'design.json': input, 'chipdb.bin': db, ...(sdc ? { 'design.sdc': sdc } : {}) }, l => lines.push(l));
       } catch (e) {
-        throw new StepError(`nextpnr failed: ${e.message}`, errors());
+        // (a WebAssembly exception has no message: nextpnr's own ERROR lines say why)
+        throw new StepError(`nextpnr failed: ${e?.message ?? 'it stopped on an error'}`, errors());
       }
       const routedJson = files?.['routed.json'];
       if (!routedJson) throw new StepError('nextpnr wrote no routed design', errors());

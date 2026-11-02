@@ -104,6 +104,15 @@ test('nextpnrToXdl: a block RAM and multipliers, as Silinx\'s packer writes them
   for (const m of mult) assert.ok(pinsOf(m).every(p => /^(A|B)\d+$|^(CE[ABP]|CLK|RST[ABP])$/.test(p)), pinsOf(m).join(' '));
 });
 
+test('nextpnrToXdl: a cascaded multiplier\'s B_INPUT as nextpnr sets it, DIRECT if not set (#2566)', () => {
+  const r = structuredClone(routed);
+  const cells = Object.values(Object.values(r.modules)[0].cells).filter(c => c.type === 'MULT18X18SIO');
+  cells[0].parameters.B_INPUT = 'CASCADE ';   // (nextpnr's string parameters padded)
+  delete cells[1].parameters.B_INPUT;
+  const mult = parseXdl(writeXdl(nextpnrToXdl(r, device, PART))).insts.filter(i => i.type === 'MULT18X18SIO');
+  assert.deepEqual(mult.map(m => cfgOf(m, 'B_INPUT')).sort(), ['CASCADE', 'DIRECT', 'DIRECT']);
+});
+
 test('nextpnrToXdl: the blocks\' constants on XDL\'s gnd and vcc nets: a SLICEL with only _GND_SOURCE, a VCC site beside the pins', () => {
   const insts = new Map(design.insts.map(i => [i.name, i]));
   const gnd = design.nets.filter(n => n.type === 'gnd'), vcc = design.nets.filter(n => n.type === 'vcc');

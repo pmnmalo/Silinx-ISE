@@ -49,6 +49,22 @@ test('nextpnrNetlist: a one-bit bus port\'s pad written x<0>, not a scalar port\
   assert.deepEqual([c.ia.attributes?.LOC, c.ib.attributes.LOC, c.ib.attributes.IOSTANDARD, c.oy.attributes.LOC], [undefined, 'P11', 'LVCMOS33', 'M5']);
 });
 
+// #2567: an input read only past the first bit of a cell's bus port (a multiplier's A<1>) keeps its pad: every bit read
+// counts, not the port's first (its IBUF had gone, the multiplier's pin left unconnected: ISE's DRC, PhysDesignRules:1133)
+test('nextpnrNetlist: an input read by a bus port\'s later bit keeps its pad (#2567)', () => {
+  const io = (type, I, O) => ({ type, port_directions: { I: 'input', O: 'output' }, connections: { I: [I], O: [O] } });
+  const json = JSON.stringify({ modules: { t: { attributes: { top: '1' },
+    ports: { s: { direction: 'input', bits: [2, 3] }, y: { direction: 'output', bits: [4] } },
+    cells: { i0: io('IBUF', 2, 5), i1: io('IBUF', 3, 6), oy: io('OBUF', 7, 4),
+      m: { type: 'MULT18X18', port_directions: { A: 'input', B: 'input', P: 'output' }, connections: { A: [5, 6], B: ['1'], P: [7] } } },
+    netnames: { s: { bits: [2, 3], attributes: {} }, y: { bits: [4], attributes: {} } } } } });
+  const { json: out, problems } = nextpnrNetlist(json, 't', 'NET "s<0>" LOC = "P11";\nNET "s<1>" LOC = "L3";\nNET "y" LOC = "M5";');
+  assert.deepEqual(problems, []);
+  const mod = Object.values(out.modules)[0];
+  assert.deepEqual(mod.ports.s.bits, [2, 3]);
+  assert.deepEqual([mod.cells.i0.attributes.LOC, mod.cells.i1.attributes.LOC], ['P11', 'L3']);
+});
+
 test('nextpnrNetlist: what the micro-architecture cannot implement yet is named', () => {
   const ucfNoLed1 = ucf().split('\n').filter(l => !/led<1>/.test(l)).join('\n');
   assert.deepEqual(nextpnrNetlist(gates(), 'gates', ucfNoLed1).problems,

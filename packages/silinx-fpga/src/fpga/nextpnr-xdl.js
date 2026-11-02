@@ -190,14 +190,14 @@ function bramCfg(inst, add) {
 }
 
 /** A multiplier's settings (the packer's MULT18X18SIO of MULT18X18 / MULT18X18S / MULT18X18SIO, its registers in AREG,
- *  BREG, PREG), as Silinx's packer writes them (pack-cfg.js): the inverters of the connected pins. */
+ *  BREG, PREG; B_INPUT: CASCADE takes B from BCIN, #2566), as Silinx's packer writes them (pack-cfg.js): the inverters of the connected pins. */
 function multCfg(inst, add) {
   const c = inst.cells.MULT18X18SIO, p = c.parameters;
   inst.type = 'MULT18X18SIO';
   inst.name = esc(c.name);
   const reg = k => String(parseInt(bitsOf(p[k] ?? 0), 2));
   const inv = pin => { if (portNet(c, pin) !== undefined) add(`${pin}INV`, '', pin); };
-  add('AREG', '', reg('AREG')); add('BREG', '', reg('BREG')); add('B_INPUT', '', 'DIRECT');
+  add('AREG', '', reg('AREG')); add('BREG', '', reg('BREG')); add('B_INPUT', '', String(p.B_INPUT ?? 'DIRECT').trim());
   for (const pin of ['CEA', 'CEB', 'CEP', 'CLK']) inv(pin);
   add('PREG', '', reg('PREG')); add('PREG_CLKINVERSION', '', '0');
   for (const pin of ['RSTA', 'RSTB', 'RSTP']) inv(pin);
