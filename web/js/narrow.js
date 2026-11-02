@@ -15,6 +15,7 @@ export const NARROW_QUERY = '(max-width: 1023px)';
 export const DRAWER_KEY = prefKey('silinx.drawer');
 export const PROPS_KEY = prefKey('silinx.narrow.props');       // the diagram editors' properties panel
 export const SYMBOLS_KEY = prefKey('silinx.narrow.symbols');   // the schematic editor's symbols
+export const RESOURCES_KEY = prefKey('silinx.narrow.resources');   // I/O Pin Planning's board resources
 export const isNarrow = () => !!globalThis.matchMedia?.(NARROW_QUERY).matches;
 // the left side a drawer: a narrow screen, not the Tasks interface (its side panel docked beside the document, #1463)
 const asDrawer = () => isNarrow() && document.documentElement.dataset.layout !== 'tasks';

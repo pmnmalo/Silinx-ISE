@@ -519,8 +519,6 @@ html[data-ui="silinx"][data-theme="dark"] .editor-bar .gen-banner { background: 
 html[data-ui="silinx"][data-theme="dark"] .gen-banner.out-of-sync { background: rgba(240, 113, 107, .14); border-color: rgba(240, 113, 107, .45); color: #ffb4ae; }
 html[data-ui="silinx"][data-theme="dark"] .msg-warn .msg-icon { color: #000; }
 html[data-ui="silinx"][data-theme="dark"] .impact-chain { background: var(--m-surface-2); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .pin-planner .pp-res { background: var(--m-surface-2); border-color: var(--m-border); }
-html[data-ui="silinx"][data-theme="dark"] .pin-planner .pp-res .grp { color: var(--m-fg); }
 html[data-ui="silinx"][data-theme="dark"] .pin-planner td.conflict input { background: rgba(240, 113, 107, .25) !important; }
 html[data-ui="silinx"][data-theme="dark"] .console-page .diag-hint b { color: var(--m-fg); }
 /* the ISE style colour icons of trees, menus and tabs: a little softer on the dark background */

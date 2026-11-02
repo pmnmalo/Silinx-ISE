@@ -391,13 +391,13 @@ uiTest('I/O Pin Planning: assign from the board resources, auto-assign, saved UC
   await page.openProject('PinPj');
   await page.menu('Tools', 'I/O Pin Planning');
   await page.waitFor(() => window.Silinx.active?.id === 'pins' && document.querySelectorAll('.pin-planner .pp-table tr').length === 10);
-  const status = () => page.eval(() => document.querySelector('.pp-bar > span:last-child').textContent);
+  const status = () => page.eval(() => document.querySelector('.pp-status').textContent);
   assert.equal(await status(), '1/9 I/Os assigned');
   const rowOf = (net) => page.eval((n) => [...document.querySelectorAll('.pp-table tr')].findIndex((r) => r.cells[0]?.textContent === n), net);
   // led<0> to the board's LED LD0 through the resource list
   const r = await rowOf('led<0>');
   await page.eval((i) => { const s = document.querySelectorAll('.pp-table tr')[i].cells[2].querySelector('select'); s.value = 'M5'; s.dispatchEvent(new Event('change')); }, r);
-  await page.waitFor(() => document.querySelector('.pp-bar > span:last-child').textContent === '2/9 I/Os assigned');
+  await page.waitFor(() => document.querySelector('.pp-status').textContent === '2/9 I/Os assigned');
   assert.equal(await page.eval((i) => document.querySelectorAll('.pp-table tr')[i].cells[3].querySelector('input').value, r), 'M5');
   // the board panel shows the pin as used
   assert.ok(await page.eval(() => [...document.querySelectorAll('.pp-res .res.used')].some((e) => e.textContent.includes('M5'))));
@@ -406,8 +406,8 @@ uiTest('I/O Pin Planning: assign from the board resources, auto-assign, saved UC
   await page.eval((i) => { const inp = document.querySelectorAll('.pp-table tr')[i].cells[3].querySelector('input'); inp.value = 'm5'; inp.dispatchEvent(new Event('change')); }, r1);
   await page.waitFor(() => document.querySelectorAll('.pp-table td.conflict').length === 2);
   // Auto-assign from Board: every port matched by name
-  await page.click('.pp-bar .btn', { text: 'Auto-assign from Board' });
-  await page.waitFor(() => document.querySelector('.pp-bar > span:last-child').textContent === '9/9 I/Os assigned');
+  await page.click('.pp-bar .asm-btn', { text: 'Auto-assign from Board' });
+  await page.waitFor(() => document.querySelector('.pp-status').textContent === '9/9 I/Os assigned');
   assert.equal(await page.eval(() => document.querySelectorAll('.pp-table td.conflict').length), 0);
   // saved automatically: the UCF has the LOCs and still the lines the planner does not edit
   await page.waitFor(() => !window.Silinx.active.tab.classList.contains('dirty'), [], { what: 'pin planning saved' });
@@ -426,9 +426,9 @@ uiTest('I/O Pin Planning: assign from the board resources, auto-assign, saved UC
   await page.waitConsole(/Process "Check Constraints" completed successfully/);
   // Clear All empties the assignments
   await page.eval(() => window.SilinxApp.openPinPlanner('top'));
-  await page.waitFor(() => window.Silinx.active?.id === 'pins' && document.querySelector('.pp-bar > span:last-child')?.textContent === '9/9 I/Os assigned');
-  await page.click('.pp-bar .btn', { text: 'Clear All' });
-  await page.waitFor(() => document.querySelector('.pp-bar > span:last-child').textContent === '0/9 I/Os assigned');
+  await page.waitFor(() => window.Silinx.active?.id === 'pins' && document.querySelector('.pp-status')?.textContent === '9/9 I/Os assigned');
+  await page.click('.pp-bar .asm-btn', { text: 'Clear All' });
+  await page.waitFor(() => document.querySelector('.pp-status').textContent === '0/9 I/Os assigned');
   await tick(100);
 });
 
@@ -454,7 +454,7 @@ uiTest('I/O Pin Planning and Check Constraints: escaped port names (\\opcode[0] 
   for (const [net, pin] of [['_opcode[0]_', 'P11'], ['_opcode[1]_', 'L3'], ['_res[0]_', 'M5']]) {
     await page.eval((n, p) => { const r = [...document.querySelectorAll('.pp-table tr')].find((x) => x.cells[0]?.textContent === n); const inp = r.cells[3].querySelector('input'); inp.value = p; inp.dispatchEvent(new Event('change')); }, net, pin);
   }
-  await page.waitFor(() => document.querySelector('.pp-bar > span:last-child').textContent === '3/3 I/Os assigned');
+  await page.waitFor(() => document.querySelector('.pp-status').textContent === '3/3 I/Os assigned');
   await page.waitFor(async () => /NET "_res\[0\]_"\s+LOC = "M5"/.test(await (await fetch('/api/projects/EscPj/file?path=constraints/top.ucf')).text()), [], { what: 'pin planning saved' });
   const ucf = await readWs(env, 'EscPj', 'constraints/top.ucf');
   assert.match(ucf, /^NET "_opcode\[0\]_"\s+LOC = "P11" ;$/m);
@@ -480,10 +480,10 @@ uiTest('I/O Pin Planning keeps a hand-written bracket name that is not a bus bit
   await page.waitFor(() => window.Silinx.active?.id === 'pins' && document.querySelectorAll('.pin-planner .pp-table tr').length === 5);
   const rows = await page.eval(() => [...document.querySelectorAll('.pp-table tr')].slice(1).map((r) => `${r.cells[0].textContent}=${r.cells[3].querySelector('input').value}`));
   assert.deepEqual([...rows].sort(), ['_opcode[1]_=', 'x<0>=K3', 'x<1>=P11', 'y=']);
-  assert.equal(await page.eval(() => document.querySelector('.pp-bar > span:last-child').textContent), '2/4 I/Os assigned');
+  assert.equal(await page.eval(() => document.querySelector('.pp-status').textContent), '2/4 I/Os assigned');
   // an edit saves the UCF: opcode[1] as written (not opcode<1>), the bus bits as x<i>
   await page.eval(() => { const r = [...document.querySelectorAll('.pp-table tr')].find((x) => x.cells[0]?.textContent === 'y'); const inp = r.cells[3].querySelector('input'); inp.value = 'M5'; inp.dispatchEvent(new Event('change')); });
-  await page.waitFor(() => document.querySelector('.pp-bar > span:last-child').textContent === '3/4 I/Os assigned');
+  await page.waitFor(() => document.querySelector('.pp-status').textContent === '3/4 I/Os assigned');
   await page.waitFor(async () => /NET "y"\s+LOC = "M5"/.test(await (await fetch('/api/projects/BrPj/file?path=constraints/top.ucf')).text()), [], { what: 'pin planning saved' });
   const ucf = await readWs(env, 'BrPj', 'constraints/top.ucf');
   assert.match(ucf, /^NET "opcode\[1\]"\s+LOC = "L3" ; {2}# not a port of the top module$/m);
@@ -514,7 +514,7 @@ uiTest('I/O Pin Planning and Check Constraints: VHDL extended identifiers (\\Mix
   for (const [net, pin] of [['_Mixed_', 'P11'], ['_Bus_<0>', 'L3'], ['_Bus_<1>', 'K3'], ['y', 'M5']]) {
     await page.eval((n, p) => { const r = [...document.querySelectorAll('.pp-table tr')].find((x) => x.cells[0]?.textContent === n); const inp = r.cells[3].querySelector('input'); inp.value = p; inp.dispatchEvent(new Event('change')); }, net, pin);
   }
-  await page.waitFor(() => document.querySelector('.pp-bar > span:last-child').textContent === '4/4 I/Os assigned');
+  await page.waitFor(() => document.querySelector('.pp-status').textContent === '4/4 I/Os assigned');
   await page.waitFor(async () => /NET "y"\s+LOC = "M5"/.test(await (await fetch('/api/projects/ExtPj/file?path=constraints/top.ucf')).text()), [], { what: 'pin planning saved' });
   const ucf = await readWs(env, 'ExtPj', 'constraints/top.ucf');
   assert.match(ucf, /^NET "_Mixed_"\s+LOC = "P11" ;$/m);
@@ -542,9 +542,9 @@ architecture rtl of gate is begin y <= a and b; end rtl;
   await makeProject(env, { name: 'PpGate', files: { 'src/gate.vhd': GATE }, top: 'gate', board: 'basys2' });
   await page.openProject('PpGate');
   await page.eval(() => window.SilinxApp.openPinPlanner('gate'));
-  await page.waitFor(() => document.querySelector('.pp-bar > span:last-child')?.textContent === '0/3 I/Os assigned', [], { what: 'nothing assigned yet' });
-  await page.click('.pp-bar .btn', { text: 'Auto-assign from Board' });
-  await page.waitFor(() => document.querySelector('.pp-bar > span:last-child').textContent === '3/3 I/Os assigned', [], { what: 'all assigned' });
+  await page.waitFor(() => document.querySelector('.pp-status')?.textContent === '0/3 I/Os assigned', [], { what: 'nothing assigned yet' });
+  await page.click('.pp-bar .asm-btn', { text: 'Auto-assign from Board' });
+  await page.waitFor(() => document.querySelector('.pp-status').textContent === '3/3 I/Os assigned', [], { what: 'all assigned' });
   await page.waitConsole(/I\/O Pin Planning: 3 I\/Os assigned from Digilent Basys2; 3 by direction \(a → sw<0>; b → sw<1>; y → led<0>\)\./);
   // saved into the UCF
   await page.waitFor(async () => /NET "y"\s+LOC = "M5"/.test(await (await fetch('/api/projects/PpGate/file?path=constraints/top.ucf')).text()), [], { what: 'UCF written' });
