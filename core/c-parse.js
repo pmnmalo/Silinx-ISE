@@ -197,6 +197,8 @@ function exprParser(T, typedefs, cpp = false) {
       expect(']');
     }
     for (let k = dims.length - 1; k >= 0; k--) type = { kind: 'array', of: type, size: dims[k] };
+    // (T (&a)[N], made T a[N] by core/c-struct.js: a reference to the array, not a pointer, #2641)
+    if (nameTok?.refArray && type.kind === 'array') type.refArray = true;
     return { name, type, params, loc: loc(nameTok) };
   }
 
