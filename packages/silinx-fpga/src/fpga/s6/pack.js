@@ -106,12 +106,7 @@ const KIND_RANK = { X: 0, L: 1, M: 2 };
  * position, O6 and O5).
  */
 export function packS6(nl, { combine = 'off' } = {}) {
-  const p = packSlices(nl, combine);
-  if (combine !== 'area') return p;
-  // (the O5s the combining takes may be those the storage elements placed after it need for their 5FFs, which then
-  // fill the slice it emptied and more: 'area' is kept only when it takes no more slices than 'off', #2279)
-  const off = packSlices(nl, 'off');
-  return off.stats.slices < p.stats.slices ? off : p;
+  return packSlices(nl, combine);
 }
 
 function packSlices(nl, combine) {
@@ -298,10 +293,38 @@ function packSlices(nl, combine) {
     s.pos[p].o6 = lc; put(lc, si);
     if (ff !== undefined && fits(s, key, ffKind(cells[ff].type).latch)) { placeFf(si, p, ff, false); placed.add(ff); }
   }
+  // the other storage elements: with others of their control set, the FF of a position by its bypass input (one
+  // net per bypass input), the 5FF (whose D is O5's only, #1143) through the position's O5 as a route-through of a
+  // LUT input ('thru:<net>', as map's PK_PACKTHRU): when O5 is free and the O6 LUT leaves it an input (5 shared at
+  // most, A6 high)
+  const o5Thru = (q, net) => {
+    if (q.o5 !== null || net <= 1) return false;
+    if (q.o6 === null || (typeof q.o6 === 'string' && q.o6.startsWith('const:'))) return true;
+    if (typeof q.o6 === 'string') return true;   // a route-through of S: two inputs
+    if (!isLut(cells[q.o6])) return false;
+    return new Set([...lutInputs(cells[q.o6]), net]).size <= 5;
+  };
+  for (const ci of rest) {
+    if (placed.has(ci)) continue;
+    const key = ctrlKey(cells[ci]), latch = ffKind(cells[ci].type).latch, dnet = cells[ci].pins.D ?? 0;
+    let done = false;
+    for (let si = 0; si < slices.length && !done; si++) {
+      const s = slices[si];
+      if (!fits(s, key, latch)) continue;
+      for (const p of POS) {
+        const pos = s.pos[p];
+        if (pos.x !== null && pos.x !== dnet) continue;
+        if (pos.ff === null) { placeFf(si, p, ci, false, dnet); done = true; break; }
+        if (!latch && pos.ff5 === null && pos.mux === null && fitsFf5(s, key) && o5Thru(pos, dnet)) { placeFf(si, p, ci, true); pos.o5 = `thru:${dnet}`; done = true; break; }
+      }
+    }
+    if (!done) { const si = slice('X'); placeFf(si, 'A', ci, false, dnet); }
+  }
+
   // LUT combining ('area'): the LUTs of a SLICEX of no storage element (5 inputs at most each) into the O5s of other
   // SLICEXs' positions whose O6 LUT shares their inputs (a SLICEL's multiplexed outputs are the carry's and the
-  // F7s'), all of a slice's or none: moved one by one from slices they did not empty, they saved no slice and took
-  // the O5s the storage elements below need for their 5FFs (#2279)
+  // F7s'), all of a slice's or none (one by one, they saved no slice, #2279), once every storage element is placed
+  // (before, it took the O5s the 5FFs needed and emptied slices the FFs filled again: a slice more, #2636)
   if (combine === 'area') {
     const free = [];
     for (let si = 0; si < slices.length; si++) {
@@ -335,33 +358,6 @@ function packSlices(nl, combine) {
       }
       emptied.add(sj);
     }
-  }
-  // the other storage elements: with others of their control set, the FF of a position by its bypass input (one
-  // net per bypass input), the 5FF (whose D is O5's only, #1143) through the position's O5 as a route-through of a
-  // LUT input ('thru:<net>', as map's PK_PACKTHRU): when O5 is free and the O6 LUT leaves it an input (5 shared at
-  // most, A6 high)
-  const o5Thru = (q, net) => {
-    if (q.o5 !== null || net <= 1) return false;
-    if (q.o6 === null || (typeof q.o6 === 'string' && q.o6.startsWith('const:'))) return true;
-    if (typeof q.o6 === 'string') return true;   // a route-through of S: two inputs
-    if (!isLut(cells[q.o6])) return false;
-    return new Set([...lutInputs(cells[q.o6]), net]).size <= 5;
-  };
-  for (const ci of rest) {
-    if (placed.has(ci)) continue;
-    const key = ctrlKey(cells[ci]), latch = ffKind(cells[ci].type).latch, dnet = cells[ci].pins.D ?? 0;
-    let done = false;
-    for (let si = 0; si < slices.length && !done; si++) {
-      const s = slices[si];
-      if (!fits(s, key, latch)) continue;
-      for (const p of POS) {
-        const pos = s.pos[p];
-        if (pos.x !== null && pos.x !== dnet) continue;
-        if (pos.ff === null) { placeFf(si, p, ci, false, dnet); done = true; break; }
-        if (!latch && pos.ff5 === null && pos.mux === null && fitsFf5(s, key) && o5Thru(pos, dnet)) { placeFf(si, p, ci, true); pos.o5 = `thru:${dnet}`; done = true; break; }
-      }
-    }
-    if (!done) { const si = slice('X'); placeFf(si, 'A', ci, false, dnet); }
   }
 
   // ---- the multiplexed outputs: what leaves a position by AMUX … (O5, the carry's XOR or carry out, F7 / F8)
