@@ -25,12 +25,15 @@ the core (`core/`: the simulators and the board programming), the GitHub workflo
 Out of scope: Xilinx ISE itself and its Docker image (the project only drives them; report their
 problems to their vendors); the user's operating system and browser; a server the user exposed to
 other computers with `serve --host 0.0.0.0` (or another address), which the printed token protects:
-whoever has the address with its token has the server, as the warning says at start.
+whoever has the address with its token has the server, as the warning says at start. On this computer, the
+token is in the configuration folder (`~/.silinx`) while the server runs, readable by its owner only: whoever
+can read that user's files has the server too.
 
 ## What the project does
 
-- The server listens on this computer only (loopback) unless told otherwise, and then a token made
-  at every start is the only way in; it checks the Host and Origin headers of every request.
+- The server listens on this computer only (loopback) unless told otherwise, and a token made at every
+  start is the only way in, on loopback too (another user of the same computer has none, #2564); it
+  checks the Host and Origin headers of every request.
 - The pages carry a Content Security Policy with the hashes of their scripts and styles.
 - Every path a request names is confined to the project it belongs to; a project's zip is limited in
   size when it is unpacked.

@@ -3,6 +3,7 @@
 // directory and HOME, and without opening a browser (SILINX_NO_BROWSER). Used by the launcher test
 // (from the repository) and the release test (from the unzipped release).
 import { spawn, execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
@@ -59,12 +60,18 @@ export async function startLauncher(appDir, launcher, tmp, { timeout = 60000 } =
     } catch { /* already gone */ }
     proc.stdout.destroy(); proc.stderr.destroy(); proc.unref();
   };
+  // the token the server made at its start (#2564), from the file it writes for its owner
+  const tokenFile = path.join(env.SILINX_CONFIG_DIR, `server-${port}.token`);
+  let token = null;
   const t0 = Date.now();
   for (;;) {
-    if (await fetch(`${url}/api/templates`).then((r) => r.ok, () => false)) break;
+    try { token = fs.readFileSync(tokenFile, 'utf8'); } catch { /* not yet */ }
+    if (token && await fetch(`${url}/api/templates`, { headers: { 'X-Silinx-Token': token } }).then((r) => r.ok, () => false)) break;
     if (proc.exitCode != null) throw new Error(`${launcher} exited (${proc.exitCode}) before the server answered:\n${out}`);
     if (Date.now() - t0 > timeout) { stop(); throw new Error(`${launcher}: no server at ${url} after ${timeout} ms:\n${out}`); }
     await sleep(100);
   }
-  return { url, port, proc, output: () => out, stop, workspace: env.SILINX_WORKSPACE, configDir: env.SILINX_CONFIG_DIR };
+  // headers(): the token with others; open: the address the launcher opens in the browser
+  const headers = (h = {}) => ({ ...h, 'X-Silinx-Token': token });
+  return { url, port, proc, token, headers, open: `${url}/#token=${token}`, output: () => out, stop, workspace: env.SILINX_WORKSPACE, configDir: env.SILINX_CONFIG_DIR };
 }

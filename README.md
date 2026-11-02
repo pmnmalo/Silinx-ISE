@@ -381,7 +381,7 @@ editors and the drawings, simulation, and the Silinx toolchain (synthesis, place
 ```bash
 git clone https://github.com/pmnmalo/Silinx-ISE.git && cd Silinx-ISE
 npm install
-npm start          # http://127.0.0.1:8642  (node bin/silinx-ise.js serve --open also opens the browser)
+npm start          # prints the address to open, http://127.0.0.1:8642/#token=…  (node bin/silinx-ise.js serve --open opens it)
 ```
 
 How Silinx is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the application as a whole, and
@@ -392,9 +392,11 @@ tests, integration) are in [CLAUDE.md](CLAUDE.md), for people and AI agents alik
 Security: report a vulnerability privately, as [SECURITY.md](SECURITY.md) says (it also lists what is
 in scope and what the project does to protect its users).
 
-The server listens on this computer only (`127.0.0.1`). With `serve --host 0.0.0.0` (or another address)
-other computers can reach it: it then prints a warning and an address with a token (`…/#token=…`), the only
-way they can use it; the token changes at every start. The toolchain settings that run a program
+The server listens on this computer only (`127.0.0.1`), and answers only the browser that has its token: it
+makes one at every start and prints the address with it (`…/#token=…`), which the launchers and `--open` open;
+the page keeps it, so the plain address works afterwards in the same browser (#2564). Another user of the
+same computer has no token. With `serve --host 0.0.0.0` (or another address) other computers can reach it:
+it then prints a warning, and the address with the token is the only way they can use it. The toolchain settings that run a program
 (`docker.command`, `docker.extraArgs`, `ssh.sshArgs`, `ssh.identity`, `paths`) are set in
 `~/.silinx/config.json` only, never from the page.
 

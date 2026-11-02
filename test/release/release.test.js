@@ -151,10 +151,10 @@ for (const launcher of launchersOf()) {
       const html = await (await fetch(srv.url)).text();
       assert.match(html, /<title>Silinx ISE Project Navigator<\/title>/);
       for (const asset of ['/js/app.js', '/core/version.js', '/vendor/yowasp-yosys/gen/bundle.js']) assert.equal((await fetch(srv.url + asset)).status, 200, asset);
-      assert.ok((await (await fetch(`${srv.url}/api/templates`)).json()).includes('blinky'));
-      const r = await fetch(`${srv.url}/api/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Blinky', template: 'blinky' }) });
+      assert.ok((await (await fetch(`${srv.url}/api/templates`, { headers: srv.headers() })).json()).includes('blinky'));
+      const r = await fetch(`${srv.url}/api/projects`, { method: 'POST', headers: srv.headers({ 'content-type': 'application/json' }), body: JSON.stringify({ name: 'Blinky', template: 'blinky' }) });
       assert.ok(r.ok, `create a project: ${r.status} ${await r.text()}`);
-      const pj = await (await fetch(`${srv.url}/api/projects/Blinky`)).json();
+      const pj = await (await fetch(`${srv.url}/api/projects/Blinky`, { headers: srv.headers() })).json();
       assert.ok(pj.files.some((f) => /\.vhd$/.test(f.path)), JSON.stringify(pj.files));
       assert.ok(fs.existsSync(path.join(srv.workspace, 'Blinky', 'silinx.json')), 'in the workspace given (SILINX_WORKSPACE)');
     } finally { srv.stop(); }
@@ -180,18 +180,18 @@ test('release zip: a bitstream in the default mode (Silinx toolchain), Synthesiz
     await probe.close();
     env.external.length = 0;
 
-    await fetch(`${srv.url}/api/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'OpenSynth', template: 'blinky' }) });
-    page = await env.newPage(srv.url, { updateCheck: true });
+    await fetch(`${srv.url}/api/projects`, { method: 'POST', headers: srv.headers({ 'content-type': 'application/json' }), body: JSON.stringify({ name: 'OpenSynth', template: 'blinky' }) });
+    page = await env.newPage(srv.open, { updateCheck: true });
     await page.waitFor(() => window.SilinxApp && document.querySelector('#menubar .item'), [], { what: 'app boot', timeout: 30000 });
     await page.openProject('OpenSynth');
     // a new installation: the Silinx toolchain, a bitstream with no Xilinx tool (#27)
-    assert.equal((await (await fetch(`${srv.url}/api/toolchain`)).json()).config.mode, 'silinx');
+    assert.equal((await (await fetch(`${srv.url}/api/toolchain`, { headers: srv.headers() })).json()).config.mode, 'silinx');
     await page.treeRow('#procs', 'Generate Programming File', { dbl: true, exact: true });
     await page.waitConsole(/Process "Generate Programming File" (completed successfully|failed|stopped)/, { timeout: 180000 });
     assert.match(await page.consoleText(), /Process "Generate Programming File" completed successfully/, (await page.consoleText()).slice(-2000));
     assert.ok(fs.existsSync(path.join(srv.workspace, 'OpenSynth', 'build', 'top.bit')), 'the bitstream');
     // an ISE mode (no ISE here): Synthesize - Yosys (open) runs in the browser
-    await fetch(`${srv.url}/api/toolchain`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'local' }) });
+    await fetch(`${srv.url}/api/toolchain`, { method: 'PUT', headers: srv.headers({ 'content-type': 'application/json' }), body: JSON.stringify({ mode: 'local' }) });
     await page.eval(async () => { window.SilinxApp.S.toolchain = await (await import('/js/api.js')).api.toolchain(); window.SilinxApp.renderProcesses(); });
     await page.treeRow('#procs', 'Synthesize - Yosys (open)', { dbl: true, exact: true });
     await page.waitConsole(/Process "Synthesize - Yosys \(open\)" (completed successfully|failed|stopped)/, { timeout: 120000 });

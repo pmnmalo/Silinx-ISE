@@ -114,7 +114,8 @@ A black window (the Silinx server) opens and then your browser shows Silinx at
 **http://127.0.0.1:8642**.
 
 - **Keep the black window open** while you work. Closing it stops Silinx.
-- Opened the browser tab by mistake? Just go to http://127.0.0.1:8642 again while the window is open.
+- Closed the browser tab by mistake? Go to http://127.0.0.1:8642 again, in the same browser, while the window is open
+  (or double-click the launcher again).
 - Double-clicking the launcher when Silinx is already running just opens the browser again.
 
 **First time only, you may see:**
@@ -192,5 +193,5 @@ and press Enter. macOS: right-click the folder ▸ *New Terminal at Folder* (or 
 git clone https://github.com/pmnmalo/Silinx-ISE.git
 cd Silinx-ISE
 npm install
-npm start            # http://127.0.0.1:8642
+npm start            # prints the address to open: http://127.0.0.1:8642/#token=…
 ```

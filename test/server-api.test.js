@@ -479,7 +479,7 @@ test('security: foreign Host headers and cross-origin writes are refused', async
   assert.equal(r.status, 200);
 });
 
-test('security: bound to another address than loopback, the API needs the token (or a local client)', async () => {
+test('security: bound to another address than loopback, the API needs the token (a local client too, #2564)', async () => {
   const { createApp } = await import('../server/server.js');
   await assert.rejects(createApp({ host: '0.0.0.0' }), /needs a token/);
   const token = 'k'.repeat(24);
@@ -512,8 +512,9 @@ test('security: bound to another address than loopback, the API needs the token 
     r = await any.raw('DELETE', `/api/projects/Tok?token=${token}`, { headers: { host: 'fpga-lab.local' } });
     assert.deepEqual([r.status, r.body], [403, refused]);
     assert.equal((await any.raw('GET', `/api/projects/Tok/export.zip`, { headers: { host: 'fpga-lab.local', 'x-silinx-token': token } })).status, 200, 'the header everywhere');
-    // this machine's own browser (a loopback client, a local Host) needs no token
-    assert.equal((await any.raw('GET', '/api/templates', { headers: { host: 'localhost:8642' } })).status, 200);
+    // this machine's own requests too (a loopback client, a local Host: another user of this computer, #2564)
+    assert.deepEqual([(r = await any.raw('GET', '/api/templates', { headers: { host: 'localhost:8642' } })).status, r.body], [403, refused]);
+    assert.equal((await any.raw('GET', '/api/templates', { headers: { host: 'localhost:8642', 'x-silinx-token': token } })).status, 200);
     // cross-origin writes are still refused, token or not
     assert.equal((await any.raw('POST', '/api/projects', { headers: { host: 'fpga-lab.local', 'x-silinx-token': token, origin: 'http://evil.example', 'content-type': 'application/json' }, body: '{}' })).status, 403);
     // the static UI is not guarded (it holds no data): the token comes in the address
@@ -523,7 +524,7 @@ test('security: bound to another address than loopback, the API needs the token 
   try {
     assert.equal((await named.raw('GET', '/api/templates', { headers: { host: 'fpga-box:8642' } })).status, 403);
     assert.equal((await named.raw('GET', '/api/templates', { headers: { host: 'fpga-box:8642', 'x-silinx-token': token } })).status, 200);
-    assert.equal((await named.raw('GET', '/api/templates', { headers: { host: 'localhost' } })).status, 200);
+    assert.equal((await named.raw('GET', '/api/templates', { headers: { host: 'localhost' } })).status, 403);
   } finally { await named.close(); }
 });
 
@@ -538,11 +539,31 @@ test('security: serve on 0.0.0.0 makes a token at every start and prints the add
     assert.match(out.join('\n'), /WARNING: listening on 0\.0\.0\.0, not only on this machine/);
     assert.ok(out.some(l => l.endsWith(`/#token=${srv.silinxToken}`)));
   } finally { await new Promise(r => srv.close(r)); }
-  // on loopback: no token, no warning
-  out.length = 0;
-  console.log = (...a) => out.push(a.join(' '));
-  try { srv = await startServer({ port: 0, host: '127.0.0.1' }); } finally { console.log = log; }
-  try { assert.equal(srv.silinxToken, null); assert.ok(!out.some(l => /WARNING|token/.test(l))); } finally { await new Promise(r => srv.close(r)); }
+  // on loopback too (#2564): a token at every start, no warning; the address to open says it, and the
+  // API refuses a request without it (another user of this computer reaches 127.0.0.1 as well)
+  const { tokenFile } = await import('../server/server.js');
+  const seen = [];
+  for (let i = 0; i < 2; i++) {
+    out.length = 0;
+    console.log = (...a) => out.push(a.join(' '));
+    try { srv = await startServer({ port: 0, host: '127.0.0.1' }); } finally { console.log = log; }
+    const port = srv.address().port, file = tokenFile(port);
+    try {
+      assert.match(srv.silinxToken, /^[\w-]{24}$/);
+      seen.push(srv.silinxToken);
+      assert.equal(srv.silinxUrl, `http://127.0.0.1:${port}/#token=${srv.silinxToken}`);
+      assert.deepEqual(out.slice(1), [`Open it at ${srv.silinxUrl}`]);
+      assert.ok(!out.some(l => /WARNING/.test(l)));
+      const r = await fetch(`http://127.0.0.1:${port}/api/projects`);
+      assert.deepEqual([r.status, await r.json()], [403, { error: 'this Silinx server needs its token: open the URL it printed at start-up' }]);
+      assert.equal((await fetch(`http://127.0.0.1:${port}/api/projects`, { headers: { 'X-Silinx-Token': srv.silinxToken } })).status, 200);
+      // the file a second launch reads: the token, for its owner only, gone when the server stops
+      assert.equal(await fs.readFile(file, 'utf8'), srv.silinxToken);
+      if (process.platform !== 'win32') assert.equal((await fs.stat(file)).mode & 0o777, 0o600);
+    } finally { await new Promise(r => srv.close(r)); }
+    assert.ok(!fss.existsSync(file));
+  }
+  assert.notEqual(seen[0], seen[1], 'a new token at every start');
 });
 
 test('pages carry a Content-Security-Policy: scripts only from the server and the page\'s own inline ones', async () => {
@@ -990,7 +1011,7 @@ test('startServer listens (and rejects a used port); openBrowser runs the platfo
   try { srv = await startServer({ port: 0, host: '127.0.0.1' }); } finally { console.log = log; }
   assert.match(out.join('\n'), /Silinx running at http:\/\/127.0.0.1:0 {2}\(workspace: /);
   const port = srv.address().port;
-  assert.equal((await fetch(`http://127.0.0.1:${port}/api/templates`)).status, 200);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/api/templates`, { headers: { 'X-Silinx-Token': srv.silinxToken } })).status, 200);
   // a used port: rejected, and "running" never printed (Express 5 passes the error to the listen callback, #350)
   out.length = 0;
   console.log = (...a) => out.push(a.join(' '));
