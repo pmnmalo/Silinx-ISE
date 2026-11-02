@@ -250,7 +250,7 @@ function checkFunction(f, ctx) {
       if (v.type.kind === 'ptr' && !v.said && v.type.to.name !== 'FILE') report(v.loc, `'${v.name}': a pointer variable is not possible in Silinx HLS (pointers only as arguments; use an array index)`);
       if (v.type.kind === 'array' && !v.type.length && !v.type.size && !v.init) report(v.loc, `'${v.name}': an array needs its size`);
     }
-    if (v.init) expr(v.init);
+    if (v.init) expr(v.init, { init: v.type?.kind === 'array' && (v.type.of?.name === 'char' || v.type.of?.bits === 8) });
     if (v.const && v.type.kind === 'int' && v.init && v.init.kind !== 'init') { const c = constValue(v.init, consts); if (c !== null) consts.set(v.name, c); }
   };
   const isStream = (e) => {
@@ -270,7 +270,7 @@ function checkFunction(f, ctx) {
       case 'num': case 'chr': return;
       // (in hardware a double constant is only an ap_fixed's value: said by the synthesis otherwise, #1643)
       case 'float': return;
-      case 'str': if (hw && !how.printf) report(e.loc, 'a string is only possible in printf (ignored by synthesis)'); return;
+      case 'str': if (hw && !how.printf && !how.init) report(e.loc, 'a string is only possible in printf (ignored by synthesis)'); return;
       case 'init': for (const x of e.items) expr(x); return;
       case 'id':
         // (stdio's streams: the test bench's; in synthesized code only in fprintf, ignored)

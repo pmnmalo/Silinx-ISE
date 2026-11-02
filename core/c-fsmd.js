@@ -408,9 +408,10 @@ class SeqFlow extends Flow {
       if ((this.arrayLength(v) > MEM_MIN || this.storage?.has(v.orig ?? v.name) || this.memArgs?.has(v.name)) && !parted && !asRegs) return this.memSlot(v);
       const et = typeOf(t.of);
       if (!et) this.error(v.loc, `'${v.name}': only arrays of integers (one dimension) are supported yet`);
-      const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : null);
+      const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : v.init?.kind === 'str' ? v.init.value.length + 1 : null);
       if (!n) this.error(v.loc, `'${v.name}': an array needs its size`);
-      const regs = Array.from({ length: n }, (_, k) => this.reg(`${v.name}_${k}`, et, v.static && v.init?.kind === 'init' ? (init(v.init.items[k], et) ?? 0n) : 0n));
+      const strByte = (k) => (k < v.init.value.length ? BigInt(v.init.value.charCodeAt(k)) : 0n);
+      const regs = Array.from({ length: n }, (_, k) => this.reg(`${v.name}_${k}`, et, v.static && v.init?.kind === 'init' ? (init(v.init.items[k], et) ?? 0n) : v.static && v.init?.kind === 'str' ? strByte(k) : 0n));
       if (v.static && v.init?.kind === 'init' && v.init.items.some((x) => this.constOf(x, et) === null)) this.error(v.loc, `the static '${v.name}': its initial values must be constants`);
       return { kind: 'array', t: et, regs, elems: null, name: v.name };
     }
@@ -420,7 +421,7 @@ class SeqFlow extends Flow {
     if (v.static && v.init) { reset = init(v.init, et); if (reset === null) this.error(v.loc, `the static '${v.name}': its initial value must be a constant`); }
     return { kind: 'var', t: et, reg: this.reg(v.name, et, reset), name: v.name, static: !!v.static };
   }
-  arrayLength(v) { return Number(v.type.length ?? (v.init?.kind === 'init' ? v.init.items.length : 0)); }
+  arrayLength(v) { return Number(v.type.length ?? (v.init?.kind === 'init' ? v.init.items.length : v.init?.kind === 'str' ? v.init.value.length + 1 : 0)); }
   /** A goto-only block with no statement is skipped (its predecessors go where it goes). */
   thread() {
     const target = (b) => { const seen = new Set(); while (b && !b.stmts.length && b.term?.goto && !seen.has(b)) { seen.add(b); b = b.term.goto; } return b; };
@@ -453,6 +454,12 @@ class SeqFlow extends Flow {
     const slot = this.slots.get(v.name);
     if (!v.init || v.static || slot.kind === 'mem') return;   // (a static is initialized once, at the reset; a memory holds its values)
     if (slot.kind === 'array') {
+      if (v.init.kind === 'str') {
+        [...v.init.value, '\0'].forEach((ch, k) => {
+          if (k < slot.elems.length) slot.elems[k] = this.mux(g, this.g.const(ch.charCodeAt(0), slot.t), slot.elems[k], slot.t);
+        });
+        return;
+      }
       if (v.init.kind !== 'init') this.error(v.loc, `'${v.name}': an array is initialized with { … }`);
       v.init.items.forEach((x, k) => { if (k < slot.elems.length) slot.elems[k] = this.mux(g, this.conv(this.expr(x, g), slot.t).id, slot.elems[k], slot.t); });
       return;

@@ -120,7 +120,7 @@ class Machine {
       const dims = [];
       let at = t;
       // (a size known when it runs: a test bench's, #1734)
-      for (; at.kind === 'array'; at = at.of) dims.push(at.length ?? (at.size ? Number(this.intOf(this.eval(at.size), v)) : at === t && v.init?.kind === 'init' ? v.init.items.length : 0));
+      for (; at.kind === 'array'; at = at.of) dims.push(at.length ?? (at.size ? Number(this.intOf(this.eval(at.size), v)) : at === t && v.init?.kind === 'init' ? v.init.items.length : at === t && v.init?.kind === 'str' ? v.init.value.length + 1 : 0));
       // (const char *: a test bench's texts, each cell a pointer, #2309)
       if (at.kind === 'ptr' && at.to.kind === 'int' && at.to.bits === 8) {
         const n = dims.reduce((a, b) => a * b, 1), et = { w: 64, s: false, ap: false, text: true };

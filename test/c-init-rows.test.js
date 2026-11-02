@@ -130,3 +130,55 @@ int main(void) {
   assert.equal(sim.output, '3 12 4 2 48 16 10 2 10\n');
   if (!noCC) assert.equal(compiledRun(src).output, sim.output);
 });
+
+test('#2640 char b[] = "abc" in the C simulation: its size and elements taken from the string, as cc\'s', () => {
+  const src = `#include <stdio.h>
+int top(int v) { return v; }
+int main(void) {
+  char b[] = "abc";
+  char e[] = "";
+  printf("%d %d %d %d %d %d\\n", b[0], b[1], b[2], b[3], (int)sizeof b, (int)sizeof e);
+  return 0;
+}
+`;
+  const sim = simulateC(src, { file: 'str.c' });
+  assert.deepEqual([sim.error, sim.exitCode, said(sim.diagnostics)], [null, 0, []]);
+  assert.equal(sim.output, '97 98 99 0 4 1\n');
+  if (!noCC) assert.equal(compiledRun(src).output, sim.output);
+});
+
+test('#2640 char b[] = "abc" in synthesis: combinational, sequential (a loop) and static co-simulated against cc', { skip: noCC }, () => {
+  const comb = `int top(int i) {
+  char b[] = "abc";
+  return b[i & 3];
+}
+`;
+  against(comb, 'top', { ins: [{ name: 'i', w: 32, s: true }], ret: { w: 32, s: true }, n: 20 });
+
+  const seq = `int top(int i) {
+  char b[] = "abc";
+  int s = 0;
+  for (int k = 0; k < (i & 3); k++) s += b[k];
+  return s;
+}
+`;
+  against(seq, 'top', { ins: [{ name: 'i', w: 32, s: true }], ret: { w: 32, s: true }, n: 20 });
+
+  const st = `int top(int i) {
+  static char b[] = "abc";
+  return b[i & 3];
+}
+`;
+  against(st, 'top', { ins: [{ name: 'i', w: 32, s: true }], ret: { w: 32, s: true }, n: 20 });
+});
+
+test('#2640 int x = "abc" in synthesis: reports a string is only possible in printf (ignored by synthesis)', () => {
+  const hw = `int top(int i) {
+  int x = "abc";
+  return i;
+}
+`;
+  const res = cToHdl(hw, { file: 'top.c', top: 'top' });
+  assert.equal(res.ok, false);
+  assert.ok(said(res.diagnostics).some((d) => d.includes('a string is only possible in printf (ignored by synthesis)')));
+});

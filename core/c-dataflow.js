@@ -151,11 +151,12 @@ export class Flow {
     if (t.kind === 'array') {
       const et = typeOf(t.of);
       if (!et) this.error(v.loc, `'${v.name}': only arrays of integers (one dimension) are supported yet`);
-      const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : null);
+      const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : v.init?.kind === 'str' ? v.init.value.length + 1 : null);
       if (!n) this.error(v.loc, `'${v.name}': an array needs its size`);
       const zero = this.g.const(0, et);
       const elems = Array.from({ length: n }, () => zero);
       if (v.init?.kind === 'init') v.init.items.forEach((x, k) => { if (k < n) elems[k] = this.conv(this.expr(x, g), et).id; });
+      if (v.init?.kind === 'str') [...v.init.value, '\0'].forEach((ch, k) => { if (k < n) elems[k] = this.g.const(ch.charCodeAt(0), et); });
       return { kind: 'array', t: et, elems, name: v.name };
     }
     const et = typeOf(t);

@@ -78,12 +78,17 @@ export const memMethods = {
     if (t.of.kind === 'array') this.error(v.loc, `'${v.name}': an array of arrays as a memory is not supported yet: one dimension`);
     const et = typeOf(t.of);
     if (!et) this.error(v.loc, `'${v.name}': only arrays of integers are supported`);
-    const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : null);
+    const n = t.length ?? (v.init?.kind === 'init' ? v.init.items.length : v.init?.kind === 'str' ? v.init.value.length + 1 : null);
     if (!n) this.error(v.loc, ext ? `the array argument '${v.name}' needs its size (the memory's depth): ${v.name}[N]` : `'${v.name}': an array needs its size`);
     let init = null;
     if (v.init) {
-      if (v.init.kind !== 'init') this.error(v.loc, `'${v.name}': an array is initialized with { … }`);
-      init = v.init.items.map((x) => { const c = this.constOf(x, et); if (c === null) this.error(x.loc || v.loc, `'${v.name}': a memory's initial values must be constants`); return c; });
+      if (v.init.kind === 'str') {
+        init = [...v.init.value].map((c) => BigInt(c.charCodeAt(0))).concat([0n]);
+      } else if (v.init.kind === 'init') {
+        init = v.init.items.map((x) => { const c = this.constOf(x, et); if (c === null) this.error(x.loc || v.loc, `'${v.name}': a memory's initial values must be constants`); return c; });
+      } else {
+        this.error(v.loc, `'${v.name}': an array is initialized with { … }`);
+      }
     }
     // (a static or a global with no initial values: zeros, as C)
     if (!init && !ext && v.static) init = [];

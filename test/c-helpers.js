@@ -78,15 +78,26 @@ export function compiledRun(src) {
  *  the C's "changed" (a write of the same value is a write the C cannot see). */
 export function runHdl(gen, lang, ins, outs, ret, vectors) {
   const port = (n) => gen.ports.find((p) => p.name === n);
+  const isSeq = !!port('ap_clk');
   const L = ['module tb;'];
-  for (const p of gen.ports) L.push(`  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
-  L.push(`  ${gen.top} dut(${gen.ports.map((p) => `.${p.name}(${p.name})`).join(', ')});`, '  initial begin');
-  if (port('ap_start')) L.push('    ap_start = 1;');
+  if (isSeq) L.push('  reg ap_clk = 0, ap_rst = 1;');
+  for (const p of gen.ports) if (!['ap_clk', 'ap_rst'].includes(p.name)) L.push(`  ${p.dir === 'in' ? 'reg' : 'wire'} ${p.w > 1 ? `[${p.w - 1}:0] ` : ''}${p.name};`);
+  L.push(`  ${gen.top} dut(${gen.ports.map((p) => `.${p.name}(${p.name})`).join(', ')});`);
+  if (isSeq) L.push('  always #5 ap_clk = ~ap_clk;');
+  L.push('  initial begin');
+  if (isSeq) L.push('    #12 ap_rst = 0;');
+  else if (port('ap_start')) L.push('    ap_start = 1;');
   const hex = (v, w) => `${w}'h${(BigInt(v) & mask(w)).toString(16)}`;
   for (const v of vectors) {
     const asg = ins.map((i) => `${port(i.ptrIn ? `${i.name}_i` : i.name) ? (i.ptrIn ? `${i.name}_i` : i.name) : i.name} = ${hex(v[i.name], i.w)};`).join(' ');
     const shown = [ret ? 'ap_return' : null, ...outs.flatMap((o) => [o.name, `${o.name}_ap_vld`]), ...ins.filter((i) => i.ptrIn).map((i) => `${i.name}_o`)].filter(Boolean);
-    L.push(`    ${asg} #1 $display("${shown.map(() => '%h').join(' ')}", ${shown.join(', ')});`);
+    if (isSeq) {
+      L.push(`    ${asg} ap_start = 1; @(posedge ap_clk); #1 ap_start = 0;`);
+      L.push(`    while (!ap_done) @(posedge ap_clk);`);
+      L.push(`    $display("${shown.map(() => '%h').join(' ')}", ${shown.join(', ')});`);
+    } else {
+      L.push(`    ${asg} #1 $display("${shown.map(() => '%h').join(' ')}", ${shown.join(', ')});`);
+    }
   }
   L.push('    $finish;', '  end', 'endmodule');
   const r = simulate([{ path: lang === 'vhdl' ? 'dut.vhd' : 'dut.v', text: gen.hdl }, { path: 'tb.v', text: L.join('\n') }], 'tb', { until: 1e9 });
