@@ -7,6 +7,12 @@ export const ICON = {
   wire: I('<path d="M1.5 12.5h5v-9h8" fill="none" stroke="#0000a0" stroke-width="1.6"/><circle cx="1.5" cy="12.5" r="1.4" fill="#0000a0"/><circle cx="14.5" cy="3.5" r="1.4" fill="#0000a0"/>'),
   net: I('<path d="M1 12.5h14" stroke="#0000a0" stroke-width="1.4"/><text x="1.5" y="9.5" font-size="8" font-family="Arial" font-weight="bold" fill="#800000">abc</text>'),
   io: I('<path d="M1.5 4.5h8l4 3.5-4 3.5h-8z" fill="#fffff0" stroke="#000080" stroke-width="1.2"/>'),
+  // the drawings with no function (#2593): Text, Line, Rectangle, Circle, Arc
+  gtext: I('<text x="2" y="13" font-size="13" font-family="Georgia, serif" font-weight="bold" fill="#24476f">A</text><path d="M11 3.5v9" stroke="#24476f" stroke-width="1.1"/>'),
+  gline: I('<path d="M2.5 13.5l11-11" stroke="#24476f" stroke-width="1.5" stroke-linecap="round"/>'),
+  grect: I('<rect x="2" y="3.5" width="12" height="9" fill="none" stroke="#24476f" stroke-width="1.4"/>'),
+  gcircle: I('<circle cx="8" cy="8" r="5.5" fill="none" stroke="#24476f" stroke-width="1.4"/>'),
+  garc: I('<path d="M2.5 12.5A6.5 6.5 0 0 1 13.5 6" fill="none" stroke="#24476f" stroke-width="1.5" stroke-linecap="round"/>'),
   rotate: I('<path d="M12.5 8a4.5 4.5 0 1 1-1.3-3.2" fill="none" stroke="#24476f" stroke-width="1.5"/><path d="M13.6 1.8v3.8H9.8z" fill="#24476f"/>'),
   mirrorv: I('<path d="M1 8h14" stroke="#888" stroke-dasharray="2 1.5"/><path d="M3.5 6.5h9L12.5 1.5z" fill="#9cc3ea" stroke="#24476f"/><path d="M3.5 9.5h9l0 5z" fill="#fff" stroke="#24476f"/>'),
   more: I('<circle cx="8" cy="3" r="1.5" fill="#24476f"/><circle cx="8" cy="8" r="1.5" fill="#24476f"/><circle cx="8" cy="13" r="1.5" fill="#24476f"/>'),

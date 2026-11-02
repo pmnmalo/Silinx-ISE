@@ -72,6 +72,18 @@ export const SCH_PT = {
   'Bidirectional': 'Bidirecional',
   // several objects selected: a property whose value differs between them (#1471)
   '(mixed)': '(vários)',
+  // the drawings with no function that annotate the sheet (#2593)
+  'Add Graphics: text, lines, rectangles, circles, arcs to annotate the sheet': 'Adicionar Gráficos: texto, linhas, retângulos, círculos e arcos para anotar a folha',
+  'Add Text (T)': 'Adicionar Texto (T)', 'Add Line': 'Adicionar Linha', 'Add Rectangle': 'Adicionar Retângulo', 'Add Circle': 'Adicionar Círculo', 'Add Arc': 'Adicionar Arco',
+  'Text': 'Texto', 'Line': 'Linha', 'Rectangle': 'Retângulo', 'Circle': 'Círculo', 'Arc': 'Arco',
+  'Text size': 'Tamanho do texto', 'Position': 'Posição', 'Start': 'Início', 'End': 'Fim', 'Size': 'Tamanho', 'Centre': 'Centro', 'Radius': 'Raio', 'Through': 'Passa por',
+  'A drawing to annotate the sheet: it does not change the circuit.': 'Um desenho para anotar a folha: não altera o circuito.',
+  'Add Text: click where the text goes, then type it (its lines and size in the Properties panel). It does not change the circuit.':
+    'Adicionar Texto: clique onde fica o texto e escreva-o (as suas linhas e o tamanho no painel Propriedades). Não altera o circuito.',
+  'Add Line: drag from one end to the other. It does not change the circuit.': 'Adicionar Linha: arraste de uma ponta à outra. Não altera o circuito.',
+  'Add Rectangle: drag from one corner to the other. It does not change the circuit.': 'Adicionar Retângulo: arraste de um canto ao outro. Não altera o circuito.',
+  'Add Circle: drag from its centre outwards. It does not change the circuit.': 'Adicionar Círculo: arraste do centro para fora. Não altera o circuito.',
+  'Add Arc: drag from its start to its end, then click where it passes. It does not change the circuit.': 'Adicionar Arco: arraste do início ao fim e depois clique por onde ele passa. Não altera o circuito.',
   // the Add I/O Marker tool: on a wire, a pin or empty space (#680)
   'Add I/O Marker: click a wire end, a pin or empty space to add a port marker (a wire to its tip connects it later).':
     'Adicionar Marcador de E/S: clique na ponta de um fio, num pino ou num espaço vazio para adicionar um marcador de porto (um fio até à sua ponta liga-o depois).',

@@ -5,6 +5,7 @@
 import { GRID, normalizeDoc, symbolPins } from '/core/schdoc.js';
 import { connectivity, connectionsKept, moveSegment } from '/core/schroute.js';
 import { clone, snap, onSeg, segDist, cleanPts } from './sch-editor.js';
+import { moveGraphic } from '/core/schgraphics.js';
 
 // a wire moved by (dx, dy), its kept ends where they were: joined by a jog square to its end segment
 export function keptEnds(pts0, keep, dx, dy) {
@@ -62,8 +63,9 @@ export function mountMove(ctx) {
 
   function beginMove(start) {
     const before = snapshot();
-    const orig = clone({ symbols: doc().symbols, wires: doc().wires, ports: doc().ports, labels: doc().labels });
+    const orig = clone({ symbols: doc().symbols, wires: doc().wires, ports: doc().ports, labels: doc().labels, ...(doc().graphics ? { graphics: doc().graphics } : {}) });
     const symIds = new Set(selected('sym')), portIds = new Set(selected('port')), wireIds = new Set(selected('wire')), labelIds = new Set(selected('label'));
+    const graphicIds = new Set(selected('graphic'));   // (drawings, #2593: moved, nothing following them)
     const moved = new Set();
     for (const s of doc().symbols) if (symIds.has(s.id)) for (const p of symbolPins(s, modules())) moved.add(`${p.x},${p.y}`);
     for (const p of doc().ports) if (portIds.has(p.id)) moved.add(`${p.x},${p.y}`);
@@ -124,7 +126,7 @@ export function mountMove(ctx) {
     }
     let conn0 = null;
     try { conn0 = connectivity(doc(), modules()); } catch { /* checked only when available */ }
-    return { kind: 'move', start, before, orig, symIds, portIds, wireIds, labelIds, attach, anchors, conn0, guard, synth, keepEnds, dx: 0, dy: 0 };
+    return { kind: 'move', start, before, orig, symIds, portIds, wireIds, labelIds, graphicIds, attach, anchors, conn0, guard, synth, keepEnds, dx: 0, dy: 0 };
   }
   function applyMove(m, dx, dy) {
     if (dx === m.dx && dy === m.dy) return;
@@ -133,6 +135,7 @@ export function mountMove(ctx) {
     for (const s of doc().symbols) if (m.symIds.has(s.id)) { const s0 = o.symbols.find(x => x.id === s.id); s.x = s0.x + dx; s.y = s0.y + dy; }
     for (const p of doc().ports) if (m.portIds.has(p.id)) { const p0 = o.ports.find(x => x.id === p.id); p.x = p0.x + dx; p.y = p0.y + dy; }
     for (const l of doc().labels) if (m.labelIds.has(l.id)) { const l0 = o.labels.find(x => x.id === l.id); l.x = l0.x + dx; l.y = l0.y + dy; }
+    if (doc().graphics) doc().graphics = doc().graphics.map(g => (m.graphicIds?.has(g.id) ? moveGraphic(o.graphics.find(x => x.id === g.id), dx, dy) : g));
     for (const w of doc().wires) if (m.wireIds.has(w.id)) { const w0 = o.wires.find(x => x.id === w.id); w.points = keptEnds(w0.points, m.keepEnds?.[w.id], dx, dy); }
     for (const at of m.attach) {
       const w = doc().wires.find(x => x.id === at.id), w0 = o.wires.find(x => x.id === at.id);

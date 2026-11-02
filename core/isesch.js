@@ -30,6 +30,7 @@ import { exportIseSch, decodeXlSymbol, iseTimestamp } from './isesch-export.js';
 import { readIseNets } from './isesch-nets.js';
 import { blockGeometry } from './isesch-geometry.js';
 import { assembleIseImport } from './isesch-assemble.js';
+import { ISE_GRAPHIC_TAGS, graphicsFromIse, iseGraphic } from './isesch-graphics.js';
 import { libTemplate } from './isesch-hdl.js';
 import { primFromIse, primLibPins } from './isesch-prims.js';
 export { exportIseSch, decodeXlSymbol, iseTimestamp };
@@ -119,7 +120,7 @@ export function parseIseSch(text) {
       pins: kids(b, 'blockpin').map(p => ({ name: p.attrs.name, signal: p.attrs.signalname ?? null })) });
   }
   for (const sh of kids(dr, 'sheet')) {
-    const S = { num: num(sh.attrs.sheetnum) || 1, width: num(sh.attrs.width) || 3520, height: num(sh.attrs.height) || 2720, instances: [], branches: [], iomarkers: [], bustaps: [], texts: [] };
+    const S = { num: num(sh.attrs.sheetnum) || 1, width: num(sh.attrs.width) || 3520, height: num(sh.attrs.height) || 2720, instances: [], branches: [], iomarkers: [], bustaps: [], graphics: [] };
     for (const c of sh.children) {
       const A = c.attrs;
       if (c.tag === 'instance') S.instances.push({ name: A.name, x: num(A.x), y: num(A.y), orien: A.orien || 'R0' });
@@ -128,7 +129,7 @@ export function parseIseSch(text) {
           labels: kids(c, 'attrtext').filter(t => !t.attrs.attrname || /^name$/i.test(t.attrs.attrname)).map(t => ({ x: num(t.attrs.x), y: num(t.attrs.y), style: t.attrs.style || '' })) });
       } else if (c.tag === 'iomarker') S.iomarkers.push({ name: A.name, x: num(A.x), y: num(A.y), orien: A.orien || 'R0' });
       else if (c.tag === 'bustap') S.bustaps.push({ x1: num(A.x1), y1: num(A.y1), x2: num(A.x2), y2: num(A.y2) });
-      else if (c.tag === 'text') S.texts.push({ x: num(A.x), y: num(A.y), text: c.text.trim() });
+      else if (ISE_GRAPHIC_TAGS.has(c.tag)) S.graphics.push(iseGraphic(c.tag, A, c.text));
     }
     m.sheets.push(S);
   }
@@ -208,7 +209,7 @@ function parseV6(src) {
       i++; m.blocks.push(b); continue;
     }
     if (isBegin(t, 'SHEET')) {
-      const S = { num: num(t[2]) || 1, width: num(t[3]) || 3520, height: num(t[4]) || 2720, instances: [], branches: [], iomarkers: [], bustaps: [], texts: [] };
+      const S = { num: num(t[2]) || 1, width: num(t[3]) || 3520, height: num(t[4]) || 2720, instances: [], branches: [], iomarkers: [], bustaps: [], graphics: [] };
       i++;
       while (i < N && !(lines[i][0] === 'END' && lines[i][1] === 'SHEET')) {
         const u = lines[i];
@@ -227,7 +228,7 @@ function parseV6(src) {
         }
         if (u[0] === 'IOMARKER') { S.iomarkers.push({ x: num(u[1]), y: num(u[2]), name: u[3], orien: u[4] || 'R0' }); i++; continue; }
         if (u[0] === 'BUSTAP') { S.bustaps.push({ x1: num(u[1]), y1: num(u[2]), x2: num(u[3]), y2: num(u[4]) }); i++; continue; }
-        if (isBegin(u, 'DISPLAY') && u[4] === 'TEXT') { S.texts.push({ x: num(u[2]), y: num(u[3]), text: u.slice(5).join(' ') }); skipBlock(); continue; }
+        if (isBegin(u, 'DISPLAY') && u[4] === 'TEXT') { S.graphics.push({ kind: 'text', x: num(u[2]), y: num(u[3]), text: u.slice(5).join(' ') }); skipBlock(); continue; }
         if (u[0] === 'BEGIN') { skipBlock(); continue; }
         i++;
       }
@@ -838,7 +839,7 @@ export function importIseSch(xmlText, opts = {}) {
   return assembleIseImport({
     addWire, declLines, docName, keyName, keyWidth, labelKey, labels, lang, macroBox, macros, mainInfo, model, modules,
     occ, occAdd, occReset, overlapsForeign, parked, passes, pinKey, pinsOf, portKey, ports, segAdd, shiftMacro, sigs,
-    stubOf, syms, unplacedPorts, warn, warnings, wireKey, wires, lid, pid
+    stubOf, syms, unplacedPorts, warn, warnings, wireKey, wires, lid, pid, graphics: graphicsFromIse(model, MX, MY, S_IN)
   });
 }
 

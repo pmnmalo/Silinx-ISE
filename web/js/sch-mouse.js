@@ -9,17 +9,20 @@ import { closeMenus, twoFingerView } from './ui.js';
 import { untangleNew } from '/core/schpath.js';
 import { clone, snap } from './sch-editor.js';
 import { mountStroke } from './sch-stroke.js';
+import { GRAPHIC_TOOLS, mountSchGraphics } from './sch-graphics.js';
 
 /** { finishMove, onMove, onUp } of mountSchEditor (cursor(), destroyed(), doc(), drag(), hoverPin(), keepConn(), live(), modules(), sel(), spaceDown(), tool(), view(), wireDraw(): its current values). */
 export function mountSchMouse(ctx) {
   const {
-    container, opts, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
+    container, opts, edit, nextId, promptBox, applyMove, applySegMove, applyView, bandRect, bandSelect, beginMove, beginSegMove, canvas, changed, contextMenu, curve,
     cursor, destroyed, doc, drag, finishSegMove, finishWire, flash, hoverPin, ioClick, itemAt, keepConn, live, modules,
     netClick, pinNear, placeAt, propBody, pushUndo, readOnly, refusedShort, render, renderOverlay, renderProps, segSel, sel,
     setTool, spaceDown, startPlace, svg, toSheet, tool, updateStatus, view, wireClick, wholeBranch, wireDraw, zoomAt, setCursor, setDoc, setDrag,
     setHoverPin, setSel, setWireDraw
   } = ctx;
   // a wire drawn as a freehand stroke (#1052)
+  // the drawings with no function (#2593)
+  const graphics = mountSchGraphics({ doc, drag, setDrag, tool, edit, nextId, promptBox, renderOverlay });
   const { strokeStart, strokeMove, strokeEnd, strokeCancel } = mountStroke({ doc, modules, view, curve: () => curve, pinNear, finishWire, renderOverlay, setWireDraw });
 
   function onDown(e) {
@@ -45,6 +48,7 @@ export function mountSchMouse(ctx) {
       if (st) setDrag(st);
       return;
     }
+    if (GRAPHIC_TOOLS.includes(tool())) { graphics.down(pt); return; }   // (#2593)
     if (tool() === 'net') { netClick(pt); return; }
     if (tool() === 'io') { ioClick(pt); return; }
     // (curved, #1144: a handle of the selected wire)
@@ -98,6 +102,8 @@ export function mountSchMouse(ctx) {
       if (d) closeMenus();
       applySegMove(drag(), d); return;
     }
+    // (a drawing under way, #2593; another tool taken meanwhile: given up)
+    if (drag()?.kind === 'graphic') { if (GRAPHIC_TOOLS.includes(tool())) graphics.move(drag(), pt); else setDrag(null); return; }
     if (drag() && drag().kind !== 'pan' && drag().kind !== 'band') closeMenus();
     if (drag()?.kind === 'band') { drag().cur = pt; renderOverlay(); return; }
     if (drag()?.kind === 'knot') { curve.moveKnot(drag(), pt); return; }
@@ -153,6 +159,7 @@ export function mountSchMouse(ctx) {
     if (d.kind === 'seg') { if (d.d) { finishSegMove(d); if (!wholeBranch()) { segSel.pick(d.id, toSheet(e.clientX, e.clientY)); render(); } } return; }
     if (d.kind === 'stroke') { strokeEnd(d, toSheet(e.clientX, e.clientY)); return; }
     if (d.kind === 'knot') { curve.endKnot(d); return; }
+    if (d.kind === 'graphic') { setDrag(graphics.up(d, toSheet(e.clientX, e.clientY))); return; }
     if (d.kind === 'move') {
       if (d.dx || d.dy) finishMove(d);
       else if (d.synth?.length) { doc().wires = doc().wires.filter(w => !d.synth.includes(w.id)); render(); }   // just a click
@@ -161,7 +168,7 @@ export function mountSchMouse(ctx) {
     if (d.kind === 'band') {
       const r = bandRect(d);
       if (r.w < 3 && r.h < 3) { if (!d.add) sel().clear(); }
-      else bandSelect(d.add, d);
+      else { bandSelect(d.add, d); graphics.band(r, sel()); }
       render(); renderProps();
     }
   }
@@ -179,7 +186,7 @@ export function mountSchMouse(ctx) {
       doc().labels = clone(d.labels0);
       if (d.sel0) setSel(d.sel0);
       render(); renderProps();
-    } else if (d?.kind === 'band') renderOverlay();
+    } else if (d?.kind === 'band' || d?.kind === 'graphic') renderOverlay();
     else if (d?.kind === 'stroke') strokeCancel();
     else if (d?.kind === 'knot') { curve.cancelKnot(d); if (d.sel0) { setSel(d.sel0); render(); renderProps(); } }
   }

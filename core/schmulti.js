@@ -10,8 +10,9 @@
 // flip-flops...). Its value is the objects' one, or mixed (null) when they differ. What must stay unique per object
 // (an instance name, a marker's name, a net name) and what changes a symbol's type (its inputs) is left out.
 import { symbolParams } from './schdoc.js';
+import { TEXT_SIZE, TEXT_SIZES } from './schgraphics.js';
 
-const KEYS = { sym: 'symbols', wire: 'wires', port: 'ports', label: 'labels' };
+const KEYS = { sym: 'symbols', wire: 'wires', port: 'ports', label: 'labels', graphic: 'graphics' };
 const DIRS = [['in', 'Input'], ['out', 'Output'], ['inout', 'Bidirectional']];
 
 // the editable fields of one object: [{ key, label, kind, options?, min?, max?, get(o), set(o, v) }]
@@ -21,6 +22,11 @@ function fieldsOf(kind, o) {
     { key: 'width', label: 'Width', kind: 'int', min: 1, get: p => p.width ?? 1,
       set: (p, v) => { p.width = Math.max(1, Math.round(+v || 1)); if (p.type && !/\(|\[/.test(p.type) && p.width > 1) delete p.type; } },
     { key: 'type', label: 'HDL type', kind: 'text', get: p => p.type || '', set: (p, v) => { if (String(v).trim()) p.type = String(v).trim(); else delete p.type; } },
+  ];
+  // (texts, #2593: their size)
+  if (kind === 'graphic') return o.kind !== 'text' ? [] : [
+    { key: 'size', label: 'Text size', kind: 'int', min: TEXT_SIZES[0], max: TEXT_SIZES[1], get: g => g.size ?? TEXT_SIZE,
+      set: (g, v) => { g.size = Math.max(TEXT_SIZES[0], Math.min(TEXT_SIZES[1], Math.round(+v || TEXT_SIZE))); } },
   ];
   if (kind === 'wire') return [];   // (no "Draw as bus": a wire drawn by its net's width, #1705)
   // (a COMP's comparisons, kind multi: its own tick boxes only, as they re-pin it, #1555)

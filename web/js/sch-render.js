@@ -6,6 +6,8 @@ import { symbolDef, symbolDiff, symbolPins, rotSize, parseNetName, wireCrossings
 import { esc } from './dom.js';
 import { symbolSvg, portSvg, hopPath, inLineRuns, wireRun } from './sch-svg.js';
 import { snap } from './sch-editor.js';
+import { graphicSvg } from '/core/schgraphics.js';
+import { GRAPHIC_TOOLS, graphicGhost } from './sch-graphics.js';
 
 /** { renderSheet, render, renderOverlay, updateToolbar, updateStatus } of a schematic editor (state(): its current
  *  document, netlist, selection, tool, … at the time of the call; refreshNetlist() computes the netlist again). */
@@ -32,7 +34,8 @@ export function mountRender(ctx) {
     refreshNetlist();
     const { doc, nl, sel, live, modules, showHops, showNames } = state();
     renderSheet();
-    const parts = [];
+    // the drawings with no function (#2593): under the circuit
+    const parts = (doc.graphics || []).map(g => graphicSvg(g, sel.has(`graphic:${g.id}`) ? ' sel' : ''));
     const busW = new Map();
     if (nl) for (const [wid, n] of nl.wireNet) busW.set(wid, n.width);
     // wires (Hop-overs: the crossings of each, by segment, #692)
@@ -145,6 +148,7 @@ export function mountRender(ctx) {
     if (drag?.kind === 'stroke' && drag.inking) s += `<polyline class="wire-ink" points="${drag.ink.map(p => `${p.x},${p.y}`).join(' ')}"/>`;
     if ((tool === 'wire' || tool === 'io' || tool === 'net') && hoverPin) s += `<rect class="pinhover" x="${hoverPin.x - 4}" y="${hoverPin.y - 4}" width="8" height="8"/>`;
     if (tool === 'wire' || tool === 'io') { const c = snapPoint(cursor); s += `<path class="xhair" d="M${c.x - 6},${c.y} H${c.x + 6} M${c.x},${c.y - 6} V${c.y + 6}"/>`; }
+    if (drag?.kind === 'graphic') s += graphicGhost(drag, tool);
     if (drag && drag.kind === 'band') {
       const r = bandRect();
       s += `<rect class="band" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/>`;
@@ -154,7 +158,7 @@ export function mountRender(ctx) {
   function updateToolbar() {
     const { live, tool, sel, doc } = state();
     curve.box.checked = doc.wireStyle === 'curved';
-    tb.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('on', live ? b.dataset.act === 'sim' : b.dataset.act === tool));
+    tb.querySelectorAll('[data-act]').forEach(b => b.classList.toggle('on', live ? b.dataset.act === 'sim' : b.dataset.act === tool || (b.dataset.act === 'graphics' && GRAPHIC_TOOLS.includes(tool))));
     const any = sel.size > 0;
     tb.querySelector('[data-act="delete"]').disabled = !any;
     const symSel = [...sel].some(k => k.startsWith('sym:') || k.startsWith('port:')) || (tool === 'place');
@@ -168,6 +172,12 @@ export function mountRender(ctx) {
     net: 'Add Net Name: type a name, then click a wire to attach it.',
     io: 'Add I/O Marker: click a wire end, a pin or empty space to add a port marker (a wire to its tip connects it later).',
     place: 'Click to place the symbol (Ctrl+R rotate, Ctrl+M mirror). Esc to stop placing.',
+    // (the drawings, #2593)
+    text: 'Add Text: click where the text goes, then type it (its lines and size in the Properties panel). It does not change the circuit.',
+    line: 'Add Line: drag from one end to the other. It does not change the circuit.',
+    rect: 'Add Rectangle: drag from one corner to the other. It does not change the circuit.',
+    circle: 'Add Circle: drag from its centre outwards. It does not change the circuit.',
+    arc: 'Add Arc: drag from its start to its end, then click where it passes. It does not change the circuit.',
   };
   // (curved wires, #1144)
   const CURVED_HINT = {

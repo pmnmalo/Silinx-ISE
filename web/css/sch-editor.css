@@ -41,14 +41,17 @@
 }
 /* the toolbar's menu (#2208): always at the right of its first line, whatever wraps */
 .sch-editor .se-more { position: absolute; top: 2px; right: 4px; }
-.sch-editor .se-more-menu {
+.sch-editor :is(.se-more-menu, .se-gfx-menu) {
   position: absolute; top: 100%; right: 0; margin-top: 2px; z-index: 30; display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px;
   background: var(--se-panel); border: 1px solid var(--se-border); box-shadow: 2px 2px 6px rgba(0, 0, 0, .3);
 }
-.sch-editor .se-more-menu[hidden] { display: none; }
-.sch-editor .se-more-menu .se-btn { justify-content: flex-start; }
+.sch-editor :is(.se-more-menu, .se-gfx-menu)[hidden] { display: none; }
+.sch-editor :is(.se-more-menu, .se-gfx-menu) .se-btn { justify-content: flex-start; }
 .sch-editor .se-more-menu .se-sep { width: auto; height: 1px; margin: 2px 0; box-shadow: none; }
 .sch-editor .se-more-menu label { min-height: 22px; }
+/* Add Graphics' menu (#2593): under its button */
+.sch-editor .se-gfx { position: relative; display: inline-flex; }
+.sch-editor .se-gfx-menu { right: auto; left: 0; }
 .sch-editor .se-btn {
   height: 22px; min-width: 24px; padding: 0 3px; border: 1px solid transparent; border-radius: 2px; background: none;
   display: inline-flex; align-items: center; justify-content: center; gap: 3px; cursor: default; white-space: nowrap;
@@ -219,6 +222,13 @@
 .sch-editor svg .sym.sel .cbox, .sch-editor svg .port.sel .iomark, .sch-editor svg .port.sel .pin { stroke: var(--se-select); }
 .sch-editor svg .sym.sel .ripper { fill: var(--se-select); stroke: var(--se-select); }
 .sch-editor svg .sym.sel text, .sch-editor svg .port.sel text, .sch-editor svg .label.sel text { fill: var(--se-select); }
+/* the drawings with no function (#2593): thin lines, a text in the sheet's colour; picked by a wide transparent line */
+.sch-editor svg .graphic .gline { fill: none; stroke: var(--se-text); stroke-width: 1.2; }
+.sch-editor svg .graphic .ghit { fill: none; stroke: transparent; stroke-width: 9; }
+.sch-editor .se-svg .graphic .gtext { fill: var(--se-text); white-space: pre; }
+.sch-editor svg .graphic:hover .gline { stroke: var(--se-highlight); }
+.sch-editor svg .graphic.sel .gline { stroke: var(--se-select); }
+.sch-editor .se-svg .graphic.sel .gtext { fill: var(--se-select); }
 
 /* overlay */
 .sch-editor svg .ghost { opacity: .55; pointer-events: none; }

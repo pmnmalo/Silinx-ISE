@@ -56,7 +56,7 @@ export function mountSchSelect(ctx) {
     const seg = segSel.current();
     if (seg) { edit(() => { deleteWireSegment(doc(), seg.id, seg.a, seg.b); sel().clear(); }); return; }
     edit(() => {
-      for (const [kind, arr] of Object.entries(KEYS)) { const ids = new Set(selected(kind)); doc()[arr] = doc()[arr].filter(o => !ids.has(o.id)); }
+      for (const [kind, arr] of Object.entries(KEYS)) { const ids = new Set(selected(kind)); if (doc()[arr]) doc()[arr] = doc()[arr].filter(o => !ids.has(o.id)); }
       sel().clear();
     });
   }
@@ -74,7 +74,7 @@ export function mountSchSelect(ctx) {
   }
   function copySel(cut = false) {
     if (!sel().size || readOnly || live()) return;
-    const clip = copySchematic(doc(), { symbols: selected('sym'), wires: selected('wire'), ports: selected('port'), labels: selected('label') }, modules());
+    const clip = copySchematic(doc(), { symbols: selected('sym'), wires: selected('wire'), ports: selected('port'), labels: selected('label'), graphics: selected('graphic') }, modules());
     writeClip('schematic', clip);
     if (cut) deleteSel();
   }
@@ -90,7 +90,7 @@ export function mountSchSelect(ctx) {
       const { ids } = pasteSchematic(doc(), clip, { dx, dy });
       // (its wires routed clear of what was there, #948)
       try { untangleNew(JSON.parse(before), doc(), { modules: modules(), prefer: ids.wires }); } catch (e) { console.error(e); }
-      setSel(new Set([...ids.symbols.map(id => `sym:${id}`), ...ids.wires.map(id => `wire:${id}`), ...ids.ports.map(id => `port:${id}`), ...ids.labels.map(id => `label:${id}`)]));
+      setSel(new Set([...ids.symbols.map(id => `sym:${id}`), ...ids.wires.map(id => `wire:${id}`), ...ids.ports.map(id => `port:${id}`), ...ids.labels.map(id => `label:${id}`), ...ids.graphics.map(id => `graphic:${id}`)]));
     });
     if (refusedShort(before, 'Pasting')) { undoStack.pop(); changed(); }
     container.focus({ preventScroll: true });
@@ -110,7 +110,7 @@ export function mountSchSelect(ctx) {
     });
     if (refusedShort(before, 'Duplicating')) { undoStack.pop(); changed(); }
   }
-  function selectAll() { setSel(new Set([...doc().symbols.map(s => `sym:${s.id}`), ...doc().wires.map(w => `wire:${w.id}`), ...doc().ports.map(p => `port:${p.id}`), ...doc().labels.map(l => `label:${l.id}`)])); render(); renderProps(); }
+  function selectAll() { setSel(new Set([...doc().symbols.map(s => `sym:${s.id}`), ...doc().wires.map(w => `wire:${w.id}`), ...doc().ports.map(p => `port:${p.id}`), ...doc().labels.map(l => `label:${l.id}`), ...(doc().graphics || []).map(g => `graphic:${g.id}`)])); render(); renderProps(); }
 
   return { copySel, deleteSel, duplicateSel, mirrorSel, mirrorVSel, paste, rotateSel, selectAll, selected };
 }

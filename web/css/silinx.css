@@ -394,7 +394,7 @@ html[data-ui="silinx"] .tb-more { top: 6px; right: 8px; }
 html[data-ui="silinx"] .tb-more .tb-more-btn { width: var(--m-tool-h); padding-left: 0; padding-right: 0; }
 html[data-ui="silinx"] .tb-more-menu { padding: 6px; border-radius: 8px; background: var(--m-surface, #fff); }
 html[data-ui="silinx"] .sch-editor .se-more { top: 6px; right: 8px; }
-html[data-ui="silinx"] .sch-editor .se-more-menu { padding: 6px; border-radius: 8px; }
+html[data-ui="silinx"] .sch-editor :is(.se-more-menu, .se-gfx-menu) { padding: 6px; border-radius: 8px; }
 html[data-ui="silinx"] :is(.editor-bar, .doc-toolbar, .isim-toolbar, .tt-toolbar, .sch-editor .se-toolbar, .asm-editor .asm-toolbar, .emu-bar, .pin-planner .pp-bar)
   :is(select, input:is(:not([type]), [type=text], [type=number])) { height: var(--m-tool-h); padding: 0 6px; border-radius: var(--m-radius-sm); }
 /* (in the Tasks interface SSim's toolbar is its wave window's line: its own padding none, the line's) */

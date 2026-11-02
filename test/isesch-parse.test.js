@@ -117,7 +117,7 @@ test('parseIseSch (XML): attributes, signals with attributes, ports, blockdef sh
   assert.deepEqual(S.branches, [{ name: 'A', wires: [[240, 304, 400, 304]], labels: [{ x: 300, y: 304, style: 'fontsize:28' }] }]);
   assert.deepEqual(S.iomarkers, [{ name: 'A', x: 240, y: 304, orien: 'R180' }]);
   assert.deepEqual(S.bustaps, [{ x1: 420, y1: 600, x2: 500, y2: 600 }]);
-  assert.deepEqual(S.texts, [{ x: 100, y: 100, text: 'a note' }]);
+  assert.deepEqual(S.graphics, [{ kind: 'text', x: 100, y: 100, text: 'a note' }]);
 });
 
 test('parseIseSch (VERSION 6 text) reads the same drawing into the same model', () => {
@@ -136,7 +136,7 @@ test('parseIseSch (VERSION 6 text) reads the same drawing into the same model', 
   assert.deepEqual(st.branches.map(b => [b.name, b.wires, b.labels.map(l => [l.x, l.y])]), sx.branches.map(b => [b.name, b.wires, b.labels.map(l => [l.x, l.y])]));
   assert.deepEqual(st.iomarkers, sx.iomarkers);
   assert.deepEqual(st.bustaps, sx.bustaps);
-  assert.deepEqual(st.texts, sx.texts);
+  assert.deepEqual(st.graphics, sx.graphics);
 });
 
 test('parseIseSch rejects files that are not ISE schematics', () => {

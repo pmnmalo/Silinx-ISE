@@ -16,6 +16,7 @@ import { clone, snap, KEYS } from './sch-editor.js';
 import { mountMultiProps } from './sch-multi.js';
 import { mountCompareTicks } from './sch-compare.js';
 import { setMarkerWidth } from '/core/schmarker.js';
+import { graphicProps } from './sch-graphics.js';
 
 /** { renderProps, openSelected, renamed, joinByName, renameLabel } of a schematic editor (doc(), sel(), nl(), live(), modules(): its current ones). */
 export function mountProps(ctx) {
@@ -54,12 +55,13 @@ export function mountProps(ctx) {
       return;
     }
     const [kind, id] = items[0].split(/:(.*)/s);
-    const obj = doc()[KEYS[kind]].find(o => o.id === id);
+    const obj = doc()[KEYS[kind]]?.find(o => o.id === id);
     if (!obj) return;
     if (kind === 'sym') symProps(obj);
     else if (kind === 'port') portProps(obj);
     else if (kind === 'label') labelProps(obj);
     else if (kind === 'wire') wireProps(obj);
+    else if (kind === 'graphic') graphicProps(obj, { propBody, field, inp, ta });   // (#2593, sch-graphics.js)
   }
   // text input bound to a setter (commits on change)
   // a property applied with Enter keeps the keyboard in the (redrawn) field
