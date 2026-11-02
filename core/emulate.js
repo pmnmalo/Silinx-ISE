@@ -272,8 +272,9 @@ export function lcdFeedEdges(st, watch, captured) {
 // ~10^5 cycles/s, so the large integer generics of the top are divided to make them visible.
 // ---------------------------------------------------------------------------------------------
 
-// Integer generics that are sizes, not cycle counts: never divided
-const SIZE_NAME = /WIDTH|DEPTH|SIZE|BITS|ADDR|WORDS|ENTRIES|BAUD|^N_|^(W|NB|AW|DW)$|_W$/i;
+// Integer generics that are sizes or rates, not cycle counts: never divided (a clock's frequency, CLK_HZ: divided, a
+// UART's bit, CLK_HZ / BAUD cycles, would be no cycle at all, #2537)
+const SIZE_NAME = /WIDTH|DEPTH|SIZE|BITS|ADDR|WORDS|ENTRIES|BAUD|_HZ$|FREQ|^N_|^(W|NB|AW|DW)$|_W$/i;
 
 /** Timing generics of a top module ({ name, value }): its integer generics >= 1000 that are not sizes. */
 export function timingGenerics(params) {

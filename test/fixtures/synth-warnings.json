@@ -26,6 +26,7 @@
   "examples/pong": [],
   "examples/stopwatch": [],
   "examples/traffic": [],
+  "examples/uart": [],
   "examples/vga": [],
   "fixtures/verilog/counter_top": [],
   "fixtures/vhdl/counter": [],
