@@ -8,7 +8,7 @@
 // one (the Tasks layout) has no drawer: its side panel docked beside the document, folded by the task's side button (#1463).
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupUi, uiTest, makeProject } from './harness.js';
+import { setupUi, uiTest, makeProject, chromeOnly } from './harness.js';
 
 let env;
 before(async () => { env = await setupUi(); });
@@ -326,8 +326,16 @@ for (const [w, h] of [[1400, 900], [820, 1180]]) {
     if (silinx) assert.deepEqual(JSON.parse(await page.eval(() => localStorage.getItem('silinx.tasks'))).tasks.edit.side, true);
     await noWarnings(page);
     // (the reloaded page's Warnings tab has the start-up checks' lines of the machine: its console only, below)
+    // (#2528: the reload's wait ends with the start-up checks' answer; the Start page comes with the projects' list, which
+    // a slow machine gives later: the list held here so that it does, the test waiting for the start-up to end)
+    const held = chromeOnly ? null : await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+      const orig = window.fetch;
+      window.fetch = async (u, o) => { if (String(u).endsWith('/api/projects')) await new Promise((r) => setTimeout(r, 1000)); return orig(u, o); };
+    })();` });
     await page.reload();
+    if (held) await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: held.identifier });
     await page.setViewport(w, h);
+    await page.waitFor(() => !document.querySelector('.left-page[data-page=start]').hidden, [], { what: 'the start-up done: the Start page, the projects listed' });
     await visible('reloaded');
     // still folded by the viewer afterwards
     if (silinx) { await sideButton(page); assert.equal((await arranged()).side, 'folded'); await sideButton(page); }
