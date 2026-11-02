@@ -168,18 +168,9 @@ function packSlices(nl, combine) {
         const coOut = i < 3 && co > 1 && ix.loads(co).some(l => !(cells[l.cell].type === 'CARRY4' && l.pin === 'CI'));
         if (sumOut && coOut && s.ctrl === null) { s.pos[p].ff = AND2L; s.ctrl = AND2L; }
       });
-      // CYINIT from AX when it is a signal (a constant is a setting); DI<0>, which needed AX too, then through A's O5 as
-      // a route-through of its net (map's PK_PACKTHRU, ACY0 = O5, A6 high: an adder's carry in, #2638) when O5 is free
-      // and the S LUT leaves it an input
+      // CYINIT from AX when it is a signal (a constant is a setting)
       const cy = c.pins.CYINIT ?? 0;
-      if (cy > 1 && !below.has(ci)) {
-        const a = s.pos.A, di = a.x;
-        if (di !== null && di !== cy) {
-          if (a.o5 === null && (typeof a.o6 !== 'number' || new Set([...lutInputs(cells[a.o6]), di]).size <= 5)) a.o5 = `thru:${di}`;
-          else warnings.push(`carry chain at ${c.name}: CYINIT and DI<0> both need the bypass input AX`);
-        }
-        a.x = cy;
-      }
+      if (cy > 1 && !below.has(ci)) cyinitOnAx(s, c, cy, cells, warnings);
     }
     chains.push(chain);
   }
@@ -418,6 +409,17 @@ function packSlices(nl, combine) {
   };
   const renum = new Map(slices.map((s, i) => [i, live.indexOf(s)]));
   return { slices: live, chains: chains.map(ch => ch.map(i => renum.get(i))), others, stats, warnings };
+}
+
+// a chain's CYINIT on AX; DI<0>, which needed AX too, then through A's O5 as a route-through of its net (map's
+// PK_PACKTHRU, ACY0 = O5, A6 high: an adder's carry in, #2638) when O5 is free and the S LUT leaves it an input
+function cyinitOnAx(s, c, cy, cells, warnings) {
+  const a = s.pos.A, di = a.x;
+  if (di !== null && di !== cy) {
+    if (a.o5 === null && (typeof a.o6 !== 'number' || new Set([...lutInputs(cells[a.o6]), di]).size <= 5)) a.o5 = `thru:${di}`;
+    else warnings.push(`carry chain at ${c.name}: CYINIT and DI<0> both need the bypass input AX`);
+  }
+  a.x = cy;
 }
 
 // a position's multiplexed output: one signal; a second one is the packer's error
