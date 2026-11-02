@@ -1,10 +1,12 @@
 // The Board Emulator's toolbar (#405: out of mountEmulator in emulator.js): Run / Pause, Step, Reset, the emulated
 // clock rate, what it does while not seen (#719), the timing scale of the top's generics, the model (the RTL or a
-// netlist, #490, #878) and the engine (compiled or event-driven, #418).
+// netlist, #490, #878); in its menu (the three dots at its right, as the diagram editors', #2666) the engine (compiled or
+// event-driven, #418), what it does while not seen and the modules shown (emulator-modules.js).
 import { h } from './dom.js';
 import { HIDDEN_KEY, SPEEDS } from './emulator.js';
+import { toolbarMenu } from './toolbar-menu.js';
 
-/** { main, resetBtn, root, runBtn, stat, stepBtn } of mountEmulator (compiled(), engineNote(), running(), speed(), whenHidden(): its current values). */
+/** { main, menu, resetBtn, root, runBtn, stat, stepBtn } (menu: the toolbar menu's element, its rows appended) of mountEmulator (compiled(), engineNote(), running(), speed(), whenHidden(): its current values). */
 export function mountEmuToolbar(ctx) {
   const {
     container, engine, model, timing, title, compiled, engineNote, powerCycle, running, setRunning, speed, step,
@@ -43,13 +45,16 @@ export function mountEmuToolbar(ctx) {
     onchange: (e) => engine.onChange?.(e.target.value) },
     h('option', { value: 'compiled', selected: !!compiled(), disabled: !compiled() && !!engineNote(), title: !compiled() && engineNote() ? `Not compiled: ${engineNote()}` : null }, 'Compiled (real speed)'),
     h('option', { value: 'event', selected: !compiled() }, 'Event-driven (debugging)')) : null;
+  const row = (label, el) => h('label', { class: 'emu-menu-row' }, label, el);
+  const more = toolbarMenu([engineSel ? row('Engine:', engineSel) : null, row('When hidden:', hiddenSel)].filter(Boolean),
+    { title: 'Engine, when hidden, modules shown', btnClass: 'btn' });
   root.append(h('div', { class: 'emu-bar' }, modelSel ? 'Model:' : null, modelSel, modelSel ? h('span', { class: 'sep' }) : null,
-    engineSel ? 'Engine:' : null, engineSel, engineSel ? h('span', { class: 'sep' }) : null,
     runBtn, stepBtn, resetBtn, h('span', { class: 'sep' }), 'Clock:', speedSel,
-    timingSel ? h('span', { class: 'sep' }) : null, timingSel ? 'Timing:' : null, timingSel, h('span', { class: 'sep' }), 'When hidden:', hiddenSel, stat));
+    timingSel ? h('span', { class: 'sep' }) : null, timingSel ? 'Timing:' : null, timingSel, more.el, stat));
 
+  // the board and its modules (main), the side panel at its right (emulator-side.js)
   const main = h('div', { class: 'emu-main' });
-  root.append(main);
+  root.append(h('div', { class: 'emu-body' }, main));
 
-  return { main, resetBtn, root, runBtn, stat, stepBtn };
+  return { main, menu: more.el.querySelector('.tb-more-menu'), resetBtn, root, runBtn, stat, stepBtn };
 }

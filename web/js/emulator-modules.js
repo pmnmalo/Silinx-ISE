@@ -1,4 +1,4 @@
-// The Board Emulator's modules outside the board (#2522): a checkbox for each in the toolbar, to show or hide it (the
+// The Board Emulator's modules outside the board (#2522): a checkbox for each in the toolbar's menu (#2666), to show or hide it (the
 // VGA monitor, the serial terminal, the iCEBreaker's modules on its Pmods). A module is what its drawing marks with data-module; hiding it
 // changes the view only: the design goes on driving it. The choice is remembered, per module.
 import { h } from './dom.js';
@@ -8,8 +8,8 @@ const LABELS = { vga: 'VGA monitor', serial: 'Serial terminal', display: 'Displa
 const MODULE_KEY = (id) => prefKey(`silinx.emulator.module.${id}`);
 const pref = (id) => { try { return localStorage.getItem(MODULE_KEY(id)) !== 'hidden'; } catch { return true; } };
 
-/** The checkboxes, before the toolbar's status (stat), for the modules in main; changed(): after one is shown or hidden. */
-export function mountEmuModules({ main, stat, changed }) {
+/** The checkboxes, in the toolbar's menu (menu), for the modules in main; changed(): after one is shown or hidden. */
+export function mountEmuModules({ main, menu, changed }) {
   const all = [...main.querySelectorAll('[data-module]')], ids = [...new Set(all.map((e) => e.dataset.module))];
   if (!ids.length) return;
   // the room a board keeps over itself for its modules (data-module-room), given back when none of them is shown
@@ -32,5 +32,5 @@ export function mountEmuModules({ main, stat, changed }) {
         changed();
       } }), LABELS[id] || id);
   };
-  stat.before(h('span', { class: 'sep' }), 'Show:', ...ids.map(box));
+  menu.append(h('div', { class: 'emu-menu-row emu-menu-show' }, 'Show:', ...ids.map(box)));
 }

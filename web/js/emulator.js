@@ -41,12 +41,18 @@ function injectStyle() {
   if (styled) return;
   styled = true;
   document.head.append(h('style', {}, `
-.emu { display: flex; flex-direction: column; height: 100%; background: var(--bg, #f0f0f0); font: 12px var(--font, system-ui); overflow: auto; }
-.emu-bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border, #aaa); background: var(--panel-alt, #f7f7f7); flex-wrap: wrap; }
+.emu { display: flex; flex-direction: column; height: 100%; background: var(--bg, #f0f0f0); font: 12px var(--font, system-ui); overflow: auto; container-type: inline-size; }
+.emu-bar { flex: none; position: relative; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 6px 44px 6px 8px; border-bottom: 1px solid var(--border, #aaa); background: var(--panel-alt, #f7f7f7); flex-wrap: wrap; }
+/* its menu (#2666): the three dots at the right of its first line (toolbar-menu.js), the rows of fields */
+.emu-bar .tb-more-menu { padding: 6px; gap: 6px; }
+.emu-menu-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.emu-menu-show { flex-wrap: wrap; max-width: 300px; white-space: normal; }
 .emu-bar .sep { width: 1px; height: 20px; background: var(--frame); margin: 0 4px; }
 .emu-bar .stat { margin-left: auto; color: var(--grey-3); font-family: var(--mono, monospace); font-variant-numeric: tabular-nums;
   flex: 1 1 0; min-width: min(100%, 84ch); text-align: right; }   /* (the whole line, t = … ns · … cycles · … kHz (…% of real time): a row of its own when the controls leave it no room, two lines on a window too narrow for one, never cut, #918) */
-.emu-main { display: flex; gap: 12px; padding: 12px; flex-wrap: wrap; align-items: flex-start; }
+/* the board and its modules (main), the side panel at their right, as the diagram editors' Properties (#2666) */
+.emu-body { flex: 1; display: flex; min-height: 0; }
+.emu-main { flex: 1; min-width: 0; overflow: auto; scroll-padding: 12px; display: flex; gap: 12px; padding: 12px; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; }   /* (a part scrolled to: clear of the edge and its scrollbar) */
 .emu-board { background: linear-gradient(#25603d, #1d4f32); border-radius: 10px; padding: 14px 18px 12px; color: #e9f3ea; box-shadow: 0 2px 8px #0005; min-width: 520px; }
 .emu-board h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: .04em; color: #fff; font-weight: 600; }
 .emu-row { display: flex; gap: 10px; align-items: flex-end; margin: 10px 0; flex-wrap: wrap; }
@@ -62,7 +68,29 @@ function injectStyle() {
 .emu-btn.on { background: radial-gradient(#d33, #600); border-color: #fcc; }
 .emu-cell.nc .emu-sw, .emu-cell.nc .emu-btn { opacity: .45; }
 .emu-disp { background: #111; border-radius: 6px; padding: 8px 10px; display: flex; gap: 6px; }
-.emu-side { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 10px; }
+.emu-side { width: 280px; flex: none; overflow-y: auto; background: var(--panel, #fff); border-left: 1px solid var(--border, #aaa); }
+.emu-side .asm-cap { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; height: 20px; padding: 2px 6px;
+  background: var(--title-grad, linear-gradient(#e9eff8, #c9d7ed)); color: var(--title-fg, #15428b); font-weight: bold; border-bottom: 1px solid #99bbe8; white-space: nowrap; }
+.emu-side .asm-cap .sp { flex: 1; }
+.emu-side .asm-fold { border: 0; background: none; padding: 0 2px; margin-right: -2px; color: inherit; display: inline-flex; align-items: center; cursor: pointer; opacity: .75; }
+.emu-side .asm-fold:hover { opacity: 1; }
+.emu-side .emu-box { border: 0; border-bottom: 1px solid var(--frame-lighter, #ddd); border-radius: 0; background: none; }
+.emu-side > .emu-hint { padding: 6px 8px; }
+@container (min-width: 900px) {
+  .emu.props-folded .emu-side { width: 24px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+  .emu.props-folded .emu-side > :not(.asm-cap) { display: none; }
+  .emu.props-folded .emu-side .asm-cap { flex: 1; height: auto; writing-mode: vertical-rl; flex-direction: row-reverse; justify-content: flex-end; padding: 6px 0; gap: 8px; border-bottom: 0; }
+  .emu.props-folded .emu-side .asm-cap .sp { display: none; }
+  .emu.props-folded .emu-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
+}
+/* the emulator narrow (a tablet, the Tasks interface's panel beside it): the side panel below the board, the whole
+   emulator scrolling down */
+@container (max-width: 899px) {
+  .emu-body { flex: none; flex-direction: column; }
+  .emu-main { overflow: visible; }
+  .emu-side { width: auto; overflow: visible; border-left: 0; border-top: 1px solid var(--border, #aaa); }
+  .emu-side .asm-fold { display: none; }
+}
 .emu-box { background: var(--panel, #fff); border: 1px solid var(--border, #aaa); border-radius: 4px; padding: 8px; }
 .emu-box h4 { margin: 0 0 6px; font-size: 12px; }
 .emu-box table { border-collapse: collapse; width: 100%; font-family: var(--mono, monospace); table-layout: fixed; font-variant-numeric: tabular-nums; }
@@ -245,7 +273,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   let lcdDirty = true;
 
   // ------------------------------------------------------------------------------- DOM (emulator-toolbar.js)
-  const { main, resetBtn, root, runBtn, stat, stepBtn } = mountEmuToolbar({
+  const { main, menu, resetBtn, root, runBtn, stat, stepBtn } = mountEmuToolbar({
     container, engine, model, timing, title, compiled: () => compiled, engineNote: () => engineNote,
     powerCycle: (...a) => powerCycle(...a), running: () => running, setRunning: (...a) => setRunning(...a),
     speed: () => speed, step: (...a) => step(...a), visibility: (...a) => visibility(...a),
@@ -281,15 +309,15 @@ export function mountEmulator(container, { design, board, assignments, title = '
   // finds it in the sync pulses (core/vga.js), in the board's time; with the compiled engine only
   let vgaView = null;
   // (the VGA monitor, the side panel: emulator-side.js)
-  const { logEl, watched } = mountEmuSide({
+  const { logEl, side, watched } = mountEmuSide({
     board, design, engine, timing, title, after: (...a) => after(...a), clockSigs, compiled: () => compiled,
-    engineNote: () => engineNote, main, powered: () => powered, refresh: (...a) => refresh(...a),
+    engineNote: () => engineNote, main, powered: () => powered, refresh: (...a) => refresh(...a), root,
     running: () => running, sim, vgaView: () => vgaView, vgaWired, wiring, setVgaView: (v) => { vgaView = v; }
   });
   // (the modules outside the board shown or hidden, #2522: emulator-modules.js; shown when paused, the picture of now)
-  // the serial terminal (#2536: emulator-serial.js), before the side panel
+  // the serial terminal (#2536: emulator-serial.js), after the VGA monitor
   const serialView = mountEmuSerial({ compiled: () => compiled, main, sim, wiring });
-  mountEmuModules({ main, stat, changed: () => { if (compiled && !running) after(advance(0)); } });
+  mountEmuModules({ main, menu, changed: () => { if (compiled && !running) after(advance(0)); } });
 
   // ------------------------------------------------------------------------------- simulation
   // (mask: the bits that changed, to the compiled engine: the rotary knob's may be the worker's to set)
@@ -490,6 +518,6 @@ export function mountEmulator(container, { design, board, assignments, title = '
     get outputs() { return prev; },
     get paints() { return paints; },
     get held() { return held; },
-    printView: () => emuPrintView({ main, stat }),   // (#1512)
+    printView: () => emuPrintView({ main, side, stat }),   // (#1512)
   };
 }

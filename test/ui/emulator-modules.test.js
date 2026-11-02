@@ -88,8 +88,8 @@ const mountAlone = (page) => page.eval(async (b) => {
   const [{ mountBoardParts }, { mountEmuModules }, { h }] = await Promise.all([import('/js/emulator-board.js'), import('/js/emulator-modules.js'), import('/js/dom.js')]);
   document.querySelector('#alone')?.remove();
   const main = h('div', { id: 'alone', style: { position: 'fixed', left: '0', top: '0', zIndex: '1000', background: '#fff' } });
-  const stat = h('span', {});
-  main.append(h('div', { id: 'alone-bar' }, stat));
+  const menu = h('div', {});
+  main.append(h('div', { id: 'alone-bar' }, menu));
   document.body.append(main);
   mountBoardParts({
     board: b, title: '', after() {}, bitFor: () => undefined, compiled: () => false, hasLcd: false, inVal: new Map(), knobEnd: () => 0,
@@ -98,7 +98,7 @@ const mountAlone = (page) => page.eval(async (b) => {
     sim: {}, tip: (res, k = 0) => `${res}${k}`, wiring: { bits: [], clocks: [] }, setKnobEnd() {}, setLcdView() {},
   });
   window.__changed = 0;
-  mountEmuModules({ main, stat, changed: () => { window.__changed++; } });
+  mountEmuModules({ main, menu, changed: () => { window.__changed++; } });
 }, ICE);
 
 uiTest('#2522 the iCEBreaker\'s modules: each hidden alone with its wires and parts, none shown gives the room back and the board stays usable; remembered when mounted again', E, async (page) => {
