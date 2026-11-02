@@ -17,8 +17,6 @@ let on = false;                   // (the 3D box ticked: every table's map of 5 
 
 /** A cell's value as the map shows it: SOP groups the 1s, its 0s left blank; POS the 0s, its 1s blank (X always, #1494). */
 export const cellText = (v, groups) => (v === (groups === 'pos' ? '1' : '0') ? '' : v);
-/** Whether the maps are shown in 3D. */
-export const k3dOn = () => on;
 /** The 3D box of the K-map's options (`changed`: the map drawn again). */
 export function k3dBox(changed) {
   const c = h('input', { type: 'checkbox', class: 'tt-k3d-on', checked: on, onchange: () => { on = c.checked; changed(); } });

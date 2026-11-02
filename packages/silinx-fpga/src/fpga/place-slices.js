@@ -19,7 +19,7 @@ export function mountSlices(ctx) {
   const gridM = new Uint8Array(GN);
   for (const s of sliceList) { gridSite[s.x * GH + s.y] = s; gridM[s.x * GH + s.y] = s.type === 'SLICEM' ? 1 : 0; }
   const gidx = (x, y) => (x < 0 || y < 0 || x > maxX || y > maxY ? -1 : x * GH + y);
-  // allowedAt on the grid: a table of the slices an instance may take (null: any), one per clock
+  // where an instance may go, on the grid: a table of the slices an instance may take (null: any), one per clock
   // reach and SLICEM need (the slices the clock reaches, the SLICEM sites)
   const allowedTables = new Map();
   const allowedG = allowedOf.map((r, i) => {

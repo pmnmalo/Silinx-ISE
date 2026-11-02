@@ -5,10 +5,6 @@ import { prefKey } from './prefs.js';
 
 export { h, esc };
 
-// Undo / Redo of an editor's own toolbar as the main toolbar's (its icon, tip and look, #220): ico 'undo' | 'redo'
-export const undoButton = (ico, onclick, attrs = {}) =>
-  h('button', { type: 'button', class: 'tb-btn', title: ico === 'undo' ? 'Undo' : 'Redo', html: icons[ico], onclick, ...attrs });
-
 // A drawing editor's model with its HDL file linked (generatedFile; none: unlinked), in place: the
 // link alone changes (#245), the editor's history, selection and view are kept
 export function linkModel(m, file) {

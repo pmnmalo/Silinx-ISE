@@ -2,7 +2,7 @@
 
 `<part>.json.gz`: the routing graph of a device (its tiles, sites, wires and routing switches) in
 Silinx's own packed format (`packages/silinx-fpga/src/fpga/device.js`, `packDevice`), used by the Silinx toolchain's
-placer, router and bitstream writer (`core/fpga/`).
+placer, router and bitstream writer (`packages/silinx-fpga/src/fpga/`).
 
 | File | Device | Board |
 |---|---|---|
@@ -14,7 +14,7 @@ placer, router and bitstream writer (`core/fpga/`).
 | `xc6slx45csg324-3.json.gz` | XC6SLX45, CSG324 package (any speed grade) | Digilent Atlys (the same) |
 
 The Silinx toolchain writes bitstreams for the devices that also have a bit database
-(packages/silinx-fpga/bitdb): the four Spartan-3E ones, for these packages. The Spartan-6 ones have none yet
+(packages/silinx-fpga/bitdb): the four Spartan-3E ones and the Spartan-6 ones, for these packages
 (research/s6/README.md).
 
 Each file was computed by Silinx from the output of ISE 14.7's documented
