@@ -34,7 +34,8 @@ test('nextpnrNetlist: each port bit\'s pad (UCF) on its I/O buffer; no problem f
 });
 
 // #2232: a one-bit bus port (b : std_logic_vector(0 downto 0), Yosys's single_bit_vector) takes the LOC written b<0>, as
-// XST names it (#2199); a scalar's a<0> is not its name (ngdbuild does not find it, #84, #2229): no pad
+// XST names it (#2199); a scalar's a<0> is not its name (ngdbuild does not find it, #84, #2229): no LOC (nextpnr
+// chooses its pad, #2625)
 test('nextpnrNetlist: a one-bit bus port\'s pad written x<0>, not a scalar port\'s (#2232)', () => {
   const io = (type, I, O) => ({ type, port_directions: { I: 'input', O: 'output' }, connections: { I: [I], O: [O] } });
   const one = { single_bit_vector: '00000000000000000000000000000001' };
@@ -44,7 +45,7 @@ test('nextpnrNetlist: a one-bit bus port\'s pad written x<0>, not a scalar port\
       l: { type: 'LUT2', parameters: { INIT: '0110' }, port_directions: { I0: 'input', I1: 'input', O: 'output' }, connections: { I0: [5], I1: [6], O: [7] } } },
     netnames: { a: { bits: [2], attributes: {} }, b: { bits: [3], attributes: one }, y: { bits: [4], attributes: {} } } } } });
   const { json: out, problems } = nextpnrNetlist(json, 't', 'NET "a<0>" LOC = "G12";\nNET "B<0>" LOC = "P11" | IOSTANDARD = LVCMOS33;\nNET "y" LOC = "M5";');
-  assert.deepEqual(problems, ['port a: no LOC in the constraints (the nextpnr engine places only the ports given a pad)']);
+  assert.deepEqual(problems, []);
   const c = cellsOf(out);
   assert.deepEqual([c.ia.attributes?.LOC, c.ib.attributes.LOC, c.ib.attributes.IOSTANDARD, c.oy.attributes.LOC], [undefined, 'P11', 'LVCMOS33', 'M5']);
 });
@@ -65,10 +66,14 @@ test('nextpnrNetlist: an input read by a bus port\'s later bit keeps its pad (#2
   assert.deepEqual([mod.cells.i0.attributes.LOC, mod.cells.i1.attributes.LOC], ['P11', 'L3']);
 });
 
-test('nextpnrNetlist: what the micro-architecture cannot implement yet is named', () => {
+test('nextpnrNetlist: what the micro-architecture cannot implement yet is named; a port with no LOC is not, nextpnr chooses its pad (#2625)', () => {
   const ucfNoLed1 = ucf().split('\n').filter(l => !/led<1>/.test(l)).join('\n');
-  assert.deepEqual(nextpnrNetlist(gates(), 'gates', ucfNoLed1).problems,
-    ['port led<1>: no LOC in the constraints (the nextpnr engine places only the ports given a pad)']);
+  const noLed1 = nextpnrNetlist(gates(), 'gates', ucfNoLed1);
+  assert.deepEqual(noLed1.problems, []);
+  // (its buffer the only one with no LOC)
+  const led1 = Object.values(cellsOf(noLed1.json)).find(c => c.type === 'OBUF' && !c.attributes?.LOC);
+  assert.ok(led1, 'the OBUF of led<1>');
+  assert.equal(Object.values(cellsOf(noLed1.json)).filter(c => /^(IBUF|OBUF)$/.test(c.type) && !c.attributes?.LOC).length, 1);
   // a cell it does not have; constants, carry chains and wide multiplexers are the micro-architecture's own (#2135)
   const json = JSON.parse(gates());
   const cells = cellsOf(json);
@@ -563,7 +568,7 @@ test('#2194 a DCM_SP (Silinx\'s synthesis) built with --engine nextpnr: no warni
   assert.deepEqual(design.insts.filter(i => i.type === 'BUFGMUX').map(i => i.site).sort(), ['BUFGMUX_X1Y10', 'BUFGMUX_X1Y11', 'BUFGMUX_X2Y10', 'BUFGMUX_X2Y11']);
 });
 
-test('#2136 --engine auto: nextpnr when it can implement the design; else the Silinx engine, which Map says (no warning)', { timeout: 300000 }, async () => {
+test('#2136 --engine auto: nextpnr when it can implement the design, a port with no LOC too (#2625): no warnings', { timeout: 300000 }, async () => {
   const build = async ucfText => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
     fs.writeFileSync(path.join(dir, 'gates.ucf'), ucfText);
@@ -573,15 +578,19 @@ test('#2136 --engine auto: nextpnr when it can implement the design; else the Si
     assert.equal(code, 0, err.join('\n'));
     assert.deepEqual(err, []);   // no warnings
     assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+    out.xdl = fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8');
     return out;
   };
   // the gates example with its pads: nextpnr
   const n = await build(ucf());
   assert.ok(n.includes('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).'), n.join('\n'));
-  // a port without a pad: the Silinx engine, said once, its placer choosing the pin
+  // a port without a pad: nextpnr too, on a free bonded pad it chooses (not one the UCF gives another port)
   const s = await build(ucf().split('\n').filter(l => !/led<1>/.test(l)).join('\n'));
-  assert.deepEqual(s.filter(l => /^Map: /.test(l)), ['Map: the nextpnr engine cannot implement this design yet (port led<1>: no LOC in the constraints (the nextpnr engine places only the ports given a pad)): the Silinx engine places and routes it.']);
-  assert.ok(!s.some(l => /nextpnr packs|Placed and routed by nextpnr/.test(l)), s.join('\n'));
+  assert.ok(s.includes('Map: nextpnr packs the design itself, at Place & Route (the nextpnr engine).'), s.join('\n'));
+  const pad = /^inst "led<1>" "IOB",placed \w+ (\w+)/m.exec(s.xdl)?.[1];
+  const given = [...ucf().matchAll(/LOC = "(\w+)"/g)].map(m => m[1]);
+  assert.ok(pad && !given.includes(pad), pad);
+  assert.equal(loadDeviceCache(findDeviceGraph('xc3s250ecp132-4')).site(pad)?.bonded, 1, pad);
 });
 
 // #2136: the engine 'auto' (the default) with nextpnr not starting (offline: its chip database not downloaded yet, #2329):

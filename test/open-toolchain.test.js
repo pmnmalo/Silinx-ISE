@@ -276,7 +276,8 @@ test('open mode: a VHDL top with capital letters (its netlist is named in lower 
   await app.call('PUT', '/projects/VhdlCaps/file?path=src/Blink_Top.vhd', [
     'library ieee;', 'use ieee.std_logic_1164.all;', 'entity Blink_Top is', '  port (CLK : in std_logic; D : in std_logic; Q : out std_logic);', 'end Blink_Top;',
     'architecture rtl of Blink_Top is', 'begin', '  process (CLK) begin if rising_edge(CLK) then Q <= not D; end if; end process;', 'end rtl;', ''].join('\n'));
-  await P.updateProject('VhdlCaps', pj => { pj.top = 'Blink_Top'; });
+  // (the Silinx engine, whose Map packs the slices: a design with no pins goes to nextpnr too since #2625)
+  await P.updateProject('VhdlCaps', pj => { pj.top = 'Blink_Top'; pj.impl = { ...pj.impl, engine: 'silinx' }; });
   const j = await waitJob(jobs, await implement('VhdlCaps', { steps: ['synth', 'translate', 'map'] }), { timeoutMs: 280000 });
   assert.equal(j.status, 'ok', j.lines.join('\n'));
   assert.ok(j.lines.some(l => /^Netlist: build\/open\/blink_top\.json/.test(l)), j.lines.join('\n'));
@@ -309,7 +310,8 @@ test('open mode: Place & Route replicates a flip-flop of many loads on the criti
   await app.call('POST', '/projects', { name: 'Fan64', device: DEV('xc3s250e', 'cp132') });
   // (Optimization Speed: a new project's Area replicates no register, #2470)
   const pj = (await app.call('GET', '/projects/Fan64')).body;
-  await app.call('PUT', '/projects/Fan64', { ...pj, impl: { ...pj.impl, optMode: 'Speed', optLevel: 2 } });
+  // (the Silinx engine's replication: a design with no pins goes to nextpnr too since #2625)
+  await app.call('PUT', '/projects/Fan64', { ...pj, impl: { ...pj.impl, optMode: 'Speed', optLevel: 2, engine: 'silinx' } });
   // s selects 64 registers spread over the chip: its net is the slowest of the critical path
   await app.call('PUT', '/projects/Fan64/file?path=src/fan.v', ['module fan(input clk, input sel, input din, output reg y);', '  reg s;', '  reg [63:0] a, q;', '  reg [15:0] r1;', '  reg [3:0] r2;', '  integer i;',
     '  always @(posedge clk) begin', '    s <= sel;', '    a <= {a[62:0], din};', '    for (i = 0; i < 64; i = i + 1) q[i] <= s ? a[i] : a[63 - i];', '    for (i = 0; i < 16; i = i + 1) r1[i] <= ^q[4*i +: 4];',
