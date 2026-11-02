@@ -41,7 +41,7 @@ test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v
   assert.match(unit, /^        os: \[ubuntu-latest, macos-latest, windows-latest\]\n        shard: \[1, 2, 3\]$/m);
   assert.match(unit, /node scripts\/test-shard\.mjs "\$SHARD\/3"\n\s+--test-reporter=tap --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-file-times\.mjs --test-reporter-destination=stdout\n\s+--test-reporter=\.\/scripts\/test-times-reporter\.mjs --test-reporter-destination=test-times\.json\n\s+shell: bash/);
   assert.match(unit, /- if: always\(\) && matrix\.os == 'ubuntu-latest'\n\s+uses: actions\/upload-artifact@.+\n\s+with:\n\s+name: unit-times-\$\{\{ matrix\.shard \}\}\n\s+path: test-times\.json\n/);
-  assert.match(unit, /^    timeout-minutes: 60$/m, 'a Windows part takes up to 45 minutes and more (#1582)');
+  assert.match(unit, /^    timeout-minutes: 90$/m, 'a Windows part takes up to 45 minutes and more (#1582), macOS and Windows over 60 (#2665)');
   assert.doesNotMatch(unit, /--test-shard=/, "node's own shards split by order, not time");
   for (const t of ['docs', 'changelog', 'quality-page']) assert.ok(fs.existsSync(path.join(ROOT, `test/${t}.test.js`)), t);
   // the UI tests in both interfaces, each in three parts of about the same time, one file at a time (#912;
