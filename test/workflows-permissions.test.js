@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { workflowFiles } from './workflows-lib.mjs';
+import { workflowFiles, jobsOf, jobPermissions } from './workflows-lib.mjs';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.github', 'workflows');
 const read = f => fs.readFileSync(path.join(DIR, f), 'utf8');
@@ -115,4 +115,37 @@ test('pages.yml: the deployment\'s token on the deploy job only; the build job, 
 test('dependabot waits a week before proposing an npm version (#1436)', () => {
   const yml = fs.readFileSync(path.join(DIR, '..', 'dependabot.yml'), 'utf8');
   assert.match(yml, /\n  - package-ecosystem: npm\n(?:    .*\n)*?    cooldown:\n      default-days: 7\n/);
+});
+
+test('a job whose token writes installs no dependency (#2644): the build reads, a job of its own publishes its artifact', () => {
+  const writing = [];
+  for (const f of FILES) {
+    const yml = read(f);
+    for (const [name, job] of Object.entries(jobsOf(yml))) {
+      const perms = jobPermissions(yml, job);
+      const writes = Object.keys(perms).filter(p => perms[p] === 'write');
+      if (!writes.length || /^ {4}uses: \.\/\.github\/workflows\//m.test(job)) continue;
+      writing.push(`${f}:${name}`);
+      const code = job.replace(/#.*$/gm, '');
+      // the setup action (npm ci), npm installing or running the project's packages, npx
+      assert.doesNotMatch(code, /uses: \.\/\.github\/actions\/setup|\bnpm (ci|install(?! --global npm@\d+\.\d+\.\d+ --ignore-scripts)|run|test|exec)\b|\bnpx\b/, `${f}:${name} (${writes}): installs or runs dependencies`);
+    }
+  }
+  // the publishing jobs among them (a sanity check of the parsing)
+  for (const j of ['dev-release.yml:publish', 'release.yml:publish', 'silinx-fpga-release.yml:publish', 'pages.yml:deploy', 'quality.yml:publish'])
+    assert.ok(writing.includes(j), j);
+  for (const j of ['dev-release.yml:build', 'release.yml:build', 'silinx-fpga-release.yml:build', 'pages.yml:build'])
+    assert.ok(!writing.includes(j), j);
+});
+
+test('every Dockerfile\'s base is pinned by its digest; Dependabot updates the Vitis image\'s (#1435, #2645)', () => {
+  const ROOT = path.join(DIR, '..', '..');
+  const files = ['docker/ise/Dockerfile', 'scripts/vitis-hls-image/Dockerfile'];
+  for (const f of files) {
+    const from = fs.readFileSync(path.join(ROOT, f), 'utf8').match(/^FROM .*$/gm);
+    assert.ok(from.length, f);
+    for (const l of from) if (!/^FROM \w+( AS \w+)?$/.test(l)) assert.match(l, /^FROM (--platform=\S+ )?[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}( AS \w+)?$/, `${f}: ${l}`);
+  }
+  const dependabot = fs.readFileSync(path.join(DIR, '..', 'dependabot.yml'), 'utf8');
+  assert.match(dependabot, /\n  - package-ecosystem: docker\n    directory: \/scripts\/vitis-hls-image\n/);
 });

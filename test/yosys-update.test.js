@@ -213,6 +213,12 @@ test('yosys update: the steps with a writing token run the base\'s code, and the
     assert.match(`\n${j[job].join('\n')}\n`, baseCheckout, job);
     assert.ok(!j[job].some(l => /run: .*\bnode scripts\//.test(l) && /GITHUB_TOKEN|GH_TOKEN/.test(l)), job);
   }
+  // nothing of the pull request runs in them (#2644): only the base's scripts (check reads the pull request's
+  // package files as data); the report job does not check the pull request out at all
+  for (const job of ['check', 'report'])
+    assert.ok(!j[job].some(l => /(?<!base\/)\bscripts\//.test(l.replace(/#.*$/, ''))), `${job}: the base's scripts only`);
+  assert.equal(j.report.filter(l => /uses: actions\/checkout@/.test(l)).length, 1, 'report: the base\'s checkout only');
+  assert.ok(j.report.some(l => /^ {10}node base\/scripts\/yosys-update-report\.mjs report --base /.test(l)), 'the table by the base\'s script');
   // the versions by the base's script, the comment by the base's script with the token
   assert.ok(j.check.some(l => l === '        run: node base/scripts/yosys-update-report.mjs versions base/package.json base/package-lock.json package.json package-lock.json'));
   const comment = j.report.indexOf('        run: node base/scripts/yosys-update-report.mjs comment yosys-update.md');

@@ -7,18 +7,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { jobsOf, stepsOf, jobPermissions } from './workflows-lib.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const yml = read('.github/workflows/silinx-fpga-release.yml');
-const steps = yml.slice(yml.indexOf('\n    steps:\n')).split(/\n(?= {6}- )/).slice(1);
-const step = (re) => { const i = steps.findIndex(s => re.test(s)); assert.ok(i >= 0, String(re)); return [i, steps[i]]; };
+const jobs = jobsOf(yml);
+const stepIn = (job) => {
+  const steps = stepsOf(jobs[job]);
+  return (re) => { const i = steps.findIndex(s => re.test(s)); assert.ok(i >= 0, `${job}: ${re}`); return [i, steps[i], steps.length]; };
+};
 
 test('#1681 silinx-fpga release: on its own tag only, with the permissions of the provenance and no more', () => {
   assert.match(yml, /\non:\n {2}push:\n {4}tags: \['silinx-fpga-v\*'\]\npermissions:\n/);
   const perms = /\npermissions:\n((?: {2}.*\n)+)/.exec(yml)[1].replace(/ *#.*$/gm, '').trim().split('\n').map(l => l.trim());
-  assert.deepEqual(perms, ['actions: read', 'contents: read', 'id-token: write']);
-  assert.equal(yml.match(/permissions:/g).length, 1);
+  assert.deepEqual(perms, ['actions: read', 'contents: read']);
+  // two jobs (#2644): the build reads; the OIDC token is the publish job's only
+  assert.deepEqual(Object.keys(jobs), ['build', 'publish']);
+  assert.deepEqual(jobPermissions(yml, jobs.build), { actions: 'read', contents: 'read' });
+  assert.deepEqual(jobPermissions(yml, jobs.publish), { 'id-token': 'write' });
   // the IDE's tags are not its, nor its the IDE's (release.yml, pages.yml: v followed by a digit)
   assert.match(read('.github/workflows/release.yml'), /\n {4}tags: \['v\*'\]\n/);
   assert.ok(!/^v/.test('silinx-fpga-v0.1.0'));
@@ -26,7 +33,8 @@ test('#1681 silinx-fpga release: on its own tag only, with the permissions of th
   assert.match(read('.github/workflows/ci.yml'), /\n {4}tags: \['v\*', 'silinx-fpga-v\*'\]\n/);
 });
 
-test('#1681 silinx-fpga release: the commit on main, its version and changelog, CI passed, then published', () => {
+test('#1681 silinx-fpga release: the commit on main, its version and changelog, CI passed, packed; then published from the tarball', () => {
+  const step = stepIn('build');
   const [checkout, checkoutStep] = step(/uses: actions\/checkout@/);
   assert.match(checkoutStep, /fetch-depth: 0\n {10}persist-credentials: false/);
   const [main] = step(/run: git merge-base --is-ancestor "\$GITHUB_SHA" origin\/main/);
@@ -37,14 +45,24 @@ test('#1681 silinx-fpga release: the commit on main, its version and changelog, 
   assert.match(versionStep, /node scripts\/sync-version\.mjs --package silinx-fpga\n/);
   const [ci, ciStep] = step(/name: CI passed\n/);
   assert.match(ciStep, /run: node scripts\/wait-for-ci\.mjs "\$GITHUB_SHA" --timeout (\d+) --appear \d+\n\s+env:\n\s+GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
-  const wait = +/--timeout (\d+)/.exec(ciStep)[1], job = +/\n {4}timeout-minutes: (\d+)\n/.exec(yml)[1];
+  const wait = +/--timeout (\d+)/.exec(ciStep)[1], job = +/\n {4}timeout-minutes: (\d+)\n/.exec(jobs.build)[1];
   assert.ok(job >= wait + 10, `${job} >= ${wait} + 10`);
-  const [publish, publishStep] = step(/name: Publish\n/);
-  assert.deepEqual([checkout, main, setup, version, ci, publish], [0, 1, 2, 3, 4, 5]);
-  assert.equal(publish, steps.length - 1);
-  assert.match(publishStep, /npm publish -w silinx-fpga --provenance --access public --ignore-scripts\n/);
+  const [pack, packStep] = step(/name: Pack\n/);
+  assert.match(packStep, /npm pack -w silinx-fpga --ignore-scripts --pack-destination out/);
+  const [upload, uploadStep, n] = step(/uses: actions\/upload-artifact@[0-9a-f]{40} /);
+  assert.match(uploadStep, /name: silinx-fpga\n {10}path: out(\n|$)/);
+  assert.deepEqual([checkout, main, setup, version, ci, pack, upload], [0, 1, 2, 3, 4, 5, 6]);
+  assert.equal(upload, n - 1);
+  // the publish job: no checkout, no dependency installed, nothing of the repository run: npm on the tarball
+  const pub = stepIn('publish');
+  assert.match(jobs.publish, /^ {4}needs: build$/m);
+  assert.doesNotMatch(jobs.publish, /actions\/checkout|\.\/\.github\/actions|npm ci|scripts\//);
+  const [, download] = pub(/uses: actions\/download-artifact@[0-9a-f]{40} /);
+  assert.match(download, /name: silinx-fpga\n {10}path: out(\n|$)/);
+  const [publish, publishStep, m] = pub(/name: Publish\n/);
+  assert.equal(publish, m - 1);
+  assert.match(publishStep, /npm publish out\/silinx-fpga-\*\.tgz --provenance --access public --ignore-scripts\n/);
   // npm's trusted publishing (#2428): GitHub's OIDC token, no secret, no npmrc; npm 11.5.1 or later, pinned, before publishing
-  assert.match(yml, /\n {2}id-token: write/);
   assert.doesNotMatch(yml, /secrets\.|NODE_AUTH_TOKEN|_authToken|npmrc/i);
   const npm = /run: \|\n\s+npm install --global npm@(\d+)\.(\d+)\.(\d+) --ignore-scripts --no-audit --no-fund\n\s+npm publish /.exec(publishStep);
   assert.ok(npm, 'npm installed, pinned, then the publish');

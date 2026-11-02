@@ -5,6 +5,9 @@
 #     base's), and which is never merged on green alone (CLAUDE.md, Integration)
 #   - GitHub Actions: every action of the workflows and of the setup action in one pull request; the actions are
 #     pinned by commit, their version in a comment (#414), which Dependabot updates with the commit
+#   - Docker: the Vitis HLS image's base (scripts/vitis-hls-image/Dockerfile), pinned by its digest (#2645), which
+#     Dependabot updates with the digest within Ubuntu 22.04 (the release Vivado supports); the ISE image's
+#     Ubuntu 14.04 (docker/ise/) has no new digest to come (end of life), and is left out
 # @silinx/nextpnr-himbaechel-spartan3e (nextpnr, #2136) is pinned by its version on npm (#2307), which Dependabot updates;
 # -spartan6 (#2138) is still pinned by its release's URL (pmnmalo/nextpnr-spartan), which Dependabot does not update:
 # a new release of it is pinned by hand (its group entry only keeps every dependency named).
@@ -44,3 +47,14 @@ updates:
     groups:
       github-actions:
         patterns: ['*']
+  - package-ecosystem: docker
+    directory: /scripts/vitis-hls-image
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
+    labels: [dependencies]
+    ignore:
+      # Ubuntu 22.04 stays (Vivado ML 2025's): only its digest is updated
+      - dependency-name: ubuntu
+        update-types: [version-update:semver-major, version-update:semver-minor]

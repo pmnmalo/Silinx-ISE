@@ -155,10 +155,8 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # the base's code for the step that holds the token (the comment, #1440)
+      # the base's code for every step of this job, whose token writes (#1440): the pull request's code
+      # run here could change the files the comment's step runs (#2644)
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -177,7 +175,7 @@ jobs:
         run: |
           mkdir -p results/corpus
           cp results/yosys-corpus-*/shard-*.json results/corpus/ 2>/dev/null || true
-          node scripts/yosys-update-report.mjs report --base results/yosys-base --head results/yosys-head --corpus results/corpus \
+          node base/scripts/yosys-update-report.mjs report --base results/yosys-base --head results/yosys-head --corpus results/corpus \
             --base-version "$BASE_VERSION" --head-version "$HEAD_VERSION" --out yosys-update.md
           cat yosys-update.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
