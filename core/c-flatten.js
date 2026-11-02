@@ -18,7 +18,7 @@ function dims(t) {
 const num = (v, loc) => ({ kind: 'num', value: BigInt(v), text: String(v), loc });
 /** sizeof x of a variable declared of type t (an array, a pointer) indexed or dereferenced depth times: sizeof of its
  *  type (a parameter's array a pointer: int a[][8], sizeof a 8 bytes, sizeof a[0] 32), or null as it was (#2641). */
-function sizeofType(t, depth, { param, init } = {}) {
+export function sizeofType(t, depth, { param, init } = {}) {
   let ty = param && t.kind === 'array' && !t.refArray ? { kind: 'ptr', to: t.of } : t;
   if (ty.kind !== 'array' && !(ty.kind === 'ptr' && !ty.ref)) return null;
   for (let k = 0; k < depth; k++) {

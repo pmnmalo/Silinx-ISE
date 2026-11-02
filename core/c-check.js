@@ -20,6 +20,7 @@ import { checkPragmas, tripcountArgs, addDirectives } from './c-pragma.js';
 import { MATH, BITCASTS } from './c-float.js';
 import { Q_MODES, O_MODES } from './c-fixed.js';
 import { foldResetCtors } from './c-const-init.js';
+import { sizeofBytes } from './c-sizeof.js';
 
 // the library calls Silinx HLS refuses in synthesized code (UG1399: no system calls), and the ones it ignores there
 const REFUSED = new Set(['malloc', 'calloc', 'realloc', 'free', 'exit', 'abort', 'rand', 'srand', 'time', 'clock', 'fopen', 'fclose',
@@ -35,21 +36,23 @@ const STREAM_MEMBERS = new Set(['read', 'write', 'empty', 'full', 'read_nb', 'wr
 const AP_MEMBERS = new Set(['range', 'to_double', 'to_float', 'to_int', 'to_uint', 'to_long', 'to_ulong', 'to_int64', 'to_uint64', 'length', 'and_reduce', 'or_reduce', 'xor_reduce']);
 export const MAX_AP_WIDTH = 1024;
 
-/** The value of a constant expression (numbers, the constants known, C's operators), or null if it is not one. */
-export function constValue(e, consts = new Map()) {
+/** The value of a constant expression (numbers, the constants known, C's operators, sizeof if sizeOf is given), or null
+ *  if it is not one. */
+export function constValue(e, consts = new Map(), sizeOf = null) {
   if (!e) return null;
   switch (e.kind) {
     case 'num': case 'chr': return e.value;
     case 'id': return consts.has(e.name) ? consts.get(e.name) : null;
     case 'unary': {
-      const v = constValue(e.e, consts);
+      const v = constValue(e.e, consts, sizeOf);
       if (v === null) return null;
       return e.op === '-' ? -v : e.op === '+' ? v : e.op === '!' ? (v ? 0n : 1n) : e.op === '~' ? ~v : null;
     }
-    case 'cast': return constValue(e.e, consts);
-    case 'cond': { const c = constValue(e.c, consts); return c === null ? null : constValue(c ? e.a : e.b, consts); }
+    case 'sizeof': return sizeOf ? sizeOf(e) : null;   // (sizeOf(e): its bytes, core/c-sizeof.js, #2643)
+    case 'cast': return constValue(e.e, consts, sizeOf);
+    case 'cond': { const c = constValue(e.c, consts, sizeOf); return c === null ? null : constValue(c ? e.a : e.b, consts, sizeOf); }
     case 'binary': {
-      const a = constValue(e.l, consts), b = constValue(e.r, consts);
+      const a = constValue(e.l, consts, sizeOf), b = constValue(e.r, consts, sizeOf);
       if (a === null || b === null) return null;
       switch (e.op) {
         case '+': return a + b; case '-': return a - b; case '*': return a * b;
@@ -82,6 +85,7 @@ export function checkC(source, file = 'input.c', opts = {}) {
   const funcs = new Map();
   const globals = new Map();
   const consts = new Map();   // the global const integers: array sizes and widths may use them
+  const gSize = (e) => sizeofBytes(e, (n) => (globals.has(n) ? { kind: 'global', ...globals.get(n) } : null), (x) => constValue(x, consts, gSize));
   for (const it of ast.items) {
     if (it.kind === 'func') {
       const prev = funcs.get(it.name);
@@ -94,7 +98,7 @@ export function checkC(source, file = 'input.c', opts = {}) {
       if (prev && prev.const && it.const && prev.init && it.init && constValue(prev.init, consts) !== null && constValue(prev.init, consts) === constValue(it.init, consts)) continue;
       if (prev) report(it.loc, `'${it.name}' is declared twice`);
       globals.set(it.name, it);
-      if (it.const && it.type.kind === 'int' && it.init && it.init.kind !== 'init') { const v = constValue(it.init, consts); if (v !== null) consts.set(it.name, v); }
+      if (it.const && it.type.kind === 'int' && it.init && it.init.kind !== 'init') { const v = constValue(it.init, consts, gSize); if (v !== null) consts.set(it.name, v); }
     }
   }
   // the widths of the ap_int / ap_uint types and the sizes of the arrays: constants
@@ -227,7 +231,10 @@ function checkFunction(f, ctx) {
     if (hw && !pa.said) typeHw(pa.type, pa.loc, `the parameter '${pa.name}'`);   // (said: core/c-pointer-args.js)
   }
   if (hw) typeHw(f.ret, f.loc, `the result of '${f.name}'`);
-  const lookup = (name) => { for (let k = scopes.length - 1; k >= 0; k--) if (scopes[k].has(name)) return scopes[k].get(name); return globals.has(name) ? { kind: 'global', type: globals.get(name).type } : null; };
+  const lookup = (name) => { for (let k = scopes.length - 1; k >= 0; k--) if (scopes[k].has(name)) return scopes[k].get(name); return globals.has(name) ? { kind: 'global', type: globals.get(name).type, init: globals.get(name).init } : null; };
+  // (a constant's value, sizeof's too: a loop bounded by sizeof a / sizeof a[0] its count known, #2643)
+  const value = (e) => constValue(e, consts, sizeOf);
+  const sizeOf = (e) => sizeofBytes(e, lookup, value);
   function typeHw(t, loc, what) {
     if (!t) return;
     // (float and double: their operations the soft-float library's, core/c-dataflow-float.js, #1768, #1773)
@@ -241,7 +248,7 @@ function checkFunction(f, ctx) {
   }
   const declare = (v) => {
     if (scopes.at(-1).has(v.name)) report(v.loc, `'${v.name}' is declared twice in the same block`);
-    scopes.at(-1).set(v.name, { kind: v.static ? 'static' : 'local', type: v.type });
+    scopes.at(-1).set(v.name, { kind: v.static ? 'static' : 'local', type: v.type, init: v.init });
     typeOk(v.type, v.loc, !hw);
     if (hw) {
       typeHw(v.type, v.loc, `'${v.name}'`);
@@ -251,7 +258,7 @@ function checkFunction(f, ctx) {
       if (v.type.kind === 'array' && !v.type.length && !v.type.size && !v.init) report(v.loc, `'${v.name}': an array needs its size`);
     }
     if (v.init) expr(v.init);
-    if (v.const && v.type.kind === 'int' && v.init && v.init.kind !== 'init') { const c = constValue(v.init, consts); if (c !== null) consts.set(v.name, c); }
+    if (v.const && v.type.kind === 'int' && v.init && v.init.kind !== 'init') { const c = value(v.init); if (c !== null) consts.set(v.name, c); }
   };
   const isStream = (e) => {
     if (e.kind !== 'id') return false;
@@ -381,16 +388,16 @@ function checkFunction(f, ctx) {
   function tripCount(st) {
     let v = null, start = null;
     const init = st.init;
-    if (init?.kind === 'decl' && init.vars.length === 1) { v = init.vars[0].name; start = constValue(init.vars[0].init, consts); }
-    else if (init?.kind === 'expr' && init.e.kind === 'assign' && init.e.op === '=' && init.e.l.kind === 'id') { v = init.e.l.name; start = constValue(init.e.r, consts); }
+    if (init?.kind === 'decl' && init.vars.length === 1) { v = init.vars[0].name; start = value(init.vars[0].init); }
+    else if (init?.kind === 'expr' && init.e.kind === 'assign' && init.e.op === '=' && init.e.l.kind === 'id') { v = init.e.l.name; start = value(init.e.r); }
     if (v === null || start === null || !st.cond || st.cond.kind !== 'binary' || st.cond.l.kind !== 'id' || st.cond.l.name !== v) return null;
-    const end = constValue(st.cond.r, consts);
+    const end = value(st.cond.r);
     if (end === null) return null;
     let step = null;
     const s = st.step;
     if (s && (s.kind === 'postfix' || s.kind === 'unary') && s.e?.kind === 'id' && s.e.name === v) step = s.op === '++' ? 1n : s.op === '--' ? -1n : null;
     else if (s?.kind === 'assign' && s.l.kind === 'id' && s.l.name === v) {
-      const k = constValue(s.r, consts);
+      const k = value(s.r);
       if (k !== null && s.op === '+=') step = k;
       if (k !== null && s.op === '-=') step = -k;
     }
