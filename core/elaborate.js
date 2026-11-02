@@ -234,7 +234,7 @@ BUILTIN_VHDL.def('false', { kind: 'const', val: V.ZERO, t: BOOL });
 for (const [n, sev] of [['note', 0], ['warning', 1], ['error', 2], ['failure', 3]]) BUILTIN_VHDL.def(n, { kind: 'const', val: V.fromInt(sev, 2, false), t: INT });
 const BUILTIN_VLOG = new Scope();
 
-function packageScope(ctx, name, file, loc, diagE) {
+export function packageScope(ctx, name, file, loc, diagE) {
   if (ctx.pkgScopes.has(name)) return ctx.pkgScopes.get(name);
   const pkg = ctx.lib.packages.get(name) || [...ctx.lib.packages.values()].find(p => p.name.toLowerCase() === name.toLowerCase());
   if (!pkg) {
@@ -472,7 +472,7 @@ export function elabType(E, ts, allowUnconstrained = false) {
       return { kind: 'array', left, right, desc, lo, len, elem, w: elem.w };
     }
     case 'named': {
-      const e = E.sc.lookup(ts.name);
+      const e = ts.pkg ? packageScope(E.ctx, ts.pkg, E.file, ts.loc || E.inst?.loc, E)?.lookup(ts.name) : E.sc.lookup(ts.name);
       if (!e || e.kind !== 'type') {
         const std = stdTypeName(ts.name);
         if (std) return elabType(E, { ...std, range: ts.range || null });

@@ -120,8 +120,9 @@ export const sequentialMethods = {
   /** Name used as a statement -> procedure call. std.env.finish -> 'finish'. */
   makeCall(target, tok) {
     const loc = this.loc(tok);
-    if (target.op === 'ref') return { kind: 'call', name: target.name, args: [], loc };
-    if (target.op === 'apply') return { kind: 'call', name: target.name, args: target.args, loc };
+    const pkg = target.pkg;
+    if (target.op === 'ref') return { kind: 'call', name: target.name, ...(pkg ? { pkg } : {}), args: [], loc };
+    if (target.op === 'apply') return { kind: 'call', name: target.name, ...(pkg ? { pkg } : {}), args: target.args, loc };
     this.fail('invalid procedure call', tok);
   },
 
