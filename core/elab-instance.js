@@ -5,6 +5,7 @@ import * as V from './values.js';
 import { bindBlock, bindTrigger, vhdlMech } from './elab-stmt.js';
 import { bindExpr } from './elab-expr.js';
 import { nativePrimitive } from './native.js';
+import { actualProblem } from './vhdl/actual.js';
 import {
   ElabError, FrameBuilder, INT, STR, Scope, bindDecl, bindLvalue, checkAssignable, collectRW, constOf, ctxSize,
   defaultValue, diag, elabType, evalRange, exprText, findModule, fitAny, fitVal, isConstNode, isLvalueExpr, rangeCheck,
@@ -348,6 +349,7 @@ function elabChild(E, it) {
         continue;
       }
       node = bindExpr({ ...E, implicitNets: true }, c.expr, null, it.loc);
+      if (E.lang === 'vhdl') vhdlActual(E, c, it);
       if (pdecl && pdecl.dir !== 'in' && isLvalueExpr(c.expr)) lnode = bindLvalue({ ...E, implicitNets: true }, c.expr, it.loc);
     } catch (e) {
       if (!(e instanceof ElabError)) throw e;
@@ -447,6 +449,15 @@ function elabChild(E, it) {
     }
     E.inst.children.push(child);
   });
+}
+
+// VHDL-93's actual of a port (#2565): an operator on a signal, or a signal's index, is an error (as in XST)
+function vhdlActual(E, c, it) {
+  const reads = (e) => { try { return readsOf(bindExpr(E, e, null, it.loc)).size > 0; } catch { return false; } };
+  const bad = actualProblem(c.expr, reads);
+  if (!bad) return;
+  const what = bad.kind === 'operator' ? 'the result of an operator on a signal' : 'indexed by a signal';
+  diag(E, `port '${c.port}' of '${it.name}': the actual is ${what}, not a static signal name`, it.loc);
 }
 
 // Whether the component `comp` declared in the module being elaborated (VHDL) gives its port `port` a default
