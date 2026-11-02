@@ -17,8 +17,8 @@ patched: update to the latest.
 ## Scope
 
 In scope: the local server and its API (`server/`), the browser editions (`web/`, the single-file
-edition and the Pages site), the open toolchain (`core/`: synthesis, pack, place, route, bitgen,
-the simulators and the board programming), the GitHub workflows (`.github/workflows/`), the scripts
+edition and the Pages site), the open toolchain (`packages/silinx-fpga/`: synthesis, pack, place, route, bitgen),
+the core (`core/`: the simulators and the board programming), the GitHub workflows (`.github/workflows/`), the scripts
 (`scripts/`) and the launchers (`Start Silinx-ISE.command`, `Start Silinx-ISE.bat`,
 `start-silinx-ise.sh`).
 

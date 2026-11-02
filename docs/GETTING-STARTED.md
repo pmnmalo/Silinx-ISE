@@ -38,7 +38,7 @@ That's all. Things to know:
   and **File ▸ Use Browser Storage** goes back to the browser. The status bar shows where the projects
   are kept. Firefox and Safari cannot open a folder: there the projects stay in the browser.
 - **Implement Design** and **Generate Programming File** run the Silinx toolchain in the browser
-  (Basys2 and Nexys2 boards; the first run downloads its tools from the site, about 100 MB, then the
+  (Basys2, Nexys2, Nexys3 and Atlys boards; the first run downloads its tools from the site, about 100 MB, then the
   browser keeps them; the downloaded `Silinx-ISE.html` too): the bitstream (`top.bit`) is downloaded.
 - **Program the board from the browser** (Chrome or Edge, or Chrome on an Android tablet; Firefox
   and Safari cannot reach USB devices; the page opened from the site's address, not from the

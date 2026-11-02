@@ -21,7 +21,7 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
 1. Abra a **[última versão](https://github.com/pmnmalo/Silinx-ISE/releases/latest)**.
 2. Em **Assets**, clique em **`Silinx-ISE.html`** para o descarregar.
 3. Faça duplo clique no ficheiro descarregado. Abre no browser (Chrome, Edge, Firefox ou Safari).
-4. Na página inicial clique em **New Project…** e escolha em *Start from* **Example: gates** (portas lógicas desenhadas num esquemático: um bom primeiro exemplo), **Example: traffic** (uma passadeira para peões: um diagrama de estados e uma tabela de verdade), **Example: blinky** (ou *pong*, um jogo para dois, *stopwatch*, *clock*, *vga*, uma imagem num monitor VGA, ou *isqrt*, uma função em C feita em hardware) ou **Empty project**. Depois dos exemplos vêm os **Test design: …**: projetos com que o próprio Silinx é testado (esquemáticos, diagramas de estados, programas em C para o Silinx HLS), cada um com o seu teste (uma bancada de teste, ou o `main()` do programa em C), para ver o que o Silinx faz com cada tipo de fonte.
+4. Na página inicial clique em **New Project…** e escolha em *Start from* **Example: gates** (portas lógicas desenhadas num esquemático: um bom primeiro exemplo), **Example: traffic** (uma passadeira para peões: um diagrama de estados e uma álgebra booleana), **Example: blinky** (ou *pong*, um jogo para dois, *stopwatch*, *clock*, *vga*, uma imagem num monitor VGA, ou *isqrt*, uma função em C feita em hardware) ou **Empty project**. Depois dos exemplos vêm os **Test design: …**: projetos com que o próprio Silinx é testado (esquemáticos, diagramas de estados, programas em C para o Silinx HLS), cada um com o seu teste (uma bancada de teste, ou o `main()` do programa em C), para ver o que o Silinx faz com cada tipo de fonte.
 
 É tudo. A saber:
 
@@ -38,7 +38,7 @@ https://pmnmalo.github.io/Silinx-ISE/dev/, com os projetos à parte) e passe ao 
   e **File ▸ Use Browser Storage** volta ao browser. A barra de estado mostra onde ficam os
   projetos. O Firefox e o Safari não abrem pastas: aí os projetos ficam no browser.
 - **Implement Design** e **Generate Programming File** correm a cadeia de ferramentas Silinx no
-  browser (placas Basys2 e Nexys2; a primeira vez descarrega as ferramentas do site, cerca de 100 MB,
+  browser (placas Basys2, Nexys2, Nexys3 e Atlys; a primeira vez descarrega as ferramentas do site, cerca de 100 MB,
   que o browser guarda; também no `Silinx-ISE.html` descarregado): o bitstream (`top.bit`) é
   descarregado.
 - **Programar a placa a partir do browser** (Chrome ou Edge, ou o Chrome num tablet Android; o
@@ -132,8 +132,8 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 
 - Página inicial ▸ **New Project…**, *Start from* **Example: gates** para começar (portas AND, OR, NOT e NAND
   num esquemático: um detetor de números primos de 4 bits nos interruptores e em dois LEDs), **Example: traffic**
-  a seguir (uma passadeira para peões: o controlador é um diagrama de estados, as luzes uma tabela de
-  verdade), **Example: blinky** para explorar um projeto completo, ou **Empty project**.
+  a seguir (uma passadeira para peões: o controlador é um diagrama de estados, as luzes uma álgebra
+  booleana), **Example: blinky** para explorar um projeto completo, ou **Empty project**.
 - Os projetos ficam em pastas normais em **`Silinx-projects`**, na sua pasta de utilizador
   (Windows: `C:\Users\<você>\Silinx-projects`, macOS: `/Users/<você>/Silinx-projects`).
   Pode copiá-los, fazer cópias de segurança, ou comprimi-los para entregar.

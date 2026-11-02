@@ -44,7 +44,7 @@ npm start          # http://127.0.0.1:8642
    errors".
 4. **Locally run only the tests related to your change, one process at a time.** Never the full
    suites or parallel stress runs on the developer's Mac: it gets slow, and other tests then time out
-   by mistake. GitHub CI runs the full suites on the PR. For load, use `SILINX_UI_THROTTLE=6` on one
+   by mistake. The full suites run at a release; a pull request runs its related tests. For load, use `SILINX_UI_THROTTLE=6` on one
    process. The design and Yosys test corpora are heavy: locally run them only filtered
    (`--filter a,b`) with `--jobs 1`.
 5. **The changelog: a fragment, never an edit of CHANGELOG.md.** Add one new file,
@@ -68,7 +68,7 @@ Several sessions work on the repository at the same time, each in its own clone 
 | Session | Area |
 |---|---|
 | **Silinx core development** (Pedro) | the app and its UI, editors, board/PROM programming (`core/adept.js`, `core/xcf.js`), CI and workflows, releases |
-| **Codebase bug review** (Pedro) | synthesis, place & route, bitstream: `core/synth-open*.js`, `core/fpga/*`, `research/*`, the design corpus |
+| **Codebase bug review** (Pedro) | synthesis, place & route, bitstream: `packages/silinx-fpga/src/`, `packages/silinx-fpga/research/`, `research/synth-quality`, the design corpus |
 | **Issue sessions** (one per issue, named after it) | one issue each, announced to the others (e.g. CodeMirror 6 #349, the compiled simulator #384, the device descriptions #3) |
 
 - **Before starting, announce** the issue and the files you will touch to the other sessions
@@ -106,7 +106,7 @@ web/js/        the Project Navigator: app.js (the shell, Design pane, processes,
 server/        the local server: projects, the ISE flow, the Silinx flow, programmers
 test/ui/       UI tests on headless Chrome over CDP (harness.js); Firefox / WebKit via Playwright
 examples/      gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt: the test designs
-research/      the open toolchain's research (bit database, route, place, synthesis quality)
+research/      synthesis quality, handwriting models; the toolchain's research is in packages/silinx-fpga/research
 docs/          user guides (EN, PT), the project model and API, QUALITY.md (against ISE)
 ```
 

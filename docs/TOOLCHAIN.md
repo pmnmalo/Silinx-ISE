@@ -56,9 +56,9 @@ Map and Place & Route have two engines, chosen by the project (`impl.engine`, Pr
 
 | Engine | Spartan-3E | Spartan-6 |
 |---|---|---|
-| `silinx`, the default | Silinx's packer, placer and router | The same, its own modules (`fpga/s6/`) |
+| `silinx` | Silinx's packer, placer and router | The same, its own modules (`fpga/s6/`) |
 | `nextpnr` | nextpnr packs, places and routes | Silinx's packer; nextpnr places and routes; local server only (#2288) |
-| `auto` | nextpnr when it can implement the design, else `silinx`, which Map says | `silinx` |
+| `auto`, the default | nextpnr when it can implement the design, else `silinx`, which Map says | `silinx` |
 
 **nextpnr replaces Silinx's packer, placer and router** (decided in #2131): they stay until nextpnr reaches parity (the
 examples on all four Spartan-3E devices, clean in ISE, at least Silinx's size and speed), then #2137 removes them.
@@ -118,7 +118,7 @@ The plan is in #1953 and #2315. For the open toolchains:
 |---|---|---|---|---|---|
 | Spartan-3E | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser and local |
 | Spartan-6 | `synth_xilinx` | Silinx, nextpnr | Silinx | UCF | Works, browser (the Silinx engine, #2103) and local |
-| iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works: local server and browser, nextpnr-ice40 downloaded on first use (#2444); its 12 parts in the interface (#2463), no board yet (#2297) |
+| iCE40 | `synth_ice40` | nextpnr-ice40 | `icepack` | PCF | Works: local server and browser, nextpnr-ice40 downloaded on first use (#2444); its 12 parts in the interface (#2463), the iCEBreaker board (#2517), other boards #2297 |
 | ECP5, MachXO2 | `synth_ecp5`, to be defined | nextpnr | `ecppack`, Project Trellis | LPF | Planned (#2302) |
 | Gowin | `synth_gowin` | nextpnr-himbaechel | `gowin_pack` (Python: the browser's path is to be decided) | CST | Planned (#2303) |
 | Cyclone V | `synth_intel_alm` | nextpnr, not yet stable | Mistral | to be defined | To be measured (#2304) |
@@ -134,7 +134,7 @@ needs (`orderSteps`), ISE's names for the Xilinx families. A fake family runs in
 one of the IDE: the release zip and the published site download it from npm's registry on the first iCE40 run, at
 `package-lock.json`'s version and SHA-512, and keep it (`server/nextpnr-ice40-fetch.js`, `web/js/nextpnr-ice40-browser.js`, #2444).
 
-And around the flow, one issue each: the boards and examples (#2297), programming (#2298), the primitives' simulation models
+And around the flow, one issue each: the boards and examples (#2297), the primitives' simulation models
 (#2299), the reports (#2300). In the interface: the device profile (#2310), the tool descriptor (#2311), personalities (#2312).
 
 Vendor tools (ISE, Vivado, Quartus) are another kind of back end: they run a whole flow externally and give reports and a

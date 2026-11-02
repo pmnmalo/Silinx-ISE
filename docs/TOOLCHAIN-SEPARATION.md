@@ -3,8 +3,8 @@
 The plan for [#1651](https://github.com/pmnmalo/Silinx-ISE/issues/1651): the Silinx toolchain (Yosys in
 WebAssembly, then Silinx's pack, place, route, timing, DRC and bitgen, with the device data) becomes a
 package that works without the IDE, as a library and a command line, and the IDE uses it like any other user.
-This document is the analysis (October 2026, version 15.18.4) and the steps, each an issue of its own. No code
-has moved yet.
+This document is the analysis (October 2026, version 15.18.4) and the steps, each an issue of its own. Its tables describe the
+code then; each step below says what has moved since.
 
 ## 1. What the toolchain is
 
@@ -307,4 +307,4 @@ the back end's (#2384): its format and its file (XDL, `open/routed.xdl`, for the
 run by the steps that need it. The constraints reach the back ends as one model, in the back end's format (#2385,
 `constraints.js`). The synthesis is the back end's too (#2386): `synth_xilinx` and its mappings for the Xilinx families, a
 Yosys script of its own for another (`synth-script.js`); the steps are the back end's list (#2387). A fake family runs in Node
-and in the browser's worker (#2388). Next: iCE40 (#2295).
+and in the browser's worker (#2388). The iCE40 is the first family on it (#2295).

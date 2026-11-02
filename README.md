@@ -87,8 +87,8 @@ for Xilinx FPGAs supported by ISE 14.7.
   registers, 2-flip-flop input synchronisers, `<<`/`>>`, and *every cycle* blocks (decision and
   output boxes evaluated on every clock cycle, in parallel with the states), e.g. the blinky
   example's `speed_ctrl.asm.json` (button synchronisers + debouncers + speed FSM + step divider).
-- **Board emulator** (*Emulate on Board (RTL)*): the design runs on a drawing of the real kit
-  (Digilent Basys2 and Nexys2, Spartan-3E Starter Kit; a generic panel for the other boards),
+- **Board emulator** (*Emulate on Board ▸ Emulate Behavioral Model (RTL)*): the design runs on a drawing of the real kit
+  (Digilent Basys2, Nexys2, Nexys3 and Atlys, Spartan-3E Starter Kit, 1BitSquared iCEBreaker; a generic panel for the other boards),
   wired by the UCF: click the slide switches, press the buttons, watch the LEDs and the
   multiplexed 7-segment display (persistence of vision), at a chosen clock rate, with a watch list
   of internal signals. It works without ISE and in the standalone edition. Two engines: the design
@@ -141,7 +141,7 @@ for Xilinx FPGAs supported by ISE 14.7.
 - **New Source types**: *Boolean Algebra*, *Module (HDL)* (the ISE Define Module page: language, entity/module and
   architecture names, a port table), *Schematic* (a blank sheet), *Finite State Machine (FSM)*, *Algorithmic State
   Machine (ASM)*, *Petri Net*, *Clock Manager (DCM / PLL)*, *Block Memory*, *Test Bench*, *Implementation
-  Constraints File*, *Memory Initialization File (.mem)*. Page 2 is the same for every type: the file name, the
+  Constraints File*, *Memory Initialization File (.mem)*, *C Function (HLS)*, *C++ Function (HLS)*. Page 2 is the same for every type: the file name, the
   location and the language (VHDL / Verilog, the project's preferred language by default), with the buttons
   *Wizard > | < Back | Next > | Cancel*: *Next >* makes the plain source, *Wizard >* opens the type's wizard (Boolean
   Algebra, Module, Schematic, FSM, ASM, Petri Net, Test Bench, Clocking Wizard, Block Memory, UCF) at its own pages,
@@ -215,7 +215,7 @@ for Xilinx FPGAs supported by ISE 14.7.
   from outside (click: Z → 0 → 1; a bus opens the value editor, *Z* releases it) — the circuit
   drives it through tri-state buffers (BUFE / BUFT) or a module symbol with an inout port.
 - **Boolean Algebra / Karnaugh Map** (it was Truth Table; *Tools ▸ Boolean Algebra / Karnaugh Map…*, New Source ▸
-  *Boolean Algebra (.tt.json)*): name 1–6 inputs and any number of outputs, click the cells (0 → 1 → X don't care)
+  *Boolean Algebra (.bool.json)*): name 1–6 inputs and any number of outputs, click the cells (0 → 1 → X don't care)
   or type an expression per output (`ab' + c`, `a·b + c`, `/a.b + a./b`, `~a & b`,
   `(a and not b) or c`, `a ^ b`…). For each output: the Karnaugh map (Gray order; 5–6 inputs as two/four 4×4 maps) with the groups of the minimal SOP
   (1s) or POS (0s) drawn as coloured rounded rectangles, wrap-around groups split at the edges;
@@ -481,7 +481,7 @@ System Access API; each project a folder as the full application writes it, so t
 there; web/js/project-store.js). `--site <dir>` also writes the GitHub Pages site: the page and its `assets/` (the device
 descriptions, the bit database and Yosys in WebAssembly, ~115 MB), with which the site runs the
 Silinx toolchain in the browser: *Implement Design* and *Generate Programming File* for the
-Spartan-3E boards (the bitstream is downloaded), and *Configure Target Device* programs the FPGA of
+Spartan-3E and Spartan-6 boards and the iCE40 (the bitstream is downloaded), and *Configure Target Device* programs the FPGA of
 a Basys2 / Nexys2 over WebUSB (Chrome / Edge; core/adept.js, a port of adepttool's Adept USB
 protocol), and its Platform Flash (core/xcf.js, the steps of `scripts/xcf_prog.py`). XST (Xilinx ISE)
 needs the full application (`npm start`).
@@ -544,10 +544,10 @@ package). Developers can build another package's description from an ISE
 (`packages/silinx-fpga/research/s3e-route/build-device.mjs`, into `~/.silinx/devices/`) once its pads are in the bit
 database. The open
 toolchain also takes **the Spartan-6 boards (Nexys3, Atlys)** in the local server, to a bitstream ISE's bitgen
-writes byte for byte for the same routing (not yet in the browser edition: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node packages/silinx-fpga/research/s3e-route/open-flow.mjs <project
+writes byte for byte for the same routing (in the browser edition too, with the Silinx engine, #2103: [docs/OPEN-TOOLCHAIN.md](docs/OPEN-TOOLCHAIN.md)). From the command line: `node packages/silinx-fpga/research/s3e-route/open-flow.mjs <project
 folder> <out folder>`.
 Beyond Xilinx, it takes **the 1BitSquared iCEBreaker** (Lattice iCE40UP5K-SG48): Yosys's `synth_ice40`,
-nextpnr-ice40 and icepack, to `build/<top>.bin`, its pins written as a PCF (programming it from Silinx is still to come).
+nextpnr-ice40 and icepack, to `build/<top>.bin`, its pins written as a PCF (programmed into its SPI flash from Silinx: over WebUSB in the browser, or with openFPGALoader locally, #2298).
 The examples run on it with their seven-segment display and switches on its Pmods 1A and 1B; vga on the
 **1BitSquared iCEBreaker + PmodVGA**, a Digilent PmodVGA in those Pmods.
 How its circuits compare with ISE's (size and speed on the open-source designs of the design corpus):
@@ -612,8 +612,7 @@ the same over WebUSB (`core/xcf.js`, Chrome / Edge, Chrome on Android), its back
 
 ```
 core/       VHDL/Verilog parsers, elaborator, simulator, schematics, ASM, UCF, zip (browser + Node);
-            core/fpga: the Silinx toolchain (pack, place, route, timing, bitstream); adept.js / xcf.js:
-            the board and its Platform Flash programmed over WebUSB
+            adept.js / xcf.js: the board and its Platform Flash programmed over WebUSB
 server/     HTTP server, projects, ISE flow, programmers, boards/devices, .xise
 web/        Project Navigator UI (the Silinx and ISE style interfaces, web/css/silinx.css): editor, SSim, schematics, ASM, pin planner, iMPACT
 docker/ise/ builder kit for the private Xilinx ISE 14.7 Docker image
@@ -630,8 +629,10 @@ docs/       ARCHITECTURE.md (Silinx's architecture as a whole: the editions, the
             representation), PROJECT.md (project model and API), OPEN-TOOLCHAIN.md (how the open
             Spartan-3E toolchain is developed), TOOLCHAIN.md (the toolchain's architecture, from the design to the
             .bit), QUALITY.md (the Silinx toolchain against ISE)
-research/   the Silinx toolchain's research: s3e-bitstream (the bit database it ships), s3e-route
-            (the command-line flow, device descriptions), s3e-place, s3e-device, synth-quality
+packages/silinx-fpga/
+            the Silinx toolchain (pack, place, route, timing, bitstream); its research/ builds the
+            bit database and the device descriptions
+research/   synthesis quality, handwriting models, other experiments
 test/       node:test suites
 ```
 
