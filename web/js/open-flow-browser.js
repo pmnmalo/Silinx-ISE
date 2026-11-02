@@ -10,7 +10,8 @@ import { compile } from '/core/compile.js';
 import { synthEffort, synthGoal, s6OpenStatus } from '/packages/silinx-fpga/src/index.js';
 import { modulesFromLibrary } from '/core/schdoc.js';
 import { OPEN_STEPS, engineOf, orderOpenSteps, orderSteps, deviceFamily, isIseFamily } from '/packages/silinx-fpga/src/parts.js';
-import { ICE40_PARTS, ICE40_STEPS } from '/packages/silinx-fpga/src/index.js';
+import { ICE40_PARTS } from '/packages/silinx-fpga/src/index.js';
+import { familyProfile } from '/core/family-profile.js';
 
 // the devices whose device description and bit database are published (packages/silinx-fpga/devices,
 // packages/silinx-fpga/bitdb): device/package -> the description's file
@@ -57,20 +58,21 @@ export function browserOpenStatus(device = {}) {
   const part = `${dev}${pkg}${speed}`;
   const family = deviceFamily(device) || 'spartan3e';
   const list = Object.keys(BROWSER_DEVICES).map(k => k.replace('/', ' ')).join(', ');
+  const flow = familyProfile(family).openFlow;   // (the family's open flow, #2310)
   // (the iCE40, #2295: nextpnr-ice40 served by the local server, or the published editions' download from npm's registry, #2444)
-  if (family === 'ice40') {
+  if (flow?.tools === 'nextpnr-ice40') {
     const name = `${dev}${pkg}`;
     if (!ICE40_PARTS.includes(dev.replace(/^ice40/, ''))) return { available: false, part: name, reason: `${dev}: not an iCE40 part of nextpnr-ice40` };
-    return LAYOUT.nextpnrIce40 || LAYOUT.nextpnrIce40Package ? { available: true, part: name, family: 'ice40', reason: `${name}: nextpnr-ice40 and icepack (in the browser)` }
+    return LAYOUT.nextpnrIce40 || LAYOUT.nextpnrIce40Package ? { available: true, part: name, family, reason: `${name}: nextpnr-ice40 and icepack (in the browser)` }
       : { available: false, part: name, reason: 'nextpnr-ice40 is not in this edition: use the local server' };
   }
   // (the Spartan-6, #2103: the parts of the Nexys3 and the Atlys)
-  if (family === 'spartan6' && /^xc6slx\d+$/.test(dev)) {
+  if (flow?.bitDb === 's6' && flow.parts.test(dev)) {
     const s6 = s6OpenStatus(dev, pkg, part);
     if (!s6.available || !BROWSER_DEVICES[`${dev}/${pkg}`]) return { available: false, part, family, reason: s6.reason };
     return { available: true, part, family, graph: BROWSER_DEVICES[`${dev}/${pkg}`], steps: s6.steps, reason: `${s6.reason} (in the browser)` };
   }
-  if (family !== 'spartan3e' || !/^xc3s\d+e$/.test(dev)) {
+  if (!flow?.parts?.test(dev)) {
     return { available: false, part, family, reason: `the Silinx toolchain supports the Spartan-3E and the Nexys3's and Atlys's Spartan-6 only (${list}); other devices need Xilinx ISE, in the full application` };
   }
   if (!BROWSER_DEVICES[`${dev}/${pkg}`]) return { available: false, part, family, reason: `no device description of the ${dev} in the ${pkg} package yet (only ${list})` };
@@ -80,9 +82,10 @@ export function browserOpenStatus(device = {}) {
 const ALIASES = { implement: 'par', impl: 'par', synthesize: 'synth', xst: 'synth', ngdbuild: 'translate', place: 'par', route: 'par', timing: 'trce', bit: 'bitgen' };
 /** The steps of a run: the chain from synthesis to the last step asked for (packages/silinx-fpga/src/open-steps.js, as the server's openSteps). */
 export function browserSteps(steps, { synthUpToDate = false, family = null } = {}) {
-  if (family === 'ice40') {
+  const own = familyProfile(family).openFlow?.steps;   // (a family with its own tools' steps: the iCE40's)
+  if (own) {
     const asked = (Array.isArray(steps) ? steps : [steps]).filter(Boolean).map(s => ALIASES[String(s).toLowerCase()] || String(s).toLowerCase());
-    const list = orderSteps(ICE40_STEPS, asked);
+    const list = orderSteps(own, asked);
     return synthUpToDate && !asked.includes('synth') ? list.filter(s => s !== 'synth') : list;
   }
   const set = new Set((Array.isArray(steps) ? steps : [steps]).filter(Boolean).map(s => ALIASES[String(s).toLowerCase()] || String(s).toLowerCase()));
@@ -183,7 +186,7 @@ export async function runBrowserFlow({ project, files, steps, resources = null, 
       fail: e => { end(); reject(e); },
     });
     signal?.addEventListener('abort', abort, { once: true });
-    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrIce40: st.family === 'ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, spec, sources, simSources, ucf, ucfName: project.constraints ? project.constraints.split('/').pop() : null, files: earlier, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), nextpnrIce40: familyProfile(st.family).openFlow?.tools === 'nextpnr-ice40' ? (LAYOUT.nextpnrIce40Package || new URL(LAYOUT.nextpnrIce40, assetsBase()).href) : null, integrity: LAYOUT.integrity || null });
   });
 }
 
@@ -204,7 +207,7 @@ export function prepareBrowserFlow(device = {}, impl = undefined) {
   const w = getWorker(), id = ++runSeq;
   return new Promise(resolve => {
     runs.set(id, { onData: data => { if (data.done) { runs.delete(id); resolve(data.done); } }, fail: () => { runs.delete(id); prepared.delete(st.graph); resolve(null); } });
-    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: st.family === 'spartan3e' && engineOf(impl) !== 'silinx' }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
+    w.postMessage({ id, prepare: { graph: st.graph, part: st.part, family: st.family, device: String(device.part).toLowerCase(), pkg: String(device.package).toLowerCase(), nextpnr: !!familyProfile(st.family).openFlow?.nextpnr && engineOf(impl) !== 'silinx' }, assets: assetsBase(), yosys: yosysBundleUrl(), nextpnr: nextpnrBundleUrl(), root: assetsRoot(), integrity: LAYOUT.integrity || null });
   });
 }
 
