@@ -3,6 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lutEntries, routeThroughs, loadDb, kindModel, predictSlice, checkDesign, CIN_BIT } from '../packages/silinx-fpga/research/s6/check-slice6.mjs';
+import { memEntries } from '../packages/silinx-fpga/src/fpga/s6/bitgen-slice.js';
+import fs from 'node:fs';
 import { S6_DEVICES, emptyFdri, writeBit6, FRAME_WORDS } from '../packages/silinx-fpga/src/fpga/s6/bitstream.js';
 
 const cfg = s => s.split(' ').map(x => { const [attr, name, ...v] = x.split(':'); return { attr, name, value: v.join(':') }; });
@@ -36,7 +38,11 @@ test('check-slice6: the predicted bits of a slice: the LUTs, the settings change
   const ff = predictSlice(m, cfg('AFF:f:#LATCH AFFMUX::O6 SYNC_ATTR::ASYNC CLKINV::CLK_B'));
   assert.ok(ff.bits.has('4,25') && ff.bits.has('4,35') && !ff.bits.has('4,27'));
   assert.deepEqual(predictSlice(m, cfg('WEMUX::XX')).unknown, ['WEMUX=XX']);
-  assert.equal(predictSlice(m, cfg('A6LUT:r:#RAM:O6=0x0000000000000001 A6RAMMODE::SPRAM64')).ram, true);
+  // a RAM's contents in the LUT map (#2556); a ROM's other than zeros not measured
+  const ram = predictSlice(kindModel(db, 'M'), cfg('A6LUT:r:#RAM:O6=0x0000000000000001 A6RAMMODE::SPRAM64'));
+  assert.equal(ram.ram, false);
+  assert.ok(ram.bits.has(db.lut.kinds.M.A[0].join()));
+  assert.equal(predictSlice(m, cfg('A6LUT:r:#ROM:O6=0x0000000000000001')).ram, true);
   assert.equal(predictSlice(m, cfg('A6LUT:r:#RAM:O6=0x0000000000000000 A6RAMMODE::SRL16')).ram, false);
 });
 
@@ -70,4 +76,34 @@ inst "s1" "SLICEX",placed CLEXL_X1Y5 SLICE_X1Y5 , cfg " B6LUT:s1.B:#LUT:O6=~A3 B
   fdri[(f0 + 4) * FRAME_WORDS + ((b0 + 55) >> 4)] |= 0x8000 >> ((b0 + 55) & 15);
   const bad = checkDesign(xdl, writeBit6({ fdri, name: 't.ncd', part: '6slx16csg324', date: '2026/10/28', time: '12:00:00', device: dev }), db);
   assert.deepEqual(bad.mismatches, [{ tile: 'CLEXL_X1Y5', sites: ['SLICE_X0Y5', 'SLICE_X1Y5'], missing: ['L 4,55'], extra: [] }]);
+});
+
+test('memEntries: a RAM\'s and a shift register\'s contents in the LUT\'s entries, by mode (#2556)', () => {
+  const set = a => a.flatMap((x, e) => (x ? [e] : []));
+  assert.deepEqual(set(memEntries('#RAM:O6=0x8000000000000001', null, 'SPRAM64')), [0, 63]);
+  assert.deepEqual(set(memEntries('#RAM:O6=0x8000000000000001', null, 'DPRAM64')), [0, 63]);
+  // a 32-bit RAM pair: O5 in the entries with A6 = 0, O6 in the others
+  assert.deepEqual(set(memEntries('#RAM:O6=0x0000000100000001', '#RAM:O5=0x80000002', 'DPRAM32')), [1, 31, 32]);
+  // a shift register: bit i at entries 2i and 2i + 1, a 16-bit one in the upper half
+  assert.deepEqual(set(memEntries('#RAM:O6=0x0000000080000001', null, 'SRL32')), [0, 1, 62, 63]);
+  assert.deepEqual(set(memEntries('#RAM:O6=0x0000000000008001', null, 'SRL16')), [32, 33, 62, 63]);
+  assert.deepEqual(set(memEntries('#RAM:O6=0x0000000000000000', null, 'SRL16')), []);
+  // not measured: a 16-bit shift register's bits past 16, O5 of a shift register, a ROM, another mode
+  assert.equal(memEntries('#RAM:O6=0x0000000000010000', null, 'SRL16'), null);
+  assert.equal(memEntries('#RAM:O6=0x0000000100000000', null, 'SRL32'), null);
+  assert.equal(memEntries('#RAM:O6=0x1', '#RAM:O5=0x1', 'SRL16'), null);
+  assert.equal(memEntries('#ROM:O6=0x1', null, undefined), null);
+  assert.equal(memEntries('#RAM:O6=0x1', null, 'SPRAM32'), null);
+});
+
+test('the contents of every RAM and shift register of gen-mem6.mjs\'s designs as ISE\'s bitgen wrote them (research/s6/measured/mem.json, #2556)', () => {
+  const ise = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/mem.json', import.meta.url), 'utf8'));
+  const m = kindModel(db, 'M');
+  assert.equal(Object.keys(ise).length, 21);
+  for (const [name, d] of Object.entries(ise)) {
+    const p = predictSlice(m, d.cfg.map(x => { const [attr, value] = x.split('::'); return { attr, name: '', value }; }));
+    assert.equal(p.ram, false, name);
+    const lut = Object.fromEntries(['A', 'B', 'C', 'D'].map(q => [q, db.lut.kinds.M[q].flatMap((o, e) => (p.bits.has(o.join()) ? [e] : []))]).filter(([, e]) => e.length));
+    assert.deepEqual(lut, d.lut, name);
+  }
 });
