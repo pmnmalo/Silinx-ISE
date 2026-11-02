@@ -106,6 +106,15 @@ const KIND_RANK = { X: 0, L: 1, M: 2 };
  * position, O6 and O5).
  */
 export function packS6(nl, { combine = 'off' } = {}) {
+  const p = packSlices(nl, combine);
+  if (combine !== 'area') return p;
+  // (the O5s the combining takes may be those the storage elements placed after it need for their 5FFs, which then
+  // fill the slice it emptied and more: 'area' is kept only when it takes no more slices than 'off', #2279)
+  const off = packSlices(nl, 'off');
+  return off.stats.slices < p.stats.slices ? off : p;
+}
+
+function packSlices(nl, combine) {
   const ix = indexOf(nl);
   const cells = nl.cells;
   const slices = [], chains = [], others = {}, warnings = [];
@@ -289,8 +298,10 @@ export function packS6(nl, { combine = 'off' } = {}) {
     s.pos[p].o6 = lc; put(lc, si);
     if (ff !== undefined && fits(s, key, ffKind(cells[ff].type).latch)) { placeFf(si, p, ff, false); placed.add(ff); }
   }
-  // LUT combining ('area'): a 5-input LUT at most into the O5 of a SLICEX's position whose O6 LUT shares the
-  // inputs (a SLICEL's multiplexed outputs are the carry's and the F7s')
+  // LUT combining ('area'): the LUTs of a SLICEX of no storage element (5 inputs at most each) into the O5s of other
+  // SLICEXs' positions whose O6 LUT shares their inputs (a SLICEL's multiplexed outputs are the carry's and the
+  // F7s'), all of a slice's or none: moved one by one from slices they did not empty, they saved no slice and took
+  // the O5s the storage elements below need for their 5FFs (#2279)
   if (combine === 'area') {
     const free = [];
     for (let si = 0; si < slices.length; si++) {
@@ -301,23 +312,28 @@ export function packS6(nl, { combine = 'off' } = {}) {
         if (typeof o6 === 'number' && isLut(cells[o6]) && s.pos[p].o5 === null && lutInputs(cells[o6]).length <= 5) free.push([si, p]);
       }
     }
-    // (a slice emptied of all its LUTs this way is dropped below)
-    for (const [si, p] of free) {
-      const s = slices[si];
-      if (s.pos[p].o5 !== null || s.pos[p].o6 === null) continue;
-      const mine = new Set(lutInputs(cells[s.pos[p].o6]));
-      for (let sj = si + 1; sj < slices.length; sj++) {
-        const t = slices[sj];
-        if (t.kind !== 'X' || t.pos.A.ff || t.pos.B.ff || t.pos.C.ff || t.pos.D.ff) continue;
-        const q = POS.find(r => typeof t.pos[r].o6 === 'number' && t.pos[r].o5 === null && lutInputs(cells[t.pos[r].o6]).length <= 5
-          && new Set([...mine, ...lutInputs(cells[t.pos[r].o6])]).size <= 5);
-        if (!q) continue;
-        const lc = t.pos[q].o6;
-        t.pos[q].o6 = null; where.set(lc, si);
-        s.pos[p].o5 = lc;
-        if (s.pos[p].mux === null) s.pos[p].mux = 'o5';
-        break;
+    // (a slice emptied this way is dropped below; one that takes a LUT is not emptied)
+    const emptied = new Set(), into = new Set();
+    for (let sj = slices.length - 1; sj >= 0; sj--) {
+      const t = slices[sj], mine = POS.filter(r => t.pos[r].o6 !== null);
+      if (t.kind !== 'X' || into.has(sj) || !mine.length || POS.some(r => t.pos[r].ff !== null || t.pos[r].ff5 !== null || t.pos[r].o5 !== null)) continue;
+      if (mine.some(r => typeof t.pos[r].o6 !== 'number' || !isLut(cells[t.pos[r].o6]) || lutInputs(cells[t.pos[r].o6]).length > 5)) continue;
+      const taken = new Set(), plan = [];
+      for (const r of mine) {
+        const ins = lutInputs(cells[t.pos[r].o6]);
+        const k = free.findIndex(([si, p], i) => !taken.has(i) && si !== sj && !emptied.has(si) && slices[si].pos[p].o5 === null
+          && new Set([...lutInputs(cells[slices[si].pos[p].o6]), ...ins]).size <= 5);
+        if (k < 0) break;
+        taken.add(k); plan.push([r, k]);
       }
+      if (plan.length < mine.length) continue;
+      for (const [r, k] of plan) {
+        const [si, p] = free[k], s = slices[si], lc = t.pos[r].o6;
+        t.pos[r].o6 = null; where.set(lc, si);
+        s.pos[p].o5 = lc; into.add(si);
+        if (s.pos[p].mux === null) s.pos[p].mux = 'o5';
+      }
+      emptied.add(sj);
     }
   }
   // the other storage elements: with others of their control set, the FF of a position by its bypass input (one
