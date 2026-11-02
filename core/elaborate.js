@@ -282,8 +282,13 @@ export function bindDecl(E, d) {
       else if (E.lang === 'verilog' && t) { n = strVec(E, n); ctxSize(n, t.w); }
       let val = constOf(E, n, d.loc);
       let ft = t;
+      // (an unconstrained type: the value's bounds, #2548; a bit-string literal's or an aggregate's are those of the
+      // index subtype, natural: 0 to n - 1)
       if (!t || (t.kind === 'logic' && t.unconstrained) || t.signedOnly) ft = n.t;
+      else if (t.kind === 'array' && t.unconstrained && !n.t.unconstrained) ft = n.t;
       else val = fitAny(val, t);
+      if (t?.kind === 'logic' && t.unconstrained && E.lang === 'vhdl' && ft.kind === 'logic' && ft.w > 1
+        && ((d.value.op === 'lit' && !d.value.scalar) || d.value.op === 'aggregate')) ft = { ...ft, left: 0, right: ft.w - 1, desc: false };
       E.sc.def(d.name, { kind: 'const', val, t: ft });
       return;
     }
@@ -441,7 +446,7 @@ export function elabType(E, ts, allowUnconstrained = false) {
     case 'character': return CHAR;
     case 'array': {
       const elem = elabType(E, ts.elem);
-      if (!ts.range) return { kind: 'array', unconstrained: true, elem, w: 0 };
+      if (!ts.range) return { kind: 'array', unconstrained: true, elem, w: 0, ...indexStart(E, ts.index) };
       const r = evalRange(E, ts.range), { left, right, desc } = r;
       const lo = Math.min(left, right), len = rangeLen(r);
       if (len > 1 << 22) throw new ElabError(`array too large (${len} elements)`);
@@ -456,7 +461,7 @@ export function elabType(E, ts, allowUnconstrained = false) {
       }
       if (e.unconstrained) {
         if (!ts.range) {
-          if (allowUnconstrained) return { kind: 'array', unconstrained: true, elem: elabType(E, e.unconstrained.elem), w: 0, name: e.name };
+          if (allowUnconstrained) return { kind: 'array', unconstrained: true, elem: elabType(E, e.unconstrained.elem), w: 0, name: e.name, ...indexStart(E, e.unconstrained.index) };
           throw new ElabError(`unconstrained type '${ts.name}' needs an index range`);
         }
         return { ...elabType(E, { ...e.unconstrained, range: ts.range }), name: e.name };
@@ -474,6 +479,14 @@ export function elabType(E, ts, allowUnconstrained = false) {
     }
   }
   throw new ElabError(`unsupported type '${ts.kind}'`);
+}
+
+// The left bound and the direction of an unconstrained array's index subtype (`natural range <>`: 0, ascending;
+// `positive range <>`: 1): those of a positional aggregate of the type (IEEE 1076-2008 9.3.3.3, #2548)
+function indexStart(E, name) {
+  const std = name && !E.sc.lookup(name) && stdTypeName(name);
+  const it = !name ? null : std ? elabType(E, std) : elabType(E, { kind: 'named', name });
+  return it?.kind === 'int' ? { ileft: scalarBounds(it)[0], idesc: !!it.rdown } : { ileft: 0, idesc: false };
 }
 
 export function stdTypeName(n) {
@@ -526,6 +539,9 @@ function evalRange0(E, r) {
   if (r.of) {
     const n = bindExpr(E, r.of, null);
     const t = n.t;
+    // a string of a known length (a constant's, string(1 to n)): 1 to its length (#2548)
+    const slen = t.kind !== 'str' ? null : t.slen ?? (n.k === 'c' && typeof n.val?.str === 'string' ? n.val.str.length : null);
+    if (slen !== null) return r.reverse ? { left: slen, right: 1, desc: true } : { left: 1, right: slen, desc: false };
     if (t.kind === 'str') throw new ElabError("'range of a string is not supported (use std_logic_vector)", r.of.loc);
     if (r.reverse) return { left: t.right, right: t.left, desc: !t.desc };
     return { left: t.left, right: t.right, desc: t.desc };

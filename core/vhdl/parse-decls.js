@@ -201,12 +201,16 @@ export const declarationMethods = {
       type = { kind: 'enum', values };
     } else if (this.acceptKw('array')) {
       this.expectOp('(');
-      const ranges = [];
-      do { ranges.push(this.parseIndexSubtype()); } while (this.acceptOp(','));
+      // (an unconstrained index, `natural range <>`, keeps its subtype's name: a constant's value takes its bounds, #2548)
+      const ranges = [], index = [];
+      do {
+        index.push(this.isId() && this.isKw('range', 1) && this.isOp('<>', 2) ? this.peek().value : null);
+        ranges.push(this.parseIndexSubtype());
+      } while (this.acceptOp(','));
       this.expectOp(')');
       this.expectKw('of');
       let elem = this.parseSubtypeIndication();
-      for (let k = ranges.length - 1; k >= 0; k--) elem = { kind: 'array', range: ranges[k], elem };
+      for (let k = ranges.length - 1; k >= 0; k--) elem = { kind: 'array', range: ranges[k], elem, ...(index[k] ? { index: index[k] } : {}) };
       type = elem;
     } else if (this.acceptKw('range')) {
       const r = this.parseRange();

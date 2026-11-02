@@ -278,7 +278,7 @@ describe('types and declarations', () => {
     assert.deepEqual(noloc(d.state_t), { kind: 'type', name: 'state_t', type: { kind: 'enum', values: ['idle', 'run', 'done'] } });
     assert.deepEqual(d.ram_t.type, { kind: 'array', range: { left: I(0), right: I(255), dir: 'to' },
       elem: { kind: 'logic', range: { left: I(7), right: I(0), dir: 'downto' }, signed: false, mark: 'std_logic_vector' } });
-    assert.deepEqual(d.vec_arr.type, { kind: 'array', range: null, elem: LOGIC });
+    assert.deepEqual(d.vec_arr.type, { kind: 'array', range: null, elem: LOGIC, index: 'natural' });
     assert.deepEqual(d.small.type, { kind: 'integer', range: { left: I(0), right: I(15), dir: 'to' } });
     assert.equal(d.byte.type.kind, 'logic');
     assert.deepEqual(d.idx.type, { kind: 'integer', range: { left: I(0), right: I(7), dir: 'to' } });

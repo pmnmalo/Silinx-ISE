@@ -499,6 +499,37 @@ function bindBinary(E, e, expect, loc) {
   return { k: 'bin', o, a, b, t };
 }
 
+// An aggregate of an unconstrained array type takes its bounds (IEEE 1076-2008 9.3.3.3, #2548): a positional one
+// from the index subtype's left bound in its direction (`natural range <>`: 0 to n - 1), a named one from its
+// choices, in the index subtype's direction. (Elements are stored from the low index up.)
+function unconstrainedAggregate(E, e, expect, loc) {
+  const desc = !!expect.idesc, mk = (lo, len, elems) => fold({
+    k: 'arr', elems, t: { ...expect, unconstrained: false, left: desc ? lo + len - 1 : lo, right: desc ? lo : lo + len - 1, desc, lo, len },
+  });
+  if (e.items.every(i => !i.choices)) {
+    const elems = e.items.map(i => bindExpr(E, i.value, expect.elem, loc)), lb = expect.ileft ?? 0;
+    return mk(desc ? lb - elems.length + 1 : lb, elems.length, desc ? elems.reverse() : elems);
+  }
+  const at = new Map();
+  for (const it of e.items) {
+    if (!it.choices) throw new ElabError('an aggregate mixes positional and named elements', loc);
+    const val = bindExpr(E, it.value, expect.elem, loc);
+    for (const ch of it.choices) {
+      if (ch === 'others') throw new ElabError('aggregate with others needs a constrained target', loc);
+      if (ch.range) {
+        const r = evalRange(E, ch.range);
+        if (!r.isNull) for (let i = Math.min(r.left, r.right); i <= Math.max(r.left, r.right); i++) at.set(i, val);
+      } else at.set(V.toNum(constOf(E, bindExpr(E, ch, null, loc), loc)), val);
+    }
+  }
+  if (!at.size) return mk(expect.ileft ?? 0, 0, []);
+  const lo = Math.min(...at.keys()), len = Math.max(...at.keys()) - lo + 1;
+  const elems = Array.from({ length: len }, (_, k) => at.get(lo + k));
+  const gap = elems.findIndex(x => !x);
+  if (gap >= 0) throw new ElabError(`aggregate has no element for index ${lo + gap}`, loc);
+  return mk(lo, len, elems);
+}
+
 function bindAttr(E, e, loc) {
   const at = e.attr.toLowerCase();
   if (at === 'image' || at === 'to_string') {
@@ -635,11 +666,7 @@ function bindAggregate(E, e, expect, loc) {
     return fold({ k: 'arr', elems, t: expect });
   }
   if (expect.kind === 'array') {
-    if (expect.unconstrained) {
-      const elems = e.items.map(i => bindExpr(E, i.value, expect.elem, loc));
-      const t = { ...expect, unconstrained: false, left: 0, right: elems.length - 1, desc: false, lo: 0, len: elems.length };
-      return fold({ k: 'arr', elems, t });
-    }
+    if (expect.unconstrained) return unconstrainedAggregate(E, e, expect, loc);
     const slots = new Array(expect.len).fill(null);
     let pos = 0;
     for (const it of e.items) {
