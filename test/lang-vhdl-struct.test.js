@@ -3,7 +3,7 @@
 // subprograms (functions, procedures, parameter modes, overloading), blocks and use clauses.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { out, sim, vhd } from './lang-util.js';
+import { diags, out, outW, sim, vhd } from './lang-util.js';
 
 const ADDER = `library ieee; use ieee.std_logic_1164.all; use ieee.numeric_std.all;
 entity adder is
@@ -198,6 +198,130 @@ architecture sim of tb is begin
   process begin report integer'image(A) & " " & integer'image(work.p.B); wait; end process;
 end;` });
   assert.deepEqual(r, ['5 6']);
+});
+
+test('selected name work.pkg.x without a use clause (#2562)', () => {
+  const r = outW({
+    'defs.vhd': `package defs is
+  constant WIDTH : integer := 4;
+  subtype word_t is integer range 0 to 2 ** WIDTH - 1;
+  function inc(x : integer) return integer;
+end package defs;
+package body defs is
+  function inc(x : integer) return integer is begin return x + 1; end function;
+end package body defs;`,
+    'e.vhd': `entity e is
+  port (a : in work.defs.word_t;
+        y : out integer range 0 to 15);
+end e;
+architecture r of e is begin y <= work.defs.inc(a); end r;`,
+    'tb.vhd': `entity tb is end;
+architecture sim of tb is
+  signal a : integer range 0 to 15 := 0;
+  signal y : integer range 0 to 15;
+begin
+  u: entity work.e port map (a => a, y => y);
+  process begin
+    a <= 5;
+    wait for 1 ns;
+    report integer'image(y);
+    wait;
+  end process;
+end;`
+  }, [], 'tb');
+  assert.deepEqual(r, ['6']);
+
+  // in the same file, with port width expression 2 ** work.defs.WIDTH - 1
+  const r2 = outW({
+    'one.vhd': `package defs is
+  constant WIDTH : integer := 4;
+  function inc(x : integer) return integer;
+end package defs;
+package body defs is
+  function inc(x : integer) return integer is begin return x + 1; end function;
+end package body defs;
+
+entity e is
+  port (a : in integer range 0 to 2 ** work.defs.WIDTH - 1;
+        y : out integer range 0 to 15);
+end e;
+architecture r of e is begin y <= work.defs.inc(a); end r;
+
+entity tb is end;
+architecture sim of tb is
+  signal a : integer range 0 to 15 := 0;
+  signal y : integer range 0 to 15;
+begin
+  u: entity work.e port map (a => a, y => y);
+  process begin
+    a <= 8;
+    wait for 1 ns;
+    report integer'image(y);
+    wait;
+  end process;
+end;`
+  }, [], 'tb');
+  assert.deepEqual(r2, ['9']);
+
+  // enum type and literal by expanded names, procedure call in a process
+  const r3 = outW({
+    'defs.vhd': `package defs is
+  type state_t is (idle, run, done);
+  procedure step(signal s : inout state_t);
+end package defs;
+package body defs is
+  procedure step(signal s : inout state_t) is
+  begin
+    if s = idle then s <= run; else s <= done; end if;
+  end procedure;
+end package body defs;`,
+    'tb.vhd': `entity tb is end;
+architecture sim of tb is
+  signal s : work.defs.state_t := work.defs.run;
+begin
+  process begin
+    wait for 1 ns;
+    report work.defs.state_t'image(s);
+    wait;
+  end process;
+end;`
+  }, [], 'tb');
+  assert.deepEqual(r3, ['run']);
+
+  // an expanded name does not make the package's other declarations visible unqualified
+  const err = diags({
+    'defs.vhd': `package defs is
+  constant WIDTH : integer := 4;
+  function inc(x : integer) return integer;
+end package defs;
+package body defs is
+  function inc(x : integer) return integer is begin return x + 1; end function;
+end package body defs;`,
+    'e.vhd': `entity e is
+  port (a : in integer range 0 to 15;
+        y : out integer range 0 to 15);
+end e;
+architecture r of e is begin y <= work.defs.inc(a) + WIDTH; end r;`,
+    'tb.vhd': `entity tb is end;
+architecture sim of tb is
+  signal a, y : integer range 0 to 15;
+begin
+  u: entity work.e port map (a => a, y => y);
+end;`
+  }, 'tb');
+  assert.deepEqual(err.filter(d => d.severity === 'error').map(d => `${d.file}:${d.line} ${d.message}`), ["e.vhd:5 'width' is not declared"]);
+
+  // unknown package in an expanded name reports at its location
+  const errNoPkg = diags({
+    'e.vhd': `entity e is end;
+architecture r of e is signal y, a : integer; begin y <= work.nopkg.inc(a); end r;`,
+    'tb.vhd': `entity tb is end;
+architecture sim of tb is begin u: entity work.e; end;`
+  }, 'tb');
+  assert.deepEqual(errNoPkg.filter(d => d.severity === 'error').map(d => `${d.file}:${d.line} ${d.message}`), [
+    "e.vhd:2 package 'nopkg' not found",
+    "e.vhd:2 'inc' is not declared"
+  ]);
 });
 
 test('functions: overloading by parameter type, recursion, named association, default parameters, early return', () => {

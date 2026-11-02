@@ -5,7 +5,7 @@ import { TEXTIO_PROCS, bindExpr, bindTextio, boundFunction, hierResolve, notDecl
 import * as V from './values.js';
 import {
   ElabError, INT, STR, Scope, bindDecl, bindLvalue, checkAssignable, containsKind, ctxSize, diag, evalRange, fitVal,
-  lroot, rangeCheck, readsOf, triggersOfReads, walk
+  lroot, packageScope, rangeCheck, readsOf, triggersOfReads, walk
 } from './elaborate.js';
 
 // ---------------------------------------------------------------- statements
@@ -223,11 +223,11 @@ function bindCallStmt(E, s, loc) {
     }
     return { k: 'sys', name: sysName, args, loc };
   }
-  let entry = E.sc.lookup(name);
+  let entry = s.pkg ? packageScope(E.ctx, s.pkg, E.file, loc, E)?.lookup(name) : E.sc.lookup(name);
   if (entry && entry.kind === 'func') entry = pickOverload(E, entry, s.args, loc);
   if (!entry || entry.kind !== 'func') {
-    if (E.lang === 'vhdl' && TEXTIO_PROCS.has(name)) return bindTextio(E, name, s.args, loc);
-    if (E.lang === 'vhdl' && ['file_open', 'file_close'].includes(name)) {
+    if (E.lang === 'vhdl' && !s.pkg && TEXTIO_PROCS.has(name)) return bindTextio(E, name, s.args, loc);
+    if (E.lang === 'vhdl' && !s.pkg && ['file_open', 'file_close'].includes(name)) {
       diag(E, `procedure '${name}' (textio) is not supported`, loc, 'warning');
       return { k: 'null', loc };
     }
