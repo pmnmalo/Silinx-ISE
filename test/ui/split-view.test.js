@@ -133,6 +133,8 @@ uiTest('#1619 a schematic and its generated VHDL side by side: the HDL follows t
 uiTest('#1652 the Split button: the right side empty, a document opened there, a tab dragged across or moved; View ▸ Split Editor; a narrow workspace stacks the sides; Portuguese', E, async (page) => {
   await makeProject(env, { name: 'SplitAny', template: 'gates' });
   await page.openProject('SplitAny');
+  // (the Design Summary, opened with the project in the background, its module loaded first: before the test bench, #2603)
+  await page.waitFor(() => window.Silinx.docs.some((d) => d.id === 'summary'), [], { what: 'the Design Summary' });
   await page.eval(() => window.SilinxApp.openFile('sim/tb_gates.vhd'));
   await page.waitFor(() => window.Silinx.active?.id === 'file:sim/tb_gates.vhd' && window.Silinx.active.editor);
   await page.eval(() => window.SilinxApp.openFile('src/gates.vhd'));
@@ -155,8 +157,10 @@ uiTest('#1652 the Split button: the right side empty, a document opened there, a
   await page.waitFor(() => document.getElementById('workspace').classList.contains('split'), [], { what: 'split' });
   // the right side empty, worked in: how to bring a document there under a large pen (#1720), the other documents one click away
   assert.deepEqual(await ids(page), [`a:${VHD}*`]);
+  // (the Tasks interface: the Design Summary is Implement's, not a pick of Design's, #2603)
+  const tasks = await page.eval(() => !!document.getElementById('task-view'));
   const empty = await page.eval(() => { const e = document.getElementById('split-empty'); return { side: e.dataset.side, front: e.classList.contains('pane-front'), text: e.querySelector('p').textContent, icon: (() => { const r = e.querySelector('.split-ico svg')?.getBoundingClientRect(); return r ? [Math.round(r.width), Math.round(r.height), r.bottom <= e.querySelector('p').getBoundingClientRect().top] : null; })(), picks: [...e.querySelectorAll('.split-picks button')].filter((b) => b.getClientRects().length).map((b) => b.textContent) }; });
-  assert.deepEqual(empty, { side: 'b', front: true, text: 'Drag a tab here, or right-click an open tab and choose Move to the Other Side', icon: [48, 48, true], picks: empty.picks.includes('Design Summary') ? ['Design Summary', 'tb_gates.vhd'] : ['tb_gates.vhd'] });
+  assert.deepEqual(empty, { side: 'b', front: true, text: 'Drag a tab here, or right-click an open tab and choose Move to the Other Side', icon: [48, 48, true], picks: tasks ? ['tb_gates.vhd'] : ['Design Summary', 'tb_gates.vhd'] });
   assert.equal(await page.eval(() => document.getElementById('split-btn').getAttribute('aria-pressed')), 'true');
   assert.deepEqual(await viewItems(), ['Split Editor (checked)', 'Show Generated HDL Beside (disabled)']);
   // a document opened (the Design pane's schematic): there
