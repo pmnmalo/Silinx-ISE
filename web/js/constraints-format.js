@@ -33,7 +33,7 @@ export function pcfDiagnostics(text, ports = []) {
   const lines = String(text).split(/\r?\n/);
   return Object.keys(model.assignments).filter(n => !known.has(toModel(n))).map(n => ({
     severity: 'warning', message: `set_io ${n}: the top has no such port`,
-    line: lines.findIndex(l => new RegExp(`\\s${n.replace(/[[\]]/g, '\\$&')}\\s`).test(l)) + 1,
+    line: lines.findIndex(l => l.split(/\s+/).includes(n)) + 1,
   }));
 }
 
