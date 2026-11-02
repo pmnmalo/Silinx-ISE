@@ -15,9 +15,12 @@ const QUALS = new Set(['const', 'static', 'volatile', 'register', 'extern', 'inl
 const WORDS = new Set(['void', 'char', 'short', 'int', 'long', 'signed', 'unsigned', 'float', 'double', 'bool', '_Bool']);
 const NOT_TYPE = new Set(['return', 'else', 'do', 'goto', 'case', 'default', 'break', 'continue', 'if', 'for', 'while', 'switch', 'sizeof', 'namespace', 'using', 'template']);
 const SCALAR = { k: 's' };
+const AP = new Set(['ap_int', 'ap_uint', 'ap_fixed', 'ap_ufixed', 'ap_int_base', 'ap_fixed_base']);
+// (a pointer's, and a type not known here: a template's, a class's, whose value may be a list of its own, #2185)
+const POINTER = { k: 's', ptr: true }, OPAQUE = { k: 's', opaque: true };
 const placeOf = (t) => `${t.file ?? ''}:${t.line}:${t.col}`;
 
-// Types: SCALAR, an array { k: 'a', n (null: []), of }, a struct or a union { k: 'r', union, members: [{ name (null:
+// Types: SCALAR (POINTER, OPAQUE), an array { k: 'a', n (null: []), of }, a struct or a union { k: 'r', union, members: [{ name (null:
 // anonymous), type, init }], key (a union: its definition's place) }.
 const has = (r, name) => r.members.some((m) => m.name === name || (m.name === null && has(m.type, name)));
 const withUnion = (ty) => (ty.k === 'a' ? withUnion(ty.of) : ty.k === 'r' && (ty.union || ty.members.some((m) => withUnion(m.type))));
@@ -61,12 +64,14 @@ function fill(ty, q, braced, what, report, node = null) {
     if (it.des.length) return fill(sub, q, false, what, report, prev);
     if (it.val.list) {
       q.shift();
+      if (it.val.list.length === 1 && text(sub, it.val.list[0].val)) return chars(sub, it.val.list[0].val.e[0], what, report);
       if (sub.k !== 's') return fill(sub, it.val.list.slice(), true, what, report);
       let v = it.val;
       while (v?.list) v = v.list[0]?.val;
       return { e: v?.e ?? [L(it.at, '0', 'num')] };
     }
     if (sub.k === 's') { q.shift(); return { e: it.val.e }; }
+    if (text(sub, it.val)) { q.shift(); return chars(sub, it.val.e[0], what, report); }
     return fill(sub, q, false, what, report);
   };
   let pos = 0;
@@ -101,6 +106,14 @@ function fill(ty, q, braced, what, report, node = null) {
     pos++;
   }
   return node;
+}
+
+/** Whether a value is a string for an array of characters (char s[2][4] = { "ab", { "cd" } }, #2185). */
+const text = (ty, v) => ty.k === 'a' && ty.of.k === 's' && !ty.of.ptr && v.e?.length === 1 && v.e[0].t === 'str';
+/** An array of characters from a string: its characters, its '\0' when there is room for it. */
+function chars(ty, s, what, report) {
+  if (ty.n !== null && s.v.length > ty.n) report(s, `'${what}': the string "${s.v}" is longer than its ${ty.n} characters`);
+  return { a: [...s.v.slice(0, ty.n ?? Infinity)].map((c) => ({ e: [L(s, String(c.charCodeAt(0)), 'num')] })) };
 }
 
 /** A value as tokens, in full (at: where it is said; full: an array's elements all said, a row of a larger one). */
@@ -188,10 +201,11 @@ export function cDesignated(input, report) {
     while (isId(ts[j]) && QUALS.has(ts[j].v)) j++;
     const x = ts[j];
     if (!isId(x) || NOT_TYPE.has(x.v)) return null;
-    if (['struct', 'union', 'class', 'enum'].includes(x.v)) return isId(ts[j + 1]) ? { type: types.get(ts[j + 1].v) ?? SCALAR, next: j + 2 } : null;
+    if (x.v === 'enum') return isId(ts[j + 1]) ? { type: SCALAR, next: j + 2 } : null;
+    if (['struct', 'union', 'class'].includes(x.v)) return isId(ts[j + 1]) ? { type: types.get(ts[j + 1].v) ?? OPAQUE, next: j + 2 } : null;
     if (WORDS.has(x.v)) { while (isId(ts[j]) && (WORDS.has(ts[j].v) || QUALS.has(ts[j].v))) j++; return { type: SCALAR, next: j }; }
-    if (op(ts[j + 1], '<')) { const e = closing(ts, j + 1); return e > 0 ? { type: SCALAR, next: e + 1 } : null; }
-    return { type: types.get(x.v) ?? SCALAR, next: j + 1 };
+    if (op(ts[j + 1], '<')) { const e = closing(ts, j + 1); return e > 0 ? { type: AP.has(x.v) ? SCALAR : OPAQUE, next: e + 1 } : null; }
+    return { type: types.get(x.v) ?? OPAQUE, next: j + 1 };
   }
 
   /** A declarator's array of its dimensions' tokens. */
@@ -231,7 +245,7 @@ export function cDesignated(input, report) {
         const dims = [];
         while (op(d[i], '[')) { const e = closing(d, i); dims.push(d.slice(i + 1, e)); i = e + 1; }
         const init = op(d[i], '=') ? d.slice(i + 1) : op(d[i], '{') ? d.slice(i) : null;
-        ty.members.push({ name, type: arrayOf(ptr ? SCALAR : type, dims), init });
+        ty.members.push({ name, type: arrayOf(ptr ? POINTER : type, dims), init });
       }
     }
     return ty;
@@ -254,15 +268,28 @@ export function cDesignated(input, report) {
       else if (!td) after.set(end + 1, ty);
       return k;
     }
+    // (using T = ap_uint<8>;: a type's name)
+    if (isId(input[k], 'using') && isId(input[k + 1]) && op(input[k + 2], '=')) {
+      const r = typeAt(input, k + 3);
+      if (r && op(input[r.next], ';')) types.set(input[k + 1].v, r.type);
+      return k;
+    }
     if (td) {
       const r = typeAt(input, j);
-      if (r && r.type !== SCALAR && isId(input[r.next]) && op(input[r.next + 1], ';')) types.set(input[r.next].v, r.type);
+      if (r && isId(input[r.next]) && op(input[r.next + 1], ';')) types.set(input[r.next].v, r.type);
+      // (typedef int row_t[3];: an array's type, #2185)
+      else if (r && isId(input[r.next]) && op(input[r.next + 1], '[')) {
+        const dims = [];
+        let i = r.next + 1;
+        while (op(input[i], '[')) { const e = closing(input, i); dims.push(input.slice(i + 1, e)); i = e + 1; }
+        if (op(input[i], ';')) types.set(input[r.next].v, arrayOf(r.type, dims));
+      }
       return k;
     }
     const r = typeAt(input, k);
     if (!r) return k;
     // (const int N = 4;: a constant of the sizes and the indices)
-    if (r.type === SCALAR && isId(input[k], 'const') && isId(input[r.next]) && op(input[r.next + 1], '=')) {
+    if (r.type.k === 's' && isId(input[k], 'const') && isId(input[r.next]) && op(input[r.next + 1], '=')) {
       let e = r.next + 2;
       while (input[e] && !op(input[e], ';') && !op(input[e], ',')) e++;
       const v = constOf(input.slice(r.next + 2, e), consts);
@@ -294,11 +321,12 @@ export function cDesignated(input, report) {
       if (op(input[open], '{')) {
         const end = closing(input, open);
         const ts = input.slice(open, end + 1);
-        const ty = arrayOf(ptr ? SCALAR : type, dims);
-        if (designated(ts) || withUnion(ty)) {
-          // (the sizes as numbers: an enum's constant, a const int)
-          const sizes = dims.flatMap((d) => { const v = d.length ? constOf(d, consts) : null; return [L(name, '['), ...(v === null ? d : [L(name, String(v), 'num')]), L(name, ']')]; });
-          out.push(...input.slice(j, input.indexOf(name, j) + 1), ...sizes, L(input[i], '='), ...written(ty, ts, name));
+        const ty = arrayOf(ptr ? POINTER : type, dims);
+        if (designated(ts) || withUnion(ty) || nested(ty, ts)) {
+          // (the sizes as numbers: an enum's constant, a const int; a [] the number of elements written, #2185)
+          const w = written(ty, ts, name);
+          const sizes = dims.flatMap((d, k) => { const v = d.length ? constOf(d, consts) : k ? null : BigInt(splitTop(w.slice(1, -1)).length); return [L(name, '['), ...(v === null ? d : [L(name, String(v), 'num')]), L(name, ']')]; });
+          out.push(...input.slice(j, input.indexOf(name, j) + 1), ...sizes, L(input[i], '='), ...w);
           changed = true;
         } else out.push(...input.slice(j, end + 1));
         i = end + 1;
@@ -324,6 +352,14 @@ export function cDesignated(input, report) {
   }
   /** Whether a list (and the lists in it) has a designator. */
   function designated(ts) { return ts.some((x, i) => (op(x, '.') && isId(ts[i + 1]) && (op(ts[i - 1], '{') || op(ts[i - 1], ','))) || (op(x, '[') && (op(ts[i - 1], '{') || op(ts[i - 1], ',')))); }
+  /** Whether a list of an array of arrays has a list or a string in it, its rows given in part maybe, or its number of
+   *  rows is the list's: written in full, each row's missing values zero (#2185); a list of values alone of an array
+   *  of known size is its words in order, as it is. */
+  function nested(ty, ts) {
+    if (ty.k !== 'a' || ty.of.k !== 'a') return false;
+    const leaf = (t) => (t.k === 'a' ? leaf(t.of) : t.k === 'r' ? t.members.every((m) => leaf(m.type)) : !t.opaque);
+    return leaf(ty) && (ty.n === null || ts.slice(1, -1).some((x) => op(x, '{') || x.t === 'str'));
+  }
   /** A list in full for its type. */
   function written(ty, ts, name) {
     const q = tree(ts, consts, report).list;
