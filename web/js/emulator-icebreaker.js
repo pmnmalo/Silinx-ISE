@@ -2,6 +2,7 @@
 // top view in its repository: each part where it is, as it is turned, in proportion (the main board 712 x 493, its
 // snap-off Pmod part plugged into PMOD2 on its right), with its silkscreen names.
 import { ledNumbers } from '/core/emulate.js';
+import { esc } from './dom.js';
 import { holes4, boardFrame, svgText as text, ic, POWER_V_CSS } from './emulator-pcb.js';
 
 const W = 1010, BH = 493, MW = 712;                      // the drawing: the main board (MW x BH), the snap-off part
@@ -119,7 +120,7 @@ function modules(board, hasDisp, hasSw) {
   const segs = ['CA', 'CB', 'CC', 'CD', 'CE', 'CF', 'CG'].map((c, i) => `${c}(${pinsOf(board, 'seg')[i] ?? ''})`).concat(`DP(${pinsOf(board, 'dp')[0] ?? ''})`);
   const holes = (y) => Array.from({ length: 2 * 30 }, (_, i) => `<rect x="${52 + (i % 30) * 11}" y="${y + Math.floor(i / 30) * 9}" width="3" height="3" fill="#a59c82"/>`).join('');
   // the wires: the segments to PMOD1A's pins, the anodes to PMOD1B's lower row
-  const wire = (x0, x1, y1, colour) => `<path d="M${x0},176 C${x0},${y1 - 6} ${x1},${176} ${x1},${y1}" fill="none" stroke="${colour}" stroke-width="2.5"/>`;
+  const wire = (x0, x1, y1, colour) => `<path d="M${x0},176 C${x0},${y1 - 6} ${x1},${176} ${x1},${y1}" fill="none" stroke="${esc(colour)}" stroke-width="2.5"/>`;
   const colours = ['#c0392b', '#e67e22', '#f1c40f', '#27ae60', '#2980b9', '#8e44ad', '#7f8c8d', '#ecf0f1'];
   const disp = !hasDisp ? '' : `<g data-module="display">
     <rect x="40" y="8" width="340" height="168" rx="6" fill="#ebe6d6" stroke="#b7ae94" stroke-width="2"/>${holes(20)}${holes(150)}
