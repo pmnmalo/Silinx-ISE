@@ -1,5 +1,5 @@
 // Silinx elaboration - the actual of a VHDL port (#2565): VHDL-93 wants a static signal name there, a conversion of one, or a
-// constant expression (LRM 4.3.2.2). XST rejects an operator on a signal ("Actual, result of operator, …
+// constant expression (the LRM's association lists). XST rejects an operator on a signal ("Actual, result of operator, …
 // is not a Signal", HDLParsers:864) and a name indexed by a signal ("Value i is not static",
 // HDLParsers:852), but takes `not s`, a conversion (`std_logic_vector(u)`) and a constant expression
 // (`"00" & "11"`, `C + 1`, `-1`).
