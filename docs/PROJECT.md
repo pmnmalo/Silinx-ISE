@@ -38,7 +38,7 @@ All under `/api`. JSON in/out. Errors: `{ error: "message" }` with 4xx/5xx.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | /projects | list `[{ name, device, top }]` |
+| GET | /projects | list `[{ name, device, top, board, modified }]` |
 | POST | /projects | `{ name, template?: 'empty' or an example (GET /templates: gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt), device?, board? }` create |
 | GET | /projects/:p | project json + `fileTree` |
 | PUT | /projects/:p | replace project json |
@@ -47,10 +47,10 @@ All under `/api`. JSON in/out. Errors: `{ error: "message" }` with 4xx/5xx.
 | PUT | /projects/:p/file?path=... | write raw text body |
 | DELETE | /projects/:p/file?path=... | delete file (and remove from files list) |
 | GET | /projects/:p/sources | `[{ path, lang, role, text }]` all HDL sources (for the in-browser compiler) |
-| GET | /devices | the parts of every ISE 14.7 WebPACK family + boards database (server/devices.js) |
+| GET | /devices | the parts of every ISE 14.7 WebPACK family and the iCE40 + boards database (server/devices.js) |
 | GET | /toolchain | detected ISE + programmer tools |
 | PUT | /toolchain | save toolchain settings (`~/.silinx/config.json`) |
-| POST | /projects/:p/implement | `{ steps?: ['synth','translate','map','par','bitgen'] }` -> `{ job }` |
+| POST | /projects/:p/implement | `{ steps?: ['synth','translate','map','par','trce','bitgen','prombit'] }` -> `{ job }` |
 | GET | /projects/:p/reports | parsed utilization / timing summaries of last run |
 | POST | /program | `{ project?, bitfile?, tool?, cable?, board?, position? }` -> `{ job }` |
 | POST | /jtag/scan | `{ tool?, cable? }` -> `{ job }` |
