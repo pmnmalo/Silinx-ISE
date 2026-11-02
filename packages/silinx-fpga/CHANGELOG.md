@@ -3,7 +3,14 @@
 What changed in each version of silinx-fpga, the Silinx toolchain. The newest version is first. Its versions
 are its own (semver, 0.x until its API is stable), apart from Silinx ISE's.
 
+## 0.2.1
+
+The package of 0.2.0, published: 0.2.0 was tagged but not published, its release CI failed on the IDE's side (the
+release zip carried nextpnr-ice40, #2570; a UI test, #2571). No change in the package since 0.2.0.
+
 ## 0.2.0
+
+Tagged but not published (see 0.2.1).
 
 In short:
 
