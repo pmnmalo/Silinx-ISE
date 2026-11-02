@@ -20,6 +20,7 @@ architecture rtl of prm is
   signal n : integer range 0 to 2499999 := 0;   -- 10 steps per second at 25 MHz
   signal a : unsigned(2 downto 0) := (others => '0');
   signal q : std_logic_vector(7 downto 0);
+  signal addr : std_logic_vector(10 downto 0);   -- (a port's actual is a signal's name, as XST requires, #2602)
 begin
   u_dcm : DCM_SP generic map (CLKFX_MULTIPLY => 2, CLKFX_DIVIDE => 4, CLKIN_PERIOD => 20.0)
     port map (CLKIN => clk, RST => '0', CLKFX => fx);
@@ -29,8 +30,9 @@ begin
       if n = 2499999 then n <= 0; a <= a + 1; else n <= n + 1; end if;
     end if;
   end process;
+  addr <= "00000000" & std_logic_vector(a);
   u_rom : RAMB16_S9 generic map (INIT_00 => X"00000000000000000000000000000000000000000000000080402010080402FF")
-    port map (DO => q, DOP => open, ADDR => "00000000" & std_logic_vector(a), CLK => c25, DI => X"00", DIP => "0", EN => '1', SSR => '0', WE => '0');
+    port map (DO => q, DOP => open, ADDR => addr, CLK => c25, DI => X"00", DIP => "0", EN => '1', SSR => '0', WE => '0');
   led <= q xor sw;
 end rtl;
 `;
