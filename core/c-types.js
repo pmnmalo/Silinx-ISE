@@ -7,7 +7,6 @@ import { floatType } from './c-float.js';
 import { fixedType } from './c-fixed.js';
 
 export const INT = Object.freeze({ w: 32, s: true, ap: false });
-export const UINT = Object.freeze({ w: 32, s: false, ap: false });
 export const BOOL = Object.freeze({ w: 1, s: false, ap: false, bool: true });
 
 /** The type of a parsed Type (core/c-parse.js) of an integer, else null. */

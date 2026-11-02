@@ -81,8 +81,5 @@ export function mountHard(ctx) {
     const reach = clockReachOf(sites[n.outpins[0].inst].name);
     if (reach) for (const p of n.inpins) if (p.pin === 'CLK' && packed.insts[p.inst].kind === 'slice') allowedOf[p.inst] = reach;
   }
-  // RAMs and shift registers (instances of type SLICEM) only on SLICEM sites (the left column of a CLB)
-  const allowedAt = (i, k) => (!allowedOf[i] || allowedOf[i].has(dev.slices.get(k).name)) && (packed.insts[i].type !== 'SLICEM' || dev.slices.get(k).type === 'SLICEM');
-
   return { allowedOf, hardOk, hardSites, hardUsed, setHard };
 }
