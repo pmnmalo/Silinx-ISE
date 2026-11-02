@@ -51,6 +51,7 @@ uiTest('#1220 Unset as Top Module: on the top\'s menu, the project without a top
   } else {
     // the ISE style interface's Project menu: Set as Top Module of the selected module; on the top, Unset
     await page.treeRow('#hier', 'b', { exact: true });
+    await page.waitFor(() => window.Silinx?.sel?.module === 'b', [], { what: 'b selected' });
     assert.ok((await page.openMenu('Project')).some((i) => i.label === 'Set as Top Module'));
     await page.closeMenus();
   }
@@ -60,7 +61,10 @@ uiTest('#1220 Unset as Top Module: on the top\'s menu, the project without a top
   await page.waitFor(() => window.Silinx.project.top === 'b', [], { what: 'b the top' });
   await waitSaved('UnsetPj', 'b');
   if (!await page.eval(() => document.documentElement.dataset.layout === 'tasks')) {
+    // (the hierarchy drawn again with b the top, first: its rows' order changes under the click otherwise, #2630)
+    await page.waitFor(() => document.querySelector('#hier .row.top-mod .lbl')?.textContent.trim() === 'b', [], { what: 'b the top in the hierarchy' });
     await page.treeRow('#hier', 'b', { exact: true });
+    await page.waitFor(() => window.Silinx?.sel?.module === 'b', [], { what: 'b selected' });
     const items = (await page.openMenu('Project')).map((i) => i.label);
     assert.ok(items.includes('Unset as Top Module') && !items.includes('Set as Top Module'), items.join(', '));
     await page.closeMenus();
