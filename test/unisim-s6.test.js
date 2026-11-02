@@ -19,7 +19,8 @@ import { postSynthesisModels, SIM_PRIMITIVES } from '../core/sim-model.js';
 import { scalarizeNetlist } from '../core/netlist-hier.js';
 import { PRIMITIVE_MODELS } from '../core/compiled-prims.js';
 import { frontEnd, compareNetlist, stimulus, runSilinx, compareRuns, rng } from './diff-synth.js';
-import { diffCycles, rng as rng2 } from './compiled-diff.js';
+import { diffCycles, designOf, rng as rng2 } from './compiled-diff.js';
+import { compileDesign } from '../core/compiled-sim.js';
 
 const S6 = ['CARRY4', 'SRLC32E', 'RAM128X1S', 'RAM128X1D', 'RAM256X1S', 'RAM32M', 'RAM64M', 'DSP48A1', 'RAMB8BWER', 'RAMB16BWER'];
 
@@ -103,8 +104,11 @@ for (const d of DESIGNS) {
     assert.deepEqual(m.unknown, []);
     const vhdl = { path: 'm_synthesis.vhd', lang: 'vhdl', text: scalarizeNetlist(m.vhdl) };
     assert.equal(rtlVsModel(fe.design, vhdl, 'm', { cycles: 300, sim: d.sim, seed: d.name }), null, 'the VHDL model differs from the RTL');
-    // the compiled engine, on both models
+    // the compiled engine, on both models, with no warnings (#2639: a RAM32M's or a RAM64M's DID, which Yosys leaves
+    // unconnected, had no driver)
     for (const model of [vhdl, { path: 'm_synthesis.v', lang: 'verilog', text: m.verilog }]) {
+      const cs = await compileDesign(designOf([{ ...model, role: 'design' }], 'm'), { run: yosysNode });
+      assert.deepEqual(cs.warnings, [], `${model.lang}: the compiled engine's warnings`);
       const ins = fe.design.top.ports.filter(p => p.dir === 'in' && p.name !== 'clk'), g = rng2(720), cur = {};
       const res = await diffCycles([{ ...model, role: 'design' }], 'm', { cycles: 300, inputs: k => { for (const x of ins) if (k === 0 || g() < 0.3) cur[x.name] = BigInt(Math.floor(g() * 2 ** Math.min(x.sig.t.w, 30))); return cur; } });
       assert.deepEqual(res.mismatches, [], `${model.lang}: the compiled engine differs`);
