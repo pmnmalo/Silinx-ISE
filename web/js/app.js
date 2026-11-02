@@ -346,6 +346,7 @@ export function openDoc(spec) {
   activateDoc(doc, spec);
   Object.assign(doc, spec.create(doc.el, doc) || {});
   doc.onActivate?.();
+  refreshSteps();   // (its editor made: the toolbar's Undo / Redo follow it at once, not at the next click or second, #2589)
   saveViewState();
   return doc;
 }
@@ -362,6 +363,7 @@ export function activateDoc(doc, { background = false } = {}) {
   if (!keepView && !background) drawerGiveWay();   // a narrow screen: the drawer gives way to the document (#266)
   updateTitle();
   saveViewState();
+  refreshSteps();   // (the toolbar's buttons follow the document in front, #2589)
   // (said, for the Tasks layout to bring its task forward, also when it was in front already behind another task: #1191)
   dispatchEvent(new CustomEvent('silinx:doc-activated', { detail: { doc, background } }));
 }
