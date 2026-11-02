@@ -22,7 +22,7 @@ the code and the lessons learnt.
 - **Tests assert the warnings too**: the exact expected warnings of every flow (Check Syntax,
   simulation, synthesis, implementation, ISE), or an explicit "no warnings", never only "no errors".
 - **The examples are the test designs**: gates, traffic, blinky, pong, stopwatch, clock,
-  vga, isqrt (`examples/`, in that order). Each must run on every device of the Silinx toolchain
+  vga, isqrt, uart (`examples/`, in that order). Each must run on every device of the Silinx toolchain
   (Basys2-100/250, Nexys2-500/1200, Nexys3, Atlys: `TARGETS` in `test/examples-lib.mjs`) and build with ISE with no
   warnings. A new source style or
   feature should be exercised by an example where it fits.
