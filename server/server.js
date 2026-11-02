@@ -9,6 +9,7 @@ import { orderExamples } from '../core/examples.js';
 import { orderTestDesigns } from '../core/test-designs.js';
 import { importMapPackages } from './import-map.js';
 import { contentSecurityPolicy, inlineScriptHashes } from './csp.js';
+import { configDir } from './toolchain.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -37,12 +38,12 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   const app = express();
   // The API changes files and runs the ISE flow: only the Silinx page itself may call it.
   // A request from another web origin (a malicious page in the same browser) is refused, and when
-  // bound to localhost the Host header must be local too (DNS rebinding). Bound to another address
-  // (--host 0.0.0.0, a LAN address), the API answers only this machine's own requests (a loopback
-  // client and a local Host) or those carrying the server's token (X-Silinx-Token; printed in the URL at
-  // start-up): another machine, or a page rebinding its name to this one, has neither. ?token= is taken on
-  // the download links only (export.xise, export.zip: a GET a link opens, #1434): an address stays in the
-  // browser's history and in proxies' logs.
+  // bound to localhost the Host header must be local too (DNS rebinding). With a token (`serve` makes one
+  // at every start, on every address, #2564), the API answers only the requests that carry it
+  // (X-Silinx-Token; printed in the URL at start-up): another user of this computer, another machine, or a
+  // page rebinding its name to this one, has none. ?token= is taken on the download links only
+  // (export.xise, export.zip: a GET a link opens, #1434): an address stays in the browser's history and in
+  // proxies' logs. Without a token (tests, an app embedding the server) only loopback is allowed.
   const LOCAL = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
   const DOWNLOAD = /^\/projects\/[^/]+\/export\.(xise|zip)$/;
   const exposed = !isLoopback(host);
@@ -53,10 +54,9 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
     // never cached (#1434): a project's text would stay in the browser's disk cache after the project is deleted
     res.set('Cache-Control', 'no-store');
     const hostName = String(req.headers.host || '').replace(/:\d+$/, '').toLowerCase();
-    if (exposed) {
-      if (!(isLoopback(req.socket.remoteAddress || '') && LOCAL.has(hostName)) && !tokenOk(req.headers['x-silinx-token']) && !(req.method === 'GET' && DOWNLOAD.test(req.path) && tokenOk(req.query.token)))
-        return res.status(403).json({ error: 'this Silinx server needs its token: open the URL it printed at start-up' });
-    } else if (hostName && !LOCAL.has(hostName) && hostName !== String(host).toLowerCase()) return res.status(403).json({ error: 'forbidden host' });
+    if (!exposed && hostName && !LOCAL.has(hostName) && hostName !== String(host).toLowerCase()) return res.status(403).json({ error: 'forbidden host' });
+    if (token && !tokenOk(req.headers['x-silinx-token']) && !(req.method === 'GET' && DOWNLOAD.test(req.path) && tokenOk(req.query.token)))
+      return res.status(403).json({ error: 'this Silinx server needs its token: open the URL it printed at start-up' });
     // a request another site's page made (an <img>, a link, a form: the browser says so in
     // Sec-Fetch-Site) is refused, a GET too: some GETs write a file or start a process
     if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({ error: 'cross-site request refused' });
@@ -143,20 +143,35 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   return app;
 }
 
+/** The file that holds the token of the server on `port` while it runs: a second `serve` (the launcher
+ *  double-clicked twice) opens the running server with it; readable by its owner only. */
+export const tokenFile = port => path.join(configDir(), `server-${port}.token`);
+
 export async function startServer({ port = 8642, host = '127.0.0.1' } = {}) {
-  // another address than loopback: a token for the API, made anew at every start
-  const token = isLoopback(host) ? null : crypto.randomBytes(18).toString('base64url');
+  // a token for the API, made anew at every start, on loopback too (#2564): another user of this
+  // computer reaches 127.0.0.1 as well
+  const token = crypto.randomBytes(18).toString('base64url');
   const app = await createApp({ host, token });
   return new Promise((resolve, reject) => {
     // Express 5 calls the listen callback with the error too (a port in use): not "running"
     const srv = app.listen(port, host, err => {
       if (err) return reject(err);
+      const real = srv.address().port;
+      const file = tokenFile(real);
+      try {
+        fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+        fs.rmSync(file, { force: true });   // written anew, so the mode below holds
+        fs.writeFileSync(file, token, { mode: 0o600 });
+        srv.on('close', () => fs.rmSync(file, { force: true }));
+      } catch { /* no configuration folder: a second launch only says it is running */ }
+      const shown = ['0.0.0.0', '::'].includes(host) ? '127.0.0.1' : host;
+      srv.silinxUrl = `http://${shown}:${real}/#token=${token}`;
       console.log(`Silinx running at http://${host}:${port}  (workspace: ${P.workspaceDir()})`);
-      if (token) {
+      if (!isLoopback(host)) {
         console.log(`WARNING: listening on ${host}, not only on this machine. Other computers that can reach this port need the address below (with its token);`);
         console.log('         anyone who has it can change your projects and run the toolchain. Use the default (127.0.0.1) unless you need this.');
-        console.log(`         http://${['0.0.0.0', '::'].includes(host) ? '<this computer>' : host}:${port}/#token=${token}`);
-      }
+        console.log(`         http://${['0.0.0.0', '::'].includes(host) ? '<this computer>' : host}:${real}/#token=${token}`);
+      } else console.log(`Open it at ${srv.silinxUrl}`);
       srv.silinxToken = token;
       resolve(srv);
     });

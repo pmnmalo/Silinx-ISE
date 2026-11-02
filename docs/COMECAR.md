@@ -116,7 +116,8 @@ Abre-se uma janela preta (o servidor do Silinx) e depois o browser mostra o Sili
 **http://127.0.0.1:8642**.
 
 - **Mantenha a janela preta aberta** enquanto trabalha. Fechá-la desliga o Silinx.
-- Fechou o separador do browser sem querer? Volte a http://127.0.0.1:8642 enquanto a janela está aberta.
+- Fechou o separador do browser sem querer? Volte a http://127.0.0.1:8642, no mesmo browser, enquanto a janela está aberta
+  (ou faça duplo clique outra vez no ficheiro).
 - Fazer duplo clique no ficheiro com o Silinx já a correr só volta a abrir o browser.
 
 **Só da primeira vez pode aparecer:**
@@ -198,5 +199,5 @@ Terminal, escreva `cd `, arraste a pasta para a janela e carregue em Enter).
 git clone https://github.com/pmnmalo/Silinx-ISE.git
 cd Silinx-ISE
 npm install
-npm start            # http://127.0.0.1:8642
+npm start            # mostra o endereço a abrir: http://127.0.0.1:8642/#token=…
 ```

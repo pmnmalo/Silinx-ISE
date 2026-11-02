@@ -19,7 +19,9 @@ for (const launcher of launchersOf()) {
     let srv;
     try {
       srv = await startLauncher(ROOT, launcher, tmp);
-      const templates = await (await fetch(`${srv.url}/api/templates`)).json();
+      // the API needs the token made at this start (#2564)
+      assert.equal((await fetch(`${srv.url}/api/templates`)).status, 403);
+      const templates = await (await fetch(`${srv.url}/api/templates`, { headers: srv.headers() })).json();
       assert.ok(templates.includes('blinky'), JSON.stringify(templates));
       assert.match(srv.output(), new RegExp(`http://127\\.0\\.0\\.1:${srv.port}`));
       // the workspace given, not the user's

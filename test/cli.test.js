@@ -264,11 +264,23 @@ test('serve: starts on the given port with the scratch workspace and opens the b
   const { port } = s;
   try {
     assert.match(s.out(), new RegExp(`Silinx running at http://127.0.0.1:${port} {2}\\(workspace: ${process.env.SILINX_WORKSPACE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`));
-    const r = await fetch(`http://127.0.0.1:${port}/api/projects`);
+    // the API needs the token made at this start (#2564): printed, opened, and in the configuration folder
+    const token = /Open it at http:\/\/127\.0\.0\.1:\d+\/#token=([\w-]+)$/m.exec(s.out())?.[1];
+    assert.ok(token, s.out());
+    assert.equal(fss.readFileSync(path.join(process.env.SILINX_CONFIG_DIR, `server-${port}.token`), 'utf8'), token);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/projects`)).status, 403);
+    const r = await fetch(`http://127.0.0.1:${port}/api/projects`, { headers: { 'X-Silinx-Token': token } });
     assert.equal(r.status, 200);
     assert.ok(Array.isArray(await r.json()));
     for (let i = 0; i < 300 && !fss.existsSync(env.FAKE_OPEN_LOG); i++) await sleep(10);
-    assert.match(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'), new RegExp(`(open|xdg-open) http://127.0.0.1:${port}`));
+    assert.match(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'), new RegExp(`(open|xdg-open) http://127.0.0.1:${port}/#token=${token}`));
+    // a second launch (the launcher double-clicked twice): "already running", and opens it with the token
+    await fs.rm(env.FAKE_OPEN_LOG, { force: true });
+    const again = await cli(['serve', '--port', String(port), '--open']);
+    assert.equal(again.code, 0, again.err);
+    assert.match(again.out, new RegExp(`^Silinx is already running at http://127.0.0.1:${port}$`, 'm'));
+    for (let i = 0; i < 300 && !fss.existsSync(env.FAKE_OPEN_LOG); i++) await sleep(10);
+    assert.match(await fs.readFile(env.FAKE_OPEN_LOG, 'utf8'), new RegExp(`http://127.0.0.1:${port}/#token=${token}`));
   } finally { await stop(s.proc); }
   await fs.rm(env.FAKE_OPEN_LOG, { force: true });
   // PORT from the environment, host 0.0.0.0 shown as 127.0.0.1 in the URL
@@ -276,7 +288,9 @@ test('serve: starts on the given port with the scratch workspace and opens the b
   const port2 = s2.port;
   try {
     assert.match(s2.out(), new RegExp(`Silinx running at http://0.0.0.0:${port2}`));
-    assert.equal((await fetch(`http://127.0.0.1:${port2}/api/templates`)).status, 200);
+    const token2 = /\/#token=([\w-]+)$/m.exec(s2.out())?.[1];
+    assert.equal((await fetch(`http://127.0.0.1:${port2}/api/templates`)).status, 403);
+    assert.equal((await fetch(`http://127.0.0.1:${port2}/api/templates`, { headers: { 'X-Silinx-Token': token2 } })).status, 200);
   } finally { await stop(s2.proc); }
 });
 

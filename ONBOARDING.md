@@ -14,7 +14,7 @@ together, where things are, and the lessons learnt.
 ```bash
 git clone https://github.com/pmnmalo/Silinx-ISE.git && cd Silinx-ISE
 npm ci
-npm start          # http://127.0.0.1:8642
+npm start          # prints the address to open: http://127.0.0.1:8642/#token=…
 ```
 
 - **No ISE is needed** for almost everything: the browser edition and the Silinx toolchain run without it.

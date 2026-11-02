@@ -39,21 +39,26 @@ async function main() {
   if (['help', '--help', '-h'].includes(cmd) || args.includes('--help') || args.includes('-h')) { console.log(USAGE); return; }
   switch (cmd) {
     case 'serve': {
-      const { startServer, openBrowser } = await import('../server/server.js');
+      const { startServer, openBrowser, tokenFile } = await import('../server/server.js');
       const port = +opt('port', process.env.PORT || 8642), host = opt('host', '127.0.0.1');
       const url = `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}`;
+      let srv;
       try {
-        await startServer({ port, host });
+        srv = await startServer({ port, host });
       } catch (e) {
         if (e.code !== 'EADDRINUSE') throw e;
-        // already running (e.g. the launcher was double-clicked twice): just open it
-        const up = await fetch(`${url}/api/templates`).then(r => r.ok).catch(() => false);
+        // already running (e.g. the launcher was double-clicked twice): just open it, with the token it
+        // wrote for its owner (#2564)
+        let token = null;
+        try { token = fs.readFileSync(tokenFile(port), 'utf8').trim(); } catch { /* none written */ }
+        const headers = token ? { 'X-Silinx-Token': token } : {};
+        const up = await fetch(`${url}/api/templates`, { headers }).then(r => r.ok).catch(() => false);
         if (!up) { console.error(`Port ${port} is used by another program. Start Silinx on another port: node bin/silinx-ise.js serve --port ${port + 1}`); process.exit(1); }
         console.log(`Silinx is already running at ${url}`);
-        if (args.includes('--open')) await openBrowser(url);
+        if (args.includes('--open')) await openBrowser(token ? `${url}/#token=${token}` : url);
         process.exit(0);
       }
-      if (args.includes('--open')) await openBrowser(url);
+      if (args.includes('--open')) await openBrowser(srv.silinxUrl);
       console.log('Keep this window open while you use Silinx. To stop it, close the window or press Ctrl+C.');
       break;
     }

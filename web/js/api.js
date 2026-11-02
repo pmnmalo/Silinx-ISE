@@ -1,12 +1,13 @@
 // Thin REST client for the Silinx server.
 
-// A server reached from another computer (serve --host 0.0.0.0) answers only with its token, given
-// in the address it prints (…/#token=…): kept for the tab, sent with every request.
+// The server answers only with its token, made at every start (#2564) and given in the address it
+// prints and opens (…/#token=…): kept for this browser (another tab opened at the plain address has it
+// too, until the server restarts), sent with every request.
 const TOKEN = (() => {
   try {
     const m = /(?:^#|&)token=([\w-]+)/.exec(location.hash);
-    if (m) { sessionStorage.setItem('silinx-token', m[1]); history.replaceState(null, '', location.pathname + location.search); }
-    return sessionStorage.getItem('silinx-token');
+    if (m) { localStorage.setItem('silinx-token', m[1]); history.replaceState(null, '', location.pathname + location.search); }
+    return localStorage.getItem('silinx-token');
   } catch { return null; }
 })();
 const auth = (headers = {}) => (TOKEN ? { ...headers, 'X-Silinx-Token': TOKEN } : headers);
