@@ -52,9 +52,6 @@ export function mountValues(ctx) {
   // a vector of no bit (a VHDL null range): not declared, not assigned
   const nullVec = t => t?.kind === 'logic' && t.w === 0;
 
-  function ctxFor(proc) {
-    return { proc, locals: new Map(), fn: null, flags: [] };
-  }
   // the variables of a function are its own (v<slot>); those of processes and inlined procedures
   // become module-level registers named after their process. No dot in these names: Yosys takes a
   // name with a dot for a hierarchical reference in places (as a for loop variable it unrolled the

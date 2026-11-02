@@ -828,12 +828,6 @@ export function withComments(text, s0, e0, lang) {
   if (isC.test(rest) && !own.test(rest)) e += rest.replace(/\s+$/, '').length;
   return [s, e];
 }
-// a Verilog text with its compiler directive lines (`ifdef, `else, `endif, `define…) blanked (the
-// same offsets): a statement after `endif starts at its own keyword
-export function blankDirectives(text) {
-  return text.replace(/^[ \t]*`(ifdef|ifndef|elsif|else|endif|define|undef|include|timescale|default_nettype|resetall|celldefine|endcelldefine|line|pragma)\b[^\n]*/gm, m => ' '.repeat(m.length));
-}
-
 // Verilog statement extent (token index -> index after the statement)
 export function vStmt(toks, i) {
   const t = toks[i];

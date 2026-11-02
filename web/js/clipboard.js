@@ -93,5 +93,3 @@ export const canPasteText = () => readable !== false || hasClip('text');
 export function noteCopy(text, kind = 'text', data = null) {
   mem = { text, kind, data: clone(data) };
 }
-
-export { encode as encodeClip, decode as decodeClip };
