@@ -276,7 +276,9 @@ export const TOOLS = [
       if (typeof text !== 'string') throw toolError('text: the whole text of the file');
       // the path as the project lists it: ./silinx.json is silinx.json (#1233)
       const key = P.relKey(P.projectDir(name), await projectPath(name, rel));
-      if (key === P.PROJECT_FILE || key === 'build' || key.startsWith('build/')) throw toolError(`'${rel}' is written by Silinx itself`);
+      const low = key.toLowerCase();
+      if (low === P.PROJECT_FILE || low === 'build' || low.startsWith('build/')) throw toolError(`'${rel}' is written by Silinx itself`);
+      if (key.split('/').some(s => s.startsWith('.'))) throw toolError(`'${rel}': a hidden file or folder cannot be written`);
       rel = key;
       const existed = (await P.fileTree(name)).includes(rel);
       try { await P.writeFile(name, rel, text); } catch (e) { throw toolError(e.message); }

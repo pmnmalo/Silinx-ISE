@@ -47,7 +47,8 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   const DOWNLOAD = /^\/projects\/[^/]+\/export\.(xise|zip)$/;
   const exposed = !isLoopback(host);
   if (exposed && !token) throw new Error('a server on a non-loopback address needs a token');
-  const tokenOk = t => typeof t === 'string' && t.length === token.length && crypto.timingSafeEqual(Buffer.from(t), Buffer.from(token));
+  const digest = s => crypto.createHash('sha256').update(s).digest();
+  const tokenOk = t => typeof t === 'string' && crypto.timingSafeEqual(digest(t), digest(token));
   app.use('/api', (req, res, next) => {
     // never cached (#1434): a project's text would stay in the browser's disk cache after the project is deleted
     res.set('Cache-Control', 'no-store');
@@ -66,8 +67,8 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
     }
     next();
   });
-  app.use(express.json({ limit: '20mb' }));
-  app.use(express.text({ type: 'text/*', limit: '20mb' }));
+  app.use('/api', express.json({ limit: '20mb' }));
+  app.use('/api', express.text({ type: 'text/*', limit: '20mb' }));
 
   // Content-Security-Policy of the pages: scripts only from the server itself (and the pages' own
   // inline scripts, by their hashes), no plug-ins, no framing; so a script injected into a page
@@ -76,12 +77,9 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   // address sent to another site, and no word of the server's software
   app.disable('x-powered-by');
   app.use((req, res, next) => { res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' }); next(); });
-  app.use((req, res, next) => {
-    const file = req.path.endsWith('/') ? `${req.path}index.html` : req.path;
-    if (/\.html$/.test(file)) { const csp = pageCsp(path.join(ROOT, 'web', path.normalize(file))); if (csp) res.set('Content-Security-Policy', csp); }
-    next();
-  });
-  app.use('/', express.static(path.join(ROOT, 'web')));
+  // (on the file served, so however the URL spells it)
+  const setHeaders = (res, file) => { if (/\.html$/i.test(file)) { const csp = pageCsp(file); if (csp) res.set('Content-Security-Policy', csp); } };
+  app.use('/', express.static(path.join(ROOT, 'web'), { setHeaders }));
   app.use('/core', express.static(path.join(ROOT, 'core')));
   // the toolchain's package (silinx-fpga, #1677): its code, which core/'s re-exports import
   app.use('/packages/silinx-fpga/src', express.static(path.join(ROOT, 'packages/silinx-fpga/src')));
@@ -136,6 +134,12 @@ export async function createApp({ host = '127.0.0.1', token = null } = {}) {
   registerImplRoutes(api, { wrap, projects: P });
 
   app.use('/api', api);
+  // an error no route answered (a bad body, a bad address): its message, never a stack trace with the server's paths
+  app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({ error: status < 500 ? err.message : 'internal server error' });
+  });
   return app;
 }
 

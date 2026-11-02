@@ -253,6 +253,8 @@ export async function deleteProject(name) {
 
 // project-relative path normalised to forward slashes, without './' or a trailing '/'
 export const relKey = (dir, full) => path.relative(dir, full).split(path.sep).join('/');
+// (whatever its case: on a case-insensitive file system SILINX.JSON is the same file)
+const isProjectFile = key => key.toLowerCase() === PROJECT_FILE;
 
 export async function readFile(name, rel) {
   const full = safeJoin(projectDir(name), rel);
@@ -267,7 +269,7 @@ export async function writeFile(name, rel0, text) {
   // project's description, written by the project's own routes (as the browser store refuses it)
   const rel = relKey(dir, full);
   if (!rel) throw new HttpError(400, 'missing path');
-  if (rel === PROJECT_FILE) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
+  if (isProjectFile(rel)) throw new HttpError(400, `${PROJECT_FILE} is the project's description`);
   await fs.mkdir(path.dirname(full), { recursive: true });
   // atomic: a reader (or a crash) never sees a half-written / empty file
   const tmp = path.join(path.dirname(full), `.${path.basename(full)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);   // hidden: not listed
@@ -301,7 +303,7 @@ export async function renameFile(name, from, to) {
   const src = safeJoin(dir, from), dst = safeJoin(dir, to);
   if (src === dir || dst === dir) throw new HttpError(400, 'cannot rename the project folder itself');
   const fromKey = relKey(dir, src), toKey = relKey(dir, dst);
-  if (fromKey === PROJECT_FILE || toKey === PROJECT_FILE) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
+  if (isProjectFile(fromKey) || isProjectFile(toKey)) throw new HttpError(400, `${PROJECT_FILE} cannot be renamed`);
   return withProjectLock(name, async () => {
     let st;
     try { st = await fs.stat(src); } catch { throw new HttpError(404, `file '${from}' not found`); }
@@ -337,7 +339,7 @@ export async function deleteFile(name, rel) {
   const full = safeJoin(dir, rel);
   if (full === dir) throw new HttpError(400, 'cannot delete the project folder itself (delete the project instead)');
   const key = relKey(dir, full);
-  if (key === PROJECT_FILE) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
+  if (isProjectFile(key)) throw new HttpError(400, `${PROJECT_FILE} cannot be deleted`);
   await withProjectLock(name, async () => {
     await fs.rm(full, { recursive: true, force: true });
     const pj = await readProject(name);

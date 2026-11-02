@@ -89,7 +89,7 @@ const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const bad = msg => Object.assign(new Error(msg), { status: 400 });
 
 /** This computer's settings script, set through the API: an existing file outside the workspace
- *  (whose files the API writes), owned by root or this user and writable by nobody else, its folders too. */
+ *  (whose files the API writes), owned by root or this user and writable by nobody else, its folders too. Its real path, the one to keep: a link could be changed after this check. */
 async function checkLocalSettings(file) {
   if (!path.isAbsolute(file)) throw bad('local.settings must be an absolute path');
   let real;
@@ -99,7 +99,8 @@ async function checkLocalSettings(file) {
   try { ws = await fs.realpath(ws); } catch { /* no workspace yet */ }
   if (real === ws || real.startsWith(ws + path.sep)) throw bad('local.settings cannot be a file of the workspace');
   if (!(await fs.stat(real)).isFile()) throw bad(`local.settings: ${file} is not a file`);
-  if (typeof process.getuid !== 'function') return;   // Windows: no owners and modes to check
+  if (!SETTINGS.test(real)) throw bad(`local.settings: ${file} is not ISE's settings64.sh (or settings32.sh)`);
+  if (typeof process.getuid !== 'function') return real;   // Windows: no owners and modes to check
   const me = process.getuid();
   for (let p = real, leaf = true; ; p = path.dirname(p), leaf = false) {
     const st = await fs.stat(p);
@@ -108,6 +109,7 @@ async function checkLocalSettings(file) {
       throw bad(`local.settings: ${p} may be changed by other users (it must belong to root or to you, and be writable by its owner only)`);
     if (p === path.dirname(p)) break;
   }
+  return real;
 }
 
 /** A settings script in the docker image or on the ssh host: an absolute path, not in the folder
@@ -143,7 +145,7 @@ export async function saveConfig(partial, { fromApi = false } = {}) {
   // this computer may call it) only one that the project's files cannot be; a changed value only
   if (fromApi) {
     const changed = key => { const v = at(partial, key); return v !== undefined && !same(v, at(current, key)); };
-    if (changed('local.settings') && cfg.local.settings) await checkLocalSettings(String(cfg.local.settings));
+    if (changed('local.settings') && cfg.local.settings) cfg.local.settings = await checkLocalSettings(String(cfg.local.settings));
     if (['docker.settings', 'ssh.settings', 'ssh.remoteDir'].some(changed)) checkRemoteSettings(cfg);
   }
   if (cfg.docker.image && !IMAGE.test(cfg.docker.image)) throw Object.assign(new Error('docker.image contains invalid characters'), { status: 400 });

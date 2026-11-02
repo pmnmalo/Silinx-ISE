@@ -13,6 +13,7 @@ import { deviceFamily, openOnlyDevice } from '../packages/silinx-fpga/src/parts.
 import { runOpenImplementation, openStatus, openSteps, buildDeviceJob, reportPart } from './open-flow.js';
 import { programJob, scanJob, promJob, readBitInfo, checkBitPart, expectedDevice, parseBitHeader } from './programmer.js';
 import { importXise, importIseSchematics } from './xise.js';
+import { within } from './paths.js';
 import * as Projects from './projects.js';
 import { mountXiseRoutes } from './xise-routes.js';
 import { IDENT } from './ident.js';
@@ -121,6 +122,7 @@ export function registerImplRoutes(api, { wrap, projects: P }) {
     const project = await P.readProject(req.params.p);
     if (!topOf(project)) return { available: false, reason: 'no-top' };
     const dir = path.join(P.projectDir(req.params.p), 'build');
+    if (!within(P.projectDir(req.params.p), dir)) return { available: false, reason: 'no-ncd' };   // (a link out of the project: its cache is written there)
     const f = name => path.join(dir, name);
     const mtime = p => { try { return fss.statSync(p).mtimeMs; } catch { return 0; } };
     const { MODEL_VERSION } = await import('../packages/silinx-fpga/src/parts.js');
