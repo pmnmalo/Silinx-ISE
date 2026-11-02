@@ -29,6 +29,7 @@ test('addAnalytics: GoatCounter\'s loader before the last </body>, once; only on
   assert.match(out, /<script id="silinx-site-analytics">[\s\S]*https:\/\/silinx\.goatcounter\.com\/count[\s\S]*<\/script>\n<\/body><\/html>$/);
   assert.match(out, /if \(\/\\\.github\\\.io\$\/\.test\(location\.hostname\)\)/);
   assert.equal(addAnalytics(out, 'silinx'), out, 'once');
+  assert.ok(out.includes(`s.dataset.goatcounterSettings = '{"title":"Silinx ISE","referrer":""}'`), 'the title fixed, no referrer: a project\'s name is never counted (#2551)');
   for (const bad of ['', 'Silinx', 'a.b', 'x"><script>', '-x']) assert.throws(() => addAnalytics(PAGE, bad), /not a GoatCounter code/);
   assert.throws(() => addAnalytics('<html></html>', 'silinx'), /no <\/body>/);
 });

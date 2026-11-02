@@ -327,9 +327,28 @@ export function ucfPlacesPins(text) {
   return Object.values(parseUcf(text).assignments).some(a => a.loc);
 }
 
-/** A UCF name with wildcards (* any characters, ? one character) as a RegExp of the whole name. */
+/** A UCF name with wildcards (* any characters, ? one character) as a matcher of the whole name, with a RegExp's
+ *  test (flags: 'i' ignores case). Two pointers, no backtracking of a RegExp: a name comes from someone else's
+ *  project, and a*a*a*…b would take a RegExp exponential time. */
 export function ucfPattern(name, flags = '') {
-  return new RegExp(`^${String(name).replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, flags);
+  const fold = s => (flags.includes('i') ? s.toLowerCase() : s);
+  const pat = fold(String(name));
+  const LINE_END = /[\n\r\u2028\u2029]/;
+  return {
+    test(value) {
+      const s = fold(String(value));
+      if (LINE_END.test(s)) return false;   // (a wildcard is on one line)
+      let i = 0, p = 0, star = -1, from = 0;
+      while (i < s.length) {
+        if (p < pat.length && pat[p] === '*') { star = p++; from = i; }
+        else if (p < pat.length && (pat[p] === '?' || pat[p] === s[i])) { p++; i++; }
+        else if (star >= 0) { p = star + 1; i = ++from; }
+        else return false;
+      }
+      while (p < pat.length && pat[p] === '*') p++;
+      return p === pat.length;
+    },
+  };
 }
 const hasWildcard = name => /[*?]/.test(name);
 // a one-bit bus port (std_logic_vector(0 downto 0)) is x in the netlist, its UCF name x<0> (or x(0), x[0]),
