@@ -1,6 +1,7 @@
 // The Spartan-6 designs of the placer's and the router's tests (#729, #730): a design synthesized for the Spartan-6
 // (the open synthesis, Yosys xc6s), packed, its physical design, on the boards' parts.
 import { compile, elaborate } from '../core/compile.js';
+import { primitiveSources } from '../core/unisim.js';
 import { synthesizeOpen } from '../core/synth-front.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
@@ -23,9 +24,10 @@ export function s6Device(part) {
   return devices.get(part);
 }
 
-/** A design synthesized for the Spartan-6, read as the packer reads it. */
+/** A design synthesized for the Spartan-6, read as the packer reads it (the UNISIM primitives it instantiates
+ *  compiled with it, as the flow's front end compiles them). */
 export async function s6Netlist(sources, top) {
-  const d = elaborate(compile(sources), top);
+  const d = elaborate(compile([...primitiveSources(sources), ...sources]), top);
   const r = await synthesizeOpen(d, { family: 'spartan6', run: yosysNode });
   return readYosysJson(r.files[`${r.top}.json`], { top: r.top });
 }

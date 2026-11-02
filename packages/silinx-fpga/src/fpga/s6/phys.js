@@ -12,7 +12,8 @@
 //                      (S's on O6, a 5FF's D on O5, #1143) after them;
 //   AX … DX            the bypass inputs: a storage element's D, the carry's DI or CYINIT (AX), a wide
 //                      multiplexer's select (AX, CX: F7AMUX, F7BMUX; BX: F8MUX);
-//   CLK, CE, SR        the slice's control set; WE, AI … DI the SLICEM's shift registers' enable and data;
+//   CLK, CE, SR        the slice's control set (a SLICEM's RAMs' and shift registers' clock and write enable: CLK, CE);
+//                      AI … DI a SLICEM's RAMs' and shift registers' data (phys-mem.js, #1153);
 //   CIN, COUT          the carry chain, from the CARRY4 below, to the CARRY4 above (dedicated);
 //   A … D (O6), AMUX … DMUX (the multiplexed output), AQ … DQ (the storage element)   the outputs.
 // Constant inputs of a LUT are part of its function; other constant inputs (a bypass input, A6 of an O6 / O5
@@ -35,12 +36,12 @@ import { constraintsFor } from '../../constraints.js';
 import { portAssignments } from '../../ucf.js';
 import { oneBitBusesOf, ucfPortsOf } from '../pack.js';
 import { AND2L, ffKind } from './pack.js';
+import { MEM_TYPE, memConstPins, memInPins, memOutPin, memPositions } from './phys-mem.js';
 
 export class PhysError extends Error {}
 
 const POS = ['A', 'B', 'C', 'D'];
 const LUT_TYPE = /^(LUT[1-6]|INV|BUF)$/;
-const SRL = /^(SRL16E?|SRLC16E|SRLC32E)$/;
 // the cells of sites of their own: site type, kind
 const OWN = {
   IBUF: ['IOB', 'iob'], IBUFG: ['IOB', 'iob'], OBUF: ['IOB', 'iob'], OBUFT: ['IOB', 'iob'], IOBUF: ['IOB', 'iob'],
@@ -82,10 +83,13 @@ export function physS6(nl, packed, { ucf = null } = {}) {
       const q = s.pos[p];
       if (typeof q.o6 === 'number') {
         const c = cells[q.o6];
-        if (!LUT_TYPE.test(c.type) && !SRL.test(c.type)) errors.push(`${c.name} (${c.type}): the SLICEM's distributed RAMs are not placed yet (#729)`);
+        // (a RAM or shift register: one role for all its positions, D first)
+        if (MEM_TYPE.test(c.type)) { if (!role.has(q.o6)) { role.set(q.o6, { inst, r: 'mem', p, ps: memPositions(s, q.o6) }); used.add(q.o6); } }
+        else if (!LUT_TYPE.test(c.type)) errors.push(`${c.name} (${c.type}): not a LUT, RAM or shift register`);
         else if (role.has(q.o6)) errors.push(`${c.name}: a cell in two positions of a slice`);
+        else at(q.o6, 'o6', p);
       }
-      at(q.o6, 'o6', p); at(q.o5, 'o5', p); at(q.ff, 'ff', p); at(q.ff5, 'ff5', p);
+      at(q.o5, 'o5', p); at(q.ff, 'ff', p); at(q.ff5, 'ff5', p);
     }
     at(s.carry, 'carry', null); at(s.f7.A, 'f7', 'A'); at(s.f7.B, 'f7', 'C'); at(s.f8, 'f8', 'B');
     const named = [...POS.map(p => s.pos[p].ff), ...POS.map(p => s.pos[p].o6), s.carry].find(c => typeof c === 'number');
@@ -170,7 +174,7 @@ export function physS6(nl, packed, { ucf = null } = {}) {
   });
 
   const ctrlPin = { C: 'CLK', G: 'CLK', CE: 'CE', GE: 'CE', R: 'SR', S: 'SR', CLR: 'SR', PRE: 'SR' };
-  // the site pin of an input pin of a cell (null: none); n its net
+  // the site pin of an input pin of a cell (null: none; a RAM's: the site pins, an array); n its net
   const inPin = (ci, pin, n) => {
     const r = role.get(ci), c = cells[ci];
     if (!r) return null;
@@ -183,14 +187,8 @@ export function physS6(nl, packed, { ucf = null } = {}) {
     if (internal(ci, pin, n)) return null;
     const s = slicePacked(r.inst);
     switch (r.r) {
+      case 'mem': return memInPins(c, r.ps, pin, n, x => (isConst(x) ? konst.get(x) : null));
       case 'o6': case 'o5': {
-        if (SRL.test(c.type)) {
-          if (pin === 'D') return `${r.p}I`;
-          if (pin === 'CLK') return 'CLK';
-          if (pin === 'CE') return isConst(n) && konst.get(n) === 1 ? null : 'WE';
-          const m = /^A(?:<(\d)>|(\d))$/.exec(pin);
-          return m ? `${r.p}${+(m[1] ?? m[2]) + 2}` : null;
-        }
         if (isConst(n)) return null;
         const k = +(/^I(\d?)$/.exec(pin)[1] || 0);
         return lutPins[r.inst][r.p][r.r][k];
@@ -234,7 +232,8 @@ export function physS6(nl, packed, { ucf = null } = {}) {
     if (inst.kind !== 'slice') return sitePinOf(pin);
     const s = slicePacked(r.inst);
     switch (r.r) {
-      case 'o6': return SRL.test(c.type) && pin === 'Q31' ? `${r.p}MUX` : r.p;
+      case 'mem': return memOutPin(c, r.ps, pin);
+      case 'o6': return r.p;
       case 'o5': case 'ff5': return `${r.p}MUX`;
       case 'ff': return `${r.p}Q`;
       case 'f7': return `${r.p}MUX`;
@@ -263,10 +262,10 @@ export function physS6(nl, packed, { ucf = null } = {}) {
     const net = { name: null, net: n, power: null, clock: insts[role.get(d.ci).inst].kind === 'bufg', driver: null, loads: [] };
     for (const l of nets[n].loads) {
       if (!role.has(l.cell)) continue;
-      const pin = inPin(l.cell, l.pin, n);
-      if (pin !== null) addLoad(net, role.get(l.cell).inst, pin);
+      const pin = inPin(l.cell, l.pin, n), pins = pin === null ? [] : [pin].flat();
+      for (const p of pins) addLoad(net, role.get(l.cell).inst, p);
       // (the connections of the timing estimate: the clocks' left out)
-      if (!net.clock) conns.push({ src: d.ci, dst: l.cell, dstPin: l.pin, srcInst: role.get(d.ci).inst, dstInst: role.get(l.cell).inst, internal: pin === null });
+      if (!net.clock) conns.push({ src: d.ci, dst: l.cell, dstPin: l.pin, srcInst: role.get(d.ci).inst, dstInst: role.get(l.cell).inst, internal: !pins.length });
     }
     if (!net.loads.length) continue;
     const pin = outPin(d.ci, d.pin, n);
@@ -278,6 +277,7 @@ export function physS6(nl, packed, { ucf = null } = {}) {
   // the constant inputs that are pins: the bypass inputs, A6 of the O6 / O5 pairs, the hard blocks', the IOBs'
   for (const [ci, r] of role) {
     const c = cells[ci], kind = insts[r.inst].kind;
+    if (r.r === 'mem') { for (const [sp, v] of memConstPins(c, r.ps, x => (isConst(x) ? konst.get(x) : null))) addLoad(power[v ? 'vcc' : 'gnd'], r.inst, sp); continue; }
     for (const [pin, n] of Object.entries(c.pins)) {
       if (!isConst(n) || c.dirs[pin.replace(/<\d+>$/, '')] === 'output') continue;
       let sp = null;
