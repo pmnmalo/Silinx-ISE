@@ -207,6 +207,17 @@ test('a carry\'s sum and carry out both out of one position: the carry out by it
   assert.deepEqual(checkSlice(bad, nl), [`${g[0].k}FF: a gate (AND2L) but not the carry's sum beside its carry out`]);
 });
 
+test('LUT combining (combine: area) never takes more slices: isqrt\'s first top, whose 5FFs need the O5s a combining that empties no slice took (#2279)', async () => {
+  // (the top of isqrt's first version, #1966: its digits by / 10, its reset a 2-bit shift register; 29 slices with
+  // combining against 28 without, before)
+  const ex = example('isqrt'), top = fs.readFileSync(new URL('./fixtures/s6-pack/isqrt_top_2279.vhd', import.meta.url), 'utf8');
+  const nl = await netlistOf(ex.design.map(f => ({ path: f.path, lang: f.lang, text: f.path.endsWith('isqrt_top.vhd') ? top : f.text })), ex.project.top);
+  const off = packed(nl), area = packed(nl, { combine: 'area' });
+  assert.deepEqual([off.warnings, area.warnings], [[], []]);
+  assert.equal(area.stats.luts, off.stats.luts);
+  assert.ok(area.stats.slices <= off.stats.slices, `${area.stats.slices} <= ${off.stats.slices}`);
+});
+
 test('a cell the packer has no place for: a PackError naming it', () => {
   const nl = { cells: [{ name: 'u0', type: 'ICAP_SPARTAN6', params: {}, pins: {}, dirs: {} }], nets: [{ id: 0, loads: [] }, { id: 1, loads: [] }], ports: [] };
   assert.throws(() => packS6(nl), e => e instanceof PackError && e.message === 'the Spartan-6 packer has no place for the cell u0 (ICAP_SPARTAN6)');
