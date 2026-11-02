@@ -8,3 +8,12 @@ node_modules
 # local notes for Claude Code (not shared)
 CLAUDE.local.md
 test-times.json
+dist/
+
+# never in the repository: keys, and Xilinx's outputs (CLAUDE.md)
+.env
+*.pem
+*.key
+.npmrc
+*.bit
+*.ncd

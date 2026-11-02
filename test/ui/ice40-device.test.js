@@ -49,6 +49,7 @@ uiTest('#2463 an iCE40 project: its processes, a .ucf becomes its .pcf, Check Co
       good: pcfDiagnostics(PINS_TEXT(), ports),
       bad: pcfDiagnostics('set_io clk 35\nset_bogus a\n', ports),
       unknown: pcfDiagnostics('set_io nope 35\n', ports),
+      hostile: pcfDiagnostics(`set_io (a+)+$ 35\nset_io ( 36\n`, ports),   // (a name is no pattern, #2551)
       moved: pj.constraints, logged,
     };
     function PINS_TEXT() { return 'set_io clk 35\nset_io led[0] 11\nset_io led[1] 37\n'; }
@@ -59,6 +60,7 @@ uiTest('#2463 an iCE40 project: its processes, a .ucf becomes its .pcf, Check Co
   assert.deepEqual(r.good, []);
   assert.deepEqual(r.bad, [{ severity: 'error', line: 2, message: 'set_bogus: not a PCF command (set_io, set_frequency)' }]);
   assert.deepEqual(r.unknown, [{ severity: 'warning', message: 'set_io nope: the top has no such port', line: 1 }]);
+  assert.deepEqual(r.hostile, [{ severity: 'warning', message: 'set_io (a+)+$: the top has no such port', line: 1 }, { severity: 'warning', message: 'set_io (: the top has no such port', line: 2 }]);
   assert.equal(r.moved, 'constraints/top.pcf');
   assert.deepEqual(r.logged, ["WARNING: this device's constraints are PCF: constraints/top.pcf is the project's now, constraints/top.ucf was not converted."]);
 
