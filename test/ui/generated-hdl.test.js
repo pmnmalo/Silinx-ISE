@@ -97,7 +97,7 @@ uiTest('#1176 a module written in HDL stays editable; converted to a schematic w
   await page.waitFor(() => window.Silinx.active?.id === 'file:src/inv.vhd' && window.Silinx.active.editor, [], { what: 'the HDL editor' });
   assert.equal(await page.eval(() => window.Silinx.active.editor.readOnly()), false);
   assert.equal(await banner(page), null);
-  assert.deepEqual(await barButtons(page), ['Undo', 'Redo', 'Find (Ctrl+F)', 'Language Templates', 'Check Syntax of this file']);
+  assert.deepEqual(await barButtons(page), ['Find (Ctrl+F)', 'Language Templates', 'Check Syntax of this file']);   // (no Undo / Redo of its own, #2514)
   assert.deepEqual(await editorMenu(page), ['Undo', 'Redo', 'Cut', 'Copy', 'Paste', 'Select All', 'Toggle Comment', 'Find…', 'Rename Symbol…F2', 'Quick Fix…Ctrl+.',
     'Language Templates▸', 'Device Primitives▸', 'Instantiate module▸', 'Check Syntax']);
   // typed, then saved
