@@ -146,6 +146,22 @@ endmodule
   assert.deepEqual(b.waves, a.waves);
 });
 
+test('#2544 a module\'s output left open: open in the schematic\'s HDL, no signal of its own, no warning (VHDL and Verilog)', async () => {
+  const sub = { vhdl: 'library ieee; use ieee.std_logic_1164.all;\nentity sub is port (a : in std_logic; y, z : out std_logic); end;\narchitecture r of sub is begin y <= a; z <= not a; end;\n',
+    verilog: 'module sub(input a, output y, output z); assign y = a; assign z = ~a; endmodule\n' };
+  const top = { vhdl: 'library ieee; use ieee.std_logic_1164.all;\nentity top is port (a : in std_logic; y : out std_logic); end;\narchitecture r of top is begin\n  u: entity work.sub port map (a => a, y => y, z => open);\nend;\n',
+    verilog: 'module top(input a, output y); sub u(.a(a), .y(y), .z()); endmodule\n' };
+  for (const lang of ['vhdl', 'verilog']) {
+    const ext = lang === 'vhdl' ? 'vhd' : 'v';
+    const sources = [{ path: `sub.${ext}`, lang, role: 'design', text: sub[lang] }, { path: `top.${ext}`, lang, role: 'design', text: top[lang] }];
+    const r = await convertModuleToSchematic({ sources, module: 'top' });
+    assert.deepEqual(r.warnings, [], lang);
+    const hdl = r.writes[`top.${ext}`];
+    assert.match(hdl, lang === 'vhdl' ? /z => open/ : /\.z\(\)/, lang);
+    assert.doesNotMatch(hdl, /net_\d/, lang);
+  }
+});
+
 test('moduleUnitRanges: what a file keeps when a module is taken out of it', () => {
   const c = CASES.find(x => x.name === 'verilog-multi');
   const lib = compile(srcList(c.files));

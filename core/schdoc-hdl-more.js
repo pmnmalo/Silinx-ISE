@@ -9,7 +9,7 @@ import { hdlName, vhdlClass } from './schdoc-hdl.js';
 export function mountSymbolCasesMore(ctx) {
   const {
     INN, OUTN, assign, blockLang, body, ci, clsOf, declared, diags, extra, fresh, inNet, init, lang, modules, name, netName,
-    netType, nk, nl, outRead, used, vtype, wrapV
+    isolated, netType, nk, nl, outRead, used, vtype, wrapV
   } = ctx;
 
   const symbolCasesMore = (s, def, p, S, cmt) => {
@@ -204,7 +204,8 @@ export function mountSymbolCasesMore(ctx) {
         if (!mname) { diags.push({ severity: 'error', message: `${s.name}: no module selected`, ref: { kind: 'symbol', id: s.id } }); return; }
         const gens = Object.entries(p.generics || {}).filter(([, v]) => String(v ?? '').trim() !== '');
         const conns = def.pins.map(q => {
-          const n = nl.pinNet.get(`${s.id}/${q.name}`);
+          // (an output left unconnected: open, #2544)
+          const pn = nl.pinNet.get(`${s.id}/${q.name}`), n = q.dir === 'out' && pn?.auto && isolated(pn) ? null : pn;
           let a = n ? (outRead.get(n) && q.dir !== 'out' ? outRead.get(n) : (q.dir === 'out' && outRead.get(n)) || netName(n)) : null;
           if (!a && q.dir !== 'out') diags.push({ severity: 'warning', message: `${s.name}: input ${q.name} of '${mname}' is unconnected`, ref: { kind: 'symbol', id: s.id, pin: q.name } });
           return [q.name, a];

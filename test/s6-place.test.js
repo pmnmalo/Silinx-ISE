@@ -9,7 +9,7 @@ import { placeS6, PlaceError, chainSites } from '../packages/silinx-fpga/src/fpg
 import { checkPlacementS6 } from '../packages/silinx-fpga/src/fpga/s6/place-check.js';
 import { PhysError } from '../packages/silinx-fpga/src/fpga/s6/phys.js';
 import { S6_ESTIMATE, timingGraphS6, analyzeS6 } from '../packages/silinx-fpga/src/fpga/s6/place-timing.js';
-import { EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
+import { S6_EXAMPLES as EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 
 const LX16 = 'xc6slx16csg324-3', LX45 = 'xc6slx45csg324-3';
