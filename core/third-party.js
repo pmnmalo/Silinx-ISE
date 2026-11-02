@@ -111,7 +111,8 @@ export const THIRD_PARTY = [
     "version": "0.11.96-dev.805",
     "license": "ISC",
     "url": "https://yowasp.org/",
-    "standalone": false
+    "standalone": false,
+    "downloaded": true
   },
   {
     "name": "@yowasp/yosys",
