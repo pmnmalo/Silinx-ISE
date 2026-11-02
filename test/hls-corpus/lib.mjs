@@ -15,8 +15,6 @@ export function unitOf(design, texts) {
 
 // (a test bench's run longer than the C simulation's limit of steps: 2 frames of 30000 pixels, 225 taps each, twice, #2234)
 const STEPS = { 'modeling-using-array-stencil-2d': 2_000_000_000 };
-// (a co-simulation not run, its reason: too long until #pragma HLS ARRAY_STENCIL makes its II 1, #2503)
-const NO_COSIM = { 'modeling-using-array-stencil-2d': 'co-simulation not run: II=225 without #pragma HLS ARRAY_STENCIL (#2503), about 6.75M cycles a call, not ended in 9.5 hours' };
 const first = (diags) => diags.find((d) => d.severity === 'error');
 const why = (d) => (d ? `${d.file && !/^unit\.c(pp)?$/.test(d.file) ? `${d.file.split('/').pop()}:` : ''}${d.line}: ${d.message}` : null);
 
@@ -33,9 +31,8 @@ export function runDesign(design, texts, { maxCycles = 100000 } = {}) {
   const gens = ['vhdl', 'verilog'].map((lang) => cToHdl(unit, { ...opts, lang }));
   r.synth = gens.every((g) => g.ok) ? 'pass' : 'fail';
   if (r.synth === 'fail') r.reason ||= `C synthesis: ${why(first(gens.find((g) => !g.ok).diagnostics))}`;
-  if (r.csim === 'pass' && r.synth === 'pass' && NO_COSIM[design.name]) r.reason = NO_COSIM[design.name];
-  else if (r.csim === 'pass' && r.synth === 'pass') {
-    const c = cosimulate(unit, { ...opts, lang: 'vhdl', maxCycles });
+  if (r.csim === 'pass' && r.synth === 'pass') {
+    const c = cosimulate(unit, { ...opts, lang: 'vhdl', maxCycles, ...(maxSteps ? { maxSteps } : {}) });
     r.cosim = c.ok && c.pass ? 'pass' : 'fail';
     r.latency = c.latency;
     if (r.cosim === 'fail') r.reason ||= `co-simulation: ${c.errors[0] || `${c.mismatches.length} mismatch(es)`}`;

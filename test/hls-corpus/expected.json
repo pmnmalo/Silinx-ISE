@@ -554,18 +554,22 @@
     "synth": "pass",
     "cosim": "pass",
     "latency": {
-      "min": 225576,
-      "max": 225576,
-      "avg": 225576
+      "min": 113983,
+      "max": 113983,
+      "avg": 113983
     },
     "reason": null
   },
   "modeling-using-array-stencil-2d": {
     "csim": "pass",
     "synth": "pass",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "co-simulation not run: II=225 without #pragma HLS ARRAY_STENCIL (#2503), about 6.75M cycles a call, not ended in 9.5 hours"
+    "cosim": "pass",
+    "latency": {
+      "min": 385359,
+      "max": 385383,
+      "avg": 385371
+    },
+    "reason": null
   },
   "modeling-using-cpp-templates": {
     "csim": "pass",

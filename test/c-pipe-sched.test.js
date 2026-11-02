@@ -208,7 +208,10 @@ test('#1962 moduloSchedule: a port used once modulo the II; a dependence refused
   const s = g.add('reg', [], T, { port: { key: 'reg:s', name: 's' } });
   const twice = g.add('add', [s, s], T), next = g.add('add', [q1, twice], T);
   const dep = { g, ops, updates: [[s, next]], exit: null, budget: 1e9 };
-  assert.deepEqual(moduloSchedule(dep, 2).fail, { kind: 'var', reg: s });
+  assert.deepEqual(moduloSchedule(dep, 2).fail, { kind: 'var', reg: s, late: [[s, 2]] });
+  // (#2503: again with its readers no earlier than stage 1, s written where its next value is made: II=2)
+  const floored = moduloSchedule({ ...dep, floor: new Map([[s, 1]]) }, 2);
+  assert.deepEqual([floored.fail, floored.stage.get(twice), floored.read.get(s), floored.written.get(s)], [undefined, 1, 1, 2]);
   assert.equal(moduloSchedule(dep, 3).fail, undefined);
   const late = moduloSchedule({ ...dep, budget: Infinity }, 2);
   assert.deepEqual([late.fail, late.stage.get(twice), late.read.get(s)], [undefined, 2, 2]);

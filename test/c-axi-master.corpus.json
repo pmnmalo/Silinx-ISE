@@ -37,9 +37,7 @@
   "modeling-using-arbitrary-precision-arith": [],
   "modeling-using-array-stencil-1d": [
     "23 warning: 'in' is a reserved word of VHDL or Verilog: it is named in_r in the module",
-    "23 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module",
-    "33 warning: #pragma HLS PIPELINE II=1: II=3 made (the memory 'in' has one port, accessed 3 times an iteration)",
-    "35 warning: #pragma HLS ARRAY_STENCIL is not a pragma Silinx knows: ignored"
+    "23 warning: 'out' is a reserved word of VHDL or Verilog: it is named out_r in the module"
   ],
   "interface-memory-using-axi-master": [],
   "interface-memory-manual-burst-manual-burst-example-manual-burst-inference-success": [

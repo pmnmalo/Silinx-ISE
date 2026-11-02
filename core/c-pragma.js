@@ -15,7 +15,7 @@ import { checkOpPragma } from './c-op-pragmas.js';
 
 // what Silinx makes of the pragmas it knows
 // (TASK: an hls::task's, core/cpp-lex.js, #1721; AGGREGATE and DISAGGREGATE: of the top's struct arguments, core/c-aggregate.js, #1668)
-export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY', 'ARRAY_RESHAPE', 'STREAM']);
+export const MADE = new Set(['TOP', 'INTERFACE', 'LOOP_TRIPCOUNT', 'INLINE', 'UNROLL', 'PIPELINE', 'ARRAY_PARTITION', 'TASK', 'AGGREGATE', 'DISAGGREGATE', 'BIND_STORAGE', 'DEPENDENCE', 'LOOP_FLATTEN', 'LOOP_MERGE', 'BIND_OP', 'ALLOCATION', 'LATENCY', 'ARRAY_RESHAPE', 'STREAM', 'ARRAY_STENCIL']);
 // Vitis HLS's others: accepted, ignored with a warning
 export const IGNORED = new Set(['DATAFLOW', 'RESOURCE',
   'OCCURRENCE', 'PROTOCOL', 'EXPRESSION_BALANCE', 'FUNCTION_INSTANTIATE',
