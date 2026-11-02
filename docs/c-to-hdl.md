@@ -494,7 +494,14 @@ void top(ap_uint<1> dir, ap_uint<15> scaling, cx xn[1024], cx xk[1024], bool *st
   `systolicfft_inv`. It is bit-exact with AMD's C model on the corpus's 1024-point, SSR 2 forward golden files
   (core/hls-fft.js gives the arithmetic); other lengths, other super sample rates and the inverse follow the same rules
   with no golden file to check them. Its input and output may be streams of `hls::vector<std::complex<float>, super_sample_rate>`, a word of that many
-  samples (#2309). Its synthesis is refused (a floating-point FFT's hardware waits on #1761).
+  samples (#2309). Its hardware (core/hls-fft-float-hdl.js) is the top's own module, as the fixed point's: a block RAM of the
+  values (`{im, re}`, the floats' bits), a ROM of the N / 2 twiddles, one floating-point adder and one multiplier (Silinx HLS's
+  own, from its soft-float library, #1761), so its outputs are the C model's to the last bit. Its ports are `in_dout` /
+  `out_din` of a word of the complex values (a stream of `hls::vector`: lane 0 the low bits), with `_empty_n` / `_read` and
+  `_full_n` / `_write`; `fwd_inv` and `scale_sch` are not used. One butterfly at a time: 12 cycles with a twiddle, 9 without,
+  about 61,000 cycles for 1024 points. Its size for 1024 points (the open synthesis, Spartan-3E): 6 block RAMs, 4 18x18
+  multipliers, about 6,200 LUTs: an XC3S500E (Nexys2) or larger, not a Basys2's XC3S100E or XC3S250E; the corpus's Artix-7 part
+  (xc7a35t) holds it easily.
 
 ## Pragmas (`#pragma HLS …`)
 

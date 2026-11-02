@@ -16,6 +16,7 @@
 //     fft: core/cpp-fft.js's; params: the top's [{ name, w }] by the call's argument names (fwd_inv, scale_sch: a
 //     parameter of the top or a constant; ovflo: the top's pointer)
 import { fftTwiddles } from './hls-fft.js';
+import { fftFloatHdl } from './hls-fft-float-hdl.js';
 import { bin } from './c-hdl.js';
 import { typeOf } from './c-types.js';
 
@@ -23,49 +24,53 @@ const clog2 = (n) => Math.max(1, (n - 1).toString(2).length);
 
 /** The module's ports (the block protocol first), and the call's arguments the top's: { ports, dir, sch, ovflo }. */
 function portsOf(fft, params) {
-  const { p } = fft, W = 2 * p.inW;
+  const { p } = fft, w = p.float ? 32 : p.inW;
+  // (a word: {im, re} of w bits, a float's its bits; a stream of hls::vector's lanes, lane 0 the low bits, #2309)
+  const lanes = (a) => a.lanes || 0, width = (a) => 2 * w * Math.max(1, lanes(a));
   const P = [['ap_clk', 'in'], ['ap_rst', 'in'], ['ap_start', 'in'], ['ap_done', 'out'], ['ap_idle', 'out'], ['ap_ready', 'out']].map(([name, dir]) => ({ name, dir, w: 1 }));
   const bare = (k) => fft.names[k]?.replace(/^[&*]/, '');
   const top = (k) => params.find((x) => x.name === bare(k));
   const dir = top(2), sch = top(3), ovflo = fft.names[5] ? top(5) : null;
   if (dir) P.push({ name: dir.name, dir: 'in', w: dir.w, role: 'arg', param: dir.name });
   if (sch) P.push({ name: sch.name, dir: 'in', w: sch.w, role: 'arg', param: sch.name });
-  const fields = (n) => [{ param: `${n}_ap_re`, off: 0, w: p.inW, k: 1, size: p.inW }, { param: `${n}_ap_im`, off: p.inW, w: p.inW, k: 1, size: p.inW }];
+  const fields = (n, a) => (lanes(a) ? Array.from({ length: lanes(a) }, (_, l) => `${n}_ap_d_${l}`) : [n]).flatMap((m, l) => [
+    { param: `${m}_ap_re`, off: 2 * w * l, w, k: 1, size: w }, { param: `${m}_ap_im`, off: 2 * w * l + w, w, k: 1, size: w }]);
   const xn = fft.names[0], xk = fft.names[1];
-  P.push({ name: `${xn}_dout`, dir: 'in', w: W, role: 'fifo', param: xn }, { name: `${xn}_empty_n`, dir: 'in', w: 1, role: 'fifo', param: xn }, { name: `${xn}_read`, dir: 'out', w: 1, role: 'fifo', param: xn });
-  P.push({ name: `${xk}_din`, dir: 'out', w: W, role: 'fifo', param: xk }, { name: `${xk}_full_n`, dir: 'in', w: 1, role: 'fifo', param: xk }, { name: `${xk}_write`, dir: 'out', w: 1, role: 'fifo', param: xk });
+  P.push({ name: `${xn}_dout`, dir: 'in', w: width(fft.args.xn), role: 'fifo', param: xn }, { name: `${xn}_empty_n`, dir: 'in', w: 1, role: 'fifo', param: xn }, { name: `${xn}_read`, dir: 'out', w: 1, role: 'fifo', param: xn });
+  P.push({ name: `${xk}_din`, dir: 'out', w: width(fft.args.xk), role: 'fifo', param: xk }, { name: `${xk}_full_n`, dir: 'in', w: 1, role: 'fifo', param: xk }, { name: `${xk}_write`, dir: 'out', w: 1, role: 'fifo', param: xk });
   if (ovflo) P.push({ name: `${ovflo.name}_din`, dir: 'out', w: 1, role: 'fifo', param: ovflo.name }, { name: `${ovflo.name}_full_n`, dir: 'in', w: 1, role: 'fifo', param: ovflo.name }, { name: `${ovflo.name}_write`, dir: 'out', w: 1, role: 'fifo', param: ovflo.name });
   // (the C's values of the FIFOs: an array's from its memory, a stream's, the pointer's value)
   const from = (a) => (a.stream ? 'stream' : 'mem');
-  const fifos = [{ name: xn, port: xn, dir: 'in', w: W, s: false, fields: fields(xn), from: from(fft.args.xn), n: p.N }, { name: xk, port: xk, dir: 'out', w: W, s: false, fields: fields(xk), from: from(fft.args.xk), n: p.N },
+  const fifos = [{ name: xn, port: xn, dir: 'in', w: width(fft.args.xn), s: false, fields: fields(xn, fft.args.xn), from: from(fft.args.xn), n: p.N },
+    { name: xk, port: xk, dir: 'out', w: width(fft.args.xk), s: false, fields: fields(xk, fft.args.xk), from: from(fft.args.xk), n: p.N },
     ...(ovflo ? [{ name: ovflo.name, port: ovflo.name, dir: 'out', w: 1, s: false, from: 'ptr', param: ovflo.name }] : [])];
   // (fwd_inv and scale_sch not the top's: constants; not given: UG1399's defaults, inverse and the schedule all ones)
   const value = (k, def) => (fft.names[k] === undefined ? def : /^-?\d+$/.test(fft.names[k]) ? BigInt(fft.names[k]) : null);
   return { ports: P, dir, sch, ovflo, fifos, xn, xk, fwd: dir ? 0n : value(2, 0n), schedule: sch ? 0n : value(3, -1n) };
 }
 
-/** The top of a call of an hls::fft: the transform's hardware its module (no other statement in it; a float's refused).
- *  checked: core/c-check.js's; call: the top's statement. */
-export function fftTop(checked, call, { file, lang, module, diagnostics }) {
+/** The top of a call of an hls::fft: the transform's hardware its module (no other statement in it; a float's
+ *  core/hls-fft-float-hdl.js's). checked: core/c-check.js's; call: the top's statement; cToHdl: core/c-hdl.js's. */
+export function fftTop(checked, call, { file, lang, module, diagnostics, cToHdl }) {
   const fft = checked.ast.ffts.get(call.e.callee.name), f = checked.funcs.get(checked.top);
   const fail = (loc, message) => ({ ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, { file: loc.file || file, line: loc.line || 1, col: loc.col || 1, message, severity: 'error' }] });
-  if (fft.p.float) return fail(fft.loc, `hls::fft<${fft.config}>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too)`);
   const other = f.body.items.find((st) => st !== call && !['pragma', 'empty'].includes(st.kind));
   if (other) return fail(other.loc || fft.loc, `hls::fft<${fft.config}>: the top holds the call alone (its hardware is the top's): move the other statements to another function`);
   const elem = (t) => typeOf(t.kind === 'ptr' ? t.to : t.kind === 'array' || t.kind === 'stream' ? t.of : t);
   const params = f.params.filter((pa) => !/^(struct)$/.test(pa.type.kind)).map((pa) => ({ name: pa.name, w: elem(pa.type)?.w ?? 1 }));
   // (xn and xk, complex values: their members' arguments, core/c-struct.js)
-  for (const n of fft.names.slice(0, 2)) if (!params.some((x) => x.name === n) && f.params.some((pa) => pa.name === `${n}_ap_re`)) params.push({ name: n, w: 2 * fft.p.inW });
-  const gen = fftHdl(fft, { lang, module: module || checked.top, src: file.split('/').pop(), params });
+  for (const n of fft.names.slice(0, 2)) if (!params.some((x) => x.name === n) && f.params.some((pa) => pa.name === `${n}_ap_re` || pa.name === `${n}_ap_d_0_ap_re`)) params.push({ name: n, w: 2 * fft.p.inW });
+  const gen = fftHdl(fft, { lang, module: module || checked.top, src: file.split('/').pop(), params, cToHdl });
   return { ...gen, diagnostics: [...diagnostics, ...gen.diagnostics] };
 }
 
-export function fftHdl(fft, { lang = 'vhdl', module, src = 'input.cpp', params = [] }) {
+export function fftHdl(fft, { lang = 'vhdl', module, src = 'input.cpp', params = [], cToHdl }) {
   const { p } = fft;
   const io = portsOf(fft, params);
   const bad = !fft.names.slice(0, 2).every((n) => params.some((x) => x.name === n)) ? 'its xn and xk the top\'s arguments' : io.fwd === null ? 'its fwd_inv the top\'s argument or a constant' : io.schedule === null ? 'its scale_sch the top\'s argument or a constant'
     : fft.names[5] && !io.ovflo ? 'its ovflo the top\'s pointer' : null;
   if (bad) return { ok: false, hdl: '', top: module, ports: [], diagnostics: [{ file: fft.loc.file || src, line: fft.loc.line, col: fft.loc.col, severity: 'error', message: `hls::fft<${fft.config}>: ${bad}: its hardware is the top's` }] };
+  if (p.float) return fftFloatHdl(fft, io, { lang, module, src, cToHdl });
   const tw = fftTwiddles(p);
   const rn = (3 * p.N) / 4;
   const k = { ...p, io, aw: p.nfft, tw, rn, raw: clog2(rn), sw: clog2(p.stages), xw: p.inW + 2, pw: p.inW + 18 };

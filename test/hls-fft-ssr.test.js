@@ -1,7 +1,8 @@
 // Silinx HLS (#2309): hls::fft's floating-point SSR designs, as AMD's corpus writes them: hls::stream<hls::vector<
 // std::complex<float>, 2>> into and out of the transform, its C model's values fftFloat's (and a double DFT's within a
 // float's error), a test bench of const char * members, a default argument, `if (!(f >> a >> b))`, sizeof of a struct
-// array; a stream of hls::vector of std::complex through the hardware (VHDL and Verilog, co-simulated); the errors said.
+// array; a stream of hls::vector of std::complex through the hardware (VHDL and Verilog, co-simulated); the errors said;
+// the float transform synthesized.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -106,14 +107,14 @@ test('#2309 a stream of hls::vector<std::complex<float>, 2> through hls::fft: it
   });
 });
 
-test('#2309 the errors: a vector of other than super_sample_rate values, a vector array; the float transform\'s synthesis refused', () => {
+test('#2309 the errors: a vector of other than super_sample_rate values, a vector array; the float transform synthesized, no warning', () => {
   const errs = (src) => said(simulateC(src, { ...OPTS, files: FILES })).filter((d) => / error: /.test(d));
   assert.deepEqual(errs(SOURCE(4)).filter((d) => /hls::fft/.test(d)), ['16 error: hls::fft<config1>: a stream of hls::vector of super_sample_rate (2) values']);
   const arr = SOURCE().replace('hls::stream<hls::vector<cmpx, 2>> &in, hls::stream<hls::vector<cmpx, 2>> &out', 'hls::vector<cmpx, 2> in[8], hls::vector<cmpx, 2> out[8]');
   assert.deepEqual(errs(arr).filter((d) => /hls::fft/.test(d)), ['16 error: hls::fft<config1>: hls::vector in a stream only (hls::stream<hls::vector<std::complex<T>, 2>>), or an array of std::complex']);
+  // (its hardware core/hls-fft-float-hdl.js's, test/hls-fft-float-hdl.test.js)
   const g = cToHdl(SOURCE(), { ...OPTS, lang: 'vhdl' });
-  assert.equal(g.ok, false);
-  assert.deepEqual(said(g).filter((d) => / error: /.test(d)).map((d) => d.replace(/ \(#2309.*$/, '')), ['16 error: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS']);
+  assert.deepEqual([g.ok, said(g)], [true, []]);
 });
 
 const VEC = `#include "hls_vector.h"
