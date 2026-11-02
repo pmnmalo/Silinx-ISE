@@ -1,7 +1,7 @@
 // Silinx - the placed Spartan-6 design as XDL (#729): what ISE's `xdl -xdl2ncd` reads and `par -k` routes, and the
 // router (#730) takes (browser + Node). The configuration of each site is written as ISE's xdl -ncd2xdl writes it
 // (the elements and values of the device report's primitive definitions of SLICEX / SLICEL / SLICEM, IOB, BUFG,
-// RAMB8BWER / RAMB16BWER, DSP48A1).
+// RAMB8BWER / RAMB16BWER, DSP48A1; a SLICEM's RAMs and shift registers: xdl-mem.js, #1153).
 //
 //   placedXdlS6(nl, packed, phys, placement, { part, name, device }) -> a design for writeXdl (xdl.js); with the
 //     device (its routing graph) each power net is split into one net a TIEOFF, the one each pin is tied from, its
@@ -10,6 +10,8 @@
 import { paramBits, paramInt } from '../netlist.js';
 import { AND2L, ffKind } from './pack.js';
 import { tieoffFor } from './tieoffs.js';
+import { MEM_TYPE } from './phys-mem.js';
+import { memPosCfg, memSliceCfg } from './xdl-mem.js';
 
 class XdlError extends Error {}
 
@@ -86,16 +88,18 @@ export function placedXdlS6(nl, packed, phys, placement, { part, name = 'top', d
     POS.forEach((p, k) => {
       const q = s.pos[p], m = lp[p];
       // the LUTs
-      if (typeof q.o6 === 'number') {
+      const memCell = typeof q.o6 === 'number' && MEM_TYPE.test(cells[q.o6].type);
+      if (memCell) memPosCfg(cells[q.o6], s, q.o6, p, put);
+      else if (typeof q.o6 === 'number') {
         const c = cells[q.o6];
-        if (!/^(LUT\d|INV|BUF)$/.test(c.type)) throw new XdlError(`${c.name} (${c.type}): the SLICEM's shift registers and RAMs are not written as XDL yet (#729)`);
+        if (!/^(LUT\d|INV|BUF)$/.test(c.type)) throw new XdlError(`${c.name} (${c.type}): not a LUT, RAM or shift register`);
         put(`${p}6LUT`, c.name, `#LUT:O6=${high(p, lutEquation(lutInit(c), lutInputsOf(c, m.o6)))}`);
       } else if (typeof q.o6 === 'string' && q.o6.startsWith('thru:')) put(`${p}6LUT`, `${netNameOf(+q.o6.slice(5))}_rt`, `#LUT:O6=${high(p, eqPin(m.o6thru))}`);
       else if (typeof q.o6 === 'string') put(`${p}6LUT`, `${name}.${p}6LUT`, `#LUT:O6=${high(p, q.o6.slice(6))}`);
       else if (a6High.has(`${i}:${p}`)) put(`${p}6LUT`, `${name}.${p}6LUT`, `#LUT:O6=${high(p, '0')}`);
       else put(`${p}6LUT`, '', '#OFF');
       const di = carry ? carry.pins[`DI<${k}>`] ?? 0 : null;
-      if (typeof q.o5 === 'number') put(`${p}5LUT`, cells[q.o5].name, `#LUT:O5=${lutEquation(lutInit(cells[q.o5]), lutInputsOf(cells[q.o5], m.o5))}`);
+      if (memCell) { /* (its O5: memPosCfg's) */ } else if (typeof q.o5 === 'number') put(`${p}5LUT`, cells[q.o5].name, `#LUT:O5=${lutEquation(lutInit(cells[q.o5]), lutInputsOf(cells[q.o5], m.o5))}`);
       else if (typeof q.o5 === 'string') put(`${p}5LUT`, `${netNameOf(+q.o5.slice(5))}_rt5`, `#LUT:O5=${eqPin(m.o5thru)}`);
       else if (m.diThru) put(`${p}5LUT`, `${name}.${p}5LUT`, `#LUT:O5=${eqPin(m.o6thru)}`);
       else if (m.diConst === 'o5') put(`${p}5LUT`, `${name}.${p}5LUT`, `#LUT:O5=${di}`);
@@ -114,13 +118,15 @@ export function placedXdlS6(nl, packed, phys, placement, { part, name = 'top', d
       if (typeof q.ff5 === 'number') { put(`${p}5FF`, cells[q.ff5].name, ''); put(`${p}5FFSRINIT`, '', srinit(cells[q.ff5])); }
       else put(`${p}5FFSRINIT`, '', '#OFF');
       // the outputs
-      const mux = { o5: 'O5', xor: 'XOR', cy: 'CY', f7: 'F7', f8: 'F8', ff5: `${p}5Q` }[q.mux];
+      const mux = { o5: 'O5', xor: 'XOR', cy: 'CY', f7: 'F7', f8: 'F8', ff5: `${p}5Q`, mc31: 'MC31' }[q.mux];
       put(`${p}OUTMUX`, '', drives[i].has(`${p}MUX`) && mux ? mux : '#OFF');
       put(`${p}USED`, '', drives[i].has(p) ? '0' : '#OFF');
     });
     const and2l = s.ctrl === AND2L;
-    put('CLKINV', '', and2l ? 'CLK_B' : kind ? (s.ctrl.split(':')[1] === '1' ? 'CLK_B' : 'CLK') : '#OFF');
-    put('CEUSED', '', takes[i].has('CE') ? '0' : '#OFF');
+    // (a SLICEM's RAMs and shift registers: the clock as it is, CE their write enable, no storage element beside them)
+    put('CLKINV', '', and2l ? 'CLK_B' : kind ? (s.ctrl.split(':')[1] === '1' ? 'CLK_B' : 'CLK') : s.mem ? 'CLK' : '#OFF');
+    put('CEUSED', '', takes[i].has('CE') && !s.mem ? '0' : '#OFF');
+    if (s.mem) memSliceCfg(cells, s, put);
     put('SRUSED', '', takes[i].has('SR') ? '0' : '#OFF');
     put('SYNC_ATTR', '', and2l ? 'ASYNC' : kind ? (kind.sr && kind.async ? 'ASYNC' : 'SYNC') : '#OFF');
     if (carry) {
@@ -129,9 +135,11 @@ export function placedXdlS6(nl, packed, phys, placement, { part, name = 'top', d
       put('PRECYINIT', '', !bottom ? '#OFF' : konst(cy) !== null ? String(cy) : 'AX');
       put('COUTUSED', '', drives[i].has('COUT') ? '0' : '#OFF');
     }
-    if (typeof s.f7.A === 'number') put('F7AMUX', cells[s.f7.A].name, '');
-    if (typeof s.f7.B === 'number') put('F7BMUX', cells[s.f7.B].name, '');
-    if (typeof s.f8 === 'number') put('F8MUX', cells[s.f8].name, '');
+    // (a wide RAM's: 'mem:<cell>')
+    const muxName = (x, k) => (typeof x === 'number' ? cells[x].name : `${cells[+x.slice(4)].name}/${k}`);
+    if (s.f7.A !== null) put('F7AMUX', muxName(s.f7.A, 'F7A'), '');
+    if (s.f7.B !== null) put('F7BMUX', muxName(s.f7.B, 'F7B'), '');
+    if (s.f8 !== null) put('F8MUX', muxName(s.f8, 'F8'), '');
   }
   // a LUT's inputs as lutEquation takes them: their site pins, or the constants they are tied to
   // (an equation names the inputs A1 … A6 in every position: B3 is its A3)

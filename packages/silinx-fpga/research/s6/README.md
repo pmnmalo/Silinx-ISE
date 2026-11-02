@@ -172,6 +172,24 @@ implementation of stopwatch has too (`ise-place-check.sh`, `summarize-ise-check.
 The first round taught the last two rules above: ISE refuses a power net without a source, and an A6 tied high that
 the O6 equation does not name (PhysDesignRules:1709).
 
+### The SLICEM's distributed RAMs and shift registers (#1153, 2026-11-02)
+
+`gen-mem6.mjs` writes 21 designs of one primitive each (RAM32X1S / D, RAM64X1S / D, RAM128X1S / D, RAM256X1S, RAM32M,
+RAM64M, SRL16, SRL16E, SRLC16E, SRLC32E; the RAMs again with INITs that tell their LUTs and address bits apart), every
+pin on a pad; ISE implements them (`ise-s6.sh impl`, 1 to 2 minutes each) and `ana-mem6.mjs` keeps the SLICEM's
+settings and what its pins carry (`measured/mem.json`). What ISE's map does (`s6/phys-mem.js`, `s6/xdl-mem.js`): the
+write address is the D LUT's inputs, each position's inputs its read address; a 32-bit RAM is a 64-bit one with A1 low
+(address k at bit 2k of `#RAM:O6=0x…`); a wide RAM's 7th address bit is the F7's select (AX, CX; CX also WA7), its 8th
+the F8's (BX, WA8), its HIGH half in A / C, its LOW in B / D, RAM256X1S's quarters in D, C, B, A; a dual-port RAM's
+read port in the positions after its write port's; the data on DX in D and through the DI1 multiplexers (B, C: DX; A:
+BDI1) or a position's own AX …; RAM32M's DO<1> in O6 (its INIT's odd bits, in both halves: A6 high), DO<0> in O5 (the
+even bits, on AMUX …); the write enable on CE (WEMUX::CE, CEUSED off); a shift register's address on A2 … A5 (A6), A1
+high (A6 too in a 16-bit one), its INIT as it is, its data on AI … (16-bit) or AX … (32-bit, DI1MUX), its cascade out
+(Q15, Q31) by DMUX (DOUTMUX::MC31) from position A only. The Silinx toolchain writes the same settings and pins for the
+21 designs (the LUT positions aside, its placer's choice; test/s6-xdl-mem.test.js), and ISE reads its placement and
+its routing of each (`ise-place-check.sh`): `par -k` routes the placement completely, the DRC finds no error and no
+warning. The contents in the bitstream (other than zeros): #2556.
+
 ### The router (#730, 2026-10-24)
 
 `packages/silinx-fpga/src/fpga/s6/route.js` (PathFinder, as the Spartan-3E router), `route-nets.js` (the general interconnect, which
@@ -326,7 +344,7 @@ XC6SLX16's settings (the same tiles).
   slices' frames (minors 21 to 29 / 30 of a CLB column); minors 0 to 20 are the routing's (#726), bit 17 of minor 19
   next to a SLICEL using F7B among them.
 - Not measured: a LUT RAM's or ROM's contents other than zeros (the SRL modes move bits); Silinx does not write them
-  yet (#1153).
+  yet (#2556).
 
 ### The INT switch box (#726, S6-D, 2026-10-29)
 
@@ -833,6 +851,8 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `prim-defs6.mjs` | The sites' elements and options from an XDLRC: `measured/prim-defs.json` (#725) |
 | `gen-slice6.mjs` | The slice settings' designs in XDL, one per slice kind (#725) |
 | `ana-slice6.mjs` | The slice settings from their bitstreams: `db/<device>-slice.json` (#725) |
+| `gen-mem6.mjs` | The SLICEM's RAMs' and shift registers' designs, one primitive each, for ISE to implement (#1153) |
+| `ana-mem6.mjs` | Their SLICEM as ISE wrote it, its settings and pins: `measured/mem.json` (#1153) |
 | `check-slice6.mjs` | The LUT and slice databases checked against ISE's implemented examples, tile by tile (#725) |
 | `gen-pipprobe6.mjs` | The PIP probe and the INT switch box's rounds, a PIP per INT tile on a net of its TIEOFF (#726) |
 | `gen-pipcover6.mjs` | The PIPs that need a driven source, on paths from a driver (#726) |

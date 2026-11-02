@@ -113,14 +113,16 @@ test('the placer\'s errors: a LOC that is no pad, two ports on one pad, banks of
   assert.throws(() => s6Phys(odd), e => e instanceof PhysError && e.message === 'the Spartan-6 design cannot be placed: u_io (BUFIO2): the Spartan-6 placer has no site for it yet (#729)');
 });
 
-test('a shift register takes a SLICEM, its pins the SLICEM\'s (the data on DI, the clock enable on WE)', async () => {
+test('a shift register takes a SLICEM, its pins the SLICEM\'s (the data on DI or DX, the clock enable on CE, as ISE\'s WEMUX::CE, #1153)', async () => {
   const nl = await s6Verilog('module m(input clk, input e, input d, output q); reg [19:0] s; always @(posedge clk) if (e) s <= {s[18:0], d}; assign q = s[19]; endmodule');
   const d = s6Phys(nl);
   const m = d.phys.insts.filter(i => i.type === 'SLICEM');
   assert.equal(m.length, 1);
   const pins = new Set(d.phys.nets.flatMap(n => n.loads.filter(l => d.phys.insts[l.inst].type === 'SLICEM').map(l => l.pin)));
-  assert.ok(pins.has('CLK') && pins.has('WE'), [...pins].join(' '));
-  assert.ok([...pins].some(p => /^[A-D]I$/.test(p)), 'the data input');
+  assert.ok(pins.has('CLK') && pins.has('CE') && !pins.has('WE'), [...pins].join(' '));
+  // (the data on AI … DI for a 16-bit one, on AX … DX for SRLC32E, as ISE's)
+  const srl = nl.cells.find(c => /^SRL/.test(c.type));
+  assert.ok([...pins].some(p => (srl.type === 'SRLC32E' ? /^[A-D]X$/ : /^[A-D]I$/).test(p)), `the data input of ${srl.type}`);
   const { r, errors, sites } = placed(d);
   assert.deepEqual(errors, []);
   assert.equal(sites.slices.get(r.site[d.phys.insts.findIndex(i => i.type === 'SLICEM')]).kind, 'M');
