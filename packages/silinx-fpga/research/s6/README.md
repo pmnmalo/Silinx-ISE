@@ -203,6 +203,12 @@ routed XDL on both boards and its DRC finds no error and no warning but stopwatc
 (`measured/ise-check.json`). The first round found a route through the net's own slice by a LUT in use (D4 -> D,
 PhysDesignRules:2066): out of its own slice a net takes only COUT -> DMUX.
 
+- **The LUT inputs swapped** (#1152, 2026-11-02; `route-swap.js`): a net ends on any free pin of its LUT position (not
+  a RAM's or shift register's, not A6 under an O5, not a clock's, power net's or unrouted net's pin), the O6 / O5
+  equations rewritten for the pins taken. The examples take 10 to 14 % fewer switches: 1.00 to 1.08 times ISE's per
+  connection (1.10 to 1.22 before; `compare-route.mjs --silinx`), in 3 or 4 passes; ISE reads the 14 routings and its
+  DRC finds no error and no warning (`ise-check.json`'s routed results again).
+
 ### The bitstream format (#724, 2026-10-27)
 
 Stage S6-A on the Mac mini (`ise-format.sh`, 2 minutes): the two empty designs through bitgen with the options of

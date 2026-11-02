@@ -210,15 +210,11 @@
    },
    "routed": {
     "xdl2ncd": "ok",
-    "messages": {
-     "WARNING:PhysDesignRules:2410": 1
-    },
+    "messages": {},
     "drc": {
      "errors": 0,
-     "warnings": 1,
-     "messages": {
-      "WARNING:PhysDesignRules:2410": 1
-     }
+     "warnings": 0,
+     "messages": {}
     }
    }
   },
@@ -241,15 +237,11 @@
    },
    "routed": {
     "xdl2ncd": "ok",
-    "messages": {
-     "WARNING:PhysDesignRules:2410": 1
-    },
+    "messages": {},
     "drc": {
      "errors": 0,
-     "warnings": 1,
-     "messages": {
-      "WARNING:PhysDesignRules:2410": 1
-     }
+     "warnings": 0,
+     "messages": {}
     }
    }
   },

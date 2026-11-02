@@ -21,14 +21,18 @@
 // - Known switches only (opts.allowPip(tile, pip)): for a bitstream writer that knows only some PIPs' bits (#726). A
 //   sink no allowed switch reaches is found once (its search sees every node it may reach) and not searched again;
 //   the passes end when nothing is shared and only such sinks are left (failedSinks' dead, #732).
+// - LUT inputs (opts.swapLutPins, default on, #1152): the inputs of a LUT position are interchangeable, so a net may
+//   end on any of its position's pins no other net takes (as ISE's router swaps them, and the Spartan-3E router):
+//   the one its path reaches best; routedXdlS6 rewrites the equations for the pins taken (route-swap.js).
 //
-//   const r = routeS6(design, device, { maxPasses, allowPip, log })
+//   const r = routeS6(design, device, { maxPasses, allowPip, swapLutPins, log })
 //     r = { trees: [Map node -> edge (-1 a source)] by net, nets (netEndpointsS6's), failed: [net names], warnings,
 //           stats: { passes, seconds, overused, pips } }
 //   routedXdlS6(design, device, r) -> the routed design for writeXdl (xdl.js)
 import { PIP_ROUTETHRU } from '../device.js';
 import { routingResources, netEndpointsS6, powerSources, routeThruSite, FREE_ROUTETHRU } from './route-nets.js';
 import { mountRoutedS6 } from './route-output.js';
+import { lutSwapGroups } from './route-swap.js';
 
 export class RouteError extends Error {}
 
@@ -56,8 +60,8 @@ class Heap {
   }
 }
 
-/** Route a placed design (see above). Options: maxPasses (50), allowPip(tile, pip) (null: every PIP), log. */
-export function routeS6(design, device, { maxPasses = 50, allowPip = null, log = null } = {}) {
+/** Route a placed design (see above). Options: maxPasses (50), allowPip(tile, pip) (null: every PIP), swapLutPins (true), log. */
+export function routeS6(design, device, { maxPasses = 50, allowPip = null, swapLutPins = true, log = null } = {}) {
   const t0 = Date.now();
   const res = routingResources(device);
   const { nets, errors, used } = netEndpointsS6(design, device, res);
@@ -107,6 +111,10 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
     w.tieoffOf = new Map();
     for (const s of w.sinks) for (const t of powerSources(device, res, s.node, w.power, 4)) w.tieoffOf.set(t.node, t);
   }
+  // a LUT position's inputs interchangeable (swapLutPins): a sink's targets, the free pins of its position, one sink a
+  // pin (claim: node -> sink; each sink's own pin until it is routed elsewhere)
+  const lutGroups = swapLutPins ? lutSwapGroups(design, device, work) : [], claim = new Map();
+  for (const grp of lutGroups) for (const s of grp.sinks) claim.set(s.node, s);
   const trees = work.map(() => new Map());   // node -> edge into it (-1: a source)
   const rtUsed = work.map(() => new Map());  // route-through resource -> count of the net's edges through it
   let pf = 0.5;
@@ -123,6 +131,7 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
   };
   const addTree = (wi, n, k) => { occ[n] += k; };
   const ripUp = wi => {
+    for (const s of work[wi].sinks) if (s.targets && claim.get(s.node) === s) claim.delete(s.node);
     for (const n of trees[wi].keys()) occ[n]--;
     for (const [r, c] of rtUsed[wi]) if (c > 0) occ[r]--;
     trees[wi] = new Map(); rtUsed[wi] = new Map();
@@ -132,7 +141,9 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
   const heap = new Heap();
   // (exhausted: the last search found no path having seen every node it may reach, not stopped at its limit)
   let exhausted = false;
-  const search = (wi, sink, starts, restrict) => {
+  // (targets: a LUT input's free pins, any of which ends the search; found: the one it reached)
+  let found = -1;
+  const search = (wi, sink, starts, restrict, targets = null) => {
     const w = work[wi], tree = trees[wi];
     heap.n = 0;
     for (const n of touched) g[n] = Infinity;
@@ -140,9 +151,10 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
     for (const n of starts) { g[n] = 0; via[n] = -1; touched.push(n); heap.push(0.6 * dist(n, sink), n); }
     let pops = 0;
     exhausted = false;
+    found = -1;
     while (heap.n) {
       const n = heap.pop();
-      if (n === sink) break;
+      if (n === sink || targets?.has(n)) { found = n; break; }
       if (++pops > 2000000) return null;
       const gn = g[n];
       for (let e = E.edgeStart[n]; e < E.edgeStart[n + 1]; e++) {
@@ -154,10 +166,10 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
         if (c < g[m]) { if (g[m] === Infinity) touched.push(m); g[m] = c; via[m] = e; heap.push(c + 0.6 * dist(m, sink), m); }
       }
     }
-    if (g[sink] === Infinity) { exhausted = true; return null; }
+    if (found < 0) { exhausted = true; return null; }
     // the path back to the tree (or a start)
     const path = [];
-    for (let n = sink; via[n] !== -1 && !tree.has(n); ) { path.push(via[n]); n = fromOf(via[n]); }
+    for (let n = found; via[n] !== -1 && !tree.has(n); ) { path.push(via[n]); n = fromOf(via[n]); }
     return path;
   };
   // the node an edge leaves (the edges are stored by their from-node: a binary search of edgeStart)
@@ -180,7 +192,8 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
       if (unreachable.has(`${wi} ${k}`)) { failed.push(s); continue; }
       let starts = [...tree.keys()];
       if (w.power) starts = [...starts, ...w.srcFor[k].filter(n => !tree.has(n))];
-      let path = search(wi, s.node, starts, w.clock || w.dedicated);
+      const targets = s.targets ? new Set(s.targets.filter(n => !claim.has(n) || claim.get(n) === s)) : null;
+      let path = search(wi, s.node, starts, w.clock || w.dedicated, targets);
       if (!path && (w.clock || w.dedicated)) {
         path = search(wi, s.node, starts, false);
         if (path && !w.warned) {
@@ -189,6 +202,7 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
         }
       }
       if (!path) { if (exhausted) unreachable.add(`${wi} ${k}`); failed.push(s); continue; }
+      if (s.targets) { if (claim.get(s.node) === s) claim.delete(s.node); s.node = found; claim.set(found, s); }
       // the path's start: a node of the tree, or (a power net) a TIEOFF, a new root
       for (let j = path.length - 1; j >= 0; j--) {
         const e = path[j], m = E.edgeTo[e], from = fromOf(e);
@@ -228,7 +242,7 @@ export function routeS6(design, device, { maxPasses = 50, allowPip = null, log =
   const over = overused();
   if (over) warnings.push(`${over} routing nodes shared after ${passes} passes`);
   const failed = [...new Set(failedSinks.map(f => f.net))];
-  const r = { trees, work, failed, failedSinks, warnings, rtSiteName, E, fromOf,
+  const r = { trees, work, failed, failedSinks, warnings, rtSiteName, E, fromOf, lutGroups,
     stats: { passes, seconds: (Date.now() - t0) / 1000, overused: over, pips: 0 } };
   for (const t of trees) for (const e of t.values()) if (e >= 0) r.stats.pips++;
   return r;

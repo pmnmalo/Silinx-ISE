@@ -6,6 +6,7 @@
 // research/s6/measured/route-compare.json.
 //
 //   node research/s6/compare-route.mjs [night1 folder (~/s6-night1)]
+//   node research/s6/compare-route.mjs --silinx      (the Silinx router measured again, ISE's side kept from the record)
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,7 +20,8 @@ import { EXAMPLE_ORDER } from '../../../../core/examples.js';
 import { S6_BOARDS, s6Device, s6Example } from '../../../../test/s6-lib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const dir = process.argv[2] || path.join(os.homedir(), 's6-night1');
+const again = process.argv[2] === '--silinx', dir = again ? null : process.argv[2] || path.join(os.homedir(), 's6-night1');
+const record = path.join(here, 'measured', 'route-compare.json'), before = again ? JSON.parse(fs.readFileSync(record, 'utf8')) : null;
 
 // the kind of the wire a PIP drives: the interconnect's singles (?R1 / ?L1), doubles (?2), quads (?4), the logic
 // pins (LOGICIN, a site's input pins), the rest (outputs into the interconnect, clock, I/O and site wires)
@@ -42,9 +44,9 @@ for (const { board, part } of S6_BOARDS) {
   const { device, sites } = s6Device(part);
   out.boards[board] = {};
   for (const name of EXAMPLE_ORDER) {
-    const f = path.join(dir, `edif-${board}`, name, 'top.xdl');
-    if (!fs.existsSync(f)) { console.log(`${board} ${name}: no ${f}`); continue; }
-    const ise = usage(parseXdl(fs.readFileSync(f, 'utf8')));
+    const f = again ? null : path.join(dir, `edif-${board}`, name, 'top.xdl');
+    if (again ? !before.boards[board]?.[name] : !fs.existsSync(f)) { console.log(`${board} ${name}: no ISE routing`); continue; }
+    const ise = again ? before.boards[board][name].ise : usage(parseXdl(fs.readFileSync(f, 'utf8')));
     const d = await s6Example(name, board);
     const pl = placeS6(d.phys, sites, { nl: d.nl, seed: 1 });
     const x = placedXdlS6(d.nl, d.packed, d.phys, pl, { part, device, name });
@@ -57,4 +59,4 @@ for (const { board, part } of S6_BOARDS) {
     console.log(`${board} ${name}: ISE ${ise.pips} PIPs / ${ise.connections} = ${ise.perConnection} (q ${ise.quad} d ${ise.double} s ${ise.single}), Silinx ${silinx.pips} / ${silinx.connections} = ${silinx.perConnection} (q ${silinx.quad} d ${silinx.double} s ${silinx.single}), ${silinx.passes} passes ${silinx.seconds} s`);
   }
 }
-fs.writeFileSync(path.join(here, 'measured', 'route-compare.json'), JSON.stringify(out, null, 1) + '\n');
+fs.writeFileSync(record, JSON.stringify(out, null, 1) + '\n');

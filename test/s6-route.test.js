@@ -11,7 +11,7 @@ import { placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xdl.js';
 import { routeS6, routedXdlS6, RouteError } from '../packages/silinx-fpga/src/fpga/s6/route.js';
 import { routingResources } from '../packages/silinx-fpga/src/fpga/s6/route-nets.js';
 import { checkRoutingS6 } from '../packages/silinx-fpga/src/fpga/s6/route-check.js';
-import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
+import { parseXdl, writeXdl, evalLut } from '../packages/silinx-fpga/src/xdl.js';
 import { EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 
@@ -130,6 +130,46 @@ test('every example routed on the XC6SLX16 and the XC6SLX45: complete, no node o
   }
 });
 
+// a design's LUT positions as functions of their nets: { 'inst A6LUT': (values of the nets) -> 0 / 1 }, from its
+// equations and the nets on its pins (A6 high under an O5, as the power net leaves it)
+function lutFunctions(x) {
+  const netOf = new Map();
+  for (const n of x.nets) for (const p of n.inpins) netOf.set(`${p.inst} ${p.pin}`, n.name.replace(/^(GLOBAL_LOGIC[01])_\d+$/, '$1'));
+  const out = new Map();
+  for (const i of x.insts) for (const c of i.cfg || []) {
+    if (!/^[A-D][56]LUT$/.test(c.attr) || !/^#LUT:/.test(c.value)) continue;
+    const pins = [1, 2, 3, 4, 5, 6].map(k => netOf.get(`${i.name} ${c.attr[0]}${k}`));
+    out.set(`${i.name} ${c.attr}`, val => evalLut(c.value.slice(5), Object.fromEntries(pins.map((n, k) => [`A${k + 1}`, n === 'GLOBAL_LOGIC1' ? 1 : n ? val(n) : 0]))) ? 1 : 0);
+  }
+  return out;
+}
+
+test('LUT inputs swapped (#1152): a net on any free pin of its LUT position, the equations rewritten, every LUT the same function of its nets; fewer switches', { timeout: 300000 }, async () => {
+  const d = await s6Example('stopwatch', 'nexys3');
+  const off = routed(d, LX16, { swapLutPins: false }), on = routed(d, LX16);
+  for (const r of [off, on]) {
+    assert.deepEqual(r.check.problems, []);
+    assert.deepEqual([r.r.failed, r.r.stats.overused, r.r.warnings], [[], 0, []]);
+  }
+  assert.equal(off.r.lutGroups.length, 0);
+  assert.ok(on.r.lutGroups.length > 100, `${on.r.lutGroups.length} LUT positions`);
+  // (A6 under an O5 stays: high)
+  for (const g of on.r.lutGroups) if (g.inst.cfg.some(c => c.attr === `${g.letter}5LUT` && c.value !== '#OFF')) assert.ok(!g.free.includes(`${g.letter}6`));
+  const moved = on.out.nets.flatMap(n => n.inpins).filter(p => /^[A-D][1-6]$/.test(p.pin)).length;
+  const before = lutFunctions(on.x), after = lutFunctions(on.out);
+  assert.deepEqual([...after.keys()].sort(), [...before.keys()].sort());
+  let changed = 0;
+  for (const i of on.out.insts) for (const c of i.cfg || []) if (/^[A-D][56]LUT$/.test(c.attr) && on.x.insts.find(j => j.name === i.name)?.cfg.find(e => e.attr === c.attr)?.value !== c.value) changed++;
+  assert.ok(changed > 20, `${changed} equations rewritten (${moved} LUT pins)`);
+  // every LUT the same function of its nets (random values, the same for both)
+  for (let t = 0; t < 64; t++) {
+    const v = new Map(), val = n => (v.has(n) ? v.get(n) : v.set(n, Math.random() < 0.5 ? 1 : 0).get(n));
+    for (const [k, f] of before) assert.equal(after.get(k)(val), f(val), k);
+  }
+  const perConn = r => { let p = 0, c = 0; for (const n of r.out.nets) if (n.type === 'wire' && n.outpins.length && !/^BUFG/.test(r.out.insts.find(i => i.name === n.outpins[0].inst).type)) { p += n.pips.length; c += n.inpins.length; } return p / c; };
+  assert.ok(perConn(on) < perConn(off), `${perConn(on).toFixed(2)} < ${perConn(off).toFixed(2)} switches a connection`);
+});
+
 // ISE's routing of the same netlists (night 1, packages/silinx-fpga/research/s6/compare-route.mjs): the routing switches of the signal
 // nets per connection, the Silinx router's no more than 30 % above ISE's (night 1: 1.03 … 1.22 of it)
 test('the switches per connection against ISE\'s routing of the same netlists (night 1)', { timeout: 900000 }, async () => {
@@ -150,16 +190,16 @@ test('the switches per connection against ISE\'s routing of the same netlists (n
   }
 });
 
-// ISE's check of the routings (2026-10-24, packages/silinx-fpga/research/s6/ise-place-check.sh, measured/ise-check.json): ISE reads every
-// example's routed XDL on both boards and its DRC finds no error; the one warning, of xdl2ncd and of the DRC, is
-// stopwatch's 9K block RAM note (PhysDesignRules:2410, ISE's own implementation of stopwatch has it too)
+// ISE's check of the routings (2026-10-24, packages/silinx-fpga/research/s6/ise-place-check.sh, measured/ise-check.json; the
+// routed designs again on 2026-11-02 with the LUT inputs swapped, #1152): ISE reads every example's routed XDL on both
+// boards and its DRC finds no error and no warning (stopwatch's 9K block RAM note, PhysDesignRules:2410, gone with its
+// RAMB16BWER)
 test('ISE\'s DRC of every example\'s routing on both boards: no error, the warnings', () => {
   const rec = JSON.parse(fs.readFileSync(new URL('../packages/silinx-fpga/research/s6/measured/ise-check.json', import.meta.url), 'utf8'));
   assert.deepEqual(Object.keys(rec.designs), S6_BOARDS.flatMap(({ board }) => ISE_RECORDED.map(n => `${n}-${board}`)).sort());
   for (const [d, { routed }] of Object.entries(rec.designs)) {
-    const sw = d.startsWith('stopwatch-');
     assert.equal(routed.xdl2ncd, 'ok', d);
-    assert.deepEqual(routed.messages, sw ? { 'WARNING:PhysDesignRules:2410': 1 } : {}, d);
-    assert.deepEqual(routed.drc, sw ? { errors: 0, warnings: 1, messages: { 'WARNING:PhysDesignRules:2410': 1 } } : { errors: 0, warnings: 0, messages: {} }, d);
+    assert.deepEqual(routed.messages, {}, d);
+    assert.deepEqual(routed.drc, { errors: 0, warnings: 0, messages: {} }, d);
   }
 });
