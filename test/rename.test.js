@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import { renameModuleInSource, renameModuleInSchematic, renameSymbol, renameInterfaceInSource, symbolAt, interfaceUnit } from '../core/rename.js';
+import { renameModuleInSource, renameModuleInSchematic, renameSymbol, renameInterfaceInSource, symbolAt, interfaceUnit, packageOf, packageDecl, renamePackageItemInSource } from '../core/rename.js';
 import { analyze } from '../core/scopes.js';
 import { compile, elaborate } from '../core/compile.js';
 
@@ -233,10 +233,14 @@ test('Rename Symbol on the examples: every name of every source renamed, the des
         const o = sym.occs[0];
         const r = renameSymbol(f.text, lang, o.line, o.col, `zq_${sym.name}`);
         assert.equal(r.error, undefined, `${ex}/${f.path}: ${sym.name}`);
-        // (a port / generic: also in the instances of the module in the other files, as the editor does)
-        const unit = interfaceUnit(sym);
+        // (a port / generic: also in the instances of the module in the other files, as the editor does;
+        // a declaration of a package: in the files that use the package, #2558)
+        const unit = interfaceUnit(sym), pkg = packageOf(sym);
+        const decl = pkg && packageDecl(f.text, lang, pkg.name);
+        const other = x => (x.path.endsWith('.v') ? 'verilog' : 'vhdl');
         const after = signals(files.map(x => (x === f ? { ...x, text: r.text }
-          : unit ? { ...x, text: renameInterfaceInSource(x.text, x.path.endsWith('.v') ? 'verilog' : 'vhdl', unit.name, sym.name, `zq_${sym.name}`).text } : x)));
+          : unit ? { ...x, text: renameInterfaceInSource(x.text, other(x), unit.name, sym.name, `zq_${sym.name}`).text }
+            : decl && other(x) === lang ? { ...x, text: renamePackageItemInSource(x.text, lang, decl, sym.name, `zq_${sym.name}`).text } : x)));
         // the same signals; the renamed one (and its copies in the hierarchy) with the new name
         // (a port connected to a signal of the same name is one net: compared as sets of names)
         const names = s => [...new Set(s.split(' '))].sort().join(' ');
@@ -264,4 +268,185 @@ test('Rename Symbol and a drawing without an HDL file (#177): its HDL made in me
   // from a file that instances a module drawn as a truth table, its port is not renamed: it is declared there
   const top = 'entity top is port (a, b, c : in bit; y : out bit); end top;\narchitecture s of top is\nbegin\n  u_maj : entity work.maj3 port map (a => a, b => b, c => c, f => y);\nend s;\n';
   assert.equal(renameSymbol(top, 'vhdl', ...at(top, 'a', 1), 'x').error, "'a' is a port of 'maj3', declared in another file: rename it there.");
+});
+
+// ---------------------------------------------------------------- a declaration of a package (#2558)
+// every message of a project: its compilation and the elaboration of each of its units
+const diags = srcs => {
+  const lib = compile(srcs);
+  return [...lib.errors, ...[...lib.modules.keys()].sort().flatMap(m => elaborate(lib, m).diags)];
+};
+const PKG = `library ieee;
+use ieee.std_logic_1164.all;
+
+-- the declarations shared by the design: WIDTH, state_t, inc
+package defs is
+  constant WIDTH : integer := 4;
+  type state_t is (idle, run);
+  function inc(x : integer) return integer;
+end package defs;
+
+package body defs is
+  function inc(x : integer) return integer is
+  begin
+    return (x + 1) mod 2 ** WIDTH;
+  end function inc;
+end package body defs;
+`;
+// two files see the package through use work.defs.all, one through its names (use work.defs.x, selected names)
+const USE_ALL = `library ieee;
+use ieee.std_logic_1164.all;
+use work.defs.all;
+
+entity counter is
+  port (clk : in std_logic;
+        q   : out integer range 0 to 2 ** WIDTH - 1);
+end counter;
+
+architecture rtl of counter is
+  signal state : state_t := idle;   -- a state_t in a comment
+  signal n     : integer range 0 to 2 ** WIDTH - 1 := 0;
+begin
+  process (clk)
+  begin
+    if rising_edge(clk) then
+      state <= run;
+      if state = run then n <= inc(n); end if;
+    end if;
+  end process;
+  q <= n;
+end rtl;
+`;
+const USE_ALL2 = `library ieee;
+use ieee.std_logic_1164.all;
+use work.DEFS.all;
+
+entity shower is
+  port (s : in state_t;
+        y : out std_logic_vector(Width - 1 downto 0));
+end shower;
+
+architecture rtl of shower is
+begin
+  -- "WIDTH" in a string is not a name either
+  y <= (others => '1') when s = run else (others => '0');
+  assert Width > 0 report "WIDTH must be positive" severity failure;
+end rtl;
+`;
+const SELECTED = `library ieee;
+use ieee.std_logic_1164.all;
+use work.defs.WIDTH;
+use work.defs.inc;
+
+entity stepper is
+  port (a : in integer range 0 to 2 ** work.defs.WIDTH - 1;
+        y : out integer range 0 to 2 ** work.defs.WIDTH - 1);
+end stepper;
+
+architecture rtl of stepper is
+begin
+  y <= work.defs.inc(a);
+end rtl;
+`;
+// its own WIDTH hides the package's: kept
+const LOCAL = `library ieee;
+use ieee.std_logic_1164.all;
+use work.defs.all;
+
+entity wide is
+  port (y : out std_logic_vector(7 downto 0));
+end wide;
+
+architecture rtl of wide is
+  constant WIDTH : integer := 8;
+begin
+  y <= (WIDTH - 1 downto 0 => '0');
+end rtl;
+`;
+
+test('Rename Symbol, a declaration of a VHDL package (#2558): also in the files that use the package (use work.pkg.all, work.pkg.x), not where a local declaration hides it, not in comments or strings; the project compiles with no warnings', () => {
+  const files = { 'src/defs.vhd': PKG, 'src/counter.vhd': USE_ALL, 'src/shower.vhd': USE_ALL2, 'src/stepper.vhd': SELECTED, 'src/wide.vhd': LOCAL };
+  const project = fs => Object.entries(fs).map(([path, text]) => ({ path, text }));
+  assert.deepEqual(diags(project(files)), []);
+  const decl = packageDecl(PKG, 'vhdl', 'DEFS');
+  assert.equal(decl, PKG.slice(PKG.indexOf('package defs'), PKG.indexOf('end package defs;') + 17));
+  // the editor's rename: the package's file (renameSymbol), then the others
+  const renameAll = (word, k, to) => {
+    const r = ren(PKG, 'vhdl', word, k, to);
+    assert.equal(r.error, undefined);
+    assert.equal(packageOf(r.sym)?.name, 'defs');
+    const out = { 'src/defs.vhd': r.text }, counts = {};
+    for (const [p, text] of Object.entries(files).slice(1)) {
+      const o = renamePackageItemInSource(text, 'vhdl', decl, r.sym.name, to);
+      out[p] = o.text;
+      counts[p] = o.count;
+    }
+    return { out, counts };
+  };
+  // the constant: every spelling, the selected names too
+  const w = renameAll('WIDTH', 1, 'N_BITS');
+  assert.equal(w.out['src/defs.vhd'], PKG.replace('constant WIDTH', 'constant N_BITS').replace('2 ** WIDTH', '2 ** N_BITS'));
+  assert.equal(w.out['src/counter.vhd'], USE_ALL.replaceAll('2 ** WIDTH', '2 ** N_BITS'));
+  assert.equal(w.out['src/shower.vhd'], USE_ALL2.replace('(Width - 1', '(N_BITS - 1').replace('assert Width', 'assert N_BITS'));
+  assert.equal(w.out['src/stepper.vhd'], SELECTED.replaceAll('work.defs.WIDTH', 'work.defs.N_BITS'));
+  assert.match(w.out['src/stepper.vhd'], /^use work\.defs\.N_BITS;$/m);
+  assert.equal(w.out['src/wide.vhd'], LOCAL);
+  assert.deepEqual(w.counts, { 'src/counter.vhd': 2, 'src/shower.vhd': 2, 'src/stepper.vhd': 3, 'src/wide.vhd': 0 });
+  assert.deepEqual(diags(project(w.out)), []);
+  // the type
+  const t = renameAll('state_t', 1, 'mode_t');
+  assert.equal(t.out['src/counter.vhd'], USE_ALL.replace('signal state : state_t', 'signal state : mode_t'));
+  assert.equal(t.out['src/shower.vhd'], USE_ALL2.replace('(s : in state_t', '(s : in mode_t'));
+  assert.deepEqual(t.counts, { 'src/counter.vhd': 1, 'src/shower.vhd': 1, 'src/stepper.vhd': 0, 'src/wide.vhd': 0 });
+  assert.deepEqual(diags(project(t.out)), []);
+  // the function: its body in the package body, the calls through use and through a selected name
+  const f = renameAll('inc', 1, 'step');
+  assert.equal(f.out['src/defs.vhd'], PKG.replace(/function inc\(/g, 'function step(').replace('end function inc', 'end function step'));
+  assert.equal(f.out['src/counter.vhd'], USE_ALL.replace('n <= inc(n)', 'n <= step(n)'));
+  assert.equal(f.out['src/stepper.vhd'], SELECTED.replaceAll('work.defs.inc', 'work.defs.step'));
+  assert.deepEqual(diags(project(f.out)), []);
+  // a name that would mean another object in a file that uses the package: refused
+  assert.deepEqual(renamePackageItemInSource(USE_ALL, 'vhdl', decl, 'WIDTH', 'n'), { error: "'n' is already used for another object where 'WIDTH' is visible: choose another name." });
+  assert.deepEqual(renamePackageItemInSource(USE_ALL, 'vhdl', decl, 'WIDTH', 'q'), { error: "'q' is already used for another object where 'WIDTH' is visible: choose another name." });
+  // a file that does not use the package keeps its own name of the same spelling
+  const other = LOCAL.replace('use work.defs.all;\n', '');
+  assert.deepEqual(renamePackageItemInSource(other, 'vhdl', decl, 'WIDTH', 'N_BITS'), { text: other, count: 0, edits: [] });
+});
+
+test('Rename Symbol, a package (#2558): its body in another file follows; work.pkg.x in its own file; the declaration of a package found by name', () => {
+  const pkg = PKG.slice(0, PKG.indexOf('package body'));
+  const body = 'package body defs is\n  function inc(x : integer) return integer is\n  begin\n    return (x + 1) mod 2 ** WIDTH;\n  end function inc;\nend package body defs;\n';
+  const decl = packageDecl(pkg, 'vhdl', 'defs');
+  const r = renamePackageItemInSource(body, 'vhdl', decl, 'inc', 'step');
+  assert.equal(r.text, body.replace('function inc(', 'function step(').replace('end function inc', 'end function step'));
+  assert.deepEqual(r.edits, [{ line: 2, col: 12, len: 3 }, { line: 5, col: 16, len: 3 }]);
+  const n = renamePackageItemInSource(body, 'vhdl', decl, 'WIDTH', 'N');
+  assert.equal(n.text, body.replace('** WIDTH', '** N'));
+  assert.deepEqual(diags([{ path: 'a.vhd', text: pkg.replace('constant WIDTH', 'constant N') }, { path: 'b.vhd', text: n.text }]), []);
+  // in the package's own file: a selected name of the package is the same constant
+  const one = PKG + '\nentity e is port (y : out integer); end e;\narchitecture a of e is begin y <= work.defs.WIDTH; end a;\n';
+  assert.equal(ren(one, 'vhdl', 'WIDTH', 1, 'N').text, one.replace('constant WIDTH', 'constant N').replace('2 ** WIDTH', '2 ** N').replace('work.defs.WIDTH', 'work.defs.N'));
+  assert.equal(packageDecl(PKG, 'vhdl', 'nope'), null);
+  // not a declaration of a package: an entity's port, an architecture's signal
+  assert.equal(packageOf(symbolAt(USE_ALL, 'vhdl', ...at(USE_ALL, 'q')).sym), null);
+  assert.equal(packageOf(symbolAt(USE_ALL, 'vhdl', ...at(USE_ALL, 'n', 1)).sym), null);
+});
+
+test('Rename Symbol, a declaration of a Verilog package (#2558): also in the files that import it (import pkg::*, pkg::x), case-sensitive, not a local declaration; compiles with no warnings', () => {
+  const pkg = 'package defs;\n  localparam W = 4;\nendpackage : defs\n';
+  const m1 = 'module acc import defs::*; (input clk, input [W-1:0] d, output reg [W-1:0] q);\n  // W in a comment\n  always @(posedge clk) q <= q + d;\nendmodule\n';
+  const m2 = "module shw (output [defs::W-1:0] y);\n  assign y = {defs::W{1'b1}};\nendmodule\n";
+  const m3 = 'module own import defs::*; (output [7:0] y);\n  localparam W = 8;\n  localparam w = 2;\n  assign y = W + w;\nendmodule\n';
+  const decl = packageDecl(pkg, 'verilog', 'defs');
+  assert.equal(decl, pkg.trimEnd());
+  assert.equal(packageDecl(pkg, 'verilog', 'DEFS'), null);
+  const r = ren(pkg, 'verilog', 'W', 0, 'WIDTH');
+  assert.equal(packageOf(r.sym).name, 'defs');
+  const out = [m1, m2, m3].map(t => renamePackageItemInSource(t, 'verilog', decl, 'W', 'WIDTH'));
+  assert.deepEqual(out.map(o => o.count), [2, 2, 0]);
+  assert.equal(out[0].text, m1.replaceAll('[W-1:0]', '[WIDTH-1:0]'));
+  assert.equal(out[1].text, m2.replaceAll('defs::W', 'defs::WIDTH'));
+  assert.equal(out[2].text, m3);
+  const files = [r.text, ...out.map(o => o.text)].map((text, k) => ({ path: `f${k}.sv`, text }));
+  assert.deepEqual(diags(files), []);
 });

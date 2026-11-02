@@ -396,7 +396,11 @@ function analyzeVhdl(text) {
     if (isOp(p, '.')) {
       const pre = tokens[i - 2];
       if (pre?.key === 'work') { const s = file.syms.get(t.key); C.occ(i, s || null, false, s ? file : null); }
-      else if (fields.syms.has(t.key)) C.occ(i, fields.syms.get(t.key), false, fields);
+      // work.pkg.X: a declaration of a package of this file (#2558)
+      else if (isOp(tokens[i - 3], '.') && tokens[i - 4]?.key === 'work' && file.syms.get(pre?.key)?.kind === 'package' && file.syms.get(pre.key).owner?.syms.has(t.key)) {
+        const pk = file.syms.get(pre.key).owner;
+        C.occ(i, pk.syms.get(t.key), false, pk);
+      } else if (fields.syms.has(t.key)) C.occ(i, fields.syms.get(t.key), false, fields);
       else C.loose(i);
       continue;
     }
@@ -675,6 +679,14 @@ function analyzeVerilog(text) {
     if (top?.mode === 'enum' && elemStart) { C.declare(cur, i, 'enum'); continue; }
     // SystemVerilog types used like keywords: int i; bit [3:0] b;
     if (V_SV_TYPES.has(w) && (tokens[i + 1]?.k === 'id' || isOp(n, '[') || isKw(n, 'signed', 'unsigned'))) { startDecl(w, t); continue; }
+    // pkg::x: a declaration of a package of this file (#2558); another scope's name is not resolved here
+    if (isOp(p, '::')) {
+      const pk = file.syms.get(tokens[i - 2]?.key);
+      const s = pk?.kind === 'package' ? pk.owner?.syms.get(t.key) : null;
+      if (s) C.occ(i, s, false, pk.owner);
+      else C.loose(i);
+      continue;
+    }
     // after '.': the formal of a named connection, a hierarchical name or a struct field
     if (isOp(p, '.')) {
       if (top?.mode === 'assoc' && !(tokens[i - 2]?.k === 'id')) {
