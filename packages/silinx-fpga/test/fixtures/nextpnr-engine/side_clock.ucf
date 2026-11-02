@@ -1,0 +1,2 @@
+NET "clka" LOC = "K3" ;
+NET "clkb" LOC = "K14" ;

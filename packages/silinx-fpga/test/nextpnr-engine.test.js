@@ -536,6 +536,32 @@ test('#2566 a multiplier cascade built with --engine nextpnr: no warnings, the c
   }
 });
 
+// #2627: the design (Silinx's test/fixtures/open-flow/feat_side_clock): clka on K3, which reaches no global buffer by a
+// dedicated path, and clkb on K14, a side GCLK pin whose path reaches only the right side buffer BUFGMUX_X3Y6; eight
+// flip-flops on each. A side buffer drives its line in its half of the chip only: clkb's flip-flops must be right of the
+// clock tiles' column (nextpnr had put them anywhere, and router 1 stopped on its assert valid_wires_for_net)
+test('#2627 a clock on a side buffer built with --engine nextpnr: no warnings, its flip-flops in its half of the chip, the other clock on a top / bottom buffer', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fileURLToPath(fixture('side_clock.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('side_clock.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.some(l => /^Bitstream: .*every feature in the bit database\)$/.test(l)), out.join('\n'));
+  const design = parseXdl(fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8'));
+  const bufs = design.insts.filter(i => i.type === 'BUFGMUX');
+  const bufOf = pad => bufs.find(b => design.nets.some(n => n.outpins.some(p => p.inst === pad) && n.inpins.some(p => p.inst === b.name)));
+  assert.equal(bufOf('clkb')?.site, 'BUFGMUX_X3Y6');
+  // (clka's buffer on a top / bottom buffer, which reaches the whole chip: X1 / X2)
+  assert.match(bufOf('clka')?.site ?? '', /^BUFGMUX_X[12]Y/);
+  // clkb's flip-flops right of the clock tiles' column (the CLKT tile's)
+  const centre = +/_X(\d+)Y/.exec(bufs.find(b => /^BUFGMUX_X[12]Y/.test(b.site)).tile)[1];
+  const net = design.nets.find(n => n.outpins.some(p => p.inst === bufOf('clkb').name));
+  const loads = net.inpins.filter(p => p.pin === 'CLK').map(p => design.insts.find(i => i.name === p.inst));
+  assert.equal(loads.length, 4);   // (eight flip-flops, two to a slice)
+  for (const i of loads) assert.ok(+/_X(\d+)Y/.exec(i.tile)[1] > centre, `${i.name} on ${i.tile}`);
+});
+
 test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its global buffer; an INST LOC as the DCM\'s BEL, a wrong site refused', () => {
   const json = () => fs.readFileSync(fixture('feat_dcm.json'), 'utf8'), ucf = fs.readFileSync(fixture('feat_dcm.ucf'), 'utf8');
   const { problems, sdc } = nextpnrNetlist(json(), 'top', ucf);
