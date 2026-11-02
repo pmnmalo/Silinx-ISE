@@ -7,7 +7,7 @@ import { VGA_H, VGA_STATE, VGA_W } from './compiled-vga.js';
 export function mountSteps(ctx) {
   const {
     watch, ckSet, count, counted, dlist, edgeCode, edges, elems, fire, flush, flushFn, groups, inputs, levels, mems,
-    needFall, negMain, pairs, posMain, sched, settleCode, sig, vars, vgaCode, vk, watched
+    needFall, negMain, pairs, posMain, sched, settleCode, sig, uartCode, vars, vgaCode, vk, watched
   } = ctx;
 
   // ---- the loop's steps: the main clock's rising edge (the cycle's samples before it), its falling edge; with
@@ -18,7 +18,7 @@ export function mountSteps(ctx) {
   // event-driven simulator they come a few deltas before those of RST); it sets the group's outputs to 0 and
   // drops its steps left; a cycle's rising edge with RST low starts the group's schedule again
   const endCount = counted && !needFall ? `if (n) { ${count('0.5')} }` : '';
-  const riseCount = `${counted ? (needFall ? count('0.5') : count('(cy ? 1 : 0.5)')) : ''}\n${edgeCode}\n${vgaCode}`;
+  const riseCount = `${counted ? (needFall ? count('0.5') : count('(cy ? 1 : 0.5)')) : ''}\n${edgeCode}\n${vgaCode}\n${uartCode}`;
   let dcmStep = '', dcmTables = '', dcmLocals = '', dcmSave = '';
   if (sched) {
     const { T } = sched, gs = groups.filter(g => g.chans.length);
@@ -92,6 +92,7 @@ ${dlist.map(d => `let P${d.k} = -1;`).join('\n')}
 const K = new Float64Array(${levels.length + pairs.length}), EV = [];
 ${watch?.vga ? `const VG = new Float64Array(${VGA_STATE.length}).fill(-1), FB = new Uint16Array(${VGA_W * VGA_H}); VG[${VGA_STATE.indexOf('ct')}] = 0; VG[${VGA_STATE.indexOf('frames')}] = 0; VG[${VGA_STATE.indexOf('L')}] = 0;` : ''}
 ${edges.map((_, i) => `let E${i} = -1;`).join(' ')}
+${watch?.uart ? 'const UT = []; let U_TX = -1, UB = 0;' : ''}
 ${dcmTables}
 ${counted ? flushFn : ''}
 function run(n) {
@@ -101,6 +102,7 @@ function run(n) {
   ${temps.length ? `let ${temps.join(', ')};` : ''}
   ${edges.length ? `let ${edges.map((_, i) => `e${i} = E${i}`).join(', ')};` : ''}
   ${watch?.vga ? `let ${VGA_STATE.map((k, i) => `g_${k} = VG[${i}]`).join(', ')};` : ''}
+  ${watch?.uart ? 'let u_tx = U_TX;' : ''}
   let ph = 0, cy = 0, it = 0, ch = false@@decl@@;${dcmLocals}@@fns@@
   ${counted ? `let R = 0${watched.map(v => `, l${v} = v${v}`).join('')}; ${flush}` : ''}
   run: for (;;) {
@@ -126,12 +128,13 @@ ${fire(negMain, 'f')}
   ${dlist.map(d => `P${d.k} = p${d.k};`).join(' ')}${dcmSave}
   ${edges.map((_, i) => `E${i} = e${i};`).join(' ')}
   ${watch?.vga ? VGA_STATE.map((k, i) => `VG[${i}] = g_${k};`).join(' ') : ''}
+  ${watch?.uart ? 'U_TX = u_tx; UB += cy;' : ''}
 }
 // the counts and the edges since the last take (the counts back to 0)
 function take() { const counts = Array.from(K); K.fill(0); return { counts, edges: EV.splice(0) }; }
 function set(k, x) { switch (k) { ${inputs.map(p => `case ${p.v}: ${OUT ? 'v' : 'V'}${p.v} = x; break;`).join(' ')} } }
 function vals() { return [${V.map(i => `${OUT ? 'v' : 'V'}${i}`).join(', ')}]; }
-return { run, set, vals, take, mems: [${mems.map(m => `M${m.k}`).join(', ')}]${watch?.vga ? ', vga: { state: VG, fb: FB }' : ''} };
+return { run, set, vals, take, mems: [${mems.map(m => `M${m.k}`).join(', ')}]${watch?.vga ? ', vga: { state: VG, fb: FB }' : ''}${watch?.uart ? ', uart: { take: () => UT.splice(0) }' : ''} };
 `;
 
   return { memChars, templateOf };

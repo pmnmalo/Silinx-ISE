@@ -1,10 +1,10 @@
 // The Board Emulator's modules outside the board (#2522): a checkbox for each in the toolbar, to show or hide it (the
-// VGA monitor, the iCEBreaker's modules on its Pmods). A module is what its drawing marks with data-module; hiding it
+// VGA monitor, the serial terminal, the iCEBreaker's modules on its Pmods). A module is what its drawing marks with data-module; hiding it
 // changes the view only: the design goes on driving it. The choice is remembered, per module.
 import { h } from './dom.js';
 import { prefKey } from './prefs.js';
 
-const LABELS = { vga: 'VGA monitor', display: 'Display', switches: 'Switches' };
+const LABELS = { vga: 'VGA monitor', serial: 'Serial terminal', display: 'Display', switches: 'Switches' };
 const MODULE_KEY = (id) => prefKey(`silinx.emulator.module.${id}`);
 const pref = (id) => { try { return localStorage.getItem(MODULE_KEY(id)) !== 'hidden'; } catch { return true; } };
 

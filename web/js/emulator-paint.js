@@ -6,7 +6,7 @@ import { formatTime } from '/core/interp.js';
 import { h } from './dom.js';
 import { lcdText } from '/core/emulate.js';
 
-/** { paint, setStat } of mountEmulator (compiled(), dirty(), lcd(), lcdDirty(), lcdView(), logN(), paints(), powered(), prev(), rateWin(), running(), vgaView(): its current values). */
+/** { paint, setStat } of mountEmulator (compiled(), dirty(), lcd(), lcdDirty(), lcdView(), logN(), paints(), powered(), prev(), rateWin(), running(), serialView(), vgaView(): its current values). */
 // an LED's colour at brightness v (0..1): green, or red (data-colour="red": the iCEBreaker's LED1 and LEDR_N, #2511)
 const ledColour = (v, red) => (red ? [58 + 197 * v, 27 + 20 * v, 27 + 20 * v] : [27 + 20 * v, 58 + 197 * v, 35 + 40 * v]).map(Math.round);
 // (the status line's rewrites while running: twice a second at most, #1106)
@@ -15,7 +15,7 @@ const STAT_MS = 500;
 export function mountEmuPaint(ctx) {
   const {
     compiled, digits, dirty, lcd, lcdDirty, lcdView, leds, logEl, logN, paints, period, powered, prev, rateWin, running,
-    shown, sim, stat, vgaView, watched, setDirty, setPaints, setLcdDirty, setRateWin, setLogN
+    serialView, shown, sim, stat, vgaView, watched, setDirty, setPaints, setLcdDirty, setRateWin, setLogN
   } = ctx;
 
   const setStat = (t) => { if (stat.textContent !== t) stat.textContent = t; };
@@ -38,6 +38,7 @@ export function mountEmuPaint(ctx) {
     digits.forEach((d, k) => d && d.set(prev()?.digits[k] ?? null));
     if (lcdView() && lcdDirty()) { lcdView().set(powered() ? lcdText(lcd()) : null, lcd()); setLcdDirty(false); }
     vgaView()?.draw();
+    serialView()?.draw();
     for (const w of watched) {
       const v = compiled() ? sim.value(w.s) : w.s.val;
       const t = v == null || Array.isArray(v) ? '?' : (w.s.t?.w > 1 ? `${V.toBin(v)}${v.x ? '' : ` (${v.v.toString(16).toUpperCase()}h)`}` : (v.x ? 'X' : v.v.toString()));
