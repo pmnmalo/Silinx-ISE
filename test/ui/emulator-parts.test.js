@@ -48,14 +48,15 @@ uiTest('#405 Board Emulator parts: the toolbar, the board, a watched signal, the
   await page.eval(() => window.SilinxApp.openFile('src/cnt.vhd'));
   await openEmulator(page);
   const q = (s) => page.eval((x) => [...document.querySelectorAll(x)].map((e) => e.textContent), s);
-  // ---- the toolbar: running; its selectors
-  assert.deepEqual(await q('.emu-bar button'), ['⏸ Pause', '⏭ Step', '⟲ Power cycle']);
-  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-bar select')].map((s) => [s.value, s.options.length])), [['', 5], ['compiled', 2], ['real', 8], ['pause', 2]]);
+  // ---- the toolbar: running; its selectors, the engine and when hidden in its menu (#2666)
+  assert.deepEqual(await q('.emu-bar > button'), ['⏸ Pause', '⏭ Step', '⟲ Power cycle']);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-bar > select')].map((s) => [s.value, s.options.length])), [['', 5], ['real', 8]]);
+  assert.deepEqual(await page.eval(() => [...document.querySelectorAll('.emu-bar .tb-more-menu select')].map((s) => [s.value, s.options.length])), [['compiled', 2], ['pause', 2]]);
   // ---- the board: 8 LEDs, 8 switches, 4 buttons, the power switch
   assert.deepEqual(await page.eval(() => ['.emu-led', '.emu-sw', '.emu-btn', '.emu-power'].map((s) => document.querySelectorAll(s).length)), [8, 8, 4, 1]);
   // ---- Pause: Run shown; Step: one clock cycle (20 ns) further
   await page.click('.emu-bar button', { text: '⏸ Pause' });
-  assert.deepEqual(await q('.emu-bar button'), ['▶ Run', '⏭ Step', '⟲ Power cycle']);
+  assert.deepEqual(await q('.emu-bar > button'), ['▶ Run', '⏭ Step', '⟲ Power cycle']);
   const t0 = await settledNow(page);
   await page.click('.emu-bar button', { text: '⏭ Step' });
   await page.waitFor((t) => window.SilinxApp.findDoc('emulator').view.sim.now === t + 20000 && !window.SilinxApp.findDoc('emulator').view.sim.busy, [t0], { what: 'one cycle on' });

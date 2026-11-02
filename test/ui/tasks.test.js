@@ -593,18 +593,21 @@ uiTest('#801 Tasks ▸ Emulate: the board fits, its switches and buttons on scre
 }, { build: DEV });
 
 // #1021, #1999: the board fits the window (zoomed up on a large window; down on a smaller one, a tablet, to 0.7 at
-// least), the emulator's bar above it, never under it; when the width runs short, the Watch and the VGA monitor wrap to
-// the next row, below the board, and the emulator's area scrolls down, not across; a laptop, a tablet in landscape and
-// in portrait; the ISE style interface as before
+// least), the emulator's bar above it, never under it; when the width runs short, the VGA monitor wraps to the next
+// row, below the board, and the board's area scrolls down, not across; the Watch in the side panel at the board's right
+// (#2666), below it when the emulator is narrow (a tablet); a laptop, a tablet in landscape and in portrait; the ISE
+// style interface as before
 const emuLayout = (page) => page.eval(() => {
   const emu = document.querySelector('.doc:not([hidden]) .emu'), wrap = emu.querySelector('.emu-board-wrap'), pcb = wrap.querySelector('.emu-pcb');
   const wr = wrap.getBoundingClientRect(), pr = pcb.getBoundingClientRect();
   const where = (el) => { const r = el.getBoundingClientRect(); return !el.getClientRects().length ? 'folded' : r.left >= wr.right - 1 ? 'beside' : r.top >= wr.bottom - 1 ? 'below' : 'over'; };
+  // (the board's area scrolls, the side panel beside it; the whole emulator on a narrow window, the side panel below it)
+  const main = emu.querySelector('.emu-main'), scrolls = (k) => [emu, main].some((e) => e[`scroll${k}`] > e[`client${k}`] + 1);
   return { zoom: +wrap.style.zoom || 1, proper: pr.width >= parseFloat(pcb.style.width) - 0.5 && pr.height >= parseFloat(pcb.style.height) - 0.5,
     watch: where(emu.querySelector('.emu-side')), vga: where(emu.querySelector('.emu-vga')),
-    scrollsDown: emu.scrollHeight > emu.clientHeight + 1, scrollsAcross: emu.scrollWidth > emu.clientWidth + 1 };
+    scrollsDown: scrolls('Height'), scrollsAcross: scrolls('Width') };
 });
-uiTest('#1021 #1999 Tasks ▸ Emulate: the board fits the window; the Watch and the VGA monitor wrap below it, scrolling down; ISE style as before', E, async (page) => {
+uiTest('#1021 #1999 #2666 Tasks ▸ Emulate: the board fits the window; the VGA monitor wraps below it, scrolling down; the Watch at its right, below it when narrow; ISE style as before', E, async (page) => {
   await makeProject(env, { name: 'TasksWrap', template: 'vga' });
   await page.setViewport(1280, 800);
   await tasksInterface(page);
@@ -629,8 +632,9 @@ uiTest('#1021 #1999 Tasks ▸ Emulate: the board fits the window; the Watch and 
   const barAbove = () => page.eval(() => { const e = document.querySelector('.doc:not([hidden]) .emu'); return e.querySelector('.emu-bar').getBoundingClientRect().bottom <= e.querySelector('.emu-board-wrap').getBoundingClientRect().top; });
   L = await at(1280, 800);
   fits(L, 'a smaller laptop', ['below', 'beside']);
-  // a tablet in landscape: the side panel docked, not a drawer (#1418); the board smaller beside it, the Watch and the
-  // VGA monitor below it, the area scrolling down only; the emulator's bar (two rows) above the board
+  // a tablet in landscape: the side panel docked, not a drawer (#1418); the board smaller beside it, the Watch (the
+  // emulator narrow, #2666) and the VGA monitor below it, the area scrolling down only; the emulator's bar (two rows)
+  // above the board
   L = await at(1024, 768);
   fits(L, 'a tablet in landscape');
   assert.equal(await barAbove(), true, 'the bar above the board');

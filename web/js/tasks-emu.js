@@ -1,10 +1,11 @@
 // The Tasks interface's Emulate task (#801, #782): the board gets the screen.
 // - The board fits the window (#1021, #1999): its picture, drawn at a fixed size by web/js/emulator.js, is zoomed (CSS
-//   zoom, which keeps the pointer's aim) to the room beside the Watch, at most MAX_ZOOM; on a small window (a tablet) it
-//   is made smaller, down to MIN_ZOOM, the Watch below it when beside it the board would be smaller than its proper
-//   size; measured again when the window, the task's panels or the board change (fitBoard).
-// - The emulator's side column (Watch, the timing generics, the hints) is shown at first (#1020): beside the board; when the width runs short, it and the VGA monitor wrap to the next row, below the board, and the
-//   task's area scrolls (web/css/tasks.css); the Design pane is not shown in Emulate.
+//   zoom, which keeps the pointer's aim) to the room left of the emulator's side panel, at most MAX_ZOOM; on a small
+//   window (a tablet) it is made smaller, down to MIN_ZOOM; measured again when the window, the task's panels, the
+//   emulator's side panel (folded, #2666) or the board change (fitBoard).
+// - The emulator's side panel (Watch, the timing generics, the hints) is shown at first (#1020): at the right of the
+//   board (#2666), below it on a narrow window; the VGA monitor wraps below the board when the width runs short, and the
+//   board's area scrolls (web/css/tasks.css); the Design pane is not shown in Emulate.
 // - Its Processes (#1204): the top module's User Constraints (I/O Pin Planning, Edit Constraints (Text), Check
 //   Constraints) and Emulate on Board with its models, as in Implement: the task's side panel, as Implement's
 //   (web/js/tasks.js, #1399).
@@ -15,13 +16,13 @@
 
 export const MAX_ZOOM = 1.5, MIN_ZOOM = 0.7;   // (smaller on a tablet, but not below 0.7: its labels kept legible, #1999)
 const GAP = 12;   // (.emu-main's padding and gap, web/js/emulator.js)
-const BAR = 16;   // (a scrollbar's room: the area scrolling down once zoomed keeps the Watch beside the board, #1399)
+const BAR = 16;   // (a scrollbar's room: the area scrolling down once zoomed, #1399)
 
 /** The zoom of a board of size `board` ({ w, h }) in the room `room` ({ w, h }): as large as fits, at most MAX_ZOOM,
  *  at least MIN_ZOOM (the room smaller still: the task's area scrolls). */
 export function boardZoom(room, board) {
   if (!(board?.w > 0) || !(board?.h > 0) || !(room?.w > 0) || !(room?.h > 0)) return 1;
-  // (to the hundredth below: a board that fills the room leaves the Watch beside it)
+  // (to the hundredth below: a board that fills the room makes it scroll in neither direction)
   return Math.max(MIN_ZOOM, Math.floor(100 * Math.min(MAX_ZOOM, room.w / board.w, room.h / board.h)) / 100);
 }
 
@@ -42,13 +43,10 @@ export function fitBoard(on) {
     placeStat(emu, wrap);
     wrap.style.zoom = '';
     if (!on || !shown(emu)) continue;
-    const main = emu.querySelector('.emu-main'), side = emu.querySelector('.emu-side'), bar = emu.querySelector('.emu-bar');
-    // (the room beside the Watch: the VGA monitor wraps below the board; the Watch too when the board leaves it no room)
+    const main = emu.querySelector('.emu-main'), bar = emu.querySelector('.emu-bar');
+    // (the board's area, the side panel at its right or below it, #2666: the VGA monitor wraps below the board)
     const h = emu.clientHeight - (bar?.offsetHeight || 0) - 2 * GAP, board = { w: wrap.offsetWidth, h: wrap.offsetHeight };
-    const beside = boardZoom({ w: main.clientWidth - 2 * GAP - BAR - (shown(side) ? side.offsetWidth + GAP : 0), h }, board);
-    // (smaller than its proper size beside the Watch: the whole width, the Watch wrapping below it, #1999)
-    const zoom = beside >= 1 ? beside : Math.max(beside, boardZoom({ w: main.clientWidth - 2 * GAP - BAR, h }, board));
-    wrap.style.zoom = String(zoom);
+    wrap.style.zoom = String(boardZoom({ w: main.clientWidth - 2 * GAP - BAR, h }, board));
   }
 }
 
@@ -58,6 +56,7 @@ export function initEmulate(on) {
   let soon = false;
   const later = () => { if (soon) return; soon = true; requestAnimationFrame(() => { soon = false; fitBoard(on()); }); };
   new ResizeObserver(later).observe(ws);
+  addEventListener('resize', later);   // (also an emulator's side panel folded or expanded: side-fold.js)
   // (an emulator builds its board after its document opens, once its design is compiled: a board appearing is watched
   // in the Tasks interface only, by one observer and no timer, so that no closed document is kept: #879)
   const isBoard = n => n.nodeType === 1 && (n.matches('.emu-board-wrap') || !!n.querySelector('.emu-board-wrap'));

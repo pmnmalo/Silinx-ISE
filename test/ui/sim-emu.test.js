@@ -228,7 +228,7 @@ for (const [board, name] of [['basys2', 'Basys2'], ['nexys2', 'Nexys2']]) {
     const off = await page.eval(() => ({
       sw: document.querySelector('.doc:not([hidden]) .emu-power').getAttribute('aria-checked'),
       stat: document.querySelector('.doc:not([hidden]) .emu .stat').textContent,
-      disabled: [...document.querySelectorAll('.doc:not([hidden]) .emu-bar .btn')].map((b) => [b.textContent, b.disabled]),
+      disabled: [...document.querySelectorAll('.doc:not([hidden]) .emu-bar > .btn')].map((b) => [b.textContent, b.disabled]),
       t: window.Silinx.active.view.sim.now,
     }));
     assert.equal(off.sw, 'false');
@@ -472,6 +472,8 @@ uiTest('board emulator: a design with a combinational loop runs on the event-dri
   // in Portuguese: no untranslated text
   await page.click('.doc:not([hidden]) .emu-bar .btn', { text: '⏸ Pause' });
   await page.eval(TEXTS);
+  // (the Engine selector in the toolbar's menu, opened, #2666)
+  await page.click('.doc:not([hidden]) .emu-bar .tb-more-btn');
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('en');
   const en = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden])')));

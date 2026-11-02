@@ -26,8 +26,7 @@ export function mountEmuSerial(ctx) {
   line.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
   const box = h('div', { class: 'emu-box emu-serial', 'data-module': 'serial' }, h('h4', {}, 'Serial terminal'),
     h('div', { class: 'emu-serial-bar' }, baudSel, clearBtn), out, h('div', { class: 'emu-serial-bar' }, line, sendBtn), note);
-  const side = main.querySelector('.emu-side');
-  if (side) side.before(box); else main.append(box);
+  main.append(box);
 
   // the line typed and a CR, one frame after the other on RX (the board's time: core/emulate-remote.js sequence)
   function send() {
