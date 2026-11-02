@@ -85,15 +85,16 @@ export function vhdlSeq(name, src, ports, m, agg) {
   for (const r of regs) L.push(`        ${r.sig} <= "${bin(r.reset, r.w)}";`);
   L.push(ce ? "      elsif ap_ce = '1' then" : '      else');
   for (const r of regs) if (/_vld_reg$/.test(r.name)) L.push(`        ${r.sig} <= "0";`);
-  L.push(`        if ap_CS_fsm = ${S(m.idle)} then`, `          if ap_start = '1'${chain ? " and ap_done_reg = '0'" : ''} then`);
-  for (const r of regs) if (r.latch != null) L.push(`            ${r.sig} <= ${sig(g.get(r.latch))};`);
-  L.push(`            ap_CS_fsm <= ${S(m.entry)};`, '          end if;');
+  // (a case, as the Verilog's: an if … elsif of thousands of states, pow in double, nests as deep, #2272)
+  L.push('        case ap_CS_fsm is', `          when ${S(m.idle)} =>`, `            if ap_start = '1'${chain ? " and ap_done_reg = '0'" : ''} then`);
+  for (const r of regs) if (r.latch != null) L.push(`              ${r.sig} <= ${sig(g.get(r.latch))};`);
+  L.push(`              ap_CS_fsm <= ${S(m.entry)};`, '            end if;');
   for (const st of m.states) {
-    L.push(`        elsif ap_CS_fsm = ${S(st.id)} then${st.line ? `   -- line ${st.line}` : ''}`);
-    for (const [r, id] of st.updates) L.push(`          ${byName.get(r).sig} <= ${sig(g.get(id))};`);
-    L.push(`          ap_CS_fsm <= ${sig(g.get(st.next))};`);
+    L.push(`          when ${S(st.id)} =>${st.line ? `   -- line ${st.line}` : ''}`);
+    for (const [r, id] of st.updates) L.push(`            ${byName.get(r).sig} <= ${sig(g.get(id))};`);
+    L.push(`            ap_CS_fsm <= ${sig(g.get(st.next))};`);
   }
-  L.push('        else', `          ap_CS_fsm <= ${S(m.idle)};`, '        end if;', '      end if;', '    end if;', '  end process;');
+  L.push('          when others =>', `            ap_CS_fsm <= ${S(m.idle)};`, '        end case;', '      end if;', '    end if;', '  end process;');
   // (a function pipelined, #1962: its calls overlap, its block protocol its valid bits')
   if (m.freeRun) L.push(`  ap_done <= ${sig(g.get(m.freeRun.done))}(0);`, `  ap_ready <= ${sig(g.get(m.freeRun.ready))}(0);`, `  ap_idle <= ${sig(g.get(m.freeRun.idle))}(0);`);
   else L.push(`  ap_done <= '1' when ap_CS_fsm = ${S(m.done)}${chain ? " or ap_done_reg = '1'" : ''} else '0';`, `  ap_ready <= '1' when ap_CS_fsm = ${S(m.done)} else '0';`, `  ap_idle <= '1' when ap_CS_fsm = ${S(m.idle)}${chain ? " and ap_start = '0'" : ''} else '0';`);
