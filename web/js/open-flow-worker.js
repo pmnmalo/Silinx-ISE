@@ -9,6 +9,7 @@
 //        fetched into Cache Storage (web/js/asset-cache.js, #967), this edition's other versions deleted from it
 //   out: { done: { fetched, bytes, pruned } }
 import { runOpenFlow } from '/core/flow-ide.js';
+import { familyProfile } from '/core/family-profile.js';
 import { loadDevice, dbFileNames, dbFilesFrom, makeBitDb, fetchBitDbS6, s6DbNames, nextpnrIo, ice40Io, runYosysOnce, yosysWorkerSource, readableBlobs } from '/packages/silinx-fpga/src/index.js';
 import { yosysPool } from './yosys-client.js';
 import { workerIo } from './open-flow-worker-io.js';
@@ -51,7 +52,7 @@ async function prepare({ prepare: d, assets, yosys, nextpnr, root }) {
   return { ...await prefetchAssets(urls, { fetchFn: netFetch }), pruned };
 }
 // a device's bit database files: the Spartan-3E's in bitdb/, the Spartan-6's in bitdb/s6 (#2103)
-const dbUrls = (d, base) => (d.family === 'spartan6' ? s6DbNames(d.part).map(n => new URL(`bitdb/s6/${n}.json`, base))
+const dbUrls = (d, base) => (familyProfile(d.family).openFlow?.bitDb === 's6' ? s6DbNames(d.part).map(n => new URL(`bitdb/s6/${n}.json`, base))
   : Object.values(dbFileNames(d.device, d.pkg)).map(f => new URL(`bitdb/${f}`, base)));
 // the Spartan-6's bit databases (fpga/s6/bitdb.js fetchBitDbS6: the same object as the server's loadBitDbS6)
 const fetchS6Db = (part, base) => fetchBitDbS6(part, async f => {
@@ -104,7 +105,7 @@ self.onmessage = async ({ data }) => {
       post({ line: `Loading the device description of ${spec.part} and its bit database…` });
       const graph = await gunzipJson(await fetchOk(new URL(`devices/${spec.graph}`, base), 'the device description'));
       const dev = loadDevice(graph);
-      if (spec.family === 'spartan6') {
+      if (familyProfile(spec.family).openFlow?.bitDb === 's6') {
         const db = await fetchS6Db(spec.part, base);
         if (!db.slices.lut || !db.iob) throw new Error(`no bit database for ${spec.device} on the site`);
         lastDevice = { key, device: dev, db };

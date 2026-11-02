@@ -7,6 +7,7 @@ import { icons } from './icons.js';
 import { log, showConsolePage } from './console.js';
 import { showCommandLines } from './messages.js';
 import { periodNs, deviceFamily, resourceCount } from '/packages/silinx-fpga/src/parts.js';
+import { familyProfile } from '/core/family-profile.js';
 import { familyOf } from '/core/c-timing.js';
 
 export const isC = (p) => /\.(c|cpp|cc|cxx)$/i.test(p || '');
@@ -146,7 +147,8 @@ export function hlsFamily() {
 export function hlsMults() {
   const part = S.project?.device?.part;
   if (!part) return null;
-  try { return resourceCount(part, deviceFamily(S.project.device) === 'spartan6' ? 'dsp48a1' : 'mult18x18') || null; } catch { return null; }
+  // (the family's multiplier, #2310; a family with no profile: the Spartan-3 generation's MULT18X18)
+  try { return resourceCount(part, familyProfile(deviceFamily(S.project.device)).multiplier || 'mult18x18') || null; } catch { return null; }
 }
 
 /** View C Synthesis Report (#1531): what the C was made into (core/c-hdl.js's report): the module, its ports, its

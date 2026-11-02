@@ -8,6 +8,7 @@ import { api } from './api.js';
 import { h, alertDlg, toast } from './ui.js';
 import { memoryModule, planMemory, readInitFile, MEMORY_FAMILIES } from '/core/blockram.js';
 import { resourceCount } from '/packages/silinx-fpga/src/parts.js';
+import { familyProfile } from '/core/family-profile.js';
 import { identError } from '/core/modgen.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
@@ -16,16 +17,17 @@ import { cleanLoc, namedPages } from './wizard-util.js';
 const LANGS = [['vhdl', 'VHDL'], ['verilog', 'Verilog']];
 const INIT_RE = /\.(mem|coe)$/i;
 
-// the block RAMs of the project's device, in the plan's unit: RAMB16s (Spartan-3E), 9 Kbit halves (Spartan-6)
+// the block RAMs of the project's device, in the plan's unit (the family's profile, #2310): RAMB16s (Spartan-3E), 9 Kbit
+// halves (Spartan-6)
 function deviceBlocks(family) {
   const part = S.devices?.parts?.find(p => p.part === S.project.device.part);
   if (!part) return null;
-  return family === 'spartan6' ? resourceCount(part, 'ramb8bwer') : resourceCount(part, 'ramb16');
+  return resourceCount(part, familyProfile(family).blockRam.resource);
 }
 const usageText = (plan, have) => {
-  const s6 = plan.family === 'spartan6';
-  const n = s6 ? `${plan.blocks} ${plan.prim}` : `${plan.blocks} RAMB16`;
-  const of = have === null ? '' : s6 ? ` (${plan.halves} of the ${have} halves of 9 Kbit on this device)` : ` of the ${have} on this device`;
+  const halves = familyProfile(plan.family).blockRam.halves;
+  const n = halves ? `${plan.blocks} ${plan.prim}` : `${plan.blocks} RAMB16`;
+  const of = have === null ? '' : halves ? ` (${plan.halves} of the ${have} halves of 9 Kbit on this device)` : ` of the ${have} on this device`;
   return `Block RAMs: ${n}${of}; ${plan.primName} of ${plan.shape.depth} x ${plan.shape.width}, ${plan.cols} side by side${plan.rows > 1 ? `, ${plan.rows} deep` : ''}.`;
 };
 
@@ -50,6 +52,7 @@ export async function blockMemoryWizard({ name = '', location = 'src', lang = nu
     return alertDlg('Block Memory', `${editPath} was made for another family of devices than the project's: create a new one with New Source ▸ Block Memory ▸ Wizard.`, 'error');
   }
   const have = deviceBlocks(family);
+  const halves = familyProfile(family).blockRam.halves;
   const L = lang || (pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
   const spec = structuredClone(old || { wizard: 'memory', version: 1, name: 'bram', lang: L, family, kind: 'ram', ports: 'single', width: 8, depth: 1024, writeMode: 'READ_FIRST', style: 'primitive', init: '' });
   if (!old && name) spec.name = name;   // the file name typed in New Source (#958)
@@ -66,11 +69,11 @@ export async function blockMemoryWizard({ name = '', location = 'src', lang = nu
   [nameIn, locIn].forEach(e => e.addEventListener('input', syncFile));
   langSel.addEventListener('change', syncFile);
   if (editPath) [nameIn, langSel, locIn].forEach(e => { e.disabled = true; });
-  const countNote = () => (have === null ? '' : h('div', { class: 'hint bw-count', style: { marginTop: '10px' } }, family === 'spartan6' ? `Block RAMs on this device: ${have / 2} of 18 Kbit (${have} halves of 9 Kbit)` : `Block RAMs on this device: ${have} RAMB16 of 18 Kbit`));
+  const countNote = () => (have === null ? '' : h('div', { class: 'hint bw-count', style: { marginTop: '10px' } }, halves ? `Block RAMs on this device: ${have / 2} of 18 Kbit (${have} halves of 9 Kbit)` : `Block RAMs on this device: ${have} RAMB16 of 18 Kbit`));
   const p1 = {
     title: 'Name and Language',
     render: () => h('div', {},
-      h('div', { class: 'hint' }, family === 'spartan6'
+      h('div', { class: 'hint' }, halves
         ? 'The wizard writes a module with a RAM or a ROM of the Spartan-6\'s block RAMs (RAMB8BWER, RAMB16BWER), or the HDL synthesis maps to them.'
         : 'The wizard writes a module with a RAM or a ROM of the Spartan-3E\'s block RAMs (RAMB16), or the HDL synthesis maps to them.'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
@@ -109,7 +112,7 @@ export async function blockMemoryWizard({ name = '', location = 'src', lang = nu
     const plan = planMemory(spec);
     let err = plan.errors[0] || null;
     if (!err && have !== null && plan.halves > have) {
-      err = family === 'spartan6' ? `It takes ${plan.halves} halves of 9 Kbit and the device has ${have}: make it smaller.` : `It takes ${plan.blocks} block RAMs and the device has ${have}: make it smaller.`;
+      err = halves ? `It takes ${plan.halves} halves of 9 Kbit and the device has ${have}: make it smaller.` : `It takes ${plan.blocks} block RAMs and the device has ${have}: make it smaller.`;
     }
     usage.textContent = plan.errors.length ? '' : usageText(plan, have);
     errBox.textContent = err || '';

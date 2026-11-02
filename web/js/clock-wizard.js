@@ -8,6 +8,7 @@ import { api } from './api.js';
 import { h, alertDlg, toast } from './ui.js';
 import { clockModule, planClock, fxChoices, dvChoices, DCM_PINS, PLL_OUTPUTS } from '/core/clocking.js';
 import { resourceCount, periodNs } from '/packages/silinx-fpga/src/parts.js';
+import { familyProfile } from '/core/family-profile.js';
 import { identError } from '/core/modgen.js';
 import { wizard, field, select, replaceGuard, closeBeforeReplace, moduleElsewhere } from './wizards.js';
 import { S, app } from './app.js';
@@ -15,7 +16,6 @@ import { cleanLoc, namedPages } from './wizard-util.js';
 
 const LANGS = [['vhdl', 'VHDL'], ['verilog', 'Verilog']];
 const mhzText = x => `${(+x).toFixed(3).replace(/\.?0+$/, '')} MHz`;
-const FAMILY_PRIM = { spartan3e: 'DCM_SP', spartan6: 'PLL_BASE' };
 
 // the board's oscillator (its Clock resource with a period), else 50 MHz
 function boardMHz() {
@@ -28,7 +28,7 @@ function boardMHz() {
 // a new spec for the project's device, or the one of the module being edited
 function defaultSpec(family, fin, lang) {
   const base = { wizard: 'clock', version: 1, name: 'clkgen', lang, family, speed: S.project.device.speed, inMHz: fin, input: 'clk_in', ibufg: true, reset: 'rst', locked: 'locked' };
-  if (family === 'spartan6') return { ...base, outputs: [{ port: 'clk_out0', mhz: fin, phase: 0 }] };
+  if (familyProfile(family).clock?.manager === 'pll') return { ...base, outputs: [{ port: 'clk_out0', mhz: fin, phase: 0 }] };
   return { ...base, div2: false, phaseShift: 0, outputs: [{ pin: 'CLK0', port: 'clk0' }] };
 }
 
@@ -40,13 +40,14 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
   if (!S.project) return;
   const pj = S.project;
   const family = old?.family || pj.device.family;
-  if (!FAMILY_PRIM[family]) return alertDlg('Clocking Wizard', 'The Clocking Wizard makes a DCM for the Spartan-3E and a PLL for the Spartan-6: choose one of them as the target device (Design Properties).', 'error');
+  const clock = familyProfile(family).clock;   // (the device's clock manager, #2310)
+  if (!clock) return alertDlg('Clocking Wizard', 'The Clocking Wizard makes a DCM for the Spartan-3E and a PLL for the Spartan-6: choose one of them as the target device (Design Properties).', 'error');
   if (old && old.family !== pj.device.family) {
     return alertDlg('Clocking Wizard', `${editPath} was made for another family of devices than the project's: create a new one with New Source ▸ Clock Manager (DCM / PLL) ▸ Wizard.`, 'error');
   }
   const part = S.devices?.parts?.find(p => p.part === pj.device.part) || null;
-  const res = family === 'spartan6' ? 'pll' : 'dcm';
-  const count = part ? resourceCount(part, res) : null;
+  const pll = clock.manager === 'pll', dcm = clock.manager === 'dcm';
+  const count = part ? resourceCount(part, clock.resource) : null;
   const { mhz: oscMHz, board } = boardMHz();
   const L = lang || (pj.preferredLanguage === 'verilog' ? 'verilog' : 'vhdl');
   const spec = structuredClone(old || defaultSpec(family, oscMHz, L));
@@ -65,11 +66,11 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
   if (editPath) [nameIn, langSel, locIn].forEach(e => { e.disabled = true; });
   // a module changed by hand since the wizard wrote it: said, Finish writes it again from the settings
   const edited = editPath && (S.sources || []).find(s => s.path === editPath)?.text !== clockModule(old).code;
-  const countNote = () => (count === null ? '' : h('div', { class: 'hint cw-count', style: { marginTop: '10px' } }, family === 'spartan6' ? `PLLs on this device: ${count}` : `DCMs on this device: ${count}`));
+  const countNote = () => (count === null ? '' : h('div', { class: 'hint cw-count', style: { marginTop: '10px' } }, pll ? `PLLs on this device: ${count}` : `DCMs on this device: ${count}`));
   const p1 = {
     title: 'Name and Language',
     render: () => h('div', {},
-      h('div', { class: 'hint' }, family === 'spartan6'
+      h('div', { class: 'hint' }, pll
         ? 'The wizard writes a module with a PLL of the Spartan-6 (PLL_BASE) for the frequencies you ask, its outputs on global clock buffers (BUFG).'
         : 'The wizard writes a module with a DCM of the Spartan-3E (DCM_SP) for the frequencies you ask, its outputs on global clock buffers (BUFG).'),
       h('div', { class: 'form-grid', style: { marginTop: '10px' } },
@@ -78,7 +79,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
       edited ? h('div', { class: 'hint cw-edited', style: { marginTop: '10px', color: 'var(--danger)' } }, 'This module was changed by hand since the wizard wrote it: Finish writes it again from the wizard\'s settings, and those changes are lost.') : ''),
     onShow: syncFile,
     validate: async () => {
-      if (count === 0) return family === 'spartan6' ? 'This device has no PLL.' : 'This device has no DCM.';
+      if (count === 0) return pll ? 'This device has no PLL.' : 'This device has no DCM.';
       const n = nameIn.value.trim();
       const e = identError(n, langSel.value);
       if (e) return `Name: ${e}.`;
@@ -107,7 +108,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
     spec.reset = rstChk.checked ? rstIn.value.trim() : '';
     spec.locked = lkChk.checked ? lkIn.value.trim() : '';
     rstIn.disabled = !rstChk.checked; lkIn.disabled = !lkChk.checked;
-    if (family === 'spartan3e') {
+    if (dcm) {
       spec.div2 = div2Chk.checked;
       spec.phaseShift = Math.trunc(+phaseIn.value || 0);
       const f = spec.inMHz / (spec.div2 ? 2 : 1);
@@ -123,7 +124,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
       h('div', { class: 'form-grid' },
         ...field('Input frequency (MHz):', finIn), ...field('Input port:', inputIn),
         ...field('From a pin (IBUFG):', ibufgChk),
-        ...(family === 'spartan3e' ? [...field('Divide the input by 2 (CLKIN_DIVIDE_BY_2):', div2Chk), ...field('Phase shift (PHASE_SHIFT, 256ths of the period):', h('span', {}, phaseIn, ' ', phaseNote))] : []),
+        ...(dcm ? [...field('Divide the input by 2 (CLKIN_DIVIDE_BY_2):', div2Chk), ...field('Phase shift (PHASE_SHIFT, 256ths of the period):', h('span', {}, phaseIn, ' ', phaseNote))] : []),
         ...field('Reset input (RST):', h('span', {}, rstChk, ' ', rstIn)), ...field('LOCKED output:', h('span', {}, lkChk, ' ', lkIn))),
       inNote,
       h('div', { class: 'hint', style: { marginTop: '8px' } }, 'Give the input its PERIOD constraint in the UCF: the timing derives each output\'s from it.')),
@@ -134,7 +135,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
       const e = portErr('Input port', spec.input) || (spec.reset && portErr('Reset input', spec.reset)) || (spec.locked && portErr('LOCKED output', spec.locked));
       if (e) return e;
       // the input's own errors (the outputs come next)
-      return planClock({ ...spec, outputs: family === 'spartan6' ? [{ port: 'x', mhz: spec.inMHz }] : [{ pin: 'CLK0', port: 'x' }] }).errors.find(x => !/^CLK0 /.test(x)) || null;
+      return planClock({ ...spec, outputs: pll ? [{ port: 'x', mhz: spec.inMHz }] : [{ pin: 'CLK0', port: 'x' }] }).errors.find(x => !/^CLK0 /.test(x)) || null;
     },
   };
   // ------------------------------------------------------------ page 3: the outputs
@@ -142,7 +143,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
   const vcoNote = h('div', { class: 'hint cw-vco', 'data-no-i18n': '' });
   const errBox = h('div', { class: 'cw-errors', style: { color: 'var(--danger)', minHeight: '16px', marginTop: '6px' } });
   // the rows: Spartan-3E, one per DCM output (CLKFX180 at CLKFX's frequency); Spartan-6, the PLL's six
-  const rows = family === 'spartan6'
+  const rows = pll
     ? Array.from({ length: PLL_OUTPUTS }, (_, i) => {
       const o = spec.outputs[i];
       return { pin: `CLKOUT${i}`, on: !!o, port: o?.port || `clk_out${i}`, mhz: o?.mhz ?? spec.inMHz / (i + 1), phase: o?.phase ?? 0 };
@@ -152,7 +153,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
       const fx = spec.outputs.find(x => /^CLKFX/.test(x.pin) && x.mhz !== undefined);
       return { pin, on: !!o, port: o?.port || pin.toLowerCase(), mhz: pin === 'CLKDV' ? (o?.mhz ?? spec.inMHz / 2) : pin === 'CLKFX' ? (fx?.mhz ?? spec.inMHz * 2) : undefined };
     });
-  const outputsOf = () => (family === 'spartan6'
+  const outputsOf = () => (pll
     ? rows.filter(r => r.on).map(r => ({ port: r.port, mhz: +r.mhz, phase: +r.phase || 0 }))
     : rows.filter(r => r.on).map(r => ({ pin: r.pin, port: r.port, ...(/^CLKFX/.test(r.pin) ? { mhz: +rows.find(x => x.pin === 'CLKFX').mhz } : r.pin === 'CLKDV' ? { mhz: +r.mhz } : {}) })));
   let cells = [];
@@ -170,7 +171,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
       if (!c.row.on || !(f > 0)) continue;
       const near = c.row.pin === 'CLKFX' ? fxChoices(f, +c.row.mhz, { speed: spec.speed, div2: spec.div2 }).map(x => x.mhz)
         : c.row.pin === 'CLKDV' ? dvChoices(f, { speed: spec.speed, div2: spec.div2 }).sort((a, b) => Math.abs(a.mhz - c.row.mhz) - Math.abs(b.mhz - c.row.mhz)).slice(0, 5).map(x => x.mhz)
-        : family === 'spartan6' && plan.vco ? [...new Set([-2, -1, 0, 1, 2].map(k => Math.round(plan.vco / Math.max(1, Math.round(plan.vco / +c.row.mhz) + k) * 1e6) / 1e6))] : [];
+        : pll && plan.vco ? [...new Set([-2, -1, 0, 1, 2].map(k => Math.round(plan.vco / Math.max(1, Math.round(plan.vco / +c.row.mhz) + k) * 1e6) / 1e6))] : [];
       for (const x of near) c.near.append(h('button', { class: 'btn cw-near-btn', 'data-no-i18n': '', title: 'Ask for this frequency', onclick: () => { c.row.mhz = x; c.mhz.value = String(x); refresh(); } }, mhzText(x)));
     }
     vcoNote.textContent = plan.notes.join(' ');
@@ -179,13 +180,13 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
   };
   const renderRows = () => {
     outTbl.replaceChildren(h('tr', {}, h('th', {}, ''), h('th', {}, 'Output'), h('th', {}, 'Port'), h('th', {}, 'Asked (MHz)'),
-      ...(family === 'spartan6' ? [h('th', {}, 'Phase (°)')] : []), h('th', {}, 'Frequency'), h('th', {}, 'Made as'), h('th', {}, 'Reachable near it')));
+      ...(pll ? [h('th', {}, 'Phase (°)')] : []), h('th', {}, 'Frequency'), h('th', {}, 'Made as'), h('th', {}, 'Reachable near it')));
     cells = rows.map(row => {
       const on = h('input', { type: 'checkbox', class: 'cw-on', 'data-pin': row.pin, checked: row.on });
       const port = h('input', { type: 'text', class: 'cw-port', 'data-pin': row.pin, value: row.port, style: { width: '90px' } });
       const asks = row.mhz !== undefined;
       const mhz = asks ? num('cw-mhz', row.mhz, { 'data-pin': row.pin, style: { width: '80px' } }) : h('span', { class: 'cw-fixed', 'data-no-i18n': '' }, row.pin === 'CLKFX180' ? '= CLKFX' : '');
-      const phase = family === 'spartan6' ? num('cw-ph', row.phase, { 'data-pin': row.pin, style: { width: '60px' } }) : null;
+      const phase = pll ? num('cw-ph', row.phase, { 'data-pin': row.pin, style: { width: '60px' } }) : null;
       const actual = h('span', { class: 'cw-actual', 'data-pin': row.pin, 'data-no-i18n': '' });
       const note = h('span', { class: 'cw-note', 'data-pin': row.pin, 'data-no-i18n': '' });
       const near = h('span', { class: 'cw-near', 'data-pin': row.pin, style: { display: 'flex', gap: '3px', flexWrap: 'wrap' } });
@@ -203,7 +204,7 @@ export async function clockWizard({ name = '', location = 'src', lang = null, pa
     render: () => {
       renderRows();
       return h('div', {},
-        h('div', { class: 'hint' }, family === 'spartan6'
+        h('div', { class: 'hint' }, pll
           ? 'Choose the outputs and the frequency of each: the PLL makes them all from one VCO frequency, the nearest it can to the ones asked.'
           : 'Choose the outputs: CLK0, CLK90, CLK180 and CLK270 run at the input frequency, CLK2X at twice it; CLKDV divides it, CLKFX multiplies and divides it: the nearest it can to the one asked.'),
         h('div', { style: { marginTop: '8px', maxHeight: '330px', overflow: 'auto', border: '1px solid var(--frame)' } }, outTbl), vcoNote, errBox);
