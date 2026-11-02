@@ -193,7 +193,7 @@ const PT = {
   'Bitgen Report': 'Relatório do Bitgen', 'Current': 'Atual', '(not set)': '(não definido)', '(none)': '(nenhum)',
   // pin planner
   'Auto-assign from Board': 'Atribuir Automaticamente pela Placa', 'Clear All': 'Limpar Tudo',
-  'I/O Name': 'Nome de E/S', 'Board Resource': 'Recurso da Placa', 'Site (LOC)': 'Pino (LOC)', 'I/O Std.': 'Norma de E/S', 'Drive': 'Corrente',
+  'I/O Name': 'Nome de E/S', 'Board Resource': 'Recurso da Placa', 'Board Resources': 'Recursos da Placa', '☰ Board Resources': '☰ Recursos da Placa', 'Show / hide the board resources panel': 'Mostrar / esconder o painel dos recursos da placa', 'Remove every pin assignment': 'Remover todas as atribuições de pinos', 'Collapse the Board Resources panel': 'Recolher o painel dos recursos da placa', 'Expand the Board Resources panel': 'Expandir o painel dos recursos da placa', 'Site (LOC)': 'Pino (LOC)', 'I/O Std.': 'Norma de E/S', 'Drive': 'Corrente',
   'Slew': 'Slew', 'Pull': 'Pull', 'Clock period (ns)': 'Período do relógio (ns)', 'Input': 'Entrada', 'Output': 'Saída', 'Bidir': 'Bidir.',
   'Select a board in Design Properties': 'Selecione uma placa nas Propriedades do Projeto',
   'Match port names with board resources (clk, led, sw, btn, seg, an…)': 'Associar nomes de portos aos recursos da placa (clk, led, sw, btn, seg, an…)',

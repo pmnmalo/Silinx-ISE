@@ -287,13 +287,11 @@ table.grid tr.sel td { background: #dbe8fb; }
 .xl-lint-tip .xl-fix:hover { text-decoration: underline; }
 
 /* pin planner */
-.pin-planner { display: flex; flex-direction: column; height: 100%; }
-.pin-planner .pp-bar { display: flex; gap: 6px; align-items: center; padding: 4px 6px; border-bottom: 1px solid #ddd; background: #fafafa; flex-wrap: wrap; }
-.pin-planner .pp-body { flex: 1; display: flex; min-height: 0; }
-.pin-planner .pp-table { flex: 1; overflow: auto; }
-.pin-planner .pp-res { width: 280px; border-left: 1px solid #ddd; overflow: auto; padding: 6px; background: #fbfbfb; }
+/* I/O Pin Planning (web/js/pinplanner.js): the diagram editors' toolbar and side panel (asm-editor.css, #2671) */
+.pin-planner .pp-table { flex: 1; overflow: auto; background: var(--panel, #fff); }
+.pin-planner .pp-info, .pin-planner .pp-status { margin: 0 4px; color: var(--grey-3); white-space: nowrap; }
 .pin-planner .pp-missing { padding: 16px 20px; max-width: 640px; line-height: 1.5; }
-.pin-planner .pp-res .grp { font-weight: bold; margin: 8px 0 2px; color: #1e395b; }
+.pin-planner .pp-none { color: var(--grey-5); }
 .pin-planner .pp-res .res { padding: 1px 4px; font-family: var(--mono); font-size: 11px; display: flex; justify-content: space-between; }
 .pin-planner .pp-res .res.used { color: #999; text-decoration: line-through; }
 .pin-planner td.conflict input { background: #ffd7d7 !important; }

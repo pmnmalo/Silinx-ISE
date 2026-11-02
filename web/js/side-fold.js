@@ -6,14 +6,15 @@ import { h } from './dom.js';
 import { prefKey } from './prefs.js';
 import { foldChevron } from './sch-panels.js';
 
-/** The side panel `side` of the editor `root` foldable, its title (.asm-cap) first; `key`: its preference. */
-export function mountSideFold({ root, side, key }) {
+/** The side panel `side` of the editor `root` foldable, its title (.asm-cap) first; `key`: its preference; `titles`: its
+ *  button's tips (another panel's name: I/O Pin Planning's Board Resources, #2671). */
+export function mountSideFold({ root, side, key, titles = { fold: 'Collapse the Properties panel', unfold: 'Expand the Properties panel' } }) {
   const cap = side.querySelector('.asm-cap');
   const b = h('button', { type: 'button', class: 'asm-fold', 'data-fold': 'props' });
   cap.append(h('span', { class: 'sp' }), b);
   function setFolded(folded, remember = true) {
     root.classList.toggle('props-folded', folded);
-    const title = folded ? 'Expand the Properties panel' : 'Collapse the Properties panel';
+    const title = folded ? titles.unfold : titles.fold;
     b.title = title; b.setAttribute('aria-label', title); b.setAttribute('aria-expanded', String(!folded));
     b.innerHTML = foldChevron(folded ? 'left' : 'right');
     if (remember) try { localStorage.setItem(prefKey(key), folded ? '1' : '0'); } catch { /* storage unavailable */ }
