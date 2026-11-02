@@ -234,6 +234,25 @@ endmodule`);
   assert.deepEqual(phys.warnings, []);
 });
 
+test('an adder\'s carry in: CYINIT on AX, DI<0> (which needed AX too) through A\'s O5 as a route-through of its net, as map packs it (#2638)', async () => {
+  // (micro80's ALU, the light8080's: before, "CYINIT and DI<0> both need the bypass input AX" warned, and the physical
+  // design stopped at "its pin AX carries … and …")
+  const nl = await verilog('module m(input clk, input c, input [3:0] a, input [3:0] b, output reg [3:0] q); always @(posedge clk) q <= a + b + c; endmodule');
+  const p = packed(nl);
+  assert.deepEqual(p.warnings, []);
+  const [s] = p.slices.filter(x => x.carry !== null), c = nl.cells[s.carry];
+  assert.ok(c.pins.CYINIT > 1 && c.pins['DI<0>'] > 1 && c.pins.CYINIT !== c.pins['DI<0>']);
+  assert.equal(s.pos.A.x, c.pins.CYINIT);
+  assert.equal(s.pos.A.o5, `thru:${c.pins['DI<0>']}`);
+  assert.ok(lutInputs(nl.cells[s.pos.A.o6]).includes(c.pins['DI<0>']), 'DI<0> one of the S LUT\'s inputs');
+  assert.deepEqual(['B', 'C', 'D'].map((k, i) => s.pos[k].x), [1, 2, 3].map(i => c.pins[`DI<${i}>`]));
+  assert.deepEqual([p.stats.slices, p.stats.luts, p.stats.ffs], [1, 4, 4]);
+  // the physical design: DI<0> by the LUT input its route-through takes, AX CYINIT's alone
+  const phys = physS6(nl, p);
+  assert.deepEqual(phys.errors ?? [], []);
+  assert.deepEqual(phys.warnings, []);
+});
+
 test('LUT combining (combine: area) never takes more slices: isqrt\'s first top, whose 5FFs need the O5s a combining that empties no slice took (#2279)', async () => {
   // (the top of isqrt's first version, #1966: its digits by / 10, its reset a 2-bit shift register; 29 slices with
   // combining against 28 without, before)

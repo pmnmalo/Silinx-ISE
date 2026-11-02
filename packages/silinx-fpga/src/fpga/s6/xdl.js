@@ -105,7 +105,7 @@ export function placedXdlS6(nl, packed, phys, placement, { part, name = 'top', d
       else if (m.diConst === 'o5') put(`${p}5LUT`, `${name}.${p}5LUT`, `#LUT:O5=${di}`);
       else put(`${p}5LUT`, '', '#OFF');
       // the carry's DI
-      if (carry) put(`${p}CY0`, '', typeof q.o5 === 'number' || m.diThru || m.diConst === 'o5' ? 'O5' : `${p}X`);
+      if (carry) put(`${p}CY0`, '', typeof q.o5 === 'number' || q.o5 === `thru:${di}` || m.diThru || m.diConst === 'o5' ? 'O5' : `${p}X`);
       // the storage elements
       if (q.ff === AND2L) { put(`${p}FF`, `${name}.${p}FF_rt`, '#AND2L'); put(`${p}FFMUX`, '', 'XOR'); put(`${p}FFSRINIT`, '', 'SRINIT0'); }
       else if (typeof q.ff === 'number') {

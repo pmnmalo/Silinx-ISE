@@ -130,3 +130,23 @@ endmodule`);
   assert.deepEqual(['A', 'B', 'C', 'D'].map(p => [g[`${p}FFMUX`], g[`${p}FFSRINIT`]]), ['A', 'B', 'C', 'D'].map(p => [`${p}X`, 'SRINIT1']));
   assert.equal(g.SRUSED, '#OFF');
 });
+
+test('an adder\'s carry in: PRECYINIT AX, ACY0 O5, A5LUT a route-through of DI<0> on the S LUT\'s own pin, A6 high, as map writes it (#2638)', async () => {
+  const nl = await s6Verilog('module m(input clk, input c, input [3:0] a, input [3:0] b, output reg [3:0] q); always @(posedge clk) q <= a + b + c; endmodule');
+  const d = s6Phys(nl);
+  const { sites } = s6Device('xc6slx16csg324-3');
+  const x = placedXdlS6(nl, d.packed, d.phys, placeS6(d.phys, sites, { nl, seed: 1 }), { part: 'xc6slx16csg324-3' });
+  const carry = d.phys.insts.findIndex(i => i.type === 'SLICEL');
+  const c = Object.fromEntries(x.insts[carry].cfg.map(a => [a.attr, a.value]));
+  assert.equal(c.PRECYINIT, 'AX');
+  assert.deepEqual(['A', 'B', 'C', 'D'].map(p => c[`${p}CY0`]), ['O5', 'BX', 'CX', 'DX']);
+  // (ISE's map: A5LUT "#LUT:O5=A5", A6LUT "#LUT:O6=(A6+~A6)*((A4@A5))", on the same pins as the open flow's)
+  const pin = /^#LUT:O5=(A[1-5])$/.exec(c.A5LUT)?.[1];
+  assert.ok(pin, c.A5LUT);
+  assert.match(c.A6LUT, /^#LUT:O6=\(A6\+~A6\)\*\(/);
+  assert.ok(c.A6LUT.includes(pin), 'the route-through on one of the S LUT\'s pins');
+  const net = x.nets.find(n => n.inpins.some(q => q.inst === x.insts[carry].name && q.pin === pin));
+  const dnet = nl.cells[d.packed.slices[d.phys.insts[carry].slice].carry].pins['DI<0>'];
+  assert.equal(net.name, d.phys.nets.find(n => n.net === dnet).name, `${pin}: DI<0>'s net`);
+  assert.equal(x.nets.filter(n => n.inpins.some(q => q.inst === x.insts[carry].name && q.pin === 'AX')).length, 1);
+});

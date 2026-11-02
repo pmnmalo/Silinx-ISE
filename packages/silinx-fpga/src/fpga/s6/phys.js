@@ -204,8 +204,13 @@ export function physS6(nl, packed, { ucf = null } = {}) {
       }
       case 'carry': {
         let m;
-        // (DI the net S takes through the position's LUT: O5 passes it too, as map packs it, A6 high)
-        if ((m = /^DI<(\d)>$/.exec(pin))) return isConst(n) || s.pos[POS[+m[1]]].o6 === `thru:${n}` ? null : `${POS[+m[1]]}X`;
+        // (DI the net S takes through the position's LUT: O5 passes it too, as map packs it, A6 high; DI through O5's
+        // own route-through, by its LUT input, #2638)
+        if ((m = /^DI<(\d)>$/.exec(pin))) {
+          const q = s.pos[POS[+m[1]]];
+          if (q.o5 === `thru:${n}`) return lutPins[r.inst][POS[+m[1]]].o5thru;
+          return isConst(n) || q.o6 === `thru:${n}` ? null : `${POS[+m[1]]}X`;
+        }
         if ((m = /^S<(\d)>$/.exec(pin))) return isConst(n) ? null : s.pos[POS[+m[1]]].o6 === `thru:${n}` ? lutPins[r.inst][POS[+m[1]]].o6thru : null;
         if (pin === 'CYINIT') return isConst(n) ? null : 'AX';
         if (pin === 'CI') {
