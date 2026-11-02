@@ -195,13 +195,11 @@ html[data-layout="tasks"] .isim-toolbar .isim-model { height: var(--m-tool-h); m
 
 /* ------------------------------------------------------------------ Emulate (#801, web/js/tasks-emu.js) */
 /* the board gets the screen at its proper size at least (zoomed up by tasks-emu.js, never down: #1021); its side
-   column (Watch, timing generics) shown at first (#1020): beside the board, then the VGA monitor; when the width runs
-   short they wrap to the next row, below the board, and the task's area scrolls; the task's side panel its Processes,
-   as Implement's (#1399) */
+   panel (Watch, timing generics) at its right (#1020, #2666), the VGA monitor beside the board or, when the width runs
+   short, below it, the board's area scrolling; the task's side panel its Processes, as Implement's (#1399) */
 html[data-layout="tasks"] .emu-main { flex-wrap: wrap; align-items: flex-start; }
 html[data-layout="tasks"] .emu-board-wrap { flex: none; }
-html[data-layout="tasks"] .emu-side { flex: none; width: 240px; min-width: 0; order: 1; }   /* (beside the board, the side panel at the left: #1399) */
-html[data-layout="tasks"] .emu-vga { order: 2; }
+
 /* the emulator's status right below the board (moved there by tasks-emu.js), in place of the board's line (#1022) */
 html[data-layout="tasks"] .emu-board-note { display: none; }
 html[data-layout="tasks"] .emu-board-wrap > .stat { align-self: flex-start; color: var(--grey-3); font: 11px var(--mono, monospace);

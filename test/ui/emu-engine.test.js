@@ -113,6 +113,9 @@ uiTest('Tasks ▸ Emulate on a tablet: the event-driven engine, switched to comp
   await page.waitConsole(/Board Emulator: 'top' \(RTL, event-driven\)/);
   const ui = await engineUi(page);
   assert.deepEqual({ ...ui, hint: !!ui.hint }, { value: 'event', enabled: ['compiled', 'event'], hint: true, saved: null });
+  // (in the toolbar's menu, #2666)
+  assert.ok(await page.eval((s) => !document.querySelector(s).getClientRects().length, engineSel), 'the Engine selector in the closed menu');
+  await page.click('.doc:not([hidden]) .emu-bar .tb-more-btn');
   assert.ok(await page.eval((s) => document.querySelector(s).getClientRects().length > 0, engineSel), 'the Engine selector shown');
   await choose(page, 'compiled');
   await running(page, 'compiled');

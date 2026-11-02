@@ -36,10 +36,10 @@ uiTest('#2536 the serial terminal: a line typed comes back from a UART echo, its
   await page.openProject('EmuSerial');
   await open(page);
   assert.equal(await page.eval(() => window.Silinx.active.view.engine), 'compiled');
-  // the box: its title, its rate, its pins (the Nexys2's RS-232 port), before the side panel
+  // the box: its title, its rate, its pins (the Nexys2's RS-232 port), with the board (the side panel at their right, #2666)
   assert.deepEqual(await page.eval((d) => {
     const b = document.querySelector(`${d} .emu-serial`);
-    return [b.querySelector('h4').textContent, b.querySelector('select').value, b.querySelector('.emu-hint').textContent, b.nextElementSibling.classList.contains('emu-side')];
+    return [b.querySelector('h4').textContent, b.querySelector('select').value, b.querySelector('.emu-hint').textContent, b.parentElement.classList.contains('emu-main')];
   }, DOC), ['Serial terminal', '9600', 'TX: tx (pin P9) · RX: rx (pin U6)', true]);
   // a line: back as typed, a CR its end
   await type(page, 'Hello, FPGA');

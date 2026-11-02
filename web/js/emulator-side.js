@@ -1,13 +1,15 @@
 // The Board Emulator's VGA monitor and side panel (#405: out of mountEmulator in emulator.js): the picture the design
 // scans out on the VGA connector (#420), the signals watched, the ports on no pin of the board, and the log with
-// why the engine runs the design as it does.
+// why the engine runs the design as it does. The side panel is at the right of the board, as the diagram editors'
+// Properties, folded as theirs (side-fold.js, #2666); below the board on a narrow window.
 import { h } from './dom.js';
 import { vgaPixels } from '/core/vga.js';
+import { mountSideFold } from './side-fold.js';
 
-/** { logEl, watched } of mountEmulator (compiled(), engineNote(), powered(), running(), vgaView(): its current values). */
+/** { logEl, side, watched } of mountEmulator (compiled(), engineNote(), powered(), running(), vgaView(): its current values). */
 export function mountEmuSide(ctx) {
   const {
-    board, design, engine, timing, title, after, clockSigs, compiled, engineNote, main, powered, refresh, running, sim,
+    board, design, engine, timing, title, after, clockSigs, compiled, engineNote, main, powered, refresh, root, running, sim,
     vgaView, vgaWired, wiring, setVgaView
   } = ctx;
 
@@ -42,8 +44,9 @@ export function mountEmuSide(ctx) {
   }
 
   // side: watch, unconnected ports, log
-  const side = h('div', { class: 'emu-side' });
-  main.append(side);
+  const side = h('aside', { class: 'emu-side' }, h('div', { class: 'asm-cap' }, 'Properties'));
+  main.after(side);
+  mountSideFold({ root, side, key: 'silinx.emulator.props.folded' });
   const watchBody = h('tbody');
   const watched = [];
   const sigSel = h('select', { style: { maxWidth: '100%' } }, h('option', { value: '' }, 'Add a signal to watch…'),
@@ -96,5 +99,5 @@ export function mountEmuSide(ctx) {
   else if (engine?.auto && !compiled()) side.append(h('div', { class: 'emu-hint emu-engine-auto' }, `The event-driven engine by default on this device (${engine.auto}): choose Engine ▸ Compiled to run the design at the board's real speed.`));
   for (const w of compiled()?.warnings || []) side.append(h('div', { class: 'emu-hint' }, `Compiled engine: ${w}`));
 
-  return { logEl, watched };
+  return { logEl, side, watched };
 }

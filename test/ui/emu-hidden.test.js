@@ -148,6 +148,8 @@ uiTest('board emulator: paused while hidden and while its document tab is not ac
   await activate(page, 'emulator');
   await page.click('.doc:not([hidden]) .emu-bar .btn', { text: '⏸ Pause' });
   await page.eval(TEXTS);
+  // (the selector in the toolbar's menu, opened, #2666)
+  await page.click('.doc:not([hidden]) .emu-bar .tb-more-btn');
   const setLang = (l) => page.eval(async (x) => { (await import('/js/i18n.js')).setLanguage(x); }, l);
   await setLang('en');
   const en = await page.eval(() => window.__uiTexts(document.querySelector('.doc:not([hidden]) .emu-bar')));
