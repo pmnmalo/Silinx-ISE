@@ -797,6 +797,10 @@ traffic, blinky and pong on the Atlys):
   bitgen** (the Atlys's stopwatch, clock, vga, blinky and traffic, the Nexys3's, and gates on the Nexys3 with no UCF,
   its pads on the right side), every one with no DRC error: **all seven examples on both boards** come out of the
   open flow with ISE's own bitstream for their routing.
+- **The uart example on the Atlys** (#2539, 2026-11-02; `gen-flowdrop6.mjs` on its open-flow design, 3 XDL through
+  `ise-xdl-bits.sh`, 90 s; `ana-cmtdrop6.mjs`): its USB-UART pins (A16, B16) on two PIPs no design had used, a top
+  inner I/O tile's `D1_OLOGIC_SITE -> OQ_OLOGIC_SITE` (3 bits) and a BTERM's
+  `IOI_BTERM_SR1B0 -> IOI_BTERM_NR1E0` (no bits), into `db/s6-pips-flow.json`.
 
 ## Trying the parts that exist
 
