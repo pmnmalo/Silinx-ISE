@@ -27,7 +27,7 @@
 //              f8, chain: { id, index } | null, ctrl (the storage elements' control set key) | null, mem (the SLICEM's
 //              RAM / SRL control key) | null }]   (cells by their index in the netlist; o6 / o5 / ff / ff5: a cell or
 //              null; ff: AND2L, the storage element as a gate passing the carry's sum; o5 'thru:<net>': the LUT passing a
-//              net to the 5FF (#1143); mux: what leaves by AMUX … ('o5', 'xor',
+//              net to the 5FF (#1143) or to the carry's DI (#2638); mux: what leaves by AMUX … ('o5', 'xor',
 //              'cy', 'f7', 'f8', 'ff5'))
 //   chains: [[slice indices, bottom to top]]   carry chains: consecutive SLICEL / SLICEM of one column
 //   others: { type: count }   the cells on sites of their own (I/O buffers, BUFG, RAMB8BWER / RAMB16BWER, DSP48A1…)
@@ -168,11 +168,17 @@ function packSlices(nl, combine) {
         const coOut = i < 3 && co > 1 && ix.loads(co).some(l => !(cells[l.cell].type === 'CARRY4' && l.pin === 'CI'));
         if (sumOut && coOut && s.ctrl === null) { s.pos[p].ff = AND2L; s.ctrl = AND2L; }
       });
-      // CYINIT from AX when it is a signal (a constant is a setting)
+      // CYINIT from AX when it is a signal (a constant is a setting); DI<0>, which needed AX too, then through A's O5 as
+      // a route-through of its net (map's PK_PACKTHRU, ACY0 = O5, A6 high: an adder's carry in, #2638) when O5 is free
+      // and the S LUT leaves it an input
       const cy = c.pins.CYINIT ?? 0;
       if (cy > 1 && !below.has(ci)) {
-        if (s.pos.A.x !== null && s.pos.A.x !== cy) warnings.push(`carry chain at ${c.name}: CYINIT and DI<0> both need the bypass input AX`);
-        s.pos.A.x = cy;
+        const a = s.pos.A, di = a.x;
+        if (di !== null && di !== cy) {
+          if (a.o5 === null && (typeof a.o6 !== 'number' || new Set([...lutInputs(cells[a.o6]), di]).size <= 5)) a.o5 = `thru:${di}`;
+          else warnings.push(`carry chain at ${c.name}: CYINIT and DI<0> both need the bypass input AX`);
+        }
+        a.x = cy;
       }
     }
     chains.push(chain);
