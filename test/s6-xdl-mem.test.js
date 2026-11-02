@@ -42,7 +42,7 @@ test('every RAM and shift register as ISE writes it: the SLICEM\'s settings and 
     assert.deepEqual(d.phys.warnings, [], name);
     assert.deepEqual(d.packed.warnings, [], name);
     const ours = memSummary(text), ise = ISE[name];
-    const same = PERMS.map(p => Object.fromEntries(['A', 'B', 'C', 'D'].map((x, i) => [x, p[i]]))).find(map => JSON.stringify(renamed(ours, map)) === JSON.stringify(ise));
+    const same = PERMS.map(p => Object.fromEntries(['A', 'B', 'C', 'D'].map((x, i) => [x, p[i]]))).find(map => JSON.stringify(renamed(ours, map)) === JSON.stringify({ cfg: ise.cfg, pins: ise.pins }));
     assert.ok(same, `${name}:\nours ${JSON.stringify(ours)}\nISE  ${JSON.stringify(ise)}`);
   }
 });

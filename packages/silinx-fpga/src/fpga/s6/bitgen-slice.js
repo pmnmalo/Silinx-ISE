@@ -46,6 +46,23 @@ export function lutEntries(o6, o5) {
 }
 
 /**
+ * A SLICEM LUT's 64 entries from its contents as RAM or shift register (#2556, measured on gen-mem6.mjs's designs: ISE's
+ * .bit): a RAM's INIT as a LUT's (O6's entry e its bit e, O5's the entries with A6 = 0 when there is one), a shift
+ * register's bit i at entries 2i and 2i + 1 (A1 high), a 16-bit one's in the upper half (A6 high). null: not measured
+ * (a ROM's, another mode's, a 16-bit shift register's bits past 16).
+ */
+export function memEntries(o6, o5, mode) {
+  const hex = v => (v ? BigInt(v.replace(/^#R[AO]M:O[56]=/, '')) : 0n), bit = (h, i) => Number((h >> BigInt(i)) & 1n);
+  if ([o6, o5].some(v => v && !v.startsWith('#RAM:'))) return null;
+  const h6 = hex(o6), h5 = o5 ? hex(o5) : null;
+  if (/^(SPRAM64|DPRAM64|DPRAM32)$/.test(mode)) return Array.from({ length: 64 }, (_, e) => (h5 != null && e < 32 ? bit(h5, e) : bit(h6, e)));
+  if (h5 || !/^SRL(16|32)$/.test(mode)) return null;
+  const n = mode === 'SRL16' ? 16 : 32, from = 64 - 2 * n;
+  if (h6 >> BigInt(n)) return null;
+  return Array.from({ length: 64 }, (_, e) => (e < from ? 0 : bit(h6, (e - from) >> 1)));
+}
+
+/**
  * A kind's model: { lut: { A … D: [64 offsets] }, positions: Set of the settings' offsets, base: Set (the full
  * round's base, its LUTs' bits left out), baseCfg: Map element -> value, delta(element, value) -> { set, clear } |
  * null (not measured) }.
@@ -102,9 +119,14 @@ export function predictSlice(model, cfg) {
   for (const p of LUTS) {
     const lutOf = e => { const v = by.get(e)?.value; return v && v !== '#OFF' ? v : null; };
     const o6 = lutOf(`${p}6LUT`), o5 = lutOf(`${p}5LUT`);
-    // a RAM's or ROM's contents as their INIT (0x…): only all zeros are checked (their layout is not measured)
+    // a RAM's or shift register's contents as their INIT (0x…), in its mode's layout; a ROM's only all zeros
     const mem = [o6, o5].filter(v => v && !v.startsWith('#LUT:'));
-    if (mem.length) { if (mem.some(v => !/^#R[AO]M:O[56]=0x0+$/.test(v))) ram = true; continue; }
+    if (mem.length) {
+      const entries = memEntries(o6, o5, by.get(`${p}6RAMMODE`)?.value);
+      if (entries) entries.forEach((x, e) => { if (x) bits.add(key(model.lut[p][e])); });
+      else if (mem.some(v => !/^#R[AO]M:O[56]=0x0+$/.test(v))) ram = true;
+      continue;
+    }
     const eq = v => (v && v.startsWith('#LUT:') ? v.replace(/^#LUT:O[56]=/, '') : null);
     lutEntries(eq(o6), eq(o5)).forEach((x, e) => { if (x) bits.add(key(model.lut[p][e])); });
   }
