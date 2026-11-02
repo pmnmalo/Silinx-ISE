@@ -575,7 +575,10 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   column, the XC6SLX45's zero design's (S6-B), left out. The DRC reports the probes of one clock row and GCLK on one
   shared wire (PhysDesignRules:1712); bitgen writes them all the same. #728's 14 block RAM and DSP designs leave no bit
   over now (13 on the XC6SLX45 before), and 9 of their `.bit` are byte-identical with ISE's (5 before; the other 5,
-  RAMB16BWER designs, 2 bytes each, are the block RAM frame bitgen writes again).
+  RAMB16BWER designs, 2 bytes each, all 14 since #2586: bitgen clears a RAMB16BWER's two `RAM_MODE` bits, 23,-177 and
+  23,48, the ones `RAM_MODE=SP` clears, only when its XDL has no `RAM_MODE`, as Silinx's has not; ISE's map writes
+  `RAM_MODE::TDP`, and they stay set). The XC6SLX16's 23 XDL RAMB16BWER designs are byte-identical too (none before);
+  the XC6SLX45's differ by its `outside` bits only (S6-F).
 - **The BUFGMUX designs** (`gen-cmtsites6.mjs --muxes`: per CMT site 8 designs from the board's clock pad, V10 for
   the bottom half and C10 for the top, two outputs on BUFGMUXes k and k + 8, the DCM's feedback on a fixed one; 48).
   **A BUFGMUX a CMT drives** sets one bit of the REGC frame (`cmt6.mjs`'s `CMT_REGC`, `cmtRegcBits`): 1008 + i for

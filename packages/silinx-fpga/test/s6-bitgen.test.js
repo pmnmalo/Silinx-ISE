@@ -82,7 +82,7 @@ test('bitgen: a pad\'s bits by its settings, a design\'s the union of its instan
   assert.deepEqual([u.bits.size, [...u.unknown]], [0, [['NOSUCH A -> B', 1]]]);
 });
 
-test('bitgen: the block RAM\'s frame written again (minor 23 of its column, two bits cleared, a pad frame), a RAMB16BWER\'s bits cleared in the frame data, the unmeasured named', () => {
+test('bitgen: the block RAM\'s frame written again (minor 23 of its column, two bits cleared, a pad frame), a RAMB16BWER\'s bits cleared in the frame data when it has no RAM_MODE, the unmeasured named', () => {
   const site = s6Sites(device).brams[0], ramb8 = { name: 'r', type: 'RAMB8BWER', site: site.r8[0], tile: site.tile, placed: true, cfg: [] };
   const fdri = emptyFdri(dev).slice().fill(0xffff), [f0, b0] = gridRegion(device, dev, site.tile), w = (b0 >> 4) - 12;
   const r = bramRewrites({ insts: [ramb8], nets: [] }, device, dev, fdri);
@@ -95,10 +95,21 @@ test('bitgen: the block RAM\'s frame written again (minor 23 of its column, two 
   assert.deepEqual([x.words[w], x.words[w + 15]], [0xfffd, 0xbfff]);
   assert.equal(x.words.filter(v => v === 0xffff).length, 2 * FRAME_WORDS - 2);
   assert.deepEqual(r.clears, []);
-  // a RAMB16BWER (#2130): no frame written again, bit 0 of word w and bit 15 of word w + 15 cleared in the frame data
-  const r16 = bramRewrites({ insts: [{ ...ramb8, type: 'RAMB16BWER', site: site.r16 }], nets: [] }, device, dev, fdri);
+  // a RAMB16BWER with no RAM_MODE (Silinx's XDL, #2130): no frame written again, bit 0 of word w and bit 15 of word
+  // w + 15 cleared in the frame data
+  const ramb16 = { ...ramb8, type: 'RAMB16BWER', site: site.r16 };
+  const r16 = bramRewrites({ insts: [ramb16], nets: [] }, device, dev, fdri);
   const [c0] = columnOf(dev, f0), main = (c0 + 23) * FRAME_WORDS;
   assert.deepEqual(r16, { rewrites: [], clears: [[main + w, 0x0001], [main + w + 15, 0x8000]], unknown: [] });
+  // one with RAM_MODE::TDP (ISE's map's XDL, #2586: #728's r16a, r16b, r16clka on the XC6SLX16, r16ab, r16clka on the
+  // XC6SLX45) keeps them: ISE's bitgen leaves both set; SP and SDP clear them through their settings' bits
+  const tdp = { ...ramb16, cfg: cfg({ RAM_MODE: 'TDP' }) };
+  assert.deepEqual(bramRewrites({ insts: [tdp], nets: [] }, device, dev, fdri), { rewrites: [], clears: [], unknown: [] });
+  // every RAMB16BWER with no RAM_MODE has its own cleared, not only the first's
+  const other = s6Sites(device).brams.find(b => gridRegion(device, dev, b.tile)[0] !== f0), [g0, d0] = gridRegion(device, dev, other.tile);
+  const two = bramRewrites({ insts: [tdp, { ...ramb16, name: 's', site: other.r16, tile: other.tile }], nets: [] }, device, dev, fdri);
+  const main2 = (columnOf(dev, g0)[0] + 23) * FRAME_WORDS, w2 = (d0 >> 4) - 12;
+  assert.deepEqual(two.clears, [[main2 + w2, 0x0001], [main2 + w2 + 15, 0x8000]]);
   // two block RAMs: not measured
   assert.match(bramRewrites({ insts: [ramb8, { ...ramb8, name: 's', site: site.r8[1] }], nets: [] }, device, dev, fdri).unknown[0], /^2 block RAMs/);
   assert.deepEqual(bramRewrites({ insts: [], nets: [] }, device, dev, fdri), { rewrites: [], clears: [], unknown: [] });
