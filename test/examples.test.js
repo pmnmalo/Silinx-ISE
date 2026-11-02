@@ -1,4 +1,4 @@
-// The example projects (examples/gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt), which also test Silinx's workflows end to
+// The example projects (examples/gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt, uart, micro80), which also test Silinx's workflows end to
 // end on every device of the Silinx toolchain (Basys2-100 / 250, Nexys2-500 / 1200): each example's
 // sources read with no error or warning and no design-check message, its self-checking testbench
 // passes in Silinx's simulator with no warning, the UCF it ships is the one Silinx's board pin
@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { compile, elaborate } from '../core/compile.js';
 import { designChecks } from '../core/lint.js';
-import { EXAMPLES, TARGETS, ICE40_TARGETS, exampleBoard, targetName, example, exampleUcf, exampleProject, runTestbench, silinxFlow } from './examples-lib.mjs';
+import { EXAMPLES, TARGETS, S6_TARGETS, targetsOf, ICE40_TARGETS, exampleBoard, targetName, example, exampleUcf, exampleProject, runTestbench, silinxFlow } from './examples-lib.mjs';
 
 // known failures, with their issue: the test still runs, as a todo
 const KNOWN = {};
@@ -46,8 +46,17 @@ process.env.SILINX_CONFIG_DIR = path.join(tmp, 'config');
 // two builds at a time: each runs in its own process (server/open-flow-run.js), and one after another
 // they took most of the unit tests' time
 describe('the examples on every board', { concurrency: 2 }, () => {
+  // (#2638) micro80's ALU has a carry chain the Spartan-6's packer puts on one pin twice: refused with its reason
+  for (const t of S6_TARGETS) {
+    test(`example micro80 on the ${targetName(t)}: refused, the pin named (#2638)`, { timeout: 600000 }, async () => {
+      const { dir, project } = exampleProject('micro80', t, tmp);
+      const job = await silinxFlow(dir, project);
+      assert.equal(job.status, 'error');
+      assert.match(job.lines.join('\n'), /the Spartan-6 design cannot be placed: .*its pin AX carries/);
+    });
+  }
   for (const name of EXAMPLES) {
-    for (const t of TARGETS) {
+    for (const t of targetsOf(name)) {
       test(`example ${name} on the ${targetName(t)}: the Silinx toolchain builds the bitstream, no warning`, { timeout: 600000, todo: KNOWN[`${name}-${targetName(t)}`] || KNOWN[name] }, async () => {
         const { dir, project } = exampleProject(name, t, tmp);
         const job = await silinxFlow(dir, project);
@@ -71,7 +80,7 @@ describe('the examples on every board', { concurrency: 2 }, () => {
 // board has no pin for (5 LEDs, 3 buttons, the PmodSWT's 4 switches), each warned, by Silinx and by nextpnr
 const LEDS = ['led[5]', 'led[6]', 'led[7]'];
 const ICE40_NO_PIN = { gates: [], traffic: LEDS, blinky: LEDS, pong: ['btn[3]', ...LEDS], stopwatch: ['btn[3]', ...LEDS], clock: ['btn[3]', ...LEDS],
-  vga: ['sw', 'btn[3]'], isqrt: ['sw[4]', 'sw[5]', 'sw[6]', 'sw[7]'], uart: LEDS };
+  vga: ['sw', 'btn[3]'], isqrt: ['sw[4]', 'sw[5]', 'sw[6]', 'sw[7]'], uart: LEDS, micro80: ['sw[4]', 'sw[5]', 'sw[6]', 'sw[7]', ...LEDS] };
 describe('the examples on the iCE40\'s board', { concurrency: 2 }, () => {
   for (const name of EXAMPLES) {
     for (const t of ICE40_TARGETS.map(x => exampleBoard(name, x))) {

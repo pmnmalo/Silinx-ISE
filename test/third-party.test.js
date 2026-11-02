@@ -22,7 +22,7 @@ test('every component has a known licence and its full text; the editor\'s modul
   const md = fs.readFileSync(path.join(ROOT, 'THIRD-PARTY-NOTICES.md'), 'utf8');
   assert.ok(THIRD_PARTY.length > 10);
   for (const c of THIRD_PARTY) {
-    assert.match(c.license, /^(MIT|ISC|BSD-[23]-Clause|Apache-2\.0|EPL-2\.0 OR GPL-3\.0-or-later)$/, `${c.name}: licence ${c.license}`);
+    assert.match(c.license, /^(MIT|ISC|BSD-[23]-Clause|Apache-2\.0|EPL-2\.0 OR GPL-3\.0-or-later|LGPL-2\.1)$/, `${c.name}: licence ${c.license}`);
     const sec = new RegExp(`## ${c.name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} ${c.version} — [^\\n]*\\n\\n[^\\n]*\\n\\n\`\`\`text\\n([\\s\\S]*?)\\n\`\`\``).exec(md);
     assert.ok(sec, `${c.name} has a section`);
     assert.ok(sec[1].length > 200 && !/no licence file/.test(sec[1]), `${c.name}: the licence text`);

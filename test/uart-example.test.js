@@ -17,8 +17,8 @@ const ex = example('uart');
 const src = (p) => ex.sources.find((s) => s.path === p).text;
 const ok = (bytes) => bytes.map((byte) => ({ byte, error: false }));
 
-test('the examples list it, last', () => {
-  assert.equal(EXAMPLES.at(-1), 'uart');
+test('the examples list it after isqrt, before micro80 (#2544)', () => {
+  assert.deepEqual(EXAMPLES.slice(-3), ['isqrt', 'uart', 'micro80']);
 });
 
 // a mutation of the design makes the testbench fail: it does check what it says
