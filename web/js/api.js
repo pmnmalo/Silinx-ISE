@@ -1,4 +1,5 @@
 // Thin REST client for the Silinx server.
+import { prefKey } from './prefs.js';
 
 // The server answers only with its token, made at every start (#2564) and given in the address it
 // prints and opens (…/#token=…): kept for this browser (another tab opened at the plain address has it
@@ -6,8 +7,8 @@
 const TOKEN = (() => {
   try {
     const m = /(?:^#|&)token=([\w-]+)/.exec(location.hash);
-    if (m) { localStorage.setItem('silinx-token', m[1]); history.replaceState(null, '', location.pathname + location.search); }
-    return localStorage.getItem('silinx-token');
+    if (m) { localStorage.setItem(prefKey('silinx-token'), m[1]); history.replaceState(null, '', location.pathname + location.search); }
+    return localStorage.getItem(prefKey('silinx-token'));
   } catch { return null; }
 })();
 const auth = (headers = {}) => (TOKEN ? { ...headers, 'X-Silinx-Token': TOKEN } : headers);
