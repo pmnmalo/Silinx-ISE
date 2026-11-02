@@ -1,5 +1,0 @@
-In short:
-- The Board Emulator draws the Spartan-3E Starter Kit as the real board: each part where it is, turned as it is and in proportion, with the board's names (the upright power switch by the 5 V jack, the knob among BTN_NORTH / EAST / SOUTH / WEST, the LCD, LED7..LED0 over SW3..SW0, the connectors on their edges).
-
-In detail:
-- The Spartan-3E Starter Kit's drawing (`web/js/emulator-s3e.js`) redone after the board's user guide (UG230): the board 860 x 736 (its proportions); the board's name, not its makers' names or logos; the top edge's 5 V jack, upright power switch and red LED, VGA (J15), PS/2 (J14), RS-232 DCE (J9) and DTE (J10); Ethernet and USB on the left edge; the FX2 connector (J3) and the 6-pin headers J4, J1, J2 on the right; the FPGA, DDR, flashes and CPLD (their part numbers or kinds), the 50 MHz oscillator, the clock socket, SMA and PROG; the rotary knob among the four buttons, the LCD module (its 16 x 2 characters in proportion), the SMD LEDs over the four slide switches. A layout may bring its own style (`css`), added after the emulator's (#2478).
