@@ -264,9 +264,9 @@ const EXAMPLE_PACK = {
   uart: { slices: 52, X: 33, L: 19, M: 0, luts: 140, ffs: 138, warnings: 0 },
   micro80: { slices: 63, X: 43, L: 18, M: 2, luts: 172, ffs: 185, warnings: 1 },   // (a carry chain: CYINIT and DI<0> both on AX, #2638)
 };
-// with LUT combining (combine: 'area'): the slices, never more than without (isqrt: 29 when the combining came before
-// the storage elements, which then filled the slices it emptied again, #2636)
-const EXAMPLE_AREA = { gates: 1, traffic: 31, blinky: 52, pong: 107, stopwatch: 81, clock: 82, vga: 49, isqrt: 28, uart: 49 };
+// with LUT combining (combine: 'area'): the slices, never more than without, and the same warnings (isqrt: 29 when
+// the combining came before the storage elements, which then filled the slices it emptied again, #2636)
+const EXAMPLE_AREA = { gates: 1, traffic: 31, blinky: 52, pong: 107, stopwatch: 81, clock: 82, vga: 49, isqrt: 28, uart: 49, micro80: 61 };
 // map's packing of the same netlists on ISE (packages/silinx-fpga/research/s6/measured/night1.json, night 1): its SLICELs are the packer's
 // (the carry chains and the wide multiplexers); its SLICEX are a placement's, more (packages/silinx-fpga/research/s6/README.md)
 test('the packer\'s SLICELs are those of ISE\'s map on the same netlists, every example on the Nexys3 and the Atlys (night 1)', () => {
@@ -294,7 +294,7 @@ test('every example packs into legal slices for the XC6SLX16 (the slices by kind
     assert.equal(p.stats.and2l, name === 'clock' || name === 'uart' ? 1 : 0, name);
     // (LUT combining: never more slices)
     const area = packed(nl, { combine: 'area' });
-    assert.deepEqual([area.stats.slices, area.stats.luts, area.warnings], [EXAMPLE_AREA[name], luts, []], name);
+    assert.deepEqual([area.stats.slices, area.stats.luts, area.warnings], [EXAMPLE_AREA[name], luts, p.warnings], name);
     assert.ok(area.stats.slices <= slices, name);
   }
 });
