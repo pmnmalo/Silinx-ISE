@@ -6,18 +6,18 @@
 #                                           GitHub's build provenance attestation (#485)
 # The tests are not run here (#416): CI runs at a release only (#607), started by the same tag, and the
 # job waits for that run (scripts/wait-for-ci.mjs), then checks the packages it publishes. The tagged
-# commit must be on main.
+# commit must be on main. The build job (the repository's code and its dependencies) reads only; the
+# attestation and the release are made in a job of their own, from its artifact, with no code of the
+# repository run there (#2644).
 name: Release
 on:
   push:
     tags: ['v*']
 permissions:
   actions: read               # the tagged commit's CI run
-  attestations: write         # the files' build provenance (#485)
-  contents: write
-  id-token: write             # (the attestation's signing certificate, from GitHub's OIDC token)
+  contents: read
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 170
     steps:
@@ -46,6 +46,28 @@ jobs:
         timeout-minutes: 10
         env:
           CHROME_PATH: /usr/bin/google-chrome
+      # "What's new" (CHANGELOG.md section of this version) + downloads / licence note + the checksums
+      - name: Notes
+        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" --require --sums out/SHA256SUMS > notes.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            out
+            notes.md
+          retention-days: 7
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      attestations: write     # the files' build provenance (#485)
+      contents: write
+      id-token: write         # (the attestation's signing certificate, from GitHub's OIDC token)
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
       # signed statements that each file listed in SHA256SUMS was built here, by this workflow, from this
       # tag (gh attestation verify <file> --repo pmnmalo/Silinx-ISE)
       - name: Build provenance
@@ -55,8 +77,7 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           V="${GITHUB_REF_NAME#v}"
-          # "What's new" (CHANGELOG.md section of this version) + downloads / licence note + the checksums
-          node scripts/release-notes.mjs "$V" --require --sums out/SHA256SUMS > out-notes.md
-          gh release create "$GITHUB_REF_NAME" out/* --title "Silinx ISE $V" --notes-file out-notes.md
+          gh release create "$GITHUB_REF_NAME" out/* --title "Silinx ISE $V" --notes-file notes.md

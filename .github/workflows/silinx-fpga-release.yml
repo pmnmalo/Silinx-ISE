@@ -6,7 +6,9 @@
 # with its changelog section and no fragment left (scripts/sync-version.mjs --package). No token: npm's trusted
 # publishing (#2428) authenticates this workflow by GitHub's OIDC token, the package's trusted publisher on npmjs.com
 # being this repository and this workflow; it needs npm 11.5.1 or later (Node 22's is npm 10), pinned here. No
-# GitHub Release: the Pages site serves the IDE's latest one.
+# GitHub Release: the Pages site serves the IDE's latest one. The OIDC token is the publish job's only (#2644): the
+# build job, which installs the dependencies and runs the repository's code, packs the package and holds none; the
+# publish job runs only npm, on that tarball.
 name: silinx-fpga release
 on:
   push:
@@ -14,9 +16,8 @@ on:
 permissions:
   actions: read               # the tagged commit's CI run
   contents: read
-  id-token: write             # npm's trusted publishing and provenance (GitHub's OIDC token)
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 170
     steps:
@@ -37,7 +38,28 @@ jobs:
         run: node scripts/wait-for-ci.mjs "$GITHUB_SHA" --timeout 150 --appear 10
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Pack
+        run: mkdir -p out && npm pack -w silinx-fpga --ignore-scripts --pack-destination out && ls -la out
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: silinx-fpga
+          path: out
+          retention-days: 7
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write         # npm's trusted publishing and provenance (GitHub's OIDC token)
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: silinx-fpga
+          path: out
       - name: Publish
         run: |
           npm install --global npm@11.21.0 --ignore-scripts --no-audit --no-fund
-          npm publish -w silinx-fpga --provenance --access public --ignore-scripts
+          npm publish out/silinx-fpga-*.tgz --provenance --access public --ignore-scripts

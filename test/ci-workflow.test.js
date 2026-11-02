@@ -77,7 +77,7 @@ test('CI: at a release only (a tag v*, or the toolchain package\'s silinx-fpga-v
 test('CI at a release only: the development build and the site\'s dev/ after every push to main, not after CI (#607)', () => {
   const dev = read('.github/workflows/dev-release.yml');
   assert.equal(on(dev).replace(/^#.*\n/gm, ''), 'on:\n  push:\n    branches: [main]\n  workflow_dispatch:\n');
-  assert.ok(jobs(dev).dev.includes("    if: github.ref == 'refs/heads/main'"));
+  assert.ok(jobs(dev).build.includes("    if: github.ref == 'refs/heads/main'"));
   assert.match(dev, /ref: \$\{\{ github\.sha \}\}/);
   assert.doesNotMatch(dev, /workflow_run/);
   const pages = read('.github/workflows/pages.yml');

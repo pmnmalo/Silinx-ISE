@@ -49,7 +49,8 @@ test('wait for CI: the command line without its arguments', () => {
 test('release: CI on the tagged commit instead of npm test, the commit on main; the packages still checked', () => {
   const yml = fs.readFileSync(path.join(ROOT, '.github/workflows/release.yml'), 'utf8');
   assert.doesNotMatch(yml, /npm test\b/);
-  assert.match(yml, /\npermissions:\n {2}actions: read .*\n {2}attestations: write .*\n {2}contents: write\n {2}id-token: write .*\n/);
+  // the CI run read by the build job; the writing permissions are the publish job's (test/release-workflow.test.js, #2644)
+  assert.match(yml, /\npermissions:\n {2}actions: read .*\n {2}contents: read\n/);
   assert.match(yml, /- name: CI passed\n\s+run: node scripts\/wait-for-ci\.mjs "\$GITHUB_SHA" --timeout (\d+) --appear \d+\n\s+env:\n\s+GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
   // the tagged commit on main (#607: CI runs on the tag, so a tag elsewhere would pass it too)
   assert.match(yml, /uses: actions\/checkout@.+\n\s+with:\n\s+fetch-depth: 0\n/);
