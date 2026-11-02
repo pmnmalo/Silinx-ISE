@@ -24,7 +24,9 @@ uiTest('#405 FSM editor parts: the view, the history, the inline editing, the po
   });
   await makeProject(env, { name: 'FsmParts', files: { 'src/pri.fsm.json': JSON.stringify(m0, null, 2) } });
   await page.openProject('FsmParts');
-  await page.eval(() => window.SilinxApp.openFsm('src/pri.fsm.json'));
+  // (#2589: the toolbar's Undo follows the editor at once, opened without a click: it was greyed out until the next click
+  // or second, and an Undo clicked meanwhile was lost)
+  assert.equal(await page.eval(async () => { await window.SilinxApp.openFsm('src/pri.fsm.json'); return document.querySelector('#toolbar [data-cmd=undo]').disabled; }), false);
   await page.waitFor((ed) => window.Silinx.active?.id === 'fsm:src/pri.fsm.json' && document.querySelector(`${ed} [data-trans=t1] .fsm-label`), [ED], { what: 'FSM editor' });
   await new Promise((r) => setTimeout(r, 300));   // (the fit when it opened)
   const model = () => page.eval(() => window.Silinx.active.fsmEditor.getModel());
