@@ -25,7 +25,6 @@ const BTN_AT = [['BTNS', 731, 812], ['BTNU', 731, 744], ['BTNL', 656, 812], ['BT
  *  micro-USB; the FPGA in the middle, DONE and RESET right of it; LD7..LD0 over the slide switches SW7..SW0 along the
  *  bottom edge, the 4-digit display over the cross of five buttons (right). */
 export function nexys3Layout({ board, title, h, mkDigit, mkLed, mkSwitch, mkButton, portLabel, bitFor, clockNote, mkPower }) {
-  const pin = (res, k = 0) => pinsOf(board, res)[k] ?? '';
   const art = `
     <defs><linearGradient id="nx3pcb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b4f3e"/><stop offset="1" stop-color="#213f31"/></linearGradient></defs>
     <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="8" fill="url(#nx3pcb)" stroke="#0f2219" stroke-width="3"/>

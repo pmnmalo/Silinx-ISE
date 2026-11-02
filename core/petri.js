@@ -388,6 +388,3 @@ export function fromPnml(xml, { name = null } = {}) {
   for (const p of m.places) p.capacity = Math.max(p.capacity, p.tokens, 1);
   return normalizePetri(m);
 }
-
-/** A copy of the model with new ids for a duplicate (not used yet: the editor's paste). */
-export const clonePetri = m => clone(normalizePetri(m));

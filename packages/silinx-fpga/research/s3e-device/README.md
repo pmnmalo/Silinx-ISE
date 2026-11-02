@@ -29,8 +29,8 @@ showed it.
 | `measure.mjs` | The XC3S250E's recipe for another die, in stages: `designs` (every observation design, sized to the part), `observe`, `tiles` (the tile probe: switch-tiles.txt, clb-tiles.txt), `random`, `round k` and `verdicts k` (the join tests' rounds) (#3, the other devices) |
 | `prototype.mjs` | The phase-2 prototype: observe, predict, tests, verdicts, build the measured CLB array, compare it with the shipped graph; `score`: the tests' verdicts against the shipped graph |
 
-What the experiments produce (ISE's routed XDL and logs, the candidates, the verdicts) stays in the
-working folders, out of the repository; only the scripts and this record are here.
+ISE's routed XDL and logs stay in the working folders, out of the repository; what is parsed from them
+(the observations, the probes, the verdicts) is in `data/`, with the scripts and this record.
 
 ## 1. Method
 

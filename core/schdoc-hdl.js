@@ -214,7 +214,6 @@ export function generateHdl(docIn, opts = {}) {
   }
   const OUTN = (s, pin) => { const n = nl.pinNet.get(`${s.id}/${pin}`); if (!n) return null; return outRead.get(n) || netName(n); };
   const INN = (s, pin, named) => { const n = inNet(s, pin); if (n && outRead.has(n)) return outRead.get(n); return IN(s, pin, named); };
-  const castU = (x, cls, sgn) => (sgn ? `signed(${x})` : `unsigned(${x})`);
   const wrapV = (expr, cls) => (cls === 'u' || cls === 's' ? (cls === 's' ? `signed(${expr})` : expr) : `std_logic_vector(${expr})`);
 
   // (set when a device primitive is instanced: the UNISIM library in the context clause)
