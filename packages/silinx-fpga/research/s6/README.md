@@ -188,7 +188,7 @@ high (A6 too in a 16-bit one), its INIT as it is, its data on AI … (16-bit) or
 (Q15, Q31) by DMUX (DOUTMUX::MC31) from position A only. The Silinx toolchain writes the same settings and pins for the
 21 designs (the LUT positions aside, its placer's choice; test/s6-xdl-mem.test.js), and ISE reads its placement and
 its routing of each (`ise-place-check.sh`): `par -k` routes the placement completely, the DRC finds no error and no
-warning. The contents in the bitstream (other than zeros): #2556.
+warning. The contents in the bitstream: #2556, below (the slice settings).
 
 ### The router (#730, 2026-10-24)
 
@@ -343,8 +343,13 @@ XC6SLX16's settings (the same tiles).
 - **The residual** (the bits ISE sets in the used tiles' columns and bands that no position explains): none in the
   slices' frames (minors 21 to 29 / 30 of a CLB column); minors 0 to 20 are the routing's (#726), bit 17 of minor 19
   next to a SLICEL using F7B among them.
-- Not measured: a LUT RAM's or ROM's contents other than zeros (the SRL modes move bits); Silinx does not write them
-  yet (#2556).
+- **A LUT RAM's and shift register's contents** (#2556, 2026-11-02; no new design: the 21 of `gen-mem6.mjs` that ISE
+  implemented, `ana-mem6.mjs` keeping the entries of the SLICEM's LUTs set in ISE's `.bit`, `measured/mem.json` `lut`):
+  a RAM's INIT (SPRAM64, DPRAM64, DPRAM32's O6 and O5) is written as a LUT's, by the LUT map (O6's bit e at entry e,
+  O5's at the entries with A6 = 0); a shift register's bit i at entries 2i and 2i + 1 (A1 high), a 16-bit one's in
+  the upper half (entries 32 + 2i, 33 + 2i: A6 high). `bitgen-slice.js` `memEntries` writes them: the 21 designs'
+  `.bit`, CRC on and off, byte-identical with ISE's (`check-bitgen6.mjs`). Not measured: a ROM's contents other than
+  zeros, SPRAM32, a 16-bit shift register's INIT past bit 15.
 
 ### The INT switch box (#726, S6-D, 2026-10-29)
 
