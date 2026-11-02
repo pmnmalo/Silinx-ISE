@@ -507,7 +507,7 @@ test('toolchain config through the API: the settings scripts the project files c
     const real = await fs.realpath(tmp);   // the folders above the test's own (e.g. macOS's /var/folders) may be shared
     const st = await fs.stat(path.dirname(real)).catch(() => null);
     if (typeof process.getuid !== 'function' || (st && !(st.mode & 0o022))) {
-      assert.equal((await api({ mode: 'local', local: { settings: path.join(ise, 'settings64.sh') } })).local.settings, path.join(ise, 'settings64.sh'));
+      assert.equal((await api({ mode: 'local', local: { settings: path.join(ise, 'settings64.sh') } })).local.settings, await fs.realpath(path.join(ise, 'settings64.sh')));
     }
     // a value sent unchanged (the dialog sends every field) is not checked again; '' = auto-detect
     await tc.saveConfig({ local: { settings: path.join(ws, 'x', 'settings64.sh') } });

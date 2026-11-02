@@ -408,13 +408,16 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
 
   const buildDir = path.join(projectDir, 'build');
   const srcDir = path.join(buildDir, 'src');
+  // the build folder is written and emptied: never through a link a project folder brought along
+  if (!within(projectDir, buildDir)) throw Object.assign(new Error('the build folder is a link out of the project'), { status: 400 });
+  await dropLinks(buildDir);
   await fs.rm(srcDir, { recursive: true, force: true });
   await fs.mkdir(srcDir, { recursive: true });
 
   // Copy sources, preserving their relative layout under build/src/ (paths stay unique).
   const sources = [];
   for (const f of design) {
-    const from = inside(f.path);
+    const from = inside(scriptSafe(f.path));
     if (!fss.existsSync(from)) { warnings.push(`missing source file ${f.path} (skipped)`); continue; }
     const rel = f.path.split(/[\\/]/).join('/');
     const to = path.join(srcDir, rel);
@@ -436,6 +439,7 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   const includeDirs = new Set();
   for (const rel of await walkFiles(projectDir)) {
     if (!/\.(vh|svh|h|inc|vinc)$/i.test(rel)) continue;
+    scriptSafe(rel);
     const to = path.join(srcDir, rel);
     await fs.mkdir(path.dirname(to), { recursive: true });
     await fs.copyFile(path.join(projectDir, rel), to);
@@ -487,6 +491,23 @@ export async function generateBuild(project, projectDir, { steps } = {}) {
   return { buildDir, top, device, files: Object.keys(files).concat(hasUcf ? [`${top}.ucf`] : []), sources, hasUcf, warnings, steps: defaultSteps };
 }
 
+// A path as XST's script and project file quote it: nothing that would end its quotes or its option
+function scriptSafe(rel) {
+  if (/["{}\x00-\x1f]/.test(rel)) throw Object.assign(new Error(`file path not allowed in XST's script: ${JSON.stringify(rel)}`), { status: 400 });
+  return rel;
+}
+
+// The symbolic links under a folder removed (the links, not what they point to)
+async function dropLinks(dir) {
+  let ents = [];
+  try { ents = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of ents) {
+    const p = path.join(dir, e.name);
+    if (e.isSymbolicLink()) await fs.rm(p, { force: true });
+    else if (e.isDirectory()) await dropLinks(p);
+  }
+}
+
 async function walkFiles(dir, base = '') {
   const out = [];
   let ents = [];
@@ -494,7 +515,7 @@ async function walkFiles(dir, base = '') {
   for (const e of ents) {
     if (e.name.startsWith('.') || (base === '' && (e.name === 'build' || e.name === 'node_modules'))) continue;
     const rel = base ? `${base}/${e.name}` : e.name;
-    if (e.isDirectory()) out.push(...await walkFiles(dir, rel)); else out.push(rel);
+    if (e.isDirectory()) out.push(...await walkFiles(dir, rel)); else if (e.isFile()) out.push(rel);   // never a link
   }
   return out;
 }

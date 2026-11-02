@@ -93,7 +93,7 @@ export function mountXiseRoutes(ctx) {
     let entries;
     try { entries = await readZip(new Uint8Array(req.body), NODE_CODEC); } catch (e) { throw bad(`cannot read zip: ${e.message}`); }
     const xiseEntry = entries.filter(e => /\.xise$/i.test(e.path)).sort((x, y) => x.path.split('/').length - y.path.split('/').length)[0];
-    const pjEntry = entries.find(e => /(^|\/)silinx\.json$/.test(e.path));
+    const pjEntry = entries.find(e => /(^|\/)silinx\.json$/i.test(e.path));
     const root = (xiseEntry || pjEntry) ? path.posix.dirname((xiseEntry || pjEntry).path) : '';
     const rel = p => (root === '.' || !root ? p : p.startsWith(root + '/') ? p.slice(root.length + 1) : null);
     const text = e => Buffer.from(e.data).toString('utf8');
@@ -114,9 +114,10 @@ export function mountXiseRoutes(ctx) {
     const extra = [];
     for (const e of entries) {
       const r = rel(e.path);
-      if (r === null || written.has(r) || /\.xise$/i.test(r) || r === 'silinx.json' || (xiseEntry && ISE_OUTPUT.test(r))) continue;
+      if (r === null || written.has(r) || /\.xise$/i.test(r) || r.toLowerCase() === 'silinx.json' || (xiseEntry && ISE_OUTPUT.test(r))) continue;
       const norm = path.posix.normalize(r);
-      if (norm.startsWith('..') || path.posix.isAbsolute(norm)) continue;
+      // (no hidden file or folder: an export has none, and a .git/ or an editor's settings would run commands)
+      if (norm.startsWith('..') || path.posix.isAbsolute(norm) || norm.split('/').some(s => s.startsWith('.'))) continue;
       await fs.mkdir(path.dirname(P.safeJoin(P.projectDir(name), norm)), { recursive: true });
       await fs.writeFile(P.safeJoin(P.projectDir(name), norm), Buffer.from(e.data));
       extra.push(norm);
@@ -146,7 +147,7 @@ export function mountXiseRoutes(ctx) {
     const name = req.params.p;
     const project = await P.readProject(name);
     const dir = P.projectDir(name);
-    const xfile = path.join(dir, xiseName(project));
+    const xfile = P.safeJoin(dir, xiseName(project));
     let direction = (req.body || {}).direction || 'auto';
     if (!['auto', 'import', 'export'].includes(direction)) throw bad('direction must be auto, import or export');
     if (direction === 'auto') {
