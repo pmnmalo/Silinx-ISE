@@ -65,6 +65,7 @@ test('the constants that name the settings\' keys are made by prefKey', () => {
   for (const [f, names] of Object.entries(defs)) {
     for (const n of names) assert.match(src(f), new RegExp(`const ${n} = prefKey\\('silinx\\.`), `${f} ${n}`);
   }
+  assert.match(src('api.js'), /const TOKEN_KEY = prefKey\('silinx-token'\)/, 'the server\'s token (#2597)');
   // the parameters: the splitters' storageKey (ui.js), the viewers' engine (viewers.js), the narrow panels (narrow.js)
   assert.match(src('ui.js'), /getItem\(prefKey\(storageKey\)\)/);
   assert.match(src('ui.js'), /setItem\(prefKey\(storageKey\),/);
