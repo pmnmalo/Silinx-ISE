@@ -199,3 +199,69 @@ uiTest('FPGA view: not placed and routed yet asks to run Implement Design (No: n
   assert.deepEqual(untranslated(en, pt, [/^@?(Fit|DCMs \/ PLLs|Flip-flops|IOBs)$/]), []);
   assert.match(await page.eval((v) => document.querySelector(`${v} .fv-detail`).innerText, V), /Tabelas de consulta \(LUTs\)[\s\S]*valor inicial 1/);
 });
+
+// #2668: the side panel as the Design editors' Properties: its title folds it to a strip (remembered), each section folds
+// by its title; on a narrow window it goes over the chip, shown and hidden by the toolbar's ☰ Properties; in Portuguese
+uiTest('#2668 FPGA view: the side panel as the Design editors\' Properties: folded to a strip and remembered, its sections folded, over the chip from the toolbar on a narrow window; Portuguese', E, async (page) => {
+  await routedProject('PanelPj');
+  await page.setViewport(1366, 768);
+  await page.eval(async () => {
+    const [{ prefKey }, { PROPS_KEY }] = await Promise.all([import('/js/prefs.js'), import('/js/narrow.js')]);
+    localStorage.removeItem(prefKey('silinx.fpgaview.props.folded')); localStorage.removeItem(PROPS_KEY);
+  });
+  await page.openProject('PanelPj');
+  const open = async () => {
+    await page.menu('Tools', 'Implemented Design (FPGA View)');
+    await page.waitFor(() => window.Silinx.active?.id === 'fpgaview' && document.querySelector('.doc:not([hidden]) .fv-site'), [], { what: 'FPGA view open' });
+  };
+  await open();
+  const look = () => page.eval((v) => {
+    const fv = document.querySelector(v), side = fv.querySelector('.fv-side'), shown = (e) => !!e && e.getClientRects().length > 0;
+    const toggle = [...fv.querySelectorAll('.fv-bar .btn')].find((b) => /☰/.test(b.textContent));
+    return { cap: side.querySelector('.asm-cap').textContent, width: side.offsetWidth, shown: shown(side), over: getComputedStyle(side).position === 'absolute',
+      folded: fv.classList.contains('props-folded'), secs: [...side.querySelectorAll('details.fv-sec')].map((d) => `${d.querySelector('summary').textContent}${d.open ? '' : ' (closed)'}`),
+      toggle: shown(toggle) ? toggle.textContent : null, canvas: fv.querySelector('.fv-canvas').offsetWidth };
+  }, V);
+  // a wide window: the panel beside the chip, its four sections open, no ☰ Properties in the toolbar
+  let L = await look();
+  assert.deepEqual({ ...L, canvas: undefined }, { cap: 'Properties', width: 330, shown: true, over: false, folded: false, secs: ['Device', 'Modules', 'Selection', 'Nets'], toggle: null, canvas: undefined });
+  const wide = L.canvas;
+  // a section folded by its title, and unfolded
+  await page.click(`${V} .fv-sec > summary`, { text: 'Modules' });
+  L = await look();
+  assert.deepEqual(L.secs, ['Device', 'Modules (closed)', 'Selection', 'Nets']);
+  assert.equal(await page.eval((v) => document.querySelector(`${v} .fv-mod`).checkVisibility(), V), false, 'the legend hidden');
+  await page.click(`${V} .fv-sec > summary`, { text: 'Modules' });
+  assert.deepEqual((await look()).secs, ['Device', 'Modules', 'Selection', 'Nets']);
+  // folded to a strip: the chip wider; remembered when the view opens again; a click on the strip expands it
+  await page.click(`${V} .fv-side .asm-fold`);
+  L = await look();
+  assert.ok(L.folded && L.width === 24 && L.canvas > wide, JSON.stringify(L));
+  await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('fpgaview')));
+  await open();
+  assert.deepEqual([(await look()).folded, (await look()).width], [true, 24], 'remembered');
+  await page.click(`${V} .fv-side`);
+  L = await look();
+  assert.ok(!L.folded && L.width === 330, JSON.stringify(L));
+  // a narrow window: the panel hidden, ☰ Properties in the toolbar shows it over the chip (the chip's size kept); the
+  // left side's drawer closed (the ISE style interface's)
+  await page.setViewport(900, 700);
+  await page.eval(async () => (await import('/js/narrow.js')).setDrawer(false, { remember: false }));
+  await page.waitFor((v) => !document.querySelector(`${v} .fv-side`).getClientRects().length, [V], { what: 'the panel hidden' });
+  L = await look();
+  assert.deepEqual([L.shown, L.toggle], [false, '☰ Properties']);
+  const narrow = L.canvas;
+  await page.click(`${V} .fv-bar .btn`, { text: '☰ Properties' });
+  L = await look();
+  assert.ok(L.shown && L.over && L.canvas === narrow, JSON.stringify(L));
+  // in Portuguese
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
+  await page.waitFor(() => document.documentElement.lang === 'pt');
+  L = await look();
+  assert.deepEqual([L.cap, L.toggle, L.secs[0]], ['Propriedades', '☰ Propriedades', 'Dispositivo']);
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
+  await page.click(`${V} .fv-bar .btn`, { text: '☰ Properties' });
+  assert.equal((await look()).shown, false, 'hidden again');
+  await page.setViewport(1366, 768);
+  assert.doesNotMatch(await page.consoleText(), /WARNING|ERROR/);
+});
