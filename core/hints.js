@@ -234,6 +234,13 @@ export const HINTS = [
       fix: "Use os nomes dos portos da declaração de '$1' (no editor, Modelos ▾ ▸ Instanciar módulo escreve o port map completo). Em VHDL o formal (porto do componente) fica à esquerda de '=>'." },
   },
   {
+    id: 'port-actual', re: /^port '([^']+)' of '([^']+)': the actual is (?:the result of an operator on a signal|indexed by a signal)/,
+    en: { explain: "In VHDL-93 (and in XST) a port of an instance is connected to a signal, a slice or element of one with constant indices, a conversion of one (std_logic_vector(u)) or a constant: not to an expression such as a & b, a and b or a + 1, nor to s(i) with i a signal.",
+      fix: "Assign the expression to a signal of its own ('x <= a & b;') and connect that signal ('$1 => x')." },
+    pt: { explain: "Em VHDL-93 (e no XST) um porto de uma instância liga-se a um sinal, a uma fatia ou elemento de um com índices constantes, a uma conversão de um (std_logic_vector(u)) ou a uma constante: não a uma expressão como a & b, a and b ou a + 1, nem a s(i) com i um sinal.",
+      fix: "Atribua a expressão a um sinal próprio ('x <= a & b;') e ligue esse sinal ('$1 => x')." },
+  },
+  {
     id: 'too-many-ports', re: /^too many port connections for '([^']+)'/,
     en: { explain: "The instance connects more signals than '$1' has ports (positional association: one actual per port, in the order of the declaration).",
       fix: "Compare with the port list of '$1'. Prefer named association (VHDL 'port map (a => x, y => z)', Verilog '.a(x), .y(z)'): the order then does not matter." },

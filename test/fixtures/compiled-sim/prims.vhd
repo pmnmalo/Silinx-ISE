@@ -36,44 +36,63 @@ architecture rtl of prims_vhd is
   signal sq15, gclk, mclk : std_logic;
   signal cg, cm : unsigned(3 downto 0) := (others => '0');
   signal bcout : std_logic_vector(17 downto 0);
+  -- the block RAMs' addresses (VHDL-93: a port's actual is a signal, not a concatenation, #2565)
+  signal r1_addra : std_logic_vector(13 downto 0);
+  signal r1_addrb : std_logic_vector(11 downto 0);
+  signal r2_addra : std_logic_vector(12 downto 0);
+  signal r2_addrb : std_logic_vector(9 downto 0);
+  signal r3_addr : std_logic_vector(8 downto 0);
+  signal r4_addr : std_logic_vector(11 downto 0);
+  signal r5_addr : std_logic_vector(10 downto 0);
+  signal r6_addra : std_logic_vector(9 downto 0);
+  signal r6_addrb : std_logic_vector(8 downto 0);
 begin
+  r1_addra <= "00000000" & a;
+  r1_addrb <= "000000000" & b(2 downto 0);
+  r2_addra <= "0000000" & a;
+  r2_addrb <= "0000000" & b(2 downto 0);
+  r3_addr <= "000000" & a(2 downto 0);
+  r4_addr <= "000000" & a;
+  r5_addr <= "00000" & a;
+  r6_addra <= "0000" & a;
+  r6_addrb <= "000" & b;
   -- 1 bit / 4 bits: READ_FIRST / WRITE_FIRST
   r1 : RAMB16_S1_S4
     generic map (WRITE_MODE_A => "READ_FIRST", WRITE_MODE_B => "WRITE_FIRST", INIT_A => "1", SRVAL_A => "0", INIT_B => X"A", SRVAL_B => X"5",
                  INIT_00 => X"0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF")
-    port map (DOA => q1a, ADDRA => "00000000" & a, CLKA => clk, DIA => di(0 downto 0), ENA => en, SSRA => ssr, WEA => we,
-              DOB => q1b, ADDRB => "000000000" & b(2 downto 0), CLKB => clk, DIB => di(7 downto 4), ENB => en2, SSRB => ssr2, WEB => we2);
+    port map (DOA => q1a, ADDRA => r1_addra, CLKA => clk, DIA => di(0 downto 0), ENA => en, SSRA => ssr, WEA => we,
+              DOB => q1b, ADDRB => r1_addrb, CLKB => clk, DIB => di(7 downto 4), ENB => en2, SSRB => ssr2, WEB => we2);
   -- 2 bits / 18 bits: NO_CHANGE / READ_FIRST, parity on B only
   r2 : RAMB16_S2_S18
     generic map (WRITE_MODE_A => "NO_CHANGE", WRITE_MODE_B => "READ_FIRST", INIT_B => "10" & X"1234", SRVAL_B => "01" & X"FEDC",
                  INIT_00 => X"FFEEDDCCBBAA99887766554433221100FFEEDDCCBBAA99887766554433221100",
                  INITP_00 => X"00000000000000000000000000000000000000000000000000000000C3C3A5A5")
-    port map (DOA => q2a, ADDRA => "0000000" & a, CLKA => clk, DIA => di(1 downto 0), ENA => en, SSRA => ssr, WEA => we,
-              DOB => q2b(15 downto 0), DOPB => q2b(17 downto 16), ADDRB => "0000000" & b(2 downto 0), CLKB => clk, DIB => di(15 downto 0), DIPB => di(17 downto 16),
+    port map (DOA => q2a, ADDRA => r2_addra, CLKA => clk, DIA => di(1 downto 0), ENA => en, SSRA => ssr, WEA => we,
+              DOB => q2b(15 downto 0), DOPB => q2b(17 downto 16), ADDRB => r2_addrb, CLKB => clk, DIB => di(15 downto 0), DIPB => di(17 downto 16),
               ENB => en2, SSRB => ssr2, WEB => we2);
   -- 36 bits, single port, READ_FIRST
   r3 : RAMB16_S36
     generic map (WRITE_MODE => "READ_FIRST", INIT => X"F" & X"0000FFFF", SRVAL => X"6" & X"12345678",
                  INIT_00 => X"89ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF01234567",
                  INITP_00 => X"000000000000000000000000000000000000000000000000000000000000ABCD")
-    port map (DO => q3(31 downto 0), DOP => q3(35 downto 32), ADDR => "000000" & a(2 downto 0), CLK => clk, DI => di(31 downto 0), DIP => di(35 downto 32),
+    port map (DO => q3(31 downto 0), DOP => q3(35 downto 32), ADDR => r3_addr, CLK => clk, DI => di(31 downto 0), DIP => di(35 downto 32),
               EN => en, SSR => ssr, WE => we);
   -- 4 bits, single port, NO_CHANGE
   r4 : RAMB16_S4
     generic map (WRITE_MODE => "NO_CHANGE", INIT => X"7", SRVAL => X"C")
-    port map (DO => q4, ADDR => "000000" & a, CLK => clk, DI => di(3 downto 0), EN => en2, SSR => ssr, WE => we);
+    port map (DO => q4, ADDR => r4_addr, CLK => clk, DI => di(3 downto 0), EN => en2, SSR => ssr, WE => we);
   -- 9 bits, single port, WRITE_FIRST (the default)
   r5 : RAMB16_S9
     generic map (INITP_00 => X"00000000000000000000000000000000000000000000000000000000000000F0",
                  INIT_00 => X"FFEEDDCCBBAA99887766554433221100FFEEDDCCBBAA99887766554433221100")
-    port map (DO => q5(7 downto 0), DOP => q5(8 downto 8), ADDR => "00000" & a, CLK => clk, DI => di(7 downto 0), DIP => di(8 downto 8),
+    port map (DO => q5(7 downto 0), DOP => q5(8 downto 8), ADDR => r5_addr, CLK => clk, DI => di(7 downto 0), DIP => di(8 downto 8),
               EN => en, SSR => ssr2, WE => we);
   -- 18 / 36 bits, dual port, both WRITE_FIRST
   r6 : RAMB16_S18_S36
     generic map (SRVAL_A => "11" & X"0F0F", INIT_B => X"5" & X"55555555")
-    port map (DOA => q6a(15 downto 0), DOPA => q6a(17 downto 16), ADDRA => "0000" & a, CLKA => clk, DIA => di(15 downto 0), DIPA => di(17 downto 16),
+    port map (DOA => q6a(15 downto 0), DOPA => q6a(17 downto 16), ADDRA => r6_addra, CLKA => clk, DIA => di(15 downto 0), DIPA => di(17 downto 16),
               ENA => en, SSRA => ssr, WEA => we,
-              DOB => q6b(31 downto 0), DOPB => q6b(35 downto 32), ADDRB => "000" & b, CLKB => clk, DIB => di(35 downto 4), DIPB => di(3 downto 0),
+              DOB => q6b(31 downto 0), DOPB => q6b(35 downto 32), ADDRB => r6_addrb, CLKB => clk, DIB => di(35 downto 4), DIPB => di(3 downto 0),
               ENB => en2, SSRB => ssr2, WEB => we2);
 
   u0 : MULT18X18 port map (A => m, B => di(17 downto 0), P => p0);
