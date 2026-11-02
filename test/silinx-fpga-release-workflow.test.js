@@ -66,5 +66,5 @@ test('#1681 silinx-fpga release: the package is publishable, its version with it
   const s = spawnSync(process.execPath, ['scripts/sync-version.mjs', '--package', 'silinx-fpga'], { cwd: ROOT, encoding: 'utf8' });
   const changelog = read('packages/silinx-fpga/CHANGELOG.md');
   if (changelog.includes(`\n## ${pkg.version}\n`)) assert.equal(s.status, fs.readdirSync(path.join(ROOT, 'packages/silinx-fpga/changes')).some(f => f !== 'README.md') ? 1 : 0);
-  else assert.match(s.stderr, new RegExp(`packages/silinx-fpga/CHANGELOG\\.md has no "## ${pkg.version.replace(/\./g, '\\.')}" section`));
+  else assert.ok(s.stderr.includes(`packages/silinx-fpga/CHANGELOG.md has no "## ${pkg.version}" section`));
 });

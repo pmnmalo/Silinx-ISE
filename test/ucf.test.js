@@ -517,3 +517,20 @@ test('#2011 normalizePort, periodNs, backAnnotateUcf: linear on a long run of sp
   assert.equal(backAnnotateUcf('NET "clk" LOC = "B8";  \n\n ', 'NET "led" LOC = "P1";', { date: 'D' }).text,
     'NET "clk" LOC = "B8";\n\n# Back-annotated pin locations (pin2ucf, D)\nNET "led" LOC = "P1";\n');
 });
+
+test('ucfPattern: as the RegExp of the name on every small case, and linear on a name built to be slow (#2551)', async () => {
+  const { portAssignments, ucfPattern } = await import('../packages/silinx-fpga/src/ucf.js');
+  const asRegExp = (name, flags) => new RegExp(`^${name.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, flags);
+  const words = (alphabet, n) => (n === 0 ? [''] : words(alphabet, n - 1).flatMap(w => ['', ...alphabet].map(c => w + c)));
+  const patterns = [...new Set(words(['a', 'B', '*', '?', '<', '.'], 4))];
+  const names = [...new Set(words(['a', 'b', '<', '.'], 3))];
+  for (const flags of ['', 'i']) for (const p of patterns) {
+    const m = ucfPattern(p, flags), re = asRegExp(p, flags);
+    for (const n of names) assert.equal(m.test(n), re.test(n), `${p} ${flags} on ${n}`);
+  }
+  assert.equal(ucfPattern('a*').test('a\nb'), false, 'a wildcard stays on one line');
+  const t0 = Date.now();
+  const r = portAssignments({ assignments: { [`${'a*'.repeat(12)}b`]: { loc: 'P1' } } }, ['a'.repeat(64)]);
+  assert.deepEqual(r, { assignments: {}, unmatched: [`${'a*'.repeat(12)}b`] });
+  assert.ok(Date.now() - t0 < 1000, 'no exponential time');
+});
