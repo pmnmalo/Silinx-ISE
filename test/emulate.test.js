@@ -127,11 +127,12 @@ test('HD44780: 4-bit initialisation (UG230 sequence), text on two lines, clear',
   assert.equal(lcdText(st), null);
 });
 
-test('timing scale: only integer generics that count cycles (not sizes, vectors, times or reals)', async () => {
+test('timing scale: only integer generics that count cycles (not sizes, rates, vectors, times or reals)', async () => {
   const { timingGenerics, autoTimeScale, scaledGenerics } = await import('../core/emulate.js');
   const src = `library ieee; use ieee.std_logic_1164.all;
 entity top is generic (PAT : std_logic_vector(15 downto 0) := x"ABCD"; DIV : integer := 50000000; T : time := 10 ms; R : real := 2000.0;
-  DEPTH : natural := 1024; DATA_WIDTH : integer := 2048; N_BITS : integer := 4096; BAUD : integer := 9600; N : integer := 2000);
+  DEPTH : natural := 1024; DATA_WIDTH : integer := 2048; N_BITS : integer := 4096; BAUD : integer := 9600; N : integer := 2000;
+  CLK_HZ : integer := 50000000; FREQ : integer := 100000000);
 port (clk : in std_logic; led : out std_logic_vector(15 downto 0)); end top;
 architecture a of top is begin led <= PAT; end a;`;
   const lib = compile([{ path: 't.vhd', lang: 'vhdl', text: src }]);
