@@ -49,11 +49,12 @@ function foldApWidths(toks) {
   return out;
 }
 
-/** A parameter T (&a)[N], a reference to an array, is T a[N] (an array is passed by reference, #1891). */
+/** A parameter T (&a)[N], a reference to an array, is T a[N] (an array is passed by reference, #1891), its name marked
+ *  (refArray: its sizeof the array's, not a pointer's, #2641). */
 function refArrays(toks) {
   const out = [];
   for (let k = 0; k < toks.length; k++) {
-    if (op(toks[k], '(') && op(toks[k + 1], '&') && isId(toks[k + 2]) && op(toks[k + 3], ')') && op(toks[k + 4], '[') && isId(toks[k - 1])) { out.push(toks[k + 2]); k += 3; continue; }
+    if (op(toks[k], '(') && op(toks[k + 1], '&') && isId(toks[k + 2]) && op(toks[k + 3], ')') && op(toks[k + 4], '[') && isId(toks[k - 1])) { out.push({ ...toks[k + 2], refArray: true }); k += 3; continue; }
     out.push(toks[k]);
   }
   return out;

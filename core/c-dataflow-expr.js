@@ -48,8 +48,16 @@ export const exprMethods = {
       case 'call': return this.callExpr(e, g);
       case 'index': return this.index(e, g);
       case 'sizeof': {
-        const t = e.type ? typeOf(e.type) : this.expr(e.e, g).t;
-        return this.v(this.g.const(Math.ceil((t?.w || 32) / 8), INT), INT);
+        // (of an array type: all its elements, sizeof(int[3][4]); of a pointer type: 8 bytes, cc's; an array's or a
+        // pointer's, sizeof a[0], made sizeof of its type by core/c-flatten.js, #2641)
+        let ty = e.type, n = 1;
+        for (; ty?.kind === 'array'; ty = ty.of) {
+          const k = ty.length ?? (ty.size ? this.expr(ty.size, g) : null);
+          if (k?.id !== undefined && !this.g.isConst(k.id)) this.error(e.loc, 'sizeof of an array whose size is not a constant');
+          n *= Number(k?.id !== undefined ? this.g.k(k.id) : k ?? 1);
+        }
+        const t = ty?.kind === 'ptr' && !ty.ref ? { w: 64 } : ty ? typeOf(ty.kind === 'ptr' ? ty.to : ty) : this.expr(e.e, g).t;
+        return this.v(this.g.const(Math.ceil((t?.w || 32) / 8) * n, INT), INT);
       }
       case 'member': this.error(e.loc, `'.${e.name}' is a member function: call it`); break;
       default: this.error(e.loc, `this expression is not supported in a combinational module yet`);

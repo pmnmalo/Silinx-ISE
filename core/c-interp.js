@@ -150,7 +150,7 @@ class Machine {
     }
     if (t.kind === 'ptr' && t.to.kind === 'struct' && t.to.name === 'FILE') return { isFile: true, fh: v.init ? this.eval(v.init).fh ?? null : null, t: { w: 32, s: true } };
     if (t.kind === 'ptr') {
-      const c = { t: typeOf(t.to), ref: null };
+      const c = { t: typeOf(t.to), ref: null, ...(t.ref ? {} : { pointer: true }) };
       if (v.init) { let p = this.eval(v.init); if (p.heap !== undefined) p = this.heapPtr(p, t.to, v); if (p.str !== undefined) p = this.strPtr(p.str); c.ref = p.ptr || (p.arr ? this.elemRef(p.arr, 0, p.t) : null); }
       return c;
     }
@@ -250,10 +250,12 @@ class Machine {
     fn.params.forEach((pa, k) => {
       const a = args[k];
       if (!a) return;
+      // (an array parameter is a pointer, as a pointer parameter, not a reference: its sizeof a pointer's, #2641)
+      const pointer = (pa.type.kind === 'array' && !pa.type.refArray) || (pa.type.kind === 'ptr' && !pa.type.ref);
       if (a.fifo) scope.set(pa.name, { t: a.t, fifo: a.fifo });
       else if (a.argv) scope.set(pa.name, { t: { w: 32, s: true }, argv: a.argv });
-      else if (a.arr) scope.set(pa.name, { t: a.t, arr: a.arr, ...(dimsOf(pa.type, a.arr.length) ? { dims: dimsOf(pa.type, a.arr.length) } : {}) });
-      else if (a.ptr) scope.set(pa.name, { t: a.t, ref: a.ptr });
+      else if (a.arr) scope.set(pa.name, { t: a.t, arr: a.arr, ...(dimsOf(pa.type, a.arr.length) ? { dims: dimsOf(pa.type, a.arr.length) } : {}), ...(pointer ? { pointer } : {}) });
+      else if (a.ptr) scope.set(pa.name, { t: a.t, ref: a.ptr, ...(pointer ? { pointer } : {}) });
       else { const t = typeOf(pa.type); scope.set(pa.name, { t, v: this.as(a, t, at) }); }
     });
   }

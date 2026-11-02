@@ -77,16 +77,19 @@ export const exprMethods = {
         return r.row || r.get();
       }
       case 'sizeof': {
-        // (an array variable's: all its elements, snprintf(buf, sizeof buf, …), #1897; a row's, sizeof u[0], #2572)
+        // (an array variable's: all its elements, snprintf(buf, sizeof buf, …), #1897; a row's, sizeof u[0], #2572; a
+        // pointer's, an array parameter's too, int a[][8]: 8 bytes, cc's on a 64-bit host, #2641)
         let at = e.e, depth = 0;
         while (at?.kind === 'index' || (at?.kind === 'unary' && at.op === '*')) { at = at.e; depth++; }
         const c = !e.type && at?.kind === 'id' ? this.find(at.name) : null;
+        if (c?.pointer && depth === 0) return num(8n, { w: 64, s: false, ap: false });
         if (c?.arr) {
           const n = depth === 0 ? c.arr.length : (c.dims ? c.dims.slice(depth) : []).reduce((a, b) => a * b, 1);
           return num(BigInt(Math.ceil((c.t?.w || 32) / 8) * n), { w: 64, s: false, ap: false });
         }
         let ty = e.type, n = 1;
         for (; ty?.kind === 'array'; ty = ty.of) n *= ty.length ?? (ty.size ? Number(this.intOf(this.eval(ty.size), e)) : 1);
+        if (ty?.kind === 'ptr' && !ty.ref) return num(BigInt(8 * n), { w: 64, s: false, ap: false });
         const t = ty ? typeOf(ty) : this.typeOfExpr(e.e);
         return num(BigInt(Math.ceil((t?.w || 32) / 8) * n), { w: 64, s: false, ap: false });
       }
