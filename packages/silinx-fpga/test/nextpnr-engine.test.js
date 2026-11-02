@@ -507,6 +507,30 @@ test('#2457 falling-edge flip-flops, latches and clock switches built with --eng
   assert.notEqual(compareSims(netlist, asPacked(text.slice(0, u0) + text.slice(u0).replace('CLKINV::CLK_B', 'CLKINV::CLK')), { cycles: 5000 }), null, 'u0 CLKINV');
 });
 
+// #2566: the design (Silinx's test/fixtures/open-flow/feat_mult_chain on the Basys2): three MULT18X18SIOs, u_m0's B
+// cascaded into u_m1's and u_m1's into u_m2's (B_INPUT = CASCADE)
+test('#2566 a multiplier cascade built with --engine nextpnr: no warnings, the chain up a block RAM column, BCOUT -> BCIN through the cascade\'s PIP', { timeout: 300000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'silinx-nextpnr-'));
+  const out = [], err = [];
+  const code = await main(['build', fileURLToPath(fixture('mult_chain.json')), '--part', 'xc3s250e-cp132-4', '--ucf', fileURLToPath(fixture('mult_chain.ucf')), '--out-dir', dir, '--engine', 'nextpnr'],
+    { out: l => out.push(l), err: l => err.push(l) });
+  assert.equal(code, 0, err.join('\n'));
+  assert.deepEqual(err, []);   // no warnings
+  assert.ok(out.includes('  Number of MULT18X18SIOs: 3 out of 12 25%'), out.join('\n'));
+  assert.ok(out.includes('All constraints were met.'), out.join('\n'));
+  const text = fs.readFileSync(path.join(dir, 'routed.xdl'), 'utf8');
+  const mult = parseXdl(text).insts.filter(i => i.type === 'MULT18X18SIO');
+  const input = Object.fromEntries(mult.map(i => [i.name, i.cfg.find(c => c.attr === 'B_INPUT').value]));
+  assert.deepEqual(input, { u_m0: 'DIRECT', u_m1: 'CASCADE', u_m2: 'CASCADE' });
+  // (consecutive multiplier sites of one column, u_m0 lowest)
+  const y = Object.fromEntries(mult.map(i => [i.name, +/Y(\d+)$/.exec(i.site)[1]]));
+  assert.deepEqual([y.u_m1 - y.u_m0, y.u_m2 - y.u_m1], [1, 1]);
+  assert.equal(new Set(mult.map(i => /X(\d+)Y/.exec(i.site)[1])).size, 1);
+  for (const [from, to] of [['u_m0', 'u_m1'], ['u_m1', 'u_m2']]) for (let k = 0; k < 18; k++) {
+    assert.match(text, new RegExp(`^net "[^"]+" , \\n {2}outpin "${from}" BCOUT${k} ,\\n {2}inpin "${to}" BCIN${k} ,\\n {2}pip BRAMSITE2\\w* MULT_CCARRY_BCOUT${k} -> MULT_CARRYB_BCOUT${k} ,$`, 'm'), `${from} BCOUT${k}`);
+  }
+});
+
 test('#2194 nextpnrNetlist: each clock of a DCM with its derived period, on its global buffer; an INST LOC as the DCM\'s BEL, a wrong site refused', () => {
   const json = () => fs.readFileSync(fixture('feat_dcm.json'), 'utf8'), ucf = fs.readFileSync(fixture('feat_dcm.ucf'), 'utf8');
   const { problems, sdc } = nextpnrNetlist(json(), 'top', ucf);
