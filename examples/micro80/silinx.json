@@ -1,0 +1,53 @@
+{
+  "name": "micro80",
+  "version": 1,
+  "device": {
+    "family": "spartan3e",
+    "part": "xc3s250e",
+    "package": "cp132",
+    "speed": "-4"
+  },
+  "board": "basys2",
+  "top": "micro80_top",
+  "simTop": "tb_micro80",
+  "files": [
+    {
+      "path": "src/light8080_ucode_pkg.vhdl",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/light8080.vhdl",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/program.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/sevenseg.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/micro80_top.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "sim/tb_micro80.vhd",
+      "lang": "vhdl",
+      "role": "sim"
+    }
+  ],
+  "constraints": "constraints/top.ucf",
+  "stimuli": {},
+  "impl": {
+    "optMode": "Speed",
+    "optLevel": 1,
+    "startupClk": "JtagClk"
+  },
+  "preferredLanguage": "vhdl"
+}

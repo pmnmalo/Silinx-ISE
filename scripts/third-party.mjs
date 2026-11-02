@@ -66,6 +66,8 @@ function describe(d) {
 
 // code ported into Silinx (not an npm package): its licence, kept in scripts/licences/
 const PORTED = [
+  { name: 'light8080', version: '57163bc', ported: true, license: 'LGPL-2.1', url: 'https://github.com/jaruiz/light8080',
+    note: 'examples/micro80/src/light8080.vhdl and light8080_ucode_pkg.vhdl, the processor of the micro80 example, are its files as they are.' },
   { name: 'adepttool', version: 'ported', ported: true, license: 'MIT', url: 'https://github.com/mwkmwkmwk/adepttool', standalone: true,
     note: 'core/adept.js (the Digilent Adept USB programmer over WebUSB) is a JavaScript port of its USB and JTAG code.' },
 ];

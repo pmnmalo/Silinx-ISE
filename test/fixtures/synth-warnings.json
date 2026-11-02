@@ -23,6 +23,7 @@
   "examples/clock": [],
   "examples/gates": [],
   "examples/isqrt": [],
+  "examples/micro80": [],
   "examples/pong": [],
   "examples/stopwatch": [],
   "examples/traffic": [],

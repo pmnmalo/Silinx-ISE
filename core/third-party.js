@@ -381,6 +381,13 @@ export const THIRD_PARTY = [
     "standalone": false
   },
   {
+    "name": "light8080",
+    "version": "57163bc",
+    "license": "LGPL-2.1",
+    "url": "https://github.com/jaruiz/light8080",
+    "ported": true
+  },
+  {
     "name": "math-intrinsics",
     "version": "1.1.0",
     "license": "MIT",

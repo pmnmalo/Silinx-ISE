@@ -8,7 +8,7 @@ import { lutEquation, placedXdlS6 } from '../packages/silinx-fpga/src/fpga/s6/xd
 import { placeS6 } from '../packages/silinx-fpga/src/fpga/s6/place.js';
 import { parseXdl, writeXdl, evalLut } from '../packages/silinx-fpga/src/xdl.js';
 import { paramBits } from '../packages/silinx-fpga/src/fpga/netlist.js';
-import { EXAMPLES } from './examples-lib.mjs';
+import { S6_EXAMPLES as EXAMPLES } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 
 test('lutEquation: the sum of the ones or the complement of the zeros, constant inputs folded, any pin order', () => {

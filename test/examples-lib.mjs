@@ -13,10 +13,10 @@ import { EXAMPLE_ORDER } from '../core/examples.js';
 import { isCSource, viewHdl } from '../core/view-hdl.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const EXAMPLES = EXAMPLE_ORDER;   // gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt
+export const EXAMPLES = EXAMPLE_ORDER;   // gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt, micro80
 // the examples of the ISE records made before isqrt (#1966): the Spartan-6's night 1 (packages/silinx-fpga/research/s6/
-// measured), XPower's fit (test/fixtures/power); isqrt is checked against ISE in test/ise/examples.test.js
-export const ISE_RECORDED = EXAMPLES.filter(n => n !== 'isqrt');
+// measured), XPower's fit (test/fixtures/power); isqrt and micro80 are checked against ISE in test/ise/examples.test.js
+export const ISE_RECORDED = EXAMPLES.filter(n => n !== 'isqrt' && n !== 'micro80');
 // the boards (and variants) of the devices of the Silinx toolchain: the examples run on all of them; the Spartan-3E's
 // also through ISE (test/ise/examples.test.js, the power estimates), the Spartan-6's (#732, no variants; the Atlys's
 // seven-segment display and VGA on its VHDCI connector) checked against ISE in packages/silinx-fpga/research/s6 so far
@@ -26,6 +26,9 @@ export const S3E_TARGETS = [
 ];
 export const S6_TARGETS = [{ board: 'nexys3' }, { board: 'atlys' }];
 export const TARGETS = [...S3E_TARGETS, ...S6_TARGETS];
+// the examples the Spartan-6's placer takes: micro80's processor has a distributed RAM, refused until #1153
+export const S6_EXAMPLES = EXAMPLES.filter(n => n !== 'micro80');
+export const targetsOf = name => (S6_EXAMPLES.includes(name) ? TARGETS : S3E_TARGETS);
 // the iCE40's board (#2517): the examples on the iCEBreaker, the display and the switches on its Pmods; vga on its
 // PmodVGA, a board of its own (icebreaker-vga). Its ports with no pin on the board, warned (btn<3>, led<5..7>…)
 export const ICE40_TARGETS = [{ board: 'icebreaker' }];

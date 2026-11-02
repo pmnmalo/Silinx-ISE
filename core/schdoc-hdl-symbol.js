@@ -104,8 +104,8 @@ export function mountSymbolHdl(ctx) {
   // the HDL of one symbol (#405): a block, a device primitive, a gate, a flip-flop, the other kinds by cases
   // (symbolCases, symbolCasesMore); a symbol skipped returns
   const { symbolCasesMore } = mountSymbolCasesMore({
-    INN, OUTN, assign, blockLang, body, ci, clsOf, declared, diags, extra, fresh, inNet, init, lang, modules, name, netName,
-    netType, nk, nl, outRead, used, vtype, wrapV
+    INN, OUTN, assign, blockLang, body, ci, clsOf, declared, diags, extra, fresh, inNet, init, isolated, lang, modules, name,
+    netName, netType, nk, nl, outRead, used, vtype, wrapV
   });
 
   const { symbolCases } = mountSymbolCases({

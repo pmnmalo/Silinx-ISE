@@ -12,7 +12,7 @@ import { routeS6, routedXdlS6, RouteError } from '../packages/silinx-fpga/src/fp
 import { routingResources } from '../packages/silinx-fpga/src/fpga/s6/route-nets.js';
 import { checkRoutingS6 } from '../packages/silinx-fpga/src/fpga/s6/route-check.js';
 import { parseXdl, writeXdl } from '../packages/silinx-fpga/src/xdl.js';
-import { EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
+import { S6_EXAMPLES as EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
 import { S6_BOARDS, s6Device, s6Example, s6Phys, s6Verilog } from './s6-lib.mjs';
 
 const LX16 = 'xc6slx16csg324-3';

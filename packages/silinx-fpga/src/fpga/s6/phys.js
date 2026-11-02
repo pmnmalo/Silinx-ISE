@@ -82,7 +82,7 @@ export function physS6(nl, packed, { ucf = null } = {}) {
       const q = s.pos[p];
       if (typeof q.o6 === 'number') {
         const c = cells[q.o6];
-        if (!LUT_TYPE.test(c.type) && !SRL.test(c.type)) errors.push(`${c.name} (${c.type}): the SLICEM's distributed RAMs are not placed yet (#729)`);
+        if (!LUT_TYPE.test(c.type) && !SRL.test(c.type)) errors.push(`${c.name} (${c.type}): the SLICEM's distributed RAMs are not placed yet (#1153)`);
         else if (role.has(q.o6)) errors.push(`${c.name}: a cell in two positions of a slice`);
       }
       at(q.o6, 'o6', p); at(q.o5, 'o5', p); at(q.ff, 'ff', p); at(q.ff5, 'ff5', p);
@@ -91,6 +91,8 @@ export function physS6(nl, packed, { ucf = null } = {}) {
     const named = [...POS.map(p => s.pos[p].ff), ...POS.map(p => s.pos[p].o6), s.carry].find(c => typeof c === 'number');
     insts.push({ name: uniq(named !== undefined ? cells[named].name : `slice${si}`), kind: 'slice', type: `SLICE${s.kind}`, slice: si });
   });
+  // (a cell refused here has no pins for what follows)
+  if (errors.length) throw new PhysError(`the Spartan-6 design cannot be placed: ${[...new Set(errors)].join('; ')}`);
   const portOf = new Map();
   for (const p of nl.ports) for (const b of p.bits) portOf.set(b.net, b.name);
   cells.forEach((c, ci) => {

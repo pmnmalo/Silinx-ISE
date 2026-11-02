@@ -223,6 +223,7 @@ const EXAMPLE_PACK = {
   clock: { slices: 87, X: 36, L: 51, M: 0, luts: 161, ffs: 174, warnings: 0 },
   vga: { slices: 52, X: 22, L: 30, M: 0, luts: 129, ffs: 56, warnings: 0 },
   isqrt: { slices: 30, X: 17, L: 13, M: 0, luts: 77, ffs: 86, warnings: 0 },
+  micro80: { slices: 63, X: 43, L: 18, M: 2, luts: 172, ffs: 185, warnings: 1 },   // (a carry chain: CYINIT and DI<0> both on AX)
 };
 // map's packing of the same netlists on ISE (packages/silinx-fpga/research/s6/measured/night1.json, night 1): its SLICELs are the packer's
 // (the carry chains and the wide multiplexers); its SLICEX are a placement's, more (packages/silinx-fpga/research/s6/README.md)
