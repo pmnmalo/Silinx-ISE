@@ -129,9 +129,18 @@ export function checkC(source, file = 'input.c', opts = {}) {
     }
     if (t.kind === 'ptr') typeOk(t.to, loc);
   };
+  /** A string's chars in its array (core/c-parse.js): its '\0' dropped when the array is just the string's length, as C's
+   *  char b[3] = "abc"; a string longer, an error (#2640). */
+  const textFits = (v) => {
+    const n = v.type.length, s = v.init?.text;
+    if (s === undefined || !n || v.init.items.length <= n) return;
+    if (s.length === n) v.init.items.length = n;
+    else report(v.init.loc, `'${v.name}': the string "${s}" is longer than its ${n} characters`);
+  };
   for (const it of ast.items) {
     if (it.kind === 'var') {
       typeOk(it.type, it.loc);
+      textFits(it);
       // (a global's value: its casts' widths too, an ap_uint<W>'s, #1963)
       const casts = (n) => { if (!n || typeof n !== 'object') return; if (Array.isArray(n)) { n.forEach(casts); return; } if (n.kind === 'cast') typeOk(n.type, n.loc); for (const [k, v] of Object.entries(n)) if (k !== 'loc' && k !== 'type') casts(v); };
       casts(it.init);
@@ -195,7 +204,7 @@ export function checkC(source, file = 'input.c', opts = {}) {
   for (const f of funcs.values()) {
     if (!f.body) continue;
     const hw = synth.has(f.name);
-    checkFunction(f, { hw, funcs, globals, consts, report, loops, typeOk, dataflow: hasDataflow(f) });   // (a region's streams: any function's, its C simulation; the hardware the top's, core/c-processes.js)
+    checkFunction(f, { hw, funcs, globals, consts, report, loops, typeOk, textFits, dataflow: hasDataflow(f) });   // (a region's streams: any function's, its C simulation; the hardware the top's, core/c-processes.js)
   }
   // (ap_float, hls::autorestart: the test bench's, core/cpp-hls-lib.js, #1891)
   const simulated = new Set();
@@ -218,7 +227,7 @@ export function checkC(source, file = 'input.c', opts = {}) {
 export const hasDataflow = (f) => !!f?.body?.items.some((st) => st.kind === 'pragma' && (st.pragma.name === 'DATAFLOW' || st.pragma.name === 'TASK'));   // (an hls::task's region too, #1721)
 
 function checkFunction(f, ctx) {
-  const { funcs, globals, consts, report, loops, typeOk, dataflow } = ctx;
+  const { funcs, globals, consts, report, loops, typeOk, textFits, dataflow } = ctx;
   let { hw } = ctx;
   const scopes = [new Map()];
   for (const pa of f.params) {
@@ -243,6 +252,7 @@ function checkFunction(f, ctx) {
     if (scopes.at(-1).has(v.name)) report(v.loc, `'${v.name}' is declared twice in the same block`);
     scopes.at(-1).set(v.name, { kind: v.static ? 'static' : 'local', type: v.type });
     typeOk(v.type, v.loc, !hw);
+    textFits(v);
     if (hw) {
       typeHw(v.type, v.loc, `'${v.name}'`);
       // (a DATAFLOW region's: a FIFO between its processes, #1707)
