@@ -1,8 +1,9 @@
 // Stage S6-E2 (#1951): the probed PIPs' bits (gen-cmtprobe6.mjs's designs ISE turned into bitstreams): each design's
 // bits, by the region of the probed tiles (bitsByTile: the tile whose column and band hold a bit, else the nearest),
 // as offsets from the tile's region: its PIP's. A PIP probed in tiles of other parts too: the same bits (checked).
-//   node research/s6/ana-cmtprobe6.mjs <dir>[=part] …   -> packages/silinx-fpga/bitdb/s6/s6-pips-probe.json ({ pips: { 'TYPE from dir to':
-//     ['minor,bit'] } }, read by residual6.mjs with the PIP drop's)
+//   node research/s6/ana-cmtprobe6.mjs [--add] <dir>[=part] …   -> packages/silinx-fpga/bitdb/s6/s6-pips-probe.json ({ pips: { 'TYPE
+//     from dir to': ['minor,bit'] } }, read by residual6.mjs with the PIP drop's); --add: the PIPs added to the file's
+//     (#1957's HCLK probes, gen-cmtprobe6.mjs --types)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,9 +25,9 @@ export function probeBits(device, dev, fdri, probes) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const dirs = process.argv.slice(2);
-  if (!dirs.length) { console.error('usage: node research/s6/ana-cmtprobe6.mjs <dir>[=part] …'); process.exit(1); }
-  const pips = {}, problems = [];
+  const add = process.argv[2] === '--add', dirs = process.argv.slice(add ? 3 : 2), file = new URL('../../bitdb/s6/s6-pips-probe.json', import.meta.url);
+  if (!dirs.length) { console.error('usage: node research/s6/ana-cmtprobe6.mjs [--add] <dir>[=part] …'); process.exit(1); }
+  const before = add ? JSON.parse(fs.readFileSync(file, 'utf8')).pips : {}, pips = {}, problems = [];
   let unplaced = 0;
   for (const d of dirs) {
     const [dir, part = 'xc6slx16csg324-3'] = d.split('='), { device } = s6Device(part), dev = bitFormat6(part.replace(/^xc/, '').replace(/-\d$/, ''));
@@ -41,6 +42,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       }
     }
   }
+  for (const [k, b] of Object.entries(before)) if (k in pips && pips[k].join(' ') !== b.join(' ')) problems.push(`${k}: ${b.join(' ')} before, ${pips[k].join(' ')} now`);
   console.log(`${Object.keys(pips).length} PIPs probed, ${Object.values(pips).filter(b => b.length).length} with bits; ${unplaced} bits near no probed tile; ${problems.length} problems${problems.length ? `: ${problems.slice(0, 4).join('; ')}` : ''}`);
-  fs.writeFileSync(new URL('../../bitdb/s6/s6-pips-probe.json', import.meta.url), `${JSON.stringify({ note: 'The PIPs the PIP drop could not take apart, probed one by one on TIEOFF nets (#1951); offsets from gridRegion.', pips })}\n`);
+  fs.writeFileSync(file, `${JSON.stringify({ note: 'The PIPs the PIP drop could not take apart, probed one by one on TIEOFF nets (#1951, #1957); offsets from gridRegion.', pips: { ...before, ...pips } })}\n`);
 }

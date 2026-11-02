@@ -555,6 +555,16 @@ Designs ISE implements (`ise-s6.sh impl`), as the routing of a global clock need
   take apart, each on a TIEOFF net of its own (59 XDL designs, one PIP per region each): 222 PIPs, 148 with bits. The
   REG_V_HCLK tile's are left out: alone a BUFH route-through and a spine mux set bits they do not set in a design.
   The site designs' residual goes from 1404 to 1094 bits (about 27 a design), nothing predicted that ISE does not set.
+- **The HCLK tiles' clock PIPs** (#1957, 2026-11-02; `gen-cmtprobe6.mjs --types`, `ana-cmtprobe6.mjs --add`): the
+  PIPs of the block RAM and DSP columns' HCLK feedthroughs (BRAM_HCLK_FEEDTHRU, DSP_INT_HCLK_FEEDTHRU, their _FOLD
+  types), and of the HCLK_CLB tiles the PIP drop had left out (two on the XC6SLX16, 19 of the XC6SLX45's folded ones),
+  probed as above: 6 XDL designs (4 on the XC6SLX16, 2 on the XC6SLX45), a minute of xdl and bitgen. All 126 set one bit,
+  by one rule: `HCLK_GCLKn_INT -> HCLK_GCLKn` (the lower half of the clock row) minor n, bit 14 of the tile's region
+  (the clock row word's bit 526), `-> HCLK_GCLK_UPn` bit 15 (527). One probe also set bits 527 of minors 16 to 19 of its
+  column, the XC6SLX45's zero design's (S6-B), left out. The DRC reports the probes of one clock row and GCLK on one
+  shared wire (PhysDesignRules:1712); bitgen writes them all the same. #728's 14 block RAM and DSP designs leave no bit
+  over now (13 on the XC6SLX45 before), and 9 of their `.bit` are byte-identical with ISE's (5 before; the other 5,
+  RAMB16BWER designs, 2 bytes each, are the block RAM frame bitgen writes again).
 - **The BUFGMUX designs** (`gen-cmtsites6.mjs --muxes`: per CMT site 8 designs from the board's clock pad, V10 for
   the bottom half and C10 for the top, two outputs on BUFGMUXes k and k + 8, the DCM's feedback on a fixed one; 48).
   **A BUFGMUX a CMT drives** sets one bit of the REGC frame (`cmt6.mjs`'s `CMT_REGC`, `cmtRegcBits`): 1008 + i for
