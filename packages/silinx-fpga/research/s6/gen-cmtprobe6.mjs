@@ -3,6 +3,9 @@
 // were: each PIP on a net of its own whose only pin is a TIEOFF's HARD1 (ISE programs a PIP on such a net even off
 // its path), a TIEOFF of an INT tile each; per design one PIP per region, the types' tiles in turn.
 //   node research/s6/gen-cmtprobe6.mjs <out dir> [part]   -> <part>.cp<j>.xdl, <part>.cp<j>.json ({ tile: 'from dir to' })
+// --types <regex>: the PIPs of those tile types the databases do not have instead (#1957: the HCLK feedthroughs of the
+// block RAM and DSP columns, the folded HCLK tiles of the XC6SLX45), each in a tile of the type in turn.
+//   node research/s6/gen-cmtprobe6.mjs --types <regex> <out dir> [part]
 // ana-pipdrop6.mjs's regions give each tile its bits (ana-cmtprobe6.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { probeXdl } from './gen-pipprobe6.mjs';
 import { gridRegion } from './ana-pipdrop6.mjs';
 import { bitFormat6 } from '../../src/fpga/s6/bitstream.js';
+import { loadBitDbS6 } from '../../src/fpga/s6/bitdb-node.js';
 import { s6Device } from '../../../../test/s6-lib.mjs';
 
 /**
@@ -33,16 +37,30 @@ export function cmtProbes(device, dev, unresolved) {
   return out;
 }
 
+/** The PIPs ('TYPE from dir to') of the tile types matching re that the databases (db.other.pips) do not have. */
+export function missingPips(device, re, known) {
+  const out = new Set(), seen = new Set();
+  for (let k = 0; k < device.tileNames.length; k++) {
+    const t = device.tileType(k);
+    if (!re.test(t) || seen.has(t)) continue;
+    seen.add(t);
+    for (let i = 0; i < device.templates[device.tileTemplate[k]].from.length; i++) { const p = device.pip(k, i), key = `${t} ${p.from} ${p.dir} ${p.to}`; if (!(key in known)) out.add(key); }
+  }
+  return [...out];
+}
+
 /** The TIEOFF sites of the INT tiles: their HARD1 the probes' pins, one net each. */
 export function intTieoffs(device) {
   return device.sites().filter(s => s.type === 'TIEOFF' && /^INT_X/.test(s.tileName)).map(s => s.name);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [out, part = 'xc6slx16csg324-3'] = process.argv.slice(2);
-  if (!out) { console.error('usage: node research/s6/gen-cmtprobe6.mjs <out dir> [part]'); process.exit(1); }
+  const args = process.argv.slice(2), types = args[0] === '--types' ? new RegExp(args[1]) : null;
+  const [out, part = 'xc6slx16csg324-3'] = types ? args.slice(2) : args;
+  if (!out) { console.error('usage: node research/s6/gen-cmtprobe6.mjs [--types <regex>] <out dir> [part]'); process.exit(1); }
   const { device } = s6Device(part), p = part.replace(/^(xc6slx\d+)(csg)/, '$1-$2');
-  const { unresolved } = JSON.parse(fs.readFileSync(new URL('../../bitdb/s6/s6-pips-other.json', import.meta.url), 'utf8'));
+  const unresolved = types ? missingPips(device, types, loadBitDbS6(part).other.pips)
+    : JSON.parse(fs.readFileSync(new URL('../../bitdb/s6/s6-pips-other.json', import.meta.url), 'utf8')).unresolved;
   const probes = cmtProbes(device, bitFormat6(part.replace(/^xc/, '').replace(/-\d$/, '')), unresolved), ties = intTieoffs(device), tieTile = new Map(device.sites().map(s => [s.name, s.tileName]));
   fs.mkdirSync(out, { recursive: true });
   probes.forEach((pips, j) => {

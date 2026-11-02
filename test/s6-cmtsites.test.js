@@ -6,7 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { cmtSiteDesigns, cmtSiteDesign, cmtOutputDesigns, DCM_ALL, PLL_ALL } from '../packages/silinx-fpga/research/s6/gen-cmtsites6.mjs';
-import { cmtProbes, intTieoffs } from '../packages/silinx-fpga/research/s6/gen-cmtprobe6.mjs';
+import { cmtProbes, intTieoffs, missingPips } from '../packages/silinx-fpga/research/s6/gen-cmtprobe6.mjs';
+import { loadBitDbS6 } from '../packages/silinx-fpga/src/fpga/s6/bitdb-node.js';
 import { probeBits, CONTEXT } from '../packages/silinx-fpga/research/s6/ana-cmtprobe6.mjs';
 import { gridRegion } from '../packages/silinx-fpga/research/s6/ana-pipdrop6.mjs';
 import { cmtKind, predictCmtSettings, CMT_FRAME } from '../packages/silinx-fpga/research/s6/cmt6.mjs';
@@ -140,4 +141,22 @@ test('gen-cmtprobe6 / ana-cmtprobe6: the PIPs not taken apart, each on a TIEOFF 
   const probe = db('s6-pips-probe').pips;
   assert.ok(Object.keys(probe).length > 200);
   assert.ok(!Object.keys(probe).some(k => CONTEXT.test(k)));
+});
+
+test('db: the HCLK tiles\' clock PIPs of every column, both halves of a clock row, both parts: GCLK n at minor n, bit 14 (down) or 15 (up) of the region (#1957)', () => {
+  const HCLK = /^(BRAM_HCLK_FEEDTHRU(_FOLD)?|DSP_INT_HCLK_FEEDTHRU(_FOLD)?|HCLK_CLB_X[LM]_INT(_FOLD)?)$/;
+  for (const part of ['xc6slx16csg324-3', 'xc6slx45csg324-3']) {
+    const { device } = s6Device(part), known = loadBitDbS6(part).other.pips;
+    // (gen-cmtprobe6 --types: what is left to probe; none now)
+    assert.deepEqual(missingPips(device, HCLK, known), [], part);
+    assert.ok(missingPips(device, HCLK, {}).length >= 112, part);
+    let n = 0;
+    for (const k of missingPips(device, HCLK, {})) {
+      const m = /HCLK_GCLK(\d+)_INT\S* -> HCLK_GCLK(_UP)?(\d+)/.exec(k);
+      assert.ok(m && m[1] === m[3], k);
+      assert.deepEqual(known[k], [`${m[1]},${m[2] ? 15 : 14}`], k);
+      n++;
+    }
+    assert.ok(n >= 112, part);
+  }
 });
