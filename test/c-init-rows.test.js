@@ -108,3 +108,25 @@ test('#2185 a string longer than its row, said', () => {
   const sim = simulateC('int main(void) { char c[2][2] = { "abc", "d" }; return c[1][0]; }\n', { file: 'e.c' });
   assert.deepEqual(said(sim.diagnostics), ['1 error: \'c\': the string "abc" is longer than its 2 characters']);
 });
+
+test('#2572 sizeof of a row of an array of arrays in the C simulation: the row\'s size, as cc\'s', () => {
+  const src = `#include <stdio.h>
+typedef short row_t[5];
+int top(int v) { return v; }
+int main(void) {
+  int u[3][3];
+  int w[][4] = { { 1 }, { 2, 3 } };
+  int d[2][3][4];
+  short s[2][5];
+  printf("%d %d %d %d %d %d %d %d %d\\n",
+    (int)(sizeof u / sizeof u[0]), (int)sizeof u[0], (int)sizeof u[0][0],
+    (int)(sizeof w / sizeof w[0]), (int)sizeof d[0], (int)sizeof d[0][0],
+    (int)sizeof s[0], (int)sizeof s[0][0], (int)sizeof(row_t));
+  return 0;
+}
+`;
+  const sim = simulateC(src, { file: 'sz.c' });
+  assert.deepEqual([sim.error, sim.exitCode, said(sim.diagnostics)], [null, 0, []]);
+  assert.equal(sim.output, '3 12 4 2 48 16 10 2 10\n');
+  if (!noCC) assert.equal(compiledRun(src).output, sim.output);
+});

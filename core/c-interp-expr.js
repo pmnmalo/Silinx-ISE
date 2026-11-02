@@ -77,11 +77,17 @@ export const exprMethods = {
         return r.row || r.get();
       }
       case 'sizeof': {
-        // (an array variable's: all its elements, snprintf(buf, sizeof buf, …), #1897)
-        const c = !e.type && e.e?.kind === 'id' ? this.find(e.e.name) : null;
-        if (c?.arr) return num(BigInt(Math.ceil((c.t?.w || 32) / 8) * c.arr.length), { w: 64, s: false, ap: false });
-        const t = e.type ? typeOf(e.type) : this.typeOfExpr(e.e);
-        const n = e.type?.kind === 'array' ? (e.type.length || 1) : 1;
+        // (an array variable's: all its elements, snprintf(buf, sizeof buf, …), #1897; a row's, sizeof u[0], #2572)
+        let at = e.e, depth = 0;
+        while (at?.kind === 'index' || (at?.kind === 'unary' && at.op === '*')) { at = at.e; depth++; }
+        const c = !e.type && at?.kind === 'id' ? this.find(at.name) : null;
+        if (c?.arr) {
+          const n = depth === 0 ? c.arr.length : (c.dims ? c.dims.slice(depth) : []).reduce((a, b) => a * b, 1);
+          return num(BigInt(Math.ceil((c.t?.w || 32) / 8) * n), { w: 64, s: false, ap: false });
+        }
+        let ty = e.type, n = 1;
+        for (; ty?.kind === 'array'; ty = ty.of) n *= ty.length ?? (ty.size ? Number(this.intOf(this.eval(ty.size), e)) : 1);
+        const t = ty ? typeOf(ty) : this.typeOfExpr(e.e);
         return num(BigInt(Math.ceil((t?.w || 32) / 8) * n), { w: 64, s: false, ap: false });
       }
       default: this.fail(e, `this expression cannot be simulated`);
@@ -101,6 +107,11 @@ export const exprMethods = {
     if (e.kind === 'num') return literalType(e.value, { unsigned: e.unsigned, long: e.long });
     if (e.kind === 'float') return /[fF]$/.test(e.text) ? F32 : F64;
     if (e.kind === 'id') { const c = this.find(e.name); return c && !c.arr && !c.ref ? c.t : null; }
+    if (e.kind === 'index' || (e.kind === 'unary' && e.op === '*')) {
+      let at = e;
+      while (at.kind === 'index' || (at.kind === 'unary' && at.op === '*')) at = at.e;
+      return at.kind === 'id' ? this.find(at.name)?.t ?? null : null;
+    }
     if (e.kind === 'cast') return typeOf(e.type);
     return null;
   },
