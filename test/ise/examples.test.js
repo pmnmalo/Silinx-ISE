@@ -25,7 +25,7 @@ const LOCAL = process.env.SILINX_ISE_HOST === 'local';
 const HOST = LOCAL ? null : /^(?:([\w.-]+)@)?([\w.:-]+)$/.exec(process.env.SILINX_ISE_HOST || '');
 const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST && !LOCAL ? 'set SILINX_ISE_HOST=user@host (the machine with the ISE Docker image), or local (the image here)' : false;
 // known failures of the Silinx toolchain, with their issue
-const KNOWN = { 'uart-atlys': '#2539: the Atlys\'s USB-UART pins use two features the bit database has not measured' };
+const KNOWN = {};
 // the warnings ISE gives on each example (the same on every device): XST, map, par
 const ISE_WARNINGS = {
   gates: [],
