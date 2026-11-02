@@ -23,7 +23,7 @@ test('the examples list it, last', () => {
 
 // a mutation of the design makes the testbench fail: it does check what it says
 for (const [what, file, from, to] of [
-  ['the transmitter sends the bits in the wrong order', 'src/uart_tx.vhd', "frame <= '1' & frame(9 downto 1);", "frame <= frame(8 downto 0) & '1';"],
+  ['the transmitter sends the bits in the wrong order', 'src/uart_tx.vhd', "frame <= '1' & frame(8 downto 1);", "frame <= frame(7 downto 0) & '1';"],
   ['the receiver samples at the start of each bit, not in its middle', 'src/uart_rx.vhd', 'count <= BIT_T / 2;', 'count <= 0;'],
   ['no stop bit: a frame a bit short', 'src/uart_tx.vhd', 'if bitn = 9 then', 'if bitn = 8 then'],
   ['the byte received while busy is lost', 'src/uart.vhd', "pending <= '1';", "pending <= not tx_busy;"],

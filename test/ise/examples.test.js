@@ -1,4 +1,4 @@
-// The example projects (examples/gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt) with Xilinx ISE 14.7, on every device of
+// The example projects (examples/gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt, uart) with Xilinx ISE 14.7, on every device of
 // the Silinx toolchain (opt-in, as test/ise/ise-flow.test.js: it needs ISE's Docker image):
 //   - ISE builds each example (XST, translate, map, place & route, timing, bitgen) with no error, and
 //     the warnings of XST, map and par are the expected ones (below);
@@ -25,7 +25,7 @@ const LOCAL = process.env.SILINX_ISE_HOST === 'local';
 const HOST = LOCAL ? null : /^(?:([\w.-]+)@)?([\w.:-]+)$/.exec(process.env.SILINX_ISE_HOST || '');
 const skip = !enabled ? 'set SILINX_ISE_TESTS=1 to run the ISE tests' : !HOST && !LOCAL ? 'set SILINX_ISE_HOST=user@host (the machine with the ISE Docker image), or local (the image here)' : false;
 // known failures of the Silinx toolchain, with their issue
-const KNOWN = {};
+const KNOWN = { 'uart-atlys': '#2539: the Atlys\'s USB-UART pins use two features the bit database has not measured' };
 // the warnings ISE gives on each example (the same on every device): XST, map, par
 const ISE_WARNINGS = {
   gates: [],
@@ -36,6 +36,7 @@ const ISE_WARNINGS = {
   clock: [],
   vga: [],
   isqrt: [],
+  uart: [],
 };
 
 let tmp;
@@ -64,7 +65,7 @@ const checkOpenFlow = (name, t) => {
 
 for (const name of EXAMPLES) {
   for (const t of S6_TARGETS) {
-    test(`example ${name} for the ${targetName(t)}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000 }, () => checkOpenFlow(name, t));
+    test(`example ${name} for the ${targetName(t)}: Silinx's bitstream is byte-identical to ISE's, ISE's DRC clean`, { skip, timeout: 30 * 60000, todo: KNOWN[`${name}-${targetName(t)}`] }, () => checkOpenFlow(name, t));
   }
   for (const t of TARGETS) {
     test(`ISE builds example ${name} for the ${t.board}-${t.variant}, with the expected warnings`, { skip, timeout: 30 * 60000 }, async () => {
