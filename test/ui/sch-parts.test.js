@@ -38,13 +38,13 @@ uiTest('#405 schematic editor parts: the toolbar, the palette, Select All and De
   const ev = (fn, ...a) => page.eval(fn, ED, ...a);
   const doc = () => page.eval(() => window.Silinx.active.schEditor.getDoc());
   // ---- the toolbar: its buttons in order, the edits right after the drawing tools (no Undo / Redo: the main toolbar's, #2505); the
-  // zooms, then Keep connections between separators (#1733); the menu last (#2208)
+  // zooms, then Keep connections between separators (#1733); the menu last (#2208); Add Graphics after Add I/O Marker (#2593)
   assert.deepEqual(await ev((ed) => [...document.querySelectorAll(`${ed} .se-toolbar [data-act]`)].map((b) => b.dataset.act)),
-    ['select', 'wire', 'net', 'io', 'rotate', 'mirror', 'mirrorv', 'delete', 'zin', 'zout', 'fit', 'check', 'sim', 'more', 'rewire', 'relayout']);
+    ['select', 'wire', 'net', 'io', 'graphics', 'rotate', 'mirror', 'mirrorv', 'delete', 'zin', 'zout', 'fit', 'check', 'sim', 'more', 'rewire', 'relayout']);
   assert.deepEqual(await ev((ed) => [...document.querySelector(`${ed} .se-toolbar`).children].map((e) => e.dataset.act || (e.classList.contains('se-sep') ? '|' : e.className.match(/se-(keep|curved)/)?.[1])).filter(Boolean).slice(9, 16)),
     ['|', 'zin', 'zout', 'fit', '|', 'keep', '|']);
-  assert.deepEqual(await ev((ed) => [...document.querySelector(`${ed} .se-toolbar`).children].slice(3, 9).map((e) => e.dataset.act || (e.classList.contains('se-sep') ? '|' : e.className))),
-    ['io', '|', 'rotate', 'mirror', 'mirrorv', 'delete']);
+  assert.deepEqual(await ev((ed) => [...document.querySelector(`${ed} .se-toolbar`).children].slice(3, 10).map((e) => e.dataset.act || (e.classList.contains('se-sep') ? '|' : e.className))),
+    ['io', 'se-gfx', '|', 'rotate', 'mirror', 'mirrorv', 'delete']);
   // the zooms (the view): Zoom In scales the drawing by 1.25, Fit back
   const scale = () => ev((ed) => parseFloat(/scale\(([\d.]+)\)/.exec(document.querySelector(`${ed} .se-vp`).getAttribute('transform'))[1]));
   await page.click(`${ED} .se-btn[data-act=fit]`);

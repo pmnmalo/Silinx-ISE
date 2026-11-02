@@ -68,7 +68,7 @@ test('paste into the same sheet: offset, fresh ids, instance, marker and net nam
   const doc = chain();
   const clip = copySchematic(doc, { symbols: ['S1', 'S2'], ports: ['P1', 'P2'], wires: [], labels: ['L1'] });
   const { ids, renamed } = pasteSchematic(doc, clip, { dx: 0, dy: 200 });
-  assert.deepEqual(ids, { symbols: ['S3', 'S4'], wires: ['W4', 'W5', 'W6'], ports: ['P3', 'P4'], labels: ['L2'] });
+  assert.deepEqual(ids, { symbols: ['S3', 'S4'], wires: ['W4', 'W5', 'W6'], ports: ['P3', 'P4'], labels: ['L2'], graphics: [] });
   assert.deepEqual(names(doc.symbols), ['U1', 'U2', 'inst_1', 'inst_2']);
   assert.deepEqual(Object.fromEntries(renamed.instances), { U1: 'inst_1', U2: 'inst_2' });
   assert.deepEqual(names(doc.ports), ['a', 'a_1', 'y', 'y_1']);
@@ -135,7 +135,7 @@ test('paste: a clipboard from the outside is normalized; garbage pastes nothing'
   const before = JSON.stringify(doc);
   for (const junk of [null, {}, { symbols: 'x' }, { symbols: [{ nope: 1 }], wires: [{ points: [{ x: 1, y: 1 }] }], ports: [{ dir: 'in' }], labels: [{ x: 1 }] }]) {
     const { ids } = pasteSchematic(doc, junk);
-    assert.deepEqual(ids, { symbols: [], wires: [], ports: [], labels: [] });
+    assert.deepEqual(ids, { symbols: [], wires: [], ports: [], labels: [], graphics: [] });
   }
   assert.equal(JSON.stringify(doc), before);
   // off-grid coordinates and offsets are snapped

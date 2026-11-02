@@ -3,6 +3,7 @@
 import { h } from './dom.js';
 import { portBox, symbolBox } from '/core/schdoc.js';
 import { isCurved, sampleCurve } from '/core/schcurve.js';
+import { graphicBox } from '/core/schgraphics.js';
 import { printDiagram, svgSnapshot } from './print.js';
 import { r1 } from './sch-svg.js';
 import { snap } from './sch-editor.js';
@@ -37,6 +38,7 @@ export function mountSchView(ctx) {
     // (curved, #1144: all of each curve)
     for (const w of doc().wires) for (const p of isCurved(doc()) ? sampleCurve(w, 8) : w.points) add(p);
     for (const l of doc().labels) add({ x: l.x, y: l.y - 12, w: 8 * l.net.length, h: 12 });
+    for (const g of doc().graphics || []) add(graphicBox(g));
     if (!Number.isFinite(x0)) return null;
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }

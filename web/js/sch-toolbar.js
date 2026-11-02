@@ -4,6 +4,7 @@
 import { PROPS_KEY, SYMBOLS_KEY, panelToggle } from './narrow.js';
 import { h } from './dom.js';
 import { ICON } from './sch-editor.js';
+import { GRAPHIC_LABELS, GRAPHIC_TITLES, GRAPHIC_TOOLS } from './sch-graphics.js';
 
 /** { optBox } of mountSchEditor (live(): its current values). */
 export function mountSchToolbar(ctx) {
@@ -26,17 +27,28 @@ export function mountSchToolbar(ctx) {
   );
   const moreBtn = h('button', { type: 'button', class: 'se-btn', 'data-act': 'more', title: 'Wires and layout', 'aria-haspopup': 'true', 'aria-expanded': 'false', html: ICON.more });
   const more = h('span', { class: 'se-more' }, moreBtn, moreMenu);
-  const onOutside = e => { if (!more.contains(e.target)) showMore(false); };
-  const onEsc = e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); showMore(false); container.focus({ preventScroll: true }); } };
-  function showMore(open) {
-    moreMenu.hidden = !open;
-    moreBtn.classList.toggle('on', open);
-    moreBtn.setAttribute('aria-expanded', String(open));
-    document[open ? 'addEventListener' : 'removeEventListener']('pointerdown', onOutside, true);
-    document[open ? 'addEventListener' : 'removeEventListener']('keydown', onEsc, true);
+  // a button's menu open (#2208), closed by a click elsewhere or Esc; its button marked by cls while it is open
+  function dropdown(wrap, button, menu, cls = 'on') {
+    const onOutside = e => { if (!wrap.contains(e.target)) show(false); };
+    const onEsc = e => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); show(false); container.focus({ preventScroll: true }); } };
+    function show(open) {
+      menu.hidden = !open;
+      button.classList.toggle(cls, open);
+      button.setAttribute('aria-expanded', String(open));
+      document[open ? 'addEventListener' : 'removeEventListener']('pointerdown', onOutside, true);
+      document[open ? 'addEventListener' : 'removeEventListener']('keydown', onEsc, true);
+    }
+    return show;
   }
+  const showMore = dropdown(more, moreBtn, moreMenu);
+  // the drawings with no function (#2593): Text, Line, Rectangle, Circle, Arc
+  const gfxMenu = h('div', { class: 'se-gfx-menu', hidden: true },
+    ...GRAPHIC_TOOLS.map(t => { const b = h('button', { type: 'button', class: 'se-btn wide', 'data-gfx': t, title: GRAPHIC_TITLES[t], html: ICON['g' + t] }); b.append(h('span', { text: GRAPHIC_LABELS[t] })); return b; }));
+  const gfxBtn = h('button', { type: 'button', class: 'se-btn', 'data-act': 'graphics', title: 'Add Graphics: text, lines, rectangles, circles, arcs to annotate the sheet', 'aria-haspopup': 'true', 'aria-expanded': 'false', html: ICON.gtext });
+  const gfx = h('span', { class: 'se-gfx' }, gfxBtn, gfxMenu);
+  const showGfx = dropdown(gfx, gfxBtn, gfxMenu, 'open');   // (its button on while a drawing tool is in use)
   tb.append(
-    btn('select', 'select', 'Select (Esc)'), btn('wire', 'wire', 'Add Wire (W)'), btn('net', 'net', 'Add Net Name (N)'), btn('io', 'io', 'Add I/O Marker (O)'),
+    btn('select', 'select', 'Select (Esc)'), btn('wire', 'wire', 'Add Wire (W)'), btn('net', 'net', 'Add Net Name (N)'), btn('io', 'io', 'Add I/O Marker (O)'), gfx,
     sep(), btn('rotate', 'rotate', 'Rotate (Ctrl+R)'), btn('mirror', 'mirror', 'Mirror Horizontal (Ctrl+M)'), btn('mirrorv', 'mirrorv', 'Mirror Vertical'), btn('delete', 'del', 'Delete (Del)'),
     sep(), btn('zin', 'zin', 'Zoom In (+)'), btn('zout', 'zout', 'Zoom Out (−)'), btn('fit', 'fit', 'Zoom to Full View (F)'),
     // (Keep connections after the view's buttons, #1733)
@@ -60,18 +72,21 @@ export function mountSchToolbar(ctx) {
     let prevSep = true;                                   // a separator at the start is not needed
     let lastSep = null;
     for (const el of tb.children) {
-      if (el.classList.contains('se-keep') || el.classList.contains('se-branch') || el.classList.contains('se-opts') || el.classList.contains('se-more') || ['wire', 'net', 'io', 'rotate', 'mirror', 'mirrorv', 'delete'].includes(el.dataset.act) || (el.dataset.act === 'sim' && !canSim)) continue;   // hidden by .read-only CSS
+      if (el.classList.contains('se-keep') || el.classList.contains('se-branch') || el.classList.contains('se-opts') || el.classList.contains('se-more') || el.classList.contains('se-gfx') || ['wire', 'net', 'io', 'rotate', 'mirror', 'mirrorv', 'delete'].includes(el.dataset.act) || (el.dataset.act === 'sim' && !canSim)) continue;   // hidden by .read-only CSS
       if (el.classList.contains('se-sep')) { if (prevSep) el.style.display = 'none'; else { prevSep = true; lastSep = el; } }
       else { prevSep = false; lastSep = null; }
     }
     if (lastSep) lastSep.style.display = 'none';          // nor at the end
   }
   tb.addEventListener('click', e => {
+    const g = e.target.closest('[data-gfx]');
+    if (g) { showGfx(false); if (!live()) setTool(g.dataset.gfx); container.focus({ preventScroll: true }); return; }
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled) return;
     const a = b.dataset.act;
     if (a === 'sim') { if (live()) leaveSim(); else enterSim(); container.focus({ preventScroll: true }); return; }
     if (a === 'more') { showMore(moreMenu.hidden); return; }
+    if (a === 'graphics') { showGfx(gfxMenu.hidden); return; }
     if (live() && !['zin', 'zout', 'fit', 'check'].includes(a)) return;
     if (a === 'select' || a === 'wire' || a === 'net' || a === 'io') setTool(a);
     else if (a === 'rotate') rotateSel(); else if (a === 'mirror') mirrorSel(); else if (a === 'mirrorv') mirrorVSel(); else if (a === 'delete') deleteSel();

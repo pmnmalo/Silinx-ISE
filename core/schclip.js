@@ -2,7 +2,7 @@
 // same sheet, in another schematic of the project or in another project. Isomorphic (no DOM).
 //
 //   import { copySchematic, pasteSchematic } from '/core/schclip.js';
-//   const clip = copySchematic(doc, { symbols: [ids], wires: [ids], ports: [ids], labels: [ids] }, modules);
+//   const clip = copySchematic(doc, { symbols: [ids], wires: [ids], ports: [ids], labels: [ids], graphics: [ids] }, modules);
 //   const { ids } = pasteSchematic(doc2, clip, { dx: 40, dy: 40 });   // doc2 changed in place, ids: what was pasted
 //
 // What is copied: the selected symbols, wires, net names and I/O markers, with the wires that join the copied
@@ -17,8 +17,11 @@
 // copy connects to that port (the clk of the sheet, say), as a label of that name drawn by hand does.
 import { DOC_VERSION, GRID, normalizeDoc, portBox, symbolBox, symbolPins, parseNetName } from './schdoc.js';
 import { clone } from './util.js';
+import { graphicBox, moveGraphic } from './schgraphics.js';
 
 const CLIP_VERSION = 1;
+// a clipboard read as a document of doc's language
+const clipDoc = (doc, clip) => normalizeDoc({ version: +clip?.docVersion || 3, lang: doc.lang, symbols: clip?.symbols, wires: clip?.wires, ports: clip?.ports, labels: clip?.labels, graphics: clip?.graphics });
 const key = (x, y) => `${x},${y}`;
 function onSeg(p, a, b) {
   if (a.x === b.x) return p.x === a.x && p.y >= Math.min(a.y, b.y) && p.y <= Math.max(a.y, b.y);
@@ -63,22 +66,24 @@ export function copySchematic(doc, sel, modules = {}) {
   // the net names: those selected, and those on a copied wire
   const lsel = new Set(sel.labels || []);
   const labels = doc.labels.filter(l => lsel.has(l.id) || allWires.some(w => onWire(l, w)));
-  return clone({ version: CLIP_VERSION, docVersion: DOC_VERSION, lang: doc.lang, from: doc.name, symbols, wires: doc.wires.filter(w => allWires.includes(w)), ports, labels });
+  // (the drawings selected, #2593)
+  const graphics = pick(doc.graphics || [], sel.graphics);
+  return clone({ version: CLIP_VERSION, docVersion: DOC_VERSION, lang: doc.lang, from: doc.name, symbols, wires: doc.wires.filter(w => allWires.includes(w)), ports, labels, ...(graphics.length ? { graphics } : {}) });
 }
 
 /** Whether a clipboard has something to paste. */
-export const clipEmpty = clip => !clip || !['symbols', 'wires', 'ports', 'labels'].some(k => Array.isArray(clip[k]) && clip[k].length);
+export const clipEmpty = clip => !clip || !['symbols', 'wires', 'ports', 'labels', 'graphics'].some(k => Array.isArray(clip[k]) && clip[k].length);
 
 /** Paste clip into doc (changed in place), offset by (dx, dy) (snapped to the grid). Returns
- *  { ids: { symbols, wires, ports, labels }, renamed: { instances, ports, nets }: Maps of old -> new names }. */
+ *  { ids: { symbols, wires, ports, labels, graphics }, renamed: { instances, ports, nets }: Maps of old -> new names }. */
 export function pasteSchematic(doc, clip, { dx = 0, dy = 0 } = {}) {
   // (a clipboard from the system's, read as text: normalized as a document is, nothing kept that is not one)
   // (its symbols drawn as in the document copied from, docVersion: one copied before #1136 has narrower multiplexers)
-  const c = normalizeDoc({ version: +clip?.docVersion || 3, lang: doc.lang, symbols: clip?.symbols, wires: clip?.wires, ports: clip?.ports, labels: clip?.labels });
+  const c = clipDoc(doc, clip);
   dx = Math.round(dx / GRID) * GRID; dy = Math.round(dy / GRID) * GRID;
   const ci = doc.lang === 'vhdl';
   const nk = s => (ci ? String(s).toLowerCase() : String(s));
-  const ids = { symbols: [], wires: [], ports: [], labels: [] };
+  const ids = { symbols: [], wires: [], ports: [], labels: [], graphics: [] };
   const renamed = { instances: new Map(), ports: new Map(), nets: new Map() };
   const nextId = (prefix, arr) => { let n = 0; for (const o of arr) { const m = new RegExp(`^${prefix}(\\d+)$`).exec(o.id); if (m) n = Math.max(n, +m[1]); } return `${prefix}${n + 1}`; };
 
@@ -122,6 +127,10 @@ export function pasteSchematic(doc, clip, { dx = 0, dy = 0 } = {}) {
     const w = { ...w0, id: nextId('W', doc.wires), points: w0.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     doc.wires.push(w); ids.wires.push(w.id);
   }
+  for (const g0 of c.graphics || []) {
+    const g = { ...moveGraphic(g0, dx, dy), id: nextId('G', doc.graphics ||= []) };
+    doc.graphics.push(g); ids.graphics.push(g.id);
+  }
   return { ids, renamed };
 }
 
@@ -132,6 +141,7 @@ function boxesOf(d, modules) {
   for (const sy of d.symbols) { const b = symbolBox(sy, modules); out.push({ x: b.x, y: b.y - 14, w: b.w, h: b.h + 14 }); }
   for (const p of d.ports) out.push(portBox(p));
   for (const l of d.labels) out.push({ x: l.x, y: l.y - 12, w: 8 * String(l.net).length, h: 12 });
+  for (const g of d.graphics || []) out.push(graphicBox(g));
   for (const w of d.wires) for (let i = 0; i + 1 < w.points.length; i++) {
     const a = w.points[i], b = w.points[i + 1];
     out.push({ x: Math.min(a.x, b.x) - 2, y: Math.min(a.y, b.y) - 2, w: Math.abs(a.x - b.x) + 4, h: Math.abs(a.y - b.y) + 4 });
@@ -151,7 +161,7 @@ const onGrid = v => Math.round(v / GRID) * GRID || 0;   // (no -0)
  *  { x, y, w, h }) nearest to its centre, clear of what is drawn there by a grid step; no place blank: centred in
  *  `area` (its part on the sheet). With neither, 40 right and down (where it was copied from, beside it). */
 export function pasteOffset(doc, clip, { at = null, area = null, modules = {} } = {}) {
-  const c = normalizeDoc({ version: +clip?.docVersion || 3, lang: doc.lang, symbols: clip?.symbols, wires: clip?.wires, ports: clip?.ports, labels: clip?.labels });
+  const c = clipDoc(doc, clip);
   const box = around(boxesOf(c, modules));
   if (!box) return { dx: 0, dy: 0 };
   const centredOn = p => ({ dx: onGrid(p.x - (box.x + box.w / 2)), dy: onGrid(p.y - (box.y + box.h / 2)) });

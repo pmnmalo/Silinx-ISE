@@ -56,7 +56,7 @@ import { clone } from '/core/util.js';
 export { clone };   // (core/util.js's)
 
 export const snap = v => Math.round(v / GRID) * GRID;
-export const KEYS = { sym: 'symbols', wire: 'wires', port: 'ports', label: 'labels' };
+export const KEYS = { sym: 'symbols', wire: 'wires', port: 'ports', label: 'labels', graphic: 'graphics' };
 
 
 export { ICON };   // (editor-icons.js's)
@@ -274,7 +274,7 @@ export function mountSchEditor(container, opts = {}) {
     renderOverlay, renderProps, sel: () => sel, setTool, spaceDown: () => spaceDown, startPlace, svg, toSheet, tool: () => tool,
     updateStatus, view: () => view, wireClick, wireDraw: () => wireDraw, zoomAt, setCursor: (v) => { cursor = v; },
     setDoc: (v) => { doc = v; }, setDrag: (v) => { drag = v; }, setHoverPin: (v) => { hoverPin = v; },
-    setSel: (v) => { sel = v; }, setWireDraw: (v) => { wireDraw = v; }
+    setSel: (v) => { sel = v; }, setWireDraw: (v) => { wireDraw = v; }, edit, nextId, promptBox: (...a) => promptBox(...a)
   });
 
   // ---------------- keyboard (sch-keys.js)

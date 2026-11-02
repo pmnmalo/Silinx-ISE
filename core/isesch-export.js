@@ -7,6 +7,8 @@ import {
 } from './schdoc.js';
 import { LIB_GFX, LIB_TS, findModule, gfxShapes, iomarkerOrien, iseXform, lc, libPins, xaiToIseOrien } from './isesch.js';
 import { blockHdlDecls } from './isesch-blockhdl.js';
+import { graphicsToIse } from './isesch-graphics.js';
+import { graphicBox } from './schgraphics.js';
 import { primIseSymbol, primTimestamp } from './isesch-prims.js';
 import { pickOrigin, placeBlock, routeStubs, sheetRouter } from './isesch-route.js';
 
@@ -455,6 +457,7 @@ export function exportIseSch(docIn, opts = {}) {
   for (const s of doc.symbols) { const b = symbolBox(s, modules); acc(X(b.x + b.w), X(b.y + b.h)); }
   for (const w of doc.wires) for (const p of w.points) acc(X(p.x), X(p.y));
   for (const p of doc.ports) { const b = portBox(p); acc(X(b.x + b.w), X(b.y + b.h)); }
+  for (const g of doc.graphics || []) { const b = graphicBox(g); acc(X(b.x + b.w), X(b.y + b.h)); }
   const size = SHEET_SIZES.find(([w, h]) => mx + 64 <= w && my + 64 <= h) || [Math.ceil((mx + 128) / 32) * 32, Math.ceil((my + 128) / 32) * 32];
 
   // ------------------------------------------------------------- XML
@@ -473,7 +476,7 @@ export function exportIseSch(docIn, opts = {}) {
   out.push(...blocks);
   out.push('    </netlist>');
   out.push(`    <sheet sheetnum="1" width="${size[0]}" height="${size[1]}">`);
-  out.push(...instances, ...branches, ...bustaps, ...iomarkers);
+  out.push(...instances, ...branches, ...bustaps, ...iomarkers, ...graphicsToIse(doc.graphics, X));
   out.push('    </sheet>', '</drawing>', '');
   return { xml: out.join('\n'), warnings, files };
 }

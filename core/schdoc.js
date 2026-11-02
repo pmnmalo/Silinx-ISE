@@ -15,7 +15,8 @@
 //     hdl?:    { lang, context, generics: [{ name, type, default }], decls, arch },  // verbatim HDL
 //     generatedFile?: 'src/name.vhd',
 //     description?: 'text',                 // shown on the sheet, a comment in the generated HDL
-//     wireStyle?: 'curved' }                // the wires drawn as curves (#1144); else the technical drawing
+//     wireStyle?: 'curved',                 // the wires drawn as curves (#1144); else the technical drawing
+//     graphics?: [{ id, kind, ... }] }      // drawings with no function: text, lines, … (#2593, core/schgraphics.js)
 //
 // (x, y) of a symbol is the top-left corner of its (rotated) bounding box; rotation is clockwise.
 // Connectivity is geometric, at the ends only (#678): wire end points, pins and I/O markers at the
@@ -27,6 +28,7 @@ import { VHDL93_WORDS, VERILOG_WORDS, reservedError } from './reserved.js';
 import { BLOCK_MARK, blockMarkOf, declaredIn, generateHdl, isBlockSymbol } from './schdoc-hdl.js';
 import { mergeNetWires } from './schdoc-place.js';
 import { normalizeCurve, splitCurve } from './schcurve.js';
+import { normalizeGraphic } from './schgraphics.js';
 import { moveTaps, widenBuffers, widenJoins, widenMuxes } from './schdoc-upgrade.js';
 import { symbolDiff } from './schdoc-modsym.js';
 import {
@@ -130,6 +132,10 @@ export function normalizeDoc(d, { modules } = {}) {
     if (p.default != null && String(p.default).trim()) o.default = String(p.default).trim();
     uid(o, 'P'); return o;
   });
+  // (drawings with no function, #2593)
+  const graphics = (Array.isArray(doc.graphics) ? doc.graphics : []).map(normalizeGraphic).filter(Boolean);
+  for (const g of graphics) uid(g, 'G');
+  if (graphics.length) doc.graphics = graphics; else delete doc.graphics;
   // names for symbols without one
   const names = new Set(doc.symbols.map(s => s.name).filter(Boolean));
   let k = 0;

@@ -70,6 +70,7 @@ export function mountSchKeys(ctx) {
     if (k === 'w') setTool('wire');
     else if (k === 'n') setTool('net');
     else if (k === 'o') setTool('io');
+    else if (k === 't') setTool('text');   // (Add Text, #2593)
     else if (k === 's' && tool() !== 'select') setTool('select');
     else if (k === 'f') fit();
     else if (k === '+' || k === '=') zoomAt(1.25);

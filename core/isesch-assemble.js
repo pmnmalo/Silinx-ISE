@@ -3,6 +3,7 @@
 // markers, net names added where ISE connects nets by name only, and the final check against the ISE connectivity
 // (its warnings, the nets split or joined, where each ISE block pin ended up). Isomorphic (no DOM, no Node APIs).
 import { DOC_VERSION, normalizeDoc, symbolBox, symbolPins, portBox, netlist, joinWires } from './schdoc.js';
+import { graphicBox } from './schgraphics.js';
 import { AUTO_RE, SIDE_VEC, lc, onSegment, r10 } from './isesch.js';
 
 /** The imported schematic assembled and checked: { doc, warnings, unconnected, pinMap }. ctx: what the placement
@@ -11,7 +12,7 @@ export function assembleIseImport(ctx) {
   const {
     addWire, declLines, docName, keyName, keyWidth, labelKey, labels, lang, macroBox, macros, mainInfo, model, modules,
     occ, occAdd, occReset, overlapsForeign, parked, passes, pinKey, pinsOf, portKey, ports, segAdd, shiftMacro, sigs,
-    stubOf, syms, unplacedPorts, warn, warnings, wireKey, wires
+    stubOf, syms, unplacedPorts, warn, warnings, wireKey, wires, graphics = []
   } = ctx;
   let { lid, pid } = ctx;
 
@@ -23,6 +24,7 @@ export function assembleIseImport(ctx) {
     for (const p of ports) { const b = portBox(p); acc(b.x, b.y); acc(b.x + b.w, b.y + b.h); }
     for (const s of syms) { const b = symbolBox(s, modules); acc(b.x, b.y); acc(b.x + b.w, b.y + b.h); }
     for (const l of labels) acc(l.x, l.y);
+    for (const g of graphics) { const b = graphicBox(g); acc(b.x, b.y); acc(b.x + b.w, b.y + b.h); }
     if (x0 === Infinity) return { x0: 40, y0: 40, x1: 40, y1: 40 };
     return { x0, y0, x1, y1 };
   };
@@ -56,7 +58,7 @@ export function assembleIseImport(ctx) {
     : mainInfo.has(k) || keyWidth(k) > 1 ? `${keyName.get(k)}(${keyWidth(k) - 1}:0)` : keyName.get(k));
   const build = () => {
     for (const l of labels) l.net = labelText(labelKey.get(l.id));
-    const d = normalizeDoc({ version: DOC_VERSION, name: docName, lang, sheet: { w: 1700, h: 1100 }, symbols: syms, wires, labels, ports });
+    const d = normalizeDoc({ version: DOC_VERSION, name: docName, lang, sheet: { w: 1700, h: 1100 }, symbols: syms, wires, labels, ports, graphics });
     // each net's wires joined where they branch and at its pins and markers (#678: connected at the ends)
     const ids = new Map(), at = new Map();
     const of = (m, k) => { let v = m.get(k); if (!v) m.set(k, v = []); return v; };
@@ -166,7 +168,6 @@ export function assembleIseImport(ctx) {
   }
   for (const [k, s] of where) if (s.size > 1) { warn(`connectivity: ISE net '${sigs.get(k)?.name || k}' is split in ${s.size} parts`); unconnected.push(sigs.get(k)?.name || k); }
   for (const d of nl.diagnostics) if (d.severity === 'error') warn(`schematic check: ${d.message}`);
-  if (model.sheets.some(s => s.texts.length)) warn(`${model.sheets.reduce((a, s) => a + s.texts.length, 0)} text annotation(s) of the ISE sheet were not imported`);
   if (model.sheets.length > 1) warn(`the ${model.sheets.length} ISE sheets are placed side by side on one Silinx sheet`);
   doc.importedFrom = { format: 'ise-sch', version: model.version, family: model.attrs.DeviceFamilyName || null };
   // where each ISE block pin ended up ('XLXI_1.I0' -> 'XLXI_1_invI0.I')
