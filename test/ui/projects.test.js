@@ -149,7 +149,7 @@ uiTest('Start page: no Open Example entries (#776); New Project… lists the sev
   // the wizard's list of templates: the empty project, then the examples in their order (then the test designs, #1746:
   // test/ui/test-designs.test.js)
   assert.deepEqual((await page.eval(() => [...document.querySelector('.dlg-overlay .wiz-main select').options].map((o) => [o.value, o.textContent]))).filter(([, l]) => !/^Test design: /.test(l)),
-    [['empty', 'Empty project'], ...['gates', 'traffic', 'blinky', 'pong', 'stopwatch', 'clock', 'vga', 'isqrt'].map((t) => [t, `Example: ${t}`])]);
+    [['empty', 'Empty project'], ...['gates', 'traffic', 'blinky', 'pong', 'stopwatch', 'clock', 'vga', 'isqrt', 'uart'].map((t) => [t, `Example: ${t}`])]);
   await page.fill('.dlg-overlay .wiz-main input[type=text]', 'PongN2');
   await page.dialogButton('Next >');
   await page.waitFor(() => document.querySelector('.dlg-overlay .wiz-main h3')?.textContent === 'Project Settings');
