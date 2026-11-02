@@ -1,10 +1,10 @@
 // Silinx - the compiled simulator's edges and counts (#405: out of compileNetlist in core/compiled-sim.js): the main
 // clock's edges (their samples and commits), the settling of the other clocks and the asynchronous elements, what
-// each cycle counts (watch: levels, pairs, edges, the VGA monitor).
+// each cycle counts (watch: levels, pairs, edges, the VGA monitor, the serial port's TX).
 import { VGA_CODE } from './compiled-vga.js';
 import { fix32, lit } from './compiled-helpers.js';
 
-/** { ckSet, count, counted, dlist, edgeCode, edges, fire, flush, flushFn, levels, pairs, settleCode, vgaCode, watched } of compileNetlist. */
+/** { ckSet, count, counted, dlist, edgeCode, edges, fire, flush, flushFn, levels, pairs, settleCode, uartCode, vgaCode, watched } of compileNetlist. */
 export function mountWatch(ctx) {
   const {
     watch, async, asyncEls, commit, derived, main, mainPort, pol, sample, sig, src
@@ -51,5 +51,8 @@ export function mountWatch(ctx) {
   const vgaCode = watch?.vga ? VGA_CODE(sig([watch.vga.hs], 'n'), sig([watch.vga.vs], 'n'), sig(watch.vga.rgb, 'n')) : '';
   const edgeCode = edges.map((w, i) => `{ const e = ${sig([w.bit], 'n')}; if (e${i} === 1 && e === 0) EV.push(cy, ${sig(w.capture, 'n')}); e${i} = e; }`).join('\n');
 
-  return { ckSet, count, counted, dlist, edgeCode, edges, fire, flush, flushFn, levels, pairs, settleCode, vgaCode, watched };
+  // the serial port's TX (#2536): each change, its cycle from the start (UB: the cycles of the runs before) and its level
+  const uartCode = watch?.uart ? `{ const t = ${sig([watch.uart.tx], 'n')}; if (t !== u_tx) { UT.push(UB + cy, t); u_tx = t; } }` : '';
+
+  return { ckSet, count, counted, dlist, edgeCode, edges, fire, flush, flushFn, levels, pairs, settleCode, uartCode, vgaCode, watched };
 }

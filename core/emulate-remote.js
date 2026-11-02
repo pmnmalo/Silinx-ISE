@@ -9,8 +9,8 @@
 // as many as fit in the time budget.
 //
 // The messages, page -> host: init { opts }, force { port, value, mask }, at { t, sets: [force…] },
-// sequence { steps: [{ dt, sets }] }, reset, watch { sigs }, run { id, gen, cycles, budget, vga }; host -> page: ready { warnings, palette },
-// state { id, gen, now, cycles, finished, outputs, lcd, log, values, vga }, error { message }.
+// sequence { steps: [{ dt, sets }] }, reset, watch { sigs }, baud { baud }, run { id, gen, cycles, budget, vga }; host -> page: ready
+// { warnings, palette }, state { id, gen, now, cycles, finished, outputs, lcd, log, values, vga, serial }, error { message }.
 //
 // Isomorphic ES module (browser + Node), no DOM.
 import { CompiledBoard } from './emulate-compiled.js';
@@ -57,6 +57,7 @@ export function hostBoard(port) {
     },
     reset() { board.reset(); seqEnd = 0; prev = null; lcd = lcd && lcdState(); logN = 0; board.log.length = 0; },
     watch({ sigs }) { watched = sigs; },
+    baud({ baud }) { board.setBaud(baud); },
     run({ id, gen, cycles, budget = 16, vga = false }) {
       const start = nowMs(), t0 = board.now, end = t0 + cycles * board.period;
       // (slices of about 2 ms between two looks at the clock)
@@ -82,7 +83,7 @@ export function hostBoard(port) {
       post({
         type: 'state', id, gen, now: board.now, cycles: ran, finished: board.finished, outputs: prev,
         lcd: fed ? lcd : null, log, values: watched.map((s) => board.value(s)),
-        vga: v ? { status: v.status, fb } : null,
+        vga: v ? { status: v.status, fb } : null, serial: board.serial(),
       }, fb ? [fb.buffer] : []);
     },
   };
@@ -114,6 +115,7 @@ export class RemoteBoard {
     this.outputs = null;
     this.lcdState = null;
     this.vgaLast = null;
+    this.serialIn = [];
     this.values = new Map();
     this.watched = [];
     this.gen = 0;
@@ -145,6 +147,7 @@ export class RemoteBoard {
     if (m.log.length) this.log.push(...m.log);
     this.watched.forEach((s, i) => this.values.set(s, m.values[i]));
     if (m.vga) this.vgaLast = { status: m.vga.status, fb: m.vga.fb || this.vgaLast?.fb || null };
+    if (m.serial?.length) this.serialIn.push(...m.serial);
     done?.(m);
   }
   /** Runs in flight. */
@@ -179,6 +182,7 @@ export class RemoteBoard {
     this.outputs = null;
     this.lcdState = null;
     this.vgaLast = null;
+    this.serialIn = [];
   }
   /** Forget the runs in flight (the board switched off): their states are not shown. */
   invalidate() { this.gen++; }
@@ -200,6 +204,10 @@ export class RemoteBoard {
   }
   /** The VGA monitor: { fb, palette, status } (the last picture fetched) or null (no VGA connector, no run yet). */
   vga() { return this.vgaLast ? { fb: this.vgaLast.fb, palette: this.palette, status: this.vgaLast.status } : null; }
+  /** The serial terminal's baud rate. */
+  baud(baud) { this.post({ type: 'baud', baud }); }
+  /** The bytes the design sent on the serial port since the last call ([{ byte, error }]). */
+  serial() { return this.serialIn.splice(0); }
   /** A watched signal's value after the last run (a simulator value), or null. */
   value(sig) { return this.values.get(sig) ?? null; }
   /** End the host (the worker terminated); the runs in flight resolve null. */

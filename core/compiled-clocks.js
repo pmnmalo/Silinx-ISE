@@ -71,7 +71,7 @@ export function mountClocks(ctx) {
     const other = new Set([...comb.flatMap(inBits), ...elems.flatMap(e => [...Object.entries(e.C).flatMap(([p, b]) => (p === 'CLK' && clocked.includes(e) ? [] : b)), ...(e.addr || []), ...(e.data || []), ...(e.en || [])]),
       ...ports.filter(p => p.dir !== 'input').flatMap(p => p.bits), ...dcms.flatMap(d => [d.C.CLKIN[0], ...(d.C.RST || [])]),
       ...(watch?.levels || []).map(w => w.bit), ...(watch?.pairs || []).flat().map(w => w.bit), ...(watch?.edges || []).flatMap(w => [w.bit, ...w.capture]),
-      ...(watch?.vga ? [watch.vga.hs, watch.vga.vs, ...watch.vga.rgb] : [])]);
+      ...(watch?.vga ? [watch.vga.hs, watch.vga.vs, ...watch.vga.rgb] : []), ...(watch?.uart ? [watch.uart.tx] : [])]);
     const read = new Set([...other, ...asClock]);
     const waves = new Map(), level = new Map(), root = new Map();   // dcm -> its outputs' waveforms, its depth in a cascade, its group's DCM
     const driven = d => (d.C.RST || []).some(b => typeof b === 'number');

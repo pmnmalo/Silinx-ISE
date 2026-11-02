@@ -399,6 +399,8 @@ const PT_FF = [['synchronous set and reset (S over R)', 'set e reset síncronos 
   ['clock enable', 'habilitação do relógio'], ['asynchronous clear', 'clear assíncrono'], ['asynchronous preset', 'preset assíncrono'],
   ['synchronous reset', 'reset síncrono'], ['synchronous set', 'set síncrono']];
 const PT_PATTERNS = [
+  // the serial terminal's pins (#2536)
+  [/^TX: (.+) · RX: (.+)$/, (m, ...p) => `TX: ${p.slice(0, 2).map((x) => x.replace(/ \(pin (\S+)\)$/, ' (pino $1)').replace(/^not connected in the UCF$/, 'não ligado no UCF')).join(' · RX: ')}`], [/^(\d+) baud$/, '$1 baud'],
   // Find in Project (#1430)
   [/^(\d+) result\(s\) in (\d+) file\(s\)$/, '$1 resultado(s) em $2 ficheiro(s)'], [/^(\d+) replacement\(s\) in (\d+) file\(s\)$/, '$1 substituição(ões) em $2 ficheiro(s)'],
   [/^Invalid regular expression: (.*)$/, 'Expressão regular inválida: $1'],
@@ -534,7 +536,10 @@ Object.assign(PT, {
   'Real values: the compiled engine runs the design at up to the board\'s clock rate.': 'Valores reais: o motor compilado corre o projeto até à frequência do relógio da placa.',
   'Compiling the design for the Board Emulator (Yosys)…': 'A compilar o projeto para o Emulador de Placa (Yosys)…',
   'Starting the Board Emulator…': 'A iniciar o Emulador de Placa…',
-  'VGA monitor (640×480)': 'Monitor VGA (640×480)', 'VGA monitor': 'Monitor VGA', 'Show:': 'Mostrar:', 'Display': 'Mostrador', 'Switches': 'Interruptores',
+  'VGA monitor (640×480)': 'Monitor VGA (640×480)', 'VGA monitor': 'Monitor VGA', 'Show:': 'Mostrar:', 'Serial terminal': 'Terminal série', 'Send': 'Enviar',
+  'Type a line, Enter sends it with CR': 'Escreva uma linha; Enter envia-a com CR', 'The baud rate (8 data bits, no parity, 1 stop bit)': 'A taxa de transmissão (8 bits de dados, sem paridade, 1 bit de paragem)',
+  'The serial terminal needs the compiled engine (the event-driven one is too slow for a frame)': 'O terminal série precisa do motor compilado (o orientado a eventos é demasiado lento para uma trama)',
+  'Display': 'Mostrador', 'Switches': 'Interruptores',
   'Show or hide this module: the design goes on running': 'Mostrar ou esconder este módulo: o projeto continua a executar', 'No signal': 'Sem sinal',
   'The VGA monitor needs the compiled engine (the event-driven one is too slow for a frame)': 'O monitor VGA precisa do motor compilado (o motor por eventos é demasiado lento para uma imagem)',
   'HSYNC active high: 640×480 at 60 Hz has it active low': 'HSYNC ativo a 1: em 640×480 a 60 Hz é ativo a 0',

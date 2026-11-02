@@ -13,6 +13,7 @@ import * as V from './values.js';
 import { compileNetlist, CompiledSim, portBit } from './compiled-sim.js';
 import { outputWatch, boardOutputsFromCounts, lcdFeedEdges } from './emulate.js';
 import { vgaPins, vgaPalette, vgaStatus } from './vga.js';
+import { uartPins, UartDecoder } from './uart.js';
 
 export class CompiledBoard {
   /**
@@ -30,12 +31,15 @@ export class CompiledBoard {
     // the VGA monitor, when the UCF wires the board's VGA connector (core/vga.js)
     this.vgaPins = vgaPins(wiring, board);
     this.palette = this.vgaPins ? vgaPalette(this.vgaPins.widths) : null;
+    // the serial terminal, when the UCF wires the board's serial port's TX (core/uart.js, #2536)
+    this.uartTx = uartPins(wiring)?.tx || null;
     model ??= compileNetlist(json, {
       top, clock: clock || false,
       watch: {
         levels: this.watch.levels.map((l) => ({ bit: bit(l.b), on: l.on })),
         pairs: this.watch.pairs.map(([a, b]) => [{ bit: bit(a.b), on: a.on }, { bit: bit(b.b), on: b.on }]),
         edges: this.watch.edges.map((e) => ({ bit: bit(e.b), capture: e.capture.map(bit) })),
+        uart: this.uartTx && { tx: bit(this.uartTx) },
         vga: this.vgaPins && { hs: bit(this.vgaPins.hs), vs: bit(this.vgaPins.vs), rgb: [...this.vgaPins.red, ...this.vgaPins.green, ...this.vgaPins.blue].map(bit) },
       },
     });
@@ -52,6 +56,7 @@ export class CompiledBoard {
   reset() {
     this.cs.reset();
     this.cs.take();
+    this.decoder = this.uartTx ? new UartDecoder((this.baudBit ?? 1e12 / 9600) / this.period) : null;
     this.now = 0;
     this.finished = false;
     this.queue = [];
@@ -105,6 +110,18 @@ export class CompiledBoard {
   vga() {
     const v = this.cs.vga;
     return v ? { fb: v.fb, palette: this.palette, status: vgaStatus(v.state, this.period) } : null;
+  }
+  /** The serial terminal's baud rate (9600 at first). */
+  setBaud(baud) {
+    this.baudBit = 1e12 / baud;
+    if (this.decoder) this.decoder.bit = this.baudBit / this.period;
+  }
+  /** The bytes the design sent on the serial port's TX since the last call ([{ byte, error }]: UartDecoder's), [] without one. */
+  serial() {
+    if (!this.decoder) return [];
+    this.decoder.feed(this.cs.uart.take());
+    this.decoder.flush(this.cs.cycles);
+    return this.decoder.bytes();
   }
   /** A signal's value now (a simulator value), or null when the netlist has no net of its name. */
   value(sig) {

@@ -181,7 +181,8 @@ export function portBit(json, top, name, pos = 0) {
  *      the code's characters above which run() is split, and its functions' at most (#629: SPLIT, CHUNK) }
  * watch: { levels: [{ bit, on }] (the cycles a bit is at `on`), pairs: [[{ bit, on }, { bit, on }]] (the cycles
  *   both are), edges: [{ bit, capture: [bits] }] (each falling edge of the bit: the cycle and the captured
- *   bits' value, up to 32), vga: { hs, vs, rgb: [bits] } (a VGA monitor: VGA_CODE) }, the bits as in the
+ *   bits' value, up to 32), vga: { hs, vs, rgb: [bits] } (a VGA monitor: VGA_CODE), uart: { tx } (each change of the bit:
+ *   its cycle and level, #2536) }, the bits as in the
  *   netlist (portBit), sampled in every cycle before its clock edge (the values the cycle shows).
  */
 export function compileNetlist(json, { top, clock = null, wide = false, watch = null, activity = true, profile = PROFILE, split: splitAt = SPLIT, chunk = CHUNK } = {}) {
@@ -223,14 +224,14 @@ export function compileNetlist(json, { top, clock = null, wide = false, watch = 
   let blockOrder = blocksOf();
 
   // ---- the main clock's edges, the settling, what each cycle counts (compiled-watch.js)
-  const { ckSet, count, counted, dlist, edgeCode, edges, fire, flush, flushFn, levels, pairs, settleCode, vgaCode, watched } = mountWatch({
+  const { ckSet, count, counted, dlist, edgeCode, edges, fire, flush, flushFn, levels, pairs, settleCode, uartCode, vgaCode, watched } = mountWatch({
     watch, async, asyncEls, commit, derived, main, mainPort, pol, sample, sig, src
   });
 
   // ---- the loop's steps and the template of the code (compiled-steps.js)
   const { memChars, templateOf } = mountSteps({
     watch, ckSet, count, counted, dlist, edgeCode, edges, elems, fire, flush, flushFn, groups, inputs, levels, mems,
-    needFall, negMain, pairs, posMain, sched, settleCode, sig, vars, vgaCode, vk, watched
+    needFall, negMain, pairs, posMain, sched, settleCode, sig, uartCode, vars, vgaCode, vk, watched
   });
 
   // ---- the code of the segments (compiled-generate.js)
@@ -325,6 +326,8 @@ export class CompiledSim {
   take() { return this.inst.take(); }
   /** The VGA monitor (compileNetlist's watch.vga): { state: VG (VGA_STATE's values), fb } or null. */
   get vga() { return this.inst.vga || null; }
+  /** The serial port's TX (compileNetlist's watch.uart): its changes since the last take(), [cycle, level…] (the cycles from the start), or null. */
+  get uart() { return this.inst.uart || null; }
   /** The value of a port or a named net (BigInt). */
   get(name) {
     const bits = this.model.nets.get(name);

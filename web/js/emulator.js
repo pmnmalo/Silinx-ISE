@@ -13,6 +13,8 @@ import { formatTime } from '/core/interp.js';
 import { boardWiring, boardOutputs, lcdState, lcdFeed, emulatorClocks, manualClocks } from '/core/emulate.js';
 import { h } from './dom.js';
 import { mountBoardParts } from './emulator-board.js';
+import { mountEmuSerial } from './emulator-serial.js';
+import { UART_GROUPS } from '/core/uart.js';
 import { mountEmuSide } from './emulator-side.js';
 import { mountEmuPaint } from './emulator-paint.js';
 import { mountEmuToolbar } from './emulator-toolbar.js';
@@ -113,6 +115,11 @@ function injectStyle() {
 .emu-vga-nosig[hidden] { display: none; }   /* (its display: flex would show it hidden too, #453) */
 .emu-vga-stat { margin-top: 4px; font-family: var(--mono, monospace); color: var(--grey-3); }
 .emu-vga-warn { color: var(--log-warning); }
+/* the serial terminal (#2536) */
+.emu-serial { flex: none; width: 380px; max-width: 100%; }
+.emu-serial-out { height: 180px; margin: 4px 0; padding: 4px 6px; overflow: auto; background: #111; color: #c8f0c8; font: 12px var(--mono, monospace); white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 3px; }
+.emu-serial-bar { display: flex; gap: 6px; align-items: center; }
+.emu-serial-in { flex: 1; min-width: 0; font-family: var(--mono, monospace); }
 `), h('style', {}, Object.values(BOARD_LAYOUTS).map((l) => l.css || '').join('')));   // (each board's parts, after the common ones)
 }
 
@@ -216,7 +223,9 @@ export function mountEmulator(container, { design, board, assignments, title = '
   const inVal = new Map(inputPorts.map((p) => [p.sig, 0n]));   // value of each input port (unmapped bits 0)
   // inputs with a pull-up on the board (e.g. the rotary encoder's A / B) rest at '1', and an active-low button (the
   // iCEBreaker's BTN_N, #2511) released
-  const restsHigh = (b) => (b.res.pull === 'up' && b.kind !== 'sw' && b.kind !== 'btn') || (b.res.extra?.activeLow && (b.kind === 'btn' || b.kind === 'sw'));
+  // the serial port's RX idle (#2536)
+  const restsHigh = (b) => (b.res.pull === 'up' && b.kind !== 'sw' && b.kind !== 'btn') || (b.res.extra?.activeLow && (b.kind === 'btn' || b.kind === 'sw'))
+    || UART_GROUPS.includes(b.res.group);
   for (const b of wiring.bits) if (b.dir === 'in' && restsHigh(b)) inVal.set(b.sig, (inVal.get(b.sig) ?? 0n) | (1n << BigInt(b.pos)));
   let lcd = lcdState(), lcdView = null;
 
@@ -278,6 +287,8 @@ export function mountEmulator(container, { design, board, assignments, title = '
     running: () => running, sim, vgaView: () => vgaView, vgaWired, wiring, setVgaView: (v) => { vgaView = v; }
   });
   // (the modules outside the board shown or hidden, #2522: emulator-modules.js; shown when paused, the picture of now)
+  // the serial terminal (#2536: emulator-serial.js), before the side panel
+  const serialView = mountEmuSerial({ compiled: () => compiled, main, sim, wiring });
   mountEmuModules({ main, stat, changed: () => { if (compiled && !running) after(advance(0)); } });
 
   // ------------------------------------------------------------------------------- simulation
@@ -457,7 +468,7 @@ export function mountEmulator(container, { design, board, assignments, title = '
   const { paint, setStat } = mountEmuPaint({
     compiled: () => compiled, digits, dirty: () => dirty, lcd: () => lcd, lcdDirty: () => lcdDirty,
     lcdView: () => lcdView, leds, logEl, logN: () => logN, paints: () => paints, period, powered: () => powered,
-    prev: () => prev, rateWin: () => rateWin, running: () => running, shown, sim, stat, vgaView: () => vgaView, watched,
+    prev: () => prev, rateWin: () => rateWin, running: () => running, serialView: () => serialView, shown, sim, stat, vgaView: () => vgaView, watched,
     setDirty: (v) => { dirty = v; }, setPaints: (v) => { paints = v; }, setLcdDirty: (v) => { lcdDirty = v; },
     setRateWin: (v) => { rateWin = v; }, setLogN: (v) => { logN = v; }
   });
