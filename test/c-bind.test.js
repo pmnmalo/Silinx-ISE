@@ -117,9 +117,13 @@ for (const [name, call, args, t] of [['sinf', 'sinf(a)', 'float a', 'float'], ['
     const g = cToHdl(src, { file: 't.c', top: 'f', family: 'spartan3e', mults: 4 });
     assert.deepEqual(g.diagnostics, []);
     assert.equal(g.report.blocks, 4);
-    // (sin's and pow's VHDL, 2000 and 5000 states in one if … elsif, overflow the elaborator's stack: #2272; sin's
-    // passes alone, not under the test runner's frames)
-    for (const lang of name === 'sinf' ? LANGS : ['verilog']) {
+    // (#2272: sin's and pow's VHDL, 2200 and 5600 states, were one if … elsif as deep, which overflowed the stack of
+    // the VHDL simulator's parser and elaborator; now a case, as the Verilog's)
+    if (name !== 'sinf') {
+      assert.equal((g.hdl.match(/elsif ap_CS_fsm/g) || []).length, 0);
+      assert.ok(g.hdl.includes('case ap_CS_fsm is') && g.hdl.includes('when others =>'));
+    }
+    for (const lang of LANGS) {
       const c = cosimulate(tb, { file: 't.c', lang, top: 'f', family: 'spartan3e', mults: 4 });
       assert.deepEqual([c.pass, c.gen.diagnostics], [true, []], lang);
     }
