@@ -204,3 +204,58 @@ export function renameInterfaceInSource(text, lang, unit, oldName, newName) {
   const edits = [...hits].map(o => ({ line: o.line, col: o.col, len: o.len }));
   return { text: splice(text, edits, newName), count: edits.length, edits };
 }
+
+// ------------------------------------------------------------------ a declaration of a package (#2558)
+// A type, constant, function… of a package is also renamed in the other sources that see it: VHDL's
+// `use work.pkg.all` / `use work.pkg.x` and selected names `work.pkg.x`, Verilog's `import pkg::*` and
+// `pkg::x`. The other source is analysed after the package's declaration, as if it followed it in one
+// file: its names resolve through the scopes of core/scopes.js (a local declaration of the same name
+// hides the package's; comments and strings are not names).
+
+/** The package a declaration belongs to (its symbol), or null. */
+export function packageOf(sym) {
+  const owner = sym?.scope?.kind === 'package' ? sym.scope.sym : null;
+  return owner?.kind === 'package' ? owner : null;
+}
+
+/** The text of the declaration of package `name` in a source (from `package` to its end), or null. */
+export function packageDecl(text, lang, name) {
+  const a = analyze(text, lang);
+  const key = lang === 'verilog' ? String(name) : String(name).toLowerCase();
+  const scope = a.scopes.find(s => s.kind === 'package' && s.sym?.kind === 'package' && s.sym.key === key);
+  if (!scope || scope.end == null) return null;
+  const T = a.tokens;
+  let j = scope.end;
+  if (lang === 'verilog') { if (T[j + 1]?.v === ':' && T[j + 2]?.k === 'id') j += 2; }
+  else while (j < T.length - 1 && !(T[j].k === 'op' && T[j].v === ';')) j++;
+  return text.slice(T[scope.tok].off, T[j].off + (T[j].len || T[j].v.length));
+}
+
+// A source analysed after a package's declaration: the analysis, the package and where the source starts.
+function afterPackage(decl, text, lang) {
+  const pre = decl + '\n';
+  const a = analyze(pre + text, lang);
+  const pk = a.symbols.find(s => s.kind === 'package' && s.scope === a.file);
+  return { a, pk, at: pre.length, lines: pre.split('\n').length - 1 };
+}
+
+/**
+ * Rename `oldName`, declared in the package whose declaration is `decl` (packageDecl), in a source
+ * that uses the package. Returns { text, count, edits } (the same text when the source does not
+ * use it), or { error } when the new name would make a name of the source mean another object.
+ */
+export function renamePackageItemInSource(text, lang, decl, oldName, newName) {
+  const { a, pk, at, lines } = afterPackage(decl, text, lang);
+  const sym = pk?.owner?.syms.get(lang === 'verilog' ? String(oldName) : String(oldName).toLowerCase());
+  const inSource = o => a.tokens[o.i].off >= at;
+  const occs = sym ? sym.occs.filter(inSource) : [];
+  const edits = occs.filter(o => o.name !== newName).map(o => ({ line: o.line - lines, col: o.col, len: o.len }));
+  const out = splice(text, edits, newName);
+  if (edits.length) {
+    // the package renamed too, every name of the source must still mean the same object
+    const b = afterPackage(splice(decl, sym.occs.filter(o => !inSource(o)), newName), out, lang).a;
+    const ma = meanings(a), mb = meanings(b);
+    if (ma.length !== mb.length || ma.some((m, k) => m !== mb[k])) return { error: `'${newName}' is already used for another object where '${sym.name}' is visible: choose another name.` };
+  }
+  return { text: out, count: occs.length, edits };
+}

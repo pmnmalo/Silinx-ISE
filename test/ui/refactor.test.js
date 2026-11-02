@@ -182,6 +182,131 @@ uiTest('Rename Symbol from the right-click menu in Verilog: case-sensitive, not 
   assert.equal(await ed(page), BLINK);
 });
 
+// a package and the files that use it (#2558): two through use work.defs.all, one through its names;
+// one with a WIDTH of its own
+const DEFS = `-- WIDTH: the counters' width
+package defs is
+  constant WIDTH : integer := 4;
+end package defs;
+`;
+const USES = `library ieee;
+use ieee.std_logic_1164.all;
+use work.defs.all;
+
+entity counter is
+  port (clk : in std_logic;
+        q   : out integer range 0 to 2 ** WIDTH - 1);
+end counter;
+
+architecture rtl of counter is
+  signal n : integer range 0 to 2 ** Width - 1 := 0;
+begin
+  process (clk)
+  begin
+    if rising_edge(clk) then
+      n <= (n + 1) mod 2 ** width;
+    end if;
+  end process;
+  q <= n;
+end rtl;
+`;
+const USES2 = `use work.defs.all;
+
+entity shower is
+  port (y : out bit_vector(WIDTH - 1 downto 0));
+end shower;
+
+architecture rtl of shower is
+begin
+  y <= (others => '1');   -- all WIDTH bits
+end rtl;
+`;
+const NAMED = `use work.defs.WIDTH;
+
+entity stepper is
+  port (y : out integer range 0 to 2 ** work.defs.WIDTH - 1);
+end stepper;
+
+architecture rtl of stepper is
+begin
+  y <= 2 ** WIDTH - 1;
+end rtl;
+`;
+const OWN = `use work.defs.all;
+
+entity wide is
+  port (y : out bit_vector(7 downto 0));
+end wide;
+
+architecture rtl of wide is
+  constant WIDTH : integer := 8;
+begin
+  y <= (WIDTH - 1 downto 0 => '0');
+end rtl;
+`;
+
+uiTest('Rename Symbol on a declaration of a package (#2558): also in the files that use the package (the open one in its editor, its own Undo; the others written), not a file with its own name; a clash in another file refused; in Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'RenamePkg', top: 'counter', files: { 'src/defs.vhd': DEFS, 'src/counter.vhd': USES, 'src/shower.vhd': USES2, 'src/stepper.vhd': NAMED, 'src/wide.vhd': OWN } });
+  await page.openProject('RenamePkg');
+  await page.eval(() => window.SilinxApp.openFile('src/counter.vhd'));
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/counter.vhd' && window.Silinx.active.editor);
+  await page.eval(() => window.SilinxApp.openFile('src/defs.vhd'));
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/defs.vhd' && window.Silinx.active.editor);
+
+  // ---- the dialog: the files that use the package, not wide.vhd (its WIDTH is its own)
+  await cursorOn(page, 'WIDTH', 1);
+  await page.key('F2');
+  await page.waitDialog('Rename Symbol');
+  assert.match(await dlgText(page), /Renames the constant 'WIDTH' everywhere it is used in this file: 1 place\.\s+Also in the files that use the package 'defs' \(src\/counter\.vhd, src\/shower\.vhd, src\/stepper\.vhd\)\s*$/);
+  assert.equal(await page.eval(() => document.querySelector('.rename-dlg input[type=checkbox]').checked), true);
+  // a name of another object in a file that uses the package: refused, the dialog stays
+  await page.fill('.rename-dlg input[type=text]', 'N');
+  await page.dialogButton('Rename');
+  await page.waitFor(() => !!document.querySelector('.rename-dlg .rename-error').textContent);
+  assert.equal(await page.eval(() => document.querySelector('.rename-dlg .rename-error').textContent), "'N' is already used for another object in src/counter.vhd, where 'WIDTH' is visible: choose another name.");
+  await page.fill('.rename-dlg input[type=text]', 'N_BITS');
+  await page.dialogButton('Rename');
+  await page.waitNoDialog();
+  assert.equal(await ed(page), DEFS.replace('constant WIDTH', 'constant N_BITS'));
+  await page.waitFor(() => [...document.querySelectorAll('.toast')].some((t) => t.textContent === "Renamed 'WIDTH' to 'N_BITS': 1 in this file, and in 3 other files."), [], { what: 'the message' });
+  // the open file: in its editor; the others: written; wide.vhd unchanged
+  const counterEd = () => page.eval(() => window.Silinx.docs.find((d) => d.path === 'src/counter.vhd').editor.getValue());
+  const counter = USES.replace('2 ** WIDTH', '2 ** N_BITS').replace('2 ** Width', '2 ** N_BITS').replace('2 ** width', '2 ** N_BITS');
+  assert.equal(await counterEd(), counter);
+  const want = { 'src/shower.vhd': USES2.replace('(WIDTH - 1', '(N_BITS - 1'), 'src/stepper.vhd': NAMED.replaceAll('WIDTH', 'N_BITS') };
+  for (const [p, text] of Object.entries(want)) {
+    for (let k = 0; k < 50 && (await readWs(env, 'RenamePkg', p)) !== text; k++) await tick(100);
+    assert.equal(await readWs(env, 'RenamePkg', p), text);
+  }
+  assert.equal(await readWs(env, 'RenamePkg', 'src/wide.vhd'), OWN);
+  await page.eval(() => window.SilinxApp.openFile('src/counter.vhd'));
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/counter.vhd');
+  await checkSyntax(page, /Process "Check Syntax" completed successfully\s*$/m);
+  assert.equal(await page.eval(() => document.getElementById('err-count').textContent + document.getElementById('warn-count').textContent), '');
+  // the open file's own Undo reverts its part
+  await page.eval(() => window.Silinx.active.editor.focus());
+  await page.key('z', UNDO);
+  assert.equal(await ed(page), USES);
+  await page.eval(() => window.Silinx.active.editor.exec('redo'));
+  assert.equal(await ed(page), counter);
+
+  // ---- in Portuguese
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('pt'));
+  await page.eval(() => window.SilinxApp.openFile('src/defs.vhd'));
+  await page.waitFor(() => window.Silinx.active?.id === 'file:src/defs.vhd');
+  await cursorOn(page, 'N_BITS', 0);
+  await page.key('F2');
+  await page.waitDialog('Mudar o Nome do Símbolo');
+  assert.match(await dlgText(page), /Também nos ficheiros que usam o pacote 'defs' \(src\/counter\.vhd, src\/shower\.vhd, src\/stepper\.vhd\)\s*$/);
+  await page.fill('.rename-dlg input[type=text]', 'n');
+  await page.dialogButton('Mudar o Nome');
+  await page.waitFor(() => !!document.querySelector('.rename-dlg .rename-error').textContent);
+  assert.equal(await page.eval(() => document.querySelector('.rename-dlg .rename-error').textContent), "'n' já é usado para outro objeto em src/counter.vhd, onde 'N_BITS' é visível: escolha outro nome.");
+  await page.dialogButton('Cancelar');
+  await page.waitNoDialog();
+  await page.eval(async () => (await import('/js/i18n.js')).setLanguage('en'));
+});
+
 // ---------------------------------------------------------------- quick fixes (#179)
 const GATE = `library ieee;
 use ieee.std_logic_1164.all;

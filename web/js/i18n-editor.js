@@ -56,6 +56,8 @@ export const EDITOR_PT_PATTERNS = [
   ...FIX_PT,
   [/^Renames the (.+?) '(.+)' everywhere it is used in this file: (\d+) (places?)\.$/, (m, k, n, c, w) => `Muda o nome de '${n}' (${kindPt(k)}) em todos os sítios onde é usado neste ficheiro: ${places(c, w)}.`],
   [/^Also in the instances of '(.+)' in the other files \((.+)\)$/, "Também nas instâncias de '$1' nos outros ficheiros ($2)"],
+  [/^Also in the files that use the package '(.+)' \((.+)\)$/, "Também nos ficheiros que usam o pacote '$1' ($2)"],
+  [/^'(.+)' is already used for another object in (.+), where '(.+)' is visible: choose another name\.$/, "'$1' já é usado para outro objeto em $2, onde '$3' é visível: escolha outro nome."],
   [/^No other file of the project instantiates '(.+)'\.$/, "Nenhum outro ficheiro do projeto instancia '$1'."],
   [/^Not changed: the instances of '(.+)' in (.+) \(made from the drawing: change them there\)\.$/, "Não mudam: as instâncias de '$1' em $2 (feitas a partir do desenho: mude-as lá)."],
   [/^'(.+)' is a port of '(.+)', declared in another file: rename it there\.$/, "'$1' é um porto de '$2', declarado noutro ficheiro: mude-lhe o nome lá."],
