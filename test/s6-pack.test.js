@@ -281,7 +281,7 @@ const EXAMPLE_PACK = {
   vga: { slices: 52, X: 22, L: 30, M: 0, luts: 129, ffs: 56, warnings: 0 },
   isqrt: { slices: 30, X: 17, L: 13, M: 0, luts: 74, ffs: 86, warnings: 0 },
   uart: { slices: 52, X: 33, L: 19, M: 0, luts: 140, ffs: 138, warnings: 0 },
-  micro80: { slices: 63, X: 43, L: 18, M: 2, luts: 172, ffs: 185, warnings: 1 },   // (a carry chain: CYINIT and DI<0> both on AX, #2638)
+  micro80: { slices: 63, X: 43, L: 18, M: 2, luts: 172, ffs: 185, warnings: 0 },
 };
 // with LUT combining (combine: 'area'): the slices, never more than without, and the same warnings (isqrt: 29 when
 // the combining came before the storage elements, which then filled the slices it emptied again, #2636)
