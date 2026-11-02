@@ -90,7 +90,7 @@ export const exprMethods = {
   },
   /** malloc's bytes as an array of to's, a pointer to its first (#1891). */
   heapPtr(x, to, e) {
-    const t = typeOf(to);
+    const t = to?.w || to?.fl ? to : typeOf(to);
     if (!t) this.fail(e, 'malloc: its memory is given to a pointer to numbers');
     const arr = Array.from({ length: Math.floor(x.heap / Math.ceil((t.w || 32) / 8)) }, () => ({ v: t.fl ? 0 : 0n }));
     if (!arr.length) this.fail(e, `malloc: ${x.heap} bytes hold no element`);
@@ -135,7 +135,7 @@ export const exprMethods = {
       }
       // (*s of a reference to a stream: the stream, #1721)
       case '*': { const p = this.eval(e.e); if (p.fifo) return p; if (!p.ptr) this.fail(e, "'*' of something that is not a pointer"); return p.ptr.get(); }
-      case '&': return { ptr: this.lvalue(e.e), t: this.lvalue(e.e).t };
+      case '&': { const ref = this.lvalue(e.e); return { ptr: ref, t: ref.t }; }
       case '++': case '--': {
         const ref = this.lvalue(e.e);
         ref.set(this.arith(e.op === '++' ? '+' : '-', ref.get(), num(1n, INT), e));
@@ -159,6 +159,17 @@ export const exprMethods = {
   },
   /** l op r with C's / ap_int's arithmetic: + - * / % & | ^ << >> */
   arith(op, l, r, e) {
+    // (a + k, p + k, p - k: a pointer into the array, #2592)
+    if ((op === '+' || op === '-') && (l.arr || l.ptr?.arr)) {
+      const d = Number(this.intOf(r, e)) * (l.dims?.length > 1 ? l.dims.slice(1).reduce((a, b) => a * b, 1) : 1);
+      const arr = l.flat ?? l.arr ?? l.ptr.arr, i = (l.arr ? l.off ?? 0 : l.ptr.index) + (op === '+' ? d : -d);
+      return { ptr: this.elemRef(arr, i, l.t), t: l.t };
+    }
+    if (op === '+' && (r.arr || r.ptr?.arr)) {
+      const d = Number(this.intOf(l, e)) * (r.dims?.length > 1 ? r.dims.slice(1).reduce((a, b) => a * b, 1) : 1);
+      const arr = r.flat ?? r.arr ?? r.ptr.arr, i = (r.arr ? r.off ?? 0 : r.ptr.index) + d;
+      return { ptr: this.elemRef(arr, i, r.t), t: r.t };
+    }
     if (l.t?.fl || r.t?.fl) {
       // (floating point: in double, or float when neither is a double)
       const t = floatOf(l.t.fl ? l.t : {}, r.t.fl ? r.t : {});
@@ -244,7 +255,17 @@ export const exprMethods = {
       const c = this.lookup(e.name, e);
       if (c.arr) this.fail(e, `'${e.name}' is an array: give an index`);
       if (c.isFile) return { get: () => ({ fh: c.fh, v: c.fh ? 1n : 0n, t: c.t }), set: (x) => { c.fh = x.fh ?? null; }, t: c.t };
-      if (c.ref) return { get: () => ({ ptr: c.ref, t: c.t }), set: (x) => { if (!x.ptr) this.fail(e, `'${e.name}' is a pointer`); c.ref = x.ptr; }, t: c.t };
+      if ('ref' in c) return {
+        get: () => (c.ref ? { ptr: c.ref, t: c.t } : { v: 0n, t: c.t }),
+        set: (x) => {
+          if (x.heap !== undefined) x = this.heapPtr(x, c.t, e);
+          if (x.str !== undefined) x = this.strPtr(x.str);
+          const ref = x.ptr || (x.arr ? this.elemRef(x.flat ?? x.arr, x.off ?? 0, x.t) : null);
+          if (!ref && x.v !== 0n) this.fail(e, `'${e.name}' is a pointer`);
+          c.ref = ref;
+        },
+        t: c.t,
+      };
       return { get: () => ({ v: c.v, t: c.t }), set: (x) => { c.v = this.as(x, c.t, e); }, t: c.t };
     }
     if (e.kind === 'unary' && e.op === '*') { const p = this.eval(e.e); if (!p.ptr) this.fail(e, "'*' of something that is not a pointer"); return p.ptr; }
@@ -283,7 +304,7 @@ export const exprMethods = {
       if (i < 0 || i >= base.dims[0]) this.fail(e, `the index ${i} is outside the array (0 to ${base.dims[0] - 1})`);
       // (flat, off: the whole array and where the row starts: &a[0][0] points into all of it, #2234)
       const row = { arr: base.arr.slice(i * stride, (i + 1) * stride), t: base.t, dims: base.dims.slice(1), flat: base.flat ?? base.arr, off: (base.off ?? 0) + i * stride };
-      return { row, get: () => row, set: () => this.fail(e, 'a row of an array cannot be assigned'), t: base.t };
+      return { row, get: () => row, set: () => this.fail(e, 'a row of an array cannot be assigned'), t: base.t, arr: row.flat, index: row.off };
     }
     if (base.arr) {
       if (i < 0 || i >= base.arr.length) this.fail(e, `the index ${i} is outside the array (0 to ${base.arr.length - 1})`);

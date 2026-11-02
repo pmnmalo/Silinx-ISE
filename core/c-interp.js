@@ -151,7 +151,7 @@ class Machine {
     if (t.kind === 'ptr' && t.to.kind === 'struct' && t.to.name === 'FILE') return { isFile: true, fh: v.init ? this.eval(v.init).fh ?? null : null, t: { w: 32, s: true } };
     if (t.kind === 'ptr') {
       const c = { t: typeOf(t.to), ref: null };
-      if (v.init) { let p = this.eval(v.init); if (p.heap !== undefined) p = this.heapPtr(p, t.to, v); if (p.str !== undefined) p = this.strPtr(p.str); c.ref = p.ptr || (p.arr ? this.elemRef(p.arr, 0, p.t) : null); }
+      if (v.init) { let p = this.eval(v.init); if (p.heap !== undefined) p = this.heapPtr(p, t.to, v); if (p.str !== undefined) p = this.strPtr(p.str); c.ref = p.ptr || (p.arr ? this.elemRef(p.flat ?? p.arr, p.off ?? 0, p.t) : null); }
       return c;
     }
     const et = typeOf(t);
@@ -220,12 +220,15 @@ class Machine {
   callArgs(fn, e) {
     return e.args.map((a, k) => {
       const pt = fn.params[k]?.type;
-      const x = this.eval(a);
+      let x = this.eval(a);
       // (a stream, or a reference to one: a function declared before its definition, #1721)
       if (pt?.kind === 'stream' || (pt?.kind === 'ptr' && pt.to.kind === 'stream')) { if (!x.fifo) this.fail(a, `the argument of '${fn.params[k].name}' must be a stream`); return x; }
       if (pt?.kind === 'ptr' || pt?.kind === 'array') {
-        if (x.str !== undefined) return this.strPtr(x.str);
+        if (x.heap !== undefined) x = this.heapPtr(x, pt.to ?? pt.of, a);
+        if (x.str !== undefined) x = this.strPtr(x.str);
         if (x.arr) return { arr: x.arr, t: x.t };
+        // (an array parameter given a pointer into an array: the elements from there, #2592)
+        if ((pt.kind === 'array' || pt.to?.kind === 'array') && x.ptr?.arr) return { arr: x.ptr.arr.slice(x.ptr.index), t: x.t };
         if (x.ptr) return { ptr: x.ptr, t: x.t };
         this.fail(a, `the argument of '${fn.params[k].name}' must be a pointer or an array`);
       }

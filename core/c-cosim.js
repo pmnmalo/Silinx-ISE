@@ -187,7 +187,7 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
       if (p.fields) return `${p.name} = ${hex(pack(p.fields, (m) => c.ptrIn[m] ?? c.args[m]), p.w)};`;
       const v = p.name.endsWith('_i') && c.ptrIn[p.param] !== undefined ? c.ptrIn[p.param] : (c.args[p.param] ?? c.ptrIn[p.param] ?? 0n);
       return `${p.name} = ${hex(v, p.w)};`;
-    }).concat(mems.flatMap((x) => (c.memIn[x.name] || []).map((v, k) => `mem_${x.name}[${k}] = ${hex(v, x.w)};`)))
+    }).concat(mems.flatMap((x) => (c.memIn[x.name] || []).slice(0, x.n).map((v, k) => `mem_${x.name}[${k}] = ${hex(v, x.w)};`)))
       .concat(fifos.flatMap((f) => {
         if (f.dir !== 'in') return [`fo_${f.name} = 0;`];
         if (free) { const at = fresh.get(f.name).slice(0, ci).flat().length, nw = fresh.get(f.name)[ci]; return [...nw.map((v, k) => `fin_${f.name}[${at + k}] = ${hex(v, f.w)};`), `fn_${f.name} = ${at + nw.length};`]; }

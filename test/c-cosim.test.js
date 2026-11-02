@@ -236,3 +236,33 @@ void f(hls::stream<int> &a, hls::stream<int> &b) {
 int main() { hls::stream<int> a, b; a.write(1); f(a, b); return b.read() != 2; }
 `), ['ap_rst_n = 0']);
 });
+
+test('#2592 co-simulation: an array argument given a pointer into an array (malloc, &a[0][0], a + k) passes the elements from there in memIn and memOut', () => {
+  const src = `#include <stdio.h>
+#include <stdlib.h>
+void f(const char coeff[6], const int x[6], int y[6]) {
+  for (int i = 0; i < 6; i++) y[i] = x[i] * coeff[i] + i;
+}
+int main(void) {
+  char *c = (char *)malloc(6);
+  for (int i = 0; i < 6; i++) c[i] = i + 2;
+  int a[2][3] = {{10, 20, 30}, {40, 50, 60}};
+  int b[8] = {0};
+  f(c, &a[0][0], b + 2);
+  free(c);
+  for (int i = 0; i < 8; i++) printf("%d ", b[i]);
+  printf("\\n");
+  return 0;
+}
+`;
+  const sim = simulateC(src, { file: 'ptr_arr.c' });
+  assert.deepEqual([sim.error, sim.exitCode, sim.output], [null, 0, '0 0 20 61 122 203 304 425 \n']);
+  assert.deepEqual(sim.calls[0].ptrIn, {});
+  assert.deepEqual(sim.calls[0].memIn.coeff, [2n, 3n, 4n, 5n, 6n, 7n]);
+  assert.deepEqual(sim.calls[0].memIn.x, [10n, 20n, 30n, 40n, 50n, 60n]);
+  assert.deepEqual(sim.calls[0].memOut.y, [20n, 61n, 122n, 203n, 304n, 425n]);
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(src, { file: 'ptr_arr.c', lang });
+    assert.deepEqual([r.ok, r.pass, r.errors, r.mismatches, r.gen.diagnostics], [true, true, [], [], []], lang);
+  }
+});
