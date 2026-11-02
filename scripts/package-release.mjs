@@ -16,6 +16,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sha256sums, SUMS_FILE } from './checksums.mjs';
+import { leaveOutDownloaded } from './downloaded-packages.mjs';
 import { leaveOutChipdbs } from '../packages/silinx-fpga/src/node.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -76,6 +77,8 @@ function packageApp() {
     copyTracked(app);
     run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], app);
     unlinkWorkspaces(app);
+    // the iCE40's nextpnr: downloaded on its first use (#2444), but installed by npm ci (#2570)
+    leaveOutDownloaded(app);
     // nextpnr's chip databases: downloaded on their first use (#2329)
     for (const pkg of NEXTPNR_PACKAGES) leaveOutChipdbs(path.join(app, 'node_modules', pkg));
     fs.rmSync(path.join(app, '.github'), { recursive: true, force: true });

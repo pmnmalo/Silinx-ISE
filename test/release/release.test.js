@@ -84,8 +84,12 @@ test('release zip: the app with its production dependencies only, Yosys\'s WebAs
   assert.ok(!fs.existsSync(path.join(APP, 'node_modules/silinx-fpga')), 'no link to packages/silinx-fpga in node_modules');
   const { THIRD_PARTY } = await import(pathToFileURL(path.join(APP, 'core/third-party.js')).href);
   // (code ported into Silinx, e.g. adepttool, is listed but is not a package)
-  const listed = THIRD_PARTY.filter((c) => !c.ported).map((c) => `${c.name}@${c.version}`).sort();
+  // (and a package downloaded on its first use, the iCE40's nextpnr, is not in it: #2444, #2570)
+  const listed = THIRD_PARTY.filter((c) => !c.ported && !c.downloaded).map((c) => `${c.name}@${c.version}`).sort();
   assert.deepEqual(packages(path.join(APP, 'node_modules')), listed, 'node_modules of the zip = THIRD-PARTY-NOTICES.md (node scripts/third-party.mjs)');
+  const downloaded = THIRD_PARTY.filter((c) => c.downloaded).map((c) => c.name);
+  assert.deepEqual(downloaded, ['@yowasp/nextpnr-ice40']);
+  for (const name of downloaded) assert.ok(!fs.existsSync(path.join(APP, 'node_modules', name)), `${name} left out of the zip`);
   const notices = fs.readFileSync(path.join(APP, 'THIRD-PARTY-NOTICES.md'), 'utf8');
   for (const c of listed) assert.ok(notices.includes(`## ${c.replace(/@(?=[^@]+$)/, ' ')} `), `${c} in THIRD-PARTY-NOTICES.md`);
 });
