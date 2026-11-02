@@ -348,6 +348,15 @@ function stmtParser(T, E, typedefs) {
   const { toks, S, at, loc, fail, expect, Stop, recover } = T;
   const { startsType, specifiers, declarator, ternary, expression, initializer } = E;
   // ---------------------------------------------------------- declarations and statements
+  /** An array of chars from a string, char b[] = "abc" (or { "abc" }): its chars and its '\0' as a list, its size the
+   *  string's when left out; core/c-check.js drops the '\0' of an array just the string's length (#2640). */
+  function text(v) {
+    const t = v.type, s = v.init?.kind === 'init' && v.init.items.length === 1 ? v.init.items[0] : v.init;
+    if (t.kind !== 'array' || t.of.kind !== 'int' || t.of.bits !== 8 || t.of.ap || s?.kind !== 'str') return;
+    const items = [...s.value, '\0'].map((ch) => ({ kind: 'chr', value: BigInt(ch.charCodeAt(0)), loc: s.loc }));
+    if (!t.size) v.type = { ...t, size: { kind: 'num', value: BigInt(items.length), text: String(items.length), loc: s.loc } };
+    v.init = { kind: 'init', items, text: s.value, loc: s.loc };
+  }
   /** The declarations after the specifiers: Var[] (or Func with its body / Typedef). */
   function declarations(s, top) {
     const out = [];
@@ -367,7 +376,7 @@ function stmtParser(T, E, typedefs) {
         out.push(fn);
       } else {
         const v = { kind: 'var', name: d.name, type: d.type, init: null, static: s.static, const: !!s.type.const, loc: d.loc };
-        if (at('=')) { S.p++; v.init = initializer(); }
+        if (at('=')) { S.p++; v.init = initializer(); text(v); }
         out.push(v);
       }
       if (at(',')) { S.p++; continue; }

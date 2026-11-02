@@ -153,6 +153,8 @@ export const libMethods = {
         [...s2, '\0'].forEach((ch, j) => { arr[k0 + j].v = BigInt(ch.charCodeAt(0)); });
         return d;
       }
+      // (strlen: a string's length up to its '\0', a size_t, #2640)
+      case 'strlen': { const [a] = A(), s = this.cString(a); if (s === undefined) this.fail(e, 'strlen: of a string'); return { v: BigInt(s.length), t: { w: 64, s: false, ap: false } }; }
       case 'memcpy': {
         const [d, a, n] = A();
         if (!d.ptr || !a.ptr || d.arr || a.arr) this.fail(e, 'memcpy: of one value into another (&x, &y) in the C simulation');
