@@ -1,0 +1,53 @@
+{
+  "name": "uart",
+  "version": 1,
+  "device": {
+    "family": "spartan3e",
+    "part": "xc3s250e",
+    "package": "cp132",
+    "speed": "-4"
+  },
+  "board": "basys2",
+  "top": "uart",
+  "simTop": "tb_uart",
+  "files": [
+    {
+      "path": "src/uart_rx.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/uart_tx.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/debounce.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/sevenseg.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "src/uart.vhd",
+      "lang": "vhdl",
+      "role": "design"
+    },
+    {
+      "path": "sim/tb_uart.vhd",
+      "lang": "vhdl",
+      "role": "sim"
+    }
+  ],
+  "constraints": "constraints/top.ucf",
+  "stimuli": {},
+  "impl": {
+    "optMode": "Speed",
+    "optLevel": 1,
+    "startupClk": "JtagClk"
+  },
+  "preferredLanguage": "vhdl"
+}

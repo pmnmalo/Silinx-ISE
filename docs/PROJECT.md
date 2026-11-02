@@ -39,7 +39,7 @@ All under `/api`. JSON in/out. Errors: `{ error: "message" }` with 4xx/5xx.
 | Method | Path | Description |
 |---|---|---|
 | GET | /projects | list `[{ name, device, top }]` |
-| POST | /projects | `{ name, template?: 'empty' or an example (GET /templates: gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt), device?, board? }` create |
+| POST | /projects | `{ name, template?: 'empty' or an example (GET /templates: gates, traffic, blinky, pong, stopwatch, clock, vga, isqrt, uart), device?, board? }` create |
 | GET | /projects/:p | project json + `fileTree` |
 | PUT | /projects/:p | replace project json |
 | DELETE | /projects/:p | move project to `.trash` inside workspace |
