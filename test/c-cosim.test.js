@@ -236,3 +236,33 @@ void f(hls::stream<int> &a, hls::stream<int> &b) {
 int main() { hls::stream<int> a, b; a.write(1); f(a, b); return b.read() != 2; }
 `), ['ap_rst_n = 0']);
 });
+
+test('#2592 a malloc\'ed buffer, or a pointer into an array, given to an array argument: its elements from there, both ways', () => {
+  // (the regression: taken as a pointer to one value, the module never given the buffer: every output a mismatch)
+  const src = `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+void f(const char c[8], int d[4]) {
+  for (int i = 0; i < 4; i++) d[i] = c[i] * 3 + c[i + 4];
+}
+int main(void) {
+  char k[2][4] = {{1, 2, 3, 4}, {5, 6, 7, 8}};
+  char *c = (char *)malloc(8);
+  memcpy(c, &k[0][0], 8);
+  int d[8] = {0};
+  f(c, d);
+  f(&k[0][0], &d[4]);
+  for (int i = 0; i < 8; i++) printf("%d ", d[i]);
+  free(c);
+  return 0;
+}
+`;
+  const sim = simulateC(src, { file: 't.c' });
+  assert.equal(sim.output, '8 12 16 20 8 12 16 20 ');
+  assert.deepEqual(sim.calls.map((c) => [c.memIn.c, c.memOut.d]), [[[1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n], [8n, 12n, 16n, 20n, 0n, 0n, 0n, 0n]], [[1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n], [8n, 12n, 16n, 20n]]]);
+  for (const lang of ['vhdl', 'verilog']) {
+    const r = cosimulate(src, { file: 't.c', lang, top: 'f' });
+    assert.deepEqual([r.errors, r.pass, r.mismatches.length], [[], true, 0], lang);
+    assert.deepEqual(r.gen.diagnostics.map((d) => `${d.line} ${d.severity}: ${d.message}`), ["5 warning: this loop is pipelined automatically, as Vitis HLS does (II=1): II=2 made (the memory 'c' has one port, accessed 2 times an iteration); #pragma HLS PIPELINE off in it turns that off"], lang);
+  }
+});

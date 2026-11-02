@@ -6,7 +6,7 @@
 // compared, #1527).
 // Isomorphic ES module: no DOM and no Node APIs.
 //
-//   cosimulate(source, { file, lang, maxCycles }) ->
+//   cosimulate(source, { file, lang, maxCycles, maxSteps }) ->
 //     { ok, pass, calls, mismatches: [{ call, port, expected, got }], latency: { min, max, avg } | null,
 //       output, sim: the C simulation's result, gen: cToHdl's result, errors: [message] }
 import { simulateC } from './c-interp.js';
@@ -219,8 +219,8 @@ export function cosimBench(gen, calls0, { maxCycles = MAX_CYCLES } = {}) {
 }
 
 // (files: the test bench's, core/c-interp.js's, #1897)
-export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family, blackboxes = null, directives = null, mults } = {}) {
-  const sim = simulateC(source, { file, headers, top, files, blackboxes, directives, mults });
+export function cosimulate(source, { file = 'input.c', lang = 'vhdl', maxCycles = MAX_CYCLES, alter = null, headers = null, top = null, files = null, pipelineLoops, clock, family, blackboxes = null, directives = null, mults, maxSteps } = {}) {
+  const sim = simulateC(source, { file, headers, top, files, blackboxes, directives, mults, ...(maxSteps ? { maxSteps } : {}) });   // (maxSteps: the C simulation's limit, #2503)
   const made = cToHdl(source, { file, lang, headers, top, pipelineLoops, clock, family, blackboxes, directives, mults });
   if (alter && made.ok) made.hdl = alter(made.hdl);   // (the tests: an HDL that differs, its mismatches reported)
   const base = { ok: false, pass: false, calls: 0, mismatches: [], latency: null, output: sim.output, sim, gen: made, errors: [] };

@@ -20,6 +20,7 @@ import { splitWriteEffects } from './c-fifo.js';
 import { dataflowCall, hasStreams } from './c-dataflow-call.js';
 import { foldTables } from './c-const-init.js';
 import { flattenArrays } from './c-flatten.js';
+import { makeStencils } from './c-stencil.js';
 import { DEFAULT_CLOCK, fitsClock } from './c-timing.js';
 import { axiPlan, axiWrap } from './c-axi.js';
 import { loadBlackboxes, applyBlackboxes, blackboxHdl } from './c-blackbox.js';
@@ -71,6 +72,8 @@ function fromChecked(source, checked, { file = 'input.c', lang = 'vhdl', headers
   if (diagnostics.some((d) => d.severity === 'error')) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics };
   // (a table filled from constants: computed at synthesis, a ROM, #1779; arrays of more dimensions one, #1786)
   foldTables(checked, diagnostics);
+  // (ARRAY_STENCIL: its loops made one, its reads line buffers and a window, #2503)
+  makeStencils(checked, (loc, message) => diagnostics.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'warning' }));
   const flatErrs = [];
   flattenArrays(checked, (loc, message) => flatErrs.push({ file, line: loc?.line || 1, col: loc?.col || 1, message, severity: 'error' }));
   if (flatErrs.length) return { ok: false, hdl: '', top: checked.top, ports: [], diagnostics: [...diagnostics, ...flatErrs] };

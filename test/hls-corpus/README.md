@@ -76,8 +76,8 @@ Not part of `npm test` (it needs the network once).
 | modeling-free-running-kernel-remerge-ii4to1 | C++ | pass | pass | pass | 80 |  |
 | modeling-using-arbitrary-precision-arith | C++ | pass | pass | pass | 73-78 |  |
 | modeling-using-arbitrary-precision-casting | C++ | pass | pass | pass | 4 |  |
-| modeling-using-array-stencil-1d | C++ | pass | pass | pass | 225576 |  |
-| modeling-using-array-stencil-2d | C++ | pass | pass | skip | - | co-simulation not run: II=225 without #pragma HLS ARRAY_STENCIL (#2503), about 6.75M cycles a call, not ended in 9.5 hours |
+| modeling-using-array-stencil-1d | C++ | pass | pass | pass | 113983 |  |
+| modeling-using-array-stencil-2d | C++ | pass | pass | pass | 385359-385383 |  |
 | modeling-using-cpp-templates | C++ | pass | pass | pass | 2 |  |
 | modeling-using-fixed-point | C++ | pass | pass | pass | 1 |  |
 | modeling-using-float-and-double | C | pass | pass | pass | 2 |  |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | pass | pass | 108-110 |  |
 
-73 designs: 72 through co-simulation.
+73 designs: 73 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

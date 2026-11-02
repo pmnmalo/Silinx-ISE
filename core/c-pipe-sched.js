@@ -4,6 +4,8 @@
 // chained while they fit the clock, the values a later stage reads in pipeline registers, a stage's work enabled by its
 // valid bit. The II is the one asked or the lowest that works: the ports, a variable's next value read by the next iteration
 // (a dependence), a memory read after a write of another iteration, the exit known before the next iteration starts.
+// A variable read before the previous iteration has written it is tried again written where its next value is made, its
+// readers no earlier (a shift register's, from a memory, #2503).
 // The whole is one state of the machine: it holds while the pipeline runs and leaves when it has drained; a function's is
 // the machine's only state, a call starting whenever ap_start finds the first stage free (ap_ready), ap_done a call's end.
 // Inner loops of constant count are unrolled in it, those with a memory's access as statements. An exit known late
@@ -39,12 +41,12 @@ const memOf = (key) => key.replace(/#1$/, '');
  *   whether a #pragma HLS DEPENDENCE says that dependence of the memory false (#1961).
  * -> { stage: Map node -> stage, opStage: [stage], read: Map register's node -> its stage, written: Map -> its stage, depth }
  */
-export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new Set(), sameIndex = () => false, together = [], budget = Infinity, family = 'artix7', dep = () => false }, ii) {
+export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new Set(), sameIndex = () => false, together = [], budget = Infinity, family = 'artix7', dep = () => false, floor = null }, ii) {
   const stage = new Map(), at = new Map();
   const ensure = (roots) => {
     for (const n of g.needed(roots)) {
       if (stage.has(n.id)) continue;
-      if (!n.args.length) { stage.set(n.id, -1); at.set(n.id, 0); continue; }   // (a constant, a register: where it is read)
+      if (!n.args.length) { stage.set(n.id, floor?.get(n.id) ?? -1); at.set(n.id, 0); continue; }   // (a constant, a register: where it is read; floor: not before)
       let s = -1, t = 0;
       for (const a of n.args) {
         const sa = stage.get(a), ta = at.get(a);
@@ -95,13 +97,33 @@ export function moduloSchedule({ g, ops, updates, exit, pinned = [], own = new S
   const roots = [...ops.flatMap((op) => op.roots), ...updates.map((u) => u[1]), ...(exit != null ? [exit] : [])];
   for (const n of g.needed(roots)) if (n.args.length) for (const a of n.args) reader(a, stage.get(n.id));
   ops.forEach((op, k) => { for (const r of op.roots) reader(r, opStage[k]); });
-  for (const [, v] of updates) reader(v, 0);
+  if (!floor) for (const [, v] of updates) reader(v, 0);
   if (exit != null) reader(exit, 0);
   for (const r of pinned) read.set(r, 0);
   const written = new Map();
-  for (const [r, v] of updates) written.set(r, Math.max(stage.get(v), read.get(r) ?? 0, 0));
+  if (!floor) for (const [r, v] of updates) written.set(r, Math.max(stage.get(v), read.get(r) ?? 0, 0));
+  else {
+    // (floor, a retry: a variable written where its next value is made and read there, its readers no earlier than the
+    // floor says; a next value another variable's, a shift register's, where that one is written: its sources first; one
+    // of a cycle of them, a swap, read first, #2503)
+    const qs = new Set(ops.flatMap((op) => [op.q, ...(op.alias || [])]));   // (a read's value: a register's node too)
+    const isCopy = ([, v]) => g.get(v).op === 'reg' && !qs.has(v);
+    for (const [r, v] of updates) if (!isCopy([r, v])) { const w = Math.max(stage.get(v), 0); written.set(r, w); reader(r, w); }
+    const copies = updates.filter(isCopy), targets = new Set(copies.map(([r]) => r));
+    for (let left = copies; left.length;) {
+      const ready = left.filter(([, v]) => !targets.has(v) || written.has(v));
+      for (const [r, v] of ready.length ? ready : left) {
+        const w = ready.length ? (written.get(v) ?? 0) : 0;
+        reader(v, w);
+        written.set(r, w);
+        reader(r, w);
+      }
+      left = left.filter((u) => !(ready.length ? ready : left).includes(u));
+    }
+  }
   for (const [a, b] of together) if (written.has(a) && written.has(b)) { const w = Math.max(written.get(a), written.get(b)); written.set(a, w); written.set(b, w); }
-  for (const [r, w] of written) if (read.has(r) && w - read.get(r) >= ii) return { fail: { kind: 'var', reg: r } };
+  const late = [...written].filter(([r, w]) => read.has(r) && w - read.get(r) >= ii);
+  if (late.length) return { fail: { kind: 'var', reg: late[0][0], late } };
   // (the exit known after the next iteration has started: those started then squashed, when none has written anything
   // by then but the loop's own variables, as Vitis HLS speculates)
   const e = exit != null ? Math.max(stage.get(exit), 0) : 0;
@@ -279,7 +301,20 @@ export const pipelineSchedMethods = {
     const perMem = new Map();
     for (const op of ops) perMem.set(op.mem, (perMem.get(op.mem) || 0) + 1);
     const dep = (mem, way, dir) => (p.deps || []).some((d) => (d.variable == null || d.variable === mem) && d.inter === (way === 'inter') && d[dir]);
-    const sched = (n, budget) => moduloSchedule({ g, ops, updates, exit: exitNode, pinned: latched.map((r) => this.regNode(r)), own, sameIndex, together, budget, family: this.pipeTiming?.family, dep }, n);
+    const once = (n, budget, floor) => moduloSchedule({ g, ops, updates, exit: exitNode, pinned: latched.map((r) => this.regNode(r)), own, sameIndex, together, budget, family: this.pipeTiming?.family, dep, floor }, n);
+    // (a variable read before the previous iteration has written it: again, each written where its next value is made,
+    // its readers no earlier, until none is, #2503; by the clock only when the II needed it)
+    const sched = (n, budget, retry = true) => {
+      const first = once(n, budget);
+      if (first.fail?.kind !== 'var' || !retry) return first;
+      const floor = new Map();
+      for (let k = 0, plan = first; k < 64 && plan.fail?.kind === 'var'; k++) {
+        for (const [r, w] of plan.fail.late) floor.set(r, Math.max(floor.get(r) ?? 0, w - n + 1));
+        plan = once(n, budget, floor);
+        if (!plan.fail) return { ...plan, retried: true };
+      }
+      return first;
+    };
     let ii = Math.max(asked, ...perMem.values()), plan = null, why = null;
     for (; ; ii++) {
       plan = sched(ii, Infinity);
@@ -287,7 +322,7 @@ export const pipelineSchedMethods = {
       why ||= plan.fail;
     }
     // (the stages by the clock when they keep that II; else one long path, said as a pipelined state's is, core/c-schedule.js)
-    const timed = this.pipeTiming ? sched(ii, this.pipeTiming.budget) : plan;
+    const timed = this.pipeTiming ? sched(ii, this.pipeTiming.budget, !!plan.retried) : plan;
     if (!timed.fail) plan = timed;
     const crowded = [...perMem].filter(([, n]) => n > asked).sort((x, y) => y[1] - x[1])[0];
     if (ii > asked) {

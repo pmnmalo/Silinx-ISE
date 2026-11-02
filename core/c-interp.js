@@ -226,6 +226,8 @@ class Machine {
       if (pt?.kind === 'ptr' || pt?.kind === 'array') {
         if (x.str !== undefined) return this.strPtr(x.str);
         if (x.arr) return { arr: x.arr, t: x.t };
+        // (a pointer into an array, a malloc'ed buffer's, given to an array: its elements from there, the same cells, #2592)
+        if (x.ptr && pt.kind === 'array' && x.ptr.arr) return { arr: x.ptr.index ? x.ptr.arr.slice(x.ptr.index) : x.ptr.arr, t: x.t };
         if (x.ptr) return { ptr: x.ptr, t: x.t };
         this.fail(a, `the argument of '${fn.params[k].name}' must be a pointer or an array`);
       }
