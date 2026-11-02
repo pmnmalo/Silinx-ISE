@@ -1,0 +1,1352 @@
+{
+  "creator": "Yosys 0.70 (git sha1 28ba3cb92, Release, Clang /workspace/YoWASP/yosys/wasi-sdk-33.0-x86_64-linux/share/cmake/../..//bin/clang++ 22.1.0)",
+  "modules": {
+    "top": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "top_syn.v:2.1-21.10"
+      },
+      "ports": {
+        "clka": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "clkb": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "q": {
+          "direction": "output",
+          "bits": [ 4, 5, 6, 7 ]
+        }
+      },
+      "cells": {
+        "$abc$1432$blif$1432$0": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 8 ],
+            "O": [ 9 ]
+          }
+        },
+        "$abc$1432$blif$1432$1": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 10 ],
+            "O": [ 11 ]
+          }
+        },
+        "$abc$1432$blif$1432$2": {
+          "hide_name": 1,
+          "type": "INV",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "/share/xilinx/lut_map.v:36.13-36.48"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 12 ],
+            "O": [ 13 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[0].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ "0" ],
+            "DI": [ "1" ],
+            "O": [ 14 ],
+            "S": [ 13 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[0].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ "0" ],
+            "LI": [ 13 ],
+            "O": [ 15 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[1].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 14 ],
+            "DI": [ "0" ],
+            "O": [ 16 ],
+            "S": [ 17 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[1].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 14 ],
+            "LI": [ 17 ],
+            "O": [ 18 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[2].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 16 ],
+            "DI": [ "0" ],
+            "O": [ 19 ],
+            "S": [ 20 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[2].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 16 ],
+            "LI": [ 20 ],
+            "O": [ 21 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[3].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 19 ],
+            "DI": [ "0" ],
+            "O": [ 22 ],
+            "S": [ 23 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[3].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 19 ],
+            "LI": [ 23 ],
+            "O": [ 24 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[4].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 22 ],
+            "DI": [ "0" ],
+            "O": [ 25 ],
+            "S": [ 26 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[4].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 22 ],
+            "LI": [ 26 ],
+            "O": [ 27 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[5].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 25 ],
+            "DI": [ "0" ],
+            "O": [ 28 ],
+            "S": [ 29 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[5].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 25 ],
+            "LI": [ 29 ],
+            "O": [ 30 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[6].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 28 ],
+            "DI": [ "0" ],
+            "O": [ 31 ],
+            "S": [ 32 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[6].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 28 ],
+            "LI": [ 32 ],
+            "O": [ 33 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.genblk1.slice[7].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 31 ],
+            "LI": [ 34 ],
+            "O": [ 35 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[0].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ "0" ],
+            "DI": [ "1" ],
+            "O": [ 36 ],
+            "S": [ 9 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[0].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ "0" ],
+            "LI": [ 9 ],
+            "O": [ 37 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[1].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 36 ],
+            "DI": [ "1" ],
+            "O": [ 38 ],
+            "S": [ 11 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[1].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 36 ],
+            "LI": [ 11 ],
+            "O": [ 39 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[2].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 38 ],
+            "DI": [ "0" ],
+            "O": [ 40 ],
+            "S": [ 41 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[2].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 38 ],
+            "LI": [ 41 ],
+            "O": [ 42 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[3].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 40 ],
+            "DI": [ "0" ],
+            "O": [ 43 ],
+            "S": [ 44 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[3].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 40 ],
+            "LI": [ 44 ],
+            "O": [ 45 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[4].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 43 ],
+            "DI": [ "0" ],
+            "O": [ 46 ],
+            "S": [ 47 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[4].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 43 ],
+            "LI": [ 47 ],
+            "O": [ 48 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[5].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 46 ],
+            "DI": [ "0" ],
+            "O": [ 49 ],
+            "S": [ 50 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[5].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 46 ],
+            "LI": [ 50 ],
+            "O": [ 51 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[6].muxcy": {
+          "hide_name": 1,
+          "type": "MUXCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:141.9-146.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "DI": "input",
+            "O": "output",
+            "S": "input"
+          },
+          "connections": {
+            "CI": [ 49 ],
+            "DI": [ "0" ],
+            "O": [ 52 ],
+            "S": [ 53 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[6].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 49 ],
+            "LI": [ 53 ],
+            "O": [ 54 ]
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.genblk1.slice[7].xorcy": {
+          "hide_name": 1,
+          "type": "XORCY",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:147.9-151.4"
+          },
+          "port_directions": {
+            "CI": "input",
+            "LI": "input",
+            "O": "output"
+          },
+          "connections": {
+            "CI": [ 52 ],
+            "LI": [ 55 ],
+            "O": [ 56 ]
+          }
+        },
+        "$auto$clkbufmap.cc:261:execute$1439": {
+          "hide_name": 1,
+          "type": "BUFG",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 57 ],
+            "O": [ 58 ]
+          }
+        },
+        "$auto$clkbufmap.cc:261:execute$1441": {
+          "hide_name": 1,
+          "type": "BUFG",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 59 ],
+            "O": [ 60 ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1270": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 58 ],
+            "CE": [ "1" ],
+            "D": [ 37 ],
+            "Q": [ 8 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1271": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 58 ],
+            "CE": [ "1" ],
+            "D": [ 39 ],
+            "Q": [ 10 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1272": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 58 ],
+            "CE": [ "1" ],
+            "D": [ 42 ],
+            "Q": [ 41 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1273": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 58 ],
+            "CE": [ "1" ],
+            "D": [ 45 ],
+            "Q": [ 44 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1274": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 58 ],
+            "CE": [ "1" ],
+            "D": [ 48 ],
+            "Q": [ 47 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1275": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 58 ],
+            "CE": [ "1" ],
+            "D": [ 51 ],
+            "Q": [ 50 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1276": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 58 ],
+            "CE": [ "1" ],
+            "D": [ 54 ],
+            "Q": [ 53 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1277": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:14.3-16.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 58 ],
+            "CE": [ "1" ],
+            "D": [ 56 ],
+            "Q": [ 55 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1278": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:10.3-12.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 60 ],
+            "CE": [ "1" ],
+            "D": [ 15 ],
+            "Q": [ 12 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1279": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:10.3-12.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 60 ],
+            "CE": [ "1" ],
+            "D": [ 18 ],
+            "Q": [ 17 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1280": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:10.3-12.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 60 ],
+            "CE": [ "1" ],
+            "D": [ 21 ],
+            "Q": [ 20 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1281": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:10.3-12.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 60 ],
+            "CE": [ "1" ],
+            "D": [ 24 ],
+            "Q": [ 23 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1282": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:10.3-12.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 60 ],
+            "CE": [ "1" ],
+            "D": [ 27 ],
+            "Q": [ 26 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1283": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:10.3-12.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 60 ],
+            "CE": [ "1" ],
+            "D": [ 30 ],
+            "Q": [ 29 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1284": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:10.3-12.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 60 ],
+            "CE": [ "1" ],
+            "D": [ 33 ],
+            "Q": [ 32 ],
+            "R": [ "0" ]
+          }
+        },
+        "$auto$ff.cc:337:slice$1285": {
+          "hide_name": 1,
+          "type": "FDRE",
+          "parameters": {
+            "INIT": "0"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "top_syn.v:10.3-12.6|/share/xilinx/ff_map.v:68.41-68.95"
+          },
+          "port_directions": {
+            "C": "input",
+            "CE": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 60 ],
+            "CE": [ "1" ],
+            "D": [ 35 ],
+            "Q": [ 34 ],
+            "R": [ "0" ]
+          }
+        },
+        "$iopadmap$top.clka": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 2 ],
+            "O": [ 59 ]
+          }
+        },
+        "$iopadmap$top.clkb": {
+          "hide_name": 1,
+          "type": "IBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 3 ],
+            "O": [ 57 ]
+          }
+        },
+        "$iopadmap$top.q": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 53 ],
+            "O": [ 4 ]
+          }
+        },
+        "$iopadmap$top.q_1": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 55 ],
+            "O": [ 5 ]
+          }
+        },
+        "$iopadmap$top.q_2": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 32 ],
+            "O": [ 6 ]
+          }
+        },
+        "$iopadmap$top.q_3": {
+          "hide_name": 1,
+          "type": "OBUF",
+          "parameters": {
+          },
+          "attributes": {
+            "keep": "00000000000000000000000000000001"
+          },
+          "port_directions": {
+            "I": "input",
+            "O": "output"
+          },
+          "connections": {
+            "I": [ 34 ],
+            "O": [ 7 ]
+          }
+        }
+      },
+      "netnames": {
+        "$auto$alumacc.cc:578:replace_alu$1110.CO": {
+          "hide_name": 1,
+          "bits": [ 14, 16, 19, 22, 25, 28, 31, 61 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:116.23-116.25"
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.X": {
+          "hide_name": 1,
+          "bits": [ 13, 17, 20, 23, 26, 29, 32, 34 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:112.23-112.24"
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1110.Y": {
+          "hide_name": 1,
+          "bits": [ 15, 18, 21, 24, 27, 30, 33, 35 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "top_syn.v:11.14-11.23|/share/xilinx/arith_map.v:112.26-112.27"
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.CO": {
+          "hide_name": 1,
+          "bits": [ 36, 38, 40, 43, 46, 49, 52, 62 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:116.23-116.25"
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.X": {
+          "hide_name": 1,
+          "bits": [ 9, 11, 41, 44, 47, 50, 53, 55 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:112.23-112.24"
+          }
+        },
+        "$auto$alumacc.cc:578:replace_alu$1113.Y": {
+          "hide_name": 1,
+          "bits": [ 37, 39, 42, 45, 48, 51, 54, 56 ],
+          "attributes": {
+            "force_downto": "00000000000000000000000000000001",
+            "src": "top_syn.v:15.14-15.23|/share/xilinx/arith_map.v:112.26-112.27"
+          }
+        },
+        "$auto$clkbufmap.cc:262:execute$1440": {
+          "hide_name": 1,
+          "bits": [ 57 ],
+          "attributes": {
+          }
+        },
+        "$auto$clkbufmap.cc:262:execute$1442": {
+          "hide_name": 1,
+          "bits": [ 59 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$clka": {
+          "hide_name": 1,
+          "bits": [ 60 ],
+          "attributes": {
+          }
+        },
+        "$iopadmap$clkb": {
+          "hide_name": 1,
+          "bits": [ 58 ],
+          "attributes": {
+          }
+        },
+        "ca": {
+          "hide_name": 0,
+          "bits": [ 12, 17, 20, 23, 26, 29, 32, 34 ],
+          "attributes": {
+            "src": "top_syn.v:7.15-7.17"
+          }
+        },
+        "cb": {
+          "hide_name": 0,
+          "bits": [ 8, 10, 41, 44, 47, 50, 53, 55 ],
+          "attributes": {
+            "src": "top_syn.v:8.15-8.17"
+          }
+        },
+        "clka": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "top_syn.v:3.14-3.18"
+          }
+        },
+        "clkb": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "top_syn.v:4.14-4.18"
+          }
+        },
+        "q": {
+          "hide_name": 0,
+          "bits": [ 4, 5, 6, 7 ],
+          "attributes": {
+            "src": "top_syn.v:5.22-5.23"
+          }
+        }
+      }
+    }
+  }
+}
