@@ -29,10 +29,10 @@ Not part of `npm test` (it needs the network once).
 | array-array-partition-block-cyclic | C++ | pass | pass | pass | 157280 |  |
 | array-array-partition-complete | C++ | pass | pass | pass | 353890 |  |
 | dsp-fft-interface-array | C++ | pass | pass | pass | 26626 |  |
-| dsp-fft-interface-array-float-ssr2 | C++ | pass | fail | skip | - | C synthesis: fft_top.cpp:26: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too) |
+| dsp-fft-interface-array-float-ssr2 | C++ | pass | pass | pass | 64002-64006 |  |
 | dsp-fft-interface-stream | C++ | pass | pass | pass | 26626 |  |
-| dsp-fft-interface-stream-float-ssr2 | C++ | pass | fail | skip | - | C synthesis: fft_top.cpp:26: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too) |
-| dsp-fft-logicore-fft-float-ssr | C++ | pass | fail | skip | - | C synthesis: fft_top.cpp:31: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too) |
+| dsp-fft-interface-stream-float-ssr2 | C++ | pass | pass | pass | 61104-61106 |  |
+| dsp-fft-logicore-fft-float-ssr | C++ | pass | pass | pass | 61104-61106 |  |
 | dsp-fir-decimator | C++ | pass | pass | pass | 31 |  |
 | interface-aggregation-disaggregation-aggregation-of-m-axi-ports | C++ | pass | pass | pass | 70 |  |
 | interface-aggregation-disaggregation-aggregation-of-nested-structs | C++ | pass | pass | pass | 19 |  |
@@ -100,7 +100,7 @@ Not part of `npm test` (it needs the network once).
 | task-level-parallelism-data-driven-simple-data-driven | C++ | pass | pass | pass | 60 |  |
 | task-level-parallelism-data-driven-unique-task-regions | C++ | pass | pass | pass | 108-110 |  |
 
-73 designs: 69 through co-simulation.
+73 designs: 72 through co-simulation.
 <!-- /results -->
 
 ## Against Vitis HLS

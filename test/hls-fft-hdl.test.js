@@ -1,7 +1,7 @@
 // Silinx HLS (#1943, core/hls-fft-hdl.js): the hardware of hls_fft.h's hls::fft, its own HDL. The designs of the corpus's
 // form co-simulated against the C simulation in VHDL and in Verilog (arrays and streams, bit-reversed and natural order,
 // forward and inverse, an overflow), their ports Vitis HLS's, no warning; a constant direction and schedule; what its
-// synthesis refuses (a float's, other statements); the open synthesis (Yosys, Spartan-3E) making it four multipliers and
+// synthesis refuses (other statements); the open synthesis (Yosys, Spartan-3E) making it four multipliers and
 // block RAMs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -78,11 +78,9 @@ int main() {
   }
 });
 
-test('#1943 what its synthesis refuses: a float\'s, other statements in the top, an argument not the top\'s', () => {
+test('#1943 what its synthesis refuses: other statements in the top, an argument not the top\'s', () => {
   const head = (cfg, ty = 'std::complex<float>') => `#include "hls_fft.h"\ntypedef ${ty} cx;\nstruct config1 : hls::ip_fft::params_t { static const unsigned max_nfft = 4; ${cfg} };\n`;
   const errs = (src) => { const r = cToHdl(src, { ...opts, lang: 'vhdl' }); assert.equal(r.ok, false); return r.diagnostics.filter((d) => d.severity === 'error').map((d) => `${d.line} ${d.message}`); };
-  const flt = `${head('static const bool use_native_float = true;')}void top(cx a[16], cx b[16]) { hls::fft<config1>(a, b); }\n`;
-  assert.deepEqual(errs(flt), ["4 hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too)"]);
   const fx = head('', 'std::complex<ap_fixed<16, 1> >');
   assert.deepEqual(errs(`${fx}void top(cx a[16], cx b[16], int *o) { *o = 1; hls::fft<config1>(a, b, 1, 10); }\n`), ['4 hls::fft<config1>: the top holds the call alone (its hardware is the top\'s): move the other statements to another function']);
   assert.deepEqual(errs(`${fx}void top(cx a[16], cx b[16], int q) { hls::fft<config1>(a, b, q + 1, 10); }\n`), ["4 hls::fft<config1>: its fwd_inv the top's argument or a constant: its hardware is the top's"]);

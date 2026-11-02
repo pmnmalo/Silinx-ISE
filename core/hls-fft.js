@@ -27,6 +27,7 @@
 //     struct the config derives from, 'params_t' or 'ssr_params_t'
 //   fftFixed(re, im, p, fwd, sch) -> overflow (0 / 1): the transform in place, re and im arrays of N integers
 //   fftFloat(re, im, p) -> the transform in place, of doubles held as floats
+//   fftFloatTwiddles(p) -> { cos, sin }: the floating point's, N / 2 entries
 //   fftTwiddles(p) -> { cos, sin }: the fixed point's tables, N entries
 //   fftCModel(fn, p, args) -> the C++ text of the function fn(xn, xk[, dir[, sch[, cp[, ovflo]]]]), its
 //     complex values' members ap_re and ap_im (core/cpp-hls-lib.js's); a stream of hls::vector (args.xn.lanes, an SSR
@@ -152,9 +153,21 @@ const floatTowardZero = (v) => {
   return F32[0];
 };
 
+/** The floating-point transform's twiddles: W^t's cos and sin (W = e^(-+2 pi i / N)), those of double truncated toward
+ *  zero to floats, of N / 2 angles (a stage's W^k of L points the angle t = k N / L's: the same doubles). */
+export function fftFloatTwiddles(p) {
+  const sg = p.inverse ? 1 : -1, cos = [], sin = [];
+  for (let t = 0; t < p.N / 2; t++) {
+    const a = (sg * 2 * Math.PI * t) / p.N;
+    cos.push(floatTowardZero(Math.cos(a)));
+    sin.push(floatTowardZero(Math.sin(a)));
+  }
+  return { cos, sin };
+}
+
 /** The floating-point transform in place, natural order, unscaled (forward, or inverse: systolicfft_inv). */
 export function fftFloat(re, im, p) {
-  const f = Math.fround, { N } = p, sg = p.inverse ? 1 : -1;
+  const f = Math.fround, { N } = p, sg = p.inverse ? 1 : -1, tw = fftFloatTwiddles(p);
   for (let L = N; L >= 2; L /= 2) {
     const h = L / 2;
     for (let b = 0; b < N; b += L) for (let k = 0; k < h; k++) {
@@ -163,7 +176,7 @@ export function fftFloat(re, im, p) {
       re[i] = ar; im[i] = ai;
       if (!k) { re[j] = dr; im[j] = di; continue; }
       if (4 * k === L) { re[j] = -sg * di; im[j] = sg * dr; continue; }
-      const a = (sg * 2 * Math.PI * k) / L, wr = floatTowardZero(Math.cos(a)), wi = floatTowardZero(Math.sin(a));
+      const wr = tw.cos[k * (N / L)], wi = tw.sin[k * (N / L)];
       re[j] = f(f(dr * wr) - f(di * wi));
       im[j] = f(f(dr * wi) + f(di * wr));
     }

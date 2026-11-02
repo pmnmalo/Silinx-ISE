@@ -34,10 +34,14 @@
   },
   "dsp-fft-interface-array-float-ssr2": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C synthesis: fft_top.cpp:26: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too)"
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 64002,
+      "max": 64006,
+      "avg": 64005.6
+    },
+    "reason": null
   },
   "dsp-fft-interface-stream": {
     "csim": "pass",
@@ -52,17 +56,25 @@
   },
   "dsp-fft-interface-stream-float-ssr2": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C synthesis: fft_top.cpp:26: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too)"
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 61104,
+      "max": 61106,
+      "avg": 61104.9
+    },
+    "reason": null
   },
   "dsp-fft-logicore-fft-float-ssr": {
     "csim": "pass",
-    "synth": "fail",
-    "cosim": "skip",
-    "latency": null,
-    "reason": "C synthesis: fft_top.cpp:31: hls::fft<config1>: use_native_float: a floating-point FFT runs in the C simulation; its hardware is not made by Silinx HLS (#2309; Vitis HLS's synthesis of the corpus's such designs fails too)"
+    "synth": "pass",
+    "cosim": "pass",
+    "latency": {
+      "min": 61104,
+      "max": 61106,
+      "avg": 61104.8
+    },
+    "reason": null
   },
   "dsp-fir-decimator": {
     "csim": "pass",
