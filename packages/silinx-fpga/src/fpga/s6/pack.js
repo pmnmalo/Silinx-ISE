@@ -204,21 +204,35 @@ export function packS6(nl, { combine = 'off' } = {}) {
     if (!m) continue;
     const key = memKey(cells[ci]);
     let si = memSlices.get(key);
-    const used = s => POS.filter(p => slices[s].pos[p].o6 !== null).length;
-    if (si === undefined || used(si) + m.luts > 4) { si = slice('M'); slices[si].mem = key; memSlices.set(key, si); }
+    // (a shift register's cascade out, Q15 / Q31, leaves by DMUX from position A only, #1153; a cell of two LUTs
+    // takes a pair of positions, D and C or B and A: a wide RAM's F7, a dual-port RAM's data from its pair's)
+    const cascade = m.srl && ['Q15', 'Q31'].some(q => cells[ci].pins[q] > 1 && ix.loads(cells[ci].pins[q]).length);
+    const room = s => {
+      const free = p => slices[s].pos[p].o6 === null;
+      if (cascade) return free('A') && slices[s].pos.D.mux === null ? ['A'] : [];
+      if (m.luts === 2) return [['D', 'C'], ['B', 'A']].find(pair => pair.every(free)) ?? [];
+      return ['D', 'C', 'B', 'A'].filter(free);
+    };
+    if (si === undefined || room(si).length < m.luts) { si = slice('M'); slices[si].mem = key; memSlices.set(key, si); }
     const s = slices[si];
-    const free = [...POS].reverse().filter(p => s.pos[p].o6 === null).slice(0, m.luts);
+    const free = room(si).slice(0, m.luts);
     for (const p of free) s.pos[p].o6 = ci;
     put(ci, si);
-    if (m.f7) { s.f7.A = s.f7.A ?? `mem:${ci}`; if (m.f7 > 1) s.f7.B = `mem:${ci}`; }
+    if (cascade) s.pos.D.mux = 'mc31';
+    if (m.f7) { if (free.includes('A')) s.f7.A = `mem:${ci}`; if (free.includes('C')) s.f7.B = `mem:${ci}`; }
     if (m.f8) s.f8 = `mem:${ci}`;
+    // (the outputs by the multiplexed outputs: a wide RAM's F7s or F8, a RAM32M's O5s)
+    if (m.f8) s.pos.B.mux = 'f8';
+    else if (m.f7) for (const p of ['A', 'C']) if (free.includes(p)) s.pos[p].mux = 'f7';
+    if (cells[ci].type === 'RAM32M') for (const p of free) s.pos[p].mux = 'o5';
   }
 
   // ---- the storage elements: into the slice of the logic that drives their D (a LUT's O6, the carry's XOR or
   // carry out, an F7 / F8) when its control set allows, else beside their LUT, else with others of their control set
   const ffs = cells.map((c, i) => (ffKind(c.type) ? i : -1)).filter(i => i >= 0);
-  // (a SLICEM's storage elements are clocked by its RAMs' or shift registers' clock)
-  const sameClock = (s, key) => !s.mem || s.mem.split(':')[1] === key.split(':')[0];
+  // (a SLICEM's RAMs and shift registers take its clock and its CE as their write enable: no storage element
+  // beside them, #1153)
+  const sameClock = s => !s.mem;
   const fits = (s, key, latch) => (s.ctrl === null || s.ctrl === key) && sameClock(s, key) && !(latch && POS.some(p => s.pos[p].ff5 !== null));
   const fitsFf5 = (s, key) => (s.ctrl === null || s.ctrl === key) && sameClock(s, key) && !(s.ctrl && s.ctrl.endsWith(':L'));
   const placeFf = (si, p, ci, five, x = null) => {
