@@ -390,8 +390,8 @@
 .sch-editor .lv-err { color: var(--se-danger); font-weight: bold; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sch-editor .lv-err[hidden] { display: none; }
 .sch-editor.sim-mode .se-left { opacity: .45; pointer-events: none; }
-/* (Try it: the drawing's options stay, #1175, in the menu, #2208) */
-.sch-editor.sim-mode .se-toolbar .se-btn:not([data-act="sim"]):not([data-act="zin"]):not([data-act="zout"]):not([data-act="fit"]):not([data-act="view"]):not([data-act="check"]):not([data-act="more"]),
+/* (Try it: the drawing's options stay, #1175, in the menu, #2208; the RTL view's Up, Push into and file, #2667) */
+.sch-editor.sim-mode .se-toolbar .se-btn:not([data-act="sim"]):not(.rtl-nav):not([data-act="zin"]):not([data-act="zout"]):not([data-act="fit"]):not([data-act="view"]):not([data-act="check"]):not([data-act="more"]),
 .sch-editor.sim-mode .se-toolbar .tb-btn, .sch-editor.sim-mode .se-toolbar .se-keep, .sch-editor.sim-mode .se-toolbar .se-branch { opacity: .35; pointer-events: none; }
 .sch-editor.sim-mode .se-canvas { cursor: default; }
 /* wires by value: 1 bright green, 0 dark green, X/U red, Z blue, no value grey; a single-bit wire keeps its width,

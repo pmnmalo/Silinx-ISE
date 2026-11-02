@@ -1013,7 +1013,7 @@ uiTest('browser edition: Back-annotate Pin Locations runs the Silinx toolchain i
 uiTest('browser edition: View Technology Schematic of blinky and pong: the netlist of the Silinx toolchain\'s synthesis in the browser, by instance (#119)', E, async (page) => {
   const view = () => page.eval(() => {
     const ed = window.Silinx.active?.viewer;
-    return ed ? { id: window.Silinx.active.id, crumb: document.querySelector('.doc:not([hidden]) .rtl-crumbs b')?.textContent, syms: ed.getDoc().symbols.map((x) => ({ id: x.id, module: x.params?.module || null })) } : null;
+    return ed ? { id: window.Silinx.active.id, up: !document.querySelector('.doc:not([hidden]) .se-toolbar .rtl-nav[data-nav="up"]')?.disabled, syms: ed.getDoc().symbols.map((x) => ({ id: x.id, module: x.params?.module || null })) } : null;
   });
   for (const [name, top, blocks, inside] of [['blinky', 'top', ['u_pre', 'u_speed', 'u_knight'], 'u_knight'], ['pong', 'pong', ['display', 'dbL', 'dbR', 'db1', 'db2', 'timer_logic'], 'display']]) {
     await newSiteProject(page, `WebTech_${name}`, name);
@@ -1024,13 +1024,13 @@ uiTest('browser edition: View Technology Schematic of blinky and pong: the netli
     assert.match(log, new RegExp(`Technology Schematic of '${top}': the netlist of the Silinx toolchain's synthesis \\(build/open/${top}\\.json\\), \\d+ cells in \\d+ block\\(s\\): `));
     assert.doesNotMatch(log, /SILINX FAILED|ERROR/);
     let v = await view();
-    assert.equal(v.crumb, `${top} : ${top}`);
+    assert.equal(v.up, false, 'at the top: Up off');
     const mods = new Set(v.syms.map((x) => x.module));
     for (const m of ['IBUF', 'OBUF', 'BUFG', ...blocks]) assert.ok(mods.has(m), `${name}: ${m} (${[...mods].join(' ')})`);
     // push into an instance: LUTs and flip-flops; a LUT's function on demand
     await page.dblclick(`.doc:not([hidden]) .se-svg [data-kind=sym][data-id="${v.syms.find((x) => x.module === inside).id}"]`);
-    // (the crumbs say the instance once its drawing is shown, #346: a click before then went to the drawing left)
-    await page.waitFor((b) => document.querySelector('.doc:not([hidden]) .rtl-crumbs b')?.textContent === `${b} : ${b}`, [inside], { what: `inside ${inside}`, timeout: 60000 });
+    // (Up on once the instance's drawing is shown, #346: a click before then went to the drawing left; #2667)
+    await page.waitFor(() => !document.querySelector('.doc:not([hidden]) .se-toolbar .rtl-nav[data-nav="up"]').disabled, [], { what: `inside ${inside}`, timeout: 60000 });
     v = await view();
     assert.ok(!v.syms.some((x) => x.module === inside), `${name}/${inside}: the instance's drawing`);
     assert.ok(v.syms.some((x) => x.module === 'FDRE'), `${name}/${inside}: flip-flops`);

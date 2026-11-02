@@ -117,7 +117,7 @@ uiTest('Try it on blinky\'s RTL Schematic: the clock stepped from the strip and 
   await page.waitFor(() => window.Silinx.active.viewer.getDoc().name.toLowerCase() === 'knight', [], { what: 'inside u_knight' });
   await tryIt(page);
   assert.deepEqual(await page.eval((sel) => [...document.querySelectorAll(`${sel} .se-simbar .lv-clock`)].map((b) => b.dataset.clock), ED), ['clk']);
-  await page.click('.doc:not([hidden]) .rtl-crumbs .rtl-nav', { text: '⬆ Up' });
+  await page.click('.doc:not([hidden]) .se-toolbar .rtl-nav', { text: '⬆ Up' });
   await page.waitFor(() => window.Silinx.active.viewer.getDoc().name.toLowerCase() === 'top', [], { what: 'back to the top' });
   await page.waitFor((sel) => !document.querySelector(sel).classList.contains('sim-mode'), [ED], { what: 'Try it left' });
   await noWarnings(page);

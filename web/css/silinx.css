@@ -404,7 +404,7 @@ html[data-ui="silinx"] .editor-bar { gap: 4px; }
 /* HDL editor */
 html[data-ui="silinx"] .editor-bar .path { color: var(--m-muted); }
 html[data-ui="silinx"] .editor-bar .gen-banner { border-radius: 6px; }
-html[data-ui="silinx"] .editor-bar .gen-banner a, html[data-ui="silinx"] .rtl-crumbs a { color: var(--m-accent); }
+html[data-ui="silinx"] .editor-bar .gen-banner a { color: var(--m-accent); }
 html[data-ui="silinx"] .xl-editor .cm-gutters { background: var(--m-surface); border-right: 1px solid var(--m-border); color: var(--m-muted); }
 html[data-ui="silinx"] .xl-editor .cm-lineNumbers .cm-gutterElement { opacity: .8; }
 html[data-ui="silinx"] .xl-editor .cm-activeLine, html[data-ui="silinx"] .xl-editor .cm-activeLineGutter { background: var(--m-hover); }

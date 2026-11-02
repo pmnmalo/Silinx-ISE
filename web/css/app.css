@@ -317,14 +317,8 @@ table.grid tr.sel td { background: #dbe8fb; }
 
 .editor-bar .gen-banner { margin-left: 12px; padding: 1px 8px; background: #fff4ce; border: 1px solid #e6d690; border-radius: 3px; color: #5a4a00; }
 .editor-bar .gen-banner a { color: #0645ad; cursor: pointer; text-decoration: underline; }
-.rtl-crumbs { gap: 4px; font-size: 12px; }
-.rtl-crumbs a { color: #1a4d9c; cursor: pointer; text-decoration: underline; }
-.rtl-crumbs .rtl-ro { color: #666; font-style: italic; }
-.rtl-crumbs .spacer { flex: 1; }
 
 .gen-banner.out-of-sync { background: #fdecea; border-color: #e0a0a0; color: #900; }
-
-.rtl-crumbs .rtl-nav { min-width: 0; padding: 1px 8px; margin-right: 4px; }
 
 /* plain-language help of a diagnostic (web/js/diaghelp.js): Errors / Warnings tabs and editor tooltip */
 .console-page .diag .diag-more { flex: none; margin-left: 10px; color: #0645ad; cursor: pointer; white-space: nowrap; }
