@@ -12,6 +12,7 @@ import { synthesizeOpen } from '../core/synth-front.js';
 import { yosysNode } from '../packages/silinx-fpga/src/synth-open-node.js';
 import { readYosysJson } from '../packages/silinx-fpga/src/fpga/netlist.js';
 import { packS6, checkSlice, ctrlKey, lutInputs, PackError, AND2L } from '../packages/silinx-fpga/src/fpga/s6/pack.js';
+import { physS6 } from '../packages/silinx-fpga/src/fpga/s6/phys.js';
 import { example, EXAMPLES, ISE_RECORDED } from './examples-lib.mjs';
 
 // a design synthesized for the Spartan-6 and read as the packer reads it
@@ -205,6 +206,32 @@ test('a carry\'s sum and carry out both out of one position: the carry out by it
   const bad = JSON.parse(JSON.stringify(g[0].sl));
   bad.pos[g[0].k].mux = 'xor';
   assert.deepEqual(checkSlice(bad, nl), [`${g[0].k}FF: a gate (AND2L) but not the carry's sum beside its carry out`]);
+});
+
+test('a carry\'s DI the same net as its S, a LUT\'s output: by the bypass input, which no flip-flop then takes (#2291)', async () => {
+  // (isqrt's decimal written as a loop that takes 10 away while it fits: before, a flip-flop's D took AX too, and the
+  // physical design stopped at "its pin AX carries … and …")
+  const nl = await verilog(`module m(input clk, input [5:0] v, input [3:0] e, output [7:0] q, output [3:0] r);
+  reg [5:0] ones; reg [3:0] tens; integer k;
+  always @* begin ones = v; tens = 0; for (k = 0; k < 3; k = k + 1) if (ones >= 10) begin ones = ones - 10; tens = tens + 1; end end
+  reg [7:0] o = 0; reg [3:0] f = 0;
+  always @(posedge clk) begin o <= {tens, ones[3:0]}; f <= e; end
+  assign q = o; assign r = f;
+endmodule`);
+  const p = packed(nl);
+  assert.deepEqual(p.warnings, []);
+  let same = 0;
+  for (const s of p.slices.filter(x => x.carry !== null)) {
+    const c = nl.cells[s.carry];
+    ['A', 'B', 'C', 'D'].forEach((k, i) => {
+      const di = c.pins[`DI<${i}>`], q = s.pos[k];
+      if (di > 1 && di === c.pins[`S<${i}>`] && typeof q.o6 === 'number') { same++; assert.equal(q.x, di, `${k}X: the DI`); }
+      if (typeof q.ff === 'number') assert.ok(q.x === null || q.x === nl.cells[q.ff].pins.D, `${k}FF: its D on ${k}X`);
+    });
+  }
+  assert.ok(same > 0, 'a carry\'s DI the same net as its S');
+  const phys = physS6(nl, p);
+  assert.deepEqual(phys.warnings, []);
 });
 
 test('a cell the packer has no place for: a PackError naming it', () => {

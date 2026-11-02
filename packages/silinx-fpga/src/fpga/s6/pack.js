@@ -140,12 +140,14 @@ export function packS6(nl, { combine = 'off' } = {}) {
         placeLut(si, p, c.pins[`S<${i}>`] ?? 0);
         // DI from the position's O5 (LUT combining in the carry chain, which map does: a 5-input LUT sharing the S
         // LUT's inputs, its only load the carry: O5 has no way out of the slice but the multiplexed output, which
-        // the carry's sum may need) or from the bypass input
+        // the carry's sum may need) or from the bypass input (DI the net S takes: through the route-through of S, O5
+        // passing it, A6 high; but S a LUT's output, by the bypass input, which the position's flip-flop then cannot
+        // take, #2291)
         const di = c.pins[`DI<${i}>`] ?? 0, o6 = s.pos[p].o6;
         const dl = di > 1 && ix.loads(di).every(l => l.cell === ci) ? lutOf(di) : null;
         if (dl !== null && typeof o6 === 'number' && new Set([...lutInputs(cells[o6]), ...lutInputs(cells[dl])]).size <= 5 && lutInputs(cells[dl]).length <= 5) {
           s.pos[p].o5 = dl; put(dl, si);
-        } else if (di > 1 && di !== c.pins[`S<${i}>`]) s.pos[p].x = di;
+        } else if (di > 1 && (di !== c.pins[`S<${i}>`] || typeof o6 === 'number')) s.pos[p].x = di;
       });
       // the sum and the carry out both out of a position (the sum to anything but a flip-flop, the carry out to
       // anything but the carry above): the carry out by the multiplexed output, the sum through the position's
