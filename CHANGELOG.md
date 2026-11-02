@@ -3,6 +3,1214 @@
 What changed in each version of Silinx ISE. The newest version is first. Each section is also
 the "What's new" text of its GitHub release.
 
+## 15.21.0
+
+nextpnr as the Silinx toolchain's place and route, the iCE40 and the iCEBreaker, the Spartan-6 boards without a
+developer flag, the Board Emulator drawn as the real boards, the interfaces named Silinx and ISE style, and Silinx HLS
+closer to Vitis HLS.
+
+In short:
+
+- **nextpnr by default:** the Silinx toolchain places and routes with nextpnr (Process Properties ▸ Place & Route
+  Engine), with Silinx's own engine when nextpnr cannot; it takes every cell Silinx's engine takes (carry chains, wide
+  multiplexers, distributed RAMs, DCMs, IOB registers, latches, falling-edge flip-flops, clock switches) and the whole
+  UCF, at Silinx's size, faster designs and a quicker Place & Route. The release zip no longer carries nextpnr's chip
+  databases: the first Place & Route of a device fetches them.
+- **The iCE40 and the iCEBreaker:** 12 iCE40 parts in New Project, built with the Silinx toolchain only, their pins in a
+  PCF; the iCEBreaker board (and with a PmodVGA), the examples on it, the Board Emulator running its designs, and
+  Program Flash writing its .bin into the board's flash (not yet tried on a real board).
+- **The Spartan-6 boards (Nexys3, Atlys)** build with the Silinx toolchain in the local server and the browser edition,
+  with no developer flag.
+- **Optimization:** Process Properties chooses Fast, Area (a new project's default) or Speed.
+- **The Board Emulator** draws the Spartan-3E Starter Kit, Basys2, Nexys2, Nexys3, Atlys and iCEBreaker as the real
+  boards, shows or hides the modules outside the board, and fits a tablet's window.
+- **The interfaces are named Silinx and ISE style** (Estilo ISE) in View ▸ Interface; a saved choice is kept.
+- **The editors:** the drawing editors' toolbars and panels as the Schematic editor's; wizards for the FSM, ASM, Petri net,
+  Boolean Algebra and UCF, with templates; the Truth Table source is now Boolean Algebra, with equations written by
+  hand; the schematic's symbols with a pin per bit, Mirror Vertical, Select whole branch; Close Project in the toolbar.
+- **Silinx HLS** closer to Vitis HLS: AXI4 / AXI4-Lite / AXI-Stream ports, DATAFLOW, the pragmas PIPELINE, DEPENDENCE,
+  LOOP_FLATTEN / MERGE, BIND_OP / BIND_STORAGE, ALLOCATION, LATENCY, ARRAY_RESHAPE and INLINE off, RTL blackboxes,
+  math.h in hardware, hls::fft (bit-exact with AMD's C model), hls::FIR, C++ classes and the device's delays; a new
+  example, isqrt, written in C.
+
+In detail:
+
+- **docs/OPEN-TOOLCHAIN.md says where the device measurement stands (#2533):** the open question on the device
+  description no longer calls the black-box measurement a first prototype on the XC3S250E's CLB array: the four
+  Spartan-3E dies are measured (#3, #2483), and what still comes from ISE's device report is named (#2502).
+- **A UI test waits for the start-up after a reload (#2528):** narrow.test.js's "Close Project shows the side panel
+  again" checked the Start page as soon as the reload's wait ended, which is the start-up checks' answer; the Start
+  page comes with the projects' list, later on a slow machine (CI). The test now waits for it, and holds the list a
+  second (Chrome) so that it always comes late. No behaviour change.
+- **The Silinx interface's files named after it (#2525, Refs #2451):** web/js/modern.js, web/css/modern.css,
+  test/modern.test.js and test/ui/modern.test.js renamed to silinx.js, silinx.css, silinx.test.js, and every
+  reference with them (the imports, web/index.html, the test lists, test/timings.json, CI, the docs). A rename only,
+  with no change in behaviour; a preference saved with an old id is still migrated.
+- Board Emulator: a checkbox in the toolbar for each module outside the board, shown only for the modules the board has, the choice remembered per module. Hiding one changes the view only; a hidden VGA monitor fetches and draws no picture, and with no module left the iCEBreaker gives back the room over it (#2522).
+- The iCEBreaker's Pmods 1A and 1B hold the examples' seven-segment display (seg, dp, an) and switches sw[3:0]. A board of its own, icebreaker-vga, holds a Digilent PmodVGA (the colours' most significant bits). Every example builds on them with the Silinx toolchain to its .bin, timing met; the warnings are those of the ports the board has no pin for (led<5..7>, btn<3>, isqrt's sw<7:4>, vga's sw) (#2517).
+- The iCE40's back end: a one-bit port's constraint is read as nextpnr-ice40 names it (btn, not btn[0]); before, it was an unmatched constraint and the port was placed anywhere (#2518).
+- **No Undo / Redo, no path in the text editors' bar (#2514):** the bar of the text editors (HDL, C/C++, memory
+  initialization file, constraints) without its own Undo and Redo, the main toolbar's, Edit ▸ Undo / Redo and
+  Ctrl+Z / Ctrl+Y remaining, and without the file's path, in the tab and its tip. Test: test/ui/text-editor-bar.test.js.
+- Emulate and Program FPGA read a PCF's pins as a UCF's before saying "Pins not set" (`placesPins` in `web/js/pins-check.js`, with the project's device); the emulator already wired the PCF's pins (#2511).
+- An active-low button or switch (`extra.activeLow`, the iCEBreaker's BTN_N) rests high and is driven low while pressed or on (`web/js/emulator.js`, `web/js/emulator-board.js`), as the outputs already were (#2511).
+- The LED resources besides `led` (the iCEBreaker's LEDR_N and LEDG_N) are LEDs of the emulator, numbered after LED1..LEDn (`ledNumbers` in `core/emulate.js`), no longer "not emulated"; an LED may be drawn red (`data-colour`, `web/js/emulator-paint.js`) (#2511).
+- **The toolbars as the Schematic editor's (#2505):** flat buttons in both interfaces, its icons for Delete and the
+  zooms (web/js/editor-icons.js), the zoom level in the status bar, the same order of groups; the FSM's Arrange in its
+  menu, as the ASM chart's; the Algebra editor's menu (Algebra from Module, Handwritten Algebra) an icon and a label.
+- **No second Undo, Redo or Print (#2505):** none in the Schematic, Algebra, ASM, FSM and Petri net editors' toolbars,
+  no Print in the ASM and FSM editors': the main toolbar's, Ctrl+Z, Ctrl+Y and Ctrl+P remain.
+- **No note of the HDL in sync (#2505):** the FSM and the Petri net no longer say "HDL: x.vhd — generated from …", and
+  the FSM has no `</> HDL` panel: its file is in the Design pane. "Not in sync with" stays.
+- **The side panels as the Schematic editor's Properties (#2505):** the Petri net, FSM and ASM editors': its caption,
+  width, titles and fields; folded to a strip by the button in its caption, expanded by a click on the strip, remembered
+  per editor (web/js/side-fold.js).
+- **The Petri net's zooms (#2505):** Zoom In and Zoom Out in its toolbar and on + and −; F fits, in the FSM and ASM
+  editors too.
+- **The weekly comparison with ISE gets 20 hours (#2498):** the comparison took 14h13m on 2026-10-25 and was cancelled
+  at its 15 hours on 2026-10-31, with no results that week. `.github/workflows/quality.yml`'s `compare` job now has
+  1200 minutes; the runner's window does not close while a job runs. Test: test/workflows.test.js.
+- **The UI tests' page load (#2497):** when the load event does not come, the harness's `goto` / `reload` name the requests the page still waits for (URL, type, for how long), in the error and in the log. The wait is now 45 s, up from 30 s, and is awaited together with the navigation, so a failed navigation leaves no rejection behind.
+- **The start-up does not reopen the last project over one opened meanwhile (#2492):** the start-up reopened
+  the last project once the list of projects came back. That list could come after the start-up checks
+  (`startupChecked`), and so after a project opened meanwhile (from the Start page, or by a UI test). The
+  start-up then closed that project's documents, its Design Summary among them, and opened the last project.
+  This made the Tasks UI tests "the message centre" and "#2492 … a document closed" time out on CI, waiting
+  for the Design Summary. A project asked for now keeps its place (`projectRequested()`, web/js/project.js;
+  web/js/app.js). Test: test/ui/app.test.js (a regression test that holds the list until that project is open
+  and fails on the old code).
+- **A document closed in the Tasks interface: the task's own last document in its place (#2492):** the document
+  that comes forward was the last one opened, which could be another task's (the Design Summary, opened with the
+  project or by Implement), hidden in the current task: the task's remaining tab not active, its document not
+  shown. The task's own last document comes forward now (web/js/tasks.js). The flaky "#1564 Tasks: the last
+  document of a maximized task closed" UI test hit this when the project's Design Summary opened late, after the
+  test's sources. Test: test/ui/tasks.test.js (a regression test, failing on the old code).
+- **Device measurements, the XC3S1200E's long-line splitters measured by half (#2483):** a join test out of a splitter's
+  bidirectional PIP cannot be read from ISE's DRC, so `splitters.mjs` reads the direction bit ISE's bitgen sets (`oracle.sh
+  -b`). 19 533 verdicts, all agreeing with the shipped graph, replace the description's deference to it at the splitters:
+  the 1469 split nodes a short can come from are now 0, with no merged node. The 7 examples and the 45 open-flow designs
+  routed by the open flow on it pass ISE (DRC 0 / 0, `.bit` byte-identical with CRC on and off). The shipped graph is
+  unchanged.
+- The iCEBreaker's layout (`web/js/emulator-icebreaker.js`), after the board's annotated top view: the main board 712 x 493 and its snap-off part; the FPGA turned a quarter, the flash, CDONE, CRESET, the FLASH header, the RGB LED, the green and red LEDs; the board's name, not its makers' names or logos. The board has no power switch (the USB powers it): the emulator's is drawn by the USB, its LED the PWR LED (#2481).
+- Layouts of their own for the Nexys3 (`web/js/emulator-nexys3.js`: 900 x 930; the upright power switch on the left edge by the 5 V jack, JA..JD and JTAG along the top, USB PROG, Ethernet, VGA and USB HOST down the left edge, VHDC and UART on the right, LD7..LD0 over SW7..SW0, the display over the cross of BTNU / BTNL / BTNS / BTNR / BTND) and the Atlys (`web/js/emulator-atlys.js`: 860 x 780; the upright power switch by the 5 V jack, HDMI OUT, the audio jacks, HDMI IN and Ethernet along the top, JTAG, PROG, HOST, UART and HDMI IN down the left edge, the VHDCI connector with the 7-segment module on the right edge, RESET over the cross of five buttons, the Pmod JB, LD7..LD0 over SW7..SW0 along the bottom); the boards' names, not their makers' names or logos (#2481). The iCEBreaker's layout follows its board data (#2475).
+- The Nexys2's drawing (`web/js/emulator-nexys2.js`) redone after the board's photos and reference manual: the board 860 x 720 (its proportions); every part where it is and as it is turned (the Pmods 2 x 6 with their power jumpers, the power select jumper, the clock socket IC7, the 50 MHz oscillator, JP8); the silkscreen's names with the pins from the board's resources; the board's name (NEXYS 2), not its makers' names or logos. The helpers no board uses any more (`pmod`, `pmod12`, `db`, `chip`) left `web/js/emulator-pcb.js` (#2480).
+- The Basys2's drawing (`web/js/emulator-basys2.js`) redone after the board's photos and reference manual: the board 840 x 556 (its proportions); every part where it is and as it is turned; the silkscreen's names with the pins from the board's resources; the STATUS LED by the power switch; the board's name (BASYS 2), not its makers' names or logos. The drawing's small helpers (`svgText`, `ic`) and the upright power switch's style (`POWER_V_CSS`) moved to `web/js/emulator-pcb.js`, shared with the Spartan-3E Starter Kit's (#2479).
+- The Board Emulator's board drawings in modules of their own, out of `web/js/emulator.js` as they were: `web/js/emulator-layouts.js` (`BOARD_LAYOUTS`, still exported by `emulator.js`), one module per board (`emulator-basys2.js`, `emulator-nexys2.js`, `emulator-s3e.js`) and their drawing helpers (`emulator-pcb.js`), before each board is drawn as the real one (#405, #2478).
+- The Spartan-3E Starter Kit's drawing (`web/js/emulator-s3e.js`) redone after the board's user guide (UG230): the board 860 x 736 (its proportions); the board's name, not its makers' names or logos; the top edge's 5 V jack, upright power switch and red LED, VGA (J15), PS/2 (J14), RS-232 DCE (J9) and DTE (J10); Ethernet and USB on the left edge; the FX2 connector (J3) and the 6-pin headers J4, J1, J2 on the right; the FPGA, DDR, flashes and CPLD (their part numbers or kinds), the 50 MHz oscillator, the clock socket, SMA and PROG; the rotary knob among the four buttons, the LCD module (its 16 x 2 characters in proportion), the SMD LEDs over the four slide switches. A layout may bring its own style (`css`), added after the emulator's (#2478).
+- The Optimization, Fast, Area or Speed, kept as ISE's Optimization Goal and Effort (Speed / Normal, Area / High, Speed / High): with the Silinx toolchain, Fast synthesizes the usual mapping alone and makes one placement with no register replication; Area keeps the smaller of the usual mapping's netlist and Speed's (by slices, then LUTs: neither is always the smaller) with one placement; Speed tries every mapping for speed and several placements as High did (#2470).
+- The 1BitSquared iCEBreaker in the board data, its pins from IceStorm's icebreaker.pcf; a board's constraints made from its pin table are written in its family's format, a PCF on the iCE40 (#2468).
+- **A Spartan-6 bit database test on Windows (#2465):** test/s6-bitdb-browser.test.js makes its temporary folder in the
+  system's (`os.tmpdir()`), not `/tmp`, which Windows has not.
+- **The iCE40's devices (#2463):** the parts nextpnr-ice40 names, with Lattice's data sheets' figures and packages (`server/devices-ice40.js`), no speed grade; the device picker (`web/js/device-picker.js`) without one and with the synthesis locked to Silinx; a family ISE does not implement always runs the Silinx toolchain, with only its back end's processes (no Map, timing, power, simulation models, pin back-annotation or FPGA view) and none of the "ISE not available" messages; its constraints PCF in New Source, Check Constraints, I/O Pin Planning and the emulator (`web/js/constraints-format.js`), a device change to another format moving the project to a new file. The boards are #2297.
+- **CI: the UI parts' time limit (#2462):** a part of the UI tests may take 40 minutes (the job 45), not 25: two parts of
+  the ISE-style interface ran out of time at silinx-fpga 0.1.6's release with their tests passing. Test:
+  test/ci-workflow.test.js.
+- **The nextpnr engine: falling-edge flip-flops, latches, clock switches (#2457):** silinx-fpga's Map gives nextpnr
+  every cell Silinx's own packer takes (packages/silinx-fpga/changes/2457-nextpnr-edges-latches-switches.md).
+- **The documentation names the interfaces Silinx and ISE style (#2451):** README, docs/ARCHITECTURE.md,
+  ONBOARDING.md and CLAUDE.md say "the Silinx interface" and "the ISE style interface", and the tests' command
+  `SILINX_UI_INTERFACE=ise`. The test of the old names reads every Markdown file too (not CHANGELOG.md, the
+  changelog's fragments nor the research notes, kept as they were written).
+- **The interfaces' ids: silinx and ise (#2451):** the ids `modern` and `classic` became `silinx` and `ise`
+  everywhere: `INTERFACES` (web/js/modern.js), `data-ui` and its CSS selectors, the saved preference, the UI
+  tests' `SILINX_UI_INTERFACE` and CI's matrix of the UI tests (and the names of their times' artifacts). A
+  preference saved with an old id is migrated once on load (`LEGACY_INTERFACES`; web/index.html's early script
+  too, before the first paint), so a viewer's choice is kept. `SILINX_UI_INTERFACE=modern|classic` is still
+  accepted for a transition, mapped with a warning (test/ui/interface.js); a value that is no interface is an
+  error. A test finds any old id left in the code, the tests, the scripts and the workflows. Nothing visible
+  changes: the labels and the documentation follow.
+- **The interfaces' names: Silinx and ISE style (#2451):** the Interface menu's entries come from one table of names
+  next to `INTERFACES` (`INTERFACE_NAMES`, web/js/modern.js), so another interface is one more entry; "ISE style" is
+  "Estilo ISE" in Portuguese, Silinx a proper name, the same. The code's comments and the tests' names say "the
+  Silinx interface" and "the ISE style interface". A UI test reads the names in each interface's own menu in English
+  and Portuguese and chooses an interface by its name; the test of the old ids now also finds the old names (Modern,
+  Classic, the modern / classic interface, Moderna, Clássica, the Xilinx ISE interface).
+- The iCE40's nextpnr and icepack (`@yowasp/nextpnr-ice40`, 78 MB) are not in the release zip or on the site: the first iCE40 run downloads them from npm's registry, at the version and the SHA-512 of `package-lock.json`, and keeps them (the local server in `~/.silinx/nextpnr/`, the browser in Cache Storage); `https://registry.npmjs.org` joins the pages' `connect-src` (#2444).
+- **The nextpnr packages pinned at spartan3e 0.11.3 and spartan6 0.1.1 (#2441):** both declare the Node versions they
+  run on, 22 and later (#2351); their engines are unchanged.
+  - **Tests:** test/silinx-fpga-package.test.js, test/toolchain-boundary.test.js and the third-party notices' check,
+    unchanged.
+- **A new project from an example on another board, in the browser edition (#2430):** its UCF is made from the chosen
+  board's pin table when the example's pins are not on that board (`boardUcf`, `web/js/implement.js`), as the local server
+  writes it (#36). It kept the example's Basys2 pins, and the first Implement Design stopped on them.
+  - **Tests:** test/ui/standalone-boards.test.js.
+- **MCP server: the place and route summary without "null passes" (#2420):** `get_report`'s summary of a Silinx
+  toolchain run said "null passes" with the nextpnr engine, which counts no router passes; it now gives the passes
+  only when the engine counts them.
+  - **Tests:** test/mcp.test.js.
+- **The development build's notes fit GitHub's limit (#2411):** a release's body holds at most 125,000
+  characters, and the changes since v15.20.0 had grown past it, so the "Development build" workflow failed at
+  Publish (`gh release edit dev`, HTTP 422). scripts/dev-notes.mjs keeps the notes under 120,000: past it, the
+  "In short" items stay in full and the "In detail" list keeps its newest entries, with a line saying how many
+  were left out and linking to changes/ on main; under it, the notes are unchanged. Tests: test/dev-notes.test.js
+  (a synthetic set over the limit and one under it).
+- **The architecture counts two interfaces (#2403):** `docs/ARCHITECTURE.md` listed a third, Tasks interface, which became
+  the modern one (#1149); it and the header of `web/js/tasks.js` now say so, and a test keeps the document in step with the
+  code's `INTERFACES`.
+- **The README links the architecture (#2401):** `docs/ARCHITECTURE.md` and `docs/TOOLCHAIN.md` were named only in its
+  Layout's code block, where they cannot be clicked; "For developers" links them, and a test keeps it so.
+- **Silinx's architecture documented (#2399):** `docs/ARCHITECTURE.md`, the application as a whole: its two editions
+  (the local server, the browser), its layers, and each part (the project, the drawings, the HDL front end, simulation, the
+  two flows, Silinx HLS, programming, the interface) with its files and the documents that go deeper. The README and
+  ONBOARDING.md link it; ONBOARDING.md's map names the toolchain's package, where its modules now are.
+- **The state diagram's UI test waits for the fitted view (#2397):** the test read a state's position before the
+  editor's first fit (only the circle's size was waited for) and double-clicked 130 px under it after the fit,
+  on that state's rim, where no name field opens: it failed on fast CI runs. It now waits for the view fitted
+  (`fitted()`, new in the editor's API, web/js/fsm-editor.js) and for the point to be the empty background.
+  Checked with the editor's first fit delayed by up to 1.5 s, in both interfaces. Test: test/ui/fsm.test.js.
+- **The Preferred Language's UI test with the editors' new toolbars (#2395):** test/ui/preferred-language.test.js waited for the
+  state diagram editor's Language select, which #2257 removed; it now waits for the editor itself and checks that the open
+  editor follows the Preferred Language by its model (its language and its HDL file).
+  - **Tests:** test/ui/preferred-language.test.js, in both interfaces.
+- **The handwriting dialogs keep a correction typed while the pad's reading is pending (#2389):** each stroke reads
+  the pad a moment later, and Insert, Fill Table or Create Schematic read it at once; a correction typed before that
+  reading (the Recognized text, the table's text, a gate's type or a name) was replaced by it. Typing now cancels the
+  pending reading; the next stroke reads the pad again. The UI tests of the three dialogs correct while a reading is
+  pending, and the handwritten expression's test no longer fails now and then on a slow machine.
+- **A family's back end tested in the browser's worker (#2388):** the browser edition's io of the Silinx toolchain's flow
+  (the files in memory, each line, file and report posted to the page) is a module of its own,
+  `web/js/open-flow-worker-io.js`, which the flow's worker uses; a UI test runs a fake family with its own steps through it
+  in a module worker: its files in memory, its report, an earlier run's file read again, no warnings.
+- **Silinx HLS: the co-simulation's bench (#2368):** the Verilog test bench of a sequential top declares `ap_rst` once;
+  it was declared twice, which Silinx's simulator accepted, with the same results.
+- **The nextpnr engine's Design Summary: every resource (#2361):** the block RAMs, the multipliers and the DCMs are listed
+  too, used or not, as by the Silinx engine (#795).
+  - **Tests:** test/open-toolchain.test.js.
+- **The release script through the toolchain's API (#2356):** scripts/package-release.mjs imports `leaveOutChipdbs`
+  from `silinx-fpga/node`, no longer from its module; a pull request's related tests now include
+  test/toolchain-boundary.test.js and test/layering.test.js for any changed source (they read every source's imports),
+  which would have caught it.
+- `core/c-partition.js`: a partitioned array's memory whose name another argument or variable has takes the next number of one count, `d_01`, then `d_02` or `d_12`, as Vitis HLS 2025.2 names it, not `d_0_s` (#2348).
+- **The nextpnr engine's tests on Windows (#2335):** a file URL's `pathname` (`/D:/…`) was passed as a file path by
+  packages/silinx-fpga/test/nextpnr-engine.test.js and nextpnr-hard.test.js, test/ui/open-toolchain.test.js and
+  research/s3e-place/fixtures.mjs: they use `fileURLToPath` now, and test/url-pathname.test.js keeps it so.
+- **The documents' toolbars alike, a toolbar with a menu (#2331):** the UI test of #1409 expects the shared padding
+  of every toolbar, and, for a toolbar with a menu at the right of its first line (the schematic editor's, #2208),
+  the menu's place kept free on the right and its button clear of the other controls; the release's UI tests
+  failed on the schematic's padding.
+- **The schematic's segment highlight checked by the markup scanner (#2330):** its polyline is written in the wire's
+  template as a template of its own, which `test/web-markup-interpolations.test.js` (#1443) scans, instead of a
+  local the scanner rejected.
+- **The release zip within its 40 MB budget (#2329):** `scripts/package-release.mjs` replaces the nextpnr packages' databases
+  by a manifest (`chipdb/fetch.json`: the fork's release, each file's size and SHA-256) and leaves out the tests (`test/`,
+  `packages/silinx-fpga/test/`), which the app does not read. The local server's flow downloads a device's database on its
+  first use, checks it against the manifest and keeps it in `~/.silinx/nextpnr/`; the log says so, and offline the error
+  says what to do. test/release/release.test.js checks the zip.
+- **A C source in an exported ISE project (#2320):** File ▸ Export Xilinx ISE Project writes each C source's generated HDL (`src/x.c.vhd` or `.v`) into the zip and the `.xise`, in the full application and in the browser, and leaves the C out, since imported back that HDL would hide later edits of the C; such a module can be the top; a C source with errors is reported as a warning. The example isqrt, which ISE refused (`isqrt is not an entity name`), joins `test/ise/xise-interop.test.js`.
+- `core/c-struct.js`: a struct's chain of uses and a leaf's tokens moved out of `uses`, which is under the limit of 300 lines again; no change of behaviour (#2317).
+- **Silinx HLS: hls::fft's float SSR test benches (#2309):** `hls::fft` takes streams of
+  `hls::vector<std::complex<T>, super_sample_rate>` (a word of that many samples), in the C simulation; their
+  synthesis stays refused (a floating-point FFT's hardware, #1761). A stream of `hls::vector` of structs (of
+  `std::complex`) is one stream per member of each element, in the C simulation and in the hardware; `hls_vector.h`
+  brings `<complex>` in first, so `hls::vector<C, N>` of a `std::complex` typedef is made. A test bench's struct may
+  have `const char *` members (its texts: `printf`'s `%s`, `cout`, a `const char *` parameter, `fopen`; a struct of
+  them as a parameter refused); `S a[] = { … }` takes the list's size; `sizeof` of a struct or an array of structs
+  is g++'s (x86-64); a function's default arguments are given to the calls that leave them out; `if (!(f >> a >>
+  b))` reads a file stream, and `f >> x` reads a float as a float. A shift by a constant count of the value's width
+  or more (`1 << 32`), undefined in C, takes g++'s value in the C simulation (0, or -1 for a negative value shifted
+  right) with a warning; a count known only when it runs still stops the run, and synthesis refuses both.
+  `dsp-fft-logicore-fft-float-ssr` passes its C simulation; the two `*-float-ssr2` designs compare their floats
+  with `==` and need AMD's own order of operations, not found yet.
+- **`hls::fft`'s floating-point transform bit-exact with AMD's C model (#2309):** radix-2 decimation in frequency in `float`, with `cos` and `sin` of double truncated toward zero to float rather than rounded, and an exact rotation at a quarter turn. Every value of the 10 forward frames of `dsp-fft-interface-array-float-ssr2` and `dsp-fft-interface-stream-float-ssr2` matches their golden files, and both pass C simulation; their synthesis stays refused (#1761). Other lengths, other super sample rates and the inverse follow the same rules, with no golden file to check them.
+- **The interoperability with ISE tested against ISE (#2308):** `test/ise/xise-interop.test.js` opens every example's exported project in ISE's own project flow (`xtclsh`), builds it through to the bitstream on the Basys2-250 and the Nexys3 with the warnings asserted, and imports back the folder ISE leaves; `test/xise-ise-files.test.js` reads `.xise` files written by ISE itself, with no ISE at hand. What they found: the HDL of a C function is not exported (#2320), and the examples' warnings on the Spartan-6 (#2321).
+- **nextpnr from npm (#2307):** the IDE's dependency `@silinx/nextpnr-himbaechel-spartan3e` is pinned by its version on
+  npm, 0.11.2 (published by nextpnr-spartan's CI through npm's trusted publishing, with its provenance), no longer by the
+  URL of its GitHub release, so Dependabot proposes its new versions. Its engine is v0.11.0's.
+- Configure Target Device of an iCE40 project: a page of its own, Program Flash, instead of iMPACT's JTAG chain. Without a .bin it offers to implement the design first (#2298).
+- The local server writes the .bin with `openFPGALoader -b ice40_generic` (the iCEBreaker's FT2232H); `/program` takes an iCE40 project's .bin, and `/bitinfo` gives its size (#2298).
+- The browser edition writes it itself, as IceStorm's iceprog does, through the FT2232H in MPSSE mode (`core/ftdi-ice40.js`, #2298):
+  - the FPGA is held in reset while the flash is written;
+  - the blocks the .bin needs are erased, then written a page at a time;
+  - the flash is read back and compared;
+  - the FPGA is released, and Silinx waits for its CDONE.
+- The iCEBreaker's drawing shows the modules of the examples on its Pmods when the board data has them: the 4-digit display on a breadboard over PMOD1A (its segments there, its anodes on PMOD1B by wires), the 4 switches' module on PMOD1B, the board under them; without them it is drawn as before (`web/js/emulator-icebreaker.js`). `test/web-emulator.test.js` takes a layout's `has('…')` parts as optional (Refs #2297).
+- The iCE40's flow in the local server and in the browser's flow worker: a project with an iCE40 device and a PCF goes from HDL to its `.bin` (`server/open-flow.js`, `web/js/open-flow-worker.js`); its build folder has no ISE file. No board or device of the family in the interface yet (#2297, #2310), and `@yowasp/nextpnr-ice40` is a development dependency: not in the release zip or on the site (#2295).
+- **Each operation only as wide as its users read it (#2290):** an addition, subtraction, bitwise operation, negation, shift left or multiplexer whose result is truncated (C's integer promotions: `odd + 2` an `int`, kept in 6 bits) is made that wide, its operands' low bits taken; a constant read only as a shift's amount is written as a number, with no signal of its own. The results are the same (co-simulated against the C).
+- **The Silinx toolchain's delays of a slice's carry chain (#2286):** the delays through the carry's XORs and onto the
+  slice's XB output are trce's instead of estimates, in the timing analysis, the placer and router, and the
+  post-place & route simulation model. Designs with carry chains report a longer, truer minimum period and may be
+  placed and routed differently.
+- **Design Properties and Process Properties keep their choices during a project reload (#2281):** a reload ending while
+  the dialog was open, or just after its OK, no longer brings back the previous values (a Preferred Language, an
+  Optimization Goal); a reload reads the project once the saves asked before it are on the server.
+- **The ISE runner's access to Docker kept (#2268):** the agent `scripts/ise-runner/install.sh --docker-acl` installs
+  took the runner user's ACL off Docker Desktop's socket and put it back on every run, and launchd ran it every 10
+  seconds or so: for an instant each time the runner could not reach Docker, and a nightly ISE run failed one design
+  on `permission denied`. It now adds the ACL only when the socket lacks it. Tests: test/ise-runner.test.js.
+- **The C commands' lines in the Edit task (#2262):** C Simulation, C/RTL Co-simulation and View C Synthesis Report turn
+  the Console's filter to their source (Simulation, Implementation) when it hides it, also a filter following the task:
+  the Edit task's shows Design's lines only, and since #1867 a process started left it as it was. Other processes
+  started keep the task's filter.
+- **The ASM editor's toolbar (#2261):** its Language choice and the Code button with its panel removed; Arrange and # Snap
+  in the menu of `web/js/toolbar-menu.js`, as the FSM (#2260), algebra (#2257) and Petri net (#2259) editors'.
+- **The FSM editor's toolbar (#2260):** its Language choice removed; Convert to ASM chart in the menu of
+  `web/js/toolbar-menu.js`, as the algebra (#2257) and Petri net (#2259) editors'.
+- **The Petri net editor's toolbar (#2259):** Analysis and the PNML export and import in a menu (`web/js/toolbar-menu.js`,
+  shared with the algebra editor's, #2257), as the schematic editor's (#2208).
+- **The algebra editor's toolbar (#2257):** its Language choice removed; a menu at the right of the first line, as the
+  schematic editor's (#2208), holds Algebra from Module… and Handwritten Algebra…, closed by Esc, a click elsewhere or a
+  command.
+- **A table's open schematic follows the project's Preferred Language (#2257):** it kept the old language until reopened.
+- **A drawn source's language in Source Properties (#2254):** a schematic, ASM chart, state diagram, truth table or Petri
+  net; its HDL file is made again in that language. Set to VHDL or Verilog, it keeps that language when the project's
+  Preferred Language changes; HDL written by hand keeps the language of its file.
+- **View Association out of Source Properties (#2255):** a source's association itself is unchanged, set when it is added
+  and shown in the Files view.
+- **Petri net editor without the </> HDL button (#2250):** the button and its panel removed; the linked HDL file, generated
+  from the net, is unchanged, and so are the language selector, Simulate and Analysis.
+- **Silinx HLS, a pointer or reference argument written before it is read (#2241):** a sequential function
+  (`core/c-fsmd.js`) took the caller's value as an input whenever the argument was read, even after a write. Now
+  `core/c-out-first.js` follows its reads and writes through the states: a read that a write reaches on every path (in
+  the same state under the same condition, or in both branches of an if, or in a state before it on every path) is the
+  value written, and the argument is an output only. A read that some path reaches with no write, such as a write under
+  a condition or in a loop that may not run, keeps the input `<p>_i`, as before. The ports were checked against Vitis
+  HLS 2025.2.
+- Silinx HLS: a test bench's classes and functions over `std::string` and `std::map` (`<map>`, `<chrono>`, nested classes, overloads, default and reference arguments, `new` and `delete`, iterators, `main(argc, argv)`) are taken out of the source and run by the C simulation alone; the synthesized function cannot reach them, and what is not read is reported at its line (#2234).
+- Silinx HLS: `&a[0][0]` points into the whole array in the C simulation (`memcpy` of a two-dimensional array), and `a[i][j]` no longer copies its row (#2234).
+- Silinx HLS: the corpus's `modeling-using-array-stencil-2d` passes C simulation and C synthesis; its co-simulation is not run until `#pragma HLS ARRAY_STENCIL` (#2503) makes its II 1 (#2234).
+- **The Schematic Wizard's circuits (#2231):** eight templates of several blocks wired together, each simulated against a
+  model in VHDL and Verilog (`core/sch-circuits.js`); the templates that were one symbol (multiplexer, demultiplexer,
+  adder, subtractor, comparator, decoder, priority encoder) are gone, the palette has them.
+- **Select whole branch selects the signal's whole network of wires (#2228):** every wire of the net, across junctions
+  and net names, with a click, a Shift+click or a right click; its Delete and Copy take them all, its properties stay the
+  wire's, and a drag still moves the segment under the pointer, or a curve's handle of the wire clicked.
+- **The Silinx toolchain's hold check of two flip-flops as trce's (#2226):** the timing report's hold check took the
+  inputs' hold time for every flip-flop and was about 0.7 ns more optimistic than ISE's trce, so a hold violation trce
+  finds was reported as met. It now takes trce's earliest delays and each flip-flop's own hold time: the worst hold
+  path is trce's, its slack within about 0.1 ns. The minimum periods do not change.
+- **The Silinx toolchain's timing analysis: a clock on general routing (#2224):** a global clock that reaches some
+  flip-flops through general routing instead of the global lines (as nextpnr's router did before nextpnr-spartan
+  v0.7.1) has their clock skew counted in the minimum period, the pads' paths and the hold check, as ISE's trce counts
+  it; the timing report says how many clock pins are reached that way and the skew. A clock wholly on the global lines,
+  as both engines route it today, is timed exactly as before.
+- **The nextpnr engine: flip-flops alone in the carry chains' slices, a carry in at 1 from the VCC site (#2223):**
+  nextpnr-spartan v0.10.0 puts a flip-flop alone into a free flip-flop place of a chain's slices when BX / BY is free or
+  carries the same net and the control set suits, as Silinx's packer does. A chain's carry in at 1 comes from the CLB's VCC
+  site instead of a LUT giving 1, and a stage whose select is a constant reads a LUT giving it instead of passing a constant
+  LUT through. The router is kept off the paths that would break such a slice (the flip-flop's D only through BX / BY).
+- **The nextpnr engine's placer: an annealing refinement, delays fitted to Silinx's routes (#2222):** nextpnr-spartan
+  v0.11.0 refines nextpnr's analytic placement with a timing-driven annealing that moves the carry chains and slices
+  whole, its delay estimates fitted to Silinx's delays of routed designs (a LUT's output and a flip-flop's apart, a net's
+  load by its fanout). On the examples on the four devices the periods are 1.4 % shorter at best of 8 placements and
+  2.1 % on average, the slices unchanged; each placement takes three to five times as long.
+- **UI tests up to date with the empty new charts and the new marker's direction (#2221):** `hierarchy`, `replace` and
+  `sch-iomarker` still expected the behaviour from before #2176 and #2170; a new test covers an empty chart with no HDL.
+- **The document tabs, a full strip (#2215):** activating a document scrolls its tab into view (one strip, or its side's
+  in a split, once the Tasks layout has shown it); the strip was clipped and could not scroll.
+- **Select whole branch in the schematic editor (#2211):** the choice remembered; with curved wires, a read-only view or
+  several wires selected, a wire is selected whole; Copy takes the whole wire.
+- **Mirror Vertical in the schematic editor (#2209):** symbols, the symbol being placed and I/O markers (those above and
+  below change sides). Mirror Horizontal on a symbol turned by 90 or 270 degrees used to flip it vertically on the sheet.
+- **A menu in the schematic toolbar (#2208):** its button stays on the first line whatever wraps; a tick box leaves the
+  menu open, a command, a click elsewhere or Esc closes it; the toolbar's Symbol Info button removed.
+- **The 3D Karnaugh map holds its place (#2206):** its scene is sized to the whole stack at any rotation
+  (`kmapSceneSide`, the projection of the sphere around it) rather than to one flat layer, so turning it moves
+  nothing beside it, and the list of groups goes beside it or below it.
+- **The Silinx toolchain: a one-bit bus port's UCF pin (#2199):** its `LOC` and `IOSTANDARD`, written `btn<0>` (or
+  `btn(0)`), were dropped by the packer, which chose a pad of its own; the toolchain's package fixes it
+  (packages/silinx-fpga/changes/2199-one-bit-bus-loc.md). Tests: test/ucf.test.js, test/iob-pack.test.js.
+- **The nextpnr engine's packing (#2196):** nextpnr-spartan v0.7.1: slices' free places filled with unrelated LUTs and
+  flip-flops, the critical connections first; carry stages and F5s on copies of shared LUTs; the carry out on XB / YB; a
+  global buffer's clock pins on its global lines (on general routing trce measured up to 1.5 ns of skew, ISE's DRC silent).
+- **The nextpnr engine: several placements (#2196):** four placements at Normal for a design of up to 500 slices (eight at
+  High), each routed and reported with its period and time, the fastest kept; nextpnr-spartan v0.9.1 (from v0.8.1 on) stops router 1 trying
+  a chain's DI through the BX its carry in needs, which took the VGA example from about 100 s to 3 s per placement.
+- **nextpnr-spartan v0.12.0 (#2196):** the carry chain's delays in nextpnr's chip database are Silinx's slice arcs after
+  #2286 (per side of the slice, the XB output's own); router 1 routes the critical connections first, the short ones
+  inside a CLB too, and its estimate of a route left is the least a route takes, so the critical connections get the
+  CLB's direct connections to the LUT pins. On the examples (28 builds, 8 placements each, Silinx's analysis): periods
+  0.9 % shorter at best and 1.4 % on average, the slices unchanged; ISE's DRC clean and Silinx's `.bit` byte-identical to
+  ISE's (CRC on and off) on all 28. The gap left is accepted (#2135): nextpnr stays the only engine.
+  - **Tests:** packages/silinx-fpga/test/nextpnr-engine.test.js, test/silinx-fpga-package.test.js,
+    test/toolchain-boundary.test.js and the third-party notices' check; test/silinx-fpga-cli.test.js: the README's
+    blinky's best placement recorded anew (seed 1, 5.069 ns, was seed 2, 5.040 ns).
+- **The nextpnr engine: the UCF beyond LOC and PERIOD (#2195):**
+  - **The pads' attributes:** `nextpnrNetlist` puts them on each pad's buffer, a NET name with wildcards on every bit it
+    matches, and **src/fpga/nextpnr-iob.js** writes them as Silinx's packer does. An input nothing reads gets no pad, as
+    with Silinx's engine.
+  - **Several clocks:** one `create_clock` per PERIOD in an SDC file (`--sdc`), on the clock's net after its global
+    buffer; the tightest stays as `--freq` for clocks with none. No new nextpnr-spartan release.
+  - **OFFSET, TIG, CLOCK_DEDICATED_ROUTE:** as in Silinx's flow, where the placer and the router read none of them: OFFSET
+    and PERIOD are checked by the shared timing step; TIG and CLOCK_DEDICATED_ROUTE change nothing, with no warning.
+  - **Proof:** research/nextpnr-s3e/ucf_all.v: every IOB's settings equal to Silinx's packer's; ISE's DRC with no errors
+    or warnings, the .bit byte-identical to ISE's bitgen; its flip-flops simulate equal to the netlist.
+  - **Tests:** test/nextpnr-s3e.test.js and test/nextpnr-engine.test.js (the settings against Silinx's packer, the SDC, the
+    checks of both engines compared, no warnings).
+- **The nextpnr engine: the DCM (#2194):** the dependency `@silinx/nextpnr-himbaechel-spartan3e` has this since nextpnr-spartan
+  v0.9.0 (on main through v0.9.1). Its packer puts a DCM where the most of its clock outputs reach global buffers of their own by dedicated
+  paths, then where a pad's dedicated path reaches its CLKIN, and keeps the UCF's `INST LOC`.
+  - **src/fpga/nextpnr-dcm.js** (new) writes its settings as Silinx's packer does; **src/open-flow-nextpnr.js** (Map)
+    accepts DCM and DCM_SP, gives `INST LOC` to the micro-architecture and each DCM clock its period in the SDC
+    (CLK2X half, CLKDV and CLKFX by their factors); **research/nextpnr-s3e/lib.mjs**'s simCheck takes LOCKED, PSDONE and
+    STATUS as inputs of both simulations.
+  - **A global buffer's select:** the buffers of one tile now share one VCC net, from the tile's VCC site. Two nets on
+    one wire failed the routing check.
+  - **Proof:** feat_dcm, feat_dcm_bufgin, feat_dcm2, feat_dcm_div2, feat_dcm_phase and feat_dcm_wait (Basys2-250): ISE's DRC
+    with no errors or warnings, the .bit byte-identical to ISE's bitgen, the flip-flops simulate equal to the netlist.
+  - **Tests:** test/nextpnr-s3e.test.js and test/nextpnr-engine.test.js.
+- **The nextpnr engine: the IOB's registers and DDR, the clock pads (#2192):** the dependency
+  `@silinx/nextpnr-himbaechel-spartan3e` has this since nextpnr-spartan v0.4.0. Its chip database has the IOB site's
+  flip-flops (IFF1 / IFF2, OFF1 / OFF2, TFF1) and the multiplexers between them and the pad; its packer puts a flip-flop
+  into its pad's IOB when asked (its clock on a global buffer), and an IDDR2 / ODDR2 as two flip-flops (the second on
+  the inverse of the first's clock); a global buffer driven by a pad goes where the pad's dedicated path reaches it.
+  - **src/fpga/nextpnr-iob.js** (new) writes each IOB's settings as Silinx's packer does; **src/open-flow-nextpnr.js**
+    (Map) accepts IBUFG, OBUFT, IOBUF, IDDR2 and ODDR2 and gives the micro-architecture the UCF's `IOB = TRUE / FALSE`
+    (NET on the pad's buffer, INST on the cell); **research/nextpnr-s3e/lib.mjs**'s simCheck simulates the IOB's
+    registers on both clock edges, with asynchronous set / reset, and with random inputs (`xdl-sim-check.mjs
+    --random-inputs`).
+  - **research/nextpnr-s3e/iob_regs.v through nextpnr:** every IOB's settings equal to Silinx's packer's, the clock
+    pad on the path Silinx takes; ISE's DRC with no errors or warnings, the .bit byte-identical to ISE's bitgen; its
+    flip-flops simulate equal to the netlist.
+  - **The examples through nextpnr, on the new chip database (Basys2-250):** gates, traffic, blinky, pong, stopwatch,
+    clock and vga build with no warnings, ISE's DRC with no errors or warnings, their .bit byte-identical to ISE's
+    bitgen (nextpnr-spartan v0.5.0).
+  - **Tests:** test/nextpnr-s3e.test.js (the settings against Silinx's packer, the clock pad's path, a complete
+    bitstream, the simulation catching a wrong clock edge, initial value, set / reset or enable) and
+    test/nextpnr-engine.test.js (the UCF's IOB constraints on the netlist; the design built with the engine).
+- **The nextpnr engine: the SLICEM's memories (#2191):** the dependency `@silinx/nextpnr-himbaechel-spartan3e` is now nextpnr-spartan
+  v0.9.1. A SLICEM's LUTs are memories too (BELs MEM16F, MEM16G); its packer pairs them as Silinx's does, with cascades on SHIFTIN and
+  SRLC16E chains through Q15 on a CLB's two SLICEMs.
+  - **src/fpga/nextpnr-mem.js** (new) writes the contents, the data's multiplexers and the write strobe as Silinx's packer does;
+    **src/open-flow-nextpnr.js** (Map) accepts the cells; **research/nextpnr-s3e/lib.mjs**'s simCheck simulates the contents.
+  - **research/nextpnr-s3e/slicemem.v through nextpnr:** each memory slice's settings equal to Silinx's packer's; ISE's DRC with no
+    errors or warnings, the .bit byte-identical to ISE's bitgen; its flip-flops simulate equal to the netlist. So too feat_srl, feat_srl_chain and
+    feat_srl_var.
+  - **Tests:** test/nextpnr-s3e.test.js (the settings against Silinx's packer, the simulation catching wrong contents, data or clock
+    edge) and test/nextpnr-engine.test.js (the design built with the engine, no warnings).
+- **The nextpnr engine: MUXF7 and MUXF8 (#2190):** the dependency `@silinx/nextpnr-himbaechel-spartan3e` is now nextpnr-spartan
+  v0.6.0. On a CLB's upper slices the FXMUX is a MUXF7 (X0Y1, the CLB's two F6s) or a MUXF8 (X1Y1, the F7s of its CLB and the
+  CLB above); its packer takes a whole tree as one cluster, as Silinx's does.
+  - **research/nextpnr-s3e/lib.mjs**'s simCheck simulates them; the converter and Map already took them.
+  - **research/nextpnr-s3e/widemux.v through nextpnr:** the same multiplexer settings as Silinx's packer; ISE's DRC with no errors
+    or warnings, the .bit byte-identical to ISE's bitgen; its flip-flops simulate equal to the netlist. The examples use neither
+    multiplexer: their sizes do not change.
+  - **Tests:** test/nextpnr-s3e.test.js (the places and the wires, the settings against Silinx's packer, the simulation catching
+    swapped inputs) and test/nextpnr-engine.test.js (the design built with the engine, no warnings).
+- **The state register of a sequential module (#2183):** the machine kept the schedule's states added in a field named as an inherited method, so every machine was made again with the method's text as its room for states; a 5-state loop had a 920-bit `ap_CS_fsm`.
+- **A Template page in the Schematic Wizard (#2180):** Empty (the markers only, as before), register, shift register,
+  counter, multiplexer, demultiplexer, adder, subtractor, comparator, decoder, priority encoder and a full adder of
+  gates, with their parameters (width, clock enable, reset…); the next page shows their ports, which can be renamed
+  and added to; their directions and widths stay the parameters' (`core/sch-templates.js`).
+- **Device measurements, the join tests' designs at most 1000 tests (#2178):** `joinTestDesigns` takes `maxTests`
+  (`MAXTESTS` for `prototype.mjs tests`, default 1000); the rest wait for the next design. In the XC3S1200E's designs of
+  up to 17 344 test nets ISE's DRC gave a few wrong verdicts (2721 per million over 10 000 tests, none up to 500), and a
+  wrong join became a known join the next rounds' paths crossed.
+- **New Source without the wizard: FSM, ASM and Petri net start empty (#2176):** Finish writes a drawing with no
+  states, boxes, places, transitions or ports, instead of the example machine; the wizard's templates are unchanged.
+- **I/O markers: joining a net of their name, and the direction of a new one (#2170):** the Add I/O Marker tool, the
+  Properties panel's Name and Rename… ask, when the name is that of another net, "Join" (the marker takes the net's
+  whole width from its net names, and a marker placed unconnected the net's direction: an output when it is driven) or
+  "Choose another name" (the name asked again; a rename not made). A marker placed on a pin or a wire still takes its
+  direction from it; on empty space, the direction of the marker added last (its highest id). The name prompt's Enter
+  no longer reaches the dialog it opens (it pressed Join at once). New core/schmarker.js. Tests:
+  test/schmarker.test.js (the direction, the join, the HDL of a joined marker compiled and simulated in VHDL and
+  Verilog with no warnings), test/ui/sch-iomarker-join.test.js (English, Portuguese), test/ui/sch-tools.test.js.
+- **Close Project shows the side panel again (#2169):** a hidden side panel stayed hidden after File ▸ Close Project,
+  the Start page out of sight. Now the project closed (`silinx:project-closed`, web/js/project.js) shows it again: in
+  the modern interface Design's side panel open and no document maximized, kept (`closedState`, web/js/tasks.js) so the
+  saved choice does not fold it again; on a narrow screen in the classic interface the drawer open, kept too
+  (web/js/narrow.js). Tests: test/tasks.test.js (closedState), test/ui/narrow.test.js (both interfaces, at
+  1400 × 900 and 820 × 1180, and after a reload).
+- **A block's output left unconnected declares no net (#2162):** core/schdoc-hdl.js no longer declares the net of a
+  block's output left unconnected (ADD's CO, a flip-flop's Q with only QN wired), which the instance leaves out of its
+  port map: XST warned that it was never used or assigned (Xst:1780). Test: test/schdoc-hdl.test.js.
+- **Flip-flops with an inverted output QN (#2161):** core/schdoc-symbols.js gives the flip-flops the parameter qn (off by
+  default: the symbols and their HDL as before); with it a pin QN, level with the last input, which web/js/sch-svg.js
+  names Q barred; core/schdoc-hdl-symbol.js drives it as not Q (VHDL through the local copy of Q; Q left open: Q kept in
+  a register of its own), so that Try it shows it; the ISE export names it xl_<type>_i<INIT>[_w<W>]_qn (no library
+  flip-flop has QN), imported back with the option. Tests: test/ff-qn.test.js (every flip-flop simulated in VHDL and
+  Verilog, QN against Q at every clock, no warnings), test/ui/sch-ff-qn.test.js (both interfaces, Portuguese, Try it).
+- **Try it out's bus formats without plain Binary, Binary (Unsigned) by default (#2160):** the bar's Buses list is
+  Hex, Binary (Unsigned), Binary (Two's Complement) and Binary (One's Complement); nothing saved, or the removed
+  Binary saved, gives Binary (Unsigned). The bus editor's own typing formats and the simulator's radixes are as
+  they were.
+- **A table filled by a loop in the function's own body, computed at synthesis (#2151):** the C simulation runs a loop
+  whose writes to arrays depend only on constants and its index (math.h's too), its results their initial values; its
+  loop-only variables and its warning of an unknown count go with it. A loop reading an input, an array also written
+  elsewhere or read before it, and the like stay hardware.
+- **A table of ap_fixed computed at synthesis (#2151):** its values were taken as integers; now as the C simulation's, by a
+  function (#1779) or a loop; one wider than a double's 53 bits stays hardware.
+- **Templates (#2149):** the FSM, ASM and Petri Net wizards (New Source ▸ … ▸ Wizard >) start with a Template page,
+  a template and its parameters (N, the pattern, overlapping or not, Moore or Mealy, the users), refused with a
+  message when out of range; leaving it fills in the next pages (`core/chart-templates.js`, `web/js/template-page.js`).
+  FSM: empty, counter, up/down counter, counter with enable, ring counter, Johnson counter, sequence detector, traffic
+  light; ASM: empty, counter, up/down counter, start/done controller, request/acknowledge handshake (its state boxes
+  renamed on the States page); Petri net: empty, cycle of N places, producer/consumer, mutual exclusion, fork/join,
+  semaphore. Every template, in VHDL and in Verilog, makes a valid chart whose HDL compiles with no warnings; the
+  counters, the detector (against a search of the bits) and the nets behave as said (`test/chart-templates.test.js`).
+  The Petri Net Wizard's net builder moved to `core/chart-wizard.js` (`petriFromPorts`, still exported by
+  `web/js/petri-wizard.js`).
+- `npm run check:open-flow` reaches the toolchain's device descriptions and Spartan-6 bit database through the
+  package's Node entry (`packages/silinx-fpga/src/node.js`), as the toolchain boundary test requires (#2148).
+- **Module Wizard: no quick-add buttons (#2145):** the Inputs and Outputs page of New Source ▸ Module (HDL) ▸ Wizard >
+  has no "Quick add (inputs / outputs / bidirectional)" rows; the port table (`portEditor`, `web/js/modwizard.js`) no
+  longer has them for any wizard, and the list of their ports (`QUICK_PORTS`, `core/modgen.js`) and their labels'
+  translations are gone.
+- **Silinx HLS: fmod and fmodf exact for every quotient (#2144):** core/c-mathlib.js's reduction is a loop of the state
+  machine, one step a cycle (a pipelined loop, its bound in the report), rather than 64 steps unrolled; a subnormal x
+  and y are each normalized alone, so that a large x no longer overflows with a subnormal y. The call is inlined into
+  the top as a function with a loop is (core/c-inline.js, core/c-dataflow-float.js's withSeqMath); of constants it is
+  still folded, and a function of the program named so stays its own. A step's path is 14.9 ns in the Spartan-3E's
+  delays: at a faster clock the report says so, as of any pipelined loop too slow (#2080). A loop pipelined around
+  the call is no longer pipelined (said, its count not a constant), and a call in a loop's condition or after && / || /
+  ?: is an error that says to make it a statement of its own. Tests: test/c-mathlib2.test.js, co-simulated in VHDL and
+  Verilog on quotients just below and above 2^64, the largest and smallest exponents and subnormals.
+- **Symbol Info: pins per bit (#2141):** the datasheet of a multiplexer of 4 to 16 inputs with Pins per bit stayed
+  empty (its data pins, D0_1…, had no index for their text), and the other symbols with Pins per bit described their
+  pins wrongly ("Input null"; INV's inputs as outputs). Each row's pin is now described as the one-bit symbol's, with
+  its bit: D2_1 "Data input selected when S1 S0 = 10 (2) (bit 1)", O1 "Output: the selected data input (bit 1)"; the
+  shared selects and enable as before. Tests: test/symdocs.test.js, test/ui/sch-symdoc-bits.test.js.
+- **< Back on a wizard's first page (#2140):** a wizard opened by New Source's *Wizard >* has *< Back* enabled on its
+  first page: it closes and New Source opens again at File Name and Location, with the type, the name, the location
+  and the language as they were (`wizard()`'s `back` and `start`, `web/js/wizards.js`).
+- **File Name and Location the same for every type (#2140):** Source type, File name, Location and Language for all
+  of them; the language no longer on the Define Module and Associate Source pages. The Boolean Algebra's optional
+  expression (#1056) moves to the new Boolean Algebra Wizard (`web/js/tt-wizard.js`): the inputs and the outputs
+  named, or an expression that gives them and fills the output's column; *Next >* makes the default table.
+- **nextpnr's Place & Route on the Spartan-6 (#2138):** the local server's flow gives the Spartan-6's Place & Route to
+  nextpnr (the new dependency `@silinx/nextpnr-himbaechel-spartan6`) when Process Properties chooses the nextpnr engine;
+  auto stays on Silinx's engine there. Silinx still maps the design into sites. The notices name the new package.
+- **nextpnr, the default engine (#2136):** a project that never chose an engine (no `impl.engine`) now takes `auto`
+  (nextpnr when it can implement the design, else the Silinx engine, which Map says in one line), in the local server's
+  flow, the browser's and Process Properties; one that chose `silinx` keeps it. The Spartan-6 stays on the Silinx engine.
+  When nextpnr cannot start (offline, its chip database not downloaded yet, #2329), `auto` takes the Silinx engine, with
+  one warning, instead of failing.
+  nextpnr's size and speed are still being brought to the Silinx engine's (#2196).
+- **The browser edition keeps nextpnr (#2136):** nextpnr's bundle and chip databases are versioned assets
+  (web/js/asset-cache.js `isVersionedAsset`): the service worker and the flow's worker read them from Cache Storage, and
+  `prepareBrowserFlow(device, impl)` fetches the bundle and the device's chip database when a project opens, unless its
+  engine is Silinx's; pruning keeps this version's.
+  - **Tests:** packages/silinx-fpga/test/nextpnr-engine.test.js (`engineOf`, nextpnr not starting), test/silinx-fpga-cli.test.js,
+    test/examples.test.js (the examples on every device, no warning, through the default), test/asset-cache.test.js,
+    test/web-open-flow-browser.test.js, and the UI tests test/ui/open-toolchain.test.js (nextpnr by default, the Silinx
+    engine once chosen) and test/ui/standalone.test.js (nextpnr prefetched, then offline from the cache), in both interfaces.
+- **nextpnr as a Place & Route engine, behind a flag (#2136):** `spec.engine: 'nextpnr'` (the command line's `--engine
+  nextpnr`, the local server's flow.json `engine`) gives the open flow's Map and Place & Route to nextpnr-himbaechel with
+  the Spartan-3E. The WebAssembly package comes from the fork pmnmalo/nextpnr-spartan, release v0.1.0
+  (`@silinx/nextpnr-himbaechel-spartan3e`), and its result is converted to XDL. The timing, the pins and the bitstream
+  read that XDL as they read Silinx's own.
+  - **Map** (packages/silinx-fpga/src/open-flow-nextpnr.js) puts each port's pad (its LOC) on its I/O buffer. It fails,
+    naming them, on the cells the micro-architecture does not have yet (#2135: carry chains, wide multiplexers, RAMs…)
+    and on ports without a LOC.
+  - **The converter** moved from research/nextpnr-s3e into src/fpga/nextpnr-xdl.js. An IOB is now named after its bit
+    of a bus (led<3>).
+  - **The notices:** THIRD-PARTY-NOTICES and NOTICE name nextpnr, Boost and Eigen, which the package contains.
+  - **Tests:** packages/silinx-fpga/test/nextpnr-engine.test.js builds the gates example with the engine: no
+    warnings, its pads, a complete bitstream.
+- **The nextpnr engine in the IDE and the browser (#2136):**
+  - **The project's engine:** `impl.engine` (`silinx`, `nextpnr` or `auto`), set in Process Properties (the Silinx toolchain
+    only), read by the local server's flow and the browser's; not set, `auto` (#2136: nextpnr by default).
+  - **`auto`:** nextpnr when it can implement the design; otherwise (a cell it does not have yet, a port without its pin) the
+    Silinx engine, which Map says in one line (not a warning). The Spartan-6 stays on the Silinx engine.
+  - **The browser edition:** the flow's worker runs nextpnr's bundle from the site's assets
+    (`vendor/nextpnr-spartan/<version>/`, its chip databases beside it); the local server serves it from node_modules.
+  - **Tests:** test/nextpnr-engine.test.js (`--engine auto` both ways, `engineOf`), test/silinx-fpga-cli.test.js, and the UI tests
+    test/ui/open-toolchain.test.js (Process Properties, English and Portuguese, Implement Design through nextpnr) and
+    test/ui/standalone.test.js (nextpnr in the browser edition), in both interfaces.
+- **The nextpnr engine: carry chains and constants (#2135):** nextpnr-spartan v0.2.1 (the pinned WebAssembly package)
+  places and routes MUXCY / XORCY chains up a column of slices, and takes the constants. As Silinx's packer, it adds a
+  carry-in stage when a chain's first DI needs BX, and keeps a chain's slices to its own cells. The converter writes the
+  carry settings ISE's map writes: CYINIT, CY0F / CY0G and their GNDF / C1VDD, CYMUXF, XORF, FXOR / GXOR, COUTUSED.
+  Map accepts MUXCY, XORCY, GND and VCC. The simulation check simulates the carry too.
+  - **Five of the seven examples** go through nextpnr (gates, blinky, pong, clock, vga): the routing checked, their
+    flip-flops simulated equal to the netlist, a complete bitstream. Their size and speed against Silinx's own engine:
+    blinky 132 / 117 slices, 7.5 / 6.6 ns; pong 266 / 245, 11.8 / 11.9 ns; clock 225 / 207, 6.6 / 6.2 ns; vga 183 /
+    144, 10.5 / 8.6 ns. traffic needs MUXF5 / MUXF6, stopwatch MULT18X18 and RAMB16.
+  - **The counter as Silinx's synthesis maps it (24 bits, one chain):** 13 slices as Silinx's; ISE's DRC clean; trce
+    4.608 ns against Silinx's 4.526 ns; the .bit byte-identical to ISE's bitgen.
+  - **A fix:** nextpnr writes a string parameter with a trailing space (`"1 "`); the converter now trims it. The space
+    had reached the XDL (`CY0F::1\ `), and the flip-flops' set / reset modes were misread.
+  - **Tests:** packages/silinx-fpga/test/nextpnr-s3e.test.js (the chain's settings, a complete bitstream, the
+    simulation check catching a wrong DI or carry in) and nextpnr-engine.test.js (the counter built with the engine).
+- **The nextpnr engine: MUXF5 and MUXF6 (#2135):** the dependency `@silinx/nextpnr-himbaechel-spartan3e` is now
+  nextpnr-spartan v0.3.0. Its micro-architecture places an MUXF5 with its slice's two LUTs, and an MUXF6 on a CLB's
+  lower slice with the F5s of that slice and the one above (the dedicated F5 -> FXINA / FXINB wires); MUXF7 and
+  MUXF8 become LUTs for now. A slice of a carry chain or a wide multiplexer takes no other cluster's cells.
+  - **src/fpga/nextpnr-xdl.js** writes F5MUX, F6MUX, F5USED / FXUSED, FXMUX = F5, GYMUX = FX and the selects' BXINV /
+    BYINV. **src/open-flow-nextpnr.js** (Map) accepts MUXF5 to MUXF8. **research/nextpnr-s3e/lib.mjs**'s simCheck
+    simulates them.
+  - **traffic through nextpnr:** 70 slices against Silinx's 66; ISE's DRC with no errors or warnings, trce 8.286 ns;
+    the .bit byte-identical to ISE's bitgen; its flip-flops simulate equal to the netlist. gates, blinky, pong, clock
+    and vga still pass (blinky 130 slices, was 132).
+  - **Tests:** test/nextpnr-s3e.test.js (traffic's F5 / F6 settings and wiring, a complete bitstream, the simulation
+    catching an output taken from the LUT instead) and test/nextpnr-engine.test.js (traffic built with the engine).
+- The open synthesis for the Spartan-6 runs synth_xilinx's memory step on Yosys's block RAM rule without the 9K halves
+  (`packages/silinx-fpga/src/synth-brams-s6.js`); the other examples' netlists are unchanged, a RAMB8BWER the design
+  instantiates stays one (#2130).
+- The Spartan-6 bitstream writes a RAMB16BWER as ISE's bitgen does (no block RAM frame written again, two bits of the
+  frame data cleared), and the bit database has its clock and reset pins, measured against ISE: the seven examples on
+  the Nexys3 and the Atlys are byte-identical with ISE's bitgen and DRC clean (#2130).
+- **Schematic: MUX / DEMUX pins per bit, the selects on every row (#2127):** each multiplexer and demultiplexer of
+  the stack has its selects' names where the last one has them, in every orientation; the shared select lines are drawn
+  before the bodies, so only the pieces between the rows show; M4_1… inside each multiplexer (#2122), DEMUX's type
+  above the stack as the one-bit one's. Tests: test/web-sch-svg.test.js, test/ui/sch-mux-rows.test.js.
+- **Silinx HLS: a struct's member array copied a statement each (#2126):** a copy (`a = b;`, `S c = d;`) of a
+  member array of 64 elements or fewer is a statement per element, no longer an inner loop, so that the loop
+  around it is pipelined automatically (core/c-pipeline.js's rule for a parent of small inner loops); a larger
+  member array is still copied in a loop. The corpus's aggregation-of-struct: an II of 1, down from 8 (Vitis HLS 2025.2: 2),
+  its latency 13 cycles, down from 103 (Vitis HLS: 24).
+- **Operators shared between states (#2125):** after the scheduling of #2080, the multiplications of different
+  states are bound to one unit of their kind where the period leaves room for its multiplexers, its operands multiplexed by the
+  state, in an order that leaves no
+  combinational loop; with the device's multiplier blocks (the IDE passes them, `cToHdl`'s `mults`) a cycle takes no
+  more, the others waiting for a later one. The report lists the units (their widths, blocks, uses and inputs) and the
+  longest path through their multiplexers, which the View C Synthesis Report warns about when over the clock.
+- **Schematic: pins per bit, the type inside each row (#2122):** wherever the one-bit symbol has its type inside its
+  shape (#2041), the pins-per-bit one has it inside each row's shape: the gates (inverted inputs too) in every
+  orientation; INV, BUF, BUFE and BUFT near each triangle's base (BUFE5: BUFE in each), upright or turned 180°; M2_1… in
+  each trapezoid, upright. Where the one-bit symbol has it outside (a triangle turned 90° / 270°, a turned multiplexer,
+  DEMUX), it stays once outside the stack. Tests: test/web-sch-svg.test.js, test/ui/sch-type-rows.test.js.
+- **The nextpnr spike's commands on their new paths (#2120):** after the move into the toolchain package (#2111),
+  packages/silinx-fpga/research/nextpnr-s3e's README and its scripts' usage lines named `research/nextpnr-s3e/…` and
+  `research/s3e-route/check.mjs`, which no longer exist; they now name `packages/silinx-fpga/research/…`.
+  packages/silinx-fpga/test/nextpnr-s3e.test.js checks that every script they name exists.
+- **Silinx HLS: math.h's other functions in hardware (#2119):** core/c-mathlib.js has tan (on sin and cos's reduction),
+  log2 and log10 (log's m and e, the constants in two parts), exp2, hypot (scaled against overflow, in two steps), fmod
+  (long division of the significands, 64 steps, NaN for a larger quotient, so that its circuit stays one a board can
+  hold), atan (fdlibm's reduction and polynomial), atan2, asin and acos from atan, sinh, cosh and tanh from exp (a Taylor
+  polynomial under 1), and cbrt (Halley's steps and a last Newton's). The C simulation and the constants folded at
+  synthesis run them (core/c-float.js's MATH, which gains the float names); within 3 ulps of JavaScript's Math. The hint
+  and the refusal list them, lround being the one still of constants only. Tests: test/c-mathlib2.test.js.
+- **sin and cos in double near a zero (#2119):** the reduction's second part was fdlibm's pio2_1t, which already holds the
+  third part, so n times 2e-21 was counted twice; it is now pio2_2 (tan was 84 ulps off near a pole, now 3).
+- **The schematic drawing's interpolations safe for #1443's check (#2110):** web/js/sch-svg.js writes a gate row's
+  coordinates as numbers, BUFE / BUFT's squeezed type and VCC / GND's label anchor inline, so that
+  test/web-markup-interpolations.test.js recognises them (the drawing unchanged).
+- **Boolean Algebra: no Apply button (#2107):** the toolbar's Apply of the input and output names duplicated what
+  leaving the field (its change event) and Enter already did; the button and its two translations are removed, the
+  errors shown as before. Tests: test/ui/truthtable.test.js (the names applied by Enter and by leaving the field,
+  the errors, the toolbar's buttons in English and in Portuguese).
+- **Try it keeps the inputs' values (#2106):** stopping a schematic's Try it and starting it again, its input markers
+  (switches, bus values) and the bidirectional markers driven from outside have the values they had at the end of the
+  last Try it, the circuit settled on them at time 0 and the registers at their initial values; the clocks start at 0.
+  The values live in memory, with the open schematic: closing it forgets them. A marker removed, turned into a clock
+  or of another width since then starts from 0. Try it's Reset now sets the inputs back to their initial values too
+  (0, the bidirectional markers released), with the power cycle as before. core/schlive.js: `inputValues()`,
+  `restoreInputs()`, `reset({ inputs: true })`. Tests: test/sch-livesim.test.js, test/inout.test.js,
+  test/ui/sch-live-parts.test.js (both interfaces), test/ui/livesim.test.js (Reset).
+- **Boolean Algebra: an icon meaning algebra (#2105):** web/js/icons.js's new `algebra` icon (Ā·B on paper, drawn
+  with paths so a row's text stays its label) is used in the Design pane's rows, the New Source list, the Tools
+  menu, the document's tab and the processes; the old id `truthtable` draws it too. Tests:
+  test/ui/algebra-icon.test.js, both interfaces.
+- **The Spartan-6 in the browser edition (#2103):** the site publishes the Spartan-6's bit databases
+  (`assets/<version>/bitdb/s6/`, a folder the build did not copy) beside the XC6SLX16's and XC6SLX45's device
+  descriptions, and keeps them in Cache Storage as the other assets. `web/js/open-flow-browser.js` takes the Nexys3's and
+  the Atlys's parts with the steps the server has for them (another step is refused, as the server refuses it), and the
+  flow's worker fetches the part's bit databases (`fetchBitDbS6`): the same object as the server's, and the same
+  bitstream. The Spartan-6 uses the Silinx engine in the browser.
+  - **Tests:** test/s6-bitdb-browser.test.js, test/web-open-flow-browser.test.js, test/asset-cache.test.js,
+    test/ui/standalone-boards.test.js.
+- **The tests of the Pins per bit changes on main (#2096):** core/symdocs.js has the Portuguese of the gates', the
+  multiplexers' and the demultiplexer's Pins per bit labels (#2079, #2081); test/schsymbols.test.js,
+  test/schmulti.test.js and test/inv-bits.test.js expect the new parameter and BUF's 40 px body (#2068).
+- **A pull request's tests: through re-exports and a page script's imports (#2093):** scripts/related-tests.mjs counts as
+  changed a module that re-exports names of a changed one (a split module's old one: core/schdoc.js of
+  core/schdoc-symbols.js), selects a UI test that imports a changed module, follows a page script's absolute imports
+  (/core/…, /js/…) and selects the UI test of a page script that imports a changed module. A change of the symbols'
+  definitions now runs the tests that list their parameters (test/schmulti.test.js, test/symdocs.test.js,
+  test/ui/sch-props.test.js…), which three pull requests broke on main without running them (#2086, #2091, #2096).
+  Tests: test/related-tests.test.js.
+- **A schematic Properties test with the gates' Pins per bit (#2091):** test/ui/sch-props.test.js expects a gate's new
+  field (#2079) among its properties and its read-only fields.
+- **A UI test reading a field's note with its label (#2086):** test/ui/sch-inv-bits.test.js reads the Pins per bit
+  field's label element, not its whole text, which since #2076 has a note at Width 1.
+- **The FSM, ASM and UCF wizards (#2082):** New Source ▸ Finite State Machine (FSM) / Algorithmic State Machine
+  (ASM) ▸ Wizard >: the inputs and outputs (the port table), the clock and the reset (an FSM: Moore or Mealy), the
+  states (an FSM's transitions too, from, to and condition; an ASM's state boxes chained), a summary; the chart is
+  created and opened in its editor (`core/chart-wizard.js`, `web/js/chart-wizards.js`). Implementation Constraints
+  File ▸ Wizard >: each bit of a module's ports on a pin of the board, assigned from it as I/O Pin Planning's
+  Auto-assign and changed at will (typed with no board), a pin given twice refused; the `.ucf` is written, the
+  project's constraints file when it has none (`web/js/ucf-wizard.js`).
+- **"Wizard >" (#2082):** the button is "Wizard >" ("Assistente >"), and the wizards it opens (Module, Schematic,
+  FSM, ASM, Petri Net, Clocking Wizard, Block Memory, UCF) leave out their "Name and Language" page: the name was
+  checked on New Source's page (a reserved word, a module or a drawing's HDL file of that name), the language is
+  chosen there too (shown for the HDL files and the drawings, and used by Next > for a drawing's HDL), the
+  description and a clock manager's or block memory's count of the device's resources move to the wizard's first
+  page. The Petri net wizard's Inputs and Outputs page has no "Quick add" buttons.
+- **MUX and DEMUX with a pin per bit (#2081):** core/schdoc-symbols.js gives the multiplexers and the demultiplexer Pins
+  per bit: with it a W-bit one is W of them one under the other, a MUX's row r with D<i>_<r> and O<r>, a DEMUX's with
+  D<r> and O<i>_<r>; the select bits and the enable are one pin each, shared. web/js/sch-svg.js draws a body a row, the
+  select lines through them from their pins and the enable's line on the left with a dot at each row; each row's pins
+  named as the one-bit one's. core/schdoc-hdl-cases.js writes each row's assignments, the shared pins read (and an
+  unconnected one tied to 0) once; the ISE export names them xl_mux…_bits / xl_demux…_bits, imported back with the
+  option. Tests: test/mux-bits.test.js (the HDL simulated in VHDL and Verilog), test/ui/sch-mux-bits.test.js (both
+  interfaces, Portuguese), test/ui/sch-bits-enabled.test.js; the schematic corpus re-saved with the new parameter.
+- **Silinx HLS, the delays of a family (#2080):** `core/c-timing.js` estimates a path with the Artix-7's delays, as before, or
+  with the Spartan-3E's, fitted on small designs through the open flow; the scheduling over cycles will use them. A `<=`
+  now counts as a carry chain, as `<` does (it counted as nothing).
+- **Silinx HLS, a wide multiplication over cycles (#2080):** in a state the clock splits, a multiplication wider than one
+  multiplier block becomes 18 x 18 ones and their sum (`core/c-mul-split.js`), which the scheduling chains as any other
+  operation, so each state fits the period.
+- **Silinx HLS, a state that accesses a memory split by the clock (#2080):** its access made in the chain's last state
+  (its address, enables and data computed by then, a value read before the chain held), so a memory's read, computation
+  and write fit the period. The split is made inside `core/c-fsmd.js`, before the memories' ports.
+- **Silinx HLS, the device family's delays in the IDE (#2080):** View HDL, the ASM chart, the co-simulation and the C
+  Synthesis Report schedule with the delays of the project's family (`familyOf` in `core/c-timing.js`): the Spartan-3E's,
+  else the Artix-7's.
+- **Silinx HLS, a state that writes a stream split by the clock (#2080):** its value computed in the chain's states, the
+  handshake in the last one, where the machine waits for its FIFO without computing again.
+- **Silinx HLS, a pipelined loop too slow for the clock (#2080):** its II kept (Silinx adds no pipeline stages), its
+  longest path in the report (`slowLoops`) and a warning in View C Synthesis Report, not in a compilation's messages.
+- **Silinx HLS, states split by the clock (#2080):** `core/c-schedule.js` chains a state's operations while they fit the
+  period less its uncertainty; a state that does not fit becomes a chain of states, the values crossing them in registers
+  of their own and the C's registers written in its last state, so the results are the same. A state that accesses a memory
+  or a stream, and a pipelined loop's, are not split yet. A multiplication by a power of 2 counts as wiring.
+- **The logic gates with a pin per bit (#2079):** core/schdoc-symbols.js gives every gate Pins per bit: with it a W-bit
+  gate is W gates one under the other, gate k's inputs I0_k, I1_k… (inverted as the 1-bit gate's) and its output Ok;
+  web/js/sch-svg.js draws a gate a row (the type under them); core/schdoc-hdl-symbol.js writes a gate's assignment a
+  bit; the ISE export names it xl_<gate>_w<W>_bits, imported back with the option. The gates example and the schematic
+  corpus re-saved with the new parameter. Tests: test/gate-bits.test.js (the HDL simulated in VHDL and Verilog),
+  test/ui/sch-gate-bits.test.js, test/ui/sch-bits-enabled.test.js (both interfaces, Portuguese).
+- **Pins per bit enabled for a Width of 2 or more (#2076):** web/js/sch-props.js shows the check box of INV, BUF,
+  BUFE / BUFT, ADD, SUB, COMP and CNT unticked and greyed at Width 1, with the note "for a Width of 2 or more"; a wider
+  symbol enables it, its saved tick shown again. Tests: test/ui/sch-bits-enabled.test.js (every such symbol, both
+  interfaces, Portuguese).
+- **New Source: the dialog's title (#2072):** "New Source Wizard" is now "New Source" (web/js/new-source.js), and in
+  Portuguese "Assistente de Nova Fonte" is now "Nova Fonte" (web/js/i18n.js). The UI tests wait for the new title.
+- **BUF, BUFE and BUFT: a 40 px triangle, their type inside (#2068):** core/schdoc-symbols.js and web/js/sch-svg.js
+  draw BUF's and the tri-state buffers' triangle from x = 20 to 60 (4 grid steps; it was 34 / 36), INV keeping its
+  triangle and bubble, which reach the same; the pins unchanged. BUFE's and BUFT's type (BUFE8 too) is inside the
+  triangle, 7 px near its base, as INV's and BUF's (#2041); BUFE4's under its triangles. Tests: test/web-sch-svg.test.js,
+  test/ui/sch-labels.test.js (both interfaces).
+- **INV and BUF with a pin per bit (#2067):** core/schdoc-symbols.js gives INV and BUF the Pins per bit parameter: with
+  it, a W-bit one has I0..I(W-1) and O0..O(W-1), a row each (80 x 20W); web/js/sch-svg.js draws a triangle a row (the
+  type under them); core/schdoc-hdl-symbol.js writes an assignment a bit; the ISE export names it xl_inv_w<W>_bits /
+  xl_buf_w<W>_bits, imported back with the option. Tests: test/inv-bits.test.js (the HDL simulated in VHDL and
+  Verilog), test/ui/sch-inv-bits.test.js (both interfaces, Portuguese). The gates example and the schematic corpus
+  re-saved with the new parameter.
+- **Boolean algebra sources named .bool.json (#2065):** New Source, the state diagram's Create Boolean Algebra and the
+  wizards make <name>.bool.json; every place that knows the drawings (core/view-hdl.js's VIEW_RE, the Design pane,
+  open, rename, find, split view, the HDL file's banner, the ISE export's Silinx-only files) knows both extensions, so a
+  project's <name>.tt.json is the same kind of drawing. examples/traffic/src/lamps.tt.json is lamps.bool.json (its HDL
+  and the other sources' comments say so). Tests: test/view-hdl.test.js, the UI tests that make algebra sources.
+- **Try it: a bus's bits and their value (#2064):** web/js/sch-live.js shows a bus's value, in the three readings of
+  #2015, as its bits and their decimal value (1110 = 14, 1110 = -2, 1110 = -1), on the markers, the wires and the
+  registers; the bar's formats named so, with their Portuguese labels. The value editor still takes a decimal. Tests:
+  test/ui/sch-live-parts.test.js (both interfaces, Portuguese).
+- **Spartan-6: a slice flip-flop set as a gate in the bitstream (#2061):** the XDL writes it `#AND2L` / `#OR2L`, and
+  the slice databases named its measured variant as the primitive does (AND2L / OR2L), so bitgen took it as not
+  measured. bitgen-slice.js's kindModel now finds it by either name, and the clock example on the Nexys3 reaches its
+  bitstream. Tests: packages/silinx-fpga/test/s6-bitgen.test.js.
+- **A pull request's tests: the helpers in the tests' subfolders followed (#2058):** scripts/related-tests.mjs counts as
+  a test helper a .js / .mjs at any depth of test/ and packages/silinx-fpga/test/ (not test/ui/), so a change of
+  core/schdoc.js runs test/schematic-corpus.test.js, through test/schematic-corpus/lib.mjs; #1988's did not, and main
+  broke (#2055). Tests: test/related-tests.test.js.
+- **The schematic corpus at document version 7 (#2055):** its hand-made schematics (test/schematic-corpus/hand) re-saved
+  at version 7 after #1988, so that they load as saved; their expectations unchanged.
+- **Boolean algebra editor: its toolbar (#2047):** web/js/truthtable.js shows the link to the table's HDL file only
+  when the file is not in sync with the table ("Not in sync with …"), the file's name kept in the link's data-hdl.
+  "Boolean Algebra from Module…" is now "Algebra from Module…" (its dialog too) and "Handwritten…" "Handwritten
+  Algebra…", with their Portuguese labels. Tests: test/ui/truthtable.test.js, test/ui/projects.test.js,
+  test/web-i18n.test.js.
+- **Schematic editor: a module symbol double-clicked opens its main source (#2046):** web/js/drawings.js opens it
+  with design.js's openModuleSource, as the module's Design row's double-click: its drawing when it is drawn, its
+  wizard, else its HDL. Tests: test/ui/sch-open-module.test.js (a schematic, a state diagram, a truth table and a VHDL
+  module; both interfaces).
+- **Spartan-6 synthesis: no warning on an inferred block RAM's ports (#2045):** Yosys's block-RAM mapping for the
+  Spartan-6 connects its generic 64- and 8-bit data ports and a 14-bit address to the RAMB8BWER's narrower ones. It
+  logs "Resizing cell port … DOADO from 64 bits to 16 bits" and "ADDRAWRADDR from 14 bits to 13 bits" (a RAMB8BWER's
+  rule has 13 address bits, so the 14th is never used). These are left out of the log and the warnings as the
+  Spartan-3E's were (packages/silinx-fpga/src/synth-open.js QUIET). The stopwatch example now synthesizes for the
+  Nexys3 with no warning. Tests: test/synth-open.test.js, test/s6-devices.test.js, test/unisim-s6.test.js.
+- **Schematic editor: VCC's and GND's label clear of the symbol in every orientation (#2042):** web/js/sch-svg.js
+  places the label past the bar away from the pin (VCC's bar, GND's last bar): above or below it upright or turned
+  180°, beside it, anchored away from it, when turned 90° or 270°. Tests: test/web-sch-svg.test.js (every orientation,
+  mirrored too; upright where it was), test/ui/sch-vcc-label.test.js (the boxes measured on the screen, both
+  interfaces).
+- **The symbol's type inside its shape (#2041, correcting #2036):** web/js/sch-svg.js draws a gate's, an inverter's,
+  a buffer's and an upright multiplexer's type at its body's centre (a triangle's near its base), 8 px bold, a type a
+  little long for the body squeezed to it (NAND3B3); else under it as before (a turned inverter; BUFE / BUFT, whose
+  triangles are too small; a turned multiplexer's above it). The instance name is above the symbol again, as before
+  #2036 (whose change, the name inside, is undone). Tests: test/ui/sch-labels.test.js (both interfaces),
+  test/web-sch-svg.test.js, test/ui/sch-gate-width.test.js.
+- **The tablet tests in Firefox and WebKit (#2038):** the UI tests of #1985, #1990 and #1992 send their touches through
+  the Chrome DevTools Protocol: Chrome only (skipped in the other browsers, as the other CDP tests).
+- **The Start page's order (#2029):** Project Commands, then Where Projects Are Kept, then Recent Projects.
+- **The toolbar's Close Project (#2027):** as File ▸ Close Project, enabled when a project is open; its icon a folder
+  with a cross.
+- **Spartan-6: the clock pads' BUFIO2s (#2025):** the clock paths from every pad measured into a DCM or a PLL now
+  match ISE's bitgen, including pads whose BUFIO2 had not been measured with that DCM or PLL. On the XC6SLX16's 203
+  CMT and example designs, every bit is predicted (196 before).
+- **Spartan-6: the I/O logic's clock and the CMTs' HCLK outputs (#2025):** the PIPs of a clock to the I/O logic and of
+  the DCMs' and PLLs' outputs onto the HCLK lines measured against ISE's bitgen; on the XC6SLX16's 203 CMT and example
+  designs the rules predict 122 bit for bit (103 before).
+- **Spartan-6: an output register in the pad (#2025, #2372):** an output flip-flop that ISE packs into a pad's I/O logic
+  (OLOGIC2) is now measured against ISE's bitgen at every site of the XC6SLX16 and the XC6SLX45, along with its clock's
+  path. On the XC6SLX16's 203 CMT and example designs the rules predict 196 bit for bit (122 before). A top pad's output
+  no longer predicts a bit that ISE does not set.
+- **Spartan-6: a DCM's or PLL's bits by the same rules at every site (#2025):** a DCM or PLL at the one site measured
+  whole in #727 set a few bits ISE's bitgen does not when it drove other BUFGMUXes; it is now predicted as at any other
+  site. On the XC6SLX16's 203 CMT and example designs, every bit matches ISE (199 before).
+- **Spartan-6: the XC6SLX16's top-half DCMs and PLL (#2025):** the clock paths' PIPs of PLL_ADV_X0Y1, DCM_X0Y2 and
+  DCM_X0Y3 measured one at a time against ISE's bitgen (219 PIPs more in the CMT paths' database), and their input
+  table's rows; the DCMs' and PLLs' settings measured without the bits of their CLKIN path (which differ by the BUFIO2
+  that drives it) nor the PLL's CLKOUT0 enable, now one of its outputs. On the 203 CMT and example designs measured,
+  the rules predict 119 bit for bit (65 before) and no bit ISE does not set.
+- **Spartan-6: the XC6SLX45's (Atlys) DCMs and PLLs (#2025):** their clock paths, settings and inputs measured against
+  ISE's bitgen; the CMT paths' PIPs a database per device. On the XC6SLX45's 184 CMT designs the rules predict every
+  bit.
+- **CodeQL's alerts as issues (#2021):** after each analysis, a job of `codeql.yml` (scripts/codeql-issues.mjs) opens
+  one issue per open alert of the default branch, never twice for one alert, and closes the issue of an alert fixed
+  or dismissed with a comment saying which. Issues are public and a vulnerability is reported privately
+  (SECURITY.md): an issue holds only the alert's number and its link, which the maintainers alone can open (no rule,
+  file, line or message), labels bug and security. Tests: test/codeql-issues.test.js, test/ci-workflow.test.js.
+- **The remote scripts' ssh does not hang (#2019):** scripts/hls-vitis.mjs, scripts/check-open-flow.mjs,
+  research/synth-quality/fsm-ise.mjs and test/designs-corpus/compare-ise.mjs give every ssh and rsync
+  `ServerAliveInterval=30`, `ServerAliveCountMax=4` and `ConnectTimeout=30`: a connection that drops silently fails
+  within about 2 minutes. Test: test/ssh-keepalive.test.js.
+- **Truth Table renamed Boolean Algebra (#2017):** everywhere the interface named the source: the New Source and
+  New Project wizards' source type, *Tools ▸ Boolean Algebra / Karnaugh Map…*, *View/Edit Boolean Algebra*, the
+  console's *Created Boolean Algebra …*, the Design pane's badge ([Algebra], it was [Table]) and its tips, the editor's *Boolean Algebra from Module…*,
+  the FSM editor's *Create Boolean Algebra*, the Development menu's *Handwritten Boolean Algebra…*, the About text,
+  the generated HDL's header (*generated from the Boolean algebra … (Silinx Boolean Algebra / Karnaugh Map)*, the
+  traffic example's lamps.vhd with it), README and docs; Portuguese *Álgebra Booleana*. A text about the table of
+  values itself still says truth table. The file format and its extension are unchanged. Tests: the UI tests of the
+  wizards, menus, processes, editors and their Portuguese labels.
+- **Try it's decimal readings (#2015):** the bus values' number format has Decimal (Unsigned), Decimal (Two's
+  Complement) and Decimal (One's Complement) beside Hex and Binary; the value editor reads a negative decimal in two's
+  or one's complement; a 1-bit wire shows its bit in every format.
+- **Check for Updates' Refresh (#2013):** the dialog's Refresh (Atualizar) asks again (the site's version, GitHub's latest
+  release) and shows the answer of now.
+- **CodeQL's alerts since #585 reviewed (#2011):** the regular expressions that could take quadratic time on a long
+  run of one character fixed: a port's and a clock period's text in the UCF (trimmed first), the back-annotated UCF's
+  end, a base64 string's padding (a device's routing graph) and XDL's quoted strings (one with no closing quote is now
+  an error, not words). A no-op replace in a test removed. The others are false positives, dismissed with their
+  reason (paths through `projectDir` / `safeJoin`, XDL's escapes as ISE's, the tests' escapes of known strings).
+  Tests: test/ucf.test.js, test/xdl.test.js, test/fpga-device.test.js.
+- **Handwritten expressions in the truth table editor (#2010):** the editor's toolbar has Handwritten… (the
+  Development menu keeps the handwritten table and schematic, previews). Its pad reads one or more equations, one a
+  line, with any names (core/ink/equations.js: the strokes split into lines by their height, a bar, a stroke of = or a
+  dot with its line; each line read by recognizeExpression); inserted, they replace the table's inputs (the
+  expressions', in order of appearance), outputs (the equations' names), columns and expressions, one step of Undo;
+  a single expression with no name is the selected output's. The editor's rules are the dialog's errors: an
+  expression of several with no name, an output twice, a name both an output and an input, a reserved name, more than
+  6 inputs. The pad is taller (two or three lines). Tests: test/ink-equations.test.js (the lines of drawings with
+  bars and dots, the equations read, the table's columns against an independent evaluation, every error),
+  test/ui/ink.test.js (two equations of new names into the editor, its rule, Undo), test/ui/truthtable.test.js,
+  test/ui/dev-menu.test.js.
+- **The handwritten truth table written down the page (#2007):** the Handwritten Truth Table dialog's pad is taller
+  than it is wide, on the left (as high as the window allows), and the hint, the pad's buttons and the table read
+  with its messages are in a column on its right; on a narrow screen, one under the other (web/js/ink-table-dialog.js,
+  web/css/ink.css). Tests: test/ui/ink-table.test.js (the pad tall, the column on its right, in order; the Portuguese
+  labels in their new order).
+- **Erase on the handwriting pad (#2004):** the pad of the Handwritten Expression, Truth Table and Schematic dialogs has
+  an Erase button beside Move and Fit (one of them on at a time): a drag with a pen, a finger or the mouse rubs out the
+  ink within 12 px of it (a line is 3 px wide), a stroke it crosses cut in two, the eraser's circle shown where it rubs;
+  one drag is one step of Undo, and the drawing is read again when it ends (web/js/ink-pad.js). Tests:
+  test/ui/ink.test.js (a B rubbed out, the rest read as before, Undo and Redo, Erase or Move), the dialogs' Portuguese
+  labels.
+- **Move on the handwriting pad (#2003):** the pad of the Handwritten Expression, Truth Table and Schematic dialogs has
+  a Move button beside Fit (pressed while on): a drag with a pen, a finger or the mouse moves the drawing in the pad
+  (its view) instead of writing, and the mouse's middle button drags it at any time; the strokes keep their
+  coordinates, so what is read does not change (web/js/ink-pad.js, web/css/ink.css). Tests: test/ui/ink.test.js (the
+  mouse, a pen, the middle button, the same text; Move off writes again), the dialogs' Portuguese labels.
+- **The handwritten expression in the editor's notation (#2001):** what the Handwritten Expression dialog reads, when
+  it parses, is shown and inserted in the slash notation of the truth table editor (core/logic.js
+  `formatExpr(…, 'slash')`): `F = /A.B + C`, a bar over a group `/(A + B)`; a text that does not parse stays as
+  written, for the user to correct. `recognizeExpression` (core/ink/expression.js) also returns `written`, the
+  text as written (its letters' case, its primes), which the flip-flops' labels read. Tests: test/ink.test.js
+  (the notation, the same function as written; the text as written when it does not parse), test/ui/ink.test.js.
+- **The emulator's board on a small window (#1999):** in the Tasks interface the board is zoomed to fit the window
+  down to 0.7 (it was never made smaller than its proper size, #1021), the Watch below it when beside it the board
+  would be smaller than its proper size; the emulator's bar keeps its rows (a flex item that no longer shrinks), so its
+  second row (Power cycle, Clock, When hidden) is never under the board.
+- **A bus's bits in the wizard (#1995):** a port of width N shows (N-1:0) next to its width, the neutral form of the
+  symbols, in place of VHDL's (N-1 downto 0), which had no Portuguese.
+- **A symbol's menu and a drag (#1992):** the menu closes when the dragged symbol (or a wire's segment) has moved a
+  grid step, not on a pixel's jitter of the finger before it moves.
+- **A menu closed by a drag (#1992):** a symbol's menu, opened by a right click or a tablet's long press, closes the
+  moment a drag begins (a symbol, a wire's segment, a selection band); the view's pan leaves it.
+- **The symbol palette on a tablet (#1990):** a long press on a row (a finger or a pen) opens no menu, the browser's nor
+  Silinx's; with a mouse, the right click's menu (Symbol Info…, Place Symbol) stays.
+- **Schematic editor: INV, BUF and the tri-state buffers 80 px wide (#1988):** core/schdoc-symbols.js draws them as
+  wide as the 2-input gates (they were 60 px, BUF_OLD_W), their triangle 34 or 36 px long, so that the output's lead
+  has room for its bus width. Document version 7: core/schdoc-upgrade.js's widenBuffers keeps each one's inputs where
+  they were and moves its outputs along their leads, and what met them follows: a wire's end, an I/O marker, a net name
+  on the lead. A version 2 document has its wires split at the old outputs first, so a wire that crossed an output keeps
+  its connection (#678). The generators place the longer inverter too: a truth table's gate schematic
+  (core/logic-sch.js) and an ISE schematic's inverted pins (core/isesch-geometry.js). The gates example is saved at
+  version 7. Tests: test/tristate.test.js and the schematic tests whose coordinates were the 60 px inverter's.
+- **The Buffers category (#1987):** BUF (from Logic) and the tri-state buffers BUFE / BUFT (from Tri-State) in one
+  palette category, Buffers, after Logic; the Tri-State category removed, in English and in Portuguese.
+- **The Board Emulator on a tablet (#1985):** no context menu over the emulated board (a long press is one, and it
+  released a push button held down); its buttons take the touch themselves (`touch-action: none`), and the board shows
+  no text selection or touch callout.
+- **Simulator: the decimal radixes by their encoding, and one's complement (#1983):** the wave window's Radix menu
+  shows Decimal (Unsigned) and Decimal (Two's Complement) (formerly Unsigned / Signed Decimal) and a new Decimal
+  (One's Complement) (`c1dec`: 1110 = -1, 1111 = -0), in Portuguese Decimal (sem sinal / complemento para 2 /
+  complemento para 1); the console's `show value` and `ssim force add` take `-radix c1dec`, a value typed in one's
+  complement encoded as such. A .wcfg file has no ISE radix for it: the signal is written without one. Tests:
+  test/web-helpers.test.js (every value on 1, 4 and 8 bits against the definition, shown and typed back),
+  test/wcfg.test.js, test/web-isim-rows.test.js, test/ui/wave.test.js.
+- **A pull request's tests get 90 minutes a part (#1982):** a change of the open toolchain runs "the examples on
+  every board", 41 minutes alone on GitHub's runner, and its part passed the 45 minutes with its UI tests, so
+  `related-tests` reported a cancellation instead of a result. `.github/workflows/pr-tests.yml`'s parts now have 90
+  minutes. Test: test/related-tests.test.js.
+- **The example isqrt (#1966):** a C function (`src/isqrt.c`, a loop of a count the data decide, a pointer output, `ap_uint`) instanced by a VHDL top with the display, its HDL generated with no file of its own; C simulation, C/RTL co-simulation and the display's test bench, on every device of the Silinx toolchain. The examples' tests make a C module's HDL as the application does.
+- **Silinx HLS: `ap_ctrl_chain` (#1965):** `ap_ctrl_hs`'s ports and `ap_continue`, in sequential, combinational (with a
+  clock, latency 0) and DATAFLOW tops, as Vitis HLS 2025.2's RTL: `ap_done` held until `ap_continue` is 1, no new call
+  meanwhile, `ap_ready` one cycle a call, `ap_idle` 0 while `ap_start` is 1. It was accepted and made as `ap_ctrl_hs`.
+  The C/RTL co-simulation holds `ap_continue` at 0 after each call and checks all this; the ASM chart and the C
+  Synthesis Report show it.
+- Silinx HLS C++: a base class is a member of its own: its members and methods through it, hiding, `A::f()`, upcasts,
+  several bases, class templates; a constructor calls the bases' and the members', in C++'s order. A static or global
+  object's constructor runs when the source is checked (constants only, said otherwise), its results the initial
+  values; arrays of objects, each element's constructor; a method of an element by reference, inlined; a virtual
+  function or base still refused (#1964).
+- **Silinx HLS, unions and initializers (#1963):** a union over 64 bits is a word of its size (`ap_uint<N>`, its `sizeof`
+  C's); a union in a struct, named or anonymous, is a member of the word's type, reached through the struct's chains
+  (`s.u.m`, `p->u.m`, `a[i].u.m`) and its methods; a union in a union is a part of it; `++` and `--` on a member write it
+  and give C's value; a new pass (`core/c-designated.js`) writes designated initializers, and those of a type with a
+  union, in full by C's rules. The casts in a global's initial value now get their `ap_uint` width.
+- **PIPELINE of a function, and of a loop with a memory or a loop in it, as Vitis HLS (#1962):** core/c-pipe-sched.js
+  schedules a body modulo its II: a memory's port an access a cycle, the operations chained within the clock, pipeline
+  registers and valid bits, a dependence (a variable, a memory, the exit) raising the II and said; an exit known late
+  squashes what started after it; an element read twice is one read; an array's element written and read back at the
+  same index is that value (no mux); an II the ports and the dependences allow, kept when the clock's stages would
+  need more (the path then reported as too long for the clock, as any pipelined loop's); a pointer output's `_ap_vld`
+  with its value; the ASM chart made from the C (core/c-asm.js) shows a pipelined loop as one state, its statements in it. A loop's cycles are (N - 1) x II + its stages (the report's `depth`). The top
+  function's pragma: one pipeline, `ap_ready` ahead of `ap_done`, the report's `pipeline`. A loop with a stream, a
+  partitioned array (#1920) or a memory of structs keeps its states as before; a pipelined function's `ap_start` is
+  the protocol's, not renamed `ap_start_r` (#1926). A function of ap_ctrl_chain (#1965) keeps its calls one
+  after the other, said. Tests: test/c-pipe-sched.test.js (co-simulated in VHDL and Verilog, the warnings asserted,
+  overlapping calls in a bench of their own), test/c-pipeline.test.js, test/c-pragma.test.js.
+- **`DEPENDENCE` (#1961):** `inter … false` frees a memory's read from coming after another iteration's write, `intra …
+  false` lets a read and a write of one iteration share a stage, in the loop the pragma is in and those inside it, and in
+  a pipelined function. `true` has no effect, and a pragma on a variable or a name that is no memory keeps its dependence, with a
+  warning.
+- **`LOOP_FLATTEN`, `LOOP_MERGE` (#1961):** `LOOP_FLATTEN` makes a perfect nest of constant counts one loop, and `off`
+  leaves it alone. `LOOP_MERGE` makes a body's consecutive `for` loops one, of the largest count or their common bound,
+  and `force` merges them even when a value crosses them. What cannot be made keeps its loops, with a warning saying why.
+- **`BIND_STORAGE impl=`, `ARRAY_RESHAPE`, `STREAM` (#1961):** `impl=lutram` and `bram` set the tools' `ram_style` or
+  `rom_style`, and `register` makes no memory; `uram`, `srl` and `latency=` warn, as does `impl=` on an argument. `ARRAY_RESHAPE` of a local array is made as a
+  partition, with its accesses at once, and says so; of an argument it warns and keeps the port. `STREAM` warns outside a
+  DATAFLOW region, on an array that stays a buffer, and for `type=shared` or `unsync`.
+- **`BIND_OP`, `ALLOCATION`, `LATENCY` (#1961):** `BIND_OP op=mul impl=fabric` makes the variable's multiplications from
+  shifts and additions. `ALLOCATION instances=mul limit=N` keeps a cycle to N multiplier blocks, and a value carried to a
+  later cycle is now as narrow as the value, so those multiplications share one. `LATENCY min=` adds wait states at the
+  top function's start and `max=` warns when a path takes more. What Silinx cannot make keeps a warning saying why.
+- **A called function not inlined, a sub-module (#1960):** core/c-submodule.js. `INLINE off` makes the function a module
+  with its block protocol, one instance per caller and size of its arrays; a call is a state of the caller's machine
+  holding `ap_start` and the arguments until `ap_done`; `ap_return` and pointers' values (at their `_ap_vld`) taken as they
+  come; an array or a stream argument's port the callee's during the call. `INLINE recursive` dissolves the functions it
+  calls but those with `off`. The report has `latency` and `functions` (calls, latency, states, register bits, memories), a
+  loop's cycles with its calls in them; the ASM chart shows the call's wait. DATAFLOW's processes and sub-modules are made
+  by the same registry of modules (`moduleRegistry`). A function of latency 0 under a top of latency 0, sharing a global
+  with its caller, with a struct argument, with ap_ctrl_chain, or under an AXI master, stays inlined (said). Test: test/c-submodule.test.js.
+- **The Spartan-3E through nextpnr-himbaechel, a spike (#1954):** packages/silinx-fpga/research/nextpnr-s3e: a `spartan3e`
+  micro-architecture of nextpnr (in a fork, branch `silinx-s3e`) whose chip database is built from Silinx's device
+  graph, leaves out the PIPs whose bits Silinx's bit database does not know and takes Silinx's delay model (fitted to
+  ISE's trce); it packs LUTs and flip-flops into slices and permutes the LUTs' inputs. packages/silinx-fpga/research/nextpnr-s3e/lib.mjs
+  writes nextpnr's routed design as XDL for Silinx's bitgen, checks it against the netlist by simulation, and exports
+  the PIPs and the delays for the chip database. A counter on the XC3S250E: ISE's DRC clean, Silinx's .bit
+  byte-identical to ISE's bitgen and run on a Basys2, 19 slices as Silinx's, 7.15 ns against Silinx's 6.72 ns.
+  Tests: packages/silinx-fpga/test/nextpnr-s3e.test.js.
+- **Spartan-6: the bottom CMTs' clock paths by rules (#1951):** on the XC6SLX16, a DCM's or PLL's path from the clock
+  pad to the BUFGMUXes predicted from its parts. Each BUFGMUX design (research/s6/gen-cmtsites6.mjs --muxes) has its
+  paths' PIPs dropped one at a time in context (gen-cmtdrop6.mjs, ana-cmtdrop6.mjs: research/s6/db/s6-pips-cmt.json).
+  A BUFGMUX a CMT drives sets its REGC bit (cmt6.mjs's CMT_REGC). A CMT's outputs used, its input BUFIO2 and the clock
+  spine set their own bits (ana-cmtinput6.mjs: research/s6/db/xc6slx16-cmt-input.json). residual6.mjs reads them all,
+  and `--no-cmt-paths` drops #727's whole paths. The bottom DCMs' BUFGMUX designs come out exact. Nothing is predicted
+  that ISE does not set on #727's CMT designs, which the rules were not derived from, and the examples stay exact.
+  The top half and the XC6SLX45 go on in #2025. Tests: test/s6-cmtpaths.test.js.
+- **Spartan-6: the CMT paths' PIPs probed (#1951):** the PIPs the PIP drop could not take apart (the CMT tiles' input
+  and output chains, the I/O tiles' clock paths) measured one by one with ISE, each on a TIEOFF net of its own
+  (research/s6/gen-cmtprobe6.mjs, ana-cmtprobe6.mjs: research/s6/db/s6-pips-probe.json, read by residual6.mjs); each
+  DCM and PLL output alone at every CMT site (gen-cmtsites6.mjs --outputs) for the settings. Tests:
+  test/s6-cmtsites.test.js.
+- **`hls::FIR`'s structure from its rate (#1947):** core/hls-fir.js's `firStructure` computes the MACs as PG149 does (the
+  taps over an output's clocks, half of a mirrored filter's, at most 28 with a warning); core/hls-fir-hdl.js makes them,
+  the delay line partitioned among them and read while inputs arrive, the products in a pipelined tree. A `coeff_structure`
+  `symmetric` or `negative_symmetric` of coefficients not so mirrored is now refused. The default rate of a clock an input
+  now makes a MAC a tap: a large filter should state its `sample_period`.
+- **Silinx HLS: hls::fft (#1943):** core/hls-fft.js (the parameters, each one Silinx does not make refused; the transform,
+  radix-4 decimation in frequency, the twiddle product rounded at 5 guard bits and truncated by the stage's scale, as found
+  against the 20 golden frames), core/cpp-fft.js (the config struct, the call a C model's), core/hls-fft-hdl.js (a block RAM,
+  a ROM, four 18x18 multipliers; 26,626 cycles for 1024 points where Vitis HLS's takes 3,198). dsp-fft-interface-array and
+  dsp-fft-interface-stream pass all three stages, their ports as Vitis HLS's. The floating-point designs are not done: a
+  float C model close to AMD's but not bit-exact, its synthesis refused, and the corpus's three float designs still fail their
+  C simulation (#2309).
+  Also `std::complex<T>(re, im)`, a typedef's constructor and `std::complex` as a general type; in a test bench `fgetc`, `strcat`,
+  `memcpy` of one value, `ldexp`, `fscanf`'s `%X` and `%f`, `<string>` and `<sstream>`; co-simulation of an `ap_fifo` array and
+  pointer. Tests: test/hls-fft.test.js, test/cpp-fft.test.js, test/hls-fft-hdl.test.js.
+- **A DATAFLOW top keeps every scalar argument's port (#1940):** `core/c-processes.js` made a port only for an argument a
+  process read; a scalar no process reads now has its input port, as in Vitis HLS and in a top without DATAFLOW, also
+  when the top calls the region with a constant in its place. A pointer no process uses still has none, as in a top
+  without DATAFLOW. Tests: test/c-dataflow-call.test.js, co-simulated in VHDL and Verilog.
+- **Vitis HLS's reserved names, checked against Vitis HLS 2025.2 (#1926):** `scripts/hls-vitis-names.mjs` runs 444
+  candidate names (SystemC's, C++'s keywords, the block protocol's, every word of VHDL, Verilog and SystemVerilog) as
+  the arguments of small tops through Vitis's C synthesis and records each port's name
+  (`test/hls-corpus/vitis-names.json`); `core/c-names.js` renames exactly those, in any letter case. `neg` is no longer
+  renamed (#1902 had guessed it); VHDL-2008's PSL words and SystemVerilog-2009's, which Vitis keeps, are kept; `units`,
+  `uwire`, `include`, `incdir` and `rtranif1`, which Vitis keeps but Silinx's HDL would not compile with, stay renamed,
+  their warning saying so.
+- **Silinx HLS: the target clock (#1924):** core/c-timing.js estimates the delay of a combinational function's longest
+  path (its additions, comparisons, multiplications, multiplexers and shifts) and checks it against the clock less
+  Vitis HLS's 27 % uncertainty; core/c-hdl.js makes a top that does not fit a sequential module (core/c-fsmd.js), with
+  ap_clk and ap_rst. The clock is cToHdl's `clock` (ns): syn.clock of hls_config.cfg, else Vitis HLS's 10 ns; in the
+  IDE the board's oscillator (web/js/c-source.js hlsClock), which the report's "Target clock" line names. The corpus's
+  five designs Vitis HLS schedules over cycles now have its ports; dividing the operations among the cycles by the
+  clock is #2080. Tests: test/c-timing.test.js, test/c-ports.test.js, test/ui/c-sim.test.js; the tests of combinational
+  modules give a slow clock (test/c-helpers.js COMB).
+- `core/c-partition.js`: an array partitioned as memories (`A_0`, `A_1`, …); an access of a memory known at synthesis is that memory's, another selects its memory by its index, in one state; the co-simulation's test bench fills each memory from the C's array; a pragma that cannot be made is said and ignored (#1920).
+- **Silinx HLS: the RTL blackbox (#1903):** core/c-blackbox.js reads the descriptions (Vitis HLS's keys: the function,
+  the module, its C model and RTL files, each argument's ports, the result, the clock, reset, enable and the
+  ap_ctrl_chain signals, the latency) and refuses a malformed one with a message that starts with `syn.blackbox:`;
+  memory and stream ports, and a blackbox in a DATAFLOW region, are refused as not supported yet. The C simulation
+  adds the C model to the unit (core/c-interp.js); the synthesis checks the function's arguments and the module's
+  ports, then makes each call a state of the machine (core/c-fsmd.js): its inputs in registers, `ap_start` pulsed,
+  the state waiting for `ap_done` or the latency, each output taken on its valid; the module is instantiated in the
+  VHDL and the Verilog (core/c-hdl.js), and the ASM chart draws its state. The co-simulation (core/c-cosim.js)
+  simulates the module's files with the HDL. In the app, the server's ISE flow and the browser's open flow, the
+  project's descriptions are read with the files they name (`blackboxesIn`). The corpus's misc-rtl-as-blackbox
+  now passes the C simulation, the synthesis and the co-simulation; its manifest names its description and files
+  (scripts/hls-corpus-manifest.mjs, also for the Vitis HLS run). Tests: test/c-blackbox.test.js,
+  test/hls-corpus.test.js, test/ui/c-source.test.js.
+- **Silinx HLS: ap_fifo and ap_hs on pointers, two-port memories (#1901):** a pointer or array argument with `ap_fifo`
+  has `_din`, `_full_n`, `_write` / `_dout`, `_empty_n`, `_read`, one with `ap_hs` `_ap_vld` and `_ap_ack`, each access a
+  state that waits (core/c-fifo.js). `BIND_STORAGE` and `storage_type=` make `ram_2p` and `ram_t2p` memories, inside the
+  module too; a memory argument of a loop with `UNROLL` and a `DATAFLOW` top's have both ports, as Vitis HLS's; a
+  statement's two reads share a state, unrolled copies not yet. A pipeline's schedule (core/c-pipe-sched.js) has a
+  memory's two ports each an access a cycle, in the C's order across them: a pipelined loop's or function's II 1 with
+  them (Interface/Memory/ram_uram's). The HLS corpus runs
+  with its configs' `syn.directive.interface` lines (`directives` of `cToHdl`, `simulateC`, `cosimulate`).
+  Test: test/c-ptr-fifo.test.js.
+- **Silinx HLS: AXI4-Stream ports (#1894):** a top's stream with `#pragma HLS INTERFACE axis`, or of `ap_axis` /
+  `ap_axiu` / `hls::axis` / `hls::axis_user`, is an AXI4-Stream port (a `std::complex` datum one `TDATA`, both its parts) with Vitis HLS's names and side channels; an array with the
+  pragma too, when read or written once in a loop over all of it (else its memory, with a warning); the design's reset
+  is then `ap_rst_n`. The state machine is a module `<top>_core` under the top's. The five corpus designs have Vitis
+  HLS's ports, co-simulated in VHDL and Verilog; DATAFLOW and `hls::FIR` tops keep their `ap_fifo`, with a warning.
+- Silinx HLS: `hls::burst_maxi<T>` arguments (`hls_burst_maxi.h`): their read and write requests queued and their reads and writes made in turn on the AXI4 master; `memcpy` of an array or a pointer argument a loop of its elements, its pointer casts dropped (#1893).
+- Tests: the AXI4 master's expected warnings as the automatic pipelining of #1962 words them (#2374).
+- Silinx HLS: `#pragma HLS INTERFACE m_axi` (and a config's `syn.directive.interface … mode=m_axi`): an array, or a pointer indexed or read and written as `*p`, is read and written over an AXI4 master `m_axi_<bundle>_*`, its address an AXI4-Lite register (`offset=slave`), a port (`offset=direct`) or 0 (`offset=off`), the bus's width as Vitis HLS's; the module waits while an access is not done; the co-simulation drives it through a model of the bus; 14 corpus designs have Vitis HLS's ports (#1893).
+- Silinx HLS: `#pragma HLS INTERFACE s_axilite`: the function's module inside one with Vitis HLS's ports (`s_axi_<bundle>_*`, `ap_rst_n`, `interrupt`) and registers (the block's control, the interrupts, the arguments from 0x10 or at `offset=`); the co-simulation drives it through a model of the bus (#1893).
+- **Silinx HLS: the Vitis library headers the corpus uses (#1891):** core/cpp-hls-lib.js and core/cpp-vector.js:
+  `hls::vector` (a struct of an array: `v[i]`, element-wise `+ - * /`), `hls::stream_of_blocks` with its locks (a block a
+  word of a FIFO), `std::complex` (`real`, `imag`, a list, `==`, `!=`), `hls::axis<T, …>`, `ap_float` (a double in a test
+  bench, with a warning; refused in the synthesized code), `hls::autorestart`, `malloc` and `free` in the C simulation.
+  Also a stream of a struct with an array member (a stream per element), `extern "C"`, a typedef of `hls::stream`, a
+  parameter `T (&a)[N]` deduced. modeling-using-array-stencil-2d passes `malloc.h` and now stops at `<map>`, `<string>`
+  and `<chrono>` of its command-line parser. Test: test/cpp-hls-lib.test.js.
+- **Silinx HLS: math.h's exp, log, sin, cos and pow in hardware (#1761):** core/c-mathlib.js writes each algorithm once,
+  against an interface of operations: its C on the soft-float library's operations (MATHLIB, added to
+  core/c-softfloat.js's in core/c-dataflow-float.js) for the hardware, its JavaScript (each operation IEEE-rounded)
+  for the C simulation and the constants folded at synthesis (core/c-float.js's MATH). Only + - * /, the comparisons,
+  the conversions and powers of two are used, so both give the same bits. exp: Cody-Waite reduction and a Taylor
+  polynomial; log: 2 atanh((m - 1) / (m + 1)); sin, cos: a three-part reduction by pi/2 (accurate for |x| up to 32768
+  in float, 2^20 in double); pow: C99's special cases, an integer power under 2048 by squaring, else exp(y log |x|) in
+  double. Within 2 ulps of JavaScript's Math (pow: up to about a hundred ulps for a non-integer power in double). The
+  co-simulation allows a million delta cycles (core/compile.js simulate's maxDeltas): pow's soft-float path is deep.
+  The hint for math.h's other functions lists the new ones. Tests: test/c-mathlib.test.js (accuracy, special cases,
+  the library's C run by the C interpreter against the simulation's bits, expf and logf co-simulated in VHDL and
+  Verilog); the HLS corpus's float-and-double example (pow(2.0, n)) passes.
+- **DATAFLOW: nested regions (Fixes #1706):** a process that is itself a region has its processes and channels in its
+  caller's (core/c-dataflow-nest.js); a region the top calls among other statements is a module of its own, called each
+  time, its tasks' state kept. `s.write(a + n++)` is made, the value before the change (`?:`, `&&` and `||` stay
+  refused). The report's processes have their latency, the region its latency and interval. The corpus's
+  `unique_task_regions` now passes with Vitis HLS's ports. Test: test/c-dataflow-nest.test.js.
+- **DATAFLOW: loops and outputs (#1706):** in a region of streams, a loop among the calls becomes a process
+  `Loop_<k>_proc` (core/c-dataflow-loops.js); these regions were refused. A process's pointer output, given an output
+  of the top, is that top's port and its `ap_vld`. `#pragma HLS INLINE off` on a function whose array argument has no
+  size (`A[]`) inlines it, with a warning, instead of an error. A process's PIPELINE no longer gets the false warning
+  that it is inlined in the top. The corpus's `using_free_running_pipeline` now passes with Vitis HLS's ports.
+  Test: test/c-dataflow-loops.test.js.
+- **DATAFLOW: a top's interfaces as Vitis HLS's (#1706):** an `axis` stream of a DATAFLOW top is made AXI4-Stream ports
+  instead of being ignored with a warning; a stream of structs of the top is one word on its port, an adapter
+  (core/c-processes-word.js) between it and the FIFOs of its members, which the processes read and write each in a
+  state of its own. `axis` around the AXI interfaces' module, for any top: `axis` beside `s_axilite` or `m_axi` was
+  silently left as `ap_fifo` ports. A DATAFLOW top's memory keeps both ports inside these modules (`autorestart`'s
+  top lacked `_d0`, `_we0`, `_q0`...). The corpus's `axi_stream_to_master` and `autorestart` now have Vitis HLS's
+  ports. Tests: test/c-processes-word.test.js, test/c-axis.test.js.
+- **silinx-fpga's own changelog (#1681):** step 10 of the toolchain's separation (#1651): the package gets its
+  CHANGELOG.md and its fragments, packages/silinx-fpga/changes (the format of changes/; its first one, the
+  package's first version). scripts/changelog-release.mjs and scripts/sync-version.mjs take `--package
+  silinx-fpga`: its fragments assembled into its CHANGELOG.md, its version checked against it (no version.js
+  written); CLAUDE.md and ONBOARDING.md say where a change's fragment goes. Tests:
+  test/changelog-fragments.test.js (the package's fragments and changelog; both scripts with --package, their
+  errors, the IDE's changelog untouched).
+- **silinx-fpga's notices and npm contents (#1681):** the first part of step 10 of the toolchain's separation
+  (#1651, docs/TOOLCHAIN-SEPARATION.md). The package has its own NOTICE (Apache-2.0, its code and its data) and
+  THIRD-PARTY-NOTICES.md (Yosys / YoWASP and nextpnr-spartan, with their licence texts), which
+  scripts/third-party.mjs writes with the IDE's; the IDE's NOTICE names silinx-fpga (Apache-2.0) among its
+  components. Its package.json gets a `files` list: the npm package holds src/, bin/, bitdb/, devices/ and the
+  notices, not the research (24 MB) nor the tests. Tests: test/third-party.test.js (the licence, the notices, the
+  packed files and every relative import of the code in them), test/private-data.test.js (the package's notices
+  name their authors, as the IDE's: the private-data check allows them).
+- **silinx-fpga published on npm (#1681):** the last part of step 10 of the toolchain's separation (#1651): the
+  workflow silinx-fpga-release.yml publishes the package on npm, with npm's provenance, when its own tag
+  `silinx-fpga-vX` is pushed: the commit on main, the package's version X with its changelog section, and CI (which
+  the tag starts too, as a `v*` one) passed on that commit (scripts/wait-for-ci.mjs accepts its run). The package is
+  no longer private. Tests: test/silinx-fpga-release-workflow.test.js, test/wait-for-ci.test.js,
+  test/ci-workflow.test.js, test/silinx-fpga-package.test.js.
+- **The toolchain package's own tests (#1680):** the first part of step 9 of the toolchain's separation (#1651,
+  docs/TOOLCHAIN-SEPARATION.md). The 16 unit test files that import the package alone (the device description, the
+  netlist, pack, place, route, timing's parts, the bitstream, the synthesis's BDD and resynthesis, Yosys's
+  integrity, the API), its simulators of a packed design (fpga-sim.js) and its fixtures (fixtures/fpga) move as they
+  are into packages/silinx-fpga/test, `npm test` there. The IDE's tests and the research that use the simulators or
+  the fixtures read them there. The repository's `npm test`, the CI's parts (scripts/test-shard.mjs: the unit tests'
+  folders, UNIT_DIRS), the timings and a pull request's related tests (scripts/related-tests.mjs) take the package's
+  folder too. Tests: test/toolchain-boundary.test.js (the package's tests import the package alone),
+  test/test-shard.test.js (the unit tests of both folders), test/related-tests.test.js (a change of the package runs
+  the tests of its folder, and of the IDE's that import its helper).
+- **The Spartan-3E research in the toolchain package (#1680):** the second part of step 9 of the toolchain's
+  separation (#1651, docs/TOOLCHAIN-SEPARATION.md). The research that builds the package's data (s3e-device,
+  s3e-bitstream, s3e-place, s3e-route) and the nextpnr spike (nextpnr-s3e, #1954) move as they are into
+  packages/silinx-fpga/research, their relative paths adjusted; the five tests that then import the package alone
+  (fpga-bitgen, iob-reg, s3e-bitstream-tools, s3e-devices, nextpnr-s3e, with its fixture) into packages/silinx-fpga/test.
+  The IDE's tests, scripts, documentation and workflows (CodeQL's ignored paths, ISE's, the Yosys update's) and the
+  release zip's measurements left out follow; research/s6 stays until the Spartan-6 work settles. Tests:
+  test/layering.test.js (the application imports nothing of either research folder; the old folders gone),
+  test/related-tests.test.js (a measurement of the moved research runs its test there).
+- **The Spartan-6 research in the toolchain package (#1680):** the third and last part of step 9 of the toolchain's
+  separation (#1651, docs/TOOLCHAIN-SEPARATION.md). research/s6 moves as it is into packages/silinx-fpga/research/s6,
+  its relative paths adjusted (the toolchain's sources, bit databases and the IDE's test helpers); the IDE's tests that
+  read its measurements, `npm run check:open-flow`'s Spartan-6 bitstream comparison and the documentation follow.
+  Tests: test/layering.test.js (the application imports nothing of the research; research/s6 gone, its README in the
+  package), test/toolchain-boundary.test.js (the package's research is no API: the scripts may import it, as
+  check:open-flow does check-bitgen6.mjs).
+- **research/s6: the Spartan-3E research's paths in its prose (#1680):** its README and gen-pipdrop6.mjs's comment name
+  the Spartan-3E research in packages/silinx-fpga/research/ (s3e-route's timing check and device builder,
+  s3e-bitstream's PIP drop), where it moved.
+- **silinx-fpga's command line (#1679):** step 8 of the toolchain's separation (#1651, docs/TOOLCHAIN-SEPARATION.md).
+  `silinx-fpga build <file.v ...|netlist.json> --part xc3s250e-cp132-4 [--ucf pins.ucf] [-o top.bit]` (the package's
+  `bin`, packages/silinx-fpga/bin/silinx-fpga.js, src/cli.js) runs the toolchain's flow (runFlow) from Verilog or
+  a Yosys JSON netlist to the .bit. Options: the top (found when not given), the out folder (the netlist, the placed
+  and routed XDL, the timing report), the effort, the placer's seed, no register replication, quiet. The Verilog is
+  checked by Yosys first, file by file, so an error says its file and line. It prints the flow's log, warnings and
+  errors on stderr, and exits 0 when built, 1 when the flow fails, 2 on a wrong command line. Spartan-3E parts with
+  a device description and a bit database (the Basys2's and the Nexys2's); VHDL needs Silinx ISE. The package's
+  README builds a blinky for the Basys2 with it. Tests: test/silinx-fpga-cli.test.js (the options and their errors,
+  the parts, the top, the design's errors, the README's blinky with no warnings and its .bit byte for byte the IDE
+  flow's, from its Verilog and from its netlist).
+- **The IDE imports the toolchain through its API (#1678):** the second part of step 7 of the toolchain's
+  separation (#1651, docs/TOOLCHAIN-SEPARATION.md). server/, web/js, core/, scripts/ and bin/ import
+  packages/silinx-fpga through its entries only, each import the lightest with its names: `src/index.js`,
+  `src/node.js` (the disk's loaders and Yosys in Node: server/'s flow, scripts/), and a new light one, `src/parts.js` (`silinx-fpga/parts`: the parts' families and resources, the UCF, the steps by name, the
+  XDL format), so the IDE's pages load 7 of the package's modules, not its 58. The tests and the research import
+  the package's modules by their paths; core/'s 75 old paths, which re-exported them, are gone, and the comments and
+  docs name the modules where they are. The standalone build and the Node tests of the pages resolve /packages/. Tests:
+  test/toolchain-boundary.test.js (the IDE imports the entries only, each import the lightest, no old path left), test/silinx-fpga-api.test.js (the light entry: its names, its 7 modules), test/silinx-fpga-package.test.js.
+  No behaviour change.
+- **The Atlys: the seven-segment display and VGA on its VHDCI connector (#732):** the Atlys has neither on the
+  board and only one 8-I/O Pmod, so its board description puts them on the VHDCI connector's pins (EXP-IO1..7_P the
+  segments, then the decimal point, the four anodes, VGA's 3-3-2 colour and its syncs), with the rest of the
+  connector as two buses, vhdci_io1 and vhdci_io2. Every example's ports now have pins on the Atlys and all seven go
+  through the open flow to the bitstream with no warnings; the routing comparison against ISE
+  (research/s6/measured/route-compare.json) is recorded again with the new pins. Tests: test/boards.test.js,
+  test/s6-devices.test.js (the blinky on both Spartan-6 boards), test/s6-research.test.js.
+- **Spartan-6: the bit databases and their prediction moved into the Silinx toolchain (#732):** the databases measured
+  in research/s6 against ISE's bitgen are now in packages/silinx-fpga/bitdb/s6 (moved with their history; the
+  research scripts read and write them there). The prediction of a design's configuration bits from them is now in
+  packages/silinx-fpga/src/fpga/s6/: bitgen.js (predictDesign), bitgen-slice.js, bitgen-pips.js, bitgen-regions.js,
+  bitgen-hard.js, bitgen-cmt.js, and bitdb-node.js (the loader). It was moved as it was, and the research modules
+  re-export every name they had. The block RAMs' and DSP48A1's base settings are a small table of their own
+  (bitdb/s6/s6-hard-base.json), so the package does not read ISE's primitive definitions. No change in behaviour:
+  the residual of the 14 examples routed by ISE is exact as before, and the 86 CMT designs give the same output as
+  main's. Tests: packages/silinx-fpga/test/s6-bitgen.test.js.
+- **Spartan-6: the bitstream (#732):** packages/silinx-fpga/src/fpga/s6/bitgen.js's bitstreamS6 writes a placed and
+  routed design's .bit from the bit databases. It also writes the block RAM's frame that bitgen writes again after
+  the frame data. A feature the databases do not have, or a DCM or PLL (#2025), is named, and the open flow's
+  bitgen step stops with the list. The open flow routes on the switches whose bits are known (knownPipS6), and
+  takes the PIPs of a hard block's pins as having no bits (NO_BITS: every one measured had none). The steps bitgen and prombit are on under the flag. Night 1's 14 examples on both
+  boards are byte-identical with ISE's bitgen, CRC on and off (research/s6/check-bitgen6.mjs). Tests:
+  packages/silinx-fpga/test/s6-bitgen.test.js and test/s6-devices.test.js (blinky and stopwatch on the Nexys3
+  through the bitstream). Six of the seven examples reach their bitstream on the Nexys3; clock needs #2061.
+- **`npm run check:open-flow` for the Spartan-6 (#732):** a Nexys3 or Atlys project (its device's family) runs the
+  application's own open flow on a copy of it. ISE converts its routed design (xdl -xdl2ncd), checks it (drc) and
+  writes its bitstreams (CRC on and off), and Silinx's bitstream of the same routing is compared with each, byte
+  for byte (research/s6/check-bitgen6.mjs). The nightly ISE tests run this check for every example on both boards;
+  ISE's own build of the examples on them is not recorded there yet. Tests: test/ise/examples.test.js.
+- **Docs: the Spartan-6 in the Silinx toolchain (#732):** docs/OPEN-TOOLCHAIN.md and the README say what the
+  Spartan-6 boards have under the developer flag: the whole flow to a bitstream byte-identical with ISE's bitgen on
+  the examples, its timing fitted to trce, and what it does not cover yet.
+- **The examples on the Spartan-6 boards (#732):** the seven examples are built by the Silinx toolchain on the Nexys3
+  and the Atlys too, with no warning, their PERIOD met (test/examples.test.js); their pins on both boards are checked
+  (test/blinky-example.test.js, gates, traffic: the Spartan-6 boards' 100 MHz clock). `TARGETS` (test/examples-lib.mjs)
+  lists both boards; the ISE tests and the power estimates keep the Spartan-3E's (`S3E_TARGETS`), the Spartan-6's
+  bitstreams being checked against ISE's bitgen in research/s6.
+- **Spartan-6: the open flow's PIPs measured, every example's bitstream as ISE's (#732):** the PIPs the open flow
+  routes on that the databases did not have (a right or left I/O tile's paths, the BIOB_SINGLE pads, the block RAM's
+  clock and reset pins on the XC6SLX45 …) were measured one at a time in context on ISE (research/s6/gen-flowdrop6.mjs,
+  packages/silinx-fpga/bitdb/s6/s6-pips-flow.json, read by bitdb-node.js). With them all seven examples on the Nexys3
+  and the Atlys, routed by the open flow, are byte-identical with ISE's bitgen of the same routing, and ISE's DRC finds
+  no error in them. Tests: packages/silinx-fpga/test/s6-bitgen.test.js, test/s6-cmtpaths.test.js.
+- **Spartan-6: the open flow's routings checked by ISE (#732):** research/s6/flow-xdl6.mjs writes the examples as the
+  open flow routes them, and ISE checks them and writes their bitstreams. ISE's DRC finds no error. The seven Nexys3
+  examples' bitstreams (bitstreamS6) are byte-identical with ISE's bitgen of the same routings, as are the Atlys's
+  gates and pong. The rest is in the research note.
+- **Spartan-6: Map, Place & Route and the static timing in the open flow (#732):** under the developer flag, the
+  open flow packs, places, routes and checks a Spartan-6 design (packages/silinx-fpga/src/open-flow-s6.js) and times
+  it with the model fitted to ISE's trce (fpga/s6/timing.js), with the MAP report's lines and the timing report and
+  checks the Spartan-3E's flow writes. The server gives the boards' parts their shipped device description. The
+  bitstream is still refused. Tests: test/s6-devices.test.js (the gates example on the Nexys3, and blinky with the
+  board's pins and clock, timed).
+- **Spartan-6: the developer flag removed (#732):** the Nexys3's and the Atlys's parts (XC6SLX16, XC6SLX45 in the
+  CSG324) are available to the Silinx toolchain without `SILINX_SPARTAN6_OPEN` (the package no longer exports
+  `spartan6Open`); the other Spartan-6 parts are refused as before, with ISE's modes named. The browser edition does
+  not have the Spartan-6's bit databases yet. Tests: test/s6-devices.test.js, test/open-toolchain.test.js, test/docs.test.js (the README names both boards), packages/silinx-fpga/test/silinx-fpga-api.test.js. The browser edition: #2103.
+- **Spartan-6: the router fast when a sink cannot be reached on the switches allowed (#732):** with the open flow's
+  known switches only, a sink no allowed switch reached was searched again on every pass, over the whole device,
+  and the passes went on to their limit. The Atlys's stopwatch took over an hour; it now takes 142 s, both routings
+  included. Such a sink is now searched once (packages/silinx-fpga/src/fpga/s6/route.js), and the passes end when
+  nothing is shared and only those sinks are left. Tests: test/s6-route.test.js.
+- **Spartan-6: the static timing in the Silinx toolchain (#732):** packages/silinx-fpga/src/fpga/s6/timing.js's
+  analyzeTimingS6 times a placed and routed Spartan-6 design with the model fitted to ISE's trce (#731). The arcs
+  (fpga/s6/timing-arcs.js) and the model (fpga/s6/timing-model.js, S6_SPEED_3, generated by
+  research/s6/fit-model6.mjs) feed fpga/timing.js's analysis, which now takes the family's arcs, its clock pins and
+  the clocks' skew. Its result has analyzeTiming's shape, so the open flow's reports read it as the Spartan-3E's. On
+  night 1's 24 designs routed by ISE it is within the #731 criterion in 23 PERIOD constraints and in every OFFSET.
+  The research note's count of 24 PERIOD constraints, printed to one decimal, is corrected to 23: one design is
+  0.001 ns over. Tests: test/s6-timing-flow.test.js.
+- **The user guides: the Spartan-6 boards (#732):** docs/GETTING-STARTED.md and docs/COMECAR.md name the Nexys3 and the
+  Atlys among the boards that need no Xilinx tool with Silinx running locally (not yet in the browser, #2103).
+  Test: test/docs.test.js.
+- **Spartan-6: the logic arcs and trce's paths re-evaluated (#731, second part):** a table of the logic arcs' delays
+  read from trce's reports, and each path of them re-evaluated with the arcs and the fitted wire model on ISE's
+  routing (research/s6/timing6.mjs): the data path's rms error 0.219 ns on night 1's examples, every constraint's
+  slack within 6% of the period. Tests: test/s6-timing.test.js.
+- **Spartan-6: the wire delays fitted on every connection (#731):** reportgen -delay's report of each of night 1's
+  28 routed designs read beside trce's (research/s6/timing-fit6.mjs's dlySamples, 5581 connections, not only trce's
+  10 worst paths a constraint), and the load pin's kind in the model (pinKind: a LUT's A1 to A6, the bypass, the
+  carry, an I/O): rms 0.089 ns per connection, 0.146 ns without it. timing6.mjs fits on them when the .dly is there.
+  Tests: test/s6-timing.test.js.
+- **Spartan-6: the OFFSET IN and OUT in the static timing (#731):** research/s6/sta6.mjs computes trce's OFFSET IN
+  BEFORE and OUT AFTER on a routed design. It reads the input pads' Tiopi and the output pads' Tioop, and the clock's
+  earliest and latest arrival from its pad through its BUFG, fitted on trce's paths (twr6.mjs's parseOffsets). A shift
+  register's arcs are among the slice's. On night 1's 24 designs both OFFSETs are within 5% or 0.1 ns of trce's
+  allowable offset. Tests: test/s6-sta.test.js.
+- **Spartan-6: the static timing of a routed design (#731):** research/s6/sta6.mjs is trce's PERIOD analysis on a
+  routed XDL. It reads the slices' arcs from their settings (the LUTs' equations, the carry chain stage by stage, the
+  flip-flops and the second ones, a flip-flop set as a gate) and the block RAMs' and DSP48A1s' arcs, with delays by
+  site class, and takes the clock's arrival at each flip-flop from its routed tree. The wire model counts each wire
+  type (timing-fit6.mjs's fitWires) and matches reportgen's loads by their logical pin (loadDelay): 19008 connections,
+  rms 0.045 ns. On night 1's 24 PERIOD constraints the worst slack is within 5% of trce's in 20, and every error is
+  under 2.5% of the period. Tests: test/s6-sta.test.js, test/s6-timing.test.js.
+- **Spartan-6: the static timing meets its criterion (#731):** on night 1's 24 designs routed by ISE, each PERIOD
+  slack and each OFFSET IN / OUT is within 5% of trce's or 2.5% of the period, whichever is larger. The criterion
+  is the maintainer's, and the research note (research/s6/README.md) records it.
+- **Spartan-6: the wire delays fitted to ISE's trce (#731, first part):** trce's reports read (research/s6/twr6.mjs)
+  and the delay of each net of their paths fitted on the routing ISE wrote, by the classes of the wires it takes
+  (research/s6/timing-fit6.mjs): rms 0.110 ns on night 1's examples, both boards. Tests: test/s6-timing.test.js.
+- The device picker of New Project and Design Properties in a module of its own, `web/js/device-picker.js`, out of `web/js/wizards.js` as it was (#405).
+- **Device measurements, the XC3S1200E measured (#3):** `data/xc3s1200e/` holds the measurements of the XC3S1200E-FG320
+  (Nexys2-1200) and the description built from them alone; `test/s3e-device.test.js` rebuilds it byte for byte. Against
+  the shipped graph: no merged node, every valid test's verdict and every probe's answer agreeing. At the long-line
+  splitters ISE's routes cannot tell the two halves apart, so there the description defers to the shipped graph, and
+  1469 split nodes a short can come from are left (all at the splitters, #2483). The 7 examples and the 45 open-flow
+  designs routed by the open flow on it pass ISE (DRC 0 / 0, `.bit` byte-identical with CRC on and off). The shipped
+  graph is unchanged.
+- **Device measurements, the XC3S500E's open-flow designs (#3):** the `test/fixtures/open-flow` designs, retargeted to
+  the Nexys2-500, measured with ISE: their observation and the clock tree's rounds (the clock column, the clock rows,
+  the side buffers), every verdict agreeing with the shipped graph. The measured description's placer now reaches every
+  slice and block RAM from every global buffer; 655 split nodes lose a route (932 before). All 43 designs routed by the
+  open flow on it pass ISE (DRC 0 / 0, `.bit` byte-identical with CRC on and off). `prototype.mjs observe` no longer
+  overflows the stack on large designs. The shipped graph is unchanged.
+- **Device measurements, the XC3S500E measured (#3):** `data/xc3s500e/` holds the measurements of the XC3S500E-FG320
+  (Nexys2-500) and the description built from them alone; `test/s3e-device.test.js` rebuilds it byte for byte. Against
+  the shipped graph: no merged node, no split node a short can come from, every valid test's verdict and every probe's
+  answer agreeing (four clock tests whose own route drove the other end are marked invalid). The 7 examples routed by
+  the open flow on it pass ISE (DRC 0 / 0, `.bit` byte-identical with CRC on and off). The shipped graph is unchanged.
+
 ## 15.20.0
 
 Silinx HLS closer to Vitis HLS (loops pipelined automatically, hls::FIR, unions, streams of structs, its corpus
