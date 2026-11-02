@@ -19,14 +19,14 @@ architecture Behavioral of uart_tx is
     signal sending : STD_LOGIC := '0';
     signal count   : integer range 0 to BIT_T - 1 := 0;
     signal bitn    : integer range 0 to 9 := 0;
-    signal frame   : STD_LOGIC_VECTOR (9 downto 0) := (others => '1');   -- stop, data, start: sent from bit 0
+    signal frame   : STD_LOGIC_VECTOR (8 downto 0) := (others => '1');   -- data, start: sent from bit 0, 1s after them (the stop bit)
 begin
     process (clk)
     begin
         if rising_edge(clk) then
             if sending = '0' then
                 if start = '1' then
-                    frame <= '1' & data & '0';
+                    frame <= data & '0';
                     sending <= '1';
                     count <= BIT_T - 1;
                     bitn <= 0;
@@ -35,7 +35,7 @@ begin
                 count <= count - 1;
             else
                 count <= BIT_T - 1;
-                frame <= '1' & frame(9 downto 1);
+                frame <= '1' & frame(8 downto 1);
                 if bitn = 9 then
                     sending <= '0';
                 else
