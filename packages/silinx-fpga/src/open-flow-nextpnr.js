@@ -95,12 +95,12 @@ export function nextpnrNetlist(text, top, ucf, device = null) {
       // a one-bit bus ([0:0], std_logic_vector(0 downto 0)) also as p<0>, as XST names it; not a scalar (#2199, #2232)
       const oneBitBus = d.bits.length === 1 && d.offset === undefined && !d.upto && mod.netnames?.[p]?.attributes?.single_bit_vector !== undefined;
       const a = { ...(oneBitBus ? consOf(`${p}<0>`) : null), ...consOf(bit) };
-      if (!a.loc) problems.push(`port ${bit}: no LOC in the constraints (the nextpnr engine places only the ports given a pad)`);
-      else if (!buffer) problems.push(`port ${bit}: no I/O buffer (IBUF / OBUF) on it`);
+      if (!buffer) problems.push(`port ${bit}: no I/O buffer (IBUF / OBUF) on it`);
       else {
         const iob = asked('NET', bit);
-        // (the converter to XDL writes the IOB's settings from them: they stay on the cell in the routed design)
-        buffer.attributes = { ...buffer.attributes, LOC: a.loc, ...(iob ? { IOB: iob } : {}), ...(a.iostandard ? { IOSTANDARD: a.iostandard } : {}),
+        // (the converter to XDL writes the IOB's settings from them: they stay on the cell in the routed design; a port
+        // with no LOC gets its pad from nextpnr, #2625)
+        buffer.attributes = { ...buffer.attributes, ...(a.loc ? { LOC: a.loc } : {}), ...(iob ? { IOB: iob } : {}), ...(a.iostandard ? { IOSTANDARD: a.iostandard } : {}),
           ...(a.drive ? { DRIVE: String(a.drive) } : {}), ...(a.slew ? { SLEW: a.slew } : {}), ...(a.pull ? { PULL: a.pull } : {}) };
       }
     });
