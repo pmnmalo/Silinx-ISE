@@ -107,7 +107,7 @@ test('uartPins: each board\'s serial port in its resources, from the UCF\'s wiri
   assert.deepEqual(ports('nexys2'), ['rs232_rx:in', 'rs232_tx:out']);
   assert.deepEqual(ports('icebreaker'), ['rx:in', 'tx:out']);
   assert.deepEqual(ports('nexys3'), ['uart_rx:in', 'uart_tx:out']);
-  assert.deepEqual(ports('basys2'), []);
+  assert.deepEqual(ports('basys2'), ['rx:in', 'tx:out']);   // (its PmodUSBUART on JA, #2537)
   const res = (name, group, dir) => ({ name, group, dir });
   const bits = [{ res: res('led', 'LEDs', 'out'), dir: 'out' }, { res: res('rs232_dte_rxd', 'RS-232', 'in'), dir: 'in' },
     { res: res('rs232_dce_rxd', 'RS-232', 'in'), dir: 'in' }, { res: res('rs232_dce_txd', 'RS-232', 'out'), dir: 'out' }];
