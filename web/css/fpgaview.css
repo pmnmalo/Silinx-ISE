@@ -30,9 +30,38 @@
 .fv-clock .fv-wire { stroke: #ff6b6b; stroke-width: .8; opacity: .7; } .fv-clock .fv-load { fill: #ff6b6b; } .fv-clock .fv-route { fill: rgba(255, 107, 107, .10); stroke: rgba(255, 107, 107, .35); } .fv-clock .fv-drv { stroke: #ff6b6b; }
 .fv-picked .fv-wire { stroke-width: 1.6; opacity: 1; }
 .fv-tip { position: absolute; z-index: 3; pointer-events: none; background: rgba(13, 17, 23, .92); color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 4px 8px; font: 11px var(--mono, monospace); white-space: pre; }
-.fv-side { width: 330px; flex: none; overflow: auto; border-left: 1px solid var(--border-light, #ccc); padding: 6px 10px 12px; font-size: 12px; }
-.fv-sec { margin-bottom: 10px; }
-.fv-sec h4 { margin: 6px 0; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted, #666); }
+/* the side panel: the diagram editors' Properties (asm-editor.css), folded as theirs (side-fold.js), each section folded
+   by its title; on a narrow window over the chip, shown by the toolbar's ☰ Properties (#2668) */
+.fv-main { position: relative; }
+.fv-side { width: 330px; flex: none; overflow: auto; scroll-padding-top: 26px; border-left: 1px solid var(--border-light, #ccc); font-size: 12px; background: var(--panel, #fff); }
+.fv-side .asm-cap {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; height: 20px; padding: 2px 6px;
+  background: var(--title-grad, linear-gradient(#e9eff8, #c9d7ed)); color: var(--title-fg, #15428b); font-weight: bold; border-bottom: 1px solid #99bbe8; white-space: nowrap;
+}
+.fv-side .asm-cap .sp { flex: 1; }
+.fv-side .asm-fold { border: 0; background: none; padding: 0 2px; margin-right: -2px; color: inherit; display: inline-flex; align-items: center; cursor: pointer; opacity: .75; }
+.fv-side .asm-fold:hover { opacity: 1; }
+.fv-sec { border-bottom: 1px solid var(--border-light, #d4d0c8); }
+.fv-sec > summary { padding: 4px 8px; cursor: default; font-weight: bold; color: var(--title-fg, #15428b); list-style: none; user-select: none; }
+.fv-sec > summary::-webkit-details-marker { display: none; }
+.fv-sec > summary::before { content: "▸"; display: inline-block; width: 14px; transition: transform .12s; }
+.fv-sec[open] > summary::before { transform: rotate(90deg); }
+.fv-sec-body { padding: 0 10px 8px; }
+@media (min-width: 1024px) {
+  .fv.props-folded :is(.fv-side, .fv-side.wide) { width: 24px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+  .fv.props-folded .fv-side > :not(.asm-cap) { display: none; }
+  .fv.props-folded .fv-side .asm-cap {
+    flex: 1; height: auto; writing-mode: vertical-rl; flex-direction: row-reverse; justify-content: flex-end; padding: 6px 0; gap: 8px; border-bottom: 0; align-items: center;
+  }
+  .fv.props-folded .fv-side .asm-cap .sp { display: none; }
+  .fv.props-folded .fv-side .asm-fold { writing-mode: horizontal-tb; margin: 0; }
+}
+@media (max-width: 1023px) {
+  .fv-side .asm-fold { display: none; }
+  .fv-side { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(330px, 85%); box-shadow: -6px 0 20px rgba(0, 0, 0, .22); }
+  .fv-side.wide { width: 95%; }
+  .fv:not(.side-open) .fv-side { display: none; }
+}
 .fv-sec h5 { margin: 10px 0 4px; font-size: 12px; }
 .fv-dev { font-family: var(--mono, monospace); margin-bottom: 4px; }
 .fv-util { width: 100%; border-collapse: collapse; }
