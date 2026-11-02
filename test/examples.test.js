@@ -14,7 +14,7 @@ import { designChecks } from '../core/lint.js';
 import { EXAMPLES, TARGETS, ICE40_TARGETS, exampleBoard, targetName, example, exampleUcf, exampleProject, runTestbench, silinxFlow } from './examples-lib.mjs';
 
 // known failures, with their issue: the test still runs, as a todo
-const KNOWN = {};
+const KNOWN = { 'uart-atlys': '#2539: the Atlys\'s USB-UART pins use two features the bit database has not measured' };
 
 for (const name of EXAMPLES) {
   test(`example ${name}: no error, no warning, no design-check message`, () => {
@@ -48,7 +48,7 @@ process.env.SILINX_CONFIG_DIR = path.join(tmp, 'config');
 describe('the examples on every board', { concurrency: 2 }, () => {
   for (const name of EXAMPLES) {
     for (const t of TARGETS) {
-      test(`example ${name} on the ${targetName(t)}: the Silinx toolchain builds the bitstream, no warning`, { timeout: 600000, todo: KNOWN[name] }, async () => {
+      test(`example ${name} on the ${targetName(t)}: the Silinx toolchain builds the bitstream, no warning`, { timeout: 600000, todo: KNOWN[`${name}-${targetName(t)}`] || KNOWN[name] }, async () => {
         const { dir, project } = exampleProject(name, t, tmp);
         const job = await silinxFlow(dir, project);
         const log = job.lines.join('\n');
@@ -71,7 +71,7 @@ describe('the examples on every board', { concurrency: 2 }, () => {
 // board has no pin for (5 LEDs, 3 buttons, the PmodSWT's 4 switches), each warned, by Silinx and by nextpnr
 const LEDS = ['led[5]', 'led[6]', 'led[7]'];
 const ICE40_NO_PIN = { gates: [], traffic: LEDS, blinky: LEDS, pong: ['btn[3]', ...LEDS], stopwatch: ['btn[3]', ...LEDS], clock: ['btn[3]', ...LEDS],
-  vga: ['sw', 'btn[3]'], isqrt: ['sw[4]', 'sw[5]', 'sw[6]', 'sw[7]'] };
+  vga: ['sw', 'btn[3]'], isqrt: ['sw[4]', 'sw[5]', 'sw[6]', 'sw[7]'], uart: LEDS };
 describe('the examples on the iCE40\'s board', { concurrency: 2 }, () => {
   for (const name of EXAMPLES) {
     for (const t of ICE40_TARGETS.map(x => exampleBoard(name, x))) {

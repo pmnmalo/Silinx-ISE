@@ -383,6 +383,9 @@ export function boardAutoAssign(ports, board, { byDirection = false } = {}) {
     // fall back to the board's resource group (e.g. Numato boards call their switches "dip")
     const GROUP = { clk: 'Clock', led: 'LEDs', sw: 'Switches', btn: 'Buttons' };
     if (!r && GROUP[alias]) r = res.find(x => x.group === GROUP[alias] && x.pins.length >= Math.min(p.width || 1, 2)) || res.find(x => x.group === GROUP[alias]);
+    // rx / tx: the board's serial port, whatever it calls them (rs232_rx, uart_tx, rs232_dce_txd…: the first, #2537)
+    const SERIAL = { rx: 'in', tx: 'out' };
+    if (!r && SERIAL[alias]) r = res.find(x => ['UART', 'RS-232', 'USB-UART'].includes(x.group) && x.dir === SERIAL[alias]);
     if (!r) { unmatched.push(p.name); continue; }
     const attrs = pin => {
       const a = { loc: pin };   // I/O standard: the default (none written) unless the user picks one

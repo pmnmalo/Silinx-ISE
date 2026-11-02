@@ -127,10 +127,13 @@ export const BOARDS = [
       { name: 'vga_vsync', label: 'VGA VSYNC', pins: ['K13'], dir: 'out', iostandard: 'LVCMOS33', group: 'VGA' },
       { name: 'ps2_clk', label: 'PS/2 clock', pins: ['B1'], dir: 'inout', iostandard: 'LVCMOS33', pull: 'up', drive: 2, group: 'PS/2' },
       { name: 'ps2_data', label: 'PS/2 data', pins: ['C3'], dir: 'inout', iostandard: 'LVCMOS33', pull: 'up', drive: 2, group: 'PS/2' },
-      { name: 'ja', label: 'Pmod JA (JA1..JA4)', pins: ['B2', 'A3', 'J3', 'B5'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+      { name: 'ja', label: 'Pmod JA (JA1, JA4; JA2 and JA3 are the UART below)', pins: ['B2', 'B5'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
       { name: 'jb', label: 'Pmod JB (JB1..JB4)', pins: ['C6', 'B6', 'C5', 'B7'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
       { name: 'jc', label: 'Pmod JC (JC1..JC4)', pins: ['A9', 'B9', 'A10', 'C9'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
       { name: 'jd', label: 'Pmod JD (JD1..JD4)', pins: ['C12', 'A13', 'C13', 'D12'], dir: 'inout', iostandard: 'LVCMOS33', group: 'Pmod' },
+      // the Basys2 has no serial port: a PmodUSBUART on JA (#2537), its RXD (into the Pmod) on JA2, its TXD on JA3
+      { name: 'rx', label: 'UART RX on a PmodUSBUART in JA (its TXD, JA3)', pins: ['J3'], dir: 'in', iostandard: 'LVCMOS33', group: 'UART', verified: false },
+      { name: 'tx', label: 'UART TX on a PmodUSBUART in JA (its RXD, JA2)', pins: ['A3'], dir: 'out', iostandard: 'LVCMOS33', group: 'UART', verified: false },
     ],
   },
   {
