@@ -356,6 +356,7 @@ uiTest('State diagram (FSM): Create Boolean Algebra with more than 4 output bits
   await page.waitFor((ed) => document.querySelector(`${ed} .fsm-tab-btn`), [ED], { what: 'FSM editor' });
   await page.click(`${ED} .fsm-tab-btn`, { text: 'Tables' });
   await page.waitForSelector(`${ED} .fsm-mktt`);
+  await page.eval((ed) => document.querySelector(`${ed} .fsm-mktt`).scrollIntoView(), ED);   // (below the tables, in the panel's scroll)
   await page.click(`${ED} .fsm-mktt`);
   await page.waitFor(() => window.Silinx.fileTree?.includes('src/wide_next.bool.json') && window.Silinx.fileTree.includes('src/wide_out.bool.json'), [], { what: 'truth tables', timeout: 15000 });
   assert.deepEqual(await page.eval(() => window.Silinx.fileTree.filter((f) => /^src\/wide.*\.bool\.json$/.test(f)).sort()), ['src/wide_next.bool.json', 'src/wide_out.bool.json']);
