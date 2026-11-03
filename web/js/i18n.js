@@ -412,6 +412,7 @@ const PT_PATTERNS = [
   // Simulate's side panel: a test bench's row (#1378)
   [/^Simulate ([A-Za-z][A-Za-z0-9_]*)$/, 'Simular $1'],
   [/^Read-only, the C model of (.+)$/, 'Só de leitura, o modelo C de $1'],
+  [/^Translated to (VHDL|Verilog) \(read-only\)$/, 'Traduzido para $1 (só de leitura)'],
   // the Development menu (#707)
   [/^Features \((\d+)\)$/, 'Funcionalidades ($1)'], [/^Bug fixes \((\d+)\)$/, 'Correções ($1)'], [/^Other \((\d+)\)$/, 'Outras ($1)'],
   [/^All Changes since (\d+\.\d+\.\d+)…$/, 'Todas as Alterações desde a $1…'], [/^Changes since (\d+\.\d+\.\d+)$/, 'Alterações desde a $1'],
@@ -496,7 +497,7 @@ for (const k of Object.keys(PT)) { const tk = k.trim(); if (tk !== k) { if (!(tk
 Object.assign(PT, {
   'Not in sync with': 'Não sincronizado com', 'Generated from': 'Gerado a partir de', 
   // the HDL editor's banner of a file generated from a drawing (#1176)
-  'Read-only, generated from': 'Só de leitura, gerado a partir de', 'Read-only, not in sync with': 'Só de leitura, não sincronizado com',
+  'Read-only, generated from': 'Só de leitura, gerado a partir de', 'Read-only, translated from': 'Só de leitura, traduzido de', 'Cannot be translated from': 'Não pode ser traduzido de', 'Read-only, not in sync with': 'Só de leitura, não sincronizado com',
   
   
   

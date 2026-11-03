@@ -84,7 +84,7 @@ const EXAMPLES = {
       '      fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
       '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
       '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
-      '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
+      '      verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
     ],
     sim: [
       'project H_traffic',
@@ -94,14 +94,14 @@ const EXAMPLES = {
       '        fsm u_fsm - traffic [FSM*] [VHDL] (traffic.fsm.json)',
       '        vhdl u_timer - timer [VHDL*] (timer.vhd)',
       '        algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
-      '        verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
+      '        verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
     ],
     tips: [
       'top: VHDL (Open)',
       'u_fsm - traffic: FSM (Base: its HDL is generated from it) VHDL (Generated from the state diagram)',
       'u_timer - timer: VHDL (Open)',
       'u_lamps - lamps: Algebra (Base: its HDL is generated from it) Schematic (Generated from the Boolean algebra, in its HDL logic form) VHDL (Generated from the Boolean algebra)',
-      'u_display - sevenseg: Verilog (Open)',
+      'u_display - sevenseg: Verilog (Open) VHDL (Translated to VHDL (read-only))',
     ],
   },
   blinky: {
@@ -109,30 +109,30 @@ const EXAMPLES = {
       'project H_blinky',
       '  chip xc3s250e-4-cp132',
       '    moduleTop top [VHDL*] (top.vhd)',
-      '      verilog u_pre - prescaler [Verilog*] (counter.v)',
+      '      verilog u_pre - prescaler [Verilog*] [VHDL] (counter.v)',
       '      asm u_speed - speed_ctrl [ASM*] [VHDL] (speed_ctrl.asm.json)',
       '      vhdl u_knight - knight [VHDL*] (knight.vhd)',
       '      vhdl u_count - bcd_counter [VHDL*] (bcd_counter.vhd)',
-      '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
+      '      verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
     ],
     sim: [
       'project H_blinky',
       '  sim Behavioral',
       '    vhdl tb_top [VHDL*] (tb_top.vhd)',
       '      vhdl uut - top [VHDL*] (top.vhd)',
-      '        verilog u_pre - prescaler [Verilog*] (counter.v)',
+      '        verilog u_pre - prescaler [Verilog*] [VHDL] (counter.v)',
       '        asm u_speed - speed_ctrl [ASM*] [VHDL] (speed_ctrl.asm.json)',
       '        vhdl u_knight - knight [VHDL*] (knight.vhd)',
       '        vhdl u_count - bcd_counter [VHDL*] (bcd_counter.vhd)',
-      '        verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
+      '        verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
     ],
     tips: [
       'top: VHDL (Open)',
-      'u_pre - prescaler: Verilog (Open)',
+      'u_pre - prescaler: Verilog (Open) VHDL (Translated to VHDL (read-only))',
       'u_speed - speed_ctrl: ASM (Base: its HDL is generated from it) VHDL (Generated from the state machine)',
       'u_knight - knight: VHDL (Open)',
       'u_count - bcd_counter: VHDL (Open)',
-      'u_display - sevenseg: Verilog (Open)',
+      'u_display - sevenseg: Verilog (Open) VHDL (Translated to VHDL (read-only))',
     ],
   },
 };
@@ -392,7 +392,7 @@ uiTest('Design pane (#207, #220) in Portuguese: the badges [FSM] [Álgebra] [VHD
       'u_fsm - traffic: FSM (Base: o seu HDL é gerado a partir daqui) VHDL (Gerado a partir do diagrama de estados)',
       'u_timer - timer: VHDL (Abrir)',
       'u_lamps - lamps: Álgebra (Base: o seu HDL é gerado a partir daqui) Esquemático (Gerado a partir da álgebra booleana, na sua forma da lógica do HDL) VHDL (Gerado a partir da álgebra booleana)',
-      'u_display - sevenseg: Verilog (Abrir)',
+      'u_display - sevenseg: Verilog (Abrir) VHDL (Traduzido para VHDL (só de leitura))',
     ]);
     assert.deepEqual(await badgeMenu(page, 'u_lamps - lamps', 'Álgebra'), ['Abrir', 'Remover do Projeto']);
     assert.deepEqual(await badgeMenu(page, 'u_fsm - traffic', 'FSM'), ['Abrir', 'Converter para fluxograma ASM', 'Remover do Projeto']);
@@ -517,7 +517,7 @@ end architecture rtl;
     '      vhdl u_fsm - traffic [VHDL*] (traffic.vhd)',
     '      vhdl u_timer - timer [VHDL*] (timer.vhd)',
     '      algebra u_lamps - lamps [Algebra*] [Schematic] [VHDL] (lamps.bool.json)',
-    '      verilog u_display - sevenseg [Verilog*] (sevenseg.v)',
+    '      verilog u_display - sevenseg [Verilog*] [VHDL] (sevenseg.v)',
   ]);
 }, { ui: 'ise' });
 
