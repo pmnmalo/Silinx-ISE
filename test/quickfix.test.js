@@ -478,7 +478,7 @@ test('the examples: every end, endcase, endmodule… and every ";" at the end of
     "isqrt/src/isqrt_top.vhd:60: unexpected 'entity' in sequential statement",
     "micro80/src/micro80_top.vhd:59: unexpected 'entity' in sequential statement",
     "micro80/src/micro80_top.vhd:100: unexpected 'entity' in sequential statement",
-    "stopwatch/src/stopwatch.vhd:95: unexpected 'entity' in sequential statement",
+    "stopwatch/src/stopwatch.vhd:96: unexpected 'entity' in sequential statement",
     "traffic/src/top.vhd:74: unexpected 'entity' in sequential statement",
     "traffic/sim/tb_traffic.vhd:69: unexpected 'process' in sequential statement",
     "uart/src/uart.vhd:97: unexpected 'entity' in sequential statement",

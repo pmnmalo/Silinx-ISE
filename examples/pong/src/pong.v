@@ -10,7 +10,7 @@
 // The design: a state machine (serve, play, point, game over), the button debouncers
 // (debounce.v) and the 7-segment display (sevenseg.v).
 module pong #(
-    parameter TICK     = 6250000,             // clock cycles per ball step at the start (8 per second)
+    parameter TICK     = 6250000,             // clock cycles per ball step at the start (8 per second; < 2**23)
     parameter STABLE   = 1000000,             // button debounce (20 ms)
     parameter REFRESH  = 50000,               // display: cycles per digit (1 ms)
     parameter WIN      = 5                    // points to win a game
@@ -35,32 +35,32 @@ module pong #(
     reg [1:0]  state = SERVE;
     reg [2:0]  pos = 3'd0;                    // the ball: LED 0 (right) .. 7 (left)
     reg        dir = LEFT;                    // where the ball goes
-    reg [23:0] period = TICK;                 // cycles per step now
-    reg [23:0] timer = 24'd0;
+    reg [22:0] period = TICK;                 // cycles per step now
+    reg [22:0] timer = 23'd0;
     reg [3:0]  scoreL = 4'd0, scoreR = 4'd0;
     reg        server = RIGHT, pointTo = RIGHT;
     reg        lockL = 1'b0, lockR = 1'b0;    // pressed too early in this rally
     reg [3:0]  hold = 4'd0;                   // steps left showing a point
     reg        paused = 1'b0;
     // a slow beat for blinking: one half-period every TICK cycles
-    reg [23:0] beatCount = 24'd0;
+    reg [22:0] beatCount = 23'd0;
     reg        beat = 1'b0;
 
-    wire [23:0] start  = sw[1] ? TICK / 2 : TICK;
-    wire [23:0] faster = period - (period >> 3);
+    wire [22:0] start  = sw[1] ? TICK / 2 : TICK;
+    wire [22:0] faster = period - (period >> 3);
     wire        step   = !paused && (timer == period - 1);
 
     always @(posedge clk) begin
-        if (beatCount == TICK - 1) begin beatCount <= 24'd0; beat <= ~beat; end
-        else beatCount <= beatCount + 24'd1;
+        if (beatCount == TICK - 1) begin beatCount <= 23'd0; beat <= ~beat; end
+        else beatCount <= beatCount + 23'd1;
     end
 
     always @(posedge clk) begin
         if (sw[0]) begin
             state <= SERVE; server <= RIGHT; pos <= 3'd0;
-            scoreL <= 4'd0; scoreR <= 4'd0; timer <= 24'd0; paused <= 1'b0;
+            scoreL <= 4'd0; scoreR <= 4'd0; timer <= 23'd0; paused <= 1'b0;
         end else begin
-            if (!paused) timer <= step ? 24'd0 : timer + 24'd1;
+            if (!paused) timer <= step ? 23'd0 : timer + 23'd1;
             if (state != PLAY) paused <= 1'b0;
             else if (press1 || press2) paused <= ~paused;
             case (state)
@@ -70,16 +70,16 @@ module pong #(
                         state <= PLAY;
                         dir <= ~server;               // away from the server
                         period <= start;
-                        timer <= 24'd0;
+                        timer <= 23'd0;
                         lockL <= 1'b0; lockR <= 1'b0;
                     end
                 end
                 PLAY: if (!paused) begin
                     if (dir == LEFT && pressL && pos == 3'd7 && !lockL) begin
-                        dir <= RIGHT; timer <= 24'd0; lockL <= 1'b0; lockR <= 1'b0;
+                        dir <= RIGHT; timer <= 23'd0; lockL <= 1'b0; lockR <= 1'b0;
                         if (faster > TICK / 4) period <= faster;
                     end else if (dir == RIGHT && pressR && pos == 3'd0 && !lockR) begin
-                        dir <= LEFT; timer <= 24'd0; lockL <= 1'b0; lockR <= 1'b0;
+                        dir <= LEFT; timer <= 23'd0; lockL <= 1'b0; lockR <= 1'b0;
                         if (faster > TICK / 4) period <= faster;
                     end else begin
                         if (dir == LEFT && pressL) lockL <= 1'b1;     // too early

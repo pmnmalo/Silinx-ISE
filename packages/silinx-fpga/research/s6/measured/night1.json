@@ -786,21 +786,21 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 217,
+        "used": 253,
         "of": 9112
        },
        "used as logic": {
-        "used": 211,
+        "used": 248,
         "of": 9112
        },
        "using O6 output only": {
-        "used": 103
+        "used": 151
        },
        "using O5 output only": {
-        "used": 79
+        "used": 74
        },
        "using O5 and O6": {
-        "used": 29
+        "used": 23
        },
        "used as ROM": {
         "used": 0
@@ -810,42 +810,42 @@
         "of": 2176
        },
        "used exclusively as route-thrus": {
-        "used": 6
+        "used": 5
        },
        "with same-slice register load": {
         "used": 0
        },
        "with same-slice carry load": {
-        "used": 6
+        "used": 5
        },
        "with other load": {
         "used": 0
        },
        "occupied Slices": {
-        "used": 73,
+        "used": 87,
         "of": 2278
        },
        "MUXCYs used": {
-        "used": 100,
+        "used": 84,
         "of": 4556
        },
        "LUT Flip Flop pairs used": {
-        "used": 221
+        "used": 255
        },
        "with an unused Flip Flop": {
-        "used": 99,
-        "of": 221
+        "used": 132,
+        "of": 255
        },
        "with an unused LUT": {
-        "used": 4,
-        "of": 221
+        "used": 2,
+        "of": 255
        },
        "fully used LUT-FF pairs": {
-        "used": 118,
-        "of": 221
+        "used": 121,
+        "of": 255
        },
        "unique control sets": {
-        "used": 8
+        "used": 7
        },
        "bonded IOBs": {
         "used": 27,
@@ -949,19 +949,19 @@
       "sites": {
        "BUFG": 1,
        "IOB": 27,
-       "SLICEL": 25,
-       "SLICEX": 48
+       "SLICEL": 21,
+       "SLICEX": 66
       },
       "routed": true,
-      "minPeriod": 4.073,
+      "minPeriod": 3.863,
       "times": {
-       "xst": 12,
-       "ngdbuild": 5,
-       "map": 11,
-       "par": 11,
-       "trce": 6,
-       "xdl": 4,
-       "bitgen": 7
+       "xst": 13,
+       "ngdbuild": 8,
+       "map": 14,
+       "par": 15,
+       "trce": 8,
+       "xdl": 5,
+       "bitgen": 9
       }
      },
      "open": {
@@ -989,15 +989,15 @@
         "used": 1
        },
        "Slice LUTs": {
-        "used": 199,
+        "used": 197,
         "of": 9112
        },
        "used as logic": {
-        "used": 198,
+        "used": 196,
         "of": 9112
        },
        "using O6 output only": {
-        "used": 89
+        "used": 87
        },
        "using O5 output only": {
         "used": 96
@@ -1025,7 +1025,7 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 72,
+        "used": 71,
         "of": 2278
        },
        "MUXCYs used": {
@@ -1033,19 +1033,19 @@
         "of": 4556
        },
        "LUT Flip Flop pairs used": {
-        "used": 204
+        "used": 203
        },
        "with an unused Flip Flop": {
-        "used": 73,
-        "of": 204
+        "used": 72,
+        "of": 203
        },
        "with an unused LUT": {
-        "used": 5,
-        "of": 204
+        "used": 6,
+        "of": 203
        },
        "fully used LUT-FF pairs": {
-        "used": 126,
-        "of": 204
+        "used": 125,
+        "of": 203
        },
        "unique control sets": {
         "used": 15
@@ -1153,16 +1153,16 @@
        "BUFG": 1,
        "IOB": 27,
        "SLICEL": 29,
-       "SLICEX": 43
+       "SLICEX": 42
       },
       "routed": true,
-      "minPeriod": 5.051,
+      "minPeriod": 5.685,
       "times": {
-       "ngdbuild": 9,
-       "map": 10,
-       "par": 10,
-       "trce": 5,
-       "xdl": 4
+       "ngdbuild": 16,
+       "map": 14,
+       "par": 15,
+       "trce": 9,
+       "xdl": 5
       }
      }
     },
@@ -1177,11 +1177,11 @@
         "used": 0
        },
        "Slice Registers": {
-        "used": 203,
+        "used": 202,
         "of": 18224
        },
        "used as Flip Flops": {
-        "used": 203
+        "used": 202
        },
        "used as Latches": {
         "used": 0
@@ -1193,21 +1193,21 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 366,
+        "used": 360,
         "of": 9112
        },
        "used as logic": {
-        "used": 355,
+        "used": 349,
         "of": 9112
        },
        "using O6 output only": {
-        "used": 150
+        "used": 144
        },
        "using O5 output only": {
-        "used": 131
+        "used": 130
        },
        "using O5 and O6": {
-        "used": 74
+        "used": 75
        },
        "used as ROM": {
         "used": 0
@@ -1242,23 +1242,23 @@
         "of": 2278
        },
        "MUXCYs used": {
-        "used": 216,
+        "used": 212,
         "of": 4556
        },
        "LUT Flip Flop pairs used": {
-        "used": 366
+        "used": 362
        },
        "with an unused Flip Flop": {
-        "used": 178,
-        "of": 366
+        "used": 175,
+        "of": 362
        },
        "with an unused LUT": {
-        "used": 0,
-        "of": 366
+        "used": 2,
+        "of": 362
        },
        "fully used LUT-FF pairs": {
-        "used": 188,
-        "of": 366
+        "used": 185,
+        "of": 362
        },
        "unique control sets": {
         "used": 12
@@ -1365,19 +1365,19 @@
       "sites": {
        "BUFG": 1,
        "IOB": 27,
-       "SLICEL": 55,
+       "SLICEL": 54,
        "SLICEM": 1,
-       "SLICEX": 58
+       "SLICEX": 59
       },
       "routed": true,
-      "minPeriod": 5.525,
+      "minPeriod": 5.605,
       "times": {
-       "xst": 15,
-       "ngdbuild": 7,
-       "map": 15,
-       "par": 16,
-       "trce": 7,
-       "xdl": 5,
+       "xst": 14,
+       "ngdbuild": 8,
+       "map": 16,
+       "par": 15,
+       "trce": 8,
+       "xdl": 6,
        "bitgen": 10
       }
      },
@@ -1390,11 +1390,11 @@
         "used": 0
        },
        "Slice Registers": {
-        "used": 226,
+        "used": 207,
         "of": 18224
        },
        "used as Flip Flops": {
-        "used": 226
+        "used": 207
        },
        "used as Latches": {
         "used": 0
@@ -1406,18 +1406,18 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 416,
+        "used": 393,
         "of": 9112
        },
        "used as logic": {
-        "used": 411,
+        "used": 388,
         "of": 9112
        },
        "using O6 output only": {
-        "used": 242
+        "used": 236
        },
        "using O5 output only": {
-        "used": 159
+        "used": 142
        },
        "using O5 and O6": {
         "used": 10
@@ -1442,27 +1442,27 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 141,
+        "used": 130,
         "of": 2278
        },
        "MUXCYs used": {
-        "used": 228,
+        "used": 208,
         "of": 4556
        },
        "LUT Flip Flop pairs used": {
-        "used": 427
+        "used": 403
        },
        "with an unused Flip Flop": {
-        "used": 201,
-        "of": 427
+        "used": 196,
+        "of": 403
        },
        "with an unused LUT": {
-        "used": 11,
-        "of": 427
+        "used": 10,
+        "of": 403
        },
        "fully used LUT-FF pairs": {
-        "used": 215,
-        "of": 427
+        "used": 197,
+        "of": 403
        },
        "unique control sets": {
         "used": 28
@@ -1569,17 +1569,17 @@
       "sites": {
        "BUFG": 1,
        "IOB": 27,
-       "SLICEL": 57,
-       "SLICEX": 84
+       "SLICEL": 53,
+       "SLICEX": 77
       },
       "routed": true,
-      "minPeriod": 7.691,
+      "minPeriod": 6.945,
       "times": {
-       "ngdbuild": 9,
-       "map": 14,
-       "par": 11,
-       "trce": 6,
-       "xdl": 4
+       "ngdbuild": 16,
+       "map": 21,
+       "par": 16,
+       "trce": 8,
+       "xdl": 5
       }
      }
     },
@@ -1591,14 +1591,14 @@
         "used": 0
        },
        "warnings": {
-        "used": 1
+        "used": 0
        },
        "Slice Registers": {
-        "used": 183,
+        "used": 185,
         "of": 18224
        },
        "used as Flip Flops": {
-        "used": 183
+        "used": 185
        },
        "used as Latches": {
         "used": 0
@@ -1610,21 +1610,21 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 261,
+        "used": 275,
         "of": 9112
        },
        "used as logic": {
-        "used": 248,
+        "used": 262,
         "of": 9112
        },
        "using O6 output only": {
-        "used": 88
+        "used": 103
        },
        "using O5 output only": {
-        "used": 130
+        "used": 131
        },
        "using O5 and O6": {
-        "used": 30
+        "used": 28
        },
        "used as ROM": {
         "used": 0
@@ -1655,7 +1655,7 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 85,
+        "used": 93,
         "of": 2278
        },
        "MUXCYs used": {
@@ -1663,22 +1663,22 @@
         "of": 4556
        },
        "LUT Flip Flop pairs used": {
-        "used": 266
+        "used": 281
        },
        "with an unused Flip Flop": {
-        "used": 91,
-        "of": 266
+        "used": 104,
+        "of": 281
        },
        "with an unused LUT": {
-        "used": 5,
-        "of": 266
+        "used": 6,
+        "of": 281
        },
        "fully used LUT-FF pairs": {
-        "used": 170,
-        "of": 266
+        "used": 171,
+        "of": 281
        },
        "unique control sets": {
-        "used": 13
+        "used": 12
        },
        "bonded IOBs": {
         "used": 26,
@@ -1689,11 +1689,11 @@
         "of": 26
        },
        "RAMB16BWERs": {
-        "used": 0,
+        "used": 1,
         "of": 32
        },
        "RAMB8BWERs": {
-        "used": 1,
+        "used": 0,
         "of": 64
        },
        "BUFIO2/BUFIO2_2CLKs": {
@@ -1783,18 +1783,18 @@
        "BUFG": 1,
        "DSP48A1": 3,
        "IOB": 26,
-       "RAMB8BWER": 1,
+       "RAMB16BWER": 1,
        "SLICEL": 39,
        "SLICEM": 1,
-       "SLICEX": 45
+       "SLICEX": 53
       },
       "routed": true,
-      "minPeriod": 7.089,
+      "minPeriod": 6.958,
       "times": {
-       "xst": 15,
+       "xst": 16,
        "ngdbuild": 7,
-       "map": 15,
-       "par": 15,
+       "map": 16,
+       "par": 17,
        "trce": 8,
        "xdl": 5,
        "bitgen": 11
@@ -1806,14 +1806,14 @@
         "used": 0
        },
        "warnings": {
-        "used": 1
+        "used": 0
        },
        "Slice Registers": {
-        "used": 200,
+        "used": 201,
         "of": 18224
        },
        "used as Flip Flops": {
-        "used": 200
+        "used": 201
        },
        "used as Latches": {
         "used": 0
@@ -1825,18 +1825,18 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 319,
+        "used": 323,
         "of": 9112
        },
        "used as logic": {
-        "used": 316,
+        "used": 320,
         "of": 9112
        },
        "using O6 output only": {
-        "used": 168
+        "used": 171
        },
        "using O5 output only": {
-        "used": 139
+        "used": 140
        },
        "using O5 and O6": {
         "used": 9
@@ -1861,7 +1861,7 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 113,
+        "used": 112,
         "of": 2278
        },
        "MUXCYs used": {
@@ -1869,19 +1869,19 @@
         "of": 4556
        },
        "LUT Flip Flop pairs used": {
-        "used": 336
+        "used": 337
        },
        "with an unused Flip Flop": {
         "used": 142,
-        "of": 336
+        "of": 337
        },
        "with an unused LUT": {
-        "used": 17,
-        "of": 336
+        "used": 14,
+        "of": 337
        },
        "fully used LUT-FF pairs": {
-        "used": 177,
-        "of": 336
+        "used": 181,
+        "of": 337
        },
        "unique control sets": {
         "used": 18
@@ -1895,11 +1895,11 @@
         "of": 26
        },
        "RAMB16BWERs": {
-        "used": 0,
+        "used": 1,
         "of": 32
        },
        "RAMB8BWERs": {
-        "used": 1,
+        "used": 0,
         "of": 64
        },
        "BUFIO2/BUFIO2_2CLKs": {
@@ -1989,18 +1989,18 @@
        "BUFG": 1,
        "DSP48A1": 3,
        "IOB": 26,
-       "RAMB8BWER": 1,
+       "RAMB16BWER": 1,
        "SLICEL": 42,
-       "SLICEX": 71
+       "SLICEX": 70
       },
       "routed": true,
-      "minPeriod": 8.74,
+      "minPeriod": 8.783,
       "times": {
-       "ngdbuild": 5,
-       "map": 11,
-       "par": 12,
-       "trce": 6,
-       "xdl": 3
+       "ngdbuild": 16,
+       "map": 16,
+       "par": 17,
+       "trce": 8,
+       "xdl": 5
       }
      }
     },
@@ -2076,7 +2076,7 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 108,
+        "used": 107,
         "of": 2278
        },
        "MUXCYs used": {
@@ -2205,18 +2205,18 @@
        "IOB": 27,
        "SLICEL": 33,
        "SLICEM": 1,
-       "SLICEX": 74
+       "SLICEX": 73
       },
       "routed": true,
-      "minPeriod": 4.325,
+      "minPeriod": 4.148,
       "times": {
-       "xst": 12,
-       "ngdbuild": 7,
-       "map": 14,
-       "par": 16,
-       "trce": 8,
-       "xdl": 5,
-       "bitgen": 10
+       "xst": 10,
+       "ngdbuild": 5,
+       "map": 9,
+       "par": 10,
+       "trce": 5,
+       "xdl": 3,
+       "bitgen": 6
       }
      },
      "open": {
@@ -2228,11 +2228,11 @@
         "used": 0
        },
        "Slice Registers": {
-        "used": 175,
+        "used": 159,
         "of": 18224
        },
        "used as Flip Flops": {
-        "used": 174
+        "used": 158
        },
        "used as Latches": {
         "used": 0
@@ -2244,18 +2244,18 @@
         "used": 1
        },
        "Slice LUTs": {
-        "used": 321,
+        "used": 296,
         "of": 9112
        },
        "used as logic": {
-        "used": 307,
+        "used": 282,
         "of": 9112
        },
        "using O6 output only": {
-        "used": 144
+        "used": 135
        },
        "using O5 output only": {
-        "used": 144
+        "used": 128
        },
        "using O5 and O6": {
         "used": 19
@@ -2280,27 +2280,27 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 119,
+        "used": 113,
         "of": 2278
        },
        "MUXCYs used": {
-        "used": 196,
+        "used": 180,
         "of": 4556
        },
        "LUT Flip Flop pairs used": {
-        "used": 332
+        "used": 307
        },
        "with an unused Flip Flop": {
-        "used": 157,
-        "of": 332
+        "used": 148,
+        "of": 307
        },
        "with an unused LUT": {
         "used": 11,
-        "of": 332
+        "of": 307
        },
        "fully used LUT-FF pairs": {
-        "used": 164,
-        "of": 332
+        "used": 148,
+        "of": 307
        },
        "unique control sets": {
         "used": 20
@@ -2407,17 +2407,17 @@
       "sites": {
        "BUFG": 1,
        "IOB": 27,
-       "SLICEL": 51,
-       "SLICEX": 68
+       "SLICEL": 46,
+       "SLICEX": 67
       },
       "routed": true,
-      "minPeriod": 5.341,
+      "minPeriod": 5.056,
       "times": {
-       "ngdbuild": 9,
-       "map": 10,
+       "ngdbuild": 10,
+       "map": 9,
        "par": 10,
-       "trce": 6,
-       "xdl": 4
+       "trce": 5,
+       "xdl": 3
       }
      }
     },
@@ -3602,11 +3602,7 @@
      }
     },
     "blinky": {
-     "unmatched": [
-      "seg",
-      "dp",
-      "an"
-     ],
+     "unmatched": [],
      "hdl": {
       "map": {
        "errors": {
@@ -3632,21 +3628,21 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 217,
+        "used": 253,
         "of": 27288
        },
        "used as logic": {
-        "used": 211,
+        "used": 248,
         "of": 27288
        },
        "using O6 output only": {
-        "used": 103
+        "used": 151
        },
        "using O5 output only": {
-        "used": 79
+        "used": 74
        },
        "using O5 and O6": {
-        "used": 29
+        "used": 23
        },
        "used as ROM": {
         "used": 0
@@ -3656,49 +3652,49 @@
         "of": 6408
        },
        "used exclusively as route-thrus": {
-        "used": 6
+        "used": 5
        },
        "with same-slice register load": {
         "used": 0
        },
        "with same-slice carry load": {
-        "used": 6
+        "used": 5
        },
        "with other load": {
         "used": 0
        },
        "occupied Slices": {
-        "used": 74,
+        "used": 86,
         "of": 6822
        },
        "MUXCYs used": {
-        "used": 100,
+        "used": 84,
         "of": 13644
        },
        "LUT Flip Flop pairs used": {
-        "used": 221
+        "used": 257
        },
        "with an unused Flip Flop": {
-        "used": 99,
-        "of": 221
+        "used": 133,
+        "of": 257
        },
        "with an unused LUT": {
         "used": 4,
-        "of": 221
+        "of": 257
        },
        "fully used LUT-FF pairs": {
-        "used": 118,
-        "of": 221
+        "used": 120,
+        "of": 257
        },
        "unique control sets": {
-        "used": 8
+        "used": 7
        },
        "bonded IOBs": {
         "used": 27,
         "of": 218
        },
        "LOCed IOBs": {
-        "used": 15,
+        "used": 27,
         "of": 27
        },
        "RAMB16BWERs": {
@@ -3795,19 +3791,19 @@
       "sites": {
        "BUFG": 1,
        "IOB": 27,
-       "SLICEL": 25,
-       "SLICEX": 49
+       "SLICEL": 21,
+       "SLICEX": 65
       },
       "routed": true,
-      "minPeriod": 5.694,
+      "minPeriod": 5.861,
       "times": {
-       "xst": 8,
-       "ngdbuild": 5,
-       "map": 15,
-       "par": 13,
-       "trce": 6,
-       "xdl": 4,
-       "bitgen": 9
+       "xst": 14,
+       "ngdbuild": 7,
+       "map": 21,
+       "par": 19,
+       "trce": 10,
+       "xdl": 5,
+       "bitgen": 15
       }
      },
      "open": {
@@ -3835,15 +3831,15 @@
         "used": 1
        },
        "Slice LUTs": {
-        "used": 199,
+        "used": 197,
         "of": 27288
        },
        "used as logic": {
-        "used": 198,
+        "used": 196,
         "of": 27288
        },
        "using O6 output only": {
-        "used": 89
+        "used": 87
        },
        "using O5 output only": {
         "used": 96
@@ -3879,19 +3875,19 @@
         "of": 13644
        },
        "LUT Flip Flop pairs used": {
-        "used": 204
+        "used": 203
        },
        "with an unused Flip Flop": {
-        "used": 73,
-        "of": 204
+        "used": 72,
+        "of": 203
        },
        "with an unused LUT": {
-        "used": 5,
-        "of": 204
+        "used": 6,
+        "of": 203
        },
        "fully used LUT-FF pairs": {
-        "used": 126,
-        "of": 204
+        "used": 125,
+        "of": 203
        },
        "unique control sets": {
         "used": 15
@@ -3901,7 +3897,7 @@
         "of": 218
        },
        "LOCed IOBs": {
-        "used": 15,
+        "used": 27,
         "of": 27
        },
        "RAMB16BWERs": {
@@ -4002,22 +3998,18 @@
        "SLICEX": 46
       },
       "routed": true,
-      "minPeriod": 6.007,
+      "minPeriod": 6.995,
       "times": {
-       "ngdbuild": 9,
-       "map": 14,
-       "par": 14,
-       "trce": 6,
-       "xdl": 4
+       "ngdbuild": 17,
+       "map": 19,
+       "par": 18,
+       "trce": 10,
+       "xdl": 5
       }
      }
     },
     "pong": {
-     "unmatched": [
-      "seg",
-      "an",
-      "dp"
-     ],
+     "unmatched": [],
      "hdl": {
       "map": {
        "errors": {
@@ -4027,11 +4019,11 @@
         "used": 0
        },
        "Slice Registers": {
-        "used": 203,
+        "used": 202,
         "of": 54576
        },
        "used as Flip Flops": {
-        "used": 203
+        "used": 202
        },
        "used as Latches": {
         "used": 0
@@ -4043,21 +4035,21 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 366,
+        "used": 360,
         "of": 27288
        },
        "used as logic": {
-        "used": 355,
+        "used": 349,
         "of": 27288
        },
        "using O6 output only": {
-        "used": 150
+        "used": 144
        },
        "using O5 output only": {
-        "used": 131
+        "used": 130
        },
        "using O5 and O6": {
-        "used": 74
+        "used": 75
        },
        "used as ROM": {
         "used": 0
@@ -4088,27 +4080,27 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 114,
+        "used": 111,
         "of": 6822
        },
        "MUXCYs used": {
-        "used": 216,
+        "used": 212,
         "of": 13644
        },
        "LUT Flip Flop pairs used": {
-        "used": 367
+        "used": 362
        },
        "with an unused Flip Flop": {
-        "used": 179,
-        "of": 367
+        "used": 175,
+        "of": 362
        },
        "with an unused LUT": {
-        "used": 1,
-        "of": 367
+        "used": 2,
+        "of": 362
        },
        "fully used LUT-FF pairs": {
-        "used": 187,
-        "of": 367
+        "used": 185,
+        "of": 362
        },
        "unique control sets": {
         "used": 12
@@ -4118,7 +4110,7 @@
         "of": 218
        },
        "LOCed IOBs": {
-        "used": 15,
+        "used": 27,
         "of": 27
        },
        "RAMB16BWERs": {
@@ -4215,20 +4207,20 @@
       "sites": {
        "BUFG": 1,
        "IOB": 27,
-       "SLICEL": 55,
+       "SLICEL": 54,
        "SLICEM": 1,
-       "SLICEX": 58
+       "SLICEX": 56
       },
       "routed": true,
-      "minPeriod": 6.036,
+      "minPeriod": 6.495,
       "times": {
-       "xst": 14,
-       "ngdbuild": 9,
+       "xst": 15,
+       "ngdbuild": 7,
        "map": 24,
-       "par": 19,
+       "par": 22,
        "trce": 10,
-       "xdl": 5,
-       "bitgen": 15
+       "xdl": 6,
+       "bitgen": 14
       }
      },
      "open": {
@@ -4240,11 +4232,11 @@
         "used": 0
        },
        "Slice Registers": {
-        "used": 226,
+        "used": 207,
         "of": 54576
        },
        "used as Flip Flops": {
-        "used": 226
+        "used": 207
        },
        "used as Latches": {
         "used": 0
@@ -4256,18 +4248,18 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 416,
+        "used": 393,
         "of": 27288
        },
        "used as logic": {
-        "used": 411,
+        "used": 388,
         "of": 27288
        },
        "using O6 output only": {
-        "used": 242
+        "used": 236
        },
        "using O5 output only": {
-        "used": 159
+        "used": 142
        },
        "using O5 and O6": {
         "used": 10
@@ -4292,27 +4284,27 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 141,
+        "used": 135,
         "of": 6822
        },
        "MUXCYs used": {
-        "used": 228,
+        "used": 208,
         "of": 13644
        },
        "LUT Flip Flop pairs used": {
-        "used": 426
+        "used": 403
        },
        "with an unused Flip Flop": {
-        "used": 200,
-        "of": 426
+        "used": 196,
+        "of": 403
        },
        "with an unused LUT": {
         "used": 10,
-        "of": 426
+        "of": 403
        },
        "fully used LUT-FF pairs": {
-        "used": 216,
-        "of": 426
+        "used": 197,
+        "of": 403
        },
        "unique control sets": {
         "used": 28
@@ -4322,7 +4314,7 @@
         "of": 218
        },
        "LOCed IOBs": {
-        "used": 15,
+        "used": 27,
         "of": 27
        },
        "RAMB16BWERs": {
@@ -4419,40 +4411,36 @@
       "sites": {
        "BUFG": 1,
        "IOB": 27,
-       "SLICEL": 57,
-       "SLICEX": 84
+       "SLICEL": 53,
+       "SLICEX": 82
       },
       "routed": true,
-      "minPeriod": 8.039,
+      "minPeriod": 7.593,
       "times": {
-       "ngdbuild": 8,
-       "map": 17,
-       "par": 15,
-       "trce": 7,
-       "xdl": 4
+       "ngdbuild": 17,
+       "map": 25,
+       "par": 20,
+       "trce": 10,
+       "xdl": 6
       }
      }
     },
     "stopwatch": {
-     "unmatched": [
-      "seg",
-      "dp",
-      "an"
-     ],
+     "unmatched": [],
      "hdl": {
       "map": {
        "errors": {
         "used": 0
        },
        "warnings": {
-        "used": 1
+        "used": 0
        },
        "Slice Registers": {
-        "used": 183,
+        "used": 185,
         "of": 54576
        },
        "used as Flip Flops": {
-        "used": 183
+        "used": 185
        },
        "used as Latches": {
         "used": 0
@@ -4464,21 +4452,21 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 261,
+        "used": 275,
         "of": 27288
        },
        "used as logic": {
-        "used": 248,
+        "used": 262,
         "of": 27288
        },
        "using O6 output only": {
-        "used": 88
+        "used": 103
        },
        "using O5 output only": {
-        "used": 130
+        "used": 131
        },
        "using O5 and O6": {
-        "used": 30
+        "used": 28
        },
        "used as ROM": {
         "used": 0
@@ -4509,7 +4497,7 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 82,
+        "used": 89,
         "of": 6822
        },
        "MUXCYs used": {
@@ -4517,37 +4505,37 @@
         "of": 13644
        },
        "LUT Flip Flop pairs used": {
-        "used": 265
+        "used": 278
        },
        "with an unused Flip Flop": {
-        "used": 90,
-        "of": 265
+        "used": 101,
+        "of": 278
        },
        "with an unused LUT": {
-        "used": 4,
-        "of": 265
+        "used": 3,
+        "of": 278
        },
        "fully used LUT-FF pairs": {
-        "used": 171,
-        "of": 265
+        "used": 174,
+        "of": 278
        },
        "unique control sets": {
-        "used": 13
+        "used": 12
        },
        "bonded IOBs": {
         "used": 26,
         "of": 218
        },
        "LOCed IOBs": {
-        "used": 14,
+        "used": 26,
         "of": 26
        },
        "RAMB16BWERs": {
-        "used": 0,
+        "used": 1,
         "of": 116
        },
        "RAMB8BWERs": {
-        "used": 1,
+        "used": 0,
         "of": 232
        },
        "BUFIO2/BUFIO2_2CLKs": {
@@ -4637,21 +4625,21 @@
        "BUFG": 1,
        "DSP48A1": 3,
        "IOB": 26,
-       "RAMB8BWER": 1,
+       "RAMB16BWER": 1,
        "SLICEL": 39,
        "SLICEM": 1,
-       "SLICEX": 42
+       "SLICEX": 49
       },
       "routed": true,
-      "minPeriod": 7.948,
+      "minPeriod": 8.057,
       "times": {
-       "xst": 14,
-       "ngdbuild": 7,
-       "map": 21,
+       "xst": 17,
+       "ngdbuild": 8,
+       "map": 23,
        "par": 21,
-       "trce": 9,
+       "trce": 10,
        "xdl": 5,
-       "bitgen": 16
+       "bitgen": 15
       }
      },
      "open": {
@@ -4660,14 +4648,14 @@
         "used": 0
        },
        "warnings": {
-        "used": 1
+        "used": 0
        },
        "Slice Registers": {
-        "used": 200,
+        "used": 201,
         "of": 54576
        },
        "used as Flip Flops": {
-        "used": 200
+        "used": 201
        },
        "used as Latches": {
         "used": 0
@@ -4679,18 +4667,18 @@
         "used": 0
        },
        "Slice LUTs": {
-        "used": 319,
+        "used": 323,
         "of": 27288
        },
        "used as logic": {
-        "used": 316,
+        "used": 320,
         "of": 27288
        },
        "using O6 output only": {
-        "used": 168
+        "used": 171
        },
        "using O5 output only": {
-        "used": 139
+        "used": 140
        },
        "using O5 and O6": {
         "used": 9
@@ -4715,7 +4703,7 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 113,
+        "used": 119,
         "of": 6822
        },
        "MUXCYs used": {
@@ -4723,19 +4711,19 @@
         "of": 13644
        },
        "LUT Flip Flop pairs used": {
-        "used": 332
+        "used": 338
        },
        "with an unused Flip Flop": {
-        "used": 138,
-        "of": 332
+        "used": 143,
+        "of": 338
        },
        "with an unused LUT": {
-        "used": 13,
-        "of": 332
+        "used": 15,
+        "of": 338
        },
        "fully used LUT-FF pairs": {
-        "used": 181,
-        "of": 332
+        "used": 180,
+        "of": 338
        },
        "unique control sets": {
         "used": 18
@@ -4745,15 +4733,15 @@
         "of": 218
        },
        "LOCed IOBs": {
-        "used": 13,
+        "used": 25,
         "of": 26
        },
        "RAMB16BWERs": {
-        "used": 0,
+        "used": 1,
         "of": 116
        },
        "RAMB8BWERs": {
-        "used": 1,
+        "used": 0,
         "of": 232
        },
        "BUFIO2/BUFIO2_2CLKs": {
@@ -4843,27 +4831,23 @@
        "BUFG": 1,
        "DSP48A1": 3,
        "IOB": 26,
-       "RAMB8BWER": 1,
+       "RAMB16BWER": 1,
        "SLICEL": 42,
-       "SLICEX": 71
+       "SLICEX": 77
       },
       "routed": true,
-      "minPeriod": 9.319,
+      "minPeriod": 8.652,
       "times": {
-       "ngdbuild": 5,
-       "map": 14,
-       "par": 14,
-       "trce": 7,
-       "xdl": 3
+       "ngdbuild": 17,
+       "map": 21,
+       "par": 21,
+       "trce": 9,
+       "xdl": 6
       }
      }
     },
     "clock": {
-     "unmatched": [
-      "seg",
-      "an",
-      "dp"
-     ],
+     "unmatched": [],
      "hdl": {
       "map": {
        "errors": {
@@ -4934,7 +4918,7 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 112,
+        "used": 113,
         "of": 6822
        },
        "MUXCYs used": {
@@ -4964,7 +4948,7 @@
         "of": 218
        },
        "LOCed IOBs": {
-        "used": 15,
+        "used": 27,
         "of": 27
        },
        "RAMB16BWERs": {
@@ -5063,18 +5047,18 @@
        "IOB": 27,
        "SLICEL": 33,
        "SLICEM": 1,
-       "SLICEX": 78
+       "SLICEX": 79
       },
       "routed": true,
-      "minPeriod": 5.688,
+      "minPeriod": 4.8,
       "times": {
-       "xst": 15,
-       "ngdbuild": 6,
-       "map": 20,
-       "par": 20,
-       "trce": 10,
+       "xst": 11,
+       "ngdbuild": 5,
+       "map": 13,
+       "par": 13,
+       "trce": 8,
        "xdl": 5,
-       "bitgen": 14
+       "bitgen": 13
       }
      },
      "open": {
@@ -5086,11 +5070,11 @@
         "used": 0
        },
        "Slice Registers": {
-        "used": 175,
+        "used": 159,
         "of": 54576
        },
        "used as Flip Flops": {
-        "used": 174
+        "used": 158
        },
        "used as Latches": {
         "used": 0
@@ -5102,18 +5086,18 @@
         "used": 1
        },
        "Slice LUTs": {
-        "used": 321,
+        "used": 296,
         "of": 27288
        },
        "used as logic": {
-        "used": 307,
+        "used": 282,
         "of": 27288
        },
        "using O6 output only": {
-        "used": 144
+        "used": 135
        },
        "using O5 output only": {
-        "used": 144
+        "used": 128
        },
        "using O5 and O6": {
         "used": 19
@@ -5138,27 +5122,27 @@
         "used": 0
        },
        "occupied Slices": {
-        "used": 116,
+        "used": 109,
         "of": 6822
        },
        "MUXCYs used": {
-        "used": 196,
+        "used": 180,
         "of": 13644
        },
        "LUT Flip Flop pairs used": {
-        "used": 331
+        "used": 306
        },
        "with an unused Flip Flop": {
-        "used": 156,
-        "of": 331
+        "used": 147,
+        "of": 306
        },
        "with an unused LUT": {
         "used": 10,
-        "of": 331
+        "of": 306
        },
        "fully used LUT-FF pairs": {
-        "used": 165,
-        "of": 331
+        "used": 149,
+        "of": 306
        },
        "unique control sets": {
         "used": 20
@@ -5168,7 +5152,7 @@
         "of": 218
        },
        "LOCed IOBs": {
-        "used": 15,
+        "used": 27,
         "of": 27
        },
        "RAMB16BWERs": {
@@ -5265,16 +5249,16 @@
       "sites": {
        "BUFG": 1,
        "IOB": 27,
-       "SLICEL": 51,
-       "SLICEX": 65
+       "SLICEL": 46,
+       "SLICEX": 63
       },
       "routed": true,
-      "minPeriod": 5.909,
+      "minPeriod": 5.14,
       "times": {
-       "ngdbuild": 8,
-       "map": 14,
-       "par": 15,
-       "trce": 7,
+       "ngdbuild": 11,
+       "map": 13,
+       "par": 13,
+       "trce": 6,
        "xdl": 3
       }
      }

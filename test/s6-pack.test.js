@@ -274,10 +274,10 @@ test('a cell the packer has no place for: a PackError naming it', () => {
 const EXAMPLE_PACK = {
   gates: { slices: 1, X: 1, L: 0, M: 0, luts: 1, ffs: 0, warnings: 0 },
   traffic: { slices: 34, X: 14, L: 20, M: 0, luts: 96, ffs: 58, warnings: 0 },
-  blinky: { slices: 54, X: 25, L: 29, M: 0, luts: 104, ffs: 131, warnings: 0 },
-  pong: { slices: 117, X: 60, L: 57, M: 0, luts: 275, ffs: 226, warnings: 0 },
-  stopwatch: { slices: 84, X: 42, L: 42, M: 0, luts: 178, ffs: 200, warnings: 0 },
-  clock: { slices: 87, X: 36, L: 51, M: 0, luts: 161, ffs: 174, warnings: 0 },
+  blinky: { slices: 53, X: 24, L: 29, M: 0, luts: 102, ffs: 130, warnings: 0 },
+  pong: { slices: 111, X: 58, L: 53, M: 0, luts: 270, ffs: 207, warnings: 0 },
+  stopwatch: { slices: 85, X: 43, L: 42, M: 0, luts: 181, ffs: 201, warnings: 0 },
+  clock: { slices: 81, X: 35, L: 46, M: 0, luts: 152, ffs: 158, warnings: 0 },
   vga: { slices: 52, X: 22, L: 30, M: 0, luts: 129, ffs: 56, warnings: 0 },
   isqrt: { slices: 30, X: 17, L: 13, M: 0, luts: 74, ffs: 86, warnings: 0 },
   uart: { slices: 52, X: 33, L: 19, M: 0, luts: 140, ffs: 138, warnings: 0 },
@@ -285,7 +285,7 @@ const EXAMPLE_PACK = {
 };
 // with LUT combining (combine: 'area'): the slices, never more than without, and the same warnings (isqrt: 29 when
 // the combining came before the storage elements, which then filled the slices it emptied again, #2636)
-const EXAMPLE_AREA = { gates: 1, traffic: 31, blinky: 52, pong: 107, stopwatch: 81, clock: 82, vga: 49, isqrt: 28, uart: 49, micro80: 61 };
+const EXAMPLE_AREA = { gates: 1, traffic: 31, blinky: 52, pong: 102, stopwatch: 80, clock: 76, vga: 49, isqrt: 28, uart: 49, micro80: 61 };
 // map's packing of the same netlists on ISE (packages/silinx-fpga/research/s6/measured/night1.json, night 1): its SLICELs are the packer's
 // (the carry chains and the wide multiplexers); its SLICEX are a placement's, more (packages/silinx-fpga/research/s6/README.md)
 test('the packer\'s SLICELs are those of ISE\'s map on the same netlists, every example on the Nexys3 and the Atlys (night 1)', () => {

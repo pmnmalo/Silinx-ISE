@@ -67,7 +67,7 @@
     },
     {
       "name": "ticks",
-      "width": 8,
+      "width": 7,
       "init": "0"
     }
   ],

@@ -26,7 +26,7 @@ test('synthGoal: Fast, Area, Speed of the two ISE properties; every project befo
 });
 
 // the examples' sizes (Spartan-3E, Normal; LUTs): the usual mapping's, Speed's. Neither is always the smaller.
-const USUAL_SPEED = { traffic: [110, 106], stopwatch: [224, 196], clock: [207, 215], pong: [282, 282] };
+const USUAL_SPEED = { traffic: [110, 106], stopwatch: [226, 224], clock: [199, 208], pong: [261, 261] };
 for (const [name, [usualLuts, speedLuts]] of Object.entries(USUAL_SPEED)) {
   test(`Area's synthesis of ${name}: the usual mapping (FAST_SYNTH, one mapping) and Speed's, the smaller kept`, async () => {
     const ex = example(name);

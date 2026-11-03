@@ -44,7 +44,7 @@
 --   cnt_s : 20 bits, reset 0
 --   deb_s : 1 bit, reset 0
 --   level : 3 bits, reset 5
---   ticks : 8 bits, reset 0
+--   ticks : 7 bits, reset 0
 --==============================================================================
 
 library ieee;
@@ -87,7 +87,7 @@ architecture rtl of speed_ctrl is
     signal cnt_s, cnt_s_next : std_logic_vector(19 downto 0) := "00000000000000000000";
     signal deb_s, deb_s_next : std_logic := '0';
     signal level, level_next : std_logic_vector(2 downto 0) := "101";
-    signal ticks, ticks_next : std_logic_vector(7 downto 0) := "00000000";
+    signal ticks, ticks_next : std_logic_vector(6 downto 0) := "0000000";
 
     -- input synchronisers (2 flip-flops)
     signal faster_meta, faster_sync : std_logic := '0';
@@ -107,7 +107,7 @@ begin
                 cnt_s <= "00000000000000000000";
                 deb_s <= '0';
                 level <= "101";
-                ticks <= "00000000";
+                ticks <= "0000000";
                 faster_meta <= '0';
                 faster_sync <= '0';
                 slower_meta <= '0';
@@ -190,7 +190,7 @@ begin
         step_next <= '0';
         if tick = '1' then
             if unsigned(ticks) >= (shift_left(to_unsigned(1, 32), to_integer(unsigned(level))) - 1) then
-                ticks_next <= "00000000";
+                ticks_next <= "0000000";
                 step_next <= '1';
             else
                 ticks_next <= std_logic_vector(unsigned(ticks) + 1);
