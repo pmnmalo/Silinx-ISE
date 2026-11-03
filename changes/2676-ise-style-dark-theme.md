@@ -10,7 +10,7 @@ In detail:
   ISE look (`web/css/ise-dark.css`): the menu bar, the toolbars, the panes and their captions, Processes, the console,
   the dialogs and wizards, the HDL editor, the schematic, FSM, ASM, Petri net and truth table editors, SSim, the board
   emulator, iMPACT and the pin planner; the dark tokens and the documents' dark rules of `silinx.css` shared by both
-  looks. The dark contrast scan runs in the interface the UI tests run in. Tests: test/ui/silinx.test.js,
-  test/ui/dark-contrast.test.js.
+  looks. The dark contrast scan runs in the interface the UI tests run in; the theme leaves the interface parity test's
+  allow-list (#2450). Tests: test/ui/silinx.test.js, test/ui/dark-contrast.test.js, test/ui/interface-parity.test.js.
 - **The ISE style interface, light: the disabled menu items and a selected tree row's twisty readable (#2678):** they
   were below a contrast of 3 (2.4 and 1.4). Test: test/ui/dark-contrast.test.js.
