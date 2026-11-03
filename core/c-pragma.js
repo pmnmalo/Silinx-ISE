@@ -10,6 +10,7 @@
 //   tripcountArgs(a LOOP_TRIPCOUNT's text) -> { min?, max?, avg? }: its values' texts
 //   dependenceOf(pragma) -> { variable, inter, raw, war } of a DEPENDENCE saying a dependence is false, else null (#1961)
 //   unrollBy(loop, n) -> the loop with n copies of its body (a 'for'), each after the first if its condition holds
+//   constArgs(pragma, value) -> its numeric arguments given by constants (factor=N) their values, in place (#2750)
 
 import { checkOpPragma } from './c-op-pragmas.js';
 
@@ -43,6 +44,23 @@ export function readPragma(rest) {
   for (const a of m[2].matchAll(/(\w+)\s*(?:=\s*("[^"]*"|[^\s,]+))?/g)) args[a[1].toLowerCase()] = a[2] === undefined ? true : a[2].replace(/^"|"$/g, '');
   return { name: m[1].toUpperCase(), args, text: rest.trim() };
 }
+
+// the arguments a number gives (#2750)
+const NUMERIC = new Set(['factor', 'ii', 'dim', 'depth', 'latency', 'limit', 'min', 'max', 'avg', 'distance',
+  'max_read_burst_length', 'max_write_burst_length', 'num_read_outstanding', 'num_write_outstanding', 'max_widen_bitwidth']);
+/** A pragma's numeric arguments given by constants, as Vitis HLS takes them (`const int N = 4;` … `factor=N`, an enum's, a
+ *  constant expression's): their values, in place; a name that is no constant kept, in the pragma's `notConst` (#2750).
+ *  value(text) -> the BigInt of a constant expression, or null. */
+export function constArgs(p, value) {
+  for (const [k, v] of Object.entries(p.args)) {
+    if (!NUMERIC.has(k) || typeof v !== 'string' || /^-?\d+$/.test(v)) continue;
+    const n = value(v);
+    if (n !== null) p.args[k] = String(n);
+    else if (/^[A-Za-z_]\w*$/.test(v)) (p.notConst ??= {})[k] = v;
+  }
+}
+/** `'N' is not a constant: ` of an argument a name that is no constant, else '' (#2750). */
+const notConst = (p, k) => (p.notConst?.[k] !== undefined ? `'${p.notConst[k]}' is not a constant: ` : '');
 
 /** A LOOP_TRIPCOUNT's min= / max= / avg= from its text, each value the text up to the next key, spaces included
  *  (`max = c_dim * c_dim`, Vitis HLS's examples, #1921): { min?, max?, avg? }. */
@@ -81,7 +99,8 @@ function checkImpl({ args }, loc, report, fn) {
   else if (implOf({ args }) === null) report(loc, `#pragma HLS BIND_STORAGE impl=${impl}: the Spartan-3E has none: a block RAM made`, 'warning');
 }
 /** A STREAM's warnings: what it does in a DATAFLOW region is a stream's depth (core/c-processes.js). */
-function checkStream({ args }, loc, report, fn) {
+function checkStream(p, loc, report, fn) {
+  const { args } = p;
   const v = args.variable, type = String(args.type ?? '').toLowerCase();
   if (!v) { report(loc, '#pragma HLS STREAM needs variable=<the stream or the array>'); return; }
   const inRegion = fn?.body?.items.some((s) => s.kind === 'pragma' && (s.pragma.name === 'DATAFLOW' || s.pragma.name === 'TASK'));
@@ -91,7 +110,7 @@ function checkStream({ args }, loc, report, fn) {
   if (!inRegion) { report(loc, `#pragma HLS STREAM variable=${v}: outside a DATAFLOW region: no effect: nothing runs at once to fill a FIFO`, 'warning'); return; }
   if (kind === 'array') { if (args.off === undefined && type !== 'pipo') report(loc, `#pragma HLS STREAM variable=${v}${type ? ` type=${type}` : ''}: not made: a local array stays a buffer (PIPO): its readers start once its writer is done`, 'warning'); return; }
   if (type && type !== 'fifo') report(loc, `#pragma HLS STREAM variable=${v} type=${type}: not made: a stream is a FIFO`, 'warning');
-  if (args.depth !== undefined && !/^\d+$/.test(String(args.depth))) report(loc, `#pragma HLS STREAM depth=${args.depth}: not a whole number: its default depth made`, 'warning');
+  if (args.depth !== undefined && !/^\d+$/.test(String(args.depth))) report(loc, `#pragma HLS STREAM depth=${args.depth}: ${notConst(p, 'depth') || 'not a whole number: '}its default depth made`, 'warning');
 }
 const LOOP_ONLY = new Set(['PIPELINE', 'UNROLL', 'LOOP_TRIPCOUNT', 'LOOP_FLATTEN']);
 
@@ -118,8 +137,8 @@ export function checkPragmas(ast, funcs, report, top = null) {
       else report(loc, `#pragma HLS ${name} applies to the loop it is in (first in its body): ignored here`, 'warning');
       return;
     }
-    if (name === 'UNROLL' && args.factor !== undefined && !posInt(args.factor)) report(loc, `#pragma HLS UNROLL factor=${args.factor}: the factor must be a whole number, 1 or more`);
-    if (name === 'PIPELINE' && args.ii !== undefined && !posInt(args.ii)) report(loc, `#pragma HLS PIPELINE II=${args.ii}: II must be a whole number, 1 or more`);
+    if (name === 'UNROLL' && args.factor !== undefined && !posInt(args.factor)) report(loc, `#pragma HLS UNROLL factor=${args.factor}: ${notConst(p, 'factor')}the factor must be a whole number, 1 or more`);
+    if (name === 'PIPELINE' && args.ii !== undefined && !posInt(args.ii)) report(loc, `#pragma HLS PIPELINE II=${args.ii}: ${notConst(p, 'ii')}II must be a whole number, 1 or more`);
     if (name === 'AGGREGATE' && args.compact !== undefined && !['bit', 'byte', 'none', 'auto'].includes(String(args.compact).toLowerCase())) report(loc, `#pragma HLS AGGREGATE compact=${args.compact} is not one of bit, byte, none and auto: ignored (its default made)`, 'warning');
     if (name === 'INLINE') { const other = Object.keys(args).find((k) => k !== 'off' && k !== 'recursive'); if (other) report(loc, `#pragma HLS INLINE ${other}: not one of off and recursive: ignored`, 'warning'); }
     if (name === 'STREAM') { checkStream(p, loc, report, funcs.get(fname)); return; }
@@ -134,9 +153,9 @@ export function checkPragmas(ast, funcs, report, top = null) {
       if (!args.variable) { report(loc, `#pragma HLS ${name} needs variable=<the array>`); return; }
       const type = String(args.type || (args.block ? 'block' : args.cyclic ? 'cyclic' : 'complete')).toLowerCase();
       if (!['complete', 'block', 'cyclic'].includes(type)) report(loc, `#pragma HLS ${name} type=${type} is not one of complete, block and cyclic: ignored`, 'warning');
-      else if (type !== 'complete' && !posInt(args.factor)) report(loc, `#pragma HLS ${name} type=${type} needs factor=N, a whole number, 1 or more: ignored`, 'warning');
+      else if (type !== 'complete' && !posInt(args.factor)) report(loc, `#pragma HLS ${name} type=${type} ${p.notConst?.factor !== undefined ? `factor=${args.factor}: ${notConst(p, 'factor')}it ` : ''}needs factor=N, a whole number, 1 or more: ignored`, 'warning');
       else if (type !== 'complete' && String(args.dim) === '0') report(loc, `#pragma HLS ${name} type=${type} dim=0 is not made yet: ignored (name its dimension, dim=1 and up)`, 'warning');
-      if (args.dim !== undefined && !/^\d+$/.test(String(args.dim))) report(loc, `#pragma HLS ${name} dim=${args.dim}: the dimension must be a whole number: ignored`, 'warning');
+      if (args.dim !== undefined && !/^\d+$/.test(String(args.dim))) report(loc, `#pragma HLS ${name} dim=${args.dim}: ${notConst(p, 'dim')}the dimension must be a whole number: ignored`, 'warning');
     }
     if (name === 'BIND_STORAGE') {
       if (!args.variable) { report(loc, '#pragma HLS BIND_STORAGE needs variable=<the array>'); return; }

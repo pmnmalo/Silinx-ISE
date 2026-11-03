@@ -82,7 +82,7 @@ test('#1961 STREAM: its depth in a DATAFLOW region; another type, an array, or o
   assert.deepEqual(m(`${P}STREAM variable=s depth=8`), []);
   assert.deepEqual(m(`${P}STREAM variable=s type=fifo depth=8`), []);
   assert.deepEqual(m(`${P}STREAM variable=s type=shared`), ['#pragma HLS STREAM variable=s type=shared: not made: a stream is a FIFO']);
-  assert.deepEqual(m(`${P}STREAM variable=s depth=x`), ['#pragma HLS STREAM depth=x: not a whole number: its default depth made']);
+  assert.deepEqual(m(`${P}STREAM variable=s depth=x`), ["#pragma HLS STREAM depth=x: 'x' is not a constant: its default depth made"]);
   assert.deepEqual(m(`${P}STREAM variable=b type=pipo`), []);
   assert.deepEqual(m(`${P}STREAM variable=b off`), []);
   assert.deepEqual(m(`${P}STREAM variable=b depth=4`), ['#pragma HLS STREAM variable=b: not made: a local array stays a buffer (PIPO): its readers start once its writer is done']);

@@ -192,7 +192,7 @@ int main(void) { return f(4) != 12; }
   assert.deepEqual(said('#pragma HLS ARRAY_PARTITION variable=A type=block factor=0')[1], ['3 warning: #pragma HLS ARRAY_PARTITION type=block needs factor=N, a whole number, 1 or more: ignored']);
   assert.deepEqual(said('#pragma HLS ARRAY_PARTITION variable=A type=block factor=2 dim=0')[1], ['3 warning: #pragma HLS ARRAY_PARTITION type=block dim=0 is not made yet: ignored (name its dimension, dim=1 and up)']);
   assert.deepEqual(said('#pragma HLS ARRAY_PARTITION variable=A type=other')[1], ['3 warning: #pragma HLS ARRAY_PARTITION type=other is not one of complete, block and cyclic: ignored']);
-  assert.deepEqual(said('#pragma HLS ARRAY_PARTITION variable=A cyclic factor=2 dim=x')[1], ['3 warning: #pragma HLS ARRAY_PARTITION dim=x: the dimension must be a whole number: ignored']);
+  assert.deepEqual(said('#pragma HLS ARRAY_PARTITION variable=A cyclic factor=2 dim=x')[1], ["3 warning: #pragma HLS ARRAY_PARTITION dim=x: 'x' is not a constant: the dimension must be a whole number: ignored"]);
   // (on a memory: a dimension it does not have, a second pragma)
   const big = 'int A[80]';
   assert.deepEqual(said('#pragma HLS ARRAY_PARTITION variable=A cyclic factor=2 dim=2', big)[1], ["3 warning: #pragma HLS ARRAY_PARTITION dim=2: 'A' has 1 dimension: ignored"]);

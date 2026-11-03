@@ -149,7 +149,7 @@ test('#1529 the pragmas accepted and ignored, unknown, misplaced or wrong: their
   ]);
   assert.deepEqual(msgs('int f(int a) {\n  int s = 0;\n  for (int i = 0; i < 4; i++) {\n#pragma HLS UNROLL factor=0\n#pragma HLS PIPELINE II=x\n    s += a;\n  }\n#pragma HLS ARRAY_PARTITION type=complete\n  return s;\n}'), [
     '4 error: #pragma HLS UNROLL factor=0: the factor must be a whole number, 1 or more',
-    '5 error: #pragma HLS PIPELINE II=x: II must be a whole number, 1 or more',
+    "5 error: #pragma HLS PIPELINE II=x: 'x' is not a constant: II must be a whole number, 1 or more",
     '8 error: #pragma HLS ARRAY_PARTITION needs variable=<the array>',
   ]);
   // a combinational module: its loops unrolled whatever the pragmas, no message
