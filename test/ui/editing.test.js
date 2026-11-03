@@ -190,7 +190,7 @@ uiTest('Check Syntax: errors in the Errors tab with file and line, click jumps t
   await page.waitForSelector('.doc:not([hidden]) .cm-lint-marker-error');
   await page.eval(() => window.Silinx.active.editor.setCursor({ line: 0, ch: 0 }));
   await page.click('#console-errors .diag');
-  await page.waitFor(() => /^Ln 1[67]/.test(document.getElementById('status-pos').textContent));
+  await page.waitFor(() => /^Ln 1[67],/.test(document.querySelector('.doc:not([hidden]) .doc-status .pos')?.textContent));   // (its status line's, #2763)
   // the Warnings tab and the Console tab
   await page.click('#console-tabs .tab[data-page=warnings]');
   await page.waitFor(() => !document.getElementById('console-warnings').hidden);

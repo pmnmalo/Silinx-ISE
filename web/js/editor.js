@@ -26,6 +26,7 @@ import { esc } from './dom.js';
 import { mountCompletion } from './editor-complete.js';
 import { cSnippets } from './c-templates.js';
 import { exprShort, typeText } from '/core/type-text.js';
+import { statusLine } from './status-line.js';
 
 /** A source's Language Templates: an HDL's (SNIPPETS), a C or C++ one's (web/js/c-templates.js, #1855), else none. */
 export const snippetsFor = (lang, path) => (lang === 'c' ? cSnippets(path) : SNIPPETS[lang] || null);
@@ -184,6 +185,14 @@ function parseSource(lang, text, path) {
 }
 
 // ------------------------------------------------------------------ editor factory
+// a text editor's status line (#2763): { el, show(pos) }, the cursor's line and column (0-based pos) and the language
+function cursorStatus(lang, path) {
+  const name = { vhdl: 'VHDL', verilog: /\.sv$/i.test(path) ? 'SystemVerilog' : 'Verilog', ucf: 'UCF',
+    c: /\.(cpp|cc|cxx|hpp|hh)$/i.test(path) ? 'C++' : 'C' }[lang] || 'Text';
+  const st = statusLine();
+  return { el: st.el, show: (p) => st.set([{ text: `Ln ${p.line + 1}, Col ${p.ch + 1}`, cls: 'pos' }, name]) };
+}
+
 export function createEditor(container, { text = '', lang = 'verilog', path = '', readOnly = false, project = () => null, onChange, onSave, onGotoDefinition, onCursor, onRename, onFix } = {}) {
   // (onChange({ user }): user says whether the change was the user's own in the editor, #534)
   let parsed = { units: [], errors: [] }, syms = new Map(), parsedDoc = null;   // (parsedDoc: the text parsed)
@@ -199,6 +208,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
   };
   const lineText = line => (line >= 0 && line < view.state.doc.lines ? view.state.doc.line(line + 1).text : '');
   const getCursor = () => posOf(view.state.selection.main.head);
+  const status = cursorStatus(lang, path), showPos = () => status.show(getCursor());   // (the caller puts it under the editor)
   const setCursor = pos => view.dispatch({ selection: { anchor: offsetOf(pos) }, scrollIntoView: true });
   const posAt = (x, y) => { const off = view.posAtCoords({ x, y }, false); return posOf(off); };
   const lineAtY = y => view.state.doc.lineAt(view.lineBlockAtHeight(y - view.documentTop).from).number - 1;
@@ -358,14 +368,14 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
             // snippet of theirs; false: written by setValue, as a command or an Undo of the project writes)
             onChange?.({ user: u.transactions.some(tr => !!tr.annotation(Transaction.userEvent)) });
           }
-          if (u.selectionSet) { const p = getCursor(); onCursor?.(p.line + 1, p.ch + 1); }
+          if (u.selectionSet) { const p = getCursor(); showPos(); onCursor?.(p.line + 1, p.ch + 1); }
         }),
       ],
     }),
   });
   let changeTimer = null;
   let cleanDoc = view.state.doc;
-  reparse();
+  reparse(); showPos();
   // another language: the editor's own texts, and the help of the lint messages
   const offLang = onLanguageChange(() => { view.dispatch({ effects: phrasing.reconfigure(EditorState.phrases.of(phrases())) }); lintNow(); });
 
@@ -448,6 +458,7 @@ export function createEditor(container, { text = '', lang = 'verilog', path = ''
 
   return {
     view,
+    status: status.el,   // (its status line's element, #2763)
     getValue: () => view.state.doc.toString(),
     setValue: v => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: v } }),
     focus: () => view.focus(),
