@@ -1,0 +1,100 @@
+// The MCP server's conversions (#2674, server/mcp-convert.js): an HDL module to a schematic (stopwatch, blinky's top),
+// an ASM chart or a state diagram (traffic's state machine, from its HDL), each then the module's base, the test bench
+// passing after it; a state diagram to an ASM chart and back, and to its Boolean algebra; a Verilog module; the
+// converters' refusals.
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { scratchEnv } from './server-helpers.js';
+
+let tmp;
+const { handle } = await import('../server/mcp.js');
+const P = await import('../server/projects.js');
+let id = 0;
+async function call(name, args = {}) {
+  const r = (await handle({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: args } })).result;
+  return { text: r.content[0].text, data: r.structuredContent, isError: r.isError };
+}
+const ok = async (name, args) => { const r = await call(name, args); assert.equal(r.isError, false, r.text); return r; };
+const fails = async (name, args, message) => { const r = await call(name, args); assert.equal(r.isError, true, r.text); assert.equal(r.text, `${name}: ${message}`); };
+const read = (project, f) => fs.readFileSync(path.join(P.projectDir(project), f), 'utf8');
+// the project's test bench: its messages, no warning, not failed
+async function passes(project, time_ns, log) {
+  const s = await ok('simulate', { project, time_ns, signals: [] });
+  assert.deepEqual([s.data.log.map(l => l.text), s.data.warnings, s.data.failed], [log, [], false]);
+}
+
+before(async () => { tmp = await scratchEnv('silinx-mcp-convert-'); });
+after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+test('convert_module to a schematic: stopwatch\'s and blinky\'s top, the schematic their base, the test bench as before', async () => {
+  await ok('new_project_from_example', { name: 's', example: 'stopwatch' });
+  await passes('s', 2000000, ['Simulation finished OK']);
+  const r = await ok('convert_module', { project: 's', module: 'stopwatch', to: 'schematic' });
+  assert.equal(r.text, '\'stopwatch\' converted to the schematic src/stopwatch.sch.json (11 symbols drawn, 5 HDL blocks keeping the HDL that is not drawn): it is now the module\'s base, src/stopwatch.vhd generated from it.');
+  assert.equal(JSON.parse(read('s', 'src/stopwatch.sch.json')).generatedFile, 'src/stopwatch.vhd');
+  assert.match((await ok('check_syntax', { project: 's', simulation: true })).text, /^Process "Check Syntax" of <tb_stopwatch> completed successfully \(\d+ signals, \d+ processes\)\.$/);
+  await passes('s', 2000000, ['Simulation finished OK']);
+  await fails('convert_module', { project: 's', module: 'stopwatch', to: 'asm' }, '\'stopwatch\' is made from src/stopwatch.sch.json already: its file src/stopwatch.vhd is generated from that drawing');
+  await ok('new_project_from_example', { name: 'b', example: 'blinky' });
+  assert.equal((await ok('convert_module', { project: 'b', module: 'top', to: 'schematic' })).text,
+    '\'top\' converted to the schematic src/top.sch.json (15 symbols drawn, 1 HDL block keeping the HDL that is not drawn): it is now the module\'s base, src/top.vhd generated from it.');
+  assert.match((await ok('check_syntax', { project: 'b', simulation: true })).text, /^Process "Check Syntax" of <tb_top> completed successfully \(\d+ signals, \d+ processes\)\.$/);
+});
+
+test('convert_module to a state diagram and to an ASM chart: traffic\'s state machine from its HDL, the test bench as before', async () => {
+  for (const [to, word] of [['fsm', 'state diagram'], ['asm', 'ASM chart']]) {
+    const n = `t_${to}`;
+    await ok('new_project_from_example', { name: n, example: 'traffic' });
+    await ok('delete_file', { project: n, path: 'src/traffic.fsm.json' });
+    const hdl = read(n, 'src/traffic.vhd');
+    const r = await ok('convert_module', { project: n, module: 'traffic', to });
+    assert.equal(r.text, `'traffic' converted to the ${word} src/traffic.${to}.json; it stays in sync with src/traffic.vhd.`);
+    // its HDL file as it was, until the drawing is edited; then made from it
+    assert.equal(read(n, 'src/traffic.vhd'), hdl);
+    const w = await ok('write_file', { project: n, path: `src/traffic.${to}.json`, text: read(n, `src/traffic.${to}.json`) });
+    assert.match(w.text, new RegExp(`\\nsrc/traffic\\.vhd updated from src/traffic\\.${to}\\.json$`));
+    assert.equal((await ok('check_syntax', { project: n, simulation: true })).text, 'Process "Check Syntax" of <tb_traffic> completed successfully (42 signals, 32 processes).');
+    await passes(n, 100000, ['Simulation finished OK']);
+  }
+});
+
+test('convert_drawing: a state diagram to an ASM chart and back, and to its Boolean algebra', async () => {
+  await ok('new_project_from_example', { name: 'd', example: 'traffic' });
+  assert.equal((await ok('convert_drawing', { project: 'd', path: 'src/traffic.fsm.json', to: 'asm' })).text,
+    'State diagram \'src/traffic.fsm.json\' -> ASM chart src/traffic_asm.asm.json (module \'traffic_asm\'; not linked to the diagram).');
+  assert.equal((await ok('convert_drawing', { project: 'd', path: 'src/traffic_asm.asm.json', to: 'fsm' })).text,
+    'ASM chart \'src/traffic_asm.asm.json\' -> state diagram src/traffic_asm_fsm.fsm.json (module \'traffic_asm_fsm\'; not linked to the chart).');
+  // (a second one: a free name)
+  assert.equal((await ok('convert_drawing', { project: 'd', path: 'src/traffic.fsm.json', to: 'asm' })).data.made[0], 'src/traffic_asm2.asm.json');
+  for (const m of ['traffic_asm', 'traffic_asm_fsm']) assert.equal((await ok('check_syntax', { project: 'd', top: m })).text, `Process "Check Syntax" of <${m}> completed successfully (8 signals, 3 processes).`);
+  assert.equal((await ok('convert_drawing', { project: 'd', path: 'src/traffic.fsm.json', to: 'boolean' })).text,
+    'State diagram \'src/traffic.fsm.json\' -> Boolean algebra src/traffic_next.bool.json, src/traffic_out.bool.json (next-state and output logic of the binary encoding; unused codes are don\'t cares).');
+  assert.match((await ok('check_syntax', { project: 'd', top: 'traffic_next' })).text, /^Process "Check Syntax" of <traffic_next> completed successfully/);
+});
+
+test('convert_module: a Verilog state machine to a state diagram and a schematic', async () => {
+  await ok('new_project', { name: 'v' });
+  await ok('write_file', { project: 'v', path: 'src/seq.v', text: 'module seq(input clk, input rst, input x, output y);\n  localparam A = 2\'d0, B = 2\'d1, C = 2\'d2;\n  reg [1:0] s;\n  always @(posedge clk)\n    if (rst) s <= A;\n    else case (s)\n      A: if (x) s <= B;\n      B: if (x) s <= C; else s <= A;\n      C: if (!x) s <= A;\n      default: s <= A;\n    endcase\n  assign y = (s == C);\nendmodule\n' });
+  const f = await ok('convert_module', { project: 'v', module: 'seq', to: 'fsm' });
+  assert.match(f.text, /^'seq' converted to the state diagram src\/seq\.fsm\.json; it stays in sync with src\/seq\.v\./);
+  const d = JSON.parse(read('v', 'src/seq.fsm.json'));
+  assert.deepEqual(d.states.map(s => s.name).sort(), ['A', 'B', 'C']);
+  await ok('write_file', { project: 'v', path: 'src/seq.fsm.json', text: read('v', 'src/seq.fsm.json') });
+  assert.match((await ok('check_syntax', { project: 'v', top: 'seq' })).text, /^Process "Check Syntax" of <seq> completed successfully/);
+  await ok('write_file', { project: 'v', path: 'src/and2.v', text: 'module and2(input a, input b, output y);\n  assign y = a & b;\nendmodule\n' });
+  const s = await ok('convert_module', { project: 'v', module: 'and2', to: 'schematic' });
+  assert.match(s.text, /^'and2' converted to the schematic src\/and2\.sch\.json \(\d+ symbols? drawn, \d+ HDL blocks? keeping the HDL that is not drawn\): it is now the module's base, src\/and2\.v generated from it\.$/);
+  assert.match((await ok('check_syntax', { project: 'v', top: 'and2' })).text, /^Process "Check Syntax" of <and2> completed successfully/);
+});
+
+test('the converters\' refusals', async () => {
+  await fails('convert_module', { project: 's', module: 'debounce', to: 'fsm' }, '\'debounce\' cannot be shown as a state diagram: clocked process at line 22 has no reset: the state register must be reset to the initial state');
+  await fails('convert_module', { project: 'b', module: 'knight', to: 'fsm' }, '\'knight\' cannot be shown as a state diagram: expression at line 34 uses concatenation, which a chart cannot express');
+  await fails('convert_module', { project: 'b', module: 'nosuch', to: 'fsm' }, 'no module \'nosuch\' in the project\'s HDL files');
+  await fails('convert_module', { project: 'b', module: 'knight', to: 'petri' }, 'to: schematic, asm or fsm');
+  await fails('convert_drawing', { project: 'd', path: 'src/traffic.fsm.json', to: 'fsm' }, 'src/traffic.fsm.json: an ASM chart (.asm.json) becomes a state diagram');
+  await fails('convert_drawing', { project: 'd', path: 'src/traffic_asm.asm.json', to: 'boolean' }, 'src/traffic_asm.asm.json: a state diagram (.fsm.json) becomes an ASM chart or Boolean algebra');
+  await fails('convert_drawing', { project: 'd', path: 'src/none.fsm.json', to: 'asm' }, 'no drawing \'src/none.fsm.json\' in the project \'d\'');
+});
