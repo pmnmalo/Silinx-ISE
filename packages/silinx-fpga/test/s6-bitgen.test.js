@@ -110,9 +110,45 @@ test('bitgen: the block RAM\'s frame written again (minor 23 of its column, two 
   const two = bramRewrites({ insts: [tdp, { ...ramb16, name: 's', site: other.r16, tile: other.tile }], nets: [] }, device, dev, fdri);
   const main2 = (columnOf(dev, g0)[0] + 23) * FRAME_WORDS, w2 = (d0 >> 4) - 12;
   assert.deepEqual(two.clears, [[main2 + w2, 0x0001], [main2 + w2 + 15, 0x8000]]);
-  // two block RAMs: not measured
-  assert.match(bramRewrites({ insts: [ramb8, { ...ramb8, name: 's', site: site.r8[1] }], nets: [] }, device, dev, fdri).unknown[0], /^2 block RAMs/);
   assert.deepEqual(bramRewrites({ insts: [], nets: [] }, device, dev, fdri), { rewrites: [], clears: [], unknown: [] });
+});
+
+// (#2679) two or more block RAMs, measured with ISE (research/s6/gen-brams6.mjs; gen-hard6.mjs's designs with every
+// site of a type, up to 232 RAMB8BWERs on the XC6SLX45): one frame written again per column and row with a RAMB8BWER,
+// in the frames' order, every RAMB8BWER's two bits cleared in it; none for the RAMB16BWERs, each one's bits cleared
+// in the frame data
+test('bitgen: several block RAMs, one frame written again per column and row with a RAMB8BWER, their bits cleared in it, none named as not measured (#2679)', () => {
+  const brams = s6Sites(device).brams, fdri = emptyFdri(dev).slice().fill(0xffff);
+  const at = b => { const [f0, b0] = gridRegion(device, dev, b.tile); return { main: (columnOf(dev, f0)[0] + 23) * FRAME_WORDS, w: (b0 >> 4) - 12 }; };
+  const r8 = (b, k = 0) => ({ name: `r8_${b.r8[k]}`, type: 'RAMB8BWER', site: b.r8[k], tile: b.tile, placed: true, cfg: cfg({ RAM_MODE: 'TDP' }) });
+  const r16 = b => ({ name: `r16_${b.r16}`, type: 'RAMB16BWER', site: b.r16, tile: b.tile, placed: true, cfg: [] });
+  const cleared = x => [...x.words].flatMap((v, i) => (v !== 0xffff ? [[i, v]] : []));
+  const [a, b] = brams, other = brams.find(x => at(x).main !== at(a).main);
+  // both sites of a tile: one frame, its two bits cleared once
+  const tile = bramRewrites({ insts: [r8(a, 0), r8(a, 1)], nets: [] }, device, dev, fdri);
+  assert.deepEqual([tile.rewrites.length, tile.unknown, tile.clears], [1, [], []]);
+  assert.deepEqual(cleared(tile.rewrites[0]), [[at(a).w, 0xfffd], [at(a).w + 15, 0xbfff]]);
+  // two tiles of one column and row: one frame, both tiles' bits cleared
+  assert.equal(at(b).main, at(a).main);
+  const col = bramRewrites({ insts: [r8(b), r8(a)], nets: [] }, device, dev, fdri);
+  assert.deepEqual([col.rewrites.length, col.unknown], [1, []]);
+  assert.deepEqual(cleared(col.rewrites[0]), [a, b].flatMap(x => [[at(x).w, 0xfffd], [at(x).w + 15, 0xbfff]]).sort((x, y) => x[0] - y[0]));
+  // two columns or rows: a frame each, in the frames' order whatever the instances' order
+  const two = bramRewrites({ insts: [r8(other), r8(a)], nets: [] }, device, dev, fdri);
+  assert.deepEqual(two.rewrites.map(x => x.far[1]), [23, 23]);
+  assert.ok(two.rewrites[0].far[0] < two.rewrites[1].far[0]);
+  assert.deepEqual(two.rewrites.map(x => cleared(x)[0][0]), [at(a), at(other)].sort((x, y) => x.main - y.main).map(x => x.w));
+  // a RAMB16BWER beside a RAMB8BWER in its column and row: the RAMB8BWER's frame alone, the RAMB16BWER's bits cleared in
+  // the frame data and in that frame too (ISE's mix-col, mix-3); one in another column: in the frame data only
+  const mix = bramRewrites({ insts: [r8(a), r16(b), r16(other)], nets: [] }, device, dev, fdri);
+  assert.deepEqual([mix.rewrites.length, mix.unknown], [1, []]);
+  assert.deepEqual(cleared(mix.rewrites[0]), [[at(b).w, 0xfffe], [at(a).w, 0xfffd], [at(b).w + 15, 0x7fff], [at(a).w + 15, 0xbfff]].sort((x, y) => x[0] - y[0]));
+  assert.deepEqual(mix.clears, [b, other].map(at).flatMap(({ main, w }) => [[main + w, 0x0001], [main + w + 15, 0x8000]]));
+  // a RAMB8BWER on every site (gen-hard6.mjs's RAMB8BWER-base on the XC6SLX16): ISE's bitgen writes 8 frames again, at
+  // these addresses (FAR_MAJ, minor 23)
+  const all = bramRewrites({ insts: brams.flatMap(x => [r8(x, 0), r8(x, 1)]), nets: [] }, device, dev, fdri);
+  assert.deepEqual(all.rewrites.map(x => x.far[0].toString(16)), ['4', '16', '104', '116', '204', '216', '304', '316']);
+  assert.deepEqual(all.unknown, []);
 });
 
 test('bitgen: a design\'s .bit, its frame data the empty device\'s with the design\'s bits; a DCM named as not measured', () => {

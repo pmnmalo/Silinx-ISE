@@ -26,11 +26,13 @@ test('lutEquation: the sum of the ones or the complement of the zeros, constant 
   assert.equal(lutEquation([1, 1], ['A1']), '1');
 });
 
-const SLICE_ATTR = /^([A-D](6LUT|5LUT|FF|FFMUX|FFSRINIT|5FF|5FFSRINIT|OUTMUX|USED|CY0)|CLKINV|CEUSED|SRUSED|SYNC_ATTR|CARRY4|PRECYINIT|COUTUSED|F7AMUX|F7BMUX|F8MUX|_GND_SOURCE|_VCC_SOURCE)$/;
+const SLICE_ATTR = /^([A-D](6LUT|5LUT|FF|FFMUX|FFSRINIT|5FF|5FFSRINIT|OUTMUX|USED|CY0|6RAMMODE|5RAMMODE|DI1MUX)|WEMUX|CLKINV|CEUSED|SRUSED|SYNC_ATTR|CARRY4|PRECYINIT|COUTUSED|F7AMUX|F7BMUX|F8MUX|_GND_SOURCE|_VCC_SOURCE)$/;
 // the values of the slices' elements in ISE's primitive definitions (night 1's device reports)
 const VALUES = {
   FF: /^(#OFF|#FF|#LATCH|#AND2L)$/, FFMUX: /^(#OFF|O6|O5|[A-D]X|F7|F8|CY|XOR)$/, FFSRINIT: /^(#OFF|SRINIT[01])$/, '5FFSRINIT': /^(#OFF|SRINIT[01])$/,
   OUTMUX: /^(#OFF|[A-D]5Q|O5|O6|XOR|CY|F7|F8)$/, USED: /^(#OFF|0)$/, CY0: /^(O5|[A-D]X)$/, '5FF': /^$/,
+  // a SLICEM's distributed RAM (micro80's register bank, #2679)
+  '6RAMMODE': /^(SPRAM32|SRL32|DPRAM32|SPRAM64|DPRAM64|SRL16)$/, '5RAMMODE': /^(SPRAM32|SRL32|DPRAM32|SRL16)$/, DI1MUX: /^([A-D]X|BDI1|[B-D]MC31)$/,
 };
 
 test('every example as placed XDL on both parts: every LUT\'s equation its INIT, the configurations ISE\'s, the XDL read back, the pins the sites\'', { timeout: 600000 }, async () => {

@@ -43,7 +43,7 @@ export const micro80S3eWarnings = srcDir => [
   ...['fetch', 'halt', 'inta', 'inte', 'rd', 'vma'].map(port => `WARNING:Xst:753 - "${srcDir}/micro80_top.vhd" line 61: Unconnected output port '${port}' of component 'light8080'.`),
 ];
 
-/** On the Spartan-6 (the Nexys3, through ISE's project flow only: Silinx's toolchain does not build it there yet): XST's
+/** On the Spartan-6 (the Nexys3 through ISE's project flow; both boards in test/ise/examples.test.js, #2679): XST's
  *  (fewer than the Spartan-3E's: no unused signals or ports reported, int_pending and inta_reg the other way round), and
  *  map's and par's on the register bank's distributed RAM, an output with no load, and the program's block RAM. */
 export const MICRO80_S6_WARNINGS = [

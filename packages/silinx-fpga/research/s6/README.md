@@ -800,7 +800,14 @@ Recorded here because the work was planned without the author's answers (2026-10
   word w + 15 (w the first word of the four switch boxes' rows the block RAM's tile spans, its tile's band less 12
   words), then a pad frame; measured with one RAMB8BWER (stopwatch, both boards). A RAMB16BWER (#2130: the open
   synthesis's inferred memories since, stopwatch on both boards): no frame written again, bit 0 of word w and bit 15 of
-  word w + 15 cleared in the frame data itself. Two block RAMs are named as not measured.
+  word w + 15 cleared in the frame data itself. **Several block RAMs** (#2679: `gen-brams6.mjs`, two and three block
+  RAMs of each type and mixed, in one tile, one column and row, two columns, two rows, on both parts; and `gen-hard6.mjs`'s
+  designs with every site of a type, up to 232 RAMB8BWERs): one frame written again per column and row with a
+  RAMB8BWER, in the frames' order, WCFG before the first only, each RAMB8BWER tile's two bits cleared in it and the
+  RAMB16BWERs' of that column and row too; none for the RAMB16BWERs, even 116. Byte-identical with ISE's bitgen: the
+  XC6SLX16's 13 designs and 68 of `gen-hard6.mjs`, micro80 as the open flow routes it on the Nexys3 and the Atlys. The
+  XC6SLX45's no-net designs differ by the `outside` bits only (minors 16 to 19 of frame 8411's column, word 32, as in
+  the `gen-hard6.mjs` designs: in no design with nets).
 - **Against ISE's bitgen** (`check-bitgen6.mjs`: each routed XDL written with the header and options of ISE's own
   .bit): night 1's 14 examples on both boards, CRC on and off, **28 of 28 byte-identical**. Of the 86 CMT designs, 30
   identical; the others are the clock managers' gaps (#2025), and a DCM or PLL is now always named as not measured,
@@ -909,6 +916,7 @@ Silinx toolchain's Spartan-6 bitstream writer reads them there.
 | `check-bitgen6.mjs` | The Silinx toolchain's .bit of each routed XDL against ISE's bitgen's, byte for byte (#732) |
 | `fit-model6.mjs` | The timing model of the Silinx toolchain fitted on routed designs: `packages/silinx-fpga/src/fpga/s6/timing-model.js` (#732) |
 | `gen-hard6.mjs` | The block RAM's and DSP48A1's designs: base, ids, variants, contents by code, width pairs (#728) |
+| `gen-brams6.mjs` | Two and three block RAMs, each type and mixed, in one column and row or two: the frames bitgen writes again (#2679) |
 | `ana-hard6.mjs` | Their bits: `db/<device>-hard.json`; `--pins`: the clock pins' from designs ISE implemented (#728) |
 | `hard6.mjs` | A block RAM's or DSP48A1's bits from its settings, pins and contents (`residual6.mjs`, #728) |
 | `gen-iologic6.mjs` | The I/O logic's route-throughs on every site (they set no bits without a net) (#727) |

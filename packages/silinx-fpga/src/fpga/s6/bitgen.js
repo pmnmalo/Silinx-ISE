@@ -153,9 +153,11 @@ export function predictDesign(design, device, dev, db) {
 
 /**
  * The frames bitgen writes again after the frame data (#724, #728, measured on a design with one RAMB8BWER, stopwatch
- * on both boards): minor 23 of the block RAM's column in its row, as in the frame data but for two bits it clears
- * (bit 1 of word w, bit 14 of word w + 15, counting from the word's lowest; w the first word of the four switch boxes' rows the block RAM's tile
- * spans), then a frame of pad (all ones). A RAMB16BWER: no frame written again; one with no RAM_MODE in its settings
+ * on both boards; #2679, with two, three and every site's, alone and beside RAMB16BWERs): for each column and row with a
+ * RAMB8BWER, in the frames' order, minor 23 of that column in that row, as in the frame data but for two bits it clears
+ * per RAMB8BWER's tile (bit 1 of word w, bit 14 of word w + 15, counting from the word's lowest; w the first word of
+ * the four switch boxes' rows the tile spans) and those its RAMB16BWERs have cleared, then a frame of pad (all ones);
+ * WCFG before the first only (writeBit6). A RAMB16BWER: no frame written again; one with no RAM_MODE in its settings
  * (Silinx's XDL, #2130: stopwatch's on both boards) has the same words' other bits cleared in the frame data itself
  * (bit 0 of word w, bit 15 of word w + 15: RAM_MODE=SP's bits), one with RAM_MODE::TDP (ISE's map's, #2586) keeps
  * them. { rewrites: [{ far, words }], clears: [[the frame data's word, its bits cleared]], unknown: [what was not
@@ -163,20 +165,25 @@ export function predictDesign(design, device, dev, db) {
  */
 export function bramRewrites(design, device, dev, fdri) {
   const brams = design.insts.filter(i => /^RAMB(8|16)BWER$/.test(i.type) && i.placed), unknown = [];
-  if (!brams.length) return { rewrites: [], clears: [], unknown };
-  if (brams.length > 1) unknown.push(`${brams.length} block RAMs: the frame bitgen writes again measured with one`);
   // the frame of minor 23 of a block RAM's column, the first word of its tile's rows there
   const at = b => { const [f0, b0] = gridRegion(device, dev, b.tile); return { f0, main: (columnOf(dev, f0)[0] + 23) * FRAME_WORDS, w: (b0 >> 4) - 12 }; };
   const clears = brams.filter(b => b.type === 'RAMB16BWER' && !b.cfg.some(c => c.attr === 'RAM_MODE')).map(at).flatMap(({ main, w }) => [[main + w, 0x0001], [main + w + 15, 0x8000]]);
-  if (brams[0].type === 'RAMB16BWER') return { rewrites: [], clears, unknown };
-  const { f0, main, w } = at(brams[0]), row = Math.floor(f0 / dev.rowFrames), [c0] = columnOf(dev, f0);
-  let column = 0;
-  for (let f = row * dev.rowFrames; f < c0; f += dev.columns[column]) column++;
-  const words = new Uint16Array(2 * FRAME_WORDS).fill(0xffff);
-  words.set(fdri.subarray(main, main + FRAME_WORDS), 0);
-  words[w] &= ~0x0002;
-  words[w + 15] &= ~0x4000;
-  return { rewrites: [{ far: [(row << 8) | column, 23], words }], clears, unknown };
+  const frames = new Map();
+  for (const b of brams.filter(b => b.type === 'RAMB8BWER')) {
+    const { f0, main, w } = at(b);
+    (frames.get(main) ?? frames.set(main, { f0, ws: new Set() }).get(main)).ws.add(w);
+  }
+  const rewrites = [...frames].sort((a, b) => a[0] - b[0]).map(([main, { f0, ws }]) => {
+    const row = Math.floor(f0 / dev.rowFrames), [c0] = columnOf(dev, f0);
+    let column = 0;
+    for (let f = row * dev.rowFrames; f < c0; f += dev.columns[column]) column++;
+    const words = new Uint16Array(2 * FRAME_WORDS).fill(0xffff);
+    words.set(fdri.subarray(main, main + FRAME_WORDS), 0);
+    for (const [i, m] of clears) if (i >= main && i < main + FRAME_WORDS) words[i - main] &= ~m;
+    for (const w of ws) { words[w] &= ~0x0002; words[w + 15] &= ~0x4000; }
+    return { far: [(row << 8) | column, 23], words };
+  });
+  return { rewrites, clears, unknown };
 }
 
 /**
